@@ -113,7 +113,7 @@ export default function Layout() {
           add('/comprovantes/upload', 'Upload Comprovantes', HiOutlineCloudArrowUp);
           add('/comprovantes/pendentes', 'Comprovantes Pendentes', HiOutlineReceiptRefund);
         }
-        if (isAdminGEO) add('/usuarios', 'Usu�rios', HiOutlineUsers);
+        if (isAdminGEO) add('/usuarios', 'Usu\u00E1rios', HiOutlineUsers);
         if (isAdminGEO) add('/gestao-contratos', 'Gestão de Contratos', HiOutlineBanknotes);
         add('/perfil', 'Meu Perfil', HiOutlineCog6Tooth);
         break;
@@ -125,7 +125,7 @@ export default function Layout() {
         add('/solicitacoes-arquivadas', 'Arquivadas', HiOutlineFolderOpen);
         add('/comprovantes/upload', 'Upload Comprovantes', HiOutlineCloudArrowUp);
         add('/comprovantes/pendentes', 'Comprovantes Pendentes', HiOutlineReceiptRefund);
-        add('/usuarios', 'Usuários', HiOutlineUsers);
+        add('/usuarios', 'Usu\u00E1rios', HiOutlineUsers);
         add('/obras', 'Obras', HiOutlineBuildingOffice2);
         add('/setores', 'Setores', HiOutlineAdjustmentsHorizontal);
         add('/cargos', 'Cargos', HiOutlineFolderOpen);
@@ -294,4 +294,5 @@ function MenuItem({ to, label, icon: Icon, active, onSelect, collapsed }) {
     </li>
   );
 }
+
 
