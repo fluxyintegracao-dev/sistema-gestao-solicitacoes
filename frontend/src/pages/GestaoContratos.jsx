@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { fileUrl } from '../services/api';
+import { API_URL, authHeaders, fileUrl } from '../services/api';
 import { getMinhasObras, getObras } from '../services/obras';
 import {
   atualizarContrato,
@@ -243,6 +243,68 @@ export default function GestaoContratos() {
 
   function removerArquivoModal(index) {
     setUploadAnexos(prev => prev.filter((_, i) => i !== index));
+  }
+
+  async function obterUrlAssinada(caminhoArquivo) {
+    if (!caminhoArquivo) return null;
+    if (!String(caminhoArquivo).startsWith('http')) {
+      return fileUrl(caminhoArquivo);
+    }
+
+    try {
+      const res = await fetch(
+        `${API_URL}/anexos/presign?url=${encodeURIComponent(caminhoArquivo)}`,
+        { headers: authHeaders() }
+      );
+      if (!res.ok) throw new Error('Falha ao assinar URL');
+      const data = await res.json();
+      return data?.url || caminhoArquivo;
+    } catch (error) {
+      console.error(error);
+      return caminhoArquivo;
+    }
+  }
+
+  async function visualizarAnexoContrato(caminhoArquivo) {
+    try {
+      const urlArquivo = await obterUrlAssinada(caminhoArquivo);
+      if (!urlArquivo) {
+        alert('Arquivo inválido.');
+        return;
+      }
+      window.open(urlArquivo, '_blank', 'noopener,noreferrer');
+    } catch (error) {
+      console.error(error);
+      alert('Erro ao visualizar anexo.');
+    }
+  }
+
+  async function baixarAnexoContrato(caminhoArquivo, nomeArquivo) {
+    try {
+      const urlArquivo = await obterUrlAssinada(caminhoArquivo);
+      if (!urlArquivo) {
+        alert('Arquivo inválido.');
+        return;
+      }
+
+      const response = await fetch(urlArquivo);
+      if (!response.ok) {
+        throw new Error('Falha ao baixar arquivo');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = nomeArquivo || 'anexo';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error(error);
+      alert('Erro ao baixar anexo.');
+    }
   }
 
   function renderFiltros() {
@@ -621,20 +683,22 @@ export default function GestaoContratos() {
                   </span>
                   <div className="flex items-center gap-3 whitespace-nowrap">
                     <a
-                      href={fileUrl(anexo.caminho_arquivo)}
-                      target="_blank"
-                      rel="noreferrer"
+                      href="#"
+                      onClick={async e => {
+                        e.preventDefault();
+                        await visualizarAnexoContrato(anexo.caminho_arquivo);
+                      }}
                       className="text-blue-600 hover:underline"
                     >
                       Visualizar
                     </a>
-                    <a
-                      href={fileUrl(anexo.caminho_arquivo)}
-                      download={anexo.nome_original || true}
+                    <button
+                      type="button"
+                      onClick={() => baixarAnexoContrato(anexo.caminho_arquivo, anexo.nome_original)}
                       className="text-green-600 hover:underline"
                     >
                       Baixar
-                    </a>
+                    </button>
                   </div>
                 </div>
               ))}
