@@ -479,14 +479,22 @@ export default function NovaSolicitacao() {
               className="input"
               required
               value={form.area_responsavel}
+              disabled={!form.obra_id}
             >
-              <option value="">Selecione</option>
+              <option value="">
+                {form.obra_id ? 'Selecione' : 'Selecione a obra primeiro'}
+              </option>
               {setoresFiltrados.map(s => (
                 <option key={s.id} value={s.codigo}>
                   {s.nome}
                 </option>
               ))}
             </select>
+            {!form.obra_id && (
+              <span className="text-xs text-gray-500">
+                Selecione a obra para habilitar a área responsável.
+              </span>
+            )}
           </label>
 
           <label className="grid gap-1 text-sm">
