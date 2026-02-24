@@ -57,6 +57,19 @@ export function ThemeProvider({ children }) {
   }, []);
 
   useEffect(() => {
+    function recarregarAoFocar() {
+      carregar();
+    }
+
+    window.addEventListener('focus', recarregarAoFocar);
+    document.addEventListener('visibilitychange', recarregarAoFocar);
+    return () => {
+      window.removeEventListener('focus', recarregarAoFocar);
+      document.removeEventListener('visibilitychange', recarregarAoFocar);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!tema?.palette) return;
     const root = document.documentElement;
     root.style.setProperty('--c-bg', tema.palette.bg);

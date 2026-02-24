@@ -1361,13 +1361,6 @@ module.exports = {
         return res.status(404).json({ error: 'Solicitacao nao encontrada' });
       }
 
-      const solicitacaoBrape = await isSolicitacaoBrape(solicitacao);
-      if (solicitacaoBrape) {
-        return res.status(403).json({
-          error: 'Solicitacoes do setor BRAPE nao podem ser enviadas para outros setores.'
-        });
-      }
-
       const acessoObra = await validarAcessoObra(req, solicitacao);
       if (!acessoObra) {
         return res.status(403).json({
