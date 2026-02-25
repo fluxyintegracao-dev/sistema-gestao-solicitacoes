@@ -1933,11 +1933,18 @@ module.exports = {
         });
       }
 
-      await SolicitacaoVisibilidadeUsuario.upsert({
-        solicitacao_id: id,
-        usuario_id: usuarioId,
-        oculto: true
-      });
+      const [linhasAfetadas] = await SolicitacaoVisibilidadeUsuario.update(
+        { oculto: true },
+        { where: { solicitacao_id: id, usuario_id: usuarioId } }
+      );
+
+      if (!linhasAfetadas) {
+        await SolicitacaoVisibilidadeUsuario.create({
+          solicitacao_id: id,
+          usuario_id: usuarioId,
+          oculto: true
+        });
+      }
 
       return res.sendStatus(204);
 
@@ -1979,11 +1986,17 @@ module.exports = {
           continue;
         }
 
-        await SolicitacaoVisibilidadeUsuario.upsert({
-          solicitacao_id: id,
-          usuario_id: usuarioId,
-          oculto: true
-        });
+        const [linhasAfetadas] = await SolicitacaoVisibilidadeUsuario.update(
+          { oculto: true },
+          { where: { solicitacao_id: id, usuario_id: usuarioId } }
+        );
+        if (!linhasAfetadas) {
+          await SolicitacaoVisibilidadeUsuario.create({
+            solicitacao_id: id,
+            usuario_id: usuarioId,
+            oculto: true
+          });
+        }
         resultado.sucesso += 1;
       }
 
@@ -2066,11 +2079,10 @@ module.exports = {
         });
       }
 
-      await SolicitacaoVisibilidadeUsuario.upsert({
-        solicitacao_id: id,
-        usuario_id: usuarioId,
-        oculto: false
-      });
+      await SolicitacaoVisibilidadeUsuario.update(
+        { oculto: false },
+        { where: { solicitacao_id: id, usuario_id: usuarioId } }
+      );
 
       return res.sendStatus(204);
     } catch (error) {
