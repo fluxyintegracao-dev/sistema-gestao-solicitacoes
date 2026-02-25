@@ -298,6 +298,19 @@ export default function NovaSolicitacao() {
       return;
     }
 
+    const datasParaValidar = [
+      { valor: form.data_vencimento, label: 'Data de vencimento' },
+      { valor: form.data_inicio_medicao, label: 'Data inicial da medição' },
+      { valor: form.data_fim_medicao, label: 'Data final da medição' }
+    ];
+    for (const item of datasParaValidar) {
+      if (!item.valor) continue;
+      if (String(item.valor) < String(hojeInput)) {
+        alert(`${item.label} não pode ser menor que a data atual.`);
+        return;
+      }
+    }
+
     const payload = {
       ...form,
       contrato_id: form.contrato_id || null,
@@ -388,7 +401,8 @@ export default function NovaSolicitacao() {
     return lista;
   }, [setores, isSetorObra, areasObra, destinosPermitidosPorSetorOrigem]);
   const contratosDisponiveis = contratosRef.length > 0 ? contratosRef : contratos;
-  const hojeInput = new Date().toISOString().slice(0, 10);
+  const hoje = new Date();
+  const hojeInput = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-${String(hoje.getDate()).padStart(2, '0')}`;
   const tiposFiltradosPorSetor = useMemo(() => {
     const setorKey = String(form.area_responsavel || '').trim().toUpperCase();
     if (!setorKey) return [];
@@ -646,6 +660,7 @@ export default function NovaSolicitacao() {
                 onChange={handleChange}
                 className="input"
                 value={form.data_inicio_medicao}
+                min={hojeInput}
                 required
               />
             </label>
@@ -657,6 +672,7 @@ export default function NovaSolicitacao() {
                 onChange={handleChange}
                 className="input"
                 value={form.data_fim_medicao}
+                min={hojeInput}
                 required
               />
             </label>
