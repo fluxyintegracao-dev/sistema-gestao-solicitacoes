@@ -65,3 +65,21 @@ export async function getContratoAnexos(id) {
   if (!res.ok) throw new Error('Erro ao buscar anexos do contrato');
   return res.json();
 }
+
+export async function importarContratosEmMassa(file) {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const res = await fetch(`${API_URL}/contratos/importar-massa`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: formData
+  });
+
+  const data = await res.json().catch(() => null);
+  if (!res.ok) {
+    throw new Error(data?.error || 'Erro ao importar contratos em massa');
+  }
+
+  return data;
+}

@@ -12,6 +12,80 @@ const {
 } = require('../models');
 const { uploadToS3 } = require('../services/s3');
 
+function normalizarCabecalho(valor) {
+  return String(valor || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+}
+
+function parseCsvLine(line, delimiter) {
+  const values = [];
+  let current = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i += 1) {
+    const char = line[i];
+    const next = line[i + 1];
+
+    if (char === '"') {
+      if (inQuotes && next === '"') {
+        current += '"';
+        i += 1;
+        continue;
+      }
+      inQuotes = !inQuotes;
+      continue;
+    }
+
+    if (char === delimiter && !inQuotes) {
+      values.push(current);
+      current = '';
+      continue;
+    }
+
+    current += char;
+  }
+
+  values.push(current);
+  return values;
+}
+
+function parseCsv(content) {
+  const texto = String(content || '').replace(/^\uFEFF/, '');
+  const linhas = texto
+    .split(/\r?\n/)
+    .map(l => l.replace(/\r$/, ''))
+    .filter(l => l.trim() !== '');
+
+  if (linhas.length < 2) return { headers: [], rows: [] };
+
+  const first = linhas[0];
+  const semicolonCount = (first.match(/;/g) || []).length;
+  const commaCount = (first.match(/,/g) || []).length;
+  const delimiter = semicolonCount >= commaCount ? ';' : ',';
+
+  const headers = parseCsvLine(first, delimiter).map(h => h.trim());
+  const rows = linhas.slice(1).map(line => parseCsvLine(line, delimiter));
+  return { headers, rows };
+}
+
+function parseValorMonetario(valor) {
+  if (valor === null || valor === undefined) return null;
+  const texto = String(valor).trim();
+  if (!texto) return null;
+  const numero = Number(
+    texto
+      .replace(/[R$\s]/gi, '')
+      .replace(/\./g, '')
+      .replace(',', '.')
+  );
+  return Number.isNaN(numero) ? null : numero;
+}
+
 async function isAdminGEO(req) {
   const perfil = String(req.user?.perfil || '').trim().toUpperCase();
   if (perfil !== 'ADMIN' && perfil !== 'SUPERADMIN') return false;
@@ -157,6 +231,137 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return res.status(500).json({ error: 'Erro ao criar contrato' });
+    }
+  },
+
+  async importarMassa(req, res) {
+    try {
+      const podeAcessar = await isAdminGEO(req);
+      const perfil = String(req.user?.perfil || '').trim().toUpperCase();
+      if (!podeAcessar || perfil !== 'SUPERADMIN') {
+        return res.status(403).json({ error: 'Apenas SUPERADMIN pode importar contratos em massa.' });
+      }
+
+      const file = req.file;
+      if (!file) {
+        return res.status(400).json({ error: 'Envie um arquivo CSV no campo "file".' });
+      }
+
+      const nomeArquivo = String(file.originalname || '').toLowerCase();
+      if (!nomeArquivo.endsWith('.csv')) {
+        return res.status(400).json({ error: 'Formato inválido. Utilize a planilha modelo em CSV.' });
+      }
+
+      const conteudo = file.buffer.toString('utf8');
+      const { headers, rows } = parseCsv(conteudo);
+      if (!headers.length) {
+        return res.status(400).json({ error: 'Arquivo CSV vazio ou sem cabeçalho.' });
+      }
+
+      const headerMap = headers.map(normalizarCabecalho);
+      const idxContrato = headerMap.findIndex(h => ['contrato'].includes(h));
+      const idxCodigoObra = headerMap.findIndex(h => ['codigo', 'codigo_obra'].includes(h));
+      const idxRef = headerMap.findIndex(h => ['ref_do_contrato', 'ref_contrato'].includes(h));
+      const idxDescricao = headerMap.findIndex(h => ['descricao'].includes(h));
+      const idxItens = headerMap.findIndex(h => ['itens_de_apropriacao', 'itens_apropriacao'].includes(h));
+      const idxSolicitado = headerMap.findIndex(h => ['solicitado', 'valor_total'].includes(h));
+
+      const camposObrigatorios = [
+        ['Contrato', idxContrato],
+        ['Codigo', idxCodigoObra],
+        ['Ref. do Contrato', idxRef],
+        ['Solicitado', idxSolicitado]
+      ];
+      const faltando = camposObrigatorios.filter(([, idx]) => idx < 0).map(([nome]) => nome);
+      if (faltando.length > 0) {
+        return res.status(400).json({
+          error: `Cabeçalhos obrigatórios ausentes: ${faltando.join(', ')}`
+        });
+      }
+
+      const obras = await Obra.findAll({
+        attributes: ['id', 'codigo', 'nome']
+      });
+      const obraMap = new Map();
+      obras.forEach(obra => {
+        const codigo = String(obra.codigo || '').trim().toUpperCase();
+        if (codigo) obraMap.set(codigo, obra);
+      });
+
+      const resultado = {
+        total_linhas: rows.length,
+        importados: 0,
+        ignorados: 0,
+        erros: []
+      };
+
+      for (let i = 0; i < rows.length; i += 1) {
+        const row = rows[i];
+        const linhaPlanilha = i + 2;
+
+        const codigoContrato = String(row[idxContrato] ?? '').trim();
+        const codigoObra = String(row[idxCodigoObra] ?? '').trim();
+        const refContrato = String(row[idxRef] ?? '').trim();
+        const descricao = idxDescricao >= 0 ? String(row[idxDescricao] ?? '').trim() : '';
+        const itensApropriacao = idxItens >= 0 ? String(row[idxItens] ?? '').trim() : '';
+        const valorTotal = parseValorMonetario(row[idxSolicitado]);
+
+        if (!codigoContrato && !codigoObra && !refContrato && (row.join('').trim() === '')) {
+          resultado.ignorados += 1;
+          continue;
+        }
+
+        if (!codigoContrato || !codigoObra || !refContrato || valorTotal === null) {
+          resultado.erros.push({
+            linha: linhaPlanilha,
+            error: 'Campos obrigatórios inválidos (Contrato, Codigo, Ref. do Contrato, Solicitado).'
+          });
+          continue;
+        }
+
+        const obra = obraMap.get(codigoObra.toUpperCase());
+        if (!obra) {
+          resultado.erros.push({
+            linha: linhaPlanilha,
+            error: `Obra não encontrada para o código "${codigoObra}".`
+          });
+          continue;
+        }
+
+        const existente = await Contrato.findOne({
+          where: {
+            obra_id: obra.id,
+            codigo: codigoContrato
+          },
+          attributes: ['id']
+        });
+
+        if (existente) {
+          resultado.erros.push({
+            linha: linhaPlanilha,
+            error: `Contrato "${codigoContrato}" já existe para a obra "${obra.nome}".`
+          });
+          continue;
+        }
+
+        await Contrato.create({
+          obra_id: obra.id,
+          codigo: codigoContrato,
+          ref_contrato: refContrato,
+          descricao: descricao || null,
+          itens_apropriacao: itensApropriacao || null,
+          valor_total: valorTotal,
+          ajuste_solicitado: 0,
+          ajuste_pago: 0
+        });
+
+        resultado.importados += 1;
+      }
+
+      return res.json(resultado);
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao importar contratos em massa' });
     }
   },
 

@@ -295,6 +295,7 @@ router.get('/contratos/resumo', ContratoController.resumo);
 router.get('/contratos/:id/solicitacoes', ContratoController.solicitacoes);
 router.get('/contratos/:id/anexos', ContratoController.listarAnexos);
 router.post('/contratos', ContratoController.create);
+router.post('/contratos/importar-massa', permit(['SUPERADMIN']), uploadComprovantes.single('file'), ContratoController.importarMassa);
 router.post('/contratos/:id/anexos', uploadComprovantes.array('files'), ContratoController.uploadAnexos);
 router.patch('/contratos/:id', ContratoController.update);
 router.patch('/contratos/:id/ativar', ContratoController.ativar);

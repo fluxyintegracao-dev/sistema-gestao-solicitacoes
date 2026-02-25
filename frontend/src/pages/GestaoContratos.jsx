@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { HiArrowDownTray, HiArrowUpTray } from 'react-icons/hi2';
 import { useAuth } from '../contexts/AuthContext';
 import { API_URL, authHeaders, fileUrl } from '../services/api';
 import { getMinhasObras, getObras } from '../services/obras';
@@ -8,6 +9,7 @@ import {
   getContratoAnexos,
   getContratos,
   getContratosResumo,
+  importarContratosEmMassa,
   uploadContratoAnexos
 } from '../services/contratos';
 
@@ -36,6 +38,7 @@ export default function GestaoContratos() {
   const [modalAnexos, setModalAnexos] = useState(null);
   const [anexos, setAnexos] = useState([]);
   const [uploadAnexos, setUploadAnexos] = useState([]);
+  const [importandoContratos, setImportandoContratos] = useState(false);
 
   const setorTokens = [
     String(user?.setor?.nome || '').toUpperCase(),
@@ -234,6 +237,67 @@ export default function GestaoContratos() {
     } catch (error) {
       console.error(error);
       alert('Erro ao enviar anexos.');
+    }
+  }
+
+  function baixarModeloImportacaoContratos() {
+    const linhas = [
+      ['Contrato', 'Codigo', 'Ref. do Contrato', 'Descrição', 'Itens de Apropriação', 'Solicitado'],
+      ['CT/PE001-7', '7', 'EXEMPLO REF CONTRATO', 'Descrição do contrato', 'APR001; APR002', '15000,00']
+    ];
+
+    const csv = linhas
+      .map(colunas => colunas.map(v => `"${String(v).replace(/"/g, '""')}"`).join(';'))
+      .join('\r\n');
+
+    const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'modelo-importacao-contratos.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+  }
+
+  async function onSelecionarArquivoImportacao(e) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+
+    if (!String(file.name || '').toLowerCase().endsWith('.csv')) {
+      alert('Utilize o arquivo modelo em CSV para importar os contratos.');
+      return;
+    }
+
+    if (!confirm(`Importar contratos em massa usando o arquivo "${file.name}"?`)) {
+      return;
+    }
+
+    try {
+      setImportandoContratos(true);
+      const resultado = await importarContratosEmMassa(file);
+      await carregar();
+
+      const importados = Number(resultado?.importados || 0);
+      const ignorados = Number(resultado?.ignorados || 0);
+      const erros = Array.isArray(resultado?.erros) ? resultado.erros : [];
+
+      if (erros.length > 0) {
+        const resumoErros = erros
+          .slice(0, 5)
+          .map(item => `Linha ${item.linha}: ${item.error}`)
+          .join('\n');
+        alert(`Importados: ${importados}. Ignorados: ${ignorados}. Erros: ${erros.length}.\n${resumoErros}${erros.length > 5 ? '\n...' : ''}`);
+      } else {
+        alert(`Importação concluída. Importados: ${importados}. Ignorados: ${ignorados}.`);
+      }
+    } catch (error) {
+      console.error(error);
+      alert(error?.message || 'Erro ao importar contratos em massa.');
+    } finally {
+      setImportandoContratos(false);
     }
   }
 
@@ -440,6 +504,39 @@ export default function GestaoContratos() {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold">Gestão de Contratos</h1>
+
+      {user?.perfil === 'SUPERADMIN' && (
+        <div className="bg-white rounded-xl shadow p-4 flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            className="btn btn-outline px-3"
+            onClick={baixarModeloImportacaoContratos}
+            title="Baixar planilha modelo de importação"
+            aria-label="Baixar planilha modelo de importação"
+          >
+            <HiArrowDownTray className="w-4 h-4" />
+          </button>
+
+          <label
+            className={`btn btn-outline px-3 cursor-pointer ${importandoContratos ? 'opacity-60 pointer-events-none' : ''}`}
+            title="Importar contratos em massa (.csv)"
+            aria-label="Importar contratos em massa"
+          >
+            <HiArrowUpTray className="w-4 h-4" />
+            <input
+              type="file"
+              accept=".csv,text/csv"
+              className="hidden"
+              onChange={onSelecionarArquivoImportacao}
+              disabled={importandoContratos}
+            />
+          </label>
+
+          <span className="text-sm text-gray-600">
+            Modelo CSV (abre no Excel): Contrato, Código da obra, Ref. do Contrato, Descrição, Itens de Apropriação e Solicitado.
+          </span>
+        </div>
+      )}
 
       <form
         onSubmit={handleCriarContrato}
