@@ -5,23 +5,34 @@ import { API_URL, authHeaders, fileUrl } from '../../services/api';
 export default function Timeline({ historicos, canRemoveAnexo = false, onAnexoRemovido }) {
   const [preview, setPreview] = useState(null);
 
+  function normalizarUrlArquivo(url) {
+    const valor = String(url || '');
+    if (!valor.startsWith('http')) return valor;
+
+    // Corrige anexos antigos salvos com "%" literal no nome (ex.: "%%20"),
+    // evitando URL inválida antes de pedir a URL assinada.
+    return valor.replace(/%(?![0-9A-Fa-f]{2})/g, '%25');
+  }
+
   async function obterUrlAssinada(caminhoArquivo) {
     if (!caminhoArquivo) return null;
     if (!String(caminhoArquivo).startsWith('http')) {
       return fileUrl(caminhoArquivo);
     }
 
+    const caminhoNormalizado = normalizarUrlArquivo(caminhoArquivo);
+
     try {
       const res = await fetch(
-        `${API_URL}/anexos/presign?url=${encodeURIComponent(caminhoArquivo)}`,
+        `${API_URL}/anexos/presign?url=${encodeURIComponent(caminhoNormalizado)}`,
         { headers: authHeaders() }
       );
       if (!res.ok) throw new Error('Falha ao assinar URL');
       const data = await res.json();
-      return data?.url || caminhoArquivo;
+      return data?.url || caminhoNormalizado;
     } catch (error) {
       console.error(error);
-      return caminhoArquivo;
+      return caminhoNormalizado;
     }
   }
 

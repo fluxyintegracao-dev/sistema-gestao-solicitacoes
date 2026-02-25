@@ -28,7 +28,14 @@ function getKeyFromUrl(url) {
     const parsed = new URL(url);
     if (!parsed.hostname.startsWith(`${bucket}.s3`)) return null;
     const rawKey = parsed.pathname.replace(/^\//, '');
-    return decodeURIComponent(rawKey);
+    try {
+      return decodeURIComponent(rawKey);
+    } catch {
+      // Alguns anexos antigos podem ter "%" literal no nome do arquivo.
+      // Escapa apenas "%" inválidos para permitir decodificação sem quebrar a URL.
+      const sanitizedKey = rawKey.replace(/%(?![0-9A-Fa-f]{2})/g, '%25');
+      return decodeURIComponent(sanitizedKey);
+    }
   } catch (error) {
     return null;
   }
