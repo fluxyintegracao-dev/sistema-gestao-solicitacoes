@@ -64,3 +64,21 @@ export async function alterarSenhaAtual({ senha_atual, senha_nova }) {
     throw new Error(data?.error || 'Erro ao alterar senha');
   }
 }
+
+export async function importarUsuariosEmMassa(file) {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const res = await fetch(`${API_URL}/usuarios/importar-massa`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: formData
+  });
+
+  const data = await res.json().catch(() => null);
+  if (!res.ok) {
+    throw new Error(data?.error || 'Erro ao importar usuários em massa');
+  }
+
+  return data;
+}

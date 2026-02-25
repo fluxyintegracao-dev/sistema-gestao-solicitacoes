@@ -187,6 +187,7 @@ router.post(
 router.get('/usuarios', allowGestaoUsuarios, UsuarioController.index);
 router.get('/usuarios/:id', allowGestaoUsuarios, UsuarioController.show);
 router.post('/usuarios', allowGestaoUsuarios, UsuarioController.create);
+router.post('/usuarios/importar-massa', allowGestaoUsuarios, uploadComprovantes.single('file'), UsuarioController.importarMassa);
 router.put('/usuarios/:id', allowGestaoUsuarios, UsuarioController.update);
 router.patch('/usuarios/me/senha', UsuarioController.alterarSenha);
 router.patch('/usuarios/:id/ativar', allowGestaoUsuarios, UsuarioController.ativar);

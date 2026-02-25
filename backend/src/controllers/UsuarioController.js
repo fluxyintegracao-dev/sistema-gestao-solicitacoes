@@ -15,6 +15,80 @@ function podeDefinirPerfilSuperadmin(req, perfilDestino) {
   return perfilSolicitante === 'SUPERADMIN';
 }
 
+function normalizarTexto(valor) {
+  return String(valor || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+}
+
+function normalizarCabecalho(valor) {
+  return normalizarTexto(valor)
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+}
+
+function parseCsvLine(line, delimiter) {
+  const values = [];
+  let current = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i += 1) {
+    const char = line[i];
+    const next = line[i + 1];
+
+    if (char === '"') {
+      if (inQuotes && next === '"') {
+        current += '"';
+        i += 1;
+        continue;
+      }
+      inQuotes = !inQuotes;
+      continue;
+    }
+
+    if (char === delimiter && !inQuotes) {
+      values.push(current);
+      current = '';
+      continue;
+    }
+
+    current += char;
+  }
+
+  values.push(current);
+  return values;
+}
+
+function parseCsv(content) {
+  const texto = String(content || '').replace(/^\uFEFF/, '');
+  const linhas = texto
+    .split(/\r?\n/)
+    .map(l => l.replace(/\r$/, ''))
+    .filter(l => l.trim() !== '');
+
+  if (linhas.length < 2) return { headers: [], rows: [] };
+
+  const first = linhas[0];
+  const semicolonCount = (first.match(/;/g) || []).length;
+  const commaCount = (first.match(/,/g) || []).length;
+  const delimiter = semicolonCount >= commaCount ? ';' : ',';
+
+  const headers = parseCsvLine(first, delimiter).map(h => h.trim());
+  const rows = linhas.slice(1).map(line => parseCsvLine(line, delimiter));
+  return { headers, rows };
+}
+
+function splitObrasCell(valor) {
+  const texto = String(valor || '').trim();
+  if (!texto) return [];
+  return texto
+    .split(/[|,;]/)
+    .map(v => String(v || '').trim())
+    .filter(Boolean);
+}
+
 module.exports = {
 
   // =====================================================
@@ -293,6 +367,185 @@ module.exports = {
       return res.status(500).json({
         error: 'Erro ao desativar usuário'
       });
+    }
+  },
+
+  async importarMassa(req, res) {
+    try {
+      const file = req.file;
+      if (!file) {
+        return res.status(400).json({ error: 'Envie um arquivo CSV no campo "file".' });
+      }
+
+      const nomeArquivo = String(file.originalname || '').toLowerCase();
+      if (!nomeArquivo.endsWith('.csv')) {
+        return res.status(400).json({ error: 'Formato inválido. Utilize a planilha modelo em CSV.' });
+      }
+
+      const { headers, rows } = parseCsv(file.buffer.toString('utf8'));
+      if (!headers.length) {
+        return res.status(400).json({ error: 'Arquivo CSV vazio ou sem cabeçalho.' });
+      }
+
+      const headerMap = headers.map(normalizarCabecalho);
+      const idxNome = headerMap.findIndex(h => h === 'nome');
+      const idxEmail = headerMap.findIndex(h => h === 'email');
+      const idxCargo = headerMap.findIndex(h => h === 'cargo');
+      const idxSetor = headerMap.findIndex(h => h === 'setor');
+      const idxObras = headerMap.findIndex(h => h === 'obras');
+      const idxSenha = headerMap.findIndex(h => h === 'senha');
+      const idxPerfil = headerMap.findIndex(h => h === 'perfil');
+
+      const obrigatorios = [
+        ['Nome', idxNome],
+        ['Email', idxEmail],
+        ['Cargo', idxCargo],
+        ['Setor', idxSetor],
+        ['Senha', idxSenha]
+      ];
+      const faltando = obrigatorios.filter(([, idx]) => idx < 0).map(([nome]) => nome);
+      if (faltando.length > 0) {
+        return res.status(400).json({
+          error: `Cabeçalhos obrigatórios ausentes: ${faltando.join(', ')}`
+        });
+      }
+
+      const [cargos, setores, obras] = await Promise.all([
+        Cargo.findAll({ attributes: ['id', 'nome'] }),
+        Setor.findAll({ attributes: ['id', 'nome', 'codigo'] }),
+        Obra.findAll({ attributes: ['id', 'nome', 'codigo'] })
+      ]);
+
+      const cargoMap = new Map();
+      cargos.forEach(c => {
+        cargoMap.set(normalizarTexto(c.nome), c);
+        cargoMap.set(String(c.id), c);
+      });
+
+      const setorMap = new Map();
+      setores.forEach(s => {
+        setorMap.set(normalizarTexto(s.nome), s);
+        setorMap.set(normalizarTexto(s.codigo), s);
+        setorMap.set(String(s.id), s);
+      });
+
+      const obraMap = new Map();
+      obras.forEach(o => {
+        obraMap.set(normalizarTexto(o.codigo), o);
+        obraMap.set(normalizarTexto(o.nome), o);
+        obraMap.set(String(o.id), o);
+        if (o.codigo && o.nome) {
+          obraMap.set(normalizarTexto(`${o.codigo} - ${o.nome}`), o);
+        }
+      });
+
+      const resultado = {
+        total_linhas: rows.length,
+        importados: 0,
+        ignorados: 0,
+        erros: []
+      };
+
+      for (let i = 0; i < rows.length; i += 1) {
+        const row = rows[i];
+        const linha = i + 2;
+
+        const nome = String(row[idxNome] ?? '').trim();
+        const email = String(row[idxEmail] ?? '').trim().toLowerCase();
+        const cargoRaw = String(row[idxCargo] ?? '').trim();
+        const setorRaw = String(row[idxSetor] ?? '').trim();
+        const obrasRaw = String(idxObras >= 0 ? (row[idxObras] ?? '') : '').trim();
+        const senhaRaw = String(row[idxSenha] ?? '').trim();
+        const perfilRaw = idxPerfil >= 0 ? String(row[idxPerfil] ?? '').trim() : '';
+        const perfil = (perfilRaw || 'USUARIO').toUpperCase();
+
+        if (![nome, email, cargoRaw, setorRaw, senhaRaw, obrasRaw].some(Boolean)) {
+          resultado.ignorados += 1;
+          continue;
+        }
+
+        if (!nome || !email || !cargoRaw || !setorRaw || !senhaRaw) {
+          resultado.erros.push({
+            linha,
+            error: 'Campos obrigatórios inválidos (Nome, Email, Cargo, Setor, Senha).'
+          });
+          continue;
+        }
+
+        if (!podeDefinirPerfilSuperadmin(req, perfil)) {
+          resultado.erros.push({
+            linha,
+            error: 'Apenas SUPERADMIN pode importar usuário com perfil SUPERADMIN.'
+          });
+          continue;
+        }
+
+        const cargo = cargoMap.get(normalizarTexto(cargoRaw));
+        const setor = setorMap.get(normalizarTexto(setorRaw));
+        if (!cargo || !setor) {
+          resultado.erros.push({
+            linha,
+            error: `Cargo ou setor não encontrado (${cargoRaw} / ${setorRaw}).`
+          });
+          continue;
+        }
+
+        const emailExistente = await User.findOne({ where: { email } });
+        if (emailExistente) {
+          resultado.erros.push({
+            linha,
+            error: `Email já cadastrado: ${email}`
+          });
+          continue;
+        }
+
+        const obrasTokens = splitObrasCell(obrasRaw);
+        const obrasIds = [];
+        let obraInvalida = null;
+        for (const token of obrasTokens) {
+          const obra = obraMap.get(normalizarTexto(token));
+          if (!obra) {
+            obraInvalida = token;
+            break;
+          }
+          if (!obrasIds.includes(obra.id)) {
+            obrasIds.push(obra.id);
+          }
+        }
+        if (obraInvalida) {
+          resultado.erros.push({
+            linha,
+            error: `Obra não encontrada: ${obraInvalida}`
+          });
+          continue;
+        }
+
+        const senhaHash = await bcrypt.hash(senhaRaw, 10);
+        const usuario = await User.create({
+          nome,
+          email,
+          senha: senhaHash,
+          cargo_id: cargo.id,
+          setor_id: setor.id,
+          perfil,
+          ativo: true
+        });
+
+        for (const obra_id of obrasIds) {
+          await UsuarioObra.create({
+            user_id: usuario.id,
+            obra_id,
+            perfil
+          });
+        }
+
+        resultado.importados += 1;
+      }
+
+      return res.json(resultado);
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao importar usuários em massa' });
     }
   },
 
