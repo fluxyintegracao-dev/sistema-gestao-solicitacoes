@@ -583,9 +583,6 @@ module.exports = {
 
       const isSetorObra = await isUsuarioSetorObra(req);
       const isUsuarioGeo = await isUsuarioSetorGeo(req);
-      if (isSetorObra && obrasVinculadas.length === 0) {
-        return res.json([]);
-      }
 
       const setorTokens = [
         setorAtual?.codigo,
@@ -714,6 +711,17 @@ module.exports = {
           where[Op.and].push({ area_responsavel: { [Op.notIn]: brapeTokensTodos } });
         }
         where[Op.and].push({ area_responsavel: { [Op.notLike]: 'BRAPE%' } });
+      }
+
+      // Setor OBRA (ADMIN e USUARIO): ve apenas solicitacoes criadas por ele
+      // e/ou das obras vinculadas ao usuario. Superadmin continua com visao global.
+      if (isSetorObra && perfil !== 'SUPERADMIN') {
+        const condicoesObra = [{ criado_por: usuarioId }];
+        if (obrasVinculadas.length > 0) {
+          condicoesObra.push({ obra_id: { [Op.in]: obrasVinculadas } });
+        }
+        where[Op.and] = where[Op.and] || [];
+        where[Op.and].push({ [Op.or]: condicoesObra });
       }
 
       // SUPERADMIN ve tudo; demais passam por regra de visibilidade
