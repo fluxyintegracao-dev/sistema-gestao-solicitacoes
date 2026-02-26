@@ -22,9 +22,14 @@ export default function ModalAtribuirResponsavel({
   }, []);
 
   async function carregarUsuarios() {
-    const res = await fetch(`${API_URL}/usuarios`, {
+    const res = await fetch(`${API_URL}/usuarios/opcoes-atribuicao`, {
       headers: authHeaders()
     });
+
+    if (!res.ok) {
+      setUsuarios([]);
+      return;
+    }
 
     const data = await res.json();
     const lista = Array.isArray(data) ? data : [];

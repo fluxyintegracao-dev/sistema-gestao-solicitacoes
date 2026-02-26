@@ -132,6 +132,39 @@ module.exports = {
     }
   },
 
+  async opcoesAtribuicao(req, res) {
+    try {
+      const setorId = req.user?.setor_id;
+
+      if (!setorId) {
+        return res.status(400).json({ error: 'Usuario sem setor vinculado' });
+      }
+
+      const usuarios = await User.findAll({
+        attributes: { exclude: ['senha'] },
+        where: {
+          setor_id: setorId,
+          ativo: true
+        },
+        include: [
+          {
+            model: UsuarioObra,
+            as: 'vinculos',
+            attributes: ['id', 'obra_id', 'user_id']
+          }
+        ],
+        order: [['nome', 'ASC']]
+      });
+
+      return res.json(usuarios);
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({
+        error: 'Erro ao listar usuarios para atribuicao'
+      });
+    }
+  },
+
   // =====================================================
   // DETALHE USUÃRIO
   // =====================================================

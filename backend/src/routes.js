@@ -185,6 +185,7 @@ router.post(
 // -------------------------------------------------------------------
 
 router.get('/usuarios', allowGestaoUsuarios, UsuarioController.index);
+router.get('/usuarios/opcoes-atribuicao', UsuarioController.opcoesAtribuicao);
 router.get('/usuarios/:id', allowGestaoUsuarios, UsuarioController.show);
 router.post('/usuarios', allowGestaoUsuarios, UsuarioController.create);
 router.post('/usuarios/importar-massa', allowGestaoUsuarios, uploadComprovantes.single('file'), UsuarioController.importarMassa);

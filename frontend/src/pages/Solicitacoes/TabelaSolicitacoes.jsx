@@ -267,10 +267,11 @@ export default function TabelaSolicitacoes({
 
       <div
         ref={bottomScrollRef}
-        className="overflow-x-auto overflow-y-hidden border-t border-gray-200 dark:border-slate-700 h-4"
+        className="overflow-x-scroll overflow-y-hidden border-t border-gray-200 dark:border-slate-700 h-5 scrollbar-thin"
+        style={{ scrollbarGutter: 'stable both-edges' }}
         aria-label="Rolagem horizontal da tabela"
       >
-        <div style={{ width: `${totalTableWidth}px`, height: '1px' }} />
+        <div style={{ width: `${totalTableWidth}px`, height: '14px' }} />
       </div>
     </div>
   );
