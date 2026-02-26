@@ -1421,7 +1421,7 @@ module.exports = {
           }
         ],
         order: [
-          [{ model: Historico, as: 'historicos' }, 'createdAt', 'ASC']
+          [{ model: Historico, as: 'historicos' }, 'createdAt', 'DESC']
         ]
       });
 
