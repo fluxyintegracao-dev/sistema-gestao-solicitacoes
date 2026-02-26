@@ -581,7 +581,7 @@ module.exports = {
       });
       const obrasVinculadas = vinculos.map(v => v.obra_id);
 
-      const isSetorObra = await isUsuarioSetorObra(req);
+      const isSetorObra = await isSetorObraGeral(req);
       const isUsuarioGeo = await isUsuarioSetorGeo(req);
 
       const setorTokens = [
