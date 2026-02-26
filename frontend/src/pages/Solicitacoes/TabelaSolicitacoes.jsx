@@ -85,29 +85,7 @@ export default function TabelaSolicitacoes({
   }, [columns]);
 
   useEffect(() => {
-    function ajustarParaTela() {
-      const containerWidth = tableWrapRef.current?.clientWidth;
-      if (!containerWidth) return;
-
-      const fixedTotal = columns.reduce((acc, col) => acc + (col.fixed ? col.width : 0), 0);
-      const flexible = columns.filter(col => !col.fixed);
-      const totalWeight = flexible.reduce((acc, col) => acc + col.weight, 0);
-      const available = Math.max(containerWidth - fixedTotal, 0);
-
-      const nextWidths = columns.map(col => {
-        if (col.fixed) return col.width;
-        const target = totalWeight > 0
-          ? Math.floor((available * col.weight) / totalWeight)
-          : col.width;
-        return Math.max(col.width, target);
-      });
-
-      setWidths(nextWidths);
-    }
-
-    ajustarParaTela();
-    window.addEventListener('resize', ajustarParaTela);
-    return () => window.removeEventListener('resize', ajustarParaTela);
+    setWidths(columns.map(col => col.width));
   }, [columns]);
 
   const totalTableWidth = useMemo(
