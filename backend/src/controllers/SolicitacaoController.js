@@ -1440,7 +1440,7 @@ module.exports = {
 
       const isUsuarioGeo = await isUsuarioSetorGeo(req);
       if (isUsuarioGeo) {
-        const historico = await Historico.findOne({
+        const historicoResponsavel = await Historico.findOne({
           where: {
             solicitacao_id: id,
             usuario_responsavel_id: req.user.id,
@@ -1450,7 +1450,35 @@ module.exports = {
           },
           attributes: ['id']
         });
-        if (!historico) {
+        const historicoInteracao = await Historico.findOne({
+          where: {
+            solicitacao_id: id,
+            usuario_responsavel_id: req.user.id
+          },
+          attributes: ['id']
+        });
+        const historicoSetorGeo = await Historico.findOne({
+          where: {
+            solicitacao_id: id,
+            [Op.or]: [
+              Sequelize.where(
+                Sequelize.fn('UPPER', Sequelize.cast(Sequelize.col('setor'), 'CHAR')),
+                'GEO'
+              ),
+              {
+                acao: 'ENVIADA_SETOR',
+                observacao: {
+                  [Op.or]: [
+                    { [Op.like]: 'De GEO para %' },
+                    { [Op.like]: '% para GEO' }
+                  ]
+                }
+              }
+            ]
+          },
+          attributes: ['id']
+        });
+        if (!historicoResponsavel && !historicoInteracao && !historicoSetorGeo) {
           return res.status(403).json({ error: 'Acesso negado' });
         }
       }

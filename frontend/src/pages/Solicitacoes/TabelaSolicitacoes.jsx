@@ -62,6 +62,10 @@ export default function TabelaSolicitacoes({
 
   const [widths, setWidths] = useState(() => columns.map(col => col.width));
   const [ordenacao, setOrdenacao] = useState({ campo: 'data', direcao: 'desc' });
+  const totalTableWidth = useMemo(
+    () => widths.reduce((acc, w) => acc + Number(w || 0), 0),
+    [widths]
+  );
 
   useEffect(() => {
     setWidths(columns.map(col => col.width));
@@ -156,7 +160,10 @@ export default function TabelaSolicitacoes({
       className="bg-white dark:bg-slate-900 rounded-xl shadow overflow-x-scroll overflow-y-auto ring-1 ring-gray-200 dark:ring-slate-700 max-h-[70vh] scrollbar-thin"
       style={{ scrollbarGutter: 'stable both-edges' }}
     >
-      <table className="min-w-full text-sm table-fixed solicitacoes-table">
+      <table
+        className="min-w-full text-sm table-fixed solicitacoes-table"
+        style={{ minWidth: `${totalTableWidth}px` }}
+      >
         <colgroup>
           {widths.map((width, index) => (
             <col key={columns[index].id} style={{ width: `${width}px` }} />

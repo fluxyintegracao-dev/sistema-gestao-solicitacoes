@@ -61,6 +61,9 @@ export default function SolicitacaoDetalhe() {
       );
 
       const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.error || 'Erro ao carregar solicitacao');
+      }
       setSolicitacao(data);
 
     } catch (err) {
@@ -108,7 +111,7 @@ export default function SolicitacaoDetalhe() {
 
         {/* TIMELINE */}
         <Timeline
-          historicos={solicitacao.historicos}
+          historicos={solicitacao.historicos || []}
           canRemoveAnexo={isSetorCompras || isSuperadmin}
           onAnexoRemovido={carregar}
         />
