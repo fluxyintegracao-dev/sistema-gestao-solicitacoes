@@ -19,6 +19,9 @@ export default function TabelaSolicitacoes({
   const bottomScrollRef = useRef(null);
   const syncingScrollRef = useRef(false);
   const [bottomScrollContentWidth, setBottomScrollContentWidth] = useState(0);
+  const [viewportWidth, setViewportWidth] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth : 1280
+  );
   const { user } = useAuth();
 
   const setorTokens = [
@@ -29,6 +32,7 @@ export default function TabelaSolicitacoes({
   const isSetorObra = setorTokens.includes('OBRA');
 
   const selecaoHabilitada = !mostrarArquivadas && typeof onToggleSelecionada === 'function';
+  const viewportMode = viewportWidth < 768 ? 'mobile' : viewportWidth < 1024 ? 'tablet' : 'desktop';
   const idsSet = useMemo(() => new Set((selecionadasIds || []).map(Number)), [selecionadasIds]);
   const todasSelecionadas = selecaoHabilitada && solicitacoes.length > 0 &&
     solicitacoes.every(item => idsSet.has(Number(item.id)));
@@ -72,10 +76,48 @@ export default function TabelaSolicitacoes({
     return new Set(visibleColumns);
   }, [visibleColumns]);
 
+  const responsiveVisibleSet = useMemo(() => {
+    if (viewportMode === 'desktop') return null;
+
+    if (viewportMode === 'tablet') {
+      return new Set([
+        ...(selecaoHabilitada ? ['selecionar'] : []),
+        'data',
+        'codigo',
+        'numero_sienge',
+        'obra',
+        'status',
+        'vencimento',
+        'acoes'
+      ]);
+    }
+
+    return new Set([
+      ...(selecaoHabilitada ? ['selecionar'] : []),
+      'codigo',
+      'numero_sienge',
+      'obra',
+      'contrato',
+      ...(isSetorObra ? ['ref_contrato'] : []),
+      'descricao',
+      'tipo',
+      'valor',
+      'setor',
+      'responsavel',
+      'status',
+      'vencimento',
+      'acoes'
+    ]);
+  }, [viewportMode, selecaoHabilitada, isSetorObra]);
+
   const columns = useMemo(() => {
-    if (!visibleSet) return columnsBase;
-    return columnsBase.filter(col => col.id === 'selecionar' || visibleSet.has(col.id));
-  }, [columnsBase, visibleSet]);
+    const userFiltered = !visibleSet
+      ? columnsBase
+      : columnsBase.filter(col => col.id === 'selecionar' || visibleSet.has(col.id));
+
+    if (!responsiveVisibleSet) return userFiltered;
+    return userFiltered.filter(col => col.id === 'selecionar' || responsiveVisibleSet.has(col.id));
+  }, [columnsBase, visibleSet, responsiveVisibleSet]);
 
   const [widths, setWidths] = useState(() => columns.map(col => col.width));
   const [ordenacao, setOrdenacao] = useState({ campo: 'data', direcao: 'desc' });
@@ -83,6 +125,15 @@ export default function TabelaSolicitacoes({
   useEffect(() => {
     setWidths(columns.map(col => col.width));
   }, [columns]);
+
+  useEffect(() => {
+    function handleResize() {
+      setViewportWidth(window.innerWidth);
+    }
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     setWidths(columns.map(col => col.width));
@@ -190,14 +241,14 @@ export default function TabelaSolicitacoes({
   }, [solicitacoesOrdenadas.length, totalTableWidth, columns.length, visibleColumns]);
 
   return (
-    <div className="bg-white dark:bg-slate-900 rounded-xl shadow ring-1 ring-gray-200 dark:ring-slate-700">
+    <div className={`bg-white dark:bg-slate-900 rounded-xl shadow ring-1 ring-gray-200 dark:ring-slate-700 solicitacoes-table-shell solicitacoes-table-shell--${viewportMode}`}>
       <div
         ref={tableWrapRef}
         className="overflow-x-auto overflow-y-auto max-h-[70vh] scrollbar-thin"
         style={{ scrollbarGutter: 'stable both-edges' }}
       >
         <table
-          className="text-sm table-fixed solicitacoes-table"
+          className={`text-sm table-fixed solicitacoes-table solicitacoes-table--${viewportMode}`}
           style={{ minWidth: `${totalTableWidth}px` }}
         >
         <colgroup>
@@ -257,6 +308,7 @@ export default function TabelaSolicitacoes({
               selecaoHabilitada={selecaoHabilitada}
               selecionada={idsSet.has(Number(s.id))}
               onToggleSelecionada={onToggleSelecionada}
+              viewportMode={viewportMode}
             />
           ))}
         </tbody>
@@ -265,7 +317,7 @@ export default function TabelaSolicitacoes({
 
       <div
         ref={bottomScrollRef}
-        className="w-full overflow-x-scroll overflow-y-hidden border-t border-gray-200 dark:border-slate-700 h-6 scrollbar-thin"
+        className={`w-full overflow-x-scroll overflow-y-hidden border-t border-gray-200 dark:border-slate-700 h-6 scrollbar-thin ${viewportMode === 'mobile' ? 'hidden' : ''}`}
         style={{ scrollbarGutter: 'stable both-edges' }}
         aria-label="Rolagem horizontal da tabela"
       >

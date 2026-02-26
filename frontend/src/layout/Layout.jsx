@@ -29,14 +29,47 @@ export default function Layout() {
   const [menuAberto, setMenuAberto] = useState(false); // mobile drawer
   const [collapsed, setCollapsed] = useState(false); // desktop collapse
   const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light');
+  const [isMobileViewport, setIsMobileViewport] = useState(() =>
+    typeof window !== 'undefined' ? window.matchMedia('(max-width: 767px)').matches : false
+  );
 
-  const isMobile = () => window.matchMedia('(max-width: 767px)').matches;
-  const sidebarWidth = collapsed ? 72 : 228;
+  const sidebarWidth = isMobileViewport ? 292 : (collapsed ? 76 : 236);
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark');
     localStorage.setItem('theme', theme);
   }, [theme]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const media = window.matchMedia('(max-width: 767px)');
+    const listener = (event) => setIsMobileViewport(event.matches);
+    setIsMobileViewport(media.matches);
+
+    if (media.addEventListener) {
+      media.addEventListener('change', listener);
+      return () => media.removeEventListener('change', listener);
+    }
+
+    media.addListener(listener);
+    return () => media.removeListener(listener);
+  }, []);
+
+  useEffect(() => {
+    if (!isMobileViewport) {
+      document.body.style.overflow = '';
+      return undefined;
+    }
+
+    document.body.style.overflow = menuAberto ? 'hidden' : '';
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [menuAberto, isMobileViewport]);
+
+  useEffect(() => {
+    if (isMobileViewport) setMenuAberto(false);
+  }, [location.pathname, isMobileViewport]);
 
   const perfilUpper = String(user?.perfil || '').toUpperCase();
   const areaUpper = String(user?.area || '').toUpperCase();
@@ -158,7 +191,7 @@ export default function Layout() {
           role="navigation"
           aria-label="Menu lateral"
         >
-          <div className="flex flex-col h-full px-4 py-4 gap-3">
+          <div className="flex flex-col h-full px-3 md:px-4 py-3 md:py-4 gap-3">
             <div className={`brand ${collapsed ? 'justify-center' : 'justify-between'}`}>
               <img
                 src="/CSC_logo_colorida.png"
@@ -180,7 +213,7 @@ export default function Layout() {
                   aria-expanded={!collapsed}
                   type="button"
                 >
-                  {collapsed ? <HiOutlineChevronDoubleRight size={20} /> : <HiOutlineChevronDoubleLeft size={20} />}
+                      {collapsed ? <HiOutlineChevronDoubleRight size={20} /> : <HiOutlineChevronDoubleLeft size={20} />}
                 </button>
                 <button
                   onClick={() => setMenuAberto(false)}
@@ -211,7 +244,7 @@ export default function Layout() {
                       active={isActive(item.to)}
                       onSelect={() => {
                         navigate(item.to);
-                        if (isMobile()) setMenuAberto(false);
+                        if (isMobileViewport) setMenuAberto(false);
                       }}
                       collapsed={collapsed}
                     />
@@ -241,37 +274,48 @@ export default function Layout() {
           />
         )}
 
-        <main className="flex-1 p-6 md:ml-0 bg-[var(--c-bg)] transition-colors duration-200">
-          <div className="flex items-center gap-3 mb-6 w-full">
-            <button
-              onClick={() => setMenuAberto(true)}
-              className="md:hidden inline-flex items-center justify-center p-2 rounded-md border border-[var(--c-border)] text-[var(--c-text)]"
-              aria-label="Abrir menu"
-              type="button"
-            >
-              <HiOutlineBars3 size={20} />
-            </button>
-
-            <div className="ml-auto flex items-center gap-2">
+        <main className="layout-main flex-1 min-w-0 bg-[var(--c-bg)] transition-colors duration-200">
+          <div className="mx-auto w-full max-w-[1800px] px-3 sm:px-4 md:px-5 lg:px-6 xl:px-8 pb-5 md:pb-8">
+            <div className="topbar-shell flex items-center gap-3 mb-4 md:mb-6 w-full py-2 md:py-3">
               <button
-                onClick={toggleTheme}
-                className="theme-toggle"
+                onClick={() => setMenuAberto(true)}
+                className="md:hidden inline-flex items-center justify-center h-11 w-11 rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] text-[var(--c-text)]"
+                aria-label="Abrir menu"
                 type="button"
               >
-                {theme === 'dark' ? (
-                  <>
-                    <HiOutlineSun size={18} /> Claro
-                  </>
-                ) : (
-                  <>
-                    <HiOutlineMoon size={18} /> Escuro
-                  </>
-                )}
+                <HiOutlineBars3 size={20} />
               </button>
-              <NotificacoesBell />
+
+              <div className="min-w-0">
+                <p className="text-sm md:text-base font-semibold text-[var(--c-text)] truncate">
+                  Sistema de Solicitações
+                </p>
+                <p className="hidden sm:block text-xs text-[var(--c-muted)] truncate">
+                  {user?.nome} · {perfilUpper || 'USUARIO'}
+                </p>
+              </div>
+
+              <div className="ml-auto flex items-center gap-2">
+                <button
+                  onClick={toggleTheme}
+                  className="theme-toggle"
+                  type="button"
+                >
+                  {theme === 'dark' ? (
+                    <>
+                      <HiOutlineSun size={18} /> <span className="hidden sm:inline">Claro</span>
+                    </>
+                  ) : (
+                    <>
+                      <HiOutlineMoon size={18} /> <span className="hidden sm:inline">Escuro</span>
+                    </>
+                  )}
+                </button>
+                <NotificacoesBell />
+              </div>
             </div>
+            <Outlet />
           </div>
-          <Outlet />
         </main>
       </div>
     </div>

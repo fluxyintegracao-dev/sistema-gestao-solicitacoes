@@ -23,7 +23,8 @@ export default function LinhaSolicitacao({
   mostrarArquivadas = false,
   selecaoHabilitada = false,
   selecionada = false,
-  onToggleSelecionada
+  onToggleSelecionada,
+  viewportMode = 'desktop'
 }) {
 
   const [modalAtribuir, setModalAtribuir] = useState(false);
@@ -37,6 +38,11 @@ export default function LinhaSolicitacao({
     ? new Set(visibleColumns)
     : null;
   const mostrarColuna = (id) => !visibleSet || visibleSet.has(id);
+  const isMobileCard = viewportMode === 'mobile';
+  const tdBase = (label, extraClass = '') => ({
+    'data-label': label,
+    className: `${extraClass}`.trim()
+  });
   const { user } = useAuth();
   const { tema } = useTheme();
   const isSetorObra =
@@ -170,7 +176,7 @@ export default function LinhaSolicitacao({
       <tr className="border-b border-gray-200 dark:border-slate-700 odd:bg-white even:bg-gray-50/50 dark:odd:bg-slate-900 dark:even:bg-slate-800/90 hover:bg-blue-50/40 dark:hover:bg-slate-700 text-gray-900 dark:text-slate-100">
 
         {selecaoHabilitada && (
-          <td className="p-2 whitespace-nowrap">
+          <td className="p-2 whitespace-nowrap" data-label="Selecionar">
             <input
               type="checkbox"
               checked={!!selecionada}
@@ -182,7 +188,7 @@ export default function LinhaSolicitacao({
 
         {mostrarColuna('data') && (
           <td
-            className="p-2 whitespace-nowrap"
+            {...tdBase('Data', 'p-2 whitespace-nowrap')}
             title={dataCriacaoTitle}
           >
             {dataCriacaoLabel}
@@ -191,7 +197,7 @@ export default function LinhaSolicitacao({
 
         {mostrarColuna('codigo') && (
           <td
-            className="p-2 font-medium whitespace-nowrap truncate"
+            {...tdBase('Código', `p-2 font-medium whitespace-nowrap truncate ${isMobileCard ? 'text-sm font-semibold' : ''}`)}
             title={solicitacao.codigo || ''}
           >
             {solicitacao.codigo}
@@ -200,7 +206,7 @@ export default function LinhaSolicitacao({
 
         {mostrarColuna('numero_sienge') && (
           <td
-            className="p-2 whitespace-nowrap truncate"
+            {...tdBase('Nº SIENGE', 'p-2 whitespace-nowrap truncate')}
             title={solicitacao.numero_pedido || ''}
           >
             {limitarTexto(solicitacao.numero_pedido, 15) || '-'}
@@ -209,7 +215,7 @@ export default function LinhaSolicitacao({
 
         {mostrarColuna('obra') && (
           <td
-            className="p-2 whitespace-nowrap truncate"
+            {...tdBase('Obra', 'p-2 whitespace-nowrap truncate')}
             title={solicitacao.obra?.nome || ''}
           >
             {limitarTexto(solicitacao.obra?.nome, 15) || '-'}
@@ -218,7 +224,7 @@ export default function LinhaSolicitacao({
 
         {mostrarColuna('contrato') && (
           <td
-            className="p-2 whitespace-nowrap truncate"
+            {...tdBase('Contrato', 'p-2 whitespace-nowrap truncate')}
             title={solicitacao.contrato?.codigo || solicitacao.codigo_contrato || ''}
           >
             {limitarTexto(solicitacao.contrato?.codigo || solicitacao.codigo_contrato, 15) || '-'}
@@ -233,7 +239,7 @@ export default function LinhaSolicitacao({
 
             return (
               <td
-                className="p-2 whitespace-nowrap truncate"
+                {...tdBase('Ref. do Contrato', 'p-2 whitespace-nowrap truncate')}
                 title={refContrato}
               >
                 {refContratoCurta || '-'}
@@ -248,7 +254,7 @@ export default function LinhaSolicitacao({
             descricao.length > 15 ? `${descricao.slice(0, 15)}...` : descricao;
           return (
             <td
-              className="p-2 whitespace-nowrap truncate"
+              {...tdBase('Descrição', 'p-2 whitespace-nowrap truncate')}
               title={descricao}
             >
               {descricaoCurta}
@@ -258,7 +264,7 @@ export default function LinhaSolicitacao({
 
         {mostrarColuna('tipo') && (
           <td
-            className="p-2 whitespace-nowrap truncate"
+            {...tdBase('Tipo de Solicitação', 'p-2 whitespace-nowrap truncate')}
             title={solicitacao.tipo?.nome || solicitacao.tipoMacroSolicitacao?.nome || ''}
           >
             {solicitacao.tipo?.nome || solicitacao.tipoMacroSolicitacao?.nome || '-'}
@@ -267,7 +273,7 @@ export default function LinhaSolicitacao({
 
         {mostrarColuna('valor') && (
         <td
-          className="p-2 whitespace-nowrap"
+          {...tdBase('Valor', 'p-2 whitespace-nowrap')}
           title={solicitacao.valor ? String(solicitacao.valor) : ''}
         >
           {editandoValor ? (
@@ -324,7 +330,7 @@ export default function LinhaSolicitacao({
 
         {mostrarColuna('setor') && (
           <td
-            className="p-2 whitespace-nowrap truncate"
+            {...tdBase('Setor', 'p-2 whitespace-nowrap truncate')}
             title={setoresMap?.[solicitacao.area_responsavel] || solicitacao.area_responsavel || ''}
           >
             {setoresMap?.[solicitacao.area_responsavel] || solicitacao.area_responsavel}
@@ -333,7 +339,7 @@ export default function LinhaSolicitacao({
 
         {mostrarColuna('responsavel') && (
           <td
-            className="p-2 whitespace-nowrap truncate"
+            {...tdBase('Responsável', 'p-2 whitespace-nowrap truncate')}
             title={solicitacao.responsavel || ''}
           >
             {solicitacao.responsavel || '-'}
@@ -342,7 +348,7 @@ export default function LinhaSolicitacao({
 
         {mostrarColuna('status') && (
           <td
-            className="p-2 whitespace-nowrap"
+            {...tdBase('Status', 'p-2 whitespace-nowrap')}
             title={solicitacao.status_global || ''}
           >
             <StatusBadge
@@ -354,7 +360,7 @@ export default function LinhaSolicitacao({
 
         {mostrarColuna('vencimento') && (
           <td
-            className="p-2 whitespace-nowrap"
+            {...tdBase('Vencimento', 'p-2 whitespace-nowrap')}
             title={dataVencimentoTitle}
           >
             {dataVencimentoLabel}
@@ -362,8 +368,8 @@ export default function LinhaSolicitacao({
         )}
 
         {mostrarColuna('acoes') && (
-        <td className="p-2 whitespace-nowrap">
-          <div className="flex gap-2 flex-nowrap">
+        <td {...tdBase('Ações', 'p-2 whitespace-nowrap')}>
+          <div className={`flex gap-2 ${isMobileCard ? 'flex-wrap' : 'flex-nowrap'}`}>
 
           <button
             className="hover:underline text-xs"

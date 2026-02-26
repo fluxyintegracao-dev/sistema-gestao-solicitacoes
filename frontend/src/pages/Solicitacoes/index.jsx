@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { HiDocumentArrowDown, HiViewColumns } from 'react-icons/hi2';
 import Filtros from './Filtros';
 import TabelaSolicitacoes from './TabelaSolicitacoes';
@@ -207,7 +207,7 @@ export default function Solicitacoes({ arquivadas = false }) {
   ];
   const isSetorObra = setorTokens.includes('OBRA');
   const isSetorFinanceiro = setorTokens.includes('FINANCEIRO');
-  const opcoesColunas = [
+  const opcoesColunas = useMemo(() => [
     { id: 'data', label: 'Data' },
     { id: 'codigo', label: 'Código' },
     { id: 'numero_sienge', label: 'Nº SIENGE' },
@@ -222,7 +222,7 @@ export default function Solicitacoes({ arquivadas = false }) {
     { id: 'status', label: 'Status' },
     { id: 'vencimento', label: 'Vencimento' },
     { id: 'acoes', label: 'Ações' }
-  ];
+  ], [isSetorObra]);
 
   useEffect(() => {
     setColunasVisiveis(prev => {
@@ -250,6 +250,17 @@ export default function Solicitacoes({ arquivadas = false }) {
     document.addEventListener('mousedown', fecharAoClicarFora);
     return () => document.removeEventListener('mousedown', fecharAoClicarFora);
   }, [mostrarSeletorColunas]);
+
+  useEffect(() => {
+    function handleEscape(event) {
+      if (event.key !== 'Escape') return;
+      setMostrarSeletorColunas(false);
+      setModalEnvioMassa(false);
+    }
+
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, []);
 
   function toggleSelecionada(id) {
     const idNum = Number(id);
@@ -411,9 +422,9 @@ export default function Solicitacoes({ arquivadas = false }) {
   }
 
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-semibold">
+    <div className="px-0 py-1 md:py-2">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-4 md:mb-6">
+        <h1 className="text-xl md:text-2xl font-semibold">
           {arquivadas ? 'Solicitações Arquivadas' : 'Solicitações'}
         </h1>
       </div>
@@ -431,14 +442,14 @@ export default function Solicitacoes({ arquivadas = false }) {
       />
 
       {!arquivadas && (
-        <div className="relative bg-white p-4 rounded-xl shadow mb-4 flex flex-col md:flex-row md:items-center gap-3">
-          <div className="text-sm text-gray-600">
+        <div className="relative bg-white dark:bg-slate-900 p-3 md:p-4 rounded-xl shadow ring-1 ring-gray-200 dark:ring-slate-700 mb-4 flex flex-col xl:flex-row xl:items-center gap-3">
+          <div className="text-sm text-gray-600 dark:text-slate-300">
             Selecionadas: <strong>{selecionadasIds.length}</strong>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2 xl:ml-auto">
             <button
               type="button"
-              className="btn btn-outline px-3"
+              className="btn btn-outline px-3 min-w-[44px]"
               onClick={exportarSelecionadasExcel}
               disabled={processandoMassa || selecionadasIds.length === 0}
               title="Exportar selecionadas para Excel (.csv)"
@@ -449,7 +460,7 @@ export default function Solicitacoes({ arquivadas = false }) {
             <button
               ref={botaoColunasRef}
               type="button"
-              className="btn btn-outline px-3"
+              className="btn btn-outline px-3 min-w-[44px]"
               onClick={() => setMostrarSeletorColunas(prev => !prev)}
               title="Selecionar colunas"
               aria-label="Selecionar colunas"
@@ -474,7 +485,7 @@ export default function Solicitacoes({ arquivadas = false }) {
             </button>
           </div>
           {isSetorObra && (
-            <span className="text-xs text-red-600">
+            <span className="text-xs text-red-600 dark:text-red-400">
               Setor OBRA não pode enviar solicitações para outro setor.
             </span>
           )}
@@ -482,7 +493,7 @@ export default function Solicitacoes({ arquivadas = false }) {
           {mostrarSeletorColunas && (
             <div
               ref={seletorColunasRef}
-              className="absolute z-20 top-full mt-2 left-4 w-[320px] max-w-[calc(100vw-3rem)] bg-white border border-gray-200 rounded-xl shadow-lg p-3"
+              className="absolute z-20 top-full mt-2 left-0 md:left-4 w-[320px] max-w-[calc(100vw-2rem)] bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl shadow-lg p-3"
             >
               <div className="flex items-center justify-between mb-2">
                 <p className="text-sm font-medium">Colunas visíveis</p>
@@ -516,7 +527,7 @@ export default function Solicitacoes({ arquivadas = false }) {
         </div>
       )}
 
-      {loading && <p className="mt-6">Carregando...</p>}
+      {loading && <p className="mt-6 text-sm md:text-base text-[var(--c-muted)]">Carregando...</p>}
 
       {!loading && solicitacoes.length === 0 && (
         <p className="mt-6">
@@ -539,14 +550,14 @@ export default function Solicitacoes({ arquivadas = false }) {
       )}
 
       {modalEnvioMassa && !arquivadas && (
-        <div className="fixed inset-0 bg-black/40 flex justify-center items-center z-50">
-          <div className="bg-white p-6 rounded-xl w-full max-w-md">
+        <div className="fixed inset-0 bg-black/40 flex justify-center items-center z-50 px-3">
+          <div className="bg-white dark:bg-slate-900 p-4 md:p-6 rounded-xl w-full max-w-md ring-1 ring-gray-200 dark:ring-slate-700" role="dialog" aria-modal="true" aria-label="Enviar solicita??es em massa">
             <h2 className="text-lg font-semibold mb-4">Enviar solicitações em massa</h2>
-            <p className="text-sm text-gray-600 mb-3">
+            <p className="text-sm text-gray-600 dark:text-slate-300 mb-3">
               Selecionadas: {selecionadasIds.length}
             </p>
             <select
-              className="w-full border p-2 rounded mb-4"
+              className="input mb-4"
               value={setorEnvioMassa}
               onChange={e => setSetorEnvioMassa(e.target.value)}
             >
@@ -560,7 +571,7 @@ export default function Solicitacoes({ arquivadas = false }) {
             <div className="flex justify-end gap-3">
               <button
                 type="button"
-                className="border px-4 py-2 rounded"
+                className="btn btn-outline"
                 onClick={() => {
                   setModalEnvioMassa(false);
                   setSetorEnvioMassa('');
@@ -571,7 +582,7 @@ export default function Solicitacoes({ arquivadas = false }) {
               </button>
               <button
                 type="button"
-                className="bg-orange-600 text-white px-4 py-2 rounded disabled:opacity-60"
+                className="btn bg-orange-600 text-white disabled:opacity-60"
                 onClick={confirmarEnvioMassa}
                 disabled={processandoMassa}
               >

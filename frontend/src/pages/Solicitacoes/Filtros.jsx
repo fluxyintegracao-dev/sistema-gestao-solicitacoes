@@ -1,3 +1,6 @@
+import { useEffect, useState } from 'react';
+import { HiAdjustmentsHorizontal, HiChevronDown, HiChevronUp } from 'react-icons/hi2';
+
 export default function Filtros({
   filtros,
   setFiltros,
@@ -9,6 +12,22 @@ export default function Filtros({
   mostrarSomaValor = false,
   somaValorFiltrado = 0
 }) {
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [isMobileViewport, setIsMobileViewport] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth < 768 : false
+  );
+
+  useEffect(() => {
+    function onResize() {
+      const isMobile = window.innerWidth < 768;
+      setIsMobileViewport(isMobile);
+      if (!isMobile) setMobileOpen(false);
+    }
+
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
   function handleChange(e) {
     const { name, value } = e.target;
     setFiltros(prev => ({
@@ -40,8 +59,46 @@ export default function Filtros({
     });
   }
 
+  const quantidadeFiltrosAtivos = [
+    filtros.obra_descricao,
+    filtros.area,
+    filtros.tipo_solicitacao_id,
+    filtros.status,
+    filtros.valor_min,
+    filtros.valor_max,
+    filtros.data_registro,
+    filtros.data_vencimento,
+    mostrarFiltroResponsavel ? filtros.responsavel : ''
+  ].filter(v => String(v || '').trim() !== '').length;
+
   return (
-    <div className="bg-white p-4 rounded-xl shadow mb-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-4">
+    <div className="bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-xl shadow mb-4 md:mb-6 ring-1 ring-gray-200 dark:ring-slate-700">
+      <div className="md:hidden mb-3">
+        <button
+          type="button"
+          onClick={() => setMobileOpen(prev => !prev)}
+          className="w-full min-h-[44px] inline-flex items-center justify-between gap-2 rounded-xl border border-gray-200 dark:border-slate-700 px-3 py-2 bg-white dark:bg-slate-800 text-sm font-medium"
+          aria-expanded={mobileOpen}
+          aria-controls="painel-filtros-solicitacoes"
+        >
+          <span className="inline-flex items-center gap-2">
+            <HiAdjustmentsHorizontal className="w-4 h-4" />
+            Filtros
+            {quantidadeFiltrosAtivos > 0 && (
+              <span className="inline-flex items-center justify-center min-w-6 h-6 px-2 rounded-full text-xs bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-200">
+                {quantidadeFiltrosAtivos}
+              </span>
+            )}
+          </span>
+          {mobileOpen ? <HiChevronUp className="w-4 h-4" /> : <HiChevronDown className="w-4 h-4" />}
+        </button>
+      </div>
+
+      <div
+        id="painel-filtros-solicitacoes"
+        className={`${isMobileViewport && !mobileOpen ? 'hidden' : 'block'}`}
+      >
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-6 gap-3 md:gap-4">
       <div className="flex gap-2">
         <input
           name="obra_descricao"
@@ -147,7 +204,7 @@ export default function Filtros({
         />
       )}
 
-      <div className="flex gap-2 items-end md:col-span-2 xl:col-span-2">
+      <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-end md:col-span-2 xl:col-span-2">
         <button className="btn btn-outline" type="button" onClick={onBuscarObraDescricao}>
           Buscar
         </button>
@@ -158,7 +215,7 @@ export default function Filtros({
 
       {mostrarSomaValor && (
         <div className="md:col-span-2 xl:col-span-2">
-          <label className="text-sm text-gray-600">Soma do valor filtrado</label>
+          <label className="text-sm text-gray-600 dark:text-slate-300">Soma do valor filtrado</label>
           <input
             className="input mt-1"
             value={Number(somaValorFiltrado || 0).toLocaleString('pt-BR', {
@@ -169,6 +226,21 @@ export default function Filtros({
           />
         </div>
       )}
+        </div>
+
+        <div className="md:hidden sticky bottom-0 mt-3 -mx-3 px-3 py-2 bg-white/95 dark:bg-slate-900/95 border-t border-gray-200 dark:border-slate-700 backdrop-blur supports-[backdrop-filter]:bg-white/80">
+          <button
+            className="btn btn-primary w-full"
+            type="button"
+            onClick={() => {
+              onBuscarObraDescricao?.();
+              setMobileOpen(false);
+            }}
+          >
+            Filtrar
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
