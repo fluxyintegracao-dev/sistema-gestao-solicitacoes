@@ -458,6 +458,7 @@ module.exports = {
         const senhaRaw = String(row[idxSenha] ?? '').trim();
         const perfilRaw = idxPerfil >= 0 ? String(row[idxPerfil] ?? '').trim() : '';
         const perfil = (perfilRaw || 'USUARIO').toUpperCase();
+        const perfisPermitidos = new Set(['USUARIO', 'ADMIN', 'SUPERADMIN']);
 
         if (![nome, email, cargoRaw, setorRaw, senhaRaw, obrasRaw].some(Boolean)) {
           resultado.ignorados += 1;
@@ -468,6 +469,14 @@ module.exports = {
           resultado.erros.push({
             linha,
             error: 'Campos obrigatórios inválidos (Nome, Email, Cargo, Setor, Senha).'
+          });
+          continue;
+        }
+
+        if (!perfisPermitidos.has(perfil)) {
+          resultado.erros.push({
+            linha,
+            error: `Perfil inválido: ${perfil}. Use USUARIO, ADMIN ou SUPERADMIN.`
           });
           continue;
         }

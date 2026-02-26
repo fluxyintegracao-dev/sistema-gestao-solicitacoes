@@ -28,8 +28,8 @@ export default function Usuarios() {
 
   function baixarModeloImportacaoUsuarios() {
     const linhas = [
-      ['Nome', 'Email', 'Cargo', 'Setor', 'Obras', 'Senha'],
-      ['Usuario Exemplo', 'usuario.exemplo@empresa.com', 'Analista', 'FINANCEIRO', '7|8', '123456']
+      ['Nome', 'Email', 'Cargo', 'Setor', 'Perfil', 'Obras', 'Senha'],
+      ['Usuario Exemplo', 'usuario.exemplo@empresa.com', 'Analista', 'FINANCEIRO', 'USUARIO', '7|8', '123456']
     ];
 
     const csv = linhas
@@ -121,7 +121,7 @@ export default function Usuarios() {
       </div>
 
       <div className="text-sm text-gray-600">
-        Modelo CSV: Nome, Email, Cargo, Setor, Obras (separar por <code>|</code> ou <code>,</code>) e Senha. A senha informada (ex.: <code>123456</code>) é convertida em hash automaticamente no import.
+        Modelo CSV: Nome, Email, Cargo, Setor, Perfil, Obras (separar por <code>|</code> ou <code>,</code>) e Senha. Perfis aceitos: <code>USUARIO</code>, <code>ADMIN</code> e <code>SUPERADMIN</code>. A senha informada (ex.: <code>123456</code>) é convertida em hash automaticamente no import.
       </div>
 
       <div className="card">
