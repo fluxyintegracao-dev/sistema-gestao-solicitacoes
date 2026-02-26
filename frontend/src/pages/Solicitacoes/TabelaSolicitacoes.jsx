@@ -108,8 +108,8 @@ export default function TabelaSolicitacoes({
   }, [columns]);
 
   const totalTableWidth = useMemo(
-    () => widths.reduce((acc, w) => acc + Number(w || 0), 0),
-    [widths]
+    () => columns.reduce((acc, col, index) => acc + Number(widths[index] ?? col.width ?? 0), 0),
+    [columns, widths]
   );
 
   const solicitacoesOrdenadas = useMemo(() => {
@@ -172,8 +172,8 @@ export default function TabelaSolicitacoes({
         style={{ minWidth: `${totalTableWidth}px` }}
       >
         <colgroup>
-          {widths.map((width, index) => (
-            <col key={columns[index].id} style={{ width: `${width}px` }} />
+          {columns.map((col, index) => (
+            <col key={col.id} style={{ width: `${widths[index] ?? col.width}px` }} />
           ))}
         </colgroup>
 
@@ -185,7 +185,7 @@ export default function TabelaSolicitacoes({
                 <th
                   key={col.id}
                   className="p-3 text-left relative select-none whitespace-nowrap text-xs uppercase tracking-wide text-gray-600 dark:text-slate-200 border-b border-gray-200 dark:border-slate-700 sticky top-0 z-10 bg-gray-50 dark:bg-slate-800"
-                  style={{ width: `${widths[index]}px` }}
+                  style={{ width: `${widths[index] ?? col.width}px` }}
                 >
                   {col.id === 'selecionar' ? (
                     <input
