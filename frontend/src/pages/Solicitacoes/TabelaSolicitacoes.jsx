@@ -82,7 +82,9 @@ export default function TabelaSolicitacoes({
         const target = totalWeight > 0
           ? Math.floor((available * col.weight) / totalWeight)
           : col.width;
-        return Math.max(col.min, target);
+        // Mantem largura base das colunas para permitir rolagem horizontal real
+        // quando a tela for menor que a tabela.
+        return Math.max(col.width, target);
       });
 
       setWidths(nextWidths);
