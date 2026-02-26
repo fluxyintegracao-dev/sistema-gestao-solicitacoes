@@ -16,6 +16,8 @@ export default function TabelaSolicitacoes({
   visibleColumns = null
 }) {
   const tableWrapRef = useRef(null);
+  const bottomScrollRef = useRef(null);
+  const syncingScrollRef = useRef(false);
   const { user } = useAuth();
 
   const setorTokens = [
@@ -161,16 +163,45 @@ export default function TabelaSolicitacoes({
     return ordenacao.direcao === 'asc' ? ' ^' : ' v';
   }
 
+  useEffect(() => {
+    const topEl = tableWrapRef.current;
+    const bottomEl = bottomScrollRef.current;
+    if (!topEl || !bottomEl) return undefined;
+
+    function syncFromTop() {
+      if (syncingScrollRef.current) return;
+      syncingScrollRef.current = true;
+      bottomEl.scrollLeft = topEl.scrollLeft;
+      requestAnimationFrame(() => { syncingScrollRef.current = false; });
+    }
+
+    function syncFromBottom() {
+      if (syncingScrollRef.current) return;
+      syncingScrollRef.current = true;
+      topEl.scrollLeft = bottomEl.scrollLeft;
+      requestAnimationFrame(() => { syncingScrollRef.current = false; });
+    }
+
+    topEl.addEventListener('scroll', syncFromTop, { passive: true });
+    bottomEl.addEventListener('scroll', syncFromBottom, { passive: true });
+
+    return () => {
+      topEl.removeEventListener('scroll', syncFromTop);
+      bottomEl.removeEventListener('scroll', syncFromBottom);
+    };
+  }, [totalTableWidth, columns.length]);
+
   return (
-    <div
-      ref={tableWrapRef}
-      className="bg-white dark:bg-slate-900 rounded-xl shadow overflow-x-auto overflow-y-auto ring-1 ring-gray-200 dark:ring-slate-700 max-h-[70vh] scrollbar-thin"
-      style={{ scrollbarGutter: 'stable both-edges' }}
-    >
-      <table
-        className="text-sm table-fixed solicitacoes-table"
-        style={{ minWidth: `${totalTableWidth}px` }}
+    <div className="bg-white dark:bg-slate-900 rounded-xl shadow ring-1 ring-gray-200 dark:ring-slate-700">
+      <div
+        ref={tableWrapRef}
+        className="overflow-x-auto overflow-y-auto max-h-[70vh] scrollbar-thin"
+        style={{ scrollbarGutter: 'stable both-edges' }}
       >
+        <table
+          className="text-sm table-fixed solicitacoes-table"
+          style={{ minWidth: `${totalTableWidth}px` }}
+        >
         <colgroup>
           {columns.map((col, index) => (
             <col key={col.id} style={{ width: `${widths[index] ?? col.width}px` }} />
@@ -231,7 +262,16 @@ export default function TabelaSolicitacoes({
             />
           ))}
         </tbody>
-      </table>
+        </table>
+      </div>
+
+      <div
+        ref={bottomScrollRef}
+        className="overflow-x-auto overflow-y-hidden border-t border-gray-200 dark:border-slate-700 h-4"
+        aria-label="Rolagem horizontal da tabela"
+      >
+        <div style={{ width: `${totalTableWidth}px`, height: '1px' }} />
+      </div>
     </div>
   );
 }
