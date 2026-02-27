@@ -59,6 +59,21 @@ export default function ConversasSaida() {
     }
   }
 
+  async function arquivarOuDesarquivarIndividual(conversaId) {
+    try {
+      if (arquivadas) {
+        await desarquivarConversasEmMassa([conversaId]);
+        alert('Conversa desarquivada com sucesso.');
+      } else {
+        await arquivarConversasEmMassa([conversaId]);
+        alert('Conversa arquivada com sucesso.');
+      }
+      await carregar();
+    } catch (error) {
+      alert(error?.message || 'Erro ao processar conversa');
+    }
+  }
+
   useEffect(() => {
     carregar();
   }, [aba]);
@@ -141,9 +156,18 @@ export default function ConversasSaida() {
                   <td>{item.participantes_total ?? 0}</td>
                   <td>{formatarDataHora(item.updatedAt)}</td>
                   <td>
-                    <button type="button" className="btn btn-outline" onClick={() => navigate(`/conversas/${item.id}`)}>
-                      Abrir chat
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button type="button" className="btn btn-outline" onClick={() => navigate(`/conversas/${item.id}`)}>
+                        Abrir chat
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-outline"
+                        onClick={() => arquivarOuDesarquivarIndividual(item.id)}
+                      >
+                        {arquivadas ? 'Desarquivar' : 'Arquivar'}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
