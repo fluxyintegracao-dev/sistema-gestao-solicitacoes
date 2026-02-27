@@ -321,7 +321,7 @@ module.exports = {
         where.criado_por_id = req.user.id;
       }
 
-      const conversas = await ConversaInterna.findAll({
+      let conversas = await ConversaInterna.findAll({
         where,
         include: [
           {
