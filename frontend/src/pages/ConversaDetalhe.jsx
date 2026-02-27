@@ -11,6 +11,7 @@ import {
   reabrirConversa
 } from '../services/conversasInternas';
 import { API_URL, authHeaders, fileUrl } from '../services/api';
+import PreviewAnexoModal from './SolicitacaoDetalhe/PreviewAnexoModal';
 
 const JANELA_EDICAO_MS = 5 * 60 * 1000;
 
@@ -44,6 +45,7 @@ export default function ConversaDetalhe() {
   const [showAdicionarParticipantes, setShowAdicionarParticipantes] = useState(false);
   const [candidatosParticipantes, setCandidatosParticipantes] = useState([]);
   const [novosParticipantesIds, setNovosParticipantesIds] = useState([]);
+  const [previewAnexo, setPreviewAnexo] = useState(null);
 
   async function carregar() {
     try {
@@ -188,11 +190,15 @@ export default function ConversaDetalhe() {
     return data?.url || caminhoNormalizado;
   }
 
-  async function visualizarAnexo(caminhoArquivo) {
+  async function visualizarAnexo(anexo) {
     try {
-      const url = await obterUrlAssinada(caminhoArquivo);
+      const url = await obterUrlAssinada(anexo?.caminho);
       if (!url) return;
-      window.open(url, '_blank', 'noopener,noreferrer');
+      setPreviewAnexo({
+        nome: anexo?.nome_arquivo || 'Anexo',
+        caminho: anexo?.caminho,
+        url
+      });
     } catch (error) {
       alert(error?.message || 'Erro ao abrir anexo');
     }
@@ -322,7 +328,7 @@ export default function ConversaDetalhe() {
                       {item.anexos.map((anexo) => (
                         <div key={anexo.id} className="flex flex-wrap items-center gap-2 text-sm">
                           <span className="font-medium">{anexo.nome_arquivo}</span>
-                          <button type="button" className="text-blue-600" onClick={() => visualizarAnexo(anexo.caminho)}>
+                          <button type="button" className="text-blue-600" onClick={() => visualizarAnexo(anexo)}>
                             Visualizar
                           </button>
                           <button type="button" className="text-green-600" onClick={() => baixarAnexo(anexo.caminho, anexo.nome_arquivo)}>
@@ -436,6 +442,13 @@ export default function ConversaDetalhe() {
             </div>
           </div>
         </div>
+      )}
+
+      {previewAnexo && (
+        <PreviewAnexoModal
+          anexo={previewAnexo}
+          onClose={() => setPreviewAnexo(null)}
+        />
       )}
     </div>
   );

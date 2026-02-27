@@ -15,10 +15,11 @@ function formatarDataHora(valor) {
   return data.toLocaleString('pt-BR');
 }
 
-function parseIdsSelecionados(options) {
-  return Array.from(options || [])
-    .map((opt) => Number(opt.value))
-    .filter((v) => Number.isInteger(v) && v > 0);
+function alternarSelecionado(lista, id) {
+  if (lista.includes(id)) {
+    return lista.filter((item) => item !== id);
+  }
+  return [...lista, id];
 }
 
 export default function ConversasEntrada() {
@@ -243,38 +244,54 @@ export default function ConversasEntrada() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <label className="text-sm">
                     <span className="block mb-1">Usuários (múltiplos)</span>
-                    <select
-                      multiple
-                      value={destinatariosMassaIds.map(String)}
-                      onChange={(e) => {
-                        setDestinatariosMassaIds(parseIdsSelecionados(e.target.selectedOptions));
-                      }}
-                      className="w-full min-h-[160px] rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] px-3 py-2 text-[var(--c-text)]"
-                    >
-                      {destinatarios.map(dest => (
-                        <option key={dest.id} value={dest.id}>
-                          {dest.nome} ({dest.setor?.nome || 'Sem setor'})
-                        </option>
-                      ))}
-                    </select>
+                    <div className="w-full min-h-[160px] max-h-[220px] overflow-auto rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] px-3 py-2 text-[var(--c-text)] space-y-1">
+                      {destinatarios.map((dest) => {
+                        const checked = destinatariosMassaIds.includes(Number(dest.id));
+                        return (
+                          <label key={dest.id} className="flex items-center gap-2 text-sm cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() =>
+                                setDestinatariosMassaIds((prev) =>
+                                  alternarSelecionado(prev, Number(dest.id))
+                                )
+                              }
+                            />
+                            <span>{dest.nome} ({dest.setor?.nome || 'Sem setor'})</span>
+                          </label>
+                        );
+                      })}
+                      {destinatarios.length === 0 && (
+                        <span className="text-xs text-[var(--c-muted)]">Nenhum usuário disponível.</span>
+                      )}
+                    </div>
                   </label>
 
                   <label className="text-sm">
                     <span className="block mb-1">Setores (múltiplos)</span>
-                    <select
-                      multiple
-                      value={setoresMassaIds.map(String)}
-                      onChange={(e) => {
-                        setSetoresMassaIds(parseIdsSelecionados(e.target.selectedOptions));
-                      }}
-                      className="w-full min-h-[160px] rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] px-3 py-2 text-[var(--c-text)]"
-                    >
-                      {setores.map(setor => (
-                        <option key={setor.id} value={setor.id}>
-                          {setor.nome}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="w-full min-h-[160px] max-h-[220px] overflow-auto rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] px-3 py-2 text-[var(--c-text)] space-y-1">
+                      {setores.map((setor) => {
+                        const checked = setoresMassaIds.includes(Number(setor.id));
+                        return (
+                          <label key={setor.id} className="flex items-center gap-2 text-sm cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() =>
+                                setSetoresMassaIds((prev) =>
+                                  alternarSelecionado(prev, Number(setor.id))
+                                )
+                              }
+                            />
+                            <span>{setor.nome}</span>
+                          </label>
+                        );
+                      })}
+                      {setores.length === 0 && (
+                        <span className="text-xs text-[var(--c-muted)]">Nenhum setor disponível.</span>
+                      )}
+                    </div>
                   </label>
                 </div>
               )}
