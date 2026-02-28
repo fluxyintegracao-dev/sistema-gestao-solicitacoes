@@ -1261,16 +1261,20 @@ module.exports = {
         });
       }
       if (data_vencimento) {
-        const hoje = new Date();
-        hoje.setHours(0, 0, 0, 0);
-        const vencimento = new Date(data_vencimento);
-        if (!Number.isNaN(vencimento.getTime())) {
-          vencimento.setHours(0, 0, 0, 0);
-          if (vencimento < hoje) {
-            return res.status(400).json({
-              error: 'A data de vencimento nao pode ser menor que a data atual.'
-            });
-          }
+        const vencimentoStr = String(data_vencimento).trim();
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(vencimentoStr)) {
+          return res.status(400).json({
+            error: 'Data de vencimento invalida. Use o formato YYYY-MM-DD.'
+          });
+        }
+
+        const agora = new Date();
+        const hojeStr = `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, '0')}-${String(agora.getDate()).padStart(2, '0')}`;
+
+        if (vencimentoStr < hojeStr) {
+          return res.status(400).json({
+            error: 'A data de vencimento nao pode ser menor que a data atual.'
+          });
         }
       }
       if (nomeTipoNormalizado === 'MEDICAO' && !contrato_id) {
