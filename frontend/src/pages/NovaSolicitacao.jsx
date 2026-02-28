@@ -148,6 +148,7 @@ export default function NovaSolicitacao() {
   const pedidoContratacao = nomeTipoNormalizado === 'PEDIDO DE CONTRATACAO';
   const tipoSemValor = solicitacaoCompra || outrosAssuntos || pedidoContratacao;
   const exibirCamposContrato = medicaoObrigatoria || subtipoObrigatorio;
+  const camposContratoObrigatorios = exibirCamposContrato;
 
   useEffect(() => {
     if (!exibirCamposContrato) {
@@ -281,8 +282,8 @@ export default function NovaSolicitacao() {
       return;
     }
 
-    if (subtipoObrigatorio && !form.tipo_sub_id) {
-      alert('Para continuar, selecione o subtipo para Adm Local de Obra.');
+    if (camposContratoObrigatorios && !form.tipo_sub_id) {
+      alert('Para continuar, selecione o subtipo.');
       return;
     }
     if (!tipoSemValor && (form.valor === '' || form.valor === null || form.valor === undefined)) {
@@ -293,16 +294,16 @@ export default function NovaSolicitacao() {
       alert('Para Medicao, informe data inicial e data final.');
       return;
     }
-    if (medicaoObrigatoria && !form.data_vencimento) {
-      alert('Para Medicao, informe a data de vencimento.');
+    if (!form.data_vencimento) {
+      alert('Informe a data de vencimento.');
       return;
     }
-    if (medicaoObrigatoria && !form.contrato_id) {
-      alert('Para Medicao, selecione um contrato.');
+    if (camposContratoObrigatorios && !form.contrato_id) {
+      alert('Selecione um contrato.');
       return;
     }
-    if (medicaoObrigatoria && !refContratoBusca.trim()) {
-      alert('Para Medicao, informe a ref do contrato.');
+    if (camposContratoObrigatorios && !refContratoBusca.trim()) {
+      alert('Informe a ref. do contrato.');
       return;
     }
     if (aberturaContratoObrigatoria && !form.itens_apropriacao) {
@@ -616,7 +617,7 @@ export default function NovaSolicitacao() {
                 name="tipo_sub_id"
                 onChange={handleChange}
                 className="input"
-                required={subtipoObrigatorio}
+                required={camposContratoObrigatorios}
                 disabled={!form.tipo_solicitacao_id}
                 value={form.tipo_sub_id}
               >
@@ -648,7 +649,7 @@ export default function NovaSolicitacao() {
                 className="input"
                 disabled={!form.obra_id && contratosDisponiveis.length === 0}
                 value={form.contrato_id}
-                required={medicaoObrigatoria}
+                required={camposContratoObrigatorios}
               >
                 <option value="">Não vincular</option>
                 {contratosDisponiveis.map(c => (
@@ -684,7 +685,7 @@ export default function NovaSolicitacao() {
             className="input"
             value={form.data_vencimento}
             min={hojeInput}
-            required={medicaoObrigatoria}
+            required
           />
         </label>
 

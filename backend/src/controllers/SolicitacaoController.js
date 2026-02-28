@@ -1232,6 +1232,9 @@ module.exports = {
         'OUTROS ASSUNTOS',
         'PEDIDO DE CONTRATACAO'
       ]);
+      const exigeCamposContrato =
+        nomeTipoNormalizado === 'MEDICAO' ||
+        nomeTipo === 'ADM LOCAL DE OBRA';
 
       if (!tiposSemValor.has(nomeTipoNormalizado) && (valor === '' || valor === null || valor === undefined)) {
         return res.status(400).json({
@@ -1245,9 +1248,9 @@ module.exports = {
         });
       }
 
-      if (nomeTipo === 'ADM LOCAL DE OBRA' && !tipo_sub_id) {
+      if (exigeCamposContrato && !tipo_sub_id) {
         return res.status(400).json({
-          error: 'Para continuar, selecione o subtipo para Adm Local de Obra.'
+          error: 'Para continuar, selecione o subtipo.'
         });
       }
       if (nomeTipoNormalizado === 'MEDICAO' && (!data_inicio_medicao || !data_fim_medicao)) {
@@ -1255,9 +1258,9 @@ module.exports = {
           error: 'Para Medicao, informe data inicial e data final.'
         });
       }
-      if (nomeTipoNormalizado === 'MEDICAO' && !data_vencimento) {
+      if (!data_vencimento) {
         return res.status(400).json({
-          error: 'Para Medicao, informe a data de vencimento.'
+          error: 'Informe a data de vencimento.'
         });
       }
       if (data_vencimento) {
@@ -1277,9 +1280,9 @@ module.exports = {
           });
         }
       }
-      if (nomeTipoNormalizado === 'MEDICAO' && !contrato_id) {
+      if (exigeCamposContrato && !contrato_id) {
         return res.status(400).json({
-          error: 'Para Medicao, selecione um contrato.'
+          error: 'Selecione um contrato.'
         });
       }
       if (nomeTipoNormalizado === 'ABERTURA DE CONTRATO' && !itens_apropriacao) {
