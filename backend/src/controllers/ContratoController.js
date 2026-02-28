@@ -493,6 +493,7 @@ module.exports = {
 
       const { id } = req.params;
       const {
+        obra_id,
         codigo,
         ref_contrato,
         fornecedor,
@@ -511,7 +512,15 @@ module.exports = {
         return res.status(404).json({ error: 'Contrato nÃ£o encontrado' });
       }
 
+      if (obra_id !== undefined && obra_id !== null) {
+        const obra = await Obra.findByPk(obra_id, { attributes: ['id'] });
+        if (!obra) {
+          return res.status(400).json({ error: 'Obra nÃ£o encontrada' });
+        }
+      }
+
       await contrato.update({
+        obra_id: obra_id !== undefined && obra_id !== null ? obra_id : contrato.obra_id,
         codigo: codigo ?? contrato.codigo,
         ref_contrato: (ref_contrato ?? fornecedor) ?? contrato.ref_contrato,
         descricao: descricao ?? contrato.descricao,

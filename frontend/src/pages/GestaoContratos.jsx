@@ -36,6 +36,16 @@ export default function GestaoContratos() {
   const [files, setFiles] = useState([]);
   const [salvando, setSalvando] = useState(false);
   const [ajustes, setAjustes] = useState({});
+  const [editandoId, setEditandoId] = useState(null);
+  const [salvandoEdicaoId, setSalvandoEdicaoId] = useState(null);
+  const [formEdicao, setFormEdicao] = useState({
+    obra_id: '',
+    codigo: '',
+    ref_contrato: '',
+    descricao: '',
+    itens_apropriacao: '',
+    valor_total: ''
+  });
   const [modalAnexos, setModalAnexos] = useState(null);
   const [anexos, setAnexos] = useState([]);
   const [uploadAnexos, setUploadAnexos] = useState([]);
@@ -199,6 +209,79 @@ export default function GestaoContratos() {
         [campo]: valor
       }
     }));
+  }
+
+  function iniciarEdicao(contrato) {
+    setEditandoId(contrato.id);
+    setFormEdicao({
+      obra_id: contrato.obra_id ? String(contrato.obra_id) : '',
+      codigo: String(contrato.codigo || ''),
+      ref_contrato: String(contrato.ref_contrato || ''),
+      descricao: String(contrato.descricao || ''),
+      itens_apropriacao: String(contrato.itens_apropriacao || ''),
+      valor_total: contrato.valor_total !== null && contrato.valor_total !== undefined
+        ? String(contrato.valor_total)
+        : ''
+    });
+  }
+
+  function cancelarEdicao() {
+    setEditandoId(null);
+    setSalvandoEdicaoId(null);
+    setFormEdicao({
+      obra_id: '',
+      codigo: '',
+      ref_contrato: '',
+      descricao: '',
+      itens_apropriacao: '',
+      valor_total: ''
+    });
+  }
+
+  function onChangeEdicao(e) {
+    const { name, value } = e.target;
+    setFormEdicao(prev => ({ ...prev, [name]: value }));
+  }
+
+  async function salvarEdicao(contrato) {
+    if (salvandoEdicaoId) return;
+
+    const valorTotalEdicao = String(formEdicao.valor_total || '').trim();
+    const valorTotalNumerico = valorTotalEdicao === ''
+      ? null
+      : Number(valorTotalEdicao.replace(',', '.'));
+
+    if (valorTotalEdicao !== '' && Number.isNaN(valorTotalNumerico)) {
+      alert('Valor inválido.');
+      return;
+    }
+
+    const payload = {
+      obra_id: formEdicao.obra_id ? Number(formEdicao.obra_id) : null,
+      codigo: String(formEdicao.codigo || '').trim(),
+      ref_contrato: String(formEdicao.ref_contrato || '').trim(),
+      descricao: String(formEdicao.descricao || '').trim() || null,
+      itens_apropriacao: String(formEdicao.itens_apropriacao || '').trim() || null,
+      valor_total: valorTotalNumerico
+    };
+
+    if (!payload.obra_id || !payload.codigo || !payload.ref_contrato) {
+      alert('Obra, código e Ref. do Contrato são obrigatórios.');
+      return;
+    }
+
+    try {
+      setSalvandoEdicaoId(contrato.id);
+      await atualizarContrato(contrato.id, payload);
+      await carregar();
+      cancelarEdicao();
+      alert('Contrato atualizado com sucesso.');
+    } catch (error) {
+      console.error(error);
+      alert(error?.message || 'Erro ao atualizar contrato.');
+    } finally {
+      setSalvandoEdicaoId(null);
+    }
   }
 
   async function salvarAjustes(contrato) {
@@ -704,16 +787,89 @@ export default function GestaoContratos() {
             )}
             {contratos.map(c => (
               <tr key={c.id} className="border-t">
-                <td className="p-3 font-medium">{c.codigo}</td>
-                <td className="p-3">{c.obra?.nome || '-'}</td>
-                <td className="p-3">{c.ref_contrato || '-'}</td>
-                <td className="p-3">{c.descricao || '-'}</td>
-                <td className="p-3">{c.itens_apropriacao || '-'}</td>
+                <td className="p-3 font-medium">
+                  {editandoId === c.id ? (
+                    <input
+                      name="codigo"
+                      value={formEdicao.codigo}
+                      onChange={onChangeEdicao}
+                      className="w-40 border rounded p-1"
+                    />
+                  ) : (
+                    c.codigo
+                  )}
+                </td>
+                <td className="p-3">
+                  {editandoId === c.id ? (
+                    <select
+                      name="obra_id"
+                      value={formEdicao.obra_id}
+                      onChange={onChangeEdicao}
+                      className="w-56 border rounded p-1"
+                    >
+                      <option value="">Selecione</option>
+                      {obras.map(obra => (
+                        <option key={obra.id} value={obra.id}>
+                          {obra.codigo} - {obra.nome}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    c.obra?.nome || '-'
+                  )}
+                </td>
+                <td className="p-3">
+                  {editandoId === c.id ? (
+                    <input
+                      name="ref_contrato"
+                      value={formEdicao.ref_contrato}
+                      onChange={onChangeEdicao}
+                      className="w-56 border rounded p-1"
+                    />
+                  ) : (
+                    c.ref_contrato || '-'
+                  )}
+                </td>
+                <td className="p-3">
+                  {editandoId === c.id ? (
+                    <input
+                      name="descricao"
+                      value={formEdicao.descricao}
+                      onChange={onChangeEdicao}
+                      className="w-64 border rounded p-1"
+                    />
+                  ) : (
+                    c.descricao || '-'
+                  )}
+                </td>
+                <td className="p-3">
+                  {editandoId === c.id ? (
+                    <input
+                      name="itens_apropriacao"
+                      value={formEdicao.itens_apropriacao}
+                      onChange={onChangeEdicao}
+                      className="w-64 border rounded p-1"
+                    />
+                  ) : (
+                    c.itens_apropriacao || '-'
+                  )}
+                </td>
                 <td className="p-3 text-right">
-                  {Number(c.total_solicitado || 0).toLocaleString('pt-BR', {
-                    style: 'currency',
-                    currency: 'BRL'
-                  })}
+                  {editandoId === c.id ? (
+                    <input
+                      type="number"
+                      step="0.01"
+                      className="w-32 border rounded p-1 text-right"
+                      name="valor_total"
+                      value={formEdicao.valor_total}
+                      onChange={onChangeEdicao}
+                    />
+                  ) : (
+                    Number(c.total_solicitado || 0).toLocaleString('pt-BR', {
+                      style: 'currency',
+                      currency: 'BRL'
+                    })
+                  )}
                 </td>
                 <td className="p-3 text-right">
                   {Number(c.total_pago || 0).toLocaleString('pt-BR', {
@@ -756,12 +912,39 @@ export default function GestaoContratos() {
                 </td>
                 <td className="p-3">
                   <div className="flex items-center gap-3">
-                    <button
-                      className="text-green-600"
-                      onClick={() => salvarAjustes(c)}
-                    >
-                      Salvar
-                    </button>
+                    {editandoId === c.id ? (
+                      <>
+                        <button
+                          className="text-green-600"
+                          onClick={() => salvarEdicao(c)}
+                          disabled={salvandoEdicaoId === c.id}
+                        >
+                          {salvandoEdicaoId === c.id ? 'Salvando...' : 'Salvar edição'}
+                        </button>
+                        <button
+                          className="text-gray-600"
+                          onClick={cancelarEdicao}
+                          disabled={salvandoEdicaoId === c.id}
+                        >
+                          Cancelar
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          className="text-blue-600"
+                          onClick={() => iniciarEdicao(c)}
+                        >
+                          Editar
+                        </button>
+                        <button
+                          className="text-green-600"
+                          onClick={() => salvarAjustes(c)}
+                        >
+                          Salvar ajustes
+                        </button>
+                      </>
+                    )}
                     <button
                       className="text-red-600"
                       onClick={() => excluirContratoItem(c)}
