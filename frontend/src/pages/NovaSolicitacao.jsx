@@ -49,7 +49,7 @@ export default function NovaSolicitacao() {
 
   useEffect(() => {
     async function load() {
-      setObras(await getMinhasObras());
+      setObras(await getMinhasObras({ modo: 'CRIACAO' }));
       setTipos(await getTiposSolicitacao());
       setSetores(await getSetores());
       try {
@@ -183,7 +183,7 @@ export default function NovaSolicitacao() {
   async function buscarObrasPorCodigo() {
     const codigo = obraCodigo.trim().toUpperCase();
     if (!codigo) return;
-    const data = await getMinhasObras({ codigo });
+    const data = await getMinhasObras({ codigo, modo: 'CRIACAO' });
     const lista = Array.isArray(data) ? data : [];
     if (lista.length === 1) {
       const obra = lista[0];
@@ -198,7 +198,7 @@ export default function NovaSolicitacao() {
   async function buscarObrasPorDescricao() {
     const descricao = obraDescricao.trim();
     if (!descricao) return;
-    const data = await getMinhasObras({ descricao });
+    const data = await getMinhasObras({ descricao, modo: 'CRIACAO' });
     const lista = Array.isArray(data) ? data : [];
     if (lista.length === 0) {
       alert('Nenhuma obra encontrada');

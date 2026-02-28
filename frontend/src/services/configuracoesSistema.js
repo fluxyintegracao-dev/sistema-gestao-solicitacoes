@@ -110,3 +110,21 @@ export async function salvarTiposSolicitacaoPorSetor(data) {
   if (!res.ok) throw new Error('Erro ao salvar configuracao de tipos por setor');
   return res.json();
 }
+
+export async function getSetoresCriacaoTodasObras() {
+  const res = await fetch(`${API_URL}/configuracoes/setores-criacao-todas-obras`, {
+    headers: authHeaders()
+  });
+  if (!res.ok) throw new Error('Erro ao buscar configuracao de criacao em todas as obras');
+  return res.json();
+}
+
+export async function salvarSetoresCriacaoTodasObras(data) {
+  const res = await fetch(`${API_URL}/configuracoes/setores-criacao-todas-obras`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+  if (!res.ok) throw new Error('Erro ao salvar configuracao de criacao em todas as obras');
+  return res.json();
+}

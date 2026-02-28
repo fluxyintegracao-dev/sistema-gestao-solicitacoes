@@ -96,6 +96,11 @@ export default function Configuracoes() {
             to="/tipos-solicitacao-por-setor"
           />
           <ConfigItem
+            title="Criação em Todas as Obras"
+            description="Defina quais setores podem criar solicitação em qualquer obra na Nova Solicitação."
+            to="/setores-criacao-todas-obras"
+          />
+          <ConfigItem
             title="Tempo de Inatividade"
             description="Define o tempo para logout automatico por inatividade."
             to="/timeout-inatividade"

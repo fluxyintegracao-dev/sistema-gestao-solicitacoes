@@ -6,6 +6,7 @@ const CHAVE_AREAS_POR_SETOR_ORIGEM = 'AREAS_POR_SETOR_ORIGEM';
 const CHAVE_SETORES_VISIVEIS_POR_USUARIO = 'SETORES_VISIVEIS_POR_USUARIO';
 const CHAVE_TIMEOUT_INATIVIDADE = 'TIMEOUT_INATIVIDADE_MINUTOS';
 const CHAVE_TIPOS_SOLICITACAO_POR_SETOR = 'TIPOS_SOLICITACAO_POR_SETOR';
+const CHAVE_SETORES_CRIACAO_TODAS_OBRAS = 'SETORES_CRIACAO_TODAS_OBRAS';
 const TIMEOUT_INATIVIDADE_PADRAO_MINUTOS = 20;
 
 function parseJsonOrDefault(value, fallback) {
@@ -406,6 +407,52 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return res.status(500).json({ error: 'Erro ao salvar configuracao de tipos por setor' });
+    }
+  },
+
+  async getSetoresCriacaoTodasObras(req, res) {
+    try {
+      const item = await ConfiguracaoSistema.findOne({
+        where: { chave: CHAVE_SETORES_CRIACAO_TODAS_OBRAS },
+        order: [['id', 'DESC']]
+      });
+
+      if (!item || !item.valor) {
+        return res.json({ setores: [] });
+      }
+
+      const data = parseJsonOrDefault(item.valor, { setores: [] });
+      const setores = normalizarListaSetores(data?.setores);
+      return res.json({ setores });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao buscar configuracao de setores para criacao em todas as obras' });
+    }
+  },
+
+  async updateSetoresCriacaoTodasObras(req, res) {
+    try {
+      const setores = normalizarListaSetores(req.body?.setores);
+
+      const existente = await ConfiguracaoSistema.findOne({
+        where: { chave: CHAVE_SETORES_CRIACAO_TODAS_OBRAS },
+        order: [['id', 'DESC']]
+      });
+
+      const valor = JSON.stringify({ setores });
+      if (existente) {
+        await existente.update({ valor });
+      } else {
+        await ConfiguracaoSistema.create({
+          chave: CHAVE_SETORES_CRIACAO_TODAS_OBRAS,
+          valor
+        });
+      }
+
+      return res.json({ ok: true, setores });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao salvar configuracao de setores para criacao em todas as obras' });
     }
   }
 };

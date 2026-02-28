@@ -1,5 +1,37 @@
-const { Obra, UsuarioObra } = require('../models');
+const { Obra, UsuarioObra, Setor, ConfiguracaoSistema } = require('../models');
 const { Op } = require('sequelize');
+const CHAVE_SETORES_CRIACAO_TODAS_OBRAS = 'SETORES_CRIACAO_TODAS_OBRAS';
+
+async function obterSetoresCriacaoTodasObras() {
+  const item = await ConfiguracaoSistema.findOne({
+    where: { chave: CHAVE_SETORES_CRIACAO_TODAS_OBRAS },
+    order: [['id', 'DESC']]
+  });
+  if (!item?.valor) return [];
+  try {
+    const data = JSON.parse(item.valor);
+    if (!Array.isArray(data?.setores)) return [];
+    return [...new Set(
+      data.setores
+        .map(v => String(v || '').trim().toUpperCase())
+        .filter(Boolean)
+    )];
+  } catch {
+    return [];
+  }
+}
+
+async function obterTokensSetorUsuario(req) {
+  const tokens = new Set();
+  if (req.user?.area) tokens.add(String(req.user.area).trim().toUpperCase());
+  if (req.user?.setor_id) {
+    tokens.add(String(req.user.setor_id).trim().toUpperCase());
+    const setor = await Setor.findByPk(req.user.setor_id, { attributes: ['codigo', 'nome'] });
+    if (setor?.codigo) tokens.add(String(setor.codigo).trim().toUpperCase());
+    if (setor?.nome) tokens.add(String(setor.nome).trim().toUpperCase());
+  }
+  return Array.from(tokens).filter(Boolean);
+}
 
 module.exports = {
   async index(req, res) {
@@ -23,7 +55,7 @@ module.exports = {
   async minhas(req, res) {
     try {
       const { id: usuarioId, perfil } = req.user;
-      const { codigo, descricao } = req.query;
+      const { codigo, descricao, modo } = req.query;
 
       if (perfil === 'SUPERADMIN') {
         const where = {};
@@ -34,6 +66,26 @@ module.exports = {
           order: [['nome', 'ASC']]
         });
         return res.json(obras);
+      }
+
+      const modoCriacao = String(modo || '').trim().toUpperCase() === 'CRIACAO';
+      if (modoCriacao) {
+        const [tokensUsuario, setoresPermitidos] = await Promise.all([
+          obterTokensSetorUsuario(req),
+          obterSetoresCriacaoTodasObras()
+        ]);
+
+        const podeCriarEmTodas = tokensUsuario.some(token => setoresPermitidos.includes(token));
+        if (podeCriarEmTodas) {
+          const where = {};
+          if (codigo) where.codigo = String(codigo).toUpperCase();
+          if (descricao) where.nome = { [Op.like]: `%${descricao}%` };
+          const obras = await Obra.findAll({
+            where,
+            order: [['nome', 'ASC']]
+          });
+          return res.json(obras);
+        }
       }
 
       if (codigo) {

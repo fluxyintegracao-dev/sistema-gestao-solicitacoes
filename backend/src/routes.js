@@ -288,6 +288,8 @@ router.get('/configuracoes/setores-visiveis-usuario', permit(['SUPERADMIN']), Co
 router.patch('/configuracoes/setores-visiveis-usuario', permit(['SUPERADMIN']), ConfiguracaoSistemaController.updateSetoresVisiveisPorUsuario);
 router.get('/configuracoes/tipos-solicitacao-por-setor', ConfiguracaoSistemaController.getTiposSolicitacaoPorSetor);
 router.patch('/configuracoes/tipos-solicitacao-por-setor', permit(['SUPERADMIN']), ConfiguracaoSistemaController.updateTiposSolicitacaoPorSetor);
+router.get('/configuracoes/setores-criacao-todas-obras', ConfiguracaoSistemaController.getSetoresCriacaoTodasObras);
+router.patch('/configuracoes/setores-criacao-todas-obras', permit(['SUPERADMIN']), ConfiguracaoSistemaController.updateSetoresCriacaoTodasObras);
 
 // -------------------------------------------------------------------
 // CONTRATOS

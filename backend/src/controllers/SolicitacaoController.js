@@ -29,6 +29,7 @@ const { uploadToS3 } = require('../services/s3');
 const CHAVE_AREAS_POR_SETOR_ORIGEM = 'AREAS_POR_SETOR_ORIGEM';
 const CHAVE_SETORES_VISIVEIS_POR_USUARIO = 'SETORES_VISIVEIS_POR_USUARIO';
 const CHAVE_TIPOS_SOLICITACAO_POR_SETOR = 'TIPOS_SOLICITACAO_POR_SETOR';
+const CHAVE_SETORES_CRIACAO_TODAS_OBRAS = 'SETORES_CRIACAO_TODAS_OBRAS';
 
 /* =====================================================
    FUNCAO AUXILIAR - VISIBILIDADE
@@ -206,6 +207,16 @@ async function obterTiposSolicitacaoPorSetorConfig() {
   });
 
   return regras;
+}
+
+async function obterSetoresCriacaoTodasObras() {
+  const data = await lerConfiguracaoJson(CHAVE_SETORES_CRIACAO_TODAS_OBRAS, { setores: [] });
+  const lista = Array.isArray(data?.setores) ? data.setores : [];
+  return [...new Set(
+    lista
+      .map(item => String(item || '').trim().toUpperCase())
+      .filter(Boolean)
+  )];
 }
 
 function obterRegrasTipoPorTokensSetor(regrasConfig = {}, tokensSetor = []) {
@@ -1193,6 +1204,28 @@ module.exports = {
       const regrasAreasPorSetor = await obterRegrasAreasPorSetorOrigem();
       const areaUsuario = await obterAreaUsuario(req);
       const tokensSetorUsuario = await obterTokensSetorUsuario(req, areaUsuario);
+      const perfilUsuario = String(req.user?.perfil || '').trim().toUpperCase();
+      const setoresCriacaoTodasObras = await obterSetoresCriacaoTodasObras();
+      const podeCriarEmTodasObras = tokensSetorUsuario.some(token =>
+        setoresCriacaoTodasObras.includes(String(token || '').trim().toUpperCase())
+      );
+
+      if (perfilUsuario !== 'SUPERADMIN' && !podeCriarEmTodasObras) {
+        const { UsuarioObra } = require('../models');
+        const vinculo = await UsuarioObra.findOne({
+          where: {
+            user_id: req.user.id,
+            obra_id
+          },
+          attributes: ['id']
+        });
+        if (!vinculo) {
+          return res.status(403).json({
+            error: 'Acesso negado. Usuario nao vinculado a obra selecionada.'
+          });
+        }
+      }
+
       const destinosPermitidos = new Set();
       tokensSetorUsuario.forEach(token => {
         const lista = regrasAreasPorSetor[String(token || '').toUpperCase()] || [];
