@@ -2248,17 +2248,13 @@ module.exports = {
         return res.status(404).json({ error: 'Solicitacao nao encontrada' });
       }
 
-      const acessoObra = await validarAcessoObra(req, solicitacao);
-      if (!acessoObra) {
-        return res.status(403).json({
-          error: 'Acesso negado. Vincule o usuario a obra para continuar.'
-        });
+      const [visibilidade] = await SolicitacaoVisibilidadeUsuario.findOrCreate({
+        where: { solicitacao_id: id, usuario_id: usuarioId },
+        defaults: { oculto: false }
+      });
+      if (visibilidade.oculto) {
+        await visibilidade.update({ oculto: false });
       }
-
-      await SolicitacaoVisibilidadeUsuario.update(
-        { oculto: false },
-        { where: { solicitacao_id: id, usuario_id: usuarioId } }
-      );
 
       return res.sendStatus(204);
     } catch (error) {
