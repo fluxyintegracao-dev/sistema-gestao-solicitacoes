@@ -16,10 +16,6 @@ function normalizarTexto(valor) {
   return String(valor || '').trim();
 }
 
-function isSuperadmin(req) {
-  return String(req.user?.perfil || '').trim().toUpperCase() === 'SUPERADMIN';
-}
-
 function extrairIdsNumericos(lista) {
   const valores = Array.isArray(lista)
     ? lista
@@ -79,10 +75,6 @@ async function podeVisualizarConversa(req, conversaId) {
   }
 
   await garantirParticipantesBasicos(conversa);
-
-  if (isSuperadmin(req)) {
-    return { conversa, permitido: true };
-  }
 
   const usuarioId = Number(req.user?.id);
   const participacao = await ConversaInternaParticipante.findOne({
@@ -239,61 +231,40 @@ module.exports = {
     try {
       let conversas = [];
       const somenteArquivadas = parseBoolean(req.query?.arquivadas);
+      const participacoes = await ConversaInternaParticipante.findAll({
+        where: { usuario_id: req.user.id },
+        attributes: ['conversa_id']
+      });
+      const idsParticipacao = participacoes.map((item) => item.conversa_id);
 
-      if (isSuperadmin(req)) {
-        conversas = await ConversaInterna.findAll({
-          include: [
+      conversas = await ConversaInterna.findAll({
+        where: {
+          [Op.and]: [
+            { criado_por_id: { [Op.ne]: req.user.id } },
             {
-              model: User,
-              as: 'criador',
-              attributes: ['id', 'nome', 'setor_id'],
-              include: [{ model: Setor, as: 'setor', attributes: ['id', 'nome', 'codigo'] }]
-            },
-            {
-              model: User,
-              as: 'destinatario',
-              attributes: ['id', 'nome', 'setor_id'],
-              include: [{ model: Setor, as: 'setor', attributes: ['id', 'nome', 'codigo'] }]
+              [Op.or]: [
+                { destinatario_id: req.user.id },
+                idsParticipacao.length > 0 ? { id: { [Op.in]: idsParticipacao } } : null
+              ].filter(Boolean)
             }
-          ],
-          order: [['updatedAt', 'DESC']]
-        });
-      } else {
-        const participacoes = await ConversaInternaParticipante.findAll({
-          where: { usuario_id: req.user.id },
-          attributes: ['conversa_id']
-        });
-        const idsParticipacao = participacoes.map((item) => item.conversa_id);
-
-        conversas = await ConversaInterna.findAll({
-          where: {
-            [Op.and]: [
-              { criado_por_id: { [Op.ne]: req.user.id } },
-              {
-                [Op.or]: [
-                  { destinatario_id: req.user.id },
-                  idsParticipacao.length > 0 ? { id: { [Op.in]: idsParticipacao } } : null
-                ].filter(Boolean)
-              }
-            ]
+          ]
+        },
+        include: [
+          {
+            model: User,
+            as: 'criador',
+            attributes: ['id', 'nome', 'setor_id'],
+            include: [{ model: Setor, as: 'setor', attributes: ['id', 'nome', 'codigo'] }]
           },
-          include: [
-            {
-              model: User,
-              as: 'criador',
-              attributes: ['id', 'nome', 'setor_id'],
-              include: [{ model: Setor, as: 'setor', attributes: ['id', 'nome', 'codigo'] }]
-            },
-            {
-              model: User,
-              as: 'destinatario',
-              attributes: ['id', 'nome', 'setor_id'],
-              include: [{ model: Setor, as: 'setor', attributes: ['id', 'nome', 'codigo'] }]
-            }
-          ],
-          order: [['updatedAt', 'DESC']]
-        });
-      }
+          {
+            model: User,
+            as: 'destinatario',
+            attributes: ['id', 'nome', 'setor_id'],
+            include: [{ model: Setor, as: 'setor', attributes: ['id', 'nome', 'codigo'] }]
+          }
+        ],
+        order: [['updatedAt', 'DESC']]
+      });
 
       for (const conversa of conversas) {
         await garantirParticipantesBasicos(conversa);
@@ -315,11 +286,8 @@ module.exports = {
 
   async saida(req, res) {
     try {
-      const where = {};
       const somenteArquivadas = parseBoolean(req.query?.arquivadas);
-      if (!isSuperadmin(req)) {
-        where.criado_por_id = req.user.id;
-      }
+      const where = { criado_por_id: req.user.id };
 
       let conversas = await ConversaInterna.findAll({
         where,
@@ -698,7 +666,7 @@ module.exports = {
         return res.status(400).json({ error: 'So e permitido adicionar participantes em conversas abertas.' });
       }
 
-      if (!isSuperadmin(req) && Number(req.user.id) !== Number(conversa.criado_por_id)) {
+      if (Number(req.user.id) !== Number(conversa.criado_por_id)) {
         return res.status(403).json({ error: 'Apenas o criador pode adicionar participantes' });
       }
 
@@ -787,7 +755,7 @@ module.exports = {
         return res.status(404).json({ error: 'Conversa nao encontrada' });
       }
 
-      if (conversa.criado_por_id !== Number(req.user.id) && !isSuperadmin(req)) {
+      if (conversa.criado_por_id !== Number(req.user.id)) {
         return res.status(403).json({ error: 'Apenas o criador pode concluir a conversa' });
       }
 
@@ -812,7 +780,7 @@ module.exports = {
         return res.status(404).json({ error: 'Conversa nao encontrada' });
       }
 
-      if (conversa.criado_por_id !== Number(req.user.id) && !isSuperadmin(req)) {
+      if (conversa.criado_por_id !== Number(req.user.id)) {
         return res.status(403).json({ error: 'Apenas o criador pode reabrir a conversa' });
       }
 
