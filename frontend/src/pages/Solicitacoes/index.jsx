@@ -1,5 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { HiDocumentArrowDown, HiViewColumns } from 'react-icons/hi2';
+import {
+  HiDocumentArrowDown,
+  HiViewColumns,
+  HiOutlineFolderOpen,
+  HiOutlineArrowRightOnRectangle,
+  HiOutlineXMark
+} from 'react-icons/hi2';
 import Filtros from './Filtros';
 import TabelaSolicitacoes from './TabelaSolicitacoes';
 import { API_URL, authHeaders } from '../../services/api';
@@ -630,6 +636,57 @@ export default function Solicitacoes({ arquivadas = false }) {
           onToggleSelecionada={toggleSelecionada}
           onToggleSelecionarTodas={toggleSelecionarTodas}
         />
+      )}
+
+      {!arquivadas && selecionadasIds.length > 0 && (
+        <div className="solicitacoes-massa-modal fixed left-1/2 -translate-x-1/2 bottom-4 z-40 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 shadow-xl rounded-2xl px-3 py-2 flex items-center gap-2">
+          <span className="text-sm font-medium text-gray-700 dark:text-slate-200 px-2">
+            {selecionadasIds.length} selecionada(s)
+          </span>
+
+          <button
+            type="button"
+            className="btn btn-outline !min-h-0 h-9 px-3 inline-flex items-center gap-2"
+            onClick={exportarSelecionadasExcel}
+            disabled={processandoMassa}
+            title="Exportar selecionadas"
+          >
+            <HiDocumentArrowDown className="w-4 h-4" />
+            <span className="hidden sm:inline">Exportar</span>
+          </button>
+
+          <button
+            type="button"
+            className="btn btn-outline !min-h-0 h-9 px-3 inline-flex items-center gap-2"
+            onClick={arquivarEmMassa}
+            disabled={processandoMassa}
+            title="Arquivar selecionadas"
+          >
+            <HiOutlineFolderOpen className="w-4 h-4" />
+            <span className="hidden sm:inline">Arquivar</span>
+          </button>
+
+          <button
+            type="button"
+            className="btn btn-outline !min-h-0 h-9 px-3 inline-flex items-center gap-2"
+            onClick={() => setModalEnvioMassa(true)}
+            disabled={processandoMassa || isSetorObra}
+            title="Enviar selecionadas para outro setor"
+          >
+            <HiOutlineArrowRightOnRectangle className="w-4 h-4" />
+            <span className="hidden sm:inline">Enviar</span>
+          </button>
+
+          <button
+            type="button"
+            className="btn btn-outline !min-h-0 h-9 px-2.5 inline-flex items-center gap-1"
+            onClick={() => setSelecionadasIds([])}
+            disabled={processandoMassa}
+            title="Limpar seleção"
+          >
+            <HiOutlineXMark className="w-4 h-4" />
+          </button>
+        </div>
       )}
 
       {modalEnvioMassa && !arquivadas && (

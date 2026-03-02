@@ -570,6 +570,19 @@ a {
   text-decoration: underline;
 }
 
+.solicitacoes-massa-modal {
+  backdrop-filter: blur(6px);
+}
+
+@media (max-width: 767px) {
+  .solicitacoes-massa-modal {
+    width: calc(100vw - 1rem);
+    justify-content: space-between;
+    padding: 0.5rem;
+    border-radius: 14px;
+  }
+}
+
 .solicitacoes-table th button {
   min-height: 32px;
 }
