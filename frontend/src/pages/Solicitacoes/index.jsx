@@ -2,12 +2,17 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   HiDocumentArrowDown,
   HiViewColumns,
+  HiOutlineEye,
+  HiOutlineUserPlus,
   HiOutlineFolderOpen,
   HiOutlineArrowRightOnRectangle,
+  HiOutlineTrash,
   HiOutlineXMark
 } from 'react-icons/hi2';
 import Filtros from './Filtros';
 import TabelaSolicitacoes from './TabelaSolicitacoes';
+import ModalAtribuirResponsavel from './ModalAtribuirResponsavel';
+import ModalEnviarSetor from './ModalEnviarSetor';
 import { API_URL, authHeaders } from '../../services/api';
 import { getSetores } from '../../services/setores';
 import { getTiposSolicitacao } from '../../services/tiposSolicitacao';
@@ -17,6 +22,7 @@ import { getStatusSetor } from '../../services/statusSetor';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   arquivarSolicitacoesEmMassa,
+  deleteSolicitacao,
   enviarSolicitacoesParaSetorEmMassa
 } from '../../services/solicitacoes';
 
@@ -34,8 +40,7 @@ export default function Solicitacoes({ arquivadas = false }) {
     'setor',
     'responsavel',
     'status',
-    'vencimento',
-    'acoes'
+    'vencimento'
   ];
   const [solicitacoes, setSolicitacoes] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -46,6 +51,8 @@ export default function Solicitacoes({ arquivadas = false }) {
   const [permissaoUsuario, setPermissaoUsuario] = useState(null);
   const [selecionadasIds, setSelecionadasIds] = useState([]);
   const [modalEnvioMassa, setModalEnvioMassa] = useState(false);
+  const [modalAtribuir, setModalAtribuir] = useState(false);
+  const [modalEnviarUnitario, setModalEnviarUnitario] = useState(false);
   const [setorEnvioMassa, setSetorEnvioMassa] = useState('');
   const [processandoMassa, setProcessandoMassa] = useState(false);
   const [mostrarSeletorColunas, setMostrarSeletorColunas] = useState(false);
@@ -248,6 +255,8 @@ export default function Solicitacoes({ arquivadas = false }) {
   ];
   const isSetorObra = setorTokens.includes('OBRA');
   const isSetorFinanceiro = setorTokens.includes('FINANCEIRO');
+  const isAdminGEO = perfilUpper.startsWith('ADMIN') && setorTokens.includes('GEO');
+  const isSuperadmin = perfilUpper === 'SUPERADMIN';
   const colunasStorageKey = useMemo(() => {
     const identificador = user?.id || user?.email || user?.nome || user?.perfil || 'anon';
     return `solicitacoes:colunas:${identificador}`;
@@ -266,8 +275,8 @@ export default function Solicitacoes({ arquivadas = false }) {
     { id: 'responsavel', label: 'Responsável' },
     { id: 'status', label: 'Status' },
     { id: 'vencimento', label: 'Vencimento' },
-    { id: 'acoes', label: 'Ações' }
-  ], [isSetorObra]);
+    ...(arquivadas ? [{ id: 'acoes', label: 'Ações' }] : [])
+  ], [isSetorObra, arquivadas]);
 
   useEffect(() => {
     try {
@@ -509,6 +518,77 @@ export default function Solicitacoes({ arquivadas = false }) {
     }
   }
 
+  const selecionadaUnica = useMemo(() => {
+    if (selecionadasIds.length !== 1) return null;
+    const idSelecionado = Number(selecionadasIds[0]);
+    return solicitacoes.find(item => Number(item.id) === idSelecionado) || null;
+  }, [selecionadasIds, solicitacoes]);
+
+  const podeAssumirUnica = useMemo(() => {
+    if (!selecionadaUnica) return false;
+    if (isSetorObra) return false;
+    const modo = String(permissaoUsuario?.modo_recebimento || 'TODOS_VISIVEIS').toUpperCase();
+    if (modo !== 'TODOS_VISIVEIS') return false;
+    const isUsuario = user?.perfil === 'USUARIO';
+    return isUsuario ? (!!permissaoUsuario?.usuario_pode_assumir || isSetorFinanceiro) : true;
+  }, [selecionadaUnica, isSetorObra, permissaoUsuario, user?.perfil, isSetorFinanceiro]);
+
+  const podeAtribuirUnica = useMemo(() => {
+    if (!selecionadaUnica) return false;
+    if (isSetorObra) return false;
+    const modo = String(permissaoUsuario?.modo_recebimento || 'TODOS_VISIVEIS').toUpperCase();
+    if (modo !== 'TODOS_VISIVEIS') return false;
+    const isUsuario = user?.perfil === 'USUARIO';
+    return isUsuario ? (!!permissaoUsuario?.usuario_pode_atribuir || isSetorFinanceiro) : true;
+  }, [selecionadaUnica, isSetorObra, permissaoUsuario, user?.perfil, isSetorFinanceiro]);
+
+  const podeExcluirUnica = !!selecionadaUnica && (isSuperadmin || isAdminGEO);
+
+  const isSetorObraSolicitacaoUnica = useMemo(() => {
+    if (!selecionadaUnica) return false;
+    const setorNomeSolicitacao =
+      (setoresMap?.[selecionadaUnica.area_responsavel] || selecionadaUnica.area_responsavel || '');
+    return String(setorNomeSolicitacao).trim().toUpperCase() === 'OBRA';
+  }, [selecionadaUnica, setoresMap]);
+
+  async function assumirSelecionada() {
+    if (!selecionadaUnica) return;
+    try {
+      const res = await fetch(`${API_URL}/solicitacoes/${selecionadaUnica.id}/assumir`, {
+        method: 'POST',
+        headers: authHeaders()
+      });
+
+      if (!res.ok) {
+        let mensagem = 'Erro ao assumir solicitação';
+        try {
+          const data = await res.json();
+          mensagem = data?.error || mensagem;
+        } catch (_) {}
+        alert(mensagem);
+        return;
+      }
+
+      alert('Solicitação assumida com sucesso.');
+      await carregar();
+    } catch (error) {
+      console.error(error);
+      alert('Erro ao assumir solicitação');
+    }
+  }
+
+  async function excluirSelecionada() {
+    if (!selecionadaUnica) return;
+    if (!confirm('Excluir esta solicitação? Esta ação não pode ser desfeita.')) return;
+    try {
+      await deleteSolicitacao(selecionadaUnica.id);
+      await carregar();
+    } catch (error) {
+      console.error(error);
+      alert('Erro ao excluir solicitação');
+    }
+  }
+
   return (
     <div className="solicitacoes-page px-0 py-1 md:py-2">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-4 md:mb-6">
@@ -644,6 +724,44 @@ export default function Solicitacoes({ arquivadas = false }) {
             {selecionadasIds.length} selecionada(s)
           </span>
 
+          {selecionadaUnica && (
+            <button
+              type="button"
+              className="btn btn-outline !min-h-0 h-9 px-3 inline-flex items-center gap-2"
+              onClick={() => window.location.assign(`/solicitacoes/${selecionadaUnica.id}`)}
+              title="Ver solicitação"
+            >
+              <HiOutlineEye className="w-4 h-4" />
+              <span className="hidden sm:inline">Ver</span>
+            </button>
+          )}
+
+          {selecionadaUnica && podeAssumirUnica && (
+            <button
+              type="button"
+              className="btn btn-outline !min-h-0 h-9 px-3 inline-flex items-center gap-2"
+              onClick={assumirSelecionada}
+              disabled={processandoMassa}
+              title="Assumir solicitação"
+            >
+              <HiOutlineUserPlus className="w-4 h-4" />
+              <span className="hidden sm:inline">Assumir</span>
+            </button>
+          )}
+
+          {selecionadaUnica && podeAtribuirUnica && (
+            <button
+              type="button"
+              className="btn btn-outline !min-h-0 h-9 px-3 inline-flex items-center gap-2"
+              onClick={() => setModalAtribuir(true)}
+              disabled={processandoMassa}
+              title="Atribuir responsável"
+            >
+              <HiOutlineUserPlus className="w-4 h-4" />
+              <span className="hidden sm:inline">Atribuir</span>
+            </button>
+          )}
+
           <button
             type="button"
             className="btn btn-outline !min-h-0 h-9 px-3 inline-flex items-center gap-2"
@@ -666,6 +784,19 @@ export default function Solicitacoes({ arquivadas = false }) {
             <span className="hidden sm:inline">Arquivar</span>
           </button>
 
+          {selecionadaUnica && !isSetorObra && (
+            <button
+              type="button"
+              className="btn btn-outline !min-h-0 h-9 px-3 inline-flex items-center gap-2"
+              onClick={() => setModalEnviarUnitario(true)}
+              disabled={processandoMassa}
+              title="Enviar para outro setor"
+            >
+              <HiOutlineArrowRightOnRectangle className="w-4 h-4" />
+              <span className="hidden sm:inline">Enviar</span>
+            </button>
+          )}
+
           <button
             type="button"
             className="btn btn-outline !min-h-0 h-9 px-3 inline-flex items-center gap-2"
@@ -674,8 +805,21 @@ export default function Solicitacoes({ arquivadas = false }) {
             title="Enviar selecionadas para outro setor"
           >
             <HiOutlineArrowRightOnRectangle className="w-4 h-4" />
-            <span className="hidden sm:inline">Enviar</span>
+            <span className="hidden sm:inline">Enviar em massa</span>
           </button>
+
+          {selecionadaUnica && podeExcluirUnica && (
+            <button
+              type="button"
+              className="btn btn-outline !min-h-0 h-9 px-3 inline-flex items-center gap-2"
+              onClick={excluirSelecionada}
+              disabled={processandoMassa}
+              title="Excluir solicitação"
+            >
+              <HiOutlineTrash className="w-4 h-4" />
+              <span className="hidden sm:inline">Excluir</span>
+            </button>
+          )}
 
           <button
             type="button"
@@ -687,6 +831,25 @@ export default function Solicitacoes({ arquivadas = false }) {
             <HiOutlineXMark className="w-4 h-4" />
           </button>
         </div>
+      )}
+
+      {!arquivadas && modalAtribuir && selecionadaUnica && (
+        <ModalAtribuirResponsavel
+          solicitacaoId={selecionadaUnica.id}
+          obraId={selecionadaUnica.obra_id}
+          isSetorObraSolicitacao={isSetorObraSolicitacaoUnica}
+          isUsuarioSetorObra={isSetorObra}
+          onClose={() => setModalAtribuir(false)}
+          onSucesso={carregar}
+        />
+      )}
+
+      {!arquivadas && modalEnviarUnitario && selecionadaUnica && (
+        <ModalEnviarSetor
+          solicitacaoId={selecionadaUnica.id}
+          onClose={() => setModalEnviarUnitario(false)}
+          onSucesso={carregar}
+        />
       )}
 
       {modalEnvioMassa && !arquivadas && (
