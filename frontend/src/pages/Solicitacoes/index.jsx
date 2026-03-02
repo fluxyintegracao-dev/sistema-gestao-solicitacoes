@@ -797,16 +797,18 @@ export default function Solicitacoes({ arquivadas = false }) {
             </button>
           )}
 
-          <button
-            type="button"
-            className="btn btn-outline !min-h-0 h-9 px-3 inline-flex items-center gap-2"
-            onClick={() => setModalEnvioMassa(true)}
-            disabled={processandoMassa || isSetorObra}
-            title="Enviar selecionadas para outro setor"
-          >
-            <HiOutlineArrowRightOnRectangle className="w-4 h-4" />
-            <span className="hidden sm:inline">Enviar em massa</span>
-          </button>
+          {selecionadasIds.length > 1 && (
+            <button
+              type="button"
+              className="btn btn-outline !min-h-0 h-9 px-3 inline-flex items-center gap-2"
+              onClick={() => setModalEnvioMassa(true)}
+              disabled={processandoMassa || isSetorObra}
+              title="Enviar selecionadas para outro setor"
+            >
+              <HiOutlineArrowRightOnRectangle className="w-4 h-4" />
+              <span className="hidden sm:inline">Enviar em massa</span>
+            </button>
+          )}
 
           {selecionadaUnica && podeExcluirUnica && (
             <button
