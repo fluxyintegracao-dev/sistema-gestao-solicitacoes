@@ -648,6 +648,11 @@ export default function NovaSolicitacao() {
                     contrato_id: contratoId,
                     codigo_contrato: contrato?.codigo || ''
                   }));
+                  setRefContratoBusca(contrato?.ref_contrato || '');
+                  setRefResultados([]);
+                  if (!contratoId) {
+                    setContratosRef([]);
+                  }
                 }}
                 className="input"
                 disabled={!form.obra_id && contratosDisponiveis.length === 0}
