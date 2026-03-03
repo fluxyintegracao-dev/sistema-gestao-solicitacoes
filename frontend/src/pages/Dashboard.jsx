@@ -80,16 +80,16 @@ export default function Dashboard() {
     [dados.porArea]
   );
 
-  const cores = ['#6366f1', '#14b8a6', '#f59e0b', '#f472b6', '#0ea5e9'];
+  const cores = ['#1d4ed8', '#2563eb', '#3b82f6', '#60a5fa', '#0ea5e9'];
   const titulo = isSuperadmin ? 'Dashboard Executivo' : 'Dashboard do Setor';
   const subtitulo = isSuperadmin
-    ? 'Visao geral das solicitacoes e indicadores principais.'
-    : 'Visao do seu setor.';
+    ? 'Visão geral das solicitações e indicadores principais.'
+    : 'Visão do seu setor.';
 
   if (loading) {
     return (
       <div className="page dashboard">
-        <p className="text-sm text-gray-600">Carregando dashboard executivo...</p>
+        <p className="text-sm" style={{ color: 'var(--c-muted)' }}>Carregando dashboard executivo...</p>
       </div>
     );
   }
@@ -99,7 +99,7 @@ export default function Dashboard() {
       <div className="page dashboard">
         <div className="card">
           <h1 className="page-title">Dashboard</h1>
-          <p className="text-sm text-gray-600">{erro}</p>
+          <p className="text-sm" style={{ color: 'var(--c-muted)' }}>{erro}</p>
         </div>
       </div>
     );
@@ -110,14 +110,14 @@ export default function Dashboard() {
       <section className="dash-hero">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 relative z-10">
           <div>
-            <p className="text-xs uppercase tracking-[0.18em] text-slate-300">
-              {isSuperadmin ? 'Visao Global' : 'Visao Setor'}
+            <p className="text-xs uppercase tracking-[0.18em]" style={{ color: 'var(--c-muted)' }}>
+              {isSuperadmin ? 'Visão Global' : 'Visão Setor'}
             </p>
-            <h1 className="text-2xl font-bold text-white leading-tight">{titulo}</h1>
-            <p className="text-sm text-slate-200/80">{subtitulo}</p>
+            <h1 className="text-2xl font-bold leading-tight" style={{ color: 'var(--c-text)' }}>{titulo}</h1>
+            <p className="text-sm" style={{ color: 'var(--c-muted)' }}>{subtitulo}</p>
           </div>
           <div className="chip">
-            <span className="chip-dot" style={{ background: '#22c55e' }} />
+            <span className="chip-dot" style={{ background: '#3b82f6' }} />
             Dados em tempo real
           </div>
         </div>
@@ -128,9 +128,9 @@ export default function Dashboard() {
               <span>{dados.total}</span>
             </div>
             <div className="flex-1">
-              <p className="text-xs uppercase tracking-wide text-slate-600">Solicitações</p>
-              <h3 className="text-lg font-semibold text-slate-900">Volume total</h3>
-              <p className="text-sm text-slate-600">
+              <p className="text-xs uppercase tracking-wide" style={{ color: 'var(--c-muted)' }}>Solicitações</p>
+              <h3 className="text-lg font-semibold" style={{ color: 'var(--c-text)' }}>Volume total</h3>
+              <p className="text-sm" style={{ color: 'var(--c-muted)' }}>
                 Pendentes: <strong>{getTotalByStatus('PENDENTE')}</strong> · Em análise:{' '}
                 <strong>{getTotalByStatus('EM_ANALISE')}</strong>
               </p>
@@ -140,14 +140,14 @@ export default function Dashboard() {
           <div className="glass metric-grid">
             {[
               { label: 'Pendentes', value: getTotalByStatus('PENDENTE'), color: cores[0] },
-              { label: 'Em Análise', value: getTotalByStatus('EM_ANALISE'), color: cores[1] },
+              { label: 'Em análise', value: getTotalByStatus('EM_ANALISE'), color: cores[1] },
               { label: 'Concluídas', value: getTotalByStatus('CONCLUIDA'), color: cores[2] },
-              { label: 'Valor Total', value: valorTotal, color: cores[3], isMoney: true }
+              { label: 'Valor total', value: valorTotal, color: cores[3], isMoney: true }
             ].map(item => (
               <div key={item.label} className="value-block">
                 <div>
-                  <p className="text-xs uppercase tracking-wide text-slate-500">{item.label}</p>
-                  <strong className="text-slate-900">
+                  <p className="text-xs uppercase tracking-wide" style={{ color: 'var(--c-muted)' }}>{item.label}</p>
+                  <strong style={{ color: 'var(--c-text)' }}>
                     {item.isMoney
                       ? item.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
                       : item.value}
@@ -163,11 +163,11 @@ export default function Dashboard() {
       <section className="two-col">
         <div className="glass">
           <div className="value-block mb-3">
-            <h3 className="font-semibold text-slate-900">Solicitações por Status</h3>
-            <span className="pill">Equilibrio</span>
+            <h3 className="font-semibold" style={{ color: 'var(--c-text)' }}>Solicitações por Status</h3>
+            <span className="pill">Equilíbrio</span>
           </div>
           {dados.porStatus.length === 0 ? (
-            <p className="text-sm text-slate-500">Nenhum dado disponivel</p>
+            <p className="text-sm" style={{ color: 'var(--c-muted)' }}>Nenhum dado disponível</p>
           ) : (
             <div className="space-y-3">
               {dados.porStatus.map((item, idx) => {
@@ -176,8 +176,8 @@ export default function Dashboard() {
                 return (
                   <div key={item.status_global} className="space-y-1">
                     <div className="flex items-center justify-between text-sm">
-                      <span className="text-slate-600">{item.status_global}</span>
-                      <span className="font-semibold text-slate-900">{total}</span>
+                      <span style={{ color: 'var(--c-muted)' }}>{item.status_global}</span>
+                      <span className="font-semibold" style={{ color: 'var(--c-text)' }}>{total}</span>
                     </div>
                     <div className="progress-track">
                       <div
@@ -197,11 +197,11 @@ export default function Dashboard() {
 
         <div className="glass">
           <div className="value-block mb-3">
-            <h3 className="font-semibold text-slate-900">Solicitações por Área</h3>
+            <h3 className="font-semibold" style={{ color: 'var(--c-text)' }}>Solicitações por Área</h3>
             <span className="pill">Mapa de carga</span>
           </div>
           {dados.porArea.length === 0 ? (
-            <p className="text-sm text-slate-500">Nenhum dado disponivel</p>
+            <p className="text-sm" style={{ color: 'var(--c-muted)' }}>Nenhum dado disponível</p>
           ) : (
             <div className="space-y-3">
               {dados.porArea.map((item, idx) => {
@@ -210,8 +210,8 @@ export default function Dashboard() {
                 return (
                   <div key={item.area_responsavel} className="space-y-1">
                     <div className="flex items-center justify-between text-sm">
-                      <span className="text-slate-600">{item.area_responsavel}</span>
-                      <span className="font-semibold text-slate-900">{total}</span>
+                      <span style={{ color: 'var(--c-muted)' }}>{item.area_responsavel}</span>
+                      <span className="font-semibold" style={{ color: 'var(--c-text)' }}>{total}</span>
                     </div>
                     <div className="progress-track">
                       <div
@@ -233,18 +233,18 @@ export default function Dashboard() {
       <section className="two-col">
         <div className="glass">
           <div className="value-block mb-3">
-            <h3 className="font-semibold text-slate-900">Valores por Status</h3>
+            <h3 className="font-semibold" style={{ color: 'var(--c-text)' }}>Valores por Status</h3>
             <span className="pill">Financeiro</span>
           </div>
           {dados.valoresPorStatus.length === 0 ? (
-            <p className="text-sm text-slate-500">Nenhum valor registrado</p>
+            <p className="text-sm" style={{ color: 'var(--c-muted)' }}>Nenhum valor registrado</p>
           ) : (
             <div className="space-y-3">
               {dados.valoresPorStatus.map((item, idx) => (
                 <div key={item.status_global} className="space-y-1">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-slate-600">{item.status_global}</span>
-                    <span className="font-semibold text-slate-900">
+                    <span style={{ color: 'var(--c-muted)' }}>{item.status_global}</span>
+                    <span className="font-semibold" style={{ color: 'var(--c-text)' }}>
                       {Number(item.valor_total || 0).toLocaleString('pt-BR', {
                         style: 'currency',
                         currency: 'BRL'

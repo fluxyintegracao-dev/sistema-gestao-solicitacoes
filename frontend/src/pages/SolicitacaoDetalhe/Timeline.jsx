@@ -9,8 +9,7 @@ export default function Timeline({ historicos, canRemoveAnexo = false, onAnexoRe
     const valor = String(url || '');
     if (!valor.startsWith('http')) return valor;
 
-    // Corrige anexos antigos salvos com "%" literal no nome (ex.: "%%20"),
-    // evitando URL inválida antes de pedir a URL assinada.
+    // Corrige anexos antigos salvos com '%' literal no nome.
     return valor.replace(/%(?![0-9A-Fa-f]{2})/g, '%25');
   }
 
@@ -39,11 +38,8 @@ export default function Timeline({ historicos, canRemoveAnexo = false, onAnexoRe
   async function baixarArquivo(caminhoArquivo, nomeArquivo) {
     try {
       const urlArquivo = await obterUrlAssinada(caminhoArquivo);
-
       const response = await fetch(urlArquivo);
-      if (!response.ok) {
-        throw new Error('Falha ao baixar arquivo');
-      }
+      if (!response.ok) throw new Error('Falha ao baixar arquivo');
 
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
@@ -65,13 +61,10 @@ export default function Timeline({ historicos, canRemoveAnexo = false, onAnexoRe
     if (!confirmar) return;
 
     try {
-      const res = await fetch(
-        `${API_URL}/anexos/historico/${historicoId}`,
-        {
-          method: 'DELETE',
-          headers: authHeaders()
-        }
-      );
+      const res = await fetch(`${API_URL}/anexos/historico/${historicoId}`, {
+        method: 'DELETE',
+        headers: authHeaders()
+      });
 
       const data = await res.json().catch(() => null);
       if (!res.ok) {
@@ -88,24 +81,27 @@ export default function Timeline({ historicos, canRemoveAnexo = false, onAnexoRe
   }
 
   return (
-    <div className="bg-white p-4 rounded-xl shadow">
-      <h2 className="font-semibold mb-4">Historico</h2>
+    <div className="sol-detail-card">
+      <h2 className="sol-detail-card-title">Historico</h2>
 
-      <div className="space-y-4 max-h-[70vh] overflow-y-auto">
+      <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
         {historicos.map(h => {
-          const meta = h.metadata ? JSON.parse(h.metadata) : null;
-          const acaoLabel = h.acao === 'NUMERO_PEDIDO_ATUALIZADO' ? 'Nº no SIENGE Atualizado' : h.acao;
+          let meta = null;
+          try {
+            meta = h.metadata ? JSON.parse(h.metadata) : null;
+          } catch {
+            meta = null;
+          }
+
+          const acaoLabel = h.acao === 'NUMERO_PEDIDO_ATUALIZADO' ? 'No SIENGE atualizado' : h.acao;
           const atorNome = meta?.ator_nome || null;
           const responsavelNome = meta?.responsavel_nome || h.usuario?.nome || null;
           const caminhoArquivo = meta?.caminho || null;
           const podeExibirArquivo = ['ANEXO_ADICIONADO', 'COMPROVANTE_ADICIONADO'].includes(h.acao);
 
           return (
-            <div
-              key={h.id}
-              className="border-l-4 border-blue-500 pl-3"
-            >
-              <p className="text-sm font-medium">{acaoLabel}</p>
+            <div key={h.id} className="sol-detail-timeline-item">
+              <p className="text-sm font-semibold">{acaoLabel}</p>
 
               {(h.status_anterior || h.status_novo) && (
                 <p className="text-sm text-gray-700">
@@ -127,14 +123,10 @@ export default function Timeline({ historicos, canRemoveAnexo = false, onAnexoRe
               )}
 
               {h.acao === 'ENVIADA_SETOR' && h.observacao && (
-                <p className="text-sm text-gray-700">
-                  {h.observacao}
-                </p>
+                <p className="text-sm text-gray-700">{h.observacao}</p>
               )}
 
-              {h.descricao && (
-                <p className="text-sm text-gray-700">{h.descricao}</p>
-              )}
+              {h.descricao && <p className="text-sm text-gray-700">{h.descricao}</p>}
 
               {podeExibirArquivo && meta && caminhoArquivo && (
                 <div className="flex gap-3 mt-1">
@@ -148,14 +140,15 @@ export default function Timeline({ historicos, canRemoveAnexo = false, onAnexoRe
                         url: urlArquivo
                       });
                     }}
+                    type="button"
                   >
                     Visualizar
                   </button>
 
                   <button
                     type="button"
-                    className="text-green-600 text-sm"
-                    onClick={async (e) => {
+                    className="text-blue-600 text-sm"
+                    onClick={async e => {
                       e.preventDefault();
                       e.stopPropagation();
                       await baixarArquivo(caminhoArquivo, h.descricao);
@@ -167,7 +160,7 @@ export default function Timeline({ historicos, canRemoveAnexo = false, onAnexoRe
                   {canRemoveAnexo && (
                     <button
                       type="button"
-                      className="text-red-600 text-sm"
+                      className="text-blue-700 text-sm"
                       onClick={() => removerAnexo(h.id)}
                     >
                       Remover
@@ -176,8 +169,8 @@ export default function Timeline({ historicos, canRemoveAnexo = false, onAnexoRe
                 </div>
               )}
 
-              <span className="text-xs text-gray-400">
-                {h.usuario?.nome} • {new Date(h.createdAt).toLocaleString()}
+              <span className="sol-detail-timeline-meta">
+                {h.usuario?.nome || '-'} | {new Date(h.createdAt).toLocaleString('pt-BR')}
               </span>
             </div>
           );

@@ -63,7 +63,7 @@ export default function Login() {
         </div>
 
 <h1 className="text-2xl font-semibold text-center">
-          Sistema de Solicitações
+          Fluxy
         </h1>
 
         <input

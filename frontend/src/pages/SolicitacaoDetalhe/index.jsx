@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { HiOutlineArrowLeft, HiChevronRight } from 'react-icons/hi2';
 import { useAuth } from '../../contexts/AuthContext';
 
 import Header from './Header';
@@ -13,16 +14,16 @@ import { updateStatusSolicitacao } from '../../services/solicitacoes';
 import { API_URL, authHeaders } from '../../services/api';
 
 export default function SolicitacaoDetalhe() {
-
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+
   const setorTokens = [
     String(user?.setor?.codigo || '').toUpperCase(),
     String(user?.setor?.nome || '').toUpperCase(),
     String(user?.area || '').toUpperCase()
   ];
-  const isSetorObra = setorTokens.includes('OBRA');
+
   const isSetorGeo = setorTokens.includes('GEO');
   const isSetorCompras = setorTokens.includes('COMPRAS');
   const isSuperadmin = String(user?.perfil || '').trim().toUpperCase() === 'SUPERADMIN';
@@ -33,11 +34,7 @@ export default function SolicitacaoDetalhe() {
   const [modalEnviarSetor, setModalEnviarSetor] = useState(false);
 
   const perfil = String(user?.perfil || '').trim().toUpperCase();
-  const setorUsuario =
-    user?.setor?.codigo ||
-    user?.area ||
-    user?.setor?.nome ||
-    '';
+  const setorUsuario = user?.setor?.codigo || user?.area || user?.setor?.nome || '';
   const setorParaStatus =
     perfil === 'SUPERADMIN'
       ? null
@@ -55,29 +52,23 @@ export default function SolicitacaoDetalhe() {
     try {
       setLoading(true);
 
-      const res = await fetch(
-        `${API_URL}/solicitacoes/${id}`,
-        {
-          headers: authHeaders()
-        }
-      );
+      const res = await fetch(`${API_URL}/solicitacoes/${id}`, {
+        headers: authHeaders()
+      });
 
       const data = await res.json();
       if (!res.ok) {
         throw new Error(data?.error || 'Erro ao carregar solicitacao');
       }
-      setSolicitacao(data);
 
+      setSolicitacao(data);
     } catch (err) {
       console.error(err);
-      alert('Erro ao carregar solicitação');
+      alert('Erro ao carregar solicitacao');
     } finally {
       setLoading(false);
     }
   }
-
-  if (loading) return <p>Carregando...</p>;
-  if (!solicitacao) return null;
 
   async function salvarStatus(novoStatus) {
     try {
@@ -91,18 +82,33 @@ export default function SolicitacaoDetalhe() {
     }
   }
 
+  if (loading) return <p>Carregando...</p>;
+  if (!solicitacao) return null;
+
+  const atualizadoEm = new Date(solicitacao.updatedAt || solicitacao.createdAt).toLocaleString('pt-BR');
+
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
+    <div className="sol-detail-page max-w-6xl mx-auto space-y-6">
+      <div className="sol-detail-nav">
+        <button
+          onClick={() => navigate(-1)}
+          className="sol-detail-back-btn"
+          type="button"
+        >
+          <HiOutlineArrowLeft className="sol-detail-back-icon" />
+          <span>Voltar para solicitacoes</span>
+        </button>
 
-      {/* VOLTAR */}
-      <button
-        onClick={() => navigate(-1)}
-        className="text-sm text-gray-600 hover:underline"
-      >
-        ← Voltar
-      </button>
+        <div className="sol-detail-nav-right">
+          <div className="sol-detail-breadcrumb">
+            <span>Solicitacoes</span>
+            <HiChevronRight className="sol-detail-breadcrumb-sep" />
+            <span className="sol-detail-breadcrumb-current">{solicitacao.codigo}</span>
+          </div>
+          <span className="sol-detail-updated-at">Atualizado em {atualizadoEm}</span>
+        </div>
+      </div>
 
-      {/* CABEÇALHO */}
       <Header
         solicitacao={solicitacao}
         onAlterarStatus={() => setModalStatus(true)}
@@ -111,20 +117,14 @@ export default function SolicitacaoDetalhe() {
         mostrarEnviarSetor
       />
 
-      {/* CONTEÚDO */}
       <div className="grid md:grid-cols-2 gap-6">
-
-        {/* TIMELINE */}
         <Timeline
           historicos={solicitacao.historicos || []}
           canRemoveAnexo={isSetorCompras || isSuperadmin}
           onAnexoRemovido={carregar}
         />
 
-        {/* LADO DIREITO */}
         <div className="space-y-6">
-
-          {/* CAMPO COMENTÁRIO */}
           <Comentarios
             solicitacaoId={id}
             onSucesso={carregar}
@@ -138,14 +138,11 @@ export default function SolicitacaoDetalhe() {
             />
           )}
 
-          {/* UPLOAD */}
           <Anexos
             solicitacaoId={id}
             onSucesso={carregar}
           />
-
         </div>
-
       </div>
 
       <ModalAlterarStatus
@@ -162,7 +159,6 @@ export default function SolicitacaoDetalhe() {
           onSucesso={carregar}
         />
       )}
-
     </div>
   );
 }

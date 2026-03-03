@@ -6,7 +6,7 @@ export default function Pedido({ solicitacaoId, numeroPedido, onSucesso }) {
   const [loading, setLoading] = useState(false);
 
   async function salvar() {
-    if (!confirm('Confirmar envio do Nº no SIENGE?')) return;
+    if (!confirm('Confirmar envio do No SIENGE?')) return;
 
     try {
       setLoading(true);
@@ -17,25 +17,25 @@ export default function Pedido({ solicitacaoId, numeroPedido, onSucesso }) {
       });
 
       if (!res.ok) {
-        throw new Error('Erro ao atualizar Nº no SIENGE da solicitação');
+        throw new Error('Erro ao atualizar No SIENGE da solicitacao');
       }
 
       onSucesso?.();
-      alert('Nº no SIENGE registrado com sucesso.');
+      alert('No SIENGE registrado com sucesso.');
     } catch (error) {
       console.error(error);
-      alert('Erro ao salvar Nº no SIENGE');
+      alert('Erro ao salvar No SIENGE');
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className="bg-white p-4 rounded-xl shadow space-y-2">
-      <h2 className="font-semibold">Nº no SIENGE</h2>
+    <div className="sol-detail-card space-y-3">
+      <h2 className="sol-detail-card-title">No no SIENGE</h2>
       <input
         className="input"
-        placeholder="Informe o Nº no SIENGE"
+        placeholder="Informe o No no SIENGE"
         value={valor}
         onChange={e => setValor(e.target.value)}
       />
@@ -43,7 +43,8 @@ export default function Pedido({ solicitacaoId, numeroPedido, onSucesso }) {
         <button
           onClick={salvar}
           disabled={loading}
-          className="bg-blue-600 text-white px-4 py-2 rounded"
+          className="btn btn-primary"
+          type="button"
         >
           {loading ? 'Salvando...' : 'Salvar'}
         </button>

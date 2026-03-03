@@ -8,6 +8,13 @@ function formatarData(valor) {
   return data.toLocaleDateString('pt-BR');
 }
 
+function formatarDataHora(valor) {
+  if (!valor) return '-';
+  const data = new Date(valor);
+  if (Number.isNaN(data.getTime())) return '-';
+  return data.toLocaleString('pt-BR');
+}
+
 function formatarValor(valor) {
   if (valor === null || valor === undefined || valor === '') return '-';
   const numero = Number(valor);
@@ -23,6 +30,15 @@ function extrairMensagemErro(error) {
   } catch {
     return error.message;
   }
+}
+
+function InfoItem({ label, value }) {
+  return (
+    <div className="sol-detail-stat">
+      <span className="sol-detail-stat-label">{label}</span>
+      <p className="sol-detail-stat-value">{value || '-'}</p>
+    </div>
+  );
 }
 
 export default function Header({
@@ -73,108 +89,48 @@ export default function Header({
   const setorStatusAtual = ultimoHistoricoStatus?.setor || solicitacao?.area_responsavel || null;
 
   return (
-    <div className="bg-white p-6 rounded-xl shadow">
-
-      <div className="flex justify-between items-center">
-
-        <div>
-          <h1 className="text-xl font-semibold">
-            {solicitacao.codigo}
-          </h1>
-
-          <p className="text-sm text-gray-500">
-            Tipo: {solicitacao.tipo?.nome || '-'}
-          </p>
+    <div className="sol-detail-header">
+      <div className="sol-detail-header-main">
+        <div className="sol-detail-title-wrap">
+          <span className="sol-detail-code-chip">{solicitacao.codigo || '-'}</span>
+          <h1 className="sol-detail-type">{solicitacao.tipo?.nome || '-'}</h1>
+          <p className="sol-detail-description">{solicitacao.descricao || 'Sem descricao informada.'}</p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="sol-detail-actions">
           {mostrarAlterarStatus && (
-            <button
-              onClick={onAlterarStatus}
-              className="btn btn-outline"
-            >
+            <button onClick={onAlterarStatus} className="btn btn-outline sol-detail-action-btn" type="button">
               Alterar status
             </button>
           )}
           <StatusBadge status={solicitacao.status_global} setor={setorStatusAtual} />
           {mostrarEnviarSetor && (
-            <button
-              onClick={onEnviarSetor}
-              className="btn btn-outline"
-            >
+            <button onClick={onEnviarSetor} className="btn btn-outline sol-detail-action-btn" type="button">
               Enviar para outro setor
             </button>
           )}
         </div>
-
       </div>
 
-      <p className="mt-4">
-        {solicitacao.descricao}
-      </p>
-
-      <div className="grid grid-cols-2 md:grid-cols-7 gap-4 mt-4 text-sm">
-
-        <div>
-          <span className="text-gray-500">Obra</span>
-          <p>{solicitacao.obra?.nome}</p>
-        </div>
-
-        <div>
-          <span className="text-gray-500">Setor</span>
-          <p>{solicitacao.area_responsavel}</p>
-        </div>
-
-        <div>
-          <span className="text-gray-500">Valor</span>
-          <p>{formatarValor(solicitacao.valor)}</p>
-        </div>
-
-        <div>
-          <span className="text-gray-500">Criado em</span>
-          <p>
-            {new Date(solicitacao.createdAt).toLocaleString()}
-          </p>
-        </div>
-
-        <div>
-          <span className="text-gray-500">Data de vencimento</span>
-          <p>{formatarData(solicitacao.data_vencimento)}</p>
-        </div>
-
-        <div>
-          <span className="text-gray-500">Inicio da medicao</span>
-          <p>{formatarData(solicitacao.data_inicio_medicao)}</p>
-        </div>
-
-        <div>
-          <span className="text-gray-500">Fim da medicao</span>
-          <p>{formatarData(solicitacao.data_fim_medicao)}</p>
-        </div>
-
-        <div>
-          <span className="text-gray-500">Status</span>
-          <p>{solicitacao.status_global}</p>
-        </div>
-
+      <div className="sol-detail-stats-grid">
+        <InfoItem label="Obra" value={solicitacao.obra?.nome || '-'} />
+        <InfoItem label="Setor" value={solicitacao.area_responsavel || '-'} />
+        <InfoItem label="Valor" value={formatarValor(solicitacao.valor)} />
+        <InfoItem label="Criado em" value={formatarDataHora(solicitacao.createdAt)} />
+        <InfoItem label="Vencimento" value={formatarData(solicitacao.data_vencimento)} />
+        <InfoItem label="Inicio da medicao" value={formatarData(solicitacao.data_inicio_medicao)} />
+        <InfoItem label="Fim da medicao" value={formatarData(solicitacao.data_fim_medicao)} />
+        <InfoItem label="Status" value={solicitacao.status_global || '-'} />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 text-sm">
-        <div>
-          <span className="text-gray-500">Ref. do Contrato</span>
-          <p>{refContratoAtual}</p>
-        </div>
-        <div>
-          <span className="text-gray-500">Contrato</span>
-          <p>{codigoContratoAtual}</p>
-        </div>
+      <div className="sol-detail-stats-grid sol-detail-contract-grid">
+        <InfoItem label="Ref. do contrato" value={refContratoAtual} />
+        <InfoItem label="Contrato" value={codigoContratoAtual} />
       </div>
 
       {podeEditarRefContrato && (
-        <div className="mt-4 p-3 border rounded-lg bg-gray-50">
-          <p className="text-sm font-medium text-gray-700 mb-2">
-            Editar Ref. do Contrato
-          </p>
+        <div className="sol-detail-contract-editor">
+          <p className="sol-detail-contract-editor-title">Editar ref. do contrato</p>
           <div className="flex flex-col md:flex-row gap-2">
             <select
               className="input"
@@ -194,12 +150,11 @@ export default function Header({
               onClick={handleSalvarRefContrato}
               disabled={!houveAlteracaoRef || salvandoRef}
             >
-              {salvandoRef ? 'Salvando...' : 'Salvar Ref.'}
+              {salvandoRef ? 'Salvando...' : 'Salvar ref.'}
             </button>
           </div>
         </div>
       )}
-
     </div>
   );
 }

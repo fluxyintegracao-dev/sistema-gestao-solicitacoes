@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { getMinhasObras } from '../services/obras';
 import { getTiposSolicitacao } from '../services/tiposSolicitacao';
 import { getSetores } from '../services/setores';
@@ -9,6 +9,7 @@ import { getContratos } from '../services/contratos';
 import ObraSearchModal from '../components/ObraSearchModal';
 import { getAreasObra, getAreasPorSetorOrigem, getTiposSolicitacaoPorSetor } from '../services/configuracoesSistema';
 import { useAuth } from '../contexts/AuthContext';
+import { HiPaperClip } from 'react-icons/hi2';
 
 export default function NovaSolicitacao() {
   const { user } = useAuth();
@@ -772,7 +773,7 @@ export default function NovaSolicitacao() {
             <textarea
               name="itens_apropriacao"
               onChange={handleChange}
-              className="input min-h-[120px]"
+              className="input min-h-[120px] text-[var(--c-text)] placeholder:text-[var(--c-muted)]"
               required
               value={form.itens_apropriacao}
               placeholder="Descreva os itens de apropriação"
@@ -791,7 +792,7 @@ export default function NovaSolicitacao() {
               }))
             }
             maxLength={50}
-            className="input min-h-[120px]"
+            className="input min-h-[120px] text-[var(--c-text)] placeholder:text-[var(--c-muted)]"
             required={!medicaoObrigatoria}
             value={form.descricao}
           />
@@ -802,23 +803,35 @@ export default function NovaSolicitacao() {
 
         <label className="grid gap-1 text-sm">
           Anexos
-          <input
-            type="file"
-            multiple
-            ref={anexosRef}
-            onChange={e => setArquivos([...e.target.files])}
-          />
+          <div className="flex items-center gap-2 flex-wrap">
+            <label className="btn btn-outline inline-flex items-center gap-2 cursor-pointer">
+              <HiPaperClip className="w-4 h-4" />
+              <span>Anexar arquivos</span>
+              <input
+                type="file"
+                multiple
+                ref={anexosRef}
+                className="hidden"
+                onChange={e => setArquivos([...e.target.files])}
+              />
+            </label>
+            <span className="text-xs text-[var(--c-muted)]">
+              {arquivos.length > 0
+                ? `${arquivos.length} arquivo(s) selecionado(s)`
+                : 'Nenhum arquivo selecionado'}
+            </span>
+          </div>
           {arquivos.length > 0 && (
             <div className="mt-2 space-y-1">
               {arquivos.map((arquivo, index) => (
                 <div
                   key={`${arquivo.name}-${index}`}
-                  className="flex items-center justify-between text-sm bg-gray-50 border rounded px-2 py-1"
+                  className="flex items-center justify-between text-sm bg-[var(--c-surface)] border border-[var(--c-border)] rounded px-2 py-1"
                 >
                   <span className="truncate">{arquivo.name}</span>
                   <button
                     type="button"
-                    className="text-red-600 font-bold px-2"
+                    className="text-blue-600 font-bold px-2"
                     onClick={e => {
                       e.preventDefault();
                       e.stopPropagation();
@@ -854,4 +867,5 @@ export default function NovaSolicitacao() {
     </div>
   );
 }
+
 

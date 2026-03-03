@@ -143,13 +143,13 @@ export default function Perfil() {
         </div>
 
         {erro && (
-          <p className="text-sm text-red-600">
+          <p className="text-sm text-blue-700">
             {erro}
           </p>
         )}
 
         {mensagem && (
-          <p className="text-sm text-green-600">
+          <p className="text-sm text-blue-600">
             {mensagem}
           </p>
         )}

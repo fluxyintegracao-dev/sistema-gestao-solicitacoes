@@ -170,17 +170,35 @@ export default function LinhaSolicitacao({
   }
 
   const acaoCores = tema?.actions || {};
+  const podeSelecionarLinha = selecaoHabilitada && typeof onToggleSelecionada === 'function';
+
+  function clicarEmElementoInterativo(target) {
+    if (!(target instanceof Element)) return false;
+    return !!target.closest('button, a, input, select, textarea, label, [role=\"button\"], [data-no-row-select=\"true\"]');
+  }
+
+  function alternarSelecaoLinha() {
+    if (!podeSelecionarLinha) return;
+    onToggleSelecionada(solicitacao.id);
+  }
 
   return (
     <>
-      <tr className="border-b border-gray-200 dark:border-slate-700 odd:bg-white even:bg-gray-50/50 dark:odd:bg-slate-900 dark:even:bg-slate-800/90 hover:bg-blue-50/40 dark:hover:bg-slate-700 text-gray-900 dark:text-slate-100">
+      <tr
+        className={`solicitacao-row border-b border-gray-200 dark:border-slate-700 odd:bg-white even:bg-gray-50/50 dark:odd:bg-slate-900 dark:even:bg-slate-800/90 hover:bg-blue-50/40 dark:hover:bg-slate-700 ${podeSelecionarLinha ? 'cursor-pointer' : ''}`}
+        onClick={(event) => {
+          if (!podeSelecionarLinha) return;
+          if (clicarEmElementoInterativo(event.target)) return;
+          alternarSelecaoLinha();
+        }}
+      >
 
         {selecaoHabilitada && (
           <td className="p-2 whitespace-nowrap" data-label="Selecionar">
             <input
               type="checkbox"
               checked={!!selecionada}
-              onChange={() => onToggleSelecionada?.(solicitacao.id)}
+              onChange={alternarSelecaoLinha}
               aria-label={`Selecionar ${solicitacao.codigo || solicitacao.id}`}
             />
           </td>
@@ -273,7 +291,7 @@ export default function LinhaSolicitacao({
 
         {mostrarColuna('valor') && (
         <td
-          {...tdBase('Valor', 'p-2 whitespace-nowrap')}
+          {...tdBase('Valor', 'p-2 overflow-hidden')}
           title={solicitacao.valor ? String(solicitacao.valor) : ''}
         >
           {editandoValor ? (
@@ -281,12 +299,12 @@ export default function LinhaSolicitacao({
               <input
                 type="number"
                 step="0.01"
-                className="w-24 border rounded p-1 text-right"
+                className="w-24 rounded px-2 py-1 text-right bg-[var(--c-surface)] text-[var(--c-text)] border border-[var(--c-border)] focus:outline-none focus:ring-2 focus:ring-blue-500/35"
                 value={valorEditado}
                 onChange={e => setValorEditado(e.target.value)}
               />
               <button
-                className="text-xs text-green-600 hover:underline"
+                className="text-xs text-blue-700 hover:underline"
                 onClick={salvarValor}
               >
                 Salvar
@@ -306,8 +324,18 @@ export default function LinhaSolicitacao({
               </button>
             </div>
           ) : (
-            <div className="flex items-center gap-2">
-              <span>
+            <div className="flex flex-col items-start gap-1 min-w-0 w-full">
+              <span
+                className="block w-full min-w-0 truncate"
+                title={
+                  solicitacao.valor
+                    ? Number(solicitacao.valor).toLocaleString('pt-BR', {
+                        style: 'currency',
+                        currency: 'BRL'
+                      })
+                    : '-'
+                }
+              >
                 {solicitacao.valor
                   ? Number(solicitacao.valor).toLocaleString('pt-BR', {
                       style: 'currency',
@@ -317,7 +345,7 @@ export default function LinhaSolicitacao({
               </span>
               {podeEditarValor && (
                 <button
-                  className="text-xs text-blue-600 hover:underline"
+                  className="text-[11px] leading-none text-blue-600 hover:underline shrink-0"
                   onClick={() => setEditandoValor(true)}
                 >
                   Editar
@@ -371,9 +399,9 @@ export default function LinhaSolicitacao({
         <td {...tdBase('Ações', 'p-2 whitespace-nowrap')}>
           <div className={`solicitacao-acoes ${isMobileCard ? 'flex-wrap' : 'flex-nowrap'}`}>
 
-          <button
-            className="acao-link"
-            style={{ color: acaoCores.ver || '#2563eb' }}
+            <button
+              className="acao-link"
+              style={{ color: acaoCores.ver || '#2563eb' }}
             onClick={() =>
               navigate(`/solicitacoes/${solicitacao.id}`)
             }
@@ -383,7 +411,7 @@ export default function LinhaSolicitacao({
           {podeAssumir && (
             <button
               className="acao-link"
-              style={{ color: acaoCores.assumir || '#16a34a' }}
+              style={{ color: acaoCores.assumir || '#1d4ed8' }}
               onClick={async () => {
                 const res = await fetch(
                   `${API_URL}/solicitacoes/${solicitacao.id}/assumir`,
@@ -414,7 +442,7 @@ export default function LinhaSolicitacao({
           {podeAtribuir && (
             <button
               className="acao-link"
-              style={{ color: acaoCores.atribuir || '#7c3aed' }}
+              style={{ color: acaoCores.atribuir || '#3b82f6' }}
               onClick={() => setModalAtribuir(true)}
             >
               Atribuir
@@ -424,7 +452,7 @@ export default function LinhaSolicitacao({
           {!isSetorObra && (
             <button
               className="acao-link"
-              style={{ color: acaoCores.enviar || '#f97316' }}
+              style={{ color: acaoCores.enviar || '#0ea5e9' }}
               onClick={() => setModalEnviar(true)}
             >
               Enviar
@@ -434,7 +462,7 @@ export default function LinhaSolicitacao({
           {(isSuperadmin || isAdminGEO) && (
             <button
               className="acao-link"
-              style={{ color: '#dc2626' }}
+              style={{ color: '#1e40af' }}
               onClick={excluirSolicitacao}
             >
               Excluir
@@ -444,7 +472,7 @@ export default function LinhaSolicitacao({
           {!mostrarArquivadas ? (
             <button
               className="acao-link"
-              style={{ color: acaoCores.ocultar || '#6b7280' }}
+              style={{ color: acaoCores.ocultar || '#64748b' }}
               onClick={arquivarItem}
             >
               Arquivar
@@ -452,7 +480,7 @@ export default function LinhaSolicitacao({
           ) : (
             <button
               className="acao-link"
-              style={{ color: acaoCores.ocultar || '#6b7280' }}
+              style={{ color: acaoCores.ocultar || '#64748b' }}
               onClick={desarquivarItem}
             >
               Desarquivar

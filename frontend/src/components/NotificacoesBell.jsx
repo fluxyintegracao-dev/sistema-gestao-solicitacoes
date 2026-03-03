@@ -58,7 +58,7 @@ export default function NotificacoesBell() {
       >
         <span className="text-xl">🔔</span>
         {totalNaoLidas > 0 && (
-          <span className="absolute -top-1 -right-1 text-xs bg-red-600 text-white rounded-full px-1.5 py-0.5">
+          <span className="absolute -top-1 -right-1 text-xs bg-blue-600 text-white rounded-full px-1.5 py-0.5">
             {totalNaoLidas}
           </span>
         )}

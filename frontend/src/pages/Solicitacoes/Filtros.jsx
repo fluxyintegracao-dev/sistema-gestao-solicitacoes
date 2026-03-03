@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { HiAdjustmentsHorizontal, HiChevronDown, HiChevronUp } from 'react-icons/hi2';
 
 export default function Filtros({
@@ -17,6 +17,8 @@ export default function Filtros({
   const [isMobileViewport, setIsMobileViewport] = useState(() =>
     typeof window !== 'undefined' ? window.innerWidth < 768 : false
   );
+  const [tipoDropdownOpen, setTipoDropdownOpen] = useState(false);
+  const tipoDropdownRef = useRef(null);
 
   useEffect(() => {
     function onResize() {
@@ -29,23 +31,22 @@ export default function Filtros({
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
+  useEffect(() => {
+    function onClickOutside(event) {
+      if (!tipoDropdownOpen) return;
+      if (tipoDropdownRef.current?.contains(event.target)) return;
+      setTipoDropdownOpen(false);
+    }
+
+    document.addEventListener('mousedown', onClickOutside);
+    return () => document.removeEventListener('mousedown', onClickOutside);
+  }, [tipoDropdownOpen]);
+
   function handleChange(e) {
     const { name, value } = e.target;
     setFiltros(prev => ({
       ...prev,
       [name]: value
-    }));
-  }
-
-  function handleMultiChange(e) {
-    const { name, selectedOptions } = e.target;
-    const values = Array.from(selectedOptions || [])
-      .map(option => option.value)
-      .filter(Boolean);
-
-    setFiltros(prev => ({
-      ...prev,
-      [name]: values.join(',')
     }));
   }
 
@@ -61,6 +62,48 @@ export default function Filtros({
       data_vencimento: '',
       responsavel: ''
     });
+    setTipoDropdownOpen(false);
+  }
+
+  const tipoSelecionadosIds = String(filtros.tipo_solicitacao_id || '')
+    .split(',')
+    .map(v => String(v).trim())
+    .filter(Boolean);
+
+  const tipoSelecionadosSet = new Set(tipoSelecionadosIds);
+  const tipoSelecionadosNomes = tiposSolicitacao
+    .filter(tipo => tipoSelecionadosSet.has(String(tipo.id)))
+    .map(tipo => tipo.nome);
+  const resumoTiposSelecionados = (() => {
+    if (tipoSelecionadosNomes.length === 0) return 'Todos os tipos';
+    if (tipoSelecionadosNomes.length <= 2) return tipoSelecionadosNomes.join(', ');
+    return `${tipoSelecionadosNomes.slice(0, 2).join(', ')} +${tipoSelecionadosNomes.length - 2}`;
+  })();
+
+  function atualizarTiposSelecionados(ids) {
+    setFiltros(prev => ({
+      ...prev,
+      tipo_solicitacao_id: ids.join(',')
+    }));
+  }
+
+  function alternarTipo(tipoId) {
+    const id = String(tipoId);
+    const atuais = [...tipoSelecionadosIds];
+    const existe = atuais.includes(id);
+    const proximos = existe
+      ? atuais.filter(item => item !== id)
+      : [...atuais, id];
+    atualizarTiposSelecionados(proximos);
+  }
+
+  function selecionarTodosTipos() {
+    const ids = tiposSolicitacao.map(tipo => String(tipo.id));
+    atualizarTiposSelecionados(ids);
+  }
+
+  function limparTipos() {
+    atualizarTiposSelecionados([]);
   }
 
   const quantidadeFiltrosAtivos = [
@@ -76,7 +119,7 @@ export default function Filtros({
   ].filter(v => String(v || '').trim() !== '').length;
 
   return (
-    <div className="solicitacoes-filtros bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-xl shadow mb-4 md:mb-6 ring-1 ring-gray-200 dark:ring-slate-700">
+    <div className="solicitacoes-filtros sol-surface-card p-3 sm:p-4 rounded-xl mb-4 md:mb-6">
       <div className="md:hidden mb-3">
         <button
           type="button"
@@ -102,16 +145,39 @@ export default function Filtros({
         id="painel-filtros-solicitacoes"
         className={`${isMobileViewport && !mobileOpen ? 'hidden' : 'block'}`}
       >
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-6 gap-3 md:gap-4">
+        <div className="sol-filtros-head">
           <div>
-            <label className="text-sm text-gray-600 block mb-1">Obras</label>
+            <p className="sol-filtros-title">Filtros</p>
+            <p className="sol-filtros-subtitle">Refine por obra, setor, tipo, status, valor e datas.</p>
+          </div>
+          <div className="sol-filtros-meta">
+            {quantidadeFiltrosAtivos > 0 && (
+              <span className="sol-filtros-badge">{quantidadeFiltrosAtivos} ativo(s)</span>
+            )}
+            {mostrarSomaValor && (
+              <div className="sol-filtros-soma">
+                <span className="sol-filtros-soma-label">Soma filtrada</span>
+                <strong className="sol-filtros-soma-value">
+                  {Number(somaValorFiltrado || 0).toLocaleString('pt-BR', {
+                    style: 'currency',
+                    currency: 'BRL'
+                  })}
+                </strong>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="sol-filtros-grid">
+          <div className="sol-filter-field">
+            <label className="sol-filter-label">Obra</label>
             <select
               name="obra_ids"
               className="input"
               value={filtros.obra_ids || ''}
               onChange={handleChange}
             >
-              <option value="">Obra</option>
+              <option value="">Todas as obras</option>
               {obrasOptions.map(obra => (
                 <option key={obra.value} value={obra.value}>
                   {obra.label}
@@ -120,70 +186,128 @@ export default function Filtros({
             </select>
           </div>
 
-          <select
-            name="area"
-            className="input"
-            value={filtros.area || ''}
-            onChange={handleChange}
-          >
-            <option value="">Setor</option>
-            {setores.map(s => (
-              <option key={s.id || s.codigo || s.nome} value={s.codigo || s.nome}>
-                {s.nome || s.codigo}
-              </option>
-            ))}
-          </select>
+          <div className="sol-filter-field">
+            <label className="sol-filter-label">Setor</label>
+            <select
+              name="area"
+              className="input"
+              value={filtros.area || ''}
+              onChange={handleChange}
+            >
+              <option value="">Todos os setores</option>
+              {setores.map(s => (
+                <option key={s.id || s.codigo || s.nome} value={s.codigo || s.nome}>
+                  {s.nome || s.codigo}
+                </option>
+              ))}
+            </select>
+          </div>
 
-          <select
-            name="tipo_solicitacao_id"
-            className="input"
-            value={filtros.tipo_solicitacao_id || ''}
-            onChange={handleChange}
-          >
-            <option value="">Tipo de Solicitação</option>
-            {tiposSolicitacao.map(t => (
-              <option key={t.id} value={t.id}>{t.nome}</option>
-            ))}
-          </select>
+          <div className="sol-filter-field sol-filter-field-multi" ref={tipoDropdownRef}>
+            <div className="sol-filter-label-row">
+              <label className="sol-filter-label">Tipo de solicitacao</label>
+              {tipoSelecionadosIds.length > 0 && (
+                <button
+                  type="button"
+                  className="sol-filter-link-btn"
+                  onClick={limparTipos}
+                >
+                  Limpar
+                </button>
+              )}
+            </div>
+            <button
+              type="button"
+              className={`sol-filter-multi-trigger ${tipoDropdownOpen ? 'open' : ''}`}
+              onClick={() => setTipoDropdownOpen(prev => !prev)}
+              aria-expanded={tipoDropdownOpen}
+              aria-label="Selecionar tipos de solicitacao"
+            >
+              <span className="truncate">{resumoTiposSelecionados}</span>
+              {tipoDropdownOpen ? <HiChevronUp className="w-4 h-4" /> : <HiChevronDown className="w-4 h-4" />}
+            </button>
 
-          <select
-            name="status"
-            onChange={handleChange}
-            className="input"
-            value={filtros.status || ''}
-          >
-            <option value="">Status</option>
-            {statusOptions.map(item => (
-              <option key={item.value} value={item.value}>
-                {item.label}
-              </option>
-            ))}
-          </select>
+            {tipoDropdownOpen && (
+              <div className="sol-filter-multi-popover">
+                <div className="sol-filter-multi-actions">
+                  <button type="button" className="sol-filter-link-btn" onClick={selecionarTodosTipos}>
+                    Selecionar todos
+                  </button>
+                  <button type="button" className="sol-filter-link-btn" onClick={limparTipos}>
+                    Limpar
+                  </button>
+                </div>
 
-          <input
-            name="valor_min"
-            placeholder="Valor mínimo"
-            className="input"
-            value={filtros.valor_min || ''}
-            onChange={handleChange}
-            type="number"
-            step="0.01"
-            min="0"
-          />
+                <div className="sol-filter-multi-list">
+                  {tiposSolicitacao.map(tipo => {
+                    const id = String(tipo.id);
+                    const checked = tipoSelecionadosSet.has(id);
+                    return (
+                      <label key={tipo.id} className="sol-filter-multi-item">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => alternarTipo(id)}
+                        />
+                        <span>{tipo.nome}</span>
+                      </label>
+                    );
+                  })}
+                  {tiposSolicitacao.length === 0 && (
+                    <p className="sol-filter-multi-empty">Nenhum tipo cadastrado.</p>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
 
-          <input
-            name="valor_max"
-            placeholder="Valor máximo"
-            className="input"
-            value={filtros.valor_max || ''}
-            onChange={handleChange}
-            type="number"
-            step="0.01"
-            min="0"
-          />
+          <div className="sol-filter-field">
+            <label className="sol-filter-label">Status</label>
+            <select
+              name="status"
+              onChange={handleChange}
+              className="input"
+              value={filtros.status || ''}
+            >
+              <option value="">Todos os status</option>
+              {statusOptions.map(item => (
+                <option key={item.value} value={item.value}>
+                  {item.label}
+                </option>
+              ))}
+            </select>
+          </div>
 
-          <div>
-            <label className="text-sm text-gray-600 block mb-1">Data de registro</label>
+          <div className="sol-filter-field">
+            <label className="sol-filter-label">Valor minimo</label>
+            <input
+              name="valor_min"
+              placeholder="Ex: 1000"
+              className="input"
+              value={filtros.valor_min || ''}
+              onChange={handleChange}
+              type="number"
+              step="0.01"
+              min="0"
+            />
+          </div>
+
+          <div className="sol-filter-field">
+            <label className="sol-filter-label">Valor maximo</label>
+            <input
+              name="valor_max"
+              placeholder="Ex: 50000"
+              className="input"
+              value={filtros.valor_max || ''}
+              onChange={handleChange}
+              type="number"
+              step="0.01"
+              min="0"
+            />
+          </div>
+
+          <div className="sol-filter-field">
+            <label className="sol-filter-label">Data de registro</label>
             <input
               name="data_registro"
               className="input"
@@ -193,8 +317,8 @@ export default function Filtros({
             />
           </div>
 
-          <div>
-            <label className="text-sm text-gray-600 block mb-1">Data de vencimento</label>
+          <div className="sol-filter-field">
+            <label className="sol-filter-label">Data de vencimento</label>
             <input
               name="data_vencimento"
               className="input"
@@ -205,40 +329,29 @@ export default function Filtros({
           </div>
 
           {mostrarFiltroResponsavel && (
-            <select
-              name="responsavel"
-              className="input"
-              value={filtros.responsavel || ''}
-              onChange={handleChange}
-            >
-              <option value="">Responsável</option>
-              {responsaveisOptions.map(responsavel => (
-                <option key={responsavel.value} value={responsavel.value}>
-                  {responsavel.label}
-                </option>
-              ))}
-            </select>
-          )}
-
-          <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-end md:col-span-2 xl:col-span-2">
-            <button className="btn btn-outline" type="button" onClick={limparFiltros}>
-              Limpar
-            </button>
-          </div>
-
-          {mostrarSomaValor && (
-            <div className="md:col-span-2 xl:col-span-2">
-              <label className="text-sm text-gray-600 dark:text-slate-300">Soma do valor filtrado</label>
-              <input
-                className="input mt-1"
-                value={Number(somaValorFiltrado || 0).toLocaleString('pt-BR', {
-                  style: 'currency',
-                  currency: 'BRL'
-                })}
-                readOnly
-              />
+            <div className="sol-filter-field">
+              <label className="sol-filter-label">Responsavel</label>
+              <select
+                name="responsavel"
+                className="input"
+                value={filtros.responsavel || ''}
+                onChange={handleChange}
+              >
+                <option value="">Todos os responsaveis</option>
+                {responsaveisOptions.map(responsavel => (
+                  <option key={responsavel.value} value={responsavel.value}>
+                    {responsavel.label}
+                  </option>
+                ))}
+              </select>
             </div>
           )}
+        </div>
+
+        <div className="sol-filtros-actions">
+          <button className="btn btn-outline" type="button" onClick={limparFiltros}>
+            Limpar filtros
+          </button>
         </div>
 
         <div className="md:hidden sticky bottom-0 mt-3 -mx-3 px-3 py-2 bg-white/95 dark:bg-slate-900/95 border-t border-gray-200 dark:border-slate-700 backdrop-blur supports-[backdrop-filter]:bg-white/80">

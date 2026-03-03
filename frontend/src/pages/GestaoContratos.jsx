@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { HiArrowDownTray, HiArrowUpTray } from 'react-icons/hi2';
+import { HiArrowDownTray, HiArrowUpTray, HiPaperClip } from 'react-icons/hi2';
 import { useAuth } from '../contexts/AuthContext';
 import { API_URL, authHeaders, fileUrl } from '../services/api';
 import { getMinhasObras, getObras } from '../services/obras';
@@ -719,23 +719,34 @@ export default function GestaoContratos() {
 
         <div>
           <label className="text-sm text-gray-600">Anexos do contrato</label>
-          <input
-            type="file"
-            multiple
-            onChange={e => setFiles(Array.from(e.target.files || []))}
-            className="block mt-1"
-          />
+          <div className="flex items-center gap-2 flex-wrap mt-1">
+            <label className="btn btn-outline inline-flex items-center gap-2 cursor-pointer">
+              <HiPaperClip className="w-4 h-4" />
+              <span>Anexar arquivos</span>
+              <input
+                type="file"
+                multiple
+                className="hidden"
+                onChange={e => setFiles(Array.from(e.target.files || []))}
+              />
+            </label>
+            <span className="text-xs text-[var(--c-muted)]">
+              {files.length > 0
+                ? `${files.length} arquivo(s) selecionado(s)`
+                : 'Nenhum arquivo selecionado'}
+            </span>
+          </div>
           {files.length > 0 && (
             <div className="mt-2 space-y-1">
               {files.map((arquivo, index) => (
                 <div
                   key={`${arquivo.name}-${index}`}
-                  className="flex items-center justify-between text-sm bg-gray-50 border rounded px-2 py-1"
+                  className="flex items-center justify-between text-sm bg-[var(--c-surface)] border border-[var(--c-border)] rounded px-2 py-1"
                 >
                   <span className="truncate">{arquivo.name}</span>
                   <button
                     type="button"
-                    className="text-red-600 font-bold px-2"
+                    className="text-blue-600 font-bold px-2"
                     onClick={() => removerArquivoNovoContrato(index)}
                     aria-label={`Remover ${arquivo.name}`}
                   >
@@ -915,7 +926,7 @@ export default function GestaoContratos() {
                     {editandoId === c.id ? (
                       <>
                         <button
-                          className="text-green-600"
+                          className="text-blue-600"
                           onClick={() => salvarEdicao(c)}
                           disabled={salvandoEdicaoId === c.id}
                         >
@@ -938,7 +949,7 @@ export default function GestaoContratos() {
                           Editar
                         </button>
                         <button
-                          className="text-green-600"
+                          className="text-blue-600"
                           onClick={() => salvarAjustes(c)}
                         >
                           Salvar ajustes
@@ -946,7 +957,7 @@ export default function GestaoContratos() {
                       </>
                     )}
                     <button
-                      className="text-red-600"
+                      className="text-blue-700"
                       onClick={() => excluirContratoItem(c)}
                     >
                       Excluir
@@ -997,7 +1008,7 @@ export default function GestaoContratos() {
                     <button
                       type="button"
                       onClick={() => baixarAnexoContrato(anexo.caminho_arquivo, anexo.nome_original)}
-                      className="text-green-600 hover:underline"
+                      className="text-blue-600 hover:underline"
                     >
                       Baixar
                     </button>
@@ -1008,23 +1019,34 @@ export default function GestaoContratos() {
 
             <div>
               <label className="text-sm text-gray-600">Enviar novos anexos</label>
-              <input
-                type="file"
-                multiple
-                onChange={e => setUploadAnexos(Array.from(e.target.files || []))}
-                className="block mt-1"
-              />
+              <div className="flex items-center gap-2 flex-wrap mt-1">
+                <label className="btn btn-outline inline-flex items-center gap-2 cursor-pointer">
+                  <HiPaperClip className="w-4 h-4" />
+                  <span>Anexar arquivos</span>
+                  <input
+                    type="file"
+                    multiple
+                    className="hidden"
+                    onChange={e => setUploadAnexos(Array.from(e.target.files || []))}
+                  />
+                </label>
+                <span className="text-xs text-[var(--c-muted)]">
+                  {uploadAnexos.length > 0
+                    ? `${uploadAnexos.length} arquivo(s) selecionado(s)`
+                    : 'Nenhum arquivo selecionado'}
+                </span>
+              </div>
               {uploadAnexos.length > 0 && (
                 <div className="mt-2 space-y-1">
                   {uploadAnexos.map((arquivo, index) => (
                     <div
                       key={`${arquivo.name}-${index}`}
-                      className="flex items-center justify-between text-sm bg-gray-50 border rounded px-2 py-1"
+                      className="flex items-center justify-between text-sm bg-[var(--c-surface)] border border-[var(--c-border)] rounded px-2 py-1"
                     >
                       <span className="truncate">{arquivo.name}</span>
                       <button
                         type="button"
-                        className="text-red-600 font-bold px-2"
+                        className="text-blue-600 font-bold px-2"
                         onClick={() => removerArquivoModal(index)}
                         aria-label={`Remover ${arquivo.name}`}
                       >

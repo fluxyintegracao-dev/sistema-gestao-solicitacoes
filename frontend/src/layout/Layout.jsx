@@ -1,4 +1,4 @@
-﻿import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useContext, useEffect, useMemo, useState } from 'react';
 import { AuthContext } from '../contexts/AuthContext';
 import NotificacoesBell from '../components/NotificacoesBell';
@@ -6,9 +6,13 @@ import {
   HiOutlineSquares2X2,
   HiOutlinePlusCircle,
   HiOutlineClipboardDocumentList,
+  HiOutlineChatBubbleLeftRight,
   HiOutlineCloudArrowUp,
   HiOutlineReceiptRefund,
   HiOutlineUsers,
+  HiOutlineRectangleGroup,
+  HiOutlineUserCircle,
+  HiOutlineWallet,
   HiOutlineBuildingOffice2,
   HiOutlineAdjustmentsHorizontal,
   HiOutlineCog6Tooth,
@@ -18,9 +22,15 @@ import {
   HiOutlineBars3,
   HiOutlineMoon,
   HiOutlineSun,
-  HiOutlineChevronDoubleLeft,
-  HiOutlineChevronDoubleRight
+  HiOutlineChevronDown,
+  HiOutlineChevronRight,
+  HiOutlineChevronLeft,
+  HiOutlineArchiveBox,
+  HiOutlineDocumentText,
+  HiOutlineInboxStack,
+  HiOutlinePaperAirplane
 } from 'react-icons/hi2';
+import { BsBuildingsFill } from 'react-icons/bs';
 
 export default function Layout() {
   const { user, logout } = useContext(AuthContext);
@@ -28,6 +38,7 @@ export default function Layout() {
   const navigate = useNavigate();
   const [menuAberto, setMenuAberto] = useState(false); // mobile drawer
   const [collapsed, setCollapsed] = useState(false); // desktop collapse
+  const [expandedGroups, setExpandedGroups] = useState([]);
   const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light');
   const [isMobileViewport, setIsMobileViewport] = useState(() =>
     typeof window !== 'undefined' ? window.matchMedia('(max-width: 767px)').matches : false
@@ -90,110 +101,233 @@ export default function Layout() {
     user?.perfil === 'ADMIN' && setorTokens.includes('GEO');
   const isSetorObra = setorTokens.includes('OBRA');
 
-  const menuItems = useMemo(() => {
-    const base = [];
-    const add = (to, label, icon) => base.push({ to, label, icon });
+  const menuGroups = useMemo(() => {
+    const groups = [];
+    const item = (to, label, icon) => ({ to, label, icon });
+    const groupIcons = {
+      Painel: HiOutlineSquares2X2,
+      Solicitações: HiOutlineClipboardDocumentList,
+      Comunicação: HiOutlineChatBubbleLeftRight,
+      Financeiro: HiOutlineWallet,
+      Cadastros: HiOutlineRectangleGroup,
+      Contratos: HiOutlineBanknotes,
+      Configurações: HiOutlineCog6Tooth,
+      Conta: HiOutlineUserCircle
+    };
+    const addGroup = (label, entries) => {
+      const items = entries.filter(Boolean);
+      if (items.length) groups.push({ label, icon: groupIcons[label] || HiOutlineFolderOpen, items });
+    };
 
     switch (user?.perfil) {
       case 'USUARIO':
-        add('/solicitacoes', 'Minhas Solicitações', HiOutlineClipboardDocumentList);
-        add('/solicitacoes-arquivadas', 'Arquivadas', HiOutlineFolderOpen);
-        add('/conversas/entrada', 'Caixa de Entrada', HiOutlineClipboardDocumentList);
-        add('/conversas/saida', 'Caixa de Saída', HiOutlineFolderOpen);
-        add('/nova-solicitacao', 'Nova Solicitação', HiOutlinePlusCircle);
-        add('/perfil', 'Meu Perfil', HiOutlineCog6Tooth);
-        if (isSetorObra) add('/gestao-contratos', 'Gestão de Contratos', HiOutlineBanknotes);
-        if (isFinanceiro) {
-          add('/comprovantes/upload', 'Upload Comprovantes', HiOutlineCloudArrowUp);
-          add('/comprovantes/pendentes', 'Comprovantes Pendentes', HiOutlineReceiptRefund);
+        addGroup('Solicitações', [
+          item('/solicitacoes', 'Minhas Solicitações', HiOutlineDocumentText),
+          item('/solicitacoes-arquivadas', 'Arquivadas', HiOutlineArchiveBox),
+          item('/nova-solicitacao', 'Nova Solicitação', HiOutlinePlusCircle)
+        ]);
+        addGroup('Comunicação', [
+          item('/conversas/entrada', 'Caixa de Entrada', HiOutlineInboxStack),
+          item('/conversas/saida', 'Caixa de Saída', HiOutlinePaperAirplane)
+        ]);
+        if (isSetorObra) {
+          addGroup('Contratos', [
+            item('/gestao-contratos', 'Gestão de Contratos', HiOutlineBanknotes)
+          ]);
         }
+        if (isFinanceiro) {
+          addGroup('Financeiro', [
+            item('/comprovantes/upload', 'Upload Comprovantes', HiOutlineCloudArrowUp),
+            item('/comprovantes/pendentes', 'Comprovantes Pendentes', HiOutlineReceiptRefund)
+          ]);
+        }
+        addGroup('Conta', [
+          item('/perfil', 'Meu Perfil', HiOutlineUserCircle)
+        ]);
         break;
 
       case 'SETOR':
-        add('/solicitacoes', 'Solicitações do Setor', HiOutlineClipboardDocumentList);
-        add('/solicitacoes-arquivadas', 'Arquivadas', HiOutlineFolderOpen);
-        add('/conversas/entrada', 'Caixa de Entrada', HiOutlineClipboardDocumentList);
-        add('/conversas/saida', 'Caixa de Saída', HiOutlineFolderOpen);
-        add('/perfil', 'Meu Perfil', HiOutlineCog6Tooth);
-        if (isSetorObra) add('/gestao-contratos', 'Gestão de Contratos', HiOutlineBanknotes);
-        if (isFinanceiro) {
-          add('/comprovantes/upload', 'Upload Comprovantes', HiOutlineCloudArrowUp);
-          add('/comprovantes/pendentes', 'Comprovantes Pendentes', HiOutlineReceiptRefund);
+        addGroup('Solicitações', [
+          item('/solicitacoes', 'Solicitações do Setor', HiOutlineDocumentText),
+          item('/solicitacoes-arquivadas', 'Arquivadas', HiOutlineArchiveBox)
+        ]);
+        addGroup('Comunicação', [
+          item('/conversas/entrada', 'Caixa de Entrada', HiOutlineInboxStack),
+          item('/conversas/saida', 'Caixa de Saída', HiOutlinePaperAirplane)
+        ]);
+        if (isSetorObra) {
+          addGroup('Contratos', [
+            item('/gestao-contratos', 'Gestão de Contratos', HiOutlineBanknotes)
+          ]);
         }
+        if (isFinanceiro) {
+          addGroup('Financeiro', [
+            item('/comprovantes/upload', 'Upload Comprovantes', HiOutlineCloudArrowUp),
+            item('/comprovantes/pendentes', 'Comprovantes Pendentes', HiOutlineReceiptRefund)
+          ]);
+        }
+        addGroup('Conta', [
+          item('/perfil', 'Meu Perfil', HiOutlineUserCircle)
+        ]);
         break;
 
       case 'GESTOR':
-        add('/solicitacoes', 'Todas as Solicitações', HiOutlineClipboardDocumentList);
-        add('/solicitacoes-arquivadas', 'Arquivadas', HiOutlineFolderOpen);
-        add('/conversas/entrada', 'Caixa de Entrada', HiOutlineClipboardDocumentList);
-        add('/conversas/saida', 'Caixa de Saída', HiOutlineFolderOpen);
-        add('/perfil', 'Meu Perfil', HiOutlineCog6Tooth);
-        if (isSetorObra) add('/gestao-contratos', 'Gestão de Contratos', HiOutlineBanknotes);
-        if (isFinanceiro) {
-          add('/comprovantes/upload', 'Upload Comprovantes', HiOutlineCloudArrowUp);
-          add('/comprovantes/pendentes', 'Comprovantes Pendentes', HiOutlineReceiptRefund);
+        addGroup('Solicitações', [
+          item('/solicitacoes', 'Todas as Solicitações', HiOutlineDocumentText),
+          item('/solicitacoes-arquivadas', 'Arquivadas', HiOutlineArchiveBox)
+        ]);
+        addGroup('Comunicação', [
+          item('/conversas/entrada', 'Caixa de Entrada', HiOutlineInboxStack),
+          item('/conversas/saida', 'Caixa de Saída', HiOutlinePaperAirplane)
+        ]);
+        if (isSetorObra) {
+          addGroup('Contratos', [
+            item('/gestao-contratos', 'Gestão de Contratos', HiOutlineBanknotes)
+          ]);
         }
+        if (isFinanceiro) {
+          addGroup('Financeiro', [
+            item('/comprovantes/upload', 'Upload Comprovantes', HiOutlineCloudArrowUp),
+            item('/comprovantes/pendentes', 'Comprovantes Pendentes', HiOutlineReceiptRefund)
+          ]);
+        }
+        addGroup('Conta', [
+          item('/perfil', 'Meu Perfil', HiOutlineUserCircle)
+        ]);
         break;
 
       case 'FINANCEIRO':
-        add('/solicitacoes', 'Solicitações do Setor', HiOutlineClipboardDocumentList);
-        add('/solicitacoes-arquivadas', 'Arquivadas', HiOutlineFolderOpen);
-        add('/conversas/entrada', 'Caixa de Entrada', HiOutlineClipboardDocumentList);
-        add('/conversas/saida', 'Caixa de Saída', HiOutlineFolderOpen);
-        add('/comprovantes/upload', 'Upload Comprovantes', HiOutlineCloudArrowUp);
-        add('/comprovantes/pendentes', 'Comprovantes Pendentes', HiOutlineReceiptRefund);
-        add('/perfil', 'Meu Perfil', HiOutlineCog6Tooth);
+        addGroup('Solicitações', [
+          item('/solicitacoes', 'Solicitações do Setor', HiOutlineDocumentText),
+          item('/solicitacoes-arquivadas', 'Arquivadas', HiOutlineArchiveBox)
+        ]);
+        addGroup('Comunicação', [
+          item('/conversas/entrada', 'Caixa de Entrada', HiOutlineInboxStack),
+          item('/conversas/saida', 'Caixa de Saída', HiOutlinePaperAirplane)
+        ]);
+        addGroup('Financeiro', [
+          item('/comprovantes/upload', 'Upload Comprovantes', HiOutlineCloudArrowUp),
+          item('/comprovantes/pendentes', 'Comprovantes Pendentes', HiOutlineReceiptRefund)
+        ]);
+        addGroup('Conta', [
+          item('/perfil', 'Meu Perfil', HiOutlineUserCircle)
+        ]);
         break;
 
       case 'ADMIN':
-        add('/', 'Dashboard', HiOutlineSquares2X2);
-        add('/nova-solicitacao', 'Nova Solicitação', HiOutlinePlusCircle);
-        add('/solicitacoes', 'Solicitações', HiOutlineClipboardDocumentList);
-        add('/solicitacoes-arquivadas', 'Arquivadas', HiOutlineFolderOpen);
-        add('/conversas/entrada', 'Caixa de Entrada', HiOutlineClipboardDocumentList);
-        add('/conversas/saida', 'Caixa de Saída', HiOutlineFolderOpen);
+        addGroup('Painel', [
+          item('/', 'Dashboard', HiOutlineSquares2X2)
+        ]);
+        addGroup('Solicitações', [
+          item('/solicitacoes', 'Solicitações', HiOutlineDocumentText),
+          item('/solicitacoes-arquivadas', 'Arquivadas', HiOutlineArchiveBox),
+          item('/nova-solicitacao', 'Nova Solicitação', HiOutlinePlusCircle)
+        ]);
+        addGroup('Comunicação', [
+          item('/conversas/entrada', 'Caixa de Entrada', HiOutlineInboxStack),
+          item('/conversas/saida', 'Caixa de Saída', HiOutlinePaperAirplane)
+        ]);
         if (isFinanceiro) {
-          add('/comprovantes/upload', 'Upload Comprovantes', HiOutlineCloudArrowUp);
-          add('/comprovantes/pendentes', 'Comprovantes Pendentes', HiOutlineReceiptRefund);
+          addGroup('Financeiro', [
+            item('/comprovantes/upload', 'Upload Comprovantes', HiOutlineCloudArrowUp),
+            item('/comprovantes/pendentes', 'Comprovantes Pendentes', HiOutlineReceiptRefund)
+          ]);
         }
-        if (isAdminGEO) add('/usuarios', 'Usu\u00E1rios', HiOutlineUsers);
-        if (isAdminGEO) add('/gestao-contratos', 'Gestão de Contratos', HiOutlineBanknotes);
-        add('/perfil', 'Meu Perfil', HiOutlineCog6Tooth);
+        if (isAdminGEO) {
+          addGroup('Cadastros', [
+            item('/usuarios', 'Usuários', HiOutlineUsers)
+          ]);
+          addGroup('Contratos', [
+            item('/gestao-contratos', 'Gestão de Contratos', HiOutlineBanknotes)
+          ]);
+        }
+        addGroup('Conta', [
+          item('/perfil', 'Meu Perfil', HiOutlineUserCircle)
+        ]);
         break;
 
       case 'SUPERADMIN':
-        add('/', 'Dashboard', HiOutlineSquares2X2);
-        add('/nova-solicitacao', 'Nova Solicitação', HiOutlinePlusCircle);
-        add('/solicitacoes', 'Solicitações', HiOutlineClipboardDocumentList);
-        add('/solicitacoes-arquivadas', 'Arquivadas', HiOutlineFolderOpen);
-        add('/conversas/entrada', 'Caixa de Entrada', HiOutlineClipboardDocumentList);
-        add('/conversas/saida', 'Caixa de Saída', HiOutlineFolderOpen);
-        add('/comprovantes/upload', 'Upload Comprovantes', HiOutlineCloudArrowUp);
-        add('/comprovantes/pendentes', 'Comprovantes Pendentes', HiOutlineReceiptRefund);
-        add('/usuarios', 'Usu\u00E1rios', HiOutlineUsers);
-        add('/obras', 'Obras', HiOutlineBuildingOffice2);
-        add('/setores', 'Setores', HiOutlineAdjustmentsHorizontal);
-        add('/cargos', 'Cargos', HiOutlineFolderOpen);
-        add('/tipos-solicitacao', 'Tipos de Solicitação', HiOutlineClipboardDocumentList);
-        add('/gestao-contratos', 'Gestão de Contratos', HiOutlineBanknotes);
-        add('/configuracoes', 'Configurações', HiOutlineCog6Tooth);
-        add('/perfil', 'Meu Perfil', HiOutlineCog6Tooth);
+        addGroup('Painel', [
+          item('/', 'Dashboard', HiOutlineSquares2X2)
+        ]);
+        addGroup('Solicitações', [
+          item('/solicitacoes', 'Solicitações', HiOutlineDocumentText),
+          item('/solicitacoes-arquivadas', 'Arquivadas', HiOutlineArchiveBox),
+          item('/nova-solicitacao', 'Nova Solicitação', HiOutlinePlusCircle)
+        ]);
+        addGroup('Comunicação', [
+          item('/conversas/entrada', 'Caixa de Entrada', HiOutlineInboxStack),
+          item('/conversas/saida', 'Caixa de Saída', HiOutlinePaperAirplane)
+        ]);
+        addGroup('Financeiro', [
+          item('/comprovantes/upload', 'Upload Comprovantes', HiOutlineCloudArrowUp),
+          item('/comprovantes/pendentes', 'Comprovantes Pendentes', HiOutlineReceiptRefund)
+        ]);
+        addGroup('Cadastros', [
+          item('/usuarios', 'Usuários', HiOutlineUsers),
+          item('/obras', 'Obras', HiOutlineBuildingOffice2),
+          item('/setores', 'Setores', HiOutlineAdjustmentsHorizontal),
+          item('/cargos', 'Cargos', HiOutlineFolderOpen),
+          item('/tipos-solicitacao', 'Tipos de Solicitação', HiOutlineClipboardDocumentList)
+        ]);
+        addGroup('Contratos', [
+          item('/gestao-contratos', 'Gestão de Contratos', HiOutlineBanknotes)
+        ]);
+        addGroup('Configurações', [
+          item('/configuracoes', 'Configurações', HiOutlineCog6Tooth)
+        ]);
+        addGroup('Conta', [
+          item('/perfil', 'Meu Perfil', HiOutlineUserCircle)
+        ]);
         break;
 
       default:
         break;
     }
 
-    return base;
+    return groups;
   }, [user?.perfil, isFinanceiro, isAdminGEO, isSetorObra]);
+
+  const flatMenuItems = useMemo(
+    () => menuGroups.flatMap(group => group.items),
+    [menuGroups]
+  );
+
+  useEffect(() => {
+    setExpandedGroups(prev => {
+      const validLabels = new Set(menuGroups.map(group => group.label));
+      const filtered = prev.filter(label => validLabels.has(label));
+      const activeGroup = menuGroups.find(group =>
+        group.items.some(item => isPathActive(location.pathname, item.to))
+      )?.label;
+
+      if (filtered.length === 0) {
+        if (activeGroup) return [activeGroup];
+        return menuGroups.length > 0 ? [menuGroups[0].label] : [];
+      }
+
+      if (activeGroup && !filtered.includes(activeGroup)) {
+        return [...filtered, activeGroup];
+      }
+
+      return filtered;
+    });
+  }, [menuGroups, location.pathname]);
 
   const toggleTheme = () => setTheme(t => (t === 'light' ? 'dark' : 'light'));
 
-  const isActive = path =>
-    location.pathname === path || location.pathname.startsWith(`${path}/`);
+  const isActive = path => isPathActive(location.pathname, path);
+  const toggleGroup = (label) => {
+    setExpandedGroups(prev =>
+      prev.includes(label)
+        ? prev.filter(item => item !== label)
+        : [...prev, label]
+    );
+  };
 
   return (
-    <div className="layout-shell flex min-h-screen overflow-x-hidden">
+    <div className={theme === 'dark' ? 'dark' : ''}>
+      <div className="layout-shell flex min-h-screen overflow-x-hidden">
         <aside
           className={`sidebar ${collapsed ? 'collapsed' : ''} fixed md:static top-0 left-0 h-full md:h-auto z-40 transform transition-all duration-200 ${
             menuAberto ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
@@ -211,21 +345,11 @@ export default function Layout() {
               />
               <div className="flex items-center gap-2 brand-text">
                 <div className="leading-tight">
-                  <p className="text-sm font-semibold" style={{ color: 'var(--nav-text)' }}>
-                    Sistema de Solicitações
-                  </p>
+                  <p className="brand-title">Fluxy</p>
+                  {!collapsed && <p className="brand-subtitle">Gestão de solicitações</p>}
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setCollapsed(c => !c)}
-                  className="chevron-btn hidden md:inline-flex"
-                  aria-label="Alternar menu"
-                  aria-expanded={!collapsed}
-                  type="button"
-                >
-                      {collapsed ? <HiOutlineChevronDoubleRight size={20} /> : <HiOutlineChevronDoubleLeft size={20} />}
-                </button>
                 <button
                   onClick={() => setMenuAberto(false)}
                   className="chevron-btn md:hidden"
@@ -245,10 +369,11 @@ export default function Layout() {
             )}
 
             <nav className="flex-1">
-              <ul className="nav-list">
-                {menuItems.map(item => (
-                  <li key={item.to}>
+              {collapsed ? (
+                <ul className="nav-list">
+                  {flatMenuItems.map(item => (
                     <MenuItem
+                      key={item.to}
                       to={item.to}
                       label={item.label}
                       icon={item.icon}
@@ -259,15 +384,67 @@ export default function Layout() {
                       }}
                       collapsed={collapsed}
                     />
-                  </li>
-                ))}
-              </ul>
+                  ))}
+                </ul>
+              ) : (
+                <ul className="nav-list nav-list-grouped">
+                  {menuGroups.map(group => {
+                    const isOpen = expandedGroups.includes(group.label);
+                    const groupId = `submenu-${String(group.label).toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+                    const GroupIcon = group.icon;
+
+                    return (
+                      <li key={group.label} className="nav-group">
+                        <button
+                          type="button"
+                          className={`nav-group-toggle ${isOpen ? 'open' : ''}`}
+                          onClick={() => toggleGroup(group.label)}
+                          aria-expanded={isOpen}
+                          aria-controls={groupId}
+                        >
+                          <span className="nav-group-heading">
+                            {GroupIcon && <GroupIcon className="nav-group-icon" />}
+                            <span className="nav-group-title">{group.label}</span>
+                          </span>
+                          {isOpen ? (
+                            <HiOutlineChevronDown className="nav-group-chevron" />
+                          ) : (
+                            <HiOutlineChevronRight className="nav-group-chevron" />
+                          )}
+                        </button>
+                        <div
+                          id={groupId}
+                          className={`nav-sublist-wrap ${isOpen ? 'open' : ''}`}
+                        >
+                          <ul className="nav-sublist">
+                            {group.items.map(item => (
+                              <MenuItem
+                                key={item.to}
+                                to={item.to}
+                                label={item.label}
+                                icon={item.icon}
+                                active={isActive(item.to)}
+                                onSelect={() => {
+                                  navigate(item.to);
+                                  if (isMobileViewport) setMenuAberto(false);
+                                }}
+                                collapsed={false}
+                                subItem
+                              />
+                            ))}
+                          </ul>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
             </nav>
 
             <div className="flex flex-col gap-3">
               <button
                 onClick={logout}
-                className="nav-btn text-red-300 hover:text-white"
+                className="nav-btn text-blue-300 hover:text-white"
                 type="button"
               >
                 <HiOutlineArrowRightOnRectangle className="nav-icon" />
@@ -275,6 +452,17 @@ export default function Layout() {
               </button>
             </div>
           </div>
+          <button
+            onClick={() => setCollapsed(c => !c)}
+            className="sidebar-toggle-rail hidden md:inline-flex"
+            aria-label={collapsed ? 'Expandir menu' : 'Recolher menu'}
+            aria-expanded={!collapsed}
+            type="button"
+          >
+            <HiOutlineChevronLeft
+              className={`sidebar-toggle-icon ${collapsed ? 'is-collapsed' : ''}`}
+            />
+          </button>
         </aside>
 
         {menuAberto && (
@@ -286,8 +474,8 @@ export default function Layout() {
         )}
 
         <main className="layout-main flex-1 min-w-0 bg-[var(--c-bg)] transition-colors duration-200">
-          <div className="mx-auto w-full max-w-[1800px] px-3 sm:px-4 md:px-5 lg:px-6 xl:px-8 pb-5 md:pb-8">
-            <div className="topbar-shell flex items-center gap-3 mb-4 md:mb-6 w-full py-2 md:py-3">
+          <div className="mx-auto w-full max-w-none px-3 sm:px-4 md:px-5 lg:px-6 xl:px-8 pb-6 md:pb-9">
+            <div className="topbar-shell flex flex-wrap items-center justify-between gap-4 md:gap-6 mb-5 md:mb-7 w-full py-4 md:py-5 min-h-[76px]">
               <button
                 onClick={() => setMenuAberto(true)}
                 className="md:hidden inline-flex items-center justify-center h-11 w-11 rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] text-[var(--c-text)]"
@@ -297,11 +485,11 @@ export default function Layout() {
                 <HiOutlineBars3 size={20} />
               </button>
 
-              <div className="min-w-0">
-                <p className="text-sm md:text-base font-semibold text-[var(--c-text)] truncate">
-                  Sistema de Solicitações
+              <div className="min-w-0 flex-1">
+                <p className="brand-title truncate" style={{ fontSize: '1.1rem' }}>
+                  Fluxy
                 </p>
-                <p className="hidden sm:block text-xs text-[var(--c-muted)] truncate">
+                <p className="text-xs text-[var(--c-muted)] truncate">
                   {user?.nome} · {perfilUpper || 'USUARIO'}
                 </p>
               </div>
@@ -328,17 +516,22 @@ export default function Layout() {
             <Outlet />
           </div>
         </main>
+      </div>
     </div>
   );
 }
 
-function MenuItem({ to, label, icon: Icon, active, onSelect, collapsed }) {
+function isPathActive(currentPath, targetPath) {
+  return currentPath === targetPath || currentPath.startsWith(`${targetPath}/`);
+}
+
+function MenuItem({ to, label, icon: Icon, active, onSelect, collapsed, subItem = false }) {
   return (
     <li>
       <Link
         to={to}
         onClick={() => onSelect()}
-        className={`nav-btn ${active ? 'active' : ''}`}
+        className={`nav-btn ${subItem ? 'nav-btn-sub' : ''} ${active ? 'active' : ''}`}
         title={label}
         aria-label={label}
       >

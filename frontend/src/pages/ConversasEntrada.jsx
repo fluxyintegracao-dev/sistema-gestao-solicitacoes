@@ -9,6 +9,7 @@ import {
   getDestinatariosConversa
 } from '../services/conversasInternas';
 import { getSetores } from '../services/setores';
+import { HiPaperClip } from 'react-icons/hi2';
 
 function formatarDataHora(valor) {
   if (!valor) return '-';
@@ -344,14 +345,31 @@ export default function ConversasEntrada() {
                 <textarea className="w-full min-h-[120px] rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] px-3 py-2" value={mensagem} onChange={(e) => setMensagem(e.target.value)} />
               </label>
 
-              <label className="text-sm">
+              <div className="text-sm">
                 <span className="block mb-1">Anexos</span>
-                <input type="file" multiple onChange={(e) => {
-                  const novos = Array.from(e.target.files || []);
-                  if (novos.length > 0) setArquivos((prev) => [...prev, ...novos]);
-                  e.target.value = '';
-                }} />
-              </label>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <label className={`btn btn-outline inline-flex items-center gap-2 cursor-pointer ${salvando ? 'opacity-60 pointer-events-none' : ''}`}>
+                    <HiPaperClip className="w-4 h-4" />
+                    <span>Anexar arquivos</span>
+                    <input
+                      type="file"
+                      multiple
+                      className="hidden"
+                      disabled={salvando}
+                      onChange={(e) => {
+                        const novos = Array.from(e.target.files || []);
+                        if (novos.length > 0) setArquivos((prev) => [...prev, ...novos]);
+                        e.target.value = '';
+                      }}
+                    />
+                  </label>
+                  <span className="text-xs text-[var(--c-muted)]">
+                    {arquivos.length > 0
+                      ? `${arquivos.length} arquivo(s) selecionado(s)`
+                      : 'Nenhum arquivo selecionado'}
+                  </span>
+                </div>
+              </div>
 
               <div className="flex justify-end gap-2">
                 <button type="button" className="btn btn-outline" onClick={() => setShowNova(false)} disabled={salvando}>Cancelar</button>

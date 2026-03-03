@@ -4,36 +4,49 @@ import { useAuth } from './AuthContext';
 
 const ThemeContext = createContext();
 
-const TEMA_PADRAO = {
+const PALETA_AZUL = {
   palette: {
-    bg: '#f5f7fb',
+    bg: '#f3f7fd',
     surface: '#ffffff',
-    border: '#e3e7ef',
-    text: '#0f172a',
-    muted: '#64748b',
+    border: '#d5e0ef',
+    text: '#0f1f3a',
+    muted: '#5f7496',
     primary: '#2563eb',
     primary600: '#1d4ed8',
-    secondary: '#0f766e',
-    warning: '#d97706',
-    danger: '#dc2626',
-    success: '#16a34a'
+    secondary: '#3b82f6',
+    warning: '#60a5fa',
+    danger: '#1e40af',
+    success: '#0ea5e9'
   },
   actions: {
     ver: '#2563eb',
-    assumir: '#16a34a',
-    atribuir: '#7c3aed',
-    enviar: '#f97316',
-    ocultar: '#6b7280'
+    assumir: '#1d4ed8',
+    atribuir: '#3b82f6',
+    enviar: '#0ea5e9',
+    ocultar: '#64748b'
   },
   status: {
     global: {
-      PENDENTE: '#64748b',
-      EM_ANALISE: '#0ea5e9',
-      AGUARDANDO_AJUSTE: '#f59e0b',
-      APROVADA: '#16a34a',
-      REJEITADA: '#dc2626',
-      CONCLUIDA: '#059669'
+      PENDENTE: '#94a3b8',
+      EM_ANALISE: '#38bdf8',
+      AGUARDANDO_AJUSTE: '#60a5fa',
+      APROVADA: '#2563eb',
+      REJEITADA: '#1d4ed8',
+      CONCLUIDA: '#0ea5e9'
     },
+    setores: {}
+  }
+};
+
+const TEMA_PADRAO = {
+  palette: {
+    ...PALETA_AZUL.palette
+  },
+  actions: {
+    ...PALETA_AZUL.actions
+  },
+  status: {
+    global: { ...PALETA_AZUL.status.global },
     setores: {}
   }
 };
@@ -50,45 +63,20 @@ function mergeTema(base, override) {
   };
 }
 
+function forcarEscalaAzul(tema) {
+  return {
+    palette: { ...PALETA_AZUL.palette },
+    actions: { ...PALETA_AZUL.actions },
+    status: {
+      ...tema.status,
+      global: { ...PALETA_AZUL.status.global }
+    }
+  };
+}
+
 export function ThemeProvider({ children }) {
   const [tema, setTema] = useState(TEMA_PADRAO);
   const { user } = useAuth();
-
-  function aplicarPaletteConformeModo(modoEscuroAtivo, palette) {
-    const root = document.documentElement;
-    const chaves = [
-      '--c-bg',
-      '--c-surface',
-      '--c-border',
-      '--c-text',
-      '--c-muted',
-      '--c-primary',
-      '--c-primary-600',
-      '--c-secondary',
-      '--c-warning',
-      '--c-danger',
-      '--c-success'
-    ];
-
-    if (modoEscuroAtivo) {
-      // Em modo escuro, deixa as variáveis definidas no CSS da classe `.dark`
-      // para evitar mistura de tema claro + utilitários dark.
-      chaves.forEach(chave => root.style.removeProperty(chave));
-      return;
-    }
-
-    root.style.setProperty('--c-bg', palette.bg);
-    root.style.setProperty('--c-surface', palette.surface);
-    root.style.setProperty('--c-border', palette.border);
-    root.style.setProperty('--c-text', palette.text);
-    root.style.setProperty('--c-muted', palette.muted);
-    root.style.setProperty('--c-primary', palette.primary);
-    root.style.setProperty('--c-primary-600', palette.primary600);
-    root.style.setProperty('--c-secondary', palette.secondary);
-    root.style.setProperty('--c-warning', palette.warning);
-    root.style.setProperty('--c-danger', palette.danger);
-    root.style.setProperty('--c-success', palette.success);
-  }
 
   useEffect(() => {
     carregar();
@@ -114,24 +102,24 @@ export function ThemeProvider({ children }) {
   useEffect(() => {
     if (!tema?.palette) return;
     const root = document.documentElement;
-
-    const aplicar = () => {
-      const darkAtivo = root.classList.contains('dark');
-      aplicarPaletteConformeModo(darkAtivo, tema.palette);
-    };
-
-    aplicar();
-
-    const observer = new MutationObserver(aplicar);
-    observer.observe(root, { attributes: true, attributeFilter: ['class'] });
-
-    return () => observer.disconnect();
+    root.style.setProperty('--c-bg', tema.palette.bg);
+    root.style.setProperty('--c-surface', tema.palette.surface);
+    root.style.setProperty('--c-border', tema.palette.border);
+    root.style.setProperty('--c-text', tema.palette.text);
+    root.style.setProperty('--c-muted', tema.palette.muted);
+    root.style.setProperty('--c-primary', tema.palette.primary);
+    root.style.setProperty('--c-primary-600', tema.palette.primary600);
+    root.style.setProperty('--c-secondary', tema.palette.secondary);
+    root.style.setProperty('--c-warning', tema.palette.warning);
+    root.style.setProperty('--c-danger', tema.palette.danger);
+    root.style.setProperty('--c-success', tema.palette.success);
   }, [tema]);
 
   async function carregar() {
     try {
       const data = await getTemaSistema();
-      setTema(mergeTema(TEMA_PADRAO, data));
+      const merged = mergeTema(TEMA_PADRAO, data);
+      setTema(forcarEscalaAzul(merged));
     } catch (error) {
       console.error(error);
       setTema(TEMA_PADRAO);
@@ -140,8 +128,9 @@ export function ThemeProvider({ children }) {
 
   async function atualizarTema(novoTema) {
     const merged = mergeTema(TEMA_PADRAO, novoTema);
-    await salvarTemaSistema(merged);
-    setTema(merged);
+    const normalizado = forcarEscalaAzul(merged);
+    await salvarTemaSistema(normalizado);
+    setTema(normalizado);
   }
 
   return (

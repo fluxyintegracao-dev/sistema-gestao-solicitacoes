@@ -16,9 +16,6 @@ export default function TabelaSolicitacoes({
   visibleColumns = null
 }) {
   const tableWrapRef = useRef(null);
-  const bottomScrollRef = useRef(null);
-  const syncingScrollRef = useRef(false);
-  const [bottomScrollContentWidth, setBottomScrollContentWidth] = useState(0);
   const [viewportWidth, setViewportWidth] = useState(() =>
     typeof window !== 'undefined' ? window.innerWidth : 1280
   );
@@ -49,7 +46,7 @@ export default function TabelaSolicitacoes({
       { id: 'contrato', label: 'Contrato', width: 120, min: 95, weight: 1 },
       { id: 'descricao', label: 'Descrição', width: 110, min: 110, weight: 0, fixed: true },
       { id: 'tipo', label: 'Tipo de Solicitação', width: 170, min: 120, weight: 1.1 },
-      { id: 'valor', label: 'Valor', width: 110, min: 90, weight: 0.9 },
+      { id: 'valor', label: 'Valor', width: 200, min: 160, weight: 1.15 },
       { id: 'setor', label: 'Setor', width: 110, min: 90, weight: 0.9 },
       { id: 'responsavel', label: 'Responsável', width: 130, min: 100, weight: 1.1 },
       { id: 'status', label: 'Status', width: 140, min: 110, weight: 1 },
@@ -135,10 +132,6 @@ export default function TabelaSolicitacoes({
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  useEffect(() => {
-    setWidths(columns.map(col => col.width));
-  }, [columns]);
-
   const totalTableWidth = useMemo(
     () => columns.reduce((acc, col, index) => acc + Number(widths[index] ?? col.width ?? 0), 0),
     [columns, widths]
@@ -193,63 +186,16 @@ export default function TabelaSolicitacoes({
     return ordenacao.direcao === 'asc' ? ' ^' : ' v';
   }
 
-  useEffect(() => {
-    const topEl = tableWrapRef.current;
-    const bottomEl = bottomScrollRef.current;
-    if (!topEl || !bottomEl) return undefined;
-
-    function syncFromTop() {
-      if (syncingScrollRef.current) return;
-      syncingScrollRef.current = true;
-      bottomEl.scrollLeft = topEl.scrollLeft;
-      requestAnimationFrame(() => { syncingScrollRef.current = false; });
-    }
-
-    function syncFromBottom() {
-      if (syncingScrollRef.current) return;
-      syncingScrollRef.current = true;
-      topEl.scrollLeft = bottomEl.scrollLeft;
-      requestAnimationFrame(() => { syncingScrollRef.current = false; });
-    }
-
-    topEl.addEventListener('scroll', syncFromTop, { passive: true });
-    bottomEl.addEventListener('scroll', syncFromBottom, { passive: true });
-
-    return () => {
-      topEl.removeEventListener('scroll', syncFromTop);
-      bottomEl.removeEventListener('scroll', syncFromBottom);
-    };
-  }, [totalTableWidth, columns.length]);
-
-  useEffect(() => {
-    function atualizarLarguraScrollReal() {
-      const topEl = tableWrapRef.current;
-      if (!topEl) return;
-
-      const atualizar = () => {
-        const scrollWidth = Math.ceil(topEl.scrollWidth || 0);
-        setBottomScrollContentWidth(scrollWidth);
-      };
-
-      requestAnimationFrame(atualizar);
-    }
-
-    atualizarLarguraScrollReal();
-    window.addEventListener('resize', atualizarLarguraScrollReal);
-
-    return () => window.removeEventListener('resize', atualizarLarguraScrollReal);
-  }, [solicitacoesOrdenadas.length, totalTableWidth, columns.length, visibleColumns]);
-
   return (
-    <div className={`bg-white dark:bg-slate-900 rounded-xl shadow ring-1 ring-gray-200 dark:ring-slate-700 solicitacoes-table-shell solicitacoes-table-shell--${viewportMode} solicitacoes-table-compact`}>
+    <div className={`sol-surface-card rounded-xl solicitacoes-table-shell solicitacoes-table-shell--${viewportMode} solicitacoes-table-compact`}>
       <div
         ref={tableWrapRef}
-        className="overflow-x-auto overflow-y-auto max-h-[70vh] scrollbar-thin"
+        className="solicitacoes-table-scroll scrollbar-thin"
         style={{ scrollbarGutter: 'stable both-edges' }}
       >
         <table
           className={`text-sm table-fixed solicitacoes-table solicitacoes-table--${viewportMode}`}
-          style={{ minWidth: `${totalTableWidth}px` }}
+          style={{ width: '100%', minWidth: `${totalTableWidth}px` }}
         >
         <colgroup>
           {columns.map((col, index) => (

@@ -731,30 +731,32 @@ export default function Solicitacoes({ arquivadas = false }) {
       />
 
       {!arquivadas && (
-        <div className="acoes-massa-solicitacoes solicitacoes-toolbar relative bg-white dark:bg-slate-900 p-3 md:p-4 rounded-xl shadow ring-1 ring-gray-200 dark:ring-slate-700 mb-4 flex flex-col xl:flex-row xl:items-center gap-3">
+        <div className="acoes-massa-solicitacoes solicitacoes-toolbar sol-surface-card relative p-3 md:p-4 rounded-xl mb-4 flex flex-col xl:flex-row xl:items-center gap-3">
           <div className="text-sm text-gray-600 dark:text-slate-300">
             Selecionadas: <strong>{selecionadasIds.length}</strong>
           </div>
           <div className="flex flex-wrap gap-2 xl:ml-auto">
             <button
               type="button"
-              className="btn btn-outline px-3 min-w-[44px]"
+              className="btn btn-outline inline-flex items-center gap-2"
               onClick={exportarSelecionadasExcel}
               disabled={processandoMassa || selecionadasIds.length === 0}
               title="Exportar selecionadas para Excel (.csv)"
               aria-label="Exportar selecionadas para Excel"
             >
               <HiDocumentArrowDown className="w-4 h-4" />
+              <span className="hidden sm:inline">Exportar</span>
             </button>
             <button
               ref={botaoColunasRef}
               type="button"
-              className="btn btn-outline px-3 min-w-[44px]"
+              className="btn btn-outline inline-flex items-center gap-2"
               onClick={alternarSeletorColunas}
               title="Selecionar colunas"
               aria-label="Selecionar colunas"
             >
               <HiViewColumns className="w-4 h-4" />
+              <span className="hidden sm:inline">Colunas</span>
             </button>
             <button
               type="button"
@@ -774,7 +776,7 @@ export default function Solicitacoes({ arquivadas = false }) {
             </button>
           </div>
           {isSetorObra && (
-            <span className="text-xs text-red-600 dark:text-red-400">
+            <span className="text-xs text-blue-700 dark:text-blue-300">
               Setor OBRA não pode enviar solicitações para outro setor.
             </span>
           )}
@@ -1019,7 +1021,7 @@ export default function Solicitacoes({ arquivadas = false }) {
               </button>
               <button
                 type="button"
-                className="btn bg-purple-600 text-white disabled:opacity-60"
+                className="btn bg-blue-700 text-white disabled:opacity-60"
                 onClick={confirmarAtribuirMassa}
                 disabled={processandoMassa}
               >
@@ -1063,7 +1065,7 @@ export default function Solicitacoes({ arquivadas = false }) {
               </button>
               <button
                 type="button"
-                className="btn bg-orange-600 text-white disabled:opacity-60"
+                className="btn bg-blue-600 text-white disabled:opacity-60"
                 onClick={confirmarEnvioMassa}
                 disabled={processandoMassa}
               >

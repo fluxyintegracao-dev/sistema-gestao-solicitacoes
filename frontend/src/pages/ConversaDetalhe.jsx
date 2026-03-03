@@ -12,6 +12,7 @@ import {
 } from '../services/conversasInternas';
 import { API_URL, authHeaders, fileUrl } from '../services/api';
 import PreviewAnexoModal from './SolicitacaoDetalhe/PreviewAnexoModal';
+import { HiPaperClip } from 'react-icons/hi2';
 
 const JANELA_EDICAO_MS = 5 * 60 * 1000;
 
@@ -33,6 +34,8 @@ export default function ConversaDetalhe() {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const origemConversa = String(location.state?.origemConversa || 'entrada').toLowerCase();
+  const rotaVoltar = origemConversa === 'saida' ? '/conversas/saida' : '/conversas/entrada';
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [conversa, setConversa] = useState(null);
@@ -341,7 +344,7 @@ export default function ConversaDetalhe() {
                           <button type="button" className="text-blue-600" onClick={() => visualizarAnexo(anexo)}>
                             Visualizar
                           </button>
-                          <button type="button" className="text-green-600" onClick={() => baixarAnexo(anexo.caminho, anexo.nome_arquivo)}>
+                          <button type="button" className="text-blue-600" onClick={() => baixarAnexo(anexo.caminho, anexo.nome_arquivo)}>
                             Baixar
                           </button>
                         </div>
@@ -378,18 +381,28 @@ export default function ConversaDetalhe() {
           disabled={!conversaAberta || enviando}
           placeholder={conversaAberta ? 'Digite a mensagem...' : 'Conversa concluída. Reabra para enviar mensagem.'}
         />
-        <div className="mt-2">
-          <input
-            type="file"
-            multiple
-            disabled={!conversaAberta || enviando}
-            onChange={(e) => {
-              const novos = Array.from(e.target.files || []);
-              if (novos.length === 0) return;
-              setArquivosMensagem(prev => [...prev, ...novos]);
-              e.target.value = '';
-            }}
-          />
+        <div className="mt-2 flex items-center gap-2 flex-wrap">
+          <label className={`btn btn-outline inline-flex items-center gap-2 cursor-pointer ${(!conversaAberta || enviando) ? 'opacity-60 pointer-events-none' : ''}`}>
+            <HiPaperClip className="w-4 h-4" />
+            <span>Anexar arquivos</span>
+            <input
+              type="file"
+              multiple
+              className="hidden"
+              disabled={!conversaAberta || enviando}
+              onChange={(e) => {
+                const novos = Array.from(e.target.files || []);
+                if (novos.length === 0) return;
+                setArquivosMensagem(prev => [...prev, ...novos]);
+                e.target.value = '';
+              }}
+            />
+          </label>
+          <span className="text-xs text-[var(--c-muted)]">
+            {arquivosMensagem.length > 0
+              ? `${arquivosMensagem.length} arquivo(s) selecionado(s)`
+              : 'Nenhum arquivo selecionado'}
+          </span>
         </div>
         {arquivosMensagem.length > 0 && (
           <div className="mt-2 rounded-lg border border-[var(--c-border)] p-2">
@@ -400,7 +413,7 @@ export default function ConversaDetalhe() {
                   <span className="truncate">{file.name}</span>
                   <button
                     type="button"
-                    className="text-red-600 font-semibold px-2"
+                    className="text-blue-700 font-semibold px-2"
                     onClick={() => setArquivosMensagem(prev => prev.filter((_, i) => i !== index))}
                   >
                     x
@@ -465,5 +478,3 @@ export default function ConversaDetalhe() {
     </div>
   );
 }
-  const origemConversa = String(location.state?.origemConversa || 'entrada').toLowerCase();
-  const rotaVoltar = origemConversa === 'saida' ? '/conversas/saida' : '/conversas/entrada';
