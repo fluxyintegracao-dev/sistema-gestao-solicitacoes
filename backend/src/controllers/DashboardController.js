@@ -33,6 +33,14 @@ module.exports = {
 
       const isAdmin = perfil === 'ADMIN';
       const isSuperadmin = perfil === 'SUPERADMIN';
+      const tokensSetor = [
+        areaUsuario,
+        setorAtual?.codigo,
+        setorAtual?.nome
+      ]
+        .filter(Boolean)
+        .map(item => String(item).trim().toUpperCase());
+      const isSetorDiretoria = tokensSetor.includes('DIRETORIA');
 
       if (!isSuperadmin && !isAdmin) {
         return res.status(403).json({ error: 'Acesso negado' });
@@ -40,9 +48,9 @@ module.exports = {
 
       const whereBase = { cancelada: false };
 
-      // ADMIN sempre enxerga apenas o proprio setor.
-      // SUPERADMIN enxerga a empresa toda.
-      if (isAdmin) {
+      // SUPERADMIN e ADMIN do setor DIRETORIA enxergam a empresa toda.
+      // Demais ADMINs enxergam apenas o proprio setor.
+      if (isAdmin && !isSetorDiretoria) {
         if (!areaUsuario) {
           return res.status(403).json({ error: 'Acesso negado' });
         }
