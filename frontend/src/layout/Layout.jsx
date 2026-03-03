@@ -193,8 +193,7 @@ export default function Layout() {
     location.pathname === path || location.pathname.startsWith(`${path}/`);
 
   return (
-    <div className={theme === 'dark' ? 'dark' : ''}>
-      <div className="layout-shell flex min-h-screen overflow-x-hidden">
+    <div className="layout-shell flex min-h-screen overflow-x-hidden">
         <aside
           className={`sidebar ${collapsed ? 'collapsed' : ''} fixed md:static top-0 left-0 h-full md:h-auto z-40 transform transition-all duration-200 ${
             menuAberto ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
@@ -329,7 +328,6 @@ export default function Layout() {
             <Outlet />
           </div>
         </main>
-      </div>
     </div>
   );
 }
@@ -350,4 +348,3 @@ function MenuItem({ to, label, icon: Icon, active, onSelect, collapsed }) {
     </li>
   );
 }
-

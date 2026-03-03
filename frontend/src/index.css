@@ -3,6 +3,7 @@
 @tailwind utilities;
 
 :root {
+  color-scheme: light;
   --c-bg: #f5f7fb;
   --c-surface: #ffffff;
   --c-border: #e3e7ef;
@@ -35,6 +36,7 @@
 }
 
 .dark {
+  color-scheme: dark;
   --c-bg: #0c1222;
   --c-surface: #121b33;
   --c-border: #1e2740;
@@ -549,6 +551,24 @@ a {
   line-height: 1.25rem;
   padding-top: 8px !important;
   padding-bottom: 8px !important;
+}
+
+html:not(.dark) .solicitacoes-table tbody tr:nth-child(odd) {
+  background: #ffffff !important;
+}
+
+html:not(.dark) .solicitacoes-table tbody tr:nth-child(even) {
+  background: rgba(249, 250, 251, 0.75) !important;
+}
+
+html:not(.dark) .solicitacoes-table tbody tr:hover {
+  background: rgba(239, 246, 255, 0.7) !important;
+}
+
+html:not(.dark) .solicitacoes-table tbody td,
+html:not(.dark) .solicitacoes-table tbody td span,
+html:not(.dark) .solicitacoes-table tbody td p {
+  color: #111827 !important;
 }
 
 .solicitacao-acoes {
