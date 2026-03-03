@@ -255,6 +255,7 @@ router.post('/tipos-sub-contrato', permit(['SUPERADMIN']), TipoSubContratoContro
 router.patch('/tipos-sub-contrato/:id', permit(['SUPERADMIN']), TipoSubContratoController.update);
 router.patch('/tipos-sub-contrato/:id/ativar', permit(['SUPERADMIN']), TipoSubContratoController.ativar);
 router.patch('/tipos-sub-contrato/:id/desativar', permit(['SUPERADMIN']), TipoSubContratoController.desativar);
+router.delete('/tipos-sub-contrato/:id', permit(['SUPERADMIN']), TipoSubContratoController.excluir);
 
 // -------------------------------------------------------------------
 // STATUS POR SETOR (SUPERADMIN)

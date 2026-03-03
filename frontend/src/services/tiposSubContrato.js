@@ -30,15 +30,34 @@ export async function atualizarTipoSubContrato(id, data) {
 }
 
 export async function ativarTipoSubContrato(id) {
-  await fetch(`${API_URL}/tipos-sub-contrato/${id}/ativar`, {
+  const res = await fetch(`${API_URL}/tipos-sub-contrato/${id}/ativar`, {
     method: 'PATCH',
     headers: authHeaders()
   });
+  if (!res.ok) {
+    const data = await res.json().catch(() => null);
+    throw new Error(data?.error || 'Erro ao ativar subtipo');
+  }
 }
 
 export async function desativarTipoSubContrato(id) {
-  await fetch(`${API_URL}/tipos-sub-contrato/${id}/desativar`, {
+  const res = await fetch(`${API_URL}/tipos-sub-contrato/${id}/desativar`, {
     method: 'PATCH',
     headers: authHeaders()
   });
+  if (!res.ok) {
+    const data = await res.json().catch(() => null);
+    throw new Error(data?.error || 'Erro ao desativar subtipo');
+  }
+}
+
+export async function excluirTipoSubContrato(id) {
+  const res = await fetch(`${API_URL}/tipos-sub-contrato/${id}`, {
+    method: 'DELETE',
+    headers: authHeaders()
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => null);
+    throw new Error(data?.error || 'Erro ao excluir subtipo');
+  }
 }

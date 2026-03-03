@@ -1,4 +1,4 @@
-const { TipoSubContrato, TipoSolicitacao } = require('../models');
+﻿const { TipoSubContrato, TipoSolicitacao, Solicitacao, Contrato } = require('../models');
 
 module.exports = {
   async index(req, res) {
@@ -27,13 +27,15 @@ module.exports = {
       const { nome, tipo_macro_id } = req.body;
       if (!nome || !tipo_macro_id) {
         return res.status(400).json({
-          error: 'Nome e tipo macro sÃ£o obrigatÃ³rios'
+          error: 'Nome e tipo macro sao obrigatorios'
         });
       }
+
       const macro = await TipoSolicitacao.findByPk(tipo_macro_id);
       if (!macro) {
         return res.status(400).json({ error: 'Tipo macro nao encontrado' });
       }
+
       const tipo = await TipoSubContrato.create({ nome, tipo_macro_id });
       return res.status(201).json(tipo);
     } catch (error) {
@@ -46,15 +48,19 @@ module.exports = {
     try {
       const { id } = req.params;
       const { nome, tipo_macro_id } = req.body;
+
       if (!nome || !tipo_macro_id) {
         return res.status(400).json({ error: 'Nome e tipo macro sao obrigatorios' });
       }
+
       const macro = await TipoSolicitacao.findByPk(tipo_macro_id);
       if (!macro) {
         return res.status(400).json({ error: 'Tipo macro nao encontrado' });
       }
+
       const tipo = await TipoSubContrato.findByPk(id);
       if (!tipo) return res.status(404).json({ error: 'Tipo nao encontrado' });
+
       await tipo.update({ nome, tipo_macro_id });
       return res.json(tipo);
     } catch (error) {
@@ -66,12 +72,9 @@ module.exports = {
   async ativar(req, res) {
     try {
       const { id } = req.params;
-      const macro = await TipoSolicitacao.findByPk(tipo_macro_id);
-      if (!macro) {
-        return res.status(400).json({ error: 'Tipo macro nao encontrado' });
-      }
       const tipo = await TipoSubContrato.findByPk(id);
-      if (!tipo) return res.status(404).json({ error: 'Tipo nÃ£o encontrado' });
+      if (!tipo) return res.status(404).json({ error: 'Subtipo nao encontrado' });
+
       await tipo.update({ ativo: true });
       return res.sendStatus(204);
     } catch (error) {
@@ -83,17 +86,39 @@ module.exports = {
   async desativar(req, res) {
     try {
       const { id } = req.params;
-      const macro = await TipoSolicitacao.findByPk(tipo_macro_id);
-      if (!macro) {
-        return res.status(400).json({ error: 'Tipo macro nao encontrado' });
-      }
       const tipo = await TipoSubContrato.findByPk(id);
-      if (!tipo) return res.status(404).json({ error: 'Tipo nÃ£o encontrado' });
+      if (!tipo) return res.status(404).json({ error: 'Subtipo nao encontrado' });
+
       await tipo.update({ ativo: false });
       return res.sendStatus(204);
     } catch (error) {
       console.error(error);
       return res.status(500).json({ error: 'Erro ao desativar subtipo' });
+    }
+  },
+
+  async excluir(req, res) {
+    try {
+      const { id } = req.params;
+      const tipo = await TipoSubContrato.findByPk(id);
+      if (!tipo) return res.status(404).json({ error: 'Subtipo nao encontrado' });
+
+      const [totalSolicitacoes, totalContratos] = await Promise.all([
+        Solicitacao.count({ where: { tipo_sub_id: id } }),
+        Contrato.count({ where: { tipo_sub_id: id } })
+      ]);
+
+      if (totalSolicitacoes > 0 || totalContratos > 0) {
+        return res.status(409).json({
+          error: 'Nao e possivel excluir subtipo com solicitacoes ou contratos vinculados.'
+        });
+      }
+
+      await tipo.destroy();
+      return res.sendStatus(204);
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao excluir subtipo' });
     }
   }
 };

@@ -4,7 +4,8 @@ import {
   criarTipoSubContrato,
   atualizarTipoSubContrato,
   ativarTipoSubContrato,
-  desativarTipoSubContrato
+  desativarTipoSubContrato,
+  excluirTipoSubContrato
 } from '../services/tiposSubContrato';
 import { getTiposSolicitacao } from '../services/tiposSolicitacao';
 
@@ -45,12 +46,28 @@ export default function TiposSubContrato() {
   }
 
   async function toggle(tipo) {
-    if (tipo.ativo) {
-      await desativarTipoSubContrato(tipo.id);
-    } else {
-      await ativarTipoSubContrato(tipo.id);
+    try {
+      if (tipo.ativo) {
+        await desativarTipoSubContrato(tipo.id);
+      } else {
+        await ativarTipoSubContrato(tipo.id);
+      }
+      carregar();
+    } catch (error) {
+      console.error(error);
+      alert(error?.message || 'Erro ao alterar status do subtipo');
     }
-    carregar();
+  }
+
+  async function excluir(item) {
+    if (!confirm(`Excluir o subtipo "${item.nome}"?`)) return;
+    try {
+      await excluirTipoSubContrato(item.id);
+      carregar();
+    } catch (error) {
+      console.error(error);
+      alert(error?.message || 'Erro ao excluir subtipo');
+    }
   }
 
   function iniciarEdicao(item) {
@@ -174,20 +191,24 @@ export default function TiposSubContrato() {
                 <td>
                   {editId === t.id ? (
                     <>
-                      <button className="btn btn-primary" onClick={() => salvarEdicao(t.id)} disabled={saving}>
+                      <button type="button" className="btn btn-primary" onClick={() => salvarEdicao(t.id)} disabled={saving}>
                         {saving ? 'Salvando...' : 'Salvar'}
                       </button>{' '}
-                      <button className="btn btn-outline" onClick={cancelarEdicao} disabled={saving}>
+                      <button type="button" className="btn btn-outline" onClick={cancelarEdicao} disabled={saving}>
                         Cancelar
                       </button>
                     </>
                   ) : (
                     <>
-                      <button className="btn btn-outline" onClick={() => iniciarEdicao(t)}>
+                      <button type="button" className="btn btn-outline" onClick={() => iniciarEdicao(t)}>
                         Editar
                       </button>{' '}
-                      <button className="btn btn-secondary" onClick={() => toggle(t)}>
+                      <button type="button" className="btn btn-secondary" onClick={() => toggle(t)}>
                         {t.ativo ? 'Desativar' : 'Ativar'}
+                      </button>
+                      {' '}
+                      <button type="button" className="btn btn-danger" onClick={() => excluir(t)}>
+                        Excluir
                       </button>
                     </>
                   )}
