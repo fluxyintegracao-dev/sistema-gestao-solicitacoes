@@ -521,6 +521,12 @@ a {
   font-size: var(--sol-font-base);
 }
 
+.solicitacoes-page .solicitacoes-filtros .btn {
+  min-height: 40px !important;
+  padding: 8px 12px !important;
+  font-size: var(--sol-font-base);
+}
+
 .solicitacoes-page .solicitacoes-filtros label {
   font-size: var(--sol-font-small);
 }
