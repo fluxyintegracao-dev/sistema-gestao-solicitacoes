@@ -147,14 +147,21 @@ export default function NovaSolicitacao() {
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '');
   }, [nomeTipoSelecionado]);
+  const nomeTipoToken = useMemo(() => {
+    return nomeTipoNormalizado
+      .toUpperCase()
+      .replace(/[^A-Z0-9]+/g, ' ')
+      .trim();
+  }, [nomeTipoNormalizado]);
   const subtipoObrigatorio = nomeTipoSelecionado === 'ADM LOCAL DE OBRA';
   const medicaoObrigatoria = nomeTipoNormalizado === 'MEDICAO';
+  const locacaoMaqEq = nomeTipoToken === 'LOCACAO DE MAQ EQ';
   const aberturaContratoObrigatoria = nomeTipoNormalizado === 'ABERTURA DE CONTRATO';
   const solicitacaoCompra = nomeTipoNormalizado === 'SOLICITACAO DE COMPRA';
   const outrosAssuntos = nomeTipoNormalizado === 'OUTROS ASSUNTOS';
   const pedidoContratacao = nomeTipoNormalizado === 'PEDIDO DE CONTRATACAO';
   const tipoSemValor = solicitacaoCompra || outrosAssuntos || pedidoContratacao;
-  const exibirCamposContrato = medicaoObrigatoria || subtipoObrigatorio;
+  const exibirCamposContrato = medicaoObrigatoria || subtipoObrigatorio || locacaoMaqEq;
   const camposContratoObrigatorios = exibirCamposContrato;
   const exibirCampoSubtipo = subtipoObrigatorio;
 

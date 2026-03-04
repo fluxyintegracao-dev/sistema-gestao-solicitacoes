@@ -1288,6 +1288,9 @@ module.exports = {
       const nomeTipoNormalizado = nomeTipo
         .normalize('NFD')
         .replace(/[\u0300-\u036f]/g, '');
+      const nomeTipoToken = nomeTipoNormalizado
+        .replace(/[^A-Z0-9]+/g, ' ')
+        .trim();
 
       const tiposSemValor = new Set([
         'SOLICITACAO DE COMPRA',
@@ -1296,7 +1299,8 @@ module.exports = {
       ]);
       const exigeCamposContrato =
         nomeTipoNormalizado === 'MEDICAO' ||
-        nomeTipo === 'ADM LOCAL DE OBRA';
+        nomeTipo === 'ADM LOCAL DE OBRA' ||
+        nomeTipoToken === 'LOCACAO DE MAQ EQ';
       const exigeSubtipo = nomeTipo === 'ADM LOCAL DE OBRA';
 
       if (!tiposSemValor.has(nomeTipoNormalizado) && (valor === '' || valor === null || valor === undefined)) {
