@@ -2,6 +2,7 @@ import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useContext, useEffect, useMemo, useState } from 'react';
 import { AuthContext } from '../contexts/AuthContext';
 import NotificacoesBell from '../components/NotificacoesBell';
+import { getCaixaEntrada } from '../services/conversasInternas';
 import {
   HiOutlineSquares2X2,
   HiOutlinePlusCircle,
@@ -43,6 +44,7 @@ export default function Layout() {
   const [isMobileViewport, setIsMobileViewport] = useState(() =>
     typeof window !== 'undefined' ? window.matchMedia('(max-width: 767px)').matches : false
   );
+  const [inboxNovasCount, setInboxNovasCount] = useState(0);
 
   const sidebarWidth = isMobileViewport ? 292 : (collapsed ? 76 : 236);
 
@@ -81,6 +83,51 @@ export default function Layout() {
   useEffect(() => {
     if (isMobileViewport) setMenuAberto(false);
   }, [location.pathname, isMobileViewport]);
+
+  useEffect(() => {
+    const userId = Number(user?.id);
+    if (!Number.isInteger(userId) || userId <= 0) {
+      setInboxNovasCount(0);
+      return undefined;
+    }
+
+    const storageKey = `conversas_entrada_last_seen_${userId}`;
+    let ativo = true;
+
+    const atualizarBadge = async () => {
+      try {
+        const lista = await getCaixaEntrada({ arquivadas: false });
+        if (!ativo) return;
+        const seenValue = localStorage.getItem(storageKey);
+        const seenMs = seenValue ? new Date(seenValue).getTime() : 0;
+
+        const total = (Array.isArray(lista) ? lista : []).filter(item => {
+          const updatedMs = new Date(item?.updatedAt || item?.createdAt).getTime();
+          const autorId = Number(item?.ultima_mensagem?.autor?.id || 0);
+          const autorEhOutroUsuario = !autorId || autorId !== userId;
+          return updatedMs > seenMs && autorEhOutroUsuario;
+        }).length;
+
+        setInboxNovasCount(total);
+      } catch {
+        // sem bloqueio visual em caso de falha temporaria
+      }
+    };
+
+    const handleSeenEvent = () => {
+      atualizarBadge();
+    };
+
+    window.addEventListener('conversas:entrada:seen', handleSeenEvent);
+    atualizarBadge();
+    const interval = setInterval(atualizarBadge, 20000);
+
+    return () => {
+      ativo = false;
+      window.removeEventListener('conversas:entrada:seen', handleSeenEvent);
+      clearInterval(interval);
+    };
+  }, [user?.id]);
 
   const perfilUpper = String(user?.perfil || '').toUpperCase();
   const areaUpper = String(user?.area || '').toUpperCase();
@@ -399,13 +446,14 @@ export default function Layout() {
                       label={item.label}
                       icon={item.icon}
                       active={isActive(item.to)}
-                      onSelect={() => {
-                        navigate(item.to);
-                        if (isMobileViewport) setMenuAberto(false);
-                      }}
-                      collapsed={collapsed}
-                    />
-                  ))}
+                              onSelect={() => {
+                                navigate(item.to);
+                                if (isMobileViewport) setMenuAberto(false);
+                              }}
+                              collapsed={collapsed}
+                              inboxNovasCount={inboxNovasCount}
+                            />
+                          ))}
                 </ul>
               ) : (
                 <ul className="nav-list nav-list-grouped">
@@ -451,6 +499,7 @@ export default function Layout() {
                                 }}
                                 collapsed={false}
                                 subItem
+                                inboxNovasCount={inboxNovasCount}
                               />
                             ))}
                           </ul>
@@ -547,7 +596,9 @@ function isPathActive(currentPath, targetPath) {
   return currentPath === targetPath || currentPath.startsWith(`${targetPath}/`);
 }
 
-function MenuItem({ to, label, icon: Icon, active, onSelect, collapsed, subItem = false }) {
+function MenuItem({ to, label, icon: Icon, active, onSelect, collapsed, subItem = false, inboxNovasCount = 0 }) {
+  const mostrarBadgeInbox = to === '/conversas/entrada';
+  const inboxCount = Number(inboxNovasCount || 0);
   return (
     <li>
       <Link
@@ -559,6 +610,11 @@ function MenuItem({ to, label, icon: Icon, active, onSelect, collapsed, subItem 
       >
         {Icon && <Icon className="nav-icon" />}
         {!collapsed && <span>{label}</span>}
+        {!collapsed && mostrarBadgeInbox && inboxCount > 0 && (
+          <span className="ml-auto inline-flex min-w-[20px] h-5 px-1.5 items-center justify-center rounded-full text-[11px] font-semibold bg-red-600 text-white">
+            {inboxCount > 99 ? '99+' : inboxCount}
+          </span>
+        )}
       </Link>
     </li>
   );
