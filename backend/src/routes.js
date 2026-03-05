@@ -27,6 +27,7 @@ const NotificacaoController = require('./controllers/NotificacaoController');
 const SetorPermissaoController = require('./controllers/SetorPermissaoController');
 const ConfiguracaoSistemaController = require('./controllers/ConfiguracaoSistemaController');
 const ConversaInternaController = require('./controllers/ConversaInternaController');
+const ArquivoModeloController = require('./controllers/ArquivoModeloController');
 const { Setor } = require('./models');
 //console.log('AnexoController =>', AnexoController);
 
@@ -38,6 +39,20 @@ router.post('/login', AuthController.login);
 router.get('/configuracoes/tema', ConfiguracaoSistemaController.getTema);
 const auth = require('./middlewares/auth');
 router.use(auth);
+
+// -------------------------------------------------------------------
+// ARQUIVOS MODELOS
+// -------------------------------------------------------------------
+router.get('/arquivos-modelos/contexto', ArquivoModeloController.contexto);
+router.get('/arquivos-modelos/admins', ArquivoModeloController.listarAdmins);
+router.get('/arquivos-modelos', ArquivoModeloController.listarArquivos);
+router.post('/arquivos-modelos/upload', uploadComprovantes.single('file'), ArquivoModeloController.upload);
+router.get('/arquivos-modelos/:id/link', ArquivoModeloController.obterLink);
+router.post('/arquivos-modelos/paginas', permit(['SUPERADMIN']), ArquivoModeloController.criarPagina);
+router.patch('/arquivos-modelos/paginas', permit(['SUPERADMIN']), ArquivoModeloController.salvarPaginas);
+router.patch('/arquivos-modelos/paginas/:codigo/ativar', permit(['SUPERADMIN']), ArquivoModeloController.ativarPagina);
+router.patch('/arquivos-modelos/paginas/:codigo/desativar', permit(['SUPERADMIN']), ArquivoModeloController.desativarPagina);
+router.patch('/arquivos-modelos/uploaders', permit(['SUPERADMIN']), ArquivoModeloController.salvarUploaders);
 
 const allowGestaoUsuarios = async (req, res, next) => {
   try {

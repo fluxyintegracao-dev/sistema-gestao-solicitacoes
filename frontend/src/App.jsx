@@ -39,6 +39,8 @@ import SetoresCriacaoTodasObras from './pages/SetoresCriacaoTodasObras';
 import ConversasEntrada from './pages/ConversasEntrada';
 import ConversasSaida from './pages/ConversasSaida';
 import ConversaDetalhe from './pages/ConversaDetalhe';
+import ArquivosModelos from './pages/ArquivosModelos';
+import ArquivosModelosConfig from './pages/ArquivosModelosConfig';
 import { useAuth } from './contexts/AuthContext';
 
 function GestaoUsuariosRoute({ children }) {
@@ -56,6 +58,15 @@ function GestaoUsuariosRoute({ children }) {
     return <Navigate to="/" replace />;
   }
 
+  return children;
+}
+
+function SuperadminRoute({ children }) {
+  const { user } = useAuth();
+  const perfil = String(user?.perfil || '').toUpperCase();
+  if (perfil !== 'SUPERADMIN') {
+    return <Navigate to="/" replace />;
+  }
   return children;
 }
 
@@ -88,6 +99,7 @@ export default function App() {
         <Route path="conversas/entrada" element={<ConversasEntrada />} />
         <Route path="conversas/saida" element={<ConversasSaida />} />
         <Route path="conversas/:id" element={<ConversaDetalhe />} />
+        <Route path="arquivos-modelos" element={<ArquivosModelos />} />
 
         <Route path="nova-solicitacao" element={<NovaSolicitacao />} />
 
@@ -113,6 +125,7 @@ export default function App() {
         <Route path="timeout-inatividade" element={<TimeoutInatividade />} />
         <Route path="tipos-solicitacao-por-setor" element={<TiposSolicitacaoPorSetor />} />
         <Route path="setores-criacao-todas-obras" element={<SetoresCriacaoTodasObras />} />
+        <Route path="arquivos-modelos-config" element={<SuperadminRoute><ArquivosModelosConfig /></SuperadminRoute>} />
 
         <Route path="comprovantes/upload" element={<UploadComprovantes />} />
         <Route path="comprovantes/pendentes" element={<ComprovantesPendentes />} />

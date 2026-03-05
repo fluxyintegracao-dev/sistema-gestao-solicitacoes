@@ -38,6 +38,7 @@ db.ConversaInternaMensagem = require('./ConversaInternaMensagem')(sequelize, Seq
 db.ConversaInternaAnexo = require('./ConversaInternaAnexo')(sequelize, Sequelize);
 db.ConversaInternaParticipante = require('./ConversaInternaParticipante')(sequelize, Sequelize);
 db.ConversaInternaArquivoUsuario = require('./ConversaInternaArquivoUsuario')(sequelize, Sequelize);
+db.ArquivoModelo = require('./ArquivoModelo')(sequelize, Sequelize);
 
   
 
@@ -251,6 +252,16 @@ db.Contrato.hasMany(db.ContratoAnexo, {
 db.ContratoAnexo.belongsTo(db.Contrato, {
   foreignKey: 'contrato_id',
   as: 'contrato'
+});
+
+db.User.hasMany(db.ArquivoModelo, {
+  foreignKey: 'criado_por_id',
+  as: 'arquivosModelos'
+});
+
+db.ArquivoModelo.belongsTo(db.User, {
+  foreignKey: 'criado_por_id',
+  as: 'criadoPor'
 });
 
 

@@ -98,6 +98,11 @@ const SECOES_CONFIG = [
         title: 'Tempo de Inatividade',
         description: 'Define o tempo para logout automático por inatividade.',
         to: '/timeout-inatividade'
+      },
+      {
+        title: 'Arquivos Modelos',
+        description: 'Crie páginas e defina admins com permissão de upload.',
+        to: '/arquivos-modelos-config'
       }
     ]
   }

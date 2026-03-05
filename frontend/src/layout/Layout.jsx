@@ -112,6 +112,7 @@ export default function Layout() {
       Cadastros: HiOutlineRectangleGroup,
       Contratos: HiOutlineBanknotes,
       Configurações: HiOutlineCog6Tooth,
+      Biblioteca: HiOutlineFolderOpen,
       Conta: HiOutlineUserCircle
     };
     const addGroup = (label, entries) => {
@@ -129,6 +130,9 @@ export default function Layout() {
         addGroup('Comunicação', [
           item('/conversas/entrada', 'Caixa de Entrada', HiOutlineInboxStack),
           item('/conversas/saida', 'Caixa de Saída', HiOutlinePaperAirplane)
+        ]);
+        addGroup('Biblioteca', [
+          item('/arquivos-modelos', 'Arquivos Modelos', HiOutlineFolderOpen)
         ]);
         if (isSetorObra) {
           addGroup('Contratos', [
@@ -155,6 +159,9 @@ export default function Layout() {
           item('/conversas/entrada', 'Caixa de Entrada', HiOutlineInboxStack),
           item('/conversas/saida', 'Caixa de Saída', HiOutlinePaperAirplane)
         ]);
+        addGroup('Biblioteca', [
+          item('/arquivos-modelos', 'Arquivos Modelos', HiOutlineFolderOpen)
+        ]);
         if (isSetorObra) {
           addGroup('Contratos', [
             item('/gestao-contratos', 'Gestão de Contratos', HiOutlineBanknotes)
@@ -179,6 +186,9 @@ export default function Layout() {
         addGroup('Comunicação', [
           item('/conversas/entrada', 'Caixa de Entrada', HiOutlineInboxStack),
           item('/conversas/saida', 'Caixa de Saída', HiOutlinePaperAirplane)
+        ]);
+        addGroup('Biblioteca', [
+          item('/arquivos-modelos', 'Arquivos Modelos', HiOutlineFolderOpen)
         ]);
         if (isSetorObra) {
           addGroup('Contratos', [
@@ -205,6 +215,9 @@ export default function Layout() {
           item('/conversas/entrada', 'Caixa de Entrada', HiOutlineInboxStack),
           item('/conversas/saida', 'Caixa de Saída', HiOutlinePaperAirplane)
         ]);
+        addGroup('Biblioteca', [
+          item('/arquivos-modelos', 'Arquivos Modelos', HiOutlineFolderOpen)
+        ]);
         addGroup('Financeiro', [
           item('/comprovantes/upload', 'Upload Comprovantes', HiOutlineCloudArrowUp),
           item('/comprovantes/pendentes', 'Comprovantes Pendentes', HiOutlineReceiptRefund)
@@ -226,6 +239,9 @@ export default function Layout() {
         addGroup('Comunicação', [
           item('/conversas/entrada', 'Caixa de Entrada', HiOutlineInboxStack),
           item('/conversas/saida', 'Caixa de Saída', HiOutlinePaperAirplane)
+        ]);
+        addGroup('Biblioteca', [
+          item('/arquivos-modelos', 'Arquivos Modelos', HiOutlineFolderOpen)
         ]);
         if (isFinanceiro) {
           addGroup('Financeiro', [
@@ -258,6 +274,9 @@ export default function Layout() {
         addGroup('Comunicação', [
           item('/conversas/entrada', 'Caixa de Entrada', HiOutlineInboxStack),
           item('/conversas/saida', 'Caixa de Saída', HiOutlinePaperAirplane)
+        ]);
+        addGroup('Biblioteca', [
+          item('/arquivos-modelos', 'Arquivos Modelos', HiOutlineFolderOpen)
         ]);
         addGroup('Financeiro', [
           item('/comprovantes/upload', 'Upload Comprovantes', HiOutlineCloudArrowUp),
