@@ -17,6 +17,8 @@ export default function Filtros({
   const [isMobileViewport, setIsMobileViewport] = useState(() =>
     typeof window !== 'undefined' ? window.innerWidth < 768 : false
   );
+  const [obraDropdownOpen, setObraDropdownOpen] = useState(false);
+  const obraDropdownRef = useRef(null);
   const [tipoDropdownOpen, setTipoDropdownOpen] = useState(false);
   const tipoDropdownRef = useRef(null);
 
@@ -33,14 +35,17 @@ export default function Filtros({
 
   useEffect(() => {
     function onClickOutside(event) {
-      if (!tipoDropdownOpen) return;
-      if (tipoDropdownRef.current?.contains(event.target)) return;
-      setTipoDropdownOpen(false);
+      if (tipoDropdownOpen && !tipoDropdownRef.current?.contains(event.target)) {
+        setTipoDropdownOpen(false);
+      }
+      if (obraDropdownOpen && !obraDropdownRef.current?.contains(event.target)) {
+        setObraDropdownOpen(false);
+      }
     }
 
     document.addEventListener('mousedown', onClickOutside);
     return () => document.removeEventListener('mousedown', onClickOutside);
-  }, [tipoDropdownOpen]);
+  }, [tipoDropdownOpen, obraDropdownOpen]);
 
   function handleChange(e) {
     const { name, value } = e.target;
@@ -62,7 +67,49 @@ export default function Filtros({
       data_vencimento: '',
       responsavel: ''
     });
+    setObraDropdownOpen(false);
     setTipoDropdownOpen(false);
+  }
+
+  const obraSelecionadosIds = String(filtros.obra_ids || '')
+    .split(',')
+    .map(v => String(v).trim())
+    .filter(Boolean);
+
+  const obraSelecionadosSet = new Set(obraSelecionadosIds);
+  const obraSelecionadosNomes = obrasOptions
+    .filter(obra => obraSelecionadosSet.has(String(obra.value)))
+    .map(obra => obra.label);
+  const resumoObrasSelecionadas = (() => {
+    if (obraSelecionadosNomes.length === 0) return 'Todas as obras';
+    if (obraSelecionadosNomes.length <= 2) return obraSelecionadosNomes.join(', ');
+    return `${obraSelecionadosNomes.slice(0, 2).join(', ')} +${obraSelecionadosNomes.length - 2}`;
+  })();
+
+  function atualizarObrasSelecionadas(ids) {
+    setFiltros(prev => ({
+      ...prev,
+      obra_ids: ids.join(',')
+    }));
+  }
+
+  function alternarObra(obraId) {
+    const id = String(obraId);
+    const atuais = [...obraSelecionadosIds];
+    const existe = atuais.includes(id);
+    const proximos = existe
+      ? atuais.filter(item => item !== id)
+      : [...atuais, id];
+    atualizarObrasSelecionadas(proximos);
+  }
+
+  function selecionarTodasObras() {
+    const ids = obrasOptions.map(obra => String(obra.value));
+    atualizarObrasSelecionadas(ids);
+  }
+
+  function limparObras() {
+    atualizarObrasSelecionadas([]);
   }
 
   const tipoSelecionadosIds = String(filtros.tipo_solicitacao_id || '')
@@ -169,21 +216,62 @@ export default function Filtros({
         </div>
 
         <div className="sol-filtros-grid">
-          <div className="sol-filter-field">
-            <label className="sol-filter-label">Obra</label>
-            <select
-              name="obra_ids"
-              className="input"
-              value={filtros.obra_ids || ''}
-              onChange={handleChange}
+          <div className="sol-filter-field sol-filter-field-multi" ref={obraDropdownRef}>
+            <div className="sol-filter-label-row">
+              <label className="sol-filter-label">Obra</label>
+              {obraSelecionadosIds.length > 0 && (
+                <button
+                  type="button"
+                  className="sol-filter-link-btn"
+                  onClick={limparObras}
+                >
+                  Limpar
+                </button>
+              )}
+            </div>
+            <button
+              type="button"
+              className={`sol-filter-multi-trigger ${obraDropdownOpen ? 'open' : ''}`}
+              onClick={() => setObraDropdownOpen(prev => !prev)}
+              aria-expanded={obraDropdownOpen}
+              aria-label="Selecionar obras"
             >
-              <option value="">Todas as obras</option>
-              {obrasOptions.map(obra => (
-                <option key={obra.value} value={obra.value}>
-                  {obra.label}
-                </option>
-              ))}
-            </select>
+              <span className="truncate">{resumoObrasSelecionadas}</span>
+              {obraDropdownOpen ? <HiChevronUp className="w-4 h-4" /> : <HiChevronDown className="w-4 h-4" />}
+            </button>
+
+            {obraDropdownOpen && (
+              <div className="sol-filter-multi-popover">
+                <div className="sol-filter-multi-actions">
+                  <button type="button" className="sol-filter-link-btn" onClick={selecionarTodasObras}>
+                    Selecionar todas
+                  </button>
+                  <button type="button" className="sol-filter-link-btn" onClick={limparObras}>
+                    Limpar
+                  </button>
+                </div>
+
+                <div className="sol-filter-multi-list">
+                  {obrasOptions.map(obra => {
+                    const id = String(obra.value);
+                    const checked = obraSelecionadosSet.has(id);
+                    return (
+                      <label key={obra.value} className="sol-filter-multi-item">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => alternarObra(id)}
+                        />
+                        <span>{obra.label}</span>
+                      </label>
+                    );
+                  })}
+                  {obrasOptions.length === 0 && (
+                    <p className="sol-filter-multi-empty">Nenhuma obra disponivel.</p>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="sol-filter-field">
