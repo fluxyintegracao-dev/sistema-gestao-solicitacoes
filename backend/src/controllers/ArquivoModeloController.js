@@ -5,6 +5,10 @@ const { normalizeOriginalName } = require('../utils/fileName');
 
 const KEY_PAGINAS = 'ARQUIVOS_MODELOS_PAGINAS';
 const KEY_UPLOADERS = 'ARQUIVOS_MODELOS_UPLOADERS';
+const ALIAS_CODIGO_PAGINA_POR_SETOR = {
+  GEO: 'GERENCIA_PROCESSOS',
+  GERENCIA_DE_PROCESSOS: 'GERENCIA_PROCESSOS'
+};
 
 const PAGINAS_PADRAO = [
   { codigo: 'GERENCIA_PROCESSOS', nome: 'Gerência de Processos', ativo: true },
@@ -97,12 +101,42 @@ function isAdmin(req) {
   return String(req.user?.perfil || '').trim().toUpperCase() === 'ADMIN';
 }
 
-function podeUploadPagina(req, paginaCodigo, uploadersByPagina) {
+async function obterCodigosPaginaPermitidosPorSetor(req) {
+  const codigos = new Set();
+  const adicionarCodigo = valor => {
+    const codigoNormalizado = normalizarCodigo(valor);
+    if (!codigoNormalizado) return;
+    codigos.add(codigoNormalizado);
+    const alias = ALIAS_CODIGO_PAGINA_POR_SETOR[codigoNormalizado];
+    if (alias) {
+      codigos.add(alias);
+    }
+  };
+
+  adicionarCodigo(req.user?.area);
+
+  if (req.user?.setor_id) {
+    const setor = await Setor.findByPk(req.user.setor_id, {
+      attributes: ['codigo', 'nome']
+    });
+    adicionarCodigo(setor?.codigo);
+    adicionarCodigo(setor?.nome);
+  }
+
+  return Array.from(codigos);
+}
+
+async function podeUploadPagina(req, paginaCodigo, uploadersByPagina) {
   if (isSuperadmin(req)) return true;
   if (!isAdmin(req)) return false;
 
-  const lista = uploadersByPagina[String(paginaCodigo || '').toUpperCase()] || [];
-  if (lista.length === 0) return true; // fallback para nao bloquear ADMIN existente
+  const codigoPagina = normalizarCodigo(paginaCodigo);
+  const codigosPermitidosPorSetor = await obterCodigosPaginaPermitidosPorSetor(req);
+  if (codigosPermitidosPorSetor.includes(codigoPagina)) {
+    return true;
+  }
+
+  const lista = uploadersByPagina[String(codigoPagina || '').toUpperCase()] || [];
   return lista.includes(Number(req.user?.id));
 }
 
@@ -115,9 +149,9 @@ module.exports = {
       ]);
 
       const uploadPermitidoPorPagina = {};
-      paginas.forEach(pagina => {
-        uploadPermitidoPorPagina[pagina.codigo] = podeUploadPagina(req, pagina.codigo, uploadersByPagina);
-      });
+      for (const pagina of paginas) {
+        uploadPermitidoPorPagina[pagina.codigo] = await podeUploadPagina(req, pagina.codigo, uploadersByPagina);
+      }
 
       return res.json({
         paginas,
@@ -272,7 +306,7 @@ module.exports = {
         return res.status(400).json({ error: 'Pagina invalida ou desativada' });
       }
 
-      if (!podeUploadPagina(req, paginaCodigo, uploadersByPagina)) {
+      if (!(await podeUploadPagina(req, paginaCodigo, uploadersByPagina))) {
         return res.status(403).json({ error: 'Sem permissao para upload nesta pagina' });
       }
 
@@ -313,7 +347,7 @@ module.exports = {
 
       if (!isSuperadmin(req)) {
         const uploadersByPagina = await getUploaders();
-        const permitido = podeUploadPagina(req, arquivo.pagina_codigo, uploadersByPagina);
+        const permitido = await podeUploadPagina(req, arquivo.pagina_codigo, uploadersByPagina);
         if (!permitido) {
           return res.status(403).json({ error: 'Sem permissao para excluir arquivo desta pagina' });
         }
