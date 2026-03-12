@@ -298,7 +298,7 @@ export default function Solicitacoes({ arquivadas = false }) {
   }
 
   const perfilUpper = String(user?.perfil || '').toUpperCase();
-  const mostrarSomaValor = perfilUpper.startsWith('ADMIN');
+  const mostrarSomaValor = perfilUpper.startsWith('ADMIN') || perfilUpper === 'SUPERADMIN';
   const somaValorFiltrado = solicitacoes.reduce((total, item) => {
     const valor = Number(item?.valor || 0);
     return total + (Number.isNaN(valor) ? 0 : valor);
