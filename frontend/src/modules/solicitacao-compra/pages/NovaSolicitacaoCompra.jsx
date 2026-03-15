@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { listarApropriacoes, listarInsumos } from '../../../services/compras';
 import { getMinhasObras } from '../../../services/obras';
@@ -41,6 +41,8 @@ function criarItemManualBase(dados, necessarioParaPadrao) {
 export default function NovaSolicitacaoCompra() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const hidratandoDraftRef = useRef(false);
+  const draftCarregadoRef = useRef(false);
   const [obras, setObras] = useState([]);
   const [insumos, setInsumos] = useState([]);
   const [apropriacoes, setApropriacoes] = useState([]);
@@ -106,7 +108,71 @@ export default function NovaSolicitacaoCompra() {
   }, []);
 
   useEffect(() => {
+    if (draftCarregadoRef.current) {
+      return;
+    }
+
+    try {
+      const salvo = window.localStorage.getItem(DRAFT_KEY);
+      if (!salvo) {
+        draftCarregadoRef.current = true;
+        return;
+      }
+
+      const dados = JSON.parse(salvo);
+      const payload = dados?.payload;
+      if (!payload || !payload.obra_id) {
+        draftCarregadoRef.current = true;
+        return;
+      }
+
+      hidratandoDraftRef.current = true;
+      setObraId(String(payload.obra_id || ''));
+      setNecessarioPara(payload.necessario_para || '');
+      setObservacoes(payload.observacoes || '');
+      setLinkGeral(payload.link_geral || '');
+      setItens(
+        Array.isArray(payload.itens)
+          ? payload.itens.map((item) => ({
+              insumo_id: item.manual ? null : item.insumo_id,
+              insumo_nome: item.manual
+                ? item.nome_manual || item.insumo_nome || ''
+                : dados?.resumo?.itens?.find((resumoItem) =>
+                    !resumoItem.manual && Number(resumoItem.insumo_id) === Number(item.insumo_id)
+                  )?.insumo_nome || '',
+              unidade_id: item.manual ? null : item.unidade_id,
+              unidade_sigla: item.manual
+                ? item.unidade_sigla_manual || item.unidade_sigla || ''
+                : dados?.resumo?.itens?.find((resumoItem) =>
+                    !resumoItem.manual && Number(resumoItem.insumo_id) === Number(item.insumo_id)
+                  )?.unidade_sigla || '',
+              quantidade: String(item.quantidade ?? '1'),
+              especificacao: item.especificacao || '',
+              apropriacao_id: item.apropriacao_id ? String(item.apropriacao_id) : '',
+              necessario_para: item.necessario_para || payload.necessario_para || '',
+              link_produto: item.link_produto || '',
+              manual: Boolean(item.manual),
+              nome_manual: item.manual ? item.nome_manual || item.insumo_nome || '' : '',
+              unidade_sigla_manual: item.manual
+                ? item.unidade_sigla_manual || item.unidade_sigla || ''
+                : ''
+            }))
+          : []
+      );
+    } catch (error) {
+      console.error(error);
+    } finally {
+      draftCarregadoRef.current = true;
+    }
+  }, []);
+
+  useEffect(() => {
     carregarApropriacoes(obraId);
+    if (hidratandoDraftRef.current) {
+      hidratandoDraftRef.current = false;
+      return;
+    }
+
     setItens((atual) =>
       atual.map((item) => ({
         ...item,
