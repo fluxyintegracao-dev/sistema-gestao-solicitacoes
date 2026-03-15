@@ -96,7 +96,7 @@ export default function NovaSolicitacaoCompra() {
       setApropriacoes(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error(error);
-      alert(error.message || 'Erro ao carregar apropriações');
+      alert(error.message || 'Erro ao carregar apropriaÃ§Ãµes');
     }
   }
 
@@ -142,7 +142,7 @@ export default function NovaSolicitacaoCompra() {
 
     const existente = itens.find((item) => !item.manual && Number(item.insumo_id) === Number(insumo.id));
     if (existente) {
-      alert('Esse insumo já foi adicionado.');
+      alert('Esse insumo jÃ¡ foi adicionado.');
       return;
     }
 
@@ -264,7 +264,7 @@ export default function NovaSolicitacaoCompra() {
     for (let index = 0; index < itens.length; index += 1) {
       const item = itens[index];
       if (!item.apropriacao_id || !item.quantidade) {
-        alert(`Item ${index + 1}: informe apropriação e quantidade.`);
+        alert(`Item ${index + 1}: informe apropriaÃ§Ã£o e quantidade.`);
         return;
       }
       if (item.manual) {
@@ -316,7 +316,7 @@ export default function NovaSolicitacaoCompra() {
       navigate('/solicitacoes-compra/revisar');
     } catch (error) {
       console.error(error);
-      alert(error.message || 'Erro ao preparar revisão da solicitação');
+      alert(error.message || 'Erro ao preparar revisÃ£o da solicitaÃ§Ã£o');
     } finally {
       setLoading(false);
     }
@@ -325,9 +325,9 @@ export default function NovaSolicitacaoCompra() {
   return (
     <div className="page">
       <div>
-        <h1 className="page-title">Nova Solicitação de Compra</h1>
+        <h1 className="page-title">Nova SolicitaÃ§Ã£o de Compra</h1>
         <p className="page-subtitle">
-          Monte os itens da compra e envie a solicitação para o fluxo principal do sistema.
+          Monte os itens da compra e envie a solicitaÃ§Ã£o para o fluxo principal do sistema.
         </p>
       </div>
 
@@ -355,7 +355,7 @@ export default function NovaSolicitacaoCompra() {
           </div>
 
           <div className="grid gap-2">
-            <label className="text-sm font-medium">Necessário para</label>
+            <label className="text-sm font-medium">NecessÃ¡rio para</label>
             <input type="date" className="input" value={necessarioPara} onChange={(event) => setNecessarioPara(event.target.value)} />
           </div>
 
@@ -365,8 +365,8 @@ export default function NovaSolicitacaoCompra() {
           </div>
 
           <div className="grid gap-2 md:col-span-2">
-            <label className="text-sm font-medium">Observações</label>
-            <textarea className="input min-h-[96px]" value={observacoes} onChange={(event) => setObservacoes(event.target.value)} placeholder="Informações adicionais para a compra" />
+            <label className="text-sm font-medium">ObservaÃ§Ãµes</label>
+            <textarea className="input min-h-[96px]" value={observacoes} onChange={(event) => setObservacoes(event.target.value)} placeholder="InformaÃ§Ãµes adicionais para a compra" />
           </div>
         </div>
       </div>
@@ -381,7 +381,7 @@ export default function NovaSolicitacaoCompra() {
           </div>
 
           <div className="grid gap-3">
-            <input className="input" placeholder="Buscar por nome, código ou categoria" value={buscaInsumo} onChange={(event) => setBuscaInsumo(event.target.value)} />
+            <input className="input" placeholder="Buscar por nome, cÃ³digo ou categoria" value={buscaInsumo} onChange={(event) => setBuscaInsumo(event.target.value)} />
 
             <div className="grid max-h-[520px] gap-2 overflow-y-auto">
               {insumosFiltrados.map((insumo) => (
@@ -393,7 +393,7 @@ export default function NovaSolicitacaoCompra() {
                 >
                   <div className="font-medium">{insumo.nome}</div>
                   <div className="mt-1 text-xs text-[var(--c-muted)]">
-                    {insumo.categoria?.nome || 'Sem categoria'} · {insumo.unidade?.sigla || '-'}
+                    {insumo.categoria?.nome || 'Sem categoria'} Â· {insumo.unidade?.sigla || '-'}
                   </div>
                 </button>
               ))}
@@ -407,16 +407,16 @@ export default function NovaSolicitacaoCompra() {
 
         <div className="card">
           <div className="card-header flex flex-wrap items-center justify-between gap-3">
-            <h2 className="font-semibold">Itens da solicitação</h2>
+            <h2 className="font-semibold">Itens da solicitaÃ§Ã£o</h2>
             <span className="text-sm text-[var(--c-muted)]">{itens.length} item(ns)</span>
           </div>
 
           {itens.length > 0 && (
             <div className="mb-4 grid gap-3 rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] p-4">
-              <h3 className="font-medium">Ações em massa</h3>
+              <h3 className="font-medium">AÃ§Ãµes em massa</h3>
               <div className="grid gap-3 lg:grid-cols-3">
                 <div className="grid gap-2">
-                  <label className="text-sm font-medium">Apropriação</label>
+                  <label className="text-sm font-medium">ApropriaÃ§Ã£o</label>
                   <select className="input" value={edicaoMassa.apropriacao_id} onChange={(event) => setEdicaoMassa((atual) => ({ ...atual, apropriacao_id: event.target.value }))}>
                     <option value="">Selecione</option>
                     {apropriacoes.map((apropriacao) => (
@@ -428,7 +428,7 @@ export default function NovaSolicitacaoCompra() {
                 </div>
 
                 <div className="grid gap-2">
-                  <label className="text-sm font-medium">Necessário para</label>
+                  <label className="text-sm font-medium">NecessÃ¡rio para</label>
                   <input type="date" className="input" value={edicaoMassa.necessario_para} onChange={(event) => setEdicaoMassa((atual) => ({ ...atual, necessario_para: event.target.value }))} />
                 </div>
 
@@ -457,11 +457,11 @@ export default function NovaSolicitacaoCompra() {
                     <th>Insumo</th>
                     <th>Unidade</th>
                     <th>Quantidade *</th>
-                    <th>Especificação</th>
-                    <th>Apropriação *</th>
-                    <th>Necessário para</th>
+                    <th>EspecificaÃ§Ã£o</th>
+                    <th>ApropriaÃ§Ã£o *</th>
+                    <th>NecessÃ¡rio para</th>
                     <th>Link do produto</th>
-                    <th>Ações</th>
+                    <th>AÃ§Ãµes</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -512,12 +512,12 @@ export default function NovaSolicitacaoCompra() {
           )}
 
           <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-            Itens manuais agora ficam registrados em tabela própria no banco e aparecem destacados no detalhe e no PDF.
+            Itens manuais agora ficam registrados em tabela prÃ³pria no banco e aparecem destacados no detalhe e no PDF.
           </div>
 
           <div className="mt-6 flex flex-wrap justify-end gap-2">
             <button type="button" className="btn btn-outline" onClick={() => navigate('/solicitacoes-compra')}>Cancelar</button>
-            <button type="button" className="btn btn-primary" onClick={handleSalvar} disabled={loading}>{loading ? 'Preparando...' : 'Revisar solicitação'}</button>
+            <button type="button" className="btn btn-primary" onClick={handleSalvar} disabled={loading}>{loading ? 'Preparando...' : 'Revisar solicitaÃ§Ã£o'}</button>
           </div>
         </div>
       </div>
@@ -543,7 +543,7 @@ export default function NovaSolicitacaoCompra() {
                 <input type="number" min="0.01" step="0.01" className="input" value={itemManual.quantidade} onChange={(event) => setItemManual((atual) => ({ ...atual, quantidade: event.target.value }))} />
               </div>
               <div className="grid gap-2 md:col-span-2">
-                <label className="text-sm font-medium">Especificação</label>
+                <label className="text-sm font-medium">EspecificaÃ§Ã£o</label>
                 <textarea className="input min-h-[96px]" value={itemManual.especificacao} onChange={(event) => setItemManual((atual) => ({ ...atual, especificacao: event.target.value }))} />
               </div>
             </div>
