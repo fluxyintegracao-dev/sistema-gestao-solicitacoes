@@ -14,6 +14,7 @@ import {
 } from '../../services/solicitacoes';
 import { useAuth } from '../../contexts/AuthContext';
 import { parseDateSmart } from '../../utils/dateLocal';
+import { corrigirTextoCorrompido } from '../../utils/texto';
 
 export default function LinhaSolicitacao({
   solicitacao,
@@ -269,7 +270,7 @@ export default function LinhaSolicitacao({
         )}
 
         {mostrarColuna('descricao') && (() => {
-          const descricao = solicitacao.descricao || '';
+          const descricao = corrigirTextoCorrompido(solicitacao.descricao || '');
           const descricaoCurta =
             descricao.length > 15 ? `${descricao.slice(0, 15)}...` : descricao;
           return (

@@ -94,7 +94,7 @@ async function buscarTipoSolicitacaoCompra(transaction) {
 
   return TipoSolicitacao.create(
     {
-      nome: 'Solicitação de Compra',
+      nome: 'SolicitaÃ§Ã£o de Compra',
       ativo: true
     },
     { transaction }
@@ -531,9 +531,9 @@ module.exports = {
       const resumoItens = [...resumoItensNormais, ...resumoItensManuais].join(', ');
 
       const descricao = [
-        'Solicitação de Compra',
+        'SolicitaÃ§Ã£o de Compra',
         resumoItens ? `Itens: ${resumoItens}` : null,
-        observacoes ? `Observações: ${observacoes}` : null
+        observacoes ? `ObservaÃ§Ãµes: ${observacoes}` : null
       ]
         .filter(Boolean)
         .join('\n');
@@ -567,7 +567,7 @@ module.exports = {
           setor: setorDestino,
           acao: 'CRIADA',
           status_novo: 'PENDENTE',
-          observacao: `Solicitacao de compra criada com ${itensPreparados.length + itensManuaisPreparados.length} item(ns)`
+          observacao: `Solicita??o de compra criada com ${itensPreparados.length + itensManuaisPreparados.length} item(ns)`
         },
         { transaction }
       );
@@ -577,7 +577,7 @@ module.exports = {
           solicitacao_id: solicitacaoPrincipal.id,
           setor: setorDestino,
           status: 'PENDENTE',
-          observacao: 'Solicitacao de compra criada'
+          observacao: 'Solicita??o de compra criada'
         },
         { transaction }
       );

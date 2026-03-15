@@ -1,3 +1,5 @@
+import { corrigirTextoCorrompido } from '../../utils/texto';
+
 export default function InfoCard({ solicitacao }) {
   return (
     <div className="bg-white p-4 rounded-xl shadow space-y-2">
@@ -39,7 +41,7 @@ export default function InfoCard({ solicitacao }) {
 
       <div>
         <span className="text-gray-500">Descrição</span>
-        <p className="mt-1">{solicitacao.descricao}</p>
+        <p className="mt-1">{corrigirTextoCorrompido(solicitacao.descricao)}</p>
       </div>
 
     </div>

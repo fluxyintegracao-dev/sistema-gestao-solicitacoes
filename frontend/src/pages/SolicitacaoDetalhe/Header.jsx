@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import StatusBadge from '../../components/StatusBadge';
+import { corrigirTextoCorrompido } from '../../utils/texto';
 import { formatarDataLocalPtBr } from '../../utils/dateLocal';
 
 function formatarData(valor) {
@@ -96,6 +97,7 @@ export default function Header({
     .filter(item => item?.acao === 'STATUS_ALTERADO')
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
   const setorStatusAtual = ultimoHistoricoStatus?.setor || solicitacao?.area_responsavel || null;
+  const descricaoCorrigida = corrigirTextoCorrompido(solicitacao?.descricao || '');
 
   return (
     <div className="sol-detail-header">
@@ -103,7 +105,7 @@ export default function Header({
         <div className="sol-detail-title-wrap">
           <span className="sol-detail-code-chip">{solicitacao.codigo || '-'}</span>
           <h1 className="sol-detail-type">{solicitacao.tipo?.nome || '-'}</h1>
-          <p className="sol-detail-description">{solicitacao.descricao || 'Sem descricao informada.'}</p>
+          <p className="sol-detail-description">{descricaoCorrigida || 'Sem descricao informada.'}</p>
         </div>
 
         <div className="sol-detail-actions">
