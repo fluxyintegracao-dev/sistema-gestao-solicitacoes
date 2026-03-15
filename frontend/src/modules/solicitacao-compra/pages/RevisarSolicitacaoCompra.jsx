@@ -38,6 +38,7 @@ export default function RevisarSolicitacaoCompra() {
   const [confirmado, setConfirmado] = useState(false);
   const [loading, setLoading] = useState(false);
   const [previewVisualizado, setPreviewVisualizado] = useState(false);
+  const [modalPreviewAberto, setModalPreviewAberto] = useState(false);
 
   useEffect(() => {
     try {
@@ -64,9 +65,9 @@ export default function RevisarSolicitacaoCompra() {
 
   const totalItens = useMemo(() => draft?.payload?.itens?.length || 0, [draft]);
 
-  function abrirPreviaPdf() {
+  const conteudoPreviewPdf = useMemo(() => {
     if (!draft) {
-      return;
+      return '';
     }
 
     const itensHtml = (draft.resumo?.itens || [])
@@ -84,7 +85,7 @@ export default function RevisarSolicitacaoCompra() {
       `)
       .join('');
 
-    const conteudo = `
+    return `
       <!DOCTYPE html>
       <html lang="pt-BR">
         <head>
@@ -124,17 +125,14 @@ export default function RevisarSolicitacaoCompra() {
         </body>
       </html>
     `;
+  }, [draft]);
 
-    const janela = window.open('', '_blank', 'noopener,noreferrer');
-    if (!janela) {
-      alert('O navegador bloqueou a pré-visualização. Libere pop-ups para continuar.');
+  function abrirPreviaPdf() {
+    if (!draft) {
       return;
     }
 
-    janela.document.open();
-    janela.document.write(conteudo);
-    janela.document.close();
-    janela.focus();
+    setModalPreviewAberto(true);
     setPreviewVisualizado(true);
   }
 
@@ -284,6 +282,36 @@ export default function RevisarSolicitacaoCompra() {
           </div>
         </div>
       </div>
+
+      {modalPreviewAberto && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="flex h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-[var(--c-border)] px-4 py-3">
+              <div>
+                <h2 className="text-lg font-semibold">Pré-visualização do PDF</h2>
+                <p className="text-sm text-[var(--c-muted)]">
+                  Revise o documento antes de confirmar a criação da solicitação.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={() => setModalPreviewAberto(false)}
+              >
+                Fechar
+              </button>
+            </div>
+
+            <div className="flex-1 bg-gray-100 p-3">
+              <iframe
+                title="Pré-visualização da solicitação de compra"
+                srcDoc={conteudoPreviewPdf}
+                className="h-full w-full rounded-lg border border-[var(--c-border)] bg-white"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
