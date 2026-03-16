@@ -241,6 +241,10 @@ function isGeoToken(valor) {
   return TOKENS_GEO_EQUIVALENTES.has(normalizarTokenComparacao(valor));
 }
 
+function isAdministrativoToken(valor) {
+  return normalizarTokenComparacao(valor) === 'ADMINISTRATIVO';
+}
+
 function expandirTokensComAliasesGeo(tokens = []) {
   const tokensLista = Array.isArray(tokens) ? tokens : [];
   const contemGeo = tokensLista.some(isGeoToken);
@@ -654,6 +658,7 @@ module.exports = {
       const adminGEO =
         perfil.startsWith('ADMIN') &&
         setorTokens.some(isGeoToken);
+      const isSetorAdministrativo = setorTokens.some(isAdministrativoToken);
       const literalHistoricoSetorUsuario = montarLiteralHistoricoSetoresEnvolvidos(setorTokens);
       const isSetorBrape = setorTokens.some(token => isBrapeToken(token));
       const usuarioBrape = perfil === 'USUARIO' && isSetorBrape;
@@ -685,7 +690,35 @@ module.exports = {
         ...brapeTokensDb
       ]));
 
-      if (isSetorBrape) {
+      if (isSetorAdministrativo && perfil !== 'SUPERADMIN') {
+        where[Op.and] = where[Op.and] || [];
+        where[Op.and].push({
+          [Op.or]: [
+            { criado_por: usuarioId },
+            {
+              id: {
+                [Op.in]: Sequelize.literal(`(
+                  SELECT solicitacao_id
+                  FROM historicos
+                  WHERE usuario_responsavel_id = ${usuarioId}
+                    AND acao IN ('RESPONSAVEL_ATRIBUIDO', 'RESPONSAVEL_ASSUMIU')
+                )`)
+              }
+            },
+            {
+              id: {
+                [Op.in]: Sequelize.literal(`(
+                  SELECT n.solicitacao_id
+                  FROM notificacoes n
+                  INNER JOIN notificacao_destinatarios nd ON nd.notificacao_id = n.id
+                  WHERE nd.usuario_id = ${usuarioId}
+                    AND n.tipo = 'MENCAO_COMENTARIO'
+                )`)
+              }
+            }
+          ]
+        });
+      } else if (isSetorBrape) {
         if (usuarioBrape) {
           if (obrasVinculadas.length === 0) {
             return res.json([]);
@@ -706,7 +739,7 @@ module.exports = {
         }
       }
 
-      if (perfil !== 'SUPERADMIN' && adminGEO) {
+      if (!isSetorAdministrativo && perfil !== 'SUPERADMIN' && adminGEO) {
         // ADMIN GEO ve solicitacoes do setor GEO/gerencia de processos
         // e tambem solicitacoes que ja passaram por esse setor.
         where[Op.and] = where[Op.and] || [];
@@ -728,7 +761,7 @@ module.exports = {
         where[Op.and].push({ area_responsavel: { [Op.notLike]: 'BRAPE%' } });
       }
 
-      if (!isSetorBrape && perfil !== 'SUPERADMIN' && !adminGEO) {
+      if (!isSetorAdministrativo && !isSetorBrape && perfil !== 'SUPERADMIN' && !adminGEO) {
         where[Op.and] = where[Op.and] || [];
         if (brapeTokensTodos.length > 0) {
           where[Op.and].push({ area_responsavel: { [Op.notIn]: brapeTokensTodos } });
@@ -738,7 +771,7 @@ module.exports = {
 
       // Setor OBRA (ADMIN e USUARIO): ve apenas solicitacoes criadas por ele
       // e/ou das obras vinculadas ao usuario. Superadmin continua com visao global.
-      if (isSetorObra && perfil !== 'SUPERADMIN') {
+      if (!isSetorAdministrativo && isSetorObra && perfil !== 'SUPERADMIN') {
         const condicoesObra = [{ criado_por: usuarioId }];
         if (obrasVinculadas.length > 0) {
           condicoesObra.push({ obra_id: { [Op.in]: obrasVinculadas } });
@@ -748,7 +781,7 @@ module.exports = {
       }
 
       // SUPERADMIN ve tudo; demais passam por regra de visibilidade
-      if (perfil !== 'SUPERADMIN' && !adminGEO && !isSetorObra && !isSetorBrape) {
+      if (perfil !== 'SUPERADMIN' && !isSetorAdministrativo && !adminGEO && !isSetorObra && !isSetorBrape) {
         const condicoes = [];
 
         // Criador ve
@@ -1514,12 +1547,50 @@ module.exports = {
         });
       }
 
+      const areaUsuario = await obterAreaUsuario(req);
+      const tokensSetorUsuario = expandirTokensComAliasesGeo(
+        await obterTokensSetorUsuario(req, areaUsuario)
+      );
+      const isSetorAdministrativo = tokensSetorUsuario.some(isAdministrativoToken);
+
+      if (isSetorAdministrativo && String(req.user?.perfil || '').trim().toUpperCase() !== 'SUPERADMIN') {
+        const itemCriadoPeloUsuario = Number(solicitacao.criado_por) === Number(req.user.id);
+        const historicoResponsavel = await Historico.findOne({
+          where: {
+            solicitacao_id: id,
+            usuario_responsavel_id: req.user.id,
+            acao: {
+              [Op.in]: ['RESPONSAVEL_ATRIBUIDO', 'RESPONSAVEL_ASSUMIU']
+            }
+          },
+          attributes: ['id']
+        });
+        const mencaoUsuario = await NotificacaoDestinatario.findOne({
+          include: [
+            {
+              model: Notificacao,
+              as: 'notificacao',
+              required: true,
+              where: {
+                solicitacao_id: id,
+                tipo: 'MENCAO_COMENTARIO'
+              },
+              attributes: ['id']
+            }
+          ],
+          where: {
+            usuario_id: req.user.id
+          },
+          attributes: ['id']
+        });
+
+        if (!itemCriadoPeloUsuario && !historicoResponsavel && !mencaoUsuario) {
+          return res.status(403).json({ error: 'Acesso negado' });
+        }
+      }
+
       const isUsuarioGeo = await isUsuarioSetorGeo(req);
       if (isUsuarioGeo) {
-        const areaUsuario = await obterAreaUsuario(req);
-        const tokensSetorUsuario = expandirTokensComAliasesGeo(
-          await obterTokensSetorUsuario(req, areaUsuario)
-        );
         const areaSolicitacao = String(solicitacao.area_responsavel || '').trim().toUpperCase();
         const solicitacaoDoSetorUsuario = tokensSetorUsuario.includes(areaSolicitacao);
         const modoRecebimentoGeo = await obterModoRecebimentoPorSetorETipo(
