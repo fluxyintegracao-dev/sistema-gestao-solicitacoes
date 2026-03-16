@@ -20,7 +20,7 @@ import { getSetorPermissoes } from '../../services/setorPermissoes';
 import { getStatusSetor } from '../../services/statusSetor';
 import { useAuth } from '../../contexts/AuthContext';
 import { parseDateSmart } from '../../utils/dateLocal';
-import { isGeoSetor } from '../../utils/setor';
+import { isGeoSetor, solicitacaoEstaNoSetorDoUsuario } from '../../utils/setor';
 import {
   arquivarSolicitacoesEmMassa,
   deleteSolicitacao,
@@ -583,11 +583,12 @@ export default function Solicitacoes({ arquivadas = false }) {
   const podeAssumirUnica = useMemo(() => {
     if (!selecionadaUnica) return false;
     if (isSetorObra) return false;
+    if (!isSuperadmin && !solicitacaoEstaNoSetorDoUsuario(selecionadaUnica.area_responsavel, user)) return false;
     const modo = String(permissaoUsuario?.modo_recebimento || 'TODOS_VISIVEIS').toUpperCase();
     if (modo !== 'TODOS_VISIVEIS') return false;
     const isUsuario = user?.perfil === 'USUARIO';
     return isUsuario ? (!!permissaoUsuario?.usuario_pode_assumir || isSetorFinanceiro) : true;
-  }, [selecionadaUnica, isSetorObra, permissaoUsuario, user?.perfil, isSetorFinanceiro]);
+  }, [selecionadaUnica, isSetorObra, isSuperadmin, permissaoUsuario, user, isSetorFinanceiro]);
 
   const podeAtribuirUnica = useMemo(() => {
     if (!selecionadaUnica) return false;
@@ -607,6 +608,18 @@ export default function Solicitacoes({ arquivadas = false }) {
   }, [selecionadasIds.length, isSetorObra, permissaoUsuario, user?.perfil, isSetorFinanceiro]);
 
   const podeExcluirUnica = !!selecionadaUnica && (isSuperadmin || isAdminGEO);
+  const podeEnviarUnica = useMemo(() => {
+    if (!selecionadaUnica || isSetorObra) return false;
+    return isSuperadmin || solicitacaoEstaNoSetorDoUsuario(selecionadaUnica.area_responsavel, user);
+  }, [selecionadaUnica, isSetorObra, isSuperadmin, user]);
+  const podeEnviarMassa = useMemo(() => {
+    if (selecionadasIds.length <= 1 || isSetorObra) return false;
+    if (isSuperadmin) return true;
+    return selecionadasIds.every(idSelecionado => {
+      const solicitacao = solicitacoes.find(item => Number(item.id) === Number(idSelecionado));
+      return solicitacao && solicitacaoEstaNoSetorDoUsuario(solicitacao.area_responsavel, user);
+    });
+  }, [selecionadasIds, isSetorObra, isSuperadmin, solicitacoes, user]);
 
   const isSetorObraSolicitacaoUnica = useMemo(() => {
     if (!selecionadaUnica) return false;
@@ -800,16 +813,11 @@ export default function Solicitacoes({ arquivadas = false }) {
               type="button"
               className="btn btn-outline"
               onClick={() => setModalEnvioMassa(true)}
-              disabled={processandoMassa || selecionadasIds.length === 0 || isSetorObra}
+              disabled={processandoMassa || selecionadasIds.length === 0 || !podeEnviarMassa}
             >
               Enviar em massa
             </button>
           </div>
-          {isSetorObra && (
-            <span className="text-xs text-blue-700 dark:text-blue-300">
-              Setor OBRA não pode enviar solicitações para outro setor.
-            </span>
-          )}
 
           {mostrarSeletorColunas && (
             <div
@@ -937,7 +945,7 @@ export default function Solicitacoes({ arquivadas = false }) {
             <span className="hidden sm:inline">Arquivar</span>
           </button>
 
-          {selecionadaUnica && !isSetorObra && (
+          {selecionadaUnica && podeEnviarUnica && (
             <button
               type="button"
               className="btn btn-outline !min-h-0 h-9 px-3 inline-flex items-center gap-2"
@@ -950,12 +958,12 @@ export default function Solicitacoes({ arquivadas = false }) {
             </button>
           )}
 
-          {selecionadasIds.length > 1 && (
+          {selecionadasIds.length > 1 && podeEnviarMassa && (
             <button
               type="button"
               className="btn btn-outline !min-h-0 h-9 px-3 inline-flex items-center gap-2"
               onClick={() => setModalEnvioMassa(true)}
-              disabled={processandoMassa || isSetorObra}
+              disabled={processandoMassa}
               title="Enviar selecionadas para outro setor"
             >
               <HiOutlineArrowRightOnRectangle className="w-4 h-4" />
@@ -1108,3 +1116,4 @@ export default function Solicitacoes({ arquivadas = false }) {
     </div>
   );
 }
+

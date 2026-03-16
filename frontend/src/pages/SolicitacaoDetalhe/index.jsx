@@ -12,7 +12,7 @@ import ModalAlterarStatus from './ModalAlterarStatus';
 import ModalEnviarSetor from '../Solicitacoes/ModalEnviarSetor';
 import { updateStatusSolicitacao } from '../../services/solicitacoes';
 import { API_URL, authHeaders } from '../../services/api';
-import { isGeoSetor } from '../../utils/setor';
+import { isGeoSetor, solicitacaoEstaNoSetorDoUsuario } from '../../utils/setor';
 
 export default function SolicitacaoDetalhe() {
   const { id } = useParams();
@@ -84,6 +84,10 @@ export default function SolicitacaoDetalhe() {
   if (loading) return <p>Carregando...</p>;
   if (!solicitacao) return null;
 
+  const isSetorObra = setorTokens.includes('OBRA');
+  const podeEnviarSetor =
+    !isSetorObra && (isSuperadmin || solicitacaoEstaNoSetorDoUsuario(solicitacao.area_responsavel, user));
+
   const atualizadoEm = new Date(solicitacao.updatedAt || solicitacao.createdAt).toLocaleString('pt-BR');
 
   return (
@@ -113,7 +117,7 @@ export default function SolicitacaoDetalhe() {
         onAlterarStatus={() => setModalStatus(true)}
         onEnviarSetor={() => setModalEnviarSetor(true)}
         mostrarAlterarStatus
-        mostrarEnviarSetor
+        mostrarEnviarSetor={podeEnviarSetor}
       />
 
       <div className="grid md:grid-cols-2 gap-6">
@@ -151,7 +155,7 @@ export default function SolicitacaoDetalhe() {
         onSalvar={salvarStatus}
       />
 
-      {modalEnviarSetor && (
+      {modalEnviarSetor && podeEnviarSetor && (
         <ModalEnviarSetor
           solicitacaoId={solicitacao.id}
           onClose={() => setModalEnviarSetor(false)}

@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import StatusBadge from '../../components/StatusBadge';
 import { useTheme } from '../../contexts/ThemeContext';
-import { isGeoSetor } from '../../utils/setor';
+import { isGeoSetor, solicitacaoEstaNoSetorDoUsuario } from '../../utils/setor';
 import ModalAtribuirResponsavel from './ModalAtribuirResponsavel';
 import ModalEnviarSetor from './ModalEnviarSetor';
 import { API_URL, authHeaders } from '../../services/api';
@@ -72,6 +72,7 @@ export default function LinhaSolicitacao({
   const isUsuario = user?.perfil === 'USUARIO';
   const podeAssumir =
     !isSetorObra &&
+    (isSuperadmin || solicitacaoEstaNoSetorDoUsuario(solicitacao.area_responsavel, user)) &&
     String(permissaoUsuario?.modo_recebimento || 'TODOS_VISIVEIS').toUpperCase() === 'TODOS_VISIVEIS' &&
     (isUsuario
       ? (!!permissaoUsuario?.usuario_pode_assumir || isFinanceiro)
@@ -82,6 +83,9 @@ export default function LinhaSolicitacao({
     (isUsuario
       ? (!!permissaoUsuario?.usuario_pode_atribuir || isFinanceiro)
       : true);
+  const podeEnviar =
+    !isSetorObra &&
+    (isSuperadmin || solicitacaoEstaNoSetorDoUsuario(solicitacao.area_responsavel, user));
 
   const navigate = useNavigate();
   const dataCriacaoRaw =
@@ -452,7 +456,7 @@ export default function LinhaSolicitacao({
             </button>
           )}
 
-          {!isSetorObra && (
+          {podeEnviar && (
             <button
               className="acao-link"
               style={{ color: acaoCores.enviar || '#0ea5e9' }}

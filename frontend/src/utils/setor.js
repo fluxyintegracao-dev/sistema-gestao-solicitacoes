@@ -19,3 +19,15 @@ export function obterTokensSetorUsuario(user) {
     String(user?.area || '').toUpperCase()
   ].filter(Boolean);
 }
+
+export function solicitacaoEstaNoSetorDoUsuario(areaResponsavel, user) {
+  const setorSolicitacao = normalizarSetorToken(areaResponsavel);
+  if (!setorSolicitacao) return false;
+
+  return obterTokensSetorUsuario(user).some(token => {
+    const tokenNormalizado = normalizarSetorToken(token);
+    if (!tokenNormalizado) return false;
+    if (tokenNormalizado === setorSolicitacao) return true;
+    return isGeoSetor(tokenNormalizado) && isGeoSetor(setorSolicitacao);
+  });
+}

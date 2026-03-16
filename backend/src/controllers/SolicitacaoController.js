@@ -64,6 +64,17 @@ async function enviarSolicitacaoParaSetorInterno({
     return { ok: false, status: 403, error: 'Acesso negado. Vincule o usuario a obra para continuar.' };
   }
 
+  const perfil = String(req.user?.perfil || '').trim().toUpperCase();
+  if (perfil !== 'SUPERADMIN') {
+    const areaUsuario = await obterAreaUsuario(req);
+    const tokensSetorUsuario = expandirTokensComAliasesGeo(
+      await obterTokensSetorUsuario(req, areaUsuario)
+    );
+    if (!setorPertenceAoUsuario(tokensSetorUsuario, solicitacao.area_responsavel)) {
+      return { ok: false, status: 403, error: 'Voce so pode enviar solicitacoes que estejam no seu setor atual.' };
+    }
+  }
+
   const setorOrigem = solicitacao.area_responsavel;
   const setorOrigemRow = await Setor.findOne({
     where: {
@@ -258,6 +269,18 @@ function expandirTokensComAliasesGeo(tokens = []) {
     'GERENCIA DE PROCESSOS',
     'GERENCIA_PROCESSOS'
   ]));
+}
+
+function setorPertenceAoUsuario(tokensSetor = [], setorSolicitacao = null) {
+  const setorNormalizado = normalizarTokenComparacao(setorSolicitacao);
+  if (!setorNormalizado) return false;
+
+  return (Array.isArray(tokensSetor) ? tokensSetor : []).some(token => {
+    const tokenNormalizado = normalizarTokenComparacao(token);
+    if (!tokenNormalizado) return false;
+    if (tokenNormalizado === setorNormalizado) return true;
+    return isGeoToken(tokenNormalizado) && isGeoToken(setorNormalizado);
+  });
 }
 
 function obterRegrasTipoPorTokensSetor(regrasConfig = {}, tokensSetor = []) {
@@ -2062,6 +2085,15 @@ module.exports = {
 
       if (!solicitacao) {
         return res.status(404).json({ error: 'Solicitacao nao encontrada' });
+      }
+
+      if (String(perfil || '').trim().toUpperCase() !== 'SUPERADMIN') {
+        const tokensSetorUsuario = expandirTokensComAliasesGeo(tokensSetor);
+        if (!setorPertenceAoUsuario(tokensSetorUsuario, solicitacao.area_responsavel)) {
+          return res.status(403).json({
+            error: 'Voce so pode assumir solicitacoes que estejam no seu setor atual.'
+          });
+        }
       }
 
       const acessoObra = await validarAcessoObra(req, solicitacao);

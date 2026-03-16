@@ -52,6 +52,11 @@ Guia rapido para colaboradores e agentes automatizados.
 - Status por setor: na tela de detalhe, usuarios veem lista de status do proprio setor.
   - `SUPERADMIN` permanece como excecao administrativa.
   - Backend e frontend estao alinhados para usar o setor do usuario nas trocas de status.
+- Assumir e enviar solicitacoes:
+  - Usuarios so podem assumir solicitacoes que estejam atualmente no proprio setor.
+  - Usuarios so podem enviar para outro setor solicitacoes que estejam atualmente no proprio setor.
+  - `SUPERADMIN` permanece como excecao administrativa.
+  - Setor `OBRA` continua sem poder enviar para outros setores e o frontend apenas oculta o botao, sem mensagem explicativa.
 - Configuracao de areas visiveis para OBRA:
   - Nova config salva em `configuracoes_sistema` (chave `AREAS_OBRA_VISIVEIS`).
   - Nova pagina `AreasObra` em Configuracoes para SUPERADMIN.

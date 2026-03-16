@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { useAuth } from '../../contexts/AuthContext';
 import { API_URL, authHeaders } from '../../services/api';
 
 export default function ModalEnviarSetor({
@@ -10,10 +9,6 @@ export default function ModalEnviarSetor({
 
   const [setores, setSetores] = useState([]);
   const [setor, setSetor] = useState('');
-  const { user } = useAuth();
-  const isSetorObra =
-    user?.setor?.codigo === 'OBRA' ||
-    user?.area === 'OBRA';
 
   useEffect(() => {
     carregarSetores();
@@ -29,10 +24,6 @@ export default function ModalEnviarSetor({
   }
 
   async function enviar() {
-    if (isSetorObra) {
-      alert('Setor OBRA nao pode enviar solicitacoes para outro setor');
-      return;
-    }
     if (!setor) {
       alert('Selecione um setor');
       return;
@@ -77,7 +68,6 @@ export default function ModalEnviarSetor({
           className="w-full border p-2 rounded mb-4"
           value={setor}
           onChange={e => setSetor(e.target.value)}
-          disabled={isSetorObra}
         >
           <option value="">Selecione um setor</option>
 
@@ -88,12 +78,6 @@ export default function ModalEnviarSetor({
           ))}
         </select>
 
-        {isSetorObra && (
-          <p className="text-sm text-blue-700 mb-3">
-            Setor OBRA nao pode enviar solicitacoes para outro setor.
-          </p>
-        )}
-
         <div className="flex justify-end gap-3">
 
           <button onClick={onClose} className="border px-4 py-2 rounded">
@@ -103,7 +87,6 @@ export default function ModalEnviarSetor({
           <button
             onClick={enviar}
             className="bg-blue-600 text-white px-4 py-2 rounded disabled:opacity-60"
-            disabled={isSetorObra}
           >
             Enviar
           </button>
