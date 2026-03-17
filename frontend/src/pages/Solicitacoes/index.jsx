@@ -610,16 +610,16 @@ export default function Solicitacoes({ arquivadas = false }) {
   const podeExcluirUnica = !!selecionadaUnica && (isSuperadmin || isAdminGEO);
   const podeEnviarUnica = useMemo(() => {
     if (!selecionadaUnica || isSetorObra) return false;
-    return isSuperadmin || solicitacaoEstaNoSetorDoUsuario(selecionadaUnica.area_responsavel, user);
-  }, [selecionadaUnica, isSetorObra, isSuperadmin, user]);
+    return isSuperadmin || isAdminGEO || solicitacaoEstaNoSetorDoUsuario(selecionadaUnica.area_responsavel, user);
+  }, [selecionadaUnica, isSetorObra, isSuperadmin, isAdminGEO, user]);
   const podeEnviarMassa = useMemo(() => {
     if (selecionadasIds.length <= 1 || isSetorObra) return false;
-    if (isSuperadmin) return true;
+    if (isSuperadmin || isAdminGEO) return true;
     return selecionadasIds.every(idSelecionado => {
       const solicitacao = solicitacoes.find(item => Number(item.id) === Number(idSelecionado));
       return solicitacao && solicitacaoEstaNoSetorDoUsuario(solicitacao.area_responsavel, user);
     });
-  }, [selecionadasIds, isSetorObra, isSuperadmin, solicitacoes, user]);
+  }, [selecionadasIds, isSetorObra, isSuperadmin, isAdminGEO, solicitacoes, user]);
 
   const isSetorObraSolicitacaoUnica = useMemo(() => {
     if (!selecionadaUnica) return false;

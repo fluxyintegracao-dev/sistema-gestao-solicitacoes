@@ -85,7 +85,7 @@ export default function LinhaSolicitacao({
       : true);
   const podeEnviar =
     !isSetorObra &&
-    (isSuperadmin || solicitacaoEstaNoSetorDoUsuario(solicitacao.area_responsavel, user));
+    (isSuperadmin || isAdminGEO || solicitacaoEstaNoSetorDoUsuario(solicitacao.area_responsavel, user));
 
   const navigate = useNavigate();
   const dataCriacaoRaw =

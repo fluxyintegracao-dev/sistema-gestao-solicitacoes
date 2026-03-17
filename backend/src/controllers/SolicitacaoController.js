@@ -65,11 +65,12 @@ async function enviarSolicitacaoParaSetorInterno({
   }
 
   const perfil = String(req.user?.perfil || '').trim().toUpperCase();
-  if (perfil !== 'SUPERADMIN') {
-    const areaUsuario = await obterAreaUsuario(req);
-    const tokensSetorUsuario = expandirTokensComAliasesGeo(
-      await obterTokensSetorUsuario(req, areaUsuario)
-    );
+  const areaUsuario = await obterAreaUsuario(req);
+  const tokensSetorUsuario = expandirTokensComAliasesGeo(
+    await obterTokensSetorUsuario(req, areaUsuario)
+  );
+  const isAdminGeo = perfil.startsWith('ADMIN') && tokensSetorUsuario.some(isGeoToken);
+  if (perfil !== 'SUPERADMIN' && !isAdminGeo) {
     if (!setorPertenceAoUsuario(tokensSetorUsuario, solicitacao.area_responsavel)) {
       return { ok: false, status: 403, error: 'Voce so pode enviar solicitacoes que estejam no seu setor atual.' };
     }

@@ -28,6 +28,9 @@ export default function SolicitacaoDetalhe() {
   const isSetorGeo = setorTokens.some(isGeoSetor);
   const isSetorCompras = setorTokens.includes('COMPRAS');
   const isSuperadmin = String(user?.perfil || '').trim().toUpperCase() === 'SUPERADMIN';
+  const isAdminGEO =
+    String(user?.perfil || '').trim().toUpperCase().startsWith('ADMIN') &&
+    setorTokens.some(isGeoSetor);
 
   const [solicitacao, setSolicitacao] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -86,7 +89,8 @@ export default function SolicitacaoDetalhe() {
 
   const isSetorObra = setorTokens.includes('OBRA');
   const podeEnviarSetor =
-    !isSetorObra && (isSuperadmin || solicitacaoEstaNoSetorDoUsuario(solicitacao.area_responsavel, user));
+    !isSetorObra &&
+    (isSuperadmin || isAdminGEO || solicitacaoEstaNoSetorDoUsuario(solicitacao.area_responsavel, user));
 
   const atualizadoEm = new Date(solicitacao.updatedAt || solicitacao.createdAt).toLocaleString('pt-BR');
 
