@@ -1,5 +1,8 @@
 const { NotificacaoDestinatario, Notificacao } = require('../models');
 
+const NOTIFICACOES_CACHE_TTL_MS = 120000;
+const notificacoesCache = new Map();
+
 function erroBancoIndisponivel(error) {
   const nome = String(error?.name || '');
   const codigo = String(error?.original?.code || error?.parent?.code || error?.code || '');
@@ -13,29 +16,87 @@ function erroBancoIndisponivel(error) {
   );
 }
 
+function montarCacheKey({ usuarioId, naoLidas, limit }) {
+  return `${usuarioId}:${naoLidas ? '1' : '0'}:${limit}`;
+}
+
+function lerCache(key) {
+  const item = notificacoesCache.get(key);
+  if (!item) return null;
+
+  if (item.expiraEm <= Date.now()) {
+    notificacoesCache.delete(key);
+    return null;
+  }
+
+  return item.valor;
+}
+
+function salvarCache(key, valor) {
+  notificacoesCache.set(key, {
+    valor,
+    expiraEm: Date.now() + NOTIFICACOES_CACHE_TTL_MS
+  });
+}
+
+function invalidarCacheUsuario(usuarioId) {
+  const prefixo = `${usuarioId}:`;
+  for (const key of notificacoesCache.keys()) {
+    if (key.startsWith(prefixo)) {
+      notificacoesCache.delete(key);
+    }
+  }
+}
+
+function parseMetadata(metadata) {
+  if (!metadata) return null;
+
+  try {
+    return JSON.parse(metadata);
+  } catch (_error) {
+    return null;
+  }
+}
+
 module.exports = {
   async index(req, res) {
     try {
       const { nao_lidas, limit } = req.query;
-      const where = { usuario_id: req.user.id };
-      if (String(nao_lidas) === '1' || String(nao_lidas) === 'true') {
+      const usuarioId = Number(req.user.id);
+      const somenteNaoLidas = String(nao_lidas) === '1' || String(nao_lidas) === 'true';
+      const limite = Number(limit) > 0 ? Math.min(Number(limit), 100) : 50;
+      const cacheKey = montarCacheKey({
+        usuarioId,
+        naoLidas: somenteNaoLidas,
+        limit: limite
+      });
+      const resultadoEmCache = lerCache(cacheKey);
+
+      if (resultadoEmCache) {
+        return res.json(resultadoEmCache);
+      }
+
+      const where = { usuario_id: usuarioId };
+      if (somenteNaoLidas) {
         where.lida_em = null;
       }
 
       const totalNaoLidas = await NotificacaoDestinatario.count({
-        where: { usuario_id: req.user.id, lida_em: null }
+        where: { usuario_id: usuarioId, lida_em: null }
       });
 
       const itens = await NotificacaoDestinatario.findAll({
         where,
+        attributes: ['id', 'lida_em', 'createdAt'],
         include: [
           {
             model: Notificacao,
-            as: 'notificacao'
+            as: 'notificacao',
+            attributes: ['createdAt', 'tipo', 'mensagem', 'solicitacao_id', 'metadata']
           }
         ],
         order: [['createdAt', 'DESC']],
-        limit: Number(limit) > 0 ? Number(limit) : 50
+        limit: limite
       });
 
       const resultado = itens.map(item => ({
@@ -45,15 +106,16 @@ module.exports = {
         tipo: item.notificacao?.tipo,
         mensagem: item.notificacao?.mensagem,
         solicitacao_id: item.notificacao?.solicitacao_id,
-        metadata: item.notificacao?.metadata
-          ? JSON.parse(item.notificacao.metadata)
-          : null
+        metadata: parseMetadata(item.notificacao?.metadata)
       }));
 
-      return res.json({
+      const payload = {
         total_nao_lidas: totalNaoLidas,
         itens: resultado
-      });
+      };
+
+      salvarCache(cacheKey, payload);
+      return res.json(payload);
     } catch (error) {
       console.error(error);
       if (erroBancoIndisponivel(error)) {
@@ -84,6 +146,7 @@ module.exports = {
         await destinatario.update({ lida_em: new Date() });
       }
 
+      invalidarCacheUsuario(Number(req.user.id));
       return res.sendStatus(204);
     } catch (error) {
       console.error(error);
@@ -103,6 +166,7 @@ module.exports = {
         }
       );
 
+      invalidarCacheUsuario(Number(req.user.id));
       return res.sendStatus(204);
     } catch (error) {
       console.error(error);
