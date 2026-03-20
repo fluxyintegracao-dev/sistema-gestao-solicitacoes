@@ -149,6 +149,14 @@ async function montarResumoConversa(conversa) {
   };
 }
 
+async function montarResumosConversas(conversas) {
+  const itens = [];
+  for (const conversa of Array.isArray(conversas) ? conversas : []) {
+    itens.push(await montarResumoConversa(conversa));
+  }
+  return itens;
+}
+
 async function criarConversaIndividual({ criadorId, destinatarioId, assunto, mensagemInicial, files }) {
   const conversa = await ConversaInterna.create({
     assunto,
@@ -268,17 +276,13 @@ module.exports = {
         order: [['updatedAt', 'DESC']]
       });
 
-      for (const conversa of conversas) {
-        await garantirParticipantesBasicos(conversa);
-      }
-
       conversas = await filtrarPorArquivamento(
         conversas,
         Number(req.user.id),
         somenteArquivadas
       );
 
-      const itens = await Promise.all(conversas.map(montarResumoConversa));
+      const itens = await montarResumosConversas(conversas);
       return res.json(itens);
     } catch (error) {
       console.error(error);
@@ -310,17 +314,13 @@ module.exports = {
         order: [['updatedAt', 'DESC']]
       });
 
-      for (const conversa of conversas) {
-        await garantirParticipantesBasicos(conversa);
-      }
-
       conversas = await filtrarPorArquivamento(
         conversas,
         Number(req.user.id),
         somenteArquivadas
       );
 
-      const itens = await Promise.all(conversas.map(montarResumoConversa));
+      const itens = await montarResumosConversas(conversas);
       return res.json(itens);
     } catch (error) {
       console.error(error);
