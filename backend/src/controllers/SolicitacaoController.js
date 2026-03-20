@@ -910,18 +910,23 @@ module.exports = {
         }
       }
       if (status) {
-        const statusFiltro = String(status).trim();
-        const statusSemAcento = statusFiltro
-          .toUpperCase()
-          .normalize('NFD')
-          .replace(/[\u0300-\u036f]/g, '');
-        const statusComUnderscore = statusSemAcento.replace(/\s+/g, '_');
-        const statusComEspaco = statusSemAcento.replace(/_/g, ' ');
-        const statusSemSeparador = statusSemAcento.replace(/[\s_]+/g, '');
+        const statusLista = Array.from(new Set(
+          String(status)
+            .split(',')
+            .map(item => String(item || '').trim())
+            .filter(Boolean)
+        ));
 
-        where[Op.and] = where[Op.and] || [];
-        where[Op.and].push({
-          [Op.or]: [
+        const condicoesStatus = statusLista.flatMap(statusFiltro => {
+          const statusSemAcento = statusFiltro
+            .toUpperCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '');
+          const statusComUnderscore = statusSemAcento.replace(/\s+/g, '_');
+          const statusComEspaco = statusSemAcento.replace(/_/g, ' ');
+          const statusSemSeparador = statusSemAcento.replace(/[\s_]+/g, '');
+
+          return [
             { status_global: statusComUnderscore },
             { status_global: statusComEspaco },
             Sequelize.where(
@@ -938,8 +943,15 @@ module.exports = {
               ),
               statusSemSeparador
             )
-          ]
+          ];
         });
+
+        if (condicoesStatus.length > 0) {
+          where[Op.and] = where[Op.and] || [];
+          where[Op.and].push({
+            [Op.or]: condicoesStatus
+          });
+        }
       }
       if (obra_id) {
         const idNum = Number(obra_id);

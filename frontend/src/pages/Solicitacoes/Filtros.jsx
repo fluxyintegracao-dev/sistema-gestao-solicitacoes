@@ -21,6 +21,8 @@ export default function Filtros({
   const obraDropdownRef = useRef(null);
   const [tipoDropdownOpen, setTipoDropdownOpen] = useState(false);
   const tipoDropdownRef = useRef(null);
+  const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
+  const statusDropdownRef = useRef(null);
 
   useEffect(() => {
     function onResize() {
@@ -41,11 +43,14 @@ export default function Filtros({
       if (obraDropdownOpen && !obraDropdownRef.current?.contains(event.target)) {
         setObraDropdownOpen(false);
       }
+      if (statusDropdownOpen && !statusDropdownRef.current?.contains(event.target)) {
+        setStatusDropdownOpen(false);
+      }
     }
 
     document.addEventListener('mousedown', onClickOutside);
     return () => document.removeEventListener('mousedown', onClickOutside);
-  }, [tipoDropdownOpen, obraDropdownOpen]);
+  }, [tipoDropdownOpen, obraDropdownOpen, statusDropdownOpen]);
 
   function handleChange(e) {
     const { name, value } = e.target;
@@ -69,6 +74,7 @@ export default function Filtros({
     });
     setObraDropdownOpen(false);
     setTipoDropdownOpen(false);
+    setStatusDropdownOpen(false);
   }
 
   const obraSelecionadosIds = String(filtros.obra_ids || '')
@@ -151,6 +157,47 @@ export default function Filtros({
 
   function limparTipos() {
     atualizarTiposSelecionados([]);
+  }
+
+  const statusSelecionadosIds = String(filtros.status || '')
+    .split(',')
+    .map(v => String(v).trim())
+    .filter(Boolean);
+
+  const statusSelecionadosSet = new Set(statusSelecionadosIds);
+  const statusSelecionadosNomes = statusOptions
+    .filter(status => statusSelecionadosSet.has(String(status.value)))
+    .map(status => status.label);
+  const resumoStatusSelecionados = (() => {
+    if (statusSelecionadosNomes.length === 0) return 'Todos os status';
+    if (statusSelecionadosNomes.length <= 2) return statusSelecionadosNomes.join(', ');
+    return `${statusSelecionadosNomes.slice(0, 2).join(', ')} +${statusSelecionadosNomes.length - 2}`;
+  })();
+
+  function atualizarStatusSelecionados(ids) {
+    setFiltros(prev => ({
+      ...prev,
+      status: ids.join(',')
+    }));
+  }
+
+  function alternarStatus(statusId) {
+    const id = String(statusId);
+    const atuais = [...statusSelecionadosIds];
+    const existe = atuais.includes(id);
+    const proximos = existe
+      ? atuais.filter(item => item !== id)
+      : [...atuais, id];
+    atualizarStatusSelecionados(proximos);
+  }
+
+  function selecionarTodosStatus() {
+    const ids = statusOptions.map(status => String(status.value));
+    atualizarStatusSelecionados(ids);
+  }
+
+  function limparStatus() {
+    atualizarStatusSelecionados([]);
   }
 
   const quantidadeFiltrosAtivos = [
@@ -349,21 +396,62 @@ export default function Filtros({
             )}
           </div>
 
-          <div className="sol-filter-field">
-            <label className="sol-filter-label">Status</label>
-            <select
-              name="status"
-              onChange={handleChange}
-              className="input"
-              value={filtros.status || ''}
+          <div className="sol-filter-field sol-filter-field-multi" ref={statusDropdownRef}>
+            <div className="sol-filter-label-row">
+              <label className="sol-filter-label">Status</label>
+              {statusSelecionadosIds.length > 0 && (
+                <button
+                  type="button"
+                  className="sol-filter-link-btn"
+                  onClick={limparStatus}
+                >
+                  Limpar
+                </button>
+              )}
+            </div>
+            <button
+              type="button"
+              className={`sol-filter-multi-trigger ${statusDropdownOpen ? 'open' : ''}`}
+              onClick={() => setStatusDropdownOpen(prev => !prev)}
+              aria-expanded={statusDropdownOpen}
+              aria-label="Selecionar status"
             >
-              <option value="">Todos os status</option>
-              {statusOptions.map(item => (
-                <option key={item.value} value={item.value}>
-                  {item.label}
-                </option>
-              ))}
-            </select>
+              <span className="truncate">{resumoStatusSelecionados}</span>
+              {statusDropdownOpen ? <HiChevronUp className="w-4 h-4" /> : <HiChevronDown className="w-4 h-4" />}
+            </button>
+
+            {statusDropdownOpen && (
+              <div className="sol-filter-multi-popover">
+                <div className="sol-filter-multi-actions">
+                  <button type="button" className="sol-filter-link-btn" onClick={selecionarTodosStatus}>
+                    Selecionar todos
+                  </button>
+                  <button type="button" className="sol-filter-link-btn" onClick={limparStatus}>
+                    Limpar
+                  </button>
+                </div>
+
+                <div className="sol-filter-multi-list">
+                  {statusOptions.map(item => {
+                    const id = String(item.value);
+                    const checked = statusSelecionadosSet.has(id);
+                    return (
+                      <label key={item.value} className="sol-filter-multi-item">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => alternarStatus(id)}
+                        />
+                        <span>{item.label}</span>
+                      </label>
+                    );
+                  })}
+                  {statusOptions.length === 0 && (
+                    <p className="sol-filter-multi-empty">Nenhum status cadastrado.</p>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="sol-filter-field">
