@@ -163,11 +163,106 @@ async function montarResumoConversa(conversa) {
 }
 
 async function montarResumosConversas(conversas) {
-  const itens = [];
-  for (const conversa of Array.isArray(conversas) ? conversas : []) {
-    itens.push(await montarResumoConversa(conversa));
+  const listaConversas = Array.isArray(conversas) ? conversas : [];
+  if (listaConversas.length === 0) return [];
+
+  const conversaIds = listaConversas.map((item) => Number(item.id)).filter((id) => Number.isInteger(id) && id > 0);
+  if (conversaIds.length === 0) return [];
+
+  const [mensagens, anexosTotais, participantesTotais] = await Promise.all([
+    ConversaInternaMensagem.findAll({
+      where: { conversa_id: { [Op.in]: conversaIds } },
+      include: [
+        {
+          model: User,
+          as: 'autor',
+          attributes: ['id', 'nome']
+        }
+      ],
+      order: [
+        ['conversa_id', 'ASC'],
+        ['createdAt', 'DESC']
+      ]
+    }),
+    ConversaInternaAnexo.findAll({
+      where: { conversa_id: { [Op.in]: conversaIds } },
+      attributes: [
+        'conversa_id',
+        [ConversaInternaAnexo.sequelize.fn('COUNT', ConversaInternaAnexo.sequelize.col('id')), 'total']
+      ],
+      group: ['conversa_id'],
+      raw: true
+    }),
+    ConversaInternaParticipante.findAll({
+      where: { conversa_id: { [Op.in]: conversaIds } },
+      attributes: [
+        'conversa_id',
+        [ConversaInternaParticipante.sequelize.fn('COUNT', ConversaInternaParticipante.sequelize.col('id')), 'total']
+      ],
+      group: ['conversa_id'],
+      raw: true
+    })
+  ]);
+
+  const ultimaMensagemPorConversa = new Map();
+  for (const mensagem of mensagens) {
+    const conversaId = Number(mensagem.conversa_id);
+    if (!ultimaMensagemPorConversa.has(conversaId)) {
+      ultimaMensagemPorConversa.set(conversaId, mensagem);
+    }
   }
-  return itens;
+
+  const anexosTotaisPorConversa = new Map(
+    anexosTotais.map((item) => [Number(item.conversa_id), Number(item.total || 0)])
+  );
+  const participantesTotaisPorConversa = new Map(
+    participantesTotais.map((item) => [Number(item.conversa_id), Number(item.total || 0)])
+  );
+
+  return listaConversas.map((conversa) => {
+    const ultimaMensagem = ultimaMensagemPorConversa.get(Number(conversa.id));
+    const anexosTotal = anexosTotaisPorConversa.get(Number(conversa.id)) || 0;
+    const participantesTotal = participantesTotaisPorConversa.get(Number(conversa.id)) || 0;
+
+    return {
+      id: conversa.id,
+      assunto: conversa.assunto,
+      status: conversa.status,
+      createdAt: conversa.createdAt,
+      updatedAt: conversa.updatedAt,
+      criador: conversa.criador
+        ? {
+            id: conversa.criador.id,
+            nome: conversa.criador.nome,
+            setor: conversa.criador.setor
+              ? { id: conversa.criador.setor.id, nome: conversa.criador.setor.nome, codigo: conversa.criador.setor.codigo }
+              : null
+          }
+        : null,
+      destinatario: conversa.destinatario
+        ? {
+            id: conversa.destinatario.id,
+            nome: conversa.destinatario.nome,
+            setor: conversa.destinatario.setor
+              ? { id: conversa.destinatario.setor.id, nome: conversa.destinatario.setor.nome, codigo: conversa.destinatario.setor.codigo }
+              : null
+          }
+        : null,
+      ultima_mensagem: ultimaMensagem
+        ? {
+            id: ultimaMensagem.id,
+            mensagem: ultimaMensagem.mensagem,
+            autor: ultimaMensagem.autor
+              ? { id: ultimaMensagem.autor.id, nome: ultimaMensagem.autor.nome }
+              : null,
+            createdAt: ultimaMensagem.createdAt,
+            editada_em: ultimaMensagem.editada_em
+          }
+        : null,
+      anexos_total: anexosTotal,
+      participantes_total: participantesTotal
+    };
+  });
 }
 
 async function criarConversaIndividual({ criadorId, destinatarioId, assunto, mensagemInicial, files }) {
