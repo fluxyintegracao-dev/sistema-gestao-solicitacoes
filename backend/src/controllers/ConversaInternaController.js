@@ -13,6 +13,19 @@ const { normalizeOriginalName } = require('../utils/fileName');
 
 const JANELA_EDICAO_MS = 5 * 60 * 1000;
 
+function erroBancoIndisponivel(error) {
+  const nome = String(error?.name || '');
+  const codigo = String(error?.original?.code || error?.parent?.code || error?.code || '');
+  const mensagem = String(error?.message || '');
+
+  return (
+    nome.includes('SequelizeConnection') ||
+    nome.includes('ConnectionAcquireTimeout') ||
+    codigo === 'ETIMEDOUT' ||
+    mensagem.includes('Operation timeout')
+  );
+}
+
 function normalizarTexto(valor) {
   return String(valor || '').trim();
 }
@@ -286,6 +299,9 @@ module.exports = {
       return res.json(itens);
     } catch (error) {
       console.error(error);
+      if (erroBancoIndisponivel(error)) {
+        return res.json([]);
+      }
       return res.status(500).json({ error: 'Erro ao listar caixa de entrada' });
     }
   },
@@ -324,6 +340,9 @@ module.exports = {
       return res.json(itens);
     } catch (error) {
       console.error(error);
+      if (erroBancoIndisponivel(error)) {
+        return res.json([]);
+      }
       return res.status(500).json({ error: 'Erro ao listar caixa de saida' });
     }
   },

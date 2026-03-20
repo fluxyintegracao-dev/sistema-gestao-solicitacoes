@@ -1,5 +1,18 @@
 const { NotificacaoDestinatario, Notificacao } = require('../models');
 
+function erroBancoIndisponivel(error) {
+  const nome = String(error?.name || '');
+  const codigo = String(error?.original?.code || error?.parent?.code || error?.code || '');
+  const mensagem = String(error?.message || '');
+
+  return (
+    nome.includes('SequelizeConnection') ||
+    nome.includes('ConnectionAcquireTimeout') ||
+    codigo === 'ETIMEDOUT' ||
+    mensagem.includes('Operation timeout')
+  );
+}
+
 module.exports = {
   async index(req, res) {
     try {
@@ -43,6 +56,12 @@ module.exports = {
       });
     } catch (error) {
       console.error(error);
+      if (erroBancoIndisponivel(error)) {
+        return res.json({
+          total_nao_lidas: 0,
+          itens: []
+        });
+      }
       return res.status(500).json({ error: 'Erro ao buscar notificacoes' });
     }
   },
