@@ -14,6 +14,7 @@ import TabelaSolicitacoes from './TabelaSolicitacoes';
 import ModalAtribuirResponsavel from './ModalAtribuirResponsavel';
 import ModalEnviarSetor from './ModalEnviarSetor';
 import { API_URL, authHeaders } from '../../services/api';
+import { getMinhasObras, getObras } from '../../services/obras';
 import { getSetores } from '../../services/setores';
 import { getTiposSolicitacao } from '../../services/tiposSolicitacao';
 import { getSetorPermissoes } from '../../services/setorPermissoes';
@@ -234,20 +235,12 @@ export default function Solicitacoes({ arquivadas = false }) {
     return Array.from(responsaveisMap.values()).sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
   }
 
-  async function carregarOpcoesObras(paramsObj = {}) {
-    const paramsObras = { ...paramsObj };
-    delete paramsObras.obra_ids;
+  async function carregarOpcoesObras() {
+    const carregarObras = isSetorObra
+      ? () => getMinhasObras()
+      : () => getObras();
 
-    const query = new URLSearchParams(paramsObras).toString();
-    const res = await fetch(`${API_URL}/solicitacoes?${query}`, {
-      headers: authHeaders()
-    });
-
-    if (!res.ok) {
-      throw new Error('Erro ao carregar opcoes de obras');
-    }
-
-    const data = await res.json();
+    const data = await carregarObras();
     return extrairOpcoesObras(Array.isArray(data) ? data : []);
   }
 
@@ -281,7 +274,7 @@ export default function Solicitacoes({ arquivadas = false }) {
       setResponsaveisOptions(extrairOpcoesResponsaveis(lista));
 
       try {
-        const obrasLista = await carregarOpcoesObras(paramsObj);
+        const obrasLista = await carregarOpcoesObras();
         setObrasOptions(obrasLista);
       } catch (errorOpcoesObras) {
         console.error(errorOpcoesObras);

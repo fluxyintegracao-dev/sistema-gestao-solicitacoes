@@ -1135,30 +1135,6 @@ module.exports = {
             model: TipoSolicitacao,
             as: 'tipoMacroSolicitacao',
             attributes: ['id', 'nome']
-          },
-          {
-            model: Historico,
-            as: 'historicos',
-            required: false,
-            where: {
-              usuario_responsavel_id: { [Op.ne]: null },
-              acao: {
-                [Op.in]: [
-                  'RESPONSAVEL_ATRIBUIDO',
-                  'RESPONSAVEL_ASSUMIU',
-                  'ENVIADA_SETOR'
-                ]
-              }
-            },
-            limit: 1,
-            order: [['createdAt', 'DESC']],
-            include: [
-              {
-                model: User,
-                as: 'usuario',
-                attributes: ['id', 'nome']
-              }
-            ]
           }
         ],
         order: [['createdAt', 'DESC']]
@@ -1168,16 +1144,52 @@ module.exports = {
         6) FORMATAR RESPOSTA
       =============================== */
 
-      const resultadoBase = solicitacoes.map(s => {
-        const historicoResponsavel = s.historicos?.[0];
-        const responsavel =
-          historicoResponsavel && historicoResponsavel.acao !== 'ENVIADA_SETOR'
-            ? historicoResponsavel.usuario?.nome || null
-            : null;
+      const idsSolicitacoesBase = solicitacoes.map(item => Number(item.id)).filter(Number.isFinite);
+      const responsavelPorSolicitacao = new Map();
 
+      if (idsSolicitacoesBase.length > 0) {
+        const historicosResponsavel = await Historico.findAll({
+          where: {
+            solicitacao_id: { [Op.in]: idsSolicitacoesBase },
+            usuario_responsavel_id: { [Op.ne]: null },
+            acao: {
+              [Op.in]: [
+                'RESPONSAVEL_ATRIBUIDO',
+                'RESPONSAVEL_ASSUMIU',
+                'ENVIADA_SETOR'
+              ]
+            }
+          },
+          attributes: ['solicitacao_id', 'acao', 'createdAt'],
+          include: [
+            {
+              model: User,
+              as: 'usuario',
+              attributes: ['id', 'nome']
+            }
+          ],
+          order: [
+            ['solicitacao_id', 'ASC'],
+            ['createdAt', 'DESC']
+          ]
+        });
+
+        historicosResponsavel.forEach(item => {
+          const solicitacaoId = Number(item.solicitacao_id);
+          if (responsavelPorSolicitacao.has(solicitacaoId)) {
+            return;
+          }
+          responsavelPorSolicitacao.set(
+            solicitacaoId,
+            item.acao !== 'ENVIADA_SETOR' ? item.usuario?.nome || null : null
+          );
+        });
+      }
+
+      const resultadoBase = solicitacoes.map(s => {
         return {
           ...s.toJSON(),
-          responsavel
+          responsavel: responsavelPorSolicitacao.get(Number(s.id)) || null
         };
       });
 
