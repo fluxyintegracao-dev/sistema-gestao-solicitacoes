@@ -917,18 +917,18 @@ module.exports = {
             .filter(Boolean)
         ));
 
-        const condicoesStatus = statusLista.flatMap(statusFiltro => {
-          const statusSemAcento = statusFiltro
+        const statusNormalizados = statusLista
+          .map(statusFiltro => statusFiltro
             .toUpperCase()
             .normalize('NFD')
-            .replace(/[\u0300-\u036f]/g, '');
-          const statusComUnderscore = statusSemAcento.replace(/\s+/g, '_');
-          const statusComEspaco = statusSemAcento.replace(/_/g, ' ');
-          const statusSemSeparador = statusSemAcento.replace(/[\s_]+/g, '');
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/[\s_]+/g, '')
+          )
+          .filter(Boolean);
 
-          return [
-            { status_global: statusComUnderscore },
-            { status_global: statusComEspaco },
+        if (statusNormalizados.length > 0) {
+          where[Op.and] = where[Op.and] || [];
+          where[Op.and].push(
             Sequelize.where(
               Sequelize.fn(
                 'REPLACE',
@@ -941,16 +941,11 @@ module.exports = {
                 ' ',
                 ''
               ),
-              statusSemSeparador
+              {
+                [Op.in]: statusNormalizados
+              }
             )
-          ];
-        });
-
-        if (condicoesStatus.length > 0) {
-          where[Op.and] = where[Op.and] || [];
-          where[Op.and].push({
-            [Op.or]: condicoesStatus
-          });
+          );
         }
       }
       if (obra_id) {
