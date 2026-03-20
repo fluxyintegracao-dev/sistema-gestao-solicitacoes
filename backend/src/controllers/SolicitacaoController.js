@@ -927,25 +927,23 @@ module.exports = {
           .filter(Boolean);
 
         if (statusNormalizados.length > 0) {
-          where[Op.and] = where[Op.and] || [];
-          where[Op.and].push(
-            Sequelize.where(
-              Sequelize.fn(
-                'REPLACE',
-                Sequelize.fn(
-                  'REPLACE',
-                  Sequelize.fn('UPPER', Sequelize.col('status_global')),
-                  '_',
-                  ''
-                ),
-                ' ',
-                ''
-              ),
-              {
-                [Op.in]: statusNormalizados
-              }
-            )
+          const expressaoStatusNormalizado = Sequelize.fn(
+            'REPLACE',
+            Sequelize.fn(
+              'REPLACE',
+              Sequelize.fn('UPPER', Sequelize.col('status_global')),
+              '_',
+              ''
+            ),
+            ' ',
+            ''
           );
+          where[Op.and] = where[Op.and] || [];
+          where[Op.and].push({
+            [Op.or]: statusNormalizados.map(statusItem =>
+              Sequelize.where(expressaoStatusNormalizado, statusItem)
+            )
+          });
         }
       }
       if (obra_id) {
