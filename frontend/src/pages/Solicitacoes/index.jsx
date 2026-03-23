@@ -200,8 +200,8 @@ export default function Solicitacoes({ arquivadas = false }) {
     const obrasMap = new Map();
 
     (Array.isArray(lista) ? lista : []).forEach(item => {
-      const obraId = item?.obra?.id ?? item?.obra_id;
-      const obraNome = item?.obra?.nome || null;
+      const obraId = item?.obra?.id ?? item?.obra_id ?? item?.id;
+      const obraNome = item?.obra?.nome || item?.nome || null;
       if (obraId && obraNome) {
         const chave = String(obraId);
         if (!obrasMap.has(chave)) {
