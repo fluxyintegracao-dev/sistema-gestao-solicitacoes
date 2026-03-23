@@ -28,6 +28,10 @@ import {
   enviarSolicitacoesParaSetorEmMassa
 } from '../../services/solicitacoes';
 
+function isBrapeToken(valor) {
+  return String(valor || '').trim().toUpperCase().startsWith('BRAPE');
+}
+
 export default function Solicitacoes({ arquivadas = false }) {
   const DEFAULT_VISIBLE_COLUMNS = [
     'data',
@@ -236,7 +240,7 @@ export default function Solicitacoes({ arquivadas = false }) {
   }
 
   async function carregarOpcoesObras() {
-    const carregarObras = isSetorObra
+    const carregarObras = (isSetorObra || isUsuarioBrape)
       ? () => getMinhasObras()
       : () => getObras();
 
@@ -303,6 +307,7 @@ export default function Solicitacoes({ arquivadas = false }) {
     String(user?.area || '').toUpperCase()
   ];
   const isSetorObra = setorTokens.includes('OBRA');
+  const isUsuarioBrape = perfilUpper === 'USUARIO' && setorTokens.some(isBrapeToken);
   const isSetorFinanceiro = setorTokens.includes('FINANCEIRO');
   const isAdminGEO = perfilUpper.startsWith('ADMIN') && setorTokens.some(isGeoSetor);
   const isSuperadmin = perfilUpper === 'SUPERADMIN';
