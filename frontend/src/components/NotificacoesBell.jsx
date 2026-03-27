@@ -29,9 +29,36 @@ export default function NotificacoesBell() {
   }
 
   useEffect(() => {
-    carregar();
-    const id = setInterval(carregar, 60000);
-    return () => clearInterval(id);
+    let ativo = true;
+    let carregando = false;
+
+    const carregarComProtecao = async () => {
+      if (!ativo || carregando || document.hidden) {
+        return;
+      }
+
+      try {
+        carregando = true;
+        await carregar();
+      } finally {
+        carregando = false;
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        carregarComProtecao();
+      }
+    };
+
+    carregarComProtecao();
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    const id = setInterval(carregarComProtecao, 60000);
+    return () => {
+      ativo = false;
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      clearInterval(id);
+    };
   }, []);
 
   async function abrirModal() {

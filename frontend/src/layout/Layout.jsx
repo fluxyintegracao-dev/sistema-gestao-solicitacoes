@@ -97,9 +97,20 @@ export default function Layout() {
     const storageKeyEntrada = `conversas_entrada_last_seen_${userId}`;
     const storageKeySaida = `conversas_saida_last_seen_${userId}`;
     let ativo = true;
+    let carregando = false;
+
+    const estaEmTelaDeConversa =
+      location.pathname.startsWith('/conversas/entrada') ||
+      location.pathname.startsWith('/conversas/saida') ||
+      location.pathname.startsWith('/conversas/');
 
     const atualizarBadge = async () => {
+      if (!ativo || carregando || document.hidden || estaEmTelaDeConversa) {
+        return;
+      }
+
       try {
+        carregando = true;
         const [listaEntrada, listaSaida] = await Promise.all([
           getCaixaEntrada({ arquivadas: false }),
           getCaixaSaida({ arquivadas: false })
@@ -128,6 +139,8 @@ export default function Layout() {
         setSaidaNovasCount(totalSaida);
       } catch {
         // sem bloqueio visual em caso de falha temporaria
+      } finally {
+        carregando = false;
       }
     };
 
@@ -135,8 +148,15 @@ export default function Layout() {
       atualizarBadge();
     };
 
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        atualizarBadge();
+      }
+    };
+
     window.addEventListener('conversas:entrada:seen', handleSeenEvent);
     window.addEventListener('conversas:saida:seen', handleSeenEvent);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
     atualizarBadge();
     const interval = setInterval(atualizarBadge, 20000);
 
@@ -144,9 +164,10 @@ export default function Layout() {
       ativo = false;
       window.removeEventListener('conversas:entrada:seen', handleSeenEvent);
       window.removeEventListener('conversas:saida:seen', handleSeenEvent);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       clearInterval(interval);
     };
-  }, [user?.id]);
+  }, [user?.id, location.pathname]);
 
   const perfilUpper = String(user?.perfil || '').toUpperCase();
   const areaUpper = String(user?.area || '').toUpperCase();

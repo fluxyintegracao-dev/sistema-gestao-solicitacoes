@@ -1,4 +1,4 @@
-const { Op } = require('sequelize');
+const { Op, QueryTypes } = require('sequelize');
 const {
   ConversaInterna,
   ConversaInternaMensagem,
@@ -41,6 +41,57 @@ async function garantirParticipantesBasicos(conversa) {
       where: { conversa_id: conversa.id, usuario_id: usuarioId },
       defaults: { adicionado_por_id: conversa.criado_por_id }
     });
+  }
+}
+
+async function garantirParticipantesBasicosEmLote(conversas) {
+  if (!Array.isArray(conversas) || conversas.length === 0) {
+    return;
+  }
+
+  const conversaIds = [];
+  const usuarioIds = new Set();
+  const paresNecessarios = [];
+
+  for (const conversa of conversas) {
+    if (!conversa?.id) continue;
+    conversaIds.push(Number(conversa.id));
+
+    for (const usuarioId of [conversa.criado_por_id, conversa.destinatario_id]) {
+      const idNumerico = Number(usuarioId);
+      if (!Number.isInteger(idNumerico) || idNumerico <= 0) continue;
+      usuarioIds.add(idNumerico);
+      paresNecessarios.push({
+        conversa_id: Number(conversa.id),
+        usuario_id: idNumerico,
+        adicionado_por_id: Number(conversa.criado_por_id) || null
+      });
+    }
+  }
+
+  if (paresNecessarios.length === 0) {
+    return;
+  }
+
+  const existentes = await ConversaInternaParticipante.findAll({
+    where: {
+      conversa_id: { [Op.in]: conversaIds },
+      usuario_id: { [Op.in]: [...usuarioIds] }
+    },
+    attributes: ['conversa_id', 'usuario_id'],
+    raw: true
+  });
+
+  const existentesSet = new Set(
+    existentes.map((item) => `${Number(item.conversa_id)}:${Number(item.usuario_id)}`)
+  );
+
+  const faltantes = paresNecessarios.filter(
+    (item) => !existentesSet.has(`${item.conversa_id}:${item.usuario_id}`)
+  );
+
+  if (faltantes.length > 0) {
+    await ConversaInternaParticipante.bulkCreate(faltantes, { ignoreDuplicates: true });
   }
 }
 
@@ -147,6 +198,118 @@ async function montarResumoConversa(conversa) {
     anexos_total: anexosTotal,
     participantes_total: participantesTotal
   };
+}
+
+async function carregarUltimasMensagensPorConversa(conversaIds) {
+  if (!Array.isArray(conversaIds) || conversaIds.length === 0) {
+    return new Map();
+  }
+
+  const placeholders = conversaIds.map(() => '?').join(', ');
+  const sql = `
+    SELECT
+      m.id,
+      m.conversa_id,
+      m.mensagem,
+      m.createdAt,
+      m.updatedAt,
+      m.editada_em,
+      u.id AS autor_id,
+      u.nome AS autor_nome
+    FROM conversas_internas_mensagens m
+    INNER JOIN (
+      SELECT conversa_id, MAX(id) AS ultimo_id
+      FROM conversas_internas_mensagens
+      WHERE conversa_id IN (${placeholders})
+      GROUP BY conversa_id
+    ) ultimas ON ultimas.ultimo_id = m.id
+    LEFT JOIN users u ON u.id = m.usuario_id
+  `;
+
+  const linhas = await ConversaInternaMensagem.sequelize.query(sql, {
+    replacements: conversaIds,
+    type: QueryTypes.SELECT
+  });
+
+  return new Map(
+    linhas.map((item) => [
+      Number(item.conversa_id),
+      {
+        id: item.id,
+        mensagem: item.mensagem,
+        autor: item.autor_id
+          ? {
+              id: item.autor_id,
+              nome: item.autor_nome
+            }
+          : null,
+        createdAt: item.createdAt,
+        editada_em: item.editada_em
+      }
+    ])
+  );
+}
+
+async function contarPorConversa(Modelo, conversaIds) {
+  if (!Array.isArray(conversaIds) || conversaIds.length === 0) {
+    return new Map();
+  }
+
+  const linhas = await Modelo.findAll({
+    where: { conversa_id: { [Op.in]: conversaIds } },
+    attributes: [
+      'conversa_id',
+      [Modelo.sequelize.fn('COUNT', Modelo.sequelize.col('id')), 'total']
+    ],
+    group: ['conversa_id'],
+    raw: true
+  });
+
+  return new Map(
+    linhas.map((item) => [Number(item.conversa_id), Number(item.total || 0)])
+  );
+}
+
+async function montarResumosConversasEmLote(conversas) {
+  if (!Array.isArray(conversas) || conversas.length === 0) {
+    return [];
+  }
+
+  const conversaIds = conversas.map((item) => Number(item.id)).filter((id) => id > 0);
+  const [ultimasMensagensMap, anexosTotalMap, participantesTotalMap] = await Promise.all([
+    carregarUltimasMensagensPorConversa(conversaIds),
+    contarPorConversa(ConversaInternaAnexo, conversaIds),
+    contarPorConversa(ConversaInternaParticipante, conversaIds)
+  ]);
+
+  return conversas.map((conversa) => ({
+    id: conversa.id,
+    assunto: conversa.assunto,
+    status: conversa.status,
+    createdAt: conversa.createdAt,
+    updatedAt: conversa.updatedAt,
+    criador: conversa.criador
+      ? {
+          id: conversa.criador.id,
+          nome: conversa.criador.nome,
+          setor: conversa.criador.setor
+            ? { id: conversa.criador.setor.id, nome: conversa.criador.setor.nome, codigo: conversa.criador.setor.codigo }
+            : null
+        }
+      : null,
+    destinatario: conversa.destinatario
+      ? {
+          id: conversa.destinatario.id,
+          nome: conversa.destinatario.nome,
+          setor: conversa.destinatario.setor
+            ? { id: conversa.destinatario.setor.id, nome: conversa.destinatario.setor.nome, codigo: conversa.destinatario.setor.codigo }
+            : null
+        }
+      : null,
+    ultima_mensagem: ultimasMensagensMap.get(Number(conversa.id)) || null,
+    anexos_total: anexosTotalMap.get(Number(conversa.id)) || 0,
+    participantes_total: participantesTotalMap.get(Number(conversa.id)) || 0
+  }));
 }
 
 async function criarConversaIndividual({ criadorId, destinatarioId, assunto, mensagemInicial, files }) {
@@ -268,9 +431,7 @@ module.exports = {
         order: [['updatedAt', 'DESC']]
       });
 
-      for (const conversa of conversas) {
-        await garantirParticipantesBasicos(conversa);
-      }
+      await garantirParticipantesBasicosEmLote(conversas);
 
       conversas = await filtrarPorArquivamento(
         conversas,
@@ -278,7 +439,7 @@ module.exports = {
         somenteArquivadas
       );
 
-      const itens = await Promise.all(conversas.map(montarResumoConversa));
+      const itens = await montarResumosConversasEmLote(conversas);
       return res.json(itens);
     } catch (error) {
       console.error(error);
@@ -310,9 +471,7 @@ module.exports = {
         order: [['updatedAt', 'DESC']]
       });
 
-      for (const conversa of conversas) {
-        await garantirParticipantesBasicos(conversa);
-      }
+      await garantirParticipantesBasicosEmLote(conversas);
 
       conversas = await filtrarPorArquivamento(
         conversas,
@@ -320,7 +479,7 @@ module.exports = {
         somenteArquivadas
       );
 
-      const itens = await Promise.all(conversas.map(montarResumoConversa));
+      const itens = await montarResumosConversasEmLote(conversas);
       return res.json(itens);
     } catch (error) {
       console.error(error);
