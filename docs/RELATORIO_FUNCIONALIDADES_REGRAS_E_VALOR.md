@@ -361,6 +361,7 @@ Regra de negocio importante:
 - tabela principal com filtros, colunas configuraveis, acoes contextuais e responsividade
 - fluxo de login com identidade visual CSC
 - filtro de solicitacoes por codigo e `numero_sienge` com correspondencia parcial
+- filtros de `obra`, `tipo de solicitacao`, `setor` e `status` com multisselecao combinavel
 
 ## 7. Integridade, auditoria e seguranca
 - validacoes criticas em frontend e backend

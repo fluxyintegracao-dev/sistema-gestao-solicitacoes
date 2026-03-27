@@ -617,6 +617,47 @@ function montarCondicaoBuscaParcialEmColunas(valor, colunas) {
   return { [Op.or]: condicoesPorColuna };
 }
 
+function extrairValoresFiltroMultiplo(valor) {
+  return String(valor || '')
+    .split(',')
+    .map(item => String(item || '').trim())
+    .filter(Boolean);
+}
+
+function montarCondicaoStatus(statusFiltro) {
+  const statusNormalizado = String(statusFiltro || '').trim();
+  if (!statusNormalizado) return null;
+
+  const statusSemAcento = statusNormalizado
+    .toUpperCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+  const statusComUnderscore = statusSemAcento.replace(/\s+/g, '_');
+  const statusComEspaco = statusSemAcento.replace(/_/g, ' ');
+  const statusSemSeparador = statusSemAcento.replace(/[\s_]+/g, '');
+
+  return {
+    [Op.or]: [
+      { status_global: statusComUnderscore },
+      { status_global: statusComEspaco },
+      Sequelize.where(
+        Sequelize.fn(
+          'REPLACE',
+          Sequelize.fn(
+            'REPLACE',
+            Sequelize.fn('UPPER', Sequelize.col('status_global')),
+            '_',
+            ''
+          ),
+          ' ',
+          ''
+        ),
+        statusSemSeparador
+      )
+    ]
+  };
+}
+
 module.exports = {
 
   // =====================================================
@@ -924,14 +965,18 @@ module.exports = {
       =============================== */
 
       if (area) {
-        const areaFiltro = String(area).trim();
-        const areaFiltroUpper = areaFiltro.toUpperCase();
-        const setorFiltroRow = await Setor.findOne({
+        const areasSelecionadas = extrairValoresFiltroMultiplo(area);
+        const areasSelecionadasUpper = areasSelecionadas.map(item => item.toUpperCase());
+        const idsFiltroSetor = areasSelecionadas
+          .map(item => Number(item))
+          .filter(item => !Number.isNaN(item));
+
+        const setoresFiltroRows = await Setor.findAll({
           where: {
             [Op.or]: [
-              { codigo: areaFiltro },
-              { nome: areaFiltro },
-              { id: Number.isNaN(Number(areaFiltro)) ? -1 : Number(areaFiltro) }
+              { codigo: { [Op.in]: areasSelecionadas } },
+              { nome: { [Op.in]: areasSelecionadas } },
+              ...(idsFiltroSetor.length > 0 ? [{ id: { [Op.in]: idsFiltroSetor } }] : [])
             ]
           },
           attributes: ['id', 'codigo', 'nome']
@@ -939,10 +984,12 @@ module.exports = {
 
         const valoresFiltroSetor = Array.from(new Set(
           [
-            areaFiltro,
-            setorFiltroRow?.codigo,
-            setorFiltroRow?.nome,
-            setorFiltroRow?.id != null ? String(setorFiltroRow.id) : null
+            ...areasSelecionadas,
+            ...setoresFiltroRows.flatMap(setor => [
+              setor?.codigo,
+              setor?.nome,
+              setor?.id != null ? String(setor.id) : null
+            ])
           ]
             .filter(Boolean)
             .map(v => String(v).trim())
@@ -950,43 +997,27 @@ module.exports = {
 
         if (valoresFiltroSetor.length > 0) {
           where.area_responsavel = { [Op.in]: valoresFiltroSetor };
-        } else if (areaFiltroUpper === 'BRAPE') {
+        } else if (areasSelecionadasUpper.includes('BRAPE')) {
           where.id = -1;
+        } else if (areasSelecionadas.length === 1) {
+          where.area_responsavel = areasSelecionadas[0];
         } else {
-          where.area_responsavel = areaFiltro;
+          where.id = -1;
         }
       }
       if (status) {
-        const statusFiltro = String(status).trim();
-        const statusSemAcento = statusFiltro
-          .toUpperCase()
-          .normalize('NFD')
-          .replace(/[\u0300-\u036f]/g, '');
-        const statusComUnderscore = statusSemAcento.replace(/\s+/g, '_');
-        const statusComEspaco = statusSemAcento.replace(/_/g, ' ');
-        const statusSemSeparador = statusSemAcento.replace(/[\s_]+/g, '');
+        const statusSelecionados = extrairValoresFiltroMultiplo(status)
+          .map(montarCondicaoStatus)
+          .filter(Boolean);
 
-        where[Op.and] = where[Op.and] || [];
-        where[Op.and].push({
-          [Op.or]: [
-            { status_global: statusComUnderscore },
-            { status_global: statusComEspaco },
-            Sequelize.where(
-              Sequelize.fn(
-                'REPLACE',
-                Sequelize.fn(
-                  'REPLACE',
-                  Sequelize.fn('UPPER', Sequelize.col('status_global')),
-                  '_',
-                  ''
-                ),
-                ' ',
-                ''
-              ),
-              statusSemSeparador
-            )
-          ]
-        });
+        if (statusSelecionados.length > 0) {
+          where[Op.and] = where[Op.and] || [];
+          where[Op.and].push(
+            statusSelecionados.length === 1
+              ? statusSelecionados[0]
+              : { [Op.or]: statusSelecionados }
+          );
+        }
       }
       if (obra_id) {
         const idNum = Number(obra_id);
