@@ -14,7 +14,6 @@ import TabelaSolicitacoes from './TabelaSolicitacoes';
 import ModalAtribuirResponsavel from './ModalAtribuirResponsavel';
 import ModalEnviarSetor from './ModalEnviarSetor';
 import { API_URL, authHeaders } from '../../services/api';
-import { getMinhasObras, getObras } from '../../services/obras';
 import { getSetores } from '../../services/setores';
 import { getTiposSolicitacao } from '../../services/tiposSolicitacao';
 import { getSetorPermissoes } from '../../services/setorPermissoes';
@@ -27,10 +26,6 @@ import {
   deleteSolicitacao,
   enviarSolicitacoesParaSetorEmMassa
 } from '../../services/solicitacoes';
-
-function isBrapeToken(valor) {
-  return String(valor || '').trim().toUpperCase().startsWith('BRAPE');
-}
 
 export default function Solicitacoes({ arquivadas = false }) {
   const DEFAULT_VISIBLE_COLUMNS = [
@@ -77,6 +72,7 @@ export default function Solicitacoes({ arquivadas = false }) {
   const { user } = useAuth();
 
   const [filtros, setFiltros] = useState({
+    numero_solicitacao: '',
     obra_ids: '',
     area: '',
     tipo_solicitacao_id: '',
@@ -204,8 +200,8 @@ export default function Solicitacoes({ arquivadas = false }) {
     const obrasMap = new Map();
 
     (Array.isArray(lista) ? lista : []).forEach(item => {
-      const obraId = item?.obra?.id ?? item?.obra_id ?? item?.id;
-      const obraNome = item?.obra?.nome || item?.nome || null;
+      const obraId = item?.obra?.id ?? item?.obra_id;
+      const obraNome = item?.obra?.nome || null;
       if (obraId && obraNome) {
         const chave = String(obraId);
         if (!obrasMap.has(chave)) {
@@ -239,12 +235,20 @@ export default function Solicitacoes({ arquivadas = false }) {
     return Array.from(responsaveisMap.values()).sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
   }
 
-  async function carregarOpcoesObras() {
-    const carregarObras = (isSetorObra || isUsuarioBrape)
-      ? () => getMinhasObras()
-      : () => getObras();
+  async function carregarOpcoesObras(paramsObj = {}) {
+    const paramsObras = { ...paramsObj };
+    delete paramsObras.obra_ids;
 
-    const data = await carregarObras();
+    const query = new URLSearchParams(paramsObras).toString();
+    const res = await fetch(`${API_URL}/solicitacoes?${query}`, {
+      headers: authHeaders()
+    });
+
+    if (!res.ok) {
+      throw new Error('Erro ao carregar opcoes de obras');
+    }
+
+    const data = await res.json();
     return extrairOpcoesObras(Array.isArray(data) ? data : []);
   }
 
@@ -278,7 +282,7 @@ export default function Solicitacoes({ arquivadas = false }) {
       setResponsaveisOptions(extrairOpcoesResponsaveis(lista));
 
       try {
-        const obrasLista = await carregarOpcoesObras();
+        const obrasLista = await carregarOpcoesObras(paramsObj);
         setObrasOptions(obrasLista);
       } catch (errorOpcoesObras) {
         console.error(errorOpcoesObras);
@@ -307,7 +311,6 @@ export default function Solicitacoes({ arquivadas = false }) {
     String(user?.area || '').toUpperCase()
   ];
   const isSetorObra = setorTokens.includes('OBRA');
-  const isUsuarioBrape = perfilUpper === 'USUARIO' && setorTokens.some(isBrapeToken);
   const isSetorFinanceiro = setorTokens.includes('FINANCEIRO');
   const isAdminGEO = perfilUpper.startsWith('ADMIN') && setorTokens.some(isGeoSetor);
   const isSuperadmin = perfilUpper === 'SUPERADMIN';
@@ -608,16 +611,16 @@ export default function Solicitacoes({ arquivadas = false }) {
   const podeExcluirUnica = !!selecionadaUnica && (isSuperadmin || isAdminGEO);
   const podeEnviarUnica = useMemo(() => {
     if (!selecionadaUnica || isSetorObra) return false;
-    return isSuperadmin || isAdminGEO || solicitacaoEstaNoSetorDoUsuario(selecionadaUnica.area_responsavel, user);
-  }, [selecionadaUnica, isSetorObra, isSuperadmin, isAdminGEO, user]);
+    return isSuperadmin || solicitacaoEstaNoSetorDoUsuario(selecionadaUnica.area_responsavel, user);
+  }, [selecionadaUnica, isSetorObra, isSuperadmin, user]);
   const podeEnviarMassa = useMemo(() => {
     if (selecionadasIds.length <= 1 || isSetorObra) return false;
-    if (isSuperadmin || isAdminGEO) return true;
+    if (isSuperadmin) return true;
     return selecionadasIds.every(idSelecionado => {
       const solicitacao = solicitacoes.find(item => Number(item.id) === Number(idSelecionado));
       return solicitacao && solicitacaoEstaNoSetorDoUsuario(solicitacao.area_responsavel, user);
     });
-  }, [selecionadasIds, isSetorObra, isSuperadmin, isAdminGEO, solicitacoes, user]);
+  }, [selecionadasIds, isSetorObra, isSuperadmin, solicitacoes, user]);
 
   const isSetorObraSolicitacaoUnica = useMemo(() => {
     if (!selecionadaUnica) return false;

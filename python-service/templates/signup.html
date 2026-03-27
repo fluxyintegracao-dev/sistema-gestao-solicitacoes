@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="panel auth-panel">
+  <h1 class="with-icon">
+    <svg class="ui-icon"><use href="#i-user-plus"></use></svg>
+    <span>Criar conta</span>
+  </h1>
+  <p class="hint">Conta padrão de solicitante. Perfil admin é gerenciado pelo administrador master.</p>
+  {% if msg %}
+  <p class="notice">{{ msg }}</p>
+  {% endif %}
+  <form method="post" class="auth-form">
+    <input type="hidden" name="next" value="{{ next_url or '' }}" />
+    <label for="nome">Nome</label>
+    <input type="text" id="nome" name="nome" placeholder="Nome completo" required autocomplete="name" />
+    <label for="email">Email</label>
+    <input type="email" id="email" name="email" placeholder="voce@empresa.com" required autocomplete="email" />
+    <label for="senha">Senha</label>
+    <input type="password" id="senha" name="senha" minlength="6" required autocomplete="new-password" />
+    <label for="senha_confirm">Confirmar senha</label>
+    <input type="password" id="senha_confirm" name="senha_confirm" minlength="6" required autocomplete="new-password" />
+    <button type="submit" class="primary with-icon">
+      <svg class="ui-icon"><use href="#i-user-plus"></use></svg>
+      <span>Criar conta</span>
+    </button>
+  </form>
+  <div class="auth-links">
+    {% if google_auth_enabled %}
+    <a class="card auth-link with-icon" href="{{ url_for('login_google', next=next_url or '') }}">
+      <svg class="ui-icon"><use href="#i-user"></use></svg>
+      <span>Criar com Google</span>
+    </a>
+    {% endif %}
+    <a class="card auth-link with-icon" href="{{ url_for('login', next=next_url or '') }}">
+      <svg class="ui-icon"><use href="#i-login"></use></svg>
+      <span>Já tenho conta</span>
+    </a>
+  </div>
+</section>
+{% endblock %}

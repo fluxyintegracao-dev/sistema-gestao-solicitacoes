@@ -1774,6 +1774,57 @@ a {
   max-width: 1200px;
 }
 
+.page.page-compra-nova {
+  max-width: 1380px;
+}
+
+.compra-nova-layout {
+  display: grid;
+  gap: 1rem;
+}
+
+.compra-insumos-card,
+.compra-itens-card {
+  min-height: 540px;
+}
+
+.compra-itens-empty {
+  min-height: 220px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.compra-itens-table-wrap {
+  min-height: 420px;
+}
+
+.compra-itens-table th,
+.compra-itens-table td {
+  padding-top: 0.95rem;
+  padding-bottom: 0.95rem;
+}
+
+.compra-itens-table th {
+  white-space: nowrap;
+}
+
+@media (min-width: 1280px) {
+  .compra-nova-layout {
+    grid-template-columns: 248px minmax(0, 1fr);
+  }
+}
+
+@media (min-width: 1536px) {
+  .page.page-compra-nova {
+    max-width: 1480px;
+  }
+
+  .compra-nova-layout {
+    grid-template-columns: 264px minmax(0, 1fr);
+  }
+}
+
 .dash-hero {
   position: relative;
   overflow: hidden;

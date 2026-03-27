@@ -7,7 +7,6 @@ import {
 } from '../services/notificacoes';
 
 const TIPOS_VISIVEIS = new Set(['MENCAO_COMENTARIO', 'SOLICITACAO_CRIADA']);
-const NOTIFICACOES_POLL_INTERVAL_MS = 120000;
 
 export default function NotificacoesBell() {
   const [aberto, setAberto] = useState(false);
@@ -30,25 +29,9 @@ export default function NotificacoesBell() {
   }
 
   useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        carregar();
-      }
-    };
-
     carregar();
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    const id = setInterval(() => {
-      if (document.visibilityState === 'visible') {
-        carregar();
-      }
-    }, NOTIFICACOES_POLL_INTERVAL_MS);
-
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      clearInterval(id);
-    };
+    const id = setInterval(carregar, 60000);
+    return () => clearInterval(id);
   }, []);
 
   async function abrirModal() {

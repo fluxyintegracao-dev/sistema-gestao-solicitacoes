@@ -65,12 +65,11 @@ async function enviarSolicitacaoParaSetorInterno({
   }
 
   const perfil = String(req.user?.perfil || '').trim().toUpperCase();
-  const areaUsuario = await obterAreaUsuario(req);
-  const tokensSetorUsuario = expandirTokensComAliasesGeo(
-    await obterTokensSetorUsuario(req, areaUsuario)
-  );
-  const isAdminGeo = perfil.startsWith('ADMIN') && tokensSetorUsuario.some(isGeoToken);
-  if (perfil !== 'SUPERADMIN' && !isAdminGeo) {
+  if (perfil !== 'SUPERADMIN') {
+    const areaUsuario = await obterAreaUsuario(req);
+    const tokensSetorUsuario = expandirTokensComAliasesGeo(
+      await obterTokensSetorUsuario(req, areaUsuario)
+    );
     if (!setorPertenceAoUsuario(tokensSetorUsuario, solicitacao.area_responsavel)) {
       return { ok: false, status: 403, error: 'Voce so pode enviar solicitacoes que estejam no seu setor atual.' };
     }
@@ -590,6 +589,7 @@ module.exports = {
         obra_id,
         obra_ids,
         codigo_contrato,
+        numero_solicitacao,
         responsavel,
         data_registro,
         data_vencimento,
@@ -910,41 +910,36 @@ module.exports = {
         }
       }
       if (status) {
-        const statusLista = Array.from(new Set(
-          String(status)
-            .split(',')
-            .map(item => String(item || '').trim())
-            .filter(Boolean)
-        ));
+        const statusFiltro = String(status).trim();
+        const statusSemAcento = statusFiltro
+          .toUpperCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '');
+        const statusComUnderscore = statusSemAcento.replace(/\s+/g, '_');
+        const statusComEspaco = statusSemAcento.replace(/_/g, ' ');
+        const statusSemSeparador = statusSemAcento.replace(/[\s_]+/g, '');
 
-        const statusNormalizados = statusLista
-          .map(statusFiltro => statusFiltro
-            .toUpperCase()
-            .normalize('NFD')
-            .replace(/[\u0300-\u036f]/g, '')
-            .replace(/[\s_]+/g, '')
-          )
-          .filter(Boolean);
-
-        if (statusNormalizados.length > 0) {
-          const expressaoStatusNormalizado = Sequelize.fn(
-            'REPLACE',
-            Sequelize.fn(
-              'REPLACE',
-              Sequelize.fn('UPPER', Sequelize.col('status_global')),
-              '_',
-              ''
-            ),
-            ' ',
-            ''
-          );
-          where[Op.and] = where[Op.and] || [];
-          where[Op.and].push({
-            [Op.or]: statusNormalizados.map(statusItem =>
-              Sequelize.where(expressaoStatusNormalizado, statusItem)
+        where[Op.and] = where[Op.and] || [];
+        where[Op.and].push({
+          [Op.or]: [
+            { status_global: statusComUnderscore },
+            { status_global: statusComEspaco },
+            Sequelize.where(
+              Sequelize.fn(
+                'REPLACE',
+                Sequelize.fn(
+                  'REPLACE',
+                  Sequelize.fn('UPPER', Sequelize.col('status_global')),
+                  '_',
+                  ''
+                ),
+                ' ',
+                ''
+              ),
+              statusSemSeparador
             )
-          });
-        }
+          ]
+        });
       }
       if (obra_id) {
         const idNum = Number(obra_id);
@@ -1002,6 +997,14 @@ module.exports = {
         if (codigoContratoFiltro) {
           where.codigo_contrato = {
             [Op.like]: `%${codigoContratoFiltro}%`
+          };
+        }
+      }
+      if (numero_solicitacao) {
+        const numeroSolicitacaoFiltro = String(numero_solicitacao).trim();
+        if (numeroSolicitacaoFiltro) {
+          where.numero_sienge = {
+            [Op.like]: `%${numeroSolicitacaoFiltro}%`
           };
         }
       }
@@ -1135,6 +1138,30 @@ module.exports = {
             model: TipoSolicitacao,
             as: 'tipoMacroSolicitacao',
             attributes: ['id', 'nome']
+          },
+          {
+            model: Historico,
+            as: 'historicos',
+            required: false,
+            where: {
+              usuario_responsavel_id: { [Op.ne]: null },
+              acao: {
+                [Op.in]: [
+                  'RESPONSAVEL_ATRIBUIDO',
+                  'RESPONSAVEL_ASSUMIU',
+                  'ENVIADA_SETOR'
+                ]
+              }
+            },
+            limit: 1,
+            order: [['createdAt', 'DESC']],
+            include: [
+              {
+                model: User,
+                as: 'usuario',
+                attributes: ['id', 'nome']
+              }
+            ]
           }
         ],
         order: [['createdAt', 'DESC']]
@@ -1144,52 +1171,16 @@ module.exports = {
         6) FORMATAR RESPOSTA
       =============================== */
 
-      const idsSolicitacoesBase = solicitacoes.map(item => Number(item.id)).filter(Number.isFinite);
-      const responsavelPorSolicitacao = new Map();
-
-      if (idsSolicitacoesBase.length > 0) {
-        const historicosResponsavel = await Historico.findAll({
-          where: {
-            solicitacao_id: { [Op.in]: idsSolicitacoesBase },
-            usuario_responsavel_id: { [Op.ne]: null },
-            acao: {
-              [Op.in]: [
-                'RESPONSAVEL_ATRIBUIDO',
-                'RESPONSAVEL_ASSUMIU',
-                'ENVIADA_SETOR'
-              ]
-            }
-          },
-          attributes: ['solicitacao_id', 'acao', 'createdAt'],
-          include: [
-            {
-              model: User,
-              as: 'usuario',
-              attributes: ['id', 'nome']
-            }
-          ],
-          order: [
-            ['solicitacao_id', 'ASC'],
-            ['createdAt', 'DESC']
-          ]
-        });
-
-        historicosResponsavel.forEach(item => {
-          const solicitacaoId = Number(item.solicitacao_id);
-          if (responsavelPorSolicitacao.has(solicitacaoId)) {
-            return;
-          }
-          responsavelPorSolicitacao.set(
-            solicitacaoId,
-            item.acao !== 'ENVIADA_SETOR' ? item.usuario?.nome || null : null
-          );
-        });
-      }
-
       const resultadoBase = solicitacoes.map(s => {
+        const historicoResponsavel = s.historicos?.[0];
+        const responsavel =
+          historicoResponsavel && historicoResponsavel.acao !== 'ENVIADA_SETOR'
+            ? historicoResponsavel.usuario?.nome || null
+            : null;
+
         return {
           ...s.toJSON(),
-          responsavel: responsavelPorSolicitacao.get(Number(s.id)) || null
+          responsavel
         };
       });
 

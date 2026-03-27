@@ -17,7 +17,11 @@ module.exports = (sequelize, DataTypes) => {
       },
       unidade_id: {
         type: DataTypes.INTEGER,
-        allowNull: false
+        allowNull: true
+      },
+      unidade_sigla_manual: {
+        type: DataTypes.STRING(50),
+        allowNull: true
       },
       apropriacao_id: {
         type: DataTypes.INTEGER,
@@ -36,6 +40,14 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: true
       },
       link_produto: {
+        type: DataTypes.STRING,
+        allowNull: true
+      },
+      arquivo_url: {
+        type: DataTypes.TEXT,
+        allowNull: true
+      },
+      arquivo_nome_original: {
         type: DataTypes.STRING,
         allowNull: true
       }

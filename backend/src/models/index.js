@@ -46,6 +46,10 @@ db.Apropriacao = require('./Apropriacao')(sequelize, Sequelize);
 db.SolicitacaoCompra = require('./SolicitacaoCompra')(sequelize, Sequelize);
 db.SolicitacaoCompraItem = require('./SolicitacaoCompraItem')(sequelize, Sequelize);
 db.SolicitacaoCompraItemManual = require('./SolicitacaoCompraItemManual')(sequelize, Sequelize);
+db.FornecedorCompra = require('./FornecedorCompra')(sequelize, Sequelize);
+db.SolicitacaoCompraFornecedor = require('./SolicitacaoCompraFornecedor')(sequelize, Sequelize);
+db.SolicitacaoCompraRespostaItem = require('./SolicitacaoCompraRespostaItem')(sequelize, Sequelize);
+db.SolicitacaoCompraLog = require('./SolicitacaoCompraLog')(sequelize, Sequelize);
 
   
 
@@ -568,6 +572,69 @@ db.SolicitacaoCompraItem.belongsTo(db.Apropriacao, {
 db.SolicitacaoCompraItemManual.belongsTo(db.Apropriacao, {
   foreignKey: 'apropriacao_id',
   as: 'apropriacao'
+});
+
+db.FornecedorCompra.hasMany(db.SolicitacaoCompraFornecedor, {
+  foreignKey: 'fornecedor_compra_id',
+  as: 'participacoes'
+});
+
+db.SolicitacaoCompraFornecedor.belongsTo(db.FornecedorCompra, {
+  foreignKey: 'fornecedor_compra_id',
+  as: 'fornecedor'
+});
+
+db.SolicitacaoCompra.hasMany(db.SolicitacaoCompraFornecedor, {
+  foreignKey: 'solicitacao_compra_id',
+  as: 'fornecedores',
+  onDelete: 'CASCADE'
+});
+
+db.SolicitacaoCompraFornecedor.belongsTo(db.SolicitacaoCompra, {
+  foreignKey: 'solicitacao_compra_id',
+  as: 'solicitacao'
+});
+
+db.SolicitacaoCompraFornecedor.hasMany(db.SolicitacaoCompraRespostaItem, {
+  foreignKey: 'solicitacao_compra_fornecedor_id',
+  as: 'respostas',
+  onDelete: 'CASCADE'
+});
+
+db.SolicitacaoCompraRespostaItem.belongsTo(db.SolicitacaoCompraFornecedor, {
+  foreignKey: 'solicitacao_compra_fornecedor_id',
+  as: 'cotacaoFornecedor'
+});
+
+db.SolicitacaoCompraRespostaItem.belongsTo(db.SolicitacaoCompraItem, {
+  foreignKey: 'solicitacao_compra_item_id',
+  as: 'itemCadastrado'
+});
+
+db.SolicitacaoCompraRespostaItem.belongsTo(db.SolicitacaoCompraItemManual, {
+  foreignKey: 'solicitacao_compra_item_manual_id',
+  as: 'itemManual'
+});
+
+db.SolicitacaoCompra.hasMany(db.SolicitacaoCompraLog, {
+  foreignKey: 'solicitacao_compra_id',
+  as: 'logs',
+  onDelete: 'CASCADE'
+});
+
+db.SolicitacaoCompraLog.belongsTo(db.SolicitacaoCompra, {
+  foreignKey: 'solicitacao_compra_id',
+  as: 'solicitacao'
+});
+
+db.SolicitacaoCompraLog.belongsTo(db.User, {
+  foreignKey: 'usuario_id',
+  as: 'usuario'
+});
+
+db.SolicitacaoCompraLog.belongsTo(db.FornecedorCompra, {
+  foreignKey: 'fornecedor_compra_id',
+  as: 'fornecedor'
 });
 
 

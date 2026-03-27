@@ -34,8 +34,6 @@ import {
 import { BsBuildingsFill } from 'react-icons/bs';
 import { isGeoSetor } from '../utils/setor';
 
-const BADGE_POLL_INTERVAL_MS = 120000;
-
 export default function Layout() {
   const { user, logout } = useContext(AuthContext);
   const location = useLocation();
@@ -98,14 +96,9 @@ export default function Layout() {
 
     const storageKeyEntrada = `conversas_entrada_last_seen_${userId}`;
     const storageKeySaida = `conversas_saida_last_seen_${userId}`;
-    const usuarioEstaNaTelaDeConversas = location.pathname.startsWith('/conversas');
     let ativo = true;
 
     const atualizarBadge = async () => {
-      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
-        return;
-      }
-
       try {
         const [listaEntrada, listaSaida] = await Promise.all([
           getCaixaEntrada({ arquivadas: false }),
@@ -142,28 +135,18 @@ export default function Layout() {
       atualizarBadge();
     };
 
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        atualizarBadge();
-      }
-    };
-
     window.addEventListener('conversas:entrada:seen', handleSeenEvent);
     window.addEventListener('conversas:saida:seen', handleSeenEvent);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
     atualizarBadge();
-    const interval = usuarioEstaNaTelaDeConversas
-      ? null
-      : setInterval(atualizarBadge, BADGE_POLL_INTERVAL_MS);
+    const interval = setInterval(atualizarBadge, 20000);
 
     return () => {
       ativo = false;
       window.removeEventListener('conversas:entrada:seen', handleSeenEvent);
       window.removeEventListener('conversas:saida:seen', handleSeenEvent);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      if (interval) clearInterval(interval);
+      clearInterval(interval);
     };
-  }, [location.pathname, user?.id]);
+  }, [user?.id]);
 
   const perfilUpper = String(user?.perfil || '').toUpperCase();
   const areaUpper = String(user?.area || '').toUpperCase();

@@ -22,7 +22,28 @@ module.exports = (sequelize, DataTypes) => {
       status: {
         type: DataTypes.STRING,
         allowNull: false,
-        defaultValue: 'ABERTA'
+        defaultValue: 'ENVIADO'
+      },
+      numero_sienge: {
+        type: DataTypes.STRING,
+        allowNull: true
+      },
+      integrado_sienge: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false
+      },
+      data_integracao_sienge: {
+        type: DataTypes.DATE,
+        allowNull: true
+      },
+      liberado_para_compra_em: {
+        type: DataTypes.DATE,
+        allowNull: true
+      },
+      encerrado_em: {
+        type: DataTypes.DATE,
+        allowNull: true
       },
       observacoes: {
         type: DataTypes.TEXT,

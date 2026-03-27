@@ -1,0 +1,55 @@
+{% extends "admin_layout.html" %}
+{% block admin_content %}
+<section class="panel">
+  <h1 class="with-icon">
+    <svg class="ui-icon"><use href="#i-search"></use></svg>
+    <span>Editar insumo</span>
+  </h1>
+  <p class="hint">Ajuste categoria e unidades específicas deste insumo.</p>
+  {% if mensagem %}
+  <p class="notice">{{ mensagem }}</p>
+  {% endif %}
+  <form method="post" class="inline-form insumo-edit-form">
+    <input type="hidden" name="next" value="{{ url_for('admin_insumos') }}" />
+    <input type="hidden" name="gerenciar_unidades" value="1" />
+    <div class="field">
+      <label for="insumo-nome">Nome</label>
+      <input id="insumo-nome" type="text" name="nome" value="{{ insumo.nome }}" required />
+    </div>
+    <div class="field">
+      <label for="insumo-categoria">Categoria</label>
+      <select id="insumo-categoria" name="categoria_id" class="searchable-select">
+        <option value="">Categoria</option>
+        {% for categoria in categorias %}
+        <option value="{{ categoria.id }}" {% if insumo.categoria_id == categoria.id %}selected{% endif %}>{{ categoria.nome }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label for="insumo-unidades">Unidades deste insumo (1 a 1)</label>
+      <select id="insumo-unidades" name="unidade_ids" multiple size="8" class="multi-select">
+        {% for unidade in unidades %}
+        <option value="{{ unidade.id }}" {% if unidade.id in insumo_unidade_ids %}selected{% endif %}>
+          {{ unidade.nome }}
+        </option>
+        {% endfor %}
+      </select>
+      <p class="hint">Você pode selecionar uma ou várias unidades (Ctrl + clique para múltipla seleção).</p>
+    </div>
+    <div class="field">
+      <label for="insumo-novas-unidades">Novas unidades (1 por linha)</label>
+      <textarea id="insumo-novas-unidades" name="novas_unidades" rows="5" placeholder="Ex:\nM\nM2"></textarea>
+    </div>
+    <div class="actions-row">
+      <button type="submit" class="with-icon">
+        <svg class="ui-icon"><use href="#i-list-check"></use></svg>
+        <span>Salvar</span>
+      </button>
+      <a class="card action-link with-icon" href="{{ url_for('admin_insumos') }}">
+        <svg class="ui-icon"><use href="#i-login"></use></svg>
+        <span>Voltar</span>
+      </a>
+    </div>
+  </form>
+</section>
+{% endblock %}

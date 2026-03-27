@@ -14,7 +14,9 @@ const allowedOrigins = new Set([
   'https://api.jrfluxy.com.br',
   'https://jrfluxy.com.br',
   'https://www.jrfluxy.com.br',
-  'https://csc.jrfluxy.com.br'
+  'https://csc.jrfluxy.com.br',
+  'http://localhost:5173',
+  'http://127.0.0.1:5173'
 ]);
 
 const corsOptions = {
@@ -25,6 +27,9 @@ const corsOptions = {
       return callback(null, true);
     }
     if (/^https:\/\/sistema-gestao-solicitacoes-.*\.vercel\.app$/.test(origin)) {
+      return callback(null, true);
+    }
+    if (/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
       return callback(null, true);
     }
     return callback(new Error('Not allowed by CORS'));
@@ -376,7 +381,12 @@ async function prepararBanco() {
         obra_id INT NOT NULL,
         solicitante_id INT NOT NULL,
         solicitacao_principal_id INT NULL,
-        status VARCHAR(50) NOT NULL DEFAULT 'ABERTA',
+        status VARCHAR(50) NOT NULL DEFAULT 'ENVIADO',
+        numero_sienge VARCHAR(120) NULL,
+        integrado_sienge TINYINT(1) NOT NULL DEFAULT 0,
+        data_integracao_sienge DATETIME NULL,
+        liberado_para_compra_em DATETIME NULL,
+        encerrado_em DATETIME NULL,
         observacoes TEXT NULL,
         necessario_para DATE NULL,
         link_geral VARCHAR(500) NULL,
@@ -402,6 +412,8 @@ async function prepararBanco() {
         especificacao TEXT NOT NULL,
         necessario_para DATE NULL,
         link_produto VARCHAR(500) NULL,
+        arquivo_url TEXT NULL,
+        arquivo_nome_original VARCHAR(255) NULL,
         createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
         updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         CONSTRAINT fk_solicitacao_compra_itens_solicitacao FOREIGN KEY (solicitacao_compra_id) REFERENCES solicitacao_compras(id) ON DELETE CASCADE,
@@ -426,6 +438,8 @@ async function prepararBanco() {
         especificacao TEXT NOT NULL,
         necessario_para DATE NULL,
         link_produto VARCHAR(500) NULL,
+        arquivo_url TEXT NULL,
+        arquivo_nome_original VARCHAR(255) NULL,
         createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
         updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         CONSTRAINT fk_solicitacao_compra_itens_manuais_solicitacao FOREIGN KEY (solicitacao_compra_id) REFERENCES solicitacao_compras(id) ON DELETE CASCADE,
@@ -434,6 +448,154 @@ async function prepararBanco() {
     );
   } catch (error) {
     // ignora se a tabela/constraints ja existirem
+  }
+
+  try {
+    await db.sequelize.query(
+      `CREATE TABLE IF NOT EXISTS fornecedores_compra (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        nome VARCHAR(255) NOT NULL,
+        email VARCHAR(255) NULL,
+        whatsapp VARCHAR(100) NULL,
+        contato VARCHAR(255) NULL,
+        observacoes TEXT NULL,
+        ativo TINYINT(1) NOT NULL DEFAULT 1,
+        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      )`
+    );
+  } catch (error) {
+    // ignora se a tabela/constraints ja existirem
+  }
+
+  try {
+    await db.sequelize.query(
+      `CREATE TABLE IF NOT EXISTS solicitacao_compra_fornecedores (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        solicitacao_compra_id INT NOT NULL,
+        fornecedor_compra_id INT NOT NULL,
+        token VARCHAR(255) NOT NULL,
+        status VARCHAR(50) NOT NULL DEFAULT 'ENVIADO',
+        enviado_em DATETIME NULL,
+        visualizado_em DATETIME NULL,
+        respondido_em DATETIME NULL,
+        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        CONSTRAINT fk_solicitacao_compra_fornecedores_solicitacao FOREIGN KEY (solicitacao_compra_id) REFERENCES solicitacao_compras(id) ON DELETE CASCADE,
+        CONSTRAINT fk_solicitacao_compra_fornecedores_fornecedor FOREIGN KEY (fornecedor_compra_id) REFERENCES fornecedores_compra(id),
+        UNIQUE KEY uk_solicitacao_compra_fornecedores_token (token)
+      )`
+    );
+  } catch (error) {
+    // ignora se a tabela/constraints ja existirem
+  }
+
+  try {
+    await db.sequelize.query(
+      `CREATE TABLE IF NOT EXISTS solicitacao_compra_resposta_itens (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        solicitacao_compra_fornecedor_id INT NOT NULL,
+        item_tipo VARCHAR(30) NOT NULL,
+        solicitacao_compra_item_id INT NULL,
+        solicitacao_compra_item_manual_id INT NULL,
+        disponivel TINYINT(1) NOT NULL DEFAULT 0,
+        preco DECIMAL(12,2) NULL,
+        prazo VARCHAR(100) NULL,
+        observacao TEXT NULL,
+        vencedor TINYINT(1) NOT NULL DEFAULT 0,
+        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        CONSTRAINT fk_solicitacao_compra_resposta_itens_fornecedor FOREIGN KEY (solicitacao_compra_fornecedor_id) REFERENCES solicitacao_compra_fornecedores(id) ON DELETE CASCADE,
+        CONSTRAINT fk_solicitacao_compra_resposta_itens_item FOREIGN KEY (solicitacao_compra_item_id) REFERENCES solicitacao_compra_itens(id) ON DELETE CASCADE,
+        CONSTRAINT fk_solicitacao_compra_resposta_itens_item_manual FOREIGN KEY (solicitacao_compra_item_manual_id) REFERENCES solicitacao_compra_itens_manuais(id) ON DELETE CASCADE
+      )`
+    );
+  } catch (error) {
+    // ignora se a tabela/constraints ja existirem
+  }
+
+  try {
+    await db.sequelize.query(
+      `CREATE TABLE IF NOT EXISTS solicitacao_compra_logs (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        solicitacao_compra_id INT NOT NULL,
+        usuario_id INT NULL,
+        fornecedor_compra_id INT NULL,
+        tipo_acao VARCHAR(120) NOT NULL,
+        descricao TEXT NOT NULL,
+        metadados LONGTEXT NULL,
+        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT fk_solicitacao_compra_logs_solicitacao FOREIGN KEY (solicitacao_compra_id) REFERENCES solicitacao_compras(id) ON DELETE CASCADE,
+        CONSTRAINT fk_solicitacao_compra_logs_usuario FOREIGN KEY (usuario_id) REFERENCES users(id),
+        CONSTRAINT fk_solicitacao_compra_logs_fornecedor FOREIGN KEY (fornecedor_compra_id) REFERENCES fornecedores_compra(id)
+      )`
+    );
+  } catch (error) {
+    // ignora se a tabela/constraints ja existirem
+  }
+
+  try {
+    const hasItensCompra = await tableExists('solicitacao_compra_itens');
+    if (hasItensCompra) {
+      const hasArquivoUrl = await columnExists('solicitacao_compra_itens', 'arquivo_url');
+      if (!hasArquivoUrl) {
+        await db.sequelize.query(
+          'ALTER TABLE solicitacao_compra_itens ADD COLUMN arquivo_url TEXT NULL'
+        );
+      }
+
+      const hasArquivoNome = await columnExists('solicitacao_compra_itens', 'arquivo_nome_original');
+      if (!hasArquivoNome) {
+        await db.sequelize.query(
+          'ALTER TABLE solicitacao_compra_itens ADD COLUMN arquivo_nome_original VARCHAR(255) NULL'
+        );
+      }
+    }
+  } catch (error) {
+    // ignora se nao conseguir ajustar agora
+  }
+
+  try {
+    const hasSolicitacaoCompras = await tableExists('solicitacao_compras');
+    if (hasSolicitacaoCompras) {
+      const extraColumns = [
+        ['numero_sienge', 'ALTER TABLE solicitacao_compras ADD COLUMN numero_sienge VARCHAR(120) NULL'],
+        ['integrado_sienge', 'ALTER TABLE solicitacao_compras ADD COLUMN integrado_sienge TINYINT(1) NOT NULL DEFAULT 0'],
+        ['data_integracao_sienge', 'ALTER TABLE solicitacao_compras ADD COLUMN data_integracao_sienge DATETIME NULL'],
+        ['liberado_para_compra_em', 'ALTER TABLE solicitacao_compras ADD COLUMN liberado_para_compra_em DATETIME NULL'],
+        ['encerrado_em', 'ALTER TABLE solicitacao_compras ADD COLUMN encerrado_em DATETIME NULL']
+      ];
+
+      for (const [columnName, query] of extraColumns) {
+        const exists = await columnExists('solicitacao_compras', columnName);
+        if (!exists) {
+          await db.sequelize.query(query);
+        }
+      }
+    }
+  } catch (error) {
+    // ignora se nao conseguir ajustar agora
+  }
+
+  try {
+    const hasItensCompraManuais = await tableExists('solicitacao_compra_itens_manuais');
+    if (hasItensCompraManuais) {
+      const hasArquivoUrl = await columnExists('solicitacao_compra_itens_manuais', 'arquivo_url');
+      if (!hasArquivoUrl) {
+        await db.sequelize.query(
+          'ALTER TABLE solicitacao_compra_itens_manuais ADD COLUMN arquivo_url TEXT NULL'
+        );
+      }
+
+      const hasArquivoNome = await columnExists('solicitacao_compra_itens_manuais', 'arquivo_nome_original');
+      if (!hasArquivoNome) {
+        await db.sequelize.query(
+          'ALTER TABLE solicitacao_compra_itens_manuais ADD COLUMN arquivo_nome_original VARCHAR(255) NULL'
+        );
+      }
+    }
+  } catch (error) {
+    // ignora se nao conseguir ajustar agora
   }
 
   try {

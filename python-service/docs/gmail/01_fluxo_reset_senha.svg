@@ -1,0 +1,47 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="700" viewBox="0 0 1200 700">
+  <defs>
+    <style>
+      .title { font: 700 34px 'Segoe UI', Arial, sans-serif; fill: #102a43; }
+      .label { font: 600 20px 'Segoe UI', Arial, sans-serif; fill: #102a43; }
+      .text { font: 500 17px 'Segoe UI', Arial, sans-serif; fill: #243b53; }
+      .box { fill: #f0f4f8; stroke: #486581; stroke-width: 3; rx: 16; }
+      .accent { fill: #d9e2ec; }
+    </style>
+    <marker id="arrow" markerWidth="14" markerHeight="10" refX="10" refY="5" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,10 L10,5 z" fill="#334e68" />
+    </marker>
+  </defs>
+
+  <rect width="1200" height="700" fill="#fffdf7" />
+  <text x="60" y="70" class="title">Fluxo: Recuperacao de senha com Gmail SMTP</text>
+
+  <rect x="70" y="150" width="280" height="140" class="box" />
+  <text x="95" y="195" class="label">1) Usuario</text>
+  <text x="95" y="230" class="text">Clica em "Esqueci minha senha"</text>
+  <text x="95" y="260" class="text">e informa o email.</text>
+
+  <rect x="460" y="120" width="300" height="200" class="box accent" />
+  <text x="485" y="165" class="label">2) Seu Flask (app.py)</text>
+  <text x="485" y="200" class="text">- Gera token</text>
+  <text x="485" y="230" class="text">- Salva hash no banco</text>
+  <text x="485" y="260" class="text">- Monta link /reset-senha</text>
+  <text x="485" y="290" class="text">- Envia email via SMTP</text>
+
+  <rect x="870" y="150" width="260" height="140" class="box" />
+  <text x="895" y="195" class="label">3) Gmail SMTP</text>
+  <text x="895" y="230" class="text">smtp.gmail.com</text>
+  <text x="895" y="260" class="text">porta 587 (TLS)</text>
+
+  <rect x="460" y="420" width="300" height="180" class="box" />
+  <text x="485" y="465" class="label">4) Usuario recebe link</text>
+  <text x="485" y="500" class="text">Abre o email</text>
+  <text x="485" y="530" class="text">Clica no link</text>
+  <text x="485" y="560" class="text">Define nova senha</text>
+
+  <line x1="350" y1="220" x2="450" y2="220" stroke="#334e68" stroke-width="4" marker-end="url(#arrow)" />
+  <line x1="760" y1="220" x2="860" y2="220" stroke="#334e68" stroke-width="4" marker-end="url(#arrow)" />
+  <line x1="1000" y1="300" x2="760" y2="455" stroke="#334e68" stroke-width="4" marker-end="url(#arrow)" />
+  <line x1="460" y1="510" x2="350" y2="510" stroke="#334e68" stroke-width="4" marker-end="url(#arrow)" />
+
+  <text x="70" y="650" class="text">No seu codigo: is_password_reset_email_ready() e send_password_reset_email() fazem essa etapa.</text>
+</svg>

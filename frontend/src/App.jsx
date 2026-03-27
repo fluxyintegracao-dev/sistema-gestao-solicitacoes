@@ -42,6 +42,7 @@ import ConversaDetalhe from './pages/ConversaDetalhe';
 import ArquivosModelos from './pages/ArquivosModelos';
 import ArquivosModelosConfig from './pages/ArquivosModelosConfig';
 import {
+  CotacaoFornecedorPublica,
   GestaoApropriacoes,
   GestaoCategorias,
   GestaoInsumos,
@@ -105,6 +106,7 @@ export default function App() {
           LOGIN (PÚBLICO)
       ========================= */}
       <Route path="/login" element={<Login />} />
+      <Route path="/cotacao/:token" element={<CotacaoFornecedorPublica />} />
 
       {/* =========================
           ÁREA PROTEGIDA

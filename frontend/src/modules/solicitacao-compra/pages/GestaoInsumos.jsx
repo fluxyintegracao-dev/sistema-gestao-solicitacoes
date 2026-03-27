@@ -3,6 +3,7 @@ import {
   atualizarInsumo,
   criarInsumo,
   deletarInsumo,
+  importarInsumosEmMassa,
   listarCategorias,
   listarInsumos,
   listarUnidades
@@ -13,6 +14,7 @@ const initialForm = {
   codigo: '',
   descricao: '',
   unidade_id: '',
+  unidade_manual: '',
   categoria_id: ''
 };
 
@@ -27,6 +29,12 @@ export default function GestaoInsumos() {
   const [modalAberto, setModalAberto] = useState(false);
   const [editandoId, setEditandoId] = useState(null);
   const [form, setForm] = useState(initialForm);
+  const [modalImportacaoAberto, setModalImportacaoAberto] = useState(false);
+  const [importacaoTexto, setImportacaoTexto] = useState('');
+  const [importacaoUnidadeId, setImportacaoUnidadeId] = useState('');
+  const [importacaoCategoriaId, setImportacaoCategoriaId] = useState('');
+  const [importandoEmMassa, setImportandoEmMassa] = useState(false);
+  const [resultadoImportacao, setResultadoImportacao] = useState(null);
 
   async function carregarContexto() {
     try {
@@ -75,6 +83,7 @@ export default function GestaoInsumos() {
       codigo: item.codigo || '',
       descricao: item.descricao || '',
       unidade_id: item.unidade_id ? String(item.unidade_id) : '',
+      unidade_manual: item.unidade_manual || '',
       categoria_id: item.categoria_id ? String(item.categoria_id) : ''
     });
     setModalAberto(true);
@@ -89,8 +98,13 @@ export default function GestaoInsumos() {
   async function handleSalvar(event) {
     event.preventDefault();
 
-    if (!form.nome.trim() || !form.unidade_id) {
-      alert('Informe nome e unidade.');
+    if (!form.nome.trim()) {
+      alert('Informe o nome.');
+      return;
+    }
+
+    if (!form.unidade_id && !form.unidade_manual.trim()) {
+      alert('Selecione uma unidade ou informe uma unidade manual.');
       return;
     }
 
@@ -98,7 +112,8 @@ export default function GestaoInsumos() {
       nome: form.nome,
       codigo: form.codigo || null,
       descricao: form.descricao || null,
-      unidade_id: Number(form.unidade_id),
+      unidade_id: form.unidade_id ? Number(form.unidade_id) : null,
+      unidade_manual: form.unidade_manual || null,
       categoria_id: form.categoria_id ? Number(form.categoria_id) : null
     };
 
@@ -135,6 +150,57 @@ export default function GestaoInsumos() {
     }
   }
 
+  function abrirModalImportacao() {
+    setImportacaoTexto('');
+    setImportacaoUnidadeId('');
+    setImportacaoCategoriaId('');
+    setResultadoImportacao(null);
+    setModalImportacaoAberto(true);
+  }
+
+  function fecharModalImportacao() {
+    setModalImportacaoAberto(false);
+    setImportacaoTexto('');
+    setImportacaoUnidadeId('');
+    setImportacaoCategoriaId('');
+    setResultadoImportacao(null);
+  }
+
+  async function handleImportarEmMassa(event) {
+    event.preventDefault();
+
+    const linhas = importacaoTexto
+      .split('\n')
+      .map(linha => linha.trim())
+      .filter(linha => linha.length > 0);
+
+    if (linhas.length === 0) {
+      alert('Cole pelo menos um insumo.');
+      return;
+    }
+
+    try {
+      setImportandoEmMassa(true);
+      const resultado = await importarInsumosEmMassa({
+        insumos: linhas,
+        unidade_id: importacaoUnidadeId ? Number(importacaoUnidadeId) : null,
+        categoria_id: importacaoCategoriaId ? Number(importacaoCategoriaId) : null
+      });
+
+      setResultadoImportacao(resultado);
+      
+      if (resultado.sucesso > 0) {
+        setLoading(true);
+        await carregarContexto();
+      }
+    } catch (error) {
+      console.error(error);
+      alert(error.message || 'Erro ao importar insumos em massa');
+    } finally {
+      setImportandoEmMassa(false);
+    }
+  }
+
   return (
     <div className="page">
       <div>
@@ -143,7 +209,7 @@ export default function GestaoInsumos() {
       </div>
 
       <div className="card">
-        <div className="grid gap-3 md:grid-cols-[1fr_240px_auto]">
+        <div className="grid gap-3 md:grid-cols-[1fr_240px_auto_auto]">
           <input
             className="input"
             placeholder="Buscar por nome, codigo, descricao ou categoria"
@@ -160,6 +226,9 @@ export default function GestaoInsumos() {
               <option key={item.id} value={item.id}>{item.nome}</option>
             ))}
           </select>
+          <button type="button" className="btn btn-outline" onClick={abrirModalImportacao}>
+            Importar em massa
+          </button>
           <button type="button" className="btn btn-primary" onClick={abrirNovo}>
             Novo insumo
           </button>
@@ -190,7 +259,13 @@ export default function GestaoInsumos() {
                 <tr key={item.id}>
                   <td>{item.nome}</td>
                   <td>{item.codigo || '-'}</td>
-                  <td>{item.unidade?.sigla || item.unidade?.nome || '-'}</td>
+                  <td>
+                    {item.unidade_manual ? (
+                      <span className="text-red-600 dark:text-red-400 font-semibold">{item.unidade_manual}</span>
+                    ) : (
+                      item.unidade?.sigla || item.unidade?.nome || '-'
+                    )}
+                  </td>
                   <td>{item.categoria?.nome || '-'}</td>
                   <td>{item.descricao || '-'}</td>
                   <td>
@@ -285,6 +360,127 @@ export default function GestaoInsumos() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {modalImportacaoAberto && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="card w-full max-w-2xl">
+            <div className="card-header">
+              <h2 className="font-semibold">Importar insumos em massa</h2>
+            </div>
+
+            {resultadoImportacao ? (
+              <div className="grid gap-4">
+                <div className={`p-4 rounded-lg ${resultadoImportacao.sucesso > 0 ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800'}`}>
+                  <p className={`font-semibold ${resultadoImportacao.sucesso > 0 ? 'text-green-900 dark:text-green-200' : 'text-red-900 dark:text-red-200'}`}>
+                    {resultadoImportacao.sucesso} de {resultadoImportacao.total} insumos importados com sucesso
+                  </p>
+                </div>
+
+                {resultadoImportacao.erros && resultadoImportacao.erros.length > 0 && (
+                  <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+                    <p className="font-semibold text-yellow-900 dark:text-yellow-200 mb-2">Erros encontrados:</p>
+                    <ul className="text-sm text-yellow-800 dark:text-yellow-300 space-y-1">
+                      {resultadoImportacao.erros.map((erro, idx) => (
+                        <li key={idx}>• {erro}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                <div className="flex justify-end gap-2">
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={fecharModalImportacao}
+                  >
+                    Fechar
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <form onSubmit={handleImportarEmMassa} className="grid gap-3">
+                <div className="grid gap-3 md:grid-cols-2">
+                  <label className="grid gap-1 text-sm">
+                    <span className="font-medium">Unidade (opcional)</span>
+                    <span className="text-xs text-[var(--c-muted)] mb-1">Selecione uma unidade pré-cadastrada ou deixe em branco</span>
+                    <select
+                      className="input"
+                      value={importacaoUnidadeId}
+                      onChange={(event) => setImportacaoUnidadeId(event.target.value)}
+                    >
+                      <option value="">Nenhuma (entrada manual)</option>
+                      {unidades.map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {item.sigla} - {item.nome}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="grid gap-1 text-sm">
+                    <span className="font-medium">Categoria (opcional)</span>
+                    <span className="text-xs text-[var(--c-muted)] mb-1">Todos os insumos receberão esta categoria</span>
+                    <select
+                      className="input"
+                      value={importacaoCategoriaId}
+                      onChange={(event) => setImportacaoCategoriaId(event.target.value)}
+                    >
+                      <option value="">Nenhuma</option>
+                      {categorias.map((item) => (
+                        <option key={item.id} value={item.id}>{item.nome}</option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+
+                <label className="grid gap-1 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium">Insumos (um por linha)</span>
+                    <span className="text-xs text-[var(--c-muted)]">
+                      {importacaoTexto.split('\n').filter(l => l.trim()).length} insumo(s)
+                    </span>
+                  </div>
+                  <textarea
+                    className="input min-h-[200px] font-mono text-sm"
+                    placeholder="Parafuso M8&#10;Prego 2.5&#10;Cimento Portland&#10;Areia média&#10;Brita 1"
+                    value={importacaoTexto}
+                    onChange={(event) => setImportacaoTexto(event.target.value)}
+                    required
+                  />
+                </label>
+
+                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 text-sm text-blue-900 dark:text-blue-200">
+                  <p className="font-semibold mb-2">Como funciona:</p>
+                  <ul className="list-disc list-inside space-y-1 text-xs">
+                    <li><strong>Unidade selecionada:</strong> Todos os insumos usarão esta unidade</li>
+                    <li><strong>Unidade manual:</strong> Deixe em branco e adicione a unidade manualmente depois (aparecerá em vermelho no PDF)</li>
+                    <li>Cole um nome de insumo por linha</li>
+                    <li>Linhas vazias serão ignoradas</li>
+                    <li>Insumos duplicados não serão criados</li>
+                  </ul>
+                </div>
+
+                <div className="flex justify-end gap-2">
+                  <button
+                    type="button"
+                    className="btn btn-outline"
+                    onClick={fecharModalImportacao}
+                    disabled={importandoEmMassa}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn btn-primary"
+                    disabled={importandoEmMassa}
+                  >
+                    {importandoEmMassa ? 'Importando...' : 'Importar'}
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}

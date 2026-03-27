@@ -55,7 +55,7 @@ Guia rapido para colaboradores e agentes automatizados.
 - Assumir e enviar solicitacoes:
   - Usuarios so podem assumir solicitacoes que estejam atualmente no proprio setor.
   - Usuarios so podem enviar para outro setor solicitacoes que estejam atualmente no proprio setor.
-  - `SUPERADMIN` e `ADMIN GEO` / `Gerencia de Processos` permanecem como excecoes administrativas para envio entre setores.
+  - `SUPERADMIN` permanece como excecao administrativa.
   - Setor `OBRA` continua sem poder enviar para outros setores e o frontend apenas oculta o botao, sem mensagem explicativa.
 - Configuracao de areas visiveis para OBRA:
   - Nova config salva em `configuracoes_sistema` (chave `AREAS_OBRA_VISIVEIS`).

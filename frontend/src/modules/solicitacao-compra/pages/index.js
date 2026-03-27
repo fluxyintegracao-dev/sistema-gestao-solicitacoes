@@ -1,5 +1,6 @@
 export { default as SolicitacoesCompra } from './SolicitacoesCompra';
-export { default as SolicitacaoCompraDetalhe } from './SolicitacaoCompraDetalhe';
+export { default as CotacaoFornecedorPublica } from './CotacaoFornecedorPublica';
+export { default as SolicitacaoCompraDetalhe } from './SolicitacaoCompraDetalheView';
 export { default as NovaSolicitacaoCompra } from './NovaSolicitacaoCompra';
 export { default as RevisarSolicitacaoCompra } from './RevisarSolicitacaoCompra';
 export { default as RevisarSolicitacaoCompraFinal } from './RevisarSolicitacaoCompraFinal';

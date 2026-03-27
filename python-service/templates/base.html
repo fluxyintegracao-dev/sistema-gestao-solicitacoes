@@ -1,0 +1,356 @@
+﻿<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{{ title }}</title>
+  <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico', v='20260203') }}" />
+  <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='favicon.png', v='20260203') }}" />
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg', v='20260203') }}" />
+  <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico', v='20260203') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body>
+  <svg class="icon-sprite" aria-hidden="true" focusable="false">
+    <symbol id="i-home" viewBox="0 0 24 24">
+      <path d="M3 10.5 12 3l9 7.5"></path>
+      <path d="M5.5 9.5V21h13V9.5"></path>
+    </symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24">
+      <path d="M12 3 4.5 6v6.2c0 4.2 2.8 8.2 7.5 9.8 4.7-1.6 7.5-5.6 7.5-9.8V6L12 3z"></path>
+      <path d="m9.2 12.1 2 2.2 3.6-4"></path>
+    </symbol>
+    <symbol id="i-login" viewBox="0 0 24 24">
+      <path d="M10 17 15 12 10 7"></path>
+      <path d="M15 12H3"></path>
+      <path d="M13 4h7v16h-7"></path>
+    </symbol>
+    <symbol id="i-user-plus" viewBox="0 0 24 24">
+      <circle cx="9" cy="8" r="4"></circle>
+      <path d="M2.5 20c.9-3.8 3.2-5.7 6.5-5.7 3.3 0 5.6 1.9 6.5 5.7"></path>
+      <path d="M18 8h4"></path>
+      <path d="M20 6v4"></path>
+    </symbol>
+    <symbol id="i-user" viewBox="0 0 24 24">
+      <circle cx="12" cy="8" r="4"></circle>
+      <path d="M4 21c1-4.2 3.8-6.3 8-6.3S19 16.8 20 21"></path>
+    </symbol>
+    <symbol id="i-logout" viewBox="0 0 24 24">
+      <path d="M14 17 19 12 14 7"></path>
+      <path d="M19 12H8"></path>
+      <path d="M11 4H4v16h7"></path>
+    </symbol>
+    <symbol id="i-clipboard-list" viewBox="0 0 24 24">
+      <path d="M9 4h6"></path>
+      <rect x="5" y="3" width="14" height="18" rx="2"></rect>
+      <path d="M8.5 9.5h7"></path>
+      <path d="M8.5 13h7"></path>
+      <path d="M8.5 16.5h5"></path>
+    </symbol>
+    <symbol id="i-dashboard" viewBox="0 0 24 24">
+      <rect x="3" y="3" width="8" height="8" rx="1.5"></rect>
+      <rect x="13" y="3" width="8" height="5" rx="1.5"></rect>
+      <rect x="13" y="10" width="8" height="11" rx="1.5"></rect>
+      <rect x="3" y="13" width="8" height="8" rx="1.5"></rect>
+    </symbol>
+    <symbol id="i-users" viewBox="0 0 24 24">
+      <circle cx="9" cy="8" r="3.2"></circle>
+      <circle cx="17.2" cy="9.4" r="2.4"></circle>
+      <path d="M2.8 20c.8-3.2 2.9-4.8 6.2-4.8s5.4 1.6 6.2 4.8"></path>
+      <path d="M14.8 19.5c.4-2.2 1.8-3.4 4.1-3.4 1.1 0 2 .3 2.9.9"></path>
+    </symbol>
+    <symbol id="i-building" viewBox="0 0 24 24">
+      <rect x="4" y="3" width="13" height="18" rx="1.5"></rect>
+      <path d="M9 21v-4h3v4"></path>
+      <path d="M7 7h2"></path>
+      <path d="M12 7h2"></path>
+      <path d="M7 11h2"></path>
+      <path d="M12 11h2"></path>
+      <path d="M7 15h2"></path>
+      <path d="M12 15h2"></path>
+      <path d="M17 8h3v13h-3"></path>
+    </symbol>
+    <symbol id="i-tag" viewBox="0 0 24 24">
+      <path d="M3 12 12 3h7l2 2v7l-9 9L3 12z"></path>
+      <circle cx="16.5" cy="7.5" r="1.3"></circle>
+    </symbol>
+    <symbol id="i-box" viewBox="0 0 24 24">
+      <path d="m3 7 9-4 9 4-9 4-9-4z"></path>
+      <path d="M3 7v10l9 4 9-4V7"></path>
+      <path d="M12 11v10"></path>
+    </symbol>
+    <symbol id="i-ruler" viewBox="0 0 24 24">
+      <path d="M3 16 16 3l5 5L8 21H3v-5z"></path>
+      <path d="M10 6.5 13 9.5"></path>
+      <path d="m7.5 9 3 3"></path>
+      <path d="m5 11.5 3 3"></path>
+    </symbol>
+    <symbol id="i-list-check" viewBox="0 0 24 24">
+      <path d="m4.5 7 1.6 1.6L8.8 6"></path>
+      <path d="m4.5 12 1.6 1.6 2.7-2.6"></path>
+      <path d="m4.5 17 1.6 1.6 2.7-2.6"></path>
+      <path d="M11.5 7h8"></path>
+      <path d="M11.5 12h8"></path>
+      <path d="M11.5 17h8"></path>
+    </symbol>
+    <symbol id="i-hash" viewBox="0 0 24 24">
+      <path d="M8 3 6 21"></path>
+      <path d="m16 3-2 18"></path>
+      <path d="M4 9h16"></path>
+      <path d="M3 15h16"></path>
+    </symbol>
+    <symbol id="i-search" viewBox="0 0 24 24">
+      <circle cx="11" cy="11" r="6.5"></circle>
+      <path d="m16 16 4.5 4.5"></path>
+    </symbol>
+    <symbol id="i-calendar" viewBox="0 0 24 24">
+      <rect x="3" y="5" width="18" height="16" rx="2"></rect>
+      <path d="M7 3v4"></path>
+      <path d="M17 3v4"></path>
+      <path d="M3 10h18"></path>
+    </symbol>
+    <symbol id="i-file-pdf" viewBox="0 0 24 24">
+      <path d="M7 3h7l5 5v13H7z"></path>
+      <path d="M14 3v5h5"></path>
+      <path d="M9 16h6"></path>
+      <path d="M9 13h6"></path>
+    </symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24">
+      <path d="M12 5v14"></path>
+      <path d="M5 12h14"></path>
+    </symbol>
+    <symbol id="i-close" viewBox="0 0 24 24">
+      <path d="m6 6 12 12"></path>
+      <path d="M18 6 6 18"></path>
+    </symbol>
+    <symbol id="i-upload" viewBox="0 0 24 24">
+      <path d="M12 16V5"></path>
+      <path d="m7.5 9.5 4.5-4.5 4.5 4.5"></path>
+      <path d="M4 19h16"></path>
+    </symbol>
+    <symbol id="i-download" viewBox="0 0 24 24">
+      <path d="M12 4v11"></path>
+      <path d="m7.5 11.5 4.5 4.5 4.5-4.5"></path>
+      <path d="M4 20h16"></path>
+    </symbol>
+    <symbol id="i-image" viewBox="0 0 24 24">
+      <rect x="3" y="5" width="18" height="14" rx="2"></rect>
+      <circle cx="9" cy="10" r="1.8"></circle>
+      <path d="m4.5 17 5.5-5 3.5 3 2-2 3 4"></path>
+    </symbol>
+    <symbol id="i-key" viewBox="0 0 24 24">
+      <circle cx="8" cy="12" r="4"></circle>
+      <path d="M12 12h9"></path>
+      <path d="M17 12v3"></path>
+      <path d="M20 12v2"></path>
+    </symbol>
+    <symbol id="i-mail" viewBox="0 0 24 24">
+      <rect x="3" y="5" width="18" height="14" rx="2"></rect>
+      <path d="m4 7 8 6 8-6"></path>
+    </symbol>
+  </svg>
+  <header class="topbar">
+    <div class="brand">
+      <img
+        class="brand-logo"
+        src="{{ url_for('static', filename='logo_csc.png', v='20260205-logo') }}"
+        data-step="png"
+        alt="Logo da empresa"
+        onerror="if(this.dataset.step==='png'){this.dataset.step='jpg';this.src='{{ url_for('static', filename='logo_csc.jpg', v='20260205-logo') }}';}else if(this.dataset.step==='jpg'){this.dataset.step='jpeg';this.src='{{ url_for('static', filename='logo_csc.jpeg', v='20260205-logo') }}';}else{this.style.display='none';}"
+      />
+      <div class="brand-copy">
+        <span class="brand-text">{{ title }}</span>
+        <span class="brand-sub">Construtora Sul Capixaba</span>
+      </div>
+    </div>
+
+    <nav class="topnav">
+      <div class="theme-switch" role="group" aria-label="Tema visual">
+        <button type="button" id="theme-toggle" class="theme-btn theme-toggle" aria-pressed="false">
+          <span class="theme-icon" id="theme-icon" aria-hidden="true"></span>
+          <span class="theme-label" id="theme-label">Modo escuro</span>
+        </button>
+      </div>
+      {% if current_user %}
+      <a href="{{ url_for('index') }}" class="with-icon {{ 'active' if request.endpoint == 'index' else '' }}">
+        <svg class="ui-icon"><use href="#i-clipboard-list"></use></svg>
+        <span>Solicitação</span>
+      </a>
+      {% if is_admin_user %}
+      <a href="{{ url_for('admin') }}" class="with-icon {{ 'active' if request.endpoint and request.endpoint.startswith('admin') else '' }}">
+        <svg class="ui-icon"><use href="#i-shield"></use></svg>
+        <span>Admin</span>
+      </a>
+      {% endif %}
+      <span class="user-chip with-icon">
+        <svg class="ui-icon"><use href="#i-user"></use></svg>
+        <span>{{ current_user.nome or current_user.email }}</span>
+      </span>
+      <form method="post" action="{{ url_for('logout') }}" class="logout-form">
+        <button type="submit" class="topnav-button with-icon">
+          <svg class="ui-icon"><use href="#i-logout"></use></svg>
+          <span>Sair</span>
+        </button>
+      </form>
+      {% else %}
+      <a href="{{ url_for('login') }}" class="with-icon {{ 'active' if request.endpoint == 'login' else '' }}">
+        <svg class="ui-icon"><use href="#i-login"></use></svg>
+        <span>Entrar</span>
+      </a>
+      {% if auth_allow_public_signup %}
+      <a href="{{ url_for('signup') }}" class="with-icon {{ 'active' if request.endpoint == 'signup' else '' }}">
+        <svg class="ui-icon"><use href="#i-user-plus"></use></svg>
+        <span>Cadastrar-se</span>
+      </a>
+      {% endif %}
+      {% endif %}
+    </nav>
+  </header>
+
+  <main class="container">
+    {% block content %}{% endblock %}
+  </main>
+
+  <script>
+    (() => {
+      const root = document.documentElement;
+      const toggleBtn = document.getElementById("theme-toggle");
+      const toggleIcon = document.getElementById("theme-icon");
+      const toggleLabel = document.getElementById("theme-label");
+      const THEME_KEY = "csc_theme";
+      const ICON_SUN =
+        '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">' +
+        '<circle cx="12" cy="12" r="4.1" fill="currentColor"></circle>' +
+        '<g stroke="currentColor" stroke-width="1.8" stroke-linecap="round">' +
+        '<line x1="12" y1="2.2" x2="12" y2="5.2"></line>' +
+        '<line x1="12" y1="18.8" x2="12" y2="21.8"></line>' +
+        '<line x1="2.2" y1="12" x2="5.2" y2="12"></line>' +
+        '<line x1="18.8" y1="12" x2="21.8" y2="12"></line>' +
+        '<line x1="5.1" y1="5.1" x2="7.2" y2="7.2"></line>' +
+        '<line x1="16.8" y1="16.8" x2="18.9" y2="18.9"></line>' +
+        '<line x1="16.8" y1="7.2" x2="18.9" y2="5.1"></line>' +
+        '<line x1="5.1" y1="18.9" x2="7.2" y2="16.8"></line>' +
+        "</g></svg>";
+      const ICON_MOON =
+        '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">' +
+        '<defs><mask id="moon-cutout">' +
+        '<rect width="24" height="24" fill="white"></rect>' +
+        '<circle cx="15.5" cy="9" r="7" fill="black"></circle>' +
+        "</mask></defs>" +
+        '<circle cx="10.5" cy="13" r="9" fill="currentColor" mask="url(#moon-cutout)"></circle>' +
+        "</svg>";
+
+      const readStoredTheme = () => {
+        try {
+          return localStorage.getItem(THEME_KEY) || "";
+        } catch (_) {
+          return "";
+        }
+      };
+
+      const readCookieTheme = () => {
+        try {
+          const escaped = THEME_KEY.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+          const match = document.cookie.match(new RegExp(`(?:^|;\\s*)${escaped}=([^;]+)`));
+          return match ? decodeURIComponent(match[1]) : "";
+        } catch (_) {
+          return "";
+        }
+      };
+
+      const saveTheme = (theme) => {
+        try {
+          localStorage.setItem(THEME_KEY, theme);
+        } catch (_) {
+          // ignore storage errors
+        }
+        try {
+          document.cookie = `${THEME_KEY}=${encodeURIComponent(theme)}; path=/; max-age=31536000`;
+        } catch (_) {
+          // ignore cookie errors
+        }
+      };
+
+      const detectSystemDark = () => {
+        try {
+          return (
+            typeof window.matchMedia === "function" &&
+            window.matchMedia("(prefers-color-scheme: dark)").matches
+          );
+        } catch (_) {
+          return false;
+        }
+      };
+
+      const normalizeTheme = (theme) => (theme === "dark" || theme === "light" ? theme : "");
+
+      const updateToggleLabel = (theme) => {
+        if (!toggleBtn) return;
+        const darkActive = theme === "dark";
+        if (toggleLabel) {
+          toggleLabel.textContent = darkActive ? "Modo claro" : "Modo escuro";
+        }
+        if (toggleIcon) {
+          toggleIcon.innerHTML = darkActive ? ICON_SUN : ICON_MOON;
+        }
+        toggleBtn.setAttribute("aria-pressed", darkActive ? "true" : "false");
+        toggleBtn.setAttribute(
+          "aria-label",
+          darkActive ? "Trocar para modo claro" : "Trocar para modo escuro"
+        );
+        toggleBtn.setAttribute(
+          "title",
+          darkActive ? "Trocar para modo claro" : "Trocar para modo escuro"
+        );
+      };
+
+      const applyTheme = (theme, persist) => {
+        const next = normalizeTheme(theme) || "light";
+        root.setAttribute("data-theme", next);
+        root.classList.toggle("theme-dark", next === "dark");
+        root.classList.toggle("theme-light", next === "light");
+        if (persist) {
+          saveTheme(next);
+        }
+        updateToggleLabel(next);
+      };
+
+      const initialTheme =
+        normalizeTheme(readStoredTheme()) ||
+        normalizeTheme(readCookieTheme()) ||
+        (detectSystemDark() ? "dark" : "light");
+
+      applyTheme(initialTheme, false);
+
+      if (toggleBtn) {
+        toggleBtn.addEventListener("click", () => {
+          const current = root.getAttribute("data-theme") === "dark" ? "dark" : "light";
+          applyTheme(current === "dark" ? "light" : "dark", true);
+        });
+      }
+    })();
+
+    document.addEventListener("submit", (event) => {
+      const form = event.target;
+      if (!form || form.tagName !== "FORM") return;
+      const hasDangerSubmit = Boolean(
+        form.querySelector('button.danger[type="submit"], input.danger[type="submit"]')
+      );
+      const maybeDeleteAction = /delete|remove|excluir|remover/i.test(
+        [form.action || "", form.getAttribute("data-confirm") || ""].join(" ")
+      );
+
+      let message = form.getAttribute("data-confirm");
+      if (!message && (hasDangerSubmit || maybeDeleteAction)) {
+        message = "Tem certeza de que deseja excluir? Esta ação não pode ser desfeita.";
+      } else if (message && (hasDangerSubmit || maybeDeleteAction) && !/tem certeza/i.test(message)) {
+        message = `Tem certeza de que deseja excluir?\n\n${message}`;
+      }
+      if (!message) return;
+      if (!confirm(message)) {
+        event.preventDefault();
+      }
+    });
+  </script>
+</body>
+</html>

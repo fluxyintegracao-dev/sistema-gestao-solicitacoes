@@ -22,7 +22,11 @@ module.exports = (sequelize, DataTypes) => {
       },
       unidade_id: {
         type: DataTypes.INTEGER,
-        allowNull: false
+        allowNull: true
+      },
+      unidade_manual: {
+        type: DataTypes.STRING,
+        allowNull: true
       },
       categoria_id: {
         type: DataTypes.INTEGER,

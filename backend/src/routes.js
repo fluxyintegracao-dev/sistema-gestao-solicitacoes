@@ -33,6 +33,8 @@ const CategoriaController = require('./controllers/CategoriaController');
 const InsumoController = require('./controllers/InsumoController');
 const ApropriacaoController = require('./controllers/ApropriacaoController');
 const SolicitacaoCompraController = require('./controllers/SolicitacaoCompraController');
+const FornecedorCompraController = require('./controllers/FornecedorCompraController');
+const CotacaoFornecedorController = require('./controllers/CotacaoFornecedorController');
 const { Setor } = require('./models');
 //console.log('AnexoController =>', AnexoController);
 
@@ -42,6 +44,10 @@ const { Setor } = require('./models');
 // -------------------------------------------------------------------
 router.post('/login', AuthController.login);
 router.get('/configuracoes/tema', ConfiguracaoSistemaController.getTema);
+router.post('/cotacoes/upload', uploadComprovantes.single('file'), CotacaoFornecedorController.upload);
+router.get('/cotacoes/:token/modelo', CotacaoFornecedorController.modelo);
+router.get('/cotacoes/:token', CotacaoFornecedorController.show);
+router.post('/cotacoes/:token', CotacaoFornecedorController.responder);
 const auth = require('./middlewares/auth');
 router.use(auth);
 router.get('/usuarios-lista', UsuarioController.listaPublica);
@@ -273,6 +279,7 @@ router.put('/compras/categorias/:id', permit(['SUPERADMIN']), CategoriaControlle
 router.delete('/compras/categorias/:id', permit(['SUPERADMIN']), CategoriaController.destroy);
 
 router.get('/compras/insumos', InsumoController.index);
+router.post('/compras/insumos/importar-massa', permit(['SUPERADMIN']), InsumoController.importarEmMassa);
 router.post('/compras/insumos', permit(['SUPERADMIN']), InsumoController.create);
 router.put('/compras/insumos/:id', permit(['SUPERADMIN']), InsumoController.update);
 router.delete('/compras/insumos/:id', permit(['SUPERADMIN']), InsumoController.destroy);
@@ -281,10 +288,20 @@ router.get('/compras/apropriacoes', ApropriacaoController.index);
 router.post('/compras/apropriacoes', permit(['SUPERADMIN']), ApropriacaoController.create);
 router.put('/compras/apropriacoes/:id', permit(['SUPERADMIN']), ApropriacaoController.update);
 router.delete('/compras/apropriacoes/:id', permit(['SUPERADMIN']), ApropriacaoController.destroy);
+router.get('/compras/fornecedores', FornecedorCompraController.index);
+router.post('/compras/fornecedores', FornecedorCompraController.create);
+router.put('/compras/fornecedores/:id', FornecedorCompraController.update);
+router.delete('/compras/fornecedores/:id', FornecedorCompraController.destroy);
+router.post('/compras/anexos-temporarios', uploadComprovantes.single('file'), SolicitacaoCompraController.uploadTemporario);
 router.get('/compras/solicitacoes', SolicitacaoCompraController.index);
 router.get('/compras/solicitacoes/:id', SolicitacaoCompraController.show);
+router.get('/compras/solicitacoes/:id/comparativo', SolicitacaoCompraController.comparativo);
 router.get('/compras/solicitacoes/:id/pdf', SolicitacaoCompraController.pdf);
 router.post('/compras/solicitacoes', SolicitacaoCompraController.create);
+router.patch('/compras/solicitacoes/:id/integrar', SolicitacaoCompraController.integrar);
+router.patch('/compras/solicitacoes/:id/liberar', SolicitacaoCompraController.liberar);
+router.post('/compras/solicitacoes/:id/enviar', SolicitacaoCompraController.enviarParaFornecedores);
+router.patch('/compras/solicitacoes/:id/encerrar', SolicitacaoCompraController.encerrar);
 
 // -------------------------------------------------------------------
 // TIPOS DE SOLICITAÇÃO

@@ -1,22 +1,30 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { listarApropriacoes, listarInsumos } from '../../../services/compras';
+import {
+  listarApropriacoes,
+  listarInsumos,
+  obterUrlAssinadaCompra,
+  uploadAnexoTemporarioCompra
+} from '../../../services/compras';
 import { getMinhasObras } from '../../../services/obras';
 import { useAuth } from '../../../contexts/AuthContext';
 
 const DRAFT_KEY = 'fluxy_solicitacao_compra_draft';
+const ITEM_ATTACHMENT_ACCEPT = '.pdf,.doc,.docx,.xls,.xlsx,.csv,.ppt,.pptx,.png,.jpg,.jpeg,.html,.rar';
 
 function criarItemBase(insumo) {
   return {
     insumo_id: insumo.id,
     insumo_nome: insumo.nome,
     unidade_id: insumo.unidade_id,
-    unidade_sigla: insumo.unidade?.sigla || '',
+    unidade_sigla: insumo.unidade_manual || insumo.unidade?.sigla || '',
     quantidade: '1',
     especificacao: '',
     apropriacao_id: '',
     necessario_para: '',
     link_produto: '',
+    arquivo_url: '',
+    arquivo_nome_original: '',
     manual: false
   };
 }
@@ -32,6 +40,8 @@ function criarItemManualBase(dados, necessarioParaPadrao) {
     apropriacao_id: '',
     necessario_para: necessarioParaPadrao || '',
     link_produto: '',
+    arquivo_url: '',
+    arquivo_nome_original: '',
     manual: true,
     nome_manual: dados.nome_manual,
     unidade_sigla_manual: dados.unidade_sigla_manual
@@ -56,8 +66,10 @@ export default function NovaSolicitacaoCompra() {
   const [edicaoMassa, setEdicaoMassa] = useState({
     apropriacao_id: '',
     necessario_para: '',
+    quantidade: '',
     link_produto: ''
   });
+  const [uploadingArquivos, setUploadingArquivos] = useState({});
   const [loading, setLoading] = useState(false);
   const [modalManualAberto, setModalManualAberto] = useState(false);
   const [itemManual, setItemManual] = useState({
@@ -151,6 +163,8 @@ export default function NovaSolicitacaoCompra() {
               apropriacao_id: item.apropriacao_id ? String(item.apropriacao_id) : '',
               necessario_para: item.necessario_para || payload.necessario_para || '',
               link_produto: item.link_produto || '',
+              arquivo_url: item.arquivo_url || '',
+              arquivo_nome_original: item.arquivo_nome_original || '',
               manual: Boolean(item.manual),
               nome_manual: item.manual ? item.nome_manual || item.insumo_nome || '' : '',
               unidade_sigla_manual: item.manual
@@ -180,7 +194,6 @@ export default function NovaSolicitacaoCompra() {
         necessario_para: item.necessario_para || necessarioPara
       }))
     );
-    setItensSelecionados([]);
   }, [obraId]);
 
   const insumosFiltrados = useMemo(() => {
@@ -272,12 +285,18 @@ export default function NovaSolicitacaoCompra() {
     );
   }
 
-  function removerItem(index) {
-    setItens((atual) => atual.filter((_, itemIndex) => itemIndex !== index));
-    setItensSelecionados((atual) =>
-      atual
-        .filter((itemIndex) => itemIndex !== index)
-        .map((itemIndex) => (itemIndex > index ? itemIndex - 1 : itemIndex))
+  function atualizarCamposItem(index, campos) {
+    setItens((atual) =>
+      atual.map((item, itemIndex) => {
+        if (itemIndex !== index) {
+          return item;
+        }
+
+        return {
+          ...item,
+          ...campos
+        };
+      })
     );
   }
 
@@ -288,12 +307,22 @@ export default function NovaSolicitacaoCompra() {
   }
 
   function toggleTodos() {
-    setItensSelecionados(todosSelecionados ? [] : itens.map((_, index) => index));
+    setItensSelecionados((atual) => (atual.length === itens.length ? [] : itens.map((_, index) => index)));
   }
 
   function aplicarEdicaoMassa() {
     if (!itensSelecionados.length) {
-      alert('Selecione ao menos um item.');
+      alert('Selecione ao menos um item para aplicar as alteracoes em massa.');
+      return;
+    }
+
+    if (
+      !edicaoMassa.apropriacao_id &&
+      !edicaoMassa.necessario_para &&
+      !edicaoMassa.quantidade &&
+      !edicaoMassa.link_produto
+    ) {
+      alert('Informe ao menos um campo para aplicar aos itens selecionados.');
       return;
     }
 
@@ -307,13 +336,89 @@ export default function NovaSolicitacaoCompra() {
           ...item,
           apropriacao_id: edicaoMassa.apropriacao_id || item.apropriacao_id,
           necessario_para: edicaoMassa.necessario_para || item.necessario_para,
+          quantidade: edicaoMassa.quantidade || item.quantidade,
           link_produto: edicaoMassa.link_produto || item.link_produto
         };
       })
     );
+  }
 
-    setEdicaoMassa({ apropriacao_id: '', necessario_para: '', link_produto: '' });
+  function removerItem(index) {
+    setItens((atual) => atual.filter((_, itemIndex) => itemIndex !== index));
+    setItensSelecionados((atual) =>
+      atual
+        .filter((itemIndex) => itemIndex !== index)
+        .map((itemIndex) => (itemIndex > index ? itemIndex - 1 : itemIndex))
+    );
+    setUploadingArquivos((atual) => {
+      const proximo = {};
+      Object.entries(atual).forEach(([chave, valor]) => {
+        const itemIndex = Number(chave);
+        if (itemIndex === index) {
+          return;
+        }
+
+        proximo[itemIndex > index ? itemIndex - 1 : itemIndex] = valor;
+      });
+      return proximo;
+    });
+  }
+
+  function limparLista() {
+    if (!window.confirm('Deseja remover todos os itens da lista atual?')) {
+      return;
+    }
+
+    setItens([]);
     setItensSelecionados([]);
+    setUploadingArquivos({});
+  }
+
+  async function handleSelecionarArquivo(index, file) {
+    if (!file) {
+      return;
+    }
+
+    setUploadingArquivos((atual) => ({ ...atual, [index]: true }));
+
+    try {
+      const data = await uploadAnexoTemporarioCompra(file);
+      atualizarCamposItem(index, {
+        arquivo_url: data?.arquivo_url || '',
+        arquivo_nome_original: data?.arquivo_nome_original || file.name || ''
+      });
+    } catch (error) {
+      console.error(error);
+      alert(error.message || 'Erro ao enviar arquivo do item');
+    } finally {
+      setUploadingArquivos((atual) => {
+        const proximo = { ...atual };
+        delete proximo[index];
+        return proximo;
+      });
+    }
+  }
+
+  function removerArquivoItem(index) {
+    atualizarCamposItem(index, {
+      arquivo_url: '',
+      arquivo_nome_original: ''
+    });
+  }
+
+  async function abrirArquivoItem(item) {
+    try {
+      const url = await obterUrlAssinadaCompra(item.arquivo_url);
+      if (!url) {
+        alert('Arquivo nao encontrado.');
+        return;
+      }
+
+      window.open(url, '_blank', 'noopener,noreferrer');
+    } catch (error) {
+      console.error(error);
+      alert(error.message || 'Erro ao abrir arquivo do item');
+    }
   }
 
   async function handleSalvar() {
@@ -338,9 +443,11 @@ export default function NovaSolicitacaoCompra() {
           alert(`Item manual ${index + 1}: informe nome e unidade.`);
           return;
         }
-      } else if (!item.insumo_id || !item.unidade_id) {
-        alert(`Item ${index + 1}: informe insumo e unidade.`);
-        return;
+      } else {
+        if (!item.insumo_id) {
+          alert(`Item ${index + 1}: informe o insumo.`);
+          return;
+        }
       }
     }
 
@@ -362,8 +469,10 @@ export default function NovaSolicitacaoCompra() {
           especificacao: item.especificacao || '',
           necessario_para: item.necessario_para || necessarioPara || null,
           link_produto: item.link_produto || null,
+          arquivo_url: item.arquivo_url || null,
+          arquivo_nome_original: item.arquivo_nome_original || null,
           nome_manual: item.manual ? item.nome_manual : null,
-          unidade_sigla_manual: item.manual ? item.unidade_sigla_manual : null
+          unidade_sigla_manual: item.manual ? item.unidade_sigla_manual : (item.unidade_id ? null : item.unidade_sigla)
         }))
       };
 
@@ -389,7 +498,7 @@ export default function NovaSolicitacaoCompra() {
   }
 
   return (
-    <div className="page">
+    <div className="page page-compra-nova">
       <div>
         <h1 className="page-title">Nova Solicitação de Compra</h1>
         <p className="page-subtitle">
@@ -437,8 +546,8 @@ export default function NovaSolicitacaoCompra() {
         </div>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
-        <div className="card">
+      <div className="compra-nova-layout">
+        <div className="card compra-insumos-card">
           <div className="card-header flex flex-wrap items-center justify-between gap-3">
             <h2 className="font-semibold">Insumos</h2>
             <button type="button" className="btn btn-outline" onClick={() => setModalManualAberto(true)}>
@@ -459,7 +568,11 @@ export default function NovaSolicitacaoCompra() {
                 >
                   <div className="font-medium">{insumo.nome}</div>
                   <div className="mt-1 text-xs text-[var(--c-muted)]">
-                    {insumo.categoria?.nome || 'Sem categoria'} · {insumo.unidade?.sigla || '-'}
+                    {insumo.categoria?.nome || 'Sem categoria'} · {insumo.unidade_manual ? (
+                      <span className="text-red-600 dark:text-red-400 font-semibold">{insumo.unidade_manual}</span>
+                    ) : (
+                      insumo.unidade?.sigla || '-'
+                    )}
                   </div>
                 </button>
               ))}
@@ -471,20 +584,42 @@ export default function NovaSolicitacaoCompra() {
           </div>
         </div>
 
-        <div className="card">
+        <div className="card compra-itens-card">
           <div className="card-header flex flex-wrap items-center justify-between gap-3">
             <h2 className="font-semibold">Itens da solicitação</h2>
-            <span className="text-sm text-[var(--c-muted)]">{itens.length} item(ns)</span>
+            <div className="flex flex-wrap items-center gap-3 text-sm text-[var(--c-muted)]">
+              <span>{itens.length} item(ns)</span>
+              {itens.length > 0 && <span>{itensSelecionados.length} selecionado(s)</span>}
+            </div>
           </div>
 
           {itens.length > 0 && (
-            <div className="mb-4 grid gap-3 rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] p-4">
-              <h3 className="font-medium">Ações em massa</h3>
-              <div className="grid gap-3 lg:grid-cols-3">
+            <div className="mb-5 grid gap-4 rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h3 className="font-medium">Ajustes em massa</h3>
+                  <p className="text-sm text-[var(--c-muted)]">
+                    Selecione os itens abaixo e aplique quantidade, apropriacao, prazo ou link de uma vez.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" className="btn btn-outline" onClick={toggleTodos}>
+                    {todosSelecionados ? 'Desmarcar todos' : 'Selecionar todos'}
+                  </button>
+                  <button type="button" className="btn btn-outline" onClick={limparLista}>
+                    Limpar lista
+                  </button>
+                </div>
+              </div>
+              <div className="grid gap-3 xl:grid-cols-4">
                 <div className="grid gap-2">
-                  <label className="text-sm font-medium">Apropriação</label>
-                  <select className="input" value={edicaoMassa.apropriacao_id} onChange={(event) => setEdicaoMassa((atual) => ({ ...atual, apropriacao_id: event.target.value }))}>
-                    <option value="">Selecione</option>
+                  <label className="text-sm font-medium">Apropriacao</label>
+                  <select
+                    className="input"
+                    value={edicaoMassa.apropriacao_id}
+                    onChange={(event) => setEdicaoMassa((atual) => ({ ...atual, apropriacao_id: event.target.value }))}
+                  >
+                    <option value="">Manter atual</option>
                     {apropriacoes.map((apropriacao) => (
                       <option key={apropriacao.id} value={apropriacao.id}>
                         {apropriacao.codigo} - {apropriacao.descricao}
@@ -494,32 +629,56 @@ export default function NovaSolicitacaoCompra() {
                 </div>
 
                 <div className="grid gap-2">
-                  <label className="text-sm font-medium">Necessário para</label>
-                  <input type="date" className="input" value={edicaoMassa.necessario_para} onChange={(event) => setEdicaoMassa((atual) => ({ ...atual, necessario_para: event.target.value }))} />
+                  <label className="text-sm font-medium">Quantidade</label>
+                  <input
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    className="input"
+                    placeholder="Ex.: 10"
+                    value={edicaoMassa.quantidade}
+                    onChange={(event) => setEdicaoMassa((atual) => ({ ...atual, quantidade: event.target.value }))}
+                  />
+                </div>
+
+                <div className="grid gap-2">
+                  <label className="text-sm font-medium">Necessario para</label>
+                  <input
+                    type="date"
+                    className="input"
+                    value={edicaoMassa.necessario_para}
+                    onChange={(event) => setEdicaoMassa((atual) => ({ ...atual, necessario_para: event.target.value }))}
+                  />
                 </div>
 
                 <div className="grid gap-2">
                   <label className="text-sm font-medium">Link do produto</label>
-                  <input type="url" className="input" placeholder="https://" value={edicaoMassa.link_produto} onChange={(event) => setEdicaoMassa((atual) => ({ ...atual, link_produto: event.target.value }))} />
+                  <input
+                    type="url"
+                    className="input"
+                    placeholder="https://"
+                    value={edicaoMassa.link_produto}
+                    onChange={(event) => setEdicaoMassa((atual) => ({ ...atual, link_produto: event.target.value }))}
+                  />
                 </div>
               </div>
 
               <div className="flex flex-wrap gap-2">
-                <button type="button" className="btn btn-primary" onClick={aplicarEdicaoMassa}>Aplicar selecionados</button>
-                <button type="button" className="btn btn-outline" onClick={toggleTodos}>{todosSelecionados ? 'Desmarcar todos' : 'Selecionar todos'}</button>
+                <button type="button" className="btn btn-primary" onClick={aplicarEdicaoMassa}>Aplicar nos selecionados</button>
               </div>
             </div>
           )}
 
           {itens.length === 0 ? (
-            <div className="py-8 text-center text-sm text-[var(--c-muted)]">Adicione itens a partir da lista de insumos ou crie item manual.</div>
+            <div className="compra-itens-empty py-8 text-center text-sm text-[var(--c-muted)]">Adicione itens a partir da lista de insumos ou crie item manual.</div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="table">
+            <div className="overflow-x-auto compra-itens-table-wrap">
+              <table className="table compra-itens-table">
                 <thead>
                   <tr>
-                    <th className="w-12"><input type="checkbox" checked={todosSelecionados} onChange={toggleTodos} /></th>
-                    <th>Tipo</th>
+                    <th className="w-12 text-center">
+                      <input type="checkbox" checked={todosSelecionados} onChange={toggleTodos} />
+                    </th>
                     <th>Insumo</th>
                     <th>Unidade</th>
                     <th>Quantidade *</th>
@@ -527,21 +686,23 @@ export default function NovaSolicitacaoCompra() {
                     <th>Apropriação *</th>
                     <th>Necessário para</th>
                     <th>Link do produto</th>
+                    <th>Arquivo do item</th>
                     <th>Ações</th>
                   </tr>
                 </thead>
                 <tbody>
                   {itens.map((item, index) => (
                     <tr key={`${item.manual ? 'manual' : item.insumo_id}-${index}`}>
-                      <td><input type="checkbox" checked={itensSelecionados.includes(index)} onChange={() => toggleSelecionado(index)} /></td>
-                      <td>
-                        <span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${item.manual ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-700'}`}>
-                          {item.manual ? 'MANUAL' : 'CADASTRADO'}
-                        </span>
+                      <td className="align-top text-center">
+                        <input
+                          type="checkbox"
+                          checked={itensSelecionados.includes(index)}
+                          onChange={() => toggleSelecionado(index)}
+                        />
                       </td>
                       <td>
                         <input
-                          className={`input min-w-[180px] ${item.manual ? 'border-red-300 text-red-700' : ''}`}
+                          className={`input min-w-[240px] ${item.manual ? 'border-red-300 text-red-700' : ''}`}
                           value={item.insumo_nome}
                           disabled={!item.manual}
                           onChange={(event) => atualizarItem(index, 'insumo_nome', event.target.value)}
@@ -549,16 +710,16 @@ export default function NovaSolicitacaoCompra() {
                       </td>
                       <td>
                         <input
-                          className={`input min-w-[96px] ${item.manual ? 'border-red-300 text-red-700' : ''}`}
-                          value={item.unidade_sigla || '-'}
-                          disabled={!item.manual}
+                          className="input min-w-[110px]"
+                          placeholder="Ex: kg, m, un"
+                          value={item.unidade_sigla || ''}
                           onChange={(event) => atualizarItem(index, 'unidade_sigla', event.target.value)}
                         />
                       </td>
-                      <td><input type="number" min="0.01" step="0.01" className="input min-w-[96px]" value={item.quantidade} onChange={(event) => atualizarItem(index, 'quantidade', event.target.value)} /></td>
-                      <td><input className="input min-w-[180px]" value={item.especificacao} onChange={(event) => atualizarItem(index, 'especificacao', event.target.value)} /></td>
+                      <td><input type="number" min="0.01" step="0.01" className="input min-w-[110px]" value={item.quantidade} onChange={(event) => atualizarItem(index, 'quantidade', event.target.value)} /></td>
+                      <td><input className="input min-w-[260px]" value={item.especificacao} onChange={(event) => atualizarItem(index, 'especificacao', event.target.value)} /></td>
                       <td>
-                        <select className="input min-w-[220px]" value={item.apropriacao_id} onChange={(event) => atualizarItem(index, 'apropriacao_id', event.target.value)}>
+                        <select className="input min-w-[240px]" value={item.apropriacao_id} onChange={(event) => atualizarItem(index, 'apropriacao_id', event.target.value)}>
                           <option value="">Selecione</option>
                           {apropriacoes.map((apropriacao) => (
                             <option key={apropriacao.id} value={apropriacao.id}>
@@ -567,9 +728,51 @@ export default function NovaSolicitacaoCompra() {
                           ))}
                         </select>
                       </td>
-                      <td><input type="date" className="input min-w-[156px]" value={item.necessario_para} onChange={(event) => atualizarItem(index, 'necessario_para', event.target.value)} /></td>
-                      <td><input type="url" className="input min-w-[180px]" placeholder="https://" value={item.link_produto} onChange={(event) => atualizarItem(index, 'link_produto', event.target.value)} /></td>
-                      <td><button type="button" className="btn btn-danger" onClick={() => removerItem(index)}>Remover</button></td>
+                      <td><input type="date" className="input min-w-[170px]" value={item.necessario_para} onChange={(event) => atualizarItem(index, 'necessario_para', event.target.value)} /></td>
+                      <td>
+                        <input
+                          type="url"
+                          className="input min-w-[260px]"
+                          placeholder="https://"
+                          value={item.link_produto}
+                          onChange={(event) => atualizarItem(index, 'link_produto', event.target.value)}
+                        />
+                      </td>
+                      <td>
+                        <div className="flex min-w-[260px] flex-col gap-2">
+                          <label className={`btn btn-outline cursor-pointer justify-center ${uploadingArquivos[index] ? 'pointer-events-none opacity-60' : ''}`}>
+                            <input
+                              type="file"
+                              className="hidden"
+                              accept={ITEM_ATTACHMENT_ACCEPT}
+                              onChange={(event) => {
+                                const [file] = Array.from(event.target.files || []);
+                                void handleSelecionarArquivo(index, file);
+                                event.target.value = '';
+                              }}
+                            />
+                            {uploadingArquivos[index]
+                              ? 'Enviando...'
+                              : item.arquivo_nome_original
+                                ? 'Trocar arquivo'
+                                : 'Anexar arquivo'}
+                          </label>
+                          <div className="text-xs text-[var(--c-muted)]">
+                            {item.arquivo_nome_original || 'Sem arquivo anexado'}
+                          </div>
+                          {item.arquivo_url && (
+                            <div className="flex flex-wrap gap-2 text-xs">
+                              <button type="button" className="text-blue-600 hover:underline" onClick={() => abrirArquivoItem(item)}>
+                                Abrir
+                              </button>
+                              <button type="button" className="text-red-600 hover:underline" onClick={() => removerArquivoItem(index)}>
+                                Remover arquivo
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      <td><button type="button" className="btn btn-danger min-w-[110px] justify-center" onClick={() => removerItem(index)}>Remover</button></td>
                     </tr>
                   ))}
                 </tbody>

@@ -38,6 +38,14 @@ module.exports = (sequelize, DataTypes) => {
       link_produto: {
         type: DataTypes.STRING,
         allowNull: true
+      },
+      arquivo_url: {
+        type: DataTypes.TEXT,
+        allowNull: true
+      },
+      arquivo_nome_original: {
+        type: DataTypes.STRING,
+        allowNull: true
       }
     },
     {
