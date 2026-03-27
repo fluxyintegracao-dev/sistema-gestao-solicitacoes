@@ -1,81 +1,112 @@
 # AGENTS.md
 
 ## Objetivo
-Guia rapido para colaboradores e agentes automatizados.
+Guia rapido para colaboradores e agentes automatizados que trabalham neste repositorio.
 
 ## Regras
-- O sistema esta funcionando e pronto para deploy dentro dos objetivos pretendidos. Tudo o que for criado precisa levar em conta todo o contexto criado ate o momento para nao quebrar o sistema.
-- Nao alterar arquivos fora deste repositorio.
-- Evitar mudancas destrutivas.
-- Sempre explicar as alteracoes.
+- o sistema esta funcionando e em producao dentro do objetivo esperado
+- toda alteracao deve considerar o contexto atual para nao quebrar o fluxo principal nem o modulo compras
+- nao alterar arquivos fora deste repositorio
+- evitar mudancas destrutivas sem necessidade real
+- sempre explicar as alteracoes e o impacto esperado
 
 ## Fluxo
-1. Ler este arquivo antes de qualquer mudanca.
-2. Pedir confirmacao antes de alteracoes grandes.
-3. Ler `docs/COLABORACAO_CODEX.md` antes de iniciar trabalho compartilhado entre dois agentes.
+1. ler este arquivo antes de qualquer mudanca
+2. pedir confirmacao antes de alteracoes grandes
+3. em trabalho com dois agentes, ler `docs/COLABORACAO_CODEX.md`
+4. atualizar `docs/` e este arquivo quando regras, fluxos ou arquitetura mudarem
 
-## Estado Atual (resumo das mudancas feitas)
+## Entrypoints reais em runtime
+Backend:
+- `backend/server.js`
+- `backend/src/app.js`
+- `backend/src/routes.js`
 
-### Infra / Deploy
-- Backend roda em EC2 com PM2 (`backend-solicitacoes`) e Nginx proxy em `api.jrfluxy.com.br` para `127.0.0.1:8000`.
-- Frontend hospedado na Vercel (root `frontend/`).
-- Dominios configurados: `jrfluxy.com.br`, `www.jrfluxy.com.br`, `csc.jrfluxy.com.br` (apontando para Vercel).
-- CORS do backend ajustado para aceitar dominios Vercel (preview) e dominios customizados.
-- S3 usado para anexos/comprovantes com URLs assinadas e CORS liberado (atual: `AllowedOrigins: ["*"]`).
+Frontend:
+- `frontend/src/main.jsx`
+- `frontend/src/App.jsx`
+- `frontend/src/layout/Layout.jsx`
 
-### Uploads / S3
-- Uploads migram para S3 via `uploadToS3`.
-- Backend gera URL assinada para download/preview (`/anexos/presign`).
-- Ajuste no `fileUrl` do frontend para usar origem da API em paths relativos `/uploads/...`.
-- Correcoes de encoding no presign (decode do key antes de assinar).
+Observacao:
+- arquivos antigos com sufixo `"(1)"` e `"(2)"` foram removidos do codigo por nao fazerem parte do runtime ativo
+- artefatos em `backend/uploads/` permanecem preservados
 
-### CORS
-- Backend (`backend/src/app.js`) usa allowlist com:
-  - `https://sistema-gestao-solicitacoes.vercel.app`
-  - `https://api.jrfluxy.com.br`
-  - `https://jrfluxy.com.br`
-  - `https://www.jrfluxy.com.br`
-  - `https://csc.jrfluxy.com.br`
-  - e aceita previews `https://sistema-gestao-solicitacoes-*.vercel.app`
+## Estado atual consolidado
 
-### Frontend (UX/UI)
-- Menu lateral inicia oculto e abre por hover na borda esquerda; fecha ao sair do mouse.
-- Menu com rolagem (`overflow-y-auto`) e dimensoes reduzidas para caber em notebook.
-- Tabela de solicitacoes com coluna "Data" e melhorias visuais.
-- Login com logo CSC (em `frontend/public/CSC_logo_colorida.png`) e tamanho aumentado.
-- Rewrites SPA via `frontend/vercel.json`.
+### Infra e deploy
+- backend em EC2 com PM2 (`backend-solicitacoes`) e Nginx apontando para `127.0.0.1:8000`
+- frontend em Vercel com root `frontend/`
+- dominios principais:
+  - `jrfluxy.com.br`
+  - `www.jrfluxy.com.br`
+  - `csc.jrfluxy.com.br`
+- backend publicado em `api.jrfluxy.com.br`
 
-### Permissoes / Regras de Negocio
-- Numero do pedido: somente setor GEO pode editar.
-  - Backend valida setor GEO no endpoint `PATCH /solicitacoes/:id/pedido`.
-  - Frontend exibe componente Pedido apenas para GEO.
-- Status por setor: na tela de detalhe, usuarios veem lista de status do proprio setor.
-  - `SUPERADMIN` permanece como excecao administrativa.
-  - Backend e frontend estao alinhados para usar o setor do usuario nas trocas de status.
-- Assumir e enviar solicitacoes:
-  - Usuarios so podem assumir solicitacoes que estejam atualmente no proprio setor.
-  - Usuarios so podem enviar para outro setor solicitacoes que estejam atualmente no proprio setor.
-  - `SUPERADMIN` permanece como excecao administrativa.
-  - Setor `OBRA` continua sem poder enviar para outros setores e o frontend apenas oculta o botao, sem mensagem explicativa.
-- Configuracao de areas visiveis para OBRA:
-  - Nova config salva em `configuracoes_sistema` (chave `AREAS_OBRA_VISIVEIS`).
-  - Nova pagina `AreasObra` em Configuracoes para SUPERADMIN.
-  - NovaSolicitacao filtra `Area Responsavel` para setor OBRA.
+### CORS e arquivos
+- backend usa allowlist para dominios oficiais e previews Vercel
+- S3 e usado para anexos e comprovantes com URL assinada
+- o sistema ainda suporta anexos antigos em `/uploads`
 
-### Correcoes importantes (hist?rico)
-- Corrigido case-sensitivity no Linux: `CargoController.js`.
-- Corrigido regex no `s3.js` (parse key).
-- Corrigido `src` da logo no login.
+### Modulos ativos
+- autenticacao e sessao
+- dashboard
+- solicitacoes do fluxo principal
+- contratos
+- usuarios
+- comprovantes
+- comunicacao interna
+- arquivos modelos
+- modulo de solicitacoes de compras
 
-## Checklist de Deploy
-- Backend: `git pull` -> `npm install` (backend) -> `pm2 restart backend-solicitacoes --update-env`.
-- Frontend: `git push` -> Redeploy na Vercel (cache limpo).
+### Regras de negocio criticas
+- numero do pedido permanece restrito ao escopo GEO
+- lista de status no detalhe segue o setor do usuario logado
+- backend valida a mesma regra de status do frontend
+- assumir e enviar solicitacoes dependem do setor atual da solicitacao
+- arquivamento de solicitacao e individual por usuario
+- filtro e escopo de obras dependem de vinculo e perfil
+- `SUPERADMIN` continua como excecao administrativa ampla
 
-## Observacoes
-- Se o backend nao responde em `127.0.0.1:8000`, Nginx retorna 502.
-- Se anexos antigos ainda estiverem em `/uploads`, o frontend usa a origem da API para baixar.
+### Modulo compras
+- esta integrado ao backend e ao frontend
+- acesso controlado por perfil e pela flag `pode_criar_solicitacao_compra`
+- depende diretamente de:
+  - `backend/src/app.js`
+  - `backend/src/routes.js`
+  - `backend/src/models/index.js`
+  - `backend/src/models/User.js`
+  - `backend/src/controllers/AuthController.js`
+  - `backend/src/controllers/UsuarioController.js`
+  - `backend/src/controllers/SolicitacaoCompraController.js`
+  - `frontend/src/App.jsx`
+  - `frontend/src/layout/Layout.jsx`
+  - `frontend/src/services/compras.js`
+  - `frontend/src/modules/solicitacao-compra/pages/`
+- alteracoes nesses pontos exigem validacao reforcada
+
+### Validacoes ja executadas em manutencao recente
+- limpeza de duplicados `"(1)"` e `"(2)"` do codigo e documentacao
+- `npm run build` do frontend concluido com sucesso
+- checagem de sintaxe do backend concluida em arquivos centrais
+
+## Checklist de deploy
+Backend:
+- `git pull`
+- `npm install` em `backend/`, se necessario
+- `pm2 restart backend-solicitacoes --update-env`
+- validar logs e resposta local
+
+Frontend:
+- `git push`
+- redeploy na Vercel
+- limpar cache se houver mudanca estrutural forte
+
+## Observacoes operacionais
+- se o backend nao responder em `127.0.0.1:8000`, o Nginx retorna `502`
+- artefatos de `backend/uploads/` nao devem ser removidos em limpezas de codigo
+- compras e fluxo principal compartilham partes estruturais; nao tratar o modulo compras como isolado
 
 ## Colaboracao entre agentes
-- Quando houver dois agentes trabalhando no repositorio, seguir obrigatoriamente `docs/COLABORACAO_CODEX.md`.
-- Nenhum agente deve editar o mesmo arquivo que esteja explicitamente reservado por outro agente.
-- Antes de iniciar qualquer tarefa, registrar ownership temporario dos arquivos que serao alterados.
+- seguir `docs/COLABORACAO_CODEX.md` quando houver dois agentes trabalhando no repositorio
+- nenhum agente deve editar arquivo reservado por outro agente
+- arquivos centrais e documentacao estrutural devem ter ownership explicito antes de edicao em trabalho colaborativo

@@ -1,66 +1,86 @@
-# Checklist de ativacao segura do modulo compras
+# Checklist de ativacao e validacao do modulo compras
 
-## Estado atual
-- Etapa 1 pronta: models, migrations e campo `pode_criar_solicitacao_compra`
-- Etapa 2 pronta: CRUDs auxiliares de compras
-- Etapa 3 pronta: backend da solicitacao de compra e rotas
-- Etapa 4 pronta: login e usuarios com permissao do modulo
-- Ainda nao integrado: frontend do modulo compras
+## 1. Estado atual
+O modulo compras esta integrado ao sistema principal e faz parte do runtime ativo.
 
-## Antes de testar no servidor
-1. Confirmar branch atual e commit desejado.
-2. Confirmar backup disponivel:
-   - branch `backup/pre-modulo-compras`
-   - tag `pre-modulo-compras-2026-03-14`
-3. Garantir que o deploy sera feito primeiro em janela controlada.
+Ja implementado:
+- estruturas de banco tratadas pelo backend
+- modelos Sequelize do modulo
+- rotas `/compras/*`
+- cotacao publica por token em `/cotacoes/:token`
+- telas React do modulo em `frontend/src/modules/solicitacao-compra/`
+- menu e controle de acesso por perfil e pela flag `pode_criar_solicitacao_compra`
+- integracao com a solicitacao principal do fluxo comum
 
-## Dependencias novas
+## 2. Antes de alterar ou publicar
+- confirmar integridade dos arquivos canonicamente ativos:
+  - `backend/src/app.js`
+  - `backend/src/routes.js`
+  - `backend/src/models/index.js`
+  - `backend/src/controllers/SolicitacaoCompraController.js`
+  - `backend/src/controllers/UsuarioController.js`
+  - `backend/src/controllers/AuthController.js`
+  - `backend/src/models/User.js`
+  - `frontend/src/App.jsx`
+  - `frontend/src/layout/Layout.jsx`
+  - `frontend/src/services/compras.js`
+- nao substituir arquivos canonicamente ativos por snapshots antigos
+- nao remover dados em `backend/uploads/`
+
+## 3. Validacoes tecnicas minimas
 Backend:
-- `pdfkit`
+- `node --check backend/server.js`
+- `node --check backend/src/app.js`
+- `node --check backend/src/routes.js`
+- `node --check backend/src/controllers/SolicitacaoCompraController.js`
 
-Comando:
-```bash
-cd ~/sistema-gestao-solicitacoes/backend
-npm install
-```
+Frontend:
+- `npm run build` em `frontend/`
 
-## Banco de dados
-O backend foi preparado para criar as estruturas do modulo compras de forma idempotente em `backend/src/app.js` durante a inicializacao.
+## 4. Validacoes funcionais minimas
+- login com usuario autorizado ao modulo compras
+- menu `Compras` visivel quando permitido
+- acesso a `Solicitacoes de Compra`
+- abertura de `Nova Solicitacao de Compra`
+- revisao e finalizacao da solicitacao
+- abertura do detalhe da solicitacao de compra
+- geracao ou download do PDF
+- consulta das rotas auxiliares:
+  - `/compras/unidades`
+  - `/compras/categorias`
+  - `/compras/insumos`
+  - `/compras/apropriacoes`
+- validacao do relacionamento com a solicitacao principal
 
-Mesmo assim, manter as migrations versionadas para referencia:
-- `backend/migrations/create-compras-tables.sql`
-- `backend/migrations/add-pode-criar-solicitacao-compra.sql`
+## 5. Validacoes de permissao
+- usuario sem permissao nao deve acessar rotas do modulo no frontend
+- backend deve negar acesso quando o usuario nao atender aos criterios de compras
+- `SUPERADMIN` e `ADMIN` mantem acesso
+- usuario com `pode_criar_solicitacao_compra` deve manter acesso
 
-## Sequencia segura no servidor
-```bash
-cd ~/sistema-gestao-solicitacoes/backend
-git pull origin main
-npm install
-pm2 restart backend-solicitacoes --update-env
-pm2 logs backend-solicitacoes --lines 120
-```
+## 6. Deploy seguro
+Backend:
+1. `git pull`
+2. `npm install` em `backend/`, se necessario
+3. `pm2 restart backend-solicitacoes --update-env`
+4. validar logs
 
-## Validacoes minimas apos subir backend
-1. Login continua funcionando.
-2. `GET /api/compras/unidades` responde autenticado.
-3. `GET /api/compras/categorias` responde autenticado.
-4. `GET /api/compras/insumos` responde autenticado.
-5. `GET /api/compras/apropriacoes` responde autenticado.
-6. `GET /api/compras/solicitacoes` responde autenticado.
-7. `GET /health` continua `{"ok":true}`.
+Frontend:
+1. `git push`
+2. redeploy na Vercel
+3. validar rotas do modulo no ambiente publicado
 
-## Riscos conhecidos nesta fase
-- O frontend do modulo compras ainda nao foi integrado.
-- A rota de PDF depende de `pdfkit` instalado no servidor.
-- Itens personalizados da copia do frontend ainda nao foram implementados no backend atual.
+## 7. Sinais de alerta
+- sumico do grupo `Compras` no menu para usuarios que deveriam ter acesso
+- erro 403 inesperado no modulo
+- falha em criar a solicitacao principal associada
+- erro em `/compras/solicitacoes/:id/pdf`
+- quebra de `AuthController`, `UsuarioController` ou `models/User`
+- quebra de `backend/src/models/index.js` ou `backend/src/routes.js`
 
-## Rollback
-Se houver problema apos subir o backend:
-```bash
-cd ~/sistema-gestao-solicitacoes/backend
-git checkout pre-modulo-compras-2026-03-14
-npm install
-pm2 restart backend-solicitacoes --update-env
-```
-
-Depois, para voltar ao fluxo normal, retornar para `main`.
+## 8. Rollback conceitual
+Se uma alteracao quebrar o modulo:
+- restaurar os arquivos canonicamente ativos da ultima revisao funcional valida
+- reaplicar deploy do backend
+- reaplicar deploy do frontend
+- validar login, fluxo principal e compras antes de encerrar a manutencao
