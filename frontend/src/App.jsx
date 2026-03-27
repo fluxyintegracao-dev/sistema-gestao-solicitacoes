@@ -36,9 +36,6 @@ import ComportamentoRecebimentoSetor from './pages/ComportamentoRecebimentoSetor
 import TimeoutInatividade from './pages/TimeoutInatividade';
 import TiposSolicitacaoPorSetor from './pages/TiposSolicitacaoPorSetor';
 import SetoresCriacaoTodasObras from './pages/SetoresCriacaoTodasObras';
-import ConversasEntrada from './pages/ConversasEntrada';
-import ConversasSaida from './pages/ConversasSaida';
-import ConversaDetalhe from './pages/ConversaDetalhe';
 import ArquivosModelos from './pages/ArquivosModelos';
 import ArquivosModelosConfig from './pages/ArquivosModelosConfig';
 import {
@@ -125,9 +122,9 @@ export default function App() {
         <Route path="solicitacoes" element={<Solicitacoes />} />
         <Route path="solicitacoes-arquivadas" element={<SolicitacoesArquivadas />} />
         <Route path="solicitacoes/:id" element={<SolicitacaoDetalhe />} />
-        <Route path="conversas/entrada" element={<ConversasEntrada />} />
-        <Route path="conversas/saida" element={<ConversasSaida />} />
-        <Route path="conversas/:id" element={<ConversaDetalhe />} />
+        <Route path="conversas/entrada" element={<Navigate to="/solicitacoes" replace />} />
+        <Route path="conversas/saida" element={<Navigate to="/solicitacoes" replace />} />
+        <Route path="conversas/:id" element={<Navigate to="/solicitacoes" replace />} />
         <Route path="arquivos-modelos" element={<ArquivosModelos />} />
 
         <Route path="nova-solicitacao" element={<NovaSolicitacao />} />

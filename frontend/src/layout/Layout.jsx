@@ -1,13 +1,10 @@
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useContext, useEffect, useMemo, useState } from 'react';
 import { AuthContext } from '../contexts/AuthContext';
-import NotificacoesBell from '../components/NotificacoesBell';
-import { getCaixaEntrada, getCaixaSaida } from '../services/conversasInternas';
 import {
   HiOutlineSquares2X2,
   HiOutlinePlusCircle,
   HiOutlineClipboardDocumentList,
-  HiOutlineChatBubbleLeftRight,
   HiOutlineCloudArrowUp,
   HiOutlineReceiptRefund,
   HiOutlineUsers,
@@ -28,8 +25,6 @@ import {
   HiOutlineChevronLeft,
   HiOutlineArchiveBox,
   HiOutlineDocumentText,
-  HiOutlineInboxStack,
-  HiOutlinePaperAirplane
 } from 'react-icons/hi2';
 import { BsBuildingsFill } from 'react-icons/bs';
 import { isGeoSetor } from '../utils/setor';
@@ -45,8 +40,6 @@ export default function Layout() {
   const [isMobileViewport, setIsMobileViewport] = useState(() =>
     typeof window !== 'undefined' ? window.matchMedia('(max-width: 767px)').matches : false
   );
-  const [inboxNovasCount, setInboxNovasCount] = useState(0);
-  const [saidaNovasCount, setSaidaNovasCount] = useState(0);
 
   const sidebarWidth = isMobileViewport ? 292 : (collapsed ? 76 : 236);
 
@@ -86,88 +79,6 @@ export default function Layout() {
     if (isMobileViewport) setMenuAberto(false);
   }, [location.pathname, isMobileViewport]);
 
-  useEffect(() => {
-    const userId = Number(user?.id);
-    if (!Number.isInteger(userId) || userId <= 0) {
-      setInboxNovasCount(0);
-      setSaidaNovasCount(0);
-      return undefined;
-    }
-
-    const storageKeyEntrada = `conversas_entrada_last_seen_${userId}`;
-    const storageKeySaida = `conversas_saida_last_seen_${userId}`;
-    let ativo = true;
-    let carregando = false;
-
-    const estaEmTelaDeConversa =
-      location.pathname.startsWith('/conversas/entrada') ||
-      location.pathname.startsWith('/conversas/saida') ||
-      location.pathname.startsWith('/conversas/');
-
-    const atualizarBadge = async () => {
-      if (!ativo || carregando || document.hidden || estaEmTelaDeConversa) {
-        return;
-      }
-
-      try {
-        carregando = true;
-        const [listaEntrada, listaSaida] = await Promise.all([
-          getCaixaEntrada({ arquivadas: false }),
-          getCaixaSaida({ arquivadas: false })
-        ]);
-        if (!ativo) return;
-        const seenEntradaValue = localStorage.getItem(storageKeyEntrada);
-        const seenEntradaMs = seenEntradaValue ? new Date(seenEntradaValue).getTime() : 0;
-        const seenSaidaValue = localStorage.getItem(storageKeySaida);
-        const seenSaidaMs = seenSaidaValue ? new Date(seenSaidaValue).getTime() : 0;
-
-        const totalEntrada = (Array.isArray(listaEntrada) ? listaEntrada : []).filter(item => {
-          const updatedMs = new Date(item?.updatedAt || item?.createdAt).getTime();
-          const autorId = Number(item?.ultima_mensagem?.autor?.id || 0);
-          const autorEhOutroUsuario = !autorId || autorId !== userId;
-          return updatedMs > seenEntradaMs && autorEhOutroUsuario;
-        }).length;
-
-        const totalSaida = (Array.isArray(listaSaida) ? listaSaida : []).filter(item => {
-          const updatedMs = new Date(item?.updatedAt || item?.createdAt).getTime();
-          const autorId = Number(item?.ultima_mensagem?.autor?.id || 0);
-          const autorEhOutroUsuario = !autorId || autorId !== userId;
-          return updatedMs > seenSaidaMs && autorEhOutroUsuario;
-        }).length;
-
-        setInboxNovasCount(totalEntrada);
-        setSaidaNovasCount(totalSaida);
-      } catch {
-        // sem bloqueio visual em caso de falha temporaria
-      } finally {
-        carregando = false;
-      }
-    };
-
-    const handleSeenEvent = () => {
-      atualizarBadge();
-    };
-
-    const handleVisibilityChange = () => {
-      if (!document.hidden) {
-        atualizarBadge();
-      }
-    };
-
-    window.addEventListener('conversas:entrada:seen', handleSeenEvent);
-    window.addEventListener('conversas:saida:seen', handleSeenEvent);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    atualizarBadge();
-    const interval = setInterval(atualizarBadge, 60000);
-
-    return () => {
-      ativo = false;
-      window.removeEventListener('conversas:entrada:seen', handleSeenEvent);
-      window.removeEventListener('conversas:saida:seen', handleSeenEvent);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      clearInterval(interval);
-    };
-  }, [user?.id, location.pathname]);
 
   const perfilUpper = String(user?.perfil || '').toUpperCase();
   const areaUpper = String(user?.area || '').toUpperCase();
@@ -200,7 +111,6 @@ export default function Layout() {
     const groupIcons = {
       Painel: HiOutlineSquares2X2,
       Solicitações: HiOutlineClipboardDocumentList,
-      Comunicação: HiOutlineChatBubbleLeftRight,
       Compras: HiOutlineWallet,
       Financeiro: HiOutlineWallet,
       Cadastros: HiOutlineRectangleGroup,
@@ -223,10 +133,6 @@ export default function Layout() {
           item('/solicitacoes', 'Minhas Solicitações', HiOutlineDocumentText),
           item('/solicitacoes-arquivadas', 'Arquivadas', HiOutlineArchiveBox),
           item('/nova-solicitacao', 'Nova Solicitação', HiOutlinePlusCircle)
-        ]);
-        addGroup('Comunicação', [
-          item('/conversas/entrada', 'Caixa de Entrada', HiOutlineInboxStack),
-          item('/conversas/saida', 'Caixa de Saída', HiOutlinePaperAirplane)
         ]);
         addGroup('Biblioteca', [
           item('/arquivos-modelos', 'Arquivos Modelos', HiOutlineFolderOpen)
@@ -258,10 +164,6 @@ export default function Layout() {
           item('/solicitacoes', 'Solicitações do Setor', HiOutlineDocumentText),
           item('/solicitacoes-arquivadas', 'Arquivadas', HiOutlineArchiveBox)
         ]);
-        addGroup('Comunicação', [
-          item('/conversas/entrada', 'Caixa de Entrada', HiOutlineInboxStack),
-          item('/conversas/saida', 'Caixa de Saída', HiOutlinePaperAirplane)
-        ]);
         addGroup('Biblioteca', [
           item('/arquivos-modelos', 'Arquivos Modelos', HiOutlineFolderOpen)
         ]);
@@ -291,10 +193,6 @@ export default function Layout() {
         addGroup('Solicitações', [
           item('/solicitacoes', 'Todas as Solicitações', HiOutlineDocumentText),
           item('/solicitacoes-arquivadas', 'Arquivadas', HiOutlineArchiveBox)
-        ]);
-        addGroup('Comunicação', [
-          item('/conversas/entrada', 'Caixa de Entrada', HiOutlineInboxStack),
-          item('/conversas/saida', 'Caixa de Saída', HiOutlinePaperAirplane)
         ]);
         addGroup('Biblioteca', [
           item('/arquivos-modelos', 'Arquivos Modelos', HiOutlineFolderOpen)
@@ -326,10 +224,6 @@ export default function Layout() {
           item('/solicitacoes', 'Solicitações do Setor', HiOutlineDocumentText),
           item('/solicitacoes-arquivadas', 'Arquivadas', HiOutlineArchiveBox)
         ]);
-        addGroup('Comunicação', [
-          item('/conversas/entrada', 'Caixa de Entrada', HiOutlineInboxStack),
-          item('/conversas/saida', 'Caixa de Saída', HiOutlinePaperAirplane)
-        ]);
         addGroup('Biblioteca', [
           item('/arquivos-modelos', 'Arquivos Modelos', HiOutlineFolderOpen)
         ]);
@@ -356,10 +250,6 @@ export default function Layout() {
           item('/solicitacoes', 'Solicitações', HiOutlineDocumentText),
           item('/solicitacoes-arquivadas', 'Arquivadas', HiOutlineArchiveBox),
           item('/nova-solicitacao', 'Nova Solicitação', HiOutlinePlusCircle)
-        ]);
-        addGroup('Comunicação', [
-          item('/conversas/entrada', 'Caixa de Entrada', HiOutlineInboxStack),
-          item('/conversas/saida', 'Caixa de Saída', HiOutlinePaperAirplane)
         ]);
         addGroup('Biblioteca', [
           item('/arquivos-modelos', 'Arquivos Modelos', HiOutlineFolderOpen)
@@ -397,10 +287,6 @@ export default function Layout() {
           item('/solicitacoes', 'Solicitações', HiOutlineDocumentText),
           item('/solicitacoes-arquivadas', 'Arquivadas', HiOutlineArchiveBox),
           item('/nova-solicitacao', 'Nova Solicitação', HiOutlinePlusCircle)
-        ]);
-        addGroup('Comunicação', [
-          item('/conversas/entrada', 'Caixa de Entrada', HiOutlineInboxStack),
-          item('/conversas/saida', 'Caixa de Saída', HiOutlinePaperAirplane)
         ]);
         addGroup('Biblioteca', [
           item('/arquivos-modelos', 'Arquivos Modelos', HiOutlineFolderOpen)
@@ -570,8 +456,6 @@ export default function Layout() {
                                 if (isMobileViewport) setMenuAberto(false);
                               }}
                               collapsed={collapsed}
-                              inboxNovasCount={inboxNovasCount}
-                              saidaNovasCount={saidaNovasCount}
                             />
                           ))}
                 </ul>
@@ -594,11 +478,6 @@ export default function Layout() {
                           <span className="nav-group-heading">
                             {GroupIcon && <GroupIcon className="nav-group-icon" />}
                             <span className="nav-group-title">{group.label}</span>
-                            {group.label === 'Comunicação' && (inboxNovasCount + saidaNovasCount) > 0 && (
-                              <span className="inline-flex min-w-[20px] h-5 px-1.5 items-center justify-center rounded-full text-[11px] font-semibold bg-red-600 text-white">
-                                {(inboxNovasCount + saidaNovasCount) > 99 ? '99+' : (inboxNovasCount + saidaNovasCount)}
-                              </span>
-                            )}
                           </span>
                           {isOpen ? (
                             <HiOutlineChevronDown className="nav-group-chevron" />
@@ -624,8 +503,6 @@ export default function Layout() {
                                 }}
                                 collapsed={false}
                                 subItem
-                                inboxNovasCount={inboxNovasCount}
-                                saidaNovasCount={saidaNovasCount}
                               />
                             ))}
                           </ul>
@@ -707,7 +584,6 @@ export default function Layout() {
                     </>
                   )}
                 </button>
-                <NotificacoesBell />
               </div>
             </div>
             <Outlet />
@@ -722,11 +598,7 @@ function isPathActive(currentPath, targetPath) {
   return currentPath === targetPath || currentPath.startsWith(`${targetPath}/`);
 }
 
-function MenuItem({ to, label, icon: Icon, active, onSelect, collapsed, subItem = false, inboxNovasCount = 0, saidaNovasCount = 0 }) {
-  const mostrarBadgeInbox = to === '/conversas/entrada';
-  const mostrarBadgeSaida = to === '/conversas/saida';
-  const inboxCount = Number(inboxNovasCount || 0);
-  const saidaCount = Number(saidaNovasCount || 0);
+function MenuItem({ to, label, icon: Icon, active, onSelect, collapsed, subItem = false }) {
   return (
     <li>
       <Link
@@ -738,16 +610,6 @@ function MenuItem({ to, label, icon: Icon, active, onSelect, collapsed, subItem 
       >
         {Icon && <Icon className="nav-icon" />}
         {!collapsed && <span>{label}</span>}
-        {!collapsed && mostrarBadgeInbox && inboxCount > 0 && (
-          <span className="ml-auto inline-flex min-w-[20px] h-5 px-1.5 items-center justify-center rounded-full text-[11px] font-semibold bg-red-600 text-white">
-            {inboxCount > 99 ? '99+' : inboxCount}
-          </span>
-        )}
-        {!collapsed && mostrarBadgeSaida && saidaCount > 0 && (
-          <span className="ml-auto inline-flex min-w-[20px] h-5 px-1.5 items-center justify-center rounded-full text-[11px] font-semibold bg-red-600 text-white">
-            {saidaCount > 99 ? '99+' : saidaCount}
-          </span>
-        )}
       </Link>
     </li>
   );
