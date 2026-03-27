@@ -158,7 +158,7 @@ export default function Layout() {
     window.addEventListener('conversas:saida:seen', handleSeenEvent);
     document.addEventListener('visibilitychange', handleVisibilityChange);
     atualizarBadge();
-    const interval = setInterval(atualizarBadge, 20000);
+    const interval = setInterval(atualizarBadge, 60000);
 
     return () => {
       ativo = false;

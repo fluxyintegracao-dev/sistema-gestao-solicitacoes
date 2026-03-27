@@ -53,7 +53,7 @@ export default function NotificacoesBell() {
 
     carregarComProtecao();
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    const id = setInterval(carregarComProtecao, 60000);
+    const id = setInterval(carregarComProtecao, 120000);
     return () => {
       ativo = false;
       document.removeEventListener('visibilitychange', handleVisibilityChange);
