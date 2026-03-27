@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { HiAdjustmentsHorizontal, HiChevronDown, HiChevronUp, HiEye, HiEyeSlash } from 'react-icons/hi2';
 
 const FILTROS_DISPONIVEIS = [
+  { id: 'codigo', label: 'Codigo' },
   { id: 'numero_sienge', label: 'Número SIENGE' },
   { id: 'obra_ids', label: 'Obra' },
   { id: 'area', label: 'Setor' },
@@ -95,6 +96,7 @@ export default function Filtros({
 
   function limparFiltros() {
     setFiltros({
+      codigo: '',
       numero_solicitacao: '',
       obra_ids: '',
       area: '',
@@ -205,6 +207,7 @@ export default function Filtros({
   }
 
   const quantidadeFiltrosAtivos = [
+    filtros.codigo,
     filtros.numero_solicitacao,
     filtros.obra_ids,
     filtros.area,
@@ -272,6 +275,20 @@ export default function Filtros({
         </div>
 
         <div className="sol-filtros-grid">
+          {isFiltroVisivel('codigo') && (
+            <div className="sol-filter-field">
+              <label className="sol-filter-label">Codigo</label>
+              <input
+                name="codigo"
+                placeholder="Ex: SOL-000123 ou 123"
+                className="input"
+                value={filtros.codigo || ''}
+                onChange={handleChange}
+                type="text"
+              />
+            </div>
+          )}
+
           {isFiltroVisivel('numero_sienge') && (
             <div className="sol-filter-field">
               <label className="sol-filter-label">Número SIENGE</label>
@@ -584,3 +601,4 @@ export default function Filtros({
     </div>
   );
 }
+

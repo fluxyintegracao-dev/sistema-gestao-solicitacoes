@@ -583,6 +583,7 @@ module.exports = {
       const perfil = String(req.user?.perfil || '').trim().toUpperCase();
       let areaUsuario = req.user?.area || null;
       const {
+        codigo,
         area,
         status,
         arquivadas,
@@ -997,6 +998,14 @@ module.exports = {
         if (codigoContratoFiltro) {
           where.codigo_contrato = {
             [Op.like]: `%${codigoContratoFiltro}%`
+          };
+        }
+      }
+      if (codigo) {
+        const codigoFiltro = String(codigo).trim();
+        if (codigoFiltro) {
+          where.codigo = {
+            [Op.like]: `%${codigoFiltro}%`
           };
         }
       }

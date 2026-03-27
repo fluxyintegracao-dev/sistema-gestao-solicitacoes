@@ -72,6 +72,7 @@ export default function Solicitacoes({ arquivadas = false }) {
   const { user } = useAuth();
 
   const [filtros, setFiltros] = useState({
+    codigo: '',
     numero_solicitacao: '',
     obra_ids: '',
     area: '',
@@ -100,7 +101,11 @@ export default function Solicitacoes({ arquivadas = false }) {
       if (salvo) {
         const parsed = JSON.parse(salvo);
         if (parsed && typeof parsed === 'object') {
-          setFiltros(prev => ({ ...prev, ...parsed }));
+          setFiltros(prev => ({
+            ...prev,
+            ...parsed,
+            codigo: String(parsed.codigo || '').trim()
+          }));
         }
       }
     } catch (error) {
@@ -1117,4 +1122,3 @@ export default function Solicitacoes({ arquivadas = false }) {
     </div>
   );
 }
-
