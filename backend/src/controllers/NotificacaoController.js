@@ -1,10 +1,35 @@
 const { NotificacaoDestinatario, Notificacao } = require('../models');
+const runtimeCache = require('../utils/runtimeCache');
+
+const CACHE_TTL_MS = 15 * 1000;
+
+function getNotificacaoCacheKey(usuarioId, naoLidas, limit) {
+  return `notificacoes:${usuarioId}:${naoLidas}:${limit}`;
+}
+
+function limparCacheNotificacoes(usuarioId) {
+  runtimeCache.clearPrefix(`notificacoes:${usuarioId}:`);
+}
 
 module.exports = {
   async index(req, res) {
     try {
       const { nao_lidas, limit } = req.query;
       const where = { usuario_id: req.user.id };
+      const limitNormalizado = Number(limit) > 0 ? Number(limit) : 50;
+      const naoLidasNormalizado =
+        String(nao_lidas) === '1' || String(nao_lidas) === 'true';
+
+      const cacheKey = getNotificacaoCacheKey(
+        req.user.id,
+        naoLidasNormalizado ? 'nao-lidas' : 'todas',
+        limitNormalizado
+      );
+      const cached = runtimeCache.get(cacheKey);
+      if (cached) {
+        return res.json(cached);
+      }
+
       if (String(nao_lidas) === '1' || String(nao_lidas) === 'true') {
         where.lida_em = null;
       }
@@ -22,7 +47,7 @@ module.exports = {
           }
         ],
         order: [['createdAt', 'DESC']],
-        limit: Number(limit) > 0 ? Number(limit) : 50
+        limit: limitNormalizado
       });
 
       const resultado = itens.map(item => ({
@@ -37,10 +62,14 @@ module.exports = {
           : null
       }));
 
-      return res.json({
+      const response = {
         total_nao_lidas: totalNaoLidas,
         itens: resultado
-      });
+      };
+
+      runtimeCache.set(cacheKey, response, CACHE_TTL_MS);
+
+      return res.json(response);
     } catch (error) {
       console.error(error);
       return res.status(500).json({ error: 'Erro ao buscar notificacoes' });
@@ -65,6 +94,8 @@ module.exports = {
         await destinatario.update({ lida_em: new Date() });
       }
 
+      limparCacheNotificacoes(req.user.id);
+
       return res.sendStatus(204);
     } catch (error) {
       console.error(error);
@@ -83,6 +114,8 @@ module.exports = {
           }
         }
       );
+
+      limparCacheNotificacoes(req.user.id);
 
       return res.sendStatus(204);
     } catch (error) {

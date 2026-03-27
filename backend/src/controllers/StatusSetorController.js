@@ -1,10 +1,23 @@
 const { EtapaSetor, Setor } = require('../models');
 const { Op } = require('sequelize');
+const runtimeCache = require('../utils/runtimeCache');
+
+const CACHE_TTL_MS = 60 * 1000;
+
+function getStatusSetorCacheKey(setor) {
+  return `status-setor:${String(setor || '').trim().toUpperCase() || 'todos'}`;
+}
 
 module.exports = {
   async index(req, res) {
     try {
       const { setor } = req.query;
+      const cacheKey = getStatusSetorCacheKey(setor);
+      const cached = runtimeCache.get(cacheKey);
+      if (cached) {
+        return res.json(cached);
+      }
+
       const perfil = String(req.user?.perfil || '').trim().toUpperCase();
       const where = {};
       if (setor) {
@@ -28,6 +41,8 @@ module.exports = {
         order: [['ordem', 'ASC']]
       });
 
+      runtimeCache.set(cacheKey, itens, CACHE_TTL_MS);
+
       return res.json(itens);
     } catch (error) {
       console.error(error);
@@ -49,6 +64,8 @@ module.exports = {
         nome,
         ordem
       });
+
+      runtimeCache.clearPrefix('status-setor:');
 
       return res.status(201).json(item);
     } catch (error) {
@@ -72,6 +89,8 @@ module.exports = {
         ordem: ordem ?? item.ordem
       });
 
+      runtimeCache.clearPrefix('status-setor:');
+
       return res.json(item);
     } catch (error) {
       console.error(error);
@@ -87,6 +106,7 @@ module.exports = {
         return res.status(404).json({ error: 'Status nao encontrado' });
       }
       await item.update({ ativo: true });
+      runtimeCache.clearPrefix('status-setor:');
       return res.sendStatus(204);
     } catch (error) {
       console.error(error);
@@ -102,6 +122,7 @@ module.exports = {
         return res.status(404).json({ error: 'Status nao encontrado' });
       }
       await item.update({ ativo: false });
+      runtimeCache.clearPrefix('status-setor:');
       return res.sendStatus(204);
     } catch (error) {
       console.error(error);

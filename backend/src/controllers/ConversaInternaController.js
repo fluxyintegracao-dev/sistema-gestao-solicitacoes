@@ -10,8 +10,10 @@ const {
 } = require('../models');
 const { uploadToS3 } = require('../services/s3');
 const { normalizeOriginalName } = require('../utils/fileName');
+const runtimeCache = require('../utils/runtimeCache');
 
 const JANELA_EDICAO_MS = 5 * 60 * 1000;
+const CACHE_LISTA_CONVERSAS_MS = 15 * 1000;
 
 function normalizarTexto(valor) {
   return String(valor || '').trim();
@@ -342,6 +344,15 @@ function parseBoolean(valor) {
   return texto === '1' || texto === 'true' || texto === 'sim';
 }
 
+function getListaConversaCacheKey(tipo, usuarioId, somenteArquivadas) {
+  return `conversas:${tipo}:${usuarioId}:${somenteArquivadas ? 'arquivadas' : 'ativas'}`;
+}
+
+function limparCacheConversas(usuarioId) {
+  runtimeCache.clearPrefix(`conversas:entrada:${usuarioId}:`);
+  runtimeCache.clearPrefix(`conversas:saida:${usuarioId}:`);
+}
+
 async function filtrarPorArquivamento(conversas, usuarioId, somenteArquivadas) {
   if (!Array.isArray(conversas) || conversas.length === 0) return [];
   const conversaIds = conversas.map((item) => item.id);
@@ -396,6 +407,12 @@ module.exports = {
     try {
       let conversas = [];
       const somenteArquivadas = parseBoolean(req.query?.arquivadas);
+      const cacheKey = getListaConversaCacheKey('entrada', req.user.id, somenteArquivadas);
+      const cached = runtimeCache.get(cacheKey);
+      if (cached) {
+        return res.json(cached);
+      }
+
       const participacoes = await ConversaInternaParticipante.findAll({
         where: { usuario_id: req.user.id },
         attributes: ['conversa_id']
@@ -440,6 +457,7 @@ module.exports = {
       );
 
       const itens = await montarResumosConversasEmLote(conversas);
+      runtimeCache.set(cacheKey, itens, CACHE_LISTA_CONVERSAS_MS);
       return res.json(itens);
     } catch (error) {
       console.error(error);
@@ -450,6 +468,12 @@ module.exports = {
   async saida(req, res) {
     try {
       const somenteArquivadas = parseBoolean(req.query?.arquivadas);
+      const cacheKey = getListaConversaCacheKey('saida', req.user.id, somenteArquivadas);
+      const cached = runtimeCache.get(cacheKey);
+      if (cached) {
+        return res.json(cached);
+      }
+
       const where = { criado_por_id: req.user.id };
 
       let conversas = await ConversaInterna.findAll({
@@ -480,6 +504,7 @@ module.exports = {
       );
 
       const itens = await montarResumosConversasEmLote(conversas);
+      runtimeCache.set(cacheKey, itens, CACHE_LISTA_CONVERSAS_MS);
       return res.json(itens);
     } catch (error) {
       console.error(error);
@@ -521,6 +546,9 @@ module.exports = {
         mensagemInicial,
         files: req.files
       });
+
+      limparCacheConversas(req.user.id);
+      limparCacheConversas(destinatarioId);
 
       return res.status(201).json({ id: conversa.id });
     } catch (error) {
@@ -577,7 +605,10 @@ module.exports = {
           files: req.files
         });
         conversasCriadas.push(conversa.id);
+        limparCacheConversas(usuarioId);
       }
+
+      limparCacheConversas(req.user.id);
 
       return res.status(201).json({
         total: conversasCriadas.length,
@@ -754,6 +785,9 @@ module.exports = {
       });
 
       await conversa.update({ updatedAt: new Date() });
+      limparCacheConversas(req.user.id);
+      limparCacheConversas(conversa.criado_por_id);
+      limparCacheConversas(conversa.destinatario_id);
 
       return res.status(201).json({
         id: nova.id,
@@ -799,6 +833,9 @@ module.exports = {
       await mensagem.save();
 
       await conversa.update({ updatedAt: new Date() });
+      limparCacheConversas(req.user.id);
+      limparCacheConversas(conversa.criado_por_id);
+      limparCacheConversas(conversa.destinatario_id);
 
       return res.json({
         id: mensagem.id,
@@ -850,6 +887,10 @@ module.exports = {
 
       await criarParticipantes(id, idsValidos, req.user.id);
       await conversa.update({ updatedAt: new Date() });
+      limparCacheConversas(req.user.id);
+      limparCacheConversas(conversa.criado_por_id);
+      limparCacheConversas(conversa.destinatario_id);
+      idsValidos.forEach(limparCacheConversas);
 
       return res.json({ adicionados: idsValidos.length });
     } catch (error) {
@@ -878,6 +919,8 @@ module.exports = {
             arquivada_em: new Date()
           }
         });
+
+        limparCacheConversas(req.user.id);
       }
 
       return res.sendStatus(204);
@@ -900,6 +943,8 @@ module.exports = {
           conversa_id: { [Op.in]: conversaIds }
         }
       });
+
+      limparCacheConversas(req.user.id);
 
       return res.sendStatus(204);
     } catch (error) {
@@ -926,6 +971,9 @@ module.exports = {
         concluida_em: new Date()
       });
 
+      limparCacheConversas(req.user.id);
+      limparCacheConversas(conversa.destinatario_id);
+
       return res.sendStatus(204);
     } catch (error) {
       console.error(error);
@@ -950,6 +998,9 @@ module.exports = {
         concluida_por_id: null,
         concluida_em: null
       });
+
+      limparCacheConversas(req.user.id);
+      limparCacheConversas(conversa.destinatario_id);
 
       return res.sendStatus(204);
     } catch (error) {

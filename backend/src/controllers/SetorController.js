@@ -1,13 +1,24 @@
 const { Setor } = require('../models');
+const runtimeCache = require('../utils/runtimeCache');
+
+const CACHE_KEY_SETORES_ATIVOS = 'setores:ativos';
+const CACHE_TTL_MS = 60 * 1000;
 
 module.exports = {
 
   async index(req, res) {
     try {
+      const cached = runtimeCache.get(CACHE_KEY_SETORES_ATIVOS);
+      if (cached) {
+        return res.json(cached);
+      }
+
       const setores = await Setor.findAll({
         where: { ativo: true },
         order: [['nome', 'ASC']]
       });
+
+      runtimeCache.set(CACHE_KEY_SETORES_ATIVOS, setores, CACHE_TTL_MS);
 
       return res.json(setores);
 
@@ -27,6 +38,8 @@ module.exports = {
         nome,
         codigo
       });
+
+      runtimeCache.del(CACHE_KEY_SETORES_ATIVOS);
 
       return res.status(201).json(setor);
 
@@ -57,6 +70,8 @@ module.exports = {
         codigo: codigo ? String(codigo).toUpperCase() : setor.codigo
       });
 
+      runtimeCache.del(CACHE_KEY_SETORES_ATIVOS);
+
       return res.json(setor);
 
     } catch (error) {
@@ -77,6 +92,7 @@ module.exports = {
       }
 
       await setor.update({ ativo: true });
+      runtimeCache.del(CACHE_KEY_SETORES_ATIVOS);
 
       return res.sendStatus(204);
 
@@ -98,6 +114,7 @@ module.exports = {
       }
 
       await setor.update({ ativo: false });
+      runtimeCache.del(CACHE_KEY_SETORES_ATIVOS);
 
       return res.sendStatus(204);
 

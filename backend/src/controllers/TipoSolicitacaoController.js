@@ -1,10 +1,20 @@
 const { TipoSolicitacao, TipoSubContrato, Solicitacao, Contrato } = require('../models');
+const runtimeCache = require('../utils/runtimeCache');
+
+const CACHE_KEY_TIPOS_SOLICITACAO = 'tipos-solicitacao:lista';
+const CACHE_TTL_MS = 60 * 1000;
 
 module.exports = {
   async index(req, res) {
+    const cached = runtimeCache.get(CACHE_KEY_TIPOS_SOLICITACAO);
+    if (cached) {
+      return res.json(cached);
+    }
+
     const tipos = await TipoSolicitacao.findAll({
       order: [['nome', 'ASC']]
     });
+    runtimeCache.set(CACHE_KEY_TIPOS_SOLICITACAO, tipos, CACHE_TTL_MS);
     return res.json(tipos);
   },
 
@@ -12,6 +22,7 @@ module.exports = {
     const { nome } = req.body;
 
     const tipo = await TipoSolicitacao.create({ nome });
+    runtimeCache.del(CACHE_KEY_TIPOS_SOLICITACAO);
     return res.status(201).json(tipo);
   },
 
@@ -30,6 +41,7 @@ module.exports = {
       }
 
       await tipo.update({ nome });
+      runtimeCache.del(CACHE_KEY_TIPOS_SOLICITACAO);
       return res.json(tipo);
     } catch (error) {
       console.error('Erro ao atualizar tipo:', error);
@@ -45,6 +57,7 @@ module.exports = {
       }
 
       await tipo.update({ ativo: true });
+      runtimeCache.del(CACHE_KEY_TIPOS_SOLICITACAO);
       return res.sendStatus(204);
     } catch (error) {
       console.error('Erro ao ativar tipo:', error);
@@ -60,6 +73,7 @@ module.exports = {
       }
 
       await tipo.update({ ativo: false });
+      runtimeCache.del(CACHE_KEY_TIPOS_SOLICITACAO);
       return res.sendStatus(204);
     } catch (error) {
       console.error('Erro ao desativar tipo:', error);
@@ -89,6 +103,7 @@ module.exports = {
       }
 
       await tipo.destroy();
+      runtimeCache.del(CACHE_KEY_TIPOS_SOLICITACAO);
       return res.sendStatus(204);
     } catch (error) {
       console.error('Erro ao excluir tipo:', error);

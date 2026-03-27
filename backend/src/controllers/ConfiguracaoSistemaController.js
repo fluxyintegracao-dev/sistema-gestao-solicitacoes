@@ -1,4 +1,5 @@
 const { ConfiguracaoSistema } = require('../models');
+const runtimeCache = require('../utils/runtimeCache');
 
 const CHAVE_TEMA = 'TEMA_SISTEMA';
 const CHAVE_AREAS_OBRA = 'AREAS_OBRA_VISIVEIS';
@@ -8,6 +9,31 @@ const CHAVE_TIMEOUT_INATIVIDADE = 'TIMEOUT_INATIVIDADE_MINUTOS';
 const CHAVE_TIPOS_SOLICITACAO_POR_SETOR = 'TIPOS_SOLICITACAO_POR_SETOR';
 const CHAVE_SETORES_CRIACAO_TODAS_OBRAS = 'SETORES_CRIACAO_TODAS_OBRAS';
 const TIMEOUT_INATIVIDADE_PADRAO_MINUTOS = 20;
+const CACHE_TTL_MS = 60 * 1000;
+
+function getConfiguracaoCacheKey(chave) {
+  return `configuracao-sistema:${chave}`;
+}
+
+function limparCacheConfiguracao(chave) {
+  runtimeCache.del(getConfiguracaoCacheKey(chave));
+}
+
+async function buscarConfiguracaoPorChave(chave) {
+  const cacheKey = getConfiguracaoCacheKey(chave);
+  const cached = runtimeCache.get(cacheKey);
+  if (cached !== null) {
+    return cached;
+  }
+
+  const item = await ConfiguracaoSistema.findOne({
+    where: { chave },
+    order: [['id', 'DESC']]
+  });
+
+  runtimeCache.set(cacheKey, item || null, CACHE_TTL_MS);
+  return item || null;
+}
 
 function parseJsonOrDefault(value, fallback) {
   if (!value) return fallback;
@@ -75,10 +101,7 @@ function normalizarIdList(lista) {
 module.exports = {
   async getTimeoutInatividade(req, res) {
     try {
-      const item = await ConfiguracaoSistema.findOne({
-        where: { chave: CHAVE_TIMEOUT_INATIVIDADE },
-        order: [['id', 'DESC']]
-      });
+      const item = await buscarConfiguracaoPorChave(CHAVE_TIMEOUT_INATIVIDADE);
 
       const minutos = Number(item?.valor);
       if (Number.isNaN(minutos) || minutos <= 0) {
@@ -114,6 +137,8 @@ module.exports = {
         });
       }
 
+      limparCacheConfiguracao(CHAVE_TIMEOUT_INATIVIDADE);
+
       return res.json({ ok: true, minutos: Number(valor) });
     } catch (error) {
       console.error(error);
@@ -123,10 +148,7 @@ module.exports = {
 
   async getTema(req, res) {
     try {
-      const item = await ConfiguracaoSistema.findOne({
-        where: { chave: CHAVE_TEMA },
-        order: [['id', 'DESC']]
-      });
+      const item = await buscarConfiguracaoPorChave(CHAVE_TEMA);
       if (!item || !item.valor) {
         return res.json(getTemaPadrao());
       }
@@ -160,6 +182,8 @@ module.exports = {
         });
       }
 
+      limparCacheConfiguracao(CHAVE_TEMA);
+
       return res.json({ ok: true });
     } catch (error) {
       console.error(error);
@@ -170,10 +194,7 @@ module.exports = {
 
   async getAreasObra(req, res) {
     try {
-      const item = await ConfiguracaoSistema.findOne({
-        where: { chave: CHAVE_AREAS_OBRA },
-        order: [['id', 'DESC']]
-      });
+      const item = await buscarConfiguracaoPorChave(CHAVE_AREAS_OBRA);
 
       if (!item || !item.valor) {
         return res.json({ areas: [] });
@@ -210,6 +231,8 @@ module.exports = {
         });
       }
 
+      limparCacheConfiguracao(CHAVE_AREAS_OBRA);
+
       return res.json({ ok: true, areas });
     } catch (error) {
       console.error(error);
@@ -220,10 +243,7 @@ module.exports = {
 
   async getAreasPorSetorOrigem(req, res) {
     try {
-      const item = await ConfiguracaoSistema.findOne({
-        where: { chave: CHAVE_AREAS_POR_SETOR_ORIGEM },
-        order: [['id', 'DESC']]
-      });
+      const item = await buscarConfiguracaoPorChave(CHAVE_AREAS_POR_SETOR_ORIGEM);
 
       if (!item || !item.valor) {
         return res.json({ regras: {} });
@@ -266,6 +286,8 @@ module.exports = {
         });
       }
 
+      limparCacheConfiguracao(CHAVE_AREAS_POR_SETOR_ORIGEM);
+
       return res.json({ ok: true, regras });
     } catch (error) {
       console.error(error);
@@ -275,10 +297,7 @@ module.exports = {
 
   async getSetoresVisiveisPorUsuario(req, res) {
     try {
-      const item = await ConfiguracaoSistema.findOne({
-        where: { chave: CHAVE_SETORES_VISIVEIS_POR_USUARIO },
-        order: [['id', 'DESC']]
-      });
+      const item = await buscarConfiguracaoPorChave(CHAVE_SETORES_VISIVEIS_POR_USUARIO);
 
       if (!item || !item.valor) {
         return res.json({ regras: {} });
@@ -321,6 +340,8 @@ module.exports = {
         });
       }
 
+      limparCacheConfiguracao(CHAVE_SETORES_VISIVEIS_POR_USUARIO);
+
       return res.json({ ok: true, regras });
     } catch (error) {
       console.error(error);
@@ -330,10 +351,7 @@ module.exports = {
 
   async getTiposSolicitacaoPorSetor(req, res) {
     try {
-      const item = await ConfiguracaoSistema.findOne({
-        where: { chave: CHAVE_TIPOS_SOLICITACAO_POR_SETOR },
-        order: [['id', 'DESC']]
-      });
+      const item = await buscarConfiguracaoPorChave(CHAVE_TIPOS_SOLICITACAO_POR_SETOR);
 
       if (!item || !item.valor) {
         return res.json({ regras: {} });
@@ -403,6 +421,8 @@ module.exports = {
         await ConfiguracaoSistema.create({ chave: CHAVE_TIPOS_SOLICITACAO_POR_SETOR, valor });
       }
 
+      limparCacheConfiguracao(CHAVE_TIPOS_SOLICITACAO_POR_SETOR);
+
       return res.json({ ok: true, regras });
     } catch (error) {
       console.error(error);
@@ -412,10 +432,7 @@ module.exports = {
 
   async getSetoresCriacaoTodasObras(req, res) {
     try {
-      const item = await ConfiguracaoSistema.findOne({
-        where: { chave: CHAVE_SETORES_CRIACAO_TODAS_OBRAS },
-        order: [['id', 'DESC']]
-      });
+      const item = await buscarConfiguracaoPorChave(CHAVE_SETORES_CRIACAO_TODAS_OBRAS);
 
       if (!item || !item.valor) {
         return res.json({ setores: [] });
@@ -448,6 +465,8 @@ module.exports = {
           valor
         });
       }
+
+      limparCacheConfiguracao(CHAVE_SETORES_CRIACAO_TODAS_OBRAS);
 
       return res.json({ ok: true, setores });
     } catch (error) {
