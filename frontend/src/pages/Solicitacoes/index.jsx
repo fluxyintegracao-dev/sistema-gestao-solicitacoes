@@ -337,7 +337,9 @@ export default function Solicitacoes({ arquivadas = false }) {
   const solicitacoesFiltradas = useMemo(() => {
     return solicitacoes.filter(item => {
       const matchCodigo = correspondeBuscaParcialNormalizada(item?.codigo, filtros.codigo);
-      const matchNumeroSienge = correspondeBuscaParcialNormalizada(item?.numero_sienge, filtros.numero_sienge);
+      const matchNumeroSienge =
+        correspondeBuscaParcialNormalizada(item?.numero_pedido, filtros.numero_sienge) ||
+        correspondeBuscaParcialNormalizada(item?.numero_sienge, filtros.numero_sienge);
       return matchCodigo && matchNumeroSienge;
     });
   }, [solicitacoes, filtros.codigo, filtros.numero_sienge]);

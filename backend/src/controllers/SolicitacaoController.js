@@ -603,6 +603,20 @@ function montarCondicaoBuscaParcial(valor, coluna) {
   return { [Op.or]: condicoes };
 }
 
+function montarCondicaoBuscaParcialEmColunas(valor, colunas) {
+  const listaColunas = Array.isArray(colunas) ? colunas.filter(Boolean) : [colunas].filter(Boolean);
+  if (listaColunas.length === 0) return null;
+
+  const condicoesPorColuna = listaColunas
+    .map(coluna => montarCondicaoBuscaParcial(valor, coluna))
+    .filter(Boolean);
+
+  if (condicoesPorColuna.length === 0) return null;
+  if (condicoesPorColuna.length === 1) return condicoesPorColuna[0];
+
+  return { [Op.or]: condicoesPorColuna };
+}
+
 module.exports = {
 
   // =====================================================
@@ -1042,7 +1056,10 @@ module.exports = {
       }
       const numeroSiengeFiltro = numero_sienge ?? numero_solicitacao;
       if (numeroSiengeFiltro) {
-        const condicaoNumeroSienge = montarCondicaoBuscaParcial(numeroSiengeFiltro, 'numero_sienge');
+        const condicaoNumeroSienge = montarCondicaoBuscaParcialEmColunas(numeroSiengeFiltro, [
+          'numero_pedido',
+          'numero_sienge'
+        ]);
         if (condicaoNumeroSienge) {
           where[Op.and] = where[Op.and] || [];
           where[Op.and].push(condicaoNumeroSienge);
