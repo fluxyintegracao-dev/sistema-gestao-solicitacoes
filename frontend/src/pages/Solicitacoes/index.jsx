@@ -28,6 +28,33 @@ import {
 } from '../../services/solicitacoes';
 
 export default function Solicitacoes({ arquivadas = false }) {
+  function correspondeBuscaParcialNormalizada(valorItem, termoBusca) {
+    const termo = String(termoBusca || '').trim();
+    if (!termo) return true;
+
+    const textoItem = String(valorItem || '').trim();
+    const textoItemUpper = textoItem.toUpperCase();
+    const termoUpper = termo.toUpperCase();
+
+    if (textoItemUpper.includes(termoUpper)) {
+      return true;
+    }
+
+    const digitosItem = textoItem.replace(/\D+/g, '');
+    const digitosBusca = termo.replace(/\D+/g, '');
+
+    if (!digitosBusca) {
+      return false;
+    }
+
+    const digitosBuscaSemZeros = digitosBusca.replace(/^0+(?=\d)/, '');
+
+    return (
+      digitosItem.includes(digitosBusca) ||
+      (digitosBuscaSemZeros ? digitosItem.includes(digitosBuscaSemZeros) : false)
+    );
+  }
+
   const DEFAULT_VISIBLE_COLUMNS = [
     'data',
     'codigo',
@@ -307,7 +334,15 @@ export default function Solicitacoes({ arquivadas = false }) {
 
   const perfilUpper = String(user?.perfil || '').toUpperCase();
   const mostrarSomaValor = perfilUpper.startsWith('ADMIN') || perfilUpper === 'SUPERADMIN';
-  const somaValorFiltrado = solicitacoes.reduce((total, item) => {
+  const solicitacoesFiltradas = useMemo(() => {
+    return solicitacoes.filter(item => {
+      const matchCodigo = correspondeBuscaParcialNormalizada(item?.codigo, filtros.codigo);
+      const matchNumeroSienge = correspondeBuscaParcialNormalizada(item?.numero_sienge, filtros.numero_sienge);
+      return matchCodigo && matchNumeroSienge;
+    });
+  }, [solicitacoes, filtros.codigo, filtros.numero_sienge]);
+
+  const somaValorFiltradoFinal = solicitacoesFiltradas.reduce((total, item) => {
     const valor = Number(item?.valor || 0);
     return total + (Number.isNaN(valor) ? 0 : valor);
   }, 0);
@@ -415,7 +450,7 @@ export default function Solicitacoes({ arquivadas = false }) {
   }
 
   function toggleSelecionarTodas() {
-    const idsPagina = solicitacoes.map(item => Number(item.id));
+    const idsPagina = solicitacoesFiltradas.map(item => Number(item.id));
     const todasSelecionadas = idsPagina.length > 0 && idsPagina.every(id => selecionadasIds.includes(id));
     setSelecionadasIds(todasSelecionadas ? [] : idsPagina);
   }
@@ -465,7 +500,7 @@ export default function Solicitacoes({ arquivadas = false }) {
       return;
     }
 
-    const selecionadas = solicitacoes.filter(item => selecionadasIds.includes(Number(item.id)));
+    const selecionadas = solicitacoesFiltradas.filter(item => selecionadasIds.includes(Number(item.id)));
     if (selecionadas.length === 0) {
       alert('Nenhuma solicitação selecionada para exportar.');
       return;
@@ -585,8 +620,8 @@ export default function Solicitacoes({ arquivadas = false }) {
   const selecionadaUnica = useMemo(() => {
     if (selecionadasIds.length !== 1) return null;
     const idSelecionado = Number(selecionadasIds[0]);
-    return solicitacoes.find(item => Number(item.id) === idSelecionado) || null;
-  }, [selecionadasIds, solicitacoes]);
+    return solicitacoesFiltradas.find(item => Number(item.id) === idSelecionado) || null;
+  }, [selecionadasIds, solicitacoesFiltradas]);
 
   const podeAssumirUnica = useMemo(() => {
     if (!selecionadaUnica) return false;
@@ -624,10 +659,10 @@ export default function Solicitacoes({ arquivadas = false }) {
     if (selecionadasIds.length <= 1 || isSetorObra) return false;
     if (isSuperadmin) return true;
     return selecionadasIds.every(idSelecionado => {
-      const solicitacao = solicitacoes.find(item => Number(item.id) === Number(idSelecionado));
+      const solicitacao = solicitacoesFiltradas.find(item => Number(item.id) === Number(idSelecionado));
       return solicitacao && solicitacaoEstaNoSetorDoUsuario(solicitacao.area_responsavel, user);
     });
-  }, [selecionadasIds, isSetorObra, isSuperadmin, solicitacoes, user]);
+  }, [selecionadasIds, isSetorObra, isSuperadmin, solicitacoesFiltradas, user]);
 
   const isSetorObraSolicitacaoUnica = useMemo(() => {
     if (!selecionadaUnica) return false;
@@ -778,7 +813,7 @@ export default function Solicitacoes({ arquivadas = false }) {
         statusOptions={statusOptions}
         mostrarFiltroResponsavel={isSetorFinanceiro}
         mostrarSomaValor={mostrarSomaValor}
-        somaValorFiltrado={somaValorFiltrado}
+        somaValorFiltrado={somaValorFiltradoFinal}
       />
 
       {!arquivadas && (
@@ -867,15 +902,15 @@ export default function Solicitacoes({ arquivadas = false }) {
 
       {loading && <p className="mt-6 text-sm md:text-base text-[var(--c-muted)]">Carregando...</p>}
 
-      {!loading && solicitacoes.length === 0 && (
+      {!loading && solicitacoesFiltradas.length === 0 && (
         <p className="mt-6">
           {arquivadas ? 'Nenhuma solicitação arquivada.' : 'Nenhuma solicitação encontrada.'}
         </p>
       )}
 
-      {!loading && solicitacoes.length > 0 && (
+      {!loading && solicitacoesFiltradas.length > 0 && (
         <TabelaSolicitacoes
-          solicitacoes={solicitacoes}
+          solicitacoes={solicitacoesFiltradas}
           onAtualizar={carregar}
           setoresMap={setoresMap}
           permissaoUsuario={permissaoUsuario}
