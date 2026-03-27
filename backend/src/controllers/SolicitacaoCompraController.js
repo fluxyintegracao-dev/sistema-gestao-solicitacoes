@@ -82,6 +82,15 @@ function isImageAttachment(item) {
   return extension === '.png' || extension === '.jpg' || extension === '.jpeg';
 }
 
+function obterLinkArquivoPdf(item) {
+  const arquivoUrl = String(item?.arquivo_url || '').trim();
+  if (!arquivoUrl) {
+    return null;
+  }
+
+  return arquivoUrl.startsWith('http') ? arquivoUrl : null;
+}
+
 async function carregarArquivoBuffer(arquivoUrl) {
   if (!arquivoUrl) {
     return null;
@@ -193,10 +202,12 @@ function renderPaginaAnexosVisuais(doc, anexos) {
       });
     doc
       .fontSize(8)
-      .fillColor('#64748b')
+      .fillColor(obterLinkArquivoPdf(anexo.item) ? '#1d4ed8' : '#64748b')
       .font('Helvetica')
       .text(anexo.item.arquivo_nome_original || 'Imagem anexada', x + 12, y + 30, {
-        width: cardWidth - 24
+        width: cardWidth - 24,
+        link: obterLinkArquivoPdf(anexo.item) || undefined,
+        underline: Boolean(obterLinkArquivoPdf(anexo.item))
       });
 
     doc.roundedRect(x + 12, y + 52, cardWidth - 24, imageHeight, 8).fillAndStroke('#f8fafc', '#e2e8f0');
@@ -799,15 +810,33 @@ async function renderPdfSolicitacaoCompra(doc, solicitacao) {
       });
       if (item.arquivo_nome_original) {
         const offset = doc.heightOfString(item.link_produto, { width: colWidths[7] - 8 }) + 2;
-        doc.fontSize(6).fillColor('#000000').text(construirTextoMidiaPdf({ ...item, link_produto: null }), colX[7] + 4, yLink + offset, {
-          width: colWidths[7] - 8
-        });
+        const arquivoUrlPdf = obterLinkArquivoPdf(item);
+        doc
+          .fontSize(6)
+          .fillColor(arquivoUrlPdf ? '#1d4ed8' : '#000000')
+          .text(construirTextoMidiaPdf({ ...item, link_produto: null }), colX[7] + 4, yLink + offset, {
+            width: colWidths[7] - 8,
+            link: arquivoUrlPdf || undefined,
+            underline: Boolean(arquivoUrlPdf)
+          });
       }
     } else {
-      desenharTextoNaCelula(doc, textoMidia || '-', colX[7], y, colWidths[7], rowHeight, {
-        fontSize: 6,
-        paddingX: 4
-      });
+      const arquivoUrlPdf = item.arquivo_nome_original ? obterLinkArquivoPdf(item) : null;
+      if (arquivoUrlPdf && textoMidia) {
+        doc
+          .fontSize(6)
+          .fillColor('#1d4ed8')
+          .text(textoMidia, colX[7] + 4, y + 4, {
+            width: colWidths[7] - 8,
+            link: arquivoUrlPdf,
+            underline: true
+          });
+      } else {
+        desenharTextoNaCelula(doc, textoMidia || '-', colX[7], y, colWidths[7], rowHeight, {
+          fontSize: 6,
+          paddingX: 4
+        });
+      }
     }
 
     y += rowHeight;
