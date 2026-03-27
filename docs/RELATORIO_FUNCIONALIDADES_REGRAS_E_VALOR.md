@@ -143,7 +143,8 @@ Regras de operacao:
 - `ADMIN GEO` e escopos equivalentes podem ter ampliacao conforme regra do backend
 - numero do pedido permanece restrito a GEO
 - remocao de anexo historico permanece restrita a `COMPRAS` e `SUPERADMIN`
-- a listagem aceita filtro por `codigo` com busca parcial, inclusive por trechos numericos do codigo
+- a listagem aceita filtro por `codigo` com busca parcial, inclusive por trechos numericos e buscas com zeros a esquerda
+- a listagem aceita filtro por `numero_sienge` com busca parcial
 
 ### 5.4 Nova Solicitacao
 Campos principais:
@@ -359,7 +360,7 @@ Regra de negocio importante:
 - persistencia de filtros e preferencias visuais em `localStorage`
 - tabela principal com filtros, colunas configuraveis, acoes contextuais e responsividade
 - fluxo de login com identidade visual CSC
-- filtro de solicitacoes por codigo com correspondencia parcial
+- filtro de solicitacoes por codigo e `numero_sienge` com correspondencia parcial
 
 ## 7. Integridade, auditoria e seguranca
 - validacoes criticas em frontend e backend

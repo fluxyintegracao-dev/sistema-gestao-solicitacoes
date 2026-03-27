@@ -572,6 +572,37 @@ function parseObservacaoEnvioSetor(observacao) {
   };
 }
 
+function montarCondicaoBuscaParcial(valor, coluna) {
+  const termo = String(valor || '').trim();
+  if (!termo) return null;
+
+  const variantes = new Set([termo]);
+  const apenasDigitos = termo.replace(/\D+/g, '');
+  const digitosSemZerosAEsquerda = apenasDigitos.replace(/^0+(?=\d)/, '');
+
+  if (apenasDigitos) {
+    variantes.add(apenasDigitos);
+  }
+
+  if (digitosSemZerosAEsquerda) {
+    variantes.add(digitosSemZerosAEsquerda);
+  }
+
+  const condicoes = Array.from(variantes)
+    .map(item => String(item || '').trim())
+    .filter(Boolean)
+    .map(item => ({
+      [coluna]: {
+        [Op.like]: `%${item}%`
+      }
+    }));
+
+  if (condicoes.length === 0) return null;
+  if (condicoes.length === 1) return condicoes[0];
+
+  return { [Op.or]: condicoes };
+}
+
 module.exports = {
 
   // =====================================================
@@ -590,6 +621,7 @@ module.exports = {
         obra_id,
         obra_ids,
         codigo_contrato,
+        numero_sienge,
         numero_solicitacao,
         responsavel,
         data_registro,
@@ -1002,19 +1034,18 @@ module.exports = {
         }
       }
       if (codigo) {
-        const codigoFiltro = String(codigo).trim();
-        if (codigoFiltro) {
-          where.codigo = {
-            [Op.like]: `%${codigoFiltro}%`
-          };
+        const condicaoCodigo = montarCondicaoBuscaParcial(codigo, 'codigo');
+        if (condicaoCodigo) {
+          where[Op.and] = where[Op.and] || [];
+          where[Op.and].push(condicaoCodigo);
         }
       }
-      if (numero_solicitacao) {
-        const numeroSolicitacaoFiltro = String(numero_solicitacao).trim();
-        if (numeroSolicitacaoFiltro) {
-          where.numero_sienge = {
-            [Op.like]: `%${numeroSolicitacaoFiltro}%`
-          };
+      const numeroSiengeFiltro = numero_sienge ?? numero_solicitacao;
+      if (numeroSiengeFiltro) {
+        const condicaoNumeroSienge = montarCondicaoBuscaParcial(numeroSiengeFiltro, 'numero_sienge');
+        if (condicaoNumeroSienge) {
+          where[Op.and] = where[Op.and] || [];
+          where[Op.and].push(condicaoNumeroSienge);
         }
       }
       if (valor_min !== undefined && valor_min !== null && String(valor_min).trim() !== '') {

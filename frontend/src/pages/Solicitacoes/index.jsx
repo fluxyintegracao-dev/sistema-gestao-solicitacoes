@@ -73,7 +73,7 @@ export default function Solicitacoes({ arquivadas = false }) {
 
   const [filtros, setFiltros] = useState({
     codigo: '',
-    numero_solicitacao: '',
+    numero_sienge: '',
     obra_ids: '',
     area: '',
     tipo_solicitacao_id: '',
@@ -101,10 +101,12 @@ export default function Solicitacoes({ arquivadas = false }) {
       if (salvo) {
         const parsed = JSON.parse(salvo);
         if (parsed && typeof parsed === 'object') {
+          const numeroSiengeSalvo = parsed.numero_sienge ?? parsed.numero_solicitacao ?? '';
           setFiltros(prev => ({
             ...prev,
             ...parsed,
-            codigo: String(parsed.codigo || '').trim()
+            codigo: String(parsed.codigo || '').trim(),
+            numero_sienge: String(numeroSiengeSalvo || '').trim()
           }));
         }
       }
