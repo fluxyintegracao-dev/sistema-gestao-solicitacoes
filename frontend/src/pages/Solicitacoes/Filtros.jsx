@@ -111,7 +111,7 @@ export default function Filtros({
   function limparFiltros() {
     setFiltros({
       codigo: '',
-      numero_solicitacao: '',
+      numero_sienge: '',
       obra_ids: '',
       area: '',
       tipo_solicitacao_id: '',
@@ -308,7 +308,7 @@ export default function Filtros({
 
   const quantidadeFiltrosAtivos = [
     filtros.codigo,
-    filtros.numero_solicitacao,
+    filtros.numero_sienge,
     filtros.obra_ids,
     filtros.area,
     filtros.tipo_solicitacao_id,
@@ -393,10 +393,10 @@ export default function Filtros({
             <div className="sol-filter-field">
               <label className="sol-filter-label">Número SIENGE</label>
               <input
-                name="numero_solicitacao"
+                name="numero_sienge"
                 placeholder="Ex: 12345"
                 className="input"
-                value={filtros.numero_solicitacao || ''}
+                value={filtros.numero_sienge || ''}
                 onChange={handleChange}
                 type="text"
               />
