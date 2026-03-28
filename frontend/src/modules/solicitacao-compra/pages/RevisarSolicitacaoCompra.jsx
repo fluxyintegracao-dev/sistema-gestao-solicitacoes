@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { criarSolicitacaoCompra, obterUrlAssinadaCompra } from '../../../services/compras';
+import CompraPreviewModal from '../components/CompraPreviewModal';
 
 const DRAFT_KEY = 'fluxy_solicitacao_compra_draft';
 
@@ -78,6 +79,7 @@ export default function RevisarSolicitacaoCompra() {
   const [loading, setLoading] = useState(false);
   const [previewVisualizado, setPreviewVisualizado] = useState(false);
   const [modalPreviewAberto, setModalPreviewAberto] = useState(false);
+  const [previewArquivo, setPreviewArquivo] = useState(null);
 
   useEffect(() => {
     try {
@@ -214,7 +216,11 @@ export default function RevisarSolicitacaoCompra() {
         return;
       }
 
-      window.open(url, '_blank', 'noopener,noreferrer');
+      setPreviewArquivo({
+        title: 'Arquivo do item',
+        name: item.arquivo_nome_original || 'Arquivo anexado',
+        url
+      });
     } catch (error) {
       console.error(error);
       alert(error.message || 'Erro ao abrir arquivo do item');
@@ -516,6 +522,8 @@ export default function RevisarSolicitacaoCompra() {
           </div>
         </div>
       )}
+
+      <CompraPreviewModal preview={previewArquivo} onClose={() => setPreviewArquivo(null)} />
     </div>
   );
 }

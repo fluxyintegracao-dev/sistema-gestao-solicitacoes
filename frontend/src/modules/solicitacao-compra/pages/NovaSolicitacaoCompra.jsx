@@ -8,6 +8,7 @@ import {
 } from '../../../services/compras';
 import { getMinhasObras } from '../../../services/obras';
 import { useAuth } from '../../../contexts/AuthContext';
+import CompraPreviewModal from '../components/CompraPreviewModal';
 
 const DRAFT_KEY = 'fluxy_solicitacao_compra_draft';
 const ITEM_ATTACHMENT_ACCEPT = '.pdf,.doc,.docx,.xls,.xlsx,.csv,.ppt,.pptx,.png,.jpg,.jpeg,.html,.rar';
@@ -72,6 +73,7 @@ export default function NovaSolicitacaoCompra() {
   const [uploadingArquivos, setUploadingArquivos] = useState({});
   const [loading, setLoading] = useState(false);
   const [modalManualAberto, setModalManualAberto] = useState(false);
+  const [previewArquivo, setPreviewArquivo] = useState(null);
   const [itemManual, setItemManual] = useState({
     nome_manual: '',
     unidade_sigla_manual: '',
@@ -414,7 +416,11 @@ export default function NovaSolicitacaoCompra() {
         return;
       }
 
-      window.open(url, '_blank', 'noopener,noreferrer');
+      setPreviewArquivo({
+        title: 'Arquivo do item',
+        name: item.arquivo_nome_original || 'Arquivo anexado',
+        url
+      });
     } catch (error) {
       console.error(error);
       alert(error.message || 'Erro ao abrir arquivo do item');
@@ -823,6 +829,8 @@ export default function NovaSolicitacaoCompra() {
           </div>
         </div>
       )}
+
+      <CompraPreviewModal preview={previewArquivo} onClose={() => setPreviewArquivo(null)} />
     </div>
   );
 }

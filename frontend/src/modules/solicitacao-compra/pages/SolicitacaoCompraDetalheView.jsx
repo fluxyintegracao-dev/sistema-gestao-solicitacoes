@@ -13,6 +13,7 @@ import {
   obterUrlAssinadaCompra
 } from '../../../services/compras';
 import { useAuth } from '../../../contexts/AuthContext';
+import CompraPreviewModal from '../components/CompraPreviewModal';
 
 function formatarData(data) {
   if (!data) {
@@ -77,6 +78,7 @@ export default function SolicitacaoCompraDetalheView() {
   const [comparativo, setComparativo] = useState(null);
   const [loading, setLoading] = useState(false);
   const [baixando, setBaixando] = useState(false);
+  const [previewArquivo, setPreviewArquivo] = useState(null);
   const [salvandoIntegracao, setSalvandoIntegracao] = useState(false);
   const [salvandoLiberacao, setSalvandoLiberacao] = useState(false);
   const [enviandoFornecedores, setEnviandoFornecedores] = useState(false);
@@ -185,8 +187,11 @@ export default function SolicitacaoCompraDetalheView() {
       setBaixando(true);
       const blob = await baixarPdfSolicitacaoCompra(id);
       const url = window.URL.createObjectURL(blob);
-      window.open(url, '_blank', 'noopener,noreferrer');
-      window.setTimeout(() => window.URL.revokeObjectURL(url), 10000);
+      setPreviewArquivo({
+        title: `PDF da solicitacao SC-${String(solicitacao?.id || id).padStart(5, '0')}`,
+        name: `SC-${String(solicitacao?.id || id).padStart(5, '0')}.pdf`,
+        url
+      });
     } catch (error) {
       console.error(error);
       alert(error.message || 'Erro ao abrir PDF');
@@ -203,7 +208,11 @@ export default function SolicitacaoCompraDetalheView() {
         return;
       }
 
-      window.open(url, '_blank', 'noopener,noreferrer');
+      setPreviewArquivo({
+        title: 'Arquivo do item',
+        name: item.arquivo_nome_original || 'Arquivo anexado',
+        url
+      });
     } catch (error) {
       console.error(error);
       alert(error.message || 'Erro ao abrir arquivo do item');
@@ -703,6 +712,8 @@ export default function SolicitacaoCompraDetalheView() {
           </div>
         </div>
       </div>
+
+      <CompraPreviewModal preview={previewArquivo} onClose={() => setPreviewArquivo(null)} />
     </div>
   );
 }

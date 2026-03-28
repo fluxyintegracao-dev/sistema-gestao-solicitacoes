@@ -1,12 +1,14 @@
 import { useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { baixarPdfSolicitacaoCompra, obterUrlAssinadaCompra } from '../../../services/compras';
+import CompraPreviewModal from '../components/CompraPreviewModal';
 
 export default function RevisarSolicitacaoCompraFinal() {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
   const [baixando, setBaixando] = useState(false);
+  const [previewArquivo, setPreviewArquivo] = useState(null);
   const resultado = location.state?.resultado || null;
   const resumo = location.state?.resumo || null;
 
@@ -20,10 +22,11 @@ export default function RevisarSolicitacaoCompraFinal() {
       setBaixando(true);
       const blob = await baixarPdfSolicitacaoCompra(id);
       const url = window.URL.createObjectURL(blob);
-      window.open(url, '_blank', 'noopener,noreferrer');
-      window.setTimeout(() => {
-        window.URL.revokeObjectURL(url);
-      }, 10000);
+      setPreviewArquivo({
+        title: `PDF da solicitacao ${codigo}`,
+        name: `${codigo}.pdf`,
+        url
+      });
     } catch (error) {
       console.error(error);
       alert(error.message || 'Erro ao abrir PDF');
@@ -40,7 +43,11 @@ export default function RevisarSolicitacaoCompraFinal() {
         return;
       }
 
-      window.open(url, '_blank', 'noopener,noreferrer');
+      setPreviewArquivo({
+        title: 'Arquivo do item',
+        name: item.arquivo_nome_original || 'Arquivo anexado',
+        url
+      });
     } catch (error) {
       console.error(error);
       alert(error.message || 'Erro ao abrir arquivo do item');
@@ -162,6 +169,8 @@ export default function RevisarSolicitacaoCompraFinal() {
           )}
         </div>
       </div>
+
+      <CompraPreviewModal preview={previewArquivo} onClose={() => setPreviewArquivo(null)} />
     </div>
   );
 }
