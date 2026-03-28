@@ -1,6 +1,0 @@
-flask
-openpyxl
-pillow
-gunicorn
-reportlab
-cryptography

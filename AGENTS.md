@@ -22,6 +22,7 @@ Guia rapido para colaboradores e agentes automatizados.
 - Dominios configurados: `jrfluxy.com.br`, `www.jrfluxy.com.br`, `csc.jrfluxy.com.br` (apontando para Vercel).
 - CORS do backend ajustado para aceitar dominios Vercel (preview) e dominios customizados.
 - S3 usado para anexos/comprovantes com URLs assinadas e CORS liberado (atual: `AllowedOrigins: ["*"]`).
+- O repositorio nao possui mais `python-service`; o runtime ativo e apenas Node/React (`backend/` + `frontend/`).
 
 ### Uploads / S3
 - Uploads migram para S3 via `uploadToS3`.

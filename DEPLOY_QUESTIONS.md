@@ -11,7 +11,7 @@
 
 ## 2) Backend (Node/Express) — detalhes técnicos essenciais
 - CommonJS ou ESM: **CommonJS** (`require/module.exports`)
-- Versão do Node: **NAO DEFINIDA em package.json** (observado em logs: Node 24.11.1)
+- Versão do Node: **NAO DEFINIDA no repositorio** (observado em logs: Node 24.11.1)
 - CORS:
   - `app.use(cors())` => **aceita * (origens livres)**
   - `CORS_ORIGIN` não é lido

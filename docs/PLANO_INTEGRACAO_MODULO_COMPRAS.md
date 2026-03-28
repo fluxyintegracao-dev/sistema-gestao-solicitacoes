@@ -11,7 +11,6 @@ Integrar ao projeto em producao o modulo de compras que existe em `Fluxy_com_Mod
   - `backend/src/routes.js`
   - `frontend/src/pages/ComprovantesPendentes.jsx`
   - `frontend/src/services/comprovantes.js`
-  - `requirements.txt`
 - Ha tambem conteudo novo nao rastreado:
   - `Fluxy_com_Modulo_Solicitacoes/`
   - `git`
