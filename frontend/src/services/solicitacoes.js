@@ -12,6 +12,23 @@ export async function getSolicitacoes(params = '') {
   return res.json();
 }
 
+export async function getObrasVisiveisSolicitacoes(params = {}) {
+  const query = new URLSearchParams(params).toString();
+  const url = query
+    ? `${API_URL}/solicitacoes/filtros/obras?${query}`
+    : `${API_URL}/solicitacoes/filtros/obras`;
+
+  const res = await fetch(url, {
+    headers: authHeaders()
+  });
+
+  if (!res.ok) {
+    throw new Error('Erro ao buscar obras visiveis das solicitacoes');
+  }
+
+  return res.json();
+}
+
 export async function createSolicitacao(data) {
   const res = await fetch(`${API_URL}/solicitacoes`, {
     method: 'POST',

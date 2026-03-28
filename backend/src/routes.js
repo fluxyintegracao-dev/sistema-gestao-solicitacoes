@@ -110,6 +110,7 @@ const allowGestaoUsuarios = async (req, res, next) => {
 // -------------------------------------------------------------------
 
 router.post('/solicitacoes', SolicitacaoController.create);
+router.get('/solicitacoes/filtros/obras', SolicitacaoController.obrasVisiveis);
 router.get('/solicitacoes', SolicitacaoController.index);
 router.get('/solicitacoes/:id', SolicitacaoController.show);
 router.patch('/solicitacoes/:id/status', SolicitacaoController.updateStatus);

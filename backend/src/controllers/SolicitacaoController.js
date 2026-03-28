@@ -681,10 +681,14 @@ module.exports = {
         tipo_macro_id,
         tipo_solicitacao_id,
         page,
-        limit
+        limit,
+        apenas_obras
       } = req.query;
       const paginacaoSolicitada =
         req.query.page !== undefined || req.query.limit !== undefined;
+      const apenasObrasSolicitadas = ['1', 'true', 'sim'].includes(
+        String(apenas_obras || '').trim().toLowerCase()
+      );
       const paginaAtual = parsePositiveInt(page, 1);
       const limitePorPagina = Math.min(
         parsePositiveInt(limit, DEFAULT_SOLICITACOES_PAGE_SIZE),
@@ -1282,6 +1286,28 @@ module.exports = {
       let resultado = [];
       let totalRegistros = 0;
 
+      const listarObrasDistinct = async (obraIds) => {
+        const idsValidos = Array.from(new Set((obraIds || [])
+          .map(id => Number(id))
+          .filter(id => !Number.isNaN(id) && id > 0)));
+
+        if (idsValidos.length === 0) {
+          return [];
+        }
+
+        const obras = await Obra.findAll({
+          where: { id: { [Op.in]: idsValidos } },
+          attributes: ['id', 'nome', 'codigo'],
+          order: [['nome', 'ASC']]
+        });
+
+        return obras.map(obra => ({
+          id: obra.id,
+          nome: obra.nome,
+          codigo: obra.codigo
+        }));
+      };
+
       const usuarioComRegraMistaPorTipo =
         perfil === 'USUARIO' &&
         !adminGEO &&
@@ -1339,6 +1365,12 @@ module.exports = {
         });
 
         totalRegistros = resultadoFiltro.length;
+
+        if (apenasObrasSolicitadas) {
+          const obraIdsVisiveis = resultadoFiltro.map(item => Number(item.obra_id));
+          return res.json(await listarObrasDistinct(obraIdsVisiveis));
+        }
+
         const idsPagina = (paginacaoSolicitada
           ? resultadoFiltro.slice(offset, offset + limitePorPagina)
           : resultadoFiltro
@@ -1358,6 +1390,20 @@ module.exports = {
           );
         }
       } else {
+        if (apenasObrasSolicitadas) {
+          const solicitacoesComObra = await Solicitacao.findAll({
+            where,
+            attributes: ['obra_id']
+          });
+
+          let obraIdsVisiveis = solicitacoesComObra.map(item => Number(item.obra_id));
+          if (isSetorObra) {
+            obraIdsVisiveis = obraIdsVisiveis.filter(id => obrasVinculadas.includes(id));
+          }
+
+          return res.json(await listarObrasDistinct(obraIdsVisiveis));
+        }
+
         totalRegistros = await Solicitacao.count({ where });
         const solicitacoes = await Solicitacao.findAll({
           where,
@@ -1397,6 +1443,19 @@ module.exports = {
       console.error(error);
       return res.status(500).json({ error: 'Erro ao buscar solicitacoes' });
     }
+  },
+
+  async obrasVisiveis(req, res) {
+    return module.exports.index(
+      {
+        ...req,
+        query: {
+          ...req.query,
+          apenas_obras: '1'
+        }
+      },
+      res
+    );
   },
 
   // =====================================================

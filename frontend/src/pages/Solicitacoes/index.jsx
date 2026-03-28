@@ -18,14 +18,14 @@ import { getSetores } from '../../services/setores';
 import { getTiposSolicitacao } from '../../services/tiposSolicitacao';
 import { getSetorPermissoes } from '../../services/setorPermissoes';
 import { getStatusSetor } from '../../services/statusSetor';
-import { getMinhasObras, getObras } from '../../services/obras';
 import { useAuth } from '../../contexts/AuthContext';
 import { parseDateSmart } from '../../utils/dateLocal';
 import { isGeoSetor, solicitacaoEstaNoSetorDoUsuario } from '../../utils/setor';
 import {
   arquivarSolicitacoesEmMassa,
   deleteSolicitacao,
-  enviarSolicitacoesParaSetorEmMassa
+  enviarSolicitacoesParaSetorEmMassa,
+  getObrasVisiveisSolicitacoes
 } from '../../services/solicitacoes';
 
 export default function Solicitacoes({ arquivadas = false }) {
@@ -146,7 +146,7 @@ export default function Solicitacoes({ arquivadas = false }) {
 
   useEffect(() => {
     carregarObrasOptions();
-  }, [user?.perfil]);
+  }, [arquivadas]);
 
   async function carregarTiposSolicitacao() {
     try {
@@ -259,8 +259,7 @@ export default function Solicitacoes({ arquivadas = false }) {
 
   async function carregarObrasOptions() {
     try {
-      const service = user?.perfil === 'USUARIO' ? getMinhasObras : getObras;
-      const data = await service();
+      const data = await getObrasVisiveisSolicitacoes(arquivadas ? { arquivadas: '1' } : {});
       const lista = (Array.isArray(data) ? data : []).map((obra) => ({
         value: String(obra.id),
         label: obra.nome
