@@ -24,6 +24,20 @@ export async function getDestinatariosConversa(setorId) {
   return parseResponse(response, 'Erro ao buscar destinatarios');
 }
 
+export async function getResumoConversas({ entradaSeenAt, saidaSeenAt } = {}) {
+  const params = new URLSearchParams();
+  if (entradaSeenAt) params.set('entrada_seen_at', entradaSeenAt);
+  if (saidaSeenAt) params.set('saida_seen_at', saidaSeenAt);
+  const query = params.toString();
+  const response = await fetch(
+    `${API_URL}/conversas-internas/resumo${query ? `?${query}` : ''}`,
+    {
+      headers: authHeaders()
+    }
+  );
+  return parseResponse(response, 'Erro ao buscar resumo de conversas');
+}
+
 export async function getCaixaEntrada({ arquivadas = false, page, limit } = {}) {
   const params = new URLSearchParams({
     arquivadas: arquivadas ? '1' : '0'

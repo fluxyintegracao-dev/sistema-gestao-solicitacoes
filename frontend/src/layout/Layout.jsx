@@ -2,7 +2,7 @@ import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useContext, useEffect, useMemo, useState } from 'react';
 import { AuthContext } from '../contexts/AuthContext';
 import NotificacoesBell from '../components/NotificacoesBell';
-import { getCaixaEntrada, getCaixaSaida } from '../services/conversasInternas';
+import { getResumoConversas } from '../services/conversasInternas';
 import {
   HiOutlineSquares2X2,
   HiOutlinePlusCircle,
@@ -103,32 +103,15 @@ export default function Layout() {
         return;
       }
       try {
-        const [listaEntrada, listaSaida] = await Promise.all([
-          getCaixaEntrada({ arquivadas: false }),
-          getCaixaSaida({ arquivadas: false })
-        ]);
+        const seenEntradaValue = localStorage.getItem(storageKeyEntrada) || '';
+        const seenSaidaValue = localStorage.getItem(storageKeySaida) || '';
+        const resumo = await getResumoConversas({
+          entradaSeenAt: seenEntradaValue,
+          saidaSeenAt: seenSaidaValue
+        });
         if (!ativo) return;
-        const seenEntradaValue = localStorage.getItem(storageKeyEntrada);
-        const seenEntradaMs = seenEntradaValue ? new Date(seenEntradaValue).getTime() : 0;
-        const seenSaidaValue = localStorage.getItem(storageKeySaida);
-        const seenSaidaMs = seenSaidaValue ? new Date(seenSaidaValue).getTime() : 0;
-
-        const totalEntrada = (Array.isArray(listaEntrada) ? listaEntrada : []).filter(item => {
-          const updatedMs = new Date(item?.updatedAt || item?.createdAt).getTime();
-          const autorId = Number(item?.ultima_mensagem?.autor?.id || 0);
-          const autorEhOutroUsuario = !autorId || autorId !== userId;
-          return updatedMs > seenEntradaMs && autorEhOutroUsuario;
-        }).length;
-
-        const totalSaida = (Array.isArray(listaSaida) ? listaSaida : []).filter(item => {
-          const updatedMs = new Date(item?.updatedAt || item?.createdAt).getTime();
-          const autorId = Number(item?.ultima_mensagem?.autor?.id || 0);
-          const autorEhOutroUsuario = !autorId || autorId !== userId;
-          return updatedMs > seenSaidaMs && autorEhOutroUsuario;
-        }).length;
-
-        setInboxNovasCount(totalEntrada);
-        setSaidaNovasCount(totalSaida);
+        setInboxNovasCount(Number(resumo?.entrada_nao_vistas || 0));
+        setSaidaNovasCount(Number(resumo?.saida_nao_vistas || 0));
       } catch {
         // sem bloqueio visual em caso de falha temporaria
       }

@@ -19,7 +19,7 @@ export default function NotificacoesBell() {
       return;
     }
     try {
-      const data = await getNotificacoes({ limit: 50 });
+      const data = await getNotificacoes({ limit: 20 });
       const itensFiltrados = Array.isArray(data.itens)
         ? data.itens.filter(item => TIPOS_VISIVEIS.has(String(item.tipo || '').toUpperCase()))
         : [];

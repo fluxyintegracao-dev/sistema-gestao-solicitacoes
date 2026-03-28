@@ -55,21 +55,31 @@ async function garantirParticipantesBasicos(conversa) {
 }
 
 async function criarParticipantes(conversaId, usuarioIds, adicionadoPorId) {
-  for (const usuarioId of usuarioIds) {
-    await ConversaInternaParticipante.findOrCreate({
-      where: { conversa_id: conversaId, usuario_id: usuarioId },
-      defaults: { adicionado_por_id: adicionadoPorId }
-    });
-  }
+  const idsValidos = [...new Set(
+    (Array.isArray(usuarioIds) ? usuarioIds : [])
+      .map((item) => Number(item))
+      .filter((item) => Number.isInteger(item) && item > 0)
+  )];
+  if (idsValidos.length === 0) return;
+
+  await ConversaInternaParticipante.bulkCreate(
+    idsValidos.map((usuarioId) => ({
+      conversa_id: conversaId,
+      usuario_id: usuarioId,
+      adicionado_por_id: adicionadoPorId
+    })),
+    { ignoreDuplicates: true }
+  );
 }
 
 async function salvarAnexosMensagem({ conversaId, mensagemId, files }) {
   if (!Array.isArray(files) || files.length === 0) return;
 
+  const anexos = [];
   for (const file of files) {
     const nomeArquivo = normalizeOriginalName(file.originalname);
     const caminho = await uploadToS3(file, `anexos/conversas/${conversaId}`);
-    await ConversaInternaAnexo.create({
+    anexos.push({
       conversa_id: conversaId,
       mensagem_id: mensagemId,
       nome_arquivo: nomeArquivo,
@@ -77,6 +87,10 @@ async function salvarAnexosMensagem({ conversaId, mensagemId, files }) {
       mime_type: file.mimetype || null,
       tamanho_bytes: Number(file.size || 0) || null
     });
+  }
+
+  if (anexos.length > 0) {
+    await ConversaInternaAnexo.bulkCreate(anexos);
   }
 }
 
@@ -292,6 +306,52 @@ async function listarConversasPaginadas({
   };
 }
 
+async function contarConversasComNovidade({
+  usuarioId,
+  since,
+  where
+}) {
+  const filtroSince = String(since || '').trim();
+  const sinceDate = filtroSince ? new Date(filtroSince) : null;
+  const whereBase = {
+    ...where,
+    ...(sinceDate && !Number.isNaN(sinceDate.getTime())
+      ? { updatedAt: { [Op.gt]: sinceDate } }
+      : {})
+  };
+
+  const conversas = await ConversaInterna.findAll({
+    where: whereBase,
+    attributes: ['id']
+  });
+  const conversaIds = conversas.map((item) => Number(item.id)).filter(Boolean);
+  if (conversaIds.length === 0) {
+    return 0;
+  }
+
+  const mensagens = await ConversaInternaMensagem.findAll({
+    where: { conversa_id: { [Op.in]: conversaIds } },
+    attributes: ['conversa_id', 'usuario_id', 'createdAt'],
+    order: [
+      ['conversa_id', 'ASC'],
+      ['createdAt', 'DESC']
+    ]
+  });
+
+  const ultimaMensagemPorConversa = new Map();
+  mensagens.forEach((mensagem) => {
+    const conversaId = Number(mensagem.conversa_id);
+    if (!ultimaMensagemPorConversa.has(conversaId)) {
+      ultimaMensagemPorConversa.set(conversaId, Number(mensagem.usuario_id) || 0);
+    }
+  });
+
+  return conversaIds.filter((conversaId) => {
+    const autorId = ultimaMensagemPorConversa.get(conversaId) || 0;
+    return autorId !== Number(usuarioId);
+  }).length;
+}
+
 async function criarConversaIndividual({ criadorId, destinatarioId, assunto, mensagemInicial, files }) {
   const conversa = await ConversaInterna.create({
     assunto,
@@ -340,6 +400,48 @@ async function filtrarPorArquivamento(conversas, usuarioId, somenteArquivadas) {
 }
 
 module.exports = {
+  async resumo(req, res) {
+    try {
+      const usuarioId = Number(req.user.id);
+      const participacoes = await ConversaInternaParticipante.findAll({
+        where: { usuario_id: usuarioId },
+        attributes: ['conversa_id']
+      });
+      const idsParticipacao = participacoes.map((item) => item.conversa_id);
+
+      const [entrada_nao_vistas, saida_nao_vistas] = await Promise.all([
+        contarConversasComNovidade({
+          usuarioId,
+          since: req.query?.entrada_seen_at,
+          where: {
+            [Op.and]: [
+              { criado_por_id: { [Op.ne]: usuarioId } },
+              {
+                [Op.or]: [
+                  { destinatario_id: usuarioId },
+                  idsParticipacao.length > 0 ? { id: { [Op.in]: idsParticipacao } } : null
+                ].filter(Boolean)
+              }
+            ]
+          }
+        }),
+        contarConversasComNovidade({
+          usuarioId,
+          since: req.query?.saida_seen_at,
+          where: { criado_por_id: usuarioId }
+        })
+      ]);
+
+      return res.json({
+        entrada_nao_vistas,
+        saida_nao_vistas
+      });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao carregar resumo de conversas' });
+    }
+  },
+
   async opcoesDestinatario(req, res) {
     try {
       const setorId = Number(req.query?.setor_id || 0);

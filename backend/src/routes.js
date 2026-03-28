@@ -392,6 +392,7 @@ router.get('/dashboard/executivo', DashboardController.executivo);
 // CONVERSAS INTERNAS (CAIXA DE ENTRADA/SAIDA)
 // -------------------------------------------------------------------
 router.get('/conversas-internas/destinatarios', ConversaInternaController.opcoesDestinatario);
+router.get('/conversas-internas/resumo', ConversaInternaController.resumo);
 router.get('/conversas-internas/entrada', ConversaInternaController.entrada);
 router.get('/conversas-internas/saida', ConversaInternaController.saida);
 router.get('/conversas-internas/:id', ConversaInternaController.detalhar);
