@@ -640,59 +640,58 @@ module.exports = {
         return res.status(403).json({ error: 'Acesso negado a conversa' });
       }
 
-      const conversaCompleta = await ConversaInterna.findByPk(id, {
-        include: [
-          {
-            model: User,
-            as: 'criador',
-            attributes: ['id', 'nome', 'email', 'setor_id'],
-            include: [{ model: Setor, as: 'setor', attributes: ['id', 'nome', 'codigo'] }]
-          },
-          {
-            model: User,
-            as: 'destinatario',
-            attributes: ['id', 'nome', 'email', 'setor_id'],
-            include: [{ model: Setor, as: 'setor', attributes: ['id', 'nome', 'codigo'] }]
-          },
-          {
-            model: User,
-            as: 'concluidaPor',
-            attributes: ['id', 'nome']
-          }
-        ]
-      });
-
-      const mensagens = await ConversaInternaMensagem.findAll({
-        where: { conversa_id: id },
-        include: [
-          {
-            model: User,
-            as: 'autor',
-            attributes: ['id', 'nome', 'email', 'setor_id'],
-            include: [{ model: Setor, as: 'setor', attributes: ['id', 'nome', 'codigo'] }]
-          }
-        ],
-        order: [['createdAt', 'ASC']]
-      });
-
-      const participantes = await ConversaInternaParticipante.findAll({
-        where: { conversa_id: id },
-        include: [
-          {
-            model: User,
-            as: 'usuario',
-            attributes: ['id', 'nome', 'email', 'setor_id'],
-            include: [{ model: Setor, as: 'setor', attributes: ['id', 'nome', 'codigo'] }]
-          }
-        ],
-        order: [['createdAt', 'ASC']]
-      });
-
-      const anexos = await ConversaInternaAnexo.findAll({
-        where: { conversa_id: id },
-        attributes: ['id', 'mensagem_id', 'nome_arquivo', 'caminho', 'mime_type', 'tamanho_bytes', 'createdAt'],
-        order: [['createdAt', 'ASC']]
-      });
+      const [conversaCompleta, mensagens, participantes, anexos] = await Promise.all([
+        ConversaInterna.findByPk(id, {
+          include: [
+            {
+              model: User,
+              as: 'criador',
+              attributes: ['id', 'nome', 'email', 'setor_id'],
+              include: [{ model: Setor, as: 'setor', attributes: ['id', 'nome', 'codigo'] }]
+            },
+            {
+              model: User,
+              as: 'destinatario',
+              attributes: ['id', 'nome', 'email', 'setor_id'],
+              include: [{ model: Setor, as: 'setor', attributes: ['id', 'nome', 'codigo'] }]
+            },
+            {
+              model: User,
+              as: 'concluidaPor',
+              attributes: ['id', 'nome']
+            }
+          ]
+        }),
+        ConversaInternaMensagem.findAll({
+          where: { conversa_id: id },
+          include: [
+            {
+              model: User,
+              as: 'autor',
+              attributes: ['id', 'nome', 'email', 'setor_id'],
+              include: [{ model: Setor, as: 'setor', attributes: ['id', 'nome', 'codigo'] }]
+            }
+          ],
+          order: [['createdAt', 'ASC']]
+        }),
+        ConversaInternaParticipante.findAll({
+          where: { conversa_id: id },
+          include: [
+            {
+              model: User,
+              as: 'usuario',
+              attributes: ['id', 'nome', 'email', 'setor_id'],
+              include: [{ model: Setor, as: 'setor', attributes: ['id', 'nome', 'codigo'] }]
+            }
+          ],
+          order: [['createdAt', 'ASC']]
+        }),
+        ConversaInternaAnexo.findAll({
+          where: { conversa_id: id },
+          attributes: ['id', 'mensagem_id', 'nome_arquivo', 'caminho', 'mime_type', 'tamanho_bytes', 'createdAt'],
+          order: [['createdAt', 'ASC']]
+        })
+      ]);
 
       const anexosPorMensagem = anexos.reduce((acc, item) => {
         if (!acc[item.mensagem_id]) {
