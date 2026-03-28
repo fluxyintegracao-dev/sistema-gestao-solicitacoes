@@ -1,0 +1,22 @@
+# Frontend build
+dist
+frontend/dist
+
+# Backend static
+backend/dist
+backend/public
+
+# Env
+.env
+frontend/.env
+backend/.env
+backend/uploads
+build
+.vscode
+
+# Env
+.env
+frontend/.env
+backend/.env
+
+node_modules

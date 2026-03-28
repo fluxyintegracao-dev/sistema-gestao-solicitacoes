@@ -1,0 +1,70 @@
+{% extends "admin_layout.html" %}
+{% block admin_content %}
+<section class="panel">
+  <h2 class="with-icon">
+    <svg class="ui-icon"><use href="#i-dashboard"></use></svg>
+    <span>Painel administrativo</span>
+  </h2>
+  {% if admin_msg %}
+  <p class="notice">{{ admin_msg }}</p>
+  {% endif %}
+  {% if import_result %}
+  <p class="notice">{{ import_result }}</p>
+  {% endif %}
+
+  <form method="post" action="{{ url_for('admin_logo_upload') }}" class="inline-form" enctype="multipart/form-data">
+    <input type="file" name="logo" accept=".png,.jpg,.jpeg" required />
+    <button type="submit" class="with-icon">
+      <svg class="ui-icon"><use href="#i-image"></use></svg>
+      <span>Atualizar logo da empresa</span>
+    </button>
+  </form>
+
+  <form method="post" action="{{ url_for('admin_importacao_geral') }}" class="inline-form" enctype="multipart/form-data">
+    <input type="file" name="arquivo" accept=".xlsx,.csv" required />
+    <button type="submit" class="with-icon">
+      <svg class="ui-icon"><use href="#i-upload"></use></svg>
+      <span>Importação geral em massa</span>
+    </button>
+    <a class="card action-link with-icon" href="{{ url_for('admin_importacao_template') }}">
+      <svg class="ui-icon"><use href="#i-download"></use></svg>
+      <span>Baixar template XLSX</span>
+    </a>
+  </form>
+
+  <p class="hint">A logo enviada será usada no topo do sistema e na planilha exportada.</p>
+  <p class="hint">Importação geral aceita XLSX (abas: obras, categorias, unidades, insumos, especificações, apropriações).</p>
+  <p class="hint">Usuários comuns acessam apenas a tela de solicitação.</p>
+
+  <div class="admin-links">
+    <a class="card with-icon" href="{{ url_for('admin_usuarios') }}">
+      <svg class="ui-icon"><use href="#i-users"></use></svg>
+      <span>Usuários</span>
+    </a>
+    <a class="card with-icon" href="{{ url_for('admin_obras') }}">
+      <svg class="ui-icon"><use href="#i-building"></use></svg>
+      <span>Obras</span>
+    </a>
+    <a class="card with-icon" href="{{ url_for('admin_categorias') }}">
+      <svg class="ui-icon"><use href="#i-tag"></use></svg>
+      <span>Categorias</span>
+    </a>
+    <a class="card with-icon" href="{{ url_for('admin_insumos') }}">
+      <svg class="ui-icon"><use href="#i-box"></use></svg>
+      <span>Insumos</span>
+    </a>
+    <a class="card with-icon" href="{{ url_for('admin_unidades') }}">
+      <svg class="ui-icon"><use href="#i-ruler"></use></svg>
+      <span>Unidades</span>
+    </a>
+    <a class="card with-icon" href="{{ url_for('admin_especificacoes') }}">
+      <svg class="ui-icon"><use href="#i-list-check"></use></svg>
+      <span>Especificacoes</span>
+    </a>
+    <a class="card with-icon" href="{{ url_for('admin_apropriacoes') }}">
+      <svg class="ui-icon"><use href="#i-hash"></use></svg>
+      <span>Apropriacoes</span>
+    </a>
+  </div>
+</section>
+{% endblock %}

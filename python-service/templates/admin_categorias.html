@@ -1,0 +1,131 @@
+{% extends "admin_layout.html" %}
+{% block admin_content %}
+<section class="panel">
+  <h1 class="with-icon">
+    <svg class="ui-icon"><use href="#i-tag"></use></svg>
+    <span>Categorias</span>
+  </h1>
+  <p class="hint">Use categorias para organizar os insumos por tipo.</p>
+  {% if mensagem %}
+  <p class="notice">{{ mensagem }}</p>
+  {% endif %}
+  <form method="post" class="inline-form">
+    <input type="text" name="nome" placeholder="Nome da categoria" required />
+    <button type="submit" class="with-icon">
+      <svg class="ui-icon"><use href="#i-plus"></use></svg>
+      <span>Adicionar</span>
+    </button>
+  </form>
+  <form method="post" action="{{ url_for('admin_categorias_bulk') }}" class="inline-form">
+    <textarea name="lista" rows="4" placeholder="Adicionar categorias em massa (1 por linha)"></textarea>
+    <button type="submit" class="with-icon">
+      <svg class="ui-icon"><use href="#i-upload"></use></svg>
+      <span>Importar</span>
+    </button>
+  </form>
+  <form
+    id="bulk-delete-categorias-form"
+    method="post"
+    action="{{ url_for('admin_categorias_bulk_delete') }}"
+    class="inline-form"
+    data-confirm="Deseja excluir as categorias selecionadas?"
+  >
+    <button type="button" id="categorias-toggle-all">Selecionar todos</button>
+    <button type="submit" class="danger with-icon">
+      <svg class="ui-icon"><use href="#i-close"></use></svg>
+      <span>Excluir selecionadas</span>
+    </button>
+  </form>
+  <div class="table-wrap">
+    <table class="grid">
+      <thead>
+        <tr>
+          <th class="cell-check">
+            <input type="checkbox" id="categorias-check-all" />
+          </th>
+          <th>Nome</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if not categorias %}
+        <tr>
+          <td colspan="3" class="table-empty">Nenhuma categoria cadastrada.</td>
+        </tr>
+        {% endif %}
+        {% for categoria in categorias %}
+        <tr>
+          <td class="cell-check">
+            <input
+              type="checkbox"
+              name="categoria_ids"
+              value="{{ categoria.id }}"
+              class="categoria-check"
+              form="bulk-delete-categorias-form"
+            />
+          </td>
+          <td>{{ categoria.nome }}</td>
+          <td>
+            <form method="post" action="{{ url_for('admin_categorias_delete', categoria_id=categoria.id) }}" data-confirm="Deseja remover esta categoria?">
+              <button type="submit" class="danger with-icon">
+                <svg class="ui-icon"><use href="#i-close"></use></svg>
+                <span>Remover</span>
+              </button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+<script>
+  const categoriasToggleAllBtn = document.getElementById("categorias-toggle-all");
+  const categoriasCheckAll = document.getElementById("categorias-check-all");
+  const categoriaChecks = document.querySelectorAll(".categoria-check");
+
+  const updateCategoriasToggleLabel = () => {
+    if (!categoriasToggleAllBtn) return;
+    const allChecked =
+      categoriaChecks.length > 0 && Array.from(categoriaChecks).every((item) => item.checked);
+    categoriasToggleAllBtn.textContent = allChecked ? "Deselecionar todos" : "Selecionar todos";
+  };
+
+  if (categoriasCheckAll) {
+    categoriasCheckAll.addEventListener("change", () => {
+      categoriaChecks.forEach((item) => {
+        item.checked = categoriasCheckAll.checked;
+      });
+      updateCategoriasToggleLabel();
+    });
+
+  }
+
+  if (categoriasToggleAllBtn) {
+    categoriasToggleAllBtn.addEventListener("click", () => {
+      const allChecked =
+        categoriaChecks.length > 0 && Array.from(categoriaChecks).every((item) => item.checked);
+      categoriaChecks.forEach((item) => {
+        item.checked = !allChecked;
+      });
+      if (categoriasCheckAll) {
+        categoriasCheckAll.checked = !allChecked;
+      }
+      updateCategoriasToggleLabel();
+    });
+  }
+
+  categoriaChecks.forEach((item) => {
+    item.addEventListener("change", () => {
+      if (!categoriasCheckAll) {
+        updateCategoriasToggleLabel();
+        return;
+      }
+      categoriasCheckAll.checked =
+        categoriaChecks.length > 0 && Array.from(categoriaChecks).every((row) => row.checked);
+      updateCategoriasToggleLabel();
+    });
+  });
+  updateCategoriasToggleLabel();
+</script>
+{% endblock %}

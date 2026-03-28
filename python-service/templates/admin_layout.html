@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="admin-layout">
+  <aside class="panel admin-sidebar">
+    <h1 class="with-icon">
+      <svg class="ui-icon"><use href="#i-shield"></use></svg>
+      <span>Admin</span>
+    </h1>
+    <p class="hint">Cadastros, importações e controle de acesso.</p>
+    <nav class="admin-nav">
+      <a href="{{ url_for('admin') }}" class="with-icon {{ 'active' if current_admin == 'overview' else '' }}">
+        <svg class="ui-icon"><use href="#i-dashboard"></use></svg>
+        <span>Visao geral</span>
+      </a>
+      <a href="{{ url_for('admin_usuarios') }}" class="with-icon {{ 'active' if current_admin == 'usuarios' else '' }}">
+        <svg class="ui-icon"><use href="#i-users"></use></svg>
+        <span>Usuários</span>
+      </a>
+      <a href="{{ url_for('admin_obras') }}" class="with-icon {{ 'active' if current_admin == 'obras' else '' }}">
+        <svg class="ui-icon"><use href="#i-building"></use></svg>
+        <span>Obras</span>
+      </a>
+      <a href="{{ url_for('admin_categorias') }}" class="with-icon {{ 'active' if current_admin == 'categorias' else '' }}">
+        <svg class="ui-icon"><use href="#i-tag"></use></svg>
+        <span>Categorias</span>
+      </a>
+      <a href="{{ url_for('admin_insumos') }}" class="with-icon {{ 'active' if current_admin == 'insumos' else '' }}">
+        <svg class="ui-icon"><use href="#i-box"></use></svg>
+        <span>Insumos</span>
+      </a>
+      <a href="{{ url_for('admin_unidades') }}" class="with-icon {{ 'active' if current_admin == 'unidades' else '' }}">
+        <svg class="ui-icon"><use href="#i-ruler"></use></svg>
+        <span>Unidades</span>
+      </a>
+      <a href="{{ url_for('admin_especificacoes') }}" class="with-icon {{ 'active' if current_admin == 'especificacoes' else '' }}">
+        <svg class="ui-icon"><use href="#i-list-check"></use></svg>
+        <span>Especificacoes</span>
+      </a>
+      <a href="{{ url_for('admin_apropriacoes') }}" class="with-icon {{ 'active' if current_admin == 'apropriacoes' else '' }}">
+        <svg class="ui-icon"><use href="#i-hash"></use></svg>
+        <span>Apropriacoes</span>
+      </a>
+    </nav>
+  </aside>
+  <div class="admin-main">
+    {% block admin_content %}{% endblock %}
+  </div>
+</div>
+{% endblock %}

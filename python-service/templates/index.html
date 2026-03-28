@@ -1,0 +1,184 @@
+﻿{% extends "base.html" %}
+{% block content %}
+<section class="panel request-panel">
+  <div class="request-header">
+    <h1 class="with-icon">
+      <svg class="ui-icon"><use href="#i-clipboard-list"></use></svg>
+      <span>Nova solicitação</span>
+    </h1>
+    <p class="hint">Fluxo direto: clique no insumo, ajuste e exporte.</p>
+  </div>
+  {% if msg %}
+  <p class="notice">{{ msg }}</p>
+  {% endif %}
+
+  <form method="post" action="{{ url_for('criar_requisicao') }}" id="req-form" enctype="multipart/form-data">
+    <div class="field-grid request-meta">
+      <div class="field">
+        <label for="obra">Obra</label>
+        <select name="obra" id="obra" required {% if not obras %}disabled{% endif %}>
+          {% if obras %}
+          <option value="">Selecione</option>
+          {% for obra in obras %}
+          <option value="{{ obra.id }}">{{ obra.nome }}</option>
+          {% endfor %}
+          {% else %}
+          <option value="">Sem obras liberadas</option>
+          {% endif %}
+        </select>
+      </div>
+      <div class="field">
+        <label for="solicitante">Solicitante</label>
+        <input type="text" name="solicitante" id="solicitante" placeholder="Nome do solicitante" value="{{ default_solicitante or '' }}" />
+      </div>
+      <div class="field">
+        <label for="necessario_em">Necessário para</label>
+        <input type="date" name="necessario_em" id="necessario_em" value="{{ default_necessario_iso or today_iso }}" min="{{ default_necessario_iso or today_iso }}" />
+      </div>
+    </div>
+    <p class="hint request-lead-hint" id="lead-time-hint"></p>
+
+    <div class="request-layout">
+      <aside class="request-sidebar">
+        <div class="request-section-head">
+          <h2 class="with-icon">
+            <svg class="ui-icon"><use href="#i-box"></use></svg>
+            <span>Insumos</span>
+          </h2>
+        </div>
+        <p class="section-note">Clique para adicionar. Pode repetir o mesmo insumo para especificacoes diferentes.</p>
+        <input type="text" id="insumo-search" placeholder="Buscar insumo" aria-label="Buscar insumo" />
+        <div class="categoria-filter" id="categoria-filter">
+          <button type="button" class="categoria-item" data-categoria-id="">Todos</button>
+          {% for categoria in categorias %}
+          <button type="button" class="categoria-item" data-categoria-id="{{ categoria.id }}">{{ categoria.nome }}</button>
+          {% endfor %}
+        </div>
+        <div class="custom-insumo-box" aria-label="Adicionar insumo manual">
+          <div class="custom-insumo-head">
+            <h3>Insumo manual</h3>
+            <span class="custom-insumo-tag">marca no PDF/planilha</span>
+          </div>
+          <div class="custom-insumo-row">
+            <input type="text" id="custom-insumo-nome" placeholder="Digite um insumo que não esteja cadastrado" aria-label="Insumo manual" />
+            <button type="button" id="custom-insumo-add" class="ghost-button">Adicionar</button>
+          </div>
+          <p class="custom-insumo-help">Fica só nesta solicitação e será destacado em vermelho apenas no PDF/planilha gerada.</p>
+        </div>
+        <div class="insumo-list" id="insumo-list">
+          {% for insumo in insumos %}
+          {% set nome_insumo = (insumo.nome or '')|trim %}
+          <button
+            type="button"
+            class="insumo-item"
+            data-insumo-id="{{ insumo.id }}"
+            data-insumo-nome="{{ nome_insumo or 'Insumo sem nome' }}"
+            data-categoria-id="{{ insumo.categoria_id or '' }}"
+          >
+            {% if insumo.foto_path %}
+            <img class="insumo-thumb" src="{{ url_for('static', filename=insumo.foto_path) }}" alt="" loading="lazy" />
+            {% endif %}
+            <span class="insumo-label">{{ nome_insumo or 'Insumo sem nome' }}</span>
+          </button>
+          {% endfor %}
+        </div>
+      </aside>
+
+      <section class="request-main">
+        <div class="request-section-head">
+          <h2 class="with-icon">
+            <svg class="ui-icon"><use href="#i-list-check"></use></svg>
+            <span>Itens</span>
+          </h2>
+          <div class="request-head-actions">
+            <div class="summary-pills">
+              <span class="summary-pill">Itens: <strong id="selected-count">0</strong></span>
+              <span class="summary-pill">Marcados: <strong id="checked-count">0</strong></span>
+            </div>
+            <button type="button" class="ghost-button sidebar-toggle" id="toggle-sidebar" aria-pressed="false" aria-expanded="true">
+              Ocultar insumos
+            </button>
+          </div>
+        </div>
+        <p class="section-note">Edição por linha com atalho em massa.</p>
+        <div class="request-tools">
+          <button type="button" id="clear-items" class="ghost-button with-icon">
+            <svg class="ui-icon"><use href="#i-list-check"></use></svg>
+            <span>Limpar itens</span>
+          </button>
+        </div>
+
+        <details class="bulk-panel">
+          <summary>Ajustes em massa</summary>
+          <div class="bulk-actions request-bulk">
+            <div class="bulk-field">
+              <label for="bulk-apropriacao">Apropriação em massa</label>
+              <select id="bulk-apropriacao"></select>
+            </div>
+            <div class="bulk-field">
+              <label for="bulk-unidade">Unidade em massa</label>
+              <input type="text" id="bulk-unidade" list="unidades-list" placeholder="Ex: un, kg, m2" />
+              <datalist id="unidades-list">
+                {% for unidade in unidades %}
+                <option value="{{ unidade.nome }}"></option>
+                {% endfor %}
+              </datalist>
+            </div>
+            <div class="bulk-field">
+              <label for="bulk-quantidade">Quantidade em massa</label>
+              <input type="text" id="bulk-quantidade" placeholder="Ex: 10" />
+            </div>
+            <div class="bulk-actions-row">
+              <button type="button" id="bulk-apply">Aplicar aos selecionados</button>
+              <button type="button" id="toggle-all">Selecionar todos</button>
+            </div>
+          </div>
+        </details>
+
+        <div class="table-wrap">
+          <table class="grid" id="itens-table">
+            <thead>
+              <tr>
+                <th></th>
+                <th>Insumo</th>
+                <th>Unidade</th>
+                <th>Quantidade</th>
+                <th>Especificação</th>
+                <th>Apropriação</th>
+                <th>Necessário</th>
+                <th>Produto</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="table-empty-row">
+                <td colspan="9" class="table-empty">
+                  Nenhum item selecionado. Clique nos insumos ao lado para montar a solicitação.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <div class="actions request-actions">
+      <p id="request-feedback" class="form-feedback" role="alert" aria-live="polite"></p>
+      <button type="submit" class="primary with-icon" {% if not obras %}disabled title="Sem obras liberadas para seu usuário"{% endif %}>
+        <svg class="ui-icon"><use href="#i-file-pdf"></use></svg>
+        <span>Gerar PDF</span>
+      </button>
+    </div>
+  </form>
+</section>
+
+<script>
+  const specs = {{ specs|tojson }};
+  const apropriacoes = {{ apropriacoes|tojson }};
+  const insumoUnidades = {{ insumo_unidades|tojson }};
+  const leadRules = {{ lead_rules_payload|tojson }};
+  const leadFallbackDays = {{ lead_fallback_days|tojson }};
+</script>
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+{% endblock %}
+

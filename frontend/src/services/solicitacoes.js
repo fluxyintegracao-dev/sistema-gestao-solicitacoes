@@ -1,0 +1,169 @@
+import { API_URL, authHeaders } from './api';
+
+export async function getSolicitacoes(params = '') {
+  const res = await fetch(`${API_URL}/solicitacoes${params}`, {
+    headers: authHeaders()
+  });
+
+  if (!res.ok) {
+    throw new Error('Erro ao buscar solicitações');
+  }
+
+  return res.json();
+}
+
+export async function createSolicitacao(data) {
+  const res = await fetch(`${API_URL}/solicitacoes`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+
+  if (!res.ok) {
+    let mensagem = 'Erro ao criar solicitacao';
+    try {
+      const json = await res.json();
+      mensagem = json?.error || mensagem;
+    } catch (_) {
+      try {
+        const text = await res.text();
+        if (text) mensagem = text;
+      } catch (_) {}
+    }
+    throw new Error(mensagem);
+  }
+
+  return res.json();
+}
+
+export async function getSolicitacaoById(id) {
+  const res = await fetch(`${API_URL}/solicitacoes/${id}`, {
+    headers: authHeaders()
+  });
+
+  if (!res.ok) {
+    throw new Error('Erro ao buscar solicitação');
+  }
+
+  return res.json();
+}
+
+export async function updateStatusSolicitacao(id, status) {
+  const res = await fetch(`${API_URL}/solicitacoes/${id}/status`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ status })
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text);
+  }
+
+  return true;
+}
+
+export async function updateValorSolicitacao(id, valor) {
+  const res = await fetch(`${API_URL}/solicitacoes/${id}/valor`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ valor })
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text);
+  }
+
+  return true;
+}
+
+export async function updateRefContratoSolicitacao(id, contrato_id) {
+  const res = await fetch(`${API_URL}/solicitacoes/${id}/ref-contrato`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ contrato_id })
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text);
+  }
+
+  return true;
+}
+
+export async function deleteSolicitacao(id) {
+  const res = await fetch(`${API_URL}/solicitacoes/${id}`, {
+    method: 'DELETE',
+    headers: authHeaders()
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text);
+  }
+
+  return true;
+}
+
+export async function arquivarSolicitacao(id) {
+  const res = await fetch(`${API_URL}/solicitacoes/${id}/arquivar`, {
+    method: 'PATCH',
+    headers: authHeaders()
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text);
+  }
+
+  return true;
+}
+
+export async function desarquivarSolicitacao(id) {
+  const res = await fetch(`${API_URL}/solicitacoes/${id}/desarquivar`, {
+    method: 'PATCH',
+    headers: authHeaders()
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text);
+  }
+
+  return true;
+}
+
+export async function arquivarSolicitacoesEmMassa(solicitacao_ids = []) {
+  const res = await fetch(`${API_URL}/solicitacoes/arquivar-massa`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ solicitacao_ids })
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text);
+  }
+
+  return res.json();
+}
+
+export async function enviarSolicitacoesParaSetorEmMassa({ solicitacao_ids, setor_destino }) {
+  const res = await fetch(`${API_URL}/solicitacoes/enviar-setor-massa`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ solicitacao_ids, setor_destino })
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text);
+  }
+
+  return res.json();
+}
+
+
+

@@ -1,0 +1,2740 @@
+const {
+  Solicitacao,
+  Historico,
+  StatusArea,
+  Obra,
+  User,
+  TipoSolicitacao,
+  EtapaSetor,
+  Contrato,
+  TipoSubContrato,
+  Anexo,
+  MensagemSetor,
+  SetorPermissao,
+  Setor,
+  ConfiguracaoSistema,
+  SolicitacaoVisibilidadeUsuario,
+  Comprovante,
+  Notificacao,
+  NotificacaoDestinatario,
+  LogExclusao,
+  Sequelize
+} = require('../models');
+
+const { Op } = require('sequelize');
+const {
+  criarNotificacao,
+  obterDestinatariosCriacaoSetor
+} = require('../services/notificacoes');
+const gerarCodigoSolicitacao = require('../services/solicitacao/gerarCodigo');
+const { uploadToS3 } = require('../services/s3');
+const { normalizeOriginalName } = require('../utils/fileName');
+
+const CHAVE_AREAS_POR_SETOR_ORIGEM = 'AREAS_POR_SETOR_ORIGEM';
+const CHAVE_SETORES_VISIVEIS_POR_USUARIO = 'SETORES_VISIVEIS_POR_USUARIO';
+const CHAVE_TIPOS_SOLICITACAO_POR_SETOR = 'TIPOS_SOLICITACAO_POR_SETOR';
+const CHAVE_SETORES_CRIACAO_TODAS_OBRAS = 'SETORES_CRIACAO_TODAS_OBRAS';
+const TOKENS_GEO_EQUIVALENTES = new Set([
+  'GEO',
+  'GERENCIA_DE_PROCESSOS',
+  'GERENCIA_PROCESSOS'
+]);
+
+/* =====================================================
+   FUNCAO AUXILIAR - VISIBILIDADE
+===================================================== */
+async function garantirVisibilidade(solicitacaoId, usuarioId) {
+  await SolicitacaoVisibilidadeUsuario.findOrCreate({
+    where: {
+      solicitacao_id: solicitacaoId,
+      usuario_id: usuarioId
+    },
+    defaults: { oculto: false }
+  });
+}
+
+async function enviarSolicitacaoParaSetorInterno({
+  req,
+  solicitacao,
+  setorDestino,
+  usuarioId
+}) {
+  const acessoObra = await validarAcessoObra(req, solicitacao);
+  if (!acessoObra) {
+    return { ok: false, status: 403, error: 'Acesso negado. Vincule o usuario a obra para continuar.' };
+  }
+
+  const perfil = String(req.user?.perfil || '').trim().toUpperCase();
+  if (perfil !== 'SUPERADMIN') {
+    const areaUsuario = await obterAreaUsuario(req);
+    const tokensSetorUsuario = expandirTokensComAliasesGeo(
+      await obterTokensSetorUsuario(req, areaUsuario)
+    );
+    if (!setorPertenceAoUsuario(tokensSetorUsuario, solicitacao.area_responsavel)) {
+      return { ok: false, status: 403, error: 'Voce so pode enviar solicitacoes que estejam no seu setor atual.' };
+    }
+  }
+
+  const setorOrigem = solicitacao.area_responsavel;
+  const setorOrigemRow = await Setor.findOne({
+    where: {
+      [Op.or]: [
+        { codigo: setorOrigem },
+        { nome: setorOrigem }
+      ]
+    },
+    attributes: ['nome', 'codigo']
+  });
+  const setorDestinoRow = await Setor.findOne({
+    where: {
+      [Op.or]: [
+        { codigo: setorDestino },
+        { nome: setorDestino }
+      ]
+    },
+    attributes: ['nome', 'codigo']
+  });
+
+  const nomeOrigem = setorOrigemRow?.nome || setorOrigem;
+  const nomeDestino = setorDestinoRow?.nome || setorDestino;
+
+  await solicitacao.update({
+    area_responsavel: setorDestino
+  });
+
+  await Historico.create({
+    solicitacao_id: solicitacao.id,
+    usuario_responsavel_id: usuarioId,
+    setor: setorDestino,
+    acao: 'ENVIADA_SETOR',
+    observacao: `De ${setorOrigem} para ${setorDestino}`
+  });
+
+  await criarNotificacao({
+    solicitacao_id: solicitacao.id,
+    tipo: 'ENVIADA_SETOR',
+    mensagem: `${req.user?.nome || 'Usuario'} enviou a solicitacao ${solicitacao.codigo} do setor ${nomeOrigem} para o setor ${nomeDestino}`,
+    created_by: usuarioId,
+    metadata: {
+      setor_origem: setorOrigem,
+      setor_destino: setorDestino
+    }
+  });
+
+  return { ok: true };
+}
+
+async function obterAreaUsuario(req) {
+  let areaUsuario = req.user?.area || null;
+
+  if (!areaUsuario && req.user?.setor_id) {
+    const setorIdRaw = String(req.user.setor_id);
+    const setorAtual = await Setor.findOne({
+      where: {
+        [Op.or]: [
+          { id: req.user.setor_id },
+          { codigo: setorIdRaw },
+          { nome: setorIdRaw }
+        ]
+      },
+      attributes: ['id', 'codigo', 'nome']
+    });
+    areaUsuario = setorAtual?.codigo || setorAtual?.nome || null;
+  }
+
+  if (!areaUsuario) return null;
+  return String(areaUsuario).trim().toUpperCase();
+}
+
+async function obterTokensSetorUsuario(req, areaUsuario) {
+  const tokens = [];
+  if (areaUsuario) tokens.push(areaUsuario);
+  if (req.user?.setor_id) {
+    tokens.push(String(req.user.setor_id));
+    const setor = await Setor.findByPk(req.user.setor_id, {
+      attributes: ['id', 'codigo', 'nome']
+    });
+    if (setor?.codigo) tokens.push(String(setor.codigo).toUpperCase());
+    if (setor?.nome) tokens.push(String(setor.nome).toUpperCase());
+  }
+  return Array.from(new Set(tokens.filter(Boolean)));
+}
+
+async function lerConfiguracaoJson(chave, fallback) {
+  const item = await ConfiguracaoSistema.findOne({
+    where: { chave },
+    order: [['id', 'DESC']]
+  });
+  if (!item?.valor) return fallback;
+  try {
+    return JSON.parse(item.valor);
+  } catch {
+    return fallback;
+  }
+}
+
+async function obterRegrasAreasPorSetorOrigem() {
+  const data = await lerConfiguracaoJson(CHAVE_AREAS_POR_SETOR_ORIGEM, { regras: {} });
+  const regrasRaw = data?.regras && typeof data.regras === 'object' ? data.regras : {};
+  const regras = {};
+  Object.entries(regrasRaw).forEach(([origem, destinos]) => {
+    const key = String(origem || '').trim().toUpperCase();
+    if (!key) return;
+    regras[key] = Array.isArray(destinos)
+      ? [...new Set(destinos.map(v => String(v || '').trim().toUpperCase()).filter(Boolean))]
+      : [];
+  });
+  return regras;
+}
+
+async function obterSetoresVisiveisPorUsuario() {
+  const data = await lerConfiguracaoJson(CHAVE_SETORES_VISIVEIS_POR_USUARIO, { regras: {} });
+  const regrasRaw = data?.regras && typeof data.regras === 'object' ? data.regras : {};
+  const regras = {};
+  Object.entries(regrasRaw).forEach(([usuarioId, setores]) => {
+    const key = String(usuarioId || '').trim();
+    if (!key) return;
+    regras[key] = Array.isArray(setores)
+      ? [...new Set(setores.map(v => String(v || '').trim().toUpperCase()).filter(Boolean))]
+      : [];
+  });
+  return regras;
+}
+
+async function obterTiposSolicitacaoPorSetorConfig() {
+  const data = await lerConfiguracaoJson(CHAVE_TIPOS_SOLICITACAO_POR_SETOR, { regras: {} });
+  const regrasRaw = data?.regras && typeof data.regras === 'object' ? data.regras : {};
+  const regras = {};
+
+  Object.entries(regrasRaw).forEach(([setor, config]) => {
+    const key = String(setor || '').trim().toUpperCase();
+    if (!key) return;
+
+    const tipos = Array.isArray(config?.tipos)
+      ? [...new Set(config.tipos.map(v => Number(v)).filter(v => Number.isInteger(v) && v > 0))]
+      : [];
+
+    const modosRaw = config?.modos && typeof config.modos === 'object' ? config.modos : {};
+    const modos = {};
+    Object.entries(modosRaw).forEach(([tipoId, modo]) => {
+      const id = Number(tipoId);
+      if (!Number.isInteger(id) || id <= 0) return;
+      const modoNorm = String(modo || '').trim().toUpperCase();
+      modos[String(id)] = modoNorm === 'ADMIN_PRIMEIRO' ? 'ADMIN_PRIMEIRO' : 'TODOS_VISIVEIS';
+    });
+
+    regras[key] = { tipos, modos };
+  });
+
+  return regras;
+}
+
+async function obterSetoresCriacaoTodasObras() {
+  const data = await lerConfiguracaoJson(CHAVE_SETORES_CRIACAO_TODAS_OBRAS, { setores: [] });
+  const lista = Array.isArray(data?.setores) ? data.setores : [];
+  return [...new Set(
+    lista
+      .map(item => String(item || '').trim().toUpperCase())
+      .filter(Boolean)
+  )];
+}
+
+function normalizarTokenComparacao(valor) {
+  return String(valor || '')
+    .trim()
+    .toUpperCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[\s-]+/g, '_');
+}
+
+function isGeoToken(valor) {
+  return TOKENS_GEO_EQUIVALENTES.has(normalizarTokenComparacao(valor));
+}
+
+function isAdministrativoToken(valor) {
+  return normalizarTokenComparacao(valor) === 'ADMINISTRATIVO';
+}
+
+function expandirTokensComAliasesGeo(tokens = []) {
+  const tokensLista = Array.isArray(tokens) ? tokens : [];
+  const contemGeo = tokensLista.some(isGeoToken);
+  if (!contemGeo) {
+    return Array.from(new Set(tokensLista.filter(Boolean)));
+  }
+
+  return Array.from(new Set([
+    ...tokensLista.filter(Boolean),
+    'GEO',
+    'GERENCIA DE PROCESSOS',
+    'GERENCIA_PROCESSOS'
+  ]));
+}
+
+function setorPertenceAoUsuario(tokensSetor = [], setorSolicitacao = null) {
+  const setorNormalizado = normalizarTokenComparacao(setorSolicitacao);
+  if (!setorNormalizado) return false;
+
+  return (Array.isArray(tokensSetor) ? tokensSetor : []).some(token => {
+    const tokenNormalizado = normalizarTokenComparacao(token);
+    if (!tokenNormalizado) return false;
+    if (tokenNormalizado === setorNormalizado) return true;
+    return isGeoToken(tokenNormalizado) && isGeoToken(setorNormalizado);
+  });
+}
+
+function obterRegrasTipoPorTokensSetor(regrasConfig = {}, tokensSetor = []) {
+  if (!Array.isArray(tokensSetor) || tokensSetor.length === 0) return null;
+  for (const token of tokensSetor) {
+    const key = String(token || '').trim().toUpperCase();
+    if (regrasConfig[key]) return regrasConfig[key];
+  }
+  return null;
+}
+
+async function obterModoRecebimentoPorSetorETipo(tokensSetor = [], tipoSolicitacaoId = null) {
+  const tipoId = Number(tipoSolicitacaoId);
+  if (Number.isInteger(tipoId) && tipoId > 0) {
+    const regrasTipos = await obterTiposSolicitacaoPorSetorConfig();
+    const regraSetor = obterRegrasTipoPorTokensSetor(regrasTipos, tokensSetor);
+    if (regraSetor?.modos && regraSetor.modos[String(tipoId)]) {
+      return regraSetor.modos[String(tipoId)];
+    }
+  }
+  return obterModoRecebimentoSetor(tokensSetor);
+}
+
+async function obterModoRecebimentoSetor(tokensSetor = []) {
+  if (!Array.isArray(tokensSetor) || tokensSetor.length === 0) {
+    return 'TODOS_VISIVEIS';
+  }
+
+  const permissoes = await SetorPermissao.findAll({
+    where: {
+      setor: { [Op.in]: tokensSetor }
+    },
+    attributes: ['setor', 'modo_recebimento']
+  });
+
+  for (const token of tokensSetor) {
+    const item = permissoes.find(p => String(p.setor || '').toUpperCase() === String(token).toUpperCase());
+    if (item?.modo_recebimento) {
+      return String(item.modo_recebimento).toUpperCase();
+    }
+  }
+
+  return 'TODOS_VISIVEIS';
+}
+
+async function isUsuarioSetorObra(req) {
+  const perfil = String(req.user?.perfil || '').trim().toUpperCase();
+  if (perfil !== 'USUARIO') return false;
+
+  if (!req.user?.setor_id) return false;
+
+  const setor = await Setor.findByPk(req.user.setor_id, {
+    attributes: ['id', 'codigo', 'nome']
+  });
+
+  if (!setor) return false;
+
+  const nomeSetor = String(setor.nome || '').toUpperCase();
+  const codigoSetor = String(setor.codigo || '').toUpperCase();
+  const areaToken = String(req.user?.area || '').toUpperCase();
+
+  return (
+    nomeSetor === 'OBRA' ||
+    codigoSetor === 'OBRA' ||
+    areaToken === 'OBRA'
+  );
+}
+
+async function isUsuarioSetorGeo(req) {
+  const perfil = String(req.user?.perfil || '').trim().toUpperCase();
+  if (perfil !== 'USUARIO') return false;
+
+  if (!req.user?.setor_id) return false;
+
+  const setor = await Setor.findByPk(req.user.setor_id, {
+    attributes: ['id', 'codigo', 'nome']
+  });
+
+  if (!setor) return false;
+
+  const nomeSetor = String(setor.nome || '').toUpperCase();
+  const codigoSetor = String(setor.codigo || '').toUpperCase();
+  const areaToken = String(req.user?.area || '').toUpperCase();
+
+  return (
+    isGeoToken(nomeSetor) ||
+    isGeoToken(codigoSetor) ||
+    isGeoToken(areaToken)
+  );
+}
+
+async function isSetorGeo(req) {
+  const areaUsuario = await obterAreaUsuario(req);
+  if (isGeoToken(areaUsuario)) return true;
+
+  if (!req.user?.setor_id) return false;
+
+  const setor = await Setor.findByPk(req.user.setor_id, {
+    attributes: ['codigo', 'nome']
+  });
+
+  if (!setor) return false;
+
+  const nomeSetor = String(setor.nome || '').toUpperCase();
+  const codigoSetor = String(setor.codigo || '').toUpperCase();
+  const areaToken = String(req.user?.area || '').toUpperCase();
+
+  return (
+    isGeoToken(nomeSetor) ||
+    isGeoToken(codigoSetor) ||
+    isGeoToken(areaToken)
+  );
+}
+
+async function isSetorObraGeral(req) {
+  const areaUsuario = await obterAreaUsuario(req);
+  if (areaUsuario === 'OBRA') return true;
+
+  if (!req.user?.setor_id) return false;
+
+  const setor = await Setor.findByPk(req.user.setor_id, {
+    attributes: ['codigo', 'nome']
+  });
+
+  if (!setor) return false;
+
+  const nomeSetor = String(setor.nome || '').toUpperCase();
+  const codigoSetor = String(setor.codigo || '').toUpperCase();
+  const areaToken = String(req.user?.area || '').toUpperCase();
+
+  return (
+    nomeSetor === 'OBRA' ||
+    codigoSetor === 'OBRA' ||
+    areaToken === 'OBRA'
+  );
+}
+
+function isBrapeToken(valor) {
+  if (!valor) return false;
+  return String(valor).trim().toUpperCase().startsWith('BRAPE');
+}
+
+async function isSolicitacaoBrape(solicitacao) {
+  if (!solicitacao) return false;
+  const area = String(solicitacao.area_responsavel || '').trim();
+  if (isBrapeToken(area)) return true;
+
+  if (!area) return false;
+
+  const setor = await Setor.findOne({
+    where: {
+      [Op.or]: [
+        { id: area },
+        { codigo: area },
+        { nome: area }
+      ]
+    },
+    attributes: ['codigo', 'nome']
+  });
+
+  if (!setor) return false;
+
+  return (
+    isBrapeToken(setor.codigo) ||
+    isBrapeToken(setor.nome)
+  );
+}
+
+async function isSetorBrape(req) {
+  const areaUsuario = await obterAreaUsuario(req);
+  if (isBrapeToken(areaUsuario)) return true;
+
+  if (!req.user?.setor_id) return false;
+
+  const setor = await Setor.findByPk(req.user.setor_id, {
+    attributes: ['codigo', 'nome']
+  });
+
+  if (!setor) return false;
+
+  const nomeSetor = String(setor.nome || '').toUpperCase();
+  const codigoSetor = String(setor.codigo || '').toUpperCase();
+  const areaToken = String(req.user?.area || '').toUpperCase();
+
+  return (
+    isBrapeToken(nomeSetor) ||
+    isBrapeToken(codigoSetor) ||
+    isBrapeToken(areaToken)
+  );
+}
+
+async function validarAcessoObra(req, solicitacao) {
+  if (!solicitacao) return false;
+
+  const perfil = String(req.user?.perfil || '').trim().toUpperCase();
+  const isSuperadmin = perfil === 'SUPERADMIN';
+  if (isSuperadmin) return true;
+
+  const isBrape = await isSetorBrape(req);
+  const solicitacaoBrape = await isSolicitacaoBrape(solicitacao);
+
+  if (solicitacaoBrape) {
+    if (!isBrape) return false;
+    if (perfil.startsWith('ADMIN')) return true;
+    if (!solicitacao.obra_id) return false;
+    const { UsuarioObra } = require('../models');
+    const vinculos = await UsuarioObra.findAll({
+      where: { user_id: req.user.id },
+      attributes: ['obra_id']
+    });
+    const obrasVinculadas = vinculos.map(v => v.obra_id);
+    return obrasVinculadas.includes(solicitacao.obra_id);
+  }
+
+  if (isBrape) {
+    if (!solicitacao.obra_id) return false;
+    const { UsuarioObra } = require('../models');
+    const vinculos = await UsuarioObra.findAll({
+      where: { user_id: req.user.id },
+      attributes: ['obra_id']
+    });
+    const obrasVinculadas = vinculos.map(v => v.obra_id);
+    return obrasVinculadas.includes(solicitacao.obra_id);
+  }
+
+  const isSetorObra = await isUsuarioSetorObra(req);
+  if (!isSetorObra) {
+    return true;
+  }
+
+  if (!solicitacao.obra_id) {
+    return false;
+  }
+
+  const { UsuarioObra } = require('../models');
+  const vinculos = await UsuarioObra.findAll({
+    where: { user_id: req.user.id },
+    attributes: ['obra_id']
+  });
+  const obrasVinculadas = vinculos.map(v => v.obra_id);
+  return obrasVinculadas.includes(solicitacao.obra_id);
+}
+
+function montarLiteralHistoricoSetoresEnvolvidos(tokens = []) {
+  const tokensValidos = Array.from(
+    new Set(
+      (Array.isArray(tokens) ? tokens : [])
+        .map(v => String(v || '').trim().toUpperCase())
+        .filter(Boolean)
+    )
+  );
+
+  if (tokensValidos.length === 0) return null;
+
+  const inList = tokensValidos.map(v => `'${v.replace(/'/g, "''")}'`).join(', ');
+
+  const likes = tokensValidos
+    .map(token => {
+      const seguro = token.replace(/'/g, "''");
+      return [
+        `UPPER(COALESCE(h.observacao, '')) LIKE 'DE ${seguro} PARA %'`,
+        `UPPER(COALESCE(h.observacao, '')) LIKE '% PARA ${seguro}'`
+      ];
+    })
+    .flat()
+    .join(' OR ');
+
+  return Sequelize.literal(`(
+    SELECT DISTINCT h.solicitacao_id
+    FROM historicos h
+    WHERE h.solicitacao_id = Solicitacao.id
+      AND (
+        UPPER(CAST(h.setor AS CHAR)) IN (${inList})
+        OR (
+          h.acao = 'ENVIADA_SETOR'
+          AND (${likes})
+        )
+      )
+  )`);
+}
+
+function parseObservacaoEnvioSetor(observacao) {
+  const texto = String(observacao || '').trim();
+  const match = texto.match(/^De\s+(.+?)\s+para\s+(.+)$/i);
+  if (!match) return null;
+  return {
+    origem: String(match[1] || '').trim(),
+    destino: String(match[2] || '').trim()
+  };
+}
+
+module.exports = {
+
+  // =====================================================
+  // LISTAR SOLICITACOES
+  // =====================================================
+  async index(req, res) {
+    try {
+      const { id: usuarioId } = req.user;
+      const perfil = String(req.user?.perfil || '').trim().toUpperCase();
+      let areaUsuario = req.user?.area || null;
+      const {
+        area,
+        status,
+        arquivadas,
+        obra_id,
+        obra_ids,
+        codigo_contrato,
+        numero_solicitacao,
+        responsavel,
+        data_registro,
+        data_vencimento,
+        data_inicio,
+        data_fim,
+        valor_min,
+        valor_max,
+        tipo_macro_id,
+        tipo_solicitacao_id
+      } = req.query;
+
+      /* ===============================
+        1) BUSCAR SOLICITACOES OCULTADAS
+      =============================== */
+      const listarArquivadas = ['1', 'true', 'sim'].includes(
+        String(arquivadas || '').trim().toLowerCase()
+      );
+
+      const ocultadas = await SolicitacaoVisibilidadeUsuario.findAll({
+        where: {
+          usuario_id: usuarioId,
+          oculto: true
+        },
+        attributes: ['solicitacao_id']
+      });
+
+      const idsOcultos = ocultadas.map(o => o.solicitacao_id);
+
+      /* ===============================
+        2) WHERE BASE
+      =============================== */
+      const where = {
+        cancelada: false
+      };
+
+      if (listarArquivadas) {
+        if (idsOcultos.length === 0) {
+          return res.json([]);
+        }
+        where[Op.and] = where[Op.and] || [];
+        where[Op.and].push({ id: { [Op.in]: idsOcultos } });
+      } else if (idsOcultos.length > 0) {
+        where[Op.and] = where[Op.and] || [];
+        where[Op.and].push({ id: { [Op.notIn]: idsOcultos } });
+      }
+
+      /* ===============================
+        3) REGRAS POR PERFIL
+      =============================== */
+
+      const { UsuarioObra } = require('../models');
+      let setorAtual = null;
+      if (req.user.setor_id) {
+        const setorIdRaw = String(req.user.setor_id);
+        setorAtual = await Setor.findOne({
+          where: {
+            [Op.or]: [
+              { id: req.user.setor_id },
+              { codigo: setorIdRaw },
+              { nome: setorIdRaw }
+            ]
+          },
+          attributes: ['id', 'codigo', 'nome']
+        });
+        if (!areaUsuario) {
+          areaUsuario = setorAtual?.codigo || setorAtual?.nome || null;
+        }
+      }
+      if (areaUsuario) {
+        areaUsuario = String(areaUsuario).trim().toUpperCase();
+      }
+      const vinculos = await UsuarioObra.findAll({
+        where: { user_id: usuarioId },
+        attributes: ['obra_id']
+      });
+      const obrasVinculadas = vinculos.map(v => v.obra_id);
+
+      const isSetorObra = await isSetorObraGeral(req);
+      const isUsuarioGeo = await isUsuarioSetorGeo(req);
+
+      const setorTokensBase = [
+        setorAtual?.codigo,
+        setorAtual?.nome,
+        areaUsuario,
+        req.user?.setor_id
+      ]
+        .filter(Boolean)
+        .map(v => String(v).trim().toUpperCase());
+      const setorTokens = expandirTokensComAliasesGeo(setorTokensBase);
+      const adminGEO =
+        perfil.startsWith('ADMIN') &&
+        setorTokens.some(isGeoToken);
+      const isSetorAdministrativo = setorTokens.some(isAdministrativoToken);
+      const literalHistoricoSetorUsuario = montarLiteralHistoricoSetoresEnvolvidos(setorTokens);
+      const isSetorBrape = setorTokens.some(token => isBrapeToken(token));
+      const usuarioBrape = perfil === 'USUARIO' && isSetorBrape;
+      const adminBrape = perfil.startsWith('ADMIN') && isSetorBrape;
+      const regrasSetoresPorUsuario = await obterSetoresVisiveisPorUsuario();
+      const setoresExtrasUsuario = regrasSetoresPorUsuario[String(usuarioId)] || [];
+      const setoresVisiveisAoAtribuir = Array.from(new Set([
+        ...setorTokens,
+        ...setoresExtrasUsuario
+      ]));
+      const modoRecebimentoSetorUsuario = await obterModoRecebimentoSetor(setorTokens);
+      const setorTodosVisiveis = modoRecebimentoSetorUsuario === 'TODOS_VISIVEIS';
+      const brapeTokens = Array.from(new Set(setorTokens.filter(isBrapeToken)));
+      const brapeSetoresDb = await Setor.findAll({
+        where: {
+          [Op.or]: [
+            { codigo: { [Op.like]: 'BRAPE%' } },
+            { nome: { [Op.like]: 'BRAPE%' } }
+          ]
+        },
+        attributes: ['id', 'codigo', 'nome']
+      });
+      const brapeTokensDb = brapeSetoresDb
+        .flatMap(item => [item.id, item.codigo, item.nome])
+        .filter(Boolean)
+        .map(value => String(value).trim().toUpperCase());
+      const brapeTokensTodos = Array.from(new Set([
+        ...brapeTokens,
+        ...brapeTokensDb
+      ]));
+
+      if (isSetorAdministrativo && perfil !== 'SUPERADMIN') {
+        where[Op.and] = where[Op.and] || [];
+        where[Op.and].push({
+          [Op.or]: [
+            { criado_por: usuarioId },
+            {
+              id: {
+                [Op.in]: Sequelize.literal(`(
+                  SELECT solicitacao_id
+                  FROM historicos
+                  WHERE usuario_responsavel_id = ${usuarioId}
+                    AND acao IN ('RESPONSAVEL_ATRIBUIDO', 'RESPONSAVEL_ASSUMIU')
+                )`)
+              }
+            },
+            {
+              id: {
+                [Op.in]: Sequelize.literal(`(
+                  SELECT n.solicitacao_id
+                  FROM notificacoes n
+                  INNER JOIN notificacao_destinatarios nd ON nd.notificacao_id = n.id
+                  WHERE nd.usuario_id = ${usuarioId}
+                    AND n.tipo = 'MENCAO_COMENTARIO'
+                )`)
+              }
+            }
+          ]
+        });
+      } else if (isSetorBrape) {
+        if (usuarioBrape) {
+          if (obrasVinculadas.length === 0) {
+            return res.json([]);
+          }
+          where.obra_id = { [Op.in]: obrasVinculadas };
+        } else if (adminBrape) {
+          const condicoesBrape = [];
+          if (brapeTokens.length > 0) {
+            condicoesBrape.push({ area_responsavel: { [Op.in]: brapeTokens } });
+          }
+          if (obrasVinculadas.length > 0) {
+            condicoesBrape.push({ obra_id: { [Op.in]: obrasVinculadas } });
+          }
+          if (condicoesBrape.length > 0) {
+            where[Op.and] = where[Op.and] || [];
+            where[Op.and].push({ [Op.or]: condicoesBrape });
+          }
+        }
+      }
+
+      if (!isSetorAdministrativo && perfil !== 'SUPERADMIN' && adminGEO) {
+        // ADMIN GEO ve solicitacoes do setor GEO/gerencia de processos
+        // e tambem solicitacoes que ja passaram por esse setor.
+        where[Op.and] = where[Op.and] || [];
+        const tokensGeoUsuario = setorTokens.filter(isGeoToken);
+        const literalHistoricoGeoUsuario = montarLiteralHistoricoSetoresEnvolvidos(tokensGeoUsuario);
+        where[Op.and].push({
+          [Op.or]: [
+            { area_responsavel: { [Op.in]: tokensGeoUsuario } },
+            literalHistoricoGeoUsuario ? {
+              id: {
+                [Op.in]: literalHistoricoGeoUsuario
+              }
+            } : null
+          ].filter(Boolean)
+        });
+        if (brapeTokensTodos.length > 0) {
+          where[Op.and].push({ area_responsavel: { [Op.notIn]: brapeTokensTodos } });
+        }
+        where[Op.and].push({ area_responsavel: { [Op.notLike]: 'BRAPE%' } });
+      }
+
+      if (!isSetorAdministrativo && !isSetorBrape && perfil !== 'SUPERADMIN' && !adminGEO) {
+        where[Op.and] = where[Op.and] || [];
+        if (brapeTokensTodos.length > 0) {
+          where[Op.and].push({ area_responsavel: { [Op.notIn]: brapeTokensTodos } });
+        }
+        where[Op.and].push({ area_responsavel: { [Op.notLike]: 'BRAPE%' } });
+      }
+
+      // Setor OBRA (ADMIN e USUARIO): ve apenas solicitacoes criadas por ele
+      // e/ou das obras vinculadas ao usuario. Superadmin continua com visao global.
+      if (!isSetorAdministrativo && isSetorObra && perfil !== 'SUPERADMIN') {
+        const condicoesObra = [{ criado_por: usuarioId }];
+        if (obrasVinculadas.length > 0) {
+          condicoesObra.push({ obra_id: { [Op.in]: obrasVinculadas } });
+        }
+        where[Op.and] = where[Op.and] || [];
+        where[Op.and].push({ [Op.or]: condicoesObra });
+      }
+
+      // SUPERADMIN ve tudo; demais passam por regra de visibilidade
+      if (perfil !== 'SUPERADMIN' && !isSetorAdministrativo && !adminGEO && !isSetorObra && !isSetorBrape) {
+        const condicoes = [];
+
+        // Criador ve
+        condicoes.push({ criado_por: usuarioId });
+
+        // Setor atual ve
+        const setoresPermitidos = [];
+        if (areaUsuario) setoresPermitidos.push(areaUsuario);
+        if (setorAtual?.codigo) setoresPermitidos.push(setorAtual.codigo);
+        if (setorAtual?.nome) setoresPermitidos.push(setorAtual.nome);
+        if (setorAtual?.id) setoresPermitidos.push(String(setorAtual.id));
+        if (req.user.setor_id) setoresPermitidos.push(String(req.user.setor_id));
+        const setoresUnicos = Array.from(new Set(setoresPermitidos.filter(Boolean)));
+        if (setoresUnicos.length > 0) {
+          condicoes.push({ area_responsavel: { [Op.in]: setoresUnicos } });
+        }
+
+        // Responsavel ve (respeita setores configurados para o usuario)
+        condicoes.push({
+          [Op.and]: [
+            { area_responsavel: { [Op.in]: setoresVisiveisAoAtribuir } },
+            {
+              id: {
+                [Op.in]: Sequelize.literal(`(
+                  SELECT solicitacao_id
+                  FROM historicos
+                  WHERE usuario_responsavel_id = ${usuarioId}
+                    AND acao IN ('RESPONSAVEL_ATRIBUIDO', 'RESPONSAVEL_ASSUMIU')
+                )`)
+              }
+            }
+          ]
+        });
+
+        // Qualquer interacao do usuario no historico (respeita setores configurados)
+        condicoes.push({
+          [Op.and]: [
+            { area_responsavel: { [Op.in]: setoresVisiveisAoAtribuir } },
+            {
+              id: {
+                [Op.in]: Sequelize.literal(`(
+                  SELECT solicitacao_id
+                  FROM historicos
+                  WHERE usuario_responsavel_id = ${usuarioId}
+                )`)
+              }
+            }
+          ]
+        });
+
+        // Vinculo com obra ve
+        if (obrasVinculadas.length > 0) {
+          condicoes.push({ obra_id: { [Op.in]: obrasVinculadas } });
+        }
+
+        // Mantem visibilidade de solicitacoes que ja passaram pelo setor do usuario
+        if (literalHistoricoSetorUsuario) {
+          condicoes.push({
+            id: { [Op.in]: literalHistoricoSetorUsuario }
+          });
+        }
+
+        where[Op.and] = where[Op.and] || [];
+        where[Op.and].push({ [Op.or]: condicoes });
+      }
+
+      /* ===============================
+        4) FILTROS
+      =============================== */
+
+      if (area) {
+        const areaFiltro = String(area).trim();
+        const areaFiltroUpper = areaFiltro.toUpperCase();
+        const setorFiltroRow = await Setor.findOne({
+          where: {
+            [Op.or]: [
+              { codigo: areaFiltro },
+              { nome: areaFiltro },
+              { id: Number.isNaN(Number(areaFiltro)) ? -1 : Number(areaFiltro) }
+            ]
+          },
+          attributes: ['id', 'codigo', 'nome']
+        });
+
+        const valoresFiltroSetor = Array.from(new Set(
+          [
+            areaFiltro,
+            setorFiltroRow?.codigo,
+            setorFiltroRow?.nome,
+            setorFiltroRow?.id != null ? String(setorFiltroRow.id) : null
+          ]
+            .filter(Boolean)
+            .map(v => String(v).trim())
+        ));
+
+        if (valoresFiltroSetor.length > 0) {
+          where.area_responsavel = { [Op.in]: valoresFiltroSetor };
+        } else if (areaFiltroUpper === 'BRAPE') {
+          where.id = -1;
+        } else {
+          where.area_responsavel = areaFiltro;
+        }
+      }
+      if (status) {
+        const statusFiltro = String(status).trim();
+        const statusSemAcento = statusFiltro
+          .toUpperCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '');
+        const statusComUnderscore = statusSemAcento.replace(/\s+/g, '_');
+        const statusComEspaco = statusSemAcento.replace(/_/g, ' ');
+        const statusSemSeparador = statusSemAcento.replace(/[\s_]+/g, '');
+
+        where[Op.and] = where[Op.and] || [];
+        where[Op.and].push({
+          [Op.or]: [
+            { status_global: statusComUnderscore },
+            { status_global: statusComEspaco },
+            Sequelize.where(
+              Sequelize.fn(
+                'REPLACE',
+                Sequelize.fn(
+                  'REPLACE',
+                  Sequelize.fn('UPPER', Sequelize.col('status_global')),
+                  '_',
+                  ''
+                ),
+                ' ',
+                ''
+              ),
+              statusSemSeparador
+            )
+          ]
+        });
+      }
+      if (obra_id) {
+        const idNum = Number(obra_id);
+        if (!Number.isNaN(idNum) && idNum > 0) {
+          where.obra_id = idNum;
+        }
+      }
+      if (obra_ids) {
+        const ids = String(obra_ids)
+          .split(',')
+          .map(id => Number(id))
+          .filter(id => !Number.isNaN(id) && id > 0);
+        if (ids.length > 0) {
+          where.obra_id = { [Op.in]: ids };
+        } else {
+          where.obra_id = -1;
+        }
+      }
+
+      if (isSetorObra) {
+        const filtroAtual = where.obra_id;
+        if (filtroAtual) {
+          if (typeof filtroAtual === 'number') {
+            if (!obrasVinculadas.includes(filtroAtual)) {
+              where.obra_id = -1;
+            }
+          } else if (filtroAtual[Op.in]) {
+            const idsFiltrados = filtroAtual[Op.in].filter(id => obrasVinculadas.includes(id));
+            where.obra_id = idsFiltrados.length > 0 ? { [Op.in]: idsFiltrados } : -1;
+          }
+        } else {
+          where.obra_id = { [Op.in]: obrasVinculadas };
+        }
+      }
+      if (tipo_macro_id) {
+        const tipoMacroNum = Number(tipo_macro_id);
+        if (!Number.isNaN(tipoMacroNum) && tipoMacroNum > 0) {
+          where.tipo_macro_id = tipoMacroNum;
+        }
+      }
+      if (tipo_solicitacao_id) {
+        const tiposSelecionados = String(tipo_solicitacao_id)
+          .split(',')
+          .map(id => Number(id))
+          .filter(id => !Number.isNaN(id) && id > 0);
+
+        if (tiposSelecionados.length > 1) {
+          where.tipo_solicitacao_id = { [Op.in]: tiposSelecionados };
+        } else if (tiposSelecionados.length === 1) {
+          where.tipo_solicitacao_id = tiposSelecionados[0];
+        }
+      }
+      if (codigo_contrato) {
+        const codigoContratoFiltro = String(codigo_contrato).trim();
+        if (codigoContratoFiltro) {
+          where.codigo_contrato = {
+            [Op.like]: `%${codigoContratoFiltro}%`
+          };
+        }
+      }
+      if (numero_solicitacao) {
+        const numeroSolicitacaoFiltro = String(numero_solicitacao).trim();
+        if (numeroSolicitacaoFiltro) {
+          where.numero_sienge = {
+            [Op.like]: `%${numeroSolicitacaoFiltro}%`
+          };
+        }
+      }
+      if (valor_min !== undefined && valor_min !== null && String(valor_min).trim() !== '') {
+        const min = Number(valor_min);
+        if (!Number.isNaN(min)) {
+          where.valor = { ...(where.valor || {}), [Op.gte]: min };
+        }
+      }
+      if (valor_max !== undefined && valor_max !== null && String(valor_max).trim() !== '') {
+        const max = Number(valor_max);
+        if (!Number.isNaN(max)) {
+          where.valor = { ...(where.valor || {}), [Op.lte]: max };
+        }
+      }
+      if (data_registro) {
+        const dataRegistroStr = String(data_registro).trim();
+        if (/^\d{4}-\d{2}-\d{2}$/.test(dataRegistroStr)) {
+          where.createdAt = {
+            [Op.gte]: new Date(`${dataRegistroStr}T00:00:00`),
+            [Op.lte]: new Date(`${dataRegistroStr}T23:59:59.999`)
+          };
+        }
+      } else if (data_inicio || data_fim) {
+        const intervaloData = {};
+        if (data_inicio) {
+          const dataInicioStr = String(data_inicio).trim();
+          if (/^\d{4}-\d{2}-\d{2}$/.test(dataInicioStr)) {
+            intervaloData[Op.gte] = new Date(`${dataInicioStr}T00:00:00`);
+          }
+        }
+        if (data_fim) {
+          const dataFimStr = String(data_fim).trim();
+          if (/^\d{4}-\d{2}-\d{2}$/.test(dataFimStr)) {
+            intervaloData[Op.lte] = new Date(`${dataFimStr}T23:59:59.999`);
+          }
+        }
+        if (Object.keys(intervaloData).length > 0) {
+          where.createdAt = intervaloData;
+        }
+      }
+
+      if (data_vencimento) {
+        const dataVencimentoStr = String(data_vencimento).trim();
+        if (/^\d{4}-\d{2}-\d{2}$/.test(dataVencimentoStr)) {
+          where[Op.and] = where[Op.and] || [];
+          where[Op.and].push(
+            Sequelize.where(
+              Sequelize.fn('DATE', Sequelize.col('Solicitacao.data_vencimento')),
+              dataVencimentoStr
+            )
+          );
+        }
+      }
+
+      if (responsavel) {
+        const responsavelFiltro = String(responsavel).trim();
+        if (responsavelFiltro) {
+          const responsaveisSelecionados = responsavelFiltro
+            .split(',')
+            .map(item => String(item || '').trim())
+            .filter(Boolean);
+
+          where[Op.and] = where[Op.and] || [];
+
+          if (responsaveisSelecionados.length > 1) {
+            const valoresIn = responsaveisSelecionados
+              .map(item => `'${item.replace(/'/g, "''").toUpperCase()}'`)
+              .join(', ');
+
+            where[Op.and].push(
+              Sequelize.literal(`EXISTS (
+                SELECT 1
+                FROM historicos h
+                INNER JOIN users u ON u.id = h.usuario_responsavel_id
+                WHERE h.solicitacao_id = Solicitacao.id
+                  AND h.acao IN ('RESPONSAVEL_ATRIBUIDO', 'RESPONSAVEL_ASSUMIU')
+                  AND h.createdAt = (
+                    SELECT MAX(h2.createdAt)
+                    FROM historicos h2
+                    WHERE h2.solicitacao_id = Solicitacao.id
+                      AND h2.acao IN ('RESPONSAVEL_ATRIBUIDO', 'RESPONSAVEL_ASSUMIU')
+                  )
+                  AND UPPER(u.nome) IN (${valoresIn})
+              )`)
+            );
+          } else {
+            const filtroEscapado = responsaveisSelecionados[0].replace(/'/g, "''");
+            where[Op.and].push(
+              Sequelize.literal(`EXISTS (
+                SELECT 1
+                FROM historicos h
+                INNER JOIN users u ON u.id = h.usuario_responsavel_id
+                WHERE h.solicitacao_id = Solicitacao.id
+                  AND h.acao IN ('RESPONSAVEL_ATRIBUIDO', 'RESPONSAVEL_ASSUMIU')
+                  AND h.createdAt = (
+                    SELECT MAX(h2.createdAt)
+                    FROM historicos h2
+                    WHERE h2.solicitacao_id = Solicitacao.id
+                      AND h2.acao IN ('RESPONSAVEL_ATRIBUIDO', 'RESPONSAVEL_ASSUMIU')
+                  )
+                  AND UPPER(u.nome) LIKE UPPER('%${filtroEscapado}%')
+              )`)
+            );
+          }
+        }
+      }
+      /* ===============================
+        5) CONSULTA
+      =============================== */
+
+      const solicitacoes = await Solicitacao.findAll({
+        where,
+        include: [
+          {
+            model: Obra,
+            as: 'obra',
+            attributes: ['id', 'nome', 'codigo']
+          },
+          {
+            model: TipoSolicitacao,
+            as: 'tipo',
+            attributes: ['id', 'nome']
+          },
+          {
+            model: Contrato,
+            as: 'contrato',
+            attributes: ['id', 'codigo', 'ref_contrato']
+          },
+          {
+            model: TipoSolicitacao,
+            as: 'tipoMacroSolicitacao',
+            attributes: ['id', 'nome']
+          },
+          {
+            model: Historico,
+            as: 'historicos',
+            required: false,
+            where: {
+              usuario_responsavel_id: { [Op.ne]: null },
+              acao: {
+                [Op.in]: [
+                  'RESPONSAVEL_ATRIBUIDO',
+                  'RESPONSAVEL_ASSUMIU',
+                  'ENVIADA_SETOR'
+                ]
+              }
+            },
+            limit: 1,
+            order: [['createdAt', 'DESC']],
+            include: [
+              {
+                model: User,
+                as: 'usuario',
+                attributes: ['id', 'nome']
+              }
+            ]
+          }
+        ],
+        order: [['createdAt', 'DESC']]
+      });
+
+      /* ===============================
+        6) FORMATAR RESPOSTA
+      =============================== */
+
+      const resultadoBase = solicitacoes.map(s => {
+        const historicoResponsavel = s.historicos?.[0];
+        const responsavel =
+          historicoResponsavel && historicoResponsavel.acao !== 'ENVIADA_SETOR'
+            ? historicoResponsavel.usuario?.nome || null
+            : null;
+
+        return {
+          ...s.toJSON(),
+          responsavel
+        };
+      });
+
+      let resultado = isSetorObra
+        ? resultadoBase.filter(r => obrasVinculadas.includes(r.obra_id))
+        : resultadoBase;
+
+      const usuarioComRegraMistaPorTipo =
+        perfil === 'USUARIO' &&
+        !adminGEO &&
+        !isSetorObra &&
+        !isSetorBrape;
+
+      if (usuarioComRegraMistaPorTipo && resultado.length > 0) {
+        const idsResultado = resultado.map(item => item.id);
+        const historicosUsuario = await Historico.findAll({
+          where: {
+            solicitacao_id: { [Op.in]: idsResultado },
+            usuario_responsavel_id: usuarioId,
+            acao: { [Op.in]: ['RESPONSAVEL_ATRIBUIDO', 'RESPONSAVEL_ASSUMIU'] }
+          },
+          attributes: ['solicitacao_id']
+        });
+        const idsComInteracaoUsuario = new Set(
+          historicosUsuario.map(h => Number(h.solicitacao_id))
+        );
+
+        const regrasTiposPorSetor = await obterTiposSolicitacaoPorSetorConfig();
+        const setoresUsuarioUpper = new Set(setorTokens.map(t => String(t || '').toUpperCase()));
+
+        resultado = resultado.filter(item => {
+          const areaItem = String(item.area_responsavel || '').trim().toUpperCase();
+          const tipoId = Number(item.tipo_solicitacao_id);
+          const itemEhDoSetorUsuario = setoresUsuarioUpper.has(areaItem);
+          const itemCriadoPeloUsuario = Number(item.criado_por) === Number(usuarioId);
+          const itemComInteracaoUsuario = idsComInteracaoUsuario.has(Number(item.id));
+
+          if (!itemEhDoSetorUsuario) return true;
+          if (itemCriadoPeloUsuario || itemComInteracaoUsuario) return true;
+
+          const regraTipo = obterRegrasTipoPorTokensSetor(regrasTiposPorSetor, [areaItem]);
+          let modoPorTipo = null;
+          if (regraTipo?.modos && Number.isInteger(tipoId) && tipoId > 0) {
+            modoPorTipo = regraTipo.modos[String(tipoId)] || null;
+          }
+
+          const modoEfetivo = String(modoPorTipo || (setorTodosVisiveis ? 'TODOS_VISIVEIS' : 'ADMIN_PRIMEIRO')).toUpperCase();
+          return modoEfetivo === 'TODOS_VISIVEIS';
+        });
+      }
+
+      if (resultado.length > 0) {
+        const idsSolicitacoes = resultado.map(item => item.id);
+        const historicosStatus = await Historico.findAll({
+          where: {
+            solicitacao_id: { [Op.in]: idsSolicitacoes },
+            acao: 'STATUS_ALTERADO'
+          },
+          attributes: ['solicitacao_id', 'setor', 'createdAt'],
+          order: [['createdAt', 'DESC']]
+        });
+
+        const setorStatusPorSolicitacao = new Map();
+        historicosStatus.forEach(item => {
+          const solicitacaoId = Number(item.solicitacao_id);
+          if (!setorStatusPorSolicitacao.has(solicitacaoId)) {
+            setorStatusPorSolicitacao.set(solicitacaoId, item.setor || null);
+          }
+        });
+
+        resultado.forEach(item => {
+          item.setor_status_atual =
+            setorStatusPorSolicitacao.get(Number(item.id)) || item.area_responsavel || null;
+        });
+      }
+
+      return res.json(resultado);
+
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao buscar solicitacoes' });
+    }
+  },
+
+  // =====================================================
+  // CRIAR SOLICITACAO
+  // =====================================================
+  async create(req, res) {
+    try {
+      const {
+        obra_id,
+        tipo_solicitacao_id,
+        tipo_macro_id,
+        tipo_sub_id,
+        descricao,
+        valor,
+        area_responsavel,
+        codigo_contrato,
+        contrato_id,
+        data_vencimento,
+        data_inicio_medicao,
+        data_fim_medicao,
+        itens_apropriacao,
+        ref_contrato_abertura
+      } = req.body;
+
+      if (!obra_id || !tipo_solicitacao_id || !area_responsavel) {
+        return res.status(400).json({
+          error: 'Campos obrigatorios nao informados'
+        });
+      }
+
+      const regrasAreasPorSetor = await obterRegrasAreasPorSetorOrigem();
+      const areaUsuario = await obterAreaUsuario(req);
+      const tokensSetorUsuario = await obterTokensSetorUsuario(req, areaUsuario);
+      const perfilUsuario = String(req.user?.perfil || '').trim().toUpperCase();
+      const setoresCriacaoTodasObras = await obterSetoresCriacaoTodasObras();
+      const podeCriarEmTodasObras = tokensSetorUsuario.some(token =>
+        setoresCriacaoTodasObras.includes(String(token || '').trim().toUpperCase())
+      );
+
+      if (perfilUsuario !== 'SUPERADMIN' && !podeCriarEmTodasObras) {
+        const { UsuarioObra } = require('../models');
+        const vinculo = await UsuarioObra.findOne({
+          where: {
+            user_id: req.user.id,
+            obra_id
+          },
+          attributes: ['id']
+        });
+        if (!vinculo) {
+          return res.status(403).json({
+            error: 'Acesso negado. Usuario nao vinculado a obra selecionada.'
+          });
+        }
+      }
+
+      const destinosPermitidos = new Set();
+      tokensSetorUsuario.forEach(token => {
+        const lista = regrasAreasPorSetor[String(token || '').toUpperCase()] || [];
+        lista.forEach(item => destinosPermitidos.add(String(item || '').toUpperCase()));
+      });
+
+      if (destinosPermitidos.size > 0) {
+        const destino = String(area_responsavel || '').trim().toUpperCase();
+        if (!destinosPermitidos.has(destino)) {
+          return res.status(403).json({
+            error: 'Area responsavel nao permitida para o seu setor.'
+          });
+        }
+      }
+
+      const tipoSelecionado = await TipoSolicitacao.findByPk(tipo_solicitacao_id);
+      const tiposPorSetorConfig = await obterTiposSolicitacaoPorSetorConfig();
+      const regraTiposSetorDestino = obterRegrasTipoPorTokensSetor(
+        tiposPorSetorConfig,
+        [area_responsavel]
+      );
+      if (regraTiposSetorDestino && Array.isArray(regraTiposSetorDestino.tipos) && regraTiposSetorDestino.tipos.length > 0) {
+        const tipoIdNum = Number(tipo_solicitacao_id);
+        if (!regraTiposSetorDestino.tipos.includes(tipoIdNum)) {
+          return res.status(403).json({
+            error: 'Tipo de solicitacao nao permitido para o setor selecionado.'
+          });
+        }
+      }
+      const nomeTipo = String(tipoSelecionado?.nome || '').trim().toUpperCase();
+      const nomeTipoNormalizado = nomeTipo
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
+      const nomeTipoToken = nomeTipoNormalizado
+        .replace(/[^A-Z0-9]+/g, ' ')
+        .trim();
+
+      const tiposSemValor = new Set([
+        'SOLICITACAO DE COMPRA',
+        'OUTROS ASSUNTOS',
+        'PEDIDO DE CONTRATACAO'
+      ]);
+      const exigeCamposContrato =
+        nomeTipoNormalizado === 'MEDICAO' ||
+        nomeTipo === 'ADM LOCAL DE OBRA' ||
+        nomeTipoToken === 'LOCACAO DE MAQ EQ';
+      const exigeSubtipo = nomeTipo === 'ADM LOCAL DE OBRA';
+
+      if (!tiposSemValor.has(nomeTipoNormalizado) && (valor === '' || valor === null || valor === undefined)) {
+        return res.status(400).json({
+          error: 'Para continuar, informe o valor da solicitacao.'
+        });
+      }
+
+      if (nomeTipoNormalizado !== 'MEDICAO' && !descricao) {
+        return res.status(400).json({
+          error: 'Campos obrigatorios nao informados'
+        });
+      }
+
+      if (exigeSubtipo && !tipo_sub_id) {
+        return res.status(400).json({
+          error: 'Para continuar, selecione o subtipo.'
+        });
+      }
+      if (nomeTipoNormalizado === 'MEDICAO' && (!data_inicio_medicao || !data_fim_medicao)) {
+        return res.status(400).json({
+          error: 'Para Medicao, informe data inicial e data final.'
+        });
+      }
+      if (!data_vencimento) {
+        return res.status(400).json({
+          error: 'Informe a data de vencimento.'
+        });
+      }
+      if (data_vencimento) {
+        const vencimentoStr = String(data_vencimento).trim();
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(vencimentoStr)) {
+          return res.status(400).json({
+            error: 'Data de vencimento invalida. Use o formato YYYY-MM-DD.'
+          });
+        }
+
+        const agora = new Date();
+        const hojeStr = `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, '0')}-${String(agora.getDate()).padStart(2, '0')}`;
+
+        if (vencimentoStr < hojeStr) {
+          return res.status(400).json({
+            error: 'A data de vencimento nao pode ser menor que a data atual.'
+          });
+        }
+      }
+      if (exigeCamposContrato && !contrato_id) {
+        return res.status(400).json({
+          error: 'Selecione um contrato.'
+        });
+      }
+      if (nomeTipoNormalizado === 'ABERTURA DE CONTRATO' && !itens_apropriacao) {
+        return res.status(400).json({
+          error: 'Para Abertura de Contrato, informe os itens de apropriacao.'
+        });
+      }
+      if (nomeTipoNormalizado === 'ABERTURA DE CONTRATO' && !ref_contrato_abertura) {
+        return res.status(400).json({
+          error: 'Para Abertura de Contrato, informe a ref do contrato.'
+        });
+      }
+
+      const usuarioId = req.user.id;
+      const usuario = await User.findByPk(usuarioId);
+      const valorPersistido = tiposSemValor.has(nomeTipoNormalizado)
+        ? null
+        : (valor === '' || valor === undefined ? null : valor);
+
+      const codigo = await gerarCodigoSolicitacao();
+
+      const solicitacao = await Solicitacao.create({
+        codigo,
+        obra_id,
+        tipo_solicitacao_id,
+        tipo_macro_id: tipo_macro_id || null,
+        tipo_sub_id: tipo_sub_id || null,
+        descricao,
+        valor: valorPersistido,
+        area_responsavel,
+        codigo_contrato,
+        contrato_id: contrato_id || null,
+        data_vencimento: data_vencimento || null,
+        data_inicio_medicao: data_inicio_medicao || null,
+        data_fim_medicao: data_fim_medicao || null,
+        criado_por: usuarioId,
+        status_global: 'PENDENTE'
+      });
+
+      const itensTexto = itens_apropriacao
+        ? `Itens de apropriacao: ${String(itens_apropriacao).trim()}`
+        : null;
+      const refTexto = ref_contrato_abertura
+        ? `Ref. do contrato: ${String(ref_contrato_abertura).trim()}`
+        : null;
+      const descricaoHistorico = [itensTexto, refTexto].filter(Boolean).join(' | ') || null;
+      const metadata = {};
+      if (itens_apropriacao) {
+        metadata.itens_apropriacao = String(itens_apropriacao).trim();
+      }
+      if (ref_contrato_abertura) {
+        metadata.ref_contrato_abertura = String(ref_contrato_abertura).trim();
+      }
+
+      await Historico.create({
+        solicitacao_id: solicitacao.id,
+        usuario_responsavel_id: usuarioId,
+        setor: req.user.area,
+        acao: 'SOLICITACAO_CRIADA',
+        status_novo: 'PENDENTE',
+        descricao: descricaoHistorico,
+        metadata: Object.keys(metadata).length > 0 ? JSON.stringify(metadata) : null
+      });
+
+      const destinatariosCriacao = await obterDestinatariosCriacaoSetor(solicitacao);
+
+      await criarNotificacao({
+        solicitacao_id: solicitacao.id,
+        tipo: 'SOLICITACAO_CRIADA',
+        mensagem: `${usuario?.nome || 'Usuario'} criou a solicitacao ${codigo}`,
+        created_by: usuarioId,
+        destinatarios: destinatariosCriacao,
+        usarDestinatariosInformados: true
+      });
+
+      // Criador ja enxerga
+      await garantirVisibilidade(solicitacao.id, usuarioId);
+
+      return res.status(201).json(solicitacao);
+
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao criar solicitacao' });
+    }
+  },
+
+  // =====================================================
+  // DETALHE
+  // =====================================================
+  async show(req, res) {
+    try {
+      const { id } = req.params;
+
+      const solicitacao = await Solicitacao.findByPk(id, {
+        include: [
+          // OBRA
+          {
+            model: Obra,
+            as: 'obra',
+            attributes: ['id', 'nome', 'codigo']
+          },
+          // TIPO DE SOLICITACAO
+          {
+            model: TipoSolicitacao,
+            as: 'tipo',
+            attributes: ['id', 'nome']
+          },
+          // TIPOS MACRO/SUB DA SOLICITACAO
+          {
+            model: TipoSolicitacao,
+            as: 'tipoMacroSolicitacao',
+            attributes: ['id', 'nome']
+          },
+          {
+            model: TipoSubContrato,
+            as: 'tipoSubSolicitacao',
+            attributes: ['id', 'nome']
+          },
+          // CONTRATO
+          {
+            model: Contrato,
+            as: 'contrato',
+            include: [
+              {
+                model: TipoSolicitacao,
+                as: 'tipoMacro',
+                attributes: ['id', 'nome']
+              },
+              {
+                model: TipoSubContrato,
+                as: 'tipoSub',
+                attributes: ['id', 'nome']
+              }
+            ]
+          },
+          // HISTORICO
+          {
+            model: Historico,
+            as: 'historicos',
+            include: [
+              {
+                model: User,
+                as: 'usuario',
+                attributes: ['id', 'nome']
+              }
+            ]
+          }
+        ],
+        order: [
+          [{ model: Historico, as: 'historicos' }, 'createdAt', 'DESC']
+        ]
+      });
+
+      if (!solicitacao) {
+        return res.status(404).json({
+          error: 'Solicitacao nao encontrada'
+        });
+      }
+
+      const acessoObra = await validarAcessoObra(req, solicitacao);
+      if (!acessoObra) {
+        return res.status(403).json({
+          error: 'Acesso negado. Vincule o usuario a obra para continuar.'
+        });
+      }
+
+      const areaUsuario = await obterAreaUsuario(req);
+      const tokensSetorUsuario = expandirTokensComAliasesGeo(
+        await obterTokensSetorUsuario(req, areaUsuario)
+      );
+      const isSetorAdministrativo = tokensSetorUsuario.some(isAdministrativoToken);
+
+      if (isSetorAdministrativo && String(req.user?.perfil || '').trim().toUpperCase() !== 'SUPERADMIN') {
+        const itemCriadoPeloUsuario = Number(solicitacao.criado_por) === Number(req.user.id);
+        const historicoResponsavel = await Historico.findOne({
+          where: {
+            solicitacao_id: id,
+            usuario_responsavel_id: req.user.id,
+            acao: {
+              [Op.in]: ['RESPONSAVEL_ATRIBUIDO', 'RESPONSAVEL_ASSUMIU']
+            }
+          },
+          attributes: ['id']
+        });
+        const mencaoUsuario = await NotificacaoDestinatario.findOne({
+          include: [
+            {
+              model: Notificacao,
+              as: 'notificacao',
+              required: true,
+              where: {
+                solicitacao_id: id,
+                tipo: 'MENCAO_COMENTARIO'
+              },
+              attributes: ['id']
+            }
+          ],
+          where: {
+            usuario_id: req.user.id
+          },
+          attributes: ['id']
+        });
+
+        if (!itemCriadoPeloUsuario && !historicoResponsavel && !mencaoUsuario) {
+          return res.status(403).json({ error: 'Acesso negado' });
+        }
+      }
+
+      const isUsuarioGeo = await isUsuarioSetorGeo(req);
+      if (isUsuarioGeo) {
+        const areaSolicitacao = String(solicitacao.area_responsavel || '').trim().toUpperCase();
+        const solicitacaoDoSetorUsuario = tokensSetorUsuario.includes(areaSolicitacao);
+        const modoRecebimentoGeo = await obterModoRecebimentoPorSetorETipo(
+          tokensSetorUsuario,
+          solicitacao.tipo_solicitacao_id
+        );
+        const itemCriadoPeloUsuario = Number(solicitacao.criado_por) === Number(req.user.id);
+        const historicoResponsavel = await Historico.findOne({
+          where: {
+            solicitacao_id: id,
+            usuario_responsavel_id: req.user.id,
+            acao: {
+              [Op.in]: ['RESPONSAVEL_ATRIBUIDO', 'RESPONSAVEL_ASSUMIU']
+            }
+          },
+          attributes: ['id']
+        });
+        const historicoInteracao = await Historico.findOne({
+          where: {
+            solicitacao_id: id,
+            usuario_responsavel_id: req.user.id
+          },
+          attributes: ['id']
+        });
+        const historicoSetorGeo = (Array.isArray(solicitacao.historicos) ? solicitacao.historicos : []).some(item => {
+          if (isGeoToken(item?.setor)) return true;
+          if (String(item?.acao || '').toUpperCase() !== 'ENVIADA_SETOR') return false;
+          const envio = parseObservacaoEnvioSetor(item?.observacao);
+          return isGeoToken(envio?.origem) || isGeoToken(envio?.destino);
+        });
+        const podeVerPeloModoRecebimento =
+          solicitacaoDoSetorUsuario &&
+          String(modoRecebimentoGeo || '').toUpperCase() === 'TODOS_VISIVEIS';
+
+        if (
+          !itemCriadoPeloUsuario &&
+          !podeVerPeloModoRecebimento &&
+          !historicoResponsavel &&
+          !historicoInteracao &&
+          !historicoSetorGeo
+        ) {
+          return res.status(403).json({ error: 'Acesso negado' });
+        }
+      }
+
+      return res.json(solicitacao);
+
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({
+        error: 'Erro ao buscar solicitacao'
+      });
+    }
+  },
+
+  // =====================================================
+  // ATUALIZAR STATUS
+  // =====================================================
+  async updateStatus(req, res) {
+    try {
+      const { id } = req.params;
+      const { status } = req.body;
+      const usuarioId = req.user.id;
+      const usuario = await User.findByPk(usuarioId);
+      const perfil = String(req.user?.perfil || '').trim().toUpperCase();
+      const isSuperadmin = perfil === 'SUPERADMIN';
+      const areaUsuario = await obterAreaUsuario(req);
+      const isSetorObra = await isSetorObraGeral(req);
+
+      const solicitacao = await Solicitacao.findByPk(id);
+      if (!solicitacao) {
+        return res.status(404).json({ error: 'Solicitacao nao encontrada' });
+      }
+
+      const acessoObra = await validarAcessoObra(req, solicitacao);
+      if (!acessoObra) {
+        return res.status(403).json({
+          error: 'Acesso negado. Vincule o usuario a obra para continuar.'
+        });
+      }
+
+      const statusAnterior = solicitacao.status_global;
+
+      if (status === statusAnterior) {
+        return res.sendStatus(204);
+      }
+
+      const setorAtual = solicitacao.area_responsavel;
+      const setorValidacaoStatus = String(areaUsuario || setorAtual || '').trim();
+
+      if (!isSuperadmin) {
+        const setorAtualStr = setorValidacaoStatus;
+        const whereSetor = {
+          ativo: true
+        };
+
+        if (setorAtualStr) {
+          const setorRow = await Setor.findOne({
+            where: {
+              [Op.or]: [
+                { codigo: setorAtualStr },
+                { nome: setorAtualStr },
+                Sequelize.where(
+                  Sequelize.fn('LOWER', Sequelize.col('codigo')),
+                  setorAtualStr.toLowerCase()
+                ),
+                Sequelize.where(
+                  Sequelize.fn('LOWER', Sequelize.col('nome')),
+                  setorAtualStr.toLowerCase()
+                )
+              ]
+            },
+            attributes: ['codigo', 'nome']
+          });
+
+          const tokensSetor = [
+            setorAtualStr,
+            String(setorRow?.codigo || '').trim(),
+            String(setorRow?.nome || '').trim()
+          ].filter(Boolean);
+
+          whereSetor.setor = { [Op.in]: tokensSetor };
+        }
+
+        const etapas = await EtapaSetor.findAll({
+          where: whereSetor,
+          attributes: ['nome']
+        });
+
+        if (etapas.length > 0) {
+          const permitidos = etapas
+            .map(e => String(e.nome || '').trim().toUpperCase())
+            .filter(Boolean);
+          const statusNovo = String(status || '').trim().toUpperCase();
+
+          if (!permitidos.includes(statusNovo)) {
+            return res.status(400).json({
+              error: 'Status nao permitido para este setor'
+            });
+          }
+        }
+      }
+
+      await solicitacao.update({ status_global: status });
+
+      await Historico.create({
+        solicitacao_id: id,
+        usuario_responsavel_id: usuarioId,
+        setor: setorValidacaoStatus || solicitacao.area_responsavel,
+        acao: 'STATUS_ALTERADO',
+        status_anterior: statusAnterior,
+        status_novo: status,
+        metadata: JSON.stringify({
+          ator_id: usuarioId,
+          ator_nome: usuario ? usuario.nome : null
+        })
+      });
+
+      await criarNotificacao({
+        solicitacao_id: id,
+        tipo: 'STATUS_ALTERADO',
+        mensagem: `${usuario?.nome || 'Usuario'} alterou status de ${statusAnterior} para ${status} na solicitacao ${solicitacao.codigo}`,
+        created_by: usuarioId,
+        metadata: {
+          status_anterior: statusAnterior,
+          status_novo: status
+        }
+      });
+
+      if (isSetorObra) {
+        const statusAnteriorNorm = normalizarTokenComparacao(statusAnterior);
+        const statusNovoNorm = normalizarTokenComparacao(status);
+
+        // Quando OBRA atende um ajuste, retorna automaticamente para o setor
+        // que enviou a solicitacao para OBRA (ultimo envio para OBRA).
+        const statusAjustePend = new Set(['PENDENTE_DE_AJUSTE', 'AGUARDANDO_AJUSTE']);
+        if (statusAjustePend.has(statusAnteriorNorm) && statusNovoNorm === 'ATENDIDO') {
+          const envios = await Historico.findAll({
+            where: {
+              solicitacao_id: id,
+              acao: 'ENVIADA_SETOR'
+            },
+            attributes: ['observacao', 'createdAt'],
+            order: [['createdAt', 'DESC']]
+          });
+
+          const setorAtualNorm = normalizarTokenComparacao(setorAtual);
+          let setorRetorno = null;
+
+          for (const envio of envios) {
+            const parsed = parseObservacaoEnvioSetor(envio.observacao);
+            if (!parsed) continue;
+            const destinoNorm = normalizarTokenComparacao(parsed.destino);
+            if (destinoNorm !== setorAtualNorm && destinoNorm !== 'OBRA') continue;
+            const origemNorm = normalizarTokenComparacao(parsed.origem);
+            if (!origemNorm || origemNorm === setorAtualNorm || origemNorm === 'OBRA') continue;
+            setorRetorno = parsed.origem;
+            break;
+          }
+
+          if (setorRetorno) {
+            const envioAuto = await enviarSolicitacaoParaSetorInterno({
+              req,
+              solicitacao,
+              setorDestino: setorRetorno,
+              usuarioId
+            });
+
+            if (!envioAuto.ok) {
+              return res.status(envioAuto.status || 400).json({
+                error: envioAuto.error || 'Erro ao retornar solicitacao para o setor anterior'
+              });
+            }
+          }
+        }
+
+        // Quando OBRA marca "Mercadoria Entregue", envia automaticamente para FINANCEIRO.
+        if (statusNovoNorm === 'MERCADORIA_ENTREGUE') {
+          const envioFinanceiro = await enviarSolicitacaoParaSetorInterno({
+            req,
+            solicitacao,
+            setorDestino: 'FINANCEIRO',
+            usuarioId
+          });
+
+          if (!envioFinanceiro.ok) {
+            return res.status(envioFinanceiro.status || 400).json({
+              error: envioFinanceiro.error || 'Erro ao enviar solicitacao automaticamente para FINANCEIRO'
+            });
+          }
+        }
+      }
+
+      return res.sendStatus(204);
+
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao atualizar status' });
+    }
+  },
+
+  // =====================================================
+  // ATUALIZAR NUMERO DO PEDIDO
+  // =====================================================
+  async atualizarNumeroPedido(req, res) {
+    try {
+      const { id } = req.params;
+      const { numero_pedido } = req.body;
+      const isGeo = await isSetorGeo(req);
+
+      if (!isGeo) {
+        return res.status(403).json({
+          error: 'Apenas o setor GEO pode atualizar numero do pedido.'
+        });
+      }
+
+      const solicitacao = await Solicitacao.findByPk(id);
+      if (!solicitacao) {
+        return res.status(404).json({ error: 'Solicitacao nao encontrada' });
+      }
+
+      const acessoObra = await validarAcessoObra(req, solicitacao);
+      if (!acessoObra) {
+        return res.status(403).json({
+          error: 'Acesso negado. Vincule o usuario a obra para continuar.'
+        });
+      }
+
+      const usuario = await User.findByPk(req.user.id);
+
+      await solicitacao.update({
+        numero_pedido: numero_pedido || null
+      });
+
+      await Historico.create({
+        solicitacao_id: id,
+        usuario_responsavel_id: req.user.id,
+        setor: req.user.area,
+        acao: 'NUMERO_PEDIDO_ATUALIZADO',
+        descricao: numero_pedido ? `Nº no SIENGE: ${numero_pedido}` : 'Nº no SIENGE removido'
+      });
+
+      await criarNotificacao({
+        solicitacao_id: id,
+        tipo: 'NUMERO_PEDIDO_ATUALIZADO',
+        mensagem: `${usuario?.nome || 'Usuario'} atualizou o Nº no SIENGE da solicitacao ${solicitacao.codigo}`,
+        created_by: req.user.id
+      });
+
+      return res.sendStatus(204);
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao atualizar Nº no SIENGE' });
+    }
+  },
+
+  // =====================================================
+  // ATUALIZAR REF. DO CONTRATO (SETOR OBRA)
+  // =====================================================
+  async atualizarRefContrato(req, res) {
+    try {
+      const { id } = req.params;
+      const { contrato_id } = req.body;
+
+      const setorObra = await isSetorObraGeral(req);
+      if (!setorObra) {
+        return res.status(403).json({
+          error: 'Apenas usuarios do setor OBRA podem atualizar a ref. do contrato.'
+        });
+      }
+
+      const solicitacao = await Solicitacao.findByPk(id);
+      if (!solicitacao) {
+        return res.status(404).json({ error: 'Solicitacao nao encontrada' });
+      }
+
+      const acessoObra = await validarAcessoObra(req, solicitacao);
+      if (!acessoObra) {
+        return res.status(403).json({
+          error: 'Acesso negado. Vincule o usuario a obra para continuar.'
+        });
+      }
+
+      const contratoIdNum = Number(contrato_id);
+      if (Number.isNaN(contratoIdNum) || contratoIdNum <= 0) {
+        return res.status(400).json({ error: 'Contrato invalido.' });
+      }
+
+      const contrato = await Contrato.findByPk(contratoIdNum, {
+        attributes: ['id', 'codigo', 'ref_contrato', 'obra_id']
+      });
+
+      if (!contrato) {
+        return res.status(404).json({ error: 'Contrato nao encontrado.' });
+      }
+
+      if (Number(contrato.obra_id) !== Number(solicitacao.obra_id)) {
+        return res.status(400).json({
+          error: 'Selecione um contrato da mesma obra da solicitacao.'
+        });
+      }
+
+      await solicitacao.update({
+        contrato_id: contrato.id,
+        codigo_contrato: contrato.codigo || null
+      });
+
+      await Historico.create({
+        solicitacao_id: id,
+        usuario_responsavel_id: req.user.id,
+        setor: req.user.area,
+        acao: 'REF_CONTRATO_ATUALIZADA',
+        descricao: `Ref. do contrato atualizada para ${contrato.ref_contrato || '-'} (${contrato.codigo || '-'})`,
+        metadata: JSON.stringify({
+          contrato_id: contrato.id,
+          contrato_codigo: contrato.codigo || null,
+          ref_contrato: contrato.ref_contrato || null
+        })
+      });
+
+      return res.sendStatus(204);
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao atualizar ref. do contrato' });
+    }
+  },
+
+  // =====================================================
+  // ATUALIZAR VALOR DA SOLICITACAO (ADMIN GEO / SUPERADMIN)
+  // =====================================================
+  async atualizarValor(req, res) {
+    try {
+      const { id } = req.params;
+      const { valor } = req.body;
+      const perfil = String(req.user?.perfil || '').trim().toUpperCase();
+      const isGeo = await isSetorGeo(req);
+      const podeEditar =
+        perfil === 'SUPERADMIN' ||
+        (perfil.startsWith('ADMIN') && isGeo);
+
+      if (!podeEditar) {
+        return res.status(403).json({
+          error: 'Acesso negado para alterar valor.'
+        });
+      }
+
+      const solicitacao = await Solicitacao.findByPk(id);
+      if (!solicitacao) {
+        return res.status(404).json({ error: 'Solicitacao nao encontrada' });
+      }
+
+      const acessoObra = await validarAcessoObra(req, solicitacao);
+      if (!acessoObra) {
+        return res.status(403).json({
+          error: 'Acesso negado. Vincule o usuario a obra para continuar.'
+        });
+      }
+
+      let novoValor = valor;
+      if (novoValor === '' || novoValor === undefined) {
+        novoValor = null;
+      }
+      if (novoValor !== null) {
+        novoValor = Number(novoValor);
+        if (Number.isNaN(novoValor)) {
+          return res.status(400).json({ error: 'Valor invalido' });
+        }
+      }
+
+      const valorAnterior = solicitacao.valor ?? null;
+
+      await solicitacao.update({
+        valor: novoValor
+      });
+
+      const usuario = await User.findByPk(req.user.id);
+
+      await Historico.create({
+        solicitacao_id: id,
+        usuario_responsavel_id: req.user.id,
+        setor: req.user.area,
+        acao: 'VALOR_ATUALIZADO',
+        descricao: `De ${valorAnterior ?? '-'} para ${novoValor ?? '-'}`,
+        metadata: JSON.stringify({
+          valor_anterior: valorAnterior,
+          valor_novo: novoValor
+        })
+      });
+
+      await criarNotificacao({
+        solicitacao_id: id,
+        tipo: 'VALOR_ATUALIZADO',
+        mensagem: `${usuario?.nome || 'Usuario'} atualizou o valor da solicitacao ${solicitacao.codigo}`,
+        created_by: req.user.id,
+        metadata: {
+          valor_anterior: valorAnterior,
+          valor_novo: novoValor
+        }
+      });
+
+      return res.sendStatus(204);
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao atualizar valor' });
+    }
+  },
+
+  // =====================================================
+  // ATRIBUIR RESPONSAVEL
+  // =====================================================
+  async atribuirResponsavel(req, res) {
+    try {
+      const { id } = req.params;
+      const { usuario_responsavel_id } = req.body;
+
+      const perfil = req.user.perfil;
+      const areaUsuario = await obterAreaUsuario(req);
+      const isSetorObra = await isUsuarioSetorObra(req);
+      const tokensSetor = await obterTokensSetorUsuario(req, areaUsuario);
+      const isUsuarioFinanceiro = tokensSetor.includes('FINANCEIRO');
+
+      if (isSetorObra) {
+        return res.status(403).json({
+          error: 'Setor OBRA nao pode atribuir responsaveis. Para seguir, solicite apoio ao responsavel do setor.'
+        });
+      }
+
+      const solicitacao = await Solicitacao.findByPk(id);
+
+      if (!solicitacao) {
+        return res.status(404).json({ error: 'Solicitacao nao encontrada' });
+      }
+
+      if (String(perfil || '').trim().toUpperCase() !== 'SUPERADMIN') {
+        const tokensSetorUsuario = expandirTokensComAliasesGeo(tokensSetor);
+        if (!setorPertenceAoUsuario(tokensSetorUsuario, solicitacao.area_responsavel)) {
+          return res.status(403).json({
+            error: 'Voce so pode assumir solicitacoes que estejam no seu setor atual.'
+          });
+        }
+      }
+
+      const acessoObra = await validarAcessoObra(req, solicitacao);
+      if (!acessoObra) {
+        return res.status(403).json({
+          error: 'Acesso negado. Vincule o usuario a obra para continuar.'
+        });
+      }
+
+      // REGRA PARA USUARIO
+      if (perfil === 'USUARIO') {
+        const modoRecebimento = await obterModoRecebimentoPorSetorETipo(
+          tokensSetor,
+          solicitacao.tipo_solicitacao_id
+        );
+        if (modoRecebimento !== 'TODOS_VISIVEIS') {
+          return res.status(403).json({
+            error: 'Seu setor esta configurado para recebimento via ADMIN primeiro.'
+          });
+        }
+
+        let regra = null;
+        if (tokensSetor.length > 0) {
+          regra = await SetorPermissao.findOne({
+            where: { setor: { [Op.in]: tokensSetor } }
+          });
+        }
+
+        if (!regra || !regra.usuario_pode_atribuir) {
+          if (!isUsuarioFinanceiro) {
+            return res.status(403).json({
+              error: 'Seu setor nao permite atribuir responsaveis'
+            });
+          }
+        }
+      }
+
+      if (perfil === 'USUARIO') {
+        if (tokensSetor.includes('OBRA')) {
+          return res.status(403).json({
+            error: 'Setor OBRA nao pode atribuir responsaveis. Para seguir, solicite apoio ao responsavel do setor.'
+          });
+        }
+      }
+
+      const usuarioAcao = await User.findByPk(req.user.id);
+      const usuarioResponsavel = await User.findByPk(usuario_responsavel_id);
+
+      if (perfil === 'USUARIO') {
+        if (!usuarioResponsavel || usuarioResponsavel.setor_id !== req.user.setor_id) {
+          return res.status(403).json({
+            error: 'Usuarios com perfil USUARIO so podem atribuir para pessoas do mesmo setor.'
+          });
+        }
+      }
+      if (req.user?.setor_id && usuarioResponsavel && usuarioResponsavel.setor_id !== req.user.setor_id) {
+        return res.status(403).json({
+          error: 'Atribuicoes devem ser para pessoas do mesmo setor.'
+        });
+      }
+
+      const setorSolicitacao = await Setor.findOne({
+        where: {
+          [Op.or]: [
+            { codigo: solicitacao.area_responsavel },
+            { nome: solicitacao.area_responsavel }
+          ]
+        },
+        attributes: ['id', 'nome', 'codigo']
+      });
+
+      if (setorSolicitacao && String(setorSolicitacao.nome || '').toUpperCase() === 'OBRA') {
+        const { UsuarioObra } = require('../models');
+        const vinculo = await UsuarioObra.findOne({
+          where: { user_id: usuario_responsavel_id, obra_id: solicitacao.obra_id }
+        });
+        if (!vinculo) {
+          return res.status(403).json({
+            error: 'Para solicitacoes do setor OBRA, atribua apenas usuarios vinculados a mesma obra.'
+          });
+        }
+      }
+
+      await Historico.create({
+        solicitacao_id: id,
+        usuario_responsavel_id,
+        setor: solicitacao.area_responsavel,
+        acao: 'RESPONSAVEL_ATRIBUIDO',
+        metadata: JSON.stringify({
+          ator_id: req.user.id,
+          ator_nome: usuarioAcao ? usuarioAcao.nome : null,
+          responsavel_id: usuario_responsavel_id,
+          responsavel_nome: usuarioResponsavel ? usuarioResponsavel.nome : null
+        })
+      });
+
+      await criarNotificacao({
+        solicitacao_id: id,
+        tipo: 'RESPONSAVEL_ATRIBUIDO',
+        mensagem: `${usuarioAcao?.nome || 'Usuario'} atribuiu responsavel na solicitacao ${solicitacao.codigo}`,
+        created_by: req.user.id,
+        metadata: {
+          responsavel_id: usuario_responsavel_id,
+          responsavel_nome: usuarioResponsavel ? usuarioResponsavel.nome : null
+        }
+      });
+
+      return res.sendStatus(204);
+
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao atribuir responsavel' });
+    }
+  },
+
+  // =====================================================
+  // COMENTARIO
+  // =====================================================
+  async adicionarComentario(req, res) {
+    try {
+      const { id } = req.params;
+      const { descricao, mencoes } = req.body;
+      const usuario = await User.findByPk(req.user.id);
+
+      if (!descricao?.trim()) {
+        return res.status(400).json({ error: 'Comentario vazio' });
+      }
+
+      const solicitacao = await Solicitacao.findByPk(id);
+      if (!solicitacao) {
+        return res.status(404).json({ error: 'Solicitacao nao encontrada' });
+      }
+
+      const acessoObra = await validarAcessoObra(req, solicitacao);
+      if (!acessoObra) {
+        return res.status(403).json({
+          error: 'Acesso negado. Vincule o usuario a obra para continuar.'
+        });
+      }
+
+      await Historico.create({
+        solicitacao_id: id,
+        usuario_responsavel_id: req.user.id,
+        setor: usuario.setor_id,
+        acao: 'COMENTARIO',
+        descricao
+      });
+
+      const mencoesRecebidas = Array.isArray(mencoes) ? mencoes : [];
+      const idsMencionados = [
+        ...new Set(
+          mencoesRecebidas
+            .map(item => Number(item))
+            .filter(item => Number.isInteger(item) && item > 0 && item !== req.user.id)
+        )
+      ];
+
+      let temMencoes = false;
+
+      if (idsMencionados.length > 0) {
+        const usuariosMencionados = await User.findAll({
+          where: {
+            id: { [Op.in]: idsMencionados },
+            ativo: true
+          },
+          attributes: ['id', 'nome']
+        });
+
+        for (const usuarioMencionado of usuariosMencionados) {
+          temMencoes = true;
+
+          await criarNotificacao({
+            solicitacao_id: id,
+            tipo: 'MENCAO_COMENTARIO',
+            mensagem: `${usuario?.nome || 'Usuario'} mencionou você: "${descricao}"`,
+            metadata: {
+              comentario: descricao,
+              mencionado_por: req.user.id
+            },
+            created_by: req.user.id,
+            destinatarios: [usuarioMencionado.id],
+            usarDestinatariosInformados: true
+          });
+        }
+      }
+
+      if (!temMencoes) {
+        await criarNotificacao({
+          solicitacao_id: id,
+          tipo: 'COMENTARIO',
+          mensagem: `${usuario?.nome || 'Usuario'} comentou na solicitacao ${id}`,
+          created_by: req.user.id
+        });
+      }
+
+      return res.sendStatus(201);
+
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao adicionar comentario' });
+    }
+  },
+
+  // =====================================================
+  // ARQUIVAR DA MINHA LISTA
+  // =====================================================
+  async ocultarDaMinhaLista(req, res) {
+    try {
+      const { id } = req.params;
+      const usuarioId = req.user.id;
+
+      const solicitacao = await Solicitacao.findByPk(id);
+      if (!solicitacao) {
+        return res.status(404).json({ error: 'Solicitacao nao encontrada' });
+      }
+
+      const acessoObra = await validarAcessoObra(req, solicitacao);
+      if (!acessoObra) {
+        return res.status(403).json({
+          error: 'Acesso negado. Vincule o usuario a obra para continuar.'
+        });
+      }
+
+      const [linhasAfetadas] = await SolicitacaoVisibilidadeUsuario.update(
+        { oculto: true },
+        { where: { solicitacao_id: id, usuario_id: usuarioId } }
+      );
+
+      if (!linhasAfetadas) {
+        await SolicitacaoVisibilidadeUsuario.create({
+          solicitacao_id: id,
+          usuario_id: usuarioId,
+          oculto: true
+        });
+      }
+
+      return res.sendStatus(204);
+
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao ocultar solicitacao' });
+    }
+  },
+
+  async arquivarEmMassa(req, res) {
+    try {
+      const usuarioId = req.user.id;
+      const ids = Array.isArray(req.body?.solicitacao_ids)
+        ? req.body.solicitacao_ids.map(Number).filter(id => Number.isInteger(id) && id > 0)
+        : [];
+
+      const idsUnicos = [...new Set(ids)];
+      if (idsUnicos.length === 0) {
+        return res.status(400).json({ error: 'Informe ao menos uma solicitacao.' });
+      }
+
+      const solicitacoes = await Solicitacao.findAll({
+        where: { id: { [Op.in]: idsUnicos } }
+      });
+
+      const map = new Map(solicitacoes.map(s => [Number(s.id), s]));
+      const resultado = { total: idsUnicos.length, sucesso: 0, erros: [] };
+
+      for (const id of idsUnicos) {
+        const solicitacao = map.get(Number(id));
+        if (!solicitacao) {
+          resultado.erros.push({ id, error: 'Solicitacao nao encontrada' });
+          continue;
+        }
+
+        const acessoObra = await validarAcessoObra(req, solicitacao);
+        if (!acessoObra) {
+          resultado.erros.push({ id, error: 'Acesso negado a obra da solicitacao' });
+          continue;
+        }
+
+        const [linhasAfetadas] = await SolicitacaoVisibilidadeUsuario.update(
+          { oculto: true },
+          { where: { solicitacao_id: id, usuario_id: usuarioId } }
+        );
+        if (!linhasAfetadas) {
+          await SolicitacaoVisibilidadeUsuario.create({
+            solicitacao_id: id,
+            usuario_id: usuarioId,
+            oculto: true
+          });
+        }
+        resultado.sucesso += 1;
+      }
+
+      return res.json(resultado);
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao arquivar solicitacoes em massa' });
+    }
+  },
+
+  async enviarParaSetorEmMassa(req, res) {
+    try {
+      const ids = Array.isArray(req.body?.solicitacao_ids)
+        ? req.body.solicitacao_ids.map(Number).filter(id => Number.isInteger(id) && id > 0)
+        : [];
+      const idsUnicos = [...new Set(ids)];
+      const setorDestino = String(req.body?.setor_destino || '').trim();
+      const usuarioId = req.user.id;
+      const isSetorObra = await isUsuarioSetorObra(req);
+
+      if (isSetorObra) {
+        return res.status(403).json({
+          error: 'Setor OBRA nao pode enviar solicitacoes para outro setor. Para seguir, solicite apoio ao responsavel do setor.'
+        });
+      }
+      if (!setorDestino) {
+        return res.status(400).json({ error: 'Selecione um setor de destino.' });
+      }
+      if (idsUnicos.length === 0) {
+        return res.status(400).json({ error: 'Informe ao menos uma solicitacao.' });
+      }
+
+      const solicitacoes = await Solicitacao.findAll({
+        where: { id: { [Op.in]: idsUnicos } }
+      });
+      const map = new Map(solicitacoes.map(s => [Number(s.id), s]));
+      const resultado = { total: idsUnicos.length, sucesso: 0, erros: [] };
+
+      for (const id of idsUnicos) {
+        const solicitacao = map.get(Number(id));
+        if (!solicitacao) {
+          resultado.erros.push({ id, error: 'Solicitacao nao encontrada' });
+          continue;
+        }
+
+        const envio = await enviarSolicitacaoParaSetorInterno({
+          req,
+          solicitacao,
+          setorDestino,
+          usuarioId
+        });
+        if (!envio.ok) {
+          resultado.erros.push({ id, error: envio.error || 'Erro ao enviar' });
+          continue;
+        }
+        resultado.sucesso += 1;
+      }
+
+      return res.json(resultado);
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao enviar solicitacoes em massa' });
+    }
+  },
+
+  async desarquivarDaMinhaLista(req, res) {
+    try {
+      const { id } = req.params;
+      const usuarioId = req.user.id;
+
+      const solicitacao = await Solicitacao.findByPk(id);
+      if (!solicitacao) {
+        return res.status(404).json({ error: 'Solicitacao nao encontrada' });
+      }
+
+      const [visibilidade] = await SolicitacaoVisibilidadeUsuario.findOrCreate({
+        where: { solicitacao_id: id, usuario_id: usuarioId },
+        defaults: { oculto: false }
+      });
+      if (visibilidade.oculto) {
+        await visibilidade.update({ oculto: false });
+      }
+
+      return res.sendStatus(204);
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao desarquivar solicitacao' });
+    }
+  },
+
+  // =====================================================
+  // EXCLUIR SOLICITACAO (SUPERADMIN / ADMIN GEO)
+  // =====================================================
+  async excluir(req, res) {
+    try {
+      const perfil = String(req.user?.perfil || '').trim().toUpperCase();
+      const isSuperadmin = perfil === 'SUPERADMIN';
+      const isGeo = await isSetorGeo(req);
+      const isAdminGeo = perfil.startsWith('ADMIN') && isGeo;
+
+      if (!isSuperadmin && !isAdminGeo) {
+        return res.status(403).json({ error: 'Acesso negado' });
+      }
+
+      const { id } = req.params;
+      const solicitacao = await Solicitacao.findByPk(id);
+      if (!solicitacao) {
+        return res.status(404).json({ error: 'Solicitacao nao encontrada' });
+      }
+
+      const transaction = await Solicitacao.sequelize.transaction();
+      try {
+        const notificacoes = await Notificacao.findAll({
+          where: { solicitacao_id: id },
+          attributes: ['id'],
+          transaction
+        });
+        const notificacaoIds = notificacoes.map(n => n.id);
+        if (notificacaoIds.length > 0) {
+          await NotificacaoDestinatario.destroy({
+            where: { notificacao_id: { [Op.in]: notificacaoIds } },
+            transaction
+          });
+        }
+
+        await Promise.all([
+          Notificacao.destroy({ where: { solicitacao_id: id }, transaction }),
+          Historico.destroy({ where: { solicitacao_id: id }, transaction }),
+          Anexo.destroy({ where: { solicitacao_id: id }, transaction }),
+          MensagemSetor.destroy({ where: { solicitacao_id: id }, transaction }),
+          StatusArea.destroy({ where: { solicitacao_id: id }, transaction }),
+          Comprovante.destroy({ where: { solicitacao_id: id }, transaction }),
+          SolicitacaoVisibilidadeUsuario.destroy({ where: { solicitacao_id: id }, transaction })
+        ]);
+
+        await LogExclusao.create({
+          entidade: 'SOLICITACAO',
+          entidade_id: Number(id),
+          solicitacao_id: Number(id),
+          usuario_id: req.user.id,
+          perfil,
+          setor: req.user.area || null,
+          motivo: isSuperadmin ? 'Exclusao realizada por SUPERADMIN' : 'Exclusao realizada por ADMIN GEO',
+          payload_json: JSON.stringify({
+            codigo: solicitacao.codigo,
+            obra_id: solicitacao.obra_id,
+            area_responsavel: solicitacao.area_responsavel,
+            valor: solicitacao.valor,
+            status_global: solicitacao.status_global
+          })
+        }, { transaction });
+
+        await Solicitacao.destroy({ where: { id }, transaction });
+        await transaction.commit();
+      } catch (error) {
+        await transaction.rollback();
+        throw error;
+      }
+
+      return res.sendStatus(204);
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao excluir solicitacao' });
+    }
+  },
+
+  // =====================================================
+  // RESUMO
+  // =====================================================
+  async resumo(req, res) {
+    try {
+      const dados = await Solicitacao.findAll({
+        attributes: [
+          'area_responsavel',
+          'status_global',
+          [Sequelize.fn('COUNT', Sequelize.col('id')), 'total']
+        ],
+        group: ['area_responsavel', 'status_global']
+      });
+
+      const resumo = {};
+
+      dados.forEach(item => {
+        const area = item.area_responsavel;
+        const status = item.status_global;
+        const total = Number(item.get('total'));
+
+        if (!resumo[area]) resumo[area] = {};
+        resumo[area][status] = total;
+      });
+
+      return res.json(resumo);
+
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao gerar resumo' });
+    }
+  },
+
+  async upload(req, res) {
+    const url = await uploadToS3(req.file, 'solicitacoes');
+    const nomeArquivo = url.split('/').pop();
+    const nomeOriginal = normalizeOriginalName(req.file.originalname);
+
+    const anexo = await Anexo.create({
+      solicitacao_id: req.params.id,
+      nome_original: nomeOriginal,
+      nome_arquivo: nomeArquivo,
+      url
+    });
+
+    return res.json(anexo);
+  },
+
+  // =====================================================
+  // ENVIAR PARA OUTRO SETOR
+  // =====================================================
+  async enviarParaSetor(req, res) {
+    try {
+      const { id } = req.params;
+      const { setor_destino } = req.body;
+      const usuarioId = req.user.id;
+      const areaUsuario = await obterAreaUsuario(req);
+      const isSetorObra = await isUsuarioSetorObra(req);
+
+      if (isSetorObra) {
+        return res.status(403).json({
+          error: 'Setor OBRA nao pode enviar solicitacoes para outro setor. Para seguir, solicite apoio ao responsavel do setor.'
+        });
+      }
+
+      const solicitacao = await Solicitacao.findByPk(id);
+      if (!solicitacao) {
+        return res.status(404).json({ error: 'Solicitacao nao encontrada' });
+      }
+
+      const envio = await enviarSolicitacaoParaSetorInterno({
+        req,
+        solicitacao,
+        setorDestino: setor_destino,
+        usuarioId
+      });
+      if (!envio.ok) {
+        return res.status(envio.status || 400).json({ error: envio.error || 'Erro ao enviar para setor' });
+      }
+
+      return res.sendStatus(204);
+
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao enviar para setor' });
+    }
+  },
+
+  // ASSUMIR SOLICITACAO
+  async assumirSolicitacao(req, res) {
+    try {
+      const { id } = req.params;
+      const usuarioId = req.user.id;
+      const perfil = req.user.perfil;
+      const areaUsuario = await obterAreaUsuario(req);
+      const isSetorObra = await isUsuarioSetorObra(req);
+      const tokensSetor = await obterTokensSetorUsuario(req, areaUsuario);
+      const isUsuarioFinanceiro = tokensSetor.includes('FINANCEIRO');
+
+      if (isSetorObra) {
+        return res.status(403).json({
+          error: 'Setor OBRA nao pode assumir solicitacoes. Para seguir, solicite apoio ao responsavel do setor.'
+        });
+      }
+
+      const solicitacao = await Solicitacao.findByPk(id);
+
+      if (!solicitacao) {
+        return res.status(404).json({ error: 'Solicitacao nao encontrada' });
+      }
+
+      const acessoObra = await validarAcessoObra(req, solicitacao);
+      if (!acessoObra) {
+        return res.status(403).json({
+          error: 'Acesso negado. Vincule o usuario a obra para continuar.'
+        });
+      }
+
+      // REGRA PARA USUARIO
+      if (perfil === 'USUARIO') {
+        const modoRecebimento = await obterModoRecebimentoPorSetorETipo(
+          tokensSetor,
+          solicitacao.tipo_solicitacao_id
+        );
+        if (modoRecebimento !== 'TODOS_VISIVEIS') {
+          return res.status(403).json({
+            error: 'Seu setor esta configurado para recebimento via ADMIN primeiro.'
+          });
+        }
+
+        let regra = null;
+        if (tokensSetor.length > 0) {
+          regra = await SetorPermissao.findOne({
+            where: { setor: { [Op.in]: tokensSetor } }
+          });
+        }
+
+        if (!regra || !regra.usuario_pode_assumir) {
+          if (!isUsuarioFinanceiro) {
+            return res.status(403).json({
+              error: 'Seu setor nao permite assumir solicitacoes'
+            });
+          }
+        }
+      }
+
+      if (perfil === 'USUARIO') {
+        if (tokensSetor.includes('OBRA')) {
+          return res.status(403).json({
+            error: 'Setor OBRA nao pode assumir solicitacoes. Para seguir, solicite apoio ao responsavel do setor.'
+          });
+        }
+      }
+
+      const usuarioAcao = await User.findByPk(usuarioId);
+
+      await Historico.create({
+        solicitacao_id: id,
+        usuario_responsavel_id: usuarioId,
+        setor: solicitacao.area_responsavel,
+        acao: 'RESPONSAVEL_ASSUMIU',
+        metadata: JSON.stringify({
+          ator_id: usuarioId,
+          ator_nome: usuarioAcao ? usuarioAcao.nome : null
+        })
+      });
+
+      await criarNotificacao({
+        solicitacao_id: id,
+        tipo: 'RESPONSAVEL_ASSUMIU',
+        mensagem: `${usuarioAcao?.nome || 'Usuario'} assumiu a solicitacao ${solicitacao.codigo}`,
+        created_by: usuarioId
+      });
+
+      return res.sendStatus(204);
+
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao assumir solicitacao' });
+    }
+  }
+};
