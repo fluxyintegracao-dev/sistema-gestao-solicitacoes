@@ -1147,9 +1147,13 @@ module.exports = {
       if (numero_solicitacao) {
         const numeroSolicitacaoFiltro = String(numero_solicitacao).trim();
         if (numeroSolicitacaoFiltro) {
-          where.numero_sienge = {
-            [Op.like]: `%${numeroSolicitacaoFiltro}%`
-          };
+          where[Op.and] = where[Op.and] || [];
+          where[Op.and].push({
+            [Op.or]: [
+              { numero_sienge: { [Op.like]: `%${numeroSolicitacaoFiltro}%` } },
+              { numero_pedido: { [Op.like]: `%${numeroSolicitacaoFiltro}%` } }
+            ]
+          });
         }
       }
       if (valor_min !== undefined && valor_min !== null && String(valor_min).trim() !== '') {

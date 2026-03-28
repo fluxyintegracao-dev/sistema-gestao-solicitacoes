@@ -146,7 +146,7 @@ export default function Solicitacoes({ arquivadas = false }) {
 
   useEffect(() => {
     carregarObrasOptions();
-  }, [arquivadas]);
+  }, [arquivadas, user?.id]);
 
   async function carregarTiposSolicitacao() {
     try {
@@ -305,6 +305,10 @@ export default function Solicitacoes({ arquivadas = false }) {
           : [];
       setSolicitacoes(lista);
       setResponsaveisOptions(extrairOpcoesResponsaveis(lista));
+      setObrasOptions(prev => {
+        if (prev.length > 0) return prev;
+        return extrairOpcoesObras(lista);
+      });
       setMetaPaginacao({
         page: Number(data?.meta?.page || paginaAtual),
         limit: Number(data?.meta?.limit || limitePorPagina),
