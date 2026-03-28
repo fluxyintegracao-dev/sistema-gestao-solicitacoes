@@ -330,7 +330,7 @@ async function prepararBanco() {
         nome VARCHAR(255) NOT NULL,
         codigo VARCHAR(255) UNIQUE,
         descricao TEXT,
-        unidade_id INT NOT NULL,
+        unidade_id INT NULL,
         categoria_id INT NULL,
         ativo BOOLEAN DEFAULT TRUE,
         createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -341,6 +341,17 @@ async function prepararBanco() {
     );
   } catch (error) {
     // ignora se a tabela/constraints ja existirem
+  }
+
+  try {
+    const hasInsumos = await tableExists('insumos');
+    if (hasInsumos) {
+      await db.sequelize.query(
+        'ALTER TABLE insumos MODIFY COLUMN unidade_id INT NULL'
+      );
+    }
+  } catch (error) {
+    // ignora se nao conseguir ajustar agora
   }
 
   try {
