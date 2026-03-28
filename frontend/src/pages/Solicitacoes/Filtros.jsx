@@ -2,16 +2,17 @@ import { useEffect, useRef, useState } from 'react';
 import { HiAdjustmentsHorizontal, HiChevronDown, HiChevronUp, HiEye, HiEyeSlash } from 'react-icons/hi2';
 
 const FILTROS_DISPONIVEIS = [
-  { id: 'numero_sienge', label: 'Número SIENGE' },
+  { id: 'codigo', label: 'Codigo da solicitacao' },
+  { id: 'numero_sienge', label: 'Numero SIENGE' },
   { id: 'obra_ids', label: 'Obra' },
   { id: 'area', label: 'Setor' },
-  { id: 'tipo_solicitacao_id', label: 'Tipo de solicitação' },
+  { id: 'tipo_solicitacao_id', label: 'Tipo de solicitacao' },
   { id: 'status', label: 'Status' },
-  { id: 'valor_min', label: 'Valor mínimo' },
-  { id: 'valor_max', label: 'Valor máximo' },
+  { id: 'valor_min', label: 'Valor minimo' },
+  { id: 'valor_max', label: 'Valor maximo' },
   { id: 'data_registro', label: 'Data de registro' },
   { id: 'data_vencimento', label: 'Data de vencimento' },
-  { id: 'responsavel', label: 'Responsável' }
+  { id: 'responsavel', label: 'Responsavel' }
 ];
 
 export default function Filtros({
@@ -32,8 +33,12 @@ export default function Filtros({
   );
   const [obraDropdownOpen, setObraDropdownOpen] = useState(false);
   const obraDropdownRef = useRef(null);
+  const [setorDropdownOpen, setSetorDropdownOpen] = useState(false);
+  const setorDropdownRef = useRef(null);
   const [tipoDropdownOpen, setTipoDropdownOpen] = useState(false);
   const tipoDropdownRef = useRef(null);
+  const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
+  const statusDropdownRef = useRef(null);
   const [seletorFiltrosOpen, setSeletorFiltrosOpen] = useState(false);
   const seletorFiltrosRef = useRef(null);
   
@@ -41,7 +46,11 @@ export default function Filtros({
     try {
       const salvo = localStorage.getItem('solicitacoes:filtros-visiveis');
       if (salvo) {
-        return JSON.parse(salvo);
+        const filtrosSalvos = JSON.parse(salvo);
+        if (Array.isArray(filtrosSalvos) && !filtrosSalvos.includes('codigo')) {
+          return ['codigo', ...filtrosSalvos];
+        }
+        return filtrosSalvos;
       }
     } catch (error) {
       console.error('Erro ao carregar filtros visíveis', error);
@@ -76,6 +85,12 @@ export default function Filtros({
       if (obraDropdownOpen && !obraDropdownRef.current?.contains(event.target)) {
         setObraDropdownOpen(false);
       }
+      if (setorDropdownOpen && !setorDropdownRef.current?.contains(event.target)) {
+        setSetorDropdownOpen(false);
+      }
+      if (statusDropdownOpen && !statusDropdownRef.current?.contains(event.target)) {
+        setStatusDropdownOpen(false);
+      }
       if (seletorFiltrosOpen && !seletorFiltrosRef.current?.contains(event.target)) {
         setSeletorFiltrosOpen(false);
       }
@@ -83,7 +98,7 @@ export default function Filtros({
 
     document.addEventListener('mousedown', onClickOutside);
     return () => document.removeEventListener('mousedown', onClickOutside);
-  }, [tipoDropdownOpen, obraDropdownOpen, seletorFiltrosOpen]);
+  }, [tipoDropdownOpen, obraDropdownOpen, setorDropdownOpen, statusDropdownOpen, seletorFiltrosOpen]);
 
   function handleChange(e) {
     const { name, value } = e.target;
@@ -95,6 +110,7 @@ export default function Filtros({
 
   function limparFiltros() {
     setFiltros({
+      codigo: '',
       numero_solicitacao: '',
       obra_ids: '',
       area: '',
@@ -107,7 +123,9 @@ export default function Filtros({
       responsavel: ''
     });
     setObraDropdownOpen(false);
+    setSetorDropdownOpen(false);
     setTipoDropdownOpen(false);
+    setStatusDropdownOpen(false);
   }
 
   function alternarFiltroVisivel(filtroId) {
@@ -162,6 +180,48 @@ export default function Filtros({
     atualizarObrasSelecionadas([]);
   }
 
+  // Dados de setores
+  const setorSelecionadosIds = String(filtros.area || '')
+    .split(',')
+    .map(v => String(v).trim())
+    .filter(Boolean);
+
+  const setorSelecionadosSet = new Set(setorSelecionadosIds);
+  const setorSelecionadosNomes = setores
+    .filter(setor => setorSelecionadosSet.has(String(setor.codigo || setor.nome || setor.id)))
+    .map(setor => setor.nome || setor.codigo || String(setor.id));
+  const resumoSetoresSelecionados = (() => {
+    if (setorSelecionadosNomes.length === 0) return 'Todos os setores';
+    if (setorSelecionadosNomes.length <= 2) return setorSelecionadosNomes.join(', ');
+    return `${setorSelecionadosNomes.slice(0, 2).join(', ')} +${setorSelecionadosNomes.length - 2}`;
+  })();
+
+  function atualizarSetoresSelecionados(ids) {
+    setFiltros(prev => ({
+      ...prev,
+      area: ids.join(',')
+    }));
+  }
+
+  function alternarSetor(setorId) {
+    const id = String(setorId);
+    const atuais = [...setorSelecionadosIds];
+    const existe = atuais.includes(id);
+    const proximos = existe
+      ? atuais.filter(item => item !== id)
+      : [...atuais, id];
+    atualizarSetoresSelecionados(proximos);
+  }
+
+  function selecionarTodosSetores() {
+    const ids = setores.map(setor => String(setor.codigo || setor.nome || setor.id)).filter(Boolean);
+    atualizarSetoresSelecionados(ids);
+  }
+
+  function limparSetores() {
+    atualizarSetoresSelecionados([]);
+  }
+
   // Dados de tipos
   const tipoSelecionadosIds = String(filtros.tipo_solicitacao_id || '')
     .split(',')
@@ -204,7 +264,50 @@ export default function Filtros({
     atualizarTiposSelecionados([]);
   }
 
+  // Dados de status
+  const statusSelecionadosIds = String(filtros.status || '')
+    .split(',')
+    .map(v => String(v).trim())
+    .filter(Boolean);
+
+  const statusSelecionadosSet = new Set(statusSelecionadosIds);
+  const statusSelecionadosNomes = statusOptions
+    .filter(status => statusSelecionadosSet.has(String(status.value)))
+    .map(status => status.label);
+  const resumoStatusSelecionados = (() => {
+    if (statusSelecionadosNomes.length === 0) return 'Todos os status';
+    if (statusSelecionadosNomes.length <= 2) return statusSelecionadosNomes.join(', ');
+    return `${statusSelecionadosNomes.slice(0, 2).join(', ')} +${statusSelecionadosNomes.length - 2}`;
+  })();
+
+  function atualizarStatusSelecionados(ids) {
+    setFiltros(prev => ({
+      ...prev,
+      status: ids.join(',')
+    }));
+  }
+
+  function alternarStatus(statusId) {
+    const id = String(statusId);
+    const atuais = [...statusSelecionadosIds];
+    const existe = atuais.includes(id);
+    const proximos = existe
+      ? atuais.filter(item => item !== id)
+      : [...atuais, id];
+    atualizarStatusSelecionados(proximos);
+  }
+
+  function selecionarTodosStatus() {
+    const ids = statusOptions.map(status => String(status.value));
+    atualizarStatusSelecionados(ids);
+  }
+
+  function limparStatus() {
+    atualizarStatusSelecionados([]);
+  }
+
   const quantidadeFiltrosAtivos = [
+    filtros.codigo,
     filtros.numero_solicitacao,
     filtros.obra_ids,
     filtros.area,
@@ -272,6 +375,20 @@ export default function Filtros({
         </div>
 
         <div className="sol-filtros-grid">
+          {isFiltroVisivel('codigo') && (
+            <div className="sol-filter-field">
+              <label className="sol-filter-label">Codigo da solicitacao</label>
+              <input
+                name="codigo"
+                placeholder="Ex: SOL-12345"
+                className="input"
+                value={filtros.codigo || ''}
+                onChange={handleChange}
+                type="text"
+              />
+            </div>
+          )}
+
           {isFiltroVisivel('numero_sienge') && (
             <div className="sol-filter-field">
               <label className="sol-filter-label">Número SIENGE</label>
@@ -347,21 +464,62 @@ export default function Filtros({
           )}
 
           {isFiltroVisivel('area') && (
-            <div className="sol-filter-field">
-              <label className="sol-filter-label">Setor</label>
-              <select
-                name="area"
-                className="input"
-                value={filtros.area || ''}
-                onChange={handleChange}
+            <div className="sol-filter-field sol-filter-field-multi" ref={setorDropdownRef}>
+              <div className="sol-filter-label-row">
+                <label className="sol-filter-label">Setor</label>
+                {setorSelecionadosIds.length > 0 && (
+                  <button
+                    type="button"
+                    className="sol-filter-link-btn"
+                    onClick={limparSetores}
+                  >
+                    Limpar
+                  </button>
+                )}
+              </div>
+              <button
+                type="button"
+                className={`sol-filter-multi-trigger ${setorDropdownOpen ? 'open' : ''}`}
+                onClick={() => setSetorDropdownOpen(prev => !prev)}
+                aria-expanded={setorDropdownOpen}
+                aria-label="Selecionar setores"
               >
-                <option value="">Todos os setores</option>
-                {setores.map(s => (
-                  <option key={s.id || s.codigo || s.nome} value={s.codigo || s.nome}>
-                    {s.nome || s.codigo}
-                  </option>
-                ))}
-              </select>
+                <span className="truncate">{resumoSetoresSelecionados}</span>
+                {setorDropdownOpen ? <HiChevronUp className="w-4 h-4" /> : <HiChevronDown className="w-4 h-4" />}
+              </button>
+
+              {setorDropdownOpen && (
+                <div className="sol-filter-multi-popover">
+                  <div className="sol-filter-multi-actions">
+                    <button type="button" className="sol-filter-link-btn" onClick={selecionarTodosSetores}>
+                      Selecionar todos
+                    </button>
+                    <button type="button" className="sol-filter-link-btn" onClick={limparSetores}>
+                      Limpar
+                    </button>
+                  </div>
+
+                  <div className="sol-filter-multi-list">
+                    {setores.map(setor => {
+                      const id = String(setor.codigo || setor.nome || setor.id);
+                      const checked = setorSelecionadosSet.has(id);
+                      return (
+                        <label key={setor.id || setor.codigo || setor.nome} className="sol-filter-multi-item">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => alternarSetor(id)}
+                          />
+                          <span>{setor.nome || setor.codigo}</span>
+                        </label>
+                      );
+                    })}
+                    {setores.length === 0 && (
+                      <p className="sol-filter-multi-empty">Nenhum setor disponivel.</p>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -426,21 +584,62 @@ export default function Filtros({
           )}
 
           {isFiltroVisivel('status') && (
-            <div className="sol-filter-field">
-              <label className="sol-filter-label">Status</label>
-              <select
-                name="status"
-                onChange={handleChange}
-                className="input"
-                value={filtros.status || ''}
+            <div className="sol-filter-field sol-filter-field-multi" ref={statusDropdownRef}>
+              <div className="sol-filter-label-row">
+                <label className="sol-filter-label">Status</label>
+                {statusSelecionadosIds.length > 0 && (
+                  <button
+                    type="button"
+                    className="sol-filter-link-btn"
+                    onClick={limparStatus}
+                  >
+                    Limpar
+                  </button>
+                )}
+              </div>
+              <button
+                type="button"
+                className={`sol-filter-multi-trigger ${statusDropdownOpen ? 'open' : ''}`}
+                onClick={() => setStatusDropdownOpen(prev => !prev)}
+                aria-expanded={statusDropdownOpen}
+                aria-label="Selecionar status"
               >
-                <option value="">Todos os status</option>
-                {statusOptions.map(item => (
-                  <option key={item.value} value={item.value}>
-                    {item.label}
-                  </option>
-                ))}
-              </select>
+                <span className="truncate">{resumoStatusSelecionados}</span>
+                {statusDropdownOpen ? <HiChevronUp className="w-4 h-4" /> : <HiChevronDown className="w-4 h-4" />}
+              </button>
+
+              {statusDropdownOpen && (
+                <div className="sol-filter-multi-popover">
+                  <div className="sol-filter-multi-actions">
+                    <button type="button" className="sol-filter-link-btn" onClick={selecionarTodosStatus}>
+                      Selecionar todos
+                    </button>
+                    <button type="button" className="sol-filter-link-btn" onClick={limparStatus}>
+                      Limpar
+                    </button>
+                  </div>
+
+                  <div className="sol-filter-multi-list">
+                    {statusOptions.map(item => {
+                      const id = String(item.value);
+                      const checked = statusSelecionadosSet.has(id);
+                      return (
+                        <label key={item.value} className="sol-filter-multi-item">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => alternarStatus(id)}
+                          />
+                          <span>{item.label}</span>
+                        </label>
+                      );
+                    })}
+                    {statusOptions.length === 0 && (
+                      <p className="sol-filter-multi-empty">Nenhum status disponivel.</p>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

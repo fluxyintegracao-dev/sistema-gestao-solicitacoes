@@ -81,6 +81,7 @@ export default function Solicitacoes({ arquivadas = false }) {
   const { user } = useAuth();
 
   const [filtros, setFiltros] = useState({
+    codigo: '',
     numero_solicitacao: '',
     obra_ids: '',
     area: '',

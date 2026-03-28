@@ -668,6 +668,7 @@ module.exports = {
         arquivadas,
         obra_id,
         obra_ids,
+        codigo,
         codigo_contrato,
         numero_solicitacao,
         responsavel,
@@ -989,69 +990,88 @@ module.exports = {
       =============================== */
 
       if (area) {
-        const areaFiltro = String(area).trim();
-        const areaFiltroUpper = areaFiltro.toUpperCase();
-        const setorFiltroRow = await Setor.findOne({
-          where: {
-            [Op.or]: [
-              { codigo: areaFiltro },
-              { nome: areaFiltro },
-              { id: Number.isNaN(Number(areaFiltro)) ? -1 : Number(areaFiltro) }
-            ]
-          },
-          attributes: ['id', 'codigo', 'nome']
-        });
+        const areasSelecionadas = String(area)
+          .split(',')
+          .map(item => String(item || '').trim())
+          .filter(Boolean);
 
-        const valoresFiltroSetor = Array.from(new Set(
-          [
-            areaFiltro,
-            setorFiltroRow?.codigo,
-            setorFiltroRow?.nome,
-            setorFiltroRow?.id != null ? String(setorFiltroRow.id) : null
+        if (areasSelecionadas.length > 0) {
+          const areaIdsNumericos = areasSelecionadas
+            .map(item => Number(item))
+            .filter(item => !Number.isNaN(item));
+
+          const setoresFiltroRows = await Setor.findAll({
+            where: {
+              [Op.or]: [
+                { codigo: { [Op.in]: areasSelecionadas } },
+                { nome: { [Op.in]: areasSelecionadas } },
+                ...(areaIdsNumericos.length > 0 ? [{ id: { [Op.in]: areaIdsNumericos } }] : [])
+              ]
+            },
+            attributes: ['id', 'codigo', 'nome']
+          });
+
+          const valoresFiltroSetor = Array.from(new Set([
+            ...areasSelecionadas,
+            ...setoresFiltroRows.flatMap(setor => [
+              setor?.codigo,
+              setor?.nome,
+              setor?.id != null ? String(setor.id) : null
+            ])
           ]
             .filter(Boolean)
-            .map(v => String(v).trim())
-        ));
+            .map(v => String(v).trim())));
 
-        if (valoresFiltroSetor.length > 0) {
-          where.area_responsavel = { [Op.in]: valoresFiltroSetor };
-        } else if (areaFiltroUpper === 'BRAPE') {
-          where.id = -1;
-        } else {
-          where.area_responsavel = areaFiltro;
+          if (valoresFiltroSetor.length > 0) {
+            where.area_responsavel = { [Op.in]: valoresFiltroSetor };
+          } else if (areasSelecionadas.some(item => String(item).trim().toUpperCase() === 'BRAPE')) {
+            where.id = -1;
+          } else {
+            where.area_responsavel = { [Op.in]: areasSelecionadas };
+          }
         }
       }
       if (status) {
-        const statusFiltro = String(status).trim();
-        const statusSemAcento = statusFiltro
-          .toUpperCase()
-          .normalize('NFD')
-          .replace(/[\u0300-\u036f]/g, '');
-        const statusComUnderscore = statusSemAcento.replace(/\s+/g, '_');
-        const statusComEspaco = statusSemAcento.replace(/_/g, ' ');
-        const statusSemSeparador = statusSemAcento.replace(/[\s_]+/g, '');
+        const statusSelecionados = String(status)
+          .split(',')
+          .map(item => String(item || '').trim())
+          .filter(Boolean);
 
-        where[Op.and] = where[Op.and] || [];
-        where[Op.and].push({
-          [Op.or]: [
-            { status_global: statusComUnderscore },
-            { status_global: statusComEspaco },
-            Sequelize.where(
-              Sequelize.fn(
-                'REPLACE',
-                Sequelize.fn(
-                  'REPLACE',
-                  Sequelize.fn('UPPER', Sequelize.col('status_global')),
-                  '_',
-                  ''
-                ),
-                ' ',
-                ''
-              ),
-              statusSemSeparador
-            )
-          ]
-        });
+        if (statusSelecionados.length > 0) {
+          const condicoesStatus = statusSelecionados.map(statusFiltro => {
+            const statusSemAcento = statusFiltro
+              .toUpperCase()
+              .normalize('NFD')
+              .replace(/[\u0300-\u036f]/g, '');
+            const statusComUnderscore = statusSemAcento.replace(/\s+/g, '_');
+            const statusComEspaco = statusSemAcento.replace(/_/g, ' ');
+            const statusSemSeparador = statusSemAcento.replace(/[\s_]+/g, '');
+
+            return {
+              [Op.or]: [
+                { status_global: statusComUnderscore },
+                { status_global: statusComEspaco },
+                Sequelize.where(
+                  Sequelize.fn(
+                    'REPLACE',
+                    Sequelize.fn(
+                      'REPLACE',
+                      Sequelize.fn('UPPER', Sequelize.col('status_global')),
+                      '_',
+                      ''
+                    ),
+                    ' ',
+                    ''
+                  ),
+                  statusSemSeparador
+                )
+              ]
+            };
+          });
+
+          where[Op.and] = where[Op.and] || [];
+          where[Op.and].push({ [Op.or]: condicoesStatus });
+        }
       }
       if (obra_id) {
         const idNum = Number(obra_id);
@@ -1102,6 +1122,14 @@ module.exports = {
           where.tipo_solicitacao_id = { [Op.in]: tiposSelecionados };
         } else if (tiposSelecionados.length === 1) {
           where.tipo_solicitacao_id = tiposSelecionados[0];
+        }
+      }
+      if (codigo) {
+        const codigoFiltro = String(codigo).trim();
+        if (codigoFiltro) {
+          where.codigo = {
+            [Op.like]: `%${codigoFiltro}%`
+          };
         }
       }
       if (codigo_contrato) {
