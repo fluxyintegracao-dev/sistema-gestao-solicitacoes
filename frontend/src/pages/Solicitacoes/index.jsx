@@ -146,7 +146,7 @@ export default function Solicitacoes({ arquivadas = false }) {
 
   useEffect(() => {
     carregarObrasOptions();
-  }, [arquivadas, user?.id]);
+  }, [arquivadas, user?.id, filtros.codigo, filtros.numero_solicitacao, filtros.area, filtros.tipo_solicitacao_id, filtros.status, filtros.valor_min, filtros.valor_max, filtros.data_registro, filtros.data_vencimento, filtros.responsavel]);
 
   async function carregarTiposSolicitacao() {
     try {
@@ -259,7 +259,18 @@ export default function Solicitacoes({ arquivadas = false }) {
 
   async function carregarObrasOptions() {
     try {
-      const data = await getObrasVisiveisSolicitacoes(arquivadas ? { arquivadas: '1' } : {});
+      const params = {};
+      Object.entries(filtros).forEach(([chave, valor]) => {
+        if (chave === 'obra_ids') return;
+        if (valor !== undefined && valor !== null && String(valor).trim() !== '') {
+          params[chave] = String(valor).trim();
+        }
+      });
+      if (arquivadas) {
+        params.arquivadas = '1';
+      }
+
+      const data = await getObrasVisiveisSolicitacoes(params);
       const lista = (Array.isArray(data) ? data : []).map((obra) => ({
         value: String(obra.id),
         label: obra.nome

@@ -671,6 +671,7 @@ module.exports = {
         codigo,
         codigo_contrato,
         numero_solicitacao,
+        numero_sienge,
         responsavel,
         data_registro,
         data_vencimento,
@@ -1144,17 +1145,15 @@ module.exports = {
           };
         }
       }
-      if (numero_solicitacao) {
-        const numeroSolicitacaoFiltro = String(numero_solicitacao).trim();
-        if (numeroSolicitacaoFiltro) {
-          where[Op.and] = where[Op.and] || [];
-          where[Op.and].push({
-            [Op.or]: [
-              { numero_sienge: { [Op.like]: `%${numeroSolicitacaoFiltro}%` } },
-              { numero_pedido: { [Op.like]: `%${numeroSolicitacaoFiltro}%` } }
-            ]
-          });
-        }
+      const numeroSiengeFiltroBruto = String(numero_sienge || numero_solicitacao || '').trim();
+      if (numeroSiengeFiltroBruto) {
+        where[Op.and] = where[Op.and] || [];
+        where[Op.and].push({
+          [Op.or]: [
+            { numero_sienge: { [Op.like]: `%${numeroSiengeFiltroBruto}%` } },
+            { numero_pedido: { [Op.like]: `%${numeroSiengeFiltroBruto}%` } }
+          ]
+        });
       }
       if (valor_min !== undefined && valor_min !== null && String(valor_min).trim() !== '') {
         const min = Number(valor_min);
