@@ -14,6 +14,7 @@ import {
 } from '../../../services/compras';
 import { useAuth } from '../../../contexts/AuthContext';
 import CompraPreviewModal from '../components/CompraPreviewModal';
+import { criarPreviewCompra } from '../utils/preview';
 
 function formatarData(data) {
   if (!data) {
@@ -187,11 +188,11 @@ export default function SolicitacaoCompraDetalheView() {
       setBaixando(true);
       const blob = await baixarPdfSolicitacaoCompra(id);
       const url = window.URL.createObjectURL(blob);
-      setPreviewArquivo({
+      setPreviewArquivo(await criarPreviewCompra({
         title: `PDF da solicitacao SC-${String(solicitacao?.id || id).padStart(5, '0')}`,
         name: `SC-${String(solicitacao?.id || id).padStart(5, '0')}.pdf`,
         url
-      });
+      }));
     } catch (error) {
       console.error(error);
       alert(error.message || 'Erro ao abrir PDF');
@@ -208,11 +209,11 @@ export default function SolicitacaoCompraDetalheView() {
         return;
       }
 
-      setPreviewArquivo({
+      setPreviewArquivo(await criarPreviewCompra({
         title: 'Arquivo do item',
         name: item.arquivo_nome_original || 'Arquivo anexado',
         url
-      });
+      }));
     } catch (error) {
       console.error(error);
       alert(error.message || 'Erro ao abrir arquivo do item');

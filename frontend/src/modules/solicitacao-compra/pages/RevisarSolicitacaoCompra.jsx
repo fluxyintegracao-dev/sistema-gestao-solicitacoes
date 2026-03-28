@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { criarSolicitacaoCompra, obterUrlAssinadaCompra } from '../../../services/compras';
 import CompraPreviewModal from '../components/CompraPreviewModal';
+import { criarPreviewCompra } from '../utils/preview';
 
 const DRAFT_KEY = 'fluxy_solicitacao_compra_draft';
 
@@ -216,11 +217,11 @@ export default function RevisarSolicitacaoCompra() {
         return;
       }
 
-      setPreviewArquivo({
+      setPreviewArquivo(await criarPreviewCompra({
         title: 'Arquivo do item',
         name: item.arquivo_nome_original || 'Arquivo anexado',
         url
-      });
+      }));
     } catch (error) {
       console.error(error);
       alert(error.message || 'Erro ao abrir arquivo do item');

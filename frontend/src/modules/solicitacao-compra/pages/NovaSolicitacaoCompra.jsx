@@ -9,6 +9,7 @@ import {
 import { getMinhasObras } from '../../../services/obras';
 import { useAuth } from '../../../contexts/AuthContext';
 import CompraPreviewModal from '../components/CompraPreviewModal';
+import { criarPreviewCompra } from '../utils/preview';
 
 const DRAFT_KEY = 'fluxy_solicitacao_compra_draft';
 const ITEM_ATTACHMENT_ACCEPT = '.pdf,.doc,.docx,.xls,.xlsx,.csv,.ppt,.pptx,.png,.jpg,.jpeg,.html,.rar';
@@ -416,11 +417,11 @@ export default function NovaSolicitacaoCompra() {
         return;
       }
 
-      setPreviewArquivo({
+      setPreviewArquivo(await criarPreviewCompra({
         title: 'Arquivo do item',
         name: item.arquivo_nome_original || 'Arquivo anexado',
         url
-      });
+      }));
     } catch (error) {
       console.error(error);
       alert(error.message || 'Erro ao abrir arquivo do item');

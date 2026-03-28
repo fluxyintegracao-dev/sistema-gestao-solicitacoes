@@ -1,14 +1,5 @@
 import { useEffect } from 'react';
-
-function isImageFile(preview) {
-  const value = String(preview?.name || preview?.url || '').toLowerCase();
-  return /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/.test(value);
-}
-
-function isPdfFile(preview) {
-  const value = String(preview?.name || preview?.url || '').toLowerCase();
-  return /\.pdf($|\?)/.test(value);
-}
+import { isImagePreview, isPdfPreview } from '../utils/preview';
 
 export default function CompraPreviewModal({ preview, onClose }) {
   useEffect(() => {
@@ -77,7 +68,7 @@ export default function CompraPreviewModal({ preview, onClose }) {
               srcDoc={preview.srcDoc}
               className="h-full w-full rounded-lg border border-[var(--c-border)] bg-white"
             />
-          ) : isImageFile(preview) ? (
+          ) : isImagePreview(preview?.name, preview?.url) ? (
             <div className="flex h-full items-center justify-center overflow-auto rounded-lg border border-[var(--c-border)] bg-white p-4">
               <img
                 src={preview.url}
@@ -85,7 +76,7 @@ export default function CompraPreviewModal({ preview, onClose }) {
                 className="max-h-full max-w-full object-contain"
               />
             </div>
-          ) : isPdfFile(preview) ? (
+          ) : isPdfPreview(preview?.name, preview?.url) ? (
             <iframe
               title={preview.title || preview.name || 'Preview PDF'}
               src={preview.url}

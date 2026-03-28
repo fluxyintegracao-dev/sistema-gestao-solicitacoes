@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { baixarPdfSolicitacaoCompra, obterUrlAssinadaCompra } from '../../../services/compras';
 import CompraPreviewModal from '../components/CompraPreviewModal';
+import { criarPreviewCompra } from '../utils/preview';
 
 export default function RevisarSolicitacaoCompraFinal() {
   const { id } = useParams();
@@ -22,11 +23,11 @@ export default function RevisarSolicitacaoCompraFinal() {
       setBaixando(true);
       const blob = await baixarPdfSolicitacaoCompra(id);
       const url = window.URL.createObjectURL(blob);
-      setPreviewArquivo({
+      setPreviewArquivo(await criarPreviewCompra({
         title: `PDF da solicitacao ${codigo}`,
         name: `${codigo}.pdf`,
         url
-      });
+      }));
     } catch (error) {
       console.error(error);
       alert(error.message || 'Erro ao abrir PDF');
@@ -43,11 +44,11 @@ export default function RevisarSolicitacaoCompraFinal() {
         return;
       }
 
-      setPreviewArquivo({
+      setPreviewArquivo(await criarPreviewCompra({
         title: 'Arquivo do item',
         name: item.arquivo_nome_original || 'Arquivo anexado',
         url
-      });
+      }));
     } catch (error) {
       console.error(error);
       alert(error.message || 'Erro ao abrir arquivo do item');
