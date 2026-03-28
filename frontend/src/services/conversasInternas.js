@@ -24,15 +24,27 @@ export async function getDestinatariosConversa(setorId) {
   return parseResponse(response, 'Erro ao buscar destinatarios');
 }
 
-export async function getCaixaEntrada({ arquivadas = false } = {}) {
-  const response = await fetch(`${API_URL}/conversas-internas/entrada?arquivadas=${arquivadas ? 1 : 0}`, {
+export async function getCaixaEntrada({ arquivadas = false, page, limit } = {}) {
+  const params = new URLSearchParams({
+    arquivadas: arquivadas ? '1' : '0'
+  });
+  if (page !== undefined) params.set('page', String(page));
+  if (limit !== undefined) params.set('limit', String(limit));
+
+  const response = await fetch(`${API_URL}/conversas-internas/entrada?${params.toString()}`, {
     headers: authHeaders()
   });
   return parseResponse(response, 'Erro ao buscar caixa de entrada');
 }
 
-export async function getCaixaSaida({ arquivadas = false } = {}) {
-  const response = await fetch(`${API_URL}/conversas-internas/saida?arquivadas=${arquivadas ? 1 : 0}`, {
+export async function getCaixaSaida({ arquivadas = false, page, limit } = {}) {
+  const params = new URLSearchParams({
+    arquivadas: arquivadas ? '1' : '0'
+  });
+  if (page !== undefined) params.set('page', String(page));
+  if (limit !== undefined) params.set('limit', String(limit));
+
+  const response = await fetch(`${API_URL}/conversas-internas/saida?${params.toString()}`, {
     headers: authHeaders()
   });
   return parseResponse(response, 'Erro ao buscar caixa de saida');

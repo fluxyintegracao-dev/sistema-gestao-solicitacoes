@@ -26,14 +26,37 @@ export default function ConversasSaida() {
   const [loading, setLoading] = useState(true);
   const [aba, setAba] = useState('ABERTAS');
   const [selecionadas, setSelecionadas] = useState([]);
+  const [paginaAtual, setPaginaAtual] = useState(1);
+  const [limitePorPagina, setLimitePorPagina] = useState(20);
+  const [metaPaginacao, setMetaPaginacao] = useState({
+    page: 1,
+    limit: 20,
+    total: 0,
+    total_pages: 0
+  });
 
   const arquivadas = aba === 'ARQUIVADAS';
 
   async function carregar() {
     try {
       setLoading(true);
-      const data = await getCaixaSaida({ arquivadas });
-      setItens(Array.isArray(data) ? data : []);
+      const data = await getCaixaSaida({
+        arquivadas,
+        page: paginaAtual,
+        limit: limitePorPagina
+      });
+      const lista = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.items)
+          ? data.items
+          : [];
+      setItens(lista);
+      setMetaPaginacao({
+        page: Number(data?.meta?.page || paginaAtual),
+        limit: Number(data?.meta?.limit || limitePorPagina),
+        total: Number(data?.meta?.total || lista.length),
+        total_pages: Number(data?.meta?.total_pages || (lista.length > 0 ? 1 : 0))
+      });
       setSelecionadas([]);
       if (!arquivadas) {
         const userId = Number(user?.id);
@@ -84,8 +107,17 @@ export default function ConversasSaida() {
   }
 
   useEffect(() => {
+    setPaginaAtual(1);
+  }, [aba, limitePorPagina]);
+
+  useEffect(() => {
     carregar();
-  }, [aba, user?.id]);
+  }, [aba, user?.id, paginaAtual, limitePorPagina]);
+
+  const totalRegistros = Number(metaPaginacao.total || 0);
+  const totalPaginas = Number(metaPaginacao.total_pages || 0);
+  const paginaInicial = totalRegistros === 0 ? 0 : ((paginaAtual - 1) * limitePorPagina) + 1;
+  const paginaFinal = totalRegistros === 0 ? 0 : Math.min(totalRegistros, paginaAtual * limitePorPagina);
 
   return (
     <div className="page">
@@ -186,6 +218,49 @@ export default function ConversasSaida() {
               ))}
             </tbody>
           </table>
+        </div>
+
+        <div className="mt-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <div className="text-sm text-[var(--c-muted)]">
+            {totalRegistros > 0
+              ? `Exibindo ${paginaInicial}-${paginaFinal} de ${totalRegistros} conversas`
+              : 'Nenhuma conversa nesta aba.'}
+          </div>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+            <label className="flex items-center gap-2 text-sm">
+              <span>Por página</span>
+              <select
+                className="input !w-auto min-w-[88px]"
+                value={limitePorPagina}
+                onChange={(e) => setLimitePorPagina(Number(e.target.value) || 20)}
+              >
+                {[10, 20, 50, 100].map((opcao) => (
+                  <option key={opcao} value={opcao}>{opcao}</option>
+                ))}
+              </select>
+            </label>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={() => setPaginaAtual((prev) => Math.max(1, prev - 1))}
+                disabled={paginaAtual <= 1}
+              >
+                Anterior
+              </button>
+              <span className="text-sm min-w-[96px] text-center">
+                Página {paginaAtual} de {Math.max(totalPaginas, 1)}
+              </span>
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={() => setPaginaAtual((prev) => Math.min(Math.max(totalPaginas, 1), prev + 1))}
+                disabled={totalPaginas === 0 || paginaAtual >= totalPaginas}
+              >
+                Próxima
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>

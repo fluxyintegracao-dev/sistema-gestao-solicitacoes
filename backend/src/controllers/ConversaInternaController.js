@@ -1,4 +1,4 @@
-const { Op } = require('sequelize');
+const { Op, fn, col } = require('sequelize');
 const {
   ConversaInterna,
   ConversaInternaMensagem,
@@ -12,6 +12,8 @@ const { uploadToS3 } = require('../services/s3');
 const { normalizeOriginalName } = require('../utils/fileName');
 
 const JANELA_EDICAO_MS = 5 * 60 * 1000;
+const DEFAULT_CONVERSAS_PAGE_SIZE = 20;
+const MAX_CONVERSAS_PAGE_SIZE = 100;
 
 function normalizarTexto(valor) {
   return String(valor || '').trim();
@@ -30,6 +32,14 @@ function extrairIdsNumericos(lista) {
       .map((item) => Number(item))
       .filter((id) => Number.isInteger(id) && id > 0)
   )];
+}
+
+function parsePositiveInt(value, fallback) {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    return fallback;
+  }
+  return parsed;
 }
 
 async function garantirParticipantesBasicos(conversa) {
@@ -76,9 +86,14 @@ async function podeVisualizarConversa(req, conversaId) {
     return { conversa: null, permitido: false };
   }
 
-  await garantirParticipantesBasicos(conversa);
-
   const usuarioId = Number(req.user?.id);
+  if (
+    Number(conversa.criado_por_id) === usuarioId ||
+    Number(conversa.destinatario_id) === usuarioId
+  ) {
+    return { conversa, permitido: true };
+  }
+
   const participacao = await ConversaInternaParticipante.findOne({
     where: { conversa_id: conversa.id, usuario_id: usuarioId },
     attributes: ['id']
@@ -88,64 +103,192 @@ async function podeVisualizarConversa(req, conversaId) {
   return { conversa, permitido };
 }
 
-async function montarResumoConversa(conversa) {
-  const ultimaMensagem = await ConversaInternaMensagem.findOne({
-    where: { conversa_id: conversa.id },
+function serializarUsuarioConversa(usuario) {
+  if (!usuario) return null;
+  return {
+    id: usuario.id,
+    nome: usuario.nome,
+    setor: usuario.setor
+      ? {
+          id: usuario.setor.id,
+          nome: usuario.setor.nome,
+          codigo: usuario.setor.codigo
+        }
+      : null
+  };
+}
+
+async function montarResumosConversas(conversas) {
+  if (!Array.isArray(conversas) || conversas.length === 0) return [];
+
+  const conversaIds = conversas.map((item) => Number(item.id)).filter(Boolean);
+  const ordemConversas = new Map(conversaIds.map((id, index) => [id, index]));
+
+  const [mensagens, anexosAgrupados, participantesAgrupados] = await Promise.all([
+    ConversaInternaMensagem.findAll({
+      where: { conversa_id: { [Op.in]: conversaIds } },
+      include: [
+        {
+          model: User,
+          as: 'autor',
+          attributes: ['id', 'nome']
+        }
+      ],
+      order: [
+        ['conversa_id', 'ASC'],
+        ['createdAt', 'DESC']
+      ]
+    }),
+    ConversaInternaAnexo.findAll({
+      where: { conversa_id: { [Op.in]: conversaIds } },
+      attributes: [
+        'conversa_id',
+        [fn('COUNT', col('id')), 'total']
+      ],
+      group: ['conversa_id']
+    }),
+    ConversaInternaParticipante.findAll({
+      where: { conversa_id: { [Op.in]: conversaIds } },
+      attributes: [
+        'conversa_id',
+        [fn('COUNT', col('id')), 'total']
+      ],
+      group: ['conversa_id']
+    })
+  ]);
+
+  const ultimaMensagemPorConversa = new Map();
+  mensagens.forEach((mensagem) => {
+    const conversaId = Number(mensagem.conversa_id);
+    if (!ultimaMensagemPorConversa.has(conversaId)) {
+      ultimaMensagemPorConversa.set(conversaId, mensagem);
+    }
+  });
+
+  const anexosTotalPorConversa = new Map(
+    anexosAgrupados.map((item) => [Number(item.conversa_id), Number(item.get('total') || 0)])
+  );
+  const participantesTotalPorConversa = new Map(
+    participantesAgrupados.map((item) => [Number(item.conversa_id), Number(item.get('total') || 0)])
+  );
+
+  return conversas
+    .map((conversa) => {
+      const ultimaMensagem = ultimaMensagemPorConversa.get(Number(conversa.id)) || null;
+      return {
+        id: conversa.id,
+        assunto: conversa.assunto,
+        status: conversa.status,
+        createdAt: conversa.createdAt,
+        updatedAt: conversa.updatedAt,
+        criador: serializarUsuarioConversa(conversa.criador),
+        destinatario: serializarUsuarioConversa(conversa.destinatario),
+        ultima_mensagem: ultimaMensagem
+          ? {
+              id: ultimaMensagem.id,
+              mensagem: ultimaMensagem.mensagem,
+              autor: ultimaMensagem.autor
+                ? { id: ultimaMensagem.autor.id, nome: ultimaMensagem.autor.nome }
+                : null,
+              createdAt: ultimaMensagem.createdAt,
+              editada_em: ultimaMensagem.editada_em
+            }
+          : null,
+        anexos_total: anexosTotalPorConversa.get(Number(conversa.id)) || 0,
+        participantes_total: participantesTotalPorConversa.get(Number(conversa.id)) || 0
+      };
+    })
+    .sort(
+      (a, b) =>
+        (ordemConversas.get(Number(a.id)) || 0) -
+        (ordemConversas.get(Number(b.id)) || 0)
+    );
+}
+
+async function listarConversasPaginadas({
+  somenteArquivadas,
+  usuarioId,
+  page,
+  limit,
+  where
+}) {
+  const paginacaoSolicitada = page !== undefined || limit !== undefined;
+  const paginaAtual = parsePositiveInt(page, 1);
+  const limitePorPagina = Math.min(
+    parsePositiveInt(limit, DEFAULT_CONVERSAS_PAGE_SIZE),
+    MAX_CONVERSAS_PAGE_SIZE
+  );
+
+  const conversasBase = await ConversaInterna.findAll({
+    where,
+    attributes: ['id', 'updatedAt'],
+    order: [['updatedAt', 'DESC']]
+  });
+  const conversasFiltradas = await filtrarPorArquivamento(
+    conversasBase,
+    Number(usuarioId),
+    somenteArquivadas
+  );
+  const total = conversasFiltradas.length;
+  const offset = (paginaAtual - 1) * limitePorPagina;
+  const idsPagina = (paginacaoSolicitada
+    ? conversasFiltradas.slice(offset, offset + limitePorPagina)
+    : conversasFiltradas
+  ).map((item) => Number(item.id));
+
+  if (idsPagina.length === 0) {
+    if (!paginacaoSolicitada) {
+      return [];
+    }
+    return {
+      items: [],
+      meta: {
+        page: paginaAtual,
+        limit: limitePorPagina,
+        total,
+        total_pages: total > 0 ? Math.ceil(total / limitePorPagina) : 0
+      }
+    };
+  }
+
+  const ordemPagina = new Map(idsPagina.map((id, index) => [id, index]));
+  const conversas = await ConversaInterna.findAll({
+    where: { id: { [Op.in]: idsPagina } },
     include: [
       {
         model: User,
-        as: 'autor',
-        attributes: ['id', 'nome']
+        as: 'criador',
+        attributes: ['id', 'nome', 'setor_id'],
+        include: [{ model: Setor, as: 'setor', attributes: ['id', 'nome', 'codigo'] }]
+      },
+      {
+        model: User,
+        as: 'destinatario',
+        attributes: ['id', 'nome', 'setor_id'],
+        include: [{ model: Setor, as: 'setor', attributes: ['id', 'nome', 'codigo'] }]
       }
-    ],
-    order: [['createdAt', 'DESC']]
+    ]
   });
 
-  const anexosTotal = await ConversaInternaAnexo.count({
-    where: { conversa_id: conversa.id }
-  });
+  const itens = await montarResumosConversas(conversas);
+  itens.sort(
+    (a, b) =>
+      (ordemPagina.get(Number(a.id)) || 0) -
+      (ordemPagina.get(Number(b.id)) || 0)
+  );
 
-  const participantesTotal = await ConversaInternaParticipante.count({
-    where: { conversa_id: conversa.id }
-  });
+  if (!paginacaoSolicitada) {
+    return itens;
+  }
 
   return {
-    id: conversa.id,
-    assunto: conversa.assunto,
-    status: conversa.status,
-    createdAt: conversa.createdAt,
-    updatedAt: conversa.updatedAt,
-    criador: conversa.criador
-      ? {
-          id: conversa.criador.id,
-          nome: conversa.criador.nome,
-          setor: conversa.criador.setor
-            ? { id: conversa.criador.setor.id, nome: conversa.criador.setor.nome, codigo: conversa.criador.setor.codigo }
-            : null
-        }
-      : null,
-    destinatario: conversa.destinatario
-      ? {
-          id: conversa.destinatario.id,
-          nome: conversa.destinatario.nome,
-          setor: conversa.destinatario.setor
-            ? { id: conversa.destinatario.setor.id, nome: conversa.destinatario.setor.nome, codigo: conversa.destinatario.setor.codigo }
-            : null
-        }
-      : null,
-    ultima_mensagem: ultimaMensagem
-      ? {
-          id: ultimaMensagem.id,
-          mensagem: ultimaMensagem.mensagem,
-          autor: ultimaMensagem.autor
-            ? { id: ultimaMensagem.autor.id, nome: ultimaMensagem.autor.nome }
-            : null,
-          createdAt: ultimaMensagem.createdAt,
-          editada_em: ultimaMensagem.editada_em
-        }
-      : null,
-    anexos_total: anexosTotal,
-    participantes_total: participantesTotal
+    items: itens,
+    meta: {
+      page: paginaAtual,
+      limit: limitePorPagina,
+      total,
+      total_pages: total > 0 ? Math.ceil(total / limitePorPagina) : 0
+    }
   };
 }
 
@@ -231,7 +374,6 @@ module.exports = {
 
   async entrada(req, res) {
     try {
-      let conversas = [];
       const somenteArquivadas = parseBoolean(req.query?.arquivadas);
       const participacoes = await ConversaInternaParticipante.findAll({
         where: { usuario_id: req.user.id },
@@ -239,7 +381,11 @@ module.exports = {
       });
       const idsParticipacao = participacoes.map((item) => item.conversa_id);
 
-      conversas = await ConversaInterna.findAll({
+      const resultado = await listarConversasPaginadas({
+        somenteArquivadas,
+        usuarioId: req.user.id,
+        page: req.query?.page,
+        limit: req.query?.limit,
         where: {
           [Op.and]: [
             { criado_por_id: { [Op.ne]: req.user.id } },
@@ -250,36 +396,10 @@ module.exports = {
               ].filter(Boolean)
             }
           ]
-        },
-        include: [
-          {
-            model: User,
-            as: 'criador',
-            attributes: ['id', 'nome', 'setor_id'],
-            include: [{ model: Setor, as: 'setor', attributes: ['id', 'nome', 'codigo'] }]
-          },
-          {
-            model: User,
-            as: 'destinatario',
-            attributes: ['id', 'nome', 'setor_id'],
-            include: [{ model: Setor, as: 'setor', attributes: ['id', 'nome', 'codigo'] }]
-          }
-        ],
-        order: [['updatedAt', 'DESC']]
+        }
       });
 
-      for (const conversa of conversas) {
-        await garantirParticipantesBasicos(conversa);
-      }
-
-      conversas = await filtrarPorArquivamento(
-        conversas,
-        Number(req.user.id),
-        somenteArquivadas
-      );
-
-      const itens = await Promise.all(conversas.map(montarResumoConversa));
-      return res.json(itens);
+      return res.json(resultado);
     } catch (error) {
       console.error(error);
       return res.status(500).json({ error: 'Erro ao listar caixa de entrada' });
@@ -289,39 +409,14 @@ module.exports = {
   async saida(req, res) {
     try {
       const somenteArquivadas = parseBoolean(req.query?.arquivadas);
-      const where = { criado_por_id: req.user.id };
-
-      let conversas = await ConversaInterna.findAll({
-        where,
-        include: [
-          {
-            model: User,
-            as: 'criador',
-            attributes: ['id', 'nome', 'setor_id'],
-            include: [{ model: Setor, as: 'setor', attributes: ['id', 'nome', 'codigo'] }]
-          },
-          {
-            model: User,
-            as: 'destinatario',
-            attributes: ['id', 'nome', 'setor_id'],
-            include: [{ model: Setor, as: 'setor', attributes: ['id', 'nome', 'codigo'] }]
-          }
-        ],
-        order: [['updatedAt', 'DESC']]
+      const resultado = await listarConversasPaginadas({
+        somenteArquivadas,
+        usuarioId: req.user.id,
+        page: req.query?.page,
+        limit: req.query?.limit,
+        where: { criado_por_id: req.user.id }
       });
-
-      for (const conversa of conversas) {
-        await garantirParticipantesBasicos(conversa);
-      }
-
-      conversas = await filtrarPorArquivamento(
-        conversas,
-        Number(req.user.id),
-        somenteArquivadas
-      );
-
-      const itens = await Promise.all(conversas.map(montarResumoConversa));
-      return res.json(itens);
+      return res.json(resultado);
     } catch (error) {
       console.error(error);
       return res.status(500).json({ error: 'Erro ao listar caixa de saida' });
