@@ -20,3 +20,11 @@ frontend/.env
 backend/.env
 
 node_modules
+*.log
+tmp-*
+image.png
+image-1.png
+image-2.png
+image-3.png
+arquivo_certo.md
+teste

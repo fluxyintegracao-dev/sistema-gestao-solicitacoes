@@ -1,1 +1,0 @@
-export default function EtapasSetor() { return <div>EtapasSetor</div>; }
