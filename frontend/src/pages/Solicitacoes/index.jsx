@@ -18,6 +18,7 @@ import { getSetores } from '../../services/setores';
 import { getTiposSolicitacao } from '../../services/tiposSolicitacao';
 import { getSetorPermissoes } from '../../services/setorPermissoes';
 import { getStatusSetor } from '../../services/statusSetor';
+import { getMinhasObras, getObras } from '../../services/obras';
 import { useAuth } from '../../contexts/AuthContext';
 import { parseDateSmart } from '../../utils/dateLocal';
 import { isGeoSetor, solicitacaoEstaNoSetorDoUsuario } from '../../utils/setor';
@@ -67,6 +68,14 @@ export default function Solicitacoes({ arquivadas = false }) {
   const [seletorColunasLeft, setSeletorColunasLeft] = useState(0);
   const [seletorColunasTop, setSeletorColunasTop] = useState(0);
   const [filtrosStoragePronto, setFiltrosStoragePronto] = useState(false);
+  const [paginaAtual, setPaginaAtual] = useState(1);
+  const [limitePorPagina, setLimitePorPagina] = useState(25);
+  const [metaPaginacao, setMetaPaginacao] = useState({
+    page: 1,
+    limit: 25,
+    total: 0,
+    total_pages: 0
+  });
   const seletorColunasRef = useRef(null);
   const botaoColunasRef = useRef(null);
   const { user } = useAuth();
@@ -91,8 +100,16 @@ export default function Solicitacoes({ arquivadas = false }) {
   }, [user?.id, user?.email, user?.nome, user?.perfil, arquivadas]);
 
   useEffect(() => {
-    carregar();
-  }, [filtros, arquivadas]);
+    setPaginaAtual(1);
+  }, [filtros, arquivadas, limitePorPagina]);
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      carregar();
+    }, 250);
+
+    return () => clearTimeout(timeout);
+  }, [filtros, arquivadas, paginaAtual, limitePorPagina]);
 
   useEffect(() => {
     try {
@@ -125,6 +142,10 @@ export default function Solicitacoes({ arquivadas = false }) {
     carregarStatusOptions();
     carregarPermissoes();
   }, []);
+
+  useEffect(() => {
+    carregarObrasOptions();
+  }, [user?.perfil]);
 
   async function carregarTiposSolicitacao() {
     try {
@@ -235,21 +256,19 @@ export default function Solicitacoes({ arquivadas = false }) {
     return Array.from(responsaveisMap.values()).sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
   }
 
-  async function carregarOpcoesObras(paramsObj = {}) {
-    const paramsObras = { ...paramsObj };
-    delete paramsObras.obra_ids;
-
-    const query = new URLSearchParams(paramsObras).toString();
-    const res = await fetch(`${API_URL}/solicitacoes?${query}`, {
-      headers: authHeaders()
-    });
-
-    if (!res.ok) {
-      throw new Error('Erro ao carregar opcoes de obras');
+  async function carregarObrasOptions() {
+    try {
+      const service = user?.perfil === 'USUARIO' ? getMinhasObras : getObras;
+      const data = await service();
+      const lista = (Array.isArray(data) ? data : []).map((obra) => ({
+        value: String(obra.id),
+        label: obra.nome
+      }));
+      setObrasOptions(lista.sort((a, b) => a.label.localeCompare(b.label, 'pt-BR')));
+    } catch (error) {
+      console.error(error);
+      setObrasOptions([]);
     }
-
-    const data = await res.json();
-    return extrairOpcoesObras(Array.isArray(data) ? data : []);
   }
 
   async function carregar() {
@@ -265,6 +284,8 @@ export default function Solicitacoes({ arquivadas = false }) {
       if (arquivadas) {
         paramsObj.arquivadas = '1';
       }
+      paramsObj.page = String(paginaAtual);
+      paramsObj.limit = String(limitePorPagina);
 
       const params = new URLSearchParams(paramsObj).toString();
 
@@ -277,17 +298,19 @@ export default function Solicitacoes({ arquivadas = false }) {
       }
 
       const data = await res.json();
-      const lista = Array.isArray(data) ? data : [];
+      const lista = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.items)
+          ? data.items
+          : [];
       setSolicitacoes(lista);
       setResponsaveisOptions(extrairOpcoesResponsaveis(lista));
-
-      try {
-        const obrasLista = await carregarOpcoesObras(paramsObj);
-        setObrasOptions(obrasLista);
-      } catch (errorOpcoesObras) {
-        console.error(errorOpcoesObras);
-        setObrasOptions(extrairOpcoesObras(lista));
-      }
+      setMetaPaginacao({
+        page: Number(data?.meta?.page || paginaAtual),
+        limit: Number(data?.meta?.limit || limitePorPagina),
+        total: Number(data?.meta?.total || lista.length),
+        total_pages: Number(data?.meta?.total_pages || (lista.length > 0 ? 1 : 0))
+      });
 
       setSelecionadasIds([]);
     } catch (error) {
@@ -304,6 +327,12 @@ export default function Solicitacoes({ arquivadas = false }) {
     const valor = Number(item?.valor || 0);
     return total + (Number.isNaN(valor) ? 0 : valor);
   }, 0);
+  const totalSolicitacoes = Number(metaPaginacao?.total || 0);
+  const totalPaginas = Number(metaPaginacao?.total_pages || 0);
+  const paginaInicial = totalSolicitacoes === 0 ? 0 : ((paginaAtual - 1) * limitePorPagina) + 1;
+  const paginaFinal = totalSolicitacoes === 0
+    ? 0
+    : Math.min(totalSolicitacoes, paginaAtual * limitePorPagina);
 
   const setorTokens = [
     String(user?.setor?.codigo || '').toUpperCase(),
@@ -867,17 +896,64 @@ export default function Solicitacoes({ arquivadas = false }) {
       )}
 
       {!loading && solicitacoes.length > 0 && (
-        <TabelaSolicitacoes
-          solicitacoes={solicitacoes}
-          onAtualizar={carregar}
-          setoresMap={setoresMap}
-          permissaoUsuario={permissaoUsuario}
-          mostrarArquivadas={arquivadas}
-          visibleColumns={colunasVisiveis}
-          selecionadasIds={selecionadasIds}
-          onToggleSelecionada={toggleSelecionada}
-          onToggleSelecionarTodas={toggleSelecionarTodas}
-        />
+        <>
+          <TabelaSolicitacoes
+            solicitacoes={solicitacoes}
+            onAtualizar={carregar}
+            setoresMap={setoresMap}
+            permissaoUsuario={permissaoUsuario}
+            mostrarArquivadas={arquivadas}
+            visibleColumns={colunasVisiveis}
+            selecionadasIds={selecionadasIds}
+            onToggleSelecionada={toggleSelecionada}
+            onToggleSelecionarTodas={toggleSelecionarTodas}
+          />
+
+          <div className="sol-surface-card mt-4 p-3 md:p-4 rounded-xl flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+            <div className="text-sm text-gray-600 dark:text-slate-300">
+              {totalSolicitacoes > 0
+                ? `Exibindo ${paginaInicial}-${paginaFinal} de ${totalSolicitacoes} solicitações`
+                : 'Nenhuma solicitação encontrada'}
+            </div>
+
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+              <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-slate-300">
+                <span>Por página</span>
+                <select
+                  className="input !w-auto min-w-[88px]"
+                  value={limitePorPagina}
+                  onChange={(event) => setLimitePorPagina(Number(event.target.value) || 25)}
+                >
+                  {[10, 25, 50, 100].map((opcao) => (
+                    <option key={opcao} value={opcao}>{opcao}</option>
+                  ))}
+                </select>
+              </label>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={() => setPaginaAtual((prev) => Math.max(1, prev - 1))}
+                  disabled={paginaAtual <= 1}
+                >
+                  Anterior
+                </button>
+                <span className="text-sm text-gray-700 dark:text-slate-200 min-w-[96px] text-center">
+                  Página {paginaAtual} de {Math.max(totalPaginas, 1)}
+                </span>
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={() => setPaginaAtual((prev) => Math.min(Math.max(totalPaginas, 1), prev + 1))}
+                  disabled={totalPaginas === 0 || paginaAtual >= totalPaginas}
+                >
+                  Próxima
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
       )}
 
       {!arquivadas && selecionadasIds.length > 0 && (
@@ -1117,4 +1193,3 @@ export default function Solicitacoes({ arquivadas = false }) {
     </div>
   );
 }
-

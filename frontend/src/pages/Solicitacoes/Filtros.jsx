@@ -505,19 +505,22 @@ export default function Filtros({
           {mostrarFiltroResponsavel && isFiltroVisivel('responsavel') && (
             <div className="sol-filter-field">
               <label className="sol-filter-label">Responsavel</label>
-              <select
+              <input
                 name="responsavel"
                 className="input"
                 value={filtros.responsavel || ''}
                 onChange={handleChange}
-              >
-                <option value="">Todos os responsaveis</option>
+                type="text"
+                placeholder="Nome do responsavel"
+                list="responsaveis-solicitacoes"
+              />
+              <datalist id="responsaveis-solicitacoes">
                 {responsaveisOptions.map(responsavel => (
                   <option key={responsavel.value} value={responsavel.value}>
                     {responsavel.label}
                   </option>
                 ))}
-              </select>
+              </datalist>
             </div>
           )}
         </div>

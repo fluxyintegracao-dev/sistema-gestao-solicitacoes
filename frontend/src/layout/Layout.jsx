@@ -99,6 +99,9 @@ export default function Layout() {
     let ativo = true;
 
     const atualizarBadge = async () => {
+      if (typeof document !== 'undefined' && document.hidden) {
+        return;
+      }
       try {
         const [listaEntrada, listaSaida] = await Promise.all([
           getCaixaEntrada({ arquivadas: false }),
@@ -138,7 +141,7 @@ export default function Layout() {
     window.addEventListener('conversas:entrada:seen', handleSeenEvent);
     window.addEventListener('conversas:saida:seen', handleSeenEvent);
     atualizarBadge();
-    const interval = setInterval(atualizarBadge, 20000);
+    const interval = setInterval(atualizarBadge, 60000);
 
     return () => {
       ativo = false;

@@ -34,6 +34,8 @@ const CHAVE_AREAS_POR_SETOR_ORIGEM = 'AREAS_POR_SETOR_ORIGEM';
 const CHAVE_SETORES_VISIVEIS_POR_USUARIO = 'SETORES_VISIVEIS_POR_USUARIO';
 const CHAVE_TIPOS_SOLICITACAO_POR_SETOR = 'TIPOS_SOLICITACAO_POR_SETOR';
 const CHAVE_SETORES_CRIACAO_TODAS_OBRAS = 'SETORES_CRIACAO_TODAS_OBRAS';
+const DEFAULT_SOLICITACOES_PAGE_SIZE = 25;
+const MAX_SOLICITACOES_PAGE_SIZE = 100;
 const TOKENS_GEO_EQUIVALENTES = new Set([
   'GEO',
   'GERENCIA_DE_PROCESSOS',
@@ -51,6 +53,84 @@ async function garantirVisibilidade(solicitacaoId, usuarioId) {
     },
     defaults: { oculto: false }
   });
+}
+
+function parsePositiveInt(value, fallback) {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    return fallback;
+  }
+  return parsed;
+}
+
+async function montarResumoSolicitacoesLista(solicitacoes) {
+  if (!Array.isArray(solicitacoes) || solicitacoes.length === 0) {
+    return [];
+  }
+
+  const idsSolicitacoes = solicitacoes.map((item) => Number(item.id)).filter(Boolean);
+  const ordemIds = new Map(idsSolicitacoes.map((id, index) => [id, index]));
+
+  const [historicosResponsavel, historicosStatus] = await Promise.all([
+    Historico.findAll({
+      where: {
+        solicitacao_id: { [Op.in]: idsSolicitacoes },
+        usuario_responsavel_id: { [Op.ne]: null },
+        acao: {
+          [Op.in]: ['RESPONSAVEL_ATRIBUIDO', 'RESPONSAVEL_ASSUMIU']
+        }
+      },
+      attributes: ['solicitacao_id', 'createdAt'],
+      include: [
+        {
+          model: User,
+          as: 'usuario',
+          attributes: ['id', 'nome']
+        }
+      ],
+      order: [
+        ['solicitacao_id', 'ASC'],
+        ['createdAt', 'DESC']
+      ]
+    }),
+    Historico.findAll({
+      where: {
+        solicitacao_id: { [Op.in]: idsSolicitacoes },
+        acao: 'STATUS_ALTERADO'
+      },
+      attributes: ['solicitacao_id', 'setor', 'createdAt'],
+      order: [
+        ['solicitacao_id', 'ASC'],
+        ['createdAt', 'DESC']
+      ]
+    })
+  ]);
+
+  const responsavelPorSolicitacao = new Map();
+  historicosResponsavel.forEach((item) => {
+    const solicitacaoId = Number(item.solicitacao_id);
+    if (!responsavelPorSolicitacao.has(solicitacaoId)) {
+      responsavelPorSolicitacao.set(solicitacaoId, item.usuario?.nome || null);
+    }
+  });
+
+  const setorStatusPorSolicitacao = new Map();
+  historicosStatus.forEach((item) => {
+    const solicitacaoId = Number(item.solicitacao_id);
+    if (!setorStatusPorSolicitacao.has(solicitacaoId)) {
+      setorStatusPorSolicitacao.set(solicitacaoId, item.setor || null);
+    }
+  });
+
+  return solicitacoes
+    .map((item) => {
+      const solicitacao = item.toJSON();
+      solicitacao.responsavel = responsavelPorSolicitacao.get(Number(item.id)) || null;
+      solicitacao.setor_status_atual =
+        setorStatusPorSolicitacao.get(Number(item.id)) || solicitacao.area_responsavel || null;
+      return solicitacao;
+    })
+    .sort((a, b) => (ordemIds.get(Number(a.id)) || 0) - (ordemIds.get(Number(b.id)) || 0));
 }
 
 async function enviarSolicitacaoParaSetorInterno({
@@ -598,8 +678,18 @@ module.exports = {
         valor_min,
         valor_max,
         tipo_macro_id,
-        tipo_solicitacao_id
+        tipo_solicitacao_id,
+        page,
+        limit
       } = req.query;
+      const paginacaoSolicitada =
+        req.query.page !== undefined || req.query.limit !== undefined;
+      const paginaAtual = parsePositiveInt(page, 1);
+      const limitePorPagina = Math.min(
+        parsePositiveInt(limit, DEFAULT_SOLICITACOES_PAGE_SIZE),
+        MAX_SOLICITACOES_PAGE_SIZE
+      );
+      const offset = (paginaAtual - 1) * limitePorPagina;
 
       /* ===============================
         1) BUSCAR SOLICITACOES OCULTADAS
@@ -627,7 +717,18 @@ module.exports = {
 
       if (listarArquivadas) {
         if (idsOcultos.length === 0) {
-          return res.json([]);
+          if (!paginacaoSolicitada) {
+            return res.json([]);
+          }
+          return res.json({
+            items: [],
+            meta: {
+              page: paginaAtual,
+              limit: limitePorPagina,
+              total: 0,
+              total_pages: 0
+            }
+          });
         }
         where[Op.and] = where[Op.and] || [];
         where[Op.and].push({ id: { [Op.in]: idsOcultos } });
@@ -745,7 +846,18 @@ module.exports = {
       } else if (isSetorBrape) {
         if (usuarioBrape) {
           if (obrasVinculadas.length === 0) {
-            return res.json([]);
+            if (!paginacaoSolicitada) {
+              return res.json([]);
+            }
+            return res.json({
+              items: [],
+              meta: {
+                page: paginaAtual,
+                limit: limitePorPagina,
+                total: 0,
+                total_pages: 0
+              }
+            });
           }
           where.obra_id = { [Op.in]: obrasVinculadas };
         } else if (adminBrape) {
@@ -1116,77 +1228,31 @@ module.exports = {
         5) CONSULTA
       =============================== */
 
-      const solicitacoes = await Solicitacao.findAll({
-        where,
-        include: [
-          {
-            model: Obra,
-            as: 'obra',
-            attributes: ['id', 'nome', 'codigo']
-          },
-          {
-            model: TipoSolicitacao,
-            as: 'tipo',
-            attributes: ['id', 'nome']
-          },
-          {
-            model: Contrato,
-            as: 'contrato',
-            attributes: ['id', 'codigo', 'ref_contrato']
-          },
-          {
-            model: TipoSolicitacao,
-            as: 'tipoMacroSolicitacao',
-            attributes: ['id', 'nome']
-          },
-          {
-            model: Historico,
-            as: 'historicos',
-            required: false,
-            where: {
-              usuario_responsavel_id: { [Op.ne]: null },
-              acao: {
-                [Op.in]: [
-                  'RESPONSAVEL_ATRIBUIDO',
-                  'RESPONSAVEL_ASSUMIU',
-                  'ENVIADA_SETOR'
-                ]
-              }
-            },
-            limit: 1,
-            order: [['createdAt', 'DESC']],
-            include: [
-              {
-                model: User,
-                as: 'usuario',
-                attributes: ['id', 'nome']
-              }
-            ]
-          }
-        ],
-        order: [['createdAt', 'DESC']]
-      });
+      const includeBase = [
+        {
+          model: Obra,
+          as: 'obra',
+          attributes: ['id', 'nome', 'codigo']
+        },
+        {
+          model: TipoSolicitacao,
+          as: 'tipo',
+          attributes: ['id', 'nome']
+        },
+        {
+          model: Contrato,
+          as: 'contrato',
+          attributes: ['id', 'codigo', 'ref_contrato']
+        },
+        {
+          model: TipoSolicitacao,
+          as: 'tipoMacroSolicitacao',
+          attributes: ['id', 'nome']
+        }
+      ];
 
-      /* ===============================
-        6) FORMATAR RESPOSTA
-      =============================== */
-
-      const resultadoBase = solicitacoes.map(s => {
-        const historicoResponsavel = s.historicos?.[0];
-        const responsavel =
-          historicoResponsavel && historicoResponsavel.acao !== 'ENVIADA_SETOR'
-            ? historicoResponsavel.usuario?.nome || null
-            : null;
-
-        return {
-          ...s.toJSON(),
-          responsavel
-        };
-      });
-
-      let resultado = isSetorObra
-        ? resultadoBase.filter(r => obrasVinculadas.includes(r.obra_id))
-        : resultadoBase;
+      let resultado = [];
+      let totalRegistros = 0;
 
       const usuarioComRegraMistaPorTipo =
         perfil === 'USUARIO' &&
@@ -1194,16 +1260,29 @@ module.exports = {
         !isSetorObra &&
         !isSetorBrape;
 
-      if (usuarioComRegraMistaPorTipo && resultado.length > 0) {
-        const idsResultado = resultado.map(item => item.id);
-        const historicosUsuario = await Historico.findAll({
-          where: {
-            solicitacao_id: { [Op.in]: idsResultado },
-            usuario_responsavel_id: usuarioId,
-            acao: { [Op.in]: ['RESPONSAVEL_ATRIBUIDO', 'RESPONSAVEL_ASSUMIU'] }
-          },
-          attributes: ['solicitacao_id']
+      if (usuarioComRegraMistaPorTipo) {
+        const solicitacoesFiltro = await Solicitacao.findAll({
+          where,
+          attributes: ['id', 'obra_id', 'area_responsavel', 'tipo_solicitacao_id', 'criado_por', 'createdAt'],
+          order: [['createdAt', 'DESC']]
         });
+        let resultadoFiltro = solicitacoesFiltro.map(item => item.toJSON());
+
+        if (isSetorObra) {
+          resultadoFiltro = resultadoFiltro.filter(item => obrasVinculadas.includes(item.obra_id));
+        }
+
+        const idsResultado = resultadoFiltro.map(item => item.id);
+        const historicosUsuario = idsResultado.length > 0
+          ? await Historico.findAll({
+              where: {
+                solicitacao_id: { [Op.in]: idsResultado },
+                usuario_responsavel_id: usuarioId,
+                acao: { [Op.in]: ['RESPONSAVEL_ATRIBUIDO', 'RESPONSAVEL_ASSUMIU'] }
+              },
+              attributes: ['solicitacao_id']
+            })
+          : [];
         const idsComInteracaoUsuario = new Set(
           historicosUsuario.map(h => Number(h.solicitacao_id))
         );
@@ -1211,7 +1290,7 @@ module.exports = {
         const regrasTiposPorSetor = await obterTiposSolicitacaoPorSetorConfig();
         const setoresUsuarioUpper = new Set(setorTokens.map(t => String(t || '').toUpperCase()));
 
-        resultado = resultado.filter(item => {
+        resultadoFiltro = resultadoFiltro.filter(item => {
           const areaItem = String(item.area_responsavel || '').trim().toUpperCase();
           const tipoId = Number(item.tipo_solicitacao_id);
           const itemEhDoSetorUsuario = setoresUsuarioUpper.has(areaItem);
@@ -1230,34 +1309,61 @@ module.exports = {
           const modoEfetivo = String(modoPorTipo || (setorTodosVisiveis ? 'TODOS_VISIVEIS' : 'ADMIN_PRIMEIRO')).toUpperCase();
           return modoEfetivo === 'TODOS_VISIVEIS';
         });
-      }
 
-      if (resultado.length > 0) {
-        const idsSolicitacoes = resultado.map(item => item.id);
-        const historicosStatus = await Historico.findAll({
-          where: {
-            solicitacao_id: { [Op.in]: idsSolicitacoes },
-            acao: 'STATUS_ALTERADO'
-          },
-          attributes: ['solicitacao_id', 'setor', 'createdAt'],
-          order: [['createdAt', 'DESC']]
+        totalRegistros = resultadoFiltro.length;
+        const idsPagina = (paginacaoSolicitada
+          ? resultadoFiltro.slice(offset, offset + limitePorPagina)
+          : resultadoFiltro
+        ).map(item => Number(item.id));
+
+        if (idsPagina.length > 0) {
+          const ordemPagina = new Map(idsPagina.map((id, index) => [id, index]));
+          const solicitacoesPagina = await Solicitacao.findAll({
+            where: { id: { [Op.in]: idsPagina } },
+            include: includeBase
+          });
+          resultado = await montarResumoSolicitacoesLista(solicitacoesPagina);
+          resultado.sort(
+            (a, b) =>
+              (ordemPagina.get(Number(a.id)) || 0) -
+              (ordemPagina.get(Number(b.id)) || 0)
+          );
+        }
+      } else {
+        totalRegistros = await Solicitacao.count({ where });
+        const solicitacoes = await Solicitacao.findAll({
+          where,
+          include: includeBase,
+          order: [['createdAt', 'DESC']],
+          ...(paginacaoSolicitada
+            ? { limit: limitePorPagina, offset }
+            : {})
         });
+        resultado = await montarResumoSolicitacoesLista(solicitacoes);
 
-        const setorStatusPorSolicitacao = new Map();
-        historicosStatus.forEach(item => {
-          const solicitacaoId = Number(item.solicitacao_id);
-          if (!setorStatusPorSolicitacao.has(solicitacaoId)) {
-            setorStatusPorSolicitacao.set(solicitacaoId, item.setor || null);
+        if (isSetorObra) {
+          resultado = resultado.filter(item => obrasVinculadas.includes(item.obra_id));
+          if (!paginacaoSolicitada) {
+            totalRegistros = resultado.length;
           }
-        });
-
-        resultado.forEach(item => {
-          item.setor_status_atual =
-            setorStatusPorSolicitacao.get(Number(item.id)) || item.area_responsavel || null;
-        });
+        }
       }
 
-      return res.json(resultado);
+      if (!paginacaoSolicitada) {
+        return res.json(resultado);
+      }
+
+      return res.json({
+        items: resultado,
+        meta: {
+          page: paginaAtual,
+          limit: limitePorPagina,
+          total: totalRegistros,
+          total_pages: totalRegistros > 0
+            ? Math.ceil(totalRegistros / limitePorPagina)
+            : 0
+        }
+      });
 
     } catch (error) {
       console.error(error);

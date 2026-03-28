@@ -15,6 +15,9 @@ export default function NotificacoesBell() {
   const navigate = useNavigate();
 
   async function carregar() {
+    if (typeof document !== 'undefined' && document.hidden) {
+      return;
+    }
     try {
       const data = await getNotificacoes({ limit: 50 });
       const itensFiltrados = Array.isArray(data.itens)
@@ -30,7 +33,7 @@ export default function NotificacoesBell() {
 
   useEffect(() => {
     carregar();
-    const id = setInterval(carregar, 60000);
+    const id = setInterval(carregar, 120000);
     return () => clearInterval(id);
   }, []);
 
