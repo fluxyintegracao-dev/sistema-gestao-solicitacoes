@@ -11,8 +11,9 @@ Guia rapido para colaboradores e agentes automatizados.
 
 ## Fluxo
 1. Ler este arquivo antes de qualquer mudanca.
-2. Pedir confirmacao antes de alteracoes grandes.
-3. Ler `docs/COLABORACAO_CODEX.md` antes de iniciar trabalho compartilhado entre dois agentes.
+2. Ler `docs/README.md` para navegar pela documentacao estruturada do projeto.
+3. Pedir confirmacao antes de alteracoes grandes.
+4. Ler `docs/COLABORACAO_CODEX.md` antes de iniciar trabalho compartilhado entre dois agentes.
 
 ## Estado Atual (resumo das mudancas feitas)
 
