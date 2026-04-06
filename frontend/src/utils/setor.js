@@ -31,3 +31,16 @@ export function solicitacaoEstaNoSetorDoUsuario(areaResponsavel, user) {
     return isGeoSetor(tokenNormalizado) && isGeoSetor(setorSolicitacao);
   });
 }
+
+export function usuarioPodeEnviarQualquerSetor(user) {
+  const perfil = String(user?.perfil || '').trim().toUpperCase();
+  return perfil === 'SUPERADMIN' || Boolean(user?.pode_enviar_qualquer_setor);
+}
+
+export function usuarioPodeEnviarSolicitacaoParaOutroSetor(areaResponsavel, user) {
+  if (usuarioPodeEnviarQualquerSetor(user)) {
+    return true;
+  }
+
+  return solicitacaoEstaNoSetorDoUsuario(areaResponsavel, user);
+}

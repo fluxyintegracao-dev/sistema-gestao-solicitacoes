@@ -1,4 +1,5 @@
-const { ConfiguracaoSistema } = require('../models');
+const { Op } = require('sequelize');
+const { ConfiguracaoSistema, User, Setor } = require('../models');
 
 const CHAVE_TEMA = 'TEMA_SISTEMA';
 const CHAVE_AREAS_OBRA = 'AREAS_OBRA_VISIVEIS';
@@ -70,6 +71,12 @@ function normalizarIdList(lista) {
       .map(item => Number(item))
       .filter(item => Number.isInteger(item) && item > 0)
   )];
+}
+
+function isSetorObra(setor) {
+  const codigo = String(setor?.codigo || '').trim().toUpperCase();
+  const nome = String(setor?.nome || '').trim().toUpperCase();
+  return codigo === 'OBRA' || nome === 'OBRA';
 }
 
 module.exports = {
@@ -453,6 +460,113 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return res.status(500).json({ error: 'Erro ao salvar configuracao de setores para criacao em todas as obras' });
+    }
+  },
+
+  async getUsuariosEnvioQualquerSetor(req, res) {
+    try {
+      const usuariosRaw = await User.findAll({
+        where: {
+          perfil: { [Op.ne]: 'SUPERADMIN' }
+        },
+        attributes: [
+          'id',
+          'nome',
+          'email',
+          'perfil',
+          'ativo',
+          'setor_id',
+          'pode_enviar_qualquer_setor'
+        ],
+        include: [
+          {
+            model: Setor,
+            as: 'setor',
+            attributes: ['id', 'nome', 'codigo']
+          }
+        ],
+        order: [
+          ['ativo', 'DESC'],
+          ['nome', 'ASC']
+        ]
+      });
+
+      const usuarios = usuariosRaw.filter(usuario => !isSetorObra(usuario?.setor));
+
+      return res.json({ usuarios });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao buscar usuarios com permissao especial de envio' });
+    }
+  },
+
+  async updateUsuariosEnvioQualquerSetor(req, res) {
+    const transaction = await User.sequelize.transaction();
+
+    try {
+      const usuarioIds = normalizarIdList(req.body?.usuario_ids);
+
+      if (usuarioIds.length > 0) {
+        const usuariosValidos = await User.findAll({
+          where: {
+            id: { [Op.in]: usuarioIds },
+            perfil: { [Op.ne]: 'SUPERADMIN' }
+          },
+          attributes: ['id'],
+          include: [
+            {
+              model: Setor,
+              as: 'setor',
+              attributes: ['id', 'nome', 'codigo']
+            }
+          ],
+          transaction
+        });
+
+        const idsValidos = new Set(
+          usuariosValidos
+            .filter(usuario => !isSetorObra(usuario?.setor))
+            .map(usuario => Number(usuario.id))
+        );
+        const idsInvalidos = usuarioIds.filter(id => !idsValidos.has(id));
+        if (idsInvalidos.length > 0) {
+          await transaction.rollback();
+          return res.status(400).json({
+            error: 'Um ou mais usuarios informados sao invalidos para esta permissao.',
+            usuario_ids_invalidos: idsInvalidos
+          });
+        }
+      }
+
+      await User.update(
+        { pode_enviar_qualquer_setor: false },
+        {
+          where: {
+            perfil: { [Op.ne]: 'SUPERADMIN' }
+          },
+          transaction
+        }
+      );
+
+      if (usuarioIds.length > 0) {
+        await User.update(
+          { pode_enviar_qualquer_setor: true },
+          {
+            where: {
+              id: { [Op.in]: usuarioIds },
+              perfil: { [Op.ne]: 'SUPERADMIN' }
+            },
+            transaction
+          }
+        );
+      }
+
+      await transaction.commit();
+      return res.json({ ok: true, usuario_ids: usuarioIds });
+    } catch (error) {
+      await transaction.rollback();
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao salvar permissao especial de envio' });
     }
   }
 };

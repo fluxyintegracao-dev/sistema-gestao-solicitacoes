@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+﻿import { Link } from 'react-router-dom';
 
 const SECOES_CONFIG = [
   {
@@ -6,17 +6,17 @@ const SECOES_CONFIG = [
     itens: [
       {
         title: 'Obras',
-        description: 'Cadastro e manutenção de obras.',
+        description: 'Cadastro e manutencao de obras.',
         to: '/obras'
       },
       {
         title: 'Setores',
-        description: 'Cadastro e manutenção de setores.',
+        description: 'Cadastro e manutencao de setores.',
         to: '/setores'
       },
       {
         title: 'Cargos',
-        description: 'Cadastro e manutenção de cargos.',
+        description: 'Cadastro e manutencao de cargos.',
         to: '/cargos'
       },
       {
@@ -31,23 +31,23 @@ const SECOES_CONFIG = [
       },
       {
         title: 'Contratos',
-        description: 'Cadastro e manutenção de contratos.',
+        description: 'Cadastro e manutencao de contratos.',
         to: '/gestao-contratos'
       }
     ]
   },
   {
-    title: 'Usuários',
+    title: 'Usuarios',
     itens: [
       {
-        title: 'Cadastro de Usuários',
-        description: 'Cadastrar e gerenciar usuários.',
+        title: 'Cadastro de Usuarios',
+        description: 'Cadastrar e gerenciar usuarios.',
         to: '/usuarios'
       }
     ]
   },
   {
-    title: 'Status e Vínculos',
+    title: 'Status e Vinculos',
     itens: [
       {
         title: 'Status por Setor',
@@ -55,33 +55,38 @@ const SECOES_CONFIG = [
         to: '/status-setor'
       },
       {
-        title: 'Permissões por Setor',
-        description: 'Defina se usuários podem assumir/atribuir.',
+        title: 'Permissoes por Setor',
+        description: 'Defina se usuarios podem assumir/atribuir.',
         to: '/permissoes-setor'
       },
       {
         title: 'Cores do Sistema',
-        description: 'Defina cores de botões e status.',
+        description: 'Defina cores de botoes e status.',
         to: '/cores-sistema'
       },
       {
-        title: 'Áreas Visíveis para OBRA',
-        description: 'Controle as áreas visíveis na nova solicitação.',
+        title: 'Areas Visiveis para OBRA',
+        description: 'Controle as areas visiveis na nova solicitacao.',
         to: '/areas-obra'
       },
       {
-        title: 'Áreas por Setor de Origem',
-        description: 'Defina quais setores cada setor pode selecionar na nova solicitação.',
+        title: 'Areas por Setor de Origem',
+        description: 'Defina quais setores cada setor pode selecionar na nova solicitacao.',
         to: '/areas-por-setor-origem'
       },
       {
-        title: 'Setores Visíveis por Usuário',
-        description: 'Defina setores extras que cada usuário pode visualizar quando atribuído.',
+        title: 'Setores Visiveis por Usuario',
+        description: 'Defina setores extras que cada usuario pode visualizar quando atribuido.',
         to: '/setores-visiveis-usuario'
       },
       {
+        title: 'Envio Livre entre Setores',
+        description: 'Marque usuarios que podem enviar solicitacoes fora do setor atual.',
+        to: '/usuarios-envio-qualquer-setor'
+      },
+      {
         title: 'Recebimento por Setor',
-        description: 'Defina se as solicitações chegam primeiro ao admin ou ficam visíveis para todos.',
+        description: 'Defina se as solicitacoes chegam primeiro ao admin ou ficam visiveis para todos.',
         to: '/comportamento-recebimento-setor'
       },
       {
@@ -90,18 +95,18 @@ const SECOES_CONFIG = [
         to: '/tipos-solicitacao-por-setor'
       },
       {
-        title: 'Criação em Todas as Obras',
-        description: 'Defina quais setores podem criar solicitação em qualquer obra.',
+        title: 'Criacao em Todas as Obras',
+        description: 'Defina quais setores podem criar solicitacao em qualquer obra.',
         to: '/setores-criacao-todas-obras'
       },
       {
         title: 'Tempo de Inatividade',
-        description: 'Define o tempo para logout automático por inatividade.',
+        description: 'Define o tempo para logout automatico por inatividade.',
         to: '/timeout-inatividade'
       },
       {
         title: 'Arquivos Modelos',
-        description: 'Crie páginas e defina admins com permissão de upload.',
+        description: 'Crie paginas e defina admins com permissao de upload.',
         to: '/arquivos-modelos-config'
       }
     ]
@@ -112,9 +117,9 @@ export default function Configuracoes() {
   return (
     <div className="config-page space-y-5 md:space-y-6">
       <header className="config-page-header">
-        <h1 className="config-page-title">Configurações</h1>
+        <h1 className="config-page-title">Configuracoes</h1>
         <p className="config-page-subtitle">
-          Gerencie cadastros e regras globais do sistema em um único lugar.
+          Gerencie cadastros e regras globais do sistema em um unico lugar.
         </p>
       </header>
 

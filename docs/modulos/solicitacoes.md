@@ -17,3 +17,5 @@
 - historico
 - acoes em massa
 - exportacao
+- envio entre setores com regra padrao por setor atual da solicitacao
+- permissao especial configuravel para envio fora do setor atual, sem liberar o setor OBRA

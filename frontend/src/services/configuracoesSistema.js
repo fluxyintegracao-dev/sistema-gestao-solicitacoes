@@ -128,3 +128,24 @@ export async function salvarSetoresCriacaoTodasObras(data) {
   if (!res.ok) throw new Error('Erro ao salvar configuracao de criacao em todas as obras');
   return res.json();
 }
+
+export async function getUsuariosEnvioQualquerSetor() {
+  const res = await fetch(`${API_URL}/configuracoes/usuarios-envio-qualquer-setor`, {
+    headers: authHeaders()
+  });
+  if (!res.ok) throw new Error('Erro ao buscar usuarios com permissao especial de envio');
+  return res.json();
+}
+
+export async function salvarUsuariosEnvioQualquerSetor(data) {
+  const res = await fetch(`${API_URL}/configuracoes/usuarios-envio-qualquer-setor`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.error || 'Erro ao salvar permissao especial de envio');
+  }
+  return res.json();
+}

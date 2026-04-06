@@ -36,6 +36,7 @@ import ComportamentoRecebimentoSetor from './pages/ComportamentoRecebimentoSetor
 import TimeoutInatividade from './pages/TimeoutInatividade';
 import TiposSolicitacaoPorSetor from './pages/TiposSolicitacaoPorSetor';
 import SetoresCriacaoTodasObras from './pages/SetoresCriacaoTodasObras';
+import UsuariosEnvioQualquerSetor from './pages/UsuariosEnvioQualquerSetor';
 import ConversasEntrada from './pages/ConversasEntrada';
 import ConversasSaida from './pages/ConversasSaida';
 import ConversaDetalhe from './pages/ConversaDetalhe';
@@ -150,6 +151,7 @@ export default function App() {
         <Route path="areas-obra" element={<AreasObra />} />
         <Route path="areas-por-setor-origem" element={<AreasPorSetorOrigem />} />
         <Route path="setores-visiveis-usuario" element={<SetoresVisiveisUsuario />} />
+        <Route path="usuarios-envio-qualquer-setor" element={<SuperadminRoute><UsuariosEnvioQualquerSetor /></SuperadminRoute>} />
         <Route path="comportamento-recebimento-setor" element={<ComportamentoRecebimentoSetor />} />
         <Route path="timeout-inatividade" element={<TimeoutInatividade />} />
         <Route path="tipos-solicitacao-por-setor" element={<TiposSolicitacaoPorSetor />} />

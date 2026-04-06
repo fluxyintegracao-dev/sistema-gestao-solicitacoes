@@ -20,7 +20,7 @@ import { getSetorPermissoes } from '../../services/setorPermissoes';
 import { getStatusSetor } from '../../services/statusSetor';
 import { useAuth } from '../../contexts/AuthContext';
 import { parseDateSmart } from '../../utils/dateLocal';
-import { isGeoSetor, solicitacaoEstaNoSetorDoUsuario } from '../../utils/setor';
+import { isGeoSetor, solicitacaoEstaNoSetorDoUsuario, usuarioPodeEnviarSolicitacaoParaOutroSetor } from '../../utils/setor';
 import {
   arquivarSolicitacoesEmMassa,
   deleteSolicitacao,
@@ -650,16 +650,15 @@ export default function Solicitacoes({ arquivadas = false }) {
   const podeExcluirUnica = !!selecionadaUnica && (isSuperadmin || isAdminGEO);
   const podeEnviarUnica = useMemo(() => {
     if (!selecionadaUnica || isSetorObra) return false;
-    return isSuperadmin || solicitacaoEstaNoSetorDoUsuario(selecionadaUnica.area_responsavel, user);
-  }, [selecionadaUnica, isSetorObra, isSuperadmin, user]);
+    return usuarioPodeEnviarSolicitacaoParaOutroSetor(selecionadaUnica.area_responsavel, user);
+  }, [selecionadaUnica, isSetorObra, user]);
   const podeEnviarMassa = useMemo(() => {
     if (selecionadasIds.length <= 1 || isSetorObra) return false;
-    if (isSuperadmin) return true;
     return selecionadasIds.every(idSelecionado => {
       const solicitacao = solicitacoes.find(item => Number(item.id) === Number(idSelecionado));
-      return solicitacao && solicitacaoEstaNoSetorDoUsuario(solicitacao.area_responsavel, user);
+      return solicitacao && usuarioPodeEnviarSolicitacaoParaOutroSetor(solicitacao.area_responsavel, user);
     });
-  }, [selecionadasIds, isSetorObra, isSuperadmin, solicitacoes, user]);
+  }, [selecionadasIds, isSetorObra, solicitacoes, user]);
 
   const isSetorObraSolicitacaoUnica = useMemo(() => {
     if (!selecionadaUnica) return false;

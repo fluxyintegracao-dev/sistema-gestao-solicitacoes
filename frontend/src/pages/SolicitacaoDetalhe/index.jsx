@@ -12,7 +12,7 @@ import ModalAlterarStatus from './ModalAlterarStatus';
 import ModalEnviarSetor from '../Solicitacoes/ModalEnviarSetor';
 import { updateStatusSolicitacao } from '../../services/solicitacoes';
 import { API_URL, authHeaders } from '../../services/api';
-import { isGeoSetor, solicitacaoEstaNoSetorDoUsuario } from '../../utils/setor';
+import { isGeoSetor, usuarioPodeEnviarSolicitacaoParaOutroSetor } from '../../utils/setor';
 
 export default function SolicitacaoDetalhe() {
   const { id } = useParams();
@@ -86,7 +86,7 @@ export default function SolicitacaoDetalhe() {
 
   const isSetorObra = setorTokens.includes('OBRA');
   const podeEnviarSetor =
-    !isSetorObra && (isSuperadmin || solicitacaoEstaNoSetorDoUsuario(solicitacao.area_responsavel, user));
+    !isSetorObra && usuarioPodeEnviarSolicitacaoParaOutroSetor(solicitacao.area_responsavel, user);
 
   const atualizadoEm = new Date(solicitacao.updatedAt || solicitacao.createdAt).toLocaleString('pt-BR');
 

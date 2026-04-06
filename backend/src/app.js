@@ -293,6 +293,18 @@ async function prepararBanco() {
     // ignora se nao conseguir aplicar agora
   }
 
+  // Solicitacoes - permissao especial para envio fora do setor atual
+  try {
+    const hasColumn = await columnExists('users', 'pode_enviar_qualquer_setor');
+    if (!hasColumn) {
+      await db.sequelize.query(
+        "ALTER TABLE users ADD COLUMN pode_enviar_qualquer_setor BOOLEAN NOT NULL DEFAULT 0"
+      );
+    }
+  } catch (error) {
+    // ignora se nao conseguir aplicar agora
+  }
+
   // Modulo de compras - tabelas auxiliares
   try {
     await db.sequelize.query(

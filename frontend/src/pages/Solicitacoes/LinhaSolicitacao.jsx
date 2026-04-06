@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import StatusBadge from '../../components/StatusBadge';
 import { useTheme } from '../../contexts/ThemeContext';
-import { isGeoSetor, solicitacaoEstaNoSetorDoUsuario } from '../../utils/setor';
+import { isGeoSetor, solicitacaoEstaNoSetorDoUsuario, usuarioPodeEnviarSolicitacaoParaOutroSetor } from '../../utils/setor';
 import ModalAtribuirResponsavel from './ModalAtribuirResponsavel';
 import ModalEnviarSetor from './ModalEnviarSetor';
 import { API_URL, authHeaders } from '../../services/api';
@@ -85,7 +85,7 @@ export default function LinhaSolicitacao({
       : true);
   const podeEnviar =
     !isSetorObra &&
-    (isSuperadmin || solicitacaoEstaNoSetorDoUsuario(solicitacao.area_responsavel, user));
+    usuarioPodeEnviarSolicitacaoParaOutroSetor(solicitacao.area_responsavel, user);
 
   const navigate = useNavigate();
   const dataCriacaoRaw =

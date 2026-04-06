@@ -145,7 +145,13 @@ async function enviarSolicitacaoParaSetorInterno({
   }
 
   const perfil = String(req.user?.perfil || '').trim().toUpperCase();
-  if (perfil !== 'SUPERADMIN') {
+  const usuarioLogado = await User.findByPk(req.user.id, {
+    attributes: ['id', 'pode_enviar_qualquer_setor']
+  });
+  const podeEnviarQualquerSetor =
+    perfil === 'SUPERADMIN' || Boolean(usuarioLogado?.pode_enviar_qualquer_setor);
+
+  if (!podeEnviarQualquerSetor) {
     const areaUsuario = await obterAreaUsuario(req);
     const tokensSetorUsuario = expandirTokensComAliasesGeo(
       await obterTokensSetorUsuario(req, areaUsuario)
