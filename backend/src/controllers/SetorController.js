@@ -4,8 +4,12 @@ module.exports = {
 
   async index(req, res) {
     try {
+      const incluirInativos = String(req.query?.incluir_inativos || '')
+        .trim()
+        .toLowerCase() === 'true';
+
       const setores = await Setor.findAll({
-        where: { ativo: true },
+        where: incluirInativos ? {} : { ativo: true },
         order: [['nome', 'ASC']]
       });
 

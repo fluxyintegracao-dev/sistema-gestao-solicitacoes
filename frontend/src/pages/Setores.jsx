@@ -24,7 +24,7 @@ export default function Setores() {
   async function carregarSetores() {
     try {
       setLoading(true);
-      const data = await getSetores();
+      const data = await getSetores({ incluirInativos: true });
       setSetores(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Erro ao carregar setores', error);
