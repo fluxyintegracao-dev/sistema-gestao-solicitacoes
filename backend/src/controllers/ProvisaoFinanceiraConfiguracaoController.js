@@ -178,6 +178,11 @@ function normalizarRegraEntrada(regra, indice) {
 module.exports = {
   async getPermissoes(req, res) {
     try {
+      res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      res.set('Pragma', 'no-cache');
+      res.set('Expires', '0');
+      res.set('Surrogate-Control', 'no-store');
+
       const regras = await ProvisaoFinanceiraPermissao.findAll({
         include: [
           {
@@ -219,6 +224,11 @@ module.exports = {
     const transaction = await sequelize.transaction();
 
     try {
+      res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      res.set('Pragma', 'no-cache');
+      res.set('Expires', '0');
+      res.set('Surrogate-Control', 'no-store');
+
       const regrasEntrada = Array.isArray(req.body?.regras) ? req.body.regras : [];
       const regrasNormalizadas = regrasEntrada.map((regra, indice) =>
         normalizarRegraEntrada(regra, indice + 1)

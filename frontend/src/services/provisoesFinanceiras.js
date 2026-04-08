@@ -20,7 +20,8 @@ async function parseJsonOrThrow(res, fallbackMessage) {
 
 export async function getProvisionamentoFinanceiroContexto() {
   const res = await fetch(`${API_URL}/provisoes-financeiras/contexto`, {
-    headers: authHeaders()
+    headers: authHeaders(),
+    cache: 'no-store'
   });
 
   return parseJsonOrThrow(res, 'Erro ao buscar contexto do provisionamento financeiro');
@@ -36,7 +37,8 @@ export async function getDashboardProvisionamentoFinanceiro(params = {}) {
 
 export async function getProvisionamentoFinanceiroPermissoes() {
   const res = await fetch(`${API_URL}/configuracoes/provisoes-financeiras/permissoes`, {
-    headers: authHeaders()
+    headers: authHeaders(),
+    cache: 'no-store'
   });
 
   return parseJsonOrThrow(res, 'Erro ao buscar permissoes do provisionamento financeiro');

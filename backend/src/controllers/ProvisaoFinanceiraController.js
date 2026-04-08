@@ -594,6 +594,11 @@ module.exports = {
 
   async contexto(req, res) {
     try {
+      res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      res.set('Pragma', 'no-cache');
+      res.set('Expires', '0');
+      res.set('Surrogate-Control', 'no-store');
+
       const permissoes = await obterPermissoes(req);
       const [obrasAcesso, obrasCriacao, criadoresFiltro] = await Promise.all([
         listarObrasPorEscopo(permissoes?.obras_acesso),
