@@ -1,6 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
+  HiOutlineArrowTrendingUp,
+  HiOutlineBanknotes,
+  HiOutlineBuildingOffice2,
+  HiOutlineCalendarDays,
+  HiOutlineChartBarSquare,
+  HiOutlineCheckBadge,
+  HiOutlineExclamationTriangle,
+  HiOutlineShieldExclamation
+} from 'react-icons/hi2';
+import {
   getDashboardProvisionamentoFinanceiro,
   getProvisionamentoFinanceiroContexto,
   listarCategoriasMacroProvisionamento
@@ -55,6 +65,11 @@ function formatarMes(anoMes) {
   });
 }
 
+function calcularPercentual(total, referencia) {
+  if (!referencia) return 0;
+  return Number(((Number(total || 0) / Number(referencia || 0)) * 100).toFixed(1));
+}
+
 export default function DashboardProvisionamentoFinanceiro() {
   const navigate = useNavigate();
   const [contexto, setContexto] = useState(null);
@@ -92,11 +107,18 @@ export default function DashboardProvisionamentoFinanceiro() {
     carregarBase();
   }, []);
 
+  const podeVerDashboard = useMemo(
+    () => Boolean(contexto?.permissoes?.superadmin || contexto?.permissoes?.pode_dashboard_global),
+    [contexto]
+  );
+
   useEffect(() => {
-    if (!contexto) return;
-    if (!(contexto?.permissoes?.superadmin || contexto?.permissoes?.pode_dashboard_global)) {
-      return;
-    }
+    if (!contexto || podeVerDashboard) return;
+    navigate('/provisoes-financeiras', { replace: true });
+  }, [contexto, navigate, podeVerDashboard]);
+
+  useEffect(() => {
+    if (!contexto || !podeVerDashboard) return;
 
     async function carregarDashboard() {
       try {
@@ -112,20 +134,109 @@ export default function DashboardProvisionamentoFinanceiro() {
     }
 
     carregarDashboard();
-  }, [contexto, filtros]);
+  }, [contexto, filtros, podeVerDashboard]);
 
   const obrasAcesso = useMemo(() => (
     Array.isArray(contexto?.obras_acesso) ? contexto.obras_acesso : []
   ), [contexto]);
-  const podeVerDashboard = useMemo(
-    () => Boolean(contexto?.permissoes?.superadmin || contexto?.permissoes?.pode_dashboard_global),
-    [contexto]
+
+  const pipelineOrdenado = useMemo(
+    () => [...(dashboard?.graficos?.pipeline_status || [])].sort((a, b) => Number(b?.total_valor || 0) - Number(a?.total_valor || 0)),
+    [dashboard]
+  );
+  const obrasOrdenadas = useMemo(
+    () => [...(dashboard?.graficos?.por_obra || [])].sort((a, b) => Number(b?.total_valor || 0) - Number(a?.total_valor || 0)),
+    [dashboard]
+  );
+  const categoriasOrdenadas = useMemo(
+    () => [...(dashboard?.graficos?.por_categoria || [])].sort((a, b) => Number(b?.total_valor || 0) - Number(a?.total_valor || 0)),
+    [dashboard]
+  );
+  const mesesOrdenados = useMemo(
+    () => [...(dashboard?.graficos?.por_mes || [])].sort((a, b) => String(a?.mes || '').localeCompare(String(b?.mes || ''))),
+    [dashboard]
+  );
+  const semanasOrdenadas = useMemo(
+    () => [...(dashboard?.graficos?.curva_semanal || [])].sort((a, b) => String(a?.semana_inicio || '').localeCompare(String(b?.semana_inicio || ''))),
+    [dashboard]
   );
 
-  useEffect(() => {
-    if (!contexto || podeVerDashboard) return;
-    navigate('/provisoes-financeiras', { replace: true });
-  }, [contexto, navigate, podeVerDashboard]);
+  const vencidasQtd = Number(dashboard?.alertas?.vencidas_nao_tratadas?.quantidade || 0);
+  const criticasQtd = Number(dashboard?.alertas?.itens_criticos_proximos?.quantidade || 0);
+  const obraLider = obrasOrdenadas[0] || null;
+  const categoriaLider = categoriasOrdenadas[0] || null;
+  const pipelineLider = pipelineOrdenado[0] || null;
+  const totalPeriodo = Number(dashboard?.cards?.total_periodo || 0);
+  const concentracaoLider = dashboard?.alertas?.obras_concentracao_alta?.[0] || null;
+  const proximaSemana = Number(dashboard?.cards?.total_proximos_7_dias || 0);
+  const proximos30 = Number(dashboard?.cards?.total_proximos_30_dias || 0);
+  const quantidadeAbertas = Number(dashboard?.cards?.quantidade_abertas || 0);
+
+  const cards = [
+    {
+      titulo: 'Total provisionado',
+      valor: formatarMoedaBRL(totalPeriodo),
+      detalhe: `${quantidadeAbertas} provisao(oes) em aberto`,
+      destaque: pipelineLider ? `${formatarStatus(pipelineLider.status)} lidera o pipeline` : 'Sem pipeline dominante',
+      icon: HiOutlineBanknotes
+    },
+    {
+      titulo: 'Proximos 7 dias',
+      valor: formatarMoedaBRL(proximaSemana),
+      detalhe: `${criticasQtd} item(ns) criticos no curto prazo`,
+      destaque: criticasQtd > 0 ? 'Atencao imediata' : 'Janela sob controle',
+      icon: HiOutlineCalendarDays
+    },
+    {
+      titulo: 'Proximos 30 dias',
+      valor: formatarMoedaBRL(proximos30),
+      detalhe: obraLider ? `Maior concentracao em ${formatarObra(obraLider.obra)}` : 'Sem obra lider',
+      destaque: obraLider ? `${calcularPercentual(obraLider.total_valor, totalPeriodo)}% do total` : 'Sem concentracao',
+      icon: HiOutlineChartBarSquare
+    },
+    {
+      titulo: 'Vencidas nao tratadas',
+      valor: String(vencidasQtd),
+      detalhe: `${criticasQtd} critica(s) proximas`,
+      destaque: vencidasQtd > 0 ? 'Priorizar saneamento' : 'Sem atrasos relevantes',
+      icon: HiOutlineShieldExclamation
+    }
+  ];
+
+  const leituras = [
+    {
+      titulo: 'Obra com maior carga financeira',
+      descricao: obraLider
+        ? `${formatarObra(obraLider.obra)} concentra ${formatarMoedaBRL(obraLider.total_valor)} no recorte atual.`
+        : 'Sem concentracao de obra no periodo selecionado.',
+      tonalidade: 'primary',
+      icon: HiOutlineBuildingOffice2
+    },
+    {
+      titulo: 'Categoria dominante',
+      descricao: categoriaLider
+        ? `${categoriaLider.categoria?.nome || '-'} lidera com ${formatarMoedaBRL(categoriaLider.total_valor)}.`
+        : 'Sem categoria dominante no recorte atual.',
+      tonalidade: 'neutral',
+      icon: HiOutlineArrowTrendingUp
+    },
+    {
+      titulo: 'Pressao de curto prazo',
+      descricao: criticasQtd > 0
+        ? `Existem ${criticasQtd} item(ns) criticos nos proximos 7 dias.`
+        : 'Nao ha itens criticos imediatos no horizonte de 7 dias.',
+      tonalidade: criticasQtd > 0 ? 'warning' : 'success',
+      icon: HiOutlineExclamationTriangle
+    },
+    {
+      titulo: 'Concentracao relevante',
+      descricao: concentracaoLider
+        ? `${formatarObra(concentracaoLider.obra)} representa ${concentracaoLider.percentual}% do total provisionado.`
+        : 'Nenhuma obra ultrapassou o limite de concentracao definido.',
+      tonalidade: concentracaoLider ? 'warning' : 'success',
+      icon: HiOutlineCheckBadge
+    }
+  ];
 
   function atualizarFiltro(campo, valor) {
     setFiltros((atual) => ({ ...atual, [campo]: valor ?? '' }));
@@ -151,22 +262,70 @@ export default function DashboardProvisionamentoFinanceiro() {
   }
 
   return (
-    <div className="page space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="page-title">Dashboard de Provisionamento</h1>
-          <p className="page-subtitle">
-            Visao gerencial consolidada das previsoes financeiras por obra.
-          </p>
+    <div className="page dashboard space-y-6">
+      <section className="dash-hero">
+        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 relative z-10">
+          <div className="space-y-2">
+            <p className="text-xs uppercase tracking-[0.18em]" style={{ color: 'var(--c-muted)' }}>
+              Provisionamento financeiro
+            </p>
+            <h1 className="text-2xl font-bold leading-tight" style={{ color: 'var(--c-text)' }}>
+              Dashboard Gerencial de Provisionamento
+            </h1>
+            <p className="text-sm max-w-3xl" style={{ color: 'var(--c-muted)' }}>
+              Leitura executiva para decidir prioridade, distribuicao de caixa e risco de concentracao por obra.
+            </p>
+          </div>
+          <div className={`chip ${dashboard?.escopo?.global ? '' : 'dash-chip-warning'}`}>
+            <span className="chip-dot" style={{ background: dashboard?.escopo?.global ? '#22c55e' : '#f59e0b' }} />
+            {dashboard?.escopo?.global ? 'Visao global habilitada' : 'Visao restrita ao escopo do usuario'}
+          </div>
         </div>
-        <div className={`rounded-full px-4 py-2 text-sm font-medium ${dashboard?.escopo?.global ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-800'}`}>
-          {dashboard?.escopo?.global ? 'Visao global habilitada' : 'Visao restrita as obras permitidas'}
-        </div>
-      </div>
 
-      <div className="card space-y-4">
+        <div className="dash-hero-grid relative z-10">
+          <div className="glass dash-spotlight">
+            <div className="dash-spotlight-icon">
+              <HiOutlineBanknotes size={22} />
+            </div>
+            <div className="space-y-2">
+              <p className="text-xs uppercase tracking-[0.16em]" style={{ color: 'var(--c-muted)' }}>
+                Exposicao do periodo
+              </p>
+              <div className="dash-spotlight-value">{formatarMoedaBRL(totalPeriodo)}</div>
+              <p className="dash-spotlight-note">
+                {obraLider
+                  ? `${formatarObra(obraLider.obra)} lidera o recorte com ${formatarMoedaBRL(obraLider.total_valor)}.`
+                  : 'Ainda nao ha concentracao suficiente para destaque.'}
+              </p>
+            </div>
+          </div>
+
+          <div className="glass dash-hero-side">
+            <MiniStat
+              titulo="Vencidas"
+              valor={String(vencidasQtd)}
+              descricao="Itens fora do prazo e ainda sem tratamento"
+            />
+            <MiniStat
+              titulo="Criticas"
+              valor={String(criticasQtd)}
+              descricao="Itens de prioridade critica no curto prazo"
+            />
+            <MiniStat
+              titulo="Pipeline lider"
+              valor={pipelineLider ? formatarStatus(pipelineLider.status) : '-'}
+              descricao={pipelineLider ? formatarMoedaBRL(pipelineLider.total_valor) : 'Sem pipeline dominante'}
+            />
+          </div>
+        </div>
+      </section>
+
+      <section className="card space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="font-semibold">Filtros do dashboard</h2>
+          <div>
+            <h2 className="font-semibold">Filtros gerenciais</h2>
+            <p className="text-sm text-[var(--c-muted)]">Ajuste o recorte para avaliar volume, risco e concentracao.</p>
+          </div>
           <button type="button" className="btn btn-outline" onClick={limparFiltros}>
             Limpar filtros
           </button>
@@ -221,176 +380,243 @@ export default function DashboardProvisionamentoFinanceiro() {
             <input type="date" className="input" value={filtros.data_final} onChange={(event) => atualizarFiltro('data_final', event.target.value)} />
           </label>
         </div>
-      </div>
+      </section>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <ResumoCard titulo="Total no periodo" valor={formatarMoedaBRL(dashboard?.cards?.total_periodo)} />
-        <ResumoCard titulo="Proximos 7 dias" valor={formatarMoedaBRL(dashboard?.cards?.total_proximos_7_dias)} />
-        <ResumoCard titulo="Proximos 30 dias" valor={formatarMoedaBRL(dashboard?.cards?.total_proximos_30_dias)} />
-        <ResumoCard titulo="Provisoes abertas" valor={String(dashboard?.cards?.quantidade_abertas || 0)} />
-      </div>
+      <section className="dash-kpi-grid">
+        {cards.map((card) => (
+          <MetricCard key={card.titulo} {...card} />
+        ))}
+      </section>
 
       {loadingDashboard ? (
         <div className="card"><p className="text-sm text-[var(--c-muted)]">Carregando dados do dashboard...</p></div>
       ) : (
         <>
-          <div className="grid gap-6 xl:grid-cols-2">
-            <BarChartCard
+          <section className="dash-section-grid">
+            <BarPanel
               titulo="Provisionamento por mes"
-              itens={(dashboard?.graficos?.por_mes || []).map((item) => ({
+              subtitulo="Leitura de tendencia para antecipar picos de desembolso."
+              itens={mesesOrdenados.map((item) => ({
                 label: formatarMes(item.mes),
                 valor: Number(item.total_valor || 0),
-                detalhe: `${item.quantidade || 0} registro(s)`
+                meta: `${item.quantidade || 0} registro(s)`
               }))}
             />
-            <BarChartCard
+            <BarPanel
               titulo="Curva semanal de desembolso"
-              itens={(dashboard?.graficos?.curva_semanal || []).map((item) => ({
+              subtitulo="Distribuicao de caixa prevista semana a semana."
+              itens={semanasOrdenadas.map((item) => ({
                 label: item.semana_label,
                 valor: Number(item.total_valor || 0),
-                detalhe: `${item.quantidade || 0} registro(s)`
+                meta: `${item.quantidade || 0} registro(s)`
               }))}
             />
-          </div>
+          </section>
 
-          <div className="grid gap-6 xl:grid-cols-2">
-            <BarChartCard
+          <section className="dash-section-grid">
+            <BarPanel
               titulo="Top obras por valor provisionado"
-              itens={(dashboard?.graficos?.por_obra || []).map((item) => ({
+              subtitulo="Onde a diretoria deve concentrar revisao financeira."
+              itens={obrasOrdenadas.map((item) => ({
                 label: formatarObra(item.obra),
                 valor: Number(item.total_valor || 0),
-                detalhe: `${item.quantidade || 0} registro(s)`
+                meta: `${item.quantidade || 0} registro(s)`
               }))}
             />
-            <BarChartCard
+            <BarPanel
               titulo="Provisionamento por categoria macro"
-              itens={(dashboard?.graficos?.por_categoria || []).map((item) => ({
+              subtitulo="Composicao do provisionamento por natureza de gasto."
+              itens={categoriasOrdenadas.map((item) => ({
                 label: item.categoria?.nome || '-',
                 valor: Number(item.total_valor || 0),
-                detalhe: `${item.quantidade || 0} registro(s)`
+                meta: `${item.quantidade || 0} registro(s)`
               }))}
             />
-          </div>
+          </section>
 
-          <div className="grid gap-6 xl:grid-cols-2">
-            <BarChartCard
+          <section className="dash-section-grid">
+            <BarPanel
               titulo="Pipeline por status"
-              itens={(dashboard?.graficos?.pipeline_status || []).map((item) => ({
+              subtitulo="Status com maior impacto financeiro no recorte atual."
+              itens={pipelineOrdenado.map((item) => ({
                 label: formatarStatus(item.status),
                 valor: Number(item.total_valor || 0),
-                detalhe: `${item.quantidade || 0} registro(s)`
+                meta: `${item.quantidade || 0} registro(s)`
               }))}
             />
-            <div className="card space-y-4">
-              <div className="card-header">
-                <h2 className="font-semibold">Alertas gerenciais</h2>
-              </div>
-              <AlertaLista
-                titulo={`Vencidas nao tratadas (${dashboard?.alertas?.vencidas_nao_tratadas?.quantidade || 0})`}
-                itens={dashboard?.alertas?.vencidas_nao_tratadas?.itens || []}
-              />
-              <AlertaLista
-                titulo={`Criticas proximas (${dashboard?.alertas?.itens_criticos_proximos?.quantidade || 0})`}
-                itens={dashboard?.alertas?.itens_criticos_proximos?.itens || []}
-              />
-            </div>
-          </div>
+            <InsightsPanel itens={leituras} />
+          </section>
 
-          <div className="card space-y-4">
-            <div className="card-header">
-              <h2 className="font-semibold">Obras com concentracao alta</h2>
+          <section className="dash-section-grid">
+            <AlertPanel
+              titulo={`Vencidas nao tratadas (${vencidasQtd})`}
+              subtitulo="Itens que pedem regularizacao imediata."
+              itens={dashboard?.alertas?.vencidas_nao_tratadas?.itens || []}
+            />
+            <AlertPanel
+              titulo={`Criticas proximas (${criticasQtd})`}
+              subtitulo="Itens de alta pressao no horizonte de 7 dias."
+              itens={dashboard?.alertas?.itens_criticos_proximos?.itens || []}
+            />
+          </section>
+
+          <section className="dash-panel">
+            <div className="dash-panel-head">
+              <div>
+                <h2>Obras com concentracao alta</h2>
+                <p>Obras que concentram parcela relevante do valor provisionado no recorte atual.</p>
+              </div>
             </div>
             {Array.isArray(dashboard?.alertas?.obras_concentracao_alta) && dashboard.alertas.obras_concentracao_alta.length > 0 ? (
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              <div className="dash-insights">
                 {dashboard.alertas.obras_concentracao_alta.map((item) => (
-                  <div key={item.obra_id} className="rounded-lg border border-[var(--c-border)] px-4 py-3">
-                    <div className="font-medium">{formatarObra(item.obra)}</div>
-                    <div className="text-sm text-[var(--c-muted)] mt-1">
-                      {formatarMoedaBRL(item.total_valor)} • {item.percentual}% do total
+                  <article key={item.obra_id} className="dash-insight dash-insight-warning">
+                    <div className="dash-insight-icon">
+                      <HiOutlineBuildingOffice2 size={18} />
                     </div>
-                  </div>
+                    <div className="space-y-1">
+                      <h3>{formatarObra(item.obra)}</h3>
+                      <p>
+                        {formatarMoedaBRL(item.total_valor)} concentrados no recorte. Participacao de {item.percentual}% do total.
+                      </p>
+                    </div>
+                  </article>
                 ))}
               </div>
             ) : (
-              <div className="text-sm text-[var(--c-muted)]">Nenhuma obra com concentracao alta no recorte atual.</div>
+              <div className="dash-empty">Nenhuma obra ultrapassou o limite de concentracao definido.</div>
             )}
-          </div>
+          </section>
         </>
       )}
     </div>
   );
 }
 
-function ResumoCard({ titulo, valor }) {
+function MetricCard({ titulo, valor, detalhe, destaque, icon: Icon }) {
   return (
-    <div className="rounded-xl border border-[var(--c-border)] bg-white px-4 py-4 shadow-sm">
-      <div className="text-xs uppercase tracking-wide text-[var(--c-muted)]">{titulo}</div>
-      <div className="mt-2 text-xl font-semibold">{valor}</div>
+    <article className="dash-kpi-card">
+      <div className="dash-kpi-head">
+        <div>
+          <div className="dash-kpi-title">{titulo}</div>
+          <div className="dash-kpi-value">{valor}</div>
+        </div>
+        <div className="dash-kpi-icon">
+          <Icon size={20} />
+        </div>
+      </div>
+      <div className="dash-kpi-foot">
+        <span>{detalhe}</span>
+        <strong>{destaque}</strong>
+      </div>
+    </article>
+  );
+}
+
+function MiniStat({ titulo, valor, descricao }) {
+  return (
+    <div className="dash-mini-stat">
+      <div className="dash-mini-stat-label">{titulo}</div>
+      <div className="dash-mini-stat-value">{valor}</div>
+      <div className="dash-mini-stat-desc">{descricao}</div>
     </div>
   );
 }
 
-function BarChartCard({ titulo, itens }) {
-  const maxValor = Math.max(...itens.map((item) => Number(item.valor || 0)), 0);
+function BarPanel({ titulo, subtitulo, itens }) {
+  const maximo = Math.max(...itens.map((item) => Number(item.valor || 0)), 0);
 
   return (
-    <div className="card space-y-4">
-      <div className="card-header">
-        <h2 className="font-semibold">{titulo}</h2>
+    <section className="dash-panel">
+      <div className="dash-panel-head">
+        <div>
+          <h2>{titulo}</h2>
+          <p>{subtitulo}</p>
+        </div>
       </div>
-
       {itens.length === 0 ? (
-        <div className="text-sm text-[var(--c-muted)]">Sem dados para o recorte atual.</div>
+        <div className="dash-empty">Sem dados para o recorte atual.</div>
       ) : (
-        <div className="space-y-3">
+        <div className="dash-bar-list">
           {itens.map((item, index) => {
             const valor = Number(item.valor || 0);
-            const width = maxValor > 0 ? Math.max(8, (valor / maxValor) * 100) : 0;
+            const percentual = maximo > 0 ? Math.max(6, (valor / maximo) * 100) : 0;
             return (
-              <div key={`${titulo}-${item.label}-${index}`} className="space-y-1">
-                <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-                  <span className="font-medium">{item.label}</span>
-                  <span>{formatarMoedaBRL(valor)}</span>
+              <div key={`${titulo}-${item.label}-${index}`} className="dash-bar-row">
+                <div className="dash-bar-top">
+                  <div>
+                    <div className="dash-bar-label">{item.label}</div>
+                    <div className="dash-bar-meta">{item.meta}</div>
+                  </div>
+                  <strong>{formatarMoedaBRL(valor)}</strong>
                 </div>
-                <div className="h-3 overflow-hidden rounded-full bg-slate-100">
-                  <div
-                    className="h-full rounded-full bg-blue-500"
-                    style={{ width: `${width}%` }}
-                  />
+                <div className="dash-bar-track">
+                  <div className="dash-bar-fill" style={{ width: `${percentual}%` }} />
                 </div>
-                {item.detalhe && (
-                  <div className="text-xs text-[var(--c-muted)]">{item.detalhe}</div>
-                )}
               </div>
             );
           })}
         </div>
       )}
-    </div>
+    </section>
   );
 }
 
-function AlertaLista({ titulo, itens }) {
+function InsightsPanel({ itens }) {
   return (
-    <div className="space-y-3">
-      <div className="text-sm font-medium">{titulo}</div>
+    <section className="dash-panel">
+      <div className="dash-panel-head">
+        <div>
+          <h2>Leituras para decisao</h2>
+          <p>Pontos de leitura rapida para orientar priorizacao e alocacao financeira.</p>
+        </div>
+      </div>
+      <div className="dash-insights">
+        {itens.map((item) => {
+          const Icon = item.icon;
+          return (
+            <article key={item.titulo} className={`dash-insight dash-insight-${item.tonalidade || 'neutral'}`}>
+              <div className="dash-insight-icon">
+                <Icon size={18} />
+              </div>
+              <div className="space-y-1">
+                <h3>{item.titulo}</h3>
+                <p>{item.descricao}</p>
+              </div>
+            </article>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function AlertPanel({ titulo, subtitulo, itens }) {
+  return (
+    <section className="dash-panel">
+      <div className="dash-panel-head">
+        <div>
+          <h2>{titulo}</h2>
+          <p>{subtitulo}</p>
+        </div>
+      </div>
       {itens.length === 0 ? (
-        <div className="text-sm text-[var(--c-muted)]">Nenhum item neste alerta.</div>
+        <div className="dash-empty">Nenhum item neste alerta.</div>
       ) : (
-        <div className="space-y-2">
+        <div className="dash-alert-list">
           {itens.map((item) => (
-            <div key={item.id} className="rounded-lg border border-[var(--c-border)] px-3 py-3 text-sm">
-              <div className="font-medium">{item.codigo}</div>
-              <div className="text-[var(--c-muted)] mt-1">
-                {formatarObra(item.obra)} • {formatarData(item.data_prevista_desembolso)} • {formatarMoedaBRL(item.valor_previsto)}
+            <article key={item.id} className="dash-alert-card">
+              <div className="dash-alert-title">{item.codigo}</div>
+              <div className="dash-alert-meta">
+                {formatarObra(item.obra)} - {formatarData(item.data_prevista_desembolso)}
               </div>
-              <div className="text-[var(--c-muted)] mt-1">
-                Status: {formatarStatus(item.status)} • Prioridade: {item.prioridade || '-'}
+              <div className="dash-alert-meta">
+                {formatarMoedaBRL(item.valor_previsto)} - Status {formatarStatus(item.status)} - Prioridade {item.prioridade || '-'}
               </div>
-            </div>
+            </article>
           ))}
         </div>
       )}
-    </div>
+    </section>
   );
 }

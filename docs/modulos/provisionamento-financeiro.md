@@ -52,6 +52,7 @@ Nesta etapa o modulo ainda nao aparece no menu principal para usuarios comuns.
 - alertas gerenciais
 - visao global apenas para quem possui permissao de dashboard global
 - demais usuarios enxergam dashboard restrito ao proprio escopo de obras
+- refinamento visual com foco em leitura executiva e tomada de decisao
 
 ## Escopo do Sprint 6
 - hardening de permissao por obra para usuarios comuns
