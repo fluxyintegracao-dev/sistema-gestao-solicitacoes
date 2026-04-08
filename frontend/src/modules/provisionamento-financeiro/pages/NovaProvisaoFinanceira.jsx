@@ -25,11 +25,10 @@ export default function NovaProvisaoFinanceira() {
   const [form, setForm] = useState({
     obra_id: '',
     data_prevista_desembolso: '',
-    categoria_macro_id: '',
+    item_macro: '',
     descricao: '',
     valor_previsto: '',
     fornecedor_texto: '',
-    comentario: '',
     prioridade: '',
     status: 'previsto'
   });
@@ -75,8 +74,8 @@ export default function NovaProvisaoFinanceira() {
   async function handleSubmit(event) {
     event.preventDefault();
 
-    if (!form.obra_id || !form.data_prevista_desembolso || !form.categoria_macro_id || !form.descricao.trim() || !form.valor_previsto) {
-      alert('Preencha obra, data prevista, categoria macro, descricao e valor previsto.');
+    if (!form.obra_id || !form.data_prevista_desembolso || !form.item_macro.trim() || !form.descricao.trim() || !form.valor_previsto) {
+      alert('Preencha obra, data prevista, item macro, descricao e valor previsto.');
       return;
     }
 
@@ -84,8 +83,7 @@ export default function NovaProvisaoFinanceira() {
       setSaving(true);
       const provisao = await criarProvisaoFinanceira({
         ...form,
-        obra_id: Number(form.obra_id),
-        categoria_macro_id: Number(form.categoria_macro_id)
+        obra_id: Number(form.obra_id)
       });
       navigate(`/provisoes-financeiras/${provisao.id}`);
     } catch (error) {
@@ -125,13 +123,20 @@ export default function NovaProvisaoFinanceira() {
           </label>
 
           <label className="grid gap-1 text-sm">
-            Categoria macro *
-            <select className="input" value={form.categoria_macro_id} onChange={(event) => atualizarCampo('categoria_macro_id', event.target.value)}>
-              <option value="">Selecione...</option>
+            Item Macro *
+            <input
+              type="text"
+              className="input"
+              list="provisao-item-macro-opcoes"
+              value={form.item_macro}
+              onChange={(event) => atualizarCampo('item_macro', event.target.value)}
+              placeholder="Ex.: concretagem, locacao, estrutura metalica"
+            />
+            <datalist id="provisao-item-macro-opcoes">
               {categorias.map((categoria) => (
-                <option key={categoria.id} value={categoria.id}>{categoria.nome}</option>
+                <option key={categoria.id} value={categoria.nome} />
               ))}
-            </select>
+            </datalist>
           </label>
 
           <label className="grid gap-1 text-sm xl:col-span-2">
@@ -175,10 +180,6 @@ export default function NovaProvisaoFinanceira() {
             </select>
           </label>
 
-          <label className="grid gap-1 text-sm xl:col-span-3">
-            Comentario inicial
-            <textarea className="input min-h-[96px]" value={form.comentario} onChange={(event) => atualizarCampo('comentario', event.target.value)} placeholder="Observacoes adicionais sobre a previsao" />
-          </label>
         </div>
 
         <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">

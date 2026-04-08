@@ -151,6 +151,9 @@ Restricao por obra:
 ## Observacoes tecnicas
 - o backend normaliza valor monetario aceitando tanto decimal puro (`1234.56`) quanto formato mascarado (`R$ 1.234,56`)
 - o codigo segue `PREV{obra.codigo}-{sequencial}` com lock transacional por obra
+- o campo operacional de classificacao na criacao/edicao passou a ser `Item Macro`, em texto livre curto
+- quando um `Item Macro` novo e informado, o backend reutiliza ou cria automaticamente o registro correspondente em `provisao_categorias_macro`
+- a tela de `Nova Provisao` nao exibe mais `Comentario inicial`; a `Descricao` cobre esse uso inicial
 - a exportacao CSV respeita exatamente os filtros e a ordenacao aplicados na listagem
 - o dashboard usa o mesmo escopo de acesso do modulo e so amplia para visao global quando `pode_dashboard_global` estiver habilitado
 - o frontend oculta o menu do dashboard para usuarios sem `pode_dashboard_global`

@@ -252,7 +252,7 @@ export default function DashboardProvisionamentoFinanceiro() {
       icon: HiOutlineBuildingOffice2
     },
     {
-      titulo: 'Categoria dominante',
+      titulo: 'Item Macro dominante',
       descricao: categoriaLider
         ? `${categoriaLider.categoria?.nome || '-'} lidera com ${formatarMoedaBRL(categoriaLider.total_valor)}.`
         : 'Sem categoria dominante no recorte atual.',
@@ -436,7 +436,7 @@ export default function DashboardProvisionamentoFinanceiro() {
           </label>
 
           <label className="grid gap-1 text-sm">
-            Categoria macro
+            Item Macro
             <select className="input" value={filtros.categoria_macro_id} onChange={(event) => atualizarFiltro('categoria_macro_id', event.target.value)}>
               <option value="">Todas</option>
               {categorias.map((categoria) => (
@@ -517,7 +517,7 @@ export default function DashboardProvisionamentoFinanceiro() {
               }))}
             />
             <BarPanel
-              titulo="Provisionamento por categoria macro"
+              titulo="Provisionamento por item macro"
               subtitulo="Composição do provisionamento por natureza de gasto."
               itens={categoriasOrdenadas.map((item) => ({
                 label: item.categoria?.nome || '-',

@@ -69,7 +69,7 @@ export default function ProvisionamentoFinanceiroDetalhe() {
       setCategorias(Array.isArray(categoriasData) ? categoriasData : []);
       setProvisao(provisaoData);
       setForm({
-        categoria_macro_id: String(provisaoData?.categoria_macro_id || ''),
+        item_macro: provisaoData?.categoriaMacro?.nome || '',
         data_prevista_desembolso: String(provisaoData?.data_prevista_desembolso || ''),
         descricao: provisaoData?.descricao || '',
         valor_previsto: String(provisaoData?.valor_previsto || ''),
@@ -134,10 +134,15 @@ export default function ProvisionamentoFinanceiroDetalhe() {
     event.preventDefault();
     if (!form) return;
 
+    if (!form.item_macro.trim() || !form.data_prevista_desembolso || !form.descricao.trim() || !form.valor_previsto) {
+      alert('Preencha item macro, data prevista, descricao e valor previsto.');
+      return;
+    }
+
     try {
       setSaving(true);
       const atualizado = await atualizarProvisaoFinanceira(id, {
-        categoria_macro_id: Number(form.categoria_macro_id),
+        item_macro: form.item_macro,
         data_prevista_desembolso: form.data_prevista_desembolso,
         descricao: form.descricao,
         valor_previsto: form.valor_previsto,
@@ -330,7 +335,7 @@ export default function ProvisionamentoFinanceiroDetalhe() {
       <div className="card">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4 text-sm">
           <Info label="Status" value={formatarStatus(provisao.status)} />
-          <Info label="Categoria macro" value={provisao.categoriaMacro?.nome || '-'} />
+          <Info label="Item Macro" value={provisao.categoriaMacro?.nome || '-'} />
           <Info label="Data prevista" value={formatarData(provisao.data_prevista_desembolso)} />
           <Info label="Valor previsto" value={formatarMoedaBRL(provisao.valor_previsto)} />
           <Info label="Fornecedor" value={provisao.fornecedor_texto || '-'} />
@@ -361,13 +366,20 @@ export default function ProvisionamentoFinanceiroDetalhe() {
           </div>
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             <label className="grid gap-1 text-sm">
-              Categoria macro
-              <select className="input" value={form.categoria_macro_id} onChange={(event) => setForm((atual) => ({ ...atual, categoria_macro_id: event.target.value }))}>
-                <option value="">Selecione...</option>
+              Item Macro
+              <input
+                type="text"
+                className="input"
+                list="provisao-item-macro-opcoes-edicao"
+                value={form.item_macro}
+                onChange={(event) => setForm((atual) => ({ ...atual, item_macro: event.target.value }))}
+                placeholder="Ex.: concretagem, locacao, estrutura metalica"
+              />
+              <datalist id="provisao-item-macro-opcoes-edicao">
                 {categorias.map((categoria) => (
-                  <option key={categoria.id} value={categoria.id}>{categoria.nome}</option>
+                  <option key={categoria.id} value={categoria.nome} />
                 ))}
-              </select>
+              </datalist>
             </label>
             <label className="grid gap-1 text-sm">
               Data prevista

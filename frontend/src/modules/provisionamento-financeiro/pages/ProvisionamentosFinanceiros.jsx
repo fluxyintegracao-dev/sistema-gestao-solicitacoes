@@ -312,7 +312,7 @@ export default function ProvisionamentosFinanceiros() {
         'Codigo',
         'Obra',
         'Data prevista',
-        'Categoria macro',
+        'Item Macro',
         'Descricao',
         'Fornecedor',
         'Valor previsto',
@@ -424,7 +424,7 @@ export default function ProvisionamentosFinanceiros() {
           </label>
 
           <label className="grid gap-1 text-sm">
-            Categoria macro
+            Item Macro
             <select className="input" value={filtros.categoria_macro_id} onChange={(event) => atualizarFiltro('categoria_macro_id', event.target.value)}>
               <option value="">Todas</option>
               {categorias.map((categoria) => (
@@ -575,7 +575,7 @@ export default function ProvisionamentosFinanceiros() {
                   <th>Codigo</th>
                   <th>Obra</th>
                   <th>Data prevista</th>
-                  <th>Categoria</th>
+                    <th>Item Macro</th>
                   <th>Descricao</th>
                   <th>Fornecedor</th>
                   <th>Valor previsto</th>

@@ -281,6 +281,7 @@ function normalizarDadosProvisionamento(body = {}) {
   return {
     obra_id: parsePositiveInt(body.obra_id),
     categoria_macro_id: parsePositiveInt(body.categoria_macro_id),
+    item_macro: normalizarTexto(body.item_macro),
     descricao: normalizarTexto(body.descricao),
     fornecedor_id: parsePositiveInt(body.fornecedor_id),
     fornecedor_texto: normalizarTexto(body.fornecedor_texto),
@@ -292,9 +293,10 @@ function normalizarDadosProvisionamento(body = {}) {
   };
 }
 
-async function validarCategoriaAtiva(categoriaId) {
+async function validarCategoriaAtiva(categoriaId, options = {}) {
   const categoria = await ProvisaoCategoriaMacro.findByPk(categoriaId, {
-    attributes: ['id', 'nome', 'ativo']
+    attributes: ['id', 'nome', 'ativo'],
+    transaction: options.transaction
   });
 
   if (!categoria) {
@@ -306,6 +308,42 @@ async function validarCategoriaAtiva(categoriaId) {
   }
 
   return { ok: true, categoria };
+}
+
+async function resolverCategoriaMacroProvisionamento({
+  categoriaMacroId,
+  itemMacro,
+  transaction
+}) {
+  const itemMacroNormalizado = normalizarTexto(itemMacro);
+
+  if (itemMacroNormalizado) {
+    let categoria = await ProvisaoCategoriaMacro.findOne({
+      where: sequelize.where(
+        sequelize.fn('LOWER', sequelize.col('nome')),
+        itemMacroNormalizado.toLowerCase()
+      ),
+      attributes: ['id', 'nome', 'ativo'],
+      transaction
+    });
+
+    if (categoria) {
+      if (categoria.ativo === false) {
+        await categoria.update({ ativo: true }, { transaction });
+      }
+
+      return { ok: true, categoria };
+    }
+
+    categoria = await ProvisaoCategoriaMacro.create({
+      nome: itemMacroNormalizado,
+      ativo: true
+    }, { transaction });
+
+    return { ok: true, categoria };
+  }
+
+  return validarCategoriaAtiva(categoriaMacroId, { transaction });
 }
 
 function serializarHistoricoItem(item) {
@@ -651,7 +689,7 @@ module.exports = {
         'Codigo',
         'Obra',
         'Data prevista',
-        'Categoria macro',
+        'Item Macro',
         'Descricao',
         'Fornecedor',
         'Valor previsto',
@@ -725,9 +763,9 @@ module.exports = {
     try {
       const dados = normalizarDadosProvisionamento(req.body);
 
-      if (!dados.obra_id || !dados.categoria_macro_id || !dados.descricao || !dados.data_prevista_desembolso) {
+      if (!dados.obra_id || !dados.descricao || !dados.data_prevista_desembolso || (!dados.item_macro && !dados.categoria_macro_id)) {
         await transaction.rollback();
-        return res.status(400).json({ error: 'Obra, categoria macro, descricao e data prevista sao obrigatorios.' });
+        return res.status(400).json({ error: 'Obra, item macro, descricao e data prevista sao obrigatorios.' });
       }
 
       if (dados.valor_previsto === null || dados.valor_previsto <= 0) {
@@ -746,7 +784,11 @@ module.exports = {
         return res.status(acesso.resposta.status).json(acesso.resposta.body);
       }
 
-      const validacaoCategoria = await validarCategoriaAtiva(dados.categoria_macro_id);
+      const validacaoCategoria = await resolverCategoriaMacroProvisionamento({
+        categoriaMacroId: dados.categoria_macro_id,
+        itemMacro: dados.item_macro,
+        transaction
+      });
       if (!validacaoCategoria.ok) {
         await transaction.rollback();
         return res.status(400).json({ error: validacaoCategoria.error });
@@ -758,7 +800,16 @@ module.exports = {
       });
 
       const provisao = await ProvisaoFinanceira.create({
-        ...dados,
+        obra_id: dados.obra_id,
+        categoria_macro_id: validacaoCategoria.categoria.id,
+        descricao: dados.descricao,
+        fornecedor_id: dados.fornecedor_id,
+        fornecedor_texto: dados.fornecedor_texto,
+        data_prevista_desembolso: dados.data_prevista_desembolso,
+        valor_previsto: dados.valor_previsto,
+        comentario: dados.comentario,
+        status: dados.status,
+        prioridade: dados.prioridade,
         codigo,
         usuario_criacao_id: req.user.id,
         usuario_atualizacao_id: req.user.id
@@ -819,9 +870,9 @@ module.exports = {
         codigo: provisao.codigo
       });
 
-      if (!dados.categoria_macro_id || !dados.descricao || !dados.data_prevista_desembolso) {
+      if (!dados.descricao || !dados.data_prevista_desembolso || (!dados.item_macro && !dados.categoria_macro_id)) {
         await transaction.rollback();
-        return res.status(400).json({ error: 'Categoria macro, descricao e data prevista sao obrigatorios.' });
+        return res.status(400).json({ error: 'Item macro, descricao e data prevista sao obrigatorios.' });
       }
 
       if (dados.valor_previsto === null || dados.valor_previsto <= 0) {
@@ -834,7 +885,11 @@ module.exports = {
         return res.status(400).json({ error: 'Transicao de status invalida para esta etapa.' });
       }
 
-      const validacaoCategoria = await validarCategoriaAtiva(dados.categoria_macro_id);
+      const validacaoCategoria = await resolverCategoriaMacroProvisionamento({
+        categoriaMacroId: dados.categoria_macro_id,
+        itemMacro: dados.item_macro,
+        transaction
+      });
       if (!validacaoCategoria.ok) {
         await transaction.rollback();
         return res.status(400).json({ error: validacaoCategoria.error });
@@ -843,7 +898,7 @@ module.exports = {
       const antes = provisao.toJSON();
 
       await provisao.update({
-        categoria_macro_id: dados.categoria_macro_id,
+        categoria_macro_id: validacaoCategoria.categoria.id,
         descricao: dados.descricao,
         fornecedor_id: dados.fornecedor_id,
         fornecedor_texto: dados.fornecedor_texto,
