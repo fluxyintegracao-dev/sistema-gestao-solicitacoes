@@ -25,6 +25,7 @@ const STATUS_PROVISAO_FINANCEIRA = [
   'cancelado',
   'realizado'
 ];
+const MAX_LIMITE_LISTAGEM = 200;
 
 function normalizarTexto(valor) {
   const texto = String(valor || '').trim();
@@ -582,7 +583,7 @@ module.exports = {
   async index(req, res) {
     try {
       const page = parsePagina(req.query?.page, 1);
-      const limit = Math.min(parsePagina(req.query?.limit, 20), 100);
+      const limit = Math.min(parsePagina(req.query?.limit, 20), MAX_LIMITE_LISTAGEM);
       const offset = (page - 1) * limit;
       const consulta = await construirConsultaListagem(req);
       if (consulta?.erro) {

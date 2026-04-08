@@ -53,6 +53,12 @@ Nesta etapa o modulo ainda nao aparece no menu principal para usuarios comuns.
 - visao global apenas para quem possui permissao de dashboard global
 - demais usuarios enxergam dashboard restrito ao proprio escopo de obras
 
+## Escopo do Sprint 6
+- hardening de permissao por obra para usuarios comuns
+- alinhamento do backend com paginação de ate `200` itens por pagina
+- indices adicionais para consultas do modulo, regras de permissao e vinculos por obra
+- checklist operacional e documentacao de deploy da etapa
+
 ## Regras de status
 - criacao aceita `previsto` ou `em_analise`
 - edicao de campos do registro ficou restrita ao `SUPERADMIN`
@@ -94,6 +100,7 @@ Acoes controladas:
 Restricao por obra:
 - sem obras vinculadas na regra: acesso global dentro do escopo da regra
 - com obras vinculadas: acesso limitado as obras selecionadas
+- para perfil `USUARIO`, o escopo final ainda e intersectado com os vinculos reais em `usuarios_obras`
 
 `SUPERADMIN` continua com acesso total por regra implicita.
 
@@ -137,6 +144,7 @@ Restricao por obra:
 - subir primeiro schema e models
 - manter modulo restrito ao SUPERADMIN na configuracao inicial
 - nao liberar menu operacional antes do CRUD estar pronto
+- no Sprint 6, aplicar tambem `backend/migrations/add-provisionamento-financeiro-hardening-indexes.sql`
 
 ## Observacoes tecnicas
 - o backend normaliza valor monetario aceitando tanto decimal puro (`1234.56`) quanto formato mascarado (`R$ 1.234,56`)
@@ -144,3 +152,4 @@ Restricao por obra:
 - a exportacao CSV respeita exatamente os filtros e a ordenacao aplicados na listagem
 - o dashboard usa o mesmo escopo de acesso do modulo e so amplia para visao global quando `pode_dashboard_global` estiver habilitado
 - o frontend oculta o menu do dashboard para usuarios sem `pode_dashboard_global`
+- o backend passou a aceitar ate `200` itens por pagina, alinhado ao frontend

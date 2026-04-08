@@ -1,7 +1,8 @@
 const { Op } = require('sequelize');
 const {
   ProvisaoFinanceiraPermissao,
-  ProvisaoFinanceiraPermissaoObra
+  ProvisaoFinanceiraPermissaoObra,
+  UsuarioObra
 } = require('../../models');
 
 const PERFIS_VALIDOS = new Set(['SUPERADMIN', 'ADMIN', 'USUARIO']);
@@ -23,6 +24,15 @@ function normalizarIdInteiro(valor) {
   const numero = Number(valor);
   if (!Number.isInteger(numero) || numero <= 0) return null;
   return numero;
+}
+
+function normalizarListaIdsInteiros(lista) {
+  if (!Array.isArray(lista)) return [];
+  return [...new Set(
+    lista
+      .map((item) => normalizarIdInteiro(item))
+      .filter(Boolean)
+  )];
 }
 
 function obterChavesEscopoUsuario(user) {
@@ -71,6 +81,35 @@ function agruparObrasPorAcao(regras, campoAcao) {
     habilitado: obraIds.size > 0,
     obras: Array.from(obraIds)
   };
+}
+
+async function listarObrasVinculadasUsuario(usuarioId) {
+  const userId = normalizarIdInteiro(usuarioId);
+  if (!userId) return [];
+
+  const vinculos = await UsuarioObra.findAll({
+    where: { user_id: userId },
+    attributes: ['obra_id'],
+    raw: true
+  });
+
+  return normalizarListaIdsInteiros(vinculos.map((item) => item?.obra_id));
+}
+
+function restringirObrasPorVinculo(obrasPermitidas, obrasVinculadas) {
+  const vinculadas = normalizarListaIdsInteiros(obrasVinculadas);
+  if (vinculadas.length === 0) return [];
+
+  if (obrasPermitidas === null) {
+    return vinculadas;
+  }
+
+  if (!Array.isArray(obrasPermitidas) || obrasPermitidas.length === 0) {
+    return [];
+  }
+
+  const permitidas = new Set(normalizarListaIdsInteiros(obrasPermitidas));
+  return vinculadas.filter((obraId) => permitidas.has(obraId));
 }
 
 async function resolverPermissoesProvisionamentoFinanceiro(user) {
@@ -144,6 +183,24 @@ async function resolverPermissoesProvisionamentoFinanceiro(user) {
   const criacao = agruparObrasPorAcao(regras, 'pode_criar');
   const aprovacao = agruparObrasPorAcao(regras, 'pode_aprovar');
   const podeDashboardGlobal = regras.some(regra => normalizarBoolean(regra?.pode_dashboard_global));
+
+  if (perfil === 'USUARIO') {
+    const obrasVinculadas = await listarObrasVinculadasUsuario(chavesEscopo.usuarioId);
+    const obrasAcesso = restringirObrasPorVinculo(acesso.obras, obrasVinculadas);
+    const obrasCriacao = restringirObrasPorVinculo(criacao.obras, obrasVinculadas);
+    const obrasAprovacao = restringirObrasPorVinculo(aprovacao.obras, obrasVinculadas);
+
+    return {
+      superadmin: false,
+      pode_acessar: acesso.habilitado && obrasAcesso.length > 0,
+      pode_criar: criacao.habilitado && obrasCriacao.length > 0,
+      pode_aprovar: aprovacao.habilitado && obrasAprovacao.length > 0,
+      pode_dashboard_global: podeDashboardGlobal,
+      obras_acesso: obrasAcesso,
+      obras_criacao: obrasCriacao,
+      obras_aprovacao: obrasAprovacao
+    };
+  }
 
   return {
     superadmin: false,
