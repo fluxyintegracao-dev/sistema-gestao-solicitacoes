@@ -1,7 +1,6 @@
-# 2026-04 - Modernizacao visual dos dashboards
+# 2026-04 - Modernizacao visual do dashboard de provisionamento
 
 ## Escopo
-- dashboard executivo principal
 - dashboard do modulo de provisionamento financeiro
 
 ## Objetivo
@@ -11,13 +10,12 @@
 
 ## Entregas
 - nova hierarquia visual com hero, cards de KPI e paineis de leitura
-- cards de destaque com foco em volume, exposicao, pendencia e concentracao
-- listas visuais modernizadas para status, areas, pipeline, obras e categorias
+- cards de destaque com foco em curto prazo, exposicao, concentracao e risco
+- listas visuais modernizadas para pipeline, obras, categorias, alertas e curva de desembolso
 - blocos de leitura executiva com linguagem mais orientada a decisao
 - refinamento visual reutilizavel em `frontend/src/index.css`
 
 ## Arquivos
-- `frontend/src/pages/Dashboard.jsx`
 - `frontend/src/modules/provisionamento-financeiro/pages/DashboardProvisionamentoFinanceiro.jsx`
 - `frontend/src/index.css`
 
