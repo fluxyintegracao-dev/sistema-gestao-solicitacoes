@@ -1,0 +1,64 @@
+{
+  "expo": {
+    "name": "Fluxy",
+    "slug": "fluxy-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/fluxy-logo-icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": false,
+    "scheme": "fluxy",
+    "splash": {
+      "image": "./assets/fluxy-logo-horizontal.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#eef3fa"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "br.com.fluxy.core",
+      "buildNumber": "1",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSCameraUsageDescription": "O Fluxy usa a camera apenas quando voce escolhe anexar fotos em solicitacoes e provisionamentos.",
+        "NSPhotoLibraryUsageDescription": "O Fluxy acessa sua biblioteca de fotos apenas quando voce escolhe anexar imagens em solicitacoes e provisionamentos."
+      }
+    },
+    "android": {
+      "versionCode": 1,
+      "package": "br.com.fluxy.core",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/fluxy-logo-icon.png",
+        "backgroundColor": "#eef3fa"
+      },
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.INTERNET"
+      ],
+      "blockedPermissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.SYSTEM_ALERT_WINDOW"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/fluxy-logo-icon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "O Fluxy usa a camera apenas quando voce escolhe anexar fotos em solicitacoes e provisionamentos.",
+          "photosPermission": "O Fluxy acessa sua biblioteca de fotos apenas quando voce escolhe anexar imagens em solicitacoes e provisionamentos."
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
