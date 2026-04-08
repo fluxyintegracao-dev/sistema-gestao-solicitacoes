@@ -98,6 +98,19 @@ export async function listarProvisoesFinanceiras(params = {}) {
   return parseJsonOrThrow(res, 'Erro ao listar provisoes financeiras');
 }
 
+export async function exportarProvisoesFinanceirasCsv(params = {}) {
+  const res = await fetch(buildUrl('/provisoes-financeiras/exportar', params), {
+    headers: authHeaders()
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.error || 'Erro ao exportar provisoes financeiras');
+  }
+
+  return res.blob();
+}
+
 export async function getProvisaoFinanceira(id) {
   const res = await fetch(`${API_URL}/provisoes-financeiras/${id}`, {
     headers: authHeaders()

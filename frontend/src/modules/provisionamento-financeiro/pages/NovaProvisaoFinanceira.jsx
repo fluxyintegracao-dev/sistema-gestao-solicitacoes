@@ -5,6 +5,10 @@ import {
   getProvisionamentoFinanceiroContexto,
   listarCategoriasMacroProvisionamento
 } from '../../../services/provisoesFinanceiras';
+import {
+  formatarMoedaBRL,
+  normalizarEntradaMoeda
+} from '../utils/moeda';
 
 function formatarObra(obra) {
   if (!obra) return '-';
@@ -17,6 +21,7 @@ export default function NovaProvisaoFinanceira() {
   const [categorias, setCategorias] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [valorPrevistoTexto, setValorPrevistoTexto] = useState('');
   const [form, setForm] = useState({
     obra_id: '',
     data_prevista_desembolso: '',
@@ -56,6 +61,15 @@ export default function NovaProvisaoFinanceira() {
 
   function atualizarCampo(campo, valor) {
     setForm((atual) => ({ ...atual, [campo]: valor }));
+  }
+
+  function atualizarValorPrevisto(raw) {
+    const { textoFormatado, valorNumerico } = normalizarEntradaMoeda(raw);
+    setValorPrevistoTexto(textoFormatado);
+    setForm((atual) => ({
+      ...atual,
+      valor_previsto: valorNumerico
+    }));
   }
 
   async function handleSubmit(event) {
@@ -127,7 +141,14 @@ export default function NovaProvisaoFinanceira() {
 
           <label className="grid gap-1 text-sm">
             Valor previsto *
-            <input type="number" min="0.01" step="0.01" className="input" value={form.valor_previsto} onChange={(event) => atualizarCampo('valor_previsto', event.target.value)} />
+            <input
+              type="text"
+              inputMode="numeric"
+              className="input"
+              value={valorPrevistoTexto}
+              onChange={(event) => atualizarValorPrevisto(event.target.value)}
+              placeholder={formatarMoedaBRL(0)}
+            />
           </label>
 
           <label className="grid gap-1 text-sm">

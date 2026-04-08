@@ -92,6 +92,65 @@ function CheckboxPermissao({ label, checked, onChange }) {
   );
 }
 
+function ObrasPermitidasSelector({
+  obras,
+  selectedIds,
+  onToggle,
+  onSelecionarTodas,
+  onLimpar
+}) {
+  const totalSelecionadas = Array.isArray(selectedIds) ? selectedIds.length : 0;
+
+  return (
+    <div className="grid gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[var(--c-muted)]">
+        <span>{totalSelecionadas} obra(s) selecionada(s)</span>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            className="rounded-lg border border-[var(--c-border)] px-3 py-2 text-xs font-medium hover:bg-[var(--c-surface)]"
+            onClick={onSelecionarTodas}
+          >
+            Selecionar todas
+          </button>
+          <button
+            type="button"
+            className="rounded-lg border border-[var(--c-border)] px-3 py-2 text-xs font-medium hover:bg-[var(--c-surface)]"
+            onClick={onLimpar}
+          >
+            Limpar
+          </button>
+        </div>
+      </div>
+
+      <div className="max-h-48 overflow-y-auto rounded-lg border border-[var(--c-border)] bg-white">
+        {obras.map((obra) => {
+          const checked = selectedIds.includes(Number(obra.id));
+          return (
+            <label
+              key={obra.id}
+              className="flex items-center gap-3 border-b border-[var(--c-border)] px-3 py-2 text-sm last:border-b-0"
+            >
+              <input
+                type="checkbox"
+                checked={checked}
+                onChange={() => onToggle(obra.id)}
+              />
+              <span>{formatarObra(obra)}</span>
+            </label>
+          );
+        })}
+
+        {obras.length === 0 && (
+          <div className="px-3 py-3 text-sm text-[var(--c-muted)]">
+            Nenhuma obra disponivel.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function ConfiguracaoProvisionamentoFinanceiro() {
   const [usuarios, setUsuarios] = useState([]);
   const [setores, setSetores] = useState([]);
@@ -183,6 +242,22 @@ export default function ConfiguracaoProvisionamentoFinanceiro() {
       .filter((item) => Number.isInteger(item) && item > 0);
 
     atualizarRegra(regraId, { obra_ids: obraIdsNormalizados });
+  }
+
+  function alternarObraRegra(regraId, obraId) {
+    const obraIdNormalizado = Number(obraId);
+    setRegras((prev) => prev.map((regra) => {
+      if (regra.id !== regraId) return regra;
+
+      const atuais = Array.isArray(regra.obra_ids) ? regra.obra_ids.map(Number) : [];
+      const jaSelecionada = atuais.includes(obraIdNormalizado);
+      return {
+        ...regra,
+        obra_ids: jaSelecionada
+          ? atuais.filter((item) => item !== obraIdNormalizado)
+          : [...atuais, obraIdNormalizado]
+      };
+    }));
   }
 
   function adicionarRegra() {
@@ -303,23 +378,13 @@ export default function ConfiguracaoProvisionamentoFinanceiro() {
 
                     <label className="grid gap-1 text-sm md:col-span-2 xl:col-span-1">
                       Obras permitidas
-                      <select
-                        className="input min-h-[9rem]"
-                        multiple
-                        value={(regra.obra_ids || []).map(String)}
-                        onChange={(event) => {
-                          atualizarObrasRegra(
-                            regra.id,
-                            Array.from(event.target.selectedOptions, (option) => option.value)
-                          );
-                        }}
-                      >
-                        {obrasOrdenadas.map((obra) => (
-                          <option key={obra.id} value={obra.id}>
-                            {formatarObra(obra)}
-                          </option>
-                        ))}
-                      </select>
+                      <ObrasPermitidasSelector
+                        obras={obrasOrdenadas}
+                        selectedIds={(regra.obra_ids || []).map(Number)}
+                        onToggle={(obraId) => alternarObraRegra(regra.id, obraId)}
+                        onSelecionarTodas={() => atualizarObrasRegra(regra.id, obrasOrdenadas.map((obra) => obra.id))}
+                        onLimpar={() => atualizarObrasRegra(regra.id, [])}
+                      />
                     </label>
                   </div>
 

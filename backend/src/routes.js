@@ -420,6 +420,11 @@ router.get(
   ProvisaoFinanceiraController.index
 );
 router.get(
+  '/provisoes-financeiras/exportar',
+  criarMiddlewareProvisionamentoFinanceiro('acessar'),
+  ProvisaoFinanceiraController.exportarCsv
+);
+router.get(
   '/provisoes-financeiras/:id',
   criarMiddlewareProvisionamentoFinanceiro('acessar'),
   ProvisaoFinanceiraController.show

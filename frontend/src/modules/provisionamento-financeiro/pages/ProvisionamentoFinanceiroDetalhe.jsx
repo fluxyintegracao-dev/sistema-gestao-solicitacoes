@@ -9,6 +9,11 @@ import {
   obterUrlAssinadaAnexoProvisaoFinanceira,
   uploadAnexosProvisaoFinanceira
 } from '../../../services/provisoesFinanceiras';
+import {
+  formatarMoedaBRL,
+  inicializarEntradaMoeda,
+  normalizarEntradaMoeda
+} from '../utils/moeda';
 
 function formatarData(valor) {
   if (!valor) return '-';
@@ -19,13 +24,6 @@ function formatarData(valor) {
     return '-';
   }
   return data.toLocaleString('pt-BR');
-}
-
-function formatarMoeda(valor) {
-  return Number(valor || 0).toLocaleString('pt-BR', {
-    style: 'currency',
-    currency: 'BRL'
-  });
 }
 
 function formatarStatus(valor) {
@@ -47,6 +45,7 @@ export default function ProvisionamentoFinanceiroDetalhe() {
   const [editando, setEditando] = useState(false);
   const [comentario, setComentario] = useState('');
   const [form, setForm] = useState(null);
+  const [valorPrevistoTexto, setValorPrevistoTexto] = useState('');
 
   async function carregar() {
     try {
@@ -70,6 +69,7 @@ export default function ProvisionamentoFinanceiroDetalhe() {
         prioridade: provisaoData?.prioridade || '',
         status: provisaoData?.status || 'previsto'
       });
+      setValorPrevistoTexto(inicializarEntradaMoeda(provisaoData?.valor_previsto).textoFormatado);
     } catch (error) {
       console.error(error);
       alert(error?.message || 'Erro ao carregar detalhe da provisao financeira.');
@@ -86,6 +86,15 @@ export default function ProvisionamentoFinanceiroDetalhe() {
     if (!contexto?.permissoes?.pode_criar || !provisao) return false;
     return !['aprovado', 'cancelado', 'realizado'].includes(String(provisao.status || '').toLowerCase());
   }, [contexto, provisao]);
+
+  function atualizarValorPrevisto(raw) {
+    const { textoFormatado, valorNumerico } = normalizarEntradaMoeda(raw);
+    setValorPrevistoTexto(textoFormatado);
+    setForm((atual) => ({
+      ...atual,
+      valor_previsto: valorNumerico
+    }));
+  }
 
   async function salvarEdicao(event) {
     event.preventDefault();
@@ -193,7 +202,7 @@ export default function ProvisionamentoFinanceiroDetalhe() {
           <Info label="Status" value={formatarStatus(provisao.status)} />
           <Info label="Categoria macro" value={provisao.categoriaMacro?.nome || '-'} />
           <Info label="Data prevista" value={formatarData(provisao.data_prevista_desembolso)} />
-          <Info label="Valor previsto" value={formatarMoeda(provisao.valor_previsto)} />
+          <Info label="Valor previsto" value={formatarMoedaBRL(provisao.valor_previsto)} />
           <Info label="Fornecedor" value={provisao.fornecedor_texto || '-'} />
           <Info label="Prioridade" value={provisao.prioridade || '-'} />
           <Info label="Criado por" value={provisao.usuarioCriacao?.nome || '-'} />
@@ -230,7 +239,14 @@ export default function ProvisionamentoFinanceiroDetalhe() {
             </label>
             <label className="grid gap-1 text-sm">
               Valor previsto
-              <input type="number" min="0.01" step="0.01" className="input" value={form.valor_previsto} onChange={(event) => setForm((atual) => ({ ...atual, valor_previsto: event.target.value }))} />
+              <input
+                type="text"
+                inputMode="numeric"
+                className="input"
+                value={valorPrevistoTexto}
+                onChange={(event) => atualizarValorPrevisto(event.target.value)}
+                placeholder={formatarMoedaBRL(0)}
+              />
             </label>
             <label className="grid gap-1 text-sm">
               Status

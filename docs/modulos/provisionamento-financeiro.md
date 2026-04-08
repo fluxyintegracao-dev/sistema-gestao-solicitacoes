@@ -27,6 +27,16 @@ Nesta etapa o modulo ainda nao aparece no menu principal para usuarios comuns.
 - upload e listagem de anexos
 - exibicao do modulo no menu apenas para usuarios com acesso
 
+## Escopo do Sprint 3
+- filtros avancados por obra, periodo, categoria, status, fornecedor, faixa de valor, prioridade e criador
+- ordenacao configuravel
+- totalizador por valor filtrado
+- contador de registros filtrados
+- exportacao CSV da listagem filtrada
+- persistencia local dos filtros por usuario
+- ajuste de UX para valor previsto com mascara monetaria
+- configuracao de obras permitidas com checklist multi-selecao
+
 ## Codigo da previsao
 Formato:
 - `PREV{obra.codigo}-{sequencial}`
@@ -73,6 +83,7 @@ Restricao por obra:
 - backend:
   - `GET /provisoes-financeiras/contexto`
   - `GET /provisoes-financeiras`
+  - `GET /provisoes-financeiras/exportar`
   - `GET /provisoes-financeiras/:id`
   - `POST /provisoes-financeiras`
   - `PUT /provisoes-financeiras/:id`
@@ -95,3 +106,8 @@ Restricao por obra:
 - subir primeiro schema e models
 - manter modulo restrito ao SUPERADMIN na configuracao inicial
 - nao liberar menu operacional antes do CRUD estar pronto
+
+## Observacoes tecnicas
+- o backend normaliza valor monetario aceitando tanto decimal puro (`1234.56`) quanto formato mascarado (`R$ 1.234,56`)
+- o codigo segue `PREV{obra.codigo}-{sequencial}` com lock transacional por obra
+- a exportacao CSV respeita exatamente os filtros e a ordenacao aplicados na listagem

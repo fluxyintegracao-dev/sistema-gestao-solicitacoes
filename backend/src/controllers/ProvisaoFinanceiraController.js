@@ -34,11 +34,19 @@ function normalizarTexto(valor) {
 function normalizarValorDecimal(valor) {
   if (valor === null || valor === undefined || valor === '') return null;
 
-  const texto = String(valor)
+  let texto = String(valor)
     .trim()
-    .replace(/[R$\s]/gi, '')
-    .replace(/\./g, '')
-    .replace(',', '.');
+    .replace(/[R$\s]/gi, '');
+
+  if (!texto) return null;
+
+  if (texto.includes(',')) {
+    texto = texto
+      .replace(/\./g, '')
+      .replace(',', '.');
+  } else {
+    texto = texto.replace(/,/g, '');
+  }
 
   const numero = Number(texto);
   if (!Number.isFinite(numero)) return null;
@@ -55,6 +63,30 @@ function parsePagina(valor, padrao) {
   const numero = Number(valor);
   if (!Number.isInteger(numero) || numero <= 0) return padrao;
   return numero;
+}
+
+function normalizarDirecaoOrdenacao(valor) {
+  return String(valor || 'DESC').trim().toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+}
+
+function normalizarCampoOrdenacao(valor) {
+  const campo = String(valor || '').trim().toLowerCase();
+  const mapa = {
+    codigo: 'codigo',
+    data_prevista: 'data_prevista_desembolso',
+    data_prevista_desembolso: 'data_prevista_desembolso',
+    categoria: 'categoria_macro_id',
+    valor: 'valor_previsto',
+    valor_previsto: 'valor_previsto',
+    status: 'status',
+    prioridade: 'prioridade',
+    criador: 'usuario_criacao_id',
+    createdat: 'createdAt',
+    created_at: 'createdAt',
+    criacao: 'createdAt'
+  };
+
+  return mapa[campo] || 'data_prevista_desembolso';
 }
 
 function serializarStatus(valor) {
@@ -261,23 +293,217 @@ function serializarHistoricoItem(item) {
   };
 }
 
+function aplicarEscopoObrasNoWhere(where, permissoes) {
+  if (permissoes?.superadmin) {
+    return true;
+  }
+
+  if (Array.isArray(permissoes?.obras_acesso) && permissoes.obras_acesso.length === 0) {
+    return false;
+  }
+
+  if (Array.isArray(permissoes?.obras_acesso)) {
+    where.obra_id = { [Op.in]: permissoes.obras_acesso };
+  }
+
+  return true;
+}
+
+async function listarCriadoresFiltro(permissoes) {
+  const where = {};
+  const possuiAcesso = aplicarEscopoObrasNoWhere(where, permissoes);
+  if (!possuiAcesso) {
+    return [];
+  }
+
+  const registros = await ProvisaoFinanceira.findAll({
+    where,
+    attributes: [
+      [sequelize.fn('DISTINCT', sequelize.col('usuario_criacao_id')), 'usuario_criacao_id']
+    ],
+    raw: true
+  });
+
+  const ids = registros
+    .map((item) => parsePositiveInt(item?.usuario_criacao_id))
+    .filter(Boolean);
+
+  if (ids.length === 0) {
+    return [];
+  }
+
+  const usuarios = await User.findAll({
+    where: { id: { [Op.in]: ids } },
+    attributes: ['id', 'nome', 'email'],
+    order: [['nome', 'ASC']]
+  });
+
+  return usuarios.map((usuario) => ({
+    id: usuario.id,
+    nome: usuario.nome,
+    email: usuario.email
+  }));
+}
+
+async function construirConsultaListagem(req) {
+  const permissoes = await obterPermissoes(req);
+  const where = {};
+  const obraId = parsePositiveInt(req.query?.obra_id);
+  const categoriaId = parsePositiveInt(req.query?.categoria_macro_id);
+  const usuarioCriacaoId = parsePositiveInt(req.query?.usuario_criacao_id);
+  const status = serializarStatus(req.query?.status);
+  const prioridade = serializarStatus(req.query?.prioridade);
+  const busca = normalizarTexto(req.query?.busca);
+  const fornecedor = normalizarTexto(req.query?.fornecedor);
+  const dataInicial = normalizarTexto(req.query?.data_inicial);
+  const dataFinal = normalizarTexto(req.query?.data_final);
+  const valorMinimo = normalizarValorDecimal(req.query?.valor_minimo);
+  const valorMaximo = normalizarValorDecimal(req.query?.valor_maximo);
+  const sortBy = normalizarCampoOrdenacao(req.query?.sort_by);
+  const sortDir = normalizarDirecaoOrdenacao(req.query?.sort_dir);
+
+  const possuiAcesso = aplicarEscopoObrasNoWhere(where, permissoes);
+  if (!possuiAcesso) {
+    return {
+      permissoes,
+      where,
+      vazio: true,
+      order: [['data_prevista_desembolso', 'ASC'], ['createdAt', 'DESC']]
+    };
+  }
+
+  if (obraId) {
+    const acessoObra = await validarAcessoNaObra(req, obraId, 'acessar');
+    if (!acessoObra.ok) {
+      return {
+        permissoes,
+        erro: acessoObra.resposta
+      };
+    }
+
+    where.obra_id = obraId;
+  }
+
+  if (categoriaId) {
+    where.categoria_macro_id = categoriaId;
+  }
+
+  if (usuarioCriacaoId) {
+    where.usuario_criacao_id = usuarioCriacaoId;
+  }
+
+  if (status) {
+    if (!STATUS_PROVISAO_FINANCEIRA.includes(status)) {
+      return {
+        permissoes,
+        erro: {
+          status: 400,
+          body: { error: 'Status invalido para o modulo.' }
+        }
+      };
+    }
+    where.status = status;
+  }
+
+  if (prioridade) {
+    where.prioridade = prioridade;
+  }
+
+  if (dataInicial || dataFinal) {
+    where.data_prevista_desembolso = {};
+    if (dataInicial) {
+      where.data_prevista_desembolso[Op.gte] = dataInicial;
+    }
+    if (dataFinal) {
+      where.data_prevista_desembolso[Op.lte] = dataFinal;
+    }
+  }
+
+  if (valorMinimo !== null || valorMaximo !== null) {
+    where.valor_previsto = {};
+    if (valorMinimo !== null) {
+      where.valor_previsto[Op.gte] = valorMinimo;
+    }
+    if (valorMaximo !== null) {
+      where.valor_previsto[Op.lte] = valorMaximo;
+    }
+  }
+
+  const blocosBusca = [];
+  if (busca) {
+    blocosBusca.push(
+      { codigo: { [Op.like]: `%${busca}%` } },
+      { descricao: { [Op.like]: `%${busca}%` } },
+      { fornecedor_texto: { [Op.like]: `%${busca}%` } }
+    );
+  }
+
+  if (fornecedor) {
+    blocosBusca.push({ fornecedor_texto: { [Op.like]: `%${fornecedor}%` } });
+  }
+
+  if (blocosBusca.length > 0) {
+    where[Op.and] = [
+      ...(Array.isArray(where[Op.and]) ? where[Op.and] : []),
+      { [Op.or]: blocosBusca }
+    ];
+  }
+
+  return {
+    permissoes,
+    where,
+    vazio: false,
+    order: [
+      [sortBy, sortDir],
+      ['createdAt', sortBy === 'createdAt' ? sortDir : 'DESC']
+    ]
+  };
+}
+
+function formatarDataCsv(valor) {
+  if (!valor) return '';
+  const match = String(valor).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (match) {
+    return `${match[3]}/${match[2]}/${match[1]}`;
+  }
+
+  const data = new Date(valor);
+  if (Number.isNaN(data.getTime())) {
+    return '';
+  }
+
+  return data.toLocaleString('pt-BR');
+}
+
+function escaparValorCsv(valor) {
+  const texto = String(valor ?? '');
+  if (!texto.includes(';') && !texto.includes('"') && !texto.includes('\n')) {
+    return texto;
+  }
+
+  return `"${texto.replace(/"/g, '""')}"`;
+}
+
 module.exports = {
   STATUS_PROVISAO_FINANCEIRA,
 
   async contexto(req, res) {
     try {
       const permissoes = await obterPermissoes(req);
-      const [obrasAcesso, obrasCriacao] = await Promise.all([
+      const [obrasAcesso, obrasCriacao, criadoresFiltro] = await Promise.all([
         listarObrasPorEscopo(permissoes?.obras_acesso),
-        listarObrasPorEscopo(permissoes?.obras_criacao)
+        listarObrasPorEscopo(permissoes?.obras_criacao),
+        listarCriadoresFiltro(permissoes)
       ]);
 
       return res.json({
         modulo: 'provisionamento-financeiro',
         permissoes,
         status_disponiveis: STATUS_PROVISAO_FINANCEIRA,
+        prioridades_disponiveis: ['baixa', 'media', 'alta', 'critica'],
         obras_acesso: obrasAcesso,
-        obras_criacao: obrasCriacao
+        obras_criacao: obrasCriacao,
+        criadores_filtro: criadoresFiltro
       });
     } catch (error) {
       console.error(error);
@@ -289,60 +515,35 @@ module.exports = {
 
   async index(req, res) {
     try {
-      const permissoes = await obterPermissoes(req);
-      const where = {};
       const page = parsePagina(req.query?.page, 1);
       const limit = Math.min(parsePagina(req.query?.limit, 20), 100);
       const offset = (page - 1) * limit;
-      const obraId = parsePositiveInt(req.query?.obra_id);
-      const categoriaId = parsePositiveInt(req.query?.categoria_macro_id);
-      const status = serializarStatus(req.query?.status);
-      const busca = normalizarTexto(req.query?.busca);
-
-      if (!permissoes?.superadmin) {
-        if (Array.isArray(permissoes?.obras_acesso) && permissoes.obras_acesso.length === 0) {
-          return res.json({ items: [], meta: { page, limit, total: 0, pages: 0 } });
-        }
-
-        if (Array.isArray(permissoes?.obras_acesso)) {
-          where.obra_id = { [Op.in]: permissoes.obras_acesso };
-        }
+      const consulta = await construirConsultaListagem(req);
+      if (consulta?.erro) {
+        return res.status(consulta.erro.status).json(consulta.erro.body);
       }
 
-      if (obraId) {
-        const acessoObra = await validarAcessoNaObra(req, obraId, 'acessar');
-        if (!acessoObra.ok) {
-          return res.status(acessoObra.resposta.status).json(acessoObra.resposta.body);
-        }
-        where.obra_id = obraId;
-      }
-
-      if (categoriaId) {
-        where.categoria_macro_id = categoriaId;
-      }
-
-      if (status) {
-        if (!STATUS_PROVISAO_FINANCEIRA.includes(status)) {
-          return res.status(400).json({ error: 'Status invalido para o modulo.' });
-        }
-        where.status = status;
-      }
-
-      if (busca) {
-        where[Op.or] = [
-          { codigo: { [Op.like]: `%${busca}%` } },
-          { descricao: { [Op.like]: `%${busca}%` } },
-          { fornecedor_texto: { [Op.like]: `%${busca}%` } }
-        ];
+      if (consulta?.vazio) {
+        return res.json({
+          items: [],
+          meta: { page, limit, total: 0, pages: 0 },
+          resumo: {
+            total_registros_filtrados: 0,
+            valor_total_filtrado: 0
+          }
+        });
       }
 
       const { rows, count } = await ProvisaoFinanceira.findAndCountAll({
-        where,
+        where: consulta.where,
         include: obterIncludesLista(),
-        order: [['data_prevista_desembolso', 'ASC'], ['createdAt', 'DESC']],
+        order: consulta.order,
         limit,
         offset,
         distinct: true
+      });
+      const somaValores = await ProvisaoFinanceira.sum('valor_previsto', {
+        where: consulta.where
       });
 
       return res.json({
@@ -352,11 +553,78 @@ module.exports = {
           limit,
           total: count,
           pages: count > 0 ? Math.ceil(count / limit) : 0
+        },
+        resumo: {
+          total_registros_filtrados: count,
+          valor_total_filtrado: Number(somaValores || 0)
         }
       });
     } catch (error) {
       console.error(error);
       return res.status(500).json({ error: 'Erro ao listar provisoes financeiras' });
+    }
+  },
+
+  async exportarCsv(req, res) {
+    try {
+      const consulta = await construirConsultaListagem(req);
+      if (consulta?.erro) {
+        return res.status(consulta.erro.status).json(consulta.erro.body);
+      }
+
+      const itens = consulta?.vazio
+        ? []
+        : await ProvisaoFinanceira.findAll({
+            where: consulta.where,
+            include: obterIncludesLista(),
+            order: consulta.order
+          });
+
+      const cabecalho = [
+        'Codigo',
+        'Obra',
+        'Data prevista',
+        'Categoria macro',
+        'Descricao',
+        'Fornecedor',
+        'Valor previsto',
+        'Status',
+        'Prioridade',
+        'Criador',
+        'Data de criacao'
+      ];
+
+      const linhas = itens.map((item) => ([
+        item.codigo,
+        item.obra ? `${item.obra.codigo ? `${item.obra.codigo} - ` : ''}${item.obra.nome}` : '',
+        formatarDataCsv(item.data_prevista_desembolso),
+        item.categoriaMacro?.nome || '',
+        item.descricao || '',
+        item.fornecedor_texto || '',
+        Number(item.valor_previsto || 0).toFixed(2).replace('.', ','),
+        item.status || '',
+        item.prioridade || '',
+        item.usuarioCriacao?.nome || '',
+        formatarDataCsv(item.createdAt)
+      ]));
+
+      const csv = [
+        cabecalho,
+        ...linhas
+      ]
+        .map((colunas) => colunas.map(escaparValorCsv).join(';'))
+        .join('\n');
+
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="provisoes-financeiras-${new Date().toISOString().slice(0, 10)}.csv"`
+      );
+
+      return res.send(`\uFEFF${csv}`);
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao exportar provisoes financeiras' });
     }
   },
 

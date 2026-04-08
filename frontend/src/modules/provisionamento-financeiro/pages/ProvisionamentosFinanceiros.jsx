@@ -1,11 +1,27 @@
-﻿import { useContext, useEffect, useMemo, useState } from 'react';
+import { useContext, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../../../contexts/AuthContext';
 import {
+  exportarProvisoesFinanceirasCsv,
   getProvisionamentoFinanceiroContexto,
   listarCategoriasMacroProvisionamento,
   listarProvisoesFinanceiras
 } from '../../../services/provisoesFinanceiras';
+import { formatarMoedaBRL } from '../utils/moeda';
+
+const DEFAULT_FILTERS = {
+  obra_id: '',
+  categoria_macro_id: '',
+  status: '',
+  prioridade: '',
+  busca: '',
+  fornecedor: '',
+  data_inicial: '',
+  data_final: '',
+  valor_minimo: '',
+  valor_maximo: '',
+  usuario_criacao_id: ''
+};
 
 const STATUS_OPCOES = [
   { value: '', label: 'Todos' },
@@ -14,6 +30,23 @@ const STATUS_OPCOES = [
   { value: 'aprovado', label: 'Aprovado' },
   { value: 'cancelado', label: 'Cancelado' },
   { value: 'realizado', label: 'Realizado' }
+];
+
+const PRIORIDADE_OPCOES = [
+  { value: '', label: 'Todas' },
+  { value: 'baixa', label: 'Baixa' },
+  { value: 'media', label: 'Media' },
+  { value: 'alta', label: 'Alta' },
+  { value: 'critica', label: 'Critica' }
+];
+
+const ORDENACAO_OPCOES = [
+  { value: 'data_prevista_desembolso', label: 'Data prevista' },
+  { value: 'createdAt', label: 'Data de criacao' },
+  { value: 'valor_previsto', label: 'Valor previsto' },
+  { value: 'codigo', label: 'Codigo' },
+  { value: 'status', label: 'Status' },
+  { value: 'prioridade', label: 'Prioridade' }
 ];
 
 function formatarData(valor) {
@@ -27,18 +60,15 @@ function formatarData(valor) {
   return data.toLocaleDateString('pt-BR');
 }
 
-function formatarMoeda(valor) {
-  const numero = Number(valor || 0);
-  return numero.toLocaleString('pt-BR', {
-    style: 'currency',
-    currency: 'BRL'
-  });
-}
-
 function formatarStatus(valor) {
   return String(valor || '-')
     .replace(/_/g, ' ')
     .toUpperCase();
+}
+
+function formatarObra(obra) {
+  if (!obra) return '-';
+  return `${obra.codigo ? `${obra.codigo} - ` : ''}${obra.nome}`;
 }
 
 export default function ProvisionamentosFinanceiros() {
@@ -48,18 +78,64 @@ export default function ProvisionamentosFinanceiros() {
   const [categorias, setCategorias] = useState([]);
   const [lista, setLista] = useState([]);
   const [meta, setMeta] = useState({ page: 1, pages: 0, total: 0, limit: 20 });
-  const [loading, setLoading] = useState(true);
-  const [filtros, setFiltros] = useState({
-    obra_id: '',
-    categoria_macro_id: '',
-    status: '',
-    busca: ''
+  const [resumo, setResumo] = useState({
+    total_registros_filtrados: 0,
+    valor_total_filtrado: 0
   });
+  const [loadingBase, setLoadingBase] = useState(true);
+  const [loadingLista, setLoadingLista] = useState(false);
+  const [exportando, setExportando] = useState(false);
+  const [filtrosStoragePronto, setFiltrosStoragePronto] = useState(false);
+  const [filtros, setFiltros] = useState(DEFAULT_FILTERS);
+  const [ordenacao, setOrdenacao] = useState({
+    sort_by: 'data_prevista_desembolso',
+    sort_dir: 'ASC'
+  });
+
+  const storageKey = useMemo(() => {
+    const identificador = user?.id || user?.email || user?.nome || user?.perfil || 'anon';
+    return `provisionamento-financeiro:filtros:${identificador}`;
+  }, [user?.id, user?.email, user?.nome, user?.perfil]);
+
+  useEffect(() => {
+    try {
+      const salvo = window.localStorage.getItem(storageKey);
+      if (salvo) {
+        const parsed = JSON.parse(salvo);
+        if (parsed?.filtros && typeof parsed.filtros === 'object') {
+          setFiltros((atual) => ({ ...atual, ...parsed.filtros }));
+        }
+        if (parsed?.ordenacao && typeof parsed.ordenacao === 'object') {
+          setOrdenacao((atual) => ({ ...atual, ...parsed.ordenacao }));
+        }
+        if (parsed?.limit) {
+          setMeta((atual) => ({ ...atual, limit: Number(parsed.limit) || atual.limit }));
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao carregar filtros do provisionamento financeiro', error);
+    } finally {
+      setFiltrosStoragePronto(true);
+    }
+  }, [storageKey]);
+
+  useEffect(() => {
+    if (!filtrosStoragePronto) return;
+    try {
+      window.localStorage.setItem(storageKey, JSON.stringify({
+        filtros,
+        ordenacao,
+        limit: meta.limit
+      }));
+    } catch (error) {
+      console.error('Erro ao salvar filtros do provisionamento financeiro', error);
+    }
+  }, [filtros, ordenacao, meta.limit, storageKey, filtrosStoragePronto]);
 
   useEffect(() => {
     async function carregarBase() {
       try {
-        setLoading(true);
+        setLoadingBase(true);
         const [contextoData, categoriasData] = await Promise.all([
           getProvisionamentoFinanceiroContexto(),
           listarCategoriasMacroProvisionamento()
@@ -70,7 +146,7 @@ export default function ProvisionamentosFinanceiros() {
         console.error(error);
         alert(error?.message || 'Erro ao carregar o modulo de provisionamento financeiro.');
       } finally {
-        setLoading(false);
+        setLoadingBase(false);
       }
     }
 
@@ -78,14 +154,18 @@ export default function ProvisionamentosFinanceiros() {
   }, []);
 
   useEffect(() => {
+    if (!contexto || !filtrosStoragePronto) return;
+
     async function carregarLista() {
       try {
-        setLoading(true);
+        setLoadingLista(true);
         const data = await listarProvisoesFinanceiras({
           page: meta.page,
           limit: meta.limit,
+          ...ordenacao,
           ...filtros
         });
+
         setLista(Array.isArray(data?.items) ? data.items : []);
         setMeta((atual) => ({
           ...atual,
@@ -94,26 +174,70 @@ export default function ProvisionamentosFinanceiros() {
           pages: Number(data?.meta?.pages || 0),
           total: Number(data?.meta?.total || 0)
         }));
+        setResumo({
+          total_registros_filtrados: Number(data?.resumo?.total_registros_filtrados || data?.meta?.total || 0),
+          valor_total_filtrado: Number(data?.resumo?.valor_total_filtrado || 0)
+        });
       } catch (error) {
         console.error(error);
         alert(error?.message || 'Erro ao listar provisoes financeiras.');
       } finally {
-        setLoading(false);
+        setLoadingLista(false);
       }
     }
 
-    if (contexto) {
-      carregarLista();
-    }
-  }, [contexto, filtros, meta.page, meta.limit]);
+    carregarLista();
+  }, [contexto, filtrosStoragePronto, filtros, ordenacao, meta.page, meta.limit]);
 
   const obrasAcesso = useMemo(() => (
     Array.isArray(contexto?.obras_acesso) ? contexto.obras_acesso : []
   ), [contexto]);
 
+  const criadoresFiltro = useMemo(() => (
+    Array.isArray(contexto?.criadores_filtro) ? contexto.criadores_filtro : []
+  ), [contexto]);
+
   function atualizarFiltro(campo, valor) {
     setMeta((atual) => ({ ...atual, page: 1 }));
-    setFiltros((atual) => ({ ...atual, [campo]: valor }));
+    setFiltros((atual) => ({ ...atual, [campo]: valueOrEmpty(valor) }));
+  }
+
+  function atualizarOrdenacao(campo, valor) {
+    setMeta((atual) => ({ ...atual, page: 1 }));
+    setOrdenacao((atual) => ({ ...atual, [campo]: valor }));
+  }
+
+  function limparFiltros() {
+    setMeta((atual) => ({ ...atual, page: 1 }));
+    setFiltros(DEFAULT_FILTERS);
+  }
+
+  async function exportarCsv() {
+    try {
+      setExportando(true);
+      const blob = await exportarProvisoesFinanceirasCsv({
+        ...ordenacao,
+        ...filtros
+      });
+
+      const url = window.URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `provisoes-financeiras-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error(error);
+      alert(error?.message || 'Erro ao exportar provisoes financeiras.');
+    } finally {
+      setExportando(false);
+    }
+  }
+
+  if (loadingBase) {
+    return <div className="page"><p>Carregando modulo...</p></div>;
   }
 
   return (
@@ -131,6 +255,9 @@ export default function ProvisionamentosFinanceiros() {
               Categorias macro
             </button>
           )}
+          <button type="button" className="btn btn-outline" onClick={exportarCsv} disabled={exportando}>
+            {exportando ? 'Exportando...' : 'Exportar CSV'}
+          </button>
           {Boolean(contexto?.permissoes?.pode_criar) && (
             <button type="button" className="btn btn-primary" onClick={() => navigate('/provisoes-financeiras/nova')}>
               Nova provisao
@@ -139,7 +266,33 @@ export default function ProvisionamentosFinanceiros() {
         </div>
       </div>
 
-      <div className="card">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <ResumoCard
+          titulo="Total filtrado"
+          valor={formatarMoedaBRL(resumo.valor_total_filtrado)}
+        />
+        <ResumoCard
+          titulo="Registros filtrados"
+          valor={String(resumo.total_registros_filtrados || 0)}
+        />
+        <ResumoCard
+          titulo="Pagina atual"
+          valor={`${meta.page || 1} / ${meta.pages || 1}`}
+        />
+        <ResumoCard
+          titulo="Itens por pagina"
+          valor={String(meta.limit || 20)}
+        />
+      </div>
+
+      <div className="card space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="font-semibold">Filtros</h2>
+          <button type="button" className="btn btn-outline" onClick={limparFiltros}>
+            Limpar filtros
+          </button>
+        </div>
+
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <label className="grid gap-1 text-sm">
             Obra
@@ -147,8 +300,7 @@ export default function ProvisionamentosFinanceiros() {
               <option value="">Todas</option>
               {obrasAcesso.map((obra) => (
                 <option key={obra.id} value={obra.id}>
-                  {obra.codigo ? `${obra.codigo} - ` : ''}
-                  {obra.nome}
+                  {formatarObra(obra)}
                 </option>
               ))}
             </select>
@@ -174,6 +326,15 @@ export default function ProvisionamentosFinanceiros() {
           </label>
 
           <label className="grid gap-1 text-sm">
+            Prioridade
+            <select className="input" value={filtros.prioridade} onChange={(event) => atualizarFiltro('prioridade', event.target.value)}>
+              {PRIORIDADE_OPCOES.map((prioridade) => (
+                <option key={prioridade.value || 'todas'} value={prioridade.value}>{prioridade.label}</option>
+              ))}
+            </select>
+          </label>
+
+          <label className="grid gap-1 text-sm">
             Busca
             <input
               className="input"
@@ -181,6 +342,105 @@ export default function ProvisionamentosFinanceiros() {
               value={filtros.busca}
               onChange={(event) => atualizarFiltro('busca', event.target.value)}
             />
+          </label>
+
+          <label className="grid gap-1 text-sm">
+            Fornecedor
+            <input
+              className="input"
+              placeholder="Nome do fornecedor"
+              value={filtros.fornecedor}
+              onChange={(event) => atualizarFiltro('fornecedor', event.target.value)}
+            />
+          </label>
+
+          <label className="grid gap-1 text-sm">
+            Criador
+            <select className="input" value={filtros.usuario_criacao_id} onChange={(event) => atualizarFiltro('usuario_criacao_id', event.target.value)}>
+              <option value="">Todos</option>
+              {criadoresFiltro.map((criador) => (
+                <option key={criador.id} value={criador.id}>
+                  {criador.nome || criador.email || `Usuario ${criador.id}`}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="grid gap-1 text-sm">
+            Itens por pagina
+            <select
+              className="input"
+              value={meta.limit}
+              onChange={(event) => {
+                const limit = Number(event.target.value) || 20;
+                setMeta((atual) => ({ ...atual, limit, page: 1 }));
+              }}
+            >
+              {[10, 20, 50, 100].map((opcao) => (
+                <option key={opcao} value={opcao}>{opcao}</option>
+              ))}
+            </select>
+          </label>
+
+          <label className="grid gap-1 text-sm">
+            Data prevista inicial
+            <input
+              type="date"
+              className="input"
+              value={filtros.data_inicial}
+              onChange={(event) => atualizarFiltro('data_inicial', event.target.value)}
+            />
+          </label>
+
+          <label className="grid gap-1 text-sm">
+            Data prevista final
+            <input
+              type="date"
+              className="input"
+              value={filtros.data_final}
+              onChange={(event) => atualizarFiltro('data_final', event.target.value)}
+            />
+          </label>
+
+          <label className="grid gap-1 text-sm">
+            Valor minimo
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              className="input"
+              value={filtros.valor_minimo}
+              onChange={(event) => atualizarFiltro('valor_minimo', event.target.value)}
+            />
+          </label>
+
+          <label className="grid gap-1 text-sm">
+            Valor maximo
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              className="input"
+              value={filtros.valor_maximo}
+              onChange={(event) => atualizarFiltro('valor_maximo', event.target.value)}
+            />
+          </label>
+
+          <label className="grid gap-1 text-sm">
+            Ordenar por
+            <select className="input" value={ordenacao.sort_by} onChange={(event) => atualizarOrdenacao('sort_by', event.target.value)}>
+              {ORDENACAO_OPCOES.map((opcao) => (
+                <option key={opcao.value} value={opcao.value}>{opcao.label}</option>
+              ))}
+            </select>
+          </label>
+
+          <label className="grid gap-1 text-sm">
+            Direcao
+            <select className="input" value={ordenacao.sort_dir} onChange={(event) => atualizarOrdenacao('sort_dir', event.target.value)}>
+              <option value="ASC">Crescente</option>
+              <option value="DESC">Decrescente</option>
+            </select>
           </label>
         </div>
       </div>
@@ -191,7 +451,7 @@ export default function ProvisionamentosFinanceiros() {
           <span className="text-sm text-[var(--c-muted)]">{meta.total || 0} registro(s)</span>
         </div>
 
-        {loading ? (
+        {loadingLista ? (
           <div className="py-8 text-center text-sm text-[var(--c-muted)]">Carregando...</div>
         ) : lista.length === 0 ? (
           <div className="py-8 text-center text-sm text-[var(--c-muted)]">Nenhuma provisao financeira encontrada.</div>
@@ -208,6 +468,7 @@ export default function ProvisionamentosFinanceiros() {
                   <th>Fornecedor</th>
                   <th>Valor previsto</th>
                   <th>Status</th>
+                  <th>Prioridade</th>
                   <th>Criador</th>
                   <th>Criado em</th>
                   <th>Acoes</th>
@@ -217,13 +478,14 @@ export default function ProvisionamentosFinanceiros() {
                 {lista.map((item) => (
                   <tr key={item.id}>
                     <td className="font-mono text-xs font-semibold">{item.codigo}</td>
-                    <td>{item.obra ? `${item.obra.codigo ? `${item.obra.codigo} - ` : ''}${item.obra.nome}` : '-'}</td>
+                    <td>{formatarObra(item.obra)}</td>
                     <td>{formatarData(item.data_prevista_desembolso)}</td>
                     <td>{item.categoriaMacro?.nome || '-'}</td>
                     <td>{item.descricao || '-'}</td>
                     <td>{item.fornecedor_texto || '-'}</td>
-                    <td>{formatarMoeda(item.valor_previsto)}</td>
+                    <td>{formatarMoedaBRL(item.valor_previsto)}</td>
                     <td>{formatarStatus(item.status)}</td>
+                    <td>{item.prioridade || '-'}</td>
                     <td>{item.usuarioCriacao?.nome || '-'}</td>
                     <td>{formatarData(item.createdAt)}</td>
                     <td>
@@ -262,6 +524,19 @@ export default function ProvisionamentosFinanceiros() {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function valueOrEmpty(valor) {
+  return valor ?? '';
+}
+
+function ResumoCard({ titulo, valor }) {
+  return (
+    <div className="rounded-xl border border-[var(--c-border)] bg-white px-4 py-4 shadow-sm">
+      <div className="text-xs uppercase tracking-wide text-[var(--c-muted)]">{titulo}</div>
+      <div className="mt-2 text-xl font-semibold">{valor}</div>
     </div>
   );
 }
