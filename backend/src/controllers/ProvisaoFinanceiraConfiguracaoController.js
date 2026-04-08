@@ -23,6 +23,81 @@ function normalizarListaIds(lista) {
   )];
 }
 
+function consolidarRegrasPorEscopo(regras) {
+  const mapa = new Map();
+
+  (Array.isArray(regras) ? regras : []).forEach((regra) => {
+    const escopoTipo = normalizarEscopoTipo(regra?.escopo_tipo);
+    const escopoValor = String(regra?.escopo_valor || '').trim();
+    if (!escopoTipo || !escopoValor) {
+      return;
+    }
+
+    const chave = `${escopoTipo}::${escopoValor}`;
+    const obras = Array.isArray(regra?.obras)
+      ? regra.obras.map((item) => ({
+          id: item?.id,
+          obra_id: Number(item?.obra_id || item?.obra?.id),
+          obra: item?.obra
+            ? {
+                id: item.obra.id,
+                codigo: item.obra.codigo,
+                nome: item.obra.nome,
+                ativo: item.obra.ativo !== false
+              }
+            : undefined
+        }))
+      : [];
+    const obraIds = Array.isArray(regra?.obra_ids)
+      ? normalizarListaIds(regra.obra_ids)
+      : normalizarListaIds(obras.map((item) => item?.obra_id));
+
+    if (!mapa.has(chave)) {
+      mapa.set(chave, {
+        id: regra?.id,
+        escopo_tipo: escopoTipo,
+        escopo_valor: escopoValor,
+        pode_acessar: normalizarBoolean(regra?.pode_acessar),
+        pode_criar: normalizarBoolean(regra?.pode_criar),
+        pode_aprovar: normalizarBoolean(regra?.pode_aprovar),
+        pode_dashboard_global: normalizarBoolean(regra?.pode_dashboard_global),
+        ativo: regra?.ativo !== false,
+        obra_ids: [...obraIds],
+        obras
+      });
+      return;
+    }
+
+    const atual = mapa.get(chave);
+    const mapaObras = new Map(
+      (Array.isArray(atual.obras) ? atual.obras : [])
+        .filter((item) => Number.isInteger(Number(item?.obra_id)))
+        .map((item) => [Number(item.obra_id), item])
+    );
+
+    obras.forEach((item) => {
+      const obraId = Number(item?.obra_id);
+      if (Number.isInteger(obraId) && obraId > 0 && !mapaObras.has(obraId)) {
+        mapaObras.set(obraId, item);
+      }
+    });
+
+    mapa.set(chave, {
+      ...atual,
+      pode_acessar: Boolean(atual.pode_acessar) || normalizarBoolean(regra?.pode_acessar),
+      pode_criar: Boolean(atual.pode_criar) || normalizarBoolean(regra?.pode_criar),
+      pode_aprovar: Boolean(atual.pode_aprovar) || normalizarBoolean(regra?.pode_aprovar),
+      pode_dashboard_global:
+        Boolean(atual.pode_dashboard_global) || normalizarBoolean(regra?.pode_dashboard_global),
+      ativo: atual.ativo !== false || regra?.ativo !== false,
+      obra_ids: normalizarListaIds([...(atual.obra_ids || []), ...obraIds]),
+      obras: Array.from(mapaObras.values())
+    });
+  });
+
+  return Array.from(mapa.values());
+}
+
 function serializarRegra(regra) {
   return {
     id: regra.id,
@@ -125,8 +200,10 @@ module.exports = {
         ]
       });
 
+      const regrasConsolidadas = consolidarRegrasPorEscopo(regras);
+
       return res.json({
-        regras: regras.map(serializarRegra),
+        regras: regrasConsolidadas.map(serializarRegra),
         escopos_validos: Array.from(ESCOPOS_VALIDOS),
         perfis_validos: Array.from(PERFIS_VALIDOS)
       });
@@ -146,9 +223,10 @@ module.exports = {
       const regrasNormalizadas = regrasEntrada.map((regra, indice) =>
         normalizarRegraEntrada(regra, indice + 1)
       );
+      const regrasConsolidadas = consolidarRegrasPorEscopo(regrasNormalizadas);
 
       const obraIds = [...new Set(
-        regrasNormalizadas.flatMap((regra) => regra.obra_ids)
+        regrasConsolidadas.flatMap((regra) => regra.obra_ids)
       )];
 
       if (obraIds.length > 0) {
@@ -176,7 +254,7 @@ module.exports = {
         transaction
       });
 
-      for (const regra of regrasNormalizadas) {
+      for (const regra of regrasConsolidadas) {
         const permissao = await ProvisaoFinanceiraPermissao.create({
           escopo_tipo: regra.escopo_tipo,
           escopo_valor: regra.escopo_valor,
