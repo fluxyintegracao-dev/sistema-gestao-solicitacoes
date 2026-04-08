@@ -26,6 +26,9 @@ const AnexoController = require('./controllers/AnexoController');
 const NotificacaoController = require('./controllers/NotificacaoController');
 const SetorPermissaoController = require('./controllers/SetorPermissaoController');
 const ConfiguracaoSistemaController = require('./controllers/ConfiguracaoSistemaController');
+const ProvisaoCategoriaMacroController = require('./controllers/ProvisaoCategoriaMacroController');
+const ProvisaoFinanceiraController = require('./controllers/ProvisaoFinanceiraController');
+const ProvisaoFinanceiraConfiguracaoController = require('./controllers/ProvisaoFinanceiraConfiguracaoController');
 const ConversaInternaController = require('./controllers/ConversaInternaController');
 const ArquivoModeloController = require('./controllers/ArquivoModeloController');
 const UnidadeController = require('./controllers/UnidadeController');
@@ -35,6 +38,7 @@ const ApropriacaoController = require('./controllers/ApropriacaoController');
 const SolicitacaoCompraController = require('./controllers/SolicitacaoCompraController');
 const FornecedorCompraController = require('./controllers/FornecedorCompraController');
 const CotacaoFornecedorController = require('./controllers/CotacaoFornecedorController');
+const criarMiddlewareProvisionamentoFinanceiro = require('./middlewares/provisaoFinanceira');
 const { Setor } = require('./models');
 //console.log('AnexoController =>', AnexoController);
 
@@ -368,6 +372,89 @@ router.get('/configuracoes/setores-criacao-todas-obras', ConfiguracaoSistemaCont
 router.patch('/configuracoes/setores-criacao-todas-obras', permit(['SUPERADMIN']), ConfiguracaoSistemaController.updateSetoresCriacaoTodasObras);
 router.get('/configuracoes/usuarios-envio-qualquer-setor', permit(['SUPERADMIN']), ConfiguracaoSistemaController.getUsuariosEnvioQualquerSetor);
 router.patch('/configuracoes/usuarios-envio-qualquer-setor', permit(['SUPERADMIN']), ConfiguracaoSistemaController.updateUsuariosEnvioQualquerSetor);
+router.get('/configuracoes/provisoes-financeiras/permissoes', permit(['SUPERADMIN']), ProvisaoFinanceiraConfiguracaoController.getPermissoes);
+router.patch('/configuracoes/provisoes-financeiras/permissoes', permit(['SUPERADMIN']), ProvisaoFinanceiraConfiguracaoController.updatePermissoes);
+
+// -------------------------------------------------------------------
+// PROVISIONAMENTO FINANCEIRO
+// -------------------------------------------------------------------
+
+router.get(
+  '/provisoes-financeiras/contexto',
+  criarMiddlewareProvisionamentoFinanceiro('acessar'),
+  ProvisaoFinanceiraController.contexto
+);
+router.get(
+  '/provisoes-financeiras/categorias',
+  criarMiddlewareProvisionamentoFinanceiro('acessar'),
+  ProvisaoCategoriaMacroController.index
+);
+router.post(
+  '/provisoes-financeiras/categorias',
+  permit(['SUPERADMIN']),
+  ProvisaoCategoriaMacroController.create
+);
+router.put(
+  '/provisoes-financeiras/categorias/:id',
+  permit(['SUPERADMIN']),
+  ProvisaoCategoriaMacroController.update
+);
+router.patch(
+  '/provisoes-financeiras/categorias/:id/ativar',
+  permit(['SUPERADMIN']),
+  ProvisaoCategoriaMacroController.ativar
+);
+router.patch(
+  '/provisoes-financeiras/categorias/:id/desativar',
+  permit(['SUPERADMIN']),
+  ProvisaoCategoriaMacroController.desativar
+);
+router.get(
+  '/provisoes-financeiras/anexos/presign',
+  criarMiddlewareProvisionamentoFinanceiro('acessar'),
+  ProvisaoFinanceiraController.presignAnexo
+);
+router.get(
+  '/provisoes-financeiras',
+  criarMiddlewareProvisionamentoFinanceiro('acessar'),
+  ProvisaoFinanceiraController.index
+);
+router.get(
+  '/provisoes-financeiras/:id',
+  criarMiddlewareProvisionamentoFinanceiro('acessar'),
+  ProvisaoFinanceiraController.show
+);
+router.post(
+  '/provisoes-financeiras',
+  criarMiddlewareProvisionamentoFinanceiro('criar'),
+  ProvisaoFinanceiraController.create
+);
+router.put(
+  '/provisoes-financeiras/:id',
+  criarMiddlewareProvisionamentoFinanceiro('criar'),
+  ProvisaoFinanceiraController.update
+);
+router.get(
+  '/provisoes-financeiras/:id/historico',
+  criarMiddlewareProvisionamentoFinanceiro('acessar'),
+  ProvisaoFinanceiraController.historico
+);
+router.post(
+  '/provisoes-financeiras/:id/comentarios',
+  criarMiddlewareProvisionamentoFinanceiro('acessar'),
+  ProvisaoFinanceiraController.adicionarComentario
+);
+router.post(
+  '/provisoes-financeiras/:id/anexos',
+  criarMiddlewareProvisionamentoFinanceiro('criar'),
+  uploadComprovantes.array('files'),
+  ProvisaoFinanceiraController.uploadAnexos
+);
+router.get(
+  '/provisoes-financeiras/:id/anexos',
+  criarMiddlewareProvisionamentoFinanceiro('acessar'),
+  ProvisaoFinanceiraController.listarAnexos
+);
 
 // -------------------------------------------------------------------
 // CONTRATOS

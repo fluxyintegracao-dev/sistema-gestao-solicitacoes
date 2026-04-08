@@ -42,6 +42,11 @@ import ConversasSaida from './pages/ConversasSaida';
 import ConversaDetalhe from './pages/ConversaDetalhe';
 import ArquivosModelos from './pages/ArquivosModelos';
 import ArquivosModelosConfig from './pages/ArquivosModelosConfig';
+import ConfiguracaoProvisionamentoFinanceiro from './modules/provisionamento-financeiro/pages/ConfiguracaoProvisionamentoFinanceiro';
+import GestaoCategoriasMacro from './modules/provisionamento-financeiro/pages/GestaoCategoriasMacro';
+import NovaProvisaoFinanceira from './modules/provisionamento-financeiro/pages/NovaProvisaoFinanceira';
+import ProvisionamentoFinanceiroDetalhe from './modules/provisionamento-financeiro/pages/ProvisionamentoFinanceiroDetalhe';
+import ProvisionamentosFinanceiros from './modules/provisionamento-financeiro/pages/ProvisionamentosFinanceiros';
 import {
   CotacaoFornecedorPublica,
   GestaoApropriacoes,
@@ -157,6 +162,11 @@ export default function App() {
         <Route path="tipos-solicitacao-por-setor" element={<TiposSolicitacaoPorSetor />} />
         <Route path="setores-criacao-todas-obras" element={<SetoresCriacaoTodasObras />} />
         <Route path="arquivos-modelos-config" element={<SuperadminRoute><ArquivosModelosConfig /></SuperadminRoute>} />
+        <Route path="provisionamento-financeiro-config" element={<SuperadminRoute><ConfiguracaoProvisionamentoFinanceiro /></SuperadminRoute>} />
+        <Route path="provisoes-financeiras" element={<ProvisionamentosFinanceiros />} />
+        <Route path="provisoes-financeiras/nova" element={<NovaProvisaoFinanceira />} />
+        <Route path="provisoes-financeiras/categorias" element={<SuperadminRoute><GestaoCategoriasMacro /></SuperadminRoute>} />
+        <Route path="provisoes-financeiras/:id" element={<ProvisionamentoFinanceiroDetalhe />} />
 
         <Route path="comprovantes/upload" element={<UploadComprovantes />} />
         <Route path="comprovantes/pendentes" element={<ComprovantesPendentes />} />

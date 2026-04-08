@@ -50,6 +50,13 @@ db.FornecedorCompra = require('./FornecedorCompra')(sequelize, Sequelize);
 db.SolicitacaoCompraFornecedor = require('./SolicitacaoCompraFornecedor')(sequelize, Sequelize);
 db.SolicitacaoCompraRespostaItem = require('./SolicitacaoCompraRespostaItem')(sequelize, Sequelize);
 db.SolicitacaoCompraLog = require('./SolicitacaoCompraLog')(sequelize, Sequelize);
+db.ProvisaoFinanceira = require('./ProvisaoFinanceira')(sequelize, Sequelize);
+db.ProvisaoCategoriaMacro = require('./ProvisaoCategoriaMacro')(sequelize, Sequelize);
+db.ProvisaoFinanceiraHistorico = require('./ProvisaoFinanceiraHistorico')(sequelize, Sequelize);
+db.ProvisaoFinanceiraAnexo = require('./ProvisaoFinanceiraAnexo')(sequelize, Sequelize);
+db.ProvisaoFinanceiraPermissao = require('./ProvisaoFinanceiraPermissao')(sequelize, Sequelize);
+db.ProvisaoFinanceiraPermissaoObra = require('./ProvisaoFinanceiraPermissaoObra')(sequelize, Sequelize);
+db.ProvisaoFinanceiraSequencia = require('./ProvisaoFinanceiraSequencia')(sequelize, Sequelize);
 
   
 
@@ -635,6 +642,139 @@ db.SolicitacaoCompraLog.belongsTo(db.User, {
 db.SolicitacaoCompraLog.belongsTo(db.FornecedorCompra, {
   foreignKey: 'fornecedor_compra_id',
   as: 'fornecedor'
+});
+
+// =====================
+// MODULO DE PROVISIONAMENTO FINANCEIRO
+// =====================
+db.Obra.hasMany(db.ProvisaoFinanceira, {
+  foreignKey: 'obra_id',
+  as: 'provisoesFinanceiras'
+});
+
+db.ProvisaoFinanceira.belongsTo(db.Obra, {
+  foreignKey: 'obra_id',
+  as: 'obra'
+});
+
+db.ProvisaoCategoriaMacro.hasMany(db.ProvisaoFinanceira, {
+  foreignKey: 'categoria_macro_id',
+  as: 'provisoes'
+});
+
+db.ProvisaoFinanceira.belongsTo(db.ProvisaoCategoriaMacro, {
+  foreignKey: 'categoria_macro_id',
+  as: 'categoriaMacro'
+});
+
+db.User.hasMany(db.ProvisaoFinanceira, {
+  foreignKey: 'usuario_criacao_id',
+  as: 'provisoesCriadas'
+});
+
+db.ProvisaoFinanceira.belongsTo(db.User, {
+  foreignKey: 'usuario_criacao_id',
+  as: 'usuarioCriacao'
+});
+
+db.User.hasMany(db.ProvisaoFinanceira, {
+  foreignKey: 'usuario_atualizacao_id',
+  as: 'provisoesAtualizadas'
+});
+
+db.ProvisaoFinanceira.belongsTo(db.User, {
+  foreignKey: 'usuario_atualizacao_id',
+  as: 'usuarioAtualizacao'
+});
+
+db.User.hasMany(db.ProvisaoFinanceira, {
+  foreignKey: 'aprovado_por_id',
+  as: 'provisoesAprovadas'
+});
+
+db.ProvisaoFinanceira.belongsTo(db.User, {
+  foreignKey: 'aprovado_por_id',
+  as: 'aprovadoPor'
+});
+
+db.User.hasMany(db.ProvisaoFinanceira, {
+  foreignKey: 'cancelado_por_id',
+  as: 'provisoesCanceladas'
+});
+
+db.ProvisaoFinanceira.belongsTo(db.User, {
+  foreignKey: 'cancelado_por_id',
+  as: 'canceladoPor'
+});
+
+db.ProvisaoFinanceira.hasMany(db.ProvisaoFinanceiraHistorico, {
+  foreignKey: 'provisao_financeira_id',
+  as: 'historicos'
+});
+
+db.ProvisaoFinanceiraHistorico.belongsTo(db.ProvisaoFinanceira, {
+  foreignKey: 'provisao_financeira_id',
+  as: 'provisao'
+});
+
+db.User.hasMany(db.ProvisaoFinanceiraHistorico, {
+  foreignKey: 'usuario_id',
+  as: 'historicosProvisionamentoFinanceiro'
+});
+
+db.ProvisaoFinanceiraHistorico.belongsTo(db.User, {
+  foreignKey: 'usuario_id',
+  as: 'usuario'
+});
+
+db.ProvisaoFinanceira.hasMany(db.ProvisaoFinanceiraAnexo, {
+  foreignKey: 'provisao_financeira_id',
+  as: 'anexos'
+});
+
+db.ProvisaoFinanceiraAnexo.belongsTo(db.ProvisaoFinanceira, {
+  foreignKey: 'provisao_financeira_id',
+  as: 'provisao'
+});
+
+db.User.hasMany(db.ProvisaoFinanceiraAnexo, {
+  foreignKey: 'uploaded_by',
+  as: 'anexosProvisionamentoFinanceiro'
+});
+
+db.ProvisaoFinanceiraAnexo.belongsTo(db.User, {
+  foreignKey: 'uploaded_by',
+  as: 'uploadUser'
+});
+
+db.ProvisaoFinanceiraPermissao.hasMany(db.ProvisaoFinanceiraPermissaoObra, {
+  foreignKey: 'permissao_id',
+  as: 'obras'
+});
+
+db.ProvisaoFinanceiraPermissaoObra.belongsTo(db.ProvisaoFinanceiraPermissao, {
+  foreignKey: 'permissao_id',
+  as: 'permissao'
+});
+
+db.Obra.hasMany(db.ProvisaoFinanceiraPermissaoObra, {
+  foreignKey: 'obra_id',
+  as: 'permissoesProvisionamentoFinanceiro'
+});
+
+db.ProvisaoFinanceiraPermissaoObra.belongsTo(db.Obra, {
+  foreignKey: 'obra_id',
+  as: 'obra'
+});
+
+db.Obra.hasMany(db.ProvisaoFinanceiraSequencia, {
+  foreignKey: 'obra_id',
+  as: 'sequenciasProvisionamentoFinanceiro'
+});
+
+db.ProvisaoFinanceiraSequencia.belongsTo(db.Obra, {
+  foreignKey: 'obra_id',
+  as: 'obra'
 });
 
 

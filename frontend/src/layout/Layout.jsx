@@ -3,6 +3,7 @@ import { useContext, useEffect, useMemo, useState } from 'react';
 import { AuthContext } from '../contexts/AuthContext';
 import NotificacoesBell from '../components/NotificacoesBell';
 import { getResumoConversas } from '../services/conversasInternas';
+import { getProvisionamentoFinanceiroContexto } from '../services/provisoesFinanceiras';
 import {
   HiOutlineSquares2X2,
   HiOutlinePlusCircle,
@@ -47,6 +48,7 @@ export default function Layout() {
   );
   const [inboxNovasCount, setInboxNovasCount] = useState(0);
   const [saidaNovasCount, setSaidaNovasCount] = useState(0);
+  const [provisionamentoContexto, setProvisionamentoContexto] = useState(null);
 
   const sidebarWidth = isMobileViewport ? 292 : (collapsed ? 76 : 236);
 
@@ -134,6 +136,33 @@ export default function Layout() {
     };
   }, [user?.id]);
 
+  useEffect(() => {
+    let ativo = true;
+
+    async function carregarProvisionamento() {
+      try {
+        const data = await getProvisionamentoFinanceiroContexto();
+        if (ativo) {
+          setProvisionamentoContexto(data);
+        }
+      } catch {
+        if (ativo) {
+          setProvisionamentoContexto(null);
+        }
+      }
+    }
+
+    if (user?.id) {
+      carregarProvisionamento();
+    } else {
+      setProvisionamentoContexto(null);
+    }
+
+    return () => {
+      ativo = false;
+    };
+  }, [user?.id]);
+
   const perfilUpper = String(user?.perfil || '').toUpperCase();
   const areaUpper = String(user?.area || '').toUpperCase();
   const setorCodigoUpper = String(user?.setor?.codigo || '').toUpperCase();
@@ -152,6 +181,12 @@ export default function Layout() {
   const isAdminGEO =
     user?.perfil === 'ADMIN' && setorTokens.some(isGeoSetor);
   const isSetorObra = setorTokens.includes('OBRA');
+  const hasProvisionamentoAccess =
+    perfilUpper === 'SUPERADMIN' ||
+    Boolean(provisionamentoContexto?.permissoes?.pode_acessar);
+  const canCreateProvisionamento =
+    perfilUpper === 'SUPERADMIN' ||
+    Boolean(provisionamentoContexto?.permissoes?.pode_criar);
 
   const menuGroups = useMemo(() => {
     const groups = [];
@@ -168,6 +203,7 @@ export default function Layout() {
       Comunicação: HiOutlineChatBubbleLeftRight,
       Compras: HiOutlineWallet,
       Financeiro: HiOutlineWallet,
+      Provisionamento: HiOutlineBanknotes,
       Cadastros: HiOutlineRectangleGroup,
       Contratos: HiOutlineBanknotes,
       Configurações: HiOutlineCog6Tooth,
@@ -435,8 +471,29 @@ export default function Layout() {
       }
     }
 
+    if (hasProvisionamentoAccess) {
+      addGroup('Provisionamento', [
+        item('/provisoes-financeiras', 'Provisionamentos', HiOutlineBanknotes),
+        canCreateProvisionamento
+          ? item('/provisoes-financeiras/nova', 'Nova Provisao', HiOutlinePlusCircle)
+          : null,
+        perfilUpper === 'SUPERADMIN'
+          ? item('/provisoes-financeiras/categorias', 'Categorias Macro', HiOutlineFolderOpen)
+          : null
+      ]);
+    }
+
     return groups;
-  }, [user?.perfil, user?.pode_criar_solicitacao_compra, isFinanceiro, isAdminGEO, isSetorObra]);
+  }, [
+    user?.perfil,
+    user?.pode_criar_solicitacao_compra,
+    isFinanceiro,
+    isAdminGEO,
+    isSetorObra,
+    hasProvisionamentoAccess,
+    canCreateProvisionamento,
+    perfilUpper
+  ]);
 
   const flatMenuItems = useMemo(
     () => menuGroups.flatMap(group => group.items),

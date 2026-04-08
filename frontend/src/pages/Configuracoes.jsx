@@ -110,6 +110,16 @@ const SECOES_CONFIG = [
         to: '/arquivos-modelos-config'
       }
     ]
+  },
+  {
+    title: 'Modulos',
+    itens: [
+      {
+        title: 'Provisionamento Financeiro',
+        description: 'Configura o gate inicial de acesso ao novo modulo de previsao financeira.',
+        to: '/provisionamento-financeiro-config'
+      }
+    ]
   }
 ];
 
