@@ -9,6 +9,8 @@
 - exportacao CSV da listagem filtrada
 - mascara monetaria para `valor_previsto` no cadastro e na edicao
 - checklist de obras permitidas na configuracao do modulo
+- selecao de previsoes na tabela e exportacao CSV das selecionadas
+- seletor de pagina no rodape com opcoes `25`, `50`, `100` e `200`
 
 ## Backend
 - `backend/src/controllers/ProvisaoFinanceiraController.js`

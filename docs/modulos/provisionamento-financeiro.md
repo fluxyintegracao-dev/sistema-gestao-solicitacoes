@@ -36,6 +36,8 @@ Nesta etapa o modulo ainda nao aparece no menu principal para usuarios comuns.
 - persistencia local dos filtros por usuario
 - ajuste de UX para valor previsto com mascara monetaria
 - configuracao de obras permitidas com checklist multi-selecao
+- selecao de previsoes na tabela com exportacao CSV apenas das selecionadas
+- seletor de itens por pagina no rodape da tabela (`25`, `50`, `100`, `200`)
 
 ## Codigo da previsao
 Formato:

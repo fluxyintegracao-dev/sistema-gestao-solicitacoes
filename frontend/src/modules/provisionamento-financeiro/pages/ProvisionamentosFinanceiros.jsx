@@ -2,7 +2,6 @@ import { useContext, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../../../contexts/AuthContext';
 import {
-  exportarProvisoesFinanceirasCsv,
   getProvisionamentoFinanceiroContexto,
   listarCategoriasMacroProvisionamento,
   listarProvisoesFinanceiras
@@ -77,7 +76,7 @@ export default function ProvisionamentosFinanceiros() {
   const [contexto, setContexto] = useState(null);
   const [categorias, setCategorias] = useState([]);
   const [lista, setLista] = useState([]);
-  const [meta, setMeta] = useState({ page: 1, pages: 0, total: 0, limit: 20 });
+  const [meta, setMeta] = useState({ page: 1, pages: 0, total: 0, limit: 25 });
   const [resumo, setResumo] = useState({
     total_registros_filtrados: 0,
     valor_total_filtrado: 0
@@ -86,6 +85,8 @@ export default function ProvisionamentosFinanceiros() {
   const [loadingLista, setLoadingLista] = useState(false);
   const [exportando, setExportando] = useState(false);
   const [filtrosStoragePronto, setFiltrosStoragePronto] = useState(false);
+  const [selecionadasIds, setSelecionadasIds] = useState([]);
+  const [itensSelecionados, setItensSelecionados] = useState({});
   const [filtros, setFiltros] = useState(DEFAULT_FILTERS);
   const [ordenacao, setOrdenacao] = useState({
     sort_by: 'data_prevista_desembolso',
@@ -109,7 +110,7 @@ export default function ProvisionamentosFinanceiros() {
           setOrdenacao((atual) => ({ ...atual, ...parsed.ordenacao }));
         }
         if (parsed?.limit) {
-          setMeta((atual) => ({ ...atual, limit: Number(parsed.limit) || atual.limit }));
+          setMeta((atual) => ({ ...atual, limit: Number(parsed.limit) || atual.limit || 25 }));
         }
       }
     } catch (error) {
@@ -197,6 +198,32 @@ export default function ProvisionamentosFinanceiros() {
     Array.isArray(contexto?.criadores_filtro) ? contexto.criadores_filtro : []
   ), [contexto]);
 
+  const idsPaginaAtual = useMemo(() => (
+    lista
+      .map((item) => Number(item?.id))
+      .filter((id) => Number.isInteger(id) && id > 0)
+  ), [lista]);
+
+  const todasPaginaSelecionadas = useMemo(() => (
+    idsPaginaAtual.length > 0 && idsPaginaAtual.every((id) => selecionadasIds.includes(id))
+  ), [idsPaginaAtual, selecionadasIds]);
+
+  const quantidadeSelecionadas = selecionadasIds.length;
+
+  useEffect(() => {
+    if (!Array.isArray(lista) || lista.length === 0) return;
+
+    setItensSelecionados((atual) => {
+      const proximo = { ...atual };
+      lista.forEach((item) => {
+        if (selecionadasIds.includes(Number(item.id))) {
+          proximo[item.id] = item;
+        }
+      });
+      return proximo;
+    });
+  }, [lista, selecionadasIds]);
+
   function atualizarFiltro(campo, valor) {
     setMeta((atual) => ({ ...atual, page: 1 }));
     setFiltros((atual) => ({ ...atual, [campo]: valueOrEmpty(valor) }));
@@ -212,28 +239,126 @@ export default function ProvisionamentosFinanceiros() {
     setFiltros(DEFAULT_FILTERS);
   }
 
-  async function exportarCsv() {
+  function alternarSelecionada(item) {
+    const itemId = Number(item?.id);
+    if (!Number.isInteger(itemId) || itemId <= 0) return;
+    const jaSelecionada = selecionadasIds.includes(itemId);
+
+    setSelecionadasIds((atual) => {
+      if (atual.includes(itemId)) {
+        return atual.filter((id) => id !== itemId);
+      }
+      return [...atual, itemId];
+    });
+
+    setItensSelecionados((atual) => {
+      if (jaSelecionada) {
+        const proximo = { ...atual };
+        delete proximo[itemId];
+        return proximo;
+      }
+
+      return {
+        ...atual,
+        [itemId]: item
+      };
+    });
+  }
+
+  function alternarTodasPaginaAtual() {
+    if (idsPaginaAtual.length === 0) return;
+
+    if (todasPaginaSelecionadas) {
+      setSelecionadasIds((atual) => atual.filter((id) => !idsPaginaAtual.includes(id)));
+      setItensSelecionados((atual) => {
+        const proximo = { ...atual };
+        idsPaginaAtual.forEach((id) => {
+          delete proximo[id];
+        });
+        return proximo;
+      });
+      return;
+    }
+
+    setSelecionadasIds((atual) => Array.from(new Set([...atual, ...idsPaginaAtual])));
+    setItensSelecionados((atual) => {
+      const proximo = { ...atual };
+      lista.forEach((item) => {
+        proximo[item.id] = item;
+      });
+      return proximo;
+    });
+  }
+
+  function exportarSelecionadasCsv() {
+    if (selecionadasIds.length === 0) {
+      alert('Selecione ao menos uma previsao para exportar.');
+      return;
+    }
+
     try {
       setExportando(true);
-      const blob = await exportarProvisoesFinanceirasCsv({
-        ...ordenacao,
-        ...filtros
-      });
 
+      const registros = selecionadasIds
+        .map((id) => itensSelecionados[id])
+        .filter(Boolean);
+
+      if (registros.length === 0) {
+        alert('Nenhuma previsao selecionada esta disponivel para exportacao.');
+        return;
+      }
+
+      const cabecalho = [
+        'Codigo',
+        'Obra',
+        'Data prevista',
+        'Categoria macro',
+        'Descricao',
+        'Fornecedor',
+        'Valor previsto',
+        'Status',
+        'Prioridade',
+        'Criador',
+        'Data de criacao'
+      ];
+
+      const linhas = registros.map((item) => ([
+        item.codigo || '',
+        formatarObra(item.obra),
+        formatarData(item.data_prevista_desembolso),
+        item.categoriaMacro?.nome || '',
+        item.descricao || '',
+        item.fornecedor_texto || '',
+        Number(item.valor_previsto || 0).toFixed(2).replace('.', ','),
+        formatarStatus(item.status),
+        item.prioridade || '',
+        item.usuarioCriacao?.nome || '',
+        formatarData(item.createdAt)
+      ]));
+
+      const csv = [cabecalho, ...linhas]
+        .map((colunas) => colunas.map(escaparColunaCsv).join(';'))
+        .join('\n');
+
+      const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' });
       const url = window.URL.createObjectURL(blob);
       const anchor = document.createElement('a');
       anchor.href = url;
-      anchor.download = `provisoes-financeiras-${new Date().toISOString().slice(0, 10)}.csv`;
+      anchor.download = `provisoes-financeiras-selecionadas-${new Date().toISOString().slice(0, 10)}.csv`;
       document.body.appendChild(anchor);
       anchor.click();
       anchor.remove();
       window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error(error);
-      alert(error?.message || 'Erro ao exportar provisoes financeiras.');
+      alert(error?.message || 'Erro ao exportar previsoes selecionadas.');
     } finally {
       setExportando(false);
     }
+  }
+
+  async function exportarCsv() {
+    exportarSelecionadasCsv();
   }
 
   if (loadingBase) {
@@ -256,7 +381,7 @@ export default function ProvisionamentosFinanceiros() {
             </button>
           )}
           <button type="button" className="btn btn-outline" onClick={exportarCsv} disabled={exportando}>
-            {exportando ? 'Exportando...' : 'Exportar CSV'}
+            {exportando ? 'Exportando...' : `Exportar CSV${quantidadeSelecionadas > 0 ? ` (${quantidadeSelecionadas})` : ''}`}
           </button>
           {Boolean(contexto?.permissoes?.pode_criar) && (
             <button type="button" className="btn btn-primary" onClick={() => navigate('/provisoes-financeiras/nova')}>
@@ -279,10 +404,7 @@ export default function ProvisionamentosFinanceiros() {
           titulo="Pagina atual"
           valor={`${meta.page || 1} / ${meta.pages || 1}`}
         />
-        <ResumoCard
-          titulo="Itens por pagina"
-          valor={String(meta.limit || 20)}
-        />
+        <ResumoCard titulo="Selecionadas" valor={String(quantidadeSelecionadas)} />
       </div>
 
       <div className="card space-y-4">
@@ -367,22 +489,6 @@ export default function ProvisionamentosFinanceiros() {
           </label>
 
           <label className="grid gap-1 text-sm">
-            Itens por pagina
-            <select
-              className="input"
-              value={meta.limit}
-              onChange={(event) => {
-                const limit = Number(event.target.value) || 20;
-                setMeta((atual) => ({ ...atual, limit, page: 1 }));
-              }}
-            >
-              {[10, 20, 50, 100].map((opcao) => (
-                <option key={opcao} value={opcao}>{opcao}</option>
-              ))}
-            </select>
-          </label>
-
-          <label className="grid gap-1 text-sm">
             Data prevista inicial
             <input
               type="date"
@@ -460,6 +566,16 @@ export default function ProvisionamentosFinanceiros() {
             <table className="table">
               <thead>
                 <tr>
+                  <th className="w-12">
+                    <label className="flex items-center justify-center">
+                      <input
+                        type="checkbox"
+                        checked={todasPaginaSelecionadas}
+                        onChange={alternarTodasPaginaAtual}
+                        title={todasPaginaSelecionadas ? 'Desmarcar todas da pagina' : 'Selecionar todas da pagina'}
+                      />
+                    </label>
+                  </th>
                   <th>Codigo</th>
                   <th>Obra</th>
                   <th>Data prevista</th>
@@ -477,6 +593,15 @@ export default function ProvisionamentosFinanceiros() {
               <tbody>
                 {lista.map((item) => (
                   <tr key={item.id}>
+                    <td>
+                      <label className="flex items-center justify-center">
+                        <input
+                          type="checkbox"
+                          checked={selecionadasIds.includes(Number(item.id))}
+                          onChange={() => alternarSelecionada(item)}
+                        />
+                      </label>
+                    </td>
                     <td className="font-mono text-xs font-semibold">{item.codigo}</td>
                     <td>{formatarObra(item.obra)}</td>
                     <td>{formatarData(item.data_prevista_desembolso)}</td>
@@ -501,10 +626,49 @@ export default function ProvisionamentosFinanceiros() {
         )}
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm">
-          <span className="text-[var(--c-muted)]">
-            Pagina {meta.page || 1} de {meta.pages || 1}
-          </span>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-[var(--c-muted)]">
+              Pagina {meta.page || 1} de {meta.pages || 1}
+            </span>
+            <label className="flex items-center gap-2 text-[var(--c-muted)]">
+              <span>Itens por pagina</span>
+              <select
+                className="input min-w-[96px]"
+                value={meta.limit}
+                onChange={(event) => {
+                  const limit = Number(event.target.value) || 25;
+                  setMeta((atual) => ({ ...atual, limit, page: 1 }));
+                }}
+              >
+                {[25, 50, 100, 200].map((opcao) => (
+                  <option key={opcao} value={opcao}>{opcao}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[var(--c-muted)]">
+              {quantidadeSelecionadas} selecionada(s)
+            </span>
+            <button
+              type="button"
+              className="btn btn-outline"
+              onClick={alternarTodasPaginaAtual}
+              disabled={idsPaginaAtual.length === 0}
+            >
+              {todasPaginaSelecionadas ? 'Desmarcar pagina' : 'Selecionar pagina'}
+            </button>
+            <button
+              type="button"
+              className="btn btn-outline"
+              onClick={() => {
+                setSelecionadasIds([]);
+                setItensSelecionados({});
+              }}
+              disabled={quantidadeSelecionadas === 0}
+            >
+              Limpar selecao
+            </button>
             <button
               type="button"
               className="btn btn-outline"
@@ -530,6 +694,15 @@ export default function ProvisionamentosFinanceiros() {
 
 function valueOrEmpty(valor) {
   return valor ?? '';
+}
+
+function escaparColunaCsv(valor) {
+  const texto = String(valor ?? '');
+  if (!texto.includes(';') && !texto.includes('"') && !texto.includes('\n')) {
+    return texto;
+  }
+
+  return `"${texto.replace(/"/g, '""')}"`;
 }
 
 function ResumoCard({ titulo, valor }) {
