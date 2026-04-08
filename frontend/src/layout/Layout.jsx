@@ -184,6 +184,9 @@ export default function Layout() {
   const hasProvisionamentoAccess =
     perfilUpper === 'SUPERADMIN' ||
     Boolean(provisionamentoContexto?.permissoes?.pode_acessar);
+  const hasProvisionamentoDashboard =
+    perfilUpper === 'SUPERADMIN' ||
+    Boolean(provisionamentoContexto?.permissoes?.pode_dashboard_global);
   const canCreateProvisionamento =
     perfilUpper === 'SUPERADMIN' ||
     Boolean(provisionamentoContexto?.permissoes?.pode_criar);
@@ -473,7 +476,9 @@ export default function Layout() {
 
     if (hasProvisionamentoAccess) {
       addGroup('Provisionamento', [
-        item('/provisoes-financeiras/dashboard', 'Dashboard Provisionamento', HiOutlineSquares2X2),
+        hasProvisionamentoDashboard
+          ? item('/provisoes-financeiras/dashboard', 'Dashboard Provisionamento', HiOutlineSquares2X2)
+          : null,
         item('/provisoes-financeiras', 'Provisionamentos', HiOutlineBanknotes),
         canCreateProvisionamento
           ? item('/provisoes-financeiras/nova', 'Nova Provisao', HiOutlinePlusCircle)
@@ -492,6 +497,7 @@ export default function Layout() {
     isAdminGEO,
     isSetorObra,
     hasProvisionamentoAccess,
+    hasProvisionamentoDashboard,
     canCreateProvisionamento,
     perfilUpper
   ]);

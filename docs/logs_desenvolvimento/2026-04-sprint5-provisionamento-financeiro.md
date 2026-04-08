@@ -38,6 +38,7 @@
   - nova rota `/provisoes-financeiras/dashboard`
 - `frontend/src/layout/Layout.jsx`
   - item de menu `Dashboard Provisionamento`
+  - exibicao restrita a `SUPERADMIN` e usuarios com `pode_dashboard_global`
 
 ## Validacao
 - `node --check backend/src/controllers/ProvisaoFinanceiraDashboardController.js`

@@ -92,7 +92,7 @@ export default function ProvisionamentoFinanceiroDetalhe() {
   }, [id]);
 
   const podeEditar = useMemo(() => {
-    if (!contexto?.permissoes?.pode_criar || !provisao) return false;
+    if (!contexto?.permissoes?.superadmin || !provisao) return false;
     return !['aprovado', 'cancelado', 'realizado'].includes(String(provisao.status || '').toLowerCase());
   }, [contexto, provisao]);
 
@@ -102,8 +102,7 @@ export default function ProvisionamentoFinanceiroDetalhe() {
     if (['aprovado', 'cancelado', 'realizado'].includes(status)) return false;
     return Boolean(
       contexto?.permissoes?.superadmin ||
-      contexto?.permissoes?.pode_aprovar ||
-      contexto?.permissoes?.pode_criar
+      contexto?.permissoes?.pode_aprovar
     );
   }, [contexto, provisao]);
 
@@ -144,8 +143,7 @@ export default function ProvisionamentoFinanceiroDetalhe() {
         valor_previsto: form.valor_previsto,
         fornecedor_texto: form.fornecedor_texto,
         comentario: form.comentario,
-        prioridade: form.prioridade,
-        status: form.status
+        prioridade: form.prioridade
       });
       setProvisao(atualizado);
       setEditando(false);
@@ -385,13 +383,6 @@ export default function ProvisionamentoFinanceiroDetalhe() {
                 onChange={(event) => atualizarValorPrevisto(event.target.value)}
                 placeholder={formatarMoedaBRL(0)}
               />
-            </label>
-            <label className="grid gap-1 text-sm">
-              Status
-              <select className="input" value={form.status} onChange={(event) => setForm((atual) => ({ ...atual, status: event.target.value }))}>
-                <option value="previsto">Previsto</option>
-                <option value="em_analise">Em analise</option>
-              </select>
             </label>
             <label className="grid gap-1 text-sm">
               Prioridade

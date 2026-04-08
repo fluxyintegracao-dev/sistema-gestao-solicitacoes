@@ -175,19 +175,13 @@ async function validarAcessoParaGerenciarStatus(req, obraId) {
     return { ok: true, permissoes };
   }
 
-  const podeCriar = usuarioPodeAtuarNaObra({
-    permissoes,
-    obraId,
-    acao: 'criar'
-  });
-
   const podeAprovar = usuarioPodeAtuarNaObra({
     permissoes,
     obraId,
     acao: 'aprovar'
   });
 
-  if (podeCriar || podeAprovar) {
+  if (podeAprovar) {
     return { ok: true, permissoes };
   }
 
@@ -806,10 +800,10 @@ module.exports = {
         return res.status(404).json({ error: 'Provisao financeira nao encontrada.' });
       }
 
-      const acesso = await validarAcessoNaObra(req, provisao.obra_id, 'criar');
-      if (!acesso.ok) {
+      const permissoes = await obterPermissoes(req);
+      if (!permissoes?.superadmin) {
         await transaction.rollback();
-        return res.status(acesso.resposta.status).json(acesso.resposta.body);
+        return res.status(403).json({ error: 'Somente SUPERADMIN pode editar registros de provisionamento financeiro.' });
       }
 
       if (['aprovado', 'cancelado', 'realizado'].includes(String(provisao.status || '').toLowerCase())) {
@@ -855,7 +849,6 @@ module.exports = {
         data_prevista_desembolso: dados.data_prevista_desembolso,
         valor_previsto: dados.valor_previsto,
         comentario: dados.comentario,
-        status: dados.status,
         prioridade: dados.prioridade,
         usuario_atualizacao_id: req.user.id
       }, { transaction });
@@ -895,21 +888,6 @@ module.exports = {
           metadata: {
             anterior: antes.valor_previsto,
             novo: provisao.valor_previsto
-          },
-          transaction
-        });
-      }
-
-      if (String(antes.status || '') !== String(provisao.status || '')) {
-        await registrarHistoricoMudancaStatus({
-          provisaoId: provisao.id,
-          usuarioId: req.user.id,
-          statusAnterior: antes.status,
-          statusNovo: provisao.status,
-          acao: 'STATUS_ALTERADO_MANUAL',
-          descricao: 'Status ajustado manualmente na edicao da provisao.',
-          metadata: {
-            origem: 'edicao'
           },
           transaction
         });

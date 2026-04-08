@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   getDashboardProvisionamentoFinanceiro,
   getProvisionamentoFinanceiroContexto,
@@ -55,6 +56,7 @@ function formatarMes(anoMes) {
 }
 
 export default function DashboardProvisionamentoFinanceiro() {
+  const navigate = useNavigate();
   const [contexto, setContexto] = useState(null);
   const [categorias, setCategorias] = useState([]);
   const [dashboard, setDashboard] = useState(null);
@@ -92,6 +94,9 @@ export default function DashboardProvisionamentoFinanceiro() {
 
   useEffect(() => {
     if (!contexto) return;
+    if (!(contexto?.permissoes?.superadmin || contexto?.permissoes?.pode_dashboard_global)) {
+      return;
+    }
 
     async function carregarDashboard() {
       try {
@@ -112,6 +117,15 @@ export default function DashboardProvisionamentoFinanceiro() {
   const obrasAcesso = useMemo(() => (
     Array.isArray(contexto?.obras_acesso) ? contexto.obras_acesso : []
   ), [contexto]);
+  const podeVerDashboard = useMemo(
+    () => Boolean(contexto?.permissoes?.superadmin || contexto?.permissoes?.pode_dashboard_global),
+    [contexto]
+  );
+
+  useEffect(() => {
+    if (!contexto || podeVerDashboard) return;
+    navigate('/provisoes-financeiras', { replace: true });
+  }, [contexto, navigate, podeVerDashboard]);
 
   function atualizarFiltro(campo, valor) {
     setFiltros((atual) => ({ ...atual, [campo]: valor ?? '' }));
@@ -130,6 +144,10 @@ export default function DashboardProvisionamentoFinanceiro() {
 
   if (loadingBase) {
     return <div className="page"><p>Carregando dashboard...</p></div>;
+  }
+
+  if (!podeVerDashboard) {
+    return <div className="page"><p>Redirecionando...</p></div>;
   }
 
   return (

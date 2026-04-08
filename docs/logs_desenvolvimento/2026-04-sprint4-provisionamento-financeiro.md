@@ -14,6 +14,9 @@
   - `previsto -> em_analise`
   - `em_analise -> previsto`
   - disponivel para superadmin e usuarios com permissao de aprovacao
+- restricao de permissao:
+  - edicao de campos do registro restrita ao `SUPERADMIN`
+  - alteracao manual de status restrita a `SUPERADMIN` e usuarios com `pode_aprovar`
 
 ## Backend
 - `backend/src/controllers/ProvisaoFinanceiraController.js`

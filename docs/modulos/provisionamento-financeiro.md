@@ -55,7 +55,7 @@ Nesta etapa o modulo ainda nao aparece no menu principal para usuarios comuns.
 
 ## Regras de status
 - criacao aceita `previsto` ou `em_analise`
-- edicao manual continua limitada a `previsto` e `em_analise`
+- edicao de campos do registro ficou restrita ao `SUPERADMIN`
 - superadmin e usuarios com permissao de aprovacao podem mover manualmente entre `previsto` e `em_analise`
 - aprovacao: somente `em_analise -> aprovado`
 - cancelamento:
@@ -143,3 +143,4 @@ Restricao por obra:
 - o codigo segue `PREV{obra.codigo}-{sequencial}` com lock transacional por obra
 - a exportacao CSV respeita exatamente os filtros e a ordenacao aplicados na listagem
 - o dashboard usa o mesmo escopo de acesso do modulo e so amplia para visao global quando `pode_dashboard_global` estiver habilitado
+- o frontend oculta o menu do dashboard para usuarios sem `pode_dashboard_global`

@@ -427,7 +427,7 @@ router.get(
 );
 router.get(
   '/provisoes-financeiras/dashboard/resumo',
-  criarMiddlewareProvisionamentoFinanceiro('acessar'),
+  criarMiddlewareProvisionamentoFinanceiro('dashboard'),
   ProvisaoFinanceiraDashboardController.resumo
 );
 router.post(
