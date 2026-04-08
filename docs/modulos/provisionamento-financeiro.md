@@ -44,6 +44,15 @@ Nesta etapa o modulo ainda nao aparece no menu principal para usuarios comuns.
 - auditoria especifica para mudancas de status
 - acoes gerenciais no detalhe da provisao
 
+## Escopo do Sprint 5
+- dashboard gerencial do modulo
+- cards consolidados por periodo
+- graficos agregados por mes, obra, categoria e status
+- curva semanal de desembolso projetado
+- alertas gerenciais
+- visao global apenas para quem possui permissao de dashboard global
+- demais usuarios enxergam dashboard restrito ao proprio escopo de obras
+
 ## Regras de status
 - criacao aceita `previsto` ou `em_analise`
 - edicao manual continua limitada a `previsto` e `em_analise`
@@ -102,6 +111,7 @@ Restricao por obra:
   - `GET /provisoes-financeiras/contexto`
   - `GET /provisoes-financeiras`
   - `GET /provisoes-financeiras/exportar`
+  - `GET /provisoes-financeiras/dashboard/resumo`
   - `GET /provisoes-financeiras/:id`
   - `POST /provisoes-financeiras`
   - `PUT /provisoes-financeiras/:id`
@@ -132,3 +142,4 @@ Restricao por obra:
 - o backend normaliza valor monetario aceitando tanto decimal puro (`1234.56`) quanto formato mascarado (`R$ 1.234,56`)
 - o codigo segue `PREV{obra.codigo}-{sequencial}` com lock transacional por obra
 - a exportacao CSV respeita exatamente os filtros e a ordenacao aplicados na listagem
+- o dashboard usa o mesmo escopo de acesso do modulo e so amplia para visao global quando `pode_dashboard_global` estiver habilitado

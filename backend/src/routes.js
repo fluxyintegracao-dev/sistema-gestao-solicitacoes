@@ -29,6 +29,7 @@ const ConfiguracaoSistemaController = require('./controllers/ConfiguracaoSistema
 const ProvisaoCategoriaMacroController = require('./controllers/ProvisaoCategoriaMacroController');
 const ProvisaoFinanceiraController = require('./controllers/ProvisaoFinanceiraController');
 const ProvisaoFinanceiraConfiguracaoController = require('./controllers/ProvisaoFinanceiraConfiguracaoController');
+const ProvisaoFinanceiraDashboardController = require('./controllers/ProvisaoFinanceiraDashboardController');
 const ConversaInternaController = require('./controllers/ConversaInternaController');
 const ArquivoModeloController = require('./controllers/ArquivoModeloController');
 const UnidadeController = require('./controllers/UnidadeController');
@@ -423,6 +424,11 @@ router.get(
   '/provisoes-financeiras/exportar',
   criarMiddlewareProvisionamentoFinanceiro('acessar'),
   ProvisaoFinanceiraController.exportarCsv
+);
+router.get(
+  '/provisoes-financeiras/dashboard/resumo',
+  criarMiddlewareProvisionamentoFinanceiro('acessar'),
+  ProvisaoFinanceiraDashboardController.resumo
 );
 router.post(
   '/provisoes-financeiras/:id/aprovar',

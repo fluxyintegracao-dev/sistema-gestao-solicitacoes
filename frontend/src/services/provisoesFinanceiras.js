@@ -26,6 +26,14 @@ export async function getProvisionamentoFinanceiroContexto() {
   return parseJsonOrThrow(res, 'Erro ao buscar contexto do provisionamento financeiro');
 }
 
+export async function getDashboardProvisionamentoFinanceiro(params = {}) {
+  const res = await fetch(buildUrl('/provisoes-financeiras/dashboard/resumo', params), {
+    headers: authHeaders()
+  });
+
+  return parseJsonOrThrow(res, 'Erro ao buscar dashboard do provisionamento financeiro');
+}
+
 export async function getProvisionamentoFinanceiroPermissoes() {
   const res = await fetch(`${API_URL}/configuracoes/provisoes-financeiras/permissoes`, {
     headers: authHeaders()

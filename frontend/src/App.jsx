@@ -43,6 +43,7 @@ import ConversaDetalhe from './pages/ConversaDetalhe';
 import ArquivosModelos from './pages/ArquivosModelos';
 import ArquivosModelosConfig from './pages/ArquivosModelosConfig';
 import ConfiguracaoProvisionamentoFinanceiro from './modules/provisionamento-financeiro/pages/ConfiguracaoProvisionamentoFinanceiro';
+import DashboardProvisionamentoFinanceiro from './modules/provisionamento-financeiro/pages/DashboardProvisionamentoFinanceiro';
 import GestaoCategoriasMacro from './modules/provisionamento-financeiro/pages/GestaoCategoriasMacro';
 import NovaProvisaoFinanceira from './modules/provisionamento-financeiro/pages/NovaProvisaoFinanceira';
 import ProvisionamentoFinanceiroDetalhe from './modules/provisionamento-financeiro/pages/ProvisionamentoFinanceiroDetalhe';
@@ -163,6 +164,7 @@ export default function App() {
         <Route path="setores-criacao-todas-obras" element={<SetoresCriacaoTodasObras />} />
         <Route path="arquivos-modelos-config" element={<SuperadminRoute><ArquivosModelosConfig /></SuperadminRoute>} />
         <Route path="provisionamento-financeiro-config" element={<SuperadminRoute><ConfiguracaoProvisionamentoFinanceiro /></SuperadminRoute>} />
+        <Route path="provisoes-financeiras/dashboard" element={<DashboardProvisionamentoFinanceiro />} />
         <Route path="provisoes-financeiras" element={<ProvisionamentosFinanceiros />} />
         <Route path="provisoes-financeiras/nova" element={<NovaProvisaoFinanceira />} />
         <Route path="provisoes-financeiras/categorias" element={<SuperadminRoute><GestaoCategoriasMacro /></SuperadminRoute>} />

@@ -473,6 +473,7 @@ export default function Layout() {
 
     if (hasProvisionamentoAccess) {
       addGroup('Provisionamento', [
+        item('/provisoes-financeiras/dashboard', 'Dashboard Provisionamento', HiOutlineSquares2X2),
         item('/provisoes-financeiras', 'Provisionamentos', HiOutlineBanknotes),
         canCreateProvisionamento
           ? item('/provisoes-financeiras/nova', 'Nova Provisao', HiOutlinePlusCircle)
