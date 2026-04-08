@@ -2369,6 +2369,98 @@ a {
 }
 
 /* ============================
+   Dashboard extras: btn-sm, KPI variants, badges, alert link
+============================ */
+
+.btn-sm {
+  padding: 0.35rem 0.7rem;
+  min-height: 34px;
+  font-size: 0.85rem;
+  border-radius: 8px;
+}
+
+.dash-kpi-card--warning {
+  border-color: rgba(245, 158, 11, 0.35);
+  background: linear-gradient(180deg, rgba(255, 251, 235, 0.98), rgba(255, 247, 237, 0.92));
+}
+
+.dash-kpi-card--warning .dash-kpi-icon {
+  background: rgba(245, 158, 11, 0.14);
+  color: #b45309;
+}
+
+.dash-kpi-card--danger {
+  border-color: rgba(239, 68, 68, 0.35);
+  background: linear-gradient(180deg, rgba(255, 241, 242, 0.98), rgba(255, 237, 237, 0.92));
+}
+
+.dash-kpi-card--danger .dash-kpi-icon {
+  background: rgba(239, 68, 68, 0.14);
+  color: #b91c1c;
+}
+
+.dark .dash-kpi-card--warning {
+  border-color: rgba(245, 158, 11, 0.28);
+  background: rgba(245, 158, 11, 0.07);
+}
+
+.dark .dash-kpi-card--warning .dash-kpi-icon {
+  background: rgba(245, 158, 11, 0.18);
+  color: #fbbf24;
+}
+
+.dark .dash-kpi-card--danger {
+  border-color: rgba(239, 68, 68, 0.28);
+  background: rgba(239, 68, 68, 0.07);
+}
+
+.dark .dash-kpi-card--danger .dash-kpi-icon {
+  background: rgba(239, 68, 68, 0.18);
+  color: #f87171;
+}
+
+.dash-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.18rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  border: 1px solid transparent;
+}
+
+.badge-blue   { background: #dbeafe; color: #1e40af; border-color: #bfdbfe; }
+.badge-amber  { background: #fef3c7; color: #92400e; border-color: #fde68a; }
+.badge-green  { background: #dcfce7; color: #166534; border-color: #bbf7d0; }
+.badge-red    { background: #fee2e2; color: #991b1b; border-color: #fecaca; }
+.badge-orange { background: #ffedd5; color: #9a3412; border-color: #fed7aa; }
+.badge-gray   { background: #f1f5f9; color: #475569; border-color: #e2e8f0; }
+
+.dark .badge-blue   { background: rgba(59, 130, 246, 0.18);  color: #93c5fd; border-color: rgba(59, 130, 246, 0.3); }
+.dark .badge-amber  { background: rgba(245, 158, 11, 0.18);  color: #fcd34d; border-color: rgba(245, 158, 11, 0.3); }
+.dark .badge-green  { background: rgba(34, 197, 94, 0.16);   color: #86efac; border-color: rgba(34, 197, 94, 0.3); }
+.dark .badge-red    { background: rgba(239, 68, 68, 0.18);   color: #fca5a5; border-color: rgba(239, 68, 68, 0.3); }
+.dark .badge-orange { background: rgba(249, 115, 22, 0.18);  color: #fdba74; border-color: rgba(249, 115, 22, 0.3); }
+.dark .badge-gray   { background: rgba(255, 255, 255, 0.07); color: #94a3b8; border-color: rgba(255, 255, 255, 0.12); }
+
+.dash-alert-card--link {
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.dash-alert-card--link:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.13);
+  border-color: #b0c8e8;
+}
+
+.dark .dash-alert-card--link:hover {
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.5);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+/* ============================
    Dark mode helpers
 ============================ */
 .dark .bg-white {
