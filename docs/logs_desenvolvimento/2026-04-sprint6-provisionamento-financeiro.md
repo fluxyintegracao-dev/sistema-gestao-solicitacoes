@@ -13,6 +13,7 @@
 ## Backend
 - `backend/src/services/provisaoFinanceira/permissoes.js`
   - interseccao de `obras_acesso`, `obras_criacao` e `obras_aprovacao` com `usuarios_obras` para perfil `USUARIO`
+  - fallback para manter o escopo do modulo quando o usuario ainda nao possui vinculos em `usuarios_obras`
 - `backend/src/controllers/ProvisaoFinanceiraController.js`
   - limite maximo da paginacao ajustado para `200`
 - `backend/migrations/add-provisionamento-financeiro-hardening-indexes.sql`

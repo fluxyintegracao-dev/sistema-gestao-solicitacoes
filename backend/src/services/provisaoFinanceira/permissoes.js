@@ -98,7 +98,10 @@ async function listarObrasVinculadasUsuario(usuarioId) {
 
 function restringirObrasPorVinculo(obrasPermitidas, obrasVinculadas) {
   const vinculadas = normalizarListaIdsInteiros(obrasVinculadas);
-  if (vinculadas.length === 0) return [];
+  if (vinculadas.length === 0) {
+    if (obrasPermitidas === null) return null;
+    return Array.isArray(obrasPermitidas) ? normalizarListaIdsInteiros(obrasPermitidas) : [];
+  }
 
   if (obrasPermitidas === null) {
     return vinculadas;
@@ -192,9 +195,9 @@ async function resolverPermissoesProvisionamentoFinanceiro(user) {
 
     return {
       superadmin: false,
-      pode_acessar: acesso.habilitado && obrasAcesso.length > 0,
-      pode_criar: criacao.habilitado && obrasCriacao.length > 0,
-      pode_aprovar: aprovacao.habilitado && obrasAprovacao.length > 0,
+      pode_acessar: acesso.habilitado && (obrasAcesso === null || obrasAcesso.length > 0),
+      pode_criar: criacao.habilitado && (obrasCriacao === null || obrasCriacao.length > 0),
+      pode_aprovar: aprovacao.habilitado && (obrasAprovacao === null || obrasAprovacao.length > 0),
       pode_dashboard_global: podeDashboardGlobal,
       obras_acesso: obrasAcesso,
       obras_criacao: obrasCriacao,

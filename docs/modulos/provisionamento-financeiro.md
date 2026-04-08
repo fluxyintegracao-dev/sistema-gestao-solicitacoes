@@ -100,7 +100,8 @@ Acoes controladas:
 Restricao por obra:
 - sem obras vinculadas na regra: acesso global dentro do escopo da regra
 - com obras vinculadas: acesso limitado as obras selecionadas
-- para perfil `USUARIO`, o escopo final ainda e intersectado com os vinculos reais em `usuarios_obras`
+- para perfil `USUARIO`, o escopo final e intersectado com `usuarios_obras` quando esses vinculos existirem
+- se o usuario nao possuir vinculos em `usuarios_obras`, prevalece o escopo configurado diretamente no modulo
 
 `SUPERADMIN` continua com acesso total por regra implicita.
 
