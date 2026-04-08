@@ -4,6 +4,7 @@ import {
   aprovarProvisaoFinanceira,
   adicionarComentarioProvisaoFinanceira,
   atualizarProvisaoFinanceira,
+  atualizarStatusProvisaoFinanceira,
   cancelarProvisaoFinanceira,
   getProvisionamentoFinanceiroContexto,
   getProvisaoFinanceira,
@@ -93,6 +94,17 @@ export default function ProvisionamentoFinanceiroDetalhe() {
   const podeEditar = useMemo(() => {
     if (!contexto?.permissoes?.pode_criar || !provisao) return false;
     return !['aprovado', 'cancelado', 'realizado'].includes(String(provisao.status || '').toLowerCase());
+  }, [contexto, provisao]);
+
+  const podeGerenciarStatusManual = useMemo(() => {
+    if (!provisao) return false;
+    const status = serializarStatus(provisao.status);
+    if (['aprovado', 'cancelado', 'realizado'].includes(status)) return false;
+    return Boolean(
+      contexto?.permissoes?.superadmin ||
+      contexto?.permissoes?.pode_aprovar ||
+      contexto?.permissoes?.pode_criar
+    );
   }, [contexto, provisao]);
 
   const podeAprovar = useMemo(() => {
@@ -206,6 +218,22 @@ export default function ProvisionamentoFinanceiroDetalhe() {
         await aprovarProvisaoFinanceira(provisao.id, { comentario });
       }
 
+      if (acao === 'em_analise') {
+        const comentario = window.prompt('Comentario da mudanca para Em analise (opcional):', '') ?? '';
+        await atualizarStatusProvisaoFinanceira(provisao.id, {
+          status: 'em_analise',
+          comentario
+        });
+      }
+
+      if (acao === 'previsto') {
+        const comentario = window.prompt('Comentario da mudanca para Previsto (opcional):', '') ?? '';
+        await atualizarStatusProvisaoFinanceira(provisao.id, {
+          status: 'previsto',
+          comentario
+        });
+      }
+
       if (acao === 'cancelar') {
         const comentario = window.prompt('Informe o motivo do cancelamento:', '');
         if (comentario === null) return;
@@ -243,6 +271,26 @@ export default function ProvisionamentoFinanceiroDetalhe() {
           <button type="button" className="btn btn-outline" onClick={() => navigate('/provisoes-financeiras')}>
             Voltar
           </button>
+          {podeGerenciarStatusManual && serializarStatus(provisao.status) === 'previsto' && (
+            <button
+              type="button"
+              className="btn btn-outline"
+              disabled={processandoAcao}
+              onClick={() => executarAcao('em_analise')}
+            >
+              {processandoAcao ? 'Processando...' : 'Enviar para analise'}
+            </button>
+          )}
+          {podeGerenciarStatusManual && serializarStatus(provisao.status) === 'em_analise' && (
+            <button
+              type="button"
+              className="btn btn-outline"
+              disabled={processandoAcao}
+              onClick={() => executarAcao('previsto')}
+            >
+              {processandoAcao ? 'Processando...' : 'Voltar para previsto'}
+            </button>
+          )}
           {podeAprovar && (
             <button
               type="button"

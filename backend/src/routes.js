@@ -454,6 +454,11 @@ router.put(
   criarMiddlewareProvisionamentoFinanceiro('criar'),
   ProvisaoFinanceiraController.update
 );
+router.patch(
+  '/provisoes-financeiras/:id/status',
+  criarMiddlewareProvisionamentoFinanceiro('acessar'),
+  ProvisaoFinanceiraController.alterarStatus
+);
 router.get(
   '/provisoes-financeiras/:id/historico',
   criarMiddlewareProvisionamentoFinanceiro('acessar'),

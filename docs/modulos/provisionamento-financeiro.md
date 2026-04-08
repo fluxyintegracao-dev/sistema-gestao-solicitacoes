@@ -47,6 +47,7 @@ Nesta etapa o modulo ainda nao aparece no menu principal para usuarios comuns.
 ## Regras de status
 - criacao aceita `previsto` ou `em_analise`
 - edicao manual continua limitada a `previsto` e `em_analise`
+- superadmin e usuarios com permissao de aprovacao podem mover manualmente entre `previsto` e `em_analise`
 - aprovacao: somente `em_analise -> aprovado`
 - cancelamento:
   - `previsto -> cancelado`

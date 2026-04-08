@@ -139,6 +139,16 @@ export async function atualizarProvisaoFinanceira(id, data) {
   return parseJsonOrThrow(res, 'Erro ao atualizar provisao financeira');
 }
 
+export async function atualizarStatusProvisaoFinanceira(id, data = {}) {
+  const res = await fetch(`${API_URL}/provisoes-financeiras/${id}/status`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+
+  return parseJsonOrThrow(res, 'Erro ao alterar status da provisao financeira');
+}
+
 export async function aprovarProvisaoFinanceira(id, data = {}) {
   const res = await fetch(`${API_URL}/provisoes-financeiras/${id}/aprovar`, {
     method: 'POST',

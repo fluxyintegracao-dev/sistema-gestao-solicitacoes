@@ -169,6 +169,38 @@ async function validarAcessoNaObra(req, obraId, acao) {
   return { ok: true, permissoes };
 }
 
+async function validarAcessoParaGerenciarStatus(req, obraId) {
+  const permissoes = await obterPermissoes(req);
+  if (permissoes?.superadmin) {
+    return { ok: true, permissoes };
+  }
+
+  const podeCriar = usuarioPodeAtuarNaObra({
+    permissoes,
+    obraId,
+    acao: 'criar'
+  });
+
+  const podeAprovar = usuarioPodeAtuarNaObra({
+    permissoes,
+    obraId,
+    acao: 'aprovar'
+  });
+
+  if (podeCriar || podeAprovar) {
+    return { ok: true, permissoes };
+  }
+
+  return {
+    ok: false,
+    permissoes,
+    resposta: {
+      status: 403,
+      body: { error: 'Acesso negado para alterar status desta provisao financeira' }
+    }
+  };
+}
+
 function obterIncludesLista() {
   return [
     {
@@ -891,6 +923,82 @@ module.exports = {
       await transaction.rollback();
       console.error(error);
       return res.status(500).json({ error: error.message || 'Erro ao atualizar provisao financeira' });
+    }
+  },
+
+  async alterarStatus(req, res) {
+    const transaction = await sequelize.transaction();
+
+    try {
+      const id = parsePositiveInt(req.params?.id);
+      const statusNovo = serializarStatus(req.body?.status);
+      const comentario = normalizarTexto(req.body?.comentario);
+
+      if (!id) {
+        await transaction.rollback();
+        return res.status(400).json({ error: 'Identificador invalido.' });
+      }
+
+      if (!['previsto', 'em_analise'].includes(statusNovo)) {
+        await transaction.rollback();
+        return res.status(400).json({ error: 'Status invalido para alteracao manual.' });
+      }
+
+      const provisao = await ProvisaoFinanceira.findByPk(id, { transaction });
+      if (!provisao) {
+        await transaction.rollback();
+        return res.status(404).json({ error: 'Provisao financeira nao encontrada.' });
+      }
+
+      const acesso = await validarAcessoParaGerenciarStatus(req, provisao.obra_id);
+      if (!acesso.ok) {
+        await transaction.rollback();
+        return res.status(acesso.resposta.status).json(acesso.resposta.body);
+      }
+
+      const statusAtual = serializarStatus(provisao.status);
+      if (['cancelado', 'realizado', 'aprovado'].includes(statusAtual)) {
+        await transaction.rollback();
+        return res.status(400).json({ error: 'Nao e possivel alterar manualmente o status desta provisao.' });
+      }
+
+      if (statusAtual === statusNovo) {
+        await transaction.rollback();
+        const provisaoCompleta = await carregarProvisaoDetalhada(provisao.id);
+        return res.json(provisaoCompleta);
+      }
+
+      if (!validarStatusEdicao(statusAtual, statusNovo)) {
+        await transaction.rollback();
+        return res.status(400).json({ error: 'Transicao de status invalida para alteracao manual.' });
+      }
+
+      await provisao.update({
+        status: statusNovo,
+        usuario_atualizacao_id: req.user.id
+      }, { transaction });
+
+      await registrarHistoricoMudancaStatus({
+        provisaoId: provisao.id,
+        usuarioId: req.user.id,
+        statusAnterior: statusAtual,
+        statusNovo,
+        acao: 'STATUS_ALTERADO_MANUAL',
+        descricao: 'Status alterado manualmente.',
+        comentario,
+        metadata: {
+          origem: 'acao-status'
+        },
+        transaction
+      });
+
+      await transaction.commit();
+      const provisaoCompleta = await carregarProvisaoDetalhada(provisao.id);
+      return res.json(provisaoCompleta);
+    } catch (error) {
+      await transaction.rollback();
+      console.error(error);
+      return res.status(500).json({ error: error.message || 'Erro ao alterar status da provisao financeira' });
     }
   },
 

@@ -10,6 +10,10 @@
   - selecao clicando na linha inteira
   - remocao dos cards auxiliares de pagina/selecionadas
   - remocao dos botoes extras de selecao no rodape
+- ajuste de status manual:
+  - `previsto -> em_analise`
+  - `em_analise -> previsto`
+  - disponivel para superadmin e usuarios com permissao de aprovacao
 
 ## Backend
 - `backend/src/controllers/ProvisaoFinanceiraController.js`
