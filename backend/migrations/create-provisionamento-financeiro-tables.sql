@@ -42,13 +42,13 @@ CREATE TABLE IF NOT EXISTS `provisoes_financeiras` (
   CONSTRAINT `fk_provisoes_financeiras_categoria`
     FOREIGN KEY (`categoria_macro_id`) REFERENCES `provisao_categorias_macro`(`id`),
   CONSTRAINT `fk_provisoes_financeiras_usuario_criacao`
-    FOREIGN KEY (`usuario_criacao_id`) REFERENCES `Users`(`id`),
+    FOREIGN KEY (`usuario_criacao_id`) REFERENCES `users`(`id`),
   CONSTRAINT `fk_provisoes_financeiras_usuario_atualizacao`
-    FOREIGN KEY (`usuario_atualizacao_id`) REFERENCES `Users`(`id`),
+    FOREIGN KEY (`usuario_atualizacao_id`) REFERENCES `users`(`id`),
   CONSTRAINT `fk_provisoes_financeiras_aprovado_por`
-    FOREIGN KEY (`aprovado_por_id`) REFERENCES `Users`(`id`),
+    FOREIGN KEY (`aprovado_por_id`) REFERENCES `users`(`id`),
   CONSTRAINT `fk_provisoes_financeiras_cancelado_por`
-    FOREIGN KEY (`cancelado_por_id`) REFERENCES `Users`(`id`)
+    FOREIGN KEY (`cancelado_por_id`) REFERENCES `users`(`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `provisao_financeira_historico` (
@@ -69,7 +69,7 @@ CREATE TABLE IF NOT EXISTS `provisao_financeira_historico` (
   CONSTRAINT `fk_provisao_financeira_historico_provisao`
     FOREIGN KEY (`provisao_financeira_id`) REFERENCES `provisoes_financeiras`(`id`),
   CONSTRAINT `fk_provisao_financeira_historico_usuario`
-    FOREIGN KEY (`usuario_id`) REFERENCES `Users`(`id`)
+    FOREIGN KEY (`usuario_id`) REFERENCES `users`(`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `provisao_financeira_anexos` (
@@ -86,7 +86,7 @@ CREATE TABLE IF NOT EXISTS `provisao_financeira_anexos` (
   CONSTRAINT `fk_provisao_financeira_anexos_provisao`
     FOREIGN KEY (`provisao_financeira_id`) REFERENCES `provisoes_financeiras`(`id`),
   CONSTRAINT `fk_provisao_financeira_anexos_usuario`
-    FOREIGN KEY (`uploaded_by`) REFERENCES `Users`(`id`)
+    FOREIGN KEY (`uploaded_by`) REFERENCES `users`(`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `provisao_financeira_permissoes` (
