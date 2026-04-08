@@ -47,6 +47,50 @@ function formatarObra(obra) {
   return codigo || nome || `Obra ${obra?.id}`;
 }
 
+function consolidarRegras(regras) {
+  const mapa = new Map();
+
+  (Array.isArray(regras) ? regras : []).forEach((regra) => {
+    const escopoTipo = String(regra?.escopo_tipo || '').trim();
+    const escopoValor = String(regra?.escopo_valor || '').trim();
+    const chave = `${escopoTipo}::${escopoValor}`;
+
+    if (!escopoTipo || !escopoValor) {
+      return;
+    }
+
+    const atual = mapa.get(chave);
+    const obraIds = Array.isArray(regra?.obra_ids)
+      ? regra.obra_ids.map(Number).filter((item) => Number.isInteger(item) && item > 0)
+      : [];
+
+    if (!atual) {
+      mapa.set(chave, {
+        ...regra,
+        escopo_tipo: escopoTipo,
+        escopo_valor: escopoValor,
+        pode_acessar: Boolean(regra?.pode_acessar),
+        pode_criar: Boolean(regra?.pode_criar),
+        pode_aprovar: Boolean(regra?.pode_aprovar),
+        pode_dashboard_global: Boolean(regra?.pode_dashboard_global),
+        obra_ids: [...new Set(obraIds)]
+      });
+      return;
+    }
+
+    mapa.set(chave, {
+      ...atual,
+      pode_acessar: Boolean(atual.pode_acessar) || Boolean(regra?.pode_acessar),
+      pode_criar: Boolean(atual.pode_criar) || Boolean(regra?.pode_criar),
+      pode_aprovar: Boolean(atual.pode_aprovar) || Boolean(regra?.pode_aprovar),
+      pode_dashboard_global: Boolean(atual.pode_dashboard_global) || Boolean(regra?.pode_dashboard_global),
+      obra_ids: [...new Set([...(atual.obra_ids || []), ...obraIds])]
+    });
+  });
+
+  return Array.from(mapa.values());
+}
+
 function obterOpcoesEscopo(escopoTipo, { usuarios, setores }) {
   if (escopoTipo === 'SETOR') {
     return setores.map((setor) => ({
@@ -175,7 +219,7 @@ export default function ConfiguracaoProvisionamentoFinanceiro() {
         setUsuarios(Array.isArray(usuariosData) ? usuariosData : []);
         setSetores(Array.isArray(setoresData) ? setoresData : []);
         setObras(Array.isArray(obrasData) ? obrasData : []);
-        const regrasCarregadas = Array.isArray(permissoesData?.regras) ? permissoesData.regras : [];
+        const regrasCarregadas = consolidarRegras(permissoesData?.regras);
         setRegras(regrasCarregadas);
         setRegrasPersistidas(regrasCarregadas);
       } catch (error) {
@@ -318,7 +362,8 @@ export default function ConfiguracaoProvisionamentoFinanceiro() {
     try {
       setSalvando(true);
 
-      const payload = regras.map((regra) => ({
+      const regrasConsolidadas = consolidarRegras(regras);
+      const payload = regrasConsolidadas.map((regra) => ({
         escopo_tipo: regra.escopo_tipo,
         escopo_valor: regra.escopo_valor,
         pode_acessar: Boolean(regra.pode_acessar),
@@ -330,7 +375,7 @@ export default function ConfiguracaoProvisionamentoFinanceiro() {
 
       await salvarProvisionamentoFinanceiroPermissoes({ regras: payload });
       const atualizado = await getProvisionamentoFinanceiroPermissoes();
-      const regrasAtualizadas = Array.isArray(atualizado?.regras) ? atualizado.regras : [];
+      const regrasAtualizadas = consolidarRegras(atualizado?.regras);
       setRegras(regrasAtualizadas);
       setRegrasPersistidas(regrasAtualizadas);
       alert('Configuracao do provisionamento financeiro salva com sucesso.');
