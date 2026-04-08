@@ -156,6 +156,7 @@ export default function ConfiguracaoProvisionamentoFinanceiro() {
   const [setores, setSetores] = useState([]);
   const [obras, setObras] = useState([]);
   const [regras, setRegras] = useState([]);
+  const [regrasPersistidas, setRegrasPersistidas] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState(false);
   const [busca, setBusca] = useState('');
@@ -174,7 +175,9 @@ export default function ConfiguracaoProvisionamentoFinanceiro() {
         setUsuarios(Array.isArray(usuariosData) ? usuariosData : []);
         setSetores(Array.isArray(setoresData) ? setoresData : []);
         setObras(Array.isArray(obrasData) ? obrasData : []);
-        setRegras(Array.isArray(permissoesData?.regras) ? permissoesData.regras : []);
+        const regrasCarregadas = Array.isArray(permissoesData?.regras) ? permissoesData.regras : [];
+        setRegras(regrasCarregadas);
+        setRegrasPersistidas(regrasCarregadas);
       } catch (error) {
         console.error(error);
         alert(error?.message || 'Erro ao carregar configuracao do provisionamento financeiro.');
@@ -225,13 +228,56 @@ export default function ConfiguracaoProvisionamentoFinanceiro() {
     )));
   }
 
+  function obterRegraPersistida(escopoTipo, escopoValor) {
+    return regrasPersistidas.find((regra) => (
+      String(regra?.escopo_tipo || '') === String(escopoTipo || '')
+      && String(regra?.escopo_valor || '') === String(escopoValor || '')
+    ));
+  }
+
   function atualizarEscopoTipo(regraId, escopoTipo) {
     setRegras((prev) => prev.map((regra) => {
       if (regra.id !== regraId) return regra;
       return {
         ...regra,
         escopo_tipo: escopoTipo,
-        escopo_valor: ''
+        escopo_valor: '',
+        pode_acessar: true,
+        pode_criar: false,
+        pode_aprovar: false,
+        pode_dashboard_global: false,
+        obra_ids: []
+      };
+    }));
+  }
+
+  function atualizarEscopoValor(regraId, escopoValor) {
+    setRegras((prev) => prev.map((regra) => {
+      if (regra.id !== regraId) return regra;
+
+      const regraPersistida = obterRegraPersistida(regra.escopo_tipo, escopoValor);
+      if (!regraPersistida) {
+        return {
+          ...regra,
+          escopo_valor: escopoValor,
+          pode_acessar: true,
+          pode_criar: false,
+          pode_aprovar: false,
+          pode_dashboard_global: false,
+          obra_ids: []
+        };
+      }
+
+      return {
+        ...regra,
+        escopo_valor: escopoValor,
+        pode_acessar: Boolean(regraPersistida.pode_acessar),
+        pode_criar: Boolean(regraPersistida.pode_criar),
+        pode_aprovar: Boolean(regraPersistida.pode_aprovar),
+        pode_dashboard_global: Boolean(regraPersistida.pode_dashboard_global),
+        obra_ids: Array.isArray(regraPersistida.obra_ids)
+          ? regraPersistida.obra_ids.map(Number)
+          : []
       };
     }));
   }
@@ -284,7 +330,9 @@ export default function ConfiguracaoProvisionamentoFinanceiro() {
 
       await salvarProvisionamentoFinanceiroPermissoes({ regras: payload });
       const atualizado = await getProvisionamentoFinanceiroPermissoes();
-      setRegras(Array.isArray(atualizado?.regras) ? atualizado.regras : []);
+      const regrasAtualizadas = Array.isArray(atualizado?.regras) ? atualizado.regras : [];
+      setRegras(regrasAtualizadas);
+      setRegrasPersistidas(regrasAtualizadas);
       alert('Configuracao do provisionamento financeiro salva com sucesso.');
     } catch (error) {
       console.error(error);
@@ -362,7 +410,7 @@ export default function ConfiguracaoProvisionamentoFinanceiro() {
                       <select
                         className="input"
                         value={regra.escopo_valor || ''}
-                        onChange={(event) => atualizarRegra(regra.id, { escopo_valor: event.target.value })}
+                        onChange={(event) => atualizarEscopoValor(regra.id, event.target.value)}
                       >
                         <option value="">Selecione...</option>
                         {obterOpcoesEscopo(regra.escopo_tipo, {
