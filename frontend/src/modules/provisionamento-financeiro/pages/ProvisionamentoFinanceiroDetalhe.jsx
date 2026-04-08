@@ -1,12 +1,15 @@
 ﻿import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
+  aprovarProvisaoFinanceira,
   adicionarComentarioProvisaoFinanceira,
   atualizarProvisaoFinanceira,
+  cancelarProvisaoFinanceira,
   getProvisionamentoFinanceiroContexto,
   getProvisaoFinanceira,
   listarCategoriasMacroProvisionamento,
   obterUrlAssinadaAnexoProvisaoFinanceira,
+  realizarProvisaoFinanceira,
   uploadAnexosProvisaoFinanceira
 } from '../../../services/provisoesFinanceiras';
 import {
@@ -32,6 +35,10 @@ function formatarStatus(valor) {
     .toUpperCase();
 }
 
+function serializarStatus(valor) {
+  return String(valor || '').trim().toLowerCase();
+}
+
 export default function ProvisionamentoFinanceiroDetalhe() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -40,6 +47,7 @@ export default function ProvisionamentoFinanceiroDetalhe() {
   const [provisao, setProvisao] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [processandoAcao, setProcessandoAcao] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [comentando, setComentando] = useState(false);
   const [editando, setEditando] = useState(false);
@@ -85,6 +93,21 @@ export default function ProvisionamentoFinanceiroDetalhe() {
   const podeEditar = useMemo(() => {
     if (!contexto?.permissoes?.pode_criar || !provisao) return false;
     return !['aprovado', 'cancelado', 'realizado'].includes(String(provisao.status || '').toLowerCase());
+  }, [contexto, provisao]);
+
+  const podeAprovar = useMemo(() => {
+    return Boolean(contexto?.permissoes?.pode_aprovar) && serializarStatus(provisao?.status) === 'em_analise';
+  }, [contexto, provisao]);
+
+  const podeCancelar = useMemo(() => {
+    const status = serializarStatus(provisao?.status);
+    if (!Boolean(contexto?.permissoes?.pode_aprovar)) return false;
+    if (['previsto', 'em_analise'].includes(status)) return true;
+    return Boolean(contexto?.permissoes?.superadmin) && status === 'aprovado';
+  }, [contexto, provisao]);
+
+  const podeRealizar = useMemo(() => {
+    return Boolean(contexto?.permissoes?.pode_aprovar) && serializarStatus(provisao?.status) === 'aprovado';
   }, [contexto, provisao]);
 
   function atualizarValorPrevisto(raw) {
@@ -172,6 +195,37 @@ export default function ProvisionamentoFinanceiroDetalhe() {
     }
   }
 
+  async function executarAcao(acao) {
+    if (!provisao?.id) return;
+
+    try {
+      setProcessandoAcao(true);
+
+      if (acao === 'aprovar') {
+        const comentario = window.prompt('Comentario da aprovacao (opcional):', '') ?? '';
+        await aprovarProvisaoFinanceira(provisao.id, { comentario });
+      }
+
+      if (acao === 'cancelar') {
+        const comentario = window.prompt('Informe o motivo do cancelamento:', '');
+        if (comentario === null) return;
+        await cancelarProvisaoFinanceira(provisao.id, { comentario });
+      }
+
+      if (acao === 'realizar') {
+        const comentario = window.prompt('Comentario da realizacao (opcional):', '') ?? '';
+        await realizarProvisaoFinanceira(provisao.id, { comentario });
+      }
+
+      await carregar();
+    } catch (error) {
+      console.error(error);
+      alert(error?.message || 'Erro ao executar acao do provisionamento financeiro.');
+    } finally {
+      setProcessandoAcao(false);
+    }
+  }
+
   if (loading || !provisao || !form) {
     return <div className="page"><p>Carregando provisao financeira...</p></div>;
   }
@@ -189,6 +243,36 @@ export default function ProvisionamentoFinanceiroDetalhe() {
           <button type="button" className="btn btn-outline" onClick={() => navigate('/provisoes-financeiras')}>
             Voltar
           </button>
+          {podeAprovar && (
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={processandoAcao}
+              onClick={() => executarAcao('aprovar')}
+            >
+              {processandoAcao ? 'Processando...' : 'Aprovar'}
+            </button>
+          )}
+          {podeCancelar && (
+            <button
+              type="button"
+              className="btn btn-outline"
+              disabled={processandoAcao}
+              onClick={() => executarAcao('cancelar')}
+            >
+              {processandoAcao ? 'Processando...' : 'Cancelar'}
+            </button>
+          )}
+          {podeRealizar && (
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={processandoAcao}
+              onClick={() => executarAcao('realizar')}
+            >
+              {processandoAcao ? 'Processando...' : 'Marcar como realizado'}
+            </button>
+          )}
           {podeEditar && (
             <button type="button" className="btn btn-primary" onClick={() => setEditando((valor) => !valor)}>
               {editando ? 'Fechar edicao' : 'Editar registro'}
@@ -207,6 +291,12 @@ export default function ProvisionamentoFinanceiroDetalhe() {
           <Info label="Prioridade" value={provisao.prioridade || '-'} />
           <Info label="Criado por" value={provisao.usuarioCriacao?.nome || '-'} />
           <Info label="Criado em" value={formatarData(provisao.createdAt)} />
+          <Info label="Aprovado por" value={provisao.aprovadoPor?.nome || '-'} />
+          <Info label="Aprovado em" value={formatarData(provisao.aprovado_em)} />
+          <Info label="Cancelado por" value={provisao.canceladoPor?.nome || '-'} />
+          <Info label="Cancelado em" value={formatarData(provisao.cancelado_em)} />
+          <Info label="Realizado em" value={formatarData(provisao.realizado_em)} />
+          <Info label="Atualizado por" value={provisao.usuarioAtualizacao?.nome || '-'} />
         </div>
         <div className="mt-4 grid gap-2 text-sm">
           <span className="font-medium">Descricao</span>

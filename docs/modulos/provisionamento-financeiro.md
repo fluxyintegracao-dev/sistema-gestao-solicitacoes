@@ -39,6 +39,21 @@ Nesta etapa o modulo ainda nao aparece no menu principal para usuarios comuns.
 - selecao de previsoes na tabela com exportacao CSV apenas das selecionadas
 - seletor de itens por pagina no rodape da tabela (`25`, `50`, `100`, `200`)
 
+## Escopo do Sprint 4
+- transicoes formais de status para aprovacao, cancelamento e realizacao
+- auditoria especifica para mudancas de status
+- acoes gerenciais no detalhe da provisao
+
+## Regras de status
+- criacao aceita `previsto` ou `em_analise`
+- edicao manual continua limitada a `previsto` e `em_analise`
+- aprovacao: somente `em_analise -> aprovado`
+- cancelamento:
+  - `previsto -> cancelado`
+  - `em_analise -> cancelado`
+  - `aprovado -> cancelado` apenas para `SUPERADMIN`
+- realizacao: somente `aprovado -> realizado`
+
 ## Codigo da previsao
 Formato:
 - `PREV{obra.codigo}-{sequencial}`
@@ -89,6 +104,9 @@ Restricao por obra:
   - `GET /provisoes-financeiras/:id`
   - `POST /provisoes-financeiras`
   - `PUT /provisoes-financeiras/:id`
+  - `POST /provisoes-financeiras/:id/aprovar`
+  - `POST /provisoes-financeiras/:id/cancelar`
+  - `POST /provisoes-financeiras/:id/realizar`
   - `GET /provisoes-financeiras/:id/historico`
   - `POST /provisoes-financeiras/:id/comentarios`
   - `POST /provisoes-financeiras/:id/anexos`

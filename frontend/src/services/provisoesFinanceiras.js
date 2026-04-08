@@ -139,6 +139,36 @@ export async function atualizarProvisaoFinanceira(id, data) {
   return parseJsonOrThrow(res, 'Erro ao atualizar provisao financeira');
 }
 
+export async function aprovarProvisaoFinanceira(id, data = {}) {
+  const res = await fetch(`${API_URL}/provisoes-financeiras/${id}/aprovar`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+
+  return parseJsonOrThrow(res, 'Erro ao aprovar provisao financeira');
+}
+
+export async function cancelarProvisaoFinanceira(id, data = {}) {
+  const res = await fetch(`${API_URL}/provisoes-financeiras/${id}/cancelar`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+
+  return parseJsonOrThrow(res, 'Erro ao cancelar provisao financeira');
+}
+
+export async function realizarProvisaoFinanceira(id, data = {}) {
+  const res = await fetch(`${API_URL}/provisoes-financeiras/${id}/realizar`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+
+  return parseJsonOrThrow(res, 'Erro ao marcar provisao financeira como realizada');
+}
+
 export async function listarHistoricoProvisaoFinanceira(id) {
   const res = await fetch(`${API_URL}/provisoes-financeiras/${id}/historico`, {
     headers: authHeaders()

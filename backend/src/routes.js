@@ -424,6 +424,21 @@ router.get(
   criarMiddlewareProvisionamentoFinanceiro('acessar'),
   ProvisaoFinanceiraController.exportarCsv
 );
+router.post(
+  '/provisoes-financeiras/:id/aprovar',
+  criarMiddlewareProvisionamentoFinanceiro('aprovar'),
+  ProvisaoFinanceiraController.aprovar
+);
+router.post(
+  '/provisoes-financeiras/:id/cancelar',
+  criarMiddlewareProvisionamentoFinanceiro('aprovar'),
+  ProvisaoFinanceiraController.cancelar
+);
+router.post(
+  '/provisoes-financeiras/:id/realizar',
+  criarMiddlewareProvisionamentoFinanceiro('aprovar'),
+  ProvisaoFinanceiraController.realizar
+);
 router.get(
   '/provisoes-financeiras/:id',
   criarMiddlewareProvisionamentoFinanceiro('acessar'),

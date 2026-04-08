@@ -98,6 +98,10 @@ function validarStatusEdicao(statusAtual, statusNovo) {
   return ['previsto', 'em_analise'].includes(statusNovo);
 }
 
+function descricaoMudancaStatus(statusAnterior, statusNovo) {
+  return `Status alterado de ${String(statusAnterior || '-').toUpperCase()} para ${String(statusNovo || '-').toUpperCase()}.`;
+}
+
 function obterResumoUsuario(usuario) {
   if (!usuario) return null;
   return {
@@ -484,6 +488,42 @@ function escaparValorCsv(valor) {
   return `"${texto.replace(/"/g, '""')}"`;
 }
 
+async function registrarHistoricoMudancaStatus({
+  provisaoId,
+  usuarioId,
+  statusAnterior,
+  statusNovo,
+  acao,
+  descricao,
+  comentario,
+  metadata,
+  transaction
+}) {
+  await registrarHistoricoProvisionamento({
+    provisao_financeira_id: provisaoId,
+    usuario_id: usuarioId,
+    acao: 'STATUS_ALTERADO',
+    status_anterior: statusAnterior,
+    status_novo: statusNovo,
+    descricao: descricaoMudancaStatus(statusAnterior, statusNovo),
+    comentario,
+    metadata,
+    transaction
+  });
+
+  return registrarHistoricoProvisionamento({
+    provisao_financeira_id: provisaoId,
+    usuario_id: usuarioId,
+    acao,
+    status_anterior: statusAnterior,
+    status_novo: statusNovo,
+    descricao,
+    comentario,
+    metadata,
+    transaction
+  });
+}
+
 module.exports = {
   STATUS_PROVISAO_FINANCEIRA,
 
@@ -828,6 +868,21 @@ module.exports = {
         });
       }
 
+      if (String(antes.status || '') !== String(provisao.status || '')) {
+        await registrarHistoricoMudancaStatus({
+          provisaoId: provisao.id,
+          usuarioId: req.user.id,
+          statusAnterior: antes.status,
+          statusNovo: provisao.status,
+          acao: 'STATUS_ALTERADO_MANUAL',
+          descricao: 'Status ajustado manualmente na edicao da provisao.',
+          metadata: {
+            origem: 'edicao'
+          },
+          transaction
+        });
+      }
+
       await transaction.commit();
 
       const provisaoCompleta = await carregarProvisaoDetalhada(provisao.id);
@@ -1003,6 +1058,202 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return res.status(500).json({ error: 'Erro ao gerar URL assinada do anexo' });
+    }
+  },
+
+  async aprovar(req, res) {
+    const transaction = await sequelize.transaction();
+
+    try {
+      const id = parsePositiveInt(req.params?.id);
+      const comentario = normalizarTexto(req.body?.comentario);
+      if (!id) {
+        await transaction.rollback();
+        return res.status(400).json({ error: 'Identificador invalido.' });
+      }
+
+      const provisao = await ProvisaoFinanceira.findByPk(id, { transaction });
+      if (!provisao) {
+        await transaction.rollback();
+        return res.status(404).json({ error: 'Provisao financeira nao encontrada.' });
+      }
+
+      const acesso = await validarAcessoNaObra(req, provisao.obra_id, 'aprovar');
+      if (!acesso.ok) {
+        await transaction.rollback();
+        return res.status(acesso.resposta.status).json(acesso.resposta.body);
+      }
+
+      if (serializarStatus(provisao.status) !== 'em_analise') {
+        await transaction.rollback();
+        return res.status(400).json({ error: 'Somente provisoes em analise podem ser aprovadas.' });
+      }
+
+      const statusAnterior = provisao.status;
+      await provisao.update({
+        status: 'aprovado',
+        aprovado_por_id: req.user.id,
+        aprovado_em: new Date(),
+        usuario_atualizacao_id: req.user.id
+      }, { transaction });
+
+      await registrarHistoricoMudancaStatus({
+        provisaoId: provisao.id,
+        usuarioId: req.user.id,
+        statusAnterior,
+        statusNovo: provisao.status,
+        acao: 'APROVADA',
+        descricao: 'Provisao financeira aprovada.',
+        comentario,
+        metadata: {
+          origem: 'aprovacao'
+        },
+        transaction
+      });
+
+      await transaction.commit();
+      const provisaoCompleta = await carregarProvisaoDetalhada(provisao.id);
+      return res.json(provisaoCompleta);
+    } catch (error) {
+      await transaction.rollback();
+      console.error(error);
+      return res.status(500).json({ error: error.message || 'Erro ao aprovar provisao financeira' });
+    }
+  },
+
+  async cancelar(req, res) {
+    const transaction = await sequelize.transaction();
+
+    try {
+      const id = parsePositiveInt(req.params?.id);
+      const comentario = normalizarTexto(req.body?.comentario);
+      if (!id) {
+        await transaction.rollback();
+        return res.status(400).json({ error: 'Identificador invalido.' });
+      }
+
+      const provisao = await ProvisaoFinanceira.findByPk(id, { transaction });
+      if (!provisao) {
+        await transaction.rollback();
+        return res.status(404).json({ error: 'Provisao financeira nao encontrada.' });
+      }
+
+      const permissoes = await obterPermissoes(req);
+      const acesso = await validarAcessoNaObra(req, provisao.obra_id, 'aprovar');
+      if (!acesso.ok) {
+        await transaction.rollback();
+        return res.status(acesso.resposta.status).json(acesso.resposta.body);
+      }
+
+      const statusAtual = serializarStatus(provisao.status);
+      if (statusAtual === 'cancelado') {
+        await transaction.rollback();
+        return res.status(400).json({ error: 'A provisao ja esta cancelada.' });
+      }
+
+      if (statusAtual === 'realizado') {
+        await transaction.rollback();
+        return res.status(400).json({ error: 'Provisoes realizadas nao podem ser canceladas.' });
+      }
+
+      if (statusAtual === 'aprovado' && !permissoes?.superadmin) {
+        await transaction.rollback();
+        return res.status(403).json({ error: 'Apenas SUPERADMIN pode cancelar provisoes aprovadas.' });
+      }
+
+      if (!comentario) {
+        await transaction.rollback();
+        return res.status(400).json({ error: 'Informe o motivo do cancelamento.' });
+      }
+
+      const statusAnterior = provisao.status;
+      await provisao.update({
+        status: 'cancelado',
+        cancelado_por_id: req.user.id,
+        cancelado_em: new Date(),
+        usuario_atualizacao_id: req.user.id
+      }, { transaction });
+
+      await registrarHistoricoMudancaStatus({
+        provisaoId: provisao.id,
+        usuarioId: req.user.id,
+        statusAnterior,
+        statusNovo: provisao.status,
+        acao: 'CANCELADA',
+        descricao: 'Provisao financeira cancelada.',
+        comentario,
+        metadata: {
+          origem: 'cancelamento'
+        },
+        transaction
+      });
+
+      await transaction.commit();
+      const provisaoCompleta = await carregarProvisaoDetalhada(provisao.id);
+      return res.json(provisaoCompleta);
+    } catch (error) {
+      await transaction.rollback();
+      console.error(error);
+      return res.status(500).json({ error: error.message || 'Erro ao cancelar provisao financeira' });
+    }
+  },
+
+  async realizar(req, res) {
+    const transaction = await sequelize.transaction();
+
+    try {
+      const id = parsePositiveInt(req.params?.id);
+      const comentario = normalizarTexto(req.body?.comentario);
+      if (!id) {
+        await transaction.rollback();
+        return res.status(400).json({ error: 'Identificador invalido.' });
+      }
+
+      const provisao = await ProvisaoFinanceira.findByPk(id, { transaction });
+      if (!provisao) {
+        await transaction.rollback();
+        return res.status(404).json({ error: 'Provisao financeira nao encontrada.' });
+      }
+
+      const acesso = await validarAcessoNaObra(req, provisao.obra_id, 'aprovar');
+      if (!acesso.ok) {
+        await transaction.rollback();
+        return res.status(acesso.resposta.status).json(acesso.resposta.body);
+      }
+
+      if (serializarStatus(provisao.status) !== 'aprovado') {
+        await transaction.rollback();
+        return res.status(400).json({ error: 'Somente provisoes aprovadas podem ser marcadas como realizadas.' });
+      }
+
+      const statusAnterior = provisao.status;
+      await provisao.update({
+        status: 'realizado',
+        realizado_em: new Date(),
+        usuario_atualizacao_id: req.user.id
+      }, { transaction });
+
+      await registrarHistoricoMudancaStatus({
+        provisaoId: provisao.id,
+        usuarioId: req.user.id,
+        statusAnterior,
+        statusNovo: provisao.status,
+        acao: 'REALIZADA',
+        descricao: 'Provisao financeira marcada como realizada.',
+        comentario,
+        metadata: {
+          origem: 'realizacao'
+        },
+        transaction
+      });
+
+      await transaction.commit();
+      const provisaoCompleta = await carregarProvisaoDetalhada(provisao.id);
+      return res.json(provisaoCompleta);
+    } catch (error) {
+      await transaction.rollback();
+      console.error(error);
+      return res.status(500).json({ error: error.message || 'Erro ao realizar provisao financeira' });
     }
   }
 };

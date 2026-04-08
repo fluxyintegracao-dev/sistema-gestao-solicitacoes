@@ -400,11 +400,6 @@ export default function ProvisionamentosFinanceiros() {
           titulo="Registros filtrados"
           valor={String(resumo.total_registros_filtrados || 0)}
         />
-        <ResumoCard
-          titulo="Pagina atual"
-          valor={`${meta.page || 1} / ${meta.pages || 1}`}
-        />
-        <ResumoCard titulo="Selecionadas" valor={String(quantidadeSelecionadas)} />
       </div>
 
       <div className="card space-y-4">
@@ -572,6 +567,7 @@ export default function ProvisionamentosFinanceiros() {
                         type="checkbox"
                         checked={todasPaginaSelecionadas}
                         onChange={alternarTodasPaginaAtual}
+                        onClick={(event) => event.stopPropagation()}
                         title={todasPaginaSelecionadas ? 'Desmarcar todas da pagina' : 'Selecionar todas da pagina'}
                       />
                     </label>
@@ -592,13 +588,18 @@ export default function ProvisionamentosFinanceiros() {
               </thead>
               <tbody>
                 {lista.map((item) => (
-                  <tr key={item.id}>
+                  <tr
+                    key={item.id}
+                    className="cursor-pointer"
+                    onClick={() => alternarSelecionada(item)}
+                  >
                     <td>
-                      <label className="flex items-center justify-center">
+                      <label className="flex items-center justify-center" onClick={(event) => event.stopPropagation()}>
                         <input
                           type="checkbox"
                           checked={selecionadasIds.includes(Number(item.id))}
                           onChange={() => alternarSelecionada(item)}
+                          onClick={(event) => event.stopPropagation()}
                         />
                       </label>
                     </td>
@@ -614,7 +615,14 @@ export default function ProvisionamentosFinanceiros() {
                     <td>{item.usuarioCriacao?.nome || '-'}</td>
                     <td>{formatarData(item.createdAt)}</td>
                     <td>
-                      <button type="button" className="btn btn-outline" onClick={() => navigate(`/provisoes-financeiras/${item.id}`)}>
+                      <button
+                        type="button"
+                        className="btn btn-outline"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          navigate(`/provisoes-financeiras/${item.id}`);
+                        }}
+                      >
                         Detalhes
                       </button>
                     </td>
@@ -629,6 +637,9 @@ export default function ProvisionamentosFinanceiros() {
           <div className="flex flex-wrap items-center gap-3">
             <span className="text-[var(--c-muted)]">
               Pagina {meta.page || 1} de {meta.pages || 1}
+            </span>
+            <span className="text-[var(--c-muted)]">
+              {quantidadeSelecionadas} selecionada(s)
             </span>
             <label className="flex items-center gap-2 text-[var(--c-muted)]">
               <span>Itens por pagina</span>
@@ -647,28 +658,6 @@ export default function ProvisionamentosFinanceiros() {
             </label>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[var(--c-muted)]">
-              {quantidadeSelecionadas} selecionada(s)
-            </span>
-            <button
-              type="button"
-              className="btn btn-outline"
-              onClick={alternarTodasPaginaAtual}
-              disabled={idsPaginaAtual.length === 0}
-            >
-              {todasPaginaSelecionadas ? 'Desmarcar pagina' : 'Selecionar pagina'}
-            </button>
-            <button
-              type="button"
-              className="btn btn-outline"
-              onClick={() => {
-                setSelecionadasIds([]);
-                setItensSelecionados({});
-              }}
-              disabled={quantidadeSelecionadas === 0}
-            >
-              Limpar selecao
-            </button>
             <button
               type="button"
               className="btn btn-outline"

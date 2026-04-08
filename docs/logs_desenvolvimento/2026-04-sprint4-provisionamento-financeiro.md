@@ -1,0 +1,43 @@
+# 2026-04 - Sprint 4 do Provisionamento Financeiro
+
+## Entregas
+- aprovacao formal de provisoes
+- cancelamento formal de provisoes
+- marcacao de provisoes como realizadas
+- auditoria especifica de mudancas de status
+- acoes gerenciais expostas no detalhe do registro
+- ajuste de UX da listagem:
+  - selecao clicando na linha inteira
+  - remocao dos cards auxiliares de pagina/selecionadas
+  - remocao dos botoes extras de selecao no rodape
+
+## Backend
+- `backend/src/controllers/ProvisaoFinanceiraController.js`
+  - novos endpoints de transicao:
+    - `aprovar`
+    - `cancelar`
+    - `realizar`
+  - historico de `STATUS_ALTERADO`
+  - historicos especificos:
+    - `APROVADA`
+    - `CANCELADA`
+    - `REALIZADA`
+    - `STATUS_ALTERADO_MANUAL`
+- `backend/src/routes.js`
+  - novas rotas protegidas por permissao de aprovacao
+
+## Frontend
+- `frontend/src/modules/provisionamento-financeiro/pages/ProvisionamentosFinanceiros.jsx`
+  - selecao de registros clicando na linha
+  - exportacao CSV das selecionadas
+  - seletor de pagina no rodape
+- `frontend/src/modules/provisionamento-financeiro/pages/ProvisionamentoFinanceiroDetalhe.jsx`
+  - botoes de aprovar, cancelar e realizar
+  - exibicao de aprovador/cancelador e datas
+- `frontend/src/services/provisoesFinanceiras.js`
+  - chamadas para aprovar, cancelar e realizar
+
+## Validacao
+- `node --check backend/src/controllers/ProvisaoFinanceiraController.js`
+- `node --check backend/src/routes.js`
+- `npm run build` em `frontend/`
