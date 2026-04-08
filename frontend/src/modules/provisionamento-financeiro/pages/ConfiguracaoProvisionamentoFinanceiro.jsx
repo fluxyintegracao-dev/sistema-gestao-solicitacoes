@@ -18,6 +18,7 @@ function criarRegraVazia() {
     id: `nova-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     escopo_tipo: 'USUARIO',
     escopo_valor: '',
+    escopo_valores: [],
     pode_acessar: false,
     pode_criar: false,
     pode_aprovar: false,
@@ -40,6 +41,25 @@ function compararTexto(a, b) {
   });
 }
 
+function ordenarValoresEscopo(lista) {
+  return [...new Set((Array.isArray(lista) ? lista : [])
+    .map((item) => String(item || '').trim())
+    .filter(Boolean))].sort((a, b) => {
+      const numeroA = Number(a);
+      const numeroB = Number(b);
+      if (Number.isInteger(numeroA) && Number.isInteger(numeroB)) {
+        return numeroA - numeroB;
+      }
+      return compararTexto(a, b);
+    });
+}
+
+function normalizarListaObraIds(lista) {
+  return [...new Set((Array.isArray(lista) ? lista : [])
+    .map((item) => Number(item))
+    .filter((item) => Number.isInteger(item) && item > 0))];
+}
+
 function formatarObra(obra) {
   const codigo = String(obra?.codigo || '').trim();
   const nome = String(obra?.nome || '').trim();
@@ -47,33 +67,88 @@ function formatarObra(obra) {
   return codigo || nome || `Obra ${obra?.id}`;
 }
 
+function obterUsuariosSelecionados(regra) {
+  const valores = regra?.escopo_tipo === 'USUARIO'
+    ? (Array.isArray(regra?.escopo_valores) && regra.escopo_valores.length > 0
+      ? regra.escopo_valores
+      : [regra?.escopo_valor])
+    : [];
+
+  return ordenarValoresEscopo(valores);
+}
+
 function consolidarRegras(regras) {
   const mapa = new Map();
 
   (Array.isArray(regras) ? regras : []).forEach((regra) => {
     const escopoTipo = String(regra?.escopo_tipo || '').trim();
-    const escopoValor = String(regra?.escopo_valor || '').trim();
-    const chave = `${escopoTipo}::${escopoValor}`;
-
-    if (!escopoTipo || !escopoValor) {
+    if (!escopoTipo) {
       return;
     }
 
+    const obraIds = normalizarListaObraIds(regra?.obra_ids);
+
+    if (escopoTipo === 'USUARIO') {
+      const usuariosSelecionados = obterUsuariosSelecionados(regra);
+      if (usuariosSelecionados.length === 0) {
+        return;
+      }
+
+      const chave = [
+        escopoTipo,
+        Boolean(regra?.pode_acessar),
+        Boolean(regra?.pode_criar),
+        Boolean(regra?.pode_aprovar),
+        Boolean(regra?.pode_dashboard_global),
+        obraIds.slice().sort((a, b) => a - b).join(',')
+      ].join('::');
+
+      const atual = mapa.get(chave);
+      if (!atual) {
+        mapa.set(chave, {
+          ...regra,
+          escopo_tipo: escopoTipo,
+          escopo_valor: usuariosSelecionados.length === 1 ? usuariosSelecionados[0] : '',
+          escopo_valores: usuariosSelecionados,
+          pode_acessar: Boolean(regra?.pode_acessar),
+          pode_criar: Boolean(regra?.pode_criar),
+          pode_aprovar: Boolean(regra?.pode_aprovar),
+          pode_dashboard_global: Boolean(regra?.pode_dashboard_global),
+          obra_ids: obraIds
+        });
+        return;
+      }
+
+      mapa.set(chave, {
+        ...atual,
+        escopo_valores: ordenarValoresEscopo([
+          ...obterUsuariosSelecionados(atual),
+          ...usuariosSelecionados
+        ]),
+        escopo_valor: ''
+      });
+      return;
+    }
+
+    const escopoValor = String(regra?.escopo_valor || '').trim();
+    if (!escopoValor) {
+      return;
+    }
+
+    const chave = `${escopoTipo}::${escopoValor}`;
     const atual = mapa.get(chave);
-    const obraIds = Array.isArray(regra?.obra_ids)
-      ? regra.obra_ids.map(Number).filter((item) => Number.isInteger(item) && item > 0)
-      : [];
 
     if (!atual) {
       mapa.set(chave, {
         ...regra,
         escopo_tipo: escopoTipo,
         escopo_valor: escopoValor,
+        escopo_valores: [],
         pode_acessar: Boolean(regra?.pode_acessar),
         pode_criar: Boolean(regra?.pode_criar),
         pode_aprovar: Boolean(regra?.pode_aprovar),
         pode_dashboard_global: Boolean(regra?.pode_dashboard_global),
-        obra_ids: [...new Set(obraIds)]
+        obra_ids: obraIds
       });
       return;
     }
@@ -84,7 +159,7 @@ function consolidarRegras(regras) {
       pode_criar: Boolean(atual.pode_criar) || Boolean(regra?.pode_criar),
       pode_aprovar: Boolean(atual.pode_aprovar) || Boolean(regra?.pode_aprovar),
       pode_dashboard_global: Boolean(atual.pode_dashboard_global) || Boolean(regra?.pode_dashboard_global),
-      obra_ids: [...new Set([...(atual.obra_ids || []), ...obraIds])]
+      obra_ids: normalizarListaObraIds([...(atual.obra_ids || []), ...obraIds])
     });
   });
 
@@ -119,8 +194,13 @@ function obterLabelEscopo(regra, { usuarios, setores }) {
     return setor?.nome || setor?.codigo || regra?.escopo_valor || '';
   }
 
-  const usuario = usuarios.find((item) => String(item.id) === String(regra?.escopo_valor));
-  return usuario?.nome || usuario?.email || regra?.escopo_valor || '';
+  const usuariosSelecionados = obterUsuariosSelecionados(regra);
+  return usuariosSelecionados
+    .map((usuarioId) => {
+      const usuario = usuarios.find((item) => String(item.id) === String(usuarioId));
+      return usuario?.nome || usuario?.email || usuarioId;
+    })
+    .join(', ');
 }
 
 function CheckboxPermissao({ label, checked, onChange }) {
@@ -133,6 +213,86 @@ function CheckboxPermissao({ label, checked, onChange }) {
       />
       <span>{label}</span>
     </label>
+  );
+}
+
+function UsuariosEscopoSelector({
+  usuarios,
+  selectedIds,
+  onToggle,
+  onSelecionarTodos,
+  onLimpar
+}) {
+  const [busca, setBusca] = useState('');
+
+  const usuariosFiltrados = useMemo(() => {
+    const termo = normalizarTexto(busca);
+    if (!termo) return usuarios;
+
+    return usuarios.filter((usuario) => normalizarTexto(
+      `${usuario?.nome || ''} ${usuario?.email || ''}`
+    ).includes(termo));
+  }, [busca, usuarios]);
+
+  const totalSelecionados = Array.isArray(selectedIds) ? selectedIds.length : 0;
+
+  return (
+    <div className="grid gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[var(--c-muted)]">
+        <span>{totalSelecionados} usuario(s) selecionado(s)</span>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            className="rounded-lg border border-[var(--c-border)] px-3 py-2 text-xs font-medium hover:bg-[var(--c-surface)]"
+            onClick={() => onSelecionarTodos(usuariosFiltrados.map((usuario) => usuario.id))}
+          >
+            Selecionar filtrados
+          </button>
+          <button
+            type="button"
+            className="rounded-lg border border-[var(--c-border)] px-3 py-2 text-xs font-medium hover:bg-[var(--c-surface)]"
+            onClick={onLimpar}
+          >
+            Limpar
+          </button>
+        </div>
+      </div>
+
+      <input
+        className="input"
+        placeholder="Buscar usuario por nome ou email"
+        value={busca}
+        onChange={(event) => setBusca(event.target.value)}
+      />
+
+      <div className="max-h-56 overflow-y-auto rounded-lg border border-[var(--c-border)] bg-white">
+        {usuariosFiltrados.map((usuario) => {
+          const checked = selectedIds.includes(String(usuario.id));
+          return (
+            <label
+              key={usuario.id}
+              className="flex items-center gap-3 border-b border-[var(--c-border)] px-3 py-2 text-sm last:border-b-0"
+            >
+              <input
+                type="checkbox"
+                checked={checked}
+                onChange={() => onToggle(usuario.id)}
+              />
+              <span>
+                <strong>{usuario?.nome || `Usuario ${usuario.id}`}</strong>
+                <span className="text-[var(--c-muted)]">{' '} - {usuario?.email || 'sem email'}</span>
+              </span>
+            </label>
+          );
+        })}
+
+        {usuariosFiltrados.length === 0 && (
+          <div className="px-3 py-3 text-sm text-[var(--c-muted)]">
+            Nenhum usuario encontrado.
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -279,6 +439,26 @@ export default function ConfiguracaoProvisionamentoFinanceiro() {
     ));
   }
 
+  function obterRegraPersistidaUsuarios(escopoValores) {
+    const usuariosSelecionados = ordenarValoresEscopo(escopoValores);
+    if (usuariosSelecionados.length === 0) {
+      return null;
+    }
+
+    return regrasPersistidas.find((regra) => {
+      if (String(regra?.escopo_tipo || '') !== 'USUARIO') {
+        return false;
+      }
+
+      const usuariosDaRegra = obterUsuariosSelecionados(regra);
+      if (usuariosDaRegra.length !== usuariosSelecionados.length) {
+        return false;
+      }
+
+      return usuariosDaRegra.every((usuarioId, indice) => usuarioId === usuariosSelecionados[indice]);
+    }) || null;
+  }
+
   function atualizarEscopoTipo(regraId, escopoTipo) {
     setRegras((prev) => prev.map((regra) => {
       if (regra.id !== regraId) return regra;
@@ -286,6 +466,7 @@ export default function ConfiguracaoProvisionamentoFinanceiro() {
         ...regra,
         escopo_tipo: escopoTipo,
         escopo_valor: '',
+        escopo_valores: [],
         pode_acessar: false,
         pode_criar: false,
         pode_aprovar: false,
@@ -304,6 +485,7 @@ export default function ConfiguracaoProvisionamentoFinanceiro() {
         return {
           ...regra,
           escopo_valor: escopoValor,
+          escopo_valores: [],
           pode_acessar: false,
           pode_criar: false,
           pode_aprovar: false,
@@ -315,6 +497,7 @@ export default function ConfiguracaoProvisionamentoFinanceiro() {
       return {
         ...regra,
         escopo_valor: escopoValor,
+        escopo_valores: [],
         pode_acessar: Boolean(regraPersistida.pode_acessar),
         pode_criar: Boolean(regraPersistida.pode_criar),
         pode_aprovar: Boolean(regraPersistida.pode_aprovar),
@@ -326,12 +509,100 @@ export default function ConfiguracaoProvisionamentoFinanceiro() {
     }));
   }
 
-  function atualizarObrasRegra(regraId, obraIds) {
-    const obraIdsNormalizados = obraIds
-      .map((item) => Number(item))
-      .filter((item) => Number.isInteger(item) && item > 0);
+  function atualizarUsuariosRegra(regraId, usuarioIds) {
+    setRegras((prev) => prev.map((regra) => {
+      if (regra.id !== regraId) return regra;
 
-    atualizarRegra(regraId, { obra_ids: obraIdsNormalizados });
+      const usuariosSelecionados = ordenarValoresEscopo(usuarioIds);
+      const regraPersistida = obterRegraPersistidaUsuarios(usuariosSelecionados);
+
+      if (regraPersistida) {
+        return {
+          ...regra,
+          escopo_valor: usuariosSelecionados.length === 1 ? usuariosSelecionados[0] : '',
+          escopo_valores: usuariosSelecionados,
+          pode_acessar: Boolean(regraPersistida.pode_acessar),
+          pode_criar: Boolean(regraPersistida.pode_criar),
+          pode_aprovar: Boolean(regraPersistida.pode_aprovar),
+          pode_dashboard_global: Boolean(regraPersistida.pode_dashboard_global),
+          obra_ids: Array.isArray(regraPersistida.obra_ids)
+            ? regraPersistida.obra_ids.map(Number)
+            : []
+        };
+      }
+
+      if (usuariosSelecionados.length === 0) {
+        return {
+          ...regra,
+          escopo_valor: '',
+          escopo_valores: [],
+          pode_acessar: false,
+          pode_criar: false,
+          pode_aprovar: false,
+          pode_dashboard_global: false,
+          obra_ids: []
+        };
+      }
+
+      return {
+        ...regra,
+        escopo_valor: usuariosSelecionados.length === 1 ? usuariosSelecionados[0] : '',
+        escopo_valores: usuariosSelecionados
+      };
+    }));
+  }
+
+  function alternarUsuarioRegra(regraId, usuarioId) {
+    setRegras((prev) => prev.map((regra) => {
+      if (regra.id !== regraId) return regra;
+
+      const atuais = obterUsuariosSelecionados(regra);
+      const usuarioIdNormalizado = String(usuarioId);
+      const novosSelecionados = atuais.includes(usuarioIdNormalizado)
+        ? atuais.filter((item) => item !== usuarioIdNormalizado)
+        : [...atuais, usuarioIdNormalizado];
+
+      const usuariosSelecionados = ordenarValoresEscopo(novosSelecionados);
+      const regraPersistida = obterRegraPersistidaUsuarios(usuariosSelecionados);
+
+      if (regraPersistida) {
+        return {
+          ...regra,
+          escopo_valor: usuariosSelecionados.length === 1 ? usuariosSelecionados[0] : '',
+          escopo_valores: usuariosSelecionados,
+          pode_acessar: Boolean(regraPersistida.pode_acessar),
+          pode_criar: Boolean(regraPersistida.pode_criar),
+          pode_aprovar: Boolean(regraPersistida.pode_aprovar),
+          pode_dashboard_global: Boolean(regraPersistida.pode_dashboard_global),
+          obra_ids: Array.isArray(regraPersistida.obra_ids)
+            ? regraPersistida.obra_ids.map(Number)
+            : []
+        };
+      }
+
+      if (usuariosSelecionados.length === 0) {
+        return {
+          ...regra,
+          escopo_valor: '',
+          escopo_valores: [],
+          pode_acessar: false,
+          pode_criar: false,
+          pode_aprovar: false,
+          pode_dashboard_global: false,
+          obra_ids: []
+        };
+      }
+
+      return {
+        ...regra,
+        escopo_valor: usuariosSelecionados.length === 1 ? usuariosSelecionados[0] : '',
+        escopo_valores: usuariosSelecionados
+      };
+    }));
+  }
+
+  function atualizarObrasRegra(regraId, obraIds) {
+    atualizarRegra(regraId, { obra_ids: normalizarListaObraIds(obraIds) });
   }
 
   function alternarObraRegra(regraId, obraId) {
@@ -339,7 +610,7 @@ export default function ConfiguracaoProvisionamentoFinanceiro() {
     setRegras((prev) => prev.map((regra) => {
       if (regra.id !== regraId) return regra;
 
-      const atuais = Array.isArray(regra.obra_ids) ? regra.obra_ids.map(Number) : [];
+      const atuais = normalizarListaObraIds(regra.obra_ids);
       const jaSelecionada = atuais.includes(obraIdNormalizado);
       return {
         ...regra,
@@ -363,15 +634,38 @@ export default function ConfiguracaoProvisionamentoFinanceiro() {
       setSalvando(true);
 
       const regrasConsolidadas = consolidarRegras(regras);
-      const payload = regrasConsolidadas.map((regra) => ({
-        escopo_tipo: regra.escopo_tipo,
-        escopo_valor: regra.escopo_valor,
-        pode_acessar: Boolean(regra.pode_acessar),
-        pode_criar: Boolean(regra.pode_criar),
-        pode_aprovar: Boolean(regra.pode_aprovar),
-        pode_dashboard_global: Boolean(regra.pode_dashboard_global),
-        obra_ids: Array.isArray(regra.obra_ids) ? regra.obra_ids : []
-      }));
+      const payload = regrasConsolidadas.flatMap((regra, indice) => {
+        if (regra.escopo_tipo === 'USUARIO') {
+          const usuariosSelecionados = obterUsuariosSelecionados(regra);
+          if (usuariosSelecionados.length === 0) {
+            throw new Error(`Regra ${indice + 1}: selecione ao menos um usuario.`);
+          }
+
+          return usuariosSelecionados.map((usuarioId) => ({
+            escopo_tipo: 'USUARIO',
+            escopo_valor: usuarioId,
+            pode_acessar: Boolean(regra.pode_acessar),
+            pode_criar: Boolean(regra.pode_criar),
+            pode_aprovar: Boolean(regra.pode_aprovar),
+            pode_dashboard_global: Boolean(regra.pode_dashboard_global),
+            obra_ids: normalizarListaObraIds(regra.obra_ids)
+          }));
+        }
+
+        if (!String(regra.escopo_valor || '').trim()) {
+          throw new Error(`Regra ${indice + 1}: selecione um valor para o escopo.`);
+        }
+
+        return [{
+          escopo_tipo: regra.escopo_tipo,
+          escopo_valor: regra.escopo_valor,
+          pode_acessar: Boolean(regra.pode_acessar),
+          pode_criar: Boolean(regra.pode_criar),
+          pode_aprovar: Boolean(regra.pode_aprovar),
+          pode_dashboard_global: Boolean(regra.pode_dashboard_global),
+          obra_ids: normalizarListaObraIds(regra.obra_ids)
+        }];
+      });
 
       await salvarProvisionamentoFinanceiroPermissoes({ regras: payload });
       const atualizado = await getProvisionamentoFinanceiroPermissoes();
@@ -450,30 +744,40 @@ export default function ConfiguracaoProvisionamentoFinanceiro() {
                       </select>
                     </label>
 
-                    <label className="grid gap-1 text-sm">
-                      Valor do escopo
-                      <select
-                        className="input"
-                        value={regra.escopo_valor || ''}
-                        onChange={(event) => atualizarEscopoValor(regra.id, event.target.value)}
-                      >
-                        <option value="">Selecione...</option>
-                        {obterOpcoesEscopo(regra.escopo_tipo, {
-                          usuarios: usuariosOrdenados,
-                          setores: setoresOrdenados
-                        }).map((opcao) => (
-                          <option key={opcao.value} value={opcao.value}>
-                            {opcao.label}
-                          </option>
-                        ))}
-                      </select>
+                    <label className="grid gap-1 text-sm md:col-span-2 xl:col-span-1">
+                      {regra.escopo_tipo === 'USUARIO' ? 'Usuarios' : 'Valor do escopo'}
+                      {regra.escopo_tipo === 'USUARIO' ? (
+                        <UsuariosEscopoSelector
+                          usuarios={usuariosOrdenados}
+                          selectedIds={obterUsuariosSelecionados(regra)}
+                          onToggle={(usuarioId) => alternarUsuarioRegra(regra.id, usuarioId)}
+                          onSelecionarTodos={(usuarioIds) => atualizarUsuariosRegra(regra.id, [...obterUsuariosSelecionados(regra), ...usuarioIds])}
+                          onLimpar={() => atualizarUsuariosRegra(regra.id, [])}
+                        />
+                      ) : (
+                        <select
+                          className="input"
+                          value={regra.escopo_valor || ''}
+                          onChange={(event) => atualizarEscopoValor(regra.id, event.target.value)}
+                        >
+                          <option value="">Selecione...</option>
+                          {obterOpcoesEscopo(regra.escopo_tipo, {
+                            usuarios: usuariosOrdenados,
+                            setores: setoresOrdenados
+                          }).map((opcao) => (
+                            <option key={opcao.value} value={opcao.value}>
+                              {opcao.label}
+                            </option>
+                          ))}
+                        </select>
+                      )}
                     </label>
 
                     <label className="grid gap-1 text-sm md:col-span-2 xl:col-span-1">
                       Obras permitidas
                       <ObrasPermitidasSelector
                         obras={obrasOrdenadas}
-                        selectedIds={(regra.obra_ids || []).map(Number)}
+                        selectedIds={normalizarListaObraIds(regra.obra_ids)}
                         onToggle={(obraId) => alternarObraRegra(regra.id, obraId)}
                         onSelecionarTodas={() => atualizarObrasRegra(regra.id, obrasOrdenadas.map((obra) => obra.id))}
                         onLimpar={() => atualizarObrasRegra(regra.id, [])}
