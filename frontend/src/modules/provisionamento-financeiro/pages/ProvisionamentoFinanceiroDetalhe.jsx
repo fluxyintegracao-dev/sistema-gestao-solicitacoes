@@ -1,16 +1,12 @@
 ﻿import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
-  aprovarProvisaoFinanceira,
   adicionarComentarioProvisaoFinanceira,
   atualizarProvisaoFinanceira,
-  atualizarStatusProvisaoFinanceira,
-  cancelarProvisaoFinanceira,
   getProvisionamentoFinanceiroContexto,
   getProvisaoFinanceira,
   listarCategoriasMacroProvisionamento,
   obterUrlAssinadaAnexoProvisaoFinanceira,
-  realizarProvisaoFinanceira,
   uploadAnexosProvisaoFinanceira
 } from '../../../services/provisoesFinanceiras';
 import {
@@ -30,16 +26,6 @@ function formatarData(valor) {
   return data.toLocaleString('pt-BR');
 }
 
-function formatarStatus(valor) {
-  return String(valor || '-')
-    .replace(/_/g, ' ')
-    .toUpperCase();
-}
-
-function serializarStatus(valor) {
-  return String(valor || '').trim().toLowerCase();
-}
-
 export default function ProvisionamentoFinanceiroDetalhe() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -48,7 +34,6 @@ export default function ProvisionamentoFinanceiroDetalhe() {
   const [provisao, setProvisao] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [processandoAcao, setProcessandoAcao] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [comentando, setComentando] = useState(false);
   const [editando, setEditando] = useState(false);
@@ -75,8 +60,7 @@ export default function ProvisionamentoFinanceiroDetalhe() {
         valor_previsto: String(provisaoData?.valor_previsto || ''),
         fornecedor_texto: provisaoData?.fornecedor_texto || '',
         comentario: provisaoData?.comentario || '',
-        prioridade: provisaoData?.prioridade || '',
-        status: provisaoData?.status || 'previsto'
+        prioridade: provisaoData?.prioridade || ''
       });
       setValorPrevistoTexto(inicializarEntradaMoeda(provisaoData?.valor_previsto).textoFormatado);
     } catch (error) {
@@ -96,30 +80,6 @@ export default function ProvisionamentoFinanceiroDetalhe() {
     return !['aprovado', 'cancelado', 'realizado'].includes(String(provisao.status || '').toLowerCase());
   }, [contexto, provisao]);
 
-  const podeGerenciarStatusManual = useMemo(() => {
-    if (!provisao) return false;
-    const status = serializarStatus(provisao.status);
-    if (['aprovado', 'cancelado', 'realizado'].includes(status)) return false;
-    return Boolean(
-      contexto?.permissoes?.superadmin ||
-      contexto?.permissoes?.pode_aprovar
-    );
-  }, [contexto, provisao]);
-
-  const podeAprovar = useMemo(() => {
-    return Boolean(contexto?.permissoes?.pode_aprovar) && serializarStatus(provisao?.status) === 'em_analise';
-  }, [contexto, provisao]);
-
-  const podeCancelar = useMemo(() => {
-    const status = serializarStatus(provisao?.status);
-    if (!Boolean(contexto?.permissoes?.pode_aprovar)) return false;
-    if (['previsto', 'em_analise'].includes(status)) return true;
-    return Boolean(contexto?.permissoes?.superadmin) && status === 'aprovado';
-  }, [contexto, provisao]);
-
-  const podeRealizar = useMemo(() => {
-    return Boolean(contexto?.permissoes?.pode_aprovar) && serializarStatus(provisao?.status) === 'aprovado';
-  }, [contexto, provisao]);
 
   function atualizarValorPrevisto(raw) {
     const { textoFormatado, valorNumerico } = normalizarEntradaMoeda(raw);
@@ -210,52 +170,6 @@ export default function ProvisionamentoFinanceiroDetalhe() {
     }
   }
 
-  async function executarAcao(acao) {
-    if (!provisao?.id) return;
-
-    try {
-      setProcessandoAcao(true);
-
-      if (acao === 'aprovar') {
-        const comentario = window.prompt('Comentario da aprovacao (opcional):', '') ?? '';
-        await aprovarProvisaoFinanceira(provisao.id, { comentario });
-      }
-
-      if (acao === 'em_analise') {
-        const comentario = window.prompt('Comentario da mudanca para Em analise (opcional):', '') ?? '';
-        await atualizarStatusProvisaoFinanceira(provisao.id, {
-          status: 'em_analise',
-          comentario
-        });
-      }
-
-      if (acao === 'previsto') {
-        const comentario = window.prompt('Comentario da mudanca para Previsto (opcional):', '') ?? '';
-        await atualizarStatusProvisaoFinanceira(provisao.id, {
-          status: 'previsto',
-          comentario
-        });
-      }
-
-      if (acao === 'cancelar') {
-        const comentario = window.prompt('Informe o motivo do cancelamento:', '');
-        if (comentario === null) return;
-        await cancelarProvisaoFinanceira(provisao.id, { comentario });
-      }
-
-      if (acao === 'realizar') {
-        const comentario = window.prompt('Comentario da realizacao (opcional):', '') ?? '';
-        await realizarProvisaoFinanceira(provisao.id, { comentario });
-      }
-
-      await carregar();
-    } catch (error) {
-      console.error(error);
-      alert(error?.message || 'Erro ao executar acao do provisionamento financeiro.');
-    } finally {
-      setProcessandoAcao(false);
-    }
-  }
 
   if (loading || !provisao || !form) {
     return <div className="page"><p>Carregando provisao financeira...</p></div>;
@@ -274,56 +188,6 @@ export default function ProvisionamentoFinanceiroDetalhe() {
           <button type="button" className="btn btn-outline" onClick={() => navigate('/provisoes-financeiras')}>
             Voltar
           </button>
-          {podeGerenciarStatusManual && serializarStatus(provisao.status) === 'previsto' && (
-            <button
-              type="button"
-              className="btn btn-outline"
-              disabled={processandoAcao}
-              onClick={() => executarAcao('em_analise')}
-            >
-              {processandoAcao ? 'Processando...' : 'Enviar para analise'}
-            </button>
-          )}
-          {podeGerenciarStatusManual && serializarStatus(provisao.status) === 'em_analise' && (
-            <button
-              type="button"
-              className="btn btn-outline"
-              disabled={processandoAcao}
-              onClick={() => executarAcao('previsto')}
-            >
-              {processandoAcao ? 'Processando...' : 'Voltar para previsto'}
-            </button>
-          )}
-          {podeAprovar && (
-            <button
-              type="button"
-              className="btn btn-primary"
-              disabled={processandoAcao}
-              onClick={() => executarAcao('aprovar')}
-            >
-              {processandoAcao ? 'Processando...' : 'Aprovar'}
-            </button>
-          )}
-          {podeCancelar && (
-            <button
-              type="button"
-              className="btn btn-outline"
-              disabled={processandoAcao}
-              onClick={() => executarAcao('cancelar')}
-            >
-              {processandoAcao ? 'Processando...' : 'Cancelar'}
-            </button>
-          )}
-          {podeRealizar && (
-            <button
-              type="button"
-              className="btn btn-primary"
-              disabled={processandoAcao}
-              onClick={() => executarAcao('realizar')}
-            >
-              {processandoAcao ? 'Processando...' : 'Marcar como realizado'}
-            </button>
-          )}
           {podeEditar && (
             <button type="button" className="btn btn-primary" onClick={() => setEditando((valor) => !valor)}>
               {editando ? 'Fechar edicao' : 'Editar registro'}
@@ -334,7 +198,6 @@ export default function ProvisionamentoFinanceiroDetalhe() {
 
       <div className="card">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4 text-sm">
-          <Info label="Status" value={formatarStatus(provisao.status)} />
           <Info label="Item Macro" value={provisao.categoriaMacro?.nome || '-'} />
           <Info label="Data prevista" value={formatarData(provisao.data_prevista_desembolso)} />
           <Info label="Valor previsto" value={formatarMoedaBRL(provisao.valor_previsto)} />
@@ -342,11 +205,6 @@ export default function ProvisionamentoFinanceiroDetalhe() {
           <Info label="Prioridade" value={provisao.prioridade || '-'} />
           <Info label="Criado por" value={provisao.usuarioCriacao?.nome || '-'} />
           <Info label="Criado em" value={formatarData(provisao.createdAt)} />
-          <Info label="Aprovado por" value={provisao.aprovadoPor?.nome || '-'} />
-          <Info label="Aprovado em" value={formatarData(provisao.aprovado_em)} />
-          <Info label="Cancelado por" value={provisao.canceladoPor?.nome || '-'} />
-          <Info label="Cancelado em" value={formatarData(provisao.cancelado_em)} />
-          <Info label="Realizado em" value={formatarData(provisao.realizado_em)} />
           <Info label="Atualizado por" value={provisao.usuarioAtualizacao?.nome || '-'} />
         </div>
         <div className="mt-4 grid gap-2 text-sm">

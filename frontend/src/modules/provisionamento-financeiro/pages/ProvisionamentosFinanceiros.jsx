@@ -1,5 +1,10 @@
-import { useContext, useEffect, useMemo, useState } from 'react';
+import { useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import {
+  HiAdjustmentsHorizontal,
+  HiDocumentArrowDown,
+  HiViewColumns
+} from 'react-icons/hi2';
 import { AuthContext } from '../../../contexts/AuthContext';
 import {
   getProvisionamentoFinanceiroContexto,
@@ -11,7 +16,6 @@ import { formatarMoedaBRL } from '../utils/moeda';
 const DEFAULT_FILTERS = {
   obra_id: '',
   categoria_macro_id: '',
-  status: '',
   prioridade: '',
   busca: '',
   fornecedor: '',
@@ -22,14 +26,47 @@ const DEFAULT_FILTERS = {
   usuario_criacao_id: ''
 };
 
-const STATUS_OPCOES = [
-  { value: '', label: 'Todos' },
-  { value: 'previsto', label: 'Previsto' },
-  { value: 'em_analise', label: 'Em analise' },
-  { value: 'aprovado', label: 'Aprovado' },
-  { value: 'cancelado', label: 'Cancelado' },
-  { value: 'realizado', label: 'Realizado' }
+const DEFAULT_VISIBLE_FILTERS = [
+  'obra_id',
+  'categoria_macro_id',
+  'prioridade',
+  'busca',
+  'fornecedor',
+  'usuario_criacao_id',
+  'data_inicial',
+  'data_final',
+  'valor_minimo',
+  'valor_maximo'
 ];
+
+const FILTER_OPTIONS = [
+  { id: 'obra_id', label: 'Obra' },
+  { id: 'categoria_macro_id', label: 'Item Macro' },
+  { id: 'prioridade', label: 'Prioridade' },
+  { id: 'busca', label: 'Busca' },
+  { id: 'fornecedor', label: 'Fornecedor' },
+  { id: 'usuario_criacao_id', label: 'Criador' },
+  { id: 'data_inicial', label: 'Data prevista inicial' },
+  { id: 'data_final', label: 'Data prevista final' },
+  { id: 'valor_minimo', label: 'Valor minimo' },
+  { id: 'valor_maximo', label: 'Valor maximo' }
+];
+
+const COLUMN_DEFS = [
+  { id: 'codigo', label: 'Codigo', sortKey: 'codigo', mandatory: true },
+  { id: 'obra', label: 'Obra', sortKey: 'obra' },
+  { id: 'data_prevista', label: 'Data prevista', sortKey: 'data_prevista_desembolso' },
+  { id: 'item_macro', label: 'Item Macro', sortKey: 'categoria_macro' },
+  { id: 'descricao', label: 'Descricao', sortKey: 'descricao' },
+  { id: 'fornecedor', label: 'Fornecedor', sortKey: 'fornecedor_texto' },
+  { id: 'valor_previsto', label: 'Valor previsto', sortKey: 'valor_previsto' },
+  { id: 'prioridade', label: 'Prioridade', sortKey: 'prioridade' },
+  { id: 'criador', label: 'Criador', sortKey: 'usuario_criacao' },
+  { id: 'criado_em', label: 'Criado em', sortKey: 'createdAt' },
+  { id: 'acoes', label: 'Acoes', mandatory: true }
+];
+
+const DEFAULT_VISIBLE_COLUMNS = COLUMN_DEFS.map((coluna) => coluna.id);
 
 const PRIORIDADE_OPCOES = [
   { value: '', label: 'Todas' },
@@ -37,15 +74,6 @@ const PRIORIDADE_OPCOES = [
   { value: 'media', label: 'Media' },
   { value: 'alta', label: 'Alta' },
   { value: 'critica', label: 'Critica' }
-];
-
-const ORDENACAO_OPCOES = [
-  { value: 'data_prevista_desembolso', label: 'Data prevista' },
-  { value: 'createdAt', label: 'Data de criacao' },
-  { value: 'valor_previsto', label: 'Valor previsto' },
-  { value: 'codigo', label: 'Codigo' },
-  { value: 'status', label: 'Status' },
-  { value: 'prioridade', label: 'Prioridade' }
 ];
 
 function formatarData(valor) {
@@ -59,15 +87,62 @@ function formatarData(valor) {
   return data.toLocaleDateString('pt-BR');
 }
 
-function formatarStatus(valor) {
-  return String(valor || '-')
-    .replace(/_/g, ' ')
-    .toUpperCase();
-}
-
 function formatarObra(obra) {
   if (!obra) return '-';
   return `${obra.codigo ? `${obra.codigo} - ` : ''}${obra.nome}`;
+}
+
+function formatarPrioridade(valor) {
+  if (!valor) return '-';
+  return String(valor).charAt(0).toUpperCase() + String(valor).slice(1);
+}
+
+function valueOrEmpty(valor) {
+  return valor ?? '';
+}
+
+function escaparColunaCsv(valor) {
+  const texto = String(valor ?? '');
+  if (!texto.includes(';') && !texto.includes('"') && !texto.includes('\n')) {
+    return texto;
+  }
+
+  return `"${texto.replace(/"/g, '""')}"`;
+}
+
+function limparObjetoFiltros(filtros) {
+  return Object.keys(DEFAULT_FILTERS).reduce((acc, chave) => {
+    acc[chave] = valueOrEmpty(filtros?.[chave] ?? DEFAULT_FILTERS[chave]);
+    return acc;
+  }, {});
+}
+
+function normalizarListaPreferencias(lista, opcoes, obrigatorias = []) {
+  const idsValidos = new Set(opcoes.map((opcao) => opcao.id));
+  const filtradas = Array.isArray(lista)
+    ? lista.filter((item) => idsValidos.has(item))
+    : [];
+
+  obrigatorias.forEach((id) => {
+    if (!filtradas.includes(id)) {
+      filtradas.push(id);
+    }
+  });
+
+  if (filtradas.length === 0) {
+    return opcoes.map((opcao) => opcao.id);
+  }
+
+  return filtradas;
+}
+
+function ResumoCard({ titulo, valor }) {
+  return (
+    <div className="rounded-xl border border-[var(--c-border)] bg-white px-4 py-4 shadow-sm">
+      <div className="text-xs uppercase tracking-wide text-[var(--c-muted)]">{titulo}</div>
+      <div className="mt-2 text-xl font-semibold">{valor}</div>
+    </div>
+  );
 }
 
 export default function ProvisionamentosFinanceiros() {
@@ -92,10 +167,18 @@ export default function ProvisionamentosFinanceiros() {
     sort_by: 'data_prevista_desembolso',
     sort_dir: 'ASC'
   });
+  const [mostrarSeletorColunas, setMostrarSeletorColunas] = useState(false);
+  const [mostrarSeletorFiltros, setMostrarSeletorFiltros] = useState(false);
+  const [colunasVisiveis, setColunasVisiveis] = useState(DEFAULT_VISIBLE_COLUMNS);
+  const [filtrosVisiveis, setFiltrosVisiveis] = useState(DEFAULT_VISIBLE_FILTERS);
+  const seletorColunasRef = useRef(null);
+  const seletorFiltrosRef = useRef(null);
+  const botaoColunasRef = useRef(null);
+  const botaoFiltrosRef = useRef(null);
 
   const storageKey = useMemo(() => {
     const identificador = user?.id || user?.email || user?.nome || user?.perfil || 'anon';
-    return `provisionamento-financeiro:filtros:${identificador}`;
+    return `provisionamento-financeiro:lista:${identificador}`;
   }, [user?.id, user?.email, user?.nome, user?.perfil]);
 
   useEffect(() => {
@@ -104,17 +187,27 @@ export default function ProvisionamentosFinanceiros() {
       if (salvo) {
         const parsed = JSON.parse(salvo);
         if (parsed?.filtros && typeof parsed.filtros === 'object') {
-          setFiltros((atual) => ({ ...atual, ...parsed.filtros }));
+          setFiltros(limparObjetoFiltros(parsed.filtros));
         }
         if (parsed?.ordenacao && typeof parsed.ordenacao === 'object') {
-          setOrdenacao((atual) => ({ ...atual, ...parsed.ordenacao }));
+          setOrdenacao((atual) => ({
+            ...atual,
+            sort_by: parsed.ordenacao.sort_by || atual.sort_by,
+            sort_dir: parsed.ordenacao.sort_dir === 'DESC' ? 'DESC' : 'ASC'
+          }));
         }
         if (parsed?.limit) {
           setMeta((atual) => ({ ...atual, limit: Number(parsed.limit) || atual.limit || 25 }));
         }
+        if (parsed?.colunasVisiveis) {
+          setColunasVisiveis(normalizarListaPreferencias(parsed.colunasVisiveis, COLUMN_DEFS, ['codigo', 'acoes']));
+        }
+        if (parsed?.filtrosVisiveis) {
+          setFiltrosVisiveis(normalizarListaPreferencias(parsed.filtrosVisiveis, FILTER_OPTIONS));
+        }
       }
     } catch (error) {
-      console.error('Erro ao carregar filtros do provisionamento financeiro', error);
+      console.error('Erro ao carregar preferencias do provisionamento financeiro', error);
     } finally {
       setFiltrosStoragePronto(true);
     }
@@ -126,12 +219,14 @@ export default function ProvisionamentosFinanceiros() {
       window.localStorage.setItem(storageKey, JSON.stringify({
         filtros,
         ordenacao,
-        limit: meta.limit
+        limit: meta.limit,
+        colunasVisiveis,
+        filtrosVisiveis
       }));
     } catch (error) {
-      console.error('Erro ao salvar filtros do provisionamento financeiro', error);
+      console.error('Erro ao salvar preferencias do provisionamento financeiro', error);
     }
-  }, [filtros, ordenacao, meta.limit, storageKey, filtrosStoragePronto]);
+  }, [filtros, ordenacao, meta.limit, colunasVisiveis, filtrosVisiveis, storageKey, filtrosStoragePronto]);
 
   useEffect(() => {
     async function carregarBase() {
@@ -190,6 +285,42 @@ export default function ProvisionamentosFinanceiros() {
     carregarLista();
   }, [contexto, filtrosStoragePronto, filtros, ordenacao, meta.page, meta.limit]);
 
+  useEffect(() => {
+    function fecharAoClicarFora(event) {
+      const alvo = event.target;
+
+      if (
+        mostrarSeletorColunas &&
+        !seletorColunasRef.current?.contains(alvo) &&
+        !botaoColunasRef.current?.contains(alvo)
+      ) {
+        setMostrarSeletorColunas(false);
+      }
+
+      if (
+        mostrarSeletorFiltros &&
+        !seletorFiltrosRef.current?.contains(alvo) &&
+        !botaoFiltrosRef.current?.contains(alvo)
+      ) {
+        setMostrarSeletorFiltros(false);
+      }
+    }
+
+    document.addEventListener('mousedown', fecharAoClicarFora);
+    return () => document.removeEventListener('mousedown', fecharAoClicarFora);
+  }, [mostrarSeletorColunas, mostrarSeletorFiltros]);
+
+  useEffect(() => {
+    function handleEscape(event) {
+      if (event.key !== 'Escape') return;
+      setMostrarSeletorColunas(false);
+      setMostrarSeletorFiltros(false);
+    }
+
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, []);
+
   const obrasAcesso = useMemo(() => (
     Array.isArray(contexto?.obras_acesso) ? contexto.obras_acesso : []
   ), [contexto]);
@@ -210,6 +341,10 @@ export default function ProvisionamentosFinanceiros() {
 
   const quantidadeSelecionadas = selecionadasIds.length;
 
+  const colunasRenderizadas = useMemo(() => (
+    COLUMN_DEFS.filter((coluna) => colunasVisiveis.includes(coluna.id))
+  ), [colunasVisiveis]);
+
   useEffect(() => {
     if (!Array.isArray(lista) || lista.length === 0) return;
 
@@ -229,14 +364,30 @@ export default function ProvisionamentosFinanceiros() {
     setFiltros((atual) => ({ ...atual, [campo]: valueOrEmpty(valor) }));
   }
 
-  function atualizarOrdenacao(campo, valor) {
-    setMeta((atual) => ({ ...atual, page: 1 }));
-    setOrdenacao((atual) => ({ ...atual, [campo]: valor }));
-  }
-
   function limparFiltros() {
     setMeta((atual) => ({ ...atual, page: 1 }));
     setFiltros(DEFAULT_FILTERS);
+  }
+
+  function alternarOrdenacao(sortKey) {
+    if (!sortKey) return;
+
+    setMeta((atual) => ({ ...atual, page: 1 }));
+    setOrdenacao((atual) => {
+      if (atual.sort_by !== sortKey) {
+        return { sort_by: sortKey, sort_dir: 'ASC' };
+      }
+
+      return {
+        sort_by: sortKey,
+        sort_dir: atual.sort_dir === 'ASC' ? 'DESC' : 'ASC'
+      };
+    });
+  }
+
+  function indicadorOrdenacao(sortKey) {
+    if (ordenacao.sort_by !== sortKey) return '';
+    return ordenacao.sort_dir === 'ASC' ? ' ^' : ' v';
   }
 
   function alternarSelecionada(item) {
@@ -290,6 +441,25 @@ export default function ProvisionamentosFinanceiros() {
     });
   }
 
+  function toggleColuna(id) {
+    const obrigatorias = new Set(['codigo', 'acoes']);
+    if (obrigatorias.has(id)) return;
+
+    setColunasVisiveis((atual) => (
+      atual.includes(id)
+        ? atual.filter((colunaId) => colunaId !== id)
+        : [...atual, id]
+    ));
+  }
+
+  function toggleFiltroVisivel(id) {
+    setFiltrosVisiveis((atual) => (
+      atual.includes(id)
+        ? atual.filter((filtroId) => filtroId !== id)
+        : [...atual, id]
+    ));
+  }
+
   function exportarSelecionadasCsv() {
     if (selecionadasIds.length === 0) {
       alert('Selecione ao menos uma previsao para exportar.');
@@ -316,7 +486,6 @@ export default function ProvisionamentosFinanceiros() {
         'Descricao',
         'Fornecedor',
         'Valor previsto',
-        'Status',
         'Prioridade',
         'Criador',
         'Data de criacao'
@@ -330,7 +499,6 @@ export default function ProvisionamentosFinanceiros() {
         item.descricao || '',
         item.fornecedor_texto || '',
         Number(item.valor_previsto || 0).toFixed(2).replace('.', ','),
-        formatarStatus(item.status),
         item.prioridade || '',
         item.usuarioCriacao?.nome || '',
         formatarData(item.createdAt)
@@ -357,8 +525,178 @@ export default function ProvisionamentosFinanceiros() {
     }
   }
 
-  async function exportarCsv() {
-    exportarSelecionadasCsv();
+  function renderFiltro(id) {
+    switch (id) {
+      case 'obra_id':
+        return (
+          <label key={id} className="grid gap-1 text-sm">
+            Obra
+            <select className="input" value={filtros.obra_id} onChange={(event) => atualizarFiltro('obra_id', event.target.value)}>
+              <option value="">Todas</option>
+              {obrasAcesso.map((obra) => (
+                <option key={obra.id} value={obra.id}>
+                  {formatarObra(obra)}
+                </option>
+              ))}
+            </select>
+          </label>
+        );
+      case 'categoria_macro_id':
+        return (
+          <label key={id} className="grid gap-1 text-sm">
+            Item Macro
+            <select className="input" value={filtros.categoria_macro_id} onChange={(event) => atualizarFiltro('categoria_macro_id', event.target.value)}>
+              <option value="">Todas</option>
+              {categorias.map((categoria) => (
+                <option key={categoria.id} value={categoria.id}>{categoria.nome}</option>
+              ))}
+            </select>
+          </label>
+        );
+      case 'prioridade':
+        return (
+          <label key={id} className="grid gap-1 text-sm">
+            Prioridade
+            <select className="input" value={filtros.prioridade} onChange={(event) => atualizarFiltro('prioridade', event.target.value)}>
+              {PRIORIDADE_OPCOES.map((prioridade) => (
+                <option key={prioridade.value || 'todas'} value={prioridade.value}>{prioridade.label}</option>
+              ))}
+            </select>
+          </label>
+        );
+      case 'busca':
+        return (
+          <label key={id} className="grid gap-1 text-sm">
+            Busca
+            <input
+              className="input"
+              placeholder="Codigo, descricao ou fornecedor"
+              value={filtros.busca}
+              onChange={(event) => atualizarFiltro('busca', event.target.value)}
+            />
+          </label>
+        );
+      case 'fornecedor':
+        return (
+          <label key={id} className="grid gap-1 text-sm">
+            Fornecedor
+            <input
+              className="input"
+              placeholder="Nome do fornecedor"
+              value={filtros.fornecedor}
+              onChange={(event) => atualizarFiltro('fornecedor', event.target.value)}
+            />
+          </label>
+        );
+      case 'usuario_criacao_id':
+        return (
+          <label key={id} className="grid gap-1 text-sm">
+            Criador
+            <select className="input" value={filtros.usuario_criacao_id} onChange={(event) => atualizarFiltro('usuario_criacao_id', event.target.value)}>
+              <option value="">Todos</option>
+              {criadoresFiltro.map((criador) => (
+                <option key={criador.id} value={criador.id}>
+                  {criador.nome || criador.email || `Usuario ${criador.id}`}
+                </option>
+              ))}
+            </select>
+          </label>
+        );
+      case 'data_inicial':
+        return (
+          <label key={id} className="grid gap-1 text-sm">
+            Data prevista inicial
+            <input
+              type="date"
+              className="input"
+              value={filtros.data_inicial}
+              onChange={(event) => atualizarFiltro('data_inicial', event.target.value)}
+            />
+          </label>
+        );
+      case 'data_final':
+        return (
+          <label key={id} className="grid gap-1 text-sm">
+            Data prevista final
+            <input
+              type="date"
+              className="input"
+              value={filtros.data_final}
+              onChange={(event) => atualizarFiltro('data_final', event.target.value)}
+            />
+          </label>
+        );
+      case 'valor_minimo':
+        return (
+          <label key={id} className="grid gap-1 text-sm">
+            Valor minimo
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              className="input"
+              value={filtros.valor_minimo}
+              onChange={(event) => atualizarFiltro('valor_minimo', event.target.value)}
+            />
+          </label>
+        );
+      case 'valor_maximo':
+        return (
+          <label key={id} className="grid gap-1 text-sm">
+            Valor maximo
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              className="input"
+              value={filtros.valor_maximo}
+              onChange={(event) => atualizarFiltro('valor_maximo', event.target.value)}
+            />
+          </label>
+        );
+      default:
+        return null;
+    }
+  }
+
+  function renderCelula(item, colunaId) {
+    switch (colunaId) {
+      case 'codigo':
+        return <span className="font-mono text-xs font-semibold">{item.codigo}</span>;
+      case 'obra':
+        return formatarObra(item.obra);
+      case 'data_prevista':
+        return formatarData(item.data_prevista_desembolso);
+      case 'item_macro':
+        return item.categoriaMacro?.nome || '-';
+      case 'descricao':
+        return item.descricao || '-';
+      case 'fornecedor':
+        return item.fornecedor_texto || '-';
+      case 'valor_previsto':
+        return formatarMoedaBRL(item.valor_previsto);
+      case 'prioridade':
+        return formatarPrioridade(item.prioridade);
+      case 'criador':
+        return item.usuarioCriacao?.nome || '-';
+      case 'criado_em':
+        return formatarData(item.createdAt);
+      case 'acoes':
+        return (
+          <button
+            type="button"
+            className="btn btn-outline"
+            onClick={(event) => {
+              event.stopPropagation();
+              navigate(`/provisoes-financeiras/${item.id}`);
+            }}
+          >
+            Detalhes
+          </button>
+        );
+      default:
+        return '-';
+    }
   }
 
   if (loadingBase) {
@@ -371,35 +709,14 @@ export default function ProvisionamentosFinanceiros() {
         <div>
           <h1 className="page-title">Provisionamento Financeiro</h1>
           <p className="page-subtitle">
-            Registro macro de previsao de desembolso por obra, sem substituir o fluxo principal do sistema.
+            Registro macro de previsao de desembolso por obra, sem fluxo de etapas e com foco em acompanhamento gerencial.
           </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {String(user?.perfil || '').toUpperCase() === 'SUPERADMIN' && (
-            <button type="button" className="btn btn-outline" onClick={() => navigate('/provisoes-financeiras/categorias')}>
-              Categorias macro
-            </button>
-          )}
-          <button type="button" className="btn btn-outline" onClick={exportarCsv} disabled={exportando}>
-            {exportando ? 'Exportando...' : `Exportar CSV${quantidadeSelecionadas > 0 ? ` (${quantidadeSelecionadas})` : ''}`}
-          </button>
-          {Boolean(contexto?.permissoes?.pode_criar) && (
-            <button type="button" className="btn btn-primary" onClick={() => navigate('/provisoes-financeiras/nova')}>
-              Nova provisao
-            </button>
-          )}
         </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <ResumoCard
-          titulo="Total filtrado"
-          valor={formatarMoedaBRL(resumo.valor_total_filtrado)}
-        />
-        <ResumoCard
-          titulo="Registros filtrados"
-          valor={String(resumo.total_registros_filtrados || 0)}
-        />
+        <ResumoCard titulo="Total filtrado" valor={formatarMoedaBRL(resumo.valor_total_filtrado)} />
+        <ResumoCard titulo="Registros filtrados" valor={String(resumo.total_registros_filtrados || 0)} />
       </div>
 
       <div className="card space-y-4">
@@ -410,140 +727,110 @@ export default function ProvisionamentosFinanceiros() {
           </button>
         </div>
 
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <label className="grid gap-1 text-sm">
-            Obra
-            <select className="input" value={filtros.obra_id} onChange={(event) => atualizarFiltro('obra_id', event.target.value)}>
-              <option value="">Todas</option>
-              {obrasAcesso.map((obra) => (
-                <option key={obra.id} value={obra.id}>
-                  {formatarObra(obra)}
-                </option>
-              ))}
-            </select>
-          </label>
+        {filtrosVisiveis.length > 0 ? (
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            {FILTER_OPTIONS
+              .filter((filtro) => filtrosVisiveis.includes(filtro.id))
+              .map((filtro) => renderFiltro(filtro.id))}
+          </div>
+        ) : (
+          <div className="rounded-xl border border-dashed border-[var(--c-border)] p-6 text-sm text-[var(--c-muted)]">
+            Nenhum filtro visivel selecionado. Use o botao <strong>Filtros</strong> na barra acima da tabela para escolher quais filtros exibir.
+          </div>
+        )}
+      </div>
 
-          <label className="grid gap-1 text-sm">
-            Item Macro
-            <select className="input" value={filtros.categoria_macro_id} onChange={(event) => atualizarFiltro('categoria_macro_id', event.target.value)}>
-              <option value="">Todas</option>
-              {categorias.map((categoria) => (
-                <option key={categoria.id} value={categoria.id}>{categoria.nome}</option>
-              ))}
-            </select>
-          </label>
-
-          <label className="grid gap-1 text-sm">
-            Status
-            <select className="input" value={filtros.status} onChange={(event) => atualizarFiltro('status', event.target.value)}>
-              {STATUS_OPCOES.map((status) => (
-                <option key={status.value || 'todos'} value={status.value}>{status.label}</option>
-              ))}
-            </select>
-          </label>
-
-          <label className="grid gap-1 text-sm">
-            Prioridade
-            <select className="input" value={filtros.prioridade} onChange={(event) => atualizarFiltro('prioridade', event.target.value)}>
-              {PRIORIDADE_OPCOES.map((prioridade) => (
-                <option key={prioridade.value || 'todas'} value={prioridade.value}>{prioridade.label}</option>
-              ))}
-            </select>
-          </label>
-
-          <label className="grid gap-1 text-sm">
-            Busca
-            <input
-              className="input"
-              placeholder="Codigo, descricao ou fornecedor"
-              value={filtros.busca}
-              onChange={(event) => atualizarFiltro('busca', event.target.value)}
-            />
-          </label>
-
-          <label className="grid gap-1 text-sm">
-            Fornecedor
-            <input
-              className="input"
-              placeholder="Nome do fornecedor"
-              value={filtros.fornecedor}
-              onChange={(event) => atualizarFiltro('fornecedor', event.target.value)}
-            />
-          </label>
-
-          <label className="grid gap-1 text-sm">
-            Criador
-            <select className="input" value={filtros.usuario_criacao_id} onChange={(event) => atualizarFiltro('usuario_criacao_id', event.target.value)}>
-              <option value="">Todos</option>
-              {criadoresFiltro.map((criador) => (
-                <option key={criador.id} value={criador.id}>
-                  {criador.nome || criador.email || `Usuario ${criador.id}`}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="grid gap-1 text-sm">
-            Data prevista inicial
-            <input
-              type="date"
-              className="input"
-              value={filtros.data_inicial}
-              onChange={(event) => atualizarFiltro('data_inicial', event.target.value)}
-            />
-          </label>
-
-          <label className="grid gap-1 text-sm">
-            Data prevista final
-            <input
-              type="date"
-              className="input"
-              value={filtros.data_final}
-              onChange={(event) => atualizarFiltro('data_final', event.target.value)}
-            />
-          </label>
-
-          <label className="grid gap-1 text-sm">
-            Valor minimo
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              className="input"
-              value={filtros.valor_minimo}
-              onChange={(event) => atualizarFiltro('valor_minimo', event.target.value)}
-            />
-          </label>
-
-          <label className="grid gap-1 text-sm">
-            Valor maximo
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              className="input"
-              value={filtros.valor_maximo}
-              onChange={(event) => atualizarFiltro('valor_maximo', event.target.value)}
-            />
-          </label>
-
-          <label className="grid gap-1 text-sm">
-            Ordenar por
-            <select className="input" value={ordenacao.sort_by} onChange={(event) => atualizarOrdenacao('sort_by', event.target.value)}>
-              {ORDENACAO_OPCOES.map((opcao) => (
-                <option key={opcao.value} value={opcao.value}>{opcao.label}</option>
-              ))}
-            </select>
-          </label>
-
-          <label className="grid gap-1 text-sm">
-            Direcao
-            <select className="input" value={ordenacao.sort_dir} onChange={(event) => atualizarOrdenacao('sort_dir', event.target.value)}>
-              <option value="ASC">Crescente</option>
-              <option value="DESC">Decrescente</option>
-            </select>
-          </label>
+      <div className="card relative space-y-4">
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
+          <div className="text-sm text-[var(--c-muted)]">
+            Selecionadas: <strong>{quantidadeSelecionadas}</strong>
+          </div>
+          <div className="flex flex-wrap gap-2 xl:ml-auto">
+            {String(user?.perfil || '').toUpperCase() === 'SUPERADMIN' && (
+              <button type="button" className="btn btn-outline" onClick={() => navigate('/provisoes-financeiras/categorias')}>
+                Categorias macro
+              </button>
+            )}
+            <button type="button" className="btn btn-outline inline-flex items-center gap-2" onClick={exportarSelecionadasCsv} disabled={exportando || quantidadeSelecionadas === 0}>
+              <HiDocumentArrowDown className="w-4 h-4" />
+              <span className="hidden sm:inline">Exportar</span>
+            </button>
+            <button
+              ref={botaoColunasRef}
+              type="button"
+              className="btn btn-outline inline-flex items-center gap-2"
+              onClick={() => {
+                setMostrarSeletorColunas((valor) => !valor);
+                setMostrarSeletorFiltros(false);
+              }}
+            >
+              <HiViewColumns className="w-4 h-4" />
+              <span className="hidden sm:inline">Colunas</span>
+            </button>
+            <button
+              ref={botaoFiltrosRef}
+              type="button"
+              className="btn btn-outline inline-flex items-center gap-2"
+              onClick={() => {
+                setMostrarSeletorFiltros((valor) => !valor);
+                setMostrarSeletorColunas(false);
+              }}
+            >
+              <HiAdjustmentsHorizontal className="w-4 h-4" />
+              <span className="hidden sm:inline">Filtros</span>
+            </button>
+            {Boolean(contexto?.permissoes?.pode_criar) && (
+              <button type="button" className="btn btn-primary" onClick={() => navigate('/provisoes-financeiras/nova')}>
+                Nova provisao
+              </button>
+            )}
+          </div>
         </div>
+
+        {mostrarSeletorColunas && (
+          <div ref={seletorColunasRef} className="absolute right-0 top-[56px] z-20 w-[320px] max-w-[calc(100vw-2rem)] rounded-xl border border-gray-200 bg-white p-3 shadow-lg">
+            <div className="mb-2 flex items-center justify-between">
+              <p className="text-sm font-medium">Colunas visiveis</p>
+              <button type="button" className="text-xs text-blue-600 hover:underline" onClick={() => setColunasVisiveis(COLUMN_DEFS.map((coluna) => coluna.id))}>
+                Mostrar todas
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-2 max-h-60 overflow-y-auto">
+              {COLUMN_DEFS.map((coluna) => {
+                const obrigatoria = Boolean(coluna.mandatory);
+                const marcada = colunasVisiveis.includes(coluna.id);
+                return (
+                  <label key={coluna.id} className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" checked={marcada} disabled={obrigatoria} onChange={() => toggleColuna(coluna.id)} />
+                    <span className={obrigatoria ? 'text-gray-500' : ''}>{coluna.label}</span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {mostrarSeletorFiltros && (
+          <div ref={seletorFiltrosRef} className="absolute right-0 top-[56px] z-20 w-[320px] max-w-[calc(100vw-2rem)] rounded-xl border border-gray-200 bg-white p-3 shadow-lg">
+            <div className="mb-2 flex items-center justify-between">
+              <p className="text-sm font-medium">Filtros visiveis</p>
+              <button type="button" className="text-xs text-blue-600 hover:underline" onClick={() => setFiltrosVisiveis(FILTER_OPTIONS.map((filtro) => filtro.id))}>
+                Mostrar todos
+              </button>
+            </div>
+            <div className="grid grid-cols-1 gap-2 max-h-60 overflow-y-auto">
+              {FILTER_OPTIONS.map((filtro) => {
+                const marcada = filtrosVisiveis.includes(filtro.id);
+                return (
+                  <label key={filtro.id} className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" checked={marcada} onChange={() => toggleFiltroVisivel(filtro.id)} />
+                    <span>{filtro.label}</span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="card">
@@ -572,27 +859,20 @@ export default function ProvisionamentosFinanceiros() {
                       />
                     </label>
                   </th>
-                  <th>Codigo</th>
-                  <th>Obra</th>
-                  <th>Data prevista</th>
-                    <th>Item Macro</th>
-                  <th>Descricao</th>
-                  <th>Fornecedor</th>
-                  <th>Valor previsto</th>
-                  <th>Status</th>
-                  <th>Prioridade</th>
-                  <th>Criador</th>
-                  <th>Criado em</th>
-                  <th>Acoes</th>
+                  {colunasRenderizadas.map((coluna) => (
+                    <th key={coluna.id}>
+                      {coluna.sortKey ? (
+                        <button type="button" className="font-inherit hover:underline" onClick={() => alternarOrdenacao(coluna.sortKey)}>
+                          {coluna.label}{indicadorOrdenacao(coluna.sortKey)}
+                        </button>
+                      ) : coluna.label}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
                 {lista.map((item) => (
-                  <tr
-                    key={item.id}
-                    className="cursor-pointer"
-                    onClick={() => alternarSelecionada(item)}
-                  >
+                  <tr key={item.id} className="cursor-pointer" onClick={() => alternarSelecionada(item)}>
                     <td>
                       <label className="flex items-center justify-center" onClick={(event) => event.stopPropagation()}>
                         <input
@@ -603,29 +883,9 @@ export default function ProvisionamentosFinanceiros() {
                         />
                       </label>
                     </td>
-                    <td className="font-mono text-xs font-semibold">{item.codigo}</td>
-                    <td>{formatarObra(item.obra)}</td>
-                    <td>{formatarData(item.data_prevista_desembolso)}</td>
-                    <td>{item.categoriaMacro?.nome || '-'}</td>
-                    <td>{item.descricao || '-'}</td>
-                    <td>{item.fornecedor_texto || '-'}</td>
-                    <td>{formatarMoedaBRL(item.valor_previsto)}</td>
-                    <td>{formatarStatus(item.status)}</td>
-                    <td>{item.prioridade || '-'}</td>
-                    <td>{item.usuarioCriacao?.nome || '-'}</td>
-                    <td>{formatarData(item.createdAt)}</td>
-                    <td>
-                      <button
-                        type="button"
-                        className="btn btn-outline"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          navigate(`/provisoes-financeiras/${item.id}`);
-                        }}
-                      >
-                        Detalhes
-                      </button>
-                    </td>
+                    {colunasRenderizadas.map((coluna) => (
+                      <td key={coluna.id}>{renderCelula(item, coluna.id)}</td>
+                    ))}
                   </tr>
                 ))}
               </tbody>
@@ -637,9 +897,6 @@ export default function ProvisionamentosFinanceiros() {
           <div className="flex flex-wrap items-center gap-3">
             <span className="text-[var(--c-muted)]">
               Pagina {meta.page || 1} de {meta.pages || 1}
-            </span>
-            <span className="text-[var(--c-muted)]">
-              {quantidadeSelecionadas} selecionada(s)
             </span>
             <label className="flex items-center gap-2 text-[var(--c-muted)]">
               <span>Itens por pagina</span>
@@ -658,47 +915,15 @@ export default function ProvisionamentosFinanceiros() {
             </label>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              className="btn btn-outline"
-              disabled={(meta.page || 1) <= 1}
-              onClick={() => setMeta((atual) => ({ ...atual, page: Math.max(1, (atual.page || 1) - 1) }))}
-            >
+            <button type="button" className="btn btn-outline" disabled={(meta.page || 1) <= 1} onClick={() => setMeta((atual) => ({ ...atual, page: Math.max(1, (atual.page || 1) - 1) }))}>
               Anterior
             </button>
-            <button
-              type="button"
-              className="btn btn-outline"
-              disabled={!meta.pages || (meta.page || 1) >= meta.pages}
-              onClick={() => setMeta((atual) => ({ ...atual, page: (atual.page || 1) + 1 }))}
-            >
+            <button type="button" className="btn btn-outline" disabled={!meta.pages || (meta.page || 1) >= meta.pages} onClick={() => setMeta((atual) => ({ ...atual, page: (atual.page || 1) + 1 }))}>
               Proxima
             </button>
           </div>
         </div>
       </div>
-    </div>
-  );
-}
-
-function valueOrEmpty(valor) {
-  return valor ?? '';
-}
-
-function escaparColunaCsv(valor) {
-  const texto = String(valor ?? '');
-  if (!texto.includes(';') && !texto.includes('"') && !texto.includes('\n')) {
-    return texto;
-  }
-
-  return `"${texto.replace(/"/g, '""')}"`;
-}
-
-function ResumoCard({ titulo, valor }) {
-  return (
-    <div className="rounded-xl border border-[var(--c-border)] bg-white px-4 py-4 shadow-sm">
-      <div className="text-xs uppercase tracking-wide text-[var(--c-muted)]">{titulo}</div>
-      <div className="mt-2 text-xl font-semibold">{valor}</div>
     </div>
   );
 }

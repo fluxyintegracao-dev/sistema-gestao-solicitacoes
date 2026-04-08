@@ -74,20 +74,84 @@ function normalizarCampoOrdenacao(valor) {
   const campo = String(valor || '').trim().toLowerCase();
   const mapa = {
     codigo: 'codigo',
+    obra: 'obra',
     data_prevista: 'data_prevista_desembolso',
     data_prevista_desembolso: 'data_prevista_desembolso',
-    categoria: 'categoria_macro_id',
+    categoria: 'categoria_macro',
+    item_macro: 'categoria_macro',
+    categoria_macro: 'categoria_macro',
+    descricao: 'descricao',
+    fornecedor: 'fornecedor_texto',
+    fornecedor_texto: 'fornecedor_texto',
     valor: 'valor_previsto',
     valor_previsto: 'valor_previsto',
     status: 'status',
     prioridade: 'prioridade',
-    criador: 'usuario_criacao_id',
+    criador: 'usuario_criacao',
+    usuario_criacao: 'usuario_criacao',
     createdat: 'createdAt',
     created_at: 'createdAt',
     criacao: 'createdAt'
   };
 
   return mapa[campo] || 'data_prevista_desembolso';
+}
+
+function obterOrdenacaoListagem(sortBy, sortDir) {
+  switch (sortBy) {
+    case 'codigo':
+      return [
+        [sequelize.literal("CAST(SUBSTRING_INDEX(`ProvisaoFinanceira`.`codigo`, '-', -1) AS UNSIGNED)"), sortDir],
+        ['codigo', sortDir],
+        ['createdAt', 'DESC']
+      ];
+    case 'obra':
+      return [
+        [{ model: Obra, as: 'obra' }, 'nome', sortDir],
+        [{ model: Obra, as: 'obra' }, 'codigo', sortDir],
+        ['createdAt', 'DESC']
+      ];
+    case 'categoria_macro':
+      return [
+        [{ model: ProvisaoCategoriaMacro, as: 'categoriaMacro' }, 'nome', sortDir],
+        ['createdAt', 'DESC']
+      ];
+    case 'descricao':
+      return [
+        ['descricao', sortDir],
+        ['createdAt', 'DESC']
+      ];
+    case 'fornecedor_texto':
+      return [
+        ['fornecedor_texto', sortDir],
+        ['createdAt', 'DESC']
+      ];
+    case 'valor_previsto':
+      return [
+        ['valor_previsto', sortDir],
+        ['createdAt', 'DESC']
+      ];
+    case 'prioridade':
+      return [
+        ['prioridade', sortDir],
+        ['createdAt', 'DESC']
+      ];
+    case 'usuario_criacao':
+      return [
+        [{ model: User, as: 'usuarioCriacao' }, 'nome', sortDir],
+        ['createdAt', 'DESC']
+      ];
+    case 'createdAt':
+      return [
+        ['createdAt', sortDir]
+      ];
+    case 'data_prevista_desembolso':
+    default:
+      return [
+        ['data_prevista_desembolso', sortDir],
+        ['createdAt', 'DESC']
+      ];
+  }
 }
 
 function serializarStatus(valor) {
@@ -433,12 +497,12 @@ async function construirConsultaListagem(req) {
 
   const possuiAcesso = aplicarEscopoObrasNoWhere(where, permissoes);
   if (!possuiAcesso) {
-    return {
-      permissoes,
-      where,
-      vazio: true,
-      order: [['data_prevista_desembolso', 'ASC'], ['createdAt', 'DESC']]
-    };
+      return {
+        permissoes,
+        where,
+        vazio: true,
+        order: obterOrdenacaoListagem('data_prevista_desembolso', 'ASC')
+      };
   }
 
   if (obraId) {
@@ -522,10 +586,7 @@ async function construirConsultaListagem(req) {
     permissoes,
     where,
     vazio: false,
-    order: [
-      [sortBy, sortDir],
-      ['createdAt', sortBy === 'createdAt' ? sortDir : 'DESC']
-    ]
+    order: obterOrdenacaoListagem(sortBy, sortDir)
   };
 }
 
@@ -698,7 +759,6 @@ module.exports = {
         'Descricao',
         'Fornecedor',
         'Valor previsto',
-        'Status',
         'Prioridade',
         'Criador',
         'Data de criacao'
@@ -712,7 +772,6 @@ module.exports = {
         item.descricao || '',
         item.fornecedor_texto || '',
         Number(item.valor_previsto || 0).toFixed(2).replace('.', ','),
-        item.status || '',
         item.prioridade || '',
         item.usuarioCriacao?.nome || '',
         formatarDataCsv(item.createdAt)

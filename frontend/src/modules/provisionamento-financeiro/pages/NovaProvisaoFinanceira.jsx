@@ -29,8 +29,7 @@ export default function NovaProvisaoFinanceira() {
     descricao: '',
     valor_previsto: '',
     fornecedor_texto: '',
-    prioridade: '',
-    status: 'previsto'
+    prioridade: ''
   });
 
   useEffect(() => {
@@ -172,13 +171,6 @@ export default function NovaProvisaoFinanceira() {
             </select>
           </label>
 
-          <label className="grid gap-1 text-sm">
-            Status inicial
-            <select className="input" value={form.status} onChange={(event) => atualizarCampo('status', event.target.value)}>
-              <option value="previsto">Previsto</option>
-              <option value="em_analise">Em analise</option>
-            </select>
-          </label>
 
         </div>
 

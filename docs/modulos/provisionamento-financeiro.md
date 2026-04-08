@@ -28,8 +28,8 @@ Nesta etapa o modulo ainda nao aparece no menu principal para usuarios comuns.
 - exibicao do modulo no menu apenas para usuarios com acesso
 
 ## Escopo do Sprint 3
-- filtros avancados por obra, periodo, categoria, status, fornecedor, faixa de valor, prioridade e criador
-- ordenacao configuravel
+- filtros avancados por obra, periodo, categoria, fornecedor, faixa de valor, prioridade e criador
+- ordenacao direta pelos cabecalhos da tabela
 - totalizador por valor filtrado
 - contador de registros filtrados
 - exportacao CSV da listagem filtrada
@@ -38,11 +38,13 @@ Nesta etapa o modulo ainda nao aparece no menu principal para usuarios comuns.
 - configuracao de obras permitidas com checklist multi-selecao
 - selecao de previsoes na tabela com exportacao CSV apenas das selecionadas
 - seletor de itens por pagina no rodape da tabela (`25`, `50`, `100`, `200`)
+- seletor de colunas visiveis e filtros visiveis acima da tabela, no mesmo padrao operacional da tela de solicitacoes
 
 ## Escopo do Sprint 4
-- transicoes formais de status para aprovacao, cancelamento e realizacao
+- transicoes formais de status para aprovacao, cancelamento e realizacao no backend
 - auditoria especifica para mudancas de status
 - acoes gerenciais no detalhe da provisao
+- posteriormente, a interface web do modulo foi simplificada para acompanhamento, ocultando status e acoes de etapa
 
 ## Escopo do Sprint 5
 - dashboard gerencial do modulo
@@ -61,15 +63,9 @@ Nesta etapa o modulo ainda nao aparece no menu principal para usuarios comuns.
 - checklist operacional e documentacao de deploy da etapa
 
 ## Regras de status
-- criacao aceita `previsto` ou `em_analise`
-- edicao de campos do registro ficou restrita ao `SUPERADMIN`
-- superadmin e usuarios com permissao de aprovacao podem mover manualmente entre `previsto` e `em_analise`
-- aprovacao: somente `em_analise -> aprovado`
-- cancelamento:
-  - `previsto -> cancelado`
-  - `em_analise -> cancelado`
-  - `aprovado -> cancelado` apenas para `SUPERADMIN`
-- realizacao: somente `aprovado -> realizado`
+- o backend ainda preserva os estados internos do modulo para compatibilidade historica e futura
+- a interface web operacional atual nao exibe status nem permite alteracao de etapa
+- novos registros seguem fluxo simplificado de acompanhamento, sem escolha de status na tela
 
 ## Codigo da previsao
 Formato:
@@ -155,6 +151,7 @@ Restricao por obra:
 - quando um `Item Macro` novo e informado, o backend reutiliza ou cria automaticamente o registro correspondente em `provisao_categorias_macro`
 - a tela de `Nova Provisao` nao exibe mais `Comentario inicial`; a `Descricao` cobre esse uso inicial
 - a exportacao CSV respeita exatamente os filtros e a ordenacao aplicados na listagem
+- a listagem usa ordenacao por clique no cabecalho; o codigo `PREVx-n` e ordenado pelo numero apos o `-`
 - o dashboard usa o mesmo escopo de acesso do modulo e so amplia para visao global quando `pode_dashboard_global` estiver habilitado
 - o frontend oculta o menu do dashboard para usuarios sem `pode_dashboard_global`
 - o backend passou a aceitar ate `200` itens por pagina, alinhado ao frontend
