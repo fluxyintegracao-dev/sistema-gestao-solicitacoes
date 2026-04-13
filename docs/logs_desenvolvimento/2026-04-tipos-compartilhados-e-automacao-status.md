@@ -35,6 +35,7 @@
   - novas rotas protegidas por `SuperadminRoute`
 
 ## Regras finais
+- tipos compartilhados agora sao configurados por `setor de origem + tipo_solicitacao`
 - tipos compartilhados nao alteram ownership da solicitacao
 - automacao de status envia automaticamente para o setor configurado, mas so apos a mudanca de status ser aceita
 - configuracao fica toda centralizada no frontend de configuracoes para o `SUPERADMIN`

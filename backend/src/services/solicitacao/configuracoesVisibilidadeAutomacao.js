@@ -39,20 +39,33 @@ function normalizarIdPositivo(valor) {
 function normalizarTiposCompartilhados(raw = {}) {
   const regras = {};
 
-  Object.entries(raw || {}).forEach(([tipoId, setores]) => {
-    const id = normalizarIdPositivo(tipoId);
-    if (!id) return;
+  Object.entries(raw || {}).forEach(([setorOrigem, tiposRaw]) => {
+    const setorOrigemNormalizado = normalizarTokenSetor(setorOrigem);
+    if (!setorOrigemNormalizado || !tiposRaw || typeof tiposRaw !== 'object') {
+      return;
+    }
 
-    const setoresNormalizados = Array.from(
-      new Set(
-        (Array.isArray(setores) ? setores : [])
-          .map(normalizarTokenSetor)
-          .filter(Boolean)
-      )
-    );
+    const tiposNormalizados = {};
 
-    if (setoresNormalizados.length > 0) {
-      regras[String(id)] = setoresNormalizados;
+    Object.entries(tiposRaw).forEach(([tipoId, setores]) => {
+      const id = normalizarIdPositivo(tipoId);
+      if (!id) return;
+
+      const setoresNormalizados = Array.from(
+        new Set(
+          (Array.isArray(setores) ? setores : [])
+            .map(normalizarTokenSetor)
+            .filter(Boolean)
+        )
+      );
+
+      if (setoresNormalizados.length > 0) {
+        tiposNormalizados[String(id)] = setoresNormalizados;
+      }
+    });
+
+    if (Object.keys(tiposNormalizados).length > 0) {
+      regras[setorOrigemNormalizado] = tiposNormalizados;
     }
   });
 
@@ -118,13 +131,26 @@ function obterTiposCompartilhadosParaTokens(tokensSetor = [], regras = {}) {
 
   if (tokens.length === 0) return [];
 
-  return Object.entries(regras || {})
-    .filter(([, setores]) => {
-      const lista = Array.isArray(setores) ? setores : [];
-      return lista.some((setor) => tokens.includes(normalizarTokenSetor(setor)));
-    })
-    .map(([tipoId]) => Number(tipoId))
-    .filter((tipoId) => Number.isInteger(tipoId) && tipoId > 0);
+  const compartilhamentos = [];
+
+  Object.entries(regras || {}).forEach(([setorOrigem, tipos]) => {
+    const tipoIds = Object.entries(tipos || {})
+      .filter(([, setores]) => {
+        const lista = Array.isArray(setores) ? setores : [];
+        return lista.some((setor) => tokens.includes(normalizarTokenSetor(setor)));
+      })
+      .map(([tipoId]) => Number(tipoId))
+      .filter((tipoId) => Number.isInteger(tipoId) && tipoId > 0);
+
+    if (tipoIds.length > 0) {
+      compartilhamentos.push({
+        setor_origem: normalizarTokenSetor(setorOrigem),
+        tipos: tipoIds
+      });
+    }
+  });
+
+  return compartilhamentos;
 }
 
 function obterAutomacaoStatusCorrespondente({

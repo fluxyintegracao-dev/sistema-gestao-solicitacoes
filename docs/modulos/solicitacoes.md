@@ -47,7 +47,7 @@
 - o botao `Informar pagamento` aparece apenas para o setor `FINANCEIRO`
 
 ## Tipos compartilhados entre setores
-- o `SUPERADMIN` pode configurar setores extras que passam a visualizar um `tipo_solicitacao` desde a criacao
+- o `SUPERADMIN` pode configurar um `setor de origem` e, para cada `tipo_solicitacao`, quais setores extras passam a visualizar a solicitacao desde a criacao
 - esses setores ganham apenas visibilidade adicional
 - o setor responsavel da solicitacao nao muda por causa desse compartilhamento
 - essa visibilidade vale para listagem e detalhe do fluxo normal

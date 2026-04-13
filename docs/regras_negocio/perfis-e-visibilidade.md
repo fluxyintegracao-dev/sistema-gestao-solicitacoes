@@ -39,8 +39,8 @@ A visibilidade efetiva depende de combinacao entre:
   - a listagem passa a exibir saldo enquanto a solicitacao nao estiver `PAGA`
   - o detalhe mantem valor total, pago acumulado e saldo atual
 - tipos compartilhados entre setores:
-  - o `SUPERADMIN` pode configurar setores extras por `tipo_solicitacao`
-  - esses setores passam a visualizar a solicitacao desde a criacao
+  - o `SUPERADMIN` pode configurar o `setor de origem` que compartilha cada `tipo_solicitacao`
+  - os setores extras marcados passam a visualizar a solicitacao quando ela estiver naquele setor de origem com o tipo configurado
   - essa configuracao nao muda o setor responsavel da solicitacao
 - automacao de envio por status:
   - o `SUPERADMIN` pode definir, por tipo e status, qual setor recebe automaticamente a solicitacao

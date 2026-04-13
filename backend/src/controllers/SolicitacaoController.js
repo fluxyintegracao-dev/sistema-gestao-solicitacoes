@@ -462,6 +462,28 @@ function calcularResumoFinanceiroSolicitacao(solicitacao) {
   };
 }
 
+function construirCondicoesTiposCompartilhados(compartilhamentos = []) {
+  return (Array.isArray(compartilhamentos) ? compartilhamentos : [])
+    .map((item) => {
+      const setorOrigem = String(item?.setor_origem || '').trim().toUpperCase();
+      const tipos = Array.isArray(item?.tipos)
+        ? item.tipos.map(Number).filter((tipoId) => Number.isInteger(tipoId) && tipoId > 0)
+        : [];
+
+      if (!setorOrigem || tipos.length === 0) {
+        return null;
+      }
+
+      return {
+        [Op.and]: [
+          { area_responsavel: setorOrigem },
+          { tipo_solicitacao_id: { [Op.in]: tipos } }
+        ]
+      };
+    })
+    .filter(Boolean);
+}
+
 function normalizarTokenComparacao(valor) {
   return String(valor || '')
     .trim()
@@ -961,6 +983,8 @@ module.exports = {
         setoresVisiveisAoAtribuir,
         configuracaoTiposCompartilhados
       );
+      const condicoesTiposCompartilhadosUsuario =
+        construirCondicoesTiposCompartilhados(tiposCompartilhadosUsuario);
       const modoRecebimentoSetorUsuario = await obterModoRecebimentoSetor(setorTokens);
       const setorTodosVisiveis = modoRecebimentoSetorUsuario === 'TODOS_VISIVEIS';
       const brapeTokens = Array.from(new Set(setorTokens.filter(isBrapeToken)));
@@ -1009,11 +1033,7 @@ module.exports = {
           }
         ];
 
-        if (tiposCompartilhadosUsuario.length > 0) {
-          condicoesAdministrativo.push({
-            tipo_solicitacao_id: { [Op.in]: tiposCompartilhadosUsuario }
-          });
-        }
+        condicoesAdministrativo.push(...condicoesTiposCompartilhadosUsuario);
 
         where[Op.and].push({
           [Op.or]: condicoesAdministrativo
@@ -1059,9 +1079,7 @@ module.exports = {
         where[Op.and].push({
           [Op.or]: [
             { area_responsavel: { [Op.in]: tokensGeoUsuario } },
-            ...(tiposCompartilhadosUsuario.length > 0
-              ? [{ tipo_solicitacao_id: { [Op.in]: tiposCompartilhadosUsuario } }]
-              : []),
+            ...condicoesTiposCompartilhadosUsuario,
             literalHistoricoGeoUsuario ? {
               id: {
                 [Op.in]: literalHistoricoGeoUsuario
@@ -1176,11 +1194,7 @@ module.exports = {
           });
         }
 
-        if (tiposCompartilhadosUsuario.length > 0) {
-          condicoes.push({
-            tipo_solicitacao_id: { [Op.in]: tiposCompartilhadosUsuario }
-          });
-        }
+        condicoes.push(...condicoesTiposCompartilhadosUsuario);
 
         where[Op.and] = where[Op.and] || [];
         where[Op.and].push({ [Op.or]: condicoes });
@@ -2051,9 +2065,12 @@ module.exports = {
         tokensSetorUsuario,
         configuracaoTiposCompartilhados
       );
-      const solicitacaoTipoCompartilhada = tiposCompartilhadosUsuario.includes(
-        Number(solicitacao.tipo_solicitacao_id)
-      );
+      const solicitacaoTipoCompartilhada = tiposCompartilhadosUsuario.some((item) => (
+        String(item?.setor_origem || '').trim().toUpperCase() ===
+          String(solicitacao.area_responsavel || '').trim().toUpperCase() &&
+        Array.isArray(item?.tipos) &&
+        item.tipos.includes(Number(solicitacao.tipo_solicitacao_id))
+      ));
 
       if (isSetorAdministrativo && String(req.user?.perfil || '').trim().toUpperCase() !== 'SUPERADMIN') {
         const itemCriadoPeloUsuario = Number(solicitacao.criado_por) === Number(req.user.id);

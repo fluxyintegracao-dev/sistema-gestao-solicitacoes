@@ -16,6 +16,7 @@ export default function TiposCompartilhadosSetor() {
   const [setores, setSetores] = useState([]);
   const [tipos, setTipos] = useState([]);
   const [regras, setRegras] = useState({});
+  const [setorOrigemSelecionado, setSetorOrigemSelecionado] = useState('');
   const [loading, setLoading] = useState(true);
   const [salvando, setSalvando] = useState(false);
 
@@ -32,13 +33,21 @@ export default function TiposCompartilhadosSetor() {
         const setoresAtivos = Array.isArray(setoresData)
           ? setoresData.filter((setor) => setor?.ativo !== false)
           : [];
-        setSetores(setoresAtivos);
+        const setoresOrdenados = [...setoresAtivos].sort((a, b) =>
+          String(a?.nome || '').localeCompare(String(b?.nome || ''), 'pt-BR')
+        );
+
+        setSetores(setoresOrdenados);
         setTipos(Array.isArray(tiposData) ? tiposData : []);
         setRegras(
           configuracao?.regras && typeof configuracao.regras === 'object'
             ? configuracao.regras
             : {}
         );
+
+        if (setoresOrdenados.length > 0) {
+          setSetorOrigemSelecionado(normalizarSetorToken(setoresOrdenados[0]));
+        }
       } catch (error) {
         console.error(error);
         alert('Erro ao carregar configuracoes de tipos compartilhados.');
@@ -50,24 +59,26 @@ export default function TiposCompartilhadosSetor() {
     carregar();
   }, []);
 
-  const setoresOrdenados = useMemo(() => {
-    return [...setores].sort((a, b) =>
-      String(a?.nome || '').localeCompare(String(b?.nome || ''), 'pt-BR')
-    );
-  }, [setores]);
-
   const tiposOrdenados = useMemo(() => {
     return [...tipos].sort((a, b) =>
       String(a?.nome || '').localeCompare(String(b?.nome || ''), 'pt-BR')
     );
   }, [tipos]);
 
-  function toggleSetor(tipoId, setorToken) {
+  const regraAtual = useMemo(() => {
+    const regra = regras?.[setorOrigemSelecionado];
+    return regra && typeof regra === 'object' ? regra : {};
+  }, [regras, setorOrigemSelecionado]);
+
+  function toggleSetorCompartilhado(tipoId, setorToken) {
     const chaveTipo = String(tipoId);
     const token = String(setorToken || '').trim().toUpperCase();
 
     setRegras((prev) => {
-      const listaAtual = Array.isArray(prev?.[chaveTipo]) ? prev[chaveTipo] : [];
+      const regraOrigem = prev?.[setorOrigemSelecionado] && typeof prev[setorOrigemSelecionado] === 'object'
+        ? { ...prev[setorOrigemSelecionado] }
+        : {};
+      const listaAtual = Array.isArray(regraOrigem[chaveTipo]) ? regraOrigem[chaveTipo] : [];
       const set = new Set(listaAtual);
 
       if (set.has(token)) {
@@ -77,12 +88,18 @@ export default function TiposCompartilhadosSetor() {
       }
 
       const proximaLista = Array.from(set).sort((a, b) => a.localeCompare(b, 'pt-BR'));
-      const proximoEstado = { ...prev };
 
       if (proximaLista.length === 0) {
-        delete proximoEstado[chaveTipo];
+        delete regraOrigem[chaveTipo];
       } else {
-        proximoEstado[chaveTipo] = proximaLista;
+        regraOrigem[chaveTipo] = proximaLista;
+      }
+
+      const proximoEstado = { ...prev };
+      if (Object.keys(regraOrigem).length === 0) {
+        delete proximoEstado[setorOrigemSelecionado];
+      } else {
+        proximoEstado[setorOrigemSelecionado] = regraOrigem;
       }
 
       return proximoEstado;
@@ -111,19 +128,39 @@ export default function TiposCompartilhadosSetor() {
       <div>
         <h1 className="text-2xl font-semibold">Tipos Compartilhados entre Setores</h1>
         <p className="text-sm text-gray-600 mt-1">
-          Defina quais setores extras passam a visualizar uma solicitacao desde a criacao, sem assumir a posse do fluxo.
+          Defina qual setor de origem compartilha determinados tipos de solicitacao com outros setores, sem transferir a posse do fluxo.
         </p>
       </div>
 
       <div className="bg-white p-6 rounded-xl shadow space-y-4">
-        <div className="text-sm text-gray-600">
-          O setor responsavel continua sendo um so. Os setores marcados abaixo ganham apenas visibilidade adicional para o tipo de solicitacao selecionado.
+        <div className="grid grid-cols-1 md:grid-cols-[minmax(260px,340px)_1fr] gap-4 items-end">
+          <label className="grid gap-1 text-sm">
+            Setor que compartilha a solicitacao
+            <select
+              className="input"
+              value={setorOrigemSelecionado}
+              onChange={(event) => setSetorOrigemSelecionado(event.target.value)}
+            >
+              {setores.map((setor) => {
+                const token = normalizarSetorToken(setor);
+                return (
+                  <option key={setor.id} value={token}>
+                    {setor.nome} ({token})
+                  </option>
+                );
+              })}
+            </select>
+          </label>
+
+          <div className="text-sm text-gray-600">
+            Exemplo: se o setor de origem for `DEPARTAMENTO_PESSOAL` e o tipo for `ADMISSAO`, voce pode marcar `SESMT` como setor compartilhado. Assim, novas solicitacoes desse tipo criadas para esse setor tambem ficam visiveis ao `SESMT`.
+          </div>
         </div>
 
         <div className="border rounded-lg divide-y">
           {tiposOrdenados.map((tipo) => {
             const setoresSelecionados = new Set(
-              Array.isArray(regras?.[String(tipo.id)]) ? regras[String(tipo.id)] : []
+              Array.isArray(regraAtual?.[String(tipo.id)]) ? regraAtual[String(tipo.id)] : []
             );
 
             return (
@@ -134,27 +171,29 @@ export default function TiposCompartilhadosSetor() {
                 <div>
                   <h2 className="font-medium">{tipo.nome}</h2>
                   <p className="text-xs text-gray-500 mt-1">
-                    Se nenhum setor for marcado, esse tipo segue sem compartilhamento extra.
+                    Se nenhum setor for marcado, esse tipo segue sem compartilhamento extra para o setor de origem selecionado.
                   </p>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
-                  {setoresOrdenados.map((setor) => {
-                    const token = normalizarSetorToken(setor);
-                    return (
-                      <label
-                        key={`${tipo.id}-${setor.id}`}
-                        className="flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={setoresSelecionados.has(token)}
-                          onChange={() => toggleSetor(tipo.id, token)}
-                        />
-                        <span>{setor.nome} ({token})</span>
-                      </label>
-                    );
-                  })}
+                  {setores
+                    .filter((setor) => normalizarSetorToken(setor) !== setorOrigemSelecionado)
+                    .map((setor) => {
+                      const token = normalizarSetorToken(setor);
+                      return (
+                        <label
+                          key={`${tipo.id}-${setor.id}`}
+                          className="flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={setoresSelecionados.has(token)}
+                            onChange={() => toggleSetorCompartilhado(tipo.id, token)}
+                          />
+                          <span>{setor.nome} ({token})</span>
+                        </label>
+                      );
+                    })}
                 </div>
               </div>
             );

@@ -581,19 +581,36 @@ module.exports = {
       );
       const tiposValidos = new Set(tipos.map(tipo => String(tipo.id)));
 
-      const tiposInvalidos = Object.entries(regras)
-        .filter(([tipoId, setoresCompartilhados]) => (
-          !tiposValidos.has(String(tipoId)) ||
-          (Array.isArray(setoresCompartilhados)
-            ? setoresCompartilhados.some(setor => !tokensSetorValidos.has(String(setor || '').trim().toUpperCase()))
-            : false)
-        ))
-        .map(([tipoId]) => String(tipoId));
+      const regrasInvalidas = [];
 
-      if (tiposInvalidos.length > 0) {
+      Object.entries(regras).forEach(([setorOrigem, tiposCompartilhados]) => {
+        const setorOrigemValido = tokensSetorValidos.has(String(setorOrigem || '').trim().toUpperCase());
+        if (!setorOrigemValido) {
+          regrasInvalidas.push({ setor_origem: setorOrigem });
+          return;
+        }
+
+        Object.entries(tiposCompartilhados || {}).forEach(([tipoId, setoresCompartilhados]) => {
+          const tipoValido = tiposValidos.has(String(tipoId));
+          const setoresValidos = Array.isArray(setoresCompartilhados)
+            ? setoresCompartilhados.every(setor =>
+                tokensSetorValidos.has(String(setor || '').trim().toUpperCase())
+              )
+            : false;
+
+          if (!tipoValido || !setoresValidos) {
+            regrasInvalidas.push({
+              setor_origem: setorOrigem,
+              tipo_solicitacao_id: String(tipoId)
+            });
+          }
+        });
+      });
+
+      if (regrasInvalidas.length > 0) {
         return res.status(400).json({
-          error: 'Um ou mais tipos compartilhados sao invalidos.',
-          tipos_invalidos: tiposInvalidos
+          error: 'Uma ou mais regras de tipos compartilhados sao invalidas.',
+          regras_invalidas: regrasInvalidas
         });
       }
 
