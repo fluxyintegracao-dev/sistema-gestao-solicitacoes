@@ -29,6 +29,12 @@ const {
 const gerarCodigoSolicitacao = require('../services/solicitacao/gerarCodigo');
 const { uploadToS3 } = require('../services/s3');
 const { normalizeOriginalName } = require('../utils/fileName');
+const {
+  obterConfiguracaoAprovacaoDiretoria,
+  obterDiretoriaParaObra,
+  obterSetorDestinoAprovacao,
+  normalizarClassificacaoObra
+} = require('../services/aprovacaoDiretoriaConfig');
 
 const CHAVE_AREAS_POR_SETOR_ORIGEM = 'AREAS_POR_SETOR_ORIGEM';
 const CHAVE_SETORES_VISIVEIS_POR_USUARIO = 'SETORES_VISIVEIS_POR_USUARIO';
@@ -323,6 +329,44 @@ async function obterSetoresCriacaoTodasObras() {
       .map(item => String(item || '').trim().toUpperCase())
       .filter(Boolean)
   )];
+}
+
+async function obterContextoAprovacaoDiretoria(solicitacao, obraCarregada = null) {
+  const obra = obraCarregada || (
+    solicitacao?.obra_id
+      ? await Obra.findByPk(solicitacao.obra_id, {
+        attributes: ['id', 'codigo', 'nome', 'classificacao_obra']
+      })
+      : null
+  );
+
+  const configuracao = await obterConfiguracaoAprovacaoDiretoria();
+  const classificacaoObra = normalizarClassificacaoObra(obra?.classificacao_obra);
+  const diretoriaEsperada = obterDiretoriaParaObra(obra, configuracao.diretoriasPorClassificacao);
+  const setorDestinoAprovacao = obterSetorDestinoAprovacao(
+    solicitacao?.tipo_solicitacao_id,
+    configuracao.setoresDestinoPorTipo
+  );
+
+  return {
+    obra,
+    classificacaoObra,
+    diretoriaEsperada,
+    setorDestinoAprovacao,
+    diretoriasPorClassificacao: configuracao.diretoriasPorClassificacao,
+    setoresDestinoPorTipo: configuracao.setoresDestinoPorTipo
+  };
+}
+
+function solicitacaoUsaFluxoAprovacaoDiretoria(solicitacao, contextoAprovacao) {
+  if (!solicitacao || !contextoAprovacao?.diretoriaEsperada || !contextoAprovacao?.setorDestinoAprovacao) {
+    return false;
+  }
+
+  return setorPertenceAoUsuario(
+    [contextoAprovacao.diretoriaEsperada],
+    solicitacao.area_responsavel
+  );
 }
 
 function normalizarTokenComparacao(valor) {
@@ -1499,6 +1543,7 @@ module.exports = {
       const areaUsuario = await obterAreaUsuario(req);
       const tokensSetorUsuario = await obterTokensSetorUsuario(req, areaUsuario);
       const perfilUsuario = String(req.user?.perfil || '').trim().toUpperCase();
+      const usuarioSetorObra = await isSetorObraGeral(req);
       const setoresCriacaoTodasObras = await obterSetoresCriacaoTodasObras();
       const podeCriarEmTodasObras = tokensSetorUsuario.some(token =>
         setoresCriacaoTodasObras.includes(String(token || '').trim().toUpperCase())
@@ -1518,6 +1563,50 @@ module.exports = {
             error: 'Acesso negado. Usuario nao vinculado a obra selecionada.'
           });
         }
+      }
+
+      const obraSelecionada = await Obra.findByPk(obra_id, {
+        attributes: ['id', 'codigo', 'nome', 'classificacao_obra']
+      });
+      if (!obraSelecionada) {
+        return res.status(404).json({
+          error: 'Obra selecionada nao encontrada.'
+        });
+      }
+
+      const contextoAprovacaoDiretoria = await obterContextoAprovacaoDiretoria(
+        {
+          obra_id,
+          tipo_solicitacao_id
+        },
+        obraSelecionada
+      );
+      const diretoriasConfiguradas = Array.from(new Set(
+        Object.values(contextoAprovacaoDiretoria.diretoriasPorClassificacao || {})
+      ));
+      const destinoSelecionado = String(area_responsavel || '').trim().toUpperCase();
+      const selecionouDiretoriaConfigurada = diretoriasConfiguradas.some(token =>
+        setorPertenceAoUsuario([token], destinoSelecionado)
+      );
+
+      if (
+        contextoAprovacaoDiretoria.diretoriaEsperada &&
+        selecionouDiretoriaConfigurada &&
+        !setorPertenceAoUsuario([contextoAprovacaoDiretoria.diretoriaEsperada], destinoSelecionado)
+      ) {
+        return res.status(403).json({
+          error: 'A diretoria selecionada nao corresponde a classificacao da obra.'
+        });
+      }
+
+      if (
+        usuarioSetorObra &&
+        contextoAprovacaoDiretoria.diretoriaEsperada &&
+        !setorPertenceAoUsuario([contextoAprovacaoDiretoria.diretoriaEsperada], destinoSelecionado)
+      ) {
+        return res.status(403).json({
+          error: 'Usuarios do setor OBRA devem criar a solicitacao na diretoria correspondente a classificacao da obra.'
+        });
       }
 
       const destinosPermitidos = new Set();
@@ -1714,7 +1803,7 @@ module.exports = {
           {
             model: Obra,
             as: 'obra',
-            attributes: ['id', 'nome', 'codigo']
+            attributes: ['id', 'nome', 'codigo', 'classificacao_obra']
           },
           // TIPO DE SOLICITACAO
           {
@@ -1870,7 +1959,28 @@ module.exports = {
         }
       }
 
-      return res.json(solicitacao);
+      const contextoAprovacaoDiretoria = await obterContextoAprovacaoDiretoria(
+        solicitacao,
+        solicitacao.obra
+      );
+      const usaFluxoAprovacaoDiretoria = solicitacaoUsaFluxoAprovacaoDiretoria(
+        solicitacao,
+        contextoAprovacaoDiretoria
+      );
+      const podeAprovarDiretoria =
+        usaFluxoAprovacaoDiretoria &&
+        (
+          String(req.user?.perfil || '').trim().toUpperCase() === 'SUPERADMIN' ||
+          setorPertenceAoUsuario(tokensSetorUsuario, solicitacao.area_responsavel)
+        );
+
+      const payload = solicitacao.toJSON ? solicitacao.toJSON() : solicitacao;
+      payload.usa_fluxo_aprovacao_diretoria = usaFluxoAprovacaoDiretoria;
+      payload.acao_aprovar_diretoria_disponivel = podeAprovarDiretoria;
+      payload.setor_destino_aprovacao = contextoAprovacaoDiretoria.setorDestinoAprovacao || null;
+      payload.diretoria_responsavel = contextoAprovacaoDiretoria.diretoriaEsperada || null;
+
+      return res.json(payload);
 
     } catch (error) {
       console.error(error);
@@ -2610,6 +2720,7 @@ module.exports = {
       const idsUnicos = [...new Set(ids)];
       const setorDestino = String(req.body?.setor_destino || '').trim();
       const usuarioId = req.user.id;
+      const perfil = String(req.user?.perfil || '').trim().toUpperCase();
       const isSetorObra = await isUsuarioSetorObra(req);
 
       if (isSetorObra) {
@@ -2634,6 +2745,18 @@ module.exports = {
         const solicitacao = map.get(Number(id));
         if (!solicitacao) {
           resultado.erros.push({ id, error: 'Solicitacao nao encontrada' });
+          continue;
+        }
+
+        const contextoAprovacaoDiretoria = await obterContextoAprovacaoDiretoria(solicitacao);
+        if (
+          perfil !== 'SUPERADMIN' &&
+          solicitacaoUsaFluxoAprovacaoDiretoria(solicitacao, contextoAprovacaoDiretoria)
+        ) {
+          resultado.erros.push({
+            id,
+            error: 'Esta solicitacao usa fluxo de aprovacao por diretoria. Utilize o botao Aprovar.'
+          });
           continue;
         }
 
@@ -2807,6 +2930,91 @@ module.exports = {
   },
 
   // =====================================================
+  // APROVAR NA DIRETORIA
+  // =====================================================
+  async aprovarDiretoria(req, res) {
+    try {
+      const { id } = req.params;
+      const usuarioId = req.user.id;
+      const perfil = String(req.user?.perfil || '').trim().toUpperCase();
+      const isSuperadmin = perfil === 'SUPERADMIN';
+      const isSetorObra = await isUsuarioSetorObra(req);
+
+      if (isSetorObra) {
+        return res.status(403).json({
+          error: 'Setor OBRA nao pode aprovar solicitacoes de diretoria.'
+        });
+      }
+
+      const solicitacao = await Solicitacao.findByPk(id, {
+        include: [
+          {
+            model: Obra,
+            as: 'obra',
+            attributes: ['id', 'codigo', 'nome', 'classificacao_obra']
+          }
+        ]
+      });
+      if (!solicitacao) {
+        return res.status(404).json({ error: 'Solicitacao nao encontrada' });
+      }
+
+      const acessoObra = await validarAcessoObra(req, solicitacao);
+      if (!acessoObra) {
+        return res.status(403).json({
+          error: 'Acesso negado. Vincule o usuario a obra para continuar.'
+        });
+      }
+
+      const contextoAprovacaoDiretoria = await obterContextoAprovacaoDiretoria(
+        solicitacao,
+        solicitacao.obra
+      );
+      if (!solicitacaoUsaFluxoAprovacaoDiretoria(solicitacao, contextoAprovacaoDiretoria)) {
+        return res.status(400).json({
+          error: 'Esta solicitacao nao esta no fluxo de aprovacao por diretoria.'
+        });
+      }
+
+      const areaUsuario = await obterAreaUsuario(req);
+      const tokensSetorUsuario = expandirTokensComAliasesGeo(
+        await obterTokensSetorUsuario(req, areaUsuario)
+      );
+      if (!isSuperadmin && !setorPertenceAoUsuario(tokensSetorUsuario, solicitacao.area_responsavel)) {
+        return res.status(403).json({
+          error: 'Voce so pode aprovar solicitacoes que estejam na sua diretoria atual.'
+        });
+      }
+
+      const diretoriaOrigem = solicitacao.area_responsavel;
+      await Historico.create({
+        solicitacao_id: solicitacao.id,
+        usuario_responsavel_id: usuarioId,
+        setor: diretoriaOrigem,
+        acao: 'APROVADA_DIRETORIA',
+        observacao: `Aprovada na diretoria ${diretoriaOrigem}`
+      });
+
+      const envio = await enviarSolicitacaoParaSetorInterno({
+        req,
+        solicitacao,
+        setorDestino: contextoAprovacaoDiretoria.setorDestinoAprovacao,
+        usuarioId
+      });
+      if (!envio.ok) {
+        return res.status(envio.status || 400).json({
+          error: envio.error || 'Erro ao aprovar solicitacao na diretoria'
+        });
+      }
+
+      return res.sendStatus(204);
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao aprovar solicitacao na diretoria' });
+    }
+  },
+
+  // =====================================================
   // ENVIAR PARA OUTRO SETOR
   // =====================================================
   async enviarParaSetor(req, res) {
@@ -2814,6 +3022,7 @@ module.exports = {
       const { id } = req.params;
       const { setor_destino } = req.body;
       const usuarioId = req.user.id;
+      const perfil = String(req.user?.perfil || '').trim().toUpperCase();
       const areaUsuario = await obterAreaUsuario(req);
       const isSetorObra = await isUsuarioSetorObra(req);
 
@@ -2826,6 +3035,16 @@ module.exports = {
       const solicitacao = await Solicitacao.findByPk(id);
       if (!solicitacao) {
         return res.status(404).json({ error: 'Solicitacao nao encontrada' });
+      }
+
+      const contextoAprovacaoDiretoria = await obterContextoAprovacaoDiretoria(solicitacao);
+      if (
+        perfil !== 'SUPERADMIN' &&
+        solicitacaoUsaFluxoAprovacaoDiretoria(solicitacao, contextoAprovacaoDiretoria)
+      ) {
+        return res.status(403).json({
+          error: 'Para esta solicitacao, utilize o botao Aprovar da diretoria.'
+        });
       }
 
       const envio = await enviarSolicitacaoParaSetorInterno({

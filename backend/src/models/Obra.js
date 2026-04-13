@@ -9,6 +9,10 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.STRING,
       allowNull: true
     },
+    classificacao_obra: {
+      type: DataTypes.ENUM('PUBLICA', 'PRIVADA'),
+      allowNull: true
+    },
     nome: {
       type: DataTypes.STRING,
       allowNull: false

@@ -54,6 +54,7 @@ export default function Header({
   onEnviarSetor,
   mostrarAlterarStatus = true,
   mostrarEnviarSetor = true,
+  textoEnviarSetor = 'Enviar para outro setor',
   podeEditarRefContrato = false,
   contratosObra = [],
   onSalvarRefContrato
@@ -117,7 +118,7 @@ export default function Header({
           <StatusBadge status={solicitacao.status_global} setor={setorStatusAtual} />
           {mostrarEnviarSetor && (
             <button onClick={onEnviarSetor} className="btn btn-outline sol-detail-action-btn" type="button">
-              Enviar para outro setor
+              {textoEnviarSetor}
             </button>
           )}
         </div>

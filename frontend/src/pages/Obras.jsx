@@ -7,16 +7,24 @@ import {
   desativarObra
 } from '../services/obras';
 
+const CLASSIFICACOES_OBRA = [
+  { value: '', label: 'Nao classificada' },
+  { value: 'PUBLICA', label: 'Publica' },
+  { value: 'PRIVADA', label: 'Privada' }
+];
+
 export default function Obras() {
   const [obras, setObras] = useState([]);
   const [nome, setNome] = useState('');
   const [codigo, setCodigo] = useState('');
   const [cidade, setCidade] = useState('');
+  const [classificacaoObra, setClassificacaoObra] = useState('');
   const [loading, setLoading] = useState(true);
   const [editId, setEditId] = useState(null);
   const [editNome, setEditNome] = useState('');
   const [editCodigo, setEditCodigo] = useState('');
   const [editCidade, setEditCidade] = useState('');
+  const [editClassificacaoObra, setEditClassificacaoObra] = useState('');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -40,10 +48,16 @@ export default function Obras() {
     e.preventDefault();
 
     try {
-      await criarObra({ nome, codigo, cidade });
+      await criarObra({
+        nome,
+        codigo,
+        cidade,
+        classificacao_obra: classificacaoObra || null
+      });
       setNome('');
       setCodigo('');
       setCidade('');
+      setClassificacaoObra('');
       alert('Obra cadastrada com sucesso');
       carregarObras();
     } catch (error) {
@@ -57,6 +71,7 @@ export default function Obras() {
     setEditNome(item.nome);
     setEditCodigo(item.codigo || '');
     setEditCidade(item.cidade || '');
+    setEditClassificacaoObra(item.classificacao_obra || '');
   }
 
   function cancelarEdicao() {
@@ -64,6 +79,7 @@ export default function Obras() {
     setEditNome('');
     setEditCodigo('');
     setEditCidade('');
+    setEditClassificacaoObra('');
   }
 
   async function salvarEdicao(id) {
@@ -76,7 +92,8 @@ export default function Obras() {
       await atualizarObra(id, {
         nome: editNome,
         codigo: editCodigo,
-        cidade: editCidade
+        cidade: editCidade,
+        classificacao_obra: editClassificacaoObra || null
       });
       cancelarEdicao();
       carregarObras();
@@ -103,7 +120,7 @@ export default function Obras() {
         <div className="card-header">
           <h2 className="font-semibold">Nova obra</h2>
         </div>
-        <form onSubmit={handleSubmit} className="grid gap-3 md:grid-cols-3">
+        <form onSubmit={handleSubmit} className="grid gap-3 md:grid-cols-4">
           <label className="grid gap-1 text-sm">
             Codigo da obra
             <input
@@ -136,7 +153,21 @@ export default function Obras() {
               onChange={e => setCidade(e.target.value)}
             />
           </label>
-          <button type="submit" className="btn btn-primary md:col-span-3">
+          <label className="grid gap-1 text-sm">
+            Classificacao
+            <select
+              className="input"
+              value={classificacaoObra}
+              onChange={e => setClassificacaoObra(e.target.value)}
+            >
+              {CLASSIFICACOES_OBRA.map(opcao => (
+                <option key={opcao.value || 'SEM_CLASSIFICACAO'} value={opcao.value}>
+                  {opcao.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button type="submit" className="btn btn-primary md:col-span-4">
             Adicionar
           </button>
         </form>
@@ -149,6 +180,7 @@ export default function Obras() {
               <th>Codigo</th>
               <th>Nome</th>
               <th>Cidade</th>
+              <th>Classificacao</th>
               <th>Status</th>
               <th>Acoes</th>
             </tr>
@@ -156,7 +188,7 @@ export default function Obras() {
           <tbody>
             {obras.length === 0 && (
               <tr>
-                <td colSpan="5" align="center">
+                <td colSpan="6" align="center">
                   Nenhuma obra cadastrada
                 </td>
               </tr>
@@ -194,6 +226,23 @@ export default function Obras() {
                     />
                   ) : (
                     obra.cidade || '-'
+                  )}
+                </td>
+                <td>
+                  {editId === obra.id ? (
+                    <select
+                      className="input"
+                      value={editClassificacaoObra}
+                      onChange={e => setEditClassificacaoObra(e.target.value)}
+                    >
+                      {CLASSIFICACOES_OBRA.map(opcao => (
+                        <option key={opcao.value || 'SEM_CLASSIFICACAO'} value={opcao.value}>
+                          {opcao.label}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    CLASSIFICACOES_OBRA.find(opcao => opcao.value === obra.classificacao_obra)?.label || 'Nao classificada'
                   )}
                 </td>
                 <td>{obra.ativo ? 'Ativa' : 'Inativa'}</td>

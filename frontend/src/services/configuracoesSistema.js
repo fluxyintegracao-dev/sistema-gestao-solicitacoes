@@ -57,6 +57,27 @@ export async function salvarAreasObra(data) {
   return res.json();
 }
 
+export async function getAprovacaoDiretoria() {
+  const res = await fetch(`${API_URL}/configuracoes/aprovacao-diretoria`, {
+    headers: authHeaders()
+  });
+  if (!res.ok) throw new Error('Erro ao buscar configuracao de aprovacao por diretoria');
+  return res.json();
+}
+
+export async function salvarAprovacaoDiretoria(data) {
+  const res = await fetch(`${API_URL}/configuracoes/aprovacao-diretoria`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.error || 'Erro ao salvar configuracao de aprovacao por diretoria');
+  }
+  return res.json();
+}
+
 export async function getAreasPorSetorOrigem() {
   const res = await fetch(`${API_URL}/configuracoes/areas-por-setor-origem`, {
     headers: authHeaders()

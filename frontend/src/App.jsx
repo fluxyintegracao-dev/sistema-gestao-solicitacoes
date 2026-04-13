@@ -30,6 +30,7 @@ import Perfil from './pages/Perfil';
 import PermissoesSetor from './pages/PermissoesSetor';
 import CoresSistema from './pages/CoresSistema';
 import AreasObra from './pages/AreasObra';
+import AprovacaoDiretoria from './pages/AprovacaoDiretoria';
 import AreasPorSetorOrigem from './pages/AreasPorSetorOrigem';
 import SetoresVisiveisUsuario from './pages/SetoresVisiveisUsuario';
 import ComportamentoRecebimentoSetor from './pages/ComportamentoRecebimentoSetor';
@@ -155,6 +156,7 @@ export default function App() {
         <Route path="permissoes-setor" element={<PermissoesSetor />} />
         <Route path="cores-sistema" element={<CoresSistema />} />
         <Route path="areas-obra" element={<AreasObra />} />
+        <Route path="aprovacao-diretoria" element={<SuperadminRoute><AprovacaoDiretoria /></SuperadminRoute>} />
         <Route path="areas-por-setor-origem" element={<AreasPorSetorOrigem />} />
         <Route path="setores-visiveis-usuario" element={<SetoresVisiveisUsuario />} />
         <Route path="usuarios-envio-qualquer-setor" element={<SuperadminRoute><UsuariosEnvioQualquerSetor /></SuperadminRoute>} />

@@ -10,7 +10,10 @@ import Anexos from './Anexos';
 import Pedido from './Pedido';
 import ModalAlterarStatus from './ModalAlterarStatus';
 import ModalEnviarSetor from '../Solicitacoes/ModalEnviarSetor';
-import { updateStatusSolicitacao } from '../../services/solicitacoes';
+import {
+  aprovarDiretoriaSolicitacao,
+  updateStatusSolicitacao
+} from '../../services/solicitacoes';
 import { API_URL, authHeaders } from '../../services/api';
 import { isGeoSetor, usuarioPodeEnviarSolicitacaoParaOutroSetor } from '../../utils/setor';
 
@@ -81,12 +84,38 @@ export default function SolicitacaoDetalhe() {
     }
   }
 
+  async function aprovarDiretoria() {
+    const setorDestino = String(solicitacao?.setor_destino_aprovacao || '').trim();
+    const confirmou = window.confirm(
+      setorDestino
+        ? `Aprovar esta solicitacao e enviar para ${setorDestino}?`
+        : 'Aprovar esta solicitacao?'
+    );
+
+    if (!confirmou) {
+      return;
+    }
+
+    try {
+      await aprovarDiretoriaSolicitacao(solicitacao.id);
+      await carregar();
+      alert('Solicitacao aprovada com sucesso.');
+    } catch (error) {
+      console.error(error);
+      alert(error?.message || 'Erro ao aprovar solicitacao');
+    }
+  }
+
   if (loading) return <p>Carregando...</p>;
   if (!solicitacao) return null;
 
   const isSetorObra = setorTokens.includes('OBRA');
+  const usaFluxoAprovacaoDiretoria = Boolean(solicitacao.usa_fluxo_aprovacao_diretoria);
+  const podeAprovarDiretoria = Boolean(solicitacao.acao_aprovar_diretoria_disponivel);
   const podeEnviarSetor =
-    !isSetorObra && usuarioPodeEnviarSolicitacaoParaOutroSetor(solicitacao.area_responsavel, user);
+    !usaFluxoAprovacaoDiretoria &&
+    !isSetorObra &&
+    usuarioPodeEnviarSolicitacaoParaOutroSetor(solicitacao.area_responsavel, user);
 
   const atualizadoEm = new Date(solicitacao.updatedAt || solicitacao.createdAt).toLocaleString('pt-BR');
 
@@ -115,9 +144,10 @@ export default function SolicitacaoDetalhe() {
       <Header
         solicitacao={solicitacao}
         onAlterarStatus={() => setModalStatus(true)}
-        onEnviarSetor={() => setModalEnviarSetor(true)}
+        onEnviarSetor={podeAprovarDiretoria ? aprovarDiretoria : () => setModalEnviarSetor(true)}
         mostrarAlterarStatus
-        mostrarEnviarSetor={podeEnviarSetor}
+        mostrarEnviarSetor={podeAprovarDiretoria || podeEnviarSetor}
+        textoEnviarSetor={podeAprovarDiretoria ? 'Aprovar' : 'Enviar para outro setor'}
       />
 
       <div className="grid md:grid-cols-2 gap-6">

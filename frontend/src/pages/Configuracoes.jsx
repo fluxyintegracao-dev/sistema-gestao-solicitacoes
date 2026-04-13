@@ -70,6 +70,11 @@ const SECOES_CONFIG = [
         to: '/areas-obra'
       },
       {
+        title: 'Aprovacao por Diretoria',
+        description: 'Defina a diretoria por classificacao da obra e o setor destino apos aprovacao.',
+        to: '/aprovacao-diretoria'
+      },
+      {
         title: 'Areas por Setor de Origem',
         description: 'Defina quais setores cada setor pode selecionar na nova solicitacao.',
         to: '/areas-por-setor-origem'

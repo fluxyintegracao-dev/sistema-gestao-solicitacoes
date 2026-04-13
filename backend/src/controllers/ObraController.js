@@ -1,5 +1,6 @@
 const { Obra, UsuarioObra, Setor, ConfiguracaoSistema } = require('../models');
 const { Op } = require('sequelize');
+const { normalizarClassificacaoObra } = require('../services/aprovacaoDiretoriaConfig');
 const CHAVE_SETORES_CRIACAO_TODAS_OBRAS = 'SETORES_CRIACAO_TODAS_OBRAS';
 
 async function obterSetoresCriacaoTodasObras() {
@@ -35,7 +36,7 @@ async function obterTokensSetorUsuario(req) {
 
 module.exports = {
   async index(req, res) {
-    const { codigo, descricao } = req.query;
+    const { codigo, descricao, classificacao_obra } = req.query;
     const where = {};
 
     if (codigo) {
@@ -43,6 +44,10 @@ module.exports = {
     }
     if (descricao) {
       where.nome = { [Op.like]: `%${descricao}%` };
+    }
+    const classificacao = normalizarClassificacaoObra(classificacao_obra);
+    if (classificacao) {
+      where.classificacao_obra = classificacao;
     }
 
     const obras = await Obra.findAll({
@@ -55,12 +60,14 @@ module.exports = {
   async minhas(req, res) {
     try {
       const { id: usuarioId, perfil } = req.user;
-      const { codigo, descricao, modo } = req.query;
+      const { codigo, descricao, modo, classificacao_obra } = req.query;
+      const classificacao = normalizarClassificacaoObra(classificacao_obra);
 
       if (perfil === 'SUPERADMIN') {
         const where = {};
         if (codigo) where.codigo = String(codigo).toUpperCase();
         if (descricao) where.nome = { [Op.like]: `%${descricao}%` };
+        if (classificacao) where.classificacao_obra = classificacao;
         const obras = await Obra.findAll({
           where,
           order: [['nome', 'ASC']]
@@ -80,6 +87,7 @@ module.exports = {
           const where = {};
           if (codigo) where.codigo = String(codigo).toUpperCase();
           if (descricao) where.nome = { [Op.like]: `%${descricao}%` };
+          if (classificacao) where.classificacao_obra = classificacao;
           const obras = await Obra.findAll({
             where,
             order: [['nome', 'ASC']]
@@ -106,7 +114,10 @@ module.exports = {
           {
             model: Obra,
             as: 'obra',
-            where: descricao ? { nome: { [Op.like]: `%${descricao}%` } } : undefined
+            where: {
+              ...(descricao ? { nome: { [Op.like]: `%${descricao}%` } } : {}),
+              ...(classificacao ? { classificacao_obra: classificacao } : {})
+            }
           }
         ]
       });
@@ -121,7 +132,8 @@ module.exports = {
   },
 
   async create(req, res) {
-    const { nome, codigo, cidade } = req.body;
+    const { nome, codigo, cidade, classificacao_obra } = req.body;
+    const classificacao = normalizarClassificacaoObra(classificacao_obra);
 
     if (!nome || !codigo) {
       return res.status(400).json({ error: 'Nome e codigo sao obrigatorios' });
@@ -137,6 +149,7 @@ module.exports = {
     const obra = await Obra.create({
       codigo: String(codigo).toUpperCase(),
       cidade: cidade || null,
+      classificacao_obra: classificacao,
       nome,
       ativo: true
     });
@@ -146,11 +159,14 @@ module.exports = {
 
   async update(req, res) {
     const { id } = req.params;
-    const { nome, codigo, cidade } = req.body;
+    const { nome, codigo, cidade, classificacao_obra } = req.body;
 
     const dados = {};
     if (nome) dados.nome = nome;
     if (cidade !== undefined) dados.cidade = cidade || null;
+    if (classificacao_obra !== undefined) {
+      dados.classificacao_obra = normalizarClassificacaoObra(classificacao_obra);
+    }
     if (codigo !== undefined) {
       if (!codigo) {
         return res.status(400).json({ error: 'Codigo invalido' });

@@ -80,6 +80,29 @@ export async function updateStatusSolicitacao(id, status) {
   return true;
 }
 
+export async function aprovarDiretoriaSolicitacao(id) {
+  const res = await fetch(`${API_URL}/solicitacoes/${id}/aprovar-diretoria`, {
+    method: 'POST',
+    headers: authHeaders()
+  });
+
+  if (!res.ok) {
+    let mensagem = 'Erro ao aprovar solicitacao';
+    try {
+      const json = await res.json();
+      mensagem = json?.error || mensagem;
+    } catch (_) {
+      try {
+        const text = await res.text();
+        if (text) mensagem = text;
+      } catch (_) {}
+    }
+    throw new Error(mensagem);
+  }
+
+  return true;
+}
+
 export async function updateValorSolicitacao(id, valor) {
   const res = await fetch(`${API_URL}/solicitacoes/${id}/valor`, {
     method: 'PATCH',

@@ -127,6 +127,7 @@ router.post('/solicitacoes/enviar-setor-massa', SolicitacaoController.enviarPara
 router.get('/solicitacoes/resumo', SolicitacaoController.resumo);
 router.post('/solicitacoes/:id/comentarios', SolicitacaoController.adicionarComentario);
 router.post('/solicitacoes/:id/enviar-setor', SolicitacaoController.enviarParaSetor);
+router.post('/solicitacoes/:id/aprovar-diretoria', SolicitacaoController.aprovarDiretoria);
 router.post('/solicitacoes/:id/assumir', SolicitacaoController.assumirSolicitacao);
 router.patch('/solicitacoes/:id/ocultar', SolicitacaoController.ocultarDaMinhaLista);
 router.patch('/solicitacoes/:id/arquivar', SolicitacaoController.ocultarDaMinhaLista);
@@ -363,6 +364,8 @@ router.get('/configuracoes/timeout-inatividade', ConfiguracaoSistemaController.g
 router.patch('/configuracoes/timeout-inatividade', permit(['SUPERADMIN']), ConfiguracaoSistemaController.updateTimeoutInatividade);
 router.get('/configuracoes/areas-obra', ConfiguracaoSistemaController.getAreasObra);
 router.patch('/configuracoes/areas-obra', permit(['SUPERADMIN']), ConfiguracaoSistemaController.updateAreasObra);
+router.get('/configuracoes/aprovacao-diretoria', ConfiguracaoSistemaController.getAprovacaoDiretoria);
+router.patch('/configuracoes/aprovacao-diretoria', permit(['SUPERADMIN']), ConfiguracaoSistemaController.updateAprovacaoDiretoria);
 router.get('/configuracoes/areas-por-setor-origem', ConfiguracaoSistemaController.getAreasPorSetorOrigem);
 router.patch('/configuracoes/areas-por-setor-origem', permit(['SUPERADMIN']), ConfiguracaoSistemaController.updateAreasPorSetorOrigem);
 router.get('/configuracoes/setores-visiveis-usuario', permit(['SUPERADMIN']), ConfiguracaoSistemaController.getSetoresVisiveisPorUsuario);

@@ -7,9 +7,25 @@ import { uploadArquivos } from '../services/uploads';
 import { getTiposSubContrato } from '../services/tiposSubContrato';
 import { getContratos } from '../services/contratos';
 import ObraSearchModal from '../components/ObraSearchModal';
-import { getAreasObra, getAreasPorSetorOrigem, getTiposSolicitacaoPorSetor } from '../services/configuracoesSistema';
+import {
+  getAprovacaoDiretoria,
+  getAreasObra,
+  getAreasPorSetorOrigem,
+  getTiposSolicitacaoPorSetor
+} from '../services/configuracoesSistema';
 import { useAuth } from '../contexts/AuthContext';
 import { HiPaperClip } from 'react-icons/hi2';
+
+function normalizarClassificacaoObra(valor) {
+  const classificacao = String(valor || '').trim().toUpperCase();
+  return classificacao === 'PUBLICA' || classificacao === 'PRIVADA'
+    ? classificacao
+    : '';
+}
+
+function normalizarTokenSetor(valor) {
+  return String(valor || '').trim().toUpperCase();
+}
 
 export default function NovaSolicitacao() {
   const { user } = useAuth();
@@ -23,6 +39,10 @@ export default function NovaSolicitacao() {
   const [areasObra, setAreasObra] = useState([]);
   const [areasPorSetorOrigem, setAreasPorSetorOrigem] = useState({});
   const [tiposPorSetorConfig, setTiposPorSetorConfig] = useState({});
+  const [diretoriasPorClassificacao, setDiretoriasPorClassificacao] = useState({
+    PUBLICA: '',
+    PRIVADA: ''
+  });
   const [tiposSub, setTiposSub] = useState([]);
   const [contratos, setContratos] = useState([]);
   const [contratosRef, setContratosRef] = useState([]);
@@ -54,10 +74,11 @@ export default function NovaSolicitacao() {
       setTipos(await getTiposSolicitacao());
       setSetores(await getSetores());
       try {
-        const [cfg, cfgSetorOrigem, cfgTiposPorSetor] = await Promise.all([
+        const [cfg, cfgSetorOrigem, cfgTiposPorSetor, cfgAprovacaoDiretoria] = await Promise.all([
           getAreasObra(),
           getAreasPorSetorOrigem(),
-          getTiposSolicitacaoPorSetor()
+          getTiposSolicitacaoPorSetor(),
+          getAprovacaoDiretoria()
         ]);
         setAreasObra(Array.isArray(cfg?.areas) ? cfg.areas : []);
         setAreasPorSetorOrigem(
@@ -70,11 +91,19 @@ export default function NovaSolicitacao() {
             ? cfgTiposPorSetor.regras
             : {}
         );
+        setDiretoriasPorClassificacao({
+          PUBLICA: normalizarTokenSetor(cfgAprovacaoDiretoria?.diretorias_por_classificacao?.PUBLICA),
+          PRIVADA: normalizarTokenSetor(cfgAprovacaoDiretoria?.diretorias_por_classificacao?.PRIVADA)
+        });
       } catch (error) {
         console.error(error);
         setAreasObra([]);
         setAreasPorSetorOrigem({});
         setTiposPorSetorConfig({});
+        setDiretoriasPorClassificacao({
+          PUBLICA: '',
+          PRIVADA: ''
+        });
       }
     }
     load();
@@ -414,6 +443,16 @@ export default function NovaSolicitacao() {
   const isSetorObra =
     user?.setor?.codigo === 'OBRA' ||
     user?.area === 'OBRA';
+  const obraSelecionadaAtual = useMemo(() => {
+    return obras.find(obra => String(obra.id) === String(form.obra_id)) || null;
+  }, [obras, form.obra_id]);
+  const classificacaoObraSelecionada = useMemo(() => {
+    return normalizarClassificacaoObra(obraSelecionadaAtual?.classificacao_obra);
+  }, [obraSelecionadaAtual]);
+  const diretoriaEsperadaObra = useMemo(() => {
+    if (!classificacaoObraSelecionada) return '';
+    return normalizarTokenSetor(diretoriasPorClassificacao?.[classificacaoObraSelecionada]);
+  }, [classificacaoObraSelecionada, diretoriasPorClassificacao]);
   const tokensSetorUsuario = useMemo(() => {
     return Array.from(new Set([
       String(user?.setor?.codigo || '').toUpperCase(),
@@ -444,8 +483,12 @@ export default function NovaSolicitacao() {
       lista = lista.filter(s => permitidasObra.has(String(s.codigo || '').toUpperCase()));
     }
 
+    if (isSetorObra && diretoriaEsperadaObra) {
+      lista = lista.filter(s => normalizarTokenSetor(s.codigo) === diretoriaEsperadaObra);
+    }
+
     return lista;
-  }, [setores, isSetorObra, areasObra, destinosPermitidosPorSetorOrigem]);
+  }, [setores, isSetorObra, areasObra, destinosPermitidosPorSetorOrigem, diretoriaEsperadaObra]);
   const contratosDisponiveis = contratosRef.length > 0 ? contratosRef : contratos;
   const hoje = new Date();
   const hojeInput = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-${String(hoje.getDate()).padStart(2, '0')}`;
@@ -469,6 +512,12 @@ export default function NovaSolicitacao() {
     const idsPermitidos = new Set(tiposPermitidos);
     return tiposAtivos.filter(tipo => idsPermitidos.has(Number(tipo.id)));
   }, [tipos, tiposPorSetorConfig, form.area_responsavel]);
+
+  useEffect(() => {
+    if (!isSetorObra || !form.obra_id || !diretoriaEsperadaObra) return;
+    if (normalizarTokenSetor(form.area_responsavel) === diretoriaEsperadaObra) return;
+    setForm(prev => ({ ...prev, area_responsavel: diretoriaEsperadaObra }));
+  }, [isSetorObra, form.obra_id, form.area_responsavel, diretoriaEsperadaObra]);
 
   useEffect(() => {
     if (!form.area_responsavel) return;

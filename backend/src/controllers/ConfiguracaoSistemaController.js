@@ -1,5 +1,11 @@
 const { Op } = require('sequelize');
-const { ConfiguracaoSistema, User, Setor } = require('../models');
+const { ConfiguracaoSistema, User, Setor, TipoSolicitacao } = require('../models');
+const {
+  CHAVE_DIRETORIA_POR_CLASSIFICACAO_OBRA,
+  CHAVE_SETOR_DESTINO_APOS_APROVACAO_DIRETORIA,
+  normalizarMapaDiretoriasPorClassificacao,
+  normalizarMapaSetorDestinoAprovacao
+} = require('../services/aprovacaoDiretoriaConfig');
 
 const CHAVE_TEMA = 'TEMA_SISTEMA';
 const CHAVE_AREAS_OBRA = 'AREAS_OBRA_VISIVEIS';
@@ -77,6 +83,20 @@ function isSetorObra(setor) {
   const codigo = String(setor?.codigo || '').trim().toUpperCase();
   const nome = String(setor?.nome || '').trim().toUpperCase();
   return codigo === 'OBRA' || nome === 'OBRA';
+}
+
+async function salvarConfiguracaoJson(chave, payload) {
+  const existente = await ConfiguracaoSistema.findOne({
+    where: { chave },
+    order: [['id', 'DESC']]
+  });
+
+  const valor = JSON.stringify(payload);
+  if (existente) {
+    await existente.update({ valor });
+  } else {
+    await ConfiguracaoSistema.create({ chave, valor });
+  }
 }
 
 module.exports = {
@@ -224,6 +244,106 @@ module.exports = {
     }
   }
   ,
+
+  async getAprovacaoDiretoria(req, res) {
+    try {
+      const [itemDiretorias, itemDestinos] = await Promise.all([
+        ConfiguracaoSistema.findOne({
+          where: { chave: CHAVE_DIRETORIA_POR_CLASSIFICACAO_OBRA },
+          order: [['id', 'DESC']]
+        }),
+        ConfiguracaoSistema.findOne({
+          where: { chave: CHAVE_SETOR_DESTINO_APOS_APROVACAO_DIRETORIA },
+          order: [['id', 'DESC']]
+        })
+      ]);
+
+      const diretorias = normalizarMapaDiretoriasPorClassificacao(
+        parseJsonOrDefault(itemDiretorias?.valor, { diretorias: {} })?.diretorias
+      );
+      const destinos = normalizarMapaSetorDestinoAprovacao(
+        parseJsonOrDefault(itemDestinos?.valor, { destinos: {} })?.destinos
+      );
+
+      return res.json({
+        diretorias_por_classificacao: diretorias,
+        setores_destino_por_tipo: destinos
+      });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao buscar configuracao de aprovacao por diretoria' });
+    }
+  },
+
+  async updateAprovacaoDiretoria(req, res) {
+    try {
+      const diretorias = normalizarMapaDiretoriasPorClassificacao(
+        req.body?.diretorias_por_classificacao
+      );
+      const destinos = normalizarMapaSetorDestinoAprovacao(
+        req.body?.setores_destino_por_tipo
+      );
+
+      const [setores, tipos] = await Promise.all([
+        Setor.findAll({
+          attributes: ['id', 'codigo', 'nome']
+        }),
+        TipoSolicitacao.findAll({
+          attributes: ['id']
+        })
+      ]);
+
+      const tokensSetorValidos = new Set(
+        setores.flatMap(setor => [
+          String(setor.id || '').trim().toUpperCase(),
+          String(setor.codigo || '').trim().toUpperCase(),
+          String(setor.nome || '').trim().toUpperCase()
+        ]).filter(Boolean)
+      );
+      const tiposValidos = new Set(tipos.map(tipo => String(tipo.id)));
+
+      const diretoriasInvalidas = Object.entries(diretorias)
+        .filter(([, setor]) => !tokensSetorValidos.has(String(setor || '').trim().toUpperCase()))
+        .map(([classificacao]) => classificacao);
+      if (diretoriasInvalidas.length > 0) {
+        return res.status(400).json({
+          error: 'Uma ou mais diretorias configuradas sao invalidas.',
+          classificacoes_invalidas: diretoriasInvalidas
+        });
+      }
+
+      const destinosInvalidos = Object.entries(destinos)
+        .filter(([tipoId, setor]) => (
+          !tiposValidos.has(String(tipoId)) ||
+          !tokensSetorValidos.has(String(setor || '').trim().toUpperCase())
+        ))
+        .map(([tipoId]) => String(tipoId));
+      if (destinosInvalidos.length > 0) {
+        return res.status(400).json({
+          error: 'Um ou mais destinos de aprovacao sao invalidos.',
+          tipos_invalidos: destinosInvalidos
+        });
+      }
+
+      await Promise.all([
+        salvarConfiguracaoJson(CHAVE_DIRETORIA_POR_CLASSIFICACAO_OBRA, {
+          diretorias
+        }),
+        salvarConfiguracaoJson(CHAVE_SETOR_DESTINO_APOS_APROVACAO_DIRETORIA, {
+          destinos
+        })
+      ]);
+
+      return res.json({
+        ok: true,
+        diretorias_por_classificacao: diretorias,
+        setores_destino_por_tipo: destinos
+      });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao salvar configuracao de aprovacao por diretoria' });
+    }
+  },
 
   async getAreasPorSetorOrigem(req, res) {
     try {
