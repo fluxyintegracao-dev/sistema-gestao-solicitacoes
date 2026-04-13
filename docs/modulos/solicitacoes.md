@@ -45,3 +45,20 @@
   - pagos acumulados e saldo ficam destacados
   - o historico de pagamentos fica listado
 - o botao `Informar pagamento` aparece apenas para o setor `FINANCEIRO`
+
+## Tipos compartilhados entre setores
+- o `SUPERADMIN` pode configurar setores extras que passam a visualizar um `tipo_solicitacao` desde a criacao
+- esses setores ganham apenas visibilidade adicional
+- o setor responsavel da solicitacao nao muda por causa desse compartilhamento
+- essa visibilidade vale para listagem e detalhe do fluxo normal
+
+## Automacao por status
+- o `SUPERADMIN` pode configurar regras por:
+  - `tipo_solicitacao`
+  - `status`
+  - `setor_destino`
+- quando a combinacao configurada e atendida em uma alteracao de status, a solicitacao e enviada automaticamente para o setor destino
+- a automacao registra historico com a acao `ENVIO_AUTOMATICO_SETOR`
+- as automacoes legadas do fluxo atual continuam ativas:
+  - retorno automatico para setor anterior em ajustes atendidos pela `OBRA`
+  - `MERCADORIA_ENTREGUE -> FINANCEIRO` no fluxo atual da `OBRA`

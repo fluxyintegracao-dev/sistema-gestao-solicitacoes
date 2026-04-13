@@ -37,6 +37,13 @@ const {
   obterSetorDestinoAprovacao,
   normalizarClassificacaoObra
 } = require('../services/aprovacaoDiretoriaConfig');
+const {
+  obterConfiguracaoTiposCompartilhados,
+  obterConfiguracaoAutomacaoStatusSetor,
+  obterTiposCompartilhadosParaTokens,
+  obterAutomacaoStatusCorrespondente,
+  normalizarStatusAutomacao
+} = require('../services/solicitacao/configuracoesVisibilidadeAutomacao');
 
 const CHAVE_AREAS_POR_SETOR_ORIGEM = 'AREAS_POR_SETOR_ORIGEM';
 const CHAVE_SETORES_VISIVEIS_POR_USUARIO = 'SETORES_VISIVEIS_POR_USUARIO';
@@ -221,6 +228,31 @@ async function enviarSolicitacaoParaSetorInterno({
   });
 
   return { ok: true };
+}
+
+async function registrarHistoricoEnvioAutomatico({
+  solicitacaoId,
+  usuarioId,
+  setorOrigem,
+  setorDestino,
+  regra = null
+}) {
+  const metadata = regra
+    ? {
+        tipo_solicitacao_id: regra.tipo_solicitacao_id,
+        status: regra.status,
+        setor_destino: regra.setor_destino
+      }
+    : null;
+
+  await Historico.create({
+    solicitacao_id: solicitacaoId,
+    usuario_responsavel_id: usuarioId,
+    setor: setorOrigem,
+    acao: 'ENVIO_AUTOMATICO_SETOR',
+    observacao: `Automacao de ${setorOrigem} para ${setorDestino}`,
+    metadata: metadata ? JSON.stringify(metadata) : null
+  });
 }
 
 async function obterAreaUsuario(req) {
@@ -902,6 +934,7 @@ module.exports = {
         setorTokens.some(isGeoToken);
       const isSetorAdministrativo = setorTokens.some(isAdministrativoToken);
       const configuracaoAprovacaoDiretoria = await obterConfiguracaoAprovacaoDiretoria();
+      const configuracaoTiposCompartilhados = await obterConfiguracaoTiposCompartilhados();
       const diretoriaPublicaConfigurada =
         configuracaoAprovacaoDiretoria?.diretoriasPorClassificacao?.PUBLICA || null;
       const diretoriaPrivadaConfigurada =
@@ -924,6 +957,10 @@ module.exports = {
         ...setorTokens,
         ...setoresExtrasUsuario
       ]));
+      const tiposCompartilhadosUsuario = obterTiposCompartilhadosParaTokens(
+        setoresVisiveisAoAtribuir,
+        configuracaoTiposCompartilhados
+      );
       const modoRecebimentoSetorUsuario = await obterModoRecebimentoSetor(setorTokens);
       const setorTodosVisiveis = modoRecebimentoSetorUsuario === 'TODOS_VISIVEIS';
       const brapeTokens = Array.from(new Set(setorTokens.filter(isBrapeToken)));
@@ -947,31 +984,39 @@ module.exports = {
 
       if (isSetorAdministrativo && perfil !== 'SUPERADMIN') {
         where[Op.and] = where[Op.and] || [];
-        where[Op.and].push({
-          [Op.or]: [
-            { criado_por: usuarioId },
-            {
-              id: {
-                [Op.in]: Sequelize.literal(`(
-                  SELECT solicitacao_id
-                  FROM historicos
-                  WHERE usuario_responsavel_id = ${usuarioId}
-                    AND acao IN ('RESPONSAVEL_ATRIBUIDO', 'RESPONSAVEL_ASSUMIU')
-                )`)
-              }
-            },
-            {
-              id: {
-                [Op.in]: Sequelize.literal(`(
-                  SELECT n.solicitacao_id
-                  FROM notificacoes n
-                  INNER JOIN notificacao_destinatarios nd ON nd.notificacao_id = n.id
-                  WHERE nd.usuario_id = ${usuarioId}
-                    AND n.tipo = 'MENCAO_COMENTARIO'
-                )`)
-              }
+        const condicoesAdministrativo = [
+          { criado_por: usuarioId },
+          {
+            id: {
+              [Op.in]: Sequelize.literal(`(
+                SELECT solicitacao_id
+                FROM historicos
+                WHERE usuario_responsavel_id = ${usuarioId}
+                  AND acao IN ('RESPONSAVEL_ATRIBUIDO', 'RESPONSAVEL_ASSUMIU')
+              )`)
             }
-          ]
+          },
+          {
+            id: {
+              [Op.in]: Sequelize.literal(`(
+                SELECT n.solicitacao_id
+                FROM notificacoes n
+                INNER JOIN notificacao_destinatarios nd ON nd.notificacao_id = n.id
+                WHERE nd.usuario_id = ${usuarioId}
+                  AND n.tipo = 'MENCAO_COMENTARIO'
+              )`)
+            }
+          }
+        ];
+
+        if (tiposCompartilhadosUsuario.length > 0) {
+          condicoesAdministrativo.push({
+            tipo_solicitacao_id: { [Op.in]: tiposCompartilhadosUsuario }
+          });
+        }
+
+        where[Op.and].push({
+          [Op.or]: condicoesAdministrativo
         });
       } else if (isSetorBrape) {
         if (usuarioBrape) {
@@ -1014,6 +1059,9 @@ module.exports = {
         where[Op.and].push({
           [Op.or]: [
             { area_responsavel: { [Op.in]: tokensGeoUsuario } },
+            ...(tiposCompartilhadosUsuario.length > 0
+              ? [{ tipo_solicitacao_id: { [Op.in]: tiposCompartilhadosUsuario } }]
+              : []),
             literalHistoricoGeoUsuario ? {
               id: {
                 [Op.in]: literalHistoricoGeoUsuario
@@ -1125,6 +1173,12 @@ module.exports = {
               { fluxo_aprovacao_diretoria: true },
               { diretoria_fluxo_codigo: diretoriaPrivadaConfigurada }
             ]
+          });
+        }
+
+        if (tiposCompartilhadosUsuario.length > 0) {
+          condicoes.push({
+            tipo_solicitacao_id: { [Op.in]: tiposCompartilhadosUsuario }
           });
         }
 
@@ -1992,6 +2046,14 @@ module.exports = {
         await obterTokensSetorUsuario(req, areaUsuario)
       );
       const isSetorAdministrativo = tokensSetorUsuario.some(isAdministrativoToken);
+      const configuracaoTiposCompartilhados = await obterConfiguracaoTiposCompartilhados();
+      const tiposCompartilhadosUsuario = obterTiposCompartilhadosParaTokens(
+        tokensSetorUsuario,
+        configuracaoTiposCompartilhados
+      );
+      const solicitacaoTipoCompartilhada = tiposCompartilhadosUsuario.includes(
+        Number(solicitacao.tipo_solicitacao_id)
+      );
 
       if (isSetorAdministrativo && String(req.user?.perfil || '').trim().toUpperCase() !== 'SUPERADMIN') {
         const itemCriadoPeloUsuario = Number(solicitacao.criado_por) === Number(req.user.id);
@@ -2024,7 +2086,7 @@ module.exports = {
           attributes: ['id']
         });
 
-        if (!itemCriadoPeloUsuario && !historicoResponsavel && !mencaoUsuario) {
+        if (!itemCriadoPeloUsuario && !historicoResponsavel && !mencaoUsuario && !solicitacaoTipoCompartilhada) {
           return res.status(403).json({ error: 'Acesso negado' });
         }
       }
@@ -2070,7 +2132,8 @@ module.exports = {
           !podeVerPeloModoRecebimento &&
           !historicoResponsavel &&
           !historicoInteracao &&
-          !historicoSetorGeo
+          !historicoSetorGeo &&
+          !solicitacaoTipoCompartilhada
         ) {
           return res.status(403).json({ error: 'Acesso negado' });
         }
@@ -2232,6 +2295,8 @@ module.exports = {
         }
       });
 
+      let enviouAutomaticamente = false;
+
       if (isSetorObra) {
         const statusAnteriorNorm = normalizarTokenComparacao(statusAnterior);
         const statusNovoNorm = normalizarTokenComparacao(status);
@@ -2264,6 +2329,12 @@ module.exports = {
           }
 
           if (setorRetorno) {
+            await registrarHistoricoEnvioAutomatico({
+              solicitacaoId: solicitacao.id,
+              usuarioId,
+              setorOrigem: solicitacao.area_responsavel,
+              setorDestino: setorRetorno
+            });
             const envioAuto = await enviarSolicitacaoParaSetorInterno({
               req,
               solicitacao,
@@ -2276,11 +2347,19 @@ module.exports = {
                 error: envioAuto.error || 'Erro ao retornar solicitacao para o setor anterior'
               });
             }
+
+            enviouAutomaticamente = true;
           }
         }
 
         // Quando OBRA marca "Mercadoria Entregue", envia automaticamente para FINANCEIRO.
-        if (statusNovoNorm === 'MERCADORIA_ENTREGUE') {
+        if (!enviouAutomaticamente && statusNovoNorm === 'MERCADORIA_ENTREGUE') {
+          await registrarHistoricoEnvioAutomatico({
+            solicitacaoId: solicitacao.id,
+            usuarioId,
+            setorOrigem: solicitacao.area_responsavel,
+            setorDestino: 'FINANCEIRO'
+          });
           const envioFinanceiro = await enviarSolicitacaoParaSetorInterno({
             req,
             solicitacao,
@@ -2291,6 +2370,43 @@ module.exports = {
           if (!envioFinanceiro.ok) {
             return res.status(envioFinanceiro.status || 400).json({
               error: envioFinanceiro.error || 'Erro ao enviar solicitacao automaticamente para FINANCEIRO'
+            });
+          }
+
+          enviouAutomaticamente = true;
+        }
+      }
+
+      if (!enviouAutomaticamente) {
+        const regrasAutomacao = await obterConfiguracaoAutomacaoStatusSetor();
+        const automacao = obterAutomacaoStatusCorrespondente({
+          tipoSolicitacaoId: solicitacao.tipo_solicitacao_id,
+          status,
+          regras: regrasAutomacao
+        });
+
+        if (
+          automacao &&
+          !setorPertenceAoUsuario([automacao.setor_destino], solicitacao.area_responsavel)
+        ) {
+          await registrarHistoricoEnvioAutomatico({
+            solicitacaoId: solicitacao.id,
+            usuarioId,
+            setorOrigem: solicitacao.area_responsavel,
+            setorDestino: automacao.setor_destino,
+            regra: automacao
+          });
+
+          const envioConfigurado = await enviarSolicitacaoParaSetorInterno({
+            req,
+            solicitacao,
+            setorDestino: automacao.setor_destino,
+            usuarioId
+          });
+
+          if (!envioConfigurado.ok) {
+            return res.status(envioConfigurado.status || 400).json({
+              error: envioConfigurado.error || 'Erro ao executar a automacao de envio por status'
             });
           }
         }

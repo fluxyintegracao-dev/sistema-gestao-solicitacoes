@@ -36,6 +36,8 @@ import SetoresVisiveisUsuario from './pages/SetoresVisiveisUsuario';
 import ComportamentoRecebimentoSetor from './pages/ComportamentoRecebimentoSetor';
 import TimeoutInatividade from './pages/TimeoutInatividade';
 import TiposSolicitacaoPorSetor from './pages/TiposSolicitacaoPorSetor';
+import TiposCompartilhadosSetor from './pages/TiposCompartilhadosSetor';
+import AutomacaoStatusSetor from './pages/AutomacaoStatusSetor';
 import SetoresCriacaoTodasObras from './pages/SetoresCriacaoTodasObras';
 import UsuariosEnvioQualquerSetor from './pages/UsuariosEnvioQualquerSetor';
 import ConversasEntrada from './pages/ConversasEntrada';
@@ -163,6 +165,8 @@ export default function App() {
         <Route path="comportamento-recebimento-setor" element={<ComportamentoRecebimentoSetor />} />
         <Route path="timeout-inatividade" element={<TimeoutInatividade />} />
         <Route path="tipos-solicitacao-por-setor" element={<TiposSolicitacaoPorSetor />} />
+        <Route path="tipos-compartilhados-setor" element={<SuperadminRoute><TiposCompartilhadosSetor /></SuperadminRoute>} />
+        <Route path="automacao-status-setor" element={<SuperadminRoute><AutomacaoStatusSetor /></SuperadminRoute>} />
         <Route path="setores-criacao-todas-obras" element={<SetoresCriacaoTodasObras />} />
         <Route path="arquivos-modelos-config" element={<SuperadminRoute><ArquivosModelosConfig /></SuperadminRoute>} />
         <Route path="provisionamento-financeiro-config" element={<SuperadminRoute><ConfiguracaoProvisionamentoFinanceiro /></SuperadminRoute>} />

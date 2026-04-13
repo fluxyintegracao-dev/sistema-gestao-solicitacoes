@@ -373,6 +373,10 @@ router.get('/configuracoes/setores-visiveis-usuario', permit(['SUPERADMIN']), Co
 router.patch('/configuracoes/setores-visiveis-usuario', permit(['SUPERADMIN']), ConfiguracaoSistemaController.updateSetoresVisiveisPorUsuario);
 router.get('/configuracoes/tipos-solicitacao-por-setor', ConfiguracaoSistemaController.getTiposSolicitacaoPorSetor);
 router.patch('/configuracoes/tipos-solicitacao-por-setor', permit(['SUPERADMIN']), ConfiguracaoSistemaController.updateTiposSolicitacaoPorSetor);
+router.get('/configuracoes/tipos-compartilhados-setor', permit(['SUPERADMIN']), ConfiguracaoSistemaController.getTiposCompartilhadosEntreSetores);
+router.patch('/configuracoes/tipos-compartilhados-setor', permit(['SUPERADMIN']), ConfiguracaoSistemaController.updateTiposCompartilhadosEntreSetores);
+router.get('/configuracoes/automacao-status-setor', permit(['SUPERADMIN']), ConfiguracaoSistemaController.getAutomacaoStatusSetor);
+router.patch('/configuracoes/automacao-status-setor', permit(['SUPERADMIN']), ConfiguracaoSistemaController.updateAutomacaoStatusSetor);
 router.get('/configuracoes/setores-criacao-todas-obras', ConfiguracaoSistemaController.getSetoresCriacaoTodasObras);
 router.patch('/configuracoes/setores-criacao-todas-obras', permit(['SUPERADMIN']), ConfiguracaoSistemaController.updateSetoresCriacaoTodasObras);
 router.get('/configuracoes/usuarios-envio-qualquer-setor', permit(['SUPERADMIN']), ConfiguracaoSistemaController.getUsuariosEnvioQualquerSetor);

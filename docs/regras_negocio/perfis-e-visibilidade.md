@@ -38,6 +38,15 @@ A visibilidade efetiva depende de combinacao entre:
   - `SUPERADMIN` continua como excecao administrativa no backend
   - a listagem passa a exibir saldo enquanto a solicitacao nao estiver `PAGA`
   - o detalhe mantem valor total, pago acumulado e saldo atual
+- tipos compartilhados entre setores:
+  - o `SUPERADMIN` pode configurar setores extras por `tipo_solicitacao`
+  - esses setores passam a visualizar a solicitacao desde a criacao
+  - essa configuracao nao muda o setor responsavel da solicitacao
+- automacao de envio por status:
+  - o `SUPERADMIN` pode definir, por tipo e status, qual setor recebe automaticamente a solicitacao
+  - a automacao ocorre apos a alteracao manual de status
+  - o historico registra `ENVIO_AUTOMATICO_SETOR`
+  - as automacoes legadas ja existentes no fluxo atual continuam valendo
 
 ## Filtros
 Filtros da listagem precisam obedecer a visibilidade efetiva do usuario. Nao assumir que filtros podem listar valores fora do universo visivel.

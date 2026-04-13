@@ -100,6 +100,16 @@ const SECOES_CONFIG = [
         to: '/tipos-solicitacao-por-setor'
       },
       {
+        title: 'Tipos Compartilhados entre Setores',
+        description: 'Defina setores extras que visualizam determinados tipos desde a criacao.',
+        to: '/tipos-compartilhados-setor'
+      },
+      {
+        title: 'Automacao por Status',
+        description: 'Defina envios automaticos de setor por tipo de solicitacao e status.',
+        to: '/automacao-status-setor'
+      },
+      {
         title: 'Criacao em Todas as Obras',
         description: 'Defina quais setores podem criar solicitacao em qualquer obra.',
         to: '/setores-criacao-todas-obras'

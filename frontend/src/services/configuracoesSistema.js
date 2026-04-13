@@ -132,6 +132,42 @@ export async function salvarTiposSolicitacaoPorSetor(data) {
   return res.json();
 }
 
+export async function getTiposCompartilhadosEntreSetores() {
+  const res = await fetch(`${API_URL}/configuracoes/tipos-compartilhados-setor`, {
+    headers: authHeaders()
+  });
+  if (!res.ok) throw new Error('Erro ao buscar configuracao de tipos compartilhados');
+  return res.json();
+}
+
+export async function salvarTiposCompartilhadosEntreSetores(data) {
+  const res = await fetch(`${API_URL}/configuracoes/tipos-compartilhados-setor`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+  if (!res.ok) throw new Error('Erro ao salvar configuracao de tipos compartilhados');
+  return res.json();
+}
+
+export async function getAutomacaoStatusSetor() {
+  const res = await fetch(`${API_URL}/configuracoes/automacao-status-setor`, {
+    headers: authHeaders()
+  });
+  if (!res.ok) throw new Error('Erro ao buscar configuracao de automacao por status');
+  return res.json();
+}
+
+export async function salvarAutomacaoStatusSetor(data) {
+  const res = await fetch(`${API_URL}/configuracoes/automacao-status-setor`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+  if (!res.ok) throw new Error('Erro ao salvar configuracao de automacao por status');
+  return res.json();
+}
+
 export async function getSetoresCriacaoTodasObras() {
   const res = await fetch(`${API_URL}/configuracoes/setores-criacao-todas-obras`, {
     headers: authHeaders()

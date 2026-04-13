@@ -6,6 +6,12 @@ const {
   normalizarMapaDiretoriasPorClassificacao,
   normalizarMapaSetorDestinoAprovacao
 } = require('../services/aprovacaoDiretoriaConfig');
+const {
+  CHAVE_TIPOS_COMPARTILHADOS_ENTRE_SETORES,
+  CHAVE_AUTOMACAO_STATUS_SETOR,
+  normalizarTiposCompartilhados,
+  normalizarAutomacoesStatus
+} = require('../services/solicitacao/configuracoesVisibilidadeAutomacao');
 
 const CHAVE_TEMA = 'TEMA_SISTEMA';
 const CHAVE_AREAS_OBRA = 'AREAS_OBRA_VISIVEIS';
@@ -534,6 +540,132 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return res.status(500).json({ error: 'Erro ao salvar configuracao de tipos por setor' });
+    }
+  },
+
+  async getTiposCompartilhadosEntreSetores(req, res) {
+    try {
+      const item = await ConfiguracaoSistema.findOne({
+        where: { chave: CHAVE_TIPOS_COMPARTILHADOS_ENTRE_SETORES },
+        order: [['id', 'DESC']]
+      });
+
+      const data = parseJsonOrDefault(item?.valor, { regras: {} });
+      const regras = normalizarTiposCompartilhados(data?.regras);
+      return res.json({ regras });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao buscar configuracao de tipos compartilhados' });
+    }
+  },
+
+  async updateTiposCompartilhadosEntreSetores(req, res) {
+    try {
+      const regras = normalizarTiposCompartilhados(req.body?.regras);
+
+      const [setores, tipos] = await Promise.all([
+        Setor.findAll({
+          attributes: ['id', 'codigo', 'nome']
+        }),
+        TipoSolicitacao.findAll({
+          attributes: ['id']
+        })
+      ]);
+
+      const tokensSetorValidos = new Set(
+        setores.flatMap(setor => [
+          String(setor.id || '').trim().toUpperCase(),
+          String(setor.codigo || '').trim().toUpperCase(),
+          String(setor.nome || '').trim().toUpperCase()
+        ]).filter(Boolean)
+      );
+      const tiposValidos = new Set(tipos.map(tipo => String(tipo.id)));
+
+      const tiposInvalidos = Object.entries(regras)
+        .filter(([tipoId, setoresCompartilhados]) => (
+          !tiposValidos.has(String(tipoId)) ||
+          (Array.isArray(setoresCompartilhados)
+            ? setoresCompartilhados.some(setor => !tokensSetorValidos.has(String(setor || '').trim().toUpperCase()))
+            : false)
+        ))
+        .map(([tipoId]) => String(tipoId));
+
+      if (tiposInvalidos.length > 0) {
+        return res.status(400).json({
+          error: 'Um ou mais tipos compartilhados sao invalidos.',
+          tipos_invalidos: tiposInvalidos
+        });
+      }
+
+      await salvarConfiguracaoJson(CHAVE_TIPOS_COMPARTILHADOS_ENTRE_SETORES, {
+        regras
+      });
+
+      return res.json({ ok: true, regras });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao salvar configuracao de tipos compartilhados' });
+    }
+  },
+
+  async getAutomacaoStatusSetor(req, res) {
+    try {
+      const item = await ConfiguracaoSistema.findOne({
+        where: { chave: CHAVE_AUTOMACAO_STATUS_SETOR },
+        order: [['id', 'DESC']]
+      });
+
+      const data = parseJsonOrDefault(item?.valor, { regras: [] });
+      const regras = normalizarAutomacoesStatus(data?.regras);
+      return res.json({ regras });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao buscar configuracao de automacao por status' });
+    }
+  },
+
+  async updateAutomacaoStatusSetor(req, res) {
+    try {
+      const regras = normalizarAutomacoesStatus(req.body?.regras);
+
+      const [setores, tipos] = await Promise.all([
+        Setor.findAll({
+          attributes: ['id', 'codigo', 'nome']
+        }),
+        TipoSolicitacao.findAll({
+          attributes: ['id']
+        })
+      ]);
+
+      const tokensSetorValidos = new Set(
+        setores.flatMap(setor => [
+          String(setor.id || '').trim().toUpperCase(),
+          String(setor.codigo || '').trim().toUpperCase(),
+          String(setor.nome || '').trim().toUpperCase()
+        ]).filter(Boolean)
+      );
+      const tiposValidos = new Set(tipos.map(tipo => String(tipo.id)));
+
+      const regrasInvalidas = regras.filter((regra) => (
+        !tiposValidos.has(String(regra.tipo_solicitacao_id)) ||
+        !tokensSetorValidos.has(String(regra.setor_destino || '').trim().toUpperCase())
+      ));
+
+      if (regrasInvalidas.length > 0) {
+        return res.status(400).json({
+          error: 'Uma ou mais automacoes sao invalidas.',
+          regras_invalidas: regrasInvalidas
+        });
+      }
+
+      await salvarConfiguracaoJson(CHAVE_AUTOMACAO_STATUS_SETOR, {
+        regras
+      });
+
+      return res.json({ ok: true, regras });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao salvar configuracao de automacao por status' });
     }
   },
 
