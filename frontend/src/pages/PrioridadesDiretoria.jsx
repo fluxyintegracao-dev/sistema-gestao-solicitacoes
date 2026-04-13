@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   cancelarLotePrioridadeDiretoria,
   criarLotePrioridadeDiretoria,
+  excluirLotePrioridadeDiretoria,
   finalizarLotePrioridadeDiretoria,
   getLotePrioridadeDiretoria,
   getPrioridadesDiretoriaContexto,
@@ -58,6 +59,7 @@ export default function PrioridadesDiretoria() {
   const [salvandoLote, setSalvandoLote] = useState(false);
   const [finalizando, setFinalizando] = useState(false);
   const [cancelando, setCancelando] = useState(false);
+  const [excluindo, setExcluindo] = useState(false);
   const [filtroStatus, setFiltroStatus] = useState('');
   const [formNovoLote, setFormNovoLote] = useState({
     classificacao_alvo: '',
@@ -281,6 +283,29 @@ export default function PrioridadesDiretoria() {
     }
   }
 
+  async function excluirLote() {
+    if (!detalhe?.id) return;
+    if (!window.confirm('Excluir este lote de prioridade? Esta acao nao podera ser desfeita.')) {
+      return;
+    }
+
+    try {
+      setExcluindo(true);
+      await excluirLotePrioridadeDiretoria(detalhe.id);
+      setDetalhe(null);
+      setLoteSelecionadoId(null);
+      setSolicitacoesDisponiveis([]);
+      setSelecionadasIds([]);
+      await carregarLotes();
+      alert('Lote excluido com sucesso.');
+    } catch (error) {
+      console.error(error);
+      alert(error?.message || 'Erro ao excluir lote');
+    } finally {
+      setExcluindo(false);
+    }
+  }
+
   if (loading) {
     return <p>Carregando modulo de prioridades...</p>;
   }
@@ -435,6 +460,16 @@ export default function PrioridadesDiretoria() {
 
                 <div className="flex items-center gap-2 flex-wrap">
                   <BadgeStatus status={detalhe.status} />
+                  {detalhe.pode_excluir && (
+                    <button
+                      type="button"
+                      className="btn btn-outline"
+                      onClick={excluirLote}
+                      disabled={excluindo}
+                    >
+                      {excluindo ? 'Excluindo...' : 'Excluir lote'}
+                    </button>
+                  )}
                   {detalhe.pode_cancelar && (
                     <button
                       type="button"

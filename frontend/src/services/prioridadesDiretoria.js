@@ -79,3 +79,11 @@ export async function cancelarLotePrioridadeDiretoria(id) {
   });
   return tratarResposta(res, 'Erro ao cancelar lote de prioridade');
 }
+
+export async function excluirLotePrioridadeDiretoria(id) {
+  const res = await fetch(`${API_URL}/prioridades-diretoria/lotes/${id}`, {
+    method: 'DELETE',
+    headers: authHeaders()
+  });
+  return tratarResposta(res, 'Erro ao excluir lote de prioridade');
+}

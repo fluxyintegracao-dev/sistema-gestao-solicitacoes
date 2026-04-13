@@ -326,13 +326,22 @@ async function listarSolicitacoesElegiveisParaLote(lote, busca = '', solicitacao
     { prioridade_diretoria_ativa: false },
     { status_global: { [Op.ne]: 'PAGA' } },
     {
-      id: {
-        [Op.in]: Sequelize.literal(`(
-          SELECT DISTINCT solicitacao_id
-          FROM historicos
-          WHERE acao = 'APROVADA_DIRETORIA'
-        )`)
-      }
+      [Op.or]: [
+        {
+          id: {
+            [Op.in]: Sequelize.literal(`(
+              SELECT DISTINCT solicitacao_id
+              FROM historicos
+              WHERE acao = 'APROVADA_DIRETORIA'
+            )`)
+          }
+        },
+        {
+          area_responsavel: {
+            [Op.ne]: lote.diretoria_alvo_codigo
+          }
+        }
+      ]
     }
   ];
 
@@ -456,7 +465,8 @@ module.exports = {
         items: lotes.map((lote) => ({
           ...serializarLote(lote, resumoItens.get(Number(lote.id))),
           pode_finalizar: usuarioPodeFinalizarLote(permissoes, lote) && lote.status === STATUS_LOTE.ABERTO,
-          pode_cancelar: (permissoes.isSuperadmin || permissoes.isDirAdmin) && lote.status === STATUS_LOTE.ABERTO
+          pode_cancelar: (permissoes.isSuperadmin || permissoes.isDirAdmin) && lote.status === STATUS_LOTE.ABERTO,
+          pode_excluir: Boolean(permissoes.isSuperadmin)
         }))
       });
     } catch (error) {
@@ -509,7 +519,8 @@ module.exports = {
         item: {
           ...serializarLote(detalhe),
           pode_finalizar: usuarioPodeFinalizarLote(permissoes, detalhe),
-          pode_cancelar: true
+          pode_cancelar: true,
+          pode_excluir: Boolean(permissoes.isSuperadmin)
         }
       });
     } catch (error) {
@@ -546,7 +557,8 @@ module.exports = {
             solicitacao: item.solicitacao ? serializarSolicitacaoPrioridade(item.solicitacao) : null
           })),
           pode_finalizar: usuarioPodeFinalizarLote(permissoes, lote) && lote.status === STATUS_LOTE.ABERTO,
-          pode_cancelar: (permissoes.isSuperadmin || permissoes.isDirAdmin) && lote.status === STATUS_LOTE.ABERTO
+          pode_cancelar: (permissoes.isSuperadmin || permissoes.isDirAdmin) && lote.status === STATUS_LOTE.ABERTO,
+          pode_excluir: Boolean(permissoes.isSuperadmin)
         }
       });
     } catch (error) {
@@ -764,6 +776,44 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return res.status(500).json({ error: 'Erro ao cancelar lote de prioridade.' });
+    }
+  },
+
+  async excluir(req, res) {
+    const transaction = await PrioridadeLote.sequelize.transaction();
+
+    try {
+      const permissoes = await obterPermissoesPrioridade(req);
+      if (!permissoes.isSuperadmin) {
+        await transaction.rollback();
+        return res.status(403).json({ error: 'Apenas SUPERADMIN pode excluir lotes.' });
+      }
+
+      const lote = await PrioridadeLote.findByPk(req.params.id, { transaction });
+      if (!lote) {
+        await transaction.rollback();
+        return res.status(404).json({ error: 'Lote de prioridade nao encontrado.' });
+      }
+
+      const itensCount = await PrioridadeLoteItem.count({
+        where: { lote_id: lote.id },
+        transaction
+      });
+
+      if (itensCount > 0) {
+        await transaction.rollback();
+        return res.status(400).json({
+          error: 'Nao e possivel excluir um lote que ja possui solicitacoes autorizadas. Preserve a trilha de auditoria.'
+        });
+      }
+
+      await lote.destroy({ transaction });
+      await transaction.commit();
+      return res.sendStatus(204);
+    } catch (error) {
+      await transaction.rollback();
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao excluir lote de prioridade.' });
     }
   }
 };

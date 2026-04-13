@@ -50,6 +50,7 @@ A visibilidade efetiva depende de combinacao entre:
 - prioridades da diretoria:
   - `DIR_ADMIN` nao ganha visibilidade global automatica de solicitacoes, mas pode abrir lotes de prioridade
   - `DIR_OBRAS_PUBLICAS` e `DIR_OBRAS_PRIVADAS` operam apenas lotes da propria classificacao configurada
+  - `SUPERADMIN` pode finalizar lotes e excluir lotes sem itens autorizados
   - a autorizacao de prioridade nao muda o setor responsavel da solicitacao
   - a autorizacao marca a solicitacao como `prioridade_diretoria_ativa`
 

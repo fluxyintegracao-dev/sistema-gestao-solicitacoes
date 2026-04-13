@@ -230,7 +230,7 @@ export default function LinhaSolicitacao({
 
         {mostrarColuna('codigo') && (
           <td
-            {...tdBase('C?digo', `p-2 font-medium whitespace-nowrap truncate ${isMobileCard ? 'text-sm font-semibold' : ''}`)}
+            {...tdBase('Codigo', `p-2 font-medium whitespace-nowrap truncate ${isMobileCard ? 'text-sm font-semibold' : ''}`)}
             title={solicitacao.codigo || ''}
           >
             <div>{solicitacao.codigo}</div>

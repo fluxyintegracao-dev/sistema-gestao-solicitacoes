@@ -142,6 +142,7 @@ router.get('/prioridades-diretoria/lotes/:id', PrioridadeDiretoriaController.sho
 router.get('/prioridades-diretoria/lotes/:id/solicitacoes-disponiveis', PrioridadeDiretoriaController.solicitacoesDisponiveis);
 router.post('/prioridades-diretoria/lotes/:id/finalizar', PrioridadeDiretoriaController.finalizar);
 router.post('/prioridades-diretoria/lotes/:id/cancelar', PrioridadeDiretoriaController.cancelar);
+router.delete('/prioridades-diretoria/lotes/:id', PrioridadeDiretoriaController.excluir);
 
 // -------------------------------------------------------------------
 // NOTIFICACOES

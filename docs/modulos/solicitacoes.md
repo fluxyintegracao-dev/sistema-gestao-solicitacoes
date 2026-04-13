@@ -72,8 +72,10 @@
   - valor utilizado
   - status do lote
 - apenas a diretoria alvo configurada, ou `SUPERADMIN`, pode finalizar o lote
+- `SUPERADMIN` pode excluir lotes sem itens autorizados
 - as solicitacoes elegiveis sao somente as do fluxo novo de diretoria que:
   - ja passaram por `APROVADA_DIRETORIA`
+  - ou ja sairam da diretoria alvo no fluxo novo
   - ainda nao foram priorizadas
   - nao estao `PAGA`
 - ao finalizar:

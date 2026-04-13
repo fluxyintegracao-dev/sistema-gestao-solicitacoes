@@ -43,6 +43,10 @@
 - a diretoria alvo e resolvida pela configuracao existente de aprovacao por diretoria
 - somente solicitacoes do fluxo novo, ja aprovadas pela diretoria e ainda nao pagas podem entrar no lote
 - a finalizacao nao muda owner da solicitacao; apenas registra prioridade autorizada
+- criterio de elegibilidade ficou mais robusto:
+  - aceita solicitacoes com historico `APROVADA_DIRETORIA`
+  - ou solicitacoes que ja sairam da diretoria alvo no fluxo novo
+- `SUPERADMIN` pode excluir lotes sem itens autorizados
 
 ## Validacao
 - `node --check` nos arquivos backend alterados
