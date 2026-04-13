@@ -318,7 +318,7 @@ async function carregarLoteDetalhe(loteId) {
   });
 }
 
-async function listarSolicitacoesElegiveisParaLote(lote, busca = '', solicitacaoIds = null) {
+async function listarSolicitacoesElegiveisParaLote(lote, busca = '', solicitacaoIds = null, obraId = null) {
   const condicoes = [
     { cancelada: false },
     { fluxo_aprovacao_diretoria: true },
@@ -350,6 +350,11 @@ async function listarSolicitacoesElegiveisParaLote(lote, busca = '', solicitacao
   );
   if (idsFiltrados.length > 0) {
     condicoes.push({ id: { [Op.in]: idsFiltrados } });
+  }
+
+  const obraIdNormalizado = Number(obraId);
+  if (Number.isInteger(obraIdNormalizado) && obraIdNormalizado > 0) {
+    condicoes.push({ obra_id: obraIdNormalizado });
   }
 
   const buscaNormalizada = String(busca || '').trim();
@@ -584,10 +589,33 @@ module.exports = {
       }
 
       const items = lote.status === STATUS_LOTE.ABERTO
-        ? await listarSolicitacoesElegiveisParaLote(lote, req.query?.busca)
+        ? await listarSolicitacoesElegiveisParaLote(
+            lote,
+            req.query?.busca,
+            null,
+            req.query?.obra_id
+          )
         : [];
 
-      return res.json({ items });
+      const obrasBase = lote.status === STATUS_LOTE.ABERTO
+        ? await listarSolicitacoesElegiveisParaLote(lote)
+        : [];
+      const obras = Array.from(
+        new Map(
+          obrasBase
+            .filter((item) => item?.obra?.id && item?.obra?.nome)
+            .map((item) => [
+              String(item.obra.id),
+              {
+                id: item.obra.id,
+                nome: item.obra.nome,
+                codigo: item.obra.codigo || null
+              }
+            ])
+        ).values()
+      ).sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR'));
+
+      return res.json({ items, obras });
     } catch (error) {
       console.error(error);
       return res.status(500).json({ error: 'Erro ao buscar solicitacoes disponiveis para prioridade.' });

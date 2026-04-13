@@ -51,8 +51,11 @@ export default function PrioridadesDiretoria() {
   const [loteSelecionadoId, setLoteSelecionadoId] = useState(null);
   const [detalhe, setDetalhe] = useState(null);
   const [solicitacoesDisponiveis, setSolicitacoesDisponiveis] = useState([]);
+  const [obrasDisponiveis, setObrasDisponiveis] = useState([]);
   const [selecionadasIds, setSelecionadasIds] = useState([]);
+  const [selecionadasCache, setSelecionadasCache] = useState({});
   const [buscaDisponiveis, setBuscaDisponiveis] = useState('');
+  const [filtroObraId, setFiltroObraId] = useState('');
   const [loading, setLoading] = useState(true);
   const [loadingDetalhe, setLoadingDetalhe] = useState(false);
   const [loadingDisponiveis, setLoadingDisponiveis] = useState(false);
@@ -92,7 +95,11 @@ export default function PrioridadesDiretoria() {
     if (!loteSelecionadoId) {
       setDetalhe(null);
       setSolicitacoesDisponiveis([]);
+      setObrasDisponiveis([]);
       setSelecionadasIds([]);
+      setSelecionadasCache({});
+      setBuscaDisponiveis('');
+      setFiltroObraId('');
       return;
     }
     carregarDetalheLote(loteSelecionadoId);
@@ -101,16 +108,20 @@ export default function PrioridadesDiretoria() {
   useEffect(() => {
     if (!detalhe?.id || detalhe.status !== 'ABERTO' || !detalhe.pode_finalizar) {
       setSolicitacoesDisponiveis([]);
+      setObrasDisponiveis([]);
       setSelecionadasIds([]);
+      setSelecionadasCache({});
+      setBuscaDisponiveis('');
+      setFiltroObraId('');
       return;
     }
 
     const timeout = setTimeout(() => {
-      carregarSolicitacoesDisponiveis(detalhe.id, buscaDisponiveis);
+      carregarSolicitacoesDisponiveis(detalhe.id, buscaDisponiveis, filtroObraId);
     }, 250);
 
     return () => clearTimeout(timeout);
-  }, [detalhe?.id, detalhe?.status, detalhe?.pode_finalizar, buscaDisponiveis]);
+  }, [detalhe?.id, detalhe?.status, detalhe?.pode_finalizar, buscaDisponiveis, filtroObraId]);
 
   const mapaDisponiveis = useMemo(() => {
     const mapa = new Map();
@@ -120,9 +131,13 @@ export default function PrioridadesDiretoria() {
 
   const solicitacoesSelecionadas = useMemo(() => (
     selecionadasIds
-      .map((id) => mapaDisponiveis.get(Number(id)))
+      .map((id) => selecionadasCache[String(id)] || mapaDisponiveis.get(Number(id)))
       .filter(Boolean)
-  ), [selecionadasIds, mapaDisponiveis]);
+  ), [selecionadasIds, selecionadasCache, mapaDisponiveis]);
+
+  const selecionadasVisiveisCount = useMemo(() => (
+    solicitacoesDisponiveis.filter((item) => selecionadasIds.includes(Number(item.id))).length
+  ), [solicitacoesDisponiveis, selecionadasIds]);
 
   const totalSelecionado = useMemo(() => (
     solicitacoesSelecionadas.reduce((total, item) => total + Number(item.valor_prioridade || 0), 0)
@@ -204,7 +219,9 @@ export default function PrioridadesDiretoria() {
       setDetalhe(data?.item || null);
       if (data?.item?.status !== 'ABERTO') {
         setSolicitacoesDisponiveis([]);
+        setObrasDisponiveis([]);
         setSelecionadasIds([]);
+        setSelecionadasCache({});
       }
     } catch (error) {
       console.error(error);
@@ -214,13 +231,26 @@ export default function PrioridadesDiretoria() {
     }
   }
 
-  async function carregarSolicitacoesDisponiveis(id, busca = '') {
+  async function carregarSolicitacoesDisponiveis(id, busca = '', obraId = '') {
     try {
       setLoadingDisponiveis(true);
-      const data = await getSolicitacoesDisponiveisPrioridadeDiretoria(id, busca ? { busca } : {});
+      const params = {};
+      if (busca) params.busca = busca;
+      if (obraId) params.obra_id = obraId;
+      const data = await getSolicitacoesDisponiveisPrioridadeDiretoria(id, params);
       const items = Array.isArray(data?.items) ? data.items : [];
+      const obras = Array.isArray(data?.obras) ? data.obras : [];
       setSolicitacoesDisponiveis(items);
-      setSelecionadasIds((atual) => atual.filter((itemId) => items.some((item) => Number(item.id) === Number(itemId))));
+      setObrasDisponiveis(obras);
+      setSelecionadasCache((atual) => {
+        const proximo = { ...atual };
+        items.forEach((item) => {
+          if (selecionadasIds.includes(Number(item.id))) {
+            proximo[String(item.id)] = item;
+          }
+        });
+        return proximo;
+      });
     } catch (error) {
       console.error(error);
       alert(error?.message || 'Erro ao carregar solicitacoes disponiveis');
@@ -261,7 +291,19 @@ export default function PrioridadesDiretoria() {
     setSelecionadasIds((atual) => {
       const numeroId = Number(id);
       if (atual.includes(numeroId)) {
+        setSelecionadasCache((cacheAtual) => {
+          const proximo = { ...cacheAtual };
+          delete proximo[String(numeroId)];
+          return proximo;
+        });
         return atual.filter((item) => Number(item) !== numeroId);
+      }
+      const itemSelecionado = mapaDisponiveis.get(numeroId);
+      if (itemSelecionado) {
+        setSelecionadasCache((cacheAtual) => ({
+          ...cacheAtual,
+          [String(numeroId)]: itemSelecionado
+        }));
       }
       return [...atual, numeroId];
     });
@@ -329,7 +371,9 @@ export default function PrioridadesDiretoria() {
       setDetalhe(null);
       setLoteSelecionadoId(null);
       setSolicitacoesDisponiveis([]);
+      setObrasDisponiveis([]);
       setSelecionadasIds([]);
+      setSelecionadasCache({});
       await carregarLotes();
       alert('Lote excluido com sucesso.');
     } catch (error) {
@@ -517,7 +561,7 @@ export default function PrioridadesDiretoria() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                 <ResumoCard label="Valor disponivel" value={formatarValor(resumoLote.valorDisponivel)} />
                 <ResumoCard
                   label="Valor utilizado"
@@ -540,17 +584,35 @@ export default function PrioridadesDiretoria() {
 
               {detalhe.status === 'ABERTO' && detalhe.pode_finalizar && (
                 <div className="space-y-3">
-                  <div className="flex flex-col lg:flex-row gap-3">
+                  <div className="grid grid-cols-1 xl:grid-cols-[minmax(220px,1.2fr)_minmax(220px,0.9fr)_minmax(240px,0.8fr)] gap-3">
                     <input
                       className="input"
                       value={buscaDisponiveis}
                       onChange={(event) => setBuscaDisponiveis(event.target.value)}
                       placeholder="Buscar por codigo, SIENGE, descricao, obra ou tipo"
                     />
-                    <div className="rounded-xl border border-gray-200 px-3 py-2 text-sm bg-gray-50 min-w-[240px]">
+                    <select
+                      className="input"
+                      value={filtroObraId}
+                      onChange={(event) => setFiltroObraId(event.target.value)}
+                    >
+                      <option value="">Todas as obras</option>
+                      {obrasDisponiveis.map((obra) => (
+                        <option key={obra.id} value={obra.id}>
+                          {obra.nome}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="rounded-xl border border-gray-200 px-3 py-2 text-sm bg-gray-50">
                       <span className="text-gray-600">Selecionadas:</span> <strong>{solicitacoesSelecionadas.length}</strong>
                       <span className="text-gray-400 mx-1.5">|</span>
                       <span className="text-gray-600">Total:</span> <strong>{formatarValor(totalSelecionado)}</strong>
+                      {solicitacoesSelecionadas.length > selecionadasVisiveisCount && (
+                        <>
+                          <span className="text-gray-400 mx-1.5">|</span>
+                          <span className="text-gray-600">Fora do filtro:</span> <strong>{solicitacoesSelecionadas.length - selecionadasVisiveisCount}</strong>
+                        </>
+                      )}
                     </div>
                   </div>
 
