@@ -1615,7 +1615,7 @@ module.exports = {
         lista.forEach(item => destinosPermitidos.add(String(item || '').toUpperCase()));
       });
 
-      if (destinosPermitidos.size > 0) {
+      if (!usuarioSetorObra && destinosPermitidos.size > 0) {
         const destino = String(area_responsavel || '').trim().toUpperCase();
         if (!destinosPermitidos.has(destino)) {
           return res.status(403).json({

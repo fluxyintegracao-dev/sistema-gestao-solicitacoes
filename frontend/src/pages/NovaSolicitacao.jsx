@@ -27,6 +27,40 @@ function normalizarTokenSetor(valor) {
   return String(valor || '').trim().toUpperCase();
 }
 
+function setorPossuiToken(setor, token) {
+  const alvo = normalizarTokenSetor(token);
+  if (!alvo) return false;
+
+  return [
+    setor?.codigo,
+    setor?.nome,
+    setor?.id
+  ].some(valor => normalizarTokenSetor(valor) === alvo);
+}
+
+function obterValorAreaResponsavel(setor) {
+  return String(setor?.codigo || setor?.nome || setor?.id || '').trim().toUpperCase();
+}
+
+function obterRegraTiposSetor(regrasConfig = {}, setorSelecionado = '', setores = []) {
+  const tokens = new Set([normalizarTokenSetor(setorSelecionado)]);
+  const setor = (Array.isArray(setores) ? setores : []).find(item => setorPossuiToken(item, setorSelecionado));
+
+  if (setor) {
+    tokens.add(normalizarTokenSetor(setor.codigo));
+    tokens.add(normalizarTokenSetor(setor.nome));
+    tokens.add(normalizarTokenSetor(setor.id));
+  }
+
+  for (const token of tokens) {
+    if (token && regrasConfig?.[token]) {
+      return regrasConfig[token];
+    }
+  }
+
+  return null;
+}
+
 export default function NovaSolicitacao() {
   const { user } = useAuth();
   const [obras, setObras] = useState([]);
@@ -474,17 +508,29 @@ export default function NovaSolicitacao() {
   const setoresFiltrados = useMemo(() => {
     let lista = [...setores];
 
-    if (destinosPermitidosPorSetorOrigem.size > 0) {
-      lista = lista.filter(s => destinosPermitidosPorSetorOrigem.has(String(s.codigo || '').toUpperCase()));
+    if (!isSetorObra && destinosPermitidosPorSetorOrigem.size > 0) {
+      lista = lista.filter(setor => {
+        return [
+          setor?.codigo,
+          setor?.nome,
+          setor?.id
+        ].some(valor => destinosPermitidosPorSetorOrigem.has(normalizarTokenSetor(valor)));
+      });
     }
 
     if (isSetorObra && areasObra && areasObra.length > 0) {
-      const permitidasObra = new Set(areasObra.map(a => String(a).toUpperCase()));
-      lista = lista.filter(s => permitidasObra.has(String(s.codigo || '').toUpperCase()));
+      const permitidasObra = new Set(areasObra.map(a => normalizarTokenSetor(a)).filter(Boolean));
+      lista = lista.filter(setor => {
+        return [
+          setor?.codigo,
+          setor?.nome,
+          setor?.id
+        ].some(valor => permitidasObra.has(normalizarTokenSetor(valor)));
+      });
     }
 
     if (isSetorObra && diretoriaEsperadaObra) {
-      lista = lista.filter(s => normalizarTokenSetor(s.codigo) === diretoriaEsperadaObra);
+      lista = lista.filter(setor => setorPossuiToken(setor, diretoriaEsperadaObra));
     }
 
     return lista;
@@ -500,7 +546,7 @@ export default function NovaSolicitacao() {
       ? tipos.filter(tipo => tipo?.ativo !== false)
       : [];
 
-    const regra = tiposPorSetorConfig?.[setorKey];
+    const regra = obterRegraTiposSetor(tiposPorSetorConfig, setorKey, setores);
     const tiposPermitidos = Array.isArray(regra?.tipos)
       ? regra.tipos.map(Number).filter(Number.isFinite)
       : [];
@@ -511,18 +557,22 @@ export default function NovaSolicitacao() {
 
     const idsPermitidos = new Set(tiposPermitidos);
     return tiposAtivos.filter(tipo => idsPermitidos.has(Number(tipo.id)));
-  }, [tipos, tiposPorSetorConfig, form.area_responsavel]);
+  }, [tipos, tiposPorSetorConfig, form.area_responsavel, setores]);
 
   useEffect(() => {
     if (!isSetorObra || !form.obra_id || !diretoriaEsperadaObra) return;
-    if (normalizarTokenSetor(form.area_responsavel) === diretoriaEsperadaObra) return;
-    setForm(prev => ({ ...prev, area_responsavel: diretoriaEsperadaObra }));
-  }, [isSetorObra, form.obra_id, form.area_responsavel, diretoriaEsperadaObra]);
+    const setorDiretoria = setoresFiltrados.find(setor => setorPossuiToken(setor, diretoriaEsperadaObra));
+    if (!setorDiretoria) return;
+
+    const valorEsperado = obterValorAreaResponsavel(setorDiretoria);
+    if (normalizarTokenSetor(form.area_responsavel) === valorEsperado) return;
+    setForm(prev => ({ ...prev, area_responsavel: valorEsperado }));
+  }, [isSetorObra, form.obra_id, form.area_responsavel, diretoriaEsperadaObra, setoresFiltrados]);
 
   useEffect(() => {
     if (!form.area_responsavel) return;
     const existe = setoresFiltrados.some(
-      setor => String(setor.codigo || '').toUpperCase() === String(form.area_responsavel || '').toUpperCase()
+      setor => setorPossuiToken(setor, form.area_responsavel)
     );
     if (!existe) {
       setForm(prev => ({ ...prev, area_responsavel: '' }));
@@ -628,7 +678,7 @@ export default function NovaSolicitacao() {
                 {form.obra_id ? 'Selecione' : 'Selecione a obra primeiro'}
               </option>
               {setoresFiltrados.map(s => (
-                <option key={s.id} value={s.codigo}>
+                <option key={s.id} value={obterValorAreaResponsavel(s)}>
                   {s.nome}
                 </option>
               ))}
