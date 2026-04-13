@@ -40,6 +40,7 @@ import TiposCompartilhadosSetor from './pages/TiposCompartilhadosSetor';
 import AutomacaoStatusSetor from './pages/AutomacaoStatusSetor';
 import SetoresCriacaoTodasObras from './pages/SetoresCriacaoTodasObras';
 import UsuariosEnvioQualquerSetor from './pages/UsuariosEnvioQualquerSetor';
+import PrioridadesDiretoria from './pages/PrioridadesDiretoria';
 import ConversasEntrada from './pages/ConversasEntrada';
 import ConversasSaida from './pages/ConversasSaida';
 import ConversaDetalhe from './pages/ConversaDetalhe';
@@ -64,7 +65,7 @@ import {
   SolicitacoesCompra
 } from './modules/solicitacao-compra/pages';
 import { useAuth } from './contexts/AuthContext';
-import { isGeoSetor } from './utils/setor';
+import { isGeoSetor, normalizarSetorToken } from './utils/setor';
 
 function GestaoUsuariosRoute({ children }) {
   const { user } = useAuth();
@@ -108,6 +109,30 @@ function ModuloComprasRoute({ children }) {
   return children;
 }
 
+function PrioridadesDiretoriaRoute({ children }) {
+  const { user } = useAuth();
+  const perfil = String(user?.perfil || '').toUpperCase();
+  const tokens = [
+    user?.setor?.codigo,
+    user?.setor?.nome,
+    user?.area
+  ]
+    .map(normalizarSetorToken)
+    .filter(Boolean);
+
+  const permitido =
+    perfil === 'SUPERADMIN' ||
+    tokens.includes('DIR_ADMIN') ||
+    tokens.includes('DIR_OBRAS_PUBLICAS') ||
+    tokens.includes('DIR_OBRAS_PRIVADAS');
+
+  if (!permitido) {
+    return <Navigate to="/" replace />;
+  }
+
+  return children;
+}
+
 export default function App() {
   return (
     <Routes>
@@ -135,6 +160,7 @@ export default function App() {
         <Route path="solicitacoes" element={<Solicitacoes />} />
         <Route path="solicitacoes-arquivadas" element={<SolicitacoesArquivadas />} />
         <Route path="solicitacoes/:id" element={<SolicitacaoDetalhe />} />
+        <Route path="prioridades-diretoria" element={<PrioridadesDiretoriaRoute><PrioridadesDiretoria /></PrioridadesDiretoriaRoute>} />
         <Route path="conversas/entrada" element={<ConversasEntrada />} />
         <Route path="conversas/saida" element={<ConversasSaida />} />
         <Route path="conversas/:id" element={<ConversaDetalhe />} />

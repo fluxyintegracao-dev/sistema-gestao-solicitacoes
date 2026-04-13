@@ -94,6 +94,23 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.STRING,
         allowNull: true
       },
+      prioridade_diretoria_ativa: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false
+      },
+      prioridade_diretoria_em: {
+        type: DataTypes.DATE,
+        allowNull: true
+      },
+      prioridade_diretoria_lote_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        references: {
+          model: 'prioridade_lotes',
+          key: 'id'
+        }
+      },
       criado_por: {
         type: DataTypes.INTEGER,
         allowNull: false

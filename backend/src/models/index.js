@@ -51,6 +51,8 @@ db.SolicitacaoCompraFornecedor = require('./SolicitacaoCompraFornecedor')(sequel
 db.SolicitacaoCompraRespostaItem = require('./SolicitacaoCompraRespostaItem')(sequelize, Sequelize);
 db.SolicitacaoCompraLog = require('./SolicitacaoCompraLog')(sequelize, Sequelize);
 db.SolicitacaoPagamento = require('./SolicitacaoPagamento')(sequelize, Sequelize);
+db.PrioridadeLote = require('./PrioridadeLote')(sequelize, Sequelize);
+db.PrioridadeLoteItem = require('./PrioridadeLoteItem')(sequelize, Sequelize);
 db.ProvisaoFinanceira = require('./ProvisaoFinanceira')(sequelize, Sequelize);
 db.ProvisaoCategoriaMacro = require('./ProvisaoCategoriaMacro')(sequelize, Sequelize);
 db.ProvisaoFinanceiraHistorico = require('./ProvisaoFinanceiraHistorico')(sequelize, Sequelize);
@@ -184,6 +186,46 @@ db.User.hasMany(db.SolicitacaoPagamento, {
 db.SolicitacaoPagamento.belongsTo(db.User, {
   foreignKey: 'created_by',
   as: 'criadoPor'
+});
+
+db.PrioridadeLote.hasMany(db.PrioridadeLoteItem, {
+  foreignKey: 'lote_id',
+  as: 'itens'
+});
+
+db.PrioridadeLoteItem.belongsTo(db.PrioridadeLote, {
+  foreignKey: 'lote_id',
+  as: 'lote'
+});
+
+db.PrioridadeLote.belongsTo(db.User, {
+  foreignKey: 'solicitado_por',
+  as: 'solicitadoPor'
+});
+
+db.PrioridadeLote.belongsTo(db.User, {
+  foreignKey: 'finalizado_por',
+  as: 'finalizadoPor'
+});
+
+db.PrioridadeLoteItem.belongsTo(db.Solicitacao, {
+  foreignKey: 'solicitacao_id',
+  as: 'solicitacao'
+});
+
+db.Solicitacao.hasMany(db.PrioridadeLoteItem, {
+  foreignKey: 'solicitacao_id',
+  as: 'itensPrioridadeDiretoria'
+});
+
+db.PrioridadeLoteItem.belongsTo(db.User, {
+  foreignKey: 'autorizado_por',
+  as: 'autorizadoPor'
+});
+
+db.Solicitacao.belongsTo(db.PrioridadeLote, {
+  foreignKey: 'prioridade_diretoria_lote_id',
+  as: 'lotePrioridadeDiretoria'
 });
 
 /* ===== Usuário x Cargo ===== */

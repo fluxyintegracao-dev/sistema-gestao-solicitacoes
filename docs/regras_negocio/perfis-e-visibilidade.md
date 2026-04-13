@@ -47,6 +47,11 @@ A visibilidade efetiva depende de combinacao entre:
   - a automacao ocorre apos a alteracao manual de status
   - o historico registra `ENVIO_AUTOMATICO_SETOR`
   - as automacoes legadas ja existentes no fluxo atual continuam valendo
+- prioridades da diretoria:
+  - `DIR_ADMIN` nao ganha visibilidade global automatica de solicitacoes, mas pode abrir lotes de prioridade
+  - `DIR_OBRAS_PUBLICAS` e `DIR_OBRAS_PRIVADAS` operam apenas lotes da propria classificacao configurada
+  - a autorizacao de prioridade nao muda o setor responsavel da solicitacao
+  - a autorizacao marca a solicitacao como `prioridade_diretoria_ativa`
 
 ## Filtros
 Filtros da listagem precisam obedecer a visibilidade efetiva do usuario. Nao assumir que filtros podem listar valores fora do universo visivel.

@@ -102,6 +102,7 @@ export default function Header({
   const valorTotal = solicitacao?.valor_total ?? solicitacao?.valor;
   const valorPagoAcumulado = solicitacao?.valor_pago_acumulado ?? 0;
   const saldoPagamento = solicitacao?.saldo_pagamento;
+  const prioridadeDiretoriaAtiva = Boolean(solicitacao?.prioridade_diretoria_ativa);
 
   return (
     <div className="sol-detail-header">
@@ -138,6 +139,10 @@ export default function Header({
         <InfoItem label="Inicio da medicao" value={formatarData(solicitacao.data_inicio_medicao)} />
         <InfoItem label="Fim da medicao" value={formatarData(solicitacao.data_fim_medicao)} />
         <InfoItem label="Status" value={solicitacao.status_global || '-'} />
+        <InfoItem
+          label="Prioridade Diretoria"
+          value={prioridadeDiretoriaAtiva ? `Autorizada${solicitacao?.prioridade_diretoria_lote_id ? ` (Lote #${solicitacao.prioridade_diretoria_lote_id})` : ''}` : '-'}
+        />
       </div>
 
       <div className="sol-detail-stats-grid sol-detail-contract-grid">

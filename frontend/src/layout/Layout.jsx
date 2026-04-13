@@ -33,7 +33,7 @@ import {
   HiOutlinePaperAirplane
 } from 'react-icons/hi2';
 import { BsBuildingsFill } from 'react-icons/bs';
-import { isGeoSetor } from '../utils/setor';
+import { isGeoSetor, normalizarSetorToken } from '../utils/setor';
 
 export default function Layout() {
   const { user, logout } = useContext(AuthContext);
@@ -178,9 +178,15 @@ export default function Layout() {
     String(user?.setor?.codigo || '').toUpperCase(),
     String(user?.area || '').toUpperCase()
   ];
+  const setorTokensNormalizados = setorTokens.map(normalizarSetorToken).filter(Boolean);
   const isAdminGEO =
     user?.perfil === 'ADMIN' && setorTokens.some(isGeoSetor);
   const isSetorObra = setorTokens.includes('OBRA');
+  const hasPrioridadesDiretoriaAccess =
+    perfilUpper === 'SUPERADMIN' ||
+    setorTokensNormalizados.includes('DIR_ADMIN') ||
+    setorTokensNormalizados.includes('DIR_OBRAS_PUBLICAS') ||
+    setorTokensNormalizados.includes('DIR_OBRAS_PRIVADAS');
   const hasProvisionamentoAccess =
     perfilUpper === 'SUPERADMIN' ||
     Boolean(provisionamentoContexto?.permissoes?.pode_acessar);
@@ -489,6 +495,24 @@ export default function Layout() {
       ]);
     }
 
+    if (hasPrioridadesDiretoriaAccess) {
+      const grupoSolicitacoes = groups.find(
+        (group) => normalizeMenuLabel(group.label) === 'SOLICITACOES'
+      );
+
+      if (grupoSolicitacoes) {
+        if (!grupoSolicitacoes.items.some((entry) => entry.to === '/prioridades-diretoria')) {
+          grupoSolicitacoes.items.push(
+            item('/prioridades-diretoria', 'Prioridades Diretoria', HiOutlineBanknotes)
+          );
+        }
+      } else {
+        addGroup('Solicitações', [
+          item('/prioridades-diretoria', 'Prioridades Diretoria', HiOutlineBanknotes)
+        ]);
+      }
+    }
+
     return groups;
   }, [
     user?.perfil,
@@ -496,6 +520,7 @@ export default function Layout() {
     isFinanceiro,
     isAdminGEO,
     isSetorObra,
+    hasPrioridadesDiretoriaAccess,
     hasProvisionamentoAccess,
     hasProvisionamentoDashboard,
     canCreateProvisionamento,

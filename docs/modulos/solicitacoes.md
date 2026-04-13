@@ -62,3 +62,22 @@
 - as automacoes legadas do fluxo atual continuam ativas:
   - retorno automatico para setor anterior em ajustes atendidos pela `OBRA`
   - `MERCADORIA_ENTREGUE -> FINANCEIRO` no fluxo atual da `OBRA`
+
+## Prioridades da diretoria
+- `DIR_ADMIN` e `SUPERADMIN` podem abrir lotes de prioridade para `PUBLICA` ou `PRIVADA`
+- o lote registra:
+  - classificacao alvo
+  - diretoria alvo resolvida pela configuracao de aprovacao
+  - valor disponivel
+  - valor utilizado
+  - status do lote
+- apenas a diretoria alvo configurada, ou `SUPERADMIN`, pode finalizar o lote
+- as solicitacoes elegiveis sao somente as do fluxo novo de diretoria que:
+  - ja passaram por `APROVADA_DIRETORIA`
+  - ainda nao foram priorizadas
+  - nao estao `PAGA`
+- ao finalizar:
+  - os itens entram em `prioridade_lote_itens`
+  - a solicitacao recebe indicador de prioridade autorizada
+  - o historico registra `PRIORIDADE_DIRETORIA_AUTORIZADA`
+  - participantes recebem notificacao da autorizacao

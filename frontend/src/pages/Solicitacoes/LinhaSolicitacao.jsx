@@ -230,10 +230,15 @@ export default function LinhaSolicitacao({
 
         {mostrarColuna('codigo') && (
           <td
-            {...tdBase('Código', `p-2 font-medium whitespace-nowrap truncate ${isMobileCard ? 'text-sm font-semibold' : ''}`)}
+            {...tdBase('C?digo', `p-2 font-medium whitespace-nowrap truncate ${isMobileCard ? 'text-sm font-semibold' : ''}`)}
             title={solicitacao.codigo || ''}
           >
-            {solicitacao.codigo}
+            <div>{solicitacao.codigo}</div>
+            {Boolean(solicitacao.prioridade_diretoria_ativa) && (
+              <div className="text-[11px] font-semibold text-amber-700 mt-1">
+                Prioridade autorizada
+              </div>
+            )}
           </td>
         )}
 

@@ -39,6 +39,7 @@ const ApropriacaoController = require('./controllers/ApropriacaoController');
 const SolicitacaoCompraController = require('./controllers/SolicitacaoCompraController');
 const FornecedorCompraController = require('./controllers/FornecedorCompraController');
 const CotacaoFornecedorController = require('./controllers/CotacaoFornecedorController');
+const PrioridadeDiretoriaController = require('./controllers/PrioridadeDiretoriaController');
 const criarMiddlewareProvisionamentoFinanceiro = require('./middlewares/provisaoFinanceira');
 const { Setor } = require('./models');
 //console.log('AnexoController =>', AnexoController);
@@ -134,6 +135,13 @@ router.patch('/solicitacoes/:id/ocultar', SolicitacaoController.ocultarDaMinhaLi
 router.patch('/solicitacoes/:id/arquivar', SolicitacaoController.ocultarDaMinhaLista);
 router.patch('/solicitacoes/:id/desarquivar', SolicitacaoController.desarquivarDaMinhaLista);
 router.delete('/solicitacoes/:id', SolicitacaoController.excluir);
+router.get('/prioridades-diretoria/contexto', PrioridadeDiretoriaController.contexto);
+router.get('/prioridades-diretoria/lotes', PrioridadeDiretoriaController.index);
+router.post('/prioridades-diretoria/lotes', PrioridadeDiretoriaController.create);
+router.get('/prioridades-diretoria/lotes/:id', PrioridadeDiretoriaController.show);
+router.get('/prioridades-diretoria/lotes/:id/solicitacoes-disponiveis', PrioridadeDiretoriaController.solicitacoesDisponiveis);
+router.post('/prioridades-diretoria/lotes/:id/finalizar', PrioridadeDiretoriaController.finalizar);
+router.post('/prioridades-diretoria/lotes/:id/cancelar', PrioridadeDiretoriaController.cancelar);
 
 // -------------------------------------------------------------------
 // NOTIFICACOES
