@@ -118,6 +118,30 @@ export async function updateValorSolicitacao(id, valor) {
   return true;
 }
 
+export async function adicionarPagamentoSolicitacao(id, data) {
+  const res = await fetch(`${API_URL}/solicitacoes/${id}/pagamentos`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+
+  if (!res.ok) {
+    let mensagem = 'Erro ao informar pagamento';
+    try {
+      const json = await res.json();
+      mensagem = json?.error || mensagem;
+    } catch (_) {
+      try {
+        const text = await res.text();
+        if (text) mensagem = text;
+      } catch (_) {}
+    }
+    throw new Error(mensagem);
+  }
+
+  return res.json();
+}
+
 export async function updateRefContratoSolicitacao(id, contrato_id) {
   const res = await fetch(`${API_URL}/solicitacoes/${id}/ref-contrato`, {
     method: 'PATCH',

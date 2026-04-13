@@ -110,6 +110,14 @@ export default function LinhaSolicitacao({
   const dataVencimentoTitle = dataVencimentoValida
     ? dataVencimento.toLocaleString('pt-BR')
     : '';
+  const valorTotal = solicitacao.valor_total ?? solicitacao.valor;
+  const valorExibicao = solicitacao.valor_exibicao ?? valorTotal;
+  const valorPagoAcumulado = Number(solicitacao.valor_pago_acumulado || 0);
+  const valorExibicaoNumero = Number(valorExibicao);
+  const temValorExibicao = valorExibicao !== null && valorExibicao !== undefined && !Number.isNaN(valorExibicaoNumero);
+  const exibeResumoPagamento =
+    valorPagoAcumulado > 0 &&
+    String(solicitacao.status_global || '').trim().toUpperCase() !== 'PAGA';
 
   const [editandoValor, setEditandoValor] = useState(false);
   const [valorEditado, setValorEditado] = useState(
@@ -299,7 +307,7 @@ export default function LinhaSolicitacao({
         {mostrarColuna('valor') && (
         <td
           {...tdBase('Valor', 'p-2 overflow-hidden')}
-          title={solicitacao.valor ? String(solicitacao.valor) : ''}
+          title={temValorExibicao ? String(valorExibicao) : ''}
         >
           {editandoValor ? (
             <div className="flex items-center gap-2">
@@ -335,21 +343,29 @@ export default function LinhaSolicitacao({
               <span
                 className="block w-full min-w-0 truncate"
                 title={
-                  solicitacao.valor
-                    ? Number(solicitacao.valor).toLocaleString('pt-BR', {
+                  temValorExibicao
+                    ? valorExibicaoNumero.toLocaleString('pt-BR', {
                         style: 'currency',
                         currency: 'BRL'
                       })
                     : '-'
                 }
               >
-                {solicitacao.valor
-                  ? Number(solicitacao.valor).toLocaleString('pt-BR', {
+                {temValorExibicao
+                  ? valorExibicaoNumero.toLocaleString('pt-BR', {
                       style: 'currency',
                       currency: 'BRL'
                     })
                   : '-'}
               </span>
+              {exibeResumoPagamento && (
+                <span className="text-[11px] leading-none text-gray-500 dark:text-slate-400">
+                  Total: {Number(valorTotal || 0).toLocaleString('pt-BR', {
+                    style: 'currency',
+                    currency: 'BRL'
+                  })}
+                </span>
+              )}
               {podeEditarValor && (
                 <button
                   className="text-[11px] leading-none text-blue-600 hover:underline shrink-0"

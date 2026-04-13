@@ -15,10 +15,12 @@ const {
   ConfiguracaoSistema,
   SolicitacaoVisibilidadeUsuario,
   Comprovante,
+  SolicitacaoPagamento,
   Notificacao,
   NotificacaoDestinatario,
   LogExclusao,
-  Sequelize
+  Sequelize,
+  sequelize
 } = require('../models');
 
 const { Op } = require('sequelize');
@@ -131,9 +133,14 @@ async function montarResumoSolicitacoesLista(solicitacoes) {
   return solicitacoes
     .map((item) => {
       const solicitacao = item.toJSON();
+      const resumoFinanceiro = calcularResumoFinanceiroSolicitacao(solicitacao);
       solicitacao.responsavel = responsavelPorSolicitacao.get(Number(item.id)) || null;
       solicitacao.setor_status_atual =
         setorStatusPorSolicitacao.get(Number(item.id)) || solicitacao.area_responsavel || null;
+      solicitacao.valor_total = resumoFinanceiro.valorTotal;
+      solicitacao.valor_pago_acumulado = resumoFinanceiro.valorPagoAcumulado;
+      solicitacao.saldo_pagamento = resumoFinanceiro.saldoPagamento;
+      solicitacao.valor_exibicao = resumoFinanceiro.valorExibicao;
       return solicitacao;
     })
     .sort((a, b) => (ordemIds.get(Number(a.id)) || 0) - (ordemIds.get(Number(b.id)) || 0));
@@ -342,11 +349,18 @@ async function obterContextoAprovacaoDiretoria(solicitacao, obraCarregada = null
 
   const configuracao = await obterConfiguracaoAprovacaoDiretoria();
   const classificacaoObra = normalizarClassificacaoObra(obra?.classificacao_obra);
-  const diretoriaEsperada = obterDiretoriaParaObra(obra, configuracao.diretoriasPorClassificacao);
-  const setorDestinoAprovacao = obterSetorDestinoAprovacao(
-    solicitacao?.tipo_solicitacao_id,
-    configuracao.setoresDestinoPorTipo
-  );
+  const diretoriaPersistida = String(solicitacao?.diretoria_fluxo_codigo || '').trim().toUpperCase() || null;
+  const setorDestinoPersistido =
+    String(solicitacao?.setor_destino_pos_aprovacao || '').trim().toUpperCase() || null;
+  const diretoriaEsperada =
+    diretoriaPersistida ||
+    obterDiretoriaParaObra(obra, configuracao.diretoriasPorClassificacao);
+  const setorDestinoAprovacao =
+    setorDestinoPersistido ||
+    obterSetorDestinoAprovacao(
+      solicitacao?.tipo_solicitacao_id,
+      configuracao.setoresDestinoPorTipo
+    );
 
   return {
     obra,
@@ -358,8 +372,25 @@ async function obterContextoAprovacaoDiretoria(solicitacao, obraCarregada = null
   };
 }
 
+function solicitacaoPertenceAoFluxoAprovacaoDiretoria(solicitacao) {
+  if (!solicitacao) return false;
+
+  if (
+    solicitacao.fluxo_aprovacao_diretoria !== undefined &&
+    solicitacao.fluxo_aprovacao_diretoria !== null
+  ) {
+    return Boolean(Number(solicitacao.fluxo_aprovacao_diretoria));
+  }
+
+  return false;
+}
+
 function solicitacaoUsaFluxoAprovacaoDiretoria(solicitacao, contextoAprovacao) {
-  if (!solicitacao || !contextoAprovacao?.diretoriaEsperada || !contextoAprovacao?.setorDestinoAprovacao) {
+  if (
+    !solicitacao ||
+    !contextoAprovacao?.diretoriaEsperada ||
+    !contextoAprovacao?.setorDestinoAprovacao
+  ) {
     return false;
   }
 
@@ -367,6 +398,36 @@ function solicitacaoUsaFluxoAprovacaoDiretoria(solicitacao, contextoAprovacao) {
     [contextoAprovacao.diretoriaEsperada],
     solicitacao.area_responsavel
   );
+}
+
+function calcularResumoFinanceiroSolicitacao(solicitacao) {
+  const valorTotal = solicitacao?.valor === null || solicitacao?.valor === undefined
+    ? null
+    : Number(solicitacao.valor);
+  const valorPagoAcumulado = Number(solicitacao?.valor_pago_acumulado || 0);
+  const statusAtual = String(solicitacao?.status_global || '').trim().toUpperCase();
+
+  if (valorTotal === null || Number.isNaN(valorTotal)) {
+    return {
+      valorTotal: null,
+      valorPagoAcumulado: Number.isNaN(valorPagoAcumulado) ? 0 : valorPagoAcumulado,
+      saldoPagamento: null,
+      valorExibicao: null
+    };
+  }
+
+  const valorPagoNormalizado = Number.isNaN(valorPagoAcumulado)
+    ? 0
+    : Math.max(valorPagoAcumulado, 0);
+  const saldoPagamento = Math.max(valorTotal - valorPagoNormalizado, 0);
+  const valorExibicao = statusAtual === 'PAGA' ? valorTotal : saldoPagamento;
+
+  return {
+    valorTotal,
+    valorPagoAcumulado: valorPagoNormalizado,
+    saldoPagamento,
+    valorExibicao
+  };
 }
 
 function normalizarTokenComparacao(valor) {
@@ -840,6 +901,19 @@ module.exports = {
         perfil.startsWith('ADMIN') &&
         setorTokens.some(isGeoToken);
       const isSetorAdministrativo = setorTokens.some(isAdministrativoToken);
+      const configuracaoAprovacaoDiretoria = await obterConfiguracaoAprovacaoDiretoria();
+      const diretoriaPublicaConfigurada =
+        configuracaoAprovacaoDiretoria?.diretoriasPorClassificacao?.PUBLICA || null;
+      const diretoriaPrivadaConfigurada =
+        configuracaoAprovacaoDiretoria?.diretoriasPorClassificacao?.PRIVADA || null;
+      const usuarioDiretoriaObrasPublicas = Boolean(
+        diretoriaPublicaConfigurada &&
+        setorPertenceAoUsuario(setorTokens, diretoriaPublicaConfigurada)
+      );
+      const usuarioDiretoriaObrasPrivadas = Boolean(
+        diretoriaPrivadaConfigurada &&
+        setorPertenceAoUsuario(setorTokens, diretoriaPrivadaConfigurada)
+      );
       const literalHistoricoSetorUsuario = montarLiteralHistoricoSetoresEnvolvidos(setorTokens);
       const isSetorBrape = setorTokens.some(token => isBrapeToken(token));
       const usuarioBrape = perfil === 'USUARIO' && isSetorBrape;
@@ -1033,6 +1107,24 @@ module.exports = {
         if (literalHistoricoSetorUsuario) {
           condicoes.push({
             id: { [Op.in]: literalHistoricoSetorUsuario }
+          });
+        }
+
+        if (usuarioDiretoriaObrasPublicas && diretoriaPublicaConfigurada) {
+          condicoes.push({
+            [Op.and]: [
+              { fluxo_aprovacao_diretoria: true },
+              { diretoria_fluxo_codigo: diretoriaPublicaConfigurada }
+            ]
+          });
+        }
+
+        if (usuarioDiretoriaObrasPrivadas && diretoriaPrivadaConfigurada) {
+          condicoes.push({
+            [Op.and]: [
+              { fluxo_aprovacao_diretoria: true },
+              { diretoria_fluxo_codigo: diretoriaPrivadaConfigurada }
+            ]
           });
         }
 
@@ -1609,6 +1701,12 @@ module.exports = {
         });
       }
 
+      const fluxoAprovacaoDiretoriaAtivo = Boolean(
+        contextoAprovacaoDiretoria.diretoriaEsperada &&
+        contextoAprovacaoDiretoria.setorDestinoAprovacao &&
+        setorPertenceAoUsuario([contextoAprovacaoDiretoria.diretoriaEsperada], destinoSelecionado)
+      );
+
       const destinosPermitidos = new Set();
       tokensSetorUsuario.forEach(token => {
         const lista = regrasAreasPorSetor[String(token || '').toUpperCase()] || [];
@@ -1734,6 +1832,13 @@ module.exports = {
         descricao,
         valor: valorPersistido,
         area_responsavel,
+        fluxo_aprovacao_diretoria: fluxoAprovacaoDiretoriaAtivo,
+        diretoria_fluxo_codigo: fluxoAprovacaoDiretoriaAtivo
+          ? contextoAprovacaoDiretoria.diretoriaEsperada
+          : null,
+        setor_destino_pos_aprovacao: fluxoAprovacaoDiretoriaAtivo
+          ? contextoAprovacaoDiretoria.setorDestinoAprovacao
+          : null,
         codigo_contrato,
         contrato_id: contrato_id || null,
         data_vencimento: data_vencimento || null,
@@ -1847,6 +1952,18 @@ module.exports = {
               {
                 model: User,
                 as: 'usuario',
+                attributes: ['id', 'nome']
+              }
+            ]
+          },
+          {
+            model: SolicitacaoPagamento,
+            as: 'pagamentos',
+            required: false,
+            include: [
+              {
+                model: User,
+                as: 'criadoPor',
                 attributes: ['id', 'nome']
               }
             ]
@@ -1975,6 +2092,17 @@ module.exports = {
         );
 
       const payload = solicitacao.toJSON ? solicitacao.toJSON() : solicitacao;
+      const resumoFinanceiro = calcularResumoFinanceiroSolicitacao(payload);
+      payload.valor_total = resumoFinanceiro.valorTotal;
+      payload.valor_pago_acumulado = resumoFinanceiro.valorPagoAcumulado;
+      payload.saldo_pagamento = resumoFinanceiro.saldoPagamento;
+      payload.valor_exibicao = resumoFinanceiro.valorExibicao;
+      payload.pagamentos = (Array.isArray(payload.pagamentos) ? payload.pagamentos : [])
+        .sort((a, b) => {
+          const dataA = new Date(a?.data_pagamento || a?.createdAt || 0).getTime();
+          const dataB = new Date(b?.data_pagamento || b?.createdAt || 0).getTime();
+          return dataB - dataA;
+        });
       payload.usa_fluxo_aprovacao_diretoria = usaFluxoAprovacaoDiretoria;
       payload.acao_aprovar_diretoria_disponivel = podeAprovarDiretoria;
       payload.setor_destino_aprovacao = contextoAprovacaoDiretoria.setorDestinoAprovacao || null;
@@ -2344,6 +2472,17 @@ module.exports = {
         }
       }
 
+      const valorPagoAcumulado = Number(solicitacao.valor_pago_acumulado || 0);
+      if (
+        novoValor !== null &&
+        Number.isFinite(valorPagoAcumulado) &&
+        valorPagoAcumulado - novoValor > 0.009
+      ) {
+        return res.status(400).json({
+          error: 'O valor total nao pode ser menor que o valor pago acumulado.'
+        });
+      }
+
       const valorAnterior = solicitacao.valor ?? null;
 
       await solicitacao.update({
@@ -2379,6 +2518,128 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return res.status(500).json({ error: 'Erro ao atualizar valor' });
+    }
+  },
+
+  // =====================================================
+  // INFORMAR PAGAMENTO PARCIAL
+  // =====================================================
+  async adicionarPagamento(req, res) {
+    const transaction = await sequelize.transaction();
+
+    try {
+      const { id } = req.params;
+      const { valor, data_pagamento, observacao } = req.body;
+      const perfil = String(req.user?.perfil || '').trim().toUpperCase();
+      const areaUsuario = await obterAreaUsuario(req);
+      const tokensSetor = expandirTokensComAliasesGeo(
+        await obterTokensSetorUsuario(req, areaUsuario)
+      );
+      const isFinanceiro = tokensSetor.includes('FINANCEIRO');
+      const isSuperadmin = perfil === 'SUPERADMIN';
+
+      if (!isFinanceiro && !isSuperadmin) {
+        await transaction.rollback();
+        return res.status(403).json({
+          error: 'Apenas o setor FINANCEIRO pode informar pagamentos.'
+        });
+      }
+
+      const valorPagamento = Number(valor);
+      if (!Number.isFinite(valorPagamento) || valorPagamento <= 0) {
+        await transaction.rollback();
+        return res.status(400).json({ error: 'Informe um valor de pagamento valido.' });
+      }
+
+      const dataPagamento = String(data_pagamento || '').trim();
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(dataPagamento)) {
+        await transaction.rollback();
+        return res.status(400).json({
+          error: 'Informe a data do pagamento no formato YYYY-MM-DD.'
+        });
+      }
+
+      const solicitacao = await Solicitacao.findByPk(id, {
+        transaction,
+        lock: transaction.LOCK.UPDATE
+      });
+
+      if (!solicitacao) {
+        await transaction.rollback();
+        return res.status(404).json({ error: 'Solicitacao nao encontrada' });
+      }
+
+      const acessoObra = await validarAcessoObra(req, solicitacao);
+      if (!acessoObra) {
+        await transaction.rollback();
+        return res.status(403).json({
+          error: 'Acesso negado. Vincule o usuario a obra para continuar.'
+        });
+      }
+
+      const valorTotal = solicitacao.valor === null || solicitacao.valor === undefined
+        ? null
+        : Number(solicitacao.valor);
+
+      if (valorTotal === null || Number.isNaN(valorTotal) || valorTotal <= 0) {
+        await transaction.rollback();
+        return res.status(400).json({
+          error: 'A solicitacao precisa ter um valor total valido antes de registrar pagamentos.'
+        });
+      }
+
+      const valorPagoAtual = Number(solicitacao.valor_pago_acumulado || 0);
+      const novoValorPago = valorPagoAtual + valorPagamento;
+
+      if (novoValorPago - valorTotal > 0.009) {
+        await transaction.rollback();
+        return res.status(400).json({
+          error: 'O pagamento informado excede o valor total da solicitacao.'
+        });
+      }
+
+      const pagamento = await SolicitacaoPagamento.create({
+        solicitacao_id: solicitacao.id,
+        valor: valorPagamento,
+        data_pagamento: dataPagamento,
+        observacao: observacao ? String(observacao).trim() : null,
+        created_by: req.user.id
+      }, { transaction });
+
+      await solicitacao.update({
+        valor_pago_acumulado: novoValorPago
+      }, { transaction });
+
+      await Historico.create({
+        solicitacao_id: solicitacao.id,
+        usuario_responsavel_id: req.user.id,
+        setor: areaUsuario || req.user?.area || solicitacao.area_responsavel,
+        acao: 'PAGAMENTO_INFORMADO',
+        descricao: `Pagamento de ${valorPagamento.toFixed(2)} em ${dataPagamento}`,
+        metadata: JSON.stringify({
+          pagamento_id: pagamento.id,
+          valor: valorPagamento,
+          data_pagamento: dataPagamento,
+          observacao: observacao ? String(observacao).trim() : null,
+          valor_pago_acumulado: novoValorPago
+        })
+      }, { transaction });
+
+      await transaction.commit();
+
+      return res.status(201).json({
+        id: pagamento.id,
+        solicitacao_id: solicitacao.id,
+        valor: valorPagamento,
+        data_pagamento: dataPagamento,
+        observacao: observacao ? String(observacao).trim() : null,
+        valor_pago_acumulado: novoValorPago,
+        saldo_pagamento: Math.max(valorTotal - novoValorPago, 0)
+      });
+    } catch (error) {
+      await transaction.rollback();
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao informar pagamento' });
     }
   },
 
@@ -2984,6 +3245,27 @@ module.exports = {
         return res.status(403).json({
           error: 'Voce so pode aprovar solicitacoes que estejam na sua diretoria atual.'
         });
+      }
+
+      const atualizacoesFluxo = {};
+      if (!solicitacaoPertenceAoFluxoAprovacaoDiretoria(solicitacao)) {
+        atualizacoesFluxo.fluxo_aprovacao_diretoria = true;
+      }
+      if (
+        !String(solicitacao.diretoria_fluxo_codigo || '').trim() &&
+        contextoAprovacaoDiretoria.diretoriaEsperada
+      ) {
+        atualizacoesFluxo.diretoria_fluxo_codigo = contextoAprovacaoDiretoria.diretoriaEsperada;
+      }
+      if (
+        !String(solicitacao.setor_destino_pos_aprovacao || '').trim() &&
+        contextoAprovacaoDiretoria.setorDestinoAprovacao
+      ) {
+        atualizacoesFluxo.setor_destino_pos_aprovacao =
+          contextoAprovacaoDiretoria.setorDestinoAprovacao;
+      }
+      if (Object.keys(atualizacoesFluxo).length > 0) {
+        await solicitacao.update(atualizacoesFluxo);
       }
 
       const diretoriaOrigem = solicitacao.area_responsavel;

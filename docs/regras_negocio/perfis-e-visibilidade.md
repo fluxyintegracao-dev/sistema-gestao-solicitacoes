@@ -28,8 +28,16 @@ A visibilidade efetiva depende de combinacao entre:
   - para usuarios do setor `OBRA`, essa escolha passa a seguir a classificacao da obra e a configuracao de `Areas Visiveis para OBRA`, sem depender de `Areas por Setor de Origem`
   - a diretoria aprova e envia a solicitacao para o setor destino configurado pelo `SUPERADMIN`
   - o setor destino vira o dono da solicitacao para seguir o fluxo normal
-  - a diretoria que aprovou continua vendo a solicitacao pelo historico
+  - `DIR_OBRAS_PUBLICAS` e `DIR_OBRAS_PRIVADAS` continuam vendo solicitacoes novas do fluxo que pertencem a sua diretoria, mesmo apos aprovacao e envio
+  - essa visibilidade adicional depende do marcador formal `fluxo_aprovacao_diretoria`
+  - solicitacoes antigas continuam no comportamento anterior
+  - `DIR_ADMIN` nao ganha visibilidade global automatica; continua vendo apenas o que estiver no setor dela ou o que chegar por mencao/atribuicao
   - o criador da obra continua vendo a solicitacao
+- pagamentos parciais:
+  - somente `FINANCEIRO` pode informar pagamentos pela interface
+  - `SUPERADMIN` continua como excecao administrativa no backend
+  - a listagem passa a exibir saldo enquanto a solicitacao nao estiver `PAGA`
+  - o detalhe mantem valor total, pago acumulado e saldo atual
 
 ## Filtros
 Filtros da listagem precisam obedecer a visibilidade efetiva do usuario. Nao assumir que filtros podem listar valores fora do universo visivel.

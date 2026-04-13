@@ -99,6 +99,9 @@ export default function Header({
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
   const setorStatusAtual = ultimoHistoricoStatus?.setor || solicitacao?.area_responsavel || null;
   const descricaoCorrigida = corrigirTextoCorrompido(solicitacao?.descricao || '');
+  const valorTotal = solicitacao?.valor_total ?? solicitacao?.valor;
+  const valorPagoAcumulado = solicitacao?.valor_pago_acumulado ?? 0;
+  const saldoPagamento = solicitacao?.saldo_pagamento;
 
   return (
     <div className="sol-detail-header">
@@ -127,7 +130,9 @@ export default function Header({
       <div className="sol-detail-stats-grid">
         <InfoItem label="Obra" value={solicitacao.obra?.nome || '-'} />
         <InfoItem label="Setor" value={solicitacao.area_responsavel || '-'} />
-        <InfoItem label="Valor" value={formatarValor(solicitacao.valor)} />
+        <InfoItem label="Valor total" value={formatarValor(valorTotal)} />
+        <InfoItem label="Pago acumulado" value={formatarValor(valorPagoAcumulado)} />
+        <InfoItem label="Saldo atual" value={formatarValor(saldoPagamento)} />
         <InfoItem label="Criado em" value={formatarDataHora(solicitacao.createdAt)} />
         <InfoItem label="Vencimento" value={formatarData(solicitacao.data_vencimento)} />
         <InfoItem label="Inicio da medicao" value={formatarData(solicitacao.data_inicio_medicao)} />

@@ -50,6 +50,7 @@ db.FornecedorCompra = require('./FornecedorCompra')(sequelize, Sequelize);
 db.SolicitacaoCompraFornecedor = require('./SolicitacaoCompraFornecedor')(sequelize, Sequelize);
 db.SolicitacaoCompraRespostaItem = require('./SolicitacaoCompraRespostaItem')(sequelize, Sequelize);
 db.SolicitacaoCompraLog = require('./SolicitacaoCompraLog')(sequelize, Sequelize);
+db.SolicitacaoPagamento = require('./SolicitacaoPagamento')(sequelize, Sequelize);
 db.ProvisaoFinanceira = require('./ProvisaoFinanceira')(sequelize, Sequelize);
 db.ProvisaoCategoriaMacro = require('./ProvisaoCategoriaMacro')(sequelize, Sequelize);
 db.ProvisaoFinanceiraHistorico = require('./ProvisaoFinanceiraHistorico')(sequelize, Sequelize);
@@ -163,6 +164,26 @@ db.Solicitacao.hasMany(db.MensagemSetor, {
 db.MensagemSetor.belongsTo(db.Solicitacao, {
   foreignKey: 'solicitacao_id',
   as: 'solicitacao'
+});
+
+db.Solicitacao.hasMany(db.SolicitacaoPagamento, {
+  foreignKey: 'solicitacao_id',
+  as: 'pagamentos'
+});
+
+db.SolicitacaoPagamento.belongsTo(db.Solicitacao, {
+  foreignKey: 'solicitacao_id',
+  as: 'solicitacao'
+});
+
+db.User.hasMany(db.SolicitacaoPagamento, {
+  foreignKey: 'created_by',
+  as: 'pagamentosSolicitacaoCriados'
+});
+
+db.SolicitacaoPagamento.belongsTo(db.User, {
+  foreignKey: 'created_by',
+  as: 'criadoPor'
 });
 
 /* ===== Usuário x Cargo ===== */

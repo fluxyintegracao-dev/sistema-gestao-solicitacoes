@@ -8,6 +8,7 @@ import Timeline from './Timeline';
 import Comentarios from './Comentarios';
 import Anexos from './Anexos';
 import Pedido from './Pedido';
+import Pagamentos from './Pagamentos';
 import ModalAlterarStatus from './ModalAlterarStatus';
 import ModalEnviarSetor from '../Solicitacoes/ModalEnviarSetor';
 import {
@@ -30,6 +31,7 @@ export default function SolicitacaoDetalhe() {
 
   const isSetorGeo = setorTokens.some(isGeoSetor);
   const isSetorCompras = setorTokens.includes('COMPRAS');
+  const isSetorFinanceiro = setorTokens.includes('FINANCEIRO');
   const isSuperadmin = String(user?.perfil || '').trim().toUpperCase() === 'SUPERADMIN';
 
   const [solicitacao, setSolicitacao] = useState(null);
@@ -170,6 +172,12 @@ export default function SolicitacaoDetalhe() {
               onSucesso={carregar}
             />
           )}
+
+          <Pagamentos
+            solicitacao={solicitacao}
+            podeInformarPagamento={isSetorFinanceiro}
+            onSucesso={carregar}
+          />
 
           <Anexos
             solicitacaoId={id}

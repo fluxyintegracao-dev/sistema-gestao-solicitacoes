@@ -25,9 +25,23 @@
 - o `SUPERADMIN` configura qual diretoria atende cada classificacao de obra
 - usuarios do setor `OBRA` continuam criando pela tela padrao, mas a `Area Responsavel` fica restrita a diretoria correspondente a classificacao da obra quando essa configuracao existir
 - o `SUPERADMIN` tambem configura qual setor recebe a solicitacao apos a aprovacao da diretoria, por `tipo_solicitacao`
+- novas solicitacoes criadas nesse fluxo passam a persistir um marcador formal (`fluxo_aprovacao_diretoria`) e os codigos da diretoria/origem e do setor destino
 - no detalhe da solicitacao, quando ela estiver na diretoria correta e houver setor destino configurado, o botao `Enviar para outro setor` passa a ser `Aprovar`
 - ao aprovar:
   - a solicitacao e enviada ao setor destino configurado
   - o setor destino vira o dono do fluxo para alteracoes de status e demais regras normais
-  - a diretoria que aprovou continua com visibilidade via historico de envio
+  - a diretoria que aprovou continua com visibilidade pela regra do fluxo novo, mesmo depois do envio ao setor destino
   - o criador da solicitacao continua com visibilidade
+- solicitacoes antigas continuam no comportamento original; a visibilidade adicional da diretoria vale apenas para solicitacoes novas marcadas com o fluxo de aprovacao
+
+## Pagamentos parciais
+- pagamentos parciais sao registrados em `solicitacao_pagamentos`
+- o valor acumulado fica refletido em `solicitacoes.valor_pago_acumulado`
+- na listagem:
+  - se o status global for diferente de `PAGA`, a coluna `Valor` mostra o saldo (`valor total - valor pago acumulado`)
+  - se o status global for `PAGA`, a coluna volta a mostrar o valor total
+- no detalhe:
+  - o valor total permanece visivel
+  - pagos acumulados e saldo ficam destacados
+  - o historico de pagamentos fica listado
+- o botao `Informar pagamento` aparece apenas para o setor `FINANCEIRO`

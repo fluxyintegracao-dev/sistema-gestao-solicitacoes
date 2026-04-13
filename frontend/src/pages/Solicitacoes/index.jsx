@@ -334,7 +334,7 @@ export default function Solicitacoes({ arquivadas = false }) {
   const perfilUpper = String(user?.perfil || '').toUpperCase();
   const mostrarSomaValor = perfilUpper.startsWith('ADMIN') || perfilUpper === 'SUPERADMIN';
   const somaValorFiltrado = solicitacoes.reduce((total, item) => {
-    const valor = Number(item?.valor || 0);
+    const valor = Number(item?.valor_exibicao ?? item?.valor ?? 0);
     return total + (Number.isNaN(valor) ? 0 : valor);
   }, 0);
   const totalSolicitacoes = Number(metaPaginacao?.total || 0);
@@ -527,7 +527,7 @@ export default function Solicitacoes({ arquivadas = false }) {
         item.contrato?.ref_contrato || item.ref_contrato || '',
         item.descricao || '',
         item.tipo?.nome || '',
-        formatarValorExportacao(item.valor),
+        formatarValorExportacao(item.valor_exibicao ?? item.valor),
         item.area_responsavel || '',
         item.responsavel || '',
         item.status_global || '',
