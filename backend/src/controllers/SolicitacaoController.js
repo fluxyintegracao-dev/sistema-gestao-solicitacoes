@@ -61,13 +61,37 @@ const TOKENS_GEO_EQUIVALENTES = new Set([
    FUNCAO AUXILIAR - VISIBILIDADE
 ===================================================== */
 async function garantirVisibilidade(solicitacaoId, usuarioId) {
-  await SolicitacaoVisibilidadeUsuario.findOrCreate({
-    where: {
-      solicitacao_id: solicitacaoId,
-      usuario_id: usuarioId
-    },
-    defaults: { oculto: false }
-  });
+  const where = {
+    solicitacao_id: solicitacaoId,
+    usuario_id: usuarioId
+  };
+
+  const [linhasAfetadas] = await SolicitacaoVisibilidadeUsuario.update(
+    { oculto: false },
+    { where }
+  );
+
+  if (linhasAfetadas > 0) {
+    return;
+  }
+
+  try {
+    await SolicitacaoVisibilidadeUsuario.create({
+      ...where,
+      oculto: false
+    });
+  } catch (error) {
+    const codigo = error?.parent?.code || error?.original?.code;
+    if (error?.name === 'SequelizeUniqueConstraintError' || codigo === 'ER_DUP_ENTRY') {
+      await SolicitacaoVisibilidadeUsuario.update(
+        { oculto: false },
+        { where }
+      );
+      return;
+    }
+
+    throw error;
+  }
 }
 
 function parsePositiveInt(value, fallback) {
@@ -3185,13 +3209,7 @@ module.exports = {
         return res.status(404).json({ error: 'Solicitacao nao encontrada' });
       }
 
-      const [visibilidade] = await SolicitacaoVisibilidadeUsuario.findOrCreate({
-        where: { solicitacao_id: id, usuario_id: usuarioId },
-        defaults: { oculto: false }
-      });
-      if (visibilidade.oculto) {
-        await visibilidade.update({ oculto: false });
-      }
+      await garantirVisibilidade(id, usuarioId);
 
       return res.sendStatus(204);
     } catch (error) {
