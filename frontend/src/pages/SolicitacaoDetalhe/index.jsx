@@ -100,8 +100,29 @@ export default function SolicitacaoDetalhe() {
 
     try {
       await aprovarDiretoriaSolicitacao(solicitacao.id);
-      await carregar();
+      const marcadorAtualizacao = {
+        tipo: 'APROVACAO_DIRETORIA',
+        solicitacao_id: solicitacao.id,
+        timestamp: Date.now()
+      };
+
+      try {
+        sessionStorage.setItem('solicitacoes:atualizar-lista', JSON.stringify(marcadorAtualizacao));
+      } catch (storageError) {
+        console.error('Erro ao sinalizar atualizacao da lista de solicitacoes', storageError);
+      }
+
+      window.dispatchEvent(new CustomEvent('solicitacoes:atualizar-lista', {
+        detail: marcadorAtualizacao
+      }));
+
       alert('Solicitacao aprovada com sucesso.');
+      navigate('/solicitacoes', {
+        state: {
+          atualizarSolicitacoes: marcadorAtualizacao.timestamp,
+          solicitacaoAprovadaId: solicitacao.id
+        }
+      });
     } catch (error) {
       console.error(error);
       alert(error?.message || 'Erro ao aprovar solicitacao');

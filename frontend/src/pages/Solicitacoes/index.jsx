@@ -9,6 +9,7 @@ import {
   HiOutlineTrash,
   HiOutlineXMark
 } from 'react-icons/hi2';
+import { useLocation, useNavigate } from 'react-router-dom';
 import Filtros from './Filtros';
 import TabelaSolicitacoes from './TabelaSolicitacoes';
 import ModalAtribuirResponsavel from './ModalAtribuirResponsavel';
@@ -79,6 +80,8 @@ export default function Solicitacoes({ arquivadas = false }) {
   const seletorColunasRef = useRef(null);
   const botaoColunasRef = useRef(null);
   const { user } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
 
   const [filtros, setFiltros] = useState({
     codigo: '',
@@ -111,6 +114,51 @@ export default function Solicitacoes({ arquivadas = false }) {
 
     return () => clearTimeout(timeout);
   }, [filtros, arquivadas, paginaAtual, limitePorPagina]);
+
+  useEffect(() => {
+    const tokenAtualizacaoRota = location.state?.atualizarSolicitacoes;
+
+    const atualizarPelaSinalizacao = () => {
+      let deveAtualizar = Boolean(tokenAtualizacaoRota);
+
+      try {
+        const marcador = sessionStorage.getItem('solicitacoes:atualizar-lista');
+        if (marcador) {
+          sessionStorage.removeItem('solicitacoes:atualizar-lista');
+          deveAtualizar = true;
+        }
+      } catch (storageError) {
+        console.error('Erro ao consumir sinalizacao de atualizacao da lista de solicitacoes', storageError);
+      }
+
+      if (deveAtualizar) {
+        carregar();
+
+        if (tokenAtualizacaoRota) {
+          navigate(`${location.pathname}${location.search}`, {
+            replace: true,
+            state: null
+          });
+        }
+      }
+    };
+
+    atualizarPelaSinalizacao();
+
+    window.addEventListener('solicitacoes:atualizar-lista', atualizarPelaSinalizacao);
+    return () => {
+      window.removeEventListener('solicitacoes:atualizar-lista', atualizarPelaSinalizacao);
+    };
+  }, [
+    location.state?.atualizarSolicitacoes,
+    location.pathname,
+    location.search,
+    navigate,
+    filtros,
+    arquivadas,
+    paginaAtual,
+    limitePorPagina
+  ]);
 
   useEffect(() => {
     try {
