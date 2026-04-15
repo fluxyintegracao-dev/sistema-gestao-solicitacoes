@@ -42,6 +42,22 @@ function obterValorAreaResponsavel(setor) {
   return String(setor?.codigo || setor?.nome || setor?.id || '').trim().toUpperCase();
 }
 
+const FORM_INICIAL = {
+  obra_id: '',
+  tipo_solicitacao_id: '',
+  tipo_sub_id: '',
+  contrato_id: '',
+  codigo_contrato: '',
+  area_responsavel: '',
+  descricao: '',
+  itens_apropriacao: '',
+  ref_contrato_abertura: '',
+  valor: '',
+  data_vencimento: '',
+  data_inicio_medicao: '',
+  data_fim_medicao: ''
+};
+
 function obterRegraTiposSetor(regrasConfig = {}, setorSelecionado = '', setores = []) {
   const tokens = new Set([normalizarTokenSetor(setorSelecionado)]);
   const setor = (Array.isArray(setores) ? setores : []).find(item => setorPossuiToken(item, setorSelecionado));
@@ -84,23 +100,11 @@ export default function NovaSolicitacao() {
   const [refResultados, setRefResultados] = useState([]);
   const [arquivos, setArquivos] = useState([]);
   const [valorTexto, setValorTexto] = useState('');
+  const [enviando, setEnviando] = useState(false);
   const anexosRef = useRef(null);
+  const envioEmAndamentoRef = useRef(false);
 
-  const [form, setForm] = useState({
-    obra_id: '',
-    tipo_solicitacao_id: '',
-    tipo_sub_id: '',
-    contrato_id: '',
-    codigo_contrato: '',
-    area_responsavel: '',
-    descricao: '',
-    itens_apropriacao: '',
-    ref_contrato_abertura: '',
-    valor: '',
-    data_vencimento: '',
-    data_inicio_medicao: '',
-    data_fim_medicao: ''
-  });
+  const [form, setForm] = useState(() => ({ ...FORM_INICIAL }));
 
   useEffect(() => {
     async function load() {
@@ -369,8 +373,30 @@ export default function NovaSolicitacao() {
     setObras([obra]);
   }
 
+  function limparFormulario() {
+    setForm({ ...FORM_INICIAL });
+    setContratos([]);
+    setTiposSub([]);
+    setArquivos([]);
+    setObraCodigo('');
+    setObraDescricao('');
+    setListaModal([]);
+    setModalObras(false);
+    setValorTexto('');
+    setRefContratoBusca('');
+    setRefResultados([]);
+    setContratosRef([]);
+    if (anexosRef.current) {
+      anexosRef.current.value = '';
+    }
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
+
+    if (envioEmAndamentoRef.current) {
+      return;
+    }
 
     if (!form.obra_id) {
       alert('Selecione uma obra');
@@ -427,50 +453,35 @@ export default function NovaSolicitacao() {
       ref_contrato_abertura: form.ref_contrato_abertura || null
     };
 
+    envioEmAndamentoRef.current = true;
+    setEnviando(true);
+
     try {
       const solicitacao = await createSolicitacao(payload);
 
       if (arquivos.length > 0) {
-        await uploadArquivos({
-          files: arquivos,
-          solicitacao_id: solicitacao.id,
-          tipo: 'SOLICITACAO'
-        });
+        try {
+          await uploadArquivos({
+            files: arquivos,
+            solicitacao_id: solicitacao.id,
+            tipo: 'SOLICITACAO'
+          });
+        } catch (uploadError) {
+          console.error(uploadError);
+          limparFormulario();
+          alert('Solicitacao criada com sucesso, mas houve erro ao enviar anexos. Abra a solicitacao para anexar novamente.');
+          return;
+        }
       }
 
+      limparFormulario();
       alert('Solicitacao criada com sucesso');
-      setForm({
-        obra_id: '',
-        tipo_solicitacao_id: '',
-        tipo_sub_id: '',
-        contrato_id: '',
-        codigo_contrato: '',
-        area_responsavel: '',
-        descricao: '',
-        itens_apropriacao: '',
-        ref_contrato_abertura: '',
-        valor: '',
-        data_vencimento: '',
-        data_inicio_medicao: '',
-        data_fim_medicao: ''
-      });
-      setContratos([]);
-      setTiposSub([]);
-      setArquivos([]);
-      setObraCodigo('');
-      setObraDescricao('');
-      setListaModal([]);
-      setModalObras(false);
-      setValorTexto('');
-      setRefContratoBusca('');
-      setRefResultados([]);
-      setContratosRef([]);
-      if (anexosRef.current) {
-        anexosRef.current.value = '';
-      }
     } catch (error) {
       console.error(error);
       alert(error?.message || 'Erro ao criar solicitacao');
+    } finally {
+      envioEmAndamentoRef.current = false;
+      setEnviando(false);
     }
   }
 
@@ -962,8 +973,12 @@ export default function NovaSolicitacao() {
         </label>
 
         <div className="flex justify-end">
-          <button className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700">
-            Criar Solicitação
+          <button
+            type="submit"
+            className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed"
+            disabled={enviando}
+          >
+            {enviando ? 'Criando...' : 'Criar Solicitação'}
           </button>
         </div>
       </form>
