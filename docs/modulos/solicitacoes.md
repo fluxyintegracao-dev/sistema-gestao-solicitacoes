@@ -28,7 +28,7 @@
 - novas solicitacoes criadas nesse fluxo passam a persistir um marcador formal (`fluxo_aprovacao_diretoria`) e os codigos da diretoria/origem e do setor destino
 - no detalhe da solicitacao, quando ela estiver na diretoria correta e houver setor destino configurado, o botao `Enviar para outro setor` passa a ser `Aprovar`
 - ao aprovar:
-  - a solicitacao e enviada ao setor destino configurado
+  - a solicitacao e enviada ao setor destino configurado atualmente pelo `SUPERADMIN`; o destino persistido na solicitacao fica como fallback para configuracoes ausentes
   - o setor destino vira o dono do fluxo para alteracoes de status e demais regras normais
   - a diretoria que aprovou continua com visibilidade pela regra do fluxo novo, mesmo depois do envio ao setor destino
   - o criador da solicitacao continua com visibilidade

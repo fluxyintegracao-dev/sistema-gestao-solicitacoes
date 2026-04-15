@@ -384,15 +384,16 @@ async function obterContextoAprovacaoDiretoria(solicitacao, obraCarregada = null
   const diretoriaPersistida = String(solicitacao?.diretoria_fluxo_codigo || '').trim().toUpperCase() || null;
   const setorDestinoPersistido =
     String(solicitacao?.setor_destino_pos_aprovacao || '').trim().toUpperCase() || null;
+  const setorDestinoConfigurado = obterSetorDestinoAprovacao(
+    solicitacao?.tipo_solicitacao_id,
+    configuracao.setoresDestinoPorTipo
+  );
   const diretoriaEsperada =
     diretoriaPersistida ||
     obterDiretoriaParaObra(obra, configuracao.diretoriasPorClassificacao);
   const setorDestinoAprovacao =
-    setorDestinoPersistido ||
-    obterSetorDestinoAprovacao(
-      solicitacao?.tipo_solicitacao_id,
-      configuracao.setoresDestinoPorTipo
-    );
+    setorDestinoConfigurado ||
+    setorDestinoPersistido;
 
   return {
     obra,
@@ -3391,7 +3392,8 @@ module.exports = {
         atualizacoesFluxo.diretoria_fluxo_codigo = contextoAprovacaoDiretoria.diretoriaEsperada;
       }
       if (
-        !String(solicitacao.setor_destino_pos_aprovacao || '').trim() &&
+        String(solicitacao.setor_destino_pos_aprovacao || '').trim().toUpperCase() !==
+          String(contextoAprovacaoDiretoria.setorDestinoAprovacao || '').trim().toUpperCase() &&
         contextoAprovacaoDiretoria.setorDestinoAprovacao
       ) {
         atualizacoesFluxo.setor_destino_pos_aprovacao =

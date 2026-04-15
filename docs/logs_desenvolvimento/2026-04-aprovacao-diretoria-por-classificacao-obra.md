@@ -18,7 +18,8 @@ Introduzir um fluxo controlado para solicitacoes que precisam passar por diretor
 - para usuarios do setor `OBRA`, a tela de criacao ignora a restricao de `Areas por Setor de Origem` e prioriza a diretoria correta da classificacao da obra
 - se a solicitacao estiver em uma diretoria configurada e existir destino configurado para o tipo, a acao correta passa a ser `Aprovar`
 - apos aprovar:
-  - `area_responsavel` muda para o setor destino configurado
+  - `area_responsavel` muda para o setor destino configurado atualmente pelo `SUPERADMIN` para o tipo da solicitacao
+  - o destino persistido em `setor_destino_pos_aprovacao` e usado apenas como fallback quando nao houver configuracao atual para o tipo
   - o setor destino assume o fluxo normal
   - a diretoria aprovadora continua com visibilidade por historico
   - o criador continua com visibilidade

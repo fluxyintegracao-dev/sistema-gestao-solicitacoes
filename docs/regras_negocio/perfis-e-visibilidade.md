@@ -27,6 +27,7 @@ A visibilidade efetiva depende de combinacao entre:
   - obra `PRIVADA` deve nascer em `DIR_OBRAS_PRIVADAS`
   - para usuarios do setor `OBRA`, essa escolha passa a seguir a classificacao da obra e a configuracao de `Areas Visiveis para OBRA`, sem depender de `Areas por Setor de Origem`
   - a diretoria aprova e envia a solicitacao para o setor destino configurado pelo `SUPERADMIN`
+  - no momento da aprovacao, a configuracao atual por tipo de solicitacao tem prioridade sobre o destino gravado anteriormente na solicitacao; o destino gravado funciona apenas como fallback
   - o setor destino vira o dono da solicitacao para seguir o fluxo normal
   - `DIR_OBRAS_PUBLICAS` e `DIR_OBRAS_PRIVADAS` continuam vendo solicitacoes novas do fluxo que pertencem a sua diretoria, mesmo apos aprovacao e envio
   - essa visibilidade adicional depende do marcador formal `fluxo_aprovacao_diretoria`
