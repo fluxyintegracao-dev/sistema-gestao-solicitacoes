@@ -54,8 +54,25 @@ const MAX_SOLICITACOES_PAGE_SIZE = 100;
 const TOKENS_GEO_EQUIVALENTES = new Set([
   'GEO',
   'GERENCIA_DE_PROCESSOS',
+  'GERENCIAS_DE_PROCESSOS',
+  'GERENCIAS_PROCESSOS',
   'GERENCIA_PROCESSOS'
 ]);
+const VALORES_AREA_GEO_EQUIVALENTES = [
+  'GEO',
+  'GERENCIA DE PROCESSOS',
+  'GERENCIA_DE_PROCESSOS',
+  'GERENCIA_PROCESSOS',
+  'GERENCIAS DE PROCESSOS',
+  'GERENCIAS_DE_PROCESSOS',
+  'GERENCIAS_PROCESSOS',
+  'GERÊNCIA DE PROCESSOS',
+  'GERÊNCIA_DE_PROCESSOS',
+  'GERÊNCIA_PROCESSOS',
+  'GERÊNCIAS DE PROCESSOS',
+  'GERÊNCIAS_DE_PROCESSOS',
+  'GERÊNCIAS_PROCESSOS'
+];
 
 /* =====================================================
    FUNCAO AUXILIAR - VISIBILIDADE
@@ -110,7 +127,11 @@ async function montarResumoSolicitacoesLista(solicitacoes) {
   const idsSolicitacoes = solicitacoes.map((item) => Number(item.id)).filter(Boolean);
   const ordemIds = new Map(idsSolicitacoes.map((id, index) => [id, index]));
 
-  const [historicosResponsavel, historicosStatus] = await Promise.all([
+  const solicitacaoPorId = new Map(
+    solicitacoes.map((item) => [Number(item.id), item.toJSON ? item.toJSON() : item])
+  );
+
+  const [historicosResponsavel, historicosStatus, historicosEnvioSetor] = await Promise.all([
     Historico.findAll({
       where: {
         solicitacao_id: { [Op.in]: idsSolicitacoes },
@@ -119,7 +140,7 @@ async function montarResumoSolicitacoesLista(solicitacoes) {
           [Op.in]: ['RESPONSAVEL_ATRIBUIDO', 'RESPONSAVEL_ASSUMIU']
         }
       },
-      attributes: ['solicitacao_id', 'createdAt'],
+      attributes: ['solicitacao_id', 'setor', 'createdAt'],
       include: [
         {
           model: User,
@@ -142,15 +163,57 @@ async function montarResumoSolicitacoesLista(solicitacoes) {
         ['solicitacao_id', 'ASC'],
         ['createdAt', 'DESC']
       ]
+    }),
+    Historico.findAll({
+      where: {
+        solicitacao_id: { [Op.in]: idsSolicitacoes },
+        acao: {
+          [Op.in]: ['ENVIADA_SETOR', 'ENVIO_AUTOMATICO_SETOR']
+        }
+      },
+      attributes: ['solicitacao_id', 'createdAt'],
+      order: [
+        ['solicitacao_id', 'ASC'],
+        ['createdAt', 'DESC']
+      ]
     })
   ]);
+
+  const ultimaMovimentacaoSetorPorSolicitacao = new Map();
+  historicosEnvioSetor.forEach((item) => {
+    const solicitacaoId = Number(item.solicitacao_id);
+    if (!ultimaMovimentacaoSetorPorSolicitacao.has(solicitacaoId)) {
+      ultimaMovimentacaoSetorPorSolicitacao.set(solicitacaoId, item.createdAt);
+    }
+  });
 
   const responsavelPorSolicitacao = new Map();
   historicosResponsavel.forEach((item) => {
     const solicitacaoId = Number(item.solicitacao_id);
-    if (!responsavelPorSolicitacao.has(solicitacaoId)) {
-      responsavelPorSolicitacao.set(solicitacaoId, item.usuario?.nome || null);
+    if (responsavelPorSolicitacao.has(solicitacaoId)) {
+      return;
     }
+
+    const solicitacao = solicitacaoPorId.get(solicitacaoId);
+    const setorAtual = solicitacao?.area_responsavel;
+    if (
+      setorAtual &&
+      item.setor &&
+      !setorPertenceAoUsuario([item.setor], setorAtual)
+    ) {
+      return;
+    }
+
+    const ultimaMovimentacao = ultimaMovimentacaoSetorPorSolicitacao.get(solicitacaoId);
+    if (ultimaMovimentacao) {
+      const dataResponsavel = new Date(item.createdAt).getTime();
+      const dataMovimentacao = new Date(ultimaMovimentacao).getTime();
+      if (!Number.isNaN(dataResponsavel) && !Number.isNaN(dataMovimentacao) && dataResponsavel <= dataMovimentacao) {
+        return;
+      }
+    }
+
+    responsavelPorSolicitacao.set(solicitacaoId, item.usuario?.nome || null);
   });
 
   const setorStatusPorSolicitacao = new Map();
@@ -535,10 +598,7 @@ function expandirTokensComAliasesGeo(tokens = []) {
 
   return Array.from(new Set([
     ...tokensLista.filter(Boolean),
-    'GEO',
-    'GERENCIA DE PROCESSOS',
-    'GERENCIA_DE_PROCESSOS',
-    'GERENCIA_PROCESSOS'
+    ...VALORES_AREA_GEO_EQUIVALENTES
   ]));
 }
 

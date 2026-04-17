@@ -212,7 +212,7 @@ export default function Solicitacoes({ arquivadas = false }) {
 
   async function carregarSetores() {
     try {
-      const data = await getSetores();
+      const data = await getSetores({ incluirInativos: true });
       const map = {};
       (Array.isArray(data) ? data : []).forEach(s => {
         map[s.codigo] = s.nome;
