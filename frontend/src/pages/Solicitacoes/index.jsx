@@ -21,7 +21,13 @@ import { getSetorPermissoes } from '../../services/setorPermissoes';
 import { getStatusSetor } from '../../services/statusSetor';
 import { useAuth } from '../../contexts/AuthContext';
 import { parseDateSmart } from '../../utils/dateLocal';
-import { isGeoSetor, solicitacaoEstaNoSetorDoUsuario, usuarioPodeEnviarSolicitacaoParaOutroSetor } from '../../utils/setor';
+import {
+  isGeoSetor,
+  obterIdsSetoresUsuario,
+  obterTokensSetorUsuario,
+  solicitacaoEstaNoSetorDoUsuario,
+  usuarioPodeEnviarSolicitacaoParaOutroSetor
+} from '../../utils/setor';
 import {
   arquivarSolicitacoesEmMassa,
   deleteSolicitacao,
@@ -260,10 +266,21 @@ export default function Solicitacoes({ arquivadas = false }) {
         setPermissaoUsuario(null);
         return;
       }
-      const setorToken = user?.setor?.codigo || user?.setor?.nome || user?.area || user?.setor_id;
-      if (!setorToken) return;
-      const data = await getSetorPermissoes({ setor: setorToken });
-      const item = Array.isArray(data) && data.length > 0 ? data[0] : null;
+      const tokens = obterTokensSetorUsuario(user);
+      if (tokens.length === 0) return;
+      const respostas = await Promise.all(
+        tokens.map(token => getSetorPermissoes({ setor: token }).catch(() => []))
+      );
+      const itens = respostas.flat().filter(Boolean);
+      const item = itens.length > 0
+        ? {
+            modo_recebimento: itens.some(
+              permissao => String(permissao?.modo_recebimento || '').toUpperCase() === 'TODOS_VISIVEIS'
+            ) ? 'TODOS_VISIVEIS' : itens[0]?.modo_recebimento,
+            usuario_pode_assumir: itens.some(permissao => Boolean(permissao?.usuario_pode_assumir)),
+            usuario_pode_atribuir: itens.some(permissao => Boolean(permissao?.usuario_pode_atribuir))
+          }
+        : null;
       setPermissaoUsuario(item);
     } catch (error) {
       console.error(error);
@@ -765,9 +782,12 @@ export default function Solicitacoes({ arquivadas = false }) {
 
       const data = await res.json();
       const lista = Array.isArray(data) ? data : [];
-      const setorUsuario = user?.setor_id ? String(user.setor_id) : '';
-      const filtrados = setorUsuario
-        ? lista.filter(u => String(u.setor_id) === setorUsuario)
+      const setoresUsuario = obterIdsSetoresUsuario(user);
+      const filtrados = setoresUsuario.length > 0
+        ? lista.filter(u => {
+            const setoresDoUsuario = obterIdsSetoresUsuario(u);
+            return setoresDoUsuario.some(setorId => setoresUsuario.includes(setorId));
+          })
         : lista;
       setUsuariosAtribuicao(filtrados);
     } catch (error) {

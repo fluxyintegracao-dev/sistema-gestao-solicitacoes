@@ -6,8 +6,14 @@ const {
   Cargo,
   Setor,
   Obra,
-  UsuarioObra
+  UsuarioObra,
+  UsuarioSetor
 } = require('../models');
+const {
+  normalizarIdInteiro,
+  extrairSetoresUsuarioSemConsulta,
+  obterIdsSetoresUsuario
+} = require('../services/usuariosSetores');
 
 function podeDefinirPerfilSuperadmin(req, perfilDestino) {
   const perfilSolicitante = String(req.user?.perfil || '').trim().toUpperCase();
@@ -134,6 +140,112 @@ function splitObrasCell(valor) {
     .filter(Boolean);
 }
 
+function coletarIdsSetoresPayload({ setor_id, setores_ids }) {
+  const ids = [];
+
+  function adicionar(valor) {
+    if (Array.isArray(valor)) {
+      valor.forEach(item => adicionar(item));
+      return;
+    }
+
+    const id = normalizarIdInteiro(valor);
+    if (id && !ids.includes(id)) {
+      ids.push(id);
+    }
+  }
+
+  adicionar(setor_id);
+  adicionar(setores_ids);
+
+  return ids;
+}
+
+async function resolverSetoresPayload({ setor_id, setores_ids }, setorPrincipalFallback = null) {
+  const setorPrincipalId =
+    normalizarIdInteiro(setor_id) ||
+    normalizarIdInteiro(setorPrincipalFallback);
+
+  if (!setorPrincipalId) {
+    const error = new Error('Setor principal e obrigatorio');
+    error.status = 400;
+    throw error;
+  }
+
+  const setoresIds = coletarIdsSetoresPayload({
+    setor_id: setorPrincipalId,
+    setores_ids
+  });
+
+  if (!setoresIds.includes(setorPrincipalId)) {
+    setoresIds.unshift(setorPrincipalId);
+  }
+
+  const setores = await Setor.findAll({
+    where: { id: { [Op.in]: setoresIds } },
+    attributes: ['id']
+  });
+  const encontrados = new Set(setores.map(setor => Number(setor.id)));
+  const faltando = setoresIds.filter(id => !encontrados.has(Number(id)));
+
+  if (faltando.length > 0) {
+    const error = new Error(`Setor nao encontrado: ${faltando.join(', ')}`);
+    error.status = 400;
+    throw error;
+  }
+
+  return {
+    setorPrincipalId,
+    setoresIds: Array.from(new Set(setoresIds))
+  };
+}
+
+async function sincronizarSetoresUsuario(userId, setoresIds) {
+  const idsUnicos = Array.from(new Set(
+    (Array.isArray(setoresIds) ? setoresIds : [])
+      .map(normalizarIdInteiro)
+      .filter(Boolean)
+  ));
+
+  await UsuarioSetor.destroy({ where: { user_id: userId } });
+
+  if (idsUnicos.length === 0) return;
+
+  await UsuarioSetor.bulkCreate(
+    idsUnicos.map(setorId => ({
+      user_id: userId,
+      setor_id: setorId
+    })),
+    { ignoreDuplicates: true }
+  );
+}
+
+function includeSetoresUsuario() {
+  return {
+    model: UsuarioSetor,
+    as: 'setoresVinculos',
+    attributes: ['id', 'user_id', 'setor_id'],
+    include: [
+      {
+        model: Setor,
+        as: 'setor',
+        attributes: ['id', 'nome', 'codigo', 'ativo']
+      }
+    ]
+  };
+}
+
+function formatarUsuarioResposta(usuario) {
+  const plain = typeof usuario?.toJSON === 'function' ? usuario.toJSON() : (usuario || {});
+  const setores = extrairSetoresUsuarioSemConsulta(plain);
+
+  return {
+    ...plain,
+    setores,
+    setores_ids: setores.map(setor => setor.id).filter(Boolean)
+  };
+}
+
 module.exports = {
 
   // =====================================================
@@ -153,6 +265,7 @@ module.exports = {
             model: Setor,
             as: 'setor'
           },
+          includeSetoresUsuario(),
           {
             model: UsuarioObra,
             as: 'vinculos',
@@ -167,9 +280,12 @@ module.exports = {
         order: [['nome', 'ASC']]
       });
 
-      return res.json(usuarios);
+      return res.json(usuarios.map(formatarUsuarioResposta));
 
     } catch (error) {
+      if (error?.status) {
+        return res.status(error.status).json({ error: error.message });
+      }
       console.error(error);
       return res.status(500).json({
         error: 'Erro ao listar usuários'
@@ -179,19 +295,35 @@ module.exports = {
 
   async opcoesAtribuicao(req, res) {
     try {
-      const setorId = req.user?.setor_id;
+      const setoresIds = await obterIdsSetoresUsuario(req.user);
 
-      if (!setorId) {
+      if (setoresIds.length === 0) {
         return res.status(400).json({ error: 'Usuario sem setor vinculado' });
       }
+
+      const vinculosSetores = await UsuarioSetor.findAll({
+        where: { setor_id: { [Op.in]: setoresIds } },
+        attributes: ['user_id']
+      });
+      const usuariosIdsVinculados = vinculosSetores
+        .map(vinculo => normalizarIdInteiro(vinculo.user_id))
+        .filter(Boolean);
 
       const usuarios = await User.findAll({
         attributes: { exclude: ['senha'] },
         where: {
-          setor_id: setorId,
-          ativo: true
+          ativo: true,
+          [Op.or]: [
+            { setor_id: { [Op.in]: setoresIds } },
+            { id: { [Op.in]: usuariosIdsVinculados.length ? usuariosIdsVinculados : [-1] } }
+          ]
         },
         include: [
+          {
+            model: Setor,
+            as: 'setor'
+          },
+          includeSetoresUsuario(),
           {
             model: UsuarioObra,
             as: 'vinculos',
@@ -201,7 +333,7 @@ module.exports = {
         order: [['nome', 'ASC']]
       });
 
-      return res.json(usuarios);
+      return res.json(usuarios.map(formatarUsuarioResposta));
     } catch (error) {
       console.error(error);
       return res.status(500).json({
@@ -247,6 +379,7 @@ module.exports = {
             model: Setor,
             as: 'setor'
           },
+          includeSetoresUsuario(),
           {
             model: UsuarioObra,
             as: 'vinculos',
@@ -264,7 +397,7 @@ module.exports = {
         return res.status(404).json({ error: 'UsuÃ¡rio nÃ£o encontrado' });
       }
 
-      return res.json(usuario);
+      return res.json(formatarUsuarioResposta(usuario));
     } catch (error) {
       console.error(error);
       return res.status(500).json({
@@ -285,6 +418,7 @@ module.exports = {
         senha,
         cargo_id,
         setor_id,
+        setores_ids = [],
         perfil,
         obras = [],
         pode_criar_solicitacao_compra
@@ -303,6 +437,12 @@ module.exports = {
           error: 'Apenas SUPERADMIN pode criar usuario com perfil SUPERADMIN'
         });
       }
+
+      const { setorPrincipalId, setoresIds } = await resolverSetoresPayload({
+        setor_id,
+        setores_ids
+      });
+
       // Verifica email duplicado
       const existe = await User.findOne({
         where: {
@@ -327,7 +467,7 @@ module.exports = {
         email: emailNormalizado,
         senha: senhaHash,
         cargo_id,
-        setor_id,
+        setor_id: setorPrincipalId,
         perfil,
         ativo: true,
         pode_criar_solicitacao_compra: definirPermissaoSolicitacaoCompra(
@@ -336,6 +476,8 @@ module.exports = {
           false
         )
       });
+
+      await sincronizarSetoresUsuario(usuario.id, setoresIds);
 
       // 🔗 Vínculo obras
       for (const obra_id of obras) {
@@ -351,11 +493,16 @@ module.exports = {
         nome: usuario.nome,
         email: usuario.email,
         perfil: usuario.perfil,
+        setor_id: usuario.setor_id,
+        setores_ids: setoresIds,
         ativo: usuario.ativo,
         pode_criar_solicitacao_compra: usuario.pode_criar_solicitacao_compra
       });
 
     } catch (error) {
+      if (error?.status) {
+        return res.status(error.status).json({ error: error.message });
+      }
       console.error(error);
       return res.status(500).json({
         error: 'Erro ao criar usuário'
@@ -377,6 +524,7 @@ module.exports = {
         senha,
         cargo_id,
         setor_id,
+        setores_ids = [],
         perfil,
         obras = [],
         ativo,
@@ -399,11 +547,16 @@ module.exports = {
         });
       }
 
+      const { setorPrincipalId, setoresIds } = await resolverSetoresPayload(
+        { setor_id, setores_ids },
+        usuario.setor_id
+      );
+
       const dadosUpdate = {
         nome,
         email: emailNormalizado,
         cargo_id,
-        setor_id,
+        setor_id: setorPrincipalId,
         perfil,
         ativo,
         pode_criar_solicitacao_compra: definirPermissaoSolicitacaoCompra(
@@ -437,6 +590,7 @@ module.exports = {
       }
 
       await usuario.update(dadosUpdate);
+      await sincronizarSetoresUsuario(id, setoresIds);
 
       // 🔁 Atualizar obras
       await UsuarioObra.destroy({
@@ -456,11 +610,16 @@ module.exports = {
         nome: usuario.nome,
         email: usuario.email,
         perfil: usuario.perfil,
+        setor_id: usuario.setor_id,
+        setores_ids: setoresIds,
         ativo: usuario.ativo,
         pode_criar_solicitacao_compra: usuario.pode_criar_solicitacao_compra
       });
 
     } catch (error) {
+      if (error?.status) {
+        return res.status(error.status).json({ error: error.message });
+      }
       console.error(error);
       return res.status(500).json({
         error: 'Erro ao atualizar usuário'
@@ -635,11 +794,24 @@ module.exports = {
         }
 
         const cargo = cargoMap.get(normalizarTexto(cargoRaw));
-        const setor = setorMap.get(normalizarTexto(setorRaw));
-        if (!cargo || !setor) {
+        const setoresTokens = splitObrasCell(setorRaw);
+        const setoresIds = [];
+        let setorInvalido = null;
+        for (const token of setoresTokens) {
+          const setor = setorMap.get(normalizarTexto(token));
+          if (!setor) {
+            setorInvalido = token;
+            break;
+          }
+          if (!setoresIds.includes(setor.id)) {
+            setoresIds.push(setor.id);
+          }
+        }
+
+        if (!cargo || setorInvalido || setoresIds.length === 0) {
           resultado.erros.push({
             linha,
-            error: `Cargo ou setor não encontrado (${cargoRaw} / ${setorRaw}).`
+            error: `Cargo ou setor nao encontrado (${cargoRaw} / ${setorInvalido || setorRaw}).`
           });
           continue;
         }
@@ -680,7 +852,7 @@ module.exports = {
           email,
           senha: senhaHash,
           cargo_id: cargo.id,
-          setor_id: setor.id,
+          setor_id: setoresIds[0],
           perfil,
           ativo: true,
           pode_criar_solicitacao_compra: definirPermissaoSolicitacaoCompra(
@@ -689,6 +861,8 @@ module.exports = {
             false
           )
         });
+
+        await sincronizarSetoresUsuario(usuario.id, setoresIds);
 
         for (const obra_id of obrasIds) {
           await UsuarioObra.create({

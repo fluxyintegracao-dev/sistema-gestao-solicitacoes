@@ -12,6 +12,7 @@ db.sequelize = sequelize;
 db.User = require('./User')(sequelize, Sequelize);
 db.Obra = require('./Obra')(sequelize, Sequelize);
 db.UsuarioObra = require('./UsuarioObra')(sequelize, Sequelize);
+db.UsuarioSetor = require('./UsuarioSetor')(sequelize, Sequelize);
 db.Setor = require('./Setor')(sequelize, Sequelize);
 db.Solicitacao = require('./Solicitacao')(sequelize, Sequelize);
 db.StatusArea = require('./StatusArea')(sequelize, Sequelize);
@@ -358,6 +359,35 @@ db.User.belongsTo(db.Setor, {
   foreignKey: 'setor_id',
   as: 'setor' // ⚠️ ESTE alias será usado no include
 });
+
+db.User.hasMany(db.UsuarioSetor, {
+  foreignKey: 'user_id',
+  as: 'setoresVinculos',
+  onDelete: 'CASCADE',
+  onUpdate: 'CASCADE'
+});
+
+db.UsuarioSetor.belongsTo(db.User, {
+  foreignKey: 'user_id',
+  as: 'usuario',
+  onDelete: 'CASCADE',
+  onUpdate: 'CASCADE'
+});
+
+db.Setor.hasMany(db.UsuarioSetor, {
+  foreignKey: 'setor_id',
+  as: 'usuariosVinculos',
+  onDelete: 'CASCADE',
+  onUpdate: 'CASCADE'
+});
+
+db.UsuarioSetor.belongsTo(db.Setor, {
+  foreignKey: 'setor_id',
+  as: 'setor',
+  onDelete: 'CASCADE',
+  onUpdate: 'CASCADE'
+});
+
 
 // =====================
 // HISTORICO x USUARIO

@@ -41,7 +41,7 @@ const FornecedorCompraController = require('./controllers/FornecedorCompraContro
 const CotacaoFornecedorController = require('./controllers/CotacaoFornecedorController');
 const PrioridadeDiretoriaController = require('./controllers/PrioridadeDiretoriaController');
 const criarMiddlewareProvisionamentoFinanceiro = require('./middlewares/provisaoFinanceira');
-const { Setor } = require('./models');
+const { obterTokensSetoresUsuario } = require('./services/usuariosSetores');
 //console.log('AnexoController =>', AnexoController);
 
 
@@ -84,20 +84,7 @@ const allowGestaoUsuarios = async (req, res, next) => {
       return res.status(403).json({ error: 'Acesso negado' });
     }
 
-    const tokens = new Set([
-      String(req.user?.area || '').trim().toUpperCase(),
-      String(req.user?.setor?.codigo || '').trim().toUpperCase(),
-      String(req.user?.setor?.nome || '').trim().toUpperCase(),
-      String(req.user?.setor_id || '').trim().toUpperCase()
-    ].filter(Boolean));
-
-    if (!tokens.has('GEO') && req.user?.setor_id) {
-      const setor = await Setor.findByPk(req.user.setor_id, {
-        attributes: ['codigo', 'nome']
-      });
-      if (setor?.codigo) tokens.add(String(setor.codigo).trim().toUpperCase());
-      if (setor?.nome) tokens.add(String(setor.nome).trim().toUpperCase());
-    }
+    const tokens = new Set(await obterTokensSetoresUsuario(req.user));
 
     if (tokens.has('GEO')) {
       return next();
@@ -180,26 +167,26 @@ router.get(
 // -------------------------------------------------------------------
 // COMPROVANTES
 // -------------------------------------------------------------------
-const allowComprovantes = (req, res, next) => {
-  const perfil = String(req.user?.perfil || '').trim().toUpperCase();
-  const area = String(req.user?.area || '').trim().toUpperCase();
-  const setorCodigo = String(req.user?.setor?.codigo || '').trim().toUpperCase();
-  const setorNome = String(req.user?.setor?.nome || '').trim().toUpperCase();
-  const setorId = Number(req.user?.setor_id);
-  const isFinanceiro =
-    perfil === 'FINANCEIRO' ||
-    area === 'FINANCEIRO' ||
-    setorCodigo === 'FINANCEIRO' ||
-    setorNome === 'FINANCEIRO' ||
-    setorId === 4;
+const allowComprovantes = async (req, res, next) => {
+  try {
+    const perfil = String(req.user?.perfil || '').trim().toUpperCase();
+    const tokens = new Set(await obterTokensSetoresUsuario(req.user));
+    const isFinanceiro =
+      perfil === 'FINANCEIRO' ||
+      tokens.has('FINANCEIRO') ||
+      tokens.has('4');
 
-  if (
-    perfil === 'SUPERADMIN' ||
-    isFinanceiro
-  ) {
-    return next();
+    if (
+      perfil === 'SUPERADMIN' ||
+      isFinanceiro
+    ) {
+      return next();
+    }
+    return res.status(403).json({ error: 'Acesso negado' });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: 'Erro ao validar permissao de comprovantes' });
   }
-  return res.status(403).json({ error: 'Acesso negado' });
 };
 
 router.post(

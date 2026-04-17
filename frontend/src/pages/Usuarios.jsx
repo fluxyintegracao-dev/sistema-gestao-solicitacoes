@@ -29,7 +29,7 @@ export default function Usuarios() {
   function baixarModeloImportacaoUsuarios() {
     const linhas = [
       ['Nome', 'Email', 'Cargo', 'Setor', 'Perfil', 'Obras', 'Senha'],
-      ['Usuario Exemplo', 'usuario.exemplo@empresa.com', 'Analista', 'FINANCEIRO', 'USUARIO', '7|8', '123456']
+      ['Usuario Exemplo', 'usuario.exemplo@empresa.com', 'Analista', 'FINANCEIRO|GEO', 'USUARIO', '7|8', '123456']
     ];
 
     const csv = linhas
@@ -83,6 +83,19 @@ export default function Usuarios() {
     }
   }
 
+  function formatarSetoresUsuario(usuario) {
+    const setores = Array.isArray(usuario?.setores) ? usuario.setores : [];
+    const nomes = setores
+      .map(setor => setor?.nome || setor?.codigo || null)
+      .filter(Boolean);
+
+    if (nomes.length > 0) {
+      return nomes.join(', ');
+    }
+
+    return usuario?.setor?.nome || usuario?.setor?.codigo || '-';
+  }
+
   return (
     <div className="page">
       <div className="flex items-center justify-between">
@@ -121,7 +134,7 @@ export default function Usuarios() {
       </div>
 
       <div className="text-sm text-gray-600">
-        Modelo CSV: Nome, Email, Cargo, Setor, Perfil, Obras (separar por <code>|</code> ou <code>,</code>) e Senha. Perfis aceitos: <code>USUARIO</code>, <code>ADMIN</code> e <code>SUPERADMIN</code>. A senha informada (ex.: <code>123456</code>) é convertida em hash automaticamente no import.
+        Modelo CSV: Nome, Email, Cargo, Setor, Perfil, Obras (separar setores e obras por <code>|</code> ou <code>,</code>) e Senha. O primeiro setor informado sera o principal. Perfis aceitos: <code>USUARIO</code>, <code>ADMIN</code> e <code>SUPERADMIN</code>. A senha informada (ex.: <code>123456</code>) ? convertida em hash automaticamente no import.
       </div>
 
       <div className="card">
@@ -143,7 +156,7 @@ export default function Usuarios() {
                 <td>{u.nome}</td>
                 <td>{u.email}</td>
                 <td>{u.cargoInfo?.nome || '-'}</td>
-                <td>{u.setor?.nome || '-'}</td>
+                <td>{formatarSetoresUsuario(u)}</td>
                 <td>
                   {(u.vinculos || [])
                     .map(v => v.obra ? (v.obra.codigo ? `${v.obra.codigo} - ${v.obra.nome}` : v.obra.nome) : null)

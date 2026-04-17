@@ -16,6 +16,7 @@ export default function UsuarioNovo() {
   const [perfil, setPerfil] = useState('');
   const [cargoId, setCargoId] = useState('');
   const [setorId, setSetorId] = useState('');
+  const [setoresIds, setSetoresIds] = useState([]);
   const [obras, setObras] = useState([]);
   const [podeCriarSolicitacaoCompra, setPodeCriarSolicitacaoCompra] = useState(false);
 
@@ -50,7 +51,10 @@ export default function UsuarioNovo() {
         setEmail(usuario.email || '');
         setPerfil(usuario.perfil || '');
         setCargoId(usuario.cargo_id ? String(usuario.cargo_id) : '');
-        setSetorId(usuario.setor_id ? String(usuario.setor_id) : '');
+        const setorPrincipal = usuario.setor_id ? String(usuario.setor_id) : '';
+        const setoresUsuario = extrairSetoresIdsUsuario(usuario, setorPrincipal);
+        setSetorId(setorPrincipal);
+        setSetoresIds(setoresUsuario);
         setPodeCriarSolicitacaoCompra(Boolean(usuario.pode_criar_solicitacao_compra));
         const vinculos = Array.isArray(usuario.vinculos) ? usuario.vinculos : [];
         setObras(vinculos.map(v => v.obra_id).filter(Boolean));
@@ -71,8 +75,63 @@ export default function UsuarioNovo() {
     }
   }
 
+  function extrairSetoresIdsUsuario(usuario, setorPrincipal = '') {
+    const ids = [];
+
+    function adicionar(valor) {
+      const idSetor = String(valor || '').trim();
+      if (idSetor && !ids.includes(idSetor)) {
+        ids.push(idSetor);
+      }
+    }
+
+    adicionar(setorPrincipal || usuario?.setor_id);
+
+    if (Array.isArray(usuario?.setores_ids)) {
+      usuario.setores_ids.forEach(adicionar);
+    }
+
+    if (Array.isArray(usuario?.setores)) {
+      usuario.setores.forEach(setor => adicionar(setor?.id));
+    }
+
+    if (Array.isArray(usuario?.setoresVinculos)) {
+      usuario.setoresVinculos.forEach(vinculo => {
+        adicionar(vinculo?.setor_id);
+        adicionar(vinculo?.setor?.id);
+      });
+    }
+
+    return ids;
+  }
+
+  function alterarSetorPrincipal(novoSetorId) {
+    setSetorId(novoSetorId);
+    setSetoresIds(prev => {
+      const atual = new Set(prev.map(String).filter(Boolean));
+      if (novoSetorId) atual.add(String(novoSetorId));
+      return Array.from(atual);
+    });
+  }
+
+  function toggleSetorVinculado(idSetor) {
+    const idNormalizado = String(idSetor || '').trim();
+    if (!idNormalizado || idNormalizado === String(setorId)) return;
+
+    setSetoresIds(prev => (
+      prev.includes(idNormalizado)
+        ? prev.filter(idAtual => idAtual !== idNormalizado)
+        : [...prev, idNormalizado]
+    ));
+  }
+
   async function salvar(e) {
     e.preventDefault();
+
+    const setoresSelecionados = Array.from(new Set([
+      setorId,
+      ...setoresIds
+    ].map(valor => String(valor || '').trim()).filter(Boolean)));
 
     const payload = {
       nome,
@@ -81,6 +140,7 @@ export default function UsuarioNovo() {
       perfil,
       cargo_id: cargoId || null,
       setor_id: setorId || null,
+      setores_ids: setoresSelecionados,
       obras,
       pode_criar_solicitacao_compra: podeCriarSolicitacaoCompra
     };
@@ -183,7 +243,8 @@ export default function UsuarioNovo() {
             <select
               className="input"
               value={setorId}
-              onChange={e => setSetorId(e.target.value)}
+              onChange={e => alterarSetorPrincipal(e.target.value)}
+              required
             >
               <option value="">Selecione</option>
               {listaSetores.map(s => (
@@ -193,6 +254,38 @@ export default function UsuarioNovo() {
               ))}
             </select>
           </label>
+        </div>
+
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <p className="font-medium">Setores vinculados</p>
+            <span className="text-xs text-[var(--c-muted)]">
+              O setor principal fica sempre vinculado.
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+            {listaSetores.map(s => {
+              const idSetor = String(s.id);
+              const principal = idSetor === String(setorId);
+              const marcado = principal || setoresIds.includes(idSetor);
+
+              return (
+                <label key={s.id} className="flex gap-2 items-center">
+                  <input
+                    type="checkbox"
+                    checked={marcado}
+                    disabled={principal}
+                    onChange={() => toggleSetorVinculado(idSetor)}
+                  />
+                  <span>
+                    {s.nome}
+                    {principal ? ' (principal)' : ''}
+                  </span>
+                </label>
+              );
+            })}
+          </div>
         </div>
 
         {isSuperadminLogado && (

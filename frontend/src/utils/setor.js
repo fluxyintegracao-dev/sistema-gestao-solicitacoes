@@ -13,11 +13,65 @@ export function isGeoSetor(valor) {
 }
 
 export function obterTokensSetorUsuario(user) {
-  return [
+  const tokens = [
     String(user?.setor?.codigo || '').toUpperCase(),
     String(user?.setor?.nome || '').toUpperCase(),
+    String(user?.setor_id || '').toUpperCase(),
     String(user?.area || '').toUpperCase()
-  ].filter(Boolean);
+  ];
+
+  if (Array.isArray(user?.setores)) {
+    user.setores.forEach(setor => {
+      tokens.push(String(setor?.id || '').toUpperCase());
+      tokens.push(String(setor?.codigo || '').toUpperCase());
+      tokens.push(String(setor?.nome || '').toUpperCase());
+    });
+  }
+
+  if (Array.isArray(user?.setores_ids)) {
+    user.setores_ids.forEach(id => tokens.push(String(id || '').toUpperCase()));
+  }
+
+  if (Array.isArray(user?.setoresVinculos)) {
+    user.setoresVinculos.forEach(vinculo => {
+      tokens.push(String(vinculo?.setor_id || '').toUpperCase());
+      tokens.push(String(vinculo?.setor?.id || '').toUpperCase());
+      tokens.push(String(vinculo?.setor?.codigo || '').toUpperCase());
+      tokens.push(String(vinculo?.setor?.nome || '').toUpperCase());
+    });
+  }
+
+  return [...new Set(tokens.map(token => String(token || '').trim()).filter(Boolean))];
+}
+
+export function obterIdsSetoresUsuario(user) {
+  const ids = [];
+
+  function adicionar(valor) {
+    const numero = Number(valor);
+    if (Number.isInteger(numero) && numero > 0 && !ids.includes(String(numero))) {
+      ids.push(String(numero));
+    }
+  }
+
+  adicionar(user?.setor_id);
+
+  if (Array.isArray(user?.setores_ids)) {
+    user.setores_ids.forEach(adicionar);
+  }
+
+  if (Array.isArray(user?.setores)) {
+    user.setores.forEach(setor => adicionar(setor?.id));
+  }
+
+  if (Array.isArray(user?.setoresVinculos)) {
+    user.setoresVinculos.forEach(vinculo => {
+      adicionar(vinculo?.setor_id);
+      adicionar(vinculo?.setor?.id);
+    });
+  }
+
+  return ids;
 }
 
 export function solicitacaoEstaNoSetorDoUsuario(areaResponsavel, user) {

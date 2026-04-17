@@ -2,7 +2,12 @@ import { useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import StatusBadge from '../../components/StatusBadge';
 import { useTheme } from '../../contexts/ThemeContext';
-import { isGeoSetor, solicitacaoEstaNoSetorDoUsuario, usuarioPodeEnviarSolicitacaoParaOutroSetor } from '../../utils/setor';
+import {
+  isGeoSetor,
+  obterTokensSetorUsuario,
+  solicitacaoEstaNoSetorDoUsuario,
+  usuarioPodeEnviarSolicitacaoParaOutroSetor
+} from '../../utils/setor';
 import ModalAtribuirResponsavel from './ModalAtribuirResponsavel';
 import ModalEnviarSetor from './ModalEnviarSetor';
 import { API_URL, authHeaders } from '../../services/api';
@@ -51,11 +56,7 @@ export default function LinhaSolicitacao({
   const isSetorObra =
     user?.setor?.codigo === 'OBRA' ||
     user?.area === 'OBRA';
-  const setorTokens = [
-    String(user?.setor?.nome || '').toUpperCase(),
-    String(user?.setor?.codigo || '').toUpperCase(),
-    String(user?.area || '').toUpperCase()
-  ];
+  const setorTokens = obterTokensSetorUsuario(user);
   const isAdminGEO =
     String(user?.perfil || '').toUpperCase().startsWith('ADMIN') &&
     setorTokens.some(isGeoSetor);
@@ -65,10 +66,8 @@ export default function LinhaSolicitacao({
     (setoresMap?.[solicitacao.area_responsavel] || solicitacao.area_responsavel || '');
   const isSetorObraSolicitacao =
     String(setorNomeSolicitacao).trim().toUpperCase() === 'OBRA';
-  const setorCodigo = user?.setor?.codigo || user?.area || '';
   const isFinanceiro =
-    String(setorCodigo).toUpperCase() === 'FINANCEIRO' ||
-    String(user?.setor?.nome || '').toUpperCase() === 'FINANCEIRO';
+    setorTokens.includes('FINANCEIRO');
   const isUsuario = user?.perfil === 'USUARIO';
   const podeAssumir =
     !isSetorObra &&

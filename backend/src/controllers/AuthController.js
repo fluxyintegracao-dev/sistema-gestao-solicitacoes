@@ -1,7 +1,8 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { Op, fn, col, where } = require('sequelize');
-const { User, Setor } = require('../models');
+const { User, Setor, UsuarioSetor } = require('../models');
+const { extrairSetoresUsuarioSemConsulta } = require('../services/usuariosSetores');
 
 const JWT_SECRET = 'segredo_super_secreto';
 
@@ -29,6 +30,18 @@ module.exports = {
             model: Setor,
             as: 'setor',
             attributes: ['id', 'nome', 'codigo']
+          },
+          {
+            model: UsuarioSetor,
+            as: 'setoresVinculos',
+            attributes: ['id', 'user_id', 'setor_id'],
+            include: [
+              {
+                model: Setor,
+                as: 'setor',
+                attributes: ['id', 'nome', 'codigo', 'ativo']
+              }
+            ]
           }
         ]
       });
@@ -47,12 +60,17 @@ module.exports = {
       if (!ok)
         return res.status(401).json({ error: 'Senha inválida' });
 
+      const setores = extrairSetoresUsuarioSemConsulta(user);
+      const setoresIds = setores.map(setor => setor.id).filter(Boolean);
+
       const token = jwt.sign(
         {
           id: user.id,
           perfil: user.perfil,
           area: user.setor?.codigo || null,
-          setor_id: user.setor_id
+          setor_id: user.setor_id,
+          setores_ids: setoresIds,
+          setores
         },
         JWT_SECRET,
         { expiresIn: '8h' }
@@ -67,6 +85,8 @@ module.exports = {
           perfil: user.perfil,
           setor_id: user.setor_id,
           setor: user.setor,
+          setores_ids: setoresIds,
+          setores,
           pode_criar_solicitacao_compra: Boolean(user.pode_criar_solicitacao_compra),
           pode_enviar_qualquer_setor: Boolean(user.pode_enviar_qualquer_setor)
         }

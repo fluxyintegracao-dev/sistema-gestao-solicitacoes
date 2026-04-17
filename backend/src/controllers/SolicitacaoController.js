@@ -44,6 +44,10 @@ const {
   obterAutomacaoStatusCorrespondente,
   normalizarStatusAutomacao
 } = require('../services/solicitacao/configuracoesVisibilidadeAutomacao');
+const {
+  obterIdsSetoresUsuario,
+  obterTokensSetoresUsuario
+} = require('../services/usuariosSetores');
 
 const CHAVE_AREAS_POR_SETOR_ORIGEM = 'AREAS_POR_SETOR_ORIGEM';
 const CHAVE_SETORES_VISIVEIS_POR_USUARIO = 'SETORES_VISIVEIS_POR_USUARIO';
@@ -371,17 +375,7 @@ async function obterAreaUsuario(req) {
 }
 
 async function obterTokensSetorUsuario(req, areaUsuario) {
-  const tokens = [];
-  if (areaUsuario) tokens.push(areaUsuario);
-  if (req.user?.setor_id) {
-    tokens.push(String(req.user.setor_id));
-    const setor = await Setor.findByPk(req.user.setor_id, {
-      attributes: ['id', 'codigo', 'nome']
-    });
-    if (setor?.codigo) tokens.push(String(setor.codigo).toUpperCase());
-    if (setor?.nome) tokens.push(String(setor.nome).toUpperCase());
-  }
-  return Array.from(new Set(tokens.filter(Boolean)));
+  return obterTokensSetoresUsuario(req.user, areaUsuario ? [areaUsuario] : []);
 }
 
 async function lerConfiguracaoJson(chave, fallback) {
@@ -667,92 +661,26 @@ async function isUsuarioSetorObra(req) {
   const perfil = String(req.user?.perfil || '').trim().toUpperCase();
   if (perfil !== 'USUARIO') return false;
 
-  if (!req.user?.setor_id) return false;
-
-  const setor = await Setor.findByPk(req.user.setor_id, {
-    attributes: ['id', 'codigo', 'nome']
-  });
-
-  if (!setor) return false;
-
-  const nomeSetor = String(setor.nome || '').toUpperCase();
-  const codigoSetor = String(setor.codigo || '').toUpperCase();
-  const areaToken = String(req.user?.area || '').toUpperCase();
-
-  return (
-    nomeSetor === 'OBRA' ||
-    codigoSetor === 'OBRA' ||
-    areaToken === 'OBRA'
-  );
+  const tokens = await obterTokensSetorUsuario(req, await obterAreaUsuario(req));
+  return tokens.includes('OBRA');
 }
 
 async function isUsuarioSetorGeo(req) {
   const perfil = String(req.user?.perfil || '').trim().toUpperCase();
   if (perfil !== 'USUARIO') return false;
 
-  if (!req.user?.setor_id) return false;
-
-  const setor = await Setor.findByPk(req.user.setor_id, {
-    attributes: ['id', 'codigo', 'nome']
-  });
-
-  if (!setor) return false;
-
-  const nomeSetor = String(setor.nome || '').toUpperCase();
-  const codigoSetor = String(setor.codigo || '').toUpperCase();
-  const areaToken = String(req.user?.area || '').toUpperCase();
-
-  return (
-    isGeoToken(nomeSetor) ||
-    isGeoToken(codigoSetor) ||
-    isGeoToken(areaToken)
-  );
+  const tokens = await obterTokensSetorUsuario(req, await obterAreaUsuario(req));
+  return tokens.some(isGeoToken);
 }
 
 async function isSetorGeo(req) {
-  const areaUsuario = await obterAreaUsuario(req);
-  if (isGeoToken(areaUsuario)) return true;
-
-  if (!req.user?.setor_id) return false;
-
-  const setor = await Setor.findByPk(req.user.setor_id, {
-    attributes: ['codigo', 'nome']
-  });
-
-  if (!setor) return false;
-
-  const nomeSetor = String(setor.nome || '').toUpperCase();
-  const codigoSetor = String(setor.codigo || '').toUpperCase();
-  const areaToken = String(req.user?.area || '').toUpperCase();
-
-  return (
-    isGeoToken(nomeSetor) ||
-    isGeoToken(codigoSetor) ||
-    isGeoToken(areaToken)
-  );
+  const tokens = await obterTokensSetorUsuario(req, await obterAreaUsuario(req));
+  return tokens.some(isGeoToken);
 }
 
 async function isSetorObraGeral(req) {
-  const areaUsuario = await obterAreaUsuario(req);
-  if (areaUsuario === 'OBRA') return true;
-
-  if (!req.user?.setor_id) return false;
-
-  const setor = await Setor.findByPk(req.user.setor_id, {
-    attributes: ['codigo', 'nome']
-  });
-
-  if (!setor) return false;
-
-  const nomeSetor = String(setor.nome || '').toUpperCase();
-  const codigoSetor = String(setor.codigo || '').toUpperCase();
-  const areaToken = String(req.user?.area || '').toUpperCase();
-
-  return (
-    nomeSetor === 'OBRA' ||
-    codigoSetor === 'OBRA' ||
-    areaToken === 'OBRA'
-  );
+  const tokens = await obterTokensSetorUsuario(req, await obterAreaUsuario(req));
+  return tokens.includes('OBRA');
 }
 
 function isBrapeToken(valor) {
@@ -787,26 +715,8 @@ async function isSolicitacaoBrape(solicitacao) {
 }
 
 async function isSetorBrape(req) {
-  const areaUsuario = await obterAreaUsuario(req);
-  if (isBrapeToken(areaUsuario)) return true;
-
-  if (!req.user?.setor_id) return false;
-
-  const setor = await Setor.findByPk(req.user.setor_id, {
-    attributes: ['codigo', 'nome']
-  });
-
-  if (!setor) return false;
-
-  const nomeSetor = String(setor.nome || '').toUpperCase();
-  const codigoSetor = String(setor.codigo || '').toUpperCase();
-  const areaToken = String(req.user?.area || '').toUpperCase();
-
-  return (
-    isBrapeToken(nomeSetor) ||
-    isBrapeToken(codigoSetor) ||
-    isBrapeToken(areaToken)
-  );
+  const tokens = await obterTokensSetorUsuario(req, await obterAreaUsuario(req));
+  return tokens.some(isBrapeToken);
 }
 
 async function validarAcessoObra(req, solicitacao) {
@@ -1034,14 +944,7 @@ module.exports = {
       const isSetorObra = await isSetorObraGeral(req);
       const isUsuarioGeo = await isUsuarioSetorGeo(req);
 
-      const setorTokensBase = [
-        setorAtual?.codigo,
-        setorAtual?.nome,
-        areaUsuario,
-        req.user?.setor_id
-      ]
-        .filter(Boolean)
-        .map(v => String(v).trim().toUpperCase());
+      const setorTokensBase = await obterTokensSetorUsuario(req, areaUsuario);
       const setorTokens = expandirTokensComAliasesGeo(setorTokensBase);
       const adminGEO =
         perfil.startsWith('ADMIN') &&
@@ -1212,7 +1115,7 @@ module.exports = {
         condicoes.push({ criado_por: usuarioId });
 
         // Setor atual ve
-        const setoresPermitidos = [];
+        const setoresPermitidos = [...setorTokens];
         if (areaUsuario) setoresPermitidos.push(areaUsuario);
         if (setorAtual?.codigo) setoresPermitidos.push(setorAtual.codigo);
         if (setorAtual?.nome) setoresPermitidos.push(setorAtual.nome);
@@ -2959,31 +2862,47 @@ module.exports = {
         }
       }
 
+      const setorSolicitacaoValor = String(solicitacao.area_responsavel || '').trim();
+      const setorSolicitacaoIdNumerico = Number(setorSolicitacaoValor);
+      const condicoesSetorSolicitacao = [
+        { codigo: setorSolicitacaoValor },
+        { nome: setorSolicitacaoValor }
+      ];
+      if (Number.isInteger(setorSolicitacaoIdNumerico) && setorSolicitacaoIdNumerico > 0) {
+        condicoesSetorSolicitacao.push({ id: setorSolicitacaoIdNumerico });
+      }
+      const setorSolicitacao = await Setor.findOne({
+        where: {
+          [Op.or]: condicoesSetorSolicitacao
+        },
+        attributes: ['id', 'nome', 'codigo']
+      });
+
       const usuarioAcao = await User.findByPk(req.user.id);
       const usuarioResponsavel = await User.findByPk(usuario_responsavel_id);
+      const setoresIdsUsuarioAcao = await obterIdsSetoresUsuario(usuarioAcao || req.user);
+      const setoresIdsResponsavel = usuarioResponsavel
+        ? await obterIdsSetoresUsuario(usuarioResponsavel)
+        : [];
+      const responsavelCompartilhaSetor = setoresIdsUsuarioAcao.some(
+        setorId => setoresIdsResponsavel.includes(setorId)
+      );
+      const responsavelPertenceSetorSolicitacao = setorSolicitacao
+        ? setoresIdsResponsavel.includes(Number(setorSolicitacao.id))
+        : responsavelCompartilhaSetor;
 
       if (perfil === 'USUARIO') {
-        if (!usuarioResponsavel || usuarioResponsavel.setor_id !== req.user.setor_id) {
+        if (!usuarioResponsavel || !responsavelPertenceSetorSolicitacao) {
           return res.status(403).json({
             error: 'Usuarios com perfil USUARIO so podem atribuir para pessoas do mesmo setor.'
           });
         }
       }
-      if (req.user?.setor_id && usuarioResponsavel && usuarioResponsavel.setor_id !== req.user.setor_id) {
+      if (req.user?.setor_id && usuarioResponsavel && !responsavelPertenceSetorSolicitacao) {
         return res.status(403).json({
           error: 'Atribuicoes devem ser para pessoas do mesmo setor.'
         });
       }
-
-      const setorSolicitacao = await Setor.findOne({
-        where: {
-          [Op.or]: [
-            { codigo: solicitacao.area_responsavel },
-            { nome: solicitacao.area_responsavel }
-          ]
-        },
-        attributes: ['id', 'nome', 'codigo']
-      });
 
       if (setorSolicitacao && String(setorSolicitacao.nome || '').toUpperCase() === 'OBRA') {
         const { UsuarioObra } = require('../models');

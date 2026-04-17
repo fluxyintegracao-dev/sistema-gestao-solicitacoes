@@ -9,6 +9,7 @@
 A visibilidade efetiva depende de combinacao entre:
 - perfil
 - setor do usuario
+- setores adicionais vinculados ao usuario
 - vinculo com obra
 - historico da solicitacao
 - configuracoes de setores e tipos
@@ -22,6 +23,11 @@ A visibilidade efetiva depende de combinacao entre:
 - a permissao especial de envio nao remove o bloqueio do setor `OBRA`.
 - arquivamento de solicitacao e individual por usuario.
 - usuarios do setor OBRA trabalham com escopo restrito por obra/vinculo.
+- usuarios podem ter mais de um setor vinculado:
+  - `users.setor_id` continua sendo o setor principal para compatibilidade
+  - `usuario_setores` armazena todos os setores vinculados
+  - a listagem, detalhe e acoes de solicitacao consideram o setor principal e os setores adicionais
+  - ao importar usuarios por CSV, o primeiro setor informado vira o principal e os demais ficam vinculados
 - quando a obra estiver classificada e houver configuracao de aprovacao por diretoria:
   - obra `PUBLICA` deve nascer em `DIR_OBRAS_PUBLICAS`
   - obra `PRIVADA` deve nascer em `DIR_OBRAS_PRIVADAS`

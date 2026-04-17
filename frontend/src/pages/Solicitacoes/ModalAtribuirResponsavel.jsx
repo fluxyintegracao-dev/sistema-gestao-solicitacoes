@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { API_URL, authHeaders } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
+import { obterIdsSetoresUsuario } from '../../utils/setor';
 
 export default function ModalAtribuirResponsavel({
   solicitacaoId,
@@ -15,7 +16,7 @@ export default function ModalAtribuirResponsavel({
   const [usuarioSelecionado, setUsuarioSelecionado] = useState('');
   const { user } = useAuth();
   const isUsuario = user?.perfil === 'USUARIO';
-  const setorUsuario = user?.setor_id ? String(user.setor_id) : '';
+  const setoresUsuario = obterIdsSetoresUsuario(user);
 
   useEffect(() => {
     carregarUsuarios();
@@ -35,8 +36,11 @@ export default function ModalAtribuirResponsavel({
     const lista = Array.isArray(data) ? data : [];
     let filtrados = lista;
 
-    if (setorUsuario) {
-      filtrados = filtrados.filter(u => String(u.setor_id) === setorUsuario);
+    if (setoresUsuario.length > 0) {
+      filtrados = filtrados.filter(u => {
+        const setoresDoUsuario = obterIdsSetoresUsuario(u);
+        return setoresDoUsuario.some(setorId => setoresUsuario.includes(setorId));
+      });
     }
 
     if ((isSetorObraSolicitacao || isUsuarioSetorObra) && obraId) {
