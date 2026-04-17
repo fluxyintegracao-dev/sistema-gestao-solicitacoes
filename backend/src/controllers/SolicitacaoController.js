@@ -537,6 +537,7 @@ function expandirTokensComAliasesGeo(tokens = []) {
     ...tokensLista.filter(Boolean),
     'GEO',
     'GERENCIA DE PROCESSOS',
+    'GERENCIA_DE_PROCESSOS',
     'GERENCIA_PROCESSOS'
   ]));
 }
@@ -1251,7 +1252,7 @@ module.exports = {
             attributes: ['id', 'codigo', 'nome']
           });
 
-          const valoresFiltroSetor = Array.from(new Set([
+          const valoresBaseFiltroSetor = Array.from(new Set([
             ...areasSelecionadas,
             ...setoresFiltroRows.flatMap(setor => [
               setor?.codigo,
@@ -1261,6 +1262,7 @@ module.exports = {
           ]
             .filter(Boolean)
             .map(v => String(v).trim())));
+          const valoresFiltroSetor = expandirTokensComAliasesGeo(valoresBaseFiltroSetor);
 
           if (valoresFiltroSetor.length > 0) {
             where.area_responsavel = { [Op.in]: valoresFiltroSetor };
