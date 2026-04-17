@@ -246,6 +246,11 @@ async function enviarSolicitacaoParaSetorInterno({
   setorDestino,
   usuarioId
 }) {
+  const setorDestinoNormalizado = String(setorDestino || '').trim();
+  if (!setorDestinoNormalizado) {
+    return { ok: false, status: 400, error: 'Selecione um setor de destino.' };
+  }
+
   const acessoObra = await validarAcessoObra(req, solicitacao);
   if (!acessoObra) {
     return { ok: false, status: 403, error: 'Acesso negado. Vincule o usuario a obra para continuar.' };
@@ -268,7 +273,7 @@ async function enviarSolicitacaoParaSetorInterno({
     }
   }
 
-  const setorOrigem = solicitacao.area_responsavel;
+  const setorOrigem = String(solicitacao.area_responsavel || '').trim();
   const setorOrigemRow = await Setor.findOne({
     where: {
       [Op.or]: [
@@ -281,26 +286,27 @@ async function enviarSolicitacaoParaSetorInterno({
   const setorDestinoRow = await Setor.findOne({
     where: {
       [Op.or]: [
-        { codigo: setorDestino },
-        { nome: setorDestino }
+        { codigo: setorDestinoNormalizado },
+        { nome: setorDestinoNormalizado }
       ]
     },
     attributes: ['nome', 'codigo']
   });
 
   const nomeOrigem = setorOrigemRow?.nome || setorOrigem;
-  const nomeDestino = setorDestinoRow?.nome || setorDestino;
+  const setorDestinoPersistido = String(setorDestinoRow?.codigo || setorDestinoNormalizado).trim();
+  const nomeDestino = setorDestinoRow?.nome || setorDestinoPersistido;
 
   await solicitacao.update({
-    area_responsavel: setorDestino
+    area_responsavel: setorDestinoPersistido
   });
 
   await Historico.create({
     solicitacao_id: solicitacao.id,
     usuario_responsavel_id: usuarioId,
-    setor: setorDestino,
+    setor: setorDestinoPersistido,
     acao: 'ENVIADA_SETOR',
-    observacao: `De ${setorOrigem} para ${setorDestino}`
+    observacao: `De ${setorOrigem} para ${setorDestinoPersistido}`
   });
 
   await criarNotificacao({
@@ -310,7 +316,7 @@ async function enviarSolicitacaoParaSetorInterno({
     created_by: usuarioId,
     metadata: {
       setor_origem: setorOrigem,
-      setor_destino: setorDestino
+      setor_destino: setorDestinoPersistido
     }
   });
 
@@ -1325,11 +1331,23 @@ module.exports = {
           const valoresFiltroSetor = expandirTokensComAliasesGeo(valoresBaseFiltroSetor);
 
           if (valoresFiltroSetor.length > 0) {
-            where.area_responsavel = { [Op.in]: valoresFiltroSetor };
+            where[Op.and] = where[Op.and] || [];
+            where[Op.and].push(
+              Sequelize.where(
+                Sequelize.fn('TRIM', Sequelize.col('Solicitacao.area_responsavel')),
+                { [Op.in]: valoresFiltroSetor.map(valor => String(valor).trim()) }
+              )
+            );
           } else if (areasSelecionadas.some(item => String(item).trim().toUpperCase() === 'BRAPE')) {
             where.id = -1;
           } else {
-            where.area_responsavel = { [Op.in]: areasSelecionadas };
+            where[Op.and] = where[Op.and] || [];
+            where[Op.and].push(
+              Sequelize.where(
+                Sequelize.fn('TRIM', Sequelize.col('Solicitacao.area_responsavel')),
+                { [Op.in]: areasSelecionadas.map(valor => String(valor).trim()) }
+              )
+            );
           }
         }
       }
