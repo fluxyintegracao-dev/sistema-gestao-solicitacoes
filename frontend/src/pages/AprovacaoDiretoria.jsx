@@ -98,7 +98,7 @@ export default function AprovacaoDiretoria() {
       <div>
         <h1 className="text-2xl font-semibold">Aprovacao por Diretoria</h1>
         <p className="text-sm text-gray-600 mt-1">
-          Defina qual diretoria recebe a solicitacao pela classificacao da obra e qual setor recebe a solicitacao apos a aprovacao.
+          Defina qual diretoria recebe a solicitacao pela classificacao da obra. O setor destino apos aprovacao passa a ser a area responsavel selecionada na criacao.
         </p>
       </div>
 
@@ -107,7 +107,7 @@ export default function AprovacaoDiretoria() {
           <div>
             <h2 className="font-semibold">Diretoria por classificacao da obra</h2>
             <p className="text-sm text-gray-500 mt-1">
-              Essas diretorias sao usadas para validar a area responsavel na criacao da solicitacao pela obra.
+              Essas diretorias recebem primeiro as solicitacoes criadas pela obra, conforme a classificacao PUBLICA ou PRIVADA.
             </p>
           </div>
 
@@ -137,9 +137,9 @@ export default function AprovacaoDiretoria() {
 
         <section className="space-y-4">
           <div>
-            <h2 className="font-semibold">Setor destino apos aprovacao</h2>
+            <h2 className="font-semibold">Setor destino apos aprovacao (fallback)</h2>
             <p className="text-sm text-gray-500 mt-1">
-              Quando a diretoria clicar em Aprovar, a solicitacao sera enviada ao setor configurado abaixo.
+              Usado apenas para solicitacoes antigas ou registros sem area destino gravada na criacao.
             </p>
           </div>
 

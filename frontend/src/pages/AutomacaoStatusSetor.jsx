@@ -11,6 +11,7 @@ import {
 function criarLinhaVazia() {
   return {
     chave_local: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    setor_origem: '',
     tipo_solicitacao_id: '',
     status: '',
     setor_destino: ''
@@ -26,9 +27,25 @@ function formatarStatus(valor) {
     .replace(/[\s-]+/g, '_');
 }
 
+function normalizarTokenSetor(valor) {
+  return String(valor || '').trim().toUpperCase();
+}
+
+function setorPossuiToken(setor, token) {
+  const alvo = normalizarTokenSetor(token);
+  if (!alvo) return false;
+
+  return [
+    setor?.id,
+    setor?.codigo,
+    setor?.nome
+  ].some(valor => normalizarTokenSetor(valor) === alvo);
+}
+
 export default function AutomacaoStatusSetor() {
   const [setores, setSetores] = useState([]);
   const [tipos, setTipos] = useState([]);
+  const [statusPorSetor, setStatusPorSetor] = useState([]);
   const [statusOptions, setStatusOptions] = useState([]);
   const [regras, setRegras] = useState([criarLinhaVazia()]);
   const [loading, setLoading] = useState(true);
@@ -59,7 +76,8 @@ export default function AutomacaoStatusSetor() {
 
         const regrasConfiguradas = Array.isArray(configuracao?.regras)
           ? configuracao.regras.map((regra) => ({
-              chave_local: `${regra.tipo_solicitacao_id}-${regra.status}-${regra.setor_destino}`,
+              chave_local: `${regra.setor_origem || 'GLOBAL'}-${regra.tipo_solicitacao_id}-${regra.status}-${regra.setor_destino}`,
+              setor_origem: String(regra.setor_origem || ''),
               tipo_solicitacao_id: String(regra.tipo_solicitacao_id || ''),
               status: String(regra.status || ''),
               setor_destino: String(regra.setor_destino || '')
@@ -68,6 +86,7 @@ export default function AutomacaoStatusSetor() {
 
         setSetores(setoresAtivos);
         setTipos(Array.isArray(tiposData) ? tiposData : []);
+        setStatusPorSetor(listaStatus);
         setStatusOptions(statusUnicos.sort((a, b) => a.label.localeCompare(b.label, 'pt-BR')));
         setRegras(regrasConfiguradas.length > 0 ? regrasConfiguradas : [criarLinhaVazia()]);
       } catch (error) {
@@ -96,9 +115,44 @@ export default function AutomacaoStatusSetor() {
   function atualizarRegra(chaveLocal, campo, valor) {
     setRegras((prev) => prev.map((regra) => (
       regra.chave_local === chaveLocal
-        ? { ...regra, [campo]: valor }
+        ? {
+            ...regra,
+            [campo]: valor,
+            ...(campo === 'setor_origem' ? { status: '' } : {})
+          }
         : regra
     )));
+  }
+
+  function obterStatusOptionsRegra(regra) {
+    const setorOrigem = regra?.setor_origem;
+    if (!setorOrigem) return statusOptions;
+
+    const setorSelecionado = setores.find(setor => setorPossuiToken(setor, setorOrigem));
+    const statusFiltrados = statusPorSetor.filter((item) => {
+      if (item?.ativo === false || !String(item?.nome || '').trim()) return false;
+      if (!setorSelecionado) {
+        return normalizarTokenSetor(item?.setor) === normalizarTokenSetor(setorOrigem);
+      }
+      return [
+        setorSelecionado.id,
+        setorSelecionado.codigo,
+        setorSelecionado.nome
+      ].some(token => normalizarTokenSetor(item?.setor) === normalizarTokenSetor(token));
+    });
+
+    const opcoes = Array.from(
+      new Map(
+        statusFiltrados.map((item) => [
+          formatarStatus(item.nome),
+          String(item.nome || '').trim()
+        ])
+      ).entries()
+    ).map(([value, label]) => ({ value, label }));
+
+    return opcoes.length > 0
+      ? opcoes.sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'))
+      : statusOptions;
   }
 
   function adicionarLinha() {
@@ -115,11 +169,12 @@ export default function AutomacaoStatusSetor() {
   async function salvar() {
     const payload = regras
       .map((regra) => ({
+        setor_origem: String(regra.setor_origem || '').trim(),
         tipo_solicitacao_id: Number(regra.tipo_solicitacao_id),
         status: String(regra.status || '').trim(),
         setor_destino: String(regra.setor_destino || '').trim()
       }))
-      .filter((regra) => regra.tipo_solicitacao_id && regra.status && regra.setor_destino);
+      .filter((regra) => regra.setor_origem && regra.tipo_solicitacao_id && regra.status && regra.setor_destino);
 
     try {
       setSalvando(true);
@@ -148,15 +203,31 @@ export default function AutomacaoStatusSetor() {
 
       <div className="bg-white p-6 rounded-xl shadow space-y-4">
         <div className="text-sm text-gray-600">
-          As regras abaixo sao avaliadas apos a alteracao manual de status. O setor responsavel atual continua executando a mudanca de status; a automacao apenas envia a solicitacao para o novo setor quando a combinacao for atendida.
+          As regras abaixo sao avaliadas apos a alteracao manual de status na area de origem configurada. O setor responsavel atual continua executando a mudanca de status; a automacao apenas envia a solicitacao para o novo setor quando a combinacao for atendida.
         </div>
 
         <div className="space-y-3">
           {regras.map((regra) => (
             <div
               key={regra.chave_local}
-              className="grid grid-cols-1 xl:grid-cols-[minmax(220px,1fr)_minmax(220px,1fr)_minmax(220px,1fr)_auto] gap-3 items-end rounded-xl border border-gray-200 p-4"
+              className="grid grid-cols-1 xl:grid-cols-[minmax(180px,1fr)_minmax(220px,1fr)_minmax(220px,1fr)_minmax(180px,1fr)_auto] gap-3 items-end rounded-xl border border-gray-200 p-4"
             >
+              <label className="grid gap-1 text-sm">
+                Area de origem
+                <select
+                  className="input"
+                  value={regra.setor_origem}
+                  onChange={(event) => atualizarRegra(regra.chave_local, 'setor_origem', event.target.value)}
+                >
+                  <option value="">Selecione</option>
+                  {setoresOrdenados.map((setor) => (
+                    <option key={setor.id} value={String(setor.codigo || '').trim().toUpperCase()}>
+                      {setor.nome} ({String(setor.codigo || '').trim().toUpperCase()})
+                    </option>
+                  ))}
+                </select>
+              </label>
+
               <label className="grid gap-1 text-sm">
                 Tipo de solicitacao
                 <select
@@ -181,7 +252,7 @@ export default function AutomacaoStatusSetor() {
                   onChange={(event) => atualizarRegra(regra.chave_local, 'status', event.target.value)}
                 >
                   <option value="">Selecione</option>
-                  {statusOptions.map((status) => (
+                  {obterStatusOptionsRegra(regra).map((status) => (
                     <option key={status.value} value={status.value}>
                       {status.label}
                     </option>

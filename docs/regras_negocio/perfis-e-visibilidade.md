@@ -32,8 +32,9 @@ A visibilidade efetiva depende de combinacao entre:
   - obra `PUBLICA` deve nascer em `DIR_OBRAS_PUBLICAS`
   - obra `PRIVADA` deve nascer em `DIR_OBRAS_PRIVADAS`
   - para usuarios do setor `OBRA`, essa escolha passa a seguir a classificacao da obra e a configuracao de `Areas Visiveis para OBRA`, sem depender de `Areas por Setor de Origem`
-  - a diretoria aprova e envia a solicitacao para o setor destino configurado pelo `SUPERADMIN`
-  - no momento da aprovacao, a configuracao atual por tipo de solicitacao tem prioridade sobre o destino gravado anteriormente na solicitacao; o destino gravado funciona apenas como fallback
+  - na criacao, o usuario seleciona a area destino operacional e o sistema grava a diretoria correspondente em campo separado
+  - a solicitacao nasce na diretoria da classificacao da obra e, apos aprovacao, segue para a area operacional selecionada na criacao
+  - a configuracao de destino por tipo permanece como fallback para registros antigos ou sem destino persistido
   - o setor destino vira o dono da solicitacao para seguir o fluxo normal
   - `DIR_OBRAS_PUBLICAS` e `DIR_OBRAS_PRIVADAS` continuam vendo solicitacoes novas do fluxo que pertencem a sua diretoria, mesmo apos aprovacao e envio
   - essa visibilidade adicional depende do marcador formal `fluxo_aprovacao_diretoria`
@@ -50,7 +51,7 @@ A visibilidade efetiva depende de combinacao entre:
   - os setores extras marcados passam a visualizar a solicitacao quando ela estiver naquele setor de origem com o tipo configurado
   - essa configuracao nao muda o setor responsavel da solicitacao
 - automacao de envio por status:
-  - o `SUPERADMIN` pode definir, por tipo e status, qual setor recebe automaticamente a solicitacao
+  - o `SUPERADMIN` pode definir, por area de origem, tipo e status, qual setor recebe automaticamente a solicitacao
   - a automacao ocorre apos a alteracao manual de status
   - o historico registra `ENVIO_AUTOMATICO_SETOR`
   - as automacoes legadas ja existentes no fluxo atual continuam valendo

@@ -665,6 +665,10 @@ module.exports = {
 
       const regrasInvalidas = regras.filter((regra) => (
         !tiposValidos.has(String(regra.tipo_solicitacao_id)) ||
+        (
+          regra.setor_origem &&
+          !tokensSetorValidos.has(String(regra.setor_origem || '').trim().toUpperCase())
+        ) ||
         !tokensSetorValidos.has(String(regra.setor_destino || '').trim().toUpperCase())
       ));
 

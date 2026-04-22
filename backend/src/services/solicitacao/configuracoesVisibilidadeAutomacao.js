@@ -76,6 +76,7 @@ function normalizarAutomacoesStatus(raw = []) {
   const regrasPorChave = new Map();
 
   (Array.isArray(raw) ? raw : []).forEach((item) => {
+    const setorOrigem = normalizarTokenSetor(item?.setor_origem);
     const tipoSolicitacaoId = normalizarIdPositivo(item?.tipo_solicitacao_id);
     const status = normalizarStatusAutomacao(item?.status);
     const setorDestino = normalizarTokenSetor(item?.setor_destino);
@@ -84,8 +85,9 @@ function normalizarAutomacoesStatus(raw = []) {
       return;
     }
 
-    const chave = `${tipoSolicitacaoId}:${status}`;
+    const chave = `${setorOrigem || '*'}:${tipoSolicitacaoId}:${status}`;
     regrasPorChave.set(chave, {
+      setor_origem: setorOrigem,
       tipo_solicitacao_id: tipoSolicitacaoId,
       status,
       setor_destino: setorDestino
@@ -93,6 +95,12 @@ function normalizarAutomacoesStatus(raw = []) {
   });
 
   return Array.from(regrasPorChave.values()).sort((a, b) => {
+    const setorA = String(a.setor_origem || '');
+    const setorB = String(b.setor_origem || '');
+    if (setorA !== setorB) {
+      return setorA.localeCompare(setorB, 'pt-BR');
+    }
+
     if (a.tipo_solicitacao_id !== b.tipo_solicitacao_id) {
       return a.tipo_solicitacao_id - b.tipo_solicitacao_id;
     }
@@ -154,16 +162,28 @@ function obterTiposCompartilhadosParaTokens(tokensSetor = [], regras = {}) {
 }
 
 function obterAutomacaoStatusCorrespondente({
+  setorOrigem,
   tipoSolicitacaoId,
   status,
   regras = []
 }) {
+  const setorOrigemNormalizado = normalizarTokenSetor(setorOrigem);
   const tipoId = normalizarIdPositivo(tipoSolicitacaoId);
   const statusNormalizado = normalizarStatusAutomacao(status);
 
   if (!tipoId || !statusNormalizado) return null;
 
-  return (Array.isArray(regras) ? regras : []).find((regra) => (
+  const regrasValidas = Array.isArray(regras) ? regras : [];
+  const regraExata = regrasValidas.find((regra) => (
+    normalizarTokenSetor(regra?.setor_origem) === setorOrigemNormalizado &&
+    Number(regra?.tipo_solicitacao_id) === tipoId &&
+    normalizarStatusAutomacao(regra?.status) === statusNormalizado
+  ));
+
+  if (regraExata) return regraExata;
+
+  return regrasValidas.find((regra) => (
+    !normalizarTokenSetor(regra?.setor_origem) &&
     Number(regra?.tipo_solicitacao_id) === tipoId &&
     normalizarStatusAutomacao(regra?.status) === statusNormalizado
   )) || null;

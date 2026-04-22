@@ -540,12 +540,8 @@ export default function NovaSolicitacao() {
       });
     }
 
-    if (isSetorObra && diretoriaEsperadaObra) {
-      lista = lista.filter(setor => setorPossuiToken(setor, diretoriaEsperadaObra));
-    }
-
     return lista;
-  }, [setores, isSetorObra, areasObra, destinosPermitidosPorSetorOrigem, diretoriaEsperadaObra]);
+  }, [setores, isSetorObra, areasObra, destinosPermitidosPorSetorOrigem]);
   const contratosDisponiveis = contratosRef.length > 0 ? contratosRef : contratos;
   const hoje = new Date();
   const hojeInput = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-${String(hoje.getDate()).padStart(2, '0')}`;
@@ -569,16 +565,11 @@ export default function NovaSolicitacao() {
     const idsPermitidos = new Set(tiposPermitidos);
     return tiposAtivos.filter(tipo => idsPermitidos.has(Number(tipo.id)));
   }, [tipos, tiposPorSetorConfig, form.area_responsavel, setores]);
-
-  useEffect(() => {
-    if (!isSetorObra || !form.obra_id || !diretoriaEsperadaObra) return;
-    const setorDiretoria = setoresFiltrados.find(setor => setorPossuiToken(setor, diretoriaEsperadaObra));
-    if (!setorDiretoria) return;
-
-    const valorEsperado = obterValorAreaResponsavel(setorDiretoria);
-    if (normalizarTokenSetor(form.area_responsavel) === valorEsperado) return;
-    setForm(prev => ({ ...prev, area_responsavel: valorEsperado }));
-  }, [isSetorObra, form.obra_id, form.area_responsavel, diretoriaEsperadaObra, setoresFiltrados]);
+  const diretoriaAprovacaoLabel = useMemo(() => {
+    if (!isSetorObra || !form.obra_id || !diretoriaEsperadaObra) return '';
+    const setorDiretoria = setores.find(setor => setorPossuiToken(setor, diretoriaEsperadaObra));
+    return setorDiretoria?.nome || setorDiretoria?.codigo || diretoriaEsperadaObra;
+  }, [isSetorObra, form.obra_id, diretoriaEsperadaObra, setores]);
 
   useEffect(() => {
     if (!form.area_responsavel) return;
@@ -700,6 +691,20 @@ export default function NovaSolicitacao() {
               </span>
             )}
           </label>
+
+          {isSetorObra && (
+            <label className="grid gap-1 text-sm">
+              Diretoria de aprovacao
+              <input
+                className="input bg-gray-100"
+                value={diretoriaAprovacaoLabel || 'Selecione uma obra classificada'}
+                readOnly
+              />
+              <span className="text-xs text-gray-500">
+                A solicitacao sera criada nessa diretoria e, apos aprovacao, seguira para a area responsavel selecionada.
+              </span>
+            </label>
+          )}
 
           <label className="grid gap-1 text-sm">
             Tipo de Solicitação

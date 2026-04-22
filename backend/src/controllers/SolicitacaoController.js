@@ -479,8 +479,8 @@ async function obterContextoAprovacaoDiretoria(solicitacao, obraCarregada = null
     diretoriaPersistida ||
     obterDiretoriaParaObra(obra, configuracao.diretoriasPorClassificacao);
   const setorDestinoAprovacao =
-    setorDestinoConfigurado ||
-    setorDestinoPersistido;
+    setorDestinoPersistido ||
+    setorDestinoConfigurado;
 
   return {
     obra,
@@ -1749,39 +1749,19 @@ module.exports = {
         },
         obraSelecionada
       );
-      const diretoriasConfiguradas = Array.from(new Set(
-        Object.values(contextoAprovacaoDiretoria.diretoriasPorClassificacao || {})
-      ));
-      const destinoSelecionado = String(area_responsavel || '').trim().toUpperCase();
-      const selecionouDiretoriaConfigurada = diretoriasConfiguradas.some(token =>
-        setorPertenceAoUsuario([token], destinoSelecionado)
-      );
-
-      if (
-        contextoAprovacaoDiretoria.diretoriaEsperada &&
-        selecionouDiretoriaConfigurada &&
-        !setorPertenceAoUsuario([contextoAprovacaoDiretoria.diretoriaEsperada], destinoSelecionado)
-      ) {
-        return res.status(403).json({
-          error: 'A diretoria selecionada nao corresponde a classificacao da obra.'
-        });
-      }
-
-      if (
+      const areaDestinoSelecionada = String(area_responsavel || '').trim();
+      const destinoSelecionado = areaDestinoSelecionada.toUpperCase();
+      const fluxoAprovacaoDiretoriaAtivo = Boolean(
         usuarioSetorObra &&
         contextoAprovacaoDiretoria.diretoriaEsperada &&
-        !setorPertenceAoUsuario([contextoAprovacaoDiretoria.diretoriaEsperada], destinoSelecionado)
-      ) {
-        return res.status(403).json({
-          error: 'Usuarios do setor OBRA devem criar a solicitacao na diretoria correspondente a classificacao da obra.'
-        });
-      }
-
-      const fluxoAprovacaoDiretoriaAtivo = Boolean(
-        contextoAprovacaoDiretoria.diretoriaEsperada &&
-        contextoAprovacaoDiretoria.setorDestinoAprovacao &&
-        setorPertenceAoUsuario([contextoAprovacaoDiretoria.diretoriaEsperada], destinoSelecionado)
+        destinoSelecionado
       );
+      const areaResponsavelInicial = fluxoAprovacaoDiretoriaAtivo
+        ? contextoAprovacaoDiretoria.diretoriaEsperada
+        : area_responsavel;
+      const setorDestinoPosAprovacao = fluxoAprovacaoDiretoriaAtivo
+        ? destinoSelecionado
+        : null;
 
       const destinosPermitidos = new Set();
       tokensSetorUsuario.forEach(token => {
@@ -1907,13 +1887,13 @@ module.exports = {
         tipo_sub_id: tipo_sub_id || null,
         descricao,
         valor: valorPersistido,
-        area_responsavel,
+        area_responsavel: areaResponsavelInicial,
         fluxo_aprovacao_diretoria: fluxoAprovacaoDiretoriaAtivo,
         diretoria_fluxo_codigo: fluxoAprovacaoDiretoriaAtivo
           ? contextoAprovacaoDiretoria.diretoriaEsperada
           : null,
         setor_destino_pos_aprovacao: fluxoAprovacaoDiretoriaAtivo
-          ? contextoAprovacaoDiretoria.setorDestinoAprovacao
+          ? setorDestinoPosAprovacao
           : null,
         codigo_contrato,
         contrato_id: contrato_id || null,
@@ -2405,6 +2385,7 @@ module.exports = {
       if (!enviouAutomaticamente) {
         const regrasAutomacao = await obterConfiguracaoAutomacaoStatusSetor();
         const automacao = obterAutomacaoStatusCorrespondente({
+          setorOrigem: solicitacao.area_responsavel,
           tipoSolicitacaoId: solicitacao.tipo_solicitacao_id,
           status,
           regras: regrasAutomacao
