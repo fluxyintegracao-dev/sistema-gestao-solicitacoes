@@ -380,7 +380,7 @@ Permissoes efetivas dependem da combinacao de:
 ### Regras
 - O usuario ve apenas conversas em que participa.
 - O criador pode editar mensagens por ate 5 minutos.
-- O criador pode adicionar participantes apenas em conversa aberta.
+- Qualquer participante pode adicionar usuarios ativos em conversa aberta, independente do setor.
 - O botao voltar respeita a origem da navegacao.
 
 ### Alertas visuais

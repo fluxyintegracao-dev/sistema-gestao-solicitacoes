@@ -17,6 +17,8 @@ O modulo passou por otimizacoes para reduzir carga:
 - endpoint leve de resumo para badges
 - reducao de polling no frontend
 - indices em tabelas de comunicacao e notificacao
+- participantes de uma conversa aberta podem adicionar outros usuarios ativos, independente do setor
+- usuarios adicionados passam a ver todo o historico da conversa na caixa de entrada
 
 ## Risco operacional
 Esse modulo ja foi identificado como fonte de pressao no banco. Em incidente, priorizar a preservacao do fluxo principal.

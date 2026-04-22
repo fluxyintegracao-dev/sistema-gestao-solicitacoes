@@ -90,7 +90,7 @@ export default function ConversaDetalhe() {
   const usuarioId = Number(user?.id || 0);
   const conversaAberta = String(conversa?.status || '') === 'ABERTA';
   const podeConcluir = usuarioId > 0 && usuarioId === criadorId;
-  const podeAdicionarParticipantes = podeConcluir && conversaAberta;
+  const podeAdicionarParticipantes = usuarioId > 0 && conversaAberta;
 
   const tituloSecundario = useMemo(() => {
     if (!conversa) return '';

@@ -640,6 +640,8 @@ module.exports = {
         return res.status(403).json({ error: 'Acesso negado a conversa' });
       }
 
+      await garantirParticipantesBasicos(conversa);
+
       const [conversaCompleta, mensagens, participantes, anexos] = await Promise.all([
         ConversaInterna.findByPk(id, {
           include: [
@@ -864,9 +866,7 @@ module.exports = {
         return res.status(400).json({ error: 'So e permitido adicionar participantes em conversas abertas.' });
       }
 
-      if (Number(req.user.id) !== Number(conversa.criado_por_id)) {
-        return res.status(403).json({ error: 'Apenas o criador pode adicionar participantes' });
-      }
+      await garantirParticipantesBasicos(conversa);
 
       const usuarioIds = extrairIdsNumericos(req.body?.usuario_ids);
       if (usuarioIds.length === 0) {
@@ -878,17 +878,44 @@ module.exports = {
           id: { [Op.in]: usuarioIds },
           ativo: true
         },
-        attributes: ['id']
+        attributes: ['id', 'nome']
       });
-      const idsValidos = usuariosValidos.map((item) => item.id);
+      const idsValidos = usuariosValidos.map((item) => Number(item.id));
       if (idsValidos.length === 0) {
         return res.status(400).json({ error: 'Nenhum usuario valido para adicionar' });
       }
 
-      await criarParticipantes(id, idsValidos, req.user.id);
+      const participantesExistentes = await ConversaInternaParticipante.findAll({
+        where: {
+          conversa_id: id,
+          usuario_id: { [Op.in]: idsValidos }
+        },
+        attributes: ['usuario_id']
+      });
+      const idsExistentes = new Set(
+        participantesExistentes.map((item) => Number(item.usuario_id))
+      );
+      const idsParaAdicionar = idsValidos.filter((usuarioId) => !idsExistentes.has(usuarioId));
+
+      if (idsParaAdicionar.length === 0) {
+        return res.status(400).json({ error: 'Os usuarios informados ja participam da conversa' });
+      }
+
+      await criarParticipantes(id, idsParaAdicionar, req.user.id);
+      await ConversaInternaArquivoUsuario.destroy({
+        where: {
+          conversa_id: id,
+          usuario_id: { [Op.in]: idsParaAdicionar }
+        }
+      });
       await conversa.update({ updatedAt: new Date() });
 
-      return res.json({ adicionados: idsValidos.length });
+      return res.json({
+        adicionados: idsParaAdicionar.length,
+        usuarios: usuariosValidos
+          .filter((item) => idsParaAdicionar.includes(Number(item.id)))
+          .map((item) => ({ id: item.id, nome: item.nome }))
+      });
     } catch (error) {
       console.error(error);
       return res.status(500).json({ error: 'Erro ao adicionar participantes' });
