@@ -217,6 +217,7 @@ db.Parceiro.belongsToMany(db.ParceiroCategoria, {
   through: db.ParceiroCategoriaItem,
   foreignKey: 'parceiro_id',
   otherKey: 'parceiro_categoria_id',
+  uniqueKey: 'ux_parceiro_categoria_itens',
   as: 'categorias'
 });
 
@@ -224,6 +225,7 @@ db.ParceiroCategoria.belongsToMany(db.Parceiro, {
   through: db.ParceiroCategoriaItem,
   foreignKey: 'parceiro_categoria_id',
   otherKey: 'parceiro_id',
+  uniqueKey: 'ux_parceiro_categoria_itens',
   as: 'parceiros'
 });
 
