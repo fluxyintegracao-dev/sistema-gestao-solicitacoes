@@ -17,6 +17,9 @@ const {
 const {
   usuarioTemAcessoPrioridadeDiretoria
 } = require('../services/prioridadeDiretoriaAcesso');
+const {
+  obterTokensSetoresUsuario: obterTokensSetoresUsuarioComVinculos
+} = require('../services/usuariosSetores');
 const { criarNotificacao } = require('../services/notificacoes');
 
 const STATUS_LOTE = {
@@ -87,19 +90,10 @@ async function obterAreaUsuario(req) {
 }
 
 async function obterTokensSetorUsuario(req, areaUsuario) {
-  const tokens = [];
-
-  if (areaUsuario) tokens.push(areaUsuario);
-
-  if (req.user?.setor_id) {
-    tokens.push(String(req.user.setor_id));
-    const setor = await Setor.findByPk(req.user.setor_id, {
-      attributes: ['id', 'codigo', 'nome']
-    });
-    if (setor?.codigo) tokens.push(String(setor.codigo));
-    if (setor?.nome) tokens.push(String(setor.nome));
-  }
-
+  const tokens = await obterTokensSetoresUsuarioComVinculos(
+    req.user,
+    areaUsuario ? [areaUsuario] : []
+  );
   return Array.from(
     new Set(tokens.map(normalizarTokenSetor).filter(Boolean))
   );
@@ -155,6 +149,9 @@ async function obterPermissoesPrioridade(req) {
 
 function usuarioPodeVisualizarLote(permissoes, lote) {
   if (permissoes?.isSuperadmin || permissoes?.isDirAdmin) return true;
+  if (Array.isArray(permissoes?.classificacoesOperaveis) && permissoes.classificacoesOperaveis.length > 0) {
+    return permisssoesTemClassificacao(permissoes, lote?.classificacao_alvo);
+  }
   if (permissoes?.isLeitorConfigurado) return true;
   return permisssoesTemClassificacao(permissoes, lote?.classificacao_alvo);
 }
@@ -449,7 +446,12 @@ module.exports = {
         where.status = status;
       }
 
-      if (!permissoes.isSuperadmin && !permissoes.isDirAdmin && !permissoes.isLeitorConfigurado) {
+      if (
+        !permissoes.isSuperadmin &&
+        !permissoes.isDirAdmin &&
+        Array.isArray(permissoes.classificacoesOperaveis) &&
+        permissoes.classificacoesOperaveis.length > 0
+      ) {
         where.classificacao_alvo = {
           [Op.in]: permissoes.classificacoesOperaveis
         };
