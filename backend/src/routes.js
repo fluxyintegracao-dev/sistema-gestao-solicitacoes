@@ -127,7 +127,9 @@ router.get('/prioridades-diretoria/lotes', PrioridadeDiretoriaController.index);
 router.post('/prioridades-diretoria/lotes', PrioridadeDiretoriaController.create);
 router.get('/prioridades-diretoria/lotes/:id', PrioridadeDiretoriaController.show);
 router.get('/prioridades-diretoria/lotes/:id/solicitacoes-disponiveis', PrioridadeDiretoriaController.solicitacoesDisponiveis);
+router.post('/prioridades-diretoria/lotes/:id/salvar-selecao', PrioridadeDiretoriaController.salvarSelecao);
 router.post('/prioridades-diretoria/lotes/:id/finalizar', PrioridadeDiretoriaController.finalizar);
+router.post('/prioridades-diretoria/lotes/:id/reabrir', PrioridadeDiretoriaController.reabrir);
 router.post('/prioridades-diretoria/lotes/:id/cancelar', PrioridadeDiretoriaController.cancelar);
 router.delete('/prioridades-diretoria/lotes/:id', PrioridadeDiretoriaController.excluir);
 

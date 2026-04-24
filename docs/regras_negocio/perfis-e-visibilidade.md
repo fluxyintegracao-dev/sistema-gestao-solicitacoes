@@ -63,6 +63,8 @@ A visibilidade efetiva depende de combinacao entre:
   - usuarios configurados para leitura podem consultar lotes e solicitacoes ja vinculadas, mas nao criam, finalizam, cancelam ou excluem lotes
   - a permissao de leitura nao amplia o escopo de uma diretoria publica/privada para lotes da outra diretoria
   - `SUPERADMIN` pode finalizar lotes e excluir lotes sem itens autorizados
+  - `SUPERADMIN` pode reabrir lotes finalizados para que a diretoria ajuste a selecao antes de finalizar novamente
+  - diretorias podem salvar a selecao de um lote aberto sem finalizar; a selecao fica persistida para retomada posterior
   - a autorizacao de prioridade nao muda o setor responsavel da solicitacao
   - a autorizacao marca a solicitacao como `prioridade_diretoria_ativa`
 

@@ -7,7 +7,9 @@ import {
   getLotePrioridadeDiretoria,
   getPrioridadesDiretoriaContexto,
   getSolicitacoesDisponiveisPrioridadeDiretoria,
-  listarLotesPrioridadeDiretoria
+  listarLotesPrioridadeDiretoria,
+  reabrirLotePrioridadeDiretoria,
+  salvarSelecaoLotePrioridadeDiretoria
 } from '../services/prioridadesDiretoria';
 
 function formatarValor(valor) {
@@ -61,6 +63,8 @@ export default function PrioridadesDiretoria() {
   const [loadingDisponiveis, setLoadingDisponiveis] = useState(false);
   const [salvandoLote, setSalvandoLote] = useState(false);
   const [finalizando, setFinalizando] = useState(false);
+  const [salvandoSelecao, setSalvandoSelecao] = useState(false);
+  const [reabrindo, setReabrindo] = useState(false);
   const [cancelando, setCancelando] = useState(false);
   const [excluindo, setExcluindo] = useState(false);
   const [filtroStatus, setFiltroStatus] = useState('');
@@ -150,11 +154,11 @@ export default function PrioridadesDiretoria() {
     const abertoComSelecao = detalhe?.status === 'ABERTO' && detalhe?.pode_finalizar;
 
     const valorUtilizadoProjetado = abertoComSelecao
-      ? valorUtilizadoBase + totalSelecionado
+      ? totalSelecionado
       : valorUtilizadoBase;
     const saldoProjetado = Math.max(valorDisponivel - valorUtilizadoProjetado, 0);
     const itensProjetados = abertoComSelecao
-      ? itensBase + solicitacoesSelecionadas.length
+      ? solicitacoesSelecionadas.length
       : itensBase;
 
     return {
@@ -216,13 +220,32 @@ export default function PrioridadesDiretoria() {
     try {
       setLoadingDetalhe(true);
       const data = await getLotePrioridadeDiretoria(id);
-      setDetalhe(data?.item || null);
-      if (data?.item?.status !== 'ABERTO') {
+      const item = data?.item || null;
+      const itensSalvos = Array.isArray(item?.itens) ? item.itens : [];
+
+      if (item?.status === 'ABERTO') {
+        const idsSalvos = itensSalvos
+          .map((linha) => Number(linha?.solicitacao?.id))
+          .filter((numero) => Number.isInteger(numero) && numero > 0);
+        const cacheSalvo = {};
+        itensSalvos.forEach((linha) => {
+          if (linha?.solicitacao?.id) {
+            cacheSalvo[String(linha.solicitacao.id)] = {
+              ...linha.solicitacao,
+              valor_prioridade: linha.valor_considerado
+            };
+          }
+        });
+        setSelecionadasIds(idsSalvos);
+        setSelecionadasCache(cacheSalvo);
+      } else {
         setSolicitacoesDisponiveis([]);
         setObrasDisponiveis([]);
         setSelecionadasIds([]);
         setSelecionadasCache({});
       }
+
+      setDetalhe(item);
     } catch (error) {
       console.error(error);
       alert(error?.message || 'Erro ao carregar detalhe do lote');
@@ -336,6 +359,49 @@ export default function PrioridadesDiretoria() {
       alert(error?.message || 'Erro ao finalizar lote');
     } finally {
       setFinalizando(false);
+    }
+  }
+
+  async function salvarSelecaoLote() {
+    if (!detalhe?.id) return;
+    if (excedeuLimite) {
+      alert('O total selecionado excede o valor disponivel do lote.');
+      return;
+    }
+
+    try {
+      setSalvandoSelecao(true);
+      await salvarSelecaoLotePrioridadeDiretoria(detalhe.id, {
+        solicitacao_ids: selecionadasIds
+      });
+      await carregarLotes();
+      await carregarDetalheLote(detalhe.id);
+      alert('Selecao salva com sucesso.');
+    } catch (error) {
+      console.error(error);
+      alert(error?.message || 'Erro ao salvar selecao do lote');
+    } finally {
+      setSalvandoSelecao(false);
+    }
+  }
+
+  async function reabrirLote() {
+    if (!detalhe?.id) return;
+    if (!window.confirm('Reabrir este lote finalizado para edicao?')) {
+      return;
+    }
+
+    try {
+      setReabrindo(true);
+      await reabrirLotePrioridadeDiretoria(detalhe.id);
+      await carregarLotes();
+      await carregarDetalheLote(detalhe.id);
+      alert('Lote reaberto com sucesso.');
+    } catch (error) {
+      console.error(error);
+      alert(error?.message || 'Erro ao reabrir lote');
+    } finally {
+      setReabrindo(false);
     }
   }
 
@@ -538,6 +604,16 @@ export default function PrioridadesDiretoria() {
 
                 <div className="flex items-center gap-2 flex-wrap">
                   <BadgeStatus status={detalhe.status} />
+                  {detalhe.pode_reabrir && (
+                    <button
+                      type="button"
+                      className="btn btn-outline"
+                      onClick={reabrirLote}
+                      disabled={reabrindo}
+                    >
+                      {reabrindo ? 'Reabrindo...' : 'Reabrir lote'}
+                    </button>
+                  )}
                   {detalhe.pode_excluir && (
                     <button
                       type="button"
@@ -566,7 +642,7 @@ export default function PrioridadesDiretoria() {
                 <ResumoCard
                   label="Valor utilizado"
                   value={formatarValor(resumoLote.valorUtilizadoProjetado)}
-                  helper={resumoLote.possuiPrevia ? `Base ${formatarValor(resumoLote.valorUtilizadoBase)} + selecao ${formatarValor(totalSelecionado)}` : null}
+                  helper={resumoLote.possuiPrevia ? 'Total projetado com a selecao atual' : null}
                   destaque={resumoLote.possuiPrevia}
                 />
                 <ResumoCard
@@ -576,9 +652,9 @@ export default function PrioridadesDiretoria() {
                   destaque={resumoLote.possuiPrevia}
                 />
                 <ResumoCard
-                  label="Itens autorizados"
+                  label={detalhe?.status === 'ABERTO' ? 'Itens selecionados' : 'Itens autorizados'}
                   value={String(resumoLote.itensProjetados)}
-                  helper={resumoLote.possuiPrevia ? `Atual ${resumoLote.itensBase} + selecao ${solicitacoesSelecionadas.length}` : null}
+                  helper={resumoLote.possuiPrevia ? `${solicitacoesSelecionadas.length} item(ns) selecionado(s)` : null}
                 />
               </div>
 
@@ -675,7 +751,15 @@ export default function PrioridadesDiretoria() {
                     </table>
                   </div>
 
-                  <div className="flex justify-end">
+                  <div className="flex justify-end gap-2 flex-wrap">
+                    <button
+                      type="button"
+                      className="btn btn-outline"
+                      onClick={salvarSelecaoLote}
+                      disabled={salvandoSelecao || excedeuLimite}
+                    >
+                      {salvandoSelecao ? 'Salvando...' : 'Salvar selecao'}
+                    </button>
                     <button
                       type="button"
                       className="btn btn-primary"

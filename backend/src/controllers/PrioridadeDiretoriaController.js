@@ -218,6 +218,14 @@ function serializarLote(lote, resumoItens = null) {
   };
 }
 
+function normalizarSolicitacaoIds(lista) {
+  return Array.from(
+    new Set((Array.isArray(lista) ? lista : [])
+      .map(Number)
+      .filter((id) => Number.isInteger(id) && id > 0))
+  );
+}
+
 function serializarSolicitacaoPrioridade(solicitacao) {
   const resumoPagamento = calcularResumoPagamentoSolicitacao(solicitacao);
   return {
@@ -321,7 +329,7 @@ async function carregarLoteDetalhe(loteId) {
   });
 }
 
-async function listarSolicitacoesElegiveisParaLote(lote, busca = '', solicitacaoIds = null, obraId = null) {
+async function listarSolicitacoesElegiveisParaLote(lote, busca = '', solicitacaoIds = null, obraId = null, options = {}) {
   const condicoes = [
     { cancelada: false },
     { fluxo_aprovacao_diretoria: true },
@@ -397,12 +405,92 @@ async function listarSolicitacoesElegiveisParaLote(lote, busca = '', solicitacao
     order: [
       ['data_vencimento', 'ASC'],
       ['createdAt', 'DESC']
-    ]
+    ],
+    transaction: options.transaction
   });
 
   return rows
     .map(serializarSolicitacaoPrioridade)
     .filter((item) => Number(item.valor_prioridade) > 0);
+}
+
+async function sincronizarItensLote({
+  lote,
+  solicitacaoIds,
+  usuarioId,
+  transaction
+}) {
+  const idsSelecionados = normalizarSolicitacaoIds(solicitacaoIds);
+
+  if (idsSelecionados.length === 0) {
+    await PrioridadeLoteItem.destroy({
+      where: { lote_id: lote.id },
+      transaction
+    });
+    return {
+      solicitacoesSelecionadas: [],
+      valorUtilizado: 0
+    };
+  }
+
+  const solicitacoesSelecionadas = await listarSolicitacoesElegiveisParaLote(
+    lote,
+    '',
+    idsSelecionados,
+    null,
+    { transaction }
+  );
+
+  if (solicitacoesSelecionadas.length !== idsSelecionados.length) {
+    const error = new Error('Uma ou mais solicitacoes selecionadas nao estao elegiveis para prioridade.');
+    error.status = 400;
+    throw error;
+  }
+
+  const agora = new Date();
+  const mapaSolicitacoes = new Map(
+    solicitacoesSelecionadas.map((item) => [Number(item.id), item])
+  );
+
+  await PrioridadeLoteItem.destroy({
+    where: {
+      lote_id: lote.id,
+      solicitacao_id: { [Op.notIn]: idsSelecionados }
+    },
+    transaction
+  });
+
+  for (const solicitacaoId of idsSelecionados) {
+    const item = mapaSolicitacoes.get(Number(solicitacaoId));
+    const [registro, criado] = await PrioridadeLoteItem.findOrCreate({
+      where: {
+        lote_id: lote.id,
+        solicitacao_id: solicitacaoId
+      },
+      defaults: {
+        valor_considerado: item.valor_prioridade,
+        autorizado_por: usuarioId,
+        autorizado_em: agora
+      },
+      transaction
+    });
+
+    if (!criado) {
+      await registro.update({
+        valor_considerado: item.valor_prioridade,
+        autorizado_por: usuarioId,
+        autorizado_em: agora
+      }, { transaction });
+    }
+  }
+
+  return {
+    solicitacoesSelecionadas,
+    valorUtilizado: solicitacoesSelecionadas.reduce(
+      (total, item) => total + formatarNumero(item.valor_prioridade),
+      0
+    )
+  };
 }
 
 module.exports = {
@@ -481,7 +569,8 @@ module.exports = {
           ...serializarLote(lote, resumoItens.get(Number(lote.id))),
           pode_finalizar: usuarioPodeFinalizarLote(permissoes, lote) && lote.status === STATUS_LOTE.ABERTO,
           pode_cancelar: (permissoes.isSuperadmin || permissoes.isDirAdmin) && lote.status === STATUS_LOTE.ABERTO,
-          pode_excluir: Boolean(permissoes.isSuperadmin)
+          pode_excluir: Boolean(permissoes.isSuperadmin),
+          pode_reabrir: Boolean(permissoes.isSuperadmin) && lote.status === STATUS_LOTE.FINALIZADO
         }))
       });
     } catch (error) {
@@ -535,7 +624,8 @@ module.exports = {
           ...serializarLote(detalhe),
           pode_finalizar: usuarioPodeFinalizarLote(permissoes, detalhe),
           pode_cancelar: true,
-          pode_excluir: Boolean(permissoes.isSuperadmin)
+          pode_excluir: Boolean(permissoes.isSuperadmin),
+          pode_reabrir: false
         }
       });
     } catch (error) {
@@ -573,7 +663,8 @@ module.exports = {
           })),
           pode_finalizar: usuarioPodeFinalizarLote(permissoes, lote) && lote.status === STATUS_LOTE.ABERTO,
           pode_cancelar: (permissoes.isSuperadmin || permissoes.isDirAdmin) && lote.status === STATUS_LOTE.ABERTO,
-          pode_excluir: Boolean(permissoes.isSuperadmin)
+          pode_excluir: Boolean(permissoes.isSuperadmin),
+          pode_reabrir: Boolean(permissoes.isSuperadmin) && lote.status === STATUS_LOTE.FINALIZADO
         }
       });
     } catch (error) {
@@ -643,6 +734,7 @@ module.exports = {
 
   async finalizar(req, res) {
     const transaction = await PrioridadeLote.sequelize.transaction();
+    let transactionFinalizada = false;
 
     try {
       const permissoes = await obterPermissoesPrioridade(req);
@@ -667,34 +759,29 @@ module.exports = {
         return res.status(400).json({ error: 'Somente lotes abertos podem ser finalizados.' });
       }
 
-      const solicitacaoIds = Array.from(
-        new Set((Array.isArray(req.body?.solicitacao_ids) ? req.body.solicitacao_ids : [])
-          .map(Number)
-          .filter((id) => Number.isInteger(id) && id > 0))
-      );
+      const solicitacaoIds = normalizarSolicitacaoIds(req.body?.solicitacao_ids);
 
       if (solicitacaoIds.length === 0) {
         await transaction.rollback();
         return res.status(400).json({ error: 'Selecione ao menos uma solicitacao para o lote.' });
       }
 
-      const solicitacoesSelecionadas = await listarSolicitacoesElegiveisParaLote(
-        lote,
-        '',
-        solicitacaoIds
-      );
-
-      if (solicitacoesSelecionadas.length !== solicitacaoIds.length) {
+      let resultadoSincronizacao;
+      try {
+        resultadoSincronizacao = await sincronizarItensLote({
+          lote,
+          solicitacaoIds,
+          usuarioId: req.user.id,
+          transaction
+        });
+      } catch (error) {
         await transaction.rollback();
-        return res.status(400).json({
-          error: 'Uma ou mais solicitacoes selecionadas nao estao elegiveis para prioridade.'
+        return res.status(error.status || 400).json({
+          error: error.message || 'Erro ao sincronizar solicitacoes do lote.'
         });
       }
 
-      const valorUtilizado = solicitacoesSelecionadas.reduce(
-        (total, item) => total + formatarNumero(item.valor_prioridade),
-        0
-      );
+      const { solicitacoesSelecionadas, valorUtilizado } = resultadoSincronizacao;
       const valorDisponivel = formatarNumero(lote.valor_disponivel);
 
       if (valorUtilizado > valorDisponivel) {
@@ -705,17 +792,6 @@ module.exports = {
       }
 
       const agora = new Date();
-
-      await PrioridadeLoteItem.bulkCreate(
-        solicitacoesSelecionadas.map((item) => ({
-          lote_id: lote.id,
-          solicitacao_id: item.id,
-          valor_considerado: item.valor_prioridade,
-          autorizado_por: req.user.id,
-          autorizado_em: agora
-        })),
-        { transaction }
-      );
 
       await Solicitacao.update(
         {
@@ -753,6 +829,7 @@ module.exports = {
       );
 
       await transaction.commit();
+      transactionFinalizada = true;
 
       try {
         await Promise.all(
@@ -785,42 +862,254 @@ module.exports = {
             solicitacao: item.solicitacao ? serializarSolicitacaoPrioridade(item.solicitacao) : null
           })),
           pode_finalizar: false,
-          pode_cancelar: false
+          pode_cancelar: false,
+          pode_reabrir: Boolean(permissoes.isSuperadmin)
         }
       });
     } catch (error) {
-      await transaction.rollback();
+      if (!transactionFinalizada) {
+        await transaction.rollback();
+      }
       console.error(error);
       return res.status(500).json({ error: 'Erro ao finalizar lote de prioridade.' });
     }
   },
 
+  async salvarSelecao(req, res) {
+    const transaction = await PrioridadeLote.sequelize.transaction();
+    let transactionFinalizada = false;
+
+    try {
+      const permissoes = await obterPermissoesPrioridade(req);
+      if (!permissoes.podeAcessarModulo) {
+        await transaction.rollback();
+        return res.status(403).json({ error: 'Acesso negado ao modulo de prioridades.' });
+      }
+
+      const lote = await PrioridadeLote.findByPk(req.params.id, { transaction });
+      if (!lote) {
+        await transaction.rollback();
+        return res.status(404).json({ error: 'Lote de prioridade nao encontrado.' });
+      }
+
+      if (!usuarioPodeFinalizarLote(permissoes, lote)) {
+        await transaction.rollback();
+        return res.status(403).json({ error: 'Apenas a diretoria alvo pode salvar a selecao deste lote.' });
+      }
+
+      if (String(lote.status || '').toUpperCase() !== STATUS_LOTE.ABERTO) {
+        await transaction.rollback();
+        return res.status(400).json({ error: 'Somente lotes abertos podem ter selecao salva.' });
+      }
+
+      let resultadoSincronizacao;
+      try {
+        resultadoSincronizacao = await sincronizarItensLote({
+          lote,
+          solicitacaoIds: req.body?.solicitacao_ids,
+          usuarioId: req.user.id,
+          transaction
+        });
+      } catch (error) {
+        await transaction.rollback();
+        return res.status(error.status || 400).json({
+          error: error.message || 'Erro ao salvar selecao do lote.'
+        });
+      }
+
+      const valorDisponivel = formatarNumero(lote.valor_disponivel);
+      if (resultadoSincronizacao.valorUtilizado > valorDisponivel) {
+        await transaction.rollback();
+        return res.status(400).json({
+          error: 'O valor total das solicitacoes selecionadas excede o limite disponivel do lote.'
+        });
+      }
+
+      await lote.update({
+        valor_utilizado: resultadoSincronizacao.valorUtilizado
+      }, { transaction });
+
+      await transaction.commit();
+      transactionFinalizada = true;
+
+      const detalhe = await carregarLoteDetalhe(lote.id);
+      return res.json({
+        item: {
+          ...serializarLote(detalhe),
+          itens: (Array.isArray(detalhe.itens) ? detalhe.itens : []).map((item) => ({
+            id: item.id,
+            valor_considerado: formatarNumero(item.valor_considerado),
+            autorizado_em: item.autorizado_em,
+            autorizado_por: item.autorizado_por,
+            autorizado_por_nome: item?.autorizadoPor?.nome || '-',
+            solicitacao: item.solicitacao ? serializarSolicitacaoPrioridade(item.solicitacao) : null
+          })),
+          pode_finalizar: usuarioPodeFinalizarLote(permissoes, detalhe) && detalhe.status === STATUS_LOTE.ABERTO,
+          pode_cancelar: (permissoes.isSuperadmin || permissoes.isDirAdmin) && detalhe.status === STATUS_LOTE.ABERTO,
+          pode_excluir: Boolean(permissoes.isSuperadmin),
+          pode_reabrir: false
+        }
+      });
+    } catch (error) {
+      if (!transactionFinalizada) {
+        await transaction.rollback();
+      }
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao salvar selecao do lote de prioridade.' });
+    }
+  },
+
+  async reabrir(req, res) {
+    const transaction = await PrioridadeLote.sequelize.transaction();
+    let transactionFinalizada = false;
+
+    try {
+      const permissoes = await obterPermissoesPrioridade(req);
+      if (!permissoes.isSuperadmin) {
+        await transaction.rollback();
+        return res.status(403).json({ error: 'Apenas SUPERADMIN pode reabrir lotes finalizados.' });
+      }
+
+      const lote = await PrioridadeLote.findByPk(req.params.id, { transaction });
+      if (!lote) {
+        await transaction.rollback();
+        return res.status(404).json({ error: 'Lote de prioridade nao encontrado.' });
+      }
+
+      if (String(lote.status || '').toUpperCase() !== STATUS_LOTE.FINALIZADO) {
+        await transaction.rollback();
+        return res.status(400).json({ error: 'Apenas lotes finalizados podem ser reabertos.' });
+      }
+
+      const itens = await PrioridadeLoteItem.findAll({
+        where: { lote_id: lote.id },
+        attributes: ['solicitacao_id', 'valor_considerado'],
+        transaction
+      });
+      const solicitacaoIds = itens
+        .map((item) => Number(item.solicitacao_id))
+        .filter((id) => Number.isInteger(id) && id > 0);
+
+      if (solicitacaoIds.length > 0) {
+        await Solicitacao.update(
+          {
+            prioridade_diretoria_ativa: false,
+            prioridade_diretoria_em: null,
+            prioridade_diretoria_lote_id: null
+          },
+          {
+            where: {
+              id: { [Op.in]: solicitacaoIds },
+              prioridade_diretoria_lote_id: lote.id
+            },
+            transaction
+          }
+        );
+
+        await Historico.bulkCreate(
+          solicitacaoIds.map((solicitacaoId) => ({
+            solicitacao_id: solicitacaoId,
+            usuario_responsavel_id: req.user.id,
+            setor: lote.diretoria_alvo_codigo,
+            acao: 'PRIORIDADE_DIRETORIA_REABERTA',
+            observacao: `Lote de prioridade #${lote.id} reaberto pelo SUPERADMIN`
+          })),
+          { transaction }
+        );
+      }
+
+      const valorUtilizado = itens.reduce(
+        (total, item) => total + formatarNumero(item.valor_considerado),
+        0
+      );
+
+      await lote.update({
+        status: STATUS_LOTE.ABERTO,
+        valor_utilizado: valorUtilizado,
+        finalizado_por: null,
+        finalizado_em: null
+      }, { transaction });
+
+      await transaction.commit();
+      transactionFinalizada = true;
+
+      const detalhe = await carregarLoteDetalhe(lote.id);
+      return res.json({
+        item: {
+          ...serializarLote(detalhe),
+          itens: (Array.isArray(detalhe.itens) ? detalhe.itens : []).map((item) => ({
+            id: item.id,
+            valor_considerado: formatarNumero(item.valor_considerado),
+            autorizado_em: item.autorizado_em,
+            autorizado_por: item.autorizado_por,
+            autorizado_por_nome: item?.autorizadoPor?.nome || '-',
+            solicitacao: item.solicitacao ? serializarSolicitacaoPrioridade(item.solicitacao) : null
+          })),
+          pode_finalizar: usuarioPodeFinalizarLote(permissoes, detalhe) && detalhe.status === STATUS_LOTE.ABERTO,
+          pode_cancelar: true,
+          pode_excluir: true,
+          pode_reabrir: false
+        }
+      });
+    } catch (error) {
+      if (!transactionFinalizada) {
+        await transaction.rollback();
+      }
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao reabrir lote de prioridade.' });
+    }
+  },
+
   async cancelar(req, res) {
+    const transaction = await PrioridadeLote.sequelize.transaction();
+    let transactionFinalizada = false;
+
     try {
       const permissoes = await obterPermissoesPrioridade(req);
       if (!permissoes.isSuperadmin && !permissoes.isDirAdmin) {
+        await transaction.rollback();
         return res.status(403).json({ error: 'Apenas DIR_ADMIN pode cancelar lotes.' });
       }
 
-      const lote = await PrioridadeLote.findByPk(req.params.id);
+      const lote = await PrioridadeLote.findByPk(req.params.id, { transaction });
       if (!lote) {
+        await transaction.rollback();
         return res.status(404).json({ error: 'Lote de prioridade nao encontrado.' });
       }
 
       if (String(lote.status || '').toUpperCase() !== STATUS_LOTE.ABERTO) {
+        await transaction.rollback();
         return res.status(400).json({ error: 'Apenas lotes abertos podem ser cancelados.' });
       }
 
-      const itensCount = await PrioridadeLoteItem.count({
-        where: { lote_id: lote.id }
-      });
-      if (itensCount > 0) {
-        return res.status(400).json({ error: 'Nao e possivel cancelar um lote que ja possui itens autorizados.' });
-      }
+      await Solicitacao.update(
+        {
+          prioridade_diretoria_ativa: false,
+          prioridade_diretoria_em: null,
+          prioridade_diretoria_lote_id: null
+        },
+        {
+          where: { prioridade_diretoria_lote_id: lote.id },
+          transaction
+        }
+      );
 
-      await lote.update({ status: STATUS_LOTE.CANCELADO });
+      await PrioridadeLoteItem.destroy({
+        where: { lote_id: lote.id },
+        transaction
+      });
+
+      await lote.update({
+        status: STATUS_LOTE.CANCELADO,
+        valor_utilizado: 0
+      }, { transaction });
+      await transaction.commit();
+      transactionFinalizada = true;
       return res.sendStatus(204);
     } catch (error) {
+      if (!transactionFinalizada) {
+        await transaction.rollback();
+      }
       console.error(error);
       return res.status(500).json({ error: 'Erro ao cancelar lote de prioridade.' });
     }
