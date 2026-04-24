@@ -17,6 +17,11 @@ const {
   salvarConfiguracaoSetoresSemAlteracaoStatus,
   obterTokensSetoresSemAlteracaoStatus
 } = require('../services/solicitacao/setoresSemAlteracaoStatus');
+const {
+  obterUsuariosAcessoPrioridadeDiretoria,
+  salvarUsuariosAcessoPrioridadeDiretoria,
+  normalizarUsuarioIds
+} = require('../services/prioridadeDiretoriaAcesso');
 
 const CHAVE_TEMA = 'TEMA_SISTEMA';
 const CHAVE_AREAS_OBRA = 'AREAS_OBRA_VISIVEIS';
@@ -767,6 +772,68 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return res.status(500).json({ error: 'Erro ao salvar configuracao de setores sem alteracao de status' });
+    }
+  },
+
+  async getUsuariosAcessoPrioridadeDiretoria(req, res) {
+    try {
+      const configuracao = await obterUsuariosAcessoPrioridadeDiretoria();
+      const selecionados = new Set(configuracao.usuario_ids.map((id) => Number(id)));
+
+      const usuariosRaw = await User.findAll({
+        where: {
+          perfil: { [Op.ne]: 'SUPERADMIN' }
+        },
+        attributes: ['id', 'nome', 'email', 'perfil', 'ativo', 'setor_id'],
+        include: [
+          {
+            model: Setor,
+            as: 'setor',
+            attributes: ['id', 'nome', 'codigo']
+          }
+        ],
+        order: [['nome', 'ASC']]
+      });
+
+      const usuarios = usuariosRaw.map((usuario) => {
+        const plain = typeof usuario.toJSON === 'function' ? usuario.toJSON() : usuario;
+        return {
+          ...plain,
+          acesso_prioridade_diretoria: selecionados.has(Number(plain.id))
+        };
+      });
+
+      return res.json({
+        usuario_ids: configuracao.usuario_ids,
+        usuarios
+      });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao buscar usuarios com acesso a prioridade diretoria' });
+    }
+  },
+
+  async updateUsuariosAcessoPrioridadeDiretoria(req, res) {
+    try {
+      const usuarioIds = normalizarUsuarioIds(req.body?.usuario_ids);
+
+      const usuariosValidos = await User.findAll({
+        where: {
+          id: { [Op.in]: usuarioIds },
+          ativo: true
+        },
+        attributes: ['id']
+      });
+      const idsValidos = usuariosValidos.map((usuario) => Number(usuario.id));
+      const configuracao = await salvarUsuariosAcessoPrioridadeDiretoria(idsValidos);
+
+      return res.json({
+        ok: true,
+        usuario_ids: configuracao.usuario_ids
+      });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao salvar usuarios com acesso a prioridade diretoria' });
     }
   },
 

@@ -207,6 +207,27 @@ export async function salvarSetoresSemAlteracaoStatus(data) {
   return res.json();
 }
 
+export async function getUsuariosAcessoPrioridadeDiretoria() {
+  const res = await fetch(`${API_URL}/configuracoes/usuarios-acesso-prioridade-diretoria`, {
+    headers: authHeaders()
+  });
+  if (!res.ok) throw new Error('Erro ao buscar usuarios com acesso a prioridade diretoria');
+  return res.json();
+}
+
+export async function salvarUsuariosAcessoPrioridadeDiretoria(data) {
+  const res = await fetch(`${API_URL}/configuracoes/usuarios-acesso-prioridade-diretoria`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.error || 'Erro ao salvar usuarios com acesso a prioridade diretoria');
+  }
+  return res.json();
+}
+
 export async function getUsuariosEnvioQualquerSetor() {
   const res = await fetch(`${API_URL}/configuracoes/usuarios-envio-qualquer-setor`, {
     headers: authHeaders()

@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 
 import PrivateRoute from './components/PrivateRoute';
@@ -40,6 +41,7 @@ import TiposCompartilhadosSetor from './pages/TiposCompartilhadosSetor';
 import AutomacaoStatusSetor from './pages/AutomacaoStatusSetor';
 import SetoresCriacaoTodasObras from './pages/SetoresCriacaoTodasObras';
 import SetoresSemAlteracaoStatus from './pages/SetoresSemAlteracaoStatus';
+import UsuariosAcessoPrioridadeDiretoria from './pages/UsuariosAcessoPrioridadeDiretoria';
 import UsuariosEnvioQualquerSetor from './pages/UsuariosEnvioQualquerSetor';
 import PrioridadesDiretoria from './pages/PrioridadesDiretoria';
 import ConversasEntrada from './pages/ConversasEntrada';
@@ -67,6 +69,7 @@ import {
 } from './modules/solicitacao-compra/pages';
 import { useAuth } from './contexts/AuthContext';
 import { isGeoSetor, normalizarSetorToken } from './utils/setor';
+import { getPrioridadesDiretoriaContexto } from './services/prioridadesDiretoria';
 
 function GestaoUsuariosRoute({ children }) {
   const { user } = useAuth();
@@ -112,6 +115,8 @@ function ModuloComprasRoute({ children }) {
 
 function PrioridadesDiretoriaRoute({ children }) {
   const { user } = useAuth();
+  const [acessoConfigurado, setAcessoConfigurado] = useState(false);
+  const [carregandoAcesso, setCarregandoAcesso] = useState(true);
   const perfil = String(user?.perfil || '').toUpperCase();
   const tokens = [
     user?.setor?.codigo,
@@ -127,7 +132,46 @@ function PrioridadesDiretoriaRoute({ children }) {
     tokens.includes('DIR_OBRAS_PUBLICAS') ||
     tokens.includes('DIR_OBRAS_PRIVADAS');
 
-  if (!permitido) {
+  useEffect(() => {
+    let ativo = true;
+
+    async function validarAcessoConfigurado() {
+      if (permitido || !user?.id) {
+        if (ativo) {
+          setAcessoConfigurado(false);
+          setCarregandoAcesso(false);
+        }
+        return;
+      }
+
+      try {
+        setCarregandoAcesso(true);
+        const contexto = await getPrioridadesDiretoriaContexto();
+        if (ativo) {
+          setAcessoConfigurado(Boolean(contexto?.permissoes?.pode_acessar_modulo));
+        }
+      } catch {
+        if (ativo) {
+          setAcessoConfigurado(false);
+        }
+      } finally {
+        if (ativo) {
+          setCarregandoAcesso(false);
+        }
+      }
+    }
+
+    validarAcessoConfigurado();
+    return () => {
+      ativo = false;
+    };
+  }, [permitido, user?.id]);
+
+  if (!permitido && carregandoAcesso) {
+    return <p>Carregando...</p>;
+  }
+
+  if (!permitido && !acessoConfigurado) {
     return <Navigate to="/" replace />;
   }
 
@@ -196,6 +240,7 @@ export default function App() {
         <Route path="automacao-status-setor" element={<SuperadminRoute><AutomacaoStatusSetor /></SuperadminRoute>} />
         <Route path="setores-criacao-todas-obras" element={<SetoresCriacaoTodasObras />} />
         <Route path="setores-sem-alteracao-status" element={<SuperadminRoute><SetoresSemAlteracaoStatus /></SuperadminRoute>} />
+        <Route path="usuarios-acesso-prioridade-diretoria" element={<SuperadminRoute><UsuariosAcessoPrioridadeDiretoria /></SuperadminRoute>} />
         <Route path="arquivos-modelos-config" element={<SuperadminRoute><ArquivosModelosConfig /></SuperadminRoute>} />
         <Route path="provisionamento-financeiro-config" element={<SuperadminRoute><ConfiguracaoProvisionamentoFinanceiro /></SuperadminRoute>} />
         <Route path="provisoes-financeiras/dashboard" element={<DashboardProvisionamentoFinanceiro />} />

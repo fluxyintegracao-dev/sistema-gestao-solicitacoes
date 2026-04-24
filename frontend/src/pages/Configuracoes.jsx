@@ -115,6 +115,11 @@ const SECOES_CONFIG = [
         to: '/setores-sem-alteracao-status'
       },
       {
+        title: 'Acesso a Prioridade Diretoria',
+        description: 'Defina usuarios que podem consultar lotes e solicitacoes priorizadas.',
+        to: '/usuarios-acesso-prioridade-diretoria'
+      },
+      {
         title: 'Criacao em Todas as Obras',
         description: 'Defina quais setores podem criar solicitacao em qualquer obra.',
         to: '/setores-criacao-todas-obras'

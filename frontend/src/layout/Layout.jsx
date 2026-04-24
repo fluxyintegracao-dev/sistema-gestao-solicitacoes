@@ -4,6 +4,7 @@ import { AuthContext } from '../contexts/AuthContext';
 import NotificacoesBell from '../components/NotificacoesBell';
 import { getResumoConversas } from '../services/conversasInternas';
 import { getProvisionamentoFinanceiroContexto } from '../services/provisoesFinanceiras';
+import { getPrioridadesDiretoriaContexto } from '../services/prioridadesDiretoria';
 import {
   HiOutlineSquares2X2,
   HiOutlinePlusCircle,
@@ -49,6 +50,7 @@ export default function Layout() {
   const [inboxNovasCount, setInboxNovasCount] = useState(0);
   const [saidaNovasCount, setSaidaNovasCount] = useState(0);
   const [provisionamentoContexto, setProvisionamentoContexto] = useState(null);
+  const [prioridadesDiretoriaContexto, setPrioridadesDiretoriaContexto] = useState(null);
 
   const sidebarWidth = isMobileViewport ? 292 : (collapsed ? 76 : 236);
 
@@ -163,6 +165,33 @@ export default function Layout() {
     };
   }, [user?.id]);
 
+  useEffect(() => {
+    let ativo = true;
+
+    async function carregarPrioridadesDiretoria() {
+      try {
+        const data = await getPrioridadesDiretoriaContexto();
+        if (ativo) {
+          setPrioridadesDiretoriaContexto(data);
+        }
+      } catch {
+        if (ativo) {
+          setPrioridadesDiretoriaContexto(null);
+        }
+      }
+    }
+
+    if (user?.id) {
+      carregarPrioridadesDiretoria();
+    } else {
+      setPrioridadesDiretoriaContexto(null);
+    }
+
+    return () => {
+      ativo = false;
+    };
+  }, [user?.id]);
+
   const perfilUpper = String(user?.perfil || '').toUpperCase();
   const areaUpper = String(user?.area || '').toUpperCase();
   const setorCodigoUpper = String(user?.setor?.codigo || '').toUpperCase();
@@ -186,7 +215,8 @@ export default function Layout() {
     perfilUpper === 'SUPERADMIN' ||
     setorTokensNormalizados.includes('DIR_ADMIN') ||
     setorTokensNormalizados.includes('DIR_OBRAS_PUBLICAS') ||
-    setorTokensNormalizados.includes('DIR_OBRAS_PRIVADAS');
+    setorTokensNormalizados.includes('DIR_OBRAS_PRIVADAS') ||
+    Boolean(prioridadesDiretoriaContexto?.permissoes?.pode_acessar_modulo);
   const hasProvisionamentoAccess =
     perfilUpper === 'SUPERADMIN' ||
     Boolean(provisionamentoContexto?.permissoes?.pode_acessar);
@@ -524,7 +554,8 @@ export default function Layout() {
     hasProvisionamentoAccess,
     hasProvisionamentoDashboard,
     canCreateProvisionamento,
-    perfilUpper
+    perfilUpper,
+    prioridadesDiretoriaContexto?.permissoes?.pode_acessar_modulo
   ]);
 
   const flatMenuItems = useMemo(

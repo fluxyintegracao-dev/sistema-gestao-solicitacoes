@@ -14,6 +14,9 @@ const {
   normalizarClassificacaoObra,
   normalizarTokenSetor
 } = require('../services/aprovacaoDiretoriaConfig');
+const {
+  usuarioTemAcessoPrioridadeDiretoria
+} = require('../services/prioridadeDiretoriaAcesso');
 const { criarNotificacao } = require('../services/notificacoes');
 
 const STATUS_LOTE = {
@@ -130,6 +133,7 @@ async function obterPermissoesPrioridade(req) {
   const tokensUsuario = await obterTokensSetorUsuario(req, areaUsuario);
   const isSuperadmin = perfil === 'SUPERADMIN';
   const isDirAdmin = isSuperadmin || usuarioPertenceAoSetor(tokensUsuario, DIRETORIA_ADMIN_CODIGO);
+  const isLeitorConfigurado = await usuarioTemAcessoPrioridadeDiretoria(req.user?.id);
   const classificacoesOperaveis = ['PUBLICA', 'PRIVADA'].filter((classificacao) => {
     const diretoriaConfigurada = configuracao?.diretoriasPorClassificacao?.[classificacao];
     return diretoriaConfigurada && usuarioPertenceAoSetor(tokensUsuario, diretoriaConfigurada);
@@ -142,14 +146,16 @@ async function obterPermissoesPrioridade(req) {
     tokensUsuario,
     isSuperadmin,
     isDirAdmin,
+    isLeitorConfigurado,
     podeSolicitarLote: isDirAdmin,
     classificacoesOperaveis,
-    podeAcessarModulo: isDirAdmin || classificacoesOperaveis.length > 0
+    podeAcessarModulo: isDirAdmin || classificacoesOperaveis.length > 0 || isLeitorConfigurado
   };
 }
 
 function usuarioPodeVisualizarLote(permissoes, lote) {
   if (permissoes?.isSuperadmin || permissoes?.isDirAdmin) return true;
+  if (permissoes?.isLeitorConfigurado) return true;
   return permisssoesTemClassificacao(permissoes, lote?.classificacao_alvo);
 }
 
@@ -417,6 +423,8 @@ module.exports = {
         permissoes: {
           pode_solicitar_lote: permissoes.podeSolicitarLote,
           classificacoes_operaveis: permissoes.classificacoesOperaveis,
+          pode_acessar_modulo: permissoes.podeAcessarModulo,
+          acesso_visualizacao_configurado: permissoes.isLeitorConfigurado,
           is_superadmin: permissoes.isSuperadmin,
           is_dir_admin: permissoes.isDirAdmin
         },
@@ -441,7 +449,7 @@ module.exports = {
         where.status = status;
       }
 
-      if (!permissoes.isSuperadmin && !permissoes.isDirAdmin) {
+      if (!permissoes.isSuperadmin && !permissoes.isDirAdmin && !permissoes.isLeitorConfigurado) {
         where.classificacao_alvo = {
           [Op.in]: permissoes.classificacoesOperaveis
         };
@@ -586,6 +594,15 @@ module.exports = {
 
       if (!usuarioPodeVisualizarLote(permissoes, lote)) {
         return res.status(403).json({ error: 'Acesso negado a este lote de prioridade.' });
+      }
+
+      const acessoSomenteLeitura =
+        permissoes.isLeitorConfigurado &&
+        !permissoes.isSuperadmin &&
+        !permissoes.isDirAdmin &&
+        !permisssoesTemClassificacao(permissoes, lote?.classificacao_alvo);
+      if (acessoSomenteLeitura && !usuarioPodeFinalizarLote(permissoes, lote)) {
+        return res.status(403).json({ error: 'Acesso apenas para leitura dos lotes de prioridade.' });
       }
 
       const items = lote.status === STATUS_LOTE.ABERTO
