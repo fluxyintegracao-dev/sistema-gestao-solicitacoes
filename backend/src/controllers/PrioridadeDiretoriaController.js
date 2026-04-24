@@ -330,28 +330,53 @@ async function carregarLoteDetalhe(loteId) {
 }
 
 async function listarSolicitacoesElegiveisParaLote(lote, busca = '', solicitacaoIds = null, obraId = null, options = {}) {
+  const condicaoSolicitacaoAprovadaNoFluxo = {
+    [Op.and]: [
+      { fluxo_aprovacao_diretoria: true },
+      { diretoria_fluxo_codigo: lote.diretoria_alvo_codigo },
+      {
+        [Op.or]: [
+          {
+            id: {
+              [Op.in]: Sequelize.literal(`(
+                SELECT DISTINCT solicitacao_id
+                FROM historicos
+                WHERE acao = 'APROVADA_DIRETORIA'
+              )`)
+            }
+          },
+          {
+            area_responsavel: {
+              [Op.ne]: lote.diretoria_alvo_codigo
+            }
+          },
+          Sequelize.where(
+            Sequelize.fn('UPPER', Sequelize.col('status_global')),
+            { [Op.eq]: 'APROVADA' }
+          )
+        ]
+      }
+    ]
+  };
+
+  const condicaoSolicitacaoLegadaSemFluxo = {
+    [Op.or]: [
+      { fluxo_aprovacao_diretoria: false },
+      { fluxo_aprovacao_diretoria: null }
+    ]
+  };
+
   const condicoes = [
     { cancelada: false },
-    { fluxo_aprovacao_diretoria: true },
-    { diretoria_fluxo_codigo: lote.diretoria_alvo_codigo },
     { prioridade_diretoria_ativa: false },
-    { status_global: { [Op.ne]: 'PAGA' } },
+    Sequelize.where(
+      Sequelize.fn('UPPER', Sequelize.col('status_global')),
+      { [Op.ne]: 'PAGA' }
+    ),
     {
       [Op.or]: [
-        {
-          id: {
-            [Op.in]: Sequelize.literal(`(
-              SELECT DISTINCT solicitacao_id
-              FROM historicos
-              WHERE acao = 'APROVADA_DIRETORIA'
-            )`)
-          }
-        },
-        {
-          area_responsavel: {
-            [Op.ne]: lote.diretoria_alvo_codigo
-          }
-        }
+        condicaoSolicitacaoAprovadaNoFluxo,
+        condicaoSolicitacaoLegadaSemFluxo
       ]
     }
   ];

@@ -65,6 +65,7 @@ A visibilidade efetiva depende de combinacao entre:
   - `SUPERADMIN` pode finalizar lotes e excluir lotes sem itens autorizados
   - `SUPERADMIN` pode reabrir lotes finalizados para que a diretoria ajuste a selecao antes de finalizar novamente
   - diretorias podem salvar a selecao de um lote aberto sem finalizar; a selecao fica persistida para retomada posterior
+  - lotes abertos listam solicitacoes nao `PAGA` da classificacao da diretoria; no fluxo novo, a solicitacao precisa estar aprovada pela diretoria, e solicitacoes legadas sem fluxo de diretoria continuam elegiveis
   - a autorizacao de prioridade nao muda o setor responsavel da solicitacao
   - a autorizacao marca a solicitacao como `prioridade_diretoria_ativa`
 
