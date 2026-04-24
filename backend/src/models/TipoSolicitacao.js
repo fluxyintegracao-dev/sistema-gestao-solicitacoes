@@ -4,6 +4,14 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.STRING,
       allowNull: false
     },
+    codigo_interno: {
+      type: DataTypes.STRING,
+      allowNull: true
+    },
+    comportamento: {
+      type: DataTypes.TEXT('long'),
+      allowNull: true
+    },
     ativo: {
       type: DataTypes.BOOLEAN,
       defaultValue: true

@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { baixarPdfSolicitacaoCompra, obterUrlAssinadaCompra } from '../../../services/compras';
 import CompraPreviewModal from '../components/CompraPreviewModal';
 import { criarPreviewCompra } from '../utils/preview';
+import { montarLinhasResumoApropriacao } from '../utils/apropriacoes';
 
 export default function RevisarSolicitacaoCompraFinal() {
   const { id } = useParams();
@@ -56,7 +57,7 @@ export default function RevisarSolicitacaoCompraFinal() {
   }
 
   return (
-    <div className="page">
+    <div className="page solicitacoes-page">
       <div>
         <h1 className="page-title">Solicitacao de Compra Criada</h1>
         <p className="page-subtitle">
@@ -130,10 +131,15 @@ export default function RevisarSolicitacaoCompraFinal() {
                     <li
                       key={`${item.manual ? 'manual' : item.insumo_id}-${index}`}
                       className="rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] px-3 py-2"
-                    >
-                      <div className="font-medium">{item.insumo_nome}</div>
+                      >
+                        <div className="font-medium">{item.insumo_nome}</div>
                       <div className="text-[var(--c-muted)]">
-                        {item.quantidade} {item.unidade_sigla || ''} - {item.apropriacao_label || '-'}
+                        {item.quantidade} {item.unidade_sigla || ''}
+                      </div>
+                      <div className="mt-1 grid gap-1 text-xs text-[var(--c-muted)]">
+                        {montarLinhasResumoApropriacao(item).map((linha, linhaIndex) => (
+                          <div key={`${linha}-${linhaIndex}`}>{linha}</div>
+                        ))}
                       </div>
                       {(item.link_produto || item.arquivo_url) && (
                         <div className="mt-2 flex flex-wrap gap-3 text-xs">

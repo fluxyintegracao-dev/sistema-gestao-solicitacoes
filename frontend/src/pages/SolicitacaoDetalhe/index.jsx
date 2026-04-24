@@ -8,16 +8,14 @@ import Timeline from './Timeline';
 import Comentarios from './Comentarios';
 import Anexos from './Anexos';
 import Pedido from './Pedido';
+import FinanceiroCard from './FinanceiroCard';
 import Pagamentos from './Pagamentos';
 import ModalAlterarStatus from './ModalAlterarStatus';
 import ModalEnviarSetor from '../Solicitacoes/ModalEnviarSetor';
-import {
-  aprovarDiretoriaSolicitacao,
-  updateStatusSolicitacao
-} from '../../services/solicitacoes';
-import { getSetoresSemAlteracaoStatus } from '../../services/configuracoesSistema';
+import { aprovarDiretoriaSolicitacao, updateStatusSolicitacao } from '../../services/solicitacoes';
 import { API_URL, authHeaders } from '../../services/api';
-import { isGeoSetor, normalizarSetorToken, usuarioPodeEnviarSolicitacaoParaOutroSetor } from '../../utils/setor';
+import { isGeoSetor, solicitacaoEstaNoSetorDoUsuario, userHasSetorCapability } from '../../utils/setor';
+import { canAccessFinanceiro, hasEnabledModule } from '../../utils/acessoProduto';
 
 export default function SolicitacaoDetalhe() {
   const { id } = useParams();
@@ -31,16 +29,18 @@ export default function SolicitacaoDetalhe() {
   ];
 
   const isSetorGeo = setorTokens.some(isGeoSetor);
-  const isSetorCompras = setorTokens.includes('COMPRAS');
-  const isSetorFinanceiro = setorTokens.includes('FINANCEIRO');
+  const isSetorCompras = userHasSetorCapability(user, 'eh_setor_compras');
+  const isSetorFinanceiro = setorTokens.includes('FINANCEIRO') || userHasSetorCapability(user, 'eh_setor_financeiro');
   const isSuperadmin = String(user?.perfil || '').trim().toUpperCase() === 'SUPERADMIN';
+  const isFinanceiro = canAccessFinanceiro(user);
+  const podeInformarPagamento = isSuperadmin || isSetorFinanceiro;
+  const moduloContratosHabilitado = hasEnabledModule(user, 'CONTRATOS');
+  const moduloComprasHabilitado = hasEnabledModule(user, 'COMPRAS');
 
   const [solicitacao, setSolicitacao] = useState(null);
   const [loading, setLoading] = useState(true);
   const [modalStatus, setModalStatus] = useState(false);
   const [modalEnviarSetor, setModalEnviarSetor] = useState(false);
-  const [tokensSetoresSemAlteracaoStatus, setTokensSetoresSemAlteracaoStatus] = useState([]);
-  const [loadingConfiguracaoStatus, setLoadingConfiguracaoStatus] = useState(true);
 
   const perfil = String(user?.perfil || '').trim().toUpperCase();
   const setorUsuario = user?.setor?.codigo || user?.area || user?.setor?.nome || '';
@@ -54,26 +54,6 @@ export default function SolicitacaoDetalhe() {
   useEffect(() => {
     carregar();
   }, [id]);
-
-  useEffect(() => {
-    async function carregarConfiguracaoStatus() {
-      try {
-        setLoadingConfiguracaoStatus(true);
-        const configuracao = await getSetoresSemAlteracaoStatus();
-        const tokens = Array.isArray(configuracao?.tokens)
-          ? configuracao.tokens
-          : configuracao?.setores;
-        setTokensSetoresSemAlteracaoStatus(Array.isArray(tokens) ? tokens : []);
-      } catch (error) {
-        console.error('Erro ao carregar configuracao de setores sem alteracao de status', error);
-        setTokensSetoresSemAlteracaoStatus([]);
-      } finally {
-        setLoadingConfiguracaoStatus(false);
-      }
-    }
-
-    carregarConfiguracaoStatus();
-  }, []);
 
   async function carregar() {
     try {
@@ -110,65 +90,40 @@ export default function SolicitacaoDetalhe() {
   }
 
   async function aprovarDiretoria() {
-    const setorDestino = String(solicitacao?.setor_destino_aprovacao || '').trim();
-    const confirmou = window.confirm(
-      setorDestino
-        ? `Aprovar esta solicitacao e enviar para ${setorDestino}?`
-        : 'Aprovar esta solicitacao?'
-    );
-
-    if (!confirmou) {
-      return;
-    }
-
     try {
       await aprovarDiretoriaSolicitacao(solicitacao.id);
-      const marcadorAtualizacao = {
-        tipo: 'APROVACAO_DIRETORIA',
-        solicitacao_id: solicitacao.id,
-        timestamp: Date.now()
-      };
-
-      try {
-        sessionStorage.setItem('solicitacoes:atualizar-lista', JSON.stringify(marcadorAtualizacao));
-      } catch (storageError) {
-        console.error('Erro ao sinalizar atualizacao da lista de solicitacoes', storageError);
-      }
-
-      window.dispatchEvent(new CustomEvent('solicitacoes:atualizar-lista', {
-        detail: marcadorAtualizacao
-      }));
-
-      alert('Solicitacao aprovada com sucesso.');
-      navigate('/solicitacoes', {
-        state: {
-          atualizarSolicitacoes: marcadorAtualizacao.timestamp,
-          solicitacaoAprovadaId: solicitacao.id
-        }
-      });
+      await carregar();
+      alert('Solicitacao aprovada pela diretoria.');
     } catch (error) {
       console.error(error);
-      alert(error?.message || 'Erro ao aprovar solicitacao');
+      alert(error?.message || 'Erro ao aprovar solicitacao pela diretoria');
     }
   }
 
-  if (loading || loadingConfiguracaoStatus) return <p>Carregando...</p>;
+  if (loading) return <p>Carregando...</p>;
   if (!solicitacao) return null;
 
-  const isSetorObra = setorTokens.includes('OBRA');
-  const usaFluxoAprovacaoDiretoria = Boolean(solicitacao.usa_fluxo_aprovacao_diretoria);
-  const podeAprovarDiretoria = Boolean(solicitacao.acao_aprovar_diretoria_disponivel);
+  const isSetorObra = userHasSetorCapability(user, 'eh_setor_obra');
+  const usaFluxoAprovacaoDiretoria = Boolean(
+    solicitacao.usa_fluxo_aprovacao_diretoria ??
+    (
+      solicitacao.fluxo_aprovacao_diretoria &&
+      !solicitacao.aprovada_diretoria_em &&
+      solicitacao.diretoria_fluxo_codigo
+    )
+  );
+  const podeAprovarDiretoria = Boolean(
+    solicitacao.acao_aprovar_diretoria_disponivel ??
+    (
+      solicitacao.fluxo_aprovacao_diretoria &&
+      !solicitacao.aprovada_diretoria_em &&
+      (isSuperadmin || solicitacaoEstaNoSetorDoUsuario(solicitacao.area_responsavel, user))
+    )
+  );
   const podeEnviarSetor =
     !usaFluxoAprovacaoDiretoria &&
     !isSetorObra &&
-    usuarioPodeEnviarSolicitacaoParaOutroSetor(solicitacao.area_responsavel, user);
-  const setorSolicitacaoToken = normalizarSetorToken(solicitacao.area_responsavel);
-  const setorSemAlteracaoStatus = tokensSetoresSemAlteracaoStatus.some(token => {
-    const tokenNormalizado = normalizarSetorToken(token);
-    if (!tokenNormalizado || !setorSolicitacaoToken) return false;
-    if (tokenNormalizado === setorSolicitacaoToken) return true;
-    return isGeoSetor(tokenNormalizado) && isGeoSetor(setorSolicitacaoToken);
-  });
+    (isSuperadmin || solicitacaoEstaNoSetorDoUsuario(solicitacao.area_responsavel, user));
 
   const atualizadoEm = new Date(solicitacao.updatedAt || solicitacao.createdAt).toLocaleString('pt-BR');
 
@@ -197,11 +152,26 @@ export default function SolicitacaoDetalhe() {
       <Header
         solicitacao={solicitacao}
         onAlterarStatus={() => setModalStatus(true)}
-        onEnviarSetor={podeAprovarDiretoria ? aprovarDiretoria : () => setModalEnviarSetor(true)}
-        mostrarAlterarStatus={!setorSemAlteracaoStatus}
-        mostrarEnviarSetor={podeAprovarDiretoria || podeEnviarSetor}
-        textoEnviarSetor={podeAprovarDiretoria ? 'Aprovar' : 'Enviar para outro setor'}
+        onEnviarSetor={() => setModalEnviarSetor(true)}
+        mostrarAlterarStatus
+        mostrarEnviarSetor={podeEnviarSetor}
+        mostrarContratoInfo={moduloContratosHabilitado}
+        mostrarApropriacaoInfo={moduloComprasHabilitado}
       />
+
+      {podeAprovarDiretoria && (
+        <div className="card flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <div>
+            <h2 className="text-base font-semibold text-[var(--c-text)]">Aprovacao por diretoria</h2>
+            <p className="text-sm text-[var(--c-muted)]">
+              Ao aprovar, a solicitacao segue para {solicitacao.setor_destino_aprovacao || solicitacao.setor_destino_pos_aprovacao || 'a area responsavel'}.
+            </p>
+          </div>
+          <button type="button" className="btn btn-primary btn-sm" onClick={aprovarDiretoria}>
+            Aprovar e enviar
+          </button>
+        </div>
+      )}
 
       <div className="grid md:grid-cols-2 gap-6">
         <Timeline
@@ -211,6 +181,19 @@ export default function SolicitacaoDetalhe() {
         />
 
         <div className="space-y-6">
+          {isFinanceiro && (
+            <FinanceiroCard
+              solicitacao={solicitacao}
+              onTituloCriado={carregar}
+            />
+          )}
+
+          <Pagamentos
+            solicitacao={solicitacao}
+            podeInformarPagamento={podeInformarPagamento}
+            onSucesso={carregar}
+          />
+
           <Comentarios
             solicitacaoId={id}
             onSucesso={carregar}
@@ -223,12 +206,6 @@ export default function SolicitacaoDetalhe() {
               onSucesso={carregar}
             />
           )}
-
-          <Pagamentos
-            solicitacao={solicitacao}
-            podeInformarPagamento={isSetorFinanceiro}
-            onSucesso={carregar}
-          />
 
           <Anexos
             solicitacaoId={id}

@@ -104,34 +104,34 @@ export default function Timeline({ historicos, canRemoveAnexo = false, onAnexoRe
               <p className="text-sm font-semibold">{acaoLabel}</p>
 
               {(h.status_anterior || h.status_novo) && (
-                <p className="text-sm text-gray-700">
+                <p className="text-sm" style={{ color: 'var(--c-text)' }}>
                   Status: {h.status_anterior || '-'} {'->'} {h.status_novo || '-'}
                 </p>
               )}
 
               {h.acao === 'RESPONSAVEL_ATRIBUIDO' && (
-                <p className="text-sm text-gray-700">
+                <p className="text-sm" style={{ color: 'var(--c-text)' }}>
                   {atorNome ? `${atorNome} atribuiu` : 'Responsavel atribuido'}
                   {responsavelNome ? ` para ${responsavelNome}` : ''}
                 </p>
               )}
 
               {h.acao === 'RESPONSAVEL_ASSUMIU' && (
-                <p className="text-sm text-gray-700">
+                <p className="text-sm" style={{ color: 'var(--c-text)' }}>
                   {atorNome ? `${atorNome} assumiu a solicitacao` : 'Responsavel assumiu a solicitacao'}
                 </p>
               )}
 
               {h.acao === 'ENVIADA_SETOR' && h.observacao && (
-                <p className="text-sm text-gray-700">{h.observacao}</p>
+                <p className="text-sm" style={{ color: 'var(--c-text)' }}>{h.observacao}</p>
               )}
 
-              {h.descricao && <p className="text-sm text-gray-700">{h.descricao}</p>}
+              {h.descricao && <p className="text-sm" style={{ color: 'var(--c-text)' }}>{h.descricao}</p>}
 
               {podeExibirArquivo && meta && caminhoArquivo && (
                 <div className="flex gap-3 mt-1">
                   <button
-                    className="text-blue-600 text-sm"
+                    className="text-sm" style={{ color: 'var(--c-primary)' }}
                     onClick={async () => {
                       const urlArquivo = await obterUrlAssinada(caminhoArquivo);
                       setPreview({
@@ -147,7 +147,7 @@ export default function Timeline({ historicos, canRemoveAnexo = false, onAnexoRe
 
                   <button
                     type="button"
-                    className="text-blue-600 text-sm"
+                    className="text-sm" style={{ color: 'var(--c-primary)' }}
                     onClick={async e => {
                       e.preventDefault();
                       e.stopPropagation();

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import StatusBadge from '../../components/StatusBadge';
 import { corrigirTextoCorrompido } from '../../utils/texto';
 import { formatarDataLocalPtBr } from '../../utils/dateLocal';
+import { getTipoSolicitacaoBehavior } from '../../utils/tipoSolicitacao';
 
 function formatarData(valor) {
   return formatarDataLocalPtBr(valor);
@@ -54,8 +55,9 @@ export default function Header({
   onEnviarSetor,
   mostrarAlterarStatus = true,
   mostrarEnviarSetor = true,
-  textoEnviarSetor = 'Enviar para outro setor',
   podeEditarRefContrato = false,
+  mostrarContratoInfo = true,
+  mostrarApropriacaoInfo = true,
   contratosObra = [],
   onSalvarRefContrato
 }) {
@@ -91,18 +93,14 @@ export default function Header({
   }
 
   const historicos = Array.isArray(solicitacao?.historicos) ? solicitacao.historicos : [];
-  const tipoNomeNormalizado = normalizarTexto(solicitacao?.tipo?.nome);
-  const exibirSubtipoAdmLocal = tipoNomeNormalizado === 'ADM LOCAL DE OBRA';
+  const comportamentoTipo = getTipoSolicitacaoBehavior(solicitacao?.tipo);
+  const exibirSubtipoAdmLocal = comportamentoTipo.mostrar_subtipo;
   const subtipoSolicitacao = solicitacao?.tipoSubSolicitacao?.nome || '-';
   const ultimoHistoricoStatus = [...historicos]
     .filter(item => item?.acao === 'STATUS_ALTERADO')
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
   const setorStatusAtual = ultimoHistoricoStatus?.setor || solicitacao?.area_responsavel || null;
   const descricaoCorrigida = corrigirTextoCorrompido(solicitacao?.descricao || '');
-  const valorTotal = solicitacao?.valor_total ?? solicitacao?.valor;
-  const valorPagoAcumulado = solicitacao?.valor_pago_acumulado ?? 0;
-  const saldoPagamento = solicitacao?.saldo_pagamento;
-  const prioridadeDiretoriaAtiva = Boolean(solicitacao?.prioridade_diretoria_ativa);
 
   return (
     <div className="sol-detail-header">
@@ -122,7 +120,7 @@ export default function Header({
           <StatusBadge status={solicitacao.status_global} setor={setorStatusAtual} />
           {mostrarEnviarSetor && (
             <button onClick={onEnviarSetor} className="btn btn-outline sol-detail-action-btn" type="button">
-              {textoEnviarSetor}
+              Enviar para outro setor
             </button>
           )}
         </div>
@@ -131,29 +129,29 @@ export default function Header({
       <div className="sol-detail-stats-grid">
         <InfoItem label="Obra" value={solicitacao.obra?.nome || '-'} />
         <InfoItem label="Setor" value={solicitacao.area_responsavel || '-'} />
-        <InfoItem label="Valor total" value={formatarValor(valorTotal)} />
-        <InfoItem label="Pago acumulado" value={formatarValor(valorPagoAcumulado)} />
-        <InfoItem label="Saldo atual" value={formatarValor(saldoPagamento)} />
+        <InfoItem label="Valor" value={formatarValor(solicitacao.valor)} />
         <InfoItem label="Criado em" value={formatarDataHora(solicitacao.createdAt)} />
         <InfoItem label="Vencimento" value={formatarData(solicitacao.data_vencimento)} />
         <InfoItem label="Inicio da medicao" value={formatarData(solicitacao.data_inicio_medicao)} />
         <InfoItem label="Fim da medicao" value={formatarData(solicitacao.data_fim_medicao)} />
         <InfoItem label="Status" value={solicitacao.status_global || '-'} />
-        <InfoItem
-          label="Prioridade Diretoria"
-          value={prioridadeDiretoriaAtiva ? `Autorizada${solicitacao?.prioridade_diretoria_lote_id ? ` (Lote #${solicitacao.prioridade_diretoria_lote_id})` : ''}` : '-'}
-        />
       </div>
 
       <div className="sol-detail-stats-grid sol-detail-contract-grid">
-        <InfoItem label="Ref. do contrato" value={refContratoAtual} />
-        <InfoItem label="Contrato" value={codigoContratoAtual} />
+        {mostrarContratoInfo && <InfoItem label="Ref. do contrato" value={refContratoAtual} />}
+        {mostrarContratoInfo && <InfoItem label="Contrato" value={codigoContratoAtual} />}
+        {mostrarApropriacaoInfo && (
+          <InfoItem
+            label="Apropriacao"
+            value={solicitacao?.apropriacao?.codigo || solicitacao?.apropriacao?.descricao || '-'}
+          />
+        )}
         {exibirSubtipoAdmLocal && (
           <InfoItem label="Subtipo" value={subtipoSolicitacao} />
         )}
       </div>
 
-      {podeEditarRefContrato && (
+      {mostrarContratoInfo && podeEditarRefContrato && (
         <div className="sol-detail-contract-editor">
           <p className="sol-detail-contract-editor-title">Editar ref. do contrato</p>
           <div className="flex flex-col md:flex-row gap-2">

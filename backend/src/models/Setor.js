@@ -15,6 +15,31 @@ module.exports = (sequelize, DataTypes) => {
       ativo: {
         type: DataTypes.BOOLEAN,
         defaultValue: true
+      },
+
+      eh_setor_obra: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false
+      },
+
+      eh_setor_financeiro: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false
+      },
+
+      eh_setor_compras: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false
+      },
+
+      eh_setor_geo: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false
+      },
+
+      eh_setor_administrativo: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false
       }
     },
     {

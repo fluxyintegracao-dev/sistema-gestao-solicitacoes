@@ -5,7 +5,7 @@ import {
   criarApropriacao,
   deletarApropriacao,
   listarApropriacoes
-} from '../../../services/compras';
+} from '../../../services/apropriacoes';
 
 function parseLinhaApropriacao(linha) {
   const partes = String(linha || '')
@@ -193,10 +193,10 @@ export default function GestaoApropriacoes() {
   }
 
   return (
-    <div className="page">
+    <div className="page solicitacoes-page">
       <div>
         <h1 className="page-title">Gestao de Apropriacoes</h1>
-        <p className="page-subtitle">Cadastro das apropriacoes vinculadas as obras para o modulo compras.</p>
+        <p className="page-subtitle">Cadastro compartilhado das apropriacoes vinculadas as obras para solicitacoes, financeiro e compras.</p>
       </div>
 
       <div className="card">

@@ -1,6 +1,6 @@
 import { getAccessToken } from '../../features/auth/token-store';
 
-const DEFAULT_API_URL = 'https://api.jrfluxy.com.br/api';
+const DEFAULT_API_URL = 'http://10.0.2.2:8000/api';
 
 type UnauthorizedHandler = () => void | Promise<void>;
 

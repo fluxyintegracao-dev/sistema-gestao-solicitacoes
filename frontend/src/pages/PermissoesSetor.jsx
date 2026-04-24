@@ -52,12 +52,12 @@ export default function PermissoesSetor() {
   if (loading) return <p>Carregando permissoes...</p>;
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Permissoes por Setor</h1>
+    <div className="page solicitacoes-page">
+      <h1 className="page-title">Permissoes por Setor</h1>
 
-      <div className="bg-white rounded-xl shadow overflow-x-auto">
-        <table className="min-w-full text-sm">
-          <thead className="bg-gray-100">
+      <div className="card overflow-x-auto">
+        <table className="table">
+          <thead>
             <tr>
               <th className="p-3 text-left">Setor</th>
               <th className="p-3 text-center">Usuario pode assumir</th>

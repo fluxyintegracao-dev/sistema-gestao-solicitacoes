@@ -6,20 +6,27 @@ const {
   Cargo,
   Setor,
   Obra,
-  UsuarioObra,
-  UsuarioSetor
+  UsuarioObra
 } = require('../models');
-const {
-  normalizarIdInteiro,
-  extrairSetoresUsuarioSemConsulta,
-  obterIdsSetoresUsuario
-} = require('../services/usuariosSetores');
+const { env } = require('../config/env');
+const { registrarEventoSeguranca } = require('../services/securityLogService');
 
 function podeDefinirPerfilSuperadmin(req, perfilDestino) {
   const perfilSolicitante = String(req.user?.perfil || '').trim().toUpperCase();
   const perfilNormalizado = String(perfilDestino || '').trim().toUpperCase();
   if (perfilNormalizado !== 'SUPERADMIN') return true;
   return perfilSolicitante === 'SUPERADMIN';
+}
+
+function isPerfilSuperadmin(valor) {
+  return String(valor || '').trim().toUpperCase() === 'SUPERADMIN';
+}
+
+function podeGerenciarUsuarioAlvo(req, usuario) {
+  if (!usuario) return false;
+  const perfilSolicitante = String(req.user?.perfil || '').trim().toUpperCase();
+  if (perfilSolicitante === 'SUPERADMIN') return true;
+  return !isPerfilSuperadmin(usuario.perfil);
 }
 
 function normalizarTexto(valor) {
@@ -68,7 +75,7 @@ function parseBoolean(valor) {
 
 function definirPermissaoSolicitacaoCompra(perfil, valorInformado, fallback = false) {
   const perfilNormalizado = String(perfil || '').trim().toUpperCase();
-  if (perfilNormalizado === 'SUPERADMIN' || perfilNormalizado === 'ADMIN') {
+  if (perfilNormalizado === 'SUPERADMIN' || perfilNormalizado === 'ADMIN' || perfilNormalizado === 'ADMINISTRADOR') {
     return true;
   }
 
@@ -140,112 +147,6 @@ function splitObrasCell(valor) {
     .filter(Boolean);
 }
 
-function coletarIdsSetoresPayload({ setor_id, setores_ids }) {
-  const ids = [];
-
-  function adicionar(valor) {
-    if (Array.isArray(valor)) {
-      valor.forEach(item => adicionar(item));
-      return;
-    }
-
-    const id = normalizarIdInteiro(valor);
-    if (id && !ids.includes(id)) {
-      ids.push(id);
-    }
-  }
-
-  adicionar(setor_id);
-  adicionar(setores_ids);
-
-  return ids;
-}
-
-async function resolverSetoresPayload({ setor_id, setores_ids }, setorPrincipalFallback = null) {
-  const setorPrincipalId =
-    normalizarIdInteiro(setor_id) ||
-    normalizarIdInteiro(setorPrincipalFallback);
-
-  if (!setorPrincipalId) {
-    const error = new Error('Setor principal e obrigatorio');
-    error.status = 400;
-    throw error;
-  }
-
-  const setoresIds = coletarIdsSetoresPayload({
-    setor_id: setorPrincipalId,
-    setores_ids
-  });
-
-  if (!setoresIds.includes(setorPrincipalId)) {
-    setoresIds.unshift(setorPrincipalId);
-  }
-
-  const setores = await Setor.findAll({
-    where: { id: { [Op.in]: setoresIds } },
-    attributes: ['id']
-  });
-  const encontrados = new Set(setores.map(setor => Number(setor.id)));
-  const faltando = setoresIds.filter(id => !encontrados.has(Number(id)));
-
-  if (faltando.length > 0) {
-    const error = new Error(`Setor nao encontrado: ${faltando.join(', ')}`);
-    error.status = 400;
-    throw error;
-  }
-
-  return {
-    setorPrincipalId,
-    setoresIds: Array.from(new Set(setoresIds))
-  };
-}
-
-async function sincronizarSetoresUsuario(userId, setoresIds) {
-  const idsUnicos = Array.from(new Set(
-    (Array.isArray(setoresIds) ? setoresIds : [])
-      .map(normalizarIdInteiro)
-      .filter(Boolean)
-  ));
-
-  await UsuarioSetor.destroy({ where: { user_id: userId } });
-
-  if (idsUnicos.length === 0) return;
-
-  await UsuarioSetor.bulkCreate(
-    idsUnicos.map(setorId => ({
-      user_id: userId,
-      setor_id: setorId
-    })),
-    { ignoreDuplicates: true }
-  );
-}
-
-function includeSetoresUsuario() {
-  return {
-    model: UsuarioSetor,
-    as: 'setoresVinculos',
-    attributes: ['id', 'user_id', 'setor_id'],
-    include: [
-      {
-        model: Setor,
-        as: 'setor',
-        attributes: ['id', 'nome', 'codigo', 'ativo']
-      }
-    ]
-  };
-}
-
-function formatarUsuarioResposta(usuario) {
-  const plain = typeof usuario?.toJSON === 'function' ? usuario.toJSON() : (usuario || {});
-  const setores = extrairSetoresUsuarioSemConsulta(plain);
-
-  return {
-    ...plain,
-    setores,
-    setores_ids: setores.map(setor => setor.id).filter(Boolean)
-  };
-}
-
 module.exports = {
 
   // =====================================================
@@ -255,7 +156,12 @@ module.exports = {
     try {
 
       const usuarios = await User.findAll({
-        attributes: { exclude: ['senha'] }, // 🔐 nunca retornar senha
+        where: {
+          perfil: {
+            [Op.ne]: 'SUPERADMIN'
+          }
+        },
+        attributes: { exclude: ['senha'] }, // nunca retornar senha
         include: [
           {
             model: Cargo,
@@ -265,7 +171,6 @@ module.exports = {
             model: Setor,
             as: 'setor'
           },
-          includeSetoresUsuario(),
           {
             model: UsuarioObra,
             as: 'vinculos',
@@ -280,12 +185,9 @@ module.exports = {
         order: [['nome', 'ASC']]
       });
 
-      return res.json(usuarios.map(formatarUsuarioResposta));
+      return res.json(usuarios);
 
     } catch (error) {
-      if (error?.status) {
-        return res.status(error.status).json({ error: error.message });
-      }
       console.error(error);
       return res.status(500).json({
         error: 'Erro ao listar usuários'
@@ -295,35 +197,22 @@ module.exports = {
 
   async opcoesAtribuicao(req, res) {
     try {
-      const setoresIds = await obterIdsSetoresUsuario(req.user);
+      const setorId = req.user?.setor_id;
 
-      if (setoresIds.length === 0) {
+      if (!setorId) {
         return res.status(400).json({ error: 'Usuario sem setor vinculado' });
       }
-
-      const vinculosSetores = await UsuarioSetor.findAll({
-        where: { setor_id: { [Op.in]: setoresIds } },
-        attributes: ['user_id']
-      });
-      const usuariosIdsVinculados = vinculosSetores
-        .map(vinculo => normalizarIdInteiro(vinculo.user_id))
-        .filter(Boolean);
 
       const usuarios = await User.findAll({
         attributes: { exclude: ['senha'] },
         where: {
+          setor_id: setorId,
           ativo: true,
-          [Op.or]: [
-            { setor_id: { [Op.in]: setoresIds } },
-            { id: { [Op.in]: usuariosIdsVinculados.length ? usuariosIdsVinculados : [-1] } }
-          ]
+          perfil: {
+            [Op.ne]: 'SUPERADMIN'
+          }
         },
         include: [
-          {
-            model: Setor,
-            as: 'setor'
-          },
-          includeSetoresUsuario(),
           {
             model: UsuarioObra,
             as: 'vinculos',
@@ -333,7 +222,7 @@ module.exports = {
         order: [['nome', 'ASC']]
       });
 
-      return res.json(usuarios.map(formatarUsuarioResposta));
+      return res.json(usuarios);
     } catch (error) {
       console.error(error);
       return res.status(500).json({
@@ -346,7 +235,10 @@ module.exports = {
     try {
       const usuarios = await User.findAll({
         where: {
-          ativo: true
+          ativo: true,
+          perfil: {
+            [Op.ne]: 'SUPERADMIN'
+          }
         },
         attributes: ['id', 'nome', 'email'],
         order: [['nome', 'ASC']]
@@ -379,7 +271,6 @@ module.exports = {
             model: Setor,
             as: 'setor'
           },
-          includeSetoresUsuario(),
           {
             model: UsuarioObra,
             as: 'vinculos',
@@ -394,10 +285,14 @@ module.exports = {
       });
 
       if (!usuario) {
-        return res.status(404).json({ error: 'UsuÃ¡rio nÃ£o encontrado' });
+        return res.status(404).json({ error: 'Usuario nao encontrado' });
       }
 
-      return res.json(formatarUsuarioResposta(usuario));
+      if (!podeGerenciarUsuarioAlvo(req, usuario)) {
+        return res.status(404).json({ error: 'Usuario nao encontrado' });
+      }
+
+      return res.json(usuario);
     } catch (error) {
       console.error(error);
       return res.status(500).json({
@@ -418,7 +313,6 @@ module.exports = {
         senha,
         cargo_id,
         setor_id,
-        setores_ids = [],
         perfil,
         obras = [],
         pode_criar_solicitacao_compra
@@ -437,12 +331,6 @@ module.exports = {
           error: 'Apenas SUPERADMIN pode criar usuario com perfil SUPERADMIN'
         });
       }
-
-      const { setorPrincipalId, setoresIds } = await resolverSetoresPayload({
-        setor_id,
-        setores_ids
-      });
-
       // Verifica email duplicado
       const existe = await User.findOne({
         where: {
@@ -467,7 +355,7 @@ module.exports = {
         email: emailNormalizado,
         senha: senhaHash,
         cargo_id,
-        setor_id: setorPrincipalId,
+        setor_id,
         perfil,
         ativo: true,
         pode_criar_solicitacao_compra: definirPermissaoSolicitacaoCompra(
@@ -476,8 +364,6 @@ module.exports = {
           false
         )
       });
-
-      await sincronizarSetoresUsuario(usuario.id, setoresIds);
 
       // 🔗 Vínculo obras
       for (const obra_id of obras) {
@@ -488,21 +374,31 @@ module.exports = {
         });
       }
 
+      await registrarEventoSeguranca({
+        req,
+        usuarioId: req.user?.id || null,
+        tipoEvento: 'USER_CREATED',
+        recursoTipo: 'USER',
+        recursoId: usuario.id,
+        status: 'SUCCESS',
+        descricao: 'Usuario criado',
+        metadata: {
+          perfil,
+          setor_id,
+          obras
+        }
+      });
+
       return res.status(201).json({
         id: usuario.id,
         nome: usuario.nome,
         email: usuario.email,
         perfil: usuario.perfil,
-        setor_id: usuario.setor_id,
-        setores_ids: setoresIds,
         ativo: usuario.ativo,
         pode_criar_solicitacao_compra: usuario.pode_criar_solicitacao_compra
       });
 
     } catch (error) {
-      if (error?.status) {
-        return res.status(error.status).json({ error: error.message });
-      }
       console.error(error);
       return res.status(500).json({
         error: 'Erro ao criar usuário'
@@ -524,7 +420,6 @@ module.exports = {
         senha,
         cargo_id,
         setor_id,
-        setores_ids = [],
         perfil,
         obras = [],
         ativo,
@@ -537,7 +432,13 @@ module.exports = {
 
       if (!usuario) {
         return res.status(404).json({
-          error: 'Usuário não encontrado'
+          error: 'Usuario nao encontrado'
+        });
+      }
+
+      if (!podeGerenciarUsuarioAlvo(req, usuario)) {
+        return res.status(404).json({
+          error: 'Usuario nao encontrado'
         });
       }
 
@@ -547,16 +448,11 @@ module.exports = {
         });
       }
 
-      const { setorPrincipalId, setoresIds } = await resolverSetoresPayload(
-        { setor_id, setores_ids },
-        usuario.setor_id
-      );
-
       const dadosUpdate = {
         nome,
         email: emailNormalizado,
         cargo_id,
-        setor_id: setorPrincipalId,
+        setor_id,
         perfil,
         ativo,
         pode_criar_solicitacao_compra: definirPermissaoSolicitacaoCompra(
@@ -590,7 +486,6 @@ module.exports = {
       }
 
       await usuario.update(dadosUpdate);
-      await sincronizarSetoresUsuario(id, setoresIds);
 
       // 🔁 Atualizar obras
       await UsuarioObra.destroy({
@@ -605,21 +500,32 @@ module.exports = {
         });
       }
 
+      await registrarEventoSeguranca({
+        req,
+        usuarioId: req.user?.id || null,
+        tipoEvento: 'USER_UPDATED',
+        recursoTipo: 'USER',
+        recursoId: usuario.id,
+        status: 'SUCCESS',
+        descricao: 'Usuario atualizado',
+        metadata: {
+          perfil,
+          setor_id,
+          ativo,
+          obras
+        }
+      });
+
       return res.json({
         id: usuario.id,
         nome: usuario.nome,
         email: usuario.email,
         perfil: usuario.perfil,
-        setor_id: usuario.setor_id,
-        setores_ids: setoresIds,
         ativo: usuario.ativo,
         pode_criar_solicitacao_compra: usuario.pode_criar_solicitacao_compra
       });
 
     } catch (error) {
-      if (error?.status) {
-        return res.status(error.status).json({ error: error.message });
-      }
       console.error(error);
       return res.status(500).json({
         error: 'Erro ao atualizar usuário'
@@ -632,11 +538,26 @@ module.exports = {
   // =====================================================
   async ativar(req, res) {
     try {
+      const usuario = await User.findByPk(req.params.id);
+      if (!usuario) {
+        return res.status(404).json({ error: 'Usuario nao encontrado' });
+      }
 
-      await User.update(
-        { ativo: true },
-        { where: { id: req.params.id } }
-      );
+      if (!podeGerenciarUsuarioAlvo(req, usuario)) {
+        return res.status(404).json({ error: 'Usuario nao encontrado' });
+      }
+
+      await usuario.update({ ativo: true });
+
+      await registrarEventoSeguranca({
+        req,
+        usuarioId: req.user?.id || null,
+        tipoEvento: 'USER_ACTIVATED',
+        recursoTipo: 'USER',
+        recursoId: usuario.id,
+        status: 'SUCCESS',
+        descricao: 'Usuario ativado'
+      });
 
       return res.sendStatus(204);
 
@@ -653,11 +574,26 @@ module.exports = {
   // =====================================================
   async desativar(req, res) {
     try {
+      const usuario = await User.findByPk(req.params.id);
+      if (!usuario) {
+        return res.status(404).json({ error: 'Usuario nao encontrado' });
+      }
 
-      await User.update(
-        { ativo: false },
-        { where: { id: req.params.id } }
-      );
+      if (!podeGerenciarUsuarioAlvo(req, usuario)) {
+        return res.status(404).json({ error: 'Usuario nao encontrado' });
+      }
+
+      await usuario.update({ ativo: false });
+
+      await registrarEventoSeguranca({
+        req,
+        usuarioId: req.user?.id || null,
+        tipoEvento: 'USER_DEACTIVATED',
+        recursoTipo: 'USER',
+        recursoId: usuario.id,
+        status: 'SUCCESS',
+        descricao: 'Usuario desativado'
+      });
 
       return res.sendStatus(204);
 
@@ -682,6 +618,11 @@ module.exports = {
       }
 
       const { headers, rows } = parseCsv(file.buffer.toString('utf8'));
+      if (rows.length > env.csvImportMaxRows) {
+        return res.status(400).json({
+          error: `O arquivo excede o limite de ${env.csvImportMaxRows} linhas para importacao.`
+        });
+      }
       if (!headers.length) {
         return res.status(400).json({ error: 'Arquivo CSV vazio ou sem cabeçalho.' });
       }
@@ -689,7 +630,6 @@ module.exports = {
       const headerMap = headers.map(normalizarCabecalho);
       const idxNome = headerMap.findIndex(h => h === 'nome');
       const idxEmail = headerMap.findIndex(h => h === 'email');
-      const idxCargo = headerMap.findIndex(h => h === 'cargo');
       const idxSetor = headerMap.findIndex(h => h === 'setor');
       const idxObras = headerMap.findIndex(h => h === 'obras');
       const idxSenha = headerMap.findIndex(h => h === 'senha');
@@ -701,7 +641,6 @@ module.exports = {
       const obrigatorios = [
         ['Nome', idxNome],
         ['Email', idxEmail],
-        ['Cargo', idxCargo],
         ['Setor', idxSetor],
         ['Senha', idxSenha]
       ];
@@ -712,17 +651,10 @@ module.exports = {
         });
       }
 
-      const [cargos, setores, obras] = await Promise.all([
-        Cargo.findAll({ attributes: ['id', 'nome'] }),
+      const [setores, obras] = await Promise.all([
         Setor.findAll({ attributes: ['id', 'nome', 'codigo'] }),
         Obra.findAll({ attributes: ['id', 'nome', 'codigo'] })
       ]);
-
-      const cargoMap = new Map();
-      cargos.forEach(c => {
-        cargoMap.set(normalizarTexto(c.nome), c);
-        cargoMap.set(String(c.id), c);
-      });
 
       const setorMap = new Map();
       setores.forEach(s => {
@@ -754,7 +686,6 @@ module.exports = {
 
         const nome = String(row[idxNome] ?? '').trim();
         const email = String(row[idxEmail] ?? '').trim().toLowerCase();
-        const cargoRaw = String(row[idxCargo] ?? '').trim();
         const setorRaw = String(row[idxSetor] ?? '').trim();
         const obrasRaw = String(idxObras >= 0 ? (row[idxObras] ?? '') : '').trim();
         const senhaRaw = String(row[idxSenha] ?? '').trim();
@@ -762,14 +693,19 @@ module.exports = {
         const permissaoComprasRaw =
           idxPermissaoCompras >= 0 ? String(row[idxPermissaoCompras] ?? '').trim() : '';
         const perfil = (perfilRaw || 'USUARIO').toUpperCase();
-        const perfisPermitidos = new Set(['USUARIO', 'ADMIN', 'SUPERADMIN']);
+        const perfisPermitidos = new Set(['USUARIO', 'ADMIN', 'ADMINISTRADOR', 'SUPERADMIN']);
 
-        if (![nome, email, cargoRaw, setorRaw, senhaRaw, obrasRaw].some(Boolean)) {
+        if (![nome, email, setorRaw, senhaRaw, obrasRaw].some(Boolean)) {
           resultado.ignorados += 1;
           continue;
         }
 
-        if (!nome || !email || !cargoRaw || !setorRaw || !senhaRaw) {
+        if (!nome || !email || !setorRaw || !senhaRaw) {
+          resultado.erros.push({
+            linha,
+            error: 'Campos obrigatorios invalidos (Nome, Email, Setor, Senha).'
+          });
+          continue;
           resultado.erros.push({
             linha,
             error: 'Campos obrigatórios inválidos (Nome, Email, Cargo, Setor, Senha).'
@@ -780,7 +716,7 @@ module.exports = {
         if (!perfisPermitidos.has(perfil)) {
           resultado.erros.push({
             linha,
-            error: `Perfil inválido: ${perfil}. Use USUARIO, ADMIN ou SUPERADMIN.`
+            error: `Perfil inválido: ${perfil}. Use USUARIO, ADMIN, ADMINISTRADOR ou SUPERADMIN.`
           });
           continue;
         }
@@ -793,25 +729,16 @@ module.exports = {
           continue;
         }
 
-        const cargo = cargoMap.get(normalizarTexto(cargoRaw));
-        const setoresTokens = splitObrasCell(setorRaw);
-        const setoresIds = [];
-        let setorInvalido = null;
-        for (const token of setoresTokens) {
-          const setor = setorMap.get(normalizarTexto(token));
-          if (!setor) {
-            setorInvalido = token;
-            break;
-          }
-          if (!setoresIds.includes(setor.id)) {
-            setoresIds.push(setor.id);
-          }
-        }
-
-        if (!cargo || setorInvalido || setoresIds.length === 0) {
+        const setor = setorMap.get(normalizarTexto(setorRaw));
+        if (!setor) {
           resultado.erros.push({
             linha,
-            error: `Cargo ou setor nao encontrado (${cargoRaw} / ${setorInvalido || setorRaw}).`
+            error: `Setor nao encontrado (${setorRaw}).`
+          });
+          continue;
+          resultado.erros.push({
+            linha,
+            error: `Cargo ou setor não encontrado (${cargoRaw} / ${setorRaw}).`
           });
           continue;
         }
@@ -851,8 +778,8 @@ module.exports = {
           nome,
           email,
           senha: senhaHash,
-          cargo_id: cargo.id,
-          setor_id: setoresIds[0],
+          cargo_id: null,
+          setor_id: setor.id,
           perfil,
           ativo: true,
           pode_criar_solicitacao_compra: definirPermissaoSolicitacaoCompra(
@@ -861,8 +788,6 @@ module.exports = {
             false
           )
         });
-
-        await sincronizarSetoresUsuario(usuario.id, setoresIds);
 
         for (const obra_id of obrasIds) {
           await UsuarioObra.create({
@@ -910,6 +835,15 @@ module.exports = {
       );
 
       if (!ok) {
+        await registrarEventoSeguranca({
+          req,
+          usuarioId,
+          tipoEvento: 'PASSWORD_CHANGE_FAILURE',
+          recursoTipo: 'USER',
+          recursoId: usuarioId,
+          status: 'DENIED',
+          descricao: 'Tentativa de troca de senha com senha atual invalida'
+        });
         return res.status(400).json({
           error: 'Senha atual incorreta'
         });
@@ -917,6 +851,16 @@ module.exports = {
 
       const senhaHash = await bcrypt.hash(senha_nova, 10);
       await usuario.update({ senha: senhaHash });
+
+      await registrarEventoSeguranca({
+        req,
+        usuarioId,
+        tipoEvento: 'PASSWORD_CHANGED',
+        recursoTipo: 'USER',
+        recursoId: usuarioId,
+        status: 'SUCCESS',
+        descricao: 'Senha alterada com sucesso'
+      });
 
       return res.sendStatus(204);
     } catch (error) {
@@ -928,3 +872,6 @@ module.exports = {
   }
 
 };
+
+
+

@@ -198,7 +198,7 @@ export default function ConversasEntrada() {
   const paginaFinal = totalRegistros === 0 ? 0 : Math.min(totalRegistros, paginaAtual * limitePorPagina);
 
   return (
-    <div className="page">
+    <div className="page solicitacoes-page">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <h1 className="page-title">Caixa de Entrada</h1>
@@ -232,7 +232,7 @@ export default function ConversasEntrada() {
           </button>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="table-wrapper">
           <table className="table">
             <thead>
               <tr>

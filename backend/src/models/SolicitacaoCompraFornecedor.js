@@ -35,6 +35,22 @@ module.exports = (sequelize, DataTypes) => {
       respondido_em: {
         type: DataTypes.DATE,
         allowNull: true
+      },
+      prazo_resposta: {
+        type: DataTypes.DATEONLY,
+        allowNull: true
+      },
+      valor_minimo_pedido: {
+        type: DataTypes.DECIMAL(12, 2),
+        allowNull: true
+      },
+      condicao_pagamento: {
+        type: DataTypes.TEXT,
+        allowNull: true
+      },
+      pdf_resposta_url: {
+        type: DataTypes.TEXT,
+        allowNull: true
       }
     },
     {

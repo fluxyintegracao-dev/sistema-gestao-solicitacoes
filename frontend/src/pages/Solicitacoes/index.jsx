@@ -9,7 +9,6 @@ import {
   HiOutlineTrash,
   HiOutlineXMark
 } from 'react-icons/hi2';
-import { useLocation, useNavigate } from 'react-router-dom';
 import Filtros from './Filtros';
 import TabelaSolicitacoes from './TabelaSolicitacoes';
 import ModalAtribuirResponsavel from './ModalAtribuirResponsavel';
@@ -21,13 +20,8 @@ import { getSetorPermissoes } from '../../services/setorPermissoes';
 import { getStatusSetor } from '../../services/statusSetor';
 import { useAuth } from '../../contexts/AuthContext';
 import { parseDateSmart } from '../../utils/dateLocal';
-import {
-  isGeoSetor,
-  obterIdsSetoresUsuario,
-  obterTokensSetorUsuario,
-  solicitacaoEstaNoSetorDoUsuario,
-  usuarioPodeEnviarSolicitacaoParaOutroSetor
-} from '../../utils/setor';
+import { isGeoSetor, solicitacaoEstaNoSetorDoUsuario, userHasSetorCapability } from '../../utils/setor';
+import { hasEnabledModule } from '../../utils/acessoProduto';
 import {
   arquivarSolicitacoesEmMassa,
   deleteSolicitacao,
@@ -86,8 +80,7 @@ export default function Solicitacoes({ arquivadas = false }) {
   const seletorColunasRef = useRef(null);
   const botaoColunasRef = useRef(null);
   const { user } = useAuth();
-  const location = useLocation();
-  const navigate = useNavigate();
+  const moduloContratosHabilitado = hasEnabledModule(user, 'CONTRATOS');
 
   const [filtros, setFiltros] = useState({
     codigo: '',
@@ -120,51 +113,6 @@ export default function Solicitacoes({ arquivadas = false }) {
 
     return () => clearTimeout(timeout);
   }, [filtros, arquivadas, paginaAtual, limitePorPagina]);
-
-  useEffect(() => {
-    const tokenAtualizacaoRota = location.state?.atualizarSolicitacoes;
-
-    const atualizarPelaSinalizacao = () => {
-      let deveAtualizar = Boolean(tokenAtualizacaoRota);
-
-      try {
-        const marcador = sessionStorage.getItem('solicitacoes:atualizar-lista');
-        if (marcador) {
-          sessionStorage.removeItem('solicitacoes:atualizar-lista');
-          deveAtualizar = true;
-        }
-      } catch (storageError) {
-        console.error('Erro ao consumir sinalizacao de atualizacao da lista de solicitacoes', storageError);
-      }
-
-      if (deveAtualizar) {
-        carregar();
-
-        if (tokenAtualizacaoRota) {
-          navigate(`${location.pathname}${location.search}`, {
-            replace: true,
-            state: null
-          });
-        }
-      }
-    };
-
-    atualizarPelaSinalizacao();
-
-    window.addEventListener('solicitacoes:atualizar-lista', atualizarPelaSinalizacao);
-    return () => {
-      window.removeEventListener('solicitacoes:atualizar-lista', atualizarPelaSinalizacao);
-    };
-  }, [
-    location.state?.atualizarSolicitacoes,
-    location.pathname,
-    location.search,
-    navigate,
-    filtros,
-    arquivadas,
-    paginaAtual,
-    limitePorPagina
-  ]);
 
   useEffect(() => {
     try {
@@ -218,10 +166,11 @@ export default function Solicitacoes({ arquivadas = false }) {
 
   async function carregarSetores() {
     try {
-      const data = await getSetores({ incluirInativos: true });
+      const data = await getSetores();
       const map = {};
       (Array.isArray(data) ? data : []).forEach(s => {
-        map[s.codigo] = s.nome;
+        if (s?.codigo) map[s.codigo] = s;
+        if (s?.nome) map[s.nome] = s;
       });
       setSetoresLista(Array.isArray(data) ? data : []);
       setSetoresMap(map);
@@ -266,21 +215,10 @@ export default function Solicitacoes({ arquivadas = false }) {
         setPermissaoUsuario(null);
         return;
       }
-      const tokens = obterTokensSetorUsuario(user);
-      if (tokens.length === 0) return;
-      const respostas = await Promise.all(
-        tokens.map(token => getSetorPermissoes({ setor: token }).catch(() => []))
-      );
-      const itens = respostas.flat().filter(Boolean);
-      const item = itens.length > 0
-        ? {
-            modo_recebimento: itens.some(
-              permissao => String(permissao?.modo_recebimento || '').toUpperCase() === 'TODOS_VISIVEIS'
-            ) ? 'TODOS_VISIVEIS' : itens[0]?.modo_recebimento,
-            usuario_pode_assumir: itens.some(permissao => Boolean(permissao?.usuario_pode_assumir)),
-            usuario_pode_atribuir: itens.some(permissao => Boolean(permissao?.usuario_pode_atribuir))
-          }
-        : null;
+      const setorToken = user?.setor?.codigo || user?.setor?.nome || user?.area || user?.setor_id;
+      if (!setorToken) return;
+      const data = await getSetorPermissoes({ setor: setorToken });
+      const item = Array.isArray(data) && data.length > 0 ? data[0] : null;
       setPermissaoUsuario(item);
     } catch (error) {
       console.error(error);
@@ -399,7 +337,7 @@ export default function Solicitacoes({ arquivadas = false }) {
   const perfilUpper = String(user?.perfil || '').toUpperCase();
   const mostrarSomaValor = perfilUpper.startsWith('ADMIN') || perfilUpper === 'SUPERADMIN';
   const somaValorFiltrado = solicitacoes.reduce((total, item) => {
-    const valor = Number(item?.valor_exibicao ?? item?.valor ?? 0);
+    const valor = Number(item?.valor || 0);
     return total + (Number.isNaN(valor) ? 0 : valor);
   }, 0);
   const totalSolicitacoes = Number(metaPaginacao?.total || 0);
@@ -414,9 +352,9 @@ export default function Solicitacoes({ arquivadas = false }) {
     String(user?.setor?.nome || '').toUpperCase(),
     String(user?.area || '').toUpperCase()
   ];
-  const isSetorObra = setorTokens.includes('OBRA');
-  const isSetorFinanceiro = setorTokens.includes('FINANCEIRO');
-  const isAdminGEO = perfilUpper.startsWith('ADMIN') && setorTokens.some(isGeoSetor);
+  const isSetorObra = userHasSetorCapability(user, 'eh_setor_obra');
+  const isSetorFinanceiro = userHasSetorCapability(user, 'eh_setor_financeiro');
+  const isAdminGEO = perfilUpper.startsWith('ADMIN') && userHasSetorCapability(user, 'eh_setor_geo');
   const isSuperadmin = perfilUpper === 'SUPERADMIN';
   const colunasStorageKey = useMemo(() => {
     const identificador = user?.id || user?.email || user?.nome || user?.perfil || 'anon';
@@ -427,8 +365,8 @@ export default function Solicitacoes({ arquivadas = false }) {
     { id: 'codigo', label: 'Código' },
     { id: 'numero_sienge', label: 'Nº SIENGE' },
     { id: 'obra', label: 'Obra' },
-    { id: 'contrato', label: 'Contrato' },
-    ...(isSetorObra ? [{ id: 'ref_contrato', label: 'Ref. do Contrato' }] : []),
+    ...(moduloContratosHabilitado ? [{ id: 'contrato', label: 'Contrato' }] : []),
+    ...(moduloContratosHabilitado && isSetorObra ? [{ id: 'ref_contrato', label: 'Ref. do Contrato' }] : []),
     { id: 'descricao', label: 'Descrição' },
     { id: 'tipo', label: 'Tipo de Solicitação' },
     { id: 'valor', label: 'Valor' },
@@ -437,7 +375,7 @@ export default function Solicitacoes({ arquivadas = false }) {
     { id: 'status', label: 'Status' },
     { id: 'vencimento', label: 'Vencimento' },
     ...(arquivadas ? [{ id: 'acoes', label: 'Ações' }] : [])
-  ], [isSetorObra, arquivadas]);
+  ], [moduloContratosHabilitado, isSetorObra, arquivadas]);
 
   useEffect(() => {
     try {
@@ -467,7 +405,7 @@ export default function Solicitacoes({ arquivadas = false }) {
       }
       return filtradas.length > 0 ? filtradas : validas;
     });
-  }, [isSetorObra]);
+  }, [opcoesColunas]);
 
   useEffect(() => {
     if (!colunasStoragePronto) return;
@@ -573,8 +511,7 @@ export default function Solicitacoes({ arquivadas = false }) {
         'Código',
         'Nº SIENGE',
         'Obra',
-        'Contrato',
-        'Ref. do Contrato',
+        ...(moduloContratosHabilitado ? ['Contrato', 'Ref. do Contrato'] : []),
         'Descrição',
         'Tipo de Solicitação',
         'Valor',
@@ -588,11 +525,15 @@ export default function Solicitacoes({ arquivadas = false }) {
         item.codigo || '',
         item.numero_pedido || '',
         item.obra?.nome || '',
-        item.contrato?.codigo || item.codigo_contrato || '',
-        item.contrato?.ref_contrato || item.ref_contrato || '',
+        ...(moduloContratosHabilitado
+          ? [
+              item.contrato?.codigo || item.codigo_contrato || '',
+              item.contrato?.ref_contrato || item.ref_contrato || ''
+            ]
+          : []),
         item.descricao || '',
         item.tipo?.nome || '',
-        formatarValorExportacao(item.valor_exibicao ?? item.valor),
+        formatarValorExportacao(item.valor),
         item.area_responsavel || '',
         item.responsavel || '',
         item.status_global || '',
@@ -715,21 +656,23 @@ export default function Solicitacoes({ arquivadas = false }) {
   const podeExcluirUnica = !!selecionadaUnica && (isSuperadmin || isAdminGEO);
   const podeEnviarUnica = useMemo(() => {
     if (!selecionadaUnica || isSetorObra) return false;
-    return usuarioPodeEnviarSolicitacaoParaOutroSetor(selecionadaUnica.area_responsavel, user);
-  }, [selecionadaUnica, isSetorObra, user]);
+    return isSuperadmin || solicitacaoEstaNoSetorDoUsuario(selecionadaUnica.area_responsavel, user);
+  }, [selecionadaUnica, isSetorObra, isSuperadmin, user]);
   const podeEnviarMassa = useMemo(() => {
     if (selecionadasIds.length <= 1 || isSetorObra) return false;
+    if (isSuperadmin) return true;
     return selecionadasIds.every(idSelecionado => {
       const solicitacao = solicitacoes.find(item => Number(item.id) === Number(idSelecionado));
-      return solicitacao && usuarioPodeEnviarSolicitacaoParaOutroSetor(solicitacao.area_responsavel, user);
+      return solicitacao && solicitacaoEstaNoSetorDoUsuario(solicitacao.area_responsavel, user);
     });
-  }, [selecionadasIds, isSetorObra, solicitacoes, user]);
+  }, [selecionadasIds, isSetorObra, isSuperadmin, solicitacoes, user]);
 
   const isSetorObraSolicitacaoUnica = useMemo(() => {
     if (!selecionadaUnica) return false;
-    const setorNomeSolicitacao =
-      (setoresMap?.[selecionadaUnica.area_responsavel] || selecionadaUnica.area_responsavel || '');
-    return String(setorNomeSolicitacao).trim().toUpperCase() === 'OBRA';
+    const setorSolicitacao =
+      (setoresMap?.[selecionadaUnica.area_responsavel] || null);
+    return Boolean(setorSolicitacao?.eh_setor_obra) ||
+      String(setorSolicitacao?.nome || selecionadaUnica.area_responsavel || '').trim().toUpperCase() === 'OBRA';
   }, [selecionadaUnica, setoresMap]);
 
   async function assumirSelecionada() {
@@ -782,12 +725,9 @@ export default function Solicitacoes({ arquivadas = false }) {
 
       const data = await res.json();
       const lista = Array.isArray(data) ? data : [];
-      const setoresUsuario = obterIdsSetoresUsuario(user);
-      const filtrados = setoresUsuario.length > 0
-        ? lista.filter(u => {
-            const setoresDoUsuario = obterIdsSetoresUsuario(u);
-            return setoresDoUsuario.some(setorId => setoresUsuario.includes(setorId));
-          })
+      const setorUsuario = user?.setor_id ? String(user.setor_id) : '';
+      const filtrados = setorUsuario
+        ? lista.filter(u => String(u.setor_id) === setorUsuario)
         : lista;
       setUsuariosAtribuicao(filtrados);
     } catch (error) {

@@ -1,7 +1,13 @@
-module.exports = (sequelize, DataTypes) => {
-  return sequelize.define('ProvisaoCategoriaMacro', {
+module.exports = (sequelize, DataTypes) => sequelize.define(
+  'ProvisaoCategoriaMacro',
+  {
+    id: {
+      type: DataTypes.INTEGER,
+      primaryKey: true,
+      autoIncrement: true
+    },
     nome: {
-      type: DataTypes.STRING,
+      type: DataTypes.STRING(160),
       allowNull: false
     },
     descricao: {
@@ -17,8 +23,9 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.INTEGER,
       allowNull: true
     }
-  }, {
+  },
+  {
     tableName: 'provisao_categorias_macro',
     timestamps: true
-  });
-};
+  }
+);

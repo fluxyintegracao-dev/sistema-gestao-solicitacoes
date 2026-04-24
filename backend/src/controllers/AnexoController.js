@@ -6,7 +6,47 @@ const {
 } = require('../models');
 const { criarNotificacao } = require('../services/notificacoes');
 const { uploadToS3, getPresignedUrl } = require('../services/s3');
+const {
+  assertRegisteredFileAccess,
+  resolveRegisteredFileResource
+} = require('../services/fileAccessService');
 const { normalizeOriginalName } = require('../utils/fileName');
+const { hasObraAccess } = require('../services/authorizationService');
+const { userHasSetorCapability } = require('../services/setorCapabilityService');
+const { registrarEventoSeguranca } = require('../services/securityLogService');
+
+async function validarAcessoSolicitacao(req, solicitacao) {
+  if (!solicitacao) {
+    return {
+      permitido: false,
+      status: 404,
+      error: 'Solicitacao nao encontrada'
+    };
+  }
+
+  const permitido = await hasObraAccess(req.user, solicitacao.obra_id);
+  if (!permitido) {
+    await registrarEventoSeguranca({
+      req,
+      usuarioId: req.user?.id || null,
+      tipoEvento: 'FILE_ACCESS_DENIED',
+      recursoTipo: 'SOLICITACAO',
+      recursoId: solicitacao.id,
+      status: 'DENIED',
+      descricao: 'Usuario sem acesso a obra da solicitacao'
+    });
+
+    return {
+      permitido: false,
+      status: 403,
+      error: 'Acesso negado para a obra da solicitacao'
+    };
+  }
+
+  return {
+    permitido: true
+  };
+}
 
 class AnexoController {
 
@@ -41,7 +81,14 @@ class AnexoController {
         return res.status(400).json({ error: 'Nenhum arquivo enviado' });
       }
 
-      const solicitacao = await Solicitacao.findByPk(solicitacao_id);
+      const solicitacao = await Solicitacao.findByPk(solicitacao_id, {
+        attributes: ['id', 'codigo', 'obra_id']
+      });
+      const acessoSolicitacao = await validarAcessoSolicitacao(req, solicitacao);
+
+      if (!acessoSolicitacao.permitido) {
+        return res.status(acessoSolicitacao.status).json({ error: acessoSolicitacao.error });
+      }
 
       if (!solicitacao) {
         return res.status(404).json({ error: 'SolicitaÃ§Ã£o nÃ£o encontrada' });
@@ -106,6 +153,15 @@ class AnexoController {
       const { id } = req.params;
       const { tipo } = req.query;
 
+      const solicitacao = await Solicitacao.findByPk(id, {
+        attributes: ['id', 'obra_id']
+      });
+      const acessoSolicitacao = await validarAcessoSolicitacao(req, solicitacao);
+
+      if (!acessoSolicitacao.permitido) {
+        return res.status(acessoSolicitacao.status).json({ error: acessoSolicitacao.error });
+      }
+
       const where = { solicitacao_id: id };
 
       if (tipo) where.tipo = tipo;
@@ -132,6 +188,25 @@ class AnexoController {
         return res.status(400).json({ error: 'url obrigatoria' });
       }
 
+      const arquivoRegistrado = await resolveRegisteredFileResource(alvo);
+      if (!arquivoRegistrado) {
+        await registrarEventoSeguranca({
+          req,
+          usuarioId: req.user?.id || null,
+          tipoEvento: 'FILE_ACCESS_DENIED',
+          recursoTipo: 'FILE',
+          recursoId: String(alvo).slice(0, 120),
+          status: 'DENIED',
+          descricao: 'Tentativa de assinar arquivo nao registrado'
+        });
+        return res.status(404).json({ error: 'Arquivo nao encontrado' });
+      }
+
+      const acesso = await assertRegisteredFileAccess(req, arquivoRegistrado);
+      if (!acesso.allowed) {
+        return res.status(acesso.status || 403).json({ error: acesso.error || 'Acesso negado ao arquivo' });
+      }
+
       const signedUrl = await getPresignedUrl(alvo);
       return res.json({ url: signedUrl });
     } catch (error) {
@@ -145,16 +220,25 @@ class AnexoController {
       const { historicoId } = req.params;
       const usuario = await User.findByPk(req.user.id);
       const perfil = String(req.user?.perfil || '').trim().toUpperCase();
-      const setorUsuario = String(req.user?.area || req.user?.setor?.codigo || '').trim().toUpperCase();
       const isSuperadmin = perfil === 'SUPERADMIN' || perfil.includes('SUPERADMIN');
+      const isSetorCompras = await userHasSetorCapability(req.user, 'eh_setor_compras');
 
-      if (!isSuperadmin && setorUsuario !== 'COMPRAS') {
-        return res.status(403).json({ error: 'Apenas SUPERADMIN ou usuarios do setor COMPRAS podem remover anexo.' });
+      if (!isSuperadmin && !isSetorCompras) {
+        return res.status(403).json({ error: 'Apenas SUPERADMIN ou usuarios do setor configurado como compras podem remover anexo.' });
       }
 
       const historico = await Historico.findByPk(historicoId);
       if (!historico) {
         return res.status(404).json({ error: 'Historico nao encontrado.' });
+      }
+
+      const solicitacao = await Solicitacao.findByPk(historico.solicitacao_id, {
+        attributes: ['id', 'obra_id']
+      });
+      const acessoSolicitacao = await validarAcessoSolicitacao(req, solicitacao);
+
+      if (!acessoSolicitacao.permitido) {
+        return res.status(acessoSolicitacao.status).json({ error: acessoSolicitacao.error });
       }
 
       if (historico.acao !== 'ANEXO_ADICIONADO') {

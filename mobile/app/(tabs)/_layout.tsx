@@ -1,21 +1,15 @@
 import { Feather } from '@expo/vector-icons';
-import { Redirect, Tabs } from 'expo-router';
+import { Redirect, Tabs, usePathname } from 'expo-router';
 import { LoadingState } from '../../src/components/common/LoadingState';
 import { Screen } from '../../src/components/common/Screen';
 import { useAuth } from '../../src/features/auth/AuthContext';
-import { useModules } from '../../src/features/modules/ModulesContext';
 import { colors } from '../../src/theme';
 
 export default function TabsLayout() {
-  const { status } = useAuth();
-  const {
-    loadingProvisionamento,
-    hasSolicitacoesModule,
-    hasProvisionamentoAccess,
-    hasAnyOperationalModule
-  } = useModules();
+  const { status, hasModule, user } = useAuth();
+  const pathname = usePathname();
 
-  if (status === 'bootstrapping' || (status === 'authenticated' && loadingProvisionamento)) {
+  if (status === 'bootstrapping') {
     return (
       <Screen scroll={false}>
         <LoadingState label="Carregando app..." />
@@ -27,8 +21,12 @@ export default function TabsLayout() {
     return <Redirect href="/(auth)/login" />;
   }
 
-  if (!hasAnyOperationalModule) {
+  if (!hasModule('SOLICITACOES')) {
     return <Redirect href="/modulo-indisponivel" />;
+  }
+
+  if (user?.mfa_setup_pending && pathname !== '/perfil') {
+    return <Redirect href="/perfil" />;
   }
 
   return (
@@ -61,17 +59,8 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="solicitacoes"
         options={{
-          href: hasSolicitacoesModule ? undefined : null,
           title: 'Solicitacoes',
           tabBarIcon: ({ color, size }) => <Feather name="file-text" size={size} color={color} />
-        }}
-      />
-      <Tabs.Screen
-        name="provisionamento"
-        options={{
-          href: hasProvisionamentoAccess ? undefined : null,
-          title: 'Provisionamento',
-          tabBarIcon: ({ color, size }) => <Feather name="dollar-sign" size={size} color={color} />
         }}
       />
       <Tabs.Screen

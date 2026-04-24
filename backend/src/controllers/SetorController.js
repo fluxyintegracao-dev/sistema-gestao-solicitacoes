@@ -1,15 +1,30 @@
+const { Op } = require('sequelize');
 const { Setor } = require('../models');
+const { normalizeSetorCode } = require('../services/setorCapabilityService');
+
+const CAPABILITY_FIELDS = [
+  'eh_setor_obra',
+  'eh_setor_financeiro',
+  'eh_setor_compras',
+  'eh_setor_geo',
+  'eh_setor_administrativo'
+];
+
+function extractCapabilityPayload(body = {}) {
+  return CAPABILITY_FIELDS.reduce((acc, field) => {
+    if (body[field] !== undefined) {
+      acc[field] = Boolean(body[field]);
+    }
+    return acc;
+  }, {});
+}
 
 module.exports = {
 
   async index(req, res) {
     try {
-      const incluirInativos = String(req.query?.incluir_inativos || '')
-        .trim()
-        .toLowerCase() === 'true';
-
       const setores = await Setor.findAll({
-        where: incluirInativos ? {} : { ativo: true },
+        where: { ativo: true },
         order: [['nome', 'ASC']]
       });
 
@@ -26,10 +41,30 @@ module.exports = {
   async create(req, res) {
     try {
       const { nome, codigo } = req.body;
+      const nomeNormalizado = String(nome || '').trim();
+      const codigoNormalizado = normalizeSetorCode(codigo);
+
+      if (!nomeNormalizado || !codigoNormalizado) {
+        return res.status(400).json({ error: 'Nome e codigo sao obrigatorios' });
+      }
+
+      const existente = await Setor.findOne({
+        where: {
+          [Op.or]: [
+            { codigo: codigoNormalizado },
+            { nome: nomeNormalizado }
+          ]
+        },
+        attributes: ['id']
+      });
+      if (existente) {
+        return res.status(409).json({ error: 'Ja existe setor com mesmo nome ou codigo' });
+      }
 
       const setor = await Setor.create({
-        nome,
-        codigo
+        nome: nomeNormalizado,
+        codigo: codigoNormalizado,
+        ...extractCapabilityPayload(req.body)
       });
 
       return res.status(201).json(setor);
@@ -47,7 +82,8 @@ module.exports = {
       const { id } = req.params;
       const { nome, codigo } = req.body;
 
-      if (!nome && !codigo) {
+      const capabilityPayload = extractCapabilityPayload(req.body);
+      if (!nome && !codigo && Object.keys(capabilityPayload).length === 0) {
         return res.status(400).json({ error: 'Nada para atualizar' });
       }
 
@@ -56,9 +92,29 @@ module.exports = {
         return res.status(404).json({ error: 'Setor nao encontrado' });
       }
 
+      const proximoNome = nome ? String(nome).trim() : setor.nome;
+      const proximoCodigo = codigo ? normalizeSetorCode(codigo) : setor.codigo;
+
+      if (nome || codigo) {
+        const existente = await Setor.findOne({
+          where: {
+            id: { [Op.ne]: id },
+            [Op.or]: [
+              { codigo: proximoCodigo },
+              { nome: proximoNome }
+            ]
+          },
+          attributes: ['id']
+        });
+        if (existente) {
+          return res.status(409).json({ error: 'Ja existe setor com mesmo nome ou codigo' });
+        }
+      }
+
       await setor.update({
-        nome: nome || setor.nome,
-        codigo: codigo ? String(codigo).toUpperCase() : setor.codigo
+        nome: proximoNome,
+        codigo: proximoCodigo,
+        ...capabilityPayload
       });
 
       return res.json(setor);

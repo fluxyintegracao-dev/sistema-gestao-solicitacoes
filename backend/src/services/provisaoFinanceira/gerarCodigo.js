@@ -21,7 +21,7 @@ async function obterOuCriarSequenciaComLock({ obraId, transaction }) {
       ultimo_numero: 0
     }, { transaction });
   } catch (error) {
-    // Ignora corrida de criação; o próximo select com lock garante consistência.
+    // corrida de criacao; o select com lock abaixo resolve a consistencia
   }
 
   sequencia = await ProvisaoFinanceiraSequencia.findOne({
@@ -31,7 +31,7 @@ async function obterOuCriarSequenciaComLock({ obraId, transaction }) {
   });
 
   if (!sequencia) {
-    throw new Error('Nao foi possivel inicializar a sequencia da provisao financeira.');
+    throw new Error('Nao foi possivel inicializar a sequencia do provisionamento.');
   }
 
   return sequencia;
@@ -39,7 +39,7 @@ async function obterOuCriarSequenciaComLock({ obraId, transaction }) {
 
 async function gerarCodigoProvisionamentoFinanceiro({ obraId, transaction }) {
   if (!transaction) {
-    throw new Error('A geracao de codigo exige transaction ativa.');
+    throw new Error('A geracao de codigo do provisionamento exige transaction ativa.');
   }
 
   const obra = await Obra.findByPk(obraId, {
@@ -48,12 +48,12 @@ async function gerarCodigoProvisionamentoFinanceiro({ obraId, transaction }) {
   });
 
   if (!obra) {
-    throw new Error('Obra nao encontrada para gerar codigo da provisao financeira.');
+    throw new Error('Obra nao encontrada para gerar o codigo da provisao.');
   }
 
   const codigoObra = normalizarCodigoObra(obra.codigo);
   if (!codigoObra) {
-    throw new Error('A obra precisa ter codigo preenchido para gerar provisao financeira.');
+    throw new Error('A obra precisa ter codigo preenchido para gerar provisao.');
   }
 
   const sequencia = await obterOuCriarSequenciaComLock({
@@ -62,11 +62,7 @@ async function gerarCodigoProvisionamentoFinanceiro({ obraId, transaction }) {
   });
 
   const proximoNumero = Number(sequencia.ultimo_numero || 0) + 1;
-
-  await sequencia.update(
-    { ultimo_numero: proximoNumero },
-    { transaction }
-  );
+  await sequencia.update({ ultimo_numero: proximoNumero }, { transaction });
 
   return `PREV${codigoObra}-${proximoNumero}`;
 }

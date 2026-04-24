@@ -7,71 +7,106 @@ export function normalizarSetorToken(valor) {
     .replace(/[\s-]+/g, '_');
 }
 
+export function getSetorCapabilities(setor) {
+  const tokenCodigo = normalizarSetorToken(setor?.codigo);
+  const tokenNome = normalizarSetorToken(setor?.nome);
+  const tokens = [tokenCodigo, tokenNome].filter(Boolean);
+  const has = (token) => tokens.includes(token);
+
+  const read = (field, fallback) => (
+    typeof setor?.[field] === 'boolean'
+      ? setor[field]
+      : fallback
+  );
+
+  return {
+    eh_setor_obra: read('eh_setor_obra', has('OBRA')),
+    eh_setor_financeiro: read('eh_setor_financeiro', has('FINANCEIRO')),
+    eh_setor_compras: read('eh_setor_compras', has('COMPRAS')),
+    eh_setor_geo: read('eh_setor_geo', has('GEO') || has('GERENCIA_DE_PROCESSOS') || has('GERENCIA_PROCESSOS')),
+    eh_setor_administrativo: read('eh_setor_administrativo', has('ADMINISTRATIVO'))
+  };
+}
+
+export function userSetorCapabilities(user) {
+  const setores = Array.isArray(user?.setores) ? user.setores : [];
+  const capabilitiesPrincipal = getSetorCapabilities({
+    ...(user?.setor || {}),
+    codigo: user?.setor?.codigo || user?.area || user?.setor?.codigo,
+    nome: user?.setor?.nome || user?.area || user?.setor?.nome
+  });
+
+  return setores.reduce((acc, setor) => {
+    const atual = getSetorCapabilities(setor);
+    return {
+      eh_setor_obra: acc.eh_setor_obra || atual.eh_setor_obra,
+      eh_setor_financeiro: acc.eh_setor_financeiro || atual.eh_setor_financeiro,
+      eh_setor_compras: acc.eh_setor_compras || atual.eh_setor_compras,
+      eh_setor_geo: acc.eh_setor_geo || atual.eh_setor_geo,
+      eh_setor_administrativo: acc.eh_setor_administrativo || atual.eh_setor_administrativo
+    };
+  }, capabilitiesPrincipal);
+}
+
+export function userHasSetorCapability(user, capability) {
+  return Boolean(userSetorCapabilities(user)?.[capability]);
+}
+
 export function isGeoSetor(valor) {
+  if (typeof valor === 'object' && valor !== null) {
+    return getSetorCapabilities(valor).eh_setor_geo;
+  }
   const token = normalizarSetorToken(valor);
   return token === 'GEO' || token === 'GERENCIA_DE_PROCESSOS' || token === 'GERENCIA_PROCESSOS';
 }
 
-export function obterTokensSetorUsuario(user) {
-  const tokens = [
-    String(user?.setor?.codigo || '').toUpperCase(),
-    String(user?.setor?.nome || '').toUpperCase(),
-    String(user?.setor_id || '').toUpperCase(),
-    String(user?.area || '').toUpperCase()
-  ];
-
-  if (Array.isArray(user?.setores)) {
-    user.setores.forEach(setor => {
-      tokens.push(String(setor?.id || '').toUpperCase());
-      tokens.push(String(setor?.codigo || '').toUpperCase());
-      tokens.push(String(setor?.nome || '').toUpperCase());
-    });
+export function isObraSetor(valor) {
+  if (typeof valor === 'object' && valor !== null) {
+    return getSetorCapabilities(valor).eh_setor_obra;
   }
-
-  if (Array.isArray(user?.setores_ids)) {
-    user.setores_ids.forEach(id => tokens.push(String(id || '').toUpperCase()));
-  }
-
-  if (Array.isArray(user?.setoresVinculos)) {
-    user.setoresVinculos.forEach(vinculo => {
-      tokens.push(String(vinculo?.setor_id || '').toUpperCase());
-      tokens.push(String(vinculo?.setor?.id || '').toUpperCase());
-      tokens.push(String(vinculo?.setor?.codigo || '').toUpperCase());
-      tokens.push(String(vinculo?.setor?.nome || '').toUpperCase());
-    });
-  }
-
-  return [...new Set(tokens.map(token => String(token || '').trim()).filter(Boolean))];
+  return normalizarSetorToken(valor) === 'OBRA';
 }
 
-export function obterIdsSetoresUsuario(user) {
-  const ids = [];
-
-  function adicionar(valor) {
-    const numero = Number(valor);
-    if (Number.isInteger(numero) && numero > 0 && !ids.includes(String(numero))) {
-      ids.push(String(numero));
-    }
+export function isFinanceiroSetor(valor) {
+  if (typeof valor === 'object' && valor !== null) {
+    return getSetorCapabilities(valor).eh_setor_financeiro;
   }
+  return normalizarSetorToken(valor) === 'FINANCEIRO';
+}
 
-  adicionar(user?.setor_id);
-
-  if (Array.isArray(user?.setores_ids)) {
-    user.setores_ids.forEach(adicionar);
+export function isComprasSetor(valor) {
+  if (typeof valor === 'object' && valor !== null) {
+    return getSetorCapabilities(valor).eh_setor_compras;
   }
+  return normalizarSetorToken(valor) === 'COMPRAS';
+}
+
+export function obterTokensSetorUsuario(user) {
+  const tokens = new Set([
+    String(user?.setor?.codigo || '').toUpperCase(),
+    String(user?.setor?.nome || '').toUpperCase(),
+    String(user?.area || '').toUpperCase()
+  ].filter(Boolean));
 
   if (Array.isArray(user?.setores)) {
-    user.setores.forEach(setor => adicionar(setor?.id));
-  }
-
-  if (Array.isArray(user?.setoresVinculos)) {
-    user.setoresVinculos.forEach(vinculo => {
-      adicionar(vinculo?.setor_id);
-      adicionar(vinculo?.setor?.id);
+    user.setores.forEach((setor) => {
+      if (setor?.id) tokens.add(String(setor.id).toUpperCase());
+      if (setor?.codigo) tokens.add(String(setor.codigo).toUpperCase());
+      if (setor?.nome) tokens.add(String(setor.nome).toUpperCase());
     });
   }
 
-  return ids;
+  const capabilities = userSetorCapabilities(user);
+  if (capabilities.eh_setor_geo) {
+    tokens.add('GEO');
+    tokens.add('GERENCIA DE PROCESSOS');
+    tokens.add('GERENCIA_PROCESSOS');
+  }
+  if (capabilities.eh_setor_obra) tokens.add('OBRA');
+  if (capabilities.eh_setor_financeiro) tokens.add('FINANCEIRO');
+  if (capabilities.eh_setor_compras) tokens.add('COMPRAS');
+
+  return Array.from(tokens);
 }
 
 export function solicitacaoEstaNoSetorDoUsuario(areaResponsavel, user) {
@@ -84,17 +119,4 @@ export function solicitacaoEstaNoSetorDoUsuario(areaResponsavel, user) {
     if (tokenNormalizado === setorSolicitacao) return true;
     return isGeoSetor(tokenNormalizado) && isGeoSetor(setorSolicitacao);
   });
-}
-
-export function usuarioPodeEnviarQualquerSetor(user) {
-  const perfil = String(user?.perfil || '').trim().toUpperCase();
-  return perfil === 'SUPERADMIN' || Boolean(user?.pode_enviar_qualquer_setor);
-}
-
-export function usuarioPodeEnviarSolicitacaoParaOutroSetor(areaResponsavel, user) {
-  if (usuarioPodeEnviarQualquerSetor(user)) {
-    return true;
-  }
-
-  return solicitacaoEstaNoSetorDoUsuario(areaResponsavel, user);
 }

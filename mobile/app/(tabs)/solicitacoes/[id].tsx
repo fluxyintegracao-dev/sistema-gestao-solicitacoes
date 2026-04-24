@@ -1,9 +1,9 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
-import { router, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Button } from '../../../src/components/common/Button';
 import { Chip } from '../../../src/components/common/Chip';
 import { EmptyState } from '../../../src/components/common/EmptyState';
@@ -25,7 +25,7 @@ import {
 import { getUsuariosLista } from '../../../src/services/api/lookups';
 import type { MobileUploadAsset, UsuarioPublicoOption } from '../../../src/services/api/types';
 import { colors, spacing } from '../../../src/theme';
-import { formatCurrencyBR, formatDateBR } from '../../../src/utils/format';
+import { formatCurrencyBR, formatDateBR, formatPhoneBR } from '../../../src/utils/format';
 import {
   extractAttachmentFromHistorico,
   resolveSolicitacaoResponsavel,
@@ -109,19 +109,12 @@ export default function SolicitacaoDetalhePage() {
   };
 
   const handleComment = async () => {
-    const comentarioNormalizado = commentText.trim();
-    const descricaoFinal = comentarioNormalizado || (
-      selectedMentions.length > 0
-        ? `Mencao enviada para ${selectedMentions.map((usuario) => usuario.nome).join(', ')}.`
-        : ''
-    );
-
-    if (!descricaoFinal) return;
+    if (!commentText.trim()) return;
 
     try {
       setCommentLoading(true);
       await addSolicitacaoComment(solicitacaoId, {
-        descricao: descricaoFinal,
+        descricao: commentText.trim(),
         mencoes: selectedMentions.map((usuario) => Number(usuario.id))
       });
       setCommentText('');
@@ -228,17 +221,10 @@ export default function SolicitacaoDetalhePage() {
     }
   };
 
-  const openAttachment = async (path: string, title?: string) => {
+  const openAttachment = async (path: string) => {
     try {
       const signedUrl = await getSignedAttachmentUrl(path);
-      router.push({
-        pathname: '/anexo',
-        params: {
-          url: signedUrl,
-          title: title || 'Anexo da solicitacao',
-          source: path
-        }
-      });
+      await Linking.openURL(signedUrl);
     } catch (error) {
       Alert.alert('Erro ao abrir arquivo', error instanceof Error ? error.message : 'Falha inesperada');
     }
@@ -326,6 +312,10 @@ export default function SolicitacaoDetalhePage() {
             <InfoLine label="Tipo" value={solicitacao.tipo?.nome || '-'} />
             <InfoLine label="Valor" value={formatCurrencyBR(solicitacao.valor)} />
             <InfoLine label="Vencimento" value={formatDateBR(solicitacao.data_vencimento)} />
+            <InfoLine label="Parceiro" value={solicitacao.parceiro?.nome || '-'} />
+            <InfoLine label="CPF/CNPJ" value={solicitacao.parceiro?.cpf_cnpj || '-'} />
+            <InfoLine label="Contato" value={formatPhoneBR(solicitacao.parceiro?.telefone)} />
+            <InfoLine label="Email" value={solicitacao.parceiro?.email || '-'} />
             <InfoLine
               label="Contrato"
               value={solicitacao.contrato?.codigo || solicitacao.codigo_contrato || '-'}
@@ -380,7 +370,7 @@ export default function SolicitacaoDetalhePage() {
                   key={`${attachment.id}-${attachment.path}`}
                   title={attachment.name}
                   createdAt={attachment.createdAt}
-                  onPress={() => void openAttachment(attachment.path, attachment.name)}
+                  onPress={() => void openAttachment(attachment.path)}
                 />
               ))}
             </View>

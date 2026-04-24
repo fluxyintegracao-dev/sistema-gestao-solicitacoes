@@ -63,16 +63,16 @@ export default function AreasObra() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="page solicitacoes-page">
       <div>
-        <h1 className="text-2xl font-semibold">Areas visiveis para OBRA</h1>
-        <p className="text-sm text-gray-600 mt-1">
+        <h1 className="page-title">Areas visiveis para OBRA</h1>
+        <p className="text-sm mt-1" style={{ color: 'var(--c-muted)' }}>
           Marque quais areas os usuarios do setor OBRA podem selecionar
           na tela de Nova Solicitacao.
         </p>
       </div>
 
-      <div className="bg-white p-6 rounded-xl shadow space-y-4">
+      <div className="card space-y-4">
         <div className="flex gap-2 flex-wrap">
           <button type="button" className="btn btn-outline" onClick={selecionarTodas}>
             Selecionar todas

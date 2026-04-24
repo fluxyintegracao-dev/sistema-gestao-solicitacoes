@@ -9,13 +9,25 @@ async function tratarResposta(res, fallback) {
   try {
     const json = await res.json();
     mensagem = json?.error || mensagem;
-  } catch (_) {
+  } catch {
     try {
       const text = await res.text();
       if (text) mensagem = text;
-    } catch (_) {}
+    } catch {
+      // mantem fallback
+    }
   }
   throw new Error(mensagem);
+}
+
+function montarQuery(params = {}) {
+  const query = new URLSearchParams();
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && String(value).trim() !== '') {
+      query.set(key, value);
+    }
+  });
+  return query.toString();
 }
 
 export async function getPrioridadesDiretoriaContexto() {
@@ -26,11 +38,8 @@ export async function getPrioridadesDiretoriaContexto() {
 }
 
 export async function listarLotesPrioridadeDiretoria(params = {}) {
-  const query = new URLSearchParams(params).toString();
-  const url = query
-    ? `${API_URL}/prioridades-diretoria/lotes?${query}`
-    : `${API_URL}/prioridades-diretoria/lotes`;
-  const res = await fetch(url, {
+  const query = montarQuery(params);
+  const res = await fetch(`${API_URL}/prioridades-diretoria/lotes${query ? `?${query}` : ''}`, {
     headers: authHeaders()
   });
   return tratarResposta(res, 'Erro ao listar lotes de prioridade');
@@ -53,11 +62,8 @@ export async function getLotePrioridadeDiretoria(id) {
 }
 
 export async function getSolicitacoesDisponiveisPrioridadeDiretoria(id, params = {}) {
-  const query = new URLSearchParams(params).toString();
-  const url = query
-    ? `${API_URL}/prioridades-diretoria/lotes/${id}/solicitacoes-disponiveis?${query}`
-    : `${API_URL}/prioridades-diretoria/lotes/${id}/solicitacoes-disponiveis`;
-  const res = await fetch(url, {
+  const query = montarQuery(params);
+  const res = await fetch(`${API_URL}/prioridades-diretoria/lotes/${id}/solicitacoes-disponiveis${query ? `?${query}` : ''}`, {
     headers: authHeaders()
   });
   return tratarResposta(res, 'Erro ao buscar solicitacoes elegiveis para prioridade');
@@ -70,23 +76,6 @@ export async function finalizarLotePrioridadeDiretoria(id, data) {
     body: JSON.stringify(data)
   });
   return tratarResposta(res, 'Erro ao finalizar lote de prioridade');
-}
-
-export async function salvarSelecaoLotePrioridadeDiretoria(id, data) {
-  const res = await fetch(`${API_URL}/prioridades-diretoria/lotes/${id}/salvar-selecao`, {
-    method: 'POST',
-    headers: authHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify(data)
-  });
-  return tratarResposta(res, 'Erro ao salvar selecao do lote de prioridade');
-}
-
-export async function reabrirLotePrioridadeDiretoria(id) {
-  const res = await fetch(`${API_URL}/prioridades-diretoria/lotes/${id}/reabrir`, {
-    method: 'POST',
-    headers: authHeaders()
-  });
-  return tratarResposta(res, 'Erro ao reabrir lote de prioridade');
 }
 
 export async function cancelarLotePrioridadeDiretoria(id) {

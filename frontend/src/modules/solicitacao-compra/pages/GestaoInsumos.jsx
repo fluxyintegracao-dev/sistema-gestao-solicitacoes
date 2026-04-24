@@ -202,7 +202,7 @@ export default function GestaoInsumos() {
   }
 
   return (
-    <div className="page">
+    <div className="page solicitacoes-page">
       <div>
         <h1 className="page-title">Gestao de Insumos</h1>
         <p className="page-subtitle">Cadastro de insumos vinculados a unidades e categorias do modulo compras.</p>

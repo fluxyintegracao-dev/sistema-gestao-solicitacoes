@@ -156,10 +156,10 @@ export default function CoresSistema() {
   if (!draft) return <p>Carregando cores...</p>;
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Cores do Sistema</h1>
+    <div className="page solicitacoes-page">
+      <h1 className="page-title">Cores do Sistema</h1>
 
-      <section className="bg-white p-6 rounded-xl shadow space-y-4">
+      <section className="card space-y-4">
         <h2 className="font-semibold">Paleta geral</h2>
         <div className="grid gap-3 md:grid-cols-2">
           {[
@@ -195,7 +195,7 @@ export default function CoresSistema() {
         </div>
       </section>
 
-      <section className="bg-white p-6 rounded-xl shadow space-y-4">
+      <section className="card space-y-4">
         <h2 className="font-semibold">Cores dos botoes de acao</h2>
         <div className="grid gap-3 md:grid-cols-2">
           {[
@@ -217,7 +217,7 @@ export default function CoresSistema() {
         </div>
       </section>
 
-      <section className="bg-white p-6 rounded-xl shadow space-y-4">
+      <section className="card space-y-4">
         <h2 className="font-semibold">Cores de status (geral)</h2>
         <div className="grid gap-3 md:grid-cols-3">
           {STATUS_PADRAO.map(status => (
@@ -233,7 +233,7 @@ export default function CoresSistema() {
         </div>
       </section>
 
-      <section className="bg-white p-6 rounded-xl shadow space-y-4">
+      <section className="card space-y-4">
         <h2 className="font-semibold">Cores de status por setor</h2>
         <div className="flex flex-wrap items-center gap-4">
           <label className="text-sm">
@@ -253,7 +253,7 @@ export default function CoresSistema() {
         </div>
         <div className="grid gap-3 md:grid-cols-3">
           {statusParaSetor.length === 0 && (
-            <p className="text-sm text-gray-500">
+            <p className="text-sm" style={{ color: 'var(--c-muted)' }}>
               Nenhum status cadastrado para este setor.
             </p>
           )}

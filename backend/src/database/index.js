@@ -1,11 +1,13 @@
 const { Sequelize } = require('sequelize');
+const { env } = require('../config/env');
 
 const sequelize = new Sequelize(
-  process.env.DB_NAME || '',
-  process.env.DB_USER || '',
-  process.env.DB_PASS || '',
+  env.dbName,
+  env.dbUser,
+  env.dbPassword,
   {
-    host: process.env.DB_HOST || 'gestao-solicitacoes-db.cn820k66sdx7.us-east-2.rds.amazonaws.com',
+    host: env.dbHost,
+    port: env.dbPort,
     dialect: 'mysql',
     logging: false,
   }

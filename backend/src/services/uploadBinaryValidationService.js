@@ -1,0 +1,208 @@
+const path = require('path');
+const { UploadSecurityError } = require('./uploadSecurityErrors');
+
+const PDF_SIGNATURE = Buffer.from('%PDF-');
+const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+const JPEG_SIGNATURE = Buffer.from([0xff, 0xd8, 0xff]);
+const OLE_SIGNATURE = Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]);
+const ZIP_SIGNATURES = [
+  Buffer.from([0x50, 0x4b, 0x03, 0x04]),
+  Buffer.from([0x50, 0x4b, 0x05, 0x06]),
+  Buffer.from([0x50, 0x4b, 0x07, 0x08])
+];
+const RAR_SIGNATURES = [
+  Buffer.from([0x52, 0x61, 0x72, 0x21, 0x1a, 0x07, 0x00]),
+  Buffer.from([0x52, 0x61, 0x72, 0x21, 0x1a, 0x07, 0x01, 0x00])
+];
+
+const allowedProfiles = {
+  documents: new Set([
+    '.pdf',
+    '.doc',
+    '.docx',
+    '.xls',
+    '.xlsx',
+    '.csv',
+    '.ppt',
+    '.pptx',
+    '.png',
+    '.jpg',
+    '.jpeg',
+    '.rar'
+  ]),
+  ofx: new Set(['.ofx'])
+};
+
+function bufferStartsWith(buffer, signature) {
+  return Buffer.isBuffer(buffer) && buffer.length >= signature.length && buffer.subarray(0, signature.length).equals(signature);
+}
+
+function hasZipSignature(buffer) {
+  return ZIP_SIGNATURES.some((signature) => bufferStartsWith(buffer, signature));
+}
+
+function hasRarSignature(buffer) {
+  return RAR_SIGNATURES.some((signature) => bufferStartsWith(buffer, signature));
+}
+
+function hasPrintableText(buffer) {
+  if (!Buffer.isBuffer(buffer) || buffer.length === 0) {
+    return false;
+  }
+
+  const sample = buffer.subarray(0, Math.min(buffer.length, 4096));
+  let printableChars = 0;
+
+  for (const byte of sample) {
+    if (byte === 0x00) {
+      return false;
+    }
+
+    const isWhitespace = byte === 0x09 || byte === 0x0a || byte === 0x0d;
+    const isPrintable = byte >= 0x20 && byte <= 0x7e;
+    const isUtf8Extended = byte >= 0xc0;
+
+    if (isWhitespace || isPrintable || isUtf8Extended) {
+      printableChars += 1;
+    }
+  }
+
+  return printableChars / sample.length >= 0.9;
+}
+
+function containsTextFragment(buffer, fragment) {
+  return buffer.toString('utf8', 0, Math.min(buffer.length, 64 * 1024)).includes(fragment);
+}
+
+function assertOfficeOpenXml(buffer, extension) {
+  if (!hasZipSignature(buffer)) {
+    throw new UploadSecurityError('Conteudo do arquivo nao corresponde ao tipo informado.', 400, 'UPLOAD_BINARY_MISMATCH');
+  }
+
+  const body = buffer.toString('latin1', 0, Math.min(buffer.length, 512 * 1024));
+  const requiredEntries = {
+    '.docx': ['[Content_Types].xml', 'word/'],
+    '.xlsx': ['[Content_Types].xml', 'xl/'],
+    '.pptx': ['[Content_Types].xml', 'ppt/']
+  };
+
+  const matches = requiredEntries[extension] || [];
+  if (!matches.every((fragment) => body.includes(fragment))) {
+    throw new UploadSecurityError('Arquivo Office invalido ou corrompido.', 400, 'UPLOAD_BINARY_MISMATCH');
+  }
+}
+
+function assertDocumentBinary(file) {
+  const extension = String(path.extname(file?.originalname || '') || '').toLowerCase();
+  const buffer = file?.buffer;
+
+  switch (extension) {
+    case '.pdf':
+      if (!bufferStartsWith(buffer, PDF_SIGNATURE)) {
+        throw new UploadSecurityError('PDF invalido ou corrompido.', 400, 'UPLOAD_BINARY_MISMATCH');
+      }
+      return;
+    case '.png':
+      if (!bufferStartsWith(buffer, PNG_SIGNATURE)) {
+        throw new UploadSecurityError('Imagem PNG invalida ou corrompida.', 400, 'UPLOAD_BINARY_MISMATCH');
+      }
+      return;
+    case '.jpg':
+    case '.jpeg':
+      if (!bufferStartsWith(buffer, JPEG_SIGNATURE)) {
+        throw new UploadSecurityError('Imagem JPEG invalida ou corrompida.', 400, 'UPLOAD_BINARY_MISMATCH');
+      }
+      return;
+    case '.doc':
+    case '.xls':
+    case '.ppt':
+      if (!bufferStartsWith(buffer, OLE_SIGNATURE)) {
+        throw new UploadSecurityError('Documento Office invalido ou corrompido.', 400, 'UPLOAD_BINARY_MISMATCH');
+      }
+      return;
+    case '.docx':
+    case '.xlsx':
+    case '.pptx':
+      assertOfficeOpenXml(buffer, extension);
+      return;
+    case '.csv':
+      if (!hasPrintableText(buffer)) {
+        throw new UploadSecurityError('CSV invalido ou corrompido.', 400, 'UPLOAD_BINARY_MISMATCH');
+      }
+      return;
+    case '.rar':
+      if (!hasRarSignature(buffer)) {
+        throw new UploadSecurityError('Arquivo RAR invalido ou corrompido.', 400, 'UPLOAD_BINARY_MISMATCH');
+      }
+      return;
+    default:
+      throw new UploadSecurityError('Extensao de arquivo nao suportada para validacao.', 400, 'UPLOAD_EXTENSION_UNSUPPORTED');
+  }
+}
+
+function assertOfxBinary(file) {
+  const buffer = file?.buffer;
+  const extension = String(path.extname(file?.originalname || '') || '').toLowerCase();
+
+  if (extension !== '.ofx') {
+    throw new UploadSecurityError('Extensao de arquivo nao permitida.', 400, 'UPLOAD_EXTENSION_UNSUPPORTED');
+  }
+
+  if (!hasPrintableText(buffer)) {
+    throw new UploadSecurityError('Arquivo OFX invalido ou corrompido.', 400, 'UPLOAD_BINARY_MISMATCH');
+  }
+
+  const body = buffer.toString('utf8', 0, Math.min(buffer.length, 64 * 1024)).toUpperCase();
+  const matchesOfx = body.includes('OFXHEADER:') || body.includes('<OFX>');
+  if (!matchesOfx) {
+    throw new UploadSecurityError('Arquivo OFX invalido ou corrompido.', 400, 'UPLOAD_BINARY_MISMATCH');
+  }
+}
+
+function assertProfileAllowed(profile, file) {
+  const extension = String(path.extname(file?.originalname || '') || '').toLowerCase();
+  const allowedExtensions = allowedProfiles[profile] || allowedProfiles.documents;
+
+  if (!allowedExtensions.has(extension)) {
+    throw new UploadSecurityError('Extensao de arquivo nao permitida.', 400, 'UPLOAD_EXTENSION_UNSUPPORTED');
+  }
+}
+
+function assertFileBinaryMatchesProfile(file, profile = 'documents') {
+  if (!file || !Buffer.isBuffer(file.buffer) || file.buffer.length === 0) {
+    throw new UploadSecurityError('Arquivo vazio ou invalido.', 400, 'UPLOAD_EMPTY_FILE');
+  }
+
+  assertProfileAllowed(profile, file);
+
+  if (profile === 'ofx') {
+    assertOfxBinary(file);
+    return;
+  }
+
+  assertDocumentBinary(file);
+}
+
+function flattenUploadedFiles(req) {
+  if (req?.file) {
+    return [req.file];
+  }
+
+  if (Array.isArray(req?.files)) {
+    return req.files.filter(Boolean);
+  }
+
+  if (req?.files && typeof req.files === 'object') {
+    return Object.values(req.files)
+      .flatMap((value) => (Array.isArray(value) ? value : [value]))
+      .filter(Boolean);
+  }
+
+  return [];
+}
+
+module.exports = {
+  assertFileBinaryMatchesProfile,
+  containsTextFragment,
+  flattenUploadedFiles
+};

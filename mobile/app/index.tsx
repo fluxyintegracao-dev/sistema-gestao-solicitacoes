@@ -2,13 +2,11 @@ import { Redirect } from 'expo-router';
 import { LoadingState } from '../src/components/common/LoadingState';
 import { Screen } from '../src/components/common/Screen';
 import { useAuth } from '../src/features/auth/AuthContext';
-import { useModules } from '../src/features/modules/ModulesContext';
 
 export default function IndexPage() {
-  const { status } = useAuth();
-  const { loadingProvisionamento, hasAnyOperationalModule } = useModules();
+  const { status, hasModule } = useAuth();
 
-  if (status === 'bootstrapping' || (status === 'authenticated' && loadingProvisionamento)) {
+  if (status === 'bootstrapping') {
     return (
       <Screen scroll={false}>
         <LoadingState label="Preparando seu acesso..." />
@@ -20,7 +18,7 @@ export default function IndexPage() {
     return <Redirect href="/(auth)/login" />;
   }
 
-  if (!hasAnyOperationalModule) {
+  if (!hasModule('SOLICITACOES')) {
     return <Redirect href="/modulo-indisponivel" />;
   }
 

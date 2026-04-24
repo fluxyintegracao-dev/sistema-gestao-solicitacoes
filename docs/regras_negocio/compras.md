@@ -1,25 +1,33 @@
-# Regras do Modulo Compras
+# Regras de Negocio - Compras
 
-## Escopo
-O modulo compras ja esta integrado ao sistema principal e nao deve ser tratado como projeto separado.
+## Solicitacao de Compra
 
-## Dependencias estruturais
-Backend:
-- `backend/src/app.js`
-- `backend/src/routes.js`
-- `backend/src/models/index.js`
-- `backend/src/models/User.js`
-- `backend/src/controllers/SolicitacaoCompraController.js`
+- pode ter itens cadastrados e itens manuais
+- cada item precisa de apropriacao valida
+- o rateio por item deve fechar 100%
 
-Frontend:
-- `frontend/src/App.jsx`
-- `frontend/src/layout/Layout.jsx`
-- `frontend/src/services/compras.js`
-- `frontend/src/modules/solicitacao-compra/pages/`
+## Cotacao
 
-## Regras de acesso
-- `SUPERADMIN` e `ADMIN` possuem acesso
-- outros usuarios dependem de `pode_criar_solicitacao_compra`
+- so pode ser enviada apos integracao/liberacao para compra
+- fornecedores podem ser:
+  - parceiros fornecedores
+  - fornecedores avulsos
+- categorias de parceiro ajudam na selecao de fornecedores
 
-## Ponto de cuidado
-Qualquer ajuste no payload de login, menu lateral, models de usuario ou bootstrap do banco pode afetar o modulo compras.
+## Resposta do Fornecedor
+
+- fornecedor responde por token publico
+- pode informar preco, prazo, disponibilidade, minimo por item e minimo do pedido
+- status da resposta fica rastreado
+
+## Encerramento
+
+- comprador escolhe vencedor por item
+- encerramento gera base para pedido de compra
+
+## Pedido
+
+- pedido pode ser ajustado manualmente apos a geracao
+- itens podem ser removidos, alterados ou adicionados a partir do universo cotado
+- toda edicao manual de preco e quantidade precisa gerar log
+- status configuravel pode bloquear alteracao posterior

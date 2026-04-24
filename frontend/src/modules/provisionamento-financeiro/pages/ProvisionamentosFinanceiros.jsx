@@ -1,11 +1,9 @@
-import { useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   HiAdjustmentsHorizontal,
-  HiDocumentArrowDown,
   HiViewColumns
 } from 'react-icons/hi2';
-import { AuthContext } from '../../../contexts/AuthContext';
 import {
   getProvisionamentoFinanceiroContexto,
   listarCategoriasMacroProvisionamento,
@@ -16,75 +14,47 @@ import { formatarMoedaBRL } from '../utils/moeda';
 const DEFAULT_FILTERS = {
   obra_id: '',
   categoria_macro_id: '',
+  status: '',
   prioridade: '',
   busca: '',
   fornecedor: '',
+  usuario_criacao_id: '',
   data_inicial: '',
-  data_final: '',
-  valor_minimo: '',
-  valor_maximo: '',
-  usuario_criacao_id: ''
+  data_final: ''
 };
-
-const DEFAULT_VISIBLE_FILTERS = [
-  'obra_id',
-  'categoria_macro_id',
-  'prioridade',
-  'busca',
-  'fornecedor',
-  'usuario_criacao_id',
-  'data_inicial',
-  'data_final',
-  'valor_minimo',
-  'valor_maximo'
-];
 
 const FILTER_OPTIONS = [
   { id: 'obra_id', label: 'Obra' },
-  { id: 'categoria_macro_id', label: 'Item Macro' },
+  { id: 'categoria_macro_id', label: 'Item macro' },
   { id: 'prioridade', label: 'Prioridade' },
   { id: 'busca', label: 'Busca' },
   { id: 'fornecedor', label: 'Fornecedor' },
   { id: 'usuario_criacao_id', label: 'Criador' },
-  { id: 'data_inicial', label: 'Data prevista inicial' },
-  { id: 'data_final', label: 'Data prevista final' },
-  { id: 'valor_minimo', label: 'Valor minimo' },
-  { id: 'valor_maximo', label: 'Valor maximo' }
+  { id: 'data_inicial', label: 'Data inicial' },
+  { id: 'data_final', label: 'Data final' }
 ];
 
 const COLUMN_DEFS = [
   { id: 'codigo', label: 'Codigo', sortKey: 'codigo', mandatory: true },
   { id: 'obra', label: 'Obra', sortKey: 'obra' },
   { id: 'data_prevista', label: 'Data prevista', sortKey: 'data_prevista_desembolso' },
-  { id: 'item_macro', label: 'Item Macro', sortKey: 'categoria_macro' },
+  { id: 'categoria', label: 'Item macro', sortKey: 'categoria_macro' },
   { id: 'descricao', label: 'Descricao', sortKey: 'descricao' },
   { id: 'fornecedor', label: 'Fornecedor', sortKey: 'fornecedor_texto' },
-  { id: 'valor_previsto', label: 'Valor previsto', sortKey: 'valor_previsto' },
-  { id: 'prioridade', label: 'Prioridade', sortKey: 'prioridade' },
-  { id: 'criador', label: 'Criador', sortKey: 'usuario_criacao' },
-  { id: 'criado_em', label: 'Criado em', sortKey: 'createdAt' },
+  { id: 'valor', label: 'Valor previsto', sortKey: 'valor_previsto' },
+  { id: 'status', label: 'Status' },
+  { id: 'prioridade', label: 'Prioridade' },
   { id: 'acoes', label: 'Acoes', mandatory: true }
 ];
 
 const DEFAULT_VISIBLE_COLUMNS = COLUMN_DEFS.map((coluna) => coluna.id);
-
-const PRIORIDADE_OPCOES = [
-  { value: '', label: 'Todas' },
-  { value: 'baixa', label: 'Baixa' },
-  { value: 'media', label: 'Media' },
-  { value: 'alta', label: 'Alta' },
-  { value: 'critica', label: 'Critica' }
-];
+const DEFAULT_VISIBLE_FILTERS = FILTER_OPTIONS.map((item) => item.id);
 
 function formatarData(valor) {
   if (!valor) return '-';
   const match = String(valor).match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (match) return `${match[3]}/${match[2]}/${match[1]}`;
-  const data = new Date(valor);
-  if (Number.isNaN(data.getTime())) {
-    return '-';
-  }
-  return data.toLocaleDateString('pt-BR');
+  return '-';
 }
 
 function formatarObra(obra) {
@@ -92,48 +62,27 @@ function formatarObra(obra) {
   return `${obra.codigo ? `${obra.codigo} - ` : ''}${obra.nome}`;
 }
 
+function formatarStatus(valor) {
+  const normalized = String(valor || '').toLowerCase();
+  const labels = {
+    previsto: 'Previsto',
+    em_analise: 'Em analise',
+    aprovado: 'Aprovado',
+    cancelado: 'Cancelado',
+    realizado: 'Realizado'
+  };
+  return labels[normalized] || '-';
+}
+
 function formatarPrioridade(valor) {
-  if (!valor) return '-';
-  return String(valor).charAt(0).toUpperCase() + String(valor).slice(1);
-}
-
-function valueOrEmpty(valor) {
-  return valor ?? '';
-}
-
-function escaparColunaCsv(valor) {
-  const texto = String(valor ?? '');
-  if (!texto.includes(';') && !texto.includes('"') && !texto.includes('\n')) {
-    return texto;
-  }
-
-  return `"${texto.replace(/"/g, '""')}"`;
-}
-
-function limparObjetoFiltros(filtros) {
-  return Object.keys(DEFAULT_FILTERS).reduce((acc, chave) => {
-    acc[chave] = valueOrEmpty(filtros?.[chave] ?? DEFAULT_FILTERS[chave]);
-    return acc;
-  }, {});
-}
-
-function normalizarListaPreferencias(lista, opcoes, obrigatorias = []) {
-  const idsValidos = new Set(opcoes.map((opcao) => opcao.id));
-  const filtradas = Array.isArray(lista)
-    ? lista.filter((item) => idsValidos.has(item))
-    : [];
-
-  obrigatorias.forEach((id) => {
-    if (!filtradas.includes(id)) {
-      filtradas.push(id);
-    }
-  });
-
-  if (filtradas.length === 0) {
-    return opcoes.map((opcao) => opcao.id);
-  }
-
-  return filtradas;
+  const normalized = String(valor || '').toLowerCase();
+  const labels = {
+    baixa: 'Baixa',
+    media: 'Media',
+    alta: 'Alta',
+    critica: 'Critica'
+  };
+  return labels[normalized] || '-';
 }
 
 function ResumoCard({ titulo, valor }) {
@@ -147,86 +96,22 @@ function ResumoCard({ titulo, valor }) {
 
 export default function ProvisionamentosFinanceiros() {
   const navigate = useNavigate();
-  const { user } = useContext(AuthContext);
   const [contexto, setContexto] = useState(null);
   const [categorias, setCategorias] = useState([]);
   const [lista, setLista] = useState([]);
-  const [meta, setMeta] = useState({ page: 1, pages: 0, total: 0, limit: 25 });
-  const [resumo, setResumo] = useState({
-    total_registros_filtrados: 0,
-    valor_total_filtrado: 0
-  });
+  const [meta, setMeta] = useState({ page: 1, limit: 25, total: 0, pages: 0 });
+  const [resumo, setResumo] = useState({ total_registros_filtrados: 0, valor_total_filtrado: 0 });
   const [loadingBase, setLoadingBase] = useState(true);
   const [loadingLista, setLoadingLista] = useState(false);
-  const [exportando, setExportando] = useState(false);
-  const [filtrosStoragePronto, setFiltrosStoragePronto] = useState(false);
-  const [selecionadasIds, setSelecionadasIds] = useState([]);
-  const [itensSelecionados, setItensSelecionados] = useState({});
+  const [mostrarColunas, setMostrarColunas] = useState(false);
+  const [mostrarFiltros, setMostrarFiltros] = useState(false);
   const [filtros, setFiltros] = useState(DEFAULT_FILTERS);
   const [ordenacao, setOrdenacao] = useState({
     sort_by: 'data_prevista_desembolso',
     sort_dir: 'ASC'
   });
-  const [mostrarSeletorColunas, setMostrarSeletorColunas] = useState(false);
-  const [mostrarSeletorFiltros, setMostrarSeletorFiltros] = useState(false);
   const [colunasVisiveis, setColunasVisiveis] = useState(DEFAULT_VISIBLE_COLUMNS);
   const [filtrosVisiveis, setFiltrosVisiveis] = useState(DEFAULT_VISIBLE_FILTERS);
-  const seletorColunasRef = useRef(null);
-  const seletorFiltrosRef = useRef(null);
-  const botaoColunasRef = useRef(null);
-  const botaoFiltrosRef = useRef(null);
-
-  const storageKey = useMemo(() => {
-    const identificador = user?.id || user?.email || user?.nome || user?.perfil || 'anon';
-    return `provisionamento-financeiro:lista:${identificador}`;
-  }, [user?.id, user?.email, user?.nome, user?.perfil]);
-
-  useEffect(() => {
-    try {
-      const salvo = window.localStorage.getItem(storageKey);
-      if (salvo) {
-        const parsed = JSON.parse(salvo);
-        if (parsed?.filtros && typeof parsed.filtros === 'object') {
-          setFiltros(limparObjetoFiltros(parsed.filtros));
-        }
-        if (parsed?.ordenacao && typeof parsed.ordenacao === 'object') {
-          setOrdenacao((atual) => ({
-            ...atual,
-            sort_by: parsed.ordenacao.sort_by || atual.sort_by,
-            sort_dir: parsed.ordenacao.sort_dir === 'DESC' ? 'DESC' : 'ASC'
-          }));
-        }
-        if (parsed?.limit) {
-          setMeta((atual) => ({ ...atual, limit: Number(parsed.limit) || atual.limit || 25 }));
-        }
-        if (parsed?.colunasVisiveis) {
-          setColunasVisiveis(normalizarListaPreferencias(parsed.colunasVisiveis, COLUMN_DEFS, ['codigo', 'acoes']));
-        }
-        if (parsed?.filtrosVisiveis) {
-          setFiltrosVisiveis(normalizarListaPreferencias(parsed.filtrosVisiveis, FILTER_OPTIONS));
-        }
-      }
-    } catch (error) {
-      console.error('Erro ao carregar preferencias do provisionamento financeiro', error);
-    } finally {
-      setFiltrosStoragePronto(true);
-    }
-  }, [storageKey]);
-
-  useEffect(() => {
-    if (!filtrosStoragePronto) return;
-    try {
-      window.localStorage.setItem(storageKey, JSON.stringify({
-        filtros,
-        ordenacao,
-        limit: meta.limit,
-        colunasVisiveis,
-        filtrosVisiveis
-      }));
-    } catch (error) {
-      console.error('Erro ao salvar preferencias do provisionamento financeiro', error);
-    }
-  }, [filtros, ordenacao, meta.limit, colunasVisiveis, filtrosVisiveis, storageKey, filtrosStoragePronto]);
 
   useEffect(() => {
     async function carregarBase() {
@@ -240,7 +125,7 @@ export default function ProvisionamentosFinanceiros() {
         setCategorias(Array.isArray(categoriasData) ? categoriasData : []);
       } catch (error) {
         console.error(error);
-        alert(error?.message || 'Erro ao carregar o modulo de provisionamento financeiro.');
+        alert(error?.message || 'Erro ao carregar o modulo de provisoes.');
       } finally {
         setLoadingBase(false);
       }
@@ -250,76 +135,40 @@ export default function ProvisionamentosFinanceiros() {
   }, []);
 
   useEffect(() => {
-    if (!contexto || !filtrosStoragePronto) return;
+    if (!contexto) return;
 
     async function carregarLista() {
       try {
         setLoadingLista(true);
         const data = await listarProvisoesFinanceiras({
-          page: meta.page,
-          limit: meta.limit,
+          ...filtros,
           ...ordenacao,
-          ...filtros
+          page: meta.page,
+          limit: meta.limit
         });
 
         setLista(Array.isArray(data?.items) ? data.items : []);
         setMeta((atual) => ({
           ...atual,
-          ...data?.meta,
           page: Number(data?.meta?.page || atual.page || 1),
-          pages: Number(data?.meta?.pages || 0),
-          total: Number(data?.meta?.total || 0)
+          limit: Number(data?.meta?.limit || atual.limit || 25),
+          total: Number(data?.meta?.total || 0),
+          pages: Number(data?.meta?.pages || 0)
         }));
         setResumo({
-          total_registros_filtrados: Number(data?.resumo?.total_registros_filtrados || data?.meta?.total || 0),
+          total_registros_filtrados: Number(data?.resumo?.total_registros_filtrados || 0),
           valor_total_filtrado: Number(data?.resumo?.valor_total_filtrado || 0)
         });
       } catch (error) {
         console.error(error);
-        alert(error?.message || 'Erro ao listar provisoes financeiras.');
+        alert(error?.message || 'Erro ao listar provisoes.');
       } finally {
         setLoadingLista(false);
       }
     }
 
     carregarLista();
-  }, [contexto, filtrosStoragePronto, filtros, ordenacao, meta.page, meta.limit]);
-
-  useEffect(() => {
-    function fecharAoClicarFora(event) {
-      const alvo = event.target;
-
-      if (
-        mostrarSeletorColunas &&
-        !seletorColunasRef.current?.contains(alvo) &&
-        !botaoColunasRef.current?.contains(alvo)
-      ) {
-        setMostrarSeletorColunas(false);
-      }
-
-      if (
-        mostrarSeletorFiltros &&
-        !seletorFiltrosRef.current?.contains(alvo) &&
-        !botaoFiltrosRef.current?.contains(alvo)
-      ) {
-        setMostrarSeletorFiltros(false);
-      }
-    }
-
-    document.addEventListener('mousedown', fecharAoClicarFora);
-    return () => document.removeEventListener('mousedown', fecharAoClicarFora);
-  }, [mostrarSeletorColunas, mostrarSeletorFiltros]);
-
-  useEffect(() => {
-    function handleEscape(event) {
-      if (event.key !== 'Escape') return;
-      setMostrarSeletorColunas(false);
-      setMostrarSeletorFiltros(false);
-    }
-
-    document.addEventListener('keydown', handleEscape);
-    return () => document.removeEventListener('keydown', handleEscape);
-  }, []);
+  }, [contexto, filtros, ordenacao, meta.page, meta.limit]);
 
   const obrasAcesso = useMemo(() => (
     Array.isArray(contexto?.obras_acesso) ? contexto.obras_acesso : []
@@ -329,39 +178,13 @@ export default function ProvisionamentosFinanceiros() {
     Array.isArray(contexto?.criadores_filtro) ? contexto.criadores_filtro : []
   ), [contexto]);
 
-  const idsPaginaAtual = useMemo(() => (
-    lista
-      .map((item) => Number(item?.id))
-      .filter((id) => Number.isInteger(id) && id > 0)
-  ), [lista]);
-
-  const todasPaginaSelecionadas = useMemo(() => (
-    idsPaginaAtual.length > 0 && idsPaginaAtual.every((id) => selecionadasIds.includes(id))
-  ), [idsPaginaAtual, selecionadasIds]);
-
-  const quantidadeSelecionadas = selecionadasIds.length;
-
   const colunasRenderizadas = useMemo(() => (
     COLUMN_DEFS.filter((coluna) => colunasVisiveis.includes(coluna.id))
   ), [colunasVisiveis]);
 
-  useEffect(() => {
-    if (!Array.isArray(lista) || lista.length === 0) return;
-
-    setItensSelecionados((atual) => {
-      const proximo = { ...atual };
-      lista.forEach((item) => {
-        if (selecionadasIds.includes(Number(item.id))) {
-          proximo[item.id] = item;
-        }
-      });
-      return proximo;
-    });
-  }, [lista, selecionadasIds]);
-
   function atualizarFiltro(campo, valor) {
     setMeta((atual) => ({ ...atual, page: 1 }));
-    setFiltros((atual) => ({ ...atual, [campo]: valueOrEmpty(valor) }));
+    setFiltros((atual) => ({ ...atual, [campo]: valor ?? '' }));
   }
 
   function limparFiltros() {
@@ -371,18 +194,12 @@ export default function ProvisionamentosFinanceiros() {
 
   function alternarOrdenacao(sortKey) {
     if (!sortKey) return;
-
     setMeta((atual) => ({ ...atual, page: 1 }));
-    setOrdenacao((atual) => {
-      if (atual.sort_by !== sortKey) {
-        return { sort_by: sortKey, sort_dir: 'ASC' };
-      }
-
-      return {
-        sort_by: sortKey,
-        sort_dir: atual.sort_dir === 'ASC' ? 'DESC' : 'ASC'
-      };
-    });
+    setOrdenacao((atual) => (
+      atual.sort_by === sortKey
+        ? { sort_by: sortKey, sort_dir: atual.sort_dir === 'ASC' ? 'DESC' : 'ASC' }
+        : { sort_by: sortKey, sort_dir: 'ASC' }
+    ));
   }
 
   function indicadorOrdenacao(sortKey) {
@@ -390,139 +207,22 @@ export default function ProvisionamentosFinanceiros() {
     return ordenacao.sort_dir === 'ASC' ? ' ^' : ' v';
   }
 
-  function alternarSelecionada(item) {
-    const itemId = Number(item?.id);
-    if (!Number.isInteger(itemId) || itemId <= 0) return;
-    const jaSelecionada = selecionadasIds.includes(itemId);
-
-    setSelecionadasIds((atual) => {
-      if (atual.includes(itemId)) {
-        return atual.filter((id) => id !== itemId);
-      }
-      return [...atual, itemId];
-    });
-
-    setItensSelecionados((atual) => {
-      if (jaSelecionada) {
-        const proximo = { ...atual };
-        delete proximo[itemId];
-        return proximo;
-      }
-
-      return {
-        ...atual,
-        [itemId]: item
-      };
-    });
-  }
-
-  function alternarTodasPaginaAtual() {
-    if (idsPaginaAtual.length === 0) return;
-
-    if (todasPaginaSelecionadas) {
-      setSelecionadasIds((atual) => atual.filter((id) => !idsPaginaAtual.includes(id)));
-      setItensSelecionados((atual) => {
-        const proximo = { ...atual };
-        idsPaginaAtual.forEach((id) => {
-          delete proximo[id];
-        });
-        return proximo;
-      });
-      return;
-    }
-
-    setSelecionadasIds((atual) => Array.from(new Set([...atual, ...idsPaginaAtual])));
-    setItensSelecionados((atual) => {
-      const proximo = { ...atual };
-      lista.forEach((item) => {
-        proximo[item.id] = item;
-      });
-      return proximo;
-    });
-  }
-
   function toggleColuna(id) {
     const obrigatorias = new Set(['codigo', 'acoes']);
     if (obrigatorias.has(id)) return;
-
     setColunasVisiveis((atual) => (
       atual.includes(id)
-        ? atual.filter((colunaId) => colunaId !== id)
+        ? atual.filter((item) => item !== id)
         : [...atual, id]
     ));
   }
 
-  function toggleFiltroVisivel(id) {
+  function toggleFiltro(id) {
     setFiltrosVisiveis((atual) => (
       atual.includes(id)
-        ? atual.filter((filtroId) => filtroId !== id)
+        ? atual.filter((item) => item !== id)
         : [...atual, id]
     ));
-  }
-
-  function exportarSelecionadasCsv() {
-    if (selecionadasIds.length === 0) {
-      alert('Selecione ao menos uma previsao para exportar.');
-      return;
-    }
-
-    try {
-      setExportando(true);
-
-      const registros = selecionadasIds
-        .map((id) => itensSelecionados[id])
-        .filter(Boolean);
-
-      if (registros.length === 0) {
-        alert('Nenhuma previsao selecionada esta disponivel para exportacao.');
-        return;
-      }
-
-      const cabecalho = [
-        'Codigo',
-        'Obra',
-        'Data prevista',
-        'Item Macro',
-        'Descricao',
-        'Fornecedor',
-        'Valor previsto',
-        'Prioridade',
-        'Criador',
-        'Data de criacao'
-      ];
-
-      const linhas = registros.map((item) => ([
-        item.codigo || '',
-        formatarObra(item.obra),
-        formatarData(item.data_prevista_desembolso),
-        item.categoriaMacro?.nome || '',
-        item.descricao || '',
-        item.fornecedor_texto || '',
-        Number(item.valor_previsto || 0).toFixed(2).replace('.', ','),
-        item.prioridade || '',
-        item.usuarioCriacao?.nome || '',
-        formatarData(item.createdAt)
-      ]));
-
-      const csv = [cabecalho, ...linhas]
-        .map((colunas) => colunas.map(escaparColunaCsv).join(';'))
-        .join('\n');
-
-      const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' });
-      const url = window.URL.createObjectURL(blob);
-      const anchor = document.createElement('a');
-      anchor.href = url;
-      anchor.download = `provisoes-financeiras-selecionadas-${new Date().toISOString().slice(0, 10)}.csv`;
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
-      window.URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error(error);
-      alert(error?.message || 'Erro ao exportar previsoes selecionadas.');
-    } finally {
-      setExportando(false);
-    }
   }
 
   function renderFiltro(id) {
@@ -534,9 +234,7 @@ export default function ProvisionamentosFinanceiros() {
             <select className="input" value={filtros.obra_id} onChange={(event) => atualizarFiltro('obra_id', event.target.value)}>
               <option value="">Todas</option>
               {obrasAcesso.map((obra) => (
-                <option key={obra.id} value={obra.id}>
-                  {formatarObra(obra)}
-                </option>
+                <option key={obra.id} value={obra.id}>{formatarObra(obra)}</option>
               ))}
             </select>
           </label>
@@ -544,12 +242,26 @@ export default function ProvisionamentosFinanceiros() {
       case 'categoria_macro_id':
         return (
           <label key={id} className="grid gap-1 text-sm">
-            Item Macro
+            Item macro
             <select className="input" value={filtros.categoria_macro_id} onChange={(event) => atualizarFiltro('categoria_macro_id', event.target.value)}>
-              <option value="">Todas</option>
+              <option value="">Todos</option>
               {categorias.map((categoria) => (
                 <option key={categoria.id} value={categoria.id}>{categoria.nome}</option>
               ))}
+            </select>
+          </label>
+        );
+      case 'status':
+        return (
+          <label key={id} className="grid gap-1 text-sm">
+            Status
+            <select className="input" value={filtros.status} onChange={(event) => atualizarFiltro('status', event.target.value)}>
+              <option value="">Todos</option>
+              <option value="previsto">Previsto</option>
+              <option value="em_analise">Em analise</option>
+              <option value="aprovado">Aprovado</option>
+              <option value="cancelado">Cancelado</option>
+              <option value="realizado">Realizado</option>
             </select>
           </label>
         );
@@ -558,9 +270,11 @@ export default function ProvisionamentosFinanceiros() {
           <label key={id} className="grid gap-1 text-sm">
             Prioridade
             <select className="input" value={filtros.prioridade} onChange={(event) => atualizarFiltro('prioridade', event.target.value)}>
-              {PRIORIDADE_OPCOES.map((prioridade) => (
-                <option key={prioridade.value || 'todas'} value={prioridade.value}>{prioridade.label}</option>
-              ))}
+              <option value="">Todas</option>
+              <option value="baixa">Baixa</option>
+              <option value="media">Media</option>
+              <option value="alta">Alta</option>
+              <option value="critica">Critica</option>
             </select>
           </label>
         );
@@ -568,24 +282,14 @@ export default function ProvisionamentosFinanceiros() {
         return (
           <label key={id} className="grid gap-1 text-sm">
             Busca
-            <input
-              className="input"
-              placeholder="Codigo, descricao ou fornecedor"
-              value={filtros.busca}
-              onChange={(event) => atualizarFiltro('busca', event.target.value)}
-            />
+            <input className="input" value={filtros.busca} onChange={(event) => atualizarFiltro('busca', event.target.value)} placeholder="Codigo, descricao ou fornecedor" />
           </label>
         );
       case 'fornecedor':
         return (
           <label key={id} className="grid gap-1 text-sm">
             Fornecedor
-            <input
-              className="input"
-              placeholder="Nome do fornecedor"
-              value={filtros.fornecedor}
-              onChange={(event) => atualizarFiltro('fornecedor', event.target.value)}
-            />
+            <input className="input" value={filtros.fornecedor} onChange={(event) => atualizarFiltro('fornecedor', event.target.value)} placeholder="Nome do fornecedor" />
           </label>
         );
       case 'usuario_criacao_id':
@@ -595,9 +299,7 @@ export default function ProvisionamentosFinanceiros() {
             <select className="input" value={filtros.usuario_criacao_id} onChange={(event) => atualizarFiltro('usuario_criacao_id', event.target.value)}>
               <option value="">Todos</option>
               {criadoresFiltro.map((criador) => (
-                <option key={criador.id} value={criador.id}>
-                  {criador.nome || criador.email || `Usuario ${criador.id}`}
-                </option>
+                <option key={criador.id} value={criador.id}>{criador.nome || criador.email}</option>
               ))}
             </select>
           </label>
@@ -605,53 +307,15 @@ export default function ProvisionamentosFinanceiros() {
       case 'data_inicial':
         return (
           <label key={id} className="grid gap-1 text-sm">
-            Data prevista inicial
-            <input
-              type="date"
-              className="input"
-              value={filtros.data_inicial}
-              onChange={(event) => atualizarFiltro('data_inicial', event.target.value)}
-            />
+            Data inicial
+            <input type="date" className="input" value={filtros.data_inicial} onChange={(event) => atualizarFiltro('data_inicial', event.target.value)} />
           </label>
         );
       case 'data_final':
         return (
           <label key={id} className="grid gap-1 text-sm">
-            Data prevista final
-            <input
-              type="date"
-              className="input"
-              value={filtros.data_final}
-              onChange={(event) => atualizarFiltro('data_final', event.target.value)}
-            />
-          </label>
-        );
-      case 'valor_minimo':
-        return (
-          <label key={id} className="grid gap-1 text-sm">
-            Valor minimo
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              className="input"
-              value={filtros.valor_minimo}
-              onChange={(event) => atualizarFiltro('valor_minimo', event.target.value)}
-            />
-          </label>
-        );
-      case 'valor_maximo':
-        return (
-          <label key={id} className="grid gap-1 text-sm">
-            Valor maximo
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              className="input"
-              value={filtros.valor_maximo}
-              onChange={(event) => atualizarFiltro('valor_maximo', event.target.value)}
-            />
+            Data final
+            <input type="date" className="input" value={filtros.data_final} onChange={(event) => atualizarFiltro('data_final', event.target.value)} />
           </label>
         );
       default:
@@ -667,29 +331,24 @@ export default function ProvisionamentosFinanceiros() {
         return formatarObra(item.obra);
       case 'data_prevista':
         return formatarData(item.data_prevista_desembolso);
-      case 'item_macro':
+      case 'categoria':
         return item.categoriaMacro?.nome || '-';
       case 'descricao':
         return item.descricao || '-';
       case 'fornecedor':
         return item.fornecedor_texto || '-';
-      case 'valor_previsto':
+      case 'valor':
         return formatarMoedaBRL(item.valor_previsto);
+      case 'status':
+        return formatarStatus(item.status);
       case 'prioridade':
         return formatarPrioridade(item.prioridade);
-      case 'criador':
-        return item.usuarioCriacao?.nome || '-';
-      case 'criado_em':
-        return formatarData(item.createdAt);
       case 'acoes':
         return (
           <button
             type="button"
             className="btn btn-outline"
-            onClick={(event) => {
-              event.stopPropagation();
-              navigate(`/provisoes-financeiras/${item.id}`);
-            }}
+            onClick={() => navigate(`/provisoes-financeiras/${item.id}`)}
           >
             Detalhes
           </button>
@@ -705,160 +364,94 @@ export default function ProvisionamentosFinanceiros() {
 
   return (
     <div className="page space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="mx-auto flex w-full max-w-6xl flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="page-title">Provisionamento Financeiro</h1>
-          <p className="page-subtitle">
-            Registro macro de previsao de desembolso por obra, sem fluxo de etapas e com foco em acompanhamento gerencial.
-          </p>
+          <h1 className="page-title">Provisionamentos</h1>
+          <p className="page-subtitle">Acompanhe previsoes de desembolso por obra, categoria e periodo.</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {Boolean(contexto?.permissoes?.pode_categorias) && (
+            <button type="button" className="btn btn-outline" onClick={() => navigate('/provisoes-financeiras/categorias')}>
+              Categorias macro
+            </button>
+          )}
+          {Boolean(contexto?.permissoes?.pode_criar) && (
+            <button type="button" className="btn btn-primary" onClick={() => navigate('/provisoes-financeiras/nova')}>
+              Nova provisao
+            </button>
+          )}
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <ResumoCard titulo="Total filtrado" valor={formatarMoedaBRL(resumo.valor_total_filtrado)} />
+      <div className="mx-auto grid w-full max-w-6xl gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <ResumoCard titulo="Valor total filtrado" valor={formatarMoedaBRL(resumo.valor_total_filtrado)} />
         <ResumoCard titulo="Registros filtrados" valor={String(resumo.total_registros_filtrados || 0)} />
+        <ResumoCard titulo="Pagina atual" valor={`${meta.page || 1} / ${meta.pages || 1}`} />
       </div>
 
-      <div className="card space-y-4">
+      <div className="card relative mx-auto w-full max-w-6xl space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="font-semibold">Filtros</h2>
-          <button type="button" className="btn btn-outline" onClick={limparFiltros}>
-            Limpar filtros
-          </button>
-        </div>
-
-        {filtrosVisiveis.length > 0 ? (
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            {FILTER_OPTIONS
-              .filter((filtro) => filtrosVisiveis.includes(filtro.id))
-              .map((filtro) => renderFiltro(filtro.id))}
-          </div>
-        ) : (
-          <div className="rounded-xl border border-dashed border-[var(--c-border)] p-6 text-sm text-[var(--c-muted)]">
-            Nenhum filtro visivel selecionado. Use o botao <strong>Filtros</strong> na barra acima da tabela para escolher quais filtros exibir.
-          </div>
-        )}
-      </div>
-
-      <div className="card relative space-y-4">
-        <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
-          <div className="text-sm text-[var(--c-muted)]">
-            Selecionadas: <strong>{quantidadeSelecionadas}</strong>
-          </div>
-          <div className="flex flex-wrap gap-2 xl:ml-auto">
-            {String(user?.perfil || '').toUpperCase() === 'SUPERADMIN' && (
-              <button type="button" className="btn btn-outline" onClick={() => navigate('/provisoes-financeiras/categorias')}>
-                Categorias macro
-              </button>
-            )}
-            <button type="button" className="btn btn-outline inline-flex items-center gap-2" onClick={exportarSelecionadasCsv} disabled={exportando || quantidadeSelecionadas === 0}>
-              <HiDocumentArrowDown className="w-4 h-4" />
-              <span className="hidden sm:inline">Exportar</span>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" className="btn btn-outline inline-flex items-center gap-2" onClick={() => { setMostrarFiltros((valor) => !valor); setMostrarColunas(false); }}>
+              <HiAdjustmentsHorizontal className="h-4 w-4" />
+              Filtros
             </button>
-            <button
-              ref={botaoColunasRef}
-              type="button"
-              className="btn btn-outline inline-flex items-center gap-2"
-              onClick={() => {
-                setMostrarSeletorColunas((valor) => !valor);
-                setMostrarSeletorFiltros(false);
-              }}
-            >
-              <HiViewColumns className="w-4 h-4" />
-              <span className="hidden sm:inline">Colunas</span>
+            <button type="button" className="btn btn-outline inline-flex items-center gap-2" onClick={() => { setMostrarColunas((valor) => !valor); setMostrarFiltros(false); }}>
+              <HiViewColumns className="h-4 w-4" />
+              Colunas
             </button>
-            <button
-              ref={botaoFiltrosRef}
-              type="button"
-              className="btn btn-outline inline-flex items-center gap-2"
-              onClick={() => {
-                setMostrarSeletorFiltros((valor) => !valor);
-                setMostrarSeletorColunas(false);
-              }}
-            >
-              <HiAdjustmentsHorizontal className="w-4 h-4" />
-              <span className="hidden sm:inline">Filtros</span>
+            <button type="button" className="btn btn-outline" onClick={limparFiltros}>
+              Limpar
             </button>
-            {Boolean(contexto?.permissoes?.pode_criar) && (
-              <button type="button" className="btn btn-primary" onClick={() => navigate('/provisoes-financeiras/nova')}>
-                Nova provisao
-              </button>
-            )}
           </div>
         </div>
 
-        {mostrarSeletorColunas && (
-          <div ref={seletorColunasRef} className="absolute right-0 top-[56px] z-20 w-[320px] max-w-[calc(100vw-2rem)] rounded-xl border border-gray-200 bg-white p-3 shadow-lg">
-            <div className="mb-2 flex items-center justify-between">
-              <p className="text-sm font-medium">Colunas visiveis</p>
-              <button type="button" className="text-xs text-blue-600 hover:underline" onClick={() => setColunasVisiveis(COLUMN_DEFS.map((coluna) => coluna.id))}>
-                Mostrar todas
-              </button>
+        {mostrarFiltros && (
+          <div className="rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4">
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              {FILTER_OPTIONS.filter((item) => filtrosVisiveis.includes(item.id)).map((item) => renderFiltro(item.id))}
             </div>
-            <div className="grid grid-cols-2 gap-2 max-h-60 overflow-y-auto">
-              {COLUMN_DEFS.map((coluna) => {
-                const obrigatoria = Boolean(coluna.mandatory);
-                const marcada = colunasVisiveis.includes(coluna.id);
-                return (
-                  <label key={coluna.id} className="flex items-center gap-2 text-sm">
-                    <input type="checkbox" checked={marcada} disabled={obrigatoria} onChange={() => toggleColuna(coluna.id)} />
-                    <span className={obrigatoria ? 'text-gray-500' : ''}>{coluna.label}</span>
-                  </label>
-                );
-              })}
+            <div className="mt-4 flex flex-wrap gap-3">
+              {FILTER_OPTIONS.map((item) => (
+                <label key={item.id} className="flex items-center gap-2 text-sm">
+                  <input type="checkbox" checked={filtrosVisiveis.includes(item.id)} onChange={() => toggleFiltro(item.id)} />
+                  <span>{item.label}</span>
+                </label>
+              ))}
             </div>
           </div>
         )}
 
-        {mostrarSeletorFiltros && (
-          <div ref={seletorFiltrosRef} className="absolute right-0 top-[56px] z-20 w-[320px] max-w-[calc(100vw-2rem)] rounded-xl border border-gray-200 bg-white p-3 shadow-lg">
-            <div className="mb-2 flex items-center justify-between">
-              <p className="text-sm font-medium">Filtros visiveis</p>
-              <button type="button" className="text-xs text-blue-600 hover:underline" onClick={() => setFiltrosVisiveis(FILTER_OPTIONS.map((filtro) => filtro.id))}>
-                Mostrar todos
-              </button>
-            </div>
-            <div className="grid grid-cols-1 gap-2 max-h-60 overflow-y-auto">
-              {FILTER_OPTIONS.map((filtro) => {
-                const marcada = filtrosVisiveis.includes(filtro.id);
-                return (
-                  <label key={filtro.id} className="flex items-center gap-2 text-sm">
-                    <input type="checkbox" checked={marcada} onChange={() => toggleFiltroVisivel(filtro.id)} />
-                    <span>{filtro.label}</span>
-                  </label>
-                );
-              })}
+        {mostrarColunas && (
+          <div className="rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4">
+            <div className="flex flex-wrap gap-3">
+              {COLUMN_DEFS.map((item) => (
+                <label key={item.id} className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={colunasVisiveis.includes(item.id)}
+                    disabled={Boolean(item.mandatory)}
+                    onChange={() => toggleColuna(item.id)}
+                  />
+                  <span>{item.label}</span>
+                </label>
+              ))}
             </div>
           </div>
         )}
       </div>
 
-      <div className="card">
-        <div className="card-header flex flex-wrap items-center justify-between gap-3">
-          <h2 className="font-semibold">Registros</h2>
-          <span className="text-sm text-[var(--c-muted)]">{meta.total || 0} registro(s)</span>
-        </div>
-
+      <div className="card mx-auto w-full max-w-6xl">
         {loadingLista ? (
           <div className="py-8 text-center text-sm text-[var(--c-muted)]">Carregando...</div>
         ) : lista.length === 0 ? (
-          <div className="py-8 text-center text-sm text-[var(--c-muted)]">Nenhuma provisao financeira encontrada.</div>
+          <div className="py-8 text-center text-sm text-[var(--c-muted)]">Nenhum provisionamento encontrado.</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="table">
               <thead>
                 <tr>
-                  <th className="w-12">
-                    <label className="flex items-center justify-center">
-                      <input
-                        type="checkbox"
-                        checked={todasPaginaSelecionadas}
-                        onChange={alternarTodasPaginaAtual}
-                        onClick={(event) => event.stopPropagation()}
-                        title={todasPaginaSelecionadas ? 'Desmarcar todas da pagina' : 'Selecionar todas da pagina'}
-                      />
-                    </label>
-                  </th>
                   {colunasRenderizadas.map((coluna) => (
                     <th key={coluna.id}>
                       {coluna.sortKey ? (
@@ -872,17 +465,7 @@ export default function ProvisionamentosFinanceiros() {
               </thead>
               <tbody>
                 {lista.map((item) => (
-                  <tr key={item.id} className="cursor-pointer" onClick={() => alternarSelecionada(item)}>
-                    <td>
-                      <label className="flex items-center justify-center" onClick={(event) => event.stopPropagation()}>
-                        <input
-                          type="checkbox"
-                          checked={selecionadasIds.includes(Number(item.id))}
-                          onChange={() => alternarSelecionada(item)}
-                          onClick={(event) => event.stopPropagation()}
-                        />
-                      </label>
-                    </td>
+                  <tr key={item.id}>
                     {colunasRenderizadas.map((coluna) => (
                       <td key={coluna.id}>{renderCelula(item, coluna.id)}</td>
                     ))}
@@ -894,26 +477,9 @@ export default function ProvisionamentosFinanceiros() {
         )}
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm">
-          <div className="flex flex-wrap items-center gap-3">
-            <span className="text-[var(--c-muted)]">
-              Pagina {meta.page || 1} de {meta.pages || 1}
-            </span>
-            <label className="flex items-center gap-2 text-[var(--c-muted)]">
-              <span>Itens por pagina</span>
-              <select
-                className="input min-w-[96px]"
-                value={meta.limit}
-                onChange={(event) => {
-                  const limit = Number(event.target.value) || 25;
-                  setMeta((atual) => ({ ...atual, limit, page: 1 }));
-                }}
-              >
-                {[25, 50, 100, 200].map((opcao) => (
-                  <option key={opcao} value={opcao}>{opcao}</option>
-                ))}
-              </select>
-            </label>
-          </div>
+          <span className="text-[var(--c-muted)]">
+            Pagina {meta.page || 1} de {meta.pages || 1} · {meta.total || 0} registro(s)
+          </span>
           <div className="flex flex-wrap items-center gap-2">
             <button type="button" className="btn btn-outline" disabled={(meta.page || 1) <= 1} onClick={() => setMeta((atual) => ({ ...atual, page: Math.max(1, (atual.page || 1) - 1) }))}>
               Anterior

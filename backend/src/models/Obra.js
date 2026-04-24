@@ -9,10 +9,6 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.STRING,
       allowNull: true
     },
-    classificacao_obra: {
-      type: DataTypes.ENUM('PUBLICA', 'PRIVADA'),
-      allowNull: true
-    },
     nome: {
       type: DataTypes.STRING,
       allowNull: false
@@ -21,6 +17,26 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.BOOLEAN,
       allowNull: false,
       defaultValue: true
+    },
+    classificacao: {
+      type: DataTypes.STRING(20),
+      allowNull: true,
+      defaultValue: null
+    },
+    vgv: {
+      type: DataTypes.DECIMAL(14, 2),
+      allowNull: true,
+      defaultValue: null
+    },
+    planilha_geral: {
+      type: DataTypes.DECIMAL(14, 2),
+      allowNull: true,
+      defaultValue: null
+    },
+    margem_custo_esperada: {
+      type: DataTypes.DECIMAL(5, 2),
+      allowNull: true,
+      defaultValue: null
     }
   });
 

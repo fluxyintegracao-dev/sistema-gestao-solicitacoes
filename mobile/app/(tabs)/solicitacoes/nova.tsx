@@ -46,6 +46,7 @@ import {
   normalizeCurrencyInput,
   parseDateBRToApi
 } from '../../../src/utils/format';
+import { getTipoSolicitacaoBehavior } from '../../../src/utils/tipoSolicitacao';
 
 const createSchema = z.object({
   obra_id: z.string().min(1, 'Selecione a obra'),
@@ -184,28 +185,20 @@ export default function NovaSolicitacaoPage() {
     () => (tiposQuery.data || []).find((item) => String(item.id) === String(tipoSolicitacaoId)),
     [tipoSolicitacaoId, tiposQuery.data]
   );
-
-  const nomeTipoSelecionado = String(tipoSelecionado?.nome || '').trim().toUpperCase();
-  const nomeTipoNormalizado = useMemo(
-    () => nomeTipoSelecionado.normalize('NFD').replace(/[\u0300-\u036f]/g, ''),
-    [nomeTipoSelecionado]
-  );
-  const nomeTipoToken = useMemo(
-    () => nomeTipoNormalizado.replace(/[^A-Z0-9]+/g, ' ').trim(),
-    [nomeTipoNormalizado]
+  const comportamentoTipo = useMemo(
+    () => getTipoSolicitacaoBehavior(tipoSelecionado || {}),
+    [tipoSelecionado]
   );
 
-  const subtipoObrigatorio = nomeTipoSelecionado === 'ADM LOCAL DE OBRA';
-  const medicaoObrigatoria = nomeTipoNormalizado === 'MEDICAO';
-  const locacaoMaqEq = nomeTipoToken === 'LOCACAO DE MAQ EQ';
-  const aberturaContratoObrigatoria = nomeTipoNormalizado === 'ABERTURA DE CONTRATO';
-  const solicitacaoCompra = nomeTipoNormalizado === 'SOLICITACAO DE COMPRA';
-  const outrosAssuntos = nomeTipoNormalizado === 'OUTROS ASSUNTOS';
-  const pedidoContratacao = nomeTipoNormalizado === 'PEDIDO DE CONTRATACAO';
-  const exigeApropriacaoPrincipal = Boolean(tipoSolicitacaoId) && !solicitacaoCompra;
-  const tipoSemValor = solicitacaoCompra || outrosAssuntos || pedidoContratacao;
-  const exibirCamposContrato = medicaoObrigatoria || subtipoObrigatorio || locacaoMaqEq;
-  const exibirCampoSubtipo = subtipoObrigatorio;
+  const subtipoObrigatorio = comportamentoTipo.exige_subtipo;
+  const medicaoObrigatoria = comportamentoTipo.exige_periodo_medicao;
+  const aberturaContratoObrigatoria =
+    comportamentoTipo.exige_ref_contrato_abertura || comportamentoTipo.exige_itens_apropriacao;
+  const solicitacaoCompra = !comportamentoTipo.mostrar_apropriacao_principal && !comportamentoTipo.mostrar_valor;
+  const exigeApropriacaoPrincipal = Boolean(tipoSolicitacaoId) && comportamentoTipo.exige_apropriacao_principal;
+  const tipoSemValor = !comportamentoTipo.mostrar_valor;
+  const exibirCamposContrato = comportamentoTipo.mostrar_contrato;
+  const exibirCampoSubtipo = comportamentoTipo.mostrar_subtipo;
 
   const tiposSubQuery = useQuery({
     queryKey: ['lookups', 'tipos-sub-contrato', tipoSolicitacaoId],
@@ -235,7 +228,7 @@ export default function NovaSolicitacaoPage() {
     [user]
   );
 
-  const isSetorObra = tokensSetorUsuario.includes('OBRA');
+  const isSetorObra = Boolean(user?.setor?.eh_setor_obra) || tokensSetorUsuario.includes('OBRA');
 
   const destinosPermitidosPorSetorOrigem = useMemo(() => {
     const regras = areasPorSetorOrigemQuery.data?.regras || {};
@@ -543,7 +536,7 @@ export default function NovaSolicitacaoPage() {
         return;
       }
 
-      if (!medicaoObrigatoria && !String(values.descricao || '').trim()) {
+      if (comportamentoTipo.exige_descricao && !String(values.descricao || '').trim()) {
         Alert.alert('Campo obrigatorio', 'Descreva a solicitacao.');
         return;
       }
@@ -570,6 +563,7 @@ export default function NovaSolicitacaoPage() {
         descricao: String(values.descricao || '').trim(),
         data_vencimento: dataVencimento,
         valor: tipoSemValor ? undefined : valorNormalizado,
+        parceiro_id: values.parceiro_id ? Number(values.parceiro_id) : undefined,
         apropriacao_id: values.apropriacao_id ? Number(values.apropriacao_id) : undefined,
         tipo_sub_id: values.tipo_sub_id ? Number(values.tipo_sub_id) : undefined,
         contrato_id: values.contrato_id ? Number(values.contrato_id) : undefined,
@@ -681,6 +675,82 @@ export default function NovaSolicitacaoPage() {
           )}
         />
 
+        <View style={styles.partnerSection}>
+          <TextField
+            label="Parceiro"
+            value={partnerQuery}
+            onChangeText={(text) => {
+              setPartnerQuery(text);
+              setPartnerSearchExecuted(false);
+              setPartnerResults([]);
+              if (selectedPartner) {
+                setSelectedPartner(null);
+                setValue('parceiro_id', '');
+              }
+            }}
+            placeholder="Buscar por nome ou CPF/CNPJ"
+            helperText="Mesmo fluxo do web: buscar, selecionar ou cadastrar."
+          />
+
+          <View style={styles.inlineActions}>
+            <Button
+              label={partnerSearching ? 'Buscando...' : 'Buscar'}
+              onPress={() => void handleSearchPartners()}
+              variant="secondary"
+              fullWidth={false}
+              disabled={partnerSearching}
+            />
+            <Button
+              label="Cadastrar"
+              onPress={() => setPartnerModalVisible(true)}
+              variant="secondary"
+              fullWidth={false}
+            />
+            {parceiroId ? (
+              <Button
+                label="Limpar"
+                onPress={clearSelectedPartner}
+                variant="ghost"
+                fullWidth={false}
+              />
+            ) : null}
+          </View>
+
+          {selectedPartner ? (
+            <View style={styles.selectedPartnerCard}>
+              <Text style={styles.selectedPartnerName}>{selectedPartner.nome || 'Parceiro selecionado'}</Text>
+              <Text style={styles.selectedPartnerMeta}>
+                {selectedPartner.cpf_cnpj || '-'}
+                {selectedPartner.telefone ? ` - ${selectedPartner.telefone}` : ''}
+              </Text>
+            </View>
+          ) : null}
+
+          {partnerResults.length > 1 && !selectedPartner ? (
+            <View style={styles.partnerResults}>
+              {partnerResults.map((item) => (
+                <Pressable
+                  key={String(item.id)}
+                  style={({ pressed }) => [
+                    styles.partnerResultItem,
+                    pressed ? styles.partnerResultPressed : null
+                  ]}
+                  onPress={() => selectPartner(item)}
+                >
+                  <Text style={styles.partnerResultName}>{item.nome || '-'}</Text>
+                  <Text style={styles.partnerResultMeta}>{item.cpf_cnpj || '-'}</Text>
+                </Pressable>
+              ))}
+            </View>
+          ) : null}
+
+          {partnerSearchExecuted && partnerQuery.trim() && partnerResults.length === 0 && !partnerSearching && !selectedPartner ? (
+            <Text style={styles.helperText}>
+              Nenhum parceiro encontrado. Use o botao Cadastrar para criar um novo.
+            </Text>
+          ) : null}
+        </View>
+
         <Controller
           control={control}
           name="apropriacao_id"
@@ -728,7 +798,7 @@ export default function NovaSolicitacaoPage() {
                   value: String(item.id)
                 }))}
                 enabled={Boolean(tipoSolicitacaoId)}
-                helperText="Obrigatorio para Adm. Local de Obra."
+                helperText={subtipoObrigatorio ? 'Obrigatorio para este tipo.' : undefined}
               />
             )}
           />
@@ -865,14 +935,167 @@ export default function NovaSolicitacaoPage() {
               multiline
               error={errors.descricao?.message}
               helperText={
-                medicaoObrigatoria
-                  ? 'Opcional para Medicao. Nos demais tipos, o backend exige uma descricao.'
-                  : 'Descricao breve, com no maximo 50 caracteres.'
+                comportamentoTipo.exige_descricao
+                  ? 'Descricao breve, com no maximo 50 caracteres.'
+                  : 'Descricao opcional para este tipo.'
               }
             />
           )}
         />
       </SectionCard>
+
+      <Modal
+        visible={partnerModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setPartnerModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <View style={styles.modalHeaderText}>
+                <Text style={styles.modalTitle}>Cadastrar parceiro</Text>
+                <Text style={styles.modalSubtitle}>
+                  Informe os dados principais para vincular o parceiro a esta solicitacao.
+                </Text>
+              </View>
+              <Button
+                label="Fechar"
+                onPress={() => setPartnerModalVisible(false)}
+                variant="ghost"
+                fullWidth={false}
+              />
+            </View>
+
+            <ScrollView
+              style={styles.modalScroll}
+              contentContainerStyle={styles.modalContent}
+              showsVerticalScrollIndicator={false}
+            >
+              <TextField
+                label="CPF/CNPJ"
+                value={newPartner.cpf_cnpj}
+                onChangeText={(text) => setNewPartner((current) => ({ ...current, cpf_cnpj: text }))}
+              />
+              <TextField
+                label="Nome"
+                value={newPartner.nome}
+                onChangeText={(text) => setNewPartner((current) => ({ ...current, nome: text }))}
+              />
+              <TextField
+                label="Telefone"
+                value={newPartner.telefone}
+                onChangeText={(text) => setNewPartner((current) => ({ ...current, telefone: text }))}
+              />
+              <TextField
+                label="Email"
+                value={newPartner.email}
+                onChangeText={(text) => setNewPartner((current) => ({ ...current, email: text }))}
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
+              <TextField
+                label="Endereco"
+                value={newPartner.endereco}
+                onChangeText={(text) => setNewPartner((current) => ({ ...current, endereco: text }))}
+              />
+              <View style={styles.dualFields}>
+                <View style={styles.dualField}>
+                  <TextField
+                    label="Numero"
+                    value={newPartner.numero}
+                    onChangeText={(text) => setNewPartner((current) => ({ ...current, numero: text }))}
+                  />
+                </View>
+                <View style={styles.dualField}>
+                  <TextField
+                    label="Bairro"
+                    value={newPartner.bairro}
+                    onChangeText={(text) => setNewPartner((current) => ({ ...current, bairro: text }))}
+                  />
+                </View>
+              </View>
+              <View style={styles.dualFields}>
+                <View style={styles.dualField}>
+                  <TextField
+                    label="CEP"
+                    value={newPartner.cep}
+                    onChangeText={(text) => setNewPartner((current) => ({ ...current, cep: text }))}
+                  />
+                </View>
+                <View style={styles.dualField}>
+                  <TextField
+                    label="Municipio"
+                    value={newPartner.municipio}
+                    onChangeText={(text) => setNewPartner((current) => ({ ...current, municipio: text }))}
+                  />
+                </View>
+              </View>
+              <TextField
+                label="Estado"
+                value={newPartner.estado}
+                onChangeText={(text) =>
+                  setNewPartner((current) => ({ ...current, estado: text.toUpperCase().slice(0, 2) }))
+                }
+                maxLength={2}
+              />
+
+              <View style={styles.categoriesBlock}>
+                <Text style={styles.categoriesTitle}>Categorias do parceiro</Text>
+                {(partnerCategoriesQuery.data || []).length === 0 ? (
+                  <Text style={styles.helperText}>Nenhuma categoria cadastrada.</Text>
+                ) : (
+                  <View style={styles.categoriesList}>
+                    {(partnerCategoriesQuery.data || []).map((categoria: ParceiroCategoriaOption) => {
+                      const active = newPartner.categoria_ids.includes(categoria.id);
+
+                      return (
+                        <Pressable
+                          key={categoria.id}
+                          style={({ pressed }) => [
+                            styles.categoryChip,
+                            active ? styles.categoryChipActive : null,
+                            pressed ? styles.categoryChipPressed : null
+                          ]}
+                          onPress={() => {
+                            setNewPartner((current) => {
+                              const currentIds = new Set(current.categoria_ids);
+                              if (currentIds.has(categoria.id)) {
+                                currentIds.delete(categoria.id);
+                              } else {
+                                currentIds.add(categoria.id);
+                              }
+                              return { ...current, categoria_ids: Array.from(currentIds) };
+                            });
+                          }}
+                        >
+                          <Text style={[styles.categoryChipText, active ? styles.categoryChipTextActive : null]}>
+                            {active ? '[x]' : '[ ]'} {categoria.nome}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                )}
+              </View>
+            </ScrollView>
+
+            <View style={styles.modalFooter}>
+              <Button
+                label="Cancelar"
+                onPress={() => setPartnerModalVisible(false)}
+                variant="secondary"
+                fullWidth={false}
+              />
+              <Button
+                label="Salvar parceiro"
+                onPress={() => void handleCreatePartner()}
+                fullWidth={false}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       <SectionCard title="Anexos" subtitle="Foto, galeria ou documento ainda no momento da abertura">
         <View style={styles.actions}>

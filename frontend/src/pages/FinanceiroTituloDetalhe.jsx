@@ -1,0 +1,1064 @@
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import {
+  atualizarCobrancaTituloFinanceiro,
+  baixarTituloFinanceiro,
+  estornarMovimentoFinanceiro,
+  getContasBancarias,
+  getTituloFinanceiroAuditoria,
+  getTituloFinanceiroById
+} from '../services/financeiro';
+import {
+  criarIntegracaoSiengeFila,
+  reprocessarIntegracaoSiengeFila
+} from '../services/integracaoSienge';
+import {
+  canRetryIntegracaoSienge,
+  canViewIntegracaoSienge
+} from '../utils/acessoProduto';
+import { formatCurrencyInput, normalizeCurrencyTyping } from '../utils/formatters';
+
+const FORMAS_RECEBIMENTO = ['DINHEIRO', 'PIX', 'CARTAO', 'TRANSFERENCIA', 'BOLETO', 'CHEQUE', 'PERMUTA', 'BENS', 'OUTROS'];
+const CATEGORIAS_BEM = ['VEICULO', 'IMOVEL', 'TERRENO', 'SERVICO', 'MATERIAL', 'CREDITO', 'OUTROS'];
+const FORMAS_COBRANCA = ['BOLETO', 'PIX', 'OUTROS'];
+const STATUS_COBRANCA = ['PENDENTE_EMISSAO', 'EMITIDO', 'PAGO_BANCO', 'CONCILIADO', 'CANCELADO'];
+
+function formatCurrency(value) {
+  const number = Number(value || 0);
+  return number.toLocaleString('pt-BR', {
+    style: 'currency',
+    currency: 'BRL'
+  });
+}
+
+function formatDate(value) {
+  if (!value) return '-';
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return '-';
+  return date.toLocaleDateString('pt-BR');
+}
+
+function formatDateTime(value) {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '-';
+  return date.toLocaleString('pt-BR');
+}
+
+function statusClass(status) {
+  const normalized = String(status || '').toUpperCase();
+  if (normalized === 'QUITADO') return 'bg-emerald-100 text-emerald-700';
+  if (normalized === 'PARCIAL') return 'bg-amber-100 text-amber-700';
+  if (normalized === 'CANCELADO' || normalized === 'ESTORNADO') return 'bg-rose-100 text-rose-700';
+  return 'bg-slate-100 text-slate-700';
+}
+
+function today() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function contaBancariaObrigatoria(formaRecebimento) {
+  return !['DINHEIRO', 'CARTAO', 'PERMUTA', 'BENS', 'OUTROS'].includes(String(formaRecebimento || '').toUpperCase());
+}
+
+function buildBaixaForm(titulo, contasBancarias, movimento = null) {
+  if (movimento) {
+    return {
+      conta_bancaria_id: String(movimento.conta_bancaria_id || movimento.contaBancaria?.id || contasBancarias?.[0]?.id || ''),
+      forma_recebimento: movimento?.forma_recebimento || '',
+      tipo_permuta: movimento?.tipo_permuta || '',
+      categoria_bem: movimento?.categoria_bem || '',
+      descricao_bem: movimento?.descricao_bem || '',
+      valor_referencia_bem: formatCurrencyInput(movimento?.valor_referencia_bem),
+      documento_referencia: movimento?.documento_referencia || '',
+      valor: formatCurrencyInput(movimento?.valor),
+      juros: formatCurrencyInput(movimento?.juros, { emptyZero: false }),
+      multa: formatCurrencyInput(movimento?.multa, { emptyZero: false }),
+      desconto: formatCurrencyInput(movimento?.desconto, { emptyZero: false }),
+      data_movimento: movimento?.data_movimento || today(),
+      observacoes: movimento?.observacoes || ''
+    };
+  }
+
+  return {
+    conta_bancaria_id: String(contasBancarias?.[0]?.id || ''),
+    forma_recebimento: '',
+    tipo_permuta: '',
+    categoria_bem: '',
+    descricao_bem: '',
+    valor_referencia_bem: '',
+    documento_referencia: '',
+    valor: formatCurrencyInput(titulo?.valor_saldo),
+    juros: formatCurrencyInput(0, { emptyZero: false }),
+    multa: formatCurrencyInput(0, { emptyZero: false }),
+    desconto: formatCurrencyInput(0, { emptyZero: false }),
+    data_movimento: today(),
+    observacoes: ''
+  };
+}
+
+function buildCobrancaForm(titulo) {
+  return {
+    forma_cobranca: titulo?.forma_cobranca || '',
+    status_cobranca: titulo?.status_cobranca && titulo.status_cobranca !== 'NAO_APLICAVEL'
+      ? titulo.status_cobranca
+      : 'PENDENTE_EMISSAO',
+    banco_cobranca: titulo?.banco_cobranca || '',
+    nosso_numero: titulo?.nosso_numero || '',
+    linha_digitavel: titulo?.linha_digitavel || '',
+    codigo_barras: titulo?.codigo_barras || '',
+    identificador_externo: titulo?.identificador_externo || '',
+    boleto_emitido_em: titulo?.boleto_emitido_em || ''
+  };
+}
+
+function auditStatusClass(status) {
+  const normalized = String(status || '').toUpperCase();
+  if (normalized === 'SUCCESS') return 'bg-emerald-100 text-emerald-700';
+  if (normalized === 'DENIED') return 'bg-rose-100 text-rose-700';
+  return 'bg-slate-100 text-slate-700';
+}
+
+function queueStatusClass(status) {
+  const normalized = String(status || '').trim().toUpperCase();
+  if (normalized === 'SUCESSO') return 'bg-emerald-100 text-emerald-700';
+  if (normalized === 'ERRO') return 'bg-rose-100 text-rose-700';
+  if (normalized === 'PROCESSANDO') return 'bg-amber-100 text-amber-700';
+  return 'bg-slate-100 text-slate-700';
+}
+
+function canQueueTituloSienge(titulo) {
+  const tipo = String(titulo?.tipo || '').trim().toUpperCase();
+  const status = String(titulo?.status || '').trim().toUpperCase();
+  return tipo === 'PAGAR' && ['ABERTO', 'PARCIAL'].includes(status);
+}
+
+function formatAuditMetadata(metadata) {
+  if (!metadata || typeof metadata !== 'object') {
+    return [];
+  }
+
+  const labels = {
+    solicitacao_id: 'Solicitacao',
+    obra_id: 'Obra',
+    parceiro_id: 'Parceiro',
+    tipo: 'Tipo',
+    valor_original: 'Valor original',
+    movimento_id: 'Movimento',
+    conta_bancaria_id: 'Conta bancaria',
+    forma_recebimento: 'Forma de recebimento',
+    tipo_permuta: 'Tipo de permuta',
+    categoria_bem: 'Categoria do bem',
+    descricao_bem: 'Descricao do bem',
+    valor_referencia_bem: 'Valor de referencia',
+    documento_referencia: 'Documento',
+    forma_cobranca: 'Forma de cobranca',
+    status_cobranca: 'Status da cobranca',
+    banco_cobranca: 'Banco da cobranca',
+    nosso_numero: 'Nosso numero',
+    identificador_externo: 'Identificador externo',
+    boleto_emitido_em: 'Boleto emitido em',
+    valor: 'Valor',
+    juros: 'Juros',
+    multa: 'Multa',
+    desconto: 'Desconto',
+    valor_quitacao: 'Quitacao',
+    valor_estornado: 'Valor estornado'
+  };
+
+  return Object.entries(metadata)
+    .filter(([, value]) => value !== null && value !== undefined && value !== '')
+    .slice(0, 8)
+    .map(([key, value]) => ({
+      key,
+      label: labels[key] || key.replace(/_/g, ' '),
+      value: ['valor_original', 'valor', 'juros', 'multa', 'desconto', 'valor_quitacao', 'valor_estornado', 'valor_referencia_bem'].includes(key)
+        ? formatCurrency(value)
+        : String(value)
+    }));
+}
+
+export default function FinanceiroTituloDetalhe() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const [titulo, setTitulo] = useState(null);
+  const [contasBancarias, setContasBancarias] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [auditoria, setAuditoria] = useState([]);
+  const [modalBaixaOpen, setModalBaixaOpen] = useState(false);
+  const [baixaForm, setBaixaForm] = useState(() => buildBaixaForm(null, []));
+  const [cobrancaForm, setCobrancaForm] = useState(() => buildCobrancaForm(null));
+  const [savingCobranca, setSavingCobranca] = useState(false);
+  const [savingBaixa, setSavingBaixa] = useState(false);
+  const [estornandoId, setEstornandoId] = useState(null);
+  const [corrigindoMovimentoId, setCorrigindoMovimentoId] = useState(null);
+  const [savingIntegracaoSienge, setSavingIntegracaoSienge] = useState(false);
+
+  async function carregar() {
+    try {
+      setLoading(true);
+      setError('');
+      const [tituloData, contasData, auditoriaData] = await Promise.all([
+        getTituloFinanceiroById(id),
+        getContasBancarias(),
+        getTituloFinanceiroAuditoria(id)
+      ]);
+      setTitulo(tituloData);
+      setContasBancarias(Array.isArray(contasData) ? contasData : []);
+      setAuditoria(Array.isArray(auditoriaData) ? auditoriaData : []);
+      setCobrancaForm(buildCobrancaForm(tituloData));
+      setBaixaForm((current) => ({
+        ...buildBaixaForm(tituloData, Array.isArray(contasData) ? contasData : []),
+        conta_bancaria_id: current.conta_bancaria_id || String(contasData?.[0]?.id || '')
+      }));
+    } catch (err) {
+      setError(err?.message || 'Erro ao carregar titulo financeiro');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    carregar();
+  }, [id]);
+
+  const movimentosAtivos = useMemo(() => {
+    return Array.isArray(titulo?.movimentos)
+      ? titulo.movimentos.filter((item) => String(item.status || '').toUpperCase() === 'ATIVO')
+      : [];
+  }, [titulo]);
+
+  const podeOperarIntegracaoSienge = useMemo(() => {
+    return canRetryIntegracaoSienge(user) && canQueueTituloSienge(titulo);
+  }, [titulo, user]);
+  const podeVerIntegracaoSienge = useMemo(() => canViewIntegracaoSienge(user), [user]);
+
+  const filaSienge = titulo?.integracaoSienge || null;
+
+  async function handleSalvarCobranca(event) {
+    event.preventDefault();
+    try {
+      setSavingCobranca(true);
+      setError('');
+      const payload = {
+        forma_cobranca: cobrancaForm.forma_cobranca || null,
+        status_cobranca: cobrancaForm.forma_cobranca ? cobrancaForm.status_cobranca : null,
+        banco_cobranca: cobrancaForm.banco_cobranca || null,
+        nosso_numero: cobrancaForm.nosso_numero || null,
+        linha_digitavel: cobrancaForm.linha_digitavel || null,
+        codigo_barras: cobrancaForm.codigo_barras || null,
+        identificador_externo: cobrancaForm.identificador_externo || null,
+        boleto_emitido_em: cobrancaForm.boleto_emitido_em || null
+      };
+      await atualizarCobrancaTituloFinanceiro(id, payload);
+      await carregar();
+      alert('Dados de cobranca atualizados com sucesso.');
+    } catch (err) {
+      setError(err?.message || 'Erro ao atualizar cobranca do titulo');
+    } finally {
+      setSavingCobranca(false);
+    }
+  }
+
+  async function handleBaixaSubmit(event) {
+    event.preventDefault();
+    try {
+      setSavingBaixa(true);
+      setError('');
+      await baixarTituloFinanceiro(id, baixaForm);
+      setModalBaixaOpen(false);
+      setCorrigindoMovimentoId(null);
+      setBaixaForm(buildBaixaForm(titulo, contasBancarias));
+      await carregar();
+      alert(corrigindoMovimentoId ? 'Baixa corrigida com sucesso.' : 'Baixa registrada com sucesso.');
+    } catch (err) {
+      setError(err?.message || 'Erro ao registrar baixa');
+    } finally {
+      setSavingBaixa(false);
+    }
+  }
+
+  async function handleEstornar(movimentoId) {
+    const confirmar = window.confirm('Confirmar estorno desta baixa?');
+    if (!confirmar) return;
+
+    try {
+      setEstornandoId(movimentoId);
+      setError('');
+      await estornarMovimentoFinanceiro(id, movimentoId, {});
+      await carregar();
+      alert('Baixa estornada com sucesso.');
+    } catch (err) {
+      setError(err?.message || 'Erro ao estornar baixa');
+    } finally {
+      setEstornandoId(null);
+    }
+  }
+
+  async function handleCorrigirBaixa(movimento) {
+    const confirmar = window.confirm(
+      'Confirmar estorno desta baixa e abrir a correcao para alterar conta bancaria e data?'
+    );
+    if (!confirmar) return;
+
+    try {
+      setCorrigindoMovimentoId(movimento.id);
+      setEstornandoId(movimento.id);
+      setError('');
+      const tituloAtualizado = await estornarMovimentoFinanceiro(id, movimento.id, {
+        observacoes: 'Baixa estornada para correcao de conta bancaria/data.'
+      });
+      setTitulo(tituloAtualizado);
+      setBaixaForm(buildBaixaForm(tituloAtualizado, contasBancarias, movimento));
+      setModalBaixaOpen(true);
+      const auditoriaData = await getTituloFinanceiroAuditoria(id);
+      setAuditoria(Array.isArray(auditoriaData) ? auditoriaData : []);
+    } catch (err) {
+      setCorrigindoMovimentoId(null);
+      setError(err?.message || 'Erro ao preparar correcao da baixa');
+    } finally {
+      setEstornandoId(null);
+    }
+  }
+
+  async function handlePrepararOuEnviarSienge() {
+    if (!titulo?.id) return;
+
+    try {
+      setSavingIntegracaoSienge(true);
+      setError('');
+      await criarIntegracaoSiengeFila({
+        titulo_financeiro_id: Number(titulo.id),
+        origem_modulo: 'FINANCEIRO',
+        processar_agora: true,
+        forcar_recriar_payload: false
+      });
+      await carregar();
+      alert('Titulo enviado para a fila da Integracao SIENGE.');
+    } catch (err) {
+      setError(err?.message || 'Erro ao enviar titulo para a Integracao SIENGE');
+    } finally {
+      setSavingIntegracaoSienge(false);
+    }
+  }
+
+  async function handleReprocessarSienge() {
+    if (!filaSienge?.id) return;
+
+    try {
+      setSavingIntegracaoSienge(true);
+      setError('');
+      await reprocessarIntegracaoSiengeFila(filaSienge.id, {
+        forcar_recriar_payload: true
+      });
+      await carregar();
+      alert('Item da fila SIENGE reprocessado com sucesso.');
+    } catch (err) {
+      setError(err?.message || 'Erro ao reprocessar item da fila SIENGE');
+    } finally {
+      setSavingIntegracaoSienge(false);
+    }
+  }
+
+  if (loading) {
+    return <p className="text-sm text-[var(--c-muted)]">Carregando titulo financeiro...</p>;
+  }
+
+  if (!titulo) {
+    return <p className="text-sm text-[var(--c-muted)]">Titulo financeiro nao encontrado.</p>;
+  }
+
+  return (
+    <>
+      <div className="page solicitacoes-page">
+        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+          <div>
+            <button type="button" className="btn btn-outline mb-3" onClick={() => navigate(-1)}>
+              Voltar
+            </button>
+            <h1 className="page-title">Titulo #{titulo.id}</h1>
+            <p className="text-sm text-[var(--c-muted)]">{titulo.descricao || 'Sem descricao'}</p>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {titulo.solicitacao?.id && (
+              <Link className="btn btn-outline" to={`/solicitacoes/${titulo.solicitacao.id}`}>
+                Abrir solicitacao
+              </Link>
+            )}
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => {
+                setError('');
+                setCorrigindoMovimentoId(null);
+                setBaixaForm(buildBaixaForm(titulo, contasBancarias));
+                setModalBaixaOpen(true);
+              }}
+              disabled={!['ABERTO', 'PARCIAL'].includes(String(titulo.status || '').toUpperCase())}
+            >
+              Registrar baixa
+            </button>
+          </div>
+        </div>
+
+        {error && (
+          <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+            {error}
+          </div>
+        )}
+
+        <div className="grid gap-3 md:grid-cols-4">
+          <div className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4">
+            <div className="text-xs uppercase tracking-[0.18em] text-[var(--c-muted)]">Tipo</div>
+            <div className="mt-2 text-lg font-semibold text-[var(--c-text)]">{titulo.tipo}</div>
+          </div>
+          <div className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4">
+            <div className="text-xs uppercase tracking-[0.18em] text-[var(--c-muted)]">Status</div>
+            <div className="mt-2">
+              <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${statusClass(titulo.status)}`}>
+                {titulo.status}
+              </span>
+            </div>
+          </div>
+          <div className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4">
+            <div className="text-xs uppercase tracking-[0.18em] text-[var(--c-muted)]">Valor original</div>
+            <div className="mt-2 text-lg font-semibold text-[var(--c-text)]">{formatCurrency(titulo.valor_original)}</div>
+          </div>
+          <div className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4">
+            <div className="text-xs uppercase tracking-[0.18em] text-[var(--c-muted)]">Saldo</div>
+            <div className="mt-2 text-lg font-semibold text-[var(--c-text)]">{formatCurrency(titulo.valor_saldo)}</div>
+          </div>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4 space-y-3">
+            <h2 className="text-lg font-semibold text-[var(--c-text)]">Dados do titulo</h2>
+            <div className="grid gap-3 text-sm md:grid-cols-2">
+              <div>
+                <div className="text-[var(--c-muted)]">Parceiro</div>
+                <div className="font-medium text-[var(--c-text)]">{titulo.parceiro?.nome || '-'}</div>
+              </div>
+              <div>
+                <div className="text-[var(--c-muted)]">Obra</div>
+                <div className="font-medium text-[var(--c-text)]">{titulo.obra?.nome || '-'}</div>
+              </div>
+              <div>
+                <div className="text-[var(--c-muted)]">Vencimento</div>
+                <div className="font-medium text-[var(--c-text)]">{formatDate(titulo.data_vencimento)}</div>
+              </div>
+              <div>
+                <div className="text-[var(--c-muted)]">Emissao</div>
+                <div className="font-medium text-[var(--c-text)]">{formatDate(titulo.data_emissao)}</div>
+              </div>
+              <div>
+                <div className="text-[var(--c-muted)]">Valor baixado</div>
+                <div className="font-medium text-[var(--c-text)]">{formatCurrency(titulo.valor_baixado)}</div>
+              </div>
+              <div>
+                <div className="text-[var(--c-muted)]">Categoria</div>
+                <div className="font-medium text-[var(--c-text)]">{titulo.categoriaFinanceira?.nome || '-'}</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4 space-y-3">
+            <h2 className="text-lg font-semibold text-[var(--c-text)]">Resumo operacional</h2>
+            <div className="grid gap-3 text-sm md:grid-cols-2">
+              <div>
+                <div className="text-[var(--c-muted)]">Solicitacao</div>
+                <div className="font-medium text-[var(--c-text)]">
+                  {titulo.solicitacao?.id ? (
+                    <Link className="text-blue-600 hover:underline" to={`/solicitacoes/${titulo.solicitacao.id}`}>
+                      {titulo.solicitacao.codigo || `#${titulo.solicitacao.id}`}
+                    </Link>
+                  ) : '-'}
+                </div>
+              </div>
+              <div>
+                <div className="text-[var(--c-muted)]">Criado por</div>
+                <div className="font-medium text-[var(--c-text)]">{titulo.criadoPor?.nome || '-'}</div>
+              </div>
+              <div>
+                <div className="text-[var(--c-muted)]">Baixas ativas</div>
+                <div className="font-medium text-[var(--c-text)]">{movimentosAtivos.length}</div>
+              </div>
+              <div>
+                <div className="text-[var(--c-muted)]">Quitacao</div>
+                <div className="font-medium text-[var(--c-text)]">{formatDate(titulo.data_quitacao)}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {podeVerIntegracaoSienge && (
+          <div className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4 space-y-4">
+            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-[var(--c-text)]">Integracao SIENGE</h2>
+                <p className="text-sm text-[var(--c-muted)]">
+                  O gateway tecnico trabalha sempre sobre este titulo central do financeiro.
+                </p>
+              </div>
+              <div className="app-page-actions">
+                <Link to="/integracao-sienge" className="btn btn-outline">
+                  Abrir gateway
+                </Link>
+                {podeOperarIntegracaoSienge && !filaSienge && (
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={handlePrepararOuEnviarSienge}
+                    disabled={savingIntegracaoSienge}
+                  >
+                    {savingIntegracaoSienge ? 'Enviando...' : 'Enviar ao SIENGE'}
+                  </button>
+                )}
+                {podeOperarIntegracaoSienge && filaSienge && (
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={handleReprocessarSienge}
+                    disabled={savingIntegracaoSienge || String(filaSienge.status || '').toUpperCase() === 'PROCESSANDO'}
+                  >
+                    {savingIntegracaoSienge ? 'Processando...' : 'Reprocessar envio'}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {!canQueueTituloSienge(titulo) ? (
+              <div className="rounded-xl bg-[var(--c-bg)] px-3 py-4 text-sm text-[var(--c-muted)]">
+                Nesta fase, somente titulos <strong className="text-[var(--c-text)]">PAGAR</strong> com status aberto ou parcial
+                podem entrar na fila SIENGE.
+              </div>
+            ) : (
+              <div className="grid gap-3 text-sm md:grid-cols-4">
+                <div>
+                  <div className="text-[var(--c-muted)]">Status da fila</div>
+                  <div className="mt-2">
+                    {filaSienge ? (
+                      <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${queueStatusClass(filaSienge.status)}`}>
+                        {filaSienge.status}
+                      </span>
+                    ) : (
+                      <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                        NAO ENVIADO
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[var(--c-muted)]">Origem</div>
+                  <div className="font-medium text-[var(--c-text)]">{filaSienge?.origem_modulo || 'FINANCEIRO'}</div>
+                </div>
+                <div>
+                  <div className="text-[var(--c-muted)]">Tentativas</div>
+                  <div className="font-medium text-[var(--c-text)]">{filaSienge?.tentativas ?? 0}</div>
+                </div>
+                <div>
+                  <div className="text-[var(--c-muted)]">Enviado em</div>
+                  <div className="font-medium text-[var(--c-text)]">{formatDateTime(filaSienge?.enviado_em)}</div>
+                </div>
+                <div className="md:col-span-2">
+                  <div className="text-[var(--c-muted)]">Titulo externo</div>
+                  <div className="font-medium break-all text-[var(--c-text)]">{filaSienge?.external_title_id || '-'}</div>
+                </div>
+                <div className="md:col-span-2">
+                  <div className="text-[var(--c-muted)]">Ultimo erro</div>
+                  <div className="font-medium whitespace-pre-wrap text-[var(--c-text)]">{filaSienge?.ultimo_erro || '-'}</div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {titulo.tipo === 'RECEBER' && (
+          <div className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4 space-y-4">
+            <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-[var(--c-text)]">Cobranca externa</h2>
+                <p className="text-sm text-[var(--c-muted)]">
+                  Use esta area para complementar o titulo com os dados do boleto emitido diretamente no banco.
+                </p>
+              </div>
+              {titulo.forma_cobranca && (
+                <span className="inline-flex rounded-full bg-sky-100 px-2.5 py-1 text-xs font-semibold text-sky-700">
+                  {titulo.forma_cobranca} {titulo.status_cobranca && titulo.status_cobranca !== 'NAO_APLICAVEL' ? `- ${titulo.status_cobranca}` : ''}
+                </span>
+              )}
+            </div>
+
+            <div className="grid gap-3 text-sm md:grid-cols-4">
+              <div>
+                <div className="text-[var(--c-muted)]">Forma</div>
+                <div className="font-medium text-[var(--c-text)]">{titulo.forma_cobranca || '-'}</div>
+              </div>
+              <div>
+                <div className="text-[var(--c-muted)]">Status da cobranca</div>
+                <div className="font-medium text-[var(--c-text)]">{titulo.status_cobranca || 'NAO_APLICAVEL'}</div>
+              </div>
+              <div>
+                <div className="text-[var(--c-muted)]">Banco</div>
+                <div className="font-medium text-[var(--c-text)]">{titulo.banco_cobranca || '-'}</div>
+              </div>
+              <div>
+                <div className="text-[var(--c-muted)]">Emitido em</div>
+                <div className="font-medium text-[var(--c-text)]">{formatDate(titulo.boleto_emitido_em)}</div>
+              </div>
+              <div>
+                <div className="text-[var(--c-muted)]">Nosso numero</div>
+                <div className="font-medium text-[var(--c-text)]">{titulo.nosso_numero || '-'}</div>
+              </div>
+              <div>
+                <div className="text-[var(--c-muted)]">Identificador externo</div>
+                <div className="font-medium text-[var(--c-text)]">{titulo.identificador_externo || '-'}</div>
+              </div>
+              <div className="md:col-span-2">
+                <div className="text-[var(--c-muted)]">Linha digitavel</div>
+                <div className="font-medium break-all text-[var(--c-text)]">{titulo.linha_digitavel || '-'}</div>
+              </div>
+              <div className="md:col-span-2">
+                <div className="text-[var(--c-muted)]">Codigo de barras</div>
+                <div className="font-medium break-all text-[var(--c-text)]">{titulo.codigo_barras || '-'}</div>
+              </div>
+            </div>
+
+            <form className="grid gap-3 md:grid-cols-4" onSubmit={handleSalvarCobranca}>
+              <label className="text-sm">
+                <span className="mb-1 block text-slate-500">Forma de cobranca</span>
+                <select
+                  className="input w-full"
+                  value={cobrancaForm.forma_cobranca}
+                  onChange={(event) => setCobrancaForm((current) => ({
+                    ...current,
+                    forma_cobranca: event.target.value,
+                    status_cobranca: event.target.value ? current.status_cobranca : 'PENDENTE_EMISSAO'
+                  }))}
+                >
+                  <option value="">Nao controlar</option>
+                  {FORMAS_COBRANCA.map((item) => (
+                    <option key={item} value={item}>{item}</option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="text-sm">
+                <span className="mb-1 block text-slate-500">Status da cobranca</span>
+                <select
+                  className="input w-full"
+                  value={cobrancaForm.status_cobranca}
+                  onChange={(event) => setCobrancaForm((current) => ({ ...current, status_cobranca: event.target.value }))}
+                  disabled={!cobrancaForm.forma_cobranca}
+                >
+                  {STATUS_COBRANCA.map((item) => (
+                    <option key={item} value={item}>{item}</option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="text-sm">
+                <span className="mb-1 block text-slate-500">Banco</span>
+                <input
+                  className="input w-full"
+                  value={cobrancaForm.banco_cobranca}
+                  onChange={(event) => setCobrancaForm((current) => ({ ...current, banco_cobranca: event.target.value }))}
+                />
+              </label>
+
+              <label className="text-sm">
+                <span className="mb-1 block text-slate-500">Emitido em</span>
+                <input
+                  type="date"
+                  className="input w-full"
+                  value={cobrancaForm.boleto_emitido_em}
+                  onChange={(event) => setCobrancaForm((current) => ({ ...current, boleto_emitido_em: event.target.value }))}
+                />
+              </label>
+
+              <label className="text-sm">
+                <span className="mb-1 block text-slate-500">Nosso numero</span>
+                <input
+                  className="input w-full"
+                  value={cobrancaForm.nosso_numero}
+                  onChange={(event) => setCobrancaForm((current) => ({ ...current, nosso_numero: event.target.value }))}
+                />
+              </label>
+
+              <label className="text-sm">
+                <span className="mb-1 block text-slate-500">Identificador externo</span>
+                <input
+                  className="input w-full"
+                  value={cobrancaForm.identificador_externo}
+                  onChange={(event) => setCobrancaForm((current) => ({ ...current, identificador_externo: event.target.value }))}
+                />
+              </label>
+
+              <label className="text-sm md:col-span-2">
+                <span className="mb-1 block text-slate-500">Linha digitavel</span>
+                <input
+                  className="input w-full"
+                  value={cobrancaForm.linha_digitavel}
+                  onChange={(event) => setCobrancaForm((current) => ({ ...current, linha_digitavel: event.target.value }))}
+                />
+              </label>
+
+              <label className="text-sm md:col-span-4">
+                <span className="mb-1 block text-slate-500">Codigo de barras</span>
+                <input
+                  className="input w-full"
+                  value={cobrancaForm.codigo_barras}
+                  onChange={(event) => setCobrancaForm((current) => ({ ...current, codigo_barras: event.target.value }))}
+                />
+              </label>
+
+              <div className="md:col-span-4 flex justify-end">
+                <button type="submit" className="btn btn-primary" disabled={savingCobranca}>
+                  {savingCobranca ? 'Salvando...' : 'Salvar dados de cobranca'}
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        <div className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4 space-y-4">
+          <h2 className="text-lg font-semibold text-[var(--c-text)]">Movimentos financeiros</h2>
+
+          {!Array.isArray(titulo.movimentos) || titulo.movimentos.length === 0 ? (
+            <div className="rounded-xl bg-[var(--c-bg)] px-3 py-4 text-sm text-[var(--c-muted)]">
+              Nenhum movimento registrado neste titulo.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {titulo.movimentos.map((movimento) => (
+                <div key={movimento.id} className="rounded-xl border border-[var(--c-border)] px-3 py-3">
+                  <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                    <div className="space-y-1 text-sm">
+                      <div className="font-medium text-[var(--c-text)]">
+                        {movimento.tipo_movimento} #{movimento.id}
+                      </div>
+                      <div className="text-[var(--c-muted)]">
+                        {formatDate(movimento.data_movimento)} - {movimento.contaBancaria?.nome || 'Sem conta'}
+                      </div>
+                      <div className="text-[var(--c-muted)]">
+                        Forma de recebimento: {movimento.forma_recebimento || 'Nao informada'}
+                      </div>
+                      <div className="text-[var(--c-muted)]">
+                        Valor base {formatCurrency(movimento.valor)} - Juros {formatCurrency(movimento.juros)} - Multa {formatCurrency(movimento.multa)} - Desconto {formatCurrency(movimento.desconto)}
+                      </div>
+                      <div className="text-[var(--c-muted)]">
+                        Quitacao {formatCurrency(movimento.valor_quitacao)}
+                      </div>
+                      {(movimento.tipo_permuta || movimento.categoria_bem || movimento.descricao_bem || movimento.valor_referencia_bem) && (
+                        <div className="text-[var(--c-muted)]">
+                          {movimento.tipo_permuta ? `Permuta: ${movimento.tipo_permuta}. ` : ''}
+                          {movimento.categoria_bem ? `Categoria do bem: ${movimento.categoria_bem}. ` : ''}
+                          {movimento.descricao_bem ? `Bem: ${movimento.descricao_bem}. ` : ''}
+                          {movimento.valor_referencia_bem ? `Referencia ${formatCurrency(movimento.valor_referencia_bem)}.` : ''}
+                        </div>
+                      )}
+                      {movimento.observacoes && (
+                        <div className="text-[var(--c-muted)] whitespace-pre-wrap">{movimento.observacoes}</div>
+                      )}
+                    </div>
+
+                    <div className="flex flex-col items-start gap-2 md:items-end">
+                      <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${statusClass(movimento.status)}`}>
+                        {movimento.status}
+                      </span>
+                      {String(movimento.status || '').toUpperCase() === 'ATIVO' && (
+                        <div className="flex flex-wrap gap-2 md:justify-end">
+                          <button
+                            type="button"
+                            className="btn btn-outline"
+                            disabled={estornandoId === movimento.id || savingBaixa}
+                            onClick={() => handleCorrigirBaixa(movimento)}
+                          >
+                            {corrigindoMovimentoId === movimento.id && estornandoId === movimento.id
+                              ? 'Preparando...'
+                              : 'Corrigir baixa'}
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-outline"
+                            disabled={estornandoId === movimento.id || savingBaixa}
+                            onClick={() => handleEstornar(movimento.id)}
+                          >
+                            {estornandoId === movimento.id && corrigindoMovimentoId !== movimento.id
+                              ? 'Estornando...'
+                              : 'Estornar'}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4 space-y-4">
+          <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
+            <h2 className="text-lg font-semibold text-[var(--c-text)]">Auditoria financeira</h2>
+            <p className="text-sm text-[var(--c-muted)]">
+              Criacao, baixas e estornos ficam rastreados no backend.
+            </p>
+          </div>
+
+          {auditoria.length === 0 ? (
+            <div className="rounded-xl bg-[var(--c-bg)] px-3 py-4 text-sm text-[var(--c-muted)]">
+              Nenhum evento auditavel encontrado para este titulo.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {auditoria.map((evento) => {
+                const metadata = formatAuditMetadata(evento.metadata);
+
+                return (
+                  <div key={evento.id} className="rounded-xl border border-[var(--c-border)] px-3 py-3">
+                    <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                      <div className="space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <div className="font-medium text-[var(--c-text)]">{evento.label}</div>
+                          <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${auditStatusClass(evento.status)}`}>
+                            {evento.status}
+                          </span>
+                        </div>
+                        <div className="text-sm text-[var(--c-muted)]">
+                          {evento.descricao || 'Evento financeiro registrado'}
+                        </div>
+                        <div className="text-xs text-[var(--c-muted)]">
+                          {evento.usuario?.nome || evento.usuario?.email || 'Sistema'} - {formatDateTime(evento.criado_em)}
+                        </div>
+                        {metadata.length > 0 && (
+                          <div className="flex flex-wrap gap-2 pt-1">
+                            {metadata.map((item) => (
+                              <span
+                                key={`${evento.id}-${item.key}`}
+                                className="rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-700"
+                              >
+                                {item.label}: {item.value}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {modalBaixaOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="card w-full max-w-2xl space-y-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-lg font-semibold" style={{ color: 'var(--c-text)' }}>
+                  {corrigindoMovimentoId ? 'Corrigir baixa' : 'Registrar baixa'}
+                </h3>
+                <p className="text-sm text-slate-500">
+                  {corrigindoMovimentoId
+                    ? 'A baixa anterior ja foi estornada. Ajuste conta bancaria, data e demais campos antes de salvar.'
+                    : 'Use baixa parcial ou total. O saldo do titulo sera atualizado no backend.'}
+                </p>
+              </div>
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={() => {
+                  setModalBaixaOpen(false);
+                  setCorrigindoMovimentoId(null);
+                  setBaixaForm(buildBaixaForm(titulo, contasBancarias));
+                }}
+              >
+                Fechar
+              </button>
+            </div>
+
+            <form className="space-y-4" onSubmit={handleBaixaSubmit}>
+              <div className="grid gap-3 md:grid-cols-2">
+                <label className="text-sm">
+                  <span className="mb-1 block text-slate-500">Forma de recebimento</span>
+                  <select
+                    className="input w-full"
+                    value={baixaForm.forma_recebimento}
+                    onChange={(event) => setBaixaForm((current) => ({ ...current, forma_recebimento: event.target.value }))}
+                  >
+                    <option value="">Nao informar</option>
+                    {FORMAS_RECEBIMENTO.map((item) => (
+                      <option key={item} value={item}>{item}</option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="text-sm">
+                  <span className="mb-1 block text-slate-500">Conta bancaria</span>
+                  <select
+                    className="input w-full"
+                    value={baixaForm.conta_bancaria_id}
+                    onChange={(event) => setBaixaForm((current) => ({ ...current, conta_bancaria_id: event.target.value }))}
+                    required={contaBancariaObrigatoria(baixaForm.forma_recebimento)}
+                  >
+                    <option value="">Selecione</option>
+                    {contasBancarias.map((conta) => (
+                      <option key={conta.id} value={conta.id}>
+                        {conta.nome}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="text-sm">
+                  <span className="mb-1 block text-slate-500">Data do movimento</span>
+                  <input
+                    className="input w-full"
+                    type="date"
+                    value={baixaForm.data_movimento}
+                    onChange={(event) => setBaixaForm((current) => ({ ...current, data_movimento: event.target.value }))}
+                    required
+                  />
+                </label>
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <label className="text-sm">
+                  <span className="mb-1 block text-slate-500">Tipo de permuta</span>
+                  <input
+                    className="input w-full"
+                    value={baixaForm.tipo_permuta}
+                    onChange={(event) => setBaixaForm((current) => ({ ...current, tipo_permuta: event.target.value }))}
+                    placeholder="Ex.: carro + dinheiro"
+                  />
+                </label>
+                <label className="text-sm">
+                  <span className="mb-1 block text-slate-500">Categoria do bem</span>
+                  <select
+                    className="input w-full"
+                    value={baixaForm.categoria_bem}
+                    onChange={(event) => setBaixaForm((current) => ({ ...current, categoria_bem: event.target.value }))}
+                  >
+                    <option value="">Nao informar</option>
+                    {CATEGORIAS_BEM.map((item) => (
+                      <option key={item} value={item}>{item}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="text-sm">
+                  <span className="mb-1 block text-slate-500">Bem / descricao</span>
+                  <input
+                    className="input w-full"
+                    value={baixaForm.descricao_bem}
+                    onChange={(event) => setBaixaForm((current) => ({ ...current, descricao_bem: event.target.value }))}
+                    placeholder="Veiculo, imovel, terreno..."
+                  />
+                </label>
+                <label className="text-sm">
+                  <span className="mb-1 block text-slate-500">Valor referencia</span>
+                  <input
+                    className="input w-full"
+                    inputMode="decimal"
+                    value={baixaForm.valor_referencia_bem}
+                    onChange={(event) => setBaixaForm((current) => ({ ...current, valor_referencia_bem: normalizeCurrencyTyping(event.target.value) }))}
+                    onBlur={(event) => setBaixaForm((current) => ({ ...current, valor_referencia_bem: formatCurrencyInput(event.target.value) }))}
+                  />
+                </label>
+              </div>
+
+              <label className="text-sm block">
+                <span className="mb-1 block text-slate-500">Documento de referencia</span>
+                <input
+                  className="input w-full"
+                  value={baixaForm.documento_referencia}
+                  onChange={(event) => setBaixaForm((current) => ({ ...current, documento_referencia: event.target.value }))}
+                  placeholder="Numero de contrato, recibo, placa, matricula..."
+                />
+              </label>
+
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <label className="text-sm">
+                  <span className="mb-1 block text-slate-500">Valor base</span>
+                  <input
+                    className="input w-full"
+                    inputMode="decimal"
+                    value={baixaForm.valor}
+                    onChange={(event) => setBaixaForm((current) => ({ ...current, valor: normalizeCurrencyTyping(event.target.value) }))}
+                    onBlur={(event) => setBaixaForm((current) => ({ ...current, valor: formatCurrencyInput(event.target.value) }))}
+                    required
+                  />
+                </label>
+                <label className="text-sm">
+                  <span className="mb-1 block text-slate-500">Juros</span>
+                  <input
+                    className="input w-full"
+                    inputMode="decimal"
+                    value={baixaForm.juros}
+                    onChange={(event) => setBaixaForm((current) => ({ ...current, juros: normalizeCurrencyTyping(event.target.value) }))}
+                    onBlur={(event) => setBaixaForm((current) => ({ ...current, juros: formatCurrencyInput(event.target.value, { emptyZero: false }) }))}
+                  />
+                </label>
+                <label className="text-sm">
+                  <span className="mb-1 block text-slate-500">Multa</span>
+                  <input
+                    className="input w-full"
+                    inputMode="decimal"
+                    value={baixaForm.multa}
+                    onChange={(event) => setBaixaForm((current) => ({ ...current, multa: normalizeCurrencyTyping(event.target.value) }))}
+                    onBlur={(event) => setBaixaForm((current) => ({ ...current, multa: formatCurrencyInput(event.target.value, { emptyZero: false }) }))}
+                  />
+                </label>
+                <label className="text-sm">
+                  <span className="mb-1 block text-slate-500">Desconto</span>
+                  <input
+                    className="input w-full"
+                    inputMode="decimal"
+                    value={baixaForm.desconto}
+                    onChange={(event) => setBaixaForm((current) => ({ ...current, desconto: normalizeCurrencyTyping(event.target.value) }))}
+                    onBlur={(event) => setBaixaForm((current) => ({ ...current, desconto: formatCurrencyInput(event.target.value, { emptyZero: false }) }))}
+                  />
+                </label>
+              </div>
+
+              <label className="text-sm block">
+                <span className="mb-1 block text-slate-500">Observacoes</span>
+                <textarea
+                  className="input min-h-[96px] w-full"
+                  value={baixaForm.observacoes}
+                  onChange={(event) => setBaixaForm((current) => ({ ...current, observacoes: event.target.value }))}
+                />
+              </label>
+
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={() => {
+                    setModalBaixaOpen(false);
+                    setCorrigindoMovimentoId(null);
+                    setBaixaForm(buildBaixaForm(titulo, contasBancarias));
+                  }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={savingBaixa || (contaBancariaObrigatoria(baixaForm.forma_recebimento) && !baixaForm.conta_bancaria_id) || !baixaForm.valor}
+                >
+                  {savingBaixa ? 'Salvando...' : corrigindoMovimentoId ? 'Salvar correcao' : 'Confirmar baixa'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}

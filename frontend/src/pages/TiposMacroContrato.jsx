@@ -64,7 +64,7 @@ export default function TiposMacroContrato() {
   }
 
   return (
-    <div className="page">
+    <div className="page solicitacoes-page">
       <div>
         <h1 className="page-title">Tipos Macro de Contrato</h1>
         <p className="page-subtitle">Cadastro dos tipos macro de contrato.</p>

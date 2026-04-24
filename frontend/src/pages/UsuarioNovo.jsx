@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { API_URL, authHeaders } from '../services/api';
 import { getUsuario, criarUsuario, atualizarUsuario } from '../services/usuarios';
 import { useAuth } from '../contexts/AuthContext';
+import { isBusinessAdmin, isSuperadmin } from '../utils/acessoProduto';
 
 export default function UsuarioNovo() {
   const { user } = useAuth();
@@ -14,19 +15,20 @@ export default function UsuarioNovo() {
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
   const [perfil, setPerfil] = useState('');
-  const [cargoId, setCargoId] = useState('');
   const [setorId, setSetorId] = useState('');
-  const [setoresIds, setSetoresIds] = useState([]);
   const [obras, setObras] = useState([]);
   const [podeCriarSolicitacaoCompra, setPodeCriarSolicitacaoCompra] = useState(false);
 
-  const [listaCargos, setListaCargos] = useState([]);
   const [listaSetores, setListaSetores] = useState([]);
   const [listaObras, setListaObras] = useState([]);
   const [loading, setLoading] = useState(true);
-  const isSuperadminLogado = String(user?.perfil || '').toUpperCase() === 'SUPERADMIN';
+  const isSuperadminLogado = isSuperadmin(user);
+  const isBusinessAdminLogado = isBusinessAdmin(user);
   const perfilNormalizado = String(perfil || '').toUpperCase();
-  const permissaoCompraTravada = perfilNormalizado === 'ADMIN' || perfilNormalizado === 'SUPERADMIN';
+  const permissaoCompraTravada =
+    perfilNormalizado === 'ADMIN' ||
+    perfilNormalizado === 'ADMINISTRADOR' ||
+    perfilNormalizado === 'SUPERADMIN';
 
   useEffect(() => {
     carregarDados();
@@ -35,13 +37,11 @@ export default function UsuarioNovo() {
   async function carregarDados() {
     try {
       setLoading(true);
-      const [cargos, setores, obrasLista] = await Promise.all([
-        fetch(`${API_URL}/cargos`, { headers: authHeaders() }).then(r => r.json()),
+      const [setores, obrasLista] = await Promise.all([
         fetch(`${API_URL}/setores`, { headers: authHeaders() }).then(r => r.json()),
         fetch(`${API_URL}/obras`, { headers: authHeaders() }).then(r => r.json())
       ]);
 
-      setListaCargos(Array.isArray(cargos) ? cargos : []);
       setListaSetores(Array.isArray(setores) ? setores : []);
       setListaObras(Array.isArray(obrasLista) ? obrasLista : []);
 
@@ -50,11 +50,7 @@ export default function UsuarioNovo() {
         setNome(usuario.nome || '');
         setEmail(usuario.email || '');
         setPerfil(usuario.perfil || '');
-        setCargoId(usuario.cargo_id ? String(usuario.cargo_id) : '');
-        const setorPrincipal = usuario.setor_id ? String(usuario.setor_id) : '';
-        const setoresUsuario = extrairSetoresIdsUsuario(usuario, setorPrincipal);
-        setSetorId(setorPrincipal);
-        setSetoresIds(setoresUsuario);
+        setSetorId(usuario.setor_id ? String(usuario.setor_id) : '');
         setPodeCriarSolicitacaoCompra(Boolean(usuario.pode_criar_solicitacao_compra));
         const vinculos = Array.isArray(usuario.vinculos) ? usuario.vinculos : [];
         setObras(vinculos.map(v => v.obra_id).filter(Boolean));
@@ -68,79 +64,22 @@ export default function UsuarioNovo() {
   }
 
   function toggleObra(idObra) {
-    if (obras.includes(idObra)) {
-      setObras(obras.filter(o => o !== idObra));
-    } else {
-      setObras([...obras, idObra]);
-    }
-  }
-
-  function extrairSetoresIdsUsuario(usuario, setorPrincipal = '') {
-    const ids = [];
-
-    function adicionar(valor) {
-      const idSetor = String(valor || '').trim();
-      if (idSetor && !ids.includes(idSetor)) {
-        ids.push(idSetor);
-      }
-    }
-
-    adicionar(setorPrincipal || usuario?.setor_id);
-
-    if (Array.isArray(usuario?.setores_ids)) {
-      usuario.setores_ids.forEach(adicionar);
-    }
-
-    if (Array.isArray(usuario?.setores)) {
-      usuario.setores.forEach(setor => adicionar(setor?.id));
-    }
-
-    if (Array.isArray(usuario?.setoresVinculos)) {
-      usuario.setoresVinculos.forEach(vinculo => {
-        adicionar(vinculo?.setor_id);
-        adicionar(vinculo?.setor?.id);
-      });
-    }
-
-    return ids;
-  }
-
-  function alterarSetorPrincipal(novoSetorId) {
-    setSetorId(novoSetorId);
-    setSetoresIds(prev => {
-      const atual = new Set(prev.map(String).filter(Boolean));
-      if (novoSetorId) atual.add(String(novoSetorId));
-      return Array.from(atual);
-    });
-  }
-
-  function toggleSetorVinculado(idSetor) {
-    const idNormalizado = String(idSetor || '').trim();
-    if (!idNormalizado || idNormalizado === String(setorId)) return;
-
-    setSetoresIds(prev => (
-      prev.includes(idNormalizado)
-        ? prev.filter(idAtual => idAtual !== idNormalizado)
-        : [...prev, idNormalizado]
+    setObras((atual) => (
+      atual.includes(idObra)
+        ? atual.filter((obraId) => obraId !== idObra)
+        : [...atual, idObra]
     ));
   }
 
   async function salvar(e) {
     e.preventDefault();
 
-    const setoresSelecionados = Array.from(new Set([
-      setorId,
-      ...setoresIds
-    ].map(valor => String(valor || '').trim()).filter(Boolean)));
-
     const payload = {
       nome,
       email,
       senha,
       perfil,
-      cargo_id: cargoId || null,
       setor_id: setorId || null,
-      setores_ids: setoresSelecionados,
       obras,
       pode_criar_solicitacao_compra: podeCriarSolicitacaoCompra
     };
@@ -163,14 +102,14 @@ export default function UsuarioNovo() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto">
-      <h1 className="text-2xl font-semibold mb-6">
+    <div className="page solicitacoes-page max-w-3xl mx-auto">
+      <h1 className="page-title">
         {editando ? 'Editar Usuario' : 'Novo Usuario'}
       </h1>
 
       <form
         onSubmit={salvar}
-        className="bg-white p-6 rounded-xl shadow space-y-4"
+        className="card space-y-4"
       >
         <div className="grid md:grid-cols-2 gap-4">
           <label className="grid gap-1 text-sm">
@@ -216,25 +155,10 @@ export default function UsuarioNovo() {
               required
             >
               <option value="">Selecione</option>
+              {isBusinessAdminLogado && <option value="ADMINISTRADOR">ADMINISTRADOR</option>}
               <option value="ADMIN">ADMIN</option>
               {isSuperadminLogado && <option value="SUPERADMIN">SUPERADMIN</option>}
               <option value="USUARIO">USUARIO</option>
-            </select>
-          </label>
-
-          <label className="grid gap-1 text-sm">
-            Cargo
-            <select
-              className="input"
-              value={cargoId}
-              onChange={e => setCargoId(e.target.value)}
-            >
-              <option value="">Selecione</option>
-              {listaCargos.map(c => (
-                <option key={c.id} value={c.id}>
-                  {c.nome}
-                </option>
-              ))}
             </select>
           </label>
 
@@ -243,8 +167,7 @@ export default function UsuarioNovo() {
             <select
               className="input"
               value={setorId}
-              onChange={e => alterarSetorPrincipal(e.target.value)}
-              required
+              onChange={e => setSetorId(e.target.value)}
             >
               <option value="">Selecione</option>
               {listaSetores.map(s => (
@@ -256,39 +179,7 @@ export default function UsuarioNovo() {
           </label>
         </div>
 
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <p className="font-medium">Setores vinculados</p>
-            <span className="text-xs text-[var(--c-muted)]">
-              O setor principal fica sempre vinculado.
-            </span>
-          </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-            {listaSetores.map(s => {
-              const idSetor = String(s.id);
-              const principal = idSetor === String(setorId);
-              const marcado = principal || setoresIds.includes(idSetor);
-
-              return (
-                <label key={s.id} className="flex gap-2 items-center">
-                  <input
-                    type="checkbox"
-                    checked={marcado}
-                    disabled={principal}
-                    onChange={() => toggleSetorVinculado(idSetor)}
-                  />
-                  <span>
-                    {s.nome}
-                    {principal ? ' (principal)' : ''}
-                  </span>
-                </label>
-              );
-            })}
-          </div>
-        </div>
-
-        {isSuperadminLogado && (
+        {isBusinessAdminLogado && (
           <div className="rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4">
             <label className="flex items-start gap-3 text-sm">
               <input
@@ -302,7 +193,7 @@ export default function UsuarioNovo() {
                 <span className="font-medium">Permitir acesso a Nova Solicitação de Compra</span>
                 <span className="text-[var(--c-muted)]">
                   {permissaoCompraTravada
-                    ? 'Perfis ADMIN e SUPERADMIN ja possuem esse acesso automaticamente.'
+                    ? 'Perfis ADMIN, ADMINISTRADOR e SUPERADMIN ja possuem esse acesso automaticamente.'
                     : 'Define se este usuário pode acessar e utilizar a tela de Nova Solicitação de Compra.'}
                 </span>
               </span>
@@ -311,19 +202,47 @@ export default function UsuarioNovo() {
         )}
 
         <div>
-          <p className="font-medium mb-2">Obras vinculadas</p>
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <p className="font-medium">Obras vinculadas</p>
+            <span className="text-sm text-[var(--c-muted)]">
+              {obras.length} selecionada(s)
+            </span>
+          </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-            {listaObras.map(o => (
-              <label key={o.id} className="flex gap-2 items-center">
-                <input
-                  type="checkbox"
-                  checked={obras.includes(o.id)}
-                  onChange={() => toggleObra(o.id)}
-                />
-                {o.codigo ? `${o.codigo} - ${o.nome}` : o.nome}
-              </label>
-            ))}
+          <div className="max-h-72 overflow-y-auto rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)]">
+            {listaObras.length === 0 ? (
+              <div className="px-4 py-4 text-sm text-[var(--c-muted)]">
+                Nenhuma obra disponivel para vinculo.
+              </div>
+            ) : (
+              listaObras.map((obra) => {
+                const checked = obras.includes(obra.id);
+
+                return (
+                  <label
+                    key={obra.id}
+                    className={`flex cursor-pointer items-start gap-3 border-b border-[var(--c-border)] px-4 py-3 last:border-b-0 ${
+                      checked ? 'bg-blue-50/70' : ''
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      className="mt-1"
+                      checked={checked}
+                      onChange={() => toggleObra(obra.id)}
+                    />
+                    <span className="grid gap-1">
+                      <span className="font-medium">
+                        {obra.codigo ? `${obra.codigo} - ${obra.nome}` : obra.nome}
+                      </span>
+                      <span className="text-xs text-[var(--c-muted)]">
+                        ID {obra.id}
+                      </span>
+                    </span>
+                  </label>
+                );
+              })
+            )}
           </div>
         </div>
 
@@ -347,3 +266,4 @@ export default function UsuarioNovo() {
     </div>
   );
 }
+

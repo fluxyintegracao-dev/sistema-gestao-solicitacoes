@@ -1,9 +1,12 @@
 import { API_URL, authHeaders } from './api';
 
-export async function getNotificacoes({ nao_lidas = false, limit = 50 } = {}) {
+export async function getNotificacoes({ nao_lidas = false, limit = 50, tipos = [] } = {}) {
   const params = new URLSearchParams();
   if (nao_lidas) params.set('nao_lidas', '1');
   if (limit) params.set('limit', String(limit));
+  if (Array.isArray(tipos) && tipos.length > 0) {
+    params.set('tipos', tipos.join(','));
+  }
 
   const res = await fetch(`${API_URL}/notificacoes?${params.toString()}`, {
     headers: authHeaders()

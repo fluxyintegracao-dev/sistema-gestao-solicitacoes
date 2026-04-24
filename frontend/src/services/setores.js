@@ -1,16 +1,7 @@
 import { API_URL, authHeaders } from './api';
 
-export async function getSetores(options = {}) {
-  const params = new URLSearchParams();
-  if (options?.incluirInativos) {
-    params.set('incluir_inativos', 'true');
-  }
-
-  const url = params.toString()
-    ? `${API_URL}/setores?${params.toString()}`
-    : `${API_URL}/setores`;
-
-  const res = await fetch(url, {
+export async function getSetores() {
+  const res = await fetch(`${API_URL}/setores`, {
     headers: authHeaders()
   });
   return res.json();

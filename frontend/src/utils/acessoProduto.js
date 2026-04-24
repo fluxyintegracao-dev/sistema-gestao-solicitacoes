@@ -1,0 +1,320 @@
+import { userHasSetorCapability } from './setor';
+import { normalizeRhDpPermissionList } from '../constants/rhDpPermissions';
+
+export function normalizeToken(value) {
+  return String(value || '')
+    .trim()
+    .toUpperCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+}
+
+export function isSuperadmin(user) {
+  return normalizeToken(user?.perfil) === 'SUPERADMIN';
+}
+
+export function isAdministrador(user) {
+  return normalizeToken(user?.perfil) === 'ADMINISTRADOR';
+}
+
+export function isAdmin(user) {
+  return normalizeToken(user?.perfil) === 'ADMIN';
+}
+
+export function isBusinessAdmin(user) {
+  return isSuperadmin(user) || isAdministrador(user);
+}
+
+export function isAdminGeo(user) {
+  return isAdmin(user) && userHasSetorCapability(user, 'eh_setor_geo');
+}
+
+export function canManageUsers(user) {
+  return isBusinessAdmin(user) || isAdminGeo(user);
+}
+
+export function getEnabledModules(user) {
+  return Array.isArray(user?.modulos_habilitados) ? user.modulos_habilitados : [];
+}
+
+export function hasEnabledModule(user, moduleKey, options = {}) {
+  const normalizedKey = normalizeToken(moduleKey);
+  const allowSuperadminBypass = options.allowSuperadminBypass !== false;
+
+  if (!normalizedKey) return true;
+  if (allowSuperadminBypass && isSuperadmin(user)) return true;
+
+  const modules = getEnabledModules(user);
+  if (!modules.length) return true;
+
+  const found = modules.find((item) => normalizeToken(item?.key) === normalizedKey);
+  if (!found) return true;
+  return Boolean(found.enabled);
+}
+
+export function canAccessSolicitacoes(user) {
+  return hasEnabledModule(user, 'SOLICITACOES');
+}
+
+export function canAccessPrioridadesDiretoria(user) {
+  if (!canAccessSolicitacoes(user)) return false;
+  if (isSuperadmin(user)) return true;
+
+  const tokens = [
+    user?.setor?.codigo,
+    user?.setor?.nome,
+    user?.area,
+    ...(Array.isArray(user?.setores) ? user.setores.flatMap(setor => [setor?.codigo, setor?.nome]) : []),
+    ...(Array.isArray(user?.setoresVinculos)
+      ? user.setoresVinculos.flatMap(vinculo => [vinculo?.setor?.codigo, vinculo?.setor?.nome])
+      : [])
+  ].map(normalizeToken).filter(Boolean);
+
+  return (
+    tokens.includes('DIR_ADMIN') ||
+    tokens.includes('DIR_OBRAS_PUBLICAS') ||
+    tokens.includes('DIR_OBRAS_PRIVADAS')
+  );
+}
+
+export function canAccessCompras(user) {
+  if (!hasEnabledModule(user, 'COMPRAS')) return false;
+  if (isBusinessAdmin(user)) return true;
+
+  return (
+    Boolean(user?.pode_criar_solicitacao_compra) ||
+    userHasSetorCapability(user, 'eh_setor_compras') ||
+    userHasSetorCapability(user, 'eh_setor_geo')
+  );
+}
+
+export function canAccessFinanceiro(user) {
+  if (!hasEnabledModule(user, 'FINANCEIRO')) return false;
+  if (isBusinessAdmin(user)) return true;
+
+  return (
+    Boolean(user?.financeiro_liberado) ||
+    normalizeToken(user?.perfil) === 'FINANCEIRO' ||
+    userHasSetorCapability(user, 'eh_setor_financeiro')
+  );
+}
+
+export function canAccessBoletos(user) {
+  if (!hasEnabledModule(user, 'BOLETOS')) return false;
+  if (!canAccessFinanceiro(user)) return false;
+  return hasPermissao(user, 'boletos.emitir.visualizar') || hasPermissao(user, 'boletos.emitir.gerar');
+}
+
+export function canAccessCadastroObras(user) {
+  return isBusinessAdmin(user);
+}
+
+export function canAccessGestaoObras(user) {
+  return hasEnabledModule(user, 'OBRAS') && canAccessCadastroObras(user);
+}
+
+export function canAccessContratos(user) {
+  if (!hasEnabledModule(user, 'CONTRATOS')) return false;
+  if (isBusinessAdmin(user)) return true;
+  return isAdminGeo(user) || userHasSetorCapability(user, 'eh_setor_obra');
+}
+
+export function canAccessComercial(user) {
+  if (!hasEnabledModule(user, 'COMERCIAL')) return false;
+  return isBusinessAdmin(user);
+}
+
+export function canAccessRhDp(user) {
+  if (!hasEnabledModule(user, 'RH_DP')) return false;
+  if (isBusinessAdmin(user)) return true;
+  return getRhDpCapabilities(user).length > 0;
+}
+
+export function canAccessIntegracaoSienge(user) {
+  if (!hasEnabledModule(user, 'INTEGRACAO_SIENGE')) return false;
+  if (isBusinessAdmin(user)) return true;
+  return getIntegracaoSiengeCapabilities(user).length > 0;
+}
+
+export function canAccessProvisoes(user) {
+  if (!hasEnabledModule(user, 'PROVISOES')) return false;
+  if (isBusinessAdmin(user)) return true;
+
+  return (
+    hasPermissao(user, 'provisoes.lista.visualizar') ||
+    hasPermissao(user, 'provisoes.cadastro.criar') ||
+    hasPermissao(user, 'provisoes.cadastro.editar') ||
+    hasPermissao(user, 'provisoes.dashboard.visualizar') ||
+    hasPermissao(user, 'provisoes.categorias.gerenciar')
+  );
+}
+
+export function getRhDpCapabilities(user) {
+  return normalizeRhDpPermissionList(user?.rh_dp_capacidades || []);
+}
+
+export function getIntegracaoSiengeCapabilities(user) {
+  return normalizeRhDpPermissionList(user?.integracao_sienge_capacidades || []);
+}
+
+export function hasRhDpCapability(user, capability) {
+  if (isBusinessAdmin(user)) return true;
+  return getRhDpCapabilities(user).includes(String(capability || '').trim().toLowerCase());
+}
+
+export function hasIntegracaoSiengeCapability(user, capability) {
+  if (isBusinessAdmin(user)) return true;
+  return getIntegracaoSiengeCapabilities(user).includes(String(capability || '').trim().toLowerCase());
+}
+
+export function canAccessRhDpDashboard(user) {
+  return canAccessRhDp(user) && hasRhDpCapability(user, 'rh_dp_dashboard_view');
+}
+
+export function canAccessRhDpEmpresas(user) {
+  return hasEnabledModule(user, 'RH_DP') && isBusinessAdmin(user);
+}
+
+export function canViewRhDpColaboradores(user) {
+  return canAccessRhDp(user) && (
+    hasRhDpCapability(user, 'rh_dp_colaboradores_view') ||
+    hasRhDpCapability(user, 'rh_dp_colaboradores_edit')
+  );
+}
+
+export function canManageRhDpColaboradores(user) {
+  return canAccessRhDp(user) && hasRhDpCapability(user, 'rh_dp_colaboradores_edit');
+}
+
+export function canViewRhDpDocumentos(user) {
+  return canAccessRhDp(user) && (
+    hasRhDpCapability(user, 'rh_dp_documentos_view') ||
+    hasRhDpCapability(user, 'rh_dp_documentos_manage')
+  );
+}
+
+export function canManageRhDpDocumentos(user) {
+  return canAccessRhDp(user) && hasRhDpCapability(user, 'rh_dp_documentos_manage');
+}
+
+export function canExecuteRhDpImportacoes(user) {
+  return canAccessRhDp(user) && hasRhDpCapability(user, 'rh_dp_importacoes_execute');
+}
+
+export function canViewRhDpApuracao(user) {
+  return canAccessRhDp(user) && (
+    hasRhDpCapability(user, 'rh_dp_apuracao_view') ||
+    hasRhDpCapability(user, 'rh_dp_apuracao_edit') ||
+    hasRhDpCapability(user, 'rh_dp_fechamento_execute')
+  );
+}
+
+export function canEditRhDpApuracao(user) {
+  return canAccessRhDp(user) && hasRhDpCapability(user, 'rh_dp_apuracao_edit');
+}
+
+export function canViewRhDpObrigacoes(user) {
+  return canAccessRhDp(user) && (
+    hasRhDpCapability(user, 'rh_dp_obrigacoes_view') ||
+    hasRhDpCapability(user, 'rh_dp_fechamento_execute')
+  );
+}
+
+export function canExecuteRhDpFechamento(user) {
+  return canAccessRhDp(user) && hasRhDpCapability(user, 'rh_dp_fechamento_execute');
+}
+
+export function canViewIntegracaoSienge(user) {
+  return canAccessIntegracaoSienge(user) && (
+    hasIntegracaoSiengeCapability(user, 'integracao_sienge_view') ||
+    hasIntegracaoSiengeCapability(user, 'integracao_sienge_retry') ||
+    hasIntegracaoSiengeCapability(user, 'integracao_sienge_config_manage')
+  );
+}
+
+export function canRetryIntegracaoSienge(user) {
+  return canAccessIntegracaoSienge(user) && hasIntegracaoSiengeCapability(user, 'integracao_sienge_retry');
+}
+
+export function canManageIntegracaoSiengeConfig(user) {
+  return canAccessIntegracaoSienge(user) && hasIntegracaoSiengeCapability(user, 'integracao_sienge_config_manage');
+}
+
+export function canViewProvisionamentos(user) {
+  return canAccessProvisoes(user) && (
+    hasPermissao(user, 'provisoes.lista.visualizar') ||
+    hasPermissao(user, 'provisoes.cadastro.criar') ||
+    hasPermissao(user, 'provisoes.cadastro.editar')
+  );
+}
+
+export function canCreateProvisionamentos(user) {
+  return canAccessProvisoes(user) && (
+    hasPermissao(user, 'provisoes.cadastro.criar') ||
+    hasPermissao(user, 'provisoes.cadastro.editar')
+  );
+}
+
+export function canManageProvisionamentos(user) {
+  return canAccessProvisoes(user) && hasPermissao(user, 'provisoes.cadastro.editar');
+}
+
+export function canManageProvisionamentosStatus(user) {
+  return canAccessProvisoes(user) && hasPermissao(user, 'provisoes.status.gerenciar');
+}
+
+export function canViewProvisionamentosDashboard(user) {
+  return canAccessProvisoes(user) && hasPermissao(user, 'provisoes.dashboard.visualizar');
+}
+
+export function canManageProvisionamentoCategorias(user) {
+  return canAccessProvisoes(user) && hasPermissao(user, 'provisoes.categorias.gerenciar');
+}
+
+export function canAccessBiblioteca(user) {
+  return hasEnabledModule(user, 'BIBLIOTECA_MODELOS');
+}
+
+export function canAccessComunicacao(user) {
+  return hasEnabledModule(user, 'COMUNICACAO_INTERNA');
+}
+
+const CRM_PERFIS = ['SUPERADMIN', 'ADMIN', 'ADMINISTRADOR', 'ADMIN_CRM', 'GESTOR_COMERCIAL', 'COORDENADOR_CRM', 'DIRETORIA'];
+const CRM_PERFIS_EXPORT = ['SUPERADMIN', 'ADMIN', 'ADMINISTRADOR', 'ADMIN_CRM', 'GESTOR_COMERCIAL', 'COORDENADOR_CRM'];
+const CRM_PERFIS_REDISTRIBUTE = ['SUPERADMIN', 'ADMIN', 'ADMINISTRADOR', 'ADMIN_CRM', 'GESTOR_COMERCIAL', 'COORDENADOR_CRM'];
+
+export function canAccessCrm(user) {
+  if (!hasEnabledModule(user, 'CRM')) return false;
+  const perfil = normalizeToken(user?.perfil || '');
+  return CRM_PERFIS.includes(perfil);
+}
+
+export function canExportCrmLeads(user) {
+  if (!hasEnabledModule(user, 'CRM')) return false;
+  const perfil = normalizeToken(user?.perfil || '');
+  return CRM_PERFIS_EXPORT.includes(perfil);
+}
+
+export function canRedistributeCrmLeads(user) {
+  if (!hasEnabledModule(user, 'CRM')) return false;
+  const perfil = normalizeToken(user?.perfil || '');
+  return CRM_PERFIS_REDISTRIBUTE.includes(perfil);
+}
+
+/**
+ * Verifica se o usuário tem uma permissão de área específica.
+ *
+ * SUPERADMIN e ADMINISTRADOR têm bypass total (retorna sempre true).
+ * Usuários sem nenhuma permissão configurada têm acesso completo (backwards compat).
+ * Usuários COM permissões configuradas: somente as chaves listadas são concedidas.
+ *
+ * @param {object} user - Objeto do usuário da sessão
+ * @param {string} permKey - Chave no formato "modulo.area.acao" (ex: "financeiro.titulos.criar")
+ */
+export function hasPermissao(user, permKey) {
+  if (isBusinessAdmin(user)) return true;
+  const lista = user?.areas_permissoes;
+  // Sem configuração = acesso completo (compatibilidade com instalações existentes)
+  if (!Array.isArray(lista) || lista.length === 0) return true;
+  return lista.includes(String(permKey).toLowerCase());
+}

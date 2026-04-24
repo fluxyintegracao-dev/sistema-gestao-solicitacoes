@@ -6,79 +6,21 @@ import { createSolicitacao } from '../services/solicitacoes';
 import { uploadArquivos } from '../services/uploads';
 import { getTiposSubContrato } from '../services/tiposSubContrato';
 import { getContratos } from '../services/contratos';
+import { buscarParceiros, criarParceiro, listarCategoriasParceiro } from '../services/parceiros';
+import { listarApropriacoes } from '../services/apropriacoes';
 import ObraSearchModal from '../components/ObraSearchModal';
-import {
-  getAprovacaoDiretoria,
-  getAreasObra,
-  getAreasPorSetorOrigem,
-  getTiposSolicitacaoPorSetor
-} from '../services/configuracoesSistema';
+import { getAprovacaoDiretoria, getAreasObra, getAreasPorSetorOrigem, getTiposSolicitacaoPorSetor } from '../services/configuracoesSistema';
 import { useAuth } from '../contexts/AuthContext';
 import { HiPaperClip } from 'react-icons/hi2';
-
-function normalizarClassificacaoObra(valor) {
-  const classificacao = String(valor || '').trim().toUpperCase();
-  return classificacao === 'PUBLICA' || classificacao === 'PRIVADA'
-    ? classificacao
-    : '';
-}
-
-function normalizarTokenSetor(valor) {
-  return String(valor || '').trim().toUpperCase();
-}
-
-function setorPossuiToken(setor, token) {
-  const alvo = normalizarTokenSetor(token);
-  if (!alvo) return false;
-
-  return [
-    setor?.codigo,
-    setor?.nome,
-    setor?.id
-  ].some(valor => normalizarTokenSetor(valor) === alvo);
-}
-
-function obterValorAreaResponsavel(setor) {
-  return String(setor?.codigo || setor?.nome || setor?.id || '').trim().toUpperCase();
-}
-
-const FORM_INICIAL = {
-  obra_id: '',
-  tipo_solicitacao_id: '',
-  tipo_sub_id: '',
-  contrato_id: '',
-  codigo_contrato: '',
-  area_responsavel: '',
-  descricao: '',
-  itens_apropriacao: '',
-  ref_contrato_abertura: '',
-  valor: '',
-  data_vencimento: '',
-  data_inicio_medicao: '',
-  data_fim_medicao: ''
-};
-
-function obterRegraTiposSetor(regrasConfig = {}, setorSelecionado = '', setores = []) {
-  const tokens = new Set([normalizarTokenSetor(setorSelecionado)]);
-  const setor = (Array.isArray(setores) ? setores : []).find(item => setorPossuiToken(item, setorSelecionado));
-
-  if (setor) {
-    tokens.add(normalizarTokenSetor(setor.codigo));
-    tokens.add(normalizarTokenSetor(setor.nome));
-    tokens.add(normalizarTokenSetor(setor.id));
-  }
-
-  for (const token of tokens) {
-    if (token && regrasConfig?.[token]) {
-      return regrasConfig[token];
-    }
-  }
-
-  return null;
-}
+import { userHasSetorCapability } from '../utils/setor';
+import { hasEnabledModule } from '../utils/acessoProduto';
+import { applyTipoSolicitacaoModuleAvailability, getTipoSolicitacaoBehavior } from '../utils/tipoSolicitacao';
+import { maskCep, maskCpfCnpj, maskPhone, onlyDigits } from '../utils/formatters';
 
 export default function NovaSolicitacao() {
   const { user } = useAuth();
+  const moduloContratosHabilitado = hasEnabledModule(user, 'CONTRATOS');
+  const moduloApropriacoesHabilitado = hasEnabledModule(user, 'OBRAS');
   const [obras, setObras] = useState([]);
   const [obraCodigo, setObraCodigo] = useState('');
   const [obraDescricao, setObraDescricao] = useState('');
@@ -89,28 +31,71 @@ export default function NovaSolicitacao() {
   const [areasObra, setAreasObra] = useState([]);
   const [areasPorSetorOrigem, setAreasPorSetorOrigem] = useState({});
   const [tiposPorSetorConfig, setTiposPorSetorConfig] = useState({});
-  const [diretoriasPorClassificacao, setDiretoriasPorClassificacao] = useState({
-    PUBLICA: '',
-    PRIVADA: ''
-  });
+  const [aprovacaoDiretoriaConfig, setAprovacaoDiretoriaConfig] = useState({ diretorias: {}, destinos: {} });
   const [tiposSub, setTiposSub] = useState([]);
   const [contratos, setContratos] = useState([]);
   const [contratosRef, setContratosRef] = useState([]);
+  const [apropriacoes, setApropriacoes] = useState([]);
   const [refContratoBusca, setRefContratoBusca] = useState('');
   const [refResultados, setRefResultados] = useState([]);
+  const [parceiroBusca, setParceiroBusca] = useState('');
+  const [parceiroResultados, setParceiroResultados] = useState([]);
+  const [parceiroSelecionado, setParceiroSelecionado] = useState(null);
+  const [parceiroBuscando, setParceiroBuscando] = useState(false);
+  const [parceiroBuscaExecutada, setParceiroBuscaExecutada] = useState(false);
+  const [modalParceiroAberto, setModalParceiroAberto] = useState(false);
+  const [categoriasParceiro, setCategoriasParceiro] = useState([]);
+  const [novoParceiro, setNovoParceiro] = useState({
+    cpf_cnpj: '',
+    nome: '',
+    telefone: '',
+    email: '',
+    endereco: '',
+    numero: '',
+    bairro: '',
+    cep: '',
+    municipio: '',
+    estado: '',
+    cliente: false,
+    fornecedor: true,
+    corretor: false,
+    categoria_ids: []
+  });
   const [arquivos, setArquivos] = useState([]);
   const [valorTexto, setValorTexto] = useState('');
-  const [enviando, setEnviando] = useState(false);
   const anexosRef = useRef(null);
-  const envioEmAndamentoRef = useRef(false);
 
-  const [form, setForm] = useState(() => ({ ...FORM_INICIAL }));
+  const [form, setForm] = useState({
+    obra_id: '',
+    parceiro_id: '',
+    apropriacao_id: '',
+    tipo_solicitacao_id: '',
+    tipo_sub_id: '',
+    contrato_id: '',
+    codigo_contrato: '',
+    area_responsavel: '',
+    diretoria_fluxo_codigo: '',
+    descricao: '',
+    itens_apropriacao: '',
+    ref_contrato_abertura: '',
+    valor: '',
+    data_vencimento: '',
+    data_inicio_medicao: '',
+    data_fim_medicao: ''
+  });
 
   useEffect(() => {
     async function load() {
       setObras(await getMinhasObras({ modo: 'CRIACAO' }));
       setTipos(await getTiposSolicitacao());
       setSetores(await getSetores());
+      try {
+        const categoriasData = await listarCategoriasParceiro();
+        setCategoriasParceiro(Array.isArray(categoriasData) ? categoriasData : []);
+      } catch (error) {
+        console.error(error);
+        setCategoriasParceiro([]);
+      }
       try {
         const [cfg, cfgSetorOrigem, cfgTiposPorSetor, cfgAprovacaoDiretoria] = await Promise.all([
           getAreasObra(),
@@ -129,19 +114,16 @@ export default function NovaSolicitacao() {
             ? cfgTiposPorSetor.regras
             : {}
         );
-        setDiretoriasPorClassificacao({
-          PUBLICA: normalizarTokenSetor(cfgAprovacaoDiretoria?.diretorias_por_classificacao?.PUBLICA),
-          PRIVADA: normalizarTokenSetor(cfgAprovacaoDiretoria?.diretorias_por_classificacao?.PRIVADA)
+        setAprovacaoDiretoriaConfig({
+          diretorias: cfgAprovacaoDiretoria?.diretorias || {},
+          destinos: cfgAprovacaoDiretoria?.destinos || {}
         });
       } catch (error) {
         console.error(error);
         setAreasObra([]);
         setAreasPorSetorOrigem({});
         setTiposPorSetorConfig({});
-        setDiretoriasPorClassificacao({
-          PUBLICA: '',
-          PRIVADA: ''
-        });
+        setAprovacaoDiretoriaConfig({ diretorias: {}, destinos: {} });
       }
     }
     load();
@@ -167,28 +149,122 @@ export default function NovaSolicitacao() {
   useEffect(() => {
     if (!form.obra_id) {
       setContratos([]);
-      setForm(prev => ({ ...prev, contrato_id: '' }));
+      setForm(prev => ({ ...prev, contrato_id: '', ref_contrato_abertura: '' }));
       setContratosRef([]);
+      setApropriacoes([]);
+      setForm(prev => ({ ...prev, apropriacao_id: '', itens_apropriacao: '' }));
       return;
     }
 
-    async function loadContratos() {
-      try {
-        const data = await getContratos({ obra_id: form.obra_id, modo: 'CRIACAO' });
-        setContratos(Array.isArray(data) ? data : []);
-      } catch (error) {
-        console.error(error);
+    async function loadDependenciasObra() {
+      const tarefas = [
+        moduloContratosHabilitado
+          ? getContratos({ obra_id: form.obra_id, modo: 'CRIACAO' })
+          : Promise.resolve([]),
+        moduloApropriacoesHabilitado
+          ? listarApropriacoes({ obra_id: form.obra_id })
+          : Promise.resolve([])
+      ];
+
+      const [contratosResult, apropriacoesResult] = await Promise.allSettled(tarefas);
+
+      if (contratosResult.status === 'fulfilled') {
+        setContratos(Array.isArray(contratosResult.value) ? contratosResult.value : []);
+      } else {
+        console.error(contratosResult.reason);
         setContratos([]);
-      } finally {
-        setContratosRef([]);
       }
+
+      if (apropriacoesResult.status === 'fulfilled') {
+        setApropriacoes(Array.isArray(apropriacoesResult.value) ? apropriacoesResult.value : []);
+      } else {
+        console.error(apropriacoesResult.reason);
+        setApropriacoes([]);
+      }
+
+      setContratosRef([]);
     }
 
-    loadContratos();
-  }, [form.obra_id]);
+    loadDependenciasObra();
+  }, [form.obra_id, moduloContratosHabilitado, moduloApropriacoesHabilitado]);
 
   function handleChange(e) {
     setForm({ ...form, [e.target.name]: e.target.value });
+  }
+
+  function normalizarDocumento(valor) {
+    return onlyDigits(valor);
+  }
+
+  function selecionarParceiro(parceiro) {
+    setParceiroSelecionado(parceiro);
+    setForm(prev => ({ ...prev, parceiro_id: String(parceiro.id) }));
+    setParceiroBusca(parceiro.nome || parceiro.cpf_cnpj || '');
+    setParceiroResultados([]);
+    setParceiroBuscaExecutada(false);
+  }
+
+  function limparParceiroSelecionado() {
+    setParceiroSelecionado(null);
+    setParceiroBusca('');
+    setParceiroResultados([]);
+    setParceiroBuscaExecutada(false);
+    setForm(prev => ({ ...prev, parceiro_id: '' }));
+  }
+
+  async function buscarParceirosRelacionados() {
+    try {
+      const termo = parceiroBusca.trim();
+      if (!termo) return;
+      setParceiroBuscando(true);
+      setParceiroBuscaExecutada(true);
+      const data = await buscarParceiros({ q: termo, fornecedor: 1, ativo: 1, limit: 8 });
+      const lista = Array.isArray(data) ? data : [];
+      setParceiroResultados(lista);
+
+      if (lista.length === 1) {
+        selecionarParceiro(lista[0]);
+      }
+    } catch (error) {
+      console.error(error);
+      alert(error.message || 'Erro ao buscar credores');
+    } finally {
+      setParceiroBuscando(false);
+    }
+  }
+
+  async function salvarNovoParceiro() {
+    try {
+      const payload = {
+        ...novoParceiro,
+        cpf_cnpj: normalizarDocumento(novoParceiro.cpf_cnpj),
+        telefone: onlyDigits(novoParceiro.telefone),
+        cep: onlyDigits(novoParceiro.cep)
+      };
+
+      const parceiro = await criarParceiro(payload);
+      selecionarParceiro(parceiro);
+      setNovoParceiro({
+        cpf_cnpj: '',
+        nome: '',
+        telefone: '',
+        email: '',
+        endereco: '',
+        numero: '',
+        bairro: '',
+        cep: '',
+        municipio: '',
+        estado: '',
+        cliente: false,
+        fornecedor: true,
+        corretor: false,
+        categoria_ids: []
+      });
+      setModalParceiroAberto(false);
+    } catch (error) {
+      console.error(error);
+      alert(error.message || 'Erro ao cadastrar credor');
+    }
   }
 
   function limparSelecaoObraERegras() {
@@ -196,41 +272,40 @@ export default function NovaSolicitacao() {
       ...prev,
       obra_id: '',
       area_responsavel: '',
+      diretoria_fluxo_codigo: '',
+      apropriacao_id: '',
       tipo_solicitacao_id: '',
       tipo_sub_id: '',
       contrato_id: '',
       codigo_contrato: ''
     }));
     setContratos([]);
+    setApropriacoes([]);
     setContratosRef([]);
     setRefContratoBusca('');
     setRefResultados([]);
   }
 
   const tipoSelecionado = tipos.find(t => String(t.id) === String(form.tipo_solicitacao_id));
-  const nomeTipoSelecionado = String(tipoSelecionado?.nome || '').trim().toUpperCase();
-  const nomeTipoNormalizado = useMemo(() => {
-    return nomeTipoSelecionado
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '');
-  }, [nomeTipoSelecionado]);
-  const nomeTipoToken = useMemo(() => {
-    return nomeTipoNormalizado
-      .toUpperCase()
-      .replace(/[^A-Z0-9]+/g, ' ')
-      .trim();
-  }, [nomeTipoNormalizado]);
-  const subtipoObrigatorio = nomeTipoSelecionado === 'ADM LOCAL DE OBRA';
-  const medicaoObrigatoria = nomeTipoNormalizado === 'MEDICAO';
-  const locacaoMaqEq = nomeTipoToken === 'LOCACAO DE MAQ EQ';
-  const aberturaContratoObrigatoria = nomeTipoNormalizado === 'ABERTURA DE CONTRATO';
-  const solicitacaoCompra = nomeTipoNormalizado === 'SOLICITACAO DE COMPRA';
-  const outrosAssuntos = nomeTipoNormalizado === 'OUTROS ASSUNTOS';
-  const pedidoContratacao = nomeTipoNormalizado === 'PEDIDO DE CONTRATACAO';
-  const tipoSemValor = solicitacaoCompra || outrosAssuntos || pedidoContratacao;
-  const exibirCamposContrato = medicaoObrigatoria || subtipoObrigatorio || locacaoMaqEq;
-  const camposContratoObrigatorios = exibirCamposContrato;
-  const exibirCampoSubtipo = subtipoObrigatorio;
+  const comportamentoTipo = useMemo(() => {
+    const comportamentoBase = getTipoSolicitacaoBehavior(tipoSelecionado);
+    return applyTipoSolicitacaoModuleAvailability(comportamentoBase, {
+      contratos: moduloContratosHabilitado,
+      apropriacoes: moduloApropriacoesHabilitado
+    });
+  }, [tipoSelecionado, moduloContratosHabilitado, moduloApropriacoesHabilitado]);
+  const subtipoObrigatorio = comportamentoTipo.exige_subtipo;
+  const medicaoObrigatoria = comportamentoTipo.exige_periodo_medicao;
+  const aberturaContratoObrigatoria = comportamentoTipo.exige_ref_contrato_abertura || comportamentoTipo.exige_itens_apropriacao;
+  const solicitacaoCompra = !comportamentoTipo.mostrar_apropriacao_principal && !comportamentoTipo.mostrar_valor;
+  const exigeApropriacaoPrincipal =
+    Boolean(form.tipo_solicitacao_id) &&
+    comportamentoTipo.exige_apropriacao_principal;
+  const tipoSemValor = !comportamentoTipo.mostrar_valor;
+  const exibirCamposContrato = comportamentoTipo.mostrar_contrato;
+  const exibirCampoApropriacao = moduloApropriacoesHabilitado && (comportamentoTipo.mostrar_apropriacao_principal || solicitacaoCompra);
+  const camposContratoObrigatorios = comportamentoTipo.exige_contrato;
+  const exibirCampoSubtipo = comportamentoTipo.mostrar_subtipo;
 
   useEffect(() => {
     if (!exibirCamposContrato) {
@@ -238,7 +313,8 @@ export default function NovaSolicitacao() {
         ...prev,
         tipo_sub_id: '',
         contrato_id: '',
-        codigo_contrato: ''
+        codigo_contrato: '',
+        ref_contrato_abertura: ''
       }));
       setRefContratoBusca('');
       setRefResultados([]);
@@ -248,7 +324,10 @@ export default function NovaSolicitacao() {
       setForm(prev => ({ ...prev, valor: '' }));
       setValorTexto('');
     }
-  }, [exibirCamposContrato, tipoSemValor]);
+    if (!exigeApropriacaoPrincipal) {
+      setForm(prev => ({ ...prev, apropriacao_id: '', itens_apropriacao: '' }));
+    }
+  }, [exibirCamposContrato, tipoSemValor, exigeApropriacaoPrincipal]);
 
   function formatarMoeda(valor) {
     if (Number.isNaN(valor)) return '';
@@ -373,33 +452,16 @@ export default function NovaSolicitacao() {
     setObras([obra]);
   }
 
-  function limparFormulario() {
-    setForm({ ...FORM_INICIAL });
-    setContratos([]);
-    setTiposSub([]);
-    setArquivos([]);
-    setObraCodigo('');
-    setObraDescricao('');
-    setListaModal([]);
-    setModalObras(false);
-    setValorTexto('');
-    setRefContratoBusca('');
-    setRefResultados([]);
-    setContratosRef([]);
-    if (anexosRef.current) {
-      anexosRef.current.value = '';
-    }
-  }
-
   async function handleSubmit(e) {
     e.preventDefault();
 
-    if (envioEmAndamentoRef.current) {
+    if (!form.obra_id) {
+      alert('Selecione uma obra');
       return;
     }
 
-    if (!form.obra_id) {
-      alert('Selecione uma obra');
+    if (exigeApropriacaoPrincipal && !form.apropriacao_id) {
+      alert('Selecione a apropriacao principal da solicitacao.');
       return;
     }
 
@@ -443,6 +505,8 @@ export default function NovaSolicitacao() {
 
     const payload = {
       ...form,
+      parceiro_id: form.parceiro_id || null,
+      apropriacao_id: form.apropriacao_id || null,
       contrato_id: form.contrato_id || null,
       tipo_sub_id: form.tipo_sub_id || null,
       tipo_macro_id: form.tipo_solicitacao_id || null,
@@ -453,51 +517,61 @@ export default function NovaSolicitacao() {
       ref_contrato_abertura: form.ref_contrato_abertura || null
     };
 
-    envioEmAndamentoRef.current = true;
-    setEnviando(true);
-
     try {
       const solicitacao = await createSolicitacao(payload);
 
       if (arquivos.length > 0) {
-        try {
-          await uploadArquivos({
-            files: arquivos,
-            solicitacao_id: solicitacao.id,
-            tipo: 'SOLICITACAO'
-          });
-        } catch (uploadError) {
-          console.error(uploadError);
-          limparFormulario();
-          alert('Solicitacao criada com sucesso, mas houve erro ao enviar anexos. Abra a solicitacao para anexar novamente.');
-          return;
-        }
+        await uploadArquivos({
+          files: arquivos,
+          solicitacao_id: solicitacao.id,
+          tipo: 'SOLICITACAO'
+        });
       }
 
-      limparFormulario();
       alert('Solicitacao criada com sucesso');
+      setForm({
+        obra_id: '',
+        parceiro_id: '',
+        apropriacao_id: '',
+        tipo_solicitacao_id: '',
+        tipo_sub_id: '',
+        contrato_id: '',
+        codigo_contrato: '',
+        area_responsavel: '',
+        diretoria_fluxo_codigo: '',
+        descricao: '',
+        itens_apropriacao: '',
+        ref_contrato_abertura: '',
+        valor: '',
+        data_vencimento: '',
+        data_inicio_medicao: '',
+        data_fim_medicao: ''
+      });
+      setContratos([]);
+      setTiposSub([]);
+      setArquivos([]);
+      setObraCodigo('');
+      setObraDescricao('');
+      setListaModal([]);
+      setModalObras(false);
+      setValorTexto('');
+      setParceiroBusca('');
+      setParceiroResultados([]);
+      setParceiroSelecionado(null);
+      setParceiroBuscaExecutada(false);
+      setRefContratoBusca('');
+      setRefResultados([]);
+      setContratosRef([]);
+      if (anexosRef.current) {
+        anexosRef.current.value = '';
+      }
     } catch (error) {
       console.error(error);
       alert(error?.message || 'Erro ao criar solicitacao');
-    } finally {
-      envioEmAndamentoRef.current = false;
-      setEnviando(false);
     }
   }
 
-  const isSetorObra =
-    user?.setor?.codigo === 'OBRA' ||
-    user?.area === 'OBRA';
-  const obraSelecionadaAtual = useMemo(() => {
-    return obras.find(obra => String(obra.id) === String(form.obra_id)) || null;
-  }, [obras, form.obra_id]);
-  const classificacaoObraSelecionada = useMemo(() => {
-    return normalizarClassificacaoObra(obraSelecionadaAtual?.classificacao_obra);
-  }, [obraSelecionadaAtual]);
-  const diretoriaEsperadaObra = useMemo(() => {
-    if (!classificacaoObraSelecionada) return '';
-    return normalizarTokenSetor(diretoriasPorClassificacao?.[classificacaoObraSelecionada]);
-  }, [classificacaoObraSelecionada, diretoriasPorClassificacao]);
+  const isSetorObra = userHasSetorCapability(user, 'eh_setor_obra');
   const tokensSetorUsuario = useMemo(() => {
     return Array.from(new Set([
       String(user?.setor?.codigo || '').toUpperCase(),
@@ -519,25 +593,13 @@ export default function NovaSolicitacao() {
   const setoresFiltrados = useMemo(() => {
     let lista = [...setores];
 
-    if (!isSetorObra && destinosPermitidosPorSetorOrigem.size > 0) {
-      lista = lista.filter(setor => {
-        return [
-          setor?.codigo,
-          setor?.nome,
-          setor?.id
-        ].some(valor => destinosPermitidosPorSetorOrigem.has(normalizarTokenSetor(valor)));
-      });
+    if (destinosPermitidosPorSetorOrigem.size > 0) {
+      lista = lista.filter(s => destinosPermitidosPorSetorOrigem.has(String(s.codigo || '').toUpperCase()));
     }
 
     if (isSetorObra && areasObra && areasObra.length > 0) {
-      const permitidasObra = new Set(areasObra.map(a => normalizarTokenSetor(a)).filter(Boolean));
-      lista = lista.filter(setor => {
-        return [
-          setor?.codigo,
-          setor?.nome,
-          setor?.id
-        ].some(valor => permitidasObra.has(normalizarTokenSetor(valor)));
-      });
+      const permitidasObra = new Set(areasObra.map(a => String(a).toUpperCase()));
+      lista = lista.filter(s => permitidasObra.has(String(s.codigo || '').toUpperCase()));
     }
 
     return lista;
@@ -545,6 +607,17 @@ export default function NovaSolicitacao() {
   const contratosDisponiveis = contratosRef.length > 0 ? contratosRef : contratos;
   const hoje = new Date();
   const hojeInput = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-${String(hoje.getDate()).padStart(2, '0')}`;
+  const obraSelecionadaAtual = useMemo(() => (
+    Array.isArray(obras)
+      ? obras.find(obra => String(obra.id) === String(form.obra_id))
+      : null
+  ), [obras, form.obra_id]);
+  const classificacaoObraSelecionada = String(
+    obraSelecionadaAtual?.classificacao || obraSelecionadaAtual?.classificacao_obra || ''
+  ).trim().toUpperCase();
+  const diretoriaSugerida = classificacaoObraSelecionada
+    ? aprovacaoDiretoriaConfig?.diretorias?.[classificacaoObraSelecionada] || ''
+    : '';
   const tiposFiltradosPorSetor = useMemo(() => {
     const setorKey = String(form.area_responsavel || '').trim().toUpperCase();
     if (!setorKey) return [];
@@ -553,7 +626,7 @@ export default function NovaSolicitacao() {
       ? tipos.filter(tipo => tipo?.ativo !== false)
       : [];
 
-    const regra = obterRegraTiposSetor(tiposPorSetorConfig, setorKey, setores);
+    const regra = tiposPorSetorConfig?.[setorKey];
     const tiposPermitidos = Array.isArray(regra?.tipos)
       ? regra.tipos.map(Number).filter(Number.isFinite)
       : [];
@@ -564,17 +637,12 @@ export default function NovaSolicitacao() {
 
     const idsPermitidos = new Set(tiposPermitidos);
     return tiposAtivos.filter(tipo => idsPermitidos.has(Number(tipo.id)));
-  }, [tipos, tiposPorSetorConfig, form.area_responsavel, setores]);
-  const diretoriaAprovacaoLabel = useMemo(() => {
-    if (!isSetorObra || !form.obra_id || !diretoriaEsperadaObra) return '';
-    const setorDiretoria = setores.find(setor => setorPossuiToken(setor, diretoriaEsperadaObra));
-    return setorDiretoria?.nome || setorDiretoria?.codigo || diretoriaEsperadaObra;
-  }, [isSetorObra, form.obra_id, diretoriaEsperadaObra, setores]);
+  }, [tipos, tiposPorSetorConfig, form.area_responsavel]);
 
   useEffect(() => {
     if (!form.area_responsavel) return;
     const existe = setoresFiltrados.some(
-      setor => setorPossuiToken(setor, form.area_responsavel)
+      setor => String(setor.codigo || '').toUpperCase() === String(form.area_responsavel || '').toUpperCase()
     );
     if (!existe) {
       setForm(prev => ({ ...prev, area_responsavel: '' }));
@@ -597,20 +665,42 @@ export default function NovaSolicitacao() {
     }
   }, [form.area_responsavel, form.tipo_solicitacao_id, tiposFiltradosPorSetor]);
 
+  useEffect(() => {
+    if (!form.obra_id) {
+      if (form.diretoria_fluxo_codigo) {
+        setForm(prev => ({ ...prev, diretoria_fluxo_codigo: '' }));
+      }
+      return;
+    }
+    setForm(prev => {
+      if (prev.diretoria_fluxo_codigo === diretoriaSugerida) return prev;
+      return { ...prev, diretoria_fluxo_codigo: diretoriaSugerida || '' };
+    });
+  }, [form.obra_id, form.diretoria_fluxo_codigo, diretoriaSugerida]);
+
   return (
-    <div className="max-w-3xl mx-auto">
-      <h1 className="text-2xl font-semibold mb-6">Nova Solicitação</h1>
+    <div className="page solicitacoes-page solicitacao-nova-page max-w-4xl mx-auto">
+      <h1 className="page-title">Nova Solicitação</h1>
+
+      <p className="page-subtitle hidden">
+        Preencha os dados essenciais da solicitaÃ§Ã£o com um fluxo mais direto e operacional.
+      </p>
+
+      <p className="page-subtitle">
+        Preencha os dados essenciais da solicitacao com um fluxo mais direto e operacional.
+      </p>
 
       <form
         onSubmit={handleSubmit}
-        className="bg-white p-6 rounded-xl shadow space-y-4"
+        className="card nova-solicitacao-form space-y-3"
       >
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="nova-solicitacao-body">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 nova-solicitacao-grid-principal">
           <label className="grid gap-1 text-sm">
             Código da obra
-            <div className="flex gap-2">
+            <div className="flex gap-2 nova-solicitacao-inline-actions">
               <input
-                className="input"
+                className="input input-sm"
                 placeholder="Ex: OBRA123"
                 value={obraCodigo}
                 onChange={e => {
@@ -630,7 +720,7 @@ export default function NovaSolicitacao() {
                   }
                 }}
               />
-              <button type="button" className="btn btn-outline" onClick={buscarObrasPorCodigo}>
+              <button type="button" className="btn btn-outline btn-sm" onClick={buscarObrasPorCodigo}>
                 Buscar
               </button>
             </div>
@@ -638,9 +728,9 @@ export default function NovaSolicitacao() {
 
           <label className="grid gap-1 text-sm">
             Descrição da obra
-            <div className="flex gap-2">
+            <div className="flex gap-2 nova-solicitacao-inline-actions">
               <input
-                className="input"
+                className="input input-sm"
                 placeholder="Buscar por descrição"
                 value={obraDescricao}
                 onChange={e => {
@@ -660,7 +750,7 @@ export default function NovaSolicitacao() {
                   }
                 }}
               />
-              <button type="button" className="btn btn-outline" onClick={buscarObrasPorDescricao}>
+              <button type="button" className="btn btn-outline btn-sm" onClick={buscarObrasPorDescricao}>
                 Buscar
               </button>
             </div>
@@ -671,7 +761,7 @@ export default function NovaSolicitacao() {
             <select
               name="area_responsavel"
               onChange={handleChange}
-              className="input"
+              className="input input-sm"
               required
               value={form.area_responsavel}
               disabled={!form.obra_id}
@@ -680,7 +770,7 @@ export default function NovaSolicitacao() {
                 {form.obra_id ? 'Selecione' : 'Selecione a obra primeiro'}
               </option>
               {setoresFiltrados.map(s => (
-                <option key={s.id} value={obterValorAreaResponsavel(s)}>
+                <option key={s.id} value={s.codigo}>
                   {s.nome}
                 </option>
               ))}
@@ -692,26 +782,37 @@ export default function NovaSolicitacao() {
             )}
           </label>
 
-          {isSetorObra && (
-            <label className="grid gap-1 text-sm">
-              Diretoria de aprovacao
-              <input
-                className="input bg-gray-100"
-                value={diretoriaAprovacaoLabel || 'Selecione uma obra classificada'}
-                readOnly
-              />
-              <span className="text-xs text-gray-500">
-                A solicitacao sera criada nessa diretoria e, apos aprovacao, seguira para a area responsavel selecionada.
-              </span>
-            </label>
-          )}
+          <label className="grid gap-1 text-sm">
+            Diretoria de aprovação
+            <select
+              name="diretoria_fluxo_codigo"
+              onChange={handleChange}
+              className="input input-sm"
+              value={form.diretoria_fluxo_codigo}
+              disabled={!form.obra_id || !diretoriaSugerida}
+            >
+              <option value="">
+                {!form.obra_id
+                  ? 'Selecione a obra primeiro'
+                  : diretoriaSugerida
+                    ? 'Selecione'
+                    : 'Sem diretoria configurada'}
+              </option>
+              {diretoriaSugerida && (
+                <option value={diretoriaSugerida}>{diretoriaSugerida}</option>
+              )}
+            </select>
+            <span className="text-xs text-gray-500">
+              A solicitação cai primeiro na diretoria da obra e depois segue para a área responsável.
+            </span>
+          </label>
 
           <label className="grid gap-1 text-sm">
             Tipo de Solicitação
             <select
               name="tipo_solicitacao_id"
               onChange={handleChange}
-              className="input"
+              className="input input-sm"
               required
               value={form.tipo_solicitacao_id}
               disabled={!form.area_responsavel}
@@ -723,22 +824,128 @@ export default function NovaSolicitacao() {
             </select>
           </label>
 
+          <label className="grid gap-1 text-sm md:col-span-2">
+            Credor
+            <div className="flex gap-2 nova-solicitacao-inline-actions">
+              <input
+                className="input input-sm"
+                placeholder="Buscar credor por nome ou CPF/CNPJ"
+                value={parceiroBusca}
+                onChange={e => {
+                  setParceiroBusca(e.target.value);
+                  setParceiroBuscaExecutada(false);
+                  setParceiroResultados([]);
+                  if (parceiroSelecionado) {
+                    setParceiroSelecionado(null);
+                    setForm(prev => ({ ...prev, parceiro_id: '' }));
+                  }
+                }}
+              />
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                onClick={buscarParceirosRelacionados}
+                disabled={parceiroBuscando}
+              >
+                {parceiroBuscando ? 'Buscando...' : 'Buscar'}
+              </button>
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                onClick={() => setModalParceiroAberto(true)}
+              >
+                Cadastrar
+              </button>
+              {form.parceiro_id && (
+                <button
+                  type="button"
+                  className="btn btn-outline btn-sm"
+                  onClick={limparParceiroSelecionado}
+                >
+                  Limpar
+                </button>
+              )}
+            </div>
+
+            {parceiroResultados.length > 1 && !parceiroSelecionado && (
+              <div className="nova-solicitacao-results-list mt-2 border rounded p-2 max-h-40 overflow-auto">
+                {parceiroResultados.map(item => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => selecionarParceiro(item)}
+                    className="block w-full text-left text-sm p-2 hover:bg-gray-50 rounded nova-solicitacao-result-item"
+                  >
+                    {item.nome} - {item.cpf_cnpj}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {parceiroBuscaExecutada && parceiroBusca.trim() && parceiroResultados.length === 0 && !parceiroBuscando && !parceiroSelecionado && (
+              <span className="text-xs text-gray-500">
+                Nenhum credor encontrado. Use o botao Cadastrar para criar uma nova pessoa como credor.
+              </span>
+            )}
+          </label>
+
+          {exibirCampoApropriacao && (
+            <label className="grid gap-1 text-sm">
+              Apropriacao da Solicitacao na Obra
+              <select
+                name="apropriacao_id"
+                onChange={handleChange}
+                className="input input-sm"
+                required={exigeApropriacaoPrincipal}
+                value={form.apropriacao_id}
+                disabled={!form.obra_id || solicitacaoCompra}
+              >
+                <option value="">
+                  {!form.obra_id
+                    ? 'Selecione a obra primeiro'
+                    : solicitacaoCompra
+                      ? 'Nao se aplica para solicitacao de compra'
+                      : 'Selecione'}
+                </option>
+                {apropriacoes.map((apropriacao) => (
+                  <option key={apropriacao.id} value={apropriacao.id}>
+                    {apropriacao.codigo}{apropriacao.descricao ? ` - ${apropriacao.descricao}` : ''}
+                  </option>
+                ))}
+              </select>
+              {solicitacaoCompra ? (
+                <span className="text-xs text-gray-500">
+                  Para solicitacao de compra, a apropriacao e feita por item no modulo de compras.
+                </span>
+              ) : exigeApropriacaoPrincipal ? (
+                <span className="text-xs text-gray-500">
+                  Campo obrigatorio para solicitacoes gerais vinculadas a esta obra.
+                </span>
+              ) : null}
+              {form.obra_id && apropriacoes.length === 0 && !solicitacaoCompra && (
+                <span className="text-xs text-gray-500">
+                  Nenhuma apropriacao ativa encontrada para esta obra.
+                </span>
+              )}
+            </label>
+          )}
+
           {exibirCamposContrato && (
             <label className="grid gap-1 text-sm md:col-span-2">
               Ref. do Contrato
-              <div className="flex gap-2">
+              <div className="flex gap-2 nova-solicitacao-inline-actions">
                 <input
-                  className="input"
+                  className="input input-sm"
                   placeholder="Buscar por referência do contrato"
                   value={refContratoBusca}
                   onChange={e => setRefContratoBusca(e.target.value)}
                   required={medicaoObrigatoria}
                   disabled={!form.obra_id}
                 />
-                <button type="button" className="btn btn-outline" onClick={buscarRefContrato}>
+                <button type="button" className="btn btn-outline btn-sm" onClick={buscarRefContrato}>
                   Buscar
                 </button>
-                <button type="button" className="btn btn-outline" onClick={limparRefContrato}>
+                <button type="button" className="btn btn-outline btn-sm" onClick={limparRefContrato}>
                   Limpar
                 </button>
               </div>
@@ -748,13 +955,13 @@ export default function NovaSolicitacao() {
                 </span>
               )}
               {refResultados.length > 1 && (
-                <div className="mt-2 border rounded p-2 max-h-40 overflow-auto">
+                <div className="nova-solicitacao-results-list mt-2 border rounded p-2 max-h-40 overflow-auto">
                   {refResultados.map(item => (
                     <button
                       key={item.id}
                       type="button"
                       onClick={() => selecionarContratoRef(item)}
-                      className="block w-full text-left text-sm p-2 hover:bg-gray-50 rounded"
+                      className="block w-full text-left text-sm p-2 hover:bg-gray-50 rounded nova-solicitacao-result-item"
                     >
                       {item.codigo} - {item.ref_contrato || '-'}
                     </button>
@@ -766,14 +973,14 @@ export default function NovaSolicitacao() {
         </div>
 
         {exibirCamposContrato && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 nova-solicitacao-grid-secundaria">
             {exibirCampoSubtipo && (
               <label className="grid gap-1 text-sm">
                 Subtipo
                 <select
                   name="tipo_sub_id"
                   onChange={handleChange}
-                  className="input"
+                  className="input input-sm"
                   required={subtipoObrigatorio}
                   disabled={!form.tipo_solicitacao_id}
                   value={form.tipo_sub_id}
@@ -809,7 +1016,7 @@ export default function NovaSolicitacao() {
                     setContratosRef([]);
                   }
                 }}
-                className="input"
+                className="input input-sm"
                 disabled={!form.obra_id && contratosDisponiveis.length === 0}
                 value={form.contrato_id}
                 required={camposContratoObrigatorios}
@@ -825,42 +1032,44 @@ export default function NovaSolicitacao() {
           </div>
         )}
 
-        {!tipoSemValor && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 nova-solicitacao-grid-curta">
+          {!tipoSemValor && (
+            <label className="grid gap-1 text-sm">
+              Valor
+              <input
+                type="text"
+                className="input input-sm"
+                value={valorTexto}
+                onChange={e => atualizarValor(e.target.value)}
+                placeholder="R$ 0,00"
+                required
+              />
+            </label>
+          )}
+
           <label className="grid gap-1 text-sm">
-            Valor
+            Data de vencimento
             <input
-              type="text"
-              className="input"
-              value={valorTexto}
-              onChange={e => atualizarValor(e.target.value)}
-              placeholder="R$ 0,00"
+              name="data_vencimento"
+              type="date"
+              onChange={handleChange}
+              className="input input-sm"
+              value={form.data_vencimento}
+              min={hojeInput}
               required
             />
           </label>
-        )}
-
-        <label className="grid gap-1 text-sm">
-          Data de vencimento
-          <input
-            name="data_vencimento"
-            type="date"
-            onChange={handleChange}
-            className="input"
-            value={form.data_vencimento}
-            min={hojeInput}
-            required
-          />
-        </label>
+        </div>
 
         {medicaoObrigatoria && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 nova-solicitacao-grid-curta">
             <label className="grid gap-1 text-sm">
               Data inicial (Medição)
               <input
                 name="data_inicio_medicao"
                 type="date"
                 onChange={handleChange}
-                className="input"
+                className="input input-sm"
                 value={form.data_inicio_medicao}
                 required
               />
@@ -871,7 +1080,7 @@ export default function NovaSolicitacao() {
                 name="data_fim_medicao"
                 type="date"
                 onChange={handleChange}
-                className="input"
+                className="input input-sm"
                 value={form.data_fim_medicao}
                 required
               />
@@ -885,7 +1094,7 @@ export default function NovaSolicitacao() {
             <input
               name="ref_contrato_abertura"
               onChange={handleChange}
-              className="input"
+              className="input input-sm"
               required
               value={form.ref_contrato_abertura}
               placeholder="Informe a ref do contrato"
@@ -899,7 +1108,7 @@ export default function NovaSolicitacao() {
             <textarea
               name="itens_apropriacao"
               onChange={handleChange}
-              className="input min-h-[120px] text-[var(--c-text)] placeholder:text-[var(--c-muted)]"
+              className="input input-sm nova-solicitacao-textarea text-[var(--c-text)] placeholder:text-[var(--c-muted)]"
               required
               value={form.itens_apropriacao}
               placeholder="Descreva os itens de apropriação"
@@ -918,19 +1127,20 @@ export default function NovaSolicitacao() {
               }))
             }
             maxLength={50}
-            className="input min-h-[120px] text-[var(--c-text)] placeholder:text-[var(--c-muted)]"
-            required={!medicaoObrigatoria}
+            className="input input-sm nova-solicitacao-textarea text-[var(--c-text)] placeholder:text-[var(--c-muted)]"
+            required={comportamentoTipo.exige_descricao}
             value={form.descricao}
           />
           <span className="text-xs text-gray-500">
             Descrição breve, com no máximo 50 caracteres.
           </span>
-        </label>
+          </label>
 
-        <label className="grid gap-1 text-sm">
+        <div className="nova-solicitacao-actions-bar">
+          <label className="grid gap-1 text-sm nova-solicitacao-anexos">
           Anexos
-          <div className="flex items-center gap-2 flex-wrap">
-            <label className="btn btn-outline inline-flex items-center gap-2 cursor-pointer">
+          <div className="flex items-center gap-2 flex-wrap nova-solicitacao-inline-actions nova-solicitacao-anexos-head">
+            <label className="btn btn-outline btn-sm inline-flex items-center gap-2 cursor-pointer">
               <HiPaperClip className="w-4 h-4" />
               <span>Anexar arquivos</span>
               <input
@@ -952,7 +1162,7 @@ export default function NovaSolicitacao() {
               {arquivos.map((arquivo, index) => (
                 <div
                   key={`${arquivo.name}-${index}`}
-                  className="flex items-center justify-between text-sm bg-[var(--c-surface)] border border-[var(--c-border)] rounded px-2 py-1"
+                  className="nova-solicitacao-file-item flex items-center justify-between text-sm bg-[var(--c-surface)] border border-[var(--c-border)] rounded px-2 py-1"
                 >
                   <span className="truncate">{arquivo.name}</span>
                   <button
@@ -977,16 +1187,167 @@ export default function NovaSolicitacao() {
           )}
         </label>
 
-        <div className="flex justify-end">
-          <button
-            type="submit"
-            className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed"
-            disabled={enviando}
-          >
-            {enviando ? 'Criando...' : 'Criar Solicitação'}
+          <div className="flex justify-end nova-solicitacao-footer">
+          <button className="btn btn-primary btn-sm">
+            Criar Solicitação
           </button>
+          </div>
+        </div>
         </div>
       </form>
+
+      {modalParceiroAberto && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+          <div className="card w-full max-w-2xl space-y-4">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-semibold" style={{ color: 'var(--c-text)' }}>Cadastrar Credor</h2>
+                <p className="text-sm" style={{ color: 'var(--c-muted)' }}>
+                  Informe os dados principais para vincular o credor a esta solicitacao.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                onClick={() => setModalParceiroAberto(false)}
+              >
+                Fechar
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <label className="grid gap-1 text-sm">
+                CPF/CNPJ *
+                <input
+                  className="input input-sm"
+                  value={novoParceiro.cpf_cnpj}
+                  onChange={e => setNovoParceiro(prev => ({ ...prev, cpf_cnpj: maskCpfCnpj(e.target.value) }))}
+                />
+              </label>
+              <label className="grid gap-1 text-sm">
+                Nome *
+                <input
+                  className="input input-sm"
+                  value={novoParceiro.nome}
+                  onChange={e => setNovoParceiro(prev => ({ ...prev, nome: e.target.value }))}
+                />
+              </label>
+              <label className="grid gap-1 text-sm">
+                Telefone *
+                <input
+                  className="input input-sm"
+                  value={novoParceiro.telefone}
+                  onChange={e => setNovoParceiro(prev => ({ ...prev, telefone: maskPhone(e.target.value) }))}
+                />
+              </label>
+              <label className="grid gap-1 text-sm">
+                E-mail
+                <input
+                  className="input input-sm"
+                  value={novoParceiro.email}
+                  onChange={e => setNovoParceiro(prev => ({ ...prev, email: e.target.value }))}
+                />
+              </label>
+              <label className="grid gap-1 text-sm">
+                Endereco
+                <input
+                  className="input input-sm"
+                  value={novoParceiro.endereco}
+                  onChange={e => setNovoParceiro(prev => ({ ...prev, endereco: e.target.value }))}
+                />
+              </label>
+              <label className="grid gap-1 text-sm">
+                Numero
+                <input
+                  className="input input-sm"
+                  value={novoParceiro.numero}
+                  onChange={e => setNovoParceiro(prev => ({ ...prev, numero: e.target.value }))}
+                />
+              </label>
+              <label className="grid gap-1 text-sm">
+                Bairro
+                <input
+                  className="input input-sm"
+                  value={novoParceiro.bairro}
+                  onChange={e => setNovoParceiro(prev => ({ ...prev, bairro: e.target.value }))}
+                />
+              </label>
+              <label className="grid gap-1 text-sm">
+                CEP
+                <input
+                  className="input input-sm"
+                  value={novoParceiro.cep}
+                  onChange={e => setNovoParceiro(prev => ({ ...prev, cep: maskCep(e.target.value) }))}
+                />
+              </label>
+              <label className="grid gap-1 text-sm">
+                Municipio
+                <input
+                  className="input input-sm"
+                  value={novoParceiro.municipio}
+                  onChange={e => setNovoParceiro(prev => ({ ...prev, municipio: e.target.value }))}
+                />
+              </label>
+              <label className="grid gap-1 text-sm">
+                Estado
+                <input
+                  className="input input-sm"
+                  maxLength={2}
+                  value={novoParceiro.estado}
+                  onChange={e => setNovoParceiro(prev => ({ ...prev, estado: e.target.value.toUpperCase() }))}
+                />
+              </label>
+            </div>
+
+            <div className="grid gap-2">
+              <div className="text-sm font-medium">Categorias da pessoa</div>
+              {categoriasParceiro.length === 0 ? (
+                <div className="text-sm text-gray-500">Nenhuma categoria cadastrada.</div>
+              ) : (
+                <div className="grid gap-2 md:grid-cols-2 max-h-[160px] overflow-y-auto rounded-lg border border-[var(--c-border)] p-3">
+                  {categoriasParceiro.map((categoria) => (
+                    <label key={categoria.id} className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={novoParceiro.categoria_ids.includes(categoria.id)}
+                        onChange={(event) => {
+                          setNovoParceiro((prev) => {
+                            const atual = new Set(prev.categoria_ids || []);
+                            if (event.target.checked) {
+                              atual.add(categoria.id);
+                            } else {
+                              atual.delete(categoria.id);
+                            }
+                            return { ...prev, categoria_ids: Array.from(atual) };
+                          });
+                        }}
+                      />
+                      <span>{categoria.nome}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                onClick={() => setModalParceiroAberto(false)}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                onClick={salvarNovoParceiro}
+              >
+                Salvar credor
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <ObraSearchModal
         aberto={modalObras}
@@ -997,5 +1358,3 @@ export default function NovaSolicitacao() {
     </div>
   );
 }
-
-

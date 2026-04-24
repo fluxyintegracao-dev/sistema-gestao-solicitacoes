@@ -12,9 +12,56 @@ import {
   getTiposSolicitacaoPorSetor,
   salvarTiposSolicitacaoPorSetor
 } from '../services/configuracoesSistema';
+import { getDefaultTipoSolicitacaoBehavior, getTipoSolicitacaoBehavior } from '../utils/tipoSolicitacao';
+
+const BEHAVIOR_FIELDS = [
+  { key: 'mostrar_valor', label: 'Mostrar valor' },
+  { key: 'exige_valor', label: 'Exigir valor' },
+  { key: 'mostrar_descricao', label: 'Mostrar descricao' },
+  { key: 'exige_descricao', label: 'Exigir descricao' },
+  { key: 'mostrar_apropriacao_principal', label: 'Mostrar apropriacao principal' },
+  { key: 'exige_apropriacao_principal', label: 'Exigir apropriacao principal' },
+  { key: 'mostrar_contrato', label: 'Mostrar contrato' },
+  { key: 'exige_contrato', label: 'Exigir contrato' },
+  { key: 'mostrar_subtipo', label: 'Mostrar subtipo' },
+  { key: 'exige_subtipo', label: 'Exigir subtipo' },
+  { key: 'mostrar_periodo_medicao', label: 'Mostrar periodo de medicao' },
+  { key: 'exige_periodo_medicao', label: 'Exigir periodo de medicao' },
+  { key: 'mostrar_ref_contrato_abertura', label: 'Mostrar ref. contrato abertura' },
+  { key: 'exige_ref_contrato_abertura', label: 'Exigir ref. contrato abertura' },
+  { key: 'mostrar_itens_apropriacao', label: 'Mostrar itens de apropriacao' },
+  { key: 'exige_itens_apropriacao', label: 'Exigir itens de apropriacao' }
+];
+
+function formatarRegrasTipo(tipo) {
+  return BEHAVIOR_FIELDS
+    .filter(field => getTipoSolicitacaoBehavior(tipo)?.[field.key])
+    .map(field => field.label);
+}
 
 function setorKey(item) {
   return String(item?.codigo || item?.nome || item?.id || '').trim().toUpperCase();
+}
+
+function normalizarIdsTipos(values) {
+  return Array.from(
+    new Set((Array.isArray(values) ? values : []).map(Number).filter(Number.isFinite))
+  );
+}
+
+function getTiposEfetivosSetor(tipos, regrasTiposPorSetor, setorSelecionado) {
+  const listaTipos = Array.isArray(tipos) ? tipos : [];
+  if (!setorSelecionado) return listaTipos;
+
+  const regra = regrasTiposPorSetor?.[setorSelecionado];
+  const ids = normalizarIdsTipos(regra?.tipos);
+
+  if (ids.length === 0) {
+    return listaTipos;
+  }
+
+  const idsPermitidos = new Set(ids);
+  return listaTipos.filter(tipo => idsPermitidos.has(Number(tipo.id)));
 }
 
 export default function TiposSolicitacao() {
@@ -23,8 +70,12 @@ export default function TiposSolicitacao() {
   const [regrasTiposPorSetor, setRegrasTiposPorSetor] = useState({});
   const [setorSelecionado, setSetorSelecionado] = useState('');
   const [nome, setNome] = useState('');
+  const [codigoInterno, setCodigoInterno] = useState('');
+  const [comportamento, setComportamento] = useState(getDefaultTipoSolicitacaoBehavior());
   const [editId, setEditId] = useState(null);
   const [editNome, setEditNome] = useState('');
+  const [editCodigoInterno, setEditCodigoInterno] = useState('');
+  const [editComportamento, setEditComportamento] = useState(getDefaultTipoSolicitacaoBehavior());
   const [saving, setSaving] = useState(false);
 
   async function carregar() {
@@ -59,17 +110,30 @@ export default function TiposSolicitacao() {
       return;
     }
 
-    const novoTipo = await criarTipoSolicitacao({ nome });
+    const nomeNormalizado = String(nome || '').trim();
+    if (!nomeNormalizado) {
+      alert('Informe o nome do tipo.');
+      return;
+    }
+
+    const novoTipo = await criarTipoSolicitacao({
+      nome: nomeNormalizado,
+      codigo_interno: codigoInterno,
+      comportamento
+    });
 
     const regraAtual = regrasTiposPorSetor?.[setorSelecionado] || { tipos: [], modos: {} };
-    const tiposAtualizados = Array.from(new Set([
-      ...(Array.isArray(regraAtual.tipos) ? regraAtual.tipos.map(Number) : []),
-      Number(novoTipo.id)
-    ])).filter(Number.isFinite);
-    const modosAtualizados = {
-      ...(regraAtual.modos && typeof regraAtual.modos === 'object' ? regraAtual.modos : {}),
-      [String(novoTipo.id)]: regraAtual?.modos?.[String(novoTipo.id)] || 'TODOS_VISIVEIS'
-    };
+    const tiposBase = getTiposEfetivosSetor(tipos, regrasTiposPorSetor, setorSelecionado);
+    const tiposAtualizados = normalizarIdsTipos([
+      ...tiposBase.map(item => item?.id),
+      novoTipo.id
+    ]);
+    const modosBase =
+      regraAtual.modos && typeof regraAtual.modos === 'object' ? regraAtual.modos : {};
+    const modosAtualizados = tiposAtualizados.reduce((acc, tipoId) => {
+      acc[String(tipoId)] = modosBase[String(tipoId)] || 'TODOS_VISIVEIS';
+      return acc;
+    }, {});
     const novasRegras = {
       ...regrasTiposPorSetor,
       [setorSelecionado]: {
@@ -82,6 +146,8 @@ export default function TiposSolicitacao() {
     setRegrasTiposPorSetor(novasRegras);
 
     setNome('');
+    setCodigoInterno('');
+    setComportamento(getDefaultTipoSolicitacaoBehavior());
     carregar();
   }
 
@@ -114,17 +180,25 @@ export default function TiposSolicitacao() {
   function iniciarEdicao(item) {
     setEditId(item.id);
     setEditNome(item.nome);
+    setEditCodigoInterno(item.codigo_interno || '');
+    setEditComportamento(getTipoSolicitacaoBehavior(item));
   }
 
   function cancelarEdicao() {
     setEditId(null);
     setEditNome('');
+    setEditCodigoInterno('');
+    setEditComportamento(getDefaultTipoSolicitacaoBehavior());
   }
 
   async function salvarEdicao(id) {
     try {
       setSaving(true);
-      await atualizarTipoSolicitacao(id, { nome: editNome });
+      await atualizarTipoSolicitacao(id, {
+        nome: editNome,
+        codigo_interno: editCodigoInterno,
+        comportamento: editComportamento
+      });
       cancelarEdicao();
       carregar();
     } catch (error) {
@@ -136,16 +210,11 @@ export default function TiposSolicitacao() {
   }
 
   const tiposFiltrados = (() => {
-    if (!setorSelecionado) return tipos;
-    const regra = regrasTiposPorSetor?.[setorSelecionado];
-    const ids = Array.isArray(regra?.tipos) ? regra.tipos.map(Number) : [];
-    if (ids.length === 0) return tipos;
-    const setIds = new Set(ids);
-    return tipos.filter(t => setIds.has(Number(t.id)));
+    return getTiposEfetivosSetor(tipos, regrasTiposPorSetor, setorSelecionado);
   })();
 
   return (
-    <div className="page">
+    <div className="page solicitacoes-page">
       <div>
         <h1 className="page-title">Tipos (Macro)</h1>
         <p className="page-subtitle">Cadastro dos tipos macro utilizados nas solicitacoes.</p>
@@ -155,7 +224,7 @@ export default function TiposSolicitacao() {
         <div className="card-header">
           <h2 className="font-semibold">Novo tipo</h2>
         </div>
-        <form onSubmit={handleSubmit} className="grid gap-3 md:grid-cols-[220px_1fr_auto]">
+        <form onSubmit={handleSubmit} className="grid gap-3 md:grid-cols-[220px_1fr_220px_auto]">
           <label className="grid gap-1 text-sm">
             Setor
             <select
@@ -182,11 +251,35 @@ export default function TiposSolicitacao() {
               required
             />
           </label>
+          <label className="grid gap-1 text-sm">
+            Codigo interno
+            <input
+              className="input"
+              placeholder="Ex: SOLICITACAO_DE_COMPRA"
+              value={codigoInterno}
+              onChange={e => setCodigoInterno(e.target.value.toUpperCase())}
+            />
+          </label>
           <button type="submit" className="btn btn-primary md:self-end">
             Adicionar
           </button>
+          <div className="grid gap-2 text-sm md:col-span-4">
+            <span>Comportamento do tipo</span>
+            <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+              {BEHAVIOR_FIELDS.map(field => (
+                <label key={field.key} className="flex items-center gap-2 rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] px-3 py-2">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(comportamento[field.key])}
+                    onChange={e => setComportamento(prev => ({ ...prev, [field.key]: e.target.checked }))}
+                  />
+                  <span>{field.label}</span>
+                </label>
+              ))}
+            </div>
+          </div>
         </form>
-        <p className="text-xs text-gray-500 mt-2">
+        <p className="mt-2 text-xs" style={{ color: 'var(--c-muted)' }}>
           O tipo é criado no cadastro geral e automaticamente vinculado ao setor selecionado.
         </p>
       </div>
@@ -197,10 +290,13 @@ export default function TiposSolicitacao() {
             Tipos {setorSelecionado ? 'do setor selecionado' : ''}
           </h2>
         </div>
+        <div className="table-wrapper">
         <table className="table">
           <thead>
             <tr>
               <th>Nome</th>
+              <th>Codigo interno</th>
+              <th>Regras</th>
               <th>Status</th>
               <th>Acoes</th>
             </tr>
@@ -217,6 +313,41 @@ export default function TiposSolicitacao() {
                     />
                   ) : (
                     t.nome
+                  )}
+                </td>
+                <td>
+                  {editId === t.id ? (
+                    <input
+                      className="input"
+                      value={editCodigoInterno}
+                      onChange={e => setEditCodigoInterno(e.target.value.toUpperCase())}
+                    />
+                  ) : (
+                    t.codigo_interno || '-'
+                  )}
+                </td>
+                <td>
+                  {editId === t.id ? (
+                    <div className="grid gap-2 md:grid-cols-2">
+                      {BEHAVIOR_FIELDS.map(field => (
+                        <label key={field.key} className="flex items-center gap-2 text-xs">
+                          <input
+                            type="checkbox"
+                            checked={Boolean(editComportamento[field.key])}
+                            onChange={e => setEditComportamento(prev => ({ ...prev, [field.key]: e.target.checked }))}
+                          />
+                          <span>{field.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {formatarRegrasTipo(t).length > 0 ? formatarRegrasTipo(t).map(label => (
+                        <span key={label} className="rounded-full border border-[var(--c-border)] bg-[var(--c-surface)] px-2 py-1 text-xs">
+                          {label}
+                        </span>
+                      )) : <span className="text-xs text-[var(--c-muted)]">Padrao</span>}
+                    </div>
                   )}
                 </td>
                 <td>{t.ativo ? 'Ativo' : 'Inativo'}</td>
@@ -249,11 +380,12 @@ export default function TiposSolicitacao() {
             ))}
             {tiposFiltrados.length === 0 && (
               <tr>
-                <td colSpan="3" align="center">Nenhum tipo cadastrado</td>
+                <td colSpan="5" align="center">Nenhum tipo cadastrado</td>
               </tr>
             )}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );

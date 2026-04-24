@@ -87,30 +87,6 @@ export async function aprovarDiretoriaSolicitacao(id) {
   });
 
   if (!res.ok) {
-    let mensagem = 'Erro ao aprovar solicitacao';
-    try {
-      const json = await res.json();
-      mensagem = json?.error || mensagem;
-    } catch (_) {
-      try {
-        const text = await res.text();
-        if (text) mensagem = text;
-      } catch (_) {}
-    }
-    throw new Error(mensagem);
-  }
-
-  return true;
-}
-
-export async function updateValorSolicitacao(id, valor) {
-  const res = await fetch(`${API_URL}/solicitacoes/${id}/valor`, {
-    method: 'PATCH',
-    headers: authHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify({ valor })
-  });
-
-  if (!res.ok) {
     const text = await res.text();
     throw new Error(text);
   }
@@ -126,20 +102,26 @@ export async function adicionarPagamentoSolicitacao(id, data) {
   });
 
   if (!res.ok) {
-    let mensagem = 'Erro ao informar pagamento';
-    try {
-      const json = await res.json();
-      mensagem = json?.error || mensagem;
-    } catch (_) {
-      try {
-        const text = await res.text();
-        if (text) mensagem = text;
-      } catch (_) {}
-    }
-    throw new Error(mensagem);
+    const text = await res.text();
+    throw new Error(text);
   }
 
   return res.json();
+}
+
+export async function updateValorSolicitacao(id, valor) {
+  const res = await fetch(`${API_URL}/solicitacoes/${id}/valor`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ valor })
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text);
+  }
+
+  return true;
 }
 
 export async function updateRefContratoSolicitacao(id, contrato_id) {

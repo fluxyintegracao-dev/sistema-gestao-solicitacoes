@@ -1,0 +1,1515 @@
+import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { getMinhasObras } from '../services/obras';
+import { buscarParceiros, criarParceiro } from '../services/parceiros';
+import { getCategoriasFinanceiras } from '../services/financeiro';
+import { getComercialCategoriasContrato } from '../services/configuracoesSistema';
+import { maskCpfCnpj, maskPhone, normalizeCurrencyTyping, onlyDigits } from '../utils/formatters';
+import {
+  atualizarContratoComercial,
+  criarContratoComercial,
+  distratarContratoComercial,
+  getContratoComercialById,
+  getContratosComerciais,
+  getEmpreendimentosComerciais,
+  getUnidadesComerciais,
+  sincronizarStatusFinanceiroContratoComercial,
+  trocarUnidadeContratoComercial
+} from '../services/comercial';
+
+const STATUS_CONTRATO = ['RASCUNHO', 'ATIVO', 'INADIMPLENTE', 'QUITADO', 'DISTRATADO', 'CANCELADO'];
+const FORMAS_RECEBIMENTO = ['DINHEIRO', 'PIX', 'CARTAO', 'TRANSFERENCIA', 'BOLETO', 'CHEQUE', 'PERMUTA', 'BENS', 'OUTROS'];
+const PARCELA_TIPOS = ['ENTRADA', 'PARCELA', 'INTERMEDIARIA', 'CHAVES', 'BALAO', 'OUTRA'];
+const MODOS_COMPOSICAO = [
+  { value: 'ENTRADA', label: 'Entrada' },
+  { value: 'PERIODICO', label: 'Parcelas periodicas' },
+  { value: 'MANUAL', label: 'Lancamentos manuais' }
+];
+const PERIODICIDADES = [
+  { value: 'AVISTA', label: 'A vista', intervalMonths: 0 },
+  { value: 'MENSAL', label: 'Mensal', intervalMonths: 1 },
+  { value: 'TRIMESTRAL', label: 'Trimestral', intervalMonths: 3 },
+  { value: 'SEMESTRAL', label: 'Semestral', intervalMonths: 6 },
+  { value: 'ANUAL', label: 'Anual', intervalMonths: 12 },
+  { value: 'PERSONALIZADA', label: 'Datas pre-definidas', intervalMonths: null }
+];
+
+function today() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function defaultForm() {
+  return {
+    id: null,
+    empreendimento_id: '',
+    unidade_comercial_id: '',
+    parceiro_id: '',
+    corretor_parceiro_id: '',
+    obra_id: '',
+    categoria_financeira_id: '',
+    categoria_financeira_comissao_id: '',
+    numero: '',
+    status: 'ATIVO',
+    data_contrato: today(),
+    valor_total: '',
+    valor_entrada: '',
+    desconto_concedido: '',
+    indice_reajuste: '',
+    corretor_nome: '',
+    comissao_percentual: '',
+    observacoes: '',
+    parcelas: []
+  };
+}
+
+function defaultGenerator() {
+  return {
+    modo: 'PERIODICO',
+    titulo_bloco: '',
+    tipo_parcela: 'PARCELA',
+    periodicidade: 'MENSAL',
+    quantidade_parcelas: '12',
+    valor_parcela: '',
+    primeiro_vencimento: today(),
+    forma_recebimento_prevista: 'BOLETO',
+    detalhe_forma_recebimento: '',
+    parcelas_personalizadas: [
+      {
+        descricao: 'Parcela 1',
+        tipo_parcela: 'PARCELA',
+        data_vencimento: today(),
+        valor: '',
+        observacoes: ''
+      }
+    ]
+  };
+}
+
+function defaultDistratoForm() {
+  return {
+    data_distrato: today(),
+    motivo_distrato: '',
+    observacoes: ''
+  };
+}
+
+function defaultTrocaForm() {
+  return {
+    unidade_comercial_destino_id: '',
+    novo_valor_total: '',
+    data_efetiva: today(),
+    observacoes: ''
+  };
+}
+
+function defaultPessoaRapidaForm(tipo = 'cliente') {
+  return {
+    tipo,
+    cpf_cnpj: '',
+    nome: '',
+    telefone: '',
+    email: ''
+  };
+}
+
+function normalizeSearch(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+}
+
+function isDescricaoParcelaGenerica(value) {
+  const normalized = normalizeSearch(value).trim();
+  return !normalized || /^parcela\s+\d+$/.test(normalized);
+}
+
+function normalizarParcelasContrato(parcelas = []) {
+  let sequenciaBoleto = 0;
+
+  return parcelas.map((item, index) => {
+    const formaRecebimento = String(item.forma_recebimento_prevista || '').trim().toUpperCase();
+    const proximaParcela = {
+      ...item,
+      sequencia: index + 1
+    };
+
+    if (formaRecebimento === 'BOLETO') {
+      sequenciaBoleto += 1;
+      if (isDescricaoParcelaGenerica(proximaParcela.descricao)) {
+        proximaParcela.descricao = `Parcela ${sequenciaBoleto}`;
+      }
+    }
+
+    return proximaParcela;
+  });
+}
+
+function formatCurrency(value) {
+  return toNumber(value).toLocaleString('pt-BR', {
+    style: 'currency',
+    currency: 'BRL'
+  });
+}
+
+function formatCurrencyInput(value) {
+  if (value == null || String(value).trim() === '') return '';
+  const numeric = toNumber(value);
+  return numeric > 0 ? formatCurrency(numeric) : '';
+}
+
+function formatDate(value) {
+  if (!value) return '-';
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return '-';
+  return date.toLocaleDateString('pt-BR');
+}
+
+function toNumber(value) {
+  if (value == null || String(value).trim() === '') return 0;
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : 0;
+  }
+
+  const raw = String(value || '').trim().replace(/[R$\s]/gi, '');
+  if (!raw) return 0;
+
+  let normalized = raw;
+  if (raw.includes(',')) {
+    normalized = raw.replace(/\./g, '').replace(',', '.');
+  } else if (/^\d{1,3}(\.\d{3})+$/.test(raw)) {
+    normalized = raw.replace(/\./g, '');
+  }
+
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function roundCurrency(value) {
+  return Math.round((toNumber(value) + Number.EPSILON) * 100) / 100;
+}
+
+function addMonths(dateString, monthsToAdd) {
+  const [year, month, day] = String(dateString || '').split('-').map(Number);
+  if (!year || !month || !day) return today();
+  const target = new Date(year, month - 1 + monthsToAdd, day);
+  if (target.getDate() !== day) target.setDate(0);
+  return new Date(target.getTime() - target.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+}
+
+function getPeriodicidadeConfig(periodicidade) {
+  return PERIODICIDADES.find((item) => item.value === periodicidade) || PERIODICIDADES[0];
+}
+
+function getModoComposicaoLabel(modo) {
+  return MODOS_COMPOSICAO.find((item) => item.value === modo)?.label || 'Composicao';
+}
+
+function buildParcelaCustomizada(index = 1, overrides = {}) {
+  return {
+    descricao: `Parcela ${index}`,
+    tipo_parcela: 'PARCELA',
+    data_vencimento: today(),
+    valor: '',
+    observacoes: '',
+    ...overrides
+  };
+}
+
+function isFormaComDetalhe(forma) {
+  return ['BENS', 'PERMUTA', 'OUTROS'].includes(String(forma || '').toUpperCase());
+}
+
+function buildObservacoesParcela(observacoes, detalheFormaRecebimento) {
+  const partes = [
+    detalheFormaRecebimento ? `Detalhe da forma: ${String(detalheFormaRecebimento).trim()}` : '',
+    String(observacoes || '').trim()
+  ].filter(Boolean);
+
+  return partes.join('\n');
+}
+
+function statusClass(status) {
+  switch (String(status || '').toUpperCase()) {
+    case 'ATIVO':
+      return 'bg-emerald-100 text-emerald-700';
+    case 'QUITADO':
+      return 'bg-blue-100 text-blue-700';
+    case 'INADIMPLENTE':
+      return 'bg-amber-100 text-amber-700';
+    case 'DISTRATADO':
+    case 'CANCELADO':
+      return 'bg-rose-100 text-rose-700';
+    default:
+      return 'bg-slate-100 text-slate-600';
+  }
+}
+
+function pickEditForm(contrato = {}) {
+  return {
+    id: contrato.id || null,
+    empreendimento_id: contrato.empreendimento_id ? String(contrato.empreendimento_id) : '',
+    unidade_comercial_id: contrato.unidade_comercial_id ? String(contrato.unidade_comercial_id) : '',
+    parceiro_id: contrato.parceiro_id ? String(contrato.parceiro_id) : '',
+    corretor_parceiro_id: contrato.corretor_parceiro_id ? String(contrato.corretor_parceiro_id) : '',
+    obra_id: contrato.obra_id ? String(contrato.obra_id) : '',
+    categoria_financeira_id: contrato.categoria_financeira_id ? String(contrato.categoria_financeira_id) : '',
+    categoria_financeira_comissao_id: contrato.categoria_financeira_comissao_id ? String(contrato.categoria_financeira_comissao_id) : '',
+    numero: contrato.numero || '',
+    status: contrato.status || 'ATIVO',
+    data_contrato: contrato.data_contrato || today(),
+    valor_total: formatCurrencyInput(contrato.valor_total),
+    valor_entrada: formatCurrencyInput(contrato.valor_entrada),
+    desconto_concedido: formatCurrencyInput(contrato.desconto_concedido),
+    indice_reajuste: contrato.indice_reajuste || '',
+    corretor_nome: contrato.corretor_nome || '',
+    comissao_percentual: contrato.comissao_percentual || '',
+    observacoes: contrato.observacoes || '',
+    parcelas: Array.isArray(contrato.parcelas) ? contrato.parcelas : []
+  };
+}
+
+function resolveGeneratorByModo(modo, current = {}) {
+  if (modo === 'ENTRADA') {
+    return {
+      ...current,
+      modo,
+      titulo_bloco: current.titulo_bloco || 'Entrada',
+      tipo_parcela: 'ENTRADA',
+      periodicidade: 'AVISTA',
+      quantidade_parcelas: '1'
+    };
+  }
+
+  return { ...current, modo };
+}
+
+function gerarParcelasDoBloco(plano = {}) {
+  const formaRecebimento = plano.forma_recebimento_prevista || '';
+  const tituloBase = String(plano.titulo_bloco || '').trim();
+  const tipoParcelaPadrao = plano.tipo_parcela || 'PARCELA';
+
+  if (plano.modo === 'ENTRADA') {
+    const valorEntrada = toNumber(plano.valor_parcela);
+    if (valorEntrada <= 0 || !plano.primeiro_vencimento) {
+      return { error: 'Informe valor e vencimento da entrada.' };
+    }
+
+    const parcela = {
+      descricao: tituloBase || 'Entrada',
+      tipo_parcela: 'ENTRADA',
+      forma_recebimento_prevista: formaRecebimento,
+      data_vencimento: plano.primeiro_vencimento,
+      valor: valorEntrada.toFixed(2),
+      observacoes: buildObservacoesParcela('', plano.detalhe_forma_recebimento)
+    };
+
+    return {
+      parcelas: [parcela],
+      total: roundCurrency(valorEntrada)
+    };
+  }
+
+  if (plano.modo === 'MANUAL') {
+    const parcelas = (plano.parcelas_personalizadas || [])
+      .map((item, index) => ({
+        descricao: item.descricao || (tituloBase ? `${tituloBase} ${index + 1}` : `Lancamento ${index + 1}`),
+        tipo_parcela: item.tipo_parcela || tipoParcelaPadrao,
+        forma_recebimento_prevista: formaRecebimento,
+        data_vencimento: item.data_vencimento,
+        valor: toNumber(item.valor).toFixed(2),
+        observacoes: buildObservacoesParcela(item.observacoes, plano.detalhe_forma_recebimento)
+      }))
+      .filter((item) => item.data_vencimento && toNumber(item.valor) > 0);
+
+    if (!parcelas.length) {
+      return { error: 'Informe ao menos um lancamento manual com data e valor.' };
+    }
+
+    return {
+      parcelas,
+      total: roundCurrency(parcelas.reduce((acc, item) => acc + toNumber(item.valor), 0))
+    };
+  }
+
+  const periodicidade = getPeriodicidadeConfig(plano.periodicidade);
+  const quantidade = periodicidade.value === 'AVISTA'
+    ? 1
+    : Math.max(0, Number(plano.quantidade_parcelas || 0));
+  const valorParcela = toNumber(plano.valor_parcela);
+
+  if (!quantidade || valorParcela <= 0) {
+    return { error: 'Informe quantidade e valor validos para a composicao periodica.' };
+  }
+
+  const parcelas = Array.from({ length: quantidade }).map((_, index) => ({
+    descricao: tituloBase ? `${tituloBase} ${index + 1}` : `Parcela ${index + 1}`,
+    tipo_parcela: tipoParcelaPadrao,
+    forma_recebimento_prevista: formaRecebimento,
+    data_vencimento: addMonths(plano.primeiro_vencimento || today(), index * periodicidade.intervalMonths),
+    valor: valorParcela.toFixed(2),
+    observacoes: buildObservacoesParcela('', plano.detalhe_forma_recebimento)
+  }));
+
+  return {
+    parcelas,
+    total: roundCurrency(parcelas.reduce((acc, item) => acc + toNumber(item.valor), 0))
+  };
+}
+
+export default function ComercialContratos() {
+  const [form, setForm] = useState(defaultForm());
+  const [generator, setGenerator] = useState(defaultGenerator());
+  const [paymentPlans, setPaymentPlans] = useState([]);
+  const [busca, setBusca] = useState('');
+  const [statusFiltro, setStatusFiltro] = useState('');
+  const [empreendimentos, setEmpreendimentos] = useState([]);
+  const [unidades, setUnidades] = useState([]);
+  const [clientes, setClientes] = useState([]);
+  const [corretores, setCorretores] = useState([]);
+  const [obras, setObras] = useState([]);
+  const [categorias, setCategorias] = useState([]);
+  const [categoriaConfig, setCategoriaConfig] = useState({
+    contrato_venda_categoria_ids: [],
+    comissao_categoria_ids: []
+  });
+  const [contratos, setContratos] = useState([]);
+  const [contratoSelecionado, setContratoSelecionado] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [processingAction, setProcessingAction] = useState('');
+  const [showDistrato, setShowDistrato] = useState(false);
+  const [showTroca, setShowTroca] = useState(false);
+  const [pessoaRapidaModal, setPessoaRapidaModal] = useState(null);
+  const [pessoaRapidaForm, setPessoaRapidaForm] = useState(defaultPessoaRapidaForm());
+  const [distratoForm, setDistratoForm] = useState(defaultDistratoForm());
+  const [trocaForm, setTrocaForm] = useState(defaultTrocaForm());
+  const [error, setError] = useState('');
+
+  async function carregar() {
+    try {
+      setLoading(true);
+      setError('');
+      const [empreData, unidData, clientesData, corretoresData, obrasData, categoriasData, contratosData, categoriaConfigData] = await Promise.all([
+        getEmpreendimentosComerciais({ ativo: 1 }),
+        getUnidadesComerciais({ ativo: 1 }),
+        buscarParceiros({ cliente: 1, ativo: 1, limit: 300 }),
+        buscarParceiros({ corretor: 1, ativo: 1, limit: 300 }),
+        getMinhasObras(),
+        getCategoriasFinanceiras(),
+        getContratosComerciais(),
+        getComercialCategoriasContrato().catch(() => null)
+      ]);
+      setEmpreendimentos(Array.isArray(empreData) ? empreData : []);
+      setUnidades(Array.isArray(unidData) ? unidData : []);
+      setClientes(Array.isArray(clientesData) ? clientesData : []);
+      setCorretores(Array.isArray(corretoresData) ? corretoresData : []);
+      setObras(Array.isArray(obrasData) ? obrasData : []);
+      setCategorias(Array.isArray(categoriasData) ? categoriasData : []);
+      if (categoriaConfigData) {
+        setCategoriaConfig({
+          contrato_venda_categoria_ids: Array.isArray(categoriaConfigData.contrato_venda_categoria_ids)
+            ? categoriaConfigData.contrato_venda_categoria_ids.map(Number)
+            : [],
+          comissao_categoria_ids: Array.isArray(categoriaConfigData.comissao_categoria_ids)
+            ? categoriaConfigData.comissao_categoria_ids.map(Number)
+            : []
+        });
+      }
+      setContratos(Array.isArray(contratosData) ? contratosData : []);
+    } catch (err) {
+      setError(err?.message || 'Erro ao carregar contratos comerciais');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    carregar();
+  }, []);
+
+  const unidadesDoEmpreendimento = useMemo(() => {
+    if (!form.empreendimento_id) return unidades;
+    return unidades.filter((item) => String(item.empreendimento_id) === String(form.empreendimento_id));
+  }, [form.empreendimento_id, unidades]);
+
+  const categoriasCompativeis = useMemo(
+    () => {
+      const permitidas = new Set((categoriaConfig.contrato_venda_categoria_ids || []).map(Number));
+      return categorias.filter((item) => {
+        const compativel = ['RECEBER', 'AMBOS'].includes(String(item.tipo || '').toUpperCase());
+        return compativel && (permitidas.size === 0 || permitidas.has(Number(item.id)));
+      });
+    },
+    [categorias, categoriaConfig.contrato_venda_categoria_ids]
+  );
+
+  const categoriasCompativeisPagar = useMemo(
+    () => {
+      const permitidas = new Set((categoriaConfig.comissao_categoria_ids || []).map(Number));
+      return categorias.filter((item) => {
+        const compativel = ['PAGAR', 'AMBOS'].includes(String(item.tipo || '').toUpperCase());
+        return compativel && (permitidas.size === 0 || permitidas.has(Number(item.id)));
+      });
+    },
+    [categorias, categoriaConfig.comissao_categoria_ids]
+  );
+
+  const contratosFiltrados = useMemo(() => {
+    const termo = normalizeSearch(busca);
+    return contratos.filter((item) => {
+      if (statusFiltro && String(item.status) !== statusFiltro) return false;
+      if (!termo) return true;
+      const blob = normalizeSearch([
+        item.numero,
+        item.cliente?.nome,
+        item.unidadeComercial?.codigo,
+        item.empreendimento?.nome,
+        item.corretor_nome
+      ].filter(Boolean).join(' '));
+      return blob.includes(termo);
+    });
+  }, [busca, contratos, statusFiltro]);
+
+  const totalParcelas = useMemo(
+    () => form.parcelas.reduce((acc, item) => acc + toNumber(item.valor || item.valor_original), 0),
+    [form.parcelas]
+  );
+  const valorEntradaComposicao = useMemo(
+    () => form.parcelas
+      .filter((item) => String(item.tipo_parcela || '').toUpperCase() === 'ENTRADA')
+      .reduce((acc, item) => acc + toNumber(item.valor || item.valor_original), 0),
+    [form.parcelas]
+  );
+
+  const valorTotalContrato = useMemo(() => toNumber(form.valor_total), [form.valor_total]);
+  const diferencaComposicao = useMemo(
+    () => roundCurrency(valorTotalContrato - totalParcelas),
+    [valorTotalContrato, totalParcelas]
+  );
+
+  const unidadesElegiveisTroca = useMemo(() => {
+    if (!contratoSelecionado?.unidade_comercial_id) return [];
+    return unidades.filter((item) =>
+      Number(item.id) !== Number(contratoSelecionado.unidade_comercial_id)
+      && String(item.ativo) !== 'false'
+      && !['VENDIDA', 'BLOQUEADA'].includes(String(item.situacao || '').toUpperCase())
+    );
+  }, [contratoSelecionado?.unidade_comercial_id, unidades]);
+
+  function aplicarPlanosAoContrato(planos) {
+    const parcelas = normalizarParcelasContrato(planos.flatMap((plano) =>
+      (plano.parcelas_geradas || []).map((item) => ({ ...item }))
+    ));
+    const total = roundCurrency(parcelas.reduce((acc, item) => acc + toNumber(item.valor), 0));
+
+    setForm((current) => ({
+      ...current,
+      parcelas,
+      valor_total: current.valor_total ? current.valor_total : (total > 0 ? formatCurrencyInput(total) : '')
+    }));
+  }
+
+  function adicionarFormaPagamento() {
+    if (isFormaComDetalhe(generator.forma_recebimento_prevista) && !String(generator.detalhe_forma_recebimento || '').trim()) {
+      setError('Descreva o bem, a permuta ou o outro recebimento antes de adicionar a forma de pagamento.');
+      return;
+    }
+
+    const resultado = gerarParcelasDoBloco(generator);
+    if (resultado.error) {
+      setError(resultado.error);
+      return;
+    }
+
+    const proximoPlano = {
+      id: `${Date.now()}-${Math.random()}`,
+      ...generator,
+      parcelas_geradas: resultado.parcelas,
+      total_bloco: resultado.total
+    };
+    const proximosPlanos = [...paymentPlans, proximoPlano];
+
+    setError('');
+    setPaymentPlans(proximosPlanos);
+    aplicarPlanosAoContrato(proximosPlanos);
+    setGenerator(defaultGenerator());
+  }
+
+  function removerFormaPagamento(planoId) {
+    const proximosPlanos = paymentPlans.filter((item) => item.id !== planoId);
+    setPaymentPlans(proximosPlanos);
+    aplicarPlanosAoContrato(proximosPlanos);
+  }
+
+  function updateParcelaCustomizada(index, field, value) {
+    setGenerator((current) => {
+      const parcelasPersonalizadas = [...(current.parcelas_personalizadas || [])];
+      parcelasPersonalizadas[index] = {
+        ...parcelasPersonalizadas[index],
+        [field]: value
+      };
+      return {
+        ...current,
+        parcelas_personalizadas: parcelasPersonalizadas
+      };
+    });
+  }
+
+  function adicionarParcelaCustomizada() {
+    setGenerator((current) => ({
+      ...current,
+      parcelas_personalizadas: [
+        ...(current.parcelas_personalizadas || []),
+        buildParcelaCustomizada((current.parcelas_personalizadas || []).length + 1)
+      ]
+    }));
+  }
+
+  function removerParcelaCustomizada(index) {
+    setGenerator((current) => {
+      const parcelasPersonalizadas = (current.parcelas_personalizadas || []).filter((_, itemIndex) => itemIndex !== index);
+      return {
+        ...current,
+        parcelas_personalizadas: parcelasPersonalizadas.length
+          ? parcelasPersonalizadas
+          : [buildParcelaCustomizada(1)]
+      };
+    });
+  }
+
+  function updateParcela(index, field, value) {
+    setForm((current) => {
+      const parcelas = [...current.parcelas];
+      parcelas[index] = { ...parcelas[index], [field]: value };
+      return {
+        ...current,
+        parcelas
+      };
+    });
+  }
+
+  async function selecionarContrato(id) {
+    try {
+      const detalhe = await getContratoComercialById(id);
+      setContratoSelecionado(detalhe);
+      setShowDistrato(false);
+      setShowTroca(false);
+      setDistratoForm(defaultDistratoForm());
+      setTrocaForm((current) => ({
+        ...defaultTrocaForm(),
+        novo_valor_total: formatCurrencyInput(detalhe?.valor_total)
+      }));
+      return detalhe;
+    } catch (err) {
+      setError(err?.message || 'Erro ao carregar detalhe do contrato');
+      return null;
+    }
+  }
+
+  async function editarContrato(id) {
+    const detalhe = await selecionarContrato(id);
+    if (!detalhe) return;
+    setPaymentPlans([]);
+    setForm(pickEditForm(detalhe));
+  }
+
+  async function handleSincronizarStatusFinanceiro(id) {
+    try {
+      setProcessingAction('sync');
+      setError('');
+      const data = await sincronizarStatusFinanceiroContratoComercial(id);
+      setContratoSelecionado(data);
+      await carregar();
+    } catch (err) {
+      setError(err?.message || 'Erro ao sincronizar status financeiro do contrato');
+    } finally {
+      setProcessingAction('');
+    }
+  }
+
+  async function handleDistratarContrato() {
+    if (!contratoSelecionado?.id) return;
+    try {
+      setProcessingAction('distrato');
+      setError('');
+      const data = await distratarContratoComercial(contratoSelecionado.id, distratoForm);
+      setContratoSelecionado(data);
+      setShowDistrato(false);
+      setDistratoForm(defaultDistratoForm());
+      await carregar();
+    } catch (err) {
+      setError(err?.message || 'Erro ao distratar contrato');
+    } finally {
+      setProcessingAction('');
+    }
+  }
+
+  async function handleTrocaUnidadeContrato() {
+    if (!contratoSelecionado?.id) return;
+    try {
+      setProcessingAction('troca');
+      setError('');
+      const data = await trocarUnidadeContratoComercial(contratoSelecionado.id, trocaForm);
+      setContratoSelecionado(data);
+      setShowTroca(false);
+      setTrocaForm({
+        ...defaultTrocaForm(),
+        novo_valor_total: formatCurrencyInput(data?.valor_total)
+      });
+      await carregar();
+    } catch (err) {
+      setError(err?.message || 'Erro ao trocar unidade do contrato');
+    } finally {
+      setProcessingAction('');
+    }
+  }
+
+  function abrirCadastroRapidoPessoa(tipo) {
+    setPessoaRapidaForm(defaultPessoaRapidaForm(tipo));
+    setPessoaRapidaModal(tipo);
+  }
+
+  async function salvarPessoaRapida() {
+    try {
+      const tipo = pessoaRapidaModal || pessoaRapidaForm.tipo || 'cliente';
+      const payload = {
+        cpf_cnpj: onlyDigits(pessoaRapidaForm.cpf_cnpj),
+        nome: pessoaRapidaForm.nome,
+        telefone: onlyDigits(pessoaRapidaForm.telefone),
+        email: pessoaRapidaForm.email,
+        cliente: tipo === 'cliente',
+        fornecedor: tipo === 'corretor',
+        corretor: tipo === 'corretor'
+      };
+      const pessoa = await criarParceiro(payload);
+
+      if (tipo === 'cliente') {
+        setClientes((current) => [...current, pessoa].sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || ''))));
+        setForm((current) => ({ ...current, parceiro_id: String(pessoa.id) }));
+      } else {
+        setCorretores((current) => [...current, pessoa].sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || ''))));
+        setForm((current) => ({
+          ...current,
+          corretor_parceiro_id: String(pessoa.id),
+          corretor_nome: pessoa.nome || ''
+        }));
+      }
+
+      setPessoaRapidaModal(null);
+      setPessoaRapidaForm(defaultPessoaRapidaForm());
+    } catch (err) {
+      setError(err?.message || 'Erro ao cadastrar pessoa');
+    }
+  }
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    if (!form.id) {
+      const totalInformado = roundCurrency(form.valor_total);
+      if (totalInformado <= 0) {
+        setError('Informe o valor total do contrato.');
+        return;
+      }
+      if (!form.parcelas.length) {
+        setError('Adicione ao menos uma forma de pagamento para montar os recebiveis do contrato.');
+        return;
+      }
+      if (Math.abs(diferencaComposicao) > 0.009) {
+        setError('A composicao das formas de pagamento precisa fechar exatamente o valor total do contrato.');
+        return;
+      }
+    }
+    try {
+      setSaving(true);
+      setError('');
+      if (form.id) {
+        await atualizarContratoComercial(form.id, {
+          status: form.status,
+          categoria_financeira_id: form.categoria_financeira_id ? Number(form.categoria_financeira_id) : undefined,
+          corretor_parceiro_id: form.corretor_parceiro_id ? Number(form.corretor_parceiro_id) : null,
+          categoria_financeira_comissao_id: form.categoria_financeira_comissao_id ? Number(form.categoria_financeira_comissao_id) : null,
+          desconto_concedido: form.desconto_concedido || undefined,
+          indice_reajuste: form.indice_reajuste || undefined,
+          corretor_nome: form.corretor_nome || undefined,
+          comissao_percentual: form.comissao_percentual || undefined,
+          observacoes: form.observacoes || undefined
+        });
+      } else {
+        await criarContratoComercial({
+          empreendimento_id: Number(form.empreendimento_id),
+          unidade_comercial_id: Number(form.unidade_comercial_id),
+          parceiro_id: Number(form.parceiro_id),
+          corretor_parceiro_id: form.corretor_parceiro_id ? Number(form.corretor_parceiro_id) : null,
+          obra_id: Number(form.obra_id),
+          categoria_financeira_id: form.categoria_financeira_id ? Number(form.categoria_financeira_id) : undefined,
+          categoria_financeira_comissao_id: form.categoria_financeira_comissao_id ? Number(form.categoria_financeira_comissao_id) : null,
+          numero: form.numero,
+          status: form.status,
+          data_contrato: form.data_contrato,
+          valor_total: form.valor_total || undefined,
+          valor_entrada: valorEntradaComposicao || undefined,
+          desconto_concedido: form.desconto_concedido || undefined,
+          indice_reajuste: form.indice_reajuste || undefined,
+          corretor_nome: form.corretor_nome || undefined,
+          comissao_percentual: form.comissao_percentual || undefined,
+          observacoes: form.observacoes || undefined,
+          parcelas: form.parcelas.map((item, index) => ({
+            sequencia: item.sequencia || index + 1,
+            descricao: item.descricao,
+            tipo_parcela: item.tipo_parcela,
+            forma_recebimento_prevista: item.forma_recebimento_prevista || undefined,
+            data_vencimento: item.data_vencimento,
+            valor: item.valor || item.valor_original,
+            observacoes: item.observacoes || undefined
+          }))
+        });
+      }
+
+      setForm(defaultForm());
+      setGenerator(defaultGenerator());
+      setPaymentPlans([]);
+      await carregar();
+    } catch (err) {
+      setError(err?.message || 'Erro ao salvar contrato comercial');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (loading) {
+    return <div className="page solicitacoes-page"><div className="app-empty-card">Carregando contratos comerciais...</div></div>;
+  }
+
+  return (
+    <div className="page solicitacoes-page space-y-5 md:space-y-6">
+      <header className="app-page-header">
+        <div className="app-page-header-row">
+          <div>
+            <h1 className="text-xl font-semibold md:text-2xl">Contratos de venda</h1>
+            <p className="page-subtitle">
+              Contratos, agenda financeira e titulos a receber integrados ao modulo financeiro.
+            </p>
+          </div>
+        </div>
+      </header>
+
+      {error && <div className="app-alert app-alert--error">{error}</div>}
+
+      <section className="sol-surface-card rounded-2xl p-4 md:p-5 space-y-4">
+        <div className="sol-filtros-head">
+          <div>
+            <p className="sol-filtros-title">{form.id ? 'Editar resumo do contrato' : 'Novo contrato comercial'}</p>
+            <p className="sol-filtros-subtitle">
+              {form.id ? 'A edicao inicial ajusta status e dados complementares.' : 'A criacao gera as parcelas e os titulos financeiros.'}
+            </p>
+          </div>
+        </div>
+        <form className="space-y-4" onSubmit={handleSubmit}>
+          <div className="grid gap-3 md:grid-cols-4">
+            <label className="sol-filter-field">
+              <span className="sol-filter-label">Empreendimento</span>
+              <select className="input w-full" value={form.empreendimento_id} onChange={(e) => setForm((c) => ({ ...c, empreendimento_id: e.target.value, unidade_comercial_id: '' }))} required disabled={Boolean(form.id)}>
+                <option value="">Selecione</option>
+                {empreendimentos.map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}
+              </select>
+            </label>
+            <label className="sol-filter-field">
+              <span className="sol-filter-label">Unidade</span>
+              <select className="input w-full" value={form.unidade_comercial_id} onChange={(e) => setForm((c) => ({ ...c, unidade_comercial_id: e.target.value }))} required disabled={Boolean(form.id)}>
+                <option value="">Selecione</option>
+                {unidadesDoEmpreendimento.map((item) => <option key={item.id} value={item.id}>{item.codigo}</option>)}
+              </select>
+            </label>
+            <label className="sol-filter-field">
+              <span className="sol-filter-label">Cliente</span>
+              <select className="input w-full" value={form.parceiro_id} onChange={(e) => setForm((c) => ({ ...c, parceiro_id: e.target.value }))} required disabled={Boolean(form.id)}>
+                <option value="">Selecione</option>
+                {clientes.map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}
+              </select>
+              {!form.id && (
+                <button type="button" className="btn btn-outline btn-sm mt-2" onClick={() => abrirCadastroRapidoPessoa('cliente')}>
+                  Cadastro rapido
+                </button>
+              )}
+            </label>
+            <label className="sol-filter-field">
+              <span className="sol-filter-label">Obra</span>
+              <select className="input w-full" value={form.obra_id} onChange={(e) => setForm((c) => ({ ...c, obra_id: e.target.value }))} required disabled={Boolean(form.id)}>
+                <option value="">Selecione</option>
+                {obras.map((item) => <option key={item.id} value={item.id}>{item.codigo ? `${item.codigo} - ${item.nome}` : item.nome}</option>)}
+              </select>
+            </label>
+          </div>
+          <div className="grid gap-3 md:grid-cols-4">
+            <label className="sol-filter-field">
+              <span className="sol-filter-label">Contrato</span>
+              <input className="input w-full" value={form.numero} onChange={(e) => setForm((c) => ({ ...c, numero: e.target.value }))} required disabled={Boolean(form.id)} />
+            </label>
+            <label className="sol-filter-field">
+              <span className="sol-filter-label">Data</span>
+              <input className="input w-full" type="date" value={form.data_contrato} onChange={(e) => setForm((c) => ({ ...c, data_contrato: e.target.value }))} required disabled={Boolean(form.id)} />
+            </label>
+            <label className="sol-filter-field">
+              <span className="sol-filter-label">Status</span>
+              <select className="input w-full" value={form.status} onChange={(e) => setForm((c) => ({ ...c, status: e.target.value }))}>
+                {STATUS_CONTRATO.map((item) => <option key={item} value={item}>{item}</option>)}
+              </select>
+            </label>
+            <label className="sol-filter-field">
+              <span className="sol-filter-label">Categoria financeira</span>
+              <select className="input w-full" value={form.categoria_financeira_id} onChange={(e) => setForm((c) => ({ ...c, categoria_financeira_id: e.target.value }))}>
+                <option value="">Nao vincular</option>
+                {categoriasCompativeis.map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}
+              </select>
+            </label>
+          </div>
+          <div className="grid gap-3 md:grid-cols-4">
+            <label className="sol-filter-field"><span className="sol-filter-label">Desconto</span><input className="input w-full" inputMode="decimal" value={form.desconto_concedido} onChange={(e) => setForm((c) => ({ ...c, desconto_concedido: normalizeCurrencyTyping(e.target.value) }))} onBlur={(e) => setForm((c) => ({ ...c, desconto_concedido: formatCurrencyInput(e.target.value) }))} placeholder="R$ 0,00" /></label>
+            <label className="sol-filter-field"><span className="sol-filter-label">Indice reajuste</span><input className="input w-full" value={form.indice_reajuste} onChange={(e) => setForm((c) => ({ ...c, indice_reajuste: e.target.value }))} /></label>
+            <label className="sol-filter-field"><span className="sol-filter-label">Comissao %</span><input className="input w-full" type="number" step="0.01" value={form.comissao_percentual} onChange={(e) => setForm((c) => ({ ...c, comissao_percentual: e.target.value }))} /></label>
+            <label className="sol-filter-field"><span className="sol-filter-label">Valor total</span><input className="input w-full" inputMode="decimal" value={form.valor_total} onChange={(e) => setForm((c) => ({ ...c, valor_total: normalizeCurrencyTyping(e.target.value) }))} onBlur={(e) => setForm((c) => ({ ...c, valor_total: formatCurrencyInput(e.target.value) }))} placeholder="R$ 0,00" /></label>
+          </div>
+          <div className="grid gap-3 md:grid-cols-4">
+            <label className="sol-filter-field">
+              <span className="sol-filter-label">Corretor parceiro</span>
+              <select
+                className="input w-full"
+                value={form.corretor_parceiro_id}
+                onChange={(e) => {
+                  const corretorId = e.target.value;
+                  const corretor = corretores.find((item) => String(item.id) === String(corretorId));
+                  setForm((c) => ({
+                    ...c,
+                    corretor_parceiro_id: corretorId,
+                    corretor_nome: corretor?.nome || ''
+                  }));
+                }}
+              >
+                <option value="">Nao vincular</option>
+                {corretores.map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}
+              </select>
+              <button type="button" className="btn btn-outline btn-sm mt-2" onClick={() => abrirCadastroRapidoPessoa('corretor')}>
+                Cadastro rapido
+              </button>
+            </label>
+            <label className="sol-filter-field"><span className="sol-filter-label">Corretor no contrato</span><input className="input w-full" value={form.corretor_nome} onChange={(e) => setForm((c) => ({ ...c, corretor_nome: e.target.value }))} placeholder="Nome livre, se precisar ajustar" /></label>
+            <label className="sol-filter-field">
+              <span className="sol-filter-label">Categoria comissao</span>
+              <select className="input w-full" value={form.categoria_financeira_comissao_id} onChange={(e) => setForm((c) => ({ ...c, categoria_financeira_comissao_id: e.target.value }))}>
+                <option value="">Nao vincular</option>
+                {categoriasCompativeisPagar.map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}
+              </select>
+            </label>
+          </div>
+          <label className="sol-filter-field"><span className="sol-filter-label">Observacoes</span><textarea className="input min-h-[92px] w-full" value={form.observacoes} onChange={(e) => setForm((c) => ({ ...c, observacoes: e.target.value }))} /></label>
+
+          {!form.id && (
+            <div className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-bg)] p-4 space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-[var(--c-text)]">Composicao das formas de pagamento</p>
+                  <p className="text-xs text-[var(--c-muted)]">
+                    Adicione blocos de recebimento e acompanhe a diferenca ate fechar o valor total do contrato.
+                  </p>
+                  <p className="text-xs text-[var(--c-muted)]">
+                    Se houver entrada em dinheiro, PIX, bens ou outro formato, registre essa parte como um bloco proprio abaixo.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2 text-sm">
+                  <span className="inline-flex items-center rounded-full border border-[var(--c-border)] bg-[var(--c-surface)] px-3 py-2 text-[var(--c-text)]">
+                    Contrato: <strong className="ml-1">{formatCurrency(valorTotalContrato)}</strong>
+                  </span>
+                  <span className="inline-flex items-center rounded-full border border-[var(--c-border)] bg-[var(--c-surface)] px-3 py-2 text-[var(--c-text)]">
+                    Agenda: <strong className="ml-1">{formatCurrency(totalParcelas)}</strong>
+                  </span>
+                  <span className="inline-flex items-center rounded-full border border-[var(--c-border)] bg-[var(--c-surface)] px-3 py-2 text-[var(--c-text)]">
+                    Entrada: <strong className="ml-1">{formatCurrency(valorEntradaComposicao)}</strong>
+                  </span>
+                  <span className={`inline-flex items-center rounded-full border px-3 py-2 ${Math.abs(diferencaComposicao) <= 0.009 ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : diferencaComposicao > 0 ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-rose-200 bg-rose-50 text-rose-700'}`}>
+                    {Math.abs(diferencaComposicao) <= 0.009
+                      ? 'Fechado'
+                      : diferencaComposicao > 0
+                        ? `Faltam ${formatCurrency(diferencaComposicao)}`
+                        : `Excede ${formatCurrency(Math.abs(diferencaComposicao))}`}
+                  </span>
+                </div>
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-6">
+                <label className="sol-filter-field">
+                  <span className="sol-filter-label">Modo</span>
+                  <select className="input w-full" value={generator.modo} onChange={(e) => setGenerator((c) => resolveGeneratorByModo(e.target.value, c))}>
+                    {MODOS_COMPOSICAO.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+                  </select>
+                </label>
+                <label className="sol-filter-field md:col-span-2">
+                  <span className="sol-filter-label">Descricao do bloco</span>
+                  <input className="input w-full" value={generator.titulo_bloco} onChange={(e) => setGenerator((c) => ({ ...c, titulo_bloco: e.target.value }))} placeholder="Ex.: Mensais, reforco anual, bens recebidos" />
+                </label>
+                <label className="sol-filter-field">
+                  <span className="sol-filter-label">Tipo da parcela</span>
+                  <select className="input w-full" value={generator.tipo_parcela} onChange={(e) => setGenerator((c) => ({ ...c, tipo_parcela: e.target.value }))} disabled={generator.modo === 'ENTRADA'}>
+                    {PARCELA_TIPOS.map((tipo) => <option key={tipo} value={tipo}>{tipo}</option>)}
+                  </select>
+                </label>
+                <label className="sol-filter-field md:col-span-2">
+                  <span className="sol-filter-label">Forma prevista</span>
+                  <select className="input w-full" value={generator.forma_recebimento_prevista} onChange={(e) => setGenerator((c) => ({ ...c, forma_recebimento_prevista: e.target.value, detalhe_forma_recebimento: isFormaComDetalhe(e.target.value) ? c.detalhe_forma_recebimento : '' }))}>
+                    <option value="">Nao informar</option>
+                    {FORMAS_RECEBIMENTO.map((item) => <option key={item} value={item}>{item}</option>)}
+                  </select>
+                </label>
+              </div>
+
+              {isFormaComDetalhe(generator.forma_recebimento_prevista) && (
+                <label className="sol-filter-field">
+                  <span className="sol-filter-label">Detalhe do recebimento</span>
+                  <input
+                    className="input w-full"
+                    value={generator.detalhe_forma_recebimento}
+                    onChange={(e) => setGenerator((c) => ({ ...c, detalhe_forma_recebimento: e.target.value }))}
+                    placeholder="Ex.: veiculo Corolla 2024, permuta por lote 12, credito de terceiros"
+                  />
+                </label>
+              )}
+
+              {generator.modo === 'ENTRADA' ? (
+                <div className="grid gap-3 md:grid-cols-2">
+                  <label className="sol-filter-field">
+                    <span className="sol-filter-label">Valor da entrada</span>
+                    <input className="input w-full" inputMode="decimal" value={generator.valor_parcela} onChange={(e) => setGenerator((c) => ({ ...c, valor_parcela: normalizeCurrencyTyping(e.target.value) }))} onBlur={(e) => setGenerator((c) => ({ ...c, valor_parcela: formatCurrencyInput(e.target.value) }))} placeholder="R$ 0,00" />
+                  </label>
+                  <label className="sol-filter-field">
+                    <span className="sol-filter-label">Vencimento da entrada</span>
+                    <input className="input w-full" type="date" value={generator.primeiro_vencimento} onChange={(e) => setGenerator((c) => ({ ...c, primeiro_vencimento: e.target.value }))} />
+                  </label>
+                </div>
+              ) : generator.modo === 'PERIODICO' ? (
+                <div className="grid gap-3 md:grid-cols-4">
+                  <label className="sol-filter-field">
+                    <span className="sol-filter-label">Periodicidade</span>
+                  <select className="input w-full" value={generator.periodicidade} onChange={(e) => setGenerator((c) => ({ ...c, periodicidade: e.target.value, quantidade_parcelas: e.target.value === 'AVISTA' ? '1' : c.quantidade_parcelas }))}>
+                    {PERIODICIDADES.filter((item) => item.value !== 'PERSONALIZADA').map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+                  </select>
+                </label>
+                <label className="sol-filter-field">
+                  <span className="sol-filter-label">Qtd. parcelas</span>
+                  <input className="input w-full" type="number" min="1" value={generator.periodicidade === 'AVISTA' ? '1' : generator.quantidade_parcelas} onChange={(e) => setGenerator((c) => ({ ...c, quantidade_parcelas: e.target.value }))} disabled={generator.periodicidade === 'AVISTA'} />
+                </label>
+                  <label className="sol-filter-field">
+                    <span className="sol-filter-label">Valor parcela</span>
+                    <input className="input w-full" inputMode="decimal" value={generator.valor_parcela} onChange={(e) => setGenerator((c) => ({ ...c, valor_parcela: normalizeCurrencyTyping(e.target.value) }))} onBlur={(e) => setGenerator((c) => ({ ...c, valor_parcela: formatCurrencyInput(e.target.value) }))} placeholder="R$ 0,00" />
+                  </label>
+                  <label className="sol-filter-field">
+                    <span className="sol-filter-label">Primeiro vencimento</span>
+                    <input className="input w-full" type="date" value={generator.primeiro_vencimento} onChange={(e) => setGenerator((c) => ({ ...c, primeiro_vencimento: e.target.value }))} />
+                  </label>
+                </div>
+              ) : (
+                <div className="space-y-3 rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-semibold text-[var(--c-text)]">Lancamentos manuais</p>
+                      <p className="text-xs text-[var(--c-muted)]">
+                        Use para bens, outros recebimentos ou parcelas com datas e valores especificos.
+                      </p>
+                    </div>
+                    <button type="button" className="btn btn-outline" onClick={adicionarParcelaCustomizada}>
+                      Adicionar linha
+                    </button>
+                  </div>
+
+                  <div className="space-y-3">
+                    {(generator.parcelas_personalizadas || []).map((item, index) => (
+                      <div key={`custom-${index}`} className="grid gap-3 rounded-2xl border border-[var(--c-border)] p-3 md:grid-cols-[minmax(0,1.4fr)_180px_170px_160px_auto]">
+                        <label className="sol-filter-field">
+                          <span className="sol-filter-label">Descricao</span>
+                          <input className="input w-full" value={item.descricao} onChange={(e) => updateParcelaCustomizada(index, 'descricao', e.target.value)} />
+                        </label>
+                        <label className="sol-filter-field">
+                          <span className="sol-filter-label">Tipo</span>
+                          <select className="input w-full" value={item.tipo_parcela} onChange={(e) => updateParcelaCustomizada(index, 'tipo_parcela', e.target.value)}>
+                            {PARCELA_TIPOS.map((tipo) => <option key={tipo} value={tipo}>{tipo}</option>)}
+                          </select>
+                        </label>
+                        <label className="sol-filter-field">
+                          <span className="sol-filter-label">Vencimento</span>
+                          <input className="input w-full" type="date" value={item.data_vencimento} onChange={(e) => updateParcelaCustomizada(index, 'data_vencimento', e.target.value)} />
+                        </label>
+                        <label className="sol-filter-field">
+                          <span className="sol-filter-label">Valor</span>
+                          <input className="input w-full" inputMode="decimal" value={item.valor} onChange={(e) => updateParcelaCustomizada(index, 'valor', normalizeCurrencyTyping(e.target.value))} onBlur={(e) => updateParcelaCustomizada(index, 'valor', formatCurrencyInput(e.target.value))} placeholder="R$ 0,00" />
+                        </label>
+                        <div className="flex items-end">
+                          <button type="button" className="btn btn-outline w-full" onClick={() => removerParcelaCustomizada(index)}>
+                            Remover
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex flex-wrap gap-2">
+                <button type="button" className="btn btn-outline" onClick={adicionarFormaPagamento}>
+                  Adicionar forma de pagamento
+                </button>
+                <span className="inline-flex items-center rounded-full border border-[var(--c-border)] bg-[var(--c-surface)] px-3 py-2 text-sm text-[var(--c-text)]">
+                  Rascunho do bloco: <strong className="ml-1">{formatCurrency(gerarParcelasDoBloco(generator).total || 0)}</strong>
+                </span>
+              </div>
+
+              {paymentPlans.length > 0 && (
+                <div className="space-y-3">
+                  <div className="text-sm font-semibold text-[var(--c-text)]">Formas adicionadas</div>
+                  <div className="space-y-3">
+                    {paymentPlans.map((plano, index) => (
+                      <article key={plano.id} className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4">
+                        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                          <div className="space-y-2">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                                Forma {index + 1}
+                              </span>
+                              <span className="inline-flex rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-700">
+                                {getModoComposicaoLabel(plano.modo)}
+                              </span>
+                              {plano.forma_recebimento_prevista && (
+                                <span className="inline-flex rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                                  {plano.forma_recebimento_prevista}
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-sm font-semibold text-[var(--c-text)]">
+                              {plano.titulo_bloco || 'Composicao sem descricao'}
+                            </div>
+                            {plano.detalhe_forma_recebimento && (
+                              <div className="text-sm text-[var(--c-muted)]">
+                                Detalhe: {plano.detalhe_forma_recebimento}
+                              </div>
+                            )}
+                            <div className="grid gap-2 text-sm text-[var(--c-muted)] md:grid-cols-3">
+                              <span>Parcelas geradas: {plano.parcelas_geradas?.length || 0}</span>
+                              <span>Tipo base: {plano.tipo_parcela || 'PARCELA'}</span>
+                              <span>Total: {formatCurrency(plano.total_bloco)}</span>
+                            </div>
+                          </div>
+                          <button type="button" className="btn btn-outline" onClick={() => removerFormaPagamento(plano.id)}>
+                            Remover forma
+                          </button>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {form.parcelas.length > 0 && (
+                <div className="overflow-x-auto rounded-2xl border border-[var(--c-border)]">
+                  <table className="min-w-full text-sm">
+                    <thead className="bg-[var(--c-bg)] text-[var(--c-muted)]">
+                      <tr>
+                        <th className="px-3 py-3 text-left">Descricao</th>
+                        <th className="px-3 py-3 text-left">Tipo</th>
+                        <th className="px-3 py-3 text-left">Forma</th>
+                        <th className="px-3 py-3 text-left">Detalhe</th>
+                        <th className="px-3 py-3 text-left">Vencimento</th>
+                        <th className="px-3 py-3 text-right">Valor</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {form.parcelas.map((item, index) => (
+                        <tr key={`${item.descricao}-${index}`} className="border-t border-[var(--c-border)]">
+                          <td className="px-3 py-3"><input className="input w-full" value={item.descricao} onChange={(e) => updateParcela(index, 'descricao', e.target.value)} /></td>
+                          <td className="px-3 py-3">
+                            <select className="input w-full" value={item.tipo_parcela} onChange={(e) => updateParcela(index, 'tipo_parcela', e.target.value)}>
+                              {PARCELA_TIPOS.map((tipo) => <option key={tipo} value={tipo}>{tipo}</option>)}
+                            </select>
+                          </td>
+                          <td className="px-3 py-3">
+                            <select className="input w-full" value={item.forma_recebimento_prevista || ''} onChange={(e) => updateParcela(index, 'forma_recebimento_prevista', e.target.value)}>
+                              <option value="">Nao informar</option>
+                              {FORMAS_RECEBIMENTO.map((forma) => <option key={forma} value={forma}>{forma}</option>)}
+                            </select>
+                          </td>
+                          <td className="px-3 py-3">
+                            <input className="input w-full" value={item.observacoes || ''} onChange={(e) => updateParcela(index, 'observacoes', e.target.value)} placeholder="Detalhe do bem, permuta ou outro recebimento" />
+                          </td>
+                          <td className="px-3 py-3"><input className="input w-full" type="date" value={item.data_vencimento} onChange={(e) => updateParcela(index, 'data_vencimento', e.target.value)} /></td>
+                          <td className="px-3 py-3"><input className="input w-full text-right" inputMode="decimal" value={item.valor || formatCurrencyInput(item.valor_original)} onChange={(e) => updateParcela(index, 'valor', normalizeCurrencyTyping(e.target.value))} onBlur={(e) => updateParcela(index, 'valor', formatCurrencyInput(e.target.value))} placeholder="R$ 0,00" /></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="flex flex-wrap gap-2">
+            <button type="submit" className="btn btn-primary" disabled={saving || (!form.id && form.parcelas.length === 0)}>
+              {saving ? 'Salvando...' : form.id ? 'Salvar resumo' : 'Criar contrato'}
+            </button>
+            <button type="button" className="btn btn-outline" onClick={() => { setForm(defaultForm()); setGenerator(defaultGenerator()); setPaymentPlans([]); }}>
+              Limpar
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <section className="sol-surface-card rounded-2xl p-4 md:p-5">
+        <div className="sol-filtros-head">
+          <div>
+            <p className="sol-filtros-title">Carteira comercial</p>
+            <p className="sol-filtros-subtitle">Contratos de venda com acesso rapido ao financeiro.</p>
+          </div>
+          <div className="sol-filtros-meta">
+            <span>Total listado {contratosFiltrados.length}</span>
+          </div>
+        </div>
+
+        <div className="mt-4 grid gap-3 md:grid-cols-[220px_minmax(0,1fr)]">
+          <label className="sol-filter-field">
+            <span className="sol-filter-label">Status</span>
+            <select className="input w-full" value={statusFiltro} onChange={(e) => setStatusFiltro(e.target.value)}>
+              <option value="">Todos</option>
+              {STATUS_CONTRATO.map((item) => <option key={item} value={item}>{item}</option>)}
+            </select>
+          </label>
+          <label className="sol-filter-field">
+            <span className="sol-filter-label">Busca</span>
+            <input className="input w-full" value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Contrato, cliente ou unidade" />
+          </label>
+        </div>
+
+        <div className="mt-4 space-y-3">
+          {contratosFiltrados.length === 0 ? (
+            <div className="app-empty-card">Nenhum contrato comercial encontrado.</div>
+          ) : (
+            contratosFiltrados.map((item) => (
+              <article key={item.id} className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4 shadow-sm">
+                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="text-base font-semibold text-[var(--c-text)]">{item.numero}</h3>
+                      <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${statusClass(item.status)}`}>{item.status}</span>
+                      {item.indicadoresFinanceiros?.status_sugerido && item.indicadoresFinanceiros.status_sugerido !== item.status && (
+                        <span className="inline-flex rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-700">
+                          Financeiro sugere {item.indicadoresFinanceiros.status_sugerido}
+                        </span>
+                      )}
+                    </div>
+                    <div className="grid gap-2 text-sm text-[var(--c-muted)] md:grid-cols-2">
+                      <span>Cliente: {item.cliente?.nome || '-'}</span>
+                      <span>Corretor: {item.corretor_nome || '-'}</span>
+                      <span>Comissao: {Number(item.comissao_percentual || 0) > 0 ? `${Number(item.comissao_percentual).toLocaleString('pt-BR')}%` : '-'}</span>
+                      <span>Empreendimento: {item.empreendimento?.nome || '-'}</span>
+                      <span>Unidade: {item.unidadeComercial?.codigo || '-'}</span>
+                      <span>Valor total: {formatCurrency(item.valor_total)}</span>
+                      <span>Data contrato: {formatDate(item.data_contrato)}</span>
+                      <span>Obra: {item.obra?.nome || '-'}</span>
+                      <span>Em aberto: {formatCurrency(item.indicadoresFinanceiros?.valor_em_aberto || 0)}</span>
+                      <span>Vencido: {formatCurrency(item.indicadoresFinanceiros?.valor_vencido || 0)}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    <button type="button" className="btn btn-outline" onClick={() => selecionarContrato(item.id)}>
+                      Detalhes
+                    </button>
+                    <button type="button" className="btn btn-outline" onClick={() => editarContrato(item.id)}>
+                      Editar resumo
+                    </button>
+                  </div>
+                </div>
+              </article>
+            ))
+          )}
+        </div>
+      </section>
+
+      {contratoSelecionado && (
+        <section className="sol-surface-card rounded-2xl p-4 md:p-5">
+          <div className="sol-filtros-head">
+            <div>
+              <p className="sol-filtros-title">Detalhe do contrato {contratoSelecionado.numero}</p>
+              <p className="sol-filtros-subtitle">Parcelas geradas e acesso aos titulos do financeiro.</p>
+            </div>
+          </div>
+
+          <div className="mt-4 grid gap-3 md:grid-cols-4">
+            <div className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4">
+              <div className="text-xs uppercase tracking-[0.18em] text-[var(--c-muted)]">Corretor</div>
+              <div className="mt-2 text-sm font-semibold text-[var(--c-text)]">{contratoSelecionado.corretor_nome || '-'}</div>
+            </div>
+            <div className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4">
+              <div className="text-xs uppercase tracking-[0.18em] text-[var(--c-muted)]">Comissao</div>
+              <div className="mt-2 text-sm font-semibold text-[var(--c-text)]">
+                {Number(contratoSelecionado.comissao_percentual || 0) > 0
+                  ? `${Number(contratoSelecionado.comissao_percentual).toLocaleString('pt-BR')}%`
+                  : '-'}
+              </div>
+            </div>
+            <div className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4">
+              <div className="text-xs uppercase tracking-[0.18em] text-[var(--c-muted)]">Categoria comissao</div>
+              <div className="mt-2 text-sm font-semibold text-[var(--c-text)]">{contratoSelecionado.categoriaFinanceiraComissao?.nome || '-'}</div>
+            </div>
+            <div className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4">
+              <div className="text-xs uppercase tracking-[0.18em] text-[var(--c-muted)]">Titulo comissao</div>
+              <div className="mt-2">
+                {contratoSelecionado.tituloFinanceiroComissao?.id ? (
+                  <Link className="btn btn-outline" to={`/financeiro/titulos/${contratoSelecionado.tituloFinanceiroComissao.id}`}>
+                    Abrir titulo da comissao
+                  </Link>
+                ) : (
+                  <span className="text-sm text-[var(--c-muted)]">Nao gerado</span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-4 grid gap-3 md:grid-cols-4">
+            <div className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4">
+              <div className="text-xs uppercase tracking-[0.18em] text-[var(--c-muted)]">Status sugerido</div>
+              <div className="mt-2 text-sm font-semibold text-[var(--c-text)]">{contratoSelecionado.indicadoresFinanceiros?.status_sugerido || contratoSelecionado.status}</div>
+            </div>
+            <div className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4">
+              <div className="text-xs uppercase tracking-[0.18em] text-[var(--c-muted)]">Valor em aberto</div>
+              <div className="mt-2 text-sm font-semibold text-[var(--c-text)]">{formatCurrency(contratoSelecionado.indicadoresFinanceiros?.valor_em_aberto || 0)}</div>
+            </div>
+            <div className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4">
+              <div className="text-xs uppercase tracking-[0.18em] text-[var(--c-muted)]">Valor vencido</div>
+              <div className="mt-2 text-sm font-semibold text-[var(--c-text)]">{formatCurrency(contratoSelecionado.indicadoresFinanceiros?.valor_vencido || 0)}</div>
+            </div>
+            <div className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4">
+              <div className="text-xs uppercase tracking-[0.18em] text-[var(--c-muted)]">Proximo vencimento</div>
+              <div className="mt-2 text-sm font-semibold text-[var(--c-text)]">{formatDate(contratoSelecionado.indicadoresFinanceiros?.proximo_vencimento)}</div>
+            </div>
+          </div>
+
+          {(contratoSelecionado.data_distrato || contratoSelecionado.motivo_distrato) && (
+            <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">
+              <strong>Distrato registrado.</strong> Data: {formatDate(contratoSelecionado.data_distrato)}. Motivo: {contratoSelecionado.motivo_distrato || '-'}
+            </div>
+          )}
+
+          <div className="mt-4 rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4 space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-[var(--c-text)]">Acoes operacionais do contrato</p>
+                <p className="text-xs text-[var(--c-muted)]">Controle inadimplencia, distrato guiado e troca de unidade com ajuste financeiro.</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" className="btn btn-outline" onClick={() => handleSincronizarStatusFinanceiro(contratoSelecionado.id)} disabled={processingAction === 'sync'}>
+                  {processingAction === 'sync' ? 'Sincronizando...' : 'Sincronizar status financeiro'}
+                </button>
+                {!['DISTRATADO', 'CANCELADO'].includes(String(contratoSelecionado.status || '').toUpperCase()) && (
+                  <>
+                    <button type="button" className="btn btn-outline" onClick={() => { setShowTroca((value) => !value); setShowDistrato(false); }}>
+                      {showTroca ? 'Fechar troca' : 'Trocar unidade'}
+                    </button>
+                    <button type="button" className="btn btn-outline" onClick={() => { setShowDistrato((value) => !value); setShowTroca(false); }}>
+                      {showDistrato ? 'Fechar distrato' : 'Distratar contrato'}
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {showTroca && (
+              <div className="grid gap-3 rounded-2xl border border-[var(--c-border)] bg-[var(--c-bg)] p-4 md:grid-cols-4">
+                <label className="sol-filter-field">
+                  <span className="sol-filter-label">Nova unidade</span>
+                  <select className="input w-full" value={trocaForm.unidade_comercial_destino_id} onChange={(e) => setTrocaForm((current) => ({ ...current, unidade_comercial_destino_id: e.target.value }))}>
+                    <option value="">Selecione</option>
+                    {unidadesElegiveisTroca.map((item) => <option key={item.id} value={item.id}>{item.codigo} - {item.empreendimento?.nome || item.tipologia || 'Unidade'}</option>)}
+                  </select>
+                </label>
+                <label className="sol-filter-field">
+                  <span className="sol-filter-label">Novo valor total</span>
+                  <input className="input w-full" inputMode="decimal" value={trocaForm.novo_valor_total} onChange={(e) => setTrocaForm((current) => ({ ...current, novo_valor_total: normalizeCurrencyTyping(e.target.value) }))} onBlur={(e) => setTrocaForm((current) => ({ ...current, novo_valor_total: formatCurrencyInput(e.target.value) }))} placeholder="R$ 0,00" />
+                </label>
+                <label className="sol-filter-field">
+                  <span className="sol-filter-label">Data efetiva</span>
+                  <input className="input w-full" type="date" value={trocaForm.data_efetiva} onChange={(e) => setTrocaForm((current) => ({ ...current, data_efetiva: e.target.value }))} />
+                </label>
+                <label className="sol-filter-field">
+                  <span className="sol-filter-label">Observacoes</span>
+                  <input className="input w-full" value={trocaForm.observacoes} onChange={(e) => setTrocaForm((current) => ({ ...current, observacoes: e.target.value }))} />
+                </label>
+                <div className="md:col-span-4">
+                  <button type="button" className="btn btn-primary" onClick={handleTrocaUnidadeContrato} disabled={processingAction === 'troca'}>
+                    {processingAction === 'troca' ? 'Aplicando troca...' : 'Confirmar troca de unidade'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {showDistrato && (
+              <div className="grid gap-3 rounded-2xl border border-rose-200 bg-rose-50 p-4 md:grid-cols-3">
+                <label className="sol-filter-field">
+                  <span className="sol-filter-label">Data do distrato</span>
+                  <input className="input w-full" type="date" value={distratoForm.data_distrato} onChange={(e) => setDistratoForm((current) => ({ ...current, data_distrato: e.target.value }))} />
+                </label>
+                <label className="sol-filter-field md:col-span-2">
+                  <span className="sol-filter-label">Motivo</span>
+                  <input className="input w-full" value={distratoForm.motivo_distrato} onChange={(e) => setDistratoForm((current) => ({ ...current, motivo_distrato: e.target.value }))} />
+                </label>
+                <label className="sol-filter-field md:col-span-3">
+                  <span className="sol-filter-label">Observacoes</span>
+                  <textarea className="input min-h-[92px] w-full" value={distratoForm.observacoes} onChange={(e) => setDistratoForm((current) => ({ ...current, observacoes: e.target.value }))} />
+                </label>
+                <div className="md:col-span-3">
+                  <button type="button" className="btn btn-primary" onClick={handleDistratarContrato} disabled={processingAction === 'distrato'}>
+                    {processingAction === 'distrato' ? 'Distratando...' : 'Confirmar distrato'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="mt-4 overflow-x-auto rounded-2xl border border-[var(--c-border)]">
+            <table className="min-w-full text-sm">
+              <thead className="bg-[var(--c-bg)] text-[var(--c-muted)]">
+                <tr>
+                  <th className="px-4 py-3 text-left">Seq.</th>
+                  <th className="px-4 py-3 text-left">Descricao</th>
+                  <th className="px-4 py-3 text-left">Forma prevista</th>
+                  <th className="px-4 py-3 text-left">Detalhe</th>
+                  <th className="px-4 py-3 text-left">Vencimento</th>
+                  <th className="px-4 py-3 text-right">Valor</th>
+                  <th className="px-4 py-3 text-left">Status financeiro</th>
+                  <th className="px-4 py-3 text-right">Acao</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(contratoSelecionado.parcelas || []).map((parcela) => (
+                  <tr key={parcela.id} className="border-t border-[var(--c-border)]">
+                    <td className="px-4 py-3 text-[var(--c-text)]">{parcela.sequencia}</td>
+                    <td className="px-4 py-3 text-[var(--c-text)]">{parcela.descricao}</td>
+                    <td className="px-4 py-3 text-[var(--c-text)]">{parcela.forma_recebimento_prevista || '-'}</td>
+                    <td className="px-4 py-3 text-[var(--c-text)]">{parcela.observacoes || '-'}</td>
+                    <td className="px-4 py-3 text-[var(--c-text)]">{formatDate(parcela.data_vencimento)}</td>
+                    <td className="px-4 py-3 text-right text-[var(--c-text)]">{formatCurrency(parcela.valor_original)}</td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${statusClass(parcela.tituloFinanceiro?.status || 'ABERTO')}`}>
+                        {parcela.tituloFinanceiro?.status || 'ABERTO'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      {parcela.tituloFinanceiro?.id ? (
+                        <Link className="btn btn-outline" to={`/financeiro/titulos/${parcela.tituloFinanceiro.id}`}>
+                          Abrir titulo
+                        </Link>
+                      ) : (
+                        <span className="text-[var(--c-muted)]">-</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="mt-4 rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4">
+            <div className="text-sm font-semibold text-[var(--c-text)]">Historico operacional</div>
+            <div className="mt-3 space-y-3">
+              {(contratoSelecionado.eventos || []).length === 0 ? (
+                <div className="text-sm text-[var(--c-muted)]">Nenhum evento comercial registrado para este contrato.</div>
+              ) : (
+                (contratoSelecionado.eventos || []).map((evento) => (
+                  <article key={`${evento.id}-${evento.data_evento}`} className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-bg)] p-3">
+                    <div className="flex flex-wrap items-center gap-2 text-sm">
+                      <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">{evento.tipo_evento}</span>
+                      <span className="text-[var(--c-muted)]">{formatDate(evento.data_evento)}</span>
+                      <span className="text-[var(--c-muted)]">{evento.criadoPor?.nome || '-'}</span>
+                    </div>
+                    <div className="mt-2 text-sm font-medium text-[var(--c-text)]">{evento.descricao}</div>
+                    {evento.metadata && (
+                      <pre className="mt-2 overflow-x-auto rounded-xl bg-slate-950/90 p-3 text-xs text-slate-100">{JSON.stringify(evento.metadata, null, 2)}</pre>
+                    )}
+                  </article>
+                ))
+              )}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {pessoaRapidaModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="card w-full max-w-xl space-y-4">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-semibold text-[var(--c-text)]">
+                  Cadastro rapido de {pessoaRapidaModal === 'cliente' ? 'cliente' : 'corretor'}
+                </h2>
+                <p className="text-sm text-[var(--c-muted)]">
+                  Cria uma pessoa ativa e ja vincula ao contrato em preenchimento.
+                </p>
+              </div>
+              <button type="button" className="btn btn-outline btn-sm" onClick={() => setPessoaRapidaModal(null)}>
+                Fechar
+              </button>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-2">
+              <label className="sol-filter-field">
+                <span className="sol-filter-label">CPF/CNPJ</span>
+                <input
+                  className="input w-full"
+                  value={pessoaRapidaForm.cpf_cnpj}
+                  onChange={(e) => setPessoaRapidaForm((current) => ({ ...current, cpf_cnpj: maskCpfCnpj(e.target.value) }))}
+                  required
+                />
+              </label>
+              <label className="sol-filter-field">
+                <span className="sol-filter-label">Nome</span>
+                <input
+                  className="input w-full"
+                  value={pessoaRapidaForm.nome}
+                  onChange={(e) => setPessoaRapidaForm((current) => ({ ...current, nome: e.target.value }))}
+                  required
+                />
+              </label>
+              <label className="sol-filter-field">
+                <span className="sol-filter-label">Telefone</span>
+                <input
+                  className="input w-full"
+                  value={pessoaRapidaForm.telefone}
+                  onChange={(e) => setPessoaRapidaForm((current) => ({ ...current, telefone: maskPhone(e.target.value) }))}
+                  required
+                />
+              </label>
+              <label className="sol-filter-field">
+                <span className="sol-filter-label">E-mail</span>
+                <input
+                  className="input w-full"
+                  value={pessoaRapidaForm.email}
+                  onChange={(e) => setPessoaRapidaForm((current) => ({ ...current, email: e.target.value }))}
+                />
+              </label>
+            </div>
+
+            <div className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-bg)] p-3 text-sm text-[var(--c-muted)]">
+              {pessoaRapidaModal === 'cliente'
+                ? 'A pessoa sera marcada como Cliente.'
+                : 'A pessoa sera marcada como Corretor e Credor/Fornecedor para permitir comissao financeira.'}
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <button type="button" className="btn btn-outline" onClick={() => setPessoaRapidaModal(null)}>
+                Cancelar
+              </button>
+              <button type="button" className="btn btn-primary" onClick={salvarPessoaRapida}>
+                Salvar pessoa
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

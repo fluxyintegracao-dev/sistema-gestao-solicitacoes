@@ -1,239 +1,191 @@
-﻿import { API_URL, authHeaders } from './api';
+import { API_URL, authHeaders } from './api';
 
 function buildUrl(path, params = {}) {
   const query = new URLSearchParams();
-  Object.entries(params).forEach(([key, value]) => {
+
+  Object.entries(params || {}).forEach(([key, value]) => {
     if (value === undefined || value === null || value === '') return;
     query.set(key, value);
   });
+
   const suffix = query.toString();
   return suffix ? `${API_URL}${path}?${suffix}` : `${API_URL}${path}`;
 }
 
-async function parseJsonOrThrow(res, fallbackMessage) {
-  const body = await res.json().catch(() => null);
-  if (!res.ok) {
+async function parseJsonOrThrow(response, fallbackMessage) {
+  const body = await response.json().catch(() => null);
+  if (!response.ok) {
     throw new Error(body?.error || fallbackMessage);
   }
   return body;
 }
 
 export async function getProvisionamentoFinanceiroContexto() {
-  const res = await fetch(`${API_URL}/provisoes-financeiras/contexto`, {
+  const response = await fetch(`${API_URL}/provisoes-financeiras/contexto`, {
     headers: authHeaders(),
     cache: 'no-store'
   });
 
-  return parseJsonOrThrow(res, 'Erro ao buscar contexto do provisionamento financeiro');
-}
-
-export async function getDashboardProvisionamentoFinanceiro(params = {}) {
-  const res = await fetch(buildUrl('/provisoes-financeiras/dashboard/resumo', params), {
-    headers: authHeaders()
-  });
-
-  return parseJsonOrThrow(res, 'Erro ao buscar dashboard do provisionamento financeiro');
-}
-
-export async function getProvisionamentoFinanceiroPermissoes() {
-  const res = await fetch(`${API_URL}/configuracoes/provisoes-financeiras/permissoes`, {
-    headers: authHeaders(),
-    cache: 'no-store'
-  });
-
-  return parseJsonOrThrow(res, 'Erro ao buscar permissoes do provisionamento financeiro');
-}
-
-export async function salvarProvisionamentoFinanceiroPermissoes(data) {
-  const res = await fetch(`${API_URL}/configuracoes/provisoes-financeiras/permissoes`, {
-    method: 'PATCH',
-    headers: authHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify(data)
-  });
-
-  return parseJsonOrThrow(res, 'Erro ao salvar permissoes do provisionamento financeiro');
+  return parseJsonOrThrow(response, 'Erro ao carregar contexto do provisionamento');
 }
 
 export async function listarCategoriasMacroProvisionamento(params = {}) {
-  const res = await fetch(buildUrl('/provisoes-financeiras/categorias', params), {
+  const response = await fetch(buildUrl('/provisoes-financeiras/categorias', params), {
     headers: authHeaders()
   });
 
-  return parseJsonOrThrow(res, 'Erro ao buscar categorias macro do provisionamento financeiro');
+  return parseJsonOrThrow(response, 'Erro ao listar categorias macro do provisionamento');
 }
 
-export async function criarCategoriaMacroProvisionamento(data) {
-  const res = await fetch(`${API_URL}/provisoes-financeiras/categorias`, {
+export async function criarCategoriaMacroProvisionamento(payload) {
+  const response = await fetch(`${API_URL}/provisoes-financeiras/categorias`, {
     method: 'POST',
     headers: authHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify(data)
+    body: JSON.stringify(payload)
   });
 
-  return parseJsonOrThrow(res, 'Erro ao criar categoria macro do provisionamento financeiro');
+  return parseJsonOrThrow(response, 'Erro ao criar categoria macro do provisionamento');
 }
 
-export async function atualizarCategoriaMacroProvisionamento(id, data) {
-  const res = await fetch(`${API_URL}/provisoes-financeiras/categorias/${id}`, {
+export async function atualizarCategoriaMacroProvisionamento(id, payload) {
+  const response = await fetch(`${API_URL}/provisoes-financeiras/categorias/${id}`, {
     method: 'PUT',
     headers: authHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify(data)
+    body: JSON.stringify(payload)
   });
 
-  return parseJsonOrThrow(res, 'Erro ao atualizar categoria macro do provisionamento financeiro');
+  return parseJsonOrThrow(response, 'Erro ao atualizar categoria macro do provisionamento');
 }
 
 export async function ativarCategoriaMacroProvisionamento(id) {
-  const res = await fetch(`${API_URL}/provisoes-financeiras/categorias/${id}/ativar`, {
+  const response = await fetch(`${API_URL}/provisoes-financeiras/categorias/${id}/ativar`, {
     method: 'PATCH',
     headers: authHeaders()
   });
 
-  return parseJsonOrThrow(res, 'Erro ao ativar categoria macro do provisionamento financeiro');
+  return parseJsonOrThrow(response, 'Erro ao ativar categoria macro do provisionamento');
 }
 
 export async function desativarCategoriaMacroProvisionamento(id) {
-  const res = await fetch(`${API_URL}/provisoes-financeiras/categorias/${id}/desativar`, {
+  const response = await fetch(`${API_URL}/provisoes-financeiras/categorias/${id}/desativar`, {
     method: 'PATCH',
     headers: authHeaders()
   });
 
-  return parseJsonOrThrow(res, 'Erro ao desativar categoria macro do provisionamento financeiro');
+  return parseJsonOrThrow(response, 'Erro ao desativar categoria macro do provisionamento');
 }
 
 export async function listarProvisoesFinanceiras(params = {}) {
-  const res = await fetch(buildUrl('/provisoes-financeiras', params), {
+  const response = await fetch(buildUrl('/provisoes-financeiras', params), {
     headers: authHeaders()
   });
 
-  return parseJsonOrThrow(res, 'Erro ao listar provisoes financeiras');
+  return parseJsonOrThrow(response, 'Erro ao listar provisionamentos');
 }
 
-export async function exportarProvisoesFinanceirasCsv(params = {}) {
-  const res = await fetch(buildUrl('/provisoes-financeiras/exportar', params), {
+export async function getDashboardProvisionamentoFinanceiro(params = {}) {
+  const response = await fetch(buildUrl('/provisoes-financeiras/dashboard/resumo', params), {
     headers: authHeaders()
   });
 
-  if (!res.ok) {
-    const body = await res.json().catch(() => null);
-    throw new Error(body?.error || 'Erro ao exportar provisoes financeiras');
-  }
-
-  return res.blob();
+  return parseJsonOrThrow(response, 'Erro ao carregar dashboard do provisionamento');
 }
 
 export async function getProvisaoFinanceira(id) {
-  const res = await fetch(`${API_URL}/provisoes-financeiras/${id}`, {
+  const response = await fetch(`${API_URL}/provisoes-financeiras/${id}`, {
     headers: authHeaders()
   });
 
-  return parseJsonOrThrow(res, 'Erro ao buscar provisao financeira');
+  return parseJsonOrThrow(response, 'Erro ao carregar detalhe do provisionamento');
 }
 
-export async function criarProvisaoFinanceira(data) {
-  const res = await fetch(`${API_URL}/provisoes-financeiras`, {
+export async function criarProvisaoFinanceira(payload) {
+  const response = await fetch(`${API_URL}/provisoes-financeiras`, {
     method: 'POST',
     headers: authHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify(data)
+    body: JSON.stringify(payload)
   });
 
-  return parseJsonOrThrow(res, 'Erro ao criar provisao financeira');
+  return parseJsonOrThrow(response, 'Erro ao criar provisionamento');
 }
 
-export async function atualizarProvisaoFinanceira(id, data) {
-  const res = await fetch(`${API_URL}/provisoes-financeiras/${id}`, {
+export async function atualizarProvisaoFinanceira(id, payload) {
+  const response = await fetch(`${API_URL}/provisoes-financeiras/${id}`, {
     method: 'PUT',
     headers: authHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify(data)
+    body: JSON.stringify(payload)
   });
 
-  return parseJsonOrThrow(res, 'Erro ao atualizar provisao financeira');
+  return parseJsonOrThrow(response, 'Erro ao atualizar provisionamento');
 }
 
-export async function atualizarStatusProvisaoFinanceira(id, data = {}) {
-  const res = await fetch(`${API_URL}/provisoes-financeiras/${id}/status`, {
-    method: 'PATCH',
-    headers: authHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify(data)
-  });
-
-  return parseJsonOrThrow(res, 'Erro ao alterar status da provisao financeira');
-}
-
-export async function aprovarProvisaoFinanceira(id, data = {}) {
-  const res = await fetch(`${API_URL}/provisoes-financeiras/${id}/aprovar`, {
+export async function adicionarComentarioProvisaoFinanceira(id, payload) {
+  const response = await fetch(`${API_URL}/provisoes-financeiras/${id}/comentarios`, {
     method: 'POST',
     headers: authHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify(data)
+    body: JSON.stringify(payload)
   });
 
-  return parseJsonOrThrow(res, 'Erro ao aprovar provisao financeira');
+  return parseJsonOrThrow(response, 'Erro ao registrar comentario do provisionamento');
 }
 
-export async function cancelarProvisaoFinanceira(id, data = {}) {
-  const res = await fetch(`${API_URL}/provisoes-financeiras/${id}/cancelar`, {
-    method: 'POST',
-    headers: authHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify(data)
-  });
-
-  return parseJsonOrThrow(res, 'Erro ao cancelar provisao financeira');
-}
-
-export async function realizarProvisaoFinanceira(id, data = {}) {
-  const res = await fetch(`${API_URL}/provisoes-financeiras/${id}/realizar`, {
-    method: 'POST',
-    headers: authHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify(data)
-  });
-
-  return parseJsonOrThrow(res, 'Erro ao marcar provisao financeira como realizada');
-}
-
-export async function listarHistoricoProvisaoFinanceira(id) {
-  const res = await fetch(`${API_URL}/provisoes-financeiras/${id}/historico`, {
+export async function listarAnexosProvisaoFinanceira(id) {
+  const response = await fetch(`${API_URL}/provisoes-financeiras/${id}/anexos`, {
     headers: authHeaders()
   });
 
-  return parseJsonOrThrow(res, 'Erro ao listar historico da provisao financeira');
-}
-
-export async function adicionarComentarioProvisaoFinanceira(id, data) {
-  const res = await fetch(`${API_URL}/provisoes-financeiras/${id}/comentarios`, {
-    method: 'POST',
-    headers: authHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify(data)
-  });
-
-  return parseJsonOrThrow(res, 'Erro ao adicionar comentario na provisao financeira');
+  return parseJsonOrThrow(response, 'Erro ao listar anexos do provisionamento');
 }
 
 export async function uploadAnexosProvisaoFinanceira(id, files) {
   const formData = new FormData();
-  Array.from(files || []).forEach((file) => formData.append('files', file));
+  Array.from(files || []).forEach((file) => {
+    formData.append('files', file);
+  });
 
-  const res = await fetch(`${API_URL}/provisoes-financeiras/${id}/anexos`, {
+  const response = await fetch(`${API_URL}/provisoes-financeiras/${id}/anexos`, {
     method: 'POST',
     headers: authHeaders(),
     body: formData
   });
 
-  return parseJsonOrThrow(res, 'Erro ao enviar anexos da provisao financeira');
+  return parseJsonOrThrow(response, 'Erro ao enviar anexos do provisionamento');
 }
 
-export async function listarAnexosProvisaoFinanceira(id) {
-  const res = await fetch(`${API_URL}/provisoes-financeiras/${id}/anexos`, {
+export async function obterLinkAnexoProvisaoFinanceira(anexoId) {
+  const response = await fetch(`${API_URL}/provisoes-financeiras/anexos/${anexoId}/link`, {
     headers: authHeaders()
   });
 
-  return parseJsonOrThrow(res, 'Erro ao listar anexos da provisao financeira');
+  return parseJsonOrThrow(response, 'Erro ao gerar link do anexo do provisionamento');
 }
 
-export async function obterUrlAssinadaAnexoProvisaoFinanceira(url) {
-  const alvo = encodeURIComponent(url || '');
-  const res = await fetch(`${API_URL}/provisoes-financeiras/anexos/presign?url=${alvo}`, {
-    headers: authHeaders()
+async function executarAcaoStatus(id, acao, payload = {}) {
+  const response = await fetch(`${API_URL}/provisoes-financeiras/${id}/${acao}`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload)
   });
 
-  const body = await parseJsonOrThrow(res, 'Erro ao gerar URL assinada do anexo');
-  return body?.url || '';
+  return parseJsonOrThrow(response, 'Erro ao atualizar status do provisionamento');
+}
+
+export function enviarProvisionamentoParaAnalise(id, payload = {}) {
+  return executarAcaoStatus(id, 'analise', payload);
+}
+
+export function aprovarProvisaoFinanceira(id, payload = {}) {
+  return executarAcaoStatus(id, 'aprovar', payload);
+}
+
+export function cancelarProvisaoFinanceira(id, payload = {}) {
+  return executarAcaoStatus(id, 'cancelar', payload);
+}
+
+export function realizarProvisaoFinanceira(id, payload = {}) {
+  return executarAcaoStatus(id, 'realizar', payload);
+}
+
+export function reabrirProvisaoFinanceira(id, payload = {}) {
+  return executarAcaoStatus(id, 'reabrir', payload);
 }

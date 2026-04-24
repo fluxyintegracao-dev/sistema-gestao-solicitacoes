@@ -68,7 +68,7 @@ export default function Cargos() {
   }
 
   return (
-    <div className="page">
+    <div className="page solicitacoes-page">
       <div>
         <h1 className="page-title">Cargos</h1>
         <p className="page-subtitle">Cadastro e manutencao de cargos.</p>
@@ -78,7 +78,10 @@ export default function Cargos() {
         <div className="card-header">
           <h2 className="font-semibold">Novo cargo</h2>
         </div>
-        <form onSubmit={handleSubmit} className="grid gap-3 md:grid-cols-2">
+        <form
+          onSubmit={handleSubmit}
+          className="grid gap-3 md:grid-cols-[minmax(0,1.35fr)_minmax(0,0.85fr)_auto] md:items-end"
+        >
           <label className="grid gap-1 text-sm">
             Nome do cargo
             <input
@@ -101,13 +104,14 @@ export default function Cargos() {
             />
           </label>
 
-          <button type="submit" className="btn btn-primary md:col-span-2">
-            Adicionar
+          <button type="submit" className="btn btn-primary w-full md:w-auto md:px-5">
+            Adicionar cargo
           </button>
         </form>
       </div>
 
       <div className="card">
+        <div className="table-wrapper">
         <table className="table">
           <thead>
             <tr>
@@ -179,6 +183,7 @@ export default function Cargos() {
             )}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );

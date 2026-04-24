@@ -1,11 +1,17 @@
-module.exports = (sequelize, DataTypes) => {
-  return sequelize.define('ProvisaoFinanceiraAnexo', {
+module.exports = (sequelize, DataTypes) => sequelize.define(
+  'ProvisaoFinanceiraAnexo',
+  {
+    id: {
+      type: DataTypes.INTEGER,
+      primaryKey: true,
+      autoIncrement: true
+    },
     provisao_financeira_id: {
       type: DataTypes.INTEGER,
       allowNull: false
     },
     nome_original: {
-      type: DataTypes.STRING,
+      type: DataTypes.STRING(255),
       allowNull: false
     },
     caminho_arquivo: {
@@ -13,7 +19,7 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: false
     },
     tipo: {
-      type: DataTypes.STRING,
+      type: DataTypes.STRING(40),
       allowNull: false,
       defaultValue: 'ANEXO'
     },
@@ -22,11 +28,12 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: false
     },
     area_origem: {
-      type: DataTypes.STRING,
+      type: DataTypes.STRING(80),
       allowNull: true
     }
-  }, {
+  },
+  {
     tableName: 'provisao_financeira_anexos',
     timestamps: true
-  });
-};
+  }
+);

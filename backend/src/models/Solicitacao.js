@@ -27,6 +27,14 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.INTEGER,
         allowNull: false
       },
+      parceiro_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true
+      },
+      apropriacao_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true
+      },
       tipo_solicitacao_id: {
         type: DataTypes.INTEGER,
         allowNull: false,
@@ -68,11 +76,6 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.DECIMAL(12, 2),
         allowNull: true
       },
-      valor_pago_acumulado: {
-        type: DataTypes.DECIMAL(12, 2),
-        allowNull: false,
-        defaultValue: 0
-      },
       status_global: {
         type: DataTypes.STRING,
         allowNull: false
@@ -80,36 +83,6 @@ module.exports = (sequelize, DataTypes) => {
       area_responsavel: {
         type: DataTypes.STRING,
         allowNull: false
-      },
-      fluxo_aprovacao_diretoria: {
-        type: DataTypes.BOOLEAN,
-        allowNull: false,
-        defaultValue: false
-      },
-      diretoria_fluxo_codigo: {
-        type: DataTypes.STRING,
-        allowNull: true
-      },
-      setor_destino_pos_aprovacao: {
-        type: DataTypes.STRING,
-        allowNull: true
-      },
-      prioridade_diretoria_ativa: {
-        type: DataTypes.BOOLEAN,
-        allowNull: false,
-        defaultValue: false
-      },
-      prioridade_diretoria_em: {
-        type: DataTypes.DATE,
-        allowNull: true
-      },
-      prioridade_diretoria_lote_id: {
-        type: DataTypes.INTEGER,
-        allowNull: true,
-        references: {
-          model: 'prioridade_lotes',
-          key: 'id'
-        }
       },
       criado_por: {
         type: DataTypes.INTEGER,
@@ -126,6 +99,45 @@ module.exports = (sequelize, DataTypes) => {
       data_fim_medicao: {
         type: DataTypes.DATEONLY,
         allowNull: true
+      },
+      fluxo_aprovacao_diretoria: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false
+      },
+      diretoria_fluxo_codigo: {
+        type: DataTypes.STRING(120),
+        allowNull: true
+      },
+      setor_destino_pos_aprovacao: {
+        type: DataTypes.STRING(120),
+        allowNull: true
+      },
+      aprovada_diretoria_por: {
+        type: DataTypes.INTEGER,
+        allowNull: true
+      },
+      aprovada_diretoria_em: {
+        type: DataTypes.DATE,
+        allowNull: true
+      },
+      prioridade_diretoria_ativa: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false
+      },
+      prioridade_diretoria_em: {
+        type: DataTypes.DATE,
+        allowNull: true
+      },
+      prioridade_diretoria_lote_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true
+      },
+      valor_pago_acumulado: {
+        type: DataTypes.DECIMAL(14, 2),
+        allowNull: false,
+        defaultValue: 0
       },
       cancelada: {
         type: DataTypes.BOOLEAN,

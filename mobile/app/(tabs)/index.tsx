@@ -10,35 +10,19 @@ import { Screen } from '../../src/components/common/Screen';
 import { SectionCard } from '../../src/components/common/SectionCard';
 import { SolicitationCard } from '../../src/components/solicitacoes/SolicitationCard';
 import { useAuth } from '../../src/features/auth/AuthContext';
-import { useModules } from '../../src/features/modules/ModulesContext';
 import { getSolicitacoesPage } from '../../src/services/api/solicitacoes';
-import { listarProvisoesFinanceiras } from '../../src/services/api/provisionamento';
 import { colors, spacing } from '../../src/theme';
-import { formatCurrencyBR, formatDateBR } from '../../src/utils/format';
 
 export default function HomePage() {
   const { user } = useAuth();
-  const {
-    hasSolicitacoesModule,
-    hasProvisionamentoAccess,
-    canCreateProvisionamento,
-    canViewProvisionamentoDashboard
-  } = useModules();
   const recentesQuery = useQuery({
     queryKey: ['solicitacoes', 'recentes'],
-    queryFn: () => getSolicitacoesPage({ page: 1, limit: 5 }),
-    enabled: hasSolicitacoesModule
-  });
-  const provisoesRecentesQuery = useQuery({
-    queryKey: ['provisionamento', 'recentes'],
-    queryFn: () => listarProvisoesFinanceiras({ page: 1, limit: 5, sort_by: 'createdAt', sort_dir: 'DESC' }),
-    enabled: hasProvisionamentoAccess
+    queryFn: () => getSolicitacoesPage({ page: 1, limit: 5 })
   });
 
   const recentes = recentesQuery.data?.items || [];
-  const provisoesRecentes = provisoesRecentesQuery.data?.items || [];
 
-  if ((hasSolicitacoesModule && recentesQuery.isLoading) || (hasProvisionamentoAccess && provisoesRecentesQuery.isLoading)) {
+  if (recentesQuery.isLoading) {
     return (
       <Screen scroll={false}>
         <LoadingState label="Carregando sua operacao..." />
@@ -47,10 +31,7 @@ export default function HomePage() {
   }
 
   const refresh = async () => {
-    await Promise.all([
-      hasSolicitacoesModule ? recentesQuery.refetch() : Promise.resolve(),
-      hasProvisionamentoAccess ? provisoesRecentesQuery.refetch() : Promise.resolve()
-    ]);
+    await recentesQuery.refetch();
   };
 
   return (
@@ -61,58 +42,32 @@ export default function HomePage() {
       <ProfileShortcut subtitle="Conta" />
 
       <View style={styles.hero}>
+        <View style={styles.heroBadge}>
+          <Text style={styles.eyebrow}>Fluxy mobile</Text>
+          <Text style={styles.heroBadgeText}>Operacao em campo</Text>
+        </View>
         <Text style={styles.title}>Ola, {user?.nome?.split(' ')[0] || 'usuario'}</Text>
         <Text style={styles.subtitle}>
-          Use os modulos operacionais do FLUXY com o mesmo backend em producao, sem depender do desktop.
+          Acompanhe, assuma e resolva solicitacoes com leitura rapida, historico auditavel e anexos no mesmo fluxo.
         </Text>
       </View>
 
       <SectionCard
         title="Acoes rapidas"
-        subtitle="Atalhos diretos para o fluxo principal de Solicitacoes e Provisionamento"
+        subtitle="Atalhos diretos para o que mais acontece no dia a dia da obra e da operacao"
       >
         <View style={styles.actions}>
-          {hasSolicitacoesModule ? (
-            <>
-              <Button
-                label="Nova solicitacao"
-                onPress={() => router.push('/solicitacoes/nova')}
-                icon={<Feather name="plus" size={16} color={colors.white} />}
-              />
-              <Button
-                label="Minhas solicitacoes"
-                onPress={() => router.push('/solicitacoes')}
-                variant="secondary"
-                icon={<Feather name="layers" size={16} color={colors.primary} />}
-              />
-            </>
-          ) : null}
-          {hasProvisionamentoAccess ? (
-            <>
-              {canCreateProvisionamento ? (
-                <Button
-                  label="Nova provisao"
-                  onPress={() => router.push('/provisionamento/nova')}
-                  variant={hasSolicitacoesModule ? 'secondary' : 'primary'}
-                  icon={<Feather name="plus-circle" size={16} color={hasSolicitacoesModule ? colors.primary : colors.white} />}
-                />
-              ) : null}
-              <Button
-                label="Provisionamento"
-                onPress={() => router.push('/provisionamento')}
-                variant="secondary"
-                icon={<Feather name="dollar-sign" size={16} color={colors.primary} />}
-              />
-              {canViewProvisionamentoDashboard ? (
-                <Button
-                  label="Dashboard financeiro"
-                  onPress={() => router.push('/provisionamento/dashboard')}
-                  variant="ghost"
-                  icon={<Feather name="bar-chart-2" size={16} color={colors.primary} />}
-                />
-              ) : null}
-            </>
-          ) : null}
+          <Button
+            label="Nova solicitacao"
+            onPress={() => router.push('/solicitacoes/nova')}
+            icon={<Feather name="plus" size={16} color={colors.white} />}
+          />
+          <Button
+            label="Minhas solicitacoes"
+            onPress={() => router.push('/solicitacoes')}
+            variant="secondary"
+            icon={<Feather name="layers" size={16} color={colors.primary} />}
+          />
           <Button
             label="Atualizar"
             onPress={() => void refresh()}
@@ -122,63 +77,24 @@ export default function HomePage() {
         </View>
       </SectionCard>
 
-      {hasSolicitacoesModule ? (
-        <SectionCard title="Solicitacoes recentes" subtitle="Ultimas solicitacoes visiveis para voce">
-          {recentes.length === 0 ? (
-            <EmptyState
-              title="Nada por aqui"
-              description="Assim que novas solicitacoes aparecerem, elas vao ficar disponiveis nesta tela."
-            />
-          ) : (
-            <View style={styles.list}>
-              {recentes.map((item) => (
-                <SolicitationCard
-                  key={item.id}
-                  item={item}
-                  onPress={() => router.push({ pathname: '/solicitacoes/[id]', params: { id: String(item.id) } })}
-                />
-              ))}
-            </View>
-          )}
-        </SectionCard>
-      ) : null}
-
-      {hasProvisionamentoAccess ? (
-        <SectionCard title="Provisionamento recente" subtitle="Ultimas previsoes financeiras registradas no seu escopo">
-          {provisoesRecentes.length === 0 ? (
-            <EmptyState
-              title="Nenhuma provisao recente"
-              description="As previsoes financeiras visiveis para voce aparecerao aqui."
-            />
-          ) : (
-            <View style={styles.list}>
-              {provisoesRecentes.map((item) => (
-                <View key={item.id} style={styles.provisaoCard}>
-                  <View style={styles.provisaoHeader}>
-                    <Text style={styles.provisaoCode}>{item.codigo}</Text>
-                    <Text style={styles.provisaoStatus}>{String(item.status || '-').replace(/_/g, ' ').toUpperCase()}</Text>
-                  </View>
-                  <Text style={styles.provisaoDescricao}>{item.descricao || 'Previsao sem descricao'}</Text>
-                  <View style={styles.provisaoMeta}>
-                    <Text style={styles.provisaoMetaText}>{item.categoriaMacro?.nome || '-'}</Text>
-                    <Text style={styles.provisaoMetaText}>{formatDateBR(item.data_prevista_desembolso)}</Text>
-                  </View>
-                  <View style={styles.provisaoFooter}>
-                    <Text style={styles.provisaoObra}>{item.obra?.nome || '-'}</Text>
-                    <Text style={styles.provisaoValor}>{formatCurrencyBR(item.valor_previsto)}</Text>
-                  </View>
-                  <Button
-                    label="Abrir previsao"
-                    onPress={() => router.push({ pathname: '/provisionamento/[id]', params: { id: String(item.id) } })}
-                    variant="ghost"
-                    fullWidth={false}
-                  />
-                </View>
-              ))}
-            </View>
-          )}
-        </SectionCard>
-      ) : null}
+      <SectionCard title="Recentes" subtitle="Ultimas solicitacoes visiveis para voce">
+        {recentes.length === 0 ? (
+          <EmptyState
+            title="Nada por aqui"
+            description="Assim que novas solicitacoes aparecerem, elas vao ficar disponiveis nesta tela."
+          />
+        ) : (
+          <View style={styles.list}>
+            {recentes.map((item) => (
+              <SolicitationCard
+                key={item.id}
+                item={item}
+                onPress={() => router.push({ pathname: '/solicitacoes/[id]', params: { id: String(item.id) } })}
+              />
+            ))}
+          </View>
+        )}
+      </SectionCard>
     </Screen>
   );
 }
@@ -199,6 +115,23 @@ const styles = StyleSheet.create({
       elevation: 6
     })
   },
+  heroBadge: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    alignItems: 'center'
+  },
+  eyebrow: {
+    color: colors.primary,
+    fontSize: 13,
+    fontWeight: '800',
+    textTransform: 'uppercase'
+  },
+  heroBadgeText: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: '700'
+  },
   title: {
     color: colors.text,
     fontSize: 28,
@@ -214,61 +147,5 @@ const styles = StyleSheet.create({
   },
   list: {
     gap: spacing.md
-  },
-  provisaoCard: {
-    gap: spacing.sm,
-    padding: spacing.lg,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: colors.panelBorderStrong,
-    backgroundColor: colors.surfaceGlass
-  },
-  provisaoHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: spacing.sm
-  },
-  provisaoCode: {
-    color: colors.primary,
-    fontSize: 13,
-    fontWeight: '800'
-  },
-  provisaoStatus: {
-    color: colors.textMuted,
-    fontSize: 11,
-    fontWeight: '700'
-  },
-  provisaoDescricao: {
-    color: colors.text,
-    fontSize: 15,
-    fontWeight: '700'
-  },
-  provisaoMeta: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    gap: spacing.sm
-  },
-  provisaoMetaText: {
-    color: colors.textMuted,
-    fontSize: 12,
-    fontWeight: '600'
-  },
-  provisaoFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: spacing.sm
-  },
-  provisaoObra: {
-    flex: 1,
-    color: colors.text,
-    fontSize: 13,
-    fontWeight: '600'
-  },
-  provisaoValor: {
-    color: colors.primaryStrong,
-    fontSize: 15,
-    fontWeight: '800'
   }
 });

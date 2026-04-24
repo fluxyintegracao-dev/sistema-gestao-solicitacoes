@@ -80,15 +80,15 @@ export default function AreasPorSetorOrigem() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="page solicitacoes-page">
       <div>
-        <h1 className="text-2xl font-semibold">Areas por setor de origem</h1>
-        <p className="text-sm text-gray-600 mt-1">
+        <h1 className="page-title">Areas por setor de origem</h1>
+        <p className="text-sm mt-1" style={{ color: 'var(--c-muted)' }}>
           Defina quais setores cada setor pode selecionar como area responsavel na Nova Solicitacao.
         </p>
       </div>
 
-      <div className="bg-white p-6 rounded-xl shadow space-y-4">
+      <div className="card space-y-4">
         <label className="grid gap-1 text-sm md:max-w-md">
           Setor de origem
           <select

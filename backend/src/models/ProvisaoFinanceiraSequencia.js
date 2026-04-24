@@ -1,5 +1,11 @@
-module.exports = (sequelize, DataTypes) => {
-  return sequelize.define('ProvisaoFinanceiraSequencia', {
+module.exports = (sequelize, DataTypes) => sequelize.define(
+  'ProvisaoFinanceiraSequencia',
+  {
+    id: {
+      type: DataTypes.INTEGER,
+      primaryKey: true,
+      autoIncrement: true
+    },
     obra_id: {
       type: DataTypes.INTEGER,
       allowNull: false,
@@ -10,8 +16,9 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: false,
       defaultValue: 0
     }
-  }, {
+  },
+  {
     tableName: 'provisao_financeira_sequencias',
     timestamps: true
-  });
-};
+  }
+);

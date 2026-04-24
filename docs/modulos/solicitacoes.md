@@ -1,85 +1,66 @@
-# Modulo de Solicitacoes
+# Modulo - Solicitacoes
 
-## Frontend principal
-- `frontend/src/pages/Solicitacoes/`
-- `frontend/src/pages/SolicitacaoDetalhe/`
-- `frontend/src/pages/NovaSolicitacao.jsx`
+## Objetivo
 
-## Backend principal
-- `backend/src/controllers/SolicitacaoController.js`
-- `backend/src/models/Solicitacao.js`
-- `backend/src/models/Historico.js`
+Controlar o fluxo operacional entre setores, mantendo rastreabilidade por obra, parceiro, anexos, comentarios e historico.
 
-## Funcoes centrais
-- abertura de solicitacao
-- filtros e paginacao
-- detalhamento
-- historico
-- acoes em massa
-- exportacao
-- envio entre setores com regra padrao por setor atual da solicitacao
-- permissao especial configuravel para envio fora do setor atual, sem liberar o setor OBRA
+## O que o modulo entrega hoje
 
-## Fluxo de aprovacao por diretoria
-- obras podem ser classificadas como `PUBLICA` ou `PRIVADA`
-- o `SUPERADMIN` configura qual diretoria atende cada classificacao de obra
-- usuarios do setor `OBRA` continuam criando pela tela padrao, mas a `Area Responsavel` fica restrita a diretoria correspondente a classificacao da obra quando essa configuracao existir
-- o `SUPERADMIN` tambem configura qual setor recebe a solicitacao apos a aprovacao da diretoria, por `tipo_solicitacao`
-- novas solicitacoes criadas nesse fluxo passam a persistir um marcador formal (`fluxo_aprovacao_diretoria`) e os codigos da diretoria/origem e do setor destino
-- no detalhe da solicitacao, quando ela estiver na diretoria correta e houver setor destino configurado, o botao `Enviar para outro setor` passa a ser `Aprovar`
-- ao aprovar:
-  - a solicitacao e enviada ao setor destino configurado atualmente pelo `SUPERADMIN`; o destino persistido na solicitacao fica como fallback para configuracoes ausentes
-  - o setor destino vira o dono do fluxo para alteracoes de status e demais regras normais
-  - a diretoria que aprovou continua com visibilidade pela regra do fluxo novo, mesmo depois do envio ao setor destino
-  - o criador da solicitacao continua com visibilidade
-- solicitacoes antigas continuam no comportamento original; a visibilidade adicional da diretoria vale apenas para solicitacoes novas marcadas com o fluxo de aprovacao
+- criacao de solicitacoes por obra
+- tipos e status por setor
+- aprovacao previa por diretoria conforme classificacao da obra
+- prioridades da diretoria por lote
+- atribuicao e assumir solicitacao
+- envio entre setores
+- anexos, comentarios e timeline
+- visibilidade por perfil, setor e obra
+- parceiro unificado na solicitacao
+- apropriacao principal na solicitacao
+- pagamentos parciais vinculados a solicitacao
+- geracao manual de titulo financeiro a partir do detalhe
 
-## Pagamentos parciais
-- pagamentos parciais sao registrados em `solicitacao_pagamentos`
-- o valor acumulado fica refletido em `solicitacoes.valor_pago_acumulado`
-- na listagem:
-  - se o status global for diferente de `PAGA`, a coluna `Valor` mostra o saldo (`valor total - valor pago acumulado`)
-  - se o status global for `PAGA`, a coluna volta a mostrar o valor total
-- no detalhe:
-  - o valor total permanece visivel
-  - pagos acumulados e saldo ficam destacados
-  - o historico de pagamentos fica listado
-- o botao `Informar pagamento` aparece apenas para o setor `FINANCEIRO`
+## Telas Principais
 
-## Tipos compartilhados entre setores
-- o `SUPERADMIN` pode configurar um `setor de origem` e, para cada `tipo_solicitacao`, quais setores extras passam a visualizar a solicitacao desde a criacao
-- esses setores ganham apenas visibilidade adicional
-- o setor responsavel da solicitacao nao muda por causa desse compartilhamento
-- essa visibilidade vale para listagem e detalhe do fluxo normal
+- listagem geral de solicitacoes
+- detalhe da solicitacao
+- nova solicitacao
+- solicitacoes arquivadas
 
-## Automacao por status
-- o `SUPERADMIN` pode configurar regras por:
-  - `tipo_solicitacao`
-  - `status`
-  - `setor_destino`
-- quando a combinacao configurada e atendida em uma alteracao de status, a solicitacao e enviada automaticamente para o setor destino
-- a automacao registra historico com a acao `ENVIO_AUTOMATICO_SETOR`
-- as automacoes legadas do fluxo atual continuam ativas:
-  - retorno automatico para setor anterior em ajustes atendidos pela `OBRA`
-  - `MERCADORIA_ENTREGUE -> FINANCEIRO` no fluxo atual da `OBRA`
+## Integracoes com outros modulos
 
-## Prioridades da diretoria
-- `DIR_ADMIN` e `SUPERADMIN` podem abrir lotes de prioridade para `PUBLICA` ou `PRIVADA`
-- o lote registra:
-  - classificacao alvo
-  - diretoria alvo resolvida pela configuracao de aprovacao
-  - valor disponivel
-  - valor utilizado
-  - status do lote
-- apenas a diretoria alvo configurada, ou `SUPERADMIN`, pode finalizar o lote
-- `SUPERADMIN` pode excluir lotes sem itens autorizados
-- as solicitacoes elegiveis sao somente as do fluxo novo de diretoria que:
-  - ja passaram por `APROVADA_DIRETORIA`
-  - ou ja sairam da diretoria alvo no fluxo novo
-  - ainda nao foram priorizadas
-  - nao estao `PAGA`
-- ao finalizar:
-  - os itens entram em `prioridade_lote_itens`
-  - a solicitacao recebe indicador de prioridade autorizada
-  - o historico registra `PRIORIDADE_DIRETORIA_AUTORIZADA`
-  - participantes recebem notificacao da autorizacao
+- financeiro
+  Pode gerar titulo a pagar ou receber.
+
+- compras
+  Solicitacoes de compra usam fluxo dedicado.
+
+- parceiros
+  Busca por nome ou CPF/CNPJ e cadastro rapido.
+
+- obras
+  Escopo e apropriacao dependem da obra selecionada.
+
+- contratos
+  Contrato e ref. de contrato so aparecem e podem ser exigidos quando `CONTRATOS` estiver habilitado.
+
+## Modularidade Oficial
+
+- `SOLICITACOES` funciona sozinha.
+- `CONTRATOS` adiciona contexto contratual na criacao, detalhe, listagem e exportacao.
+- `OBRAS` adiciona apropriacao principal na criacao e no detalhe.
+- se `CONTRATOS` estiver desligado, os campos contratuais ficam ocultos e deixam de ser obrigatorios.
+- se `OBRAS` estiver desligado, a apropriacao principal fica oculta e deixa de ser obrigatoria.
+
+## Observacao Tecnica Importante
+
+O cadastro de apropriacoes nao pertence ao modulo `Compras`.
+Ele pertence ao dominio de `Obras` e e consumido por `Solicitacoes`, `Compras` e `Financeiro` por uma API compartilhada.
+
+## Observacoes Operacionais
+
+- usuario do setor OBRA continua com restricoes especificas
+- numero de pedido segue regra especial do setor GEO
+- backend decide o que cada perfil pode ver e fazer
+- quando a aprovacao por diretoria estiver ativa, a area responsavel escolhida na criacao e a area final; a solicitacao passa antes pela diretoria correspondente da obra
+- tipos de solicitacao continuam filtrados pela area responsavel final
+- regras completas estao em `docs/regras_negocio/solicitacoes.md`

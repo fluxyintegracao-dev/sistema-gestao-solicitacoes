@@ -1,32 +1,54 @@
+const { Op } = require('sequelize');
 const { NotificacaoDestinatario, Notificacao } = require('../models');
 const DEFAULT_NOTIFICACOES_LIMIT = 20;
 const MAX_NOTIFICACOES_LIMIT = 50;
 
+function normalizarTiposFiltro(value) {
+  const itens = Array.isArray(value) ? value : String(value || '').split(',');
+  return [
+    ...new Set(
+      itens
+        .map(item => String(item || '').trim().toUpperCase())
+        .filter(Boolean)
+    )
+  ];
+}
+
 module.exports = {
   async index(req, res) {
     try {
-      const { nao_lidas, limit } = req.query;
+      const { nao_lidas, limit, tipos } = req.query;
       const where = { usuario_id: req.user.id };
       const limite = Math.min(
         Number(limit) > 0 ? Number(limit) : DEFAULT_NOTIFICACOES_LIMIT,
         MAX_NOTIFICACOES_LIMIT
       );
+      const tiposFiltro = normalizarTiposFiltro(tipos);
+      const includeNotificacao = {
+        model: Notificacao,
+        as: 'notificacao',
+        required: tiposFiltro.length > 0,
+        where: tiposFiltro.length > 0
+          ? {
+              tipo: { [Op.in]: tiposFiltro }
+            }
+          : undefined
+      };
+
       if (String(nao_lidas) === '1' || String(nao_lidas) === 'true') {
         where.lida_em = null;
       }
 
       const [totalNaoLidas, itens] = await Promise.all([
         NotificacaoDestinatario.count({
-          where: { usuario_id: req.user.id, lida_em: null }
+          where: { usuario_id: req.user.id, lida_em: null },
+          include: [includeNotificacao],
+          distinct: true,
+          col: 'id'
         }),
         NotificacaoDestinatario.findAll({
           where,
-          include: [
-            {
-              model: Notificacao,
-              as: 'notificacao'
-            }
-          ],
+          include: [includeNotificacao],
           order: [['createdAt', 'DESC']],
           limit: limite
         })

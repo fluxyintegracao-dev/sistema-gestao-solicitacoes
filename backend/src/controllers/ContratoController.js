@@ -11,7 +11,14 @@ const {
   UsuarioObra,
   ConfiguracaoSistema
 } = require('../models');
+const { env } = require('../config/env');
 const { uploadToS3 } = require('../services/s3');
+const {
+  getUserObraScopeIds,
+  isBusinessAdmin,
+  isSuperadmin
+} = require('../services/authorizationService');
+const { registrarEventoSeguranca } = require('../services/securityLogService');
 const { normalizeOriginalName } = require('../utils/fileName');
 const CHAVE_SETORES_CRIACAO_TODAS_OBRAS = 'SETORES_CRIACAO_TODAS_OBRAS';
 
@@ -91,8 +98,8 @@ function parseValorMonetario(valor) {
 
 async function isAdminGEO(req) {
   const perfil = String(req.user?.perfil || '').trim().toUpperCase();
-  if (perfil !== 'ADMIN' && perfil !== 'SUPERADMIN') return false;
-  if (perfil === 'SUPERADMIN') return true;
+  if (isBusinessAdmin(req.user)) return true;
+  if (perfil !== 'ADMIN') return false;
 
   if (!req.user?.setor_id) return false;
 
@@ -159,6 +166,42 @@ async function obterTokensSetorUsuario(req) {
   return Array.from(tokens).filter(Boolean);
 }
 
+async function usuarioPodeAcessarObraContrato(req, obraId) {
+  if (!obraId) {
+    return false;
+  }
+
+  if (isSuperadmin(req.user)) {
+    return true;
+  }
+
+  const obrasPermitidas = await getUserObraScopeIds(req.user);
+  if (obrasPermitidas === null) {
+    return true;
+  }
+
+  if (obrasPermitidas.length > 0) {
+    return obrasPermitidas.includes(Number(obraId));
+  }
+
+  return isAdminGEO(req);
+}
+
+async function registrarNegacaoContrato(req, contratoId, obraId, descricao) {
+  await registrarEventoSeguranca({
+    req,
+    usuarioId: req.user?.id || null,
+    tipoEvento: 'AUTHZ_DENIED',
+    recursoTipo: 'CONTRATO',
+    recursoId: contratoId != null ? contratoId : obraId,
+    status: 'DENIED',
+    descricao,
+    metadata: {
+      obra_id: obraId || null
+    }
+  });
+}
+
 module.exports = {
   async index(req, res) {
     try {
@@ -166,6 +209,7 @@ module.exports = {
       const where = {};
       const podeAcessar = await isAdminGEO(req);
       const acessoObra = await isSetorObra(req);
+      const obrasPermitidas = isSuperadmin(req.user) ? null : await getUserObraScopeIds(req.user);
       const modoCriacao = String(modo || '').trim().toUpperCase() === 'CRIACAO';
       let podeCriarEmTodasObras = false;
 
@@ -188,21 +232,21 @@ module.exports = {
         where.codigo = { [Op.like]: `%${String(codigo).trim()}%` };
       }
 
-      if (acessoObra && !podeAcessar && !podeCriarEmTodasObras) {
-        const vinculos = await UsuarioObra.findAll({
-          where: { user_id: req.user.id },
-          attributes: ['obra_id']
-        });
-        const obrasVinculadas = vinculos.map(v => v.obra_id);
-        if (obrasVinculadas.length === 0) {
-          return res.json([]);
-        }
-        if (where.obra_id && !obrasVinculadas.includes(Number(where.obra_id))) {
-          return res.json([]);
+      if (obrasPermitidas && obrasPermitidas.length > 0) {
+        if (where.obra_id && !obrasPermitidas.includes(Number(where.obra_id))) {
+          await registrarNegacaoContrato(
+            req,
+            null,
+            Number(where.obra_id),
+            'Usuario tentou consultar contratos de obra fora do seu escopo'
+          );
+          return res.status(403).json({ error: 'Acesso negado para esta obra' });
         }
         where.obra_id = where.obra_id
-          ? where.obra_id
-          : { [Op.in]: obrasVinculadas };
+          ? Number(where.obra_id)
+          : { [Op.in]: obrasPermitidas };
+      } else if (obrasPermitidas !== null && acessoObra && !podeAcessar && !podeCriarEmTodasObras) {
+        return res.json([]);
       }
 
       const contratos = await Contrato.findAll({
@@ -250,6 +294,16 @@ module.exports = {
         });
       }
 
+      if (!(await usuarioPodeAcessarObraContrato(req, obra_id))) {
+        await registrarNegacaoContrato(
+          req,
+          null,
+          obra_id,
+          'Usuario tentou criar contrato em obra fora do seu escopo'
+        );
+        return res.status(403).json({ error: 'Acesso negado para esta obra' });
+      }
+
       if (tipo_macro_id) {
         const macro = await TipoSolicitacao.findByPk(tipo_macro_id);
         if (!macro) {
@@ -270,6 +324,20 @@ module.exports = {
         ajuste_pago: ajuste_pago ?? 0,
         tipo_macro_id: tipo_macro_id || null,
         tipo_sub_id: tipo_sub_id || null
+      });
+
+      await registrarEventoSeguranca({
+        req,
+        usuarioId: req.user?.id || null,
+        tipoEvento: 'CONTRACT_CREATED',
+        recursoTipo: 'CONTRATO',
+        recursoId: contrato.id,
+        status: 'SUCCESS',
+        descricao: 'Contrato criado',
+        metadata: {
+          obra_id: obra_id,
+          codigo: contrato.codigo
+        }
       });
 
       return res.status(201).json(contrato);
@@ -299,6 +367,11 @@ module.exports = {
 
       const conteudo = file.buffer.toString('utf8');
       const { headers, rows } = parseCsv(conteudo);
+      if (rows.length > env.csvImportMaxRows) {
+        return res.status(400).json({
+          error: `O arquivo excede o limite de ${env.csvImportMaxRows} linhas para importacao.`
+        });
+      }
       if (!headers.length) {
         return res.status(400).json({ error: 'Arquivo CSV vazio ou sem cabeçalho.' });
       }
@@ -414,6 +487,7 @@ module.exports = {
     try {
       const podeAcessar = await isAdminGEO(req);
       const acessoObra = await isSetorObra(req);
+      const obrasPermitidas = isSuperadmin(req.user) ? null : await getUserObraScopeIds(req.user);
 
       if (!podeAcessar && !acessoObra) {
         return res.status(403).json({ error: 'Acesso negado' });
@@ -423,19 +497,19 @@ module.exports = {
 
       const { obra_id, ref, codigo } = req.query;
 
-      if (acessoObra && !podeAcessar) {
-        const vinculos = await UsuarioObra.findAll({
-          where: { user_id: req.user.id },
-          attributes: ['obra_id']
-        });
-        const obrasVinculadas = vinculos.map(v => v.obra_id);
-        if (obrasVinculadas.length === 0) {
-          return res.json([]);
+      if (obrasPermitidas && obrasPermitidas.length > 0) {
+        if (obra_id && !obrasPermitidas.includes(Number(obra_id))) {
+          await registrarNegacaoContrato(
+            req,
+            null,
+            Number(obra_id),
+            'Usuario tentou consultar resumo de contratos de obra fora do seu escopo'
+          );
+          return res.status(403).json({ error: 'Acesso negado para esta obra' });
         }
-        if (obra_id && !obrasVinculadas.includes(Number(obra_id))) {
-          return res.json([]);
-        }
-        where.obra_id = obra_id ? obra_id : { [Op.in]: obrasVinculadas };
+        where.obra_id = obra_id ? Number(obra_id) : { [Op.in]: obrasPermitidas };
+      } else if (obrasPermitidas !== null && acessoObra && !podeAcessar) {
+        return res.json([]);
       }
 
       if (obra_id) {
@@ -515,6 +589,16 @@ module.exports = {
       const contrato = await Contrato.findByPk(id);
       if (!contrato) {
         return res.status(404).json({ error: 'Contrato nÃ£o encontrado' });
+      }
+
+      if (!(await usuarioPodeAcessarObraContrato(req, contrato.obra_id))) {
+        await registrarNegacaoContrato(
+          req,
+          contrato.id,
+          contrato.obra_id,
+          'Usuario tentou consultar solicitacoes de contrato fora do seu escopo'
+        );
+        return res.status(403).json({ error: 'Acesso negado para esta obra' });
       }
 
       const solicitacoes = await Solicitacao.findAll({

@@ -18,13 +18,34 @@ module.exports = (sequelize, DataTypes) => {
 
     destinatario_id: {
       type: DataTypes.INTEGER,
-      allowNull: false
+      allowNull: true
+    },
+
+    is_group: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false
+    },
+
+    setor_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true
     },
 
     status: {
       type: DataTypes.ENUM('ABERTA', 'CONCLUIDA'),
       allowNull: false,
       defaultValue: 'ABERTA'
+    },
+
+    last_message_at: {
+      type: DataTypes.DATE,
+      allowNull: true
+    },
+
+    last_message_preview: {
+      type: DataTypes.STRING(500),
+      allowNull: true
     },
 
     concluida_por_id: {

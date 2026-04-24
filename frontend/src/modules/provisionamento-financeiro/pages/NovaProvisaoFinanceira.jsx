@@ -1,9 +1,10 @@
-﻿import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   criarProvisaoFinanceira,
   getProvisionamentoFinanceiroContexto,
-  listarCategoriasMacroProvisionamento
+  listarCategoriasMacroProvisionamento,
+  uploadAnexosProvisaoFinanceira
 } from '../../../services/provisoesFinanceiras';
 import {
   formatarMoedaBRL,
@@ -22,6 +23,7 @@ export default function NovaProvisaoFinanceira() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [valorPrevistoTexto, setValorPrevistoTexto] = useState('');
+  const [arquivosPendentes, setArquivosPendentes] = useState([]);
   const [form, setForm] = useState({
     obra_id: '',
     data_prevista_desembolso: '',
@@ -44,7 +46,7 @@ export default function NovaProvisaoFinanceira() {
         setCategorias(Array.isArray(categoriasData) ? categoriasData : []);
       } catch (error) {
         console.error(error);
-        alert(error?.message || 'Erro ao carregar formulario de provisionamento financeiro.');
+        alert(error?.message || 'Erro ao carregar formulario de provisao.');
       } finally {
         setLoading(false);
       }
@@ -70,8 +72,20 @@ export default function NovaProvisaoFinanceira() {
     }));
   }
 
+  function adicionarArquivos(files) {
+    const novosArquivos = Array.from(files || []).filter(Boolean);
+    if (!novosArquivos.length) return;
+    setArquivosPendentes((atual) => [...atual, ...novosArquivos]);
+  }
+
+  function removerArquivoPendente(index) {
+    setArquivosPendentes((atual) => atual.filter((_, itemIndex) => itemIndex !== index));
+  }
+
   async function handleSubmit(event) {
     event.preventDefault();
+
+    if (saving) return;
 
     if (!form.obra_id || !form.data_prevista_desembolso || !form.item_macro.trim() || !form.descricao.trim() || !form.valor_previsto) {
       alert('Preencha obra, data prevista, item macro, descricao e valor previsto.');
@@ -84,10 +98,20 @@ export default function NovaProvisaoFinanceira() {
         ...form,
         obra_id: Number(form.obra_id)
       });
+
+      if (arquivosPendentes.length) {
+        try {
+          await uploadAnexosProvisaoFinanceira(provisao.id, arquivosPendentes);
+        } catch (uploadError) {
+          console.error(uploadError);
+          alert(uploadError?.message || 'A provisao foi criada, mas houve erro ao enviar os anexos.');
+        }
+      }
+
       navigate(`/provisoes-financeiras/${provisao.id}`);
     } catch (error) {
       console.error(error);
-      alert(error?.message || 'Erro ao criar provisao financeira.');
+      alert(error?.message || 'Erro ao criar provisao.');
     } finally {
       setSaving(false);
     }
@@ -99,13 +123,13 @@ export default function NovaProvisaoFinanceira() {
 
   return (
     <div className="page space-y-6">
-      <div>
-        <h1 className="page-title">Nova Provisao Financeira</h1>
-        <p className="page-subtitle">Registre uma previsao gerencial de desembolso para acompanhamento futuro.</p>
+      <div className="mx-auto w-full max-w-5xl">
+        <h1 className="page-title">Nova Provisao</h1>
+        <p className="page-subtitle">Registre uma previsao gerencial de desembolso com os dados essenciais do compromisso.</p>
       </div>
 
-      <form className="card space-y-4" onSubmit={handleSubmit}>
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+      <form className="card mx-auto w-full max-w-5xl space-y-5" onSubmit={handleSubmit}>
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
           <label className="grid gap-1 text-sm">
             Obra *
             <select className="input" value={form.obra_id} onChange={(event) => atualizarCampo('obra_id', event.target.value)}>
@@ -121,8 +145,19 @@ export default function NovaProvisaoFinanceira() {
             <input type="date" className="input" value={form.data_prevista_desembolso} onChange={(event) => atualizarCampo('data_prevista_desembolso', event.target.value)} />
           </label>
 
-          <label className="grid gap-1 text-sm">
-            Item Macro *
+          <label className="grid gap-1 text-sm md:col-span-2 xl:col-span-2">
+            Prioridade
+            <select className="input" value={form.prioridade} onChange={(event) => atualizarCampo('prioridade', event.target.value)}>
+              <option value="">Nao definida</option>
+              <option value="baixa">Baixa</option>
+              <option value="media">Media</option>
+              <option value="alta">Alta</option>
+              <option value="critica">Critica</option>
+            </select>
+          </label>
+
+          <label className="grid gap-1 text-sm md:col-span-2 xl:col-span-3">
+            Item macro *
             <input
               type="text"
               className="input"
@@ -138,12 +173,12 @@ export default function NovaProvisaoFinanceira() {
             </datalist>
           </label>
 
-          <label className="grid gap-1 text-sm xl:col-span-2">
-            Descricao *
-            <textarea className="input min-h-[120px]" value={form.descricao} onChange={(event) => atualizarCampo('descricao', event.target.value)} placeholder="Ex.: concretagem de laje, compra de insumos, locacao de equipamento" />
+          <label className="grid gap-1 text-sm md:col-span-2 xl:col-span-3">
+            Fornecedor
+            <input className="input" value={form.fornecedor_texto} onChange={(event) => atualizarCampo('fornecedor_texto', event.target.value)} placeholder="Opcional" />
           </label>
 
-          <label className="grid gap-1 text-sm">
+          <label className="grid gap-1 text-sm xl:col-span-2">
             Valor previsto *
             <input
               type="text"
@@ -155,27 +190,49 @@ export default function NovaProvisaoFinanceira() {
             />
           </label>
 
-          <label className="grid gap-1 text-sm">
-            Fornecedor (texto)
-            <input className="input" value={form.fornecedor_texto} onChange={(event) => atualizarCampo('fornecedor_texto', event.target.value)} placeholder="Opcional" />
+          <label className="grid gap-1 text-sm xl:col-span-4">
+            Descricao *
+            <textarea className="input min-h-[110px]" value={form.descricao} onChange={(event) => atualizarCampo('descricao', event.target.value)} placeholder="Descreva o desembolso previsto com contexto suficiente para a equipe entender a provisao." />
           </label>
-
-          <label className="grid gap-1 text-sm">
-            Prioridade
-            <select className="input" value={form.prioridade} onChange={(event) => atualizarCampo('prioridade', event.target.value)}>
-              <option value="">Nao definida</option>
-              <option value="baixa">Baixa</option>
-              <option value="media">Media</option>
-              <option value="alta">Alta</option>
-              <option value="critica">Critica</option>
-            </select>
-          </label>
-
-
         </div>
 
-        <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
-          Nesta etapa do modulo, os anexos sao adicionados apos a criacao do registro, na tela de detalhe.
+        <div className="grid gap-3 rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] px-4 py-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-semibold">Anexos da provisao</h2>
+              <p className="text-xs text-[var(--c-muted)]">Voce pode anexar documentos ja na criacao. Eles serao enviados logo apos o registro ser salvo.</p>
+            </div>
+            <label className={`btn btn-outline cursor-pointer ${saving ? 'pointer-events-none opacity-60' : ''}`}>
+              <input
+                type="file"
+                className="hidden"
+                multiple
+                onChange={(event) => {
+                  adicionarArquivos(event.target.files);
+                  event.target.value = '';
+                }}
+              />
+              Adicionar arquivos
+            </label>
+          </div>
+
+          {arquivosPendentes.length > 0 ? (
+            <div className="grid gap-2">
+              {arquivosPendentes.map((arquivo, index) => (
+                <div key={`${arquivo.name}-${arquivo.lastModified}-${index}`} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[var(--c-border)] bg-white px-3 py-2 text-sm">
+                  <div className="min-w-0">
+                    <div className="truncate font-medium">{arquivo.name}</div>
+                    <div className="text-[var(--c-muted)]">{(arquivo.size / 1024).toFixed(1)} KB</div>
+                  </div>
+                  <button type="button" className="btn btn-outline" onClick={() => removerArquivoPendente(index)}>
+                    Remover
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-sm text-[var(--c-muted)]">Nenhum arquivo selecionado.</div>
+          )}
         </div>
 
         <div className="flex justify-end gap-2">

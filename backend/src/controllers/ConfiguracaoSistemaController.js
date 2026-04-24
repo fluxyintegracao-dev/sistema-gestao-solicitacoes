@@ -1,5 +1,23 @@
 const { Op } = require('sequelize');
-const { ConfiguracaoSistema, User, Setor, TipoSolicitacao } = require('../models');
+const { ConfiguracaoSistema, CategoriaFinanceira, User, Setor } = require('../models');
+const {
+  DEFAULT_STATUS_PEDIDOS_COMPRA,
+  getPedidoCompraStatusConfig,
+  savePedidoCompraStatusConfig
+} = require('../services/pedidoCompraStatusConfig');
+const {
+  getModuloConfig,
+  saveModuloConfig
+} = require('../services/moduleConfigService');
+const {
+  invalidateFinanceiroAccessConfigCache,
+  invalidateObraAccessConfigCache,
+  invalidateRhDpAccessConfigCache
+} = require('../services/authorizationService');
+const {
+  RH_DP_PERMISSION_GROUPS,
+  normalizeRhDpPermissionList
+} = require('../constants/rhDpPermissions');
 const {
   CHAVE_DIRETORIA_POR_CLASSIFICACAO_OBRA,
   CHAVE_SETOR_DESTINO_APOS_APROVACAO_DIRETORIA,
@@ -12,16 +30,6 @@ const {
   normalizarTiposCompartilhados,
   normalizarAutomacoesStatus
 } = require('../services/solicitacao/configuracoesVisibilidadeAutomacao');
-const {
-  obterConfiguracaoSetoresSemAlteracaoStatus,
-  salvarConfiguracaoSetoresSemAlteracaoStatus,
-  obterTokensSetoresSemAlteracaoStatus
-} = require('../services/solicitacao/setoresSemAlteracaoStatus');
-const {
-  obterUsuariosAcessoPrioridadeDiretoria,
-  salvarUsuariosAcessoPrioridadeDiretoria,
-  normalizarUsuarioIds
-} = require('../services/prioridadeDiretoriaAcesso');
 
 const CHAVE_TEMA = 'TEMA_SISTEMA';
 const CHAVE_AREAS_OBRA = 'AREAS_OBRA_VISIVEIS';
@@ -30,7 +38,19 @@ const CHAVE_SETORES_VISIVEIS_POR_USUARIO = 'SETORES_VISIVEIS_POR_USUARIO';
 const CHAVE_TIMEOUT_INATIVIDADE = 'TIMEOUT_INATIVIDADE_MINUTOS';
 const CHAVE_TIPOS_SOLICITACAO_POR_SETOR = 'TIPOS_SOLICITACAO_POR_SETOR';
 const CHAVE_SETORES_CRIACAO_TODAS_OBRAS = 'SETORES_CRIACAO_TODAS_OBRAS';
+const CHAVE_SETORES_ACESSO_TODAS_OBRAS = 'SETORES_ACESSO_TODAS_OBRAS';
+const CHAVE_USUARIOS_ACESSO_FINANCEIRO = 'USUARIOS_ACESSO_FINANCEIRO';
+const CHAVE_USUARIOS_PERMISSOES_RH_DP = 'USUARIOS_PERMISSOES_RH_DP';
+const CHAVE_COMERCIAL_CATEGORIAS_CONTRATO = 'COMERCIAL_CATEGORIAS_CONTRATO_VENDA';
 const TIMEOUT_INATIVIDADE_PADRAO_MINUTOS = 20;
+
+const COTACOES_DEFAULTS = {
+  min_cotacoes: 3,
+  criterio_vencedor: 'menor_total',
+  prazo_resposta_padrao_dias: 5,
+  permitir_aprovar_sem_minimo: true,
+  exigir_justificativa_se_nao_menor_preco: true
+};
 
 function parseJsonOrDefault(value, fallback) {
   if (!value) return fallback;
@@ -86,6 +106,12 @@ function normalizarListaSetores(lista) {
   )];
 }
 
+function isSetorObra(setor) {
+  const codigo = String(setor?.codigo || '').trim().toUpperCase();
+  const nome = String(setor?.nome || '').trim().toUpperCase();
+  return Boolean(setor?.eh_setor_obra) || codigo === 'OBRA' || nome === 'OBRA';
+}
+
 function normalizarIdList(lista) {
   if (!Array.isArray(lista)) return [];
   return [...new Set(
@@ -95,24 +121,66 @@ function normalizarIdList(lista) {
   )];
 }
 
-function isSetorObra(setor) {
-  const codigo = String(setor?.codigo || '').trim().toUpperCase();
-  const nome = String(setor?.nome || '').trim().toUpperCase();
-  return codigo === 'OBRA' || nome === 'OBRA';
-}
-
 async function salvarConfiguracaoJson(chave, payload) {
+  const valor = JSON.stringify(payload);
   const existente = await ConfiguracaoSistema.findOne({
     where: { chave },
     order: [['id', 'DESC']]
   });
-
-  const valor = JSON.stringify(payload);
   if (existente) {
     await existente.update({ valor });
   } else {
     await ConfiguracaoSistema.create({ chave, valor });
   }
+  return payload;
+}
+
+function normalizarMapaPermissoesRhDp(input) {
+  const source = input && typeof input === 'object' ? input : {};
+  return Object.entries(source).reduce((acc, [usuarioId, permissions]) => {
+    const id = Number(usuarioId);
+    if (!Number.isInteger(id) || id <= 0) {
+      return acc;
+    }
+
+    const normalizadas = normalizeRhDpPermissionList(permissions);
+    if (!normalizadas.length) {
+      return acc;
+    }
+
+    acc[String(id)] = normalizadas;
+    return acc;
+  }, {});
+}
+
+async function getComercialCategoriasContratoConfig() {
+  const categorias = await CategoriaFinanceira.findAll({
+    where: { ativo: true },
+    order: [['nome', 'ASC']]
+  });
+  const item = await ConfiguracaoSistema.findOne({
+    where: { chave: CHAVE_COMERCIAL_CATEGORIAS_CONTRATO },
+    order: [['id', 'DESC']]
+  });
+  const config = parseJsonOrDefault(item?.valor, null);
+
+  const categoriasContrato = categorias.filter((categoria) =>
+    ['RECEBER', 'AMBOS'].includes(String(categoria.tipo || '').toUpperCase())
+  );
+  const categoriasComissao = categorias.filter((categoria) =>
+    ['PAGAR', 'AMBOS'].includes(String(categoria.tipo || '').toUpperCase())
+  );
+
+  return {
+    contrato_venda_categoria_ids: Array.isArray(config?.contrato_venda_categoria_ids)
+      ? normalizarIdList(config.contrato_venda_categoria_ids)
+      : categoriasContrato.map((categoria) => categoria.id),
+    comissao_categoria_ids: Array.isArray(config?.comissao_categoria_ids)
+      ? normalizarIdList(config.comissao_categoria_ids)
+      : categoriasComissao.map((categoria) => categoria.id),
+    categorias_contrato: categoriasContrato,
+    categorias_comissao: categoriasComissao
+  };
 }
 
 module.exports = {
@@ -260,106 +328,6 @@ module.exports = {
     }
   }
   ,
-
-  async getAprovacaoDiretoria(req, res) {
-    try {
-      const [itemDiretorias, itemDestinos] = await Promise.all([
-        ConfiguracaoSistema.findOne({
-          where: { chave: CHAVE_DIRETORIA_POR_CLASSIFICACAO_OBRA },
-          order: [['id', 'DESC']]
-        }),
-        ConfiguracaoSistema.findOne({
-          where: { chave: CHAVE_SETOR_DESTINO_APOS_APROVACAO_DIRETORIA },
-          order: [['id', 'DESC']]
-        })
-      ]);
-
-      const diretorias = normalizarMapaDiretoriasPorClassificacao(
-        parseJsonOrDefault(itemDiretorias?.valor, { diretorias: {} })?.diretorias
-      );
-      const destinos = normalizarMapaSetorDestinoAprovacao(
-        parseJsonOrDefault(itemDestinos?.valor, { destinos: {} })?.destinos
-      );
-
-      return res.json({
-        diretorias_por_classificacao: diretorias,
-        setores_destino_por_tipo: destinos
-      });
-    } catch (error) {
-      console.error(error);
-      return res.status(500).json({ error: 'Erro ao buscar configuracao de aprovacao por diretoria' });
-    }
-  },
-
-  async updateAprovacaoDiretoria(req, res) {
-    try {
-      const diretorias = normalizarMapaDiretoriasPorClassificacao(
-        req.body?.diretorias_por_classificacao
-      );
-      const destinos = normalizarMapaSetorDestinoAprovacao(
-        req.body?.setores_destino_por_tipo
-      );
-
-      const [setores, tipos] = await Promise.all([
-        Setor.findAll({
-          attributes: ['id', 'codigo', 'nome']
-        }),
-        TipoSolicitacao.findAll({
-          attributes: ['id']
-        })
-      ]);
-
-      const tokensSetorValidos = new Set(
-        setores.flatMap(setor => [
-          String(setor.id || '').trim().toUpperCase(),
-          String(setor.codigo || '').trim().toUpperCase(),
-          String(setor.nome || '').trim().toUpperCase()
-        ]).filter(Boolean)
-      );
-      const tiposValidos = new Set(tipos.map(tipo => String(tipo.id)));
-
-      const diretoriasInvalidas = Object.entries(diretorias)
-        .filter(([, setor]) => !tokensSetorValidos.has(String(setor || '').trim().toUpperCase()))
-        .map(([classificacao]) => classificacao);
-      if (diretoriasInvalidas.length > 0) {
-        return res.status(400).json({
-          error: 'Uma ou mais diretorias configuradas sao invalidas.',
-          classificacoes_invalidas: diretoriasInvalidas
-        });
-      }
-
-      const destinosInvalidos = Object.entries(destinos)
-        .filter(([tipoId, setor]) => (
-          !tiposValidos.has(String(tipoId)) ||
-          !tokensSetorValidos.has(String(setor || '').trim().toUpperCase())
-        ))
-        .map(([tipoId]) => String(tipoId));
-      if (destinosInvalidos.length > 0) {
-        return res.status(400).json({
-          error: 'Um ou mais destinos de aprovacao sao invalidos.',
-          tipos_invalidos: destinosInvalidos
-        });
-      }
-
-      await Promise.all([
-        salvarConfiguracaoJson(CHAVE_DIRETORIA_POR_CLASSIFICACAO_OBRA, {
-          diretorias
-        }),
-        salvarConfiguracaoJson(CHAVE_SETOR_DESTINO_APOS_APROVACAO_DIRETORIA, {
-          destinos
-        })
-      ]);
-
-      return res.json({
-        ok: true,
-        diretorias_por_classificacao: diretorias,
-        setores_destino_por_tipo: destinos
-      });
-    } catch (error) {
-      console.error(error);
-      return res.status(500).json({ error: 'Erro ao salvar configuracao de aprovacao por diretoria' });
-    }
-  },
 
   async getAreasPorSetorOrigem(req, res) {
     try {
@@ -553,85 +521,68 @@ module.exports = {
     }
   },
 
-  async getTiposCompartilhadosEntreSetores(req, res) {
+  async getAprovacaoDiretoria(req, res) {
+    try {
+      const [diretoriasItem, destinosItem] = await Promise.all([
+        ConfiguracaoSistema.findOne({
+          where: { chave: CHAVE_DIRETORIA_POR_CLASSIFICACAO_OBRA },
+          order: [['id', 'DESC']]
+        }),
+        ConfiguracaoSistema.findOne({
+          where: { chave: CHAVE_SETOR_DESTINO_APOS_APROVACAO_DIRETORIA },
+          order: [['id', 'DESC']]
+        })
+      ]);
+
+      const diretoriasData = parseJsonOrDefault(diretoriasItem?.valor, { diretorias: {} });
+      const destinosData = parseJsonOrDefault(destinosItem?.valor, { destinos: {} });
+      return res.json({
+        diretorias: normalizarMapaDiretoriasPorClassificacao(diretoriasData?.diretorias),
+        destinos: normalizarMapaSetorDestinoAprovacao(destinosData?.destinos)
+      });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao buscar configuracao de aprovacao por diretoria' });
+    }
+  },
+
+  async updateAprovacaoDiretoria(req, res) {
+    try {
+      const diretorias = normalizarMapaDiretoriasPorClassificacao(req.body?.diretorias);
+      const destinos = normalizarMapaSetorDestinoAprovacao(req.body?.destinos);
+      await Promise.all([
+        salvarConfiguracaoJson(CHAVE_DIRETORIA_POR_CLASSIFICACAO_OBRA, { diretorias }),
+        salvarConfiguracaoJson(CHAVE_SETOR_DESTINO_APOS_APROVACAO_DIRETORIA, { destinos })
+      ]);
+      return res.json({ ok: true, diretorias, destinos });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao salvar configuracao de aprovacao por diretoria' });
+    }
+  },
+
+  async getTiposCompartilhadosSetor(req, res) {
     try {
       const item = await ConfiguracaoSistema.findOne({
         where: { chave: CHAVE_TIPOS_COMPARTILHADOS_ENTRE_SETORES },
         order: [['id', 'DESC']]
       });
-
       const data = parseJsonOrDefault(item?.valor, { regras: {} });
-      const regras = normalizarTiposCompartilhados(data?.regras);
-      return res.json({ regras });
+      return res.json({ regras: normalizarTiposCompartilhados(data?.regras) });
     } catch (error) {
       console.error(error);
-      return res.status(500).json({ error: 'Erro ao buscar configuracao de tipos compartilhados' });
+      return res.status(500).json({ error: 'Erro ao buscar tipos compartilhados entre setores' });
     }
   },
 
-  async updateTiposCompartilhadosEntreSetores(req, res) {
+  async updateTiposCompartilhadosSetor(req, res) {
     try {
       const regras = normalizarTiposCompartilhados(req.body?.regras);
-
-      const [setores, tipos] = await Promise.all([
-        Setor.findAll({
-          attributes: ['id', 'codigo', 'nome']
-        }),
-        TipoSolicitacao.findAll({
-          attributes: ['id']
-        })
-      ]);
-
-      const tokensSetorValidos = new Set(
-        setores.flatMap(setor => [
-          String(setor.id || '').trim().toUpperCase(),
-          String(setor.codigo || '').trim().toUpperCase(),
-          String(setor.nome || '').trim().toUpperCase()
-        ]).filter(Boolean)
-      );
-      const tiposValidos = new Set(tipos.map(tipo => String(tipo.id)));
-
-      const regrasInvalidas = [];
-
-      Object.entries(regras).forEach(([setorOrigem, tiposCompartilhados]) => {
-        const setorOrigemValido = tokensSetorValidos.has(String(setorOrigem || '').trim().toUpperCase());
-        if (!setorOrigemValido) {
-          regrasInvalidas.push({ setor_origem: setorOrigem });
-          return;
-        }
-
-        Object.entries(tiposCompartilhados || {}).forEach(([tipoId, setoresCompartilhados]) => {
-          const tipoValido = tiposValidos.has(String(tipoId));
-          const setoresValidos = Array.isArray(setoresCompartilhados)
-            ? setoresCompartilhados.every(setor =>
-                tokensSetorValidos.has(String(setor || '').trim().toUpperCase())
-              )
-            : false;
-
-          if (!tipoValido || !setoresValidos) {
-            regrasInvalidas.push({
-              setor_origem: setorOrigem,
-              tipo_solicitacao_id: String(tipoId)
-            });
-          }
-        });
-      });
-
-      if (regrasInvalidas.length > 0) {
-        return res.status(400).json({
-          error: 'Uma ou mais regras de tipos compartilhados sao invalidas.',
-          regras_invalidas: regrasInvalidas
-        });
-      }
-
-      await salvarConfiguracaoJson(CHAVE_TIPOS_COMPARTILHADOS_ENTRE_SETORES, {
-        regras
-      });
-
+      await salvarConfiguracaoJson(CHAVE_TIPOS_COMPARTILHADOS_ENTRE_SETORES, { regras });
       return res.json({ ok: true, regras });
     } catch (error) {
       console.error(error);
-      return res.status(500).json({ error: 'Erro ao salvar configuracao de tipos compartilhados' });
+      return res.status(500).json({ error: 'Erro ao salvar tipos compartilhados entre setores' });
     }
   },
 
@@ -641,62 +592,22 @@ module.exports = {
         where: { chave: CHAVE_AUTOMACAO_STATUS_SETOR },
         order: [['id', 'DESC']]
       });
-
       const data = parseJsonOrDefault(item?.valor, { regras: [] });
-      const regras = normalizarAutomacoesStatus(data?.regras);
-      return res.json({ regras });
+      return res.json({ regras: normalizarAutomacoesStatus(data?.regras) });
     } catch (error) {
       console.error(error);
-      return res.status(500).json({ error: 'Erro ao buscar configuracao de automacao por status' });
+      return res.status(500).json({ error: 'Erro ao buscar automacao de status por setor' });
     }
   },
 
   async updateAutomacaoStatusSetor(req, res) {
     try {
       const regras = normalizarAutomacoesStatus(req.body?.regras);
-
-      const [setores, tipos] = await Promise.all([
-        Setor.findAll({
-          attributes: ['id', 'codigo', 'nome']
-        }),
-        TipoSolicitacao.findAll({
-          attributes: ['id']
-        })
-      ]);
-
-      const tokensSetorValidos = new Set(
-        setores.flatMap(setor => [
-          String(setor.id || '').trim().toUpperCase(),
-          String(setor.codigo || '').trim().toUpperCase(),
-          String(setor.nome || '').trim().toUpperCase()
-        ]).filter(Boolean)
-      );
-      const tiposValidos = new Set(tipos.map(tipo => String(tipo.id)));
-
-      const regrasInvalidas = regras.filter((regra) => (
-        !tiposValidos.has(String(regra.tipo_solicitacao_id)) ||
-        (
-          regra.setor_origem &&
-          !tokensSetorValidos.has(String(regra.setor_origem || '').trim().toUpperCase())
-        ) ||
-        !tokensSetorValidos.has(String(regra.setor_destino || '').trim().toUpperCase())
-      ));
-
-      if (regrasInvalidas.length > 0) {
-        return res.status(400).json({
-          error: 'Uma ou mais automacoes sao invalidas.',
-          regras_invalidas: regrasInvalidas
-        });
-      }
-
-      await salvarConfiguracaoJson(CHAVE_AUTOMACAO_STATUS_SETOR, {
-        regras
-      });
-
+      await salvarConfiguracaoJson(CHAVE_AUTOMACAO_STATUS_SETOR, { regras });
       return res.json({ ok: true, regras });
     } catch (error) {
       console.error(error);
-      return res.status(500).json({ error: 'Erro ao salvar configuracao de automacao por status' });
+      return res.status(500).json({ error: 'Erro ao salvar automacao de status por setor' });
     }
   },
 
@@ -746,100 +657,103 @@ module.exports = {
     }
   },
 
-  async getSetoresSemAlteracaoStatus(req, res) {
+  async getSetoresAcessoTodasObras(req, res) {
     try {
-      const configuracao = await obterConfiguracaoSetoresSemAlteracaoStatus();
-      const tokens = await obterTokensSetoresSemAlteracaoStatus();
-      return res.json({
-        setores: configuracao.setores,
-        tokens
+      const item = await ConfiguracaoSistema.findOne({
+        where: { chave: CHAVE_SETORES_ACESSO_TODAS_OBRAS },
+        order: [['id', 'DESC']]
       });
+
+      if (!item || !item.valor) {
+        return res.json({ setores: [] });
+      }
+
+      const data = parseJsonOrDefault(item.valor, { setores: [] });
+      const setores = normalizarListaSetores(data?.setores);
+      return res.json({ setores });
     } catch (error) {
       console.error(error);
-      return res.status(500).json({ error: 'Erro ao buscar configuracao de setores sem alteracao de status' });
+      return res.status(500).json({ error: 'Erro ao buscar configuracao de setores para acesso em todas as obras' });
     }
   },
 
-  async updateSetoresSemAlteracaoStatus(req, res) {
+  async updateSetoresAcessoTodasObras(req, res) {
     try {
-      const configuracao = await salvarConfiguracaoSetoresSemAlteracaoStatus(req.body?.setores);
-      const tokens = await obterTokensSetoresSemAlteracaoStatus();
-      return res.json({
-        ok: true,
-        setores: configuracao.setores,
-        tokens
+      const setores = normalizarListaSetores(req.body?.setores);
+
+      const existente = await ConfiguracaoSistema.findOne({
+        where: { chave: CHAVE_SETORES_ACESSO_TODAS_OBRAS },
+        order: [['id', 'DESC']]
       });
+
+      const valor = JSON.stringify({ setores });
+      if (existente) {
+        await existente.update({ valor });
+      } else {
+        await ConfiguracaoSistema.create({
+          chave: CHAVE_SETORES_ACESSO_TODAS_OBRAS,
+          valor
+        });
+      }
+
+      invalidateObraAccessConfigCache();
+      return res.json({ ok: true, setores });
     } catch (error) {
       console.error(error);
-      return res.status(500).json({ error: 'Erro ao salvar configuracao de setores sem alteracao de status' });
+      return res.status(500).json({ error: 'Erro ao salvar configuracao de setores para acesso em todas as obras' });
     }
   },
 
-  async getUsuariosAcessoPrioridadeDiretoria(req, res) {
+  async getUsuariosAcessoFinanceiro(req, res) {
     try {
-      const configuracao = await obterUsuariosAcessoPrioridadeDiretoria();
-      const selecionados = new Set(configuracao.usuario_ids.map((id) => Number(id)));
-
-      const usuariosRaw = await User.findAll({
-        where: {
-          perfil: { [Op.ne]: 'SUPERADMIN' }
-        },
-        attributes: ['id', 'nome', 'email', 'perfil', 'ativo', 'setor_id'],
-        include: [
-          {
-            model: Setor,
-            as: 'setor',
-            attributes: ['id', 'nome', 'codigo']
-          }
-        ],
-        order: [['nome', 'ASC']]
+      const item = await ConfiguracaoSistema.findOne({
+        where: { chave: CHAVE_USUARIOS_ACESSO_FINANCEIRO },
+        order: [['id', 'DESC']]
       });
 
-      const usuarios = usuariosRaw.map((usuario) => {
-        const plain = typeof usuario.toJSON === 'function' ? usuario.toJSON() : usuario;
-        return {
-          ...plain,
-          acesso_prioridade_diretoria: selecionados.has(Number(plain.id))
-        };
-      });
+      if (!item || !item.valor) {
+        return res.json({ usuarios: [] });
+      }
 
-      return res.json({
-        usuario_ids: configuracao.usuario_ids,
-        usuarios
-      });
+      const data = parseJsonOrDefault(item.valor, { usuarios: [] });
+      const usuarios = normalizarIdList(data?.usuarios);
+      return res.json({ usuarios });
     } catch (error) {
       console.error(error);
-      return res.status(500).json({ error: 'Erro ao buscar usuarios com acesso a prioridade diretoria' });
+      return res.status(500).json({ error: 'Erro ao buscar configuracao de acesso ao financeiro por usuario' });
     }
   },
 
-  async updateUsuariosAcessoPrioridadeDiretoria(req, res) {
+  async updateUsuariosAcessoFinanceiro(req, res) {
     try {
-      const usuarioIds = normalizarUsuarioIds(req.body?.usuario_ids);
+      const usuarios = normalizarIdList(req.body?.usuarios);
 
-      const usuariosValidos = await User.findAll({
-        where: {
-          id: { [Op.in]: usuarioIds },
-          ativo: true
-        },
-        attributes: ['id']
+      const existente = await ConfiguracaoSistema.findOne({
+        where: { chave: CHAVE_USUARIOS_ACESSO_FINANCEIRO },
+        order: [['id', 'DESC']]
       });
-      const idsValidos = usuariosValidos.map((usuario) => Number(usuario.id));
-      const configuracao = await salvarUsuariosAcessoPrioridadeDiretoria(idsValidos);
 
-      return res.json({
-        ok: true,
-        usuario_ids: configuracao.usuario_ids
-      });
+      const valor = JSON.stringify({ usuarios });
+      if (existente) {
+        await existente.update({ valor });
+      } else {
+        await ConfiguracaoSistema.create({
+          chave: CHAVE_USUARIOS_ACESSO_FINANCEIRO,
+          valor
+        });
+      }
+
+      invalidateFinanceiroAccessConfigCache();
+      return res.json({ ok: true, usuarios });
     } catch (error) {
       console.error(error);
-      return res.status(500).json({ error: 'Erro ao salvar usuarios com acesso a prioridade diretoria' });
+      return res.status(500).json({ error: 'Erro ao salvar configuracao de acesso ao financeiro por usuario' });
     }
   },
 
   async getUsuariosEnvioQualquerSetor(req, res) {
     try {
-      const usuariosRaw = await User.findAll({
+      const usuarios = await User.findAll({
         where: {
           perfil: { [Op.ne]: 'SUPERADMIN' }
         },
@@ -856,7 +770,7 @@ module.exports = {
           {
             model: Setor,
             as: 'setor',
-            attributes: ['id', 'nome', 'codigo']
+            attributes: ['id', 'nome', 'codigo', 'eh_setor_obra']
           }
         ],
         order: [
@@ -865,9 +779,9 @@ module.exports = {
         ]
       });
 
-      const usuarios = usuariosRaw.filter(usuario => !isSetorObra(usuario?.setor));
-
-      return res.json({ usuarios });
+      return res.json({
+        usuarios: usuarios.filter(usuario => !isSetorObra(usuario?.setor))
+      });
     } catch (error) {
       console.error(error);
       return res.status(500).json({ error: 'Erro ao buscar usuarios com permissao especial de envio' });
@@ -891,7 +805,7 @@ module.exports = {
             {
               model: Setor,
               as: 'setor',
-              attributes: ['id', 'nome', 'codigo']
+              attributes: ['id', 'nome', 'codigo', 'eh_setor_obra']
             }
           ],
           transaction
@@ -941,6 +855,226 @@ module.exports = {
       await transaction.rollback();
       console.error(error);
       return res.status(500).json({ error: 'Erro ao salvar permissao especial de envio' });
+    }
+  },
+
+  async getUsuariosPermissoesRhDp(req, res) {
+    try {
+      const item = await ConfiguracaoSistema.findOne({
+        where: { chave: CHAVE_USUARIOS_PERMISSOES_RH_DP },
+        order: [['id', 'DESC']]
+      });
+
+      if (!item || !item.valor) {
+        return res.json({
+          usuarios: {},
+          definicoes: RH_DP_PERMISSION_GROUPS
+        });
+      }
+
+      const data = parseJsonOrDefault(item.valor, { usuarios: {} });
+      return res.json({
+        usuarios: normalizarMapaPermissoesRhDp(data?.usuarios),
+        definicoes: RH_DP_PERMISSION_GROUPS
+      });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao buscar configuracao de permissoes do RH/DP' });
+    }
+  },
+
+  async updateUsuariosPermissoesRhDp(req, res) {
+    try {
+      const usuarios = normalizarMapaPermissoesRhDp(req.body?.usuarios);
+      const valor = JSON.stringify({ usuarios });
+
+      const existente = await ConfiguracaoSistema.findOne({
+        where: { chave: CHAVE_USUARIOS_PERMISSOES_RH_DP },
+        order: [['id', 'DESC']]
+      });
+
+      if (existente) {
+        await existente.update({ valor });
+      } else {
+        await ConfiguracaoSistema.create({
+          chave: CHAVE_USUARIOS_PERMISSOES_RH_DP,
+          valor
+        });
+      }
+
+      invalidateRhDpAccessConfigCache();
+      return res.json({
+        ok: true,
+        usuarios,
+        definicoes: RH_DP_PERMISSION_GROUPS
+      });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao salvar configuracao de permissoes do RH/DP' });
+    }
+  },
+
+  async getCotacoesConfig(req, res) {
+    try {
+      const chaves = Object.keys(COTACOES_DEFAULTS).map(
+        (key) => `COTACOES_${key.toUpperCase()}`
+      );
+      const registros = await ConfiguracaoSistema.findAll({
+        where: { chave: chaves }
+      });
+      const porChave = Object.fromEntries(registros.map((r) => [r.chave, r.valor]));
+
+      const config = {
+        min_cotacoes: Number(porChave['COTACOES_MIN_COTACOES'] ?? COTACOES_DEFAULTS.min_cotacoes),
+        criterio_vencedor: porChave['COTACOES_CRITERIO_VENCEDOR'] ?? COTACOES_DEFAULTS.criterio_vencedor,
+        prazo_resposta_padrao_dias: Number(porChave['COTACOES_PRAZO_RESPOSTA_PADRAO_DIAS'] ?? COTACOES_DEFAULTS.prazo_resposta_padrao_dias),
+        permitir_aprovar_sem_minimo: (porChave['COTACOES_PERMITIR_APROVAR_SEM_MINIMO'] ?? String(COTACOES_DEFAULTS.permitir_aprovar_sem_minimo)) === 'true',
+        exigir_justificativa_se_nao_menor_preco: (porChave['COTACOES_EXIGIR_JUSTIFICATIVA_SE_NAO_MENOR_PRECO'] ?? String(COTACOES_DEFAULTS.exigir_justificativa_se_nao_menor_preco)) === 'true'
+      };
+
+      return res.json(config);
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao buscar configuracoes de cotacoes' });
+    }
+  },
+
+  async setCotacoesConfig(req, res) {
+    try {
+      const {
+        min_cotacoes,
+        criterio_vencedor,
+        prazo_resposta_padrao_dias,
+        permitir_aprovar_sem_minimo,
+        exigir_justificativa_se_nao_menor_preco
+      } = req.body || {};
+
+      const entries = [
+        { chave: 'COTACOES_MIN_COTACOES', valor: String(Number(min_cotacoes) || COTACOES_DEFAULTS.min_cotacoes) },
+        { chave: 'COTACOES_CRITERIO_VENCEDOR', valor: String(criterio_vencedor || COTACOES_DEFAULTS.criterio_vencedor) },
+        { chave: 'COTACOES_PRAZO_RESPOSTA_PADRAO_DIAS', valor: String(Number(prazo_resposta_padrao_dias) || COTACOES_DEFAULTS.prazo_resposta_padrao_dias) },
+        { chave: 'COTACOES_PERMITIR_APROVAR_SEM_MINIMO', valor: String(Boolean(permitir_aprovar_sem_minimo)) },
+        { chave: 'COTACOES_EXIGIR_JUSTIFICATIVA_SE_NAO_MENOR_PRECO', valor: String(Boolean(exigir_justificativa_se_nao_menor_preco)) }
+      ];
+
+      for (const entry of entries) {
+        const existente = await ConfiguracaoSistema.findOne({ where: { chave: entry.chave }, order: [['id', 'DESC']] });
+        if (existente) {
+          await existente.update({ valor: entry.valor });
+        } else {
+          await ConfiguracaoSistema.create({ chave: entry.chave, valor: entry.valor });
+        }
+      }
+
+      return res.json({
+        min_cotacoes: Number(entries[0].valor),
+        criterio_vencedor: entries[1].valor,
+        prazo_resposta_padrao_dias: Number(entries[2].valor),
+        permitir_aprovar_sem_minimo: entries[3].valor === 'true',
+        exigir_justificativa_se_nao_menor_preco: entries[4].valor === 'true'
+      });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao salvar configuracoes de cotacoes' });
+    }
+  },
+
+  async getStatusPedidosCompra(req, res) {
+    try {
+      const statuses = await getPedidoCompraStatusConfig();
+      return res.json({ statuses });
+    } catch (error) {
+      console.error(error);
+      return res.json({ statuses: DEFAULT_STATUS_PEDIDOS_COMPRA });
+    }
+  },
+
+  async setStatusPedidosCompra(req, res) {
+    try {
+      const statuses = await savePedidoCompraStatusConfig(req.body?.statuses);
+      return res.json({ statuses });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao salvar configuracoes de status dos pedidos' });
+    }
+  },
+
+  async getComercialCategoriasContrato(req, res) {
+    try {
+      const config = await getComercialCategoriasContratoConfig();
+      return res.json(config);
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao buscar categorias comerciais do contrato' });
+    }
+  },
+
+  async setComercialCategoriasContrato(req, res) {
+    try {
+      const contratoIds = normalizarIdList(req.body?.contrato_venda_categoria_ids);
+      const comissaoIds = normalizarIdList(req.body?.comissao_categoria_ids);
+      const categorias = await CategoriaFinanceira.findAll({
+        where: { ativo: true },
+        attributes: ['id', 'tipo']
+      });
+      const porId = new Map(categorias.map((categoria) => [Number(categoria.id), categoria]));
+
+      const invalidaContrato = contratoIds.find((id) => {
+        const categoria = porId.get(id);
+        return !categoria || !['RECEBER', 'AMBOS'].includes(String(categoria.tipo || '').toUpperCase());
+      });
+      if (invalidaContrato) {
+        return res.status(400).json({ error: 'Categoria financeira invalida para contrato de venda.' });
+      }
+
+      const invalidaComissao = comissaoIds.find((id) => {
+        const categoria = porId.get(id);
+        return !categoria || !['PAGAR', 'AMBOS'].includes(String(categoria.tipo || '').toUpperCase());
+      });
+      if (invalidaComissao) {
+        return res.status(400).json({ error: 'Categoria financeira invalida para comissao.' });
+      }
+
+      const valor = JSON.stringify({
+        contrato_venda_categoria_ids: contratoIds,
+        comissao_categoria_ids: comissaoIds
+      });
+      const existente = await ConfiguracaoSistema.findOne({
+        where: { chave: CHAVE_COMERCIAL_CATEGORIAS_CONTRATO },
+        order: [['id', 'DESC']]
+      });
+
+      if (existente) {
+        await existente.update({ valor });
+      } else {
+        await ConfiguracaoSistema.create({ chave: CHAVE_COMERCIAL_CATEGORIAS_CONTRATO, valor });
+      }
+
+      const config = await getComercialCategoriasContratoConfig();
+      return res.json(config);
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao salvar categorias comerciais do contrato' });
+    }
+  },
+
+  async getModulos(req, res) {
+    try {
+      const modules = await getModuloConfig();
+      return res.json({ modules });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao buscar configuracao de modulos' });
+    }
+  },
+
+  async setModulos(req, res) {
+    try {
+      const modules = await saveModuloConfig(req.body?.modules);
+      return res.json({ modules });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao salvar configuracao de modulos' });
     }
   }
 };

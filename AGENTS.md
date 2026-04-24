@@ -5,15 +5,15 @@ Guia rapido para colaboradores e agentes automatizados.
 
 ## Regras
 - O sistema esta funcionando e pronto para deploy dentro dos objetivos pretendidos. Tudo o que for criado precisa levar em conta todo o contexto criado ate o momento para nao quebrar o sistema.
-- Nao alterar arquivos fora deste repositorio.
+- Nao alterar arquivos fora deste repositorio, exceto em sessoes explicitamente abertas para colaboracao multirrepositorio no workspace e seguindo obrigatoriamente `docs/COLABORACAO_WORKSPACE.md` e o `AGENTS.md` do repositorio alvo.
 - Evitar mudancas destrutivas.
 - Sempre explicar as alteracoes.
 
 ## Fluxo
 1. Ler este arquivo antes de qualquer mudanca.
-2. Ler `docs/README.md` para navegar pela documentacao estruturada do projeto.
-3. Pedir confirmacao antes de alteracoes grandes.
-4. Ler `docs/COLABORACAO_CODEX.md` antes de iniciar trabalho compartilhado entre dois agentes.
+2. Pedir confirmacao antes de alteracoes grandes.
+3. Ler `docs/COLABORACAO_CODEX.md` antes de iniciar trabalho compartilhado entre dois agentes.
+4. Em sessoes com mais de um repositorio no mesmo workspace, ler `docs/COLABORACAO_WORKSPACE.md` e registrar ownership em `docs/workspace/OWNERSHIP_ATIVO.md`.
 
 ## Estado Atual (resumo das mudancas feitas)
 
@@ -69,6 +69,33 @@ Guia rapido para colaboradores e agentes automatizados.
 - Corrigido regex no `s3.js` (parse key).
 - Corrigido `src` da logo no login.
 
+### Modulo de Cotacoes (RFQ)
+- Modulo completo e funcional integrado ao modulo de compras.
+- Fluxo: SolicitacaoCompra -> enviar para fornecedores -> link publico por token -> fornecedor responde online ou via CSV -> comparativo automatico -> selecao de vencedor -> encerramento.
+- Pagina publica `/cotacao/:token` sem autenticacao (fornecedor acessa pelo link).
+- Botao WhatsApp: gera link `wa.me` com mensagem padrao + link de cotacao.
+- Prazo de resposta por fornecedor (campo `prazo_resposta` em `solicitacao_compra_fornecedores`).
+- Configuracoes de cotacao via SUPERADMIN em `/configuracoes-cotacao`:
+  - `min_cotacoes`, `criterio_vencedor`, `prazo_resposta_padrao_dias`, `permitir_aprovar_sem_minimo`, `exigir_justificativa_se_nao_menor_preco`.
+  - Chaves armazenadas em `configuracoes_sistema` com prefixo `COTACOES_`.
+- Endpoints publicos (sem auth): `GET/POST /cotacoes/:token`, `POST /cotacoes/upload`, `GET /cotacoes/:token/modelo`.
+- Endpoints protegidos: `GET/PATCH /configuracoes/cotacoes` (SUPERADMIN).
+- Migrations aplicadas em: `202603310001_cotacao_prazo_resposta.js`, `202603310002_cotacoes_config_seed.js`.
+
+### Obras / Financeiro / Permissoes (2026-04-12)
+- classificacao de obras (PRIVADA/PUBLICA) com campos `vgv`, `planilha_geral`, `margem_custo_esperada`
+  - migration `202604120002_obras_classificacao_orcamento.js` ja aplicada em producao
+  - orcamento calculado: valor_referencia * (1 - margem / 100)
+- pagina `Resultado de Obras` em `/financeiro/relatorios/resultado-obras`
+  - agrega titulos financeiros por obra: executado (PAGAR baixado) e recebido (RECEBER baixado)
+- sistema de permissoes de areas por usuario:
+  - registro central em `backend/src/constants/moduloPermissoes.js`
+  - 8 modulos, 33 permissoes no formato `modulo.area.acao`
+  - armazenado em `ConfiguracaoSistema` chave `PERMISSOES_AREAS_USUARIOS`
+  - sessao do usuario: campo `areas_permissoes`
+  - helper: `hasPermissao(user, 'chave')` em `frontend/src/utils/acessoProduto.js`
+  - UI: Configuracoes > Permissoes de Areas por Usuario (`/permissoes-areas`)
+
 ## Checklist de Deploy
 - Backend: `git pull` -> `npm install` (backend) -> `pm2 restart backend-solicitacoes --update-env`.
 - Frontend: `git push` -> Redeploy na Vercel (cache limpo).
@@ -81,3 +108,9 @@ Guia rapido para colaboradores e agentes automatizados.
 - Quando houver dois agentes trabalhando no repositorio, seguir obrigatoriamente `docs/COLABORACAO_CODEX.md`.
 - Nenhum agente deve editar o mesmo arquivo que esteja explicitamente reservado por outro agente.
 - Antes de iniciar qualquer tarefa, registrar ownership temporario dos arquivos que serao alterados.
+
+## Colaboracao multirrepositorio
+- Este repositorio pode participar de sessoes compartilhadas com outros repositorios do mesmo workspace, desde que a sessao seja aberta explicitamente para esse fim.
+- A colaboracao multirrepositorio deve seguir `docs/COLABORACAO_WORKSPACE.md`.
+- Antes de editar outro repositorio, o agente deve ler o `AGENTS.md` e as regras locais do repositorio alvo.
+- O contexto compartilhado deve ser registrado em `docs/workspace/`.

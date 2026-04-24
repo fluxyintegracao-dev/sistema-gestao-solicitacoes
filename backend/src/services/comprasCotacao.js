@@ -1,12 +1,17 @@
 const crypto = require('crypto');
+const XLSX = require('xlsx');
 const {
+  Apropriacao,
   FornecedorCompra,
   SolicitacaoCompra,
   SolicitacaoCompraFornecedor,
   SolicitacaoCompraItem,
+  SolicitacaoCompraItemApropriacao,
   SolicitacaoCompraItemManual,
+  SolicitacaoCompraItemManualApropriacao,
   SolicitacaoCompraLog
 } = require('../models');
+const { construirResumoApropriacoes } = require('./compraApropriacao');
 
 function normalizeText(value) {
   return String(value || '')
@@ -52,29 +57,39 @@ function obterItemReferenciaId(item) {
 }
 
 function obterItensCotaveis(solicitacao) {
-  const itens = (solicitacao?.itens || []).map((item) => ({
-    id: Number(item.id),
-    item_tipo: 'CADASTRADO',
-    produto_id: obterCodigoProdutoCotacao({ ...item, item_tipo: 'CADASTRADO' }),
-    item_referencia_id: obterItemReferenciaId(item),
-    nome: item.insumo?.nome || '-',
-    quantidade: Number(item.quantidade || 0),
-    unidade: item.unidade?.sigla || '-',
-    especificacao: item.especificacao || '',
-    necessario_para: item.necessario_para || null
-  }));
+  const itens = (solicitacao?.itens || []).map((item) => {
+    const apropriacoes = construirResumoApropriacoes(item);
+    return {
+      id: Number(item.id),
+      item_tipo: 'CADASTRADO',
+      produto_id: obterCodigoProdutoCotacao({ ...item, item_tipo: 'CADASTRADO' }),
+      item_referencia_id: obterItemReferenciaId(item),
+      nome: item.insumo?.nome || '-',
+      quantidade: Number(item.quantidade || 0),
+      unidade: item.unidade?.sigla || '-',
+      especificacao: item.especificacao || '',
+      necessario_para: item.necessario_para || null,
+      apropriacao_resumo: apropriacoes.texto,
+      apropriacao_linhas: apropriacoes.linhas
+    };
+  });
 
-  const itensManuais = (solicitacao?.itensManuais || []).map((item) => ({
-    id: Number(item.id),
-    item_tipo: 'MANUAL',
-    produto_id: obterCodigoProdutoCotacao({ ...item, item_tipo: 'MANUAL' }),
-    item_referencia_id: obterItemReferenciaId(item),
-    nome: item.nome_manual || '-',
-    quantidade: Number(item.quantidade || 0),
-    unidade: item.unidade_sigla_manual || '-',
-    especificacao: item.especificacao || '',
-    necessario_para: item.necessario_para || null
-  }));
+  const itensManuais = (solicitacao?.itensManuais || []).map((item) => {
+    const apropriacoes = construirResumoApropriacoes(item);
+    return {
+      id: Number(item.id),
+      item_tipo: 'MANUAL',
+      produto_id: obterCodigoProdutoCotacao({ ...item, item_tipo: 'MANUAL' }),
+      item_referencia_id: obterItemReferenciaId(item),
+      nome: item.nome_manual || '-',
+      quantidade: Number(item.quantidade || 0),
+      unidade: item.unidade_sigla_manual || '-',
+      especificacao: item.especificacao || '',
+      necessario_para: item.necessario_para || null,
+      apropriacao_resumo: apropriacoes.texto,
+      apropriacao_linhas: apropriacoes.linhas
+    };
+  });
 
   return [...itens, ...itensManuais];
 }
@@ -115,12 +130,23 @@ function serializeCsvValue(value) {
 
 function gerarModeloCotacaoCsv(solicitacao) {
   const linhas = obterItensCotaveis(solicitacao);
-  const header = ['produto_id', 'nome', 'quantidade', 'preco', 'prazo', 'disponivel'];
+  const header = [
+    'produto_id',
+    'nome',
+    'quantidade',
+    'preco',
+    'prazo',
+    'disponivel',
+    'quantidade_minima_item',
+    'valor_minimo_pedido'
+  ];
   const rows = linhas.map((item) =>
     [
       item.produto_id,
       item.nome,
       item.quantidade,
+      '',
+      '',
       '',
       '',
       ''
@@ -130,6 +156,47 @@ function gerarModeloCotacaoCsv(solicitacao) {
   );
 
   return `${header.join(',')}\n${rows.join('\n')}\n`;
+}
+
+function gerarModeloCotacaoXlsx(solicitacao) {
+  const linhas = obterItensCotaveis(solicitacao);
+  const header = [
+    'PRODUTO_ID', 'NOME', 'QUANTIDADE', 'PRECO', 'PRAZO',
+    'DISPONIVEL', 'QUANTIDADE_MINIMA_ITEM', 'VALOR_MINIMO_PEDIDO'
+  ];
+  const rows = linhas.map((item) => [
+    item.produto_id, item.nome, item.quantidade, '', '', '', '', ''
+  ]);
+
+  const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
+
+  // Larguras sugeridas para as colunas
+  ws['!cols'] = [
+    { wch: 12 }, { wch: 40 }, { wch: 12 }, { wch: 14 },
+    { wch: 16 }, { wch: 14 }, { wch: 22 }, { wch: 22 }
+  ];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Cotacao');
+  return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+}
+
+function parseXlsxRows(buffer) {
+  const wb = XLSX.read(buffer, { type: 'buffer' });
+  const sheetName = wb.SheetNames[0];
+  if (!sheetName) return [];
+
+  const ws = wb.Sheets[sheetName];
+  const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+
+  // Normaliza os headers para uppercase sem acentos (mesmo padrao do CSV)
+  return rows.map((row) => {
+    const normalized = {};
+    for (const key of Object.keys(row)) {
+      normalized[normalizeText(key)] = row[key];
+    }
+    return normalized;
+  });
 }
 
 function splitCsvLine(line, delimiter) {
@@ -202,11 +269,37 @@ async function carregarSolicitacaoCompraCompleta(id) {
     include: [
       {
         model: SolicitacaoCompraItem,
-        as: 'itens'
+        as: 'itens',
+        include: [
+          {
+            model: SolicitacaoCompraItemApropriacao,
+            as: 'apropriacoes',
+            include: [
+              {
+                model: Apropriacao,
+                as: 'apropriacao',
+                attributes: ['id', 'codigo', 'descricao']
+              }
+            ]
+          }
+        ]
       },
       {
         model: SolicitacaoCompraItemManual,
-        as: 'itensManuais'
+        as: 'itensManuais',
+        include: [
+          {
+            model: SolicitacaoCompraItemManualApropriacao,
+            as: 'apropriacoes',
+            include: [
+              {
+                model: Apropriacao,
+                as: 'apropriacao',
+                attributes: ['id', 'codigo', 'descricao']
+              }
+            ]
+          }
+        ]
       },
       {
         model: SolicitacaoCompraFornecedor,
@@ -225,6 +318,7 @@ async function carregarSolicitacaoCompraCompleta(id) {
 module.exports = {
   carregarSolicitacaoCompraCompleta,
   gerarModeloCotacaoCsv,
+  gerarModeloCotacaoXlsx,
   gerarTokenCotacao,
   montarUrlCotacaoPublica,
   normalizeText,
@@ -232,5 +326,6 @@ module.exports = {
   obterItensCotaveis,
   parseCsvRows,
   parseDisponivel,
+  parseXlsxRows,
   registrarLogSolicitacaoCompra
 };

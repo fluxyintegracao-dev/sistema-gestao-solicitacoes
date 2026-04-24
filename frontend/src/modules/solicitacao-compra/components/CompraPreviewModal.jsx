@@ -34,10 +34,10 @@ export default function CompraPreviewModal({ preview, onClose }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="flex h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl">
+      <div className="flex h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-xl shadow-2xl" style={{ background: 'var(--ui-surface)' }}>
         <div className="flex items-center justify-between gap-3 border-b border-[var(--c-border)] px-4 py-3">
           <div className="min-w-0">
-            <h2 className="truncate text-lg font-semibold text-slate-900">
+            <h2 className="truncate text-lg font-semibold" style={{ color: 'var(--c-text)' }}>
               {preview.title || preview.name || 'Visualizacao de arquivo'}
             </h2>
             <p className="truncate text-sm text-[var(--c-muted)]">

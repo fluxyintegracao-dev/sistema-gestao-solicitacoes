@@ -156,9 +156,9 @@ export default function ArquivosModelos() {
 
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {arquivos.map(arquivo => (
-            <div key={arquivo.id} className="rounded-xl border border-gray-200 p-3 bg-white">
-              <p className="font-medium break-all">{arquivo.nome_original}</p>
-              <div className="text-xs text-gray-500 mt-1 space-y-0.5">
+            <div key={arquivo.id} className="card p-3">
+              <p className="font-medium break-all" style={{ color: 'var(--c-text)' }}>{arquivo.nome_original}</p>
+              <div className="mt-1 space-y-0.5 text-xs" style={{ color: 'var(--c-muted)' }}>
                 <p>Tamanho: {formatarTamanho(arquivo.tamanho_bytes)}</p>
                 <p>Enviado por: {arquivo?.criadoPor?.nome || '-'}</p>
                 <p>Data: {formatarDataHora(arquivo.createdAt)}</p>
@@ -179,7 +179,7 @@ export default function ArquivosModelos() {
             </div>
           ))}
           {arquivos.length === 0 && (
-            <div className="text-sm text-gray-500">
+            <div className="text-sm" style={{ color: 'var(--c-muted)' }}>
               Nenhum arquivo cadastrado nesta página.
             </div>
           )}

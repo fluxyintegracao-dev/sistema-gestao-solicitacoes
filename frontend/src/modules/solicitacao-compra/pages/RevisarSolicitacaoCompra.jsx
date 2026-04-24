@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { criarSolicitacaoCompra, obterUrlAssinadaCompra } from '../../../services/compras';
 import CompraPreviewModal from '../components/CompraPreviewModal';
 import { criarPreviewCompra } from '../utils/preview';
+import { montarLinhasResumoApropriacao, montarTextoResumoApropriacao } from '../utils/apropriacoes';
 
 const DRAFT_KEY = 'fluxy_solicitacao_compra_draft';
 
@@ -146,7 +147,7 @@ export default function RevisarSolicitacaoCompra() {
           <td>${escapeHtml(item.unidade_sigla || '-')}</td>
           <td>${escapeHtml(item.quantidade || '-')}</td>
           <td>${escapeHtml(item.especificacao || '-')}</td>
-          <td>${escapeHtml(item.apropriacao_label || '-')}</td>
+          <td>${montarLinhasResumoApropriacao(item).map((linha) => escapeHtml(linha)).join('<br />') || '-'}</td>
           <td>${escapeHtml(formatarData(item.necessario_para))}</td>
           <td>${escapeHtml(item.link_produto || '-')}</td>
           <td>${escapeHtml(item.arquivo_nome_original || '-')}</td>
@@ -267,7 +268,7 @@ export default function RevisarSolicitacaoCompra() {
   }
 
   return (
-    <div className="page">
+    <div className="page solicitacoes-page">
       <div>
         <h1 className="page-title">Revisar Solicitacao de Compra</h1>
         <p className="page-subtitle">
@@ -407,7 +408,7 @@ export default function RevisarSolicitacaoCompra() {
             <div>
               <h2 className="font-semibold">Itens revisados</h2>
               <p className="mt-1 text-sm text-[var(--c-muted)]">
-                Cada card resume quantidade, prazo, apropriacao e acessos de compra.
+                Cada card resume quantidade, rateio de apropriacao, prazo e acessos de compra.
               </p>
             </div>
             <div className="inline-flex rounded-full border border-[var(--c-border)] px-3 py-1 text-xs font-semibold text-[var(--c-muted)]">
@@ -432,7 +433,7 @@ export default function RevisarSolicitacaoCompra() {
                     </div>
                     <h3 className="mt-3 text-lg font-semibold text-[var(--c-text)]">{item.insumo_nome}</h3>
                     <p className="mt-1 text-sm text-[var(--c-muted)]">
-                      Quantidade {item.quantidade} {item.unidade_sigla || '-'} - Apropriacao {item.apropriacao_label || '-'}
+                      Quantidade {item.quantidade} {item.unidade_sigla || '-'} - Apropriacao {montarTextoResumoApropriacao(item)}
                     </p>
                   </div>
 
@@ -496,7 +497,7 @@ export default function RevisarSolicitacaoCompra() {
 
       {modalPreviewAberto && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="flex h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl">
+          <div className="flex h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-xl shadow-2xl" style={{ background: 'var(--ui-surface)' }}>
             <div className="flex items-center justify-between border-b border-[var(--c-border)] px-4 py-3">
               <div>
                 <h2 className="text-lg font-semibold">Pre-visualizacao do PDF</h2>

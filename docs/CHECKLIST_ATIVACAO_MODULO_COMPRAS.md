@@ -45,7 +45,7 @@ pm2 logs backend-solicitacoes --lines 120
 2. `GET /api/compras/unidades` responde autenticado.
 3. `GET /api/compras/categorias` responde autenticado.
 4. `GET /api/compras/insumos` responde autenticado.
-5. `GET /api/compras/apropriacoes` responde autenticado.
+5. `GET /api/apropriacoes` responde autenticado.
 6. `GET /api/compras/solicitacoes` responde autenticado.
 7. `GET /health` continua `{"ok":true}`.
 

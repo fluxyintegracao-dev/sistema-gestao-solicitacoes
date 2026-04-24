@@ -14,6 +14,23 @@ function parseBoolean(value, fallback) {
   return fallback;
 }
 
+function parseValorOrcado(value, fallback = 0) {
+  if (value === undefined) {
+    return fallback;
+  }
+
+  if (value === null || value === '') {
+    return 0;
+  }
+
+  const raw = String(value).trim();
+  const normalized = raw.includes(',')
+    ? raw.replace(/\./g, '').replace(',', '.')
+    : raw;
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
 module.exports = {
   async index(req, res) {
     try {
@@ -41,6 +58,7 @@ module.exports = {
       const obra_id = req.body?.obra_id;
       const codigo = String(req.body?.codigo || '').trim();
       const descricao = req.body?.descricao != null ? String(req.body.descricao).trim() : '';
+      const valorOrcado = parseValorOrcado(req.body?.valor_orcado, 0);
 
       if (!obra_id || !codigo) {
         return res.status(400).json({ error: 'Informe obra e codigo' });
@@ -54,7 +72,8 @@ module.exports = {
       const apropriacao = await Apropriacao.create({
         obra_id,
         codigo,
-        descricao: descricao || null
+        descricao: descricao || null,
+        valor_orcado: valorOrcado
       });
 
       return res.status(201).json(apropriacao);
@@ -76,10 +95,12 @@ module.exports = {
       const codigo = req.body?.codigo != null ? String(req.body.codigo).trim() : apropriacao.codigo;
       const descricao = req.body?.descricao != null ? String(req.body.descricao).trim() : apropriacao.descricao;
       const ativo = parseBoolean(req.body?.ativo, apropriacao.ativo);
+      const valorOrcado = parseValorOrcado(req.body?.valor_orcado, Number(apropriacao.valor_orcado || 0));
 
       await apropriacao.update({
         codigo: codigo || apropriacao.codigo,
         descricao: descricao === '' ? null : descricao,
+        valor_orcado: valorOrcado,
         ativo
       });
 

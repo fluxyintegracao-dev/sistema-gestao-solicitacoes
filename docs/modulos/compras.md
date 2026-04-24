@@ -1,26 +1,50 @@
-# Modulo de Compras
+# Modulo - Compras
 
-## Frontend
-- `frontend/src/modules/solicitacao-compra/pages/`
-- `frontend/src/modules/solicitacao-compra/components/CompraPreviewModal.jsx`
-- `frontend/src/modules/solicitacao-compra/utils/preview.js`
+## Objetivo
 
-## Backend
-- `backend/src/controllers/SolicitacaoCompraController.js`
-- `backend/src/controllers/UnidadeController.js`
-- `backend/src/controllers/CategoriaController.js`
-- `backend/src/controllers/InsumoController.js`
-- `backend/src/controllers/ApropriacaoController.js`
-- `backend/src/controllers/FornecedorCompraController.js`
-- `backend/src/controllers/CotacaoFornecedorController.js`
+Transformar a necessidade de compra em um fluxo rastreavel com itens, apropriacao, cotacao, comparativo e pedido.
 
-## Fluxo resumido
-- abrir nova solicitacao de compra
-- revisar itens
-- finalizar
-- gerar PDF
-- acompanhar detalhe
-- gerir cadastros auxiliares
+## O que o modulo entrega hoje
 
-## Observacao
-Preview de imagem e PDF no modulo compras foi padronizado em modal interno, sem abrir nova pagina.
+- solicitacao de compra com itens cadastrados e manuais
+- apropriacao simples ou multipla por item
+- revisao operacional da solicitacao
+- PDF da solicitacao com distribuicao por apropriacao
+- centro de cotacao no detalhe da compra
+- envio de cotacao por link publico
+- selecao de parceiros por categoria
+- comparativo por fornecedor
+- encerramento da cotacao
+- geracao de pedidos de compra
+- gestao de pedidos com edicao e auditoria de itens
+- PDF do pedido e apoio ao envio por WhatsApp
+
+## Fluxo Principal
+
+1. Criar solicitacao de compra.
+2. Adicionar itens.
+3. Apropriar os itens.
+4. Revisar.
+5. Integrar/liberar para compra.
+6. Selecionar fornecedores.
+7. Gerar links de cotacao.
+8. Receber respostas.
+9. Encerrar cotacao.
+10. Gerar pedidos.
+
+## Pontos de Atencao
+
+- o pedido nasce da cotacao, mas pode ser ajustado manualmente
+- alteracoes de itens no pedido geram trilha de auditoria
+- minimo por item e minimo por pedido podem impactar escolha do fornecedor
+- status de pedido pode bloquear edicao
+
+## Relacao com Apropriacoes
+
+O modulo `COMPRAS` consome apropriacoes por item, mas nao e o dono tecnico desse cadastro.
+
+Regra oficial:
+
+- o cadastro mestre de apropriacoes pertence ao dominio `OBRAS`
+- `COMPRAS` reutiliza esse cadastro por API compartilhada
+- para novas implantacoes, se a operacao de compras exigir apropriacao por item, a combinacao recomendada e `COMPRAS + OBRAS`

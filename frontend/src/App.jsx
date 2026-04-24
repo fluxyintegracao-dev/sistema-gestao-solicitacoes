@@ -1,88 +1,154 @@
-import { useEffect, useState } from 'react';
+import { Suspense, lazy } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-
 import PrivateRoute from './components/PrivateRoute';
-
-// Layout
+import AppRouteFallback from './components/AppRouteFallback';
 import Layout from './layout/Layout';
-
-// Páginas públicas
-import Login from './pages/Login';
-
-// Páginas protegidas
-import Dashboard from './pages/Dashboard';
-import Solicitacoes from './pages/Solicitacoes';
-import SolicitacaoDetalhe from './pages/SolicitacaoDetalhe';
-import SolicitacoesArquivadas from './pages/SolicitacoesArquivadas';
-import Usuarios from './pages/Usuarios';
-import UsuarioNovo from './pages/UsuarioNovo';
-import NovaSolicitacao from './pages/NovaSolicitacao';
-import UploadComprovantes from './pages/UploadComprovantes';
-import ComprovantesPendentes from './pages/ComprovantesPendentes';
-import Obras from './pages/Obras';
-import Setores from './pages/Setores';
-import TiposSolicitacao from './pages/TiposSolicitacao';
-import Cargo from './pages/Cargos';
-import GestaoContratos from './pages/GestaoContratos';
-import Configuracoes from './pages/Configuracoes';
-import TiposSubContrato from './pages/TiposSubContrato';
-import StatusSetor from './pages/StatusSetor';
-import Perfil from './pages/Perfil';
-import PermissoesSetor from './pages/PermissoesSetor';
-import CoresSistema from './pages/CoresSistema';
-import AreasObra from './pages/AreasObra';
-import AprovacaoDiretoria from './pages/AprovacaoDiretoria';
-import AreasPorSetorOrigem from './pages/AreasPorSetorOrigem';
-import SetoresVisiveisUsuario from './pages/SetoresVisiveisUsuario';
-import ComportamentoRecebimentoSetor from './pages/ComportamentoRecebimentoSetor';
-import TimeoutInatividade from './pages/TimeoutInatividade';
-import TiposSolicitacaoPorSetor from './pages/TiposSolicitacaoPorSetor';
-import TiposCompartilhadosSetor from './pages/TiposCompartilhadosSetor';
-import AutomacaoStatusSetor from './pages/AutomacaoStatusSetor';
-import SetoresCriacaoTodasObras from './pages/SetoresCriacaoTodasObras';
-import SetoresSemAlteracaoStatus from './pages/SetoresSemAlteracaoStatus';
-import UsuariosAcessoPrioridadeDiretoria from './pages/UsuariosAcessoPrioridadeDiretoria';
-import UsuariosEnvioQualquerSetor from './pages/UsuariosEnvioQualquerSetor';
-import PrioridadesDiretoria from './pages/PrioridadesDiretoria';
-import ConversasEntrada from './pages/ConversasEntrada';
-import ConversasSaida from './pages/ConversasSaida';
-import ConversaDetalhe from './pages/ConversaDetalhe';
-import ArquivosModelos from './pages/ArquivosModelos';
-import ArquivosModelosConfig from './pages/ArquivosModelosConfig';
-import ConfiguracaoProvisionamentoFinanceiro from './modules/provisionamento-financeiro/pages/ConfiguracaoProvisionamentoFinanceiro';
-import DashboardProvisionamentoFinanceiro from './modules/provisionamento-financeiro/pages/DashboardProvisionamentoFinanceiro';
-import GestaoCategoriasMacro from './modules/provisionamento-financeiro/pages/GestaoCategoriasMacro';
-import NovaProvisaoFinanceira from './modules/provisionamento-financeiro/pages/NovaProvisaoFinanceira';
-import ProvisionamentoFinanceiroDetalhe from './modules/provisionamento-financeiro/pages/ProvisionamentoFinanceiroDetalhe';
-import ProvisionamentosFinanceiros from './modules/provisionamento-financeiro/pages/ProvisionamentosFinanceiros';
-import {
-  CotacaoFornecedorPublica,
-  GestaoApropriacoes,
-  GestaoCategorias,
-  GestaoInsumos,
-  GestaoUnidades,
-  NovaSolicitacaoCompra,
-  RevisarSolicitacaoCompra,
-  RevisarSolicitacaoCompraFinal,
-  SolicitacaoCompraDetalhe,
-  SolicitacoesCompra
-} from './modules/solicitacao-compra/pages';
 import { useAuth } from './contexts/AuthContext';
-import { isGeoSetor, normalizarSetorToken } from './utils/setor';
-import { getPrioridadesDiretoriaContexto } from './services/prioridadesDiretoria';
+import {
+  canAccessBiblioteca,
+  canAccessBoletos,
+  canAccessComercial,
+  canAccessCadastroObras,
+  canAccessComunicacao,
+  canAccessCompras,
+  canAccessContratos,
+  canAccessFinanceiro,
+  canAccessGestaoObras,
+  canAccessPrioridadesDiretoria,
+  canCreateProvisionamentos,
+  canAccessRhDpDashboard,
+  canAccessRhDpEmpresas,
+  canExecuteRhDpImportacoes,
+  canManageProvisionamentoCategorias,
+  canViewProvisionamentos,
+  canViewProvisionamentosDashboard,
+  canViewIntegracaoSienge,
+  canViewRhDpApuracao,
+  canViewRhDpColaboradores,
+  canViewRhDpDocumentos,
+  canViewRhDpObrigacoes,
+  canAccessCrm,
+  canManageUsers,
+  hasEnabledModule,
+  isBusinessAdmin,
+  isSuperadmin
+} from './utils/acessoProduto';
+
+const Login = lazy(() => import('./pages/Login'));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Solicitacoes = lazy(() => import('./pages/Solicitacoes'));
+const SolicitacaoDetalhe = lazy(() => import('./pages/SolicitacaoDetalhe'));
+const SolicitacoesArquivadas = lazy(() => import('./pages/SolicitacoesArquivadas'));
+const Usuarios = lazy(() => import('./pages/Usuarios'));
+const UsuarioNovo = lazy(() => import('./pages/UsuarioNovo'));
+const NovaSolicitacao = lazy(() => import('./pages/NovaSolicitacao'));
+const UploadComprovantes = lazy(() => import('./pages/UploadComprovantes'));
+const ComprovantesPendentes = lazy(() => import('./pages/ComprovantesPendentes'));
+const FinanceiroTitulos = lazy(() => import('./pages/FinanceiroTitulos'));
+const FinanceiroTituloNovo = lazy(() => import('./pages/FinanceiroTituloNovo'));
+const FinanceiroTituloDetalhe = lazy(() => import('./pages/FinanceiroTituloDetalhe'));
+const FinanceiroBoletos = lazy(() => import('./pages/FinanceiroBoletos'));
+const FinanceiroCadastros = lazy(() => import('./pages/FinanceiroCadastros'));
+const FinanceiroRelatorios = lazy(() => import('./pages/FinanceiroRelatorios'));
+const FinanceiroConciliacao = lazy(() => import('./pages/FinanceiroConciliacao'));
+const FinanceiroResultadoObras = lazy(() => import('./pages/FinanceiroResultadoObras'));
+const Obras = lazy(() => import('./pages/Obras'));
+const ObraGestao = lazy(() => import('./pages/ObraGestao'));
+const RelatoriosAdministrativos = lazy(() => import('./pages/RelatoriosAdministrativos'));
+const Setores = lazy(() => import('./pages/Setores'));
+const TiposSolicitacao = lazy(() => import('./pages/TiposSolicitacao'));
+const GestaoContratos = lazy(() => import('./pages/GestaoContratos'));
+const Configuracoes = lazy(() => import('./pages/Configuracoes'));
+const AprovacaoDiretoria = lazy(() => import('./pages/AprovacaoDiretoria'));
+const TiposSubContrato = lazy(() => import('./pages/TiposSubContrato'));
+const StatusSetor = lazy(() => import('./pages/StatusSetor'));
+const Perfil = lazy(() => import('./pages/Perfil'));
+const PermissoesSetor = lazy(() => import('./pages/PermissoesSetor'));
+const CoresSistema = lazy(() => import('./pages/CoresSistema'));
+const AreasObra = lazy(() => import('./pages/AreasObra'));
+const AreasPorSetorOrigem = lazy(() => import('./pages/AreasPorSetorOrigem'));
+const SetoresVisiveisUsuario = lazy(() => import('./pages/SetoresVisiveisUsuario'));
+const ComportamentoRecebimentoSetor = lazy(() => import('./pages/ComportamentoRecebimentoSetor'));
+const TimeoutInatividade = lazy(() => import('./pages/TimeoutInatividade'));
+const TiposSolicitacaoPorSetor = lazy(() => import('./pages/TiposSolicitacaoPorSetor'));
+const TiposCompartilhadosSetor = lazy(() => import('./pages/TiposCompartilhadosSetor'));
+const AutomacaoStatusSetor = lazy(() => import('./pages/AutomacaoStatusSetor'));
+const SetoresCriacaoTodasObras = lazy(() => import('./pages/SetoresCriacaoTodasObras'));
+const SetoresAcessoTodasObras = lazy(() => import('./pages/SetoresAcessoTodasObras'));
+const UsuariosEnvioQualquerSetor = lazy(() => import('./pages/UsuariosEnvioQualquerSetor'));
+const UsuariosAcessoFinanceiro = lazy(() => import('./pages/UsuariosAcessoFinanceiro'));
+const UsuariosPermissoesRhDp = lazy(() => import('./pages/UsuariosPermissoesRhDp'));
+const PermissoesAreas = lazy(() => import('./pages/PermissoesAreas'));
+const ComunicacaoInterna = lazy(() => import('./pages/ComunicacaoInterna'));
+const PrioridadesDiretoria = lazy(() => import('./pages/PrioridadesDiretoria'));
+const ArquivosModelos = lazy(() => import('./pages/ArquivosModelos'));
+const ArquivosModelosConfig = lazy(() => import('./pages/ArquivosModelosConfig'));
+const ConfiguracoesCotacao = lazy(() => import('./pages/ConfiguracoesCotacao'));
+const ConfiguracoesStatusPedidoCompra = lazy(() => import('./pages/ConfiguracoesStatusPedidoCompra'));
+const ConfiguracoesComercialCategorias = lazy(() => import('./pages/ConfiguracoesComercialCategorias'));
+const ConfiguracoesModulos = lazy(() => import('./pages/ConfiguracoesModulos'));
+const Parceiros = lazy(() => import('./pages/Parceiros'));
+const ParceiroCategorias = lazy(() => import('./pages/ParceiroCategorias'));
+const ComercialEmpreendimentos = lazy(() => import('./pages/ComercialEmpreendimentos'));
+const ComercialUnidades = lazy(() => import('./pages/ComercialUnidades'));
+const ComercialContratos = lazy(() => import('./pages/ComercialContratos'));
+const ComercialTabelasPreco = lazy(() => import('./pages/ComercialTabelasPreco'));
+const ComercialMapaUnidades = lazy(() => import('./pages/ComercialMapaUnidades'));
+const DashboardProvisionamentoFinanceiro = lazy(() => import('./modules/provisionamento-financeiro/pages/DashboardProvisionamentoFinanceiro'));
+const ProvisionamentosFinanceiros = lazy(() => import('./modules/provisionamento-financeiro/pages/ProvisionamentosFinanceiros'));
+const NovaProvisaoFinanceira = lazy(() => import('./modules/provisionamento-financeiro/pages/NovaProvisaoFinanceira'));
+const ProvisionamentoFinanceiroDetalhe = lazy(() => import('./modules/provisionamento-financeiro/pages/ProvisionamentoFinanceiroDetalhe'));
+const GestaoCategoriasMacro = lazy(() => import('./modules/provisionamento-financeiro/pages/GestaoCategoriasMacro'));
+const RhDpInicio = lazy(() => import('./pages/RhDpInicio'));
+const RhDpEmpresas = lazy(() => import('./pages/RhDpEmpresas'));
+const RhDpColaboradores = lazy(() => import('./pages/RhDpColaboradores'));
+const RhDpDocumentos = lazy(() => import('./pages/RhDpDocumentos'));
+const RhDpImportacoes = lazy(() => import('./pages/RhDpImportacoes'));
+const RhDpApuracao = lazy(() => import('./pages/RhDpApuracao'));
+const RhDpFechamentos = lazy(() => import('./pages/RhDpFechamentos'));
+const IntegracaoSiengeInicio = lazy(() => import('./pages/IntegracaoSiengeInicio'));
+const SolicitacoesCompra = lazy(() => import('./modules/solicitacao-compra/pages/SolicitacoesCompra'));
+const CotacaoFornecedorPublica = lazy(() => import('./modules/solicitacao-compra/pages/CotacaoFornecedorPublica'));
+const SolicitacaoCompraDetalhe = lazy(() => import('./modules/solicitacao-compra/pages/SolicitacaoCompraDetalheView'));
+const NovaSolicitacaoCompra = lazy(() => import('./modules/solicitacao-compra/pages/NovaSolicitacaoCompra'));
+const RevisarSolicitacaoCompra = lazy(() => import('./modules/solicitacao-compra/pages/RevisarSolicitacaoCompra'));
+const RevisarSolicitacaoCompraFinal = lazy(() => import('./modules/solicitacao-compra/pages/RevisarSolicitacaoCompraFinal'));
+const GestaoApropriacoes = lazy(() => import('./modules/solicitacao-compra/pages/GestaoApropriacoes'));
+const GestaoInsumos = lazy(() => import('./modules/solicitacao-compra/pages/GestaoInsumos'));
+const GestaoCategorias = lazy(() => import('./modules/solicitacao-compra/pages/GestaoCategorias'));
+const GestaoUnidades = lazy(() => import('./modules/solicitacao-compra/pages/GestaoUnidades'));
+const PedidosCompra = lazy(() => import('./modules/solicitacao-compra/pages/PedidosCompra'));
+const PedidoCompraDetalhe = lazy(() => import('./modules/solicitacao-compra/pages/PedidoCompraDetalhe'));
+const GestaoFornecedores = lazy(() => import('./modules/solicitacao-compra/pages/GestaoFornecedores'));
+const NovaCotacaoAvulsa = lazy(() => import('./modules/solicitacao-compra/pages/NovaCotacaoAvulsa'));
+const ListaCotacoes = lazy(() => import('./modules/solicitacao-compra/pages/ListaCotacoes'));
+const CrmLeads = lazy(() => import('./modules/crm/pages/CrmLeads'));
+const CrmKanban = lazy(() => import('./modules/crm/pages/CrmKanban'));
+const CrmLeadDetalhe = lazy(() => import('./modules/crm/pages/CrmLeadDetalhe'));
+const CrmNovoLead = lazy(() => import('./modules/crm/pages/CrmNovoLead'));
+const CrmDashboard = lazy(() => import('./modules/crm/pages/CrmDashboard'));
+const CrmDashboardGerencial = lazy(() => import('./modules/crm/pages/CrmDashboardGerencial'));
+const CrmDashboardSla = lazy(() => import('./modules/crm/pages/CrmDashboardSla'));
+const CrmDashboardDistribuicao = lazy(() => import('./modules/crm/pages/CrmDashboardDistribuicao'));
+const CrmTarefas = lazy(() => import('./modules/crm/pages/CrmTarefas'));
+const CrmCarteira = lazy(() => import('./modules/crm/pages/CrmCarteira'));
+const CrmInbox = lazy(() => import('./modules/crm/pages/CrmInbox'));
+const CrmAutomacoes = lazy(() => import('./modules/crm/pages/CrmAutomacoes'));
+const CrmAdminCanais = lazy(() => import('./modules/crm/pages/CrmAdminCanais'));
+const CrmAdminNumeros = lazy(() => import('./modules/crm/pages/CrmAdminNumeros'));
+const CrmAdminIntegracoes = lazy(() => import('./modules/crm/pages/CrmAdminIntegracoes'));
+
+function PublicPage({ children }) {
+  return (
+    <Suspense fallback={<AppRouteFallback fullScreen />}>
+      {children}
+    </Suspense>
+  );
+}
 
 function GestaoUsuariosRoute({ children }) {
   const { user } = useAuth();
-  const perfil = String(user?.perfil || '').toUpperCase();
-  const tokens = [
-    String(user?.setor?.codigo || '').toUpperCase(),
-    String(user?.setor?.nome || '').toUpperCase(),
-    String(user?.area || '').toUpperCase()
-  ];
-  const isAdminGEO = perfil === 'ADMIN' && tokens.some(isGeoSetor);
-  const permitido = perfil === 'SUPERADMIN' || isAdminGEO;
-
-  if (!permitido) {
+  if (!canManageUsers(user)) {
     return <Navigate to="/" replace />;
   }
 
@@ -91,8 +157,23 @@ function GestaoUsuariosRoute({ children }) {
 
 function SuperadminRoute({ children }) {
   const { user } = useAuth();
-  const perfil = String(user?.perfil || '').toUpperCase();
-  if (perfil !== 'SUPERADMIN') {
+  if (!isSuperadmin(user)) {
+    return <Navigate to="/" replace />;
+  }
+  return children;
+}
+
+function BusinessAdminRoute({ children }) {
+  const { user } = useAuth();
+  if (!isBusinessAdmin(user)) {
+    return <Navigate to="/" replace />;
+  }
+  return children;
+}
+
+function EnabledModuleRoute({ moduleKey, children }) {
+  const { user } = useAuth();
+  if (!hasEnabledModule(user, moduleKey)) {
     return <Navigate to="/" replace />;
   }
   return children;
@@ -100,116 +181,230 @@ function SuperadminRoute({ children }) {
 
 function ModuloComprasRoute({ children }) {
   const { user } = useAuth();
-  const perfil = String(user?.perfil || '').toUpperCase();
-  const permitido =
-    perfil === 'SUPERADMIN' ||
-    perfil === 'ADMIN' ||
-    Boolean(user?.pode_criar_solicitacao_compra);
-
-  if (!permitido) {
+  if (!canAccessCompras(user)) {
     return <Navigate to="/" replace />;
   }
+  return children;
+}
 
+function FinanceiroRoute({ children }) {
+  const { user } = useAuth();
+  if (!canAccessFinanceiro(user)) {
+    return <Navigate to="/" replace />;
+  }
+  return children;
+}
+
+function BoletosRoute({ children }) {
+  const { user } = useAuth();
+  if (!canAccessBoletos(user)) {
+    return <Navigate to="/" replace />;
+  }
+  return children;
+}
+
+function ComunicacaoRoute({ children }) {
+  const { user } = useAuth();
+  if (!canAccessComunicacao(user)) {
+    return <Navigate to="/" replace />;
+  }
+  return children;
+}
+
+function BibliotecaRoute({ children }) {
+  const { user } = useAuth();
+  if (!canAccessBiblioteca(user)) {
+    return <Navigate to="/" replace />;
+  }
+  return children;
+}
+
+function CadastroObrasRoute({ children }) {
+  const { user } = useAuth();
+  if (!canAccessCadastroObras(user)) {
+    return <Navigate to="/" replace />;
+  }
+  return children;
+}
+
+function CrmRoute({ children }) {
+  const { user } = useAuth();
+  if (!canAccessCrm(user)) {
+    return <Navigate to="/" replace />;
+  }
   return children;
 }
 
 function PrioridadesDiretoriaRoute({ children }) {
   const { user } = useAuth();
-  const [acessoConfigurado, setAcessoConfigurado] = useState(false);
-  const [carregandoAcesso, setCarregandoAcesso] = useState(true);
-  const perfil = String(user?.perfil || '').toUpperCase();
-  const tokens = [
-    user?.setor?.codigo,
-    user?.setor?.nome,
-    user?.area
-  ]
-    .map(normalizarSetorToken)
-    .filter(Boolean);
-
-  const permitido =
-    perfil === 'SUPERADMIN' ||
-    tokens.includes('DIR_ADMIN') ||
-    tokens.includes('DIR_OBRAS_PUBLICAS') ||
-    tokens.includes('DIR_OBRAS_PRIVADAS');
-
-  useEffect(() => {
-    let ativo = true;
-
-    async function validarAcessoConfigurado() {
-      if (permitido || !user?.id) {
-        if (ativo) {
-          setAcessoConfigurado(false);
-          setCarregandoAcesso(false);
-        }
-        return;
-      }
-
-      try {
-        setCarregandoAcesso(true);
-        const contexto = await getPrioridadesDiretoriaContexto();
-        if (ativo) {
-          setAcessoConfigurado(Boolean(contexto?.permissoes?.pode_acessar_modulo));
-        }
-      } catch {
-        if (ativo) {
-          setAcessoConfigurado(false);
-        }
-      } finally {
-        if (ativo) {
-          setCarregandoAcesso(false);
-        }
-      }
-    }
-
-    validarAcessoConfigurado();
-    return () => {
-      ativo = false;
-    };
-  }, [permitido, user?.id]);
-
-  if (!permitido && carregandoAcesso) {
-    return <p>Carregando...</p>;
-  }
-
-  if (!permitido && !acessoConfigurado) {
+  if (!canAccessPrioridadesDiretoria(user)) {
     return <Navigate to="/" replace />;
   }
+  return children;
+}
 
+function GestaoObrasRoute({ children }) {
+  const { user } = useAuth();
+  if (!canAccessGestaoObras(user)) {
+    return <Navigate to="/obras" replace />;
+  }
+  return children;
+}
+
+function ContratosRoute({ children }) {
+  const { user } = useAuth();
+  if (!canAccessContratos(user)) {
+    return <Navigate to="/" replace />;
+  }
+  return children;
+}
+
+function ComercialRoute({ children }) {
+  const { user } = useAuth();
+  if (!canAccessComercial(user)) {
+    return <Navigate to="/" replace />;
+  }
+  return children;
+}
+
+function ProvisionamentosRoute({ children }) {
+  const { user } = useAuth();
+  if (!canViewProvisionamentos(user)) {
+    return <Navigate to="/" replace />;
+  }
+  return children;
+}
+
+function ProvisionamentosCreateRoute({ children }) {
+  const { user } = useAuth();
+  if (!canCreateProvisionamentos(user)) {
+    return <Navigate to="/provisoes-financeiras" replace />;
+  }
+  return children;
+}
+
+function ProvisionamentosDashboardRoute({ children }) {
+  const { user } = useAuth();
+  if (!canViewProvisionamentosDashboard(user)) {
+    return <Navigate to="/provisoes-financeiras" replace />;
+  }
+  return children;
+}
+
+function ProvisionamentosCategoriasRoute({ children }) {
+  const { user } = useAuth();
+  if (!canManageProvisionamentoCategorias(user)) {
+    return <Navigate to="/provisoes-financeiras" replace />;
+  }
+  return children;
+}
+
+function RhDpDashboardRoute({ children }) {
+  const { user } = useAuth();
+  if (!canAccessRhDpDashboard(user)) {
+    return <Navigate to="/" replace />;
+  }
+  return children;
+}
+
+function RhDpEmpresasRoute({ children }) {
+  const { user } = useAuth();
+  if (!canAccessRhDpEmpresas(user)) {
+    return <Navigate to="/rh-dp" replace />;
+  }
+  return children;
+}
+
+function RhDpColaboradoresRoute({ children }) {
+  const { user } = useAuth();
+  if (!canViewRhDpColaboradores(user)) {
+    return <Navigate to="/rh-dp" replace />;
+  }
+  return children;
+}
+
+function RhDpDocumentosRoute({ children }) {
+  const { user } = useAuth();
+  if (!canViewRhDpDocumentos(user)) {
+    return <Navigate to="/rh-dp" replace />;
+  }
+  return children;
+}
+
+function RhDpImportacoesRoute({ children }) {
+  const { user } = useAuth();
+  if (!canExecuteRhDpImportacoes(user)) {
+    return <Navigate to="/rh-dp" replace />;
+  }
+  return children;
+}
+
+function RhDpApuracaoRoute({ children }) {
+  const { user } = useAuth();
+  if (!canViewRhDpApuracao(user)) {
+    return <Navigate to="/rh-dp" replace />;
+  }
+  return children;
+}
+
+function RhDpFinanceiroRoute({ children }) {
+  const { user } = useAuth();
+  if (!canViewRhDpObrigacoes(user)) {
+    return <Navigate to="/rh-dp" replace />;
+  }
+  if (!hasEnabledModule(user, 'FINANCEIRO')) {
+    return <Navigate to="/rh-dp" replace />;
+  }
+  return children;
+}
+
+function IntegracaoSiengeRoute({ children }) {
+  const { user } = useAuth();
+  if (!canViewIntegracaoSienge(user)) {
+    return <Navigate to="/" replace />;
+  }
   return children;
 }
 
 export default function App() {
   return (
     <Routes>
+      <Route
+        path="/login"
+        element={(
+          <PublicPage>
+            <Login />
+          </PublicPage>
+        )}
+      />
+      <Route
+        path="/cotacao/:token"
+        element={(
+          <PublicPage>
+            <CotacaoFornecedorPublica />
+          </PublicPage>
+        )}
+      />
 
-      {/* =========================
-          LOGIN (PÚBLICO)
-      ========================= */}
-      <Route path="/login" element={<Login />} />
-      <Route path="/cotacao/:token" element={<CotacaoFornecedorPublica />} />
-
-      {/* =========================
-          ÁREA PROTEGIDA
-      ========================= */}
       <Route
         path="/"
-        element={
+        element={(
           <PrivateRoute>
             <Layout />
           </PrivateRoute>
-        }
+        )}
       >
-
         <Route index element={<Dashboard />} />
 
         <Route path="solicitacoes" element={<Solicitacoes />} />
         <Route path="solicitacoes-arquivadas" element={<SolicitacoesArquivadas />} />
         <Route path="solicitacoes/:id" element={<SolicitacaoDetalhe />} />
         <Route path="prioridades-diretoria" element={<PrioridadesDiretoriaRoute><PrioridadesDiretoria /></PrioridadesDiretoriaRoute>} />
-        <Route path="conversas/entrada" element={<ConversasEntrada />} />
-        <Route path="conversas/saida" element={<ConversasSaida />} />
-        <Route path="conversas/:id" element={<ConversaDetalhe />} />
-        <Route path="arquivos-modelos" element={<ArquivosModelos />} />
+        <Route path="comunicacao-interna" element={<ComunicacaoRoute><ComunicacaoInterna /></ComunicacaoRoute>} />
+        <Route path="conversas/entrada" element={<ComunicacaoRoute><ComunicacaoInterna /></ComunicacaoRoute>} />
+        <Route path="conversas/saida" element={<ComunicacaoRoute><ComunicacaoInterna /></ComunicacaoRoute>} />
+        <Route path="conversas/:id" element={<ComunicacaoRoute><ComunicacaoInterna /></ComunicacaoRoute>} />
+        <Route path="arquivos-modelos" element={<BibliotecaRoute><ArquivosModelos /></BibliotecaRoute>} />
 
         <Route path="nova-solicitacao" element={<NovaSolicitacao />} />
 
@@ -218,52 +413,99 @@ export default function App() {
         <Route path="usuarios/:id" element={<GestaoUsuariosRoute><UsuarioNovo /></GestaoUsuariosRoute>} />
         <Route path="usuarios/:id/editar" element={<GestaoUsuariosRoute><UsuarioNovo /></GestaoUsuariosRoute>} />
 
-        <Route path="obras" element={<Obras />} />
-        <Route path="setores" element={<Setores />} />
-        <Route path="cargos" element={<Cargo />} />
-        <Route path="tipos-solicitacao" element={<TiposSolicitacao />} />
-        <Route path="gestao-contratos" element={<GestaoContratos />} />
-        <Route path="configuracoes" element={<Configuracoes />} />
-        <Route path="tipos-sub-contrato" element={<TiposSubContrato />} />
-        <Route path="status-setor" element={<StatusSetor />} />
-        <Route path="permissoes-setor" element={<PermissoesSetor />} />
-        <Route path="cores-sistema" element={<CoresSistema />} />
-        <Route path="areas-obra" element={<AreasObra />} />
-        <Route path="aprovacao-diretoria" element={<SuperadminRoute><AprovacaoDiretoria /></SuperadminRoute>} />
-        <Route path="areas-por-setor-origem" element={<AreasPorSetorOrigem />} />
-        <Route path="setores-visiveis-usuario" element={<SetoresVisiveisUsuario />} />
-        <Route path="usuarios-envio-qualquer-setor" element={<SuperadminRoute><UsuariosEnvioQualquerSetor /></SuperadminRoute>} />
-        <Route path="comportamento-recebimento-setor" element={<ComportamentoRecebimentoSetor />} />
-        <Route path="timeout-inatividade" element={<TimeoutInatividade />} />
-        <Route path="tipos-solicitacao-por-setor" element={<TiposSolicitacaoPorSetor />} />
-        <Route path="tipos-compartilhados-setor" element={<SuperadminRoute><TiposCompartilhadosSetor /></SuperadminRoute>} />
-        <Route path="automacao-status-setor" element={<SuperadminRoute><AutomacaoStatusSetor /></SuperadminRoute>} />
-        <Route path="setores-criacao-todas-obras" element={<SetoresCriacaoTodasObras />} />
-        <Route path="setores-sem-alteracao-status" element={<SuperadminRoute><SetoresSemAlteracaoStatus /></SuperadminRoute>} />
-        <Route path="usuarios-acesso-prioridade-diretoria" element={<SuperadminRoute><UsuariosAcessoPrioridadeDiretoria /></SuperadminRoute>} />
+        <Route path="obras" element={<CadastroObrasRoute><Obras /></CadastroObrasRoute>} />
+        <Route path="obras/:id" element={<GestaoObrasRoute><ObraGestao /></GestaoObrasRoute>} />
+        <Route path="setores" element={<BusinessAdminRoute><Setores /></BusinessAdminRoute>} />
+        <Route path="tipos-solicitacao" element={<BusinessAdminRoute><TiposSolicitacao /></BusinessAdminRoute>} />
+        <Route path="gestao-contratos" element={<ContratosRoute><GestaoContratos /></ContratosRoute>} />
+        <Route path="configuracoes" element={<BusinessAdminRoute><Configuracoes /></BusinessAdminRoute>} />
+        <Route path="aprovacao-diretoria" element={<BusinessAdminRoute><AprovacaoDiretoria /></BusinessAdminRoute>} />
+        <Route path="tipos-sub-contrato" element={<BusinessAdminRoute><TiposSubContrato /></BusinessAdminRoute>} />
+        <Route path="status-setor" element={<BusinessAdminRoute><StatusSetor /></BusinessAdminRoute>} />
+        <Route path="permissoes-setor" element={<BusinessAdminRoute><PermissoesSetor /></BusinessAdminRoute>} />
+        <Route path="cores-sistema" element={<BusinessAdminRoute><CoresSistema /></BusinessAdminRoute>} />
+        <Route path="areas-obra" element={<BusinessAdminRoute><AreasObra /></BusinessAdminRoute>} />
+        <Route path="areas-por-setor-origem" element={<BusinessAdminRoute><AreasPorSetorOrigem /></BusinessAdminRoute>} />
+        <Route path="setores-visiveis-usuario" element={<BusinessAdminRoute><SetoresVisiveisUsuario /></BusinessAdminRoute>} />
+        <Route path="comportamento-recebimento-setor" element={<BusinessAdminRoute><ComportamentoRecebimentoSetor /></BusinessAdminRoute>} />
+        <Route path="timeout-inatividade" element={<BusinessAdminRoute><TimeoutInatividade /></BusinessAdminRoute>} />
+        <Route path="tipos-solicitacao-por-setor" element={<BusinessAdminRoute><TiposSolicitacaoPorSetor /></BusinessAdminRoute>} />
+        <Route path="tipos-compartilhados-setor" element={<BusinessAdminRoute><TiposCompartilhadosSetor /></BusinessAdminRoute>} />
+        <Route path="automacao-status-setor" element={<BusinessAdminRoute><AutomacaoStatusSetor /></BusinessAdminRoute>} />
+        <Route path="setores-criacao-todas-obras" element={<BusinessAdminRoute><SetoresCriacaoTodasObras /></BusinessAdminRoute>} />
+        <Route path="setores-acesso-todas-obras" element={<BusinessAdminRoute><SetoresAcessoTodasObras /></BusinessAdminRoute>} />
+        <Route path="usuarios-envio-qualquer-setor" element={<BusinessAdminRoute><UsuariosEnvioQualquerSetor /></BusinessAdminRoute>} />
+        <Route path="usuarios-acesso-financeiro" element={<BusinessAdminRoute><UsuariosAcessoFinanceiro /></BusinessAdminRoute>} />
+        <Route path="usuarios-permissoes-rh-dp" element={<BusinessAdminRoute><UsuariosPermissoesRhDp /></BusinessAdminRoute>} />
+        <Route path="permissoes-areas" element={<BusinessAdminRoute><PermissoesAreas /></BusinessAdminRoute>} />
         <Route path="arquivos-modelos-config" element={<SuperadminRoute><ArquivosModelosConfig /></SuperadminRoute>} />
-        <Route path="provisionamento-financeiro-config" element={<SuperadminRoute><ConfiguracaoProvisionamentoFinanceiro /></SuperadminRoute>} />
-        <Route path="provisoes-financeiras/dashboard" element={<DashboardProvisionamentoFinanceiro />} />
-        <Route path="provisoes-financeiras" element={<ProvisionamentosFinanceiros />} />
-        <Route path="provisoes-financeiras/nova" element={<NovaProvisaoFinanceira />} />
-        <Route path="provisoes-financeiras/categorias" element={<SuperadminRoute><GestaoCategoriasMacro /></SuperadminRoute>} />
-        <Route path="provisoes-financeiras/:id" element={<ProvisionamentoFinanceiroDetalhe />} />
+        <Route path="configuracoes-cotacao" element={<EnabledModuleRoute moduleKey="COMPRAS"><BusinessAdminRoute><ConfiguracoesCotacao /></BusinessAdminRoute></EnabledModuleRoute>} />
+        <Route path="configuracoes-status-pedidos-compra" element={<EnabledModuleRoute moduleKey="COMPRAS"><BusinessAdminRoute><ConfiguracoesStatusPedidoCompra /></BusinessAdminRoute></EnabledModuleRoute>} />
+        <Route path="configuracoes-comercial-categorias" element={<EnabledModuleRoute moduleKey="COMERCIAL"><SuperadminRoute><ConfiguracoesComercialCategorias /></SuperadminRoute></EnabledModuleRoute>} />
+        <Route path="configuracoes-modulos" element={<SuperadminRoute><ConfiguracoesModulos /></SuperadminRoute>} />
+        <Route path="parceiros" element={<BusinessAdminRoute><Parceiros /></BusinessAdminRoute>} />
+        <Route path="parceiros-categorias" element={<BusinessAdminRoute><ParceiroCategorias /></BusinessAdminRoute>} />
+        <Route path="crm/dashboard" element={<CrmRoute><CrmDashboard /></CrmRoute>} />
+        <Route path="crm/dashboard-gerencial" element={<CrmRoute><CrmDashboardGerencial /></CrmRoute>} />
+        <Route path="crm/dashboard-sla" element={<CrmRoute><CrmDashboardSla /></CrmRoute>} />
+        <Route path="crm/dashboard-distribuicao" element={<CrmRoute><CrmDashboardDistribuicao /></CrmRoute>} />
+        <Route path="crm/leads" element={<CrmRoute><CrmLeads /></CrmRoute>} />
+        <Route path="crm/leads/novo" element={<CrmRoute><CrmNovoLead /></CrmRoute>} />
+        <Route path="crm/leads/:id" element={<CrmRoute><CrmLeadDetalhe /></CrmRoute>} />
+        <Route path="crm/kanban" element={<CrmRoute><CrmKanban /></CrmRoute>} />
+        <Route path="crm/tarefas" element={<CrmRoute><CrmTarefas /></CrmRoute>} />
+        <Route path="crm/carteira" element={<CrmRoute><CrmCarteira /></CrmRoute>} />
+        <Route path="crm/inbox" element={<CrmRoute><CrmInbox /></CrmRoute>} />
+        <Route path="crm/automacoes" element={<CrmRoute><CrmAutomacoes /></CrmRoute>} />
+        <Route path="crm/admin/canais" element={<CrmRoute><CrmAdminCanais /></CrmRoute>} />
+        <Route path="crm/admin/numeros" element={<CrmRoute><CrmAdminNumeros /></CrmRoute>} />
+        <Route path="crm/admin/integracoes" element={<CrmRoute><CrmAdminIntegracoes /></CrmRoute>} />
+        <Route path="comercial/empreendimentos" element={<ComercialRoute><ComercialEmpreendimentos /></ComercialRoute>} />
+        <Route path="comercial/unidades" element={<ComercialRoute><ComercialUnidades /></ComercialRoute>} />
+        <Route path="comercial/tabelas-preco" element={<ComercialRoute><ComercialTabelasPreco /></ComercialRoute>} />
+        <Route path="comercial/mapa-unidades" element={<ComercialRoute><ComercialMapaUnidades /></ComercialRoute>} />
+        <Route path="comercial/contratos" element={<ComercialRoute><ComercialContratos /></ComercialRoute>} />
+        <Route path="provisoes-financeiras" element={<ProvisionamentosRoute><ProvisionamentosFinanceiros /></ProvisionamentosRoute>} />
+        <Route path="provisoes-financeiras/nova" element={<ProvisionamentosCreateRoute><NovaProvisaoFinanceira /></ProvisionamentosCreateRoute>} />
+        <Route path="provisoes-financeiras/:id" element={<ProvisionamentosRoute><ProvisionamentoFinanceiroDetalhe /></ProvisionamentosRoute>} />
+        <Route path="provisoes-financeiras/dashboard" element={<ProvisionamentosDashboardRoute><DashboardProvisionamentoFinanceiro /></ProvisionamentosDashboardRoute>} />
+        <Route path="provisoes-financeiras/categorias" element={<ProvisionamentosCategoriasRoute><GestaoCategoriasMacro /></ProvisionamentosCategoriasRoute>} />
+        <Route path="rh-dp" element={<RhDpDashboardRoute><RhDpInicio /></RhDpDashboardRoute>} />
+        <Route path="rh-dp/empresas" element={<RhDpEmpresasRoute><RhDpEmpresas /></RhDpEmpresasRoute>} />
+        <Route path="rh-dp/colaboradores" element={<RhDpColaboradoresRoute><RhDpColaboradores /></RhDpColaboradoresRoute>} />
+        <Route path="rh-dp/documentos" element={<RhDpDocumentosRoute><RhDpDocumentos /></RhDpDocumentosRoute>} />
+        <Route path="rh-dp/importacoes" element={<RhDpImportacoesRoute><RhDpImportacoes /></RhDpImportacoesRoute>} />
+        <Route path="rh-dp/apuracao" element={<RhDpApuracaoRoute><RhDpApuracao /></RhDpApuracaoRoute>} />
+        <Route path="rh-dp/fechamentos" element={<RhDpFinanceiroRoute><RhDpFechamentos /></RhDpFinanceiroRoute>} />
+        <Route path="integracao-sienge" element={<IntegracaoSiengeRoute><IntegracaoSiengeInicio /></IntegracaoSiengeRoute>} />
 
-        <Route path="comprovantes/upload" element={<UploadComprovantes />} />
-        <Route path="comprovantes/pendentes" element={<ComprovantesPendentes />} />
+        <Route path="comprovantes/upload" element={<FinanceiroRoute><UploadComprovantes /></FinanceiroRoute>} />
+        <Route path="comprovantes/pendentes" element={<FinanceiroRoute><ComprovantesPendentes /></FinanceiroRoute>} />
+        <Route path="financeiro/titulos" element={<FinanceiroRoute><FinanceiroTitulos /></FinanceiroRoute>} />
+        <Route path="financeiro/titulos/novo" element={<FinanceiroRoute><FinanceiroTituloNovo /></FinanceiroRoute>} />
+        <Route path="financeiro/titulos/:id" element={<FinanceiroRoute><FinanceiroTituloDetalhe /></FinanceiroRoute>} />
+        <Route path="financeiro/boletos" element={<BoletosRoute><FinanceiroBoletos /></BoletosRoute>} />
+        <Route path="financeiro/relatorios" element={<FinanceiroRoute><FinanceiroRelatorios /></FinanceiroRoute>} />
+        <Route path="financeiro/relatorios/resultado-obras" element={<FinanceiroRoute><FinanceiroResultadoObras /></FinanceiroRoute>} />
+        <Route path="financeiro/conciliacao" element={<FinanceiroRoute><FinanceiroConciliacao /></FinanceiroRoute>} />
+        <Route path="financeiro/cadastros" element={<FinanceiroRoute><FinanceiroCadastros /></FinanceiroRoute>} />
+        <Route path="relatorios/administrativos" element={<ModuloComprasRoute><BusinessAdminRoute><RelatoriosAdministrativos /></BusinessAdminRoute></ModuloComprasRoute>} />
         <Route path="perfil" element={<Perfil />} />
         <Route path="solicitacoes-compra" element={<ModuloComprasRoute><SolicitacoesCompra /></ModuloComprasRoute>} />
         <Route path="solicitacoes-compra/:id" element={<ModuloComprasRoute><SolicitacaoCompraDetalhe /></ModuloComprasRoute>} />
         <Route path="solicitacoes-compra/nova" element={<ModuloComprasRoute><NovaSolicitacaoCompra /></ModuloComprasRoute>} />
         <Route path="solicitacoes-compra/revisar" element={<ModuloComprasRoute><RevisarSolicitacaoCompra /></ModuloComprasRoute>} />
         <Route path="solicitacoes-compra/finalizada/:id" element={<ModuloComprasRoute><RevisarSolicitacaoCompraFinal /></ModuloComprasRoute>} />
-        <Route path="gestao-apropriacoes" element={<SuperadminRoute><GestaoApropriacoes /></SuperadminRoute>} />
-        <Route path="gestao-insumos" element={<SuperadminRoute><GestaoInsumos /></SuperadminRoute>} />
-        <Route path="gestao-unidades" element={<SuperadminRoute><GestaoUnidades /></SuperadminRoute>} />
-        <Route path="gestao-categorias" element={<SuperadminRoute><GestaoCategorias /></SuperadminRoute>} />
-
+        <Route path="pedidos-compra" element={<ModuloComprasRoute><PedidosCompra /></ModuloComprasRoute>} />
+        <Route path="pedidos-compra/:id" element={<ModuloComprasRoute><PedidoCompraDetalhe /></ModuloComprasRoute>} />
+        <Route path="gestao-apropriacoes" element={<GestaoObrasRoute><BusinessAdminRoute><GestaoApropriacoes /></BusinessAdminRoute></GestaoObrasRoute>} />
+        <Route path="gestao-insumos" element={<ModuloComprasRoute><BusinessAdminRoute><GestaoInsumos /></BusinessAdminRoute></ModuloComprasRoute>} />
+        <Route path="gestao-unidades" element={<ModuloComprasRoute><BusinessAdminRoute><GestaoUnidades /></BusinessAdminRoute></ModuloComprasRoute>} />
+        <Route path="gestao-categorias" element={<ModuloComprasRoute><BusinessAdminRoute><GestaoCategorias /></BusinessAdminRoute></ModuloComprasRoute>} />
+        <Route path="gestao-fornecedores" element={<EnabledModuleRoute moduleKey="COTACOES"><GestaoFornecedores /></EnabledModuleRoute>} />
+        <Route path="cotacoes" element={<EnabledModuleRoute moduleKey="COTACOES"><ModuloComprasRoute><ListaCotacoes /></ModuloComprasRoute></EnabledModuleRoute>} />
+        <Route path="cotacoes/nova" element={<EnabledModuleRoute moduleKey="COTACOES"><NovaCotacaoAvulsa /></EnabledModuleRoute>} />
       </Route>
-
     </Routes>
   );
 }

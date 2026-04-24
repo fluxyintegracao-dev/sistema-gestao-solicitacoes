@@ -2,12 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import StatusBadge from '../../components/StatusBadge';
 import { useTheme } from '../../contexts/ThemeContext';
-import {
-  isGeoSetor,
-  obterTokensSetorUsuario,
-  solicitacaoEstaNoSetorDoUsuario,
-  usuarioPodeEnviarSolicitacaoParaOutroSetor
-} from '../../utils/setor';
+import { isGeoSetor, solicitacaoEstaNoSetorDoUsuario, userHasSetorCapability } from '../../utils/setor';
 import ModalAtribuirResponsavel from './ModalAtribuirResponsavel';
 import ModalEnviarSetor from './ModalEnviarSetor';
 import { API_URL, authHeaders } from '../../services/api';
@@ -53,21 +48,24 @@ export default function LinhaSolicitacao({
   });
   const { user } = useAuth();
   const { tema } = useTheme();
-  const isSetorObra =
-    user?.setor?.codigo === 'OBRA' ||
-    user?.area === 'OBRA';
-  const setorTokens = obterTokensSetorUsuario(user);
+  const isSetorObra = userHasSetorCapability(user, 'eh_setor_obra');
+  const setorTokens = [
+    String(user?.setor?.nome || '').toUpperCase(),
+    String(user?.setor?.codigo || '').toUpperCase(),
+    String(user?.area || '').toUpperCase()
+  ];
   const isAdminGEO =
     String(user?.perfil || '').toUpperCase().startsWith('ADMIN') &&
     setorTokens.some(isGeoSetor);
   const isSuperadmin = String(user?.perfil || '').toUpperCase() === 'SUPERADMIN';
   const podeEditarValor = isAdminGEO || isSuperadmin;
+  const setorSolicitacao = setoresMap?.[solicitacao.area_responsavel] || null;
   const setorNomeSolicitacao =
-    (setoresMap?.[solicitacao.area_responsavel] || solicitacao.area_responsavel || '');
+    (setorSolicitacao?.nome || setorSolicitacao || solicitacao.area_responsavel || '');
   const isSetorObraSolicitacao =
+    Boolean(setorSolicitacao?.eh_setor_obra) ||
     String(setorNomeSolicitacao).trim().toUpperCase() === 'OBRA';
-  const isFinanceiro =
-    setorTokens.includes('FINANCEIRO');
+  const isFinanceiro = userHasSetorCapability(user, 'eh_setor_financeiro');
   const isUsuario = user?.perfil === 'USUARIO';
   const podeAssumir =
     !isSetorObra &&
@@ -84,7 +82,7 @@ export default function LinhaSolicitacao({
       : true);
   const podeEnviar =
     !isSetorObra &&
-    usuarioPodeEnviarSolicitacaoParaOutroSetor(solicitacao.area_responsavel, user);
+    (isSuperadmin || solicitacaoEstaNoSetorDoUsuario(solicitacao.area_responsavel, user));
 
   const navigate = useNavigate();
   const dataCriacaoRaw =
@@ -109,14 +107,6 @@ export default function LinhaSolicitacao({
   const dataVencimentoTitle = dataVencimentoValida
     ? dataVencimento.toLocaleString('pt-BR')
     : '';
-  const valorTotal = solicitacao.valor_total ?? solicitacao.valor;
-  const valorExibicao = solicitacao.valor_exibicao ?? valorTotal;
-  const valorPagoAcumulado = Number(solicitacao.valor_pago_acumulado || 0);
-  const valorExibicaoNumero = Number(valorExibicao);
-  const temValorExibicao = valorExibicao !== null && valorExibicao !== undefined && !Number.isNaN(valorExibicaoNumero);
-  const exibeResumoPagamento =
-    valorPagoAcumulado > 0 &&
-    String(solicitacao.status_global || '').trim().toUpperCase() !== 'PAGA';
 
   const [editandoValor, setEditandoValor] = useState(false);
   const [valorEditado, setValorEditado] = useState(
@@ -229,15 +219,10 @@ export default function LinhaSolicitacao({
 
         {mostrarColuna('codigo') && (
           <td
-            {...tdBase('Codigo', `p-2 font-medium whitespace-nowrap truncate ${isMobileCard ? 'text-sm font-semibold' : ''}`)}
+            {...tdBase('Código', `p-2 font-medium whitespace-nowrap truncate ${isMobileCard ? 'text-sm font-semibold' : ''}`)}
             title={solicitacao.codigo || ''}
           >
-            <div>{solicitacao.codigo}</div>
-            {Boolean(solicitacao.prioridade_diretoria_ativa) && (
-              <div className="text-[11px] font-semibold text-amber-700 mt-1">
-                Prioridade autorizada
-              </div>
-            )}
+            {solicitacao.codigo}
           </td>
         )}
 
@@ -311,7 +296,7 @@ export default function LinhaSolicitacao({
         {mostrarColuna('valor') && (
         <td
           {...tdBase('Valor', 'p-2 overflow-hidden')}
-          title={temValorExibicao ? String(valorExibicao) : ''}
+          title={solicitacao.valor ? String(solicitacao.valor) : ''}
         >
           {editandoValor ? (
             <div className="flex items-center gap-2">
@@ -347,29 +332,21 @@ export default function LinhaSolicitacao({
               <span
                 className="block w-full min-w-0 truncate"
                 title={
-                  temValorExibicao
-                    ? valorExibicaoNumero.toLocaleString('pt-BR', {
+                  solicitacao.valor
+                    ? Number(solicitacao.valor).toLocaleString('pt-BR', {
                         style: 'currency',
                         currency: 'BRL'
                       })
                     : '-'
                 }
               >
-                {temValorExibicao
-                  ? valorExibicaoNumero.toLocaleString('pt-BR', {
+                {solicitacao.valor
+                  ? Number(solicitacao.valor).toLocaleString('pt-BR', {
                       style: 'currency',
                       currency: 'BRL'
                     })
                   : '-'}
               </span>
-              {exibeResumoPagamento && (
-                <span className="text-[11px] leading-none text-gray-500 dark:text-slate-400">
-                  Total: {Number(valorTotal || 0).toLocaleString('pt-BR', {
-                    style: 'currency',
-                    currency: 'BRL'
-                  })}
-                </span>
-              )}
               {podeEditarValor && (
                 <button
                   className="text-[11px] leading-none text-blue-600 hover:underline shrink-0"
@@ -386,9 +363,9 @@ export default function LinhaSolicitacao({
         {mostrarColuna('setor') && (
           <td
             {...tdBase('Setor', 'p-2 whitespace-nowrap truncate')}
-            title={setoresMap?.[solicitacao.area_responsavel] || solicitacao.area_responsavel || ''}
+            title={setorNomeSolicitacao || ''}
           >
-            {setoresMap?.[solicitacao.area_responsavel] || solicitacao.area_responsavel}
+            {setorNomeSolicitacao}
           </td>
         )}
 

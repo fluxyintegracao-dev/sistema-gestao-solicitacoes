@@ -61,16 +61,16 @@ export default function SetoresCriacaoTodasObras() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="page solicitacoes-page">
       <div>
-        <h1 className="text-2xl font-semibold">Setores com criação em todas as obras</h1>
-        <p className="text-sm text-gray-600 mt-1">
+        <h1 className="page-title">Setores com criação em todas as obras</h1>
+        <p className="page-subtitle mt-1">
           Setores marcados podem criar solicitação em qualquer obra na tela de Nova Solicitação.
           A visibilidade das solicitações continua seguindo as regras atuais.
         </p>
       </div>
 
-      <div className="bg-white p-6 rounded-xl shadow space-y-4">
+      <div className="card space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
           {setoresOrdenados.map(setor => {
             const codigo = String(setor?.codigo || '').toUpperCase();
@@ -104,4 +104,3 @@ export default function SetoresCriacaoTodasObras() {
     </div>
   );
 }
-

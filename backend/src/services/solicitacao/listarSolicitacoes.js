@@ -1,8 +1,8 @@
-const db = require('../../models');
+﻿const db = require('../../models');
 
 module.exports = async function listarSolicitacoes(usuario) {
-  // ADMIN vê tudo
-  if (usuario.perfil === 'ADMIN') {
+  // ADMIN vÃª tudo
+  if (usuario.perfil === 'ADMIN' || usuario.perfil === 'ADMINISTRADOR') {
     return db.Solicitacao.findAll({
       include: [
         db.Obra,
@@ -12,7 +12,7 @@ module.exports = async function listarSolicitacoes(usuario) {
     });
   }
 
-  // Buscar obras vinculadas ao usuário
+  // Buscar obras vinculadas ao usuÃ¡rio
   const vinculos = await db.UsuarioObra.findAll({
     where: { user_id: usuario.id }
   });
@@ -30,3 +30,4 @@ module.exports = async function listarSolicitacoes(usuario) {
     order: [['createdAt', 'DESC']]
   });
 };
+

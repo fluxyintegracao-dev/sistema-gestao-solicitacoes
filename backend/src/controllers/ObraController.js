@@ -1,6 +1,10 @@
 const { Obra, UsuarioObra, Setor, ConfiguracaoSistema } = require('../models');
 const { Op } = require('sequelize');
-const { normalizarClassificacaoObra } = require('../services/aprovacaoDiretoriaConfig');
+const {
+  listarObrasGestao,
+  obterGestaoObra
+} = require('../services/obraGestaoService');
+const { canAccessFinanceiro } = require('../services/authorizationService');
 const CHAVE_SETORES_CRIACAO_TODAS_OBRAS = 'SETORES_CRIACAO_TODAS_OBRAS';
 
 async function obterSetoresCriacaoTodasObras() {
@@ -35,8 +39,34 @@ async function obterTokensSetorUsuario(req) {
 }
 
 module.exports = {
+  async gestaoIndex(req, res) {
+    try {
+      const dados = await listarObrasGestao();
+      return res.json(dados);
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao carregar gestao das obras' });
+    }
+  },
+
+  async gestaoShow(req, res) {
+    try {
+      const obraId = Number(req.params.id);
+      const dados = await obterGestaoObra(obraId);
+
+      if (!dados) {
+        return res.status(404).json({ error: 'Obra nao encontrada' });
+      }
+
+      return res.json(dados);
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao carregar detalhes da obra' });
+    }
+  },
+
   async index(req, res) {
-    const { codigo, descricao, classificacao_obra } = req.query;
+    const { codigo, descricao } = req.query;
     const where = {};
 
     if (codigo) {
@@ -44,10 +74,6 @@ module.exports = {
     }
     if (descricao) {
       where.nome = { [Op.like]: `%${descricao}%` };
-    }
-    const classificacao = normalizarClassificacaoObra(classificacao_obra);
-    if (classificacao) {
-      where.classificacao_obra = classificacao;
     }
 
     const obras = await Obra.findAll({
@@ -60,14 +86,13 @@ module.exports = {
   async minhas(req, res) {
     try {
       const { id: usuarioId, perfil } = req.user;
-      const { codigo, descricao, modo, classificacao_obra } = req.query;
-      const classificacao = normalizarClassificacaoObra(classificacao_obra);
+      const { codigo, descricao, modo } = req.query;
+      const modoNormalizado = String(modo || '').trim().toUpperCase();
 
       if (perfil === 'SUPERADMIN') {
         const where = {};
         if (codigo) where.codigo = String(codigo).toUpperCase();
         if (descricao) where.nome = { [Op.like]: `%${descricao}%` };
-        if (classificacao) where.classificacao_obra = classificacao;
         const obras = await Obra.findAll({
           where,
           order: [['nome', 'ASC']]
@@ -75,7 +100,18 @@ module.exports = {
         return res.json(obras);
       }
 
-      const modoCriacao = String(modo || '').trim().toUpperCase() === 'CRIACAO';
+      if (modoNormalizado === 'FINANCEIRO' && await canAccessFinanceiro(req.user)) {
+        const where = {};
+        if (codigo) where.codigo = String(codigo).toUpperCase();
+        if (descricao) where.nome = { [Op.like]: `%${descricao}%` };
+        const obras = await Obra.findAll({
+          where,
+          order: [['nome', 'ASC']]
+        });
+        return res.json(obras);
+      }
+
+      const modoCriacao = modoNormalizado === 'CRIACAO';
       if (modoCriacao) {
         const [tokensUsuario, setoresPermitidos] = await Promise.all([
           obterTokensSetorUsuario(req),
@@ -87,7 +123,6 @@ module.exports = {
           const where = {};
           if (codigo) where.codigo = String(codigo).toUpperCase();
           if (descricao) where.nome = { [Op.like]: `%${descricao}%` };
-          if (classificacao) where.classificacao_obra = classificacao;
           const obras = await Obra.findAll({
             where,
             order: [['nome', 'ASC']]
@@ -114,10 +149,7 @@ module.exports = {
           {
             model: Obra,
             as: 'obra',
-            where: {
-              ...(descricao ? { nome: { [Op.like]: `%${descricao}%` } } : {}),
-              ...(classificacao ? { classificacao_obra: classificacao } : {})
-            }
+            where: descricao ? { nome: { [Op.like]: `%${descricao}%` } } : undefined
           }
         ]
       });
@@ -132,11 +164,15 @@ module.exports = {
   },
 
   async create(req, res) {
-    const { nome, codigo, cidade, classificacao_obra } = req.body;
-    const classificacao = normalizarClassificacaoObra(classificacao_obra);
+    const { nome, codigo, cidade, classificacao, vgv, planilha_geral, margem_custo_esperada } = req.body;
 
     if (!nome || !codigo) {
       return res.status(400).json({ error: 'Nome e codigo sao obrigatorios' });
+    }
+
+    const classificacaoNorm = classificacao ? String(classificacao).trim().toUpperCase() : null;
+    if (classificacaoNorm && !['PRIVADA', 'PUBLICA'].includes(classificacaoNorm)) {
+      return res.status(400).json({ error: 'Classificacao invalida. Use PRIVADA ou PUBLICA' });
     }
 
     const existente = await Obra.findOne({
@@ -149,9 +185,12 @@ module.exports = {
     const obra = await Obra.create({
       codigo: String(codigo).toUpperCase(),
       cidade: cidade || null,
-      classificacao_obra: classificacao,
       nome,
-      ativo: true
+      ativo: true,
+      classificacao: classificacaoNorm,
+      vgv: vgv != null ? Number(vgv) : null,
+      planilha_geral: planilha_geral != null ? Number(planilha_geral) : null,
+      margem_custo_esperada: margem_custo_esperada != null ? Number(margem_custo_esperada) : null
     });
 
     res.status(201).json(obra);
@@ -159,20 +198,27 @@ module.exports = {
 
   async update(req, res) {
     const { id } = req.params;
-    const { nome, codigo, cidade, classificacao_obra } = req.body;
+    const { nome, codigo, cidade, classificacao, vgv, planilha_geral, margem_custo_esperada } = req.body;
 
     const dados = {};
     if (nome) dados.nome = nome;
     if (cidade !== undefined) dados.cidade = cidade || null;
-    if (classificacao_obra !== undefined) {
-      dados.classificacao_obra = normalizarClassificacaoObra(classificacao_obra);
-    }
     if (codigo !== undefined) {
       if (!codigo) {
         return res.status(400).json({ error: 'Codigo invalido' });
       }
       dados.codigo = String(codigo).toUpperCase();
     }
+    if (classificacao !== undefined) {
+      const classificacaoNorm = classificacao ? String(classificacao).trim().toUpperCase() : null;
+      if (classificacaoNorm && !['PRIVADA', 'PUBLICA'].includes(classificacaoNorm)) {
+        return res.status(400).json({ error: 'Classificacao invalida. Use PRIVADA ou PUBLICA' });
+      }
+      dados.classificacao = classificacaoNorm;
+    }
+    if (vgv !== undefined) dados.vgv = vgv != null ? Number(vgv) : null;
+    if (planilha_geral !== undefined) dados.planilha_geral = planilha_geral != null ? Number(planilha_geral) : null;
+    if (margem_custo_esperada !== undefined) dados.margem_custo_esperada = margem_custo_esperada != null ? Number(margem_custo_esperada) : null;
 
     if (Object.keys(dados).length === 0) {
       return res.status(400).json({ error: 'Nada para atualizar' });

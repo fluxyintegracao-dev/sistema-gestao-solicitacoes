@@ -5,10 +5,7 @@ const CHAVE_SETOR_DESTINO_APOS_APROVACAO_DIRETORIA = 'SETOR_DESTINO_APOS_APROVAC
 
 function normalizarClassificacaoObra(valor) {
   const classificacao = String(valor || '').trim().toUpperCase();
-  if (classificacao === 'PUBLICA' || classificacao === 'PRIVADA') {
-    return classificacao;
-  }
-  return null;
+  return ['PUBLICA', 'PRIVADA'].includes(classificacao) ? classificacao : null;
 }
 
 function normalizarTokenSetor(valor) {
@@ -18,31 +15,22 @@ function normalizarTokenSetor(valor) {
 
 function normalizarMapaDiretoriasPorClassificacao(raw = {}) {
   const diretorias = {};
-
   ['PUBLICA', 'PRIVADA'].forEach((classificacao) => {
     const token = normalizarTokenSetor(raw?.[classificacao]);
-    if (token) {
-      diretorias[classificacao] = token;
-    }
+    if (token) diretorias[classificacao] = token;
   });
-
   return diretorias;
 }
 
 function normalizarMapaSetorDestinoAprovacao(raw = {}) {
   const destinos = {};
-
   Object.entries(raw || {}).forEach(([tipoId, setor]) => {
     const id = Number(tipoId);
     const token = normalizarTokenSetor(setor);
-
-    if (!Number.isInteger(id) || id <= 0 || !token) {
-      return;
+    if (Number.isInteger(id) && id > 0 && token) {
+      destinos[String(id)] = token;
     }
-
-    destinos[String(id)] = token;
   });
-
   return destinos;
 }
 
@@ -51,9 +39,7 @@ async function lerConfiguracaoJson(chave, fallback) {
     where: { chave },
     order: [['id', 'DESC']]
   });
-
   if (!item?.valor) return fallback;
-
   try {
     return JSON.parse(item.valor);
   } catch {
@@ -73,8 +59,12 @@ async function obterConfiguracaoAprovacaoDiretoria() {
   };
 }
 
+function obterClassificacaoObra(obra) {
+  return normalizarClassificacaoObra(obra?.classificacao || obra?.classificacao_obra);
+}
+
 function obterDiretoriaParaObra(obra, diretoriasPorClassificacao = {}) {
-  const classificacao = normalizarClassificacaoObra(obra?.classificacao_obra);
+  const classificacao = obterClassificacaoObra(obra);
   if (!classificacao) return null;
   return diretoriasPorClassificacao[classificacao] || null;
 }
@@ -93,6 +83,7 @@ module.exports = {
   normalizarMapaDiretoriasPorClassificacao,
   normalizarMapaSetorDestinoAprovacao,
   obterConfiguracaoAprovacaoDiretoria,
+  obterClassificacaoObra,
   obterDiretoriaParaObra,
   obterSetorDestinoAprovacao
 };

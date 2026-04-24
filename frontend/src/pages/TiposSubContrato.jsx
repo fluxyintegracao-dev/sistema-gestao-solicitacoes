@@ -100,7 +100,7 @@ export default function TiposSubContrato() {
   }
 
   return (
-    <div className="page">
+    <div className="page solicitacoes-page">
       <div>
         <h1 className="page-title">Subtipos</h1>
         <p className="page-subtitle">Cadastro dos subtipos vinculados ao tipo macro.</p>

@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import { getSetores } from '../services/setores';
-import { getTiposSolicitacao } from '../services/tiposSolicitacao';
 import {
   getAprovacaoDiretoria,
   salvarAprovacaoDiretoria
@@ -13,12 +12,7 @@ const CLASSIFICACOES = [
 
 export default function AprovacaoDiretoria() {
   const [setores, setSetores] = useState([]);
-  const [tipos, setTipos] = useState([]);
-  const [diretoriasPorClassificacao, setDiretoriasPorClassificacao] = useState({
-    PUBLICA: '',
-    PRIVADA: ''
-  });
-  const [setoresDestinoPorTipo, setSetoresDestinoPorTipo] = useState({});
+  const [diretorias, setDiretorias] = useState({ PUBLICA: '', PRIVADA: '' });
   const [loading, setLoading] = useState(true);
   const [salvando, setSalvando] = useState(false);
 
@@ -26,29 +20,18 @@ export default function AprovacaoDiretoria() {
     async function carregar() {
       try {
         setLoading(true);
-        const [setoresData, tiposData, configuracao] = await Promise.all([
+        const [setoresData, configuracao] = await Promise.all([
           getSetores(),
-          getTiposSolicitacao(),
           getAprovacaoDiretoria()
         ]);
-
-        const setoresAtivos = Array.isArray(setoresData)
-          ? setoresData.filter(item => item?.ativo !== false)
-          : [];
-        setSetores(setoresAtivos);
-        setTipos(Array.isArray(tiposData) ? tiposData : []);
-        setDiretoriasPorClassificacao({
-          PUBLICA: String(configuracao?.diretorias_por_classificacao?.PUBLICA || ''),
-          PRIVADA: String(configuracao?.diretorias_por_classificacao?.PRIVADA || '')
+        setSetores(Array.isArray(setoresData) ? setoresData.filter(item => item?.ativo !== false) : []);
+        setDiretorias({
+          PUBLICA: String(configuracao?.diretorias?.PUBLICA || configuracao?.diretorias_por_classificacao?.PUBLICA || ''),
+          PRIVADA: String(configuracao?.diretorias?.PRIVADA || configuracao?.diretorias_por_classificacao?.PRIVADA || '')
         });
-        setSetoresDestinoPorTipo(
-          configuracao?.setores_destino_por_tipo && typeof configuracao.setores_destino_por_tipo === 'object'
-            ? configuracao.setores_destino_por_tipo
-            : {}
-        );
       } catch (error) {
         console.error(error);
-        alert('Erro ao carregar configuracoes de aprovacao por diretoria.');
+        alert('Erro ao carregar configuracao de aprovacao por diretoria.');
       } finally {
         setLoading(false);
       }
@@ -57,29 +40,14 @@ export default function AprovacaoDiretoria() {
     carregar();
   }, []);
 
-  const setoresOrdenados = useMemo(() => {
-    return [...setores].sort((a, b) => {
-      const nomeA = String(a?.nome || '').toUpperCase();
-      const nomeB = String(b?.nome || '').toUpperCase();
-      return nomeA.localeCompare(nomeB);
-    });
-  }, [setores]);
-
-  const tiposOrdenados = useMemo(() => {
-    return [...tipos].sort((a, b) => {
-      const nomeA = String(a?.nome || '').toUpperCase();
-      const nomeB = String(b?.nome || '').toUpperCase();
-      return nomeA.localeCompare(nomeB);
-    });
-  }, [tipos]);
+  const setoresOrdenados = useMemo(() => (
+    [...setores].sort((a, b) => String(a?.nome || '').localeCompare(String(b?.nome || ''), 'pt-BR'))
+  ), [setores]);
 
   async function salvar() {
     try {
       setSalvando(true);
-      await salvarAprovacaoDiretoria({
-        diretorias_por_classificacao: diretoriasPorClassificacao,
-        setores_destino_por_tipo: setoresDestinoPorTipo
-      });
+      await salvarAprovacaoDiretoria({ diretorias });
       alert('Configuracao salva com sucesso.');
     } catch (error) {
       console.error(error);
@@ -94,89 +62,52 @@ export default function AprovacaoDiretoria() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="page max-w-5xl mx-auto space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Aprovacao por Diretoria</h1>
-        <p className="text-sm text-gray-600 mt-1">
-          Defina qual diretoria recebe a solicitacao pela classificacao da obra. O setor destino apos aprovacao passa a ser a area responsavel selecionada na criacao.
+        <h1 className="page-title">Aprovacao por Diretoria</h1>
+        <p className="page-subtitle">
+          Define qual diretoria recebe a solicitacao primeiro conforme a classificacao da obra.
+          A area responsavel escolhida na Nova Solicitacao permanece como destino final apos a aprovacao.
         </p>
       </div>
 
-      <div className="bg-white p-6 rounded-xl shadow space-y-6">
-        <section className="space-y-4">
-          <div>
-            <h2 className="font-semibold">Diretoria por classificacao da obra</h2>
-            <p className="text-sm text-gray-500 mt-1">
-              Essas diretorias recebem primeiro as solicitacoes criadas pela obra, conforme a classificacao PUBLICA ou PRIVADA.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {CLASSIFICACOES.map(item => (
-              <label key={item.value} className="grid gap-1 text-sm">
-                {item.label}
-                <select
-                  className="input"
-                  value={diretoriasPorClassificacao[item.value] || ''}
-                  onChange={e => setDiretoriasPorClassificacao(prev => ({
-                    ...prev,
-                    [item.value]: e.target.value
-                  }))}
-                >
-                  <option value="">Selecione</option>
-                  {setoresOrdenados.map(setor => (
-                    <option key={setor.id} value={String(setor.codigo || '').toUpperCase()}>
-                      {setor.nome} ({String(setor.codigo || '').toUpperCase()})
-                    </option>
-                  ))}
-                </select>
-              </label>
-            ))}
-          </div>
-        </section>
-
-        <section className="space-y-4">
-          <div>
-            <h2 className="font-semibold">Setor destino apos aprovacao (fallback)</h2>
-            <p className="text-sm text-gray-500 mt-1">
-              Usado apenas para solicitacoes antigas ou registros sem area destino gravada na criacao.
-            </p>
-          </div>
-
-          <div className="border rounded-lg divide-y">
-            {tiposOrdenados.map(tipo => (
-              <div
-                key={tipo.id}
-                className="p-3 grid grid-cols-1 md:grid-cols-[minmax(240px,1fr)_minmax(260px,360px)] gap-3 items-center"
+      <div className="card space-y-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {CLASSIFICACOES.map(item => (
+            <label key={item.value} className="form-field">
+              <span className="form-label">{item.label}</span>
+              <select
+                className="input"
+                value={diretorias[item.value] || ''}
+                onChange={event => setDiretorias(prev => ({
+                  ...prev,
+                  [item.value]: event.target.value
+                }))}
               >
-                <div className="text-sm font-medium">{tipo.nome}</div>
-                <select
-                  className="input"
-                  value={String(setoresDestinoPorTipo[String(tipo.id)] || '')}
-                  onChange={e => setSetoresDestinoPorTipo(prev => ({
-                    ...prev,
-                    [String(tipo.id)]: e.target.value
-                  }))}
-                >
-                  <option value="">Nao configurar</option>
-                  {setoresOrdenados.map(setor => (
-                    <option key={setor.id} value={String(setor.codigo || '').toUpperCase()}>
-                      {setor.nome} ({String(setor.codigo || '').toUpperCase()})
+                <option value="">Sem diretoria configurada</option>
+                {setoresOrdenados.map(setor => {
+                  const codigo = String(setor.codigo || '').trim().toUpperCase();
+                  return (
+                    <option key={setor.id} value={codigo}>
+                      {setor.nome} ({codigo})
                     </option>
-                  ))}
-                </select>
-              </div>
-            ))}
-          </div>
-        </section>
+                  );
+                })}
+              </select>
+              <span className="form-help">
+                Obras com essa classificacao entram primeiro na diretoria definida aqui.
+              </span>
+            </label>
+          ))}
+        </div>
+
+        <div className="rounded-xl border border-[var(--c-border)] bg-[var(--c-surface-muted)] p-4 text-sm text-[var(--c-muted)]">
+          Fluxo aplicado: usuario cria a solicitacao, seleciona a area responsavel final e o sistema envia primeiro para a diretoria da obra.
+          Depois da aprovacao, a solicitacao segue automaticamente para a area responsavel escolhida.
+        </div>
 
         <div className="flex justify-end">
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={salvar}
-            disabled={salvando}
-          >
+          <button type="button" className="btn btn-primary" onClick={salvar} disabled={salvando}>
             {salvando ? 'Salvando...' : 'Salvar configuracao'}
           </button>
         </div>

@@ -40,6 +40,18 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.TEXT,
         allowNull: true
       },
+      quantidade_minima_item: {
+        type: DataTypes.DECIMAL(14, 3),
+        allowNull: true
+      },
+      status_disponibilidade: {
+        type: DataTypes.STRING(20),
+        allowNull: true
+      },
+      data_chegada: {
+        type: DataTypes.DATEONLY,
+        allowNull: true
+      },
       vencedor: {
         type: DataTypes.BOOLEAN,
         allowNull: false,

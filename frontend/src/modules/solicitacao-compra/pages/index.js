@@ -8,3 +8,5 @@ export { default as GestaoApropriacoes } from './GestaoApropriacoes';
 export { default as GestaoInsumos } from './GestaoInsumos';
 export { default as GestaoCategorias } from './GestaoCategorias';
 export { default as GestaoUnidades } from './GestaoUnidades';
+export { default as PedidosCompra } from './PedidosCompra';
+export { default as PedidoCompraDetalhe } from './PedidoCompraDetalhe';

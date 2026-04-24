@@ -115,7 +115,7 @@ export default function StatusSetor() {
   }
 
   return (
-    <div className="page">
+    <div className="page solicitacoes-page">
       <div>
         <h1 className="page-title">Status por Setor</h1>
         <p className="page-subtitle">Defina os status disponiveis por setor.</p>

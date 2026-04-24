@@ -6,7 +6,7 @@ import {
   marcarTodasNotificacoesLidas
 } from '../services/notificacoes';
 
-const TIPOS_VISIVEIS = new Set(['MENCAO_COMENTARIO', 'SOLICITACAO_CRIADA']);
+const TIPOS_VISIVEIS = new Set(['MENCAO_COMENTARIO']);
 
 export default function NotificacoesBell() {
   const [aberto, setAberto] = useState(false);
@@ -19,7 +19,7 @@ export default function NotificacoesBell() {
       return;
     }
     try {
-      const data = await getNotificacoes({ limit: 20 });
+      const data = await getNotificacoes({ limit: 20, tipos: ['MENCAO_COMENTARIO'] });
       const itensFiltrados = Array.isArray(data.itens)
         ? data.itens.filter(item => TIPOS_VISIVEIS.has(String(item.tipo || '').toUpperCase()))
         : [];

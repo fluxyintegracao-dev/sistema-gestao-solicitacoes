@@ -3,8 +3,7 @@ const { Setor, UsuarioSetor } = require('../models');
 
 function normalizarIdInteiro(valor) {
   const numero = Number(valor);
-  if (!Number.isInteger(numero) || numero <= 0) return null;
-  return numero;
+  return Number.isInteger(numero) && numero > 0 ? numero : null;
 }
 
 function normalizarSetorParaResposta(setor) {
@@ -12,7 +11,6 @@ function normalizarSetorParaResposta(setor) {
   const plain = typeof setor.toJSON === 'function' ? setor.toJSON() : setor;
   const id = normalizarIdInteiro(plain.id || plain.setor_id);
   if (!id) return null;
-
   return {
     id,
     nome: plain.nome || null,
@@ -24,7 +22,6 @@ function normalizarSetorParaResposta(setor) {
 function adicionarSetorNoMapa(mapa, setor) {
   const normalizado = normalizarSetorParaResposta(setor);
   if (!normalizado) return;
-
   const atual = mapa.get(normalizado.id) || {};
   mapa.set(normalizado.id, {
     ...atual,
@@ -38,24 +35,16 @@ function extrairSetoresUsuarioSemConsulta(usuario) {
   const plain = typeof usuario?.toJSON === 'function' ? usuario.toJSON() : (usuario || {});
   const mapa = new Map();
 
-  if (plain.setor) {
-    adicionarSetorNoMapa(mapa, plain.setor);
-  }
-
-  if (plain.setor_id) {
-    adicionarSetorNoMapa(mapa, { id: plain.setor_id });
-  }
-
+  if (plain.setor) adicionarSetorNoMapa(mapa, plain.setor);
+  if (plain.setor_id) adicionarSetorNoMapa(mapa, { id: plain.setor_id });
   if (Array.isArray(plain.setores)) {
-    plain.setores.forEach(setor => adicionarSetorNoMapa(mapa, setor));
+    plain.setores.forEach((setor) => adicionarSetorNoMapa(mapa, setor));
   }
-
   if (Array.isArray(plain.setores_ids)) {
-    plain.setores_ids.forEach(id => adicionarSetorNoMapa(mapa, { id }));
+    plain.setores_ids.forEach((id) => adicionarSetorNoMapa(mapa, { id }));
   }
-
   if (Array.isArray(plain.setoresVinculos)) {
-    plain.setoresVinculos.forEach(vinculo => {
+    plain.setoresVinculos.forEach((vinculo) => {
       adicionarSetorNoMapa(mapa, vinculo?.setor || { id: vinculo?.setor_id });
     });
   }
@@ -65,19 +54,28 @@ function extrairSetoresUsuarioSemConsulta(usuario) {
 
 async function completarDadosSetores(setores) {
   const mapa = new Map();
-  setores.forEach(setor => adicionarSetorNoMapa(mapa, setor));
+  setores.forEach((setor) => adicionarSetorNoMapa(mapa, setor));
 
   const idsSemDados = Array.from(mapa.values())
-    .filter(setor => setor.id && (!setor.nome || !setor.codigo))
-    .map(setor => setor.id);
+    .filter((setor) => setor.id && (!setor.nome || !setor.codigo))
+    .map((setor) => setor.id);
 
   if (idsSemDados.length > 0) {
     const setoresDb = await Setor.findAll({
       where: { id: { [Op.in]: Array.from(new Set(idsSemDados)) } },
-      attributes: ['id', 'nome', 'codigo', 'ativo']
+      attributes: [
+        'id',
+        'nome',
+        'codigo',
+        'ativo',
+        'eh_setor_obra',
+        'eh_setor_financeiro',
+        'eh_setor_compras',
+        'eh_setor_geo',
+        'eh_setor_administrativo'
+      ]
     });
-
-    setoresDb.forEach(setor => adicionarSetorNoMapa(mapa, setor));
+    setoresDb.forEach((setor) => adicionarSetorNoMapa(mapa, setor));
   }
 
   return Array.from(mapa.values()).sort((a, b) => {
@@ -99,13 +97,23 @@ async function listarSetoresDoUsuario(usuario) {
         {
           model: Setor,
           as: 'setor',
-          attributes: ['id', 'nome', 'codigo', 'ativo']
+          attributes: [
+            'id',
+            'nome',
+            'codigo',
+            'ativo',
+            'eh_setor_obra',
+            'eh_setor_financeiro',
+            'eh_setor_compras',
+            'eh_setor_geo',
+            'eh_setor_administrativo'
+          ]
         }
       ],
       order: [['id', 'ASC']]
     });
 
-    vinculos.forEach(vinculo => {
+    vinculos.forEach((vinculo) => {
       setoresBase.push(vinculo?.setor || { id: vinculo?.setor_id });
     });
   }
@@ -115,27 +123,21 @@ async function listarSetoresDoUsuario(usuario) {
 
 async function obterIdsSetoresUsuario(usuario) {
   const setores = await listarSetoresDoUsuario(usuario);
-  return setores
-    .map(setor => normalizarIdInteiro(setor.id))
-    .filter(Boolean);
+  return setores.map((setor) => normalizarIdInteiro(setor.id)).filter(Boolean);
 }
 
 async function obterTokensSetoresUsuario(usuario, extras = []) {
   const setores = await listarSetoresDoUsuario(usuario);
   const tokens = [];
-
-  extras.forEach(valor => {
+  (Array.isArray(extras) ? extras : [extras]).forEach((valor) => {
     if (valor) tokens.push(String(valor).trim().toUpperCase());
   });
-
   if (usuario?.area) tokens.push(String(usuario.area).trim().toUpperCase());
-
-  setores.forEach(setor => {
+  setores.forEach((setor) => {
     if (setor.id) tokens.push(String(setor.id).trim().toUpperCase());
     if (setor.codigo) tokens.push(String(setor.codigo).trim().toUpperCase());
     if (setor.nome) tokens.push(String(setor.nome).trim().toUpperCase());
   });
-
   return Array.from(new Set(tokens.filter(Boolean)));
 }
 

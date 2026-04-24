@@ -24,41 +24,27 @@ function normalizarStatusAutomacao(valor) {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/[\s-]+/g, '_');
-
   return status || null;
 }
 
 function normalizarIdPositivo(valor) {
   const numero = Number(valor);
-  if (!Number.isInteger(numero) || numero <= 0) {
-    return null;
-  }
-  return numero;
+  return Number.isInteger(numero) && numero > 0 ? numero : null;
 }
 
 function normalizarTiposCompartilhados(raw = {}) {
   const regras = {};
-
   Object.entries(raw || {}).forEach(([setorOrigem, tiposRaw]) => {
     const setorOrigemNormalizado = normalizarTokenSetor(setorOrigem);
-    if (!setorOrigemNormalizado || !tiposRaw || typeof tiposRaw !== 'object') {
-      return;
-    }
+    if (!setorOrigemNormalizado || !tiposRaw || typeof tiposRaw !== 'object') return;
 
     const tiposNormalizados = {};
-
     Object.entries(tiposRaw).forEach(([tipoId, setores]) => {
       const id = normalizarIdPositivo(tipoId);
       if (!id) return;
-
       const setoresNormalizados = Array.from(
-        new Set(
-          (Array.isArray(setores) ? setores : [])
-            .map(normalizarTokenSetor)
-            .filter(Boolean)
-        )
+        new Set((Array.isArray(setores) ? setores : []).map(normalizarTokenSetor).filter(Boolean))
       );
-
       if (setoresNormalizados.length > 0) {
         tiposNormalizados[String(id)] = setoresNormalizados;
       }
@@ -68,43 +54,26 @@ function normalizarTiposCompartilhados(raw = {}) {
       regras[setorOrigemNormalizado] = tiposNormalizados;
     }
   });
-
   return regras;
 }
 
 function normalizarAutomacoesStatus(raw = []) {
   const regrasPorChave = new Map();
-
   (Array.isArray(raw) ? raw : []).forEach((item) => {
-    const setorOrigem = normalizarTokenSetor(item?.setor_origem);
     const tipoSolicitacaoId = normalizarIdPositivo(item?.tipo_solicitacao_id);
     const status = normalizarStatusAutomacao(item?.status);
     const setorDestino = normalizarTokenSetor(item?.setor_destino);
-
-    if (!tipoSolicitacaoId || !status || !setorDestino) {
-      return;
-    }
-
-    const chave = `${setorOrigem || '*'}:${tipoSolicitacaoId}:${status}`;
-    regrasPorChave.set(chave, {
-      setor_origem: setorOrigem,
+    if (!tipoSolicitacaoId || !status || !setorDestino) return;
+    regrasPorChave.set(`${tipoSolicitacaoId}:${status}`, {
       tipo_solicitacao_id: tipoSolicitacaoId,
       status,
       setor_destino: setorDestino
     });
   });
-
   return Array.from(regrasPorChave.values()).sort((a, b) => {
-    const setorA = String(a.setor_origem || '');
-    const setorB = String(b.setor_origem || '');
-    if (setorA !== setorB) {
-      return setorA.localeCompare(setorB, 'pt-BR');
-    }
-
     if (a.tipo_solicitacao_id !== b.tipo_solicitacao_id) {
       return a.tipo_solicitacao_id - b.tipo_solicitacao_id;
     }
-
     return String(a.status).localeCompare(String(b.status), 'pt-BR');
   });
 }
@@ -114,7 +83,6 @@ async function lerConfiguracaoJson(chave, fallback) {
     where: { chave },
     order: [['id', 'DESC']]
   });
-
   return parseJsonOrDefault(item?.valor, fallback);
 }
 
@@ -130,17 +98,11 @@ async function obterConfiguracaoAutomacaoStatusSetor() {
 
 function obterTiposCompartilhadosParaTokens(tokensSetor = [], regras = {}) {
   const tokens = Array.from(
-    new Set(
-      (Array.isArray(tokensSetor) ? tokensSetor : [])
-        .map(normalizarTokenSetor)
-        .filter(Boolean)
-    )
+    new Set((Array.isArray(tokensSetor) ? tokensSetor : []).map(normalizarTokenSetor).filter(Boolean))
   );
-
   if (tokens.length === 0) return [];
 
   const compartilhamentos = [];
-
   Object.entries(regras || {}).forEach(([setorOrigem, tipos]) => {
     const tipoIds = Object.entries(tipos || {})
       .filter(([, setores]) => {
@@ -149,7 +111,6 @@ function obterTiposCompartilhadosParaTokens(tokensSetor = [], regras = {}) {
       })
       .map(([tipoId]) => Number(tipoId))
       .filter((tipoId) => Number.isInteger(tipoId) && tipoId > 0);
-
     if (tipoIds.length > 0) {
       compartilhamentos.push({
         setor_origem: normalizarTokenSetor(setorOrigem),
@@ -157,33 +118,14 @@ function obterTiposCompartilhadosParaTokens(tokensSetor = [], regras = {}) {
       });
     }
   });
-
   return compartilhamentos;
 }
 
-function obterAutomacaoStatusCorrespondente({
-  setorOrigem,
-  tipoSolicitacaoId,
-  status,
-  regras = []
-}) {
-  const setorOrigemNormalizado = normalizarTokenSetor(setorOrigem);
+function obterAutomacaoStatusCorrespondente({ tipoSolicitacaoId, status, regras = [] }) {
   const tipoId = normalizarIdPositivo(tipoSolicitacaoId);
   const statusNormalizado = normalizarStatusAutomacao(status);
-
   if (!tipoId || !statusNormalizado) return null;
-
-  const regrasValidas = Array.isArray(regras) ? regras : [];
-  const regraExata = regrasValidas.find((regra) => (
-    normalizarTokenSetor(regra?.setor_origem) === setorOrigemNormalizado &&
-    Number(regra?.tipo_solicitacao_id) === tipoId &&
-    normalizarStatusAutomacao(regra?.status) === statusNormalizado
-  ));
-
-  if (regraExata) return regraExata;
-
-  return regrasValidas.find((regra) => (
-    !normalizarTokenSetor(regra?.setor_origem) &&
+  return (Array.isArray(regras) ? regras : []).find((regra) => (
     Number(regra?.tipo_solicitacao_id) === tipoId &&
     normalizarStatusAutomacao(regra?.status) === statusNormalizado
   )) || null;

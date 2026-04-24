@@ -1,15 +1,26 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  listarApropriacoes,
   listarInsumos,
   obterUrlAssinadaCompra,
   uploadAnexoTemporarioCompra
 } from '../../../services/compras';
+import { listarApropriacoes } from '../../../services/apropriacoes';
 import { getMinhasObras } from '../../../services/obras';
 import { useAuth } from '../../../contexts/AuthContext';
 import CompraPreviewModal from '../components/CompraPreviewModal';
 import { criarPreviewCompra } from '../utils/preview';
+import {
+  aplicarApropriacaoUnica,
+  calcularResumoRateios,
+  criarRateioBase,
+  formatarQuantidade,
+  montarLinhasResumoApropriacao,
+  normalizarRateiosEntrada,
+  parseQuantidade,
+  sincronizarItemComRateios,
+  validarRateiosItem
+} from '../utils/apropriacoes';
 
 const DRAFT_KEY = 'fluxy_solicitacao_compra_draft';
 const ITEM_ATTACHMENT_ACCEPT = '.pdf,.doc,.docx,.xls,.xlsx,.csv,.ppt,.pptx,.png,.jpg,.jpeg,.html,.rar';
@@ -23,6 +34,7 @@ function criarItemBase(insumo) {
     quantidade: '1',
     especificacao: '',
     apropriacao_id: '',
+    apropriacoes: [],
     necessario_para: '',
     link_produto: '',
     arquivo_url: '',
@@ -40,6 +52,7 @@ function criarItemManualBase(dados, necessarioParaPadrao) {
     quantidade: String(dados.quantidade || '1'),
     especificacao: dados.especificacao || '',
     apropriacao_id: '',
+    apropriacoes: [],
     necessario_para: necessarioParaPadrao || '',
     link_produto: '',
     arquivo_url: '',
@@ -48,6 +61,27 @@ function criarItemManualBase(dados, necessarioParaPadrao) {
     nome_manual: dados.nome_manual,
     unidade_sigla_manual: dados.unidade_sigla_manual
   };
+}
+
+function sincronizarQuantidadeRateioUnico(item, quantidade) {
+  const rateios = normalizarRateiosEntrada(item);
+  if (rateios.length !== 1) {
+    return sincronizarItemComRateios({
+      ...item,
+      quantidade
+    });
+  }
+
+  return sincronizarItemComRateios({
+    ...item,
+    quantidade,
+    apropriacoes: [
+      {
+        ...rateios[0],
+        quantidade_apropriada: quantidade
+      }
+    ]
+  });
 }
 
 export default function NovaSolicitacaoCompra() {
@@ -74,6 +108,8 @@ export default function NovaSolicitacaoCompra() {
   const [uploadingArquivos, setUploadingArquivos] = useState({});
   const [loading, setLoading] = useState(false);
   const [modalManualAberto, setModalManualAberto] = useState(false);
+  const [modalApropriacaoIndex, setModalApropriacaoIndex] = useState(null);
+  const [rateiosModal, setRateiosModal] = useState([]);
   const [previewArquivo, setPreviewArquivo] = useState(null);
   const [itemManual, setItemManual] = useState({
     nome_manual: '',
@@ -122,6 +158,24 @@ export default function NovaSolicitacaoCompra() {
     carregarInsumos();
   }, []);
 
+  const itemModalAtual = modalApropriacaoIndex !== null ? itens[modalApropriacaoIndex] || null : null;
+
+  const resumoModalApropriacao = useMemo(() => {
+    const total = parseQuantidade(itemModalAtual?.quantidade);
+    const distribuido = rateiosModal.reduce(
+      (acc, rateio) => acc + parseQuantidade(rateio.quantidade_apropriada),
+      0
+    );
+    const saldo = Number((total - distribuido).toFixed(4));
+
+    return {
+      total,
+      distribuido: Number(distribuido.toFixed(4)),
+      saldo,
+      fechado: Math.abs(saldo) <= 0.01 && total > 0
+    };
+  }, [itemModalAtual, rateiosModal]);
+
   useEffect(() => {
     if (draftCarregadoRef.current) {
       return;
@@ -148,32 +202,33 @@ export default function NovaSolicitacaoCompra() {
       setLinkGeral(payload.link_geral || '');
       setItens(
         Array.isArray(payload.itens)
-          ? payload.itens.map((item) => ({
-              insumo_id: item.manual ? null : item.insumo_id,
-              insumo_nome: item.manual
-                ? item.nome_manual || item.insumo_nome || ''
-                : dados?.resumo?.itens?.find((resumoItem) =>
-                    !resumoItem.manual && Number(resumoItem.insumo_id) === Number(item.insumo_id)
-                  )?.insumo_nome || '',
-              unidade_id: item.manual ? null : item.unidade_id,
-              unidade_sigla: item.manual
-                ? item.unidade_sigla_manual || item.unidade_sigla || ''
-                : dados?.resumo?.itens?.find((resumoItem) =>
-                    !resumoItem.manual && Number(resumoItem.insumo_id) === Number(item.insumo_id)
-                  )?.unidade_sigla || '',
-              quantidade: String(item.quantidade ?? '1'),
-              especificacao: item.especificacao || '',
-              apropriacao_id: item.apropriacao_id ? String(item.apropriacao_id) : '',
-              necessario_para: item.necessario_para || payload.necessario_para || '',
-              link_produto: item.link_produto || '',
-              arquivo_url: item.arquivo_url || '',
-              arquivo_nome_original: item.arquivo_nome_original || '',
-              manual: Boolean(item.manual),
-              nome_manual: item.manual ? item.nome_manual || item.insumo_nome || '' : '',
-              unidade_sigla_manual: item.manual
-                ? item.unidade_sigla_manual || item.unidade_sigla || ''
-                : ''
-            }))
+          ? payload.itens.map((item, index) => {
+              const resumoItem = dados?.resumo?.itens?.[index];
+
+              return sincronizarItemComRateios({
+                insumo_id: item.manual ? null : item.insumo_id,
+                insumo_nome: item.manual
+                  ? item.nome_manual || item.insumo_nome || ''
+                  : resumoItem?.insumo_nome || '',
+                unidade_id: item.manual ? null : item.unidade_id,
+                unidade_sigla: item.manual
+                  ? item.unidade_sigla_manual || item.unidade_sigla || ''
+                  : resumoItem?.unidade_sigla || '',
+                quantidade: String(item.quantidade ?? '1'),
+                especificacao: item.especificacao || '',
+                apropriacao_id: item.apropriacao_id ? String(item.apropriacao_id) : '',
+                apropriacoes: Array.isArray(item.apropriacoes) ? item.apropriacoes : [],
+                necessario_para: item.necessario_para || payload.necessario_para || '',
+                link_produto: item.link_produto || '',
+                arquivo_url: item.arquivo_url || '',
+                arquivo_nome_original: item.arquivo_nome_original || '',
+                manual: Boolean(item.manual),
+                nome_manual: item.manual ? item.nome_manual || item.insumo_nome || '' : '',
+                unidade_sigla_manual: item.manual
+                  ? item.unidade_sigla_manual || item.unidade_sigla || ''
+                  : ''
+              });
+            })
           : []
       );
     } catch (error) {
@@ -191,11 +246,14 @@ export default function NovaSolicitacaoCompra() {
     }
 
     setItens((atual) =>
-      atual.map((item) => ({
-        ...item,
-        apropriacao_id: '',
-        necessario_para: item.necessario_para || necessarioPara
-      }))
+      atual.map((item) =>
+        sincronizarItemComRateios({
+          ...item,
+          apropriacao_id: '',
+          apropriacoes: [],
+          necessario_para: item.necessario_para || necessarioPara
+        })
+      )
     );
   }, [obraId]);
 
@@ -215,6 +273,10 @@ export default function NovaSolicitacaoCompra() {
   }, [buscaInsumo, insumos]);
 
   const todosSelecionados = itens.length > 0 && itensSelecionados.length === itens.length;
+  const itensPendentesApropriacao = useMemo(
+    () => itens.filter((item) => !validarRateiosItem(item).ok).length,
+    [itens]
+  );
 
   function adicionarInsumo(insumo) {
     if (!obraId) {
@@ -283,7 +345,11 @@ export default function NovaSolicitacaoCompra() {
           }
         }
 
-        return atualizado;
+        if (campo === 'quantidade') {
+          return sincronizarQuantidadeRateioUnico(atualizado, valor);
+        }
+
+        return sincronizarItemComRateios(atualizado);
       })
     );
   }
@@ -295,12 +361,76 @@ export default function NovaSolicitacaoCompra() {
           return item;
         }
 
-        return {
+        return sincronizarItemComRateios({
           ...item,
           ...campos
-        };
+        });
       })
     );
+  }
+
+  function abrirModalApropriacao(index) {
+    const item = itens[index];
+    if (!parseQuantidade(item?.quantidade)) {
+      alert('Informe a quantidade do item antes de distribuir a apropriacao.');
+      return;
+    }
+
+    const rateiosExistentes = normalizarRateiosEntrada(item);
+    setModalApropriacaoIndex(index);
+    setRateiosModal(
+      rateiosExistentes.length
+        ? rateiosExistentes
+        : [criarRateioBase(String(item.quantidade || ''))]
+    );
+  }
+
+  function fecharModalApropriacao() {
+    setModalApropriacaoIndex(null);
+    setRateiosModal([]);
+  }
+
+  function atualizarRateioModal(rateioIndex, campo, valor) {
+    setRateiosModal((atual) =>
+      atual.map((rateio, index) =>
+        index === rateioIndex
+          ? {
+              ...rateio,
+              [campo]: valor
+            }
+          : rateio
+      )
+    );
+  }
+
+  function adicionarRateioModal() {
+    setRateiosModal((atual) => [...atual, criarRateioBase('')]);
+  }
+
+  function removerRateioModal(rateioIndex) {
+    setRateiosModal((atual) => atual.filter((_, index) => index !== rateioIndex));
+  }
+
+  function salvarRateiosItem() {
+    if (modalApropriacaoIndex === null || !itemModalAtual) {
+      return;
+    }
+
+    const itemComRateios = sincronizarItemComRateios({
+      ...itemModalAtual,
+      apropriacoes: rateiosModal
+    });
+    const validacao = validarRateiosItem(itemComRateios);
+
+    if (!validacao.ok) {
+      alert(validacao.mensagem);
+      return;
+    }
+
+    atualizarCamposItem(modalApropriacaoIndex, {
+      apropriacoes: rateiosModal
+    });
+    fecharModalApropriacao();
   }
 
   function toggleSelecionado(index) {
@@ -335,13 +465,23 @@ export default function NovaSolicitacaoCompra() {
           return item;
         }
 
-        return {
+        const quantidadeAtualizada = edicaoMassa.quantidade || item.quantidade;
+        let atualizado = {
           ...item,
-          apropriacao_id: edicaoMassa.apropriacao_id || item.apropriacao_id,
+          quantidade: quantidadeAtualizada,
           necessario_para: edicaoMassa.necessario_para || item.necessario_para,
-          quantidade: edicaoMassa.quantidade || item.quantidade,
           link_produto: edicaoMassa.link_produto || item.link_produto
         };
+
+        if (edicaoMassa.apropriacao_id) {
+          atualizado = aplicarApropriacaoUnica(atualizado, edicaoMassa.apropriacao_id);
+        } else if (edicaoMassa.quantidade) {
+          atualizado = sincronizarQuantidadeRateioUnico(atualizado, quantidadeAtualizada);
+        } else {
+          atualizado = sincronizarItemComRateios(atualizado);
+        }
+
+        return atualizado;
       })
     );
   }
@@ -365,6 +505,12 @@ export default function NovaSolicitacaoCompra() {
       });
       return proximo;
     });
+
+    if (modalApropriacaoIndex === index) {
+      fecharModalApropriacao();
+    } else if (modalApropriacaoIndex !== null && modalApropriacaoIndex > index) {
+      setModalApropriacaoIndex((atual) => (atual !== null ? atual - 1 : atual));
+    }
   }
 
   function limparLista() {
@@ -375,6 +521,7 @@ export default function NovaSolicitacaoCompra() {
     setItens([]);
     setItensSelecionados([]);
     setUploadingArquivos({});
+    fecharModalApropriacao();
   }
 
   async function handleSelecionarArquivo(index, file) {
@@ -441,8 +588,13 @@ export default function NovaSolicitacaoCompra() {
 
     for (let index = 0; index < itens.length; index += 1) {
       const item = itens[index];
-      if (!item.apropriacao_id || !item.quantidade) {
-        alert(`Item ${index + 1}: informe apropriação e quantidade.`);
+      if (!item.quantidade) {
+        alert(`Item ${index + 1}: informe a quantidade.`);
+        return;
+      }
+      const validacaoRateios = validarRateiosItem(item);
+      if (!validacaoRateios.ok) {
+        alert(`Item ${index + 1}: ${validacaoRateios.mensagem}`);
         return;
       }
       if (item.manual) {
@@ -462,16 +614,30 @@ export default function NovaSolicitacaoCompra() {
       setLoading(true);
 
       const obraSelecionada = obras.find((obra) => Number(obra.id) === Number(obraId));
+      const itensNormalizados = itens.map((item) => {
+        const apropriacoesItem = normalizarRateiosEntrada(item).map((rateio) => ({
+          apropriacao_id: Number(rateio.apropriacao_id),
+          quantidade_apropriada: Number(rateio.quantidade_apropriada)
+        }));
+
+        return {
+          ...sincronizarItemComRateios(item),
+          apropriacoes: apropriacoesItem,
+          apropriacao_id: apropriacoesItem[0]?.apropriacao_id || null
+        };
+      });
+
       const payload = {
         obra_id: obraId,
         necessario_para: necessarioPara || null,
         observacoes: observacoes || null,
         link_geral: linkGeral || null,
-        itens: itens.map((item) => ({
+        itens: itensNormalizados.map((item) => ({
           manual: Boolean(item.manual),
           insumo_id: item.manual ? null : item.insumo_id,
           unidade_id: item.manual ? null : item.unidade_id,
           apropriacao_id: item.apropriacao_id,
+          apropriacoes: item.apropriacoes,
           quantidade: Number(item.quantidade),
           especificacao: item.especificacao || '',
           necessario_para: item.necessario_para || necessarioPara || null,
@@ -487,10 +653,9 @@ export default function NovaSolicitacaoCompra() {
         obra_nome: obraSelecionada?.nome || '',
         obra_codigo: obraSelecionada?.codigo || '',
         solicitante_nome: user?.nome || '',
-        itens: itens.map((item) => ({
+        itens: itensNormalizados.map((item) => ({
           ...item,
-          apropriacao_label:
-            apropriacoes.find((apropriacao) => Number(apropriacao.id) === Number(item.apropriacao_id))?.codigo || ''
+          apropriacao_linhas: montarLinhasResumoApropriacao(item, apropriacoes)
         }))
       };
 
@@ -505,11 +670,11 @@ export default function NovaSolicitacaoCompra() {
   }
 
   return (
-    <div className="page page-compra-nova">
+    <div className="page solicitacoes-page page-compra-nova">
       <div>
         <h1 className="page-title">Nova Solicitação de Compra</h1>
         <p className="page-subtitle">
-          Monte os itens da compra e envie a solicitação para o fluxo principal do sistema.
+          Monte os itens da compra e distribua a apropriação por item antes de enviar.
         </p>
       </div>
 
@@ -597,6 +762,7 @@ export default function NovaSolicitacaoCompra() {
             <div className="flex flex-wrap items-center gap-3 text-sm text-[var(--c-muted)]">
               <span>{itens.length} item(ns)</span>
               {itens.length > 0 && <span>{itensSelecionados.length} selecionado(s)</span>}
+              {itens.length > 0 && <span>{itensPendentesApropriacao} pendente(s) de rateio fechado</span>}
             </div>
           </div>
 
@@ -606,7 +772,7 @@ export default function NovaSolicitacaoCompra() {
                 <div>
                   <h3 className="font-medium">Ajustes em massa</h3>
                   <p className="text-sm text-[var(--c-muted)]">
-                    Selecione os itens abaixo e aplique quantidade, apropriacao, prazo ou link de uma vez.
+                    Selecione os itens abaixo e aplique quantidade, apropriacao unica, prazo ou link de uma vez.
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -620,7 +786,7 @@ export default function NovaSolicitacaoCompra() {
               </div>
               <div className="grid gap-3 xl:grid-cols-4">
                 <div className="grid gap-2">
-                  <label className="text-sm font-medium">Apropriacao</label>
+                  <label className="text-sm font-medium">Apropriacao unica</label>
                   <select
                     className="input"
                     value={edicaoMassa.apropriacao_id}
@@ -726,14 +892,45 @@ export default function NovaSolicitacaoCompra() {
                       <td><input type="number" min="0.01" step="0.01" className="input min-w-[110px]" value={item.quantidade} onChange={(event) => atualizarItem(index, 'quantidade', event.target.value)} /></td>
                       <td><input className="input min-w-[260px]" value={item.especificacao} onChange={(event) => atualizarItem(index, 'especificacao', event.target.value)} /></td>
                       <td>
-                        <select className="input min-w-[240px]" value={item.apropriacao_id} onChange={(event) => atualizarItem(index, 'apropriacao_id', event.target.value)}>
-                          <option value="">Selecione</option>
-                          {apropriacoes.map((apropriacao) => (
-                            <option key={apropriacao.id} value={apropriacao.id}>
-                              {apropriacao.codigo} - {apropriacao.descricao}
-                            </option>
-                          ))}
-                        </select>
+                        {(() => {
+                          const linhasApropriacao = montarLinhasResumoApropriacao(item, apropriacoes);
+                          const resumoApropriacao = calcularResumoRateios(item);
+
+                          return (
+                            <div className="flex min-w-[260px] flex-col gap-2 rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] p-3">
+                              {linhasApropriacao.length > 0 ? (
+                                <>
+                                  <div className="grid gap-1 text-xs text-[var(--c-text)]">
+                                    {linhasApropriacao.slice(0, 2).map((linha, linhaIndex) => (
+                                      <div key={`${linha}-${linhaIndex}`}>{linha}</div>
+                                    ))}
+                                    {linhasApropriacao.length > 2 && (
+                                      <div className="text-[var(--c-muted)]">
+                                        +{linhasApropriacao.length - 2} rateio(s)
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div
+                                    className={`text-[11px] font-semibold ${
+                                      resumoApropriacao.fechado ? 'text-emerald-700' : 'text-amber-700'
+                                    }`}
+                                  >
+                                    {resumoApropriacao.fechado
+                                      ? 'Distribuicao fechada'
+                                      : `Saldo ${formatarQuantidade(resumoApropriacao.saldo)}`}
+                                  </div>
+                                </>
+                              ) : (
+                                <div className="text-xs text-[var(--c-muted)]">
+                                  Nenhuma apropriacao definida.
+                                </div>
+                              )}
+                              <button type="button" className="btn btn-outline justify-center" onClick={() => abrirModalApropriacao(index)}>
+                                {linhasApropriacao.length > 0 ? 'Editar rateio' : 'Apropriar'}
+                              </button>
+                            </div>
+                          );
+                        })()}
                       </td>
                       <td><input type="date" className="input min-w-[170px]" value={item.necessario_para} onChange={(event) => atualizarItem(index, 'necessario_para', event.target.value)} /></td>
                       <td>
@@ -788,7 +985,7 @@ export default function NovaSolicitacaoCompra() {
           )}
 
           <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-            Itens manuais agora ficam registrados em tabela própria no banco e aparecem destacados no detalhe e no PDF.
+            Use o botao <strong>Apropriar</strong> em cada item para dividir a quantidade entre etapas da obra. O sistema mostra total, distribuido e saldo em tempo real.
           </div>
 
           <div className="mt-6 flex flex-wrap justify-end gap-2">
@@ -826,6 +1023,94 @@ export default function NovaSolicitacaoCompra() {
             <div className="mt-6 flex justify-end gap-2">
               <button type="button" className="btn btn-outline" onClick={() => setModalManualAberto(false)}>Cancelar</button>
               <button type="button" className="btn btn-primary" onClick={adicionarItemManual}>Adicionar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {modalApropriacaoIndex !== null && itemModalAtual && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
+          <div className="card w-full max-w-3xl">
+            <div className="card-header flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="font-semibold">Apropriar item</h2>
+                <p className="text-sm text-[var(--c-muted)]">
+                  {itemModalAtual.insumo_nome} · Quantidade total {formatarQuantidade(itemModalAtual.quantidade)}
+                </p>
+              </div>
+              <button type="button" className="btn btn-outline" onClick={fecharModalApropriacao}>Fechar</button>
+            </div>
+
+            <div className="grid gap-4">
+              <div className="grid gap-3 md:grid-cols-3">
+                <div className="rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] px-4 py-3">
+                  <div className="text-xs uppercase tracking-[0.14em] text-[var(--c-muted)]">Total</div>
+                  <div className="mt-2 text-xl font-semibold">{formatarQuantidade(resumoModalApropriacao.total)}</div>
+                </div>
+                <div className="rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] px-4 py-3">
+                  <div className="text-xs uppercase tracking-[0.14em] text-[var(--c-muted)]">Distribuído</div>
+                  <div className="mt-2 text-xl font-semibold">{formatarQuantidade(resumoModalApropriacao.distribuido)}</div>
+                </div>
+                <div className={`rounded-xl border px-4 py-3 ${resumoModalApropriacao.fechado ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-700'}`}>
+                  <div className="text-xs uppercase tracking-[0.14em]">Saldo</div>
+                  <div className="mt-2 text-xl font-semibold">{formatarQuantidade(resumoModalApropriacao.saldo)}</div>
+                </div>
+              </div>
+
+              <div className="grid gap-3">
+                {rateiosModal.map((rateio, rateioIndex) => (
+                  <div key={`rateio-${rateioIndex}`} className="grid gap-3 rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4 md:grid-cols-[minmax(0,1fr)_180px_96px]">
+                    <div className="grid gap-2">
+                      <label className="text-sm font-medium">Apropriação</label>
+                      <select
+                        className="input"
+                        value={rateio.apropriacao_id}
+                        onChange={(event) => atualizarRateioModal(rateioIndex, 'apropriacao_id', event.target.value)}
+                      >
+                        <option value="">Selecione</option>
+                        {apropriacoes.map((apropriacao) => (
+                          <option key={apropriacao.id} value={apropriacao.id}>
+                            {apropriacao.codigo} - {apropriacao.descricao}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="grid gap-2">
+                      <label className="text-sm font-medium">Quantidade apropriada</label>
+                      <input
+                        type="number"
+                        min="0.01"
+                        step="0.01"
+                        className="input"
+                        value={rateio.quantidade_apropriada}
+                        onChange={(event) => atualizarRateioModal(rateioIndex, 'quantidade_apropriada', event.target.value)}
+                      />
+                    </div>
+
+                    <div className="grid gap-2">
+                      <label className="text-sm font-medium">Ação</label>
+                      <button type="button" className="btn btn-outline justify-center" onClick={() => removerRateioModal(rateioIndex)}>
+                        Remover
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex flex-wrap justify-between gap-2">
+                <button type="button" className="btn btn-outline" onClick={adicionarRateioModal}>
+                  Adicionar apropriação
+                </button>
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" className="btn btn-outline" onClick={fecharModalApropriacao}>
+                    Cancelar
+                  </button>
+                  <button type="button" className="btn btn-primary" onClick={salvarRateiosItem}>
+                    Salvar distribuição
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>

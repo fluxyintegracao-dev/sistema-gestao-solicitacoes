@@ -3,7 +3,6 @@ import * as SystemUI from 'expo-system-ui';
 import { useEffect, useState } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider } from '../features/auth/AuthContext';
-import { ModulesProvider } from '../features/modules/ModulesContext';
 import { NotificationsProvider } from '../features/notifications/NotificationsContext';
 import { colors } from '../theme';
 
@@ -26,9 +25,7 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
     <SafeAreaProvider>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
-          <ModulesProvider>
-            <NotificationsProvider>{children}</NotificationsProvider>
-          </ModulesProvider>
+          <NotificationsProvider>{children}</NotificationsProvider>
         </AuthProvider>
       </QueryClientProvider>
     </SafeAreaProvider>

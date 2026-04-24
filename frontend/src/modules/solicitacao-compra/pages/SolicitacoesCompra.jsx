@@ -32,22 +32,22 @@ function classNameStatus(status) {
   const valor = String(status || '').toUpperCase();
 
   if (valor === 'ENVIADO' || valor === 'ABERTA') {
-    return 'bg-blue-100 text-blue-700';
+    return 'app-status-pill bg-blue-100 text-blue-700';
   }
 
   if (valor === 'INTEGRADO_SIENGE') {
-    return 'bg-amber-100 text-amber-700';
+    return 'app-status-pill bg-amber-100 text-amber-700';
   }
 
   if (valor === 'LIBERADO_PARA_COMPRA') {
-    return 'bg-emerald-100 text-emerald-700';
+    return 'app-status-pill bg-emerald-100 text-emerald-700';
   }
 
   if (valor === 'FINALIZADA' || valor === 'ENCERRADO') {
-    return 'bg-slate-100 text-slate-700';
+    return 'app-status-pill bg-slate-100 text-slate-700';
   }
 
-  return 'bg-indigo-100 text-indigo-700';
+  return 'app-status-pill bg-indigo-100 text-indigo-700';
 }
 
 export default function SolicitacoesCompra() {
@@ -76,7 +76,7 @@ export default function SolicitacoesCompra() {
       setSolicitacoes(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error(error);
-      alert(error.message || 'Erro ao carregar solicitações de compra');
+      alert(error.message || 'Erro ao carregar solicitacoes de compra');
     } finally {
       setLoading(false);
     }
@@ -133,28 +133,52 @@ export default function SolicitacoesCompra() {
   }
 
   return (
-    <div className="page">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="page-title">Solicitações de Compra</h1>
-          <p className="page-subtitle">
-            Acompanhe as solicitações de compra criadas no módulo e gere o PDF quando necessário.
-          </p>
+    <div className="page solicitacoes-page">
+      <div className="app-page-header">
+        <div className="app-page-header-row">
+          <div>
+            <h1 className="text-xl font-semibold md:text-2xl">Solicitacoes de Compra</h1>
+            <p className="page-subtitle">
+              Acompanhe as solicitacoes de compra criadas no modulo e gere o PDF quando necessario.
+            </p>
+          </div>
         </div>
-        <div className="flex flex-wrap gap-2">
+      </div>
+
+      <div className="sol-surface-card solicitacoes-toolbar app-toolbar-card rounded-xl p-3 md:p-4">
+        <div className="text-sm text-gray-600 dark:text-slate-300">
+          Registros disponiveis: <strong>{solicitacoesFiltradas.length}</strong>
+        </div>
+        <div className="app-page-actions">
           <button type="button" className="btn btn-outline" onClick={carregarSolicitacoes} disabled={loading}>
             {loading ? 'Atualizando...' : 'Atualizar'}
           </button>
           <button type="button" className="btn btn-primary" onClick={() => navigate('/solicitacoes-compra/nova')}>
-            Nova solicitação
+            Nova solicitacao
           </button>
         </div>
       </div>
 
-      <div className="card">
-        <div className="grid gap-3 md:grid-cols-4">
-          <div className="grid gap-2">
-            <label className="text-sm font-medium">Obra</label>
+      <div className="sol-surface-card solicitacoes-filtros app-filters-card rounded-xl p-4 md:p-5">
+        <div className="sol-filtros-head">
+          <div>
+            <p className="sol-filtros-title">Filtros</p>
+            <p className="sol-filtros-subtitle">
+              Refine por obra, status e busca textual para localizar a solicitacao certa mais rapido.
+            </p>
+          </div>
+
+          <div className="sol-filtros-meta">
+            <div className="sol-filtros-soma">
+              <span className="sol-filtros-soma-label">Total listado</span>
+              <strong className="sol-filtros-soma-value">{solicitacoesFiltradas.length}</strong>
+            </div>
+          </div>
+        </div>
+
+        <div className="sol-filtros-grid">
+          <label className="sol-filter-field">
+            <span className="sol-filter-label">Obra</span>
             <select className="input" value={obraId} onChange={(event) => setObraId(event.target.value)}>
               <option value="">Todas</option>
               {obras.map((obra) => (
@@ -164,10 +188,10 @@ export default function SolicitacoesCompra() {
                 </option>
               ))}
             </select>
-          </div>
+          </label>
 
-          <div className="grid gap-2">
-            <label className="text-sm font-medium">Status</label>
+          <label className="sol-filter-field">
+            <span className="sol-filter-label">Status</span>
             <select className="input" value={status} onChange={(event) => setStatus(event.target.value)}>
               <option value="">Todos</option>
               <option value="ENVIADO">Enviado</option>
@@ -175,49 +199,42 @@ export default function SolicitacoesCompra() {
               <option value="LIBERADO_PARA_COMPRA">Liberado para compra</option>
               <option value="ENCERRADO">Encerrado</option>
             </select>
-          </div>
+          </label>
 
-          <div className="grid gap-2 md:col-span-2">
-            <label className="text-sm font-medium">Busca</label>
+          <label className="sol-filter-field md:col-span-2">
+            <span className="sol-filter-label">Busca</span>
             <input
               className="input"
-              placeholder="Código, obra ou solicitante"
+              placeholder="Codigo, obra ou solicitante"
               value={busca}
               onChange={(event) => setBusca(event.target.value)}
             />
-          </div>
+          </label>
         </div>
       </div>
 
-      <div className="card">
-        <div className="card-header flex flex-wrap items-center justify-between gap-3">
-          <h2 className="font-semibold">Registros</h2>
-          <span className="text-sm text-[var(--c-muted)]">
-            {solicitacoesFiltradas.length} registro(s)
-          </span>
-        </div>
-
+      <div className="card sol-surface-card app-table-shell">
         {loading ? (
           <div className="py-8 text-center text-sm text-[var(--c-muted)]">Carregando...</div>
         ) : solicitacoesFiltradas.length === 0 ? (
           <div className="py-8 text-center text-sm text-[var(--c-muted)]">
-            Nenhuma solicitação de compra encontrada.
+            Nenhuma solicitacao de compra encontrada.
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="table-wrapper">
             <table className="table">
               <thead>
                 <tr>
-                  <th>Código</th>
+                  <th>Codigo</th>
                   <th>Obra</th>
                   <th>Solicitante</th>
                   <th>Itens</th>
                   <th>Numero Sienge</th>
                   <th>Fornecedores</th>
-                  <th>Necessário para</th>
+                  <th>Necessario para</th>
                   <th>Criada em</th>
                   <th>Status</th>
-                  <th>Ações</th>
+                  <th>Acoes</th>
                 </tr>
               </thead>
               <tbody>
@@ -239,7 +256,7 @@ export default function SolicitacoesCompra() {
                     <td>{formatarData(solicitacao.necessario_para)}</td>
                     <td>{formatarData(solicitacao.createdAt)}</td>
                     <td>
-                      <span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${classNameStatus(solicitacao.status)}`}>
+                      <span className={classNameStatus(solicitacao.status)}>
                         {formatarStatus(solicitacao.status)}
                       </span>
                     </td>

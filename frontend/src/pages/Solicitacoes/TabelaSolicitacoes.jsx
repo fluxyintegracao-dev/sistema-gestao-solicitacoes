@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import LinhaSolicitacao from './LinhaSolicitacao';
 import { useAuth } from '../../contexts/AuthContext';
 import { timestampOrdenacaoData } from '../../utils/dateLocal';
+import { userHasSetorCapability } from '../../utils/setor';
+import { hasEnabledModule } from '../../utils/acessoProduto';
 
 const SORTABLE_COLUMNS = new Set(['data', 'vencimento', 'valor']);
 
@@ -22,12 +24,8 @@ export default function TabelaSolicitacoes({
   );
   const { user } = useAuth();
 
-  const setorTokens = [
-    String(user?.setor?.codigo || '').toUpperCase(),
-    String(user?.setor?.nome || '').toUpperCase(),
-    String(user?.area || '').toUpperCase()
-  ];
-  const isSetorObra = setorTokens.includes('OBRA');
+  const isSetorObra = userHasSetorCapability(user, 'eh_setor_obra');
+  const moduloContratosHabilitado = hasEnabledModule(user, 'CONTRATOS');
 
   const selecaoHabilitada = !mostrarArquivadas && typeof onToggleSelecionada === 'function';
   const viewportMode = viewportWidth < 768 ? 'mobile' : viewportWidth < 1024 ? 'tablet' : 'desktop';
@@ -44,7 +42,7 @@ export default function TabelaSolicitacoes({
       { id: 'codigo', label: 'Código', width: 100, min: 80, weight: 0.9 },
       { id: 'numero_sienge', label: 'Nº SIENGE', width: 120, min: 100, weight: 0.9 },
       { id: 'obra', label: 'Obra', width: 170, min: 120, weight: 1.2 },
-      { id: 'contrato', label: 'Contrato', width: 120, min: 95, weight: 1 },
+      ...(moduloContratosHabilitado ? [{ id: 'contrato', label: 'Contrato', width: 120, min: 95, weight: 1 }] : []),
       { id: 'descricao', label: 'Descrição', width: 110, min: 110, weight: 0, fixed: true },
       { id: 'tipo', label: 'Tipo de Solicitação', width: 170, min: 120, weight: 1.1 },
       { id: 'valor', label: 'Valor', width: 200, min: 160, weight: 1.15 },
@@ -55,7 +53,7 @@ export default function TabelaSolicitacoes({
       { id: 'acoes', label: 'Ações', width: 220, min: 190, weight: 1.4 }
     ];
 
-    if (isSetorObra) {
+    if (isSetorObra && moduloContratosHabilitado) {
       base.splice(6, 0, {
         id: 'ref_contrato',
         label: 'Ref. do Contrato',
@@ -67,7 +65,7 @@ export default function TabelaSolicitacoes({
     }
 
     return base;
-  }, [isSetorObra, selecaoHabilitada]);
+  }, [isSetorObra, moduloContratosHabilitado, selecaoHabilitada]);
 
   const visibleSet = useMemo(() => {
     if (!Array.isArray(visibleColumns) || visibleColumns.length === 0) return null;
@@ -95,8 +93,8 @@ export default function TabelaSolicitacoes({
       'codigo',
       'numero_sienge',
       'obra',
-      'contrato',
-      ...(isSetorObra ? ['ref_contrato'] : []),
+      ...(moduloContratosHabilitado ? ['contrato'] : []),
+      ...(isSetorObra && moduloContratosHabilitado ? ['ref_contrato'] : []),
       'descricao',
       'tipo',
       'valor',
@@ -106,7 +104,7 @@ export default function TabelaSolicitacoes({
       'vencimento',
       'acoes'
     ]);
-  }, [viewportMode, selecaoHabilitada, isSetorObra]);
+  }, [viewportMode, selecaoHabilitada, isSetorObra, moduloContratosHabilitado]);
 
   const columns = useMemo(() => {
     const userFiltered = !visibleSet

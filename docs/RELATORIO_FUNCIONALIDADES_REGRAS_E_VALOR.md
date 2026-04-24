@@ -235,10 +235,6 @@ Permissoes efetivas dependem da combinacao de:
 - Podem alterar status conforme os status do setor `OBRA`.
 - Existem automacoes proprias de retorno para setor anterior e envio para Financeiro em determinados status.
 
-### BRAPE e BRAPE-CSC
-- Fluxo segregado para solicitacoes BRAPE.
-- BRAPE-CSC tem comportamento controlado por vinculo com obras e historico.
-
 ### FINANCEIRO
 - Todos os usuarios do setor podem acessar upload em massa de comprovantes e comprovantes pendentes.
 - Tela de Solicitacoes exibe filtro de responsavel para esse setor.
@@ -380,7 +376,7 @@ Permissoes efetivas dependem da combinacao de:
 ### Regras
 - O usuario ve apenas conversas em que participa.
 - O criador pode editar mensagens por ate 5 minutos.
-- Qualquer participante pode adicionar usuarios ativos em conversa aberta, independente do setor.
+- O criador pode adicionar participantes apenas em conversa aberta.
 - O botao voltar respeita a origem da navegacao.
 
 ### Alertas visuais
@@ -417,6 +413,97 @@ Permissoes efetivas dependem da combinacao de:
 
 ---
 
+## 4.16 Financeiro e Conciliacao Bancaria
+
+### Estrutura principal
+- Modulo financeiro simples, centrado na solicitacao como origem operacional.
+- Cadastro mestre de parceiros compartilhado entre cliente e fornecedor.
+- Titulos financeiros unificados com tipo:
+  - `PAGAR`
+  - `RECEBER`
+- Cadastros auxiliares:
+  - contas bancarias
+  - categorias financeiras
+
+### Fluxo operacional
+- A solicitacao pode gerar conta manualmente pelo botao `Gerar conta`.
+- O backend sugere parceiro, valor, vencimento, obra e tipo, mas a confirmacao final continua manual.
+- O titulo financeiro preserva vinculo com a solicitacao de origem.
+- O detalhe do titulo mostra:
+  - dados financeiros
+  - movimentos de baixa
+  - estornos
+  - auditoria operacional
+
+### Baixa e estorno
+- Baixa parcial e total.
+- Juros e desconto por movimento.
+- Estorno de baixa com recalculo de saldo e status.
+- Historico auditavel de criacao, baixa e estorno.
+
+### Relatorios
+- Listagem de titulos com filtros por tipo, status e obra.
+- Relatorio de fluxo de caixa por periodo.
+- Dashboard com:
+  - contas a pagar e receber em aberto
+  - valores vencidos
+  - fluxo do mes
+  - custo por obra e parceiro
+  - conciliacao pendente
+
+### Conciliacao OFX
+- Importacao manual de OFX sem criar lancamentos automaticamente.
+- Sugestao de match por:
+  - valor
+  - data
+  - documento
+  - parceiro
+- Confirmacao manual da conciliacao.
+- Historico de importacoes OFX com:
+  - arquivo
+  - conta bancaria
+  - usuario
+  - data/hora
+  - quantidade lida, importada e ignorada
+
+### Regra critica de duplicidade
+- O backend bloqueia reimportacao da mesma remessa para a mesma conta bancaria.
+- O bloqueio usa fingerprint do arquivo importado e identificacao estavel por lancamento.
+- Duplicidades reais dentro do OFX continuam preservadas quando o banco enviar lancamentos validos repetidos.
+
+---
+
+## 4.17 Seguranca e Auditoria Estruturada
+
+### Autenticacao e API
+- Login com rate limit e trilha de sucesso/falha.
+- Tokens invalidados por expiracao e validados no backend.
+- Middleware padronizado para:
+  - autenticacao
+  - autorizacao
+  - validacao de input
+
+### Autorizacao
+- O backend e a autoridade para regras de acesso.
+- Validacoes criticas nao dependem do frontend.
+- Escopo por obra aplicado em recursos sensiveis, inclusive contratos, compras, anexos e financeiro.
+
+### Uploads e anexos
+- Validacao de extensao, MIME e tamanho.
+- Presign mediado pelo backend.
+- Download condicionado a autorizacao do usuario.
+
+### Logs e rastreabilidade
+- Security event logs para:
+  - login
+  - negacao de acesso
+  - rate limit
+  - operacoes financeiras
+  - importacao e conciliacao OFX
+- Titulos financeiros exibem auditoria operacional na propria tela de detalhe.
+
+---
+
 ## 5. Automacoes de Fluxo
 
 ### Setor OBRA
@@ -431,6 +518,8 @@ Permissoes efetivas dependem da combinacao de:
 - Registro de acoes criticas.
 - Log de exclusao de solicitacao.
 - Rastreabilidade de anexos, comentarios, responsavel, status e envios.
+- Registro estruturado de eventos de seguranca e financeiros.
+- Trilha de importacao OFX e conciliacao bancaria.
 
 ---
 
@@ -441,6 +530,9 @@ Permissoes efetivas dependem da combinacao de:
 - Upload e download mediados pelo backend.
 - Confirmacoes de sucesso e erro no frontend.
 - Validacoes criticas em frontend e backend.
+- Rate limit em login, uploads e operacoes sensiveis.
+- Migrations controladas e configuracao por ambiente.
+- Protecao contra duplicidade de importacao OFX.
 
 ---
 

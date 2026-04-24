@@ -1,4 +1,5 @@
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   ativarCategoriaMacroProvisionamento,
   atualizarCategoriaMacroProvisionamento,
@@ -8,6 +9,7 @@ import {
 } from '../../../services/provisoesFinanceiras';
 
 export default function GestaoCategoriasMacro() {
+  const navigate = useNavigate();
   const [categorias, setCategorias] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -34,6 +36,8 @@ export default function GestaoCategoriasMacro() {
 
   async function handleSubmit(event) {
     event.preventDefault();
+    if (saving) return;
+
     if (!form.nome.trim()) {
       alert('Informe o nome da categoria macro.');
       return;
@@ -91,18 +95,23 @@ export default function GestaoCategoriasMacro() {
       await carregar();
     } catch (error) {
       console.error(error);
-      alert(error?.message || 'Erro ao alterar status da categoria macro.');
+      alert(error?.message || 'Erro ao alterar status da categoria.');
     }
   }
 
   return (
     <div className="page space-y-6">
-      <div>
-        <h1 className="page-title">Categorias Macro do Provisionamento</h1>
-        <p className="page-subtitle">Cadastro inicial das categorias macro do novo modulo.</p>
+      <div className="mx-auto flex w-full max-w-6xl flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="page-title">Categorias Macro</h1>
+          <p className="page-subtitle">Base de classificacao do modulo de provisionamento.</p>
+        </div>
+        <button type="button" className="btn btn-outline" onClick={() => navigate('/provisoes-financeiras')}>
+          Voltar
+        </button>
       </div>
 
-      <form className="card space-y-4" onSubmit={handleSubmit}>
+      <form className="card mx-auto w-full max-w-6xl space-y-4" onSubmit={handleSubmit}>
         <div className="card-header">
           <h2 className="font-semibold">Nova categoria macro</h2>
         </div>
@@ -125,7 +134,7 @@ export default function GestaoCategoriasMacro() {
         </div>
       </form>
 
-      <div className="card">
+      <div className="card mx-auto w-full max-w-6xl">
         <div className="card-header">
           <h2 className="font-semibold">Categorias cadastradas</h2>
         </div>

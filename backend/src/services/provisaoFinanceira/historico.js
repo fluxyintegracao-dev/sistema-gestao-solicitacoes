@@ -1,9 +1,4 @@
-﻿const { ProvisaoFinanceiraHistorico } = require('../../models');
-
-function serializarJson(value) {
-  if (value === undefined || value === null) return null;
-  return JSON.stringify(value);
-}
+const { ProvisaoFinanceiraHistorico } = require('../../models');
 
 async function registrarHistoricoProvisionamento({
   provisao_financeira_id,
@@ -26,9 +21,9 @@ async function registrarHistoricoProvisionamento({
     status_novo,
     descricao,
     comentario,
-    dados_antes_json: serializarJson(dados_antes),
-    dados_depois_json: serializarJson(dados_depois),
-    metadata_json: serializarJson(metadata)
+    dados_antes_json: dados_antes,
+    dados_depois_json: dados_depois,
+    metadata_json: metadata
   }, { transaction });
 }
 

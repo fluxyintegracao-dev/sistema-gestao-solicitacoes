@@ -155,7 +155,7 @@ export default function GestaoUnidades() {
   }
 
   return (
-    <div className="page">
+    <div className="page solicitacoes-page">
       <div>
         <h1 className="page-title">Gestao de Unidades</h1>
         <p className="page-subtitle">Cadastro e manutencao das unidades de medida do modulo compras.</p>

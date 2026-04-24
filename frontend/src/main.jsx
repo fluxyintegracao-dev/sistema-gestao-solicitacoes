@@ -4,10 +4,20 @@ import App from './App';
 import { BrowserRouter } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
+import { applyNativeDocumentAttributes } from './mobile/runtime';
+import { installFetchSecurityDefaults } from './services/api';
 import './index.css';
 
+applyNativeDocumentAttributes();
+installFetchSecurityDefaults();
+
 ReactDOM.createRoot(document.getElementById('root')).render(
-  <BrowserRouter>
+  <BrowserRouter
+    future={{
+      v7_startTransition: true,
+      v7_relativeSplatPath: true
+    }}
+  >
     <AuthProvider>
       <ThemeProvider>
         <App />

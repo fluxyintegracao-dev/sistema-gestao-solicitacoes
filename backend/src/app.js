@@ -1,51 +1,142 @@
 const express = require('express');
 const cors = require('cors');
+const cookieParser = require('cookie-parser');
+const helmet = require('helmet');
 const multer = require('multer');
 const app = express();
 
+const { env } = require('./config/env');
 const db = require('./models');
 const routes = require('./routes');
 const path = require('path');
 const fs = require('fs');
-const uploadMaxMb = Number(process.env.UPLOAD_MAX_FILE_SIZE_MB || 10);
+const { getRuntimeInstallationConfig } = require('./services/runtimeConfig');
 
-const allowedOrigins = new Set([
-  'https://sistema-gestao-solicitacoes.vercel.app',
-  'https://api.jrfluxy.com.br',
-  'https://jrfluxy.com.br',
-  'https://www.jrfluxy.com.br',
-  'https://csc.jrfluxy.com.br',
-  'http://localhost:5173',
-  'http://127.0.0.1:5173'
-]);
+const uploadMaxMb = env.uploadMaxFileSizeMb;
+const requestBodyLimit = `${Math.max(1, env.requestBodyLimitMb)}mb`;
+const isProduction = env.nodeEnv === 'production';
+const dangerousInlineUploadExtensions = new Set(['.htm', '.html', '.js', '.mjs', '.svg', '.xhtml', '.xml']);
+
+app.disable('x-powered-by');
+app.set('trust proxy', env.trustProxy);
+
+function matchesOriginPattern(origin, pattern) {
+  const normalizedPattern = String(pattern || '').trim();
+  if (!normalizedPattern) return false;
+  if (normalizedPattern === origin) return true;
+
+  if (!normalizedPattern.includes('*')) {
+    return false;
+  }
+
+  const escaped = normalizedPattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&');
+  const regex = new RegExp(`^${escaped.replace(/\*/g, '.*')}$`);
+  return regex.test(origin);
+}
+
+function isLocalOrigin(origin) {
+  return /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(String(origin || '').trim());
+}
+
+function shouldForceAttachmentForUploadPath(filePath = '') {
+  const extension = String(path.extname(String(filePath || '').split('?')[0]) || '').toLowerCase();
+  return dangerousInlineUploadExtensions.has(extension);
+}
 
 const corsOptions = {
   origin: (origin, callback) => {
     if (!origin) return callback(null, true);
-    if (allowedOrigins.has(origin)) return callback(null, true);
-    if (/^https:\/\/([a-z0-9-]+\.)*jrfluxy\.com\.br$/.test(origin)) {
+    if (isLocalOrigin(origin)) {
       return callback(null, true);
     }
-    if (/^https:\/\/sistema-gestao-solicitacoes-.*\.vercel\.app$/.test(origin)) {
+
+    const config = getRuntimeInstallationConfig();
+    const allowedOrigins = Array.isArray(config?.allowed_origins)
+      ? config.allowed_origins
+      : [];
+
+    if (allowedOrigins.some((item) => matchesOriginPattern(origin, item))) {
       return callback(null, true);
     }
-    if (/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
-      return callback(null, true);
-    }
+
     return callback(new Error('Not allowed by CORS'));
   },
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token'],
   credentials: true
 };
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
-app.use(express.json());
+app.use(cookieParser());
+app.use(helmet({
+  contentSecurityPolicy: isProduction
+    ? {
+        useDefaults: true,
+        directives: {
+          defaultSrc: ["'self'"],
+          baseUri: ["'self'"],
+          frameAncestors: ["'none'"],
+          objectSrc: ["'none'"],
+          scriptSrc: ["'self'"],
+          styleSrc: ["'self'", "'unsafe-inline'"],
+          imgSrc: ["'self'", 'data:', 'blob:', 'https:'],
+          fontSrc: ["'self'", 'data:', 'https:'],
+          connectSrc: ["'self'", 'https:', 'http:', 'ws:', 'wss:'],
+          frameSrc: ["'self'", 'blob:', 'https:']
+        }
+      }
+    : false,
+  crossOriginEmbedderPolicy: false,
+  crossOriginResourcePolicy: false,
+  frameguard: { action: 'deny' },
+  hsts: isProduction
+    ? {
+        maxAge: 31536000,
+        includeSubDomains: true,
+        preload: true
+      }
+    : false,
+  noSniff: true,
+  referrerPolicy: { policy: 'same-origin' }
+}));
+app.use((req, res, next) => {
+  res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
+  next();
+});
+app.use(express.json({
+  limit: requestBodyLimit,
+  verify: (req, res, buf) => {
+    if (String(req.originalUrl || '').includes('/api/crm/webhooks/')) {
+      req.rawBody = buf.toString('utf8');
+    }
+  }
+}));
+app.use(express.urlencoded({ extended: false, limit: requestBodyLimit }));
 
 app.use(
   '/uploads',
-  express.static(path.resolve(__dirname, '..', 'uploads'))
+  express.static(path.resolve(__dirname, '..', 'uploads'), {
+    setHeaders: (res, filePath) => {
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.setHeader('Cache-Control', 'no-store');
+
+      if (!shouldForceAttachmentForUploadPath(filePath)) {
+        return;
+      }
+
+      const safeFileName = path.basename(filePath).replace(/"/g, '');
+      res.setHeader('Content-Type', 'application/octet-stream');
+      res.setHeader('Content-Disposition', `attachment; filename="${safeFileName}"`);
+      res.setHeader('Content-Security-Policy', "sandbox; default-src 'none'");
+    }
+  })
 );
+
+app.use('/api', (req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store, max-age=0');
+  res.setHeader('Pragma', 'no-cache');
+  next();
+});
 
 app.use('/api', routes);
 
@@ -57,11 +148,20 @@ app.use((err, req, res, next) => {
     return res.status(400).json({ error: 'Falha no upload do arquivo.' });
   }
 
+  if (Number(err?.statusCode || 0) > 0) {
+    return res.status(Number(err.statusCode)).json({ error: err.message || 'Falha na validacao de upload.' });
+  }
+
   if (err && /Tipo de arquivo/i.test(String(err.message || ''))) {
     return res.status(400).json({ error: 'Tipo de arquivo nao permitido.' });
   }
 
   return next(err);
+});
+
+app.use((err, req, res, next) => {
+  console.error('Erro nao tratado na API:', err);
+  return res.status(500).json({ error: 'Erro interno do servidor.' });
 });
 
 const staticDir = path.resolve(__dirname, '..', 'public');
@@ -289,18 +389,6 @@ async function prepararBanco() {
     await db.sequelize.query(
       "UPDATE users SET pode_criar_solicitacao_compra = 1 WHERE perfil IN ('SUPERADMIN', 'ADMIN')"
     );
-  } catch (error) {
-    // ignora se nao conseguir aplicar agora
-  }
-
-  // Solicitacoes - permissao especial para envio fora do setor atual
-  try {
-    const hasColumn = await columnExists('users', 'pode_enviar_qualquer_setor');
-    if (!hasColumn) {
-      await db.sequelize.query(
-        "ALTER TABLE users ADD COLUMN pode_enviar_qualquer_setor BOOLEAN NOT NULL DEFAULT 0"
-      );
-    }
   } catch (error) {
     // ignora se nao conseguir aplicar agora
   }
@@ -666,41 +754,6 @@ async function prepararBanco() {
     // ignora se nao conseguir popular
   }
 }
-
-prepararBanco()
-  .then(() => {
-    if (db.User?.rawAttributes?.email) {
-      db.User.rawAttributes.email.unique = false;
-      db.User.refreshAttributes();
-    }
-    if (db.Cargo?.rawAttributes?.codigo) {
-      db.Cargo.rawAttributes.codigo.unique = false;
-      db.Cargo.refreshAttributes();
-    }
-    if (db.Setor?.rawAttributes?.codigo) {
-      db.Setor.rawAttributes.codigo.unique = false;
-      db.Setor.refreshAttributes();
-    }
-    if (db.Obra?.rawAttributes?.codigo) {
-      db.Obra.rawAttributes.codigo.unique = false;
-      db.Obra.refreshAttributes();
-    }
-    if (db.Contrato?.rawAttributes?.codigo) {
-      db.Contrato.rawAttributes.codigo.unique = false;
-      db.Contrato.refreshAttributes();
-    }
-    if (db.TipoMacroContrato?.rawAttributes?.nome) {
-      db.TipoMacroContrato.rawAttributes.nome.unique = false;
-      db.TipoMacroContrato.refreshAttributes();
-    }
-    if (db.SetorPermissao?.rawAttributes?.setor) {
-      db.SetorPermissao.rawAttributes.setor.unique = false;
-      db.SetorPermissao.refreshAttributes();
-    }
-    return db.sequelize.sync({ alter: true });
-  })
-  .then(() => console.log('Banco de dados sincronizado'))
-  .catch(err => console.error('Erro ao sincronizar banco', err));
 
 app.get('/health', (req, res) => res.json({ ok: true }));
 

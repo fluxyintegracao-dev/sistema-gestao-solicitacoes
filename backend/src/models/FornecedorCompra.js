@@ -7,9 +7,17 @@ module.exports = (sequelize, DataTypes) => {
         primaryKey: true,
         autoIncrement: true
       },
+      parceiro_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true
+      },
       nome: {
         type: DataTypes.STRING,
         allowNull: false
+      },
+      cnpj: {
+        type: DataTypes.STRING(20),
+        allowNull: true
       },
       email: {
         type: DataTypes.STRING,
@@ -25,6 +33,22 @@ module.exports = (sequelize, DataTypes) => {
       },
       observacoes: {
         type: DataTypes.TEXT,
+        allowNull: true
+      },
+      categoria_insumos: {
+        type: DataTypes.JSON,
+        allowNull: true
+      },
+      cidade: {
+        type: DataTypes.STRING(150),
+        allowNull: true
+      },
+      estado: {
+        type: DataTypes.STRING(2),
+        allowNull: true
+      },
+      cep: {
+        type: DataTypes.STRING(10),
         allowNull: true
       },
       ativo: {

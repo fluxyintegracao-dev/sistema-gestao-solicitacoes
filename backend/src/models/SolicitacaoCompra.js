@@ -7,9 +7,18 @@ module.exports = (sequelize, DataTypes) => {
         primaryKey: true,
         autoIncrement: true
       },
+      origem: {
+        type: DataTypes.STRING(20),
+        allowNull: false,
+        defaultValue: 'NORMAL'
+      },
+      titulo: {
+        type: DataTypes.STRING(255),
+        allowNull: true
+      },
       obra_id: {
         type: DataTypes.INTEGER,
-        allowNull: false
+        allowNull: true
       },
       solicitante_id: {
         type: DataTypes.INTEGER,

@@ -1,4 +1,10 @@
 import { API_URL, authHeaders, fileUrl } from './api';
+import {
+  atualizarApropriacao as atualizarApropriacaoCompartilhada,
+  criarApropriacao as criarApropriacaoCompartilhada,
+  deletarApropriacao as deletarApropriacaoCompartilhada,
+  listarApropriacoes as listarApropriacoesCompartilhadas
+} from './apropriacoes';
 
 function handleJsonResponse(response, fallbackMessage) {
   return response.text().then((text) => {
@@ -8,6 +14,20 @@ function handleJsonResponse(response, fallbackMessage) {
 
     return text ? JSON.parse(text) : null;
   });
+}
+
+function buildQueryString(params = {}) {
+  const search = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value === undefined || value === null || value === '') {
+      return;
+    }
+
+    search.set(key, String(value));
+  });
+
+  return search.toString();
 }
 
 export async function listarUnidades() {
@@ -124,41 +144,19 @@ export async function importarInsumosEmMassa(data) {
 }
 
 export async function listarApropriacoes(params = {}) {
-  const query = new URLSearchParams(params).toString();
-  const url = query
-    ? `${API_URL}/compras/apropriacoes?${query}`
-    : `${API_URL}/compras/apropriacoes`;
-
-  const response = await fetch(url, {
-    headers: authHeaders()
-  });
-  return handleJsonResponse(response, 'Erro ao buscar apropriacoes');
+  return listarApropriacoesCompartilhadas(params);
 }
 
 export async function criarApropriacao(data) {
-  const response = await fetch(`${API_URL}/compras/apropriacoes`, {
-    method: 'POST',
-    headers: authHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify(data)
-  });
-  return handleJsonResponse(response, 'Erro ao criar apropriacao');
+  return criarApropriacaoCompartilhada(data);
 }
 
 export async function atualizarApropriacao(id, data) {
-  const response = await fetch(`${API_URL}/compras/apropriacoes/${id}`, {
-    method: 'PUT',
-    headers: authHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify(data)
-  });
-  return handleJsonResponse(response, 'Erro ao atualizar apropriacao');
+  return atualizarApropriacaoCompartilhada(id, data);
 }
 
 export async function deletarApropriacao(id) {
-  const response = await fetch(`${API_URL}/compras/apropriacoes/${id}`, {
-    method: 'DELETE',
-    headers: authHeaders()
-  });
-  return handleJsonResponse(response, 'Erro ao deletar apropriacao');
+  return deletarApropriacaoCompartilhada(id);
 }
 
 export async function listarFornecedoresCompra(params = {}) {
@@ -253,6 +251,93 @@ export async function encerrarSolicitacaoCompra(id, data) {
   return handleJsonResponse(response, 'Erro ao encerrar solicitacao de compra');
 }
 
+export async function listarPedidosCompra(params = {}) {
+  const query = buildQueryString(params);
+  const url = query
+    ? `${API_URL}/compras/pedidos?${query}`
+    : `${API_URL}/compras/pedidos`;
+
+  const response = await fetch(url, {
+    headers: authHeaders()
+  });
+  return handleJsonResponse(response, 'Erro ao buscar pedidos de compra');
+}
+
+export async function obterPedidoCompra(id) {
+  const response = await fetch(`${API_URL}/compras/pedidos/${id}`, {
+    headers: authHeaders()
+  });
+  return handleJsonResponse(response, 'Erro ao buscar pedido de compra');
+}
+
+export async function listarAuditoriaItensPedidoCompra(params = {}) {
+  const query = buildQueryString(params);
+  const url = query
+    ? `${API_URL}/compras/relatorios/auditoria-itens-pedido?${query}`
+    : `${API_URL}/compras/relatorios/auditoria-itens-pedido`;
+
+  const response = await fetch(url, {
+    headers: authHeaders()
+  });
+  return handleJsonResponse(response, 'Erro ao buscar auditoria dos itens do pedido');
+}
+
+export async function atualizarStatusPedidoCompra(id, data) {
+  const response = await fetch(`${API_URL}/compras/pedidos/${id}/status`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+  return handleJsonResponse(response, 'Erro ao atualizar status do pedido');
+}
+
+export async function criarPedidoCompraDaSolicitacao(id, data) {
+  const response = await fetch(`${API_URL}/compras/solicitacoes/${id}/pedidos`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+  return handleJsonResponse(response, 'Erro ao criar pedido de compra');
+}
+
+export async function adicionarItemPedidoCompra(id, data) {
+  const response = await fetch(`${API_URL}/compras/pedidos/${id}/itens`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+  return handleJsonResponse(response, 'Erro ao adicionar item ao pedido');
+}
+
+export async function atualizarItemPedidoCompra(id, itemId, data) {
+  const response = await fetch(`${API_URL}/compras/pedidos/${id}/itens/${itemId}`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+  return handleJsonResponse(response, 'Erro ao atualizar item do pedido');
+}
+
+export async function removerItemPedidoCompra(id, itemId) {
+  const response = await fetch(`${API_URL}/compras/pedidos/${id}/itens/${itemId}`, {
+    method: 'DELETE',
+    headers: authHeaders()
+  });
+  return handleJsonResponse(response, 'Erro ao remover item do pedido');
+}
+
+export async function baixarPdfPedidoCompra(id) {
+  const response = await fetch(`${API_URL}/compras/pedidos/${id}/pdf`, {
+    headers: authHeaders()
+  });
+
+  if (!response.ok) {
+    throw new Error('Erro ao gerar PDF do pedido');
+  }
+
+  return response.blob();
+}
+
 export async function uploadAnexoTemporarioCompra(file) {
   const formData = new FormData();
   formData.append('file', file);
@@ -295,6 +380,13 @@ export async function baixarPdfSolicitacaoCompra(id) {
   return response.blob();
 }
 
+export async function listarCotacoes(params = {}) {
+  const query = buildQueryString(params);
+  const url = query ? `${API_URL}/compras/cotacoes?${query}` : `${API_URL}/compras/cotacoes`;
+  const response = await fetch(url, { headers: authHeaders() });
+  return handleJsonResponse(response, 'Erro ao buscar cotacoes');
+}
+
 export async function obterCotacaoPublica(token) {
   const response = await fetch(`${API_URL}/cotacoes/${token}`);
   return handleJsonResponse(response, 'Erro ao buscar cotacao');
@@ -327,4 +419,61 @@ export async function baixarModeloCotacaoPublica(token) {
     throw new Error('Erro ao baixar modelo da cotacao');
   }
   return response.blob();
+}
+
+export async function baixarModeloCotacaoPublicaXlsx(token) {
+  const response = await fetch(`${API_URL}/cotacoes/${token}/modelo-xlsx`);
+  if (!response.ok) {
+    throw new Error('Erro ao baixar modelo Excel da cotacao');
+  }
+  return response.blob();
+}
+
+export async function obterConfigCotacoes() {
+  const response = await fetch(`${API_URL}/configuracoes/cotacoes`, {
+    headers: authHeaders()
+  });
+  return handleJsonResponse(response, 'Erro ao buscar configuracoes de cotacoes');
+}
+
+export async function salvarConfigCotacoes(data) {
+  const response = await fetch(`${API_URL}/configuracoes/cotacoes`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+  return handleJsonResponse(response, 'Erro ao salvar configuracoes de cotacoes');
+}
+
+export async function obterFornecedorCompra(id) {
+  const response = await fetch(`${API_URL}/compras/fornecedores/${id}`, {
+    headers: authHeaders()
+  });
+  return handleJsonResponse(response, 'Erro ao buscar fornecedor');
+}
+
+export async function atualizarFornecedorCompra(id, data) {
+  const response = await fetch(`${API_URL}/compras/fornecedores/${id}`, {
+    method: 'PUT',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+  return handleJsonResponse(response, 'Erro ao atualizar fornecedor');
+}
+
+export async function desativarFornecedorCompra(id) {
+  const response = await fetch(`${API_URL}/compras/fornecedores/${id}`, {
+    method: 'DELETE',
+    headers: authHeaders()
+  });
+  return handleJsonResponse(response, 'Erro ao desativar fornecedor');
+}
+
+export async function criarCotacaoAvulsa(data) {
+  const response = await fetch(`${API_URL}/compras/cotacoes/avulsa`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+  return handleJsonResponse(response, 'Erro ao criar cotacao avulsa');
 }

@@ -19,6 +19,11 @@ module.exports = (sequelize, DataTypes) => {
     adicionado_por_id: {
       type: DataTypes.INTEGER,
       allowNull: true
+    },
+
+    lida_em: {
+      type: DataTypes.DATE,
+      allowNull: true
     }
   }, {
     tableName: 'conversas_internas_participantes',

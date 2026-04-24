@@ -128,10 +128,10 @@ export default function TiposSolicitacaoPorSetor() {
   const tiposSelecionados = new Set((regraAtual.tipos || []).map(Number));
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Tipos de Solicitação por Setor</h1>
+    <div className="page solicitacoes-page">
+      <h1 className="page-title">Tipos de Solicitação por Setor</h1>
 
-      <div className="bg-white p-6 rounded-xl shadow space-y-4">
+      <div className="card space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
           <label className="grid gap-1 text-sm">
             Setor
@@ -151,7 +151,7 @@ export default function TiposSolicitacaoPorSetor() {
             </select>
           </label>
 
-          <div className="text-sm text-gray-600 md:col-span-2">
+          <div className="text-sm md:col-span-2" style={{ color: 'var(--c-muted)' }}>
             Se nenhum tipo for marcado para o setor, o sistema mantém o comportamento atual (todos os tipos disponíveis).
           </div>
         </div>
@@ -187,7 +187,7 @@ export default function TiposSolicitacaoPorSetor() {
                       </select>
                     </label>
                   ) : (
-                    <span className="text-sm text-gray-400">
+                    <span className="text-sm" style={{ color: 'var(--c-muted)' }}>
                       Tipo não habilitado para este setor
                     </span>
                   )}

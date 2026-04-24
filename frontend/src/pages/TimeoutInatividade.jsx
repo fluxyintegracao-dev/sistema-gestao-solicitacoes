@@ -55,12 +55,12 @@ export default function TimeoutInatividade() {
     <div className="max-w-2xl space-y-6">
       <div>
         <h1 className="text-2xl font-semibold">Tempo de Inatividade</h1>
-        <p className="text-sm text-gray-600">
+        <p className="text-sm" style={{ color: 'var(--c-muted)' }}>
           Define em quantos minutos sem interação o sistema fará logout automático.
         </p>
       </div>
 
-      <form onSubmit={salvar} className="bg-white p-6 rounded-xl shadow space-y-4">
+      <form onSubmit={salvar} className="card space-y-4">
         <label className="grid gap-1 text-sm">
           Tempo (minutos)
           <input
@@ -74,7 +74,7 @@ export default function TimeoutInatividade() {
           />
         </label>
 
-        <p className="text-xs text-gray-500">
+        <p className="text-xs" style={{ color: 'var(--c-muted)' }}>
           Sugestão: `20` minutos. Valor máximo permitido: `480` minutos (8 horas).
         </p>
 

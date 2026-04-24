@@ -123,11 +123,11 @@ export default function ArquivosModelosConfig() {
         {(contexto?.paginas || []).map(pagina => {
           const ids = Array.isArray(uploadersByPagina?.[pagina.codigo]) ? uploadersByPagina[pagina.codigo] : [];
           return (
-            <div key={pagina.codigo} className="rounded-xl border border-gray-200 p-3 bg-white">
+            <div key={pagina.codigo} className="rounded-xl border border-gray-200 p-3 card">
               <div className="flex items-center justify-between gap-3 flex-wrap">
                 <div>
                   <p className="font-semibold">{pagina.nome}</p>
-                  <p className="text-xs text-gray-500">Código: {pagina.codigo}</p>
+                  <p className="text-xs" style={{ color: 'var(--c-muted)' }}>Código: {pagina.codigo}</p>
                 </div>
                 <button type="button" className="btn btn-outline" onClick={() => togglePagina(pagina)}>
                   {pagina.ativo ? 'Desativar' : 'Ativar'}
@@ -148,7 +148,7 @@ export default function ArquivosModelosConfig() {
                         />
                         <span>
                           <strong>{admin.nome}</strong><br />
-                          <span className="text-xs text-gray-500">
+                          <span className="text-xs" style={{ color: 'var(--c-muted)' }}>
                             {admin.email} · {admin.perfil} · {adminsById[Number(admin.id)]?.setor?.nome || '-'}
                           </span>
                         </span>

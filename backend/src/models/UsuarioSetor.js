@@ -1,21 +1,21 @@
-module.exports = (sequelize, DataTypes) => {
-  return sequelize.define('UsuarioSetor', {
+module.exports = (sequelize, DataTypes) => sequelize.define(
+  'UsuarioSetor',
+  {
     id: {
       type: DataTypes.INTEGER,
       primaryKey: true,
       autoIncrement: true
     },
-
     user_id: {
       type: DataTypes.INTEGER,
       allowNull: false
     },
-
     setor_id: {
       type: DataTypes.INTEGER,
       allowNull: false
     }
-  }, {
+  },
+  {
     tableName: 'usuario_setores',
     timestamps: true,
     indexes: [
@@ -25,5 +25,5 @@ module.exports = (sequelize, DataTypes) => {
         fields: ['user_id', 'setor_id']
       }
     ]
-  });
-};
+  }
+);

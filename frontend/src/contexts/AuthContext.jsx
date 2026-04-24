@@ -1,29 +1,24 @@
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
-import { getTimeoutInatividade } from '../services/configuracoesSistema';
+import {
+  enviarHeartbeatSessao,
+  getModulosSistema,
+  getTimeoutInatividade
+} from '../services/configuracoesSistema';
+import {
+  getCurrentSession,
+  logoutRequest
+} from '../services/auth';
+import { clearAuthToken, setAuthToken } from '../services/api';
 
 export const AuthContext = createContext();
 const DEFAULT_IDLE_TIMEOUT_MINUTES = 20;
 const IDLE_TIMEOUT_STORAGE_KEY = 'timeout_inatividade_minutos';
 
 export function AuthProvider({ children }) {
-  function getStoredUser() {
-    try {
-      const value = localStorage.getItem('usuario');
-      if (!value || value === 'undefined') return null;
-      return JSON.parse(value);
-    } catch {
-      return null;
-    }
-  }
-
-  function getStoredToken() {
-    const value = localStorage.getItem('token');
-    if (!value || value === 'undefined') return null;
-    return value;
-  }
-
-  const [user, setUser] = useState(getStoredUser);
-  const [token, setToken] = useState(getStoredToken);
+  const [user, setUser] = useState(null);
+  const [token, setToken] = useState(null);
+  const [sessionExpiresAt, setSessionExpiresAt] = useState(null);
+  const [authReady, setAuthReady] = useState(false);
   const [idleTimeoutMinutes, setIdleTimeoutMinutes] = useState(() => {
     const value = Number(localStorage.getItem(IDLE_TIMEOUT_STORAGE_KEY));
     return Number.isNaN(value) || value <= 0 ? DEFAULT_IDLE_TIMEOUT_MINUTES : value;
@@ -31,37 +26,38 @@ export function AuthProvider({ children }) {
 
   const idleTimerRef = useRef(null);
   const tokenExpireTimerRef = useRef(null);
+  const sessionHeartbeatTimerRef = useRef(null);
   const tokenExpireHandledRef = useRef(false);
 
-  const isAuthenticated = !!token;
+  const isAuthenticated = !!user;
 
-  function parseJwtExpirationMs(jwtToken) {
-    try {
-      const parts = String(jwtToken || '').split('.');
-      if (parts.length !== 3) return null;
+  function applySession(data) {
+    const nextUser = data?.user || null;
+    const nextToken = data?.token || null;
+    const nextExpiresAt = Number(data?.session_expires_at || 0) || null;
 
-      const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-      const padded = `${base64}${'='.repeat((4 - (base64.length % 4)) % 4)}`;
-      const payload = JSON.parse(atob(padded));
-      const expSeconds = Number(payload?.exp);
-      if (!Number.isFinite(expSeconds) || expSeconds <= 0) return null;
-
-      return expSeconds * 1000;
-    } catch {
-      return null;
-    }
-  }
-
-  function login(data) {
-    setUser(data.user);
-    setToken(data.token);
+    setUser(nextUser);
+    setToken(nextToken);
+    setSessionExpiresAt(nextExpiresAt);
+    setAuthToken(nextToken);
     tokenExpireHandledRef.current = false;
-
-    localStorage.setItem('usuario', JSON.stringify(data.user));
-    localStorage.setItem('token', data.token);
   }
 
-  function logout() {
+  async function login(data) {
+    applySession(data);
+  }
+
+  function updateUser(patch) {
+    setUser((current) => {
+      if (!current) return current;
+      return {
+        ...current,
+        ...(patch || {})
+      };
+    });
+  }
+
+  async function logout({ skipRequest = false } = {}) {
     if (idleTimerRef.current) {
       clearTimeout(idleTimerRef.current);
       idleTimerRef.current = null;
@@ -70,33 +66,90 @@ export function AuthProvider({ children }) {
       clearTimeout(tokenExpireTimerRef.current);
       tokenExpireTimerRef.current = null;
     }
+    if (sessionHeartbeatTimerRef.current) {
+      clearInterval(sessionHeartbeatTimerRef.current);
+      sessionHeartbeatTimerRef.current = null;
+    }
+
+    if (!skipRequest) {
+      try {
+        await logoutRequest();
+      } catch {
+        // o objetivo principal e limpar a sessao local mesmo se a API falhar
+      }
+    }
 
     setUser(null);
     setToken(null);
+    setSessionExpiresAt(null);
+    setAuthToken(null);
+    clearAuthToken();
     tokenExpireHandledRef.current = false;
-
-    localStorage.removeItem('usuario');
-    localStorage.removeItem('token');
   }
 
   function handleTokenExpired() {
     if (tokenExpireHandledRef.current) return;
     tokenExpireHandledRef.current = true;
     alert('Sua sessao expirou. Faca login novamente.');
-    logout();
+    void logout();
   }
 
   useEffect(() => {
-    if (!token) return;
+    let cancelado = false;
+
+    async function restoreSession() {
+      try {
+        const data = await getCurrentSession();
+        if (cancelado) return;
+        applySession(data);
+      } catch {
+        if (cancelado) return;
+
+        setUser(null);
+        setToken(null);
+        setSessionExpiresAt(null);
+        clearAuthToken();
+        tokenExpireHandledRef.current = false;
+      } finally {
+        if (!cancelado) {
+          setAuthReady(true);
+        }
+      }
+    }
+
+    void restoreSession();
+
+    return () => {
+      cancelado = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
 
     let cancelado = false;
     (async () => {
       try {
-        const data = await getTimeoutInatividade();
-        const minutos = Number(data?.minutos);
+        const [timeoutData, modulesData] = await Promise.all([
+          getTimeoutInatividade().catch(() => null),
+          getModulosSistema().catch(() => null)
+        ]);
+
+        const minutos = Number(timeoutData?.minutos);
         if (!cancelado && !Number.isNaN(minutos) && minutos > 0) {
           setIdleTimeoutMinutes(minutos);
           localStorage.setItem(IDLE_TIMEOUT_STORAGE_KEY, String(minutos));
+        }
+
+        const modules = Array.isArray(modulesData?.modules) ? modulesData.modules : null;
+        if (!cancelado && modules) {
+          setUser((current) => {
+            if (!current) return current;
+            return {
+              ...current,
+              modulos_habilitados: modules
+            };
+          });
         }
       } catch {
         // fallback silencioso para valor atual/default
@@ -106,7 +159,7 @@ export function AuthProvider({ children }) {
     return () => {
       cancelado = true;
     };
-  }, [token]);
+  }, [isAuthenticated]);
 
   useEffect(() => {
     if (!isAuthenticated) return undefined;
@@ -118,25 +171,25 @@ export function AuthProvider({ children }) {
 
       idleTimerRef.current = setTimeout(() => {
         alert('Sessao encerrada por inatividade. Faca login novamente.');
-        logout();
+        void logout();
       }, Math.max(1, Number(idleTimeoutMinutes || DEFAULT_IDLE_TIMEOUT_MINUTES)) * 60 * 1000);
     };
 
     const eventos = ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart', 'click'];
-    eventos.forEach(evento => window.addEventListener(evento, reiniciarTimer, { passive: true }));
+    eventos.forEach((evento) => window.addEventListener(evento, reiniciarTimer, { passive: true }));
     reiniciarTimer();
 
     return () => {
-      eventos.forEach(evento => window.removeEventListener(evento, reiniciarTimer));
+      eventos.forEach((evento) => window.removeEventListener(evento, reiniciarTimer));
       if (idleTimerRef.current) {
         clearTimeout(idleTimerRef.current);
         idleTimerRef.current = null;
       }
     };
-  }, [isAuthenticated, idleTimeoutMinutes]);
+  }, [idleTimeoutMinutes, isAuthenticated]);
 
   useEffect(() => {
-    if (!token) return undefined;
+    if (!isAuthenticated || !sessionExpiresAt) return undefined;
 
     if (tokenExpireTimerRef.current) {
       clearTimeout(tokenExpireTimerRef.current);
@@ -144,10 +197,7 @@ export function AuthProvider({ children }) {
     }
     tokenExpireHandledRef.current = false;
 
-    const expiresAt = parseJwtExpirationMs(token);
-    if (!expiresAt) return undefined;
-
-    const msUntilExpire = expiresAt - Date.now();
+    const msUntilExpire = sessionExpiresAt - Date.now();
     if (msUntilExpire <= 0) {
       handleTokenExpired();
       return undefined;
@@ -163,17 +213,50 @@ export function AuthProvider({ children }) {
         tokenExpireTimerRef.current = null;
       }
     };
-  }, [token]);
+  }, [isAuthenticated, sessionExpiresAt, token]);
+
+  useEffect(() => {
+    if (!isAuthenticated) return undefined;
+
+    let cancelado = false;
+
+    const enviarHeartbeat = async () => {
+      try {
+        await enviarHeartbeatSessao();
+      } catch (error) {
+        if (!cancelado && Number(error?.status || 0) === 401) {
+          await logout({ skipRequest: true });
+        }
+      }
+    };
+
+    void enviarHeartbeat();
+
+    sessionHeartbeatTimerRef.current = setInterval(() => {
+      void enviarHeartbeat();
+    }, 60 * 1000);
+
+    return () => {
+      cancelado = true;
+      if (sessionHeartbeatTimerRef.current) {
+        clearInterval(sessionHeartbeatTimerRef.current);
+        sessionHeartbeatTimerRef.current = null;
+      }
+    };
+  }, [isAuthenticated]);
 
   return (
     <AuthContext.Provider
       value={{
         user,
         token,
+        sessionExpiresAt,
         idleTimeoutMinutes,
         isAuthenticated,
+        authReady,
         login,
-        logout
+        logout,
+        updateUser
       }}
     >
       {children}

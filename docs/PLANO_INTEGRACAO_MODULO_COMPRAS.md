@@ -47,7 +47,7 @@ Sem isso, o rollback fica incompleto, porque o `HEAD` atual nao representa o est
   - `/compras/unidades`
   - `/compras/categorias`
   - `/compras/insumos`
-  - `/compras/apropriacoes`
+  - `/apropriacoes`
   - `/compras/solicitacoes`
 - Novas migrations:
   - `create-compras-tables.sql`

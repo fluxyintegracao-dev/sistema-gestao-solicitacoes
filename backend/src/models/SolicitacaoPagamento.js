@@ -1,46 +1,34 @@
-module.exports = (sequelize, DataTypes) => {
-  const SolicitacaoPagamento = sequelize.define(
-    'SolicitacaoPagamento',
-    {
-      id: {
-        type: DataTypes.INTEGER,
-        primaryKey: true,
-        autoIncrement: true
-      },
-      solicitacao_id: {
-        type: DataTypes.INTEGER,
-        allowNull: false,
-        references: {
-          model: 'solicitacoes',
-          key: 'id'
-        }
-      },
-      valor: {
-        type: DataTypes.DECIMAL(12, 2),
-        allowNull: false
-      },
-      data_pagamento: {
-        type: DataTypes.DATEONLY,
-        allowNull: false
-      },
-      observacao: {
-        type: DataTypes.TEXT,
-        allowNull: true
-      },
-      created_by: {
-        type: DataTypes.INTEGER,
-        allowNull: false,
-        references: {
-          model: 'users',
-          key: 'id'
-        }
-      }
+module.exports = (sequelize, DataTypes) => sequelize.define(
+  'SolicitacaoPagamento',
+  {
+    id: {
+      type: DataTypes.INTEGER,
+      primaryKey: true,
+      autoIncrement: true
     },
-    {
-      tableName: 'solicitacao_pagamentos',
-      timestamps: true
+    solicitacao_id: {
+      type: DataTypes.INTEGER,
+      allowNull: false
+    },
+    valor: {
+      type: DataTypes.DECIMAL(14, 2),
+      allowNull: false
+    },
+    data_pagamento: {
+      type: DataTypes.DATEONLY,
+      allowNull: false
+    },
+    observacao: {
+      type: DataTypes.TEXT,
+      allowNull: true
+    },
+    created_by: {
+      type: DataTypes.INTEGER,
+      allowNull: false
     }
-  );
-
-  return SolicitacaoPagamento;
-};
+  },
+  {
+    tableName: 'solicitacao_pagamentos',
+    timestamps: true
+  }
+);

@@ -4,6 +4,16 @@ const { S3Client, PutObjectCommand, GetObjectCommand } = require("@aws-sdk/clien
 const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 const { sanitizeFileNameForStorage } = require('../utils/fileName');
 
+const INLINE_RISKY_EXTENSIONS = new Set([
+  '.htm',
+  '.html',
+  '.js',
+  '.mjs',
+  '.svg',
+  '.xhtml',
+  '.xml'
+]);
+
 const s3 = new S3Client({
   region: process.env.AWS_REGION,
   credentials: {
@@ -73,19 +83,37 @@ function getKeyFromUrl(url) {
   }
 }
 
+function shouldForceAttachmentForTarget(target) {
+  const extension = String(path.extname(String(target || '').split('?')[0]) || '').toLowerCase();
+  return INLINE_RISKY_EXTENSIONS.has(extension);
+}
+
 async function getPresignedUrl(urlOrKey, expiresIn = 300) {
+  if (!urlOrKey) return urlOrKey;
+  if (String(urlOrKey).startsWith('/uploads/')) {
+    return urlOrKey;
+  }
+
   const key = urlOrKey?.startsWith?.('http')
     ? getKeyFromUrl(urlOrKey)
     : urlOrKey;
 
   if (!key) return urlOrKey;
 
+  const riskyInlineTarget = shouldForceAttachmentForTarget(key);
+
   const command = new GetObjectCommand({
     Bucket: process.env.AWS_S3_BUCKET,
-    Key: key
+    Key: key,
+    ...(riskyInlineTarget
+      ? {
+          ResponseContentDisposition: `attachment; filename="${sanitizeFileNameForStorage(path.basename(key))}"`,
+          ResponseContentType: 'application/octet-stream'
+        }
+      : {})
   });
 
   return getSignedUrl(s3, command, { expiresIn });
 }
 
-module.exports = { uploadToS3, getPresignedUrl };
+module.exports = { uploadToS3, getPresignedUrl, shouldForceAttachmentForTarget };

@@ -1,0 +1,9 @@
+{
+  "appId": "br.com.fluxy.core",
+  "appName": "Fluxy",
+  "webDir": "dist",
+  "bundledWebRuntime": false,
+  "android": {
+    "allowMixedContent": false
+  }
+}

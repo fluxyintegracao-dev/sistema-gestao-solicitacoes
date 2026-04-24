@@ -1,28 +1,43 @@
-export default function StatusResumo() {
+/**
+ * StatusResumo — faixa de contadores de status no topo da listagem.
+ *
+ * Props:
+ *   items : Array<{ label: string, quantidade: number, cor?: string }>
+ *
+ * Se nenhum item for passado, renderiza os defaults visuais (0).
+ */
+
+const DEFAULTS = [
+  { label: 'Pendente',   quantidade: 0 },
+  { label: 'Em análise', quantidade: 0 },
+  { label: 'Aprovada',   quantidade: 0 },
+  { label: 'Concluída',  quantidade: 0 },
+];
+
+export default function StatusResumo({ items = DEFAULTS }) {
   return (
-    <div className="flex gap-4 mb-6">
-
-      <StatusCard titulo="PENDENTE" quantidade={0} />
-      <StatusCard titulo="EM_ANALISE" quantidade={0} />
-      <StatusCard titulo="APROVADA" quantidade={0} />
-      <StatusCard titulo="CONCLUIDA" quantidade={0} />
-
-    </div>
-  );
-}
-
-function StatusCard({ titulo, quantidade }) {
-  return (
-    <div className="border rounded p-4 min-w-[140px]">
-
-      <p className="text-sm text-gray-500">
-        {titulo}
-      </p>
-
-      <p className="text-2xl font-bold">
-        {quantidade}
-      </p>
-
+    <div className="flex flex-wrap gap-3">
+      {items.map((item) => (
+        <div
+          key={item.label}
+          className="flex min-w-[130px] flex-1 flex-col gap-1 rounded-xl border px-4 py-3"
+          style={{
+            background: 'var(--ui-surface)',
+            borderColor: 'var(--ui-border)',
+            boxShadow: 'var(--ui-shadow-sm)',
+          }}
+        >
+          <p className="text-xs font-medium" style={{ color: 'var(--c-muted)' }}>
+            {item.label}
+          </p>
+          <p
+            className="text-2xl font-bold leading-none"
+            style={{ color: item.cor ?? 'var(--c-text)' }}
+          >
+            {item.quantidade ?? 0}
+          </p>
+        </div>
+      ))}
     </div>
   );
 }

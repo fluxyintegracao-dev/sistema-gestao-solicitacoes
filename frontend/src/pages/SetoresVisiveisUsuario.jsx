@@ -96,12 +96,12 @@ export default function SetoresVisiveisUsuario() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold">Setores visiveis por usuario</h1>
-        <p className="text-sm text-gray-600 mt-1">
+        <p className="text-sm mt-1" style={{ color: 'var(--c-muted)' }}>
           Defina quais setores cada usuario pode visualizar quando a solicitacao estiver atribuida/interagida por ele.
         </p>
       </div>
 
-      <div className="bg-white p-6 rounded-xl shadow space-y-4">
+      <div className="card space-y-4">
         <label className="grid gap-1 text-sm md:max-w-md">
           Usuario
           <select

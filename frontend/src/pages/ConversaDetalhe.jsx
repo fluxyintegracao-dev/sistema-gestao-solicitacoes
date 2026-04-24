@@ -90,7 +90,7 @@ export default function ConversaDetalhe() {
   const usuarioId = Number(user?.id || 0);
   const conversaAberta = String(conversa?.status || '') === 'ABERTA';
   const podeConcluir = usuarioId > 0 && usuarioId === criadorId;
-  const podeAdicionarParticipantes = usuarioId > 0 && conversaAberta;
+  const podeAdicionarParticipantes = podeConcluir && conversaAberta;
 
   const tituloSecundario = useMemo(() => {
     if (!conversa) return '';
@@ -240,7 +240,7 @@ export default function ConversaDetalhe() {
   }
 
   return (
-    <div className="page">
+    <div className="page solicitacoes-page">
       <div className="flex items-center justify-between gap-3 mb-3">
         <div>
           <h1 className="page-title">{conversa?.assunto || 'Conversa'}</h1>

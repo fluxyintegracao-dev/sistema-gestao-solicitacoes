@@ -15,7 +15,7 @@ export default function ModuloIndisponivelPage() {
     <Screen contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}>
       <EmptyState
         title="Modulo indisponivel"
-        description="Nenhum modulo operacional do app esta habilitado para este usuario neste momento."
+        description="O modulo de Solicitacoes nao esta habilitado para este usuario neste momento."
       />
       <Button label="Sair" onPress={() => void signOut()} variant="secondary" />
     </Screen>

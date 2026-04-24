@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /c/Projetos/sistema_gestao_solicitacoes/backend/migrations -type f -name *.sql)",
+      "Bash(grep -l \"cotacao\\\\|Cotacao\" /c/Projetos/sistema_gestao_solicitacoes/backend/src/models/*.js)",
+      "Bash(find /c/Projetos/sistema_gestao_solicitacoes/docs -type f -name *.md)",
+      "Bash(npm run:*)"
+    ]
+  }
+}

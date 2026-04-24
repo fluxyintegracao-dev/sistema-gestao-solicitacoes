@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   cancelarLotePrioridadeDiretoria,
   criarLotePrioridadeDiretoria,
@@ -7,837 +8,377 @@ import {
   getLotePrioridadeDiretoria,
   getPrioridadesDiretoriaContexto,
   getSolicitacoesDisponiveisPrioridadeDiretoria,
-  listarLotesPrioridadeDiretoria,
-  reabrirLotePrioridadeDiretoria,
-  salvarSelecaoLotePrioridadeDiretoria
+  listarLotesPrioridadeDiretoria
 } from '../services/prioridadesDiretoria';
 
-function formatarValor(valor) {
+function moeda(valor) {
   const numero = Number(valor);
   if (!Number.isFinite(numero)) return '-';
   return numero.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
-function formatarDataHora(valor) {
+function data(valor) {
   if (!valor) return '-';
-  const data = new Date(valor);
-  if (Number.isNaN(data.getTime())) return '-';
-  return data.toLocaleString('pt-BR');
+  const parsed = new Date(valor);
+  if (Number.isNaN(parsed.getTime())) return '-';
+  return parsed.toLocaleDateString('pt-BR');
 }
 
-function formatarData(valor) {
-  if (!valor) return '-';
-  const data = new Date(valor);
-  if (Number.isNaN(data.getTime())) return '-';
-  return data.toLocaleDateString('pt-BR');
-}
-
-function BadgeStatus({ status }) {
-  const valor = String(status || '').trim().toUpperCase();
-  const classes = {
-    ABERTO: 'bg-amber-100 text-amber-800 border-amber-200',
-    FINALIZADO: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-    CANCELADO: 'bg-slate-100 text-slate-700 border-slate-200'
-  };
-
-  return (
-    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${classes[valor] || 'bg-slate-100 text-slate-700 border-slate-200'}`}>
-      {valor || '-'}
-    </span>
-  );
+function statusClass(status) {
+  const value = String(status || '').toUpperCase();
+  if (value === 'FINALIZADO') return 'badge badge-success';
+  if (value === 'CANCELADO') return 'badge badge-danger';
+  return 'badge badge-warning';
 }
 
 export default function PrioridadesDiretoria() {
   const [contexto, setContexto] = useState(null);
   const [lotes, setLotes] = useState([]);
-  const [loteSelecionadoId, setLoteSelecionadoId] = useState(null);
-  const [detalhe, setDetalhe] = useState(null);
-  const [solicitacoesDisponiveis, setSolicitacoesDisponiveis] = useState([]);
-  const [obrasDisponiveis, setObrasDisponiveis] = useState([]);
-  const [selecionadasIds, setSelecionadasIds] = useState([]);
-  const [selecionadasCache, setSelecionadasCache] = useState({});
-  const [buscaDisponiveis, setBuscaDisponiveis] = useState('');
-  const [filtroObraId, setFiltroObraId] = useState('');
+  const [loteDetalhe, setLoteDetalhe] = useState(null);
+  const [disponiveis, setDisponiveis] = useState([]);
+  const [selecionados, setSelecionados] = useState(new Set());
+  const [busca, setBusca] = useState('');
+  const [statusFiltro, setStatusFiltro] = useState('');
   const [loading, setLoading] = useState(true);
-  const [loadingDetalhe, setLoadingDetalhe] = useState(false);
-  const [loadingDisponiveis, setLoadingDisponiveis] = useState(false);
-  const [salvandoLote, setSalvandoLote] = useState(false);
-  const [finalizando, setFinalizando] = useState(false);
-  const [salvandoSelecao, setSalvandoSelecao] = useState(false);
-  const [reabrindo, setReabrindo] = useState(false);
-  const [cancelando, setCancelando] = useState(false);
-  const [excluindo, setExcluindo] = useState(false);
-  const [filtroStatus, setFiltroStatus] = useState('');
-  const [formNovoLote, setFormNovoLote] = useState({
+  const [operando, setOperando] = useState(false);
+  const [form, setForm] = useState({
     classificacao_alvo: '',
     valor_disponivel: '',
     observacao: ''
   });
 
   const diretoriasDisponiveis = contexto?.diretorias_disponiveis || [];
-  const permissoes = contexto?.permissoes || {};
+  const podeSolicitarLote = Boolean(contexto?.permissoes?.pode_solicitar_lote);
 
   useEffect(() => {
-    carregarInicial();
+    async function carregarBase() {
+      try {
+        setLoading(true);
+        const [ctx, lotesData] = await Promise.all([
+          getPrioridadesDiretoriaContexto(),
+          listarLotesPrioridadeDiretoria()
+        ]);
+        setContexto(ctx);
+        setLotes(Array.isArray(lotesData?.items) ? lotesData.items : []);
+        const primeira = Array.isArray(ctx?.diretorias_disponiveis) ? ctx.diretorias_disponiveis[0] : null;
+        if (primeira) {
+          setForm(prev => ({ ...prev, classificacao_alvo: primeira.classificacao }));
+        }
+      } catch (error) {
+        console.error(error);
+        alert(error?.message || 'Erro ao carregar prioridades da diretoria.');
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    carregarBase();
   }, []);
 
-  useEffect(() => {
-    if (!formNovoLote.classificacao_alvo && diretoriasDisponiveis.length > 0) {
-      setFormNovoLote((atual) => ({
-        ...atual,
-        classificacao_alvo: diretoriasDisponiveis[0].classificacao
-      }));
-    }
-  }, [diretoriasDisponiveis, formNovoLote.classificacao_alvo]);
+  async function recarregarLotes(filtro = statusFiltro) {
+    const data = await listarLotesPrioridadeDiretoria(filtro ? { status: filtro } : {});
+    setLotes(Array.isArray(data?.items) ? data.items : []);
+  }
 
-  useEffect(() => {
-    if (!contexto?.permissoes) return;
-    carregarLotes();
-  }, [filtroStatus, contexto?.permissoes]);
-
-  useEffect(() => {
-    if (!loteSelecionadoId) {
-      setDetalhe(null);
-      setSolicitacoesDisponiveis([]);
-      setObrasDisponiveis([]);
-      setSelecionadasIds([]);
-      setSelecionadasCache({});
-      setBuscaDisponiveis('');
-      setFiltroObraId('');
+  async function criarLote() {
+    const valor = Number(form.valor_disponivel);
+    if (!form.classificacao_alvo) {
+      alert('Selecione a diretoria alvo.');
       return;
     }
-    carregarDetalheLote(loteSelecionadoId);
-  }, [loteSelecionadoId]);
-
-  useEffect(() => {
-    if (!detalhe?.id || detalhe.status !== 'ABERTO' || !detalhe.pode_finalizar) {
-      setSolicitacoesDisponiveis([]);
-      setObrasDisponiveis([]);
-      setSelecionadasIds([]);
-      setSelecionadasCache({});
-      setBuscaDisponiveis('');
-      setFiltroObraId('');
+    if (!Number.isFinite(valor) || valor <= 0) {
+      alert('Informe um valor disponivel valido.');
       return;
     }
 
-    const timeout = setTimeout(() => {
-      carregarSolicitacoesDisponiveis(detalhe.id, buscaDisponiveis, filtroObraId);
-    }, 250);
-
-    return () => clearTimeout(timeout);
-  }, [detalhe?.id, detalhe?.status, detalhe?.pode_finalizar, buscaDisponiveis, filtroObraId]);
-
-  const mapaDisponiveis = useMemo(() => {
-    const mapa = new Map();
-    (solicitacoesDisponiveis || []).forEach((item) => mapa.set(Number(item.id), item));
-    return mapa;
-  }, [solicitacoesDisponiveis]);
-
-  const solicitacoesSelecionadas = useMemo(() => (
-    selecionadasIds
-      .map((id) => selecionadasCache[String(id)] || mapaDisponiveis.get(Number(id)))
-      .filter(Boolean)
-  ), [selecionadasIds, selecionadasCache, mapaDisponiveis]);
-
-  const selecionadasVisiveisCount = useMemo(() => (
-    solicitacoesDisponiveis.filter((item) => selecionadasIds.includes(Number(item.id))).length
-  ), [solicitacoesDisponiveis, selecionadasIds]);
-
-  const totalSelecionado = useMemo(() => (
-    solicitacoesSelecionadas.reduce((total, item) => total + Number(item.valor_prioridade || 0), 0)
-  ), [solicitacoesSelecionadas]);
-
-  const resumoLote = useMemo(() => {
-    const valorDisponivel = Number(detalhe?.valor_disponivel || 0);
-    const valorUtilizadoBase = Number(detalhe?.valor_utilizado || 0);
-    const itensBase = Number(detalhe?.itens?.length || detalhe?.itens_count || 0);
-    const abertoComSelecao = detalhe?.status === 'ABERTO' && detalhe?.pode_finalizar;
-
-    const valorUtilizadoProjetado = abertoComSelecao
-      ? totalSelecionado
-      : valorUtilizadoBase;
-    const saldoProjetado = Math.max(valorDisponivel - valorUtilizadoProjetado, 0);
-    const itensProjetados = abertoComSelecao
-      ? solicitacoesSelecionadas.length
-      : itensBase;
-
-    return {
-      valorDisponivel,
-      valorUtilizadoBase,
-      valorUtilizadoProjetado,
-      saldoProjetado,
-      itensBase,
-      itensProjetados,
-      possuiPrevia: abertoComSelecao && solicitacoesSelecionadas.length > 0
-    };
-  }, [
-    detalhe?.valor_disponivel,
-    detalhe?.valor_utilizado,
-    detalhe?.itens,
-    detalhe?.itens_count,
-    detalhe?.status,
-    detalhe?.pode_finalizar,
-    solicitacoesSelecionadas.length,
-    totalSelecionado
-  ]);
-
-  const excedeuLimite = resumoLote.valorUtilizadoProjetado > resumoLote.valorDisponivel;
-
-  async function carregarInicial() {
     try {
-      setLoading(true);
-      const data = await getPrioridadesDiretoriaContexto();
-      setContexto(data);
-    } catch (error) {
-      console.error(error);
-      alert(error?.message || 'Erro ao carregar modulo de prioridades');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function carregarLotes() {
-    try {
-      const data = await listarLotesPrioridadeDiretoria(
-        filtroStatus ? { status: filtroStatus } : {}
-      );
-      const items = Array.isArray(data?.items) ? data.items : [];
-      setLotes(items);
-
-      setLoteSelecionadoId((atual) => {
-        if (atual && items.some((item) => Number(item.id) === Number(atual))) {
-          return atual;
-        }
-        return items[0]?.id || null;
-      });
-    } catch (error) {
-      console.error(error);
-      alert(error?.message || 'Erro ao carregar lotes de prioridade');
-    }
-  }
-
-  async function carregarDetalheLote(id) {
-    try {
-      setLoadingDetalhe(true);
-      const data = await getLotePrioridadeDiretoria(id);
-      const item = data?.item || null;
-      const itensSalvos = Array.isArray(item?.itens) ? item.itens : [];
-
-      if (item?.status === 'ABERTO') {
-        const idsSalvos = itensSalvos
-          .map((linha) => Number(linha?.solicitacao?.id))
-          .filter((numero) => Number.isInteger(numero) && numero > 0);
-        const cacheSalvo = {};
-        itensSalvos.forEach((linha) => {
-          if (linha?.solicitacao?.id) {
-            cacheSalvo[String(linha.solicitacao.id)] = {
-              ...linha.solicitacao,
-              valor_prioridade: linha.valor_considerado
-            };
-          }
-        });
-        setSelecionadasIds(idsSalvos);
-        setSelecionadasCache(cacheSalvo);
-      } else {
-        setSolicitacoesDisponiveis([]);
-        setObrasDisponiveis([]);
-        setSelecionadasIds([]);
-        setSelecionadasCache({});
-      }
-
-      setDetalhe(item);
-    } catch (error) {
-      console.error(error);
-      alert(error?.message || 'Erro ao carregar detalhe do lote');
-    } finally {
-      setLoadingDetalhe(false);
-    }
-  }
-
-  async function carregarSolicitacoesDisponiveis(id, busca = '', obraId = '') {
-    try {
-      setLoadingDisponiveis(true);
-      const params = {};
-      if (busca) params.busca = busca;
-      if (obraId) params.obra_id = obraId;
-      const data = await getSolicitacoesDisponiveisPrioridadeDiretoria(id, params);
-      const items = Array.isArray(data?.items) ? data.items : [];
-      const obras = Array.isArray(data?.obras) ? data.obras : [];
-      setSolicitacoesDisponiveis(items);
-      setObrasDisponiveis(obras);
-      setSelecionadasCache((atual) => {
-        const proximo = { ...atual };
-        items.forEach((item) => {
-          if (selecionadasIds.includes(Number(item.id))) {
-            proximo[String(item.id)] = item;
-          }
-        });
-        return proximo;
-      });
-    } catch (error) {
-      console.error(error);
-      alert(error?.message || 'Erro ao carregar solicitacoes disponiveis');
-    } finally {
-      setLoadingDisponiveis(false);
-    }
-  }
-
-  function atualizarCampoNovoLote(campo, valor) {
-    setFormNovoLote((atual) => ({ ...atual, [campo]: valor }));
-  }
-
-  async function criarLote(event) {
-    event.preventDefault();
-    try {
-      setSalvandoLote(true);
+      setOperando(true);
       await criarLotePrioridadeDiretoria({
-        classificacao_alvo: formNovoLote.classificacao_alvo,
-        valor_disponivel: Number(formNovoLote.valor_disponivel),
-        observacao: formNovoLote.observacao
+        classificacao_alvo: form.classificacao_alvo,
+        valor_disponivel: valor,
+        observacao: form.observacao
       });
-      setFormNovoLote({
-        classificacao_alvo: diretoriasDisponiveis[0]?.classificacao || '',
-        valor_disponivel: '',
-        observacao: ''
-      });
-      await carregarLotes();
-      alert('Lote de prioridade criado com sucesso.');
+      setForm(prev => ({ ...prev, valor_disponivel: '', observacao: '' }));
+      await recarregarLotes();
+      alert('Lote criado com sucesso.');
     } catch (error) {
       console.error(error);
-      alert(error?.message || 'Erro ao criar lote de prioridade');
+      alert(error?.message || 'Erro ao criar lote.');
     } finally {
-      setSalvandoLote(false);
+      setOperando(false);
     }
+  }
+
+  async function abrirLote(id) {
+    try {
+      setOperando(true);
+      const detalheData = await getLotePrioridadeDiretoria(id);
+      const detalhe = detalheData?.item || null;
+      setLoteDetalhe(detalhe);
+      setSelecionados(new Set());
+
+      if (detalhe?.status === 'ABERTO') {
+        const disponiveisData = await getSolicitacoesDisponiveisPrioridadeDiretoria(id, busca ? { busca } : {});
+        setDisponiveis(Array.isArray(disponiveisData?.items) ? disponiveisData.items : []);
+      } else {
+        setDisponiveis([]);
+      }
+    } catch (error) {
+      console.error(error);
+      alert(error?.message || 'Erro ao abrir lote.');
+    } finally {
+      setOperando(false);
+    }
+  }
+
+  async function buscarDisponiveis() {
+    if (!loteDetalhe?.id) return;
+    const dataDisponiveis = await getSolicitacoesDisponiveisPrioridadeDiretoria(
+      loteDetalhe.id,
+      busca ? { busca } : {}
+    );
+    setDisponiveis(Array.isArray(dataDisponiveis?.items) ? dataDisponiveis.items : []);
   }
 
   function alternarSolicitacao(id) {
-    setSelecionadasIds((atual) => {
-      const numeroId = Number(id);
-      if (atual.includes(numeroId)) {
-        setSelecionadasCache((cacheAtual) => {
-          const proximo = { ...cacheAtual };
-          delete proximo[String(numeroId)];
-          return proximo;
-        });
-        return atual.filter((item) => Number(item) !== numeroId);
-      }
-      const itemSelecionado = mapaDisponiveis.get(numeroId);
-      if (itemSelecionado) {
-        setSelecionadasCache((cacheAtual) => ({
-          ...cacheAtual,
-          [String(numeroId)]: itemSelecionado
-        }));
-      }
-      return [...atual, numeroId];
+    const key = String(id);
+    setSelecionados(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
     });
   }
 
+  const selecionadas = useMemo(() => (
+    disponiveis.filter(item => selecionados.has(String(item.id)))
+  ), [disponiveis, selecionados]);
+
+  const valorSelecionado = selecionadas.reduce((total, item) => total + Number(item.valor_prioridade || 0), 0);
+
   async function finalizarLote() {
-    if (!detalhe?.id || solicitacoesSelecionadas.length === 0) {
+    if (!loteDetalhe?.id) return;
+    const solicitacaoIds = Array.from(selecionados).map(Number).filter(Boolean);
+    if (solicitacaoIds.length === 0) {
       alert('Selecione ao menos uma solicitacao.');
       return;
     }
-    if (excedeuLimite) {
-      alert('O total selecionado excede o valor disponivel do lote.');
-      return;
-    }
-    if (!window.confirm(`Finalizar lote com ${solicitacoesSelecionadas.length} solicitacao(oes)?`)) {
+    if (!window.confirm(`Finalizar lote com ${solicitacaoIds.length} solicitacao(oes)?`)) {
       return;
     }
 
     try {
-      setFinalizando(true);
-      await finalizarLotePrioridadeDiretoria(detalhe.id, {
-        solicitacao_ids: selecionadasIds
-      });
-      await carregarLotes();
-      await carregarDetalheLote(detalhe.id);
-      setSelecionadasIds([]);
+      setOperando(true);
+      const dataLote = await finalizarLotePrioridadeDiretoria(loteDetalhe.id, { solicitacao_ids: solicitacaoIds });
+      setLoteDetalhe(dataLote?.item || null);
+      setDisponiveis([]);
+      setSelecionados(new Set());
+      await recarregarLotes();
       alert('Lote finalizado com sucesso.');
     } catch (error) {
       console.error(error);
-      alert(error?.message || 'Erro ao finalizar lote');
+      alert(error?.message || 'Erro ao finalizar lote.');
     } finally {
-      setFinalizando(false);
+      setOperando(false);
     }
   }
 
-  async function salvarSelecaoLote() {
-    if (!detalhe?.id) return;
-    if (excedeuLimite) {
-      alert('O total selecionado excede o valor disponivel do lote.');
-      return;
-    }
-
+  async function cancelarLote(lote) {
+    if (!window.confirm('Cancelar este lote de prioridade?')) return;
     try {
-      setSalvandoSelecao(true);
-      await salvarSelecaoLotePrioridadeDiretoria(detalhe.id, {
-        solicitacao_ids: selecionadasIds
-      });
-      await carregarLotes();
-      await carregarDetalheLote(detalhe.id);
-      alert('Selecao salva com sucesso.');
+      setOperando(true);
+      await cancelarLotePrioridadeDiretoria(lote.id);
+      if (loteDetalhe?.id === lote.id) setLoteDetalhe(null);
+      await recarregarLotes();
     } catch (error) {
       console.error(error);
-      alert(error?.message || 'Erro ao salvar selecao do lote');
+      alert(error?.message || 'Erro ao cancelar lote.');
     } finally {
-      setSalvandoSelecao(false);
+      setOperando(false);
     }
   }
 
-  async function reabrirLote() {
-    if (!detalhe?.id) return;
-    if (!window.confirm('Reabrir este lote finalizado para edicao?')) {
-      return;
-    }
-
+  async function excluirLote(lote) {
+    if (!window.confirm('Excluir este lote? Esta acao nao podera ser desfeita.')) return;
     try {
-      setReabrindo(true);
-      await reabrirLotePrioridadeDiretoria(detalhe.id);
-      await carregarLotes();
-      await carregarDetalheLote(detalhe.id);
-      alert('Lote reaberto com sucesso.');
+      setOperando(true);
+      await excluirLotePrioridadeDiretoria(lote.id);
+      if (loteDetalhe?.id === lote.id) setLoteDetalhe(null);
+      await recarregarLotes();
     } catch (error) {
       console.error(error);
-      alert(error?.message || 'Erro ao reabrir lote');
+      alert(error?.message || 'Erro ao excluir lote.');
     } finally {
-      setReabrindo(false);
+      setOperando(false);
     }
   }
 
-  async function cancelarLote() {
-    if (!detalhe?.id) return;
-    if (!window.confirm('Cancelar este lote de prioridade?')) {
-      return;
-    }
-
+  async function trocarStatusFiltro(valor) {
+    setStatusFiltro(valor);
     try {
-      setCancelando(true);
-      await cancelarLotePrioridadeDiretoria(detalhe.id);
-      await carregarLotes();
-      await carregarDetalheLote(detalhe.id);
-      alert('Lote cancelado com sucesso.');
+      setOperando(true);
+      await recarregarLotes(valor);
     } catch (error) {
       console.error(error);
-      alert(error?.message || 'Erro ao cancelar lote');
+      alert(error?.message || 'Erro ao filtrar lotes.');
     } finally {
-      setCancelando(false);
+      setOperando(false);
     }
   }
 
-  async function excluirLote() {
-    if (!detalhe?.id) return;
-    if (!window.confirm('Excluir este lote de prioridade? Esta acao nao podera ser desfeita.')) {
-      return;
-    }
-
-    try {
-      setExcluindo(true);
-      await excluirLotePrioridadeDiretoria(detalhe.id);
-      setDetalhe(null);
-      setLoteSelecionadoId(null);
-      setSolicitacoesDisponiveis([]);
-      setObrasDisponiveis([]);
-      setSelecionadasIds([]);
-      setSelecionadasCache({});
-      await carregarLotes();
-      alert('Lote excluido com sucesso.');
-    } catch (error) {
-      console.error(error);
-      alert(error?.message || 'Erro ao excluir lote');
-    } finally {
-      setExcluindo(false);
-    }
-  }
-
-  if (loading) {
-    return <p>Carregando modulo de prioridades...</p>;
-  }
+  if (loading) return <p>Carregando prioridades...</p>;
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-xl font-semibold">Prioridades da Diretoria</h1>
-        <p className="text-sm text-gray-600 mt-0.5">
-          DIR_ADMIN solicita lotes de prioridade. Diretorias publicas e privadas autorizam solicitacoes dentro do limite aprovado.
-        </p>
+    <div className="page max-w-7xl mx-auto space-y-6">
+      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <div>
+          <h1 className="page-title">Prioridades Diretoria</h1>
+          <p className="page-subtitle">
+            DIR_ADMIN solicita lotes de prioridade. A diretoria alvo autoriza quais solicitacoes entram no lote.
+          </p>
+        </div>
+        <select className="input w-full md:w-56" value={statusFiltro} onChange={event => trocarStatusFiltro(event.target.value)}>
+          <option value="">Todos os status</option>
+          <option value="ABERTO">Abertos</option>
+          <option value="FINALIZADO">Finalizados</option>
+          <option value="CANCELADO">Cancelados</option>
+        </select>
       </div>
 
-      {permissoes.pode_solicitar_lote && (
-        <form onSubmit={criarLote} className="bg-white rounded-xl shadow p-4 space-y-3">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="text-base font-medium">Solicitar prioridade</h2>
-            <span className="text-sm text-gray-500">Criacao de lote por DIR_ADMIN</span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <label className="grid gap-1 text-sm">
-              Diretoria alvo
-              <select
-                className="input"
-                value={formNovoLote.classificacao_alvo}
-                onChange={(event) => atualizarCampoNovoLote('classificacao_alvo', event.target.value)}
-              >
+      {podeSolicitarLote && (
+        <div className="card space-y-4">
+          <h2 className="text-lg font-semibold text-[var(--c-text)]">Solicitar lote</h2>
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_180px_1fr_auto] gap-3 items-end">
+            <label className="form-field">
+              <span className="form-label">Diretoria alvo</span>
+              <select className="input" value={form.classificacao_alvo} onChange={event => setForm(prev => ({ ...prev, classificacao_alvo: event.target.value }))}>
                 <option value="">Selecione</option>
-                {diretoriasDisponiveis.map((item) => (
+                {diretoriasDisponiveis.map(item => (
                   <option key={item.classificacao} value={item.classificacao}>
                     {item.classificacao} - {item.diretoria_label}
                   </option>
                 ))}
               </select>
             </label>
-
-            <label className="grid gap-1 text-sm">
-              Valor disponivel
-              <input
-                className="input"
-                type="number"
-                min="0"
-                step="0.01"
-                value={formNovoLote.valor_disponivel}
-                onChange={(event) => atualizarCampoNovoLote('valor_disponivel', event.target.value)}
-                placeholder="0,00"
-              />
+            <label className="form-field">
+              <span className="form-label">Valor disponivel</span>
+              <input className="input" type="number" step="0.01" min="0" value={form.valor_disponivel} onChange={event => setForm(prev => ({ ...prev, valor_disponivel: event.target.value }))} />
             </label>
-
-            <label className="grid gap-1 text-sm md:col-span-1">
-              Observacao
-              <input
-                className="input"
-                value={formNovoLote.observacao}
-                onChange={(event) => atualizarCampoNovoLote('observacao', event.target.value)}
-                placeholder="Contexto do lote"
-              />
+            <label className="form-field">
+              <span className="form-label">Observacao</span>
+              <input className="input" value={form.observacao} onChange={event => setForm(prev => ({ ...prev, observacao: event.target.value }))} />
             </label>
+            <button type="button" className="btn btn-primary" onClick={criarLote} disabled={operando}>Criar lote</button>
           </div>
-
-          <div className="flex justify-end">
-            <button type="submit" className="btn btn-primary" disabled={salvandoLote}>
-              {salvandoLote ? 'Salvando...' : 'Criar lote'}
-            </button>
-          </div>
-        </form>
+        </div>
       )}
 
-      <div className="grid grid-cols-1 xl:grid-cols-[360px_1fr] gap-4">
-        <div className="bg-white rounded-xl shadow p-4 space-y-3">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="text-base font-medium">Lotes</h2>
-            <select
-              className="input max-w-[180px]"
-              value={filtroStatus}
-              onChange={(event) => setFiltroStatus(event.target.value)}
-            >
-              <option value="">Todos</option>
-              <option value="ABERTO">Abertos</option>
-              <option value="FINALIZADO">Finalizados</option>
-              <option value="CANCELADO">Cancelados</option>
-            </select>
-          </div>
-
-          <div className="space-y-2.5">
-            {lotes.length === 0 && (
-              <p className="text-sm text-gray-500">Nenhum lote encontrado.</p>
-            )}
-
-            {lotes.map((lote) => (
-              <button
-                key={lote.id}
-                type="button"
-                onClick={() => setLoteSelecionadoId(lote.id)}
-                className={`w-full text-left rounded-xl border p-3 transition ${
-                  Number(loteSelecionadoId) === Number(lote.id)
-                    ? 'border-blue-500 bg-blue-50'
-                    : 'border-gray-200 hover:border-blue-300'
-                }`}
-              >
+      <div className="grid grid-cols-1 xl:grid-cols-[420px_1fr] gap-6">
+        <div className="card space-y-4">
+          <h2 className="text-lg font-semibold text-[var(--c-text)]">Lotes</h2>
+          <div className="space-y-2">
+            {lotes.map(lote => (
+              <button key={lote.id} type="button" className={`w-full rounded-2xl border p-4 text-left transition ${loteDetalhe?.id === lote.id ? 'border-[var(--c-primary)] bg-[var(--c-primary-soft)]' : 'border-[var(--c-border)] bg-[var(--c-card)]'}`} onClick={() => abrirLote(lote.id)}>
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="text-sm font-medium">Lote #{lote.id}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      {lote.classificacao_alvo} - {lote.diretoria_alvo_codigo}
-                    </p>
+                    <p className="font-semibold text-[var(--c-text)]">Lote #{lote.id} - {lote.classificacao_alvo}</p>
+                    <p className="text-xs text-[var(--c-muted)]">{lote.diretoria_alvo_codigo} | {data(lote.createdAt)}</p>
                   </div>
-                  <BadgeStatus status={lote.status} />
+                  <span className={statusClass(lote.status)}>{lote.status}</span>
                 </div>
-
-                <div className="grid grid-cols-2 gap-x-3 gap-y-2 mt-3 text-xs">
-                  <div>
-                    <span className="text-gray-500">Disponivel</span>
-                    <p className="font-medium">{formatarValor(lote.valor_disponivel)}</p>
-                  </div>
-                  <div>
-                    <span className="text-gray-500">Utilizado</span>
-                    <p className="font-medium">{formatarValor(lote.valor_utilizado)}</p>
-                  </div>
-                  <div>
-                    <span className="text-gray-500">Itens</span>
-                    <p className="font-medium">{lote.itens_count || 0}</p>
-                  </div>
-                  <div>
-                    <span className="text-gray-500">Criado em</span>
-                    <p className="font-medium">{formatarDataHora(lote.createdAt)}</p>
-                  </div>
+                <div className="mt-3 grid grid-cols-3 gap-2 text-xs text-[var(--c-muted)]">
+                  <span>Limite<br /><strong>{moeda(lote.valor_disponivel)}</strong></span>
+                  <span>Usado<br /><strong>{moeda(lote.valor_utilizado)}</strong></span>
+                  <span>Itens<br /><strong>{lote.itens_count || 0}</strong></span>
                 </div>
               </button>
             ))}
+            {lotes.length === 0 && <p className="text-sm text-[var(--c-muted)]">Nenhum lote encontrado.</p>}
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow p-4 space-y-4 min-h-[420px]">
-          {!loteSelecionadoId && <p className="text-sm text-gray-500">Selecione um lote para visualizar os detalhes.</p>}
-
-          {loadingDetalhe && <p>Carregando lote...</p>}
-
-          {!loadingDetalhe && detalhe && (
+        <div className="card space-y-4">
+          {!loteDetalhe ? (
+            <p className="text-sm text-[var(--c-muted)]">Selecione um lote para visualizar as solicitacoes.</p>
+          ) : (
             <>
-              <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
+              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                 <div>
-                  <h2 className="text-lg font-semibold">Lote #{detalhe.id}</h2>
-                  <p className="text-sm text-gray-600 mt-0.5">
-                    {detalhe.classificacao_alvo} - {detalhe.diretoria_alvo_codigo}
+                  <h2 className="text-lg font-semibold text-[var(--c-text)]">Lote #{loteDetalhe.id}</h2>
+                  <p className="text-sm text-[var(--c-muted)]">
+                    {loteDetalhe.classificacao_alvo} - {loteDetalhe.diretoria_alvo_codigo} | Saldo {moeda(loteDetalhe.saldo_disponivel)}
                   </p>
-                  {detalhe.observacao && (
-                    <p className="text-sm text-gray-700 mt-2">{detalhe.observacao}</p>
-                  )}
                 </div>
-
-                <div className="flex items-center gap-2 flex-wrap">
-                  <BadgeStatus status={detalhe.status} />
-                  {detalhe.pode_reabrir && (
-                    <button
-                      type="button"
-                      className="btn btn-outline"
-                      onClick={reabrirLote}
-                      disabled={reabrindo}
-                    >
-                      {reabrindo ? 'Reabrindo...' : 'Reabrir lote'}
-                    </button>
-                  )}
-                  {detalhe.pode_excluir && (
-                    <button
-                      type="button"
-                      className="btn btn-outline"
-                      onClick={excluirLote}
-                      disabled={excluindo}
-                    >
-                      {excluindo ? 'Excluindo...' : 'Excluir lote'}
-                    </button>
-                  )}
-                  {detalhe.pode_cancelar && (
-                    <button
-                      type="button"
-                      className="btn btn-outline"
-                      onClick={cancelarLote}
-                      disabled={cancelando}
-                    >
-                      {cancelando ? 'Cancelando...' : 'Cancelar lote'}
-                    </button>
-                  )}
+                <div className="flex flex-wrap gap-2">
+                  {loteDetalhe.pode_cancelar && <button type="button" className="btn btn-outline btn-sm" onClick={() => cancelarLote(loteDetalhe)}>Cancelar</button>}
+                  {loteDetalhe.pode_excluir && <button type="button" className="btn btn-outline btn-sm" onClick={() => excluirLote(loteDetalhe)}>Excluir</button>}
                 </div>
               </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                <ResumoCard label="Valor disponivel" value={formatarValor(resumoLote.valorDisponivel)} />
-                <ResumoCard
-                  label="Valor utilizado"
-                  value={formatarValor(resumoLote.valorUtilizadoProjetado)}
-                  helper={resumoLote.possuiPrevia ? 'Total projetado com a selecao atual' : null}
-                  destaque={resumoLote.possuiPrevia}
-                />
-                <ResumoCard
-                  label="Saldo"
-                  value={formatarValor(resumoLote.saldoProjetado)}
-                  helper={resumoLote.possuiPrevia ? 'Saldo projetado com a selecao atual' : null}
-                  destaque={resumoLote.possuiPrevia}
-                />
-                <ResumoCard
-                  label={detalhe?.status === 'ABERTO' ? 'Itens selecionados' : 'Itens autorizados'}
-                  value={String(resumoLote.itensProjetados)}
-                  helper={resumoLote.possuiPrevia ? `${solicitacoesSelecionadas.length} item(ns) selecionado(s)` : null}
-                />
+              {loteDetalhe.status === 'ABERTO' && (
+                <div className="rounded-2xl border border-[var(--c-border)] p-4 space-y-3">
+                  <div className="flex flex-col gap-2 md:flex-row md:items-end">
+                    <label className="form-field flex-1">
+                      <span className="form-label">Buscar solicitacao elegivel</span>
+                      <input className="input" value={busca} onChange={event => setBusca(event.target.value)} placeholder="Codigo, obra, descricao ou tipo" />
+                    </label>
+                    <button type="button" className="btn btn-outline" onClick={buscarDisponiveis}>Buscar</button>
+                    {loteDetalhe.pode_finalizar && (
+                      <button type="button" className="btn btn-primary" onClick={finalizarLote} disabled={operando}>
+                        Finalizar selecionadas
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-sm text-[var(--c-muted)]">
+                    Selecionadas: <strong>{selecionados.size}</strong> | Valor: <strong>{moeda(valorSelecionado)}</strong>
+                  </p>
+                </div>
+              )}
+
+              <div className="overflow-x-auto rounded-2xl border border-[var(--c-border)]">
+                <table className="table table-sm min-w-full">
+                  <thead>
+                    <tr>
+                      {loteDetalhe.status === 'ABERTO' && <th className="w-10"></th>}
+                      <th>Solicitacao</th>
+                      <th>Obra</th>
+                      <th>Vencimento</th>
+                      <th className="text-right">Valor</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(loteDetalhe.status === 'ABERTO' ? disponiveis : (loteDetalhe.itens || []).map(item => item.solicitacao).filter(Boolean)).map(item => (
+                      <tr key={item.id}>
+                        {loteDetalhe.status === 'ABERTO' && (
+                          <td>
+                            <input type="checkbox" checked={selecionados.has(String(item.id))} onChange={() => alternarSolicitacao(item.id)} />
+                          </td>
+                        )}
+                        <td>
+                          <Link className="font-semibold text-[var(--c-primary)]" to={`/solicitacoes/${item.id}`}>
+                            {item.codigo || `#${item.id}`}
+                          </Link>
+                          <p className="text-xs text-[var(--c-muted)]">{item.tipo?.nome || '-'}</p>
+                        </td>
+                        <td>{item.obra?.nome || '-'}</td>
+                        <td>{data(item.data_vencimento)}</td>
+                        <td className="text-right font-semibold">{moeda(item.valor_prioridade)}</td>
+                      </tr>
+                    ))}
+                    {(loteDetalhe.status === 'ABERTO' ? disponiveis.length === 0 : !loteDetalhe.itens?.length) && (
+                      <tr>
+                        <td colSpan={loteDetalhe.status === 'ABERTO' ? 5 : 4} className="text-center text-[var(--c-muted)] py-8">
+                          Nenhuma solicitacao encontrada para este lote.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
-
-              {detalhe.status === 'ABERTO' && detalhe.pode_finalizar && (
-                <div className="space-y-3">
-                  <div className="grid grid-cols-1 xl:grid-cols-[minmax(220px,1.2fr)_minmax(220px,0.9fr)_minmax(240px,0.8fr)] gap-3">
-                    <input
-                      className="input"
-                      value={buscaDisponiveis}
-                      onChange={(event) => setBuscaDisponiveis(event.target.value)}
-                      placeholder="Buscar por codigo, SIENGE, descricao, obra ou tipo"
-                    />
-                    <select
-                      className="input"
-                      value={filtroObraId}
-                      onChange={(event) => setFiltroObraId(event.target.value)}
-                    >
-                      <option value="">Todas as obras</option>
-                      {obrasDisponiveis.map((obra) => (
-                        <option key={obra.id} value={obra.id}>
-                          {obra.nome}
-                        </option>
-                      ))}
-                    </select>
-                    <div className="rounded-xl border border-gray-200 px-3 py-2 text-sm bg-gray-50">
-                      <span className="text-gray-600">Selecionadas:</span> <strong>{solicitacoesSelecionadas.length}</strong>
-                      <span className="text-gray-400 mx-1.5">|</span>
-                      <span className="text-gray-600">Total:</span> <strong>{formatarValor(totalSelecionado)}</strong>
-                      {solicitacoesSelecionadas.length > selecionadasVisiveisCount && (
-                        <>
-                          <span className="text-gray-400 mx-1.5">|</span>
-                          <span className="text-gray-600">Fora do filtro:</span> <strong>{solicitacoesSelecionadas.length - selecionadasVisiveisCount}</strong>
-                        </>
-                      )}
-                    </div>
-                  </div>
-
-                  {excedeuLimite && (
-                    <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700">
-                      O total selecionado excede o limite disponivel do lote.
-                    </div>
-                  )}
-
-                  <div className="border rounded-xl overflow-hidden">
-                    <table className="w-full text-sm">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="text-left px-3 py-2.5 w-12">Sel.</th>
-                          <th className="text-left px-3 py-2.5">Codigo</th>
-                          <th className="text-left px-3 py-2.5">Obra</th>
-                          <th className="text-left px-3 py-2.5">Tipo</th>
-                          <th className="text-left px-3 py-2.5">Vencimento</th>
-                          <th className="text-right px-3 py-2.5">Valor</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {loadingDisponiveis && (
-                          <tr>
-                            <td className="px-3 py-2.5" colSpan={6}>Carregando solicitacoes elegiveis...</td>
-                          </tr>
-                        )}
-
-                        {!loadingDisponiveis && solicitacoesDisponiveis.length === 0 && (
-                          <tr>
-                            <td className="px-3 py-2.5 text-gray-500" colSpan={6}>
-                              Nenhuma solicitacao elegivel encontrada para este lote.
-                            </td>
-                          </tr>
-                        )}
-
-                        {!loadingDisponiveis && solicitacoesDisponiveis.map((item) => {
-                          const checked = selecionadasIds.includes(Number(item.id));
-                          return (
-                            <tr key={item.id} className="border-t">
-                              <td className="px-3 py-2.5">
-                                <input
-                                  type="checkbox"
-                                  checked={checked}
-                                  onChange={() => alternarSolicitacao(item.id)}
-                                />
-                              </td>
-                              <td className="px-3 py-2.5">
-                                <div className="font-medium">{item.codigo || `#${item.id}`}</div>
-                                <div className="text-xs text-gray-500">{item.numero_sienge || '-'}</div>
-                              </td>
-                              <td className="px-3 py-2.5">{item.obra?.nome || '-'}</td>
-                              <td className="px-3 py-2.5">{item.tipo?.nome || '-'}</td>
-                              <td className="px-3 py-2.5">{formatarData(item.data_vencimento)}</td>
-                              <td className="px-3 py-2.5 text-right font-medium">{formatarValor(item.valor_prioridade)}</td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  <div className="flex justify-end gap-2 flex-wrap">
-                    <button
-                      type="button"
-                      className="btn btn-outline"
-                      onClick={salvarSelecaoLote}
-                      disabled={salvandoSelecao || excedeuLimite}
-                    >
-                      {salvandoSelecao ? 'Salvando...' : 'Salvar selecao'}
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-primary"
-                      onClick={finalizarLote}
-                      disabled={finalizando || solicitacoesSelecionadas.length === 0 || excedeuLimite}
-                    >
-                      {finalizando ? 'Finalizando...' : 'Finalizar lote'}
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {detalhe.status === 'ABERTO' && !detalhe.pode_finalizar && (
-                <div className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-600">
-                  Este lote ainda esta aberto. Apenas a diretoria alvo ou o SUPERADMIN podem selecionar e finalizar as solicitacoes.
-                </div>
-              )}
-
-              {detalhe.status !== 'ABERTO' && (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <h3 className="text-base font-medium">Solicitacoes autorizadas</h3>
-                    <span className="text-sm text-gray-500">
-                      Finalizado em {formatarDataHora(detalhe.finalizado_em)}
-                    </span>
-                  </div>
-
-                  <div className="border rounded-xl overflow-hidden">
-                    <table className="w-full text-sm">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="text-left px-3 py-2.5">Codigo</th>
-                          <th className="text-left px-3 py-2.5">Obra</th>
-                          <th className="text-left px-3 py-2.5">Tipo</th>
-                          <th className="text-left px-3 py-2.5">Autorizado em</th>
-                          <th className="text-right px-3 py-2.5">Valor</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {(detalhe.itens || []).length === 0 && (
-                          <tr>
-                            <td className="px-3 py-2.5 text-gray-500" colSpan={5}>
-                              Nenhuma solicitacao foi vinculada a este lote.
-                            </td>
-                          </tr>
-                        )}
-
-                        {(detalhe.itens || []).map((item) => (
-                          <tr key={item.id} className="border-t">
-                            <td className="px-3 py-2.5">
-                              <div className="font-medium">{item.solicitacao?.codigo || `#${item.solicitacao?.id || '-'}`}</div>
-                              <div className="text-xs text-gray-500">{item.solicitacao?.numero_sienge || '-'}</div>
-                            </td>
-                            <td className="px-3 py-2.5">{item.solicitacao?.obra?.nome || '-'}</td>
-                            <td className="px-3 py-2.5">{item.solicitacao?.tipo?.nome || '-'}</td>
-                            <td className="px-3 py-2.5">{formatarDataHora(item.autorizado_em)}</td>
-                            <td className="px-3 py-2.5 text-right font-medium">{formatarValor(item.valor_considerado)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
             </>
           )}
         </div>
       </div>
-    </div>
-  );
-}
-
-function ResumoCard({ label, value, helper = null, destaque = false }) {
-  return (
-    <div className={`rounded-xl border px-3 py-2.5 ${destaque ? 'border-blue-200 bg-blue-50/60' : 'border-gray-200 bg-gray-50'}`}>
-      <p className="text-xs uppercase tracking-wide text-gray-500">{label}</p>
-      <p className="text-base font-semibold mt-1">{value}</p>
-      {helper && <p className="text-[11px] text-gray-500 mt-1 leading-4">{helper}</p>}
     </div>
   );
 }

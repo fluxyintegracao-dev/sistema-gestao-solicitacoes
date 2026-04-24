@@ -1,10 +1,10 @@
-import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { useContext, useEffect, useMemo, useState } from 'react';
+﻿import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Suspense, useContext, useEffect, useMemo, useState } from 'react';
 import { AuthContext } from '../contexts/AuthContext';
+import AppRouteFallback from '../components/AppRouteFallback';
 import NotificacoesBell from '../components/NotificacoesBell';
 import { getResumoConversas } from '../services/conversasInternas';
-import { getProvisionamentoFinanceiroContexto } from '../services/provisoesFinanceiras';
-import { getPrioridadesDiretoriaContexto } from '../services/prioridadesDiretoria';
+import { getInstalacaoPublica } from '../services/instalacao';
 import {
   HiOutlineSquares2X2,
   HiOutlinePlusCircle,
@@ -34,7 +34,37 @@ import {
   HiOutlinePaperAirplane
 } from 'react-icons/hi2';
 import { BsBuildingsFill } from 'react-icons/bs';
-import { isGeoSetor, normalizarSetorToken } from '../utils/setor';
+import {
+  canAccessBiblioteca,
+  canAccessBoletos,
+  canAccessComercial,
+  canAccessCadastroObras,
+  canAccessComunicacao,
+  canAccessCompras,
+  canAccessContratos,
+  canAccessFinanceiro,
+  canAccessProvisoes,
+  canAccessPrioridadesDiretoria,
+  canAccessRhDp,
+  canAccessRhDpDashboard,
+  canAccessRhDpEmpresas,
+  canCreateProvisionamentos,
+  canExecuteRhDpImportacoes,
+  canManageProvisionamentoCategorias,
+  canViewIntegracaoSienge,
+  canViewProvisionamentos,
+  canViewProvisionamentosDashboard,
+  canViewRhDpApuracao,
+  canViewRhDpColaboradores,
+  canViewRhDpDocumentos,
+  canViewRhDpObrigacoes,
+  canAccessCrm,
+  canManageUsers,
+  hasEnabledModule,
+  isBusinessAdmin,
+  isSuperadmin
+} from '../utils/acessoProduto';
+import { isNativeApp, registerNativeBackButtonHandler } from '../mobile/runtime';
 
 export default function Layout() {
   const { user, logout } = useContext(AuthContext);
@@ -49,8 +79,13 @@ export default function Layout() {
   );
   const [inboxNovasCount, setInboxNovasCount] = useState(0);
   const [saidaNovasCount, setSaidaNovasCount] = useState(0);
-  const [provisionamentoContexto, setProvisionamentoContexto] = useState(null);
-  const [prioridadesDiretoriaContexto, setPrioridadesDiretoriaContexto] = useState(null);
+  const [comunicacaoNovasCount, setComunicacaoNovasCount] = useState(0);
+  const [instalacao, setInstalacao] = useState({
+    product_name: 'Fluxy',
+    company_name: '',
+    logo_url: ''
+  });
+  const nativeApp = isNativeApp();
 
   const sidebarWidth = isMobileViewport ? 292 : (collapsed ? 76 : 236);
 
@@ -91,15 +126,23 @@ export default function Layout() {
   }, [location.pathname, isMobileViewport]);
 
   useEffect(() => {
+    return registerNativeBackButtonHandler({
+      canCloseMenu: () => menuAberto,
+      onCloseMenu: () => setMenuAberto(false),
+      canNavigateBack: () => location.pathname !== '/',
+      onNavigateBack: () => navigate(-1)
+    });
+  }, [location.pathname, menuAberto, navigate]);
+
+  useEffect(() => {
     const userId = Number(user?.id);
     if (!Number.isInteger(userId) || userId <= 0) {
       setInboxNovasCount(0);
       setSaidaNovasCount(0);
+      setComunicacaoNovasCount(0);
       return undefined;
     }
 
-    const storageKeyEntrada = `conversas_entrada_last_seen_${userId}`;
-    const storageKeySaida = `conversas_saida_last_seen_${userId}`;
     let ativo = true;
 
     const atualizarBadge = async () => {
@@ -107,33 +150,22 @@ export default function Layout() {
         return;
       }
       try {
-        const seenEntradaValue = localStorage.getItem(storageKeyEntrada) || '';
-        const seenSaidaValue = localStorage.getItem(storageKeySaida) || '';
-        const resumo = await getResumoConversas({
-          entradaSeenAt: seenEntradaValue,
-          saidaSeenAt: seenSaidaValue
-        });
+        const resumo = await getResumoConversas();
         if (!ativo) return;
-        setInboxNovasCount(Number(resumo?.entrada_nao_vistas || 0));
-        setSaidaNovasCount(Number(resumo?.saida_nao_vistas || 0));
+        const naoLidas = Number(resumo?.nao_lidas || 0);
+        setComunicacaoNovasCount(naoLidas);
+        setInboxNovasCount(naoLidas);
+        setSaidaNovasCount(0);
       } catch {
         // sem bloqueio visual em caso de falha temporaria
       }
     };
 
-    const handleSeenEvent = () => {
-      atualizarBadge();
-    };
-
-    window.addEventListener('conversas:entrada:seen', handleSeenEvent);
-    window.addEventListener('conversas:saida:seen', handleSeenEvent);
     atualizarBadge();
     const interval = setInterval(atualizarBadge, 60000);
 
     return () => {
       ativo = false;
-      window.removeEventListener('conversas:entrada:seen', handleSeenEvent);
-      window.removeEventListener('conversas:saida:seen', handleSeenEvent);
       clearInterval(interval);
     };
   }, [user?.id]);
@@ -141,421 +173,284 @@ export default function Layout() {
   useEffect(() => {
     let ativo = true;
 
-    async function carregarProvisionamento() {
-      try {
-        const data = await getProvisionamentoFinanceiroContexto();
-        if (ativo) {
-          setProvisionamentoContexto(data);
-        }
-      } catch {
-        if (ativo) {
-          setProvisionamentoContexto(null);
-        }
-      }
-    }
-
-    if (user?.id) {
-      carregarProvisionamento();
-    } else {
-      setProvisionamentoContexto(null);
-    }
+    getInstalacaoPublica()
+      .then((data) => {
+        if (!ativo || !data) return;
+        setInstalacao((current) => ({
+          ...current,
+          ...data
+        }));
+      })
+      .catch(() => {});
 
     return () => {
       ativo = false;
     };
-  }, [user?.id]);
-
-  useEffect(() => {
-    let ativo = true;
-
-    async function carregarPrioridadesDiretoria() {
-      try {
-        const data = await getPrioridadesDiretoriaContexto();
-        if (ativo) {
-          setPrioridadesDiretoriaContexto(data);
-        }
-      } catch {
-        if (ativo) {
-          setPrioridadesDiretoriaContexto(null);
-        }
-      }
-    }
-
-    if (user?.id) {
-      carregarPrioridadesDiretoria();
-    } else {
-      setPrioridadesDiretoriaContexto(null);
-    }
-
-    return () => {
-      ativo = false;
-    };
-  }, [user?.id]);
+  }, []);
 
   const perfilUpper = String(user?.perfil || '').toUpperCase();
-  const areaUpper = String(user?.area || '').toUpperCase();
-  const setorCodigoUpper = String(user?.setor?.codigo || '').toUpperCase();
-  const setorNomeUpper = String(user?.setor?.nome || '').toUpperCase();
-  const isFinanceiro =
-    perfilUpper === 'FINANCEIRO' ||
-    setorCodigoUpper === 'FINANCEIRO' ||
-    setorNomeUpper === 'FINANCEIRO' ||
-    areaUpper === 'FINANCEIRO' ||
-    user?.setor_id === 4;
-  const setorTokens = [
-    String(user?.setor?.nome || '').toUpperCase(),
-    String(user?.setor?.codigo || '').toUpperCase(),
-    String(user?.area || '').toUpperCase()
-  ];
-  const setorTokensNormalizados = setorTokens.map(normalizarSetorToken).filter(Boolean);
-  const isAdminGEO =
-    user?.perfil === 'ADMIN' && setorTokens.some(isGeoSetor);
-  const isSetorObra = setorTokens.includes('OBRA');
-  const hasPrioridadesDiretoriaAccess =
-    perfilUpper === 'SUPERADMIN' ||
-    setorTokensNormalizados.includes('DIR_ADMIN') ||
-    setorTokensNormalizados.includes('DIR_OBRAS_PUBLICAS') ||
-    setorTokensNormalizados.includes('DIR_OBRAS_PRIVADAS') ||
-    Boolean(prioridadesDiretoriaContexto?.permissoes?.pode_acessar_modulo);
-  const hasProvisionamentoAccess =
-    perfilUpper === 'SUPERADMIN' ||
-    Boolean(provisionamentoContexto?.permissoes?.pode_acessar);
-  const hasProvisionamentoDashboard =
-    perfilUpper === 'SUPERADMIN' ||
-    Boolean(provisionamentoContexto?.permissoes?.pode_dashboard_global);
-  const canCreateProvisionamento =
-    perfilUpper === 'SUPERADMIN' ||
-    Boolean(provisionamentoContexto?.permissoes?.pode_criar);
+  const superadmin = isSuperadmin(user);
+  const businessAdmin = isBusinessAdmin(user);
+  const gestaoUsuarios = canManageUsers(user);
+  const moduloBibliotecaHabilitado = hasEnabledModule(user, 'BIBLIOTECA_MODELOS');
+  const moduloCotacoesHabilitado = hasEnabledModule(user, 'COTACOES');
+  const crmAccess = canAccessCrm(user);
+  const comprasAccess = canAccessCompras(user);
+  const prioridadesDiretoriaAccess = canAccessPrioridadesDiretoria(user);
+  const financeiroAccess = canAccessFinanceiro(user);
+  const boletosAccess = canAccessBoletos(user);
+  const financeiroModuleEnabled = hasEnabledModule(user, 'FINANCEIRO');
+  const comercialAccess = canAccessComercial(user);
+  const provisoesAccess = canAccessProvisoes(user);
+  const provisoesDashboardAccess = canViewProvisionamentosDashboard(user);
+  const provisoesListaAccess = canViewProvisionamentos(user);
+  const provisoesCreateAccess = canCreateProvisionamentos(user);
+  const provisoesCategoriasAccess = canManageProvisionamentoCategorias(user);
+  const rhDpAccess = canAccessRhDp(user);
+  const rhDpDashboardAccess = canAccessRhDpDashboard(user);
+  const rhDpEmpresasAccess = canAccessRhDpEmpresas(user);
+  const rhDpColaboradoresAccess = canViewRhDpColaboradores(user);
+  const rhDpDocumentosAccess = canViewRhDpDocumentos(user);
+  const rhDpImportacoesAccess = canExecuteRhDpImportacoes(user);
+  const rhDpApuracaoAccess = canViewRhDpApuracao(user);
+  const rhDpObrigacoesAccess = canViewRhDpObrigacoes(user) && financeiroModuleEnabled;
+  const integracaoSiengeAccess = canViewIntegracaoSienge(user);
+  const obrasAccess = canAccessCadastroObras(user);
+  const contratosAccess = canAccessContratos(user);
+  const bibliotecaAccess = canAccessBiblioteca(user);
+  const comunicacaoAccess = canAccessComunicacao(user);
+  const brandLabel = instalacao.product_name || 'Fluxy';
+  const brandAlt = instalacao.company_name || brandLabel;
+  const brandInitial = String(brandLabel || 'F').trim().charAt(0).toUpperCase() || 'F';
 
   const menuGroups = useMemo(() => {
     const groups = [];
     const item = (to, label, icon) => ({ to, label, icon });
-    const normalizeMenuLabel = (value) =>
-      String(value || '')
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .trim()
-        .toUpperCase();
     const groupIcons = {
       Painel: HiOutlineSquares2X2,
-      Solicitações: HiOutlineClipboardDocumentList,
-      Comunicação: HiOutlineChatBubbleLeftRight,
+      Solicitacoes: HiOutlineClipboardDocumentList,
+      Comunicacao: HiOutlineChatBubbleLeftRight,
       Compras: HiOutlineWallet,
       Financeiro: HiOutlineWallet,
+      CRM: HiOutlineUsers,
+      Comercial: HiOutlineBuildingOffice2,
       Provisionamento: HiOutlineBanknotes,
+      'RH/DP': HiOutlineUsers,
+      Integracoes: HiOutlineAdjustmentsHorizontal,
+      Relatorios: HiOutlineDocumentText,
       Cadastros: HiOutlineRectangleGroup,
       Contratos: HiOutlineBanknotes,
-      Configurações: HiOutlineCog6Tooth,
+      Configuracoes: HiOutlineCog6Tooth,
       Biblioteca: HiOutlineFolderOpen,
       Conta: HiOutlineUserCircle
     };
+
     const addGroup = (label, entries) => {
       const items = entries.filter(Boolean);
-      if (items.length) groups.push({ label, icon: groupIcons[label] || HiOutlineFolderOpen, items });
+      if (items.length) {
+        groups.push({ label, icon: groupIcons[label] || HiOutlineFolderOpen, items });
+      }
     };
-    const hasModuloComprasAccess =
-      ['SUPERADMIN', 'ADMIN'].includes(String(user?.perfil || '').toUpperCase()) ||
-      Boolean(user?.pode_criar_solicitacao_compra);
 
-    switch (user?.perfil) {
-      case 'USUARIO':
-        addGroup('Solicitações', [
-          item('/solicitacoes', 'Minhas Solicitações', HiOutlineDocumentText),
-          item('/solicitacoes-arquivadas', 'Arquivadas', HiOutlineArchiveBox),
-          item('/nova-solicitacao', 'Nova Solicitação', HiOutlinePlusCircle)
-        ]);
-        addGroup('Comunicação', [
-          item('/conversas/entrada', 'Caixa de Entrada', HiOutlineInboxStack),
-          item('/conversas/saida', 'Caixa de Saída', HiOutlinePaperAirplane)
-        ]);
-        addGroup('Biblioteca', [
-          item('/arquivos-modelos', 'Arquivos Modelos', HiOutlineFolderOpen)
-        ]);
-        if (hasModuloComprasAccess) {
-          addGroup('Compras', [
-            item('/solicitacoes-compra', 'Solicitações de Compra', HiOutlineClipboardDocumentList),
-            item('/solicitacoes-compra/nova', 'Nova Solicitação de Compra', HiOutlinePlusCircle)
-          ]);
-        }
-        if (isSetorObra) {
-          addGroup('Contratos', [
-            item('/gestao-contratos', 'Gestão de Contratos', HiOutlineBanknotes)
-          ]);
-        }
-        if (isFinanceiro) {
-          addGroup('Financeiro', [
-            item('/comprovantes/upload', 'Upload Comprovantes', HiOutlineCloudArrowUp),
-            item('/comprovantes/pendentes', 'Comprovantes Pendentes', HiOutlineReceiptRefund)
-          ]);
-        }
-        addGroup('Conta', [
-          item('/perfil', 'Meu Perfil', HiOutlineUserCircle)
-        ]);
-        break;
+    const perfil = String(user?.perfil || '').toUpperCase();
+    const canSeeDashboard = businessAdmin || financeiroAccess || perfil === 'ADMIN';
+    const solicitacoesLabel =
+      perfil === 'USUARIO'
+        ? 'Minhas Solicitacoes'
+        : ['SETOR', 'FINANCEIRO'].includes(perfil)
+          ? 'Solicitacoes do Setor'
+          : 'Solicitacoes';
 
-      case 'SETOR':
-        addGroup('Solicitações', [
-          item('/solicitacoes', 'Solicitações do Setor', HiOutlineDocumentText),
-          item('/solicitacoes-arquivadas', 'Arquivadas', HiOutlineArchiveBox)
-        ]);
-        addGroup('Comunicação', [
-          item('/conversas/entrada', 'Caixa de Entrada', HiOutlineInboxStack),
-          item('/conversas/saida', 'Caixa de Saída', HiOutlinePaperAirplane)
-        ]);
-        addGroup('Biblioteca', [
-          item('/arquivos-modelos', 'Arquivos Modelos', HiOutlineFolderOpen)
-        ]);
-        if (hasModuloComprasAccess) {
-          addGroup('Compras', [
-            item('/solicitacoes-compra', 'Solicitações de Compra', HiOutlineClipboardDocumentList),
-            item('/solicitacoes-compra/nova', 'Nova Solicitação de Compra', HiOutlinePlusCircle)
-          ]);
-        }
-        if (isSetorObra) {
-          addGroup('Contratos', [
-            item('/gestao-contratos', 'Gestão de Contratos', HiOutlineBanknotes)
-          ]);
-        }
-        if (isFinanceiro) {
-          addGroup('Financeiro', [
-            item('/comprovantes/upload', 'Upload Comprovantes', HiOutlineCloudArrowUp),
-            item('/comprovantes/pendentes', 'Comprovantes Pendentes', HiOutlineReceiptRefund)
-          ]);
-        }
-        addGroup('Conta', [
-          item('/perfil', 'Meu Perfil', HiOutlineUserCircle)
-        ]);
-        break;
-
-      case 'GESTOR':
-        addGroup('Solicitações', [
-          item('/solicitacoes', 'Todas as Solicitações', HiOutlineDocumentText),
-          item('/solicitacoes-arquivadas', 'Arquivadas', HiOutlineArchiveBox)
-        ]);
-        addGroup('Comunicação', [
-          item('/conversas/entrada', 'Caixa de Entrada', HiOutlineInboxStack),
-          item('/conversas/saida', 'Caixa de Saída', HiOutlinePaperAirplane)
-        ]);
-        addGroup('Biblioteca', [
-          item('/arquivos-modelos', 'Arquivos Modelos', HiOutlineFolderOpen)
-        ]);
-        if (hasModuloComprasAccess) {
-          addGroup('Compras', [
-            item('/solicitacoes-compra', 'Solicitações de Compra', HiOutlineClipboardDocumentList),
-            item('/solicitacoes-compra/nova', 'Nova Solicitação de Compra', HiOutlinePlusCircle)
-          ]);
-        }
-        if (isSetorObra) {
-          addGroup('Contratos', [
-            item('/gestao-contratos', 'Gestão de Contratos', HiOutlineBanknotes)
-          ]);
-        }
-        if (isFinanceiro) {
-          addGroup('Financeiro', [
-            item('/comprovantes/upload', 'Upload Comprovantes', HiOutlineCloudArrowUp),
-            item('/comprovantes/pendentes', 'Comprovantes Pendentes', HiOutlineReceiptRefund)
-          ]);
-        }
-        addGroup('Conta', [
-          item('/perfil', 'Meu Perfil', HiOutlineUserCircle)
-        ]);
-        break;
-
-      case 'FINANCEIRO':
-        addGroup('Solicitações', [
-          item('/solicitacoes', 'Solicitações do Setor', HiOutlineDocumentText),
-          item('/solicitacoes-arquivadas', 'Arquivadas', HiOutlineArchiveBox)
-        ]);
-        addGroup('Comunicação', [
-          item('/conversas/entrada', 'Caixa de Entrada', HiOutlineInboxStack),
-          item('/conversas/saida', 'Caixa de Saída', HiOutlinePaperAirplane)
-        ]);
-        addGroup('Biblioteca', [
-          item('/arquivos-modelos', 'Arquivos Modelos', HiOutlineFolderOpen)
-        ]);
-        if (hasModuloComprasAccess) {
-          addGroup('Compras', [
-            item('/solicitacoes-compra', 'Solicitações de Compra', HiOutlineClipboardDocumentList),
-            item('/solicitacoes-compra/nova', 'Nova Solicitação de Compra', HiOutlinePlusCircle)
-          ]);
-        }
-        addGroup('Financeiro', [
-          item('/comprovantes/upload', 'Upload Comprovantes', HiOutlineCloudArrowUp),
-          item('/comprovantes/pendentes', 'Comprovantes Pendentes', HiOutlineReceiptRefund)
-        ]);
-        addGroup('Conta', [
-          item('/perfil', 'Meu Perfil', HiOutlineUserCircle)
-        ]);
-        break;
-
-      case 'ADMIN':
-        addGroup('Painel', [
-          item('/', 'Dashboard', HiOutlineSquares2X2)
-        ]);
-        addGroup('Solicitações', [
-          item('/solicitacoes', 'Solicitações', HiOutlineDocumentText),
-          item('/solicitacoes-arquivadas', 'Arquivadas', HiOutlineArchiveBox),
-          item('/nova-solicitacao', 'Nova Solicitação', HiOutlinePlusCircle)
-        ]);
-        addGroup('Comunicação', [
-          item('/conversas/entrada', 'Caixa de Entrada', HiOutlineInboxStack),
-          item('/conversas/saida', 'Caixa de Saída', HiOutlinePaperAirplane)
-        ]);
-        addGroup('Biblioteca', [
-          item('/arquivos-modelos', 'Arquivos Modelos', HiOutlineFolderOpen)
-        ]);
-        if (hasModuloComprasAccess) {
-          addGroup('Compras', [
-            item('/solicitacoes-compra', 'Solicitações de Compra', HiOutlineClipboardDocumentList),
-            item('/solicitacoes-compra/nova', 'Nova Solicitação de Compra', HiOutlinePlusCircle)
-          ]);
-        }
-        if (isFinanceiro) {
-          addGroup('Financeiro', [
-            item('/comprovantes/upload', 'Upload Comprovantes', HiOutlineCloudArrowUp),
-            item('/comprovantes/pendentes', 'Comprovantes Pendentes', HiOutlineReceiptRefund)
-          ]);
-        }
-        if (isAdminGEO) {
-          addGroup('Cadastros', [
-            item('/usuarios', 'Usuários', HiOutlineUsers)
-          ]);
-          addGroup('Contratos', [
-            item('/gestao-contratos', 'Gestão de Contratos', HiOutlineBanknotes)
-          ]);
-        }
-        addGroup('Conta', [
-          item('/perfil', 'Meu Perfil', HiOutlineUserCircle)
-        ]);
-        break;
-
-      case 'SUPERADMIN':
-        addGroup('Painel', [
-          item('/', 'Dashboard', HiOutlineSquares2X2)
-        ]);
-        addGroup('Solicitações', [
-          item('/solicitacoes', 'Solicitações', HiOutlineDocumentText),
-          item('/solicitacoes-arquivadas', 'Arquivadas', HiOutlineArchiveBox),
-          item('/nova-solicitacao', 'Nova Solicitação', HiOutlinePlusCircle)
-        ]);
-        addGroup('Comunicação', [
-          item('/conversas/entrada', 'Caixa de Entrada', HiOutlineInboxStack),
-          item('/conversas/saida', 'Caixa de Saída', HiOutlinePaperAirplane)
-        ]);
-        addGroup('Biblioteca', [
-          item('/arquivos-modelos', 'Arquivos Modelos', HiOutlineFolderOpen)
-        ]);
-        addGroup('Compras', [
-          item('/solicitacoes-compra', 'Solicitações de Compra', HiOutlineClipboardDocumentList),
-          item('/solicitacoes-compra/nova', 'Nova Solicitação de Compra', HiOutlinePlusCircle),
-          item('/gestao-apropriacoes', 'Gestão de Apropriações', HiOutlineAdjustmentsHorizontal),
-          item('/gestao-insumos', 'Gestão de Insumos', HiOutlineRectangleGroup),
-          item('/gestao-unidades', 'Gestão de Unidades', HiOutlineBuildingOffice2),
-          item('/gestao-categorias', 'Gestão de Categorias', HiOutlineFolderOpen)
-        ]);
-        addGroup('Financeiro', [
-          item('/comprovantes/upload', 'Upload Comprovantes', HiOutlineCloudArrowUp),
-          item('/comprovantes/pendentes', 'Comprovantes Pendentes', HiOutlineReceiptRefund)
-        ]);
-        addGroup('Cadastros', [
-          item('/usuarios', 'Usuários', HiOutlineUsers),
-          item('/obras', 'Obras', HiOutlineBuildingOffice2),
-          item('/setores', 'Setores', HiOutlineAdjustmentsHorizontal),
-          item('/cargos', 'Cargos', HiOutlineFolderOpen),
-          item('/tipos-solicitacao', 'Tipos de Solicitação', HiOutlineClipboardDocumentList)
-        ]);
-        addGroup('Contratos', [
-          item('/gestao-contratos', 'Gestão de Contratos', HiOutlineBanknotes)
-        ]);
-        addGroup('Configurações', [
-          item('/configuracoes', 'Configurações', HiOutlineCog6Tooth)
-        ]);
-        addGroup('Conta', [
-          item('/perfil', 'Meu Perfil', HiOutlineUserCircle)
-        ]);
-        break;
-
-      default:
-        break;
-    }
-
-    if (hasModuloComprasAccess) {
-      const grupoSolicitacoes = groups.find(
-        (group) => normalizeMenuLabel(group.label) === 'SOLICITACOES'
-      );
-
-      if (
-        grupoSolicitacoes &&
-        !grupoSolicitacoes.items.some((entry) => entry.to === '/solicitacoes-compra/nova')
-      ) {
-        grupoSolicitacoes.items.push(
-          item('/solicitacoes-compra/nova', 'Nova Solicitação de Compra', HiOutlineWallet)
-        );
-      }
-
-      const indiceCompras = groups.findIndex(
-        (group) => normalizeMenuLabel(group.label) === 'COMPRAS'
-      );
-
-      if (indiceCompras >= 0) {
-        groups[indiceCompras].items = groups[indiceCompras].items.filter(
-          (entry) =>
-            entry.to !== '/solicitacoes-compra' &&
-            entry.to !== '/solicitacoes-compra/nova'
-        );
-
-        if (!groups[indiceCompras].items.length) {
-          groups.splice(indiceCompras, 1);
-        }
-      }
-    }
-
-    if (hasProvisionamentoAccess) {
-      addGroup('Provisionamento', [
-        hasProvisionamentoDashboard
-          ? item('/provisoes-financeiras/dashboard', 'Dashboard Provisionamento', HiOutlineSquares2X2)
-          : null,
-        item('/provisoes-financeiras', 'Provisionamentos', HiOutlineBanknotes),
-        canCreateProvisionamento
-          ? item('/provisoes-financeiras/nova', 'Nova Provisao', HiOutlinePlusCircle)
-          : null,
-        perfilUpper === 'SUPERADMIN'
-          ? item('/provisoes-financeiras/categorias', 'Categorias Macro', HiOutlineFolderOpen)
-          : null
+    if (canSeeDashboard) {
+      addGroup('Painel', [
+        item('/', 'Dashboard', HiOutlineSquares2X2)
       ]);
     }
 
-    if (hasPrioridadesDiretoriaAccess) {
-      const grupoSolicitacoes = groups.find(
-        (group) => normalizeMenuLabel(group.label) === 'SOLICITACOES'
-      );
+    addGroup('Solicitacoes', [
+      item('/solicitacoes', solicitacoesLabel, HiOutlineDocumentText),
+      item('/solicitacoes-arquivadas', 'Arquivadas', HiOutlineArchiveBox),
+      prioridadesDiretoriaAccess ? item('/prioridades-diretoria', 'Prioridades Diretoria', HiOutlineBanknotes) : null,
+      perfil !== 'SETOR' && perfil !== 'FINANCEIRO'
+        ? item('/nova-solicitacao', 'Nova Solicitacao', HiOutlinePlusCircle)
+        : null
+    ]);
 
-      if (grupoSolicitacoes) {
-        if (!grupoSolicitacoes.items.some((entry) => entry.to === '/prioridades-diretoria')) {
-          grupoSolicitacoes.items.push(
-            item('/prioridades-diretoria', 'Prioridades Diretoria', HiOutlineBanknotes)
-          );
-        }
-      } else {
-        addGroup('Solicitações', [
-          item('/prioridades-diretoria', 'Prioridades Diretoria', HiOutlineBanknotes)
-        ]);
-      }
+    if (comunicacaoAccess) {
+      addGroup('Comunicacao', [
+        item('/comunicacao-interna', 'Comunicacao Interna', HiOutlineChatBubbleLeftRight)
+      ]);
     }
+
+    if (bibliotecaAccess) {
+      addGroup('Biblioteca', [
+        item('/arquivos-modelos', 'Arquivos Modelos', HiOutlineFolderOpen)
+      ]);
+    }
+
+    if (comprasAccess) {
+      addGroup('Compras', [
+        item('/solicitacoes-compra', 'Solicitacoes de Compra', HiOutlineClipboardDocumentList),
+        item('/solicitacoes-compra/nova', 'Nova Solicitacao de Compra', HiOutlinePlusCircle),
+        item('/pedidos-compra', 'Pedidos de Compra', HiOutlineDocumentText),
+        businessAdmin ? item('/gestao-insumos', 'Gestao de Insumos', HiOutlineRectangleGroup) : null,
+        businessAdmin ? item('/gestao-unidades', 'Gestao de Unidades', HiOutlineBuildingOffice2) : null,
+        businessAdmin ? item('/gestao-categorias', 'Gestao de Categorias', HiOutlineFolderOpen) : null
+      ]);
+    }
+
+    if (moduloCotacoesHabilitado && comprasAccess) {
+      addGroup('Cotacoes', [
+        item('/cotacoes', 'Cotacoes', HiOutlineInboxStack),
+        item('/cotacoes/nova', 'Nova Cotacao Avulsa', HiOutlinePlusCircle),
+        item('/gestao-fornecedores', 'Fornecedores', HiOutlineUsers)
+      ]);
+    }
+
+    if (financeiroAccess) {
+      addGroup('Financeiro', [
+        item('/financeiro/titulos', 'Titulos Financeiros', HiOutlineWallet),
+        boletosAccess ? item('/financeiro/boletos', 'Boletos', HiOutlineDocumentText) : null,
+        item('/financeiro/relatorios', 'Relatorios Financeiros', HiOutlineDocumentText),
+        item('/financeiro/conciliacao', 'Conciliacao OFX', HiOutlineBanknotes),
+        item('/financeiro/cadastros', 'Cadastros Financeiros', HiOutlineRectangleGroup),
+        item('/comprovantes/upload', 'Upload Comprovantes', HiOutlineCloudArrowUp),
+        item('/comprovantes/pendentes', 'Comprovantes Pendentes', HiOutlineReceiptRefund)
+      ]);
+    }
+
+    if (crmAccess) {
+      addGroup('CRM', [
+        item('/crm/dashboard', 'Dashboard', HiOutlineSquares2X2),
+        item('/crm/dashboard-gerencial', 'Gerencial', HiOutlineSquares2X2),
+        item('/crm/dashboard-sla', 'SLA', HiOutlineClipboardDocumentList),
+        item('/crm/dashboard-distribuicao', 'Distribuicao', HiOutlineAdjustmentsHorizontal),
+        item('/crm/inbox', 'Inbox', HiOutlineChatBubbleLeftRight),
+        item('/crm/leads', 'Leads', HiOutlineUsers),
+        item('/crm/carteira', 'Minha Carteira', HiOutlineUsers),
+        item('/crm/leads/novo', 'Novo Lead', HiOutlinePlusCircle),
+        item('/crm/kanban', 'Kanban', HiOutlineSquares2X2),
+        item('/crm/tarefas', 'Tarefas', HiOutlineClipboardDocumentList),
+        item('/crm/automacoes', 'Automacoes', HiOutlineAdjustmentsHorizontal),
+        item('/crm/admin/canais', 'Canais', HiOutlineCog6Tooth),
+        item('/crm/admin/numeros', 'Numeros', HiOutlinePaperAirplane),
+        item('/crm/admin/integracoes', 'Integracoes', HiOutlineAdjustmentsHorizontal)
+      ]);
+    }
+
+    if (comercialAccess) {
+      addGroup('Comercial', [
+        item('/comercial/empreendimentos', 'Empreendimentos', HiOutlineBuildingOffice2),
+        item('/comercial/unidades', 'Unidades', HiOutlineRectangleGroup),
+        item('/comercial/mapa-unidades', 'Mapa de Unidades', HiOutlineSquares2X2),
+        item('/comercial/tabelas-preco', 'Tabelas de Preco', HiOutlineDocumentText),
+        item('/comercial/contratos', 'Contratos de Venda', HiOutlineBanknotes)
+      ]);
+    }
+
+    if (provisoesAccess) {
+      addGroup('Provisionamento', [
+        provisoesDashboardAccess ? item('/provisoes-financeiras/dashboard', 'Dashboard de Previsao', HiOutlineSquares2X2) : null,
+        provisoesListaAccess ? item('/provisoes-financeiras', 'Provisionamentos', HiOutlineBanknotes) : null,
+        provisoesCreateAccess ? item('/provisoes-financeiras/nova', 'Nova Provisao', HiOutlinePlusCircle) : null,
+        provisoesCategoriasAccess ? item('/provisoes-financeiras/categorias', 'Categorias Macro', HiOutlineFolderOpen) : null
+      ]);
+    }
+
+    if (rhDpAccess) {
+      addGroup('RH/DP', [
+        rhDpDashboardAccess ? item('/rh-dp', 'Visao do Modulo', HiOutlineUsers) : null,
+        rhDpEmpresasAccess ? item('/rh-dp/empresas', 'Empresas do Grupo', HiOutlineBuildingOffice2) : null,
+        rhDpColaboradoresAccess ? item('/rh-dp/colaboradores', 'Colaboradores', HiOutlineUsers) : null,
+        rhDpDocumentosAccess ? item('/rh-dp/documentos', 'Documentos', HiOutlineFolderOpen) : null,
+        rhDpImportacoesAccess ? item('/rh-dp/importacoes', 'Importacoes', HiOutlineCloudArrowUp) : null,
+        rhDpApuracaoAccess ? item('/rh-dp/apuracao', 'Apuracao', HiOutlineDocumentText) : null,
+        rhDpObrigacoesAccess ? item('/rh-dp/fechamentos', 'Fechamentos', HiOutlineBanknotes) : null
+      ]);
+    }
+
+    if (integracaoSiengeAccess) {
+      addGroup('Integracoes', [
+        item('/integracao-sienge', 'SIENGE', HiOutlineAdjustmentsHorizontal)
+      ]);
+    }
+
+    if (businessAdmin && comprasAccess) {
+      addGroup('Relatorios', [
+        item('/relatorios/administrativos', 'Auditoria de Compras', HiOutlineDocumentText)
+      ]);
+    }
+
+    if (gestaoUsuarios || businessAdmin) {
+      addGroup('Cadastros', [
+        gestaoUsuarios ? item('/usuarios', 'Usuarios', HiOutlineUsers) : null,
+        businessAdmin && obrasAccess ? item('/obras', 'Obras', HiOutlineBuildingOffice2) : null,
+        businessAdmin && obrasAccess ? item('/gestao-apropriacoes', 'Gestao de Apropriacoes', HiOutlineAdjustmentsHorizontal) : null,
+        businessAdmin ? item('/setores', 'Setores', HiOutlineAdjustmentsHorizontal) : null,
+        businessAdmin ? item('/tipos-solicitacao', 'Tipos de Solicitacao', HiOutlineClipboardDocumentList) : null,
+        businessAdmin ? item('/parceiros', 'Cadastro de Pessoas', HiOutlineUsers) : null,
+        businessAdmin ? item('/parceiros-categorias', 'Categorias de Parceiro', HiOutlineArchiveBox) : null
+      ]);
+    }
+
+    if (contratosAccess) {
+      addGroup('Contratos', [
+        item('/gestao-contratos', 'Gestao de Contratos', HiOutlineBanknotes)
+      ]);
+    }
+
+    if (businessAdmin) {
+      addGroup('Configuracoes', [
+        item('/configuracoes', 'Configuracoes', HiOutlineCog6Tooth),
+        item('/aprovacao-diretoria', 'Aprovacao Diretoria', HiOutlineAdjustmentsHorizontal),
+        item('/usuarios-envio-qualquer-setor', 'Envio Livre por Usuario', HiOutlineUsers),
+        item('/tipos-compartilhados-setor', 'Tipos Compartilhados', HiOutlineClipboardDocumentList),
+        item('/automacao-status-setor', 'Automacao por Status', HiOutlinePaperAirplane),
+        comprasAccess ? item('/configuracoes-cotacao', 'Config. Cotacoes', HiOutlineAdjustmentsHorizontal) : null,
+        comprasAccess ? item('/configuracoes-status-pedidos-compra', 'Status dos Pedidos', HiOutlineClipboardDocumentList) : null,
+        superadmin && comercialAccess ? item('/configuracoes-comercial-categorias', 'Categorias Comerciais', HiOutlineArchiveBox) : null,
+        superadmin ? item('/configuracoes-modulos', 'Modulos e Planos', HiOutlineCog6Tooth) : null,
+        superadmin && moduloBibliotecaHabilitado ? item('/arquivos-modelos-config', 'Arquivos Modelos', HiOutlineFolderOpen) : null
+      ]);
+    }
+
+    addGroup('Conta', [
+      item('/perfil', 'Meu Perfil', HiOutlineUserCircle)
+    ]);
 
     return groups;
   }, [
     user?.perfil,
-    user?.pode_criar_solicitacao_compra,
-    isFinanceiro,
-    isAdminGEO,
-    isSetorObra,
-    hasPrioridadesDiretoriaAccess,
-    hasProvisionamentoAccess,
-    hasProvisionamentoDashboard,
-    canCreateProvisionamento,
-    perfilUpper,
-    prioridadesDiretoriaContexto?.permissoes?.pode_acessar_modulo
+    businessAdmin,
+    bibliotecaAccess,
+    comercialAccess,
+    comunicacaoAccess,
+    comprasAccess,
+    contratosAccess,
+    financeiroAccess,
+    boletosAccess,
+    financeiroModuleEnabled,
+    gestaoUsuarios,
+    integracaoSiengeAccess,
+    moduloBibliotecaHabilitado,
+    moduloCotacoesHabilitado,
+    obrasAccess,
+    prioridadesDiretoriaAccess,
+    provisoesAccess,
+    provisoesCategoriasAccess,
+    provisoesCreateAccess,
+    provisoesDashboardAccess,
+    provisoesListaAccess,
+    rhDpApuracaoAccess,
+    rhDpAccess,
+    rhDpColaboradoresAccess,
+    rhDpDashboardAccess,
+    rhDpDocumentosAccess,
+    rhDpEmpresasAccess,
+    rhDpImportacoesAccess,
+    rhDpObrigacoesAccess,
+    comercialAccess,
+    superadmin
   ]);
 
   const flatMenuItems = useMemo(
@@ -597,7 +492,7 @@ export default function Layout() {
 
   return (
     <div className={theme === 'dark' ? 'dark' : ''}>
-      <div className="layout-shell flex min-h-screen overflow-x-hidden">
+      <div className={`layout-shell flex min-h-screen overflow-x-hidden ${nativeApp ? 'layout-shell-native' : ''}`}>
         <aside
           className={`sidebar ${collapsed ? 'collapsed' : ''} fixed md:static top-0 left-0 h-full md:h-auto z-40 transform transition-all duration-200 ${
             menuAberto ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
@@ -608,16 +503,22 @@ export default function Layout() {
         >
           <div className="flex flex-col h-full px-3 md:px-4 py-3 md:py-4 gap-3">
             <div className={`brand ${collapsed ? 'justify-center' : 'justify-between'}`}>
-              <img
-                src="/CSC_logo_colorida.png"
-                alt="CSC"
-                className="h-7 w-auto"
-              />
+              {instalacao.logo_url ? (
+                <img
+                  src={instalacao.logo_url}
+                  alt={brandAlt}
+                  className="h-7 w-auto"
+                />
+              ) : (
+                <div className="h-8 w-8 rounded-xl bg-blue-600 text-white flex items-center justify-center text-sm font-bold">
+                  {brandInitial}
+                </div>
+              )}
               <div className="flex items-center gap-2 brand-text">
                 <div className="leading-tight">
                   <p className="brand-title inline-flex items-center gap-1.5">
                     <BsBuildingsFill size={14} />
-                    <span>Fluxy</span>
+                    <span>{brandLabel}</span>
                   </p>
                 </div>
               </div>
@@ -679,7 +580,7 @@ export default function Layout() {
                           <span className="nav-group-heading">
                             {GroupIcon && <GroupIcon className="nav-group-icon" />}
                             <span className="nav-group-title">{group.label}</span>
-                            {group.label === 'Comunicação' && (inboxNovasCount + saidaNovasCount) > 0 && (
+                            {group.label === 'Comunicacao' && (inboxNovasCount + saidaNovasCount) > 0 && (
                               <span className="inline-flex min-w-[20px] h-5 px-1.5 items-center justify-center rounded-full text-[11px] font-semibold bg-red-600 text-white">
                                 {(inboxNovasCount + saidaNovasCount) > 99 ? '99+' : (inboxNovasCount + saidaNovasCount)}
                               </span>
@@ -709,8 +610,8 @@ export default function Layout() {
                                 }}
                                 collapsed={false}
                                 subItem
-                                inboxNovasCount={inboxNovasCount}
-                                saidaNovasCount={saidaNovasCount}
+                                inboxNovasCount={comunicacaoNovasCount}
+                                saidaNovasCount={0}
                               />
                             ))}
                           </ul>
@@ -754,9 +655,9 @@ export default function Layout() {
           />
         )}
 
-        <main className="layout-main flex-1 min-w-0 bg-[var(--c-bg)] transition-colors duration-200">
+        <main className={`layout-main flex-1 min-w-0 bg-[var(--c-bg)] transition-colors duration-200 ${nativeApp ? 'layout-main-native' : ''}`}>
           <div className="mx-auto w-full max-w-none px-3 sm:px-4 md:px-5 lg:px-6 xl:px-8 pb-6 md:pb-9">
-            <div className="topbar-shell flex flex-wrap items-center justify-between gap-4 md:gap-6 mb-5 md:mb-7 w-full py-4 md:py-5 min-h-[76px]">
+            <div className={`topbar-shell flex flex-wrap items-center justify-between gap-4 md:gap-6 mb-5 md:mb-7 w-full py-4 md:py-5 min-h-[76px] ${nativeApp ? 'topbar-shell-native' : ''}`}>
               <button
                 onClick={() => setMenuAberto(true)}
                 className="md:hidden inline-flex items-center justify-center h-11 w-11 rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] text-[var(--c-text)]"
@@ -769,7 +670,7 @@ export default function Layout() {
               <div className="min-w-0 flex-1">
                 <p className="brand-title truncate inline-flex items-center gap-2" style={{ fontSize: '1.1rem' }}>
                   <BsBuildingsFill size={16} />
-                  <span>Fluxy</span>
+                  <span>{brandLabel}</span>
                 </p>
                 <p className="text-xs text-[var(--c-muted)] truncate">
                   {user?.nome} · {perfilUpper || 'USUARIO'}
@@ -795,7 +696,9 @@ export default function Layout() {
                 <NotificacoesBell />
               </div>
             </div>
-            <Outlet />
+            <Suspense fallback={<AppRouteFallback />}>
+              <Outlet />
+            </Suspense>
           </div>
         </main>
       </div>
@@ -808,7 +711,7 @@ function isPathActive(currentPath, targetPath) {
 }
 
 function MenuItem({ to, label, icon: Icon, active, onSelect, collapsed, subItem = false, inboxNovasCount = 0, saidaNovasCount = 0 }) {
-  const mostrarBadgeInbox = to === '/conversas/entrada';
+  const mostrarBadgeInbox = to === '/comunicacao-interna' || to === '/conversas/entrada';
   const mostrarBadgeSaida = to === '/conversas/saida';
   const inboxCount = Number(inboxNovasCount || 0);
   const saidaCount = Number(saidaNovasCount || 0);

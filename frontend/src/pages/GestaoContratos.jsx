@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { HiArrowDownTray, HiArrowUpTray, HiPaperClip } from 'react-icons/hi2';
 import { useAuth } from '../contexts/AuthContext';
+import { canAccessContratos } from '../utils/acessoProduto';
 import { isGeoSetor } from '../utils/setor';
 import { API_URL, authHeaders, fileUrl } from '../services/api';
 import { getMinhasObras, getObras } from '../services/obras';
@@ -60,8 +61,7 @@ export default function GestaoContratos() {
   const isAdminGEO =
     user?.perfil === 'ADMIN' && setorTokens.some(isGeoSetor);
   const isSetorObra = setorTokens.includes('OBRA');
-  const podeAcessar =
-    user?.perfil === 'SUPERADMIN' || isAdminGEO || isSetorObra;
+  const podeAcessar = canAccessContratos(user);
 
   useEffect(() => {
     if (podeAcessar) {
@@ -472,15 +472,25 @@ export default function GestaoContratos() {
     return (
       <form
         onSubmit={aplicarFiltros}
-        className="bg-white rounded-xl shadow p-4 grid gap-3 md:grid-cols-4 items-end"
+        className="sol-surface-card solicitacoes-filtros app-filters-card rounded-xl p-4 md:p-5"
       >
-        <label className="text-sm text-gray-600 grid gap-1">
-          Obra
+        <div className="sol-filtros-head">
+          <div>
+            <p className="sol-filtros-title">Filtros</p>
+            <p className="sol-filtros-subtitle">
+              Refine por obra, codigo e referencia para localizar contratos mais rapido.
+            </p>
+          </div>
+        </div>
+
+        <div className="sol-filtros-grid">
+        <label className="sol-filter-field">
+          <span className="sol-filter-label">Obra</span>
           <select
             name="obra_id"
             value={filtros.obra_id}
             onChange={onChangeFiltro}
-            className="w-full border rounded p-2"
+            className="input w-full"
           >
             <option value="">Todas</option>
             {obras.map(obra => (
@@ -491,35 +501,36 @@ export default function GestaoContratos() {
           </select>
         </label>
 
-        <label className="text-sm text-gray-600 grid gap-1">
+        <label className="sol-filter-field">
           Código do contrato
           <input
             name="codigo"
             value={filtros.codigo}
             onChange={onChangeFiltro}
-            className="w-full border rounded p-2"
+            className="input w-full"
             placeholder="Ex: CTR-001"
           />
         </label>
 
-        <label className="text-sm text-gray-600 grid gap-1">
-          Ref. do Contrato
+        <label className="sol-filter-field">
+          <span className="sol-filter-label">Ref. do Contrato</span>
           <input
             name="ref"
             value={filtros.ref}
             onChange={onChangeFiltro}
-            className="w-full border rounded p-2"
+            className="input w-full"
             placeholder="Buscar por referencia"
           />
         </label>
 
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-end gap-2">
           <button type="submit" className="btn btn-outline">
             Buscar
           </button>
           <button type="button" className="btn btn-outline" onClick={limparFiltros}>
             Limpar
           </button>
+        </div>
         </div>
       </form>
     );
@@ -537,14 +548,16 @@ export default function GestaoContratos() {
 
   if (isSetorObra) {
     return (
-      <div className="space-y-6">
+      <div className="page solicitacoes-page">
         <h1 className="text-2xl font-semibold">Gestão de Contratos</h1>
+        <p className="page-subtitle">Acompanhamento dos contratos vinculados as suas obras.</p>
 
         {renderFiltros()}
 
-        <div className="bg-white rounded-xl shadow overflow-x-auto">
-          <table className="min-w-full text-sm">
-            <thead className="bg-gray-100">
+        <div className="card sol-surface-card app-table-shell">
+          <div className="table-wrapper">
+          <table className="table min-w-[900px]">
+            <thead>
               <tr>
                 <th className="text-left p-3">Contrato</th>
                 <th className="text-left p-3">Obra</th>
@@ -595,15 +608,17 @@ export default function GestaoContratos() {
           </table>
         </div>
       </div>
+      </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Gestão de Contratos</h1>
+    <div className="page solicitacoes-page">
+      <h1 className="page-title">Gestão de Contratos</h1>
+      <p className="page-subtitle">Cadastro, importacao e acompanhamento dos contratos por obra.</p>
 
       {user?.perfil === 'SUPERADMIN' && (
-        <div className="bg-white rounded-xl shadow p-4 flex flex-wrap items-center gap-3">
+        <div className="sol-surface-card rounded-xl p-3 md:p-4 flex flex-wrap items-center gap-3">
           <button
             type="button"
             className="btn btn-outline px-3"
@@ -629,7 +644,7 @@ export default function GestaoContratos() {
             />
           </label>
 
-          <span className="text-sm text-gray-600">
+          <span className="app-note">
             Modelo CSV (abre no Excel): Contrato, Código da obra, Ref. do Contrato, Descrição, Itens de Apropriação e Solicitado.
             Descrição e Itens de Apropriação podem ficar em branco.
           </span>
@@ -638,16 +653,25 @@ export default function GestaoContratos() {
 
       <form
         onSubmit={handleCriarContrato}
-        className="bg-white rounded-xl shadow p-4 space-y-4"
+        className="card sol-surface-card rounded-xl p-4 md:p-5 space-y-5"
       >
-        <div className="grid gap-3 md:grid-cols-2">
+        <div className="sol-filtros-head">
           <div>
-            <label className="text-sm text-gray-600">Obra</label>
+            <p className="sol-filtros-title">Novo contrato</p>
+            <p className="sol-filtros-subtitle">
+              Cadastre contrato, valor e documentos vinculados a obra correta.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(0,1.8fr)_minmax(220px,1fr)_minmax(220px,1fr)_minmax(220px,1fr)]">
+          <div>
+            <label className="grid gap-1 text-sm">Obra</label>
             <select
               name="obra_id"
               value={form.obra_id}
               onChange={onChangeForm}
-              className="w-full border rounded p-2"
+              className="input w-full"
             >
               <option value="">Selecione</option>
               {obras.map(obra => (
@@ -659,28 +683,28 @@ export default function GestaoContratos() {
           </div>
 
           <div>
-            <label className="text-sm text-gray-600">Código</label>
+            <label className="grid gap-1 text-sm">Código</label>
             <input
               name="codigo"
               value={form.codigo}
               onChange={onChangeForm}
-              className="w-full border rounded p-2"
+              className="input w-full"
               placeholder="Ex: CTR-001"
             />
           </div>
 
           <div>
-            <label className="text-sm text-gray-600">Ref. do Contrato</label>
+            <label className="grid gap-1 text-sm">Ref. do Contrato</label>
             <input
               name="ref_contrato"
               value={form.ref_contrato}
               onChange={onChangeForm}
-              className="w-full border rounded p-2"
+              className="input w-full"
             />
           </div>
 
           <div>
-            <label className="text-sm text-gray-600">Valor</label>
+            <label className="grid gap-1 text-sm">Valor</label>
             <input
               name="valor_total"
               value={valorDisplay}
@@ -689,37 +713,41 @@ export default function GestaoContratos() {
                 const numero = parseMoeda(valorDisplay);
                 setValorDisplay(numero ? formatMoeda(numero) : '');
               }}
-              className="w-full border rounded p-2"
+              className="input w-full"
             />
           </div>
 
         </div>
 
-        <div>
-          <label className="text-sm text-gray-600">Descrição</label>
+        <div className="grid gap-3 xl:grid-cols-2">
+          <div>
+          <label className="grid gap-1 text-sm">Descrição</label>
           <textarea
             name="descricao"
             value={form.descricao}
             onChange={onChangeForm}
-            className="w-full border rounded p-2"
+            className="input w-full"
             rows="3"
           />
-        </div>
+          </div>
 
-        <div>
-          <label className="text-sm text-gray-600">Itens de Apropriação</label>
+          <div>
+          <label className="grid gap-1 text-sm">Itens de Apropriação</label>
           <textarea
             name="itens_apropriacao"
             value={form.itens_apropriacao}
             onChange={onChangeForm}
-            className="w-full border rounded p-2"
+            className="input w-full"
             rows="3"
             placeholder="Descreva os itens de apropriação do contrato"
           />
+          </div>
+
         </div>
 
-        <div>
-          <label className="text-sm text-gray-600">Anexos do contrato</label>
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-end">
+          <div>
+          <label className="grid gap-1 text-sm">Anexos do contrato</label>
           <div className="flex items-center gap-2 flex-wrap mt-1">
             <label className="btn btn-outline inline-flex items-center gap-2 cursor-pointer">
               <HiPaperClip className="w-4 h-4" />
@@ -731,7 +759,7 @@ export default function GestaoContratos() {
                 onChange={e => setFiles(Array.from(e.target.files || []))}
               />
             </label>
-            <span className="text-xs text-[var(--c-muted)]">
+            <span className="app-note">
               {files.length > 0
                 ? `${files.length} arquivo(s) selecionado(s)`
                 : 'Nenhum arquivo selecionado'}
@@ -757,22 +785,26 @@ export default function GestaoContratos() {
               ))}
             </div>
           )}
-        </div>
+          </div>
 
-        <button
-          type="submit"
-          disabled={salvando}
-          className="bg-blue-600 text-white px-4 py-2 rounded"
-        >
-          {salvando ? 'Salvando...' : 'Criar contrato'}
-        </button>
+          <div className="flex justify-start xl:justify-end">
+            <button
+              type="submit"
+              disabled={salvando}
+              className="btn btn-primary w-full md:w-auto md:px-5"
+            >
+              {salvando ? 'Salvando...' : 'Criar contrato'}
+            </button>
+          </div>
+        </div>
       </form>
 
       {renderFiltros()}
 
-      <div className="bg-white rounded-xl shadow overflow-x-auto">
-        <table className="min-w-full text-sm">
-          <thead className="bg-gray-100">
+      <div className="card sol-surface-card app-table-shell">
+        <div className="table-wrapper">
+        <table className="table min-w-[1400px]">
+          <thead>
             <tr>
               <th className="text-left p-3">Contrato</th>
               <th className="text-left p-3">Obra</th>
@@ -969,11 +1001,12 @@ export default function GestaoContratos() {
             ))}
           </tbody>
         </table>
+        </div>
       </div>
 
       {modalAnexos && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow p-6 w-full max-w-lg space-y-4">
+          <div className="card p-6 w-full max-w-lg space-y-4">
             <div className="flex justify-between items-center">
               <h2 className="text-lg font-semibold">
                 Anexos do contrato {modalAnexos.codigo}

@@ -2,44 +2,65 @@ import { useNavigate } from 'react-router-dom';
 import StatusBadge from '../StatusBadge';
 
 export default function SolicitacaoCard({ solicitacao }) {
-
   const navigate = useNavigate();
+
+  const codigo = solicitacao.codigo || `#${solicitacao.id}`;
+  const obra = solicitacao.obra?.nome || '-';
+  const descricao = solicitacao.descricao || '';
+  const area = solicitacao.area_responsavel || '-';
+  const responsavel = solicitacao.responsavel_atual || 'Não atribuído';
 
   return (
     <div
+      role="button"
+      tabIndex={0}
       onClick={() => navigate(`/solicitacoes/${solicitacao.id}`)}
-      className="bg-white p-4 rounded-xl shadow hover:shadow-md transition cursor-pointer"
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') navigate(`/solicitacoes/${solicitacao.id}`);
+      }}
+      className="card cursor-pointer transition-shadow hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--c-primary)]"
     >
-
-      {/* TOPO */}
-      <div className="flex justify-between items-center mb-2">
-        <strong>{solicitacao.codigo}</strong>
+      {/* Topo */}
+      <div className="flex items-start justify-between gap-3">
+        <span className="text-sm font-bold" style={{ color: 'var(--c-text)' }}>
+          {codigo}
+        </span>
         <StatusBadge status={solicitacao.status_global} />
       </div>
 
-      {/* OBRA */}
-      <p className="text-sm text-gray-500">
-        Obra: {solicitacao.obra?.nome || '-'}
+      {/* Obra */}
+      <p className="mt-2 text-xs" style={{ color: 'var(--c-muted)' }}>
+        Obra: <span className="font-medium" style={{ color: 'var(--c-text)' }}>{obra}</span>
       </p>
 
-      {/* DESCRIÇÃO */}
-      <p className="mt-2 text-gray-800">
-        {solicitacao.descricao}
-      </p>
+      {/* Descrição */}
+      {descricao && (
+        <p
+          className="mt-2 line-clamp-2 text-sm"
+          style={{ color: 'var(--c-text)' }}
+        >
+          {descricao}
+        </p>
+      )}
 
-      {/* RODAPÉ */}
-      <div className="mt-3 flex justify-between text-sm text-gray-600">
-
+      {/* Rodapé */}
+      <div
+        className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t pt-3 text-xs"
+        style={{ borderColor: 'var(--ui-border)', color: 'var(--c-muted)' }}
+      >
         <span>
-          Área: {solicitacao.area_responsavel}
+          Área:{' '}
+          <span className="font-medium" style={{ color: 'var(--c-text)' }}>
+            {area}
+          </span>
         </span>
-
         <span>
-          Resp: {solicitacao.responsavel_atual || 'Não atribuído'}
+          Resp.:{' '}
+          <span className="font-medium" style={{ color: 'var(--c-text)' }}>
+            {responsavel}
+          </span>
         </span>
-
       </div>
-
     </div>
   );
 }

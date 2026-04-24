@@ -2,21 +2,19 @@ import { useEffect, useMemo, useState } from 'react';
 import { getSetores } from '../services/setores';
 import { getTiposSolicitacao } from '../services/tiposSolicitacao';
 import {
-  getTiposCompartilhadosEntreSetores,
-  salvarTiposCompartilhadosEntreSetores
+  getTiposCompartilhadosSetor,
+  salvarTiposCompartilhadosSetor
 } from '../services/configuracoesSistema';
 
 function normalizarSetorToken(setor) {
-  return String(setor?.codigo || setor?.nome || setor?.id || '')
-    .trim()
-    .toUpperCase();
+  return String(setor?.codigo || setor?.nome || setor?.id || '').trim().toUpperCase();
 }
 
 export default function TiposCompartilhadosSetor() {
   const [setores, setSetores] = useState([]);
   const [tipos, setTipos] = useState([]);
   const [regras, setRegras] = useState({});
-  const [setorOrigemSelecionado, setSetorOrigemSelecionado] = useState('');
+  const [setorOrigem, setSetorOrigem] = useState('');
   const [loading, setLoading] = useState(true);
   const [salvando, setSalvando] = useState(false);
 
@@ -27,30 +25,21 @@ export default function TiposCompartilhadosSetor() {
         const [setoresData, tiposData, configuracao] = await Promise.all([
           getSetores(),
           getTiposSolicitacao(),
-          getTiposCompartilhadosEntreSetores()
+          getTiposCompartilhadosSetor()
         ]);
-
         const setoresAtivos = Array.isArray(setoresData)
-          ? setoresData.filter((setor) => setor?.ativo !== false)
+          ? setoresData.filter(item => item?.ativo !== false)
           : [];
-        const setoresOrdenados = [...setoresAtivos].sort((a, b) =>
+        const ordenados = setoresAtivos.sort((a, b) =>
           String(a?.nome || '').localeCompare(String(b?.nome || ''), 'pt-BR')
         );
-
-        setSetores(setoresOrdenados);
+        setSetores(ordenados);
         setTipos(Array.isArray(tiposData) ? tiposData : []);
-        setRegras(
-          configuracao?.regras && typeof configuracao.regras === 'object'
-            ? configuracao.regras
-            : {}
-        );
-
-        if (setoresOrdenados.length > 0) {
-          setSetorOrigemSelecionado(normalizarSetorToken(setoresOrdenados[0]));
-        }
+        setRegras(configuracao?.regras && typeof configuracao.regras === 'object' ? configuracao.regras : {});
+        if (ordenados.length > 0) setSetorOrigem(normalizarSetorToken(ordenados[0]));
       } catch (error) {
         console.error(error);
-        alert('Erro ao carregar configuracoes de tipos compartilhados.');
+        alert('Erro ao carregar configuracao de tipos compartilhados.');
       } finally {
         setLoading(false);
       }
@@ -59,154 +48,112 @@ export default function TiposCompartilhadosSetor() {
     carregar();
   }, []);
 
-  const tiposOrdenados = useMemo(() => {
-    return [...tipos].sort((a, b) =>
-      String(a?.nome || '').localeCompare(String(b?.nome || ''), 'pt-BR')
-    );
-  }, [tipos]);
+  const tiposOrdenados = useMemo(() => (
+    [...tipos].sort((a, b) => String(a?.nome || '').localeCompare(String(b?.nome || ''), 'pt-BR'))
+  ), [tipos]);
 
-  const regraAtual = useMemo(() => {
-    const regra = regras?.[setorOrigemSelecionado];
-    return regra && typeof regra === 'object' ? regra : {};
-  }, [regras, setorOrigemSelecionado]);
+  const regraAtual = regras?.[setorOrigem] && typeof regras[setorOrigem] === 'object'
+    ? regras[setorOrigem]
+    : {};
 
-  function toggleSetorCompartilhado(tipoId, setorToken) {
+  function alternar(tipoId, setorToken) {
     const chaveTipo = String(tipoId);
     const token = String(setorToken || '').trim().toUpperCase();
 
-    setRegras((prev) => {
-      const regraOrigem = prev?.[setorOrigemSelecionado] && typeof prev[setorOrigemSelecionado] === 'object'
-        ? { ...prev[setorOrigemSelecionado] }
+    setRegras(prev => {
+      const regraOrigem = prev?.[setorOrigem] && typeof prev[setorOrigem] === 'object'
+        ? { ...prev[setorOrigem] }
         : {};
-      const listaAtual = Array.isArray(regraOrigem[chaveTipo]) ? regraOrigem[chaveTipo] : [];
-      const set = new Set(listaAtual);
+      const selecionados = new Set(Array.isArray(regraOrigem[chaveTipo]) ? regraOrigem[chaveTipo] : []);
 
-      if (set.has(token)) {
-        set.delete(token);
-      } else {
-        set.add(token);
-      }
+      if (selecionados.has(token)) selecionados.delete(token);
+      else selecionados.add(token);
 
-      const proximaLista = Array.from(set).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+      const novaLista = Array.from(selecionados).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+      if (novaLista.length) regraOrigem[chaveTipo] = novaLista;
+      else delete regraOrigem[chaveTipo];
 
-      if (proximaLista.length === 0) {
-        delete regraOrigem[chaveTipo];
-      } else {
-        regraOrigem[chaveTipo] = proximaLista;
-      }
-
-      const proximoEstado = { ...prev };
-      if (Object.keys(regraOrigem).length === 0) {
-        delete proximoEstado[setorOrigemSelecionado];
-      } else {
-        proximoEstado[setorOrigemSelecionado] = regraOrigem;
-      }
-
-      return proximoEstado;
+      const next = { ...prev };
+      if (Object.keys(regraOrigem).length) next[setorOrigem] = regraOrigem;
+      else delete next[setorOrigem];
+      return next;
     });
   }
 
   async function salvar() {
     try {
       setSalvando(true);
-      await salvarTiposCompartilhadosEntreSetores({ regras });
-      alert('Configuracao salva.');
+      await salvarTiposCompartilhadosSetor({ regras });
+      alert('Configuracao salva com sucesso.');
     } catch (error) {
       console.error(error);
-      alert('Erro ao salvar configuracao de tipos compartilhados.');
+      alert(error?.message || 'Erro ao salvar configuracao.');
     } finally {
       setSalvando(false);
     }
   }
 
-  if (loading) {
-    return <p>Carregando configuracoes...</p>;
-  }
+  if (loading) return <p>Carregando configuracoes...</p>;
 
   return (
-    <div className="space-y-6">
+    <div className="page max-w-6xl mx-auto space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Tipos Compartilhados entre Setores</h1>
-        <p className="text-sm text-gray-600 mt-1">
-          Defina qual setor de origem compartilha determinados tipos de solicitacao com outros setores, sem transferir a posse do fluxo.
+        <h1 className="page-title">Tipos Compartilhados entre Setores</h1>
+        <p className="page-subtitle">
+          Permite que outros setores enxerguem tipos especificos sem alterar a area responsavel da solicitacao.
         </p>
       </div>
 
-      <div className="bg-white p-6 rounded-xl shadow space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-[minmax(260px,340px)_1fr] gap-4 items-end">
-          <label className="grid gap-1 text-sm">
-            Setor que compartilha a solicitacao
-            <select
-              className="input"
-              value={setorOrigemSelecionado}
-              onChange={(event) => setSetorOrigemSelecionado(event.target.value)}
-            >
-              {setores.map((setor) => {
-                const token = normalizarSetorToken(setor);
-                return (
-                  <option key={setor.id} value={token}>
-                    {setor.nome} ({token})
-                  </option>
-                );
-              })}
-            </select>
-          </label>
+      <div className="card space-y-5">
+        <label className="form-field max-w-md">
+          <span className="form-label">Setor de origem</span>
+          <select className="input" value={setorOrigem} onChange={event => setSetorOrigem(event.target.value)}>
+            {setores.map(setor => {
+              const token = normalizarSetorToken(setor);
+              return (
+                <option key={setor.id} value={token}>
+                  {setor.nome} ({token})
+                </option>
+              );
+            })}
+          </select>
+        </label>
 
-          <div className="text-sm text-gray-600">
-            Exemplo: se o setor de origem for `DEPARTAMENTO_PESSOAL` e o tipo for `ADMISSAO`, voce pode marcar `SESMT` como setor compartilhado. Assim, novas solicitacoes desse tipo criadas para esse setor tambem ficam visiveis ao `SESMT`.
-          </div>
-        </div>
-
-        <div className="border rounded-lg divide-y">
-          {tiposOrdenados.map((tipo) => {
-            const setoresSelecionados = new Set(
-              Array.isArray(regraAtual?.[String(tipo.id)]) ? regraAtual[String(tipo.id)] : []
-            );
+        <div className="divide-y divide-[var(--c-border)] rounded-2xl border border-[var(--c-border)] overflow-hidden">
+          {tiposOrdenados.map(tipo => {
+            const selecionados = new Set(Array.isArray(regraAtual?.[String(tipo.id)]) ? regraAtual[String(tipo.id)] : []);
 
             return (
-              <div
-                key={tipo.id}
-                className="p-4 grid grid-cols-1 lg:grid-cols-[minmax(220px,280px)_1fr] gap-4"
-              >
+              <section key={tipo.id} className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-4 bg-[var(--c-card)] p-4">
                 <div>
-                  <h2 className="font-medium">{tipo.nome}</h2>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Se nenhum setor for marcado, esse tipo segue sem compartilhamento extra para o setor de origem selecionado.
-                  </p>
+                  <h2 className="font-semibold text-[var(--c-text)]">{tipo.nome}</h2>
+                  <p className="text-xs text-[var(--c-muted)]">Marque os setores adicionais que poderao visualizar.</p>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
                   {setores
-                    .filter((setor) => normalizarSetorToken(setor) !== setorOrigemSelecionado)
-                    .map((setor) => {
+                    .filter(setor => normalizarSetorToken(setor) !== setorOrigem)
+                    .map(setor => {
                       const token = normalizarSetorToken(setor);
                       return (
-                        <label
-                          key={`${tipo.id}-${setor.id}`}
-                          className="flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                        >
+                        <label key={`${tipo.id}-${setor.id}`} className="flex items-center gap-2 rounded-xl border border-[var(--c-border)] px-3 py-2 text-sm">
                           <input
                             type="checkbox"
-                            checked={setoresSelecionados.has(token)}
-                            onChange={() => toggleSetorCompartilhado(tipo.id, token)}
+                            checked={selecionados.has(token)}
+                            onChange={() => alternar(tipo.id, token)}
                           />
                           <span>{setor.nome} ({token})</span>
                         </label>
                       );
                     })}
                 </div>
-              </div>
+              </section>
             );
           })}
         </div>
 
         <div className="flex justify-end">
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={salvar}
-            disabled={salvando}
-          >
+          <button type="button" className="btn btn-primary" onClick={salvar} disabled={salvando}>
             {salvando ? 'Salvando...' : 'Salvar configuracao'}
           </button>
         </div>

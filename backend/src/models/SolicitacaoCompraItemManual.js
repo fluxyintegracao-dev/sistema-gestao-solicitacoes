@@ -13,7 +13,7 @@ module.exports = (sequelize, DataTypes) => {
       },
       apropriacao_id: {
         type: DataTypes.INTEGER,
-        allowNull: false
+        allowNull: true
       },
       nome_manual: {
         type: DataTypes.STRING,
@@ -21,7 +21,7 @@ module.exports = (sequelize, DataTypes) => {
       },
       unidade_sigla_manual: {
         type: DataTypes.STRING,
-        allowNull: false
+        allowNull: true
       },
       quantidade: {
         type: DataTypes.DECIMAL(12, 2),
@@ -29,7 +29,7 @@ module.exports = (sequelize, DataTypes) => {
       },
       especificacao: {
         type: DataTypes.TEXT,
-        allowNull: false
+        allowNull: true
       },
       necessario_para: {
         type: DataTypes.DATEONLY,

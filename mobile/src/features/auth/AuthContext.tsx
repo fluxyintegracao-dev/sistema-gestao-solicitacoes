@@ -2,9 +2,9 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { AppState } from 'react-native';
 import { clearStoredSession, loadStoredSession, saveStoredSession } from './session-storage';
 import { clearAccessToken, setAccessToken } from './token-store';
-import { heartbeatRequest, loginRequest } from '../../services/api/auth';
+import { heartbeatRequest, loginMfaRequest, loginRequest } from '../../services/api/auth';
 import { ApiError, setUnauthorizedHandler } from '../../services/api/client';
-import type { AuthSession } from '../../services/api/types';
+import type { AuthMfaChallenge, AuthSession } from '../../services/api/types';
 
 type AuthStatus = 'bootstrapping' | 'authenticated' | 'unauthenticated';
 
@@ -13,15 +13,29 @@ interface SignInPayload {
   senha: string;
 }
 
+interface VerifyMfaPayload {
+  codigo: string;
+}
+
+interface MfaChallengeState {
+  challengeToken: string;
+  user: AuthMfaChallenge['user'];
+}
+
 interface AuthContextValue {
   session: AuthSession | null;
   user: AuthSession['user'] | null;
   status: AuthStatus;
   isAuthenticated: boolean;
   authError: string | null;
+  mfaChallenge: MfaChallengeState | null;
   hasModule: (moduleCode: string) => boolean;
   clearAuthError: () => void;
   signIn: (payload: SignInPayload) => Promise<void>;
+  verifyMfa: (payload: VerifyMfaPayload) => Promise<void>;
+  cancelMfa: () => void;
+  updateUser: (patch: Partial<AuthSession['user']>) => Promise<void>;
+  applySessionData: (nextSession: AuthSession) => Promise<void>;
   signOut: (options?: { expired?: boolean }) => Promise<void>;
 }
 
@@ -76,10 +90,15 @@ function normalizeSession(session: AuthSession | null) {
   } satisfies AuthSession;
 }
 
+function isMfaChallengeResponse(response: AuthSession | AuthMfaChallenge): response is AuthMfaChallenge {
+  return Boolean((response as AuthMfaChallenge)?.mfa_required);
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<AuthSession | null>(null);
   const [status, setStatus] = useState<AuthStatus>('bootstrapping');
   const [authError, setAuthError] = useState<string | null>(null);
+  const [mfaChallenge, setMfaChallenge] = useState<MfaChallengeState | null>(null);
   const heartbeatInFlightRef = useRef(false);
   const lastHeartbeatAtRef = useRef(0);
 
@@ -89,8 +108,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     clearAccessToken();
     await clearStoredSession();
     setSession(null);
+    setMfaChallenge(null);
     setStatus('unauthenticated');
     setAuthError(expired ? 'Sua sessao expirou. Entre novamente.' : null);
+  }, []);
+
+  const applySessionData = useCallback(async (nextSessionRaw: AuthSession) => {
+    const nextSession = normalizeSession(nextSessionRaw);
+    lastHeartbeatAtRef.current = 0;
+    setAccessToken(nextSession?.token || null);
+    if (nextSession) {
+      await saveStoredSession(nextSession);
+    }
+    setSession(nextSession);
+    setMfaChallenge(null);
+    setStatus('authenticated');
   }, []);
 
   useEffect(() => {
@@ -190,18 +222,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setAuthError(null);
 
     try {
-      const nextSession = normalizeSession(await loginRequest({ email, senha }));
-      lastHeartbeatAtRef.current = 0;
-      setAccessToken(nextSession?.token || null);
-      if (nextSession) {
-        await saveStoredSession(nextSession);
+      const response = await loginRequest({ email, senha });
+
+      if (isMfaChallengeResponse(response)) {
+        lastHeartbeatAtRef.current = 0;
+        clearAccessToken();
+        await clearStoredSession();
+        setSession(null);
+        setMfaChallenge({
+          challengeToken: response.challenge_token,
+          user: response.user
+        });
+        setStatus('unauthenticated');
+        return;
       }
-      setSession(nextSession);
-      setStatus('authenticated');
+
+      await applySessionData(response);
     } catch (error) {
       clearAccessToken();
       await clearStoredSession();
       setSession(null);
+      setMfaChallenge(null);
       setStatus('unauthenticated');
 
       if (error instanceof ApiError) {
@@ -213,12 +254,64 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const verifyMfa = useCallback(async ({ codigo }: VerifyMfaPayload) => {
+    if (!mfaChallenge?.challengeToken) {
+      setAuthError('O desafio MFA expirou. Entre novamente com email e senha.');
+      return;
+    }
+
+    setAuthError(null);
+
+    try {
+      const nextSession = await loginMfaRequest({
+        challenge_token: mfaChallenge.challengeToken,
+        codigo
+      });
+      await applySessionData(nextSession);
+    } catch (error) {
+      if (error instanceof ApiError) {
+        setAuthError(error.message || 'Nao foi possivel validar o codigo MFA.');
+        return;
+      }
+
+      setAuthError('Nao foi possivel validar o codigo MFA. Tente novamente.');
+    }
+  }, [mfaChallenge]);
+
+  const cancelMfa = useCallback(() => {
+    setMfaChallenge(null);
+    setAuthError(null);
+  }, []);
+
+  const updateUser = useCallback(async (patch: Partial<AuthSession['user']>) => {
+    setSession((current) => {
+      if (!current?.user) {
+        return current;
+      }
+
+      const nextSession = normalizeSession({
+        ...current,
+        user: {
+          ...current.user,
+          ...patch
+        }
+      });
+
+      if (nextSession) {
+        void saveStoredSession(nextSession);
+      }
+
+      return nextSession;
+    });
+  }, []);
+
   const value = useMemo<AuthContextValue>(() => ({
     session,
     user: session?.user || null,
     status,
     isAuthenticated: status === 'authenticated',
     authError,
+    mfaChallenge,
     hasModule: (moduleCode: string) => {
       const normalizedKey = normalizeToken(moduleCode);
       const modules = session?.user?.modulos_habilitados || {};
@@ -233,8 +326,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     },
     clearAuthError: () => setAuthError(null),
     signIn,
+    verifyMfa,
+    cancelMfa,
+    updateUser,
+    applySessionData,
     signOut
-  }), [authError, session, signIn, signOut, status]);
+  }), [applySessionData, authError, cancelMfa, mfaChallenge, session, signIn, signOut, status, updateUser, verifyMfa]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

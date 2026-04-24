@@ -41,6 +41,11 @@ module.exports = (sequelize, DataTypes) => {
       defaultValue: true
     },
 
+    ultimo_acesso_em: {
+      type: DataTypes.DATE,
+      allowNull: true
+    },
+
     pode_criar_solicitacao_compra: {
       type: DataTypes.BOOLEAN,
       defaultValue: false,
@@ -51,6 +56,27 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.BOOLEAN,
       defaultValue: false,
       allowNull: false
+    },
+
+    mfa_totp_enabled: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+      allowNull: false
+    },
+
+    mfa_totp_secret: {
+      type: DataTypes.TEXT,
+      allowNull: true
+    },
+
+    mfa_totp_temp_secret: {
+      type: DataTypes.TEXT,
+      allowNull: true
+    },
+
+    mfa_totp_last_verified_at: {
+      type: DataTypes.DATE,
+      allowNull: true
     }
   }, {
     tableName: 'users',

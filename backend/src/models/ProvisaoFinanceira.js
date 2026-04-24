@@ -1,7 +1,13 @@
-module.exports = (sequelize, DataTypes) => {
-  return sequelize.define('ProvisaoFinanceira', {
+module.exports = (sequelize, DataTypes) => sequelize.define(
+  'ProvisaoFinanceira',
+  {
+    id: {
+      type: DataTypes.INTEGER,
+      primaryKey: true,
+      autoIncrement: true
+    },
     codigo: {
-      type: DataTypes.STRING,
+      type: DataTypes.STRING(80),
       allowNull: false,
       unique: true
     },
@@ -22,7 +28,7 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: true
     },
     fornecedor_texto: {
-      type: DataTypes.STRING,
+      type: DataTypes.STRING(180),
       allowNull: true
     },
     data_prevista_desembolso: {
@@ -38,12 +44,12 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: true
     },
     status: {
-      type: DataTypes.STRING,
+      type: DataTypes.STRING(30),
       allowNull: false,
       defaultValue: 'previsto'
     },
     prioridade: {
-      type: DataTypes.STRING,
+      type: DataTypes.STRING(20),
       allowNull: true
     },
     usuario_criacao_id: {
@@ -74,9 +80,10 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.DATE,
       allowNull: true
     }
-  }, {
+  },
+  {
     tableName: 'provisoes_financeiras',
     timestamps: true,
     paranoid: true
-  });
-};
+  }
+);

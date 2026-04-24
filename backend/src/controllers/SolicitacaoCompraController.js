@@ -7,13 +7,18 @@ const {
   Historico,
   Insumo,
   Obra,
+  Parceiro,
   FornecedorCompra,
+  PedidoCompra,
+  PedidoCompraItem,
   Setor,
   Solicitacao,
   SolicitacaoCompra,
   SolicitacaoCompraFornecedor,
   SolicitacaoCompraItem,
+  SolicitacaoCompraItemApropriacao,
   SolicitacaoCompraItemManual,
+  SolicitacaoCompraItemManualApropriacao,
   SolicitacaoCompraRespostaItem,
   StatusArea,
   TipoSolicitacao,
@@ -23,6 +28,8 @@ const {
 const { getPresignedUrl, uploadToS3 } = require('../services/s3');
 const gerarCodigoSolicitacao = require('../services/solicitacao/gerarCodigo');
 const { normalizeOriginalName } = require('../utils/fileName');
+const { findSetorByCapability, resolveSetorPersistenciaValue, userHasSetorCapability } = require('../services/setorCapabilityService');
+const { normalizeTipoSolicitacaoBehavior, normalizeTipoSolicitacaoCodigo } = require('../services/tipoSolicitacaoBehaviorService');
 const {
   gerarTokenCotacao,
   montarUrlCotacaoPublica,
@@ -30,16 +37,15 @@ const {
   obterItensCotaveis,
   registrarLogSolicitacaoCompra
 } = require('../services/comprasCotacao');
-
-const PDF_LOGO_PATH = path.resolve(
-  __dirname,
-  '..',
-  '..',
-  '..',
-  'frontend',
-  'public',
-  'CSC_logo_colorida.png'
-);
+const { gerarPedidosDosVencedores } = require('../services/pedidoCompraService');
+const {
+  construirResumoApropriacoes,
+  extrairRateiosPayload,
+  parseQuantidade,
+  validarRateiosPayload
+} = require('../services/compraApropriacao');
+const { getRuntimeInstallationConfig } = require('../services/runtimeConfig');
+const { isBusinessAdmin } = require('../services/authorizationService');
 const PDF_PAGE = {
   left: 20,
   top: 12,
@@ -48,6 +54,44 @@ const PDF_PAGE = {
 };
 const PDF_OBSERVACOES_FIXAS =
   'Solicitacoes de insumos com informacoes incompletas, incorretas ou sem a devida clareza para viabilizar a compra nao serao processadas. Leia atentamente as orientacoes destacadas em vermelho nas celulas de preenchimento. Em caso de duvida, solicite apoio antes de enviar e nao encaminhe solicitacoes com erros ou omissoes, pois isso compromete o fluxo de trabalho dos demais setores da empresa. Lembre-se: os outros setores nao estao presentes na obra e dependem exclusivamente da precisao das informacoes fornecidas. Seja claro, objetivo e tecnicamente preciso no preenchimento.';
+const APROPRIACAO_ATTRIBUTES = ['id', 'codigo', 'descricao', 'obra_id'];
+
+function buildIncludeRateiosItem() {
+  return {
+    model: SolicitacaoCompraItemApropriacao,
+    as: 'apropriacoes',
+    include: [
+      { model: Apropriacao, as: 'apropriacao', attributes: APROPRIACAO_ATTRIBUTES }
+    ]
+  };
+}
+
+function buildIncludeRateiosItemManual() {
+  return {
+    model: SolicitacaoCompraItemManualApropriacao,
+    as: 'apropriacoes',
+    include: [
+      { model: Apropriacao, as: 'apropriacao', attributes: APROPRIACAO_ATTRIBUTES }
+    ]
+  };
+}
+
+function getPdfLogoPath() {
+  const config = getRuntimeInstallationConfig();
+  const logoUrl = String(config?.pdf_logo_url || config?.logo_url || '').trim();
+
+  if (!logoUrl || /^https?:\/\//i.test(logoUrl)) {
+    return null;
+  }
+
+  const normalized = logoUrl.replace(/^\/+/, '');
+  const candidates = [
+    path.resolve(__dirname, '..', '..', '..', 'frontend', 'public', normalized),
+    path.resolve(__dirname, '..', '..', '..', normalized)
+  ];
+
+  return candidates.find((candidate) => fs.existsSync(candidate)) || null;
+}
 
 function normalizeText(value) {
   return String(value || '')
@@ -250,8 +294,7 @@ async function validarAcesso(req, res) {
   const perfil = normalizeText(usuario.perfil);
   const tokens = await obterTokensSetorUsuario(usuario);
   const possuiPermissao =
-    perfil === 'SUPERADMIN' ||
-    perfil === 'ADMIN' ||
+    isBusinessAdmin(usuario) ||
     Boolean(usuario.pode_criar_solicitacao_compra) ||
     tokens.has('COMPRAS') ||
     tokens.has('GEO') ||
@@ -289,36 +332,22 @@ async function obterTokensSetorUsuario(usuario) {
 }
 
 async function validarAcessoIntegracao(usuario) {
-  const tokens = await obterTokensSetorUsuario(usuario);
-  return (
-    tokens.has('SUPERADMIN') ||
-    tokens.has('ADMIN') ||
-    tokens.has('GEO') ||
-    tokens.has('GERENCIA DE PROCESSOS') ||
-    tokens.has('GESTAO DE PROCESSOS') ||
-    tokens.has('GERENCIA_PROCESSOS') ||
-    tokens.has('GESTAO_PROCESSOS')
-  );
+  return isBusinessAdmin(usuario) || userHasSetorCapability(usuario, 'eh_setor_geo');
 }
 
 async function validarAcessoCompras(usuario) {
-  const tokens = await obterTokensSetorUsuario(usuario);
-  return (
-    tokens.has('SUPERADMIN') ||
-    tokens.has('ADMIN') ||
-    tokens.has('COMPRAS')
-  );
+  return isBusinessAdmin(usuario) || userHasSetorCapability(usuario, 'eh_setor_compras');
 }
 
 async function buscarTipoSolicitacaoCompra(transaction) {
   const tipos = await TipoSolicitacao.findAll({
-    attributes: ['id', 'nome', 'ativo'],
+    attributes: ['id', 'nome', 'ativo', 'codigo_interno', 'comportamento'],
     transaction
   });
 
   const tipoExistente = tipos.find((tipo) => {
-    const nome = normalizeText(tipo.nome);
-    return nome === 'SOLICITACAO DE COMPRA' || nome === 'COMPRAS';
+    const codigoInterno = normalizeTipoSolicitacaoCodigo(tipo.codigo_interno, tipo.nome);
+    return codigoInterno === 'SOLICITACAO_DE_COMPRA' || codigoInterno === 'COMPRAS';
   });
 
   if (tipoExistente) {
@@ -331,6 +360,8 @@ async function buscarTipoSolicitacaoCompra(transaction) {
   return TipoSolicitacao.create(
     {
       nome: 'Solicitação de Compra',
+      codigo_interno: 'SOLICITACAO_DE_COMPRA',
+      comportamento: JSON.stringify(normalizeTipoSolicitacaoBehavior({ codigo_interno: 'SOLICITACAO_DE_COMPRA' })),
       ativo: true
     },
     { transaction }
@@ -338,26 +369,13 @@ async function buscarTipoSolicitacaoCompra(transaction) {
 }
 
 async function buscarSetorDestino(transaction) {
-  const setores = await Setor.findAll({
+  const setor = await findSetorByCapability('eh_setor_geo', {
     attributes: ['id', 'codigo', 'nome'],
+    onlyActive: false,
     transaction
   });
 
-  const setor = setores.find((item) => {
-    const codigo = normalizeText(item.codigo);
-    const nome = normalizeText(item.nome);
-
-    return (
-      codigo === 'GEO' ||
-      codigo === 'GERENCIA_PROCESSOS' ||
-      codigo === 'GESTAO_PROCESSOS' ||
-      nome === 'GEO' ||
-      nome === 'GERENCIA DE PROCESSOS' ||
-      nome === 'GESTAO DE PROCESSOS'
-    );
-  });
-
-  return setor ? (setor.codigo || setor.nome) : 'GEO';
+  return resolveSetorPersistenciaValue(setor, 'GEO');
 }
 
 async function carregarSolicitacaoCompra(id) {
@@ -372,14 +390,16 @@ async function carregarSolicitacaoCompra(id) {
         include: [
           { model: Insumo, as: 'insumo', attributes: ['id', 'nome', 'codigo'] },
           { model: Unidade, as: 'unidade', attributes: ['id', 'nome', 'sigla'] },
-          { model: Apropriacao, as: 'apropriacao', attributes: ['id', 'codigo', 'descricao', 'obra_id'] }
+          { model: Apropriacao, as: 'apropriacao', attributes: APROPRIACAO_ATTRIBUTES },
+          buildIncludeRateiosItem()
         ]
       },
       {
         model: SolicitacaoCompraItemManual,
         as: 'itensManuais',
         include: [
-          { model: Apropriacao, as: 'apropriacao', attributes: ['id', 'codigo', 'descricao', 'obra_id'] }
+          { model: Apropriacao, as: 'apropriacao', attributes: APROPRIACAO_ATTRIBUTES },
+          buildIncludeRateiosItemManual()
         ]
       },
       {
@@ -403,13 +423,142 @@ async function carregarSolicitacaoCompra(id) {
               'preco',
               'prazo',
               'observacao',
+              'quantidade_minima_item',
               'vencedor'
             ]
+          }
+        ]
+      },
+      {
+        model: PedidoCompra,
+        as: 'pedidos',
+        include: [
+          {
+            model: FornecedorCompra,
+            as: 'fornecedor',
+            attributes: ['id', 'nome', 'email', 'whatsapp', 'contato', 'ativo']
+          },
+          {
+            model: PedidoCompraItem,
+            as: 'itens',
+            attributes: ['id', 'valor_total', 'removido']
           }
         ]
       }
     ]
   });
+}
+
+async function carregarMapaApropriacoes({ obraId, itens, transaction }) {
+  const apropriacaoIds = Array.from(
+    new Set(
+      (Array.isArray(itens) ? itens : [])
+        .flatMap((item) => extrairRateiosPayload(item).map((rateio) => Number(rateio.apropriacao_id || 0)))
+        .filter((id) => id > 0)
+    )
+  );
+
+  if (!apropriacaoIds.length) {
+    return new Map();
+  }
+
+  const apropriacoes = await Apropriacao.findAll({
+    where: {
+      id: {
+        [Op.in]: apropriacaoIds
+      }
+    },
+    attributes: APROPRIACAO_ATTRIBUTES,
+    transaction
+  });
+
+  const mapa = new Map();
+  apropriacoes.forEach((apropriacao) => {
+    if (Number(apropriacao.obra_id) === Number(obraId)) {
+      mapa.set(Number(apropriacao.id), apropriacao);
+    }
+  });
+
+  return mapa;
+}
+
+function prepararItemCompraPayload({
+  item,
+  index,
+  obraId,
+  necessarioParaPadrao,
+  mapaApropriacoes
+}) {
+  const quantidade = parseQuantidade(item?.quantidade);
+  const rateios = extrairRateiosPayload(item).map((rateio) => ({
+    apropriacao_id: Number(rateio.apropriacao_id || 0) || null,
+    quantidade_apropriada: parseQuantidade(rateio.quantidade_apropriada)
+  }));
+
+  const validacaoRateios = validarRateiosPayload({
+    rateios,
+    quantidadeTotal: quantidade
+  });
+
+  if (!validacaoRateios.ok) {
+    return {
+      erro: `Item ${index + 1}: ${validacaoRateios.mensagem}`
+    };
+  }
+
+  for (const rateio of rateios) {
+    const apropriacao = mapaApropriacoes.get(Number(rateio.apropriacao_id));
+    if (!apropriacao || Number(apropriacao.obra_id) !== Number(obraId)) {
+      return {
+        erro: `Item ${index + 1}: apropriacao invalida para a obra selecionada.`
+      };
+    }
+  }
+
+  const baseItem = {
+    apropriacao_id: Number(rateios[0].apropriacao_id),
+    quantidade,
+    especificacao: item?.especificacao || '',
+    necessario_para: item?.necessario_para || necessarioParaPadrao || null,
+    link_produto: item?.link_produto || null,
+    arquivo_url: item?.arquivo_url || null,
+    arquivo_nome_original: item?.arquivo_nome_original || null
+  };
+
+  if (item?.manual || !item?.insumo_id) {
+    if (!String(item?.nome_manual || '').trim() || !String(item?.unidade_sigla_manual || '').trim()) {
+      return {
+        erro: `Item ${index + 1}: itens manuais devem conter nome e unidade.`
+      };
+    }
+
+    return {
+      manual: true,
+      item: {
+        ...baseItem,
+        nome_manual: String(item.nome_manual).trim(),
+        unidade_sigla_manual: String(item.unidade_sigla_manual).trim()
+      },
+      rateios
+    };
+  }
+
+  if (!Number(item?.insumo_id)) {
+    return {
+      erro: `Item ${index + 1}: informe o insumo do item.`
+    };
+  }
+
+  return {
+    manual: false,
+    item: {
+      ...baseItem,
+      insumo_id: Number(item.insumo_id),
+      unidade_id: item?.unidade_id ? Number(item.unidade_id) : null,
+      unidade_sigla_manual: item?.unidade_sigla_manual || null
+    },
+    rateios
+  };
 }
 
 function obterLinhasPdf(solicitacao) {
@@ -420,7 +569,7 @@ function obterLinhasPdf(solicitacao) {
     unidade: item.unidade_sigla_manual || item.unidade?.sigla || '-',
     quantidade: item.quantidade,
     especificacao: item.especificacao || '-',
-    apropriacao: item.apropriacao?.codigo || '-',
+    apropriacao: construirResumoApropriacoes(item).linhas.join('\n') || '-',
     necessario_para: item.necessario_para,
     link_produto: item.link_produto || null,
     arquivo_url: item.arquivo_url || null,
@@ -434,7 +583,7 @@ function obterLinhasPdf(solicitacao) {
     unidade: item.unidade_sigla_manual || '-',
     quantidade: item.quantidade,
     especificacao: item.especificacao || '-',
-    apropriacao: item.apropriacao?.codigo || '-',
+    apropriacao: construirResumoApropriacoes(item).linhas.join('\n') || '-',
     necessario_para: item.necessario_para,
     link_produto: item.link_produto || null,
     arquivo_url: item.arquivo_url || null,
@@ -474,6 +623,7 @@ function montarComparativoSolicitacao(solicitacao) {
     nome: cotacaoFornecedor.fornecedor?.nome || '-',
     email: cotacaoFornecedor.fornecedor?.email || '',
     whatsapp: cotacaoFornecedor.fornecedor?.whatsapp || '',
+    valor_minimo_pedido: cotacaoFornecedor.valor_minimo_pedido ?? null,
     status: cotacaoFornecedor.status,
     token: cotacaoFornecedor.token,
     enviado_em: cotacaoFornecedor.enviado_em,
@@ -500,6 +650,7 @@ function montarComparativoSolicitacao(solicitacao) {
         preco: resposta?.preco ?? null,
         prazo: resposta?.prazo || '',
         observacao: resposta?.observacao || '',
+        quantidade_minima_item: resposta?.quantidade_minima_item ?? null,
         vencedor: Boolean(resposta?.vencedor)
       };
     });
@@ -534,6 +685,14 @@ function montarComparativoSolicitacao(solicitacao) {
 }
 
 function desenharCabecalhoFicha(doc, solicitacao) {
+  const installationConfig = getRuntimeInstallationConfig();
+  const pdfLogoPath = getPdfLogoPath();
+  const companyName =
+    installationConfig?.pdf_company_name ||
+    installationConfig?.company_legal_name ||
+    installationConfig?.company_name ||
+    installationConfig?.product_name ||
+    'Fluxy';
   const x = PDF_PAGE.left;
   const y = PDF_PAGE.top;
   const logoWidth = 58;
@@ -547,9 +706,9 @@ function desenharCabecalhoFicha(doc, solicitacao) {
   doc.lineWidth(0.8);
   doc.rect(x, y, logoWidth, totalHeaderHeight).stroke('#000000');
 
-  if (fs.existsSync(PDF_LOGO_PATH)) {
+  if (pdfLogoPath && fs.existsSync(pdfLogoPath)) {
     try {
-      doc.image(PDF_LOGO_PATH, x + 4, y + 4, {
+      doc.image(pdfLogoPath, x + 4, y + 4, {
         fit: [logoWidth - 8, totalHeaderHeight - 8],
         align: 'center',
         valign: 'center'
@@ -577,7 +736,7 @@ function desenharCabecalhoFicha(doc, solicitacao) {
   doc
     .font('Helvetica-Bold')
     .fontSize(7.5)
-    .text('CONSTRUTORA SUL CAPIXABA LTDA', x + logoWidth + 4, y + titleHeight + 5, {
+    .text(companyName, x + logoWidth + 4, y + titleHeight + 5, {
       width: leftInfoWidth - 8
     });
   doc
@@ -725,6 +884,9 @@ async function renderPdfSolicitacaoCompra(doc, solicitacao) {
     const alturaEspecificacao = doc.heightOfString(item.especificacao || '-', {
       width: colWidths[4] - 10
     });
+    const alturaApropriacao = doc.heightOfString(item.apropriacao || '-', {
+      width: colWidths[5] - 10
+    });
     doc.fontSize(6).font('Helvetica');
     const alturaMidia = textoMidia
       ? doc.heightOfString(textoMidia, { width: colWidths[7] - 10 })
@@ -732,7 +894,7 @@ async function renderPdfSolicitacaoCompra(doc, solicitacao) {
     const alturaImagem = anexoVisualNaCelula ? 98 : 0;
     const rowHeight = Math.max(
       18,
-      Math.ceil(Math.max(alturaNome + 8, alturaEspecificacao + 8, alturaMidia + 8, alturaImagem))
+      Math.ceil(Math.max(alturaNome + 8, alturaEspecificacao + 8, alturaApropriacao + 8, alturaMidia + 8, alturaImagem))
     );
 
     if (y + rowHeight + 72 > PDF_PAGE.bottomLimit) {
@@ -929,9 +1091,22 @@ module.exports = {
 
       const { obra_id } = req.query;
       const where = {};
+      const obraIdsEscopo = Array.isArray(req.compraScopeObraIds)
+        ? req.compraScopeObraIds
+        : null;
 
       if (obra_id) {
         where.obra_id = obra_id;
+      }
+
+      if (obraIdsEscopo && obraIdsEscopo.length === 0) {
+        return res.json([]);
+      }
+
+      if (obraIdsEscopo && !where.obra_id) {
+        where.obra_id = {
+          [Op.in]: obraIdsEscopo
+        };
       }
 
       const solicitacoes = await SolicitacaoCompra.findAll({
@@ -947,14 +1122,16 @@ module.exports = {
             include: [
               { model: Insumo, as: 'insumo', attributes: ['id', 'nome', 'codigo'] },
               { model: Unidade, as: 'unidade', attributes: ['id', 'nome', 'sigla'] },
-              { model: Apropriacao, as: 'apropriacao', attributes: ['id', 'codigo', 'descricao'] }
+              { model: Apropriacao, as: 'apropriacao', attributes: ['id', 'codigo', 'descricao'] },
+              buildIncludeRateiosItem()
             ]
           },
           {
             model: SolicitacaoCompraItemManual,
             as: 'itensManuais',
             include: [
-              { model: Apropriacao, as: 'apropriacao', attributes: ['id', 'codigo', 'descricao'] }
+              { model: Apropriacao, as: 'apropriacao', attributes: ['id', 'codigo', 'descricao'] },
+              buildIncludeRateiosItemManual()
             ]
           },
           {
@@ -1015,66 +1192,31 @@ module.exports = {
 
       const itensPreparados = [];
       const itensManuaisPreparados = [];
+      const mapaApropriacoes = await carregarMapaApropriacoes({
+        obraId: obra_id,
+        itens,
+        transaction
+      });
 
-      for (const item of itens) {
-        const {
-          insumo_id,
-          unidade_id,
-          apropriacao_id,
-          quantidade,
-          especificacao,
-          necessario_para: itemNecessario,
-          link_produto,
-          arquivo_url,
-          arquivo_nome_original,
-          manual,
-          nome_manual,
-          unidade_sigla_manual
-        } = item || {};
-
-        if (!apropriacao_id || !quantidade) {
-          await transaction.rollback();
-          return res.status(400).json({ error: 'Todos os itens devem conter apropriacao e quantidade' });
-        }
-
-        const apropriacao = await Apropriacao.findByPk(apropriacao_id, { transaction });
-        if (!apropriacao || Number(apropriacao.obra_id) !== Number(obra_id)) {
-          await transaction.rollback();
-          return res.status(400).json({ error: 'Apropriacao nao pertence a obra selecionada' });
-        }
-
-        if (manual || !insumo_id) {
-          if (!nome_manual || !unidade_sigla_manual) {
-            await transaction.rollback();
-            return res.status(400).json({ error: 'Itens manuais devem conter nome e unidade' });
-          }
-
-          itensManuaisPreparados.push({
-            apropriacao_id,
-            nome_manual,
-            unidade_sigla_manual,
-            quantidade,
-            especificacao: especificacao || '',
-            necessario_para: itemNecessario || necessario_para || null,
-            link_produto: link_produto || null,
-            arquivo_url: arquivo_url || null,
-            arquivo_nome_original: arquivo_nome_original || null
-          });
-          continue;
-        }
-
-        itensPreparados.push({
-          insumo_id,
-          unidade_id: unidade_id || null,
-          unidade_sigla_manual: unidade_sigla_manual || null,
-          apropriacao_id,
-          quantidade,
-          especificacao: especificacao || '',
-          necessario_para: itemNecessario || necessario_para || null,
-          link_produto: link_produto || null,
-          arquivo_url: arquivo_url || null,
-          arquivo_nome_original: arquivo_nome_original || null
+      for (const [index, item] of itens.entries()) {
+        const preparado = prepararItemCompraPayload({
+          item,
+          index,
+          obraId: obra_id,
+          necessarioParaPadrao: necessario_para,
+          mapaApropriacoes
         });
+
+        if (preparado.erro) {
+          await transaction.rollback();
+          return res.status(400).json({ error: preparado.erro });
+        }
+
+        if (preparado.manual) {
+          itensManuaisPreparados.push(preparado);
+        } else {
+          itensPreparados.push(preparado);
+        }
       }
 
       const solicitacaoCompra = await SolicitacaoCompra.create(
@@ -1090,21 +1232,39 @@ module.exports = {
         { transaction }
       );
 
-      if (itensPreparados.length) {
-        await SolicitacaoCompraItem.bulkCreate(
-          itensPreparados.map((item) => ({
-            ...item,
+      for (const entry of itensPreparados) {
+        const itemCriado = await SolicitacaoCompraItem.create(
+          {
+            ...entry.item,
             solicitacao_compra_id: solicitacaoCompra.id
+          },
+          { transaction }
+        );
+
+        await SolicitacaoCompraItemApropriacao.bulkCreate(
+          entry.rateios.map((rateio) => ({
+            solicitacao_compra_item_id: itemCriado.id,
+            apropriacao_id: rateio.apropriacao_id,
+            quantidade_apropriada: rateio.quantidade_apropriada
           })),
           { transaction }
         );
       }
 
-      if (itensManuaisPreparados.length) {
-        await SolicitacaoCompraItemManual.bulkCreate(
-          itensManuaisPreparados.map((item) => ({
-            ...item,
+      for (const entry of itensManuaisPreparados) {
+        const itemCriado = await SolicitacaoCompraItemManual.create(
+          {
+            ...entry.item,
             solicitacao_compra_id: solicitacaoCompra.id
+          },
+          { transaction }
+        );
+
+        await SolicitacaoCompraItemManualApropriacao.bulkCreate(
+          entry.rateios.map((rateio) => ({
+            solicitacao_compra_item_manual_id: itemCriado.id,
+            apropriacao_id: rateio.apropriacao_id,
+            quantidade_apropriada: rateio.quantidade_apropriada
           })),
           { transaction }
         );
@@ -1118,7 +1278,7 @@ module.exports = {
         ? await Insumo.findAll({
             where: {
               id: {
-                [Op.in]: itensPreparados.map((item) => item.insumo_id)
+                [Op.in]: itensPreparados.map((entry) => entry.item.insumo_id)
               }
             },
             attributes: ['id', 'nome'],
@@ -1127,11 +1287,11 @@ module.exports = {
         : [];
 
       const mapaInsumos = new Map(insumos.map((item) => [item.id, item.nome]));
-      const resumoItensNormais = itensPreparados.map((item) => {
-        const nome = mapaInsumos.get(item.insumo_id) || `Insumo ${item.insumo_id}`;
-        return `${item.quantidade}x ${nome}`;
+      const resumoItensNormais = itensPreparados.map((entry) => {
+        const nome = mapaInsumos.get(entry.item.insumo_id) || `Insumo ${entry.item.insumo_id}`;
+        return `${entry.item.quantidade}x ${nome}`;
       });
-      const resumoItensManuais = itensManuaisPreparados.map((item) => `${item.quantidade}x ${item.nome_manual} [manual]`);
+      const resumoItensManuais = itensManuaisPreparados.map((entry) => `${entry.item.quantidade}x ${entry.item.nome_manual} [manual]`);
       const resumoItens = [...resumoItensNormais, ...resumoItensManuais].join(', ');
 
       const descricao = [
@@ -1382,9 +1542,36 @@ module.exports = {
       for (const entry of fornecedoresPayload) {
         let fornecedor = null;
         const fornecedorId = Number(entry?.fornecedor_id);
+        const parceiroId = Number(entry?.parceiro_id);
 
         if (fornecedorId > 0) {
           fornecedor = await FornecedorCompra.findByPk(fornecedorId, { transaction });
+        } else if (parceiroId > 0) {
+          const parceiro = await Parceiro.findByPk(parceiroId, { transaction });
+          if (!parceiro || !parceiro.fornecedor || parceiro.ativo === false) {
+            await transaction.rollback();
+            return res.status(400).json({ error: 'Parceiro fornecedor invalido para envio' });
+          }
+
+          fornecedor = await FornecedorCompra.findOne({
+            where: { parceiro_id: parceiro.id },
+            transaction
+          });
+
+          if (!fornecedor) {
+            fornecedor = await FornecedorCompra.create(
+              {
+                parceiro_id: parceiro.id,
+                nome: String(parceiro.nome || '').trim(),
+                email: parceiro.email ? String(parceiro.email).trim() : null,
+                whatsapp: parceiro.telefone ? String(parceiro.telefone).trim() : null,
+                contato: null,
+                observacoes: null,
+                ativo: true
+              },
+              { transaction }
+            );
+          }
         } else if (String(entry?.nome || '').trim()) {
           fornecedor = await FornecedorCompra.create(
             {
@@ -1563,6 +1750,12 @@ module.exports = {
         transaction
       });
 
+      await gerarPedidosDosVencedores({
+        solicitacaoId: solicitacaoDb.id,
+        usuarioId: usuario.id,
+        transaction
+      });
+
       await transaction.commit();
       const atualizada = await carregarSolicitacaoCompra(req.params.id);
       return res.json(atualizada);
@@ -1600,6 +1793,101 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return res.status(500).json({ error: 'Erro ao gerar PDF' });
+    }
+  },
+
+  // ── Cotação Avulsa ─────────────────────────────────────────────────────────
+  // Cria uma cotação diretamente sem passar pelo fluxo de aprovação.
+  // Permite cotações manuais sem uma solicitação de compra formal.
+  async createAvulsa(req, res) {
+    const transaction = await SolicitacaoCompra.sequelize.transaction();
+
+    try {
+      const usuario = await validarAcesso(req, res);
+      if (!usuario) {
+        await transaction.rollback();
+        return;
+      }
+
+      if (!(await validarAcessoCompras(usuario))) {
+        await transaction.rollback();
+        return res.status(403).json({ error: 'Apenas compras pode criar cotacoes avulsas' });
+      }
+
+      const { titulo, obra_id, necessario_para, observacoes, itens } = req.body || {};
+
+      if (!String(titulo || '').trim()) {
+        await transaction.rollback();
+        return res.status(400).json({ error: 'Informe um titulo para a cotacao' });
+      }
+
+      if (!Array.isArray(itens) || itens.length === 0) {
+        await transaction.rollback();
+        return res.status(400).json({ error: 'Informe ao menos um item para a cotacao' });
+      }
+
+      // Valida obra se informada
+      if (obra_id) {
+        const obra = await Obra.findByPk(obra_id, { transaction });
+        if (!obra) {
+          await transaction.rollback();
+          return res.status(400).json({ error: 'Obra nao encontrada' });
+        }
+      }
+
+      const solicitacaoCompra = await SolicitacaoCompra.create(
+        {
+          origem: 'AVULSA',
+          titulo: String(titulo).trim(),
+          obra_id: obra_id || null,
+          solicitante_id: usuario.id,
+          status: 'LIBERADO_PARA_COMPRA',
+          integrado_sienge: true,
+          liberado_para_compra_em: new Date(),
+          observacoes: observacoes || null,
+          necessario_para: necessario_para || null
+        },
+        { transaction }
+      );
+
+      for (const item of itens) {
+        const nome = String(item.nome || '').trim();
+        const quantidade = Number(item.quantidade || 0);
+        const unidade_sigla = String(item.unidade || item.unidade_sigla_manual || 'UN').trim() || 'UN';
+
+        if (!nome || quantidade <= 0) continue;
+
+        await SolicitacaoCompraItemManual.create(
+          {
+            solicitacao_compra_id: solicitacaoCompra.id,
+            nome_manual: nome,
+            quantidade,
+            unidade_sigla_manual: unidade_sigla,
+            especificacao: item.especificacao ? String(item.especificacao).trim() : '-',
+            apropriacao_id: item.apropriacao_id ? Number(item.apropriacao_id) : null,
+            necessario_para: item.necessario_para || necessario_para || null,
+            link_produto: item.link_produto ? String(item.link_produto).trim() : null
+          },
+          { transaction }
+        );
+      }
+
+      await registrarLogSolicitacaoCompra({
+        solicitacaoCompraId: solicitacaoCompra.id,
+        usuarioId: usuario.id,
+        tipoAcao: 'CRIACAO_AVULSA',
+        descricao: `Cotacao avulsa criada: ${titulo}`,
+        transaction
+      });
+
+      await transaction.commit();
+
+      const criada = await carregarSolicitacaoCompra(solicitacaoCompra.id);
+      return res.status(201).json(criada);
+    } catch (error) {
+      await transaction.rollback();
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao criar cotacao avulsa' });
     }
   }
 };

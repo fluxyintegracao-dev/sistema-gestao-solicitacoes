@@ -1,4 +1,4 @@
-const db = require('../../models');
+﻿const db = require('../../models');
 const gerarCodigo = require('./gerarCodigo');
 
 module.exports = async function criarSolicitacao({
@@ -8,7 +8,7 @@ module.exports = async function criarSolicitacao({
   valor,
   usuario
 }) {
-  // 1. Verificar vínculo usuário-obra
+  // 1. Verificar vÃ­nculo usuÃ¡rio-obra
   const vinculo = await db.UsuarioObra.findOne({
     where: {
       user_id: usuario.id,
@@ -16,14 +16,14 @@ module.exports = async function criarSolicitacao({
     }
   });
 
-  if (!vinculo && usuario.perfil !== 'ADMIN') {
-    throw new Error('Usuário não possui vínculo com esta obra');
+  if (!vinculo && usuario.perfil !== 'ADMIN' && usuario.perfil !== 'ADMINISTRADOR') {
+    throw new Error('UsuÃ¡rio nÃ£o possui vÃ­nculo com esta obra');
   }
 
-  // 2. Gerar código
+  // 2. Gerar cÃ³digo
   const codigo = await gerarCodigo();
 
-  // 3. Criar solicitação
+  // 3. Criar solicitaÃ§Ã£o
   const solicitacao = await db.Solicitacao.create({
     codigo,
     obra_id,
@@ -39,17 +39,18 @@ module.exports = async function criarSolicitacao({
   await db.StatusArea.create({
     solicitacao_id: solicitacao.id,
     setor: 'GEO',
-    status: 'Pendente de análise'
+    status: 'Pendente de anÃ¡lise'
   });
 
-  // 5. Criar histórico
+  // 5. Criar histÃ³rico
   await db.Historico.create({
     solicitacao_id: solicitacao.id,
     usuario_responsavel_id: usuario_responsavel_id,
     setor: usuario.perfil,
-    acao: 'Solicitação criada',
+    acao: 'SolicitaÃ§Ã£o criada',
     status_novo: 'Criada'
   });
 
   return solicitacao;
 };
+

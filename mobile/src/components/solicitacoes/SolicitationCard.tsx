@@ -48,6 +48,10 @@ export function SolicitationCard({ item, onPress }: SolicitationCardProps) {
           <Text style={styles.metaLabel}>Tipo</Text>
           <Text style={styles.metaValue} numberOfLines={1}>{item.tipo?.nome || '-'}</Text>
         </View>
+        <View style={styles.metaItem}>
+          <Text style={styles.metaLabel}>Parceiro</Text>
+          <Text style={styles.metaValue} numberOfLines={1}>{item.parceiro?.nome || '-'}</Text>
+        </View>
       </View>
 
       <View style={styles.footer}>

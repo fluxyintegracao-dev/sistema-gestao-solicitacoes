@@ -134,7 +134,7 @@ export default function GestaoCategorias() {
   }
 
   return (
-    <div className="page">
+    <div className="page solicitacoes-page">
       <div>
         <h1 className="page-title">Gestao de Categorias</h1>
         <p className="page-subtitle">Cadastro e manutencao das categorias do modulo compras.</p>

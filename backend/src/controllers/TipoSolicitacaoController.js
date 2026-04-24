@@ -1,24 +1,53 @@
+const { Op } = require('sequelize');
 const { TipoSolicitacao, TipoSubContrato, Solicitacao, Contrato } = require('../models');
+const {
+  enrichTipoSolicitacao,
+  normalizeTipoSolicitacaoCodigo,
+  serializeTipoSolicitacaoBehavior
+} = require('../services/tipoSolicitacaoBehaviorService');
 
 module.exports = {
   async index(req, res) {
     const tipos = await TipoSolicitacao.findAll({
       order: [['nome', 'ASC']]
     });
-    return res.json(tipos);
+    return res.json(tipos.map(enrichTipoSolicitacao));
   },
 
   async create(req, res) {
-    const { nome } = req.body;
+    const nome = String(req.body?.nome || '').trim();
+    const codigoInterno = normalizeTipoSolicitacaoCodigo(req.body?.codigo_interno, nome);
 
-    const tipo = await TipoSolicitacao.create({ nome });
-    return res.status(201).json(tipo);
+    if (!nome) {
+      return res.status(400).json({ error: 'Nome e obrigatorio' });
+    }
+
+    const existente = await TipoSolicitacao.findOne({
+      where: {
+        [Op.or]: [
+          { nome },
+          ...(codigoInterno ? [{ codigo_interno: codigoInterno }] : [])
+        ]
+      },
+      attributes: ['id']
+    });
+    if (existente) {
+      return res.status(409).json({ error: 'Ja existe tipo com mesmo nome ou codigo interno' });
+    }
+
+    const tipo = await TipoSolicitacao.create({
+      nome,
+      codigo_interno: codigoInterno || null,
+      comportamento: serializeTipoSolicitacaoBehavior(req.body?.comportamento || null)
+    });
+    return res.status(201).json(enrichTipoSolicitacao(tipo));
   },
 
   async update(req, res) {
     try {
       const { id } = req.params;
-      const { nome } = req.body;
+      const nome = String(req.body?.nome || '').trim();
+      const codigoInterno = normalizeTipoSolicitacaoCodigo(req.body?.codigo_interno, nome);
 
       if (!nome) {
         return res.status(400).json({ error: 'Nome e obrigatorio' });
@@ -29,8 +58,28 @@ module.exports = {
         return res.status(404).json({ error: 'Tipo nao encontrado' });
       }
 
-      await tipo.update({ nome });
-      return res.json(tipo);
+      const existente = await TipoSolicitacao.findOne({
+        where: {
+          id: { [Op.ne]: id },
+          [Op.or]: [
+            { nome },
+            ...(codigoInterno ? [{ codigo_interno: codigoInterno }] : [])
+          ]
+        },
+        attributes: ['id']
+      });
+      if (existente) {
+        return res.status(409).json({ error: 'Ja existe tipo com mesmo nome ou codigo interno' });
+      }
+
+      await tipo.update({
+        nome,
+        codigo_interno: codigoInterno || null,
+        comportamento: req.body?.comportamento !== undefined
+          ? serializeTipoSolicitacaoBehavior(req.body?.comportamento)
+          : tipo.comportamento
+      });
+      return res.json(enrichTipoSolicitacao(tipo));
     } catch (error) {
       console.error('Erro ao atualizar tipo:', error);
       return res.status(500).json({ error: 'Erro ao atualizar tipo' });
