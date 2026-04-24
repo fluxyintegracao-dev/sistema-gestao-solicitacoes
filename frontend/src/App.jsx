@@ -39,6 +39,7 @@ import TiposSolicitacaoPorSetor from './pages/TiposSolicitacaoPorSetor';
 import TiposCompartilhadosSetor from './pages/TiposCompartilhadosSetor';
 import AutomacaoStatusSetor from './pages/AutomacaoStatusSetor';
 import SetoresCriacaoTodasObras from './pages/SetoresCriacaoTodasObras';
+import SetoresSemAlteracaoStatus from './pages/SetoresSemAlteracaoStatus';
 import UsuariosEnvioQualquerSetor from './pages/UsuariosEnvioQualquerSetor';
 import PrioridadesDiretoria from './pages/PrioridadesDiretoria';
 import ConversasEntrada from './pages/ConversasEntrada';
@@ -194,6 +195,7 @@ export default function App() {
         <Route path="tipos-compartilhados-setor" element={<SuperadminRoute><TiposCompartilhadosSetor /></SuperadminRoute>} />
         <Route path="automacao-status-setor" element={<SuperadminRoute><AutomacaoStatusSetor /></SuperadminRoute>} />
         <Route path="setores-criacao-todas-obras" element={<SetoresCriacaoTodasObras />} />
+        <Route path="setores-sem-alteracao-status" element={<SuperadminRoute><SetoresSemAlteracaoStatus /></SuperadminRoute>} />
         <Route path="arquivos-modelos-config" element={<SuperadminRoute><ArquivosModelosConfig /></SuperadminRoute>} />
         <Route path="provisionamento-financeiro-config" element={<SuperadminRoute><ConfiguracaoProvisionamentoFinanceiro /></SuperadminRoute>} />
         <Route path="provisoes-financeiras/dashboard" element={<DashboardProvisionamentoFinanceiro />} />

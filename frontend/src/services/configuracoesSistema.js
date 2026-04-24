@@ -186,6 +186,27 @@ export async function salvarSetoresCriacaoTodasObras(data) {
   return res.json();
 }
 
+export async function getSetoresSemAlteracaoStatus() {
+  const res = await fetch(`${API_URL}/configuracoes/setores-sem-alteracao-status`, {
+    headers: authHeaders()
+  });
+  if (!res.ok) throw new Error('Erro ao buscar configuracao de setores sem alteracao de status');
+  return res.json();
+}
+
+export async function salvarSetoresSemAlteracaoStatus(data) {
+  const res = await fetch(`${API_URL}/configuracoes/setores-sem-alteracao-status`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.error || 'Erro ao salvar configuracao de setores sem alteracao de status');
+  }
+  return res.json();
+}
+
 export async function getUsuariosEnvioQualquerSetor() {
   const res = await fetch(`${API_URL}/configuracoes/usuarios-envio-qualquer-setor`, {
     headers: authHeaders()

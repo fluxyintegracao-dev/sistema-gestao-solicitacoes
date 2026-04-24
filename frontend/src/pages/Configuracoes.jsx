@@ -110,6 +110,11 @@ const SECOES_CONFIG = [
         to: '/automacao-status-setor'
       },
       {
+        title: 'Setores sem Alterar Status',
+        description: 'Desabilite o botao de alterar status para setores selecionados.',
+        to: '/setores-sem-alteracao-status'
+      },
+      {
         title: 'Criacao em Todas as Obras',
         description: 'Defina quais setores podem criar solicitacao em qualquer obra.',
         to: '/setores-criacao-todas-obras'

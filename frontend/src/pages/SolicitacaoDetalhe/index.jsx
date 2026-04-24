@@ -15,8 +15,9 @@ import {
   aprovarDiretoriaSolicitacao,
   updateStatusSolicitacao
 } from '../../services/solicitacoes';
+import { getSetoresSemAlteracaoStatus } from '../../services/configuracoesSistema';
 import { API_URL, authHeaders } from '../../services/api';
-import { isGeoSetor, usuarioPodeEnviarSolicitacaoParaOutroSetor } from '../../utils/setor';
+import { isGeoSetor, normalizarSetorToken, usuarioPodeEnviarSolicitacaoParaOutroSetor } from '../../utils/setor';
 
 export default function SolicitacaoDetalhe() {
   const { id } = useParams();
@@ -38,6 +39,8 @@ export default function SolicitacaoDetalhe() {
   const [loading, setLoading] = useState(true);
   const [modalStatus, setModalStatus] = useState(false);
   const [modalEnviarSetor, setModalEnviarSetor] = useState(false);
+  const [tokensSetoresSemAlteracaoStatus, setTokensSetoresSemAlteracaoStatus] = useState([]);
+  const [loadingConfiguracaoStatus, setLoadingConfiguracaoStatus] = useState(true);
 
   const perfil = String(user?.perfil || '').trim().toUpperCase();
   const setorUsuario = user?.setor?.codigo || user?.area || user?.setor?.nome || '';
@@ -51,6 +54,26 @@ export default function SolicitacaoDetalhe() {
   useEffect(() => {
     carregar();
   }, [id]);
+
+  useEffect(() => {
+    async function carregarConfiguracaoStatus() {
+      try {
+        setLoadingConfiguracaoStatus(true);
+        const configuracao = await getSetoresSemAlteracaoStatus();
+        const tokens = Array.isArray(configuracao?.tokens)
+          ? configuracao.tokens
+          : configuracao?.setores;
+        setTokensSetoresSemAlteracaoStatus(Array.isArray(tokens) ? tokens : []);
+      } catch (error) {
+        console.error('Erro ao carregar configuracao de setores sem alteracao de status', error);
+        setTokensSetoresSemAlteracaoStatus([]);
+      } finally {
+        setLoadingConfiguracaoStatus(false);
+      }
+    }
+
+    carregarConfiguracaoStatus();
+  }, []);
 
   async function carregar() {
     try {
@@ -129,7 +152,7 @@ export default function SolicitacaoDetalhe() {
     }
   }
 
-  if (loading) return <p>Carregando...</p>;
+  if (loading || loadingConfiguracaoStatus) return <p>Carregando...</p>;
   if (!solicitacao) return null;
 
   const isSetorObra = setorTokens.includes('OBRA');
@@ -139,6 +162,13 @@ export default function SolicitacaoDetalhe() {
     !usaFluxoAprovacaoDiretoria &&
     !isSetorObra &&
     usuarioPodeEnviarSolicitacaoParaOutroSetor(solicitacao.area_responsavel, user);
+  const setorSolicitacaoToken = normalizarSetorToken(solicitacao.area_responsavel);
+  const setorSemAlteracaoStatus = tokensSetoresSemAlteracaoStatus.some(token => {
+    const tokenNormalizado = normalizarSetorToken(token);
+    if (!tokenNormalizado || !setorSolicitacaoToken) return false;
+    if (tokenNormalizado === setorSolicitacaoToken) return true;
+    return isGeoSetor(tokenNormalizado) && isGeoSetor(setorSolicitacaoToken);
+  });
 
   const atualizadoEm = new Date(solicitacao.updatedAt || solicitacao.createdAt).toLocaleString('pt-BR');
 
@@ -168,7 +198,7 @@ export default function SolicitacaoDetalhe() {
         solicitacao={solicitacao}
         onAlterarStatus={() => setModalStatus(true)}
         onEnviarSetor={podeAprovarDiretoria ? aprovarDiretoria : () => setModalEnviarSetor(true)}
-        mostrarAlterarStatus
+        mostrarAlterarStatus={!setorSemAlteracaoStatus}
         mostrarEnviarSetor={podeAprovarDiretoria || podeEnviarSetor}
         textoEnviarSetor={podeAprovarDiretoria ? 'Aprovar' : 'Enviar para outro setor'}
       />

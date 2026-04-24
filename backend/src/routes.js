@@ -375,6 +375,8 @@ router.get('/configuracoes/automacao-status-setor', permit(['SUPERADMIN']), Conf
 router.patch('/configuracoes/automacao-status-setor', permit(['SUPERADMIN']), ConfiguracaoSistemaController.updateAutomacaoStatusSetor);
 router.get('/configuracoes/setores-criacao-todas-obras', ConfiguracaoSistemaController.getSetoresCriacaoTodasObras);
 router.patch('/configuracoes/setores-criacao-todas-obras', permit(['SUPERADMIN']), ConfiguracaoSistemaController.updateSetoresCriacaoTodasObras);
+router.get('/configuracoes/setores-sem-alteracao-status', ConfiguracaoSistemaController.getSetoresSemAlteracaoStatus);
+router.patch('/configuracoes/setores-sem-alteracao-status', permit(['SUPERADMIN']), ConfiguracaoSistemaController.updateSetoresSemAlteracaoStatus);
 router.get('/configuracoes/usuarios-envio-qualquer-setor', permit(['SUPERADMIN']), ConfiguracaoSistemaController.getUsuariosEnvioQualquerSetor);
 router.patch('/configuracoes/usuarios-envio-qualquer-setor', permit(['SUPERADMIN']), ConfiguracaoSistemaController.updateUsuariosEnvioQualquerSetor);
 router.get('/configuracoes/provisoes-financeiras/permissoes', permit(['SUPERADMIN']), ProvisaoFinanceiraConfiguracaoController.getPermissoes);

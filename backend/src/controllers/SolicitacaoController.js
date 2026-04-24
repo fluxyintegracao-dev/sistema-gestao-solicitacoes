@@ -48,6 +48,10 @@ const {
   obterIdsSetoresUsuario,
   obterTokensSetoresUsuario
 } = require('../services/usuariosSetores');
+const {
+  obterTokensSetoresSemAlteracaoStatus,
+  setorEstaSemAlteracaoStatus
+} = require('../services/solicitacao/setoresSemAlteracaoStatus');
 
 const CHAVE_AREAS_POR_SETOR_ORIGEM = 'AREAS_POR_SETOR_ORIGEM';
 const CHAVE_SETORES_VISIVEIS_POR_USUARIO = 'SETORES_VISIVEIS_POR_USUARIO';
@@ -2219,6 +2223,13 @@ module.exports = {
       }
 
       const setorAtual = solicitacao.area_responsavel;
+      const tokensSetoresSemAlteracaoStatus = await obterTokensSetoresSemAlteracaoStatus();
+      if (setorEstaSemAlteracaoStatus(setorAtual, tokensSetoresSemAlteracaoStatus)) {
+        return res.status(403).json({
+          error: 'Alteracao de status desabilitada para o setor atual da solicitacao'
+        });
+      }
+
       const setorValidacaoStatus = String(areaUsuario || setorAtual || '').trim();
 
       if (!isSuperadmin) {

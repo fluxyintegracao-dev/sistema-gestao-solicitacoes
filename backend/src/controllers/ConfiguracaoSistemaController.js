@@ -12,6 +12,11 @@ const {
   normalizarTiposCompartilhados,
   normalizarAutomacoesStatus
 } = require('../services/solicitacao/configuracoesVisibilidadeAutomacao');
+const {
+  obterConfiguracaoSetoresSemAlteracaoStatus,
+  salvarConfiguracaoSetoresSemAlteracaoStatus,
+  obterTokensSetoresSemAlteracaoStatus
+} = require('../services/solicitacao/setoresSemAlteracaoStatus');
 
 const CHAVE_TEMA = 'TEMA_SISTEMA';
 const CHAVE_AREAS_OBRA = 'AREAS_OBRA_VISIVEIS';
@@ -733,6 +738,35 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return res.status(500).json({ error: 'Erro ao salvar configuracao de setores para criacao em todas as obras' });
+    }
+  },
+
+  async getSetoresSemAlteracaoStatus(req, res) {
+    try {
+      const configuracao = await obterConfiguracaoSetoresSemAlteracaoStatus();
+      const tokens = await obterTokensSetoresSemAlteracaoStatus();
+      return res.json({
+        setores: configuracao.setores,
+        tokens
+      });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao buscar configuracao de setores sem alteracao de status' });
+    }
+  },
+
+  async updateSetoresSemAlteracaoStatus(req, res) {
+    try {
+      const configuracao = await salvarConfiguracaoSetoresSemAlteracaoStatus(req.body?.setores);
+      const tokens = await obterTokensSetoresSemAlteracaoStatus();
+      return res.json({
+        ok: true,
+        setores: configuracao.setores,
+        tokens
+      });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao salvar configuracao de setores sem alteracao de status' });
     }
   },
 
