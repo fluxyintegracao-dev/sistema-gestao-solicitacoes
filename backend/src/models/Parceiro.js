@@ -24,12 +24,36 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.STRING(255),
         allowNull: true
       },
+      rg: {
+        type: DataTypes.STRING(40),
+        allowNull: true
+      },
+      data_nascimento: {
+        type: DataTypes.DATEONLY,
+        allowNull: true
+      },
+      nacionalidade: {
+        type: DataTypes.STRING(80),
+        allowNull: true
+      },
+      profissao: {
+        type: DataTypes.STRING(120),
+        allowNull: true
+      },
+      estado_civil: {
+        type: DataTypes.STRING(60),
+        allowNull: true
+      },
       endereco: {
         type: DataTypes.STRING(255),
         allowNull: true
       },
       numero: {
         type: DataTypes.STRING(50),
+        allowNull: true
+      },
+      complemento: {
+        type: DataTypes.STRING(120),
         allowNull: true
       },
       bairro: {
@@ -66,6 +90,18 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.BOOLEAN,
         allowNull: false,
         defaultValue: false
+      },
+      conjuge_nome: {
+        type: DataTypes.STRING(255),
+        allowNull: true
+      },
+      regime_bens: {
+        type: DataTypes.STRING(120),
+        allowNull: true
+      },
+      creci: {
+        type: DataTypes.STRING(60),
+        allowNull: true
       },
       ativo: {
         type: DataTypes.BOOLEAN,

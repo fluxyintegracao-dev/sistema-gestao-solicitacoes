@@ -30,6 +30,16 @@ function sanitizeText(value) {
   return text || null;
 }
 
+function sanitizeDateOnly(value) {
+  const text = String(value || '').trim();
+  if (!text) return null;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+    throw new Error('Informe uma data de nascimento valida.');
+  }
+
+  return text;
+}
+
 function normalizeParceiroPayload(payload = {}, { partial = false } = {}) {
   const cpfCnpj = normalizarCpfCnpj(payload.cpf_cnpj);
   const nome = String(payload.nome || '').trim();
@@ -73,12 +83,30 @@ function normalizeParceiroPayload(payload = {}, { partial = false } = {}) {
     email: partial
       ? (payload.email !== undefined ? sanitizeText(payload.email) : undefined)
       : sanitizeText(payload.email),
+    rg: partial
+      ? (payload.rg !== undefined ? sanitizeText(payload.rg) : undefined)
+      : sanitizeText(payload.rg),
+    data_nascimento: partial
+      ? (payload.data_nascimento !== undefined ? sanitizeDateOnly(payload.data_nascimento) : undefined)
+      : sanitizeDateOnly(payload.data_nascimento),
+    nacionalidade: partial
+      ? (payload.nacionalidade !== undefined ? sanitizeText(payload.nacionalidade) : undefined)
+      : sanitizeText(payload.nacionalidade),
+    profissao: partial
+      ? (payload.profissao !== undefined ? sanitizeText(payload.profissao) : undefined)
+      : sanitizeText(payload.profissao),
+    estado_civil: partial
+      ? (payload.estado_civil !== undefined ? sanitizeText(payload.estado_civil) : undefined)
+      : sanitizeText(payload.estado_civil),
     endereco: partial
       ? (payload.endereco !== undefined ? sanitizeText(payload.endereco) : undefined)
       : sanitizeText(payload.endereco),
     numero: partial
       ? (payload.numero !== undefined ? sanitizeText(payload.numero) : undefined)
       : sanitizeText(payload.numero),
+    complemento: partial
+      ? (payload.complemento !== undefined ? sanitizeText(payload.complemento) : undefined)
+      : sanitizeText(payload.complemento),
     bairro: partial
       ? (payload.bairro !== undefined ? sanitizeText(payload.bairro) : undefined)
       : sanitizeText(payload.bairro),
@@ -95,6 +123,15 @@ function normalizeParceiroPayload(payload = {}, { partial = false } = {}) {
     cliente,
     fornecedor,
     corretor,
+    conjuge_nome: partial
+      ? (payload.conjuge_nome !== undefined ? sanitizeText(payload.conjuge_nome) : undefined)
+      : sanitizeText(payload.conjuge_nome),
+    regime_bens: partial
+      ? (payload.regime_bens !== undefined ? sanitizeText(payload.regime_bens) : undefined)
+      : sanitizeText(payload.regime_bens),
+    creci: partial
+      ? (payload.creci !== undefined ? sanitizeText(payload.creci) : undefined)
+      : sanitizeText(payload.creci),
     ativo: partial
       ? (payload.ativo !== undefined ? parseBoolean(payload.ativo, true) : undefined)
       : (payload.ativo === undefined ? true : parseBoolean(payload.ativo, true))

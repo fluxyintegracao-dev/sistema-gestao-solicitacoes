@@ -4,7 +4,7 @@ import { getMinhasObras } from '../services/obras';
 import { buscarParceiros, criarParceiro } from '../services/parceiros';
 import { getCategoriasFinanceiras } from '../services/financeiro';
 import { getComercialCategoriasContrato } from '../services/configuracoesSistema';
-import { maskCpfCnpj, maskPhone, normalizeCurrencyTyping, onlyDigits } from '../utils/formatters';
+import { maskCep, maskCpfCnpj, maskPhone, normalizeCurrencyTyping, onlyDigits } from '../utils/formatters';
 import {
   atualizarContratoComercial,
   criarContratoComercial,
@@ -118,7 +118,22 @@ function defaultPessoaRapidaForm(tipo = 'cliente') {
     cpf_cnpj: '',
     nome: '',
     telefone: '',
-    email: ''
+    email: '',
+    rg: '',
+    data_nascimento: '',
+    nacionalidade: '',
+    profissao: '',
+    estado_civil: '',
+    endereco: '',
+    numero: '',
+    complemento: '',
+    bairro: '',
+    cep: '',
+    municipio: '',
+    estado: '',
+    conjuge_nome: '',
+    regime_bens: '',
+    creci: ''
   };
 }
 
@@ -811,6 +826,21 @@ export default function ComercialContratos() {
         nome: pessoaRapidaForm.nome,
         telefone: onlyDigits(pessoaRapidaForm.telefone),
         email: pessoaRapidaForm.email,
+        rg: pessoaRapidaForm.rg,
+        data_nascimento: pessoaRapidaForm.data_nascimento,
+        nacionalidade: pessoaRapidaForm.nacionalidade,
+        profissao: pessoaRapidaForm.profissao,
+        estado_civil: pessoaRapidaForm.estado_civil,
+        endereco: pessoaRapidaForm.endereco,
+        numero: pessoaRapidaForm.numero,
+        complemento: pessoaRapidaForm.complemento,
+        bairro: pessoaRapidaForm.bairro,
+        cep: onlyDigits(pessoaRapidaForm.cep),
+        municipio: pessoaRapidaForm.municipio,
+        estado: pessoaRapidaForm.estado,
+        conjuge_nome: pessoaRapidaForm.conjuge_nome,
+        regime_bens: pessoaRapidaForm.regime_bens,
+        creci: pessoaRapidaForm.creci,
         cliente: tipo === 'cliente',
         fornecedor: tipo === 'corretor',
         corretor: tipo === 'corretor'
@@ -1750,7 +1780,7 @@ export default function ComercialContratos() {
 
       {pessoaRapidaModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="card w-full max-w-xl space-y-4">
+          <div className="card max-h-[90vh] w-full max-w-4xl space-y-4 overflow-y-auto">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h2 className="text-xl font-semibold text-[var(--c-text)]">
@@ -1765,7 +1795,7 @@ export default function ComercialContratos() {
               </button>
             </div>
 
-            <div className="grid gap-3 md:grid-cols-2">
+            <div className="grid gap-3 md:grid-cols-4">
               <label className="sol-filter-field">
                 <span className="sol-filter-label">CPF/CNPJ</span>
                 <input
@@ -1775,7 +1805,7 @@ export default function ComercialContratos() {
                   required
                 />
               </label>
-              <label className="sol-filter-field">
+              <label className="sol-filter-field md:col-span-2">
                 <span className="sol-filter-label">Nome</span>
                 <input
                   className="input w-full"
@@ -1793,12 +1823,144 @@ export default function ComercialContratos() {
                   required
                 />
               </label>
-              <label className="sol-filter-field">
+              <label className="sol-filter-field md:col-span-2">
                 <span className="sol-filter-label">E-mail</span>
                 <input
                   className="input w-full"
                   value={pessoaRapidaForm.email}
                   onChange={(e) => setPessoaRapidaForm((current) => ({ ...current, email: e.target.value }))}
+                />
+              </label>
+              {pessoaRapidaModal === 'corretor' && (
+                <label className="sol-filter-field md:col-span-2">
+                  <span className="sol-filter-label">CRECI</span>
+                  <input
+                    className="input w-full"
+                    value={pessoaRapidaForm.creci}
+                    onChange={(e) => setPessoaRapidaForm((current) => ({ ...current, creci: e.target.value }))}
+                  />
+                </label>
+              )}
+            </div>
+
+            {pessoaRapidaModal === 'cliente' && (
+              <div className="grid gap-3 md:grid-cols-4">
+                <label className="sol-filter-field">
+                  <span className="sol-filter-label">RG</span>
+                  <input
+                    className="input w-full"
+                    value={pessoaRapidaForm.rg}
+                    onChange={(e) => setPessoaRapidaForm((current) => ({ ...current, rg: e.target.value }))}
+                  />
+                </label>
+                <label className="sol-filter-field">
+                  <span className="sol-filter-label">Nascimento</span>
+                  <input
+                    className="input w-full"
+                    type="date"
+                    value={pessoaRapidaForm.data_nascimento}
+                    onChange={(e) => setPessoaRapidaForm((current) => ({ ...current, data_nascimento: e.target.value }))}
+                  />
+                </label>
+                <label className="sol-filter-field">
+                  <span className="sol-filter-label">Nacionalidade</span>
+                  <input
+                    className="input w-full"
+                    value={pessoaRapidaForm.nacionalidade}
+                    onChange={(e) => setPessoaRapidaForm((current) => ({ ...current, nacionalidade: e.target.value }))}
+                  />
+                </label>
+                <label className="sol-filter-field">
+                  <span className="sol-filter-label">Profissao</span>
+                  <input
+                    className="input w-full"
+                    value={pessoaRapidaForm.profissao}
+                    onChange={(e) => setPessoaRapidaForm((current) => ({ ...current, profissao: e.target.value }))}
+                  />
+                </label>
+                <label className="sol-filter-field">
+                  <span className="sol-filter-label">Estado civil</span>
+                  <input
+                    className="input w-full"
+                    value={pessoaRapidaForm.estado_civil}
+                    onChange={(e) => setPessoaRapidaForm((current) => ({ ...current, estado_civil: e.target.value }))}
+                  />
+                </label>
+                <label className="sol-filter-field md:col-span-2">
+                  <span className="sol-filter-label">Conjuge</span>
+                  <input
+                    className="input w-full"
+                    value={pessoaRapidaForm.conjuge_nome}
+                    onChange={(e) => setPessoaRapidaForm((current) => ({ ...current, conjuge_nome: e.target.value }))}
+                  />
+                </label>
+                <label className="sol-filter-field">
+                  <span className="sol-filter-label">Regime de bens</span>
+                  <input
+                    className="input w-full"
+                    value={pessoaRapidaForm.regime_bens}
+                    onChange={(e) => setPessoaRapidaForm((current) => ({ ...current, regime_bens: e.target.value }))}
+                  />
+                </label>
+              </div>
+            )}
+
+            <div className="grid gap-3 md:grid-cols-4">
+              <label className="sol-filter-field md:col-span-2">
+                <span className="sol-filter-label">Endereco</span>
+                <input
+                  className="input w-full"
+                  value={pessoaRapidaForm.endereco}
+                  onChange={(e) => setPessoaRapidaForm((current) => ({ ...current, endereco: e.target.value }))}
+                />
+              </label>
+              <label className="sol-filter-field">
+                <span className="sol-filter-label">Numero</span>
+                <input
+                  className="input w-full"
+                  value={pessoaRapidaForm.numero}
+                  onChange={(e) => setPessoaRapidaForm((current) => ({ ...current, numero: e.target.value }))}
+                />
+              </label>
+              <label className="sol-filter-field">
+                <span className="sol-filter-label">Complemento</span>
+                <input
+                  className="input w-full"
+                  value={pessoaRapidaForm.complemento}
+                  onChange={(e) => setPessoaRapidaForm((current) => ({ ...current, complemento: e.target.value }))}
+                />
+              </label>
+              <label className="sol-filter-field">
+                <span className="sol-filter-label">Bairro</span>
+                <input
+                  className="input w-full"
+                  value={pessoaRapidaForm.bairro}
+                  onChange={(e) => setPessoaRapidaForm((current) => ({ ...current, bairro: e.target.value }))}
+                />
+              </label>
+              <label className="sol-filter-field">
+                <span className="sol-filter-label">CEP</span>
+                <input
+                  className="input w-full"
+                  value={pessoaRapidaForm.cep}
+                  onChange={(e) => setPessoaRapidaForm((current) => ({ ...current, cep: maskCep(e.target.value) }))}
+                />
+              </label>
+              <label className="sol-filter-field">
+                <span className="sol-filter-label">Municipio</span>
+                <input
+                  className="input w-full"
+                  value={pessoaRapidaForm.municipio}
+                  onChange={(e) => setPessoaRapidaForm((current) => ({ ...current, municipio: e.target.value }))}
+                />
+              </label>
+              <label className="sol-filter-field">
+                <span className="sol-filter-label">UF</span>
+                <input
+                  className="input w-full"
+                  maxLength={2}
+                  value={pessoaRapidaForm.estado}
+                  onChange={(e) => setPessoaRapidaForm((current) => ({ ...current, estado: e.target.value.toUpperCase() }))}
                 />
               </label>
             </div>

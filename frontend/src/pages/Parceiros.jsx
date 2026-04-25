@@ -14,12 +14,21 @@ function defaultParceiroForm() {
     nome: '',
     telefone: '',
     email: '',
+    rg: '',
+    data_nascimento: '',
+    nacionalidade: '',
+    profissao: '',
+    estado_civil: '',
     endereco: '',
     numero: '',
+    complemento: '',
     bairro: '',
     cep: '',
     municipio: '',
     estado: '',
+    conjuge_nome: '',
+    regime_bens: '',
+    creci: '',
     cliente: true,
     fornecedor: true,
     corretor: false,
@@ -52,12 +61,21 @@ function pickParceiroFormData(parceiro = {}) {
     nome: parceiro.nome || '',
     telefone: maskPhone(parceiro.telefone),
     email: parceiro.email || '',
+    rg: parceiro.rg || '',
+    data_nascimento: parceiro.data_nascimento || '',
+    nacionalidade: parceiro.nacionalidade || '',
+    profissao: parceiro.profissao || '',
+    estado_civil: parceiro.estado_civil || '',
     endereco: parceiro.endereco || '',
     numero: parceiro.numero || '',
+    complemento: parceiro.complemento || '',
     bairro: parceiro.bairro || '',
     cep: maskCep(parceiro.cep),
     municipio: parceiro.municipio || '',
     estado: parceiro.estado || '',
+    conjuge_nome: parceiro.conjuge_nome || '',
+    regime_bens: parceiro.regime_bens || '',
+    creci: parceiro.creci || '',
     cliente: parceiro.cliente !== false,
     fornecedor: parceiro.fornecedor !== false,
     corretor: parceiro.corretor === true,
@@ -210,6 +228,69 @@ export default function Parceiros() {
                 onChange={(e) => setParceiroForm((current) => ({ ...current, email: e.target.value }))}
               />
 
+              <div className="text-sm font-medium text-[var(--c-text)]">Dados para contrato</div>
+
+              <div className="grid gap-3 md:grid-cols-2">
+                <input
+                  className="input w-full"
+                  placeholder="RG"
+                  value={parceiroForm.rg}
+                  onChange={(e) => setParceiroForm((current) => ({ ...current, rg: e.target.value }))}
+                />
+                <input
+                  className="input w-full"
+                  type="date"
+                  placeholder="Nascimento"
+                  value={parceiroForm.data_nascimento}
+                  onChange={(e) => setParceiroForm((current) => ({ ...current, data_nascimento: e.target.value }))}
+                />
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-2">
+                <input
+                  className="input w-full"
+                  placeholder="Nacionalidade"
+                  value={parceiroForm.nacionalidade}
+                  onChange={(e) => setParceiroForm((current) => ({ ...current, nacionalidade: e.target.value }))}
+                />
+                <input
+                  className="input w-full"
+                  placeholder="Profissao"
+                  value={parceiroForm.profissao}
+                  onChange={(e) => setParceiroForm((current) => ({ ...current, profissao: e.target.value }))}
+                />
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-2">
+                <input
+                  className="input w-full"
+                  placeholder="Estado civil"
+                  value={parceiroForm.estado_civil}
+                  onChange={(e) => setParceiroForm((current) => ({ ...current, estado_civil: e.target.value }))}
+                />
+                <input
+                  className="input w-full"
+                  placeholder="CRECI"
+                  value={parceiroForm.creci}
+                  onChange={(e) => setParceiroForm((current) => ({ ...current, creci: e.target.value }))}
+                />
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-2">
+                <input
+                  className="input w-full"
+                  placeholder="Conjuge"
+                  value={parceiroForm.conjuge_nome}
+                  onChange={(e) => setParceiroForm((current) => ({ ...current, conjuge_nome: e.target.value }))}
+                />
+                <input
+                  className="input w-full"
+                  placeholder="Regime de bens"
+                  value={parceiroForm.regime_bens}
+                  onChange={(e) => setParceiroForm((current) => ({ ...current, regime_bens: e.target.value }))}
+                />
+              </div>
+
               <div className="grid gap-3 md:grid-cols-2">
                 <input
                   className="input w-full"
@@ -224,6 +305,13 @@ export default function Parceiros() {
                   onChange={(e) => setParceiroForm((current) => ({ ...current, numero: e.target.value }))}
                 />
               </div>
+
+              <input
+                className="input w-full"
+                placeholder="Complemento"
+                value={parceiroForm.complemento}
+                onChange={(e) => setParceiroForm((current) => ({ ...current, complemento: e.target.value }))}
+              />
 
               <div className="grid gap-3 md:grid-cols-2">
                 <input
