@@ -234,7 +234,7 @@ export default function PrioridadesDiretoria() {
         <div>
           <h1 className="page-title">Prioridades Diretoria</h1>
           <p className="page-subtitle">
-            DIR_ADMIN solicita lotes de prioridade. A diretoria alvo autoriza quais solicitacoes entram no lote.
+            Usuarios autorizados solicitam lotes de prioridade. A diretoria alvo autoriza quais solicitacoes entram no lote.
           </p>
         </div>
         <select className="input w-full md:w-56" value={statusFiltro} onChange={event => trocarStatusFiltro(event.target.value)}>

@@ -35,6 +35,24 @@ const MODULO_PERMISSION_GROUPS = [
           { key: 'solicitacoes.acoes.aprovar', label: 'Aprovar / rejeitar', descricao: 'Permite aprovar ou rejeitar solicitações pendentes.' },
           { key: 'solicitacoes.acoes.ver_aba_financeiro', label: 'Ver aba Financeiro', descricao: 'Exibe a aba de títulos financeiros dentro de uma solicitação.' }
         ]
+      },
+      {
+        key: 'solicitacoes.anexos',
+        label: 'Anexos de Solicitações',
+        permissoes: [
+          { key: 'solicitacoes.anexos.excluir', label: 'Excluir anexos', descricao: 'Permite remover anexos do histórico de solicitações.' }
+        ]
+      },
+      {
+        key: 'solicitacoes.prioridades',
+        label: 'Prioridades Diretoria',
+        permissoes: [
+          { key: 'solicitacoes.prioridades.visualizar', label: 'Visualizar lotes', descricao: 'Acessar os lotes de prioridade da diretoria conforme o escopo configurado.' },
+          { key: 'solicitacoes.prioridades.criar', label: 'Criar lotes', descricao: 'Solicitar novos lotes de prioridade da diretoria.' },
+          { key: 'solicitacoes.prioridades.finalizar', label: 'Finalizar lotes', descricao: 'Selecionar solicitações e finalizar lotes de prioridade.' },
+          { key: 'solicitacoes.prioridades.cancelar', label: 'Cancelar lotes', descricao: 'Cancelar lotes abertos sem itens autorizados.' },
+          { key: 'solicitacoes.prioridades.excluir', label: 'Excluir lotes', descricao: 'Excluir lotes sem solicitações autorizadas.' }
+        ]
       }
     ]
   },
@@ -76,6 +94,13 @@ const MODULO_PERMISSION_GROUPS = [
           { key: 'financeiro.titulos.criar', label: 'Criar conta manual', descricao: 'Abrir novo título financeiro manualmente.' },
           { key: 'financeiro.titulos.baixar', label: 'Registrar baixa / pagamento', descricao: 'Quitar ou baixar parcialmente um título.' },
           { key: 'financeiro.titulos.estornar', label: 'Estornar movimento', descricao: 'Reverter uma baixa ou pagamento registrado.' }
+        ]
+      },
+      {
+        key: 'financeiro.comprovantes',
+        label: 'Comprovantes',
+        permissoes: [
+          { key: 'financeiro.comprovantes.excluir', label: 'Excluir comprovantes', descricao: 'Permite excluir comprovantes pendentes ou vinculados.' }
         ]
       },
       {

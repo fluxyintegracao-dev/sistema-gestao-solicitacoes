@@ -427,6 +427,7 @@ export default function Layout() {
       addGroup('Configuracoes', [
         item('/configuracoes', 'Configuracoes', HiOutlineCog6Tooth),
         item('/aprovacao-diretoria', 'Aprovacao Diretoria', HiOutlineAdjustmentsHorizontal),
+        item('/usuarios-acesso-prioridade-diretoria', 'Acesso Prioridades', HiOutlineUsers),
         item('/usuarios-envio-qualquer-setor', 'Envio Livre por Usuario', HiOutlineUsers),
         item('/tipos-compartilhados-setor', 'Tipos Compartilhados', HiOutlineClipboardDocumentList),
         item('/automacao-status-setor', 'Automacao por Status', HiOutlinePaperAirplane),

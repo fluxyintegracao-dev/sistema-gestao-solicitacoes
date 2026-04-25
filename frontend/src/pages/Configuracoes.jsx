@@ -143,6 +143,11 @@ const SECOES_CONFIG = [
         to: '/aprovacao-diretoria'
       },
       {
+        title: 'Acesso a Prioridades Diretoria',
+        description: 'Defina se o usuario ve todos os lotes de prioridade ou apenas diretorias especificas.',
+        to: '/usuarios-acesso-prioridade-diretoria'
+      },
+      {
         title: 'Tipos Compartilhados entre Setores',
         description: 'Permita visibilidade adicional por tipo sem transferir a area responsavel da solicitacao.',
         to: '/tipos-compartilhados-setor'

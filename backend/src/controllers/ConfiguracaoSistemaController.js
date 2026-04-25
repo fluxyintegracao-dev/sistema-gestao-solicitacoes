@@ -21,9 +21,16 @@ const {
 const {
   CHAVE_DIRETORIA_POR_CLASSIFICACAO_OBRA,
   CHAVE_SETOR_DESTINO_APOS_APROVACAO_DIRETORIA,
+  normalizarTokenSetor,
+  obterConfiguracaoAprovacaoDiretoria,
   normalizarMapaDiretoriasPorClassificacao,
   normalizarMapaSetorDestinoAprovacao
 } = require('../services/aprovacaoDiretoriaConfig');
+const {
+  normalizarMapaUsuariosAcesso,
+  obterUsuariosAcessoPrioridadeDiretoria,
+  salvarUsuariosAcessoPrioridadeDiretoria
+} = require('../services/prioridadeDiretoriaAcesso');
 const {
   CHAVE_TIPOS_COMPARTILHADOS_ENTRE_SETORES,
   CHAVE_AUTOMACAO_STATUS_SETOR,
@@ -119,6 +126,29 @@ function normalizarIdList(lista) {
       .map(item => Number(item))
       .filter(item => Number.isInteger(item) && item > 0)
   )];
+}
+
+function serializarDiretoriasPrioridade(configuracao, setoresDb = []) {
+  const mapaSetores = new Map();
+  (Array.isArray(setoresDb) ? setoresDb : []).forEach((setor) => {
+    const codigo = normalizarTokenSetor(setor?.codigo);
+    const nome = normalizarTokenSetor(setor?.nome);
+    if (codigo) mapaSetores.set(codigo, setor);
+    if (nome) mapaSetores.set(nome, setor);
+  });
+
+  return ['PUBLICA', 'PRIVADA'].map((classificacao) => {
+    const codigo = configuracao?.diretoriasPorClassificacao?.[classificacao];
+    if (!codigo) return null;
+
+    const setor = mapaSetores.get(normalizarTokenSetor(codigo));
+    return {
+      classificacao,
+      diretoria_codigo: codigo,
+      diretoria_nome: setor?.nome || codigo,
+      diretoria_label: setor?.nome ? `${setor.nome} (${codigo})` : codigo
+    };
+  }).filter(Boolean);
 }
 
 async function salvarConfiguracaoJson(chave, payload) {
@@ -558,6 +588,98 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return res.status(500).json({ error: 'Erro ao salvar configuracao de aprovacao por diretoria' });
+    }
+  },
+
+  async getUsuariosAcessoPrioridadeDiretoria(req, res) {
+    try {
+      const [configuracaoAcesso, configuracaoDiretoria, usuarios] = await Promise.all([
+        obterUsuariosAcessoPrioridadeDiretoria(),
+        obterConfiguracaoAprovacaoDiretoria(),
+        User.findAll({
+          where: {
+            perfil: { [Op.ne]: 'SUPERADMIN' }
+          },
+          attributes: ['id', 'nome', 'email', 'perfil', 'ativo', 'setor_id'],
+          include: [
+            {
+              model: Setor,
+              as: 'setor',
+              attributes: ['id', 'nome', 'codigo']
+            }
+          ],
+          order: [
+            ['ativo', 'DESC'],
+            ['nome', 'ASC']
+          ]
+        })
+      ]);
+      const diretoriasTokens = Object.values(configuracaoDiretoria?.diretoriasPorClassificacao || {})
+        .map(normalizarTokenSetor)
+        .filter(Boolean);
+      const setoresDiretorias = diretoriasTokens.length
+        ? await Setor.findAll({
+          where: {
+            [Op.or]: [
+              { codigo: { [Op.in]: diretoriasTokens } },
+              { nome: { [Op.in]: diretoriasTokens } }
+            ]
+          },
+          attributes: ['id', 'nome', 'codigo']
+        })
+        : [];
+
+      return res.json({
+        diretorias_disponiveis: serializarDiretoriasPrioridade(configuracaoDiretoria, setoresDiretorias),
+        usuarios: usuarios.map((usuario) => {
+          const acesso = configuracaoAcesso.usuarios[Number(usuario.id)] || null;
+          return {
+            id: usuario.id,
+            nome: usuario.nome,
+            email: usuario.email,
+            perfil: usuario.perfil,
+            ativo: usuario.ativo,
+            setor_id: usuario.setor_id,
+            setor: usuario.setor,
+            acesso_prioridade_diretoria: Boolean(acesso),
+            prioridade_diretoria_acesso: acesso
+          };
+        })
+      });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao buscar configuracao de acesso a prioridade diretoria' });
+    }
+  },
+
+  async updateUsuariosAcessoPrioridadeDiretoria(req, res) {
+    try {
+      const normalizado = normalizarMapaUsuariosAcesso(req.body);
+      const usuarioIds = Object.keys(normalizado).map(Number);
+
+      if (usuarioIds.length > 0) {
+        const usuariosValidos = await User.findAll({
+          where: {
+            id: { [Op.in]: usuarioIds },
+            perfil: { [Op.ne]: 'SUPERADMIN' }
+          },
+          attributes: ['id']
+        });
+        const idsValidos = new Set(usuariosValidos.map((usuario) => Number(usuario.id)));
+        const idsInvalidos = usuarioIds.filter((id) => !idsValidos.has(id));
+        if (idsInvalidos.length > 0) {
+          return res.status(400).json({
+            error: 'Um ou mais usuarios informados sao invalidos para esta configuracao.',
+            usuario_ids_invalidos: idsInvalidos
+          });
+        }
+      }
+
+      const resultado = await salvarUsuariosAcessoPrioridadeDiretoria({ usuarios: normalizado });
+      return res.json({ ok: true, ...resultado });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao salvar configuracao de acesso a prioridade diretoria' });
     }
   },
 

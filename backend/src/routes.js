@@ -1110,6 +1110,8 @@ router.get('/configuracoes/tipos-solicitacao-por-setor', ConfiguracaoSistemaCont
 router.patch('/configuracoes/tipos-solicitacao-por-setor', allowBusinessAdmin, ConfiguracaoSistemaController.updateTiposSolicitacaoPorSetor);
 router.get('/configuracoes/aprovacao-diretoria', ConfiguracaoSistemaController.getAprovacaoDiretoria);
 router.patch('/configuracoes/aprovacao-diretoria', allowBusinessAdmin, ConfiguracaoSistemaController.updateAprovacaoDiretoria);
+router.get('/configuracoes/usuarios-acesso-prioridade-diretoria', allowBusinessAdmin, ConfiguracaoSistemaController.getUsuariosAcessoPrioridadeDiretoria);
+router.patch('/configuracoes/usuarios-acesso-prioridade-diretoria', allowBusinessAdmin, ConfiguracaoSistemaController.updateUsuariosAcessoPrioridadeDiretoria);
 router.get('/configuracoes/tipos-compartilhados-setor', ConfiguracaoSistemaController.getTiposCompartilhadosSetor);
 router.patch('/configuracoes/tipos-compartilhados-setor', allowBusinessAdmin, ConfiguracaoSistemaController.updateTiposCompartilhadosSetor);
 router.get('/configuracoes/automacao-status-setor', ConfiguracaoSistemaController.getAutomacaoStatusSetor);

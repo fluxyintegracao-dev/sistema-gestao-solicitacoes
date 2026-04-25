@@ -17,6 +17,7 @@ const FINANCEIRO_PERMISSION_KEYS = [
   'financeiro.titulos.criar',
   'financeiro.titulos.baixar',
   'financeiro.titulos.estornar',
+  'financeiro.comprovantes.excluir',
   'financeiro.relatorios.visualizar',
   'financeiro.relatorios.resultado_obras',
   'financeiro.conciliacao.visualizar',
@@ -29,6 +30,34 @@ const FINANCEIRO_PERMISSION_KEYS = [
 const BOLETOS_PERMISSION_KEYS = [
   'boletos.emitir.visualizar',
   'boletos.emitir.gerar'
+];
+
+const SOLICITACOES_ANEXOS_DELETE_KEYS = [
+  'solicitacoes.anexos.excluir'
+];
+
+const SOLICITACOES_PRIORIDADES_VIEW_KEYS = [
+  'solicitacoes.prioridades.visualizar',
+  'solicitacoes.prioridades.criar',
+  'solicitacoes.prioridades.finalizar',
+  'solicitacoes.prioridades.cancelar',
+  'solicitacoes.prioridades.excluir'
+];
+
+const SOLICITACOES_PRIORIDADES_CREATE_KEYS = [
+  'solicitacoes.prioridades.criar'
+];
+
+const SOLICITACOES_PRIORIDADES_FINISH_KEYS = [
+  'solicitacoes.prioridades.finalizar'
+];
+
+const SOLICITACOES_PRIORIDADES_CANCEL_KEYS = [
+  'solicitacoes.prioridades.cancelar'
+];
+
+const SOLICITACOES_PRIORIDADES_DELETE_KEYS = [
+  'solicitacoes.prioridades.excluir'
 ];
 
 const COMPRAS_PEDIDOS_VIEW_KEYS = [
@@ -653,6 +682,86 @@ async function canGenerateBoletos(user) {
   return (await canAccessFinanceiro(user)) && userHasAreaPermission(user, ['boletos.emitir.gerar']);
 }
 
+async function canDeleteSolicitacaoAnexo(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, SOLICITACOES_ANEXOS_DELETE_KEYS);
+  }
+
+  return userHasSetorCapability(user, 'eh_setor_compras');
+}
+
+async function canViewPrioridadesDiretoria(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, SOLICITACOES_PRIORIDADES_VIEW_KEYS);
+  }
+
+  const tokens = await buildUserScopeTokens(user);
+  return (
+    tokens.includes('DIR_ADMIN') ||
+    tokens.includes('DIR_OBRAS_PUBLICAS') ||
+    tokens.includes('DIR_OBRAS_PRIVADAS')
+  );
+}
+
+async function canCreatePrioridadeDiretoriaLote(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, SOLICITACOES_PRIORIDADES_CREATE_KEYS);
+  }
+
+  const tokens = await buildUserScopeTokens(user);
+  return tokens.includes('DIR_ADMIN');
+}
+
+async function canFinalizePrioridadeDiretoriaLote(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, SOLICITACOES_PRIORIDADES_FINISH_KEYS);
+  }
+
+  const tokens = await buildUserScopeTokens(user);
+  return tokens.includes('DIR_OBRAS_PUBLICAS') || tokens.includes('DIR_OBRAS_PRIVADAS');
+}
+
+async function canCancelPrioridadeDiretoriaLote(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, SOLICITACOES_PRIORIDADES_CANCEL_KEYS);
+  }
+
+  const tokens = await buildUserScopeTokens(user);
+  return tokens.includes('DIR_ADMIN');
+}
+
+async function canDeletePrioridadeDiretoriaLote(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, SOLICITACOES_PRIORIDADES_DELETE_KEYS);
+  }
+
+  return false;
+}
+
 async function canAccessCompras(user) {
   if (isBusinessAdmin(user)) {
     return true;
@@ -1152,6 +1261,18 @@ async function canAccessComprovantes(user) {
   return canAccessFinanceiro(user);
 }
 
+async function canDeleteComprovante(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, ['financeiro.comprovantes.excluir']);
+  }
+
+  return false;
+}
+
 module.exports = {
   canAccessBoletos,
   canAccessComercial,
@@ -1164,6 +1285,11 @@ module.exports = {
   canAuditComprasPedidos,
   buildUserScopeTokens,
   canAccessComprovantes,
+  canCancelPrioridadeDiretoriaLote,
+  canCreatePrioridadeDiretoriaLote,
+  canDeleteComprovante,
+  canDeletePrioridadeDiretoriaLote,
+  canDeleteSolicitacaoAnexo,
   canEditRhDpApuracao,
   canEditProvisoes,
   canExecuteRhDpFechamento,
@@ -1180,6 +1306,7 @@ module.exports = {
   canManageCrmAutomacoes,
   canManageCrmConfiguracoes,
   canManageRhDpEmpresas,
+  canFinalizePrioridadeDiretoriaLote,
   canRedistributeCrmLeads,
   canReceiveCrmAutomationManagerNotification,
   canReceiveCrmLeadAssignment,
@@ -1192,6 +1319,7 @@ module.exports = {
   getFinanceiroObraScopeIds,
   canRetryIntegracaoSienge,
   canViewIntegracaoSienge,
+  canViewPrioridadesDiretoria,
   canSendCrmAtendimento,
   canViewComercialContratos,
   canViewComercialEmpreendimentos,

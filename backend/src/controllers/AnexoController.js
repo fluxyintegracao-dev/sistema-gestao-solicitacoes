@@ -11,8 +11,10 @@ const {
   resolveRegisteredFileResource
 } = require('../services/fileAccessService');
 const { normalizeOriginalName } = require('../utils/fileName');
-const { hasObraAccess } = require('../services/authorizationService');
-const { userHasSetorCapability } = require('../services/setorCapabilityService');
+const {
+  canDeleteSolicitacaoAnexo,
+  hasObraAccess
+} = require('../services/authorizationService');
 const { registrarEventoSeguranca } = require('../services/securityLogService');
 
 async function validarAcessoSolicitacao(req, solicitacao) {
@@ -219,12 +221,9 @@ class AnexoController {
     try {
       const { historicoId } = req.params;
       const usuario = await User.findByPk(req.user.id);
-      const perfil = String(req.user?.perfil || '').trim().toUpperCase();
-      const isSuperadmin = perfil === 'SUPERADMIN' || perfil.includes('SUPERADMIN');
-      const isSetorCompras = await userHasSetorCapability(req.user, 'eh_setor_compras');
 
-      if (!isSuperadmin && !isSetorCompras) {
-        return res.status(403).json({ error: 'Apenas SUPERADMIN ou usuarios do setor configurado como compras podem remover anexo.' });
+      if (!(await canDeleteSolicitacaoAnexo(req.user))) {
+        return res.status(403).json({ error: 'Usuario sem permissao para remover anexo.' });
       }
 
       const historico = await Historico.findByPk(historicoId);

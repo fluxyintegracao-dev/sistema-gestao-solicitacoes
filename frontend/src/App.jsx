@@ -87,6 +87,7 @@ const SetoresCriacaoTodasObras = lazy(() => import('./pages/SetoresCriacaoTodasO
 const SetoresAcessoTodasObras = lazy(() => import('./pages/SetoresAcessoTodasObras'));
 const UsuariosEnvioQualquerSetor = lazy(() => import('./pages/UsuariosEnvioQualquerSetor'));
 const UsuariosAcessoFinanceiro = lazy(() => import('./pages/UsuariosAcessoFinanceiro'));
+const UsuariosAcessoPrioridadeDiretoria = lazy(() => import('./pages/UsuariosAcessoPrioridadeDiretoria'));
 const UsuariosPermissoesRhDp = lazy(() => import('./pages/UsuariosPermissoesRhDp'));
 const PermissoesAreas = lazy(() => import('./pages/PermissoesAreas'));
 const ComunicacaoInterna = lazy(() => import('./pages/ComunicacaoInterna'));
@@ -526,6 +527,7 @@ export default function App() {
         <Route path="setores-acesso-todas-obras" element={<BusinessAdminRoute><SetoresAcessoTodasObras /></BusinessAdminRoute>} />
         <Route path="usuarios-envio-qualquer-setor" element={<BusinessAdminRoute><UsuariosEnvioQualquerSetor /></BusinessAdminRoute>} />
         <Route path="usuarios-acesso-financeiro" element={<BusinessAdminRoute><UsuariosAcessoFinanceiro /></BusinessAdminRoute>} />
+        <Route path="usuarios-acesso-prioridade-diretoria" element={<BusinessAdminRoute><UsuariosAcessoPrioridadeDiretoria /></BusinessAdminRoute>} />
         <Route path="usuarios-permissoes-rh-dp" element={<BusinessAdminRoute><UsuariosPermissoesRhDp /></BusinessAdminRoute>} />
         <Route path="permissoes-areas" element={<BusinessAdminRoute><PermissoesAreas /></BusinessAdminRoute>} />
         <Route path="arquivos-modelos-config" element={<SuperadminRoute><ArquivosModelosConfig /></SuperadminRoute>} />

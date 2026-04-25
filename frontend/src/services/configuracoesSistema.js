@@ -252,6 +252,27 @@ export async function salvarUsuariosAcessoFinanceiro(data) {
   return res.json();
 }
 
+export async function getUsuariosAcessoPrioridadeDiretoria() {
+  const res = await fetch(`${API_URL}/configuracoes/usuarios-acesso-prioridade-diretoria`, {
+    headers: authHeaders()
+  });
+  if (!res.ok) throw new Error('Erro ao buscar configuracao de acesso a prioridade diretoria');
+  return res.json();
+}
+
+export async function salvarUsuariosAcessoPrioridadeDiretoria(data) {
+  const res = await fetch(`${API_URL}/configuracoes/usuarios-acesso-prioridade-diretoria`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+  if (!res.ok) {
+    const payload = await res.json().catch(() => null);
+    throw new Error(payload?.error || 'Erro ao salvar configuracao de acesso a prioridade diretoria');
+  }
+  return res.json();
+}
+
 export async function getUsuariosPermissoesRhDp() {
   const res = await fetch(`${API_URL}/configuracoes/usuarios-permissoes-rh-dp`, {
     headers: authHeaders()

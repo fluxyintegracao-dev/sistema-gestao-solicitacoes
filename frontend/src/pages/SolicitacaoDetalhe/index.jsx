@@ -15,7 +15,7 @@ import ModalEnviarSetor from '../Solicitacoes/ModalEnviarSetor';
 import { aprovarDiretoriaSolicitacao, updateStatusSolicitacao } from '../../services/solicitacoes';
 import { API_URL, authHeaders } from '../../services/api';
 import { isGeoSetor, solicitacaoEstaNoSetorDoUsuario, userHasSetorCapability } from '../../utils/setor';
-import { canAccessFinanceiro, hasEnabledModule } from '../../utils/acessoProduto';
+import { canAccessFinanceiro, canDeleteSolicitacaoAnexo, hasEnabledModule } from '../../utils/acessoProduto';
 
 export default function SolicitacaoDetalhe() {
   const { id } = useParams();
@@ -29,7 +29,6 @@ export default function SolicitacaoDetalhe() {
   ];
 
   const isSetorGeo = setorTokens.some(isGeoSetor);
-  const isSetorCompras = userHasSetorCapability(user, 'eh_setor_compras');
   const isSetorFinanceiro = setorTokens.includes('FINANCEIRO') || userHasSetorCapability(user, 'eh_setor_financeiro');
   const isSuperadmin = String(user?.perfil || '').trim().toUpperCase() === 'SUPERADMIN';
   const isFinanceiro = canAccessFinanceiro(user);
@@ -176,7 +175,7 @@ export default function SolicitacaoDetalhe() {
       <div className="grid md:grid-cols-2 gap-6">
         <Timeline
           historicos={solicitacao.historicos || []}
-          canRemoveAnexo={isSetorCompras || isSuperadmin}
+          canRemoveAnexo={canDeleteSolicitacaoAnexo(user)}
           onAnexoRemovido={carregar}
         />
 

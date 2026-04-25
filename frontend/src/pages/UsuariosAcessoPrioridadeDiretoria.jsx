@@ -4,6 +4,10 @@ import {
   salvarUsuariosAcessoPrioridadeDiretoria
 } from '../services/configuracoesSistema';
 
+const MODO_NENHUM = 'NENHUM';
+const MODO_TODOS = 'TODOS';
+const MODO_DIRETORIAS = 'DIRETORIAS';
+
 function normalizarTexto(valor) {
   return String(valor || '')
     .trim()
@@ -12,9 +16,27 @@ function normalizarTexto(valor) {
     .replace(/[\u0300-\u036f]/g, '');
 }
 
+function normalizarAcesso(acesso) {
+  const modo = String(acesso?.modo || '').trim().toUpperCase();
+  if (modo === MODO_TODOS) {
+    return { modo: MODO_TODOS, diretorias: [] };
+  }
+
+  const diretorias = Array.isArray(acesso?.diretorias)
+    ? [...new Set(acesso.diretorias.map(item => String(item || '').trim().toUpperCase()).filter(Boolean))]
+    : [];
+
+  if (modo === MODO_DIRETORIAS && diretorias.length > 0) {
+    return { modo: MODO_DIRETORIAS, diretorias };
+  }
+
+  return { modo: MODO_NENHUM, diretorias: [] };
+}
+
 export default function UsuariosAcessoPrioridadeDiretoria() {
   const [usuarios, setUsuarios] = useState([]);
-  const [selecionados, setSelecionados] = useState(new Set());
+  const [diretorias, setDiretorias] = useState([]);
+  const [acessos, setAcessos] = useState({});
   const [busca, setBusca] = useState('');
   const [salvando, setSalvando] = useState(false);
   const [carregando, setCarregando] = useState(true);
@@ -26,11 +48,11 @@ export default function UsuariosAcessoPrioridadeDiretoria() {
         const data = await getUsuariosAcessoPrioridadeDiretoria();
         const lista = Array.isArray(data?.usuarios) ? data.usuarios : [];
         setUsuarios(lista);
-        setSelecionados(new Set(
-          lista
-            .filter(usuario => Boolean(usuario?.acesso_prioridade_diretoria))
-            .map(usuario => String(usuario.id))
-        ));
+        setDiretorias(Array.isArray(data?.diretorias_disponiveis) ? data.diretorias_disponiveis : []);
+        setAcessos(lista.reduce((acc, usuario) => {
+          acc[String(usuario.id)] = normalizarAcesso(usuario?.prioridade_diretoria_acesso);
+          return acc;
+        }, {}));
       } catch (error) {
         console.error(error);
         alert('Erro ao carregar usuarios com acesso a prioridade diretoria.');
@@ -58,33 +80,71 @@ export default function UsuariosAcessoPrioridadeDiretoria() {
       .sort((a, b) => String(a?.nome || '').localeCompare(String(b?.nome || ''), 'pt-BR', { sensitivity: 'base' }));
   }, [usuarios, busca]);
 
-  function alternarUsuario(usuarioId) {
-    const key = String(usuarioId);
-    setSelecionados((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) {
-        next.delete(key);
-      } else {
-        next.add(key);
+  const totalConfigurados = useMemo(() => Object.values(acessos).filter(item => item?.modo !== MODO_NENHUM).length, [acessos]);
+
+  function primeiraDiretoriaDisponivel() {
+    return String(diretorias[0]?.classificacao || '').trim().toUpperCase();
+  }
+
+  function alterarModo(usuarioId, modo) {
+    const id = String(usuarioId);
+    const novoModo = String(modo || MODO_NENHUM).toUpperCase();
+    setAcessos((prev) => {
+      const atual = normalizarAcesso(prev[id]);
+      if (novoModo === MODO_TODOS) {
+        return { ...prev, [id]: { modo: MODO_TODOS, diretorias: [] } };
       }
-      return next;
+      if (novoModo === MODO_DIRETORIAS) {
+        return {
+          ...prev,
+          [id]: {
+            modo: MODO_DIRETORIAS,
+            diretorias: atual.diretorias.length ? atual.diretorias : [primeiraDiretoriaDisponivel()].filter(Boolean)
+          }
+        };
+      }
+      return { ...prev, [id]: { modo: MODO_NENHUM, diretorias: [] } };
+    });
+  }
+
+  function alternarDiretoria(usuarioId, classificacao) {
+    const id = String(usuarioId);
+    const chave = String(classificacao || '').trim().toUpperCase();
+    if (!chave) return;
+
+    setAcessos((prev) => {
+      const atual = normalizarAcesso(prev[id]);
+      const selecionadas = new Set(atual.diretorias);
+      if (selecionadas.has(chave)) selecionadas.delete(chave);
+      else selecionadas.add(chave);
+      return {
+        ...prev,
+        [id]: {
+          modo: MODO_DIRETORIAS,
+          diretorias: Array.from(selecionadas)
+        }
+      };
     });
   }
 
   function selecionarTodosFiltrados() {
-    setSelecionados((prev) => {
-      const next = new Set(prev);
+    setAcessos((prev) => {
+      const next = { ...prev };
       usuariosFiltrados
         .filter(usuario => usuario?.ativo !== false)
-        .forEach((usuario) => next.add(String(usuario.id)));
+        .forEach((usuario) => {
+          next[String(usuario.id)] = { modo: MODO_TODOS, diretorias: [] };
+        });
       return next;
     });
   }
 
   function limparTodosFiltrados() {
-    setSelecionados((prev) => {
-      const next = new Set(prev);
-      usuariosFiltrados.forEach((usuario) => next.delete(String(usuario.id)));
+    setAcessos((prev) => {
+      const next = { ...prev };
+      usuariosFiltrados.forEach((usuario) => {
+        next[String(usuario.id)] = { modo: MODO_NENHUM, diretorias: [] };
+      });
       return next;
     });
   }
@@ -92,15 +152,17 @@ export default function UsuariosAcessoPrioridadeDiretoria() {
   async function salvar() {
     try {
       setSalvando(true);
-      const usuarioIds = Array.from(selecionados)
-        .map((id) => Number(id))
-        .filter((id) => Number.isInteger(id) && id > 0);
+      const usuariosPayload = Object.entries(acessos).reduce((acc, [usuarioId, acesso]) => {
+        const normalizado = normalizarAcesso(acesso);
+        if (normalizado.modo === MODO_TODOS) {
+          acc[usuarioId] = { modo: MODO_TODOS, diretorias: [] };
+        } else if (normalizado.modo === MODO_DIRETORIAS && normalizado.diretorias.length > 0) {
+          acc[usuarioId] = { modo: MODO_DIRETORIAS, diretorias: normalizado.diretorias };
+        }
+        return acc;
+      }, {});
 
-      await salvarUsuariosAcessoPrioridadeDiretoria({ usuario_ids: usuarioIds });
-      setUsuarios((prev) => prev.map((usuario) => ({
-        ...usuario,
-        acesso_prioridade_diretoria: selecionados.has(String(usuario.id))
-      })));
+      await salvarUsuariosAcessoPrioridadeDiretoria({ usuarios: usuariosPayload });
       alert('Configuracao salva com sucesso.');
     } catch (error) {
       console.error(error);
@@ -115,7 +177,7 @@ export default function UsuariosAcessoPrioridadeDiretoria() {
       <div>
         <h1 className="text-2xl font-semibold">Acesso a Prioridade Diretoria</h1>
         <p className="text-sm text-gray-600 mt-1">
-          Marque usuarios que podem acessar a pagina de prioridades para consultar lotes e solicitacoes autorizadas.
+          Defina quais usuarios acessam os lotes de prioridade e se enxergam todos os lotes ou apenas diretorias especificas.
         </p>
       </div>
 
@@ -133,7 +195,7 @@ export default function UsuariosAcessoPrioridadeDiretoria() {
 
           <div className="flex gap-2 flex-wrap">
             <button type="button" className="btn btn-outline" onClick={selecionarTodosFiltrados}>
-              Selecionar filtrados
+              Todos os lotes filtrados
             </button>
             <button type="button" className="btn btn-outline" onClick={limparTodosFiltrados}>
               Limpar filtrados
@@ -142,41 +204,74 @@ export default function UsuariosAcessoPrioridadeDiretoria() {
         </div>
 
         <div className="text-sm text-gray-600">
-          Marcados: <strong>{selecionados.size}</strong>
+          Usuarios configurados: <strong>{totalConfigurados}</strong>
         </div>
+
+        {diretorias.length === 0 && (
+          <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-800">
+            Nenhuma diretoria esta configurada em Aprovacao por Diretoria. Configure as diretorias antes de limitar por diretoria especifica.
+          </div>
+        )}
 
         {carregando ? (
           <p className="text-sm text-gray-600">Carregando usuarios...</p>
         ) : (
           <div className="grid grid-cols-1 gap-2">
             {usuariosFiltrados.map((usuario) => {
-              const marcado = selecionados.has(String(usuario.id));
+              const acesso = normalizarAcesso(acessos[String(usuario.id)]);
               const setorLabel = usuario?.setor?.nome || usuario?.setor?.codigo || '-';
               const ativo = usuario?.ativo !== false;
 
               return (
-                <label
+                <div
                   key={usuario.id}
-                  className="flex items-start gap-3 rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] p-3 text-sm"
+                  className="rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] p-3 text-sm"
                 >
-                  <input
-                    type="checkbox"
-                    className="mt-1"
-                    checked={marcado}
-                    disabled={!ativo}
-                    onChange={() => alternarUsuario(usuario.id)}
-                  />
+                  <div className="grid gap-3 md:grid-cols-[1fr_240px] md:items-start">
+                    <div className="grid gap-1">
+                      <span className="font-medium text-[var(--c-text)]">
+                        {usuario.nome}
+                        {!ativo ? ' (inativo)' : ''}
+                      </span>
+                      <span className="text-[var(--c-muted)]">
+                        {usuario.email} - {String(usuario.perfil || '').toUpperCase()} - {setorLabel}
+                      </span>
+                    </div>
 
-                  <span className="grid gap-1">
-                    <span className="font-medium text-[var(--c-text)]">
-                      {usuario.nome}
-                      {!ativo ? ' (inativo)' : ''}
-                    </span>
-                    <span className="text-[var(--c-muted)]">
-                      {usuario.email} - {String(usuario.perfil || '').toUpperCase()} - {setorLabel}
-                    </span>
-                  </span>
-                </label>
+                    <label className="grid gap-1">
+                      Escopo
+                      <select
+                        className="input"
+                        value={acesso.modo}
+                        disabled={!ativo}
+                        onChange={(event) => alterarModo(usuario.id, event.target.value)}
+                      >
+                        <option value={MODO_NENHUM}>Sem acesso</option>
+                        <option value={MODO_TODOS}>Todos os lotes</option>
+                        <option value={MODO_DIRETORIAS}>Diretorias especificas</option>
+                      </select>
+                    </label>
+                  </div>
+
+                  {acesso.modo === MODO_DIRETORIAS && (
+                    <div className="mt-3 flex flex-wrap gap-3">
+                      {diretorias.map((diretoria) => {
+                        const classificacao = String(diretoria.classificacao || '').toUpperCase();
+                        return (
+                          <label key={`${usuario.id}-${classificacao}`} className="inline-flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              checked={acesso.diretorias.includes(classificacao)}
+                              disabled={!ativo}
+                              onChange={() => alternarDiretoria(usuario.id, classificacao)}
+                            />
+                            <span>{classificacao} - {diretoria.diretoria_label}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               );
             })}
 

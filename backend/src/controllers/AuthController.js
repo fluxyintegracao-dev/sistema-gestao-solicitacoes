@@ -28,6 +28,7 @@ const {
 } = require('../services/mfaService');
 const { isMfaRequiredProfile } = require('../services/mfaPolicyService');
 const { listarSetoresDoUsuario } = require('../services/usuariosSetores');
+const { obterAcessoPrioridadeDiretoriaPorUsuario } = require('../services/prioridadeDiretoriaAcesso');
 
 const SETOR_ATTRIBUTES = [
   'id',
@@ -63,6 +64,7 @@ async function buildSessionUser(user) {
   const financeiroLiberado = await canAccessFinanceiro(user);
   const capacidadesRhDp = await getRhDpCapabilitiesForUser(user);
   const areasPermissoes = await getAreasPermissoesForUser(user);
+  const prioridadeDiretoriaAcesso = await obterAcessoPrioridadeDiretoriaPorUsuario(user.id);
   const mfaRequiredByPolicy = isMfaRequiredProfile(user);
   const mfaEnabled = Boolean(user.mfa_totp_enabled);
   const setores = await listarSetoresDoUsuario(user);
@@ -79,6 +81,7 @@ async function buildSessionUser(user) {
     rh_dp_capacidades: capacidadesRhDp.filter((item) => item.startsWith('rh_dp_')),
     integracao_sienge_capacidades: capacidadesRhDp.filter((item) => item.startsWith('integracao_sienge_')),
     areas_permissoes: areasPermissoes,
+    prioridade_diretoria_acesso: prioridadeDiretoriaAcesso,
     pode_criar_solicitacao_compra: Boolean(user.pode_criar_solicitacao_compra),
     pode_enviar_qualquer_setor: Boolean(user.pode_enviar_qualquer_setor),
     modulos_habilitados: modules,

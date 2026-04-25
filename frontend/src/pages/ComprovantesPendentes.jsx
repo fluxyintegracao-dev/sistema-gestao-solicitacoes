@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import PreviewAnexoModal from './SolicitacaoDetalhe/PreviewAnexoModal';
 import { fileUrl } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
+import { canDeleteComprovante } from '../utils/acessoProduto';
 import {
   getComprovantesPendentes,
   buscarSolicitacoesParaComprovante,
@@ -19,7 +20,7 @@ export default function ComprovantesPendentes() {
   const [buscando, setBuscando] = useState(false);
   const [vinculando, setVinculando] = useState({});
   const [preview, setPreview] = useState(null);
-  const isSuperadmin = String(user?.perfil || '').trim().toUpperCase() === 'SUPERADMIN';
+  const podeExcluirComprovante = canDeleteComprovante(user);
 
   useEffect(() => {
     carregarPendentes();
@@ -232,7 +233,7 @@ export default function ComprovantesPendentes() {
                     >
                       {vinculando[item.id] ? 'Vinculando...' : 'Vincular'}
                     </button>
-                    {isSuperadmin && (
+                    {podeExcluirComprovante && (
                       <button
                         className="btn btn-danger"
                         type="button"

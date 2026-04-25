@@ -58,7 +58,17 @@ export function canAccessSolicitacoes(user) {
 
 export function canAccessPrioridadesDiretoria(user) {
   if (!canAccessSolicitacoes(user)) return false;
-  if (isSuperadmin(user)) return true;
+  if (isBusinessAdmin(user)) return true;
+  if (user?.prioridade_diretoria_acesso) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasAnyPermissao(user, [
+      'solicitacoes.prioridades.visualizar',
+      'solicitacoes.prioridades.criar',
+      'solicitacoes.prioridades.finalizar',
+      'solicitacoes.prioridades.cancelar',
+      'solicitacoes.prioridades.excluir'
+    ]);
+  }
 
   const tokens = [
     user?.setor?.codigo,
@@ -75,6 +85,14 @@ export function canAccessPrioridadesDiretoria(user) {
     tokens.includes('DIR_OBRAS_PUBLICAS') ||
     tokens.includes('DIR_OBRAS_PRIVADAS')
   );
+}
+
+export function canDeleteSolicitacaoAnexo(user) {
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasPermissao(user, 'solicitacoes.anexos.excluir');
+  }
+  return userHasSetorCapability(user, 'eh_setor_compras');
 }
 
 export function canAccessCompras(user) {
@@ -157,6 +175,7 @@ export function canAccessFinanceiro(user) {
       'financeiro.titulos.criar',
       'financeiro.titulos.baixar',
       'financeiro.titulos.estornar',
+      'financeiro.comprovantes.excluir',
       'financeiro.relatorios.visualizar',
       'financeiro.relatorios.resultado_obras',
       'financeiro.conciliacao.visualizar',
@@ -172,6 +191,14 @@ export function canAccessFinanceiro(user) {
     normalizeToken(user?.perfil) === 'FINANCEIRO' ||
     userHasSetorCapability(user, 'eh_setor_financeiro')
   );
+}
+
+export function canDeleteComprovante(user) {
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasPermissao(user, 'financeiro.comprovantes.excluir');
+  }
+  return false;
 }
 
 export function canAccessBoletos(user) {

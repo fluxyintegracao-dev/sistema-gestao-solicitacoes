@@ -2,6 +2,7 @@ const { Comprovante, Solicitacao, Obra, Historico, Sequelize } = require('../mod
 const { Op } = require('sequelize');
 const { uploadToS3 } = require('../services/s3');
 const { normalizeOriginalName } = require('../utils/fileName');
+const { canDeleteComprovante } = require('../services/authorizationService');
 
 function extrairInfo(nome) {
   const result = {
@@ -152,9 +153,8 @@ module.exports = {
 
   async remover(req, res) {
     try {
-      const perfil = String(req.user?.perfil || '').trim().toUpperCase();
-      if (perfil !== 'SUPERADMIN') {
-        return res.status(403).json({ error: 'Apenas SUPERADMIN pode excluir comprovante.' });
+      if (!(await canDeleteComprovante(req.user))) {
+        return res.status(403).json({ error: 'Usuario sem permissao para excluir comprovante.' });
       }
 
       const { id } = req.params;

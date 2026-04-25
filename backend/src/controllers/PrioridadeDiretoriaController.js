@@ -16,6 +16,17 @@ const {
 } = require('../services/aprovacaoDiretoriaConfig');
 const { obterTokensSetoresUsuario } = require('../services/usuariosSetores');
 const { criarNotificacao } = require('../services/notificacoes');
+const {
+  canCancelPrioridadeDiretoriaLote,
+  canCreatePrioridadeDiretoriaLote,
+  canDeletePrioridadeDiretoriaLote,
+  canFinalizePrioridadeDiretoriaLote,
+  canViewPrioridadesDiretoria
+} = require('../services/authorizationService');
+const {
+  MODO_ACESSO_TODOS,
+  obterAcessoPrioridadeDiretoriaPorUsuario
+} = require('../services/prioridadeDiretoriaAcesso');
 
 const STATUS_LOTE = {
   ABERTO: 'ABERTO',
@@ -52,16 +63,70 @@ function usuarioPertenceAoSetor(tokensUsuario = [], tokenSetor = null) {
   ));
 }
 
+function obterClassificacoesDisponiveis(configuracao) {
+  return ['PUBLICA', 'PRIVADA'];
+}
+
+function normalizarClassificacoesPermitidas(lista, classificacoesDisponiveis = []) {
+  const disponiveis = new Set(classificacoesDisponiveis);
+  return [...new Set(
+    (Array.isArray(lista) ? lista : [])
+      .map(normalizarClassificacaoObra)
+      .filter((classificacao) => classificacao && disponiveis.has(classificacao))
+  )];
+}
+
+function resolverEscopoAcesso(acessoUsuario, classificacoesDisponiveis = []) {
+  if (!acessoUsuario) return null;
+  if (acessoUsuario.modo === MODO_ACESSO_TODOS) {
+    return [...classificacoesDisponiveis];
+  }
+  return normalizarClassificacoesPermitidas(acessoUsuario.diretorias, classificacoesDisponiveis);
+}
+
+function todasClassificacoesPermitidas(classificacoes = [], classificacoesDisponiveis = []) {
+  if (!classificacoesDisponiveis.length) return false;
+  const atuais = new Set(classificacoes);
+  return classificacoesDisponiveis.every((classificacao) => atuais.has(classificacao));
+}
+
 async function obterPermissoesPrioridade(req) {
   const configuracao = await obterConfiguracaoAprovacaoDiretoria();
   const perfil = String(req.user?.perfil || '').trim().toUpperCase();
   const tokensUsuario = await obterTokensSetoresUsuario(req.user, req.user?.area ? [req.user.area] : []);
   const isSuperadmin = perfil === 'SUPERADMIN';
   const isDirAdmin = isSuperadmin || usuarioPertenceAoSetor(tokensUsuario, DIRETORIA_ADMIN_CODIGO);
-  const classificacoesOperaveis = ['PUBLICA', 'PRIVADA'].filter((classificacao) => {
+  const classificacoesDisponiveis = obterClassificacoesDisponiveis(configuracao);
+  const classificacoesLegado = classificacoesDisponiveis.filter((classificacao) => {
     const diretoria = configuracao?.diretoriasPorClassificacao?.[classificacao];
     return diretoria && usuarioPertenceAoSetor(tokensUsuario, diretoria);
   });
+  const acessoUsuario = await obterAcessoPrioridadeDiretoriaPorUsuario(req.user?.id);
+  const escopoConfigurado = resolverEscopoAcesso(acessoUsuario, classificacoesDisponiveis);
+  const temEscopoConfigurado = Array.isArray(escopoConfigurado) && escopoConfigurado.length > 0;
+  const escopoPadrao = escopoConfigurado || (classificacoesLegado.length ? classificacoesLegado : classificacoesDisponiveis);
+
+  const [
+    podeVisualizarPermissao,
+    podeCriarPermissao,
+    podeFinalizarPermissao,
+    podeCancelarPermissao,
+    podeExcluirPermissao
+  ] = await Promise.all([
+    canViewPrioridadesDiretoria(req.user),
+    canCreatePrioridadeDiretoriaLote(req.user),
+    canFinalizePrioridadeDiretoriaLote(req.user),
+    canCancelPrioridadeDiretoriaLote(req.user),
+    canDeletePrioridadeDiretoriaLote(req.user)
+  ]);
+
+  const classificacoesOperaveis = isSuperadmin || isDirAdmin || podeVisualizarPermissao || temEscopoConfigurado
+    ? escopoPadrao
+    : classificacoesLegado;
+  const classificacoesCriaveis = isSuperadmin || isDirAdmin || podeCriarPermissao ? escopoPadrao : [];
+  const classificacoesFinalizaveis = isSuperadmin || podeFinalizarPermissao ? escopoPadrao : classificacoesLegado;
+  const classificacoesCancelaveis = isSuperadmin || isDirAdmin || podeCancelarPermissao ? escopoPadrao : [];
+  const classificacoesExcluiveis = isSuperadmin || podeExcluirPermissao ? escopoPadrao : [];
 
   return {
     configuracao,
@@ -69,25 +134,40 @@ async function obterPermissoesPrioridade(req) {
     tokensUsuario,
     isSuperadmin,
     isDirAdmin,
-    podeSolicitarLote: isDirAdmin,
+    acessoUsuario,
+    classificacoesDisponiveis,
+    podeSolicitarLote: classificacoesCriaveis.length > 0,
+    podeVisualizarTodasClassificacoes: classificacoesDisponiveis.length === 0
+      ? (isSuperadmin || isDirAdmin || podeVisualizarPermissao || temEscopoConfigurado)
+      : todasClassificacoesPermitidas(classificacoesOperaveis, classificacoesDisponiveis),
     classificacoesOperaveis,
-    podeAcessarModulo: isDirAdmin || classificacoesOperaveis.length > 0
+    classificacoesCriaveis,
+    classificacoesFinalizaveis,
+    classificacoesCancelaveis,
+    classificacoesExcluiveis,
+    podeAcessarModulo: podeVisualizarPermissao || isDirAdmin || temEscopoConfigurado || classificacoesOperaveis.length > 0
   };
 }
 
-function permissoesTemClassificacao(permissoes, classificacao) {
+function permissoesTemClassificacao(permissoes, classificacao, campo = 'classificacoesOperaveis') {
   const valor = normalizarClassificacaoObra(classificacao);
-  return Boolean(valor && permissoes?.classificacoesOperaveis?.includes(valor));
+  return Boolean(valor && permissoes?.[campo]?.includes(valor));
 }
 
 function usuarioPodeVisualizarLote(permissoes, lote) {
-  if (permissoes?.isSuperadmin || permissoes?.isDirAdmin) return true;
   return permissoesTemClassificacao(permissoes, lote?.classificacao_alvo);
 }
 
 function usuarioPodeFinalizarLote(permissoes, lote) {
-  if (permissoes?.isSuperadmin) return true;
-  return permissoesTemClassificacao(permissoes, lote?.classificacao_alvo);
+  return permissoesTemClassificacao(permissoes, lote?.classificacao_alvo, 'classificacoesFinalizaveis');
+}
+
+function usuarioPodeCancelarLote(permissoes, lote) {
+  return permissoesTemClassificacao(permissoes, lote?.classificacao_alvo, 'classificacoesCancelaveis');
+}
+
+function usuarioPodeExcluirLote(permissoes, lote) {
+  return permissoesTemClassificacao(permissoes, lote?.classificacao_alvo, 'classificacoesExcluiveis');
 }
 
 function calcularResumoPagamentoSolicitacao(solicitacao) {
@@ -281,7 +361,7 @@ async function obterSetoresPorTokens(tokens = []) {
   });
 }
 
-function serializarDiretoriasDisponiveis(configuracao, setoresDb = []) {
+function serializarDiretoriasDisponiveis(configuracao, setoresDb = [], classificacoesPermitidas = []) {
   const mapaSetores = new Map();
   (Array.isArray(setoresDb) ? setoresDb : []).forEach((setor) => {
     const codigo = normalizarTokenSetor(setor?.codigo);
@@ -289,8 +369,13 @@ function serializarDiretoriasDisponiveis(configuracao, setoresDb = []) {
     if (codigo) mapaSetores.set(codigo, setor);
     if (nome) mapaSetores.set(nome, setor);
   });
+  const permitidas = new Set(normalizarClassificacoesPermitidas(
+    classificacoesPermitidas?.length ? classificacoesPermitidas : obterClassificacoesDisponiveis(configuracao),
+    obterClassificacoesDisponiveis(configuracao)
+  ));
 
   return ['PUBLICA', 'PRIVADA'].map((classificacao) => {
+    if (!permitidas.has(classificacao)) return null;
     const codigo = configuracao?.diretoriasPorClassificacao?.[classificacao];
     if (!codigo) return null;
     const setor = mapaSetores.get(normalizarTokenSetor(codigo));
@@ -316,10 +401,18 @@ module.exports = {
         permissoes: {
           pode_solicitar_lote: permissoes.podeSolicitarLote,
           classificacoes_operaveis: permissoes.classificacoesOperaveis,
+          classificacoes_criaveis: permissoes.classificacoesCriaveis,
+          classificacoes_finalizaveis: permissoes.classificacoesFinalizaveis,
+          classificacoes_cancelaveis: permissoes.classificacoesCancelaveis,
+          classificacoes_excluiveis: permissoes.classificacoesExcluiveis,
           is_superadmin: permissoes.isSuperadmin,
           is_dir_admin: permissoes.isDirAdmin
         },
-        diretorias_disponiveis: serializarDiretoriasDisponiveis(permissoes.configuracao, diretoriasDb)
+        diretorias_disponiveis: serializarDiretoriasDisponiveis(
+          permissoes.configuracao,
+          diretoriasDb,
+          permissoes.podeSolicitarLote ? permissoes.classificacoesCriaveis : permissoes.classificacoesOperaveis
+        )
       });
     } catch (error) {
       console.error(error);
@@ -336,7 +429,7 @@ module.exports = {
       const where = {};
       const status = normalizarStatusLote(req.query?.status);
       if (status) where.status = status;
-      if (!permissoes.isSuperadmin && !permissoes.isDirAdmin) {
+      if (!permissoes.podeVisualizarTodasClassificacoes) {
         where.classificacao_alvo = { [Op.in]: permissoes.classificacoesOperaveis };
       }
       const lotes = await PrioridadeLote.findAll({
@@ -352,8 +445,8 @@ module.exports = {
         items: lotes.map((lote) => ({
           ...serializarLote(lote, resumoItens.get(Number(lote.id))),
           pode_finalizar: usuarioPodeFinalizarLote(permissoes, lote) && lote.status === STATUS_LOTE.ABERTO,
-          pode_cancelar: (permissoes.isSuperadmin || permissoes.isDirAdmin) && lote.status === STATUS_LOTE.ABERTO,
-          pode_excluir: Boolean(permissoes.isSuperadmin)
+          pode_cancelar: usuarioPodeCancelarLote(permissoes, lote) && lote.status === STATUS_LOTE.ABERTO,
+          pode_excluir: usuarioPodeExcluirLote(permissoes, lote)
         }))
       });
     } catch (error) {
@@ -366,12 +459,15 @@ module.exports = {
     try {
       const permissoes = await obterPermissoesPrioridade(req);
       if (!permissoes.podeSolicitarLote) {
-        return res.status(403).json({ error: 'Apenas DIR_ADMIN pode solicitar lotes de prioridade.' });
+        return res.status(403).json({ error: 'Usuario sem permissao para solicitar lotes de prioridade.' });
       }
       const classificacaoAlvo = normalizarClassificacaoObra(req.body?.classificacao_alvo);
       const valorDisponivel = Number(req.body?.valor_disponivel);
       const observacao = String(req.body?.observacao || '').trim();
       if (!classificacaoAlvo) return res.status(400).json({ error: 'Informe a diretoria alvo do lote.' });
+      if (!permissoes.classificacoesCriaveis.includes(classificacaoAlvo)) {
+        return res.status(403).json({ error: 'Usuario sem permissao para criar lote nesta diretoria.' });
+      }
       if (!Number.isFinite(valorDisponivel) || valorDisponivel <= 0) {
         return res.status(400).json({ error: 'Informe um valor disponivel valido para o lote.' });
       }
@@ -419,8 +515,8 @@ module.exports = {
             solicitacao: item.solicitacao ? serializarSolicitacaoPrioridade(item.solicitacao) : null
           })),
           pode_finalizar: usuarioPodeFinalizarLote(permissoes, lote) && lote.status === STATUS_LOTE.ABERTO,
-          pode_cancelar: (permissoes.isSuperadmin || permissoes.isDirAdmin) && lote.status === STATUS_LOTE.ABERTO,
-          pode_excluir: Boolean(permissoes.isSuperadmin)
+          pode_cancelar: usuarioPodeCancelarLote(permissoes, lote) && lote.status === STATUS_LOTE.ABERTO,
+          pode_excluir: usuarioPodeExcluirLote(permissoes, lote)
         }
       });
     } catch (error) {
@@ -547,11 +643,11 @@ module.exports = {
   async cancelar(req, res) {
     try {
       const permissoes = await obterPermissoesPrioridade(req);
-      if (!permissoes.isSuperadmin && !permissoes.isDirAdmin) {
-        return res.status(403).json({ error: 'Apenas DIR_ADMIN pode cancelar lotes.' });
-      }
       const lote = await PrioridadeLote.findByPk(req.params.id);
       if (!lote) return res.status(404).json({ error: 'Lote de prioridade nao encontrado.' });
+      if (!usuarioPodeCancelarLote(permissoes, lote)) {
+        return res.status(403).json({ error: 'Usuario sem permissao para cancelar este lote.' });
+      }
       if (String(lote.status || '').toUpperCase() !== STATUS_LOTE.ABERTO) {
         return res.status(400).json({ error: 'Apenas lotes abertos podem ser cancelados.' });
       }
@@ -571,14 +667,14 @@ module.exports = {
     const transaction = await PrioridadeLote.sequelize.transaction();
     try {
       const permissoes = await obterPermissoesPrioridade(req);
-      if (!permissoes.isSuperadmin) {
-        await transaction.rollback();
-        return res.status(403).json({ error: 'Apenas SUPERADMIN pode excluir lotes.' });
-      }
       const lote = await PrioridadeLote.findByPk(req.params.id, { transaction });
       if (!lote) {
         await transaction.rollback();
         return res.status(404).json({ error: 'Lote de prioridade nao encontrado.' });
+      }
+      if (!usuarioPodeExcluirLote(permissoes, lote)) {
+        await transaction.rollback();
+        return res.status(403).json({ error: 'Usuario sem permissao para excluir este lote.' });
       }
       const itensCount = await PrioridadeLoteItem.count({ where: { lote_id: lote.id }, transaction });
       if (itensCount > 0) {
