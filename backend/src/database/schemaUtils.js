@@ -9,6 +9,29 @@ async function tableExists(sequelize, tableName) {
   return Number(rows?.[0]?.total || 0) > 0;
 }
 
+async function resolveTableName(sequelize, candidates = [], fallback = null) {
+  const names = Array.from(
+    new Set((Array.isArray(candidates) ? candidates : [candidates])
+      .map((item) => String(item || '').trim())
+      .filter(Boolean))
+  );
+
+  if (names.length === 0) {
+    return fallback;
+  }
+
+  const escapedNames = names.map((name) => sequelize.escape(name)).join(', ');
+  const [rows] = await sequelize.query(
+    `SELECT TABLE_NAME
+       FROM information_schema.TABLES
+      WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME IN (${escapedNames})`
+  );
+
+  const existing = new Set((rows || []).map((row) => row.TABLE_NAME));
+  return names.find((name) => existing.has(name)) || fallback || names[0];
+}
+
 async function columnExists(sequelize, tableName, columnName) {
   const [rows] = await sequelize.query(
     `SELECT COUNT(*) AS total
@@ -50,5 +73,6 @@ module.exports = {
   columnExists,
   foreignKeyExists,
   indexExists,
+  resolveTableName,
   tableExists
 };

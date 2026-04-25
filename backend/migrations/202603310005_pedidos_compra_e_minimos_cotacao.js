@@ -2,11 +2,15 @@ const {
   columnExists,
   foreignKeyExists,
   indexExists,
+  resolveTableName,
   tableExists
 } = require('../src/database/schemaUtils');
 
 module.exports = {
   async up({ sequelize }) {
+    const tabelaObras = await resolveTableName(sequelize, ['Obras', 'obras'], 'Obras');
+    const tabelaObrasSql = sequelize.getQueryInterface().quoteTable(tabelaObras);
+
     if (!(await columnExists(sequelize, 'solicitacao_compra_fornecedores', 'valor_minimo_pedido'))) {
       await sequelize.query(`
         ALTER TABLE solicitacao_compra_fornecedores
@@ -61,7 +65,7 @@ module.exports = {
         ALTER TABLE pedido_compras
         ADD CONSTRAINT fk_pedido_compra_obra
           FOREIGN KEY (obra_id)
-          REFERENCES obras(id)
+          REFERENCES ${tabelaObrasSql}(id)
           ON DELETE CASCADE
           ON UPDATE CASCADE
       `);

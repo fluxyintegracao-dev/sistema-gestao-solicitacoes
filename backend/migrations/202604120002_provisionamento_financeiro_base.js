@@ -1,7 +1,10 @@
-const { indexExists, tableExists } = require('../src/database/schemaUtils');
+const { indexExists, resolveTableName, tableExists } = require('../src/database/schemaUtils');
 
 module.exports = {
   async up({ sequelize }) {
+    const tabelaObras = await resolveTableName(sequelize, ['Obras', 'obras'], 'Obras');
+    const tabelaObrasSql = sequelize.getQueryInterface().quoteTable(tabelaObras);
+
     if (!(await tableExists(sequelize, 'provisao_categorias_macro'))) {
       await sequelize.query(`
         CREATE TABLE provisao_categorias_macro (
@@ -27,7 +30,7 @@ module.exports = {
           ultimo_numero INT NOT NULL DEFAULT 0,
           createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
           updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-          CONSTRAINT fk_provisao_financeira_sequencias_obra FOREIGN KEY (obra_id) REFERENCES obras(id) ON DELETE RESTRICT ON UPDATE CASCADE,
+          CONSTRAINT fk_provisao_financeira_sequencias_obra FOREIGN KEY (obra_id) REFERENCES ${tabelaObrasSql}(id) ON DELETE RESTRICT ON UPDATE CASCADE,
           UNIQUE KEY uq_provisao_financeira_sequencias_obra (obra_id)
         )
       `);
@@ -58,7 +61,7 @@ module.exports = {
           createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
           updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
           deletedAt DATETIME NULL,
-          CONSTRAINT fk_provisoes_financeiras_obra FOREIGN KEY (obra_id) REFERENCES obras(id) ON DELETE RESTRICT ON UPDATE CASCADE,
+          CONSTRAINT fk_provisoes_financeiras_obra FOREIGN KEY (obra_id) REFERENCES ${tabelaObrasSql}(id) ON DELETE RESTRICT ON UPDATE CASCADE,
           CONSTRAINT fk_provisoes_financeiras_categoria_macro FOREIGN KEY (categoria_macro_id) REFERENCES provisao_categorias_macro(id) ON DELETE RESTRICT ON UPDATE CASCADE,
           CONSTRAINT fk_provisoes_financeiras_fornecedor FOREIGN KEY (fornecedor_id) REFERENCES parceiros(id) ON DELETE SET NULL ON UPDATE CASCADE,
           CONSTRAINT fk_provisoes_financeiras_usuario_criacao FOREIGN KEY (usuario_criacao_id) REFERENCES users(id) ON DELETE RESTRICT ON UPDATE CASCADE,

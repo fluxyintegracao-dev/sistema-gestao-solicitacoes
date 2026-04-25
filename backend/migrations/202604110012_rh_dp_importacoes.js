@@ -1,7 +1,10 @@
-const { tableExists } = require('../src/database/schemaUtils');
+const { resolveTableName, tableExists } = require('../src/database/schemaUtils');
 
 module.exports = {
   async up({ sequelize }) {
+    const tabelaObras = await resolveTableName(sequelize, ['Obras', 'obras'], 'Obras');
+    const tabelaObrasSql = sequelize.getQueryInterface().quoteTable(tabelaObras);
+
     if (!(await tableExists(sequelize, 'rh_importacoes'))) {
       await sequelize.query(`
         CREATE TABLE rh_importacoes (
@@ -24,7 +27,7 @@ module.exports = {
           createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
           updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
           CONSTRAINT fk_rh_importacoes_empresa FOREIGN KEY (empresa_grupo_id) REFERENCES rh_empresas_grupo(id) ON DELETE RESTRICT ON UPDATE CASCADE,
-          CONSTRAINT fk_rh_importacoes_obra FOREIGN KEY (obra_id) REFERENCES obras(id) ON DELETE SET NULL ON UPDATE CASCADE,
+          CONSTRAINT fk_rh_importacoes_obra FOREIGN KEY (obra_id) REFERENCES ${tabelaObrasSql}(id) ON DELETE SET NULL ON UPDATE CASCADE,
           CONSTRAINT fk_rh_importacoes_criado_por FOREIGN KEY (criado_por) REFERENCES users(id) ON DELETE SET NULL ON UPDATE CASCADE,
           CONSTRAINT fk_rh_importacoes_confirmado_por FOREIGN KEY (confirmado_por) REFERENCES users(id) ON DELETE SET NULL ON UPDATE CASCADE,
           KEY idx_rh_importacoes_tipo (tipo),
