@@ -12,18 +12,10 @@ const {
   User
 } = require('../models');
 const { dispararEventoAutomacaoCrm } = require('./crmAutomationRuntimeService');
+const { canReceiveCrmLeadAssignment } = require('./authorizationService');
 
 const LEAD_EXPORT_MAX_ROWS = 5000;
 const CSV_FORMULA_REGEX = /^[=+\-@]/;
-const CRM_ASSIGNMENT_PERFIS = [
-  'ADMIN',
-  'ADMINISTRADOR',
-  'ADMIN_CRM',
-  'GESTOR_COMERCIAL',
-  'COORDENADOR_CRM',
-  'ATENDENTE_INTERNO',
-  'CORRETOR_EXTERNO'
-];
 const CRM_LEAD_BACKLOG_STATUSES = ['NOVO', 'CONTATO', 'QUALIFICADO', 'OPORTUNIDADE'];
 const CSV_DATE_FORMATTER = new Intl.DateTimeFormat('pt-BR', {
   timeZone: 'America/Sao_Paulo',
@@ -111,14 +103,18 @@ async function criarNotificacaoCrm({ tipo, mensagem, metadata, destinatarios, cr
 }
 
 async function listarCandidatosRedistribuicao() {
-  const usuarios = await User.findAll({
-    where: {
-      ativo: true,
-      perfil: { [Op.in]: CRM_ASSIGNMENT_PERFIS }
-    },
+  const usuariosAtivos = await User.findAll({
+    where: { ativo: true },
     attributes: ['id', 'nome', 'email', 'perfil'],
     order: [['nome', 'ASC']]
   });
+  const usuarios = [];
+
+  for (const usuario of usuariosAtivos) {
+    if (await canReceiveCrmLeadAssignment(usuario)) {
+      usuarios.push(usuario);
+    }
+  }
 
   const ids = usuarios.map((usuario) => Number(usuario.id)).filter(Boolean);
   if (!ids.length) {

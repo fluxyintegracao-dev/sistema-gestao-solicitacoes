@@ -152,11 +152,15 @@ const {
   canAccessFinanceiro,
   canAccessComprovantes,
   canCreateComercialContratos,
+  canCreateCrmLeads,
   canExportCrmLeads,
   canGenerateBoletos,
   canManageComercialContratos,
   canManageComercialEmpreendimentos,
+  canManageCrmAutomacoes,
+  canManageCrmConfiguracoes,
   canRedistributeCrmLeads,
+  canSendCrmAtendimento,
   canEditProvisoes,
   canEditRhDpApuracao,
   canExecuteRhDpFechamento,
@@ -165,12 +169,19 @@ const {
   canManageIntegracaoSiengeConfig,
   canManageRhDpColaboradores,
   canManageRhDpDocumentos,
+  canManageRhDpEmpresas,
   canManageUsers,
+  canReopenRhDpFechamento,
   canRetryIntegracaoSienge,
   canViewProvisoes,
   canViewProvisoesDashboard,
   canViewComercialContratos,
   canViewComercialEmpreendimentos,
+  canViewCrmAtendimento,
+  canViewCrmAutomacoes,
+  canViewCrmConfiguracoes,
+  canViewCrmDashboard,
+  canViewCrmLeads,
   canViewIntegracaoSienge,
   canViewRhDpApuracao,
   canViewRhDpColaboradores,
@@ -498,6 +509,86 @@ const allowCrmLeadRedistribute = permit({
       : 'Acesso negado para redistribuir leads do CRM'
   )
 });
+const allowCrmDashboardRead = permit({
+  resource: 'CRM_DASHBOARD',
+  custom: async (req) => (
+    (await canViewCrmDashboard(req.user))
+      ? true
+      : 'Acesso negado para dashboards do CRM'
+  )
+});
+const allowCrmLeadsRead = permit({
+  resource: 'CRM_LEADS',
+  custom: async (req) => (
+    (await canViewCrmLeads(req.user))
+      ? true
+      : 'Acesso negado para leads do CRM'
+  )
+});
+const allowCrmLeadsWrite = permit({
+  resource: 'CRM_LEADS',
+  custom: async (req) => (
+    (await canCreateCrmLeads(req.user))
+      ? true
+      : 'Acesso negado para criar ou editar leads do CRM'
+  )
+});
+const allowCrmAtendimentoRead = permit({
+  resource: 'CRM_ATENDIMENTO',
+  custom: async (req) => (
+    (await canViewCrmAtendimento(req.user))
+      ? true
+      : 'Acesso negado para atendimento do CRM'
+  )
+});
+const allowCrmAtendimentoSend = permit({
+  resource: 'CRM_ATENDIMENTO',
+  custom: async (req) => (
+    (await canSendCrmAtendimento(req.user))
+      ? true
+      : 'Acesso negado para enviar mensagens no atendimento do CRM'
+  )
+});
+const allowCrmAutomacoesRead = permit({
+  resource: 'CRM_AUTOMACOES',
+  custom: async (req) => (
+    (await canViewCrmAutomacoes(req.user))
+      ? true
+      : 'Acesso negado para automacoes do CRM'
+  )
+});
+const allowCrmAutomacoesManage = permit({
+  resource: 'CRM_AUTOMACOES',
+  custom: async (req) => (
+    (await canManageCrmAutomacoes(req.user))
+      ? true
+      : 'Acesso negado para gerenciar automacoes do CRM'
+  )
+});
+const allowCrmConfiguracoesRead = permit({
+  resource: 'CRM_CONFIGURACOES',
+  custom: async (req) => (
+    (await canViewCrmConfiguracoes(req.user))
+      ? true
+      : 'Acesso negado para configuracoes do CRM'
+  )
+});
+const allowCrmConfiguracoesManage = permit({
+  resource: 'CRM_CONFIGURACOES',
+  custom: async (req) => (
+    (await canManageCrmConfiguracoes(req.user))
+      ? true
+      : 'Acesso negado para gerenciar configuracoes do CRM'
+  )
+});
+const allowRhDpEmpresasManage = permit({
+  resource: 'RH_DP_EMPRESAS',
+  custom: async (req) => (
+    (await canManageRhDpEmpresas(req.user))
+      ? true
+      : 'Acesso negado para empresas do RH/DP'
+  )
+});
 const allowRhDpColaboradoresRead = permit({
   resource: 'RH_DP_COLABORADORES',
   custom: async (req) => (
@@ -568,6 +659,14 @@ const allowRhDpFechamentoExecute = permit({
     (await canExecuteRhDpFechamento(req.user))
       ? true
       : 'Acesso negado para fechamento da competencia do RH/DP'
+  )
+});
+const allowRhDpFechamentoReopen = permit({
+  resource: 'RH_DP_FECHAMENTOS',
+  custom: async (req) => (
+    (await canReopenRhDpFechamento(req.user))
+      ? true
+      : 'Acesso negado para reabrir fechamento do RH/DP'
   )
 });
 const allowIntegracaoSiengeRead = permit({
@@ -820,9 +919,9 @@ router.post('/provisoes-financeiras/:id/comentarios', allowProvisoesEdit, critic
 // -------------------------------------------------------------------
 // RH/DP - BLOCO 2
 // -------------------------------------------------------------------
-router.get('/rh/empresas-grupo', allowBusinessAdmin, validateRequest({ query: validateRhEmpresaGrupoQuery }), RhEmpresaGrupoController.index);
-router.post('/rh/empresas-grupo', allowBusinessAdmin, criticalRateLimit, validateRequest({ body: validateRhEmpresaGrupoCreateBody }), RhEmpresaGrupoController.create);
-router.patch('/rh/empresas-grupo/:id', allowBusinessAdmin, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Empresa do grupo RH/DP'), body: validateRhEmpresaGrupoUpdateBody }), RhEmpresaGrupoController.update);
+router.get('/rh/empresas-grupo', allowRhDpEmpresasManage, validateRequest({ query: validateRhEmpresaGrupoQuery }), RhEmpresaGrupoController.index);
+router.post('/rh/empresas-grupo', allowRhDpEmpresasManage, criticalRateLimit, validateRequest({ body: validateRhEmpresaGrupoCreateBody }), RhEmpresaGrupoController.create);
+router.patch('/rh/empresas-grupo/:id', allowRhDpEmpresasManage, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Empresa do grupo RH/DP'), body: validateRhEmpresaGrupoUpdateBody }), RhEmpresaGrupoController.update);
 router.get('/rh/colaboradores', allowRhDpColaboradoresRead, validateRequest({ query: validateRhColaboradorQuery }), RhColaboradorController.index);
 router.get('/rh/colaboradores/:id', allowRhDpColaboradoresRead, validateRequest({ params: validateNumericIdParam('id', 'Colaborador RH/DP') }), RhColaboradorController.show);
 router.post('/rh/colaboradores', allowRhDpColaboradoresWrite, criticalRateLimit, validateRequest({ body: validateRhColaboradorCreateBody }), RhColaboradorController.create);
@@ -846,7 +945,7 @@ router.patch('/rh/apuracoes/:id/itens/:itemId', allowRhDpApuracaoWrite, critical
 router.post('/rh/apuracoes/:id/conferir', allowRhDpApuracaoWrite, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Apuracao RH/DP') }), RhApuracaoController.conferir);
 router.get('/rh/fechamentos', requireEnabledModule('FINANCEIRO'), allowRhDpObrigacoesRead, validateRequest({ query: validateRhFechamentoQuery }), RhFechamentoController.index);
 router.get('/rh/fechamentos/:id', requireEnabledModule('FINANCEIRO'), allowRhDpObrigacoesRead, validateRequest({ params: validateNumericIdParam('id', 'Fechamento RH/DP') }), RhFechamentoController.show);
-router.post('/rh/fechamentos/:id/reabrir', requireEnabledModule('FINANCEIRO'), allowRhDpFechamentoExecute, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Fechamento RH/DP'), body: validateRhReabrirFechamentoBody }), RhFechamentoController.reabrir);
+router.post('/rh/fechamentos/:id/reabrir', requireEnabledModule('FINANCEIRO'), allowRhDpFechamentoReopen, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Fechamento RH/DP'), body: validateRhReabrirFechamentoBody }), RhFechamentoController.reabrir);
 router.post('/rh/apuracoes/:id/fechar', requireEnabledModule('FINANCEIRO'), allowRhDpFechamentoExecute, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Apuracao RH/DP'), body: validateRhFecharApuracaoBody }), RhFechamentoController.fecharApuracao);
 
 // -------------------------------------------------------------------
@@ -1057,75 +1156,75 @@ router.patch('/contratos/:id/desativar', validateRequest({ params: validateNumer
 // CRM
 // -------------------------------------------------------------------
 
-router.get('/crm/pipelines', requireEnabledModule('CRM'), requireCrmModule(), CrmPipelineController.index);
-router.get('/crm/pipelines/:id/kanban', requireEnabledModule('CRM'), requireCrmModule(), CrmPipelineController.kanban);
-router.post('/crm/pipelines/:id/stages', requireEnabledModule('CRM'), requireCrmModule(), CrmPipelineController.createStage);
-router.patch('/crm/pipeline-stages/:id', requireEnabledModule('CRM'), requireCrmModule(), CrmPipelineController.updateStage);
-router.delete('/crm/pipeline-stages/:id', requireEnabledModule('CRM'), requireCrmModule(), CrmPipelineController.deleteStage);
-router.get('/crm/loss-reasons', requireEnabledModule('CRM'), requireCrmModule(), CrmPipelineController.lossReasons);
+router.get('/crm/pipelines', requireEnabledModule('CRM'), requireCrmModule(), allowCrmLeadsRead, CrmPipelineController.index);
+router.get('/crm/pipelines/:id/kanban', requireEnabledModule('CRM'), requireCrmModule(), allowCrmLeadsRead, CrmPipelineController.kanban);
+router.post('/crm/pipelines/:id/stages', requireEnabledModule('CRM'), requireCrmModule(), allowCrmLeadsWrite, CrmPipelineController.createStage);
+router.patch('/crm/pipeline-stages/:id', requireEnabledModule('CRM'), requireCrmModule(), allowCrmLeadsWrite, CrmPipelineController.updateStage);
+router.delete('/crm/pipeline-stages/:id', requireEnabledModule('CRM'), requireCrmModule(), allowCrmLeadsWrite, CrmPipelineController.deleteStage);
+router.get('/crm/loss-reasons', requireEnabledModule('CRM'), requireCrmModule(), allowCrmLeadsRead, CrmPipelineController.lossReasons);
 
-router.get('/crm/leads', requireEnabledModule('CRM'), requireCrmModule(), CrmLeadsController.index);
+router.get('/crm/leads', requireEnabledModule('CRM'), requireCrmModule(), allowCrmLeadsRead, CrmLeadsController.index);
 router.get('/crm/leads/export', requireEnabledModule('CRM'), requireCrmModule(), allowCrmLeadExport, CrmLeadsController.export);
 router.get('/crm/leads/redistribution-candidates', requireEnabledModule('CRM'), requireCrmModule(), allowCrmLeadRedistribute, CrmLeadsController.redistributionCandidates);
-router.post('/crm/leads', requireEnabledModule('CRM'), requireCrmModule(), CrmLeadsController.create);
-router.get('/crm/leads/:id', requireEnabledModule('CRM'), requireCrmModule(), CrmLeadsController.show);
-router.patch('/crm/leads/:id', requireEnabledModule('CRM'), requireCrmModule(), CrmLeadsController.update);
-router.patch('/crm/leads/:id/stage', requireEnabledModule('CRM'), requireCrmModule(), CrmLeadsController.changeStage);
-router.patch('/crm/leads/:id/loss', requireEnabledModule('CRM'), requireCrmModule(), CrmLeadsController.registerLoss);
-router.patch('/crm/leads/:id/convert', requireEnabledModule('CRM'), requireCrmModule(), CrmLeadsController.registerConversion);
-router.patch('/crm/leads/:id/archive', requireEnabledModule('CRM'), requireCrmModule(), CrmLeadsController.archive);
+router.post('/crm/leads', requireEnabledModule('CRM'), requireCrmModule(), allowCrmLeadsWrite, CrmLeadsController.create);
+router.get('/crm/leads/:id', requireEnabledModule('CRM'), requireCrmModule(), allowCrmLeadsRead, CrmLeadsController.show);
+router.patch('/crm/leads/:id', requireEnabledModule('CRM'), requireCrmModule(), allowCrmLeadsWrite, CrmLeadsController.update);
+router.patch('/crm/leads/:id/stage', requireEnabledModule('CRM'), requireCrmModule(), allowCrmLeadsWrite, CrmLeadsController.changeStage);
+router.patch('/crm/leads/:id/loss', requireEnabledModule('CRM'), requireCrmModule(), allowCrmLeadsWrite, CrmLeadsController.registerLoss);
+router.patch('/crm/leads/:id/convert', requireEnabledModule('CRM'), requireCrmModule(), allowCrmLeadsWrite, CrmLeadsController.registerConversion);
+router.patch('/crm/leads/:id/archive', requireEnabledModule('CRM'), requireCrmModule(), allowCrmLeadsWrite, CrmLeadsController.archive);
 router.post('/crm/leads/:id/redistribute', requireEnabledModule('CRM'), requireCrmModule(), allowCrmLeadRedistribute, CrmLeadsController.redistribute);
-router.get('/crm/leads/:id/interactions', requireEnabledModule('CRM'), requireCrmModule(), CrmLeadsController.listInteractions);
-router.post('/crm/leads/:id/interactions', requireEnabledModule('CRM'), requireCrmModule(), CrmLeadsController.createInteraction);
+router.get('/crm/leads/:id/interactions', requireEnabledModule('CRM'), requireCrmModule(), allowCrmLeadsRead, CrmLeadsController.listInteractions);
+router.post('/crm/leads/:id/interactions', requireEnabledModule('CRM'), requireCrmModule(), allowCrmLeadsWrite, CrmLeadsController.createInteraction);
 
-router.get('/crm/tasks', requireEnabledModule('CRM'), requireCrmModule(), CrmTasksController.index);
-router.post('/crm/tasks', requireEnabledModule('CRM'), requireCrmModule(), CrmTasksController.create);
-router.patch('/crm/tasks/:id', requireEnabledModule('CRM'), requireCrmModule(), CrmTasksController.update);
-router.patch('/crm/tasks/:id/complete', requireEnabledModule('CRM'), requireCrmModule(), CrmTasksController.complete);
-router.patch('/crm/tasks/:id/cancel', requireEnabledModule('CRM'), requireCrmModule(), CrmTasksController.cancel);
+router.get('/crm/tasks', requireEnabledModule('CRM'), requireCrmModule(), allowCrmLeadsRead, CrmTasksController.index);
+router.post('/crm/tasks', requireEnabledModule('CRM'), requireCrmModule(), allowCrmLeadsWrite, CrmTasksController.create);
+router.patch('/crm/tasks/:id', requireEnabledModule('CRM'), requireCrmModule(), allowCrmLeadsWrite, CrmTasksController.update);
+router.patch('/crm/tasks/:id/complete', requireEnabledModule('CRM'), requireCrmModule(), allowCrmLeadsWrite, CrmTasksController.complete);
+router.patch('/crm/tasks/:id/cancel', requireEnabledModule('CRM'), requireCrmModule(), allowCrmLeadsWrite, CrmTasksController.cancel);
 
-router.get('/crm/dashboard/operacional', requireEnabledModule('CRM'), requireCrmModule(), CrmDashboardController.operacional);
-router.get('/crm/dashboard/gerencial', requireEnabledModule('CRM'), requireCrmModule(), CrmDashboardController.gerencial);
-router.get('/crm/dashboard/sla', requireEnabledModule('CRM'), requireCrmModule(), CrmDashboardController.sla);
-router.get('/crm/dashboard/distribuicao', requireEnabledModule('CRM'), requireCrmModule(), CrmDashboardController.distribuicao);
+router.get('/crm/dashboard/operacional', requireEnabledModule('CRM'), requireCrmModule(), allowCrmDashboardRead, CrmDashboardController.operacional);
+router.get('/crm/dashboard/gerencial', requireEnabledModule('CRM'), requireCrmModule(), allowCrmDashboardRead, CrmDashboardController.gerencial);
+router.get('/crm/dashboard/sla', requireEnabledModule('CRM'), requireCrmModule(), allowCrmDashboardRead, CrmDashboardController.sla);
+router.get('/crm/dashboard/distribuicao', requireEnabledModule('CRM'), requireCrmModule(), allowCrmDashboardRead, CrmDashboardController.distribuicao);
 
-router.get('/crm/conversations', requireEnabledModule('CRM'), requireCrmModule(), CrmConversationsController.index);
-router.post('/crm/conversations', requireEnabledModule('CRM'), requireCrmModule(), CrmConversationsController.create);
-router.get('/crm/conversations/:id', requireEnabledModule('CRM'), requireCrmModule(), CrmConversationsController.show);
-router.patch('/crm/conversations/:id', requireEnabledModule('CRM'), requireCrmModule(), CrmConversationsController.update);
-router.post('/crm/conversations/:id/messages', requireEnabledModule('CRM'), requireCrmModule(), CrmConversationsController.createMessage);
-router.post('/crm/conversations/:id/read', requireEnabledModule('CRM'), requireCrmModule(), CrmConversationsController.markRead);
+router.get('/crm/conversations', requireEnabledModule('CRM'), requireCrmModule(), allowCrmAtendimentoRead, CrmConversationsController.index);
+router.post('/crm/conversations', requireEnabledModule('CRM'), requireCrmModule(), allowCrmAtendimentoSend, CrmConversationsController.create);
+router.get('/crm/conversations/:id', requireEnabledModule('CRM'), requireCrmModule(), allowCrmAtendimentoRead, CrmConversationsController.show);
+router.patch('/crm/conversations/:id', requireEnabledModule('CRM'), requireCrmModule(), allowCrmAtendimentoSend, CrmConversationsController.update);
+router.post('/crm/conversations/:id/messages', requireEnabledModule('CRM'), requireCrmModule(), allowCrmAtendimentoSend, CrmConversationsController.createMessage);
+router.post('/crm/conversations/:id/read', requireEnabledModule('CRM'), requireCrmModule(), allowCrmAtendimentoRead, CrmConversationsController.markRead);
 
-router.get('/crm/message-templates', requireEnabledModule('CRM'), requireCrmModule(), CrmConversationsController.templates);
-router.post('/crm/message-templates', requireEnabledModule('CRM'), requireCrmModule(), CrmConversationsController.createTemplate);
-router.patch('/crm/message-templates/:id', requireEnabledModule('CRM'), requireCrmModule(), CrmConversationsController.updateTemplate);
+router.get('/crm/message-templates', requireEnabledModule('CRM'), requireCrmModule(), allowCrmAtendimentoRead, CrmConversationsController.templates);
+router.post('/crm/message-templates', requireEnabledModule('CRM'), requireCrmModule(), allowCrmAtendimentoSend, CrmConversationsController.createTemplate);
+router.patch('/crm/message-templates/:id', requireEnabledModule('CRM'), requireCrmModule(), allowCrmAtendimentoSend, CrmConversationsController.updateTemplate);
 
-router.get('/crm/automation-rules', requireEnabledModule('CRM'), requireCrmModule(), CrmAutomationController.index);
-router.post('/crm/automation-rules', requireEnabledModule('CRM'), requireCrmModule(), CrmAutomationController.create);
-router.patch('/crm/automation-rules/:id', requireEnabledModule('CRM'), requireCrmModule(), CrmAutomationController.update);
-router.post('/crm/automation-rules/:id/activate', requireEnabledModule('CRM'), requireCrmModule(), CrmAutomationController.activate);
-router.post('/crm/automation-rules/:id/deactivate', requireEnabledModule('CRM'), requireCrmModule(), CrmAutomationController.deactivate);
-router.post('/crm/automation-rules/run-cycle', requireEnabledModule('CRM'), requireCrmModule(), CrmAutomationController.runCycle);
-router.get('/crm/automation-executions', requireEnabledModule('CRM'), requireCrmModule(), CrmAutomationController.executions);
+router.get('/crm/automation-rules', requireEnabledModule('CRM'), requireCrmModule(), allowCrmAutomacoesRead, CrmAutomationController.index);
+router.post('/crm/automation-rules', requireEnabledModule('CRM'), requireCrmModule(), allowCrmAutomacoesManage, CrmAutomationController.create);
+router.patch('/crm/automation-rules/:id', requireEnabledModule('CRM'), requireCrmModule(), allowCrmAutomacoesManage, CrmAutomationController.update);
+router.post('/crm/automation-rules/:id/activate', requireEnabledModule('CRM'), requireCrmModule(), allowCrmAutomacoesManage, CrmAutomationController.activate);
+router.post('/crm/automation-rules/:id/deactivate', requireEnabledModule('CRM'), requireCrmModule(), allowCrmAutomacoesManage, CrmAutomationController.deactivate);
+router.post('/crm/automation-rules/run-cycle', requireEnabledModule('CRM'), requireCrmModule(), allowCrmAutomacoesManage, CrmAutomationController.runCycle);
+router.get('/crm/automation-executions', requireEnabledModule('CRM'), requireCrmModule(), allowCrmAutomacoesRead, CrmAutomationController.executions);
 
-router.get('/crm/channels', requireEnabledModule('CRM'), requireCrmModule(), CrmAdminController.listarCanais);
-router.post('/crm/channels', requireEnabledModule('CRM'), requireCrmModule(), CrmAdminController.criarCanal);
-router.get('/crm/channels/:id', requireEnabledModule('CRM'), requireCrmModule(), CrmAdminController.obterCanal);
-router.patch('/crm/channels/:id', requireEnabledModule('CRM'), requireCrmModule(), CrmAdminController.atualizarCanal);
-router.delete('/crm/channels/:id', requireEnabledModule('CRM'), requireCrmModule(), CrmAdminController.excluirCanal);
+router.get('/crm/channels', requireEnabledModule('CRM'), requireCrmModule(), allowCrmConfiguracoesRead, CrmAdminController.listarCanais);
+router.post('/crm/channels', requireEnabledModule('CRM'), requireCrmModule(), allowCrmConfiguracoesManage, CrmAdminController.criarCanal);
+router.get('/crm/channels/:id', requireEnabledModule('CRM'), requireCrmModule(), allowCrmConfiguracoesRead, CrmAdminController.obterCanal);
+router.patch('/crm/channels/:id', requireEnabledModule('CRM'), requireCrmModule(), allowCrmConfiguracoesManage, CrmAdminController.atualizarCanal);
+router.delete('/crm/channels/:id', requireEnabledModule('CRM'), requireCrmModule(), allowCrmConfiguracoesManage, CrmAdminController.excluirCanal);
 
-router.get('/crm/phone-assets', requireEnabledModule('CRM'), requireCrmModule(), CrmAdminController.listarNumeros);
-router.post('/crm/phone-assets', requireEnabledModule('CRM'), requireCrmModule(), CrmAdminController.criarNumero);
-router.get('/crm/phone-assets/:id', requireEnabledModule('CRM'), requireCrmModule(), CrmAdminController.obterNumero);
-router.patch('/crm/phone-assets/:id', requireEnabledModule('CRM'), requireCrmModule(), CrmAdminController.atualizarNumero);
-router.delete('/crm/phone-assets/:id', requireEnabledModule('CRM'), requireCrmModule(), CrmAdminController.excluirNumero);
+router.get('/crm/phone-assets', requireEnabledModule('CRM'), requireCrmModule(), allowCrmConfiguracoesRead, CrmAdminController.listarNumeros);
+router.post('/crm/phone-assets', requireEnabledModule('CRM'), requireCrmModule(), allowCrmConfiguracoesManage, CrmAdminController.criarNumero);
+router.get('/crm/phone-assets/:id', requireEnabledModule('CRM'), requireCrmModule(), allowCrmConfiguracoesRead, CrmAdminController.obterNumero);
+router.patch('/crm/phone-assets/:id', requireEnabledModule('CRM'), requireCrmModule(), allowCrmConfiguracoesManage, CrmAdminController.atualizarNumero);
+router.delete('/crm/phone-assets/:id', requireEnabledModule('CRM'), requireCrmModule(), allowCrmConfiguracoesManage, CrmAdminController.excluirNumero);
 
-router.get('/crm/integrations/config', requireEnabledModule('CRM'), requireCrmModule(), CrmAdminController.obterIntegracoes);
-router.patch('/crm/integrations/config', requireEnabledModule('CRM'), requireCrmModule(), CrmAdminController.atualizarIntegracoes);
-router.get('/crm/integrations/meta/events', requireEnabledModule('CRM'), requireCrmModule(), CrmAdminController.listarEventosMeta);
-router.post('/crm/integrations/meta/events/:id/reprocess', requireEnabledModule('CRM'), requireCrmModule(), CrmAdminController.reprocessarEventoMeta);
-router.get('/crm/integrations/google/events', requireEnabledModule('CRM'), requireCrmModule(), CrmAdminController.listarEventosGoogle);
-router.post('/crm/integrations/google/events/:id/reprocess', requireEnabledModule('CRM'), requireCrmModule(), CrmAdminController.reprocessarEventoGoogle);
+router.get('/crm/integrations/config', requireEnabledModule('CRM'), requireCrmModule(), allowCrmConfiguracoesRead, CrmAdminController.obterIntegracoes);
+router.patch('/crm/integrations/config', requireEnabledModule('CRM'), requireCrmModule(), allowCrmConfiguracoesManage, CrmAdminController.atualizarIntegracoes);
+router.get('/crm/integrations/meta/events', requireEnabledModule('CRM'), requireCrmModule(), allowCrmConfiguracoesRead, CrmAdminController.listarEventosMeta);
+router.post('/crm/integrations/meta/events/:id/reprocess', requireEnabledModule('CRM'), requireCrmModule(), allowCrmConfiguracoesManage, CrmAdminController.reprocessarEventoMeta);
+router.get('/crm/integrations/google/events', requireEnabledModule('CRM'), requireCrmModule(), allowCrmConfiguracoesRead, CrmAdminController.listarEventosGoogle);
+router.post('/crm/integrations/google/events/:id/reprocess', requireEnabledModule('CRM'), requireCrmModule(), allowCrmConfiguracoesManage, CrmAdminController.reprocessarEventoGoogle);
 
 // -------------------------------------------------------------------
 // DASHBOARD

@@ -8,6 +8,8 @@ Este arquivo registra mudancas relevantes de produto, arquitetura e documentacao
 - alinhamento da biblioteca de arquivos modelos com a regra documentada de visualizacao ampla: qualquer usuario autenticado pode listar e abrir arquivos de paginas ativas; upload permanece restrito por pagina/perfil
 - separacao das permissoes de pedidos de compra: listagem, detalhe e PDF seguem o acesso ao modulo e escopo de obras; alteracoes de status e itens permanecem restritas ao setor de compras e administradores
 - alinhamento dos acessos por usuario com a matriz `Permissoes de Areas por Usuario` para liberar modulos habilitados como financeiro, boletos, comercial, contratos, obras, biblioteca, comunicacao e compras quando houver permissoes explicitas configuradas
+- unificacao de CRM, RH/DP e Integracao SIENGE na matriz `Permissoes de Areas por Usuario`, mantendo a configuracao legada de RH/DP apenas como compatibilidade para usuarios ainda sem matriz nova
+- granularizacao das rotas e menus do CRM por dashboards, leads, atendimento, automacoes e configuracoes; RH/DP passou a separar permissao de fechar competencia e reabrir fechamento
 
 - reescrita completa de `docs/arquitetura/deploy_ambientes.md`, transformando o antigo guia resumido de deploy em guia mestre de:
   - implantacao tecnica por instalacao

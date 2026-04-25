@@ -14,9 +14,11 @@ const {
   NotificacaoDestinatario,
   User
 } = require('../models');
+const {
+  canReceiveCrmAutomationManagerNotification,
+  canReceiveCrmLeadAssignment
+} = require('./authorizationService');
 
-const AUTOMATION_MANAGER_PERFIS = ['SUPERADMIN', 'ADMIN', 'ADMINISTRADOR', 'ADMIN_CRM', 'GESTOR_COMERCIAL', 'COORDENADOR_CRM'];
-const AUTOMATION_ASSIGNMENT_PERFIS = ['ADMIN_CRM', 'GESTOR_COMERCIAL', 'COORDENADOR_CRM', 'ADMINISTRADOR', 'ADMIN'];
 const SCHEDULED_TRIGGER_TYPES = ['NO_FIRST_CONTACT', 'NO_ACTIVITY'];
 
 let runtimeStarted = false;
@@ -182,14 +184,18 @@ async function criarNotificacaoCrm({ tipo, mensagem, metadata, destinatarios, cr
 
 async function obterGestoresCrm() {
   const rows = await User.findAll({
-    where: {
-      ativo: true,
-      perfil: { [Op.in]: AUTOMATION_MANAGER_PERFIS }
-    },
-    attributes: ['id']
+    where: { ativo: true },
+    attributes: ['id', 'perfil']
   });
 
-  return rows.map((item) => item.id);
+  const ids = [];
+  for (const usuario of rows) {
+    if (await canReceiveCrmAutomationManagerNotification(usuario)) {
+      ids.push(usuario.id);
+    }
+  }
+
+  return ids;
 }
 
 async function resolverUsuariosElegiveis(action = {}) {
@@ -202,15 +208,29 @@ async function resolverUsuariosElegiveis(action = {}) {
   }
 
   const perfis = normalizeEnumArray(action.perfis || action.roles);
-  const perfisFiltro = perfis.length > 0 ? perfis : AUTOMATION_ASSIGNMENT_PERFIS;
 
-  return User.findAll({
-    where: {
-      ativo: true,
-      perfil: { [Op.in]: perfisFiltro }
-    },
+  if (perfis.length > 0) {
+    return User.findAll({
+      where: {
+        ativo: true,
+        perfil: { [Op.in]: perfis }
+      },
+      attributes: ['id', 'nome', 'perfil']
+    });
+  }
+
+  const usuariosAtivos = await User.findAll({
+    where: { ativo: true },
     attributes: ['id', 'nome', 'perfil']
   });
+  const elegiveis = [];
+  for (const usuario of usuariosAtivos) {
+    if (await canReceiveCrmLeadAssignment(usuario)) {
+      elegiveis.push(usuario);
+    }
+  }
+
+  return elegiveis;
 }
 
 async function resolverUsuarioDestino(action = {}, lead) {

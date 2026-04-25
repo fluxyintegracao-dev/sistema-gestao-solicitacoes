@@ -184,6 +184,131 @@ const MODULO_PERMISSION_GROUPS = [
     ]
   },
   {
+    modulo: 'CRM',
+    label: 'CRM',
+    descricao: 'Leads, atendimento, tarefas, dashboards, automacoes e configuracoes comerciais.',
+    areas: [
+      {
+        key: 'crm.dashboard',
+        label: 'Dashboards CRM',
+        permissoes: [
+          { key: 'crm.dashboard.visualizar', label: 'Visualizar dashboards', descricao: 'Acessar dashboards operacional, gerencial, SLA e distribuicao.' }
+        ]
+      },
+      {
+        key: 'crm.leads',
+        label: 'Leads e Pipeline',
+        permissoes: [
+          { key: 'crm.leads.visualizar', label: 'Visualizar leads', descricao: 'Ver listas, kanban, carteira, tarefas e detalhes de leads.' },
+          { key: 'crm.leads.criar', label: 'Criar e editar leads', descricao: 'Criar leads, alterar etapas, registrar interacoes e tarefas.' },
+          { key: 'crm.leads.exportar', label: 'Exportar leads', descricao: 'Exportar base de leads em relatorios.' },
+          { key: 'crm.leads.redistribuir', label: 'Redistribuir leads', descricao: 'Redistribuir responsaveis e operar fila de distribuicao.' }
+        ]
+      },
+      {
+        key: 'crm.atendimento',
+        label: 'Atendimento CRM',
+        permissoes: [
+          { key: 'crm.atendimento.visualizar', label: 'Visualizar conversas', descricao: 'Acessar inbox e historico de conversas.' },
+          { key: 'crm.atendimento.enviar', label: 'Enviar mensagens', descricao: 'Criar conversas, mensagens e templates.' }
+        ]
+      },
+      {
+        key: 'crm.automacoes',
+        label: 'Automacoes CRM',
+        permissoes: [
+          { key: 'crm.automacoes.visualizar', label: 'Visualizar automacoes', descricao: 'Ver regras e execucoes de automacao.' },
+          { key: 'crm.automacoes.gerenciar', label: 'Gerenciar automacoes', descricao: 'Criar, editar, ativar e executar automacoes.' }
+        ]
+      },
+      {
+        key: 'crm.configuracoes',
+        label: 'Configuracoes CRM',
+        permissoes: [
+          { key: 'crm.configuracoes.visualizar', label: 'Visualizar configuracoes', descricao: 'Ver canais, numeros e integracoes.' },
+          { key: 'crm.configuracoes.gerenciar', label: 'Gerenciar configuracoes', descricao: 'Criar, editar e remover canais, numeros e integracoes.' }
+        ]
+      }
+    ]
+  },
+  {
+    modulo: 'RH_DP',
+    label: 'RH/DP',
+    descricao: 'Colaboradores, documentos, importacoes, apuracoes e fechamentos.',
+    areas: [
+      {
+        key: 'rh_dp.dashboard',
+        label: 'Dashboard RH/DP',
+        permissoes: [
+          { key: 'rh_dp.dashboard.visualizar', label: 'Visualizar dashboard', descricao: 'Abrir a visao inicial do modulo RH/DP.' }
+        ]
+      },
+      {
+        key: 'rh_dp.empresas',
+        label: 'Empresas do Grupo',
+        permissoes: [
+          { key: 'rh_dp.empresas.gerenciar', label: 'Gerenciar empresas', descricao: 'Criar e editar empresas do grupo usadas no RH/DP.' }
+        ]
+      },
+      {
+        key: 'rh_dp.colaboradores',
+        label: 'Colaboradores',
+        permissoes: [
+          { key: 'rh_dp.colaboradores.visualizar', label: 'Visualizar colaboradores', descricao: 'Listar e detalhar colaboradores.' },
+          { key: 'rh_dp.colaboradores.editar', label: 'Editar colaboradores', descricao: 'Cadastrar, editar e importar colaboradores.' }
+        ]
+      },
+      {
+        key: 'rh_dp.documentos',
+        label: 'Documentos',
+        permissoes: [
+          { key: 'rh_dp.documentos.visualizar', label: 'Visualizar documentos', descricao: 'Consultar documentos, pendencias e links assinados.' },
+          { key: 'rh_dp.documentos.gerenciar', label: 'Gerenciar documentos', descricao: 'Enviar, substituir e atualizar documentos.' }
+        ]
+      },
+      {
+        key: 'rh_dp.importacoes',
+        label: 'Importacoes',
+        permissoes: [
+          { key: 'rh_dp.importacoes.executar', label: 'Executar importacoes', descricao: 'Subir planilhas, gerar preview e confirmar lotes.' }
+        ]
+      },
+      {
+        key: 'rh_dp.apuracao',
+        label: 'Apuracao',
+        permissoes: [
+          { key: 'rh_dp.apuracao.visualizar', label: 'Visualizar apuracoes', descricao: 'Listar e detalhar apuracoes.' },
+          { key: 'rh_dp.apuracao.editar', label: 'Editar apuracoes', descricao: 'Gerar apuracao, ajustar itens e concluir conferencia.' }
+        ]
+      },
+      {
+        key: 'rh_dp.fechamento',
+        label: 'Fechamentos',
+        permissoes: [
+          { key: 'rh_dp.fechamento.executar', label: 'Fechar competencia', descricao: 'Fechar competencia e gerar titulos no financeiro.' },
+          { key: 'rh_dp.fechamento.reabrir', label: 'Reabrir fechamento', descricao: 'Reabrir competencias fechadas quando necessario.' },
+          { key: 'rh_dp.obrigacoes.visualizar', label: 'Visualizar obrigacoes', descricao: 'Acessar fechamentos e titulos gerados.' }
+        ]
+      }
+    ]
+  },
+  {
+    modulo: 'INTEGRACAO_SIENGE',
+    label: 'Integracao SIENGE',
+    descricao: 'Fila, logs, reprocessamentos, credores e configuracao da integracao SIENGE.',
+    areas: [
+      {
+        key: 'integracao_sienge.geral',
+        label: 'Operacao SIENGE',
+        permissoes: [
+          { key: 'integracao_sienge.geral.visualizar', label: 'Visualizar fila e logs', descricao: 'Consultar status, fila, saude, prontidao e logs.' },
+          { key: 'integracao_sienge.geral.reprocessar', label: 'Operar fila', descricao: 'Enviar titulos, buscar credores e reprocessar falhas.' },
+          { key: 'integracao_sienge.geral.configurar', label: 'Configurar integracao', descricao: 'Editar endpoint, defaults, credores e parametros da integracao.' }
+        ]
+      }
+    ]
+  },
+  {
     modulo: 'PROVISOES',
     label: 'Provisionamento',
     descricao: 'Previsao gerencial de desembolso, dashboard e acompanhamento de provisoes por obra.',

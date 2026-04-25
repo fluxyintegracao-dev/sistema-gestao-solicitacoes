@@ -32,8 +32,13 @@ import {
   canViewRhDpColaboradores,
   canViewRhDpDocumentos,
   canViewRhDpObrigacoes,
-  canAccessCrm,
+  canCreateCrmLeads,
   canManageUsers,
+  canViewCrmAtendimento,
+  canViewCrmAutomacoes,
+  canViewCrmConfiguracoes,
+  canViewCrmDashboard,
+  canViewCrmLeads,
   hasEnabledModule,
   isBusinessAdmin,
   isSuperadmin
@@ -264,9 +269,49 @@ function CadastroObrasRoute({ children }) {
   return children;
 }
 
-function CrmRoute({ children }) {
+function CrmDashboardRoute({ children }) {
   const { user } = useAuth();
-  if (!canAccessCrm(user)) {
+  if (!canViewCrmDashboard(user)) {
+    return <Navigate to="/" replace />;
+  }
+  return children;
+}
+
+function CrmLeadsRoute({ children }) {
+  const { user } = useAuth();
+  if (!canViewCrmLeads(user)) {
+    return <Navigate to="/" replace />;
+  }
+  return children;
+}
+
+function CrmLeadsCreateRoute({ children }) {
+  const { user } = useAuth();
+  if (!canCreateCrmLeads(user)) {
+    return <Navigate to="/crm/leads" replace />;
+  }
+  return children;
+}
+
+function CrmAtendimentoRoute({ children }) {
+  const { user } = useAuth();
+  if (!canViewCrmAtendimento(user)) {
+    return <Navigate to="/" replace />;
+  }
+  return children;
+}
+
+function CrmAutomacoesRoute({ children }) {
+  const { user } = useAuth();
+  if (!canViewCrmAutomacoes(user)) {
+    return <Navigate to="/" replace />;
+  }
+  return children;
+}
+
+function CrmConfiguracoesRoute({ children }) {
+  const { user } = useAuth();
+  if (!canViewCrmConfiguracoes(user)) {
     return <Navigate to="/" replace />;
   }
   return children;
@@ -490,21 +535,21 @@ export default function App() {
         <Route path="configuracoes-modulos" element={<SuperadminRoute><ConfiguracoesModulos /></SuperadminRoute>} />
         <Route path="parceiros" element={<BusinessAdminRoute><Parceiros /></BusinessAdminRoute>} />
         <Route path="parceiros-categorias" element={<BusinessAdminRoute><ParceiroCategorias /></BusinessAdminRoute>} />
-        <Route path="crm/dashboard" element={<CrmRoute><CrmDashboard /></CrmRoute>} />
-        <Route path="crm/dashboard-gerencial" element={<CrmRoute><CrmDashboardGerencial /></CrmRoute>} />
-        <Route path="crm/dashboard-sla" element={<CrmRoute><CrmDashboardSla /></CrmRoute>} />
-        <Route path="crm/dashboard-distribuicao" element={<CrmRoute><CrmDashboardDistribuicao /></CrmRoute>} />
-        <Route path="crm/leads" element={<CrmRoute><CrmLeads /></CrmRoute>} />
-        <Route path="crm/leads/novo" element={<CrmRoute><CrmNovoLead /></CrmRoute>} />
-        <Route path="crm/leads/:id" element={<CrmRoute><CrmLeadDetalhe /></CrmRoute>} />
-        <Route path="crm/kanban" element={<CrmRoute><CrmKanban /></CrmRoute>} />
-        <Route path="crm/tarefas" element={<CrmRoute><CrmTarefas /></CrmRoute>} />
-        <Route path="crm/carteira" element={<CrmRoute><CrmCarteira /></CrmRoute>} />
-        <Route path="crm/inbox" element={<CrmRoute><CrmInbox /></CrmRoute>} />
-        <Route path="crm/automacoes" element={<CrmRoute><CrmAutomacoes /></CrmRoute>} />
-        <Route path="crm/admin/canais" element={<CrmRoute><CrmAdminCanais /></CrmRoute>} />
-        <Route path="crm/admin/numeros" element={<CrmRoute><CrmAdminNumeros /></CrmRoute>} />
-        <Route path="crm/admin/integracoes" element={<CrmRoute><CrmAdminIntegracoes /></CrmRoute>} />
+        <Route path="crm/dashboard" element={<CrmDashboardRoute><CrmDashboard /></CrmDashboardRoute>} />
+        <Route path="crm/dashboard-gerencial" element={<CrmDashboardRoute><CrmDashboardGerencial /></CrmDashboardRoute>} />
+        <Route path="crm/dashboard-sla" element={<CrmDashboardRoute><CrmDashboardSla /></CrmDashboardRoute>} />
+        <Route path="crm/dashboard-distribuicao" element={<CrmDashboardRoute><CrmDashboardDistribuicao /></CrmDashboardRoute>} />
+        <Route path="crm/leads" element={<CrmLeadsRoute><CrmLeads /></CrmLeadsRoute>} />
+        <Route path="crm/leads/novo" element={<CrmLeadsCreateRoute><CrmNovoLead /></CrmLeadsCreateRoute>} />
+        <Route path="crm/leads/:id" element={<CrmLeadsRoute><CrmLeadDetalhe /></CrmLeadsRoute>} />
+        <Route path="crm/kanban" element={<CrmLeadsRoute><CrmKanban /></CrmLeadsRoute>} />
+        <Route path="crm/tarefas" element={<CrmLeadsRoute><CrmTarefas /></CrmLeadsRoute>} />
+        <Route path="crm/carteira" element={<CrmLeadsRoute><CrmCarteira /></CrmLeadsRoute>} />
+        <Route path="crm/inbox" element={<CrmAtendimentoRoute><CrmInbox /></CrmAtendimentoRoute>} />
+        <Route path="crm/automacoes" element={<CrmAutomacoesRoute><CrmAutomacoes /></CrmAutomacoesRoute>} />
+        <Route path="crm/admin/canais" element={<CrmConfiguracoesRoute><CrmAdminCanais /></CrmConfiguracoesRoute>} />
+        <Route path="crm/admin/numeros" element={<CrmConfiguracoesRoute><CrmAdminNumeros /></CrmConfiguracoesRoute>} />
+        <Route path="crm/admin/integracoes" element={<CrmConfiguracoesRoute><CrmAdminIntegracoes /></CrmConfiguracoesRoute>} />
         <Route path="comercial/empreendimentos" element={<ComercialEmpreendimentosRoute><ComercialEmpreendimentos /></ComercialEmpreendimentosRoute>} />
         <Route path="comercial/unidades" element={<ComercialEmpreendimentosRoute><ComercialUnidades /></ComercialEmpreendimentosRoute>} />
         <Route path="comercial/tabelas-preco" element={<ComercialEmpreendimentosRoute><ComercialTabelasPreco /></ComercialEmpreendimentosRoute>} />

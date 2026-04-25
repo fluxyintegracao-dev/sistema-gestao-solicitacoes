@@ -59,7 +59,13 @@ import {
   canViewRhDpDocumentos,
   canViewRhDpObrigacoes,
   canAccessCrm,
+  canCreateCrmLeads,
   canManageUsers,
+  canViewCrmAtendimento,
+  canViewCrmAutomacoes,
+  canViewCrmConfiguracoes,
+  canViewCrmDashboard,
+  canViewCrmLeads,
   canCreateComprasPedidos,
   canManageComprasCotacoes,
   canViewComprasCotacoes,
@@ -201,6 +207,12 @@ export default function Layout() {
   const moduloBibliotecaHabilitado = hasEnabledModule(user, 'BIBLIOTECA_MODELOS');
   const moduloCotacoesHabilitado = hasEnabledModule(user, 'COTACOES');
   const crmAccess = canAccessCrm(user);
+  const crmDashboardAccess = canViewCrmDashboard(user);
+  const crmLeadsAccess = canViewCrmLeads(user);
+  const crmLeadsCreateAccess = canCreateCrmLeads(user);
+  const crmAtendimentoAccess = canViewCrmAtendimento(user);
+  const crmAutomacoesAccess = canViewCrmAutomacoes(user);
+  const crmConfiguracoesAccess = canViewCrmConfiguracoes(user);
   const comprasAccess = canAccessCompras(user);
   const comprasPedidosAccess = canViewComprasPedidos(user);
   const comprasPedidosCreateAccess = canCreateComprasPedidos(user);
@@ -333,20 +345,20 @@ export default function Layout() {
 
     if (crmAccess) {
       addGroup('CRM', [
-        item('/crm/dashboard', 'Dashboard', HiOutlineSquares2X2),
-        item('/crm/dashboard-gerencial', 'Gerencial', HiOutlineSquares2X2),
-        item('/crm/dashboard-sla', 'SLA', HiOutlineClipboardDocumentList),
-        item('/crm/dashboard-distribuicao', 'Distribuicao', HiOutlineAdjustmentsHorizontal),
-        item('/crm/inbox', 'Inbox', HiOutlineChatBubbleLeftRight),
-        item('/crm/leads', 'Leads', HiOutlineUsers),
-        item('/crm/carteira', 'Minha Carteira', HiOutlineUsers),
-        item('/crm/leads/novo', 'Novo Lead', HiOutlinePlusCircle),
-        item('/crm/kanban', 'Kanban', HiOutlineSquares2X2),
-        item('/crm/tarefas', 'Tarefas', HiOutlineClipboardDocumentList),
-        item('/crm/automacoes', 'Automacoes', HiOutlineAdjustmentsHorizontal),
-        item('/crm/admin/canais', 'Canais', HiOutlineCog6Tooth),
-        item('/crm/admin/numeros', 'Numeros', HiOutlinePaperAirplane),
-        item('/crm/admin/integracoes', 'Integracoes', HiOutlineAdjustmentsHorizontal)
+        crmDashboardAccess ? item('/crm/dashboard', 'Dashboard', HiOutlineSquares2X2) : null,
+        crmDashboardAccess ? item('/crm/dashboard-gerencial', 'Gerencial', HiOutlineSquares2X2) : null,
+        crmDashboardAccess ? item('/crm/dashboard-sla', 'SLA', HiOutlineClipboardDocumentList) : null,
+        crmDashboardAccess ? item('/crm/dashboard-distribuicao', 'Distribuicao', HiOutlineAdjustmentsHorizontal) : null,
+        crmAtendimentoAccess ? item('/crm/inbox', 'Inbox', HiOutlineChatBubbleLeftRight) : null,
+        crmLeadsAccess ? item('/crm/leads', 'Leads', HiOutlineUsers) : null,
+        crmLeadsAccess ? item('/crm/carteira', 'Minha Carteira', HiOutlineUsers) : null,
+        crmLeadsCreateAccess ? item('/crm/leads/novo', 'Novo Lead', HiOutlinePlusCircle) : null,
+        crmLeadsAccess ? item('/crm/kanban', 'Kanban', HiOutlineSquares2X2) : null,
+        crmLeadsAccess ? item('/crm/tarefas', 'Tarefas', HiOutlineClipboardDocumentList) : null,
+        crmAutomacoesAccess ? item('/crm/automacoes', 'Automacoes', HiOutlineAdjustmentsHorizontal) : null,
+        crmConfiguracoesAccess ? item('/crm/admin/canais', 'Canais', HiOutlineCog6Tooth) : null,
+        crmConfiguracoesAccess ? item('/crm/admin/numeros', 'Numeros', HiOutlinePaperAirplane) : null,
+        crmConfiguracoesAccess ? item('/crm/admin/integracoes', 'Integracoes', HiOutlineAdjustmentsHorizontal) : null
       ]);
     }
 
@@ -445,6 +457,13 @@ export default function Layout() {
     comprasPedidosAccess,
     comprasPedidosCreateAccess,
     contratosAccess,
+    crmAccess,
+    crmAtendimentoAccess,
+    crmAutomacoesAccess,
+    crmConfiguracoesAccess,
+    crmDashboardAccess,
+    crmLeadsAccess,
+    crmLeadsCreateAccess,
     financeiroAccess,
     boletosAccess,
     financeiroModuleEnabled,

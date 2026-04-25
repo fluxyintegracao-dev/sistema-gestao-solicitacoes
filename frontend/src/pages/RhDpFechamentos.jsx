@@ -15,7 +15,7 @@ import {
 import {
   canRetryIntegracaoSienge,
   canViewIntegracaoSienge,
-  canExecuteRhDpFechamento
+  canReopenRhDpFechamento
 } from '../utils/acessoProduto';
 
 const currencyFormatter = new Intl.NumberFormat('pt-BR', {
@@ -188,7 +188,7 @@ export default function RhDpFechamentos() {
 
   const podeVerIntegracaoSienge = canViewIntegracaoSienge(user);
   const podeOperarIntegracaoSienge = canRetryIntegracaoSienge(user);
-  const podeReabrirFechamento = canExecuteRhDpFechamento(user);
+  const podeReabrirFechamento = canReopenRhDpFechamento(user);
 
   async function enviarTituloParaSienge(tituloId) {
     try {

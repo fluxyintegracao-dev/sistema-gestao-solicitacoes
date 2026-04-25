@@ -253,15 +253,62 @@ export function canViewComercialContratos(user) {
   ]);
 }
 
+const RH_DP_AREA_PERMISSION_KEYS = [
+  'rh_dp.dashboard.visualizar',
+  'rh_dp.empresas.gerenciar',
+  'rh_dp.colaboradores.visualizar',
+  'rh_dp.colaboradores.editar',
+  'rh_dp.documentos.visualizar',
+  'rh_dp.documentos.gerenciar',
+  'rh_dp.importacoes.executar',
+  'rh_dp.apuracao.visualizar',
+  'rh_dp.apuracao.editar',
+  'rh_dp.fechamento.executar',
+  'rh_dp.fechamento.reabrir',
+  'rh_dp.obrigacoes.visualizar'
+];
+
+const RH_DP_LEGACY_TO_AREA = {
+  rh_dp_dashboard_view: ['rh_dp.dashboard.visualizar'],
+  rh_dp_colaboradores_view: ['rh_dp.colaboradores.visualizar'],
+  rh_dp_colaboradores_edit: ['rh_dp.colaboradores.editar'],
+  rh_dp_documentos_view: ['rh_dp.documentos.visualizar'],
+  rh_dp_documentos_manage: ['rh_dp.documentos.gerenciar'],
+  rh_dp_importacoes_execute: ['rh_dp.importacoes.executar'],
+  rh_dp_apuracao_view: ['rh_dp.apuracao.visualizar'],
+  rh_dp_apuracao_edit: ['rh_dp.apuracao.editar'],
+  rh_dp_fechamento_execute: ['rh_dp.fechamento.executar'],
+  rh_dp_fechamento_reopen: ['rh_dp.fechamento.reabrir'],
+  rh_dp_obrigacoes_view: ['rh_dp.obrigacoes.visualizar']
+};
+
+const INTEGRACAO_SIENGE_AREA_PERMISSION_KEYS = [
+  'integracao_sienge.geral.visualizar',
+  'integracao_sienge.geral.reprocessar',
+  'integracao_sienge.geral.configurar'
+];
+
+const INTEGRACAO_SIENGE_LEGACY_TO_AREA = {
+  integracao_sienge_view: ['integracao_sienge.geral.visualizar'],
+  integracao_sienge_retry: ['integracao_sienge.geral.reprocessar'],
+  integracao_sienge_config_manage: ['integracao_sienge.geral.configurar']
+};
+
 export function canAccessRhDp(user) {
   if (!hasEnabledModule(user, 'RH_DP')) return false;
   if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasAnyPermissao(user, RH_DP_AREA_PERMISSION_KEYS);
+  }
   return getRhDpCapabilities(user).length > 0;
 }
 
 export function canAccessIntegracaoSienge(user) {
   if (!hasEnabledModule(user, 'INTEGRACAO_SIENGE')) return false;
   if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasAnyPermissao(user, INTEGRACAO_SIENGE_AREA_PERMISSION_KEYS);
+  }
   return getIntegracaoSiengeCapabilities(user).length > 0;
 }
 
@@ -288,11 +335,19 @@ export function getIntegracaoSiengeCapabilities(user) {
 
 export function hasRhDpCapability(user, capability) {
   if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    const key = String(capability || '').trim().toLowerCase();
+    return hasAnyPermissao(user, RH_DP_LEGACY_TO_AREA[key] || []);
+  }
   return getRhDpCapabilities(user).includes(String(capability || '').trim().toLowerCase());
 }
 
 export function hasIntegracaoSiengeCapability(user, capability) {
   if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    const key = String(capability || '').trim().toLowerCase();
+    return hasAnyPermissao(user, INTEGRACAO_SIENGE_LEGACY_TO_AREA[key] || []);
+  }
   return getIntegracaoSiengeCapabilities(user).includes(String(capability || '').trim().toLowerCase());
 }
 
@@ -301,7 +356,12 @@ export function canAccessRhDpDashboard(user) {
 }
 
 export function canAccessRhDpEmpresas(user) {
-  return hasEnabledModule(user, 'RH_DP') && isBusinessAdmin(user);
+  if (!hasEnabledModule(user, 'RH_DP')) return false;
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasPermissao(user, 'rh_dp.empresas.gerenciar');
+  }
+  return false;
 }
 
 export function canViewRhDpColaboradores(user) {
@@ -345,12 +405,17 @@ export function canEditRhDpApuracao(user) {
 export function canViewRhDpObrigacoes(user) {
   return canAccessRhDp(user) && (
     hasRhDpCapability(user, 'rh_dp_obrigacoes_view') ||
-    hasRhDpCapability(user, 'rh_dp_fechamento_execute')
+    hasRhDpCapability(user, 'rh_dp_fechamento_execute') ||
+    hasRhDpCapability(user, 'rh_dp_fechamento_reopen')
   );
 }
 
 export function canExecuteRhDpFechamento(user) {
   return canAccessRhDp(user) && hasRhDpCapability(user, 'rh_dp_fechamento_execute');
+}
+
+export function canReopenRhDpFechamento(user) {
+  return canAccessRhDp(user) && hasRhDpCapability(user, 'rh_dp_fechamento_reopen');
 }
 
 export function canViewIntegracaoSienge(user) {
@@ -427,23 +492,139 @@ export function canAccessComunicacao(user) {
 const CRM_PERFIS = ['SUPERADMIN', 'ADMIN', 'ADMINISTRADOR', 'ADMIN_CRM', 'GESTOR_COMERCIAL', 'COORDENADOR_CRM', 'DIRETORIA'];
 const CRM_PERFIS_EXPORT = ['SUPERADMIN', 'ADMIN', 'ADMINISTRADOR', 'ADMIN_CRM', 'GESTOR_COMERCIAL', 'COORDENADOR_CRM'];
 const CRM_PERFIS_REDISTRIBUTE = ['SUPERADMIN', 'ADMIN', 'ADMINISTRADOR', 'ADMIN_CRM', 'GESTOR_COMERCIAL', 'COORDENADOR_CRM'];
+const CRM_DASHBOARD_KEYS = ['crm.dashboard.visualizar'];
+const CRM_LEADS_VIEW_KEYS = [
+  'crm.leads.visualizar',
+  'crm.leads.criar',
+  'crm.leads.exportar',
+  'crm.leads.redistribuir'
+];
+const CRM_LEADS_WRITE_KEYS = ['crm.leads.criar'];
+const CRM_LEADS_EXPORT_KEYS = ['crm.leads.exportar'];
+const CRM_LEADS_REDISTRIBUTE_KEYS = ['crm.leads.redistribuir'];
+const CRM_ATENDIMENTO_VIEW_KEYS = ['crm.atendimento.visualizar', 'crm.atendimento.enviar'];
+const CRM_ATENDIMENTO_SEND_KEYS = ['crm.atendimento.enviar'];
+const CRM_AUTOMACOES_VIEW_KEYS = ['crm.automacoes.visualizar', 'crm.automacoes.gerenciar'];
+const CRM_AUTOMACOES_MANAGE_KEYS = ['crm.automacoes.gerenciar'];
+const CRM_CONFIG_VIEW_KEYS = ['crm.configuracoes.visualizar', 'crm.configuracoes.gerenciar'];
+const CRM_CONFIG_MANAGE_KEYS = ['crm.configuracoes.gerenciar'];
+const CRM_PERMISSION_KEYS = [
+  ...CRM_DASHBOARD_KEYS,
+  ...CRM_LEADS_VIEW_KEYS,
+  ...CRM_ATENDIMENTO_VIEW_KEYS,
+  ...CRM_AUTOMACOES_VIEW_KEYS,
+  ...CRM_CONFIG_VIEW_KEYS
+];
 
 export function canAccessCrm(user) {
   if (!hasEnabledModule(user, 'CRM')) return false;
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasAnyPermissao(user, CRM_PERMISSION_KEYS);
+  }
   const perfil = normalizeToken(user?.perfil || '');
   return CRM_PERFIS.includes(perfil);
 }
 
+export function canViewCrmDashboard(user) {
+  if (!hasEnabledModule(user, 'CRM')) return false;
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasAnyPermissao(user, CRM_DASHBOARD_KEYS);
+  }
+  return canAccessCrm(user);
+}
+
+export function canViewCrmLeads(user) {
+  if (!hasEnabledModule(user, 'CRM')) return false;
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasAnyPermissao(user, CRM_LEADS_VIEW_KEYS);
+  }
+  return canAccessCrm(user);
+}
+
+export function canCreateCrmLeads(user) {
+  if (!hasEnabledModule(user, 'CRM')) return false;
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasAnyPermissao(user, CRM_LEADS_WRITE_KEYS);
+  }
+  return canAccessCrm(user);
+}
+
 export function canExportCrmLeads(user) {
   if (!hasEnabledModule(user, 'CRM')) return false;
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasAnyPermissao(user, CRM_LEADS_EXPORT_KEYS);
+  }
   const perfil = normalizeToken(user?.perfil || '');
   return CRM_PERFIS_EXPORT.includes(perfil);
 }
 
 export function canRedistributeCrmLeads(user) {
   if (!hasEnabledModule(user, 'CRM')) return false;
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasAnyPermissao(user, CRM_LEADS_REDISTRIBUTE_KEYS);
+  }
   const perfil = normalizeToken(user?.perfil || '');
   return CRM_PERFIS_REDISTRIBUTE.includes(perfil);
+}
+
+export function canViewCrmAtendimento(user) {
+  if (!hasEnabledModule(user, 'CRM')) return false;
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasAnyPermissao(user, CRM_ATENDIMENTO_VIEW_KEYS);
+  }
+  return canAccessCrm(user);
+}
+
+export function canSendCrmAtendimento(user) {
+  if (!hasEnabledModule(user, 'CRM')) return false;
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasAnyPermissao(user, CRM_ATENDIMENTO_SEND_KEYS);
+  }
+  return canAccessCrm(user);
+}
+
+export function canViewCrmAutomacoes(user) {
+  if (!hasEnabledModule(user, 'CRM')) return false;
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasAnyPermissao(user, CRM_AUTOMACOES_VIEW_KEYS);
+  }
+  return canAccessCrm(user);
+}
+
+export function canManageCrmAutomacoes(user) {
+  if (!hasEnabledModule(user, 'CRM')) return false;
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasAnyPermissao(user, CRM_AUTOMACOES_MANAGE_KEYS);
+  }
+  return canAccessCrm(user);
+}
+
+export function canViewCrmConfiguracoes(user) {
+  if (!hasEnabledModule(user, 'CRM')) return false;
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasAnyPermissao(user, CRM_CONFIG_VIEW_KEYS);
+  }
+  return canAccessCrm(user);
+}
+
+export function canManageCrmConfiguracoes(user) {
+  if (!hasEnabledModule(user, 'CRM')) return false;
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasAnyPermissao(user, CRM_CONFIG_MANAGE_KEYS);
+  }
+  return canAccessCrm(user);
 }
 
 /**

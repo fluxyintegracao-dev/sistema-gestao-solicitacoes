@@ -1,11 +1,6 @@
 const { isModuleEnabled } = require('../services/moduleConfigService');
-const { isSuperadmin } = require('../services/authorizationService');
+const { canAccessCrm, isSuperadmin } = require('../services/authorizationService');
 const { registrarEventoSeguranca } = require('../services/securityLogService');
-
-// CRM permissions stored in crm_config as JSON array per user or
-// role. For Phase 1, superadmin and ADMIN/GESTOR bypass; all other
-// users require explicit grant via crm_config key CRM_PERMISSOES_PERFIS.
-const CRM_PERFIS_ACESSO_PADRAO = ['SUPERADMIN', 'ADMIN', 'ADMINISTRADOR', 'ADMIN_CRM', 'GESTOR_COMERCIAL', 'COORDENADOR_CRM', 'DIRETORIA'];
 
 function requireCrmModule(options = {}) {
   return async (req, res, next) => {
@@ -17,8 +12,8 @@ function requireCrmModule(options = {}) {
         return res.status(403).json({ error: 'Modulo CRM desabilitado para esta instalacao' });
       }
 
-      const perfil = String(req.user?.perfil || '').toUpperCase();
-      if (!CRM_PERFIS_ACESSO_PADRAO.includes(perfil)) {
+      if (!(await canAccessCrm(req.user))) {
+        const perfil = String(req.user?.perfil || '').toUpperCase();
         await registrarEventoSeguranca({
           req,
           usuarioId: req.user?.id || null,
@@ -26,7 +21,7 @@ function requireCrmModule(options = {}) {
           recursoTipo: 'MODULE',
           recursoId: 'CRM',
           status: 'DENIED',
-          descricao: `Perfil sem acesso ao CRM: ${perfil}`
+          descricao: `Usuario sem acesso ao CRM: perfil=${perfil}`
         });
         return res.status(403).json({ error: 'Acesso negado ao modulo CRM' });
       }

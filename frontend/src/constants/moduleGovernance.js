@@ -42,6 +42,60 @@ export const MODULE_GOVERNANCE = [
     usedIn: ['Solicitacoes de Compra', 'Cotacoes', 'Pedidos de Compra'],
     disabledEffect: 'Oculta o dominio de compras, sem bloquear o modulo principal de Solicitacoes.',
     permissionsEffect: 'Permissoes de Compras atuam apenas no fluxo de compras e cotacoes.'
+  },
+  {
+    key: 'COMERCIAL',
+    label: 'Comercial',
+    role: 'Vendas, empreendimentos e contratos comerciais',
+    dependency: 'Pode consumir dados financeiros e cadastros mestres, mas fica separado de Solicitacoes',
+    usedIn: ['Empreendimentos', 'Unidades', 'Mapa de Unidades', 'Tabelas de Preco', 'Contratos de Venda'],
+    disabledEffect: 'Oculta telas comerciais e endpoints protegidos por modulo.',
+    permissionsEffect: 'Permissoes de Comercial controlam empreendimentos, vendas e contratos comerciais.'
+  },
+  {
+    key: 'FINANCEIRO',
+    label: 'Financeiro',
+    role: 'Titulos, relatorios, conciliacao e cadastros financeiros',
+    dependency: 'Integra com Obras, Boletos, Provisoes e comprovantes',
+    usedIn: ['Titulos Financeiros', 'Relatorios Financeiros', 'Conciliacao OFX', 'Cadastros Financeiros'],
+    disabledEffect: 'Oculta rotas financeiras e bloqueia endpoints do modulo.',
+    permissionsEffect: 'Permissoes de Financeiro controlam visualizacao, criacao, baixa, estorno, conciliacao e cadastros.'
+  },
+  {
+    key: 'BOLETOS',
+    label: 'Boletos',
+    role: 'Emissao e consulta de boletos',
+    dependency: 'Complementa o Financeiro',
+    usedIn: ['Boletos'],
+    disabledEffect: 'Oculta a tela de boletos e bloqueia endpoints de emissao.',
+    permissionsEffect: 'Permissoes de Boletos controlam visualizacao e geracao.'
+  },
+  {
+    key: 'CRM',
+    label: 'CRM',
+    role: 'Leads, atendimento, dashboards, automacoes e integracoes de canais',
+    dependency: 'Modulo comercial independente',
+    usedIn: ['Dashboards CRM', 'Leads', 'Inbox', 'Automacoes', 'Administracao CRM'],
+    disabledEffect: 'Oculta o menu CRM e bloqueia endpoints do CRM.',
+    permissionsEffect: 'Permissoes de CRM controlam dashboards, leads, atendimento, automacoes e configuracoes.'
+  },
+  {
+    key: 'RH_DP',
+    label: 'RH/DP',
+    role: 'Colaboradores, documentos, apuracao e fechamentos',
+    dependency: 'Pode acoplar com Financeiro para obrigacoes e fechamentos',
+    usedIn: ['Visao do Modulo RH/DP', 'Empresas do Grupo', 'Colaboradores', 'Documentos', 'Importacoes', 'Apuracao', 'Fechamentos'],
+    disabledEffect: 'Oculta o menu RH/DP e bloqueia endpoints do RH/DP.',
+    permissionsEffect: 'Permissoes de RH/DP substituem a configuracao legada de capacidades por usuario.'
+  },
+  {
+    key: 'INTEGRACAO_SIENGE',
+    label: 'Integracao SIENGE',
+    role: 'Monitoramento, reprocessamento e configuracao da fila SIENGE',
+    dependency: 'Complementa RH/DP e rotinas financeiras/contabeis',
+    usedIn: ['Integracao SIENGE'],
+    disabledEffect: 'Oculta a tela de integracao e bloqueia endpoints do SIENGE.',
+    permissionsEffect: 'Permissoes de Integracao SIENGE controlam visualizar, reprocessar e configurar.'
   }
 ];
 
@@ -61,4 +115,3 @@ export function buildModuleEnabledMap(modules = []) {
     ])
   );
 }
-

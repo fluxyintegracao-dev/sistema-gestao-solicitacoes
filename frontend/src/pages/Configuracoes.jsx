@@ -174,13 +174,8 @@ const SECOES_CONFIG = [
         requireModule: 'FINANCEIRO'
       },
       {
-        title: 'Permissoes RH/DP e SIENGE',
-        description: 'Defina, por usuario, quais areas do RH/DP e da Integracao SIENGE podem ser operadas pela equipe de RH e contabilidade.',
-        to: '/usuarios-permissoes-rh-dp'
-      },
-      {
         title: 'Permissoes de Areas por Usuario',
-        description: 'Configure quais areas, abas e acoes de cada modulo cada usuario pode acessar. Ideal para restringir acesso sem criar perfis novos.',
+        description: 'Configure quais areas, abas e acoes de cada modulo cada usuario pode acessar, incluindo CRM, RH/DP e Integracao SIENGE.',
         to: '/permissoes-areas'
       },
       {

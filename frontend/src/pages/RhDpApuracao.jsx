@@ -16,6 +16,7 @@ import {
 import {
   canEditRhDpApuracao,
   canExecuteRhDpFechamento,
+  canReopenRhDpFechamento,
   hasEnabledModule
 } from '../utils/acessoProduto';
 
@@ -84,6 +85,7 @@ export default function RhDpApuracao() {
   const navigate = useNavigate();
   const podeEditar = canEditRhDpApuracao(user);
   const podeFechar = canExecuteRhDpFechamento(user);
+  const podeReabrirFechamento = canReopenRhDpFechamento(user);
   const financeiroHabilitado = hasEnabledModule(user, 'FINANCEIRO');
   const [empresas, setEmpresas] = useState([]);
   const [obras, setObras] = useState([]);
@@ -304,7 +306,7 @@ export default function RhDpApuracao() {
   }
 
   async function reabrirFechamentoAtual() {
-    if (!detalhe?.fechamentoRh?.id || !podeFechar) {
+    if (!detalhe?.fechamentoRh?.id || !podeReabrirFechamento) {
       return;
     }
 
@@ -623,7 +625,7 @@ export default function RhDpApuracao() {
                   <Link to={`/rh-dp/fechamentos?fechamento_id=${detalhe.fechamentoRh.id}`} className="btn btn-outline">
                     Ver fechamento
                   </Link>
-                  {podeFechar ? (
+                  {podeReabrirFechamento ? (
                     <button type="button" className="btn btn-outline" onClick={reabrirFechamentoAtual} disabled={fechando}>
                       {fechando ? 'Processando...' : 'Estornar e reabrir'}
                     </button>
