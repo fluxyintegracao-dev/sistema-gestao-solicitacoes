@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   HiDocumentArrowDown,
   HiViewColumns,
@@ -442,6 +443,10 @@ export default function Solicitacoes({ arquivadas = false }) {
   useEffect(() => {
     if (!mostrarSeletorColunas) return undefined;
 
+    const frameId = window.requestAnimationFrame(() => {
+      posicionarSeletorColunas();
+    });
+
     function reposicionarSeletor() {
       posicionarSeletorColunas();
     }
@@ -449,6 +454,7 @@ export default function Solicitacoes({ arquivadas = false }) {
     window.addEventListener('resize', reposicionarSeletor);
     window.addEventListener('scroll', reposicionarSeletor, true);
     return () => {
+      window.cancelAnimationFrame(frameId);
       window.removeEventListener('resize', reposicionarSeletor);
       window.removeEventListener('scroll', reposicionarSeletor, true);
     };
@@ -588,18 +594,20 @@ export default function Solicitacoes({ arquivadas = false }) {
     if (!botaoColunasRef.current || typeof window === 'undefined') return;
 
     const margem = 16;
-    const larguraSeletor = 320;
-    const alturaEstimada = 260;
     const btnRect = botaoColunasRef.current.getBoundingClientRect();
+    const seletorRect = seletorColunasRef.current?.getBoundingClientRect();
+    const larguraSeletor = Math.min(seletorRect?.width || 320, window.innerWidth - margem * 2);
+    const alturaSeletor = Math.min(seletorRect?.height || 260, window.innerHeight - margem * 2);
     const maxLeft = Math.max(margem, window.innerWidth - larguraSeletor - margem);
-    const abreAcima = btnRect.bottom + alturaEstimada + margem > window.innerHeight
-      && btnRect.top > alturaEstimada + margem;
+    const espacoAbaixo = window.innerHeight - btnRect.bottom - margem;
+    const espacoAcima = btnRect.top - margem;
+    const abreAcima = alturaSeletor > espacoAbaixo && espacoAcima > espacoAbaixo;
 
     setSeletorColunasPosition({
       left: Math.round(Math.min(Math.max(margem, btnRect.left), maxLeft)),
       top: Math.round(abreAcima
-        ? Math.max(margem, btnRect.top - alturaEstimada - 8)
-        : Math.min(window.innerHeight - margem, btnRect.bottom + 8))
+        ? Math.max(margem, btnRect.top - alturaSeletor - 8)
+        : Math.min(window.innerHeight - alturaSeletor - margem, btnRect.bottom + 8))
     });
   }
 
@@ -890,7 +898,7 @@ export default function Solicitacoes({ arquivadas = false }) {
             </button>
           </div>
 
-          {mostrarSeletorColunas && (
+          {mostrarSeletorColunas && typeof document !== 'undefined' && createPortal((
             <div
               ref={seletorColunasRef}
               className="fixed z-[1000] w-[320px] max-w-[calc(100vw-2rem)] max-h-[min(70vh,420px)] overflow-y-auto bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl shadow-2xl p-3"
@@ -927,7 +935,7 @@ export default function Solicitacoes({ arquivadas = false }) {
                 })}
               </div>
             </div>
-          )}
+          ), document.body)}
         </div>
       )}
 
