@@ -8,6 +8,9 @@ export const API_URL = normalizeApiUrl(import.meta.env.VITE_API_URL);
 export const API_ORIGIN = String(API_URL).replace(/\/api\/?$/, '');
 
 let currentAuthToken = null;
+let currentCsrfToken = null;
+const CSRF_HEADER_NAME = 'X-CSRF-Token';
+const CSRF_COOKIE_NAME = 'fluxy_csrf';
 
 function getCookieValue(name) {
   if (typeof document === 'undefined') return null;
@@ -23,6 +26,17 @@ function getCookieValue(name) {
 function isUnsafeMethod(method) {
   const normalized = String(method || 'GET').trim().toUpperCase();
   return !['GET', 'HEAD', 'OPTIONS'].includes(normalized);
+}
+
+function rememberCsrfTokenFromResponse(response) {
+  try {
+    const nextToken = response?.headers?.get?.(CSRF_HEADER_NAME);
+    if (nextToken) {
+      currentCsrfToken = nextToken;
+    }
+  } catch {
+    // Nem toda resposta permite leitura de headers; mantem o token atual.
+  }
 }
 
 export function installFetchSecurityDefaults() {
@@ -41,18 +55,21 @@ export function installFetchSecurityDefaults() {
       headers.set('Authorization', `Bearer ${currentAuthToken}`);
     }
 
-    if (isUnsafeMethod(method) && !headers.has('X-CSRF-Token')) {
-      const csrfToken = getCookieValue('fluxy_csrf');
+    if (isUnsafeMethod(method) && !headers.has(CSRF_HEADER_NAME)) {
+      const csrfToken = currentCsrfToken || getCookieValue(CSRF_COOKIE_NAME);
       if (csrfToken) {
-        headers.set('X-CSRF-Token', csrfToken);
+        headers.set(CSRF_HEADER_NAME, csrfToken);
       }
     }
 
-    return nativeFetch(input, {
+    const response = await nativeFetch(input, {
       ...init,
       credentials: init.credentials || 'include',
       headers
     });
+
+    rememberCsrfTokenFromResponse(response);
+    return response;
   };
 
   window.__fluxyFetchSecurityInstalled = true;
@@ -75,6 +92,7 @@ export function setAuthToken(token) {
 
 export function clearAuthToken() {
   currentAuthToken = null;
+  currentCsrfToken = null;
 }
 
 export function authHeaders(extra = {}) {
