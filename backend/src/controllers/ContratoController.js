@@ -14,6 +14,7 @@ const {
 const { env } = require('../config/env');
 const { uploadToS3 } = require('../services/s3');
 const {
+  canAccessContratos,
   getUserObraScopeIds,
   isBusinessAdmin,
   isSuperadmin
@@ -487,9 +488,10 @@ module.exports = {
     try {
       const podeAcessar = await isAdminGEO(req);
       const acessoObra = await isSetorObra(req);
+      const podeVisualizarContratos = await canAccessContratos(req.user);
       const obrasPermitidas = isSuperadmin(req.user) ? null : await getUserObraScopeIds(req.user);
 
-      if (!podeAcessar && !acessoObra) {
+      if (!podeVisualizarContratos) {
         return res.status(403).json({ error: 'Acesso negado' });
       }
 

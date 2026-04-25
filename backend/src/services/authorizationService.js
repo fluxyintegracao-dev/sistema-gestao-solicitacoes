@@ -119,6 +119,17 @@ const COMERCIAL_PERMISSION_KEYS = [
   ...COMERCIAL_CONTRATOS_VIEW_KEYS
 ];
 
+const COMERCIAL_BASE_READ_KEYS = [
+  ...COMERCIAL_EMPREENDIMENTOS_VIEW_KEYS,
+  ...COMERCIAL_CONTRATOS_VIEW_KEYS
+];
+
+const CONTRATOS_VIEW_KEYS = [
+  'contratos.geral.visualizar',
+  'contratos.geral.criar',
+  'contratos.geral.editar'
+];
+
 const CRM_DASHBOARD_KEYS = [
   'crm.dashboard.visualizar'
 ];
@@ -903,6 +914,18 @@ async function canAccessComercial(user) {
   return false;
 }
 
+async function canReadComercialBaseData(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, COMERCIAL_BASE_READ_KEYS);
+  }
+
+  return false;
+}
+
 async function canViewComercialEmpreendimentos(user) {
   if (isBusinessAdmin(user)) {
     return true;
@@ -961,6 +984,22 @@ async function canManageComercialContratos(user) {
   }
 
   return false;
+}
+
+async function canAccessContratos(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, CONTRATOS_VIEW_KEYS);
+  }
+
+  const tokens = await buildUserScopeTokens(user);
+  return (
+    (tokens.includes('ADMIN') && await userHasSetorCapability(user, 'eh_setor_geo')) ||
+    await userHasSetorCapability(user, 'eh_setor_obra')
+  );
 }
 
 async function canViewProvisoes(user) {
@@ -1276,6 +1315,7 @@ async function canDeleteComprovante(user) {
 module.exports = {
   canAccessBoletos,
   canAccessComercial,
+  canAccessContratos,
   canAccessCompras,
   canAccessCrm,
   canAccessProvisoes,
@@ -1311,6 +1351,7 @@ module.exports = {
   canReceiveCrmAutomationManagerNotification,
   canReceiveCrmLeadAssignment,
   canReopenRhDpFechamento,
+  canReadComercialBaseData,
   canManageIntegracaoSiengeConfig,
   canManageProvisoesCategorias,
   canManageProvisoesStatus,

@@ -173,6 +173,7 @@ const {
   canManageUsers,
   canReopenRhDpFechamento,
   canRetryIntegracaoSienge,
+  canReadComercialBaseData,
   canViewProvisoes,
   canViewProvisoesDashboard,
   canViewComercialContratos,
@@ -397,7 +398,7 @@ const allowBoletosGenerate = permit({
 const allowComercialEmpreendimentosRead = permit({
   resource: 'COMERCIAL',
   custom: async (req) => (
-    (await canViewComercialEmpreendimentos(req.user))
+    (await canReadComercialBaseData(req.user))
       ? true
       : 'Acesso negado para empreendimentos comerciais'
   )
