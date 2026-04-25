@@ -11,6 +11,8 @@ const LEGACY_COMPAT_ALLOWED_ORIGINS = [
   'https://jrfluxy.com.br',
   'https://www.jrfluxy.com.br',
   'https://csc.jrfluxy.com.br',
+  'https://dev.jrfluxy.com.br',
+  'https://api-dev.jrfluxy.com.br',
   'http://localhost:5173',
   'http://127.0.0.1:5173'
 ];
@@ -37,13 +39,12 @@ function getDefaultInstallationConfig() {
 }
 
 function normalizeAllowedOrigins(value) {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-
   return Array.from(
     new Set(
-      value
+      [
+        ...LEGACY_COMPAT_ALLOWED_ORIGINS,
+        ...(Array.isArray(value) ? value : [])
+      ]
         .map((item) => String(item || '').trim())
         .filter(Boolean)
     )

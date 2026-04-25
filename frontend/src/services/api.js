@@ -1,4 +1,10 @@
-export const API_URL = import.meta.env.VITE_API_URL ?? '/api';
+function normalizeApiUrl(value) {
+  const raw = String(value || '/api').trim().replace(/\/+$/g, '');
+  if (!raw) return '/api';
+  return raw.endsWith('/api') ? raw : `${raw}/api`;
+}
+
+export const API_URL = normalizeApiUrl(import.meta.env.VITE_API_URL);
 export const API_ORIGIN = String(API_URL).replace(/\/api\/?$/, '');
 
 let currentAuthToken = null;
