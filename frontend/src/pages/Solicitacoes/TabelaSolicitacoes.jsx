@@ -6,6 +6,8 @@ import { userHasSetorCapability } from '../../utils/setor';
 import { hasEnabledModule } from '../../utils/acessoProduto';
 
 const SORTABLE_COLUMNS = new Set(['data', 'vencimento', 'valor']);
+const COLUMN_WIDTHS_STORAGE_KEY = 'solicitacoes:tabela:larguras:v1';
+const MAX_COLUMN_WIDTH = 520;
 
 export default function TabelaSolicitacoes({
   solicitacoes,
@@ -19,9 +21,21 @@ export default function TabelaSolicitacoes({
   visibleColumns = null
 }) {
   const tableWrapRef = useRef(null);
+  const resizeCleanupRef = useRef(null);
   const [viewportWidth, setViewportWidth] = useState(() =>
     typeof window !== 'undefined' ? window.innerWidth : 1280
   );
+  const [widthsById, setWidthsById] = useState(() => {
+    if (typeof window === 'undefined') return {};
+    try {
+      const saved = JSON.parse(localStorage.getItem(COLUMN_WIDTHS_STORAGE_KEY) || '{}');
+      return saved && typeof saved === 'object' && !Array.isArray(saved) ? saved : {};
+    } catch (error) {
+      console.error('Erro ao carregar larguras da tabela de solicitações', error);
+      return {};
+    }
+  });
+  const [resizingColumnId, setResizingColumnId] = useState(null);
   const { user } = useAuth();
 
   const isSetorObra = userHasSetorCapability(user, 'eh_setor_obra');
@@ -115,12 +129,39 @@ export default function TabelaSolicitacoes({
     return userFiltered.filter(col => col.id === 'selecionar' || responsiveVisibleSet.has(col.id));
   }, [columnsBase, visibleSet, responsiveVisibleSet]);
 
-  const [widths, setWidths] = useState(() => columns.map(col => col.width));
   const [ordenacao, setOrdenacao] = useState({ campo: 'data', direcao: 'desc' });
 
   useEffect(() => {
-    setWidths(columns.map(col => col.width));
-  }, [columns]);
+    const validColumnIds = new Set(columnsBase.map(col => col.id));
+    setWidthsById(prev => {
+      let changed = false;
+      const next = {};
+      Object.entries(prev || {}).forEach(([id, value]) => {
+        const numericValue = Number(value);
+        if (validColumnIds.has(id) && Number.isFinite(numericValue)) {
+          next[id] = numericValue;
+        } else {
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+  }, [columnsBase]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem(COLUMN_WIDTHS_STORAGE_KEY, JSON.stringify(widthsById));
+    } catch (error) {
+      console.error('Erro ao salvar larguras da tabela de solicitações', error);
+    }
+  }, [widthsById]);
+
+  useEffect(() => {
+    return () => {
+      resizeCleanupRef.current?.();
+    };
+  }, []);
 
   useEffect(() => {
     function handleResize() {
@@ -132,9 +173,93 @@ export default function TabelaSolicitacoes({
   }, []);
 
   const totalTableWidth = useMemo(
-    () => columns.reduce((acc, col, index) => acc + Number(widths[index] ?? col.width ?? 0), 0),
-    [columns, widths]
+    () => columns.reduce((acc, col) => acc + getColumnWidth(col), 0),
+    [columns, widthsById]
   );
+
+  function getColumnWidth(col) {
+    const defaultWidth = Number(col.width ?? col.min ?? 80);
+    const savedWidth = Number(widthsById?.[col.id]);
+    const minWidth = Number(col.min ?? 60);
+    const maxWidth = Number(col.max ?? MAX_COLUMN_WIDTH);
+    const currentWidth = Number.isFinite(savedWidth) ? savedWidth : defaultWidth;
+    return Math.round(Math.min(Math.max(currentWidth, minWidth), maxWidth));
+  }
+
+  function ajustarLarguraColuna(col, delta) {
+    setWidthsById(prev => {
+      const current = Number(prev?.[col.id] ?? col.width ?? col.min ?? 80);
+      const minWidth = Number(col.min ?? 60);
+      const maxWidth = Number(col.max ?? MAX_COLUMN_WIDTH);
+      const nextWidth = Math.round(Math.min(Math.max(current + delta, minWidth), maxWidth));
+      return { ...prev, [col.id]: nextWidth };
+    });
+  }
+
+  function restaurarLarguraColuna(event, col) {
+    event.preventDefault();
+    event.stopPropagation();
+    setWidthsById(prev => {
+      if (!prev?.[col.id]) return prev;
+      const next = { ...prev };
+      delete next[col.id];
+      return next;
+    });
+  }
+
+  function iniciarRedimensionamento(event, col) {
+    if (col.id === 'selecionar') return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    resizeCleanupRef.current?.();
+
+    const startX = event.clientX;
+    const startWidth = getColumnWidth(col);
+    const minWidth = Number(col.min ?? 60);
+    const maxWidth = Number(col.max ?? MAX_COLUMN_WIDTH);
+    const originalCursor = document.body.style.cursor;
+    const originalUserSelect = document.body.style.userSelect;
+
+    setResizingColumnId(col.id);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+
+    function handlePointerMove(moveEvent) {
+      const delta = moveEvent.clientX - startX;
+      const nextWidth = Math.round(Math.min(Math.max(startWidth + delta, minWidth), maxWidth));
+      setWidthsById(prev => ({ ...prev, [col.id]: nextWidth }));
+    }
+
+    function finalizarRedimensionamento() {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', finalizarRedimensionamento);
+      window.removeEventListener('pointercancel', finalizarRedimensionamento);
+      document.body.style.cursor = originalCursor;
+      document.body.style.userSelect = originalUserSelect;
+      resizeCleanupRef.current = null;
+      setResizingColumnId(null);
+    }
+
+    resizeCleanupRef.current = finalizarRedimensionamento;
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', finalizarRedimensionamento);
+    window.addEventListener('pointercancel', finalizarRedimensionamento);
+  }
+
+  function handleResizerKeyDown(event, col) {
+    if (event.key === 'ArrowLeft') {
+      event.preventDefault();
+      ajustarLarguraColuna(col, event.shiftKey ? -40 : -16);
+    }
+    if (event.key === 'ArrowRight') {
+      event.preventDefault();
+      ajustarLarguraColuna(col, event.shiftKey ? 40 : 16);
+    }
+    if (event.key === 'Enter' || event.key === ' ') {
+      restaurarLarguraColuna(event, col);
+    }
+  }
 
   const solicitacoesOrdenadas = useMemo(() => {
     const { campo, direcao } = ordenacao || {};
@@ -197,20 +322,21 @@ export default function TabelaSolicitacoes({
           style={{ width: '100%', minWidth: `${totalTableWidth}px` }}
         >
         <colgroup>
-          {columns.map((col, index) => (
-            <col key={col.id} style={{ width: `${widths[index] ?? col.width}px` }} />
+          {columns.map(col => (
+            <col key={col.id} style={{ width: `${getColumnWidth(col)}px` }} />
           ))}
         </colgroup>
 
         <thead className="bg-gray-50 dark:bg-slate-800">
           <tr>
-            {columns.map((col, index) => {
+            {columns.map(col => {
               const sortable = SORTABLE_COLUMNS.has(col.id);
+              const resizable = col.id !== 'selecionar';
               return (
                 <th
                   key={col.id}
-                  className="p-3 text-left relative select-none whitespace-nowrap text-xs uppercase tracking-wide text-gray-600 dark:text-slate-200 border-b border-gray-200 dark:border-slate-700 sticky top-0 z-10 bg-gray-50 dark:bg-slate-800"
-                  style={{ width: `${widths[index] ?? col.width}px` }}
+                  className={`p-3 text-left relative select-none whitespace-nowrap text-xs uppercase tracking-wide text-gray-600 dark:text-slate-200 border-b border-gray-200 dark:border-slate-700 sticky top-0 z-10 bg-gray-50 dark:bg-slate-800 solicitacoes-resizable-th ${resizingColumnId === col.id ? 'is-resizing' : ''}`}
+                  style={{ width: `${getColumnWidth(col)}px` }}
                 >
                   {col.id === 'selecionar' ? (
                     <input
@@ -232,6 +358,19 @@ export default function TabelaSolicitacoes({
                     >
                       {col.label}{indicadorOrdenacao(col.id)}
                     </button>
+                  )}
+                  {resizable && (
+                    <span
+                      role="separator"
+                      aria-label={`Redimensionar coluna ${col.label}`}
+                      aria-orientation="vertical"
+                      tabIndex={0}
+                      className={`solicitacoes-col-resizer ${resizingColumnId === col.id ? 'is-active' : ''}`}
+                      title="Arraste para redimensionar. Enter restaura."
+                      onPointerDown={(event) => iniciarRedimensionamento(event, col)}
+                      onDoubleClick={(event) => restaurarLarguraColuna(event, col)}
+                      onKeyDown={(event) => handleResizerKeyDown(event, col)}
+                    />
                   )}
                 </th>
               );

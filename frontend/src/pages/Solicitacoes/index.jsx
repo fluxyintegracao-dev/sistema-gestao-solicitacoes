@@ -66,8 +66,7 @@ export default function Solicitacoes({ arquivadas = false }) {
   const [mostrarSeletorColunas, setMostrarSeletorColunas] = useState(false);
   const [colunasVisiveis, setColunasVisiveis] = useState(DEFAULT_VISIBLE_COLUMNS);
   const [colunasStoragePronto, setColunasStoragePronto] = useState(false);
-  const [seletorColunasLeft, setSeletorColunasLeft] = useState(0);
-  const [seletorColunasTop, setSeletorColunasTop] = useState(0);
+  const [seletorColunasPosition, setSeletorColunasPosition] = useState({ left: 16, top: 16 });
   const [filtrosStoragePronto, setFiltrosStoragePronto] = useState(false);
   const [paginaAtual, setPaginaAtual] = useState(1);
   const [limitePorPagina, setLimitePorPagina] = useState(25);
@@ -440,6 +439,21 @@ export default function Solicitacoes({ arquivadas = false }) {
     return () => document.removeEventListener('keydown', handleEscape);
   }, []);
 
+  useEffect(() => {
+    if (!mostrarSeletorColunas) return undefined;
+
+    function reposicionarSeletor() {
+      posicionarSeletorColunas();
+    }
+
+    window.addEventListener('resize', reposicionarSeletor);
+    window.addEventListener('scroll', reposicionarSeletor, true);
+    return () => {
+      window.removeEventListener('resize', reposicionarSeletor);
+      window.removeEventListener('scroll', reposicionarSeletor, true);
+    };
+  }, [mostrarSeletorColunas]);
+
   function toggleSelecionada(id) {
     const idNum = Number(id);
     setSelecionadasIds(prev =>
@@ -570,17 +584,27 @@ export default function Solicitacoes({ arquivadas = false }) {
     ));
   }
 
+  function posicionarSeletorColunas() {
+    if (!botaoColunasRef.current || typeof window === 'undefined') return;
+
+    const margem = 16;
+    const larguraSeletor = 320;
+    const alturaEstimada = 260;
+    const btnRect = botaoColunasRef.current.getBoundingClientRect();
+    const maxLeft = Math.max(margem, window.innerWidth - larguraSeletor - margem);
+    const abreAcima = btnRect.bottom + alturaEstimada + margem > window.innerHeight
+      && btnRect.top > alturaEstimada + margem;
+
+    setSeletorColunasPosition({
+      left: Math.round(Math.min(Math.max(margem, btnRect.left), maxLeft)),
+      top: Math.round(abreAcima
+        ? Math.max(margem, btnRect.top - alturaEstimada - 8)
+        : Math.min(window.innerHeight - margem, btnRect.bottom + 8))
+    });
+  }
+
   function alternarSeletorColunas() {
-    if (!mostrarSeletorColunas && botaoColunasRef.current) {
-      const btnRect = botaoColunasRef.current.getBoundingClientRect();
-      const containerRect = botaoColunasRef.current
-        ?.closest('.acoes-massa-solicitacoes')
-        ?.getBoundingClientRect();
-      const left = Math.max(0, Math.round(btnRect.left - (containerRect?.left || 0)));
-      const top = Math.max(0, Math.round(btnRect.bottom - (containerRect?.top || 0) + 8));
-      setSeletorColunasLeft(left);
-      setSeletorColunasTop(top);
-    }
+    if (!mostrarSeletorColunas) posicionarSeletorColunas();
     setMostrarSeletorColunas(prev => !prev);
   }
 
@@ -869,8 +893,11 @@ export default function Solicitacoes({ arquivadas = false }) {
           {mostrarSeletorColunas && (
             <div
               ref={seletorColunasRef}
-              className="absolute z-20 w-[320px] max-w-[calc(100vw-2rem)] bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl shadow-lg p-3"
-              style={{ left: `${seletorColunasLeft}px`, top: `${seletorColunasTop}px` }}
+              className="fixed z-[1000] w-[320px] max-w-[calc(100vw-2rem)] max-h-[min(70vh,420px)] overflow-y-auto bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl shadow-2xl p-3"
+              style={{
+                left: `${seletorColunasPosition.left}px`,
+                top: `${seletorColunasPosition.top}px`
+              }}
             >
               <div className="flex items-center justify-between mb-2">
                 <p className="text-sm font-medium">Colunas visíveis</p>

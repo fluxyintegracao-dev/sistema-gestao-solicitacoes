@@ -1862,6 +1862,59 @@ a {
 
 .solicitacoes-table th button {
   min-height: 32px;
+  max-width: calc(100% - 8px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.solicitacoes-resizable-th {
+  isolation: isolate;
+}
+
+.solicitacoes-col-resizer {
+  position: absolute;
+  top: 8px;
+  right: -4px;
+  bottom: 8px;
+  z-index: 30;
+  width: 9px;
+  cursor: col-resize;
+  touch-action: none;
+  border-radius: 999px;
+}
+
+.solicitacoes-col-resizer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 4px;
+  width: 2px;
+  height: 100%;
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0);
+  transition: background 120ms ease, box-shadow 120ms ease;
+}
+
+.solicitacoes-col-resizer:hover::after,
+.solicitacoes-col-resizer:focus-visible::after,
+.solicitacoes-col-resizer.is-active::after,
+.solicitacoes-resizable-th.is-resizing .solicitacoes-col-resizer::after {
+  background: rgba(37, 99, 235, 0.95);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.16);
+}
+
+.dark .solicitacoes-col-resizer:hover::after,
+.dark .solicitacoes-col-resizer:focus-visible::after,
+.dark .solicitacoes-col-resizer.is-active::after,
+.dark .solicitacoes-resizable-th.is-resizing .solicitacoes-col-resizer::after {
+  background: rgba(125, 179, 255, 0.95);
+  box-shadow: 0 0 0 3px rgba(125, 179, 255, 0.18);
+}
+
+.solicitacoes-table th:last-child .solicitacoes-col-resizer {
+  right: 0;
 }
 
 @media (max-width: 1023px) {
