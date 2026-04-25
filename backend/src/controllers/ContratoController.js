@@ -8,13 +8,15 @@ const {
   Solicitacao,
   Comprovante,
   Setor,
-  UsuarioObra,
   ConfiguracaoSistema
 } = require('../models');
 const { env } = require('../config/env');
 const { uploadToS3 } = require('../services/s3');
 const {
   canAccessContratos,
+  canAccessContratosGlobal,
+  canCreateContratos,
+  canManageContratos,
   getUserObraScopeIds,
   isBusinessAdmin,
   isSuperadmin
@@ -176,6 +178,10 @@ async function usuarioPodeAcessarObraContrato(req, obraId) {
     return true;
   }
 
+  if (await canAccessContratosGlobal(req.user)) {
+    return true;
+  }
+
   const obrasPermitidas = await getUserObraScopeIds(req.user);
   if (obrasPermitidas === null) {
     return true;
@@ -208,13 +214,17 @@ module.exports = {
     try {
       const { obra_id, ref, codigo, modo } = req.query;
       const where = {};
-      const podeAcessar = await isAdminGEO(req);
-      const acessoObra = await isSetorObra(req);
+      const podeVisualizarContratos = await canAccessContratos(req.user);
+      const acessoGlobalContratos = await canAccessContratosGlobal(req.user);
       const obrasPermitidas = isSuperadmin(req.user) ? null : await getUserObraScopeIds(req.user);
       const modoCriacao = String(modo || '').trim().toUpperCase() === 'CRIACAO';
       let podeCriarEmTodasObras = false;
 
-      if (modoCriacao && !podeAcessar) {
+      if (!podeVisualizarContratos) {
+        return res.status(403).json({ error: 'Acesso negado' });
+      }
+
+      if (modoCriacao && !acessoGlobalContratos) {
         const [tokensUsuario, setoresPermitidos] = await Promise.all([
           obterTokensSetorUsuario(req),
           obterSetoresCriacaoTodasObras()
@@ -233,7 +243,7 @@ module.exports = {
         where.codigo = { [Op.like]: `%${String(codigo).trim()}%` };
       }
 
-      if (obrasPermitidas && obrasPermitidas.length > 0) {
+      if (!acessoGlobalContratos && obrasPermitidas && obrasPermitidas.length > 0) {
         if (where.obra_id && !obrasPermitidas.includes(Number(where.obra_id))) {
           await registrarNegacaoContrato(
             req,
@@ -246,7 +256,7 @@ module.exports = {
         where.obra_id = where.obra_id
           ? Number(where.obra_id)
           : { [Op.in]: obrasPermitidas };
-      } else if (obrasPermitidas !== null && acessoObra && !podeAcessar && !podeCriarEmTodasObras) {
+      } else if (!acessoGlobalContratos && obrasPermitidas !== null && !podeCriarEmTodasObras) {
         return res.json([]);
       }
 
@@ -269,8 +279,8 @@ module.exports = {
 
   async create(req, res) {
     try {
-      const podeAcessar = await isAdminGEO(req);
-      if (!podeAcessar) {
+      const podeCriarContrato = await canCreateContratos(req.user);
+      if (!podeCriarContrato) {
         return res.status(403).json({ error: 'Acesso negado' });
       }
 
@@ -486,9 +496,8 @@ module.exports = {
 
   async resumo(req, res) {
     try {
-      const podeAcessar = await isAdminGEO(req);
-      const acessoObra = await isSetorObra(req);
       const podeVisualizarContratos = await canAccessContratos(req.user);
+      const acessoGlobalContratos = await canAccessContratosGlobal(req.user);
       const obrasPermitidas = isSuperadmin(req.user) ? null : await getUserObraScopeIds(req.user);
 
       if (!podeVisualizarContratos) {
@@ -499,7 +508,7 @@ module.exports = {
 
       const { obra_id, ref, codigo } = req.query;
 
-      if (obrasPermitidas && obrasPermitidas.length > 0) {
+      if (!acessoGlobalContratos && obrasPermitidas && obrasPermitidas.length > 0) {
         if (obra_id && !obrasPermitidas.includes(Number(obra_id))) {
           await registrarNegacaoContrato(
             req,
@@ -510,7 +519,7 @@ module.exports = {
           return res.status(403).json({ error: 'Acesso negado para esta obra' });
         }
         where.obra_id = obra_id ? Number(obra_id) : { [Op.in]: obrasPermitidas };
-      } else if (obrasPermitidas !== null && acessoObra && !podeAcessar) {
+      } else if (!acessoGlobalContratos && obrasPermitidas !== null) {
         return res.json([]);
       }
 
@@ -581,9 +590,8 @@ module.exports = {
 
   async solicitacoes(req, res) {
     try {
-      const podeAcessar = await isAdminGEO(req);
-
-      if (!podeAcessar) {
+      const podeVisualizarContratos = await canAccessContratos(req.user);
+      if (!podeVisualizarContratos) {
         return res.status(403).json({ error: 'Acesso negado' });
       }
 
@@ -617,8 +625,8 @@ module.exports = {
 
   async update(req, res) {
     try {
-      const podeAcessar = await isAdminGEO(req);
-      if (!podeAcessar) {
+      const podeEditarContrato = await canManageContratos(req.user);
+      if (!podeEditarContrato) {
         return res.status(403).json({ error: 'Acesso negado' });
       }
 
@@ -673,8 +681,8 @@ module.exports = {
 
   async ativar(req, res) {
     try {
-      const podeAcessar = await isAdminGEO(req);
-      if (!podeAcessar) {
+      const podeEditarContrato = await canManageContratos(req.user);
+      if (!podeEditarContrato) {
         return res.status(403).json({ error: 'Acesso negado' });
       }
 
@@ -693,8 +701,8 @@ module.exports = {
 
   async desativar(req, res) {
     try {
-      const podeAcessar = await isAdminGEO(req);
-      if (!podeAcessar) {
+      const podeEditarContrato = await canManageContratos(req.user);
+      if (!podeEditarContrato) {
         return res.status(403).json({ error: 'Acesso negado' });
       }
 
@@ -713,8 +721,8 @@ module.exports = {
 
   async excluir(req, res) {
     try {
-      const podeAcessar = await isAdminGEO(req);
-      if (!podeAcessar) {
+      const podeEditarContrato = await canManageContratos(req.user);
+      if (!podeEditarContrato) {
         return res.status(403).json({ error: 'Acesso negado' });
       }
 
@@ -753,8 +761,8 @@ module.exports = {
 
   async uploadAnexos(req, res) {
     try {
-      const podeAcessar = await isAdminGEO(req);
-      if (!podeAcessar) {
+      const podeEditarContrato = await canManageContratos(req.user);
+      if (!podeEditarContrato) {
         return res.status(403).json({ error: 'Acesso negado' });
       }
 
@@ -797,8 +805,8 @@ module.exports = {
 
   async listarAnexos(req, res) {
     try {
-      const podeAcessar = await isAdminGEO(req);
-      if (!podeAcessar) {
+      const podeVisualizarContratos = await canAccessContratos(req.user);
+      if (!podeVisualizarContratos) {
         return res.status(403).json({ error: 'Acesso negado' });
       }
 

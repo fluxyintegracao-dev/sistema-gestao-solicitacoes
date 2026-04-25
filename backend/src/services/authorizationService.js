@@ -130,6 +130,15 @@ const CONTRATOS_VIEW_KEYS = [
   'contratos.geral.editar'
 ];
 
+const CONTRATOS_CREATE_KEYS = [
+  'contratos.geral.criar',
+  'contratos.geral.editar'
+];
+
+const CONTRATOS_MANAGE_KEYS = [
+  'contratos.geral.editar'
+];
+
 const CRM_DASHBOARD_KEYS = [
   'crm.dashboard.visualizar'
 ];
@@ -1002,6 +1011,45 @@ async function canAccessContratos(user) {
   );
 }
 
+async function canAccessContratosGlobal(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, CONTRATOS_VIEW_KEYS);
+  }
+
+  const tokens = await buildUserScopeTokens(user);
+  return tokens.includes('ADMIN') && await userHasSetorCapability(user, 'eh_setor_geo');
+}
+
+async function canCreateContratos(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, CONTRATOS_CREATE_KEYS);
+  }
+
+  const tokens = await buildUserScopeTokens(user);
+  return tokens.includes('ADMIN') && await userHasSetorCapability(user, 'eh_setor_geo');
+}
+
+async function canManageContratos(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, CONTRATOS_MANAGE_KEYS);
+  }
+
+  const tokens = await buildUserScopeTokens(user);
+  return tokens.includes('ADMIN') && await userHasSetorCapability(user, 'eh_setor_geo');
+}
+
 async function canViewProvisoes(user) {
   if (isBusinessAdmin(user)) {
     return true;
@@ -1316,6 +1364,7 @@ module.exports = {
   canAccessBoletos,
   canAccessComercial,
   canAccessContratos,
+  canAccessContratosGlobal,
   canAccessCompras,
   canAccessCrm,
   canAccessProvisoes,
@@ -1336,10 +1385,12 @@ module.exports = {
   canExecuteRhDpImportacoes,
   canCreateCrmLeads,
   canCreateProvisoes,
+  canCreateContratos,
   canExportCrmLeads,
   canGenerateBoletos,
   canCreateComercialContratos,
   canManageComercialContratos,
+  canManageContratos,
   canManageComercialEmpreendimentos,
   canManageComprasCotacoes,
   canManageComprasPedidos,

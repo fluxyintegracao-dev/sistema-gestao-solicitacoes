@@ -1,6 +1,7 @@
 const { Contrato, PedidoCompra, SolicitacaoCompra } = require('../models');
 const {
   buildUserScopeTokens,
+  canAccessContratosGlobal,
   getUserObraScopeIds,
   isBusinessAdmin
 } = require('../services/authorizationService');
@@ -10,6 +11,7 @@ const { registrarEventoSeguranca } = require('../services/securityLogService');
 async function hasLegacyContractGlobalAccess(tokens, user) {
   return (
     isBusinessAdmin(user) ||
+    await canAccessContratosGlobal(user) ||
     tokens.includes('SUPERADMIN') ||
     (tokens.includes('ADMIN') && await userHasSetorCapability(user, 'eh_setor_geo'))
   );
