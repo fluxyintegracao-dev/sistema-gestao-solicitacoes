@@ -51,17 +51,9 @@ function statusLabel(value) {
     .replace(/(^|\s)\S/g, (letter) => letter.toUpperCase());
 }
 
-function MetricTile({ label, value, detail, tone = 'slate', href }) {
-  const tones = {
-    slate: 'from-slate-950 to-slate-800 text-white border-slate-700',
-    blue: 'from-blue-950 to-sky-800 text-white border-blue-700',
-    green: 'from-emerald-950 to-teal-800 text-white border-emerald-700',
-    amber: 'from-amber-950 to-orange-800 text-white border-amber-700',
-    red: 'from-rose-950 to-red-800 text-white border-rose-700'
-  };
-
+function MetricTile({ label, value, detail, href }) {
   const content = (
-    <div className={`relative overflow-hidden rounded-3xl border bg-gradient-to-br p-4 shadow-sm ${tones[tone] || tones.slate}`}>
+    <div className="relative overflow-hidden rounded-3xl border border-blue-700 bg-gradient-to-br from-blue-950 to-sky-800 p-4 text-white shadow-sm">
       <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-white/10" />
       <p className="relative text-xs font-semibold uppercase tracking-[0.18em] text-white/65">{label}</p>
       <strong className="relative mt-3 block text-2xl font-semibold tracking-tight md:text-3xl">{value}</strong>
@@ -399,7 +391,7 @@ export default function Dashboard() {
         <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl">
             <p className="text-xs font-semibold uppercase tracking-[0.24em] text-white/55">Centro de decisao</p>
-            <h1 className="mt-2 text-3xl font-semibold tracking-tight md:text-4xl">{titulo}</h1>
+            <h1 className="mt-2 text-3xl font-semibold tracking-tight !text-white md:text-4xl">{titulo}</h1>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-white/70">
               Leitura objetiva dos pontos que pedem acao: vencidos, caixa aberto, conciliacao, fila operacional e exposicao por obra.
             </p>
@@ -422,28 +414,24 @@ export default function Dashboard() {
               label="Saldo aberto projetado"
               value={formatCurrency(saldoAberto)}
               detail="Receber em aberto menos pagar em aberto"
-              tone={saldoAberto >= 0 ? 'green' : 'red'}
               href="/financeiro/relatorios"
             />
             <MetricTile
               label="Resultado do mes"
               value={formatCurrency(resultadoMes)}
               detail="Recebido no mes menos pago no mes"
-              tone={resultadoMes >= 0 ? 'blue' : 'amber'}
               href="/financeiro/relatorios"
             />
             <MetricTile
               label="Vencidos em aberto"
               value={formatCurrency(totalVencido)}
               detail={`${financeiro.quantidade_pagar_vencido + financeiro.quantidade_receber_vencido} titulo(s) exigem revisao`}
-              tone={totalVencido > 0 ? 'red' : 'green'}
               href="/financeiro/titulos"
             />
             <MetricTile
               label="Conciliacao pendente"
               value={formatNumber(financeiro.conciliacao_pendente_quantidade)}
               detail={formatCurrency(financeiro.conciliacao_pendente_valor)}
-              tone={financeiro.conciliacao_pendente_quantidade > 0 ? 'amber' : 'green'}
               href="/financeiro/conciliacao"
             />
           </>
