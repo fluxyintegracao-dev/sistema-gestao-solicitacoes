@@ -1779,23 +1779,27 @@ export default function ComercialContratos() {
       )}
 
       {pessoaRapidaModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="card max-h-[90vh] w-full max-w-4xl space-y-4 overflow-y-auto">
-            <div className="flex items-start justify-between gap-4">
+        <div className="quick-person-overlay fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="quick-person-dialog w-full">
+            <div className="quick-person-header">
               <div>
-                <h2 className="text-xl font-semibold text-[var(--c-text)]">
+                <p className="quick-person-kicker">Contrato comercial</p>
+                <h2 className="quick-person-title">
                   Cadastro rapido de {pessoaRapidaModal === 'cliente' ? 'cliente' : 'corretor'}
                 </h2>
-                <p className="text-sm text-[var(--c-muted)]">
-                  Cria uma pessoa ativa e ja vincula ao contrato em preenchimento.
-                </p>
               </div>
               <button type="button" className="btn btn-outline btn-sm" onClick={() => setPessoaRapidaModal(null)}>
                 Fechar
               </button>
             </div>
 
-            <div className="grid gap-3 md:grid-cols-4">
+            <div className="quick-person-body">
+              <section className="quick-person-section">
+                <div className="quick-person-section-head">
+                  <h3>Identificacao</h3>
+                  <p>Dados minimos para criar a pessoa e vincular ao contrato.</p>
+                </div>
+                <div className="quick-person-grid quick-person-grid-main">
               <label className="sol-filter-field">
                 <span className="sol-filter-label">CPF/CNPJ</span>
                 <input
@@ -1805,7 +1809,7 @@ export default function ComercialContratos() {
                   required
                 />
               </label>
-              <label className="sol-filter-field md:col-span-2">
+              <label className="sol-filter-field quick-span-2">
                 <span className="sol-filter-label">Nome</span>
                 <input
                   className="input w-full"
@@ -1823,7 +1827,7 @@ export default function ComercialContratos() {
                   required
                 />
               </label>
-              <label className="sol-filter-field md:col-span-2">
+              <label className="sol-filter-field quick-span-2">
                 <span className="sol-filter-label">E-mail</span>
                 <input
                   className="input w-full"
@@ -1832,7 +1836,7 @@ export default function ComercialContratos() {
                 />
               </label>
               {pessoaRapidaModal === 'corretor' && (
-                <label className="sol-filter-field md:col-span-2">
+                <label className="sol-filter-field quick-span-2">
                   <span className="sol-filter-label">CRECI</span>
                   <input
                     className="input w-full"
@@ -1841,10 +1845,16 @@ export default function ComercialContratos() {
                   />
                 </label>
               )}
-            </div>
+                </div>
+              </section>
 
             {pessoaRapidaModal === 'cliente' && (
-              <div className="grid gap-3 md:grid-cols-4">
+                <section className="quick-person-section">
+                  <div className="quick-person-section-head">
+                    <h3>Dados civis</h3>
+                    <p>Campos usados pelos modelos de contrato e quadro resumo.</p>
+                  </div>
+                  <div className="quick-person-grid">
                 <label className="sol-filter-field">
                   <span className="sol-filter-label">RG</span>
                   <input
@@ -1886,7 +1896,7 @@ export default function ComercialContratos() {
                     onChange={(e) => setPessoaRapidaForm((current) => ({ ...current, estado_civil: e.target.value }))}
                   />
                 </label>
-                <label className="sol-filter-field md:col-span-2">
+                <label className="sol-filter-field quick-span-2">
                   <span className="sol-filter-label">Conjuge</span>
                   <input
                     className="input w-full"
@@ -1902,11 +1912,17 @@ export default function ComercialContratos() {
                     onChange={(e) => setPessoaRapidaForm((current) => ({ ...current, regime_bens: e.target.value }))}
                   />
                 </label>
-              </div>
+                  </div>
+                </section>
             )}
 
-            <div className="grid gap-3 md:grid-cols-4">
-              <label className="sol-filter-field md:col-span-2">
+              <section className="quick-person-section">
+                <div className="quick-person-section-head">
+                  <h3>Endereco</h3>
+                  <p>Preenche rua, numero, bairro, cidade, UF e CEP nos documentos.</p>
+                </div>
+                <div className="quick-person-grid">
+              <label className="sol-filter-field quick-span-2">
                 <span className="sol-filter-label">Endereco</span>
                 <input
                   className="input w-full"
@@ -1963,21 +1979,24 @@ export default function ComercialContratos() {
                   onChange={(e) => setPessoaRapidaForm((current) => ({ ...current, estado: e.target.value.toUpperCase() }))}
                 />
               </label>
+                </div>
+              </section>
             </div>
 
-            <div className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-bg)] p-3 text-sm text-[var(--c-muted)]">
-              {pessoaRapidaModal === 'cliente'
-                ? 'A pessoa sera marcada como Cliente.'
-                : 'A pessoa sera marcada como Corretor e Credor/Fornecedor para permitir comissao financeira.'}
-            </div>
-
-            <div className="flex justify-end gap-2">
+            <div className="quick-person-footer">
+              <p>
+                {pessoaRapidaModal === 'cliente'
+                  ? 'Sera salvo como cliente ativo e selecionado neste contrato.'
+                  : 'Sera salvo como corretor e credor/fornecedor para comissao financeira.'}
+              </p>
+              <div className="flex justify-end gap-2">
               <button type="button" className="btn btn-outline" onClick={() => setPessoaRapidaModal(null)}>
                 Cancelar
               </button>
               <button type="button" className="btn btn-primary" onClick={salvarPessoaRapida}>
                 Salvar pessoa
               </button>
+              </div>
             </div>
           </div>
         </div>
