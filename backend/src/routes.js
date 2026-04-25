@@ -228,6 +228,7 @@ const ParceiroCategoriaController = require('./controllers/ParceiroCategoriaCont
 const ComercialEmpreendimentoController = require('./controllers/ComercialEmpreendimentoController');
 const ComercialUnidadeController = require('./controllers/ComercialUnidadeController');
 const ComercialContratoController = require('./controllers/ComercialContratoController');
+const ComercialContratoDocumentoController = require('./controllers/ComercialContratoDocumentoController');
 const ComercialTabelaPrecoController = require('./controllers/ComercialTabelaPrecoController');
 const ProvisaoFinanceiraController = require('./controllers/ProvisaoFinanceiraController');
 const ProvisaoCategoriaMacroController = require('./controllers/ProvisaoCategoriaMacroController');
@@ -293,6 +294,14 @@ const crmWebhookRateLimit = createRateLimit({
   resource: 'CRM_WEBHOOK'
 });
 
+const d4signWebhookRateLimit = createRateLimit({
+  windowMs: 60 * 1000,
+  max: 120,
+  message: 'Muitos eventos D4Sign recebidos em pouco tempo.',
+  eventType: 'D4SIGN_WEBHOOK_RATE_LIMIT',
+  resource: 'D4SIGN_WEBHOOK'
+});
+
 const passwordChangeRateLimit = createRateLimit({
   windowMs: Math.max(1, env.passwordRateLimitWindowMinutes) * 60 * 1000,
   max: Math.max(1, env.passwordRateLimitMaxAttempts),
@@ -318,6 +327,7 @@ router.post('/cotacoes/:token', requireEnabledModule('COTACOES', { allowSuperadm
 router.get('/crm/webhooks/meta', requireEnabledModule('CRM', { allowSuperadminBypass: false }), CrmWebhookMetaController.verify);
 router.post('/crm/webhooks/meta', crmWebhookRateLimit, requireEnabledModule('CRM', { allowSuperadminBypass: false }), CrmWebhookMetaController.receive);
 router.post('/crm/webhooks/google', crmWebhookRateLimit, requireEnabledModule('CRM', { allowSuperadminBypass: false }), CrmWebhookGoogleController.receive);
+router.post('/webhooks/d4sign', d4signWebhookRateLimit, uploadComprovantes.none(), ComercialContratoDocumentoController.webhookD4Sign);
 const auth = require('./middlewares/auth');
 router.use(auth);
 router.use(csrfProtection);
@@ -890,6 +900,11 @@ router.get('/comercial/tabelas-preco', allowComercialEmpreendimentosRead, valida
 router.post('/comercial/tabelas-preco', allowComercialEmpreendimentosManage, criticalRateLimit, validateRequest({ body: validateComercialTabelaPrecoCreateBody }), ComercialTabelaPrecoController.create);
 router.patch('/comercial/tabelas-preco/:id', allowComercialEmpreendimentosManage, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Tabela de preco comercial'), body: validateComercialTabelaPrecoUpdateBody }), ComercialTabelaPrecoController.update);
 router.post('/comercial/tabelas-preco/:id/ativar', allowComercialEmpreendimentosManage, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Tabela de preco comercial') }), ComercialTabelaPrecoController.ativar);
+router.get('/comercial/contratos-variaveis', allowComercialContratosRead, ComercialContratoDocumentoController.variaveis);
+router.get('/comercial/contratos-modelos', allowComercialContratosRead, ComercialContratoDocumentoController.listarModelos);
+router.post('/comercial/contratos-modelos', allowComercialContratosManage, uploadRateLimit, uploadComprovantes.single('file'), ComercialContratoDocumentoController.criarModelo);
+router.get('/comercial/contratos-documentos/:documentoId/link', allowComercialContratosRead, validateRequest({ params: validateNumericIdParam('documentoId', 'Documento comercial') }), ComercialContratoDocumentoController.obterLink);
+router.post('/comercial/contratos-documentos/:documentoId/enviar-d4sign', allowComercialContratosManage, criticalRateLimit, validateRequest({ params: validateNumericIdParam('documentoId', 'Documento comercial') }), ComercialContratoDocumentoController.enviarD4Sign);
 router.get('/comercial/contratos', allowComercialContratosRead, validateRequest({ query: validateComercialContratoQuery }), ComercialContratoController.index);
 router.get('/comercial/contratos/:id', allowComercialContratosRead, validateRequest({ params: validateNumericIdParam('id', 'Contrato comercial') }), ComercialContratoController.show);
 router.post('/comercial/contratos', allowComercialContratosCreate, criticalRateLimit, validateRequest({ body: validateComercialContratoCreateBody }), ComercialContratoController.create);
@@ -897,6 +912,8 @@ router.patch('/comercial/contratos/:id', allowComercialContratosManage, critical
 router.post('/comercial/contratos/:id/distrato', allowComercialContratosManage, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Contrato comercial'), body: validateComercialContratoDistratoBody }), ComercialContratoController.distratar);
 router.post('/comercial/contratos/:id/troca-unidade', allowComercialContratosManage, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Contrato comercial'), body: validateComercialContratoTrocaUnidadeBody }), ComercialContratoController.trocarUnidade);
 router.post('/comercial/contratos/:id/sincronizar-status-financeiro', allowComercialContratosManage, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Contrato comercial') }), ComercialContratoController.sincronizarStatusFinanceiro);
+router.get('/comercial/contratos/:id/documentos', allowComercialContratosRead, validateRequest({ params: validateNumericIdParam('id', 'Contrato comercial') }), ComercialContratoDocumentoController.listarDocumentosContrato);
+router.post('/comercial/contratos/:id/documentos/gerar', allowComercialContratosManage, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Contrato comercial') }), ComercialContratoDocumentoController.gerarDocumento);
 
 // -------------------------------------------------------------------
 // PROVISIONAMENTO FINANCEIRO

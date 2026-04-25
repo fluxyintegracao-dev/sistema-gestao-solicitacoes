@@ -177,3 +177,60 @@ export async function sincronizarStatusFinanceiroContratoComercial(id) {
   });
   return parseJson(response, 'Erro ao sincronizar status financeiro do contrato comercial');
 }
+
+export async function getModelosContratoComercial(params = {}) {
+  const query = buildQuery(params);
+  const url = query ? `${API_URL}/comercial/contratos-modelos?${query}` : `${API_URL}/comercial/contratos-modelos`;
+  const response = await fetch(url, {
+    headers: authHeaders()
+  });
+  return parseJson(response, 'Erro ao buscar modelos de contrato');
+}
+
+export async function criarModeloContratoComercial(data) {
+  const formData = new FormData();
+  Object.entries(data || {}).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      formData.append(key, value);
+    }
+  });
+
+  const response = await fetch(`${API_URL}/comercial/contratos-modelos`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: formData
+  });
+  return parseJson(response, 'Erro ao criar modelo de contrato');
+}
+
+export async function getDocumentosContratoComercial(contratoId) {
+  const response = await fetch(`${API_URL}/comercial/contratos/${contratoId}/documentos`, {
+    headers: authHeaders()
+  });
+  return parseJson(response, 'Erro ao buscar documentos do contrato');
+}
+
+export async function gerarDocumentoContratoComercial(contratoId, data) {
+  const response = await fetch(`${API_URL}/comercial/contratos/${contratoId}/documentos/gerar`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data || {})
+  });
+  return parseJson(response, 'Erro ao gerar documento do contrato');
+}
+
+export async function getLinkDocumentoContratoComercial(documentoId, tipo = 'pdf') {
+  const response = await fetch(`${API_URL}/comercial/contratos-documentos/${documentoId}/link?tipo=${encodeURIComponent(tipo)}`, {
+    headers: authHeaders()
+  });
+  return parseJson(response, 'Erro ao gerar link do documento');
+}
+
+export async function enviarDocumentoContratoD4Sign(documentoId, data = {}) {
+  const response = await fetch(`${API_URL}/comercial/contratos-documentos/${documentoId}/enviar-d4sign`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+  return parseJson(response, 'Erro ao enviar documento para D4Sign');
+}

@@ -38,6 +38,8 @@ db.TabelaPrecoComercialItem = require('./TabelaPrecoComercialItem')(sequelize, S
 db.ContratoComercial = require('./ContratoComercial')(sequelize, Sequelize);
 db.ContratoComercialParcela = require('./ContratoComercialParcela')(sequelize, Sequelize);
 db.ContratoComercialEvento = require('./ContratoComercialEvento')(sequelize, Sequelize);
+db.ContratoComercialModelo = require('./ContratoComercialModelo')(sequelize, Sequelize);
+db.ContratoComercialDocumento = require('./ContratoComercialDocumento')(sequelize, Sequelize);
 db.ProvisaoCategoriaMacro = require('./ProvisaoCategoriaMacro')(sequelize, Sequelize);
 db.ProvisaoFinanceira = require('./ProvisaoFinanceira')(sequelize, Sequelize);
 db.ProvisaoFinanceiraHistorico = require('./ProvisaoFinanceiraHistorico')(sequelize, Sequelize);
@@ -680,6 +682,78 @@ db.User.hasMany(db.ContratoComercialEvento, {
 db.ContratoComercialEvento.belongsTo(db.User, {
   foreignKey: 'criado_por',
   as: 'criadoPor'
+});
+
+db.Empreendimento.hasMany(db.ContratoComercialModelo, {
+  foreignKey: 'empreendimento_id',
+  as: 'modelosContratosComerciais',
+  onDelete: 'CASCADE'
+});
+
+db.ContratoComercialModelo.belongsTo(db.Empreendimento, {
+  foreignKey: 'empreendimento_id',
+  as: 'empreendimento'
+});
+
+db.User.hasMany(db.ContratoComercialModelo, {
+  foreignKey: 'criado_por',
+  as: 'modelosContratosComerciaisCriados'
+});
+
+db.ContratoComercialModelo.belongsTo(db.User, {
+  foreignKey: 'criado_por',
+  as: 'criadoPor'
+});
+
+db.User.hasMany(db.ContratoComercialModelo, {
+  foreignKey: 'atualizado_por',
+  as: 'modelosContratosComerciaisAtualizados'
+});
+
+db.ContratoComercialModelo.belongsTo(db.User, {
+  foreignKey: 'atualizado_por',
+  as: 'atualizadoPor'
+});
+
+db.ContratoComercial.hasMany(db.ContratoComercialDocumento, {
+  foreignKey: 'contrato_comercial_id',
+  as: 'documentos',
+  onDelete: 'CASCADE'
+});
+
+db.ContratoComercialDocumento.belongsTo(db.ContratoComercial, {
+  foreignKey: 'contrato_comercial_id',
+  as: 'contrato'
+});
+
+db.ContratoComercialModelo.hasMany(db.ContratoComercialDocumento, {
+  foreignKey: 'modelo_id',
+  as: 'documentosGerados'
+});
+
+db.ContratoComercialDocumento.belongsTo(db.ContratoComercialModelo, {
+  foreignKey: 'modelo_id',
+  as: 'modelo'
+});
+
+db.User.hasMany(db.ContratoComercialDocumento, {
+  foreignKey: 'criado_por',
+  as: 'documentosContratosComerciaisCriados'
+});
+
+db.ContratoComercialDocumento.belongsTo(db.User, {
+  foreignKey: 'criado_por',
+  as: 'criadoPor'
+});
+
+db.User.hasMany(db.ContratoComercialDocumento, {
+  foreignKey: 'atualizado_por',
+  as: 'documentosContratosComerciaisAtualizados'
+});
+
+db.ContratoComercialDocumento.belongsTo(db.User, {
+  foreignKey: 'atualizado_por',
+  as: 'atualizadoPor'
 });
 
 db.ProvisaoCategoriaMacro.hasMany(db.ProvisaoFinanceira, {

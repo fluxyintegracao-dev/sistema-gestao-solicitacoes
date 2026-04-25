@@ -8,10 +8,16 @@ import { maskCpfCnpj, maskPhone, normalizeCurrencyTyping, onlyDigits } from '../
 import {
   atualizarContratoComercial,
   criarContratoComercial,
+  criarModeloContratoComercial,
   distratarContratoComercial,
+  enviarDocumentoContratoD4Sign,
+  gerarDocumentoContratoComercial,
   getContratoComercialById,
   getContratosComerciais,
+  getDocumentosContratoComercial,
   getEmpreendimentosComerciais,
+  getLinkDocumentoContratoComercial,
+  getModelosContratoComercial,
   getUnidadesComerciais,
   sincronizarStatusFinanceiroContratoComercial,
   trocarUnidadeContratoComercial
@@ -20,6 +26,10 @@ import {
 const STATUS_CONTRATO = ['RASCUNHO', 'ATIVO', 'INADIMPLENTE', 'QUITADO', 'DISTRATADO', 'CANCELADO'];
 const FORMAS_RECEBIMENTO = ['DINHEIRO', 'PIX', 'CARTAO', 'TRANSFERENCIA', 'BOLETO', 'CHEQUE', 'PERMUTA', 'BENS', 'OUTROS'];
 const PARCELA_TIPOS = ['ENTRADA', 'PARCELA', 'INTERMEDIARIA', 'CHAVES', 'BALAO', 'OUTRA'];
+const TIPOS_DOCUMENTO_MODELO = [
+  { value: 'CONTRATO', label: 'Contrato padrao' },
+  { value: 'QUADRO_RESUMO', label: 'Quadro resumo' }
+];
 const MODOS_COMPOSICAO = [
   { value: 'ENTRADA', label: 'Entrada' },
   { value: 'PERIODICO', label: 'Parcelas periodicas' },
@@ -109,6 +119,24 @@ function defaultPessoaRapidaForm(tipo = 'cliente') {
     nome: '',
     telefone: '',
     email: ''
+  };
+}
+
+function defaultModeloForm() {
+  return {
+    empreendimento_id: '',
+    tipo_documento: 'CONTRATO',
+    nome: '',
+    descricao: '',
+    file: null
+  };
+}
+
+function defaultDocumentoForm() {
+  return {
+    tipo_documento: 'CONTRATO',
+    modelo_id: '',
+    variaveis_json: ''
   };
 }
 
@@ -245,6 +273,10 @@ function statusClass(status) {
   }
 }
 
+function documentoTipoLabel(tipo) {
+  return TIPOS_DOCUMENTO_MODELO.find((item) => item.value === String(tipo || '').toUpperCase())?.label || tipo || '-';
+}
+
 function pickEditForm(contrato = {}) {
   return {
     id: contrato.id || null,
@@ -374,14 +406,19 @@ export default function ComercialContratos() {
     comissao_categoria_ids: []
   });
   const [contratos, setContratos] = useState([]);
+  const [modelosContrato, setModelosContrato] = useState([]);
+  const [documentosContrato, setDocumentosContrato] = useState([]);
   const [contratoSelecionado, setContratoSelecionado] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [savingModelo, setSavingModelo] = useState(false);
   const [processingAction, setProcessingAction] = useState('');
   const [showDistrato, setShowDistrato] = useState(false);
   const [showTroca, setShowTroca] = useState(false);
   const [pessoaRapidaModal, setPessoaRapidaModal] = useState(null);
   const [pessoaRapidaForm, setPessoaRapidaForm] = useState(defaultPessoaRapidaForm());
+  const [modeloForm, setModeloForm] = useState(defaultModeloForm());
+  const [documentoForm, setDocumentoForm] = useState(defaultDocumentoForm());
   const [distratoForm, setDistratoForm] = useState(defaultDistratoForm());
   const [trocaForm, setTrocaForm] = useState(defaultTrocaForm());
   const [error, setError] = useState('');
@@ -390,7 +427,7 @@ export default function ComercialContratos() {
     try {
       setLoading(true);
       setError('');
-      const [empreData, unidData, clientesData, corretoresData, obrasData, categoriasData, contratosData, categoriaConfigData] = await Promise.all([
+      const [empreData, unidData, clientesData, corretoresData, obrasData, categoriasData, contratosData, categoriaConfigData, modelosData] = await Promise.all([
         getEmpreendimentosComerciais({ ativo: 1 }),
         getUnidadesComerciais({ ativo: 1 }),
         buscarParceiros({ cliente: 1, ativo: 1, limit: 300 }),
@@ -398,7 +435,8 @@ export default function ComercialContratos() {
         getMinhasObras(),
         getCategoriasFinanceiras(),
         getContratosComerciais(),
-        getComercialCategoriasContrato().catch(() => null)
+        getComercialCategoriasContrato().catch(() => null),
+        getModelosContratoComercial().catch(() => [])
       ]);
       setEmpreendimentos(Array.isArray(empreData) ? empreData : []);
       setUnidades(Array.isArray(unidData) ? unidData : []);
@@ -417,6 +455,7 @@ export default function ComercialContratos() {
         });
       }
       setContratos(Array.isArray(contratosData) ? contratosData : []);
+      setModelosContrato(Array.isArray(modelosData) ? modelosData : []);
     } catch (err) {
       setError(err?.message || 'Erro ao carregar contratos comerciais');
     } finally {
@@ -496,6 +535,14 @@ export default function ComercialContratos() {
       && !['VENDIDA', 'BLOQUEADA'].includes(String(item.situacao || '').toUpperCase())
     );
   }, [contratoSelecionado?.unidade_comercial_id, unidades]);
+
+  const modelosDoContratoSelecionado = useMemo(() => {
+    if (!contratoSelecionado?.empreendimento_id) return [];
+    return modelosContrato.filter((item) =>
+      Number(item.empreendimento_id) === Number(contratoSelecionado.empreendimento_id)
+      && String(item.tipo_documento || '').toUpperCase() === String(documentoForm.tipo_documento || '').toUpperCase()
+    );
+  }, [contratoSelecionado?.empreendimento_id, documentoForm.tipo_documento, modelosContrato]);
 
   function aplicarPlanosAoContrato(planos) {
     const parcelas = normalizarParcelasContrato(planos.flatMap((plano) =>
@@ -589,10 +636,24 @@ export default function ComercialContratos() {
     });
   }
 
+  async function carregarDocumentosContrato(contratoId) {
+    if (!contratoId) {
+      setDocumentosContrato([]);
+      return [];
+    }
+
+    const data = await getDocumentosContratoComercial(contratoId);
+    const lista = Array.isArray(data) ? data : [];
+    setDocumentosContrato(lista);
+    return lista;
+  }
+
   async function selecionarContrato(id) {
     try {
       const detalhe = await getContratoComercialById(id);
       setContratoSelecionado(detalhe);
+      setDocumentoForm(defaultDocumentoForm());
+      await carregarDocumentosContrato(id);
       setShowDistrato(false);
       setShowTroca(false);
       setDistratoForm(defaultDistratoForm());
@@ -660,6 +721,78 @@ export default function ComercialContratos() {
       await carregar();
     } catch (err) {
       setError(err?.message || 'Erro ao trocar unidade do contrato');
+    } finally {
+      setProcessingAction('');
+    }
+  }
+
+  async function handleCriarModeloContrato(event) {
+    event.preventDefault();
+    if (!modeloForm.file) {
+      setError('Selecione um arquivo DOCX para o modelo.');
+      return;
+    }
+
+    try {
+      setSavingModelo(true);
+      setError('');
+      await criarModeloContratoComercial(modeloForm);
+      setModeloForm(defaultModeloForm());
+      const modelosData = await getModelosContratoComercial();
+      setModelosContrato(Array.isArray(modelosData) ? modelosData : []);
+    } catch (err) {
+      setError(err?.message || 'Erro ao salvar modelo de contrato');
+    } finally {
+      setSavingModelo(false);
+    }
+  }
+
+  async function handleGerarDocumentoContrato() {
+    if (!contratoSelecionado?.id) return;
+    try {
+      setProcessingAction('gerar-documento');
+      setError('');
+      let variaveis;
+      if (String(documentoForm.variaveis_json || '').trim()) {
+        try {
+          variaveis = JSON.parse(documentoForm.variaveis_json);
+        } catch {
+          setError('Variaveis adicionais precisam estar em JSON valido.');
+          return;
+        }
+      }
+      const payload = {
+        tipo_documento: documentoForm.tipo_documento,
+        modelo_id: documentoForm.modelo_id || undefined,
+        variaveis
+      };
+      await gerarDocumentoContratoComercial(contratoSelecionado.id, payload);
+      await carregarDocumentosContrato(contratoSelecionado.id);
+    } catch (err) {
+      setError(err?.message || 'Erro ao gerar documento do contrato');
+    } finally {
+      setProcessingAction('');
+    }
+  }
+
+  async function abrirDocumentoContrato(documentoId, tipo = 'pdf') {
+    try {
+      setError('');
+      const data = await getLinkDocumentoContratoComercial(documentoId, tipo);
+      if (data?.url) window.open(data.url, '_blank', 'noopener,noreferrer');
+    } catch (err) {
+      setError(err?.message || 'Erro ao abrir documento');
+    }
+  }
+
+  async function handleEnviarDocumentoD4Sign(documentoId) {
+    try {
+      setProcessingAction(`d4sign-${documentoId}`);
+      setError('');
+      await enviarDocumentoContratoD4Sign(documentoId);
+      await carregarDocumentosContrato(contratoSelecionado?.id);
+    } catch (err) {
+      setError(err?.message || 'Erro ao enviar documento para D4Sign');
     } finally {
       setProcessingAction('');
     }
@@ -1162,6 +1295,90 @@ export default function ComercialContratos() {
       <section className="sol-surface-card rounded-2xl p-4 md:p-5">
         <div className="sol-filtros-head">
           <div>
+            <p className="sol-filtros-title">Modelos de contrato por empreendimento</p>
+            <p className="sol-filtros-subtitle">
+              Envie DOCX com papel timbrado e variaveis no formato {'{{cliente.nome}}'} para gerar PDF sem perder a formatacao.
+            </p>
+          </div>
+          <div className="sol-filtros-meta">
+            <span>{modelosContrato.length} modelo(s)</span>
+          </div>
+        </div>
+
+        <form className="mt-4 grid gap-3 md:grid-cols-5" onSubmit={handleCriarModeloContrato}>
+          <label className="sol-filter-field md:col-span-2">
+            <span className="sol-filter-label">Empreendimento</span>
+            <select
+              className="input w-full"
+              value={modeloForm.empreendimento_id}
+              onChange={(e) => setModeloForm((current) => ({ ...current, empreendimento_id: e.target.value }))}
+              required
+            >
+              <option value="">Selecione</option>
+              {empreendimentos.map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}
+            </select>
+          </label>
+          <label className="sol-filter-field">
+            <span className="sol-filter-label">Tipo</span>
+            <select
+              className="input w-full"
+              value={modeloForm.tipo_documento}
+              onChange={(e) => setModeloForm((current) => ({ ...current, tipo_documento: e.target.value }))}
+            >
+              {TIPOS_DOCUMENTO_MODELO.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+            </select>
+          </label>
+          <label className="sol-filter-field">
+            <span className="sol-filter-label">Nome interno</span>
+            <input
+              className="input w-full"
+              value={modeloForm.nome}
+              onChange={(e) => setModeloForm((current) => ({ ...current, nome: e.target.value }))}
+              placeholder="Ex.: Contrato Costa do Mar"
+            />
+          </label>
+          <label className="sol-filter-field">
+            <span className="sol-filter-label">Arquivo DOCX</span>
+            <input
+              className="input w-full"
+              type="file"
+              accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+              onChange={(e) => setModeloForm((current) => ({ ...current, file: e.target.files?.[0] || null }))}
+              required
+            />
+          </label>
+          <label className="sol-filter-field md:col-span-4">
+            <span className="sol-filter-label">Descricao</span>
+            <input
+              className="input w-full"
+              value={modeloForm.descricao}
+              onChange={(e) => setModeloForm((current) => ({ ...current, descricao: e.target.value }))}
+              placeholder="Observacao para identificar quando usar este modelo"
+            />
+          </label>
+          <div className="flex items-end">
+            <button type="submit" className="btn btn-primary w-full" disabled={savingModelo}>
+              {savingModelo ? 'Enviando...' : 'Salvar modelo'}
+            </button>
+          </div>
+        </form>
+
+        {modelosContrato.length > 0 && (
+          <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {modelosContrato.slice(0, 6).map((modelo) => (
+              <article key={modelo.id} className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4">
+                <div className="text-xs uppercase tracking-[0.18em] text-[var(--c-muted)]">{documentoTipoLabel(modelo.tipo_documento)}</div>
+                <div className="mt-2 text-sm font-semibold text-[var(--c-text)]">{modelo.nome}</div>
+                <div className="mt-1 text-xs text-[var(--c-muted)]">{modelo.empreendimento?.nome || 'Empreendimento nao informado'}</div>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="sol-surface-card rounded-2xl p-4 md:p-5">
+        <div className="sol-filtros-head">
+          <div>
             <p className="sol-filtros-title">Carteira comercial</p>
             <p className="sol-filtros-subtitle">Contratos de venda com acesso rapido ao financeiro.</p>
           </div>
@@ -1368,6 +1585,99 @@ export default function ComercialContratos() {
                 </div>
               </div>
             )}
+          </div>
+
+          <div className="mt-4 rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4 space-y-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-[var(--c-text)]">Documentos e assinatura digital</p>
+                <p className="text-xs text-[var(--c-muted)]">
+                  Gera o DOCX a partir do modelo, converte para PDF e envia para assinatura D4Sign.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <select
+                  className="input min-w-[180px]"
+                  value={documentoForm.tipo_documento}
+                  onChange={(e) => setDocumentoForm((current) => ({ ...current, tipo_documento: e.target.value, modelo_id: '' }))}
+                >
+                  {TIPOS_DOCUMENTO_MODELO.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+                </select>
+                <select
+                  className="input min-w-[220px]"
+                  value={documentoForm.modelo_id}
+                  onChange={(e) => setDocumentoForm((current) => ({ ...current, modelo_id: e.target.value }))}
+                >
+                  <option value="">Modelo ativo mais recente</option>
+                  {modelosDoContratoSelecionado.map((modelo) => <option key={modelo.id} value={modelo.id}>{modelo.nome}</option>)}
+                </select>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={handleGerarDocumentoContrato}
+                  disabled={processingAction === 'gerar-documento' || modelosDoContratoSelecionado.length === 0}
+                >
+                  {processingAction === 'gerar-documento' ? 'Gerando PDF...' : 'Gerar PDF'}
+                </button>
+              </div>
+            </div>
+
+            {modelosDoContratoSelecionado.length === 0 && (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                Cadastre um modelo DOCX para este empreendimento e tipo de documento antes de gerar o PDF.
+              </div>
+            )}
+
+            <label className="sol-filter-field block">
+              <span className="sol-filter-label">Variaveis adicionais opcionais (JSON)</span>
+              <textarea
+                className="input min-h-[88px] w-full"
+                value={documentoForm.variaveis_json}
+                onChange={(e) => setDocumentoForm((current) => ({ ...current, variaveis_json: e.target.value }))}
+                placeholder='{"cliente":{"nacionalidade":"brasileiro","profissao":"engenheiro","rg":"MG-00.000.000","conjuge_nome":"Maria"}}'
+              />
+              <span className="mt-1 block text-xs text-[var(--c-muted)]">
+                Use para dados juridicos que ainda nao existem no cadastro do cliente; o restante vem automatico do contrato.
+              </span>
+            </label>
+
+            <div className="grid gap-3 md:grid-cols-2">
+              {documentosContrato.length === 0 ? (
+                <div className="app-empty-card md:col-span-2">Nenhum documento gerado para este contrato.</div>
+              ) : (
+                documentosContrato.map((documento) => (
+                  <article key={documento.id} className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-bg)] p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <div className="text-xs uppercase tracking-[0.18em] text-[var(--c-muted)]">{documentoTipoLabel(documento.tipo_documento)}</div>
+                        <div className="mt-2 text-sm font-semibold text-[var(--c-text)]">{documento.nome}</div>
+                        <div className="mt-1 text-xs text-[var(--c-muted)]">Status: {documento.status}</div>
+                        {documento.erro && <div className="mt-2 text-xs text-rose-600">{documento.erro}</div>}
+                      </div>
+                      <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${statusClass(documento.status)}`}>
+                        {documento.status}
+                      </span>
+                    </div>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <button type="button" className="btn btn-outline" onClick={() => abrirDocumentoContrato(documento.id, 'pdf')}>
+                        Abrir PDF
+                      </button>
+                      <button type="button" className="btn btn-outline" onClick={() => abrirDocumentoContrato(documento.id, 'docx')}>
+                        Baixar DOCX
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        onClick={() => handleEnviarDocumentoD4Sign(documento.id)}
+                        disabled={processingAction === `d4sign-${documento.id}` || documento.status === 'ASSINADO'}
+                      >
+                        {processingAction === `d4sign-${documento.id}` ? 'Enviando...' : 'Enviar D4Sign'}
+                      </button>
+                    </div>
+                  </article>
+                ))
+              )}
+            </div>
           </div>
 
           <div className="mt-4 overflow-x-auto rounded-2xl border border-[var(--c-border)]">
