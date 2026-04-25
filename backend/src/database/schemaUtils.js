@@ -32,6 +32,10 @@ async function resolveTableName(sequelize, candidates = [], fallback = null) {
   return names.find((name) => existing.has(name)) || fallback || names[0];
 }
 
+function quoteIdentifier(identifier) {
+  return `\`${String(identifier || '').replace(/`/g, '``')}\``;
+}
+
 async function columnExists(sequelize, tableName, columnName) {
   const [rows] = await sequelize.query(
     `SELECT COUNT(*) AS total
@@ -73,6 +77,7 @@ module.exports = {
   columnExists,
   foreignKeyExists,
   indexExists,
+  quoteIdentifier,
   resolveTableName,
   tableExists
 };

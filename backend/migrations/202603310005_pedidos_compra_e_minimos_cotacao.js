@@ -2,6 +2,7 @@ const {
   columnExists,
   foreignKeyExists,
   indexExists,
+  quoteIdentifier,
   resolveTableName,
   tableExists
 } = require('../src/database/schemaUtils');
@@ -9,7 +10,7 @@ const {
 module.exports = {
   async up({ sequelize }) {
     const tabelaObras = await resolveTableName(sequelize, ['Obras', 'obras'], 'Obras');
-    const tabelaObrasSql = sequelize.getQueryInterface().quoteTable(tabelaObras);
+    const tabelaObrasSql = quoteIdentifier(tabelaObras);
 
     if (!(await columnExists(sequelize, 'solicitacao_compra_fornecedores', 'valor_minimo_pedido'))) {
       await sequelize.query(`

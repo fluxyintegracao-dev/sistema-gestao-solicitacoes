@@ -1,9 +1,9 @@
-const { indexExists, resolveTableName, tableExists } = require('../src/database/schemaUtils');
+const { indexExists, quoteIdentifier, resolveTableName, tableExists } = require('../src/database/schemaUtils');
 
 module.exports = {
   async up({ sequelize }) {
     const tabelaObras = await resolveTableName(sequelize, ['Obras', 'obras'], 'Obras');
-    const tabelaObrasSql = sequelize.getQueryInterface().quoteTable(tabelaObras);
+    const tabelaObrasSql = quoteIdentifier(tabelaObras);
 
     if (!(await tableExists(sequelize, 'provisao_categorias_macro'))) {
       await sequelize.query(`
