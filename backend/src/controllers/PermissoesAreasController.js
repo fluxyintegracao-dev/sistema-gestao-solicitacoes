@@ -62,8 +62,9 @@ module.exports = {
       }
 
       invalidatePermissoesAreasCache();
+      const persistedUsuarios = await getPermissoesAreasUsuarios();
 
-      return res.json({ usuarios: normalizedUsuarios });
+      return res.json({ usuarios: persistedUsuarios });
     } catch (error) {
       console.error(error);
       return res.status(500).json({ error: 'Erro ao salvar permissoes de areas' });

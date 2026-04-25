@@ -436,6 +436,10 @@ async function getAreasPermissoesForUser(user) {
   if (!user?.id) return [];
   // BusinessAdmin: sem restrições, retorna array vazio (frontend interpreta como acesso total)
   if (isBusinessAdmin(user)) return [];
+  const sessionPermissions = normalizeModuloPermissaoList(user.areas_permissoes);
+  if (sessionPermissions.length > 0) {
+    return sessionPermissions;
+  }
   const permissionMap = await getPermissoesAreasUsuarios();
   return permissionMap[Number(user.id)] || [];
 }

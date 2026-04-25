@@ -3,6 +3,7 @@ const { env } = require('../config/env');
 const { User, Setor } = require('../models');
 const {
   canAccessFinanceiro,
+  getAreasPermissoesForUser,
   getRhDpCapabilitiesForUser
 } = require('../services/authorizationService');
 const { registrarEventoSeguranca } = require('../services/securityLogService');
@@ -91,9 +92,10 @@ module.exports = async (req, res, next) => {
       return res.status(401).json({ error: 'Sessao invalida' });
     }
 
-    const [financeiroLiberado, capacidadesRhDp] = await Promise.all([
+    const [financeiroLiberado, capacidadesRhDp, areasPermissoes] = await Promise.all([
       canAccessFinanceiro(user),
-      getRhDpCapabilitiesForUser(user)
+      getRhDpCapabilitiesForUser(user),
+      getAreasPermissoesForUser(user)
     ]);
 
     req.auth = decoded;
@@ -103,7 +105,8 @@ module.exports = async (req, res, next) => {
       area: user.setor?.codigo || null,
       financeiro_liberado: Boolean(financeiroLiberado),
       rh_dp_capacidades: capacidadesRhDp.filter((item) => item.startsWith('rh_dp_')),
-      integracao_sienge_capacidades: capacidadesRhDp.filter((item) => item.startsWith('integracao_sienge_'))
+      integracao_sienge_capacidades: capacidadesRhDp.filter((item) => item.startsWith('integracao_sienge_')),
+      areas_permissoes: areasPermissoes
     };
 
     marcarAtividadeUsuario(user.id).catch(() => {});

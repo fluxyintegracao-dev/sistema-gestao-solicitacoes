@@ -261,7 +261,7 @@ function ModuleCard({
 }
 
 export default function PermissoesAreas() {
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
   const [usuarios, setUsuarios] = useState([]);
   const [registry, setRegistry] = useState([]);
   const [mapa, setMapa] = useState({});
@@ -396,7 +396,11 @@ export default function PermissoesAreas() {
     try {
       setSalvando(true);
       const resultado = await salvarPermissoesAreas({ usuarios: mapa });
-      setMapa(normalizeMapa(resultado?.usuarios));
+      const persistedMap = normalizeMapa(resultado?.usuarios);
+      setMapa(persistedMap);
+      if (Number(usuarioSelecionadoId) === Number(user?.id)) {
+        updateUser({ areas_permissoes: persistedMap[usuarioSelecionadoId] || [] });
+      }
       alert('Permissoes salvas com sucesso.');
     } catch (err) {
       alert(err?.message || 'Erro ao salvar permissoes');
