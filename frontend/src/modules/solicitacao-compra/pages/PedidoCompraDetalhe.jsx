@@ -10,7 +10,7 @@ import {
 } from '../../../services/compras';
 import { getStatusPedidosCompra } from '../../../services/configuracoesSistema';
 import { useAuth } from '../../../contexts/AuthContext';
-import { isBusinessAdmin } from '../../../utils/acessoProduto';
+import { canManageComprasPedidos, isBusinessAdmin } from '../../../utils/acessoProduto';
 import CompraPreviewModal from '../components/CompraPreviewModal';
 
 function formatMoney(value) {
@@ -157,6 +157,7 @@ export default function PedidoCompraDetalhe() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const businessAdmin = isBusinessAdmin(user);
+  const podeGerenciarPedido = canManageComprasPedidos(user);
   const [pedido, setPedido] = useState(null);
   const [statusOptions, setStatusOptions] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -261,7 +262,8 @@ export default function PedidoCompraDetalhe() {
     [statusOptions]
   );
   const statusAtual = statusMap[String(pedido?.status || '').toUpperCase()] || pedido?.status_configuracao || null;
-  const pedidoBloqueado = Boolean(statusAtual?.bloqueia_edicao || pedido?.edicao_bloqueada);
+  const edicaoBloqueadaPorStatus = Boolean(statusAtual?.bloqueia_edicao || pedido?.edicao_bloqueada);
+  const pedidoBloqueado = Boolean(edicaoBloqueadaPorStatus || !podeGerenciarPedido);
   const statusSelectOptions = useMemo(() => {
     const ativos = (statusOptions || []).filter((item) => item?.ativo !== false);
     if (!pedido?.status) {
@@ -502,7 +504,7 @@ export default function PedidoCompraDetalhe() {
                 className="input"
                 value={pedido.status || ''}
                 onChange={(event) => handleAtualizarStatus(event.target.value)}
-                disabled={savingStatus}
+                disabled={!podeGerenciarPedido || savingStatus}
               >
                 {statusSelectOptions.map((status) => (
                   <option key={status.codigo} value={status.codigo}>
@@ -539,7 +541,13 @@ export default function PedidoCompraDetalhe() {
         </div>
       </div>
 
-      {pedidoBloqueado ? (
+      {!podeGerenciarPedido ? (
+        <div className="app-alert mt-4">
+          Voce esta visualizando este pedido. Alteracoes de status e itens ficam restritas ao setor de compras.
+        </div>
+      ) : null}
+
+      {edicaoBloqueadaPorStatus ? (
         <div className="app-alert mt-4">
           O status atual do pedido bloqueia edicao. Enquanto ele estiver em "{formatStatusLabel(pedido.status, statusMap)}", os itens nao poderao ser alterados, adicionados ou removidos.
         </div>
@@ -599,38 +607,40 @@ export default function PedidoCompraDetalhe() {
             </div>
           </div>
 
-          <div className="card sol-surface-card">
-            <div className="card-header">
-              <h2 className="font-semibold">Itens cotados disponiveis</h2>
+          {podeGerenciarPedido ? (
+            <div className="card sol-surface-card">
+              <div className="card-header">
+                <h2 className="font-semibold">Itens cotados disponiveis</h2>
+              </div>
+              {pedido.candidatos_adicao?.length ? (
+                <div className="app-list-stack">
+                  {pedido.candidatos_adicao.map((item) => (
+                    <div key={item.resposta_item_id} className="app-list-card">
+                      <div className="font-medium">{item.descricao}</div>
+                      <div className="mt-1 text-sm text-[var(--c-muted)]">
+                        {formatQuantityLabel(item.quantidade_solicitada, item.unidade)} - {formatMoney(item.preco_unitario)}
+                      </div>
+                      <div className="mt-1 text-xs text-[var(--c-muted)]">
+                        Minimo do item: {formatQuantityLabel(item.quantidade_minima_item, item.unidade)} - Prazo: {item.prazo || '-'}
+                      </div>
+                      <button
+                        type="button"
+                        className="btn btn-outline mt-3"
+                        onClick={() => handleAdicionarResposta(item.resposta_item_id)}
+                        disabled={pedidoBloqueado || addingRespostaId === item.resposta_item_id}
+                      >
+                        {addingRespostaId === item.resposta_item_id ? 'Adicionando...' : 'Adicionar ao pedido'}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="app-empty-card py-6">
+                  Todos os itens cotados desse fornecedor ja foram usados ou nao ha respostas adicionais disponiveis.
+                </div>
+              )}
             </div>
-            {pedido.candidatos_adicao?.length ? (
-              <div className="app-list-stack">
-                {pedido.candidatos_adicao.map((item) => (
-                  <div key={item.resposta_item_id} className="app-list-card">
-                    <div className="font-medium">{item.descricao}</div>
-                    <div className="mt-1 text-sm text-[var(--c-muted)]">
-                      {formatQuantityLabel(item.quantidade_solicitada, item.unidade)} - {formatMoney(item.preco_unitario)}
-                    </div>
-                    <div className="mt-1 text-xs text-[var(--c-muted)]">
-                      Minimo do item: {formatQuantityLabel(item.quantidade_minima_item, item.unidade)} - Prazo: {item.prazo || '-'}
-                    </div>
-                    <button
-                      type="button"
-                      className="btn btn-outline mt-3"
-                      onClick={() => handleAdicionarResposta(item.resposta_item_id)}
-                      disabled={pedidoBloqueado || addingRespostaId === item.resposta_item_id}
-                    >
-                      {addingRespostaId === item.resposta_item_id ? 'Adicionando...' : 'Adicionar ao pedido'}
-                    </button>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="app-empty-card py-6">
-                Todos os itens cotados desse fornecedor ja foram usados ou nao ha respostas adicionais disponiveis.
-              </div>
-            )}
-          </div>
+          ) : null}
         </div>
 
         <div className="grid gap-4">
@@ -756,7 +766,7 @@ export default function PedidoCompraDetalhe() {
                                 className="btn btn-outline"
                                 onClick={() => abrirModalEdicao(item.id)}
                               >
-                                {item.removido ? 'Ver item' : 'Editar'}
+                                {podeGerenciarPedido && !item.removido ? 'Editar' : 'Ver item'}
                               </button>
                               {businessAdmin ? (
                                 <button
@@ -797,7 +807,7 @@ export default function PedidoCompraDetalhe() {
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
                 <h2 className="text-xl font-bold" style={{ color: 'var(--c-text)' }}>
-                  {itemEditando.removido ? 'Detalhes do item' : 'Editar item do pedido'}
+                  {podeGerenciarPedido && !itemEditando.removido ? 'Editar item do pedido' : 'Detalhes do item'}
                 </h2>
                 <p className="mt-1 text-sm" style={{ color: 'var(--c-muted)' }}>
                   PC-{String(pedido.id).padStart(5, '0')} - {itemEditando.descricao}
@@ -945,7 +955,7 @@ export default function PedidoCompraDetalhe() {
                 A trilha de auditoria saiu desta tela para evitar sobrecarga visual em pedidos grandes.
               </div>
               <div className="flex flex-wrap gap-2">
-                {!itemEditando.removido ? (
+                {podeGerenciarPedido && !itemEditando.removido ? (
                   <button
                     type="button"
                     className="btn btn-outline"
@@ -958,7 +968,7 @@ export default function PedidoCompraDetalhe() {
                 <button type="button" className="btn btn-outline" onClick={fecharModalEdicao} disabled={modalProcessando}>
                   Cancelar
                 </button>
-                {!itemEditando.removido ? (
+                {podeGerenciarPedido && !itemEditando.removido ? (
                   <button
                     type="button"
                     className="btn btn-primary"

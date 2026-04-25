@@ -88,6 +88,11 @@ export function canAccessCompras(user) {
   );
 }
 
+export function canManageComprasPedidos(user) {
+  if (!hasEnabledModule(user, 'COMPRAS')) return false;
+  return isBusinessAdmin(user) || userHasSetorCapability(user, 'eh_setor_compras');
+}
+
 export function canAccessFinanceiro(user) {
   if (!hasEnabledModule(user, 'FINANCEIRO')) return false;
   if (isBusinessAdmin(user)) return true;

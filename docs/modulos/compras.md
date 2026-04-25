@@ -39,6 +39,12 @@ Transformar a necessidade de compra em um fluxo rastreavel com itens, apropriaca
 - minimo por item e minimo por pedido podem impactar escolha do fornecedor
 - status de pedido pode bloquear edicao
 
+## Permissoes de Pedidos
+
+- a listagem, o detalhe e o PDF de pedidos seguem o acesso ao modulo `COMPRAS` e o escopo de obras do usuario
+- usuarios de compras, GEO e usuarios liberados para solicitacao de compra podem consultar pedidos dentro do seu escopo
+- alteracao de status, adicao, edicao e remocao de itens permanecem restritas ao setor de compras e administradores de negocio
+
 ## Relacao com Apropriacoes
 
 O modulo `COMPRAS` consome apropriacoes por item, mas nao e o dono tecnico desse cadastro.

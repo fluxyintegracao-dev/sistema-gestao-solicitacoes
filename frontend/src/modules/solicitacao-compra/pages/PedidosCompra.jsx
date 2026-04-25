@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { listarPedidosCompra } from '../../../services/compras';
 import { getStatusPedidosCompra } from '../../../services/configuracoesSistema';
 import { getObras } from '../../../services/obras';
+import { useAuth } from '../../../contexts/AuthContext';
+import { canManageComprasPedidos } from '../../../utils/acessoProduto';
 
 function formatMoney(value) {
   return Number(value || 0).toLocaleString('pt-BR', {
@@ -31,6 +33,8 @@ function statusClass(status, statusMap) {
 
 export default function PedidosCompra() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const podeGerenciarPedidos = canManageComprasPedidos(user);
   const [pedidos, setPedidos] = useState([]);
   const [obras, setObras] = useState([]);
   const [statusOptions, setStatusOptions] = useState([]);
@@ -83,7 +87,7 @@ export default function PedidosCompra() {
           <div>
             <h1 className="page-title">Pedidos de Compra</h1>
             <p className="page-subtitle">
-              Gestao dos pedidos gerados a partir das cotacoes encerradas, com ajuste manual e auditoria por item.
+              Consulta dos pedidos gerados a partir das cotacoes encerradas, com gestao restrita ao setor de compras.
             </p>
           </div>
         </div>
@@ -228,7 +232,7 @@ export default function PedidosCompra() {
                           className="btn btn-outline"
                           onClick={() => navigate(`/pedidos-compra/${pedido.id}`)}
                         >
-                          Gerenciar
+                          {podeGerenciarPedidos ? 'Gerenciar' : 'Abrir'}
                         </button>
                       </td>
                     </tr>

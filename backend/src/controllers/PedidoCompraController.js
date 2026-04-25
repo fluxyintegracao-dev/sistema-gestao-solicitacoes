@@ -13,6 +13,7 @@ const {
   buildUserScopeTokens,
   isBusinessAdmin
 } = require('../services/authorizationService');
+const { userHasSetorCapability } = require('../services/setorCapabilityService');
 const { renderPedidoCompraPdf } = require('../services/pedidoCompraPdf');
 const { responderErroController } = require('../utils/controllerError');
 const {
@@ -30,20 +31,52 @@ async function carregarUsuarioCompras(userId) {
   });
 }
 
-async function validarGestaoPedidos(req, res) {
+async function podeVisualizarPedidos(usuario) {
+  const tokens = new Set(await buildUserScopeTokens(usuario));
+  const ehSetorCompras = await userHasSetorCapability(usuario, 'eh_setor_compras');
+  const ehSetorGeo = await userHasSetorCapability(usuario, 'eh_setor_geo');
+
+  return (
+    isBusinessAdmin(usuario) ||
+    Boolean(usuario.pode_criar_solicitacao_compra) ||
+    ehSetorCompras ||
+    ehSetorGeo ||
+    tokens.has('COMPRAS') ||
+    tokens.has('GEO') ||
+    tokens.has('GERENCIA_PROCESSOS') ||
+    tokens.has('GERENCIA DE PROCESSOS') ||
+    tokens.has('GESTAO_PROCESSOS') ||
+    tokens.has('GESTAO DE PROCESSOS')
+  );
+}
+
+async function podeGerenciarPedidos(usuario) {
+  const ehSetorCompras = await userHasSetorCapability(usuario, 'eh_setor_compras');
+
+  return (
+    isBusinessAdmin(usuario) ||
+    ehSetorCompras
+  );
+}
+
+async function validarAcessoPedidos(req, res, options = {}) {
   const usuario = await carregarUsuarioCompras(req.user?.id);
   if (!usuario) {
     res.status(401).json({ error: 'Usuario nao autenticado' });
     return null;
   }
 
-  const tokens = new Set(await buildUserScopeTokens(usuario));
-  const permitido =
-    isBusinessAdmin(usuario) ||
-    tokens.has('COMPRAS');
+  const exigeGestao = options.gerenciar === true;
+  const permitido = exigeGestao
+    ? await podeGerenciarPedidos(usuario)
+    : await podeVisualizarPedidos(usuario);
 
   if (!permitido) {
-    res.status(403).json({ error: 'Apenas compras pode gerenciar pedidos de compra' });
+    res.status(403).json({
+      error: exigeGestao
+        ? 'Apenas compras pode gerenciar pedidos de compra'
+        : 'Acesso negado aos pedidos de compra'
+    });
     return null;
   }
 
@@ -53,7 +86,7 @@ async function validarGestaoPedidos(req, res) {
 module.exports = {
   async index(req, res) {
     try {
-      const usuario = await validarGestaoPedidos(req, res);
+      const usuario = await validarAcessoPedidos(req, res);
       if (!usuario) {
         return;
       }
@@ -75,7 +108,7 @@ module.exports = {
 
   async auditoria(req, res) {
     try {
-      const usuario = await validarGestaoPedidos(req, res);
+      const usuario = await validarAcessoPedidos(req, res, { gerenciar: true });
       if (!usuario) {
         return;
       }
@@ -98,7 +131,7 @@ module.exports = {
 
   async show(req, res) {
     try {
-      const usuario = await validarGestaoPedidos(req, res);
+      const usuario = await validarAcessoPedidos(req, res);
       if (!usuario) {
         return;
       }
@@ -119,7 +152,7 @@ module.exports = {
     const transaction = await PedidoCompra.sequelize.transaction();
 
     try {
-      const usuario = await validarGestaoPedidos(req, res);
+      const usuario = await validarAcessoPedidos(req, res, { gerenciar: true });
       if (!usuario) {
         await transaction.rollback();
         return;
@@ -152,7 +185,7 @@ module.exports = {
     const transaction = await PedidoCompra.sequelize.transaction();
 
     try {
-      const usuario = await validarGestaoPedidos(req, res);
+      const usuario = await validarAcessoPedidos(req, res, { gerenciar: true });
       if (!usuario) {
         await transaction.rollback();
         return;
@@ -179,7 +212,7 @@ module.exports = {
     const transaction = await PedidoCompra.sequelize.transaction();
 
     try {
-      const usuario = await validarGestaoPedidos(req, res);
+      const usuario = await validarAcessoPedidos(req, res, { gerenciar: true });
       if (!usuario) {
         await transaction.rollback();
         return;
@@ -206,7 +239,7 @@ module.exports = {
     const transaction = await PedidoCompra.sequelize.transaction();
 
     try {
-      const usuario = await validarGestaoPedidos(req, res);
+      const usuario = await validarAcessoPedidos(req, res, { gerenciar: true });
       if (!usuario) {
         await transaction.rollback();
         return;
@@ -234,7 +267,7 @@ module.exports = {
     const transaction = await PedidoCompra.sequelize.transaction();
 
     try {
-      const usuario = await validarGestaoPedidos(req, res);
+      const usuario = await validarAcessoPedidos(req, res, { gerenciar: true });
       if (!usuario) {
         await transaction.rollback();
         return;
@@ -259,7 +292,7 @@ module.exports = {
 
   async pdf(req, res) {
     try {
-      const usuario = await validarGestaoPedidos(req, res);
+      const usuario = await validarAcessoPedidos(req, res);
       if (!usuario) {
         return;
       }

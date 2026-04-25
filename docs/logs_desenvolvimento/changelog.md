@@ -6,6 +6,7 @@ Este arquivo registra mudancas relevantes de produto, arquitetura e documentacao
 
 - correcao do fluxo CSRF em ambiente com frontend e API em subdominios distintos, expondo `X-CSRF-Token` via CORS e mantendo o token em memoria no frontend para `POST/PATCH/DELETE` autenticados por cookie, sem expor o JWT HTTP-only
 - alinhamento da biblioteca de arquivos modelos com a regra documentada de visualizacao ampla: qualquer usuario autenticado pode listar e abrir arquivos de paginas ativas; upload permanece restrito por pagina/perfil
+- separacao das permissoes de pedidos de compra: listagem, detalhe e PDF seguem o acesso ao modulo e escopo de obras; alteracoes de status e itens permanecem restritas ao setor de compras e administradores
 
 - reescrita completa de `docs/arquitetura/deploy_ambientes.md`, transformando o antigo guia resumido de deploy em guia mestre de:
   - implantacao tecnica por instalacao
