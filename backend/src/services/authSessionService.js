@@ -54,6 +54,7 @@ function setAuthCookies(res, token, csrfToken) {
 
   res.cookie(env.authCookieName, token, authOptions);
   res.cookie(env.csrfCookieName, csrfToken, readableOptions);
+  setCsrfHeader(res, csrfToken);
 }
 
 function setCsrfCookie(res, csrfToken, maxAge = null) {
@@ -62,6 +63,12 @@ function setCsrfCookie(res, csrfToken, maxAge = null) {
     readableOptions.maxAge = maxAge;
   }
   res.cookie(env.csrfCookieName, csrfToken, readableOptions);
+  setCsrfHeader(res, csrfToken);
+}
+
+function setCsrfHeader(res, csrfToken) {
+  if (!csrfToken) return;
+  res.set(env.csrfHeaderName, csrfToken);
 }
 
 function clearAuthCookies(res) {
@@ -106,6 +113,7 @@ module.exports = {
   decodeTokenExpiry,
   generateCsrfToken,
   getCookieBaseOptions,
+  setCsrfHeader,
   setCsrfCookie,
   setAuthCookies,
   verifyMfaChallengeToken

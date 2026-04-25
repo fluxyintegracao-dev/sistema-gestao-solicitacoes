@@ -16,6 +16,7 @@ const {
   decodeTokenExpiry,
   generateCsrfToken,
   setAuthCookies,
+  setCsrfHeader,
   setCsrfCookie,
   verifyMfaChallengeToken
 } = require('../services/authSessionService');
@@ -265,11 +266,16 @@ module.exports = {
 
   async me(req, res) {
     try {
-      if (req.auth_mode === 'cookie' && !req.cookies?.[env.csrfCookieName]) {
-        const expiresAtMs = Number(req.auth?.exp || 0) > 0
-          ? (Number(req.auth.exp) * 1000) - Date.now()
-          : null;
-        setCsrfCookie(res, generateCsrfToken(), expiresAtMs && expiresAtMs > 0 ? expiresAtMs : null);
+      if (req.auth_mode === 'cookie') {
+        const currentCsrfToken = String(req.cookies?.[env.csrfCookieName] || '').trim();
+        if (currentCsrfToken) {
+          setCsrfHeader(res, currentCsrfToken);
+        } else {
+          const expiresAtMs = Number(req.auth?.exp || 0) > 0
+            ? (Number(req.auth.exp) * 1000) - Date.now()
+            : null;
+          setCsrfCookie(res, generateCsrfToken(), expiresAtMs && expiresAtMs > 0 ? expiresAtMs : null);
+        }
       }
 
       return res.json({

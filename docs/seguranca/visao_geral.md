@@ -16,6 +16,7 @@
 - rate limit em login, upload e rotas criticas
 - auditoria de eventos sensiveis
 - protecao de anexos por presign e controle de acesso
+- protecao CSRF em requisicoes autenticadas por cookie, com token exposto em header controlado para frontends permitidos por CORS
 
 ## Modulos Mais Sensiveis
 

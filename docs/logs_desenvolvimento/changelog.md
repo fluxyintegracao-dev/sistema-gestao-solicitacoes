@@ -4,6 +4,8 @@ Este arquivo registra mudancas relevantes de produto, arquitetura e documentacao
 
 ## 2026-04 (continuacao - sesao 12/04)
 
+- correcao do fluxo CSRF em ambiente com frontend e API em subdominios distintos, expondo `X-CSRF-Token` via CORS e mantendo o token em memoria no frontend para `POST/PATCH/DELETE` autenticados por cookie, sem expor o JWT HTTP-only
+
 - reescrita completa de `docs/arquitetura/deploy_ambientes.md`, transformando o antigo guia resumido de deploy em guia mestre de:
   - implantacao tecnica por instalacao
   - configuracao inicial da empresa cliente
