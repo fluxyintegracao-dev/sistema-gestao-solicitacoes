@@ -19,7 +19,8 @@ const {
   canManageContratos,
   getUserObraScopeIds,
   isBusinessAdmin,
-  isSuperadmin
+  isSuperadmin,
+  shouldRestrictContratosToObras
 } = require('../services/authorizationService');
 const { registrarEventoSeguranca } = require('../services/securityLogService');
 const { normalizeOriginalName } = require('../utils/fileName');
@@ -215,13 +216,17 @@ module.exports = {
       const { obra_id, ref, codigo, modo } = req.query;
       const where = {};
       const podeVisualizarContratos = await canAccessContratos(req.user);
-      const acessoGlobalContratos = await canAccessContratosGlobal(req.user);
+      const restringirPorObra = await shouldRestrictContratosToObras(req.user);
+      const acessoGlobalContratos = !restringirPorObra && await canAccessContratosGlobal(req.user);
       const obrasPermitidas = isSuperadmin(req.user) ? null : await getUserObraScopeIds(req.user);
       const modoCriacao = String(modo || '').trim().toUpperCase() === 'CRIACAO';
       let podeCriarEmTodasObras = false;
 
       if (!podeVisualizarContratos) {
-        return res.status(403).json({ error: 'Acesso negado' });
+        return res.status(403).json({
+          error: 'Acesso negado',
+          code: 'CONTRATOS_PERMISSAO_VISUALIZAR_AUSENTE'
+        });
       }
 
       if (modoCriacao && !acessoGlobalContratos) {
@@ -497,11 +502,15 @@ module.exports = {
   async resumo(req, res) {
     try {
       const podeVisualizarContratos = await canAccessContratos(req.user);
-      const acessoGlobalContratos = await canAccessContratosGlobal(req.user);
+      const restringirPorObra = await shouldRestrictContratosToObras(req.user);
+      const acessoGlobalContratos = !restringirPorObra && await canAccessContratosGlobal(req.user);
       const obrasPermitidas = isSuperadmin(req.user) ? null : await getUserObraScopeIds(req.user);
 
       if (!podeVisualizarContratos) {
-        return res.status(403).json({ error: 'Acesso negado' });
+        return res.status(403).json({
+          error: 'Acesso negado',
+          code: 'CONTRATOS_PERMISSAO_VISUALIZAR_AUSENTE'
+        });
       }
 
       const where = {};

@@ -1016,12 +1016,24 @@ async function canAccessContratosGlobal(user) {
     return true;
   }
 
+  if (await userHasSetorCapability(user, 'eh_setor_obra')) {
+    return false;
+  }
+
   if (await userHasConfiguredAreaPermissions(user)) {
     return userHasAreaPermission(user, CONTRATOS_VIEW_KEYS);
   }
 
   const tokens = await buildUserScopeTokens(user);
   return tokens.includes('ADMIN') && await userHasSetorCapability(user, 'eh_setor_geo');
+}
+
+async function shouldRestrictContratosToObras(user) {
+  if (isBusinessAdmin(user)) {
+    return false;
+  }
+
+  return userHasSetorCapability(user, 'eh_setor_obra');
 }
 
 async function canCreateContratos(user) {
@@ -1453,5 +1465,6 @@ module.exports = {
   userHasFinanceiroAccessConfig,
   userHasAllObrasAccess,
   userHasAnyRhDpCapability,
-  userHasRhDpCapabilityConfig
+  userHasRhDpCapabilityConfig,
+  shouldRestrictContratosToObras
 };
