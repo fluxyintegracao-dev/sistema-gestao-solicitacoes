@@ -51,20 +51,21 @@ function statusLabel(value) {
     .replace(/(^|\s)\S/g, (letter) => letter.toUpperCase());
 }
 
-function MetricTile({ label, value, detail, href }) {
+function MetricTile({ label, value, detail, href, tone = 'blue' }) {
+  const toneClass = `dashboard-metric-card--${tone}`;
   const content = (
-    <div className="relative overflow-hidden rounded-3xl border border-blue-700 bg-gradient-to-br from-blue-950 to-sky-800 p-4 text-white shadow-sm">
-      <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-white/10" />
-      <p className="relative text-xs font-semibold uppercase tracking-[0.18em] text-white/65">{label}</p>
-      <strong className="relative mt-3 block text-2xl font-semibold tracking-tight md:text-3xl">{value}</strong>
-      {detail ? <p className="relative mt-2 text-xs leading-5 text-white/70">{detail}</p> : null}
+    <div className={`dashboard-metric-card ${toneClass}`}>
+      <div className="dashboard-metric-orb" />
+      <p className="dashboard-metric-label">{label}</p>
+      <strong className="dashboard-metric-value">{value}</strong>
+      {detail ? <p className="dashboard-metric-detail">{detail}</p> : null}
     </div>
   );
 
   if (!href) return content;
 
   return (
-    <Link to={href} className="block transition-transform hover:-translate-y-0.5">
+    <Link to={href} className="dashboard-metric-link">
       {content}
     </Link>
   );
@@ -80,17 +81,17 @@ function DecisionItem({ tone = 'slate', title, detail, value, href }) {
   };
 
   const content = (
-    <div className="flex items-start justify-between gap-4 rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] px-4 py-3 shadow-sm transition-colors hover:bg-[var(--c-bg)]">
+    <div className={`dashboard-decision-card dashboard-decision-card--${tone}`}>
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
-          <span className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.14em] ${tones[tone] || tones.slate}`}>
+          <span className={`dashboard-decision-badge ${tones[tone] || tones.slate}`}>
             {tone === 'red' ? 'Critico' : tone === 'amber' ? 'Atencao' : 'Acao'}
           </span>
           <p className="font-semibold text-[var(--c-text)]">{title}</p>
         </div>
         {detail ? <p className="mt-1 text-sm leading-5 text-[var(--c-muted)]">{detail}</p> : null}
       </div>
-      {value ? <strong className="shrink-0 text-right text-sm text-[var(--c-text)]">{value}</strong> : null}
+      {value ? <strong className="dashboard-decision-value">{value}</strong> : null}
     </div>
   );
 
@@ -101,10 +102,10 @@ function DecisionItem({ tone = 'slate', title, detail, value, href }) {
 
 function Section({ title, subtitle, action, children }) {
   return (
-    <section className="sol-surface-card rounded-3xl p-4 md:p-5">
+    <section className="dashboard-section-card">
       <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div>
-          <h2 className="text-base font-semibold text-[var(--c-text)] md:text-lg">{title}</h2>
+          <h2 className="dashboard-section-title">{title}</h2>
           {subtitle ? <p className="mt-1 text-sm text-[var(--c-muted)]">{subtitle}</p> : null}
         </div>
         {action}
@@ -136,9 +137,9 @@ function BarList({ items, labelKey, valueKey, valueFormatter = formatNumber, lim
               <span className="truncate font-medium text-[var(--c-text)]">{item[labelKey] || '-'}</span>
               <span className="shrink-0 font-semibold text-[var(--c-muted)]">{valueFormatter(item.value)}</span>
             </div>
-            <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+            <div className="dashboard-bar-track">
               <div
-                className="h-full rounded-full bg-gradient-to-r from-slate-900 via-blue-700 to-sky-500"
+                className="dashboard-bar-fill"
                 style={{ width: `${percent}%` }}
               />
             </div>
@@ -150,19 +151,18 @@ function BarList({ items, labelKey, valueKey, valueFormatter = formatNumber, lim
 }
 
 function FinanceRow({ title, subtitle, amount, tone = 'slate', href }) {
-  const amountColor = tone === 'red' ? 'text-red-600' : tone === 'green' ? 'text-emerald-600' : 'text-[var(--c-text)]';
   const content = (
-    <div className="flex flex-col gap-2 rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+    <div className={`dashboard-list-row dashboard-list-row--${tone}`}>
       <div className="min-w-0">
         <p className="truncate font-semibold text-[var(--c-text)]">{title || '-'}</p>
         {subtitle ? <p className="mt-0.5 text-sm text-[var(--c-muted)]">{subtitle}</p> : null}
       </div>
-      <strong className={`shrink-0 text-right ${amountColor}`}>{amount}</strong>
+      <strong className="dashboard-list-amount">{amount}</strong>
     </div>
   );
 
   if (!href) return content;
-  return <Link to={href} className="block transition-transform hover:-translate-y-0.5">{content}</Link>;
+  return <Link to={href} className="dashboard-row-link">{content}</Link>;
 }
 
 function createDefaultDashboardState() {
@@ -387,20 +387,20 @@ export default function Dashboard() {
 
   return (
     <div className="page dashboard solicitacoes-page space-y-5 md:space-y-6">
-      <header className="overflow-hidden rounded-[32px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(30,64,175,0.18),_transparent_34%),linear-gradient(135deg,_#0f172a,_#1e293b_52%,_#0f766e)] p-5 text-white shadow-sm md:p-6">
+      <header className="dashboard-hero-card">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl">
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-white/55">Centro de decisao</p>
-            <h1 className="mt-2 text-3xl font-semibold tracking-tight !text-white md:text-4xl">{titulo}</h1>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-white/70">
+            <p className="dashboard-hero-kicker">Centro de decisao</p>
+            <h1 className="dashboard-hero-title">{titulo}</h1>
+            <p className="dashboard-hero-copy">
               Leitura objetiva dos pontos que pedem acao: vencidos, caixa aberto, conciliacao, fila operacional e exposicao por obra.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full border border-white/15 bg-white/10 px-3 py-2 text-xs font-medium text-white/75">
+            <span className="dashboard-hero-chip">
               Atualizado {formatDateTime(updatedAt)}
             </span>
-            <button type="button" className="btn btn-outline border-white/20 bg-white/10 text-white hover:bg-white/20" onClick={() => carregarDashboard()} disabled={refreshing}>
+            <button type="button" className="btn btn-outline" onClick={() => carregarDashboard()} disabled={refreshing}>
               {refreshing ? 'Atualizando...' : 'Atualizar'}
             </button>
           </div>
@@ -414,24 +414,28 @@ export default function Dashboard() {
               label="Saldo aberto projetado"
               value={formatCurrency(saldoAberto)}
               detail="Receber em aberto menos pagar em aberto"
+              tone={saldoAberto >= 0 ? 'green' : 'red'}
               href="/financeiro/relatorios"
             />
             <MetricTile
               label="Resultado do mes"
               value={formatCurrency(resultadoMes)}
               detail="Recebido no mes menos pago no mes"
+              tone={resultadoMes >= 0 ? 'blue' : 'amber'}
               href="/financeiro/relatorios"
             />
             <MetricTile
               label="Vencidos em aberto"
               value={formatCurrency(totalVencido)}
               detail={`${financeiro.quantidade_pagar_vencido + financeiro.quantidade_receber_vencido} titulo(s) exigem revisao`}
+              tone={totalVencido > 0 ? 'red' : 'green'}
               href="/financeiro/titulos"
             />
             <MetricTile
               label="Conciliacao pendente"
               value={formatNumber(financeiro.conciliacao_pendente_quantidade)}
               detail={formatCurrency(financeiro.conciliacao_pendente_valor)}
+              tone={financeiro.conciliacao_pendente_quantidade > 0 ? 'amber' : 'green'}
               href="/financeiro/conciliacao"
             />
           </>
