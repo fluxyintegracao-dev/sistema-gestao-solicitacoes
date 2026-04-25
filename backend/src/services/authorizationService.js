@@ -12,6 +12,84 @@ const CHAVE_USUARIOS_PERMISSOES_RH_DP = 'USUARIOS_PERMISSOES_RH_DP';
 const CHAVE_PERMISSOES_AREAS_USUARIOS = 'PERMISSOES_AREAS_USUARIOS';
 const CACHE_TTL_MS = 30 * 1000;
 
+const FINANCEIRO_PERMISSION_KEYS = [
+  'financeiro.titulos.visualizar',
+  'financeiro.titulos.criar',
+  'financeiro.titulos.baixar',
+  'financeiro.titulos.estornar',
+  'financeiro.relatorios.visualizar',
+  'financeiro.relatorios.resultado_obras',
+  'financeiro.conciliacao.visualizar',
+  'financeiro.conciliacao.importar',
+  'financeiro.conciliacao.conciliar',
+  'financeiro.cadastros.visualizar',
+  'financeiro.cadastros.gerenciar'
+];
+
+const BOLETOS_PERMISSION_KEYS = [
+  'boletos.emitir.visualizar',
+  'boletos.emitir.gerar'
+];
+
+const COMPRAS_PEDIDOS_VIEW_KEYS = [
+  'compras.pedidos.visualizar',
+  'compras.pedidos.criar',
+  'compras.pedidos.aprovar',
+  'compras.pedidos.auditoria'
+];
+
+const COMPRAS_PEDIDOS_MANAGE_KEYS = [
+  'compras.pedidos.criar',
+  'compras.pedidos.aprovar'
+];
+
+const COMPRAS_PEDIDOS_AUDIT_KEYS = [
+  'compras.pedidos.auditoria'
+];
+
+const COMPRAS_COTACOES_VIEW_KEYS = [
+  'compras.cotacoes.visualizar',
+  'compras.cotacoes.gerenciar'
+];
+
+const COMPRAS_COTACOES_MANAGE_KEYS = [
+  'compras.cotacoes.gerenciar'
+];
+
+const COMPRAS_PERMISSION_KEYS = [
+  ...COMPRAS_PEDIDOS_VIEW_KEYS,
+  ...COMPRAS_COTACOES_VIEW_KEYS
+];
+
+const COMERCIAL_EMPREENDIMENTOS_VIEW_KEYS = [
+  'comercial.empreendimentos.visualizar',
+  'comercial.empreendimentos.gerenciar'
+];
+
+const COMERCIAL_EMPREENDIMENTOS_MANAGE_KEYS = [
+  'comercial.empreendimentos.gerenciar'
+];
+
+const COMERCIAL_CONTRATOS_VIEW_KEYS = [
+  'comercial.vendas.visualizar',
+  'comercial.vendas.criar',
+  'comercial.vendas.contratos'
+];
+
+const COMERCIAL_CONTRATOS_CREATE_KEYS = [
+  'comercial.vendas.criar',
+  'comercial.vendas.contratos'
+];
+
+const COMERCIAL_CONTRATOS_MANAGE_KEYS = [
+  'comercial.vendas.contratos'
+];
+
+const COMERCIAL_PERMISSION_KEYS = [
+  ...COMERCIAL_EMPREENDIMENTOS_VIEW_KEYS,
+  ...COMERCIAL_CONTRATOS_VIEW_KEYS
+];
+
 let setoresAcessoTodasObrasCache = {
   expiresAt: 0,
   setores: []
@@ -237,6 +315,12 @@ async function userHasAreaPermission(user, permissionKeys = []) {
   return permissions.some((permission) => expected.has(String(permission || '').trim().toLowerCase()));
 }
 
+async function userHasConfiguredAreaPermissions(user) {
+  if (isBusinessAdmin(user)) return false;
+  const permissions = await getAreasPermissoesForUser(user);
+  return Array.isArray(permissions) && permissions.length > 0;
+}
+
 function invalidatePermissoesAreasCache() {
   permissoesAreasUsuariosCache = {
     expiresAt: 0,
@@ -419,6 +503,10 @@ async function canAccessFinanceiro(user) {
     return true;
   }
 
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, FINANCEIRO_PERMISSION_KEYS);
+  }
+
   if (hasAnyProfile(user, ['FINANCEIRO'])) {
     return true;
   }
@@ -428,6 +516,120 @@ async function canAccessFinanceiro(user) {
   }
 
   return userHasSetorCapability(user, 'eh_setor_financeiro');
+}
+
+async function canAccessBoletos(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, BOLETOS_PERMISSION_KEYS);
+  }
+
+  return (await canAccessFinanceiro(user)) && userHasAreaPermission(user, BOLETOS_PERMISSION_KEYS);
+}
+
+async function canGenerateBoletos(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, ['boletos.emitir.gerar']);
+  }
+
+  return (await canAccessFinanceiro(user)) && userHasAreaPermission(user, ['boletos.emitir.gerar']);
+}
+
+async function canAccessCompras(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, COMPRAS_PERMISSION_KEYS);
+  }
+
+  const tokens = await buildUserScopeTokens(user);
+  return (
+    Boolean(user?.pode_criar_solicitacao_compra) ||
+    await userHasSetorCapability(user, 'eh_setor_compras') ||
+    await userHasSetorCapability(user, 'eh_setor_geo') ||
+    tokens.includes('COMPRAS') ||
+    tokens.includes('GEO') ||
+    tokens.includes('GERENCIA_PROCESSOS') ||
+    tokens.includes('GERENCIA DE PROCESSOS') ||
+    tokens.includes('GESTAO_PROCESSOS') ||
+    tokens.includes('GESTAO DE PROCESSOS')
+  );
+}
+
+async function canViewComprasPedidos(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, COMPRAS_PEDIDOS_VIEW_KEYS);
+  }
+
+  return canAccessCompras(user);
+}
+
+async function canManageComprasPedidos(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, COMPRAS_PEDIDOS_MANAGE_KEYS);
+  }
+
+  return userHasSetorCapability(user, 'eh_setor_compras');
+}
+
+async function canAuditComprasPedidos(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, [
+      ...COMPRAS_PEDIDOS_AUDIT_KEYS,
+      ...COMPRAS_PEDIDOS_MANAGE_KEYS
+    ]);
+  }
+
+  return userHasSetorCapability(user, 'eh_setor_compras');
+}
+
+async function canViewComprasCotacoes(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, COMPRAS_COTACOES_VIEW_KEYS);
+  }
+
+  return canAccessCompras(user);
+}
+
+async function canManageComprasCotacoes(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, COMPRAS_COTACOES_MANAGE_KEYS);
+  }
+
+  const tokens = await buildUserScopeTokens(user);
+  return (
+    await userHasSetorCapability(user, 'eh_setor_compras') ||
+    tokens.includes('COMPRAS')
+  );
 }
 
 async function canAccessRhDp(user) {
@@ -463,6 +665,78 @@ async function canAccessProvisoes(user) {
     'provisoes.dashboard.visualizar',
     'provisoes.categorias.gerenciar'
   ]);
+}
+
+async function canAccessComercial(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, COMERCIAL_PERMISSION_KEYS);
+  }
+
+  return false;
+}
+
+async function canViewComercialEmpreendimentos(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, COMERCIAL_EMPREENDIMENTOS_VIEW_KEYS);
+  }
+
+  return false;
+}
+
+async function canManageComercialEmpreendimentos(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, COMERCIAL_EMPREENDIMENTOS_MANAGE_KEYS);
+  }
+
+  return false;
+}
+
+async function canViewComercialContratos(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, COMERCIAL_CONTRATOS_VIEW_KEYS);
+  }
+
+  return false;
+}
+
+async function canCreateComercialContratos(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, COMERCIAL_CONTRATOS_CREATE_KEYS);
+  }
+
+  return false;
+}
+
+async function canManageComercialContratos(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, COMERCIAL_CONTRATOS_MANAGE_KEYS);
+  }
+
+  return false;
 }
 
 async function canViewProvisoes(user) {
@@ -666,10 +940,14 @@ async function canAccessComprovantes(user) {
 }
 
 module.exports = {
+  canAccessBoletos,
+  canAccessComercial,
+  canAccessCompras,
   canAccessProvisoes,
   canAccessFinanceiro,
   canAccessIntegracaoSienge,
   canAccessRhDp,
+  canAuditComprasPedidos,
   buildUserScopeTokens,
   canAccessComprovantes,
   canEditRhDpApuracao,
@@ -678,6 +956,12 @@ module.exports = {
   canExecuteRhDpImportacoes,
   canCreateProvisoes,
   canExportCrmLeads,
+  canGenerateBoletos,
+  canCreateComercialContratos,
+  canManageComercialContratos,
+  canManageComercialEmpreendimentos,
+  canManageComprasCotacoes,
+  canManageComprasPedidos,
   canRedistributeCrmLeads,
   canManageIntegracaoSiengeConfig,
   canManageProvisoesCategorias,
@@ -687,6 +971,10 @@ module.exports = {
   getFinanceiroObraScopeIds,
   canRetryIntegracaoSienge,
   canViewIntegracaoSienge,
+  canViewComercialContratos,
+  canViewComercialEmpreendimentos,
+  canViewComprasCotacoes,
+  canViewComprasPedidos,
   canViewProvisoes,
   canViewProvisoesDashboard,
   canViewRhDpApuracao,

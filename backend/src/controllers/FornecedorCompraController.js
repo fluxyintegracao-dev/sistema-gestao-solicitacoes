@@ -1,54 +1,16 @@
 const { Op } = require('sequelize');
-const { FornecedorCompra, Setor } = require('../models');
-const { isBusinessAdmin } = require('../services/authorizationService');
-
-function normalizeText(value) {
-  return String(value || '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .trim()
-    .toUpperCase();
-}
-
-async function getUserTokens(req) {
-  const tokens = new Set([
-    normalizeText(req.user?.perfil),
-    normalizeText(req.user?.area),
-    normalizeText(req.user?.setor?.codigo),
-    normalizeText(req.user?.setor?.nome)
-  ].filter(Boolean));
-
-  if (req.user?.setor_id) {
-    const setor = await Setor.findByPk(req.user.setor_id, {
-      attributes: ['codigo', 'nome']
-    });
-    if (setor?.codigo) tokens.add(normalizeText(setor.codigo));
-    if (setor?.nome) tokens.add(normalizeText(setor.nome));
-  }
-
-  return tokens;
-}
+const { FornecedorCompra } = require('../models');
+const {
+  canManageComprasCotacoes,
+  canViewComprasCotacoes
+} = require('../services/authorizationService');
 
 async function canReadFornecedores(req) {
-  const tokens = await getUserTokens(req);
-  return (
-    isBusinessAdmin(req.user) ||
-    tokens.has('COMPRAS') ||
-    tokens.has('GEO') ||
-    tokens.has('GERENCIA DE PROCESSOS') ||
-    tokens.has('GESTAO DE PROCESSOS') ||
-    tokens.has('GERENCIA_PROCESSOS') ||
-    tokens.has('GESTAO_PROCESSOS') ||
-    Boolean(req.user?.pode_criar_solicitacao_compra)
-  );
+  return canViewComprasCotacoes(req.user);
 }
 
 async function canManageFornecedores(req) {
-  const tokens = await getUserTokens(req);
-  return (
-    isBusinessAdmin(req.user) ||
-    tokens.has('COMPRAS')
-  );
+  return canManageComprasCotacoes(req.user);
 }
 
 function parseCategorias(raw) {

@@ -10,10 +10,10 @@ const {
   removerPedidoItem
 } = require('../services/pedidoCompraService');
 const {
-  buildUserScopeTokens,
-  isBusinessAdmin
+  canAuditComprasPedidos,
+  canManageComprasPedidos,
+  canViewComprasPedidos
 } = require('../services/authorizationService');
-const { userHasSetorCapability } = require('../services/setorCapabilityService');
 const { renderPedidoCompraPdf } = require('../services/pedidoCompraPdf');
 const { responderErroController } = require('../utils/controllerError');
 const {
@@ -32,31 +32,11 @@ async function carregarUsuarioCompras(userId) {
 }
 
 async function podeVisualizarPedidos(usuario) {
-  const tokens = new Set(await buildUserScopeTokens(usuario));
-  const ehSetorCompras = await userHasSetorCapability(usuario, 'eh_setor_compras');
-  const ehSetorGeo = await userHasSetorCapability(usuario, 'eh_setor_geo');
-
-  return (
-    isBusinessAdmin(usuario) ||
-    Boolean(usuario.pode_criar_solicitacao_compra) ||
-    ehSetorCompras ||
-    ehSetorGeo ||
-    tokens.has('COMPRAS') ||
-    tokens.has('GEO') ||
-    tokens.has('GERENCIA_PROCESSOS') ||
-    tokens.has('GERENCIA DE PROCESSOS') ||
-    tokens.has('GESTAO_PROCESSOS') ||
-    tokens.has('GESTAO DE PROCESSOS')
-  );
+  return canViewComprasPedidos(usuario);
 }
 
 async function podeGerenciarPedidos(usuario) {
-  const ehSetorCompras = await userHasSetorCapability(usuario, 'eh_setor_compras');
-
-  return (
-    isBusinessAdmin(usuario) ||
-    ehSetorCompras
-  );
+  return canManageComprasPedidos(usuario);
 }
 
 async function validarAcessoPedidos(req, res, options = {}) {
@@ -67,15 +47,21 @@ async function validarAcessoPedidos(req, res, options = {}) {
   }
 
   const exigeGestao = options.gerenciar === true;
-  const permitido = exigeGestao
-    ? await podeGerenciarPedidos(usuario)
-    : await podeVisualizarPedidos(usuario);
+  const exigeAuditoria = options.auditoria === true;
+  let permitido = await podeVisualizarPedidos(usuario);
+  if (exigeAuditoria) {
+    permitido = await canAuditComprasPedidos(usuario);
+  } else if (exigeGestao) {
+    permitido = await podeGerenciarPedidos(usuario);
+  }
 
   if (!permitido) {
     res.status(403).json({
-      error: exigeGestao
-        ? 'Apenas compras pode gerenciar pedidos de compra'
-        : 'Acesso negado aos pedidos de compra'
+      error: exigeAuditoria
+        ? 'Acesso negado a auditoria dos pedidos de compra'
+        : (exigeGestao
+          ? 'Apenas compras pode gerenciar pedidos de compra'
+          : 'Acesso negado aos pedidos de compra')
     });
     return null;
   }
@@ -108,7 +94,7 @@ module.exports = {
 
   async auditoria(req, res) {
     try {
-      const usuario = await validarAcessoPedidos(req, res, { gerenciar: true });
+      const usuario = await validarAcessoPedidos(req, res, { auditoria: true });
       if (!usuario) {
         return;
       }

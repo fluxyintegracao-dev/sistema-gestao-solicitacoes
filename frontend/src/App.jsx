@@ -7,7 +7,6 @@ import { useAuth } from './contexts/AuthContext';
 import {
   canAccessBiblioteca,
   canAccessBoletos,
-  canAccessComercial,
   canAccessCadastroObras,
   canAccessComunicacao,
   canAccessCompras,
@@ -15,11 +14,17 @@ import {
   canAccessFinanceiro,
   canAccessGestaoObras,
   canAccessPrioridadesDiretoria,
+  canCreateComprasPedidos,
   canCreateProvisionamentos,
   canAccessRhDpDashboard,
   canAccessRhDpEmpresas,
   canExecuteRhDpImportacoes,
+  canManageComprasCotacoes,
   canManageProvisionamentoCategorias,
+  canViewComprasCotacoes,
+  canViewComprasPedidos,
+  canViewComercialContratos,
+  canViewComercialEmpreendimentos,
   canViewProvisionamentos,
   canViewProvisionamentosDashboard,
   canViewIntegracaoSienge,
@@ -187,6 +192,38 @@ function ModuloComprasRoute({ children }) {
   return children;
 }
 
+function ComprasPedidosRoute({ children }) {
+  const { user } = useAuth();
+  if (!canViewComprasPedidos(user)) {
+    return <Navigate to="/" replace />;
+  }
+  return children;
+}
+
+function ComprasPedidosCreateRoute({ children }) {
+  const { user } = useAuth();
+  if (!canCreateComprasPedidos(user)) {
+    return <Navigate to="/" replace />;
+  }
+  return children;
+}
+
+function ComprasCotacoesRoute({ children }) {
+  const { user } = useAuth();
+  if (!canViewComprasCotacoes(user)) {
+    return <Navigate to="/" replace />;
+  }
+  return children;
+}
+
+function ComprasCotacoesManageRoute({ children }) {
+  const { user } = useAuth();
+  if (!canManageComprasCotacoes(user)) {
+    return <Navigate to="/" replace />;
+  }
+  return children;
+}
+
 function FinanceiroRoute({ children }) {
   const { user } = useAuth();
   if (!canAccessFinanceiro(user)) {
@@ -259,9 +296,17 @@ function ContratosRoute({ children }) {
   return children;
 }
 
-function ComercialRoute({ children }) {
+function ComercialEmpreendimentosRoute({ children }) {
   const { user } = useAuth();
-  if (!canAccessComercial(user)) {
+  if (!canViewComercialEmpreendimentos(user)) {
+    return <Navigate to="/" replace />;
+  }
+  return children;
+}
+
+function ComercialContratosRoute({ children }) {
+  const { user } = useAuth();
+  if (!canViewComercialContratos(user)) {
     return <Navigate to="/" replace />;
   }
   return children;
@@ -460,11 +505,11 @@ export default function App() {
         <Route path="crm/admin/canais" element={<CrmRoute><CrmAdminCanais /></CrmRoute>} />
         <Route path="crm/admin/numeros" element={<CrmRoute><CrmAdminNumeros /></CrmRoute>} />
         <Route path="crm/admin/integracoes" element={<CrmRoute><CrmAdminIntegracoes /></CrmRoute>} />
-        <Route path="comercial/empreendimentos" element={<ComercialRoute><ComercialEmpreendimentos /></ComercialRoute>} />
-        <Route path="comercial/unidades" element={<ComercialRoute><ComercialUnidades /></ComercialRoute>} />
-        <Route path="comercial/tabelas-preco" element={<ComercialRoute><ComercialTabelasPreco /></ComercialRoute>} />
-        <Route path="comercial/mapa-unidades" element={<ComercialRoute><ComercialMapaUnidades /></ComercialRoute>} />
-        <Route path="comercial/contratos" element={<ComercialRoute><ComercialContratos /></ComercialRoute>} />
+        <Route path="comercial/empreendimentos" element={<ComercialEmpreendimentosRoute><ComercialEmpreendimentos /></ComercialEmpreendimentosRoute>} />
+        <Route path="comercial/unidades" element={<ComercialEmpreendimentosRoute><ComercialUnidades /></ComercialEmpreendimentosRoute>} />
+        <Route path="comercial/tabelas-preco" element={<ComercialEmpreendimentosRoute><ComercialTabelasPreco /></ComercialEmpreendimentosRoute>} />
+        <Route path="comercial/mapa-unidades" element={<ComercialEmpreendimentosRoute><ComercialMapaUnidades /></ComercialEmpreendimentosRoute>} />
+        <Route path="comercial/contratos" element={<ComercialContratosRoute><ComercialContratos /></ComercialContratosRoute>} />
         <Route path="provisoes-financeiras" element={<ProvisionamentosRoute><ProvisionamentosFinanceiros /></ProvisionamentosRoute>} />
         <Route path="provisoes-financeiras/nova" element={<ProvisionamentosCreateRoute><NovaProvisaoFinanceira /></ProvisionamentosCreateRoute>} />
         <Route path="provisoes-financeiras/:id" element={<ProvisionamentosRoute><ProvisionamentoFinanceiroDetalhe /></ProvisionamentosRoute>} />
@@ -493,18 +538,18 @@ export default function App() {
         <Route path="perfil" element={<Perfil />} />
         <Route path="solicitacoes-compra" element={<ModuloComprasRoute><SolicitacoesCompra /></ModuloComprasRoute>} />
         <Route path="solicitacoes-compra/:id" element={<ModuloComprasRoute><SolicitacaoCompraDetalhe /></ModuloComprasRoute>} />
-        <Route path="solicitacoes-compra/nova" element={<ModuloComprasRoute><NovaSolicitacaoCompra /></ModuloComprasRoute>} />
+        <Route path="solicitacoes-compra/nova" element={<ComprasPedidosCreateRoute><NovaSolicitacaoCompra /></ComprasPedidosCreateRoute>} />
         <Route path="solicitacoes-compra/revisar" element={<ModuloComprasRoute><RevisarSolicitacaoCompra /></ModuloComprasRoute>} />
         <Route path="solicitacoes-compra/finalizada/:id" element={<ModuloComprasRoute><RevisarSolicitacaoCompraFinal /></ModuloComprasRoute>} />
-        <Route path="pedidos-compra" element={<ModuloComprasRoute><PedidosCompra /></ModuloComprasRoute>} />
-        <Route path="pedidos-compra/:id" element={<ModuloComprasRoute><PedidoCompraDetalhe /></ModuloComprasRoute>} />
+        <Route path="pedidos-compra" element={<ComprasPedidosRoute><PedidosCompra /></ComprasPedidosRoute>} />
+        <Route path="pedidos-compra/:id" element={<ComprasPedidosRoute><PedidoCompraDetalhe /></ComprasPedidosRoute>} />
         <Route path="gestao-apropriacoes" element={<GestaoObrasRoute><BusinessAdminRoute><GestaoApropriacoes /></BusinessAdminRoute></GestaoObrasRoute>} />
         <Route path="gestao-insumos" element={<ModuloComprasRoute><BusinessAdminRoute><GestaoInsumos /></BusinessAdminRoute></ModuloComprasRoute>} />
         <Route path="gestao-unidades" element={<ModuloComprasRoute><BusinessAdminRoute><GestaoUnidades /></BusinessAdminRoute></ModuloComprasRoute>} />
         <Route path="gestao-categorias" element={<ModuloComprasRoute><BusinessAdminRoute><GestaoCategorias /></BusinessAdminRoute></ModuloComprasRoute>} />
-        <Route path="gestao-fornecedores" element={<EnabledModuleRoute moduleKey="COTACOES"><GestaoFornecedores /></EnabledModuleRoute>} />
-        <Route path="cotacoes" element={<EnabledModuleRoute moduleKey="COTACOES"><ModuloComprasRoute><ListaCotacoes /></ModuloComprasRoute></EnabledModuleRoute>} />
-        <Route path="cotacoes/nova" element={<EnabledModuleRoute moduleKey="COTACOES"><NovaCotacaoAvulsa /></EnabledModuleRoute>} />
+        <Route path="gestao-fornecedores" element={<EnabledModuleRoute moduleKey="COTACOES"><ComprasCotacoesManageRoute><GestaoFornecedores /></ComprasCotacoesManageRoute></EnabledModuleRoute>} />
+        <Route path="cotacoes" element={<EnabledModuleRoute moduleKey="COTACOES"><ComprasCotacoesRoute><ListaCotacoes /></ComprasCotacoesRoute></EnabledModuleRoute>} />
+        <Route path="cotacoes/nova" element={<EnabledModuleRoute moduleKey="COTACOES"><ComprasCotacoesManageRoute><NovaCotacaoAvulsa /></ComprasCotacoesManageRoute></EnabledModuleRoute>} />
       </Route>
     </Routes>
   );

@@ -60,6 +60,12 @@ import {
   canViewRhDpObrigacoes,
   canAccessCrm,
   canManageUsers,
+  canCreateComprasPedidos,
+  canManageComprasCotacoes,
+  canViewComprasCotacoes,
+  canViewComprasPedidos,
+  canViewComercialContratos,
+  canViewComercialEmpreendimentos,
   hasEnabledModule,
   isBusinessAdmin,
   isSuperadmin
@@ -196,11 +202,17 @@ export default function Layout() {
   const moduloCotacoesHabilitado = hasEnabledModule(user, 'COTACOES');
   const crmAccess = canAccessCrm(user);
   const comprasAccess = canAccessCompras(user);
+  const comprasPedidosAccess = canViewComprasPedidos(user);
+  const comprasPedidosCreateAccess = canCreateComprasPedidos(user);
+  const comprasCotacoesAccess = canViewComprasCotacoes(user);
+  const comprasCotacoesManageAccess = canManageComprasCotacoes(user);
   const prioridadesDiretoriaAccess = canAccessPrioridadesDiretoria(user);
   const financeiroAccess = canAccessFinanceiro(user);
   const boletosAccess = canAccessBoletos(user);
   const financeiroModuleEnabled = hasEnabledModule(user, 'FINANCEIRO');
   const comercialAccess = canAccessComercial(user);
+  const comercialEmpreendimentosAccess = canViewComercialEmpreendimentos(user);
+  const comercialContratosAccess = canViewComercialContratos(user);
   const provisoesAccess = canAccessProvisoes(user);
   const provisoesDashboardAccess = canViewProvisionamentosDashboard(user);
   const provisoesListaAccess = canViewProvisionamentos(user);
@@ -291,31 +303,31 @@ export default function Layout() {
     if (comprasAccess) {
       addGroup('Compras', [
         item('/solicitacoes-compra', 'Solicitacoes de Compra', HiOutlineClipboardDocumentList),
-        item('/solicitacoes-compra/nova', 'Nova Solicitacao de Compra', HiOutlinePlusCircle),
-        item('/pedidos-compra', 'Pedidos de Compra', HiOutlineDocumentText),
+        comprasPedidosCreateAccess ? item('/solicitacoes-compra/nova', 'Nova Solicitacao de Compra', HiOutlinePlusCircle) : null,
+        comprasPedidosAccess ? item('/pedidos-compra', 'Pedidos de Compra', HiOutlineDocumentText) : null,
         businessAdmin ? item('/gestao-insumos', 'Gestao de Insumos', HiOutlineRectangleGroup) : null,
         businessAdmin ? item('/gestao-unidades', 'Gestao de Unidades', HiOutlineBuildingOffice2) : null,
         businessAdmin ? item('/gestao-categorias', 'Gestao de Categorias', HiOutlineFolderOpen) : null
       ]);
     }
 
-    if (moduloCotacoesHabilitado && comprasAccess) {
+    if (moduloCotacoesHabilitado && comprasCotacoesAccess) {
       addGroup('Cotacoes', [
         item('/cotacoes', 'Cotacoes', HiOutlineInboxStack),
-        item('/cotacoes/nova', 'Nova Cotacao Avulsa', HiOutlinePlusCircle),
-        item('/gestao-fornecedores', 'Fornecedores', HiOutlineUsers)
+        comprasCotacoesManageAccess ? item('/cotacoes/nova', 'Nova Cotacao Avulsa', HiOutlinePlusCircle) : null,
+        comprasCotacoesManageAccess ? item('/gestao-fornecedores', 'Fornecedores', HiOutlineUsers) : null
       ]);
     }
 
-    if (financeiroAccess) {
+    if (financeiroAccess || boletosAccess) {
       addGroup('Financeiro', [
-        item('/financeiro/titulos', 'Titulos Financeiros', HiOutlineWallet),
+        financeiroAccess ? item('/financeiro/titulos', 'Titulos Financeiros', HiOutlineWallet) : null,
         boletosAccess ? item('/financeiro/boletos', 'Boletos', HiOutlineDocumentText) : null,
-        item('/financeiro/relatorios', 'Relatorios Financeiros', HiOutlineDocumentText),
-        item('/financeiro/conciliacao', 'Conciliacao OFX', HiOutlineBanknotes),
-        item('/financeiro/cadastros', 'Cadastros Financeiros', HiOutlineRectangleGroup),
-        item('/comprovantes/upload', 'Upload Comprovantes', HiOutlineCloudArrowUp),
-        item('/comprovantes/pendentes', 'Comprovantes Pendentes', HiOutlineReceiptRefund)
+        financeiroAccess ? item('/financeiro/relatorios', 'Relatorios Financeiros', HiOutlineDocumentText) : null,
+        financeiroAccess ? item('/financeiro/conciliacao', 'Conciliacao OFX', HiOutlineBanknotes) : null,
+        financeiroAccess ? item('/financeiro/cadastros', 'Cadastros Financeiros', HiOutlineRectangleGroup) : null,
+        financeiroAccess ? item('/comprovantes/upload', 'Upload Comprovantes', HiOutlineCloudArrowUp) : null,
+        financeiroAccess ? item('/comprovantes/pendentes', 'Comprovantes Pendentes', HiOutlineReceiptRefund) : null
       ]);
     }
 
@@ -340,11 +352,11 @@ export default function Layout() {
 
     if (comercialAccess) {
       addGroup('Comercial', [
-        item('/comercial/empreendimentos', 'Empreendimentos', HiOutlineBuildingOffice2),
-        item('/comercial/unidades', 'Unidades', HiOutlineRectangleGroup),
-        item('/comercial/mapa-unidades', 'Mapa de Unidades', HiOutlineSquares2X2),
-        item('/comercial/tabelas-preco', 'Tabelas de Preco', HiOutlineDocumentText),
-        item('/comercial/contratos', 'Contratos de Venda', HiOutlineBanknotes)
+        comercialEmpreendimentosAccess ? item('/comercial/empreendimentos', 'Empreendimentos', HiOutlineBuildingOffice2) : null,
+        comercialEmpreendimentosAccess ? item('/comercial/unidades', 'Unidades', HiOutlineRectangleGroup) : null,
+        comercialEmpreendimentosAccess ? item('/comercial/mapa-unidades', 'Mapa de Unidades', HiOutlineSquares2X2) : null,
+        comercialEmpreendimentosAccess ? item('/comercial/tabelas-preco', 'Tabelas de Preco', HiOutlineDocumentText) : null,
+        comercialContratosAccess ? item('/comercial/contratos', 'Contratos de Venda', HiOutlineBanknotes) : null
       ]);
     }
 
@@ -424,8 +436,14 @@ export default function Layout() {
     businessAdmin,
     bibliotecaAccess,
     comercialAccess,
+    comercialContratosAccess,
+    comercialEmpreendimentosAccess,
     comunicacaoAccess,
     comprasAccess,
+    comprasCotacoesAccess,
+    comprasCotacoesManageAccess,
+    comprasPedidosAccess,
+    comprasPedidosCreateAccess,
     contratosAccess,
     financeiroAccess,
     boletosAccess,

@@ -10,7 +10,7 @@ const {
   User
 } = require('../models');
 const { env } = require('../config/env');
-const { canAccessFinanceiro, getFinanceiroObraScopeIds } = require('./authorizationService');
+const { canAccessBoletos, getFinanceiroObraScopeIds } = require('./authorizationService');
 const { registrarEventoSeguranca } = require('./securityLogService');
 
 function createHttpError(statusCode, message) {
@@ -267,9 +267,9 @@ function calcularBoletoCaixa(titulo) {
   };
 }
 
-async function assertFinanceAccess(req) {
-  if (!(await canAccessFinanceiro(req.user))) {
-    throw createHttpError(403, 'Acesso negado ao modulo financeiro');
+async function assertBoletoAccess(req) {
+  if (!(await canAccessBoletos(req.user))) {
+    throw createHttpError(403, 'Acesso negado ao modulo de boletos');
   }
 }
 
@@ -515,7 +515,7 @@ function buildBoletoPdfBuffer(detalhe) {
 }
 
 async function carregarTituloBoleto(req, tituloId, { comercialObrigatorio = false } = {}) {
-  await assertFinanceAccess(req);
+  await assertBoletoAccess(req);
   const titulo = await TituloFinanceiro.findByPk(tituloId, {
     include: buildTituloBoletoInclude({ comercialObrigatorio })
   });
@@ -527,7 +527,7 @@ async function carregarTituloBoleto(req, tituloId, { comercialObrigatorio = fals
 }
 
 async function listarTitulosBoleto(req, filters = {}) {
-  await assertFinanceAccess(req);
+  await assertBoletoAccess(req);
   const origem = String(filters.origem || 'COMERCIAL').toUpperCase();
   const where = {
     tipo: 'RECEBER',

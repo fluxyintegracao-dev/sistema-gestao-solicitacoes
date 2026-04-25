@@ -146,11 +146,16 @@ const {
 } = require('./validators/financialValidators');
 const { env } = require('./config/env');
 const {
+  canAccessBoletos,
   canAccessProvisoes,
   canCreateProvisoes,
   canAccessFinanceiro,
   canAccessComprovantes,
+  canCreateComercialContratos,
   canExportCrmLeads,
+  canGenerateBoletos,
+  canManageComercialContratos,
+  canManageComercialEmpreendimentos,
   canRedistributeCrmLeads,
   canEditProvisoes,
   canEditRhDpApuracao,
@@ -164,6 +169,8 @@ const {
   canRetryIntegracaoSienge,
   canViewProvisoes,
   canViewProvisoesDashboard,
+  canViewComercialContratos,
+  canViewComercialEmpreendimentos,
   canViewIntegracaoSienge,
   canViewRhDpApuracao,
   canViewRhDpColaboradores,
@@ -355,6 +362,69 @@ const allowFinanceiro = permit({
     (await canAccessFinanceiro(req.user))
       ? true
       : 'Acesso negado para o modulo financeiro'
+  )
+});
+
+const allowBoletosRead = permit({
+  resource: 'BOLETOS',
+  custom: async (req) => (
+    (await canAccessBoletos(req.user))
+      ? true
+      : 'Acesso negado para boletos'
+  )
+});
+
+const allowBoletosGenerate = permit({
+  resource: 'BOLETOS',
+  custom: async (req) => (
+    (await canGenerateBoletos(req.user))
+      ? true
+      : 'Acesso negado para gerar boletos'
+  )
+});
+
+const allowComercialEmpreendimentosRead = permit({
+  resource: 'COMERCIAL',
+  custom: async (req) => (
+    (await canViewComercialEmpreendimentos(req.user))
+      ? true
+      : 'Acesso negado para empreendimentos comerciais'
+  )
+});
+
+const allowComercialEmpreendimentosManage = permit({
+  resource: 'COMERCIAL',
+  custom: async (req) => (
+    (await canManageComercialEmpreendimentos(req.user))
+      ? true
+      : 'Acesso negado para gerenciar empreendimentos comerciais'
+  )
+});
+
+const allowComercialContratosRead = permit({
+  resource: 'COMERCIAL',
+  custom: async (req) => (
+    (await canViewComercialContratos(req.user))
+      ? true
+      : 'Acesso negado para contratos comerciais'
+  )
+});
+
+const allowComercialContratosCreate = permit({
+  resource: 'COMERCIAL',
+  custom: async (req) => (
+    (await canCreateComercialContratos(req.user))
+      ? true
+      : 'Acesso negado para criar contratos comerciais'
+  )
+});
+
+const allowComercialContratosManage = permit({
+  resource: 'COMERCIAL',
+  custom: async (req) => (
+    (await canManageComercialContratos(req.user))
+      ? true
+      : 'Acesso negado para gerenciar contratos comerciais'
   )
 });
 
@@ -710,23 +780,23 @@ router.patch('/parceiros/:id', allowBusinessAdmin, validateRequest({ params: val
 // -------------------------------------------------------------------
 // COMERCIAL
 // -------------------------------------------------------------------
-router.get('/comercial/empreendimentos', allowBusinessAdmin, validateRequest({ query: validateComercialEmpreendimentoQuery }), ComercialEmpreendimentoController.index);
-router.post('/comercial/empreendimentos', allowBusinessAdmin, criticalRateLimit, validateRequest({ body: validateComercialEmpreendimentoCreateBody }), ComercialEmpreendimentoController.create);
-router.patch('/comercial/empreendimentos/:id', allowBusinessAdmin, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Empreendimento'), body: validateComercialEmpreendimentoUpdateBody }), ComercialEmpreendimentoController.update);
-router.get('/comercial/unidades', allowBusinessAdmin, validateRequest({ query: validateComercialUnidadeQuery }), ComercialUnidadeController.index);
-router.post('/comercial/unidades', allowBusinessAdmin, criticalRateLimit, validateRequest({ body: validateComercialUnidadeCreateBody }), ComercialUnidadeController.create);
-router.patch('/comercial/unidades/:id', allowBusinessAdmin, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Unidade comercial'), body: validateComercialUnidadeUpdateBody }), ComercialUnidadeController.update);
-router.get('/comercial/tabelas-preco', allowBusinessAdmin, validateRequest({ query: validateComercialTabelaPrecoQuery }), ComercialTabelaPrecoController.index);
-router.post('/comercial/tabelas-preco', allowBusinessAdmin, criticalRateLimit, validateRequest({ body: validateComercialTabelaPrecoCreateBody }), ComercialTabelaPrecoController.create);
-router.patch('/comercial/tabelas-preco/:id', allowBusinessAdmin, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Tabela de preco comercial'), body: validateComercialTabelaPrecoUpdateBody }), ComercialTabelaPrecoController.update);
-router.post('/comercial/tabelas-preco/:id/ativar', allowBusinessAdmin, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Tabela de preco comercial') }), ComercialTabelaPrecoController.ativar);
-router.get('/comercial/contratos', allowBusinessAdmin, validateRequest({ query: validateComercialContratoQuery }), ComercialContratoController.index);
-router.get('/comercial/contratos/:id', allowBusinessAdmin, validateRequest({ params: validateNumericIdParam('id', 'Contrato comercial') }), ComercialContratoController.show);
-router.post('/comercial/contratos', allowBusinessAdmin, criticalRateLimit, validateRequest({ body: validateComercialContratoCreateBody }), ComercialContratoController.create);
-router.patch('/comercial/contratos/:id', allowBusinessAdmin, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Contrato comercial'), body: validateComercialContratoUpdateBody }), ComercialContratoController.update);
-router.post('/comercial/contratos/:id/distrato', allowBusinessAdmin, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Contrato comercial'), body: validateComercialContratoDistratoBody }), ComercialContratoController.distratar);
-router.post('/comercial/contratos/:id/troca-unidade', allowBusinessAdmin, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Contrato comercial'), body: validateComercialContratoTrocaUnidadeBody }), ComercialContratoController.trocarUnidade);
-router.post('/comercial/contratos/:id/sincronizar-status-financeiro', allowBusinessAdmin, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Contrato comercial') }), ComercialContratoController.sincronizarStatusFinanceiro);
+router.get('/comercial/empreendimentos', allowComercialEmpreendimentosRead, validateRequest({ query: validateComercialEmpreendimentoQuery }), ComercialEmpreendimentoController.index);
+router.post('/comercial/empreendimentos', allowComercialEmpreendimentosManage, criticalRateLimit, validateRequest({ body: validateComercialEmpreendimentoCreateBody }), ComercialEmpreendimentoController.create);
+router.patch('/comercial/empreendimentos/:id', allowComercialEmpreendimentosManage, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Empreendimento'), body: validateComercialEmpreendimentoUpdateBody }), ComercialEmpreendimentoController.update);
+router.get('/comercial/unidades', allowComercialEmpreendimentosRead, validateRequest({ query: validateComercialUnidadeQuery }), ComercialUnidadeController.index);
+router.post('/comercial/unidades', allowComercialEmpreendimentosManage, criticalRateLimit, validateRequest({ body: validateComercialUnidadeCreateBody }), ComercialUnidadeController.create);
+router.patch('/comercial/unidades/:id', allowComercialEmpreendimentosManage, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Unidade comercial'), body: validateComercialUnidadeUpdateBody }), ComercialUnidadeController.update);
+router.get('/comercial/tabelas-preco', allowComercialEmpreendimentosRead, validateRequest({ query: validateComercialTabelaPrecoQuery }), ComercialTabelaPrecoController.index);
+router.post('/comercial/tabelas-preco', allowComercialEmpreendimentosManage, criticalRateLimit, validateRequest({ body: validateComercialTabelaPrecoCreateBody }), ComercialTabelaPrecoController.create);
+router.patch('/comercial/tabelas-preco/:id', allowComercialEmpreendimentosManage, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Tabela de preco comercial'), body: validateComercialTabelaPrecoUpdateBody }), ComercialTabelaPrecoController.update);
+router.post('/comercial/tabelas-preco/:id/ativar', allowComercialEmpreendimentosManage, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Tabela de preco comercial') }), ComercialTabelaPrecoController.ativar);
+router.get('/comercial/contratos', allowComercialContratosRead, validateRequest({ query: validateComercialContratoQuery }), ComercialContratoController.index);
+router.get('/comercial/contratos/:id', allowComercialContratosRead, validateRequest({ params: validateNumericIdParam('id', 'Contrato comercial') }), ComercialContratoController.show);
+router.post('/comercial/contratos', allowComercialContratosCreate, criticalRateLimit, validateRequest({ body: validateComercialContratoCreateBody }), ComercialContratoController.create);
+router.patch('/comercial/contratos/:id', allowComercialContratosManage, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Contrato comercial'), body: validateComercialContratoUpdateBody }), ComercialContratoController.update);
+router.post('/comercial/contratos/:id/distrato', allowComercialContratosManage, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Contrato comercial'), body: validateComercialContratoDistratoBody }), ComercialContratoController.distratar);
+router.post('/comercial/contratos/:id/troca-unidade', allowComercialContratosManage, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Contrato comercial'), body: validateComercialContratoTrocaUnidadeBody }), ComercialContratoController.trocarUnidade);
+router.post('/comercial/contratos/:id/sincronizar-status-financeiro', allowComercialContratosManage, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Contrato comercial') }), ComercialContratoController.sincronizarStatusFinanceiro);
 
 // -------------------------------------------------------------------
 // PROVISIONAMENTO FINANCEIRO
@@ -815,12 +885,12 @@ router.get('/financeiro/titulos/:id/auditoria', allowFinanceiro, validateRequest
 router.patch('/financeiro/titulos/:id/cobranca', allowFinanceiro, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Titulo financeiro'), body: validateFinanceTituloCobrancaBody }), TituloFinanceiroController.atualizarCobranca);
 router.post('/financeiro/titulos/:id/baixas', allowFinanceiro, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Titulo financeiro'), body: validateFinanceTituloBaixaBody }), TituloFinanceiroController.baixar);
 router.post('/financeiro/titulos/:id/movimentos/:movimentoId/estornar', allowFinanceiro, criticalRateLimit, validateRequest({ params: validateFinanceTituloMovimentoParams, body: validateFinanceTituloEstornoBody }), TituloFinanceiroController.estornarMovimento);
-router.get('/boletos/config', allowFinanceiro, BoletoController.config);
-router.get('/boletos/titulos', allowFinanceiro, validateRequest({ query: validateFinanceBoletoTituloQuery }), BoletoController.titulos);
-router.get('/boletos/titulos/:id', allowFinanceiro, validateRequest({ params: validateNumericIdParam('id', 'Titulo financeiro') }), BoletoController.show);
-router.get('/boletos/titulos/:id/pdf', allowFinanceiro, validateRequest({ params: validateNumericIdParam('id', 'Titulo financeiro') }), BoletoController.pdf);
-router.post('/boletos/titulos/:id/amostra', allowFinanceiro, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Titulo financeiro') }), BoletoController.amostra);
-router.post('/boletos/titulos/:id/gerar', allowFinanceiro, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Titulo financeiro') }), BoletoController.gerar);
+router.get('/boletos/config', allowBoletosRead, BoletoController.config);
+router.get('/boletos/titulos', allowBoletosRead, validateRequest({ query: validateFinanceBoletoTituloQuery }), BoletoController.titulos);
+router.get('/boletos/titulos/:id', allowBoletosRead, validateRequest({ params: validateNumericIdParam('id', 'Titulo financeiro') }), BoletoController.show);
+router.get('/boletos/titulos/:id/pdf', allowBoletosRead, validateRequest({ params: validateNumericIdParam('id', 'Titulo financeiro') }), BoletoController.pdf);
+router.post('/boletos/titulos/:id/amostra', allowBoletosGenerate, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Titulo financeiro') }), BoletoController.amostra);
+router.post('/boletos/titulos/:id/gerar', allowBoletosGenerate, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Titulo financeiro') }), BoletoController.gerar);
 router.get('/financeiro/contas-bancarias', allowFinanceiro, ContaBancariaController.index);
 router.post('/financeiro/contas-bancarias', allowFinanceiro, criticalRateLimit, validateRequest({ body: validateFinanceCadastroContaBody }), ContaBancariaController.create);
 router.patch('/financeiro/contas-bancarias/:id', allowFinanceiro, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Conta bancaria'), body: validateFinanceCadastroContaBody }), ContaBancariaController.update);
@@ -871,7 +941,7 @@ router.post('/compras/solicitacoes/:id/enviar', validateRequest({ params: valida
 router.patch('/compras/solicitacoes/:id/encerrar', validateRequest({ params: validateNumericIdParam('id', 'Solicitacao de compra'), body: validateCompraEncerrarBody }), requireCompraAccess, SolicitacaoCompraController.encerrar);
 router.post('/compras/solicitacoes/:id/pedidos', criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Solicitacao de compra'), body: validateCompraPedidoCreateBody }), requireCompraAccess, PedidoCompraController.createFromSolicitacao);
 router.get('/compras/pedidos', validateRequest({ query: validateCompraPedidoQuery }), scopeCompraListAccess, PedidoCompraController.index);
-router.get('/compras/relatorios/auditoria-itens-pedido', allowBusinessAdmin, validateRequest({ query: validateCompraPedidoAuditoriaQuery }), scopeCompraListAccess, PedidoCompraController.auditoria);
+router.get('/compras/relatorios/auditoria-itens-pedido', validateRequest({ query: validateCompraPedidoAuditoriaQuery }), scopeCompraListAccess, PedidoCompraController.auditoria);
 router.get('/compras/pedidos/:id', validateRequest({ params: validateNumericIdParam('id', 'Pedido de compra') }), requirePedidoCompraAccess, PedidoCompraController.show);
 router.post('/compras/pedidos/:id/itens', criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Pedido de compra'), body: validateCompraPedidoItemAddBody }), requirePedidoCompraAccess, PedidoCompraController.addItem);
 router.patch('/compras/pedidos/:id/status', criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Pedido de compra'), body: validateCompraPedidoStatusBody }), requirePedidoCompraAccess, PedidoCompraController.updateStatus);

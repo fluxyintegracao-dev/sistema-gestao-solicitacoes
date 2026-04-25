@@ -11,7 +11,6 @@ const {
   FornecedorCompra,
   PedidoCompra,
   PedidoCompraItem,
-  Setor,
   Solicitacao,
   SolicitacaoCompra,
   SolicitacaoCompraFornecedor,
@@ -45,7 +44,11 @@ const {
   validarRateiosPayload
 } = require('../services/compraApropriacao');
 const { getRuntimeInstallationConfig } = require('../services/runtimeConfig');
-const { isBusinessAdmin } = require('../services/authorizationService');
+const {
+  canAccessCompras,
+  canManageComprasCotacoes,
+  isBusinessAdmin
+} = require('../services/authorizationService');
 const PDF_PAGE = {
   left: 20,
   top: 12,
@@ -91,14 +94,6 @@ function getPdfLogoPath() {
   ];
 
   return candidates.find((candidate) => fs.existsSync(candidate)) || null;
-}
-
-function normalizeText(value) {
-  return String(value || '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .trim()
-    .toUpperCase();
 }
 
 function formatDate(date) {
@@ -291,17 +286,7 @@ async function validarAcesso(req, res) {
     return null;
   }
 
-  const perfil = normalizeText(usuario.perfil);
-  const tokens = await obterTokensSetorUsuario(usuario);
-  const possuiPermissao =
-    isBusinessAdmin(usuario) ||
-    Boolean(usuario.pode_criar_solicitacao_compra) ||
-    tokens.has('COMPRAS') ||
-    tokens.has('GEO') ||
-    tokens.has('GERENCIA DE PROCESSOS') ||
-    tokens.has('GESTAO DE PROCESSOS') ||
-    tokens.has('GERENCIA_PROCESSOS') ||
-    tokens.has('GESTAO_PROCESSOS');
+  const possuiPermissao = await canAccessCompras(usuario);
 
   if (!possuiPermissao) {
     res.status(403).json({ error: 'Acesso negado ao modulo de compras' });
@@ -311,32 +296,12 @@ async function validarAcesso(req, res) {
   return usuario;
 }
 
-async function obterTokensSetorUsuario(usuario) {
-  const tokens = new Set([
-    normalizeText(usuario?.perfil),
-    normalizeText(usuario?.area),
-    normalizeText(usuario?.setor?.codigo),
-    normalizeText(usuario?.setor?.nome)
-  ].filter(Boolean));
-
-  if (usuario?.setor_id) {
-    const setor = await Setor.findByPk(usuario.setor_id, {
-      attributes: ['codigo', 'nome']
-    });
-
-    if (setor?.codigo) tokens.add(normalizeText(setor.codigo));
-    if (setor?.nome) tokens.add(normalizeText(setor.nome));
-  }
-
-  return tokens;
-}
-
 async function validarAcessoIntegracao(usuario) {
   return isBusinessAdmin(usuario) || userHasSetorCapability(usuario, 'eh_setor_geo');
 }
 
 async function validarAcessoCompras(usuario) {
-  return isBusinessAdmin(usuario) || userHasSetorCapability(usuario, 'eh_setor_compras');
+  return canManageComprasCotacoes(usuario);
 }
 
 async function buscarTipoSolicitacaoCompra(transaction) {

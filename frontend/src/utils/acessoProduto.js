@@ -80,6 +80,16 @@ export function canAccessPrioridadesDiretoria(user) {
 export function canAccessCompras(user) {
   if (!hasEnabledModule(user, 'COMPRAS')) return false;
   if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasAnyPermissao(user, [
+      'compras.pedidos.visualizar',
+      'compras.pedidos.criar',
+      'compras.pedidos.aprovar',
+      'compras.pedidos.auditoria',
+      'compras.cotacoes.visualizar',
+      'compras.cotacoes.gerenciar'
+    ]);
+  }
 
   return (
     Boolean(user?.pode_criar_solicitacao_compra) ||
@@ -90,12 +100,72 @@ export function canAccessCompras(user) {
 
 export function canManageComprasPedidos(user) {
   if (!hasEnabledModule(user, 'COMPRAS')) return false;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasAnyPermissao(user, [
+      'compras.pedidos.criar',
+      'compras.pedidos.aprovar'
+    ]);
+  }
   return isBusinessAdmin(user) || userHasSetorCapability(user, 'eh_setor_compras');
+}
+
+export function canViewComprasPedidos(user) {
+  if (!hasEnabledModule(user, 'COMPRAS')) return false;
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasAnyPermissao(user, [
+      'compras.pedidos.visualizar',
+      'compras.pedidos.criar',
+      'compras.pedidos.aprovar',
+      'compras.pedidos.auditoria'
+    ]);
+  }
+  return canAccessCompras(user);
+}
+
+export function canCreateComprasPedidos(user) {
+  return canManageComprasPedidos(user);
+}
+
+export function canViewComprasCotacoes(user) {
+  if (!hasEnabledModule(user, 'COMPRAS')) return false;
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasAnyPermissao(user, [
+      'compras.cotacoes.visualizar',
+      'compras.cotacoes.gerenciar'
+    ]);
+  }
+  return canAccessCompras(user);
+}
+
+export function canManageComprasCotacoes(user) {
+  if (!hasEnabledModule(user, 'COMPRAS')) return false;
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasPermissao(user, 'compras.cotacoes.gerenciar');
+  }
+  return userHasSetorCapability(user, 'eh_setor_compras');
 }
 
 export function canAccessFinanceiro(user) {
   if (!hasEnabledModule(user, 'FINANCEIRO')) return false;
   if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasAnyPermissao(user, [
+      'financeiro.titulos.visualizar',
+      'financeiro.titulos.criar',
+      'financeiro.titulos.baixar',
+      'financeiro.titulos.estornar',
+      'financeiro.relatorios.visualizar',
+      'financeiro.relatorios.resultado_obras',
+      'financeiro.conciliacao.visualizar',
+      'financeiro.conciliacao.importar',
+      'financeiro.conciliacao.conciliar',
+      'financeiro.cadastros.visualizar',
+      'financeiro.cadastros.gerenciar'
+    ]);
+  }
 
   return (
     Boolean(user?.financeiro_liberado) ||
@@ -106,27 +176,81 @@ export function canAccessFinanceiro(user) {
 
 export function canAccessBoletos(user) {
   if (!hasEnabledModule(user, 'BOLETOS')) return false;
-  if (!canAccessFinanceiro(user)) return false;
-  return hasPermissao(user, 'boletos.emitir.visualizar') || hasPermissao(user, 'boletos.emitir.gerar');
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasAnyPermissao(user, [
+      'boletos.emitir.visualizar',
+      'boletos.emitir.gerar'
+    ]);
+  }
+  return canAccessFinanceiro(user) && (
+    hasPermissao(user, 'boletos.emitir.visualizar') ||
+    hasPermissao(user, 'boletos.emitir.gerar')
+  );
 }
 
 export function canAccessCadastroObras(user) {
-  return isBusinessAdmin(user);
+  if (!hasEnabledModule(user, 'OBRAS')) return false;
+  if (isBusinessAdmin(user)) return true;
+  return hasAnyExplicitPermissao(user, [
+    'obras.cadastro.visualizar',
+    'obras.cadastro.gerenciar'
+  ]);
 }
 
 export function canAccessGestaoObras(user) {
-  return hasEnabledModule(user, 'OBRAS') && canAccessCadastroObras(user);
+  if (!hasEnabledModule(user, 'OBRAS')) return false;
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasAnyPermissao(user, [
+      'obras.gestao.visualizar',
+      'obras.gestao.apropriacoes'
+    ]);
+  }
+  return canAccessCadastroObras(user);
 }
 
 export function canAccessContratos(user) {
   if (!hasEnabledModule(user, 'CONTRATOS')) return false;
   if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasAnyPermissao(user, [
+      'contratos.geral.visualizar',
+      'contratos.geral.criar',
+      'contratos.geral.editar'
+    ]);
+  }
   return isAdminGeo(user) || userHasSetorCapability(user, 'eh_setor_obra');
 }
 
 export function canAccessComercial(user) {
   if (!hasEnabledModule(user, 'COMERCIAL')) return false;
-  return isBusinessAdmin(user);
+  if (isBusinessAdmin(user)) return true;
+  return hasAnyExplicitPermissao(user, [
+    'comercial.empreendimentos.visualizar',
+    'comercial.empreendimentos.gerenciar',
+    'comercial.vendas.visualizar',
+    'comercial.vendas.criar',
+    'comercial.vendas.contratos'
+  ]);
+}
+
+export function canViewComercialEmpreendimentos(user) {
+  if (!hasEnabledModule(user, 'COMERCIAL')) return false;
+  if (isBusinessAdmin(user)) return true;
+  return hasAnyExplicitPermissao(user, [
+    'comercial.empreendimentos.visualizar',
+    'comercial.empreendimentos.gerenciar'
+  ]);
+}
+
+export function canViewComercialContratos(user) {
+  if (!hasEnabledModule(user, 'COMERCIAL')) return false;
+  if (isBusinessAdmin(user)) return true;
+  return hasAnyExplicitPermissao(user, [
+    'comercial.vendas.visualizar',
+    'comercial.vendas.criar',
+    'comercial.vendas.contratos'
+  ]);
 }
 
 export function canAccessRhDp(user) {
@@ -277,11 +401,27 @@ export function canManageProvisionamentoCategorias(user) {
 }
 
 export function canAccessBiblioteca(user) {
-  return hasEnabledModule(user, 'BIBLIOTECA_MODELOS');
+  if (!hasEnabledModule(user, 'BIBLIOTECA_MODELOS')) return false;
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasAnyPermissao(user, [
+      'biblioteca.geral.visualizar',
+      'biblioteca.geral.gerenciar'
+    ]);
+  }
+  return true;
 }
 
 export function canAccessComunicacao(user) {
-  return hasEnabledModule(user, 'COMUNICACAO_INTERNA');
+  if (!hasEnabledModule(user, 'COMUNICACAO_INTERNA')) return false;
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasAnyPermissao(user, [
+      'comunicacao.geral.visualizar',
+      'comunicacao.geral.enviar'
+    ]);
+  }
+  return true;
 }
 
 const CRM_PERFIS = ['SUPERADMIN', 'ADMIN', 'ADMINISTRADOR', 'ADMIN_CRM', 'GESTOR_COMERCIAL', 'COORDENADOR_CRM', 'DIRETORIA'];
@@ -322,4 +462,19 @@ export function hasPermissao(user, permKey) {
   // Sem configuração = acesso completo (compatibilidade com instalações existentes)
   if (!Array.isArray(lista) || lista.length === 0) return true;
   return lista.includes(String(permKey).toLowerCase());
+}
+
+export function hasConfiguredAreaPermissions(user) {
+  const lista = user?.areas_permissoes;
+  return Array.isArray(lista) && lista.length > 0;
+}
+
+export function hasAnyPermissao(user, permKeys = []) {
+  return (Array.isArray(permKeys) ? permKeys : []).some((permKey) => hasPermissao(user, permKey));
+}
+
+export function hasAnyExplicitPermissao(user, permKeys = []) {
+  if (isBusinessAdmin(user)) return true;
+  if (!hasConfiguredAreaPermissions(user)) return false;
+  return hasAnyPermissao(user, permKeys);
 }
