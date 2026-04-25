@@ -10,6 +10,8 @@ import {
 } from '../services/financeiro';
 import { getEmpreendimentosComerciais } from '../services/comercial';
 import { buscarParceiros } from '../services/parceiros';
+import { useAuth } from '../contexts/AuthContext';
+import { hasEnabledModule } from '../utils/acessoProduto';
 
 const STATUS_OPTIONS = [
   { value: '', label: 'Todos elegiveis' },
@@ -268,6 +270,8 @@ function BoletoPrintView({ detalhe }) {
 }
 
 export default function FinanceiroBoletos() {
+  const { user } = useAuth();
+  const comercialHabilitado = hasEnabledModule(user, 'COMERCIAL', { allowSuperadminBypass: false });
   const [config, setConfig] = useState(null);
   const [empreendimentos, setEmpreendimentos] = useState([]);
   const [clientes, setClientes] = useState([]);
@@ -292,11 +296,18 @@ export default function FinanceiroBoletos() {
     try {
       setLoading(true);
       setError('');
+      const boletoFilters = { ...filters };
+
+      if (!comercialHabilitado) {
+        delete boletoFilters.empreendimento_id;
+        boletoFilters.origem = 'MANUAL';
+      }
+
       const [configData, empreendimentosData, clientesData, titulosData] = await Promise.all([
         getBoletosConfig(),
-        getEmpreendimentosComerciais(),
+        comercialHabilitado ? getEmpreendimentosComerciais() : Promise.resolve([]),
         buscarParceiros({ cliente: 1, ativo: 1, limit: 500 }),
-        getTitulosParaBoleto(filters)
+        getTitulosParaBoleto(boletoFilters)
       ]);
       setConfig(configData);
       setEmpreendimentos(Array.isArray(empreendimentosData) ? empreendimentosData : []);
@@ -317,6 +328,22 @@ export default function FinanceiroBoletos() {
   useEffect(() => {
     carregar();
   }, []);
+
+  useEffect(() => {
+    if (comercialHabilitado) return;
+
+    setFilters((current) => {
+      if (!current.empreendimento_id && current.origem !== 'COMERCIAL') {
+        return current;
+      }
+
+      return {
+        ...current,
+        empreendimento_id: '',
+        origem: current.origem === 'COMERCIAL' ? 'TODOS' : current.origem
+      };
+    });
+  }, [comercialHabilitado]);
 
   const resumo = useMemo(() => titulos.reduce((acc, item) => {
     acc.total += 1;
@@ -449,7 +476,9 @@ export default function FinanceiroBoletos() {
           <div>
             <h1 className="text-xl font-semibold md:text-2xl">Geracao de boletos</h1>
             <p className="page-subtitle">
-              Emissao Caixa SIGCB a partir dos titulos a receber comerciais ou manuais.
+              {comercialHabilitado
+                ? 'Emissao Caixa SIGCB a partir dos titulos a receber comerciais ou manuais.'
+                : 'Emissao Caixa SIGCB a partir dos titulos a receber manuais.'}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -509,7 +538,7 @@ export default function FinanceiroBoletos() {
           <button type="button" className="btn btn-outline btn-sm" onClick={carregar}>Aplicar filtros</button>
         </div>
 
-        <div className="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_220px_220px]">
+        <div className={`mt-4 grid gap-3 ${comercialHabilitado ? 'md:grid-cols-[minmax(0,1fr)_220px_220px]' : 'md:grid-cols-[minmax(0,1fr)_220px]'}`}>
           <label className="sol-filter-field">
             <span className="sol-filter-label">Busca</span>
             <input
@@ -519,21 +548,23 @@ export default function FinanceiroBoletos() {
               placeholder="Documento, descricao, nosso numero ou linha digitavel"
             />
           </label>
-          <label className="sol-filter-field">
-            <span className="sol-filter-label">Empreendimento</span>
-            <select
-              className="input w-full"
-              value={filters.empreendimento_id}
-              onChange={(event) => setFilters((current) => ({ ...current, empreendimento_id: event.target.value }))}
-            >
-              <option value="">Todos</option>
-              {empreendimentos.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.codigo ? `${item.codigo} - ${item.nome}` : item.nome}
-                </option>
-              ))}
-            </select>
-          </label>
+          {comercialHabilitado && (
+            <label className="sol-filter-field">
+              <span className="sol-filter-label">Empreendimento</span>
+              <select
+                className="input w-full"
+                value={filters.empreendimento_id}
+                onChange={(event) => setFilters((current) => ({ ...current, empreendimento_id: event.target.value }))}
+              >
+                <option value="">Todos</option>
+                {empreendimentos.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.codigo ? `${item.codigo} - ${item.nome}` : item.nome}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           <label className="sol-filter-field">
             <span className="sol-filter-label">Cliente</span>
             <select
@@ -551,7 +582,7 @@ export default function FinanceiroBoletos() {
           </label>
         </div>
 
-        <div className="mt-3 grid gap-3 md:grid-cols-[220px_220px_minmax(0,1fr)]">
+        <div className={`mt-3 grid gap-3 ${comercialHabilitado ? 'md:grid-cols-[220px_220px_minmax(0,1fr)]' : 'md:grid-cols-[220px_minmax(0,1fr)]'}`}>
           <label className="sol-filter-field">
             <span className="sol-filter-label">Status cobranca</span>
             <select
@@ -564,22 +595,24 @@ export default function FinanceiroBoletos() {
               ))}
             </select>
           </label>
-          <label className="sol-filter-field">
-            <span className="sol-filter-label">Origem</span>
-            <select
-              className="input w-full"
-              value={filters.origem}
-              onChange={(event) => setFilters((current) => ({
-                ...current,
-                origem: event.target.value,
-                empreendimento_id: event.target.value === 'MANUAL' ? '' : current.empreendimento_id
-              }))}
-            >
-              <option value="TODOS">Todos</option>
-              <option value="COMERCIAL">Contratos de venda</option>
-              <option value="MANUAL">Manual</option>
-            </select>
-          </label>
+          {comercialHabilitado && (
+            <label className="sol-filter-field">
+              <span className="sol-filter-label">Origem</span>
+              <select
+                className="input w-full"
+                value={filters.origem}
+                onChange={(event) => setFilters((current) => ({
+                  ...current,
+                  origem: event.target.value,
+                  empreendimento_id: event.target.value === 'MANUAL' ? '' : current.empreendimento_id
+                }))}
+              >
+                <option value="TODOS">Todos</option>
+                <option value="COMERCIAL">Contratos de venda</option>
+                <option value="MANUAL">Manual</option>
+              </select>
+            </label>
+          )}
         </div>
       </section>
 
@@ -587,7 +620,11 @@ export default function FinanceiroBoletos() {
         <div className="sol-filtros-head">
           <div>
             <p className="sol-filtros-title">Titulos para boleto</p>
-            <p className="sol-filtros-subtitle">Contas a receber comerciais ou manuais com saldo em aberto.</p>
+            <p className="sol-filtros-subtitle">
+              {comercialHabilitado
+                ? 'Contas a receber comerciais ou manuais com saldo em aberto.'
+                : 'Contas a receber manuais com saldo em aberto.'}
+            </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <span className="sol-filtros-meta">Selecionados {selecionados.length}</span>
@@ -630,8 +667,8 @@ export default function FinanceiroBoletos() {
                     </th>
                     <th className="px-4 py-3">Titulo</th>
                     <th className="px-4 py-3">Cliente</th>
-                    <th className="px-4 py-3">Origem</th>
-                    <th className="px-4 py-3">Empreendimento</th>
+                    {comercialHabilitado && <th className="px-4 py-3">Origem</th>}
+                    {comercialHabilitado && <th className="px-4 py-3">Empreendimento</th>}
                     <th className="px-4 py-3">Vencimento</th>
                     <th className="px-4 py-3 text-right">Saldo</th>
                     <th className="px-4 py-3">Status</th>
@@ -658,12 +695,16 @@ export default function FinanceiroBoletos() {
                         <p className="mt-1 max-w-[340px] text-xs text-[var(--c-muted)]">{titulo.descricao}</p>
                       </td>
                       <td className="px-4 py-3 text-[var(--c-text)]">{titulo.parceiro?.nome || '-'}</td>
-                      <td className="px-4 py-3 text-[var(--c-muted)]">
-                        {titulo.parcelasComerciais?.length ? 'Comercial' : 'Manual'}
-                      </td>
-                      <td className="px-4 py-3 text-[var(--c-muted)]">
-                        {titulo.parcelasComerciais?.[0]?.contrato?.empreendimento?.nome || '-'}
-                      </td>
+                      {comercialHabilitado && (
+                        <td className="px-4 py-3 text-[var(--c-muted)]">
+                          {titulo.parcelasComerciais?.length ? 'Comercial' : 'Manual'}
+                        </td>
+                      )}
+                      {comercialHabilitado && (
+                        <td className="px-4 py-3 text-[var(--c-muted)]">
+                          {titulo.parcelasComerciais?.[0]?.contrato?.empreendimento?.nome || '-'}
+                        </td>
+                      )}
                       <td className="px-4 py-3 text-[var(--c-text)]">{formatDate(titulo.data_vencimento)}</td>
                       <td className="px-4 py-3 text-right font-semibold text-[var(--c-text)]">{formatCurrency(titulo.valor_saldo)}</td>
                       <td className="px-4 py-3">

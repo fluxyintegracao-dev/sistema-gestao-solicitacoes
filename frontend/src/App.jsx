@@ -531,7 +531,7 @@ export default function App() {
         <Route path="usuarios-permissoes-rh-dp" element={<BusinessAdminRoute><UsuariosPermissoesRhDp /></BusinessAdminRoute>} />
         <Route path="permissoes-areas" element={<BusinessAdminRoute><PermissoesAreas /></BusinessAdminRoute>} />
         <Route path="arquivos-modelos-config" element={<SuperadminRoute><ArquivosModelosConfig /></SuperadminRoute>} />
-        <Route path="configuracoes-cotacao" element={<EnabledModuleRoute moduleKey="COMPRAS"><BusinessAdminRoute><ConfiguracoesCotacao /></BusinessAdminRoute></EnabledModuleRoute>} />
+        <Route path="configuracoes-cotacao" element={<EnabledModuleRoute moduleKey="COMPRAS"><EnabledModuleRoute moduleKey="COTACOES"><BusinessAdminRoute><ConfiguracoesCotacao /></BusinessAdminRoute></EnabledModuleRoute></EnabledModuleRoute>} />
         <Route path="configuracoes-status-pedidos-compra" element={<EnabledModuleRoute moduleKey="COMPRAS"><BusinessAdminRoute><ConfiguracoesStatusPedidoCompra /></BusinessAdminRoute></EnabledModuleRoute>} />
         <Route path="configuracoes-comercial-categorias" element={<EnabledModuleRoute moduleKey="COMERCIAL"><SuperadminRoute><ConfiguracoesComercialCategorias /></SuperadminRoute></EnabledModuleRoute>} />
         <Route path="configuracoes-modulos" element={<SuperadminRoute><ConfiguracoesModulos /></SuperadminRoute>} />

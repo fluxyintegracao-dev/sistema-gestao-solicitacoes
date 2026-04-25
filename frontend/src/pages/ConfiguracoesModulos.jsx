@@ -1,7 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { getModulosSistema, salvarModulosSistema } from '../services/configuracoesSistema';
-import { getModuleGovernance, MODULE_GOVERNANCE } from '../constants/moduleGovernance';
+import {
+  getModuleDependencyLabels,
+  getModuleDependents,
+  getModuleGovernance,
+  MODULE_GOVERNANCE,
+  toggleModuleWithDependencies
+} from '../constants/moduleGovernance';
 
 export default function ConfiguracoesModulos() {
   const { updateUser } = useAuth();
@@ -44,16 +50,7 @@ export default function ConfiguracoesModulos() {
   );
 
   function toggleModule(targetKey) {
-    setModules((current) => current.map((item) => {
-      if (item.key !== targetKey || item.locked) {
-        return item;
-      }
-
-      return {
-        ...item,
-        enabled: !item.enabled
-      };
-    }));
+    setModules((current) => toggleModuleWithDependencies(current, targetKey));
   }
 
   async function handleSave() {
@@ -114,6 +111,7 @@ export default function ConfiguracoesModulos() {
               <p className="text-sm text-sky-800">
                 Esta leitura evita ambiguidade comercial e operacional: desligar um modulo deve ocultar menu, rotas e
                 obrigatoriedades ligadas a ele, sem quebrar o fluxo principal quando o acoplamento for opcional.
+                Dependencias comerciais sao aplicadas automaticamente ao ativar ou desativar modulos.
               </p>
             </div>
             <div className="rounded-xl border border-sky-200 bg-white/80 px-3 py-2 text-xs text-sky-700">
@@ -173,6 +171,8 @@ export default function ConfiguracoesModulos() {
               key={item.key}
               item={item}
               governance={getModuleGovernance(item.key)}
+              dependencyLabels={getModuleDependencyLabels(item.key)}
+              dependents={getModuleDependents(item.key)}
               onToggle={toggleModule}
             />
           ))}
@@ -182,13 +182,20 @@ export default function ConfiguracoesModulos() {
   );
 }
 
-function ModuleCard({ item, governance, onToggle }) {
+function ModuleCard({ item, governance, dependencyLabels, dependents, onToggle }) {
+  const requiresAll = dependencyLabels?.requiresAll || [];
+  const requiresAny = dependencyLabels?.requiresAny || [];
+  const dependentLabels = (Array.isArray(dependents) ? dependents : []).map((dependent) => dependent.label);
+
   return (
     <article className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div className="space-y-1">
           <h2 className="text-base font-semibold text-[var(--c-text)]">{item.label}</h2>
           <p className="text-sm text-[var(--c-muted)]">{item.description}</p>
+          {item.packageLabel ? (
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-sky-700">{item.packageLabel}</p>
+          ) : null}
         </div>
         <span
           className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
@@ -211,6 +218,21 @@ function ModuleCard({ item, governance, onToggle }) {
           <p className="mt-2">
             <strong className="text-[var(--c-text)]">Usado em:</strong> {governance.usedIn.join(' | ')}
           </p>
+          {requiresAll.length ? (
+            <p className="mt-2">
+              <strong className="text-[var(--c-text)]">Requer:</strong> {requiresAll.join(' + ')}
+            </p>
+          ) : null}
+          {requiresAny.length ? (
+            <p className="mt-2">
+              <strong className="text-[var(--c-text)]">Requer um destes:</strong> {requiresAny.join(' | ')}
+            </p>
+          ) : null}
+          {dependentLabels.length ? (
+            <p className="mt-2">
+              <strong className="text-[var(--c-text)]">Desligar tambem pode afetar:</strong> {dependentLabels.join(' | ')}
+            </p>
+          ) : null}
         </div>
       )}
 

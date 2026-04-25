@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import {
   canManageIntegracaoSiengeConfig,
-  canRetryIntegracaoSienge
+  canRetryIntegracaoSienge,
+  hasEnabledModule
 } from '../utils/acessoProduto';
 import {
   buscarIntegracaoSiengeCredorParceiro,
@@ -76,6 +77,22 @@ export default function IntegracaoSiengeInicio() {
   const { user } = useAuth();
   const canEditConfig = canManageIntegracaoSiengeConfig(user);
   const canOperateQueue = canRetryIntegracaoSienge(user);
+  const financeiroHabilitado = hasEnabledModule(user, 'FINANCEIRO', { allowSuperadminBypass: false });
+  const rhDpHabilitado = hasEnabledModule(user, 'RH_DP', { allowSuperadminBypass: false });
+  const comercialHabilitado = hasEnabledModule(user, 'COMERCIAL', { allowSuperadminBypass: false });
+  const comprasHabilitado = hasEnabledModule(user, 'COMPRAS', { allowSuperadminBypass: false });
+  const origemModuloOptions = useMemo(() => ([
+    financeiroHabilitado ? { value: 'FINANCEIRO', label: 'Financeiro' } : null,
+    rhDpHabilitado ? { value: 'RH_DP', label: 'RH/DP' } : null,
+    comercialHabilitado ? { value: 'COMERCIAL', label: 'Comercial' } : null,
+    { value: 'SOLICITACOES', label: 'Solicitacoes' },
+    comprasHabilitado ? { value: 'COMPRAS', label: 'Compras' } : null,
+    { value: 'OUTROS', label: 'Outros' }
+  ].filter(Boolean)), [comprasHabilitado, comercialHabilitado, financeiroHabilitado, rhDpHabilitado]);
+  const origemModuloValues = useMemo(
+    () => new Set(origemModuloOptions.map((item) => item.value)),
+    [origemModuloOptions]
+  );
   const [configForm, setConfigForm] = useState(buildInitialConfig(null));
   const [saude, setSaude] = useState(null);
   const [fila, setFila] = useState({ items: [], resumo: {} });
@@ -109,6 +126,21 @@ export default function IntegracaoSiengeInicio() {
   useEffect(() => {
     carregarTudo();
   }, []);
+
+  useEffect(() => {
+    setFiltrosFila((current) => {
+      if (!current.origem_modulo || origemModuloValues.has(current.origem_modulo)) {
+        return current;
+      }
+      return { ...current, origem_modulo: '' };
+    });
+    setEnqueueForm((current) => {
+      if (!current.origem_modulo || origemModuloValues.has(current.origem_modulo)) {
+        return current;
+      }
+      return { ...current, origem_modulo: '' };
+    });
+  }, [origemModuloValues]);
 
   async function carregarTudo(nextFilters = filtrosFila) {
     try {
@@ -351,12 +383,16 @@ export default function IntegracaoSiengeInicio() {
             </p>
           </div>
           <div className="app-page-actions">
-            <Link to="/financeiro/titulos" className="btn btn-outline">
-              Titulos financeiros
-            </Link>
-            <Link to="/rh-dp/fechamentos" className="btn btn-outline">
-              Fechamentos RH/DP
-            </Link>
+            {financeiroHabilitado && (
+              <Link to="/financeiro/titulos" className="btn btn-outline">
+                Titulos financeiros
+              </Link>
+            )}
+            {rhDpHabilitado && financeiroHabilitado && (
+              <Link to="/rh-dp/fechamentos" className="btn btn-outline">
+                Fechamentos RH/DP
+              </Link>
+            )}
           </div>
         </div>
       </section>
@@ -918,12 +954,9 @@ export default function IntegracaoSiengeInicio() {
                 onChange={(event) => setEnqueueForm((current) => ({ ...current, origem_modulo: event.target.value }))}
               >
                 <option value="">Inferir automaticamente</option>
-                <option value="FINANCEIRO">Financeiro</option>
-                <option value="RH_DP">RH/DP</option>
-                <option value="COMERCIAL">Comercial</option>
-                <option value="SOLICITACOES">Solicitacoes</option>
-                <option value="COMPRAS">Compras</option>
-                <option value="OUTROS">Outros</option>
+                {origemModuloOptions.map((item) => (
+                  <option key={item.value} value={item.value}>{item.label}</option>
+                ))}
               </select>
             </label>
 
@@ -990,12 +1023,9 @@ export default function IntegracaoSiengeInicio() {
                 onChange={(event) => setFiltrosFila((current) => ({ ...current, origem_modulo: event.target.value }))}
               >
                 <option value="">Todas</option>
-                <option value="FINANCEIRO">Financeiro</option>
-                <option value="RH_DP">RH/DP</option>
-                <option value="COMERCIAL">Comercial</option>
-                <option value="SOLICITACOES">Solicitacoes</option>
-                <option value="COMPRAS">Compras</option>
-                <option value="OUTROS">Outros</option>
+                {origemModuloOptions.map((item) => (
+                  <option key={item.value} value={item.value}>{item.label}</option>
+                ))}
               </select>
             </label>
 

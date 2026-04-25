@@ -309,11 +309,11 @@ router.post('/login', loginRateLimit, validateRequest({ body: validateLoginBody 
 router.post('/login/mfa', loginRateLimit, validateRequest({ body: validateMfaLoginBody }), AuthController.loginMfa);
 router.get('/instalacao/publica', InstalacaoController.publica);
 router.get('/configuracoes/tema', ConfiguracaoSistemaController.getTema);
-router.post('/cotacoes/upload', uploadRateLimit, uploadComprovantes.single('file'), CotacaoFornecedorController.upload);
-router.get('/cotacoes/:token/modelo', CotacaoFornecedorController.modelo);
-router.get('/cotacoes/:token/modelo-xlsx', CotacaoFornecedorController.modeloXlsx);
-router.get('/cotacoes/:token', CotacaoFornecedorController.show);
-router.post('/cotacoes/:token', CotacaoFornecedorController.responder);
+router.post('/cotacoes/upload', requireEnabledModule('COTACOES', { allowSuperadminBypass: false }), uploadRateLimit, uploadComprovantes.single('file'), CotacaoFornecedorController.upload);
+router.get('/cotacoes/:token/modelo', requireEnabledModule('COTACOES', { allowSuperadminBypass: false }), CotacaoFornecedorController.modelo);
+router.get('/cotacoes/:token/modelo-xlsx', requireEnabledModule('COTACOES', { allowSuperadminBypass: false }), CotacaoFornecedorController.modeloXlsx);
+router.get('/cotacoes/:token', requireEnabledModule('COTACOES', { allowSuperadminBypass: false }), CotacaoFornecedorController.show);
+router.post('/cotacoes/:token', requireEnabledModule('COTACOES', { allowSuperadminBypass: false }), CotacaoFornecedorController.responder);
 router.get('/crm/webhooks/meta', requireEnabledModule('CRM', { allowSuperadminBypass: false }), CrmWebhookMetaController.verify);
 router.post('/crm/webhooks/meta', crmWebhookRateLimit, requireEnabledModule('CRM', { allowSuperadminBypass: false }), CrmWebhookMetaController.receive);
 router.post('/crm/webhooks/google', crmWebhookRateLimit, requireEnabledModule('CRM', { allowSuperadminBypass: false }), CrmWebhookGoogleController.receive);
@@ -1129,8 +1129,8 @@ router.patch('/configuracoes/usuarios-permissoes-rh-dp', allowBusinessAdmin, Con
 router.get('/configuracoes/permissoes-areas/registry', allowBusinessAdmin, PermissoesAreasController.registry);
 router.get('/configuracoes/permissoes-areas', allowBusinessAdmin, PermissoesAreasController.get);
 router.put('/configuracoes/permissoes-areas', allowBusinessAdmin, PermissoesAreasController.save);
-router.get('/configuracoes/cotacoes', ConfiguracaoSistemaController.getCotacoesConfig);
-router.patch('/configuracoes/cotacoes', allowBusinessAdmin, ConfiguracaoSistemaController.setCotacoesConfig);
+router.get('/configuracoes/cotacoes', requireEnabledModule('COTACOES'), ConfiguracaoSistemaController.getCotacoesConfig);
+router.patch('/configuracoes/cotacoes', requireEnabledModule('COTACOES'), allowBusinessAdmin, ConfiguracaoSistemaController.setCotacoesConfig);
 router.get('/configuracoes/status-pedidos-compra', ConfiguracaoSistemaController.getStatusPedidosCompra);
 router.patch('/configuracoes/status-pedidos-compra', allowBusinessAdmin, ConfiguracaoSistemaController.setStatusPedidosCompra);
 router.get('/configuracoes/comercial-categorias-contrato', allowBusinessAdmin, ConfiguracaoSistemaController.getComercialCategoriasContrato);

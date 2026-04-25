@@ -4,6 +4,18 @@ Este arquivo registra mudancas relevantes de produto, arquitetura e documentacao
 
 ## 2026-04 (continuacao - sesao 12/04)
 
+- consolidacao da estrategia comercial de modularizacao em pacotes funcionais:
+  - Operacional: Solicitacoes, Comunicacao Interna e Arquivos Modelos
+  - Compras: Compras, Cotacoes e Pedidos, com Cotacoes dependente de Compras
+  - Financeiro: Financeiro, comprovantes e relatorios, com Boletos como add-on dependente de Financeiro
+  - Obras: obras, apropriacoes e resultado de obras
+  - Comercial e CRM separados, com CRM recomendado junto do Comercial
+  - RH/DP com fechamento financeiro condicionado ao Financeiro
+  - SIENGE como add-on tecnico condicionado a Financeiro, RH/DP ou Comercial
+- aplicacao das dependencias na tela `Modulos e Planos`, com ativacao/desativacao em cascata no frontend e normalizacao defensiva no backend
+- ajuste de `Financeiro > Boletos` para operar sem Comercial: quando `COMERCIAL` esta desabilitado, a tela deixa de chamar empreendimentos comerciais, remove filtro/colunas comerciais e lista apenas titulos manuais
+- ajuste da Integracao SIENGE para exibir origens de fila conforme os modulos habilitados na instalacao
+
 - correcao do fluxo CSRF em ambiente com frontend e API em subdominios distintos, expondo `X-CSRF-Token` via CORS e mantendo o token em memoria no frontend para `POST/PATCH/DELETE` autenticados por cookie, sem expor o JWT HTTP-only
 - alinhamento da biblioteca de arquivos modelos com a regra documentada de visualizacao ampla: qualquer usuario autenticado pode listar e abrir arquivos de paginas ativas; upload permanece restrito por pagina/perfil
 - separacao das permissoes de pedidos de compra: listagem, detalhe e PDF seguem o acesso ao modulo e escopo de obras; alteracoes de status e itens permanecem restritas ao setor de compras e administradores

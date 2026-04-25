@@ -147,6 +147,7 @@ export function canCreateComprasPedidos(user) {
 
 export function canViewComprasCotacoes(user) {
   if (!hasEnabledModule(user, 'COMPRAS')) return false;
+  if (!hasEnabledModule(user, 'COTACOES')) return false;
   if (isBusinessAdmin(user)) return true;
   if (hasConfiguredAreaPermissions(user)) {
     return hasAnyPermissao(user, [
@@ -159,6 +160,7 @@ export function canViewComprasCotacoes(user) {
 
 export function canManageComprasCotacoes(user) {
   if (!hasEnabledModule(user, 'COMPRAS')) return false;
+  if (!hasEnabledModule(user, 'COTACOES')) return false;
   if (isBusinessAdmin(user)) return true;
   if (hasConfiguredAreaPermissions(user)) {
     return hasPermissao(user, 'compras.cotacoes.gerenciar');

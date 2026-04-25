@@ -6,13 +6,35 @@ const MODULE_CATALOG = [
   {
     key: 'SOLICITACOES',
     label: 'Solicitacoes',
+    packageKey: 'OPERACIONAL',
+    packageLabel: 'Pacote Operacional',
     description: 'Modulo principal do fluxo operacional.',
     enabled: true,
     locked: true
   },
   {
+    key: 'COMUNICACAO_INTERNA',
+    label: 'Comunicacao Interna',
+    packageKey: 'OPERACIONAL',
+    packageLabel: 'Pacote Operacional',
+    description: 'Caixa de entrada, saida e conversas internas.',
+    enabled: true,
+    locked: false
+  },
+  {
+    key: 'BIBLIOTECA_MODELOS',
+    label: 'Arquivos Modelos',
+    packageKey: 'OPERACIONAL',
+    packageLabel: 'Pacote Operacional',
+    description: 'Biblioteca de modelos e arquivos padrao operacionais.',
+    enabled: true,
+    locked: false
+  },
+  {
     key: 'COMPRAS',
     label: 'Solicitacoes de Compra',
+    packageKey: 'COMPRAS',
+    packageLabel: 'Pacote Compras',
     description: 'Fluxo de solicitacao, aprovacao e liberacao de compras.',
     enabled: true,
     locked: false
@@ -20,27 +42,56 @@ const MODULE_CATALOG = [
   {
     key: 'COTACOES',
     label: 'Cotacoes e Pedidos',
-    description: 'Cotacoes com fornecedores, comparativo de precos e pedidos de compra. Pode ser usado de forma independente sem o modulo de Solicitacoes.',
+    packageKey: 'COMPRAS',
+    packageLabel: 'Pacote Compras',
+    description: 'Cotacoes com fornecedores, comparativo de precos e pedidos de compra. Depende do modulo de compras.',
     enabled: true,
-    locked: false
+    locked: false,
+    requiresAll: ['COMPRAS']
   },
   {
     key: 'FINANCEIRO',
     label: 'Financeiro',
-    description: 'Titulos, baixas, conciliacao OFX e relatorios financeiros.',
+    packageKey: 'FINANCEIRO',
+    packageLabel: 'Pacote Financeiro',
+    description: 'Titulos, baixas, comprovantes, conciliacao OFX e relatorios financeiros.',
     enabled: true,
     locked: false
+  },
+  {
+    key: 'BOLETOS',
+    label: 'Boletos',
+    packageKey: 'FINANCEIRO',
+    packageLabel: 'Add-on Boletos',
+    description: 'Emissao bancaria, homologacao, remessa e retorno de boletos. Disponivel apenas com Financeiro ativo.',
+    enabled: false,
+    locked: false,
+    requiresAll: ['FINANCEIRO']
   },
   {
     key: 'OBRAS',
     label: 'Gestao de Obras',
-    description: 'Visao consolidada por obra com orcamento, custos e relatorios.',
+    packageKey: 'OBRAS',
+    packageLabel: 'Pacote Obras',
+    description: 'Visao consolidada por obra com orcamento, custos, apropriacoes e relatorios.',
     enabled: true,
     locked: false
   },
   {
+    key: 'PROVISOES',
+    label: 'Provisionamento',
+    packageKey: 'OBRAS_FINANCEIRO',
+    packageLabel: 'Add-on Financeiro/Obras',
+    description: 'Previsao gerencial de desembolso por obra com dashboard, detalhamento e historico.',
+    enabled: false,
+    locked: false,
+    requiresAll: ['FINANCEIRO', 'OBRAS']
+  },
+  {
     key: 'CONTRATOS',
     label: 'Contratos',
+    packageKey: 'OPERACIONAL',
+    packageLabel: 'Complemento Operacional',
     description: 'Cadastro, acompanhamento e anexos de contratos.',
     enabled: true,
     locked: false
@@ -48,20 +99,27 @@ const MODULE_CATALOG = [
   {
     key: 'COMERCIAL',
     label: 'Comercial',
+    packageKey: 'COMERCIAL',
+    packageLabel: 'Pacote Comercial',
     description: 'Empreendimentos, unidades, contratos de venda e carteira comercial.',
     enabled: false,
     locked: false
   },
   {
-    key: 'PROVISOES',
-    label: 'Provisionamento',
-    description: 'Previsao gerencial de desembolso por obra com dashboard, detalhamento e historico.',
+    key: 'CRM',
+    label: 'CRM',
+    packageKey: 'CRM',
+    packageLabel: 'Pacote CRM',
+    description: 'Gestao de leads, funil comercial, distribuicao e acompanhamento de oportunidades.',
     enabled: false,
-    locked: false
+    locked: false,
+    recommendedWith: ['COMERCIAL']
   },
   {
     key: 'RH_DP',
     label: 'RH/DP',
+    packageKey: 'RH_DP',
+    packageLabel: 'Pacote RH/DP',
     description: 'Colaboradores, documentos, apuracao por competencia e fechamento operacional do RH/DP.',
     enabled: false,
     locked: false
@@ -69,37 +127,13 @@ const MODULE_CATALOG = [
   {
     key: 'INTEGRACAO_SIENGE',
     label: 'Integracao SIENGE',
+    packageKey: 'INTEGRACOES',
+    packageLabel: 'Add-on SIENGE',
     description: 'Gateway tecnico para envio de titulos, fila, logs e reprocessamento da integracao com SIENGE.',
     enabled: false,
-    locked: false
-  },
-  {
-    key: 'BOLETOS',
-    label: 'Boletos',
-    description: 'Emissao bancaria, homologacao, remessa e retorno de boletos.',
-    enabled: false,
-    locked: false
-  },
-  {
-    key: 'BIBLIOTECA_MODELOS',
-    label: 'Arquivos Modelos',
-    description: 'Biblioteca de modelos e arquivos padrao operacionais.',
-    enabled: true,
-    locked: false
-  },
-  {
-    key: 'COMUNICACAO_INTERNA',
-    label: 'Comunicacao Interna',
-    description: 'Caixa de entrada, saida e conversas internas.',
-    enabled: true,
-    locked: false
-  },
-  {
-    key: 'CRM',
-    label: 'CRM',
-    description: 'Gestao de leads, funil comercial, distribuicao e acompanhamento de oportunidades.',
-    enabled: false,
-    locked: false
+    locked: false,
+    requiresAny: ['FINANCEIRO', 'RH_DP', 'COMERCIAL'],
+    defaultRequiredModule: 'FINANCEIRO'
   }
 ];
 
@@ -111,14 +145,71 @@ function normalizeModuleKey(value) {
     .replace(/[\u0300-\u036f]/g, '');
 }
 
-function getDefaultModules() {
-  return MODULE_CATALOG.map((item) => ({
+function normalizeModuleList(values) {
+  return (Array.isArray(values) ? values : [])
+    .map((item) => normalizeModuleKey(item))
+    .filter(Boolean);
+}
+
+function serializeCatalogItem(item) {
+  return {
     key: item.key,
     label: item.label,
+    packageKey: item.packageKey,
+    packageLabel: item.packageLabel,
     description: item.description,
     enabled: Boolean(item.enabled),
-    locked: Boolean(item.locked)
-  }));
+    locked: Boolean(item.locked),
+    requiresAll: normalizeModuleList(item.requiresAll),
+    requiresAny: normalizeModuleList(item.requiresAny),
+    defaultRequiredModule: normalizeModuleKey(item.defaultRequiredModule),
+    recommendedWith: normalizeModuleList(item.recommendedWith)
+  };
+}
+
+function getDefaultModules() {
+  return MODULE_CATALOG.map(serializeCatalogItem);
+}
+
+function moduleRequirementsSatisfied(moduleItem, enabledByKey) {
+  const requiresAll = normalizeModuleList(moduleItem.requiresAll);
+  const requiresAny = normalizeModuleList(moduleItem.requiresAny);
+
+  if (requiresAll.some((key) => !enabledByKey.get(key))) {
+    return false;
+  }
+
+  if (requiresAny.length && !requiresAny.some((key) => enabledByKey.get(key))) {
+    return false;
+  }
+
+  return true;
+}
+
+function enforceModuleDependencies(modules) {
+  const enabledByKey = new Map(modules.map((item) => [item.key, Boolean(item.enabled)]));
+
+  modules.forEach((item) => {
+    if (item.locked && !item.enabled) {
+      item.enabled = true;
+      enabledByKey.set(item.key, true);
+    }
+  });
+
+  let changed = true;
+  while (changed) {
+    changed = false;
+    modules.forEach((item) => {
+      if (!item.enabled || item.locked) return;
+      if (moduleRequirementsSatisfied(item, enabledByKey)) return;
+
+      item.enabled = false;
+      enabledByKey.set(item.key, false);
+      changed = true;
+    });
+  }
+
+  return modules;
 }
 
 function normalizeModulesInput(rawList) {
@@ -134,12 +225,14 @@ function normalizeModulesInput(rawList) {
       .map((item) => [item.key, item])
   );
 
-  return defaults.map((item) => ({
+  const modules = defaults.map((item) => ({
     ...item,
     enabled: item.locked
       ? true
       : (byKey.has(item.key) ? Boolean(byKey.get(item.key)?.enabled) : Boolean(item.enabled))
   }));
+
+  return enforceModuleDependencies(modules);
 }
 
 async function getModuloConfig() {

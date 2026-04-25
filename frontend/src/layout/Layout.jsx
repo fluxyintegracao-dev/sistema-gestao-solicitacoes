@@ -431,7 +431,7 @@ export default function Layout() {
         item('/usuarios-envio-qualquer-setor', 'Envio Livre por Usuario', HiOutlineUsers),
         item('/tipos-compartilhados-setor', 'Tipos Compartilhados', HiOutlineClipboardDocumentList),
         item('/automacao-status-setor', 'Automacao por Status', HiOutlinePaperAirplane),
-        comprasAccess ? item('/configuracoes-cotacao', 'Config. Cotacoes', HiOutlineAdjustmentsHorizontal) : null,
+        moduloCotacoesHabilitado && comprasCotacoesAccess ? item('/configuracoes-cotacao', 'Config. Cotacoes', HiOutlineAdjustmentsHorizontal) : null,
         comprasAccess ? item('/configuracoes-status-pedidos-compra', 'Status dos Pedidos', HiOutlineClipboardDocumentList) : null,
         superadmin && comercialAccess ? item('/configuracoes-comercial-categorias', 'Categorias Comerciais', HiOutlineArchiveBox) : null,
         superadmin ? item('/configuracoes-modulos', 'Modulos e Planos', HiOutlineCog6Tooth) : null,
