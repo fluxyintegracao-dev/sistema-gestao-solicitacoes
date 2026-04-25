@@ -152,24 +152,14 @@ async function canUploadArquivoModeloPage(user, paginaCodigo, uploadersByPagina 
   return lista.includes(Number(user?.id));
 }
 
-async function canViewArquivoModeloPage(user, paginaCodigo, uploadersByPagina = null) {
-  if (isSuperadmin(user) || isAdministrador(user)) {
-    return true;
-  }
-
+async function canViewArquivoModeloPage(user, paginaCodigo) {
   const codigoPagina = normalizarCodigo(paginaCodigo);
-  const codigosPermitidosPorSetor = await getUserAllowedPageCodes(user);
-  if (codigosPermitidosPorSetor.includes(codigoPagina)) {
-    return true;
-  }
+  if (!codigoPagina || !user?.id) return false;
 
-  if (!isAdminRole(user)) {
-    return false;
-  }
+  const paginas = await getPaginas();
+  const pagina = paginas.find((item) => item.codigo === codigoPagina);
 
-  const uploaders = uploadersByPagina || await getUploaders();
-  const lista = uploaders[String(codigoPagina || '').toUpperCase()] || [];
-  return lista.includes(Number(user?.id));
+  return Boolean(pagina && pagina.ativo !== false);
 }
 
 module.exports = {
