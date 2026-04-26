@@ -103,6 +103,7 @@ const ParceiroCategorias = lazy(() => import('./pages/ParceiroCategorias'));
 const ComercialEmpreendimentos = lazy(() => import('./pages/ComercialEmpreendimentos'));
 const ComercialUnidades = lazy(() => import('./pages/ComercialUnidades'));
 const ComercialContratos = lazy(() => import('./pages/ComercialContratos'));
+const ComercialModelosContrato = lazy(() => import('./pages/ComercialModelosContrato'));
 const ComercialTabelasPreco = lazy(() => import('./pages/ComercialTabelasPreco'));
 const ComercialMapaUnidades = lazy(() => import('./pages/ComercialMapaUnidades'));
 const DashboardProvisionamentoFinanceiro = lazy(() => import('./modules/provisionamento-financeiro/pages/DashboardProvisionamentoFinanceiro'));
@@ -557,6 +558,7 @@ export default function App() {
         <Route path="comercial/tabelas-preco" element={<ComercialEmpreendimentosRoute><ComercialTabelasPreco /></ComercialEmpreendimentosRoute>} />
         <Route path="comercial/mapa-unidades" element={<ComercialEmpreendimentosRoute><ComercialMapaUnidades /></ComercialEmpreendimentosRoute>} />
         <Route path="comercial/contratos" element={<ComercialContratosRoute><ComercialContratos /></ComercialContratosRoute>} />
+        <Route path="comercial/modelos-contrato" element={<ComercialContratosRoute><ComercialModelosContrato /></ComercialContratosRoute>} />
         <Route path="provisoes-financeiras" element={<ProvisionamentosRoute><ProvisionamentosFinanceiros /></ProvisionamentosRoute>} />
         <Route path="provisoes-financeiras/nova" element={<ProvisionamentosCreateRoute><NovaProvisaoFinanceira /></ProvisionamentosCreateRoute>} />
         <Route path="provisoes-financeiras/:id" element={<ProvisionamentosRoute><ProvisionamentoFinanceiroDetalhe /></ProvisionamentosRoute>} />

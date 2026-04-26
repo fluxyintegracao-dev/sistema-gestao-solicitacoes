@@ -7,6 +7,7 @@ import {
 } from '../../../services/compras';
 import { useAuth } from '../../../contexts/AuthContext';
 import { isBusinessAdmin } from '../../../utils/acessoProduto';
+import { maskCep, maskCpfCnpj, maskPhone, onlyDigits } from '../../../utils/formatters';
 
 const ESTADOS_BR = [
   'AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS',
@@ -68,14 +69,14 @@ function ModalFornecedor({ fornecedor, onSalvar, onFechar, salvando }) {
     if (fornecedor) {
       setForm({
         nome: fornecedor.nome || '',
-        cnpj: fornecedor.cnpj || '',
+        cnpj: maskCpfCnpj(fornecedor.cnpj),
         email: fornecedor.email || '',
-        whatsapp: fornecedor.whatsapp || '',
+        whatsapp: maskPhone(fornecedor.whatsapp),
         contato: fornecedor.contato || '',
         observacoes: fornecedor.observacoes || '',
         cidade: fornecedor.cidade || '',
         estado: fornecedor.estado || '',
-        cep: fornecedor.cep || '',
+        cep: maskCep(fornecedor.cep),
         categoria_insumos: Array.isArray(fornecedor.categoria_insumos) ? [...fornecedor.categoria_insumos] : []
       });
     } else {
@@ -132,14 +133,14 @@ function ModalFornecedor({ fornecedor, onSalvar, onFechar, salvando }) {
             </div>
             <div>
               <label className="app-filter-label">CNPJ / CPF</label>
-              <input className="input" value={form.cnpj} onChange={(e) => update('cnpj', e.target.value)} placeholder="00.000.000/0000-00" />
+              <input className="input" value={form.cnpj} onChange={(e) => update('cnpj', maskCpfCnpj(e.target.value))} placeholder="00.000.000/0000-00" />
             </div>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label className="app-filter-label">WhatsApp</label>
-              <input className="input" value={form.whatsapp} onChange={(e) => update('whatsapp', e.target.value)} placeholder="(11) 99999-9999" />
+              <input className="input" value={form.whatsapp} onChange={(e) => update('whatsapp', maskPhone(e.target.value))} placeholder="(11) 99999-9999" />
             </div>
             <div>
               <label className="app-filter-label">Email</label>
@@ -161,7 +162,7 @@ function ModalFornecedor({ fornecedor, onSalvar, onFechar, salvando }) {
             </div>
             <div>
               <label className="app-filter-label">CEP</label>
-              <input className="input" value={form.cep} onChange={(e) => update('cep', e.target.value)} placeholder="00000-000" />
+              <input className="input" value={form.cep} onChange={(e) => update('cep', maskCep(e.target.value))} placeholder="00000-000" />
             </div>
           </div>
 
@@ -270,10 +271,16 @@ export default function GestaoFornecedores() {
   async function handleSalvar(form) {
     try {
       setSalvando(true);
+      const payload = {
+        ...form,
+        cnpj: onlyDigits(form.cnpj),
+        whatsapp: onlyDigits(form.whatsapp),
+        cep: onlyDigits(form.cep)
+      };
       if (fornecedorEditando) {
-        await atualizarFornecedorCompra(fornecedorEditando.id, form);
+        await atualizarFornecedorCompra(fornecedorEditando.id, payload);
       } else {
-        await criarFornecedorCompra(form);
+        await criarFornecedorCompra(payload);
       }
       setModalAberto(false);
       setFornecedorEditando(null);

@@ -368,7 +368,8 @@ export default function Layout() {
         comercialEmpreendimentosAccess ? item('/comercial/unidades', 'Unidades', HiOutlineRectangleGroup) : null,
         comercialEmpreendimentosAccess ? item('/comercial/mapa-unidades', 'Mapa de Unidades', HiOutlineSquares2X2) : null,
         comercialEmpreendimentosAccess ? item('/comercial/tabelas-preco', 'Tabelas de Preco', HiOutlineDocumentText) : null,
-        comercialContratosAccess ? item('/comercial/contratos', 'Contratos de Venda', HiOutlineBanknotes) : null
+        comercialContratosAccess ? item('/comercial/contratos', 'Contratos de Venda', HiOutlineBanknotes) : null,
+        comercialContratosAccess ? item('/comercial/modelos-contrato', 'Modelos de Contrato', HiOutlineFolderOpen) : null
       ]);
     }
 

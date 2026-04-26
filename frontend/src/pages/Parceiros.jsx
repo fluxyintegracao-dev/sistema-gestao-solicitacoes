@@ -5,7 +5,7 @@ import {
   criarParceiro,
   listarCategoriasParceiro
 } from '../services/parceiros';
-import { maskCep, maskCpfCnpj, maskPhone, onlyDigits } from '../utils/formatters';
+import { isValidCpfCnpj, maskCep, maskCpfCnpj, maskCreci, maskPhone, maskRg, onlyDigits } from '../utils/formatters';
 
 function defaultParceiroForm() {
   return {
@@ -144,6 +144,11 @@ export default function Parceiros() {
 
   async function handleSalvar(event) {
     event.preventDefault();
+    if (!isValidCpfCnpj(parceiroForm.cpf_cnpj)) {
+      setError('Informe um CPF/CNPJ valido.');
+      return;
+    }
+
     try {
       setSaving(true);
       setError('');
@@ -202,6 +207,9 @@ export default function Parceiros() {
                   placeholder="CPF/CNPJ"
                   value={parceiroForm.cpf_cnpj}
                   onChange={(e) => setParceiroForm((current) => ({ ...current, cpf_cnpj: maskCpfCnpj(e.target.value) }))}
+                  onBlur={() => {
+                    if (parceiroForm.cpf_cnpj && !isValidCpfCnpj(parceiroForm.cpf_cnpj)) setError('Informe um CPF/CNPJ valido.');
+                  }}
                   required
                 />
                 <input
@@ -235,7 +243,7 @@ export default function Parceiros() {
                   className="input w-full"
                   placeholder="RG"
                   value={parceiroForm.rg}
-                  onChange={(e) => setParceiroForm((current) => ({ ...current, rg: e.target.value }))}
+                  onChange={(e) => setParceiroForm((current) => ({ ...current, rg: maskRg(e.target.value) }))}
                 />
                 <input
                   className="input w-full"
@@ -272,7 +280,7 @@ export default function Parceiros() {
                   className="input w-full"
                   placeholder="CRECI"
                   value={parceiroForm.creci}
-                  onChange={(e) => setParceiroForm((current) => ({ ...current, creci: e.target.value }))}
+                  onChange={(e) => setParceiroForm((current) => ({ ...current, creci: maskCreci(e.target.value) }))}
                 />
               </div>
 

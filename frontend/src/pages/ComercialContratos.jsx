@@ -4,11 +4,10 @@ import { getMinhasObras } from '../services/obras';
 import { buscarParceiros, criarParceiro } from '../services/parceiros';
 import { getCategoriasFinanceiras } from '../services/financeiro';
 import { getComercialCategoriasContrato } from '../services/configuracoesSistema';
-import { maskCep, maskCpfCnpj, maskPhone, normalizeCurrencyTyping, onlyDigits } from '../utils/formatters';
+import { isValidCpfCnpj, maskCep, maskCpfCnpj, maskCreci, maskPhone, maskRg, normalizeCurrencyTyping, onlyDigits } from '../utils/formatters';
 import {
   atualizarContratoComercial,
   criarContratoComercial,
-  criarModeloContratoComercial,
   distratarContratoComercial,
   enviarDocumentoContratoD4Sign,
   gerarDocumentoContratoComercial,
@@ -134,16 +133,6 @@ function defaultPessoaRapidaForm(tipo = 'cliente') {
     conjuge_nome: '',
     regime_bens: '',
     creci: ''
-  };
-}
-
-function defaultModeloForm() {
-  return {
-    empreendimento_id: '',
-    tipo_documento: 'CONTRATO',
-    nome: '',
-    descricao: '',
-    file: null
   };
 }
 
@@ -331,10 +320,21 @@ function resolveGeneratorByModo(modo, current = {}) {
   return { ...current, modo };
 }
 
-function gerarParcelasDoBloco(plano = {}) {
+function gerarParcelasDoBloco(plano = {}, planoId = '') {
   const formaRecebimento = plano.forma_recebimento_prevista || '';
   const tituloBase = String(plano.titulo_bloco || '').trim();
   const tipoParcelaPadrao = plano.tipo_parcela || 'PARCELA';
+  const periodicidade = getPeriodicidadeConfig(plano.periodicidade);
+
+  function withPlanoMetadata(parcela, index, intervalMonths = null) {
+    return {
+      ...parcela,
+      plano_pagamento_id: planoId || plano.id || '',
+      plano_parcela_index: index,
+      plano_periodicidade: plano.periodicidade || '',
+      plano_interval_months: intervalMonths
+    };
+  }
 
   if (plano.modo === 'ENTRADA') {
     const valorEntrada = toNumber(plano.valor_parcela);
@@ -342,14 +342,14 @@ function gerarParcelasDoBloco(plano = {}) {
       return { error: 'Informe valor e vencimento da entrada.' };
     }
 
-    const parcela = {
+    const parcela = withPlanoMetadata({
       descricao: tituloBase || 'Entrada',
       tipo_parcela: 'ENTRADA',
       forma_recebimento_prevista: formaRecebimento,
       data_vencimento: plano.primeiro_vencimento,
       valor: valorEntrada.toFixed(2),
       observacoes: buildObservacoesParcela('', plano.detalhe_forma_recebimento)
-    };
+    }, 0, 0);
 
     return {
       parcelas: [parcela],
@@ -374,12 +374,11 @@ function gerarParcelasDoBloco(plano = {}) {
     }
 
     return {
-      parcelas,
+      parcelas: parcelas.map((item, index) => withPlanoMetadata(item, index, null)),
       total: roundCurrency(parcelas.reduce((acc, item) => acc + toNumber(item.valor), 0))
     };
   }
 
-  const periodicidade = getPeriodicidadeConfig(plano.periodicidade);
   const quantidade = periodicidade.value === 'AVISTA'
     ? 1
     : Math.max(0, Number(plano.quantidade_parcelas || 0));
@@ -389,14 +388,14 @@ function gerarParcelasDoBloco(plano = {}) {
     return { error: 'Informe quantidade e valor validos para a composicao periodica.' };
   }
 
-  const parcelas = Array.from({ length: quantidade }).map((_, index) => ({
+  const parcelas = Array.from({ length: quantidade }).map((_, index) => withPlanoMetadata({
     descricao: tituloBase ? `${tituloBase} ${index + 1}` : `Parcela ${index + 1}`,
     tipo_parcela: tipoParcelaPadrao,
     forma_recebimento_prevista: formaRecebimento,
     data_vencimento: addMonths(plano.primeiro_vencimento || today(), index * periodicidade.intervalMonths),
     valor: valorParcela.toFixed(2),
     observacoes: buildObservacoesParcela('', plano.detalhe_forma_recebimento)
-  }));
+  }, index, periodicidade.intervalMonths));
 
   return {
     parcelas,
@@ -427,13 +426,11 @@ export default function ComercialContratos() {
   const [contratoSelecionado, setContratoSelecionado] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [savingModelo, setSavingModelo] = useState(false);
   const [processingAction, setProcessingAction] = useState('');
   const [showDistrato, setShowDistrato] = useState(false);
   const [showTroca, setShowTroca] = useState(false);
   const [pessoaRapidaModal, setPessoaRapidaModal] = useState(null);
   const [pessoaRapidaForm, setPessoaRapidaForm] = useState(defaultPessoaRapidaForm());
-  const [modeloForm, setModeloForm] = useState(defaultModeloForm());
   const [documentoForm, setDocumentoForm] = useState(defaultDocumentoForm());
   const [distratoForm, setDistratoForm] = useState(defaultDistratoForm());
   const [trocaForm, setTrocaForm] = useState(defaultTrocaForm());
@@ -582,14 +579,15 @@ export default function ComercialContratos() {
       return;
     }
 
-    const resultado = gerarParcelasDoBloco(generator);
+    const planoId = `${Date.now()}-${Math.random()}`;
+    const resultado = gerarParcelasDoBloco(generator, planoId);
     if (resultado.error) {
       setError(resultado.error);
       return;
     }
 
     const proximoPlano = {
-      id: `${Date.now()}-${Math.random()}`,
+      id: planoId,
       ...generator,
       parcelas_geradas: resultado.parcelas,
       total_bloco: resultado.total
@@ -647,10 +645,47 @@ export default function ComercialContratos() {
   function updateParcela(index, field, value) {
     setForm((current) => {
       const parcelas = [...current.parcelas];
-      parcelas[index] = { ...parcelas[index], [field]: value };
+      const parcelaAtual = parcelas[index] || {};
+      const planoId = parcelaAtual.plano_pagamento_id;
+
+      parcelas[index] = { ...parcelaAtual, [field]: value };
+
+      if (field === 'data_vencimento' && value && planoId && Number(parcelaAtual.plano_interval_months) > 0) {
+        const intervalo = Number(parcelaAtual.plano_interval_months);
+        const indiceBase = Number(parcelaAtual.plano_parcela_index || 0);
+
+        parcelas.forEach((parcela, parcelaIndex) => {
+          if (
+            parcelaIndex !== index
+            && parcela.plano_pagamento_id === planoId
+            && Number(parcela.plano_parcela_index || 0) > indiceBase
+          ) {
+            parcelas[parcelaIndex] = {
+              ...parcela,
+              data_vencimento: addMonths(value, (Number(parcela.plano_parcela_index || 0) - indiceBase) * intervalo)
+            };
+          }
+        });
+      }
+
+      const parcelasNormalizadas = normalizarParcelasContrato(parcelas);
+      if (planoId) {
+        setPaymentPlans((plans) => plans.map((plano) => {
+          if (plano.id !== planoId) return plano;
+          const parcelasGeradas = parcelasNormalizadas
+            .filter((parcela) => parcela.plano_pagamento_id === planoId)
+            .map((parcela) => ({ ...parcela }));
+          return {
+            ...plano,
+            parcelas_geradas: parcelasGeradas,
+            total_bloco: roundCurrency(parcelasGeradas.reduce((acc, item) => acc + toNumber(item.valor || item.valor_original), 0))
+          };
+        }));
+      }
+
       return {
         ...current,
-        parcelas
+        parcelas: parcelasNormalizadas
       };
     });
   }
@@ -745,27 +780,6 @@ export default function ComercialContratos() {
     }
   }
 
-  async function handleCriarModeloContrato(event) {
-    event.preventDefault();
-    if (!modeloForm.file) {
-      setError('Selecione um arquivo DOCX para o modelo.');
-      return;
-    }
-
-    try {
-      setSavingModelo(true);
-      setError('');
-      await criarModeloContratoComercial(modeloForm);
-      setModeloForm(defaultModeloForm());
-      const modelosData = await getModelosContratoComercial();
-      setModelosContrato(Array.isArray(modelosData) ? modelosData : []);
-    } catch (err) {
-      setError(err?.message || 'Erro ao salvar modelo de contrato');
-    } finally {
-      setSavingModelo(false);
-    }
-  }
-
   async function handleGerarDocumentoContrato() {
     if (!contratoSelecionado?.id) return;
     try {
@@ -824,6 +838,11 @@ export default function ComercialContratos() {
 
   async function salvarPessoaRapida() {
     try {
+      if (!isValidCpfCnpj(pessoaRapidaForm.cpf_cnpj)) {
+        setError('Informe um CPF/CNPJ valido no cadastro rapido.');
+        return;
+      }
+
       const tipo = pessoaRapidaModal || pessoaRapidaForm.tipo || 'cliente';
       const payload = {
         cpf_cnpj: onlyDigits(pessoaRapidaForm.cpf_cnpj),
@@ -1329,90 +1348,6 @@ export default function ComercialContratos() {
       <section className="sol-surface-card rounded-2xl p-4 md:p-5">
         <div className="sol-filtros-head">
           <div>
-            <p className="sol-filtros-title">Modelos de contrato por empreendimento</p>
-            <p className="sol-filtros-subtitle">
-              Envie DOCX com papel timbrado e variaveis no formato {'{{cliente.nome}}'} para gerar PDF sem perder a formatacao.
-            </p>
-          </div>
-          <div className="sol-filtros-meta">
-            <span>{modelosContrato.length} modelo(s)</span>
-          </div>
-        </div>
-
-        <form className="mt-4 grid gap-3 md:grid-cols-5" onSubmit={handleCriarModeloContrato}>
-          <label className="sol-filter-field md:col-span-2">
-            <span className="sol-filter-label">Empreendimento</span>
-            <select
-              className="input w-full"
-              value={modeloForm.empreendimento_id}
-              onChange={(e) => setModeloForm((current) => ({ ...current, empreendimento_id: e.target.value }))}
-              required
-            >
-              <option value="">Selecione</option>
-              {empreendimentos.map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}
-            </select>
-          </label>
-          <label className="sol-filter-field">
-            <span className="sol-filter-label">Tipo</span>
-            <select
-              className="input w-full"
-              value={modeloForm.tipo_documento}
-              onChange={(e) => setModeloForm((current) => ({ ...current, tipo_documento: e.target.value }))}
-            >
-              {TIPOS_DOCUMENTO_MODELO.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
-            </select>
-          </label>
-          <label className="sol-filter-field">
-            <span className="sol-filter-label">Nome interno</span>
-            <input
-              className="input w-full"
-              value={modeloForm.nome}
-              onChange={(e) => setModeloForm((current) => ({ ...current, nome: e.target.value }))}
-              placeholder="Ex.: Contrato Costa do Mar"
-            />
-          </label>
-          <label className="sol-filter-field">
-            <span className="sol-filter-label">Arquivo DOCX</span>
-            <input
-              className="input w-full"
-              type="file"
-              accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-              onChange={(e) => setModeloForm((current) => ({ ...current, file: e.target.files?.[0] || null }))}
-              required
-            />
-          </label>
-          <label className="sol-filter-field md:col-span-4">
-            <span className="sol-filter-label">Descricao</span>
-            <input
-              className="input w-full"
-              value={modeloForm.descricao}
-              onChange={(e) => setModeloForm((current) => ({ ...current, descricao: e.target.value }))}
-              placeholder="Observacao para identificar quando usar este modelo"
-            />
-          </label>
-          <div className="flex items-end">
-            <button type="submit" className="btn btn-primary w-full" disabled={savingModelo}>
-              {savingModelo ? 'Enviando...' : 'Salvar modelo'}
-            </button>
-          </div>
-        </form>
-
-        {modelosContrato.length > 0 && (
-          <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {modelosContrato.slice(0, 6).map((modelo) => (
-              <article key={modelo.id} className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4">
-                <div className="text-xs uppercase tracking-[0.18em] text-[var(--c-muted)]">{documentoTipoLabel(modelo.tipo_documento)}</div>
-                <div className="mt-2 text-sm font-semibold text-[var(--c-text)]">{modelo.nome}</div>
-                <div className="mt-1 text-xs text-[var(--c-muted)]">{modelo.empreendimento?.nome || 'Empreendimento nao informado'}</div>
-              </article>
-            ))}
-          </div>
-        )}
-      </section>
-
-      <section className="sol-surface-card rounded-2xl p-4 md:p-5">
-        <div className="sol-filtros-head">
-          <div>
             <p className="sol-filtros-title">Carteira comercial</p>
             <p className="sol-filtros-subtitle">Contratos de venda com acesso rapido ao financeiro.</p>
           </div>
@@ -1659,6 +1594,9 @@ export default function ComercialContratos() {
             {modelosDoContratoSelecionado.length === 0 && (
               <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
                 Cadastre um modelo DOCX para este empreendimento e tipo de documento antes de gerar o PDF.
+                <Link className="btn btn-outline btn-sm ml-2" to="/comercial/modelos-contrato">
+                  Abrir modelos
+                </Link>
               </div>
             )}
 
@@ -1810,6 +1748,11 @@ export default function ComercialContratos() {
                   className="input w-full"
                   value={pessoaRapidaForm.cpf_cnpj}
                   onChange={(e) => setPessoaRapidaForm((current) => ({ ...current, cpf_cnpj: maskCpfCnpj(e.target.value) }))}
+                  onBlur={() => {
+                    if (pessoaRapidaForm.cpf_cnpj && !isValidCpfCnpj(pessoaRapidaForm.cpf_cnpj)) {
+                      setError('Informe um CPF/CNPJ valido no cadastro rapido.');
+                    }
+                  }}
                   required
                 />
               </label>
@@ -1845,7 +1788,7 @@ export default function ComercialContratos() {
                   <input
                     className="input w-full"
                     value={pessoaRapidaForm.creci}
-                    onChange={(e) => setPessoaRapidaForm((current) => ({ ...current, creci: e.target.value }))}
+                    onChange={(e) => setPessoaRapidaForm((current) => ({ ...current, creci: maskCreci(e.target.value) }))}
                   />
                 </label>
               )}
@@ -1864,7 +1807,7 @@ export default function ComercialContratos() {
                   <input
                     className="input w-full"
                     value={pessoaRapidaForm.rg}
-                    onChange={(e) => setPessoaRapidaForm((current) => ({ ...current, rg: e.target.value }))}
+                    onChange={(e) => setPessoaRapidaForm((current) => ({ ...current, rg: maskRg(e.target.value) }))}
                   />
                 </label>
                 <label className="sol-filter-field">

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { criarLead } from '../../../services/crm';
+import { maskCpfCnpj, maskPhone, normalizeCurrencyTyping, onlyDigits } from '../../../utils/formatters';
 
 const SOURCE_OPTIONS = [
   { value: 'MANUAL', label: 'Manual' },
@@ -39,7 +40,11 @@ export default function CrmNovoLead() {
     if (!form.nome.trim()) return alert('Nome e obrigatorio');
     try {
       setSaving(true);
-      const lead = await criarLead(form);
+      const lead = await criarLead({
+        ...form,
+        telefone: onlyDigits(form.telefone),
+        documento: onlyDigits(form.documento)
+      });
       navigate(`/crm/leads/${lead.id}`);
     } catch (err) {
       if (err.status === 409) {
@@ -77,7 +82,7 @@ export default function CrmNovoLead() {
 
             <label className="app-filter-field">
               <span className="app-filter-label">Telefone</span>
-              <input className="input" value={form.telefone} onChange={set('telefone')} placeholder="(99) 99999-9999" />
+              <input className="input" value={form.telefone} onChange={(e) => setForm((current) => ({ ...current, telefone: maskPhone(e.target.value) }))} placeholder="(99) 99999-9999" />
             </label>
 
             <label className="app-filter-field">
@@ -87,7 +92,7 @@ export default function CrmNovoLead() {
 
             <label className="app-filter-field">
               <span className="app-filter-label">CPF / CNPJ</span>
-              <input className="input" value={form.documento} onChange={set('documento')} placeholder="Documento" />
+              <input className="input" value={form.documento} onChange={(e) => setForm((current) => ({ ...current, documento: maskCpfCnpj(e.target.value) }))} placeholder="Documento" />
             </label>
 
             <label className="app-filter-field">
@@ -106,7 +111,7 @@ export default function CrmNovoLead() {
 
             <label className="app-filter-field">
               <span className="app-filter-label">Estado</span>
-              <input className="input" maxLength={2} value={form.estado} onChange={set('estado')} placeholder="ES" />
+              <input className="input" maxLength={2} value={form.estado} onChange={(e) => setForm((current) => ({ ...current, estado: e.target.value.toUpperCase() }))} placeholder="ES" />
             </label>
           </div>
         </div>
@@ -126,7 +131,7 @@ export default function CrmNovoLead() {
 
             <label className="app-filter-field">
               <span className="app-filter-label">Faixa de valor</span>
-              <input className="input" value={form.faixa_valor} onChange={set('faixa_valor')} placeholder="Ex: R$ 300.000 - R$ 400.000" />
+              <input className="input" inputMode="decimal" value={form.faixa_valor} onChange={(e) => setForm((current) => ({ ...current, faixa_valor: normalizeCurrencyTyping(e.target.value) }))} placeholder="Ex: R$ 300.000,00" />
             </label>
 
             <label className="app-filter-field">

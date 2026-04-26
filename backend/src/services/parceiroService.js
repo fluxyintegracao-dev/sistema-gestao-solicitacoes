@@ -5,6 +5,48 @@ function normalizarCpfCnpj(value) {
   return String(value || '').replace(/\D/g, '');
 }
 
+function hasRepeatedDigits(value) {
+  return /^(\d)\1+$/.test(value);
+}
+
+function isValidCpf(value) {
+  const cpf = normalizarCpfCnpj(value);
+  if (cpf.length !== 11 || hasRepeatedDigits(cpf)) return false;
+
+  let sum = 0;
+  for (let index = 0; index < 9; index += 1) sum += Number(cpf[index]) * (10 - index);
+  let digit = 11 - (sum % 11);
+  if (digit >= 10) digit = 0;
+  if (digit !== Number(cpf[9])) return false;
+
+  sum = 0;
+  for (let index = 0; index < 10; index += 1) sum += Number(cpf[index]) * (11 - index);
+  digit = 11 - (sum % 11);
+  if (digit >= 10) digit = 0;
+  return digit === Number(cpf[10]);
+}
+
+function isValidCnpj(value) {
+  const cnpj = normalizarCpfCnpj(value);
+  if (cnpj.length !== 14 || hasRepeatedDigits(cnpj)) return false;
+
+  const calc = (factors) => {
+    const sum = factors.reduce((acc, factor, index) => acc + Number(cnpj[index]) * factor, 0);
+    const rest = sum % 11;
+    return rest < 2 ? 0 : 11 - rest;
+  };
+
+  return calc([5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]) === Number(cnpj[12])
+    && calc([6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]) === Number(cnpj[13]);
+}
+
+function isValidCpfCnpj(value) {
+  const documento = normalizarCpfCnpj(value);
+  if (documento.length === 11) return isValidCpf(documento);
+  if (documento.length === 14) return isValidCnpj(documento);
+  return false;
+}
+
 function inferirTipoPessoa(cpfCnpj, tipoPessoaInformado) {
   const tipoInformado = String(tipoPessoaInformado || '')
     .trim()
@@ -62,7 +104,7 @@ function normalizeParceiroPayload(payload = {}, { partial = false } = {}) {
   const tipoPessoa = inferirTipoPessoa(cpfCnpj, payload.tipo_pessoa);
 
   if (!partial) {
-    if (!cpfCnpj || ![11, 14].includes(cpfCnpj.length)) {
+    if (!cpfCnpj || !isValidCpfCnpj(cpfCnpj)) {
       throw new Error('Informe um CPF/CNPJ valido.');
     }
     if (!nome) {
@@ -296,7 +338,7 @@ async function atualizarParceiro(id, payload) {
   const categoriaIds = parseCategoriaIds(payload?.categoria_ids);
 
   if (data.cpf_cnpj) {
-    if (![11, 14].includes(String(data.cpf_cnpj).length)) {
+    if (!isValidCpfCnpj(data.cpf_cnpj)) {
       throw new Error('Informe um CPF/CNPJ valido.');
     }
     await ensureParceiroUnico(data.cpf_cnpj, parceiro.id);
