@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   getComercialCategoriasContrato,
   salvarComercialCategoriasContrato
 } from '../services/configuracoesSistema';
-import { criarCategoriaFinanceira } from '../services/financeiro';
 
 function toggleId(list, id, checked) {
   const current = new Set((list || []).map(Number));
@@ -70,26 +70,13 @@ function CategoriaChecklist({ title, description, categorias, selectedIds, onCha
 export default function ConfiguracoesComercialCategorias() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [creating, setCreating] = useState(false);
-  const [showCreate, setShowCreate] = useState(false);
   const [error, setError] = useState('');
-  const [categoriaForm, setCategoriaForm] = useState({
-    nome: '',
-    tipo: 'RECEBER',
-    descricao: ''
-  });
   const [config, setConfig] = useState({
     contrato_venda_categoria_ids: [],
     comissao_categoria_ids: [],
     categorias_contrato: [],
     categorias_comissao: []
   });
-
-  async function carregar() {
-    const data = await getComercialCategoriasContrato();
-    setConfig(data || {});
-    return data || {};
-  }
 
   useEffect(() => {
     let active = true;
@@ -127,40 +114,6 @@ export default function ConfiguracoesComercialCategorias() {
     }
   }
 
-  async function handleCriarCategoria(event) {
-    event.preventDefault();
-    try {
-      setCreating(true);
-      setError('');
-      const categoria = await criarCategoriaFinanceira({
-        nome: categoriaForm.nome,
-        tipo: categoriaForm.tipo,
-        descricao: categoriaForm.descricao || undefined,
-        ativo: true
-      });
-      const data = await carregar();
-      const categoriaId = Number(categoria?.id);
-      const tipo = String(categoria?.tipo || categoriaForm.tipo || '').toUpperCase();
-      if (categoriaId) {
-        setConfig({
-          ...data,
-          contrato_venda_categoria_ids: ['RECEBER', 'AMBOS'].includes(tipo)
-            ? Array.from(new Set([...(data.contrato_venda_categoria_ids || []).map(Number), categoriaId]))
-            : (data.contrato_venda_categoria_ids || []),
-          comissao_categoria_ids: ['PAGAR', 'AMBOS'].includes(tipo)
-            ? Array.from(new Set([...(data.comissao_categoria_ids || []).map(Number), categoriaId]))
-            : (data.comissao_categoria_ids || [])
-        });
-      }
-      setCategoriaForm({ nome: '', tipo: 'RECEBER', descricao: '' });
-      setShowCreate(false);
-    } catch (err) {
-      setError(err?.message || 'Erro ao criar categoria financeira');
-    } finally {
-      setCreating(false);
-    }
-  }
-
   if (loading) {
     return (
       <div className="page solicitacoes-page">
@@ -176,13 +129,13 @@ export default function ConfiguracoesComercialCategorias() {
           <div>
             <h1 className="text-xl font-semibold md:text-2xl">Categorias comerciais</h1>
             <p className="page-subtitle">
-              Defina quais categorias financeiras aparecem no contrato de venda e na categoria de comissao.
+              Selecione quais categorias financeiras aparecem no contrato de venda e na comissao do corretor.
             </p>
           </div>
           <div className="app-page-actions">
-            <button type="button" className="btn btn-outline" onClick={() => setShowCreate((current) => !current)}>
-              {showCreate ? 'Fechar cadastro' : 'Nova categoria'}
-            </button>
+            <Link className="btn btn-outline" to="/financeiro/cadastros">
+              Abrir cadastros financeiros
+            </Link>
             <button type="button" className="btn btn-primary" onClick={handleSave} disabled={saving}>
               {saving ? 'Salvando...' : 'Salvar configuracao'}
             </button>
@@ -192,57 +145,16 @@ export default function ConfiguracoesComercialCategorias() {
 
       {error && <div className="app-alert app-alert--error">{error}</div>}
 
-      {showCreate && (
-        <section className="sol-surface-card rounded-2xl p-4 md:p-5">
-          <div className="sol-filtros-head">
-            <div>
-              <p className="sol-filtros-title">Nova categoria financeira</p>
-              <p className="sol-filtros-subtitle">
-                Crie a categoria e selecione onde ela sera usada no comercial.
-              </p>
-            </div>
+      <section className="sol-surface-card rounded-2xl p-4 md:p-5">
+        <div className="sol-filtros-head">
+          <div>
+            <p className="sol-filtros-title">Origem das categorias</p>
+            <p className="sol-filtros-subtitle">
+              Cadastre e mantenha as categorias no Financeiro. Aqui o Comercial apenas escolhe quais entram nos campos do contrato.
+            </p>
           </div>
-
-          <form className="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_180px_minmax(0,1fr)_auto]" onSubmit={handleCriarCategoria}>
-            <label className="sol-filter-field">
-              <span className="sol-filter-label">Nome</span>
-              <input
-                className="input w-full"
-                value={categoriaForm.nome}
-                onChange={(event) => setCategoriaForm((current) => ({ ...current, nome: event.target.value }))}
-                placeholder="Ex.: Recebiveis de venda"
-                required
-              />
-            </label>
-            <label className="sol-filter-field">
-              <span className="sol-filter-label">Tipo</span>
-              <select
-                className="input w-full"
-                value={categoriaForm.tipo}
-                onChange={(event) => setCategoriaForm((current) => ({ ...current, tipo: event.target.value }))}
-              >
-                <option value="RECEBER">Contrato de venda</option>
-                <option value="PAGAR">Comissao</option>
-                <option value="AMBOS">Ambos</option>
-              </select>
-            </label>
-            <label className="sol-filter-field">
-              <span className="sol-filter-label">Descricao</span>
-              <input
-                className="input w-full"
-                value={categoriaForm.descricao}
-                onChange={(event) => setCategoriaForm((current) => ({ ...current, descricao: event.target.value }))}
-                placeholder="Opcional"
-              />
-            </label>
-            <div className="flex items-end">
-              <button type="submit" className="btn btn-primary w-full" disabled={creating}>
-                {creating ? 'Criando...' : 'Criar categoria'}
-              </button>
-            </div>
-          </form>
-        </section>
-      )}
+        </div>
+      </section>
 
       <CategoriaChecklist
         title="Contrato de venda"

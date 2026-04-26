@@ -2,6 +2,7 @@ const { Op } = require('sequelize');
 const {
   sequelize,
   CategoriaFinanceira,
+  ConfiguracaoSistema,
   ContratoComercial,
   ContratoComercialEvento,
   ContratoComercialParcela,
@@ -15,6 +16,8 @@ const {
   User
 } = require('../models');
 const { registrarEventoSeguranca } = require('./securityLogService');
+
+const CHAVE_COMERCIAL_CATEGORIAS_CONTRATO = 'COMERCIAL_CATEGORIAS_CONTRATO_VENDA';
 
 function createHttpError(statusCode, message) {
   const error = new Error(message);
@@ -52,6 +55,55 @@ function parseMetadataJson(value) {
     return JSON.parse(value);
   } catch {
     return null;
+  }
+}
+
+function normalizarIdList(lista) {
+  if (!Array.isArray(lista)) return [];
+  return Array.from(new Set(
+    lista
+      .map((item) => Number(item))
+      .filter((item) => Number.isInteger(item) && item > 0)
+  ));
+}
+
+async function getComercialCategoriasContratoConfig() {
+  const item = await ConfiguracaoSistema.findOne({
+    where: { chave: CHAVE_COMERCIAL_CATEGORIAS_CONTRATO },
+    order: [['id', 'DESC']]
+  });
+
+  if (!item?.valor) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(item.valor);
+  } catch {
+    return null;
+  }
+}
+
+async function ensureCategoriaPermitidaNoComercial(categoriaId, campo) {
+  if (!categoriaId) {
+    return;
+  }
+
+  const config = await getComercialCategoriasContratoConfig();
+  const chave = campo === 'comissao' ? 'comissao_categoria_ids' : 'contrato_venda_categoria_ids';
+
+  if (!Array.isArray(config?.[chave])) {
+    return;
+  }
+
+  const permitidas = new Set(normalizarIdList(config[chave]));
+  if (!permitidas.has(Number(categoriaId))) {
+    throw createHttpError(
+      400,
+      campo === 'comissao'
+        ? 'Categoria financeira da comissao nao esta liberada para contratos comerciais.'
+        : 'Categoria financeira nao esta liberada para contratos comerciais.'
+    );
   }
 }
 
@@ -1210,10 +1262,12 @@ async function criarContratoComercial(req, payload = {}) {
 
   if (payload.categoria_financeira_id) {
     await ensureCategoriaFinanceiraReceber(payload.categoria_financeira_id);
+    await ensureCategoriaPermitidaNoComercial(payload.categoria_financeira_id, 'contrato');
   }
 
   if (payload.categoria_financeira_comissao_id) {
     await ensureCategoriaFinanceiraPagar(payload.categoria_financeira_comissao_id);
+    await ensureCategoriaPermitidaNoComercial(payload.categoria_financeira_comissao_id, 'comissao');
   }
 
   if (Number(unidade.empreendimento_id) !== Number(empreendimento.id)) {
@@ -1334,6 +1388,7 @@ async function atualizarContratoComercial(req, id, payload = {}) {
 
   if (payload.categoria_financeira_id) {
     await ensureCategoriaFinanceiraReceber(payload.categoria_financeira_id);
+    await ensureCategoriaPermitidaNoComercial(payload.categoria_financeira_id, 'contrato');
   }
 
   let corretorParceiro = contrato.corretorParceiro || null;
@@ -1343,6 +1398,7 @@ async function atualizarContratoComercial(req, id, payload = {}) {
 
   if (Object.prototype.hasOwnProperty.call(payload, 'categoria_financeira_comissao_id') && payload.categoria_financeira_comissao_id) {
     await ensureCategoriaFinanceiraPagar(payload.categoria_financeira_comissao_id);
+    await ensureCategoriaPermitidaNoComercial(payload.categoria_financeira_comissao_id, 'comissao');
   }
 
   const transaction = await sequelize.transaction();

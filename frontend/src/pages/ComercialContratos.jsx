@@ -420,6 +420,7 @@ export default function ComercialContratos() {
     contrato_venda_categoria_ids: [],
     comissao_categoria_ids: []
   });
+  const [categoriaConfigLoaded, setCategoriaConfigLoaded] = useState(false);
   const [contratos, setContratos] = useState([]);
   const [modelosContrato, setModelosContrato] = useState([]);
   const [documentosContrato, setDocumentosContrato] = useState([]);
@@ -468,6 +469,9 @@ export default function ComercialContratos() {
             ? categoriaConfigData.comissao_categoria_ids.map(Number)
             : []
         });
+        setCategoriaConfigLoaded(true);
+      } else {
+        setCategoriaConfigLoaded(false);
       }
       setContratos(Array.isArray(contratosData) ? contratosData : []);
       setModelosContrato(Array.isArray(modelosData) ? modelosData : []);
@@ -492,10 +496,10 @@ export default function ComercialContratos() {
       const permitidas = new Set((categoriaConfig.contrato_venda_categoria_ids || []).map(Number));
       return categorias.filter((item) => {
         const compativel = ['RECEBER', 'AMBOS'].includes(String(item.tipo || '').toUpperCase());
-        return compativel && (permitidas.size === 0 || permitidas.has(Number(item.id)));
+        return compativel && (!categoriaConfigLoaded || permitidas.has(Number(item.id)));
       });
     },
-    [categorias, categoriaConfig.contrato_venda_categoria_ids]
+    [categorias, categoriaConfig.contrato_venda_categoria_ids, categoriaConfigLoaded]
   );
 
   const categoriasCompativeisPagar = useMemo(
@@ -503,10 +507,10 @@ export default function ComercialContratos() {
       const permitidas = new Set((categoriaConfig.comissao_categoria_ids || []).map(Number));
       return categorias.filter((item) => {
         const compativel = ['PAGAR', 'AMBOS'].includes(String(item.tipo || '').toUpperCase());
-        return compativel && (permitidas.size === 0 || permitidas.has(Number(item.id)));
+        return compativel && (!categoriaConfigLoaded || permitidas.has(Number(item.id)));
       });
     },
-    [categorias, categoriaConfig.comissao_categoria_ids]
+    [categorias, categoriaConfig.comissao_categoria_ids, categoriaConfigLoaded]
   );
 
   const contratosFiltrados = useMemo(() => {
