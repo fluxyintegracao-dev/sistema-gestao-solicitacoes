@@ -30,7 +30,7 @@ O projeto ja roda em producao com uso real, frontend em Vercel e backend Node.js
 - `Seguranca`: JWT, bcrypt, autorizacao centralizada, validacao de input, rate limit e auditoria.
 
 ## Stack
-
+## teste 
 ### Backend
 
 - Node.js
