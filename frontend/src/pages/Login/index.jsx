@@ -1,11 +1,25 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import fluxyLogo from '../../assets/fluxy/fluxy-mark.svg';
 import CityBackground from '../../components/CityBackground';
 import Alert from '../../components/ui/Alert';
 import Spinner from '../../components/ui/Spinner';
 import { useAuth } from '../../contexts/AuthContext';
 import { loginMfaRequest, loginRequest } from '../../services/auth';
+
+function FluxyMark() {
+  return (
+    <svg
+      viewBox="0 0 512 512"
+      aria-hidden="true"
+      focusable="false"
+      className="login-brand-logo"
+    >
+      <path d="M140 172H363L334 201H140V172Z" fill="#102553" />
+      <path d="M140 250H304L275 289H140V250Z" fill="#102553" />
+      <path d="M140 328H241L210 375H140V328Z" fill="#102553" />
+    </svg>
+  );
+}
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -113,7 +127,7 @@ export default function Login() {
           <div className="login-shell login-shell--centered p-8">
             <div className="login-brand-header">
               <div className="login-brand-lockup">
-                <img src={fluxyLogo} alt="Fluxy" className="login-brand-logo" />
+                <FluxyMark />
                 <span className="login-brand-wordmark">Fluxy</span>
               </div>
             </div>
