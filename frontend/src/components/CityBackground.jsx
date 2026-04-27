@@ -3,82 +3,85 @@ import { useMemo } from 'react';
 const VIEW_WIDTH = 1600;
 const VIEW_HEIGHT = 980;
 const HORIZON_Y = 620;
-const STREET_Y = 758;
+const STREET_Y = 794;
 
 const LAYERS = [
   {
-    seedOffset: 0x145a32f1,
-    baseline: 702,
+    seedOffset: 0x13f4a919,
+    baseline: 706,
     minWidth: 28,
-    maxWidth: 70,
-    minHeight: 86,
-    maxHeight: 228,
+    maxWidth: 66,
+    minHeight: 82,
+    maxHeight: 210,
     gapMin: 4,
-    gapMax: 12,
-    density: 0.38,
+    gapMax: 10,
+    density: 0.42,
+    blinkChance: 0.22,
     windowWidth: 3,
     windowHeight: 6,
     gapX: 8,
     gapY: 12,
-    windowPalette: ['#77baff', '#cae9ff', '#ffd7a1'],
-    fills: ['#18324d', '#122b43', '#11263c'],
-    edges: ['#2d567a', '#234764', '#183a54'],
-    accentPalette: ['#73c5ff', '#9ccfff'],
-    accentChance: 0.16,
+    windowPalette: ['#71c3ff', '#d9efff', '#ffd7a8'],
+    fills: ['#18324d', '#112842', '#142c45'],
+    edges: ['#315e84', '#264f71', '#224566'],
+    accentPalette: ['#7cc6ff', '#abdbff'],
+    accentChance: 0.14,
     seamChance: 0.36,
-    opacity: 0.42
+    opacity: 0.4
   },
   {
-    seedOffset: 0x2947b3d5,
-    baseline: 730,
-    minWidth: 44,
-    maxWidth: 94,
+    seedOffset: 0x41cb8e73,
+    baseline: 742,
+    minWidth: 42,
+    maxWidth: 92,
     minHeight: 150,
-    maxHeight: 338,
+    maxHeight: 344,
     gapMin: 6,
     gapMax: 14,
     density: 0.3,
+    blinkChance: 0.18,
     windowWidth: 4,
     windowHeight: 8,
     gapX: 10,
     gapY: 15,
-    windowPalette: ['#8fd1ff', '#eef8ff', '#ffd69a'],
-    fills: ['#10253a', '#0d1f33', '#142b42'],
-    edges: ['#2a4f73', '#24425f', '#17344d'],
-    accentPalette: ['#79c8ff', '#f2d7b0'],
-    accentChance: 0.24,
+    windowPalette: ['#93d8ff', '#eef8ff', '#ffdba3'],
+    fills: ['#10253a', '#0c1c2d', '#122841'],
+    edges: ['#315678', '#24415e', '#1f3953'],
+    accentPalette: ['#8fcfff', '#f4deb7'],
+    accentChance: 0.23,
     seamChance: 0.48,
-    opacity: 0.72
+    opacity: 0.7
   },
   {
-    seedOffset: 0x93ca51a7,
+    seedOffset: 0x8c1ae2f5,
     baseline: STREET_Y,
-    minWidth: 56,
+    minWidth: 54,
     maxWidth: 132,
-    minHeight: 210,
-    maxHeight: 474,
+    minHeight: 224,
+    maxHeight: 484,
     gapMin: 8,
     gapMax: 18,
     density: 0.24,
+    blinkChance: 0.12,
     windowWidth: 5,
     windowHeight: 10,
     gapX: 12,
     gapY: 18,
-    windowPalette: ['#9fd7ff', '#f3fbff', '#ffe0af'],
-    fills: ['#0a1625', '#08111d', '#0d1b2b'],
-    edges: ['#214260', '#1c3650', '#163045'],
-    accentPalette: ['#72c4ff', '#ffdfb5'],
+    windowPalette: ['#a8ddff', '#f5fbff', '#ffe0ae'],
+    fills: ['#081220', '#0a1624', '#0d1a29'],
+    edges: ['#274766', '#1c3650', '#1a334a'],
+    accentPalette: ['#73c6ff', '#ffe4ba'],
     accentChance: 0.34,
-    seamChance: 0.56,
+    seamChance: 0.58,
     opacity: 1
   }
 ];
 
 function createSeed() {
   if (globalThis.crypto?.getRandomValues) {
-    const values = new Uint32Array(1);
+    const values = new Uint32Array(2);
     globalThis.crypto.getRandomValues(values);
-    return values[0] || 1;
+    return (values[0] ^ values[1] ^ Date.now()) >>> 0 || 1;
   }
 
   return ((Date.now() ^ Math.floor(Math.random() * 0xffffffff)) >>> 0) || 1;
@@ -102,10 +105,10 @@ function pick(rng, values) {
 
 function createWindows(segment, layer, seed) {
   const rng = makeRng(seed);
-  const padX = Math.max(6, Math.round(segment.w * 0.14));
+  const padX = Math.max(6, Math.round(segment.w * 0.15));
   const padTop = Math.max(10, Math.round(segment.h * 0.08));
   const usableWidth = segment.w - padX * 2;
-  const usableHeight = segment.h - padTop - 10;
+  const usableHeight = segment.h - padTop - 12;
 
   if (usableWidth < layer.windowWidth * 2 || usableHeight < layer.windowHeight * 2) {
     return [];
@@ -124,7 +127,13 @@ function createWindows(segment, layer, seed) {
       const x = segment.x + padX + column * (layer.windowWidth + layer.gapX);
       const y = segment.y + padTop + row * (layer.windowHeight + layer.gapY);
       const tallWindow = rng() < 0.14 && row < rows - 1;
-      const height = tallWindow ? layer.windowHeight + Math.round(layer.windowHeight * 0.8) : layer.windowHeight;
+      const height = tallWindow
+        ? layer.windowHeight + Math.round(layer.windowHeight * 0.8)
+        : layer.windowHeight;
+      const opacity = 0.24 + rng() * 0.62;
+      const blink = rng() < layer.blinkChance;
+      const peakOpacity = Math.min(1, opacity + 0.18 + rng() * 0.28);
+      const lowOpacity = Math.max(0.04, opacity * (0.12 + rng() * 0.24));
 
       windows.push({
         x: Math.round(x),
@@ -132,7 +141,12 @@ function createWindows(segment, layer, seed) {
         w: layer.windowWidth,
         h: height,
         fill: pick(rng, layer.windowPalette),
-        opacity: 0.28 + rng() * 0.68,
+        opacity,
+        blink,
+        lowOpacity,
+        peakOpacity,
+        delay: (rng() * 5.5).toFixed(2),
+        duration: (2.1 + rng() * 4.6).toFixed(2),
         rx: layer.windowWidth > 4 ? 1.4 : 0.8
       });
     }
@@ -164,9 +178,9 @@ function createRoofSegments(x, y, width, height, fill, rng) {
   let spire = null;
   let beacon = null;
 
-  if (roofTypeRoll < 0.28 && width > 42) {
-    const inset = Math.round(width * (0.16 + rng() * 0.1));
-    const tierHeight = Math.round(height * (0.1 + rng() * 0.08));
+  if (roofTypeRoll < 0.24 && width > 42) {
+    const inset = Math.round(width * (0.14 + rng() * 0.12));
+    const tierHeight = Math.round(height * (0.08 + rng() * 0.08));
     segments.push({
       x: x + inset,
       y: y + 2,
@@ -174,26 +188,26 @@ function createRoofSegments(x, y, width, height, fill, rng) {
       h: tierHeight,
       fill
     });
-  } else if (roofTypeRoll < 0.5 && width > 50) {
-    const inset = Math.round(width * (0.22 + rng() * 0.08));
+  } else if (roofTypeRoll < 0.48 && width > 52) {
+    const inset = Math.round(width * (0.2 + rng() * 0.1));
     const crownHeight = Math.round(height * (0.08 + rng() * 0.06));
     segments.push({
       x: x + inset,
-      y: y + 2,
+      y: y + 1,
       w: width - inset * 2,
       h: crownHeight,
       fill
     });
     segments.push({
-      x: x + inset + Math.max(3, Math.round(width * 0.05)),
-      y: y - Math.max(6, Math.round(crownHeight * 0.45)),
-      w: Math.max(10, Math.round((width - inset * 2) * 0.45)),
+      x: x + inset + Math.max(4, Math.round(width * 0.04)),
+      y: y - Math.max(6, Math.round(crownHeight * 0.5)),
+      w: Math.max(10, Math.round((width - inset * 2) * 0.46)),
       h: Math.max(8, Math.round(crownHeight * 0.72)),
       fill
     });
-  } else if (roofTypeRoll < 0.68 && width > 58) {
-    const capWidth = Math.round(width * (0.22 + rng() * 0.12));
-    const capHeight = Math.round(height * (0.11 + rng() * 0.06));
+  } else if (roofTypeRoll < 0.68 && width > 56) {
+    const capWidth = Math.round(width * (0.2 + rng() * 0.14));
+    const capHeight = Math.round(height * (0.1 + rng() * 0.05));
     segments.push({
       x: x + Math.round((width - capWidth) / 2),
       y: y + 1,
@@ -201,21 +215,24 @@ function createRoofSegments(x, y, width, height, fill, rng) {
       h: capHeight,
       fill
     });
-  } else if (height > 250 && rng() < 0.6) {
+  } else if (height > 250 && rng() < 0.62) {
     const spireHeight = Math.round(18 + rng() * 34);
     const spireX = x + Math.round(width / 2);
     spire = {
       x: spireX,
       y: y - spireHeight,
       h: spireHeight,
-      opacity: 0.55 + rng() * 0.22
+      opacity: 0.54 + rng() * 0.24
     };
-    if (rng() < 0.4) {
+
+    if (rng() < 0.42) {
       beacon = {
         cx: spireX,
         cy: y - spireHeight,
-        r: 2 + rng() * 1.6,
-        opacity: 0.5 + rng() * 0.24
+        r: 1.6 + rng() * 1.8,
+        opacity: 0.42 + rng() * 0.26,
+        duration: (1.8 + rng() * 2.4).toFixed(2),
+        delay: (rng() * 2.8).toFixed(2)
       };
     }
   }
@@ -246,22 +263,18 @@ function createBuilding(layer, x, seed) {
 
   let accent = null;
   if (rng() < layer.accentChance) {
-    const accentWidth = width > 100 ? 7 : width > 76 ? 5 : 3;
+    const accentWidth = width > 100 ? 7 : width > 78 ? 5 : 3;
     accent = {
       x: x + Math.round(width * (0.18 + rng() * 0.56)),
       y: y + 14,
       w: accentWidth,
-      h: height - 18,
+      h: height - 20,
       fill: pick(rng, layer.accentPalette),
-      opacity: 0.16 + rng() * 0.22
+      opacity: 0.14 + rng() * 0.22
     };
   }
 
   return {
-    x,
-    y,
-    w: width,
-    h: height,
     edge,
     segments,
     windows,
@@ -282,7 +295,9 @@ function createLayer(layer, seed) {
     const buildingSeed = (seed ^ (index * 0x9e3779b9) ^ Math.round(x * 97)) >>> 0;
     const building = createBuilding(layer, Math.round(x), buildingSeed);
     buildings.push(building);
-    x += building.w + Math.round(range(rng, layer.gapMin, layer.gapMax));
+    const gap = Math.round(range(rng, layer.gapMin, layer.gapMax));
+    const lastSegment = building.segments[0];
+    x += lastSegment.w + gap;
     index += 1;
   }
 
@@ -335,30 +350,30 @@ export default function CityBackground() {
     >
       <defs>
         <linearGradient id={`${scene.id}-sky`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#06101c" />
-          <stop offset="38%" stopColor="#102842" />
-          <stop offset="72%" stopColor="#1a4467" />
-          <stop offset="100%" stopColor="#28577f" />
+          <stop offset="0%" stopColor="#07111d" />
+          <stop offset="32%" stopColor="#102842" />
+          <stop offset="72%" stopColor="#193d5f" />
+          <stop offset="100%" stopColor="#214d74" />
         </linearGradient>
 
-        <radialGradient id={`${scene.id}-cool-halo`} cx="68%" cy="34%" r="44%">
-          <stop offset="0%" stopColor="#8fd8ff" stopOpacity="0.2" />
+        <radialGradient id={`${scene.id}-cool-halo`} cx="70%" cy="28%" r="46%">
+          <stop offset="0%" stopColor="#8fd8ff" stopOpacity="0.22" />
           <stop offset="100%" stopColor="#8fd8ff" stopOpacity="0" />
         </radialGradient>
 
-        <radialGradient id={`${scene.id}-warm-halo`} cx="18%" cy="18%" r="42%">
-          <stop offset="0%" stopColor="#ffd7a0" stopOpacity="0.16" />
+        <radialGradient id={`${scene.id}-warm-halo`} cx="16%" cy="18%" r="40%">
+          <stop offset="0%" stopColor="#ffd7a0" stopOpacity="0.14" />
           <stop offset="100%" stopColor="#ffd7a0" stopOpacity="0" />
         </radialGradient>
 
         <linearGradient id={`${scene.id}-street`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#09111c" />
+          <stop offset="0%" stopColor="#08111b" />
           <stop offset="100%" stopColor="#03070d" />
         </linearGradient>
 
         <linearGradient id={`${scene.id}-street-glow`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#98d6ff" stopOpacity="0.16" />
-          <stop offset="100%" stopColor="#98d6ff" stopOpacity="0" />
+          <stop offset="0%" stopColor="#9bd7ff" stopOpacity="0.18" />
+          <stop offset="100%" stopColor="#9bd7ff" stopOpacity="0" />
         </linearGradient>
 
         <filter id={`${scene.id}-blur`} x="-30%" y="-30%" width="160%" height="160%">
@@ -374,7 +389,7 @@ export default function CityBackground() {
         <line
           key={`guide-${x}`}
           x1={x}
-          y1={80}
+          y1={0}
           x2={x}
           y2={VIEW_HEIGHT}
           stroke="#d8efff"
@@ -410,7 +425,7 @@ export default function CityBackground() {
         />
       ))}
 
-      <rect x="0" y={HORIZON_Y + 10} width={VIEW_WIDTH} height="180" fill="#0a1a2b" opacity="0.18" />
+      <rect x="0" y={HORIZON_Y + 10} width={VIEW_WIDTH} height="190" fill="#091929" opacity="0.16" />
 
       {scene.layers.map((layer, layerIndex) => (
         <g key={`layer-${layerIndex}`} opacity={layer.opacity}>
@@ -442,15 +457,15 @@ export default function CityBackground() {
                     width="1"
                     height={segment.h}
                     fill={building.edge}
-                    opacity="0.72"
+                    opacity="0.74"
                   />
                   <rect
                     x={segment.x + segment.w - 1}
                     y={segment.y}
                     width="1"
                     height={segment.h}
-                    fill="#d6f0ff"
-                    opacity="0.05"
+                    fill="#daf0ff"
+                    opacity="0.06"
                   />
                 </g>
               ))}
@@ -465,7 +480,17 @@ export default function CityBackground() {
                   rx={window.rx}
                   fill={window.fill}
                   opacity={window.opacity}
-                />
+                >
+                  {window.blink && (
+                    <animate
+                      attributeName="opacity"
+                      values={`${window.lowOpacity};${window.peakOpacity};${window.lowOpacity};${window.opacity}`}
+                      dur={`${window.duration}s`}
+                      begin={`${window.delay}s`}
+                      repeatCount="indefinite"
+                    />
+                  )}
+                </rect>
               ))}
 
               {building.accent && (
@@ -498,7 +523,15 @@ export default function CityBackground() {
                   r={building.beacon.r}
                   fill="#ffe2b8"
                   opacity={building.beacon.opacity}
-                />
+                >
+                  <animate
+                    attributeName="opacity"
+                    values={`0.12;${building.beacon.opacity};0.2`}
+                    dur={`${building.beacon.duration}s`}
+                    begin={`${building.beacon.delay}s`}
+                    repeatCount="indefinite"
+                  />
+                </circle>
               )}
             </g>
           ))}
@@ -506,7 +539,7 @@ export default function CityBackground() {
       ))}
 
       <rect x="0" y={STREET_Y} width={VIEW_WIDTH} height={VIEW_HEIGHT - STREET_Y} fill={`url(#${scene.id}-street)`} />
-      <rect x="0" y={STREET_Y - 12} width={VIEW_WIDTH} height="90" fill={`url(#${scene.id}-street-glow)`} />
+      <rect x="0" y={STREET_Y - 12} width={VIEW_WIDTH} height="96" fill={`url(#${scene.id}-street-glow)`} />
       <line x1="0" y1={STREET_Y} x2={VIEW_WIDTH} y2={STREET_Y} stroke="#a7d8ff" strokeOpacity="0.34" strokeWidth="1.5" />
       <line x1="0" y1={STREET_Y + 20} x2={VIEW_WIDTH} y2={STREET_Y + 20} stroke="#7ab6de" strokeOpacity="0.14" strokeWidth="1" />
     </svg>
