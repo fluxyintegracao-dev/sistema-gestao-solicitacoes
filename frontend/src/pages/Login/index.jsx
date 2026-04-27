@@ -14,9 +14,39 @@ function FluxyMark() {
       focusable="false"
       className="login-brand-logo"
     >
-      <path d="M140 172H363L334 201H140V172Z" fill="#102553" />
-      <path d="M140 250H304L275 289H140V250Z" fill="#102553" />
-      <path d="M140 328H241L210 375H140V328Z" fill="#102553" />
+      <path d="M140 172H363L334 201H140V172Z" fill="#123a78" />
+      <path d="M140 250H304L275 289H140V250Z" fill="#123a78" />
+      <path d="M140 328H241L210 375H140V328Z" fill="#123a78" />
+    </svg>
+  );
+}
+
+function VisibilityIcon({ visible }) {
+  if (visible) {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path
+          d="M3 3l18 18M10.58 10.59A2 2 0 0012 14a2 2 0 001.41-.58M9.88 5.09A10.94 10.94 0 0112 5c5.05 0 8.27 4.11 9 5-.35.43-1.3 1.53-2.8 2.63M6.61 6.62C4.55 8.06 3.29 9.63 3 10c.73.89 3.95 5 9 5 1.59 0 3-.31 4.22-.8"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    );
+  }
+
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path
+        d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12zm11 3a3 3 0 100-6 3 3 0 000 6z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }
@@ -24,6 +54,7 @@ function FluxyMark() {
 export default function Login() {
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [mfaCode, setMfaCode] = useState('');
   const [mfaChallenge, setMfaChallenge] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -61,6 +92,7 @@ export default function Login() {
 
       if (data?.mfa_required) {
         setSenha('');
+        setShowPassword(false);
         setMfaCode('');
         setMfaChallenge({
           challengeToken: data.challenge_token,
@@ -125,10 +157,22 @@ export default function Login() {
       <div className="login-content-wrap">
         <div className="login-panel-column login-panel-column--centered">
           <div className="login-shell login-shell--centered p-8">
+            <div className="login-shell-chrome" aria-hidden="true" />
+
             <div className="login-brand-header">
               <div className="login-brand-lockup">
                 <FluxyMark />
-                <span className="login-brand-wordmark">Fluxy</span>
+                <div className="login-brand-copy">
+                  <span className="login-brand-wordmark">Fluxy</span>
+                  <span className="login-brand-caption">Acesso seguro</span>
+                </div>
+              </div>
+
+              <div className="login-heading">
+                <h1 className="login-heading-title">Entre na sua central</h1>
+                <p className="login-heading-subtitle">
+                  Obras, operacao e financeiro em um unico ambiente.
+                </p>
               </div>
             </div>
 
@@ -139,18 +183,14 @@ export default function Login() {
             )}
 
             {mfaChallenge ? (
-              <form onSubmit={handleMfaSubmit} noValidate className="grid gap-4">
+              <form onSubmit={handleMfaSubmit} noValidate className="grid gap-5">
                 <Alert
                   type="info"
                   message={`Senha validada para ${mfaChallenge.user?.nome || mfaChallenge.user?.email || 'o usuario'}. Informe o codigo gerado no aplicativo autenticador para concluir o login.`}
                 />
 
-                <div className="grid gap-1.5">
-                  <label
-                    htmlFor="login-mfa-code"
-                    className="text-sm font-medium"
-                    style={{ color: 'var(--c-text)' }}
-                  >
+                <div className="grid gap-2">
+                  <label htmlFor="login-mfa-code" className="login-field-label">
                     Codigo do autenticador
                   </label>
                   <input
@@ -159,7 +199,7 @@ export default function Login() {
                     inputMode="numeric"
                     autoComplete="one-time-code"
                     placeholder="000000"
-                    className="input"
+                    className="input login-input"
                     value={mfaCode}
                     onChange={(event) => setMfaCode(event.target.value.replace(/\D+/g, '').slice(0, 6))}
                     disabled={loading}
@@ -171,7 +211,7 @@ export default function Login() {
                   <button
                     type="submit"
                     disabled={loading}
-                    className="btn btn-primary w-full justify-center"
+                    className="btn btn-primary login-submit-btn w-full justify-center"
                   >
                     {loading ? (
                       <>
@@ -186,7 +226,7 @@ export default function Login() {
                   <button
                     type="button"
                     disabled={loading}
-                    className="btn btn-secondary w-full justify-center"
+                    className="btn btn-secondary login-secondary-btn w-full justify-center"
                     onClick={cancelarMfa}
                   >
                     Voltar
@@ -194,13 +234,9 @@ export default function Login() {
                 </div>
               </form>
             ) : (
-              <form onSubmit={handleSubmit} noValidate className="grid gap-4">
-                <div className="grid gap-1.5">
-                  <label
-                    htmlFor="login-email"
-                    className="text-sm font-medium"
-                    style={{ color: 'var(--c-text)' }}
-                  >
+              <form onSubmit={handleSubmit} noValidate className="grid gap-5">
+                <div className="grid gap-2">
+                  <label htmlFor="login-email" className="login-field-label">
                     E-mail
                   </label>
                   <input
@@ -208,7 +244,7 @@ export default function Login() {
                     type="email"
                     autoComplete="email"
                     placeholder="seu@email.com.br"
-                    className="input"
+                    className="input login-input"
                     value={email}
                     onChange={(event) => setEmail(event.target.value)}
                     disabled={loading}
@@ -216,32 +252,38 @@ export default function Login() {
                   />
                 </div>
 
-                <div className="grid gap-1.5">
-                  <label
-                    htmlFor="login-senha"
-                    className="text-sm font-medium"
-                    style={{ color: 'var(--c-text)' }}
-                  >
+                <div className="grid gap-2">
+                  <label htmlFor="login-senha" className="login-field-label">
                     Senha
                   </label>
-                  <input
-                    id="login-senha"
-                    type="password"
-                    autoComplete="current-password"
-                    placeholder="........"
-                    className="input"
-                    value={senha}
-                    onChange={(event) => setSenha(event.target.value)}
-                    disabled={loading}
-                    required
-                  />
+                  <div className="login-password-wrap">
+                    <input
+                      id="login-senha"
+                      type={showPassword ? 'text' : 'password'}
+                      autoComplete="current-password"
+                      placeholder="Digite sua senha"
+                      className="input login-input login-input--password"
+                      value={senha}
+                      onChange={(event) => setSenha(event.target.value)}
+                      disabled={loading}
+                      required
+                    />
+                    <button
+                      type="button"
+                      className="login-password-toggle"
+                      onClick={() => setShowPassword((current) => !current)}
+                      aria-label={showPassword ? 'Ocultar senha' : 'Visualizar senha'}
+                      aria-pressed={showPassword}
+                    >
+                      <VisibilityIcon visible={showPassword} />
+                    </button>
+                  </div>
                 </div>
 
                 <button
                   type="submit"
                   disabled={loading}
-                  className="btn btn-primary w-full justify-center"
-                  style={{ marginTop: '0.25rem' }}
+                  className="btn btn-primary login-submit-btn w-full justify-center"
                 >
                   {loading ? (
                     <>
