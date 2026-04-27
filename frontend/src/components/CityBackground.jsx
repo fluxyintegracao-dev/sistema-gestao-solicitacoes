@@ -1,79 +1,63 @@
 import { useMemo } from 'react';
 
-const VIEW_WIDTH = 1600;
-const VIEW_HEIGHT = 980;
-const HORIZON_Y = 620;
-const STREET_Y = 794;
+const VIEW_WIDTH = 1800;
+const VIEW_HEIGHT = 1080;
+const STREET_Y = 928;
 
 const LAYERS = [
   {
-    seedOffset: 0x13f4a919,
-    baseline: 706,
-    minWidth: 28,
-    maxWidth: 66,
-    minHeight: 82,
-    maxHeight: 210,
-    gapMin: 4,
-    gapMax: 10,
-    density: 0.42,
-    blinkChance: 0.22,
-    windowWidth: 3,
-    windowHeight: 6,
-    gapX: 8,
-    gapY: 12,
-    windowPalette: ['#71c3ff', '#d9efff', '#ffd7a8'],
-    fills: ['#18324d', '#112842', '#142c45'],
-    edges: ['#315e84', '#264f71', '#224566'],
-    accentPalette: ['#7cc6ff', '#abdbff'],
-    accentChance: 0.14,
-    seamChance: 0.36,
-    opacity: 0.4
+    seedOffset: 0x11af23c5,
+    baseline: 760,
+    minWidth: 90,
+    maxWidth: 175,
+    minHeight: 120,
+    maxHeight: 260,
+    gapMin: 0,
+    gapMax: 16,
+    fills: ['#111e52', '#141f58', '#18265e'],
+    edge: '#2a4aaa',
+    accent: '#5a9aff',
+    opacity: 0.62,
+    dividerChance: 0.32,
+    lightChance: 0.14,
+    lightSize: [8, 14],
+    riseBaseDelay: 0.04
   },
   {
-    seedOffset: 0x41cb8e73,
-    baseline: 742,
-    minWidth: 42,
-    maxWidth: 92,
-    minHeight: 150,
-    maxHeight: 344,
-    gapMin: 6,
-    gapMax: 14,
-    density: 0.3,
-    blinkChance: 0.18,
-    windowWidth: 4,
-    windowHeight: 8,
-    gapX: 10,
-    gapY: 15,
-    windowPalette: ['#93d8ff', '#eef8ff', '#ffdba3'],
-    fills: ['#10253a', '#0c1c2d', '#122841'],
-    edges: ['#315678', '#24415e', '#1f3953'],
-    accentPalette: ['#8fcfff', '#f4deb7'],
-    accentChance: 0.23,
-    seamChance: 0.48,
-    opacity: 0.7
+    seedOffset: 0x47ce94e1,
+    baseline: 846,
+    minWidth: 112,
+    maxWidth: 210,
+    minHeight: 200,
+    maxHeight: 410,
+    gapMin: 0,
+    gapMax: 20,
+    fills: ['#152066', '#1a2872', '#1e307e'],
+    edge: '#3a60c0',
+    accent: '#6aaeff',
+    opacity: 0.8,
+    dividerChance: 0.44,
+    lightChance: 0.22,
+    lightSize: [9, 16],
+    riseBaseDelay: 0.12
   },
   {
-    seedOffset: 0x8c1ae2f5,
+    seedOffset: 0x8c31d5fa,
     baseline: STREET_Y,
-    minWidth: 54,
-    maxWidth: 132,
-    minHeight: 224,
-    maxHeight: 484,
-    gapMin: 8,
-    gapMax: 18,
-    density: 0.24,
-    blinkChance: 0.12,
-    windowWidth: 5,
-    windowHeight: 10,
-    gapX: 12,
-    gapY: 18,
-    windowPalette: ['#a8ddff', '#f5fbff', '#ffe0ae'],
-    fills: ['#081220', '#0a1624', '#0d1a29'],
-    edges: ['#274766', '#1c3650', '#1a334a'],
-    accentPalette: ['#73c6ff', '#ffe4ba'],
-    accentChance: 0.34,
-    seamChance: 0.58,
-    opacity: 1
+    minWidth: 128,
+    maxWidth: 244,
+    minHeight: 250,
+    maxHeight: 550,
+    gapMin: 0,
+    gapMax: 22,
+    fills: ['#1a2872', '#20337e', '#263d8e'],
+    edge: '#4a78d8',
+    accent: '#82c0ff',
+    opacity: 1,
+    dividerChance: 0.54,
+    lightChance: 0.3,
+    lightSize: [10, 20],
+    riseBaseDelay: 0.22
   }
 ];
 
@@ -83,7 +67,6 @@ function createSeed() {
     globalThis.crypto.getRandomValues(values);
     return (values[0] ^ values[1] ^ Date.now()) >>> 0 || 1;
   }
-
   return ((Date.now() ^ Math.floor(Math.random() * 0xffffffff)) >>> 0) || 1;
 }
 
@@ -103,141 +86,79 @@ function pick(rng, values) {
   return values[Math.floor(rng() * values.length)] || values[0];
 }
 
-function createWindows(segment, layer, seed) {
-  const rng = makeRng(seed);
-  const padX = Math.max(6, Math.round(segment.w * 0.15));
-  const padTop = Math.max(10, Math.round(segment.h * 0.08));
-  const usableWidth = segment.w - padX * 2;
-  const usableHeight = segment.h - padTop - 12;
-
-  if (usableWidth < layer.windowWidth * 2 || usableHeight < layer.windowHeight * 2) {
-    return [];
-  }
-
-  const columns = Math.floor((usableWidth + layer.gapX) / (layer.windowWidth + layer.gapX));
-  const rows = Math.floor((usableHeight + layer.gapY) / (layer.windowHeight + layer.gapY));
-  const windows = [];
-
-  for (let row = 0; row < rows; row += 1) {
-    for (let column = 0; column < columns; column += 1) {
-      if (rng() > layer.density) {
-        continue;
+function createTopSegments(x, y, width, height, fill, rng) {
+  const profile = rng();
+  if (profile < 0.28 && width > 138) {
+    const towerWidth = Math.round(width * (0.22 + rng() * 0.14));
+    const towerHeight = Math.round(height * (0.16 + rng() * 0.08));
+    const alignRight = rng() < 0.5;
+    return [
+      {
+        x: alignRight ? x + width - towerWidth : x,
+        y: y - towerHeight,
+        w: towerWidth,
+        h: towerHeight,
+        fill
       }
-
-      const x = segment.x + padX + column * (layer.windowWidth + layer.gapX);
-      const y = segment.y + padTop + row * (layer.windowHeight + layer.gapY);
-      const tallWindow = rng() < 0.14 && row < rows - 1;
-      const height = tallWindow
-        ? layer.windowHeight + Math.round(layer.windowHeight * 0.8)
-        : layer.windowHeight;
-      const opacity = 0.24 + rng() * 0.62;
-      const blink = rng() < layer.blinkChance;
-      const peakOpacity = Math.min(1, opacity + 0.18 + rng() * 0.28);
-      const lowOpacity = Math.max(0.04, opacity * (0.12 + rng() * 0.24));
-
-      windows.push({
-        x: Math.round(x),
-        y: Math.round(y),
-        w: layer.windowWidth,
-        h: height,
-        fill: pick(rng, layer.windowPalette),
-        opacity,
-        blink,
-        lowOpacity,
-        peakOpacity,
-        delay: (rng() * 5.5).toFixed(2),
-        duration: (2.1 + rng() * 4.6).toFixed(2),
-        rx: layer.windowWidth > 4 ? 1.4 : 0.8
-      });
-    }
+    ];
   }
 
-  return windows;
+  if (profile < 0.48 && width > 160) {
+    const capWidth = Math.round(width * (0.42 + rng() * 0.12));
+    const capHeight = Math.round(height * (0.1 + rng() * 0.06));
+    return [
+      {
+        x: x + Math.round((width - capWidth) / 2),
+        y: y - capHeight,
+        w: capWidth,
+        h: capHeight,
+        fill
+      }
+    ];
+  }
+
+  return [];
 }
 
-function createSeams(x, width, height, layer, rng) {
-  if (rng() > layer.seamChance || width < 56) {
+function createDividers(x, y, width, height, layer, rng) {
+  if (rng() > layer.dividerChance || width < 120) {
     return [];
   }
 
-  const count = width > 92 ? 3 : width > 68 ? 2 : 1;
+  const count = width > 210 ? 3 : width > 160 ? 2 : 1;
   return Array.from({ length: count }, (_, index) => {
     const fraction = (index + 1) / (count + 1);
     return {
       x: Math.round(x + width * fraction),
-      y: Math.round(STREET_Y - height + 10),
-      h: Math.round(height - 20),
-      opacity: 0.08 + rng() * 0.16
+      y,
+      h: height,
+      opacity: 0.1 + rng() * 0.14
     };
   });
 }
 
-function createRoofSegments(x, y, width, height, fill, rng) {
-  const roofTypeRoll = rng();
-  const segments = [];
-  let spire = null;
-  let beacon = null;
+function createLights(x, y, width, height, layer, rng) {
+  const lights = [];
+  const [lightWidth, lightHeight] = layer.lightSize;
+  const slots = Math.max(0, Math.floor(width / 42));
 
-  if (roofTypeRoll < 0.24 && width > 42) {
-    const inset = Math.round(width * (0.14 + rng() * 0.12));
-    const tierHeight = Math.round(height * (0.08 + rng() * 0.08));
-    segments.push({
-      x: x + inset,
-      y: y + 2,
-      w: width - inset * 2,
-      h: tierHeight,
-      fill
-    });
-  } else if (roofTypeRoll < 0.48 && width > 52) {
-    const inset = Math.round(width * (0.2 + rng() * 0.1));
-    const crownHeight = Math.round(height * (0.08 + rng() * 0.06));
-    segments.push({
-      x: x + inset,
-      y: y + 1,
-      w: width - inset * 2,
-      h: crownHeight,
-      fill
-    });
-    segments.push({
-      x: x + inset + Math.max(4, Math.round(width * 0.04)),
-      y: y - Math.max(6, Math.round(crownHeight * 0.5)),
-      w: Math.max(10, Math.round((width - inset * 2) * 0.46)),
-      h: Math.max(8, Math.round(crownHeight * 0.72)),
-      fill
-    });
-  } else if (roofTypeRoll < 0.68 && width > 56) {
-    const capWidth = Math.round(width * (0.2 + rng() * 0.14));
-    const capHeight = Math.round(height * (0.1 + rng() * 0.05));
-    segments.push({
-      x: x + Math.round((width - capWidth) / 2),
-      y: y + 1,
-      w: capWidth,
-      h: capHeight,
-      fill
-    });
-  } else if (height > 250 && rng() < 0.62) {
-    const spireHeight = Math.round(18 + rng() * 34);
-    const spireX = x + Math.round(width / 2);
-    spire = {
-      x: spireX,
-      y: y - spireHeight,
-      h: spireHeight,
-      opacity: 0.54 + rng() * 0.24
-    };
-
-    if (rng() < 0.42) {
-      beacon = {
-        cx: spireX,
-        cy: y - spireHeight,
-        r: 1.6 + rng() * 1.8,
-        opacity: 0.42 + rng() * 0.26,
-        duration: (1.8 + rng() * 2.4).toFixed(2),
-        delay: (rng() * 2.8).toFixed(2)
-      };
+  for (let index = 0; index < slots; index += 1) {
+    if (rng() > layer.lightChance) {
+      continue;
     }
+
+    lights.push({
+      x: Math.round(x + 14 + index * 36 + rng() * 10),
+      y: Math.round(y + 28 + rng() * Math.max(20, height - 76)),
+      w: lightWidth,
+      h: lightHeight,
+      opacity: 0.55 + rng() * 0.38,
+      delay: (0.6 + rng() * 5).toFixed(2),
+      duration: (2.4 + rng() * 4).toFixed(2)
+    });
   }
 
-  return { roofSegments: segments, spire, beacon };
+  return lights;
 }
 
 function createBuilding(layer, x, seed) {
@@ -246,73 +167,54 @@ function createBuilding(layer, x, seed) {
   const height = Math.round(range(rng, layer.minHeight, layer.maxHeight));
   const y = layer.baseline - height;
   const fill = pick(rng, layer.fills);
-  const edge = pick(rng, layer.edges);
-  const body = {
-    x,
-    y,
-    w: width,
-    h: height,
-    fill
-  };
-
-  const { roofSegments, spire, beacon } = createRoofSegments(x, y, width, height, fill, rng);
-  const segments = [body, ...roofSegments];
-  const windows = segments.flatMap((segment, index) =>
-    createWindows(segment, layer, seed ^ ((index + 1) * 0x9e3779b9))
-  );
-
-  let accent = null;
-  if (rng() < layer.accentChance) {
-    const accentWidth = width > 100 ? 7 : width > 78 ? 5 : 3;
-    accent = {
-      x: x + Math.round(width * (0.18 + rng() * 0.56)),
-      y: y + 14,
-      w: accentWidth,
-      h: height - 20,
-      fill: pick(rng, layer.accentPalette),
-      opacity: 0.14 + rng() * 0.22
-    };
-  }
+  const topSegments = createTopSegments(x, y, width, height, fill, rng);
+  const dividers = createDividers(x, y, width, height, layer, rng);
+  const lights = createLights(x, y, width, height, layer, rng);
+  const riseDelay = (layer.riseBaseDelay + rng() * 0.76 + (x / VIEW_WIDTH) * 0.3).toFixed(2);
+  const riseDuration = (0.92 + rng() * 0.46).toFixed(2);
 
   return {
-    edge,
-    segments,
-    windows,
-    seams: createSeams(x, width, height, layer, rng),
-    accent,
-    spire,
-    beacon
+    x,
+    y,
+    width,
+    height,
+    fill,
+    edge: layer.edge,
+    accent: layer.accent,
+    topSegments,
+    dividers,
+    lights,
+    riseDelay,
+    riseDuration
   };
 }
 
 function createLayer(layer, seed) {
   const rng = makeRng(seed);
   const buildings = [];
-  let x = -72;
+  let x = -120;
   let index = 0;
 
-  while (x < VIEW_WIDTH + 96) {
-    const buildingSeed = (seed ^ (index * 0x9e3779b9) ^ Math.round(x * 97)) >>> 0;
+  while (x < VIEW_WIDTH + 140) {
+    const buildingSeed = (seed ^ (index * 0x9e3779b9) ^ Math.round(x * 73)) >>> 0;
     const building = createBuilding(layer, Math.round(x), buildingSeed);
     buildings.push(building);
-    const gap = Math.round(range(rng, layer.gapMin, layer.gapMax));
-    const lastSegment = building.segments[0];
-    x += lastSegment.w + gap;
+    x += building.width + Math.round(range(rng, layer.gapMin, layer.gapMax));
     index += 1;
   }
 
   return { ...layer, buildings };
 }
 
-function createGlowBands(seed) {
+function createSkyGlow(seed) {
   const rng = makeRng(seed);
-  return Array.from({ length: 5 }, (_, index) => ({
-    x: Math.round(range(rng, 120, VIEW_WIDTH - 120)),
-    y: Math.round(range(rng, HORIZON_Y - 90, HORIZON_Y + 80)),
-    rx: Math.round(range(rng, 140, 280)),
-    ry: Math.round(range(rng, 34, 72)),
-    opacity: 0.08 + rng() * 0.1,
-    warm: index % 2 === 0
+  return Array.from({ length: 3 }, (_, index) => ({
+    x: Math.round(range(rng, 240, VIEW_WIDTH - 240)),
+    y: Math.round(range(rng, 120, 480)),
+    rx: Math.round(range(rng, 200, 340)),
+    ry: Math.round(range(rng, 90, 160)),
+    opacity: 0.06 + rng() * 0.07,
+    tone: index === 1 ? '#3a7fff' : '#4466dd'
   }));
 }
 
@@ -323,9 +225,7 @@ function createScene(seed) {
 
   return {
     id: `city-${seed.toString(36)}`,
-    glowBands: createGlowBands(seed ^ 0x5ad1e7c3),
-    guideLines: Array.from({ length: 8 }, (_, index) => 120 + index * 190),
-    horizonMarkers: Array.from({ length: 6 }, (_, index) => 160 + index * 240),
+    skyGlow: createSkyGlow(seed ^ 0x5ad1e7c3),
     layers
   };
 }
@@ -350,198 +250,158 @@ export default function CityBackground() {
     >
       <defs>
         <linearGradient id={`${scene.id}-sky`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#07111d" />
-          <stop offset="32%" stopColor="#102842" />
-          <stop offset="72%" stopColor="#193d5f" />
-          <stop offset="100%" stopColor="#214d74" />
+          <stop offset="0%" stopColor="#050c22" />
+          <stop offset="45%" stopColor="#0a1638" />
+          <stop offset="100%" stopColor="#121f50" />
         </linearGradient>
 
-        <radialGradient id={`${scene.id}-cool-halo`} cx="70%" cy="28%" r="46%">
-          <stop offset="0%" stopColor="#8fd8ff" stopOpacity="0.22" />
-          <stop offset="100%" stopColor="#8fd8ff" stopOpacity="0" />
+        <radialGradient id={`${scene.id}-top-light`} cx="50%" cy="18%" r="58%">
+          <stop offset="0%" stopColor="#2255bb" stopOpacity="0.1" />
+          <stop offset="100%" stopColor="#2255bb" stopOpacity="0" />
         </radialGradient>
 
-        <radialGradient id={`${scene.id}-warm-halo`} cx="16%" cy="18%" r="40%">
-          <stop offset="0%" stopColor="#ffd7a0" stopOpacity="0.14" />
-          <stop offset="100%" stopColor="#ffd7a0" stopOpacity="0" />
-        </radialGradient>
-
-        <linearGradient id={`${scene.id}-street`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#08111b" />
-          <stop offset="100%" stopColor="#03070d" />
+        <linearGradient id={`${scene.id}-ground`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#09102e" />
+          <stop offset="100%" stopColor="#050919" />
         </linearGradient>
 
-        <linearGradient id={`${scene.id}-street-glow`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#9bd7ff" stopOpacity="0.18" />
-          <stop offset="100%" stopColor="#9bd7ff" stopOpacity="0" />
+        <linearGradient id={`${scene.id}-ground-haze`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#3a70dd" stopOpacity="0.14" />
+          <stop offset="100%" stopColor="#3a70dd" stopOpacity="0" />
         </linearGradient>
 
         <filter id={`${scene.id}-blur`} x="-30%" y="-30%" width="160%" height="160%">
-          <feGaussianBlur stdDeviation="26" />
+          <feGaussianBlur stdDeviation="32" />
         </filter>
       </defs>
 
+      <style>
+        {`
+          @keyframes city-rise {
+            0% {
+              opacity: 0;
+              transform: translateY(80px) scaleY(0.04);
+            }
+            55% {
+              opacity: 1;
+            }
+            100% {
+              opacity: 1;
+              transform: translateY(0) scaleY(1);
+            }
+          }
+        `}
+      </style>
+
       <rect width={VIEW_WIDTH} height={VIEW_HEIGHT} fill={`url(#${scene.id}-sky)`} />
-      <rect width={VIEW_WIDTH} height={VIEW_HEIGHT} fill={`url(#${scene.id}-cool-halo)`} />
-      <rect width={VIEW_WIDTH} height={VIEW_HEIGHT} fill={`url(#${scene.id}-warm-halo)`} />
+      <rect width={VIEW_WIDTH} height={VIEW_HEIGHT} fill={`url(#${scene.id}-top-light)`} />
 
-      {scene.guideLines.map((x) => (
-        <line
-          key={`guide-${x}`}
-          x1={x}
-          y1={0}
-          x2={x}
-          y2={VIEW_HEIGHT}
-          stroke="#d8efff"
-          strokeOpacity="0.05"
-          strokeWidth="1"
-        />
-      ))}
-
-      {scene.horizonMarkers.map((x) => (
-        <line
-          key={`marker-${x}`}
-          x1={x}
-          y1={HORIZON_Y}
-          x2={x + 120}
-          y2={HORIZON_Y}
-          stroke="#dff3ff"
-          strokeOpacity="0.08"
-          strokeWidth="2"
-          strokeLinecap="round"
-        />
-      ))}
-
-      {scene.glowBands.map((band, index) => (
+      {scene.skyGlow.map((glow, index) => (
         <ellipse
           key={`glow-${index}`}
-          cx={band.x}
-          cy={band.y}
-          rx={band.rx}
-          ry={band.ry}
-          fill={band.warm ? '#ffd7a0' : '#8ecfff'}
-          opacity={band.opacity}
+          cx={glow.x}
+          cy={glow.y}
+          rx={glow.rx}
+          ry={glow.ry}
+          fill={glow.tone}
+          opacity={glow.opacity}
           filter={`url(#${scene.id}-blur)`}
         />
       ))}
 
-      <rect x="0" y={HORIZON_Y + 10} width={VIEW_WIDTH} height="190" fill="#091929" opacity="0.16" />
-
       {scene.layers.map((layer, layerIndex) => (
         <g key={`layer-${layerIndex}`} opacity={layer.opacity}>
           {layer.buildings.map((building, buildingIndex) => (
-            <g key={`building-${layerIndex}-${buildingIndex}`}>
-              {building.spire && (
-                <rect
-                  x={building.spire.x}
-                  y={building.spire.y}
-                  width="2"
-                  height={building.spire.h}
-                  fill={building.edge}
-                  opacity={building.spire.opacity}
-                />
-              )}
+            <g
+              key={`building-${layerIndex}-${buildingIndex}`}
+              style={{
+                transformOrigin: 'center bottom',
+                transformBox: 'fill-box',
+                animation: `city-rise ${building.riseDuration}s cubic-bezier(0.22, 0.84, 0.24, 1) ${building.riseDelay}s both`
+              }}
+            >
+              <rect
+                x={building.x}
+                y={building.y}
+                width={building.width}
+                height={building.height}
+                fill={building.fill}
+              />
 
-              {building.segments.map((segment, segmentIndex) => (
-                <g key={`segment-${segmentIndex}`}>
-                  <rect
-                    x={segment.x}
-                    y={segment.y}
-                    width={segment.w}
-                    height={segment.h}
-                    fill={segment.fill}
-                  />
-                  <rect
-                    x={segment.x + 1}
-                    y={segment.y}
-                    width="1"
-                    height={segment.h}
-                    fill={building.edge}
-                    opacity="0.74"
-                  />
-                  <rect
-                    x={segment.x + segment.w - 1}
-                    y={segment.y}
-                    width="1"
-                    height={segment.h}
-                    fill="#daf0ff"
-                    opacity="0.06"
-                  />
-                </g>
+              {building.topSegments.map((segment, segmentIndex) => (
+                <rect
+                  key={`segment-${segmentIndex}`}
+                  x={segment.x}
+                  y={segment.y}
+                  width={segment.w}
+                  height={segment.h}
+                  fill={segment.fill}
+                />
               ))}
 
-              {building.windows.map((window, windowIndex) => (
-                <rect
-                  key={`window-${windowIndex}`}
-                  x={window.x}
-                  y={window.y}
-                  width={window.w}
-                  height={window.h}
-                  rx={window.rx}
-                  fill={window.fill}
-                  opacity={window.opacity}
-                >
-                  {window.blink && (
-                    <animate
-                      attributeName="opacity"
-                      values={`${window.lowOpacity};${window.peakOpacity};${window.lowOpacity};${window.opacity}`}
-                      dur={`${window.duration}s`}
-                      begin={`${window.delay}s`}
-                      repeatCount="indefinite"
-                    />
-                  )}
-                </rect>
-              ))}
+              <rect
+                x={building.x}
+                y={building.y}
+                width="2"
+                height={building.height}
+                fill={building.edge}
+                opacity="0.28"
+              />
 
-              {building.accent && (
+              {building.dividers.map((divider, dividerIndex) => (
                 <rect
-                  x={building.accent.x}
-                  y={building.accent.y}
-                  width={building.accent.w}
-                  height={building.accent.h}
-                  fill={building.accent.fill}
-                  opacity={building.accent.opacity}
-                />
-              )}
-
-              {building.seams.map((seam, seamIndex) => (
-                <rect
-                  key={`seam-${seamIndex}`}
-                  x={seam.x}
-                  y={seam.y}
+                  key={`divider-${dividerIndex}`}
+                  x={divider.x}
+                  y={divider.y}
                   width="1"
-                  height={seam.h}
-                  fill="#d7efff"
-                  opacity={seam.opacity}
+                  height={divider.h}
+                  fill={building.edge}
+                  opacity={divider.opacity}
                 />
               ))}
 
-              {building.beacon && (
-                <circle
-                  cx={building.beacon.cx}
-                  cy={building.beacon.cy}
-                  r={building.beacon.r}
-                  fill="#ffe2b8"
-                  opacity={building.beacon.opacity}
+              {building.lights.map((light, lightIndex) => (
+                <rect
+                  key={`light-${lightIndex}`}
+                  x={light.x}
+                  y={light.y}
+                  width={light.w}
+                  height={light.h}
+                  rx="2"
+                  fill={building.accent}
+                  opacity={light.opacity}
                 >
                   <animate
                     attributeName="opacity"
-                    values={`0.12;${building.beacon.opacity};0.2`}
-                    dur={`${building.beacon.duration}s`}
-                    begin={`${building.beacon.delay}s`}
+                    values={`0.1;${light.opacity};0.15;${light.opacity}`}
+                    dur={`${light.duration}s`}
+                    begin={`${light.delay}s`}
                     repeatCount="indefinite"
                   />
-                </circle>
-              )}
+                </rect>
+              ))}
             </g>
           ))}
         </g>
       ))}
 
-      <rect x="0" y={STREET_Y} width={VIEW_WIDTH} height={VIEW_HEIGHT - STREET_Y} fill={`url(#${scene.id}-street)`} />
-      <rect x="0" y={STREET_Y - 12} width={VIEW_WIDTH} height="96" fill={`url(#${scene.id}-street-glow)`} />
-      <line x1="0" y1={STREET_Y} x2={VIEW_WIDTH} y2={STREET_Y} stroke="#a7d8ff" strokeOpacity="0.34" strokeWidth="1.5" />
-      <line x1="0" y1={STREET_Y + 20} x2={VIEW_WIDTH} y2={STREET_Y + 20} stroke="#7ab6de" strokeOpacity="0.14" strokeWidth="1" />
+      <rect
+        x="0"
+        y={STREET_Y - 18}
+        width={VIEW_WIDTH}
+        height={VIEW_HEIGHT - STREET_Y + 18}
+        fill={`url(#${scene.id}-ground)`}
+      />
+      <rect x="0" y={STREET_Y - 44} width={VIEW_WIDTH} height="110" fill={`url(#${scene.id}-ground-haze)`} />
+      <line
+        x1="0"
+        y1={STREET_Y}
+        x2={VIEW_WIDTH}
+        y2={STREET_Y}
+        stroke="#3a70dd"
+        strokeOpacity="0.22"
+        strokeWidth="1.5"
+      />
     </svg>
   );
 }
