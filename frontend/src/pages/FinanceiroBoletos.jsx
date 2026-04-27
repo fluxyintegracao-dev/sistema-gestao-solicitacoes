@@ -58,6 +58,26 @@ function formatCpfCnpj(value) {
   return value || '-';
 }
 
+function getConfigIssues(config) {
+  if (!config) return ['configuracao de boletos ainda nao carregada'];
+  const pending = Array.isArray(config.configuracao_pendente) ? config.configuracao_pendente : [];
+  if (pending.length) return pending;
+
+  const issues = [];
+  if (!config.agencia_configurada) issues.push('CAIXA_AGENCIA');
+  if (!config.codigo_beneficiario_configurado) issues.push('CAIXA_CODIGO_BENEFICIARIO');
+  if (!config.beneficiario_configurado) issues.push('CAIXA_BENEFICIARIO_NOME ou COMPANY_LEGAL_NAME');
+  if (!config.beneficiario_cpf_cnpj_configurado) issues.push('CAIXA_BENEFICIARIO_CPF_CNPJ');
+  if (config.emissao_real_bloqueada) issues.push('homologacao Caixa pendente para emissao real');
+  return issues;
+}
+
+function getConfigIssueMessage(config, action = 'gerar boletos') {
+  const issues = getConfigIssues(config);
+  if (!issues.length) return '';
+  return `Nao foi possivel ${action}: ${issues.join(', ')}.`;
+}
+
 function normalizeBarcode(value) {
   const digits = String(value || '').replace(/\D/g, '');
   return digits.length % 2 === 0 ? digits : `0${digits}`;
@@ -291,6 +311,8 @@ export default function FinanceiroBoletos() {
   const [baixandoPdfId, setBaixandoPdfId] = useState(null);
   const [gerandoMassa, setGerandoMassa] = useState(false);
   const [error, setError] = useState('');
+  const [feedback, setFeedback] = useState('');
+  const [resultadoMassa, setResultadoMassa] = useState(null);
 
   async function carregar() {
     try {
@@ -377,6 +399,7 @@ export default function FinanceiroBoletos() {
   async function selecionarTitulo(titulo) {
     try {
       setError('');
+      setFeedback('');
       const data = await getBoletoTitulo(titulo.id);
       setDetalhe(data);
       setPreviewOpen(true);
@@ -386,13 +409,23 @@ export default function FinanceiroBoletos() {
   }
 
   async function onGerar(titulo) {
+    const configIssue = getConfigIssueMessage(config, 'gerar o boleto');
+    if (configIssue) {
+      setError(configIssue);
+      setFeedback('');
+      return;
+    }
+
     try {
       setGerandoId(titulo.id);
       setError('');
+      setFeedback('');
+      setResultadoMassa(null);
       const data = await gerarBoletoTitulo(titulo.id);
       setDetalhe(data);
       setPreviewOpen(true);
       await carregar();
+      setFeedback(`Boleto do titulo #${titulo.id} gerado com sucesso.`);
     } catch (err) {
       setError(err?.message || 'Erro ao gerar boleto');
     } finally {
@@ -401,12 +434,21 @@ export default function FinanceiroBoletos() {
   }
 
   async function onGerarAmostra(titulo) {
+    const configIssue = getConfigIssueMessage(config, 'gerar a amostra');
+    if (configIssue) {
+      setError(configIssue);
+      setFeedback('');
+      return;
+    }
+
     try {
       setGerandoId(titulo.id);
       setError('');
+      setFeedback('');
       const data = await gerarAmostraBoletoTitulo(titulo.id);
       setDetalhe(data);
       setPreviewOpen(true);
+      setFeedback(`Amostra do titulo #${titulo.id} gerada com sucesso.`);
     } catch (err) {
       setError(err?.message || 'Erro ao gerar amostra de boleto');
     } finally {
@@ -418,6 +460,7 @@ export default function FinanceiroBoletos() {
     try {
       setBaixandoPdfId(titulo.id);
       setError('');
+      setFeedback('');
       const data = await baixarPdfBoletoTitulo(titulo.id, { amostra });
       const url = URL.createObjectURL(data.blob);
       const link = document.createElement('a');
@@ -427,6 +470,7 @@ export default function FinanceiroBoletos() {
       link.click();
       link.remove();
       URL.revokeObjectURL(url);
+      setFeedback(`PDF do titulo #${titulo.id} baixado com sucesso.`);
     } catch (err) {
       setError(err?.message || 'Erro ao baixar PDF do boleto');
     } finally {
@@ -437,20 +481,58 @@ export default function FinanceiroBoletos() {
   async function onGerarMassa() {
     if (!titulosSelecionados.length) {
       setError('Selecione ao menos um titulo para gerar boletos em massa.');
+      setFeedback('');
+      return;
+    }
+
+    const configIssue = getConfigIssueMessage(config);
+    if (configIssue) {
+      setError(configIssue);
+      setFeedback('');
+      setResultadoMassa(null);
       return;
     }
 
     try {
       setGerandoMassa(true);
       setError('');
+      setFeedback('');
+      setResultadoMassa(null);
       let ultimoDetalhe = null;
+      const sucessos = [];
+      const falhas = [];
+
       for (const titulo of titulosSelecionados) {
         setGerandoId(titulo.id);
-        ultimoDetalhe = await gerarBoletoTitulo(titulo.id);
+        try {
+          ultimoDetalhe = await gerarBoletoTitulo(titulo.id);
+          sucessos.push({
+            id: titulo.id,
+            documento: titulo.numero_documento || ''
+          });
+        } catch (err) {
+          falhas.push({
+            id: titulo.id,
+            documento: titulo.numero_documento || '',
+            motivo: err?.message || 'Erro ao gerar boleto'
+          });
+        }
       }
+
       if (ultimoDetalhe) setDetalhe(ultimoDetalhe);
       setSelecionados([]);
       await carregar();
+      setResultadoMassa({ sucessos, falhas });
+
+      if (sucessos.length) {
+        setFeedback(`${sucessos.length} boleto(s) gerado(s) com sucesso.`);
+      }
+      if (falhas.length) {
+        setError(`${falhas.length} boleto(s) nao foram gerados. Veja os motivos no resumo abaixo.`);
+      }
+      if (!sucessos.length && !falhas.length) {
+        setError('Nenhum boleto foi processado.');
+      }
     } catch (err) {
       setError(err?.message || 'Erro ao gerar boletos em massa');
     } finally {
@@ -489,10 +571,11 @@ export default function FinanceiroBoletos() {
       </header>
 
       {error && <div className="app-alert app-alert--error">{error}</div>}
+      {feedback && <div className="app-alert border-emerald-200 bg-emerald-50 text-emerald-700">{feedback}</div>}
 
       {config && !config.configurado && (
         <div className="app-alert app-alert--warning">
-          Configure CAIXA_AGENCIA e CAIXA_CODIGO_BENEFICIARIO no backend/.env antes de gerar boletos.
+          Configure {getConfigIssues(config).join(', ')} no backend/.env antes de gerar boletos.
         </div>
       )}
 
@@ -646,11 +729,40 @@ export default function FinanceiroBoletos() {
             <button type="button" className="btn btn-outline btn-sm" onClick={() => setSelecionados([])} disabled={!selecionados.length || gerandoMassa}>
               Limpar selecao
             </button>
-            <button type="button" className="btn btn-primary btn-sm" onClick={onGerarMassa} disabled={!selecionados.length || !config?.configurado || gerandoMassa || config?.emissao_real_bloqueada}>
+            <button type="button" className="btn btn-primary btn-sm" onClick={onGerarMassa} disabled={!selecionados.length || gerandoMassa}>
               {gerandoMassa ? 'Gerando boletos...' : `Gerar boletos selecionados (${selecionados.length})`}
             </button>
           </div>
         </div>
+
+        {resultadoMassa && (
+          <div className="mt-3 grid gap-3 md:grid-cols-2">
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+              <div className="font-semibold">Gerados: {resultadoMassa.sucessos.length}</div>
+              {resultadoMassa.sucessos.length ? (
+                <ul className="mt-2 space-y-1">
+                  {resultadoMassa.sucessos.slice(0, 8).map((item) => (
+                    <li key={item.id}>Titulo #{item.id}{item.documento ? ` - ${item.documento}` : ''}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-2">Nenhum boleto gerado neste lote.</p>
+              )}
+            </div>
+            <div className="rounded-2xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">
+              <div className="font-semibold">Nao gerados: {resultadoMassa.falhas.length}</div>
+              {resultadoMassa.falhas.length ? (
+                <ul className="mt-2 space-y-1">
+                  {resultadoMassa.falhas.map((item) => (
+                    <li key={item.id}>Titulo #{item.id}{item.documento ? ` - ${item.documento}` : ''}: {item.motivo}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-2">Sem falhas neste lote.</p>
+              )}
+            </div>
+          </div>
+        )}
 
         <div className="mt-4 overflow-hidden rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)]">
           {loading ? (
@@ -733,7 +845,7 @@ export default function FinanceiroBoletos() {
                           <button
                             type="button"
                             className="btn btn-outline btn-sm"
-                            disabled={gerandoId === titulo.id || !config?.configurado || gerandoMassa}
+                            disabled={gerandoId === titulo.id || gerandoMassa}
                             onClick={() => onGerarAmostra(titulo)}
                             title="Gerar amostra para homologacao"
                           >
@@ -742,7 +854,7 @@ export default function FinanceiroBoletos() {
                           <button
                             type="button"
                             className="btn btn-outline btn-sm"
-                            disabled={baixandoPdfId === titulo.id || !config?.configurado || gerandoMassa}
+                            disabled={baixandoPdfId === titulo.id || gerandoMassa}
                             onClick={() => onBaixarPdf(titulo, { amostra: !titulo.codigo_barras })}
                             title={titulo.codigo_barras ? 'Baixar PDF do boleto' : 'Baixar PDF de amostra'}
                           >
@@ -751,7 +863,7 @@ export default function FinanceiroBoletos() {
                           <button
                             type="button"
                             className="btn btn-primary btn-sm"
-                            disabled={gerandoId === titulo.id || !config?.configurado || gerandoMassa || config?.emissao_real_bloqueada}
+                            disabled={gerandoId === titulo.id || gerandoMassa}
                             onClick={() => onGerar(titulo)}
                           >
                             {gerandoId === titulo.id ? 'Gerando...' : (titulo.codigo_barras ? 'Regerar' : 'Gerar')}

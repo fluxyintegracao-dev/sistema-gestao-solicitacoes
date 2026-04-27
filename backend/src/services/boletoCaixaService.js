@@ -693,13 +693,22 @@ async function gerarPdfBoletoTitulo(req, tituloId, { amostra = false } = {}) {
 
 function getConfigBoletoCaixa() {
   const codigoBeneficiario = onlyDigits(env.caixaCodigoBeneficiario);
+  const missing = [];
+  if (!env.caixaAgencia) missing.push('CAIXA_AGENCIA');
+  if (!codigoBeneficiario) missing.push('CAIXA_CODIGO_BENEFICIARIO');
+  if (!(env.caixaBeneficiarioNome || env.companyLegalName || env.companyName)) {
+    missing.push('CAIXA_BENEFICIARIO_NOME ou COMPANY_LEGAL_NAME');
+  }
+  if (!env.caixaBeneficiarioCpfCnpj) missing.push('CAIXA_BENEFICIARIO_CPF_CNPJ');
+
   return {
     banco: 'CAIXA',
     codigo_banco: '104',
     ambiente: env.caixaBoletoAmbiente === 'PRODUCAO' ? 'PRODUCAO' : 'TESTE',
     modo_teste: env.caixaBoletoAmbiente !== 'PRODUCAO',
     homologado: env.caixaBoletoHomologado,
-    configurado: Boolean(codigoBeneficiario && env.caixaAgencia),
+    configurado: missing.length === 0,
+    configuracao_pendente: missing,
     agencia_configurada: Boolean(env.caixaAgencia),
     codigo_beneficiario_configurado: Boolean(codigoBeneficiario),
     beneficiario_configurado: Boolean(env.caixaBeneficiarioNome || env.companyLegalName || env.companyName),
