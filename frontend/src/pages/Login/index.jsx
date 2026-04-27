@@ -295,6 +295,9 @@ export default function Login() {
                       <span>{showPassword ? 'Ocultar' : 'Mostrar'}</span>
                     </button>
                   </div>
+                  <button type="button" className="login-forgot-link">
+                    Esqueci minha senha
+                  </button>
                 </div>
 
                 <button
