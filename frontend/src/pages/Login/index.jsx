@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import cscLogo from '../../assets/CSC_logo_colorida.png';
 import CityBackground from '../../components/CityBackground';
 import Alert from '../../components/ui/Alert';
 import Spinner from '../../components/ui/Spinner';
@@ -62,6 +63,12 @@ export default function Login() {
 
   const { login } = useAuth();
   const navigate = useNavigate();
+  const isMfaStep = Boolean(mfaChallenge);
+  const headingKicker = isMfaStep ? 'Validacao adicional' : 'Portal integrado';
+  const headingTitle = isMfaStep ? 'Confirme seu acesso' : 'Acesse sua central';
+  const headingSubtitle = isMfaStep
+    ? 'Digite o codigo do autenticador para concluir a entrada com seguranca.'
+    : 'Operacao, financeiro e obras no mesmo fluxo de trabalho.';
 
   function navigateAfterLogin(data) {
     if (data?.user?.mfa_setup_pending) {
@@ -156,21 +163,32 @@ export default function Login() {
 
       <div className="login-content-wrap">
         <div className="login-panel-column login-panel-column--centered">
-          <div className="login-shell login-shell--centered p-8">
+          <div className="login-shell login-shell--centered">
             <div className="login-shell-chrome" aria-hidden="true" />
 
             <div className="login-brand-header">
-              <div className="login-brand-lockup">
-                <FluxyMark />
-                <span className="login-brand-wordmark">Fluxy</span>
+              <div className="login-brand-rail">
+                <div className="login-brand-chip login-brand-chip--company">
+                  <img
+                    src={cscLogo}
+                    alt="Construtora Sul Capixaba"
+                    className="login-brand-company-logo"
+                  />
+                  <span className="login-brand-company-name">Construtora Sul Capixaba</span>
+                </div>
+
+                <span className="login-brand-divider" aria-hidden="true" />
+
+                <div className="login-brand-chip login-brand-chip--platform">
+                  <FluxyMark />
+                  <span className="login-brand-wordmark">Fluxy</span>
+                </div>
               </div>
 
               <div className="login-heading">
-                <span className="login-heading-kicker">Plataforma de gestao</span>
-                <h1 className="login-heading-title">Acesse sua central</h1>
-                <p className="login-heading-subtitle">
-                  Obras, operacao e financeiro em um unico ambiente.
-                </p>
+                <span className="login-heading-kicker">{headingKicker}</span>
+                <h1 className="login-heading-title">{headingTitle}</h1>
+                <p className="login-heading-subtitle">{headingSubtitle}</p>
               </div>
             </div>
 
