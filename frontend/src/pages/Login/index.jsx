@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import fluxyLogo from '../../assets/fluxy/logo_transparent.png';
+import fluxyLogo from '../../assets/fluxy/fluxy-mark.svg';
 import CityBackground from '../../components/CityBackground';
 import Alert from '../../components/ui/Alert';
 import Spinner from '../../components/ui/Spinner';
