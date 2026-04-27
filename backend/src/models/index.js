@@ -231,6 +231,16 @@ db.ParceiroCategoria.belongsToMany(db.Parceiro, {
   as: 'parceiros'
 });
 
+db.Parceiro.belongsTo(db.Parceiro, {
+  foreignKey: 'conjuge_parceiro_id',
+  as: 'conjuge'
+});
+
+db.Parceiro.hasMany(db.Parceiro, {
+  foreignKey: 'conjuge_parceiro_id',
+  as: 'parceirosVinculadosComoConjuge'
+});
+
 db.ParceiroCategoriaItem.belongsTo(db.Parceiro, {
   foreignKey: 'parceiro_id',
   as: 'parceiro'

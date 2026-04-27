@@ -82,6 +82,15 @@ function sanitizeDateOnly(value) {
   return text;
 }
 
+function sanitizePositiveInteger(value, fieldName) {
+  if (value === undefined || value === null || value === '') return null;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    throw new Error(`${fieldName} invalido.`);
+  }
+  return parsed;
+}
+
 function normalizeParceiroPayload(payload = {}, { partial = false } = {}) {
   const cpfCnpj = normalizarCpfCnpj(payload.cpf_cnpj);
   const nome = String(payload.nome || '').trim();
@@ -168,6 +177,9 @@ function normalizeParceiroPayload(payload = {}, { partial = false } = {}) {
     conjuge_nome: partial
       ? (payload.conjuge_nome !== undefined ? sanitizeText(payload.conjuge_nome) : undefined)
       : sanitizeText(payload.conjuge_nome),
+    conjuge_parceiro_id: partial
+      ? (payload.conjuge_parceiro_id !== undefined ? sanitizePositiveInteger(payload.conjuge_parceiro_id, 'Conjuge') : undefined)
+      : sanitizePositiveInteger(payload.conjuge_parceiro_id, 'Conjuge'),
     regime_bens: partial
       ? (payload.regime_bens !== undefined ? sanitizeText(payload.regime_bens) : undefined)
       : sanitizeText(payload.regime_bens),

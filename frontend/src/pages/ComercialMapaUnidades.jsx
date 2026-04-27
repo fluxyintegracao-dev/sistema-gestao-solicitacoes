@@ -26,7 +26,7 @@ function statusClass(status) {
 }
 
 function getAgrupador(unidade) {
-  return unidade.bloco || unidade.torre || unidade.tipologia || 'Sem agrupamento';
+  return unidade.bloco || unidade.torre || 'Sem agrupamento';
 }
 
 export default function ComercialMapaUnidades() {
@@ -170,14 +170,15 @@ export default function ComercialMapaUnidades() {
                   <div className="flex items-start justify-between gap-2">
                     <div>
                       <h3 className="text-base font-semibold">{item.codigo}</h3>
-                      <p className="text-sm opacity-80">{item.nome || item.tipologia || 'Unidade comercial'}</p>
+                      <p className="text-sm opacity-80">{item.nome || 'Unidade comercial'}</p>
                     </div>
                     <span className="inline-flex rounded-full bg-white/80 px-2.5 py-1 text-xs font-semibold">
                       {item.situacao}
                     </span>
                   </div>
                   <div className="mt-3 space-y-1 text-sm">
-                    <div>Tipologia: {item.tipologia || '-'}</div>
+                    <div>Metragem privativa: {item.metragem_privativa || '-'}</div>
+                    <div>Fracao ideal: {item.fracao_ideal || '-'}</div>
                     <div>Reserva: {item.parceiroReserva?.nome || '-'}</div>
                     <div>Valor tabela: {item.valor_tabela ? formatCurrency(item.valor_tabela) : '-'}</div>
                     <div>Base venda: {item.valor_base_venda ? formatCurrency(item.valor_base_venda) : '-'}</div>

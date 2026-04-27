@@ -1368,6 +1368,38 @@ a {
   min-height: 42px;
 }
 
+.quick-person-check {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  min-height: 76px;
+  border: 1px solid color-mix(in srgb, var(--c-border) 82%, transparent);
+  border-radius: 8px;
+  padding: 0.62rem 0.75rem;
+  background: var(--c-surface);
+  color: var(--c-text);
+}
+
+.quick-person-check input {
+  flex: 0 0 auto;
+}
+
+.quick-person-check strong,
+.quick-person-check small {
+  display: block;
+}
+
+.quick-person-check strong {
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.quick-person-check small {
+  margin-top: 0.12rem;
+  font-size: 0.75rem;
+  color: var(--c-muted);
+}
+
 .quick-span-2 {
   grid-column: span 2;
 }

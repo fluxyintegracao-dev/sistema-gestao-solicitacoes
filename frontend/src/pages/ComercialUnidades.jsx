@@ -20,8 +20,8 @@ function defaultForm() {
     bloco: '',
     torre: '',
     pavimento: '',
-    tipologia: '',
     metragem_privativa: '',
+    fracao_ideal: '',
     valor_tabela: '',
     valor_base_venda: '',
     situacao: 'DISPONIVEL',
@@ -55,8 +55,8 @@ function pickForm(item = {}) {
     bloco: item.bloco || '',
     torre: item.torre || '',
     pavimento: item.pavimento || '',
-    tipologia: item.tipologia || '',
     metragem_privativa: item.metragem_privativa || '',
+    fracao_ideal: item.fracao_ideal || '',
     valor_tabela: formatCurrencyInput(item.valor_tabela),
     valor_base_venda: formatCurrencyInput(item.valor_base_venda),
     situacao: item.situacao || 'DISPONIVEL',
@@ -131,7 +131,7 @@ export default function ComercialUnidades() {
         item.nome,
         item.bloco,
         item.torre,
-        item.tipologia,
+        item.fracao_ideal,
         item.empreendimento?.nome,
         item.parceiroReserva?.nome
       ].filter(Boolean).join(' '));
@@ -154,8 +154,8 @@ export default function ComercialUnidades() {
         bloco: form.bloco,
         torre: form.torre,
         pavimento: form.pavimento,
-        tipologia: form.tipologia,
         metragem_privativa: form.metragem_privativa || undefined,
+        fracao_ideal: form.fracao_ideal || undefined,
         valor_tabela: form.valor_tabela || undefined,
         valor_base_venda: form.valor_base_venda || undefined,
         situacao: form.situacao,
@@ -264,12 +264,12 @@ export default function ComercialUnidades() {
 
               <div className="grid gap-3 md:grid-cols-2">
                 <label className="sol-filter-field">
-                  <span className="sol-filter-label">Tipologia</span>
-                  <input className="input w-full" value={form.tipologia} onChange={(event) => setForm((current) => ({ ...current, tipologia: event.target.value }))} />
-                </label>
-                <label className="sol-filter-field">
                   <span className="sol-filter-label">Metragem privativa</span>
                   <input className="input w-full" type="number" step="0.01" value={form.metragem_privativa} onChange={(event) => setForm((current) => ({ ...current, metragem_privativa: event.target.value }))} />
+                </label>
+                <label className="sol-filter-field">
+                  <span className="sol-filter-label">Fracao ideal</span>
+                  <input className="input w-full" type="number" step="0.000001" value={form.fracao_ideal} onChange={(event) => setForm((current) => ({ ...current, fracao_ideal: event.target.value }))} />
                 </label>
               </div>
 
@@ -376,7 +376,7 @@ export default function ComercialUnidades() {
 
               <label className="sol-filter-field">
                 <span className="sol-filter-label">Busca</span>
-                <input className="input w-full" value={busca} onChange={(event) => setBusca(event.target.value)} placeholder="Codigo, tipologia, reserva ou empreendimento" />
+                <input className="input w-full" value={busca} onChange={(event) => setBusca(event.target.value)} placeholder="Codigo, fracao ideal, reserva ou empreendimento" />
               </label>
             </div>
 
@@ -398,7 +398,8 @@ export default function ComercialUnidades() {
                         </div>
                         <div className="grid gap-2 text-sm text-[var(--c-muted)] md:grid-cols-2">
                           <span>Empreendimento: {item.empreendimento?.nome || '-'}</span>
-                          <span>Tipologia: {item.tipologia || '-'}</span>
+                          <span>Metragem privativa: {item.metragem_privativa || '-'}</span>
+                          <span>Fracao ideal: {item.fracao_ideal || '-'}</span>
                           <span>Reserva: {item.parceiroReserva?.nome || '-'}</span>
                           <span>Reservado ate: {item.reservado_ate || '-'}</span>
                           <span>Valor tabela: {item.valor_tabela ? formatCurrency(item.valor_tabela) : '-'}</span>

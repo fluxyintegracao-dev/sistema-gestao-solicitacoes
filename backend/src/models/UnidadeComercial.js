@@ -42,6 +42,10 @@ module.exports = (sequelize, DataTypes) => sequelize.define(
       type: DataTypes.DECIMAL(12, 2),
       allowNull: true
     },
+    fracao_ideal: {
+      type: DataTypes.DECIMAL(12, 6),
+      allowNull: true
+    },
     valor_tabela: {
       type: DataTypes.DECIMAL(14, 2),
       allowNull: true

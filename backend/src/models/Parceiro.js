@@ -95,6 +95,10 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.STRING(255),
         allowNull: true
       },
+      conjuge_parceiro_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true
+      },
       regime_bens: {
         type: DataTypes.STRING(120),
         allowNull: true

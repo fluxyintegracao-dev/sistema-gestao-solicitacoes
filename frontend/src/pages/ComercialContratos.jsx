@@ -4,7 +4,7 @@ import { getMinhasObras } from '../services/obras';
 import { buscarParceiros, criarParceiro } from '../services/parceiros';
 import { getCategoriasFinanceiras } from '../services/financeiro';
 import { getComercialCategoriasContrato } from '../services/configuracoesSistema';
-import { isValidCpfCnpj, maskCep, maskCpfCnpj, maskCreci, maskPhone, maskRg, normalizeCurrencyTyping, onlyDigits } from '../utils/formatters';
+import { isValidCpfCnpj, maskCep, maskCpfCnpj, maskCreci, maskPhone, normalizeCurrencyTyping, onlyDigits } from '../utils/formatters';
 import {
   atualizarContratoComercial,
   criarContratoComercial,
@@ -118,7 +118,6 @@ function defaultPessoaRapidaForm(tipo = 'cliente') {
     nome: '',
     telefone: '',
     email: '',
-    rg: '',
     data_nascimento: '',
     nacionalidade: '',
     profissao: '',
@@ -130,9 +129,55 @@ function defaultPessoaRapidaForm(tipo = 'cliente') {
     cep: '',
     municipio: '',
     estado: '',
-    conjuge_nome: '',
+    possui_conjuge: false,
+    conjuge: defaultConjugeRapidoForm(),
     regime_bens: '',
     creci: ''
+  };
+}
+
+function defaultConjugeRapidoForm() {
+  return {
+    cpf_cnpj: '',
+    nome: '',
+    telefone: '',
+    email: '',
+    data_nascimento: '',
+    nacionalidade: '',
+    profissao: '',
+    estado_civil: '',
+    endereco: '',
+    numero: '',
+    complemento: '',
+    bairro: '',
+    cep: '',
+    municipio: '',
+    estado: ''
+  };
+}
+
+function buildPessoaRapidaPayload(form, tipo, extras = {}) {
+  return {
+    cpf_cnpj: onlyDigits(form.cpf_cnpj),
+    nome: form.nome,
+    telefone: onlyDigits(form.telefone),
+    email: form.email,
+    data_nascimento: form.data_nascimento,
+    nacionalidade: form.nacionalidade,
+    profissao: form.profissao,
+    estado_civil: form.estado_civil,
+    endereco: form.endereco,
+    numero: form.numero,
+    complemento: form.complemento,
+    bairro: form.bairro,
+    cep: onlyDigits(form.cep),
+    municipio: form.municipio,
+    estado: form.estado,
+    creci: tipo === 'corretor' ? form.creci : '',
+    cliente: tipo === 'cliente',
+    fornecedor: tipo === 'corretor',
+    corretor: tipo === 'corretor',
+    ...extras
   };
 }
 
@@ -836,6 +881,16 @@ export default function ComercialContratos() {
     setPessoaRapidaModal(tipo);
   }
 
+  function atualizarConjugeRapido(campo, valor) {
+    setPessoaRapidaForm((current) => ({
+      ...current,
+      conjuge: {
+        ...current.conjuge,
+        [campo]: valor
+      }
+    }));
+  }
+
   async function salvarPessoaRapida() {
     try {
       if (!isValidCpfCnpj(pessoaRapidaForm.cpf_cnpj)) {
@@ -844,34 +899,40 @@ export default function ComercialContratos() {
       }
 
       const tipo = pessoaRapidaModal || pessoaRapidaForm.tipo || 'cliente';
-      const payload = {
-        cpf_cnpj: onlyDigits(pessoaRapidaForm.cpf_cnpj),
-        nome: pessoaRapidaForm.nome,
-        telefone: onlyDigits(pessoaRapidaForm.telefone),
-        email: pessoaRapidaForm.email,
-        rg: pessoaRapidaForm.rg,
-        data_nascimento: pessoaRapidaForm.data_nascimento,
-        nacionalidade: pessoaRapidaForm.nacionalidade,
-        profissao: pessoaRapidaForm.profissao,
-        estado_civil: pessoaRapidaForm.estado_civil,
-        endereco: pessoaRapidaForm.endereco,
-        numero: pessoaRapidaForm.numero,
-        complemento: pessoaRapidaForm.complemento,
-        bairro: pessoaRapidaForm.bairro,
-        cep: onlyDigits(pessoaRapidaForm.cep),
-        municipio: pessoaRapidaForm.municipio,
-        estado: pessoaRapidaForm.estado,
-        conjuge_nome: pessoaRapidaForm.conjuge_nome,
-        regime_bens: pessoaRapidaForm.regime_bens,
-        creci: pessoaRapidaForm.creci,
-        cliente: tipo === 'cliente',
-        fornecedor: tipo === 'corretor',
-        corretor: tipo === 'corretor'
-      };
+      let conjugeCriado = null;
+
+      if (tipo === 'cliente' && pessoaRapidaForm.possui_conjuge) {
+        if (!isValidCpfCnpj(pessoaRapidaForm.conjuge.cpf_cnpj)) {
+          setError('Informe um CPF/CNPJ valido para o conjuge.');
+          return;
+        }
+        if (!String(pessoaRapidaForm.conjuge.nome || '').trim()) {
+          setError('Informe o nome do conjuge.');
+          return;
+        }
+        if (!String(pessoaRapidaForm.conjuge.telefone || '').trim()) {
+          setError('Informe o telefone do conjuge.');
+          return;
+        }
+
+        conjugeCriado = await criarParceiro(buildPessoaRapidaPayload(pessoaRapidaForm.conjuge, 'cliente'));
+      }
+
+      const payload = buildPessoaRapidaPayload(
+        pessoaRapidaForm,
+        tipo,
+        tipo === 'cliente'
+          ? {
+              conjuge_nome: conjugeCriado?.nome || '',
+              conjuge_parceiro_id: conjugeCriado?.id || null,
+              regime_bens: pessoaRapidaForm.regime_bens
+            }
+          : {}
+      );
       const pessoa = await criarParceiro(payload);
 
       if (tipo === 'cliente') {
-        setClientes((current) => [...current, pessoa].sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || ''))));
+        setClientes((current) => [...current, ...[pessoa, conjugeCriado].filter(Boolean)].sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || ''))));
         setForm((current) => ({ ...current, parceiro_id: String(pessoa.id) }));
       } else {
         setCorretores((current) => [...current, pessoa].sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || ''))));
@@ -1510,7 +1571,7 @@ export default function ComercialContratos() {
                   <span className="sol-filter-label">Nova unidade</span>
                   <select className="input w-full" value={trocaForm.unidade_comercial_destino_id} onChange={(e) => setTrocaForm((current) => ({ ...current, unidade_comercial_destino_id: e.target.value }))}>
                     <option value="">Selecione</option>
-                    {unidadesElegiveisTroca.map((item) => <option key={item.id} value={item.id}>{item.codigo} - {item.empreendimento?.nome || item.tipologia || 'Unidade'}</option>)}
+                    {unidadesElegiveisTroca.map((item) => <option key={item.id} value={item.id}>{item.codigo} - {item.empreendimento?.nome || item.nome || 'Unidade'}</option>)}
                   </select>
                 </label>
                 <label className="sol-filter-field">
@@ -1606,7 +1667,7 @@ export default function ComercialContratos() {
                 className="input min-h-[88px] w-full"
                 value={documentoForm.variaveis_json}
                 onChange={(e) => setDocumentoForm((current) => ({ ...current, variaveis_json: e.target.value }))}
-                placeholder='{"cliente":{"nacionalidade":"brasileiro","profissao":"engenheiro","rg":"MG-00.000.000","conjuge_nome":"Maria"}}'
+                placeholder='{"cliente":{"nacionalidade":"brasileiro","profissao":"engenheiro"},"conjuge":{"nome":"Maria"}}'
               />
               <span className="mt-1 block text-xs text-[var(--c-muted)]">
                 Use para dados juridicos que ainda nao existem no cadastro do cliente; o restante vem automatico do contrato.
@@ -1803,14 +1864,6 @@ export default function ComercialContratos() {
                   </div>
                   <div className="quick-person-grid">
                 <label className="sol-filter-field">
-                  <span className="sol-filter-label">RG</span>
-                  <input
-                    className="input w-full"
-                    value={pessoaRapidaForm.rg}
-                    onChange={(e) => setPessoaRapidaForm((current) => ({ ...current, rg: maskRg(e.target.value) }))}
-                  />
-                </label>
-                <label className="sol-filter-field">
                   <span className="sol-filter-label">Nascimento</span>
                   <input
                     className="input w-full"
@@ -1843,14 +1896,6 @@ export default function ComercialContratos() {
                     onChange={(e) => setPessoaRapidaForm((current) => ({ ...current, estado_civil: e.target.value }))}
                   />
                 </label>
-                <label className="sol-filter-field quick-span-2">
-                  <span className="sol-filter-label">Conjuge</span>
-                  <input
-                    className="input w-full"
-                    value={pessoaRapidaForm.conjuge_nome}
-                    onChange={(e) => setPessoaRapidaForm((current) => ({ ...current, conjuge_nome: e.target.value }))}
-                  />
-                </label>
                 <label className="sol-filter-field">
                   <span className="sol-filter-label">Regime de bens</span>
                   <input
@@ -1858,6 +1903,21 @@ export default function ComercialContratos() {
                     value={pessoaRapidaForm.regime_bens}
                     onChange={(e) => setPessoaRapidaForm((current) => ({ ...current, regime_bens: e.target.value }))}
                   />
+                </label>
+                <label className="quick-person-check quick-span-2">
+                  <input
+                    type="checkbox"
+                    checked={pessoaRapidaForm.possui_conjuge}
+                    onChange={(e) => setPessoaRapidaForm((current) => ({
+                      ...current,
+                      possui_conjuge: e.target.checked,
+                      conjuge: e.target.checked ? current.conjuge : defaultConjugeRapidoForm()
+                    }))}
+                  />
+                  <span>
+                    <strong>Possui conjuge</strong>
+                    <small>Cadastra o conjuge como uma segunda pessoa no sistema.</small>
+                  </span>
                 </label>
                   </div>
                 </section>
@@ -1928,6 +1988,164 @@ export default function ComercialContratos() {
               </label>
                 </div>
               </section>
+
+              {pessoaRapidaModal === 'cliente' && pessoaRapidaForm.possui_conjuge && (
+                <>
+                  <section className="quick-person-section">
+                    <div className="quick-person-section-head">
+                      <h3>Conjuge</h3>
+                      <p>Cria uma segunda pessoa ativa e vincula ao cliente principal.</p>
+                    </div>
+                    <div className="quick-person-grid quick-person-grid-main">
+                      <label className="sol-filter-field">
+                        <span className="sol-filter-label">CPF/CNPJ</span>
+                        <input
+                          className="input w-full"
+                          value={pessoaRapidaForm.conjuge.cpf_cnpj}
+                          onChange={(e) => atualizarConjugeRapido('cpf_cnpj', maskCpfCnpj(e.target.value))}
+                          onBlur={() => {
+                            if (pessoaRapidaForm.conjuge.cpf_cnpj && !isValidCpfCnpj(pessoaRapidaForm.conjuge.cpf_cnpj)) {
+                              setError('Informe um CPF/CNPJ valido para o conjuge.');
+                            }
+                          }}
+                        />
+                      </label>
+                      <label className="sol-filter-field quick-span-2">
+                        <span className="sol-filter-label">Nome</span>
+                        <input
+                          className="input w-full"
+                          value={pessoaRapidaForm.conjuge.nome}
+                          onChange={(e) => atualizarConjugeRapido('nome', e.target.value)}
+                        />
+                      </label>
+                      <label className="sol-filter-field">
+                        <span className="sol-filter-label">Telefone</span>
+                        <input
+                          className="input w-full"
+                          value={pessoaRapidaForm.conjuge.telefone}
+                          onChange={(e) => atualizarConjugeRapido('telefone', maskPhone(e.target.value))}
+                        />
+                      </label>
+                      <label className="sol-filter-field quick-span-2">
+                        <span className="sol-filter-label">E-mail</span>
+                        <input
+                          className="input w-full"
+                          value={pessoaRapidaForm.conjuge.email}
+                          onChange={(e) => atualizarConjugeRapido('email', e.target.value)}
+                        />
+                      </label>
+                    </div>
+                  </section>
+
+                  <section className="quick-person-section">
+                    <div className="quick-person-section-head">
+                      <h3>Dados civis do conjuge</h3>
+                      <p>Usado nos contratos quando o modelo exigir assinatura do casal.</p>
+                    </div>
+                    <div className="quick-person-grid">
+                      <label className="sol-filter-field">
+                        <span className="sol-filter-label">Nascimento</span>
+                        <input
+                          className="input w-full"
+                          type="date"
+                          value={pessoaRapidaForm.conjuge.data_nascimento}
+                          onChange={(e) => atualizarConjugeRapido('data_nascimento', e.target.value)}
+                        />
+                      </label>
+                      <label className="sol-filter-field">
+                        <span className="sol-filter-label">Nacionalidade</span>
+                        <input
+                          className="input w-full"
+                          value={pessoaRapidaForm.conjuge.nacionalidade}
+                          onChange={(e) => atualizarConjugeRapido('nacionalidade', e.target.value)}
+                        />
+                      </label>
+                      <label className="sol-filter-field">
+                        <span className="sol-filter-label">Profissao</span>
+                        <input
+                          className="input w-full"
+                          value={pessoaRapidaForm.conjuge.profissao}
+                          onChange={(e) => atualizarConjugeRapido('profissao', e.target.value)}
+                        />
+                      </label>
+                      <label className="sol-filter-field">
+                        <span className="sol-filter-label">Estado civil</span>
+                        <input
+                          className="input w-full"
+                          value={pessoaRapidaForm.conjuge.estado_civil}
+                          onChange={(e) => atualizarConjugeRapido('estado_civil', e.target.value)}
+                        />
+                      </label>
+                    </div>
+                  </section>
+
+                  <section className="quick-person-section">
+                    <div className="quick-person-section-head">
+                      <h3>Endereco do conjuge</h3>
+                      <p>Pode repetir o endereco do cliente ou guardar um endereco proprio.</p>
+                    </div>
+                    <div className="quick-person-grid">
+                      <label className="sol-filter-field quick-span-2">
+                        <span className="sol-filter-label">Endereco</span>
+                        <input
+                          className="input w-full"
+                          value={pessoaRapidaForm.conjuge.endereco}
+                          onChange={(e) => atualizarConjugeRapido('endereco', e.target.value)}
+                        />
+                      </label>
+                      <label className="sol-filter-field">
+                        <span className="sol-filter-label">Numero</span>
+                        <input
+                          className="input w-full"
+                          value={pessoaRapidaForm.conjuge.numero}
+                          onChange={(e) => atualizarConjugeRapido('numero', e.target.value)}
+                        />
+                      </label>
+                      <label className="sol-filter-field">
+                        <span className="sol-filter-label">Complemento</span>
+                        <input
+                          className="input w-full"
+                          value={pessoaRapidaForm.conjuge.complemento}
+                          onChange={(e) => atualizarConjugeRapido('complemento', e.target.value)}
+                        />
+                      </label>
+                      <label className="sol-filter-field">
+                        <span className="sol-filter-label">Bairro</span>
+                        <input
+                          className="input w-full"
+                          value={pessoaRapidaForm.conjuge.bairro}
+                          onChange={(e) => atualizarConjugeRapido('bairro', e.target.value)}
+                        />
+                      </label>
+                      <label className="sol-filter-field">
+                        <span className="sol-filter-label">CEP</span>
+                        <input
+                          className="input w-full"
+                          value={pessoaRapidaForm.conjuge.cep}
+                          onChange={(e) => atualizarConjugeRapido('cep', maskCep(e.target.value))}
+                        />
+                      </label>
+                      <label className="sol-filter-field">
+                        <span className="sol-filter-label">Municipio</span>
+                        <input
+                          className="input w-full"
+                          value={pessoaRapidaForm.conjuge.municipio}
+                          onChange={(e) => atualizarConjugeRapido('municipio', e.target.value)}
+                        />
+                      </label>
+                      <label className="sol-filter-field">
+                        <span className="sol-filter-label">UF</span>
+                        <input
+                          className="input w-full"
+                          maxLength={2}
+                          value={pessoaRapidaForm.conjuge.estado}
+                          onChange={(e) => atualizarConjugeRapido('estado', e.target.value.toUpperCase())}
+                        />
+                      </label>
+                    </div>
+                  </section>
+                </>
+              )}
             </div>
 
             <div className="quick-person-footer">

@@ -46,6 +46,20 @@ const VARIAVEIS_CONTRATO_COMERCIAL = [
   { chave: 'cliente.cidade_uf', descricao: 'Cidade/UF do comprador' },
   { chave: 'cliente.cep', descricao: 'CEP do comprador' },
   { chave: 'cliente.conjuge_nome', descricao: 'Nome do conjuge do comprador' },
+  { chave: 'conjuge.nome', descricao: 'Nome do conjuge cadastrado' },
+  { chave: 'conjuge.cpf_cnpj', descricao: 'CPF/CNPJ do conjuge cadastrado' },
+  { chave: 'conjuge.email', descricao: 'E-mail do conjuge cadastrado' },
+  { chave: 'conjuge.telefone', descricao: 'Telefone do conjuge cadastrado' },
+  { chave: 'conjuge.data_nascimento', descricao: 'Data de nascimento do conjuge cadastrado' },
+  { chave: 'conjuge.nacionalidade', descricao: 'Nacionalidade do conjuge cadastrado' },
+  { chave: 'conjuge.profissao', descricao: 'Profissao do conjuge cadastrado' },
+  { chave: 'conjuge.estado_civil', descricao: 'Estado civil do conjuge cadastrado' },
+  { chave: 'conjuge.endereco', descricao: 'Endereco do conjuge cadastrado' },
+  { chave: 'conjuge.numero', descricao: 'Numero do endereco do conjuge cadastrado' },
+  { chave: 'conjuge.complemento', descricao: 'Complemento do endereco do conjuge cadastrado' },
+  { chave: 'conjuge.bairro', descricao: 'Bairro do conjuge cadastrado' },
+  { chave: 'conjuge.cidade_uf', descricao: 'Cidade/UF do conjuge cadastrado' },
+  { chave: 'conjuge.cep', descricao: 'CEP do conjuge cadastrado' },
   { chave: 'cliente.regime_bens', descricao: 'Regime de bens do comprador' },
   { chave: 'empreendimento.nome', descricao: 'Nome do empreendimento' },
   { chave: 'empreendimento.codigo', descricao: 'Codigo do empreendimento' },
@@ -56,6 +70,7 @@ const VARIAVEIS_CONTRATO_COMERCIAL = [
   { chave: 'unidade.pavimento', descricao: 'Pavimento da unidade' },
   { chave: 'unidade.tipologia', descricao: 'Tipologia da unidade' },
   { chave: 'unidade.metragem_privativa', descricao: 'Metragem privativa da unidade' },
+  { chave: 'unidade.fracao_ideal', descricao: 'Fracao ideal da unidade' },
   { chave: 'corretor.nome', descricao: 'Nome do corretor' },
   { chave: 'corretor.cpf_cnpj', descricao: 'CPF/CNPJ do corretor' },
   { chave: 'corretor.creci', descricao: 'CRECI do corretor' },
@@ -204,6 +219,7 @@ function buildParcelasResumo(parcelas = []) {
 function buildDadosContrato(contrato, customVariables = {}) {
   const raw = contrato?.toJSON ? contrato.toJSON() : contrato;
   const cliente = raw.cliente || {};
+  const conjuge = cliente.conjuge || {};
   const unidade = raw.unidadeComercial || {};
   const corretor = raw.corretorParceiro || {};
   const empreendimento = raw.empreendimento || {};
@@ -247,6 +263,25 @@ function buildDadosContrato(contrato, customVariables = {}) {
       conjuge_nome: safeString(cliente.conjuge_nome),
       regime_bens: safeString(cliente.regime_bens)
     },
+    conjuge: {
+      nome: safeString(conjuge.nome || cliente.conjuge_nome),
+      cpf_cnpj: safeString(conjuge.cpf_cnpj),
+      telefone: safeString(conjuge.telefone),
+      email: safeString(conjuge.email),
+      endereco: safeString(conjuge.endereco),
+      numero: safeString(conjuge.numero),
+      bairro: safeString(conjuge.bairro),
+      cep: safeString(conjuge.cep),
+      municipio: safeString(conjuge.municipio),
+      estado: safeString(conjuge.estado),
+      cidade_uf: [conjuge.municipio, conjuge.estado].filter(Boolean).join('-'),
+      data_nascimento: formatDateBr(conjuge.data_nascimento),
+      data_nascimento_iso: safeString(conjuge.data_nascimento),
+      nacionalidade: safeString(conjuge.nacionalidade),
+      profissao: safeString(conjuge.profissao),
+      estado_civil: safeString(conjuge.estado_civil),
+      complemento: safeString(conjuge.complemento)
+    },
     empreendimento: {
       nome: safeString(empreendimento.nome),
       codigo: safeString(empreendimento.codigo)
@@ -259,6 +294,7 @@ function buildDadosContrato(contrato, customVariables = {}) {
       pavimento: safeString(unidade.pavimento),
       tipologia: safeString(unidade.tipologia),
       metragem_privativa: safeString(unidade.metragem_privativa),
+      fracao_ideal: safeString(unidade.fracao_ideal),
       valor_tabela: safeString(unidade.valor_tabela),
       valor_tabela_formatado: formatCurrency(unidade.valor_tabela),
       valor_base_venda: safeString(unidade.valor_base_venda),
@@ -291,7 +327,7 @@ async function carregarContratoParaDocumento(id) {
     include: [
       { model: Empreendimento, as: 'empreendimento' },
       { model: UnidadeComercial, as: 'unidadeComercial' },
-      { model: Parceiro, as: 'cliente' },
+      { model: Parceiro, as: 'cliente', include: [{ model: Parceiro, as: 'conjuge' }] },
       { model: Parceiro, as: 'corretorParceiro' },
       { model: Obra, as: 'obra' },
       {
@@ -597,7 +633,7 @@ async function enviarDocumentoD4Sign(req, documentoId, payload = {}) {
       {
         model: ContratoComercial,
         as: 'contrato',
-        include: [{ model: Parceiro, as: 'cliente' }]
+        include: [{ model: Parceiro, as: 'cliente', include: [{ model: Parceiro, as: 'conjuge' }] }]
       }
     ]
   });

@@ -161,7 +161,7 @@ function buildContratoInclude({ includeParcelas = false } = {}) {
     {
       model: UnidadeComercial,
       as: 'unidadeComercial',
-      attributes: ['id', 'codigo', 'nome', 'situacao', 'tipologia', 'valor_tabela', 'valor_base_venda']
+      attributes: ['id', 'codigo', 'nome', 'situacao', 'tipologia', 'metragem_privativa', 'fracao_ideal', 'valor_tabela', 'valor_base_venda']
     },
     {
       model: Parceiro,
@@ -284,7 +284,7 @@ function buildTabelaPrecoInclude({ includeItens = true } = {}) {
         {
           model: UnidadeComercial,
           as: 'unidadeComercial',
-          attributes: ['id', 'codigo', 'nome', 'bloco', 'torre', 'tipologia', 'situacao', 'valor_tabela', 'valor_base_venda']
+          attributes: ['id', 'codigo', 'nome', 'bloco', 'torre', 'tipologia', 'metragem_privativa', 'fracao_ideal', 'situacao', 'valor_tabela', 'valor_base_venda']
         }
       ]
     });
@@ -793,6 +793,7 @@ async function criarUnidadeComercial(payload = {}) {
     pavimento: payload.pavimento || null,
     tipologia: payload.tipologia || null,
     metragem_privativa: payload.metragem_privativa ?? null,
+    fracao_ideal: payload.fracao_ideal ?? null,
     valor_tabela: payload.valor_tabela ?? null,
     valor_base_venda: payload.valor_base_venda ?? null,
     situacao: payload.situacao || 'DISPONIVEL',
