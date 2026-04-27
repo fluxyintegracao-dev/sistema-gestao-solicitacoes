@@ -162,14 +162,12 @@ export default function Login() {
             <div className="login-brand-header">
               <div className="login-brand-lockup">
                 <FluxyMark />
-                <div className="login-brand-copy">
-                  <span className="login-brand-wordmark">Fluxy</span>
-                  <span className="login-brand-caption">Acesso seguro</span>
-                </div>
+                <span className="login-brand-wordmark">Fluxy</span>
               </div>
 
               <div className="login-heading">
-                <h1 className="login-heading-title">Entre na sua central</h1>
+                <span className="login-heading-kicker">Plataforma de gestao</span>
+                <h1 className="login-heading-title">Acesse sua central</h1>
                 <p className="login-heading-subtitle">
                   Obras, operacao e financeiro em um unico ambiente.
                 </p>
@@ -276,6 +274,7 @@ export default function Login() {
                       aria-pressed={showPassword}
                     >
                       <VisibilityIcon visible={showPassword} />
+                      <span>{showPassword ? 'Ocultar' : 'Mostrar'}</span>
                     </button>
                   </div>
                 </div>
