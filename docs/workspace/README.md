@@ -14,6 +14,10 @@ Ela serve para:
 
 ## Estrutura
 
+- `PROTOCOLO_AGENTES.md`
+  - processo obrigatorio para multiplos agentes no mesmo repositorio
+- `QUADRO_AGENTES.md`
+  - painel diario com sessoes, ownership, andamento, finalizados e pendencias
 - `REPO_CONTEXTO.md`
   - papel deste repositorio no workspace
 - `INTEGRACOES_ATIVAS.md`

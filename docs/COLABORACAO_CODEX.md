@@ -39,6 +39,12 @@ Se a tarefa exigir frontend e backend ao mesmo tempo, um agente deve ficar respo
 
 Antes de editar, o agente deve declarar quais arquivos vai reservar.
 
+Quando houver mais de um agente ativo, usar obrigatoriamente o painel:
+
+- `docs/workspace/PROTOCOLO_AGENTES.md`
+- `docs/workspace/QUADRO_AGENTES.md`
+- `docs/workspace/OWNERSHIP_ATIVO.md`
+
 Formato recomendado:
 
 ```md
