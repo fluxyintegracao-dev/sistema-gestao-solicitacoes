@@ -150,12 +150,44 @@ export default function Perfil() {
   }
 
   return (
-    <div className="page solicitacoes-page max-w-3xl mx-auto">
-      <div>
-        <h1 className="page-title">Meu perfil</h1>
-        <p className="page-subtitle">
-          Confira seus dados, altere sua senha e mantenha sua conta protegida.
-        </p>
+    <div className="page solicitacoes-page max-w-4xl mx-auto space-y-5">
+      <header className="app-page-header">
+        <div className="app-page-header-row">
+          <div>
+            <h1 className="page-title">Meu perfil</h1>
+            <p className="page-subtitle">
+              Confira seus dados, altere sua senha e mantenha sua conta protegida.
+            </p>
+          </div>
+          <div className="app-page-actions">
+            <span className="app-status-pill bg-sky-100 text-sky-700">{user?.perfil || 'USUARIO'}</span>
+            <StatusBadge enabled={mfaEnabled} />
+          </div>
+        </div>
+      </header>
+
+      <div className="grid gap-4 md:grid-cols-3">
+        <div className="sol-surface-card rounded-2xl p-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--c-muted)]">Conta</p>
+          <p className="mt-3 text-lg font-semibold text-[var(--c-text)]">{user?.nome || '-'}</p>
+          <p className="mt-1 text-sm text-[var(--c-muted)]">{user?.email || '-'}</p>
+        </div>
+        <div className="sol-surface-card rounded-2xl p-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--c-muted)]">Setor</p>
+          <p className="mt-3 text-lg font-semibold text-[var(--c-text)]">
+            {user?.setor?.nome || user?.setor?.codigo || user?.setor_id || '-'}
+          </p>
+          <p className="mt-1 text-sm text-[var(--c-muted)]">Escopo operacional atual</p>
+        </div>
+        <div className="sol-surface-card rounded-2xl p-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--c-muted)]">Seguranca</p>
+          <p className="mt-3 text-lg font-semibold text-[var(--c-text)]">
+            {mfaEnabled ? 'MFA ativo' : 'MFA pendente'}
+          </p>
+          <p className="mt-1 text-sm text-[var(--c-muted)]">
+            {mfaRequiredByPolicy ? 'Obrigatorio pela politica atual' : 'Protecao complementar da conta'}
+          </p>
+        </div>
       </div>
 
       <div className="card space-y-6">
@@ -279,7 +311,6 @@ export default function Perfil() {
                 Proteja o acesso com codigo TOTP no autenticador do celular.
               </p>
             </div>
-            <StatusBadge enabled={mfaEnabled} />
           </div>
 
           {mfaSetupPending ? (

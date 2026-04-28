@@ -226,11 +226,30 @@ export default function Configuracoes() {
   return (
     <div className="config-page solicitacoes-page space-y-5 md:space-y-6">
       <header className="config-page-header">
-        <h1 className="config-page-title">Configuracoes</h1>
-        <p className="config-page-subtitle">
-          Gerencie cadastros, regras operacionais e, quando aplicavel, a camada de modulos da instalacao.
-        </p>
+        <div className="config-page-header-row">
+          <div>
+            <h1 className="config-page-title">Configuracoes</h1>
+            <p className="config-page-subtitle">
+              Gerencie cadastros, regras operacionais e, quando aplicavel, a camada de modulos da instalacao.
+            </p>
+          </div>
+          <div className="config-page-meta">
+            <span className="config-section-count">
+              {secoesVisiveis.reduce((acc, secao) => acc + secao.itens.length, 0)} atalhos
+            </span>
+          </div>
+        </div>
       </header>
+
+      <section className="config-summary-card">
+        <div>
+          <p className="config-summary-kicker">Console administrativo</p>
+          <h2 className="config-summary-title">Ajustes estruturais do Fluxy</h2>
+          <p className="config-summary-copy">
+            Todas as rotas abaixo preservam o backend atual e concentram apenas configuracoes operacionais e de acesso.
+          </p>
+        </div>
+      </section>
 
       {secoesVisiveis.map((secao) => (
         <section key={secao.title} className="config-section">

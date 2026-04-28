@@ -1,11 +1,3 @@
-/**
- * Button — componente base de botão.
- *
- * variant : 'primary' | 'outline' | 'ghost' | 'danger' | 'success'
- * size    : 'sm' | 'md' | 'lg'
- * loading : boolean — exibe spinner e desabilita interação
- * fullWidth : boolean
- */
 export default function Button({
   children,
   variant = 'primary',
@@ -16,6 +8,7 @@ export default function Button({
   type = 'button',
   onClick,
   className = '',
+  iconOnly = false,
   ...props
 }) {
   const base = 'btn';
@@ -26,24 +19,26 @@ export default function Button({
     ghost: 'btn-ghost',
     danger: 'btn-danger',
     success: 'btn-success',
-    secondary: 'btn-secondary',
+    secondary: 'btn-secondary'
   }[variant] ?? 'btn-primary';
 
   const sizeClass = {
     sm: 'btn-sm',
     md: '',
-    lg: 'btn-lg',
+    lg: 'btn-lg'
   }[size] ?? '';
 
   const widthClass = fullWidth ? 'w-full justify-center' : '';
-  const disabledClass = disabled || loading ? 'opacity-60 pointer-events-none' : '';
+  const iconOnlyClass = iconOnly ? 'btn-icon-only' : '';
+  const disabledClass = disabled || loading ? 'opacity-70 pointer-events-none' : '';
 
   return (
     <button
       type={type}
       onClick={onClick}
       disabled={disabled || loading}
-      className={[base, variantClass, sizeClass, widthClass, disabledClass, className]
+      aria-busy={loading}
+      className={[base, variantClass, sizeClass, widthClass, iconOnlyClass, disabledClass, className]
         .filter(Boolean)
         .join(' ')}
       {...props}
@@ -54,7 +49,7 @@ export default function Button({
           aria-hidden="true"
         />
       )}
-      {children}
+      {children ? <span className="btn-content">{children}</span> : null}
     </button>
   );
 }

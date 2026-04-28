@@ -1,8 +1,9 @@
-﻿import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Suspense, useContext, useEffect, useMemo, useState } from 'react';
 import { AuthContext } from '../contexts/AuthContext';
 import AppRouteFallback from '../components/AppRouteFallback';
 import NotificacoesBell from '../components/NotificacoesBell';
+import fluxyMark from '../assets/fluxy_mark_cropped.png';
 import { getResumoConversas } from '../services/conversasInternas';
 import { getInstalacaoPublica } from '../services/instalacao';
 import {
@@ -31,9 +32,11 @@ import {
   HiOutlineArchiveBox,
   HiOutlineDocumentText,
   HiOutlineInboxStack,
-  HiOutlinePaperAirplane
+  HiOutlinePaperAirplane,
+  HiOutlineSparkles,
+  HiOutlineLifebuoy,
+  HiOutlineChatBubbleOvalLeft
 } from 'react-icons/hi2';
-import { BsBuildingsFill } from 'react-icons/bs';
 import {
   canAccessBiblioteca,
   canAccessBoletos,
@@ -82,9 +85,9 @@ export default function Layout() {
   const { user, logout } = useContext(AuthContext);
   const location = useLocation();
   const navigate = useNavigate();
-  const [menuAberto, setMenuAberto] = useState(false); // mobile drawer
-  const [collapsed, setCollapsed] = useState(false); // desktop collapse
-  const [expandedGroups, setExpandedGroups] = useState([]);
+  const [menuAberto, setMenuAberto] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
+  const [openGroupId, setOpenGroupId] = useState(null);
   const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light');
   const [isMobileViewport, setIsMobileViewport] = useState(() =>
     typeof window !== 'undefined' ? window.matchMedia('(max-width: 767px)').matches : false
@@ -99,12 +102,16 @@ export default function Layout() {
   });
   const nativeApp = isNativeApp();
 
-  const sidebarWidth = isMobileViewport ? 292 : (collapsed ? 76 : 236);
+  const sidebarWidth = isMobileViewport ? 304 : (collapsed ? 86 : 286);
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark');
     localStorage.setItem('theme', theme);
   }, [theme]);
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }, [location.pathname]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
@@ -138,6 +145,18 @@ export default function Layout() {
   }, [location.pathname, isMobileViewport]);
 
   useEffect(() => {
+    if (!menuAberto) return undefined;
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        setMenuAberto(false);
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [menuAberto]);
+
+  useEffect(() => {
     return registerNativeBackButtonHandler({
       canCloseMenu: () => menuAberto,
       onCloseMenu: () => setMenuAberto(false),
@@ -169,7 +188,7 @@ export default function Layout() {
         setInboxNovasCount(naoLidas);
         setSaidaNovasCount(0);
       } catch {
-        // sem bloqueio visual em caso de falha temporaria
+        // nao bloqueia a navegacao
       }
     };
 
@@ -244,9 +263,7 @@ export default function Layout() {
   const bibliotecaAccess = canAccessBiblioteca(user);
   const comunicacaoAccess = canAccessComunicacao(user);
   const brandLabel = instalacao.product_name || 'Fluxy';
-  const brandAlt = instalacao.company_name || brandLabel;
   const brandInitial = String(brandLabel || 'F').trim().charAt(0).toUpperCase() || 'F';
-
   const menuGroups = useMemo(() => {
     const groups = [];
     const item = (to, label, icon) => ({ to, label, icon });
@@ -266,6 +283,7 @@ export default function Layout() {
       Contratos: HiOutlineBanknotes,
       Configuracoes: HiOutlineCog6Tooth,
       Biblioteca: HiOutlineFolderOpen,
+      Cotacoes: HiOutlineInboxStack,
       Conta: HiOutlineUserCircle
     };
 
@@ -488,130 +506,132 @@ export default function Layout() {
     rhDpEmpresasAccess,
     rhDpImportacoesAccess,
     rhDpObrigacoesAccess,
-    comercialAccess,
     superadmin
   ]);
 
   const flatMenuItems = useMemo(
-    () => menuGroups.flatMap(group => group.items),
+    () => menuGroups.flatMap((group) => group.items.map((item) => ({ ...item, groupLabel: group.label }))),
     [menuGroups]
   );
 
+  const activeMatch = useMemo(() => findActiveMenuMatch(menuGroups, location.pathname), [menuGroups, location.pathname]);
+  const activeGroupLabel = activeMatch?.group?.label || null;
+  const activeItem = activeMatch?.item || null;
+  const currentSectionLabel = activeItem?.label || activeGroupLabel || 'Workspace';
+  const pageDescription = activeGroupLabel
+    ? `${activeGroupLabel} · ${user?.nome || 'Operacao'}`
+    : `${brandLabel} · ${perfilUpper || 'USUARIO'}`;
+
   useEffect(() => {
-    setExpandedGroups(prev => {
-      const validLabels = new Set(menuGroups.map(group => group.label));
-      const filtered = prev.filter(label => validLabels.has(label));
-      const activeGroup = menuGroups.find(group =>
-        group.items.some(item => isPathActive(location.pathname, item.to))
-      )?.label;
+    setOpenGroupId(activeGroupLabel);
+  }, [activeGroupLabel]);
 
-      if (filtered.length === 0) {
-        if (activeGroup) return [activeGroup];
-        return menuGroups.length > 0 ? [menuGroups[0].label] : [];
-      }
+  const notificationCount = inboxNovasCount + saidaNovasCount;
 
-      if (activeGroup && !filtered.includes(activeGroup)) {
-        return [...filtered, activeGroup];
-      }
+  const toggleTheme = () => setTheme((current) => (current === 'light' ? 'dark' : 'light'));
+  const closeMobileSidebar = () => {
+    if (isMobileViewport) setMenuAberto(false);
+  };
 
-      return filtered;
-    });
-  }, [menuGroups, location.pathname]);
+  const handleSelect = (groupLabel) => {
+    if (groupLabel) setOpenGroupId(groupLabel);
+    closeMobileSidebar();
+  };
 
-  const toggleTheme = () => setTheme(t => (t === 'light' ? 'dark' : 'light'));
-
-  const isActive = path => isPathActive(location.pathname, path);
   const toggleGroup = (label) => {
-    setExpandedGroups(prev =>
-      prev.includes(label)
-        ? prev.filter(item => item !== label)
-        : [...prev, label]
-    );
+    setOpenGroupId((current) => (current === label ? null : label));
   };
 
   return (
     <div className={theme === 'dark' ? 'dark' : ''}>
-      <div className={`layout-shell flex min-h-screen overflow-x-hidden ${nativeApp ? 'layout-shell-native' : ''}`}>
+      <div className={`layout-shell fluxy-app-shell flex min-h-screen overflow-x-hidden ${nativeApp ? 'layout-shell-native' : ''}`}>
+        <div className="layout-shell-backdrop" aria-hidden="true" />
+
         <aside
-          className={`sidebar ${collapsed ? 'collapsed' : ''} fixed md:static top-0 left-0 h-full md:h-auto z-40 transform transition-all duration-200 ${
+          className={`sidebar ${collapsed ? 'collapsed' : ''} fixed md:sticky top-0 left-0 h-full z-40 transform transition-all duration-300 ${
             menuAberto ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
           }`}
-          style={{ width: `${sidebarWidth}px`, transition: 'width 0.25s ease' }}
+          style={{ width: `${sidebarWidth}px` }}
           role="navigation"
           aria-label="Menu lateral"
         >
-          <div className="flex flex-col h-full px-3 md:px-4 py-3 md:py-4 gap-3">
-            <div className={`brand ${collapsed ? 'justify-center' : 'justify-between'}`}>
-              {instalacao.logo_url ? (
-                <img
-                  src={instalacao.logo_url}
-                  alt={brandAlt}
-                  className="h-7 w-auto"
-                />
-              ) : (
-                <div className="h-8 w-8 rounded-xl bg-blue-600 text-white flex items-center justify-center text-sm font-bold">
-                  {brandInitial}
+          <div className="sidebar-inner">
+            <div className={`brand ${collapsed ? 'brand-collapsed' : ''}`}>
+              <div className="brand-mark">
+                <div className="brand-logo-tile" aria-hidden="true">
+                  <img
+                    src={fluxyMark}
+                    alt=""
+                    className="brand-logo-icon"
+                  />
+                </div>
+              </div>
+
+              {!collapsed && (
+                <div className="brand-copy">
+                  <p className="brand-wordmark">Fluxy</p>
                 </div>
               )}
-              <div className="flex items-center gap-2 brand-text">
-                <div className="leading-tight">
-                  <p className="brand-title inline-flex items-center gap-1.5">
-                    <BsBuildingsFill size={14} />
-                    <span>{brandLabel}</span>
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setMenuAberto(false)}
-                  className="chevron-btn md:hidden"
-                  aria-label="Fechar menu"
-                  type="button"
-                >
-                  <HiOutlineBars3 size={22} />
-                </button>
-              </div>
+
+              <button
+                onClick={() => setMenuAberto(false)}
+                className="chevron-btn md:hidden"
+                aria-label="Fechar menu"
+                type="button"
+              >
+                <HiOutlineChevronLeft size={18} />
+              </button>
             </div>
 
             {!collapsed && (
-              <div className="user-block mt-1 mb-2">
-                <span className="font-semibold" style={{ color: 'var(--nav-text)' }}>{user?.nome}</span>
-                <span className="user-role">{perfilUpper || 'USUARIO'}</span>
-              </div>
+              <section className="sidebar-profile-card" aria-label="Resumo da conta">
+                <div className="sidebar-profile-avatar">
+                  {String(user?.nome || brandInitial).trim().charAt(0).toUpperCase() || 'U'}
+                </div>
+                <div className="sidebar-profile-copy min-w-0">
+                  <p className="sidebar-profile-name">{user?.nome || 'Usuário'}</p>
+                  <p className="sidebar-profile-email">
+                    {user?.email || user?.setor?.nome || user?.area || ''}
+                  </p>
+                  {perfilUpper && (
+                    <span className="sidebar-profile-badge">{perfilUpper}</span>
+                  )}
+                </div>
+              </section>
             )}
 
-            <nav className="flex-1">
+            <nav className="sidebar-nav">
               {collapsed ? (
-                <ul className="nav-list">
-                  {flatMenuItems.map(item => (
+                <ul className="nav-list nav-list-collapsed">
+                  {flatMenuItems.map((item) => (
                     <MenuItem
                       key={item.to}
                       to={item.to}
                       label={item.label}
                       icon={item.icon}
-                      active={isActive(item.to)}
-                              onSelect={() => {
-                                navigate(item.to);
-                                if (isMobileViewport) setMenuAberto(false);
-                              }}
-                              collapsed={collapsed}
-                              inboxNovasCount={inboxNovasCount}
-                              saidaNovasCount={saidaNovasCount}
-                            />
-                          ))}
+                      active={isPathActive(location.pathname, item.to)}
+                      onSelect={() => handleSelect(item.groupLabel)}
+                      collapsed
+                      groupLabel={item.groupLabel}
+                      inboxNovasCount={item.to === '/comunicacao-interna' ? comunicacaoNovasCount : 0}
+                      saidaNovasCount={0}
+                    />
+                  ))}
                 </ul>
               ) : (
                 <ul className="nav-list nav-list-grouped">
-                  {menuGroups.map(group => {
-                    const isOpen = expandedGroups.includes(group.label);
+                  {menuGroups.map((group) => {
+                    const isOpen = openGroupId === group.label;
+                    const isGroupActive = group.items.some((item) => isPathActive(location.pathname, item.to));
                     const groupId = `submenu-${String(group.label).toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
                     const GroupIcon = group.icon;
+                    const unreadCount = group.label === 'Comunicacao' ? notificationCount : 0;
 
                     return (
-                      <li key={group.label} className="nav-group">
+                      <li key={group.label} className={`nav-group ${isGroupActive ? 'active' : ''}`}>
                         <button
                           type="button"
-                          className={`nav-group-toggle ${isOpen ? 'open' : ''}`}
+                          className={`nav-group-toggle ${isOpen ? 'open' : ''} ${isGroupActive ? 'current' : ''}`}
                           onClick={() => toggleGroup(group.label)}
                           aria-expanded={isOpen}
                           aria-controls={groupId}
@@ -619,9 +639,9 @@ export default function Layout() {
                           <span className="nav-group-heading">
                             {GroupIcon && <GroupIcon className="nav-group-icon" />}
                             <span className="nav-group-title">{group.label}</span>
-                            {group.label === 'Comunicacao' && (inboxNovasCount + saidaNovasCount) > 0 && (
-                              <span className="inline-flex min-w-[20px] h-5 px-1.5 items-center justify-center rounded-full text-[11px] font-semibold bg-red-600 text-white">
-                                {(inboxNovasCount + saidaNovasCount) > 99 ? '99+' : (inboxNovasCount + saidaNovasCount)}
+                            {unreadCount > 0 && (
+                              <span className="nav-count-badge">
+                                {unreadCount > 99 ? '99+' : unreadCount}
                               </span>
                             )}
                           </span>
@@ -631,25 +651,24 @@ export default function Layout() {
                             <HiOutlineChevronRight className="nav-group-chevron" />
                           )}
                         </button>
+
                         <div
                           id={groupId}
                           className={`nav-sublist-wrap ${isOpen ? 'open' : ''}`}
                         >
                           <ul className="nav-sublist">
-                            {group.items.map(item => (
+                            {group.items.map((item) => (
                               <MenuItem
                                 key={item.to}
                                 to={item.to}
                                 label={item.label}
                                 icon={item.icon}
-                                active={isActive(item.to)}
-                                onSelect={() => {
-                                  navigate(item.to);
-                                  if (isMobileViewport) setMenuAberto(false);
-                                }}
+                                active={isPathActive(location.pathname, item.to)}
+                                onSelect={() => handleSelect(group.label)}
                                 collapsed={false}
                                 subItem
-                                inboxNovasCount={comunicacaoNovasCount}
+                                groupLabel={group.label}
+                                inboxNovasCount={item.to === '/comunicacao-interna' ? comunicacaoNovasCount : 0}
                                 saidaNovasCount={0}
                               />
                             ))}
@@ -662,10 +681,17 @@ export default function Layout() {
               )}
             </nav>
 
-            <div className="flex flex-col gap-3">
+            <div className="sidebar-footer">
+              {!collapsed && (
+                <div className="sidebar-footer-note">
+                  <HiOutlineSparkles className="sidebar-footer-note-icon" />
+                  <span>Fluxo visual renovado, mantendo regras e endpoints atuais.</span>
+                </div>
+              )}
+
               <button
                 onClick={logout}
-                className="nav-btn text-blue-300 hover:text-white"
+                className="nav-btn nav-btn-logout"
                 type="button"
               >
                 <HiOutlineArrowRightOnRectangle className="nav-icon" />
@@ -673,8 +699,9 @@ export default function Layout() {
               </button>
             </div>
           </div>
+
           <button
-            onClick={() => setCollapsed(c => !c)}
+            onClick={() => setCollapsed((current) => !current)}
             className="sidebar-toggle-rail hidden md:inline-flex"
             aria-label={collapsed ? 'Expandir menu' : 'Recolher menu'}
             aria-expanded={!collapsed}
@@ -687,54 +714,93 @@ export default function Layout() {
         </aside>
 
         {menuAberto && (
-          <div
-            className="fixed inset-0 bg-black/30 md:hidden z-30"
+          <button
+            type="button"
+            className="sidebar-overlay fixed inset-0 md:hidden z-30"
             onClick={() => setMenuAberto(false)}
-            aria-hidden="true"
+            aria-label="Fechar menu lateral"
           />
         )}
 
-        <main className={`layout-main flex-1 min-w-0 bg-[var(--c-bg)] transition-colors duration-200 ${nativeApp ? 'layout-main-native' : ''}`}>
-          <div className="mx-auto w-full max-w-none px-3 sm:px-4 md:px-5 lg:px-6 xl:px-8 pb-6 md:pb-9">
-            <div className={`topbar-shell flex flex-wrap items-center justify-between gap-4 md:gap-6 mb-5 md:mb-7 w-full py-4 md:py-5 min-h-[76px] ${nativeApp ? 'topbar-shell-native' : ''}`}>
-              <button
-                onClick={() => setMenuAberto(true)}
-                className="md:hidden inline-flex items-center justify-center h-11 w-11 rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] text-[var(--c-text)]"
-                aria-label="Abrir menu"
-                type="button"
-              >
-                <HiOutlineBars3 size={20} />
-              </button>
+        <main className={`layout-main flex-1 min-w-0 transition-colors duration-200 ${nativeApp ? 'layout-main-native' : ''}`}>
+          <div className="layout-content-shell">
+            <header className={`topbar-shell ${nativeApp ? 'topbar-shell-native' : ''}`}>
+              <div className="topbar-leading">
+                <button
+                  onClick={() => setMenuAberto(true)}
+                  className="topbar-menu-button md:hidden"
+                  aria-label="Abrir menu"
+                  type="button"
+                >
+                  <HiOutlineBars3 size={20} />
+                </button>
 
-              <div className="min-w-0 flex-1">
-                <p className="brand-title truncate inline-flex items-center gap-2" style={{ fontSize: '1.1rem' }}>
-                  <BsBuildingsFill size={16} />
-                  <span>{brandLabel}</span>
-                </p>
-                <p className="text-xs text-[var(--c-muted)] truncate">
-                  {user?.nome} · {perfilUpper || 'USUARIO'}
-                </p>
+                <div className="topbar-context">
+                  <p className="topbar-breadcrumb">
+                    <span>{activeGroupLabel || brandLabel}</span>
+                    {activeItem && activeItem.label !== activeGroupLabel ? (
+                      <>
+                        <HiOutlineChevronRight size={14} />
+                        <span>{activeItem.label}</span>
+                      </>
+                    ) : null}
+                  </p>
+                  <div className="topbar-title-row">
+                    <div>
+                      <h1 className="topbar-title">{currentSectionLabel}</h1>
+                      <p className="topbar-subtitle">{pageDescription}</p>
+                    </div>
+                    <span className="topbar-status-chip">
+                      {theme === 'dark' ? 'Modo escuro' : 'Modo claro'}
+                    </span>
+                  </div>
+                </div>
               </div>
 
-              <div className="ml-auto flex items-center gap-2">
+              <div className="topbar-tray">
                 <button
                   onClick={toggleTheme}
                   className="theme-toggle"
                   type="button"
+                  aria-label={theme === 'dark' ? 'Ativar modo claro' : 'Ativar modo escuro'}
                 >
                   {theme === 'dark' ? (
                     <>
-                      <HiOutlineSun size={18} /> <span className="hidden sm:inline">Claro</span>
+                      <HiOutlineSun size={18} />
+                      <span className="hidden sm:inline">Claro</span>
                     </>
                   ) : (
                     <>
-                      <HiOutlineMoon size={18} /> <span className="hidden sm:inline">Escuro</span>
+                      <HiOutlineMoon size={18} />
+                      <span className="hidden sm:inline">Escuro</span>
                     </>
                   )}
                 </button>
+
+                <button
+                  className="theme-toggle topbar-support-btn"
+                  type="button"
+                  aria-label="Suporte"
+                  title="Suporte"
+                >
+                  <HiOutlineLifebuoy size={18} />
+                  <span className="hidden sm:inline">Suporte</span>
+                </button>
+
+                <Link
+                  to="/comunicacao-interna"
+                  className="theme-toggle topbar-chat-btn"
+                  aria-label="Chat interno"
+                  title="Chat interno"
+                >
+                  <HiOutlineChatBubbleOvalLeft size={18} />
+                  <span className="hidden sm:inline">Chat</span>
+                </Link>
+
                 <NotificacoesBell />
               </div>
-            </div>
+            </header>
+
             <Suspense fallback={<AppRouteFallback />}>
               <Outlet />
             </Suspense>
@@ -745,33 +811,63 @@ export default function Layout() {
   );
 }
 
+function findActiveMenuMatch(menuGroups, pathname) {
+  let bestMatch = null;
+
+  for (const group of menuGroups) {
+    for (const item of group.items) {
+      if (!isPathActive(pathname, item.to)) continue;
+      if (!bestMatch || item.to.length > bestMatch.item.to.length) {
+        bestMatch = { group, item };
+      }
+    }
+  }
+
+  return bestMatch;
+}
+
 function isPathActive(currentPath, targetPath) {
   return currentPath === targetPath || currentPath.startsWith(`${targetPath}/`);
 }
 
-function MenuItem({ to, label, icon: Icon, active, onSelect, collapsed, subItem = false, inboxNovasCount = 0, saidaNovasCount = 0 }) {
+function MenuItem({
+  to,
+  label,
+  icon: Icon,
+  active,
+  onSelect,
+  collapsed,
+  subItem = false,
+  groupLabel,
+  inboxNovasCount = 0,
+  saidaNovasCount = 0
+}) {
   const mostrarBadgeInbox = to === '/comunicacao-interna' || to === '/conversas/entrada';
   const mostrarBadgeSaida = to === '/conversas/saida';
   const inboxCount = Number(inboxNovasCount || 0);
   const saidaCount = Number(saidaNovasCount || 0);
+
   return (
     <li>
       <Link
         to={to}
-        onClick={() => onSelect()}
+        onClick={onSelect}
         className={`nav-btn ${subItem ? 'nav-btn-sub' : ''} ${active ? 'active' : ''}`}
-        title={label}
+        title={collapsed ? `${groupLabel} · ${label}` : label}
         aria-label={label}
+        aria-current={active ? 'page' : undefined}
       >
         {Icon && <Icon className="nav-icon" />}
-        {!collapsed && <span>{label}</span>}
+        {!collapsed && <span className="nav-btn-label">{label}</span>}
+
         {!collapsed && mostrarBadgeInbox && inboxCount > 0 && (
-          <span className="ml-auto inline-flex min-w-[20px] h-5 px-1.5 items-center justify-center rounded-full text-[11px] font-semibold bg-red-600 text-white">
+          <span className="nav-count-badge nav-count-badge-inline">
             {inboxCount > 99 ? '99+' : inboxCount}
           </span>
         )}
+
         {!collapsed && mostrarBadgeSaida && saidaCount > 0 && (
-          <span className="ml-auto inline-flex min-w-[20px] h-5 px-1.5 items-center justify-center rounded-full text-[11px] font-semibold bg-red-600 text-white">
+          <span className="nav-count-badge nav-count-badge-inline">
             {saidaCount > 99 ? '99+' : saidaCount}
           </span>
         )}

@@ -1,34 +1,30 @@
-/**
- * Spinner — indicador de carregamento.
- *
- * size  : 'sm' | 'md' | 'lg'
- * label : string — texto acessível (não visível por padrão)
- * full  : boolean — ocupa a tela toda (para loading de página)
- */
 export default function Spinner({ size = 'md', label = 'Carregando...', full = false }) {
   const sizeClass = {
     sm: 'h-4 w-4 border-2',
     md: 'h-6 w-6 border-2',
-    lg: 'h-10 w-10 border-[3px]',
+    lg: 'h-10 w-10 border-[3px]'
   }[size] ?? 'h-6 w-6 border-2';
 
   const spinner = (
-    <div role="status" className="flex items-center gap-2">
+    <div role="status" className="spinner-shell">
       <span
         className={[
           sizeClass,
-          'animate-spin rounded-full border-[var(--c-primary)] border-t-transparent',
+          'spinner-core'
         ].join(' ')}
         aria-hidden="true"
       />
-      <span className="sr-only">{label}</span>
+      {label ? <span className="sr-only">{label}</span> : null}
+      {!full && label ? <span className="spinner-label">{label}</span> : null}
     </div>
   );
 
   if (full) {
     return (
-      <div className="flex min-h-[200px] items-center justify-center">
-        {spinner}
+      <div className="spinner-fullscreen">
+        <div className="spinner-panel">
+          {spinner}
+        </div>
       </div>
     );
   }

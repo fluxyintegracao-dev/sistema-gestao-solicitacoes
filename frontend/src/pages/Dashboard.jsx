@@ -1,10 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import {
+  HiOutlineArrowPath,
+  HiOutlineBanknotes,
+  HiOutlineClipboardDocumentList,
+  HiOutlineExclamationTriangle,
+  HiOutlineSparkles
+} from 'react-icons/hi2';
 import { API_URL, authHeaders } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
-import Spinner from '../components/ui/Spinner';
 import Alert from '../components/ui/Alert';
 import EmptyState from '../components/ui/EmptyState';
+import LoadingSkeleton from '../components/ui/LoadingSkeleton';
 
 function formatCurrency(value) {
   return Number(value || 0).toLocaleString('pt-BR', {
@@ -163,6 +170,20 @@ function FinanceRow({ title, subtitle, amount, tone = 'slate', href }) {
 
   if (!href) return content;
   return <Link to={href} className="dashboard-row-link">{content}</Link>;
+}
+
+function InsightItem({ title, message, tone = 'blue' }) {
+  return (
+    <div className={`dashboard-insight-card dashboard-insight-card--${tone}`}>
+      <div className={`dashboard-insight-icon dashboard-insight-icon--${tone}`}>
+        {tone === 'red' ? <HiOutlineExclamationTriangle className="h-5 w-5" /> : <HiOutlineSparkles className="h-5 w-5" />}
+      </div>
+      <div>
+        <p className="dashboard-insight-title">{title}</p>
+        <p className="dashboard-insight-copy">{message}</p>
+      </div>
+    </div>
+  );
 }
 
 function createDefaultDashboardState() {
@@ -368,10 +389,113 @@ export default function Dashboard() {
     return perfil === 'SUPERADMIN' ? 'Painel Executivo' : 'Painel do Setor';
   }, [dados.visao, perfil]);
 
+  const insights = useMemo(() => {
+    const items = [];
+
+    if (dados.visao.financeiro) {
+      if (totalVencido > 0) {
+        items.push({
+          tone: 'red',
+          title: 'Titulos vencidos exigem atencao',
+          message: `${formatCurrency(totalVencido)} ainda estao expostos entre pagar e receber em aberto.`
+        });
+      }
+
+      if (financeiro.conciliacao_pendente_quantidade > 0) {
+        items.push({
+          tone: 'amber',
+          title: 'Conferir conciliacao bancaria',
+          message: `${financeiro.conciliacao_pendente_quantidade} pendencia(s) podem distorcer leitura de caixa e relatorios.`
+        });
+      }
+
+      if (saldoAberto >= 0) {
+        items.push({
+          tone: 'green',
+          title: 'Saldo projetado segue positivo',
+          message: `Ha ${formatCurrency(saldoAberto)} de folga entre receber e pagar em aberto no recorte atual.`
+        });
+      }
+    }
+
+    if (dados.visao.solicitacoes && solicitacoesPendentes > 0) {
+      items.push({
+        tone: 'blue',
+        title: 'Fila operacional com demanda ativa',
+        message: `${formatNumber(solicitacoesPendentes)} solicitacao(oes) seguem pendentes ou em analise e podem travar fluxo interno.`
+      });
+    }
+
+    if (!items.length) {
+      items.push({
+        tone: 'green',
+        title: 'Operacao sob controle',
+        message: 'Os dados atuais nao apontam gargalos criticos para leitura executiva imediata.'
+      });
+    }
+
+    return items.slice(0, 4);
+  }, [dados.visao, financeiro.conciliacao_pendente_quantidade, saldoAberto, solicitacoesPendentes, totalVencido]);
+
+  const quickActions = useMemo(() => {
+    const actions = [];
+
+    if (dados.visao.solicitacoes) {
+      actions.push({
+        to: '/solicitacoes',
+        label: 'Abrir solicitacoes',
+        icon: HiOutlineClipboardDocumentList
+      });
+    }
+
+    if (dados.visao.financeiro) {
+      actions.push({
+        to: '/financeiro/titulos',
+        label: 'Ir para financeiro',
+        icon: HiOutlineBanknotes
+      });
+    }
+
+    if (dados.visao.financeiro && financeiro.conciliacao_pendente_quantidade > 0) {
+      actions.push({
+        to: '/financeiro/conciliacao',
+        label: 'Revisar conciliacao',
+        icon: HiOutlineArrowPath
+      });
+    }
+
+    return actions.slice(0, 3);
+  }, [dados.visao, financeiro.conciliacao_pendente_quantidade]);
+
   if (loading) {
     return (
-      <div className="page">
-        <Spinner full size="lg" label="Carregando painel..." />
+      <div className="page dashboard solicitacoes-page space-y-5 md:space-y-6">
+        <section className="dashboard-hero-card">
+          <div className="flex flex-col gap-4">
+            <LoadingSkeleton className="h-4 w-32 rounded-xl" />
+            <LoadingSkeleton className="h-11 w-72 rounded-2xl" />
+            <LoadingSkeleton lines={2} lastLineClassName="w-2/3" />
+          </div>
+        </section>
+
+        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <div key={index} className="dashboard-metric-card">
+              <LoadingSkeleton className="h-4 w-28 rounded-xl" />
+              <LoadingSkeleton className="mt-5 h-10 w-2/3 rounded-2xl" />
+              <LoadingSkeleton lines={2} lastLineClassName="w-1/2" />
+            </div>
+          ))}
+        </section>
+
+        <section className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
+          {Array.from({ length: 2 }).map((_, index) => (
+            <div key={index} className="dashboard-section-card">
+              <LoadingSkeleton className="h-5 w-40 rounded-xl" />
+              <LoadingSkeleton lines={4} lastLineClassName="w-3/5" />
+            </div>
+          ))}
+        </section>
       </div>
     );
   }
@@ -405,6 +529,20 @@ export default function Dashboard() {
             </button>
           </div>
         </div>
+
+        {quickActions.length ? (
+          <div className="dashboard-hero-actions">
+            {quickActions.map((action) => {
+              const Icon = action.icon;
+              return (
+                <Link key={action.to} to={action.to} className="btn btn-secondary btn-sm">
+                  <Icon className="h-4 w-4" />
+                  {action.label}
+                </Link>
+              );
+            })}
+          </div>
+        ) : null}
       </header>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -499,6 +637,22 @@ export default function Dashboard() {
           </Section>
         )}
       </section>
+
+      <Section
+        title="Insights do Fluxy"
+        subtitle="Leituras objetivas geradas no frontend a partir dos indicadores ja carregados."
+      >
+        <div className="grid gap-3 lg:grid-cols-2">
+          {insights.map((item) => (
+            <InsightItem
+              key={`${item.title}-${item.message}`}
+              title={item.title}
+              message={item.message}
+              tone={item.tone}
+            />
+          ))}
+        </div>
+      </Section>
 
       {dados.visao.financeiro && (
         <section className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">

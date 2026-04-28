@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { HiAdjustmentsHorizontal, HiChevronDown, HiChevronUp, HiEye, HiEyeSlash } from 'react-icons/hi2';
 
 const FILTROS_DISPONIVEIS = [
@@ -41,7 +42,9 @@ export default function Filtros({
   const statusDropdownRef = useRef(null);
   const [seletorFiltrosOpen, setSeletorFiltrosOpen] = useState(false);
   const seletorFiltrosRef = useRef(null);
-  
+  const botaoSeletorFiltrosRef = useRef(null);
+  const [seletorFiltrosPosition, setSeletorFiltrosPosition] = useState({ left: 16, top: 16 });
+
   const [filtrosVisiveis, setFiltrosVisiveis] = useState(() => {
     try {
       const salvo = localStorage.getItem('solicitacoes:filtros-visiveis');
@@ -91,7 +94,13 @@ export default function Filtros({
       if (statusDropdownOpen && !statusDropdownRef.current?.contains(event.target)) {
         setStatusDropdownOpen(false);
       }
-      if (seletorFiltrosOpen && !seletorFiltrosRef.current?.contains(event.target)) {
+      if (seletorFiltrosOpen && seletorFiltrosRef.current?.contains(event.target)) {
+        return;
+      }
+      if (seletorFiltrosOpen && botaoSeletorFiltrosRef.current?.contains(event.target)) {
+        return;
+      }
+      if (seletorFiltrosOpen) {
         setSeletorFiltrosOpen(false);
       }
     }
@@ -99,6 +108,26 @@ export default function Filtros({
     document.addEventListener('mousedown', onClickOutside);
     return () => document.removeEventListener('mousedown', onClickOutside);
   }, [tipoDropdownOpen, obraDropdownOpen, setorDropdownOpen, statusDropdownOpen, seletorFiltrosOpen]);
+
+  useEffect(() => {
+    if (!seletorFiltrosOpen) return undefined;
+
+    const frameId = window.requestAnimationFrame(() => {
+      posicionarSeletorFiltros();
+    });
+
+    function reposicionarSeletor() {
+      posicionarSeletorFiltros();
+    }
+
+    window.addEventListener('resize', reposicionarSeletor);
+    window.addEventListener('scroll', reposicionarSeletor, true);
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      window.removeEventListener('resize', reposicionarSeletor);
+      window.removeEventListener('scroll', reposicionarSeletor, true);
+    };
+  }, [seletorFiltrosOpen]);
 
   function handleChange(e) {
     const { name, value } = e.target;
@@ -136,6 +165,32 @@ export default function Filtros({
         return [...prev, filtroId];
       }
     });
+  }
+
+  function posicionarSeletorFiltros() {
+    if (!botaoSeletorFiltrosRef.current || typeof window === 'undefined') return;
+
+    const margem = 16;
+    const btnRect = botaoSeletorFiltrosRef.current.getBoundingClientRect();
+    const painelRect = seletorFiltrosRef.current?.getBoundingClientRect();
+    const larguraPainel = Math.min(painelRect?.width || 320, window.innerWidth - margem * 2);
+    const alturaPainel = Math.min(painelRect?.height || 360, window.innerHeight - margem * 2);
+    const maxLeft = Math.max(margem, window.innerWidth - larguraPainel - margem);
+    const espacoAbaixo = window.innerHeight - btnRect.bottom - margem;
+    const espacoAcima = btnRect.top - margem;
+    const abreAcima = alturaPainel > espacoAbaixo && espacoAcima > espacoAbaixo;
+
+    setSeletorFiltrosPosition({
+      left: Math.round(Math.min(Math.max(margem, btnRect.right - larguraPainel), maxLeft)),
+      top: Math.round(abreAcima
+        ? Math.max(margem, btnRect.top - alturaPainel - 8)
+        : Math.min(window.innerHeight - alturaPainel - margem, btnRect.bottom + 8))
+    });
+  }
+
+  function alternarSeletorFiltros() {
+    if (!seletorFiltrosOpen) posicionarSeletorFiltros();
+    setSeletorFiltrosOpen(prev => !prev);
   }
 
   // Dados de obras
@@ -728,48 +783,53 @@ export default function Filtros({
           <button className="btn btn-outline" type="button" onClick={limparFiltros}>
             Limpar filtros
           </button>
-          <div className="relative" ref={seletorFiltrosRef}>
+          <div className="relative">
             <button
+              ref={botaoSeletorFiltrosRef}
               className="btn btn-outline inline-flex items-center gap-2"
               type="button"
-              onClick={() => setSeletorFiltrosOpen(prev => !prev)}
+              onClick={alternarSeletorFiltros}
               title="Selecionar quais filtros exibir"
             >
               {seletorFiltrosOpen ? <HiEyeSlash className="w-4 h-4" /> : <HiEye className="w-4 h-4" />}
               <span className="font-medium">Filtros visíveis</span>
             </button>
-            {seletorFiltrosOpen && (
-              <div className="absolute top-full right-0 mt-2 bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-600 rounded-lg shadow-xl z-50 min-w-[280px]">
-                <div className="p-4 max-h-[350px] overflow-y-auto">
-                  <p className="text-xs font-semibold text-gray-700 dark:text-slate-200 mb-3 uppercase tracking-wide">Selecione os filtros</p>
+            {seletorFiltrosOpen && typeof document !== 'undefined' && createPortal((
+              <div
+                ref={seletorFiltrosRef}
+                className="sol-floating-panel fixed z-[1000] w-[320px] max-w-[calc(100vw-2rem)] max-h-[min(72vh,430px)] overflow-hidden p-3"
+                style={{
+                  left: `${seletorFiltrosPosition.left}px`,
+                  top: `${seletorFiltrosPosition.top}px`
+                }}
+              >
+                <div className="sol-floating-panel-header mb-2">
+                  <p className="sol-floating-panel-caption">Selecione os filtros</p>
+                </div>
+                <div className="sol-floating-panel-scroll">
                   {FILTROS_DISPONIVEIS.map(filtro => {
                     const isVisible = filtrosVisiveis.includes(filtro.id);
                     const isResponsavel = filtro.id === 'responsavel';
                     const shouldDisable = isResponsavel && !mostrarFiltroResponsavel;
-                    
+
                     return (
                       <label
                         key={filtro.id}
-                        className={`flex items-center gap-3 p-2.5 rounded-md cursor-pointer transition-colors ${
-                          shouldDisable 
-                            ? 'opacity-50 cursor-not-allowed' 
-                            : 'hover:bg-gray-100 dark:hover:bg-slate-700'
-                        }`}
+                        className={`sol-floating-panel-option ${shouldDisable ? 'is-disabled' : ''}`}
                       >
                         <input
                           type="checkbox"
                           checked={isVisible}
                           onChange={() => !shouldDisable && alternarFiltroVisivel(filtro.id)}
                           disabled={shouldDisable}
-                          className="w-4 h-4 rounded border-gray-300 dark:border-slate-500 text-blue-600 dark:text-blue-500 cursor-pointer focus:ring-blue-500"
                         />
-                        <span className="text-sm text-gray-900 dark:text-slate-100 font-medium">{filtro.label}</span>
+                        <span>{filtro.label}</span>
                       </label>
                     );
                   })}
                 </div>
               </div>
-            )}
+            ), document.body)}
           </div>
         </div>
 

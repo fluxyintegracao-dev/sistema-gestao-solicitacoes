@@ -1,11 +1,3 @@
-/**
- * Input — campo de texto/select/textarea padronizado.
- *
- * label      : string
- * error      : string — mensagem de erro inline
- * hint       : string — texto de ajuda abaixo do campo
- * as         : 'input' | 'select' | 'textarea'
- */
 export default function Input({
   label,
   error,
@@ -21,12 +13,11 @@ export default function Input({
   const hasError = Boolean(error);
 
   return (
-    <div className="grid gap-1.5">
+    <div className="input-field" data-error={hasError ? 'true' : 'false'}>
       {label && (
         <label
           htmlFor={inputId}
-          className="text-sm font-medium"
-          style={{ color: 'var(--c-text)' }}
+          className="input-label"
         >
           {label}
           {required && <span className="ml-1 text-red-500">*</span>}
@@ -37,8 +28,8 @@ export default function Input({
         id={inputId}
         className={[
           'input',
-          hasError ? 'border-red-500 focus:border-red-500' : '',
-          className,
+          hasError ? 'input-error' : '',
+          className
         ]
           .filter(Boolean)
           .join(' ')}
@@ -54,7 +45,7 @@ export default function Input({
       {hasError && (
         <p
           id={`${inputId}-error`}
-          className="text-xs text-red-500"
+          className="input-message input-message-error"
           role="alert"
         >
           {error}
@@ -64,8 +55,7 @@ export default function Input({
       {!hasError && hint && (
         <p
           id={`${inputId}-hint`}
-          className="text-xs"
-          style={{ color: 'var(--c-muted)' }}
+          className="input-message"
         >
           {hint}
         </p>

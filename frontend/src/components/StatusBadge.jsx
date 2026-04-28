@@ -1,4 +1,5 @@
 import { useTheme } from '../contexts/ThemeContext';
+import Badge from './ui/Badge';
 
 function normalizarChaveStatus(valor) {
   return String(valor || '')
@@ -43,14 +44,19 @@ export default function StatusBadge({ status, setor }) {
   const mapaSetor = tema?.status?.setores?.[setorKey] || null;
   const corSetor = buscarCorPorStatus(mapaSetor, status);
   const corGlobal = buscarCorPorStatus(tema?.status?.global || {}, status);
-  const cor = corSetor || corGlobal || '#9ca3af';
+  const cor = corSetor || corGlobal || '#94a3b8';
 
   return (
-    <span
-      className="text-white px-2 py-1 rounded text-xs"
-      style={{ backgroundColor: cor }}
+    <Badge
+      variant="custom"
+      dot
+      style={{
+        backgroundColor: `${cor}16`,
+        border: `1px solid ${cor}2d`,
+        color: cor
+      }}
     >
       {status}
-    </span>
+    </Badge>
   );
 }

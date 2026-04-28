@@ -82,16 +82,15 @@ export default function ModalAtribuirResponsavel({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-
-      <div className="bg-white p-6 rounded-xl w-full max-w-md">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm">
+      <div className="card w-full max-w-md">
 
         <h2 className="text-lg font-semibold mb-4">
           Atribuir responsável
         </h2>
 
         <select
-          className="w-full border p-2 rounded mb-4"
+          className="input w-full mb-4"
           value={usuarioSelecionado}
           onChange={e => setUsuarioSelecionado(e.target.value)}
         >
@@ -105,7 +104,7 @@ export default function ModalAtribuirResponsavel({
         </select>
 
         {(isUsuario || isSetorObraSolicitacao || isUsuarioSetorObra) && (
-          <p className="text-xs text-gray-500 mb-3">
+          <p className="mb-3 text-xs text-[var(--c-muted)]">
             As atribuicoes devem ser para pessoas do mesmo setor.
             {(isSetorObraSolicitacao || isUsuarioSetorObra) && obraId && ' Para OBRA, somente usuarios vinculados a mesma obra.'}
           </p>
@@ -115,14 +114,14 @@ export default function ModalAtribuirResponsavel({
 
           <button
             onClick={onClose}
-            className="px-4 py-2 border rounded"
+            className="btn btn-outline"
           >
             Cancelar
           </button>
 
           <button
             onClick={salvar}
-            className="px-4 py-2 bg-blue-700 text-white rounded"
+            className="btn btn-primary"
           >
             Salvar
           </button>

@@ -901,35 +901,35 @@ export default function Solicitacoes({ arquivadas = false }) {
           {mostrarSeletorColunas && typeof document !== 'undefined' && createPortal((
             <div
               ref={seletorColunasRef}
-              className="fixed z-[1000] w-[320px] max-w-[calc(100vw-2rem)] max-h-[min(70vh,420px)] overflow-y-auto bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl shadow-2xl p-3"
+              className="sol-floating-panel fixed z-[1000] w-[320px] max-w-[calc(100vw-2rem)] max-h-[min(70vh,420px)] overflow-hidden p-3"
               style={{
                 left: `${seletorColunasPosition.left}px`,
                 top: `${seletorColunasPosition.top}px`
               }}
             >
-              <div className="flex items-center justify-between mb-2">
+              <div className="sol-floating-panel-header mb-2">
                 <p className="text-sm font-medium">Colunas visíveis</p>
                 <button
                   type="button"
-                  className="text-xs text-blue-600 hover:underline"
+                  className="sol-floating-panel-link"
                   onClick={() => setColunasVisiveis(opcoesColunas.map(c => c.id))}
                 >
                   Mostrar todas
                 </button>
               </div>
-              <div className="grid grid-cols-2 gap-2 max-h-60 overflow-y-auto">
+              <div className="sol-floating-panel-grid sol-floating-panel-scroll">
                 {opcoesColunas.map(col => {
                   const obrigatoria = ['codigo', 'status', 'acoes'].includes(col.id);
                   const marcada = colunasVisiveis.includes(col.id);
                   return (
-                    <label key={col.id} className="flex items-center gap-2 text-sm">
+                    <label key={col.id} className={`sol-floating-panel-option ${obrigatoria ? 'is-disabled' : ''}`}>
                       <input
                         type="checkbox"
                         checked={marcada}
                         disabled={obrigatoria}
                         onChange={() => toggleColuna(col.id)}
                       />
-                      <span className={obrigatoria ? 'text-gray-500' : ''}>{col.label}</span>
+                      <span className={obrigatoria ? 'sol-floating-panel-option-subtle' : ''}>{col.label}</span>
                     </label>
                   );
                 })}

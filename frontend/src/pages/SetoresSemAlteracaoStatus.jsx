@@ -85,12 +85,12 @@ export default function SetoresSemAlteracaoStatus() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold">Setores sem alteracao de status</h1>
-        <p className="text-sm text-gray-600 mt-1">
+        <p className="mt-1 text-sm text-[var(--c-muted)]">
           Setores marcados nao exibem o botao Alterar status no detalhe da solicitacao.
         </p>
       </div>
 
-      <div className="bg-white p-6 rounded-xl shadow space-y-4">
+      <div className="card space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
           {setoresOrdenados.map(setor => {
             const token = normalizarTokenSetor(setor?.codigo || setor?.nome);

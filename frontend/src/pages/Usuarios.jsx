@@ -2,19 +2,27 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { HiArrowDownTray, HiArrowUpTray } from 'react-icons/hi2';
 import { getUsuarios, ativarUsuario, desativarUsuario, importarUsuariosEmMassa } from '../services/usuarios';
+import EmptyState from '../components/ui/EmptyState';
+import LoadingSkeleton from '../components/ui/LoadingSkeleton';
 
 export default function Usuarios() {
   const navigate = useNavigate();
   const [usuarios, setUsuarios] = useState([]);
   const [importando, setImportando] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     carregar();
   }, []);
 
   async function carregar() {
-    const data = await getUsuarios();
-    setUsuarios(Array.isArray(data) ? data : []);
+    try {
+      setLoading(true);
+      const data = await getUsuarios();
+      setUsuarios(Array.isArray(data) ? data : []);
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function toggleAtivo(usuario) {
@@ -91,6 +99,11 @@ export default function Usuarios() {
             <h1 className="text-xl font-semibold md:text-2xl">Usuarios</h1>
             <p className="page-subtitle">Cadastro, importacao e gestao operacional de usuarios.</p>
           </div>
+          <div className="app-page-actions">
+            <span className="app-status-pill bg-sky-100 text-sky-700">
+              {loading ? 'Carregando base...' : `${usuarios.length} usuario(s)`}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -136,51 +149,66 @@ export default function Usuarios() {
       </div>
 
       <div className="card sol-surface-card app-table-shell">
-        <div className="table-wrapper">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Nome</th>
-                <th>Email</th>
-                <th>Setor</th>
-                <th>Obras</th>
-                <th>Ativo</th>
-                <th>Acoes</th>
-              </tr>
-            </thead>
-            <tbody>
-              {usuarios.map((u) => (
-                <tr key={u.id}>
-                  <td>{u.nome}</td>
-                  <td>{u.email}</td>
-                  <td>{u.setor?.nome || '-'}</td>
-                  <td>
-                    {(u.vinculos || [])
-                      .map((v) => (v.obra ? (v.obra.codigo ? `${v.obra.codigo} - ${v.obra.nome}` : v.obra.nome) : null))
-                      .filter(Boolean)
-                      .join(', ')}
-                  </td>
-                  <td>{u.ativo ? 'Sim' : 'Nao'}</td>
-                  <td>
-                    <div className="flex flex-wrap gap-2">
-                      <button className="btn btn-outline" onClick={() => navigate(`/usuarios/${u.id}`)}>
-                        Editar
-                      </button>
-                      <button className="btn btn-secondary" onClick={() => toggleAtivo(u)}>
-                        {u.ativo ? 'Desativar' : 'Ativar'}
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {usuarios.length === 0 && (
+        {loading ? (
+          <div className="space-y-4 p-4">
+            {Array.from({ length: 5 }).map((_, index) => (
+              <div key={index} className="grid gap-2 rounded-2xl border border-[var(--c-border)]/70 p-4">
+                <LoadingSkeleton className="h-4 w-40 rounded-xl" />
+                <LoadingSkeleton lines={2} lastLineClassName="w-1/2" />
+              </div>
+            ))}
+          </div>
+        ) : usuarios.length === 0 ? (
+          <EmptyState
+            title="Nenhum usuario cadastrado"
+            message="Quando novos acessos forem criados ou importados, eles aparecem aqui."
+          />
+        ) : (
+          <div className="table-wrapper">
+            <table className="table">
+              <thead>
                 <tr>
-                  <td colSpan="6" align="center">Nenhum usuario cadastrado</td>
+                  <th>Nome</th>
+                  <th>Email</th>
+                  <th>Setor</th>
+                  <th>Obras</th>
+                  <th>Status</th>
+                  <th>Acoes</th>
                 </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {usuarios.map((u) => (
+                  <tr key={u.id}>
+                    <td>{u.nome}</td>
+                    <td>{u.email}</td>
+                    <td>{u.setor?.nome || '-'}</td>
+                    <td>
+                      {(u.vinculos || [])
+                        .map((v) => (v.obra ? (v.obra.codigo ? `${v.obra.codigo} - ${v.obra.nome}` : v.obra.nome) : null))
+                        .filter(Boolean)
+                        .join(', ')}
+                    </td>
+                    <td>
+                      <span className={u.ativo ? 'app-status-pill bg-emerald-100 text-emerald-700' : 'app-status-pill bg-slate-100 text-slate-700'}>
+                        {u.ativo ? 'Ativo' : 'Inativo'}
+                      </span>
+                    </td>
+                    <td>
+                      <div className="flex flex-wrap gap-2">
+                        <button className="btn btn-outline" onClick={() => navigate(`/usuarios/${u.id}`)}>
+                          Editar
+                        </button>
+                        <button className="btn btn-secondary" onClick={() => toggleAtivo(u)}>
+                          {u.ativo ? 'Desativar' : 'Ativar'}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

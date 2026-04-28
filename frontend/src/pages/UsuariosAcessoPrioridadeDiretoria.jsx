@@ -176,12 +176,12 @@ export default function UsuariosAcessoPrioridadeDiretoria() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold">Acesso a Prioridade Diretoria</h1>
-        <p className="text-sm text-gray-600 mt-1">
+        <p className="mt-1 text-sm text-[var(--c-muted)]">
           Defina quais usuarios acessam os lotes de prioridade e se enxergam todos os lotes ou apenas diretorias especificas.
         </p>
       </div>
 
-      <div className="bg-white p-6 rounded-xl shadow space-y-4">
+      <div className="card space-y-4">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <label className="grid gap-1 text-sm w-full md:max-w-md">
             Buscar usuario
@@ -203,7 +203,7 @@ export default function UsuariosAcessoPrioridadeDiretoria() {
           </div>
         </div>
 
-        <div className="text-sm text-gray-600">
+        <div className="text-sm text-[var(--c-muted)]">
           Usuarios configurados: <strong>{totalConfigurados}</strong>
         </div>
 
@@ -214,7 +214,7 @@ export default function UsuariosAcessoPrioridadeDiretoria() {
         )}
 
         {carregando ? (
-          <p className="text-sm text-gray-600">Carregando usuarios...</p>
+          <p className="text-sm text-[var(--c-muted)]">Carregando usuarios...</p>
         ) : (
           <div className="grid grid-cols-1 gap-2">
             {usuariosFiltrados.map((usuario) => {
