@@ -2,17 +2,16 @@ import { useMemo } from 'react';
 
 const SCENE_WIDTH = 1920;
 const SCENE_HEIGHT = 1080;
-const SKYLINE_SEED = 0x51f2acdb;
 
 const LAYERS = [
   {
     key: 'far',
-    baseY: 836,
+    baseY: 930,
     startX: -120,
     minW: 98,
     maxW: 228,
-    minH: 140,
-    maxH: 336,
+    minH: 220,
+    maxH: 470,
     gap: 8,
     opacity: 0.9,
     riseBase: 0.12,
@@ -25,26 +24,26 @@ const LAYERS = [
       insetX: 14,
       insetTop: 22,
       insetBottom: 16,
-      offColor: '#12264e',
-      offOpacity: 0.24,
-      color: '#6f96dc',
-      litChance: 0.3,
-      minOpacity: 0.34,
-      maxOpacity: 0.62,
+      offColor: '#19315f',
+      offOpacity: 0.28,
+      color: '#b5d6ff',
+      litChance: 0.42,
+      minOpacity: 0.48,
+      maxOpacity: 0.82,
       blinkChance: 0.14
     },
-    antennaChance: 0.18,
-    antennaMinH: 18,
-    antennaMaxH: 42
+    antennaChance: 0.08,
+    antennaMinH: 12,
+    antennaMaxH: 28
   },
   {
     key: 'mid',
-    baseY: 936,
+    baseY: 1036,
     startX: -96,
     minW: 92,
     maxW: 204,
-    minH: 210,
-    maxH: 470,
+    minH: 300,
+    maxH: 620,
     gap: 4,
     opacity: 0.96,
     riseBase: 0.24,
@@ -57,26 +56,26 @@ const LAYERS = [
       insetX: 16,
       insetTop: 24,
       insetBottom: 18,
-      offColor: '#173363',
-      offOpacity: 0.22,
-      color: '#7eb0f6',
-      litChance: 0.34,
-      minOpacity: 0.42,
-      maxOpacity: 0.76,
+      offColor: '#20437a',
+      offOpacity: 0.26,
+      color: '#c6e2ff',
+      litChance: 0.46,
+      minOpacity: 0.58,
+      maxOpacity: 0.88,
       blinkChance: 0.18
     },
-    antennaChance: 0.24,
-    antennaMinH: 22,
-    antennaMaxH: 56
+    antennaChance: 0.13,
+    antennaMinH: 14,
+    antennaMaxH: 36
   },
   {
     key: 'front',
-    baseY: 1042,
+    baseY: 1112,
     startX: -84,
     minW: 88,
     maxW: 188,
-    minH: 250,
-    maxH: 612,
+    minH: 410,
+    maxH: 820,
     gap: 2,
     opacity: 1,
     riseBase: 0.36,
@@ -89,17 +88,17 @@ const LAYERS = [
       insetX: 18,
       insetTop: 26,
       insetBottom: 20,
-      offColor: '#234878',
-      offOpacity: 0.2,
-      color: '#98cbff',
-      litChance: 0.4,
-      minOpacity: 0.52,
-      maxOpacity: 0.9,
+      offColor: '#2d5b94',
+      offOpacity: 0.24,
+      color: '#e0f0ff',
+      litChance: 0.54,
+      minOpacity: 0.68,
+      maxOpacity: 1,
       blinkChance: 0.2
     },
-    antennaChance: 0.3,
-    antennaMinH: 24,
-    antennaMaxH: 68
+    antennaChance: 0.18,
+    antennaMinH: 16,
+    antennaMaxH: 42
   }
 ];
 
@@ -117,6 +116,16 @@ function range(rand, min, max) {
 
 function pick(rand, values) {
   return values[Math.floor(rand() * values.length)];
+}
+
+function createSceneSeed() {
+  if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+    const values = new Uint32Array(1);
+    crypto.getRandomValues(values);
+    return values[0] >>> 0;
+  }
+
+  return ((Date.now() ^ Math.floor(Math.random() * 0xffffffff)) >>> 0);
 }
 
 function buildRoof(building, layer, rand) {
@@ -163,7 +172,7 @@ function buildRoof(building, layer, rand) {
     const poleHeight = Math.round(range(rand, layer.antennaMinH, layer.antennaMaxH));
     const poleX = building.x + Math.round(building.w * (0.24 + rand() * 0.52));
     const poleBaseY = roofY + 4;
-    const lightRadius = Number((1.6 + rand() * 1.1).toFixed(2));
+    const lightRadius = Number((1.1 + rand() * 0.75).toFixed(2));
     antenna = {
       x: poleX,
       y1: poleBaseY,
@@ -254,15 +263,30 @@ function buildLayer(layer, seed) {
   return buildings;
 }
 
-function buildScene() {
-  return LAYERS.map((layer, index) => ({
-    ...layer,
-    buildings: buildLayer(layer, (SKYLINE_SEED ^ ((index + 1) * 0x85ebca6b)) >>> 0)
-  }));
+function buildScene(sceneSeed) {
+  const sceneRand = createRng(sceneSeed);
+
+  return LAYERS.map((layer, index) => {
+    const layerConfig = {
+      ...layer,
+      startX: layer.startX - Math.round(range(sceneRand, 0, 56)),
+      baseY: layer.baseY + Math.round(range(sceneRand, -10, 18)),
+      gap: Math.max(0, Math.round(layer.gap + range(sceneRand, -2, 4)))
+    };
+
+    return {
+      ...layerConfig,
+      buildings: buildLayer(
+        layerConfig,
+        (sceneSeed ^ ((index + 1) * 0x85ebca6b) ^ Math.floor(sceneRand() * 0xffffffff)) >>> 0
+      )
+    };
+  });
 }
 
 export default function CityBackground() {
-  const layers = useMemo(() => buildScene(), []);
+  const sceneSeed = useMemo(() => createSceneSeed(), []);
+  const layers = useMemo(() => buildScene(sceneSeed), [sceneSeed]);
 
   return (
     <svg
@@ -275,32 +299,34 @@ export default function CityBackground() {
     >
       <defs>
         <linearGradient id="login-city-sky" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#07132b" />
-          <stop offset="48%" stopColor="#0d2452" />
-          <stop offset="100%" stopColor="#143c7c" />
+          <stop offset="0%" stopColor="#030d20" />
+          <stop offset="30%" stopColor="#071935" />
+          <stop offset="68%" stopColor="#0f3368" />
+          <stop offset="100%" stopColor="#1a4f98" />
         </linearGradient>
 
         <radialGradient id="login-city-bloom" cx="50%" cy="24%" r="70%">
-          <stop offset="0%" stopColor="#7ab7ff" stopOpacity="0.18" />
-          <stop offset="50%" stopColor="#7ab7ff" stopOpacity="0.06" />
+          <stop offset="0%" stopColor="#77b5ff" stopOpacity="0.12" />
+          <stop offset="46%" stopColor="#77b5ff" stopOpacity="0.04" />
           <stop offset="100%" stopColor="#7ab7ff" stopOpacity="0" />
         </radialGradient>
 
         <radialGradient id="login-city-horizon" cx="50%" cy="100%" r="68%">
-          <stop offset="0%" stopColor="#89beff" stopOpacity="0.18" />
-          <stop offset="55%" stopColor="#4d7ed0" stopOpacity="0.08" />
+          <stop offset="0%" stopColor="#8ec3ff" stopOpacity="0.28" />
+          <stop offset="44%" stopColor="#5c91df" stopOpacity="0.12" />
           <stop offset="100%" stopColor="#274878" stopOpacity="0" />
         </radialGradient>
 
         <linearGradient id="login-city-ground" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#071225" stopOpacity="0" />
-          <stop offset="100%" stopColor="#040a18" stopOpacity="0.92" />
+          <stop offset="0%" stopColor="#1f4d92" stopOpacity="0" />
+          <stop offset="54%" stopColor="#24589f" stopOpacity="0.08" />
+          <stop offset="100%" stopColor="#143561" stopOpacity="0.2" />
         </linearGradient>
 
         <linearGradient id="login-city-vignette" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#030916" stopOpacity="0.12" />
-          <stop offset="65%" stopColor="#040b1c" stopOpacity="0" />
-          <stop offset="100%" stopColor="#040914" stopOpacity="0.46" />
+          <stop offset="0%" stopColor="#020712" stopOpacity="0.18" />
+          <stop offset="62%" stopColor="#040b1c" stopOpacity="0" />
+          <stop offset="100%" stopColor="#040914" stopOpacity="0.34" />
         </linearGradient>
 
         <style>{`
@@ -363,8 +389,8 @@ export default function CityBackground() {
                     x2={building.roof.antenna.x}
                     y2={building.roof.antenna.y2}
                     stroke="#c5d8ff"
-                    strokeOpacity="0.55"
-                    strokeWidth="2"
+                    strokeOpacity="0.34"
+                    strokeWidth="1.5"
                     strokeLinecap="round"
                   />
                   <circle
@@ -372,11 +398,11 @@ export default function CityBackground() {
                     cy={building.roof.antenna.lightY}
                     r={building.roof.antenna.lightRadius}
                     fill="#ffffff"
-                    opacity="0.95"
+                    opacity="0.72"
                   >
                     <animate
                       attributeName="opacity"
-                      values="0.95;0.28;0.95;0.42;0.95"
+                      values="0.72;0.22;0.72;0.34;0.72"
                       dur={`${building.roof.antenna.dur}s`}
                       begin={`${building.roof.antenna.delay}s`}
                       repeatCount="indefinite"
@@ -387,18 +413,18 @@ export default function CityBackground() {
                     cy={building.roof.antenna.lightY}
                     r={building.roof.antenna.lightRadius * 2.2}
                     fill="#ffffff"
-                    opacity="0.12"
+                    opacity="0.08"
                   >
                     <animate
                       attributeName="opacity"
-                      values="0.2;0.04;0.2"
+                      values="0.12;0.02;0.12"
                       dur={`${building.roof.antenna.dur}s`}
                       begin={`${building.roof.antenna.delay}s`}
                       repeatCount="indefinite"
                     />
                     <animate
                       attributeName="r"
-                      values={`${building.roof.antenna.lightRadius * 1.5};${building.roof.antenna.lightRadius * 2.6};${building.roof.antenna.lightRadius * 1.5}`}
+                      values={`${building.roof.antenna.lightRadius * 1.35};${building.roof.antenna.lightRadius * 2.2};${building.roof.antenna.lightRadius * 1.35}`}
                       dur={`${building.roof.antenna.dur}s`}
                       begin={`${building.roof.antenna.delay}s`}
                       repeatCount="indefinite"
@@ -435,8 +461,7 @@ export default function CityBackground() {
         </g>
       ))}
 
-      <rect x="0" y="820" width={SCENE_WIDTH} height="260" fill="url(#login-city-ground)" />
-      <rect x="0" y="1014" width={SCENE_WIDTH} height="66" fill="#050b18" opacity="0.55" />
+      <rect x="0" y="940" width={SCENE_WIDTH} height="140" fill="url(#login-city-ground)" />
     </svg>
   );
 }
