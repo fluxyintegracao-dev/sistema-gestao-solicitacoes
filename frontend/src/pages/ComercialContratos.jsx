@@ -266,6 +266,16 @@ function roundCurrency(value) {
   return Math.round((toNumber(value) + Number.EPSILON) * 100) / 100;
 }
 
+function hasText(value) {
+  return String(value ?? '').trim() !== '';
+}
+
+function formatMissingFields(fields) {
+  if (fields.length <= 1) return fields[0] || '';
+  if (fields.length === 2) return `${fields[0]} e ${fields[1]}`;
+  return `${fields.slice(0, -1).join(', ')} e ${fields[fields.length - 1]}`;
+}
+
 function addMonths(dateString, monthsToAdd) {
   const [year, month, day] = String(dateString || '').split('-').map(Number);
   if (!year || !month || !day) return today();
@@ -978,24 +988,55 @@ export default function ComercialContratos() {
     }
   }
 
+  function validarCriacaoContrato() {
+    const camposFaltando = [];
+
+    if (!hasText(form.empreendimento_id)) camposFaltando.push('Empreendimento');
+    if (!hasText(form.unidade_comercial_id)) camposFaltando.push('Unidade');
+    if (!hasText(form.parceiro_id)) camposFaltando.push('Cliente');
+    if (!hasText(form.obra_id) || !empreendimentoSelecionado?.obra_id) camposFaltando.push('Obra vinculada ao empreendimento');
+    if (!hasText(form.numero)) camposFaltando.push('Contrato');
+    if (!hasText(form.data_contrato)) camposFaltando.push('Data');
+    if (!hasText(form.status)) camposFaltando.push('Status');
+    if (!hasText(form.categoria_financeira_id)) camposFaltando.push('Categoria financeira');
+    if (!hasText(form.indice_reajuste)) camposFaltando.push('Indice reajuste');
+    if (!hasText(form.corretor_parceiro_id)) camposFaltando.push('Corretor parceiro');
+    if (!hasText(form.corretor_nome)) camposFaltando.push('Corretor no contrato');
+    if (!hasText(form.categoria_financeira_comissao_id)) camposFaltando.push('Categoria comissao');
+    if (!hasText(form.comissao_percentual) || toNumber(form.comissao_percentual) <= 0) camposFaltando.push('Comissao %');
+    if (!hasText(form.valor_total) || roundCurrency(form.valor_total) <= 0) camposFaltando.push('Valor total');
+
+    if (!form.parcelas.length) {
+      camposFaltando.push('Formas de pagamento');
+    } else {
+      const parcelaIncompleta = form.parcelas.some((item) =>
+        !hasText(item.descricao)
+        || !hasText(item.tipo_parcela)
+        || !hasText(item.forma_recebimento_prevista)
+        || !hasText(item.data_vencimento)
+        || roundCurrency(item.valor || item.valor_original) <= 0
+      );
+      if (parcelaIncompleta) camposFaltando.push('Dados das parcelas');
+    }
+
+    if (camposFaltando.length) {
+      return `Para criar o contrato, preencha: ${formatMissingFields(camposFaltando)}. Desconto e observacoes podem ficar em branco.`;
+    }
+
+    if (Math.abs(diferencaComposicao) > 0.009) {
+      return 'A composicao das formas de pagamento precisa fechar exatamente o valor total do contrato.';
+    }
+
+    return '';
+  }
+
   async function handleSubmit(event) {
     event.preventDefault();
     if (!form.id) {
-      if (!empreendimentoSelecionado?.obra_id) {
-        setError('O empreendimento selecionado precisa ter uma obra vinculada antes de criar o contrato.');
-        return;
-      }
-      const totalInformado = roundCurrency(form.valor_total);
-      if (totalInformado <= 0) {
-        setError('Informe o valor total do contrato.');
-        return;
-      }
-      if (!form.parcelas.length) {
-        setError('Adicione ao menos uma forma de pagamento para montar os recebiveis do contrato.');
-        return;
-      }
-      if (Math.abs(diferencaComposicao) > 0.009) {
-        setError('A composicao das formas de pagamento precisa fechar exatamente o valor total do contrato.');
+      const validationMessage = validarCriacaoContrato();
+      if (validationMessage) {
+        setError(validationMessage);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
         return;
       }
     }
@@ -1084,7 +1125,7 @@ export default function ComercialContratos() {
             </p>
           </div>
         </div>
-        <form className="space-y-4" onSubmit={handleSubmit}>
+        <form className="space-y-4" onSubmit={handleSubmit} noValidate>
           <div className="grid gap-3 md:grid-cols-4">
             <label className="sol-filter-field">
               <span className="sol-filter-label">Empreendimento</span>
@@ -1464,7 +1505,7 @@ export default function ComercialContratos() {
           )}
 
           <div className="flex flex-wrap gap-2">
-            <button type="submit" className="btn btn-primary" disabled={saving || (!form.id && form.parcelas.length === 0)}>
+            <button type="submit" className="btn btn-primary" disabled={saving}>
               {saving ? 'Salvando...' : form.id ? 'Salvar resumo' : 'Criar contrato'}
             </button>
             <button type="button" className="btn btn-outline" onClick={() => { setForm(defaultForm()); setGenerator(defaultGenerator()); setPaymentPlans([]); }}>
