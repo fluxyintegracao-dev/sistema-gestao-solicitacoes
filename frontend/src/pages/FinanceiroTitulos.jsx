@@ -557,7 +557,7 @@ export default function FinanceiroTitulos() {
 
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <span className="app-filter-label">Tipo</span>
-            <div className="inline-grid w-full max-w-sm grid-cols-2 rounded-xl border border-[var(--c-border)] bg-[var(--c-bg)] p-1">
+            <div className="inline-grid w-full max-w-[220px] grid-cols-2 rounded-lg border border-[var(--c-border)] bg-[var(--c-bg)] p-1">
               {[
                 { value: 'RECEBER', label: 'Receber' },
                 { value: 'PAGAR', label: 'Pagar' }
@@ -567,7 +567,7 @@ export default function FinanceiroTitulos() {
                   <button
                     key={option.value}
                     type="button"
-                    className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
+                    className={`rounded-md px-3 py-1.5 text-sm font-semibold transition-colors ${
                       active
                         ? 'bg-[var(--c-primary)] text-white shadow-sm'
                         : 'text-[var(--c-muted)] hover:bg-[var(--c-surface)] hover:text-[var(--c-text)]'
