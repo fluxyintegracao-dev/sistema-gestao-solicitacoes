@@ -582,6 +582,12 @@ async function mergePdfBuffers(pdfBuffers = []) {
   return Buffer.from(await merged.save());
 }
 
+async function getPdfPageCount(pdfBuffer) {
+  if (!pdfBuffer) return 0;
+  const pdf = await PDFDocument.load(pdfBuffer);
+  return pdf.getPageCount();
+}
+
 function buildUploadFile(buffer, originalname, mimetype) {
   return {
     buffer,
@@ -763,9 +769,30 @@ async function gerarDocumentoContratoComercial(req, contratoId, payload = {}) {
       `quadro-resumo-${numeroContrato || contrato.id}`
     );
 
+    const quadroResumoPages = await getPdfPageCount(renderQuadroResumo.pdfBuffer);
+    const contratoPages = await getPdfPageCount(renderContrato.pdfBuffer);
+
+    if (quadroResumoPages < 1) {
+      throw createHttpError(500, 'O Quadro Resumo foi convertido sem paginas. Revise o modelo DOCX antes de gerar o contrato completo.');
+    }
+
+    if (contratoPages < 1) {
+      throw createHttpError(500, 'O Contrato Padrao foi convertido sem paginas. Revise o modelo DOCX antes de gerar o contrato completo.');
+    }
+
     pdfBuffer = await mergePdfBuffers([renderQuadroResumo.pdfBuffer, renderContrato.pdfBuffer]);
+    const pdfCompletoPages = await getPdfPageCount(pdfBuffer);
+
+    if (pdfCompletoPages < quadroResumoPages + contratoPages) {
+      throw createHttpError(500, 'Nao foi possivel juntar Quadro Resumo e Contrato Padrao no PDF final.');
+    }
+
+    console.info(
+      `[comercial-contratos] PDF completo gerado contrato=${contrato.id} modelo_contrato=${modelo.id} modelo_quadro_resumo=${modeloQuadroResumo.id} paginas=${pdfCompletoPages}`
+    );
+
     modeloDocumentoId = modelo.id;
-    nomeDocumento = String(payload.nome || `Quadro resumo + ${modelo.nome || 'Contrato'}`).trim();
+    nomeDocumento = String(payload.nome || `Contrato completo - ${modelo.nome || 'Contrato Padrao'}`).trim();
     docxBuffer = renderContrato.docxBuffer;
   }
 

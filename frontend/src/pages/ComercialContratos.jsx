@@ -921,8 +921,11 @@ export default function ComercialContratos() {
         modelo_id: documentoForm.modelo_id || undefined,
         variaveis
       };
-      await gerarDocumentoContratoComercial(contratoSelecionado.id, payload);
+      const documentoGerado = await gerarDocumentoContratoComercial(contratoSelecionado.id, payload);
       await carregarDocumentosContrato(contratoSelecionado.id);
+      if (documentoGerado?.id) {
+        await abrirDocumentoContrato(documentoGerado.id, 'pdf');
+      }
     } catch (err) {
       setError(err?.message || 'Erro ao gerar documento do contrato');
     } finally {
