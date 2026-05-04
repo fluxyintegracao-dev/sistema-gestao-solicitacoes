@@ -543,19 +543,38 @@ async function listarTitulosBoleto(req, filters = {}) {
   if (filters.status_cobranca) {
     where.status_cobranca = filters.status_cobranca;
   }
+  if (filters.codigo) {
+    where.codigo = { [Op.like]: `%${filters.codigo}%` };
+  }
+  if (filters.numero_documento) {
+    where.numero_documento = { [Op.like]: `%${filters.numero_documento}%` };
+  }
   if (filters.obra_id) {
     where.obra_id = Number(filters.obra_id);
   }
   if (filters.parceiro_id) {
     where.parceiro_id = Number(filters.parceiro_id);
   }
+  if (filters.vencimento_inicial || filters.vencimento_final) {
+    where.data_vencimento = {};
+    if (filters.vencimento_inicial) {
+      where.data_vencimento[Op.gte] = filters.vencimento_inicial;
+    }
+    if (filters.vencimento_final) {
+      where.data_vencimento[Op.lte] = filters.vencimento_final;
+    }
+  }
   if (filters.q) {
     const term = `%${String(filters.q).trim()}%`;
     where[Op.or] = [
+      { codigo: { [Op.like]: term } },
       { descricao: { [Op.like]: term } },
       { numero_documento: { [Op.like]: term } },
       { nosso_numero: { [Op.like]: term } },
-      { linha_digitavel: { [Op.like]: term } }
+      { linha_digitavel: { [Op.like]: term } },
+      { '$parceiro.nome$': { [Op.like]: term } },
+      { '$obra.nome$': { [Op.like]: term } },
+      { '$obra.codigo$': { [Op.like]: term } }
     ];
   }
 
@@ -566,7 +585,7 @@ async function listarTitulosBoleto(req, filters = {}) {
   return TituloFinanceiro.findAll({
     where,
     include: buildTituloBoletoInclude({
-      comercialObrigatorio: origem === 'COMERCIAL',
+      comercialObrigatorio: origem === 'COMERCIAL' || Boolean(filters.empreendimento_id),
       empreendimentoId: filters.empreendimento_id || null
     }),
     subQuery: false,

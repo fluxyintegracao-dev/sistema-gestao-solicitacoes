@@ -20,6 +20,18 @@ const STATUS_OPTIONS = [
   { value: 'CANCELADO', label: 'Cancelado' }
 ];
 
+const DEFAULT_FILTERS = {
+  q: '',
+  codigo: '',
+  numero_documento: '',
+  empreendimento_id: '',
+  parceiro_id: '',
+  status_cobranca: 'PENDENTE_EMISSAO',
+  origem: 'TODOS',
+  vencimento_inicial: '',
+  vencimento_final: ''
+};
+
 const I25_PATTERNS = {
   0: 'nnwwn',
   1: 'wnnnw',
@@ -299,14 +311,10 @@ export default function FinanceiroBoletos() {
   const [selecionados, setSelecionados] = useState([]);
   const [detalhe, setDetalhe] = useState(null);
   const [previewOpen, setPreviewOpen] = useState(false);
-  const [filters, setFilters] = useState({
-    q: '',
-    empreendimento_id: '',
-    parceiro_id: '',
-    status_cobranca: 'PENDENTE_EMISSAO',
-    origem: 'TODOS'
-  });
-  const [loading, setLoading] = useState(true);
+  const [filters, setFilters] = useState(DEFAULT_FILTERS);
+  const [appliedFilters, setAppliedFilters] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [loadingOptions, setLoadingOptions] = useState(true);
   const [gerandoId, setGerandoId] = useState(null);
   const [baixandoPdfId, setBaixandoPdfId] = useState(null);
   const [gerandoMassa, setGerandoMassa] = useState(false);
@@ -314,26 +322,48 @@ export default function FinanceiroBoletos() {
   const [feedback, setFeedback] = useState('');
   const [resultadoMassa, setResultadoMassa] = useState(null);
 
-  async function carregar() {
+  function prepararFiltrosBoleto(rawFilters = filters) {
+    const boletoFilters = { ...rawFilters };
+
+    if (!comercialHabilitado) {
+      delete boletoFilters.empreendimento_id;
+      boletoFilters.origem = 'MANUAL';
+    }
+
+    return boletoFilters;
+  }
+
+  async function carregarBase() {
     try {
-      setLoading(true);
+      setLoadingOptions(true);
       setError('');
-      const boletoFilters = { ...filters };
-
-      if (!comercialHabilitado) {
-        delete boletoFilters.empreendimento_id;
-        boletoFilters.origem = 'MANUAL';
-      }
-
-      const [configData, empreendimentosData, clientesData, titulosData] = await Promise.all([
+      const [configData, empreendimentosData, clientesData] = await Promise.all([
         getBoletosConfig(),
         comercialHabilitado ? getEmpreendimentosComerciais() : Promise.resolve([]),
-        buscarParceiros({ cliente: 1, ativo: 1, limit: 500 }),
-        getTitulosParaBoleto(boletoFilters)
+        buscarParceiros({ cliente: 1, ativo: 1, limit: 500 })
       ]);
       setConfig(configData);
       setEmpreendimentos(Array.isArray(empreendimentosData) ? empreendimentosData : []);
       setClientes(Array.isArray(clientesData) ? clientesData : []);
+    } catch (err) {
+      setError(err?.message || 'Erro ao carregar configuracoes de boletos');
+    } finally {
+      setLoadingOptions(false);
+    }
+  }
+
+  async function carregarTitulos(nextFilters = appliedFilters) {
+    if (!nextFilters) {
+      setTitulos([]);
+      setSelecionados([]);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError('');
+      const titulosData = await getTitulosParaBoleto(prepararFiltrosBoleto(nextFilters));
       const listaTitulos = Array.isArray(titulosData) ? titulosData : [];
       setTitulos(listaTitulos);
       setSelecionados((current) => {
@@ -348,7 +378,7 @@ export default function FinanceiroBoletos() {
   }
 
   useEffect(() => {
-    carregar();
+    carregarBase();
   }, []);
 
   useEffect(() => {
@@ -365,6 +395,14 @@ export default function FinanceiroBoletos() {
         origem: current.origem === 'COMERCIAL' ? 'TODOS' : current.origem
       };
     });
+    setAppliedFilters((current) => {
+      if (!current) return current;
+      return {
+        ...current,
+        empreendimento_id: '',
+        origem: current.origem === 'COMERCIAL' ? 'TODOS' : current.origem
+      };
+    });
   }, [comercialHabilitado]);
 
   const resumo = useMemo(() => titulos.reduce((acc, item) => {
@@ -373,11 +411,46 @@ export default function FinanceiroBoletos() {
     if (item.codigo_barras) acc.emitidos += 1;
     return acc;
   }, { total: 0, valor: 0, emitidos: 0 }), [titulos]);
+  const hasConsulted = Boolean(appliedFilters);
   const titulosSelecionados = useMemo(() => {
     const ids = new Set(selecionados.map(Number));
     return titulos.filter((item) => ids.has(Number(item.id)));
   }, [selecionados, titulos]);
   const todosSelecionados = titulos.length > 0 && titulos.every((item) => selecionados.map(Number).includes(Number(item.id)));
+
+  function updateFilter(field, value) {
+    setFilters((current) => ({ ...current, [field]: value }));
+  }
+
+  function aplicarFiltros(event) {
+    event.preventDefault();
+    const nextFilters = { ...filters };
+    setAppliedFilters(nextFilters);
+    setSelecionados([]);
+    setResultadoMassa(null);
+    setFeedback('');
+    carregarTitulos(nextFilters);
+  }
+
+  function limparFiltros() {
+    setFilters(DEFAULT_FILTERS);
+    setAppliedFilters(null);
+    setTitulos([]);
+    setSelecionados([]);
+    setResultadoMassa(null);
+    setFeedback('');
+    setError('');
+    setLoading(false);
+  }
+
+  function atualizarConsulta() {
+    if (appliedFilters) {
+      carregarTitulos(appliedFilters);
+      return;
+    }
+
+    carregarBase();
+  }
 
   function toggleSelecionado(tituloId, checked) {
     const id = Number(tituloId);
@@ -424,7 +497,7 @@ export default function FinanceiroBoletos() {
       const data = await gerarBoletoTitulo(titulo.id);
       setDetalhe(data);
       setPreviewOpen(true);
-      await carregar();
+      await carregarTitulos(appliedFilters);
       setFeedback(`Boleto do titulo #${titulo.id} gerado com sucesso.`);
     } catch (err) {
       setError(err?.message || 'Erro ao gerar boleto');
@@ -521,7 +594,7 @@ export default function FinanceiroBoletos() {
 
       if (ultimoDetalhe) setDetalhe(ultimoDetalhe);
       setSelecionados([]);
-      await carregar();
+      await carregarTitulos(appliedFilters);
       setResultadoMassa({ sucessos, falhas });
 
       if (sucessos.length) {
@@ -564,7 +637,7 @@ export default function FinanceiroBoletos() {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button type="button" className="btn btn-outline" onClick={carregar}>Atualizar</button>
+            <button type="button" className="btn btn-outline" onClick={atualizarConsulta}>Atualizar</button>
             <Link to="/financeiro/titulos" className="btn btn-outline">Ver titulos</Link>
           </div>
         </div>
@@ -612,32 +685,65 @@ export default function FinanceiroBoletos() {
         </div>
       </section>
 
-      <section className="sol-surface-card rounded-2xl p-4 md:p-5">
+      <form className="sol-surface-card rounded-2xl p-4 md:p-5" onSubmit={aplicarFiltros}>
         <div className="sol-filtros-head">
           <div>
             <p className="sol-filtros-title">Filtros</p>
-            <p className="sol-filtros-subtitle">Recorte dos titulos a receber elegiveis para boleto.</p>
+            <p className="sol-filtros-subtitle">A lista abaixo atualiza somente ao consultar.</p>
           </div>
-          <button type="button" className="btn btn-outline btn-sm" onClick={carregar}>Aplicar filtros</button>
+          <button type="submit" className="btn btn-primary btn-sm" disabled={loadingOptions}>
+            Consultar
+          </button>
         </div>
 
-        <div className={`mt-4 grid gap-3 ${comercialHabilitado ? 'md:grid-cols-[minmax(0,1fr)_220px_220px]' : 'md:grid-cols-[minmax(0,1fr)_220px]'}`}>
-          <label className="sol-filter-field">
+        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-12">
+          <label className="sol-filter-field xl:col-span-2">
+            <span className="sol-filter-label">Titulo</span>
+            <input
+              className="input w-full"
+              value={filters.codigo}
+              onChange={(event) => updateFilter('codigo', event.target.value)}
+              placeholder="TIT-000001"
+            />
+          </label>
+          <label className="sol-filter-field xl:col-span-4">
             <span className="sol-filter-label">Busca</span>
             <input
               className="input w-full"
               value={filters.q}
-              onChange={(event) => setFilters((current) => ({ ...current, q: event.target.value }))}
-              placeholder="Documento, descricao, nosso numero ou linha digitavel"
+              onChange={(event) => updateFilter('q', event.target.value)}
+              placeholder="Cliente, obra, documento, nosso numero ou linha digitavel"
             />
           </label>
+          <label className="sol-filter-field xl:col-span-2">
+            <span className="sol-filter-label">N. documento</span>
+            <input
+              className="input w-full"
+              value={filters.numero_documento}
+              onChange={(event) => updateFilter('numero_documento', event.target.value)}
+              placeholder="Ex.: EPIE/01"
+            />
+          </label>
+          <label className="sol-filter-field xl:col-span-2">
+            <span className="sol-filter-label">Status cobranca</span>
+            <select
+              className="input w-full"
+              value={filters.status_cobranca}
+              onChange={(event) => updateFilter('status_cobranca', event.target.value)}
+            >
+              {STATUS_OPTIONS.map((item) => (
+                <option key={item.value || 'todos'} value={item.value}>{item.label}</option>
+              ))}
+            </select>
+          </label>
           {comercialHabilitado && (
-            <label className="sol-filter-field">
+            <label className="sol-filter-field xl:col-span-3">
               <span className="sol-filter-label">Empreendimento</span>
               <select
                 className="input w-full"
                 value={filters.empreendimento_id}
-                onChange={(event) => setFilters((current) => ({ ...current, empreendimento_id: event.target.value }))}
+                onChange={(event) => updateFilter('empreendimento_id', event.target.value)}
+                disabled={filters.origem === 'MANUAL' || loadingOptions}
               >
                 <option value="">Todos</option>
                 {empreendimentos.map((item) => (
@@ -648,12 +754,13 @@ export default function FinanceiroBoletos() {
               </select>
             </label>
           )}
-          <label className="sol-filter-field">
+          <label className="sol-filter-field xl:col-span-3">
             <span className="sol-filter-label">Cliente</span>
             <select
               className="input w-full"
               value={filters.parceiro_id}
-              onChange={(event) => setFilters((current) => ({ ...current, parceiro_id: event.target.value }))}
+              onChange={(event) => updateFilter('parceiro_id', event.target.value)}
+              disabled={loadingOptions}
             >
               <option value="">Todos</option>
               {clientes.map((item) => (
@@ -663,23 +770,8 @@ export default function FinanceiroBoletos() {
               ))}
             </select>
           </label>
-        </div>
-
-        <div className={`mt-3 grid gap-3 ${comercialHabilitado ? 'md:grid-cols-[220px_220px_minmax(0,1fr)]' : 'md:grid-cols-[220px_minmax(0,1fr)]'}`}>
-          <label className="sol-filter-field">
-            <span className="sol-filter-label">Status cobranca</span>
-            <select
-              className="input w-full"
-              value={filters.status_cobranca}
-              onChange={(event) => setFilters((current) => ({ ...current, status_cobranca: event.target.value }))}
-            >
-              {STATUS_OPTIONS.map((item) => (
-                <option key={item.value || 'todos'} value={item.value}>{item.label}</option>
-              ))}
-            </select>
-          </label>
           {comercialHabilitado && (
-            <label className="sol-filter-field">
+            <label className="sol-filter-field xl:col-span-2">
               <span className="sol-filter-label">Origem</span>
               <select
                 className="input w-full"
@@ -696,17 +788,51 @@ export default function FinanceiroBoletos() {
               </select>
             </label>
           )}
+          <label className="sol-filter-field xl:col-span-2">
+            <span className="sol-filter-label">Vencimento inicio</span>
+            <input
+              className="input w-full"
+              type="date"
+              value={filters.vencimento_inicial}
+              onChange={(event) => updateFilter('vencimento_inicial', event.target.value)}
+            />
+          </label>
+          <label className="sol-filter-field xl:col-span-2">
+            <span className="sol-filter-label">Vencimento fim</span>
+            <input
+              className="input w-full"
+              type="date"
+              value={filters.vencimento_final}
+              onChange={(event) => updateFilter('vencimento_final', event.target.value)}
+            />
+          </label>
         </div>
-      </section>
+
+        <div className="mt-4 flex flex-col gap-3 border-t border-[var(--c-border)] pt-3 md:flex-row md:items-center md:justify-between">
+          <div className="text-xs text-[var(--c-muted)]">
+            {hasConsulted ? `${titulos.length} titulo(s) no resultado atual.` : 'A tabela fica vazia ate voce consultar.'}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" className="btn btn-outline btn-sm" onClick={limparFiltros}>
+              Limpar
+            </button>
+            <button type="submit" className="btn btn-primary btn-sm" disabled={loadingOptions}>
+              Consultar
+            </button>
+          </div>
+        </div>
+      </form>
 
       <section className="sol-surface-card rounded-2xl p-4 md:p-5">
         <div className="sol-filtros-head">
           <div>
             <p className="sol-filtros-title">Titulos para boleto</p>
             <p className="sol-filtros-subtitle">
-              {comercialHabilitado
-                ? 'Contas a receber comerciais ou manuais com saldo em aberto.'
-                : 'Contas a receber manuais com saldo em aberto.'}
+              {!hasConsulted
+                ? 'Aplique um filtro para carregar os boletos elegiveis.'
+                : comercialHabilitado
+                  ? 'Contas a receber comerciais ou manuais com saldo em aberto.'
+                  : 'Contas a receber manuais com saldo em aberto.'}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -765,10 +891,14 @@ export default function FinanceiroBoletos() {
         )}
 
         <div className="mt-4 overflow-hidden rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)]">
-          {loading ? (
+          {!hasConsulted ? (
+            <div className="app-empty-card m-4">
+              Nenhum filtro aplicado. Use os filtros acima e clique em Consultar para listar os boletos.
+            </div>
+          ) : loading ? (
             <div className="app-empty-card m-4">Carregando titulos...</div>
           ) : titulos.length === 0 ? (
-            <div className="app-empty-card m-4">Nenhum titulo elegivel encontrado.</div>
+            <div className="app-empty-card m-4">Nenhum titulo elegivel encontrado para os filtros aplicados.</div>
           ) : (
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-[var(--c-border)] text-sm">
@@ -802,7 +932,7 @@ export default function FinanceiroBoletos() {
                       </td>
                       <td className="px-4 py-3">
                         <Link className="font-semibold text-blue-700 hover:underline" to={`/financeiro/titulos/${titulo.id}`}>
-                          #{titulo.id} {titulo.numero_documento ? `- ${titulo.numero_documento}` : ''}
+                          {titulo.codigo || `#${titulo.id}`} {titulo.numero_documento ? `- ${titulo.numero_documento}` : ''}
                         </Link>
                         <p className="mt-1 max-w-[340px] text-xs text-[var(--c-muted)]">{titulo.descricao}</p>
                       </td>

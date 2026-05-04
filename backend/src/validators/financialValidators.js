@@ -635,17 +635,39 @@ function validateFinanceTituloEstornoBody(body = {}) {
 function validateFinanceBoletoTituloQuery(query = {}) {
   ensureAllowedKeys(
     query,
-    ['q', 'obra_id', 'empreendimento_id', 'parceiro_id', 'status_cobranca', 'origem'],
+    [
+      'q',
+      'codigo',
+      'numero_documento',
+      'obra_id',
+      'empreendimento_id',
+      'parceiro_id',
+      'status_cobranca',
+      'origem',
+      'vencimento_inicial',
+      'vencimento_final'
+    ],
     'Consulta de boletos financeiros'
   );
 
+  const vencimentoInicial = parseDateOnly(query.vencimento_inicial, 'Vencimento inicial');
+  const vencimentoFinal = parseDateOnly(query.vencimento_final, 'Vencimento final');
+
+  if (vencimentoInicial && vencimentoFinal && vencimentoInicial > vencimentoFinal) {
+    throw new ValidationError('Vencimento inicial nao pode ser maior que vencimento final.');
+  }
+
   return {
     q: parseOptionalText(query.q, 'Busca', 120),
+    codigo: parseOptionalText(query.codigo, 'Codigo do titulo', 40),
+    numero_documento: parseOptionalText(query.numero_documento, 'Numero do documento', 120),
     obra_id: parseInteger(query.obra_id, 'Obra'),
     empreendimento_id: parseInteger(query.empreendimento_id, 'Empreendimento'),
     parceiro_id: parseInteger(query.parceiro_id, 'Cliente'),
     status_cobranca: parseEnum(query.status_cobranca, 'Status da cobranca', STATUS_COBRANCA),
-    origem: parseEnum(query.origem, 'Origem', ['COMERCIAL', 'MANUAL', 'TODOS'])
+    origem: parseEnum(query.origem, 'Origem', ['COMERCIAL', 'MANUAL', 'TODOS']),
+    vencimento_inicial: vencimentoInicial,
+    vencimento_final: vencimentoFinal
   };
 }
 
