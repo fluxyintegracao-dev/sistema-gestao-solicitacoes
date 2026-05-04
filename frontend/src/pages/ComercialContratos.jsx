@@ -533,6 +533,16 @@ export default function ComercialContratos() {
     return unidades.filter((item) => String(item.empreendimento_id) === String(form.empreendimento_id));
   }, [form.empreendimento_id, unidades]);
 
+  const empreendimentoSelecionado = useMemo(
+    () => empreendimentos.find((item) => String(item.id) === String(form.empreendimento_id)),
+    [empreendimentos, form.empreendimento_id]
+  );
+
+  const obraSelecionada = useMemo(
+    () => obras.find((item) => String(item.id) === String(form.obra_id)),
+    [form.obra_id, obras]
+  );
+
   const categoriasCompativeis = useMemo(
     () => {
       const permitidas = new Set((categoriaConfig.contrato_venda_categoria_ids || []).map(Number));
@@ -615,6 +625,17 @@ export default function ComercialContratos() {
       ...current,
       parcelas,
       valor_total: current.valor_total ? current.valor_total : (total > 0 ? formatCurrencyInput(total) : '')
+    }));
+  }
+
+  function selecionarEmpreendimentoContrato(empreendimentoId) {
+    const empreendimento = empreendimentos.find((item) => String(item.id) === String(empreendimentoId));
+    setForm((current) => ({
+      ...current,
+      empreendimento_id: empreendimentoId,
+      unidade_comercial_id: '',
+      obra_id: empreendimento?.obra_id ? String(empreendimento.obra_id) : '',
+      numero: ''
     }));
   }
 
@@ -953,6 +974,10 @@ export default function ComercialContratos() {
   async function handleSubmit(event) {
     event.preventDefault();
     if (!form.id) {
+      if (!empreendimentoSelecionado?.obra_id) {
+        setError('O empreendimento selecionado precisa ter uma obra vinculada antes de criar o contrato.');
+        return;
+      }
       const totalInformado = roundCurrency(form.valor_total);
       if (totalInformado <= 0) {
         setError('Informe o valor total do contrato.');
@@ -1056,7 +1081,7 @@ export default function ComercialContratos() {
           <div className="grid gap-3 md:grid-cols-4">
             <label className="sol-filter-field">
               <span className="sol-filter-label">Empreendimento</span>
-              <select className="input w-full" value={form.empreendimento_id} onChange={(e) => setForm((c) => ({ ...c, empreendimento_id: e.target.value, unidade_comercial_id: '', numero: '' }))} required disabled={Boolean(form.id)}>
+              <select className="input w-full" value={form.empreendimento_id} onChange={(e) => selecionarEmpreendimentoContrato(e.target.value)} required disabled={Boolean(form.id)}>
                 <option value="">Selecione</option>
                 {empreendimentos.map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}
               </select>
@@ -1096,10 +1121,22 @@ export default function ComercialContratos() {
             </label>
             <label className="sol-filter-field">
               <span className="sol-filter-label">Obra</span>
-              <select className="input w-full" value={form.obra_id} onChange={(e) => setForm((c) => ({ ...c, obra_id: e.target.value }))} required disabled={Boolean(form.id)}>
-                <option value="">Selecione</option>
-                {obras.map((item) => <option key={item.id} value={item.id}>{item.codigo ? `${item.codigo} - ${item.nome}` : item.nome}</option>)}
-              </select>
+              <input
+                className="input w-full"
+                value={
+                  obraSelecionada
+                    ? (obraSelecionada.codigo ? `${obraSelecionada.codigo} - ${obraSelecionada.nome}` : obraSelecionada.nome)
+                    : ''
+                }
+                placeholder={form.empreendimento_id ? 'Empreendimento sem obra vinculada' : 'Selecione o empreendimento'}
+                disabled
+                required
+              />
+              {!form.id && form.empreendimento_id && !empreendimentoSelecionado?.obra_id && (
+                <span className="mt-1 text-xs text-amber-600">
+                  Vincule uma obra no cadastro do empreendimento antes de criar o contrato.
+                </span>
+              )}
             </label>
           </div>
           <div className="grid gap-3 md:grid-cols-4">
