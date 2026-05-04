@@ -467,11 +467,32 @@ async function listarTitulos(req, filters = {}) {
   if (filters.status) {
     where.status = filters.status;
   }
+  if (filters.codigo) {
+    where.codigo = { [Op.like]: `%${filters.codigo}%` };
+  }
+  if (filters.numero_documento) {
+    where.numero_documento = { [Op.like]: `%${filters.numero_documento}%` };
+  }
+  if (filters.descricao) {
+    where.descricao = { [Op.like]: `%${filters.descricao}%` };
+  }
   if (filters.parceiro_id) {
     where.parceiro_id = Number(filters.parceiro_id);
   }
+  if (filters.categoria_financeira_id) {
+    where.categoria_financeira_id = Number(filters.categoria_financeira_id);
+  }
   if (filters.solicitacao_id) {
     where.solicitacao_id = Number(filters.solicitacao_id);
+  }
+  if (filters.data_emissao_inicial || filters.data_emissao_final) {
+    where.data_emissao = {};
+    if (filters.data_emissao_inicial) {
+      where.data_emissao[Op.gte] = filters.data_emissao_inicial;
+    }
+    if (filters.data_emissao_final) {
+      where.data_emissao[Op.lte] = filters.data_emissao_final;
+    }
   }
   if (filters.vencimento_inicial || filters.vencimento_final) {
     where.data_vencimento = {};
@@ -481,6 +502,19 @@ async function listarTitulos(req, filters = {}) {
     if (filters.vencimento_final) {
       where.data_vencimento[Op.lte] = filters.vencimento_final;
     }
+  }
+  if (filters.q) {
+    const term = String(filters.q).trim();
+    where[Op.or] = [
+      { codigo: { [Op.like]: `%${term}%` } },
+      { descricao: { [Op.like]: `%${term}%` } },
+      { numero_documento: { [Op.like]: `%${term}%` } },
+      { '$parceiro.nome$': { [Op.like]: `%${term}%` } },
+      { '$parceiro.cpf_cnpj$': { [Op.like]: `%${term}%` } },
+      { '$obra.nome$': { [Op.like]: `%${term}%` } },
+      { '$obra.codigo$': { [Op.like]: `%${term}%` } },
+      { '$solicitacao.codigo$': { [Op.like]: `%${term}%` } }
+    ];
   }
 
   return TituloFinanceiro.findAll({

@@ -177,23 +177,50 @@ function validateFinanceTituloQuery(query = {}) {
     [
       'tipo',
       'status',
+      'q',
+      'codigo',
       'obra_id',
       'parceiro_id',
+      'categoria_financeira_id',
       'solicitacao_id',
+      'numero_documento',
+      'descricao',
+      'data_emissao_inicial',
+      'data_emissao_final',
       'vencimento_inicial',
       'vencimento_final'
     ],
     'Consulta de titulos financeiros'
   );
 
+  const dataEmissaoInicial = parseDateOnly(query.data_emissao_inicial, 'Emissao inicial');
+  const dataEmissaoFinal = parseDateOnly(query.data_emissao_final, 'Emissao final');
+  const vencimentoInicial = parseDateOnly(query.vencimento_inicial, 'Vencimento inicial');
+  const vencimentoFinal = parseDateOnly(query.vencimento_final, 'Vencimento final');
+
+  if (dataEmissaoInicial && dataEmissaoFinal && dataEmissaoInicial > dataEmissaoFinal) {
+    throw new ValidationError('Emissao inicial nao pode ser maior que emissao final.');
+  }
+
+  if (vencimentoInicial && vencimentoFinal && vencimentoInicial > vencimentoFinal) {
+    throw new ValidationError('Vencimento inicial nao pode ser maior que vencimento final.');
+  }
+
   return {
     tipo: parseEnum(query.tipo, 'Tipo', ['PAGAR', 'RECEBER']),
     status: parseEnum(query.status, 'Status', ['ABERTO', 'PARCIAL', 'QUITADO', 'CANCELADO', 'ESTORNADO']),
+    q: parseOptionalText(query.q, 'Busca', 120),
+    codigo: parseOptionalText(query.codigo, 'Codigo do titulo', 40),
     obra_id: parseInteger(query.obra_id, 'Obra'),
     parceiro_id: parseInteger(query.parceiro_id, 'Parceiro'),
+    categoria_financeira_id: parseInteger(query.categoria_financeira_id, 'Categoria financeira'),
     solicitacao_id: parseInteger(query.solicitacao_id, 'Solicitacao'),
-    vencimento_inicial: parseDateOnly(query.vencimento_inicial, 'Vencimento inicial'),
-    vencimento_final: parseDateOnly(query.vencimento_final, 'Vencimento final')
+    numero_documento: parseOptionalText(query.numero_documento, 'Numero do documento', 120),
+    descricao: parseOptionalText(query.descricao, 'Descricao', 120),
+    data_emissao_inicial: dataEmissaoInicial,
+    data_emissao_final: dataEmissaoFinal,
+    vencimento_inicial: vencimentoInicial,
+    vencimento_final: vencimentoFinal
   };
 }
 

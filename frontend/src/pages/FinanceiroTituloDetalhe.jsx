@@ -379,7 +379,7 @@ export default function FinanceiroTituloDetalhe() {
             <button type="button" className="btn btn-outline mb-3" onClick={() => navigate(-1)}>
               Voltar
             </button>
-            <h1 className="page-title">Titulo #{titulo.id}</h1>
+            <h1 className="page-title">Titulo {titulo.codigo || `#${titulo.id}`}</h1>
             <p className="text-sm text-[var(--c-muted)]">{titulo.descricao || 'Sem descricao'}</p>
           </div>
 
@@ -438,6 +438,10 @@ export default function FinanceiroTituloDetalhe() {
           <div className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4 space-y-3">
             <h2 className="text-lg font-semibold text-[var(--c-text)]">Dados do titulo</h2>
             <div className="grid gap-3 text-sm md:grid-cols-2">
+              <div>
+                <div className="text-[var(--c-muted)]">Codigo</div>
+                <div className="font-medium text-[var(--c-text)]">{titulo.codigo || `#${titulo.id}`}</div>
+              </div>
               <div>
                 <div className="text-[var(--c-muted)]">Parceiro</div>
                 <div className="font-medium text-[var(--c-text)]">{titulo.parceiro?.nome || '-'}</div>

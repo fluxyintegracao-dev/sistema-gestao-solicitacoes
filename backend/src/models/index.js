@@ -79,6 +79,7 @@ db.SecurityEventLog = require('./SecurityEventLog')(sequelize, Sequelize);
 db.ContaBancaria = require('./ContaBancaria')(sequelize, Sequelize);
 db.CategoriaFinanceira = require('./CategoriaFinanceira')(sequelize, Sequelize);
 db.TituloFinanceiro = require('./TituloFinanceiro')(sequelize, Sequelize);
+db.TituloFinanceiroSequencia = require('./TituloFinanceiroSequencia')(sequelize, Sequelize);
 db.MovimentoFinanceiro = require('./MovimentoFinanceiro')(sequelize, Sequelize);
 db.ConciliacaoBancaria = require('./ConciliacaoBancaria')(sequelize, Sequelize);
 db.ConciliacaoBancariaImportacao = require('./ConciliacaoBancariaImportacao')(sequelize, Sequelize);
@@ -121,6 +122,71 @@ db.CrmMessageTemplate = require('./CrmMessageTemplate')(sequelize, Sequelize);
 db.CrmConversationParticipant = require('./CrmConversationParticipant')(sequelize, Sequelize);
 db.CrmAutomationRule = require('./CrmAutomationRule')(sequelize, Sequelize);
 db.CrmAutomationExecution = require('./CrmAutomationExecution')(sequelize, Sequelize);
+
+const TITULO_FINANCEIRO_SEQUENCE_KEY = 'GLOBAL';
+
+function formatTituloFinanceiroCodigo(numero) {
+  return `TIT-${String(numero).padStart(6, '0')}`;
+}
+
+async function obterOuCriarSequenciaTituloFinanceiro({ transaction }) {
+  let sequencia = await db.TituloFinanceiroSequencia.findOne({
+    where: { chave: TITULO_FINANCEIRO_SEQUENCE_KEY },
+    transaction,
+    lock: transaction.LOCK.UPDATE
+  });
+
+  if (sequencia) {
+    return sequencia;
+  }
+
+  try {
+    await db.TituloFinanceiroSequencia.create({
+      chave: TITULO_FINANCEIRO_SEQUENCE_KEY,
+      ultimo_numero: 0
+    }, { transaction });
+  } catch (error) {
+    // Em corrida de criacao, o select com lock abaixo encontra a linha criada.
+  }
+
+  sequencia = await db.TituloFinanceiroSequencia.findOne({
+    where: { chave: TITULO_FINANCEIRO_SEQUENCE_KEY },
+    transaction,
+    lock: transaction.LOCK.UPDATE
+  });
+
+  if (!sequencia) {
+    throw new Error('Nao foi possivel inicializar a sequencia dos titulos financeiros.');
+  }
+
+  return sequencia;
+}
+
+async function gerarCodigoTituloFinanceiro({ transaction: externalTransaction = null } = {}) {
+  const executar = async (transaction) => {
+    const sequencia = await obterOuCriarSequenciaTituloFinanceiro({ transaction });
+    const proximoNumero = Number(sequencia.ultimo_numero || 0) + 1;
+    await sequencia.update({ ultimo_numero: proximoNumero }, { transaction });
+    return formatTituloFinanceiroCodigo(proximoNumero);
+  };
+
+  if (externalTransaction) {
+    return executar(externalTransaction);
+  }
+
+  return db.sequelize.transaction(executar);
+}
+
+db.TituloFinanceiro.beforeValidate('gerarCodigoTituloFinanceiro', async (titulo, options = {}) => {
+  if (String(titulo.codigo || '').trim()) {
+    titulo.codigo = String(titulo.codigo).trim().toUpperCase();
+    return;
+  }
+
+  titulo.codigo = await gerarCodigoTituloFinanceiro({
+    transaction: options.transaction || null
+  });
+});
 
 
 

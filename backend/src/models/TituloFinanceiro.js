@@ -6,6 +6,11 @@ module.exports = (sequelize, DataTypes) => sequelize.define(
       primaryKey: true,
       autoIncrement: true
     },
+    codigo: {
+      type: DataTypes.STRING(40),
+      allowNull: true,
+      unique: true
+    },
     solicitacao_id: {
       type: DataTypes.INTEGER,
       allowNull: true
