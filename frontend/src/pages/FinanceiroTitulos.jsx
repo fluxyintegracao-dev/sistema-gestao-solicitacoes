@@ -18,6 +18,7 @@ import {
 import { getMinhasObras } from '../services/obras';
 import { buscarParceiros } from '../services/parceiros';
 import { canViewIntegracaoSienge } from '../utils/acessoProduto';
+import ParceiroAutocomplete from '../components/ui/ParceiroAutocomplete';
 
 const FILTER_STORAGE_KEY = 'fluxy.financeiro.titulos.filters';
 const FILTER_VISIBILITY_STORAGE_PREFIX = 'fluxy.financeiro.titulos.visibleFilters';
@@ -411,22 +412,18 @@ export default function FinanceiroTitulos() {
         );
       case 'parceiro_id':
         return (
-          <label key={filter.id} className={commonClass}>
-            <span className="app-filter-label">{parceiroLabel}</span>
-            <select
-              className="input w-full input-sm"
-              value={draftFilters.parceiro_id}
-              onChange={(event) => setFilter('parceiro_id', event.target.value)}
-              disabled={loadingOptions}
-            >
-              <option value="">{draftFilters.tipo === 'PAGAR' ? 'Todos os credores' : 'Todos os clientes'}</option>
-              {parceirosFiltrados.map((parceiro) => (
-                <option key={parceiro.id} value={parceiro.id}>
-                  {parceiro.nome}
-                </option>
-              ))}
-            </select>
-          </label>
+          <ParceiroAutocomplete
+            key={filter.id}
+            className={commonClass}
+            inputClassName="input w-full input-sm"
+            label={parceiroLabel}
+            value={draftFilters.parceiro_id}
+            options={parceirosFiltrados}
+            onChange={(nextValue) => setFilter('parceiro_id', nextValue)}
+            disabled={loadingOptions}
+            placeholder={draftFilters.tipo === 'PAGAR' ? 'Digite o credor' : 'Digite o cliente'}
+            emptyLabel={draftFilters.tipo === 'PAGAR' ? 'Nenhum credor encontrado' : 'Nenhum cliente encontrado'}
+          />
         );
       case 'obra_id':
         return (

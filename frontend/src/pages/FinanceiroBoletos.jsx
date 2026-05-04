@@ -12,6 +12,7 @@ import { getEmpreendimentosComerciais } from '../services/comercial';
 import { buscarParceiros } from '../services/parceiros';
 import { useAuth } from '../contexts/AuthContext';
 import { hasEnabledModule } from '../utils/acessoProduto';
+import ParceiroAutocomplete from '../components/ui/ParceiroAutocomplete';
 
 const STATUS_OPTIONS = [
   { value: '', label: 'Todos elegiveis' },
@@ -733,22 +734,16 @@ export default function FinanceiroBoletos() {
               </select>
             </label>
           )}
-          <label className="sol-filter-field xl:col-span-3">
-            <span className="sol-filter-label">Cliente</span>
-            <select
-              className="input w-full"
-              value={filters.parceiro_id}
-              onChange={(event) => updateFilter('parceiro_id', event.target.value)}
-              disabled={loadingOptions}
-            >
-              <option value="">Todos</option>
-              {clientes.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.nome}
-                </option>
-              ))}
-            </select>
-          </label>
+          <ParceiroAutocomplete
+            className="sol-filter-field xl:col-span-3"
+            label="Cliente"
+            value={filters.parceiro_id}
+            options={clientes}
+            onChange={(nextValue) => updateFilter('parceiro_id', nextValue)}
+            disabled={loadingOptions}
+            placeholder="Digite o cliente"
+            emptyLabel="Nenhum cliente encontrado"
+          />
           {comercialHabilitado && (
             <label className="sol-filter-field xl:col-span-2">
               <span className="sol-filter-label">Origem</span>
