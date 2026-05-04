@@ -43,7 +43,7 @@ export default function ParceiroAutocomplete({
     const source = Array.isArray(options) ? options : [];
 
     if (!normalizedQuery) {
-      return source.slice(0, 30);
+      return [];
     }
 
     return source
@@ -56,7 +56,7 @@ export default function ParceiroAutocomplete({
         ].filter(Boolean).join(' ');
         return normalizeText(searchable).includes(normalizedQuery);
       })
-      .slice(0, 30);
+      .slice(0, 5);
   }, [options, query]);
 
   useEffect(() => {
