@@ -28,7 +28,7 @@ const FILTER_OPTIONS = [
   { id: 'categoria_macro_id', label: 'Item macro' },
   { id: 'prioridade', label: 'Prioridade' },
   { id: 'busca', label: 'Busca' },
-  { id: 'fornecedor', label: 'Fornecedor' },
+  { id: 'fornecedor', label: 'Credor' },
   { id: 'usuario_criacao_id', label: 'Criador' },
   { id: 'data_inicial', label: 'Data inicial' },
   { id: 'data_final', label: 'Data final' }
@@ -40,7 +40,7 @@ const COLUMN_DEFS = [
   { id: 'data_prevista', label: 'Data prevista', sortKey: 'data_prevista_desembolso' },
   { id: 'categoria', label: 'Item macro', sortKey: 'categoria_macro' },
   { id: 'descricao', label: 'Descricao', sortKey: 'descricao' },
-  { id: 'fornecedor', label: 'Fornecedor', sortKey: 'fornecedor_texto' },
+  { id: 'fornecedor', label: 'Credor', sortKey: 'fornecedor_texto' },
   { id: 'valor', label: 'Valor previsto', sortKey: 'valor_previsto' },
   { id: 'status', label: 'Status' },
   { id: 'prioridade', label: 'Prioridade' },
@@ -282,14 +282,14 @@ export default function ProvisionamentosFinanceiros() {
         return (
           <label key={id} className="grid gap-1 text-sm">
             Busca
-            <input className="input" value={filtros.busca} onChange={(event) => atualizarFiltro('busca', event.target.value)} placeholder="Codigo, descricao ou fornecedor" />
+            <input className="input" value={filtros.busca} onChange={(event) => atualizarFiltro('busca', event.target.value)} placeholder="Codigo, descricao ou credor" />
           </label>
         );
       case 'fornecedor':
         return (
           <label key={id} className="grid gap-1 text-sm">
-            Fornecedor
-            <input className="input" value={filtros.fornecedor} onChange={(event) => atualizarFiltro('fornecedor', event.target.value)} placeholder="Nome do fornecedor" />
+            Credor
+            <input className="input" value={filtros.fornecedor} onChange={(event) => atualizarFiltro('fornecedor', event.target.value)} placeholder="Nome do credor" />
           </label>
         );
       case 'usuario_criacao_id':

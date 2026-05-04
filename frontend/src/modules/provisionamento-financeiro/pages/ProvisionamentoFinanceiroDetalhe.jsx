@@ -211,7 +211,7 @@ export default function ProvisionamentoFinanceiroDetalhe() {
           <Info label="Item macro" value={provisao.categoriaMacro?.nome || '-'} />
           <Info label="Data prevista" value={formatarData(provisao.data_prevista_desembolso)} />
           <Info label="Valor previsto" value={formatarMoedaBRL(provisao.valor_previsto)} />
-          <Info label="Fornecedor" value={provisao.fornecedor_texto || '-'} />
+          <Info label="Credor" value={provisao.fornecedor_texto || '-'} />
           <Info label="Prioridade" value={formatarPrioridade(provisao.prioridade)} />
           <Info label="Criado por" value={provisao.usuarioCriacao?.nome || '-'} />
           <Info label="Atualizado por" value={provisao.usuarioAtualizacao?.nome || '-'} />
@@ -269,7 +269,7 @@ export default function ProvisionamentoFinanceiroDetalhe() {
               </select>
             </label>
             <label className="grid gap-1 text-sm md:col-span-2 xl:col-span-4">
-              Fornecedor
+              Credor
               <input className="input" value={form.fornecedor_texto} onChange={(event) => setForm((atual) => ({ ...atual, fornecedor_texto: event.target.value }))} />
             </label>
             <label className="grid gap-1 text-sm xl:col-span-6">

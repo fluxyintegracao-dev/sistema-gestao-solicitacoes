@@ -174,7 +174,7 @@ export default function NovaProvisaoFinanceira() {
           </label>
 
           <label className="grid gap-1 text-sm md:col-span-2 xl:col-span-3">
-            Fornecedor
+            Credor
             <input className="input" value={form.fornecedor_texto} onChange={(event) => atualizarCampo('fornecedor_texto', event.target.value)} placeholder="Opcional" />
           </label>
 

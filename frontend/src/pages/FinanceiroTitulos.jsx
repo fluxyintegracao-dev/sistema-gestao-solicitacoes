@@ -23,17 +23,15 @@ const FILTER_STORAGE_KEY = 'fluxy.financeiro.titulos.filters';
 const FILTER_VISIBILITY_STORAGE_PREFIX = 'fluxy.financeiro.titulos.visibleFilters';
 
 const FILTER_DEFINITIONS = [
-  { id: 'tipo', label: 'Tipo', group: 'basic', span: 'xl:col-span-2' },
   { id: 'codigo', label: 'Titulo', group: 'basic', span: 'xl:col-span-2' },
   { id: 'q', label: 'Busca rapida', group: 'basic', span: 'xl:col-span-4' },
   { id: 'status', label: 'Status', group: 'basic', span: 'xl:col-span-2' },
   { id: 'numero_documento', label: 'N. documento', group: 'basic', span: 'xl:col-span-2' },
-  { id: 'parceiro_id', label: 'Cliente / fornecedor', group: 'basic', span: 'xl:col-span-4' },
+  { id: 'parceiro_id', label: 'Cliente/Credor', group: 'basic', span: 'xl:col-span-4' },
   { id: 'obra_id', label: 'Obra', group: 'basic', span: 'xl:col-span-4' },
   { id: 'data_emissao_inicial', label: 'Emissao inicio', group: 'basic', span: 'xl:col-span-2' },
   { id: 'data_emissao_final', label: 'Emissao fim', group: 'basic', span: 'xl:col-span-2' },
   { id: 'categoria_financeira_id', label: 'Categoria financeira', group: 'advanced', span: 'xl:col-span-3' },
-  { id: 'descricao', label: 'Descricao', group: 'advanced', span: 'xl:col-span-3' },
   { id: 'vencimento_inicial', label: 'Vencimento inicio', group: 'advanced', span: 'xl:col-span-2' },
   { id: 'vencimento_final', label: 'Vencimento fim', group: 'advanced', span: 'xl:col-span-2' }
 ];
@@ -50,7 +48,6 @@ function getDefaultFilters() {
     parceiro_id: '',
     categoria_financeira_id: '',
     numero_documento: '',
-    descricao: '',
     data_emissao_inicial: '',
     data_emissao_final: '',
     vencimento_inicial: '',
@@ -97,7 +94,7 @@ function loadVisibleFilterIds(user) {
 function pickVisibleFilters(filters, visibleFilterIds) {
   const visible = new Set(visibleFilterIds);
   return Object.fromEntries(
-    Object.entries(filters).filter(([key]) => visible.has(key))
+    Object.entries(filters).filter(([key]) => key === 'tipo' || visible.has(key))
   );
 }
 
@@ -238,9 +235,18 @@ export default function FinanceiroTitulos() {
     const tipo = String(draftFilters.tipo || '').toUpperCase();
     return categorias.filter((categoria) => {
       const categoriaTipo = String(categoria?.tipo || '').toUpperCase();
-      return !tipo || !categoriaTipo || categoriaTipo === 'AMBOS' || categoriaTipo === tipo;
+      return categoriaTipo === tipo;
     });
   }, [categorias, draftFilters.tipo]);
+
+  const parceirosFiltrados = useMemo(() => {
+    const tipo = String(draftFilters.tipo || '').toUpperCase();
+    return parceiros.filter((parceiro) => (
+      tipo === 'PAGAR'
+        ? parceiro?.fornecedor !== false || parceiro?.corretor === true
+        : parceiro?.cliente !== false
+    ));
+  }, [parceiros, draftFilters.tipo]);
 
   const resumo = useMemo(() => titulos.reduce((acc, item) => {
     acc.total += Number(item.valor_original || 0);
@@ -273,11 +279,23 @@ export default function FinanceiroTitulos() {
   );
   const tipoReferencia = appliedFilters?.tipo || draftFilters.tipo;
   const tipoLabel = tipoReferencia === 'PAGAR' ? 'a pagar' : 'a receber';
+  const parceiroLabel = draftFilters.tipo === 'PAGAR' ? 'Credor' : 'Cliente';
+  const parceiroResultadoLabel = tipoReferencia === 'PAGAR' ? 'Credor' : 'Cliente';
+  const categoriasLabel = draftFilters.tipo === 'PAGAR' ? 'contas a pagar' : 'contas a receber';
 
   function setFilter(name, value) {
     setDraftFilters((current) => ({
       ...current,
       [name]: value
+    }));
+  }
+
+  function setTipoFiltro(tipo) {
+    setDraftFilters((current) => ({
+      ...current,
+      tipo,
+      parceiro_id: '',
+      categoria_financeira_id: ''
     }));
   }
 
@@ -337,20 +355,6 @@ export default function FinanceiroTitulos() {
     const commonClass = `app-filter-field ${filter.span || ''}`;
 
     switch (filter.id) {
-      case 'tipo':
-        return (
-          <label key={filter.id} className={commonClass}>
-            <span className="app-filter-label">Tipo</span>
-            <select
-              className="input w-full input-sm"
-              value={draftFilters.tipo}
-              onChange={(event) => setFilter('tipo', event.target.value)}
-            >
-              <option value="RECEBER">Receber</option>
-              <option value="PAGAR">Pagar</option>
-            </select>
-          </label>
-        );
       case 'codigo':
         return (
           <label key={filter.id} className={commonClass}>
@@ -371,7 +375,7 @@ export default function FinanceiroTitulos() {
               className="input w-full input-sm"
               value={draftFilters.q}
               onChange={(event) => setFilter('q', event.target.value)}
-              placeholder="Cliente, obra, documento ou descricao"
+              placeholder="Cliente/credor, obra, documento ou texto"
             />
           </label>
         );
@@ -408,15 +412,15 @@ export default function FinanceiroTitulos() {
       case 'parceiro_id':
         return (
           <label key={filter.id} className={commonClass}>
-            <span className="app-filter-label">Cliente / fornecedor</span>
+            <span className="app-filter-label">{parceiroLabel}</span>
             <select
               className="input w-full input-sm"
               value={draftFilters.parceiro_id}
               onChange={(event) => setFilter('parceiro_id', event.target.value)}
               disabled={loadingOptions}
             >
-              <option value="">Todos os parceiros</option>
-              {parceiros.map((parceiro) => (
+              <option value="">{draftFilters.tipo === 'PAGAR' ? 'Todos os credores' : 'Todos os clientes'}</option>
+              {parceirosFiltrados.map((parceiro) => (
                 <option key={parceiro.id} value={parceiro.id}>
                   {parceiro.nome}
                 </option>
@@ -475,23 +479,11 @@ export default function FinanceiroTitulos() {
               onChange={(event) => setFilter('categoria_financeira_id', event.target.value)}
               disabled={loadingOptions}
             >
-              <option value="">Todas as categorias</option>
+              <option value="">Todas as categorias de {categoriasLabel}</option>
               {categoriasFiltradas.map((categoria) => (
                 <option key={categoria.id} value={categoria.id}>{categoria.nome}</option>
               ))}
             </select>
-          </label>
-        );
-      case 'descricao':
-        return (
-          <label key={filter.id} className={commonClass}>
-            <span className="app-filter-label">Descricao</span>
-            <input
-              className="input w-full input-sm"
-              value={draftFilters.descricao}
-              onChange={(event) => setFilter('descricao', event.target.value)}
-              placeholder="Texto da descricao"
-            />
           </label>
         );
       case 'vencimento_inicial':
@@ -535,6 +527,9 @@ export default function FinanceiroTitulos() {
             <HiOutlineDocumentChartBar className="h-4 w-4" />
             Relatorios
           </Link>
+          <Link to="/financeiro/conciliacao" className="btn btn-outline btn-sm">
+            Conciliacao OFX
+          </Link>
           <Link to={`/financeiro/titulos/novo?tipo=${draftFilters.tipo || 'RECEBER'}`} className="btn btn-primary btn-sm">
             <HiOutlinePlus className="h-4 w-4" />
             Novo titulo
@@ -560,6 +555,32 @@ export default function FinanceiroTitulos() {
             </label>
           </div>
 
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <span className="app-filter-label">Tipo</span>
+            <div className="inline-grid w-full max-w-sm grid-cols-2 rounded-xl border border-[var(--c-border)] bg-[var(--c-bg)] p-1">
+              {[
+                { value: 'RECEBER', label: 'Receber' },
+                { value: 'PAGAR', label: 'Pagar' }
+              ].map((option) => {
+                const active = draftFilters.tipo === option.value;
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
+                      active
+                        ? 'bg-[var(--c-primary)] text-white shadow-sm'
+                        : 'text-[var(--c-muted)] hover:bg-[var(--c-surface)] hover:text-[var(--c-text)]'
+                    }`}
+                    onClick={() => setTipoFiltro(option.value)}
+                  >
+                    {option.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-12">
             {basicVisibleFilters.map((filter) => renderFilterField(filter))}
             {basicVisibleFilters.length === 0 ? (
@@ -573,12 +594,6 @@ export default function FinanceiroTitulos() {
             <div className="overflow-hidden">
               <div className="grid gap-3 border-t border-[var(--c-border)] pt-3 md:grid-cols-2 xl:grid-cols-12">
                 {advancedVisibleFilters.map((filter) => renderFilterField(filter))}
-
-                <div className="xl:col-span-2 flex items-end">
-                  <Link to="/financeiro/conciliacao" className="btn btn-outline btn-sm w-full">
-                    Conciliacao OFX
-                  </Link>
-                </div>
               </div>
             </div>
           </div>
@@ -593,65 +608,15 @@ export default function FinanceiroTitulos() {
                 <HiOutlineAdjustmentsHorizontal className="h-4 w-4" />
                 {advancedOpen ? 'Menos filtros' : 'Mais filtros'}
               </button>
-              <div className="relative">
-                <button
-                  type="button"
-                  className="btn btn-outline btn-sm"
-                  onClick={() => setFilterChooserOpen((current) => !current)}
-                  title="Escolher filtros visiveis"
-                >
-                  <HiOutlineEye className="h-4 w-4" />
-                  Filtros
-                </button>
-
-                {filterChooserOpen ? (
-                  <div className="absolute left-0 top-[calc(100%+8px)] z-30 w-[280px] rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-3 shadow-xl">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <div className="text-sm font-semibold text-[var(--c-text)]">Filtros visiveis</div>
-                        <div className="text-[11px] text-[var(--c-muted)]">Salvo apenas para este usuario neste navegador.</div>
-                      </div>
-                      <button
-                        type="button"
-                        className="rounded-md p-1 text-[var(--c-muted)] hover:bg-[var(--c-bg)] hover:text-[var(--c-text)]"
-                        onClick={() => setFilterChooserOpen(false)}
-                        title="Fechar"
-                      >
-                        <HiOutlineXMark className="h-4 w-4" />
-                      </button>
-                    </div>
-
-                    <div className="mt-3 max-h-[320px] space-y-1 overflow-y-auto pr-1">
-                      {FILTER_DEFINITIONS.map((filter) => {
-                        const checked = visibleFilterSet.has(filter.id);
-                        return (
-                          <label
-                            key={filter.id}
-                            className="flex cursor-pointer items-center justify-between gap-3 rounded-lg px-2 py-2 text-sm hover:bg-[var(--c-bg)]"
-                          >
-                            <span className="text-[var(--c-text)]">{filter.label}</span>
-                            <input
-                              type="checkbox"
-                              className="h-4 w-4 accent-[var(--c-primary)]"
-                              checked={checked}
-                              onChange={() => toggleVisibleFilter(filter.id)}
-                            />
-                          </label>
-                        );
-                      })}
-                    </div>
-
-                    <div className="mt-3 flex justify-between border-t border-[var(--c-border)] pt-3">
-                      <button type="button" className="btn btn-outline btn-sm" onClick={resetVisibleFilters}>
-                        Restaurar
-                      </button>
-                      <button type="button" className="btn btn-primary btn-sm" onClick={() => setFilterChooserOpen(false)}>
-                        Aplicar
-                      </button>
-                    </div>
-                  </div>
-                ) : null}
-              </div>
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                onClick={() => setFilterChooserOpen(true)}
+                title="Escolher filtros visiveis"
+              >
+                <HiOutlineEye className="h-4 w-4" />
+                Filtros
+              </button>
               <button type="button" className="btn btn-outline btn-sm" onClick={clearFilters}>
                 <HiOutlineXMark className="h-4 w-4" />
                 Limpar
@@ -665,6 +630,56 @@ export default function FinanceiroTitulos() {
           </div>
         </div>
       </form>
+
+      {filterChooserOpen ? (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/35 px-4 py-6 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] shadow-2xl">
+            <div className="flex items-start justify-between gap-3 border-b border-[var(--c-border)] px-4 py-3">
+              <div>
+                <div className="text-sm font-semibold text-[var(--c-text)]">Filtros visiveis</div>
+                <div className="text-[11px] text-[var(--c-muted)]">Salvo apenas para este usuario neste navegador.</div>
+              </div>
+              <button
+                type="button"
+                className="rounded-md p-1 text-[var(--c-muted)] hover:bg-[var(--c-bg)] hover:text-[var(--c-text)]"
+                onClick={() => setFilterChooserOpen(false)}
+                title="Fechar"
+              >
+                <HiOutlineXMark className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="max-h-[60vh] space-y-1 overflow-y-auto px-3 py-3">
+              {FILTER_DEFINITIONS.map((filter) => {
+                const checked = visibleFilterSet.has(filter.id);
+                return (
+                  <label
+                    key={filter.id}
+                    className="flex cursor-pointer items-center justify-between gap-3 rounded-lg px-2 py-2 text-sm hover:bg-[var(--c-bg)]"
+                  >
+                    <span className="text-[var(--c-text)]">{filter.label}</span>
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 accent-[var(--c-primary)]"
+                      checked={checked}
+                      onChange={() => toggleVisibleFilter(filter.id)}
+                    />
+                  </label>
+                );
+              })}
+            </div>
+
+            <div className="flex justify-between border-t border-[var(--c-border)] px-4 py-3">
+              <button type="button" className="btn btn-outline btn-sm" onClick={resetVisibleFilters}>
+                Restaurar
+              </button>
+              <button type="button" className="btn btn-primary btn-sm" onClick={() => setFilterChooserOpen(false)}>
+                Aplicar
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <div className="grid gap-3 md:grid-cols-4">
         {[
@@ -718,7 +733,7 @@ export default function FinanceiroTitulos() {
                   'Status',
                   'Tipo',
                   'Documento',
-                  'Cliente/Fornecedor',
+                  parceiroResultadoLabel,
                   'Obra',
                   'Categoria',
                   'Origem',

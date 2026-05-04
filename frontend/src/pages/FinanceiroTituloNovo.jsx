@@ -52,13 +52,12 @@ function normalizeSearchText(value) {
 
 function categoriaCompativel(categoria, tipoTitulo) {
   const tipoCategoria = String(categoria?.tipo || '').trim().toUpperCase();
-  return tipoCategoria === 'AMBOS' || tipoCategoria === tipoTitulo;
+  return tipoCategoria === tipoTitulo;
 }
 
 function prioridadeCategoria(categoria, tipoTitulo) {
   const tipoCategoria = String(categoria?.tipo || '').trim().toUpperCase();
   if (tipoCategoria === tipoTitulo) return 0;
-  if (tipoCategoria === 'AMBOS') return 1;
   return 2;
 }
 
@@ -214,21 +213,20 @@ export default function FinanceiroTituloNovo() {
 
   const categoriaResumo = useMemo(() => {
     const especificas = categoriasFiltradas.filter((categoria) => String(categoria.tipo || '').trim().toUpperCase() === form.tipo).length;
-    const compartilhadas = categoriasFiltradas.filter((categoria) => String(categoria.tipo || '').trim().toUpperCase() === 'AMBOS').length;
 
     if (!categoriasFiltradas.length) {
       return `Nenhuma categoria compativel com titulos de ${labelTipoTitulo(form.tipo)}.`;
     }
 
-    return `${especificas} categoria(s) de ${labelTipoTitulo(form.tipo)} e ${compartilhadas} compartilhada(s) disponivel(is).`;
+    return `${especificas} categoria(s) de contas a ${labelTipoTitulo(form.tipo)} disponivel(is).`;
   }, [categoriasFiltradas, form.tipo]);
 
   const parceiroResumo = useMemo(() => {
     if (!parceiroBusca.trim()) {
-      return `${parceiros.length} parceiro(s) carregado(s)`;
+      return `${parceiros.length} ${form.tipo === 'RECEBER' ? 'cliente(s)' : 'credor(es)'} carregado(s)`;
     }
-    return `${parceiros.length} parceiro(s) encontrado(s) para "${parceiroBusca.trim()}"`;
-  }, [parceiros, parceiroBusca]);
+    return `${parceiros.length} ${form.tipo === 'RECEBER' ? 'cliente(s)' : 'credor(es)'} encontrado(s) para "${parceiroBusca.trim()}"`;
+  }, [form.tipo, parceiros, parceiroBusca]);
 
   function updateField(field, value) {
     setForm((current) => ({ ...current, [field]: value }));
@@ -238,7 +236,7 @@ export default function FinanceiroTituloNovo() {
         ...current,
         tipo: value,
         parceiro_id: '',
-        categoria_financeira_id: current.categoria_financeira_id,
+        categoria_financeira_id: '',
         forma_cobranca: value === 'RECEBER' ? current.forma_cobranca : '',
         status_cobranca: value === 'RECEBER' ? current.status_cobranca : 'PENDENTE_EMISSAO',
         banco_cobranca: value === 'RECEBER' ? current.banco_cobranca : '',
@@ -380,10 +378,10 @@ export default function FinanceiroTituloNovo() {
               </label>
 
               <label className="sol-filter-field md:col-span-2 xl:col-span-4">
-                <span className="sol-filter-label">Buscar parceiro</span>
+                <span className="sol-filter-label">{form.tipo === 'RECEBER' ? 'Buscar cliente' : 'Buscar credor'}</span>
                 <input
                   className="input w-full"
-                  placeholder={form.tipo === 'RECEBER' ? 'Nome, CPF/CNPJ do cliente' : 'Nome, CPF/CNPJ do fornecedor ou corretor'}
+                  placeholder={form.tipo === 'RECEBER' ? 'Nome, CPF/CNPJ do cliente' : 'Nome, CPF/CNPJ do credor ou corretor'}
                   value={parceiroBusca}
                   onChange={(event) => setParceiroBusca(event.target.value)}
                 />
@@ -391,7 +389,7 @@ export default function FinanceiroTituloNovo() {
               </label>
 
               <label className="sol-filter-field md:col-span-2 xl:col-span-5">
-                <span className="sol-filter-label">Parceiro</span>
+                <span className="sol-filter-label">{form.tipo === 'RECEBER' ? 'Cliente' : 'Credor'}</span>
                 <select
                   className="input w-full"
                   value={form.parceiro_id}
@@ -399,7 +397,7 @@ export default function FinanceiroTituloNovo() {
                   required
                   disabled={loadingParceiros}
                 >
-                  <option value="">Selecione o parceiro</option>
+                  <option value="">{form.tipo === 'RECEBER' ? 'Selecione o cliente' : 'Selecione o credor'}</option>
                   {parceiros.map((parceiro) => (
                     <option key={parceiro.id} value={parceiro.id}>
                       {parceiro.nome} {parceiro.cpf_cnpj ? `- ${parceiro.cpf_cnpj}` : ''}
