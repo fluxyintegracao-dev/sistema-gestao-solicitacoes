@@ -78,6 +78,27 @@ module.exports = (sequelize, DataTypes) => sequelize.define(
       type: DataTypes.DECIMAL(8, 2),
       allowNull: true
     },
+    possui_vaga_garagem: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false
+    },
+    quantidade_vagas_garagem: {
+      type: DataTypes.INTEGER,
+      allowNull: true
+    },
+    vagas_garagem_posicao: {
+      type: DataTypes.STRING(255),
+      allowNull: true
+    },
+    local_assinatura: {
+      type: DataTypes.STRING(160),
+      allowNull: true
+    },
+    data_assinatura: {
+      type: DataTypes.DATEONLY,
+      allowNull: true
+    },
     observacoes: {
       type: DataTypes.TEXT,
       allowNull: true

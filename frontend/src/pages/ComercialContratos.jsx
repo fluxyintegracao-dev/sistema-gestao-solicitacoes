@@ -25,6 +25,10 @@ import {
 const STATUS_CONTRATO = ['RASCUNHO', 'ATIVO', 'INADIMPLENTE', 'QUITADO', 'DISTRATADO', 'CANCELADO'];
 const FORMAS_RECEBIMENTO = ['DINHEIRO', 'PIX', 'CARTAO', 'TRANSFERENCIA', 'BOLETO', 'CHEQUE', 'PERMUTA', 'BENS', 'OUTROS'];
 const PARCELA_TIPOS = ['ENTRADA', 'PARCELA', 'INTERMEDIARIA', 'CHAVES', 'BALAO', 'OUTRA'];
+const PARCELA_REAJUSTE_TIPOS = [
+  { value: 'FIXA', label: 'Fixa', resumo: 'F' },
+  { value: 'REAJUSTAVEL', label: 'Reajustavel', resumo: 'R' }
+];
 const TIPOS_DOCUMENTO_MODELO = [
   { value: 'CONTRATO', label: 'Contrato padrao' },
   { value: 'QUADRO_RESUMO', label: 'Quadro resumo' }
@@ -66,6 +70,12 @@ function defaultForm() {
     indice_reajuste: '',
     corretor_nome: '',
     comissao_percentual: '',
+    possui_vaga_garagem: false,
+    quantidade_vagas_garagem: '',
+    vagas_garagem_posicao_especifica: false,
+    vagas_garagem_posicao: '',
+    local_assinatura: '',
+    data_assinatura: today(),
     observacoes: '',
     parcelas: []
   };
@@ -81,11 +91,13 @@ function defaultGenerator() {
     valor_parcela: '',
     primeiro_vencimento: today(),
     forma_recebimento_prevista: 'BOLETO',
+    reajuste_tipo: 'FIXA',
     detalhe_forma_recebimento: '',
     parcelas_personalizadas: [
       {
         descricao: 'Parcela 1',
         tipo_parcela: 'PARCELA',
+        reajuste_tipo: 'FIXA',
         data_vencimento: today(),
         valor: '',
         observacoes: ''
@@ -296,6 +308,7 @@ function buildParcelaCustomizada(index = 1, overrides = {}) {
   return {
     descricao: `Parcela ${index}`,
     tipo_parcela: 'PARCELA',
+    reajuste_tipo: 'FIXA',
     data_vencimento: today(),
     valor: '',
     observacoes: '',
@@ -355,6 +368,12 @@ function pickEditForm(contrato = {}) {
     indice_reajuste: contrato.indice_reajuste || '',
     corretor_nome: contrato.corretor_nome || '',
     comissao_percentual: contrato.comissao_percentual || '',
+    possui_vaga_garagem: Boolean(contrato.possui_vaga_garagem),
+    quantidade_vagas_garagem: contrato.quantidade_vagas_garagem ? String(contrato.quantidade_vagas_garagem) : '',
+    vagas_garagem_posicao_especifica: Boolean(contrato.vagas_garagem_posicao),
+    vagas_garagem_posicao: contrato.vagas_garagem_posicao || '',
+    local_assinatura: contrato.local_assinatura || '',
+    data_assinatura: contrato.data_assinatura || contrato.data_contrato || today(),
     observacoes: contrato.observacoes || '',
     parcelas: Array.isArray(contrato.parcelas) ? contrato.parcelas : []
   };
@@ -401,6 +420,7 @@ function gerarParcelasDoBloco(plano = {}, planoId = '') {
       descricao: tituloBase || 'Entrada',
       tipo_parcela: 'ENTRADA',
       forma_recebimento_prevista: formaRecebimento,
+      reajuste_tipo: plano.reajuste_tipo || 'FIXA',
       data_vencimento: plano.primeiro_vencimento,
       valor: valorEntrada.toFixed(2),
       observacoes: buildObservacoesParcela('', plano.detalhe_forma_recebimento)
@@ -418,6 +438,7 @@ function gerarParcelasDoBloco(plano = {}, planoId = '') {
         descricao: item.descricao || (tituloBase ? `${tituloBase} ${index + 1}` : `Lancamento ${index + 1}`),
         tipo_parcela: item.tipo_parcela || tipoParcelaPadrao,
         forma_recebimento_prevista: formaRecebimento,
+        reajuste_tipo: item.reajuste_tipo || plano.reajuste_tipo || 'FIXA',
         data_vencimento: item.data_vencimento,
         valor: toNumber(item.valor).toFixed(2),
         observacoes: buildObservacoesParcela(item.observacoes, plano.detalhe_forma_recebimento)
@@ -447,6 +468,7 @@ function gerarParcelasDoBloco(plano = {}, planoId = '') {
     descricao: tituloBase ? `${tituloBase} ${index + 1}` : `Parcela ${index + 1}`,
     tipo_parcela: tipoParcelaPadrao,
     forma_recebimento_prevista: formaRecebimento,
+    reajuste_tipo: plano.reajuste_tipo || 'FIXA',
     data_vencimento: addMonths(plano.primeiro_vencimento || today(), index * periodicidade.intervalMonths),
     valor: valorParcela.toFixed(2),
     observacoes: buildObservacoesParcela('', plano.detalhe_forma_recebimento)
@@ -631,6 +653,14 @@ export default function ComercialContratos() {
       && String(item.tipo_documento || '').toUpperCase() === String(documentoForm.tipo_documento || '').toUpperCase()
     );
   }, [contratoSelecionado?.empreendimento_id, documentoForm.tipo_documento, modelosContrato]);
+
+  const possuiModeloQuadroResumoSelecionado = useMemo(() => {
+    if (!contratoSelecionado?.empreendimento_id) return false;
+    return modelosContrato.some((item) =>
+      Number(item.empreendimento_id) === Number(contratoSelecionado.empreendimento_id)
+      && String(item.tipo_documento || '').toUpperCase() === 'QUADRO_RESUMO'
+    );
+  }, [contratoSelecionado?.empreendimento_id, modelosContrato]);
 
   function aplicarPlanosAoContrato(planos) {
     const parcelas = normalizarParcelasContrato(planos.flatMap((plano) =>
@@ -1005,6 +1035,10 @@ export default function ComercialContratos() {
     if (!hasText(form.categoria_financeira_comissao_id)) camposFaltando.push('Categoria comissao');
     if (!hasText(form.comissao_percentual) || toNumber(form.comissao_percentual) <= 0) camposFaltando.push('Comissao %');
     if (!hasText(form.valor_total) || roundCurrency(form.valor_total) <= 0) camposFaltando.push('Valor total');
+    if (form.possui_vaga_garagem && (!hasText(form.quantidade_vagas_garagem) || Number(form.quantidade_vagas_garagem) <= 0)) camposFaltando.push('Quantidade de vagas');
+    if (form.possui_vaga_garagem && form.vagas_garagem_posicao_especifica && !hasText(form.vagas_garagem_posicao)) camposFaltando.push('Posicao das vagas');
+    if (!hasText(form.local_assinatura)) camposFaltando.push('Local de assinatura');
+    if (!hasText(form.data_assinatura)) camposFaltando.push('Data de assinatura');
 
     if (!form.parcelas.length) {
       camposFaltando.push('Formas de pagamento');
@@ -1013,6 +1047,7 @@ export default function ComercialContratos() {
         !hasText(item.descricao)
         || !hasText(item.tipo_parcela)
         || !hasText(item.forma_recebimento_prevista)
+        || !hasText(item.reajuste_tipo)
         || !hasText(item.data_vencimento)
         || roundCurrency(item.valor || item.valor_original) <= 0
       );
@@ -1053,6 +1088,11 @@ export default function ComercialContratos() {
           indice_reajuste: form.indice_reajuste || undefined,
           corretor_nome: form.corretor_nome || undefined,
           comissao_percentual: form.comissao_percentual || undefined,
+          possui_vaga_garagem: Boolean(form.possui_vaga_garagem),
+          quantidade_vagas_garagem: form.possui_vaga_garagem ? Number(form.quantidade_vagas_garagem || 0) : null,
+          vagas_garagem_posicao: form.possui_vaga_garagem && form.vagas_garagem_posicao_especifica ? form.vagas_garagem_posicao || null : null,
+          local_assinatura: form.local_assinatura || undefined,
+          data_assinatura: form.data_assinatura || undefined,
           observacoes: form.observacoes || undefined
         });
       } else {
@@ -1073,12 +1113,18 @@ export default function ComercialContratos() {
           indice_reajuste: form.indice_reajuste || undefined,
           corretor_nome: form.corretor_nome || undefined,
           comissao_percentual: form.comissao_percentual || undefined,
+          possui_vaga_garagem: Boolean(form.possui_vaga_garagem),
+          quantidade_vagas_garagem: form.possui_vaga_garagem ? Number(form.quantidade_vagas_garagem || 0) : null,
+          vagas_garagem_posicao: form.possui_vaga_garagem && form.vagas_garagem_posicao_especifica ? form.vagas_garagem_posicao || null : null,
+          local_assinatura: form.local_assinatura || undefined,
+          data_assinatura: form.data_assinatura || form.data_contrato || undefined,
           observacoes: form.observacoes || undefined,
           parcelas: form.parcelas.map((item, index) => ({
             sequencia: item.sequencia || index + 1,
             descricao: item.descricao,
             tipo_parcela: item.tipo_parcela,
             forma_recebimento_prevista: item.forma_recebimento_prevista || undefined,
+            reajuste_tipo: item.reajuste_tipo || 'FIXA',
             data_vencimento: item.data_vencimento,
             valor: item.valor || item.valor_original,
             observacoes: item.observacoes || undefined
@@ -1228,6 +1274,54 @@ export default function ComercialContratos() {
           </div>
           <div className="grid gap-3 md:grid-cols-4">
             <label className="sol-filter-field">
+              <span className="sol-filter-label">Vaga de garagem</span>
+              <select
+                className="input w-full"
+                value={form.possui_vaga_garagem ? 'sim' : 'nao'}
+                onChange={(e) => setForm((c) => ({
+                  ...c,
+                  possui_vaga_garagem: e.target.value === 'sim',
+                  quantidade_vagas_garagem: e.target.value === 'sim' ? c.quantidade_vagas_garagem : '',
+                  vagas_garagem_posicao_especifica: e.target.value === 'sim' ? c.vagas_garagem_posicao_especifica : false,
+                  vagas_garagem_posicao: e.target.value === 'sim' ? c.vagas_garagem_posicao : ''
+                }))}
+              >
+                <option value="nao">Nao possui</option>
+                <option value="sim">Possui</option>
+              </select>
+            </label>
+            {form.possui_vaga_garagem && (
+              <>
+                <label className="sol-filter-field">
+                  <span className="sol-filter-label">Quantidade de vagas</span>
+                  <input className="input w-full" type="number" min="1" value={form.quantidade_vagas_garagem} onChange={(e) => setForm((c) => ({ ...c, quantidade_vagas_garagem: e.target.value }))} />
+                </label>
+                <label className="sol-filter-field">
+                  <span className="sol-filter-label">Posicao especifica</span>
+                  <select
+                    className="input w-full"
+                    value={form.vagas_garagem_posicao_especifica ? 'sim' : 'nao'}
+                    onChange={(e) => setForm((c) => ({
+                      ...c,
+                      vagas_garagem_posicao_especifica: e.target.value === 'sim',
+                      vagas_garagem_posicao: e.target.value === 'sim' ? c.vagas_garagem_posicao : ''
+                    }))}
+                  >
+                    <option value="nao">Nao</option>
+                    <option value="sim">Sim</option>
+                  </select>
+                </label>
+                {form.vagas_garagem_posicao_especifica && (
+                  <label className="sol-filter-field">
+                    <span className="sol-filter-label">Posicao das vagas</span>
+                    <input className="input w-full" value={form.vagas_garagem_posicao} onChange={(e) => setForm((c) => ({ ...c, vagas_garagem_posicao: e.target.value }))} placeholder="Ex.: vagas 12 e 13 / subsolo 1" />
+                  </label>
+                )}
+              </>
+            )}
+          </div>
+          <div className="grid gap-3 md:grid-cols-4">
+            <label className="sol-filter-field">
               <span className="sol-filter-label">Corretor parceiro</span>
               <select
                 className="input w-full"
@@ -1256,6 +1350,16 @@ export default function ComercialContratos() {
                 <option value="">Nao vincular</option>
                 {categoriasCompativeisPagar.map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}
               </select>
+            </label>
+          </div>
+          <div className="grid gap-3 md:grid-cols-4">
+            <label className="sol-filter-field md:col-span-2">
+              <span className="sol-filter-label">Local de assinatura</span>
+              <input className="input w-full" value={form.local_assinatura} onChange={(e) => setForm((c) => ({ ...c, local_assinatura: e.target.value }))} placeholder="Ex.: Balneario de Iriri, Anchieta-ES" />
+            </label>
+            <label className="sol-filter-field">
+              <span className="sol-filter-label">Data de assinatura</span>
+              <input className="input w-full" type="date" value={form.data_assinatura} onChange={(e) => setForm((c) => ({ ...c, data_assinatura: e.target.value }))} />
             </label>
           </div>
           <label className="sol-filter-field"><span className="sol-filter-label">Observacoes</span><textarea className="input min-h-[92px] w-full" value={form.observacoes} onChange={(e) => setForm((c) => ({ ...c, observacoes: e.target.value }))} /></label>
@@ -1299,7 +1403,7 @@ export default function ComercialContratos() {
                     {MODOS_COMPOSICAO.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
                   </select>
                 </label>
-                <label className="sol-filter-field md:col-span-2">
+                <label className="sol-filter-field">
                   <span className="sol-filter-label">Descricao do bloco</span>
                   <input className="input w-full" value={generator.titulo_bloco} onChange={(e) => setGenerator((c) => ({ ...c, titulo_bloco: e.target.value }))} placeholder="Ex.: Mensais, reforco anual, bens recebidos" />
                 </label>
@@ -1314,6 +1418,12 @@ export default function ComercialContratos() {
                   <select className="input w-full" value={generator.forma_recebimento_prevista} onChange={(e) => setGenerator((c) => ({ ...c, forma_recebimento_prevista: e.target.value, detalhe_forma_recebimento: isFormaComDetalhe(e.target.value) ? c.detalhe_forma_recebimento : '' }))}>
                     <option value="">Nao informar</option>
                     {FORMAS_RECEBIMENTO.map((item) => <option key={item} value={item}>{item}</option>)}
+                  </select>
+                </label>
+                <label className="sol-filter-field">
+                  <span className="sol-filter-label">Reajuste</span>
+                  <select className="input w-full" value={generator.reajuste_tipo} onChange={(e) => setGenerator((c) => ({ ...c, reajuste_tipo: e.target.value }))}>
+                    {PARCELA_REAJUSTE_TIPOS.map((item) => <option key={item.value} value={item.value}>{item.label} ({item.resumo})</option>)}
                   </select>
                 </label>
               </div>
@@ -1378,7 +1488,7 @@ export default function ComercialContratos() {
 
                   <div className="space-y-3">
                     {(generator.parcelas_personalizadas || []).map((item, index) => (
-                      <div key={`custom-${index}`} className="grid gap-3 rounded-2xl border border-[var(--c-border)] p-3 md:grid-cols-[minmax(0,1.4fr)_180px_170px_160px_auto]">
+                      <div key={`custom-${index}`} className="grid gap-3 rounded-2xl border border-[var(--c-border)] p-3 md:grid-cols-[minmax(0,1.4fr)_160px_160px_170px_160px_auto]">
                         <label className="sol-filter-field">
                           <span className="sol-filter-label">Descricao</span>
                           <input className="input w-full" value={item.descricao} onChange={(e) => updateParcelaCustomizada(index, 'descricao', e.target.value)} />
@@ -1387,6 +1497,12 @@ export default function ComercialContratos() {
                           <span className="sol-filter-label">Tipo</span>
                           <select className="input w-full" value={item.tipo_parcela} onChange={(e) => updateParcelaCustomizada(index, 'tipo_parcela', e.target.value)}>
                             {PARCELA_TIPOS.map((tipo) => <option key={tipo} value={tipo}>{tipo}</option>)}
+                          </select>
+                        </label>
+                        <label className="sol-filter-field">
+                          <span className="sol-filter-label">Reajuste</span>
+                          <select className="input w-full" value={item.reajuste_tipo || 'FIXA'} onChange={(e) => updateParcelaCustomizada(index, 'reajuste_tipo', e.target.value)}>
+                            {PARCELA_REAJUSTE_TIPOS.map((tipo) => <option key={tipo.value} value={tipo.value}>{tipo.label}</option>)}
                           </select>
                         </label>
                         <label className="sol-filter-field">
@@ -1437,6 +1553,9 @@ export default function ComercialContratos() {
                                   {plano.forma_recebimento_prevista}
                                 </span>
                               )}
+                              <span className="inline-flex rounded-full bg-sky-100 px-2.5 py-1 text-xs font-semibold text-sky-700">
+                                {plano.reajuste_tipo === 'REAJUSTAVEL' ? 'Reajustavel (R)' : 'Fixa (F)'}
+                              </span>
                             </div>
                             <div className="text-sm font-semibold text-[var(--c-text)]">
                               {plano.titulo_bloco || 'Composicao sem descricao'}
@@ -1470,6 +1589,7 @@ export default function ComercialContratos() {
                         <th className="px-3 py-3 text-left">Descricao</th>
                         <th className="px-3 py-3 text-left">Tipo</th>
                         <th className="px-3 py-3 text-left">Forma</th>
+                        <th className="px-3 py-3 text-left">Reajuste</th>
                         <th className="px-3 py-3 text-left">Detalhe</th>
                         <th className="px-3 py-3 text-left">Vencimento</th>
                         <th className="px-3 py-3 text-right">Valor</th>
@@ -1488,6 +1608,11 @@ export default function ComercialContratos() {
                             <select className="input w-full" value={item.forma_recebimento_prevista || ''} onChange={(e) => updateParcela(index, 'forma_recebimento_prevista', e.target.value)}>
                               <option value="">Nao informar</option>
                               {FORMAS_RECEBIMENTO.map((forma) => <option key={forma} value={forma}>{forma}</option>)}
+                            </select>
+                          </td>
+                          <td className="px-3 py-3">
+                            <select className="input w-full" value={item.reajuste_tipo || 'FIXA'} onChange={(e) => updateParcela(index, 'reajuste_tipo', e.target.value)}>
+                              {PARCELA_REAJUSTE_TIPOS.map((tipo) => <option key={tipo.value} value={tipo.value}>{tipo.label} ({tipo.resumo})</option>)}
                             </select>
                           </td>
                           <td className="px-3 py-3">
@@ -1731,7 +1856,7 @@ export default function ComercialContratos() {
               <div>
                 <p className="text-sm font-semibold text-[var(--c-text)]">Documentos e assinatura digital</p>
                 <p className="text-xs text-[var(--c-muted)]">
-                  Gera o DOCX a partir do modelo, converte para PDF e envia para assinatura D4Sign.
+                  Ao gerar contrato, o PDF sai com Quadro Resumo primeiro e Contrato na sequencia.
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -1754,7 +1879,11 @@ export default function ComercialContratos() {
                   type="button"
                   className="btn btn-primary"
                   onClick={handleGerarDocumentoContrato}
-                  disabled={processingAction === 'gerar-documento' || modelosDoContratoSelecionado.length === 0}
+                  disabled={
+                    processingAction === 'gerar-documento'
+                    || modelosDoContratoSelecionado.length === 0
+                    || (documentoForm.tipo_documento === 'CONTRATO' && !possuiModeloQuadroResumoSelecionado)
+                  }
                 >
                   {processingAction === 'gerar-documento' ? 'Gerando PDF...' : 'Gerar PDF'}
                 </button>
@@ -1767,6 +1896,12 @@ export default function ComercialContratos() {
                 <Link className="btn btn-outline btn-sm ml-2" to="/comercial/modelos-contrato">
                   Abrir modelos
                 </Link>
+              </div>
+            )}
+
+            {documentoForm.tipo_documento === 'CONTRATO' && !possuiModeloQuadroResumoSelecionado && (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                Para gerar o contrato completo, cadastre tambem um modelo ativo de Quadro Resumo para este empreendimento.
               </div>
             )}
 
@@ -1829,6 +1964,7 @@ export default function ComercialContratos() {
                   <th className="px-4 py-3 text-left">Seq.</th>
                   <th className="px-4 py-3 text-left">Descricao</th>
                   <th className="px-4 py-3 text-left">Forma prevista</th>
+                  <th className="px-4 py-3 text-left">Reajuste</th>
                   <th className="px-4 py-3 text-left">Detalhe</th>
                   <th className="px-4 py-3 text-left">Vencimento</th>
                   <th className="px-4 py-3 text-right">Valor</th>
@@ -1842,6 +1978,7 @@ export default function ComercialContratos() {
                     <td className="px-4 py-3 text-[var(--c-text)]">{parcela.sequencia}</td>
                     <td className="px-4 py-3 text-[var(--c-text)]">{parcela.descricao}</td>
                     <td className="px-4 py-3 text-[var(--c-text)]">{parcela.forma_recebimento_prevista || '-'}</td>
+                    <td className="px-4 py-3 text-[var(--c-text)]">{String(parcela.reajuste_tipo || 'FIXA') === 'REAJUSTAVEL' ? 'Reajustavel (R)' : 'Fixa (F)'}</td>
                     <td className="px-4 py-3 text-[var(--c-text)]">{parcela.observacoes || '-'}</td>
                     <td className="px-4 py-3 text-[var(--c-text)]">{formatDate(parcela.data_vencimento)}</td>
                     <td className="px-4 py-3 text-right text-[var(--c-text)]">{formatCurrency(parcela.valor_original)}</td>

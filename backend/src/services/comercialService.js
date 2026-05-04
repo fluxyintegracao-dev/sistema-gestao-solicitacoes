@@ -161,7 +161,7 @@ function buildContratoInclude({ includeParcelas = false } = {}) {
     {
       model: UnidadeComercial,
       as: 'unidadeComercial',
-      attributes: ['id', 'codigo', 'nome', 'situacao', 'tipologia', 'metragem_privativa', 'fracao_ideal', 'valor_tabela', 'valor_base_venda']
+      attributes: ['id', 'codigo', 'nome', 'situacao', 'tipologia', 'bloco', 'torre', 'pavimento', 'metragem_privativa', 'fracao_ideal', 'valor_tabela', 'valor_base_venda']
     },
     {
       model: Parceiro,
@@ -519,7 +519,10 @@ function normalizarParcelasContrato(parcelas = []) {
     const sequencia = Number(parcela.sequencia || 0) > 0 ? Number(parcela.sequencia) : index + 1;
     const proximaParcela = {
       ...parcela,
-      sequencia
+      sequencia,
+      reajuste_tipo: String(parcela.reajuste_tipo || 'FIXA').trim().toUpperCase() === 'REAJUSTAVEL'
+        ? 'REAJUSTAVEL'
+        : 'FIXA'
     };
 
     if (formaRecebimento === 'BOLETO') {
@@ -1309,6 +1312,11 @@ async function criarContratoComercial(req, payload = {}) {
       indice_reajuste: payload.indice_reajuste || null,
       corretor_nome: payload.corretor_nome || corretorParceiro?.nome || null,
       comissao_percentual: payload.comissao_percentual ?? null,
+      possui_vaga_garagem: Boolean(payload.possui_vaga_garagem),
+      quantidade_vagas_garagem: payload.possui_vaga_garagem ? (payload.quantidade_vagas_garagem || null) : null,
+      vagas_garagem_posicao: payload.possui_vaga_garagem ? (payload.vagas_garagem_posicao || null) : null,
+      local_assinatura: payload.local_assinatura || null,
+      data_assinatura: payload.data_assinatura || payload.data_contrato || null,
       observacoes: payload.observacoes || null,
       criado_por: req.user?.id || null,
       atualizado_por: req.user?.id || null
@@ -1332,6 +1340,7 @@ async function criarContratoComercial(req, payload = {}) {
         tipo_parcela: parcela.tipo_parcela,
         descricao: parcela.descricao,
         forma_recebimento_prevista: parcela.forma_recebimento_prevista || null,
+        reajuste_tipo: parcela.reajuste_tipo || 'FIXA',
         data_vencimento: parcela.data_vencimento,
         valor_original: roundCurrency(parcela.valor),
         observacoes: parcela.observacoes || null
@@ -1418,6 +1427,11 @@ async function atualizarContratoComercial(req, id, payload = {}) {
       if (!Object.prototype.hasOwnProperty.call(payload, 'corretor_nome')) {
         updateData.corretor_nome = corretorParceiro?.nome || null;
       }
+    }
+
+    if (Object.prototype.hasOwnProperty.call(payload, 'possui_vaga_garagem') && !payload.possui_vaga_garagem) {
+      updateData.quantidade_vagas_garagem = null;
+      updateData.vagas_garagem_posicao = null;
     }
 
     if (['DISTRATADO', 'CANCELADO'].includes(updateData.status)) {
@@ -1738,6 +1752,7 @@ async function trocarUnidadeContratoComercial(req, id, payload = {}) {
         descricao: `Ajuste por troca de unidade - ${unidadeDestino.codigo}`,
         tipo_parcela: 'OUTRA',
         forma_recebimento_prevista: 'OUTROS',
+        reajuste_tipo: 'FIXA',
         data_vencimento: dataEfetiva,
         valor: diferenca,
         observacoes: observacoesTroca
@@ -1765,6 +1780,7 @@ async function trocarUnidadeContratoComercial(req, id, payload = {}) {
         tipo_parcela: parcelaAjuste.tipo_parcela,
         descricao: parcelaAjuste.descricao,
         forma_recebimento_prevista: parcelaAjuste.forma_recebimento_prevista,
+        reajuste_tipo: parcelaAjuste.reajuste_tipo,
         data_vencimento: parcelaAjuste.data_vencimento,
         valor_original: roundCurrency(parcelaAjuste.valor),
         observacoes: parcelaAjuste.observacoes

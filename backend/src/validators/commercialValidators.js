@@ -48,6 +48,11 @@ const PARCELA_TIPOS = [
   'OUTRA'
 ];
 
+const PARCELA_REAJUSTE_TIPOS = [
+  'FIXA',
+  'REAJUSTAVEL'
+];
+
 function isBlank(value) {
   return value == null || String(value).trim() === '';
 }
@@ -369,7 +374,7 @@ function normalizeParcelas(parcelas) {
 
     ensureAllowedKeys(
       item,
-      ['sequencia', 'descricao', 'tipo_parcela', 'forma_recebimento_prevista', 'data_vencimento', 'valor', 'observacoes'],
+      ['sequencia', 'descricao', 'tipo_parcela', 'forma_recebimento_prevista', 'reajuste_tipo', 'data_vencimento', 'valor', 'observacoes'],
       `Parcela ${index + 1}`
     );
 
@@ -382,6 +387,7 @@ function normalizeParcelas(parcelas) {
         `Forma de recebimento prevista da parcela ${index + 1}`,
         COMERCIAL_FORMA_RECEBIMENTO
       ),
+      reajuste_tipo: parseEnum(item.reajuste_tipo, `Tipo de reajuste da parcela ${index + 1}`, PARCELA_REAJUSTE_TIPOS) || 'FIXA',
       data_vencimento: parseDateOnly(item.data_vencimento, `Vencimento da parcela ${index + 1}`, { required: true }),
       valor: parseDecimal(item.valor, `Valor da parcela ${index + 1}`, { required: true, min: 0.01 }),
       observacoes: parseOptionalText(item.observacoes, `Observacoes da parcela ${index + 1}`, 1000)
@@ -511,13 +517,18 @@ function validateComercialContratoCreateBody(body = {}) {
       'indice_reajuste',
       'corretor_nome',
       'comissao_percentual',
+      'possui_vaga_garagem',
+      'quantidade_vagas_garagem',
+      'vagas_garagem_posicao',
+      'local_assinatura',
+      'data_assinatura',
       'observacoes',
       'parcelas'
     ],
     'Contrato comercial'
   );
 
-  return {
+  const data = {
     empreendimento_id: parseInteger(body.empreendimento_id, 'Empreendimento', { required: true }),
     unidade_comercial_id: parseInteger(body.unidade_comercial_id, 'Unidade comercial', { required: true }),
     parceiro_id: parseInteger(body.parceiro_id, 'Cliente', { required: true }),
@@ -538,9 +549,25 @@ function validateComercialContratoCreateBody(body = {}) {
     indice_reajuste: parseOptionalText(body.indice_reajuste, 'Indice de reajuste', 60),
     corretor_nome: parseOptionalText(body.corretor_nome, 'Corretor', 160),
     comissao_percentual: parseDecimal(body.comissao_percentual, 'Comissao percentual', { min: 0 }),
+    possui_vaga_garagem: parseBoolean(body.possui_vaga_garagem, 'Possui vaga de garagem') || false,
+    quantidade_vagas_garagem: parseInteger(body.quantidade_vagas_garagem, 'Quantidade de vagas de garagem'),
+    vagas_garagem_posicao: parseOptionalText(body.vagas_garagem_posicao, 'Posicao das vagas de garagem', 255),
+    local_assinatura: parseOptionalText(body.local_assinatura, 'Local de assinatura', 160),
+    data_assinatura: parseDateOnly(body.data_assinatura, 'Data de assinatura'),
     observacoes: parseOptionalText(body.observacoes, 'Observacoes', 4000),
     parcelas: normalizeParcelas(body.parcelas)
   };
+
+  if (data.possui_vaga_garagem && !data.quantidade_vagas_garagem) {
+    throw new ValidationError('Quantidade de vagas de garagem e obrigatoria quando houver vaga.');
+  }
+
+  if (!data.possui_vaga_garagem) {
+    data.quantidade_vagas_garagem = null;
+    data.vagas_garagem_posicao = null;
+  }
+
+  return data;
 }
 
 function validateComercialContratoUpdateBody(body = {}) {
@@ -555,6 +582,11 @@ function validateComercialContratoUpdateBody(body = {}) {
       'indice_reajuste',
       'corretor_nome',
       'comissao_percentual',
+      'possui_vaga_garagem',
+      'quantidade_vagas_garagem',
+      'vagas_garagem_posicao',
+      'local_assinatura',
+      'data_assinatura',
       'observacoes'
     ],
     'Atualizacao de contrato comercial'
@@ -573,6 +605,11 @@ function validateComercialContratoUpdateBody(body = {}) {
     indice_reajuste: parseOptionalText(body.indice_reajuste, 'Indice de reajuste', 60),
     corretor_nome: parseOptionalText(body.corretor_nome, 'Corretor', 160),
     comissao_percentual: parseDecimal(body.comissao_percentual, 'Comissao percentual', { min: 0 }),
+    possui_vaga_garagem: parseBoolean(body.possui_vaga_garagem, 'Possui vaga de garagem'),
+    quantidade_vagas_garagem: parseInteger(body.quantidade_vagas_garagem, 'Quantidade de vagas de garagem'),
+    vagas_garagem_posicao: parseOptionalText(body.vagas_garagem_posicao, 'Posicao das vagas de garagem', 255),
+    local_assinatura: parseOptionalText(body.local_assinatura, 'Local de assinatura', 160),
+    data_assinatura: parseDateOnly(body.data_assinatura, 'Data de assinatura'),
     observacoes: parseOptionalText(body.observacoes, 'Observacoes', 4000)
   };
 

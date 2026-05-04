@@ -4,6 +4,7 @@ const path = require('path');
 const { spawn } = require('child_process');
 const PizZip = require('pizzip');
 const Docxtemplater = require('docxtemplater');
+const { PDFDocument } = require('pdf-lib');
 const {
   ContratoComercial,
   ContratoComercialDocumento,
@@ -30,6 +31,12 @@ const VARIAVEIS_CONTRATO_COMERCIAL = [
   { chave: 'contrato.valor_entrada_formatado', descricao: 'Valor de entrada formatado' },
   { chave: 'contrato.desconto_formatado', descricao: 'Desconto formatado' },
   { chave: 'contrato.indice_reajuste', descricao: 'Indice de reajuste' },
+  { chave: 'contrato.possui_vaga_garagem', descricao: 'Indica se o contrato possui vaga de garagem' },
+  { chave: 'contrato.quantidade_vagas_garagem', descricao: 'Quantidade de vagas de garagem' },
+  { chave: 'contrato.vagas_garagem_posicao', descricao: 'Posicao especifica das vagas de garagem' },
+  { chave: 'contrato.local_assinatura', descricao: 'Local de assinatura do quadro resumo' },
+  { chave: 'contrato.data_assinatura', descricao: 'Data de assinatura em formato brasileiro' },
+  { chave: 'contrato.data_assinatura_extenso', descricao: 'Data de assinatura por extenso' },
   { chave: 'cliente.nome', descricao: 'Nome do comprador' },
   { chave: 'cliente.cpf_cnpj', descricao: 'CPF/CNPJ do comprador' },
   { chave: 'cliente.email', descricao: 'E-mail do comprador' },
@@ -71,11 +78,14 @@ const VARIAVEIS_CONTRATO_COMERCIAL = [
   { chave: 'unidade.tipologia', descricao: 'Tipologia da unidade' },
   { chave: 'unidade.metragem_privativa', descricao: 'Metragem privativa da unidade' },
   { chave: 'unidade.fracao_ideal', descricao: 'Fracao ideal da unidade' },
+  { chave: 'unidade.vagas_garagem', descricao: 'Resumo das vagas de garagem da unidade vendida' },
   { chave: 'corretor.nome', descricao: 'Nome do corretor' },
   { chave: 'corretor.cpf_cnpj', descricao: 'CPF/CNPJ do corretor' },
   { chave: 'corretor.creci', descricao: 'CRECI do corretor' },
   { chave: 'corretor.percentual_comissao', descricao: 'Percentual de comissao do corretor' },
   { chave: 'parcelas.resumo', descricao: 'Resumo das parcelas do contrato' },
+  { chave: 'parcelas.quadro_resumo_texto', descricao: 'Linhas agrupadas para o item VI do quadro resumo' },
+  { chave: 'parcelas.quadro_resumo_itens', descricao: 'Lista de parcelas agrupadas para tabelas do quadro resumo' },
   { chave: 'custom.*', descricao: 'Qualquer dado complementar enviado no momento da geracao' }
 ];
 
@@ -99,6 +109,15 @@ const LEGACY_BRACKET_ALIASES = {
   '[Nº do CRECI do Corretor]': '{{corretor.creci}}',
   '[Percentual]': '{{corretor.percentual_comissao}}',
   '[Valor em Reais]': '{{contrato.valor_total_formatado}}',
+  '[Torre]': '{{unidade.torre}}',
+  '[Unidade Autônoma]': '{{unidade.codigo}}',
+  '[Area privativa]': '{{unidade.metragem_privativa}}',
+  '[Área privativa]': '{{unidade.metragem_privativa}}',
+  '[Fração Ideal]': '{{unidade.fracao_ideal}}',
+  '[Vagas de Garagem]': '{{unidade.vagas_garagem}}',
+  '[Local de Assinatura]': '{{contrato.local_assinatura}}',
+  '[Data de Assinatura]': '{{contrato.data_assinatura_extenso}}',
+  '[Forma de Pagamento]': '{{parcelas.quadro_resumo_texto}}',
   '[XXXX]': '{{contrato.numero}}'
 };
 
@@ -135,6 +154,17 @@ function formatDateBr(value) {
   const date = new Date(`${String(value).slice(0, 10)}T00:00:00`);
   if (Number.isNaN(date.getTime())) return '';
   return date.toLocaleDateString('pt-BR');
+}
+
+function formatDateLongBr(value) {
+  if (!value) return '';
+  const date = new Date(`${String(value).slice(0, 10)}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleDateString('pt-BR', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric'
+  });
 }
 
 function formatCurrency(value) {
@@ -209,11 +239,82 @@ function buildParcelasResumo(parcelas = []) {
       const partes = [
         parcela.descricao || `Parcela ${parcela.sequencia || ''}`.trim(),
         parcela.data_vencimento ? `venc. ${formatDateBr(parcela.data_vencimento)}` : '',
-        formatCurrency(parcela.valor || 0)
+        formatCurrency(parcela.valor_original || parcela.valor || 0)
       ].filter(Boolean);
       return partes.join(' - ');
     })
     .join('\n');
+}
+
+function getParcelaElemento(parcela = {}) {
+  const tipo = String(parcela.tipo_parcela || '').trim().toUpperCase();
+  if (tipo === 'ENTRADA') return 'SINAL';
+  if (tipo === 'PARCELA') return 'PARCELAS';
+  if (tipo === 'INTERMEDIARIA') return 'INTERMEDIARIAS';
+  if (tipo === 'CHAVES') return 'CHAVES';
+  if (tipo === 'BALAO') return 'BALOES';
+  return String(parcela.descricao || 'OUTRAS').trim().toUpperCase() || 'OUTRAS';
+}
+
+function buildQuadroResumoParcelas(parcelas = []) {
+  if (!Array.isArray(parcelas) || !parcelas.length) {
+    return {
+      itens: [],
+      texto: ''
+    };
+  }
+
+  const grupos = new Map();
+  parcelas.forEach((parcela) => {
+    const elemento = getParcelaElemento(parcela);
+    const reajusteTipo = String(parcela.reajuste_tipo || 'FIXA').trim().toUpperCase() === 'REAJUSTAVEL' ? 'R' : 'F';
+    const key = `${elemento}-${reajusteTipo}`;
+    if (!grupos.has(key)) {
+      grupos.set(key, {
+        elemento,
+        reajuste_codigo: reajusteTipo,
+        parcelas: []
+      });
+    }
+    grupos.get(key).parcelas.push(parcela);
+  });
+
+  const itens = Array.from(grupos.values()).map((grupo, index) => {
+    const parcelasGrupo = grupo.parcelas
+      .slice()
+      .sort((a, b) => String(a.data_vencimento || '').localeCompare(String(b.data_vencimento || '')));
+    const total = parcelasGrupo.reduce((acc, item) => acc + Number(item.valor_original || item.valor || 0), 0);
+    const primeiroVencimento = parcelasGrupo[0]?.data_vencimento;
+    const ultimoVencimento = parcelasGrupo[parcelasGrupo.length - 1]?.data_vencimento;
+
+    return {
+      item: String(index + 1).padStart(2, '0'),
+      elemento: grupo.elemento,
+      quantidade: String(parcelasGrupo.length).padStart(2, '0'),
+      reajuste_codigo: grupo.reajuste_codigo,
+      primeiro_vencimento: formatDateBr(primeiroVencimento),
+      total: safeString(total.toFixed(2)),
+      total_formatado: formatCurrency(total),
+      ultimo_vencimento: formatDateBr(ultimoVencimento)
+    };
+  });
+
+  return {
+    itens,
+    texto: itens
+      .map((item) =>
+        `${item.item} ${item.elemento} ${item.quantidade} ${item.reajuste_codigo} ${item.primeiro_vencimento} ${item.total_formatado} ${item.ultimo_vencimento}`
+      )
+      .join('\n')
+  };
+}
+
+function buildVagasGaragemResumo(contrato = {}) {
+  if (!contrato.possui_vaga_garagem) return 'Nao possui';
+  const quantidade = Number(contrato.quantidade_vagas_garagem || 0);
+  const quantidadeTexto = quantidade > 0 ? String(quantidade).padStart(2, '0') : '';
+  const posicao = safeString(contrato.vagas_garagem_posicao).trim();
+  return [quantidadeTexto, posicao ? `Posicao: ${posicao}` : 'Sem posicao especifica'].filter(Boolean).join(' - ');
 }
 
 function buildDadosContrato(contrato, customVariables = {}) {
@@ -224,6 +325,8 @@ function buildDadosContrato(contrato, customVariables = {}) {
   const corretor = raw.corretorParceiro || {};
   const empreendimento = raw.empreendimento || {};
   const obra = raw.obra || {};
+  const quadroResumoParcelas = buildQuadroResumoParcelas(raw.parcelas || []);
+  const vagasGaragemResumo = buildVagasGaragemResumo(raw);
 
   const dados = {
     contrato: {
@@ -239,6 +342,14 @@ function buildDadosContrato(contrato, customVariables = {}) {
       desconto: safeString(raw.desconto_concedido),
       desconto_formatado: formatCurrency(raw.desconto_concedido),
       indice_reajuste: safeString(raw.indice_reajuste),
+      possui_vaga_garagem: raw.possui_vaga_garagem ? 'Sim' : 'Nao',
+      quantidade_vagas_garagem: raw.possui_vaga_garagem ? safeString(raw.quantidade_vagas_garagem) : '',
+      vagas_garagem_posicao: raw.possui_vaga_garagem ? safeString(raw.vagas_garagem_posicao) : '',
+      vagas_garagem_resumo: vagasGaragemResumo,
+      local_assinatura: safeString(raw.local_assinatura),
+      data_assinatura: formatDateBr(raw.data_assinatura || raw.data_contrato),
+      data_assinatura_extenso: formatDateLongBr(raw.data_assinatura || raw.data_contrato),
+      data_assinatura_iso: safeString(raw.data_assinatura || raw.data_contrato),
       observacoes: safeString(raw.observacoes)
     },
     cliente: {
@@ -295,6 +406,7 @@ function buildDadosContrato(contrato, customVariables = {}) {
       tipologia: safeString(unidade.tipologia),
       metragem_privativa: safeString(unidade.metragem_privativa),
       fracao_ideal: safeString(unidade.fracao_ideal),
+      vagas_garagem: vagasGaragemResumo,
       valor_tabela: safeString(unidade.valor_tabela),
       valor_tabela_formatado: formatCurrency(unidade.valor_tabela),
       valor_base_venda: safeString(unidade.valor_base_venda),
@@ -314,7 +426,20 @@ function buildDadosContrato(contrato, customVariables = {}) {
     },
     parcelas: {
       resumo: buildParcelasResumo(raw.parcelas || []),
-      itens: raw.parcelas || []
+      quadro_resumo_texto: quadroResumoParcelas.texto,
+      quadro_resumo_itens: quadroResumoParcelas.itens,
+      itens: (raw.parcelas || []).map((parcela) => ({
+        sequencia: safeString(parcela.sequencia),
+        descricao: safeString(parcela.descricao),
+        tipo_parcela: safeString(parcela.tipo_parcela),
+        forma_recebimento_prevista: safeString(parcela.forma_recebimento_prevista),
+        reajuste_tipo: safeString(parcela.reajuste_tipo || 'FIXA'),
+        reajuste_codigo: String(parcela.reajuste_tipo || 'FIXA').toUpperCase() === 'REAJUSTAVEL' ? 'R' : 'F',
+        data_vencimento: formatDateBr(parcela.data_vencimento),
+        valor: safeString(parcela.valor_original || parcela.valor),
+        valor_formatado: formatCurrency(parcela.valor_original || parcela.valor || 0),
+        observacoes: safeString(parcela.observacoes)
+      }))
     },
     custom: customVariables || {}
   };
@@ -445,6 +570,18 @@ async function convertDocxToPdf(docxBuffer, baseName) {
   }
 }
 
+async function mergePdfBuffers(pdfBuffers = []) {
+  const merged = await PDFDocument.create();
+
+  for (const pdfBuffer of pdfBuffers.filter(Boolean)) {
+    const source = await PDFDocument.load(pdfBuffer);
+    const pages = await merged.copyPages(source, source.getPageIndices());
+    pages.forEach((page) => merged.addPage(page));
+  }
+
+  return Buffer.from(await merged.save());
+}
+
 function buildUploadFile(buffer, originalname, mimetype) {
   return {
     buffer,
@@ -553,6 +690,33 @@ async function resolveModeloParaContrato(contrato, payload = {}) {
   return modelo;
 }
 
+async function resolveModeloQuadroResumoParaContrato(contrato, modeloContrato) {
+  const modelo = await ContratoComercialModelo.findOne({
+    where: {
+      empreendimento_id: contrato.empreendimento_id,
+      tipo_documento: 'QUADRO_RESUMO',
+      ativo: true
+    },
+    order: [['updatedAt', 'DESC'], ['id', 'DESC']]
+  });
+
+  if (!modelo) {
+    throw createHttpError(
+      404,
+      `Cadastre um modelo ativo de Quadro Resumo para gerar o PDF completo do contrato ${modeloContrato?.nome ? `(${modeloContrato.nome})` : ''}.`
+    );
+  }
+
+  return modelo;
+}
+
+async function renderModeloDocumento(modelo, dados, baseName) {
+  const templateBuffer = await readStoredFileBuffer(modelo.arquivo_url);
+  const docxBuffer = renderDocx(templateBuffer, dados);
+  const pdfBuffer = await convertDocxToPdf(docxBuffer, baseName);
+  return { docxBuffer, pdfBuffer };
+}
+
 async function gerarDocumentoContratoComercial(req, contratoId, payload = {}) {
   const contrato = await carregarContratoParaDocumento(contratoId);
   const modelo = await resolveModeloParaContrato(contrato, payload);
@@ -561,12 +725,34 @@ async function gerarDocumentoContratoComercial(req, contratoId, payload = {}) {
     parseJson(payload.variaveis, {})
   );
   const dados = buildDadosContrato(contrato, customVariables);
-  const templateBuffer = await readStoredFileBuffer(modelo.arquivo_url);
-  const docxBuffer = renderDocx(templateBuffer, dados);
   const tipoDocumento = normalizeTipoDocumento(modelo.tipo_documento);
   const numeroContrato = sanitizeFileNameForStorage(contrato.numero || `contrato-${contrato.id}`);
   const baseName = `${tipoDocumento.toLowerCase()}-${numeroContrato || contrato.id}`;
-  const pdfBuffer = await convertDocxToPdf(docxBuffer, baseName);
+  const renderContrato = await renderModeloDocumento(modelo, dados, baseName);
+  let docxBuffer = renderContrato.docxBuffer;
+  let pdfBuffer = renderContrato.pdfBuffer;
+  let modeloDocumentoId = modelo.id;
+  let nomeDocumento = String(payload.nome || modelo.nome || `${baseName}.pdf`).trim();
+
+  if (tipoDocumento === 'CONTRATO') {
+    const modeloQuadroResumo = await resolveModeloQuadroResumoParaContrato(contrato, modelo);
+    const customQuadroResumo = deepMerge(
+      parseJson(modeloQuadroResumo.variaveis_json, {}),
+      parseJson(payload.variaveis, {})
+    );
+    const dadosQuadroResumo = buildDadosContrato(contrato, customQuadroResumo);
+    const renderQuadroResumo = await renderModeloDocumento(
+      modeloQuadroResumo,
+      dadosQuadroResumo,
+      `quadro-resumo-${numeroContrato || contrato.id}`
+    );
+
+    pdfBuffer = await mergePdfBuffers([renderQuadroResumo.pdfBuffer, renderContrato.pdfBuffer]);
+    modeloDocumentoId = modelo.id;
+    nomeDocumento = String(payload.nome || `Quadro resumo + ${modelo.nome || 'Contrato'}`).trim();
+    docxBuffer = renderContrato.docxBuffer;
+  }
+
   const docxName = `${baseName}.docx`;
   const pdfName = `${baseName}.pdf`;
 
@@ -583,9 +769,9 @@ async function gerarDocumentoContratoComercial(req, contratoId, payload = {}) {
 
   return ContratoComercialDocumento.create({
     contrato_comercial_id: contrato.id,
-    modelo_id: modelo.id,
+    modelo_id: modeloDocumentoId,
     tipo_documento: tipoDocumento,
-    nome: String(payload.nome || modelo.nome || pdfName).trim(),
+    nome: nomeDocumento,
     status: 'GERADO',
     arquivo_docx_url: arquivoDocxUrl,
     arquivo_pdf_url: arquivoPdfUrl,
