@@ -20,6 +20,25 @@ import { buscarParceiros } from '../services/parceiros';
 import { canViewIntegracaoSienge } from '../utils/acessoProduto';
 
 const FILTER_STORAGE_KEY = 'fluxy.financeiro.titulos.filters';
+const FILTER_VISIBILITY_STORAGE_PREFIX = 'fluxy.financeiro.titulos.visibleFilters';
+
+const FILTER_DEFINITIONS = [
+  { id: 'tipo', label: 'Tipo', group: 'basic', span: 'xl:col-span-2' },
+  { id: 'codigo', label: 'Titulo', group: 'basic', span: 'xl:col-span-2' },
+  { id: 'q', label: 'Busca rapida', group: 'basic', span: 'xl:col-span-4' },
+  { id: 'status', label: 'Status', group: 'basic', span: 'xl:col-span-2' },
+  { id: 'numero_documento', label: 'N. documento', group: 'basic', span: 'xl:col-span-2' },
+  { id: 'parceiro_id', label: 'Cliente / fornecedor', group: 'basic', span: 'xl:col-span-4' },
+  { id: 'obra_id', label: 'Obra', group: 'basic', span: 'xl:col-span-4' },
+  { id: 'data_emissao_inicial', label: 'Emissao inicio', group: 'basic', span: 'xl:col-span-2' },
+  { id: 'data_emissao_final', label: 'Emissao fim', group: 'basic', span: 'xl:col-span-2' },
+  { id: 'categoria_financeira_id', label: 'Categoria financeira', group: 'advanced', span: 'xl:col-span-3' },
+  { id: 'descricao', label: 'Descricao', group: 'advanced', span: 'xl:col-span-3' },
+  { id: 'vencimento_inicial', label: 'Vencimento inicio', group: 'advanced', span: 'xl:col-span-2' },
+  { id: 'vencimento_final', label: 'Vencimento fim', group: 'advanced', span: 'xl:col-span-2' }
+];
+
+const DEFAULT_VISIBLE_FILTER_IDS = FILTER_DEFINITIONS.map((item) => item.id);
 
 function getDefaultFilters() {
   return {
@@ -51,6 +70,34 @@ function normalizeFilters(filters = {}) {
 function compactFilters(filters = {}) {
   return Object.fromEntries(
     Object.entries(filters).filter(([, value]) => value !== undefined && value !== null && String(value).trim() !== '')
+  );
+}
+
+function getVisibilityStorageKey(user) {
+  const userToken = user?.id || user?.email || 'anonimo';
+  return `${FILTER_VISIBILITY_STORAGE_PREFIX}.${userToken}`;
+}
+
+function loadVisibleFilterIds(user) {
+  try {
+    const stored = localStorage.getItem(getVisibilityStorageKey(user));
+    const parsed = stored ? JSON.parse(stored) : null;
+    if (!Array.isArray(parsed)) {
+      return DEFAULT_VISIBLE_FILTER_IDS;
+    }
+
+    const allowed = new Set(FILTER_DEFINITIONS.map((item) => item.id));
+    const normalized = parsed.filter((id) => allowed.has(id));
+    return normalized.length > 0 ? normalized : DEFAULT_VISIBLE_FILTER_IDS;
+  } catch (error) {
+    return DEFAULT_VISIBLE_FILTER_IDS;
+  }
+}
+
+function pickVisibleFilters(filters, visibleFilterIds) {
+  const visible = new Set(visibleFilterIds);
+  return Object.fromEntries(
+    Object.entries(filters).filter(([key]) => visible.has(key))
   );
 }
 
@@ -104,6 +151,8 @@ export default function FinanceiroTitulos() {
   const { user } = useAuth();
   const [saveFilterCache, setSaveFilterCache] = useState(true);
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [filterChooserOpen, setFilterChooserOpen] = useState(false);
+  const [visibleFilterIds, setVisibleFilterIds] = useState(() => loadVisibleFilterIds(user));
   const [draftFilters, setDraftFilters] = useState(() => {
     try {
       const stored = localStorage.getItem(FILTER_STORAGE_KEY);
@@ -112,12 +161,12 @@ export default function FinanceiroTitulos() {
       return getDefaultFilters();
     }
   });
-  const [appliedFilters, setAppliedFilters] = useState(() => normalizeFilters(draftFilters));
+  const [appliedFilters, setAppliedFilters] = useState(null);
   const [obras, setObras] = useState([]);
   const [parceiros, setParceiros] = useState([]);
   const [categorias, setCategorias] = useState([]);
   const [titulos, setTitulos] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [loadingOptions, setLoadingOptions] = useState(true);
   const [error, setError] = useState('');
 
@@ -148,11 +197,22 @@ export default function FinanceiroTitulos() {
   }, []);
 
   useEffect(() => {
+    setVisibleFilterIds(loadVisibleFilterIds(user));
+    setFilterChooserOpen(false);
+  }, [user?.id, user?.email]);
+
+  useEffect(() => {
+    if (!appliedFilters) {
+      setTitulos([]);
+      setLoading(false);
+      return undefined;
+    }
+
     let active = true;
     setLoading(true);
     setError('');
 
-    getTitulosFinanceiros(compactFilters(appliedFilters))
+    getTitulosFinanceiros(compactFilters(pickVisibleFilters(appliedFilters, visibleFilterIds)))
       .then((data) => {
         if (active) {
           setTitulos(Array.isArray(data) ? data : []);
@@ -201,7 +261,18 @@ export default function FinanceiroTitulos() {
 
   const mostraColunaSienge = canViewIntegracaoSienge(user);
   const totalColunas = mostraColunaSienge ? 14 : 13;
-  const tipoLabel = appliedFilters.tipo === 'PAGAR' ? 'a pagar' : 'a receber';
+  const hasConsulted = Boolean(appliedFilters);
+  const visibleFilterSet = useMemo(() => new Set(visibleFilterIds), [visibleFilterIds]);
+  const basicVisibleFilters = useMemo(
+    () => FILTER_DEFINITIONS.filter((item) => item.group === 'basic' && visibleFilterSet.has(item.id)),
+    [visibleFilterSet]
+  );
+  const advancedVisibleFilters = useMemo(
+    () => FILTER_DEFINITIONS.filter((item) => item.group === 'advanced' && visibleFilterSet.has(item.id)),
+    [visibleFilterSet]
+  );
+  const tipoReferencia = appliedFilters?.tipo || draftFilters.tipo;
+  const tipoLabel = tipoReferencia === 'PAGAR' ? 'a pagar' : 'a receber';
 
   function setFilter(name, value) {
     setDraftFilters((current) => ({
@@ -213,6 +284,14 @@ export default function FinanceiroTitulos() {
   function submitFilters(event) {
     event.preventDefault();
     const normalized = normalizeFilters(draftFilters);
+    const visibleFilters = pickVisibleFilters(normalized, visibleFilterIds);
+    if (Object.keys(compactFilters(visibleFilters)).length === 0) {
+      setError('Selecione ao menos um filtro visivel antes de consultar.');
+      setTitulos([]);
+      setAppliedFilters(null);
+      return;
+    }
+
     setAppliedFilters(normalized);
     if (saveFilterCache) {
       localStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify(normalized));
@@ -224,8 +303,224 @@ export default function FinanceiroTitulos() {
   function clearFilters() {
     const defaults = getDefaultFilters();
     setDraftFilters(defaults);
-    setAppliedFilters(defaults);
+    setAppliedFilters(null);
+    setTitulos([]);
+    setLoading(false);
+    setError('');
     localStorage.removeItem(FILTER_STORAGE_KEY);
+  }
+
+  function persistVisibleFilters(nextIds) {
+    const normalized = nextIds.length > 0 ? nextIds : DEFAULT_VISIBLE_FILTER_IDS;
+    setVisibleFilterIds(normalized);
+    localStorage.setItem(getVisibilityStorageKey(user), JSON.stringify(normalized));
+  }
+
+  function toggleVisibleFilter(filterId) {
+    const current = new Set(visibleFilterIds);
+    if (current.has(filterId)) {
+      current.delete(filterId);
+    } else {
+      current.add(filterId);
+    }
+
+    persistVisibleFilters(FILTER_DEFINITIONS
+      .map((item) => item.id)
+      .filter((id) => current.has(id)));
+  }
+
+  function resetVisibleFilters() {
+    persistVisibleFilters(DEFAULT_VISIBLE_FILTER_IDS);
+  }
+
+  function renderFilterField(filter) {
+    const commonClass = `app-filter-field ${filter.span || ''}`;
+
+    switch (filter.id) {
+      case 'tipo':
+        return (
+          <label key={filter.id} className={commonClass}>
+            <span className="app-filter-label">Tipo</span>
+            <select
+              className="input w-full input-sm"
+              value={draftFilters.tipo}
+              onChange={(event) => setFilter('tipo', event.target.value)}
+            >
+              <option value="RECEBER">Receber</option>
+              <option value="PAGAR">Pagar</option>
+            </select>
+          </label>
+        );
+      case 'codigo':
+        return (
+          <label key={filter.id} className={commonClass}>
+            <span className="app-filter-label">Titulo</span>
+            <input
+              className="input w-full input-sm"
+              value={draftFilters.codigo}
+              onChange={(event) => setFilter('codigo', event.target.value)}
+              placeholder="TIT-000001"
+            />
+          </label>
+        );
+      case 'q':
+        return (
+          <label key={filter.id} className={commonClass}>
+            <span className="app-filter-label">Busca rapida</span>
+            <input
+              className="input w-full input-sm"
+              value={draftFilters.q}
+              onChange={(event) => setFilter('q', event.target.value)}
+              placeholder="Cliente, obra, documento ou descricao"
+            />
+          </label>
+        );
+      case 'status':
+        return (
+          <label key={filter.id} className={commonClass}>
+            <span className="app-filter-label">Status</span>
+            <select
+              className="input w-full input-sm"
+              value={draftFilters.status}
+              onChange={(event) => setFilter('status', event.target.value)}
+            >
+              <option value="">Todos</option>
+              <option value="ABERTO">Aberto</option>
+              <option value="PARCIAL">Parcial</option>
+              <option value="QUITADO">Quitado</option>
+              <option value="CANCELADO">Cancelado</option>
+              <option value="ESTORNADO">Estornado</option>
+            </select>
+          </label>
+        );
+      case 'numero_documento':
+        return (
+          <label key={filter.id} className={commonClass}>
+            <span className="app-filter-label">N. documento</span>
+            <input
+              className="input w-full input-sm"
+              value={draftFilters.numero_documento}
+              onChange={(event) => setFilter('numero_documento', event.target.value)}
+              placeholder="Ex.: NF, contrato"
+            />
+          </label>
+        );
+      case 'parceiro_id':
+        return (
+          <label key={filter.id} className={commonClass}>
+            <span className="app-filter-label">Cliente / fornecedor</span>
+            <select
+              className="input w-full input-sm"
+              value={draftFilters.parceiro_id}
+              onChange={(event) => setFilter('parceiro_id', event.target.value)}
+              disabled={loadingOptions}
+            >
+              <option value="">Todos os parceiros</option>
+              {parceiros.map((parceiro) => (
+                <option key={parceiro.id} value={parceiro.id}>
+                  {parceiro.nome}
+                </option>
+              ))}
+            </select>
+          </label>
+        );
+      case 'obra_id':
+        return (
+          <label key={filter.id} className={commonClass}>
+            <span className="app-filter-label">Obra</span>
+            <select
+              className="input w-full input-sm"
+              value={draftFilters.obra_id}
+              onChange={(event) => setFilter('obra_id', event.target.value)}
+              disabled={loadingOptions}
+            >
+              <option value="">Todas as obras</option>
+              {obras.map((obra) => (
+                <option key={obra.id} value={obra.id}>{obra.nome}</option>
+              ))}
+            </select>
+          </label>
+        );
+      case 'data_emissao_inicial':
+        return (
+          <label key={filter.id} className={commonClass}>
+            <span className="app-filter-label">Emissao inicio</span>
+            <input
+              className="input w-full input-sm"
+              type="date"
+              value={draftFilters.data_emissao_inicial}
+              onChange={(event) => setFilter('data_emissao_inicial', event.target.value)}
+            />
+          </label>
+        );
+      case 'data_emissao_final':
+        return (
+          <label key={filter.id} className={commonClass}>
+            <span className="app-filter-label">Emissao fim</span>
+            <input
+              className="input w-full input-sm"
+              type="date"
+              value={draftFilters.data_emissao_final}
+              onChange={(event) => setFilter('data_emissao_final', event.target.value)}
+            />
+          </label>
+        );
+      case 'categoria_financeira_id':
+        return (
+          <label key={filter.id} className={commonClass}>
+            <span className="app-filter-label">Categoria financeira</span>
+            <select
+              className="input w-full input-sm"
+              value={draftFilters.categoria_financeira_id}
+              onChange={(event) => setFilter('categoria_financeira_id', event.target.value)}
+              disabled={loadingOptions}
+            >
+              <option value="">Todas as categorias</option>
+              {categoriasFiltradas.map((categoria) => (
+                <option key={categoria.id} value={categoria.id}>{categoria.nome}</option>
+              ))}
+            </select>
+          </label>
+        );
+      case 'descricao':
+        return (
+          <label key={filter.id} className={commonClass}>
+            <span className="app-filter-label">Descricao</span>
+            <input
+              className="input w-full input-sm"
+              value={draftFilters.descricao}
+              onChange={(event) => setFilter('descricao', event.target.value)}
+              placeholder="Texto da descricao"
+            />
+          </label>
+        );
+      case 'vencimento_inicial':
+        return (
+          <label key={filter.id} className={commonClass}>
+            <span className="app-filter-label">Vencimento inicio</span>
+            <input
+              className="input w-full input-sm"
+              type="date"
+              value={draftFilters.vencimento_inicial}
+              onChange={(event) => setFilter('vencimento_inicial', event.target.value)}
+            />
+          </label>
+        );
+      case 'vencimento_final':
+        return (
+          <label key={filter.id} className={commonClass}>
+            <span className="app-filter-label">Vencimento fim</span>
+            <input
+              className="input w-full input-sm"
+              type="date"
+              value={draftFilters.vencimento_final}
+              onChange={(event) => setFilter('vencimento_final', event.target.value)}
+            />
+          </label>
+        );
+      default:
+        return null;
+    }
   }
 
   return (
@@ -266,164 +561,18 @@ export default function FinanceiroTitulos() {
           </div>
 
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-12">
-            <label className="app-filter-field xl:col-span-2">
-              <span className="app-filter-label">Tipo</span>
-              <select
-                className="input w-full input-sm"
-                value={draftFilters.tipo}
-                onChange={(event) => setFilter('tipo', event.target.value)}
-              >
-                <option value="RECEBER">Receber</option>
-                <option value="PAGAR">Pagar</option>
-              </select>
-            </label>
-
-            <label className="app-filter-field xl:col-span-2">
-              <span className="app-filter-label">Titulo</span>
-              <input
-                className="input w-full input-sm"
-                value={draftFilters.codigo}
-                onChange={(event) => setFilter('codigo', event.target.value)}
-                placeholder="TIT-000001"
-              />
-            </label>
-
-            <label className="app-filter-field xl:col-span-4">
-              <span className="app-filter-label">Busca rapida</span>
-              <input
-                className="input w-full input-sm"
-                value={draftFilters.q}
-                onChange={(event) => setFilter('q', event.target.value)}
-                placeholder="Cliente, obra, documento ou descricao"
-              />
-            </label>
-
-            <label className="app-filter-field xl:col-span-2">
-              <span className="app-filter-label">Status</span>
-              <select
-                className="input w-full input-sm"
-                value={draftFilters.status}
-                onChange={(event) => setFilter('status', event.target.value)}
-              >
-                <option value="">Todos</option>
-                <option value="ABERTO">Aberto</option>
-                <option value="PARCIAL">Parcial</option>
-                <option value="QUITADO">Quitado</option>
-                <option value="CANCELADO">Cancelado</option>
-                <option value="ESTORNADO">Estornado</option>
-              </select>
-            </label>
-
-            <label className="app-filter-field xl:col-span-2">
-              <span className="app-filter-label">N. documento</span>
-              <input
-                className="input w-full input-sm"
-                value={draftFilters.numero_documento}
-                onChange={(event) => setFilter('numero_documento', event.target.value)}
-                placeholder="Ex.: NF, contrato"
-              />
-            </label>
-
-            <label className="app-filter-field xl:col-span-4">
-              <span className="app-filter-label">Cliente / fornecedor</span>
-              <select
-                className="input w-full input-sm"
-                value={draftFilters.parceiro_id}
-                onChange={(event) => setFilter('parceiro_id', event.target.value)}
-                disabled={loadingOptions}
-              >
-                <option value="">Todos os parceiros</option>
-                {parceiros.map((parceiro) => (
-                  <option key={parceiro.id} value={parceiro.id}>
-                    {parceiro.nome}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="app-filter-field xl:col-span-4">
-              <span className="app-filter-label">Obra</span>
-              <select
-                className="input w-full input-sm"
-                value={draftFilters.obra_id}
-                onChange={(event) => setFilter('obra_id', event.target.value)}
-                disabled={loadingOptions}
-              >
-                <option value="">Todas as obras</option>
-                {obras.map((obra) => (
-                  <option key={obra.id} value={obra.id}>{obra.nome}</option>
-                ))}
-              </select>
-            </label>
-
-            <label className="app-filter-field xl:col-span-2">
-              <span className="app-filter-label">Emissao inicio</span>
-              <input
-                className="input w-full input-sm"
-                type="date"
-                value={draftFilters.data_emissao_inicial}
-                onChange={(event) => setFilter('data_emissao_inicial', event.target.value)}
-              />
-            </label>
-
-            <label className="app-filter-field xl:col-span-2">
-              <span className="app-filter-label">Emissao fim</span>
-              <input
-                className="input w-full input-sm"
-                type="date"
-                value={draftFilters.data_emissao_final}
-                onChange={(event) => setFilter('data_emissao_final', event.target.value)}
-              />
-            </label>
+            {basicVisibleFilters.map((filter) => renderFilterField(filter))}
+            {basicVisibleFilters.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-[var(--c-border)] px-3 py-4 text-sm text-[var(--c-muted)] xl:col-span-12">
+                Nenhum filtro principal visivel. Use o olho em filtros para escolher os campos.
+              </div>
+            ) : null}
           </div>
 
           <div className={`grid transition-[grid-template-rows] duration-200 ${advancedOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
             <div className="overflow-hidden">
               <div className="grid gap-3 border-t border-[var(--c-border)] pt-3 md:grid-cols-2 xl:grid-cols-12">
-                <label className="app-filter-field xl:col-span-3">
-                  <span className="app-filter-label">Categoria financeira</span>
-                  <select
-                    className="input w-full input-sm"
-                    value={draftFilters.categoria_financeira_id}
-                    onChange={(event) => setFilter('categoria_financeira_id', event.target.value)}
-                    disabled={loadingOptions}
-                  >
-                    <option value="">Todas as categorias</option>
-                    {categoriasFiltradas.map((categoria) => (
-                      <option key={categoria.id} value={categoria.id}>{categoria.nome}</option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className="app-filter-field xl:col-span-3">
-                  <span className="app-filter-label">Descricao</span>
-                  <input
-                    className="input w-full input-sm"
-                    value={draftFilters.descricao}
-                    onChange={(event) => setFilter('descricao', event.target.value)}
-                    placeholder="Texto da descricao"
-                  />
-                </label>
-
-                <label className="app-filter-field xl:col-span-2">
-                  <span className="app-filter-label">Vencimento inicio</span>
-                  <input
-                    className="input w-full input-sm"
-                    type="date"
-                    value={draftFilters.vencimento_inicial}
-                    onChange={(event) => setFilter('vencimento_inicial', event.target.value)}
-                  />
-                </label>
-
-                <label className="app-filter-field xl:col-span-2">
-                  <span className="app-filter-label">Vencimento fim</span>
-                  <input
-                    className="input w-full input-sm"
-                    type="date"
-                    value={draftFilters.vencimento_final}
-                    onChange={(event) => setFilter('vencimento_final', event.target.value)}
-                  />
-                </label>
+                {advancedVisibleFilters.map((filter) => renderFilterField(filter))}
 
                 <div className="xl:col-span-2 flex items-end">
                   <Link to="/financeiro/conciliacao" className="btn btn-outline btn-sm w-full">
@@ -444,6 +593,65 @@ export default function FinanceiroTitulos() {
                 <HiOutlineAdjustmentsHorizontal className="h-4 w-4" />
                 {advancedOpen ? 'Menos filtros' : 'Mais filtros'}
               </button>
+              <div className="relative">
+                <button
+                  type="button"
+                  className="btn btn-outline btn-sm"
+                  onClick={() => setFilterChooserOpen((current) => !current)}
+                  title="Escolher filtros visiveis"
+                >
+                  <HiOutlineEye className="h-4 w-4" />
+                  Filtros
+                </button>
+
+                {filterChooserOpen ? (
+                  <div className="absolute left-0 top-[calc(100%+8px)] z-30 w-[280px] rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-3 shadow-xl">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="text-sm font-semibold text-[var(--c-text)]">Filtros visiveis</div>
+                        <div className="text-[11px] text-[var(--c-muted)]">Salvo apenas para este usuario neste navegador.</div>
+                      </div>
+                      <button
+                        type="button"
+                        className="rounded-md p-1 text-[var(--c-muted)] hover:bg-[var(--c-bg)] hover:text-[var(--c-text)]"
+                        onClick={() => setFilterChooserOpen(false)}
+                        title="Fechar"
+                      >
+                        <HiOutlineXMark className="h-4 w-4" />
+                      </button>
+                    </div>
+
+                    <div className="mt-3 max-h-[320px] space-y-1 overflow-y-auto pr-1">
+                      {FILTER_DEFINITIONS.map((filter) => {
+                        const checked = visibleFilterSet.has(filter.id);
+                        return (
+                          <label
+                            key={filter.id}
+                            className="flex cursor-pointer items-center justify-between gap-3 rounded-lg px-2 py-2 text-sm hover:bg-[var(--c-bg)]"
+                          >
+                            <span className="text-[var(--c-text)]">{filter.label}</span>
+                            <input
+                              type="checkbox"
+                              className="h-4 w-4 accent-[var(--c-primary)]"
+                              checked={checked}
+                              onChange={() => toggleVisibleFilter(filter.id)}
+                            />
+                          </label>
+                        );
+                      })}
+                    </div>
+
+                    <div className="mt-3 flex justify-between border-t border-[var(--c-border)] pt-3">
+                      <button type="button" className="btn btn-outline btn-sm" onClick={resetVisibleFilters}>
+                        Restaurar
+                      </button>
+                      <button type="button" className="btn btn-primary btn-sm" onClick={() => setFilterChooserOpen(false)}>
+                        Aplicar
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
               <button type="button" className="btn btn-outline btn-sm" onClick={clearFilters}>
                 <HiOutlineXMark className="h-4 w-4" />
                 Limpar
@@ -488,7 +696,11 @@ export default function FinanceiroTitulos() {
           <div>
             <h2 className="text-sm font-semibold text-[var(--c-text)]">Resultado da consulta</h2>
             <p className="text-xs text-[var(--c-muted)]">
-              {loading ? 'Carregando titulos...' : `${titulos.length} titulo(s) encontrados.`}
+              {!hasConsulted
+                ? 'Aplique um filtro para carregar os titulos.'
+                : loading
+                  ? 'Carregando titulos...'
+                  : `${titulos.length} titulo(s) encontrados.`}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -527,6 +739,19 @@ export default function FinanceiroTitulos() {
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--c-border)]">
+              {!hasConsulted ? (
+                <tr>
+                  <td colSpan={totalColunas} className="px-3 py-10 text-center">
+                    <div className="mx-auto max-w-md">
+                      <div className="text-sm font-medium text-[var(--c-text)]">Nenhum filtro aplicado</div>
+                      <p className="mt-1 text-xs text-[var(--c-muted)]">
+                        A tabela fica vazia ate voce consultar os titulos com os filtros desejados.
+                      </p>
+                    </div>
+                  </td>
+                </tr>
+              ) : null}
+
               {loading ? (
                 <tr>
                   <td colSpan={totalColunas} className="px-3 py-8 text-center text-[var(--c-muted)]">
@@ -535,7 +760,7 @@ export default function FinanceiroTitulos() {
                 </tr>
               ) : null}
 
-              {!loading && titulos.length === 0 ? (
+              {hasConsulted && !loading && titulos.length === 0 ? (
                 <tr>
                   <td colSpan={totalColunas} className="px-3 py-10 text-center">
                     <div className="mx-auto max-w-md">
