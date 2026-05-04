@@ -30,8 +30,7 @@ const PARCELA_REAJUSTE_TIPOS = [
   { value: 'REAJUSTAVEL', label: 'Reajustavel', resumo: 'R' }
 ];
 const TIPOS_DOCUMENTO_MODELO = [
-  { value: 'CONTRATO', label: 'Contrato padrao' },
-  { value: 'QUADRO_RESUMO', label: 'Quadro resumo' }
+  { value: 'CONTRATO', label: 'Contrato padrao' }
 ];
 const MODOS_COMPOSICAO = [
   { value: 'ENTRADA', label: 'Entrada' },
@@ -650,9 +649,9 @@ export default function ComercialContratos() {
     if (!contratoSelecionado?.empreendimento_id) return [];
     return modelosContrato.filter((item) =>
       Number(item.empreendimento_id) === Number(contratoSelecionado.empreendimento_id)
-      && String(item.tipo_documento || '').toUpperCase() === String(documentoForm.tipo_documento || '').toUpperCase()
+      && String(item.tipo_documento || '').toUpperCase() === 'CONTRATO'
     );
-  }, [contratoSelecionado?.empreendimento_id, documentoForm.tipo_documento, modelosContrato]);
+  }, [contratoSelecionado?.empreendimento_id, modelosContrato]);
 
   const possuiModeloQuadroResumoSelecionado = useMemo(() => {
     if (!contratoSelecionado?.empreendimento_id) return false;
@@ -661,6 +660,16 @@ export default function ComercialContratos() {
       && String(item.tipo_documento || '').toUpperCase() === 'QUADRO_RESUMO'
     );
   }, [contratoSelecionado?.empreendimento_id, modelosContrato]);
+
+  const documentosContratoPadrao = useMemo(
+    () => documentosContrato.filter((item) => String(item.tipo_documento || '').toUpperCase() === 'CONTRATO'),
+    [documentosContrato]
+  );
+
+  const possuiContratoAssinado = useMemo(
+    () => documentosContratoPadrao.some((item) => String(item.status || '').toUpperCase() === 'ASSINADO'),
+    [documentosContratoPadrao]
+  );
 
   function aplicarPlanosAoContrato(planos) {
     const parcelas = normalizarParcelasContrato(planos.flatMap((plano) =>
@@ -908,7 +917,7 @@ export default function ComercialContratos() {
         }
       }
       const payload = {
-        tipo_documento: documentoForm.tipo_documento,
+        tipo_documento: 'CONTRATO',
         modelo_id: documentoForm.modelo_id || undefined,
         variaveis
       };
@@ -1861,13 +1870,6 @@ export default function ComercialContratos() {
               </div>
               <div className="flex flex-wrap gap-2">
                 <select
-                  className="input min-w-[180px]"
-                  value={documentoForm.tipo_documento}
-                  onChange={(e) => setDocumentoForm((current) => ({ ...current, tipo_documento: e.target.value, modelo_id: '' }))}
-                >
-                  {TIPOS_DOCUMENTO_MODELO.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
-                </select>
-                <select
                   className="input min-w-[220px]"
                   value={documentoForm.modelo_id}
                   onChange={(e) => setDocumentoForm((current) => ({ ...current, modelo_id: e.target.value }))}
@@ -1882,7 +1884,8 @@ export default function ComercialContratos() {
                   disabled={
                     processingAction === 'gerar-documento'
                     || modelosDoContratoSelecionado.length === 0
-                    || (documentoForm.tipo_documento === 'CONTRATO' && !possuiModeloQuadroResumoSelecionado)
+                    || !possuiModeloQuadroResumoSelecionado
+                    || possuiContratoAssinado
                   }
                 >
                   {processingAction === 'gerar-documento' ? 'Gerando PDF...' : 'Gerar PDF'}
@@ -1899,9 +1902,15 @@ export default function ComercialContratos() {
               </div>
             )}
 
-            {documentoForm.tipo_documento === 'CONTRATO' && !possuiModeloQuadroResumoSelecionado && (
+            {!possuiModeloQuadroResumoSelecionado && (
               <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
                 Para gerar o contrato completo, cadastre tambem um modelo ativo de Quadro Resumo para este empreendimento.
+              </div>
+            )}
+
+            {possuiContratoAssinado && (
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+                Este contrato ja possui documento assinado digitalmente. Uma nova geracao fica bloqueada para preservar o arquivo assinado.
               </div>
             )}
 
@@ -1919,10 +1928,10 @@ export default function ComercialContratos() {
             </label>
 
             <div className="grid gap-3 md:grid-cols-2">
-              {documentosContrato.length === 0 ? (
+              {documentosContratoPadrao.length === 0 ? (
                 <div className="app-empty-card md:col-span-2">Nenhum documento gerado para este contrato.</div>
               ) : (
-                documentosContrato.map((documento) => (
+                documentosContratoPadrao.map((documento) => (
                   <article key={documento.id} className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-bg)] p-4">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>

@@ -670,10 +670,14 @@ async function resolveModeloParaContrato(contrato, payload = {}) {
       throw createHttpError(404, 'Modelo de contrato nao encontrado.');
     }
 
+    if (normalizeTipoDocumento(modelo.tipo_documento) === 'QUADRO_RESUMO') {
+      throw createHttpError(400, 'O Quadro Resumo agora e gerado junto ao Contrato Padrao. Selecione um modelo de Contrato Padrao.');
+    }
+
     return modelo;
   }
 
-  const tipoDocumento = normalizeTipoDocumento(payload.tipo_documento);
+  const tipoDocumento = 'CONTRATO';
   const modelo = await ContratoComercialModelo.findOne({
     where: {
       empreendimento_id: contrato.empreendimento_id,
@@ -719,6 +723,18 @@ async function renderModeloDocumento(modelo, dados, baseName) {
 
 async function gerarDocumentoContratoComercial(req, contratoId, payload = {}) {
   const contrato = await carregarContratoParaDocumento(contratoId);
+  const documentoAssinado = await ContratoComercialDocumento.findOne({
+    where: {
+      contrato_comercial_id: contrato.id,
+      tipo_documento: 'CONTRATO',
+      status: 'ASSINADO'
+    }
+  });
+
+  if (documentoAssinado) {
+    throw createHttpError(400, 'Este contrato ja possui documento assinado digitalmente e nao pode ser gerado novamente.');
+  }
+
   const modelo = await resolveModeloParaContrato(contrato, payload);
   const customVariables = deepMerge(
     parseJson(modelo.variaveis_json, {}),
