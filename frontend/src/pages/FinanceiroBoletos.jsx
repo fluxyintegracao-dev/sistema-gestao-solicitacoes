@@ -664,27 +664,6 @@ export default function FinanceiroBoletos() {
         </div>
       )}
 
-      <section className="sol-surface-card rounded-2xl p-4 md:p-5">
-        <div className="grid gap-3 md:grid-cols-4">
-          <div>
-            <p className="text-xs uppercase tracking-[0.18em] text-[var(--c-muted)]">Titulos elegiveis</p>
-            <strong className="text-xl text-[var(--c-text)]">{resumo.total}</strong>
-          </div>
-          <div>
-            <p className="text-xs uppercase tracking-[0.18em] text-[var(--c-muted)]">Valor em aberto</p>
-            <strong className="text-xl text-[var(--c-text)]">{formatCurrency(resumo.valor)}</strong>
-          </div>
-          <div>
-            <p className="text-xs uppercase tracking-[0.18em] text-[var(--c-muted)]">Ja emitidos</p>
-            <strong className="text-xl text-[var(--c-text)]">{resumo.emitidos}</strong>
-          </div>
-          <div>
-            <p className="text-xs uppercase tracking-[0.18em] text-[var(--c-muted)]">Ambiente</p>
-            <strong className="text-xl text-[var(--c-text)]">{config?.ambiente || 'TESTE'}</strong>
-          </div>
-        </div>
-      </section>
-
       <form className="sol-surface-card rounded-2xl p-4 md:p-5" onSubmit={aplicarFiltros}>
         <div className="sol-filtros-head">
           <div>
@@ -822,6 +801,27 @@ export default function FinanceiroBoletos() {
           </div>
         </div>
       </form>
+
+      <section className="sol-surface-card rounded-2xl p-4 md:p-5">
+        <div className="grid gap-3 md:grid-cols-4">
+          <div>
+            <p className="text-xs uppercase tracking-[0.18em] text-[var(--c-muted)]">Titulos elegiveis</p>
+            <strong className="text-xl text-[var(--c-text)]">{resumo.total}</strong>
+          </div>
+          <div>
+            <p className="text-xs uppercase tracking-[0.18em] text-[var(--c-muted)]">Valor em aberto</p>
+            <strong className="text-xl text-[var(--c-text)]">{formatCurrency(resumo.valor)}</strong>
+          </div>
+          <div>
+            <p className="text-xs uppercase tracking-[0.18em] text-[var(--c-muted)]">Ja emitidos</p>
+            <strong className="text-xl text-[var(--c-text)]">{resumo.emitidos}</strong>
+          </div>
+          <div>
+            <p className="text-xs uppercase tracking-[0.18em] text-[var(--c-muted)]">Ambiente</p>
+            <strong className="text-xl text-[var(--c-text)]">{config?.ambiente || 'TESTE'}</strong>
+          </div>
+        </div>
+      </section>
 
       <section className="sol-surface-card rounded-2xl p-4 md:p-5">
         <div className="sol-filtros-head">
