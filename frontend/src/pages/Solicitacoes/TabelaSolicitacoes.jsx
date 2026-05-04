@@ -278,7 +278,7 @@ export default function TabelaSolicitacoes({
         return ts;
       }
       if (campo === 'valor') {
-        const n = Number(item?.valor);
+        const n = Number(item?.valor_exibicao ?? item?.saldo_pagamento ?? item?.valor);
         return Number.isNaN(n) ? null : n;
       }
       return null;

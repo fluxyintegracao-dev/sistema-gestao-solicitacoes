@@ -114,6 +114,28 @@ export default function LinhaSolicitacao({
       ? String(solicitacao.valor)
       : ''
   );
+  const valorTotalSolicitacao = Number(solicitacao.valor_total ?? solicitacao.valor);
+  const valorPagoAcumulado = Number(solicitacao.valor_pago_acumulado || 0);
+  const statusGlobalNormalizado = String(solicitacao.status_global || '').trim().toUpperCase();
+  const saldoRestanteCalculado = Number.isFinite(valorTotalSolicitacao)
+    ? Math.max(valorTotalSolicitacao - (Number.isFinite(valorPagoAcumulado) ? valorPagoAcumulado : 0), 0)
+    : null;
+  const valorPrincipal = statusGlobalNormalizado === 'PAGA'
+    ? valorTotalSolicitacao
+    : Number(solicitacao.valor_exibicao ?? solicitacao.saldo_pagamento ?? saldoRestanteCalculado ?? solicitacao.valor);
+  const mostrarValorTotalSecundario =
+    statusGlobalNormalizado !== 'PAGA' &&
+    Number.isFinite(valorTotalSolicitacao) &&
+    Number.isFinite(valorPrincipal) &&
+    Math.abs(valorTotalSolicitacao - valorPrincipal) > 0.009;
+  const formatarMoedaLinha = (valor) => {
+    const numero = Number(valor);
+    if (!Number.isFinite(numero)) return '-';
+    return numero.toLocaleString('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    });
+  };
 
   useEffect(() => {
     if (!editandoValor) {
@@ -296,7 +318,7 @@ export default function LinhaSolicitacao({
         {mostrarColuna('valor') && (
         <td
           {...tdBase('Valor', 'p-2 overflow-hidden')}
-          title={solicitacao.valor ? String(solicitacao.valor) : ''}
+          title={Number.isFinite(valorTotalSolicitacao) ? formatarMoedaLinha(valorTotalSolicitacao) : ''}
         >
           {editandoValor ? (
             <div className="flex items-center gap-2">
@@ -330,23 +352,19 @@ export default function LinhaSolicitacao({
           ) : (
             <div className="flex flex-col items-start gap-1 min-w-0 w-full">
               <span
-                className="block w-full min-w-0 truncate"
-                title={
-                  solicitacao.valor
-                    ? Number(solicitacao.valor).toLocaleString('pt-BR', {
-                        style: 'currency',
-                        currency: 'BRL'
-                      })
-                    : '-'
-                }
+                className="block w-full min-w-0 truncate font-semibold"
+                title={formatarMoedaLinha(valorPrincipal)}
               >
-                {solicitacao.valor
-                  ? Number(solicitacao.valor).toLocaleString('pt-BR', {
-                      style: 'currency',
-                      currency: 'BRL'
-                    })
-                  : '-'}
+                {formatarMoedaLinha(valorPrincipal)}
               </span>
+              {mostrarValorTotalSecundario && (
+                <span
+                  className="block w-full min-w-0 truncate text-[11px] leading-none text-[var(--c-muted)]"
+                  title={`Total: ${formatarMoedaLinha(valorTotalSolicitacao)}`}
+                >
+                  Total: {formatarMoedaLinha(valorTotalSolicitacao)}
+                </span>
+              )}
               {podeEditarValor && (
                 <button
                   className="text-[11px] leading-none text-blue-600 hover:underline shrink-0"
