@@ -1056,14 +1056,28 @@ export default function ComercialContratos() {
           <div className="grid gap-3 md:grid-cols-4">
             <label className="sol-filter-field">
               <span className="sol-filter-label">Empreendimento</span>
-              <select className="input w-full" value={form.empreendimento_id} onChange={(e) => setForm((c) => ({ ...c, empreendimento_id: e.target.value, unidade_comercial_id: '' }))} required disabled={Boolean(form.id)}>
+              <select className="input w-full" value={form.empreendimento_id} onChange={(e) => setForm((c) => ({ ...c, empreendimento_id: e.target.value, unidade_comercial_id: '', numero: '' }))} required disabled={Boolean(form.id)}>
                 <option value="">Selecione</option>
                 {empreendimentos.map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}
               </select>
             </label>
             <label className="sol-filter-field">
               <span className="sol-filter-label">Unidade</span>
-              <select className="input w-full" value={form.unidade_comercial_id} onChange={(e) => setForm((c) => ({ ...c, unidade_comercial_id: e.target.value }))} required disabled={Boolean(form.id)}>
+              <select
+                className="input w-full"
+                value={form.unidade_comercial_id}
+                onChange={(e) => {
+                  const unidadeId = e.target.value;
+                  const unidade = unidades.find((u) => String(u.id) === String(unidadeId));
+                  const emp = empreendimentos.find((em) => String(em.id) === String(form.empreendimento_id));
+                  const autoNumero = unidade && emp?.codigo
+                    ? `${emp.codigo} - ${unidade.codigo}`
+                    : (unidade?.codigo ?? '');
+                  setForm((c) => ({ ...c, unidade_comercial_id: unidadeId, numero: autoNumero }));
+                }}
+                required
+                disabled={Boolean(form.id)}
+              >
                 <option value="">Selecione</option>
                 {unidadesDoEmpreendimento.map((item) => <option key={item.id} value={item.id}>{item.codigo}</option>)}
               </select>

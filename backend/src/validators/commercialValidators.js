@@ -124,6 +124,22 @@ function parseDateOnly(value, fieldName, { required = false } = {}) {
   return normalized;
 }
 
+function parseCodigoUnidade(value, { required = false } = {}) {
+  if (isBlank(value)) {
+    if (required) throw new ValidationError('Codigo e obrigatorio.');
+    return undefined;
+  }
+  const normalized = String(value).trim();
+  if (!/^\d+$/.test(normalized)) {
+    throw new ValidationError('Codigo deve ser um numero inteiro positivo.');
+  }
+  const num = Number(normalized);
+  if (!Number.isInteger(num) || num <= 0) {
+    throw new ValidationError('Codigo deve ser um numero inteiro positivo.');
+  }
+  return normalized;
+}
+
 function parseOptionalText(value, fieldName, max, { required = false } = {}) {
   if (isBlank(value)) {
     if (required) {
@@ -273,7 +289,7 @@ function validateComercialUnidadeCreateBody(body = {}) {
   return {
     empreendimento_id: parseInteger(body.empreendimento_id, 'Empreendimento', { required: true }),
     parceiro_reserva_id: parseInteger(body.parceiro_reserva_id, 'Parceiro da reserva'),
-    codigo: parseOptionalText(body.codigo, 'Codigo', 60, { required: true }),
+    codigo: parseCodigoUnidade(body.codigo, { required: true }),
     nome: parseOptionalText(body.nome, 'Nome', 160),
     bloco: parseOptionalText(body.bloco, 'Bloco', 60),
     torre: parseOptionalText(body.torre, 'Torre', 60),
@@ -318,7 +334,7 @@ function validateComercialUnidadeUpdateBody(body = {}) {
     Object.entries({
       empreendimento_id: parseInteger(body.empreendimento_id, 'Empreendimento'),
       parceiro_reserva_id: parseInteger(body.parceiro_reserva_id, 'Parceiro da reserva'),
-      codigo: parseOptionalText(body.codigo, 'Codigo', 60),
+      codigo: parseCodigoUnidade(body.codigo),
       nome: parseOptionalText(body.nome, 'Nome', 160),
       bloco: parseOptionalText(body.bloco, 'Bloco', 60),
       torre: parseOptionalText(body.torre, 'Torre', 60),

@@ -50,7 +50,7 @@ function pickForm(item = {}) {
     id: item.id || null,
     empreendimento_id: item.empreendimento_id ? String(item.empreendimento_id) : '',
     parceiro_reserva_id: item.parceiro_reserva_id ? String(item.parceiro_reserva_id) : '',
-    codigo: item.codigo || '',
+    codigo: String(item.codigo || '').replace(/\D/g, ''),
     nome: item.nome || '',
     bloco: item.bloco || '',
     torre: item.torre || '',
@@ -230,10 +230,12 @@ export default function ComercialUnidades() {
                   <span className="sol-filter-label">Codigo</span>
                   <input
                     className="input w-full"
+                    inputMode="numeric"
+                    pattern="[0-9]+"
                     value={form.codigo}
-                    onChange={(event) => setForm((current) => ({ ...current, codigo: event.target.value }))}
+                    onChange={(event) => setForm((current) => ({ ...current, codigo: event.target.value.replace(/\D/g, '') }))}
                     required
-                    placeholder="Ex.: A-101"
+                    placeholder="Ex.: 101"
                   />
                 </label>
                 <label className="sol-filter-field">
