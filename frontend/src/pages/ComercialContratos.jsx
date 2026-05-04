@@ -529,9 +529,16 @@ export default function ComercialContratos() {
   }, []);
 
   const unidadesDoEmpreendimento = useMemo(() => {
-    if (!form.empreendimento_id) return unidades;
-    return unidades.filter((item) => String(item.empreendimento_id) === String(form.empreendimento_id));
-  }, [form.empreendimento_id, unidades]);
+    const unidadesBase = form.empreendimento_id
+      ? unidades.filter((item) => String(item.empreendimento_id) === String(form.empreendimento_id))
+      : unidades;
+
+    return unidadesBase.filter((item) => {
+      const situacao = String(item.situacao || '').trim().toUpperCase();
+      const unidadeAtualDoContrato = form.id && String(item.id) === String(form.unidade_comercial_id);
+      return unidadeAtualDoContrato || situacao !== 'VENDIDA';
+    });
+  }, [form.empreendimento_id, form.id, form.unidade_comercial_id, unidades]);
 
   const empreendimentoSelecionado = useMemo(
     () => empreendimentos.find((item) => String(item.id) === String(form.empreendimento_id)),
@@ -1104,8 +1111,18 @@ export default function ComercialContratos() {
                 disabled={Boolean(form.id)}
               >
                 <option value="">Selecione</option>
-                {unidadesDoEmpreendimento.map((item) => <option key={item.id} value={item.id}>{item.codigo}</option>)}
+                {unidadesDoEmpreendimento.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.codigo}
+                    {String(item.situacao || '').trim().toUpperCase() === 'VENDIDA' ? ' - vendida' : ''}
+                  </option>
+                ))}
               </select>
+              {!form.id && form.empreendimento_id && unidadesDoEmpreendimento.length === 0 && (
+                <span className="mt-1 text-xs text-[var(--c-muted)]">
+                  Nenhuma unidade disponivel para contrato neste empreendimento.
+                </span>
+              )}
             </label>
             <label className="sol-filter-field">
               <span className="sol-filter-label">Cliente</span>
