@@ -192,14 +192,6 @@ function buildPessoaRapidaPayload(form, tipo, extras = {}) {
   };
 }
 
-function defaultDocumentoForm() {
-  return {
-    tipo_documento: 'CONTRATO',
-    modelo_id: '',
-    variaveis_json: ''
-  };
-}
-
 function normalizeSearch(value) {
   return String(value || '')
     .normalize('NFD')
@@ -507,7 +499,6 @@ export default function ComercialContratos() {
   const [showTroca, setShowTroca] = useState(false);
   const [pessoaRapidaModal, setPessoaRapidaModal] = useState(null);
   const [pessoaRapidaForm, setPessoaRapidaForm] = useState(defaultPessoaRapidaForm());
-  const [documentoForm, setDocumentoForm] = useState(defaultDocumentoForm());
   const [distratoForm, setDistratoForm] = useState(defaultDistratoForm());
   const [trocaForm, setTrocaForm] = useState(defaultTrocaForm());
   const [error, setError] = useState('');
@@ -828,7 +819,6 @@ export default function ComercialContratos() {
     try {
       const detalhe = await getContratoComercialById(id);
       setContratoSelecionado(detalhe);
-      setDocumentoForm(defaultDocumentoForm());
       await carregarDocumentosContrato(id);
       setShowDistrato(false);
       setShowTroca(false);
@@ -907,19 +897,8 @@ export default function ComercialContratos() {
     try {
       setProcessingAction('gerar-documento');
       setError('');
-      let variaveis;
-      if (String(documentoForm.variaveis_json || '').trim()) {
-        try {
-          variaveis = JSON.parse(documentoForm.variaveis_json);
-        } catch {
-          setError('Variaveis adicionais precisam estar em JSON valido.');
-          return;
-        }
-      }
       const payload = {
-        tipo_documento: 'CONTRATO',
-        modelo_id: documentoForm.modelo_id || undefined,
-        variaveis
+        tipo_documento: 'CONTRATO'
       };
       const documentoGerado = await gerarDocumentoContratoComercial(contratoSelecionado.id, payload);
       await carregarDocumentosContrato(contratoSelecionado.id);
@@ -1872,14 +1851,6 @@ export default function ComercialContratos() {
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
-                <select
-                  className="input min-w-[220px]"
-                  value={documentoForm.modelo_id}
-                  onChange={(e) => setDocumentoForm((current) => ({ ...current, modelo_id: e.target.value }))}
-                >
-                  <option value="">Modelo ativo mais recente</option>
-                  {modelosDoContratoSelecionado.map((modelo) => <option key={modelo.id} value={modelo.id}>{modelo.nome}</option>)}
-                </select>
                 <button
                   type="button"
                   className="btn btn-primary"
@@ -1891,7 +1862,7 @@ export default function ComercialContratos() {
                     || possuiContratoAssinado
                   }
                 >
-                  {processingAction === 'gerar-documento' ? 'Gerando PDF...' : 'Gerar PDF'}
+                  {processingAction === 'gerar-documento' ? 'Gerando PDF...' : 'Gerar PDF completo'}
                 </button>
               </div>
             </div>
@@ -1917,19 +1888,6 @@ export default function ComercialContratos() {
               </div>
             )}
 
-            <label className="sol-filter-field block">
-              <span className="sol-filter-label">Variaveis adicionais opcionais (JSON)</span>
-              <textarea
-                className="input min-h-[88px] w-full"
-                value={documentoForm.variaveis_json}
-                onChange={(e) => setDocumentoForm((current) => ({ ...current, variaveis_json: e.target.value }))}
-                placeholder='{"cliente":{"nacionalidade":"brasileiro","profissao":"engenheiro"},"conjuge":{"nome":"Maria"}}'
-              />
-              <span className="mt-1 block text-xs text-[var(--c-muted)]">
-                Use para dados juridicos que ainda nao existem no cadastro do cliente; o restante vem automatico do contrato.
-              </span>
-            </label>
-
             <div className="grid gap-3 md:grid-cols-2">
               {documentosContratoPadrao.length === 0 ? (
                 <div className="app-empty-card md:col-span-2">Nenhum documento gerado para este contrato.</div>
@@ -1950,9 +1908,6 @@ export default function ComercialContratos() {
                     <div className="mt-4 flex flex-wrap gap-2">
                       <button type="button" className="btn btn-outline" onClick={() => abrirDocumentoContrato(documento.id, 'pdf')}>
                         Abrir PDF
-                      </button>
-                      <button type="button" className="btn btn-outline" onClick={() => abrirDocumentoContrato(documento.id, 'docx')}>
-                        Baixar DOCX
                       </button>
                       <button
                         type="button"

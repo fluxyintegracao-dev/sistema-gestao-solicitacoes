@@ -37,6 +37,7 @@ const VARIAVEIS_CONTRATO_COMERCIAL = [
   { chave: 'contrato.local_assinatura', descricao: 'Local de assinatura do quadro resumo' },
   { chave: 'contrato.data_assinatura', descricao: 'Data de assinatura em formato brasileiro' },
   { chave: 'contrato.data_assinatura_extenso', descricao: 'Data de assinatura por extenso' },
+  { chave: 'contrato.local_data_assinatura', descricao: 'Local e data de assinatura no formato do item XI' },
   { chave: 'cliente.nome', descricao: 'Nome do comprador' },
   { chave: 'cliente.cpf_cnpj', descricao: 'CPF/CNPJ do comprador' },
   { chave: 'cliente.email', descricao: 'E-mail do comprador' },
@@ -86,6 +87,10 @@ const VARIAVEIS_CONTRATO_COMERCIAL = [
   { chave: 'parcelas.resumo', descricao: 'Resumo das parcelas do contrato' },
   { chave: 'parcelas.quadro_resumo_texto', descricao: 'Linhas agrupadas para o item VI do quadro resumo' },
   { chave: 'parcelas.quadro_resumo_itens', descricao: 'Lista de parcelas agrupadas para tabelas do quadro resumo' },
+  { chave: 'assinaturas.comprador', descricao: 'Linha de identificacao do comprador para assinatura' },
+  { chave: 'assinaturas.conjuge', descricao: 'Linha de identificacao do conjuge para assinatura' },
+  { chave: 'assinaturas.corretor', descricao: 'Linha de identificacao do corretor para assinatura' },
+  { chave: 'assinaturas.vendedora', descricao: 'Linha de identificacao da vendedora/empreendimento para assinatura' },
   { chave: 'custom.*', descricao: 'Qualquer dado complementar enviado no momento da geracao' }
 ];
 
@@ -118,8 +123,44 @@ const LEGACY_BRACKET_ALIASES = {
   '[Local de Assinatura]': '{{contrato.local_assinatura}}',
   '[Data de Assinatura]': '{{contrato.data_assinatura_extenso}}',
   '[Forma de Pagamento]': '{{parcelas.quadro_resumo_texto}}',
-  '[XXXX]': '{{contrato.numero}}'
+  '[XXXX]': '{{contrato.numero}}',
+  'Balneário de Iriri, Anchieta-ES, xx de xxx de xxxx.': '{{contrato.local_data_assinatura}}',
+  'Balneário de Iriri, Anchieta -ES, xx de xxx de xxxx.': '{{contrato.local_data_assinatura}}',
+  'Anchieta-ES, xx de xxx de xxxx.': '{{contrato.local_data_assinatura}}',
+  'Anchieta -ES, xx de xxx de xxxx.': '{{contrato.local_data_assinatura}}'
 };
+
+Object.assign(LEGACY_BRACKET_ALIASES, {
+  '[Nº do CPF]': '{{cliente.cpf_cnpj}}',
+  '[nº do RG]': '{{cliente.rg}}',
+  '[profissão]': '{{cliente.profissao}}',
+  '[Nº]': '{{cliente.numero}}',
+  '[Nº do CPF do Corretor]': '{{corretor.cpf_cnpj}}',
+  '[Nº do CRECI do Corretor]': '{{corretor.creci}}',
+  '[Unidade Autônoma]': '{{unidade.codigo}}',
+  '[Área privativa]': '{{unidade.metragem_privativa}}',
+  '[Fração Ideal]': '{{unidade.fracao_ideal}}',
+  'Balneário de Iriri, Anchieta-ES, xx de xxx de xxxx.': '{{contrato.local_data_assinatura}}',
+  'Balneário de Iriri, Anchieta -ES, xx de xxx de xxxx.': '{{contrato.local_data_assinatura}}'
+});
+
+function normalizeLegacyAlias(value) {
+  return String(value || '')
+    .replace(/^\[/, '')
+    .replace(/\]$/, '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+const LEGACY_BRACKET_ALIAS_BY_NORMALIZED = Object.entries(LEGACY_BRACKET_ALIASES).reduce((acc, [legacy, modern]) => {
+  if (legacy.startsWith('[') && legacy.endsWith(']')) {
+    acc.set(normalizeLegacyAlias(legacy), modern);
+  }
+  return acc;
+}, new Map());
 
 function createHttpError(statusCode, message, code = null) {
   const error = new Error(message);
@@ -165,6 +206,14 @@ function formatDateLongBr(value) {
     month: 'long',
     year: 'numeric'
   });
+}
+
+function formatLocalDataAssinatura(local, value) {
+  const partes = [
+    safeString(local).trim(),
+    formatDateLongBr(value)
+  ].filter(Boolean);
+  return partes.join(', ');
 }
 
 function formatCurrency(value) {
@@ -227,6 +276,9 @@ function applyLegacyBracketAliases(zip) {
     Object.entries(LEGACY_BRACKET_ALIASES).forEach(([legacy, modern]) => {
       xml = replaceAll(xml, legacy, modern);
     });
+    xml = xml.replace(/\[[^\]]{1,140}\]/g, (legacy) => (
+      LEGACY_BRACKET_ALIAS_BY_NORMALIZED.get(normalizeLegacyAlias(legacy)) || legacy
+    ));
     zip.file(entry.name, xml);
   });
 }
@@ -317,6 +369,14 @@ function buildVagasGaragemResumo(contrato = {}) {
   return [quantidadeTexto, posicao ? `Posicao: ${posicao}` : 'Sem posicao especifica'].filter(Boolean).join(' - ');
 }
 
+function buildAssinaturaPessoa(nome, documento) {
+  const partes = [
+    safeString(nome).trim(),
+    safeString(documento).trim() ? `CPF/CNPJ: ${safeString(documento).trim()}` : ''
+  ].filter(Boolean);
+  return partes.join(' - ');
+}
+
 function buildDadosContrato(contrato, customVariables = {}) {
   const raw = contrato?.toJSON ? contrato.toJSON() : contrato;
   const cliente = raw.cliente || {};
@@ -327,6 +387,8 @@ function buildDadosContrato(contrato, customVariables = {}) {
   const obra = raw.obra || {};
   const quadroResumoParcelas = buildQuadroResumoParcelas(raw.parcelas || []);
   const vagasGaragemResumo = buildVagasGaragemResumo(raw);
+  const dataAssinaturaBase = raw.data_assinatura || raw.data_contrato;
+  const localAssinatura = safeString(raw.local_assinatura);
 
   const dados = {
     contrato: {
@@ -346,10 +408,11 @@ function buildDadosContrato(contrato, customVariables = {}) {
       quantidade_vagas_garagem: raw.possui_vaga_garagem ? safeString(raw.quantidade_vagas_garagem) : '',
       vagas_garagem_posicao: raw.possui_vaga_garagem ? safeString(raw.vagas_garagem_posicao) : '',
       vagas_garagem_resumo: vagasGaragemResumo,
-      local_assinatura: safeString(raw.local_assinatura),
-      data_assinatura: formatDateBr(raw.data_assinatura || raw.data_contrato),
-      data_assinatura_extenso: formatDateLongBr(raw.data_assinatura || raw.data_contrato),
-      data_assinatura_iso: safeString(raw.data_assinatura || raw.data_contrato),
+      local_assinatura: localAssinatura,
+      data_assinatura: formatDateBr(dataAssinaturaBase),
+      data_assinatura_extenso: formatDateLongBr(dataAssinaturaBase),
+      data_assinatura_iso: safeString(dataAssinaturaBase),
+      local_data_assinatura: formatLocalDataAssinatura(localAssinatura, dataAssinaturaBase),
       observacoes: safeString(raw.observacoes)
     },
     cliente: {
@@ -440,6 +503,12 @@ function buildDadosContrato(contrato, customVariables = {}) {
         valor_formatado: formatCurrency(parcela.valor_original || parcela.valor || 0),
         observacoes: safeString(parcela.observacoes)
       }))
+    },
+    assinaturas: {
+      comprador: buildAssinaturaPessoa(cliente.nome, cliente.cpf_cnpj),
+      conjuge: buildAssinaturaPessoa(conjuge.nome || cliente.conjuge_nome, conjuge.cpf_cnpj),
+      corretor: buildAssinaturaPessoa(corretor.nome || raw.corretor_nome, corretor.cpf_cnpj),
+      vendedora: safeString(empreendimento.nome)
     },
     custom: customVariables || {}
   };
