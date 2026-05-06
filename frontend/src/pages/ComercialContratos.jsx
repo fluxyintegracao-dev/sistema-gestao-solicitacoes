@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { HiOutlinePencilSquare } from 'react-icons/hi2';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { getMinhasObras } from '../services/obras';
@@ -509,6 +510,7 @@ export default function ComercialContratos() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [processingAction, setProcessingAction] = useState('');
+  const [parcelaEditandoIndex, setParcelaEditandoIndex] = useState(null);
   const [showDistrato, setShowDistrato] = useState(false);
   const [showTroca, setShowTroca] = useState(false);
   const [pessoaRapidaModal, setPessoaRapidaModal] = useState(null);
@@ -687,6 +689,7 @@ export default function ComercialContratos() {
     ));
     const total = roundCurrency(parcelas.reduce((acc, item) => acc + toNumber(item.valor), 0));
 
+    setParcelaEditandoIndex(null);
     setForm((current) => ({
       ...current,
       parcelas,
@@ -735,6 +738,7 @@ export default function ComercialContratos() {
   function removerFormaPagamento(planoId) {
     const proximosPlanos = paymentPlans.filter((item) => item.id !== planoId);
     setPaymentPlans(proximosPlanos);
+    setParcelaEditandoIndex(null);
     aplicarPlanosAoContrato(proximosPlanos);
   }
 
@@ -820,6 +824,28 @@ export default function ComercialContratos() {
         parcelas: parcelasNormalizadas
       };
     });
+  }
+
+  function ajustarParcelaParaFechamento(index) {
+    const parcela = form.parcelas[index];
+    if (!parcela) return;
+
+    if (Math.abs(diferencaComposicao) <= 0.009) {
+      setError('As formas de pagamento ja fecham o valor total do contrato.');
+      return;
+    }
+
+    const valorAtual = toNumber(parcela.valor || parcela.valor_original);
+    const novoValor = roundCurrency(valorAtual + diferencaComposicao);
+
+    if (novoValor < 0) {
+      setError('A diferenca e maior que o valor desta parcela. Escolha outra parcela para ajustar o fechamento.');
+      return;
+    }
+
+    setError('');
+    setParcelaEditandoIndex(index);
+    updateParcela(index, 'valor', formatCurrencyInput(novoValor));
   }
 
   async function carregarDocumentosContrato(contratoId) {
@@ -1653,34 +1679,100 @@ export default function ComercialContratos() {
                         <th className="px-3 py-3 text-left">Detalhe</th>
                         <th className="px-3 py-3 text-left">Vencimento</th>
                         <th className="px-3 py-3 text-right">Valor</th>
+                        <th className="px-3 py-3 text-right">Acoes</th>
                       </tr>
                     </thead>
                     <tbody>
                       {form.parcelas.map((item, index) => (
-                        <tr key={`${item.descricao}-${index}`} className="border-t border-[var(--c-border)]">
-                          <td className="px-3 py-3"><input className="input w-full" value={item.descricao} onChange={(e) => updateParcela(index, 'descricao', e.target.value)} /></td>
-                          <td className="px-3 py-3">
-                            <select className="input w-full" value={item.tipo_parcela} onChange={(e) => updateParcela(index, 'tipo_parcela', e.target.value)}>
-                              {PARCELA_TIPOS.map((tipo) => <option key={tipo} value={tipo}>{tipo}</option>)}
-                            </select>
-                          </td>
-                          <td className="px-3 py-3">
-                            <select className="input w-full" value={item.forma_recebimento_prevista || ''} onChange={(e) => updateParcela(index, 'forma_recebimento_prevista', e.target.value)}>
-                              <option value="">Nao informar</option>
-                              {FORMAS_RECEBIMENTO.map((forma) => <option key={forma} value={forma}>{forma}</option>)}
-                            </select>
-                          </td>
-                          <td className="px-3 py-3">
-                            <select className="input w-full" value={item.reajuste_tipo || 'FIXA'} onChange={(e) => updateParcela(index, 'reajuste_tipo', e.target.value)}>
-                              {PARCELA_REAJUSTE_TIPOS.map((tipo) => <option key={tipo.value} value={tipo.value}>{tipo.label} ({tipo.resumo})</option>)}
-                            </select>
-                          </td>
-                          <td className="px-3 py-3">
-                            <input className="input w-full" value={item.observacoes || ''} onChange={(e) => updateParcela(index, 'observacoes', e.target.value)} placeholder="Detalhe do bem, permuta ou outro recebimento" />
-                          </td>
-                          <td className="px-3 py-3"><input className="input w-full" type="date" value={item.data_vencimento} onChange={(e) => updateParcela(index, 'data_vencimento', e.target.value)} /></td>
-                          <td className="px-3 py-3"><input className="input w-full text-right" inputMode="decimal" value={item.valor || formatCurrencyInput(item.valor_original)} onChange={(e) => updateParcela(index, 'valor', normalizeCurrencyTyping(e.target.value))} onBlur={(e) => updateParcela(index, 'valor', formatCurrencyInput(e.target.value))} placeholder="R$ 0,00" /></td>
-                        </tr>
+                        (() => {
+                          const isEditing = parcelaEditandoIndex === index;
+                          const reajusteLabel = PARCELA_REAJUSTE_TIPOS.find((tipo) => tipo.value === (item.reajuste_tipo || 'FIXA'))?.label || item.reajuste_tipo || 'Fixa';
+                          const canAdjust = Math.abs(diferencaComposicao) > 0.009;
+
+                          return (
+                            <tr key={`${item.descricao}-${index}`} className={`border-t border-[var(--c-border)] ${isEditing ? 'bg-blue-50/50' : ''}`}>
+                              <td className="px-3 py-3">
+                                {isEditing ? (
+                                  <input className="input w-full" value={item.descricao} onChange={(e) => updateParcela(index, 'descricao', e.target.value)} />
+                                ) : (
+                                  <span className="font-medium text-[var(--c-text)]">{item.descricao || '-'}</span>
+                                )}
+                              </td>
+                              <td className="px-3 py-3">
+                                {isEditing ? (
+                                  <select className="input w-full" value={item.tipo_parcela} onChange={(e) => updateParcela(index, 'tipo_parcela', e.target.value)}>
+                                    {PARCELA_TIPOS.map((tipo) => <option key={tipo} value={tipo}>{tipo}</option>)}
+                                  </select>
+                                ) : (
+                                  <span className="text-[var(--c-muted)]">{item.tipo_parcela || '-'}</span>
+                                )}
+                              </td>
+                              <td className="px-3 py-3">
+                                {isEditing ? (
+                                  <select className="input w-full" value={item.forma_recebimento_prevista || ''} onChange={(e) => updateParcela(index, 'forma_recebimento_prevista', e.target.value)}>
+                                    <option value="">Nao informar</option>
+                                    {FORMAS_RECEBIMENTO.map((forma) => <option key={forma} value={forma}>{forma}</option>)}
+                                  </select>
+                                ) : (
+                                  <span className="text-[var(--c-muted)]">{item.forma_recebimento_prevista || '-'}</span>
+                                )}
+                              </td>
+                              <td className="px-3 py-3">
+                                {isEditing ? (
+                                  <select className="input w-full" value={item.reajuste_tipo || 'FIXA'} onChange={(e) => updateParcela(index, 'reajuste_tipo', e.target.value)}>
+                                    {PARCELA_REAJUSTE_TIPOS.map((tipo) => <option key={tipo.value} value={tipo.value}>{tipo.label} ({tipo.resumo})</option>)}
+                                  </select>
+                                ) : (
+                                  <span className="text-[var(--c-muted)]">{reajusteLabel}</span>
+                                )}
+                              </td>
+                              <td className="px-3 py-3">
+                                {isEditing ? (
+                                  <input className="input w-full" value={item.observacoes || ''} onChange={(e) => updateParcela(index, 'observacoes', e.target.value)} placeholder="Detalhe do bem, permuta ou outro recebimento" />
+                                ) : (
+                                  <span className="text-[var(--c-muted)]">{item.observacoes || '-'}</span>
+                                )}
+                              </td>
+                              <td className="px-3 py-3">
+                                {isEditing ? (
+                                  <input className="input w-full" type="date" value={item.data_vencimento} onChange={(e) => updateParcela(index, 'data_vencimento', e.target.value)} />
+                                ) : (
+                                  <span className="text-[var(--c-muted)]">{formatDate(item.data_vencimento)}</span>
+                                )}
+                              </td>
+                              <td className="px-3 py-3 text-right">
+                                {isEditing ? (
+                                  <input className="input w-full text-right" inputMode="decimal" value={item.valor || formatCurrencyInput(item.valor_original)} onChange={(e) => updateParcela(index, 'valor', normalizeCurrencyTyping(e.target.value))} onBlur={(e) => updateParcela(index, 'valor', formatCurrencyInput(e.target.value))} placeholder="R$ 0,00" />
+                                ) : (
+                                  <span className="font-semibold text-[var(--c-text)]">{formatCurrency(item.valor || item.valor_original)}</span>
+                                )}
+                              </td>
+                              <td className="px-3 py-3">
+                                <div className="flex min-w-[176px] flex-wrap justify-end gap-2">
+                                  <button
+                                    type="button"
+                                    className="btn btn-outline btn-sm inline-flex items-center gap-1.5"
+                                    onClick={() => setParcelaEditandoIndex(isEditing ? null : index)}
+                                    title={isEditing ? 'Concluir edicao da parcela' : 'Editar parcela'}
+                                  >
+                                    <HiOutlinePencilSquare className="h-4 w-4" />
+                                    {isEditing ? 'Concluir' : 'Editar'}
+                                  </button>
+                                  {isEditing && canAdjust && (
+                                    <button
+                                      type="button"
+                                      className="btn btn-primary btn-sm"
+                                      onClick={() => ajustarParcelaParaFechamento(index)}
+                                      title="Ajusta esta parcela pela diferenca entre a agenda e o valor total do contrato."
+                                    >
+                                      Fechar diferenca
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })()
                       ))}
                     </tbody>
                   </table>
