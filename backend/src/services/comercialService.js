@@ -4,6 +4,7 @@ const {
   CategoriaFinanceira,
   ConfiguracaoSistema,
   ContratoComercial,
+  ContratoComercialDocumento,
   ContratoComercialEvento,
   ContratoComercialParcela,
   Empreendimento,
@@ -39,6 +40,10 @@ function normalizeContractStatus(value) {
     return 'ATIVO';
   }
   return normalized;
+}
+
+function isSuperadminUser(user) {
+  return String(user?.perfil || '').trim().toUpperCase() === 'SUPERADMIN';
 }
 
 function getToday() {
@@ -626,6 +631,22 @@ async function registrarEventoContratoComercial({ transaction, contratoId, tipoE
     metadata_json: serializeJson(metadata),
     criado_por: usuarioId || null
   }, { transaction });
+}
+
+async function contratoPossuiDocumentoAssinado(contratoId) {
+  const signedStatuses = ['ASSINADO', 'FINALIZADO', 'CONCLUIDO'];
+  const documento = await ContratoComercialDocumento.findOne({
+    where: {
+      contrato_comercial_id: contratoId,
+      [Op.or]: [
+        { status: { [Op.in]: signedStatuses } },
+        { d4sign_status: { [Op.in]: signedStatuses } },
+        { d4sign_finalizado_em: { [Op.ne]: null } }
+      ]
+    }
+  });
+
+  return Boolean(documento);
 }
 
 async function ensureTabelaPrecoExists(id) {
@@ -1850,6 +1871,123 @@ async function trocarUnidadeContratoComercial(req, id, payload = {}) {
   }
 }
 
+async function excluirContratoComercial(req, id) {
+  if (!isSuperadminUser(req.user)) {
+    throw createHttpError(403, 'Apenas SUPERADMIN pode excluir contratos comerciais.');
+  }
+
+  const contrato = await carregarContratoComercial(id);
+  const possuiDocumentoAssinado = await contratoPossuiDocumentoAssinado(contrato.id);
+  if (possuiDocumentoAssinado) {
+    throw createHttpError(400, 'Nao e possivel excluir contrato com documento assinado digitalmente.');
+  }
+
+  const tituloIds = Array.from(new Set([
+    ...(contrato.parcelas || [])
+      .map((parcela) => Number(parcela.titulo_financeiro_id || parcela.tituloFinanceiro?.id || 0)),
+    Number(contrato.titulo_financeiro_comissao_id || 0)
+  ].filter((value) => value > 0)));
+
+  if (tituloIds.length) {
+    const tituloComBaixa = await TituloFinanceiro.findOne({
+      where: {
+        id: { [Op.in]: tituloIds },
+        [Op.or]: [
+          { valor_baixado: { [Op.gt]: 0 } },
+          { status: { [Op.in]: ['BAIXADO', 'PAGO', 'QUITADO', 'CONCILIADO'] } }
+        ]
+      }
+    });
+
+    if (tituloComBaixa) {
+      throw createHttpError(400, 'Nao e possivel excluir contrato com titulos financeiros baixados ou conciliados.');
+    }
+  }
+
+  const transaction = await sequelize.transaction();
+  try {
+    if (tituloIds.length) {
+      await TituloFinanceiro.update(
+        {
+          status: 'CANCELADO',
+          valor_saldo: 0,
+          atualizado_por: req.user?.id || null
+        },
+        {
+          where: { id: { [Op.in]: tituloIds } },
+          transaction
+        }
+      );
+    }
+
+    await ContratoComercialDocumento.destroy({
+      where: { contrato_comercial_id: contrato.id },
+      transaction
+    });
+
+    await ContratoComercialEvento.destroy({
+      where: { contrato_comercial_id: contrato.id },
+      transaction
+    });
+
+    await ContratoComercialParcela.destroy({
+      where: { contrato_comercial_id: contrato.id },
+      transaction
+    });
+
+    await ContratoComercial.destroy({
+      where: { id: contrato.id },
+      transaction
+    });
+
+    const contratoAtivoUnidade = await ContratoComercial.findOne({
+      where: {
+        unidade_comercial_id: contrato.unidade_comercial_id,
+        status: { [Op.in]: ['RASCUNHO', 'ATIVO', 'INADIMPLENTE', 'QUITADO'] }
+      },
+      transaction
+    });
+
+    if (!contratoAtivoUnidade) {
+      await UnidadeComercial.update(
+        {
+          situacao: 'DISPONIVEL',
+          parceiro_reserva_id: null,
+          reservado_ate: null
+        },
+        {
+          where: { id: contrato.unidade_comercial_id },
+          transaction
+        }
+      );
+    }
+
+    await transaction.commit();
+
+    await registrarEventoSeguranca({
+      req,
+      usuarioId: req.user?.id || null,
+      tipoEvento: 'COMMERCIAL_CONTRACT_DELETED',
+      recursoTipo: 'CONTRATO_COMERCIAL',
+      recursoId: contrato.id,
+      status: 'SUCCESS',
+      descricao: 'Contrato comercial excluido por SUPERADMIN antes da assinatura digital',
+      metadata: {
+        numero: contrato.numero,
+        empreendimento_id: contrato.empreendimento_id,
+        unidade_comercial_id: contrato.unidade_comercial_id,
+        parceiro_id: contrato.parceiro_id,
+        titulos_cancelados: tituloIds
+      }
+    });
+
+    return { ok: true };
+  } catch (error) {
+    await transaction.rollback();
+    throw error;
+  }
+}
+
 module.exports = {
   ativarTabelaPrecoComercial,
   atualizarContratoComercial,
@@ -1862,6 +2000,7 @@ module.exports = {
   criarTabelaPrecoComercial,
   criarUnidadeComercial,
   distratarContratoComercial,
+  excluirContratoComercial,
   listarContratosComerciais,
   listarEmpreendimentos,
   listarTabelasPrecoComerciais,

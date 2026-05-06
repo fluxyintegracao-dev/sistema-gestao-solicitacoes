@@ -151,6 +151,14 @@ export async function atualizarContratoComercial(id, data) {
   return parseJson(response, 'Erro ao atualizar contrato comercial');
 }
 
+export async function excluirContratoComercial(id) {
+  const response = await fetch(`${API_URL}/comercial/contratos/${id}`, {
+    method: 'DELETE',
+    headers: authHeaders()
+  });
+  return parseJson(response, 'Erro ao excluir contrato comercial');
+}
+
 export async function distratarContratoComercial(id, data) {
   const response = await fetch(`${API_URL}/comercial/contratos/${id}/distrato`, {
     method: 'POST',

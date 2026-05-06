@@ -3,6 +3,7 @@ const {
   carregarContratoComercial,
   criarContratoComercial,
   distratarContratoComercial,
+  excluirContratoComercial,
   listarContratosComerciais,
   sincronizarStatusFinanceiroContratoComercial,
   trocarUnidadeContratoComercial
@@ -77,6 +78,16 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return responderErroController(res, error, 'Erro ao sincronizar status financeiro do contrato');
+    }
+  },
+
+  async destroy(req, res) {
+    try {
+      const data = await excluirContratoComercial(req, req.params.id);
+      return res.json(data);
+    } catch (error) {
+      console.error(error);
+      return responderErroController(res, error, 'Erro ao excluir contrato comercial');
     }
   }
 };

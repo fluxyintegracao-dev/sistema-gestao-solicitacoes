@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import { getMinhasObras } from '../services/obras';
 import { buscarParceiros, criarParceiro } from '../services/parceiros';
 import { getCategoriasFinanceiras } from '../services/financeiro';
@@ -10,6 +11,7 @@ import {
   criarContratoComercial,
   distratarContratoComercial,
   enviarDocumentoContratoD4Sign,
+  excluirContratoComercial,
   gerarDocumentoContratoComercial,
   getContratoComercialById,
   getContratosComerciais,
@@ -472,6 +474,7 @@ function gerarParcelasDoBloco(plano = {}, planoId = '') {
 }
 
 export default function ComercialContratos() {
+  const { user } = useAuth();
   const [form, setForm] = useState(defaultForm());
   const [generator, setGenerator] = useState(defaultGenerator());
   const [paymentPlans, setPaymentPlans] = useState([]);
@@ -658,8 +661,17 @@ export default function ComercialContratos() {
   );
 
   const possuiContratoAssinado = useMemo(
-    () => documentosContratoPadrao.some((item) => String(item.status || '').toUpperCase() === 'ASSINADO'),
+    () => documentosContratoPadrao.some((item) =>
+      String(item.status || '').toUpperCase() === 'ASSINADO'
+      || String(item.d4sign_status || '').toUpperCase() === 'ASSINADO'
+      || Boolean(item.d4sign_finalizado_em)
+    ),
     [documentosContratoPadrao]
+  );
+
+  const isSuperadmin = useMemo(
+    () => String(user?.perfil || '').trim().toUpperCase() === 'SUPERADMIN',
+    [user?.perfil]
   );
 
   function aplicarPlanosAoContrato(planos) {
@@ -887,6 +899,35 @@ export default function ComercialContratos() {
       await carregar();
     } catch (err) {
       setError(err?.message || 'Erro ao trocar unidade do contrato');
+    } finally {
+      setProcessingAction('');
+    }
+  }
+
+  async function handleExcluirContrato() {
+    if (!contratoSelecionado?.id) return;
+
+    const confirmado = window.confirm(
+      'Excluir este contrato comercial? Esta acao cancela os titulos ainda sem baixa, libera a unidade e nao pode ser desfeita.'
+    );
+    if (!confirmado) return;
+
+    try {
+      setProcessingAction('excluir');
+      setError('');
+      await excluirContratoComercial(contratoSelecionado.id);
+      setContratoSelecionado(null);
+      setDocumentosContrato([]);
+      setShowDistrato(false);
+      setShowTroca(false);
+      if (String(form.id || '') === String(contratoSelecionado.id)) {
+        setForm(defaultForm());
+        setPaymentPlans([]);
+      }
+      await carregar();
+      window.alert('Contrato excluido com sucesso.');
+    } catch (err) {
+      setError(err?.message || 'Erro ao excluir contrato comercial');
     } finally {
       setProcessingAction('');
     }
@@ -1786,6 +1827,17 @@ export default function ComercialContratos() {
                       {showDistrato ? 'Fechar distrato' : 'Distratar contrato'}
                     </button>
                   </>
+                )}
+                {isSuperadmin && (
+                  <button
+                    type="button"
+                    className="btn btn-outline border-rose-200 text-rose-700 hover:bg-rose-50"
+                    onClick={handleExcluirContrato}
+                    disabled={processingAction === 'excluir' || possuiContratoAssinado}
+                    title={possuiContratoAssinado ? 'Contratos assinados nao podem ser excluidos.' : 'Excluir contrato nao assinado'}
+                  >
+                    {processingAction === 'excluir' ? 'Excluindo...' : 'Excluir contrato'}
+                  </button>
                 )}
               </div>
             </div>
