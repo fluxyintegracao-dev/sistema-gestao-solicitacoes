@@ -6,34 +6,39 @@ export default function ObraSearchModal({
 }) {
   if (!aberto) return null;
 
+  const totalObras = Array.isArray(obras) ? obras.length : 0;
+
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="bg-white p-6 rounded-xl w-full max-w-3xl">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="font-semibold">Obras encontradas</h2>
-          <button className="text-sm text-gray-500" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="w-full max-w-2xl rounded-xl bg-white p-4 shadow-xl sm:p-5">
+        <div className="mb-3 flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-base font-semibold">Obras encontradas</h2>
+            <p className="text-xs text-[var(--c-muted)]">{totalObras} resultado(s)</p>
+          </div>
+          <button className="text-sm text-gray-500 transition hover:text-gray-700" onClick={onClose}>
             Fechar
           </button>
         </div>
 
-        <div className="max-h-[60vh] overflow-y-auto">
-          <table className="table">
+        <div className="table-wrapper max-h-[55vh]">
+          <table className="table min-w-[620px]">
             <thead>
               <tr>
-                <th>Codigo</th>
-                <th>Nome</th>
-                <th>Cidade</th>
-                <th>Acoes</th>
+                <th className="px-3 py-2">Codigo</th>
+                <th className="px-3 py-2">Nome</th>
+                <th className="px-3 py-2">Cidade</th>
+                <th className="px-3 py-2">Acoes</th>
               </tr>
             </thead>
             <tbody>
               {(obras || []).map(o => (
                 <tr key={o.id}>
-                  <td>{o.codigo || '-'}</td>
-                  <td>{o.nome}</td>
-                  <td>{o.cidade || '-'}</td>
-                  <td>
-                    <button className="btn btn-outline" onClick={() => onSelect(o)}>
+                  <td className="px-3 py-2">{o.codigo || '-'}</td>
+                  <td className="px-3 py-2">{o.nome}</td>
+                  <td className="px-3 py-2">{o.cidade || '-'}</td>
+                  <td className="px-3 py-2">
+                    <button className="btn btn-outline btn-sm whitespace-nowrap" onClick={() => onSelect(o)}>
                       Selecionar
                     </button>
                   </td>
@@ -41,7 +46,9 @@ export default function ObraSearchModal({
               ))}
               {(obras || []).length === 0 && (
                 <tr>
-                  <td colSpan="4" align="center">Nenhuma obra encontrada</td>
+                  <td className="px-3 py-3 text-center text-sm text-[var(--c-muted)]" colSpan="4">
+                    Nenhuma obra encontrada
+                  </td>
                 </tr>
               )}
             </tbody>
