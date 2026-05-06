@@ -159,6 +159,36 @@ function parseOptionalText(value, fieldName, max, { required = false } = {}) {
   });
 }
 
+function onlyDigits(value) {
+  return String(value || '').replace(/\D/g, '');
+}
+
+function isValidCpfDigits(value) {
+  const digits = onlyDigits(value);
+  if (digits.length !== 11 || /^(\d)\1{10}$/.test(digits)) return false;
+
+  const calculateDigit = (base) => {
+    const sum = base
+      .split('')
+      .reduce((total, digit, index) => total + Number(digit) * (base.length + 1 - index), 0);
+    const rest = (sum * 10) % 11;
+    return rest === 10 ? 0 : rest;
+  };
+
+  const digit1 = calculateDigit(digits.slice(0, 9));
+  const digit2 = calculateDigit(digits.slice(0, 10));
+  return digit1 === Number(digits[9]) && digit2 === Number(digits[10]);
+}
+
+function parseCpf(value, fieldName, { required = false } = {}) {
+  const normalized = parseOptionalText(value, fieldName, 20, { required });
+  if (normalized === undefined) return undefined;
+  if (!isValidCpfDigits(normalized)) {
+    throw new ValidationError(`${fieldName} invalido.`);
+  }
+  return normalized;
+}
+
 function parseEnum(value, fieldName, allowedValues = [], { required = false } = {}) {
   if (isBlank(value)) {
     if (required) {
@@ -522,6 +552,10 @@ function validateComercialContratoCreateBody(body = {}) {
       'vagas_garagem_posicao',
       'local_assinatura',
       'data_assinatura',
+      'testemunha_1_nome',
+      'testemunha_1_cpf',
+      'testemunha_2_nome',
+      'testemunha_2_cpf',
       'observacoes',
       'parcelas'
     ],
@@ -554,6 +588,10 @@ function validateComercialContratoCreateBody(body = {}) {
     vagas_garagem_posicao: parseOptionalText(body.vagas_garagem_posicao, 'Posicao das vagas de garagem', 255),
     local_assinatura: parseOptionalText(body.local_assinatura, 'Local de assinatura', 160),
     data_assinatura: parseDateOnly(body.data_assinatura, 'Data de assinatura'),
+    testemunha_1_nome: parseOptionalText(body.testemunha_1_nome, 'Nome da testemunha 1', 160, { required: true }),
+    testemunha_1_cpf: parseCpf(body.testemunha_1_cpf, 'CPF da testemunha 1', { required: true }),
+    testemunha_2_nome: parseOptionalText(body.testemunha_2_nome, 'Nome da testemunha 2', 160, { required: true }),
+    testemunha_2_cpf: parseCpf(body.testemunha_2_cpf, 'CPF da testemunha 2', { required: true }),
     observacoes: parseOptionalText(body.observacoes, 'Observacoes', 4000),
     parcelas: normalizeParcelas(body.parcelas)
   };
@@ -587,6 +625,10 @@ function validateComercialContratoUpdateBody(body = {}) {
       'vagas_garagem_posicao',
       'local_assinatura',
       'data_assinatura',
+      'testemunha_1_nome',
+      'testemunha_1_cpf',
+      'testemunha_2_nome',
+      'testemunha_2_cpf',
       'observacoes'
     ],
     'Atualizacao de contrato comercial'
@@ -610,6 +652,10 @@ function validateComercialContratoUpdateBody(body = {}) {
     vagas_garagem_posicao: parseOptionalText(body.vagas_garagem_posicao, 'Posicao das vagas de garagem', 255),
     local_assinatura: parseOptionalText(body.local_assinatura, 'Local de assinatura', 160),
     data_assinatura: parseDateOnly(body.data_assinatura, 'Data de assinatura'),
+    testemunha_1_nome: parseOptionalText(body.testemunha_1_nome, 'Nome da testemunha 1', 160),
+    testemunha_1_cpf: parseCpf(body.testemunha_1_cpf, 'CPF da testemunha 1'),
+    testemunha_2_nome: parseOptionalText(body.testemunha_2_nome, 'Nome da testemunha 2', 160),
+    testemunha_2_cpf: parseCpf(body.testemunha_2_cpf, 'CPF da testemunha 2'),
     observacoes: parseOptionalText(body.observacoes, 'Observacoes', 4000)
   };
 

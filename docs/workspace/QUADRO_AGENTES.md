@@ -44,7 +44,6 @@ Todo agente deve atualizar este arquivo ao iniciar, pausar, finalizar ou transfe
     - 
 ```
 
-
 ## Trabalhos Finalizados
 
 ```md
@@ -65,6 +64,43 @@ Todo agente deve atualizar este arquivo ao iniciar, pausar, finalizar ou transfe
   commit:
     - 
 ```
+
+## Trabalho finalizado
+
+- id: contrato-comercial-assinaturas-testemunhas
+  sessao: codex-contrato-comercial-assinaturas-2026-05-06
+  responsavel: Codex
+  finalizado_em: 2026-05-06
+  escopo concluido:
+    - Titulo do Quadro Resumo passa a substituir nomes fixos pelo nome do empreendimento do contrato.
+    - Item XII do Quadro Resumo usa nome e CNPJ extraidos do item I.a da incorporadora na primeira assinatura.
+    - Clausula vigesima nona substitui local/data fixos pelo local e data de assinatura do formulario.
+    - Contrato comercial ganhou testemunha 1 e testemunha 2 com nome e CPF persistidos no banco.
+    - Formulario do contrato comercial exige testemunhas com CPF valido e envia os campos para criacao/edicao.
+    - Geracao do contrato completo bloqueia com mensagem amigavel se local/data ou testemunhas estiverem ausentes.
+  arquivos alterados:
+    - backend/src/services/comercialContratoDocumentoService.js
+    - backend/src/services/comercialService.js
+    - backend/src/models/ContratoComercial.js
+    - backend/src/validators/commercialValidators.js
+    - backend/migrations/202605060001_contrato_comercial_testemunhas.js
+    - frontend/src/pages/ComercialContratos.jsx
+    - docs/workspace/QUADRO_AGENTES.md
+    - docs/workspace/OWNERSHIP_ATIVO.md
+  validacao executada:
+    - node --check backend/src/services/comercialContratoDocumentoService.js
+    - node --check backend/src/services/comercialService.js
+    - node --check backend/src/models/ContratoComercial.js
+    - node --check backend/src/validators/commercialValidators.js
+    - node --check backend/migrations/202605060001_contrato_comercial_testemunhas.js
+    - node -e "require('./backend/src/services/comercialContratoDocumentoService'); console.log('service loaded')"
+    - npm run build em frontend/
+    - git diff --check
+  pendencias deixadas:
+    - Rodar migration no ambiente de desenvolvimento/EC2 antes de testar novos contratos.
+    - Gerar novo PDF completo em homologacao para validar visualmente assinatura, titulo, local/data e testemunhas nos modelos cadastrados.
+  commit:
+    - Pendente.
 
 ## Trabalho finalizado
 

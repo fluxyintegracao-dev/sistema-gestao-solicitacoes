@@ -6,7 +6,10 @@ Registrar quais sessoes ou chats estao com ownership ativo de arquivos neste rep
 
 ## Status atual
 
-- Nenhum ownership ativo no momento.
+- Nenhum ownership ativo registrado nesta sessao.
+
+## Ownership ativo
+- Sem arquivos reservados no momento.
 
 ## Modelo
 

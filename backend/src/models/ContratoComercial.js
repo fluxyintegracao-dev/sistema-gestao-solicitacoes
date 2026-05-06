@@ -99,6 +99,22 @@ module.exports = (sequelize, DataTypes) => sequelize.define(
       type: DataTypes.DATEONLY,
       allowNull: true
     },
+    testemunha_1_nome: {
+      type: DataTypes.STRING(160),
+      allowNull: true
+    },
+    testemunha_1_cpf: {
+      type: DataTypes.STRING(20),
+      allowNull: true
+    },
+    testemunha_2_nome: {
+      type: DataTypes.STRING(160),
+      allowNull: true
+    },
+    testemunha_2_cpf: {
+      type: DataTypes.STRING(20),
+      allowNull: true
+    },
     observacoes: {
       type: DataTypes.TEXT,
       allowNull: true

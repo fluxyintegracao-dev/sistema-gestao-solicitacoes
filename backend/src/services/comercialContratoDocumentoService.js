@@ -101,6 +101,12 @@ const VARIAVEIS_CONTRATO_COMERCIAL = [
   { chave: 'assinaturas.corretor', descricao: 'Linha de identificacao do corretor para assinatura' },
   { chave: 'assinaturas.vendedora', descricao: 'Linha de identificacao da vendedora/empreendimento para assinatura' },
   { chave: 'assinaturas.vendedora_dados', descricao: 'Dados completos da incorporadora/vendedora para o item XII' },
+  { chave: 'assinaturas.testemunha_1', descricao: 'Linha de identificacao da primeira testemunha' },
+  { chave: 'assinaturas.testemunha_2', descricao: 'Linha de identificacao da segunda testemunha' },
+  { chave: 'testemunha_1.nome', descricao: 'Nome da primeira testemunha' },
+  { chave: 'testemunha_1.cpf', descricao: 'CPF da primeira testemunha' },
+  { chave: 'testemunha_2.nome', descricao: 'Nome da segunda testemunha' },
+  { chave: 'testemunha_2.cpf', descricao: 'CPF da segunda testemunha' },
   { chave: 'custom.*', descricao: 'Qualquer dado complementar enviado no momento da geracao' }
 ];
 
@@ -488,6 +494,65 @@ function buildSingleCellRowXml(sampleRow, paragraphs, options = {}) {
   return `<w:tr>${rowPr}${buildTableCellXml(tcPr, paragraphs, options)}</w:tr>`;
 }
 
+function decodeXmlEntities(value) {
+  return safeString(value)
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'");
+}
+
+function buildParagraphLines(lines = [], options = {}) {
+  return lines
+    .map((line) => safeString(line).trim())
+    .filter(Boolean)
+    .map((line) => buildParagraphXml([{ text: line }], options))
+    .join('');
+}
+
+function formatCpfAssinatura(value) {
+  const cpf = safeString(value).trim();
+  return cpf ? `CPF n\u00ba ${cpf}` : '';
+}
+
+function replaceKnownEmpreendimentoTitle(tableXml, dados = {}) {
+  const nome = safeString(dados?.empreendimento?.nome).trim();
+  if (!nome) return tableXml;
+
+  return [
+    'EDIFÍCIO AREIA PRETA',
+    'EDIFÍCIO PEDRA MENINA',
+    'EDIFÍCIO PIEMONT',
+    'EDIFÍCIO PIEMONTE',
+    'RESIDENCIAL COSTA DO MAR',
+    'RESIDENCIAL COSTA MAR'
+  ].reduce((currentXml, label) => replaceAll(currentXml, label, escapeXml(nome)), tableXml);
+}
+
+function extractIncorporadoraAssinaturaFromRows(rows = []) {
+  const labelIndex = rows.findIndex((row) => {
+    const text = normalizeXmlText(row);
+    return text.includes('I.A') && text.includes('INCORPORADORA');
+  });
+  if (labelIndex < 0) return '';
+
+  const bodyRow = rows.slice(labelIndex + 1).find((row) => {
+    const text = normalizeXmlText(row);
+    return text && !text.includes('I.B') && !text.includes('DO(S) COMPRADOR');
+  });
+  const bodyText = decodeXmlEntities(getXmlText(bodyRow));
+  if (!bodyText) return '';
+
+  const cnpjMatch = bodyText.match(/CNPJ(?:\/MF)?\s*(?:n[ºo]\.?\s*)?([\d./-]{14,18})/i);
+  const cnpj = cnpjMatch ? cnpjMatch[1] : '';
+  const nome = bodyText
+    .split(/\s*,\s*pessoa|\s+inscrita\s+no\s+CNPJ|\s+CNPJ(?:\/MF)?/i)[0]
+    .trim();
+
+  return [nome, cnpj ? `CNPJ n\u00ba ${cnpj}` : ''].filter(Boolean).join('\n');
+}
+
 function applyLegacyBracketAliases(zip) {
   zip.file(/word\/.*\.xml$/).forEach((entry) => {
     let xml = entry.asText();
@@ -574,7 +639,10 @@ function buildAssinaturasQuadroResumo(dados = {}) {
   const linhas = [];
   const assinaturaLinha = '__________________________________________________________________';
   const addAssinatura = (titulo, partes = []) => {
-    const conteudo = partes.map((parte) => safeString(parte).trim()).filter(Boolean);
+    const conteudo = partes
+      .flatMap((parte) => safeString(parte).split(/\r?\n/))
+      .map((parte) => parte.trim())
+      .filter(Boolean);
     if (!conteudo.length) return;
     if (linhas.length) linhas.push('');
     linhas.push(assinaturaLinha);
@@ -621,8 +689,11 @@ function applyQuadroResumoAutomation(zip, dados = {}) {
         return tableXml;
       }
 
+      tableXml = replaceKnownEmpreendimentoTitle(tableXml, dados);
+
       return replaceRowsInTable(tableXml, (rows) => {
         const nextRows = [...rows];
+        const incorporadoraAssinatura = extractIncorporadoraAssinaturaFromRows(nextRows);
 
         const objetoIndex = nextRows.findIndex((row) => {
           const text = normalizeXmlText(row);
@@ -683,9 +754,16 @@ function applyQuadroResumoAutomation(zip, dados = {}) {
 
         const assinaturasIndex = nextRows.findIndex((row) => normalizeXmlText(row).includes('XII- ASSINATURAS'));
         if (assinaturasIndex >= 0 && nextRows[assinaturasIndex + 1]) {
+          const dadosAssinaturas = {
+            ...dados,
+            assinaturas: {
+              ...(dados.assinaturas || {}),
+              vendedora_dados: dados?.assinaturas?.vendedora_dados || incorporadoraAssinatura
+            }
+          };
           nextRows[assinaturasIndex + 1] = buildSingleCellRowXml(
             nextRows[assinaturasIndex + 1],
-            buildAssinaturasQuadroResumo(dados),
+            buildAssinaturasQuadroResumo(dadosAssinaturas),
             { align: 'center' }
           );
         }
@@ -698,9 +776,68 @@ function applyQuadroResumoAutomation(zip, dados = {}) {
   });
 }
 
+function isLocalDataContratoParagraph(text) {
+  const normalized = safeString(text)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase();
+
+  return /XX DE X{3,}/.test(normalized)
+    && (
+      normalized.includes('ANCHIETA')
+      || normalized.includes('GUACUI')
+      || normalized.includes('IRIRI')
+      || normalized.includes(' ES')
+      || normalized.includes('-ES')
+    );
+}
+
+function applyContratoAssinaturasAutomation(zip, dados = {}) {
+  const testemunha1 = dados?.testemunha_1 || {};
+  const testemunha2 = dados?.testemunha_2 || {};
+  const localDataAssinatura = safeString(dados?.contrato?.local_data_assinatura).trim();
+
+  zip.file(/word\/document\.xml$/).forEach((entry) => {
+    let xml = entry.asText();
+
+    xml = xml.replace(/<w:p[\s\S]*?<\/w:p>/g, (paragraphXml) => {
+      const text = decodeXmlEntities(getXmlText(paragraphXml));
+      const normalized = text
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toUpperCase();
+
+      if (localDataAssinatura && isLocalDataContratoParagraph(text)) {
+        return buildParagraphLines([localDataAssinatura], { align: 'center' });
+      }
+
+      if (testemunha1.nome && normalized.includes('DALVINA DE OLIVEIRA LIMA')) {
+        return buildParagraphLines([testemunha1.nome], { align: 'center' });
+      }
+
+      if (testemunha1.cpf && normalized.includes('123.100.157')) {
+        return buildParagraphLines([formatCpfAssinatura(testemunha1.cpf)], { align: 'center' });
+      }
+
+      if (testemunha2.nome && normalized.includes('OTAVIO TEIXEIRA DE AZEVEDO')) {
+        return buildParagraphLines([testemunha2.nome], { align: 'center' });
+      }
+
+      if (testemunha2.cpf && normalized.includes('178.544.147')) {
+        return buildParagraphLines([formatCpfAssinatura(testemunha2.cpf), 'TESTEMUNHA'], { align: 'center' });
+      }
+
+      return paragraphXml;
+    });
+
+    zip.file(entry.name, xml);
+  });
+}
+
 function applyComercialDocumentAutomation(zip, dados = {}) {
   applyContratoHeaderAutomation(zip, dados);
   applyQuadroResumoAutomation(zip, dados);
+  applyContratoAssinaturasAutomation(zip, dados);
 }
 
 function buildParcelasResumo(parcelas = []) {
@@ -933,6 +1070,14 @@ function buildDadosContrato(contrato, customVariables = {}) {
       creci: safeString(corretor.creci),
       percentual_comissao: raw.comissao_percentual ? `${safeString(raw.comissao_percentual)}%` : ''
     },
+    testemunha_1: {
+      nome: safeString(raw.testemunha_1_nome),
+      cpf: safeString(raw.testemunha_1_cpf)
+    },
+    testemunha_2: {
+      nome: safeString(raw.testemunha_2_nome),
+      cpf: safeString(raw.testemunha_2_cpf)
+    },
     obra: {
       nome: safeString(obra.nome),
       codigo: safeString(obra.codigo)
@@ -958,7 +1103,9 @@ function buildDadosContrato(contrato, customVariables = {}) {
       comprador: buildAssinaturaPessoa(cliente.nome, cliente.cpf_cnpj),
       conjuge: buildAssinaturaPessoa(conjuge.nome || cliente.conjuge_nome, conjuge.cpf_cnpj),
       corretor: buildAssinaturaPessoa(corretor.nome || raw.corretor_nome, corretor.cpf_cnpj),
-      vendedora: safeString(empreendimento.nome)
+      vendedora: safeString(empreendimento.nome),
+      testemunha_1: buildAssinaturaPessoa(raw.testemunha_1_nome, raw.testemunha_1_cpf),
+      testemunha_2: buildAssinaturaPessoa(raw.testemunha_2_nome, raw.testemunha_2_cpf)
     },
     quadro_resumo: {
       item_iii_texto: itemIIITexto,
@@ -976,6 +1123,24 @@ function buildDadosContrato(contrato, customVariables = {}) {
   };
 
   return deepMerge(dados, customVariables);
+}
+
+function assertDadosObrigatoriosDocumentoContrato(dados = {}) {
+  const faltando = [];
+
+  if (!safeString(dados?.contrato?.local_assinatura).trim()) faltando.push('local de assinatura');
+  if (!safeString(dados?.contrato?.data_assinatura_iso).trim()) faltando.push('data de assinatura');
+  if (!safeString(dados?.testemunha_1?.nome).trim()) faltando.push('nome da testemunha 1');
+  if (!safeString(dados?.testemunha_1?.cpf).trim()) faltando.push('CPF da testemunha 1');
+  if (!safeString(dados?.testemunha_2?.nome).trim()) faltando.push('nome da testemunha 2');
+  if (!safeString(dados?.testemunha_2?.cpf).trim()) faltando.push('CPF da testemunha 2');
+
+  if (faltando.length) {
+    throw createHttpError(
+      400,
+      `Antes de gerar o contrato completo, preencha ${faltando.join(', ')} no cadastro do contrato.`
+    );
+  }
 }
 
 async function carregarContratoParaDocumento(id) {
@@ -1280,6 +1445,9 @@ async function gerarDocumentoContratoComercial(req, contratoId, payload = {}) {
   );
   const dados = buildDadosContrato(contrato, customVariables);
   const tipoDocumento = normalizeTipoDocumento(modelo.tipo_documento);
+  if (tipoDocumento === 'CONTRATO') {
+    assertDadosObrigatoriosDocumentoContrato(dados);
+  }
   const numeroContrato = sanitizeFileNameForStorage(contrato.numero || `contrato-${contrato.id}`);
   const baseName = `${tipoDocumento.toLowerCase()}-${numeroContrato || contrato.id}`;
   const renderContrato = await renderModeloDocumento(modelo, dados, baseName);

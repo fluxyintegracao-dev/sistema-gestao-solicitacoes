@@ -80,6 +80,10 @@ function defaultForm() {
     vagas_garagem_posicao: '',
     local_assinatura: '',
     data_assinatura: today(),
+    testemunha_1_nome: '',
+    testemunha_1_cpf: '',
+    testemunha_2_nome: '',
+    testemunha_2_cpf: '',
     observacoes: '',
     parcelas: []
   };
@@ -380,6 +384,10 @@ function pickEditForm(contrato = {}) {
     vagas_garagem_posicao: contrato.vagas_garagem_posicao || '',
     local_assinatura: contrato.local_assinatura || '',
     data_assinatura: contrato.data_assinatura || contrato.data_contrato || today(),
+    testemunha_1_nome: contrato.testemunha_1_nome || '',
+    testemunha_1_cpf: contrato.testemunha_1_cpf || '',
+    testemunha_2_nome: contrato.testemunha_2_nome || '',
+    testemunha_2_cpf: contrato.testemunha_2_cpf || '',
     observacoes: contrato.observacoes || '',
     parcelas: Array.isArray(contrato.parcelas) ? contrato.parcelas : []
   };
@@ -1190,6 +1198,12 @@ export default function ComercialContratos() {
     if (form.possui_vaga_garagem && form.vagas_garagem_posicao_especifica && !hasText(form.vagas_garagem_posicao)) camposFaltando.push('Posicao das vagas');
     if (!hasText(form.local_assinatura)) camposFaltando.push('Local de assinatura');
     if (!hasText(form.data_assinatura)) camposFaltando.push('Data de assinatura');
+    if (!hasText(form.testemunha_1_nome)) camposFaltando.push('Nome da testemunha 1');
+    if (!hasText(form.testemunha_1_cpf)) camposFaltando.push('CPF da testemunha 1');
+    if (!hasText(form.testemunha_2_nome)) camposFaltando.push('Nome da testemunha 2');
+    if (!hasText(form.testemunha_2_cpf)) camposFaltando.push('CPF da testemunha 2');
+    if (hasText(form.testemunha_1_cpf) && (onlyDigits(form.testemunha_1_cpf).length !== 11 || !isValidCpfCnpj(form.testemunha_1_cpf))) camposFaltando.push('CPF valido da testemunha 1');
+    if (hasText(form.testemunha_2_cpf) && (onlyDigits(form.testemunha_2_cpf).length !== 11 || !isValidCpfCnpj(form.testemunha_2_cpf))) camposFaltando.push('CPF valido da testemunha 2');
 
     if (!form.parcelas.length) {
       camposFaltando.push('Formas de pagamento');
@@ -1244,6 +1258,10 @@ export default function ComercialContratos() {
           vagas_garagem_posicao: form.possui_vaga_garagem && form.vagas_garagem_posicao_especifica ? form.vagas_garagem_posicao || null : null,
           local_assinatura: form.local_assinatura || undefined,
           data_assinatura: form.data_assinatura || undefined,
+          testemunha_1_nome: form.testemunha_1_nome || undefined,
+          testemunha_1_cpf: form.testemunha_1_cpf || undefined,
+          testemunha_2_nome: form.testemunha_2_nome || undefined,
+          testemunha_2_cpf: form.testemunha_2_cpf || undefined,
           observacoes: form.observacoes || undefined
         });
       } else {
@@ -1269,6 +1287,10 @@ export default function ComercialContratos() {
           vagas_garagem_posicao: form.possui_vaga_garagem && form.vagas_garagem_posicao_especifica ? form.vagas_garagem_posicao || null : null,
           local_assinatura: form.local_assinatura || undefined,
           data_assinatura: form.data_assinatura || form.data_contrato || undefined,
+          testemunha_1_nome: form.testemunha_1_nome || undefined,
+          testemunha_1_cpf: form.testemunha_1_cpf || undefined,
+          testemunha_2_nome: form.testemunha_2_nome || undefined,
+          testemunha_2_cpf: form.testemunha_2_cpf || undefined,
           observacoes: form.observacoes || undefined,
           parcelas: form.parcelas.map((item, index) => ({
             sequencia: item.sequencia || index + 1,
@@ -1510,6 +1532,27 @@ export default function ComercialContratos() {
               <span className="sol-filter-label">Data de assinatura</span>
               <input className="input w-full" type="date" value={form.data_assinatura} onChange={(e) => setForm((c) => ({ ...c, data_assinatura: e.target.value }))} />
             </label>
+          </div>
+          <div className="rounded-xl border border-[var(--c-border)] bg-[var(--c-bg)] p-3">
+            <p className="mb-3 text-sm font-semibold text-[var(--c-text)]">Testemunhas do contrato</p>
+            <div className="grid gap-3 md:grid-cols-4">
+              <label className="sol-filter-field md:col-span-2">
+                <span className="sol-filter-label">Testemunha 1</span>
+                <input className="input w-full" value={form.testemunha_1_nome} onChange={(e) => setForm((c) => ({ ...c, testemunha_1_nome: e.target.value }))} placeholder="Nome completo" />
+              </label>
+              <label className="sol-filter-field">
+                <span className="sol-filter-label">CPF testemunha 1</span>
+                <input className="input w-full" value={form.testemunha_1_cpf} onChange={(e) => setForm((c) => ({ ...c, testemunha_1_cpf: maskCpfCnpj(e.target.value) }))} placeholder="000.000.000-00" />
+              </label>
+              <label className="sol-filter-field md:col-span-2">
+                <span className="sol-filter-label">Testemunha 2</span>
+                <input className="input w-full" value={form.testemunha_2_nome} onChange={(e) => setForm((c) => ({ ...c, testemunha_2_nome: e.target.value }))} placeholder="Nome completo" />
+              </label>
+              <label className="sol-filter-field">
+                <span className="sol-filter-label">CPF testemunha 2</span>
+                <input className="input w-full" value={form.testemunha_2_cpf} onChange={(e) => setForm((c) => ({ ...c, testemunha_2_cpf: maskCpfCnpj(e.target.value) }))} placeholder="000.000.000-00" />
+              </label>
+            </div>
           </div>
           <label className="sol-filter-field"><span className="sol-filter-label">Observacoes</span><textarea className="input min-h-[92px] w-full" value={form.observacoes} onChange={(e) => setForm((c) => ({ ...c, observacoes: e.target.value }))} /></label>
 

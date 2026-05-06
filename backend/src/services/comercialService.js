@@ -1338,6 +1338,10 @@ async function criarContratoComercial(req, payload = {}) {
       vagas_garagem_posicao: payload.possui_vaga_garagem ? (payload.vagas_garagem_posicao || null) : null,
       local_assinatura: payload.local_assinatura || null,
       data_assinatura: payload.data_assinatura || payload.data_contrato || null,
+      testemunha_1_nome: payload.testemunha_1_nome || null,
+      testemunha_1_cpf: payload.testemunha_1_cpf || null,
+      testemunha_2_nome: payload.testemunha_2_nome || null,
+      testemunha_2_cpf: payload.testemunha_2_cpf || null,
       observacoes: payload.observacoes || null,
       criado_por: req.user?.id || null,
       atualizado_por: req.user?.id || null
