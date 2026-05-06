@@ -49,6 +49,7 @@ const PERIODICIDADES = [
   { value: 'ANUAL', label: 'Anual', intervalMonths: 12 },
   { value: 'PERSONALIZADA', label: 'Datas pre-definidas', intervalMonths: null }
 ];
+const CONTRATO_COMERCIAL_DRAFT_KEY = 'fluxy:comercial:contrato-venda:draft';
 
 function today() {
   return new Date().toISOString().slice(0, 10);
@@ -384,6 +385,37 @@ function pickEditForm(contrato = {}) {
   };
 }
 
+function getStoredContratoDraft() {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(CONTRATO_COMERCIAL_DRAFT_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object' || parsed.form?.id) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function saveStoredContratoDraft(payload) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(CONTRATO_COMERCIAL_DRAFT_KEY, JSON.stringify(payload));
+  } catch {
+    // localStorage pode estar indisponivel em alguns navegadores corporativos.
+  }
+}
+
+function clearStoredContratoDraft() {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.removeItem(CONTRATO_COMERCIAL_DRAFT_KEY);
+  } catch {
+    // Sem acao: a limpeza visual do formulario continua funcionando.
+  }
+}
+
 function resolveGeneratorByModo(modo, current = {}) {
   if (modo === 'ENTRADA') {
     return {
@@ -487,9 +519,12 @@ function gerarParcelasDoBloco(plano = {}, planoId = '') {
 
 export default function ComercialContratos() {
   const { user } = useAuth();
-  const [form, setForm] = useState(defaultForm());
-  const [generator, setGenerator] = useState(defaultGenerator());
-  const [paymentPlans, setPaymentPlans] = useState([]);
+  const [draftLoaded] = useState(() => getStoredContratoDraft());
+  const [form, setForm] = useState(() => draftLoaded?.form || defaultForm());
+  const [generator, setGenerator] = useState(() => draftLoaded?.generator || defaultGenerator());
+  const [paymentPlans, setPaymentPlans] = useState(() => (
+    Array.isArray(draftLoaded?.paymentPlans) ? draftLoaded.paymentPlans : []
+  ));
   const [busca, setBusca] = useState('');
   const [statusFiltro, setStatusFiltro] = useState('');
   const [empreendimentos, setEmpreendimentos] = useState([]);
@@ -565,6 +600,11 @@ export default function ComercialContratos() {
   useEffect(() => {
     carregar();
   }, []);
+
+  useEffect(() => {
+    if (form.id) return;
+    saveStoredContratoDraft({ form, generator, paymentPlans });
+  }, [form, generator, paymentPlans]);
 
   const unidadesDoEmpreendimento = useMemo(() => {
     const unidadesBase = form.empreendimento_id
@@ -848,6 +888,32 @@ export default function ComercialContratos() {
     updateParcela(index, 'valor', formatCurrencyInput(novoValor));
   }
 
+  function limparFormasPagamentoContrato() {
+    setError('');
+    setParcelaEditandoIndex(null);
+    setGenerator(defaultGenerator());
+    setPaymentPlans([]);
+    setForm((current) => ({
+      ...current,
+      parcelas: [],
+      valor_entrada: ''
+    }));
+  }
+
+  function limparDadosContrato({ confirmar = true } = {}) {
+    if (confirmar) {
+      const confirmado = window.confirm('Limpar todos os dados preenchidos deste contrato? Esta acao tambem apaga as formas de pagamento do rascunho.');
+      if (!confirmado) return;
+    }
+
+    clearStoredContratoDraft();
+    setError('');
+    setParcelaEditandoIndex(null);
+    setForm(defaultForm());
+    setGenerator(defaultGenerator());
+    setPaymentPlans([]);
+  }
+
   async function carregarDocumentosContrato(contratoId) {
     if (!contratoId) {
       setDocumentosContrato([]);
@@ -954,8 +1020,7 @@ export default function ComercialContratos() {
       setShowDistrato(false);
       setShowTroca(false);
       if (String(form.id || '') === String(contratoSelecionado.id)) {
-        setForm(defaultForm());
-        setPaymentPlans([]);
+        limparDadosContrato({ confirmar: false });
       }
       await carregar();
       window.alert('Contrato excluido com sucesso.');
@@ -1218,9 +1283,7 @@ export default function ComercialContratos() {
         });
       }
 
-      setForm(defaultForm());
-      setGenerator(defaultGenerator());
-      setPaymentPlans([]);
+      limparDadosContrato({ confirmar: false });
       await carregar();
     } catch (err) {
       setError(err?.message || 'Erro ao salvar contrato comercial');
@@ -1785,9 +1848,16 @@ export default function ComercialContratos() {
             <button type="submit" className="btn btn-primary" disabled={saving}>
               {saving ? 'Salvando...' : form.id ? 'Salvar resumo' : 'Criar contrato'}
             </button>
-            <button type="button" className="btn btn-outline" onClick={() => { setForm(defaultForm()); setGenerator(defaultGenerator()); setPaymentPlans([]); }}>
-              Limpar
-            </button>
+            {!form.id && (
+              <button type="button" className="btn btn-outline" onClick={limparFormasPagamentoContrato} disabled={saving}>
+                Limpar formas de pagamento
+              </button>
+            )}
+            {!form.id && (
+              <button type="button" className="btn btn-outline border-rose-200 text-rose-700 hover:bg-rose-50" onClick={() => limparDadosContrato()} disabled={saving}>
+                Limpar dados do contrato
+              </button>
+            )}
           </div>
         </form>
       </section>
