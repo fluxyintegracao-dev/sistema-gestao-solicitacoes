@@ -11,6 +11,7 @@ import {
   criarContratoComercial,
   distratarContratoComercial,
   enviarDocumentoContratoD4Sign,
+  excluirDocumentoContratoComercial,
   excluirContratoComercial,
   gerarDocumentoContratoComercial,
   getContratoComercialById,
@@ -342,6 +343,16 @@ function documentoTipoLabel(tipo) {
   return TIPOS_DOCUMENTO_MODELO.find((item) => item.value === String(tipo || '').toUpperCase())?.label || tipo || '-';
 }
 
+function documentoEstaAssinado(documento) {
+  const status = String(documento?.status || '').trim().toUpperCase();
+  const d4signStatus = String(documento?.d4sign_status || '').trim().toUpperCase();
+  return status === 'ASSINADO'
+    || d4signStatus === 'ASSINADO'
+    || d4signStatus === 'FINALIZADO'
+    || d4signStatus === 'CONCLUIDO'
+    || Boolean(documento?.d4sign_finalizado_em);
+}
+
 function pickEditForm(contrato = {}) {
   return {
     id: contrato.id || null,
@@ -661,11 +672,7 @@ export default function ComercialContratos() {
   );
 
   const possuiContratoAssinado = useMemo(
-    () => documentosContratoPadrao.some((item) =>
-      String(item.status || '').toUpperCase() === 'ASSINADO'
-      || String(item.d4sign_status || '').toUpperCase() === 'ASSINADO'
-      || Boolean(item.d4sign_finalizado_em)
-    ),
+    () => documentosContratoPadrao.some((item) => documentoEstaAssinado(item)),
     [documentosContratoPadrao]
   );
 
@@ -971,6 +978,27 @@ export default function ComercialContratos() {
       await carregarDocumentosContrato(contratoSelecionado?.id);
     } catch (err) {
       setError(err?.message || 'Erro ao enviar documento para D4Sign');
+    } finally {
+      setProcessingAction('');
+    }
+  }
+
+  async function handleExcluirDocumentoContrato(documento) {
+    if (!documento?.id || !contratoSelecionado?.id) return;
+
+    const confirmado = window.confirm(
+      'Excluir este PDF gerado? O contrato comercial continua cadastrado, mas este documento sai da lista.'
+    );
+    if (!confirmado) return;
+
+    try {
+      setProcessingAction(`excluir-doc-${documento.id}`);
+      setError('');
+      await excluirDocumentoContratoComercial(documento.id);
+      await carregarDocumentosContrato(contratoSelecionado.id);
+      window.alert('Documento gerado excluido com sucesso.');
+    } catch (err) {
+      setError(err?.message || 'Erro ao excluir documento do contrato');
     } finally {
       setProcessingAction('');
     }
@@ -1946,6 +1974,10 @@ export default function ComercialContratos() {
               ) : (
                 documentosContratoPadrao.map((documento) => (
                   <article key={documento.id} className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-bg)] p-4">
+                    {(() => {
+                      const documentoAssinado = documentoEstaAssinado(documento);
+                      return (
+                        <>
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
                         <div className="text-xs uppercase tracking-[0.18em] text-[var(--c-muted)]">{documentoTipoLabel(documento.tipo_documento)}</div>
@@ -1965,11 +1997,25 @@ export default function ComercialContratos() {
                         type="button"
                         className="btn btn-primary"
                         onClick={() => handleEnviarDocumentoD4Sign(documento.id)}
-                        disabled={processingAction === `d4sign-${documento.id}` || documento.status === 'ASSINADO'}
+                        disabled={processingAction === `d4sign-${documento.id}` || documentoAssinado}
                       >
                         {processingAction === `d4sign-${documento.id}` ? 'Enviando...' : 'Enviar D4Sign'}
                       </button>
+                      {isSuperadmin && (
+                        <button
+                          type="button"
+                          className="btn btn-outline border-rose-200 text-rose-700 hover:bg-rose-50"
+                          onClick={() => handleExcluirDocumentoContrato(documento)}
+                          disabled={processingAction === `excluir-doc-${documento.id}` || documentoAssinado}
+                          title={documentoAssinado ? 'Documentos assinados nao podem ser excluidos.' : 'Excluir PDF gerado'}
+                        >
+                          {processingAction === `excluir-doc-${documento.id}` ? 'Excluindo...' : 'Excluir PDF gerado'}
+                        </button>
+                      )}
                     </div>
+                        </>
+                      );
+                    })()}
                   </article>
                 ))
               )}

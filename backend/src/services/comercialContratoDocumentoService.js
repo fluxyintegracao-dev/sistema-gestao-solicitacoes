@@ -19,6 +19,7 @@ const {
 } = require('../models');
 const { getPresignedUrl, uploadToS3 } = require('./s3');
 const { createSignerList, getConfig, registerWebhook, sendToSigners, uploadPdfDocument } = require('./d4signService');
+const { registrarEventoSeguranca } = require('./securityLogService');
 const { normalizeOriginalName, sanitizeFileNameForStorage } = require('../utils/fileName');
 
 const TIPOS_DOCUMENTO = new Set(['CONTRATO', 'QUADRO_RESUMO']);
@@ -167,6 +168,20 @@ function createHttpError(statusCode, message, code = null) {
   error.statusCode = statusCode;
   if (code) error.code = code;
   return error;
+}
+
+function isSuperadminUser(user) {
+  return String(user?.perfil || '').trim().toUpperCase() === 'SUPERADMIN';
+}
+
+function documentoEstaAssinado(documento) {
+  const status = String(documento?.status || '').trim().toUpperCase();
+  const d4signStatus = String(documento?.d4sign_status || '').trim().toUpperCase();
+  return status === 'ASSINADO'
+    || d4signStatus === 'ASSINADO'
+    || d4signStatus === 'FINALIZADO'
+    || d4signStatus === 'CONCLUIDO'
+    || Boolean(documento?.d4sign_finalizado_em);
 }
 
 function normalizeTipoDocumento(value) {
@@ -910,6 +925,45 @@ async function obterLinkDocumentoContratoComercial(documentoId, tipo = 'pdf') {
   };
 }
 
+async function excluirDocumentoContratoComercial(req, documentoId) {
+  if (!isSuperadminUser(req.user)) {
+    throw createHttpError(403, 'Apenas SUPERADMIN pode excluir documentos gerados de contratos.');
+  }
+
+  const documento = await ContratoComercialDocumento.findByPk(documentoId);
+  if (!documento) {
+    throw createHttpError(404, 'Documento nao encontrado.');
+  }
+
+  if (documentoEstaAssinado(documento)) {
+    throw createHttpError(400, 'Nao e possivel excluir documento assinado digitalmente.');
+  }
+
+  const contratoId = documento.contrato_comercial_id;
+  const metadata = {
+    contrato_comercial_id: contratoId,
+    tipo_documento: documento.tipo_documento,
+    nome: documento.nome,
+    status: documento.status,
+    d4sign_status: documento.d4sign_status
+  };
+
+  await documento.destroy();
+
+  await registrarEventoSeguranca({
+    req,
+    usuarioId: req.user?.id || null,
+    tipoEvento: 'COMMERCIAL_CONTRACT_DOCUMENT_DELETED',
+    recursoTipo: 'CONTRATO_COMERCIAL_DOCUMENTO',
+    recursoId: Number(documentoId),
+    status: 'SUCCESS',
+    descricao: 'Documento gerado de contrato comercial excluido por SUPERADMIN antes da assinatura digital',
+    metadata
+  });
+
+  return { ok: true, contrato_comercial_id: contratoId };
+}
+
 function defaultSignersFromContrato(contrato) {
   const cliente = contrato?.cliente || {};
   if (!cliente.email) return [];
@@ -1056,6 +1110,7 @@ module.exports = {
   VARIAVEIS_CONTRATO_COMERCIAL,
   criarModeloContratoComercial,
   enviarDocumentoD4Sign,
+  excluirDocumentoContratoComercial,
   gerarDocumentoContratoComercial,
   listarDocumentosContratoComercial,
   listarModelosContratoComercial,

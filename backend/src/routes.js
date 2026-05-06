@@ -905,6 +905,7 @@ router.get('/comercial/contratos-modelos', allowComercialContratosRead, Comercia
 router.post('/comercial/contratos-modelos', allowComercialContratosManage, uploadRateLimit, uploadComprovantes.single('file'), ComercialContratoDocumentoController.criarModelo);
 router.get('/comercial/contratos-documentos/:documentoId/link', allowComercialContratosRead, validateRequest({ params: validateNumericIdParam('documentoId', 'Documento comercial') }), ComercialContratoDocumentoController.obterLink);
 router.post('/comercial/contratos-documentos/:documentoId/enviar-d4sign', allowComercialContratosManage, criticalRateLimit, validateRequest({ params: validateNumericIdParam('documentoId', 'Documento comercial') }), ComercialContratoDocumentoController.enviarD4Sign);
+router.delete('/comercial/contratos-documentos/:documentoId', allowComercialContratosManage, criticalRateLimit, validateRequest({ params: validateNumericIdParam('documentoId', 'Documento comercial') }), ComercialContratoDocumentoController.excluirDocumento);
 router.get('/comercial/contratos', allowComercialContratosRead, validateRequest({ query: validateComercialContratoQuery }), ComercialContratoController.index);
 router.get('/comercial/contratos/:id', allowComercialContratosRead, validateRequest({ params: validateNumericIdParam('id', 'Contrato comercial') }), ComercialContratoController.show);
 router.post('/comercial/contratos', allowComercialContratosCreate, criticalRateLimit, validateRequest({ body: validateComercialContratoCreateBody }), ComercialContratoController.create);

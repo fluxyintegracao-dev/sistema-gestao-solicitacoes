@@ -2,6 +2,7 @@ const {
   VARIAVEIS_CONTRATO_COMERCIAL,
   criarModeloContratoComercial,
   enviarDocumentoD4Sign,
+  excluirDocumentoContratoComercial,
   gerarDocumentoContratoComercial,
   listarDocumentosContratoComercial,
   listarModelosContratoComercial,
@@ -89,6 +90,16 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return responderErroController(res, error, 'Erro ao enviar documento para D4Sign');
+    }
+  },
+
+  async excluirDocumento(req, res) {
+    try {
+      const data = await excluirDocumentoContratoComercial(req, req.params.documentoId);
+      return res.json(data);
+    } catch (error) {
+      console.error(error);
+      return responderErroController(res, error, 'Erro ao excluir documento do contrato');
     }
   },
 

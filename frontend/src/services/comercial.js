@@ -242,3 +242,11 @@ export async function enviarDocumentoContratoD4Sign(documentoId, data = {}) {
   });
   return parseJson(response, 'Erro ao enviar documento para D4Sign');
 }
+
+export async function excluirDocumentoContratoComercial(documentoId) {
+  const response = await fetch(`${API_URL}/comercial/contratos-documentos/${documentoId}`, {
+    method: 'DELETE',
+    headers: authHeaders()
+  });
+  return parseJson(response, 'Erro ao excluir documento do contrato');
+}
