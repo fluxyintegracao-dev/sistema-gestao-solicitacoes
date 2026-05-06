@@ -26,9 +26,12 @@ const TIPOS_DOCUMENTO = new Set(['CONTRATO', 'QUADRO_RESUMO']);
 
 const VARIAVEIS_CONTRATO_COMERCIAL = [
   { chave: 'contrato.numero', descricao: 'Numero do contrato' },
+  { chave: 'contrato.numero_identificador', descricao: 'Identificador do contrato calculado pelo empreendimento/unidade' },
   { chave: 'contrato.data', descricao: 'Data do contrato em formato brasileiro' },
   { chave: 'contrato.valor_total', descricao: 'Valor total em numero' },
   { chave: 'contrato.valor_total_formatado', descricao: 'Valor total formatado em reais' },
+  { chave: 'contrato.valor_total_extenso', descricao: 'Valor total por extenso' },
+  { chave: 'contrato.valor_total_com_extenso', descricao: 'Valor total formatado com valor por extenso' },
   { chave: 'contrato.valor_entrada_formatado', descricao: 'Valor de entrada formatado' },
   { chave: 'contrato.desconto_formatado', descricao: 'Desconto formatado' },
   { chave: 'contrato.indice_reajuste', descricao: 'Indice de reajuste' },
@@ -79,6 +82,7 @@ const VARIAVEIS_CONTRATO_COMERCIAL = [
   { chave: 'unidade.pavimento', descricao: 'Pavimento da unidade' },
   { chave: 'unidade.tipologia', descricao: 'Tipologia da unidade' },
   { chave: 'unidade.metragem_privativa', descricao: 'Metragem privativa da unidade' },
+  { chave: 'unidade.metragem_privativa_formatada', descricao: 'Metragem privativa formatada com m2' },
   { chave: 'unidade.fracao_ideal', descricao: 'Fracao ideal da unidade' },
   { chave: 'unidade.vagas_garagem', descricao: 'Resumo das vagas de garagem da unidade vendida' },
   { chave: 'corretor.nome', descricao: 'Nome do corretor' },
@@ -88,10 +92,15 @@ const VARIAVEIS_CONTRATO_COMERCIAL = [
   { chave: 'parcelas.resumo', descricao: 'Resumo das parcelas do contrato' },
   { chave: 'parcelas.quadro_resumo_texto', descricao: 'Linhas agrupadas para o item VI do quadro resumo' },
   { chave: 'parcelas.quadro_resumo_itens', descricao: 'Lista de parcelas agrupadas para tabelas do quadro resumo' },
+  { chave: 'quadro_resumo.item_iii_texto', descricao: 'Resumo do item III do Quadro Resumo' },
+  { chave: 'quadro_resumo.preco_total_unidade', descricao: 'Preco total da unidade para o item VI.a' },
+  { chave: 'quadro_resumo.valor_leilao', descricao: 'Valor do imovel para fins de publico leilao' },
+  { chave: 'quadro_resumo.assinaturas_texto', descricao: 'Bloco automatico de assinaturas do item XII' },
   { chave: 'assinaturas.comprador', descricao: 'Linha de identificacao do comprador para assinatura' },
   { chave: 'assinaturas.conjuge', descricao: 'Linha de identificacao do conjuge para assinatura' },
   { chave: 'assinaturas.corretor', descricao: 'Linha de identificacao do corretor para assinatura' },
   { chave: 'assinaturas.vendedora', descricao: 'Linha de identificacao da vendedora/empreendimento para assinatura' },
+  { chave: 'assinaturas.vendedora_dados', descricao: 'Dados completos da incorporadora/vendedora para o item XII' },
   { chave: 'custom.*', descricao: 'Qualquer dado complementar enviado no momento da geracao' }
 ];
 
@@ -239,6 +248,95 @@ function formatCurrency(value) {
   });
 }
 
+function formatDecimalBr(value, fractionDigits = 2) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return '';
+  return numeric.toLocaleString('pt-BR', {
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits
+  });
+}
+
+function formatArea(value) {
+  const formatted = formatDecimalBr(value, 2);
+  return formatted ? `${formatted} m²` : '';
+}
+
+function formatFracaoIdeal(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return safeString(value);
+  return numeric.toLocaleString('pt-BR', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 6
+  });
+}
+
+const EXTENSO_UNIDADES = ['', 'um', 'dois', 'tres', 'quatro', 'cinco', 'seis', 'sete', 'oito', 'nove'];
+const EXTENSO_DEZ_A_DEZENOVE = ['dez', 'onze', 'doze', 'treze', 'quatorze', 'quinze', 'dezesseis', 'dezessete', 'dezoito', 'dezenove'];
+const EXTENSO_DEZENAS = ['', '', 'vinte', 'trinta', 'quarenta', 'cinquenta', 'sessenta', 'setenta', 'oitenta', 'noventa'];
+const EXTENSO_CENTENAS = ['', 'cento', 'duzentos', 'trezentos', 'quatrocentos', 'quinhentos', 'seiscentos', 'setecentos', 'oitocentos', 'novecentos'];
+
+function joinExtenso(parts = []) {
+  return parts.filter(Boolean).join(' e ');
+}
+
+function extensoAte999(value) {
+  const numero = Number(value || 0);
+  if (numero === 0) return '';
+  if (numero === 100) return 'cem';
+
+  const centenas = Math.floor(numero / 100);
+  const dezenasUnidades = numero % 100;
+  const dezenas = Math.floor(dezenasUnidades / 10);
+  const unidades = dezenasUnidades % 10;
+
+  const partes = [];
+  if (centenas) partes.push(EXTENSO_CENTENAS[centenas]);
+  if (dezenasUnidades >= 10 && dezenasUnidades <= 19) {
+    partes.push(EXTENSO_DEZ_A_DEZENOVE[dezenasUnidades - 10]);
+  } else {
+    if (dezenas) partes.push(EXTENSO_DEZENAS[dezenas]);
+    if (unidades) partes.push(EXTENSO_UNIDADES[unidades]);
+  }
+
+  return joinExtenso(partes);
+}
+
+function numeroInteiroPorExtenso(value) {
+  const numero = Math.floor(Math.abs(Number(value || 0)));
+  if (numero === 0) return 'zero';
+
+  const milhoes = Math.floor(numero / 1000000);
+  const milhares = Math.floor((numero % 1000000) / 1000);
+  const resto = numero % 1000;
+  const partes = [];
+
+  if (milhoes) {
+    partes.push(`${extensoAte999(milhoes)} ${milhoes === 1 ? 'milhão' : 'milhões'}`);
+  }
+  if (milhares) {
+    partes.push(milhares === 1 ? 'mil' : `${extensoAte999(milhares)} mil`);
+  }
+  if (resto) {
+    partes.push(extensoAte999(resto));
+  }
+
+  return partes.join(resto && (milhoes || milhares) && resto < 100 ? ' e ' : ', ');
+}
+
+function formatCurrencyExtenso(value) {
+  const numeric = Number(value || 0);
+  const reais = Math.floor(Math.abs(numeric));
+  const centavos = Math.round((Math.abs(numeric) - reais) * 100);
+  const partes = [
+    `${numeroInteiroPorExtenso(reais)} ${reais === 1 ? 'real' : 'reais'}`
+  ];
+  if (centavos > 0) {
+    partes.push(`${numeroInteiroPorExtenso(centavos)} ${centavos === 1 ? 'centavo' : 'centavos'}`);
+  }
+  return partes.join(' e ');
+}
+
 function getPathValue(scope, rawPath) {
   const normalizedPath = String(rawPath || '').trim();
   if (!normalizedPath) return '';
@@ -285,6 +383,111 @@ function replaceAll(source, search, replacement) {
   return source.split(search).join(replacement);
 }
 
+function escapeXml(value) {
+  return safeString(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+function getXmlText(xml) {
+  return safeString(xml)
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function normalizeXmlText(xml) {
+  return getXmlText(xml)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toUpperCase();
+}
+
+function buildRunXml(text, options = {}) {
+  const {
+    bold = false,
+    font = 'Gadugi',
+    size = '20'
+  } = options;
+
+  return `<w:r><w:rPr><w:rFonts w:ascii="${font}" w:hAnsi="${font}"/>${bold ? '<w:b/><w:bCs/>' : ''}<w:sz w:val="${size}"/><w:szCs w:val="${size}"/></w:rPr><w:t xml:space="preserve">${escapeXml(text)}</w:t></w:r>`;
+}
+
+function buildParagraphXml(parts = [], options = {}) {
+  const {
+    align = 'left',
+    font = 'Gadugi',
+    size = '20'
+  } = options;
+  const normalizedParts = Array.isArray(parts) ? parts : [{ text: parts }];
+
+  return `<w:p><w:pPr><w:jc w:val="${align}"/><w:spacing w:line="240" w:lineRule="auto"/></w:pPr>${normalizedParts.map((part) => (
+    buildRunXml(part?.text ?? part, {
+      bold: Boolean(part?.bold),
+      font,
+      size
+    })
+  )).join('')}</w:p>`;
+}
+
+function extractTableRows(tableXml) {
+  return tableXml.match(/<w:tr[\s\S]*?<\/w:tr>/g) || [];
+}
+
+function extractTableCells(rowXml) {
+  return rowXml.match(/<w:tc[\s\S]*?<\/w:tc>/g) || [];
+}
+
+function extractTableCellPr(cellXml) {
+  const match = safeString(cellXml).match(/<w:tcPr[\s\S]*?<\/w:tcPr>/);
+  return match ? match[0] : '<w:tcPr><w:tcW w:w="1200" w:type="dxa"/></w:tcPr>';
+}
+
+function extractTableRowPr(rowXml) {
+  const match = safeString(rowXml).match(/<w:trPr[\s\S]*?<\/w:trPr>/);
+  return match ? match[0] : '';
+}
+
+function buildTableCellXml(tcPr, paragraphs, options = {}) {
+  if (
+    Array.isArray(paragraphs)
+    && paragraphs.length
+    && paragraphs.every((paragraph) => paragraph && typeof paragraph === 'object' && ('text' in paragraph || 'bold' in paragraph))
+  ) {
+    return `<w:tc>${tcPr}${buildParagraphXml(paragraphs, options)}</w:tc>`;
+  }
+
+  const normalizedParagraphs = Array.isArray(paragraphs) ? paragraphs : [paragraphs];
+  return `<w:tc>${tcPr}${normalizedParagraphs.map((paragraph) => (
+    Array.isArray(paragraph)
+      ? buildParagraphXml(paragraph, options)
+      : buildParagraphXml([{ text: paragraph }], options)
+  )).join('')}</w:tc>`;
+}
+
+function buildTableRowXml(sampleRow, cellParagraphs, options = {}) {
+  const cells = extractTableCells(sampleRow);
+  const cellPrs = cells.map(extractTableCellPr);
+  const fallbackCellPr = cellPrs[cellPrs.length - 1] || '<w:tcPr><w:tcW w:w="1200" w:type="dxa"/></w:tcPr>';
+  const rowPr = extractTableRowPr(sampleRow);
+
+  return `<w:tr>${rowPr}${cellParagraphs.map((paragraphs, index) => (
+    buildTableCellXml(cellPrs[index] || fallbackCellPr, paragraphs, options)
+  )).join('')}</w:tr>`;
+}
+
+function buildSingleCellRowXml(sampleRow, paragraphs, options = {}) {
+  const firstCell = extractTableCells(sampleRow)[0];
+  const tcPr = firstCell ? extractTableCellPr(firstCell) : '<w:tcPr><w:tcW w:w="10507" w:type="dxa"/><w:gridSpan w:val="12"/></w:tcPr>';
+  const rowPr = extractTableRowPr(sampleRow);
+  return `<w:tr>${rowPr}${buildTableCellXml(tcPr, paragraphs, options)}</w:tr>`;
+}
+
 function applyLegacyBracketAliases(zip) {
   zip.file(/word\/.*\.xml$/).forEach((entry) => {
     let xml = entry.asText();
@@ -296,6 +499,208 @@ function applyLegacyBracketAliases(zip) {
     ));
     zip.file(entry.name, xml);
   });
+}
+
+function applyContratoHeaderAutomation(zip, dados = {}) {
+  const numeroContrato = safeString(dados?.contrato?.numero_identificador || dados?.contrato?.numero).trim();
+  if (!numeroContrato) return;
+
+  zip.file(/word\/.*\.xml$/).forEach((entry) => {
+    let xml = entry.asText();
+    xml = xml.replace(
+      /(<w:t(?:\s[^>]*)? xml:space="preserve">CONTRATO Nº:\s*<\/w:t><\/w:r>)(?:<w:r[\s\S]*?<\/w:r>){1,6}(?=<\/w:p>)/g,
+      `$1${buildRunXml(numeroContrato, { bold: true, font: 'Verdana', size: '20' })}`
+    );
+    zip.file(entry.name, xml);
+  });
+}
+
+function buildObjetoQuadroResumoCells(dados = {}) {
+  return [
+    [
+      { text: 'Torre:', bold: true },
+      { text: ` ${safeString(dados?.unidade?.torre || dados?.empreendimento?.nome || '-')}` }
+    ],
+    [
+      { text: 'Unidade Autônoma:', bold: true },
+      { text: ` ${safeString(dados?.unidade?.nome || dados?.unidade?.codigo || '-')}` }
+    ],
+    [
+      { text: 'Área privativa da unidade:', bold: true },
+      { text: ` ${safeString(dados?.unidade?.metragem_privativa_formatada || dados?.unidade?.metragem_privativa || '-')}` }
+    ],
+    [
+      { text: 'Fração Ideal:', bold: true },
+      { text: ` ${safeString(dados?.unidade?.fracao_ideal || '-')}` }
+    ],
+    [
+      { text: 'Vagas de Garagem:', bold: true },
+      { text: ` ${safeString(dados?.unidade?.vagas_garagem || dados?.contrato?.vagas_garagem_resumo || '-')}` }
+    ]
+  ];
+}
+
+function buildQuadroResumoPagamentoRows(sampleRow, dados = {}) {
+  const itens = Array.isArray(dados?.parcelas?.quadro_resumo_itens)
+    ? dados.parcelas.quadro_resumo_itens
+    : [];
+
+  if (!itens.length) {
+    return [
+      buildTableRowXml(sampleRow, [
+        '01',
+        'A DEFINIR',
+        '00',
+        'F',
+        '-',
+        formatCurrency(dados?.contrato?.valor_total || 0),
+        '-'
+      ], { align: 'center' })
+    ];
+  }
+
+  return itens.map((item) => buildTableRowXml(sampleRow, [
+    item.item,
+    item.elemento,
+    item.quantidade,
+    item.reajuste_codigo,
+    item.primeiro_vencimento || '-',
+    item.total_formatado || formatCurrency(item.total || 0),
+    item.ultimo_vencimento || '-'
+  ], { align: 'center' }));
+}
+
+function buildAssinaturasQuadroResumo(dados = {}) {
+  const linhas = [];
+  const assinaturaLinha = '__________________________________________________________________';
+  const addAssinatura = (titulo, partes = []) => {
+    const conteudo = partes.map((parte) => safeString(parte).trim()).filter(Boolean);
+    if (!conteudo.length) return;
+    if (linhas.length) linhas.push('');
+    linhas.push(assinaturaLinha);
+    linhas.push(...conteudo);
+    if (titulo) linhas.push(titulo);
+  };
+
+  addAssinatura('INCORPORADORA', [
+    dados?.assinaturas?.vendedora_dados || dados?.assinaturas?.vendedora || dados?.empreendimento?.nome || 'INCORPORADORA'
+  ]);
+  addAssinatura('COMPRADOR(A)', [
+    dados?.cliente?.nome,
+    dados?.cliente?.cpf_cnpj ? `CPF/CNPJ: ${dados.cliente.cpf_cnpj}` : ''
+  ]);
+  addAssinatura('CONJUGE', [
+    dados?.conjuge?.nome,
+    dados?.conjuge?.cpf_cnpj ? `CPF/CNPJ: ${dados.conjuge.cpf_cnpj}` : ''
+  ]);
+  addAssinatura('CORRETOR(A)', [
+    dados?.corretor?.nome,
+    dados?.corretor?.cpf_cnpj ? `CPF/CNPJ: ${dados.corretor.cpf_cnpj}` : '',
+    dados?.corretor?.creci ? `CRECI: ${dados.corretor.creci}` : ''
+  ]);
+
+  return linhas.length ? linhas : [assinaturaLinha, 'Assinaturas'];
+}
+
+function replaceRowsInTable(tableXml, replacer) {
+  const rows = extractTableRows(tableXml);
+  if (!rows.length) return tableXml;
+  const firstRowIndex = tableXml.indexOf(rows[0]);
+  const lastRow = rows[rows.length - 1];
+  const lastRowEnd = tableXml.lastIndexOf(lastRow) + lastRow.length;
+  const nextRows = replacer(rows);
+  return `${tableXml.slice(0, firstRowIndex)}${nextRows.join('')}${tableXml.slice(lastRowEnd)}`;
+}
+
+function applyQuadroResumoAutomation(zip, dados = {}) {
+  zip.file(/word\/document\.xml$/).forEach((entry) => {
+    let xml = entry.asText();
+
+    xml = xml.replace(/<w:tbl[\s\S]*?<\/w:tbl>/g, (tableXml) => {
+      if (!/QUADRO RESUMO|DO PRECO E DA FORMA DE PAGAMENTO|DO PREÇO E DA FORMA DE PAGAMENTO/i.test(getXmlText(tableXml))) {
+        return tableXml;
+      }
+
+      return replaceRowsInTable(tableXml, (rows) => {
+        const nextRows = [...rows];
+
+        const objetoIndex = nextRows.findIndex((row) => {
+          const text = normalizeXmlText(row);
+          return text.includes('TORRE:') && text.includes('UNIDADE AUTONOMA') && text.includes('VAGAS');
+        });
+        if (objetoIndex >= 0) {
+          nextRows[objetoIndex] = buildTableRowXml(
+            nextRows[objetoIndex],
+            buildObjetoQuadroResumoCells(dados),
+            { align: 'center' }
+          );
+        }
+
+        const pagamentoHeaderIndex = nextRows.findIndex((row) => {
+          const text = normalizeXmlText(row);
+          return text.includes('ITEM') && text.includes('ELEMENTO') && text.includes('VENCIMENTO') && text.includes('TOTAL');
+        });
+        if (pagamentoHeaderIndex >= 0) {
+          const fimLinhasFixasIndex = nextRows.findIndex((row, index) => (
+            index > pagamentoHeaderIndex
+              && (normalizeXmlText(row).includes('INCIDENCIA DE JUROS') || normalizeXmlText(row).includes('PRECO TOTAL DA UNIDADE'))
+          ));
+          const sampleRow = nextRows[pagamentoHeaderIndex + 1] || nextRows[pagamentoHeaderIndex];
+          const linhasPagamento = buildQuadroResumoPagamentoRows(sampleRow, dados);
+          if (fimLinhasFixasIndex > pagamentoHeaderIndex) {
+            nextRows.splice(
+              pagamentoHeaderIndex + 1,
+              fimLinhasFixasIndex - pagamentoHeaderIndex - 1,
+              ...linhasPagamento
+            );
+          }
+        }
+
+        const precoIndex = nextRows.findIndex((row) => normalizeXmlText(row).includes('PRECO TOTAL DA UNIDADE'));
+        if (precoIndex >= 0) {
+          nextRows[precoIndex] = buildSingleCellRowXml(nextRows[precoIndex], [
+            '*Incidência de juros e correção monetária conforme itens "VI.c"; "VI.d" e "VI.e".',
+            `VI.a) PREÇO TOTAL DA UNIDADE: ${dados?.contrato?.valor_total_com_extenso || dados?.contrato?.valor_total_formatado || formatCurrency(0)}.`
+          ]);
+        }
+
+        const leilaoIndex = nextRows.findIndex((row) => normalizeXmlText(row).includes('VALOR DO IMOVEL PARA FINS DE PUBLICO LEILAO'));
+        if (leilaoIndex >= 0) {
+          nextRows[leilaoIndex] = buildSingleCellRowXml(nextRows[leilaoIndex], [
+            `VALOR DO IMÓVEL PARA FINS DE PÚBLICO LEILÃO: ${dados?.contrato?.valor_total_com_extenso || dados?.contrato?.valor_total_formatado || formatCurrency(0)}. O valor constante deste campo está posicionado na data de assinatura do presente Contrato, devendo ser atualizado pelo índice contratualmente previsto, para se obter o valor correspondente em qualquer outra data.`
+          ]);
+        }
+
+        const dataLocalIndex = nextRows.findIndex((row) => {
+          const text = normalizeXmlText(row);
+          return text.includes('XX DE XXX') || text.includes('XX DE XXXX') || text.includes('ANCHIETA -ES, XX');
+        });
+        if (dataLocalIndex >= 0) {
+          nextRows[dataLocalIndex] = buildSingleCellRowXml(nextRows[dataLocalIndex], [
+            dados?.contrato?.local_data_assinatura || dados?.contrato?.data_assinatura_extenso || ''
+          ], { align: 'center' });
+        }
+
+        const assinaturasIndex = nextRows.findIndex((row) => normalizeXmlText(row).includes('XII- ASSINATURAS'));
+        if (assinaturasIndex >= 0 && nextRows[assinaturasIndex + 1]) {
+          nextRows[assinaturasIndex + 1] = buildSingleCellRowXml(
+            nextRows[assinaturasIndex + 1],
+            buildAssinaturasQuadroResumo(dados),
+            { align: 'center' }
+          );
+        }
+
+        return nextRows;
+      });
+    });
+
+    zip.file(entry.name, xml);
+  });
+}
+
+function applyComercialDocumentAutomation(zip, dados = {}) {
+  applyContratoHeaderAutomation(zip, dados);
+  applyQuadroResumoAutomation(zip, dados);
 }
 
 function buildParcelasResumo(parcelas = []) {
@@ -377,11 +782,11 @@ function buildQuadroResumoParcelas(parcelas = []) {
 }
 
 function buildVagasGaragemResumo(contrato = {}) {
-  if (!contrato.possui_vaga_garagem) return 'Nao possui';
+  if (!contrato.possui_vaga_garagem) return 'Não possui';
   const quantidade = Number(contrato.quantidade_vagas_garagem || 0);
   const quantidadeTexto = quantidade > 0 ? String(quantidade).padStart(2, '0') : '';
   const posicao = safeString(contrato.vagas_garagem_posicao).trim();
-  return [quantidadeTexto, posicao ? `Posicao: ${posicao}` : 'Sem posicao especifica'].filter(Boolean).join(' - ');
+  return [quantidadeTexto, posicao ? `Posição: ${posicao}` : 'Sem posição específica'].filter(Boolean).join(' - ');
 }
 
 function buildAssinaturaPessoa(nome, documento) {
@@ -390,6 +795,27 @@ function buildAssinaturaPessoa(nome, documento) {
     safeString(documento).trim() ? `CPF/CNPJ: ${safeString(documento).trim()}` : ''
   ].filter(Boolean);
   return partes.join(' - ');
+}
+
+function buildNumeroContrato(raw = {}, empreendimento = {}, unidade = {}) {
+  const numeroSalvo = safeString(raw.numero).trim();
+  if (numeroSalvo) return numeroSalvo;
+
+  return [
+    safeString(empreendimento.codigo).trim(),
+    safeString(unidade.torre || unidade.bloco).trim(),
+    safeString(unidade.codigo).trim()
+  ].filter(Boolean).join(' - ');
+}
+
+function buildItemIIITexto(contrato = {}, empreendimento = {}, unidade = {}) {
+  return [
+    `Torre: ${safeString(unidade.torre || empreendimento.nome || '-')}`,
+    `Unidade Autônoma: ${safeString(unidade.nome || unidade.codigo || '-')}`,
+    `Área privativa da unidade: ${formatArea(unidade.metragem_privativa) || safeString(unidade.metragem_privativa) || '-'}`,
+    `Fração Ideal: ${formatFracaoIdeal(unidade.fracao_ideal) || '-'}`,
+    `Vagas de Garagem: ${buildVagasGaragemResumo(contrato)}`
+  ].join('\n');
 }
 
 function buildDadosContrato(contrato, customVariables = {}) {
@@ -404,16 +830,24 @@ function buildDadosContrato(contrato, customVariables = {}) {
   const vagasGaragemResumo = buildVagasGaragemResumo(raw);
   const dataAssinaturaBase = raw.data_assinatura || raw.data_contrato;
   const localAssinatura = safeString(raw.local_assinatura);
+  const numeroContrato = buildNumeroContrato(raw, empreendimento, unidade);
+  const valorTotalFormatado = formatCurrency(raw.valor_total);
+  const valorTotalExtenso = formatCurrencyExtenso(raw.valor_total);
+  const valorTotalComExtenso = `${valorTotalFormatado} (${valorTotalExtenso})`;
+  const itemIIITexto = buildItemIIITexto(raw, empreendimento, unidade);
 
   const dados = {
     contrato: {
       id: raw.id,
-      numero: safeString(raw.numero),
+      numero: numeroContrato,
+      numero_identificador: numeroContrato,
       data: formatDateBr(raw.data_contrato),
       data_iso: safeString(raw.data_contrato),
       status: safeString(raw.status),
       valor_total: safeString(raw.valor_total),
-      valor_total_formatado: formatCurrency(raw.valor_total),
+      valor_total_formatado: valorTotalFormatado,
+      valor_total_extenso: valorTotalExtenso,
+      valor_total_com_extenso: valorTotalComExtenso,
       valor_entrada: safeString(raw.valor_entrada),
       valor_entrada_formatado: formatCurrency(raw.valor_entrada),
       desconto: safeString(raw.desconto_concedido),
@@ -483,7 +917,8 @@ function buildDadosContrato(contrato, customVariables = {}) {
       pavimento: safeString(unidade.pavimento),
       tipologia: safeString(unidade.tipologia),
       metragem_privativa: safeString(unidade.metragem_privativa),
-      fracao_ideal: safeString(unidade.fracao_ideal),
+      metragem_privativa_formatada: formatArea(unidade.metragem_privativa),
+      fracao_ideal: formatFracaoIdeal(unidade.fracao_ideal) || safeString(unidade.fracao_ideal),
       vagas_garagem: vagasGaragemResumo,
       valor_tabela: safeString(unidade.valor_tabela),
       valor_tabela_formatado: formatCurrency(unidade.valor_tabela),
@@ -524,6 +959,18 @@ function buildDadosContrato(contrato, customVariables = {}) {
       conjuge: buildAssinaturaPessoa(conjuge.nome || cliente.conjuge_nome, conjuge.cpf_cnpj),
       corretor: buildAssinaturaPessoa(corretor.nome || raw.corretor_nome, corretor.cpf_cnpj),
       vendedora: safeString(empreendimento.nome)
+    },
+    quadro_resumo: {
+      item_iii_texto: itemIIITexto,
+      preco_total_unidade: valorTotalComExtenso,
+      valor_leilao: valorTotalComExtenso,
+      assinaturas_texto: buildAssinaturasQuadroResumo({
+        empreendimento: { nome: safeString(empreendimento.nome) },
+        assinaturas: { vendedora: safeString(empreendimento.nome) },
+        cliente,
+        conjuge,
+        corretor
+      }).join('\n')
     },
     custom: customVariables || {}
   };
@@ -583,6 +1030,7 @@ async function readStoredFileBuffer(urlOrPath) {
 function renderDocx(templateBuffer, data) {
   const zip = new PizZip(templateBuffer);
   applyLegacyBracketAliases(zip);
+  applyComercialDocumentAutomation(zip, data);
 
   const doc = new Docxtemplater(zip, {
     paragraphLoop: true,
