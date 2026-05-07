@@ -398,9 +398,9 @@ export default function FinanceiroTituloNovo() {
         ...form,
         obra_id: Number(form.obra_id),
         parceiro_id: Number(form.parceiro_id),
-        categoria_financeira_id: form.categoria_financeira_id ? Number(form.categoria_financeira_id) : undefined,
-        apropriacao_id: form.apropriacao_id ? Number(form.apropriacao_id) : undefined
+        categoria_financeira_id: form.categoria_financeira_id ? Number(form.categoria_financeira_id) : undefined
       };
+      delete payload.apropriacao_id;
 
       if (!form.parceiro_id) {
         throw new Error(`Selecione o ${form.tipo === 'RECEBER' ? 'cliente' : 'credor'} na lista antes de salvar.`);
