@@ -135,7 +135,6 @@ export default function ComunicacaoInterna() {
   const [isMobile, setIsMobile] = useState(false);
   const [participantesLeitura, setParticipantesLeitura] = useState([]);
   const [menuMsgId, setMenuMsgId] = useState(null);
-  const [hoverMsgId, setHoverMsgId] = useState(null);
   const [infoMsg, setInfoMsg] = useState(null);
 
   // Modal nova conversa
@@ -612,34 +611,28 @@ export default function ComunicacaoInterna() {
                   {mensagens.map((msg) => {
                     const euSou = msg.usuario_id === userId;
                     const menuAberto = menuMsgId === msg.id;
-                    const mostraChevron = hoverMsgId === msg.id || menuAberto;
                     const vista = euSou && isMensagemVista(msg, participantesLeitura, userId);
                     return (
                       <div key={msg.id} style={{ display: 'flex', justifyContent: euSou ? 'flex-end' : 'flex-start' }}>
-                        <div
-                          style={{ position: 'relative', maxWidth: '72%' }}
-                          onMouseEnter={() => setHoverMsgId(msg.id)}
-                          onMouseLeave={() => { if (!menuAberto) setHoverMsgId(null); }}
-                        >
-                          {/* Botão seta */}
-                          {mostraChevron && (
-                            <button
-                              onClick={(e) => { e.stopPropagation(); setMenuMsgId(menuAberto ? null : msg.id); }}
-                              style={{
-                                position: 'absolute', top: 4, right: 4, zIndex: 20,
-                                width: 20, height: 20, borderRadius: '50%',
-                                background: euSou ? 'rgba(0,0,0,0.2)' : 'rgba(0,0,0,0.08)',
-                                border: 'none', cursor: 'pointer', display: 'flex',
-                                alignItems: 'center', justifyContent: 'center',
-                                color: euSou ? '#fff' : 'var(--c-text)', fontSize: 10, lineHeight: 1
-                              }}
-                            >▾</button>
-                          )}
+                        <div style={{ position: 'relative', maxWidth: '72%' }}>
+                          {/* Botão seta — sempre visível */}
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setMenuMsgId(menuAberto ? null : msg.id); }}
+                            style={{
+                              position: 'absolute', top: 6, right: 6, zIndex: 20,
+                              width: 18, height: 18, borderRadius: '50%',
+                              background: euSou ? 'rgba(0,0,0,0.18)' : 'rgba(0,0,0,0.07)',
+                              border: 'none', cursor: 'pointer', display: 'flex',
+                              alignItems: 'center', justifyContent: 'center',
+                              color: euSou ? '#fff' : 'var(--c-muted)', fontSize: 9, lineHeight: 1,
+                              transition: 'background 0.15s'
+                            }}
+                          >▾</button>
 
-                          {/* Dropdown menu */}
+                          {/* Dropdown menu — abre para cima */}
                           {menuAberto && (
                             <div style={{
-                              position: 'absolute', top: 28, right: 0, zIndex: 30,
+                              position: 'absolute', bottom: '100%', right: 0, marginBottom: 4, zIndex: 30,
                               background: 'var(--c-surface)', border: '1px solid var(--c-border)',
                               borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
                               minWidth: 150, overflow: 'hidden'
@@ -691,7 +684,7 @@ export default function ComunicacaoInterna() {
                                 </div>
                               </div>
                             ) : (
-                              <p style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', margin: 0, paddingRight: mostraChevron ? 18 : 0 }}>{msg.mensagem}</p>
+                              <p style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', margin: 0, paddingRight: 20 }}>{msg.mensagem}</p>
                             )}
                             {msg.anexos?.length > 0 && (
                               <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 2 }}>
