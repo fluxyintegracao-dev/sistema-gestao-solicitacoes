@@ -619,9 +619,14 @@ module.exports = {
       const agora = Date.now();
 
       const resultado = mensagensOrdenadas.map((m) => {
-        const podeEditar =
-          m.usuario_id === usuarioId &&
-          (agora - new Date(m.createdAt).getTime()) <= JANELA_EDICAO_MS;
+        const dentroJanela = (agora - new Date(m.createdAt).getTime()) <= JANELA_EDICAO_MS;
+        const ehAutor = m.usuario_id === usuarioId;
+        const podeEditar = ehAutor && dentroJanela;
+        const jaVista = participantesLeitura.some(
+          (p) => p.usuario_id !== usuarioId && p.lida_em &&
+            new Date(p.lida_em).getTime() >= new Date(m.createdAt).getTime()
+        );
+        const podeDeletar = ehAutor && dentroJanela && !jaVista;
         return {
           id: m.id,
           conversa_id: m.conversa_id,
@@ -630,6 +635,7 @@ module.exports = {
           createdAt: m.createdAt,
           editada_em: m.editada_em,
           pode_editar: !!podeEditar,
+          pode_deletar: !!podeDeletar,
           autor: m.autor,
           anexos: anexosPorMensagem[m.id] || []
         };
@@ -760,6 +766,61 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return res.status(500).json({ error: 'Erro ao editar mensagem' });
+    }
+  },
+
+  async deletarMensagem(req, res) {
+    try {
+      const mensagemId = Number(req.params?.mensagemId || 0);
+      const usuarioId = Number(req.user.id);
+
+      const mensagem = await ConversaInternaMensagem.findByPk(mensagemId);
+      if (!mensagem) return res.status(404).json({ error: 'Mensagem nao encontrada' });
+
+      const { conversa, permitido } = await podeVisualizarConversa(req, mensagem.conversa_id);
+      if (!conversa || !permitido) return res.status(403).json({ error: 'Acesso negado' });
+      if (mensagem.usuario_id !== usuarioId) {
+        return res.status(403).json({ error: 'Apenas o autor pode excluir a mensagem' });
+      }
+
+      const tempoPassado = Date.now() - new Date(mensagem.createdAt).getTime();
+      if (tempoPassado > JANELA_EDICAO_MS) {
+        return res.status(400).json({ error: 'Prazo de exclusao expirado (maximo 5 minutos).' });
+      }
+
+      const jaVista = await ConversaInternaParticipante.findOne({
+        where: {
+          conversa_id: mensagem.conversa_id,
+          usuario_id: { [Op.ne]: usuarioId },
+          lida_em: { [Op.gte]: mensagem.createdAt }
+        }
+      });
+      if (jaVista) {
+        return res.status(400).json({ error: 'Mensagem ja visualizada e nao pode ser excluida.' });
+      }
+
+      await ConversaInternaAnexo.destroy({ where: { mensagem_id: mensagemId } });
+      await mensagem.destroy();
+
+      // Atualiza preview da conversa se era a ultima mensagem
+      const ultima = await ConversaInternaMensagem.findOne({
+        where: { conversa_id: conversa.id },
+        order: [['id', 'DESC']],
+        include: [{ model: User, as: 'autor', attributes: ['nome'] }]
+      });
+      if (ultima) {
+        await atualizarUltimaMensagem(conversa.id, ultima.mensagem, ultima.autor?.nome);
+      } else {
+        await ConversaInterna.update(
+          { last_message_at: null, last_message_preview: null },
+          { where: { id: conversa.id } }
+        );
+      }
+
+      return res.sendStatus(204);
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao excluir mensagem' });
     }
   },
 

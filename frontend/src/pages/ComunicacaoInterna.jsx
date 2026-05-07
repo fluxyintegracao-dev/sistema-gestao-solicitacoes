@@ -5,6 +5,7 @@ import {
   arquivarConversasEmMassa,
   criarConversa,
   criarConversaEmMassa,
+  deletarMensagemConversa,
   editarMensagemConversa,
   enviarMensagemConversa,
   getConversa,
@@ -62,6 +63,7 @@ function timestampConversa(conv) {
   return Number.isNaN(data.getTime()) ? 0 : data.getTime();
 }
 
+
 function isMensagemVista(msg, participantesLeitura, userId) {
   const msgTime = new Date(msg.createdAt).getTime();
   return participantesLeitura.some(
@@ -69,26 +71,18 @@ function isMensagemVista(msg, participantesLeitura, userId) {
   );
 }
 
-function isMensagemLidaPorMim(msg, participantesLeitura, userId) {
-  const msgTime = new Date(msg.createdAt).getTime();
-  const minha = participantesLeitura.find((p) => p.usuario_id === userId);
-  return !!(minha?.lida_em && new Date(minha.lida_em).getTime() >= msgTime);
-}
-
-function TicksMensagem({ vista, euSou }) {
-  const corVista = euSou ? '#bfdbfe' : '#2563eb';
-  const corNaoVista = euSou ? 'rgba(255,255,255,0.45)' : '#9ca3af';
+function TicksMensagem({ vista }) {
   if (vista) {
     return (
-      <svg width="18" height="10" viewBox="0 0 18 10" fill="none" style={{ flexShrink: 0, display: 'block' }}>
-        <path d="M1 5L4.5 8.5L10 1.5" stroke={corVista} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-        <path d="M6 5L9.5 8.5L15 1.5" stroke={corVista} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <svg width="18" height="10" viewBox="0 0 18 10" fill="none" style={{ flexShrink: 0, display: 'inline-block', verticalAlign: 'middle' }}>
+        <path d="M1 5L4.5 8.5L10 1.5" stroke="rgba(255,255,255,0.95)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M6 5L9.5 8.5L15 1.5" stroke="rgba(255,255,255,0.95)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     );
   }
   return (
-    <svg width="12" height="10" viewBox="0 0 12 10" fill="none" style={{ flexShrink: 0, display: 'block' }}>
-      <path d="M1 5L4.5 8.5L11 1.5" stroke={corNaoVista} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    <svg width="12" height="10" viewBox="0 0 12 10" fill="none" style={{ flexShrink: 0, display: 'inline-block', verticalAlign: 'middle' }}>
+      <path d="M1 5L4.5 8.5L11 1.5" stroke="rgba(255,255,255,0.45)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
@@ -140,6 +134,9 @@ export default function ComunicacaoInterna() {
   const [mobileModo, setMobileModo] = useState('lista');
   const [isMobile, setIsMobile] = useState(false);
   const [participantesLeitura, setParticipantesLeitura] = useState([]);
+  const [menuMsgId, setMenuMsgId] = useState(null);
+  const [hoverMsgId, setHoverMsgId] = useState(null);
+  const [infoMsg, setInfoMsg] = useState(null);
 
   // Modal nova conversa
   const [showNova, setShowNova] = useState(false);
@@ -231,6 +228,8 @@ export default function ComunicacaoInterna() {
     setTexto('');
     setArquivos([]);
     setParticipantesLeitura([]);
+    setMenuMsgId(null);
+    setInfoMsg(null);
     setMobileModo('chat');
     setLoadingChat(true);
     try {
@@ -338,6 +337,7 @@ export default function ComunicacaoInterna() {
         createdAt: nova.createdAt || new Date().toISOString(),
         editada_em: null,
         pode_editar: true,
+        pode_deletar: true,
         autor: { id: userId, nome: user?.nome },
         anexos: []
       }]);
@@ -358,6 +358,16 @@ export default function ComunicacaoInterna() {
       inputRef.current?.focus();
     }
   }, [conversaAtiva, enviando, texto, arquivos, userId, user, scrollToBottom]);
+
+  const deletarMensagem = useCallback(async (msgId) => {
+    if (!window.confirm('Excluir esta mensagem?')) return;
+    try {
+      await deletarMensagemConversa(msgId);
+      setMensagens((prev) => prev.filter((m) => m.id !== msgId));
+    } catch (err) {
+      alert(err.message || 'Erro ao excluir mensagem');
+    }
+  }, []);
 
   const salvarEdicao = useCallback(async () => {
     if (!editandoId) return;
@@ -596,64 +606,109 @@ export default function ComunicacaoInterna() {
                       </button>
                     </div>
                   )}
+                  {menuMsgId && (
+                    <div style={{ position: 'fixed', inset: 0, zIndex: 19 }} onClick={() => setMenuMsgId(null)} />
+                  )}
                   {mensagens.map((msg) => {
                     const euSou = msg.usuario_id === userId;
+                    const menuAberto = menuMsgId === msg.id;
+                    const mostraChevron = hoverMsgId === msg.id || menuAberto;
+                    const vista = euSou && isMensagemVista(msg, participantesLeitura, userId);
                     return (
                       <div key={msg.id} style={{ display: 'flex', justifyContent: euSou ? 'flex-end' : 'flex-start' }}>
-                        <div style={{
-                          maxWidth: '72%',
-                          borderRadius: euSou ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
-                          padding: '8px 14px',
-                          fontSize: 13,
-                          background: euSou ? '#2563eb' : 'var(--c-surface)',
-                          color: euSou ? '#ffffff' : 'var(--c-text)',
-                          border: euSou ? 'none' : '1px solid var(--c-border)',
-                          boxShadow: '0 1px 2px rgba(0,0,0,0.06)'
-                        }}>
-                          {!euSou && (
-                            <p style={{ fontSize: 11, fontWeight: 700, marginBottom: 2, color: 'var(--c-primary)' }}>{msg.autor?.nome}</p>
+                        <div
+                          style={{ position: 'relative', maxWidth: '72%' }}
+                          onMouseEnter={() => setHoverMsgId(msg.id)}
+                          onMouseLeave={() => { if (!menuAberto) setHoverMsgId(null); }}
+                        >
+                          {/* Botão seta */}
+                          {mostraChevron && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setMenuMsgId(menuAberto ? null : msg.id); }}
+                              style={{
+                                position: 'absolute', top: 4, right: 4, zIndex: 20,
+                                width: 20, height: 20, borderRadius: '50%',
+                                background: euSou ? 'rgba(0,0,0,0.2)' : 'rgba(0,0,0,0.08)',
+                                border: 'none', cursor: 'pointer', display: 'flex',
+                                alignItems: 'center', justifyContent: 'center',
+                                color: euSou ? '#fff' : 'var(--c-text)', fontSize: 10, lineHeight: 1
+                              }}
+                            >▾</button>
                           )}
-                          {editandoId === msg.id ? (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                              <textarea
-                                className="input"
-                                rows={2}
-                                style={{ fontSize: 13, resize: 'none', color: 'var(--c-text)' }}
-                                value={textoEdicao}
-                                onChange={(e) => setTextoEdicao(e.target.value)}
-                              />
-                              <div style={{ display: 'flex', gap: 8 }}>
-                                <button onClick={salvarEdicao} className="btn btn-primary" style={{ fontSize: 11, padding: '2px 8px' }}>Salvar</button>
-                                <button onClick={() => setEditandoId(null)} style={{ fontSize: 11, color: 'var(--c-muted)', background: 'none', border: 'none', cursor: 'pointer' }}>Cancelar</button>
-                              </div>
+
+                          {/* Dropdown menu */}
+                          {menuAberto && (
+                            <div style={{
+                              position: 'absolute', top: 28, right: 0, zIndex: 30,
+                              background: 'var(--c-surface)', border: '1px solid var(--c-border)',
+                              borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
+                              minWidth: 150, overflow: 'hidden'
+                            }}>
+                              {msg.pode_editar && (
+                                <button
+                                  onClick={() => { setEditandoId(msg.id); setTextoEdicao(msg.mensagem); setMenuMsgId(null); }}
+                                  style={{ display: 'flex', width: '100%', padding: '9px 14px', fontSize: 13, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-text)', gap: 8, alignItems: 'center' }}
+                                >✏️ Editar</button>
+                              )}
+                              {msg.pode_deletar && (
+                                <button
+                                  onClick={() => { deletarMensagem(msg.id); setMenuMsgId(null); }}
+                                  style={{ display: 'flex', width: '100%', padding: '9px 14px', fontSize: 13, background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', gap: 8, alignItems: 'center' }}
+                                >🗑️ Excluir</button>
+                              )}
+                              <button
+                                onClick={() => { setInfoMsg(msg); setMenuMsgId(null); }}
+                                style={{ display: 'flex', width: '100%', padding: '9px 14px', fontSize: 13, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-text)', gap: 8, alignItems: 'center', borderTop: '1px solid var(--c-border)' }}
+                              >ℹ️ Informações</button>
                             </div>
-                          ) : (
-                            <p style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', margin: 0 }}>{msg.mensagem}</p>
                           )}
-                          {msg.anexos?.length > 0 && (
-                            <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                              {msg.anexos.map((a) => (
-                                <a key={a.id} href={a.caminho} target="_blank" rel="noopener noreferrer"
-                                  style={{ fontSize: 11, color: euSou ? 'rgba(255,255,255,0.8)' : 'var(--c-primary)', textDecoration: 'underline' }}>
-                                  📎 {a.nome_arquivo}
-                                </a>
-                              ))}
-                            </div>
-                          )}
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: euSou ? 'flex-end' : 'flex-start', gap: 4, marginTop: 3 }}>
-                            <span style={{ fontSize: 10, color: euSou ? 'rgba(255,255,255,0.6)' : 'var(--c-muted)' }}>
-                              {formatDataHora(msg.createdAt)}{msg.editada_em ? ' (editada)' : ''}
-                            </span>
-                            {euSou
-                              ? <TicksMensagem euSou vista={isMensagemVista(msg, participantesLeitura, userId)} />
-                              : <TicksMensagem euSou={false} vista={isMensagemLidaPorMim(msg, participantesLeitura, userId)} />
-                            }
-                            {msg.pode_editar && !editandoId && (
-                              <button onClick={() => { setEditandoId(msg.id); setTextoEdicao(msg.mensagem); }}
-                                style={{ fontSize: 10, color: euSou ? 'rgba(255,255,255,0.7)' : 'var(--c-muted)', textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer' }}>
-                                editar
-                              </button>
+
+                          {/* Bolha */}
+                          <div style={{
+                            borderRadius: euSou ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
+                            padding: '8px 14px',
+                            fontSize: 13,
+                            background: euSou ? '#4a90d9' : 'var(--c-surface)',
+                            color: euSou ? '#ffffff' : 'var(--c-text)',
+                            border: euSou ? 'none' : '1px solid var(--c-border)',
+                            boxShadow: '0 1px 2px rgba(0,0,0,0.06)'
+                          }}>
+                            {!euSou && (
+                              <p style={{ fontSize: 11, fontWeight: 700, marginBottom: 2, color: 'var(--c-primary)' }}>{msg.autor?.nome}</p>
                             )}
+                            {editandoId === msg.id ? (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                <textarea
+                                  className="input"
+                                  rows={2}
+                                  style={{ fontSize: 13, resize: 'none', color: 'var(--c-text)' }}
+                                  value={textoEdicao}
+                                  onChange={(e) => setTextoEdicao(e.target.value)}
+                                />
+                                <div style={{ display: 'flex', gap: 8 }}>
+                                  <button onClick={salvarEdicao} className="btn btn-primary" style={{ fontSize: 11, padding: '2px 8px' }}>Salvar</button>
+                                  <button onClick={() => setEditandoId(null)} style={{ fontSize: 11, color: euSou ? 'rgba(255,255,255,0.7)' : 'var(--c-muted)', background: 'none', border: 'none', cursor: 'pointer' }}>Cancelar</button>
+                                </div>
+                              </div>
+                            ) : (
+                              <p style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', margin: 0, paddingRight: mostraChevron ? 18 : 0 }}>{msg.mensagem}</p>
+                            )}
+                            {msg.anexos?.length > 0 && (
+                              <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                {msg.anexos.map((a) => (
+                                  <a key={a.id} href={a.caminho} target="_blank" rel="noopener noreferrer"
+                                    style={{ fontSize: 11, color: euSou ? 'rgba(255,255,255,0.8)' : 'var(--c-primary)', textDecoration: 'underline' }}>
+                                    📎 {a.nome_arquivo}
+                                  </a>
+                                ))}
+                              </div>
+                            )}
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4, marginTop: 3 }}>
+                              <span style={{ fontSize: 10, color: euSou ? 'rgba(255,255,255,0.6)' : 'var(--c-muted)' }}>
+                                {formatDataHora(msg.createdAt)}{msg.editada_em ? ' (editada)' : ''}
+                              </span>
+                              {euSou && <TicksMensagem vista={vista} />}
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -723,6 +778,57 @@ export default function ComunicacaoInterna() {
           </>
         )}
       </div>
+
+      {/* === MODAL informações da mensagem === */}
+      {infoMsg && (
+        <div
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+          onClick={() => setInfoMsg(null)}
+        >
+          <div
+            style={{ background: 'var(--c-surface)', borderRadius: 12, padding: '20px 24px', minWidth: 260, maxWidth: 340, boxShadow: '0 8px 32px rgba(0,0,0,0.2)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 style={{ margin: '0 0 14px', fontSize: 14, fontWeight: 600, color: 'var(--c-text)' }}>Informações da mensagem</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: 13 }}>
+              <div>
+                <span style={{ fontSize: 11, color: 'var(--c-muted)', display: 'block', marginBottom: 2 }}>Enviada por</span>
+                <span style={{ fontWeight: 500, color: 'var(--c-text)' }}>{infoMsg.autor?.nome || 'Desconhecido'}</span>
+              </div>
+              <div>
+                <span style={{ fontSize: 11, color: 'var(--c-muted)', display: 'block', marginBottom: 2 }}>Enviada em</span>
+                <span style={{ color: 'var(--c-text)' }}>{formatDataHora(infoMsg.createdAt)}</span>
+              </div>
+              {infoMsg.editada_em && (
+                <div>
+                  <span style={{ fontSize: 11, color: 'var(--c-muted)', display: 'block', marginBottom: 2 }}>Editada em</span>
+                  <span style={{ color: 'var(--c-text)' }}>{formatDataHora(infoMsg.editada_em)}</span>
+                </div>
+              )}
+              <div>
+                <span style={{ fontSize: 11, color: 'var(--c-muted)', display: 'block', marginBottom: 2 }}>Visualização</span>
+                {(() => {
+                  const msgTime = new Date(infoMsg.createdAt).getTime();
+                  const leituras = participantesLeitura.filter(
+                    (p) => p.usuario_id !== infoMsg.usuario_id && p.lida_em && new Date(p.lida_em).getTime() >= msgTime
+                  );
+                  if (leituras.length === 0) {
+                    return <span style={{ color: 'var(--c-muted)', fontStyle: 'italic' }}>Ainda não visualizada</span>;
+                  }
+                  return leituras.map((p) => (
+                    <span key={p.usuario_id} style={{ color: '#2563eb', display: 'block' }}>✓✓ {formatDataHora(p.lida_em)}</span>
+                  ));
+                })()}
+              </div>
+            </div>
+            <button
+              onClick={() => setInfoMsg(null)}
+              className="btn btn-outline"
+              style={{ marginTop: 18, width: '100%', fontSize: 13 }}
+            >Fechar</button>
+          </div>
+        </div>
+      )}
 
       {/* === MODAL nova conversa === */}
       {showNova && (

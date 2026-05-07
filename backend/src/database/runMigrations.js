@@ -54,11 +54,21 @@ async function runMigrations() {
       throw new Error(`Migration invalida: ${fileName}`);
     }
 
+    const qi = sequelize.getQueryInterface();
+    const originalAddColumn = qi.addColumn.bind(qi);
+    qi.addColumn = async (table, column, definition, options) => {
+      const desc = await qi.describeTable(table).catch(() => ({}));
+      if (desc[column]) return;
+      return originalAddColumn(table, column, definition, options);
+    };
+
     await migration.up({
       DataTypes: Sequelize.DataTypes,
-      queryInterface: sequelize.getQueryInterface(),
+      queryInterface: qi,
       sequelize
     });
+
+    qi.addColumn = originalAddColumn;
 
     await sequelize.query(
       `INSERT INTO ${MIGRATIONS_TABLE} (name) VALUES (${sequelize.escape(fileName)})`

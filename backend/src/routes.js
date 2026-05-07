@@ -1370,5 +1370,6 @@ router.patch('/conversas-internas/desarquivar-massa', ConversaInternaController.
 router.patch('/conversas-internas/:id/concluir', ConversaInternaController.concluir);
 router.patch('/conversas-internas/:id/reabrir', ConversaInternaController.reabrir);
 router.patch('/conversas-internas/mensagens/:mensagemId', ConversaInternaController.editarMensagem);
+router.delete('/conversas-internas/mensagens/:mensagemId', ConversaInternaController.deletarMensagem);
 
 module.exports = router;

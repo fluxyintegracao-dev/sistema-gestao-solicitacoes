@@ -183,6 +183,14 @@ export async function concluirConversa(id) {
   return parseResponse(response, 'Erro ao concluir conversa');
 }
 
+export async function deletarMensagemConversa(mensagemId) {
+  const response = await fetch(`${API_URL}/conversas-internas/mensagens/${mensagemId}`, {
+    method: 'DELETE',
+    headers: authHeaders()
+  });
+  return parseResponse(response, 'Erro ao excluir mensagem');
+}
+
 export async function reabrirConversa(id) {
   const response = await fetch(`${API_URL}/conversas-internas/${id}/reabrir`, {
     method: 'PATCH',
