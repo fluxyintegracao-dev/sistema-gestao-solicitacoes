@@ -79,6 +79,18 @@ A baixa e semiautomatica:
 - secao "Dados para pagamento do credor" na criacao de titulo a pagar;
 - cadastro simples de favorecidos PIX em Cadastros Financeiros.
 
+### Complemento - Chaves PIX no cadastro de pessoas
+
+O cadastro mestre de pessoas/parceiros passa a aceitar chaves PIX opcionais para apoiar o preparo financeiro:
+
+- primeira chave PIX fixa;
+- segunda chave PIX fixa;
+- terceira chave PIX variavel.
+
+Cada chave possui tipo (`CPF`, `CNPJ`, `EMAIL`, `TELEFONE` ou `ALEATORIA`) e valor. Os mesmos campos tambem aparecem no modal de cadastro de credor da tela de Nova Solicitacao.
+
+Esses dados servem como fonte cadastral inicial. Eles nao substituem o cadastro de favorecido bancario nem o snapshot imutavel salvo em `payment_intents` no momento da criacao do lote. Alteracoes futuras no parceiro nao devem alterar retroativamente lotes aprovados, enviados ou confirmados.
+
 ## Permissoes
 
 Pagamentos:

@@ -1,6 +1,8 @@
 const { Op } = require('sequelize');
 const { Parceiro, ParceiroCategoria } = require('../models');
 
+const PIX_TIPOS_CHAVE = ['CPF', 'CNPJ', 'EMAIL', 'TELEFONE', 'ALEATORIA'];
+
 function normalizarCpfCnpj(value) {
   return String(value || '').replace(/\D/g, '');
 }
@@ -70,6 +72,20 @@ function parseBoolean(value, fallback = false) {
 function sanitizeText(value) {
   const text = String(value || '').trim();
   return text || null;
+}
+
+function sanitizePixTipo(value, fieldName) {
+  const text = String(value || '').trim().toUpperCase();
+  if (!text) return null;
+  if (!PIX_TIPOS_CHAVE.includes(text)) {
+    throw new Error(`${fieldName} invalido.`);
+  }
+  return text;
+}
+
+function sanitizePixChave(value) {
+  const text = String(value || '').trim();
+  return text ? text.slice(0, 255) : null;
 }
 
 function sanitizeDateOnly(value) {
@@ -186,6 +202,24 @@ function normalizeParceiroPayload(payload = {}, { partial = false } = {}) {
     creci: partial
       ? (payload.creci !== undefined ? sanitizeText(payload.creci) : undefined)
       : sanitizeText(payload.creci),
+    pix_chave_fixa_1_tipo: partial
+      ? (payload.pix_chave_fixa_1_tipo !== undefined ? sanitizePixTipo(payload.pix_chave_fixa_1_tipo, 'Tipo da chave PIX fixa 1') : undefined)
+      : sanitizePixTipo(payload.pix_chave_fixa_1_tipo, 'Tipo da chave PIX fixa 1'),
+    pix_chave_fixa_1: partial
+      ? (payload.pix_chave_fixa_1 !== undefined ? sanitizePixChave(payload.pix_chave_fixa_1) : undefined)
+      : sanitizePixChave(payload.pix_chave_fixa_1),
+    pix_chave_fixa_2_tipo: partial
+      ? (payload.pix_chave_fixa_2_tipo !== undefined ? sanitizePixTipo(payload.pix_chave_fixa_2_tipo, 'Tipo da chave PIX fixa 2') : undefined)
+      : sanitizePixTipo(payload.pix_chave_fixa_2_tipo, 'Tipo da chave PIX fixa 2'),
+    pix_chave_fixa_2: partial
+      ? (payload.pix_chave_fixa_2 !== undefined ? sanitizePixChave(payload.pix_chave_fixa_2) : undefined)
+      : sanitizePixChave(payload.pix_chave_fixa_2),
+    pix_chave_variavel_tipo: partial
+      ? (payload.pix_chave_variavel_tipo !== undefined ? sanitizePixTipo(payload.pix_chave_variavel_tipo, 'Tipo da chave PIX variavel') : undefined)
+      : sanitizePixTipo(payload.pix_chave_variavel_tipo, 'Tipo da chave PIX variavel'),
+    pix_chave_variavel: partial
+      ? (payload.pix_chave_variavel !== undefined ? sanitizePixChave(payload.pix_chave_variavel) : undefined)
+      : sanitizePixChave(payload.pix_chave_variavel),
     ativo: partial
       ? (payload.ativo !== undefined ? parseBoolean(payload.ativo, true) : undefined)
       : (payload.ativo === undefined ? true : parseBoolean(payload.ativo, true))

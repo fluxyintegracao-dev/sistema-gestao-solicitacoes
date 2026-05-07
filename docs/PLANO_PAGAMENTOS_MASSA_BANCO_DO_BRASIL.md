@@ -253,6 +253,10 @@ Lacunas:
 - Snapshot de dados usados em cada pagamento.
 - Historico de alteracao de conta/chave PIX.
 
+Complemento definido para a primeira etapa: o cadastro mestre de pessoas/parceiros deve aceitar ate tres chaves PIX opcionais, sendo duas chaves fixas e uma terceira chave variavel. Esses campos tambem devem estar disponiveis no modal de cadastro de credor da tela de Nova Solicitacao para evitar retrabalho operacional.
+
+Essas chaves no parceiro funcionam como base cadastral inicial. O lote de pagamento ainda deve usar `payment_beneficiaries` e snapshots imutaveis em `payment_intents`, para que alteracoes futuras no cadastro da pessoa nao modifiquem pagamentos ja aprovados, enviados ou confirmados.
+
 Recomendacao: criar uma entidade propria de favorecido bancario, vinculada ao parceiro, para evitar alterar o cadastro mestre de forma fragil.
 
 Exemplo:

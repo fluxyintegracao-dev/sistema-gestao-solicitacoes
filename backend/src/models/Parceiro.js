@@ -107,6 +107,30 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.STRING(60),
         allowNull: true
       },
+      pix_chave_fixa_1_tipo: {
+        type: DataTypes.STRING(20),
+        allowNull: true
+      },
+      pix_chave_fixa_1: {
+        type: DataTypes.STRING(255),
+        allowNull: true
+      },
+      pix_chave_fixa_2_tipo: {
+        type: DataTypes.STRING(20),
+        allowNull: true
+      },
+      pix_chave_fixa_2: {
+        type: DataTypes.STRING(255),
+        allowNull: true
+      },
+      pix_chave_variavel_tipo: {
+        type: DataTypes.STRING(20),
+        allowNull: true
+      },
+      pix_chave_variavel: {
+        type: DataTypes.STRING(255),
+        allowNull: true
+      },
       ativo: {
         type: DataTypes.BOOLEAN,
         allowNull: false,

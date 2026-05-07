@@ -44,6 +44,39 @@ function formatarRotuloBuscaObra(obra) {
   return codigo || nome;
 }
 
+const PIX_TIPOS_CHAVE = [
+  { value: 'CPF', label: 'CPF' },
+  { value: 'CNPJ', label: 'CNPJ' },
+  { value: 'EMAIL', label: 'E-mail' },
+  { value: 'TELEFONE', label: 'Telefone' },
+  { value: 'ALEATORIA', label: 'Aleatoria' }
+];
+
+function criarNovoParceiroPadrao() {
+  return {
+    cpf_cnpj: '',
+    nome: '',
+    telefone: '',
+    email: '',
+    endereco: '',
+    numero: '',
+    bairro: '',
+    cep: '',
+    municipio: '',
+    estado: '',
+    pix_chave_fixa_1_tipo: 'CPF',
+    pix_chave_fixa_1: '',
+    pix_chave_fixa_2_tipo: 'CNPJ',
+    pix_chave_fixa_2: '',
+    pix_chave_variavel_tipo: 'ALEATORIA',
+    pix_chave_variavel: '',
+    cliente: false,
+    fornecedor: true,
+    corretor: false,
+    categoria_ids: []
+  };
+}
+
 export default function NovaSolicitacao() {
   const { user } = useAuth();
   const moduloContratosHabilitado = hasEnabledModule(user, 'CONTRATOS');
@@ -70,22 +103,7 @@ export default function NovaSolicitacao() {
   const [parceiroBuscaExecutada, setParceiroBuscaExecutada] = useState(false);
   const [modalParceiroAberto, setModalParceiroAberto] = useState(false);
   const [categoriasParceiro, setCategoriasParceiro] = useState([]);
-  const [novoParceiro, setNovoParceiro] = useState({
-    cpf_cnpj: '',
-    nome: '',
-    telefone: '',
-    email: '',
-    endereco: '',
-    numero: '',
-    bairro: '',
-    cep: '',
-    municipio: '',
-    estado: '',
-    cliente: false,
-    fornecedor: true,
-    corretor: false,
-    categoria_ids: []
-  });
+  const [novoParceiro, setNovoParceiro] = useState(criarNovoParceiroPadrao);
   const [arquivos, setArquivos] = useState([]);
   const [valorTexto, setValorTexto] = useState('');
   const anexosRef = useRef(null);
@@ -278,22 +296,7 @@ export default function NovaSolicitacao() {
 
       const parceiro = await criarParceiro(payload);
       selecionarParceiro(parceiro);
-      setNovoParceiro({
-        cpf_cnpj: '',
-        nome: '',
-        telefone: '',
-        email: '',
-        endereco: '',
-        numero: '',
-        bairro: '',
-        cep: '',
-        municipio: '',
-        estado: '',
-        cliente: false,
-        fornecedor: true,
-        corretor: false,
-        categoria_ids: []
-      });
+      setNovoParceiro(criarNovoParceiroPadrao());
       setModalParceiroAberto(false);
     } catch (error) {
       console.error(error);
@@ -1370,6 +1373,81 @@ export default function NovaSolicitacao() {
                   onChange={e => setNovoParceiro(prev => ({ ...prev, email: e.target.value }))}
                 />
               </label>
+              <div className="md:col-span-2 rounded-lg border border-[var(--c-border)] p-3 space-y-3">
+                <div>
+                  <div className="text-sm font-medium" style={{ color: 'var(--c-text)' }}>
+                    Chaves PIX opcionais
+                  </div>
+                  <p className="text-xs" style={{ color: 'var(--c-muted)' }}>
+                    Cadastre ate duas chaves fixas e uma chave variavel para uso financeiro.
+                  </p>
+                </div>
+
+                <div className="grid gap-3">
+                  <label className="grid gap-1 text-sm">
+                    Chave PIX fixa 1
+                    <div className="grid grid-cols-1 gap-2 md:grid-cols-[140px_1fr]">
+                      <select
+                        className="input input-sm"
+                        value={novoParceiro.pix_chave_fixa_1_tipo}
+                        onChange={e => setNovoParceiro(prev => ({ ...prev, pix_chave_fixa_1_tipo: e.target.value }))}
+                      >
+                        {PIX_TIPOS_CHAVE.map((tipo) => (
+                          <option key={tipo.value} value={tipo.value}>{tipo.label}</option>
+                        ))}
+                      </select>
+                      <input
+                        className="input input-sm"
+                        value={novoParceiro.pix_chave_fixa_1}
+                        onChange={e => setNovoParceiro(prev => ({ ...prev, pix_chave_fixa_1: e.target.value }))}
+                        placeholder="Informe a chave"
+                      />
+                    </div>
+                  </label>
+
+                  <label className="grid gap-1 text-sm">
+                    Chave PIX fixa 2
+                    <div className="grid grid-cols-1 gap-2 md:grid-cols-[140px_1fr]">
+                      <select
+                        className="input input-sm"
+                        value={novoParceiro.pix_chave_fixa_2_tipo}
+                        onChange={e => setNovoParceiro(prev => ({ ...prev, pix_chave_fixa_2_tipo: e.target.value }))}
+                      >
+                        {PIX_TIPOS_CHAVE.map((tipo) => (
+                          <option key={tipo.value} value={tipo.value}>{tipo.label}</option>
+                        ))}
+                      </select>
+                      <input
+                        className="input input-sm"
+                        value={novoParceiro.pix_chave_fixa_2}
+                        onChange={e => setNovoParceiro(prev => ({ ...prev, pix_chave_fixa_2: e.target.value }))}
+                        placeholder="Informe a chave"
+                      />
+                    </div>
+                  </label>
+
+                  <label className="grid gap-1 text-sm">
+                    Chave PIX variavel
+                    <div className="grid grid-cols-1 gap-2 md:grid-cols-[140px_1fr]">
+                      <select
+                        className="input input-sm"
+                        value={novoParceiro.pix_chave_variavel_tipo}
+                        onChange={e => setNovoParceiro(prev => ({ ...prev, pix_chave_variavel_tipo: e.target.value }))}
+                      >
+                        {PIX_TIPOS_CHAVE.map((tipo) => (
+                          <option key={tipo.value} value={tipo.value}>{tipo.label}</option>
+                        ))}
+                      </select>
+                      <input
+                        className="input input-sm"
+                        value={novoParceiro.pix_chave_variavel}
+                        onChange={e => setNovoParceiro(prev => ({ ...prev, pix_chave_variavel: e.target.value }))}
+                        placeholder="Informe a chave"
+                      />
+                    </div>
+                  </label>
+                </div>
+              </div>
               <label className="grid gap-1 text-sm">
                 Endereco
                 <input

@@ -7,6 +7,8 @@ import {
 } from '../services/parceiros';
 import { isValidCpfCnpj, maskCep, maskCpfCnpj, maskCreci, maskPhone, maskRg, onlyDigits } from '../utils/formatters';
 
+const PIX_TIPOS_CHAVE = ['CPF', 'CNPJ', 'EMAIL', 'TELEFONE', 'ALEATORIA'];
+
 function defaultParceiroForm() {
   return {
     id: null,
@@ -29,6 +31,12 @@ function defaultParceiroForm() {
     conjuge_nome: '',
     regime_bens: '',
     creci: '',
+    pix_chave_fixa_1_tipo: 'CPF',
+    pix_chave_fixa_1: '',
+    pix_chave_fixa_2_tipo: 'CNPJ',
+    pix_chave_fixa_2: '',
+    pix_chave_variavel_tipo: 'ALEATORIA',
+    pix_chave_variavel: '',
     cliente: true,
     fornecedor: true,
     corretor: false,
@@ -76,6 +84,12 @@ function pickParceiroFormData(parceiro = {}) {
     conjuge_nome: parceiro.conjuge_nome || '',
     regime_bens: parceiro.regime_bens || '',
     creci: parceiro.creci || '',
+    pix_chave_fixa_1_tipo: parceiro.pix_chave_fixa_1_tipo || 'CPF',
+    pix_chave_fixa_1: parceiro.pix_chave_fixa_1 || '',
+    pix_chave_fixa_2_tipo: parceiro.pix_chave_fixa_2_tipo || 'CNPJ',
+    pix_chave_fixa_2: parceiro.pix_chave_fixa_2 || '',
+    pix_chave_variavel_tipo: parceiro.pix_chave_variavel_tipo || 'ALEATORIA',
+    pix_chave_variavel: parceiro.pix_chave_variavel || '',
     cliente: parceiro.cliente !== false,
     fornecedor: parceiro.fornecedor !== false,
     corretor: parceiro.corretor === true,
@@ -127,6 +141,11 @@ export default function Parceiros() {
       const nome = normalizeSearchText(parceiro.nome);
       const documento = normalizeSearchText(parceiro.cpf_cnpj);
       const telefone = normalizeSearchText(parceiro.telefone);
+      const pix = normalizeSearchText([
+        parceiro.pix_chave_fixa_1,
+        parceiro.pix_chave_fixa_2,
+        parceiro.pix_chave_variavel
+      ].filter(Boolean).join(' '));
       const categoriasParceiro = normalizeSearchText(
         Array.isArray(parceiro.categorias)
           ? parceiro.categorias.map((categoria) => categoria.nome).join(' ')
@@ -137,6 +156,7 @@ export default function Parceiros() {
         nome.includes(search) ||
         documento.includes(search) ||
         telefone.includes(search) ||
+        pix.includes(search) ||
         categoriasParceiro.includes(search)
       );
     });
@@ -235,6 +255,63 @@ export default function Parceiros() {
                 value={parceiroForm.email}
                 onChange={(e) => setParceiroForm((current) => ({ ...current, email: e.target.value }))}
               />
+
+              <div className="rounded-xl border border-[var(--c-border)] bg-[var(--c-bg)] p-3 space-y-3">
+                <div>
+                  <div className="text-sm font-medium text-[var(--c-text)]">Chaves PIX</div>
+                  <div className="text-xs text-[var(--c-muted)]">
+                    Cadastre ate duas chaves fixas e uma chave variavel para uso financeiro.
+                  </div>
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-[120px_minmax(0,1fr)]">
+                  <select
+                    className="input w-full"
+                    value={parceiroForm.pix_chave_fixa_1_tipo}
+                    onChange={(e) => setParceiroForm((current) => ({ ...current, pix_chave_fixa_1_tipo: e.target.value }))}
+                  >
+                    {PIX_TIPOS_CHAVE.map((tipo) => <option key={tipo} value={tipo}>{tipo}</option>)}
+                  </select>
+                  <input
+                    className="input w-full"
+                    placeholder="Chave PIX fixa 1"
+                    value={parceiroForm.pix_chave_fixa_1}
+                    onChange={(e) => setParceiroForm((current) => ({ ...current, pix_chave_fixa_1: e.target.value }))}
+                  />
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-[120px_minmax(0,1fr)]">
+                  <select
+                    className="input w-full"
+                    value={parceiroForm.pix_chave_fixa_2_tipo}
+                    onChange={(e) => setParceiroForm((current) => ({ ...current, pix_chave_fixa_2_tipo: e.target.value }))}
+                  >
+                    {PIX_TIPOS_CHAVE.map((tipo) => <option key={tipo} value={tipo}>{tipo}</option>)}
+                  </select>
+                  <input
+                    className="input w-full"
+                    placeholder="Chave PIX fixa 2"
+                    value={parceiroForm.pix_chave_fixa_2}
+                    onChange={(e) => setParceiroForm((current) => ({ ...current, pix_chave_fixa_2: e.target.value }))}
+                  />
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-[120px_minmax(0,1fr)]">
+                  <select
+                    className="input w-full"
+                    value={parceiroForm.pix_chave_variavel_tipo}
+                    onChange={(e) => setParceiroForm((current) => ({ ...current, pix_chave_variavel_tipo: e.target.value }))}
+                  >
+                    {PIX_TIPOS_CHAVE.map((tipo) => <option key={tipo} value={tipo}>{tipo}</option>)}
+                  </select>
+                  <input
+                    className="input w-full"
+                    placeholder="Chave PIX variavel"
+                    value={parceiroForm.pix_chave_variavel}
+                    onChange={(e) => setParceiroForm((current) => ({ ...current, pix_chave_variavel: e.target.value }))}
+                  />
+                </div>
+              </div>
 
               <div className="text-sm font-medium text-[var(--c-text)]">Dados para contrato</div>
 
@@ -463,6 +540,16 @@ export default function Parceiros() {
                         <div className="text-sm text-[var(--c-muted)]">
                           {parceiro.email || 'Sem email'}{parceiro.municipio ? ` · ${parceiro.municipio}` : ''}
                         </div>
+                        {(parceiro.pix_chave_fixa_1 || parceiro.pix_chave_fixa_2 || parceiro.pix_chave_variavel) && (
+                          <div className="text-sm text-[var(--c-muted)]">
+                            PIX:{' '}
+                            {[
+                              parceiro.pix_chave_fixa_1 ? `${parceiro.pix_chave_fixa_1_tipo || 'PIX'} ${parceiro.pix_chave_fixa_1}` : '',
+                              parceiro.pix_chave_fixa_2 ? `${parceiro.pix_chave_fixa_2_tipo || 'PIX'} ${parceiro.pix_chave_fixa_2}` : '',
+                              parceiro.pix_chave_variavel ? `${parceiro.pix_chave_variavel_tipo || 'PIX'} ${parceiro.pix_chave_variavel}` : ''
+                            ].filter(Boolean).join(' | ')}
+                          </div>
+                        )}
                         <div className="flex flex-wrap gap-2 pt-1">
                           <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${statusClass(parceiro.ativo)}`}>
                             {parceiro.ativo ? 'ATIVO' : 'INATIVO'}
