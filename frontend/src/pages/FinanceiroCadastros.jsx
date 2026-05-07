@@ -13,6 +13,7 @@ import {
   getPaymentAccounts,
   getPaymentBeneficiaries
 } from '../services/financeiro';
+import { maskCpfCnpj } from '../utils/formatters';
 
 function defaultContaForm() {
   return {
@@ -494,7 +495,14 @@ export default function FinanceiroCadastros() {
                 <div className="grid gap-3 md:grid-cols-2">
                   <label className="sol-filter-field">
                     <span className="sol-filter-label">CNPJ pagador</span>
-                    <input className="input w-full" value={paymentAccountForm.cnpj_pagador} onChange={(e) => setPaymentAccountForm((c) => ({ ...c, cnpj_pagador: e.target.value }))} required />
+                    <input
+                      className="input w-full"
+                      inputMode="numeric"
+                      placeholder="00.000.000/0000-00"
+                      value={maskCpfCnpj(paymentAccountForm.cnpj_pagador)}
+                      onChange={(e) => setPaymentAccountForm((c) => ({ ...c, cnpj_pagador: maskCpfCnpj(e.target.value) }))}
+                      required
+                    />
                   </label>
                   <label className="sol-filter-field">
                     <span className="sol-filter-label">Empresa ID</span>
