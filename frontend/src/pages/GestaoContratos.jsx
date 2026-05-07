@@ -1,8 +1,15 @@
 import { useEffect, useState } from 'react';
 import { HiArrowDownTray, HiArrowUpTray, HiPaperClip } from 'react-icons/hi2';
 import { useAuth } from '../contexts/AuthContext';
+import PendingAttachmentsList from '../components/attachments/PendingAttachmentsList';
 import { canAccessContratos } from '../utils/acessoProduto';
 import { isGeoSetor } from '../utils/setor';
+import {
+  UPLOAD_MAX_FILE_SIZE_MB_PADRAO,
+  concatenarAnexosPendentes,
+  extrairFilesAnexosPendentes,
+  montarMensagemArquivosAcimaDoLimite
+} from '../utils/pendingAttachments';
 import { API_URL, authHeaders, fileUrl } from '../services/api';
 import { getMinhasObras, getObras } from '../services/obras';
 import {
@@ -179,7 +186,7 @@ export default function GestaoContratos() {
       const contrato = await criarContrato(payload);
 
       if (files.length > 0) {
-        await uploadContratoAnexos(contrato.id, files);
+        await uploadContratoAnexos(contrato.id, extrairFilesAnexosPendentes(files));
       }
 
       setForm({
@@ -327,7 +334,7 @@ export default function GestaoContratos() {
   async function enviarAnexos() {
     if (!modalAnexos || uploadAnexos.length === 0) return;
     try {
-      await uploadContratoAnexos(modalAnexos.id, uploadAnexos);
+      await uploadContratoAnexos(modalAnexos.id, extrairFilesAnexosPendentes(uploadAnexos));
       const data = await getContratoAnexos(modalAnexos.id);
       setAnexos(Array.isArray(data) ? data : []);
       setUploadAnexos([]);
@@ -404,6 +411,26 @@ export default function GestaoContratos() {
 
   function removerArquivoModal(index) {
     setUploadAnexos(prev => prev.filter((_, i) => i !== index));
+  }
+
+  function adicionarArquivosNovoContrato(fileList) {
+    const { arquivos: proximoEstado, rejeitados } = concatenarAnexosPendentes(files, fileList, {
+      maxFileSizeMb: UPLOAD_MAX_FILE_SIZE_MB_PADRAO
+    });
+    setFiles(proximoEstado);
+    if (rejeitados.length > 0) {
+      alert(montarMensagemArquivosAcimaDoLimite(rejeitados, UPLOAD_MAX_FILE_SIZE_MB_PADRAO));
+    }
+  }
+
+  function adicionarArquivosModal(fileList) {
+    const { arquivos: proximoEstado, rejeitados } = concatenarAnexosPendentes(uploadAnexos, fileList, {
+      maxFileSizeMb: UPLOAD_MAX_FILE_SIZE_MB_PADRAO
+    });
+    setUploadAnexos(proximoEstado);
+    if (rejeitados.length > 0) {
+      alert(montarMensagemArquivosAcimaDoLimite(rejeitados, UPLOAD_MAX_FILE_SIZE_MB_PADRAO));
+    }
   }
 
   async function obterUrlAssinada(caminhoArquivo) {
@@ -756,7 +783,10 @@ export default function GestaoContratos() {
                 type="file"
                 multiple
                 className="hidden"
-                onChange={e => setFiles(Array.from(e.target.files || []))}
+                onChange={e => {
+                  adicionarArquivosNovoContrato(e.target.files);
+                  e.target.value = '';
+                }}
               />
             </label>
             <span className="app-note">
@@ -765,26 +795,13 @@ export default function GestaoContratos() {
                 : 'Nenhum arquivo selecionado'}
             </span>
           </div>
-          {files.length > 0 && (
-            <div className="mt-2 space-y-1">
-              {files.map((arquivo, index) => (
-                <div
-                  key={`${arquivo.name}-${index}`}
-                  className="flex items-center justify-between text-sm bg-[var(--c-surface)] border border-[var(--c-border)] rounded px-2 py-1"
-                >
-                  <span className="truncate">{arquivo.name}</span>
-                  <button
-                    type="button"
-                    className="text-blue-600 font-bold px-2"
-                    onClick={() => removerArquivoNovoContrato(index)}
-                    aria-label={`Remover ${arquivo.name}`}
-                  >
-                    X
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
+          <PendingAttachmentsList
+            items={files}
+            onRemove={(index) => removerArquivoNovoContrato(index)}
+            className="mt-2 space-y-1"
+            itemClassName="flex items-center justify-between gap-3 text-sm bg-[var(--c-surface)] border border-[var(--c-border)] rounded px-2 py-1"
+            removeButtonClassName="text-blue-600 font-semibold px-2"
+          />
           </div>
 
           <div className="flex justify-start xl:justify-end">
@@ -1061,7 +1078,10 @@ export default function GestaoContratos() {
                     type="file"
                     multiple
                     className="hidden"
-                    onChange={e => setUploadAnexos(Array.from(e.target.files || []))}
+                    onChange={e => {
+                      adicionarArquivosModal(e.target.files);
+                      e.target.value = '';
+                    }}
                   />
                 </label>
                 <span className="text-xs text-[var(--c-muted)]">
@@ -1070,26 +1090,13 @@ export default function GestaoContratos() {
                     : 'Nenhum arquivo selecionado'}
                 </span>
               </div>
-              {uploadAnexos.length > 0 && (
-                <div className="mt-2 space-y-1">
-                  {uploadAnexos.map((arquivo, index) => (
-                    <div
-                      key={`${arquivo.name}-${index}`}
-                      className="flex items-center justify-between text-sm bg-[var(--c-surface)] border border-[var(--c-border)] rounded px-2 py-1"
-                    >
-                      <span className="truncate">{arquivo.name}</span>
-                      <button
-                        type="button"
-                        className="text-blue-600 font-bold px-2"
-                        onClick={() => removerArquivoModal(index)}
-                        aria-label={`Remover ${arquivo.name}`}
-                      >
-                        X
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <PendingAttachmentsList
+                items={uploadAnexos}
+                onRemove={(index) => removerArquivoModal(index)}
+                className="mt-2 space-y-1"
+                itemClassName="flex items-center justify-between gap-3 text-sm bg-[var(--c-surface)] border border-[var(--c-border)] rounded px-2 py-1"
+                removeButtonClassName="text-blue-600 font-semibold px-2"
+              />
             </div>
 
             <button

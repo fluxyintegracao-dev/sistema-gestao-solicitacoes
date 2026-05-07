@@ -11,6 +11,13 @@ import {
   reabrirConversa
 } from '../services/conversasInternas';
 import { API_URL, authHeaders, fileUrl } from '../services/api';
+import PendingAttachmentsList from '../components/attachments/PendingAttachmentsList';
+import {
+  UPLOAD_MAX_FILE_SIZE_MB_PADRAO,
+  concatenarAnexosPendentes,
+  extrairFilesAnexosPendentes,
+  montarMensagemArquivosAcimaDoLimite
+} from '../utils/pendingAttachments';
 import PreviewAnexoModal from './SolicitacaoDetalhe/PreviewAnexoModal';
 import { HiPaperClip } from 'react-icons/hi2';
 
@@ -105,7 +112,7 @@ export default function ConversaDetalhe() {
 
     try {
       setEnviando(true);
-      await enviarMensagemConversa(id, novaMensagem.trim(), arquivosMensagem);
+      await enviarMensagemConversa(id, novaMensagem.trim(), extrairFilesAnexosPendentes(arquivosMensagem));
       setNovaMensagem('');
       setArquivosMensagem([]);
       await carregar();
@@ -114,6 +121,16 @@ export default function ConversaDetalhe() {
       alert(error?.message || 'Erro ao enviar mensagem');
     } finally {
       setEnviando(false);
+    }
+  }
+
+  function adicionarArquivosMensagem(files) {
+    const { arquivos: proximoEstado, rejeitados } = concatenarAnexosPendentes(arquivosMensagem, files, {
+      maxFileSizeMb: UPLOAD_MAX_FILE_SIZE_MB_PADRAO
+    });
+    setArquivosMensagem(proximoEstado);
+    if (rejeitados.length > 0) {
+      alert(montarMensagemArquivosAcimaDoLimite(rejeitados, UPLOAD_MAX_FILE_SIZE_MB_PADRAO));
     }
   }
 
@@ -391,9 +408,7 @@ export default function ConversaDetalhe() {
               className="hidden"
               disabled={!conversaAberta || enviando}
               onChange={(e) => {
-                const novos = Array.from(e.target.files || []);
-                if (novos.length === 0) return;
-                setArquivosMensagem(prev => [...prev, ...novos]);
+                adicionarArquivosMensagem(e.target.files);
                 e.target.value = '';
               }}
             />
@@ -404,25 +419,13 @@ export default function ConversaDetalhe() {
               : 'Nenhum arquivo selecionado'}
           </span>
         </div>
-        {arquivosMensagem.length > 0 && (
-          <div className="mt-2 rounded-lg border border-[var(--c-border)] p-2">
-            <p className="text-xs mb-1 text-[var(--c-muted)]">Arquivos selecionados</p>
-            <div className="space-y-1">
-              {arquivosMensagem.map((file, index) => (
-                <div key={`${file.name}-${index}`} className="flex items-center justify-between text-sm">
-                  <span className="truncate">{file.name}</span>
-                  <button
-                    type="button"
-                    className="text-blue-700 font-semibold px-2"
-                    onClick={() => setArquivosMensagem(prev => prev.filter((_, i) => i !== index))}
-                  >
-                    x
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+        <PendingAttachmentsList
+          items={arquivosMensagem}
+          onRemove={(index) => setArquivosMensagem((prev) => prev.filter((_, itemIndex) => itemIndex !== index))}
+          className="mt-2 rounded-lg border border-[var(--c-border)] p-2 space-y-1"
+          itemClassName="flex items-center justify-between gap-3 text-sm"
+          removeButtonClassName="text-blue-700 font-semibold px-2"
+        />
         <div className="flex justify-end mt-2">
           <button
             type="submit"

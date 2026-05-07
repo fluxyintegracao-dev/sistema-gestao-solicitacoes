@@ -10,6 +10,13 @@ import {
   formatarMoedaBRL,
   normalizarEntradaMoeda
 } from '../utils/moeda';
+import PendingAttachmentsList from '../../../components/attachments/PendingAttachmentsList';
+import {
+  UPLOAD_MAX_FILE_SIZE_MB_PADRAO,
+  concatenarAnexosPendentes,
+  extrairFilesAnexosPendentes,
+  montarMensagemArquivosAcimaDoLimite
+} from '../../../utils/pendingAttachments';
 
 function formatarObra(obra) {
   if (!obra) return '-';
@@ -73,9 +80,13 @@ export default function NovaProvisaoFinanceira() {
   }
 
   function adicionarArquivos(files) {
-    const novosArquivos = Array.from(files || []).filter(Boolean);
-    if (!novosArquivos.length) return;
-    setArquivosPendentes((atual) => [...atual, ...novosArquivos]);
+    const { arquivos: proximoEstado, rejeitados } = concatenarAnexosPendentes(arquivosPendentes, files, {
+      maxFileSizeMb: UPLOAD_MAX_FILE_SIZE_MB_PADRAO
+    });
+    setArquivosPendentes(proximoEstado);
+    if (rejeitados.length > 0) {
+      alert(montarMensagemArquivosAcimaDoLimite(rejeitados, UPLOAD_MAX_FILE_SIZE_MB_PADRAO));
+    }
   }
 
   function removerArquivoPendente(index) {
@@ -101,7 +112,7 @@ export default function NovaProvisaoFinanceira() {
 
       if (arquivosPendentes.length) {
         try {
-          await uploadAnexosProvisaoFinanceira(provisao.id, arquivosPendentes);
+          await uploadAnexosProvisaoFinanceira(provisao.id, extrairFilesAnexosPendentes(arquivosPendentes));
         } catch (uploadError) {
           console.error(uploadError);
           alert(uploadError?.message || 'A provisao foi criada, mas houve erro ao enviar os anexos.');
@@ -201,6 +212,7 @@ export default function NovaProvisaoFinanceira() {
             <div>
               <h2 className="text-sm font-semibold">Anexos da provisao</h2>
               <p className="text-xs text-[var(--c-muted)]">Voce pode anexar documentos ja na criacao. Eles serao enviados logo apos o registro ser salvo.</p>
+              <p className="text-xs text-[var(--c-muted)]">Limite atual: ate {UPLOAD_MAX_FILE_SIZE_MB_PADRAO} MB por arquivo.</p>
             </div>
             <label className={`btn btn-outline cursor-pointer ${saving ? 'pointer-events-none opacity-60' : ''}`}>
               <input
@@ -217,19 +229,13 @@ export default function NovaProvisaoFinanceira() {
           </div>
 
           {arquivosPendentes.length > 0 ? (
-            <div className="grid gap-2">
-              {arquivosPendentes.map((arquivo, index) => (
-                <div key={`${arquivo.name}-${arquivo.lastModified}-${index}`} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[var(--c-border)] bg-white px-3 py-2 text-sm">
-                  <div className="min-w-0">
-                    <div className="truncate font-medium">{arquivo.name}</div>
-                    <div className="text-[var(--c-muted)]">{(arquivo.size / 1024).toFixed(1)} KB</div>
-                  </div>
-                  <button type="button" className="btn btn-outline" onClick={() => removerArquivoPendente(index)}>
-                    Remover
-                  </button>
-                </div>
-              ))}
-            </div>
+            <PendingAttachmentsList
+              items={arquivosPendentes}
+              onRemove={(index) => removerArquivoPendente(index)}
+              className="grid gap-2"
+              itemClassName="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[var(--c-border)] bg-white px-3 py-2 text-sm"
+              removeButtonClassName="btn btn-outline"
+            />
           ) : (
             <div className="text-sm text-[var(--c-muted)]">Nenhum arquivo selecionado.</div>
           )}

@@ -2293,13 +2293,13 @@ a:hover {
 }
 
 .solicitacao-nova-page {
-  gap: 1rem;
-  max-width: 980px;
+  gap: 1.2rem;
+  max-width: 1120px;
 }
 
 .solicitacao-nova-page .page-title,
 .solicitacao-nova-page .page-subtitle {
-  width: min(100%, 900px);
+  width: min(100%, 1040px);
   margin-inline: auto;
 }
 
@@ -2310,16 +2310,17 @@ a:hover {
 }
 
 .solicitacao-nova-page .page-subtitle {
-  max-width: 38rem;
+  max-width: 48rem;
   font-size: 0.9rem;
   line-height: 1.5;
   color: color-mix(in srgb, var(--premium-panel-muted) 88%, var(--c-text));
+  text-align: center;
 }
 
 .solicitacao-nova-page .nova-solicitacao-form {
-  width: min(100%, 900px);
+  width: min(100%, 1040px);
   margin-inline: auto;
-  padding: clamp(0.8rem, 1.6vw, 0.95rem);
+  padding: clamp(1rem, 2vw, 1.35rem);
 }
 
 .solicitacao-nova-page .nova-solicitacao-form::before {
@@ -2336,15 +2337,15 @@ a:hover {
 }
 
 .solicitacao-nova-page .nova-solicitacao-body {
-  width: min(100%, 740px);
+  width: 100%;
   margin-inline: auto;
   display: flex;
   flex-direction: column;
-  gap: 0.7rem;
+  gap: 1rem;
 }
 
 .solicitacao-nova-page .nova-solicitacao-body > .grid {
-  gap: 0.65rem;
+  gap: 0.9rem 1rem;
 }
 
 .solicitacao-nova-page .nova-solicitacao-form .input,
@@ -2362,12 +2363,19 @@ a:hover {
 
 .solicitacao-nova-page .nova-solicitacao-grid-principal {
   align-items: start;
+  grid-auto-flow: row dense;
 }
 
 .solicitacao-nova-page .nova-solicitacao-inline-actions {
   align-items: center;
   gap: 0.45rem;
   flex-wrap: wrap;
+}
+
+.solicitacao-nova-page .nova-solicitacao-grid-principal > label,
+.solicitacao-nova-page .nova-solicitacao-grid-secundaria > label,
+.solicitacao-nova-page .nova-solicitacao-grid-curta > label {
+  min-width: 0;
 }
 
 .solicitacao-nova-page .nova-solicitacao-inline-actions .btn {
@@ -2393,6 +2401,64 @@ a:hover {
   padding: 0.5rem 0.6rem;
 }
 
+.solicitacao-nova-page .nova-solicitacao-obra-field {
+  position: relative;
+}
+
+.solicitacao-nova-page .nova-solicitacao-obra-input {
+  padding-right: 5.5rem;
+}
+
+.solicitacao-nova-page .nova-solicitacao-obra-clear {
+  position: absolute;
+  right: 0.35rem;
+  top: 50%;
+  transform: translateY(-50%);
+  min-width: auto;
+}
+
+.solicitacao-nova-page .nova-solicitacao-obra-results {
+  z-index: 30;
+  border-color: color-mix(in srgb, var(--c-primary) 18%, var(--sol-border-color));
+  background: color-mix(in srgb, #ffffff 90%, var(--sol-surface-muted));
+  box-shadow: 0 16px 34px rgba(15, 23, 42, 0.12);
+}
+
+.solicitacao-nova-page .nova-solicitacao-obra-result {
+  border: 1px solid transparent;
+  transition: border-color 0.18s ease, background-color 0.18s ease, transform 0.18s ease;
+}
+
+.solicitacao-nova-page .nova-solicitacao-obra-result:hover {
+  border-color: color-mix(in srgb, var(--c-primary) 22%, var(--sol-border-color));
+  background: color-mix(in srgb, var(--c-primary) 5%, #ffffff);
+  transform: translateY(-1px);
+}
+
+.solicitacao-nova-page .nova-solicitacao-obra-selection {
+  border-radius: 14px;
+  padding: 0.85rem 0.95rem;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(240, 247, 255, 0.95));
+}
+
+.solicitacao-nova-page .nova-solicitacao-obra-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  padding: 0.1rem 0.55rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--c-primary) 10%, #ffffff);
+  color: color-mix(in srgb, var(--c-primary) 72%, #102544);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.solicitacao-nova-page .nova-solicitacao-obra-badge-selected {
+  background: color-mix(in srgb, var(--c-primary) 16%, #ffffff);
+}
+
 .solicitacao-nova-page .nova-solicitacao-textarea {
   min-height: 64px;
 }
@@ -2416,6 +2482,9 @@ a:hover {
   display: flex;
   flex-direction: column;
   gap: 0.7rem;
+  margin-top: 0.35rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid color-mix(in srgb, var(--sol-border-color) 82%, transparent);
 }
 
 .solicitacao-nova-page .nova-solicitacao-anexos {
@@ -2427,20 +2496,17 @@ a:hover {
 }
 
 .solicitacao-nova-page .nova-solicitacao-footer .btn {
-  min-width: 140px;
+  min-width: 170px;
+  min-height: 42px;
   font-weight: 700;
 }
 
 @media (min-width: 768px) {
-  .solicitacao-nova-page .nova-solicitacao-grid-curta {
-    max-width: 560px;
-  }
-
   .solicitacao-nova-page .nova-solicitacao-actions-bar {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: end;
-    column-gap: 1rem;
+    column-gap: 1.25rem;
   }
 
   .solicitacao-nova-page .nova-solicitacao-footer {

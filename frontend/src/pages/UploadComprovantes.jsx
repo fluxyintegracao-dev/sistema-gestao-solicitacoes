@@ -1,17 +1,31 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { HiPaperClip } from 'react-icons/hi2';
 import { uploadComprovantes } from '../services/comprovantes';
+import PendingAttachmentsList from '../components/attachments/PendingAttachmentsList';
+import {
+  UPLOAD_MAX_FILE_SIZE_MB_PADRAO,
+  concatenarAnexosPendentes,
+  extrairFilesAnexosPendentes,
+  montarMensagemArquivosAcimaDoLimite
+} from '../utils/pendingAttachments';
 
 export default function UploadComprovantes() {
   const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
   const [error, setError] = useState(null);
+  const inputRef = useRef(null);
 
   function handleFileChange(event) {
-    setFiles(Array.from(event.target.files));
+    const { arquivos: proximoEstado, rejeitados } = concatenarAnexosPendentes(files, event.target.files, {
+      maxFileSizeMb: UPLOAD_MAX_FILE_SIZE_MB_PADRAO
+    });
+    setFiles(proximoEstado);
     setMessage(null);
-    setError(null);
+    setError(rejeitados.length > 0
+      ? montarMensagemArquivosAcimaDoLimite(rejeitados, UPLOAD_MAX_FILE_SIZE_MB_PADRAO)
+      : null);
+    event.target.value = '';
   }
 
   async function handleUpload(event) {
@@ -24,7 +38,7 @@ export default function UploadComprovantes() {
 
     try {
       setLoading(true);
-      const result = await uploadComprovantes(files);
+      const result = await uploadComprovantes(extrairFilesAnexosPendentes(files));
 
       if (result.message) {
         setMessage(result.message);
@@ -35,12 +49,19 @@ export default function UploadComprovantes() {
       }
 
       setFiles([]);
+      if (inputRef.current) {
+        inputRef.current.value = '';
+      }
       event.target.reset();
     } catch (err) {
       setError(err.message || 'Erro ao enviar comprovantes');
     } finally {
       setLoading(false);
     }
+  }
+
+  function removerArquivo(index) {
+    setFiles((atual) => atual.filter((_, itemIndex) => itemIndex !== index));
   }
 
   return (
@@ -67,6 +88,7 @@ export default function UploadComprovantes() {
                   accept=".pdf,.jpg,.jpeg,.png,.html,.rar"
                   className="hidden"
                   disabled={loading}
+                  ref={inputRef}
                   onChange={handleFileChange}
                 />
               </label>
@@ -76,7 +98,18 @@ export default function UploadComprovantes() {
                   : 'Nenhum arquivo selecionado'}
               </span>
             </div>
+            <p className="text-xs text-[var(--c-muted)]">
+              Limite atual: ate {UPLOAD_MAX_FILE_SIZE_MB_PADRAO} MB por arquivo.
+            </p>
           </label>
+
+          <PendingAttachmentsList
+            items={files}
+            onRemove={(index) => removerArquivo(index)}
+            className="space-y-2"
+            itemClassName="flex items-center justify-between gap-3 rounded border border-[var(--c-border)] bg-[var(--c-surface)] px-3 py-2 text-sm"
+            removeButtonClassName="text-blue-600 font-semibold px-2"
+          />
 
           <div className="flex gap-3">
             <button type="submit" className="btn btn-primary" disabled={loading}>
@@ -89,6 +122,9 @@ export default function UploadComprovantes() {
                 setFiles([]);
                 setMessage(null);
                 setError(null);
+                if (inputRef.current) {
+                  inputRef.current.value = '';
+                }
               }}
             >
               Limpar

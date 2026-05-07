@@ -1,6 +1,13 @@
 import { useRef, useState } from 'react';
 import { API_URL, authHeaders } from '../../services/api';
 import { HiPaperClip } from 'react-icons/hi2';
+import PendingAttachmentsList from '../../components/attachments/PendingAttachmentsList';
+import {
+  UPLOAD_MAX_FILE_SIZE_MB_PADRAO,
+  concatenarAnexosPendentes,
+  extrairFilesAnexosPendentes,
+  montarMensagemArquivosAcimaDoLimite
+} from '../../utils/pendingAttachments';
 
 export default function Anexos({ solicitacaoId, onSucesso }) {
   const [arquivos, setArquivos] = useState([]);
@@ -14,7 +21,7 @@ export default function Anexos({ solicitacaoId, onSucesso }) {
     formData.append('solicitacao_id', solicitacaoId);
     formData.append('tipo', 'ANEXO');
 
-    arquivos.forEach(file => {
+    extrairFilesAnexosPendentes(arquivos).forEach(file => {
       formData.append('files', file);
     });
 
@@ -49,6 +56,16 @@ export default function Anexos({ solicitacaoId, onSucesso }) {
     setArquivos(prev => prev.filter((_, i) => i !== index));
   }
 
+  function adicionarArquivos(files) {
+    const { arquivos: proximoEstado, rejeitados } = concatenarAnexosPendentes(arquivos, files, {
+      maxFileSizeMb: UPLOAD_MAX_FILE_SIZE_MB_PADRAO
+    });
+    setArquivos(proximoEstado);
+    if (rejeitados.length > 0) {
+      alert(montarMensagemArquivosAcimaDoLimite(rejeitados, UPLOAD_MAX_FILE_SIZE_MB_PADRAO));
+    }
+  }
+
   return (
     <div className="sol-detail-card">
       <h2 className="sol-detail-card-title">Anexar arquivos</h2>
@@ -63,7 +80,10 @@ export default function Anexos({ solicitacaoId, onSucesso }) {
             ref={inputRef}
             className="hidden"
             disabled={loading}
-            onChange={e => setArquivos(Array.from(e.target.files || []))}
+            onChange={e => {
+              adicionarArquivos(e.target.files);
+              e.target.value = '';
+            }}
           />
         </label>
         <span className="text-xs text-[var(--c-muted)]">
@@ -73,26 +93,13 @@ export default function Anexos({ solicitacaoId, onSucesso }) {
         </span>
       </div>
 
-      {arquivos.length > 0 && (
-        <div className="space-y-1 mb-3">
-          {arquivos.map((arquivo, index) => (
-            <div
-              key={`${arquivo.name}-${index}`}
-              className="flex items-center justify-between text-sm bg-[var(--c-surface)] border border-[var(--c-border)] rounded px-2 py-1"
-            >
-              <span className="truncate">{arquivo.name}</span>
-              <button
-                type="button"
-                className="text-blue-600 font-bold px-2"
-                onClick={() => removerArquivo(index)}
-                aria-label={`Remover ${arquivo.name}`}
-              >
-                X
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
+      <PendingAttachmentsList
+        items={arquivos}
+        onRemove={(index) => removerArquivo(index)}
+        className="space-y-1 mb-3"
+        itemClassName="flex items-center justify-between gap-3 text-sm bg-[var(--c-surface)] border border-[var(--c-border)] rounded px-2 py-1"
+        removeButtonClassName="text-blue-600 font-semibold px-2"
+      />
 
       <div className="flex justify-end">
         <button

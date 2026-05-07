@@ -11,6 +11,13 @@ import {
 import { getSetores } from '../services/setores';
 import { HiPaperClip } from 'react-icons/hi2';
 import { useAuth } from '../contexts/AuthContext';
+import PendingAttachmentsList from '../components/attachments/PendingAttachmentsList';
+import {
+  UPLOAD_MAX_FILE_SIZE_MB_PADRAO,
+  concatenarAnexosPendentes,
+  extrairFilesAnexosPendentes,
+  montarMensagemArquivosAcimaDoLimite
+} from '../utils/pendingAttachments';
 
 function formatarDataHora(valor) {
   if (!valor) return '-';
@@ -50,6 +57,16 @@ export default function ConversasEntrada() {
     total: 0,
     total_pages: 0
   });
+
+  function adicionarArquivos(files) {
+    const { arquivos: proximoEstado, rejeitados } = concatenarAnexosPendentes(arquivos, files, {
+      maxFileSizeMb: UPLOAD_MAX_FILE_SIZE_MB_PADRAO
+    });
+    setArquivos(proximoEstado);
+    if (rejeitados.length > 0) {
+      alert(montarMensagemArquivosAcimaDoLimite(rejeitados, UPLOAD_MAX_FILE_SIZE_MB_PADRAO));
+    }
+  }
 
   const arquivadas = aba === 'ARQUIVADAS';
 
@@ -152,7 +169,7 @@ export default function ConversasEntrada() {
           mensagem: mensagem.trim(),
           destinatarios_ids: destinatariosMassaIds,
           setores_ids: setoresMassaIds,
-          files: arquivos
+          files: extrairFilesAnexosPendentes(arquivos)
         });
         alert(`Mensagens enviadas. Conversas criadas: ${result?.total || 0}.`);
       } else {
@@ -161,7 +178,7 @@ export default function ConversasEntrada() {
           destinatario_id: Number(destinatarioId),
           assunto: assunto.trim(),
           mensagem: mensagem.trim(),
-          files: arquivos
+          files: extrairFilesAnexosPendentes(arquivos)
         });
         if (result?.id) navigate(`/conversas/${result.id}`);
       }
@@ -440,8 +457,7 @@ export default function ConversasEntrada() {
                       className="hidden"
                       disabled={salvando}
                       onChange={(e) => {
-                        const novos = Array.from(e.target.files || []);
-                        if (novos.length > 0) setArquivos((prev) => [...prev, ...novos]);
+                        adicionarArquivos(e.target.files);
                         e.target.value = '';
                       }}
                     />
@@ -452,7 +468,18 @@ export default function ConversasEntrada() {
                       : 'Nenhum arquivo selecionado'}
                   </span>
                 </div>
+                <span className="block mt-1 text-xs text-[var(--c-muted)]">
+                  Limite atual: ate {UPLOAD_MAX_FILE_SIZE_MB_PADRAO} MB por arquivo.
+                </span>
               </div>
+
+              <PendingAttachmentsList
+                items={arquivos}
+                onRemove={(index) => setArquivos((prev) => prev.filter((_, itemIndex) => itemIndex !== index))}
+                className="space-y-2"
+                itemClassName="flex items-center justify-between gap-3 rounded border border-[var(--c-border)] bg-[var(--c-surface)] px-3 py-2 text-sm"
+                removeButtonClassName="text-blue-700 font-semibold px-2"
+              />
 
               <div className="flex justify-end gap-2">
                 <button type="button" className="btn btn-outline" onClick={() => setShowNova(false)} disabled={salvando}>Cancelar</button>

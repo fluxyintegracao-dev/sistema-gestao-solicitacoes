@@ -8,24 +8,49 @@ import { getTiposSubContrato } from '../services/tiposSubContrato';
 import { getContratos } from '../services/contratos';
 import { buscarParceiros, criarParceiro, listarCategoriasParceiro } from '../services/parceiros';
 import { listarApropriacoes } from '../services/apropriacoes';
-import ObraSearchModal from '../components/ObraSearchModal';
 import { getAprovacaoDiretoria, getAreasObra, getAreasPorSetorOrigem, getTiposSolicitacaoPorSetor } from '../services/configuracoesSistema';
 import { useAuth } from '../contexts/AuthContext';
 import { HiPaperClip } from 'react-icons/hi2';
+import PendingAttachmentsList from '../components/attachments/PendingAttachmentsList';
 import { userHasSetorCapability } from '../utils/setor';
 import { hasEnabledModule } from '../utils/acessoProduto';
 import { applyTipoSolicitacaoModuleAvailability, getTipoSolicitacaoBehavior } from '../utils/tipoSolicitacao';
 import { maskCep, maskCpfCnpj, maskPhone, onlyDigits } from '../utils/formatters';
+import {
+  UPLOAD_MAX_FILE_SIZE_MB_PADRAO,
+  concatenarAnexosPendentes,
+  extrairFilesAnexosPendentes,
+  montarMensagemArquivosAcimaDoLimite
+} from '../utils/pendingAttachments';
+
+function normalizarBusca(valor) {
+  return String(valor || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toUpperCase();
+}
+
+function formatarLocalidadeObra(obra) {
+  if (!obra) return 'Localidade nao informada';
+  return [obra.cidade, obra.estado].filter(Boolean).join(' / ') || 'Localidade nao informada';
+}
+
+function formatarRotuloBuscaObra(obra) {
+  if (!obra) return '';
+  const codigo = String(obra.codigo || '').trim();
+  const nome = String(obra.nome || '').trim();
+  if (codigo && nome) return `${codigo} - ${nome}`;
+  return codigo || nome;
+}
 
 export default function NovaSolicitacao() {
   const { user } = useAuth();
   const moduloContratosHabilitado = hasEnabledModule(user, 'CONTRATOS');
   const moduloApropriacoesHabilitado = hasEnabledModule(user, 'OBRAS');
   const [obras, setObras] = useState([]);
-  const [obraCodigo, setObraCodigo] = useState('');
-  const [obraDescricao, setObraDescricao] = useState('');
-  const [modalObras, setModalObras] = useState(false);
-  const [listaModal, setListaModal] = useState([]);
+  const [obraBusca, setObraBusca] = useState('');
+  const [obraBuscaAtiva, setObraBuscaAtiva] = useState(false);
   const [tipos, setTipos] = useState([]);
   const [setores, setSetores] = useState([]);
   const [areasObra, setAreasObra] = useState([]);
@@ -64,6 +89,7 @@ export default function NovaSolicitacao() {
   const [arquivos, setArquivos] = useState([]);
   const [valorTexto, setValorTexto] = useState('');
   const anexosRef = useRef(null);
+  const obraBuscaBlurTimeoutRef = useRef(null);
 
   const [form, setForm] = useState({
     obra_id: '',
@@ -128,6 +154,14 @@ export default function NovaSolicitacao() {
     }
     load();
   }, []);
+
+  useEffect(() => (
+    () => {
+      if (obraBuscaBlurTimeoutRef.current) {
+        clearTimeout(obraBuscaBlurTimeoutRef.current);
+      }
+    }
+  ), []);
 
   useEffect(() => {
     if (!form.tipo_solicitacao_id) {
@@ -286,6 +320,12 @@ export default function NovaSolicitacao() {
     setRefResultados([]);
   }
 
+  function limparBuscaObra() {
+    limparSelecaoObraERegras();
+    setObraBusca('');
+    setObraBuscaAtiva(false);
+  }
+
   const tipoSelecionado = tipos.find(t => String(t.id) === String(form.tipo_solicitacao_id));
   const comportamentoTipo = useMemo(() => {
     const comportamentoBase = getTipoSolicitacaoBehavior(tipoSelecionado);
@@ -339,46 +379,6 @@ export default function NovaSolicitacao() {
     const valor = numeros ? Number(numeros) / 100 : 0;
     setValorTexto(numeros ? formatarMoeda(valor) : '');
     setForm(prev => ({ ...prev, valor: valor || '' }));
-  }
-
-  async function buscarObrasPorCodigo() {
-    try {
-      const codigo = obraCodigo.trim().toUpperCase();
-      if (!codigo) return;
-      const data = await getMinhasObras({ codigo, modo: 'CRIACAO' });
-      const lista = Array.isArray(data) ? data : [];
-      if (lista.length === 1) {
-        const obra = lista[0];
-        setForm(prev => ({ ...prev, obra_id: String(obra.id) }));
-        setObraDescricao(obra.nome || '');
-        setObras(lista);
-        return;
-      }
-      alert('Obra nao encontrada');
-    } catch (error) {
-      console.error(error);
-      alert('Erro ao buscar obra por codigo');
-      return;
-    }
-  }
-
-  async function buscarObrasPorDescricao() {
-    try {
-      const descricao = obraDescricao.trim();
-      if (!descricao) return;
-      const data = await getMinhasObras({ descricao, modo: 'CRIACAO' });
-      const lista = Array.isArray(data) ? data : [];
-      if (lista.length === 0) {
-        alert('Nenhuma obra encontrada');
-        return;
-      }
-      setListaModal(lista);
-      setModalObras(true);
-    } catch (error) {
-      console.error(error);
-      alert('Erro ao buscar obra por descricao');
-      return;
-    }
   }
 
   async function buscarRefContrato() {
@@ -444,12 +444,78 @@ export default function NovaSolicitacao() {
     setArquivos(prev => prev.filter((_, i) => i !== index));
   }
 
+  function adicionarArquivos(files) {
+    const { arquivos: proximoEstado, rejeitados } = concatenarAnexosPendentes(arquivos, files, {
+      maxFileSizeMb: UPLOAD_MAX_FILE_SIZE_MB_PADRAO
+    });
+    setArquivos(proximoEstado);
+    if (rejeitados.length > 0) {
+      alert(montarMensagemArquivosAcimaDoLimite(rejeitados, UPLOAD_MAX_FILE_SIZE_MB_PADRAO));
+    }
+  }
+
   function selecionarObra(obra) {
     setForm(prev => ({ ...prev, obra_id: String(obra.id) }));
-    setObraCodigo(obra.codigo || '');
-    setObraDescricao(obra.nome || '');
-    setModalObras(false);
-    setObras([obra]);
+    setObraBusca(formatarRotuloBuscaObra(obra));
+    setObraBuscaAtiva(false);
+  }
+
+  const obraSelecionada = useMemo(
+    () => obras.find((obra) => String(obra.id) === String(form.obra_id)) || null,
+    [obras, form.obra_id]
+  );
+
+  const obrasFiltradas = useMemo(() => {
+    const termo = normalizarBusca(obraBusca);
+    if (!termo) return [];
+
+    return obras
+      .filter((obra) => {
+        const codigo = normalizarBusca(obra.codigo);
+        const nome = normalizarBusca(obra.nome);
+        const cidade = normalizarBusca(formatarLocalidadeObra(obra));
+        return codigo.includes(termo) || nome.includes(termo) || cidade.includes(termo);
+      })
+      .slice(0, 8);
+  }, [obras, obraBusca]);
+
+  const mostrarSugestoesObra = useMemo(() => {
+    const termo = normalizarBusca(obraBusca);
+    if (!obraBuscaAtiva || !termo) return false;
+    if (!obraSelecionada) return true;
+    return termo !== normalizarBusca(formatarRotuloBuscaObra(obraSelecionada));
+  }, [obraBusca, obraBuscaAtiva, obraSelecionada]);
+
+  function handleChangeBuscaObra(valor) {
+    setObraBusca(valor);
+    setObraBuscaAtiva(true);
+
+    if (!obraSelecionada) return;
+
+    const termoSelecionado = normalizarBusca(formatarRotuloBuscaObra(obraSelecionada));
+    if (normalizarBusca(valor) !== termoSelecionado) {
+      limparSelecaoObraERegras();
+    }
+  }
+
+  function handleBlurBuscaObra() {
+    obraBuscaBlurTimeoutRef.current = setTimeout(() => {
+      setObraBuscaAtiva(false);
+    }, 120);
+  }
+
+  function handleFocusBuscaObra() {
+    if (obraBuscaBlurTimeoutRef.current) {
+      clearTimeout(obraBuscaBlurTimeoutRef.current);
+    }
+    setObraBuscaAtiva(true);
+  }
+
+  function handleKeyDownBuscaObra(event) {
+    if (event.key !== 'Enter') return;
+    if (obrasFiltradas.length !== 1) return;
+    event.preventDefault();
+    selecionarObra(obrasFiltradas[0]);
   }
 
   async function handleSubmit(e) {
@@ -522,7 +588,7 @@ export default function NovaSolicitacao() {
 
       if (arquivos.length > 0) {
         await uploadArquivos({
-          files: arquivos,
+          files: extrairFilesAnexosPendentes(arquivos),
           solicitacao_id: solicitacao.id,
           tipo: 'SOLICITACAO'
         });
@@ -679,7 +745,7 @@ export default function NovaSolicitacao() {
   }, [form.obra_id, form.diretoria_fluxo_codigo, diretoriaSugerida]);
 
   return (
-    <div className="page solicitacoes-page solicitacao-nova-page max-w-4xl mx-auto">
+    <div className="page solicitacoes-page solicitacao-nova-page max-w-6xl mx-auto">
       <h1 className="page-title">Nova Solicitação</h1>
 
       <p className="page-subtitle hidden">
@@ -695,8 +761,89 @@ export default function NovaSolicitacao() {
         className="card nova-solicitacao-form space-y-3"
       >
         <div className="nova-solicitacao-body">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 nova-solicitacao-grid-principal">
-          <label className="grid gap-1 text-sm">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 nova-solicitacao-grid-principal">
+          <label className="grid gap-1 text-sm lg:col-span-12">
+            Obra
+            <div className="relative nova-solicitacao-obra-field">
+              <input
+                className="input input-sm nova-solicitacao-obra-input"
+                placeholder="Digite o codigo ou nome da obra"
+                value={obraBusca}
+                onChange={e => handleChangeBuscaObra(e.target.value)}
+                onFocus={handleFocusBuscaObra}
+                onBlur={handleBlurBuscaObra}
+                onKeyDown={handleKeyDownBuscaObra}
+              />
+
+              {obraSelecionada && (
+                <button
+                  type="button"
+                  className="btn btn-outline btn-sm nova-solicitacao-obra-clear"
+                  onMouseDown={e => e.preventDefault()}
+                  onClick={limparBuscaObra}
+                >
+                  Limpar
+                </button>
+              )}
+
+              {mostrarSugestoesObra && (
+                <div className="nova-solicitacao-results-list nova-solicitacao-obra-results absolute left-0 right-0 top-full mt-2 max-h-72 overflow-auto border rounded p-2">
+                  {obrasFiltradas.map((obra) => (
+                    <button
+                      key={obra.id}
+                      type="button"
+                      onMouseDown={e => e.preventDefault()}
+                      onClick={() => selecionarObra(obra)}
+                      className="block w-full text-left rounded nova-solicitacao-result-item nova-solicitacao-obra-result"
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate font-semibold text-[var(--c-text)]">{obra.nome || 'Obra sem nome'}</div>
+                          <div className="text-xs text-[var(--c-muted)]">{formatarLocalidadeObra(obra)}</div>
+                        </div>
+                        <span className="nova-solicitacao-obra-badge">
+                          {obra.codigo || 'Sem codigo'}
+                        </span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <span className="text-xs text-gray-500">
+              Digite parte do nome ou do codigo para filtrar as obras enquanto voce preenche.
+              {obrasFiltradas.length === 1 && mostrarSugestoesObra ? ' Pressione Enter para selecionar o unico resultado.' : ''}
+            </span>
+            {mostrarSugestoesObra && obrasFiltradas.length === 0 && (
+              <span className="text-xs text-gray-500">
+                Nenhuma obra encontrada com esse termo.
+              </span>
+            )}
+            {obraSelecionada && (
+              <div className="nova-solicitacao-selection-card nova-solicitacao-obra-selection border border-[var(--c-border)] bg-[var(--c-surface)]">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--c-muted)]">
+                      Obra selecionada
+                    </div>
+                    <div className="mt-1 text-sm font-semibold text-[var(--c-text)] break-words">
+                      {obraSelecionada.nome || 'Obra sem nome'}
+                    </div>
+                    <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-[var(--c-muted)]">
+                      <span>Codigo: {obraSelecionada.codigo || '-'}</span>
+                      <span>{formatarLocalidadeObra(obraSelecionada)}</span>
+                    </div>
+                  </div>
+                  <span className="nova-solicitacao-obra-badge nova-solicitacao-obra-badge-selected">
+                    ID {obraSelecionada.id}
+                  </span>
+                </div>
+              </div>
+            )}
+          </label>
+          {false && (
+          <>
+          <label className="grid gap-1 text-sm lg:col-span-5">
             Código da obra
             <div className="flex gap-2 nova-solicitacao-inline-actions">
               <input
@@ -726,7 +873,7 @@ export default function NovaSolicitacao() {
             </div>
           </label>
 
-          <label className="grid gap-1 text-sm">
+          <label className="grid gap-1 text-sm lg:col-span-6">
             Descrição da obra
             <div className="flex gap-2 nova-solicitacao-inline-actions">
               <input
@@ -755,8 +902,10 @@ export default function NovaSolicitacao() {
               </button>
             </div>
           </label>
+          </>
+          )}
 
-          <label className="grid gap-1 text-sm">
+          <label className="grid gap-1 text-sm lg:col-span-4">
             Área Responsável
             <select
               name="area_responsavel"
@@ -782,7 +931,7 @@ export default function NovaSolicitacao() {
             )}
           </label>
 
-          <label className="grid gap-1 text-sm">
+          <label className="grid gap-1 text-sm lg:col-span-4">
             Diretoria de aprovação
             <select
               name="diretoria_fluxo_codigo"
@@ -802,12 +951,9 @@ export default function NovaSolicitacao() {
                 <option value={diretoriaSugerida}>{diretoriaSugerida}</option>
               )}
             </select>
-            <span className="text-xs text-gray-500">
-              A solicitação cai primeiro na diretoria da obra e depois segue para a área responsável.
-            </span>
           </label>
 
-          <label className="grid gap-1 text-sm">
+          <label className="grid gap-1 text-sm lg:col-span-4">
             Tipo de Solicitação
             <select
               name="tipo_solicitacao_id"
@@ -824,7 +970,7 @@ export default function NovaSolicitacao() {
             </select>
           </label>
 
-          <label className="grid gap-1 text-sm md:col-span-2">
+          <label className="grid gap-1 text-sm lg:col-span-6">
             Credor
             <div className="flex gap-2 nova-solicitacao-inline-actions">
               <input
@@ -890,7 +1036,7 @@ export default function NovaSolicitacao() {
           </label>
 
           {exibirCampoApropriacao && (
-            <label className="grid gap-1 text-sm">
+            <label className="grid gap-1 text-sm lg:col-span-6">
               Apropriacao da Solicitacao na Obra
               <select
                 name="apropriacao_id"
@@ -931,7 +1077,7 @@ export default function NovaSolicitacao() {
           )}
 
           {exibirCamposContrato && (
-            <label className="grid gap-1 text-sm md:col-span-2">
+            <label className="grid gap-1 text-sm lg:col-span-12">
               Ref. do Contrato
               <div className="flex gap-2 nova-solicitacao-inline-actions">
                 <input
@@ -1148,7 +1294,10 @@ export default function NovaSolicitacao() {
                 multiple
                 ref={anexosRef}
                 className="hidden"
-                onChange={e => setArquivos([...e.target.files])}
+                onChange={e => {
+                  adicionarArquivos(e.target.files);
+                  e.target.value = '';
+                }}
               />
             </label>
             <span className="text-xs text-[var(--c-muted)]">
@@ -1157,34 +1306,13 @@ export default function NovaSolicitacao() {
                 : 'Nenhum arquivo selecionado'}
             </span>
           </div>
-          {arquivos.length > 0 && (
-            <div className="mt-2 space-y-1">
-              {arquivos.map((arquivo, index) => (
-                <div
-                  key={`${arquivo.name}-${index}`}
-                  className="nova-solicitacao-file-item flex items-center justify-between text-sm bg-[var(--c-surface)] border border-[var(--c-border)] rounded px-2 py-1"
-                >
-                  <span className="truncate">{arquivo.name}</span>
-                  <button
-                    type="button"
-                    className="text-blue-600 font-bold px-2"
-                    onClick={e => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      removerArquivo(index);
-                    }}
-                    onMouseDown={e => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                    }}
-                    aria-label={`Remover ${arquivo.name}`}
-                  >
-                    X
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
+          <PendingAttachmentsList
+            items={arquivos}
+            onRemove={(index) => removerArquivo(index)}
+            className="mt-2 space-y-1"
+            itemClassName="nova-solicitacao-file-item flex items-center justify-between gap-3 text-sm bg-[var(--c-surface)] border border-[var(--c-border)] rounded px-2 py-1"
+            removeButtonClassName="text-blue-600 font-semibold px-2"
+          />
         </label>
 
           <div className="flex justify-end nova-solicitacao-footer">
@@ -1349,12 +1477,6 @@ export default function NovaSolicitacao() {
         </div>
       )}
 
-      <ObraSearchModal
-        aberto={modalObras}
-        obras={listaModal}
-        onClose={() => setModalObras(false)}
-        onSelect={selecionarObra}
-      />
     </div>
   );
 }

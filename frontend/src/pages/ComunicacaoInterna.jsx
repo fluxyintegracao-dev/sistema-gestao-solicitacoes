@@ -13,6 +13,13 @@ import {
   listarConversas,
   marcarLida
 } from '../services/conversasInternas';
+import PendingAttachmentsList from '../components/attachments/PendingAttachmentsList';
+import {
+  UPLOAD_MAX_FILE_SIZE_MB_PADRAO,
+  concatenarAnexosPendentes,
+  extrairFilesAnexosPendentes,
+  montarMensagemArquivosAcimaDoLimite
+} from '../utils/pendingAttachments';
 
 const LIST_POLL_INTERVAL_MS = 15000;
 const ACTIVE_CHAT_POLL_INTERVAL_MS = 5000;
@@ -119,6 +126,26 @@ export default function ComunicacaoInterna() {
   const mensagensContainerRef = useRef(null);
   const inputRef = useRef(null);
   const mensagensRef = useRef([]);
+
+  const adicionarArquivosConversa = useCallback((files) => {
+    const { arquivos: proximoEstado, rejeitados } = concatenarAnexosPendentes(arquivos, files, {
+      maxFileSizeMb: UPLOAD_MAX_FILE_SIZE_MB_PADRAO
+    });
+    setArquivos(proximoEstado);
+    if (rejeitados.length > 0) {
+      alert(montarMensagemArquivosAcimaDoLimite(rejeitados, UPLOAD_MAX_FILE_SIZE_MB_PADRAO));
+    }
+  }, [arquivos]);
+
+  const adicionarArquivosNovaConversa = useCallback((files) => {
+    const { arquivos: proximoEstado, rejeitados } = concatenarAnexosPendentes(arquivosNova, files, {
+      maxFileSizeMb: UPLOAD_MAX_FILE_SIZE_MB_PADRAO
+    });
+    setArquivosNova(proximoEstado);
+    if (rejeitados.length > 0) {
+      alert(montarMensagemArquivosAcimaDoLimite(rejeitados, UPLOAD_MAX_FILE_SIZE_MB_PADRAO));
+    }
+  }, [arquivosNova]);
 
   const scrollToBottom = useCallback(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -262,7 +289,11 @@ export default function ComunicacaoInterna() {
     setTexto('');
     setArquivos([]);
     try {
-      const nova = await enviarMensagemConversa(conversaAtiva, textoEnviado, arquivosEnviados);
+      const nova = await enviarMensagemConversa(
+        conversaAtiva,
+        textoEnviado,
+        extrairFilesAnexosPendentes(arquivosEnviados)
+      );
       setMensagens((prev) => [...prev, {
         id: nova.id,
         conversa_id: conversaAtiva,
@@ -348,13 +379,20 @@ export default function ComunicacaoInterna() {
         }
         await criarConversaEmMassa({
           assunto: assuntoNova, mensagem: mensagemNova,
-          destinatarios_ids: destinatariosMassaIds, setores_ids: setoresMassaIds, files: arquivosNova
+          destinatarios_ids: destinatariosMassaIds,
+          setores_ids: setoresMassaIds,
+          files: extrairFilesAnexosPendentes(arquivosNova)
         });
         setShowNova(false);
         await carregarLista();
       } else {
         if (!destinatarioId) { alert('Selecione um destinatário'); setSalvando(false); return; }
-        const res = await criarConversa({ destinatario_id: destinatarioId, assunto: assuntoNova, mensagem: mensagemNova, files: arquivosNova });
+        const res = await criarConversa({
+          destinatario_id: destinatarioId,
+          assunto: assuntoNova,
+          mensagem: mensagemNova,
+          files: extrairFilesAnexosPendentes(arquivosNova)
+        });
         setShowNova(false);
         const lista = await listarConversas({ limit: 100 });
         const items = lista?.items || [];
@@ -588,7 +626,14 @@ export default function ComunicacaoInterna() {
 
             {/* Input de mensagem */}
             <div style={{ borderTop: '1px solid var(--c-border)', background: 'var(--c-surface)', padding: '10px 16px', flexShrink: 0 }}>
-                {arquivos.length > 0 && (
+                <PendingAttachmentsList
+                  items={arquivos}
+                  onRemove={(index) => setArquivos((prev) => prev.filter((_, itemIndex) => itemIndex !== index))}
+                  className="mb-2 space-y-2"
+                  itemClassName="flex items-center justify-between gap-3 rounded border border-[var(--c-border)] bg-[var(--c-bg, #fff)] px-3 py-2 text-sm"
+                  removeButtonClassName="text-red-600 font-semibold px-2"
+                />
+                {false && arquivos.length > 0 && (
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
                     {arquivos.map((f, i) => (
                       <span key={i} style={{ fontSize: 11, background: '#dbeafe', color: '#1d4ed8', padding: '2px 8px', borderRadius: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -615,7 +660,15 @@ export default function ComunicacaoInterna() {
                   >
                     <span style={{ fontSize: 18, lineHeight: 1 }}>{'\uD83D\uDCCE'}</span>
                     📎
-                    <input type="file" multiple style={{ display: 'none' }} onChange={(e) => setArquivos((prev) => [...prev, ...Array.from(e.target.files)])} />
+                    <input
+                      type="file"
+                      multiple
+                      style={{ display: 'none' }}
+                      onChange={(e) => {
+                        adicionarArquivosConversa(e.target.files);
+                        e.target.value = '';
+                      }}
+                    />
                   </label>
                   <button
                     onClick={enviar}
@@ -736,10 +789,29 @@ export default function ComunicacaoInterna() {
               {/* Anexos */}
               <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 <span style={{ fontSize: 12, color: 'var(--c-muted)', fontWeight: 500 }}>Anexos (opcional)</span>
-                <input type="file" multiple style={{ fontSize: 13 }} onChange={(e) => setArquivosNova(Array.from(e.target.files))} />
+                <input
+                  type="file"
+                  multiple
+                  style={{ fontSize: 13 }}
+                  onChange={(e) => {
+                    adicionarArquivosNovaConversa(e.target.files);
+                    e.target.value = '';
+                  }}
+                />
+                <span style={{ fontSize: 11, color: 'var(--c-muted)' }}>
+                  Limite atual: ate {UPLOAD_MAX_FILE_SIZE_MB_PADRAO} MB por arquivo.
+                </span>
               </label>
 
               {/* Rodapé */}
+              <PendingAttachmentsList
+                items={arquivosNova}
+                onRemove={(index) => setArquivosNova((prev) => prev.filter((_, itemIndex) => itemIndex !== index))}
+                className="space-y-2"
+                itemClassName="flex items-center justify-between gap-3 rounded border border-[var(--c-border)] bg-[var(--c-bg, #fff)] px-3 py-2 text-sm"
+                removeButtonClassName="text-red-600 font-semibold px-2"
+              />
+
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, paddingTop: 4 }}>
                 <button type="button" onClick={() => setShowNova(false)} className="btn btn-outline" style={{ fontSize: 13 }}>Cancelar</button>
                 <button type="submit" disabled={salvando} className="btn btn-primary" style={{ fontSize: 13 }}>
