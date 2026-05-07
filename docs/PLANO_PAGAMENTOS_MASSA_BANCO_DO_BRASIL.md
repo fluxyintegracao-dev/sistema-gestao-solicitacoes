@@ -1089,6 +1089,11 @@ Antes de escrever codigo da integracao BB, decidir:
 - Criar cadastro de favorecido bancario.
 - Criar ou estender conta bancaria para dados BB.
 - Criar relacao empresa pagadora.
+- Disponibilizar em Cadastros Financeiros a manutencao de contas pagadoras BB, vinculando conta bancaria interna, CNPJ pagador, convenio, ambiente, referencias seguras de credenciais e `empresa_id` opcional para futura operacao multiempresa.
+- Na criacao de nova conta a pagar, separar a consulta de credor em dois usos: consulta por CPF/CNPJ e busca por nome com lista de resultados selecionaveis.
+- Ao selecionar credor pelo nome, preencher automaticamente o CPF/CNPJ exibido na consulta.
+- No preparo PIX do titulo, permitir marcar "usar o mesmo credor como favorecido" para preencher nome, CPF/CNPJ, tipo de chave e chave PIX a partir do cadastro da pessoa.
+- Renomear "Data prevista" para "Data de Pagamento" nos fluxos de preparo PIX.
 - Criar permissoes de pagamento.
 - Criar politica de MFA step-up.
 - Criar auditoria de alteracao de favorecido/conta.

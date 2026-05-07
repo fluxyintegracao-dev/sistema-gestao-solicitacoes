@@ -441,6 +441,16 @@ export async function criarPaymentAccount(data) {
   return parseJson(response, 'Erro ao criar conta pagadora');
 }
 
+export async function atualizarPaymentAccount(id, data) {
+  const response = await fetch(`${API_URL}/financeiro/pagamentos/accounts/${id}`, {
+    method: 'PUT',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+
+  return parseJson(response, 'Erro ao atualizar conta pagadora');
+}
+
 export async function criarPaymentBatch(data) {
   const response = await fetch(`${API_URL}/financeiro/pagamentos/lotes`, {
     method: 'POST',

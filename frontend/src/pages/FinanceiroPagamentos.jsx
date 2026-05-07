@@ -323,10 +323,13 @@ export default function FinanceiroPagamentos() {
                       <option value="">Selecione</option>
                       {accounts.map((account) => (
                         <option key={account.id} value={account.id}>
-                          {account.contaBancaria?.nome || `Conta ${account.id}`} - {account.cnpj_pagador}
+                          {account.contaBancaria?.nome || `Conta ${account.id}`} - CNPJ {account.cnpj_pagador} - Conv. {account.convenio || '-'}
                         </option>
                       ))}
                     </select>
+                    <span className="app-note mt-2">
+                      Cadastre em Financeiro &gt; Cadastros Financeiros &gt; Contas pagadoras BB.
+                    </span>
                   </label>
                   <label className="sol-filter-field xl:col-span-2">
                     <span className="sol-filter-label">Data pagamento</span>

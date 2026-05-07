@@ -2,12 +2,15 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   atualizarCategoriaFinanceira,
   atualizarContaBancaria,
+  atualizarPaymentAccount,
   atualizarPaymentBeneficiary,
   criarCategoriaFinanceira,
   criarContaBancaria,
+  criarPaymentAccount,
   criarPaymentBeneficiary,
   getCategoriasFinanceiras,
   getContasBancarias,
+  getPaymentAccounts,
   getPaymentBeneficiaries
 } from '../services/financeiro';
 
@@ -45,6 +48,27 @@ function defaultFavorecidoForm() {
   };
 }
 
+function defaultPaymentAccountForm() {
+  return {
+    id: null,
+    conta_bancaria_id: '',
+    empresa_id: '',
+    cnpj_pagador: '',
+    banco_codigo: '001',
+    agencia: '',
+    agencia_digito: '',
+    conta: '',
+    conta_digito: '',
+    tipo_conta: 'CORRENTE',
+    convenio: '',
+    client_id_ref: '',
+    client_secret_ref: '',
+    certificate_ref: '',
+    ambiente: 'HOMOLOGACAO',
+    ativo: true
+  };
+}
+
 function pickContaFormData(conta = {}) {
   return {
     id: conta.id || null,
@@ -64,6 +88,27 @@ function pickCategoriaFormData(categoria = {}) {
     tipo: categoria.tipo || 'AMBOS',
     descricao: categoria.descricao || '',
     ativo: categoria.ativo !== false
+  };
+}
+
+function pickPaymentAccountFormData(account = {}) {
+  return {
+    id: account.id || null,
+    conta_bancaria_id: account.conta_bancaria_id ? String(account.conta_bancaria_id) : '',
+    empresa_id: account.empresa_id ? String(account.empresa_id) : '',
+    cnpj_pagador: account.cnpj_pagador || '',
+    banco_codigo: account.banco_codigo || '001',
+    agencia: account.agencia || '',
+    agencia_digito: account.agencia_digito || '',
+    conta: account.conta || '',
+    conta_digito: account.conta_digito || '',
+    tipo_conta: account.tipo_conta || 'CORRENTE',
+    convenio: account.convenio || '',
+    client_id_ref: account.client_id_ref || '',
+    client_secret_ref: account.client_secret_ref || '',
+    certificate_ref: account.certificate_ref || '',
+    ambiente: account.ambiente || 'HOMOLOGACAO',
+    ativo: account.ativo !== false
   };
 }
 
@@ -117,11 +162,14 @@ function categoriaTipoBadgeClass(tipo) {
 
 export default function FinanceiroCadastros() {
   const [contas, setContas] = useState([]);
+  const [paymentAccounts, setPaymentAccounts] = useState([]);
   const [categorias, setCategorias] = useState([]);
   const [contaForm, setContaForm] = useState(defaultContaForm());
+  const [paymentAccountForm, setPaymentAccountForm] = useState(defaultPaymentAccountForm());
   const [categoriaForm, setCategoriaForm] = useState(defaultCategoriaForm());
   const [loading, setLoading] = useState(true);
   const [savingConta, setSavingConta] = useState(false);
+  const [savingPaymentAccount, setSavingPaymentAccount] = useState(false);
   const [savingCategoria, setSavingCategoria] = useState(false);
   const [error, setError] = useState('');
   const [categoriaFiltro, setCategoriaFiltro] = useState('');
@@ -135,12 +183,14 @@ export default function FinanceiroCadastros() {
     try {
       setLoading(true);
       setError('');
-      const [contasData, categoriasData] = await Promise.all([
+      const [contasData, categoriasData, paymentAccountsData] = await Promise.all([
         getContasBancarias(),
-        getCategoriasFinanceiras()
+        getCategoriasFinanceiras(),
+        getPaymentAccounts().catch(() => [])
       ]);
       setContas(Array.isArray(contasData) ? contasData : []);
       setCategorias(Array.isArray(categoriasData) ? categoriasData : []);
+      setPaymentAccounts(Array.isArray(paymentAccountsData) ? paymentAccountsData : []);
     } catch (err) {
       setError(err?.message || 'Erro ao carregar cadastros financeiros');
     } finally {
@@ -221,6 +271,43 @@ export default function FinanceiroCadastros() {
     } finally {
       setSavingConta(false);
     }
+  }
+
+  async function handleSalvarPaymentAccount(event) {
+    event.preventDefault();
+    try {
+      setSavingPaymentAccount(true);
+      setError('');
+      const { id, ...payload } = pickPaymentAccountFormData(paymentAccountForm);
+      const cleanPayload = {
+        ...payload,
+        conta_bancaria_id: Number(payload.conta_bancaria_id),
+        empresa_id: payload.empresa_id ? Number(payload.empresa_id) : null
+      };
+      if (paymentAccountForm.id) {
+        await atualizarPaymentAccount(paymentAccountForm.id, cleanPayload);
+      } else {
+        await criarPaymentAccount(cleanPayload);
+      }
+      setPaymentAccountForm(defaultPaymentAccountForm());
+      await carregar();
+    } catch (err) {
+      setError(err?.message || 'Erro ao salvar conta pagadora BB');
+    } finally {
+      setSavingPaymentAccount(false);
+    }
+  }
+
+  function preencherContaPagadoraPelaContaBancaria(contaBancariaId) {
+    const conta = contas.find((item) => String(item.id) === String(contaBancariaId));
+    setPaymentAccountForm((current) => ({
+      ...current,
+      conta_bancaria_id: contaBancariaId,
+      banco_codigo: current.banco_codigo || '001',
+      agencia: conta?.agencia || current.agencia,
+      conta: conta?.conta || current.conta,
+      tipo_conta: conta?.tipo_conta || current.tipo_conta
+    }));
   }
 
   async function handleSalvarCategoria(event) {
@@ -364,6 +451,153 @@ export default function FinanceiroCadastros() {
                             {conta.ativo ? 'ATIVA' : 'INATIVA'}
                           </span>
                           <button type="button" className="btn btn-outline" onClick={() => setContaForm(pickContaFormData(conta))}>
+                            Editar
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="card sol-surface-card">
+              <div className="flex flex-col gap-1 md:flex-row md:items-start md:justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold text-[var(--c-text)]">
+                    {paymentAccountForm.id ? 'Editar conta pagadora BB' : 'Nova conta pagadora BB'}
+                  </h2>
+                  <p className="text-sm text-[var(--c-muted)]">
+                    Vincula uma conta bancaria interna ao CNPJ pagador, convenio BB e futura empresa do grupo.
+                  </p>
+                </div>
+              </div>
+
+              <form className="mt-4 space-y-3" onSubmit={handleSalvarPaymentAccount}>
+                <label className="sol-filter-field">
+                  <span className="sol-filter-label">Conta bancaria interna</span>
+                  <select
+                    className="input w-full"
+                    value={paymentAccountForm.conta_bancaria_id}
+                    onChange={(e) => preencherContaPagadoraPelaContaBancaria(e.target.value)}
+                    required
+                  >
+                    <option value="">Selecione a conta bancaria</option>
+                    {contas.map((conta) => (
+                      <option key={conta.id} value={conta.id}>
+                        {conta.nome} - {conta.banco || 'Banco'} {conta.agencia || '-'} / {conta.conta || '-'}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <div className="grid gap-3 md:grid-cols-2">
+                  <label className="sol-filter-field">
+                    <span className="sol-filter-label">CNPJ pagador</span>
+                    <input className="input w-full" value={paymentAccountForm.cnpj_pagador} onChange={(e) => setPaymentAccountForm((c) => ({ ...c, cnpj_pagador: e.target.value }))} required />
+                  </label>
+                  <label className="sol-filter-field">
+                    <span className="sol-filter-label">Empresa ID</span>
+                    <input className="input w-full" inputMode="numeric" placeholder="Opcional nesta fase" value={paymentAccountForm.empresa_id} onChange={(e) => setPaymentAccountForm((c) => ({ ...c, empresa_id: e.target.value }))} />
+                  </label>
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-3">
+                  <label className="sol-filter-field">
+                    <span className="sol-filter-label">Codigo banco</span>
+                    <input className="input w-full" value={paymentAccountForm.banco_codigo} onChange={(e) => setPaymentAccountForm((c) => ({ ...c, banco_codigo: e.target.value }))} required />
+                  </label>
+                  <label className="sol-filter-field">
+                    <span className="sol-filter-label">Agencia</span>
+                    <input className="input w-full" value={paymentAccountForm.agencia} onChange={(e) => setPaymentAccountForm((c) => ({ ...c, agencia: e.target.value }))} required />
+                  </label>
+                  <label className="sol-filter-field">
+                    <span className="sol-filter-label">Digito agencia</span>
+                    <input className="input w-full" value={paymentAccountForm.agencia_digito} onChange={(e) => setPaymentAccountForm((c) => ({ ...c, agencia_digito: e.target.value }))} />
+                  </label>
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-3">
+                  <label className="sol-filter-field">
+                    <span className="sol-filter-label">Conta</span>
+                    <input className="input w-full" value={paymentAccountForm.conta} onChange={(e) => setPaymentAccountForm((c) => ({ ...c, conta: e.target.value }))} required />
+                  </label>
+                  <label className="sol-filter-field">
+                    <span className="sol-filter-label">Digito conta</span>
+                    <input className="input w-full" value={paymentAccountForm.conta_digito} onChange={(e) => setPaymentAccountForm((c) => ({ ...c, conta_digito: e.target.value }))} />
+                  </label>
+                  <label className="sol-filter-field">
+                    <span className="sol-filter-label">Tipo conta</span>
+                    <input className="input w-full" value={paymentAccountForm.tipo_conta} onChange={(e) => setPaymentAccountForm((c) => ({ ...c, tipo_conta: e.target.value }))} required />
+                  </label>
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-2">
+                  <label className="sol-filter-field">
+                    <span className="sol-filter-label">Convenio BB</span>
+                    <input className="input w-full" value={paymentAccountForm.convenio} onChange={(e) => setPaymentAccountForm((c) => ({ ...c, convenio: e.target.value }))} required />
+                  </label>
+                  <label className="sol-filter-field">
+                    <span className="sol-filter-label">Ambiente</span>
+                    <select className="input w-full" value={paymentAccountForm.ambiente} onChange={(e) => setPaymentAccountForm((c) => ({ ...c, ambiente: e.target.value }))}>
+                      <option value="HOMOLOGACAO">HOMOLOGACAO</option>
+                      <option value="PRODUCAO">PRODUCAO</option>
+                    </select>
+                  </label>
+                </div>
+
+                <details className="rounded-lg border border-[var(--c-border)] p-3">
+                  <summary className="cursor-pointer text-sm font-medium text-[var(--c-text)]">Referencias seguras de credenciais</summary>
+                  <div className="mt-3 grid gap-3">
+                    <input className="input w-full" placeholder="client_id_ref" value={paymentAccountForm.client_id_ref} onChange={(e) => setPaymentAccountForm((c) => ({ ...c, client_id_ref: e.target.value }))} />
+                    <input className="input w-full" placeholder="client_secret_ref" value={paymentAccountForm.client_secret_ref} onChange={(e) => setPaymentAccountForm((c) => ({ ...c, client_secret_ref: e.target.value }))} />
+                    <input className="input w-full" placeholder="certificate_ref" value={paymentAccountForm.certificate_ref} onChange={(e) => setPaymentAccountForm((c) => ({ ...c, certificate_ref: e.target.value }))} />
+                  </div>
+                </details>
+
+                <label className="flex items-center gap-2 text-sm text-[var(--c-text)]">
+                  <input type="checkbox" checked={paymentAccountForm.ativo} onChange={(e) => setPaymentAccountForm((c) => ({ ...c, ativo: e.target.checked }))} />
+                  Conta pagadora ativa
+                </label>
+
+                <div className="flex flex-wrap gap-2">
+                  <button type="submit" className="btn btn-primary" disabled={savingPaymentAccount}>
+                    {savingPaymentAccount ? 'Salvando...' : (paymentAccountForm.id ? 'Salvar conta pagadora' : 'Criar conta pagadora')}
+                  </button>
+                  {paymentAccountForm.id && (
+                    <button type="button" className="btn btn-outline" onClick={() => setPaymentAccountForm(defaultPaymentAccountForm())}>
+                      Cancelar
+                    </button>
+                  )}
+                </div>
+              </form>
+            </div>
+
+            <div className="card sol-surface-card space-y-3">
+              <h2 className="text-lg font-semibold text-[var(--c-text)]">Contas pagadoras BB</h2>
+              {paymentAccounts.length === 0 ? (
+                <p className="text-sm text-[var(--c-muted)]">Nenhuma conta pagadora BB cadastrada.</p>
+              ) : (
+                <div className="app-list-stack">
+                  {paymentAccounts.map((account) => (
+                    <div key={account.id} className="app-list-card">
+                      <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                        <div className="text-sm">
+                          <div className="font-medium text-[var(--c-text)]">
+                            {account.contaBancaria?.nome || `Conta pagadora ${account.id}`}
+                          </div>
+                          <div className="text-[var(--c-muted)]">
+                            CNPJ {account.cnpj_pagador} - Convenio {account.convenio || '-'}
+                          </div>
+                          <div className="text-[var(--c-muted)]">
+                            Empresa ID {account.empresa_id || 'matriz/central'} - {account.provider?.codigo || 'BB'} {account.ambiente}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className={statusClass(account.ativo)}>
+                            {account.ativo ? 'ATIVA' : 'INATIVA'}
+                          </span>
+                          <button type="button" className="btn btn-outline" onClick={() => setPaymentAccountForm(pickPaymentAccountFormData(account))}>
                             Editar
                           </button>
                         </div>

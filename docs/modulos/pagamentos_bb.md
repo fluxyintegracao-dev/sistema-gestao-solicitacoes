@@ -91,6 +91,21 @@ Cada chave possui tipo (`CPF`, `CNPJ`, `EMAIL`, `TELEFONE` ou `ALEATORIA`) e val
 
 Esses dados servem como fonte cadastral inicial. Eles nao substituem o cadastro de favorecido bancario nem o snapshot imutavel salvo em `payment_intents` no momento da criacao do lote. Alteracoes futuras no parceiro nao devem alterar retroativamente lotes aprovados, enviados ou confirmados.
 
+### Complemento - UX de credor, favorecido e conta pagadora
+
+Na criacao de nova conta, a selecao do credor foi separada em:
+
+- consulta por CPF/CNPJ;
+- busca por nome com lista de credores/clientes para selecao.
+
+Quando o usuario seleciona pelo nome, o CPF/CNPJ do cadastro e preenchido automaticamente na consulta. Isso evita duplicidade visual entre "buscar credor" e "credor" e reduz erro de selecao.
+
+No bloco "Preparar PIX", o campo "Favorecido bancario vinculado" representa o cadastro bancario rastreado que sera usado no lote. O usuario tambem pode marcar "usar o mesmo credor como favorecido"; nesse caso o sistema preenche nome, CPF/CNPJ, tipo de chave e chave PIX a partir das chaves cadastradas na pessoa.
+
+A label "Data prevista" passa a ser "Data de Pagamento".
+
+As contas pagadoras BB sao cadastradas em Cadastros Financeiros. Cada conta pagadora vincula uma conta bancaria interna a CNPJ pagador, convenio BB, ambiente, referencias seguras de credenciais e `empresa_id` opcional. Esse desenho deixa o sistema pronto para multiplas empresas e multiplos convenios no futuro, sem gravar secrets reais no repositorio.
+
 ## Permissoes
 
 Pagamentos:

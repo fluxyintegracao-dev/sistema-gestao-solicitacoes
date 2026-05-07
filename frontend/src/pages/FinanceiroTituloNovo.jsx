@@ -13,7 +13,7 @@ import {
 import { listarApropriacoes } from '../services/apropriacoes';
 import { useAuth } from '../contexts/AuthContext';
 import { hasEnabledModule } from '../utils/acessoProduto';
-import { formatCurrencyInput, normalizeCurrencyTyping } from '../utils/formatters';
+import { formatCurrencyInput, maskCpfCnpj, normalizeCurrencyTyping, onlyDigits } from '../utils/formatters';
 
 const FORMAS_COBRANCA = ['BOLETO', 'PIX', 'OUTROS'];
 const STATUS_COBRANCA = ['PENDENTE_EMISSAO', 'EMITIDO', 'PAGO_BANCO', 'CONCILIADO', 'CANCELADO'];
@@ -73,6 +73,34 @@ function labelTipoTitulo(tipoTitulo) {
   return tipoTitulo === 'RECEBER' ? 'receber' : 'pagar';
 }
 
+function getParceiroPixOptions(parceiro) {
+  if (!parceiro) return [];
+  return [
+    {
+      id: 'pix_chave_fixa_1',
+      label: 'Chave fixa 1',
+      tipo: parceiro.pix_chave_fixa_1_tipo,
+      chave: parceiro.pix_chave_fixa_1
+    },
+    {
+      id: 'pix_chave_fixa_2',
+      label: 'Chave fixa 2',
+      tipo: parceiro.pix_chave_fixa_2_tipo,
+      chave: parceiro.pix_chave_fixa_2
+    },
+    {
+      id: 'pix_chave_variavel',
+      label: 'Chave variavel',
+      tipo: parceiro.pix_chave_variavel_tipo,
+      chave: parceiro.pix_chave_variavel
+    }
+  ].filter((item) => item.tipo && item.chave);
+}
+
+function getParceiroPixPrincipal(parceiro) {
+  return getParceiroPixOptions(parceiro)[0] || null;
+}
+
 export default function FinanceiroTituloNovo() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -89,11 +117,13 @@ export default function FinanceiroTituloNovo() {
   const [loadingParceiros, setLoadingParceiros] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [parceiroBusca, setParceiroBusca] = useState('');
+  const [parceiroDocumentoBusca, setParceiroDocumentoBusca] = useState('');
+  const [parceiroNomeBusca, setParceiroNomeBusca] = useState('');
   const [paymentAccounts, setPaymentAccounts] = useState([]);
   const [beneficiaries, setBeneficiaries] = useState([]);
   const [paymentDraft, setPaymentDraft] = useState({
     preparar_pagamento_pix: false,
+    usar_credor_como_favorecido: false,
     payment_beneficiary_id: '',
     nome: '',
     cpf_cnpj: '',
@@ -152,10 +182,12 @@ export default function FinanceiroTituloNovo() {
     async function carregarParceiros() {
       try {
         setLoadingParceiros(true);
+        const termoDocumento = parceiroDocumentoBusca.trim();
+        const termoNome = parceiroNomeBusca.trim();
         const params = {
           ativo: 1,
           limit: 200,
-          q: parceiroBusca.trim()
+          q: termoDocumento || termoNome
         };
 
         if (form.tipo === 'RECEBER') {
@@ -169,11 +201,6 @@ export default function FinanceiroTituloNovo() {
           ? listaBase.filter((item) => item.cliente !== false)
           : listaBase.filter((item) => item.fornecedor !== false || item.corretor === true);
         setParceiros(lista);
-        setForm((current) => {
-          if (!current.parceiro_id) return current;
-          const exists = lista.some((item) => String(item.id) === String(current.parceiro_id));
-          return exists ? current : { ...current, parceiro_id: '' };
-        });
       } catch (err) {
         if (!active) return;
         setParceiros([]);
@@ -188,7 +215,7 @@ export default function FinanceiroTituloNovo() {
     return () => {
       active = false;
     };
-  }, [form.tipo, parceiroBusca]);
+  }, [form.tipo, parceiroDocumentoBusca, parceiroNomeBusca]);
 
   useEffect(() => {
     if (!moduloApropriacoesHabilitado || !form.obra_id) {
@@ -232,6 +259,7 @@ export default function FinanceiroTituloNovo() {
       setBeneficiaries([]);
       setPaymentDraft((current) => ({
         ...current,
+        usar_credor_como_favorecido: false,
         payment_beneficiary_id: '',
         nome: '',
         cpf_cnpj: '',
@@ -250,11 +278,11 @@ export default function FinanceiroTituloNovo() {
         if (beneficiary) {
           setPaymentDraft((current) => ({
             ...current,
-            payment_beneficiary_id: String(beneficiary.id),
-            nome: beneficiary.nome || current.nome,
-            cpf_cnpj: beneficiary.cpf_cnpj || current.cpf_cnpj,
-            pix_tipo_chave: beneficiary.pix_tipo_chave || current.pix_tipo_chave,
-            pix_chave: beneficiary.pix_chave || current.pix_chave
+            payment_beneficiary_id: current.usar_credor_como_favorecido ? '' : String(beneficiary.id),
+            nome: current.usar_credor_como_favorecido ? current.nome : (beneficiary.nome || current.nome),
+            cpf_cnpj: current.usar_credor_como_favorecido ? current.cpf_cnpj : (beneficiary.cpf_cnpj || current.cpf_cnpj),
+            pix_tipo_chave: current.usar_credor_como_favorecido ? current.pix_tipo_chave : (beneficiary.pix_tipo_chave || current.pix_tipo_chave),
+            pix_chave: current.usar_credor_como_favorecido ? current.pix_chave : (beneficiary.pix_chave || current.pix_chave)
           }));
         }
       })
@@ -285,17 +313,64 @@ export default function FinanceiroTituloNovo() {
     return `${especificas} categoria(s) de contas a ${labelTipoTitulo(form.tipo)} disponivel(is).`;
   }, [categoriasFiltradas, form.tipo]);
 
+  const parceiroSelecionado = useMemo(() => {
+    return parceiros.find((item) => String(item.id) === String(form.parceiro_id)) || null;
+  }, [form.parceiro_id, parceiros]);
+
+  const parceiroPixOptions = useMemo(() => getParceiroPixOptions(parceiroSelecionado), [parceiroSelecionado]);
+
   const parceiroResumo = useMemo(() => {
-    if (!parceiroBusca.trim()) {
+    const termo = parceiroDocumentoBusca.trim() || parceiroNomeBusca.trim();
+    if (!termo) {
       return `${parceiros.length} ${form.tipo === 'RECEBER' ? 'cliente(s)' : 'credor(es)'} carregado(s)`;
     }
-    return `${parceiros.length} ${form.tipo === 'RECEBER' ? 'cliente(s)' : 'credor(es)'} encontrado(s) para "${parceiroBusca.trim()}"`;
-  }, [form.tipo, parceiros, parceiroBusca]);
+    return `${parceiros.length} ${form.tipo === 'RECEBER' ? 'cliente(s)' : 'credor(es)'} encontrado(s) para "${termo}"`;
+  }, [form.tipo, parceiros, parceiroDocumentoBusca, parceiroNomeBusca]);
+
+  function preencherFavorecidoComParceiro(parceiro) {
+    const pix = getParceiroPixPrincipal(parceiro);
+    setPaymentDraft((current) => ({
+      ...current,
+      payment_beneficiary_id: '',
+      nome: parceiro?.nome || '',
+      cpf_cnpj: parceiro?.cpf_cnpj || '',
+      pix_tipo_chave: pix?.tipo || current.pix_tipo_chave || 'CNPJ',
+      pix_chave: pix?.chave || ''
+    }));
+  }
+
+  function selecionarParceiro(parceiro) {
+    if (!parceiro) return;
+    setForm((current) => ({ ...current, parceiro_id: String(parceiro.id) }));
+    setParceiroNomeBusca(parceiro.nome || '');
+    setParceiroDocumentoBusca(maskCpfCnpj(parceiro.cpf_cnpj || ''));
+    setPaymentDraft((current) => {
+      if (!current.usar_credor_como_favorecido) return current;
+      const pix = getParceiroPixPrincipal(parceiro);
+      return {
+        ...current,
+        payment_beneficiary_id: '',
+        nome: parceiro.nome || '',
+        cpf_cnpj: parceiro.cpf_cnpj || '',
+        pix_tipo_chave: pix?.tipo || current.pix_tipo_chave || 'CNPJ',
+        pix_chave: pix?.chave || ''
+      };
+    });
+  }
+
+  useEffect(() => {
+    if (paymentDraft.usar_credor_como_favorecido && parceiroSelecionado) {
+      preencherFavorecidoComParceiro(parceiroSelecionado);
+    }
+  }, [paymentDraft.usar_credor_como_favorecido, parceiroSelecionado]);
 
   function updateField(field, value) {
     setForm((current) => ({ ...current, [field]: value }));
     if (field === 'tipo') {
       setSearchParams({ tipo: value });
+      setParceiroDocumentoBusca('');
+      setParceiroNomeBusca('');
+      setBeneficiaries([]);
       setForm((current) => ({
         ...current,
         tipo: value,
@@ -326,6 +401,10 @@ export default function FinanceiroTituloNovo() {
         categoria_financeira_id: form.categoria_financeira_id ? Number(form.categoria_financeira_id) : undefined,
         apropriacao_id: form.apropriacao_id ? Number(form.apropriacao_id) : undefined
       };
+
+      if (!form.parceiro_id) {
+        throw new Error(`Selecione o ${form.tipo === 'RECEBER' ? 'cliente' : 'credor'} na lista antes de salvar.`);
+      }
 
       if (form.tipo === 'PAGAR' && paymentDraft.preparar_pagamento_pix) {
         if (!form.parceiro_id || !paymentDraft.nome || !paymentDraft.cpf_cnpj || !paymentDraft.pix_tipo_chave || !paymentDraft.pix_chave) {
@@ -463,34 +542,61 @@ export default function FinanceiroTituloNovo() {
                 </span>
               </label>
 
-              <label className="sol-filter-field md:col-span-2 xl:col-span-4">
-                <span className="sol-filter-label">{form.tipo === 'RECEBER' ? 'Buscar cliente' : 'Buscar credor'}</span>
+              <label className="sol-filter-field md:col-span-2 xl:col-span-3">
+                <span className="sol-filter-label">Consulta por CPF/CNPJ</span>
                 <input
                   className="input w-full"
-                  placeholder={form.tipo === 'RECEBER' ? 'Nome, CPF/CNPJ do cliente' : 'Nome, CPF/CNPJ do credor ou corretor'}
-                  value={parceiroBusca}
-                  onChange={(event) => setParceiroBusca(event.target.value)}
+                  placeholder="Digite CPF/CNPJ"
+                  value={parceiroDocumentoBusca}
+                  onChange={(event) => {
+                    setParceiroDocumentoBusca(maskCpfCnpj(event.target.value));
+                    if (onlyDigits(event.target.value).length >= 6) {
+                      setParceiroNomeBusca('');
+                    }
+                  }}
                 />
                 <span className="app-note mt-2">{loadingParceiros ? 'Carregando parceiros...' : parceiroResumo}</span>
               </label>
 
-              <label className="sol-filter-field md:col-span-2 xl:col-span-5">
+              <div className="sol-filter-field md:col-span-2 xl:col-span-6">
                 <span className="sol-filter-label">{form.tipo === 'RECEBER' ? 'Cliente' : 'Credor'}</span>
-                <select
+                <input
                   className="input w-full"
-                  value={form.parceiro_id}
-                  onChange={(event) => updateField('parceiro_id', event.target.value)}
-                  required
+                  placeholder={form.tipo === 'RECEBER' ? 'Digite o nome do cliente' : 'Digite o nome do credor'}
+                  value={parceiroNomeBusca}
+                  onChange={(event) => {
+                    setParceiroNomeBusca(event.target.value);
+                    if (event.target.value.trim()) setParceiroDocumentoBusca('');
+                    setForm((current) => ({ ...current, parceiro_id: '' }));
+                  }}
+                  required={!form.parceiro_id}
                   disabled={loadingParceiros}
-                >
-                  <option value="">{form.tipo === 'RECEBER' ? 'Selecione o cliente' : 'Selecione o credor'}</option>
-                  {parceiros.map((parceiro) => (
-                    <option key={parceiro.id} value={parceiro.id}>
-                      {parceiro.nome} {parceiro.cpf_cnpj ? `- ${parceiro.cpf_cnpj}` : ''}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                />
+                <input type="hidden" value={form.parceiro_id} required />
+                <div className="mt-2 max-h-44 overflow-y-auto rounded-lg border border-[var(--c-border)] bg-[var(--c-bg)]">
+                  {parceiros.length === 0 ? (
+                    <div className="px-3 py-2 text-sm text-[var(--c-muted)]">
+                      Nenhum {form.tipo === 'RECEBER' ? 'cliente' : 'credor'} encontrado.
+                    </div>
+                  ) : parceiros.slice(0, 8).map((parceiro) => {
+                    const selected = String(parceiro.id) === String(form.parceiro_id);
+                    return (
+                      <button
+                        key={parceiro.id}
+                        type="button"
+                        className={`w-full border-b border-[var(--c-border)] px-3 py-2 text-left text-sm last:border-b-0 hover:bg-[var(--c-surface-muted)] ${selected ? 'bg-[var(--c-surface-muted)] font-medium text-[var(--c-text)]' : 'text-[var(--c-muted)]'}`}
+                        onClick={() => selecionarParceiro(parceiro)}
+                      >
+                        <span className="block text-[var(--c-text)]">{parceiro.nome}</span>
+                        <span className="block text-xs">{parceiro.cpf_cnpj || 'CPF/CNPJ nao informado'}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <span className="app-note mt-2">
+                  Ao selecionar pelo nome, o CPF/CNPJ e preenchido automaticamente.
+                </span>
+              </div>
 
               <label className="sol-filter-field md:col-span-2 xl:col-span-4">
                 <span className="sol-filter-label">Descricao</span>
@@ -688,8 +794,31 @@ export default function FinanceiroTituloNovo() {
 
                   {paymentDraft.preparar_pagamento_pix && (
                     <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-12">
-                      <label className="sol-filter-field xl:col-span-3">
-                        <span className="sol-filter-label">Favorecido vinculado</span>
+                      <div className="xl:col-span-12 rounded-lg border border-[var(--c-border)] bg-[var(--c-surface-muted)] px-3 py-2 text-sm text-[var(--c-muted)]">
+                        Favorecido vinculado e o cadastro bancario rastreado que sera usado no lote PIX. Ele pode ser o proprio credor do titulo ou um favorecido separado, com snapshot travado quando o lote for criado.
+                      </div>
+
+                      <label className="flex items-start gap-2 text-sm text-[var(--c-text)] xl:col-span-4">
+                        <input
+                          type="checkbox"
+                          checked={paymentDraft.usar_credor_como_favorecido}
+                          onChange={(event) => {
+                            const checked = event.target.checked;
+                            setPaymentDraft((current) => ({ ...current, usar_credor_como_favorecido: checked }));
+                            if (checked && parceiroSelecionado) preencherFavorecidoComParceiro(parceiroSelecionado);
+                          }}
+                          disabled={!parceiroSelecionado}
+                        />
+                        <span>
+                          Usar o mesmo credor como favorecido
+                          <span className="mt-1 block text-xs text-[var(--c-muted)]">
+                            Preenche nome, CPF/CNPJ e a primeira chave PIX cadastrada no credor.
+                          </span>
+                        </span>
+                      </label>
+
+                      <label className="sol-filter-field xl:col-span-4">
+                        <span className="sol-filter-label">Favorecido bancario vinculado</span>
                         <select
                           className="input w-full"
                           value={paymentDraft.payment_beneficiary_id}
@@ -697,6 +826,7 @@ export default function FinanceiroTituloNovo() {
                             const selected = beneficiaries.find((item) => String(item.id) === String(event.target.value));
                             setPaymentDraft((current) => ({
                               ...current,
+                              usar_credor_como_favorecido: false,
                               payment_beneficiary_id: event.target.value,
                               nome: selected?.nome || current.nome,
                               cpf_cnpj: selected?.cpf_cnpj || current.cpf_cnpj,
@@ -712,7 +842,34 @@ export default function FinanceiroTituloNovo() {
                             </option>
                           ))}
                         </select>
+                        <span className="app-note mt-2">
+                          Se nao houver favorecido salvo, use o proprio credor ou informe os dados abaixo.
+                        </span>
                       </label>
+                      {paymentDraft.usar_credor_como_favorecido && parceiroPixOptions.length > 1 && (
+                        <label className="sol-filter-field xl:col-span-4">
+                          <span className="sol-filter-label">Chave PIX do credor</span>
+                          <select
+                            className="input w-full"
+                            value={`${paymentDraft.pix_tipo_chave}:${paymentDraft.pix_chave}`}
+                            onChange={(event) => {
+                              const selected = parceiroPixOptions.find((item) => `${item.tipo}:${item.chave}` === event.target.value);
+                              if (!selected) return;
+                              setPaymentDraft((current) => ({
+                                ...current,
+                                pix_tipo_chave: selected.tipo,
+                                pix_chave: selected.chave
+                              }));
+                            }}
+                          >
+                            {parceiroPixOptions.map((item) => (
+                              <option key={item.id} value={`${item.tipo}:${item.chave}`}>
+                                {item.label} - {item.tipo} {item.chave}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      )}
                       <label className="sol-filter-field xl:col-span-3">
                         <span className="sol-filter-label">Nome favorecido</span>
                         <input className="input w-full" value={paymentDraft.nome} onChange={(event) => setPaymentDraft((current) => ({ ...current, nome: event.target.value }))} required={paymentDraft.preparar_pagamento_pix} />
@@ -732,18 +889,21 @@ export default function FinanceiroTituloNovo() {
                         <input className="input w-full" value={paymentDraft.pix_chave} onChange={(event) => setPaymentDraft((current) => ({ ...current, pix_chave: event.target.value }))} required={paymentDraft.preparar_pagamento_pix} />
                       </label>
                       <label className="sol-filter-field xl:col-span-4">
-                        <span className="sol-filter-label">Conta pagadora padrao</span>
+                        <span className="sol-filter-label">Conta pagadora BB</span>
                         <select className="input w-full" value={paymentDraft.payment_account_id} onChange={(event) => setPaymentDraft((current) => ({ ...current, payment_account_id: event.target.value }))}>
                           <option value="">Selecione a conta</option>
                           {paymentAccounts.map((account) => (
                             <option key={account.id} value={account.id}>
-                              {account.contaBancaria?.nome || `Conta ${account.id}`} - {account.cnpj_pagador}
+                              {account.contaBancaria?.nome || `Conta ${account.id}`} - CNPJ {account.cnpj_pagador} - Conv. {account.convenio || '-'}
                             </option>
                           ))}
                         </select>
+                        <span className="app-note mt-2">
+                          Cadastre em Cadastros Financeiros &gt; Contas pagadoras BB. Cada conta pode ter empresa, CNPJ e convenio proprios.
+                        </span>
                       </label>
                       <label className="sol-filter-field xl:col-span-2">
-                        <span className="sol-filter-label">Data prevista</span>
+                        <span className="sol-filter-label">Data de Pagamento</span>
                         <input className="input w-full" type="date" value={paymentDraft.data_pagamento || form.data_vencimento} onChange={(event) => setPaymentDraft((current) => ({ ...current, data_pagamento: event.target.value }))} />
                       </label>
                       <div className="xl:col-span-6 app-note">
