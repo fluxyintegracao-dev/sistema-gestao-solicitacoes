@@ -616,10 +616,8 @@ export default function NovaSolicitacao() {
       setContratos([]);
       setTiposSub([]);
       setArquivos([]);
-      setObraCodigo('');
-      setObraDescricao('');
-      setListaModal([]);
-      setModalObras(false);
+      setObraBusca('');
+      setObraBuscaAtiva(false);
       setValorTexto('');
       setParceiroBusca('');
       setParceiroResultados([]);
@@ -849,11 +847,9 @@ export default function NovaSolicitacao() {
               <input
                 className="input input-sm"
                 placeholder="Ex: OBRA123"
-                value={obraCodigo}
+                value=""
                 onChange={e => {
                   const novoCodigo = e.target.value;
-                  setObraCodigo(novoCodigo);
-
                   if (!form.obra_id) return;
                   const obraSelecionada = obras.find(o => String(o.id) === String(form.obra_id));
                   if (!obraSelecionada) {
@@ -867,7 +863,7 @@ export default function NovaSolicitacao() {
                   }
                 }}
               />
-              <button type="button" className="btn btn-outline btn-sm" onClick={buscarObrasPorCodigo}>
+              <button type="button" className="btn btn-outline btn-sm" onClick={() => {}}>
                 Buscar
               </button>
             </div>
@@ -879,11 +875,9 @@ export default function NovaSolicitacao() {
               <input
                 className="input input-sm"
                 placeholder="Buscar por descrição"
-                value={obraDescricao}
+                value=""
                 onChange={e => {
                   const novaDescricao = e.target.value;
-                  setObraDescricao(novaDescricao);
-
                   if (!form.obra_id) return;
                   const obraSelecionada = obras.find(o => String(o.id) === String(form.obra_id));
                   if (!obraSelecionada) {
@@ -897,7 +891,7 @@ export default function NovaSolicitacao() {
                   }
                 }}
               />
-              <button type="button" className="btn btn-outline btn-sm" onClick={buscarObrasPorDescricao}>
+              <button type="button" className="btn btn-outline btn-sm" onClick={() => {}}>
                 Buscar
               </button>
             </div>
