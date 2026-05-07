@@ -12,6 +12,7 @@ import {
   canAccessCompras,
   canAccessContratos,
   canAccessFinanceiro,
+  canAccessPagamentos,
   canAccessGestaoObras,
   canAccessPrioridadesDiretoria,
   canCreateComprasPedidos,
@@ -57,6 +58,7 @@ const ComprovantesPendentes = lazy(() => import('./pages/ComprovantesPendentes')
 const FinanceiroTitulos = lazy(() => import('./pages/FinanceiroTitulos'));
 const FinanceiroTituloNovo = lazy(() => import('./pages/FinanceiroTituloNovo'));
 const FinanceiroTituloDetalhe = lazy(() => import('./pages/FinanceiroTituloDetalhe'));
+const FinanceiroPagamentos = lazy(() => import('./pages/FinanceiroPagamentos'));
 const FinanceiroBoletos = lazy(() => import('./pages/FinanceiroBoletos'));
 const FinanceiroCadastros = lazy(() => import('./pages/FinanceiroCadastros'));
 const FinanceiroRelatorios = lazy(() => import('./pages/FinanceiroRelatorios'));
@@ -234,6 +236,14 @@ function ComprasCotacoesManageRoute({ children }) {
 function FinanceiroRoute({ children }) {
   const { user } = useAuth();
   if (!canAccessFinanceiro(user)) {
+    return <Navigate to="/" replace />;
+  }
+  return children;
+}
+
+function FinanceiroPagamentosRoute({ children }) {
+  const { user } = useAuth();
+  if (!canAccessPagamentos(user)) {
     return <Navigate to="/" replace />;
   }
   return children;
@@ -578,6 +588,7 @@ export default function App() {
         <Route path="financeiro/titulos" element={<FinanceiroRoute><FinanceiroTitulos /></FinanceiroRoute>} />
         <Route path="financeiro/titulos/novo" element={<FinanceiroRoute><FinanceiroTituloNovo /></FinanceiroRoute>} />
         <Route path="financeiro/titulos/:id" element={<FinanceiroRoute><FinanceiroTituloDetalhe /></FinanceiroRoute>} />
+        <Route path="financeiro/pagamentos" element={<FinanceiroPagamentosRoute><FinanceiroPagamentos /></FinanceiroPagamentosRoute>} />
         <Route path="financeiro/boletos" element={<BoletosRoute><FinanceiroBoletos /></BoletosRoute>} />
         <Route path="financeiro/relatorios" element={<FinanceiroRoute><FinanceiroRelatorios /></FinanceiroRoute>} />
         <Route path="financeiro/relatorios/resultado-obras" element={<FinanceiroRoute><FinanceiroResultadoObras /></FinanceiroRoute>} />

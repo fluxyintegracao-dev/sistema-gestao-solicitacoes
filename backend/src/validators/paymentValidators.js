@@ -1,0 +1,150 @@
+const { ensureAllowedKeys, sanitizeString, ValidationError } = require('../middlewares/validation');
+
+function isBlank(value) {
+  return value == null || String(value).trim() === '';
+}
+
+function parseInteger(value, fieldName, { required = false } = {}) {
+  if (isBlank(value)) {
+    if (required) throw new ValidationError(`${fieldName} e obrigatorio.`);
+    return undefined;
+  }
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    throw new ValidationError(`${fieldName} invalido.`);
+  }
+  return parsed;
+}
+
+function parseBoolean(value) {
+  if (value === undefined) return undefined;
+  if (typeof value === 'boolean') return value;
+  return ['1', 'true', 'sim', 'yes'].includes(String(value).trim().toLowerCase());
+}
+
+function parseDateOnly(value, fieldName, { required = false } = {}) {
+  if (isBlank(value)) {
+    if (required) throw new ValidationError(`${fieldName} e obrigatorio.`);
+    return undefined;
+  }
+  return sanitizeString(value, fieldName, { required: true, max: 10, pattern: /^\d{4}-\d{2}-\d{2}$/ });
+}
+
+function parseEnum(value, fieldName, allowedValues, { required = false } = {}) {
+  if (isBlank(value)) {
+    if (required) throw new ValidationError(`${fieldName} e obrigatorio.`);
+    return undefined;
+  }
+  const normalized = String(value).trim().toUpperCase();
+  if (!allowedValues.includes(normalized)) throw new ValidationError(`${fieldName} invalido.`);
+  return normalized;
+}
+
+function parseOptionalText(value, fieldName, max = 255) {
+  if (value === undefined) return undefined;
+  if (isBlank(value)) return null;
+  return sanitizeString(value, fieldName, { required: false, max });
+}
+
+function cleanUndefined(data) {
+  return Object.fromEntries(Object.entries(data).filter(([, value]) => value !== undefined));
+}
+
+function validatePaymentBeneficiaryCreateBody(payload = {}) {
+  ensureAllowedKeys(payload, [
+    'parceiro_id',
+    'nome',
+    'cpf_cnpj',
+    'metodo_preferencial',
+    'pix_tipo_chave',
+    'pix_chave',
+    'banco_codigo',
+    'agencia',
+    'agencia_digito',
+    'conta',
+    'conta_digito',
+    'tipo_conta',
+    'ativo'
+  ], 'Favorecido bancario');
+
+  return cleanUndefined({
+    parceiro_id: parseInteger(payload.parceiro_id, 'Parceiro', { required: true }),
+    nome: sanitizeString(payload.nome, 'Nome favorecido', { required: true, max: 180 }),
+    cpf_cnpj: sanitizeString(payload.cpf_cnpj, 'CPF/CNPJ favorecido', { required: true, max: 20 }),
+    metodo_preferencial: parseEnum(payload.metodo_preferencial || 'PIX_CHAVE', 'Metodo preferencial', ['PIX_CHAVE'], { required: true }),
+    pix_tipo_chave: parseEnum(payload.pix_tipo_chave, 'Tipo de chave PIX', ['CPF', 'CNPJ', 'EMAIL', 'TELEFONE', 'ALEATORIA'], { required: true }),
+    pix_chave: sanitizeString(payload.pix_chave, 'Chave PIX', { required: true, max: 180 }),
+    banco_codigo: parseOptionalText(payload.banco_codigo, 'Codigo do banco', 10),
+    agencia: parseOptionalText(payload.agencia, 'Agencia', 20),
+    agencia_digito: parseOptionalText(payload.agencia_digito, 'Digito da agencia', 5),
+    conta: parseOptionalText(payload.conta, 'Conta', 30),
+    conta_digito: parseOptionalText(payload.conta_digito, 'Digito da conta', 5),
+    tipo_conta: parseOptionalText(payload.tipo_conta, 'Tipo de conta', 30),
+    ativo: parseBoolean(payload.ativo)
+  });
+}
+
+function validatePaymentBeneficiaryUpdateBody(payload = {}) {
+  const data = validatePaymentBeneficiaryCreateBody({ ...payload, parceiro_id: payload.parceiro_id || 1 });
+  if (payload.parceiro_id === undefined) delete data.parceiro_id;
+  return data;
+}
+
+function validatePaymentBatchCreateBody(payload = {}) {
+  ensureAllowedKeys(payload, ['titulo_ids', 'payment_account_id', 'data_programada'], 'Lote de pagamento');
+  const tituloIds = Array.isArray(payload.titulo_ids)
+    ? payload.titulo_ids.map((id) => parseInteger(id, 'Titulo')).filter(Boolean)
+    : [];
+  if (!tituloIds.length) throw new ValidationError('Informe ao menos um titulo para gerar o lote.');
+  return {
+    titulo_ids: tituloIds,
+    payment_account_id: parseInteger(payload.payment_account_id, 'Conta pagadora', { required: true }),
+    data_programada: parseDateOnly(payload.data_programada, 'Data programada', { required: true })
+  };
+}
+
+function validatePaymentMfaBody(payload = {}) {
+  ensureAllowedKeys(payload, ['codigo_mfa', 'mfa_code', 'justificativa'], 'MFA');
+  return cleanUndefined({
+    codigo_mfa: parseOptionalText(payload.codigo_mfa, 'Codigo MFA', 12),
+    mfa_code: parseOptionalText(payload.mfa_code, 'Codigo MFA', 12),
+    justificativa: parseOptionalText(payload.justificativa, 'Justificativa', 500)
+  });
+}
+
+function validatePaymentAccountBody(payload = {}) {
+  ensureAllowedKeys(payload, [
+    'conta_bancaria_id',
+    'empresa_id',
+    'cnpj_pagador',
+    'provider_id',
+    'banco_codigo',
+    'agencia',
+    'agencia_digito',
+    'conta',
+    'conta_digito',
+    'tipo_conta',
+    'convenio',
+    'client_id_ref',
+    'client_secret_ref',
+    'certificate_ref',
+    'ambiente',
+    'ativo'
+  ], 'Conta pagadora');
+  return cleanUndefined({
+    ...payload,
+    conta_bancaria_id: parseInteger(payload.conta_bancaria_id, 'Conta bancaria', { required: payload.conta_bancaria_id !== undefined }),
+    empresa_id: payload.empresa_id ? parseInteger(payload.empresa_id, 'Empresa') : payload.empresa_id,
+    provider_id: payload.provider_id ? parseInteger(payload.provider_id, 'Provider') : payload.provider_id,
+    ambiente: payload.ambiente ? parseEnum(payload.ambiente, 'Ambiente', ['HOMOLOGACAO', 'PRODUCAO']) : payload.ambiente,
+    ativo: parseBoolean(payload.ativo)
+  });
+}
+
+module.exports = {
+  validatePaymentAccountBody,
+  validatePaymentBatchCreateBody,
+  validatePaymentBeneficiaryCreateBody,
+  validatePaymentBeneficiaryUpdateBody,
+  validatePaymentMfaBody
+};

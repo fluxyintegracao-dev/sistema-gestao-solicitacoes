@@ -127,6 +127,30 @@ const MODULO_PERMISSION_GROUPS = [
           { key: 'financeiro.cadastros.visualizar', label: 'Visualizar cadastros', descricao: 'Ver contas bancárias e categorias financeiras.' },
           { key: 'financeiro.cadastros.gerenciar', label: 'Gerenciar cadastros', descricao: 'Criar e editar contas bancárias e categorias.' }
         ]
+      },
+      {
+        key: 'financeiro.pagamentos',
+        label: 'Pagamentos em Massa',
+        permissoes: [
+          { key: 'financeiro.pagamentos.visualizar', label: 'Visualizar pagamentos', descricao: 'Ver lotes, intents e status bancario.' },
+          { key: 'financeiro.pagamentos.preparar', label: 'Preparar lotes', descricao: 'Selecionar titulos elegiveis e criar lotes de pagamento.' },
+          { key: 'financeiro.pagamentos.aprovar', label: 'Aprovar lotes', descricao: 'Aprovar ou rejeitar lotes conforme alcada.' },
+          { key: 'financeiro.pagamentos.enviar_banco', label: 'Enviar ao banco', descricao: 'Enviar lote aprovado para o provider bancario.' },
+          { key: 'financeiro.pagamentos.cancelar', label: 'Cancelar pagamentos', descricao: 'Cancelar lotes ou itens antes do envio definitivo.' },
+          { key: 'financeiro.pagamentos.reprocessar', label: 'Reprocessar falhas', descricao: 'Reprocessar jobs ou retornos elegiveis.' },
+          { key: 'financeiro.pagamentos.confirmar_baixa', label: 'Confirmar baixa', descricao: 'Confirmar baixa semiautomatica apos confirmacao bancaria.' },
+          { key: 'financeiro.pagamentos.auditar', label: 'Auditar pagamentos', descricao: 'Consultar logs tecnicos, aprovacoes e eventos bancarios.' },
+          { key: 'financeiro.pagamentos.configurar', label: 'Configurar pagamentos', descricao: 'Gerenciar providers e contas pagadoras.' }
+        ]
+      },
+      {
+        key: 'financeiro.favorecidos',
+        label: 'Favorecidos Bancarios',
+        permissoes: [
+          { key: 'financeiro.favorecidos.visualizar', label: 'Visualizar favorecidos', descricao: 'Ver dados bancarios/PIX de favorecidos.' },
+          { key: 'financeiro.favorecidos.gerenciar', label: 'Gerenciar favorecidos', descricao: 'Criar, editar, validar, ativar e desativar favorecidos.' },
+          { key: 'financeiro.favorecidos.auditar', label: 'Auditar favorecidos', descricao: 'Ver historico de alteracoes sensiveis em favorecidos.' }
+        ]
       }
     ]
   },

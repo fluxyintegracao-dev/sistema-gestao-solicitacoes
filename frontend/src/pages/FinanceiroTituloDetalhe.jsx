@@ -128,6 +128,14 @@ function queueStatusClass(status) {
   return 'bg-slate-100 text-slate-700';
 }
 
+function paymentStatusClass(status) {
+  const normalized = String(status || '').trim().toUpperCase();
+  if (['APROVADO', 'CONFIRMADO_BANCO', 'BAIXADO'].includes(normalized)) return 'bg-emerald-100 text-emerald-700';
+  if (['PENDENTE_APROVACAO', 'ENVIADO_AO_BANCO', 'AGUARDANDO_CONFIRMACAO_BAIXA'].includes(normalized)) return 'bg-amber-100 text-amber-700';
+  if (['REJEITADO_BANCO', 'FALHA_INTEGRACAO', 'CANCELADO'].includes(normalized)) return 'bg-rose-100 text-rose-700';
+  return 'bg-slate-100 text-slate-700';
+}
+
 function canQueueTituloSienge(titulo) {
   const tipo = String(titulo?.tipo || '').trim().toUpperCase();
   const status = String(titulo?.status || '').trim().toUpperCase();
@@ -725,6 +733,66 @@ export default function FinanceiroTituloDetalhe() {
                 </button>
               </div>
             </form>
+          </div>
+        )}
+
+        {String(titulo.tipo || '').toUpperCase() === 'PAGAR' && (
+          <div className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4 space-y-4">
+            <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-[var(--c-text)]">Pagamentos bancarios</h2>
+                <p className="text-sm text-[var(--c-muted)]">
+                  Status bancario separado do status financeiro do titulo.
+                </p>
+              </div>
+              <Link to="/financeiro/pagamentos" className="btn btn-outline">Abrir pagamentos</Link>
+            </div>
+
+            {!Array.isArray(titulo.paymentIntents) || titulo.paymentIntents.length === 0 ? (
+              <div className="rounded-xl bg-[var(--c-bg)] px-3 py-4 text-sm text-[var(--c-muted)]">
+                Nenhuma intencao de pagamento criada para este titulo.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {titulo.paymentIntents.map((intent) => {
+                  const batchItem = Array.isArray(intent.batchItems) ? intent.batchItems[0] : null;
+                  const batch = batchItem?.batch;
+                  return (
+                    <div key={intent.id} className="rounded-xl border border-[var(--c-border)] px-3 py-3">
+                      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                        <div className="space-y-1 text-sm">
+                          <div className="font-medium text-[var(--c-text)]">
+                            Intent #{intent.id} - {formatCurrency(intent.valor)}
+                          </div>
+                          <div className="text-[var(--c-muted)]">
+                            Lote: {batch?.codigo || 'Nao vinculado'}
+                          </div>
+                          <div className="text-[var(--c-muted)]">
+                            Favorecido: {intent.beneficiary?.nome || '-'} - {intent.beneficiary?.pix_chave || '-'}
+                          </div>
+                          <div className="text-[var(--c-muted)]">
+                            Envio: {formatDateTime(intent.enviado_em)} | Banco: {formatDateTime(intent.confirmado_banco_em)}
+                          </div>
+                          <div className="text-[var(--c-muted)]">
+                            Baixa: {formatDateTime(intent.baixa_confirmada_em)}
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <span className={`app-status-pill ${paymentStatusClass(intent.status)}`}>
+                            {intent.status}
+                          </span>
+                          {batch?.status && (
+                            <span className={`app-status-pill ${paymentStatusClass(batch.status)}`}>
+                              Lote {batch.status}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 

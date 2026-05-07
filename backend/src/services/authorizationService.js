@@ -24,7 +24,37 @@ const FINANCEIRO_PERMISSION_KEYS = [
   'financeiro.conciliacao.importar',
   'financeiro.conciliacao.conciliar',
   'financeiro.cadastros.visualizar',
-  'financeiro.cadastros.gerenciar'
+  'financeiro.cadastros.gerenciar',
+  'financeiro.pagamentos.visualizar',
+  'financeiro.pagamentos.preparar',
+  'financeiro.pagamentos.aprovar',
+  'financeiro.pagamentos.enviar_banco',
+  'financeiro.pagamentos.cancelar',
+  'financeiro.pagamentos.reprocessar',
+  'financeiro.pagamentos.confirmar_baixa',
+  'financeiro.pagamentos.auditar',
+  'financeiro.pagamentos.configurar',
+  'financeiro.favorecidos.visualizar',
+  'financeiro.favorecidos.gerenciar',
+  'financeiro.favorecidos.auditar'
+];
+
+const FINANCEIRO_PAGAMENTOS_PERMISSION_KEYS = [
+  'financeiro.pagamentos.visualizar',
+  'financeiro.pagamentos.preparar',
+  'financeiro.pagamentos.aprovar',
+  'financeiro.pagamentos.enviar_banco',
+  'financeiro.pagamentos.cancelar',
+  'financeiro.pagamentos.reprocessar',
+  'financeiro.pagamentos.confirmar_baixa',
+  'financeiro.pagamentos.auditar',
+  'financeiro.pagamentos.configurar'
+];
+
+const FINANCEIRO_FAVORECIDOS_PERMISSION_KEYS = [
+  'financeiro.favorecidos.visualizar',
+  'financeiro.favorecidos.gerenciar',
+  'financeiro.favorecidos.auditar'
 ];
 
 const BOLETOS_PERMISSION_KEYS = [
@@ -704,6 +734,108 @@ async function canGenerateBoletos(user) {
   }
 
   return (await canAccessFinanceiro(user)) && userHasAreaPermission(user, ['boletos.emitir.gerar']);
+}
+
+async function userHasFinanceiroSector(user) {
+  if (hasAnyProfile(user, ['FINANCEIRO'])) {
+    return true;
+  }
+
+  const tokens = await buildUserScopeTokens(user);
+  return tokens.includes('FINANCEIRO') || await userHasSetorCapability(user, 'eh_setor_financeiro');
+}
+
+async function userHasPaymentApprovalDirectorate(user) {
+  const tokens = await buildUserScopeTokens(user);
+  return (
+    tokens.includes('DIR_ADMIN') ||
+    tokens.includes('DIRETORIA_ADMINISTRATIVA') ||
+    tokens.includes('DIRETORIA ADMINISTRATIVA') ||
+    tokens.includes('DIR_EXECUTIVA') ||
+    tokens.includes('DIRETORIA_EXECUTIVA') ||
+    tokens.includes('DIRETORIA EXECUTIVA')
+  );
+}
+
+async function canAccessPagamentos(user) {
+  if (isBusinessAdmin(user)) return true;
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, FINANCEIRO_PAGAMENTOS_PERMISSION_KEYS);
+  }
+
+  return (await userHasFinanceiroSector(user)) || userHasPaymentApprovalDirectorate(user);
+}
+
+async function canPreparePagamentos(user) {
+  if (isBusinessAdmin(user)) return true;
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, ['financeiro.pagamentos.preparar']);
+  }
+
+  return userHasFinanceiroSector(user);
+}
+
+async function canApprovePagamentos(user) {
+  if (isBusinessAdmin(user)) return true;
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, ['financeiro.pagamentos.aprovar']);
+  }
+
+  return userHasPaymentApprovalDirectorate(user);
+}
+
+async function canSendPagamentosBanco(user) {
+  if (isBusinessAdmin(user)) return true;
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, ['financeiro.pagamentos.enviar_banco']);
+  }
+
+  return userHasFinanceiroSector(user);
+}
+
+async function canConfigurePagamentos(user) {
+  if (isBusinessAdmin(user)) return true;
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, ['financeiro.pagamentos.configurar']);
+  }
+
+  return userHasFinanceiroSector(user);
+}
+
+async function canConfirmarBaixaPagamento(user) {
+  if (isBusinessAdmin(user)) return true;
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, ['financeiro.pagamentos.confirmar_baixa']);
+  }
+
+  return userHasFinanceiroSector(user);
+}
+
+async function canManagePaymentBeneficiaries(user) {
+  if (isBusinessAdmin(user)) return true;
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, ['financeiro.favorecidos.gerenciar']);
+  }
+
+  return (await userHasFinanceiroSector(user)) || userHasPaymentApprovalDirectorate(user);
+}
+
+async function canViewPaymentBeneficiaries(user) {
+  if (isBusinessAdmin(user)) return true;
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, FINANCEIRO_FAVORECIDOS_PERMISSION_KEYS);
+  }
+
+  return (await canAccessFinanceiro(user)) || userHasPaymentApprovalDirectorate(user);
+}
+
+async function canAuditPaymentBeneficiaries(user) {
+  if (isBusinessAdmin(user)) return true;
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, ['financeiro.favorecidos.auditar']);
+  }
+
+  return userHasFinanceiroSector(user) || userHasPaymentApprovalDirectorate(user);
 }
 
 async function canDeleteSolicitacaoAnexo(user) {
@@ -1391,6 +1523,11 @@ module.exports = {
   buildUserScopeTokens,
   canAccessComprovantes,
   canCancelPrioridadeDiretoriaLote,
+  canAccessPagamentos,
+  canApprovePagamentos,
+  canAuditPaymentBeneficiaries,
+  canConfigurePagamentos,
+  canConfirmarBaixaPagamento,
   canCreatePrioridadeDiretoriaLote,
   canDeleteComprovante,
   canDeletePrioridadeDiretoriaLote,
@@ -1405,6 +1542,7 @@ module.exports = {
   canExportCrmLeads,
   canGenerateBoletos,
   canCreateComercialContratos,
+  canManagePaymentBeneficiaries,
   canManageComercialContratos,
   canManageContratos,
   canManageComercialEmpreendimentos,
@@ -1419,6 +1557,7 @@ module.exports = {
   canReceiveCrmLeadAssignment,
   canReopenRhDpFechamento,
   canReadComercialBaseData,
+  canPreparePagamentos,
   canManageIntegracaoSiengeConfig,
   canManageProvisoesCategorias,
   canManageProvisoesStatus,
@@ -1426,7 +1565,9 @@ module.exports = {
   canManageRhDpDocumentos,
   getFinanceiroObraScopeIds,
   canRetryIntegracaoSienge,
+  canSendPagamentosBanco,
   canViewIntegracaoSienge,
+  canViewPaymentBeneficiaries,
   canViewPrioridadesDiretoria,
   canSendCrmAtendimento,
   canViewComercialContratos,

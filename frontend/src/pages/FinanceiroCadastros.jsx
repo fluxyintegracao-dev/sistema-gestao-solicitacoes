@@ -2,10 +2,13 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   atualizarCategoriaFinanceira,
   atualizarContaBancaria,
+  atualizarPaymentBeneficiary,
   criarCategoriaFinanceira,
   criarContaBancaria,
+  criarPaymentBeneficiary,
   getCategoriasFinanceiras,
-  getContasBancarias
+  getContasBancarias,
+  getPaymentBeneficiaries
 } from '../services/financeiro';
 
 function defaultContaForm() {
@@ -26,6 +29,18 @@ function defaultCategoriaForm() {
     nome: '',
     tipo: 'AMBOS',
     descricao: '',
+    ativo: true
+  };
+}
+
+function defaultFavorecidoForm() {
+  return {
+    id: null,
+    parceiro_id: '',
+    nome: '',
+    cpf_cnpj: '',
+    pix_tipo_chave: 'CNPJ',
+    pix_chave: '',
     ativo: true
   };
 }
@@ -111,6 +126,10 @@ export default function FinanceiroCadastros() {
   const [error, setError] = useState('');
   const [categoriaFiltro, setCategoriaFiltro] = useState('');
   const [categoriaTipoFiltro, setCategoriaTipoFiltro] = useState('TODAS');
+  const [favorecidoForm, setFavorecidoForm] = useState(defaultFavorecidoForm());
+  const [favorecidos, setFavorecidos] = useState([]);
+  const [savingFavorecido, setSavingFavorecido] = useState(false);
+  const [loadingFavorecidos, setLoadingFavorecidos] = useState(false);
 
   async function carregar() {
     try {
@@ -224,6 +243,53 @@ export default function FinanceiroCadastros() {
     }
   }
 
+  async function carregarFavorecidos(parceiroId = favorecidoForm.parceiro_id) {
+    if (!parceiroId) {
+      setFavorecidos([]);
+      return;
+    }
+
+    try {
+      setLoadingFavorecidos(true);
+      setError('');
+      const data = await getPaymentBeneficiaries({ parceiro_id: parceiroId });
+      setFavorecidos(Array.isArray(data) ? data : []);
+    } catch (err) {
+      setError(err?.message || 'Erro ao carregar favorecidos bancarios');
+    } finally {
+      setLoadingFavorecidos(false);
+    }
+  }
+
+  async function handleSalvarFavorecido(event) {
+    event.preventDefault();
+    try {
+      setSavingFavorecido(true);
+      setError('');
+      const payload = {
+        parceiro_id: Number(favorecidoForm.parceiro_id),
+        nome: favorecidoForm.nome,
+        cpf_cnpj: favorecidoForm.cpf_cnpj,
+        metodo_preferencial: 'PIX_CHAVE',
+        pix_tipo_chave: favorecidoForm.pix_tipo_chave,
+        pix_chave: favorecidoForm.pix_chave,
+        ativo: favorecidoForm.ativo
+      };
+      if (favorecidoForm.id) {
+        await atualizarPaymentBeneficiary(favorecidoForm.id, payload);
+      } else {
+        await criarPaymentBeneficiary(payload);
+      }
+      const parceiroId = favorecidoForm.parceiro_id;
+      setFavorecidoForm({ ...defaultFavorecidoForm(), parceiro_id: parceiroId });
+      await carregarFavorecidos(parceiroId);
+    } catch (err) {
+      setError(err?.message || 'Erro ao salvar favorecido bancario');
+    } finally {
+      setSavingFavorecido(false);
+    }
+  }
+
   return (
     <div className="page solicitacoes-page">
       <div className="app-page-header">
@@ -244,6 +310,7 @@ export default function FinanceiroCadastros() {
           Carregando cadastros financeiros...
         </div>
       ) : (
+        <>
         <div className="grid gap-6 xl:grid-cols-2">
           <div className="space-y-4">
             <div className="card sol-surface-card">
@@ -430,6 +497,94 @@ export default function FinanceiroCadastros() {
             </div>
           </div>
         </div>
+
+        <div className="mt-6 card sol-surface-card">
+          <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-[var(--c-text)]">Favorecidos bancarios PIX</h2>
+              <p className="text-sm text-[var(--c-muted)]">
+                Cadastro rastreado usado pelos lotes de pagamento em massa.
+              </p>
+            </div>
+            <button type="button" className="btn btn-outline" onClick={() => carregarFavorecidos()} disabled={!favorecidoForm.parceiro_id || loadingFavorecidos}>
+              {loadingFavorecidos ? 'Carregando...' : 'Buscar favorecidos'}
+            </button>
+          </div>
+
+          <form className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-12" onSubmit={handleSalvarFavorecido}>
+            <label className="sol-filter-field xl:col-span-2">
+              <span className="sol-filter-label">Parceiro ID</span>
+              <input className="input w-full" inputMode="numeric" value={favorecidoForm.parceiro_id} onChange={(e) => setFavorecidoForm((c) => ({ ...c, parceiro_id: e.target.value }))} required />
+            </label>
+            <label className="sol-filter-field xl:col-span-3">
+              <span className="sol-filter-label">Nome favorecido</span>
+              <input className="input w-full" value={favorecidoForm.nome} onChange={(e) => setFavorecidoForm((c) => ({ ...c, nome: e.target.value }))} required />
+            </label>
+            <label className="sol-filter-field xl:col-span-2">
+              <span className="sol-filter-label">CPF/CNPJ</span>
+              <input className="input w-full" value={favorecidoForm.cpf_cnpj} onChange={(e) => setFavorecidoForm((c) => ({ ...c, cpf_cnpj: e.target.value }))} required />
+            </label>
+            <label className="sol-filter-field xl:col-span-2">
+              <span className="sol-filter-label">Tipo chave</span>
+              <select className="input w-full" value={favorecidoForm.pix_tipo_chave} onChange={(e) => setFavorecidoForm((c) => ({ ...c, pix_tipo_chave: e.target.value }))}>
+                <option value="CPF">CPF</option>
+                <option value="CNPJ">CNPJ</option>
+                <option value="EMAIL">EMAIL</option>
+                <option value="TELEFONE">TELEFONE</option>
+                <option value="ALEATORIA">ALEATORIA</option>
+              </select>
+            </label>
+            <label className="sol-filter-field xl:col-span-3">
+              <span className="sol-filter-label">Chave PIX</span>
+              <input className="input w-full" value={favorecidoForm.pix_chave} onChange={(e) => setFavorecidoForm((c) => ({ ...c, pix_chave: e.target.value }))} required />
+            </label>
+            <label className="flex items-center gap-2 text-sm text-[var(--c-text)] xl:col-span-2">
+              <input type="checkbox" checked={favorecidoForm.ativo} onChange={(e) => setFavorecidoForm((c) => ({ ...c, ativo: e.target.checked }))} />
+              Favorecido ativo
+            </label>
+            <div className="flex flex-wrap gap-2 xl:col-span-10">
+              <button type="submit" className="btn btn-primary" disabled={savingFavorecido}>
+                {savingFavorecido ? 'Salvando...' : (favorecidoForm.id ? 'Salvar favorecido' : 'Criar favorecido')}
+              </button>
+              {favorecidoForm.id && (
+                <button type="button" className="btn btn-outline" onClick={() => setFavorecidoForm((current) => ({ ...defaultFavorecidoForm(), parceiro_id: current.parceiro_id }))}>
+                  Novo
+                </button>
+              )}
+            </div>
+          </form>
+
+          <div className="mt-4 app-list-stack">
+            {favorecidos.length === 0 ? (
+              <div className="app-note">Informe o parceiro ID e busque os favorecidos vinculados.</div>
+            ) : favorecidos.map((favorecido) => (
+              <div key={favorecido.id} className="app-list-card">
+                <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                  <div className="text-sm">
+                    <div className="font-medium text-[var(--c-text)]">{favorecido.nome}</div>
+                    <div className="text-[var(--c-muted)]">{favorecido.pix_tipo_chave} - {favorecido.pix_chave}</div>
+                    <div className="text-[var(--c-muted)]">CPF/CNPJ: {favorecido.cpf_cnpj}</div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className={statusClass(favorecido.ativo)}>{favorecido.ativo ? 'ATIVO' : 'INATIVO'}</span>
+                    <button type="button" className="btn btn-outline" onClick={() => setFavorecidoForm({
+                      id: favorecido.id,
+                      parceiro_id: String(favorecido.parceiro_id || ''),
+                      nome: favorecido.nome || '',
+                      cpf_cnpj: favorecido.cpf_cnpj || '',
+                      pix_tipo_chave: favorecido.pix_tipo_chave || 'CNPJ',
+                      pix_chave: favorecido.pix_chave || '',
+                      ativo: favorecido.ativo !== false
+                    })}>
+                      Editar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+        </>
       )}
     </div>
   );

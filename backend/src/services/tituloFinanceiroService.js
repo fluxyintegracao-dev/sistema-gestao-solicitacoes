@@ -8,6 +8,10 @@ const {
   MovimentoFinanceiro,
   Obra,
   Parceiro,
+  PaymentBatch,
+  PaymentBatchItem,
+  PaymentBeneficiary,
+  PaymentIntent,
   SecurityEventLog,
   Solicitacao,
   TipoSolicitacao,
@@ -293,6 +297,28 @@ function buildTituloInclude({ includeMovimentos = false } = {}) {
       ],
       separate: true,
       order: [['data_movimento', 'DESC'], ['createdAt', 'DESC']]
+    });
+    include.push({
+      model: PaymentIntent,
+      as: 'paymentIntents',
+      include: [
+        {
+          model: PaymentBeneficiary,
+          as: 'beneficiary',
+          attributes: ['id', 'nome', 'cpf_cnpj', 'pix_tipo_chave', 'pix_chave', 'ativo']
+        },
+        {
+          model: PaymentBatchItem,
+          as: 'batchItems',
+          include: [{
+            model: PaymentBatch,
+            as: 'batch',
+            attributes: ['id', 'codigo', 'status', 'valor_total', 'quantidade_itens', 'sent_at']
+          }]
+        }
+      ],
+      separate: true,
+      order: [['createdAt', 'DESC']]
     });
   }
 

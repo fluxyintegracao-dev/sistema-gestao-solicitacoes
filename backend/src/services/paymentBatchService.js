@@ -1,0 +1,409 @@
+const crypto = require('crypto');
+const { Op } = require('sequelize');
+const {
+  ContaBancaria,
+  Obra,
+  Parceiro,
+  PaymentAccount,
+  PaymentApproval,
+  PaymentBatch,
+  PaymentBatchItem,
+  PaymentBeneficiary,
+  PaymentIntent,
+  PaymentProvider,
+  PaymentTransaction,
+  TituloFinanceiro,
+  sequelize
+} = require('../models');
+const { registrarEventoSeguranca } = require('./securityLogService');
+const { toSnapshot: beneficiarySnapshot } = require('./paymentBeneficiaryService');
+const {
+  ACTIVE_INTENT_STATUSES,
+  validateBeneficiaryComplete,
+  validatePaymentAccount,
+  validateTituloEligibleForPayment,
+  validateUserCanPrepareBatch
+} = require('./paymentEligibilityService');
+
+function createHttpError(statusCode, message) {
+  const error = new Error(message);
+  error.statusCode = statusCode;
+  return error;
+}
+
+function normalizeIdList(list) {
+  return [...new Set(
+    (Array.isArray(list) ? list : [])
+      .map((item) => Number(item))
+      .filter((item) => Number.isInteger(item) && item > 0)
+  )];
+}
+
+function todayCode() {
+  const now = new Date();
+  const pad = (value) => String(value).padStart(2, '0');
+  return [
+    now.getFullYear(),
+    pad(now.getMonth() + 1),
+    pad(now.getDate()),
+    pad(now.getHours()),
+    pad(now.getMinutes()),
+    pad(now.getSeconds())
+  ].join('');
+}
+
+function buildBatchCode() {
+  return `PAY-${todayCode()}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
+}
+
+function buildIdempotencyKey(prefix) {
+  return `${prefix}-${crypto.randomUUID()}`;
+}
+
+function snapshotTitulo(titulo) {
+  const data = titulo.get({ plain: true });
+  return {
+    id: data.id,
+    codigo: data.codigo,
+    tipo: data.tipo,
+    status: data.status,
+    descricao: data.descricao,
+    numero_documento: data.numero_documento,
+    valor_original: data.valor_original,
+    valor_saldo: data.valor_saldo,
+    valor_baixado: data.valor_baixado,
+    data_vencimento: data.data_vencimento,
+    obra_id: data.obra_id,
+    parceiro_id: data.parceiro_id,
+    parceiro: data.parceiro ? {
+      id: data.parceiro.id,
+      nome: data.parceiro.nome,
+      cpf_cnpj: data.parceiro.cpf_cnpj
+    } : null
+  };
+}
+
+async function getDefaultProvider() {
+  const provider = await PaymentProvider.findOne({
+    where: { codigo: 'BB', ambiente: 'HOMOLOGACAO', ativo: true },
+    order: [['id', 'ASC']]
+  });
+  if (!provider) {
+    throw createHttpError(400, 'Provider BB/HOMOLOGACAO nao configurado.');
+  }
+  return provider;
+}
+
+async function listarTitulosElegiveis(req, filters = {}) {
+  await validateUserCanPrepareBatch(req);
+
+  const where = {
+    tipo: 'PAGAR',
+    status: { [Op.in]: ['ABERTO', 'PARCIAL'] },
+    valor_saldo: { [Op.gt]: 0 }
+  };
+
+  if (filters.obra_id) where.obra_id = Number(filters.obra_id);
+  if (filters.parceiro_id) where.parceiro_id = Number(filters.parceiro_id);
+  if (filters.categoria_financeira_id) where.categoria_financeira_id = Number(filters.categoria_financeira_id);
+  if (filters.vencimento_inicial || filters.vencimento_final) {
+    where.data_vencimento = {};
+    if (filters.vencimento_inicial) where.data_vencimento[Op.gte] = filters.vencimento_inicial;
+    if (filters.vencimento_final) where.data_vencimento[Op.lte] = filters.vencimento_final;
+  }
+
+  const titulos = await TituloFinanceiro.findAll({
+    where,
+    include: [
+      {
+        model: Parceiro,
+        as: 'parceiro',
+        attributes: ['id', 'nome', 'cpf_cnpj', 'ativo'],
+        include: [{
+          model: PaymentBeneficiary,
+          as: 'paymentBeneficiaries',
+          required: false,
+          attributes: ['id', 'nome', 'cpf_cnpj', 'pix_tipo_chave', 'pix_chave', 'ativo', 'validado_em']
+        }]
+      },
+      { model: Obra, as: 'obra', attributes: ['id', 'codigo', 'nome'] },
+      {
+        model: PaymentIntent,
+        as: 'paymentIntents',
+        required: false,
+        where: { status: { [Op.in]: ACTIVE_INTENT_STATUSES } },
+        attributes: ['id', 'status']
+      }
+    ],
+    order: [['data_vencimento', 'ASC'], ['id', 'ASC']],
+    limit: 200
+  });
+
+  return titulos.map((titulo) => {
+    const plain = titulo.get({ plain: true });
+    const activeIntent = (plain.paymentIntents || [])[0] || null;
+    const beneficiaries = (plain.parceiro?.paymentBeneficiaries || []);
+    const beneficiary = beneficiaries.find((item) => item.ativo) || beneficiaries[0] || null;
+    const pendencias = [];
+
+    if (activeIntent) pendencias.push('Titulo ja possui pagamento ativo.');
+    if (!beneficiary) pendencias.push('Favorecido bancario nao cadastrado.');
+    if (beneficiary && (!beneficiary.pix_tipo_chave || !beneficiary.pix_chave)) {
+      pendencias.push('Favorecido sem chave PIX completa.');
+    }
+
+    return {
+      ...plain,
+      paymentIntents: undefined,
+      paymentBeneficiaries: undefined,
+      favorecido_pagamento: beneficiary,
+      elegivel_pagamento: pendencias.length === 0,
+      pendencias_pagamento: pendencias
+    };
+  });
+}
+
+async function createBatchFromTitulos(req, payload = {}) {
+  await validateUserCanPrepareBatch(req);
+
+  const tituloIds = normalizeIdList(payload.titulo_ids);
+  if (!tituloIds.length) {
+    throw createHttpError(400, 'Informe ao menos um titulo para gerar o lote.');
+  }
+
+  const paymentAccountId = Number(payload.payment_account_id);
+  const dataProgramada = String(payload.data_programada || '').trim();
+  if (!Number.isInteger(paymentAccountId) || paymentAccountId <= 0) {
+    throw createHttpError(400, 'Conta pagadora e obrigatoria.');
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dataProgramada)) {
+    throw createHttpError(400, 'Data programada invalida.');
+  }
+
+  return sequelize.transaction(async (transaction) => {
+    const provider = await getDefaultProvider();
+    const paymentAccount = await validatePaymentAccount(paymentAccountId);
+    const titulos = await TituloFinanceiro.findAll({
+      where: { id: { [Op.in]: tituloIds } },
+      include: [
+        { model: Parceiro, as: 'parceiro', attributes: ['id', 'nome', 'cpf_cnpj', 'ativo'] },
+        { model: Obra, as: 'obra', attributes: ['id', 'codigo', 'nome'] }
+      ],
+      transaction,
+      lock: transaction.LOCK.UPDATE
+    });
+
+    if (titulos.length !== tituloIds.length) {
+      throw createHttpError(404, 'Um ou mais titulos nao foram encontrados.');
+    }
+
+    const batch = await PaymentBatch.create({
+      codigo: buildBatchCode(),
+      provider_id: provider.id,
+      payment_account_id: paymentAccount.id,
+      empresa_id: paymentAccount.empresa_id || null,
+      status: 'RASCUNHO',
+      quantidade_itens: 0,
+      valor_total: 0,
+      data_programada: dataProgramada,
+      idempotency_key: buildIdempotencyKey('batch'),
+      correlation_id: buildIdempotencyKey('corr'),
+      aprovacao_status: 'RASCUNHO',
+      created_by: req.user?.id || null
+    }, { transaction });
+
+    let total = 0;
+    let sequencia = 1;
+    for (const titulo of titulos) {
+      const beneficiary = await PaymentBeneficiary.findOne({
+        where: { parceiro_id: titulo.parceiro_id, ativo: true },
+        order: [['validado_em', 'DESC'], ['id', 'ASC']],
+        transaction
+      });
+
+      await validateBeneficiaryComplete(beneficiary);
+      await validateTituloEligibleForPayment(titulo, { beneficiary, transaction });
+
+      const valor = Number(titulo.valor_saldo || 0);
+      const intent = await PaymentIntent.create({
+        titulo_financeiro_id: titulo.id,
+        payment_account_id: paymentAccount.id,
+        payment_beneficiary_id: beneficiary.id,
+        provider_id: provider.id,
+        metodo: 'PIX_CHAVE',
+        valor,
+        data_pagamento: dataProgramada,
+        status: 'EM_LOTE',
+        idempotency_key: buildIdempotencyKey(`intent-${titulo.id}`),
+        correlation_id: buildIdempotencyKey(`corr-${titulo.id}`),
+        beneficiary_snapshot: beneficiarySnapshot(beneficiary),
+        titulo_snapshot: snapshotTitulo(titulo),
+        created_by: req.user?.id || null,
+        updated_by: req.user?.id || null
+      }, { transaction });
+
+      await PaymentBatchItem.create({
+        payment_batch_id: batch.id,
+        payment_intent_id: intent.id,
+        sequencia,
+        status: 'EM_LOTE',
+        valor
+      }, { transaction });
+
+      total += valor;
+      sequencia += 1;
+    }
+
+    await batch.update({
+      quantidade_itens: titulos.length,
+      valor_total: total
+    }, { transaction });
+
+    await registrarEventoSeguranca({
+      req,
+      usuarioId: req.user?.id || null,
+      tipoEvento: 'PAYMENT_BATCH_CREATED',
+      recursoTipo: 'PAYMENT_BATCH',
+      recursoId: batch.id,
+      status: 'SUCCESS',
+      descricao: 'Lote de pagamento criado',
+      metadata: { quantidade_itens: titulos.length, valor_total: total }
+    });
+
+    return getBatchDetail(req, batch.id, { transaction });
+  });
+}
+
+async function listBatches(req, filters = {}) {
+  const where = {};
+  if (filters.status) where.status = String(filters.status).trim().toUpperCase();
+
+  return PaymentBatch.findAll({
+    where,
+    include: [
+      { model: PaymentProvider, as: 'provider', attributes: ['id', 'codigo', 'nome', 'ambiente'] },
+      {
+        model: PaymentAccount,
+        as: 'paymentAccount',
+        include: [{ model: ContaBancaria, as: 'contaBancaria', attributes: ['id', 'nome', 'banco', 'agencia', 'conta'] }]
+      }
+    ],
+    order: [['createdAt', 'DESC']],
+    limit: 100
+  });
+}
+
+async function getBatchDetail(req, id, { transaction = null } = {}) {
+  const batch = await PaymentBatch.findByPk(id, {
+    include: [
+      { model: PaymentProvider, as: 'provider', attributes: ['id', 'codigo', 'nome', 'ambiente'] },
+      {
+        model: PaymentAccount,
+        as: 'paymentAccount',
+        include: [{ model: ContaBancaria, as: 'contaBancaria', attributes: ['id', 'nome', 'banco', 'agencia', 'conta'] }]
+      },
+      {
+        model: PaymentBatchItem,
+        as: 'items',
+        include: [{
+          model: PaymentIntent,
+          as: 'intent',
+          include: [
+            { model: TituloFinanceiro, as: 'titulo', include: [{ model: Parceiro, as: 'parceiro', attributes: ['id', 'nome', 'cpf_cnpj'] }] },
+            { model: PaymentBeneficiary, as: 'beneficiary' }
+          ]
+        }]
+      }
+    ],
+    order: [[{ model: PaymentBatchItem, as: 'items' }, 'sequencia', 'ASC']],
+    transaction
+  });
+
+  if (!batch) throw createHttpError(404, 'Lote de pagamento nao encontrado.');
+  const [approvals, transactions] = await Promise.all([
+    PaymentApproval.findAll({
+      where: { entity_type: 'BATCH', entity_id: batch.id },
+      order: [['createdAt', 'ASC']],
+      transaction
+    }),
+    PaymentTransaction.findAll({
+      where: { payment_batch_id: batch.id },
+      order: [['createdAt', 'DESC']],
+      limit: 20,
+      transaction
+    })
+  ]);
+  batch.setDataValue('approvals', approvals);
+  batch.setDataValue('transactions', transactions);
+  return batch;
+}
+
+async function submitBatchForApproval(req, id) {
+  const batch = await PaymentBatch.findByPk(id, {
+    include: [{ model: PaymentBatchItem, as: 'items' }]
+  });
+  if (!batch) throw createHttpError(404, 'Lote de pagamento nao encontrado.');
+  if (!['RASCUNHO', 'EM_REVISAO'].includes(String(batch.status || '').toUpperCase())) {
+    throw createHttpError(400, 'Apenas lotes em rascunho/revisao podem ser enviados para aprovacao.');
+  }
+  if (!batch.items?.length) {
+    throw createHttpError(400, 'Lote sem itens.');
+  }
+
+  await sequelize.transaction(async (transaction) => {
+    await batch.update({
+      status: 'PENDENTE_APROVACAO',
+      aprovacao_status: 'PENDENTE',
+      submitted_by: req.user?.id || null,
+      submitted_at: new Date()
+    }, { transaction });
+
+    const intentIds = batch.items.map((item) => item.payment_intent_id);
+    await PaymentIntent.update(
+      { status: 'PENDENTE_APROVACAO', updated_by: req.user?.id || null },
+      { where: { id: { [Op.in]: intentIds } }, transaction }
+    );
+    await PaymentBatchItem.update(
+      { status: 'PENDENTE_APROVACAO' },
+      { where: { payment_batch_id: batch.id }, transaction }
+    );
+  });
+
+  await registrarEventoSeguranca({
+    req,
+    usuarioId: req.user?.id || null,
+    tipoEvento: 'PAYMENT_BATCH_SUBMITTED',
+    recursoTipo: 'PAYMENT_BATCH',
+    recursoId: batch.id,
+    status: 'SUCCESS',
+    descricao: 'Lote submetido para aprovacao'
+  });
+
+  return getBatchDetail(req, id);
+}
+
+async function listPaymentAccounts(req) {
+  return PaymentAccount.findAll({
+    include: [
+      { model: PaymentProvider, as: 'provider', attributes: ['id', 'codigo', 'nome', 'ambiente'] },
+      { model: ContaBancaria, as: 'contaBancaria', attributes: ['id', 'nome', 'banco', 'agencia', 'conta'] }
+    ],
+    order: [['ativo', 'DESC'], ['id', 'ASC']]
+  });
+}
+
+async function listProviders(req) {
+  return PaymentProvider.findAll({
+    order: [['codigo', 'ASC'], ['ambiente', 'ASC']]
+  });
+}
+
+module.exports = {
+  createBatchFromTitulos,
+  getBatchDetail,
+  listBatches,
+  listPaymentAccounts,
+  listProviders,
+  listarTitulosElegiveis,
+  submitBatchForApproval
+};

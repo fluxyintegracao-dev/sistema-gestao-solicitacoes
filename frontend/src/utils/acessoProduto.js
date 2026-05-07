@@ -184,7 +184,14 @@ export function canAccessFinanceiro(user) {
       'financeiro.conciliacao.importar',
       'financeiro.conciliacao.conciliar',
       'financeiro.cadastros.visualizar',
-      'financeiro.cadastros.gerenciar'
+      'financeiro.cadastros.gerenciar',
+      'financeiro.pagamentos.visualizar',
+      'financeiro.pagamentos.preparar',
+      'financeiro.pagamentos.aprovar',
+      'financeiro.pagamentos.enviar_banco',
+      'financeiro.pagamentos.confirmar_baixa',
+      'financeiro.favorecidos.visualizar',
+      'financeiro.favorecidos.gerenciar'
     ]);
   }
 
@@ -192,6 +199,79 @@ export function canAccessFinanceiro(user) {
     Boolean(user?.financeiro_liberado) ||
     normalizeToken(user?.perfil) === 'FINANCEIRO' ||
     userHasSetorCapability(user, 'eh_setor_financeiro')
+  );
+}
+
+function userHasPaymentApprovalDirectorate(user) {
+  const tokens = [
+    user?.setor?.codigo,
+    user?.setor?.nome,
+    user?.area,
+    ...(Array.isArray(user?.setores) ? user.setores.flatMap(setor => [setor?.codigo, setor?.nome]) : []),
+    ...(Array.isArray(user?.setoresVinculos)
+      ? user.setoresVinculos.flatMap(vinculo => [vinculo?.setor?.codigo, vinculo?.setor?.nome])
+      : [])
+  ].map(normalizeToken).filter(Boolean);
+
+  return (
+    tokens.includes('DIR_ADMIN') ||
+    tokens.includes('DIRETORIA_ADMINISTRATIVA') ||
+    tokens.includes('DIRETORIA ADMINISTRATIVA') ||
+    tokens.includes('DIR_EXECUTIVA') ||
+    tokens.includes('DIRETORIA_EXECUTIVA') ||
+    tokens.includes('DIRETORIA EXECUTIVA')
+  );
+}
+
+export function canAccessPagamentos(user) {
+  if (!hasEnabledModule(user, 'FINANCEIRO')) return false;
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasAnyPermissao(user, [
+      'financeiro.pagamentos.visualizar',
+      'financeiro.pagamentos.preparar',
+      'financeiro.pagamentos.aprovar',
+      'financeiro.pagamentos.enviar_banco',
+      'financeiro.pagamentos.confirmar_baixa',
+      'financeiro.pagamentos.auditar',
+      'financeiro.pagamentos.configurar'
+    ]);
+  }
+
+  return canAccessFinanceiro(user) || userHasPaymentApprovalDirectorate(user);
+}
+
+export function canPreparePagamentos(user) {
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) return hasPermissao(user, 'financeiro.pagamentos.preparar');
+  return userHasSetorCapability(user, 'eh_setor_financeiro') || normalizeToken(user?.perfil) === 'FINANCEIRO';
+}
+
+export function canApprovePagamentos(user) {
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) return hasPermissao(user, 'financeiro.pagamentos.aprovar');
+  return userHasPaymentApprovalDirectorate(user);
+}
+
+export function canSendPagamentosBanco(user) {
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) return hasPermissao(user, 'financeiro.pagamentos.enviar_banco');
+  return userHasSetorCapability(user, 'eh_setor_financeiro') || normalizeToken(user?.perfil) === 'FINANCEIRO';
+}
+
+export function canConfirmarBaixaPagamento(user) {
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) return hasPermissao(user, 'financeiro.pagamentos.confirmar_baixa');
+  return userHasSetorCapability(user, 'eh_setor_financeiro') || normalizeToken(user?.perfil) === 'FINANCEIRO';
+}
+
+export function canManagePaymentBeneficiaries(user) {
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) return hasPermissao(user, 'financeiro.favorecidos.gerenciar');
+  return (
+    userHasSetorCapability(user, 'eh_setor_financeiro') ||
+    normalizeToken(user?.perfil) === 'FINANCEIRO' ||
+    userHasPaymentApprovalDirectorate(user)
   );
 }
 

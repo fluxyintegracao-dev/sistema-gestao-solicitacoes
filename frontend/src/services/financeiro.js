@@ -358,3 +358,184 @@ export async function getResultadoObras() {
 
   return parseJson(response, 'Erro ao buscar resultado de obras');
 }
+
+export async function getPaymentBeneficiaries(params = {}) {
+  const query = new URLSearchParams(
+    Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== '')
+  ).toString();
+  const url = query ? `${API_URL}/financeiro/favorecidos?${query}` : `${API_URL}/financeiro/favorecidos`;
+
+  const response = await fetch(url, {
+    headers: authHeaders()
+  });
+
+  return parseJson(response, 'Erro ao buscar favorecidos bancarios');
+}
+
+export async function criarPaymentBeneficiary(data) {
+  const response = await fetch(`${API_URL}/financeiro/favorecidos`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+
+  return parseJson(response, 'Erro ao criar favorecido bancario');
+}
+
+export async function atualizarPaymentBeneficiary(id, data) {
+  const response = await fetch(`${API_URL}/financeiro/favorecidos/${id}`, {
+    method: 'PUT',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+
+  return parseJson(response, 'Erro ao atualizar favorecido bancario');
+}
+
+export async function getPaymentBeneficiaryAudit(id) {
+  const response = await fetch(`${API_URL}/financeiro/favorecidos/${id}/auditoria`, {
+    headers: authHeaders()
+  });
+
+  return parseJson(response, 'Erro ao buscar auditoria do favorecido');
+}
+
+export async function getPaymentEligibleTitulos(params = {}) {
+  const query = new URLSearchParams(
+    Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== '')
+  ).toString();
+  const url = query
+    ? `${API_URL}/financeiro/pagamentos/titulos-elegiveis?${query}`
+    : `${API_URL}/financeiro/pagamentos/titulos-elegiveis`;
+
+  const response = await fetch(url, {
+    headers: authHeaders()
+  });
+
+  return parseJson(response, 'Erro ao buscar titulos elegiveis para pagamento');
+}
+
+export async function getPaymentProviders() {
+  const response = await fetch(`${API_URL}/financeiro/pagamentos/providers`, {
+    headers: authHeaders()
+  });
+
+  return parseJson(response, 'Erro ao buscar providers de pagamento');
+}
+
+export async function getPaymentAccounts() {
+  const response = await fetch(`${API_URL}/financeiro/pagamentos/accounts`, {
+    headers: authHeaders()
+  });
+
+  return parseJson(response, 'Erro ao buscar contas pagadoras');
+}
+
+export async function criarPaymentAccount(data) {
+  const response = await fetch(`${API_URL}/financeiro/pagamentos/accounts`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+
+  return parseJson(response, 'Erro ao criar conta pagadora');
+}
+
+export async function criarPaymentBatch(data) {
+  const response = await fetch(`${API_URL}/financeiro/pagamentos/lotes`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+
+  return parseJson(response, 'Erro ao criar lote de pagamento');
+}
+
+export async function getPaymentBatches(params = {}) {
+  const query = new URLSearchParams(
+    Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== '')
+  ).toString();
+  const url = query ? `${API_URL}/financeiro/pagamentos/lotes?${query}` : `${API_URL}/financeiro/pagamentos/lotes`;
+
+  const response = await fetch(url, {
+    headers: authHeaders()
+  });
+
+  return parseJson(response, 'Erro ao buscar lotes de pagamento');
+}
+
+export async function getPaymentBatch(id) {
+  const response = await fetch(`${API_URL}/financeiro/pagamentos/lotes/${id}`, {
+    headers: authHeaders()
+  });
+
+  return parseJson(response, 'Erro ao buscar lote de pagamento');
+}
+
+export async function submeterPaymentBatch(id) {
+  const response = await fetch(`${API_URL}/financeiro/pagamentos/lotes/${id}/submeter-aprovacao`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({})
+  });
+
+  return parseJson(response, 'Erro ao submeter lote para aprovacao');
+}
+
+export async function aprovarPaymentBatch(id, data) {
+  const response = await fetch(`${API_URL}/financeiro/pagamentos/lotes/${id}/aprovar`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+
+  return parseJson(response, 'Erro ao aprovar lote de pagamento');
+}
+
+export async function rejeitarPaymentBatch(id, data = {}) {
+  const response = await fetch(`${API_URL}/financeiro/pagamentos/lotes/${id}/rejeitar`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+
+  return parseJson(response, 'Erro ao rejeitar lote de pagamento');
+}
+
+export async function enviarPaymentBatchBanco(id, data) {
+  const response = await fetch(`${API_URL}/financeiro/pagamentos/lotes/${id}/enviar-banco`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+
+  return parseJson(response, 'Erro ao enviar lote ao banco');
+}
+
+export async function simularRetornoPaymentBatch(id, data = {}) {
+  const response = await fetch(`${API_URL}/financeiro/pagamentos/lotes/${id}/simular-retorno-banco`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+
+  return parseJson(response, 'Erro ao simular retorno bancario');
+}
+
+export async function getPaymentsAwaitingBaixa() {
+  const response = await fetch(`${API_URL}/financeiro/pagamentos/aguardando-baixa`, {
+    headers: authHeaders()
+  });
+
+  return parseJson(response, 'Erro ao buscar pagamentos aguardando baixa');
+}
+
+export async function confirmarBaixaPaymentIntent(id, data = {}) {
+  const response = await fetch(`${API_URL}/financeiro/pagamentos/intents/${id}/confirmar-baixa`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+
+  return parseJson(response, 'Erro ao confirmar baixa do pagamento');
+}

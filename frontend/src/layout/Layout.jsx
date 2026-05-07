@@ -46,6 +46,7 @@ import {
   canAccessCompras,
   canAccessContratos,
   canAccessFinanceiro,
+  canAccessPagamentos,
   canAccessProvisoes,
   canAccessPrioridadesDiretoria,
   canAccessRhDp,
@@ -239,6 +240,7 @@ export default function Layout() {
   const comprasCotacoesManageAccess = canManageComprasCotacoes(user);
   const prioridadesDiretoriaAccess = canAccessPrioridadesDiretoria(user);
   const financeiroAccess = canAccessFinanceiro(user);
+  const pagamentosAccess = canAccessPagamentos(user);
   const boletosAccess = canAccessBoletos(user);
   const financeiroModuleEnabled = hasEnabledModule(user, 'FINANCEIRO');
   const comercialAccess = canAccessComercial(user);
@@ -349,9 +351,10 @@ export default function Layout() {
       ]);
     }
 
-    if (financeiroAccess || boletosAccess) {
+    if (financeiroAccess || pagamentosAccess || boletosAccess) {
       addGroup('Financeiro', [
         financeiroAccess ? item('/financeiro/titulos', 'Titulos Financeiros', HiOutlineWallet) : null,
+        pagamentosAccess ? item('/financeiro/pagamentos', 'Pagamentos em Massa', HiOutlinePaperAirplane) : null,
         boletosAccess ? item('/financeiro/boletos', 'Boletos', HiOutlineDocumentText) : null,
         financeiroAccess ? item('/financeiro/relatorios', 'Relatorios Financeiros', HiOutlineDocumentText) : null,
         financeiroAccess ? item('/financeiro/conciliacao', 'Conciliacao OFX', HiOutlineBanknotes) : null,
@@ -485,6 +488,7 @@ export default function Layout() {
     crmLeadsAccess,
     crmLeadsCreateAccess,
     financeiroAccess,
+    pagamentosAccess,
     boletosAccess,
     financeiroModuleEnabled,
     gestaoUsuarios,

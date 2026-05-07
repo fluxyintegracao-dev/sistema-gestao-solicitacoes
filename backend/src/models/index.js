@@ -83,6 +83,18 @@ db.TituloFinanceiroSequencia = require('./TituloFinanceiroSequencia')(sequelize,
 db.MovimentoFinanceiro = require('./MovimentoFinanceiro')(sequelize, Sequelize);
 db.ConciliacaoBancaria = require('./ConciliacaoBancaria')(sequelize, Sequelize);
 db.ConciliacaoBancariaImportacao = require('./ConciliacaoBancariaImportacao')(sequelize, Sequelize);
+db.PaymentProvider = require('./PaymentProvider')(sequelize, Sequelize);
+db.PaymentAccount = require('./PaymentAccount')(sequelize, Sequelize);
+db.PaymentBeneficiary = require('./PaymentBeneficiary')(sequelize, Sequelize);
+db.PaymentBeneficiaryAuditLog = require('./PaymentBeneficiaryAuditLog')(sequelize, Sequelize);
+db.PaymentIntent = require('./PaymentIntent')(sequelize, Sequelize);
+db.PaymentBatch = require('./PaymentBatch')(sequelize, Sequelize);
+db.PaymentBatchItem = require('./PaymentBatchItem')(sequelize, Sequelize);
+db.PaymentApproval = require('./PaymentApproval')(sequelize, Sequelize);
+db.PaymentTransaction = require('./PaymentTransaction')(sequelize, Sequelize);
+db.PaymentEvent = require('./PaymentEvent')(sequelize, Sequelize);
+db.PaymentReconciliation = require('./PaymentReconciliation')(sequelize, Sequelize);
+db.PaymentJob = require('./PaymentJob')(sequelize, Sequelize);
 db.Unidade = require('./Unidade')(sequelize, Sequelize);
 db.Categoria = require('./Categoria')(sequelize, Sequelize);
 db.Insumo = require('./Insumo')(sequelize, Sequelize);
@@ -2073,6 +2085,230 @@ db.User.hasMany(db.ConciliacaoBancariaImportacao, {
 db.ConciliacaoBancariaImportacao.belongsTo(db.User, {
   foreignKey: 'criado_por',
   as: 'criadoPor'
+});
+
+// =====================
+// MOTOR DE PAGAMENTOS
+// =====================
+db.PaymentProvider.hasMany(db.PaymentAccount, {
+  foreignKey: 'provider_id',
+  as: 'accounts'
+});
+
+db.PaymentAccount.belongsTo(db.PaymentProvider, {
+  foreignKey: 'provider_id',
+  as: 'provider'
+});
+
+db.ContaBancaria.hasMany(db.PaymentAccount, {
+  foreignKey: 'conta_bancaria_id',
+  as: 'paymentAccounts'
+});
+
+db.PaymentAccount.belongsTo(db.ContaBancaria, {
+  foreignKey: 'conta_bancaria_id',
+  as: 'contaBancaria'
+});
+
+db.RhEmpresaGrupo.hasMany(db.PaymentAccount, {
+  foreignKey: 'empresa_id',
+  as: 'paymentAccounts'
+});
+
+db.PaymentAccount.belongsTo(db.RhEmpresaGrupo, {
+  foreignKey: 'empresa_id',
+  as: 'empresa'
+});
+
+db.Parceiro.hasMany(db.PaymentBeneficiary, {
+  foreignKey: 'parceiro_id',
+  as: 'paymentBeneficiaries'
+});
+
+db.PaymentBeneficiary.belongsTo(db.Parceiro, {
+  foreignKey: 'parceiro_id',
+  as: 'parceiro'
+});
+
+db.PaymentBeneficiary.hasMany(db.PaymentBeneficiaryAuditLog, {
+  foreignKey: 'payment_beneficiary_id',
+  as: 'auditLogs'
+});
+
+db.PaymentBeneficiaryAuditLog.belongsTo(db.PaymentBeneficiary, {
+  foreignKey: 'payment_beneficiary_id',
+  as: 'beneficiary'
+});
+
+db.Parceiro.hasMany(db.PaymentBeneficiaryAuditLog, {
+  foreignKey: 'parceiro_id',
+  as: 'paymentBeneficiaryAuditLogs'
+});
+
+db.PaymentBeneficiaryAuditLog.belongsTo(db.Parceiro, {
+  foreignKey: 'parceiro_id',
+  as: 'parceiro'
+});
+
+db.TituloFinanceiro.hasMany(db.PaymentIntent, {
+  foreignKey: 'titulo_financeiro_id',
+  as: 'paymentIntents'
+});
+
+db.PaymentIntent.belongsTo(db.TituloFinanceiro, {
+  foreignKey: 'titulo_financeiro_id',
+  as: 'titulo'
+});
+
+db.PaymentAccount.hasMany(db.PaymentIntent, {
+  foreignKey: 'payment_account_id',
+  as: 'intents'
+});
+
+db.PaymentIntent.belongsTo(db.PaymentAccount, {
+  foreignKey: 'payment_account_id',
+  as: 'paymentAccount'
+});
+
+db.PaymentBeneficiary.hasMany(db.PaymentIntent, {
+  foreignKey: 'payment_beneficiary_id',
+  as: 'intents'
+});
+
+db.PaymentIntent.belongsTo(db.PaymentBeneficiary, {
+  foreignKey: 'payment_beneficiary_id',
+  as: 'beneficiary'
+});
+
+db.PaymentProvider.hasMany(db.PaymentIntent, {
+  foreignKey: 'provider_id',
+  as: 'intents'
+});
+
+db.PaymentIntent.belongsTo(db.PaymentProvider, {
+  foreignKey: 'provider_id',
+  as: 'provider'
+});
+
+db.PaymentProvider.hasMany(db.PaymentBatch, {
+  foreignKey: 'provider_id',
+  as: 'batches'
+});
+
+db.PaymentBatch.belongsTo(db.PaymentProvider, {
+  foreignKey: 'provider_id',
+  as: 'provider'
+});
+
+db.PaymentAccount.hasMany(db.PaymentBatch, {
+  foreignKey: 'payment_account_id',
+  as: 'batches'
+});
+
+db.PaymentBatch.belongsTo(db.PaymentAccount, {
+  foreignKey: 'payment_account_id',
+  as: 'paymentAccount'
+});
+
+db.PaymentBatch.hasMany(db.PaymentBatchItem, {
+  foreignKey: 'payment_batch_id',
+  as: 'items',
+  onDelete: 'CASCADE'
+});
+
+db.PaymentBatchItem.belongsTo(db.PaymentBatch, {
+  foreignKey: 'payment_batch_id',
+  as: 'batch'
+});
+
+db.PaymentIntent.hasMany(db.PaymentBatchItem, {
+  foreignKey: 'payment_intent_id',
+  as: 'batchItems'
+});
+
+db.PaymentBatchItem.belongsTo(db.PaymentIntent, {
+  foreignKey: 'payment_intent_id',
+  as: 'intent'
+});
+
+db.PaymentBatch.hasMany(db.PaymentTransaction, {
+  foreignKey: 'payment_batch_id',
+  as: 'transactions'
+});
+
+db.PaymentTransaction.belongsTo(db.PaymentBatch, {
+  foreignKey: 'payment_batch_id',
+  as: 'batch'
+});
+
+db.PaymentIntent.hasMany(db.PaymentTransaction, {
+  foreignKey: 'payment_intent_id',
+  as: 'transactions'
+});
+
+db.PaymentTransaction.belongsTo(db.PaymentIntent, {
+  foreignKey: 'payment_intent_id',
+  as: 'intent'
+});
+
+db.PaymentProvider.hasMany(db.PaymentTransaction, {
+  foreignKey: 'provider_id',
+  as: 'transactions'
+});
+
+db.PaymentTransaction.belongsTo(db.PaymentProvider, {
+  foreignKey: 'provider_id',
+  as: 'provider'
+});
+
+db.PaymentBatch.hasMany(db.PaymentEvent, {
+  foreignKey: 'payment_batch_id',
+  as: 'events'
+});
+
+db.PaymentEvent.belongsTo(db.PaymentBatch, {
+  foreignKey: 'payment_batch_id',
+  as: 'batch'
+});
+
+db.PaymentIntent.hasMany(db.PaymentEvent, {
+  foreignKey: 'payment_intent_id',
+  as: 'events'
+});
+
+db.PaymentEvent.belongsTo(db.PaymentIntent, {
+  foreignKey: 'payment_intent_id',
+  as: 'intent'
+});
+
+db.PaymentIntent.hasOne(db.PaymentReconciliation, {
+  foreignKey: 'payment_intent_id',
+  as: 'reconciliation'
+});
+
+db.PaymentReconciliation.belongsTo(db.PaymentIntent, {
+  foreignKey: 'payment_intent_id',
+  as: 'intent'
+});
+
+db.MovimentoFinanceiro.hasMany(db.PaymentReconciliation, {
+  foreignKey: 'movimento_financeiro_id',
+  as: 'paymentReconciliations'
+});
+
+db.PaymentReconciliation.belongsTo(db.MovimentoFinanceiro, {
+  foreignKey: 'movimento_financeiro_id',
+  as: 'movimento'
+});
+
+db.ConciliacaoBancaria.hasMany(db.PaymentReconciliation, {
+  foreignKey: 'conciliacao_bancaria_id',
+  as: 'paymentReconciliations'
+});
+
+db.PaymentReconciliation.belongsTo(db.ConciliacaoBancaria, {
+  foreignKey: 'conciliacao_bancaria_id',
+  as: 'conciliacao'
 });
 
 /* ===== CRM ===== */
