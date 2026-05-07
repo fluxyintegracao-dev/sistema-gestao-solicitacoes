@@ -180,7 +180,7 @@ module.exports = {
           ) STORED,
           createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
           updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-          CONSTRAINT fk_payment_intents_titulo FOREIGN KEY (titulo_financeiro_id) REFERENCES titulos_financeiros(id) ON DELETE RESTRICT ON UPDATE CASCADE,
+          CONSTRAINT fk_payment_intents_titulo FOREIGN KEY (titulo_financeiro_id) REFERENCES titulos_financeiros(id) ON DELETE RESTRICT,
           CONSTRAINT fk_payment_intents_account FOREIGN KEY (payment_account_id) REFERENCES payment_accounts(id) ON DELETE RESTRICT ON UPDATE CASCADE,
           CONSTRAINT fk_payment_intents_beneficiary FOREIGN KEY (payment_beneficiary_id) REFERENCES payment_beneficiaries(id) ON DELETE RESTRICT ON UPDATE CASCADE,
           CONSTRAINT fk_payment_intents_provider FOREIGN KEY (provider_id) REFERENCES payment_providers(id) ON DELETE RESTRICT ON UPDATE CASCADE,
