@@ -69,18 +69,26 @@ function isMensagemVista(msg, participantesLeitura, userId) {
   );
 }
 
-function TicksMensagem({ vista }) {
+function isMensagemLidaPorMim(msg, participantesLeitura, userId) {
+  const msgTime = new Date(msg.createdAt).getTime();
+  const minha = participantesLeitura.find((p) => p.usuario_id === userId);
+  return !!(minha?.lida_em && new Date(minha.lida_em).getTime() >= msgTime);
+}
+
+function TicksMensagem({ vista, euSou }) {
+  const corVista = euSou ? '#bfdbfe' : '#2563eb';
+  const corNaoVista = euSou ? 'rgba(255,255,255,0.45)' : '#9ca3af';
   if (vista) {
     return (
       <svg width="18" height="10" viewBox="0 0 18 10" fill="none" style={{ flexShrink: 0, display: 'block' }}>
-        <path d="M1 5L4.5 8.5L10 1.5" stroke="#bfdbfe" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-        <path d="M6 5L9.5 8.5L15 1.5" stroke="#bfdbfe" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M1 5L4.5 8.5L10 1.5" stroke={corVista} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M6 5L9.5 8.5L15 1.5" stroke={corVista} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     );
   }
   return (
     <svg width="12" height="10" viewBox="0 0 12 10" fill="none" style={{ flexShrink: 0, display: 'block' }}>
-      <path d="M1 5L4.5 8.5L11 1.5" stroke="rgba(255,255,255,0.5)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M1 5L4.5 8.5L11 1.5" stroke={corNaoVista} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
@@ -597,8 +605,8 @@ export default function ComunicacaoInterna() {
                           borderRadius: euSou ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
                           padding: '8px 14px',
                           fontSize: 13,
-                          background: euSou ? 'var(--c-primary)' : 'var(--c-surface)',
-                          color: euSou ? '#fff' : 'var(--c-text)',
+                          background: euSou ? '#2563eb' : 'var(--c-surface)',
+                          color: euSou ? '#ffffff' : 'var(--c-text)',
                           border: euSou ? 'none' : '1px solid var(--c-border)',
                           boxShadow: '0 1px 2px rgba(0,0,0,0.06)'
                         }}>
@@ -636,9 +644,10 @@ export default function ComunicacaoInterna() {
                             <span style={{ fontSize: 10, color: euSou ? 'rgba(255,255,255,0.6)' : 'var(--c-muted)' }}>
                               {formatDataHora(msg.createdAt)}{msg.editada_em ? ' (editada)' : ''}
                             </span>
-                            {euSou && (
-                              <TicksMensagem vista={isMensagemVista(msg, participantesLeitura, userId)} />
-                            )}
+                            {euSou
+                              ? <TicksMensagem euSou vista={isMensagemVista(msg, participantesLeitura, userId)} />
+                              : <TicksMensagem euSou={false} vista={isMensagemLidaPorMim(msg, participantesLeitura, userId)} />
+                            }
                             {msg.pode_editar && !editandoId && (
                               <button onClick={() => { setEditandoId(msg.id); setTextoEdicao(msg.mensagem); }}
                                 style={{ fontSize: 10, color: euSou ? 'rgba(255,255,255,0.7)' : 'var(--c-muted)', textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer' }}>
