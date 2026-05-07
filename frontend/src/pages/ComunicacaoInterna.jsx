@@ -62,6 +62,29 @@ function timestampConversa(conv) {
   return Number.isNaN(data.getTime()) ? 0 : data.getTime();
 }
 
+function isMensagemVista(msg, participantesLeitura, userId) {
+  const msgTime = new Date(msg.createdAt).getTime();
+  return participantesLeitura.some(
+    (p) => p.usuario_id !== userId && p.lida_em && new Date(p.lida_em).getTime() >= msgTime
+  );
+}
+
+function TicksMensagem({ vista }) {
+  if (vista) {
+    return (
+      <svg width="18" height="10" viewBox="0 0 18 10" fill="none" style={{ flexShrink: 0, display: 'block' }}>
+        <path d="M1 5L4.5 8.5L10 1.5" stroke="#bfdbfe" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M6 5L9.5 8.5L15 1.5" stroke="#bfdbfe" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    );
+  }
+  return (
+    <svg width="12" height="10" viewBox="0 0 12 10" fill="none" style={{ flexShrink: 0, display: 'block' }}>
+      <path d="M1 5L4.5 8.5L11 1.5" stroke="rgba(255,255,255,0.5)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 function AvatarConversa({ conv, size = 9 }) {
   const isGroup = conv?.is_group;
   const nome = conv?.assunto || '';
@@ -108,6 +131,7 @@ export default function ComunicacaoInterna() {
   const [textoEdicao, setTextoEdicao] = useState('');
   const [mobileModo, setMobileModo] = useState('lista');
   const [isMobile, setIsMobile] = useState(false);
+  const [participantesLeitura, setParticipantesLeitura] = useState([]);
 
   // Modal nova conversa
   const [showNova, setShowNova] = useState(false);
@@ -198,6 +222,7 @@ export default function ComunicacaoInterna() {
     setOldestId(null);
     setTexto('');
     setArquivos([]);
+    setParticipantesLeitura([]);
     setMobileModo('chat');
     setLoadingChat(true);
     try {
@@ -209,6 +234,7 @@ export default function ComunicacaoInterna() {
       setMensagens(msgs?.mensagens || []);
       setTemMais(!!msgs?.tem_mais);
       setOldestId(msgs?.oldest_id || null);
+      setParticipantesLeitura(msgs?.participantes_leitura || []);
       await marcarLida(conv.id).catch(() => {});
       setConversas((prev) => prev.map((c) => c.id === conv.id ? { ...c, tem_novidade: false } : c));
     } catch {
@@ -227,6 +253,7 @@ export default function ComunicacaoInterna() {
       setMensagens((prev) => [...(data?.mensagens || []), ...prev]);
       setTemMais(!!data?.tem_mais);
       setOldestId(data?.oldest_id || null);
+      if (data?.participantes_leitura) setParticipantesLeitura(data.participantes_leitura);
     } catch {
       // erro
     } finally {
@@ -244,6 +271,7 @@ export default function ComunicacaoInterna() {
 
     try {
       const data = await getMensagens(conversaAtiva, { after_id: afterId, limit: 50 });
+      if (data?.participantes_leitura) setParticipantesLeitura(data.participantes_leitura);
       const novas = data?.mensagens || [];
       if (!novas.length) return;
 
@@ -608,6 +636,9 @@ export default function ComunicacaoInterna() {
                             <span style={{ fontSize: 10, color: euSou ? 'rgba(255,255,255,0.6)' : 'var(--c-muted)' }}>
                               {formatDataHora(msg.createdAt)}{msg.editada_em ? ' (editada)' : ''}
                             </span>
+                            {euSou && (
+                              <TicksMensagem vista={isMensagemVista(msg, participantesLeitura, userId)} />
+                            )}
                             {msg.pode_editar && !editandoId && (
                               <button onClick={() => { setEditandoId(msg.id); setTextoEdicao(msg.mensagem); }}
                                 style={{ fontSize: 10, color: euSou ? 'rgba(255,255,255,0.7)' : 'var(--c-muted)', textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer' }}>

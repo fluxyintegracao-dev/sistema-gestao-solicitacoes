@@ -610,6 +610,11 @@ module.exports = {
         anexosPorMensagem[a.mensagem_id].push(a);
       }
 
+      const participantesLeitura = await ConversaInternaParticipante.findAll({
+        where: { conversa_id: id },
+        attributes: ['usuario_id', 'lida_em']
+      });
+
       const usuarioId = Number(req.user.id);
       const agora = Date.now();
 
@@ -634,7 +639,16 @@ module.exports = {
       const oldestId = resultado.length > 0 ? resultado[0].id : null;
       const newestId = resultado.length > 0 ? resultado[resultado.length - 1].id : null;
 
-      return res.json({ mensagens: resultado, tem_mais: temMais, oldest_id: oldestId, newest_id: newestId });
+      return res.json({
+        mensagens: resultado,
+        tem_mais: temMais,
+        oldest_id: oldestId,
+        newest_id: newestId,
+        participantes_leitura: participantesLeitura.map((p) => ({
+          usuario_id: p.usuario_id,
+          lida_em: p.lida_em || null
+        }))
+      });
     } catch (error) {
       console.error(error);
       return res.status(500).json({ error: 'Erro ao listar mensagens' });
