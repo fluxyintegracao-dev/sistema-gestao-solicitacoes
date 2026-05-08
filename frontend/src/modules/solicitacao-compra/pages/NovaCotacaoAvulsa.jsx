@@ -56,6 +56,11 @@ export default function NovaCotacaoAvulsa() {
       return;
     }
 
+    if (!necessarioPara) {
+      setErro('O prazo de entrega é obrigatório.');
+      return;
+    }
+
     const itensValidos = itens.filter((item) => item.nome.trim() && Number(item.quantidade) > 0);
     if (itensValidos.length === 0) {
       setErro('Adicione ao menos um item com nome e quantidade.');
@@ -136,12 +141,13 @@ export default function NovaCotacaoAvulsa() {
               </div>
 
               <div>
-                <label className="app-filter-label">Necessario para</label>
+                <label className="app-filter-label">Necessario para *</label>
                 <input
-                  className="input"
+                  className={`input ${!necessarioPara ? 'border-red-400' : ''}`}
                   type="date"
                   value={necessarioPara}
                   onChange={(e) => setNecessarioPara(e.target.value)}
+                  required
                 />
               </div>
 

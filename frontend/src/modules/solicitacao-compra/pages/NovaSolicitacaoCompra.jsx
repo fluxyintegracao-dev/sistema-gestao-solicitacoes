@@ -593,6 +593,10 @@ export default function NovaSolicitacaoCompra() {
         alert(`Item ${index + 1}: informe a quantidade.`);
         return;
       }
+      if (!item.necessario_para) {
+        alert(`Item ${index + 1}: o prazo de entrega é obrigatório.`);
+        return;
+      }
       const validacaoRateios = validarRateiosItem(item);
       if (!validacaoRateios.ok) {
         alert(`Item ${index + 1}: ${validacaoRateios.mensagem}`);
@@ -925,7 +929,7 @@ export default function NovaSolicitacaoCompra() {
                           );
                         })()}
                       </td>
-                      <td><input type="date" className="input min-w-[170px]" value={item.necessario_para} onChange={(event) => atualizarItem(index, 'necessario_para', event.target.value)} /></td>
+                      <td><input type="date" className={`input min-w-[170px] ${!item.necessario_para ? 'border-red-400' : ''}`} value={item.necessario_para} onChange={(event) => atualizarItem(index, 'necessario_para', event.target.value)} required /></td>
                       <td>
                         <input
                           type="url"
