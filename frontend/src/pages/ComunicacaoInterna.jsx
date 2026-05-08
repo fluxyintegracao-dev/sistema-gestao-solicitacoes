@@ -792,8 +792,14 @@ export default function ComunicacaoInterna() {
                                   overflow: 'hidden'
                                 }}
                               >
-                                <p style={{ fontSize: 12, fontWeight: 700, margin: '0 0 2px', color: euSou ? 'rgba(255,255,255,0.95)' : 'var(--c-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                  {msg.citacao.autor?.nome || 'Mensagem'}
+                                <p style={{ fontSize: 11, fontWeight: 600, margin: '0 0 3px', color: euSou ? 'rgba(255,255,255,0.7)' : 'var(--c-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4 }}>
+                                  <span style={{ fontWeight: 700, color: euSou ? 'rgba(255,255,255,0.95)' : 'var(--c-primary)' }}>
+                                    {euSou ? 'Você' : (msg.autor?.nome || 'Alguém')}
+                                  </span>
+                                  <span>↩</span>
+                                  <span style={{ fontWeight: 700, color: euSou ? 'rgba(255,255,255,0.85)' : 'var(--c-text)' }}>
+                                    {msg.citacao.autor?.nome || 'Mensagem'}
+                                  </span>
                                 </p>
                                 <p style={{ fontSize: 12, margin: 0, color: euSou ? 'rgba(255,255,255,0.78)' : 'var(--c-text)', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
                                   {msg.citacao.mensagem}
