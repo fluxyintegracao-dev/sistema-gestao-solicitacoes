@@ -126,12 +126,13 @@ export default function NovaCotacaoAvulsa() {
 
               <div>
                 <label className="app-filter-label">Obra (opcional)</label>
-                <select className="input" value={obraId} onChange={(e) => setObraId(e.target.value)}>
-                  <option value="">Selecionar obra...</option>
-                  {obras.map((o) => (
-                    <option key={o.id} value={o.id}>{o.nome} {o.codigo ? `(${o.codigo})` : ''}</option>
-                  ))}
-                </select>
+                <ApropriacaoAutocomplete
+                  value={obraId}
+                  options={obras}
+                  onChange={setObraId}
+                  placeholder="Buscar obra por código ou nome..."
+                  inputClassName="input w-full"
+                />
               </div>
 
               <div>

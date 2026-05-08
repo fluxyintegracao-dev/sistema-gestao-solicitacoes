@@ -686,15 +686,13 @@ export default function NovaSolicitacaoCompra() {
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <div className="grid gap-2 xl:col-span-2">
             <label className="text-sm font-medium">Obra *</label>
-            <select className="input" value={obraId} onChange={(event) => setObraId(event.target.value)}>
-              <option value="">Selecione a obra</option>
-              {obras.map((obra) => (
-                <option key={obra.id} value={obra.id}>
-                  {obra.codigo ? `${obra.codigo} - ` : ''}
-                  {obra.nome}
-                </option>
-              ))}
-            </select>
+            <ApropriacaoAutocomplete
+              value={obraId}
+              options={obras}
+              onChange={setObraId}
+              placeholder="Buscar obra por código ou nome..."
+              inputClassName="input w-full"
+            />
           </div>
 
           <div className="grid gap-2">
