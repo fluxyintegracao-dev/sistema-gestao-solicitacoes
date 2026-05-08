@@ -179,8 +179,15 @@ async function reprocessBatch(req, id, payload = {}) {
     }
   });
 
-  const job = await createSendBatchJob(batch.id);
-  await processSendBatchJob(req, job.id);
+  const job = env.bbSandboxRealEnabled
+    ? await createPaymentJob(batch.id, 'BB_SUBMIT_PIX_BATCH')
+    : await createSendBatchJob(batch.id);
+
+  if (env.bbSandboxRealEnabled) {
+    await processBbSubmitPixBatchJob(req, job.id);
+  } else {
+    await processSendBatchJob(req, job.id);
+  }
   return PaymentBatch.findByPk(batch.id);
 }
 

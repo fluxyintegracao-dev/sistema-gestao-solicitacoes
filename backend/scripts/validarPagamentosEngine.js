@@ -197,6 +197,10 @@ function validateRoutesAndCriticalGuards() {
     'Job BB_SUBMIT_PIX_BATCH nao encontrado.'
   );
   assert(
+    executionService.includes("env.bbSandboxRealEnabled") && executionService.includes("createPaymentJob(batch.id, 'BB_SUBMIT_PIX_BATCH')"),
+    'Reprocessamento BB sandbox nao esta direcionando para o job real.'
+  );
+  assert(
     baixaService.includes('lock: transaction.LOCK.UPDATE'),
     'Lock transacional da baixa nao encontrado.'
   );
