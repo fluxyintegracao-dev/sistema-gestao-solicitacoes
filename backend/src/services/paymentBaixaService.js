@@ -1,6 +1,8 @@
 const {
   MovimentoFinanceiro,
   PaymentAccount,
+  PaymentBatch,
+  PaymentBatchItem,
   PaymentIntent,
   PaymentReconciliation,
   TituloFinanceiro,
@@ -28,6 +30,56 @@ function calcularStatusTitulo({ valorOriginal, valorBaixado }) {
     return { status: 'QUITADO', valor_saldo: 0 };
   }
   return { status: 'PARCIAL', valor_saldo: saldo };
+}
+
+async function recalcularStatusLotePorIntent(intentId, { transaction = null } = {}) {
+  const batchItems = await PaymentBatchItem.findAll({
+    where: { payment_intent_id: intentId },
+    transaction,
+    lock: transaction?.LOCK?.UPDATE
+  });
+
+  for (const batchItem of batchItems) {
+    await batchItem.update({ status: 'BAIXADO' }, { transaction });
+
+    const items = await PaymentBatchItem.findAll({
+      where: { payment_batch_id: batchItem.payment_batch_id },
+      include: [{ model: PaymentIntent, as: 'intent', attributes: ['id', 'status'] }],
+      transaction,
+      lock: transaction?.LOCK?.UPDATE
+    });
+
+    const statuses = items.map((item) => String(item.intent?.status || item.status || '').toUpperCase());
+    const allBaixado = statuses.length > 0 && statuses.every((status) => status === 'BAIXADO');
+    const hasBaixado = statuses.some((status) => status === 'BAIXADO');
+    const hasAguardandoBaixa = statuses.some((status) => status === 'AGUARDANDO_CONFIRMACAO_BAIXA');
+    const hasRejeitado = statuses.some((status) => ['REJEITADO_BANCO', 'FALHA_INTEGRACAO'].includes(status));
+
+    let nextStatus = null;
+    const updatePayload = {};
+
+    if (allBaixado) {
+      nextStatus = 'BAIXADO';
+      updatePayload.closed_at = new Date();
+    } else if (hasBaixado && hasRejeitado && !hasAguardandoBaixa) {
+      nextStatus = 'PARCIALMENTE_REJEITADO';
+    } else if (hasBaixado || hasAguardandoBaixa) {
+      nextStatus = 'AGUARDANDO_CONFIRMACAO_BAIXA';
+    }
+
+    if (nextStatus) {
+      await PaymentBatch.update(
+        {
+          status: nextStatus,
+          ...updatePayload
+        },
+        {
+          where: { id: batchItem.payment_batch_id },
+          transaction
+        }
+      );
+    }
+  }
 }
 
 async function listPaymentsAwaitingBaixaConfirmation(req) {
@@ -116,6 +168,8 @@ async function confirmBaixaFromPaymentIntent(req, id, payload = {}) {
       updated_by: req.user?.id || null
     }, { transaction });
 
+    await recalcularStatusLotePorIntent(intent.id, { transaction });
+
     await PaymentReconciliation.create({
       payment_intent_id: intent.id,
       movimento_financeiro_id: movimento.id,
@@ -143,5 +197,6 @@ async function confirmBaixaFromPaymentIntent(req, id, payload = {}) {
 
 module.exports = {
   confirmBaixaFromPaymentIntent,
-  listPaymentsAwaitingBaixaConfirmation
+  listPaymentsAwaitingBaixaConfirmation,
+  recalcularStatusLotePorIntent
 };
