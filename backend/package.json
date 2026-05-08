@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "node server.js",
     "migrate": "node src/database/runMigrations.js",
-    "test:boleto-caixa": "node scripts/validarBoletoCaixaCalculos.js"
+    "test:boleto-caixa": "node scripts/validarBoletoCaixaCalculos.js",
+    "test:payments": "node scripts/validarPagamentosEngine.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.888.0",

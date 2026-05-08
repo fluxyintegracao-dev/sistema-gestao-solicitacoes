@@ -209,6 +209,7 @@ Fase 6:
 - `node -c` nos services/controllers/rotas de pagamento;
 - carregamento de `backend/src/routes.js`;
 - carregamento de `backend/src/models`;
+- `npm run test:payments` para validar payloads, rotas e guardas criticas do motor de pagamentos sem depender de banco local;
 - `npm run build` no frontend.
 
 Pendente por ambiente local:
