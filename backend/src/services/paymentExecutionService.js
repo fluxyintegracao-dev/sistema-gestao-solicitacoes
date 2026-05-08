@@ -26,13 +26,30 @@ function createHttpError(statusCode, message) {
   return error;
 }
 
-function buildBbNumeroRequisicao(batchId) {
+async function buildBbNumeroRequisicao(batchId) {
   const base = Number(batchId);
-  const numero = Date.now() % 1000000000;
-  if (!Number.isInteger(base) || base <= 0 || !Number.isInteger(numero) || numero <= 0 || numero > 999999999) {
+  if (!Number.isInteger(base) || base <= 0) {
     throw createHttpError(400, 'Nao foi possivel gerar numeroRequisicao unico para o Banco do Brasil.');
   }
-  return numero;
+
+  const transactions = await PaymentTransaction.findAll({
+    where: { payment_batch_id: batchId },
+    attributes: ['request_snapshot'],
+    order: [['createdAt', 'DESC']],
+    limit: 100
+  });
+  const usedNumbers = new Set(
+    transactions
+      .map((transaction) => Number(transaction.request_snapshot?.body?.numeroRequisicao || 0))
+      .filter((number) => Number.isInteger(number) && number > 0)
+  );
+
+  for (let offset = 0; offset < 900000; offset += 1) {
+    const numero = 100000 + ((Date.now() + offset) % 900000);
+    if (!usedNumbers.has(numero)) return numero;
+  }
+
+  throw createHttpError(400, 'Nao foi possivel gerar numeroRequisicao unico para o Banco do Brasil.');
 }
 
 async function ensureNoPendingSendJob(batchId) {
@@ -382,7 +399,7 @@ async function processBbSubmitPixBatchJob(req, jobId) {
   }) + 1;
 
   try {
-    const numeroRequisicaoBb = buildBbNumeroRequisicao(batch.id);
+    const numeroRequisicaoBb = await buildBbNumeroRequisicao(batch.id);
     const providerResult = await bancoDoBrasilSandboxProvider.submitPixBatch(batch, {
       numeroRequisicao: numeroRequisicaoBb
     });

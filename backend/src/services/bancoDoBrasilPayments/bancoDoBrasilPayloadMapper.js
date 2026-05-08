@@ -91,8 +91,8 @@ function resolvePaymentAccount(account = {}) {
 
 function resolveNumeroRequisicao(batch, override) {
   const numero = Number(override || batch?.id);
-  if (!Number.isInteger(numero) || numero <= 0 || numero > 2147483647) {
-    throw createBancoDoBrasilError(400, 'NumeroRequisicao BB precisa ser um inteiro positivo valido.', 'BB_REQUEST_NUMBER_INVALID');
+  if (!Number.isInteger(numero) || numero <= 0 || numero > 999999) {
+    throw createBancoDoBrasilError(400, 'NumeroRequisicao BB precisa ser um inteiro positivo de ate 6 digitos.', 'BB_REQUEST_NUMBER_INVALID');
   }
   return numero;
 }

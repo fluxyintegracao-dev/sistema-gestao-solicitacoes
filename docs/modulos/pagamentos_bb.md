@@ -282,7 +282,7 @@ Numero da requisicao BB:
 
 - `numeroRequisicao` e controlado pelo FLUXY, mas o Banco do Brasil nao permite reutilizar um numero ja recebido;
 - o lote interno do FLUXY mantem seu `id` e `codigo`;
-- no envio real sandbox, o `numeroRequisicao` enviado ao BB e gerado a partir dos ultimos 9 digitos do timestamp em milissegundos, evitando reutilizacao no convenio e mantendo o valor na faixa aceita pelo sandbox;
+- no envio real sandbox, o `numeroRequisicao` enviado ao BB e gerado na faixa de 6 digitos, evitando numeros ja usados no historico local do lote;
 - reprocessar um lote em `FALHA_INTEGRACAO` deve gerar novo `numeroRequisicao`, porque o numero anterior pode ter sido registrado pelo BB mesmo quando a resposta foi `400`;
 - se uma tentativa tiver status externo desconhecido, consultar/sincronizar antes de reenviar para reduzir risco de duplicidade.
 
