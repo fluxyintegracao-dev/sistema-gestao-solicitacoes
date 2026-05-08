@@ -38,6 +38,14 @@ function isLocalOrigin(origin) {
   return /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(String(origin || '').trim());
 }
 
+function createCorsBlockedError(origin) {
+  const error = new Error('Not allowed by CORS');
+  error.statusCode = 403;
+  error.code = 'CORS_ORIGIN_BLOCKED';
+  error.origin = origin;
+  return error;
+}
+
 function shouldForceAttachmentForUploadPath(filePath = '') {
   const extension = String(path.extname(String(filePath || '').split('?')[0]) || '').toLowerCase();
   return dangerousInlineUploadExtensions.has(extension);
@@ -59,7 +67,11 @@ const corsOptions = {
       return callback(null, true);
     }
 
-    return callback(new Error('Not allowed by CORS'));
+    console.warn('[CORS_BLOCKED]', JSON.stringify({
+      origin,
+      allowed_origins_count: allowedOrigins.length
+    }));
+    return callback(createCorsBlockedError(origin));
   },
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token'],
@@ -161,6 +173,17 @@ app.use((err, req, res, next) => {
 });
 
 app.use((err, req, res, next) => {
+  if (err?.code === 'CORS_ORIGIN_BLOCKED') {
+    console.warn('[CORS_BLOCKED_REQUEST]', JSON.stringify({
+      origin: err.origin || req.headers.origin || null,
+      method: req.method,
+      path: req.originalUrl,
+      ip: req.ip,
+      user_agent: req.headers['user-agent'] || null
+    }));
+    return res.status(403).json({ error: 'Origem nao autorizada por CORS.' });
+  }
+
   console.error('Erro nao tratado na API:', err);
   return res.status(500).json({ error: 'Erro interno do servidor.' });
 });
