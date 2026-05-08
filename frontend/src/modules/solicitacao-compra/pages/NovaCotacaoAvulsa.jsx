@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { criarCotacaoAvulsa } from '../../../services/compras';
 import { listarApropriacoes } from '../../../services/apropriacoes';
 import { getObras } from '../../../services/obras';
+import ApropriacaoAutocomplete from '../../../components/ui/ApropriacaoAutocomplete';
 
 let itemIdCounter = 0;
 
@@ -255,18 +256,12 @@ export default function NovaCotacaoAvulsa() {
                         interno
                       </span>
                     </label>
-                    <select
-                      className="input"
+                    <ApropriacaoAutocomplete
                       value={item.apropriacao_id}
-                      onChange={(e) => updateItem(item._id, 'apropriacao_id', e.target.value)}
-                    >
-                      <option value="">Sem apropriacao</option>
-                      {apropriacoes.map((a) => (
-                        <option key={a.id} value={a.id}>
-                          {a.codigo ? `${a.codigo} — ` : ''}{a.nome}
-                        </option>
-                      ))}
-                    </select>
+                      options={apropriacoes}
+                      onChange={(id) => updateItem(item._id, 'apropriacao_id', id)}
+                      placeholder="Sem apropriaçao / buscar..."
+                    />
                   </div>
                 </div>
               </div>
