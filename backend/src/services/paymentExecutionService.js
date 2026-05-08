@@ -23,11 +23,11 @@ function createHttpError(statusCode, message) {
   return error;
 }
 
-function buildBbNumeroRequisicao(batchId, attemptNumber) {
+function buildBbNumeroRequisicao(batchId) {
   const base = Number(batchId);
-  const attempt = Number(attemptNumber);
-  const numero = (base * 1000) + attempt;
-  if (!Number.isInteger(base) || base <= 0 || !Number.isInteger(attempt) || attempt <= 0 || numero > 2147483647) {
+  const timestampPart = Date.now() % 1000000000;
+  const numero = (timestampPart * 10) + (base % 10);
+  if (!Number.isInteger(base) || base <= 0 || !Number.isInteger(numero) || numero <= 0 || numero > 2147483647) {
     throw createHttpError(400, 'Nao foi possivel gerar numeroRequisicao unico para o Banco do Brasil.');
   }
   return numero;
@@ -360,7 +360,7 @@ async function processBbSubmitPixBatchJob(req, jobId) {
   const attemptNumber = await PaymentTransaction.count({
     where: { payment_batch_id: batch.id }
   }) + 1;
-  const numeroRequisicaoBb = buildBbNumeroRequisicao(batch.id, attemptNumber);
+  const numeroRequisicaoBb = buildBbNumeroRequisicao(batch.id);
 
   try {
     const providerResult = await bancoDoBrasilSandboxProvider.submitPixBatch(batch, {
