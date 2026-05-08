@@ -1,5 +1,6 @@
 const { Op } = require('sequelize');
-const { Categoria, Insumo, Unidade } = require('../models');
+const { Categoria, Insumo, Unidade, SolicitacaoCompra, SolicitacaoCompraItem, SolicitacaoCompraRespostaItem } = require('../models');
+const { getUserObraScopeIds } = require('../services/authorizationService');
 
 function parseBoolean(value, fallback) {
   if (typeof value === 'boolean') {
@@ -125,6 +126,52 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return res.status(500).json({ error: 'Erro ao remover insumo' });
+    }
+  },
+
+  async ultimoPreco(req, res) {
+    try {
+      const insumoId = Number(req.params?.id);
+      if (!insumoId) return res.status(400).json({ error: 'ID de insumo invalido' });
+
+      const obraIdsEscopo = await getUserObraScopeIds(req.user);
+
+      const whereCompra = { status: 'ENCERRADO' };
+      if (Array.isArray(obraIdsEscopo)) {
+        if (obraIdsEscopo.length === 0) {
+          return res.json({ last_purchase_price: null });
+        }
+        whereCompra.obra_id = { [Op.in]: obraIdsEscopo };
+      }
+
+      const respostaItem = await SolicitacaoCompraRespostaItem.findOne({
+        where: { vencedor: true, preco: { [Op.not]: null } },
+        include: [{
+          model: SolicitacaoCompraItem,
+          as: 'itemCadastrado',
+          required: true,
+          where: { insumo_id: insumoId },
+          include: [{
+            model: SolicitacaoCompra,
+            as: 'solicitacao',
+            required: true,
+            where: whereCompra,
+            attributes: ['id', 'updatedAt']
+          }]
+        }],
+        order: [[
+          { model: SolicitacaoCompraItem, as: 'itemCadastrado' },
+          { model: SolicitacaoCompra, as: 'solicitacao' },
+          'updatedAt', 'DESC'
+        ]],
+        limit: 1
+      });
+
+      const preco = respostaItem ? Number(respostaItem.preco) : null;
+      return res.json({ last_purchase_price: preco });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao buscar ultimo preco do insumo' });
     }
   },
 

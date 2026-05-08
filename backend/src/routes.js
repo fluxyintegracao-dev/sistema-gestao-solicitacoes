@@ -1162,6 +1162,7 @@ router.put('/compras/categorias/:id', allowBusinessAdmin, CategoriaController.up
 router.delete('/compras/categorias/:id', allowBusinessAdmin, CategoriaController.destroy);
 
 router.get('/compras/insumos', InsumoController.index);
+router.get('/compras/insumos/:id/ultimo-preco', InsumoController.ultimoPreco);
 router.post('/compras/insumos/importar-massa', allowBusinessAdmin, InsumoController.importarEmMassa);
 router.post('/compras/insumos', allowBusinessAdmin, InsumoController.create);
 router.put('/compras/insumos/:id', allowBusinessAdmin, InsumoController.update);

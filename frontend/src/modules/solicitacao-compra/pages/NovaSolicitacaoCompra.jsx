@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   listarInsumos,
+  getUltimoPrecoInsumo,
   obterUrlAssinadaCompra,
   uploadAnexoTemporarioCompra
 } from '../../../services/compras';
@@ -279,7 +280,7 @@ export default function NovaSolicitacaoCompra() {
     [itens]
   );
 
-  function adicionarInsumo(insumo) {
+  async function adicionarInsumo(insumo) {
     if (!obraId) {
       alert('Selecione a obra antes de adicionar itens.');
       return;
@@ -291,13 +292,21 @@ export default function NovaSolicitacaoCompra() {
       return;
     }
 
-    setItens((atual) => [
-      ...atual,
-      {
-        ...criarItemBase(insumo),
-        necessario_para: necessarioPara || ''
+    const novoItem = { ...criarItemBase(insumo), necessario_para: necessarioPara || '', ultimo_preco: null };
+    setItens((atual) => [...atual, novoItem]);
+
+    try {
+      const data = await getUltimoPrecoInsumo(insumo.id);
+      if (data?.last_purchase_price != null) {
+        setItens((atual) => atual.map((it) =>
+          !it.manual && Number(it.insumo_id) === Number(insumo.id)
+            ? { ...it, ultimo_preco: data.last_purchase_price }
+            : it
+        ));
       }
-    ]);
+    } catch {
+      // silencioso — campo de referência, não bloqueia o fluxo
+    }
   }
 
   function adicionarItemManual() {
@@ -877,6 +886,11 @@ export default function NovaSolicitacaoCompra() {
                           disabled={!item.manual}
                           onChange={(event) => atualizarItem(index, 'insumo_nome', event.target.value)}
                         />
+                        {!item.manual && item.ultimo_preco != null && (
+                          <p className="mt-1 text-[11px] text-[var(--c-muted)]">
+                            Últ. compra: <span className="font-semibold text-emerald-700">R$ {Number(item.ultimo_preco).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                          </p>
+                        )}
                       </td>
                       <td>
                         <input

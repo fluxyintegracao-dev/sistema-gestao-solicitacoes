@@ -117,6 +117,13 @@ export async function criarInsumo(data) {
   return handleJsonResponse(response, 'Erro ao criar insumo');
 }
 
+export async function getUltimoPrecoInsumo(id) {
+  const response = await fetch(`${API_URL}/compras/insumos/${id}/ultimo-preco`, {
+    headers: authHeaders()
+  });
+  return handleJsonResponse(response, 'Erro ao buscar ultimo preco do insumo');
+}
+
 export async function atualizarInsumo(id, data) {
   const response = await fetch(`${API_URL}/compras/insumos/${id}`, {
     method: 'PUT',
