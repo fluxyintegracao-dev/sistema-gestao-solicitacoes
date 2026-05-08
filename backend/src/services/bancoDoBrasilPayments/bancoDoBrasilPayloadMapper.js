@@ -20,7 +20,7 @@ function toDdMmYyyyNumber(value, fieldName) {
   if (!match) {
     throw createBancoDoBrasilError(400, `${fieldName} deve estar no formato YYYY-MM-DD.`, 'BB_PAYLOAD_INVALID');
   }
-  return Number(`${Number(match[3])}${Number(match[2])}${match[1]}`);
+  return Number(`${match[3]}${match[2]}${match[1]}`);
 }
 
 function truncate(value, max) {

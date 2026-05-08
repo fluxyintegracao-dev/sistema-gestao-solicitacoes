@@ -277,6 +277,14 @@ Fluxo sandbox real:
 9. status `Pago` vira `AGUARDANDO_CONFIRMACAO_BAIXA`;
 10. baixa continua manual/semiautomatica pelo financeiro.
 
+Formato de data PIX:
+
+- a API BB recebe `listaTransferencias[].data` como inteiro no formato `ddmmaaaa`;
+- por ser inteiro, apenas zero no inicio do numero e omitido;
+- exemplo: `05/11/2020` deve ser enviado como `5112020`;
+- exemplo: `08/05/2026` deve ser enviado como `8052026`;
+- nao remover zeros internos de dia/mes antes de concatenar a data.
+
 Mapeamento de status BB:
 
 - `Consistente`, `Pendente`, `Agendado`, `Debitado` -> `PROCESSANDO_BANCO`

@@ -330,6 +330,7 @@ function validateBancoDoBrasilSandboxProvider() {
   assert.strictEqual(payload.contaCorrenteDebito, onlyDigitsNumber(env.bbContaCorrenteDebito, 98765));
   assert.strictEqual(payload.digitoVerificadorContaCorrente, env.bbDigitoContaCorrenteDebito || 'X');
   assert.strictEqual(payload.tipoPagamento, 126);
+  assert.strictEqual(payload.listaTransferencias[0].data, 8052026);
   assert.strictEqual(payload.listaTransferencias[0].formaIdentificacao, 2);
   assert.strictEqual(payload.listaTransferencias[0].email, 'financeiro@example.com');
   assert.strictEqual(mapPaymentStatus('Pago'), 'AGUARDANDO_CONFIRMACAO_BAIXA');
