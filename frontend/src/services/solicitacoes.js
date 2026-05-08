@@ -1,12 +1,27 @@
 import { API_URL, authHeaders } from './api';
 
+function buildResponseError(status, fallbackMessage, data = null) {
+  const error = new Error(data?.error || fallbackMessage);
+  error.status = Number(status || 0) || 0;
+  error.data = data;
+  return error;
+}
+
+async function parseJsonSafe(response) {
+  try {
+    return await response.json();
+  } catch (_) {
+    return null;
+  }
+}
+
 export async function getSolicitacoes(params = '') {
   const res = await fetch(`${API_URL}/solicitacoes${params}`, {
     headers: authHeaders()
   });
 
   if (!res.ok) {
-    throw new Error('Erro ao buscar solicitações');
+    throw buildResponseError(res.status, 'Erro ao buscar solicitacoes', await parseJsonSafe(res));
   }
 
   return res.json();
@@ -23,7 +38,7 @@ export async function getObrasVisiveisSolicitacoes(params = {}) {
   });
 
   if (!res.ok) {
-    throw new Error('Erro ao buscar obras visiveis das solicitacoes');
+    throw buildResponseError(res.status, 'Erro ao buscar obras visiveis das solicitacoes', await parseJsonSafe(res));
   }
 
   return res.json();
@@ -37,17 +52,8 @@ export async function createSolicitacao(data) {
   });
 
   if (!res.ok) {
-    let mensagem = 'Erro ao criar solicitacao';
-    try {
-      const json = await res.json();
-      mensagem = json?.error || mensagem;
-    } catch (_) {
-      try {
-        const text = await res.text();
-        if (text) mensagem = text;
-      } catch (_) {}
-    }
-    throw new Error(mensagem);
+    const json = await parseJsonSafe(res);
+    throw buildResponseError(res.status, 'Erro ao criar solicitacao', json);
   }
 
   return res.json();
@@ -59,7 +65,19 @@ export async function getSolicitacaoById(id) {
   });
 
   if (!res.ok) {
-    throw new Error('Erro ao buscar solicitação');
+    throw buildResponseError(res.status, 'Erro ao buscar solicitacao', await parseJsonSafe(res));
+  }
+
+  return res.json();
+}
+
+export async function getSolicitacaoResumoLista(id) {
+  const res = await fetch(`${API_URL}/solicitacoes/${id}/resumo-lista`, {
+    headers: authHeaders()
+  });
+
+  if (!res.ok) {
+    throw buildResponseError(res.status, 'Erro ao buscar resumo da solicitacao', await parseJsonSafe(res));
   }
 
   return res.json();
@@ -210,6 +228,3 @@ export async function enviarSolicitacoesParaSetorEmMassa({ solicitacao_ids, seto
 
   return res.json();
 }
-
-
-

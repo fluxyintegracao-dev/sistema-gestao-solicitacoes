@@ -64,6 +64,9 @@ const {
   obterTiposCompartilhadosParaTokens,
   obterAutomacaoStatusCorrespondente
 } = require('../services/solicitacao/configuracoesVisibilidadeAutomacao');
+const {
+  publishSolicitacaoRealtimeEvent
+} = require('../services/solicitacaoRealtimeService');
 
 const CHAVE_AREAS_POR_SETOR_ORIGEM = 'AREAS_POR_SETOR_ORIGEM';
 const CHAVE_SETORES_VISIVEIS_POR_USUARIO = 'SETORES_VISIVEIS_POR_USUARIO';
@@ -167,6 +170,198 @@ async function montarResumoSolicitacoesLista(solicitacoes) {
     .sort((a, b) => (ordemIds.get(Number(a.id)) || 0) - (ordemIds.get(Number(b.id)) || 0));
 }
 
+function buildSolicitacaoResumoListaInclude() {
+  return [
+    {
+      model: Obra,
+      as: 'obra',
+      attributes: ['id', 'nome', 'codigo']
+    },
+    {
+      model: TipoSolicitacao,
+      as: 'tipo',
+      attributes: ['id', 'nome', 'codigo_interno', 'comportamento']
+    },
+    {
+      model: Contrato,
+      as: 'contrato',
+      attributes: ['id', 'codigo', 'ref_contrato']
+    },
+    {
+      model: Apropriacao,
+      as: 'apropriacao',
+      attributes: ['id', 'codigo', 'descricao', 'obra_id']
+    },
+    {
+      model: Parceiro,
+      as: 'parceiro',
+      attributes: ['id', 'nome', 'cpf_cnpj']
+    },
+    {
+      model: TipoSolicitacao,
+      as: 'tipoMacroSolicitacao',
+      attributes: ['id', 'nome', 'codigo_interno', 'comportamento']
+    }
+  ];
+}
+
+async function buscarResumoListaSolicitacaoPorId(id) {
+  const solicitacao = await Solicitacao.findByPk(id, {
+    include: buildSolicitacaoResumoListaInclude()
+  });
+
+  if (!solicitacao) {
+    return null;
+  }
+
+  const resumo = await montarResumoSolicitacoesLista([solicitacao]);
+  return Array.isArray(resumo) && resumo.length > 0 ? resumo[0] : null;
+}
+
+async function verificarAcessoDetalheSolicitacao(req, solicitacao) {
+  const acessoObra = await validarAcessoObra(req, solicitacao);
+  if (!acessoObra) {
+    return {
+      allowed: false,
+      status: 403,
+      error: 'Acesso negado. Vincule o usuario a obra para continuar.'
+    };
+  }
+
+  const areaUsuario = await obterAreaUsuario(req);
+  const tokensSetorUsuario = expandirTokensComAliasesGeo(
+    await obterTokensSetorUsuario(req, areaUsuario)
+  );
+  const perfil = String(req.user?.perfil || '').trim().toUpperCase();
+  const isSetorAdministrativo = tokensSetorUsuario.some(isAdministrativoToken);
+
+  if (isSetorAdministrativo && perfil !== 'SUPERADMIN') {
+    const itemCriadoPeloUsuario = Number(solicitacao.criado_por) === Number(req.user.id);
+    const [historicoResponsavel, mencaoUsuario] = await Promise.all([
+      Historico.findOne({
+        where: {
+          solicitacao_id: solicitacao.id,
+          usuario_responsavel_id: req.user.id,
+          acao: {
+            [Op.in]: ['RESPONSAVEL_ATRIBUIDO', 'RESPONSAVEL_ASSUMIU']
+          }
+        },
+        attributes: ['id']
+      }),
+      NotificacaoDestinatario.findOne({
+        include: [
+          {
+            model: Notificacao,
+            as: 'notificacao',
+            required: true,
+            where: {
+              solicitacao_id: solicitacao.id,
+              tipo: 'MENCAO_COMENTARIO'
+            },
+            attributes: ['id']
+          }
+        ],
+        where: {
+          usuario_id: req.user.id
+        },
+        attributes: ['id']
+      })
+    ]);
+
+    if (!itemCriadoPeloUsuario && !historicoResponsavel && !mencaoUsuario) {
+      return {
+        allowed: false,
+        status: 403,
+        error: 'Acesso negado'
+      };
+    }
+  }
+
+  const isUsuarioGeo = await isUsuarioSetorGeo(req);
+  if (isUsuarioGeo) {
+    const solicitacaoDoSetorUsuario = setorPertenceAoUsuario(
+      tokensSetorUsuario,
+      solicitacao.area_responsavel
+    );
+    const modoRecebimentoGeo = await obterModoRecebimentoPorSetorETipo(
+      tokensSetorUsuario,
+      solicitacao.tipo_solicitacao_id
+    );
+    const itemCriadoPeloUsuario = Number(solicitacao.criado_por) === Number(req.user.id);
+    const [historicoResponsavel, historicoInteracao] = await Promise.all([
+      Historico.findOne({
+        where: {
+          solicitacao_id: solicitacao.id,
+          usuario_responsavel_id: req.user.id,
+          acao: {
+            [Op.in]: ['RESPONSAVEL_ATRIBUIDO', 'RESPONSAVEL_ASSUMIU']
+          }
+        },
+        attributes: ['id']
+      }),
+      Historico.findOne({
+        where: {
+          solicitacao_id: solicitacao.id,
+          usuario_responsavel_id: req.user.id
+        },
+        attributes: ['id']
+      })
+    ]);
+
+    let historicoSetorGeo = false;
+    if (Array.isArray(solicitacao.historicos) && solicitacao.historicos.length > 0) {
+      historicoSetorGeo = solicitacao.historicos.some((item) => {
+        if (isGeoToken(item?.setor)) return true;
+        if (String(item?.acao || '').toUpperCase() !== 'ENVIADA_SETOR') return false;
+        const envio = parseObservacaoEnvioSetor(item?.observacao);
+        return isGeoToken(envio?.origem) || isGeoToken(envio?.destino);
+      });
+    } else {
+      const historicosGeo = await Historico.findAll({
+        where: {
+          solicitacao_id: solicitacao.id,
+          [Op.or]: [
+            { acao: 'ENVIADA_SETOR' },
+            { setor: { [Op.in]: tokensSetorUsuario.filter(isGeoToken) } }
+          ]
+        },
+        attributes: ['acao', 'setor', 'observacao']
+      });
+
+      historicoSetorGeo = historicosGeo.some((item) => {
+        if (isGeoToken(item?.setor)) return true;
+        if (String(item?.acao || '').toUpperCase() !== 'ENVIADA_SETOR') return false;
+        const envio = parseObservacaoEnvioSetor(item?.observacao);
+        return isGeoToken(envio?.origem) || isGeoToken(envio?.destino);
+      });
+    }
+
+    const podeVerPeloModoRecebimento =
+      solicitacaoDoSetorUsuario &&
+      String(modoRecebimentoGeo || '').toUpperCase() === 'TODOS_VISIVEIS';
+
+    if (
+      !itemCriadoPeloUsuario &&
+      !podeVerPeloModoRecebimento &&
+      !historicoResponsavel &&
+      !historicoInteracao &&
+      !historicoSetorGeo
+    ) {
+      return {
+        allowed: false,
+        status: 403,
+        error: 'Acesso negado'
+      };
+    }
+  }
+
+  return {
+    allowed: true,
+    areaUsuario,
+    tokensSetorUsuario
+  };
+}
+
 async function enviarSolicitacaoParaSetorInterno({
   req,
   solicitacao,
@@ -242,6 +437,19 @@ async function enviarSolicitacaoParaSetorInterno({
           setor_destino: setorDestinoPersistido
         }
       });
+
+  await publishSolicitacaoRealtimeEvent({
+    action: 'SENT_TO_SECTOR',
+    solicitacao,
+    actor: {
+      id: usuarioId,
+      nome: req.user?.nome || null
+    },
+    metadata: {
+      setor_origem: setorOrigem,
+      setor_destino: setorDestinoPersistido
+    }
+  });
 
   return { ok: true };
 }
@@ -1187,38 +1395,7 @@ module.exports = {
         5) CONSULTA
       =============================== */
 
-      const includeBase = [
-        {
-          model: Obra,
-          as: 'obra',
-          attributes: ['id', 'nome', 'codigo']
-        },
-        {
-          model: TipoSolicitacao,
-          as: 'tipo',
-          attributes: ['id', 'nome', 'codigo_interno', 'comportamento']
-        },
-        {
-          model: Contrato,
-          as: 'contrato',
-          attributes: ['id', 'codigo', 'ref_contrato']
-        },
-        {
-          model: Apropriacao,
-          as: 'apropriacao',
-          attributes: ['id', 'codigo', 'descricao', 'obra_id']
-        },
-        {
-          model: Parceiro,
-          as: 'parceiro',
-          attributes: ['id', 'nome', 'cpf_cnpj']
-        },
-        {
-          model: TipoSolicitacao,
-          as: 'tipoMacroSolicitacao',
-          attributes: ['id', 'nome', 'codigo_interno', 'comportamento']
-        }
-      ];
+      const includeBase = buildSolicitacaoResumoListaInclude();
 
       let resultado = [];
       let totalRegistros = 0;
@@ -1731,11 +1908,58 @@ module.exports = {
       // Criador ja enxerga
       await garantirVisibilidade(solicitacao.id, usuarioId);
 
+      await publishSolicitacaoRealtimeEvent({
+        action: 'CREATED',
+        solicitacao,
+        actor: {
+          id: usuarioId,
+          nome: usuario?.nome || req.user?.nome || null
+        }
+      });
+
       return res.status(201).json(solicitacao);
 
     } catch (error) {
       console.error(error);
       return res.status(500).json({ error: 'Erro ao criar solicitacao' });
+    }
+  },
+
+  // =====================================================
+  // RESUMO LEVE PARA A LISTA
+  // =====================================================
+  async resumoLista(req, res) {
+    try {
+      const { id } = req.params;
+
+      const solicitacao = await Solicitacao.findByPk(id, {
+        attributes: [
+          'id',
+          'criado_por',
+          'obra_id',
+          'tipo_solicitacao_id',
+          'area_responsavel'
+        ]
+      });
+
+      if (!solicitacao) {
+        return res.status(404).json({ error: 'Solicitacao nao encontrada' });
+      }
+
+      const acesso = await verificarAcessoDetalheSolicitacao(req, solicitacao);
+      if (!acesso.allowed) {
+        return res.status(acesso.status || 403).json({ error: acesso.error || 'Acesso negado' });
+      }
+
+      const resumo = await buscarResumoListaSolicitacaoPorId(id);
+      if (!resumo) {
+        return res.status(404).json({ error: 'Solicitacao nao encontrada' });
+      }
+
+      return res.json(resumo);
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao buscar resumo da solicitacao' });
     }
   },
 
@@ -1834,101 +2058,11 @@ module.exports = {
         });
       }
 
-      const acessoObra = await validarAcessoObra(req, solicitacao);
-      if (!acessoObra) {
-        return res.status(403).json({
-          error: 'Acesso negado. Vincule o usuario a obra para continuar.'
-        });
+      const acesso = await verificarAcessoDetalheSolicitacao(req, solicitacao);
+      if (!acesso.allowed) {
+        return res.status(acesso.status || 403).json({ error: acesso.error || 'Acesso negado' });
       }
-
-      const areaUsuario = await obterAreaUsuario(req);
-      const tokensSetorUsuario = expandirTokensComAliasesGeo(
-        await obterTokensSetorUsuario(req, areaUsuario)
-      );
-      const isSetorAdministrativo = tokensSetorUsuario.some(isAdministrativoToken);
-
-      if (isSetorAdministrativo && String(req.user?.perfil || '').trim().toUpperCase() !== 'SUPERADMIN') {
-        const itemCriadoPeloUsuario = Number(solicitacao.criado_por) === Number(req.user.id);
-        const historicoResponsavel = await Historico.findOne({
-          where: {
-            solicitacao_id: id,
-            usuario_responsavel_id: req.user.id,
-            acao: {
-              [Op.in]: ['RESPONSAVEL_ATRIBUIDO', 'RESPONSAVEL_ASSUMIU']
-            }
-          },
-          attributes: ['id']
-        });
-        const mencaoUsuario = await NotificacaoDestinatario.findOne({
-          include: [
-            {
-              model: Notificacao,
-              as: 'notificacao',
-              required: true,
-              where: {
-                solicitacao_id: id,
-                tipo: 'MENCAO_COMENTARIO'
-              },
-              attributes: ['id']
-            }
-          ],
-          where: {
-            usuario_id: req.user.id
-          },
-          attributes: ['id']
-        });
-
-        if (!itemCriadoPeloUsuario && !historicoResponsavel && !mencaoUsuario) {
-          return res.status(403).json({ error: 'Acesso negado' });
-        }
-      }
-
-      const isUsuarioGeo = await isUsuarioSetorGeo(req);
-      if (isUsuarioGeo) {
-        const areaSolicitacao = String(solicitacao.area_responsavel || '').trim().toUpperCase();
-        const solicitacaoDoSetorUsuario = tokensSetorUsuario.includes(areaSolicitacao);
-        const modoRecebimentoGeo = await obterModoRecebimentoPorSetorETipo(
-          tokensSetorUsuario,
-          solicitacao.tipo_solicitacao_id
-        );
-        const itemCriadoPeloUsuario = Number(solicitacao.criado_por) === Number(req.user.id);
-        const historicoResponsavel = await Historico.findOne({
-          where: {
-            solicitacao_id: id,
-            usuario_responsavel_id: req.user.id,
-            acao: {
-              [Op.in]: ['RESPONSAVEL_ATRIBUIDO', 'RESPONSAVEL_ASSUMIU']
-            }
-          },
-          attributes: ['id']
-        });
-        const historicoInteracao = await Historico.findOne({
-          where: {
-            solicitacao_id: id,
-            usuario_responsavel_id: req.user.id
-          },
-          attributes: ['id']
-        });
-        const historicoSetorGeo = (Array.isArray(solicitacao.historicos) ? solicitacao.historicos : []).some(item => {
-          if (isGeoToken(item?.setor)) return true;
-          if (String(item?.acao || '').toUpperCase() !== 'ENVIADA_SETOR') return false;
-          const envio = parseObservacaoEnvioSetor(item?.observacao);
-          return isGeoToken(envio?.origem) || isGeoToken(envio?.destino);
-        });
-        const podeVerPeloModoRecebimento =
-          solicitacaoDoSetorUsuario &&
-          String(modoRecebimentoGeo || '').toUpperCase() === 'TODOS_VISIVEIS';
-
-        if (
-          !itemCriadoPeloUsuario &&
-          !podeVerPeloModoRecebimento &&
-          !historicoResponsavel &&
-          !historicoInteracao &&
-          !historicoSetorGeo
-        ) {
-          return res.status(403).json({ error: 'Acesso negado' });
-        }
-      }
+      const tokensSetorUsuario = acesso.tokensSetorUsuario || [];
 
       const contextoAprovacaoDiretoria = await obterContextoAprovacaoDiretoria(
         solicitacao,
@@ -2190,6 +2324,19 @@ module.exports = {
         }
       }
 
+      await publishSolicitacaoRealtimeEvent({
+        action: 'STATUS_UPDATED',
+        solicitacao,
+        actor: {
+          id: usuarioId,
+          nome: usuario?.nome || req.user?.nome || null
+        },
+        metadata: {
+          status_anterior: statusAnterior,
+          status_novo: status
+        }
+      });
+
       return res.sendStatus(204);
 
     } catch (error) {
@@ -2244,6 +2391,18 @@ module.exports = {
         tipo: 'NUMERO_PEDIDO_ATUALIZADO',
         mensagem: `${usuario?.nome || 'Usuario'} atualizou o Nº no SIENGE da solicitacao ${solicitacao.codigo}`,
         created_by: req.user.id
+      });
+
+      await publishSolicitacaoRealtimeEvent({
+        action: 'PEDIDO_UPDATED',
+        solicitacao,
+        actor: {
+          id: req.user.id,
+          nome: usuario?.nome || req.user?.nome || null
+        },
+        metadata: {
+          numero_pedido: numero_pedido || null
+        }
       });
 
       return res.sendStatus(204);
@@ -2315,6 +2474,20 @@ module.exports = {
           contrato_codigo: contrato.codigo || null,
           ref_contrato: contrato.ref_contrato || null
         })
+      });
+
+      await publishSolicitacaoRealtimeEvent({
+        action: 'REF_CONTRATO_UPDATED',
+        solicitacao,
+        actor: {
+          id: req.user.id,
+          nome: req.user?.nome || null
+        },
+        metadata: {
+          contrato_id: contrato.id,
+          contrato_codigo: contrato.codigo || null,
+          ref_contrato: contrato.ref_contrato || null
+        }
       });
 
       return res.sendStatus(204);
@@ -2391,6 +2564,19 @@ module.exports = {
         tipo: 'VALOR_ATUALIZADO',
         mensagem: `${usuario?.nome || 'Usuario'} atualizou o valor da solicitacao ${solicitacao.codigo}`,
         created_by: req.user.id,
+        metadata: {
+          valor_anterior: valorAnterior,
+          valor_novo: novoValor
+        }
+      });
+
+      await publishSolicitacaoRealtimeEvent({
+        action: 'VALOR_UPDATED',
+        solicitacao,
+        actor: {
+          id: req.user.id,
+          nome: usuario?.nome || req.user?.nome || null
+        },
         metadata: {
           valor_anterior: valorAnterior,
           valor_novo: novoValor
@@ -2477,6 +2663,19 @@ module.exports = {
         tipo: 'APROVADA_DIRETORIA',
         mensagem: `${req.user?.nome || 'Usuario'} aprovou a solicitacao ${solicitacao.codigo} pela diretoria`,
         created_by: usuarioId,
+        metadata: {
+          diretoria_fluxo_codigo: solicitacao.diretoria_fluxo_codigo,
+          setor_destino_pos_aprovacao: destino
+        }
+      });
+
+      await publishSolicitacaoRealtimeEvent({
+        action: 'APPROVED_DIRETORIA',
+        solicitacao,
+        actor: {
+          id: usuarioId,
+          nome: req.user?.nome || null
+        },
         metadata: {
           diretoria_fluxo_codigo: solicitacao.diretoria_fluxo_codigo,
           setor_destino_pos_aprovacao: destino
@@ -2581,6 +2780,21 @@ module.exports = {
       }, { transaction });
 
       await transaction.commit();
+
+      await publishSolicitacaoRealtimeEvent({
+        action: 'PAYMENT_ADDED',
+        solicitacaoId: solicitacao.id,
+        actor: {
+          id: req.user.id,
+          nome: req.user?.nome || null
+        },
+        metadata: {
+          pagamento_id: pagamento.id,
+          valor: valorPagamento,
+          data_pagamento: dataPagamento,
+          valor_pago_acumulado: novoValorPago
+        }
+      });
 
       return res.status(201).json({
         id: pagamento.id,
@@ -2732,6 +2946,19 @@ module.exports = {
         }
       });
 
+      await publishSolicitacaoRealtimeEvent({
+        action: 'ASSIGNED',
+        solicitacao,
+        actor: {
+          id: req.user.id,
+          nome: usuarioAcao ? usuarioAcao.nome : (req.user?.nome || null)
+        },
+        metadata: {
+          responsavel_id: usuario_responsavel_id,
+          responsavel_nome: usuarioResponsavel ? usuarioResponsavel.nome : null
+        }
+      });
+
       return res.sendStatus(204);
 
     } catch (error) {
@@ -2806,6 +3033,19 @@ module.exports = {
           });
         }
       }
+
+      await publishSolicitacaoRealtimeEvent({
+        action: 'COMMENT_ADDED',
+        solicitacao,
+        actor: {
+          id: req.user.id,
+          nome: usuario?.nome || req.user?.nome || null
+        },
+        extraUserIds: idsMencionados,
+        metadata: {
+          comentario: descricao
+        }
+      });
 
       return res.sendStatus(201);
 
@@ -3096,6 +3336,18 @@ module.exports = {
         throw error;
       }
 
+      await publishSolicitacaoRealtimeEvent({
+        action: 'DELETED',
+        solicitacao,
+        actor: {
+          id: req.user.id,
+          nome: req.user?.nome || null
+        },
+        metadata: {
+          deleted: true
+        }
+      });
+
       return res.sendStatus(204);
     } catch (error) {
       console.error(error);
@@ -3292,6 +3544,15 @@ module.exports = {
         tipo: 'RESPONSAVEL_ASSUMIU',
         mensagem: `${usuarioAcao?.nome || 'Usuario'} assumiu a solicitacao ${solicitacao.codigo}`,
         created_by: usuarioId
+      });
+
+      await publishSolicitacaoRealtimeEvent({
+        action: 'ASSUMED',
+        solicitacao,
+        actor: {
+          id: usuarioId,
+          nome: usuarioAcao ? usuarioAcao.nome : (req.user?.nome || null)
+        }
       });
 
       return res.sendStatus(204);

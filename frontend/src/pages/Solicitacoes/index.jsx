@@ -20,6 +20,7 @@ import { getTiposSolicitacao } from '../../services/tiposSolicitacao';
 import { getSetorPermissoes } from '../../services/setorPermissoes';
 import { getStatusSetor } from '../../services/statusSetor';
 import { useAuth } from '../../contexts/AuthContext';
+import { useLiveUpdateSubscription } from '../../contexts/LiveUpdatesContext';
 import { parseDateSmart } from '../../utils/dateLocal';
 import { isGeoSetor, solicitacaoEstaNoSetorDoUsuario, userHasSetorCapability } from '../../utils/setor';
 import { hasEnabledModule } from '../../utils/acessoProduto';
@@ -27,8 +28,28 @@ import {
   arquivarSolicitacoesEmMassa,
   deleteSolicitacao,
   enviarSolicitacoesParaSetorEmMassa,
+  getSolicitacaoResumoLista,
   getObrasVisiveisSolicitacoes
 } from '../../services/solicitacoes';
+
+function normalizarTextoComparacao(valor) {
+  return String(valor || '')
+    .trim()
+    .toUpperCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+}
+
+function formatarDataParaFiltro(valor) {
+  if (!valor) return '';
+  const data = parseDateSmart(valor) || new Date(valor);
+  if (!data || Number.isNaN(data.getTime())) return '';
+
+  const ano = data.getFullYear();
+  const mes = String(data.getMonth() + 1).padStart(2, '0');
+  const dia = String(data.getDate()).padStart(2, '0');
+  return `${ano}-${mes}-${dia}`;
+}
 
 export default function Solicitacoes({ arquivadas = false }) {
   const DEFAULT_VISIBLE_COLUMNS = [
@@ -79,6 +100,8 @@ export default function Solicitacoes({ arquivadas = false }) {
   });
   const seletorColunasRef = useRef(null);
   const botaoColunasRef = useRef(null);
+  const solicitacoesRef = useRef([]);
+  const localMutationsRef = useRef(new Map());
   const { user } = useAuth();
   const moduloContratosHabilitado = hasEnabledModule(user, 'CONTRATOS');
 
@@ -105,6 +128,10 @@ export default function Solicitacoes({ arquivadas = false }) {
   useEffect(() => {
     setPaginaAtual(1);
   }, [filtros, arquivadas, limitePorPagina]);
+
+  useEffect(() => {
+    solicitacoesRef.current = solicitacoes;
+  }, [solicitacoes]);
 
   useEffect(() => {
     const timeout = setTimeout(() => {
@@ -154,6 +181,10 @@ export default function Solicitacoes({ arquivadas = false }) {
   useEffect(() => {
     carregarObrasOptions();
   }, [arquivadas, user?.id]);
+
+  useEffect(() => {
+    setResponsaveisOptions(extrairOpcoesResponsaveis(solicitacoes));
+  }, [solicitacoes]);
 
   async function carregarTiposSolicitacao() {
     try {
@@ -280,9 +311,249 @@ export default function Solicitacoes({ arquivadas = false }) {
     }
   }
 
-  async function carregar() {
+  function obterIdsFiltro(valor) {
+    return String(valor || '')
+      .split(',')
+      .map((item) => String(item || '').trim())
+      .filter(Boolean);
+  }
+
+  function obterValorListaSolicitacao(item) {
+    const numero = Number(item?.valor_exibicao ?? item?.saldo_pagamento ?? item?.valor);
+    return Number.isFinite(numero) ? numero : null;
+  }
+
+  function solicitacaoAtendeFiltros(item) {
+    if (!item) return false;
+
+    const codigo = String(item?.codigo || '');
+    const numeroSienge = String(item?.numero_sienge || item?.numero_pedido || '');
+    const obraId = String(item?.obra?.id ?? item?.obra_id ?? '');
+    const tipoId = String(item?.tipo?.id ?? item?.tipo_solicitacao_id ?? '');
+    const responsavel = String(item?.responsavel || '');
+    const statusNormalizado = normalizarStatus(item?.status_global || '');
+    const valorSolicitacao = obterValorListaSolicitacao(item);
+    const dataRegistro = formatarDataParaFiltro(item?.createdAt || item?.data_criacao || item?.created_at);
+    const dataVencimento = formatarDataParaFiltro(item?.data_vencimento);
+    const filtrosObras = obterIdsFiltro(filtros.obra_ids);
+    const filtrosTipos = obterIdsFiltro(filtros.tipo_solicitacao_id);
+    const filtrosStatus = obterIdsFiltro(filtros.status).map((valor) => normalizarStatus(valor));
+    const filtrosSetor = obterIdsFiltro(filtros.area).map((valor) => normalizarTextoComparacao(valor));
+    const setorSolicitacao = setoresMap?.[item?.area_responsavel] || null;
+    const tokensSetor = new Set(
+      [
+        item?.area_responsavel,
+        setorSolicitacao?.codigo,
+        setorSolicitacao?.nome,
+        setorSolicitacao?.id
+      ]
+        .map((valor) => normalizarTextoComparacao(valor))
+        .filter(Boolean)
+    );
+
+    if (filtros.codigo && !codigo.toLowerCase().includes(String(filtros.codigo).trim().toLowerCase())) {
+      return false;
+    }
+
+    if (filtros.numero_sienge && !numeroSienge.toLowerCase().includes(String(filtros.numero_sienge).trim().toLowerCase())) {
+      return false;
+    }
+
+    if (filtrosObras.length > 0 && !filtrosObras.includes(obraId)) {
+      return false;
+    }
+
+    if (filtrosSetor.length > 0 && !filtrosSetor.some((token) => tokensSetor.has(token))) {
+      return false;
+    }
+
+    if (filtrosTipos.length > 0 && !filtrosTipos.includes(tipoId)) {
+      return false;
+    }
+
+    if (filtrosStatus.length > 0 && !filtrosStatus.includes(statusNormalizado)) {
+      return false;
+    }
+
+    if (String(filtros.valor_min || '').trim() !== '') {
+      const valorMin = Number(filtros.valor_min);
+      if (!Number.isNaN(valorMin) && (valorSolicitacao === null || valorSolicitacao < valorMin)) {
+        return false;
+      }
+    }
+
+    if (String(filtros.valor_max || '').trim() !== '') {
+      const valorMax = Number(filtros.valor_max);
+      if (!Number.isNaN(valorMax) && (valorSolicitacao === null || valorSolicitacao > valorMax)) {
+        return false;
+      }
+    }
+
+    if (filtros.data_registro && dataRegistro !== filtros.data_registro) {
+      return false;
+    }
+
+    if (filtros.data_vencimento && dataVencimento !== filtros.data_vencimento) {
+      return false;
+    }
+
+    if (filtros.responsavel && !responsavel.toLowerCase().includes(String(filtros.responsavel).trim().toLowerCase())) {
+      return false;
+    }
+
+    return true;
+  }
+
+  function registrarMutacaoLocal(id) {
+    const idNumerico = Number(id);
+    if (!Number.isInteger(idNumerico) || idNumerico <= 0) return;
+    localMutationsRef.current.set(idNumerico, Date.now());
+  }
+
+  function eventoFoiTratadoLocalmente(payload) {
+    const idNumerico = Number(payload?.record_id || 0);
+    if (!Number.isInteger(idNumerico) || idNumerico <= 0) {
+      return false;
+    }
+
+    const actorId = Number(payload?.actor?.id || 0);
+    if (!Number.isInteger(actorId) || actorId <= 0 || actorId !== Number(user?.id || 0)) {
+      return false;
+    }
+
+    const handledAt = localMutationsRef.current.get(idNumerico);
+    if (!handledAt) {
+      return false;
+    }
+
+    if (Date.now() - handledAt > 10 * 1000) {
+      localMutationsRef.current.delete(idNumerico);
+      return false;
+    }
+
+    localMutationsRef.current.delete(idNumerico);
+    return true;
+  }
+
+  function atualizarMetaPaginacaoComDelta(totalDelta = 0) {
+    if (!totalDelta) return;
+
+    setMetaPaginacao((prev) => {
+      const nextTotal = Math.max(0, Number(prev?.total || 0) + Number(totalDelta || 0));
+      const nextLimit = Math.max(1, Number(prev?.limit || limitePorPagina || 25));
+      return {
+        ...prev,
+        total: nextTotal,
+        total_pages: nextTotal > 0 ? Math.ceil(nextTotal / nextLimit) : 0
+      };
+    });
+  }
+
+  function aplicarListaLocal(nextList, { totalDelta = 0 } = {}) {
+    const listaNormalizada = Array.isArray(nextList) ? nextList : [];
+    setSolicitacoes(listaNormalizada);
+    setSelecionadasIds((prev) => prev.filter((idSelecionado) => (
+      listaNormalizada.some((item) => Number(item.id) === Number(idSelecionado))
+    )));
+    atualizarMetaPaginacaoComDelta(totalDelta);
+  }
+
+  function removerSolicitacaoDaLista(id, { decrementarTotal = false } = {}) {
+    const idNumerico = Number(id);
+    if (!Number.isInteger(idNumerico) || idNumerico <= 0) {
+      return;
+    }
+
+    const listaAtual = solicitacoesRef.current;
+    const existeNaLista = listaAtual.some((item) => Number(item.id) === idNumerico);
+    if (!existeNaLista) {
+      return;
+    }
+
+    const proximaLista = listaAtual.filter((item) => Number(item.id) !== idNumerico);
+    aplicarListaLocal(proximaLista, { totalDelta: decrementarTotal ? -1 : 0 });
+  }
+
+  async function atualizarSolicitacaoDaLista(id, { permitirInsercao = false } = {}) {
+    const idNumerico = Number(id);
+    if (!Number.isInteger(idNumerico) || idNumerico <= 0) {
+      return;
+    }
+
+    const listaAtual = solicitacoesRef.current;
+    const indiceAtual = listaAtual.findIndex((item) => Number(item.id) === idNumerico);
+
     try {
-      setLoading(true);
+      const resumo = await getSolicitacaoResumoLista(idNumerico);
+      const atendeFiltros = solicitacaoAtendeFiltros(resumo);
+
+      if (indiceAtual >= 0) {
+        if (!atendeFiltros) {
+          removerSolicitacaoDaLista(idNumerico, { decrementarTotal: true });
+          return;
+        }
+
+        const proximaLista = [...listaAtual];
+        proximaLista[indiceAtual] = resumo;
+        aplicarListaLocal(proximaLista);
+        return;
+      }
+
+      if (!atendeFiltros || !permitirInsercao || arquivadas || paginaAtual !== 1) {
+        return;
+      }
+
+      const proximaLista = [resumo, ...listaAtual]
+        .filter((item, index, array) => (
+          array.findIndex((outro) => Number(outro.id) === Number(item.id)) === index
+        ))
+        .slice(0, limitePorPagina);
+
+      aplicarListaLocal(proximaLista, { totalDelta: 1 });
+    } catch (error) {
+      const status = Number(error?.status || 0);
+      if ((status === 403 || status === 404) && indiceAtual >= 0) {
+        removerSolicitacaoDaLista(idNumerico, { decrementarTotal: true });
+        return;
+      }
+
+      console.error(error);
+    }
+  }
+
+  async function handleAtualizarLista(mutation = null) {
+    if (!mutation || typeof mutation !== 'object') {
+      await carregarEmSegundoPlano();
+      return;
+    }
+
+    const mutationId = Number(mutation.id || 0);
+    if (Number.isInteger(mutationId) && mutationId > 0) {
+      registrarMutacaoLocal(mutationId);
+    }
+
+    if (mutation.type === 'remove_item') {
+      removerSolicitacaoDaLista(mutationId, {
+        decrementarTotal: mutation.decrementarTotal !== false
+      });
+      return;
+    }
+
+    if (mutation.type === 'refresh_item') {
+      await atualizarSolicitacaoDaLista(mutationId, {
+        permitirInsercao: !!mutation.permitirInsercao
+      });
+      return;
+    }
+
+    await carregarEmSegundoPlano();
+  }
+
+  async function carregar({ silent = false } = {}) {
+    try {
+      if (!silent) {
+        setLoading(true);
+      }
 
       const paramsObj = {};
       Object.entries(filtros).forEach(([chave, valor]) => {
@@ -313,7 +584,6 @@ export default function Solicitacoes({ arquivadas = false }) {
           ? data.items
           : [];
       setSolicitacoes(lista);
-      setResponsaveisOptions(extrairOpcoesResponsaveis(lista));
       setObrasOptions(prev => {
         if (prev.length > 0) return prev;
         return extrairOpcoesObras(lista);
@@ -325,12 +595,63 @@ export default function Solicitacoes({ arquivadas = false }) {
         total_pages: Number(data?.meta?.total_pages || (lista.length > 0 ? 1 : 0))
       });
 
-      setSelecionadasIds([]);
+      setSelecionadasIds((prev) => prev.filter((idSelecionado) => (
+        lista.some((item) => Number(item.id) === Number(idSelecionado))
+      )));
     } catch (error) {
       console.error(error);
       alert('Erro ao carregar solicitações');
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function carregarEmSegundoPlano() {
+    try {
+      const paramsObj = {};
+      Object.entries(filtros).forEach(([chave, valor]) => {
+        if (valor !== undefined && valor !== null && String(valor).trim() !== '') {
+          paramsObj[chave] = String(valor).trim();
+        }
+      });
+      if (arquivadas) {
+        paramsObj.arquivadas = '1';
+      }
+      paramsObj.page = String(paginaAtual);
+      paramsObj.limit = String(limitePorPagina);
+
+      const params = new URLSearchParams(paramsObj).toString();
+      const res = await fetch(`${API_URL}/solicitacoes?${params}`, {
+        headers: authHeaders()
+      });
+
+      if (!res.ok) {
+        throw new Error('Erro ao buscar solicitacoes');
+      }
+
+      const data = await res.json();
+      const lista = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.items)
+          ? data.items
+          : [];
+
+      setSolicitacoes(lista);
+      setObrasOptions((prev) => {
+        if (prev.length > 0) return prev;
+        return extrairOpcoesObras(lista);
+      });
+      setMetaPaginacao({
+        page: Number(data?.meta?.page || paginaAtual),
+        limit: Number(data?.meta?.limit || limitePorPagina),
+        total: Number(data?.meta?.total || lista.length),
+        total_pages: Number(data?.meta?.total_pages || (lista.length > 0 ? 1 : 0))
+      });
+      setSelecionadasIds((prev) => prev.filter((idSelecionado) => (
+        lista.some((item) => Number(item.id) === Number(idSelecionado))
+      )));
+    } catch (error) {
+      console.error(error);
     }
   }
 
@@ -487,7 +808,7 @@ export default function Solicitacoes({ arquivadas = false }) {
     try {
       setProcessandoMassa(true);
       const resultado = await arquivarSolicitacoesEmMassa(selecionadasIds);
-      await carregar();
+      await handleAtualizarLista({ type: 'refresh_item', id: selecionadaUnica.id });
       if (resultado?.erros?.length > 0) {
         alert(`Arquivamento em massa concluído. Arquivadas: ${resultado.sucesso}. Falhas: ${resultado.erros.length}.`);
       } else {
@@ -638,7 +959,7 @@ export default function Solicitacoes({ arquivadas = false }) {
       });
       setModalEnvioMassa(false);
       setSetorEnvioMassa('');
-      await carregar();
+      await handleAtualizarLista({ type: 'remove_item', id: selecionadaUnica.id });
       if (resultado?.erros?.length > 0) {
         alert(`Envio em massa concluído. Enviadas: ${resultado.sucesso}. Falhas: ${resultado.erros.length}.`);
       } else {
@@ -726,7 +1047,7 @@ export default function Solicitacoes({ arquivadas = false }) {
       }
 
       alert('Solicitação assumida com sucesso.');
-      await carregar();
+      await handleAtualizarLista({ type: 'refresh_item', id: selecionadaUnica.id });
     } catch (error) {
       console.error(error);
       alert('Erro ao assumir solicitação');
@@ -738,12 +1059,39 @@ export default function Solicitacoes({ arquivadas = false }) {
     if (!confirm('Excluir esta solicitação? Esta ação não pode ser desfeita.')) return;
     try {
       await deleteSolicitacao(selecionadaUnica.id);
-      await carregar();
+      await handleAtualizarLista({ type: 'remove_item', id: selecionadaUnica.id });
     } catch (error) {
       console.error(error);
       alert('Erro ao excluir solicitação');
     }
   }
+
+  useLiveUpdateSubscription({
+    enabled: true,
+    filter: (payload) => String(payload?.entity || '').toUpperCase() === 'SOLICITACAO',
+    onEvent: async (payload) => {
+      if (eventoFoiTratadoLocalmente(payload)) {
+        return;
+      }
+
+      const recordId = Number(payload?.record_id || 0);
+      if (!Number.isInteger(recordId) || recordId <= 0) {
+        return;
+      }
+
+      const action = String(payload?.action || '').trim().toUpperCase();
+      if (action === 'DELETED') {
+        removerSolicitacaoDaLista(recordId, { decrementarTotal: true });
+        return;
+      }
+
+      await atualizarSolicitacaoDaLista(recordId, {
+        permitirInsercao: ['CREATED', 'SENT_TO_SECTOR', 'APPROVED_DIRETORIA'].includes(action)
+      });
+    },
+    fallbackRefresh: carregarEmSegundoPlano,
+    fallbackMs: 45 * 1000
+  });
 
   async function carregarUsuariosAtribuicao() {
     try {
@@ -951,7 +1299,7 @@ export default function Solicitacoes({ arquivadas = false }) {
         <>
           <TabelaSolicitacoes
             solicitacoes={solicitacoes}
-            onAtualizar={carregar}
+            onAtualizar={handleAtualizarLista}
             setoresMap={setoresMap}
             permissaoUsuario={permissaoUsuario}
             mostrarArquivadas={arquivadas}
@@ -1145,7 +1493,9 @@ export default function Solicitacoes({ arquivadas = false }) {
           isSetorObraSolicitacao={isSetorObraSolicitacaoUnica}
           isUsuarioSetorObra={isSetorObra}
           onClose={() => setModalAtribuir(false)}
-          onSucesso={carregar}
+          onSucesso={() => {
+            void handleAtualizarLista({ type: 'refresh_item', id: selecionadaUnica.id });
+          }}
         />
       )}
 
@@ -1153,7 +1503,9 @@ export default function Solicitacoes({ arquivadas = false }) {
         <ModalEnviarSetor
           solicitacaoId={selecionadaUnica.id}
           onClose={() => setModalEnviarUnitario(false)}
-          onSucesso={carregar}
+          onSucesso={() => {
+            void handleAtualizarLista({ type: 'refresh_item', id: selecionadaUnica.id });
+          }}
         />
       )}
 

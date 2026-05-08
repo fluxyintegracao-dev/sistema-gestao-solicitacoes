@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { HiOutlineArrowLeft, HiChevronRight } from 'react-icons/hi2';
 import { useAuth } from '../../contexts/AuthContext';
+import { useLiveUpdateSubscription } from '../../contexts/LiveUpdatesContext';
 
 import Header from './Header';
 import Timeline from './Timeline';
@@ -12,8 +13,11 @@ import FinanceiroCard from './FinanceiroCard';
 import Pagamentos from './Pagamentos';
 import ModalAlterarStatus from './ModalAlterarStatus';
 import ModalEnviarSetor from '../Solicitacoes/ModalEnviarSetor';
-import { aprovarDiretoriaSolicitacao, updateStatusSolicitacao } from '../../services/solicitacoes';
-import { API_URL, authHeaders } from '../../services/api';
+import {
+  aprovarDiretoriaSolicitacao,
+  getSolicitacaoById,
+  updateStatusSolicitacao
+} from '../../services/solicitacoes';
 import { isGeoSetor, solicitacaoEstaNoSetorDoUsuario, userHasSetorCapability } from '../../utils/setor';
 import { canAccessFinanceiro, canDeleteSolicitacaoAnexo, hasEnabledModule } from '../../utils/acessoProduto';
 
@@ -40,6 +44,7 @@ export default function SolicitacaoDetalhe() {
   const [loading, setLoading] = useState(true);
   const [modalStatus, setModalStatus] = useState(false);
   const [modalEnviarSetor, setModalEnviarSetor] = useState(false);
+  const localMutationsRef = useRef(new Map());
 
   const perfil = String(user?.perfil || '').trim().toUpperCase();
   const setorUsuario = user?.setor?.codigo || user?.area || user?.setor?.nome || '';
@@ -54,33 +59,69 @@ export default function SolicitacaoDetalhe() {
     carregar();
   }, [id]);
 
-  async function carregar() {
+  function registrarMutacaoLocal(solicitacaoId) {
+    const idNumerico = Number(solicitacaoId);
+    if (!Number.isInteger(idNumerico) || idNumerico <= 0) return;
+    localMutationsRef.current.set(idNumerico, Date.now());
+  }
+
+  function eventoFoiTratadoLocalmente(payload) {
+    const recordId = Number(payload?.record_id || 0);
+    if (!Number.isInteger(recordId) || recordId <= 0) {
+      return false;
+    }
+
+    const actorId = Number(payload?.actor?.id || 0);
+    if (!Number.isInteger(actorId) || actorId <= 0 || actorId !== Number(user?.id || 0)) {
+      return false;
+    }
+
+    const handledAt = localMutationsRef.current.get(recordId);
+    if (!handledAt) {
+      return false;
+    }
+
+    if (Date.now() - handledAt > 10 * 1000) {
+      localMutationsRef.current.delete(recordId);
+      return false;
+    }
+
+    localMutationsRef.current.delete(recordId);
+    return true;
+  }
+
+  async function carregar({ silent = false } = {}) {
     try {
-      setLoading(true);
-
-      const res = await fetch(`${API_URL}/solicitacoes/${id}`, {
-        headers: authHeaders()
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data?.error || 'Erro ao carregar solicitacao');
+      if (!silent) {
+        setLoading(true);
       }
 
+      const data = await getSolicitacaoById(id);
       setSolicitacao(data);
     } catch (err) {
       console.error(err);
-      alert('Erro ao carregar solicitacao');
+      const status = Number(err?.status || 0);
+      if (status === 403 || status === 404) {
+        setSolicitacao(null);
+        navigate('/solicitacoes');
+        return;
+      }
+      if (!silent) {
+        alert(err?.message || 'Erro ao carregar solicitacao');
+      }
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   }
 
   async function salvarStatus(novoStatus) {
     try {
       await updateStatusSolicitacao(solicitacao.id, novoStatus);
+      registrarMutacaoLocal(solicitacao.id);
       setModalStatus(false);
-      await carregar();
+      await carregar({ silent: true });
       alert('Status alterado com sucesso.');
     } catch (error) {
       console.error(error);
@@ -91,13 +132,37 @@ export default function SolicitacaoDetalhe() {
   async function aprovarDiretoria() {
     try {
       await aprovarDiretoriaSolicitacao(solicitacao.id);
-      await carregar();
+      registrarMutacaoLocal(solicitacao.id);
+      await carregar({ silent: true });
       alert('Solicitacao aprovada pela diretoria.');
     } catch (error) {
       console.error(error);
       alert(error?.message || 'Erro ao aprovar solicitacao pela diretoria');
     }
   }
+
+  useLiveUpdateSubscription({
+    enabled: !!id,
+    filter: (payload) => (
+      String(payload?.entity || '').toUpperCase() === 'SOLICITACAO' &&
+      Number(payload?.record_id || 0) === Number(id || 0)
+    ),
+    onEvent: async (payload) => {
+      if (eventoFoiTratadoLocalmente(payload)) {
+        return;
+      }
+
+      const action = String(payload?.action || '').trim().toUpperCase();
+      if (action === 'DELETED') {
+        navigate('/solicitacoes');
+        return;
+      }
+
+      await carregar({ silent: true });
+    },
+    fallbackRefresh: () => carregar({ silent: true }),
+    fallbackMs: 45 * 1000
+  });
 
   if (loading) return <p>Carregando...</p>;
   if (!solicitacao) return null;
@@ -176,39 +241,57 @@ export default function SolicitacaoDetalhe() {
         <Timeline
           historicos={solicitacao.historicos || []}
           canRemoveAnexo={canDeleteSolicitacaoAnexo(user)}
-          onAnexoRemovido={carregar}
+          onAnexoRemovido={() => {
+            registrarMutacaoLocal(id);
+            void carregar({ silent: true });
+          }}
         />
 
         <div className="space-y-6">
           {isFinanceiro && (
             <FinanceiroCard
               solicitacao={solicitacao}
-              onTituloCriado={carregar}
+              onTituloCriado={() => {
+                registrarMutacaoLocal(id);
+                void carregar({ silent: true });
+              }}
             />
           )}
 
           <Pagamentos
             solicitacao={solicitacao}
             podeInformarPagamento={podeInformarPagamento}
-            onSucesso={carregar}
+            onSucesso={async () => {
+              registrarMutacaoLocal(id);
+              await carregar({ silent: true });
+            }}
           />
 
           <Comentarios
             solicitacaoId={id}
-            onSucesso={carregar}
+            onSucesso={() => {
+              registrarMutacaoLocal(id);
+              void carregar({ silent: true });
+            }}
           />
 
           {isSetorGeo && (
             <Pedido
               solicitacaoId={id}
               numeroPedido={solicitacao.numero_pedido}
-              onSucesso={carregar}
+              onSucesso={() => {
+                registrarMutacaoLocal(id);
+                void carregar({ silent: true });
+              }}
             />
           )}
 
           <Anexos
             solicitacaoId={id}
-            onSucesso={carregar}
+            onSucesso={() => {
+              registrarMutacaoLocal(id);
+              void carregar({ silent: true });
+            }}
           />
         </div>
       </div>
@@ -224,7 +307,10 @@ export default function SolicitacaoDetalhe() {
         <ModalEnviarSetor
           solicitacaoId={solicitacao.id}
           onClose={() => setModalEnviarSetor(false)}
-          onSucesso={carregar}
+          onSucesso={() => {
+            registrarMutacaoLocal(solicitacao.id);
+            void carregar({ silent: true });
+          }}
         />
       )}
     </div>
