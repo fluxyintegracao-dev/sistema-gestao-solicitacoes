@@ -233,6 +233,15 @@ Regras de seguranca:
 - certificado, senha, app key, token e client secret nunca devem ser versionados nem expostos no frontend.
 - snapshots tecnicos sao mascarados antes de gravar em `payment_transactions`.
 
+Certificado A1, CA e TLS:
+
+- o certificado A1 configurado em `BB_CERT_PATH` e a identidade da empresa usada no mTLS com o Banco do Brasil;
+- a cadeia CA/TLS e a cadeia de confianca que o Node usa para validar o certificado apresentado pelo servidor do Banco do Brasil;
+- erro `SELF_SIGNED_CERT_IN_CHAIN` normalmente indica problema de confianca na cadeia TLS do servidor ou ausencia de CA intermediaria/local, nao necessariamente erro no A1;
+- em sandbox, `BB_TLS_REJECT_UNAUTHORIZED=false` pode ser usado temporariamente para teste controlado quando a cadeia do endpoint de homologacao nao for aceita pelo Node;
+- em producao, `BB_TLS_REJECT_UNAUTHORIZED` deve permanecer `true`;
+- se producao apresentar erro de cadeia TLS, a correcao deve ser configurar a cadeia CA correta em `BB_CA_CERT_PATH`, nao relaxar a validacao TLS.
+
 Endpoints BB usados no sandbox:
 
 - `POST /lotes-transferencias-pix`

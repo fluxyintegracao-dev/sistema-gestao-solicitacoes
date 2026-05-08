@@ -60,6 +60,7 @@ Manter documentado:
 ## Documentos Operacionais Importantes
 
 - `docs/arquitetura/deploy_ambientes.md`
+- `docs/arquitetura/promocao_dev_v2_para_main.md`
 - `docs/ROTEIRO_APRESENTACAO_TREINAMENTO_FLUXY.md`
 - `docs/CHECKLIST_IMPLANTACAO_CLIENTE_FLUXY.md`
 - `docs/MANUAL_FLUXO_OPERACIONAL_FINANCEIRO.md`
