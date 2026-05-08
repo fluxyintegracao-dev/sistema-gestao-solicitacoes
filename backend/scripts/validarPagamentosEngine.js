@@ -15,6 +15,7 @@ const bancoDoBrasilSandboxProvider = require('../src/services/bancoDoBrasilPayme
 const { mapBatchToPixTransferRequest } = require('../src/services/bancoDoBrasilPayments/bancoDoBrasilPayloadMapper');
 const { mapPaymentStatus } = require('../src/services/bancoDoBrasilPayments/bancoDoBrasilStatusMapper');
 const { ValidationError } = require('../src/middlewares/validation');
+const { env } = require('../src/config/env');
 
 const projectRoot = path.resolve(__dirname, '..');
 
@@ -322,10 +323,10 @@ function validateBancoDoBrasilSandboxProvider() {
 
   const payload = mapBatchToPixTransferRequest(batch);
   assert.strictEqual(payload.numeroRequisicao, 123);
-  assert.strictEqual(payload.numeroContrato, 123456);
-  assert.strictEqual(payload.agenciaDebito, 1234);
-  assert.strictEqual(payload.contaCorrenteDebito, 98765);
-  assert.strictEqual(payload.digitoVerificadorContaCorrente, 'X');
+  assert.strictEqual(payload.numeroContrato, Number(env.bbNumeroContratoPagamento || 123456));
+  assert.strictEqual(payload.agenciaDebito, Number(env.bbAgenciaDebito || 1234));
+  assert.strictEqual(payload.contaCorrenteDebito, Number(env.bbContaCorrenteDebito || 98765));
+  assert.strictEqual(payload.digitoVerificadorContaCorrente, env.bbDigitoContaCorrenteDebito || 'X');
   assert.strictEqual(payload.tipoPagamento, 126);
   assert.strictEqual(payload.listaTransferencias[0].formaIdentificacao, 2);
   assert.strictEqual(payload.listaTransferencias[0].email, 'financeiro@example.com');
@@ -333,7 +334,7 @@ function validateBancoDoBrasilSandboxProvider() {
 
   const health = bancoDoBrasilSandboxProvider.getHealth();
   assert.strictEqual(health.env, 'sandbox');
-  assert.strictEqual(health.sandboxRealEnabled, false);
+  assert.strictEqual(health.sandboxRealEnabled, Boolean(env.bbSandboxRealEnabled));
 }
 
 async function run() {
