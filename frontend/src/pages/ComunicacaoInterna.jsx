@@ -169,6 +169,7 @@ export default function ComunicacaoInterna() {
   const mensagensContainerRef = useRef(null);
   const inputRef = useRef(null);
   const mensagensRef = useRef([]);
+  const msgElemsRef = useRef({});
 
   const adicionarArquivosConversa = useCallback((files) => {
     const { arquivos: proximoEstado, rejeitados } = concatenarAnexosPendentes(arquivos, files, {
@@ -201,6 +202,19 @@ export default function ComunicacaoInterna() {
     if (typeof window !== 'undefined') {
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
+  }, []);
+
+  const scrollToMessage = useCallback((msgId) => {
+    const el = msgElemsRef.current[Number(msgId)];
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    el.style.transition = 'background-color 0.15s ease';
+    el.style.backgroundColor = 'rgba(74,144,217,0.18)';
+    el.style.borderRadius = '12px';
+    setTimeout(() => {
+      el.style.backgroundColor = '';
+      el.style.borderRadius = '';
+    }, 1400);
   }, []);
 
   useEffect(() => {
@@ -691,7 +705,11 @@ export default function ComunicacaoInterna() {
                     const menuAberto = menuMsgId === msg.id;
                     const vista = euSou && isMensagemVista(msg, participantesLeitura, userId);
                     return (
-                      <div key={msg.id} style={{ display: 'flex', justifyContent: euSou ? 'flex-end' : 'flex-start' }}>
+                      <div
+                        key={msg.id}
+                        ref={(el) => { if (el) msgElemsRef.current[Number(msg.id)] = el; else delete msgElemsRef.current[Number(msg.id)]; }}
+                        style={{ display: 'flex', justifyContent: euSou ? 'flex-end' : 'flex-start' }}
+                      >
                         <div style={{ position: 'relative', maxWidth: '72%' }}>
                           {/* Botão seta — sempre visível */}
                           <button
@@ -761,18 +779,22 @@ export default function ComunicacaoInterna() {
                               <p style={{ fontSize: 11, fontWeight: 700, marginBottom: 2, color: 'var(--c-primary)' }}>{msg.autor?.nome}</p>
                             )}
                             {msg.citacao && (
-                              <div style={{
-                                background: euSou ? 'rgba(0,0,0,0.18)' : 'rgba(0,0,0,0.05)',
-                                borderLeft: `3px solid ${euSou ? 'rgba(255,255,255,0.6)' : 'var(--c-primary)'}`,
-                                borderRadius: '4px 8px 8px 4px',
-                                padding: '5px 10px',
-                                marginBottom: 6,
-                                cursor: 'default'
-                              }}>
-                                <p style={{ fontSize: 11, fontWeight: 700, margin: '0 0 2px', color: euSou ? 'rgba(255,255,255,0.8)' : 'var(--c-primary)' }}>
+                              <div
+                                onClick={() => scrollToMessage(msg.citacao.id)}
+                                style={{
+                                  background: euSou ? 'rgba(0,0,0,0.20)' : 'rgba(37,99,235,0.07)',
+                                  borderLeft: `3px solid ${euSou ? 'rgba(255,255,255,0.55)' : 'var(--c-primary)'}`,
+                                  borderRadius: '4px 8px 8px 4px',
+                                  padding: '5px 10px',
+                                  marginBottom: 6,
+                                  cursor: 'pointer',
+                                  userSelect: 'none'
+                                }}
+                              >
+                                <p style={{ fontSize: 11, fontWeight: 700, margin: '0 0 2px', color: euSou ? 'rgba(255,255,255,0.85)' : 'var(--c-primary)' }}>
                                   {msg.citacao.autor?.nome || 'Mensagem'}
                                 </p>
-                                <p style={{ fontSize: 11, margin: 0, color: euSou ? 'rgba(255,255,255,0.65)' : 'var(--c-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 260 }}>
+                                <p style={{ fontSize: 12, margin: 0, color: euSou ? 'rgba(255,255,255,0.7)' : 'var(--c-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 280 }}>
                                   {msg.citacao.mensagem}
                                 </p>
                               </div>
