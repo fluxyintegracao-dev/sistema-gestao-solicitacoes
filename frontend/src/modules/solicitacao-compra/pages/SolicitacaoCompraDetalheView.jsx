@@ -698,7 +698,8 @@ function SecaoComparativo({ comparativo, solicitacao, podeComprar, vencedoresSel
                       return (
                         <tr
                           key={`${item.id}-${resp.fornecedor_id}`}
-                          className={isVencedor ? 'bg-emerald-50' : ''}
+                          className={`${isVencedor ? 'bg-emerald-50' : ''} ${resp.resposta_item_id && podeComprar && solicitacao.status !== 'ENCERRADO' ? 'cursor-pointer hover:bg-emerald-50/60' : ''}`}
+                          onClick={() => resp.resposta_item_id && podeComprar && solicitacao.status !== 'ENCERRADO' && onVencedorChange(buildItemKey(item), String(resp.resposta_item_id))}
                         >
                           <td className="font-medium">{resp.fornecedor_nome}</td>
                           <td>
