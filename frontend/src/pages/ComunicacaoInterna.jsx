@@ -372,8 +372,8 @@ export default function ComunicacaoInterna() {
         editada_em: null,
         pode_editar: true,
         pode_deletar: true,
-        citacao_id: nova.citacao_id || null,
-        citacao: nova.citacao || null,
+        citacao_id: nova.citacao_id || citacaoAtual?.id || null,
+        citacao: nova.citacao || (citacaoAtual ? { id: citacaoAtual.id, mensagem: citacaoAtual.mensagem, autor: citacaoAtual.autor || null } : null),
         autor: { id: userId, nome: user?.nome },
         anexos: []
       }]);
