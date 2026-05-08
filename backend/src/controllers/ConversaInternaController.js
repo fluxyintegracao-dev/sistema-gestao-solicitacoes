@@ -618,6 +618,25 @@ module.exports = {
       const usuarioId = Number(req.user.id);
       const agora = Date.now();
 
+      const citacaoIds = mensagensOrdenadas
+        .map((m) => m.citacao_id)
+        .filter((v) => v != null);
+
+      const citacoesMap = {};
+      if (citacaoIds.length > 0) {
+        const citadas = await ConversaInternaMensagem.findAll({
+          where: { id: { [Op.in]: citacaoIds } },
+          include: [{ model: User, as: 'autor' }]
+        });
+        for (const c of citadas) {
+          citacoesMap[Number(c.id)] = {
+            id: c.id,
+            mensagem: c.mensagem,
+            autor: c.autor ? { id: c.autor.id, nome: c.autor.nome } : null
+          };
+        }
+      }
+
       const resultado = mensagensOrdenadas.map((m) => {
         const dentroJanela = (agora - new Date(m.createdAt).getTime()) <= JANELA_EDICAO_MS;
         const ehAutor = m.usuario_id === usuarioId;
@@ -636,6 +655,8 @@ module.exports = {
           editada_em: m.editada_em,
           pode_editar: !!podeEditar,
           pode_deletar: !!podeDeletar,
+          citacao_id: m.citacao_id || null,
+          citacao: m.citacao_id ? (citacoesMap[Number(m.citacao_id)] || null) : null,
           autor: m.autor,
           anexos: anexosPorMensagem[m.id] || []
         };
@@ -708,12 +729,15 @@ module.exports = {
         return res.status(400).json({ error: 'Mensagem ou anexo obrigatorio' });
       }
 
+      const citacaoId = req.body?.citacao_id ? Number(req.body.citacao_id) : null;
+
       const remetente = await User.findByPk(req.user.id, { attributes: ['nome'] });
 
       const nova = await ConversaInternaMensagem.create({
         conversa_id: id,
         usuario_id: req.user.id,
-        mensagem: mensagem || '[Anexo enviado]'
+        mensagem: mensagem || '[Anexo enviado]',
+        citacao_id: citacaoId || null
       });
 
       await salvarAnexosMensagem({ conversaId: id, mensagemId: nova.id, files: req.files });
@@ -725,11 +749,27 @@ module.exports = {
         { where: { conversa_id: id, usuario_id: req.user.id } }
       );
 
+      let citacaoData = null;
+      if (citacaoId) {
+        const citada = await ConversaInternaMensagem.findByPk(citacaoId, {
+          include: [{ model: User, as: 'autor' }]
+        });
+        if (citada) {
+          citacaoData = {
+            id: citada.id,
+            mensagem: citada.mensagem,
+            autor: citada.autor ? { id: citada.autor.id, nome: citada.autor.nome } : null
+          };
+        }
+      }
+
       return res.status(201).json({
         id: nova.id,
         mensagem: nova.mensagem,
         createdAt: nova.createdAt,
-        usuario_id: nova.usuario_id
+        usuario_id: nova.usuario_id,
+        citacao_id: nova.citacao_id || null,
+        citacao: citacaoData
       });
     } catch (error) {
       console.error(error);
