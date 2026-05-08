@@ -286,6 +286,8 @@ async function validateBancoDoBrasilProvider() {
 }
 
 function validateBancoDoBrasilSandboxProvider() {
+  const onlyDigitsNumber = (value, fallback) => Number(String(value || fallback).replace(/\D/g, ''));
+
   const batch = {
     id: 123,
     codigo: 'PAY-20260508',
@@ -323,9 +325,9 @@ function validateBancoDoBrasilSandboxProvider() {
 
   const payload = mapBatchToPixTransferRequest(batch);
   assert.strictEqual(payload.numeroRequisicao, 123);
-  assert.strictEqual(payload.numeroContrato, Number(env.bbNumeroContratoPagamento || 123456));
-  assert.strictEqual(payload.agenciaDebito, Number(env.bbAgenciaDebito || 1234));
-  assert.strictEqual(payload.contaCorrenteDebito, Number(env.bbContaCorrenteDebito || 98765));
+  assert.strictEqual(payload.numeroContrato, onlyDigitsNumber(env.bbNumeroContratoPagamento, 123456));
+  assert.strictEqual(payload.agenciaDebito, onlyDigitsNumber(env.bbAgenciaDebito, 1234));
+  assert.strictEqual(payload.contaCorrenteDebito, onlyDigitsNumber(env.bbContaCorrenteDebito, 98765));
   assert.strictEqual(payload.digitoVerificadorContaCorrente, env.bbDigitoContaCorrenteDebito || 'X');
   assert.strictEqual(payload.tipoPagamento, 126);
   assert.strictEqual(payload.listaTransferencias[0].formaIdentificacao, 2);
