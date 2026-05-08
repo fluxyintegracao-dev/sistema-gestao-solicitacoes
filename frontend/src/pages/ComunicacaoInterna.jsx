@@ -792,15 +792,15 @@ export default function ComunicacaoInterna() {
                                   overflow: 'hidden'
                                 }}
                               >
-                                <p style={{ fontSize: 11, fontWeight: 600, margin: '0 0 3px', color: euSou ? 'rgba(255,255,255,0.7)' : 'var(--c-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4 }}>
-                                  <span style={{ fontWeight: 700, color: euSou ? 'rgba(255,255,255,0.95)' : 'var(--c-primary)' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2, overflow: 'hidden' }}>
+                                  <span style={{ fontSize: 11, fontWeight: 700, color: euSou ? 'rgba(255,255,255,0.95)' : 'var(--c-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                     {euSou ? 'Você' : (msg.autor?.nome || 'Alguém')}
                                   </span>
-                                  <span>↩</span>
-                                  <span style={{ fontWeight: 700, color: euSou ? 'rgba(255,255,255,0.85)' : 'var(--c-text)' }}>
+                                  <span style={{ fontSize: 10, color: euSou ? 'rgba(255,255,255,0.55)' : 'var(--c-muted)', flexShrink: 0 }}>respondeu</span>
+                                  <span style={{ fontSize: 11, fontWeight: 700, color: euSou ? 'rgba(255,255,255,0.85)' : 'var(--c-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                     {msg.citacao.autor?.nome || 'Mensagem'}
                                   </span>
-                                </p>
+                                </div>
                                 <p style={{ fontSize: 12, margin: 0, color: euSou ? 'rgba(255,255,255,0.78)' : 'var(--c-text)', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
                                   {msg.citacao.mensagem}
                                 </p>
