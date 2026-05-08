@@ -63,6 +63,7 @@ A baixa e semiautomatica:
 - job persistente em `payment_jobs`;
 - provider Banco do Brasil em modo `MOCK_HOMOLOGACAO`;
 - simulacao de confirmacao/rejeicao bancaria;
+- cancelamento auditavel de lote antes do envio ao banco, liberando as intents para nova tentativa;
 - baixa manual confirmada pelo financeiro apos confirmacao bancaria;
 - criacao de `movimentos_financeiros` somente no clique de confirmar baixa;
 - vinculo em `payment_reconciliations`.
@@ -74,6 +75,7 @@ A baixa e semiautomatica:
 - criacao de lote;
 - revisao de lote com status por item;
 - aprovacao, rejeicao, envio mockado e simulacao de retorno;
+- cancelamento de lote nos status anteriores ao envio bancario;
 - tela de pagamentos aguardando baixa;
 - bloco "Pagamentos bancarios" no detalhe do titulo;
 - secao "Dados para pagamento do credor" na criacao de titulo a pagar;

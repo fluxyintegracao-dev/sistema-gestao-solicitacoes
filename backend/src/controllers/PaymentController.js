@@ -1,4 +1,5 @@
 const {
+  cancelBatch,
   createBatchFromTitulos,
   getBatchDetail,
   listBatches,
@@ -97,6 +98,16 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return responderErro(res, error, 'Erro ao rejeitar lote de pagamento');
+    }
+  },
+
+  async cancelarLote(req, res) {
+    try {
+      const data = await cancelBatch(req, req.params.id, req.body || {});
+      return res.json(data);
+    } catch (error) {
+      console.error(error);
+      return responderErro(res, error, 'Erro ao cancelar lote de pagamento');
     }
   },
 

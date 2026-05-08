@@ -112,6 +112,13 @@ function validatePaymentMfaBody(payload = {}) {
   });
 }
 
+function validatePaymentCancelBody(payload = {}) {
+  ensureAllowedKeys(payload, ['justificativa'], 'Cancelamento de lote');
+  return cleanUndefined({
+    justificativa: parseOptionalText(payload.justificativa, 'Justificativa', 500)
+  });
+}
+
 function validatePaymentAccountBody(payload = {}) {
   ensureAllowedKeys(payload, [
     'conta_bancaria_id',
@@ -146,5 +153,6 @@ module.exports = {
   validatePaymentBatchCreateBody,
   validatePaymentBeneficiaryCreateBody,
   validatePaymentBeneficiaryUpdateBody,
+  validatePaymentCancelBody,
   validatePaymentMfaBody
 };

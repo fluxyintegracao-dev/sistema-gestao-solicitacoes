@@ -382,6 +382,76 @@ async function submitBatchForApproval(req, id) {
   return getBatchDetail(req, id);
 }
 
+async function cancelBatch(req, id, payload = {}) {
+  const motivo = String(payload.justificativa || '').trim() || 'Lote cancelado pela operacao financeira.';
+
+  await sequelize.transaction(async (transaction) => {
+    const batch = await PaymentBatch.findByPk(id, {
+      include: [{ model: PaymentBatchItem, as: 'items' }],
+      transaction,
+      lock: transaction.LOCK.UPDATE
+    });
+
+    if (!batch) throw createHttpError(404, 'Lote de pagamento nao encontrado.');
+
+    const statusAtual = String(batch.status || '').toUpperCase();
+    const cancelableStatuses = ['RASCUNHO', 'EM_REVISAO', 'PENDENTE_APROVACAO', 'APROVADO'];
+    if (!cancelableStatuses.includes(statusAtual)) {
+      throw createHttpError(400, 'Lote nao pode ser cancelado neste status.');
+    }
+
+    const intentIds = (batch.items || []).map((item) => item.payment_intent_id);
+
+    await batch.update({
+      status: 'CANCELADO',
+      aprovacao_status: statusAtual === 'PENDENTE_APROVACAO' || statusAtual === 'APROVADO'
+        ? 'CANCELADO'
+        : batch.aprovacao_status,
+      closed_at: new Date()
+    }, { transaction });
+
+    if (intentIds.length) {
+      await PaymentIntent.update(
+        {
+          status: 'CANCELADO',
+          cancelado_em: new Date(),
+          motivo_cancelamento: motivo,
+          updated_by: req.user?.id || null
+        },
+        {
+          where: { id: { [Op.in]: intentIds } },
+          transaction
+        }
+      );
+
+      await PaymentBatchItem.update(
+        {
+          status: 'CANCELADO',
+          erro_codigo: 'CANCELADO_OPERACAO',
+          erro_mensagem: motivo
+        },
+        {
+          where: { payment_batch_id: batch.id },
+          transaction
+        }
+      );
+    }
+  });
+
+  await registrarEventoSeguranca({
+    req,
+    usuarioId: req.user?.id || null,
+    tipoEvento: 'PAYMENT_BATCH_CANCELLED',
+    recursoTipo: 'PAYMENT_BATCH',
+    recursoId: id,
+    status: 'SUCCESS',
+    descricao: 'Lote de pagamento cancelado antes do envio ao banco',
+    metadata: { justificativa: motivo }
+  });
+
+  return getBatchDetail(req, id);
+}
+
 async function listPaymentAccounts(req) {
   return PaymentAccount.findAll({
     include: [
@@ -399,6 +469,7 @@ async function listProviders(req) {
 }
 
 module.exports = {
+  cancelBatch,
   createBatchFromTitulos,
   getBatchDetail,
   listBatches,

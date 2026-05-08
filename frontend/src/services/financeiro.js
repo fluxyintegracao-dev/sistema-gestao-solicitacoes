@@ -540,6 +540,16 @@ export async function rejeitarPaymentBatch(id, data = {}) {
   return parseJson(response, 'Erro ao rejeitar lote de pagamento');
 }
 
+export async function cancelarPaymentBatch(id, data = {}) {
+  const response = await fetch(`${API_URL}/financeiro/pagamentos/lotes/${id}/cancelar`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+
+  return parseJson(response, 'Erro ao cancelar lote de pagamento');
+}
+
 export async function enviarPaymentBatchBanco(id, data) {
   const response = await fetch(`${API_URL}/financeiro/pagamentos/lotes/${id}/enviar-banco`, {
     method: 'POST',

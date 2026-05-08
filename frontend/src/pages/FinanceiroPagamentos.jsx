@@ -11,6 +11,7 @@ import {
 } from 'react-icons/hi2';
 import {
   aprovarPaymentBatch,
+  cancelarPaymentBatch,
   confirmarBaixaPaymentIntent,
   criarPaymentBatch,
   enviarPaymentBatchBanco,
@@ -26,6 +27,7 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 import {
   canApprovePagamentos,
+  canCancelPagamentos,
   canConfirmarBaixaPagamento,
   canPreparePagamentos,
   canSendPagamentosBanco
@@ -117,6 +119,7 @@ export default function FinanceiroPagamentos() {
   const canPrepare = useMemo(() => canPreparePagamentos(user), [user]);
   const canApprove = useMemo(() => canApprovePagamentos(user), [user]);
   const canSend = useMemo(() => canSendPagamentosBanco(user), [user]);
+  const canCancel = useMemo(() => canCancelPagamentos(user), [user]);
   const canConfirmBaixa = useMemo(() => canConfirmarBaixaPagamento(user), [user]);
 
   async function loadBase() {
@@ -247,6 +250,15 @@ export default function FinanceiroPagamentos() {
     } finally {
       setActionLoading('');
     }
+  }
+
+  function handleCancelBatch() {
+    if (!selectedBatch?.id) return;
+    const justificativa = window.prompt('Informe o motivo do cancelamento do lote:');
+    if (justificativa === null) return;
+    runBatchAction('cancelar', (id) => cancelarPaymentBatch(id, {
+      justificativa: justificativa.trim() || 'Cancelado pela operacao financeira.'
+    }));
   }
 
   return (
@@ -470,6 +482,10 @@ export default function FinanceiroPagamentos() {
                         <button type="button" className="btn btn-outline" onClick={() => runBatchAction('rejeitar', (id) => rejeitarPaymentBatch(id, { justificativa: 'Rejeitado pela operacao financeira.' }))} disabled={!canApprove || !['PENDENTE_APROVACAO', 'APROVADO'].includes(selectedBatch.status) || actionLoading === 'rejeitar'}>
                           <HiOutlineXCircle className="h-4 w-4" />
                           Rejeitar
+                        </button>
+                        <button type="button" className="btn btn-outline" onClick={handleCancelBatch} disabled={!canCancel || !['RASCUNHO', 'EM_REVISAO', 'PENDENTE_APROVACAO', 'APROVADO'].includes(selectedBatch.status) || actionLoading === 'cancelar'}>
+                          <HiOutlineXCircle className="h-4 w-4" />
+                          Cancelar
                         </button>
                         <button type="button" className="btn btn-primary" onClick={() => runBatchAction('enviar', (id) => enviarPaymentBatchBanco(id, { codigo_mfa: mfaCode }))} disabled={!canSend || selectedBatch.status !== 'APROVADO' || !mfaCode || actionLoading === 'enviar'}>
                           <HiOutlinePaperAirplane className="h-4 w-4" />
