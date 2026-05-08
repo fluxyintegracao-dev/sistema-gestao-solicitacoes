@@ -292,12 +292,14 @@ export default function FinanceiroTitulos() {
   }
 
   function setTipoFiltro(tipo) {
-    setDraftFilters((current) => ({
-      ...current,
-      tipo,
-      parceiro_id: '',
-      categoria_financeira_id: ''
-    }));
+    setDraftFilters({
+      ...getDefaultFilters(),
+      tipo
+    });
+    setAppliedFilters(null);
+    setTitulos([]);
+    setLoading(false);
+    setError('');
   }
 
   function submitFilters(event) {
@@ -524,6 +526,9 @@ export default function FinanceiroTitulos() {
             <HiOutlineDocumentChartBar className="h-4 w-4" />
             Relatorios
           </Link>
+          <Link to="/financeiro/baixas" className="btn btn-outline btn-sm">
+            Baixas
+          </Link>
           <Link to="/financeiro/conciliacao" className="btn btn-outline btn-sm">
             Conciliacao OFX
           </Link>
@@ -717,6 +722,7 @@ export default function FinanceiroTitulos() {
           </div>
           <div className="flex flex-wrap gap-2">
             <Link to="/financeiro/cadastros" className="btn btn-outline btn-sm">Cadastros</Link>
+            <Link to="/financeiro/baixas" className="btn btn-outline btn-sm">Baixas</Link>
             <Link to="/financeiro/relatorios" className="btn btn-outline btn-sm">Gerar relatorio</Link>
           </div>
         </div>

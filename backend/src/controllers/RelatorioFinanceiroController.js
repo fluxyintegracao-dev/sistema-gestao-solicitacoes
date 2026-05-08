@@ -1,4 +1,7 @@
-const { gerarRelatorioFluxoCaixa } = require('../services/relatorioFinanceiroService');
+const {
+  gerarRelatorioAnalitico,
+  gerarRelatorioFluxoCaixa
+} = require('../services/relatorioFinanceiroService');
 const { responderErroController } = require('../utils/controllerError');
 
 function responderErro(res, error, fallbackMessage) {
@@ -13,6 +16,16 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return responderErro(res, error, 'Erro ao gerar relatorio de fluxo de caixa');
+    }
+  },
+
+  async analitico(req, res) {
+    try {
+      const relatorio = await gerarRelatorioAnalitico(req, req.query || {});
+      return res.json(relatorio);
+    } catch (error) {
+      console.error(error);
+      return responderErro(res, error, 'Erro ao gerar relatorio analitico financeiro');
     }
   }
 };

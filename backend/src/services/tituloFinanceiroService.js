@@ -553,6 +553,139 @@ async function listarTitulos(req, filters = {}) {
   });
 }
 
+async function listarBaixasRealizadas(req, filters = {}) {
+  await assertFinanceAccess(req);
+
+  const obrasPermitidas = await getFinanceiroObraScopeIds(req.user);
+  const obraFiltro = Number(filters.obra_id);
+  const tituloWhere = {};
+  const movimentoWhere = {
+    tipo_movimento: 'BAIXA'
+  };
+
+  if (obrasPermitidas === null) {
+    if (obraFiltro) {
+      tituloWhere.obra_id = obraFiltro;
+    }
+  } else if (obrasPermitidas.length > 0) {
+    if (obraFiltro && !obrasPermitidas.includes(obraFiltro)) {
+      await assertObraScope(
+        req,
+        obraFiltro,
+        'MOVIMENTO_FINANCEIRO',
+        null,
+        'Usuario tentou listar baixas financeiras de obra fora do seu escopo'
+      );
+    }
+
+    tituloWhere.obra_id = obraFiltro || { [Op.in]: obrasPermitidas };
+  } else {
+    if (obraFiltro) {
+      await assertObraScope(
+        req,
+        obraFiltro,
+        'MOVIMENTO_FINANCEIRO',
+        null,
+        'Usuario tentou listar baixas financeiras sem vinculo de obra'
+      );
+    }
+    return [];
+  }
+
+  if (filters.tipo) {
+    tituloWhere.tipo = filters.tipo;
+  }
+  if (filters.parceiro_id) {
+    tituloWhere.parceiro_id = Number(filters.parceiro_id);
+  }
+  if (filters.categoria_financeira_id) {
+    tituloWhere.categoria_financeira_id = Number(filters.categoria_financeira_id);
+  }
+  if (filters.conta_bancaria_id) {
+    movimentoWhere.conta_bancaria_id = Number(filters.conta_bancaria_id);
+  }
+
+  const statusMovimento = String(filters.status_movimento || 'ATIVO').toUpperCase();
+  if (statusMovimento && statusMovimento !== 'TODOS') {
+    movimentoWhere.status = statusMovimento;
+  }
+
+  if (filters.data_inicial || filters.data_final) {
+    movimentoWhere.data_movimento = {};
+    if (filters.data_inicial) {
+      movimentoWhere.data_movimento[Op.gte] = filters.data_inicial;
+    }
+    if (filters.data_final) {
+      movimentoWhere.data_movimento[Op.lte] = filters.data_final;
+    }
+  }
+
+  if (filters.q) {
+    const term = String(filters.q).trim();
+    movimentoWhere[Op.or] = [
+      { documento_referencia: { [Op.like]: `%${term}%` } },
+      { observacoes: { [Op.like]: `%${term}%` } },
+      { '$titulo.codigo$': { [Op.like]: `%${term}%` } },
+      { '$titulo.descricao$': { [Op.like]: `%${term}%` } },
+      { '$titulo.numero_documento$': { [Op.like]: `%${term}%` } },
+      { '$titulo.parceiro.nome$': { [Op.like]: `%${term}%` } },
+      { '$titulo.parceiro.cpf_cnpj$': { [Op.like]: `%${term}%` } },
+      { '$titulo.obra.nome$': { [Op.like]: `%${term}%` } },
+      { '$titulo.obra.codigo$': { [Op.like]: `%${term}%` } }
+    ];
+  }
+
+  return MovimentoFinanceiro.findAll({
+    where: movimentoWhere,
+    include: [
+      {
+        model: TituloFinanceiro,
+        as: 'titulo',
+        required: true,
+        where: tituloWhere,
+        include: [
+          {
+            model: Obra,
+            as: 'obra',
+            attributes: ['id', 'nome', 'codigo']
+          },
+          {
+            model: Parceiro,
+            as: 'parceiro',
+            attributes: ['id', 'nome', 'cpf_cnpj']
+          },
+          {
+            model: CategoriaFinanceira,
+            as: 'categoriaFinanceira',
+            attributes: ['id', 'nome', 'tipo']
+          }
+        ]
+      },
+      {
+        model: ContaBancaria,
+        as: 'contaBancaria',
+        attributes: ['id', 'nome', 'banco', 'agencia', 'conta']
+      },
+      {
+        model: User,
+        as: 'criadoPor',
+        attributes: ['id', 'nome', 'email']
+      },
+      {
+        model: User,
+        as: 'estornadoPor',
+        attributes: ['id', 'nome', 'email']
+      }
+    ],
+    order: [
+      ['data_movimento', 'DESC'],
+      ['createdAt', 'DESC']
+    ],
+    limit: Number(filters.limit || 200),
+    subQuery: false
+  });
+}
+
 async function listarTitulosPorSolicitacao(req, solicitacaoId) {
   await assertFinanceAccess(req);
   const solicitacao = await carregarSolicitacaoFinanceira(req, solicitacaoId);
@@ -1253,6 +1386,7 @@ module.exports = {
   criarTituloPorSolicitacao,
   estornarMovimentoTitulo,
   listarAuditoriaTitulo,
+  listarBaixasRealizadas,
   listarTitulos,
   listarTitulosPorSolicitacao
 };

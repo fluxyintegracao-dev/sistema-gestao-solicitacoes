@@ -1,6 +1,11 @@
 const { Op } = require('sequelize');
 const {
+  CategoriaFinanceira,
+  ContaBancaria,
   MovimentoFinanceiro,
+  Obra,
+  Parceiro,
+  User,
   TituloFinanceiro
 } = require('../models');
 const {
@@ -460,6 +465,261 @@ async function gerarRelatorioFluxoCaixa(req, filters = {}) {
   };
 }
 
+async function gerarRelatorioAnalitico(req, filters = {}) {
+  const obraWhere = await resolveObraScope(req, filters.obra_id);
+  if (obraWhere === null) {
+    return {
+      filtros: filters,
+      resumo: {
+        quantidade_linhas: 0,
+        titulos: 0,
+        movimentos: 0,
+        total_original: 0,
+        total_saldo: 0,
+        total_baixado: 0,
+        total_quitacao: 0,
+        total_juros: 0,
+        total_multa: 0,
+        total_desconto: 0
+      },
+      linhas: []
+    };
+  }
+
+  const tituloWhere = {
+    ...obraWhere
+  };
+  const movimentoWhere = {};
+
+  if (filters.tipo) {
+    tituloWhere.tipo = filters.tipo;
+  }
+  if (filters.status_titulo) {
+    tituloWhere.status = filters.status_titulo;
+  }
+  if (filters.parceiro_id) {
+    tituloWhere.parceiro_id = Number(filters.parceiro_id);
+  }
+  if (filters.categoria_financeira_id) {
+    tituloWhere.categoria_financeira_id = Number(filters.categoria_financeira_id);
+  }
+  if (filters.vencimento_inicial || filters.vencimento_final) {
+    tituloWhere.data_vencimento = {};
+    if (filters.vencimento_inicial) {
+      tituloWhere.data_vencimento[Op.gte] = filters.vencimento_inicial;
+    }
+    if (filters.vencimento_final) {
+      tituloWhere.data_vencimento[Op.lte] = filters.vencimento_final;
+    }
+  }
+  if (filters.q) {
+    const term = String(filters.q).trim();
+    tituloWhere[Op.or] = [
+      { codigo: { [Op.like]: `%${term}%` } },
+      { descricao: { [Op.like]: `%${term}%` } },
+      { numero_documento: { [Op.like]: `%${term}%` } },
+      { '$parceiro.nome$': { [Op.like]: `%${term}%` } },
+      { '$parceiro.cpf_cnpj$': { [Op.like]: `%${term}%` } },
+      { '$obra.nome$': { [Op.like]: `%${term}%` } },
+      { '$obra.codigo$': { [Op.like]: `%${term}%` } }
+    ];
+  }
+
+  const statusMovimento = String(filters.status_movimento || 'TODOS').toUpperCase();
+  const buscarSemBaixa = statusMovimento === 'SEM_BAIXA';
+  if (statusMovimento && !['TODOS', 'SEM_BAIXA'].includes(statusMovimento)) {
+    movimentoWhere.status = statusMovimento;
+  }
+  if (filters.conta_bancaria_id) {
+    movimentoWhere.conta_bancaria_id = Number(filters.conta_bancaria_id);
+  }
+  if (filters.data_inicial || filters.data_final) {
+    movimentoWhere.data_movimento = {};
+    if (filters.data_inicial) {
+      movimentoWhere.data_movimento[Op.gte] = filters.data_inicial;
+    }
+    if (filters.data_final) {
+      movimentoWhere.data_movimento[Op.lte] = filters.data_final;
+    }
+  }
+
+  const hasMovimentoFilter = Object.keys(movimentoWhere).length > 0;
+  const titulos = await TituloFinanceiro.findAll({
+    where: tituloWhere,
+    include: [
+      {
+        model: Obra,
+        as: 'obra',
+        attributes: ['id', 'nome', 'codigo']
+      },
+      {
+        model: Parceiro,
+        as: 'parceiro',
+        attributes: ['id', 'nome', 'cpf_cnpj']
+      },
+      {
+        model: CategoriaFinanceira,
+        as: 'categoriaFinanceira',
+        attributes: ['id', 'nome', 'tipo']
+      },
+      {
+        model: MovimentoFinanceiro,
+        as: 'movimentos',
+        required: hasMovimentoFilter && !buscarSemBaixa,
+        where: hasMovimentoFilter && !buscarSemBaixa ? movimentoWhere : undefined,
+        include: [
+          {
+            model: ContaBancaria,
+            as: 'contaBancaria',
+            attributes: ['id', 'nome', 'banco', 'agencia', 'conta']
+          },
+          {
+            model: User,
+            as: 'criadoPor',
+            attributes: ['id', 'nome', 'email']
+          }
+        ]
+      }
+    ],
+    order: [
+      ['data_vencimento', 'ASC'],
+      ['createdAt', 'DESC'],
+      [{ model: MovimentoFinanceiro, as: 'movimentos' }, 'data_movimento', 'DESC']
+    ],
+    limit: Number(filters.limit || 500),
+    subQuery: false
+  });
+
+  const linhas = [];
+  const tituloIds = new Set();
+  let movimentos = 0;
+  let totalOriginal = 0;
+  let totalSaldo = 0;
+  let totalBaixado = 0;
+  let totalQuitacao = 0;
+  let totalJuros = 0;
+  let totalMulta = 0;
+  let totalDesconto = 0;
+
+  titulos.forEach((tituloInstance) => {
+    const titulo = typeof tituloInstance.toJSON === 'function' ? tituloInstance.toJSON() : tituloInstance;
+    const movimentosOriginais = Array.isArray(titulo.movimentos) ? titulo.movimentos : [];
+    if (buscarSemBaixa && movimentosOriginais.length > 0) {
+      return;
+    }
+
+    const movimentosFiltrados = movimentosOriginais.filter((movimento) => {
+      if (buscarSemBaixa) return false;
+      if (!hasMovimentoFilter) return true;
+      if (movimentoWhere.status && String(movimento.status || '').toUpperCase() !== movimentoWhere.status) return false;
+      if (movimentoWhere.conta_bancaria_id && Number(movimento.conta_bancaria_id) !== Number(movimentoWhere.conta_bancaria_id)) return false;
+      if (movimentoWhere.data_movimento?.[Op.gte] && movimento.data_movimento < movimentoWhere.data_movimento[Op.gte]) return false;
+      if (movimentoWhere.data_movimento?.[Op.lte] && movimento.data_movimento > movimentoWhere.data_movimento[Op.lte]) return false;
+      return true;
+    });
+
+    tituloIds.add(titulo.id);
+    totalOriginal = roundCurrency(totalOriginal + Number(titulo.valor_original || 0));
+    totalSaldo = roundCurrency(totalSaldo + Number(titulo.valor_saldo || 0));
+    totalBaixado = roundCurrency(totalBaixado + Number(titulo.valor_baixado || 0));
+
+    if (!movimentosFiltrados.length) {
+      if (hasMovimentoFilter && !buscarSemBaixa) {
+        return;
+      }
+
+      linhas.push({
+        id: `titulo-${titulo.id}`,
+        titulo_id: titulo.id,
+        titulo_codigo: titulo.codigo,
+        tipo: titulo.tipo,
+        status_titulo: titulo.status,
+        numero_documento: titulo.numero_documento,
+        descricao: titulo.descricao,
+        parceiro_nome: titulo.parceiro?.nome || null,
+        parceiro_cpf_cnpj: titulo.parceiro?.cpf_cnpj || null,
+        obra_nome: titulo.obra?.nome || null,
+        obra_codigo: titulo.obra?.codigo || null,
+        categoria_nome: titulo.categoriaFinanceira?.nome || null,
+        data_emissao: titulo.data_emissao,
+        data_vencimento: titulo.data_vencimento,
+        data_movimento: null,
+        conta_bancaria_nome: null,
+        valor_original: Number(titulo.valor_original || 0),
+        valor_saldo: Number(titulo.valor_saldo || 0),
+        valor_baixado: Number(titulo.valor_baixado || 0),
+        movimento_id: null,
+        status_movimento: 'SEM_BAIXA',
+        valor_movimento: 0,
+        juros: 0,
+        multa: 0,
+        desconto: 0,
+        valor_quitacao: 0,
+        usuario_baixa: null,
+        origem: titulo.solicitacao_id ? 'SOLICITACAO' : 'MANUAL'
+      });
+      return;
+    }
+
+    movimentosFiltrados.forEach((movimento) => {
+      movimentos += 1;
+      totalQuitacao = roundCurrency(totalQuitacao + Number(movimento.valor_quitacao || 0));
+      totalJuros = roundCurrency(totalJuros + Number(movimento.juros || 0));
+      totalMulta = roundCurrency(totalMulta + Number(movimento.multa || 0));
+      totalDesconto = roundCurrency(totalDesconto + Number(movimento.desconto || 0));
+
+      linhas.push({
+        id: `movimento-${movimento.id}`,
+        titulo_id: titulo.id,
+        titulo_codigo: titulo.codigo,
+        tipo: titulo.tipo,
+        status_titulo: titulo.status,
+        numero_documento: titulo.numero_documento,
+        descricao: titulo.descricao,
+        parceiro_nome: titulo.parceiro?.nome || null,
+        parceiro_cpf_cnpj: titulo.parceiro?.cpf_cnpj || null,
+        obra_nome: titulo.obra?.nome || null,
+        obra_codigo: titulo.obra?.codigo || null,
+        categoria_nome: titulo.categoriaFinanceira?.nome || null,
+        data_emissao: titulo.data_emissao,
+        data_vencimento: titulo.data_vencimento,
+        data_movimento: movimento.data_movimento,
+        conta_bancaria_nome: movimento.contaBancaria?.nome || null,
+        valor_original: Number(titulo.valor_original || 0),
+        valor_saldo: Number(titulo.valor_saldo || 0),
+        valor_baixado: Number(titulo.valor_baixado || 0),
+        movimento_id: movimento.id,
+        status_movimento: movimento.status,
+        valor_movimento: Number(movimento.valor || 0),
+        juros: Number(movimento.juros || 0),
+        multa: Number(movimento.multa || 0),
+        desconto: Number(movimento.desconto || 0),
+        valor_quitacao: Number(movimento.valor_quitacao || 0),
+        usuario_baixa: movimento.criadoPor?.nome || null,
+        origem: titulo.solicitacao_id ? 'SOLICITACAO' : 'MANUAL'
+      });
+    });
+  });
+
+  return {
+    filtros: filters,
+    resumo: {
+      quantidade_linhas: linhas.length,
+      titulos: tituloIds.size,
+      movimentos,
+      total_original: totalOriginal,
+      total_saldo: totalSaldo,
+      total_baixado: totalBaixado,
+      total_quitacao: totalQuitacao,
+      total_juros: totalJuros,
+      total_multa: totalMulta,
+      total_desconto: totalDesconto
+    },
+    linhas
+  };
+}
+
 module.exports = {
+  gerarRelatorioAnalitico,
   gerarRelatorioFluxoCaixa
 };

@@ -133,9 +133,11 @@ const {
   validateFinanceConciliacaoMovimentosQuery,
   validateFinanceConciliacaoQuery,
   validateFinanceBoletoTituloQuery,
+  validateFinanceBaixasQuery,
   validateFinanceCadastroCategoriaBody,
   validateFinanceCadastroContaBody,
   validateFinanceFluxoCaixaQuery,
+  validateFinanceRelatorioAnaliticoQuery,
   validateFinanceTituloBaixaBody,
   validateFinanceTituloCobrancaBody,
   validateFinanceTituloCreateBody,
@@ -1092,7 +1094,9 @@ router.post('/financeiro/conciliacoes/:id/criar-titulo', allowFinanceiro, critic
 router.post('/financeiro/conciliacoes/:id/confirmar', allowFinanceiro, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Conciliacao bancaria'), body: validateFinanceConciliacaoConfirmBody }), ConciliacaoBancariaController.confirmar);
 router.post('/financeiro/conciliacoes/:id/ignorar', allowFinanceiro, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Conciliacao bancaria') }), ConciliacaoBancariaController.ignorar);
 router.get('/financeiro/relatorios/fluxo-caixa', allowFinanceiro, validateRequest({ query: validateFinanceFluxoCaixaQuery }), RelatorioFinanceiroController.fluxoCaixa);
+router.get('/financeiro/relatorios/analitico', allowFinanceiro, validateRequest({ query: validateFinanceRelatorioAnaliticoQuery }), RelatorioFinanceiroController.analitico);
 router.get('/financeiro/relatorios/resultado-obras', allowFinanceiro, ResultadoObrasController.index);
+router.get('/financeiro/baixas', allowFinanceiro, validateRequest({ query: validateFinanceBaixasQuery }), TituloFinanceiroController.baixas);
 router.get('/financeiro/titulos', allowFinanceiro, validateRequest({ query: validateFinanceTituloQuery }), TituloFinanceiroController.index);
 router.post('/financeiro/titulos', allowFinanceiro, criticalRateLimit, validateRequest({ body: validateFinanceTituloCreateBody }), TituloFinanceiroController.create);
 router.get('/financeiro/titulos/:id', allowFinanceiro, validateRequest({ params: validateNumericIdParam('id', 'Titulo financeiro') }), TituloFinanceiroController.show);

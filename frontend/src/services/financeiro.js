@@ -49,6 +49,34 @@ export async function getRelatorioFluxoCaixa(params = {}) {
   return parseJson(response, 'Erro ao buscar relatorio de fluxo de caixa');
 }
 
+export async function getRelatorioAnaliticoFinanceiro(params = {}) {
+  const query = new URLSearchParams(
+    Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== '')
+  ).toString();
+  const url = query
+    ? `${API_URL}/financeiro/relatorios/analitico?${query}`
+    : `${API_URL}/financeiro/relatorios/analitico`;
+
+  const response = await fetch(url, {
+    headers: authHeaders()
+  });
+
+  return parseJson(response, 'Erro ao buscar relatorio analitico financeiro');
+}
+
+export async function getBaixasFinanceiras(params = {}) {
+  const query = new URLSearchParams(
+    Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== '')
+  ).toString();
+  const url = query ? `${API_URL}/financeiro/baixas?${query}` : `${API_URL}/financeiro/baixas`;
+
+  const response = await fetch(url, {
+    headers: authHeaders()
+  });
+
+  return parseJson(response, 'Erro ao buscar baixas financeiras');
+}
+
 export async function getConciliacoesBancarias(params = {}) {
   const query = new URLSearchParams(
     Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== '')

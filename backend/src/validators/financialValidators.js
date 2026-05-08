@@ -254,6 +254,100 @@ function validateFinanceFluxoCaixaQuery(query = {}) {
   };
 }
 
+function validateFinanceBaixasQuery(query = {}) {
+  ensureAllowedKeys(
+    query,
+    [
+      'tipo',
+      'status_movimento',
+      'q',
+      'obra_id',
+      'parceiro_id',
+      'categoria_financeira_id',
+      'conta_bancaria_id',
+      'data_inicial',
+      'data_final',
+      'limit'
+    ],
+    'Consulta de baixas financeiras'
+  );
+
+  const dataInicial = parseDateOnly(query.data_inicial, 'Data inicial');
+  const dataFinal = parseDateOnly(query.data_final, 'Data final');
+
+  if (dataInicial && dataFinal && dataInicial > dataFinal) {
+    throw new ValidationError('Data inicial nao pode ser maior que data final.');
+  }
+
+  const limit = parseInteger(query.limit, 'Limite');
+
+  return {
+    tipo: parseEnum(query.tipo, 'Tipo', ['PAGAR', 'RECEBER']),
+    status_movimento: parseEnum(query.status_movimento, 'Status da baixa', ['ATIVO', 'ESTORNADO', 'TODOS']),
+    q: parseOptionalText(query.q, 'Busca', 120),
+    obra_id: parseInteger(query.obra_id, 'Obra'),
+    parceiro_id: parseInteger(query.parceiro_id, 'Parceiro'),
+    categoria_financeira_id: parseInteger(query.categoria_financeira_id, 'Categoria financeira'),
+    conta_bancaria_id: parseInteger(query.conta_bancaria_id, 'Conta bancaria'),
+    data_inicial: dataInicial,
+    data_final: dataFinal,
+    limit: limit ? Math.min(limit, 500) : undefined
+  };
+}
+
+function validateFinanceRelatorioAnaliticoQuery(query = {}) {
+  ensureAllowedKeys(
+    query,
+    [
+      'tipo',
+      'status_titulo',
+      'status_movimento',
+      'q',
+      'obra_id',
+      'parceiro_id',
+      'categoria_financeira_id',
+      'conta_bancaria_id',
+      'data_inicial',
+      'data_final',
+      'vencimento_inicial',
+      'vencimento_final',
+      'limit'
+    ],
+    'Consulta de relatorio financeiro analitico'
+  );
+
+  const dataInicial = parseDateOnly(query.data_inicial, 'Data inicial');
+  const dataFinal = parseDateOnly(query.data_final, 'Data final');
+  const vencimentoInicial = parseDateOnly(query.vencimento_inicial, 'Vencimento inicial');
+  const vencimentoFinal = parseDateOnly(query.vencimento_final, 'Vencimento final');
+
+  if (dataInicial && dataFinal && dataInicial > dataFinal) {
+    throw new ValidationError('Data inicial nao pode ser maior que data final.');
+  }
+
+  if (vencimentoInicial && vencimentoFinal && vencimentoInicial > vencimentoFinal) {
+    throw new ValidationError('Vencimento inicial nao pode ser maior que vencimento final.');
+  }
+
+  const limit = parseInteger(query.limit, 'Limite');
+
+  return {
+    tipo: parseEnum(query.tipo, 'Tipo', ['PAGAR', 'RECEBER']),
+    status_titulo: parseEnum(query.status_titulo, 'Status do titulo', ['ABERTO', 'PARCIAL', 'QUITADO', 'CANCELADO', 'ESTORNADO']),
+    status_movimento: parseEnum(query.status_movimento, 'Status da baixa', ['ATIVO', 'ESTORNADO', 'TODOS', 'SEM_BAIXA']),
+    q: parseOptionalText(query.q, 'Busca', 120),
+    obra_id: parseInteger(query.obra_id, 'Obra'),
+    parceiro_id: parseInteger(query.parceiro_id, 'Parceiro'),
+    categoria_financeira_id: parseInteger(query.categoria_financeira_id, 'Categoria financeira'),
+    conta_bancaria_id: parseInteger(query.conta_bancaria_id, 'Conta bancaria'),
+    data_inicial: dataInicial,
+    data_final: dataFinal,
+    vencimento_inicial: vencimentoInicial,
+    vencimento_final: vencimentoFinal,
+    limit: limit ? Math.min(limit, 1000) : undefined
+  };
+}
+
 function validateFinanceConciliacaoQuery(query = {}) {
   ensureAllowedKeys(
     query,
@@ -716,7 +810,9 @@ module.exports = {
   validateFinanceCadastroCategoriaBody,
   validateFinanceCadastroContaBody,
   validateFinanceBoletoTituloQuery,
+  validateFinanceBaixasQuery,
   validateFinanceFluxoCaixaQuery,
+  validateFinanceRelatorioAnaliticoQuery,
   validateFinanceTituloBaixaBody,
   validateFinanceTituloCobrancaBody,
   validateFinanceTituloCreateBody,

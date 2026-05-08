@@ -357,6 +357,8 @@ export default function Layout() {
         pagamentosAccess ? item('/financeiro/pagamentos', 'Pagamentos em Massa', HiOutlinePaperAirplane) : null,
         boletosAccess ? item('/financeiro/boletos', 'Boletos', HiOutlineDocumentText) : null,
         financeiroAccess ? item('/financeiro/relatorios', 'Relatorios Financeiros', HiOutlineDocumentText) : null,
+        financeiroAccess ? item('/financeiro/relatorios/analitico', 'Relatorio Analitico', HiOutlineDocumentText) : null,
+        financeiroAccess ? item('/financeiro/baixas', 'Baixas Realizadas', HiOutlineBanknotes) : null,
         financeiroAccess ? item('/financeiro/conciliacao', 'Conciliacao OFX', HiOutlineBanknotes) : null,
         financeiroAccess ? item('/financeiro/cadastros', 'Cadastros Financeiros', HiOutlineRectangleGroup) : null,
         financeiroAccess ? item('/comprovantes/upload', 'Upload Comprovantes', HiOutlineCloudArrowUp) : null,

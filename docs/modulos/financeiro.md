@@ -39,6 +39,14 @@ Controlar contas a pagar e a receber de forma simples, auditavel e integrada ao 
 
 ## Evolucoes Planejadas
 
+### Primeira entrega executada em 2026-05-08
+
+- rota e tela de baixas realizadas para consultar movimentos de baixa
+- acao operacional de excluir baixa implementada como estorno auditavel
+- relatorio analitico financeiro com colunas reordenaveis por arrastar e soltar
+- exportacao CSV do relatorio analitico respeitando ordem/visibilidade das colunas
+- limpeza de filtros e lista ao alternar entre abas `PAGAR` e `RECEBER` na consulta de titulos
+
 ### Consulta de titulos baixados e correcao de baixa
 
 Criar uma tela dedicada para consultar titulos baixados e seus movimentos financeiros.

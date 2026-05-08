@@ -6,6 +6,7 @@ const {
   criarTituloPorSolicitacao,
   estornarMovimentoTitulo,
   listarAuditoriaTitulo,
+  listarBaixasRealizadas,
   listarTitulos,
   listarTitulosPorSolicitacao
 } = require('../services/tituloFinanceiroService');
@@ -43,6 +44,16 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return responderErro(res, error, 'Erro ao buscar auditoria do titulo financeiro');
+    }
+  },
+
+  async baixas(req, res) {
+    try {
+      const baixas = await listarBaixasRealizadas(req, req.query || {});
+      return res.json(baixas);
+    } catch (error) {
+      console.error(error);
+      return responderErro(res, error, 'Erro ao listar baixas financeiras');
     }
   },
 
