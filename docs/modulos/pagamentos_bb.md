@@ -278,6 +278,14 @@ Fluxo sandbox real:
 9. status `Pago` vira `AGUARDANDO_CONFIRMACAO_BAIXA`;
 10. baixa continua manual/semiautomatica pelo financeiro.
 
+Numero da requisicao BB:
+
+- `numeroRequisicao` e controlado pelo FLUXY, mas o Banco do Brasil nao permite reutilizar um numero ja recebido;
+- o lote interno do FLUXY mantem seu `id` e `codigo`;
+- no envio real sandbox, o `numeroRequisicao` enviado ao BB e derivado de `payment_batch_id` + numero da tentativa tecnica;
+- reprocessar um lote em `FALHA_INTEGRACAO` deve gerar novo `numeroRequisicao`, porque o numero anterior pode ter sido registrado pelo BB mesmo quando a resposta foi `400`;
+- se uma tentativa tiver status externo desconhecido, consultar/sincronizar antes de reenviar para reduzir risco de duplicidade.
+
 Formato de data PIX:
 
 - a API BB recebe `listaTransferencias[].data` como inteiro no formato `ddmmaaaa`;

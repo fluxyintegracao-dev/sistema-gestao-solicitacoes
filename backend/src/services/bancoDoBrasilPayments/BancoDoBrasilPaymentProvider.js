@@ -84,9 +84,11 @@ function extractBancoDoBrasilErrorMessage(details) {
     .join('; ');
 }
 
-async function submitPixBatch(batch) {
+async function submitPixBatch(batch, options = {}) {
   assertSandboxRealEnabled();
-  const body = mapBatchToPixTransferRequest(batch);
+  const body = mapBatchToPixTransferRequest(batch, {
+    numeroRequisicao: options.numeroRequisicao
+  });
   const token = await getAccessToken(SCOPES.PIX_BATCH);
   const response = await requestJson({
     method: 'POST',
@@ -107,9 +109,11 @@ async function submitPixBatch(batch) {
   };
 }
 
-async function releasePayments(batch) {
+async function releasePayments(batch, options = {}) {
   assertSandboxRealEnabled();
-  const body = mapReleasePaymentsRequest(batch);
+  const body = mapReleasePaymentsRequest(batch, {
+    numeroRequisicao: options.numeroRequisicao
+  });
   const token = await getAccessToken(SCOPES.RELEASE);
   const response = await requestJson({
     method: 'POST',

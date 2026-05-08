@@ -89,10 +89,10 @@ function resolvePaymentAccount(account = {}) {
   };
 }
 
-function resolveNumeroRequisicao(batch) {
-  const numero = Number(batch?.id);
-  if (!Number.isInteger(numero) || numero <= 0 || numero > 999999) {
-    throw createBancoDoBrasilError(400, 'ID do lote precisa estar entre 1 e 999999 para numeroRequisicao BB.', 'BB_REQUEST_NUMBER_INVALID');
+function resolveNumeroRequisicao(batch, override) {
+  const numero = Number(override || batch?.id);
+  if (!Number.isInteger(numero) || numero <= 0 || numero > 2147483647) {
+    throw createBancoDoBrasilError(400, 'NumeroRequisicao BB precisa ser um inteiro positivo valido.', 'BB_REQUEST_NUMBER_INVALID');
   }
   return numero;
 }
@@ -117,7 +117,7 @@ function mapIntentToTransfer(item, batch) {
   };
 }
 
-function mapBatchToPixTransferRequest(batch) {
+function mapBatchToPixTransferRequest(batch, options = {}) {
   const items = Array.isArray(batch?.items) ? batch.items : [];
   if (!items.length) {
     throw createBancoDoBrasilError(400, 'Lote sem itens para envio BB.', 'BB_EMPTY_BATCH');
@@ -127,16 +127,16 @@ function mapBatchToPixTransferRequest(batch) {
   }
 
   return {
-    numeroRequisicao: resolveNumeroRequisicao(batch),
+    numeroRequisicao: resolveNumeroRequisicao(batch, options.numeroRequisicao),
     ...resolvePaymentAccount(batch.paymentAccount),
     tipoPagamento: 126,
     listaTransferencias: items.map((item) => mapIntentToTransfer(item, batch))
   };
 }
 
-function mapReleasePaymentsRequest(batch) {
+function mapReleasePaymentsRequest(batch, options = {}) {
   return {
-    numeroRequisicao: resolveNumeroRequisicao(batch)
+    numeroRequisicao: resolveNumeroRequisicao(batch, options.numeroRequisicao)
   };
 }
 

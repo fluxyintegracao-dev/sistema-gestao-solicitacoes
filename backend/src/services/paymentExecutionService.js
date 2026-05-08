@@ -23,6 +23,16 @@ function createHttpError(statusCode, message) {
   return error;
 }
 
+function buildBbNumeroRequisicao(batchId, attemptNumber) {
+  const base = Number(batchId);
+  const attempt = Number(attemptNumber);
+  const numero = (base * 1000) + attempt;
+  if (!Number.isInteger(base) || base <= 0 || !Number.isInteger(attempt) || attempt <= 0 || numero > 2147483647) {
+    throw createHttpError(400, 'Nao foi possivel gerar numeroRequisicao unico para o Banco do Brasil.');
+  }
+  return numero;
+}
+
 async function ensureNoPendingSendJob(batchId) {
   const pendingJob = await PaymentJob.findOne({
     where: {
@@ -350,9 +360,12 @@ async function processBbSubmitPixBatchJob(req, jobId) {
   const attemptNumber = await PaymentTransaction.count({
     where: { payment_batch_id: batch.id }
   }) + 1;
+  const numeroRequisicaoBb = buildBbNumeroRequisicao(batch.id, attemptNumber);
 
   try {
-    const providerResult = await bancoDoBrasilSandboxProvider.submitPixBatch(batch);
+    const providerResult = await bancoDoBrasilSandboxProvider.submitPixBatch(batch, {
+      numeroRequisicao: numeroRequisicaoBb
+    });
     const now = new Date();
     const batchStatus = mapProviderResultToBatchStatus(providerResult.provider_status);
     const intentStatus = mapProviderResultToIntentStatus(providerResult.provider_status);
@@ -490,7 +503,13 @@ async function processBbReleaseBatchJob(req, jobId) {
   }) + 1;
 
   try {
-    const providerResult = await bancoDoBrasilSandboxProvider.releasePayments(batch);
+    const lastSubmitTransaction = await PaymentTransaction.findOne({
+      where: { payment_batch_id: batch.id, provider_batch_id: { [Op.ne]: null } },
+      order: [['createdAt', 'DESC']]
+    });
+    const providerResult = await bancoDoBrasilSandboxProvider.releasePayments(batch, {
+      numeroRequisicao: lastSubmitTransaction?.provider_batch_id
+    });
     const now = new Date();
 
     await sequelize.transaction(async (transaction) => {

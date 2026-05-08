@@ -335,6 +335,9 @@ function validateBancoDoBrasilSandboxProvider() {
   assert.strictEqual(payload.listaTransferencias[0].email, 'financeiro@example.com');
   assert.strictEqual(mapPaymentStatus('Pago'), 'AGUARDANDO_CONFIRMACAO_BAIXA');
 
+  const retryPayload = mapBatchToPixTransferRequest(batch, { numeroRequisicao: 123004 });
+  assert.strictEqual(retryPayload.numeroRequisicao, 123004);
+
   const health = bancoDoBrasilSandboxProvider.getHealth();
   assert.strictEqual(health.env, 'sandbox');
   assert.strictEqual(health.sandboxRealEnabled, Boolean(env.bbSandboxRealEnabled));
