@@ -782,19 +782,20 @@ export default function ComunicacaoInterna() {
                               <div
                                 onClick={() => scrollToMessage(msg.citacao.id)}
                                 style={{
-                                  background: euSou ? 'rgba(0,0,0,0.20)' : 'rgba(37,99,235,0.07)',
-                                  borderLeft: `3px solid ${euSou ? 'rgba(255,255,255,0.55)' : 'var(--c-primary)'}`,
-                                  borderRadius: '4px 8px 8px 4px',
-                                  padding: '5px 10px',
-                                  marginBottom: 6,
+                                  background: euSou ? 'rgba(0,0,0,0.22)' : 'rgba(0,0,0,0.05)',
+                                  borderLeft: `4px solid ${euSou ? 'rgba(255,255,255,0.75)' : 'var(--c-primary)'}`,
+                                  borderRadius: '0 6px 6px 0',
+                                  padding: '6px 10px',
+                                  marginBottom: 8,
                                   cursor: 'pointer',
-                                  userSelect: 'none'
+                                  userSelect: 'none',
+                                  overflow: 'hidden'
                                 }}
                               >
-                                <p style={{ fontSize: 11, fontWeight: 700, margin: '0 0 2px', color: euSou ? 'rgba(255,255,255,0.85)' : 'var(--c-primary)' }}>
+                                <p style={{ fontSize: 12, fontWeight: 700, margin: '0 0 2px', color: euSou ? 'rgba(255,255,255,0.95)' : 'var(--c-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                   {msg.citacao.autor?.nome || 'Mensagem'}
                                 </p>
-                                <p style={{ fontSize: 12, margin: 0, color: euSou ? 'rgba(255,255,255,0.7)' : 'var(--c-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 280 }}>
+                                <p style={{ fontSize: 12, margin: 0, color: euSou ? 'rgba(255,255,255,0.78)' : 'var(--c-text)', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
                                   {msg.citacao.mensagem}
                                 </p>
                               </div>
@@ -845,12 +846,13 @@ export default function ComunicacaoInterna() {
             {/* Input de mensagem */}
             <div style={{ borderTop: '1px solid var(--c-border)', background: 'var(--c-surface)', padding: '10px 16px', flexShrink: 0 }}>
                 {mensagemRespondendo && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px', marginBottom: 8, background: 'var(--c-bg, #f8fafc)', borderRadius: 8, borderLeft: '3px solid var(--c-primary)' }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--c-primary)', margin: 0 }}>{mensagemRespondendo.autor?.nome || 'Mensagem'}</p>
-                      <p style={{ fontSize: 12, color: 'var(--c-muted)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{mensagemRespondendo.mensagem}</p>
+                  <div style={{ display: 'flex', alignItems: 'stretch', gap: 0, marginBottom: 8, borderRadius: 8, overflow: 'hidden', border: '1px solid var(--c-border)', background: 'var(--c-bg, #f8fafc)' }}>
+                    <div style={{ width: 4, flexShrink: 0, background: 'var(--c-primary)' }} />
+                    <div style={{ flex: 1, minWidth: 0, padding: '6px 10px' }}>
+                      <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--c-primary)', margin: '0 0 2px' }}>{mensagemRespondendo.autor?.nome || 'Mensagem'}</p>
+                      <p style={{ fontSize: 12, color: 'var(--c-muted)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{mensagemRespondendo.mensagem}</p>
                     </div>
-                    <button onClick={() => setMensagemRespondendo(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-muted)', display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+                    <button onClick={() => setMensagemRespondendo(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-muted)', display: 'flex', alignItems: 'center', padding: '0 10px', flexShrink: 0 }}>
                       <HiOutlineXMark size={16} />
                     </button>
                   </div>
