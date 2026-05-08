@@ -25,8 +25,7 @@ function createHttpError(statusCode, message) {
 
 function buildBbNumeroRequisicao(batchId) {
   const base = Number(batchId);
-  const timestampPart = Date.now() % 1000000000;
-  const numero = (timestampPart * 10) + (base % 10);
+  const numero = Math.floor(Date.now() / 1000);
   if (!Number.isInteger(base) || base <= 0 || !Number.isInteger(numero) || numero <= 0 || numero > 2147483647) {
     throw createHttpError(400, 'Nao foi possivel gerar numeroRequisicao unico para o Banco do Brasil.');
   }
