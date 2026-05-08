@@ -132,6 +132,7 @@ export default function FinanceiroPagamentos() {
   const canCancel = useMemo(() => canCancelPagamentos(user), [user]);
   const canReprocess = useMemo(() => canReprocessPagamentos(user), [user]);
   const canConfirmBaixa = useMemo(() => canConfirmarBaixaPagamento(user), [user]);
+  const isBbSandbox = Boolean(bbHealth?.sandboxRealEnabled);
 
   async function loadBase() {
     try {
@@ -297,8 +298,8 @@ export default function FinanceiroPagamentos() {
               </p>
             </div>
             <div className="app-page-actions">
-              <span className={bbHealth?.sandboxRealEnabled ? 'app-status-pill bg-emerald-100 text-emerald-700' : 'app-status-pill bg-slate-100 text-slate-700'}>
-                {bbHealth?.sandboxRealEnabled ? 'BB SANDBOX' : 'MOCK'}
+              <span className={isBbSandbox ? 'app-status-pill bg-emerald-100 text-emerald-700' : 'app-status-pill bg-slate-100 text-slate-700'}>
+                {isBbSandbox ? 'BB SANDBOX' : 'MOCK'}
               </span>
               <Link to="/financeiro/titulos" className="btn btn-outline">Titulos</Link>
               <Link to="/financeiro/cadastros" className="btn btn-outline">Cadastros</Link>
@@ -515,17 +516,19 @@ export default function FinanceiroPagamentos() {
                           <HiOutlineXCircle className="h-4 w-4" />
                           Cancelar
                         </button>
-                        <button type="button" className="btn btn-primary" onClick={() => runBatchAction('enviar', (id) => enviarPaymentBatchBanco(id, { codigo_mfa: mfaCode }))} disabled={!canSend || selectedBatch.status !== 'APROVADO' || !mfaCode || actionLoading === 'enviar'}>
-                          <HiOutlinePaperAirplane className="h-4 w-4" />
-                          Enviar mock
-                        </button>
-                        {bbHealth?.sandboxRealEnabled && (
+                        {!isBbSandbox && (
+                          <button type="button" className="btn btn-primary" onClick={() => runBatchAction('enviar', (id) => enviarPaymentBatchBanco(id, { codigo_mfa: mfaCode }))} disabled={!canSend || selectedBatch.status !== 'APROVADO' || !mfaCode || actionLoading === 'enviar'}>
+                            <HiOutlinePaperAirplane className="h-4 w-4" />
+                            Enviar mock
+                          </button>
+                        )}
+                        {isBbSandbox && (
                           <button type="button" className="btn btn-primary" onClick={() => runBatchAction('enviar-bb', (id) => enviarPaymentBatchBbSandbox(id, { codigo_mfa: mfaCode }))} disabled={!canSend || selectedBatch.status !== 'APROVADO' || !mfaCode || actionLoading === 'enviar-bb'}>
                             <HiOutlinePaperAirplane className="h-4 w-4" />
                             Enviar BB Sandbox
                           </button>
                         )}
-                        <button type="button" className="btn btn-outline" onClick={() => runBatchAction('sync-bb', (id) => sincronizarPaymentBatchStatusBb(id))} disabled={!canAudit || !bbHealth?.sandboxRealEnabled || !['ENVIADO_AO_BANCO', 'PROCESSANDO_BANCO', 'FALHA_INTEGRACAO', 'AGUARDANDO_CONFIRMACAO_BAIXA'].includes(selectedBatch.status) || actionLoading === 'sync-bb'}>
+                        <button type="button" className="btn btn-outline" onClick={() => runBatchAction('sync-bb', (id) => sincronizarPaymentBatchStatusBb(id))} disabled={!canAudit || !isBbSandbox || !['ENVIADO_AO_BANCO', 'PROCESSANDO_BANCO', 'FALHA_INTEGRACAO', 'AGUARDANDO_CONFIRMACAO_BAIXA'].includes(selectedBatch.status) || actionLoading === 'sync-bb'}>
                           <HiOutlineArrowPath className="h-4 w-4" />
                           Sincronizar BB
                         </button>
@@ -533,18 +536,22 @@ export default function FinanceiroPagamentos() {
                           <HiOutlineArrowPath className="h-4 w-4" />
                           Reprocessar
                         </button>
-                        <button type="button" className="btn btn-outline" onClick={() => runBatchAction('retorno', (id) => simularRetornoPaymentBatch(id, { resultado: 'CONFIRMADO' }))} disabled={!canSend || !['ENVIADO_AO_BANCO', 'PROCESSANDO_BANCO'].includes(selectedBatch.status) || actionLoading === 'retorno'}>
-                          Confirmar banco
-                        </button>
-                        <button type="button" className="btn btn-outline" onClick={() => runBatchAction('falha-mock', (id) => simularRetornoPaymentBatch(id, { resultado: 'FALHA' }))} disabled={!canSend || !['ENVIADO_AO_BANCO', 'PROCESSANDO_BANCO'].includes(selectedBatch.status) || actionLoading === 'falha-mock'}>
-                          Falha mock
-                        </button>
+                        {!isBbSandbox && (
+                          <>
+                            <button type="button" className="btn btn-outline" onClick={() => runBatchAction('retorno', (id) => simularRetornoPaymentBatch(id, { resultado: 'CONFIRMADO' }))} disabled={!canSend || !['ENVIADO_AO_BANCO', 'PROCESSANDO_BANCO'].includes(selectedBatch.status) || actionLoading === 'retorno'}>
+                              Confirmar banco
+                            </button>
+                            <button type="button" className="btn btn-outline" onClick={() => runBatchAction('falha-mock', (id) => simularRetornoPaymentBatch(id, { resultado: 'FALHA' }))} disabled={!canSend || !['ENVIADO_AO_BANCO', 'PROCESSANDO_BANCO'].includes(selectedBatch.status) || actionLoading === 'falha-mock'}>
+                              Falha mock
+                            </button>
+                          </>
+                        )}
                       </div>
                     </div>
 
                     <div className="app-note">
-                      Modo BB: {bbHealth?.sandboxRealEnabled ? 'sandbox real habilitado' : 'mock ativo'}
-                      {bbHealth?.sandboxRealEnabled && (
+                      Modo BB: {isBbSandbox ? 'sandbox real habilitado' : 'mock ativo'}
+                      {isBbSandbox && (
                         <> - {bbHealth?.baseURL || 'URL sandbox nao informada'} - certificado {bbHealth?.certificateConfigured ? 'configurado' : 'pendente'}</>
                       )}
                     </div>
