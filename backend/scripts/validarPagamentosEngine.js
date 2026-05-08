@@ -10,6 +10,7 @@ const {
   validatePaymentMfaBody,
   validatePaymentMockReturnBody
 } = require('../src/validators/paymentValidators');
+const bancoDoBrasilProvider = require('../src/services/paymentProviderBancoDoBrasil');
 const { ValidationError } = require('../src/middlewares/validation');
 
 const projectRoot = path.resolve(__dirname, '..');
@@ -180,6 +181,10 @@ function validateRoutesAndCriticalGuards() {
     'Bloqueio de job duplicado nao encontrado.'
   );
   assert(
+    executionService.includes('paymentProviderBancoDoBrasil'),
+    'Execucao nao esta usando o adapter Banco do Brasil.'
+  );
+  assert(
     baixaService.includes('lock: transaction.LOCK.UPDATE'),
     'Lock transacional da baixa nao encontrado.'
   );
@@ -189,14 +194,92 @@ function validateRoutesAndCriticalGuards() {
   );
 }
 
-function run() {
+async function validateBancoDoBrasilProvider() {
+  const context = {
+    provider: {
+      id: 1,
+      codigo: 'BB',
+      ambiente: 'HOMOLOGACAO',
+      config_ref: 'BB_MOCK_HOMOLOGACAO'
+    },
+    account: {
+      id: 9,
+      ambiente: 'HOMOLOGACAO',
+      banco_codigo: '001',
+      agencia: '1234',
+      conta: '56789',
+      tipo_conta: 'CORRENTE',
+      convenio: 'CONV-TESTE',
+      cnpj_pagador: '12.345.678/0001-99',
+      client_id_ref: 'aws/secret/client-id',
+      client_secret_ref: 'aws/secret/client-secret',
+      certificate_ref: 'aws/secret/cert'
+    }
+  };
+  const batch = {
+    id: 1,
+    codigo: 'PAY-TESTE',
+    correlation_id: 'corr-1',
+    idempotency_key: 'idem-1',
+    data_programada: '2026-05-08',
+    quantidade_itens: 1,
+    valor_total: 10,
+    items: [{
+      sequencia: 1,
+      payment_intent_id: 11,
+      valor: 10,
+      intent: {
+        id: 11,
+        metodo: 'PIX_CHAVE',
+        correlation_id: 'intent-corr-1',
+        beneficiary_snapshot: {
+          nome: 'Fornecedor Teste',
+          cpf_cnpj: '12345678000199',
+          pix_tipo_chave: 'CNPJ',
+          pix_chave: '12345678000199'
+        }
+      }
+    }]
+  };
+
+  const auth = await bancoDoBrasilProvider.authenticate(context);
+  assert.strictEqual(auth.authenticated, true);
+  assert.strictEqual(auth.mode, bancoDoBrasilProvider.MOCK_MODE);
+
+  const snapshot = bancoDoBrasilProvider.buildBatchRequestSnapshot(batch, context);
+  assert.strictEqual(snapshot.account.cnpj_pagador, '12345678000199');
+  assert(!String(snapshot.account.client_secret_ref || '').includes('client-secret'), 'Referencia sensivel nao foi mascarada.');
+  assert.strictEqual(snapshot.items[0].favorecido.pix_tipo_chave, 'CNPJ');
+
+  const result = await bancoDoBrasilProvider.submitBatch(batch, context);
+  assert.strictEqual(result.accepted, true);
+  assert.strictEqual(result.provider_batch_id, 'MOCK-BB-PAY-TESTE');
+
+  let realModeError = null;
+  try {
+    await bancoDoBrasilProvider.authenticate({
+      ...context,
+      provider: { ...context.provider, config_ref: 'BB_REAL_HOMOLOGACAO' }
+    });
+  } catch (error) {
+    realModeError = error;
+  }
+  assert(realModeError, 'Modo real deveria permanecer desabilitado nesta etapa.');
+  assert.strictEqual(realModeError.statusCode, 501);
+}
+
+async function run() {
   validateBeneficiaryPayload();
   validateBatchPayloads();
   validateSensitiveActionsPayloads();
   validatePaymentAccountPayload();
   validateRoutesAndCriticalGuards();
+  await validateBancoDoBrasilProvider();
 
   console.log('Validacoes do motor de pagamentos concluidas com sucesso.');
 }
 
-run();
+run().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});

@@ -62,6 +62,8 @@ A baixa e semiautomatica:
 - MFA step-up para aprovar e enviar;
 - job persistente em `payment_jobs`;
 - provider Banco do Brasil em modo `MOCK_HOMOLOGACAO`;
+- adapter Banco do Brasil centralizado em `paymentProviderBancoDoBrasil`, com modo real explicitamente bloqueado ate confirmacao OAuth2/mTLS;
+- snapshots tecnicos do provider com referencias de segredo mascaradas;
 - simulacao de confirmacao/rejeicao bancaria;
 - cancelamento auditavel de lote antes do envio ao banco, liberando as intents para nova tentativa;
 - reprocessamento auditavel de lotes com falha/rejeicao elegivel, com MFA e bloqueio de job duplicado;
@@ -201,6 +203,7 @@ Fase 6:
 
 - trocar o provider mockado pelo adapter real do Banco do Brasil;
 - implementar OAuth2, mTLS e tratamento de endpoints reais;
+- remover o bloqueio `BB_REAL_PROVIDER_DISABLED` somente apos credenciais, certificado e documentacao oficial validados;
 - adicionar polling/webhook conforme produto contratado;
 - preparar evidencias formais de homologacao.
 
@@ -210,6 +213,7 @@ Fase 6:
 - carregamento de `backend/src/routes.js`;
 - carregamento de `backend/src/models`;
 - `npm run test:payments` para validar payloads, rotas e guardas criticas do motor de pagamentos sem depender de banco local;
+- `npm run test:payments` tambem valida que a execucao passa pelo adapter BB e que o modo real permanece bloqueado nesta etapa;
 - `npm run build` no frontend.
 
 Pendente por ambiente local:

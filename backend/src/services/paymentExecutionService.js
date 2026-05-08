@@ -2,12 +2,15 @@ const { Op } = require('sequelize');
 const {
   PaymentBatch,
   PaymentBatchItem,
+  PaymentAccount,
   PaymentIntent,
   PaymentJob,
+  PaymentProvider,
   PaymentTransaction,
   sequelize
 } = require('../models');
 const { countValidApprovals, verifyMfaStepUp } = require('./paymentApprovalService');
+const bancoDoBrasilProvider = require('./paymentProviderBancoDoBrasil');
 const { registrarEventoSeguranca } = require('./securityLogService');
 
 function createHttpError(statusCode, message) {
@@ -163,7 +166,15 @@ async function processSendBatchJob(req, jobId) {
     }, { transaction });
 
     const batch = await PaymentBatch.findByPk(job.entity_id, {
-      include: [{ model: PaymentBatchItem, as: 'items' }],
+      include: [
+        {
+          model: PaymentBatchItem,
+          as: 'items',
+          include: [{ model: PaymentIntent, as: 'intent' }]
+        },
+        { model: PaymentProvider, as: 'provider' },
+        { model: PaymentAccount, as: 'paymentAccount' }
+      ],
       transaction,
       lock: transaction.LOCK.UPDATE
     });
@@ -174,6 +185,15 @@ async function processSendBatchJob(req, jobId) {
       where: { payment_batch_id: batch.id },
       transaction
     }) + 1;
+    const providerContext = {
+      provider: batch.provider,
+      account: batch.paymentAccount
+    };
+    await bancoDoBrasilProvider.authenticate(providerContext);
+    const requestSnapshot = bancoDoBrasilProvider.buildBatchRequestSnapshot(batch, providerContext);
+    const providerResponse = await bancoDoBrasilProvider.submitBatch(batch, providerContext);
+    const responseSnapshot = bancoDoBrasilProvider.sanitizeProviderResponse(providerResponse);
+    const providerStatus = bancoDoBrasilProvider.normalizeStatus(providerResponse);
 
     await batch.update({
       status: 'ENVIADO_AO_BANCO',
@@ -193,13 +213,13 @@ async function processSendBatchJob(req, jobId) {
       payment_batch_id: batch.id,
       provider_id: batch.provider_id,
       attempt: attemptNumber,
-      status: 'ENVIADO_AO_BANCO',
+      status: providerStatus,
       http_status: 202,
-      provider_batch_id: `MOCK-BB-${batch.codigo}`,
+      provider_batch_id: providerResponse.provider_batch_id,
       correlation_id: batch.correlation_id,
       idempotency_key: batch.idempotency_key,
-      request_snapshot: { mode: 'MOCK_HOMOLOGACAO', batch_id: batch.id },
-      response_snapshot: { accepted: true, provider_batch_id: `MOCK-BB-${batch.codigo}` },
+      request_snapshot: requestSnapshot,
+      response_snapshot: responseSnapshot,
       started_at: new Date(),
       finished_at: new Date()
     }, { transaction });
