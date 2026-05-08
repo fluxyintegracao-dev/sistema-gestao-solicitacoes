@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { HiPaperClip } from 'react-icons/hi2';
 import { useAuth } from '../contexts/AuthContext';
 import { getSetores } from '../services/setores';
 import {
@@ -744,10 +745,9 @@ export default function ComunicacaoInterna() {
                   <label
                     className="btn btn-outline"
                     title="Anexar arquivos"
-                    style={{ width: 38, height: 38, fontSize: 0, padding: 0, borderRadius: 20, flexShrink: 0, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                    style={{ width: 38, height: 38, padding: 0, borderRadius: 20, flexShrink: 0, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
                   >
-                    <span style={{ fontSize: 18, lineHeight: 1 }}>{'\uD83D\uDCCE'}</span>
-                    📎
+                    <HiPaperClip size={18} />
                     <input
                       type="file"
                       multiple

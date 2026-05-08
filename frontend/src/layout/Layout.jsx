@@ -796,9 +796,15 @@ export default function Layout() {
                   className="theme-toggle topbar-chat-btn"
                   aria-label="Chat interno"
                   title="Chat interno"
+                  style={{ position: 'relative' }}
                 >
                   <HiOutlineChatBubbleOvalLeft size={18} />
                   <span className="hidden sm:inline">Chat</span>
+                  {comunicacaoNovasCount > 0 && (
+                    <span className="notification-trigger-badge">
+                      {comunicacaoNovasCount > 99 ? '99+' : comunicacaoNovasCount}
+                    </span>
+                  )}
                 </Link>
 
                 <NotificacoesBell />
