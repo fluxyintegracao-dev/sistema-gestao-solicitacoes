@@ -829,6 +829,15 @@ async function canConfirmarBaixaPagamento(user) {
   return userHasFinanceiroSector(user);
 }
 
+async function canAuditPagamentos(user) {
+  if (isBusinessAdmin(user)) return true;
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, ['financeiro.pagamentos.auditar']);
+  }
+
+  return (await userHasFinanceiroSector(user)) || userHasPaymentApprovalDirectorate(user);
+}
+
 async function canManagePaymentBeneficiaries(user) {
   if (isBusinessAdmin(user)) return true;
   if (await userHasConfiguredAreaPermissions(user)) {
@@ -1538,6 +1547,7 @@ module.exports = {
   canAccessIntegracaoSienge,
   canAccessRhDp,
   canAuditComprasPedidos,
+  canAuditPagamentos,
   buildUserScopeTokens,
   canAccessComprovantes,
   canCancelPrioridadeDiretoriaLote,

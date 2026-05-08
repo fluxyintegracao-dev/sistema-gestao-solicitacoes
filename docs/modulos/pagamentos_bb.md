@@ -193,6 +193,107 @@ A coluna `active_titulo_key` e gerada pelo MySQL e impede mais de uma intent ati
 
 ## Proximas fases
 
+## Fase 2 - Provider Banco do Brasil sandbox
+
+Esta fase prepara o provider real do Banco do Brasil em sandbox/homologacao, mantendo o mock como caminho padrao e sem habilitar producao.
+
+Variaveis de ambiente adicionadas:
+
+- `BB_PAYMENTS_ENABLED`
+- `BB_PAYMENTS_PROVIDER`
+- `BB_PAYMENTS_ENV`
+- `BB_PROVIDER_MODE`
+- `BB_PAYMENTS_BASE_URL`
+- `BB_OAUTH_TOKEN_URL`
+- `BB_CLIENT_ID`
+- `BB_CLIENT_SECRET`
+- `BB_APP_KEY`
+- `BB_CERT_TYPE`
+- `BB_CERT_PATH`
+- `BB_CERT_PASSPHRASE`
+- `BB_CA_CERT_PATH`
+- `BB_NUMERO_CONTRATO_PAGAMENTO`
+- `BB_AGENCIA_DEBITO`
+- `BB_CONTA_CORRENTE_DEBITO`
+- `BB_DIGITO_CONTA_CORRENTE_DEBITO`
+- `BB_CNPJ_PAGADOR`
+- `BB_AUTO_LIBERAR_LOTE`
+- `BB_REQUEST_TIMEOUT_MS`
+- `BB_TOKEN_CACHE_TTL_SECONDS`
+- `BB_SANDBOX_REAL_ENABLED`
+- `BB_WEBHOOK_ENABLED`
+- `BB_WEBHOOK_PATH`
+- `BB_WEBHOOK_REQUIRE_MTLS`
+
+Regras de seguranca:
+
+- `BB_SANDBOX_REAL_ENABLED=false` mantem o fluxo mockado.
+- `BB_SANDBOX_REAL_ENABLED=true` exige `BB_CLIENT_ID`, `BB_CLIENT_SECRET`, `BB_APP_KEY` e certificado A1 configurado fora do repositorio.
+- certificado, senha, app key, token e client secret nunca devem ser versionados nem expostos no frontend.
+- snapshots tecnicos sao mascarados antes de gravar em `payment_transactions`.
+
+Endpoints BB usados no sandbox:
+
+- `POST /lotes-transferencias-pix`
+- `POST /liberar-pagamentos`
+- `GET /{id}`
+- `GET /{id}/solicitacao`
+- `GET /pagamentos`
+
+Escopos OAuth2:
+
+- `pagamentos-lote.transferencias-pix-requisicao`
+- `pagamentos-lote.lotes-requisicao`
+- `pagamentos-lote.lotes-info`
+
+Rotas internas FLUXY adicionadas:
+
+- `GET /api/financeiro/pagamentos/bb/health`
+- `POST /api/financeiro/pagamentos/lotes/:id/enviar-bb-sandbox`
+- `POST /api/financeiro/pagamentos/lotes/:id/sincronizar-status-bb`
+- `GET /api/financeiro/pagamentos/lotes/:id/transacoes-bb`
+- `POST /api/payments/bb/webhook`
+
+Fluxo sandbox real:
+
+1. lote e criado e aprovado por duas pessoas;
+2. usuario financeiro informa MFA e envia pelo botao `Enviar BB Sandbox`;
+3. backend cria job `BB_SUBMIT_PIX_BATCH`;
+4. provider monta payload `RequisicaoPOSTLotePagamentosTransferenciaPix`;
+5. OAuth2 gera token client credentials;
+6. chamada usa mTLS com certificado A1;
+7. request/response sao gravados em `payment_transactions`;
+8. consulta posterior sincroniza status do lote;
+9. status `Pago` vira `AGUARDANDO_CONFIRMACAO_BAIXA`;
+10. baixa continua manual/semiautomatica pelo financeiro.
+
+Mapeamento de status BB:
+
+- `Consistente`, `Pendente`, `Agendado`, `Debitado` -> `PROCESSANDO_BANCO`
+- `Pago` -> `AGUARDANDO_CONFIRMACAO_BAIXA`
+- `Devolvido`, `Inconsistente`, `Rejeitado`, `Vencido` -> `REJEITADO_BANCO`
+- `Cancelado` -> `CANCELADO`
+
+Webhook:
+
+- rota preparada em `/api/payments/bb/webhook`;
+- por padrao `BB_WEBHOOK_ENABLED=false`;
+- quando desabilitado, responde como indisponivel;
+- validacao mTLS via Nginx/EC2 deve ser fechada em fase posterior.
+
+Homologacao BB - pendencias:
+
+- validar payload final no Swagger/OpenAPI BB com massa real do convenio;
+- validar certificado A1, cadeia CA e senha no servidor privado;
+- validar se a liberacao sera manual ou automatica;
+- confirmar se `numeroRequisicao` deve seguir sequencia propria do convenio;
+- confirmar limites por lote e regras de janela bancaria;
+- testar retorno 201 de `POST /lotes-transferencias-pix`;
+- testar consulta de lote e pagamentos;
+- testar rejeicao/inconsistencia sem baixar titulo;
+- testar que `Pago` nao cria baixa automatica;
+- validar webhook mTLS em Nginx antes de habilitar.
+
 Fase 5:
 
 - testes/validacoes dos cenarios de aceite;
@@ -201,11 +302,11 @@ Fase 5:
 
 Fase 6:
 
-- trocar o provider mockado pelo adapter real do Banco do Brasil;
-- implementar OAuth2, mTLS e tratamento de endpoints reais;
-- remover o bloqueio `BB_REAL_PROVIDER_DISABLED` somente apos credenciais, certificado e documentacao oficial validados;
-- adicionar polling/webhook conforme produto contratado;
-- preparar evidencias formais de homologacao.
+- executar testes reais em sandbox com credenciais e certificado configurados na AWS;
+- ajustar payload conforme retorno oficial do convenio;
+- implementar liberacao manual/automatica conforme decisao operacional;
+- adicionar polling recorrente e webhook mTLS conforme produto contratado;
+- preparar evidencias formais de homologacao antes de qualquer producao.
 
 ## Validacoes executadas
 

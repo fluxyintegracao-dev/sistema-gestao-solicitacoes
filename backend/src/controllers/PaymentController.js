@@ -13,9 +13,14 @@ const {
   rejectBatch
 } = require('../services/paymentApprovalService');
 const {
+  enqueueBbSandboxSendBatch,
   enqueueSendBatch,
+  getBbHealth,
+  handleBbWebhook,
+  listBbTransactions,
   markBatchAsBankConfirmedMock,
-  reprocessBatch
+  reprocessBatch,
+  sincronizarStatusBb: sincronizarStatusBbService
 } = require('../services/paymentExecutionService');
 const {
   confirmBaixaFromPaymentIntent,
@@ -119,6 +124,55 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return responderErro(res, error, 'Erro ao enviar lote ao banco');
+    }
+  },
+
+  async enviarBbSandbox(req, res) {
+    try {
+      const data = await enqueueBbSandboxSendBatch(req, req.params.id, req.body || {});
+      return res.json(data);
+    } catch (error) {
+      console.error(error);
+      return responderErro(res, error, 'Erro ao enviar lote ao Banco do Brasil sandbox');
+    }
+  },
+
+  async sincronizarStatusBb(req, res) {
+    try {
+      const data = await sincronizarStatusBbService(req, req.params.id);
+      return res.json(data);
+    } catch (error) {
+      console.error(error);
+      return responderErro(res, error, 'Erro ao sincronizar status BB');
+    }
+  },
+
+  async transacoesBb(req, res) {
+    try {
+      const data = await listBbTransactions(req, req.params.id);
+      return res.json(data);
+    } catch (error) {
+      console.error(error);
+      return responderErro(res, error, 'Erro ao listar transacoes BB');
+    }
+  },
+
+  async bbHealth(req, res) {
+    try {
+      const data = await getBbHealth();
+      return res.json(data);
+    } catch (error) {
+      console.error(error);
+      return responderErro(res, error, 'Erro ao verificar configuracao BB');
+    }
+  },
+
+  async bbWebhook(req, res) {
+    try {
+      const data = await handleBbWebhook(req);
+      return res.status(202).json({ ok: true, id: data.id });
+    } catch (error) {
+      return responderErro(res, error, 'Webhook BB indisponivel');
     }
   },
 

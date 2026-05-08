@@ -283,6 +283,16 @@ export function canConfirmarBaixaPagamento(user) {
   return userHasSetorCapability(user, 'eh_setor_financeiro') || normalizeToken(user?.perfil) === 'FINANCEIRO';
 }
 
+export function canAuditPagamentos(user) {
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) return hasPermissao(user, 'financeiro.pagamentos.auditar');
+  return (
+    userHasSetorCapability(user, 'eh_setor_financeiro') ||
+    normalizeToken(user?.perfil) === 'FINANCEIRO' ||
+    userHasPaymentApprovalDirectorate(user)
+  );
+}
+
 export function canManagePaymentBeneficiaries(user) {
   if (isBusinessAdmin(user)) return true;
   if (hasConfiguredAreaPermissions(user)) return hasPermissao(user, 'financeiro.favorecidos.gerenciar');

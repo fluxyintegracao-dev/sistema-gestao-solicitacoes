@@ -560,6 +560,42 @@ export async function enviarPaymentBatchBanco(id, data) {
   return parseJson(response, 'Erro ao enviar lote ao banco');
 }
 
+export async function enviarPaymentBatchBbSandbox(id, data) {
+  const response = await fetch(`${API_URL}/financeiro/pagamentos/lotes/${id}/enviar-bb-sandbox`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+
+  return parseJson(response, 'Erro ao enviar lote ao BB sandbox');
+}
+
+export async function sincronizarPaymentBatchStatusBb(id) {
+  const response = await fetch(`${API_URL}/financeiro/pagamentos/lotes/${id}/sincronizar-status-bb`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({})
+  });
+
+  return parseJson(response, 'Erro ao sincronizar status BB');
+}
+
+export async function getPaymentBatchBbTransactions(id) {
+  const response = await fetch(`${API_URL}/financeiro/pagamentos/lotes/${id}/transacoes-bb`, {
+    headers: authHeaders()
+  });
+
+  return parseJson(response, 'Erro ao buscar transacoes BB');
+}
+
+export async function getBbPaymentsHealth() {
+  const response = await fetch(`${API_URL}/financeiro/pagamentos/bb/health`, {
+    headers: authHeaders()
+  });
+
+  return parseJson(response, 'Erro ao verificar configuracao BB');
+}
+
 export async function reprocessarPaymentBatch(id, data = {}) {
   const response = await fetch(`${API_URL}/financeiro/pagamentos/lotes/${id}/reprocessar`, {
     method: 'POST',

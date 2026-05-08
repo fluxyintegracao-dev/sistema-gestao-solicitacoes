@@ -11,6 +11,9 @@ const {
   validatePaymentMockReturnBody
 } = require('../src/validators/paymentValidators');
 const bancoDoBrasilProvider = require('../src/services/paymentProviderBancoDoBrasil');
+const bancoDoBrasilSandboxProvider = require('../src/services/bancoDoBrasilPayments/BancoDoBrasilPaymentProvider');
+const { mapBatchToPixTransferRequest } = require('../src/services/bancoDoBrasilPayments/bancoDoBrasilPayloadMapper');
+const { mapPaymentStatus } = require('../src/services/bancoDoBrasilPayments/bancoDoBrasilStatusMapper');
 const { ValidationError } = require('../src/middlewares/validation');
 
 const projectRoot = path.resolve(__dirname, '..');
@@ -156,6 +159,11 @@ function validateRoutesAndCriticalGuards() {
     '/financeiro/pagamentos/lotes/:id/rejeitar',
     '/financeiro/pagamentos/lotes/:id/cancelar',
     '/financeiro/pagamentos/lotes/:id/enviar-banco',
+    '/financeiro/pagamentos/lotes/:id/enviar-bb-sandbox',
+    '/financeiro/pagamentos/lotes/:id/sincronizar-status-bb',
+    '/financeiro/pagamentos/lotes/:id/transacoes-bb',
+    '/financeiro/pagamentos/bb/health',
+    '/payments/bb/webhook',
     '/financeiro/pagamentos/lotes/:id/reprocessar',
     '/financeiro/pagamentos/lotes/:id/simular-retorno-banco',
     '/financeiro/pagamentos/aguardando-baixa',
@@ -183,6 +191,10 @@ function validateRoutesAndCriticalGuards() {
   assert(
     executionService.includes('paymentProviderBancoDoBrasil'),
     'Execucao nao esta usando o adapter Banco do Brasil.'
+  );
+  assert(
+    executionService.includes('BB_SUBMIT_PIX_BATCH'),
+    'Job BB_SUBMIT_PIX_BATCH nao encontrado.'
   );
   assert(
     baixaService.includes('lock: transaction.LOCK.UPDATE'),
@@ -268,6 +280,58 @@ async function validateBancoDoBrasilProvider() {
   assert.strictEqual(realModeError.statusCode, 501);
 }
 
+function validateBancoDoBrasilSandboxProvider() {
+  const batch = {
+    id: 123,
+    codigo: 'PAY-20260508',
+    correlation_id: 'corr-bb-1',
+    idempotency_key: 'idem-bb-1',
+    data_programada: '2026-05-08',
+    paymentAccount: {
+      convenio: '123456',
+      agencia: '1234',
+      conta: '98765',
+      conta_digito: 'X'
+    },
+    items: [{
+      sequencia: 1,
+      payment_intent_id: 77,
+      valor: 25.5,
+      intent: {
+        id: 77,
+        data_pagamento: '2026-05-08',
+        correlation_id: 'intent-corr-77',
+        beneficiary_snapshot: {
+          nome: 'Fornecedor PIX',
+          cpf_cnpj: '12345678000199',
+          pix_tipo_chave: 'EMAIL',
+          pix_chave: 'financeiro@example.com'
+        },
+        titulo_snapshot: {
+          codigo: 'TIT-77',
+          numero_documento: 'NF-77',
+          descricao: 'Pagamento teste'
+        }
+      }
+    }]
+  };
+
+  const payload = mapBatchToPixTransferRequest(batch);
+  assert.strictEqual(payload.numeroRequisicao, 123);
+  assert.strictEqual(payload.numeroContrato, 123456);
+  assert.strictEqual(payload.agenciaDebito, 1234);
+  assert.strictEqual(payload.contaCorrenteDebito, 98765);
+  assert.strictEqual(payload.digitoVerificadorContaCorrente, 'X');
+  assert.strictEqual(payload.tipoPagamento, 126);
+  assert.strictEqual(payload.listaTransferencias[0].formaIdentificacao, 2);
+  assert.strictEqual(payload.listaTransferencias[0].email, 'financeiro@example.com');
+  assert.strictEqual(mapPaymentStatus('Pago'), 'AGUARDANDO_CONFIRMACAO_BAIXA');
+
+  const health = bancoDoBrasilSandboxProvider.getHealth();
+  assert.strictEqual(health.env, 'sandbox');
+  assert.strictEqual(health.sandboxRealEnabled, false);
+}
+
 async function run() {
   validateBeneficiaryPayload();
   validateBatchPayloads();
@@ -275,6 +339,7 @@ async function run() {
   validatePaymentAccountPayload();
   validateRoutesAndCriticalGuards();
   await validateBancoDoBrasilProvider();
+  validateBancoDoBrasilSandboxProvider();
 
   console.log('Validacoes do motor de pagamentos concluidas com sucesso.');
 }

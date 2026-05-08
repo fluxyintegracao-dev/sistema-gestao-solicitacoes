@@ -136,7 +136,32 @@ const env = {
   caixaLocalPagamento: String(process.env.CAIXA_LOCAL_PAGAMENTO || '').trim(),
   caixaBoletoAmbiente: String(process.env.CAIXA_BOLETO_AMBIENTE || 'TESTE').trim().toUpperCase(),
   caixaBoletoHomologado: parseBoolean(process.env.CAIXA_BOLETO_HOMOLOGADO, false),
-  caixaBoletoInstrucao: String(process.env.CAIXA_BOLETO_INSTRUCAO || '').trim()
+  caixaBoletoInstrucao: String(process.env.CAIXA_BOLETO_INSTRUCAO || '').trim(),
+  bbPaymentsEnabled: parseBoolean(process.env.BB_PAYMENTS_ENABLED, false),
+  bbPaymentsProvider: String(process.env.BB_PAYMENTS_PROVIDER || 'BB').trim().toUpperCase(),
+  bbPaymentsEnv: String(process.env.BB_PAYMENTS_ENV || 'sandbox').trim().toLowerCase(),
+  bbProviderMode: String(process.env.BB_PROVIDER_MODE || 'mock').trim().toLowerCase(),
+  bbPaymentsBaseUrl: trimTrailingSlashes(process.env.BB_PAYMENTS_BASE_URL || 'https://homologa-api-ip.bb.com.br:7144/pagamentos-lote/v1'),
+  bbOauthTokenUrl: String(process.env.BB_OAUTH_TOKEN_URL || 'https://oauth.sandbox.bb.com.br/oauth/token').trim(),
+  bbClientId: String(process.env.BB_CLIENT_ID || '').trim(),
+  bbClientSecret: String(process.env.BB_CLIENT_SECRET || ''),
+  bbAppKey: String(process.env.BB_APP_KEY || '').trim(),
+  bbCertType: String(process.env.BB_CERT_TYPE || 'pfx').trim().toLowerCase(),
+  bbCertPath: String(process.env.BB_CERT_PATH || '').trim(),
+  bbCertPassphrase: String(process.env.BB_CERT_PASSPHRASE || ''),
+  bbCaCertPath: String(process.env.BB_CA_CERT_PATH || '').trim(),
+  bbNumeroContratoPagamento: String(process.env.BB_NUMERO_CONTRATO_PAGAMENTO || '').trim(),
+  bbAgenciaDebito: String(process.env.BB_AGENCIA_DEBITO || '').trim(),
+  bbContaCorrenteDebito: String(process.env.BB_CONTA_CORRENTE_DEBITO || '').trim(),
+  bbDigitoContaCorrenteDebito: String(process.env.BB_DIGITO_CONTA_CORRENTE_DEBITO || '').trim(),
+  bbCnpjPagador: String(process.env.BB_CNPJ_PAGADOR || '').trim(),
+  bbAutoLiberarLote: parseBoolean(process.env.BB_AUTO_LIBERAR_LOTE, false),
+  bbRequestTimeoutMs: Number(process.env.BB_REQUEST_TIMEOUT_MS || 30000),
+  bbTokenCacheTtlSeconds: Number(process.env.BB_TOKEN_CACHE_TTL_SECONDS || 3000),
+  bbSandboxRealEnabled: parseBoolean(process.env.BB_SANDBOX_REAL_ENABLED, false),
+  bbWebhookEnabled: parseBoolean(process.env.BB_WEBHOOK_ENABLED, false),
+  bbWebhookPath: String(process.env.BB_WEBHOOK_PATH || '/api/payments/bb/webhook').trim(),
+  bbWebhookRequireMtls: parseBoolean(process.env.BB_WEBHOOK_REQUIRE_MTLS, true)
 };
 
 env.siengeResolvedBaseUrl = buildSiengeApiBaseUrl({

@@ -15,19 +15,24 @@ import {
   confirmarBaixaPaymentIntent,
   criarPaymentBatch,
   enviarPaymentBatchBanco,
+  enviarPaymentBatchBbSandbox,
+  getBbPaymentsHealth,
   getPaymentAccounts,
   getPaymentBatch,
+  getPaymentBatchBbTransactions,
   getPaymentBatches,
   getPaymentEligibleTitulos,
   getPaymentsAwaitingBaixa,
   rejeitarPaymentBatch,
   reprocessarPaymentBatch,
+  sincronizarPaymentBatchStatusBb,
   simularRetornoPaymentBatch,
   submeterPaymentBatch
 } from '../services/financeiro';
 import { useAuth } from '../contexts/AuthContext';
 import {
   canApprovePagamentos,
+  canAuditPagamentos,
   canCancelPagamentos,
   canConfirmarBaixaPagamento,
   canPreparePagamentos,
@@ -101,6 +106,8 @@ export default function FinanceiroPagamentos() {
   const [selectedIds, setSelectedIds] = useState([]);
   const [batches, setBatches] = useState([]);
   const [selectedBatch, setSelectedBatch] = useState(null);
+  const [bbHealth, setBbHealth] = useState(null);
+  const [bbTransactions, setBbTransactions] = useState([]);
   const [awaitingBaixa, setAwaitingBaixa] = useState([]);
   const [filters, setFilters] = useState({
     vencimento_inicial: '',
@@ -121,6 +128,7 @@ export default function FinanceiroPagamentos() {
   const canPrepare = useMemo(() => canPreparePagamentos(user), [user]);
   const canApprove = useMemo(() => canApprovePagamentos(user), [user]);
   const canSend = useMemo(() => canSendPagamentosBanco(user), [user]);
+  const canAudit = useMemo(() => canAuditPagamentos(user), [user]);
   const canCancel = useMemo(() => canCancelPagamentos(user), [user]);
   const canReprocess = useMemo(() => canReprocessPagamentos(user), [user]);
   const canConfirmBaixa = useMemo(() => canConfirmarBaixaPagamento(user), [user]);
@@ -129,14 +137,16 @@ export default function FinanceiroPagamentos() {
     try {
       setLoading(true);
       setError('');
-      const [accountsData, batchesData, baixaData] = await Promise.all([
+      const [accountsData, batchesData, baixaData, bbHealthData] = await Promise.all([
         getPaymentAccounts().catch(() => []),
         getPaymentBatches().catch(() => []),
-        getPaymentsAwaitingBaixa().catch(() => [])
+        getPaymentsAwaitingBaixa().catch(() => []),
+        getBbPaymentsHealth().catch(() => null)
       ]);
       setAccounts(Array.isArray(accountsData) ? accountsData : []);
       setBatches(Array.isArray(batchesData) ? batchesData : []);
       setAwaitingBaixa(Array.isArray(baixaData) ? baixaData : []);
+      setBbHealth(bbHealthData);
       setBatchForm((current) => ({
         ...current,
         payment_account_id: current.payment_account_id || String(accountsData?.[0]?.id || '')
@@ -169,6 +179,8 @@ export default function FinanceiroPagamentos() {
       setError('');
       const data = await getPaymentBatch(id);
       setSelectedBatch(data);
+      const transactionsData = await getPaymentBatchBbTransactions(id).catch(() => []);
+      setBbTransactions(Array.isArray(transactionsData) ? transactionsData : []);
     } catch (err) {
       setError(err?.message || 'Erro ao carregar lote');
     } finally {
@@ -279,15 +291,18 @@ export default function FinanceiroPagamentos() {
       <div className="app-page-header">
         <div className="app-page-header-row">
           <div>
-            <h1 className="text-xl font-semibold md:text-2xl">Pagamentos em Massa</h1>
-            <p className="page-subtitle">
-              Motor interno para lotes PIX por chave, com dupla aprovacao, envio mockado e baixa semiautomatica.
-            </p>
-          </div>
-          <div className="app-page-actions">
-            <Link to="/financeiro/titulos" className="btn btn-outline">Titulos</Link>
-            <Link to="/financeiro/cadastros" className="btn btn-outline">Cadastros</Link>
-          </div>
+              <h1 className="text-xl font-semibold md:text-2xl">Pagamentos em Massa</h1>
+              <p className="page-subtitle">
+                Motor interno para lotes PIX por chave, com dupla aprovacao, sandbox BB e baixa semiautomatica.
+              </p>
+            </div>
+            <div className="app-page-actions">
+              <span className={bbHealth?.sandboxRealEnabled ? 'app-status-pill bg-emerald-100 text-emerald-700' : 'app-status-pill bg-slate-100 text-slate-700'}>
+                {bbHealth?.sandboxRealEnabled ? 'BB SANDBOX' : 'MOCK'}
+              </span>
+              <Link to="/financeiro/titulos" className="btn btn-outline">Titulos</Link>
+              <Link to="/financeiro/cadastros" className="btn btn-outline">Cadastros</Link>
+            </div>
         </div>
       </div>
 
@@ -504,6 +519,16 @@ export default function FinanceiroPagamentos() {
                           <HiOutlinePaperAirplane className="h-4 w-4" />
                           Enviar mock
                         </button>
+                        {bbHealth?.sandboxRealEnabled && (
+                          <button type="button" className="btn btn-primary" onClick={() => runBatchAction('enviar-bb', (id) => enviarPaymentBatchBbSandbox(id, { codigo_mfa: mfaCode }))} disabled={!canSend || selectedBatch.status !== 'APROVADO' || !mfaCode || actionLoading === 'enviar-bb'}>
+                            <HiOutlinePaperAirplane className="h-4 w-4" />
+                            Enviar BB Sandbox
+                          </button>
+                        )}
+                        <button type="button" className="btn btn-outline" onClick={() => runBatchAction('sync-bb', (id) => sincronizarPaymentBatchStatusBb(id))} disabled={!canAudit || !bbHealth?.sandboxRealEnabled || !['ENVIADO_AO_BANCO', 'PROCESSANDO_BANCO', 'FALHA_INTEGRACAO', 'AGUARDANDO_CONFIRMACAO_BAIXA'].includes(selectedBatch.status) || actionLoading === 'sync-bb'}>
+                          <HiOutlineArrowPath className="h-4 w-4" />
+                          Sincronizar BB
+                        </button>
                         <button type="button" className="btn btn-outline" onClick={handleReprocessBatch} disabled={!canReprocess || !['FALHA_INTEGRACAO', 'REJEITADO', 'PARCIALMENTE_REJEITADO'].includes(selectedBatch.status) || !mfaCode || actionLoading === 'reprocessar'}>
                           <HiOutlineArrowPath className="h-4 w-4" />
                           Reprocessar
@@ -515,6 +540,13 @@ export default function FinanceiroPagamentos() {
                           Falha mock
                         </button>
                       </div>
+                    </div>
+
+                    <div className="app-note">
+                      Modo BB: {bbHealth?.sandboxRealEnabled ? 'sandbox real habilitado' : 'mock ativo'}
+                      {bbHealth?.sandboxRealEnabled && (
+                        <> - {bbHealth?.baseURL || 'URL sandbox nao informada'} - certificado {bbHealth?.certificateConfigured ? 'configurado' : 'pendente'}</>
+                      )}
                     </div>
 
                     <div className="grid gap-4 lg:grid-cols-2">
@@ -537,9 +569,9 @@ export default function FinanceiroPagamentos() {
                       <div>
                         <h3 className="text-sm font-semibold text-[var(--c-text)]">Tentativas tecnicas</h3>
                         <div className="mt-2 app-list-stack">
-                          {(selectedBatch.transactions || []).length === 0 ? (
+                          {(bbTransactions.length ? bbTransactions : selectedBatch.transactions || []).length === 0 ? (
                             <div className="app-note">Nenhuma tentativa registrada.</div>
-                          ) : selectedBatch.transactions.map((transaction) => (
+                          ) : (bbTransactions.length ? bbTransactions : selectedBatch.transactions || []).map((transaction) => (
                             <div key={transaction.id} className="app-list-card text-sm">
                               <div className="flex justify-between gap-3">
                                 <span>{transaction.provider_batch_id || transaction.correlation_id}</span>
