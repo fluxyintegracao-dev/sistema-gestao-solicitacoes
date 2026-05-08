@@ -1,5 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { HiPaperClip } from 'react-icons/hi2';
+import {
+  HiOutlineArchiveBox,
+  HiOutlineArrowUturnLeft,
+  HiOutlineChatBubbleLeftRight,
+  HiOutlineChevronLeft,
+  HiOutlineInformationCircle,
+  HiOutlinePencil,
+  HiOutlineTrash,
+  HiPaperClip
+} from 'react-icons/hi2';
 import { useAuth } from '../contexts/AuthContext';
 import { getSetores } from '../services/setores';
 import {
@@ -7,6 +16,7 @@ import {
   criarConversa,
   criarConversaEmMassa,
   deletarMensagemConversa,
+  desarquivarConversasEmMassa,
   editarMensagemConversa,
   enviarMensagemConversa,
   getConversa,
@@ -136,7 +146,9 @@ export default function ComunicacaoInterna() {
   const [isMobile, setIsMobile] = useState(false);
   const [participantesLeitura, setParticipantesLeitura] = useState([]);
   const [menuMsgId, setMenuMsgId] = useState(null);
+  const [menuMsgOpenUpward, setMenuMsgOpenUpward] = useState(true);
   const [infoMsg, setInfoMsg] = useState(null);
+  const [mostrandoArquivadas, setMostrandoArquivadas] = useState(false);
 
   // Modal nova conversa
   const [showNova, setShowNova] = useState(false);
@@ -205,14 +217,16 @@ export default function ComunicacaoInterna() {
   const carregarLista = useCallback(async (silent = false) => {
     try {
       if (!silent) setLoadingLista(true);
-      const data = await listarConversas({ limit: 100 });
+      const params = { limit: 100 };
+      if (mostrandoArquivadas) params.arquivadas = true;
+      const data = await listarConversas(params);
       setConversas(data?.items || []);
     } catch {
       // silencioso
     } finally {
       if (!silent) setLoadingLista(false);
     }
-  }, []);
+  }, [mostrandoArquivadas]);
 
   useEffect(() => {
     carregarLista();
@@ -395,6 +409,26 @@ export default function ComunicacaoInterna() {
     } catch (err) { alert(err.message || 'Erro'); }
   }, [conversaAtiva, carregarLista]);
 
+  const handleDesarquivar = useCallback(async () => {
+    if (!conversaAtiva) return;
+    try {
+      await desarquivarConversasEmMassa([conversaAtiva]);
+      setConversaAtiva(null);
+      setDetalhe(null);
+      setMensagens([]);
+      setMobileModo('lista');
+      await carregarLista();
+    } catch (err) { alert(err.message || 'Erro'); }
+  }, [conversaAtiva, carregarLista]);
+
+  const toggleArquivadas = useCallback(() => {
+    setMostrandoArquivadas((v) => !v);
+    setConversaAtiva(null);
+    setDetalhe(null);
+    setMensagens([]);
+    setMobileModo('lista');
+  }, []);
+
   const abrirModalNova = useCallback(async () => {
     setShowNova(true);
     setModoMassa(false);
@@ -480,10 +514,33 @@ export default function ComunicacaoInterna() {
       >
         {/* Cabeçalho */}
         <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--c-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-          <span style={{ fontWeight: 600, fontSize: 14, color: 'var(--c-text)' }}>Comunicação Interna</span>
-          <button className="btn btn-primary" style={{ fontSize: 12, padding: '4px 12px' }} onClick={abrirModalNova}>
-            + Nova
-          </button>
+          <span style={{ fontWeight: 600, fontSize: 14, color: 'var(--c-text)', display: 'flex', alignItems: 'center', gap: 6 }}>
+            {mostrandoArquivadas && (
+              <button
+                onClick={toggleArquivadas}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-muted)', display: 'flex', alignItems: 'center', padding: 2 }}
+                title="Voltar"
+              >
+                <HiOutlineChevronLeft size={16} />
+              </button>
+            )}
+            {mostrandoArquivadas ? 'Arquivadas' : 'Comunicação Interna'}
+          </span>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            {!mostrandoArquivadas && (
+              <button className="btn btn-primary" style={{ fontSize: 12, padding: '4px 12px' }} onClick={abrirModalNova}>
+                + Nova
+              </button>
+            )}
+            <button
+              onClick={toggleArquivadas}
+              className="btn btn-outline"
+              style={{ width: 30, height: 30, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+              title={mostrandoArquivadas ? 'Ver conversas ativas' : 'Ver arquivadas'}
+            >
+              <HiOutlineArchiveBox size={15} />
+            </button>
+          </div>
         </div>
 
         {/* Busca */}
@@ -564,16 +621,18 @@ export default function ComunicacaoInterna() {
       <div style={{ flex: 1, minWidth: 0, display: mostrarChat ? 'flex' : 'none', flexDirection: 'column' }} className="md:flex">
         {!conversaAtiva ? (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--c-muted)', gap: 12 }}>
-            <span style={{ fontSize: 40 }}>💬</span>
+            <HiOutlineChatBubbleLeftRight size={40} style={{ opacity: 0.35 }} />
             <span style={{ fontSize: 14 }}>Selecione uma conversa ou crie uma nova</span>
-            <button onClick={abrirModalNova} className="btn btn-outline" style={{ fontSize: 13 }}>Nova conversa</button>
+            {!mostrandoArquivadas && (
+              <button onClick={abrirModalNova} className="btn btn-outline" style={{ fontSize: 13 }}>Nova conversa</button>
+            )}
           </div>
         ) : (
           <>
             {/* Cabeçalho do chat */}
             <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--c-border)', background: 'var(--c-surface)', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
-              <button className="md:hidden" style={{ color: 'var(--c-muted)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 18 }} onClick={() => setMobileModo('lista')}>
-                ←
+              <button className="md:hidden" style={{ color: 'var(--c-muted)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center' }} onClick={() => setMobileModo('lista')}>
+                <HiOutlineChevronLeft size={20} />
               </button>
               <AvatarConversa conv={detalhe?.conversa} size={8} />
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -585,7 +644,15 @@ export default function ComunicacaoInterna() {
                 </p>
               </div>
               <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-                <button onClick={handleArquivar} className="btn btn-outline" style={{ fontSize: 12, padding: '4px 10px' }} title="Arquivar">📦</button>
+                {mostrandoArquivadas ? (
+                  <button onClick={handleDesarquivar} className="btn btn-outline" style={{ width: 32, height: 32, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="Desarquivar">
+                    <HiOutlineArrowUturnLeft size={15} />
+                  </button>
+                ) : (
+                  <button onClick={handleArquivar} className="btn btn-outline" style={{ width: 32, height: 32, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="Arquivar">
+                    <HiOutlineArchiveBox size={15} />
+                  </button>
+                )}
               </div>
             </div>
 
@@ -618,7 +685,12 @@ export default function ComunicacaoInterna() {
                         <div style={{ position: 'relative', maxWidth: '72%' }}>
                           {/* Botão seta — sempre visível */}
                           <button
-                            onClick={(e) => { e.stopPropagation(); setMenuMsgId(menuAberto ? null : msg.id); }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const rect = e.currentTarget.getBoundingClientRect();
+                              setMenuMsgOpenUpward(rect.top > 200);
+                              setMenuMsgId(menuAberto ? null : msg.id);
+                            }}
                             style={{
                               position: 'absolute', top: 6, right: 6, zIndex: 20,
                               width: 18, height: 18, borderRadius: '50%',
@@ -630,10 +702,14 @@ export default function ComunicacaoInterna() {
                             }}
                           >▾</button>
 
-                          {/* Dropdown menu — abre para cima */}
+                          {/* Dropdown menu — direção dinâmica */}
                           {menuAberto && (
                             <div style={{
-                              position: 'absolute', bottom: '100%', right: 0, marginBottom: 4, zIndex: 30,
+                              position: 'absolute',
+                              ...(menuMsgOpenUpward
+                                ? { bottom: '100%', marginBottom: 4 }
+                                : { top: '100%', marginTop: 4 }),
+                              right: 0, zIndex: 30,
                               background: 'var(--c-surface)', border: '1px solid var(--c-border)',
                               borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
                               minWidth: 150, overflow: 'hidden'
@@ -642,18 +718,18 @@ export default function ComunicacaoInterna() {
                                 <button
                                   onClick={() => { setEditandoId(msg.id); setTextoEdicao(msg.mensagem); setMenuMsgId(null); }}
                                   style={{ display: 'flex', width: '100%', padding: '9px 14px', fontSize: 13, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-text)', gap: 8, alignItems: 'center' }}
-                                >✏️ Editar</button>
+                                ><HiOutlinePencil size={14} /> Editar</button>
                               )}
                               {msg.pode_deletar && (
                                 <button
                                   onClick={() => { deletarMensagem(msg.id); setMenuMsgId(null); }}
                                   style={{ display: 'flex', width: '100%', padding: '9px 14px', fontSize: 13, background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', gap: 8, alignItems: 'center' }}
-                                >🗑️ Excluir</button>
+                                ><HiOutlineTrash size={14} /> Excluir</button>
                               )}
                               <button
                                 onClick={() => { setInfoMsg(msg); setMenuMsgId(null); }}
                                 style={{ display: 'flex', width: '100%', padding: '9px 14px', fontSize: 13, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-text)', gap: 8, alignItems: 'center', borderTop: '1px solid var(--c-border)' }}
-                              >ℹ️ Informações</button>
+                              ><HiOutlineInformationCircle size={14} /> Informações</button>
                             </div>
                           )}
 
