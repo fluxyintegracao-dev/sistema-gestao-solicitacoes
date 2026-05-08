@@ -894,36 +894,28 @@ export default function NovaSolicitacaoCompra() {
                           const resumoApropriacao = calcularResumoRateios(item);
 
                           return (
-                            <div className="flex min-w-[260px] flex-col gap-2 rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] p-3">
-                              {linhasApropriacao.length > 0 ? (
-                                <>
-                                  <div className="grid gap-1 text-xs text-[var(--c-text)]">
-                                    {linhasApropriacao.slice(0, 2).map((linha, linhaIndex) => (
-                                      <div key={`${linha}-${linhaIndex}`}>{linha}</div>
-                                    ))}
-                                    {linhasApropriacao.length > 2 && (
-                                      <div className="text-[var(--c-muted)]">
-                                        +{linhasApropriacao.length - 2} rateio(s)
-                                      </div>
-                                    )}
-                                  </div>
-                                  <div
-                                    className={`text-[11px] font-semibold ${
-                                      resumoApropriacao.fechado ? 'text-emerald-700' : 'text-amber-700'
-                                    }`}
-                                  >
-                                    {resumoApropriacao.fechado
-                                      ? 'Distribuicao fechada'
-                                      : `Saldo ${formatarQuantidade(resumoApropriacao.saldo)}`}
-                                  </div>
-                                </>
-                              ) : (
-                                <div className="text-xs text-[var(--c-muted)]">
-                                  Nenhuma apropriacao definida.
-                                </div>
-                              )}
-                              <button type="button" className="btn btn-outline justify-center" onClick={() => abrirModalApropriacao(index)}>
-                                {linhasApropriacao.length > 0 ? 'Editar rateio' : 'Apropriar'}
+                            <div className="flex min-w-[200px] items-center gap-2">
+                              <div className="flex-1 min-w-0">
+                                {linhasApropriacao.length > 0 ? (
+                                  <>
+                                    <div className="grid gap-0.5 text-xs text-[var(--c-text)]">
+                                      {linhasApropriacao.slice(0, 2).map((linha, linhaIndex) => (
+                                        <div key={`${linha}-${linhaIndex}`} className="truncate">{linha}</div>
+                                      ))}
+                                      {linhasApropriacao.length > 2 && (
+                                        <div className="text-[var(--c-muted)]">+{linhasApropriacao.length - 2} rateio(s)</div>
+                                      )}
+                                    </div>
+                                    <div className={`text-[11px] font-semibold ${resumoApropriacao.fechado ? 'text-emerald-700' : 'text-amber-700'}`}>
+                                      {resumoApropriacao.fechado ? 'Fechado' : `Saldo ${formatarQuantidade(resumoApropriacao.saldo)}`}
+                                    </div>
+                                  </>
+                                ) : (
+                                  <span className="text-xs text-[var(--c-muted)]">Nenhuma</span>
+                                )}
+                              </div>
+                              <button type="button" className="btn btn-outline text-xs px-2 py-1 shrink-0" onClick={() => abrirModalApropriacao(index)}>
+                                {linhasApropriacao.length > 0 ? 'Editar' : 'Apropriar'}
                               </button>
                             </div>
                           );
