@@ -150,6 +150,7 @@ const env = {
   bbCertPath: String(process.env.BB_CERT_PATH || '').trim(),
   bbCertPassphrase: String(process.env.BB_CERT_PASSPHRASE || ''),
   bbCaCertPath: String(process.env.BB_CA_CERT_PATH || '').trim(),
+  bbTlsRejectUnauthorized: parseBoolean(process.env.BB_TLS_REJECT_UNAUTHORIZED, true),
   bbNumeroContratoPagamento: String(process.env.BB_NUMERO_CONTRATO_PAGAMENTO || '').trim(),
   bbAgenciaDebito: String(process.env.BB_AGENCIA_DEBITO || '').trim(),
   bbContaCorrenteDebito: String(process.env.BB_CONTA_CORRENTE_DEBITO || '').trim(),

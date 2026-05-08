@@ -29,6 +29,10 @@ function buildHttpsAgent() {
     options.ca = fs.readFileSync(env.bbCaCertPath);
   }
 
+  if (env.bbPaymentsEnv === 'sandbox' && env.bbTlsRejectUnauthorized === false) {
+    options.rejectUnauthorized = false;
+  }
+
   return new https.Agent(options);
 }
 
@@ -138,6 +142,7 @@ function getHealth() {
     sandboxRealEnabled: env.bbSandboxRealEnabled,
     certificateConfigured: Boolean(env.bbCertPath),
     caConfigured: Boolean(env.bbCaCertPath),
+    tlsRejectUnauthorized: env.bbTlsRejectUnauthorized,
     appKeyConfigured: Boolean(env.bbAppKey),
     clientIdConfigured: Boolean(env.bbClientId),
     clientSecretConfigured: Boolean(env.bbClientSecret),

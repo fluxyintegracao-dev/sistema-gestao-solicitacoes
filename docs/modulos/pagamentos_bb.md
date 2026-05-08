@@ -212,6 +212,7 @@ Variaveis de ambiente adicionadas:
 - `BB_CERT_PATH`
 - `BB_CERT_PASSPHRASE`
 - `BB_CA_CERT_PATH`
+- `BB_TLS_REJECT_UNAUTHORIZED`: manter `true` por padrao. Em homologacao/sandbox, pode ser definido como `false` temporariamente se o endpoint do BB retornar `SELF_SIGNED_CERT_IN_CHAIN` e a cadeia CA oficial ainda nao estiver configurada em `BB_CA_CERT_PATH`. Nao usar `false` em producao.
 - `BB_NUMERO_CONTRATO_PAGAMENTO`
 - `BB_AGENCIA_DEBITO`
 - `BB_CONTA_CORRENTE_DEBITO`
