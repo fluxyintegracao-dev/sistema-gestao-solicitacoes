@@ -17,6 +17,9 @@ const bancoDoBrasilSandboxProvider = require('./bancoDoBrasilPayments/BancoDoBra
 const { sanitizePayload } = require('./bancoDoBrasilPayments/bancoDoBrasilErrors');
 const { registrarEventoSeguranca } = require('./securityLogService');
 
+const SEND_JOB_TYPES = ['SEND_PAYMENT_BATCH', 'BB_SUBMIT_PIX_BATCH', 'BB_RELEASE_BATCH'];
+const STALE_PROCESSING_JOB_MS = 15 * 60 * 1000;
+
 function createHttpError(statusCode, message) {
   const error = new Error(message);
   error.statusCode = statusCode;
@@ -33,9 +36,27 @@ function buildBbNumeroRequisicao(batchId) {
 }
 
 async function ensureNoPendingSendJob(batchId) {
+  await PaymentJob.update(
+    {
+      status: 'ERRO',
+      locked_at: null,
+      locked_by: null,
+      last_error: 'Job marcado como erro automaticamente por timeout operacional.'
+    },
+    {
+      where: {
+        job_type: { [Op.in]: SEND_JOB_TYPES },
+        entity_type: 'PAYMENT_BATCH',
+        entity_id: batchId,
+        status: 'PROCESSANDO',
+        locked_at: { [Op.lt]: new Date(Date.now() - STALE_PROCESSING_JOB_MS) }
+      }
+    }
+  );
+
   const pendingJob = await PaymentJob.findOne({
     where: {
-      job_type: { [Op.in]: ['SEND_PAYMENT_BATCH', 'BB_SUBMIT_PIX_BATCH', 'BB_RELEASE_BATCH'] },
+      job_type: { [Op.in]: SEND_JOB_TYPES },
       entity_type: 'PAYMENT_BATCH',
       entity_id: batchId,
       status: { [Op.in]: ['PENDENTE', 'PROCESSANDO'] }
@@ -359,9 +380,9 @@ async function processBbSubmitPixBatchJob(req, jobId) {
   const attemptNumber = await PaymentTransaction.count({
     where: { payment_batch_id: batch.id }
   }) + 1;
-  const numeroRequisicaoBb = buildBbNumeroRequisicao(batch.id);
 
   try {
+    const numeroRequisicaoBb = buildBbNumeroRequisicao(batch.id);
     const providerResult = await bancoDoBrasilSandboxProvider.submitPixBatch(batch, {
       numeroRequisicao: numeroRequisicaoBb
     });
