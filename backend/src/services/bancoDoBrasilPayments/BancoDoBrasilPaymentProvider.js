@@ -70,6 +70,20 @@ function normalizeInfoStatus(data) {
   return 'PROCESSANDO_BANCO';
 }
 
+function extractBancoDoBrasilErrorMessage(details) {
+  const erros = details?.data?.erros || details?.response_snapshot?.body?.erros || [];
+  if (!Array.isArray(erros) || !erros.length) return null;
+
+  return erros
+    .map((erro) => {
+      const codigo = erro?.codigo || erro?.code || erro?.erro || erro?.mensagemCodigo;
+      const mensagem = erro?.mensagem || erro?.message || erro?.descricao || erro?.texto;
+      return [codigo, mensagem].filter(Boolean).join(' - ');
+    })
+    .filter(Boolean)
+    .join('; ');
+}
+
 async function submitPixBatch(batch) {
   assertSandboxRealEnabled();
   const body = mapBatchToPixTransferRequest(batch);
@@ -184,9 +198,10 @@ async function searchPaymentsStatus(filters = {}) {
 }
 
 function normalizeError(error) {
+  const bbMessage = extractBancoDoBrasilErrorMessage(error.details);
   return {
     code: error.code || error.name || 'BB_PAYMENTS_ERROR',
-    message: error.message || 'Erro na integracao Banco do Brasil',
+    message: bbMessage || error.message || 'Erro na integracao Banco do Brasil',
     statusCode: error.statusCode || 500,
     details: sanitizePayload(error.details || null)
   };
