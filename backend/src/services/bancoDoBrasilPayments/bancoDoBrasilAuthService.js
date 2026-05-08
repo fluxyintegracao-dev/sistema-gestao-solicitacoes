@@ -75,6 +75,59 @@ function requestToken({ body, basic, startedAt }) {
   });
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function getMaxAttempts() {
+  const parsed = Number(env.bbOauthMaxAttempts || 3);
+  if (!Number.isInteger(parsed) || parsed <= 0) return 3;
+  return Math.min(parsed, 5);
+}
+
+function isRetryableOauthError(error) {
+  const code = String(error?.code || '').toUpperCase();
+  if (['ECONNRESET', 'ETIMEDOUT', 'EAI_AGAIN', 'ENOTFOUND', 'ECONNREFUSED', 'BB_OAUTH_CONNECTION_ERROR', 'BB_OAUTH_TIMEOUT'].includes(code)) {
+    return true;
+  }
+  const statusCode = Number(error?.statusCode || 0);
+  return statusCode >= 500 && statusCode < 600;
+}
+
+async function requestTokenWithRetry({ body, basic }) {
+  const maxAttempts = getMaxAttempts();
+  let lastError = null;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    const startedAt = Date.now();
+    try {
+      const response = await requestToken({ body, basic, startedAt });
+      if (response.ok || response.status < 500 || attempt >= maxAttempts) {
+        return response;
+      }
+      lastError = createBancoDoBrasilError(
+        response.status || 502,
+        'Falha temporaria ao autenticar no OAuth Banco do Brasil.',
+        'BB_OAUTH_TEMPORARY_ERROR',
+        {
+          http_status: response.status,
+          attempt,
+          max_attempts: maxAttempts
+        }
+      );
+    } catch (error) {
+      lastError = error;
+      if (!isRetryableOauthError(error) || attempt >= maxAttempts) {
+        throw error;
+      }
+    }
+
+    await sleep(300 * attempt);
+  }
+
+  throw lastError;
+}
+
 async function getAccessToken(scope) {
   if (!env.bbSandboxRealEnabled) {
     return {
@@ -96,7 +149,7 @@ async function getAccessToken(scope) {
 
   const basic = Buffer.from(`${env.bbClientId}:${env.bbClientSecret}`).toString('base64');
   const startedAt = Date.now();
-  const response = await requestToken({ body, basic, startedAt });
+  const response = await requestTokenWithRetry({ body, basic });
   const data = response.data || {};
 
   if (!response.ok || !data.access_token) {

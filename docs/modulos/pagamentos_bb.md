@@ -221,6 +221,7 @@ Variaveis de ambiente adicionadas:
 - `BB_AUTO_LIBERAR_LOTE`
 - `BB_REQUEST_TIMEOUT_MS`
 - `BB_TOKEN_CACHE_TTL_SECONDS`
+- `BB_OAUTH_MAX_ATTEMPTS`: quantidade maxima de tentativas para obter token OAuth2 em caso de falha temporaria de conexao com o sandbox BB. Padrao recomendado: `3`.
 - `BB_SANDBOX_REAL_ENABLED`
 - `BB_WEBHOOK_ENABLED`
 - `BB_WEBHOOK_PATH`

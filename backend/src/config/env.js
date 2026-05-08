@@ -159,6 +159,7 @@ const env = {
   bbAutoLiberarLote: parseBoolean(process.env.BB_AUTO_LIBERAR_LOTE, false),
   bbRequestTimeoutMs: Number(process.env.BB_REQUEST_TIMEOUT_MS || 30000),
   bbTokenCacheTtlSeconds: Number(process.env.BB_TOKEN_CACHE_TTL_SECONDS || 3000),
+  bbOauthMaxAttempts: Number(process.env.BB_OAUTH_MAX_ATTEMPTS || 3),
   bbSandboxRealEnabled: parseBoolean(process.env.BB_SANDBOX_REAL_ENABLED, false),
   bbWebhookEnabled: parseBoolean(process.env.BB_WEBHOOK_ENABLED, false),
   bbWebhookPath: String(process.env.BB_WEBHOOK_PATH || '/api/payments/bb/webhook').trim(),
