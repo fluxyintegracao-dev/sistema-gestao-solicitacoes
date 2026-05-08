@@ -28,8 +28,8 @@ function createHttpError(statusCode, message) {
 
 function buildBbNumeroRequisicao(batchId) {
   const base = Number(batchId);
-  const numero = Math.floor(Date.now() / 1000);
-  if (!Number.isInteger(base) || base <= 0 || !Number.isInteger(numero) || numero <= 0 || numero > 2147483647) {
+  const numero = Date.now() % 1000000000;
+  if (!Number.isInteger(base) || base <= 0 || !Number.isInteger(numero) || numero <= 0 || numero > 999999999) {
     throw createHttpError(400, 'Nao foi possivel gerar numeroRequisicao unico para o Banco do Brasil.');
   }
   return numero;
