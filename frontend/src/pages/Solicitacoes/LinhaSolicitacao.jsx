@@ -147,6 +147,12 @@ export default function LinhaSolicitacao({
     }
   }, [solicitacao.valor, editandoValor]);
 
+  async function notificarAtualizacao(payload) {
+    if (typeof onAtualizar === 'function') {
+      await onAtualizar(payload);
+    }
+  }
+
   async function salvarValor() {
     try {
       const valorNumero = valorEditado === '' ? null : Number(valorEditado);
@@ -156,7 +162,7 @@ export default function LinhaSolicitacao({
       }
       await updateValorSolicitacao(solicitacao.id, valorNumero);
       setEditandoValor(false);
-      onAtualizar();
+      await notificarAtualizacao({ type: 'refresh_item', id: solicitacao.id });
     } catch (err) {
       console.error(err);
       alert('Erro ao atualizar valor');
@@ -167,7 +173,7 @@ export default function LinhaSolicitacao({
     if (!confirm('Excluir esta solicitacao? Esta acao nao pode ser desfeita.')) return;
     try {
       await deleteSolicitacao(solicitacao.id);
-      onAtualizar();
+      await notificarAtualizacao({ type: 'remove_item', id: solicitacao.id });
     } catch (err) {
       console.error(err);
       alert('Erro ao excluir solicitacao');
@@ -178,7 +184,7 @@ export default function LinhaSolicitacao({
     if (!confirm('Arquivar esta solicitação somente para sua visualização?')) return;
     try {
       await arquivarSolicitacao(solicitacao.id);
-      onAtualizar();
+      await notificarAtualizacao({ type: 'remove_item', id: solicitacao.id });
     } catch (err) {
       console.error(err);
       alert('Erro ao arquivar solicitação');
@@ -188,7 +194,7 @@ export default function LinhaSolicitacao({
   async function desarquivarItem() {
     try {
       await desarquivarSolicitacao(solicitacao.id);
-      onAtualizar();
+      await notificarAtualizacao({ type: 'remove_item', id: solicitacao.id });
     } catch (err) {
       console.error(err);
       alert('Erro ao desarquivar solicitação');
@@ -454,7 +460,7 @@ export default function LinhaSolicitacao({
                 }
 
                 alert('Solicitação assumida com sucesso.');
-                onAtualizar();
+                await notificarAtualizacao({ type: 'refresh_item', id: solicitacao.id });
               }}
             >
               Assumir
@@ -524,7 +530,9 @@ export default function LinhaSolicitacao({
           isSetorObraSolicitacao={isSetorObraSolicitacao}
           isUsuarioSetorObra={isSetorObra}
           onClose={() => setModalAtribuir(false)}
-          onSucesso={onAtualizar}
+          onSucesso={() => {
+            void notificarAtualizacao({ type: 'refresh_item', id: solicitacao.id });
+          }}
         />
       )}
 
@@ -532,7 +540,9 @@ export default function LinhaSolicitacao({
         <ModalEnviarSetor
           solicitacaoId={solicitacao.id}
           onClose={() => setModalEnviar(false)}
-          onSucesso={onAtualizar}
+          onSucesso={() => {
+            void notificarAtualizacao({ type: 'refresh_item', id: solicitacao.id });
+          }}
         />
       )}
 

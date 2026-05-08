@@ -7,6 +7,7 @@ import {
 } from '../../../services/compras';
 import { listarApropriacoes } from '../../../services/apropriacoes';
 import { getMinhasObras } from '../../../services/obras';
+import ApropriacaoAutocomplete from '../../../components/ui/ApropriacaoAutocomplete';
 import { useAuth } from '../../../contexts/AuthContext';
 import CompraPreviewModal from '../components/CompraPreviewModal';
 import { criarPreviewCompra } from '../utils/preview';
@@ -787,18 +788,12 @@ export default function NovaSolicitacaoCompra() {
               <div className="grid gap-3 xl:grid-cols-4">
                 <div className="grid gap-2">
                   <label className="text-sm font-medium">Apropriacao unica</label>
-                  <select
-                    className="input"
+                  <ApropriacaoAutocomplete
                     value={edicaoMassa.apropriacao_id}
-                    onChange={(event) => setEdicaoMassa((atual) => ({ ...atual, apropriacao_id: event.target.value }))}
-                  >
-                    <option value="">Manter atual</option>
-                    {apropriacoes.map((apropriacao) => (
-                      <option key={apropriacao.id} value={apropriacao.id}>
-                        {apropriacao.codigo} - {apropriacao.descricao}
-                      </option>
-                    ))}
-                  </select>
+                    options={apropriacoes}
+                    onChange={(id) => setEdicaoMassa((atual) => ({ ...atual, apropriacao_id: id }))}
+                    placeholder="Manter atual / buscar..."
+                  />
                 </div>
 
                 <div className="grid gap-2">
@@ -1062,18 +1057,11 @@ export default function NovaSolicitacaoCompra() {
                   <div key={`rateio-${rateioIndex}`} className="grid gap-3 rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4 md:grid-cols-[minmax(0,1fr)_180px_96px]">
                     <div className="grid gap-2">
                       <label className="text-sm font-medium">Apropriação</label>
-                      <select
-                        className="input"
+                      <ApropriacaoAutocomplete
                         value={rateio.apropriacao_id}
-                        onChange={(event) => atualizarRateioModal(rateioIndex, 'apropriacao_id', event.target.value)}
-                      >
-                        <option value="">Selecione</option>
-                        {apropriacoes.map((apropriacao) => (
-                          <option key={apropriacao.id} value={apropriacao.id}>
-                            {apropriacao.codigo} - {apropriacao.descricao}
-                          </option>
-                        ))}
-                      </select>
+                        options={apropriacoes}
+                        onChange={(id) => atualizarRateioModal(rateioIndex, 'apropriacao_id', id)}
+                      />
                     </div>
 
                     <div className="grid gap-2">

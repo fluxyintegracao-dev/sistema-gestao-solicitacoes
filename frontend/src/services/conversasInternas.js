@@ -124,9 +124,10 @@ export async function criarConversaEmMassa(payload) {
   return parseResponse(response, 'Erro ao criar conversas em massa');
 }
 
-export async function enviarMensagemConversa(id, mensagem, files = []) {
+export async function enviarMensagemConversa(id, mensagem, files = [], citacaoId = null) {
   const formData = new FormData();
   formData.append('mensagem', String(mensagem || ''));
+  if (citacaoId) formData.append('citacao_id', String(citacaoId));
   for (const file of files) {
     formData.append('files', file);
   }

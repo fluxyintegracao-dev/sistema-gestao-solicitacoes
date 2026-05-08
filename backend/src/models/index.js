@@ -1560,6 +1560,11 @@ db.ConversaInternaAnexo.belongsTo(db.ConversaInternaMensagem, {
   as: 'mensagem'
 });
 
+db.ConversaInternaMensagem.belongsTo(db.ConversaInternaMensagem, {
+  foreignKey: 'citacao_id',
+  as: 'citacaoMensagem'
+});
+
 db.ConversaInterna.hasMany(db.ConversaInternaParticipante, {
   foreignKey: 'conversa_id',
   as: 'participantes'

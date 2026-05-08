@@ -11,6 +11,7 @@ import { listarApropriacoes } from '../services/apropriacoes';
 import { getAprovacaoDiretoria, getAreasObra, getAreasPorSetorOrigem, getTiposSolicitacaoPorSetor } from '../services/configuracoesSistema';
 import { useAuth } from '../contexts/AuthContext';
 import { HiPaperClip } from 'react-icons/hi2';
+import ApropriacaoAutocomplete from '../components/ui/ApropriacaoAutocomplete';
 import PendingAttachmentsList from '../components/attachments/PendingAttachmentsList';
 import { userHasSetorCapability } from '../utils/setor';
 import { hasEnabledModule } from '../utils/acessoProduto';
@@ -1035,27 +1036,19 @@ export default function NovaSolicitacao() {
           {exibirCampoApropriacao && (
             <label className="grid gap-1 text-sm lg:col-span-6">
               Apropriacao da Solicitacao na Obra
-              <select
-                name="apropriacao_id"
-                onChange={handleChange}
-                className="input input-sm"
-                required={exigeApropriacaoPrincipal}
+              <ApropriacaoAutocomplete
                 value={form.apropriacao_id}
+                options={apropriacoes}
+                onChange={(id) => setForm({ ...form, apropriacao_id: id })}
                 disabled={!form.obra_id || solicitacaoCompra}
-              >
-                <option value="">
-                  {!form.obra_id
+                required={exigeApropriacaoPrincipal}
+                inputClassName="input input-sm w-full"
+                disabledPlaceholder={
+                  !form.obra_id
                     ? 'Selecione a obra primeiro'
-                    : solicitacaoCompra
-                      ? 'Nao se aplica para solicitacao de compra'
-                      : 'Selecione'}
-                </option>
-                {apropriacoes.map((apropriacao) => (
-                  <option key={apropriacao.id} value={apropriacao.id}>
-                    {apropriacao.codigo}{apropriacao.descricao ? ` - ${apropriacao.descricao}` : ''}
-                  </option>
-                ))}
-              </select>
+                    : 'Nao se aplica para solicitacao de compra'
+                }
+              />
               {solicitacaoCompra ? (
                 <span className="text-xs text-gray-500">
                   Para solicitacao de compra, a apropriacao e feita por item no modulo de compras.

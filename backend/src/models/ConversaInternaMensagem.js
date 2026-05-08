@@ -24,6 +24,11 @@ module.exports = (sequelize, DataTypes) => {
     editada_em: {
       type: DataTypes.DATE,
       allowNull: true
+    },
+
+    citacao_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true
     }
   }, {
     tableName: 'conversas_internas_mensagens',

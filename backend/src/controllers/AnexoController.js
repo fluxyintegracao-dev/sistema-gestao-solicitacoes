@@ -16,6 +16,7 @@ const {
   hasObraAccess
 } = require('../services/authorizationService');
 const { registrarEventoSeguranca } = require('../services/securityLogService');
+const { publishSolicitacaoRealtimeEvent } = require('../services/solicitacaoRealtimeService');
 
 async function validarAcessoSolicitacao(req, solicitacao) {
   if (!solicitacao) {
@@ -139,6 +140,18 @@ class AnexoController {
         mensagem: `${usuario?.nome || 'Usuario'} anexou ${registros.length} arquivo(s) na solicitacao ${codigo}`,
         created_by: usuario.id,
         metadata: { total: registros.length }
+      });
+
+      await publishSolicitacaoRealtimeEvent({
+        action: 'ATTACHMENT_ADDED',
+        solicitacao,
+        actor: {
+          id: usuario.id,
+          nome: usuario?.nome || req.user?.nome || null
+        },
+        metadata: {
+          total_arquivos: registros.length
+        }
       });
 
       return res.status(201).json(registros);
@@ -281,6 +294,19 @@ class AnexoController {
         acao: 'ANEXO_REMOVIDO',
         descricao: anexo?.nome_original || historico.descricao || 'Anexo removido',
         metadata: JSON.stringify({ caminho: caminho || null })
+      });
+
+      await publishSolicitacaoRealtimeEvent({
+        action: 'ATTACHMENT_REMOVED',
+        solicitacaoId: historico.solicitacao_id,
+        actor: {
+          id: usuario.id,
+          nome: usuario?.nome || req.user?.nome || null
+        },
+        metadata: {
+          anexo_id: anexoId || null,
+          caminho: caminho || null
+        }
       });
 
       return res.json({ ok: true });
