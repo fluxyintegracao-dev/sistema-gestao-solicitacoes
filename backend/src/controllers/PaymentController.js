@@ -14,7 +14,8 @@ const {
 } = require('../services/paymentApprovalService');
 const {
   enqueueSendBatch,
-  markBatchAsBankConfirmedMock
+  markBatchAsBankConfirmedMock,
+  reprocessBatch
 } = require('../services/paymentExecutionService');
 const {
   confirmBaixaFromPaymentIntent,
@@ -118,6 +119,16 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return responderErro(res, error, 'Erro ao enviar lote ao banco');
+    }
+  },
+
+  async reprocessarLote(req, res) {
+    try {
+      const data = await reprocessBatch(req, req.params.id, req.body || {});
+      return res.json(data);
+    } catch (error) {
+      console.error(error);
+      return responderErro(res, error, 'Erro ao reprocessar lote de pagamento');
     }
   },
 

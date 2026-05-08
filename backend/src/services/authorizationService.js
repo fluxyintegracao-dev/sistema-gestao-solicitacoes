@@ -802,6 +802,15 @@ async function canCancelPagamentos(user) {
   return userHasFinanceiroSector(user);
 }
 
+async function canReprocessPagamentos(user) {
+  if (isBusinessAdmin(user)) return true;
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, ['financeiro.pagamentos.reprocessar']);
+  }
+
+  return userHasFinanceiroSector(user);
+}
+
 async function canConfigurePagamentos(user) {
   if (isBusinessAdmin(user)) return true;
   if (await userHasConfiguredAreaPermissions(user)) {
@@ -1549,6 +1558,7 @@ module.exports = {
   canCreateProvisoes,
   canCreateContratos,
   canCancelPagamentos,
+  canReprocessPagamentos,
   canExportCrmLeads,
   canGenerateBoletos,
   canCreateComercialContratos,

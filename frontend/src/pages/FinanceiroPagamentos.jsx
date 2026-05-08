@@ -21,6 +21,7 @@ import {
   getPaymentEligibleTitulos,
   getPaymentsAwaitingBaixa,
   rejeitarPaymentBatch,
+  reprocessarPaymentBatch,
   simularRetornoPaymentBatch,
   submeterPaymentBatch
 } from '../services/financeiro';
@@ -30,6 +31,7 @@ import {
   canCancelPagamentos,
   canConfirmarBaixaPagamento,
   canPreparePagamentos,
+  canReprocessPagamentos,
   canSendPagamentosBanco
 } from '../utils/acessoProduto';
 
@@ -120,6 +122,7 @@ export default function FinanceiroPagamentos() {
   const canApprove = useMemo(() => canApprovePagamentos(user), [user]);
   const canSend = useMemo(() => canSendPagamentosBanco(user), [user]);
   const canCancel = useMemo(() => canCancelPagamentos(user), [user]);
+  const canReprocess = useMemo(() => canReprocessPagamentos(user), [user]);
   const canConfirmBaixa = useMemo(() => canConfirmarBaixaPagamento(user), [user]);
 
   async function loadBase() {
@@ -258,6 +261,16 @@ export default function FinanceiroPagamentos() {
     if (justificativa === null) return;
     runBatchAction('cancelar', (id) => cancelarPaymentBatch(id, {
       justificativa: justificativa.trim() || 'Cancelado pela operacao financeira.'
+    }));
+  }
+
+  function handleReprocessBatch() {
+    if (!selectedBatch?.id) return;
+    const justificativa = window.prompt('Informe o motivo do reprocessamento do lote:');
+    if (justificativa === null) return;
+    runBatchAction('reprocessar', (id) => reprocessarPaymentBatch(id, {
+      codigo_mfa: mfaCode,
+      justificativa: justificativa.trim() || 'Reprocessamento solicitado pela operacao financeira.'
     }));
   }
 
@@ -491,8 +504,15 @@ export default function FinanceiroPagamentos() {
                           <HiOutlinePaperAirplane className="h-4 w-4" />
                           Enviar mock
                         </button>
+                        <button type="button" className="btn btn-outline" onClick={handleReprocessBatch} disabled={!canReprocess || !['FALHA_INTEGRACAO', 'REJEITADO', 'PARCIALMENTE_REJEITADO'].includes(selectedBatch.status) || !mfaCode || actionLoading === 'reprocessar'}>
+                          <HiOutlineArrowPath className="h-4 w-4" />
+                          Reprocessar
+                        </button>
                         <button type="button" className="btn btn-outline" onClick={() => runBatchAction('retorno', (id) => simularRetornoPaymentBatch(id, { resultado: 'CONFIRMADO' }))} disabled={!canSend || !['ENVIADO_AO_BANCO', 'PROCESSANDO_BANCO'].includes(selectedBatch.status) || actionLoading === 'retorno'}>
                           Confirmar banco
+                        </button>
+                        <button type="button" className="btn btn-outline" onClick={() => runBatchAction('falha-mock', (id) => simularRetornoPaymentBatch(id, { resultado: 'FALHA' }))} disabled={!canSend || !['ENVIADO_AO_BANCO', 'PROCESSANDO_BANCO'].includes(selectedBatch.status) || actionLoading === 'falha-mock'}>
+                          Falha mock
                         </button>
                       </div>
                     </div>

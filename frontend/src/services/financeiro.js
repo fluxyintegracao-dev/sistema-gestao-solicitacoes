@@ -560,6 +560,16 @@ export async function enviarPaymentBatchBanco(id, data) {
   return parseJson(response, 'Erro ao enviar lote ao banco');
 }
 
+export async function reprocessarPaymentBatch(id, data = {}) {
+  const response = await fetch(`${API_URL}/financeiro/pagamentos/lotes/${id}/reprocessar`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+
+  return parseJson(response, 'Erro ao reprocessar lote de pagamento');
+}
+
 export async function simularRetornoPaymentBatch(id, data = {}) {
   const response = await fetch(`${API_URL}/financeiro/pagamentos/lotes/${id}/simular-retorno-banco`, {
     method: 'POST',

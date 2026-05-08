@@ -16,6 +16,34 @@ function createHttpError(statusCode, message) {
   return error;
 }
 
+async function ensureNoPendingSendJob(batchId) {
+  const pendingJob = await PaymentJob.findOne({
+    where: {
+      job_type: 'SEND_PAYMENT_BATCH',
+      entity_type: 'PAYMENT_BATCH',
+      entity_id: batchId,
+      status: { [Op.in]: ['PENDENTE', 'PROCESSANDO'] }
+    },
+    order: [['createdAt', 'DESC']]
+  });
+
+  if (pendingJob) {
+    throw createHttpError(409, 'Ja existe um job de envio pendente ou em processamento para este lote.');
+  }
+}
+
+async function createSendBatchJob(batchId) {
+  return PaymentJob.create({
+    job_type: 'SEND_PAYMENT_BATCH',
+    entity_type: 'PAYMENT_BATCH',
+    entity_id: batchId,
+    status: 'PENDENTE',
+    attempts: 0,
+    max_attempts: 3,
+    next_run_at: new Date()
+  });
+}
+
 async function enqueueSendBatch(req, id, payload = {}) {
   await verifyMfaStepUp(req, payload.codigo_mfa || payload.mfa_code);
 
@@ -30,16 +58,93 @@ async function enqueueSendBatch(req, id, payload = {}) {
     throw createHttpError(400, 'Lote exige duas aprovacoes validas.');
   }
 
-  const job = await PaymentJob.create({
-    job_type: 'SEND_PAYMENT_BATCH',
-    entity_type: 'PAYMENT_BATCH',
-    entity_id: batch.id,
-    status: 'PENDENTE',
-    attempts: 0,
-    max_attempts: 3,
-    next_run_at: new Date()
+  await ensureNoPendingSendJob(batch.id);
+  const job = await createSendBatchJob(batch.id);
+
+  await processSendBatchJob(req, job.id);
+  return PaymentBatch.findByPk(batch.id);
+}
+
+async function reprocessBatch(req, id, payload = {}) {
+  await verifyMfaStepUp(req, payload.codigo_mfa || payload.mfa_code);
+
+  const batch = await PaymentBatch.findByPk(id, {
+    include: [{ model: PaymentBatchItem, as: 'items' }]
+  });
+  if (!batch) throw createHttpError(404, 'Lote de pagamento nao encontrado.');
+
+  const batchStatus = String(batch.status || '').toUpperCase();
+  const reprocessableBatchStatuses = ['FALHA_INTEGRACAO', 'REJEITADO', 'PARCIALMENTE_REJEITADO'];
+  if (!reprocessableBatchStatuses.includes(batchStatus)) {
+    throw createHttpError(400, 'Apenas lotes com falha ou rejeicao podem ser reprocessados.');
+  }
+
+  if ((await countValidApprovals(batch.id)) < 2) {
+    throw createHttpError(400, 'Lote exige duas aprovacoes validas para reprocessamento.');
+  }
+
+  await ensureNoPendingSendJob(batch.id);
+
+  const reprocessableItemStatuses = ['FALHA_INTEGRACAO', 'REJEITADO_BANCO', 'REJEITADO'];
+  const intentIds = (batch.items || [])
+    .filter((item) => reprocessableItemStatuses.includes(String(item.status || '').toUpperCase()))
+    .map((item) => item.payment_intent_id)
+    .filter(Boolean);
+
+  if (!intentIds.length) {
+    throw createHttpError(400, 'Nao ha itens elegiveis para reprocessamento neste lote.');
+  }
+
+  await sequelize.transaction(async (transaction) => {
+    await batch.update({
+      status: 'APROVADO',
+      aprovacao_status: 'APROVADO',
+      sent_at: null,
+      sent_by: null,
+      closed_at: null
+    }, { transaction });
+
+    await PaymentIntent.update(
+      {
+        status: 'APROVADO',
+        enviado_em: null,
+        confirmado_banco_em: null,
+        updated_by: req.user?.id || null
+      },
+      { where: { id: { [Op.in]: intentIds } }, transaction }
+    );
+
+    await PaymentBatchItem.update(
+      {
+        status: 'APROVADO',
+        erro_codigo: null,
+        erro_mensagem: null
+      },
+      {
+        where: {
+          payment_batch_id: batch.id,
+          payment_intent_id: { [Op.in]: intentIds }
+        },
+        transaction
+      }
+    );
   });
 
+  await registrarEventoSeguranca({
+    req,
+    usuarioId: req.user?.id || null,
+    tipoEvento: 'PAYMENT_BATCH_REPROCESS_REQUESTED',
+    recursoTipo: 'PAYMENT_BATCH',
+    recursoId: batch.id,
+    status: 'SUCCESS',
+    descricao: 'Reprocessamento de lote de pagamento solicitado',
+    metadata: {
+      justificativa: payload.justificativa || null,
+      itens_reprocessados: intentIds.length
+    }
+  });
+
+  const job = await createSendBatchJob(batch.id);
   await processSendBatchJob(req, job.id);
   return PaymentBatch.findByPk(batch.id);
 }
@@ -65,6 +170,11 @@ async function processSendBatchJob(req, jobId) {
     if (!batch) throw createHttpError(404, 'Lote de pagamento nao encontrado.');
 
     const intentIds = batch.items.map((item) => item.payment_intent_id);
+    const attemptNumber = await PaymentTransaction.count({
+      where: { payment_batch_id: batch.id },
+      transaction
+    }) + 1;
+
     await batch.update({
       status: 'ENVIADO_AO_BANCO',
       sent_by: req.user?.id || null,
@@ -82,7 +192,7 @@ async function processSendBatchJob(req, jobId) {
     await PaymentTransaction.create({
       payment_batch_id: batch.id,
       provider_id: batch.provider_id,
-      attempt: Number(job.attempts || 0) + 1,
+      attempt: attemptNumber,
       status: 'ENVIADO_AO_BANCO',
       http_status: 202,
       provider_batch_id: `MOCK-BB-${batch.codigo}`,
@@ -124,8 +234,17 @@ async function markBatchAsBankConfirmedMock(req, id, payload = {}) {
   }
 
   const rejected = resultado === 'REJEITADO';
-  const intentStatus = rejected ? 'REJEITADO_BANCO' : 'AGUARDANDO_CONFIRMACAO_BAIXA';
-  const batchStatus = rejected ? 'REJEITADO' : 'AGUARDANDO_CONFIRMACAO_BAIXA';
+  const failed = ['FALHA', 'FALHA_INTEGRACAO', 'ERRO'].includes(resultado);
+  const intentStatus = failed
+    ? 'FALHA_INTEGRACAO'
+    : rejected
+      ? 'REJEITADO_BANCO'
+      : 'AGUARDANDO_CONFIRMACAO_BAIXA';
+  const batchStatus = failed
+    ? 'FALHA_INTEGRACAO'
+    : rejected
+      ? 'REJEITADO'
+      : 'AGUARDANDO_CONFIRMACAO_BAIXA';
   const now = new Date();
   const intentIds = batch.items.map((item) => item.payment_intent_id);
 
@@ -134,7 +253,7 @@ async function markBatchAsBankConfirmedMock(req, id, payload = {}) {
     await PaymentIntent.update(
       {
         status: intentStatus,
-        confirmado_banco_em: rejected ? null : now,
+        confirmado_banco_em: rejected || failed ? null : now,
         updated_by: req.user?.id || null
       },
       { where: { id: { [Op.in]: intentIds } }, transaction }
@@ -142,8 +261,8 @@ async function markBatchAsBankConfirmedMock(req, id, payload = {}) {
     await PaymentBatchItem.update(
       {
         status: intentStatus,
-        erro_codigo: rejected ? 'MOCK_REJEITADO' : null,
-        erro_mensagem: rejected ? 'Retorno mockado rejeitado.' : null
+        erro_codigo: failed ? 'MOCK_FALHA_INTEGRACAO' : rejected ? 'MOCK_REJEITADO' : null,
+        erro_mensagem: failed ? 'Falha mockada de integracao.' : rejected ? 'Retorno mockado rejeitado.' : null
       },
       { where: { payment_batch_id: batch.id }, transaction }
     );
@@ -152,11 +271,19 @@ async function markBatchAsBankConfirmedMock(req, id, payload = {}) {
   await registrarEventoSeguranca({
     req,
     usuarioId: req.user?.id || null,
-    tipoEvento: rejected ? 'PAYMENT_BATCH_REJECTED_BY_BANK_MOCK' : 'PAYMENT_BATCH_CONFIRMED_BY_BANK_MOCK',
+    tipoEvento: failed
+      ? 'PAYMENT_BATCH_INTEGRATION_FAILED_MOCK'
+      : rejected
+        ? 'PAYMENT_BATCH_REJECTED_BY_BANK_MOCK'
+        : 'PAYMENT_BATCH_CONFIRMED_BY_BANK_MOCK',
     recursoTipo: 'PAYMENT_BATCH',
     recursoId: batch.id,
     status: 'SUCCESS',
-    descricao: rejected ? 'Retorno mockado rejeitou o lote' : 'Retorno mockado confirmou o lote'
+    descricao: failed
+      ? 'Retorno mockado marcou falha de integracao no lote'
+      : rejected
+        ? 'Retorno mockado rejeitou o lote'
+        : 'Retorno mockado confirmou o lote'
   });
 
   return PaymentBatch.findByPk(batch.id);
@@ -165,5 +292,6 @@ async function markBatchAsBankConfirmedMock(req, id, payload = {}) {
 module.exports = {
   enqueueSendBatch,
   markBatchAsBankConfirmedMock,
-  processSendBatchJob
+  processSendBatchJob,
+  reprocessBatch
 };

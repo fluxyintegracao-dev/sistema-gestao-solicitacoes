@@ -119,6 +119,13 @@ function validatePaymentCancelBody(payload = {}) {
   });
 }
 
+function validatePaymentMockReturnBody(payload = {}) {
+  ensureAllowedKeys(payload, ['resultado'], 'Retorno bancario mockado');
+  return cleanUndefined({
+    resultado: parseEnum(payload.resultado || 'CONFIRMADO', 'Resultado', ['CONFIRMADO', 'REJEITADO', 'FALHA'], { required: true })
+  });
+}
+
 function validatePaymentAccountBody(payload = {}) {
   ensureAllowedKeys(payload, [
     'conta_bancaria_id',
@@ -154,5 +161,6 @@ module.exports = {
   validatePaymentBeneficiaryCreateBody,
   validatePaymentBeneficiaryUpdateBody,
   validatePaymentCancelBody,
+  validatePaymentMockReturnBody,
   validatePaymentMfaBody
 };

@@ -152,6 +152,7 @@ const {
   validatePaymentBeneficiaryCreateBody,
   validatePaymentBeneficiaryUpdateBody,
   validatePaymentCancelBody,
+  validatePaymentMockReturnBody,
   validatePaymentMfaBody
 } = require('./validators/paymentValidators');
 const { env } = require('./config/env');
@@ -177,6 +178,7 @@ const {
   canManageCrmAutomacoes,
   canManageCrmConfiguracoes,
   canRedistributeCrmLeads,
+  canReprocessPagamentos,
   canSendCrmAtendimento,
   canEditProvisoes,
   canEditRhDpApuracao,
@@ -444,6 +446,11 @@ const allowPagamentosCancel = allowPaymentAction(
   'FINANCEIRO_PAGAMENTOS_CANCEL',
   canCancelPagamentos,
   'Acesso negado para cancelar pagamentos bancarios'
+);
+const allowPagamentosReprocess = allowPaymentAction(
+  'FINANCEIRO_PAGAMENTOS_REPROCESS',
+  canReprocessPagamentos,
+  'Acesso negado para reprocessar pagamentos bancarios'
 );
 const allowPagamentosConfirmBaixa = allowPaymentAction(
   'FINANCEIRO_PAGAMENTOS_BAIXA',
@@ -1086,7 +1093,8 @@ router.post('/financeiro/pagamentos/lotes/:id/aprovar', allowPagamentosApprove, 
 router.post('/financeiro/pagamentos/lotes/:id/rejeitar', allowPagamentosApprove, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Lote de pagamento'), body: validatePaymentMfaBody }), PaymentController.rejeitarLote);
 router.post('/financeiro/pagamentos/lotes/:id/cancelar', allowPagamentosCancel, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Lote de pagamento'), body: validatePaymentCancelBody }), PaymentController.cancelarLote);
 router.post('/financeiro/pagamentos/lotes/:id/enviar-banco', allowPagamentosSend, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Lote de pagamento'), body: validatePaymentMfaBody }), PaymentController.enviarBanco);
-router.post('/financeiro/pagamentos/lotes/:id/simular-retorno-banco', allowPagamentosSend, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Lote de pagamento') }), PaymentController.simularRetornoBanco);
+router.post('/financeiro/pagamentos/lotes/:id/reprocessar', allowPagamentosReprocess, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Lote de pagamento'), body: validatePaymentMfaBody }), PaymentController.reprocessarLote);
+router.post('/financeiro/pagamentos/lotes/:id/simular-retorno-banco', allowPagamentosSend, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Lote de pagamento'), body: validatePaymentMockReturnBody }), PaymentController.simularRetornoBanco);
 router.get('/financeiro/pagamentos/aguardando-baixa', allowPagamentosConfirmBaixa, PaymentController.aguardandoBaixa);
 router.post('/financeiro/pagamentos/intents/:id/confirmar-baixa', allowPagamentosConfirmBaixa, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Intencao de pagamento') }), PaymentController.confirmarBaixa);
 router.get('/financeiro/pagamentos/providers', allowPagamentosRead, PaymentController.providers);
