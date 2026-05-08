@@ -7,6 +7,7 @@ import {
   HiOutlineInformationCircle,
   HiOutlinePencil,
   HiOutlineTrash,
+  HiOutlineXMark,
   HiPaperClip
 } from 'react-icons/hi2';
 import { useAuth } from '../contexts/AuthContext';
@@ -149,6 +150,7 @@ export default function ComunicacaoInterna() {
   const [menuMsgOpenUpward, setMenuMsgOpenUpward] = useState(true);
   const [infoMsg, setInfoMsg] = useState(null);
   const [mostrandoArquivadas, setMostrandoArquivadas] = useState(false);
+  const [mensagemRespondendo, setMensagemRespondendo] = useState(null);
 
   // Modal nova conversa
   const [showNova, setShowNova] = useState(false);
@@ -244,6 +246,7 @@ export default function ComunicacaoInterna() {
     setParticipantesLeitura([]);
     setMenuMsgId(null);
     setInfoMsg(null);
+    setMensagemRespondendo(null);
     setMobileModo('chat');
     setLoadingChat(true);
     try {
@@ -335,13 +338,16 @@ export default function ComunicacaoInterna() {
     setEnviando(true);
     const textoEnviado = msg;
     const arquivosEnviados = arquivos;
+    const citacaoAtual = mensagemRespondendo;
     setTexto('');
     setArquivos([]);
+    setMensagemRespondendo(null);
     try {
       const nova = await enviarMensagemConversa(
         conversaAtiva,
         textoEnviado,
-        extrairFilesAnexosPendentes(arquivosEnviados)
+        extrairFilesAnexosPendentes(arquivosEnviados),
+        citacaoAtual?.id || null
       );
       setMensagens((prev) => [...prev, {
         id: nova.id,
@@ -352,6 +358,8 @@ export default function ComunicacaoInterna() {
         editada_em: null,
         pode_editar: true,
         pode_deletar: true,
+        citacao_id: nova.citacao_id || null,
+        citacao: nova.citacao || null,
         autor: { id: userId, nome: user?.nome },
         anexos: []
       }]);
@@ -371,7 +379,7 @@ export default function ComunicacaoInterna() {
       setEnviando(false);
       inputRef.current?.focus();
     }
-  }, [conversaAtiva, enviando, texto, arquivos, userId, user, scrollToBottom]);
+  }, [conversaAtiva, enviando, texto, arquivos, mensagemRespondendo, userId, user, scrollToBottom]);
 
   const deletarMensagem = useCallback(async (msgId) => {
     if (!window.confirm('Excluir esta mensagem?')) return;
@@ -659,9 +667,11 @@ export default function ComunicacaoInterna() {
             {/* Área de mensagens */}
             <div ref={mensagensContainerRef} style={{ flex: 1, overflowY: 'auto', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 4 }}>
               {loadingChat ? (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, color: 'var(--c-muted)', fontSize: 13 }}>Carregando...</div>
+                <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--c-muted)', fontSize: 13 }}>Carregando...</div>
               ) : (
                 <>
+                  {/* Spacer empurra mensagens para baixo quando há poucas */}
+                  <div style={{ flex: 1 }} />
                   {temMais && (
                     <div style={{ display: 'flex', justifyContent: 'center', padding: '8px 0' }}>
                       <button
@@ -714,6 +724,10 @@ export default function ComunicacaoInterna() {
                               borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
                               minWidth: 150, overflow: 'hidden'
                             }}>
+                                <button
+                                onClick={() => { setMensagemRespondendo(msg); setMenuMsgId(null); inputRef.current?.focus(); }}
+                                style={{ display: 'flex', width: '100%', padding: '9px 14px', fontSize: 13, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-text)', gap: 8, alignItems: 'center' }}
+                              ><HiOutlineArrowUturnLeft size={14} /> Responder</button>
                               {msg.pode_editar && (
                                 <button
                                   onClick={() => { setEditandoId(msg.id); setTextoEdicao(msg.mensagem); setMenuMsgId(null); }}
@@ -745,6 +759,23 @@ export default function ComunicacaoInterna() {
                           }}>
                             {!euSou && (
                               <p style={{ fontSize: 11, fontWeight: 700, marginBottom: 2, color: 'var(--c-primary)' }}>{msg.autor?.nome}</p>
+                            )}
+                            {msg.citacao && (
+                              <div style={{
+                                background: euSou ? 'rgba(0,0,0,0.18)' : 'rgba(0,0,0,0.05)',
+                                borderLeft: `3px solid ${euSou ? 'rgba(255,255,255,0.6)' : 'var(--c-primary)'}`,
+                                borderRadius: '4px 8px 8px 4px',
+                                padding: '5px 10px',
+                                marginBottom: 6,
+                                cursor: 'default'
+                              }}>
+                                <p style={{ fontSize: 11, fontWeight: 700, margin: '0 0 2px', color: euSou ? 'rgba(255,255,255,0.8)' : 'var(--c-primary)' }}>
+                                  {msg.citacao.autor?.nome || 'Mensagem'}
+                                </p>
+                                <p style={{ fontSize: 11, margin: 0, color: euSou ? 'rgba(255,255,255,0.65)' : 'var(--c-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 260 }}>
+                                  {msg.citacao.mensagem}
+                                </p>
+                              </div>
                             )}
                             {editandoId === msg.id ? (
                               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -791,6 +822,17 @@ export default function ComunicacaoInterna() {
 
             {/* Input de mensagem */}
             <div style={{ borderTop: '1px solid var(--c-border)', background: 'var(--c-surface)', padding: '10px 16px', flexShrink: 0 }}>
+                {mensagemRespondendo && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px', marginBottom: 8, background: 'var(--c-bg, #f8fafc)', borderRadius: 8, borderLeft: '3px solid var(--c-primary)' }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--c-primary)', margin: 0 }}>{mensagemRespondendo.autor?.nome || 'Mensagem'}</p>
+                      <p style={{ fontSize: 12, color: 'var(--c-muted)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{mensagemRespondendo.mensagem}</p>
+                    </div>
+                    <button onClick={() => setMensagemRespondendo(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-muted)', display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+                      <HiOutlineXMark size={16} />
+                    </button>
+                  </div>
+                )}
                 <PendingAttachmentsList
                   items={arquivos}
                   onRemove={(index) => setArquivos((prev) => prev.filter((_, itemIndex) => itemIndex !== index))}
@@ -798,16 +840,6 @@ export default function ComunicacaoInterna() {
                   itemClassName="flex items-center justify-between gap-3 rounded border border-[var(--c-border)] bg-[var(--c-bg, #fff)] px-3 py-2 text-sm"
                   removeButtonClassName="text-red-600 font-semibold px-2"
                 />
-                {false && arquivos.length > 0 && (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
-                    {arquivos.map((f, i) => (
-                      <span key={i} style={{ fontSize: 11, background: '#dbeafe', color: '#1d4ed8', padding: '2px 8px', borderRadius: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
-                        📎 {f.name}
-                        <button onClick={() => setArquivos((prev) => prev.filter((_, j) => j !== i))} style={{ color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700 }}>×</button>
-                      </span>
-                    ))}
-                  </div>
-                )}
                 <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
                   <textarea
                     ref={inputRef}
