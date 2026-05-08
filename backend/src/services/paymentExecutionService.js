@@ -465,7 +465,7 @@ async function processBbSubmitPixBatchJob(req, jobId) {
       );
       await job.update({ status: 'ERRO', last_error: normalized.message }, { transaction });
     });
-    throw error;
+    throw createHttpError(normalized.statusCode || 500, normalized.message);
   }
 }
 
