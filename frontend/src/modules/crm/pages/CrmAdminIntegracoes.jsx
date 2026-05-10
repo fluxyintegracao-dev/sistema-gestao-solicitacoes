@@ -19,10 +19,14 @@ function fmtDate(value) {
 function StatusPill({ status }) {
   const cls = status === 'PROCESSED'
     ? 'bg-emerald-100 text-emerald-700'
+    : status === 'PROCESSING'
+      ? 'bg-blue-100 text-blue-700'
     : status === 'ERROR'
       ? 'bg-red-100 text-red-700'
       : status === 'DUPLICATE'
         ? 'bg-amber-100 text-amber-700'
+        : status === 'IGNORED'
+          ? 'bg-slate-100 text-slate-600'
         : 'bg-elevated text-main';
 
   return <span className={`app-status-pill ${cls}`}>{status || '-'}</span>;
@@ -107,7 +111,14 @@ function EventosTabela({ title, events, loading, onReprocess }) {
 
 export default function CrmAdminIntegracoes() {
   const [config, setConfig] = useState(null);
-  const [form, setForm] = useState({ meta_verify_token: '', meta_webhook_secret: '', google_webhook_secret: '' });
+  const [form, setForm] = useState({
+    meta_verify_token: '',
+    meta_webhook_secret: '',
+    meta_page_access_token: '',
+    meta_graph_api_version: 'v20.0',
+    meta_page_id: '',
+    google_webhook_secret: ''
+  });
   const [metaEvents, setMetaEvents] = useState([]);
   const [googleEvents, setGoogleEvents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -124,7 +135,9 @@ export default function CrmAdminIntegracoes() {
       setConfig(cfg);
       setForm((prev) => ({
         ...prev,
-        meta_verify_token: cfg?.meta?.verify_token || ''
+        meta_verify_token: cfg?.meta?.verify_token || '',
+        meta_graph_api_version: cfg?.meta?.graph_api_version || 'v20.0',
+        meta_page_id: cfg?.meta?.page_id || ''
       }));
       setMetaEvents(meta?.events || []);
       setGoogleEvents(google?.events || []);
@@ -147,10 +160,13 @@ export default function CrmAdminIntegracoes() {
     try {
       const payload = { meta_verify_token: form.meta_verify_token };
       if (form.meta_webhook_secret.trim()) payload.meta_webhook_secret = form.meta_webhook_secret.trim();
+      if (form.meta_page_access_token.trim()) payload.meta_page_access_token = form.meta_page_access_token.trim();
+      payload.meta_graph_api_version = form.meta_graph_api_version || 'v20.0';
+      payload.meta_page_id = form.meta_page_id || '';
       if (form.google_webhook_secret.trim()) payload.google_webhook_secret = form.google_webhook_secret.trim();
       const updated = await atualizarIntegracoesCrm(payload);
       setConfig(updated);
-      setForm((prev) => ({ ...prev, meta_webhook_secret: '', google_webhook_secret: '' }));
+      setForm((prev) => ({ ...prev, meta_webhook_secret: '', meta_page_access_token: '', google_webhook_secret: '' }));
       alert('Configuracoes salvas.');
     } catch (err) {
       alert(err.message || 'Erro ao salvar integracoes');
@@ -206,8 +222,28 @@ export default function CrmAdminIntegracoes() {
             </label>
             <label className="space-y-1 block">
               <span className="app-filter-label">Webhook secret</span>
-              <input className="input" value={form.meta_webhook_secret} onChange={updateField('meta_webhook_secret')} placeholder={config?.meta?.webhook_secret_configurado ? 'Configurado. Preencha para trocar.' : 'Nao configurado'} />
+              <input type="password" className="input" value={form.meta_webhook_secret} onChange={updateField('meta_webhook_secret')} placeholder={config?.meta?.webhook_secret_configurado ? 'Configurado. Preencha para trocar.' : 'Nao configurado'} />
             </label>
+            <label className="space-y-1 block">
+              <span className="app-filter-label">Page Access Token</span>
+              <input
+                type="password"
+                className="input"
+                value={form.meta_page_access_token}
+                onChange={updateField('meta_page_access_token')}
+                placeholder={config?.meta?.page_access_token_configurado ? 'Configurado. Preencha para trocar.' : 'Nao configurado'}
+              />
+            </label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <label className="space-y-1 block">
+                <span className="app-filter-label">Graph API</span>
+                <input className="input" value={form.meta_graph_api_version} onChange={updateField('meta_graph_api_version')} placeholder="v20.0" />
+              </label>
+              <label className="space-y-1 block">
+                <span className="app-filter-label">Page ID</span>
+                <input className="input" value={form.meta_page_id} onChange={updateField('meta_page_id')} placeholder="Opcional" />
+              </label>
+            </div>
           </div>
 
           <div className="rounded-2xl border border-base bg-elevated p-4 space-y-3">
@@ -218,7 +254,7 @@ export default function CrmAdminIntegracoes() {
             <input className="input font-mono text-xs" value={googleWebhookUrl} readOnly />
             <label className="space-y-1 block">
               <span className="app-filter-label">Webhook secret</span>
-              <input className="input" value={form.google_webhook_secret} onChange={updateField('google_webhook_secret')} placeholder={config?.google?.webhook_secret_configurado ? 'Configurado. Preencha para trocar.' : 'Nao configurado'} />
+              <input type="password" className="input" value={form.google_webhook_secret} onChange={updateField('google_webhook_secret')} placeholder={config?.google?.webhook_secret_configurado ? 'Configurado. Preencha para trocar.' : 'Nao configurado'} />
             </label>
           </div>
         </div>

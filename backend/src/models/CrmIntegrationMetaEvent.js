@@ -7,11 +7,15 @@ module.exports = (sequelize, DataTypes) => {
     adset_name: { type: DataTypes.STRING(160), allowNull: true },
     ad_name: { type: DataTypes.STRING(160), allowNull: true },
     form_name: { type: DataTypes.STRING(160), allowNull: true },
+    ad_id: { type: DataTypes.STRING(120), allowNull: true },
+    adset_id: { type: DataTypes.STRING(120), allowNull: true },
+    campaign_id: { type: DataTypes.STRING(120), allowNull: true },
     page_id: { type: DataTypes.STRING(80), allowNull: true },
     form_id: { type: DataTypes.STRING(80), allowNull: true },
     payload_json: { type: DataTypes.JSON, allowNull: false },
+    meta_response_json: { type: DataTypes.JSON, allowNull: true },
     processing_status: {
-      type: DataTypes.ENUM('PENDING', 'PROCESSED', 'DUPLICATE', 'ERROR'),
+      type: DataTypes.ENUM('PENDING', 'PROCESSING', 'PROCESSED', 'DUPLICATE', 'ERROR', 'IGNORED'),
       allowNull: false,
       defaultValue: 'PENDING'
     },
