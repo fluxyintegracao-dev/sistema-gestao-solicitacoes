@@ -255,6 +255,12 @@ function parseEnum(value, fieldName, allowedValues = [], { required = false } = 
   return normalized;
 }
 
+function parseCommercialOption(value, fieldName, { required = false, fallback, max = 60 } = {}) {
+  const normalized = parseOptionalText(value, fieldName, max, { required });
+  if (normalized === undefined) return fallback;
+  return normalized.trim().toUpperCase();
+}
+
 function parseBoolean(value, fieldName) {
   if (value === undefined) {
     return undefined;
@@ -461,14 +467,14 @@ function normalizeParcelas(parcelas) {
     return {
       sequencia: index + 1,
       descricao: parseOptionalText(item.descricao, `Descricao da parcela ${index + 1}`, 160, { required: true }),
-      tipo_parcela: parseEnum(item.tipo_parcela, `Tipo da parcela ${index + 1}`, PARCELA_TIPOS) || 'PARCELA',
-      forma_recebimento_prevista: parseEnum(
+      tipo_parcela: parseCommercialOption(item.tipo_parcela, `Tipo da parcela ${index + 1}`, { fallback: 'PARCELA' }),
+      forma_recebimento_prevista: parseCommercialOption(
         item.forma_recebimento_prevista,
         `Forma de recebimento prevista da parcela ${index + 1}`,
-        COMERCIAL_FORMA_RECEBIMENTO
+        { max: 60 }
       ),
       periodicidade: parseOptionalText(item.periodicidade, `Periodicidade da parcela ${index + 1}`, 30),
-      reajuste_tipo: parseEnum(item.reajuste_tipo, `Tipo de reajuste da parcela ${index + 1}`, PARCELA_REAJUSTE_TIPOS) || 'FIXA',
+      reajuste_tipo: parseCommercialOption(item.reajuste_tipo, `Tipo de reajuste da parcela ${index + 1}`, { fallback: 'FIXA' }),
       data_vencimento: parseDateOnly(item.data_vencimento, `Vencimento da parcela ${index + 1}`, { required: true }),
       valor: parseDecimal(item.valor, `Valor da parcela ${index + 1}`, { required: true, min: 0.01 }),
       observacoes: parseOptionalText(item.observacoes, `Observacoes da parcela ${index + 1}`, 1000)

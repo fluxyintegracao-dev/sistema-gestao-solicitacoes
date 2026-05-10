@@ -51,20 +51,38 @@ const PERIODICIDADES = [
 ];
 const CONTRATO_COMERCIAL_DRAFT_KEY = 'fluxy:comercial:contrato-venda:draft';
 
+function getOptionValue(option) {
+  return String(option?.value || option || '').trim();
+}
+
+function getOptionLabel(option) {
+  if (option && typeof option === 'object') return option.label || option.value || '';
+  return option || '';
+}
+
+function getOptionResumo(option) {
+  if (option && typeof option === 'object') return option.resumo || '';
+  return '';
+}
+
+function resolveOptionCatalog(configCatalog, fallbackCatalog) {
+  return Array.isArray(configCatalog) && configCatalog.length ? configCatalog : fallbackCatalog;
+}
+
 function filterOptionsByActive(catalog, activeValues) {
   if (!Array.isArray(activeValues)) return catalog;
   const active = new Set(activeValues.map((item) => String(item || '').trim().toUpperCase()).filter(Boolean));
-  return catalog.filter((item) => active.has(String(item.value || item).trim().toUpperCase()));
+  return catalog.filter((item) => active.has(getOptionValue(item).toUpperCase()));
 }
 
 function optionIsAvailable(options, value) {
   const normalized = String(value || '').trim().toUpperCase();
-  return options.some((item) => String(item.value || item).trim().toUpperCase() === normalized);
+  return options.some((item) => getOptionValue(item).toUpperCase() === normalized);
 }
 
 function firstOptionValue(options, fallback = '') {
   const first = options[0];
-  return first ? (first.value || first) : fallback;
+  return first ? getOptionValue(first) : fallback;
 }
 
 function today() {
@@ -346,11 +364,11 @@ function addMonths(dateString, monthsToAdd) {
 }
 
 function getPeriodicidadeConfig(periodicidade, periodicidades = PERIODICIDADES) {
-  return periodicidades.find((item) => item.value === periodicidade) || periodicidades[0] || PERIODICIDADES[0];
+  return periodicidades.find((item) => getOptionValue(item) === periodicidade) || periodicidades[0] || PERIODICIDADES[0];
 }
 
 function getModoComposicaoLabel(modo, modos = MODOS_COMPOSICAO) {
-  return modos.find((item) => item.value === modo)?.label || 'Composicao';
+  return getOptionLabel(modos.find((item) => getOptionValue(item) === modo)) || 'Composicao';
 }
 
 function buildParcelaCustomizada(index = 1, overrides = {}) {
@@ -555,7 +573,9 @@ function gerarParcelasDoBloco(plano = {}, planoId = '', periodicidades = PERIODI
     };
   }
 
-  const quantidade = periodicidade.value === 'AVISTA'
+  const periodicidadeValue = getOptionValue(periodicidade);
+  const intervalMonths = Number.isFinite(Number(periodicidade.intervalMonths)) ? Number(periodicidade.intervalMonths) : 0;
+  const quantidade = periodicidadeValue === 'AVISTA'
     ? 1
     : Math.max(0, Number(plano.quantidade_parcelas || 0));
   const valorParcela = toNumber(plano.valor_parcela);
@@ -569,10 +589,10 @@ function gerarParcelasDoBloco(plano = {}, planoId = '', periodicidades = PERIODI
     tipo_parcela: tipoParcelaPadrao,
     forma_recebimento_prevista: formaRecebimento,
     reajuste_tipo: plano.reajuste_tipo || 'FIXA',
-    data_vencimento: addMonths(plano.primeiro_vencimento || today(), index * periodicidade.intervalMonths),
+    data_vencimento: addMonths(plano.primeiro_vencimento || today(), index * intervalMonths),
     valor: valorParcela.toFixed(2),
     observacoes: buildObservacoesParcela('', plano.detalhe_forma_recebimento)
-  }, index, periodicidade.intervalMonths));
+  }, index, intervalMonths));
 
   return {
     parcelas,
@@ -731,24 +751,24 @@ export default function ComercialContratos() {
 
   const opcoesPagamentoConfig = categoriaConfig.opcoes_pagamento || {};
   const modosComposicao = useMemo(
-    () => filterOptionsByActive(MODOS_COMPOSICAO, opcoesPagamentoConfig.modos_ativos),
-    [opcoesPagamentoConfig.modos_ativos]
+    () => filterOptionsByActive(resolveOptionCatalog(opcoesPagamentoConfig.modos, MODOS_COMPOSICAO), opcoesPagamentoConfig.modos_ativos),
+    [opcoesPagamentoConfig.modos, opcoesPagamentoConfig.modos_ativos]
   );
   const parcelaTipos = useMemo(
-    () => filterOptionsByActive(PARCELA_TIPOS, opcoesPagamentoConfig.tipos_parcela_ativos),
-    [opcoesPagamentoConfig.tipos_parcela_ativos]
+    () => filterOptionsByActive(resolveOptionCatalog(opcoesPagamentoConfig.tipos_parcela, PARCELA_TIPOS), opcoesPagamentoConfig.tipos_parcela_ativos),
+    [opcoesPagamentoConfig.tipos_parcela, opcoesPagamentoConfig.tipos_parcela_ativos]
   );
   const formasRecebimento = useMemo(
-    () => filterOptionsByActive(FORMAS_RECEBIMENTO, opcoesPagamentoConfig.formas_recebimento_ativas),
-    [opcoesPagamentoConfig.formas_recebimento_ativas]
+    () => filterOptionsByActive(resolveOptionCatalog(opcoesPagamentoConfig.formas_recebimento, FORMAS_RECEBIMENTO), opcoesPagamentoConfig.formas_recebimento_ativas),
+    [opcoesPagamentoConfig.formas_recebimento, opcoesPagamentoConfig.formas_recebimento_ativas]
   );
   const parcelaReajusteTipos = useMemo(
-    () => filterOptionsByActive(PARCELA_REAJUSTE_TIPOS, opcoesPagamentoConfig.reajustes_ativos),
-    [opcoesPagamentoConfig.reajustes_ativos]
+    () => filterOptionsByActive(resolveOptionCatalog(opcoesPagamentoConfig.reajustes, PARCELA_REAJUSTE_TIPOS), opcoesPagamentoConfig.reajustes_ativos),
+    [opcoesPagamentoConfig.reajustes, opcoesPagamentoConfig.reajustes_ativos]
   );
   const periodicidades = useMemo(
-    () => filterOptionsByActive(PERIODICIDADES, opcoesPagamentoConfig.periodicidades_ativas),
-    [opcoesPagamentoConfig.periodicidades_ativas]
+    () => filterOptionsByActive(resolveOptionCatalog(opcoesPagamentoConfig.periodicidades, PERIODICIDADES), opcoesPagamentoConfig.periodicidades_ativas),
+    [opcoesPagamentoConfig.periodicidades, opcoesPagamentoConfig.periodicidades_ativas]
   );
 
   useEffect(() => {
@@ -1838,7 +1858,7 @@ export default function ComercialContratos() {
                 <label className="sol-filter-field">
                   <span className="sol-filter-label">Modo</span>
                   <select className="input w-full" value={generator.modo} onChange={(e) => setGenerator((c) => resolveGeneratorByModo(e.target.value, c))}>
-                    {modosComposicao.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+                    {modosComposicao.map((item) => <option key={getOptionValue(item)} value={getOptionValue(item)}>{getOptionLabel(item)}</option>)}
                   </select>
                 </label>
                 <label className="sol-filter-field">
@@ -1848,20 +1868,23 @@ export default function ComercialContratos() {
                 <label className="sol-filter-field">
                   <span className="sol-filter-label">Tipo da parcela</span>
                   <select className="input w-full" value={generator.tipo_parcela} onChange={(e) => setGenerator((c) => ({ ...c, tipo_parcela: e.target.value }))} disabled={generator.modo === 'ENTRADA'}>
-                    {parcelaTipos.map((tipo) => <option key={tipo} value={tipo}>{tipo}</option>)}
+                    {parcelaTipos.map((tipo) => <option key={getOptionValue(tipo)} value={getOptionValue(tipo)}>{getOptionLabel(tipo)}</option>)}
                   </select>
                 </label>
                 <label className="sol-filter-field md:col-span-2">
                   <span className="sol-filter-label">Forma prevista</span>
                   <select className="input w-full" value={generator.forma_recebimento_prevista} onChange={(e) => setGenerator((c) => ({ ...c, forma_recebimento_prevista: e.target.value, detalhe_forma_recebimento: isFormaComDetalhe(e.target.value) ? c.detalhe_forma_recebimento : '' }))}>
                     <option value="">Nao informar</option>
-                    {formasRecebimento.map((item) => <option key={item} value={item}>{item}</option>)}
+                    {formasRecebimento.map((item) => <option key={getOptionValue(item)} value={getOptionValue(item)}>{getOptionLabel(item)}</option>)}
                   </select>
                 </label>
                 <label className="sol-filter-field">
                   <span className="sol-filter-label">Reajuste</span>
                   <select className="input w-full" value={generator.reajuste_tipo} onChange={(e) => setGenerator((c) => ({ ...c, reajuste_tipo: e.target.value }))}>
-                    {parcelaReajusteTipos.map((item) => <option key={item.value} value={item.value}>{item.label} ({item.resumo})</option>)}
+                    {parcelaReajusteTipos.map((item) => {
+                      const resumo = getOptionResumo(item);
+                      return <option key={getOptionValue(item)} value={getOptionValue(item)}>{getOptionLabel(item)}{resumo ? ` (${resumo})` : ''}</option>;
+                    })}
                   </select>
                 </label>
               </div>
@@ -1894,7 +1917,7 @@ export default function ComercialContratos() {
                   <label className="sol-filter-field">
                     <span className="sol-filter-label">Periodicidade</span>
                   <select className="input w-full" value={generator.periodicidade} onChange={(e) => setGenerator((c) => ({ ...c, periodicidade: e.target.value, quantidade_parcelas: e.target.value === 'AVISTA' ? '1' : c.quantidade_parcelas }))}>
-                    {periodicidades.filter((item) => item.value !== 'PERSONALIZADA').map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+                    {periodicidades.filter((item) => getOptionValue(item) !== 'PERSONALIZADA').map((item) => <option key={getOptionValue(item)} value={getOptionValue(item)}>{getOptionLabel(item)}</option>)}
                   </select>
                 </label>
                 <label className="sol-filter-field">
@@ -1934,13 +1957,13 @@ export default function ComercialContratos() {
                         <label className="sol-filter-field">
                           <span className="sol-filter-label">Tipo</span>
                           <select className="input w-full" value={item.tipo_parcela} onChange={(e) => updateParcelaCustomizada(index, 'tipo_parcela', e.target.value)}>
-                            {parcelaTipos.map((tipo) => <option key={tipo} value={tipo}>{tipo}</option>)}
+                            {parcelaTipos.map((tipo) => <option key={getOptionValue(tipo)} value={getOptionValue(tipo)}>{getOptionLabel(tipo)}</option>)}
                           </select>
                         </label>
                         <label className="sol-filter-field">
                           <span className="sol-filter-label">Reajuste</span>
                           <select className="input w-full" value={item.reajuste_tipo || 'FIXA'} onChange={(e) => updateParcelaCustomizada(index, 'reajuste_tipo', e.target.value)}>
-                            {parcelaReajusteTipos.map((tipo) => <option key={tipo.value} value={tipo.value}>{tipo.label}</option>)}
+                            {parcelaReajusteTipos.map((tipo) => <option key={getOptionValue(tipo)} value={getOptionValue(tipo)}>{getOptionLabel(tipo)}</option>)}
                           </select>
                         </label>
                         <label className="sol-filter-field">
@@ -2038,7 +2061,7 @@ export default function ComercialContratos() {
                       {form.parcelas.map((item, index) => (
                         (() => {
                           const isEditing = parcelaEditandoIndex === index;
-                          const reajusteLabel = parcelaReajusteTipos.find((tipo) => tipo.value === (item.reajuste_tipo || 'FIXA'))?.label || item.reajuste_tipo || 'Fixa';
+                          const reajusteLabel = getOptionLabel(parcelaReajusteTipos.find((tipo) => getOptionValue(tipo) === (item.reajuste_tipo || 'FIXA'))) || item.reajuste_tipo || 'Fixa';
                           const canAdjust = Math.abs(diferencaComposicao) > 0.009;
 
                           return (
@@ -2053,7 +2076,7 @@ export default function ComercialContratos() {
                               <td className="px-3 py-3">
                                 {isEditing ? (
                                   <select className="input w-full" value={item.tipo_parcela} onChange={(e) => updateParcela(index, 'tipo_parcela', e.target.value)}>
-                                    {parcelaTipos.map((tipo) => <option key={tipo} value={tipo}>{tipo}</option>)}
+                                    {parcelaTipos.map((tipo) => <option key={getOptionValue(tipo)} value={getOptionValue(tipo)}>{getOptionLabel(tipo)}</option>)}
                                   </select>
                                 ) : (
                                   <span className="text-[var(--c-muted)]">{item.tipo_parcela || '-'}</span>
@@ -2063,7 +2086,7 @@ export default function ComercialContratos() {
                                 {isEditing ? (
                                   <select className="input w-full" value={item.forma_recebimento_prevista || ''} onChange={(e) => updateParcela(index, 'forma_recebimento_prevista', e.target.value)}>
                                     <option value="">Nao informar</option>
-                                    {formasRecebimento.map((forma) => <option key={forma} value={forma}>{forma}</option>)}
+                                    {formasRecebimento.map((forma) => <option key={getOptionValue(forma)} value={getOptionValue(forma)}>{getOptionLabel(forma)}</option>)}
                                   </select>
                                 ) : (
                                   <span className="text-[var(--c-muted)]">{item.forma_recebimento_prevista || '-'}</span>
@@ -2072,7 +2095,10 @@ export default function ComercialContratos() {
                               <td className="px-3 py-3">
                                 {isEditing ? (
                                   <select className="input w-full" value={item.reajuste_tipo || 'FIXA'} onChange={(e) => updateParcela(index, 'reajuste_tipo', e.target.value)}>
-                                    {parcelaReajusteTipos.map((tipo) => <option key={tipo.value} value={tipo.value}>{tipo.label} ({tipo.resumo})</option>)}
+                                    {parcelaReajusteTipos.map((tipo) => {
+                                      const resumo = getOptionResumo(tipo);
+                                      return <option key={getOptionValue(tipo)} value={getOptionValue(tipo)}>{getOptionLabel(tipo)}{resumo ? ` (${resumo})` : ''}</option>;
+                                    })}
                                   </select>
                                 ) : (
                                   <span className="text-[var(--c-muted)]">{reajusteLabel}</span>

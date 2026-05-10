@@ -15,19 +15,37 @@ function toggleId(list, id, checked) {
   return Array.from(current);
 }
 
-function toggleValue(list, value, checked) {
-  const normalized = String(value || '').trim().toUpperCase();
-  const current = new Set((list || []).map((item) => String(item || '').trim().toUpperCase()).filter(Boolean));
-  if (checked) {
-    current.add(normalized);
-  } else {
-    current.delete(normalized);
-  }
-  return Array.from(current);
+function getOptionGroup(config, key) {
+  return Array.isArray(config?.opcoes_pagamento?.[key]) ? config.opcoes_pagamento[key] : [];
 }
 
-function getActiveOptions(config, key) {
-  return Array.isArray(config?.opcoes_pagamento?.[key]) ? config.opcoes_pagamento[key] : [];
+function createOptionTemplate(groupKey) {
+  const base = { value: '', label: '', ativo: true };
+  if (groupKey === 'reajustes') return { ...base, resumo: '' };
+  if (groupKey === 'periodicidades') return { ...base, intervalMonths: '' };
+  return base;
+}
+
+function updateOptionGroup(config, groupKey, updater) {
+  const currentItems = getOptionGroup(config, groupKey);
+  const nextItems = typeof updater === 'function' ? updater(currentItems) : updater;
+  return {
+    ...config,
+    opcoes_pagamento: {
+      ...(config.opcoes_pagamento || {}),
+      [groupKey]: nextItems
+    }
+  };
+}
+
+function getOptionPayload(config) {
+  return {
+    modos: getOptionGroup(config, 'modos'),
+    tipos_parcela: getOptionGroup(config, 'tipos_parcela'),
+    formas_recebimento: getOptionGroup(config, 'formas_recebimento'),
+    reajustes: getOptionGroup(config, 'reajustes'),
+    periodicidades: getOptionGroup(config, 'periodicidades')
+  };
 }
 
 function CategoriaChecklist({ title, description, categorias, selectedIds, onChange }) {
@@ -82,9 +100,28 @@ function CategoriaChecklist({ title, description, categorias, selectedIds, onCha
   );
 }
 
-function OpcaoChecklist({ title, description, itens, selectedValues, onChange }) {
-  const selected = new Set((selectedValues || []).map((item) => String(item || '').trim().toUpperCase()).filter(Boolean));
-  const allValues = (itens || []).map((item) => item.value);
+function OpcoesCrud({ title, description, groupKey, itens, onChange }) {
+  const showResumo = groupKey === 'reajustes';
+  const showInterval = groupKey === 'periodicidades';
+  const ativos = (itens || []).filter((item) => item.ativo !== false).length;
+
+  function updateItem(index, patch) {
+    onChange((itens || []).map((item, itemIndex) => (
+      itemIndex === index ? { ...item, ...patch } : item
+    )));
+  }
+
+  function addItem() {
+    onChange([...(itens || []), createOptionTemplate(groupKey)]);
+  }
+
+  function removeItem(index) {
+    onChange((itens || []).filter((_, itemIndex) => itemIndex !== index));
+  }
+
+  function markAll(ativo) {
+    onChange((itens || []).map((item) => ({ ...item, ativo })));
+  }
 
   return (
     <section className="sol-surface-card rounded-2xl p-4 md:p-5">
@@ -93,44 +130,99 @@ function OpcaoChecklist({ title, description, itens, selectedValues, onChange })
           <p className="sol-filtros-title">{title}</p>
           <p className="sol-filtros-subtitle">{description}</p>
         </div>
-        <span className="sol-filtros-meta">{selected.size} ativa(s)</span>
+        <span className="sol-filtros-meta">{ativos} ativa(s)</span>
       </div>
 
       {(itens || []).length > 0 && (
         <div className="mt-4 flex flex-wrap gap-2">
-          <button type="button" className="btn btn-outline btn-sm" onClick={() => onChange(allValues)}>
+          <button type="button" className="btn btn-outline btn-sm" onClick={() => markAll(true)}>
             Marcar todos
           </button>
-          <button type="button" className="btn btn-outline btn-sm" onClick={() => onChange([])}>
+          <button type="button" className="btn btn-outline btn-sm" onClick={() => markAll(false)}>
             Desmarcar todos
           </button>
         </div>
       )}
 
-      <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-        {(itens || []).map((item) => (
-          <label
-            key={item.value}
-            className="flex items-start gap-3 rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-3 text-sm text-[var(--c-text)]"
+      <div className="mt-4 space-y-3">
+        {(itens || []).map((item, index) => (
+          <div
+            key={`${groupKey}-${index}`}
+            className="grid gap-3 rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-3 text-sm text-[var(--c-text)] md:grid-cols-[auto_minmax(110px,0.75fr)_minmax(160px,1fr)_auto]"
           >
-            <input
-              type="checkbox"
-              className="mt-1"
-              checked={selected.has(String(item.value || '').trim().toUpperCase())}
-              onChange={(event) => onChange(toggleValue(selectedValues, item.value, event.target.checked))}
-            />
-            <span>
-              <span className="block font-semibold">{item.label || item.value}</span>
-              {item.resumo && <span className="block text-xs text-[var(--c-muted)]">Resumo: {item.resumo}</span>}
-              {Number.isFinite(item.intervalMonths) && (
-                <span className="block text-xs text-[var(--c-muted)]">
-                  Intervalo: {item.intervalMonths === 0 ? 'sem intervalo' : `${item.intervalMonths} mes(es)`}
-                </span>
-              )}
-            </span>
-          </label>
+            <label className="flex items-center gap-2 font-semibold text-[var(--c-text)]">
+              <input
+                type="checkbox"
+                checked={item.ativo !== false}
+                onChange={(event) => updateItem(index, { ativo: event.target.checked })}
+              />
+              Ativo
+            </label>
+            <label className="sol-filter-field">
+              <span className="sol-filter-label">Codigo</span>
+              <input
+                className="input w-full uppercase"
+                value={item.value || ''}
+                onChange={(event) => updateItem(index, { value: event.target.value })}
+                placeholder="Ex.: MENSAL"
+              />
+            </label>
+            <label className="sol-filter-field">
+              <span className="sol-filter-label">Nome exibido</span>
+              <input
+                className="input w-full"
+                value={item.label || ''}
+                onChange={(event) => updateItem(index, { label: event.target.value })}
+                placeholder="Ex.: Mensal"
+              />
+            </label>
+            <div className="flex items-end">
+              <button type="button" className="btn btn-outline w-full border-rose-200 text-rose-700 hover:bg-rose-50" onClick={() => removeItem(index)}>
+                Excluir
+              </button>
+            </div>
+
+            {(showResumo || showInterval) && (
+              <div className="md:col-start-2 md:col-span-2">
+                {showResumo && (
+                  <label className="sol-filter-field max-w-[220px]">
+                    <span className="sol-filter-label">Resumo no contrato</span>
+                    <input
+                      className="input w-full uppercase"
+                      value={item.resumo || ''}
+                      onChange={(event) => updateItem(index, { resumo: event.target.value })}
+                      placeholder="F ou R"
+                    />
+                  </label>
+                )}
+                {showInterval && (
+                  <label className="sol-filter-field max-w-[220px]">
+                    <span className="sol-filter-label">Intervalo em meses</span>
+                    <input
+                      className="input w-full"
+                      type="number"
+                      min="0"
+                      value={item.intervalMonths ?? ''}
+                      onChange={(event) => updateItem(index, { intervalMonths: event.target.value })}
+                      placeholder="Ex.: 1"
+                    />
+                  </label>
+                )}
+              </div>
+            )}
+          </div>
         ))}
       </div>
+
+      <div className="mt-4">
+        <button type="button" className="btn btn-outline" onClick={addItem}>
+          Adicionar opcao
+        </button>
+      </div>
+
+      {(itens || []).length === 0 && (
+        <div className="app-empty-card mt-4">Nenhuma opcao cadastrada.</div>
+      )}
     </section>
   );
 }
@@ -173,13 +265,7 @@ export default function ConfiguracoesComercialCategorias() {
       const data = await salvarComercialCategoriasContrato({
         contrato_venda_categoria_ids: config.contrato_venda_categoria_ids,
         comissao_categoria_ids: config.comissao_categoria_ids,
-        opcoes_pagamento: {
-          modos_ativos: getActiveOptions(config, 'modos_ativos'),
-          tipos_parcela_ativos: getActiveOptions(config, 'tipos_parcela_ativos'),
-          formas_recebimento_ativas: getActiveOptions(config, 'formas_recebimento_ativas'),
-          reajustes_ativos: getActiveOptions(config, 'reajustes_ativos'),
-          periodicidades_ativas: getActiveOptions(config, 'periodicidades_ativas')
-        }
+        opcoes_pagamento: getOptionPayload(config)
       });
       setConfig(data || config);
       alert('Categorias comerciais atualizadas com sucesso.');
@@ -249,59 +335,44 @@ export default function ConfiguracoesComercialCategorias() {
       />
 
       <section className="grid gap-4 xl:grid-cols-2">
-        <OpcaoChecklist
+        <OpcoesCrud
           title="Modo"
           description="Controla os modos disponiveis para compor a forma de pagamento."
+          groupKey="modos"
           itens={config.opcoes_pagamento?.modos || []}
-          selectedValues={getActiveOptions(config, 'modos_ativos')}
-          onChange={(values) => setConfig((current) => ({
-            ...current,
-            opcoes_pagamento: { ...(current.opcoes_pagamento || {}), modos_ativos: values }
-          }))}
+          onChange={(values) => setConfig((current) => updateOptionGroup(current, 'modos', values))}
         />
 
-        <OpcaoChecklist
+        <OpcoesCrud
           title="Tipo da parcela"
           description="Define os tipos de parcelas que podem ser usados nos blocos e linhas manuais."
+          groupKey="tipos_parcela"
           itens={config.opcoes_pagamento?.tipos_parcela || []}
-          selectedValues={getActiveOptions(config, 'tipos_parcela_ativos')}
-          onChange={(values) => setConfig((current) => ({
-            ...current,
-            opcoes_pagamento: { ...(current.opcoes_pagamento || {}), tipos_parcela_ativos: values }
-          }))}
+          onChange={(values) => setConfig((current) => updateOptionGroup(current, 'tipos_parcela', values))}
         />
 
-        <OpcaoChecklist
+        <OpcoesCrud
           title="Forma prevista"
           description="Define as formas de recebimento previstas exibidas no contrato."
+          groupKey="formas_recebimento"
           itens={config.opcoes_pagamento?.formas_recebimento || []}
-          selectedValues={getActiveOptions(config, 'formas_recebimento_ativas')}
-          onChange={(values) => setConfig((current) => ({
-            ...current,
-            opcoes_pagamento: { ...(current.opcoes_pagamento || {}), formas_recebimento_ativas: values }
-          }))}
+          onChange={(values) => setConfig((current) => updateOptionGroup(current, 'formas_recebimento', values))}
         />
 
-        <OpcaoChecklist
+        <OpcoesCrud
           title="Reajuste"
           description="Define se as parcelas podem ser fixas, reajustaveis ou ambas."
+          groupKey="reajustes"
           itens={config.opcoes_pagamento?.reajustes || []}
-          selectedValues={getActiveOptions(config, 'reajustes_ativos')}
-          onChange={(values) => setConfig((current) => ({
-            ...current,
-            opcoes_pagamento: { ...(current.opcoes_pagamento || {}), reajustes_ativos: values }
-          }))}
+          onChange={(values) => setConfig((current) => updateOptionGroup(current, 'reajustes', values))}
         />
 
-        <OpcaoChecklist
+        <OpcoesCrud
           title="Periodicidade"
           description="Define as periodicidades que aparecem nas parcelas periodicas."
+          groupKey="periodicidades"
           itens={config.opcoes_pagamento?.periodicidades || []}
-          selectedValues={getActiveOptions(config, 'periodicidades_ativas')}
-          onChange={(values) => setConfig((current) => ({
-            ...current,
-            opcoes_pagamento: { ...(current.opcoes_pagamento || {}), periodicidades_ativas: values }
-          }))}
+          onChange={(values) => setConfig((current) => updateOptionGroup(current, 'periodicidades', values))}
         />
       </section>
     </div>

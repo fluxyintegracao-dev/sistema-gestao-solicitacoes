@@ -175,42 +175,99 @@ function normalizarIdList(lista) {
   )];
 }
 
-function normalizarOpcaoValueList(lista, catalogo) {
-  const valoresValidos = new Set((catalogo || []).map((item) => String(item.value || '').trim().toUpperCase()));
-  if (!Array.isArray(lista)) {
-    return Array.from(valoresValidos);
-  }
+function normalizarCodigoOpcao(value, fallback = '') {
+  const raw = String(value || fallback || '').trim();
+  if (!raw) return '';
+  return raw
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 60);
+}
 
-  return [...new Set(
-    lista
-      .map((item) => String(item || '').trim().toUpperCase())
-      .filter((item) => valoresValidos.has(item))
-  )];
+function normalizarBooleanOpcao(value, fallback = true) {
+  if (typeof value === 'boolean') return value;
+  if (value === undefined || value === null || value === '') return fallback;
+  const normalized = String(value).trim().toLowerCase();
+  if (['true', '1', 'sim', 's', 'ativo'].includes(normalized)) return true;
+  if (['false', '0', 'nao', 'n', 'inativo'].includes(normalized)) return false;
+  return fallback;
+}
+
+function normalizarCatalogoOpcoesPagamento(grupo, itens, catalogoPadrao, activeSource) {
+  const source = Array.isArray(itens) && itens.length ? itens : catalogoPadrao;
+  const activeSourceProvided = Array.isArray(activeSource);
+  const activeSet = new Set((activeSource || []).map((item) => normalizarCodigoOpcao(item?.value || item)).filter(Boolean));
+  const mapped = [];
+  const vistos = new Set();
+
+  source.forEach((rawItem) => {
+    const item = rawItem && typeof rawItem === 'object' ? rawItem : { value: rawItem, label: rawItem };
+    const value = normalizarCodigoOpcao(item.value, item.label);
+    if (!value || vistos.has(value)) return;
+
+    const label = String(item.label || item.value || value).trim().slice(0, 120) || value;
+    const opcao = {
+      value,
+      label,
+      ativo: normalizarBooleanOpcao(item.ativo, activeSourceProvided ? activeSet.has(value) : true)
+    };
+
+    if (grupo === 'reajustes') {
+      opcao.resumo = String(item.resumo || value.slice(0, 1) || '').trim().toUpperCase().slice(0, 12);
+    }
+
+    if (grupo === 'periodicidades') {
+      if (item.intervalMonths === null || item.intervalMonths === '') {
+        opcao.intervalMonths = null;
+      } else {
+        const parsed = Number(item.intervalMonths);
+        opcao.intervalMonths = Number.isFinite(parsed) && parsed >= 0 ? Math.floor(parsed) : null;
+      }
+    }
+
+    vistos.add(value);
+    mapped.push(opcao);
+  });
+
+  if (mapped.length) return mapped;
+  return catalogoPadrao.map((item) => ({ ...item, ativo: true }));
 }
 
 function serializarComercialOpcoesPagamento(config = {}) {
-  return Object.entries(COMERCIAL_CONTRATO_OPCOES_PAGAMENTO).reduce((acc, [grupo, catalogo]) => {
+  return Object.entries(COMERCIAL_CONTRATO_OPCOES_PAGAMENTO).reduce((acc, [grupo, catalogoPadrao]) => {
     const activeKey = COMERCIAL_CONTRATO_OPCOES_KEYS[grupo];
-    const ativos = normalizarOpcaoValueList(config?.[activeKey], catalogo);
-    const ativosSet = new Set(ativos);
+    const catalogo = normalizarCatalogoOpcoesPagamento(
+      grupo,
+      config?.[grupo],
+      catalogoPadrao,
+      config?.[activeKey]
+    );
+    const ativos = catalogo.filter((item) => item.ativo).map((item) => item.value);
 
-    acc[grupo] = catalogo.map((item) => ({
-      ...item,
-      ativo: ativosSet.has(item.value)
-    }));
+    acc[grupo] = catalogo;
     acc[activeKey] = ativos;
     return acc;
   }, {});
 }
 
 function normalizarComercialOpcoesPagamentoPayload(payload = {}, fallback = {}) {
-  return Object.entries(COMERCIAL_CONTRATO_OPCOES_PAGAMENTO).reduce((acc, [grupo, catalogo]) => {
+  return Object.entries(COMERCIAL_CONTRATO_OPCOES_PAGAMENTO).reduce((acc, [grupo, catalogoPadrao]) => {
     const activeKey = COMERCIAL_CONTRATO_OPCOES_KEYS[grupo];
-    const source = Object.prototype.hasOwnProperty.call(payload || {}, activeKey)
+    const hasCatalogoPayload = Object.prototype.hasOwnProperty.call(payload || {}, grupo);
+    const hasActivePayload = Object.prototype.hasOwnProperty.call(payload || {}, activeKey);
+    const source = hasCatalogoPayload
+      ? payload?.[grupo]
+      : (fallback?.[grupo] || catalogoPadrao);
+    const activeSource = hasActivePayload
       ? payload?.[activeKey]
       : fallback?.[activeKey];
+    const catalogo = normalizarCatalogoOpcoesPagamento(grupo, source, catalogoPadrao, activeSource);
 
-    acc[activeKey] = normalizarOpcaoValueList(source, catalogo);
+    acc[grupo] = catalogo;
+    acc[activeKey] = catalogo.filter((item) => item.ativo).map((item) => item.value);
     return acc;
   }, {});
 }
