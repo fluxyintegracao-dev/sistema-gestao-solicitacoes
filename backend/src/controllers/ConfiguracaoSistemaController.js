@@ -51,6 +51,53 @@ const CHAVE_USUARIOS_PERMISSOES_RH_DP = 'USUARIOS_PERMISSOES_RH_DP';
 const CHAVE_COMERCIAL_CATEGORIAS_CONTRATO = 'COMERCIAL_CATEGORIAS_CONTRATO_VENDA';
 const TIMEOUT_INATIVIDADE_PADRAO_MINUTOS = 20;
 
+const COMERCIAL_CONTRATO_OPCOES_PAGAMENTO = {
+  modos: [
+    { value: 'ENTRADA', label: 'Entrada' },
+    { value: 'PERIODICO', label: 'Parcelas periodicas' },
+    { value: 'MANUAL', label: 'Lancamentos manuais' }
+  ],
+  tipos_parcela: [
+    { value: 'ENTRADA', label: 'ENTRADA' },
+    { value: 'PARCELA', label: 'PARCELA' },
+    { value: 'INTERMEDIARIA', label: 'INTERMEDIARIA' },
+    { value: 'CHAVES', label: 'CHAVES' },
+    { value: 'BALAO', label: 'BALAO' },
+    { value: 'OUTRA', label: 'OUTRA' }
+  ],
+  formas_recebimento: [
+    { value: 'DINHEIRO', label: 'DINHEIRO' },
+    { value: 'PIX', label: 'PIX' },
+    { value: 'CARTAO', label: 'CARTAO' },
+    { value: 'TRANSFERENCIA', label: 'TRANSFERENCIA' },
+    { value: 'BOLETO', label: 'BOLETO' },
+    { value: 'CHEQUE', label: 'CHEQUE' },
+    { value: 'PERMUTA', label: 'PERMUTA' },
+    { value: 'BENS', label: 'BENS' },
+    { value: 'OUTROS', label: 'OUTROS' }
+  ],
+  reajustes: [
+    { value: 'FIXA', label: 'Fixa', resumo: 'F' },
+    { value: 'REAJUSTAVEL', label: 'Reajustavel', resumo: 'R' }
+  ],
+  periodicidades: [
+    { value: 'AVISTA', label: 'A vista', intervalMonths: 0 },
+    { value: 'MENSAL', label: 'Mensal', intervalMonths: 1 },
+    { value: 'TRIMESTRAL', label: 'Trimestral', intervalMonths: 3 },
+    { value: 'SEMESTRAL', label: 'Semestral', intervalMonths: 6 },
+    { value: 'ANUAL', label: 'Anual', intervalMonths: 12 },
+    { value: 'PERSONALIZADA', label: 'Datas pre-definidas', intervalMonths: null }
+  ]
+};
+
+const COMERCIAL_CONTRATO_OPCOES_KEYS = {
+  modos: 'modos_ativos',
+  tipos_parcela: 'tipos_parcela_ativos',
+  formas_recebimento: 'formas_recebimento_ativas',
+  reajustes: 'reajustes_ativos',
+  periodicidades: 'periodicidades_ativas'
+};
+
 const COTACOES_DEFAULTS = {
   min_cotacoes: 3,
   criterio_vencedor: 'menor_total',
@@ -126,6 +173,46 @@ function normalizarIdList(lista) {
       .map(item => Number(item))
       .filter(item => Number.isInteger(item) && item > 0)
   )];
+}
+
+function normalizarOpcaoValueList(lista, catalogo) {
+  const valoresValidos = new Set((catalogo || []).map((item) => String(item.value || '').trim().toUpperCase()));
+  if (!Array.isArray(lista)) {
+    return Array.from(valoresValidos);
+  }
+
+  return [...new Set(
+    lista
+      .map((item) => String(item || '').trim().toUpperCase())
+      .filter((item) => valoresValidos.has(item))
+  )];
+}
+
+function serializarComercialOpcoesPagamento(config = {}) {
+  return Object.entries(COMERCIAL_CONTRATO_OPCOES_PAGAMENTO).reduce((acc, [grupo, catalogo]) => {
+    const activeKey = COMERCIAL_CONTRATO_OPCOES_KEYS[grupo];
+    const ativos = normalizarOpcaoValueList(config?.[activeKey], catalogo);
+    const ativosSet = new Set(ativos);
+
+    acc[grupo] = catalogo.map((item) => ({
+      ...item,
+      ativo: ativosSet.has(item.value)
+    }));
+    acc[activeKey] = ativos;
+    return acc;
+  }, {});
+}
+
+function normalizarComercialOpcoesPagamentoPayload(payload = {}, fallback = {}) {
+  return Object.entries(COMERCIAL_CONTRATO_OPCOES_PAGAMENTO).reduce((acc, [grupo, catalogo]) => {
+    const activeKey = COMERCIAL_CONTRATO_OPCOES_KEYS[grupo];
+    const source = Object.prototype.hasOwnProperty.call(payload || {}, activeKey)
+      ? payload?.[activeKey]
+      : fallback?.[activeKey];
+
+    acc[activeKey] = normalizarOpcaoValueList(source, catalogo);
+    return acc;
+  }, {});
 }
 
 function serializarDiretoriasPrioridade(configuracao, setoresDb = []) {
@@ -209,7 +296,8 @@ async function getComercialCategoriasContratoConfig() {
       ? normalizarIdList(config.comissao_categoria_ids)
       : categoriasComissao.map((categoria) => categoria.id),
     categorias_contrato: categoriasContrato,
-    categorias_comissao: categoriasComissao
+    categorias_comissao: categoriasComissao,
+    opcoes_pagamento: serializarComercialOpcoesPagamento(config?.opcoes_pagamento)
   };
 }
 
@@ -1135,6 +1223,15 @@ module.exports = {
     try {
       const contratoIds = normalizarIdList(req.body?.contrato_venda_categoria_ids);
       const comissaoIds = normalizarIdList(req.body?.comissao_categoria_ids);
+      const existente = await ConfiguracaoSistema.findOne({
+        where: { chave: CHAVE_COMERCIAL_CATEGORIAS_CONTRATO },
+        order: [['id', 'DESC']]
+      });
+      const configAtual = parseJsonOrDefault(existente?.valor, {});
+      const opcoesPagamento = normalizarComercialOpcoesPagamentoPayload(
+        req.body?.opcoes_pagamento,
+        configAtual?.opcoes_pagamento
+      );
       const categorias = await CategoriaFinanceira.findAll({
         where: { ativo: true },
         attributes: ['id', 'tipo']
@@ -1159,11 +1256,8 @@ module.exports = {
 
       const valor = JSON.stringify({
         contrato_venda_categoria_ids: contratoIds,
-        comissao_categoria_ids: comissaoIds
-      });
-      const existente = await ConfiguracaoSistema.findOne({
-        where: { chave: CHAVE_COMERCIAL_CATEGORIAS_CONTRATO },
-        order: [['id', 'DESC']]
+        comissao_categoria_ids: comissaoIds,
+        opcoes_pagamento: opcoesPagamento
       });
 
       if (existente) {

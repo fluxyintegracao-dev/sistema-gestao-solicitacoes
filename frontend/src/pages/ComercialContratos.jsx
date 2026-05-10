@@ -51,6 +51,22 @@ const PERIODICIDADES = [
 ];
 const CONTRATO_COMERCIAL_DRAFT_KEY = 'fluxy:comercial:contrato-venda:draft';
 
+function filterOptionsByActive(catalog, activeValues) {
+  if (!Array.isArray(activeValues)) return catalog;
+  const active = new Set(activeValues.map((item) => String(item || '').trim().toUpperCase()).filter(Boolean));
+  return catalog.filter((item) => active.has(String(item.value || item).trim().toUpperCase()));
+}
+
+function optionIsAvailable(options, value) {
+  const normalized = String(value || '').trim().toUpperCase();
+  return options.some((item) => String(item.value || item).trim().toUpperCase() === normalized);
+}
+
+function firstOptionValue(options, fallback = '') {
+  const first = options[0];
+  return first ? (first.value || first) : fallback;
+}
+
 function today() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -296,12 +312,12 @@ function addMonths(dateString, monthsToAdd) {
   return new Date(target.getTime() - target.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 }
 
-function getPeriodicidadeConfig(periodicidade) {
-  return PERIODICIDADES.find((item) => item.value === periodicidade) || PERIODICIDADES[0];
+function getPeriodicidadeConfig(periodicidade, periodicidades = PERIODICIDADES) {
+  return periodicidades.find((item) => item.value === periodicidade) || periodicidades[0] || PERIODICIDADES[0];
 }
 
-function getModoComposicaoLabel(modo) {
-  return MODOS_COMPOSICAO.find((item) => item.value === modo)?.label || 'Composicao';
+function getModoComposicaoLabel(modo, modos = MODOS_COMPOSICAO) {
+  return modos.find((item) => item.value === modo)?.label || 'Composicao';
 }
 
 function buildParcelaCustomizada(index = 1, overrides = {}) {
@@ -439,11 +455,11 @@ function resolveGeneratorByModo(modo, current = {}) {
   return { ...current, modo };
 }
 
-function gerarParcelasDoBloco(plano = {}, planoId = '') {
+function gerarParcelasDoBloco(plano = {}, planoId = '', periodicidades = PERIODICIDADES) {
   const formaRecebimento = plano.forma_recebimento_prevista || '';
   const tituloBase = String(plano.titulo_bloco || '').trim();
   const tipoParcelaPadrao = plano.tipo_parcela || 'PARCELA';
-  const periodicidade = getPeriodicidadeConfig(plano.periodicidade);
+  const periodicidade = getPeriodicidadeConfig(plano.periodicidade, periodicidades);
 
   function withPlanoMetadata(parcela, index, intervalMonths = null) {
     return {
@@ -543,7 +559,8 @@ export default function ComercialContratos() {
   const [categorias, setCategorias] = useState([]);
   const [categoriaConfig, setCategoriaConfig] = useState({
     contrato_venda_categoria_ids: [],
-    comissao_categoria_ids: []
+    comissao_categoria_ids: [],
+    opcoes_pagamento: {}
   });
   const [categoriaConfigLoaded, setCategoriaConfigLoaded] = useState(false);
   const [contratos, setContratos] = useState([]);
@@ -590,7 +607,8 @@ export default function ComercialContratos() {
             : [],
           comissao_categoria_ids: Array.isArray(categoriaConfigData.comissao_categoria_ids)
             ? categoriaConfigData.comissao_categoria_ids.map(Number)
-            : []
+            : [],
+          opcoes_pagamento: categoriaConfigData.opcoes_pagamento || {}
         });
         setCategoriaConfigLoaded(true);
       } else {
@@ -657,6 +675,73 @@ export default function ComercialContratos() {
     },
     [categorias, categoriaConfig.comissao_categoria_ids, categoriaConfigLoaded]
   );
+
+  const opcoesPagamentoConfig = categoriaConfig.opcoes_pagamento || {};
+  const modosComposicao = useMemo(
+    () => filterOptionsByActive(MODOS_COMPOSICAO, opcoesPagamentoConfig.modos_ativos),
+    [opcoesPagamentoConfig.modos_ativos]
+  );
+  const parcelaTipos = useMemo(
+    () => filterOptionsByActive(PARCELA_TIPOS, opcoesPagamentoConfig.tipos_parcela_ativos),
+    [opcoesPagamentoConfig.tipos_parcela_ativos]
+  );
+  const formasRecebimento = useMemo(
+    () => filterOptionsByActive(FORMAS_RECEBIMENTO, opcoesPagamentoConfig.formas_recebimento_ativas),
+    [opcoesPagamentoConfig.formas_recebimento_ativas]
+  );
+  const parcelaReajusteTipos = useMemo(
+    () => filterOptionsByActive(PARCELA_REAJUSTE_TIPOS, opcoesPagamentoConfig.reajustes_ativos),
+    [opcoesPagamentoConfig.reajustes_ativos]
+  );
+  const periodicidades = useMemo(
+    () => filterOptionsByActive(PERIODICIDADES, opcoesPagamentoConfig.periodicidades_ativas),
+    [opcoesPagamentoConfig.periodicidades_ativas]
+  );
+
+  useEffect(() => {
+    setGenerator((current) => {
+      let next = current;
+      const ensure = (condition, patch) => {
+        if (!condition) {
+          next = { ...next, ...patch };
+        }
+      };
+
+      ensure(!modosComposicao.length || optionIsAvailable(modosComposicao, next.modo), { modo: firstOptionValue(modosComposicao, next.modo) });
+      if (next.modo !== 'ENTRADA') {
+        ensure(!parcelaTipos.length || optionIsAvailable(parcelaTipos, next.tipo_parcela), { tipo_parcela: firstOptionValue(parcelaTipos, next.tipo_parcela) });
+      }
+      ensure(!formasRecebimento.length || !next.forma_recebimento_prevista || optionIsAvailable(formasRecebimento, next.forma_recebimento_prevista), {
+        forma_recebimento_prevista: firstOptionValue(formasRecebimento, '')
+      });
+      ensure(!parcelaReajusteTipos.length || optionIsAvailable(parcelaReajusteTipos, next.reajuste_tipo), {
+        reajuste_tipo: firstOptionValue(parcelaReajusteTipos, next.reajuste_tipo)
+      });
+      if (next.modo === 'PERIODICO') {
+        ensure(!periodicidades.length || optionIsAvailable(periodicidades, next.periodicidade), {
+          periodicidade: firstOptionValue(periodicidades, next.periodicidade)
+        });
+      }
+
+      const parcelasAtuais = next.parcelas_personalizadas || [];
+      const parcelasPersonalizadas = parcelasAtuais.map((item) => {
+        let parcela = item;
+        if (parcelaTipos.length && !optionIsAvailable(parcelaTipos, parcela.tipo_parcela)) {
+          parcela = { ...parcela, tipo_parcela: firstOptionValue(parcelaTipos, parcela.tipo_parcela) };
+        }
+        if (parcelaReajusteTipos.length && !optionIsAvailable(parcelaReajusteTipos, parcela.reajuste_tipo)) {
+          parcela = { ...parcela, reajuste_tipo: firstOptionValue(parcelaReajusteTipos, parcela.reajuste_tipo) };
+        }
+        return parcela;
+      });
+
+      if (parcelasPersonalizadas.some((item, index) => item !== parcelasAtuais[index])) {
+        next = { ...next, parcelas_personalizadas: parcelasPersonalizadas };
+      }
+
+      return next === current ? current : resolveGeneratorByModo(next.modo, next);
+    });
+  }, [formasRecebimento, modosComposicao, parcelaReajusteTipos, parcelaTipos, periodicidades]);
 
   const contratosFiltrados = useMemo(() => {
     const termo = normalizeSearch(busca);
@@ -763,7 +848,7 @@ export default function ComercialContratos() {
     }
 
     const planoId = `${Date.now()}-${Math.random()}`;
-    const resultado = gerarParcelasDoBloco(generator, planoId);
+    const resultado = gerarParcelasDoBloco(generator, planoId, periodicidades);
     if (resultado.error) {
       setError(resultado.error);
       return;
@@ -1593,7 +1678,7 @@ export default function ComercialContratos() {
                 <label className="sol-filter-field">
                   <span className="sol-filter-label">Modo</span>
                   <select className="input w-full" value={generator.modo} onChange={(e) => setGenerator((c) => resolveGeneratorByModo(e.target.value, c))}>
-                    {MODOS_COMPOSICAO.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+                    {modosComposicao.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
                   </select>
                 </label>
                 <label className="sol-filter-field">
@@ -1603,20 +1688,20 @@ export default function ComercialContratos() {
                 <label className="sol-filter-field">
                   <span className="sol-filter-label">Tipo da parcela</span>
                   <select className="input w-full" value={generator.tipo_parcela} onChange={(e) => setGenerator((c) => ({ ...c, tipo_parcela: e.target.value }))} disabled={generator.modo === 'ENTRADA'}>
-                    {PARCELA_TIPOS.map((tipo) => <option key={tipo} value={tipo}>{tipo}</option>)}
+                    {parcelaTipos.map((tipo) => <option key={tipo} value={tipo}>{tipo}</option>)}
                   </select>
                 </label>
                 <label className="sol-filter-field md:col-span-2">
                   <span className="sol-filter-label">Forma prevista</span>
                   <select className="input w-full" value={generator.forma_recebimento_prevista} onChange={(e) => setGenerator((c) => ({ ...c, forma_recebimento_prevista: e.target.value, detalhe_forma_recebimento: isFormaComDetalhe(e.target.value) ? c.detalhe_forma_recebimento : '' }))}>
                     <option value="">Nao informar</option>
-                    {FORMAS_RECEBIMENTO.map((item) => <option key={item} value={item}>{item}</option>)}
+                    {formasRecebimento.map((item) => <option key={item} value={item}>{item}</option>)}
                   </select>
                 </label>
                 <label className="sol-filter-field">
                   <span className="sol-filter-label">Reajuste</span>
                   <select className="input w-full" value={generator.reajuste_tipo} onChange={(e) => setGenerator((c) => ({ ...c, reajuste_tipo: e.target.value }))}>
-                    {PARCELA_REAJUSTE_TIPOS.map((item) => <option key={item.value} value={item.value}>{item.label} ({item.resumo})</option>)}
+                    {parcelaReajusteTipos.map((item) => <option key={item.value} value={item.value}>{item.label} ({item.resumo})</option>)}
                   </select>
                 </label>
               </div>
@@ -1649,7 +1734,7 @@ export default function ComercialContratos() {
                   <label className="sol-filter-field">
                     <span className="sol-filter-label">Periodicidade</span>
                   <select className="input w-full" value={generator.periodicidade} onChange={(e) => setGenerator((c) => ({ ...c, periodicidade: e.target.value, quantidade_parcelas: e.target.value === 'AVISTA' ? '1' : c.quantidade_parcelas }))}>
-                    {PERIODICIDADES.filter((item) => item.value !== 'PERSONALIZADA').map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+                    {periodicidades.filter((item) => item.value !== 'PERSONALIZADA').map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
                   </select>
                 </label>
                 <label className="sol-filter-field">
@@ -1689,13 +1774,13 @@ export default function ComercialContratos() {
                         <label className="sol-filter-field">
                           <span className="sol-filter-label">Tipo</span>
                           <select className="input w-full" value={item.tipo_parcela} onChange={(e) => updateParcelaCustomizada(index, 'tipo_parcela', e.target.value)}>
-                            {PARCELA_TIPOS.map((tipo) => <option key={tipo} value={tipo}>{tipo}</option>)}
+                            {parcelaTipos.map((tipo) => <option key={tipo} value={tipo}>{tipo}</option>)}
                           </select>
                         </label>
                         <label className="sol-filter-field">
                           <span className="sol-filter-label">Reajuste</span>
                           <select className="input w-full" value={item.reajuste_tipo || 'FIXA'} onChange={(e) => updateParcelaCustomizada(index, 'reajuste_tipo', e.target.value)}>
-                            {PARCELA_REAJUSTE_TIPOS.map((tipo) => <option key={tipo.value} value={tipo.value}>{tipo.label}</option>)}
+                            {parcelaReajusteTipos.map((tipo) => <option key={tipo.value} value={tipo.value}>{tipo.label}</option>)}
                           </select>
                         </label>
                         <label className="sol-filter-field">
@@ -1722,7 +1807,7 @@ export default function ComercialContratos() {
                   Adicionar forma de pagamento
                 </button>
                 <span className="inline-flex items-center rounded-full border border-[var(--c-border)] bg-[var(--c-surface)] px-3 py-2 text-sm text-[var(--c-text)]">
-                  Rascunho do bloco: <strong className="ml-1">{formatCurrency(gerarParcelasDoBloco(generator).total || 0)}</strong>
+                  Rascunho do bloco: <strong className="ml-1">{formatCurrency(gerarParcelasDoBloco(generator, '', periodicidades).total || 0)}</strong>
                 </span>
               </div>
 
@@ -1739,7 +1824,7 @@ export default function ComercialContratos() {
                                 Forma {index + 1}
                               </span>
                               <span className="inline-flex rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-700">
-                                {getModoComposicaoLabel(plano.modo)}
+                                {getModoComposicaoLabel(plano.modo, modosComposicao)}
                               </span>
                               {plano.forma_recebimento_prevista && (
                                 <span className="inline-flex rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700">
@@ -1793,7 +1878,7 @@ export default function ComercialContratos() {
                       {form.parcelas.map((item, index) => (
                         (() => {
                           const isEditing = parcelaEditandoIndex === index;
-                          const reajusteLabel = PARCELA_REAJUSTE_TIPOS.find((tipo) => tipo.value === (item.reajuste_tipo || 'FIXA'))?.label || item.reajuste_tipo || 'Fixa';
+                          const reajusteLabel = parcelaReajusteTipos.find((tipo) => tipo.value === (item.reajuste_tipo || 'FIXA'))?.label || item.reajuste_tipo || 'Fixa';
                           const canAdjust = Math.abs(diferencaComposicao) > 0.009;
 
                           return (
@@ -1808,7 +1893,7 @@ export default function ComercialContratos() {
                               <td className="px-3 py-3">
                                 {isEditing ? (
                                   <select className="input w-full" value={item.tipo_parcela} onChange={(e) => updateParcela(index, 'tipo_parcela', e.target.value)}>
-                                    {PARCELA_TIPOS.map((tipo) => <option key={tipo} value={tipo}>{tipo}</option>)}
+                                    {parcelaTipos.map((tipo) => <option key={tipo} value={tipo}>{tipo}</option>)}
                                   </select>
                                 ) : (
                                   <span className="text-[var(--c-muted)]">{item.tipo_parcela || '-'}</span>
@@ -1818,7 +1903,7 @@ export default function ComercialContratos() {
                                 {isEditing ? (
                                   <select className="input w-full" value={item.forma_recebimento_prevista || ''} onChange={(e) => updateParcela(index, 'forma_recebimento_prevista', e.target.value)}>
                                     <option value="">Nao informar</option>
-                                    {FORMAS_RECEBIMENTO.map((forma) => <option key={forma} value={forma}>{forma}</option>)}
+                                    {formasRecebimento.map((forma) => <option key={forma} value={forma}>{forma}</option>)}
                                   </select>
                                 ) : (
                                   <span className="text-[var(--c-muted)]">{item.forma_recebimento_prevista || '-'}</span>
@@ -1827,7 +1912,7 @@ export default function ComercialContratos() {
                               <td className="px-3 py-3">
                                 {isEditing ? (
                                   <select className="input w-full" value={item.reajuste_tipo || 'FIXA'} onChange={(e) => updateParcela(index, 'reajuste_tipo', e.target.value)}>
-                                    {PARCELA_REAJUSTE_TIPOS.map((tipo) => <option key={tipo.value} value={tipo.value}>{tipo.label} ({tipo.resumo})</option>)}
+                                    {parcelaReajusteTipos.map((tipo) => <option key={tipo.value} value={tipo.value}>{tipo.label} ({tipo.resumo})</option>)}
                                   </select>
                                 ) : (
                                   <span className="text-[var(--c-muted)]">{reajusteLabel}</span>
