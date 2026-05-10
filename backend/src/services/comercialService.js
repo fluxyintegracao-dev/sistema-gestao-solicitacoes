@@ -1365,6 +1365,7 @@ async function criarContratoComercial(req, payload = {}) {
         tipo_parcela: parcela.tipo_parcela,
         descricao: parcela.descricao,
         forma_recebimento_prevista: parcela.forma_recebimento_prevista || null,
+        periodicidade: parcela.periodicidade || null,
         reajuste_tipo: parcela.reajuste_tipo || 'FIXA',
         data_vencimento: parcela.data_vencimento,
         valor_original: roundCurrency(parcela.valor),

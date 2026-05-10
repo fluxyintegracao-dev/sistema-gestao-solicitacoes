@@ -77,6 +77,7 @@ const VARIAVEIS_CONTRATO_COMERCIAL = [
   { chave: 'empreendimento.codigo', descricao: 'Codigo do empreendimento' },
   { chave: 'unidade.codigo', descricao: 'Codigo da unidade' },
   { chave: 'unidade.nome', descricao: 'Nome da unidade' },
+  { chave: 'unidade.nome_codigo', descricao: 'Nome e numero da unidade separados por dois pontos' },
   { chave: 'unidade.bloco', descricao: 'Bloco da unidade' },
   { chave: 'unidade.torre', descricao: 'Torre/predio da unidade' },
   { chave: 'unidade.pavimento', descricao: 'Pavimento da unidade' },
@@ -95,6 +96,7 @@ const VARIAVEIS_CONTRATO_COMERCIAL = [
   { chave: 'parcelas.resumo', descricao: 'Resumo das parcelas do contrato' },
   { chave: 'parcelas.quadro_resumo_texto', descricao: 'Linhas agrupadas para o item VI do quadro resumo' },
   { chave: 'parcelas.quadro_resumo_itens', descricao: 'Lista de parcelas agrupadas para tabelas do quadro resumo' },
+  { chave: 'parcelas.itens[].periodicidade_label', descricao: 'Periodicidade formatada da parcela' },
   { chave: 'quadro_resumo.item_iii_texto', descricao: 'Resumo do item III do Quadro Resumo' },
   { chave: 'quadro_resumo.preco_total_unidade', descricao: 'Preco total da unidade para o item VI.a' },
   { chave: 'quadro_resumo.valor_leilao', descricao: 'Valor do imovel para fins de publico leilao' },
@@ -515,8 +517,20 @@ function buildParagraphLines(lines = [], options = {}) {
 }
 
 function formatCpfAssinatura(value) {
-  const cpf = safeString(value).trim();
+  const cpf = formatCpfCnpj(value);
   return cpf ? `CPF n\u00ba ${cpf}` : '';
+}
+
+function formatCpfCnpj(value) {
+  const documento = safeString(value).trim();
+  const digits = documento.replace(/\D/g, '');
+  if (digits.length === 11) {
+    return digits.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+  }
+  if (digits.length === 14) {
+    return digits.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
+  }
+  return documento;
 }
 
 function formatDocumentoRotulado(value) {
@@ -524,11 +538,11 @@ function formatDocumentoRotulado(value) {
   if (!documento) return '';
   const digits = documento.replace(/\D/g, '');
   const label = digits.length > 11 ? 'CNPJ' : 'CPF';
-  return `${label}: ${documento}`;
+  return `${label}: ${formatCpfCnpj(documento)}`;
 }
 
 function formatCreciRotulado(value) {
-  const creci = safeString(value).trim();
+  const creci = safeString(value).trim().replace(/^CRECI\s*:?\s*/i, '');
   return creci ? `CRECI: ${creci}` : '';
 }
 
@@ -590,7 +604,7 @@ function extractRepresentanteLegalIncorporadora(bodyText = '') {
 
   return [
     nome ? `Representante legal: ${nome}` : '',
-    cpfMatch ? `CPF nº ${cpfMatch[1]}` : '',
+    cpfMatch ? `CPF nº ${formatCpfCnpj(cpfMatch[1])}` : '',
     rgMatch ? `RG nº ${rgMatch[1].trim()}` : ''
   ].filter(Boolean);
 }
@@ -610,7 +624,29 @@ function extractIncorporadoraAssinaturaFromRows(rows = []) {
   if (!bodyText) return '';
 
   const cnpjMatch = bodyText.match(/CNPJ(?:\/MF)?\s*(?:n[ºo]\.?\s*)?([\d./-]{14,18})/i);
-  const cnpj = cnpjMatch ? cnpjMatch[1] : '';
+  const cnpj = cnpjMatch ? formatCpfCnpj(cnpjMatch[1]) : '';
+  const nome = bodyText
+    .split(/\s*,\s*pessoa|\s+inscrita\s+no\s+CNPJ|\s+CNPJ(?:\/MF)?/i)[0]
+    .trim();
+
+  return [
+    nome,
+    cnpj ? `CNPJ n\u00ba ${cnpj}` : '',
+    ...extractRepresentanteLegalIncorporadora(bodyText)
+  ].filter(Boolean).join('\n');
+}
+
+function extractIncorporadoraAssinaturaFromDocumentXml(xml = '') {
+  const paragraphs = safeString(xml).match(/<w:p[\s\S]*?<\/w:p>/g) || [];
+  const paragraph = paragraphs.find((item) => {
+    const text = normalizeTextForMatch(decodeXmlEntities(getXmlText(item)));
+    return text.startsWith('INCORPORADORA:') && text.includes('CNPJ');
+  });
+  const bodyText = decodeXmlEntities(getXmlText(paragraph)).replace(/^INCORPORADORA:\s*/i, '');
+  if (!bodyText) return '';
+
+  const cnpjMatch = bodyText.match(/CNPJ(?:\/MF)?\s*(?:n[Âºo]\.?\s*)?([\d./-]{14,18})/i);
+  const cnpj = cnpjMatch ? formatCpfCnpj(cnpjMatch[1]) : '';
   const nome = bodyText
     .split(/\s*,\s*pessoa|\s+inscrita\s+no\s+CNPJ|\s+CNPJ(?:\/MF)?/i)[0]
     .trim();
@@ -649,6 +685,22 @@ function applyContratoHeaderAutomation(zip, dados = {}) {
   });
 }
 
+function escapeRegExp(value) {
+  return safeString(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function buildUnidadeAutonomaResumo(unidade = {}) {
+  const codigo = safeString(unidade.codigo).trim();
+  const nome = safeString(unidade.nome).trim();
+  if (nome && codigo) {
+    const nomeSemCodigo = nome
+      .replace(new RegExp(`\\s*[-:]?\\s*${escapeRegExp(codigo)}\\s*$`, 'i'), '')
+      .trim();
+    return `${nomeSemCodigo || nome}: ${codigo}`;
+  }
+  return nome || codigo || '-';
+}
+
 function buildObjetoQuadroResumoCells(dados = {}) {
   return [
     [
@@ -657,7 +709,7 @@ function buildObjetoQuadroResumoCells(dados = {}) {
     ],
     [
       { text: 'Unidade Autônoma:', bold: true },
-      { text: ` ${safeString(dados?.unidade?.nome || dados?.unidade?.codigo || '-')}` }
+      { text: ` ${safeString(dados?.unidade?.nome_codigo || dados?.unidade?.nome || dados?.unidade?.codigo || '-')}` }
     ],
     [
       { text: 'Área privativa da unidade:', bold: true },
@@ -724,11 +776,11 @@ function buildAssinaturasQuadroResumo(dados = {}) {
   ]);
   addAssinatura('COMPRADOR(A)', [
     dados?.cliente?.nome,
-    dados?.cliente?.cpf_cnpj ? `CPF/CNPJ: ${dados.cliente.cpf_cnpj}` : ''
+    formatDocumentoRotulado(dados?.cliente?.cpf_cnpj)
   ]);
   addAssinatura('CONJUGE', [
     dados?.conjuge?.nome,
-    dados?.conjuge?.cpf_cnpj ? `CPF/CNPJ: ${dados.conjuge.cpf_cnpj}` : ''
+    formatDocumentoRotulado(dados?.conjuge?.cpf_cnpj)
   ]);
   addAssinatura('TESTEMUNHA 1', [
     dados?.testemunha_1?.nome,
@@ -865,7 +917,40 @@ function isLocalDataContratoParagraph(text) {
       || normalized.includes('IRIRI')
       || normalized.includes(' ES')
       || normalized.includes('-ES')
-    );
+  );
+}
+
+function splitSignatureLines(value) {
+  return safeString(value)
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
+
+function getLine(lines = [], index = 0) {
+  return safeString(lines[index]).trim();
+}
+
+function isIncorporadoraNomeAssinatura(normalized = '') {
+  return normalized.length <= 90 && /\bLTDA\b/.test(normalized) && (
+    normalized.includes('SPE')
+    || normalized.includes('INCORPORADORA')
+    || normalized.includes('CONSTRUTORA')
+  );
+}
+
+function buildClienteAssinaturaLines(dados = {}) {
+  return [
+    safeString(dados?.cliente?.nome).trim(),
+    formatDocumentoRotulado(dados?.cliente?.cpf_cnpj)
+  ].filter(Boolean);
+}
+
+function buildConjugeAssinaturaLines(dados = {}) {
+  return [
+    safeString(dados?.conjuge?.nome).trim(),
+    formatDocumentoRotulado(dados?.conjuge?.cpf_cnpj)
+  ].filter(Boolean);
 }
 
 function applyContratoAssinaturasAutomation(zip, dados = {}) {
@@ -875,6 +960,14 @@ function applyContratoAssinaturasAutomation(zip, dados = {}) {
 
   zip.file(/word\/document\.xml$/).forEach((entry) => {
     let xml = entry.asText();
+    const incorporadoraAssinatura = dados?.assinaturas?.vendedora_dados
+      || extractIncorporadoraAssinaturaFromDocumentXml(xml)
+      || dados?.assinaturas?.vendedora
+      || dados?.empreendimento?.nome;
+    const incorporadoraLines = splitSignatureLines(incorporadoraAssinatura);
+    const clienteLines = buildClienteAssinaturaLines(dados);
+    const conjugeLines = buildConjugeAssinaturaLines(dados);
+    let ultimaAssinaturaPessoa = '';
 
     xml = xml.replace(/<w:p[\s\S]*?<\/w:p>/g, (paragraphXml) => {
       const text = decodeXmlEntities(getXmlText(paragraphXml));
@@ -885,6 +978,41 @@ function applyContratoAssinaturasAutomation(zip, dados = {}) {
 
       if (localDataAssinatura && isLocalDataContratoParagraph(text)) {
         return buildParagraphLines([localDataAssinatura], { align: 'center' });
+      }
+
+      if (isIncorporadoraNomeAssinatura(normalized)) {
+        return buildParagraphLines([getLine(incorporadoraLines, 0)], { align: 'center' });
+      }
+
+      if (/^CNPJ\b/.test(normalized)) {
+        return buildParagraphLines([getLine(incorporadoraLines, 1)], { align: 'center' });
+      }
+
+      if (/^REPRESENTAD[AO]\b/.test(normalized)) {
+        return buildParagraphLines([getLine(incorporadoraLines, 2)], { align: 'center' });
+      }
+
+      if (/^RG\b/.test(normalized) && normalized.includes('CPF')) {
+        return buildParagraphLines([getLine(incorporadoraLines, 3)], { align: 'center' });
+      }
+
+      if (normalized === 'INCORPORADORA') {
+        return buildParagraphLines(['INCORPORADORA'], { align: 'center' });
+      }
+
+      if (normalized === 'COMPRADOR 1') {
+        ultimaAssinaturaPessoa = 'cliente';
+        return buildParagraphLines([getLine(clienteLines, 0)], { align: 'center' });
+      }
+
+      if (normalized === 'COMPRADOR 2') {
+        ultimaAssinaturaPessoa = 'conjuge';
+        return buildParagraphLines([getLine(conjugeLines, 0)], { align: 'center' });
+      }
+
+      if (normalized === 'DESCRITO NO QUADRO RESUMO') {
+        const lines = ultimaAssinaturaPessoa === 'conjuge' ? conjugeLines : clienteLines;
+        return buildParagraphLines([getLine(lines, 1)], { align: 'center' });
       }
 
       if (testemunha1.nome && normalized.includes('DALVINA DE OLIVEIRA LIMA')) {
@@ -901,6 +1029,10 @@ function applyContratoAssinaturasAutomation(zip, dados = {}) {
 
       if (testemunha2.cpf && normalized.includes('178.544.147')) {
         return buildParagraphLines([formatCpfAssinatura(testemunha2.cpf), 'TESTEMUNHA'], { align: 'center' });
+      }
+
+      if (normalized === 'TESTEMUNHA') {
+        return buildParagraphLines(['TESTEMUNHA'], { align: 'center' });
       }
 
       return paragraphXml;
@@ -941,6 +1073,55 @@ function getParcelaElemento(parcela = {}) {
   return String(parcela.descricao || 'OUTRAS').trim().toUpperCase() || 'OUTRAS';
 }
 
+const PERIODICIDADE_LABELS = {
+  AVISTA: 'A VISTA',
+  MENSAL: 'MENSAL',
+  TRIMESTRAL: 'TRIMESTRAL',
+  SEMESTRAL: 'SEMESTRAL',
+  ANUAL: 'ANUAL',
+  PERSONALIZADA: 'DATAS PRE-DEFINIDAS'
+};
+
+function normalizePeriodicidade(value) {
+  const normalized = normalizeTextForMatch(value).replace(/[^A-Z0-9]/g, '');
+  if (!normalized) return '';
+  if (normalized.includes('AVISTA') || normalized.includes('VISTA')) return 'AVISTA';
+  if (normalized.includes('MENSAL')) return 'MENSAL';
+  if (normalized.includes('TRIMESTRAL')) return 'TRIMESTRAL';
+  if (normalized.includes('SEMESTRAL')) return 'SEMESTRAL';
+  if (normalized.includes('ANUAL')) return 'ANUAL';
+  if (normalized.includes('PERSONALIZADA') || normalized.includes('PREDEFINIDA')) return 'PERSONALIZADA';
+  return normalized;
+}
+
+function inferPeriodicidadeFromDescricao(descricao = '') {
+  const normalized = normalizeTextForMatch(descricao);
+  if (/\bA\s*VISTA\b/.test(normalized)) return 'AVISTA';
+  if (/\bMENSA(IS|L)\b/.test(normalized)) return 'MENSAL';
+  if (/\bTRIMESTRA(IS|L)\b/.test(normalized)) return 'TRIMESTRAL';
+  if (/\bSEMESTRA(IS|L)\b/.test(normalized)) return 'SEMESTRAL';
+  if (/\bANUA(IS|L)\b/.test(normalized)) return 'ANUAL';
+  return '';
+}
+
+function getParcelaPeriodicidade(parcela = {}) {
+  return normalizePeriodicidade(parcela.periodicidade || parcela.plano_periodicidade)
+    || inferPeriodicidadeFromDescricao(parcela.descricao);
+}
+
+function getParcelaPeriodicidadeLabel(parcela = {}) {
+  const periodicidade = getParcelaPeriodicidade(parcela);
+  return PERIODICIDADE_LABELS[periodicidade] || periodicidade;
+}
+
+function normalizeDescricaoGrupoParcela(descricao = '') {
+  return normalizeTextForMatch(descricao)
+    .replace(/\b\d+\s*\/\s*\d+\b/g, '')
+    .replace(/\b\d+\b\s*$/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function buildQuadroResumoParcelas(parcelas = []) {
   if (!Array.isArray(parcelas) || !parcelas.length) {
     return {
@@ -953,11 +1134,13 @@ function buildQuadroResumoParcelas(parcelas = []) {
   parcelas.forEach((parcela) => {
     const elemento = getParcelaElemento(parcela);
     const reajusteTipo = String(parcela.reajuste_tipo || 'FIXA').trim().toUpperCase() === 'REAJUSTAVEL' ? 'R' : 'F';
-    const key = `${elemento}-${reajusteTipo}`;
+    const periodicidade = getParcelaPeriodicidade(parcela);
+    const key = `${elemento}-${reajusteTipo}-${periodicidade || normalizeDescricaoGrupoParcela(parcela.descricao)}`;
     if (!grupos.has(key)) {
       grupos.set(key, {
         elemento,
         reajuste_codigo: reajusteTipo,
+        periodicidade,
         parcelas: []
       });
     }
@@ -974,7 +1157,7 @@ function buildQuadroResumoParcelas(parcelas = []) {
 
     return {
       item: String(index + 1).padStart(2, '0'),
-      elemento: grupo.elemento,
+      elemento: [grupo.elemento, PERIODICIDADE_LABELS[grupo.periodicidade] || grupo.periodicidade].filter(Boolean).join(' - '),
       quantidade: String(parcelasGrupo.length).padStart(2, '0'),
       reajuste_codigo: grupo.reajuste_codigo,
       primeiro_vencimento: formatDateBr(primeiroVencimento),
@@ -1005,7 +1188,7 @@ function buildVagasGaragemResumo(contrato = {}) {
 function buildAssinaturaPessoa(nome, documento) {
   const partes = [
     safeString(nome).trim(),
-    safeString(documento).trim() ? `CPF/CNPJ: ${safeString(documento).trim()}` : ''
+    formatDocumentoRotulado(documento)
   ].filter(Boolean);
   return partes.join(' - ');
 }
@@ -1024,7 +1207,7 @@ function buildNumeroContrato(raw = {}, empreendimento = {}, unidade = {}) {
 function buildItemIIITexto(contrato = {}, empreendimento = {}, unidade = {}) {
   return [
     `Torre: ${safeString(unidade.torre || empreendimento.nome || '-')}`,
-    `Unidade Autônoma: ${safeString(unidade.nome || unidade.codigo || '-')}`,
+    `Unidade Autônoma: ${buildUnidadeAutonomaResumo(unidade)}`,
     `Área privativa da unidade: ${formatArea(unidade.metragem_privativa) || safeString(unidade.metragem_privativa) || '-'}`,
     `Fração Ideal: ${formatFracaoIdeal(unidade.fracao_ideal) || '-'}`,
     `Vagas de Garagem: ${buildVagasGaragemResumo(contrato)}`
@@ -1135,6 +1318,7 @@ function buildDadosContrato(contrato, customVariables = {}) {
     unidade: {
       codigo: safeString(unidade.codigo),
       nome: safeString(unidade.nome),
+      nome_codigo: buildUnidadeAutonomaResumo(unidade),
       bloco: safeString(unidade.bloco),
       torre: safeString(unidade.torre),
       pavimento: safeString(unidade.pavimento),
@@ -1180,6 +1364,8 @@ function buildDadosContrato(contrato, customVariables = {}) {
         descricao: safeString(parcela.descricao),
         tipo_parcela: safeString(parcela.tipo_parcela),
         forma_recebimento_prevista: safeString(parcela.forma_recebimento_prevista),
+        periodicidade: safeString(parcela.periodicidade),
+        periodicidade_label: getParcelaPeriodicidadeLabel(parcela),
         reajuste_tipo: safeString(parcela.reajuste_tipo || 'FIXA'),
         reajuste_codigo: String(parcela.reajuste_tipo || 'FIXA').toUpperCase() === 'REAJUSTAVEL' ? 'R' : 'F',
         data_vencimento: formatDateBr(parcela.data_vencimento),

@@ -1297,6 +1297,7 @@ export default function ComercialContratos() {
             descricao: item.descricao,
             tipo_parcela: item.tipo_parcela,
             forma_recebimento_prevista: item.forma_recebimento_prevista || undefined,
+            periodicidade: item.plano_periodicidade || item.periodicidade || undefined,
             reajuste_tipo: item.reajuste_tipo || 'FIXA',
             data_vencimento: item.data_vencimento,
             valor: item.valor || item.valor_original,

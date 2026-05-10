@@ -404,7 +404,7 @@ function normalizeParcelas(parcelas) {
 
     ensureAllowedKeys(
       item,
-      ['sequencia', 'descricao', 'tipo_parcela', 'forma_recebimento_prevista', 'reajuste_tipo', 'data_vencimento', 'valor', 'observacoes'],
+      ['sequencia', 'descricao', 'tipo_parcela', 'forma_recebimento_prevista', 'periodicidade', 'reajuste_tipo', 'data_vencimento', 'valor', 'observacoes'],
       `Parcela ${index + 1}`
     );
 
@@ -417,6 +417,7 @@ function normalizeParcelas(parcelas) {
         `Forma de recebimento prevista da parcela ${index + 1}`,
         COMERCIAL_FORMA_RECEBIMENTO
       ),
+      periodicidade: parseOptionalText(item.periodicidade, `Periodicidade da parcela ${index + 1}`, 30),
       reajuste_tipo: parseEnum(item.reajuste_tipo, `Tipo de reajuste da parcela ${index + 1}`, PARCELA_REAJUSTE_TIPOS) || 'FIXA',
       data_vencimento: parseDateOnly(item.data_vencimento, `Vencimento da parcela ${index + 1}`, { required: true }),
       valor: parseDecimal(item.valor, `Valor da parcela ${index + 1}`, { required: true, min: 0.01 }),

@@ -31,6 +31,10 @@ module.exports = (sequelize, DataTypes) => sequelize.define(
       type: DataTypes.STRING(30),
       allowNull: true
     },
+    periodicidade: {
+      type: DataTypes.STRING(30),
+      allowNull: true
+    },
     reajuste_tipo: {
       type: DataTypes.STRING(15),
       allowNull: false,
