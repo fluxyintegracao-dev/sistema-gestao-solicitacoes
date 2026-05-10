@@ -1441,10 +1441,8 @@ export default function ComercialContratos() {
     if (form.possui_vaga_garagem && form.vagas_garagem_posicao_especifica && !hasText(form.vagas_garagem_posicao)) camposFaltando.push('Posicao das vagas');
     if (!hasText(form.local_assinatura)) camposFaltando.push('Local de assinatura');
     if (!hasText(form.data_assinatura)) camposFaltando.push('Data de assinatura');
-    if (!hasText(form.testemunha_1_nome)) camposFaltando.push('Nome da testemunha 1');
-    if (!hasText(form.testemunha_1_cpf)) camposFaltando.push('CPF da testemunha 1');
-    if (!hasText(form.testemunha_2_nome)) camposFaltando.push('Nome da testemunha 2');
-    if (!hasText(form.testemunha_2_cpf)) camposFaltando.push('CPF da testemunha 2');
+    if (!hasText(form.testemunha_1_nome) || !hasText(form.testemunha_1_cpf)) camposFaltando.push('Testemunha 1 cadastrada');
+    if (!hasText(form.testemunha_2_nome) || !hasText(form.testemunha_2_cpf)) camposFaltando.push('Testemunha 2 cadastrada');
     if (hasText(form.testemunha_1_cpf) && (onlyDigits(form.testemunha_1_cpf).length !== 11 || !isValidCpfCnpj(form.testemunha_1_cpf))) camposFaltando.push('CPF valido da testemunha 1');
     if (hasText(form.testemunha_2_cpf) && (onlyDigits(form.testemunha_2_cpf).length !== 11 || !isValidCpfCnpj(form.testemunha_2_cpf))) camposFaltando.push('CPF valido da testemunha 2');
 
@@ -1839,50 +1837,48 @@ export default function ComercialContratos() {
           </div>
           <div className="rounded-xl border border-[var(--c-border)] bg-[var(--c-bg)] p-3">
             <p className="mb-3 text-sm font-semibold text-[var(--c-text)]">Testemunhas do contrato</p>
-            <div className="grid gap-3 md:grid-cols-4">
-              <label className="sol-filter-field md:col-span-2">
+            <div className="grid gap-3 md:grid-cols-2">
+              <label className="sol-filter-field">
                 <span className="sol-filter-label">Testemunha 1</span>
                 <select
-                  className="input mb-2 w-full"
+                  className="input w-full"
                   value={getTestemunhaSelecionadaId(1)}
                   onChange={(e) => {
                     const testemunha = testemunhas.find((item) => String(item.id) === String(e.target.value));
-                    if (testemunha) aplicarTestemunha(1, testemunha);
+                    if (testemunha) {
+                      aplicarTestemunha(1, testemunha);
+                    } else {
+                      setForm((c) => ({ ...c, testemunha_1_nome: '', testemunha_1_cpf: '' }));
+                    }
                   }}
                 >
                   <option value="">Selecionar testemunha cadastrada</option>
                   {testemunhas.map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}
                 </select>
-                <input className="input w-full" value={form.testemunha_1_nome} onChange={(e) => setForm((c) => ({ ...c, testemunha_1_nome: e.target.value }))} placeholder="Nome completo" />
                 <button type="button" className="btn btn-outline btn-sm mt-2" onClick={() => abrirCadastroRapidoPessoa('testemunha', { slot: 1 })}>
                   Cadastro rapido
                 </button>
               </label>
               <label className="sol-filter-field">
-                <span className="sol-filter-label">CPF testemunha 1</span>
-                <input className="input w-full" value={form.testemunha_1_cpf} onChange={(e) => setForm((c) => ({ ...c, testemunha_1_cpf: maskCpfCnpj(e.target.value) }))} placeholder="000.000.000-00" />
-              </label>
-              <label className="sol-filter-field md:col-span-2">
                 <span className="sol-filter-label">Testemunha 2</span>
                 <select
-                  className="input mb-2 w-full"
+                  className="input w-full"
                   value={getTestemunhaSelecionadaId(2)}
                   onChange={(e) => {
                     const testemunha = testemunhas.find((item) => String(item.id) === String(e.target.value));
-                    if (testemunha) aplicarTestemunha(2, testemunha);
+                    if (testemunha) {
+                      aplicarTestemunha(2, testemunha);
+                    } else {
+                      setForm((c) => ({ ...c, testemunha_2_nome: '', testemunha_2_cpf: '' }));
+                    }
                   }}
                 >
                   <option value="">Selecionar testemunha cadastrada</option>
                   {testemunhas.map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}
                 </select>
-                <input className="input w-full" value={form.testemunha_2_nome} onChange={(e) => setForm((c) => ({ ...c, testemunha_2_nome: e.target.value }))} placeholder="Nome completo" />
                 <button type="button" className="btn btn-outline btn-sm mt-2" onClick={() => abrirCadastroRapidoPessoa('testemunha', { slot: 2 })}>
                   Cadastro rapido
                 </button>
-              </label>
-              <label className="sol-filter-field">
-                <span className="sol-filter-label">CPF testemunha 2</span>
-                <input className="input w-full" value={form.testemunha_2_cpf} onChange={(e) => setForm((c) => ({ ...c, testemunha_2_cpf: maskCpfCnpj(e.target.value) }))} placeholder="000.000.000-00" />
               </label>
             </div>
           </div>
