@@ -264,6 +264,7 @@ function buildPessoaRapidaPayload(form, tipo, extras = {}) {
     cliente: tipo === 'cliente',
     fornecedor: tipo === 'corretor',
     corretor: tipo === 'corretor',
+    testemunha: tipo === 'testemunha',
     ...extras
   };
 }
@@ -614,6 +615,7 @@ export default function ComercialContratos() {
   const [unidades, setUnidades] = useState([]);
   const [clientes, setClientes] = useState([]);
   const [corretores, setCorretores] = useState([]);
+  const [testemunhas, setTestemunhas] = useState([]);
   const [obras, setObras] = useState([]);
   const [categorias, setCategorias] = useState([]);
   const [categoriaConfig, setCategoriaConfig] = useState({
@@ -636,6 +638,7 @@ export default function ComercialContratos() {
   const [pessoaRapidaForm, setPessoaRapidaForm] = useState(defaultPessoaRapidaForm());
   const [compradorSelecionarId, setCompradorSelecionarId] = useState('');
   const [mostrarCompradorAdicional, setMostrarCompradorAdicional] = useState(false);
+  const [testemunhaRapidaSlot, setTestemunhaRapidaSlot] = useState(null);
   const [distratoForm, setDistratoForm] = useState(defaultDistratoForm());
   const [trocaForm, setTrocaForm] = useState(defaultTrocaForm());
   const [error, setError] = useState('');
@@ -644,11 +647,12 @@ export default function ComercialContratos() {
     try {
       setLoading(true);
       setError('');
-      const [empreData, unidData, clientesData, corretoresData, obrasData, categoriasData, contratosData, categoriaConfigData, modelosData] = await Promise.all([
+      const [empreData, unidData, clientesData, corretoresData, testemunhasData, obrasData, categoriasData, contratosData, categoriaConfigData, modelosData] = await Promise.all([
         getEmpreendimentosComerciais({ ativo: 1 }),
         getUnidadesComerciais({ ativo: 1 }),
         buscarParceiros({ cliente: 1, ativo: 1, limit: 300 }),
         buscarParceiros({ corretor: 1, ativo: 1, limit: 300 }),
+        buscarParceiros({ testemunha: 1, ativo: 1, limit: 300 }),
         getMinhasObras(),
         getCategoriasFinanceiras(),
         getContratosComerciais(),
@@ -659,6 +663,7 @@ export default function ComercialContratos() {
       setUnidades(Array.isArray(unidData) ? unidData : []);
       setClientes(Array.isArray(clientesData) ? clientesData : []);
       setCorretores(Array.isArray(corretoresData) ? corretoresData : []);
+      setTestemunhas(Array.isArray(testemunhasData) ? testemunhasData : []);
       setObras(Array.isArray(obrasData) ? obrasData : []);
       setCategorias(Array.isArray(categoriasData) ? categoriasData : []);
       if (categoriaConfigData) {
@@ -1262,9 +1267,10 @@ export default function ComercialContratos() {
     }
   }
 
-  function abrirCadastroRapidoPessoa(tipo) {
+  function abrirCadastroRapidoPessoa(tipo, options = {}) {
     setPessoaRapidaForm(defaultPessoaRapidaForm(tipo));
     setPessoaRapidaModal(tipo);
+    setTestemunhaRapidaSlot(tipo === 'testemunha' ? options.slot || null : null);
   }
 
   function selecionarClientePrincipal(parceiroId) {
@@ -1304,6 +1310,26 @@ export default function ComercialContratos() {
     }));
   }
 
+  function aplicarTestemunha(slot, testemunha) {
+    if (!slot || !testemunha) return;
+    const prefix = slot === 2 ? 'testemunha_2' : 'testemunha_1';
+    setForm((current) => ({
+      ...current,
+      [`${prefix}_nome`]: testemunha.nome || '',
+      [`${prefix}_cpf`]: maskCpfCnpj(testemunha.cpf_cnpj || '')
+    }));
+  }
+
+  function getTestemunhaSelecionadaId(slot) {
+    const cpf = onlyDigits(slot === 2 ? form.testemunha_2_cpf : form.testemunha_1_cpf);
+    const nome = normalizeSearch(slot === 2 ? form.testemunha_2_nome : form.testemunha_1_nome);
+    const encontrada = testemunhas.find((item) => (
+      (cpf && onlyDigits(item.cpf_cnpj) === cpf)
+      || (!cpf && nome && normalizeSearch(item.nome) === nome)
+    ));
+    return encontrada ? String(encontrada.id) : '';
+  }
+
   function atualizarConjugeRapido(campo, valor) {
     setPessoaRapidaForm((current) => ({
       ...current,
@@ -1316,12 +1342,17 @@ export default function ComercialContratos() {
 
   async function salvarPessoaRapida() {
     try {
+      const tipo = pessoaRapidaModal || pessoaRapidaForm.tipo || 'cliente';
+
       if (!isValidCpfCnpj(pessoaRapidaForm.cpf_cnpj)) {
         setError('Informe um CPF/CNPJ valido no cadastro rapido.');
         return;
       }
+      if (tipo === 'testemunha' && onlyDigits(pessoaRapidaForm.cpf_cnpj).length !== 11) {
+        setError('Informe um CPF valido para a testemunha.');
+        return;
+      }
 
-      const tipo = pessoaRapidaModal || pessoaRapidaForm.tipo || 'cliente';
       let conjugeCriado = null;
 
       if (tipo === 'cliente' && pessoaRapidaForm.possui_conjuge) {
@@ -1369,6 +1400,9 @@ export default function ComercialContratos() {
           };
         });
         setMostrarCompradorAdicional(false);
+      } else if (tipo === 'testemunha') {
+        setTestemunhas((current) => [...current, pessoa].sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || ''))));
+        aplicarTestemunha(testemunhaRapidaSlot || 1, pessoa);
       } else {
         setCorretores((current) => [...current, pessoa].sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || ''))));
         setForm((current) => ({
@@ -1379,6 +1413,7 @@ export default function ComercialContratos() {
       }
 
       setPessoaRapidaModal(null);
+      setTestemunhaRapidaSlot(null);
       setPessoaRapidaForm(defaultPessoaRapidaForm());
     } catch (err) {
       setError(err?.message || 'Erro ao cadastrar pessoa');
@@ -1807,7 +1842,21 @@ export default function ComercialContratos() {
             <div className="grid gap-3 md:grid-cols-4">
               <label className="sol-filter-field md:col-span-2">
                 <span className="sol-filter-label">Testemunha 1</span>
+                <select
+                  className="input mb-2 w-full"
+                  value={getTestemunhaSelecionadaId(1)}
+                  onChange={(e) => {
+                    const testemunha = testemunhas.find((item) => String(item.id) === String(e.target.value));
+                    if (testemunha) aplicarTestemunha(1, testemunha);
+                  }}
+                >
+                  <option value="">Selecionar testemunha cadastrada</option>
+                  {testemunhas.map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}
+                </select>
                 <input className="input w-full" value={form.testemunha_1_nome} onChange={(e) => setForm((c) => ({ ...c, testemunha_1_nome: e.target.value }))} placeholder="Nome completo" />
+                <button type="button" className="btn btn-outline btn-sm mt-2" onClick={() => abrirCadastroRapidoPessoa('testemunha', { slot: 1 })}>
+                  Cadastro rapido
+                </button>
               </label>
               <label className="sol-filter-field">
                 <span className="sol-filter-label">CPF testemunha 1</span>
@@ -1815,7 +1864,21 @@ export default function ComercialContratos() {
               </label>
               <label className="sol-filter-field md:col-span-2">
                 <span className="sol-filter-label">Testemunha 2</span>
+                <select
+                  className="input mb-2 w-full"
+                  value={getTestemunhaSelecionadaId(2)}
+                  onChange={(e) => {
+                    const testemunha = testemunhas.find((item) => String(item.id) === String(e.target.value));
+                    if (testemunha) aplicarTestemunha(2, testemunha);
+                  }}
+                >
+                  <option value="">Selecionar testemunha cadastrada</option>
+                  {testemunhas.map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}
+                </select>
                 <input className="input w-full" value={form.testemunha_2_nome} onChange={(e) => setForm((c) => ({ ...c, testemunha_2_nome: e.target.value }))} placeholder="Nome completo" />
+                <button type="button" className="btn btn-outline btn-sm mt-2" onClick={() => abrirCadastroRapidoPessoa('testemunha', { slot: 2 })}>
+                  Cadastro rapido
+                </button>
               </label>
               <label className="sol-filter-field">
                 <span className="sol-filter-label">CPF testemunha 2</span>
@@ -2612,10 +2675,13 @@ export default function ComercialContratos() {
               <div>
                 <p className="quick-person-kicker">Contrato comercial</p>
                 <h2 className="quick-person-title">
-                  Cadastro rapido de {pessoaRapidaModal === 'cliente' ? 'cliente' : 'corretor'}
+                  Cadastro rapido de {pessoaRapidaModal === 'cliente' ? 'cliente' : pessoaRapidaModal === 'testemunha' ? 'testemunha' : 'corretor'}
                 </h2>
               </div>
-              <button type="button" className="btn btn-outline btn-sm" onClick={() => setPessoaRapidaModal(null)}>
+              <button type="button" className="btn btn-outline btn-sm" onClick={() => {
+                setPessoaRapidaModal(null);
+                setTestemunhaRapidaSlot(null);
+              }}>
                 Fechar
               </button>
             </div>
@@ -2628,12 +2694,16 @@ export default function ComercialContratos() {
                 </div>
                 <div className="quick-person-grid quick-person-grid-main">
               <label className="sol-filter-field">
-                <span className="sol-filter-label">CPF/CNPJ</span>
+                <span className="sol-filter-label">{pessoaRapidaModal === 'testemunha' ? 'CPF' : 'CPF/CNPJ'}</span>
                 <input
                   className="input w-full"
                   value={pessoaRapidaForm.cpf_cnpj}
                   onChange={(e) => setPessoaRapidaForm((current) => ({ ...current, cpf_cnpj: maskCpfCnpj(e.target.value) }))}
                   onBlur={() => {
+                    if (pessoaRapidaModal === 'testemunha' && pessoaRapidaForm.cpf_cnpj && onlyDigits(pessoaRapidaForm.cpf_cnpj).length !== 11) {
+                      setError('Informe um CPF valido para a testemunha.');
+                      return;
+                    }
                     if (pessoaRapidaForm.cpf_cnpj && !isValidCpfCnpj(pessoaRapidaForm.cpf_cnpj)) {
                       setError('Informe um CPF/CNPJ valido no cadastro rapido.');
                     }
@@ -2650,23 +2720,27 @@ export default function ComercialContratos() {
                   required
                 />
               </label>
-              <label className="sol-filter-field">
-                <span className="sol-filter-label">Telefone</span>
-                <input
-                  className="input w-full"
-                  value={pessoaRapidaForm.telefone}
-                  onChange={(e) => setPessoaRapidaForm((current) => ({ ...current, telefone: maskPhone(e.target.value) }))}
-                  required
-                />
-              </label>
-              <label className="sol-filter-field quick-span-2">
-                <span className="sol-filter-label">E-mail</span>
-                <input
-                  className="input w-full"
-                  value={pessoaRapidaForm.email}
-                  onChange={(e) => setPessoaRapidaForm((current) => ({ ...current, email: e.target.value }))}
-                />
-              </label>
+              {pessoaRapidaModal !== 'testemunha' && (
+                <>
+                  <label className="sol-filter-field">
+                    <span className="sol-filter-label">Telefone</span>
+                    <input
+                      className="input w-full"
+                      value={pessoaRapidaForm.telefone}
+                      onChange={(e) => setPessoaRapidaForm((current) => ({ ...current, telefone: maskPhone(e.target.value) }))}
+                      required
+                    />
+                  </label>
+                  <label className="sol-filter-field quick-span-2">
+                    <span className="sol-filter-label">E-mail</span>
+                    <input
+                      className="input w-full"
+                      value={pessoaRapidaForm.email}
+                      onChange={(e) => setPessoaRapidaForm((current) => ({ ...current, email: e.target.value }))}
+                    />
+                  </label>
+                </>
+              )}
               {pessoaRapidaModal === 'corretor' && (
                 <label className="sol-filter-field quick-span-2">
                   <span className="sol-filter-label">CRECI</span>
@@ -2747,71 +2821,73 @@ export default function ComercialContratos() {
                 </section>
             )}
 
-              <section className="quick-person-section">
-                <div className="quick-person-section-head">
-                  <h3>Endereco</h3>
-                  <p>Preenche rua, numero, bairro, cidade, UF e CEP nos documentos.</p>
-                </div>
-                <div className="quick-person-grid">
-              <label className="sol-filter-field quick-span-2">
-                <span className="sol-filter-label">Endereco</span>
-                <input
-                  className="input w-full"
-                  value={pessoaRapidaForm.endereco}
-                  onChange={(e) => setPessoaRapidaForm((current) => ({ ...current, endereco: e.target.value }))}
-                />
-              </label>
-              <label className="sol-filter-field">
-                <span className="sol-filter-label">Numero</span>
-                <input
-                  className="input w-full"
-                  value={pessoaRapidaForm.numero}
-                  onChange={(e) => setPessoaRapidaForm((current) => ({ ...current, numero: e.target.value }))}
-                />
-              </label>
-              <label className="sol-filter-field">
-                <span className="sol-filter-label">Complemento</span>
-                <input
-                  className="input w-full"
-                  value={pessoaRapidaForm.complemento}
-                  onChange={(e) => setPessoaRapidaForm((current) => ({ ...current, complemento: e.target.value }))}
-                />
-              </label>
-              <label className="sol-filter-field">
-                <span className="sol-filter-label">Bairro</span>
-                <input
-                  className="input w-full"
-                  value={pessoaRapidaForm.bairro}
-                  onChange={(e) => setPessoaRapidaForm((current) => ({ ...current, bairro: e.target.value }))}
-                />
-              </label>
-              <label className="sol-filter-field">
-                <span className="sol-filter-label">CEP</span>
-                <input
-                  className="input w-full"
-                  value={pessoaRapidaForm.cep}
-                  onChange={(e) => setPessoaRapidaForm((current) => ({ ...current, cep: maskCep(e.target.value) }))}
-                />
-              </label>
-              <label className="sol-filter-field">
-                <span className="sol-filter-label">Municipio</span>
-                <input
-                  className="input w-full"
-                  value={pessoaRapidaForm.municipio}
-                  onChange={(e) => setPessoaRapidaForm((current) => ({ ...current, municipio: e.target.value }))}
-                />
-              </label>
-              <label className="sol-filter-field">
-                <span className="sol-filter-label">UF</span>
-                <input
-                  className="input w-full"
-                  maxLength={2}
-                  value={pessoaRapidaForm.estado}
-                  onChange={(e) => setPessoaRapidaForm((current) => ({ ...current, estado: e.target.value.toUpperCase() }))}
-                />
-              </label>
-                </div>
-              </section>
+              {pessoaRapidaModal !== 'testemunha' && (
+                <section className="quick-person-section">
+                  <div className="quick-person-section-head">
+                    <h3>Endereco</h3>
+                    <p>Preenche rua, numero, bairro, cidade, UF e CEP nos documentos.</p>
+                  </div>
+                  <div className="quick-person-grid">
+                    <label className="sol-filter-field quick-span-2">
+                      <span className="sol-filter-label">Endereco</span>
+                      <input
+                        className="input w-full"
+                        value={pessoaRapidaForm.endereco}
+                        onChange={(e) => setPessoaRapidaForm((current) => ({ ...current, endereco: e.target.value }))}
+                      />
+                    </label>
+                    <label className="sol-filter-field">
+                      <span className="sol-filter-label">Numero</span>
+                      <input
+                        className="input w-full"
+                        value={pessoaRapidaForm.numero}
+                        onChange={(e) => setPessoaRapidaForm((current) => ({ ...current, numero: e.target.value }))}
+                      />
+                    </label>
+                    <label className="sol-filter-field">
+                      <span className="sol-filter-label">Complemento</span>
+                      <input
+                        className="input w-full"
+                        value={pessoaRapidaForm.complemento}
+                        onChange={(e) => setPessoaRapidaForm((current) => ({ ...current, complemento: e.target.value }))}
+                      />
+                    </label>
+                    <label className="sol-filter-field">
+                      <span className="sol-filter-label">Bairro</span>
+                      <input
+                        className="input w-full"
+                        value={pessoaRapidaForm.bairro}
+                        onChange={(e) => setPessoaRapidaForm((current) => ({ ...current, bairro: e.target.value }))}
+                      />
+                    </label>
+                    <label className="sol-filter-field">
+                      <span className="sol-filter-label">CEP</span>
+                      <input
+                        className="input w-full"
+                        value={pessoaRapidaForm.cep}
+                        onChange={(e) => setPessoaRapidaForm((current) => ({ ...current, cep: maskCep(e.target.value) }))}
+                      />
+                    </label>
+                    <label className="sol-filter-field">
+                      <span className="sol-filter-label">Municipio</span>
+                      <input
+                        className="input w-full"
+                        value={pessoaRapidaForm.municipio}
+                        onChange={(e) => setPessoaRapidaForm((current) => ({ ...current, municipio: e.target.value }))}
+                      />
+                    </label>
+                    <label className="sol-filter-field">
+                      <span className="sol-filter-label">UF</span>
+                      <input
+                        className="input w-full"
+                        maxLength={2}
+                        value={pessoaRapidaForm.estado}
+                        onChange={(e) => setPessoaRapidaForm((current) => ({ ...current, estado: e.target.value.toUpperCase() }))}
+                      />
+                    </label>
+                  </div>
+                </section>
+              )}
 
               {pessoaRapidaModal === 'cliente' && pessoaRapidaForm.possui_conjuge && (
                 <>
@@ -2976,10 +3052,15 @@ export default function ComercialContratos() {
               <p>
                 {pessoaRapidaModal === 'cliente'
                   ? 'Sera salvo como cliente ativo e selecionado neste contrato.'
-                  : 'Sera salvo como corretor e credor/fornecedor para comissao financeira.'}
+                  : pessoaRapidaModal === 'testemunha'
+                    ? 'Sera salvo como testemunha ativa e preenchera o campo selecionado.'
+                    : 'Sera salvo como corretor e credor/fornecedor para comissao financeira.'}
               </p>
               <div className="flex justify-end gap-2">
-              <button type="button" className="btn btn-outline" onClick={() => setPessoaRapidaModal(null)}>
+              <button type="button" className="btn btn-outline" onClick={() => {
+                setPessoaRapidaModal(null);
+                setTestemunhaRapidaSlot(null);
+              }}>
                 Cancelar
               </button>
               <button type="button" className="btn btn-primary" onClick={salvarPessoaRapida}>

@@ -120,8 +120,11 @@ function normalizeParceiroPayload(payload = {}, { partial = false } = {}) {
   let corretor = partial
     ? (payload.corretor !== undefined ? parseBoolean(payload.corretor, false) : undefined)
     : parseBoolean(payload.corretor, false);
+  let testemunha = partial
+    ? (payload.testemunha !== undefined ? parseBoolean(payload.testemunha, false) : undefined)
+    : parseBoolean(payload.testemunha, false);
 
-  if (!partial && !cliente && !fornecedor && !corretor) {
+  if (!partial && !cliente && !fornecedor && !corretor && !testemunha) {
     cliente = true;
     fornecedor = true;
   }
@@ -135,7 +138,7 @@ function normalizeParceiroPayload(payload = {}, { partial = false } = {}) {
     if (!nome) {
       throw new Error('Informe o nome do parceiro.');
     }
-    if (!telefone) {
+    if (!testemunha && !telefone) {
       throw new Error('Informe o telefone do parceiro.');
     }
     if (!tipoPessoa) {
@@ -190,6 +193,7 @@ function normalizeParceiroPayload(payload = {}, { partial = false } = {}) {
     cliente,
     fornecedor,
     corretor,
+    testemunha,
     conjuge_nome: partial
       ? (payload.conjuge_nome !== undefined ? sanitizeText(payload.conjuge_nome) : undefined)
       : sanitizeText(payload.conjuge_nome),
@@ -276,6 +280,7 @@ async function buscarParceiros({
   fornecedor,
   cliente,
   corretor,
+  testemunha,
   categoria_id,
   incluir_categorias = '0',
   ativo = '1',
@@ -302,6 +307,10 @@ async function buscarParceiros({
 
   if (corretor !== undefined && corretor !== null && corretor !== '') {
     where.corretor = parseBoolean(corretor, true);
+  }
+
+  if (testemunha !== undefined && testemunha !== null && testemunha !== '') {
+    where.testemunha = parseBoolean(testemunha, true);
   }
 
   if (termoNome || documento) {

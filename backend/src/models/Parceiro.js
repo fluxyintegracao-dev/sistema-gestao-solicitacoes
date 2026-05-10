@@ -91,6 +91,11 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
         defaultValue: false
       },
+      testemunha: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false
+      },
       conjuge_nome: {
         type: DataTypes.STRING(255),
         allowNull: true
