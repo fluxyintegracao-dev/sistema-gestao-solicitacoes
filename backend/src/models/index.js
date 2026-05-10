@@ -36,6 +36,7 @@ db.UnidadeComercial = require('./UnidadeComercial')(sequelize, Sequelize);
 db.TabelaPrecoComercial = require('./TabelaPrecoComercial')(sequelize, Sequelize);
 db.TabelaPrecoComercialItem = require('./TabelaPrecoComercialItem')(sequelize, Sequelize);
 db.ContratoComercial = require('./ContratoComercial')(sequelize, Sequelize);
+db.ContratoComercialComprador = require('./ContratoComercialComprador')(sequelize, Sequelize);
 db.ContratoComercialParcela = require('./ContratoComercialParcela')(sequelize, Sequelize);
 db.ContratoComercialEvento = require('./ContratoComercialEvento')(sequelize, Sequelize);
 db.ContratoComercialModelo = require('./ContratoComercialModelo')(sequelize, Sequelize);
@@ -668,6 +669,27 @@ db.Parceiro.hasMany(db.ContratoComercial, {
 db.ContratoComercial.belongsTo(db.Parceiro, {
   foreignKey: 'parceiro_id',
   as: 'cliente'
+});
+
+db.ContratoComercial.hasMany(db.ContratoComercialComprador, {
+  foreignKey: 'contrato_comercial_id',
+  as: 'compradoresContrato',
+  onDelete: 'CASCADE'
+});
+
+db.ContratoComercialComprador.belongsTo(db.ContratoComercial, {
+  foreignKey: 'contrato_comercial_id',
+  as: 'contrato'
+});
+
+db.Parceiro.hasMany(db.ContratoComercialComprador, {
+  foreignKey: 'parceiro_id',
+  as: 'contratosComerciaisComoComprador'
+});
+
+db.ContratoComercialComprador.belongsTo(db.Parceiro, {
+  foreignKey: 'parceiro_id',
+  as: 'parceiro'
 });
 
 db.Parceiro.hasMany(db.ContratoComercial, {

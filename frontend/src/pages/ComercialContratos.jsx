@@ -77,6 +77,7 @@ function defaultForm() {
     empreendimento_id: '',
     unidade_comercial_id: '',
     parceiro_id: '',
+    compradores: [],
     corretor_parceiro_id: '',
     obra_id: '',
     categoria_financeira_id: '',
@@ -145,6 +146,38 @@ function defaultTrocaForm() {
     data_efetiva: today(),
     observacoes: ''
   };
+}
+
+function normalizeCompradoresForm(compradores = [], parceiroPrincipalId = '') {
+  const principalId = String(parceiroPrincipalId || '').trim();
+  const vistos = new Set();
+  const normalizados = [];
+
+  if (principalId) {
+    vistos.add(principalId);
+    const principalItem = (Array.isArray(compradores) ? compradores : []).find((item) =>
+      String(item?.parceiro_id ?? item?.id ?? (item || '')).trim() === principalId
+    );
+    normalizados.push({ parceiro_id: principalId, principal: true, parceiro: principalItem?.parceiro });
+  }
+
+  (Array.isArray(compradores) ? compradores : []).forEach((item) => {
+    const parceiroId = String(item?.parceiro_id ?? item?.id ?? (item || '')).trim();
+    if (!parceiroId || vistos.has(parceiroId)) return;
+    vistos.add(parceiroId);
+    normalizados.push({
+      parceiro_id: parceiroId,
+      principal: false,
+      parceiro: item?.parceiro,
+      percentual_participacao: item?.percentual_participacao || ''
+    });
+  });
+
+  return normalizados.map((item, index) => ({
+    ...item,
+    ordem: index + 1,
+    principal: index === 0
+  }));
 }
 
 function defaultPessoaRapidaForm(tipo = 'cliente') {
@@ -376,11 +409,17 @@ function documentoEstaAssinado(documento) {
 }
 
 function pickEditForm(contrato = {}) {
+  const compradores = normalizeCompradoresForm(
+    Array.isArray(contrato.compradores) ? contrato.compradores : [],
+    contrato.parceiro_id ? String(contrato.parceiro_id) : ''
+  );
+
   return {
     id: contrato.id || null,
     empreendimento_id: contrato.empreendimento_id ? String(contrato.empreendimento_id) : '',
     unidade_comercial_id: contrato.unidade_comercial_id ? String(contrato.unidade_comercial_id) : '',
     parceiro_id: contrato.parceiro_id ? String(contrato.parceiro_id) : '',
+    compradores,
     corretor_parceiro_id: contrato.corretor_parceiro_id ? String(contrato.corretor_parceiro_id) : '',
     obra_id: contrato.obra_id ? String(contrato.obra_id) : '',
     categoria_financeira_id: contrato.categoria_financeira_id ? String(contrato.categoria_financeira_id) : '',
@@ -575,6 +614,7 @@ export default function ComercialContratos() {
   const [showTroca, setShowTroca] = useState(false);
   const [pessoaRapidaModal, setPessoaRapidaModal] = useState(null);
   const [pessoaRapidaForm, setPessoaRapidaForm] = useState(defaultPessoaRapidaForm());
+  const [compradorSelecionarId, setCompradorSelecionarId] = useState('');
   const [distratoForm, setDistratoForm] = useState(defaultDistratoForm());
   const [trocaForm, setTrocaForm] = useState(defaultTrocaForm());
   const [error, setError] = useState('');
@@ -675,6 +715,19 @@ export default function ComercialContratos() {
     },
     [categorias, categoriaConfig.comissao_categoria_ids, categoriaConfigLoaded]
   );
+
+  const compradoresContrato = useMemo(() => {
+    const mapaClientes = new Map(clientes.map((cliente) => [String(cliente.id), cliente]));
+    return normalizeCompradoresForm(form.compradores, form.parceiro_id).map((item) => ({
+      ...item,
+      parceiro: mapaClientes.get(String(item.parceiro_id)) || item.parceiro || null
+    }));
+  }, [clientes, form.compradores, form.parceiro_id]);
+
+  const clientesDisponiveisComprador = useMemo(() => {
+    const selecionados = new Set(compradoresContrato.map((item) => String(item.parceiro_id)));
+    return clientes.filter((cliente) => !selecionados.has(String(cliente.id)));
+  }, [clientes, compradoresContrato]);
 
   const opcoesPagamentoConfig = categoriaConfig.opcoes_pagamento || {};
   const modosComposicao = useMemo(
@@ -1193,6 +1246,42 @@ export default function ComercialContratos() {
     setPessoaRapidaModal(tipo);
   }
 
+  function selecionarClientePrincipal(parceiroId) {
+    setForm((current) => ({
+      ...current,
+      parceiro_id: parceiroId,
+      compradores: normalizeCompradoresForm(current.compradores, parceiroId)
+    }));
+  }
+
+  function adicionarComprador(parceiroId = compradorSelecionarId) {
+    const id = String(parceiroId || '').trim();
+    if (!id) return;
+
+    setForm((current) => ({
+      ...current,
+      compradores: normalizeCompradoresForm([
+        ...(current.compradores || []),
+        { parceiro_id: id }
+      ], current.parceiro_id || id),
+      parceiro_id: current.parceiro_id || id
+    }));
+    setCompradorSelecionarId('');
+  }
+
+  function removerComprador(parceiroId) {
+    const id = String(parceiroId || '').trim();
+    if (!id || id === String(form.parceiro_id)) return;
+
+    setForm((current) => ({
+      ...current,
+      compradores: normalizeCompradoresForm(
+        (current.compradores || []).filter((item) => String(item.parceiro_id) !== id),
+        current.parceiro_id
+      )
+    }));
+  }
+
   function atualizarConjugeRapido(campo, valor) {
     setPessoaRapidaForm((current) => ({
       ...current,
@@ -1245,7 +1334,18 @@ export default function ComercialContratos() {
 
       if (tipo === 'cliente') {
         setClientes((current) => [...current, ...[pessoa, conjugeCriado].filter(Boolean)].sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || ''))));
-        setForm((current) => ({ ...current, parceiro_id: String(pessoa.id) }));
+        setForm((current) => {
+          const parceiroId = String(pessoa.id);
+          const principalId = current.parceiro_id || parceiroId;
+          return {
+            ...current,
+            parceiro_id: principalId,
+            compradores: normalizeCompradoresForm([
+              ...(current.compradores || []),
+              { parceiro_id: parceiroId }
+            ], principalId)
+          };
+        });
       } else {
         setCorretores((current) => [...current, pessoa].sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || ''))));
         setForm((current) => ({
@@ -1331,6 +1431,11 @@ export default function ComercialContratos() {
       if (form.id) {
         await atualizarContratoComercial(form.id, {
           status: form.status,
+          compradores: compradoresContrato.map((item) => ({
+            parceiro_id: Number(item.parceiro_id),
+            principal: Boolean(item.principal),
+            ordem: item.ordem
+          })),
           categoria_financeira_id: form.categoria_financeira_id ? Number(form.categoria_financeira_id) : undefined,
           corretor_parceiro_id: form.corretor_parceiro_id ? Number(form.corretor_parceiro_id) : null,
           categoria_financeira_comissao_id: form.categoria_financeira_comissao_id ? Number(form.categoria_financeira_comissao_id) : null,
@@ -1354,6 +1459,11 @@ export default function ComercialContratos() {
           empreendimento_id: Number(form.empreendimento_id),
           unidade_comercial_id: Number(form.unidade_comercial_id),
           parceiro_id: Number(form.parceiro_id),
+          compradores: compradoresContrato.map((item) => ({
+            parceiro_id: Number(item.parceiro_id),
+            principal: Boolean(item.principal),
+            ordem: item.ordem
+          })),
           corretor_parceiro_id: form.corretor_parceiro_id ? Number(form.corretor_parceiro_id) : null,
           obra_id: Number(form.obra_id),
           categoria_financeira_id: form.categoria_financeira_id ? Number(form.categoria_financeira_id) : undefined,
@@ -1469,8 +1579,8 @@ export default function ComercialContratos() {
               )}
             </label>
             <label className="sol-filter-field">
-              <span className="sol-filter-label">Cliente</span>
-              <select className="input w-full" value={form.parceiro_id} onChange={(e) => setForm((c) => ({ ...c, parceiro_id: e.target.value }))} required disabled={Boolean(form.id)}>
+              <span className="sol-filter-label">Comprador principal</span>
+              <select className="input w-full" value={form.parceiro_id} onChange={(e) => selecionarClientePrincipal(e.target.value)} required disabled={Boolean(form.id)}>
                 <option value="">Selecione</option>
                 {clientes.map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}
               </select>
@@ -1500,6 +1610,56 @@ export default function ComercialContratos() {
               )}
             </label>
           </div>
+          <section className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-bg)] p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-[var(--c-text)]">Compradores do contrato</p>
+                <p className="text-xs text-[var(--c-muted)]">
+                  O comprador principal permanece vinculado aos titulos financeiros. Compradores adicionais entram no contrato e nas assinaturas.
+                </p>
+              </div>
+              <button type="button" className="btn btn-outline btn-sm" onClick={() => abrirCadastroRapidoPessoa('cliente')}>
+                Cadastro rapido
+              </button>
+            </div>
+
+            <div className="mt-3 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
+              <select className="input w-full" value={compradorSelecionarId} onChange={(e) => setCompradorSelecionarId(e.target.value)}>
+                <option value="">Selecionar cliente cadastrado</option>
+                {clientesDisponiveisComprador.map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}
+              </select>
+              <button type="button" className="btn btn-outline" onClick={() => adicionarComprador()} disabled={!compradorSelecionarId}>
+                Adicionar comprador
+              </button>
+            </div>
+
+            <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+              {compradoresContrato.map((item) => (
+                <div key={item.parceiro_id} className="rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-[var(--c-text)]">{item.parceiro?.nome || `Cliente ${item.parceiro_id}`}</p>
+                      <p className="text-xs text-[var(--c-muted)]">{maskCpfCnpj(item.parceiro?.cpf_cnpj || '') || 'CPF/CNPJ nao informado'}</p>
+                      {item.parceiro?.conjuge_nome && (
+                        <p className="mt-1 text-xs text-[var(--c-muted)]">Conjuge: {item.parceiro.conjuge_nome}</p>
+                      )}
+                    </div>
+                    <span className={`rounded-full px-2 py-1 text-xs font-semibold ${item.principal ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'}`}>
+                      {item.principal ? 'Principal' : `Comprador ${item.ordem}`}
+                    </span>
+                  </div>
+                  {!item.principal && (
+                    <button type="button" className="btn btn-outline btn-sm mt-3" onClick={() => removerComprador(item.parceiro_id)}>
+                      Remover
+                    </button>
+                  )}
+                </div>
+              ))}
+              {!compradoresContrato.length && (
+                <div className="app-empty-card md:col-span-2 xl:col-span-3">Selecione o comprador principal para iniciar a lista.</div>
+              )}
+            </div>
+          </section>
           <div className="grid gap-3 md:grid-cols-4">
             <label className="sol-filter-field">
               <span className="sol-filter-label">Contrato</span>

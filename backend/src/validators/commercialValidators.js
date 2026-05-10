@@ -107,6 +107,56 @@ function parseDecimal(value, fieldName, { required = false, min = null } = {}) {
   return parsed;
 }
 
+function normalizeCompradoresContrato(compradores = [], parceiroPrincipalId = null) {
+  if (compradores == null || compradores === '') {
+    return undefined;
+  }
+  if (!Array.isArray(compradores)) {
+    throw new ValidationError('Compradores deve ser uma lista.');
+  }
+
+  const principalId = parseInteger(parceiroPrincipalId, 'Cliente') || null;
+  const vistos = new Set();
+  const normalizados = [];
+
+  compradores.forEach((item, index) => {
+    const parceiroId = parseInteger(item?.parceiro_id ?? item?.id ?? item, `Comprador ${index + 1}`);
+    if (!parceiroId || vistos.has(parceiroId)) return;
+    vistos.add(parceiroId);
+
+    normalizados.push({
+      parceiro_id: parceiroId,
+      ordem: index + 1,
+      principal: Boolean(item?.principal) || (principalId && Number(parceiroId) === Number(principalId)),
+      percentual_participacao: parseDecimal(item?.percentual_participacao, `Percentual comprador ${index + 1}`, { min: 0 })
+    });
+  });
+
+  if (principalId && !vistos.has(principalId)) {
+    normalizados.unshift({
+      parceiro_id: principalId,
+      ordem: 1,
+      principal: true,
+      percentual_participacao: undefined
+    });
+  }
+
+  if (!normalizados.length) {
+    throw new ValidationError('Informe ao menos um comprador.');
+  }
+
+  const principalIndex = principalId
+    ? normalizados.findIndex((item) => Number(item.parceiro_id) === Number(principalId))
+    : normalizados.findIndex((item) => item.principal);
+
+  normalizados.forEach((item, index) => {
+    item.ordem = index + 1;
+    item.principal = index === (principalIndex >= 0 ? principalIndex : 0);
+  });
+
+  return normalizados;
+}
+
 function parseDateOnly(value, fieldName, { required = false } = {}) {
   if (isBlank(value)) {
     if (required) {
@@ -535,6 +585,7 @@ function validateComercialContratoCreateBody(body = {}) {
       'empreendimento_id',
       'unidade_comercial_id',
       'parceiro_id',
+      'compradores',
       'corretor_parceiro_id',
       'obra_id',
       'categoria_financeira_id',
@@ -567,6 +618,7 @@ function validateComercialContratoCreateBody(body = {}) {
     empreendimento_id: parseInteger(body.empreendimento_id, 'Empreendimento', { required: true }),
     unidade_comercial_id: parseInteger(body.unidade_comercial_id, 'Unidade comercial', { required: true }),
     parceiro_id: parseInteger(body.parceiro_id, 'Cliente', { required: true }),
+    compradores: normalizeCompradoresContrato(body.compradores, body.parceiro_id),
     corretor_parceiro_id: Object.prototype.hasOwnProperty.call(body, 'corretor_parceiro_id')
       ? (parseInteger(body.corretor_parceiro_id, 'Corretor') ?? null)
       : undefined,
@@ -614,6 +666,7 @@ function validateComercialContratoUpdateBody(body = {}) {
     body,
     [
       'status',
+      'compradores',
       'categoria_financeira_id',
       'corretor_parceiro_id',
       'categoria_financeira_comissao_id',
@@ -637,6 +690,9 @@ function validateComercialContratoUpdateBody(body = {}) {
 
   const payload = {
     status: parseEnum(body.status, 'Status', CONTRATO_STATUS),
+    compradores: Object.prototype.hasOwnProperty.call(body, 'compradores')
+      ? normalizeCompradoresContrato(body.compradores)
+      : undefined,
     categoria_financeira_id: parseInteger(body.categoria_financeira_id, 'Categoria financeira'),
     corretor_parceiro_id: Object.prototype.hasOwnProperty.call(body, 'corretor_parceiro_id')
       ? (parseInteger(body.corretor_parceiro_id, 'Corretor') ?? null)

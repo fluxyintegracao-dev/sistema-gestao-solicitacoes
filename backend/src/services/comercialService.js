@@ -4,6 +4,7 @@ const {
   CategoriaFinanceira,
   ConfiguracaoSistema,
   ContratoComercial,
+  ContratoComercialComprador,
   ContratoComercialDocumento,
   ContratoComercialEvento,
   ContratoComercialParcela,
@@ -172,6 +173,26 @@ function buildContratoInclude({ includeParcelas = false } = {}) {
       model: Parceiro,
       as: 'cliente',
       attributes: ['id', 'nome', 'cpf_cnpj', 'telefone', 'email']
+    },
+    {
+      model: ContratoComercialComprador,
+      as: 'compradoresContrato',
+      separate: true,
+      order: [['ordem', 'ASC'], ['id', 'ASC']],
+      include: [
+        {
+          model: Parceiro,
+          as: 'parceiro',
+          attributes: ['id', 'nome', 'cpf_cnpj', 'telefone', 'email', 'conjuge_nome', 'conjuge_parceiro_id'],
+          include: [
+            {
+              model: Parceiro,
+              as: 'conjuge',
+              attributes: ['id', 'nome', 'cpf_cnpj', 'telefone', 'email']
+            }
+          ]
+        }
+      ]
     },
     {
       model: Parceiro,
@@ -357,6 +378,84 @@ async function ensureClienteParceiro(parceiroId) {
   }
 
   return parceiro;
+}
+
+function normalizarCompradoresPayload(compradores = [], parceiroPrincipalId = null) {
+  const principalId = Number(parceiroPrincipalId || 0);
+  const source = Array.isArray(compradores) && compradores.length
+    ? compradores
+    : (principalId ? [{ parceiro_id: principalId, principal: true }] : []);
+
+  const vistos = new Set();
+  const normalizados = [];
+
+  source.forEach((item, index) => {
+    const parceiroId = Number(item?.parceiro_id ?? item?.id ?? item);
+    if (!Number.isInteger(parceiroId) || parceiroId <= 0 || vistos.has(parceiroId)) return;
+
+    vistos.add(parceiroId);
+    normalizados.push({
+      parceiro_id: parceiroId,
+      ordem: Number.isInteger(Number(item?.ordem)) && Number(item.ordem) > 0
+        ? Number(item.ordem)
+        : index + 1,
+      principal: Boolean(item?.principal) || (principalId > 0 && parceiroId === principalId),
+      percentual_participacao: item?.percentual_participacao != null && item.percentual_participacao !== ''
+        ? roundCurrency(item.percentual_participacao)
+        : null
+    });
+  });
+
+  if (principalId > 0 && !vistos.has(principalId)) {
+    normalizados.unshift({
+      parceiro_id: principalId,
+      ordem: 1,
+      principal: true,
+      percentual_participacao: null
+    });
+  }
+
+  if (!normalizados.length) {
+    throw createHttpError(400, 'Informe ao menos um comprador.');
+  }
+
+  const principalIndex = principalId > 0
+    ? normalizados.findIndex((item) => Number(item.parceiro_id) === principalId)
+    : normalizados.findIndex((item) => item.principal);
+
+  normalizados.forEach((item, index) => {
+    item.principal = index === (principalIndex >= 0 ? principalIndex : 0);
+    item.ordem = index + 1;
+  });
+
+  return normalizados;
+}
+
+async function ensureCompradoresClientes(compradores = []) {
+  const clientes = await Promise.all(compradores.map((item) => ensureClienteParceiro(item.parceiro_id)));
+  return compradores.map((item, index) => ({
+    ...item,
+    parceiro: clientes[index]
+  }));
+}
+
+async function salvarCompradoresContrato({ contratoId, compradores, transaction }) {
+  await ContratoComercialComprador.destroy({
+    where: { contrato_comercial_id: contratoId },
+    transaction
+  });
+
+  const rows = compradores.map((item, index) => ({
+    contrato_comercial_id: contratoId,
+    parceiro_id: item.parceiro_id,
+    ordem: index + 1,
+    principal: Boolean(item.principal),
+    percentual_participacao: item.percentual_participacao
+  }));
+
+  if (rows.length) {
+    await ContratoComercialComprador.bulkCreate(rows, { transaction });
+  }
 }
 
 async function ensureCorretorParceiro(parceiroId) {
@@ -1069,6 +1168,26 @@ async function anexarIndicadoresContratos(contratos = [], { manterParcelas = fal
   const normalizados = lista.map((contrato) => {
     const plain = typeof contrato.toJSON === 'function' ? contrato.toJSON() : { ...contrato };
     const parcelasContrato = porContrato.get(Number(plain.id)) || plain.parcelas || [];
+    const compradoresContrato = Array.isArray(plain.compradoresContrato) ? plain.compradoresContrato : [];
+    const compradores = compradoresContrato.length
+      ? compradoresContrato
+        .map((item) => ({
+          id: item.id,
+          contrato_comercial_id: item.contrato_comercial_id,
+          parceiro_id: item.parceiro_id,
+          ordem: item.ordem,
+          principal: Boolean(item.principal),
+          percentual_participacao: item.percentual_participacao,
+          parceiro: item.parceiro
+        }))
+        .sort((a, b) => Number(a.ordem || 0) - Number(b.ordem || 0))
+      : [{
+          parceiro_id: plain.parceiro_id,
+          ordem: 1,
+          principal: true,
+          percentual_participacao: 100,
+          parceiro: plain.cliente
+        }].filter((item) => item.parceiro_id);
     const eventos = Array.isArray(plain.eventos)
       ? plain.eventos.map((evento) => ({
           ...evento,
@@ -1078,6 +1197,7 @@ async function anexarIndicadoresContratos(contratos = [], { manterParcelas = fal
 
     return {
       ...plain,
+      compradores,
       parcelas: manterParcelas ? parcelasContrato : plain.parcelas,
       eventos,
       indicadoresFinanceiros: calcularIndicadoresFinanceirosContrato(parcelasContrato)
@@ -1277,12 +1397,14 @@ async function sincronizarTituloComissao({
 }
 
 async function criarContratoComercial(req, payload = {}) {
-  const [empreendimento, unidade, cliente, corretorParceiro, obra] = await Promise.all([
+  const compradoresNormalizados = normalizarCompradoresPayload(payload.compradores, payload.parceiro_id);
+  const [empreendimento, unidade, cliente, corretorParceiro, obra, compradoresValidados] = await Promise.all([
     ensureEmpreendimentoExists(payload.empreendimento_id),
     ensureUnidadeExists(payload.unidade_comercial_id),
     ensureClienteParceiro(payload.parceiro_id),
     ensureCorretorParceiro(payload.corretor_parceiro_id),
-    ensureObraExists(payload.obra_id)
+    ensureObraExists(payload.obra_id),
+    ensureCompradoresClientes(compradoresNormalizados)
   ]);
 
   if (payload.categoria_financeira_id) {
@@ -1347,6 +1469,12 @@ async function criarContratoComercial(req, payload = {}) {
       atualizado_por: req.user?.id || null
     }, { transaction });
 
+    await salvarCompradoresContrato({
+      contratoId: contrato.id,
+      compradores: compradoresValidados,
+      transaction
+    });
+
     for (const parcela of parcelasContrato) {
       const titulo = await TituloFinanceiro.create(
         buildTituloContratoPayload({
@@ -1404,6 +1532,7 @@ async function criarContratoComercial(req, payload = {}) {
         empreendimento_id: empreendimento.id,
         unidade_comercial_id: unidade.id,
         parceiro_id: cliente.id,
+        compradores: compradoresValidados.map((item) => item.parceiro_id),
         corretor_parceiro_id: corretorParceiro?.id || null,
         obra_id: obra.id,
         valor_total: valorTotalInformado,
@@ -1421,6 +1550,10 @@ async function criarContratoComercial(req, payload = {}) {
 
 async function atualizarContratoComercial(req, id, payload = {}) {
   const contrato = await carregarContratoComercial(id);
+  const atualizarCompradores = Object.prototype.hasOwnProperty.call(payload, 'compradores');
+  const compradoresValidados = atualizarCompradores
+    ? await ensureCompradoresClientes(normalizarCompradoresPayload(payload.compradores, contrato.parceiro_id))
+    : null;
 
   if (payload.categoria_financeira_id) {
     await ensureCategoriaFinanceiraReceber(payload.categoria_financeira_id);
@@ -1443,6 +1576,7 @@ async function atualizarContratoComercial(req, id, payload = {}) {
       ...payload,
       atualizado_por: req.user?.id || null
     };
+    delete updateData.compradores;
 
     if (payload.status) {
       updateData.status = normalizeContractStatus(payload.status);
@@ -1516,6 +1650,14 @@ async function atualizarContratoComercial(req, id, payload = {}) {
       where: { id: contrato.id },
       transaction
     });
+
+    if (atualizarCompradores) {
+      await salvarCompradoresContrato({
+        contratoId: contrato.id,
+        compradores: compradoresValidados,
+        transaction
+      });
+    }
 
     const contratoAtualizado = await ContratoComercial.findByPk(contrato.id, { transaction });
     const tituloComissao = await sincronizarTituloComissao({
@@ -1936,6 +2078,11 @@ async function excluirContratoComercial(req, id) {
     });
 
     await ContratoComercialParcela.destroy({
+      where: { contrato_comercial_id: contrato.id },
+      transaction
+    });
+
+    await ContratoComercialComprador.destroy({
       where: { contrato_comercial_id: contrato.id },
       transaction
     });

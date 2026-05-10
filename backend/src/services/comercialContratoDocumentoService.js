@@ -7,6 +7,7 @@ const Docxtemplater = require('docxtemplater');
 const { PDFDocument } = require('pdf-lib');
 const {
   ContratoComercial,
+  ContratoComercialComprador,
   ContratoComercialDocumento,
   ContratoComercialModelo,
   ContratoComercialParcela,
@@ -58,6 +59,10 @@ const VARIAVEIS_CONTRATO_COMERCIAL = [
   { chave: 'cliente.cidade_uf', descricao: 'Cidade/UF do comprador' },
   { chave: 'cliente.cep', descricao: 'CEP do comprador' },
   { chave: 'cliente.conjuge_nome', descricao: 'Nome do conjuge do comprador' },
+  { chave: 'compradores.nomes', descricao: 'Nomes de todos os compradores do contrato' },
+  { chave: 'compradores.assinaturas', descricao: 'Bloco de assinaturas de compradores e conjuges' },
+  { chave: 'compradores.itens[].cliente.nome', descricao: 'Nome de cada comprador vinculado' },
+  { chave: 'compradores.itens[].conjuge.nome', descricao: 'Nome do conjuge de cada comprador vinculado' },
   { chave: 'conjuge.nome', descricao: 'Nome do conjuge cadastrado' },
   { chave: 'conjuge.cpf_cnpj', descricao: 'CPF/CNPJ do conjuge cadastrado' },
   { chave: 'conjuge.email', descricao: 'E-mail do conjuge cadastrado' },
@@ -103,6 +108,7 @@ const VARIAVEIS_CONTRATO_COMERCIAL = [
   { chave: 'quadro_resumo.assinaturas_texto', descricao: 'Bloco automatico de assinaturas do item XII' },
   { chave: 'assinaturas.comprador', descricao: 'Linha de identificacao do comprador para assinatura' },
   { chave: 'assinaturas.conjuge', descricao: 'Linha de identificacao do conjuge para assinatura' },
+  { chave: 'assinaturas.compradores', descricao: 'Linhas de identificacao de todos os compradores para assinatura' },
   { chave: 'assinaturas.corretor', descricao: 'Linha de identificacao do corretor para assinatura' },
   { chave: 'assinaturas.vendedora', descricao: 'Linha de identificacao da vendedora/empreendimento para assinatura' },
   { chave: 'assinaturas.vendedora_dados', descricao: 'Dados completos da incorporadora/vendedora para o item XII' },
@@ -774,14 +780,21 @@ function buildAssinaturasQuadroResumo(dados = {}) {
   addAssinatura('INCORPORADORA', [
     dados?.assinaturas?.vendedora_dados || dados?.assinaturas?.vendedora || dados?.empreendimento?.nome || 'INCORPORADORA'
   ]);
-  addAssinatura('COMPRADOR(A)', [
-    dados?.cliente?.nome,
-    formatDocumentoRotulado(dados?.cliente?.cpf_cnpj)
-  ]);
-  addAssinatura('CONJUGE', [
-    dados?.conjuge?.nome,
-    formatDocumentoRotulado(dados?.conjuge?.cpf_cnpj)
-  ]);
+  const compradores = Array.isArray(dados?.compradores?.itens) && dados.compradores.itens.length
+    ? dados.compradores.itens
+    : [{ cliente: dados?.cliente, conjuge: dados?.conjuge }];
+  compradores.forEach((comprador, index) => {
+    addAssinatura(compradores.length > 1 ? `COMPRADOR(A) ${index + 1}` : 'COMPRADOR(A)', [
+      comprador?.cliente?.nome,
+      formatDocumentoRotulado(comprador?.cliente?.cpf_cnpj)
+    ]);
+    if (comprador?.conjuge?.nome || comprador?.conjuge?.cpf_cnpj) {
+      addAssinatura(`CONJUGE ${compradores.length > 1 ? index + 1 : ''}`.trim(), [
+        comprador?.conjuge?.nome,
+        formatDocumentoRotulado(comprador?.conjuge?.cpf_cnpj)
+      ]);
+    }
+  });
   addAssinatura('TESTEMUNHA 1', [
     dados?.testemunha_1?.nome,
     dados?.testemunha_1?.cpf ? formatCpfAssinatura(dados.testemunha_1.cpf) : ''
@@ -953,6 +966,35 @@ function buildConjugeAssinaturaLines(dados = {}) {
   ].filter(Boolean);
 }
 
+function buildCompradoresAssinaturaLines(dados = {}) {
+  const assinaturaLinha = '__________________________________________________________________';
+  const compradores = Array.isArray(dados?.compradores?.itens) && dados.compradores.itens.length
+    ? dados.compradores.itens
+    : [{ cliente: dados?.cliente, conjuge: dados?.conjuge }];
+  const linhas = [];
+
+  compradores.forEach((comprador, index) => {
+    const label = compradores.length > 1 ? `COMPRADOR(A) ${index + 1}` : 'COMPRADOR(A)';
+    const clienteLines = [
+      comprador?.cliente?.nome,
+      formatDocumentoRotulado(comprador?.cliente?.cpf_cnpj)
+    ].map((item) => safeString(item).trim()).filter(Boolean);
+    if (clienteLines.length) {
+      linhas.push(assinaturaLinha, ...clienteLines, label);
+    }
+
+    const conjugeLines = [
+      comprador?.conjuge?.nome,
+      formatDocumentoRotulado(comprador?.conjuge?.cpf_cnpj)
+    ].map((item) => safeString(item).trim()).filter(Boolean);
+    if (conjugeLines.length) {
+      linhas.push(assinaturaLinha, ...conjugeLines, `CONJUGE ${compradores.length > 1 ? index + 1 : ''}`.trim());
+    }
+  });
+
+  return linhas;
+}
+
 function applyContratoAssinaturasAutomation(zip, dados = {}) {
   const testemunha1 = dados?.testemunha_1 || {};
   const testemunha2 = dados?.testemunha_2 || {};
@@ -967,6 +1009,8 @@ function applyContratoAssinaturasAutomation(zip, dados = {}) {
     const incorporadoraLines = splitSignatureLines(incorporadoraAssinatura);
     const clienteLines = buildClienteAssinaturaLines(dados);
     const conjugeLines = buildConjugeAssinaturaLines(dados);
+    const compradoresLines = buildCompradoresAssinaturaLines(dados);
+    let assinaturasCompradoresInseridas = false;
     let ultimaAssinaturaPessoa = '';
 
     xml = xml.replace(/<w:p[\s\S]*?<\/w:p>/g, (paragraphXml) => {
@@ -1001,16 +1045,22 @@ function applyContratoAssinaturasAutomation(zip, dados = {}) {
       }
 
       if (normalized === 'COMPRADOR 1') {
+        if (compradoresLines.length) {
+          assinaturasCompradoresInseridas = true;
+          return buildParagraphLines(compradoresLines, { align: 'center' });
+        }
         ultimaAssinaturaPessoa = 'cliente';
         return buildParagraphLines([getLine(clienteLines, 0)], { align: 'center' });
       }
 
       if (normalized === 'COMPRADOR 2') {
+        if (assinaturasCompradoresInseridas) return '';
         ultimaAssinaturaPessoa = 'conjuge';
         return buildParagraphLines([getLine(conjugeLines, 0)], { align: 'center' });
       }
 
       if (normalized === 'DESCRITO NO QUADRO RESUMO') {
+        if (assinaturasCompradoresInseridas) return '';
         const lines = ultimaAssinaturaPessoa === 'conjuge' ? conjugeLines : clienteLines;
         return buildParagraphLines([getLine(lines, 1)], { align: 'center' });
       }
@@ -1214,10 +1264,98 @@ function buildItemIIITexto(contrato = {}, empreendimento = {}, unidade = {}) {
   ].join('\n');
 }
 
+function buildPessoaContratoData(pessoa = {}) {
+  const conjuge = pessoa.conjuge || {};
+  return {
+    cliente: {
+      nome: safeString(pessoa.nome),
+      cpf_cnpj: safeString(pessoa.cpf_cnpj),
+      telefone: safeString(pessoa.telefone),
+      email: safeString(pessoa.email),
+      endereco: safeString(pessoa.endereco),
+      numero: safeString(pessoa.numero),
+      bairro: safeString(pessoa.bairro),
+      cep: safeString(pessoa.cep),
+      municipio: safeString(pessoa.municipio),
+      estado: safeString(pessoa.estado),
+      cidade_uf: [pessoa.municipio, pessoa.estado].filter(Boolean).join('-'),
+      rg: safeString(pessoa.rg),
+      data_nascimento: formatDateBr(pessoa.data_nascimento),
+      data_nascimento_iso: safeString(pessoa.data_nascimento),
+      nacionalidade: safeString(pessoa.nacionalidade),
+      profissao: safeString(pessoa.profissao),
+      estado_civil: safeString(pessoa.estado_civil),
+      complemento: safeString(pessoa.complemento),
+      conjuge_nome: safeString(pessoa.conjuge_nome),
+      regime_bens: safeString(pessoa.regime_bens)
+    },
+    conjuge: {
+      nome: safeString(conjuge.nome || pessoa.conjuge_nome),
+      cpf_cnpj: safeString(conjuge.cpf_cnpj),
+      telefone: safeString(conjuge.telefone),
+      email: safeString(conjuge.email),
+      endereco: safeString(conjuge.endereco),
+      numero: safeString(conjuge.numero),
+      bairro: safeString(conjuge.bairro),
+      cep: safeString(conjuge.cep),
+      municipio: safeString(conjuge.municipio),
+      estado: safeString(conjuge.estado),
+      cidade_uf: [conjuge.municipio, conjuge.estado].filter(Boolean).join('-'),
+      data_nascimento: formatDateBr(conjuge.data_nascimento),
+      data_nascimento_iso: safeString(conjuge.data_nascimento),
+      nacionalidade: safeString(conjuge.nacionalidade),
+      profissao: safeString(conjuge.profissao),
+      estado_civil: safeString(conjuge.estado_civil),
+      complemento: safeString(conjuge.complemento)
+    }
+  };
+}
+
+function buildCompradoresContratoData(raw = {}) {
+  const compradoresContrato = Array.isArray(raw.compradoresContrato) ? raw.compradoresContrato : [];
+  const compradores = compradoresContrato.length
+    ? compradoresContrato.map((item) => ({
+        ordem: Number(item.ordem || 0),
+        principal: Boolean(item.principal),
+        percentual_participacao: item.percentual_participacao,
+        parceiro: item.parceiro || {}
+      }))
+    : [{
+        ordem: 1,
+        principal: true,
+        percentual_participacao: 100,
+        parceiro: raw.cliente || {}
+      }];
+
+  const itens = compradores
+    .sort((a, b) => Number(a.ordem || 0) - Number(b.ordem || 0))
+    .map((item, index) => {
+      const pessoaData = buildPessoaContratoData(item.parceiro || {});
+      return {
+        ordem: index + 1,
+        principal: Boolean(item.principal) || index === 0,
+        percentual_participacao: safeString(item.percentual_participacao),
+        ...pessoaData,
+        assinatura: buildAssinaturaPessoa(pessoaData.cliente.nome, pessoaData.cliente.cpf_cnpj),
+        assinatura_conjuge: buildAssinaturaPessoa(pessoaData.conjuge.nome, pessoaData.conjuge.cpf_cnpj)
+      };
+    });
+
+  return {
+    itens,
+    nomes: itens.map((item) => item.cliente.nome).filter(Boolean).join('; '),
+    assinaturas: itens
+      .flatMap((item) => [item.assinatura, item.assinatura_conjuge])
+      .filter(Boolean)
+      .join('\n')
+  };
+}
+
 function buildDadosContrato(contrato, customVariables = {}) {
   const raw = contrato?.toJSON ? contrato.toJSON() : contrato;
   const cliente = raw.cliente || {};
   const conjuge = cliente.conjuge || {};
+  const compradores = buildCompradoresContratoData(raw);
   const unidade = raw.unidadeComercial || {};
   const corretor = raw.corretorParceiro || {};
   const empreendimento = raw.empreendimento || {};
@@ -1270,6 +1408,7 @@ function buildDadosContrato(contrato, customVariables = {}) {
       local_data_assinatura: formatLocalDataAssinatura(localAssinatura, dataAssinaturaBase),
       observacoes: safeString(raw.observacoes)
     },
+    compradores,
     cliente: {
       nome: safeString(cliente.nome),
       cpf_cnpj: safeString(cliente.cpf_cnpj),
@@ -1377,6 +1516,7 @@ function buildDadosContrato(contrato, customVariables = {}) {
     assinaturas: {
       comprador: buildAssinaturaPessoa(cliente.nome, cliente.cpf_cnpj),
       conjuge: buildAssinaturaPessoa(conjuge.nome || cliente.conjuge_nome, conjuge.cpf_cnpj),
+      compradores: compradores.assinaturas,
       corretor: corretorDadosIdentificacao,
       vendedora: safeString(empreendimento.nome),
       testemunha_1: buildAssinaturaPessoa(raw.testemunha_1_nome, raw.testemunha_1_cpf),
@@ -1389,6 +1529,7 @@ function buildDadosContrato(contrato, customVariables = {}) {
       assinaturas_texto: buildAssinaturasQuadroResumo({
         empreendimento: { nome: safeString(empreendimento.nome) },
         assinaturas: { vendedora: safeString(empreendimento.nome) },
+        compradores,
         cliente,
         conjuge,
         testemunha_1: { nome: raw.testemunha_1_nome, cpf: raw.testemunha_1_cpf },
@@ -1425,6 +1566,13 @@ async function carregarContratoParaDocumento(id) {
       { model: Empreendimento, as: 'empreendimento' },
       { model: UnidadeComercial, as: 'unidadeComercial' },
       { model: Parceiro, as: 'cliente', include: [{ model: Parceiro, as: 'conjuge' }] },
+      {
+        model: ContratoComercialComprador,
+        as: 'compradoresContrato',
+        separate: true,
+        order: [['ordem', 'ASC'], ['id', 'ASC']],
+        include: [{ model: Parceiro, as: 'parceiro', include: [{ model: Parceiro, as: 'conjuge' }] }]
+      },
       { model: Parceiro, as: 'corretorParceiro' },
       { model: Obra, as: 'obra' },
       {
@@ -1857,18 +2005,25 @@ async function excluirDocumentoContratoComercial(req, documentoId) {
 }
 
 function defaultSignersFromContrato(contrato) {
-  const cliente = contrato?.cliente || {};
-  if (!cliente.email) return [];
+  const compradores = Array.isArray(contrato?.compradoresContrato) && contrato.compradoresContrato.length
+    ? contrato.compradoresContrato.map((item) => item.parceiro).filter(Boolean)
+    : [contrato?.cliente].filter(Boolean);
+  const emails = new Set();
 
-  return [
-    {
-      email: cliente.email,
+  compradores.forEach((comprador) => {
+    if (comprador?.email) emails.add(String(comprador.email).trim().toLowerCase());
+    if (comprador?.conjuge?.email) emails.add(String(comprador.conjuge.email).trim().toLowerCase());
+  });
+
+  return Array.from(emails)
+    .filter(Boolean)
+    .map((email) => ({
+      email,
       act: '1',
       foreign: '0',
       certificadoicpbr: '0',
       docauth: '0'
-    }
-  ];
+    }));
 }
 
 async function enviarDocumentoD4Sign(req, documentoId, payload = {}) {
@@ -1877,7 +2032,14 @@ async function enviarDocumentoD4Sign(req, documentoId, payload = {}) {
       {
         model: ContratoComercial,
         as: 'contrato',
-        include: [{ model: Parceiro, as: 'cliente', include: [{ model: Parceiro, as: 'conjuge' }] }]
+        include: [
+          { model: Parceiro, as: 'cliente', include: [{ model: Parceiro, as: 'conjuge' }] },
+          {
+            model: ContratoComercialComprador,
+            as: 'compradoresContrato',
+            include: [{ model: Parceiro, as: 'parceiro', include: [{ model: Parceiro, as: 'conjuge' }] }]
+          }
+        ]
       }
     ]
   });
