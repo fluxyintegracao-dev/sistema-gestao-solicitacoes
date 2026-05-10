@@ -22,9 +22,9 @@ O PDF oficial e sempre gerado com o Quadro Resumo primeiro e o Contrato Padrao n
 - Garagem: quantidade e posicao, quando informadas no contrato.
 - Preco: valor total, entrada, desconto e indice de reajuste.
 - Parcelas: agrupadas por elemento e tipo de reajuste, com `F` para fixa e `R` para reajustavel.
-- Corretor: parceiro corretor vinculado ao contrato.
+- Corretor: parceiro corretor vinculado ao contrato, com CPF e CRECI rotulados no item VI.b.
 - Item XI: local e data de assinatura preenchidos pelo contrato.
-- Item XII: variaveis de assinatura ficam disponiveis em `assinaturas.*`.
+- Item XII: assinatura da incorporadora traz nome, CNPJ e representante legal quando o modelo informa esses dados no item I.a; comprador, conjuge e testemunhas entram pelo cadastro do contrato.
 
 ## Regras finais antes de producao
 
@@ -49,4 +49,4 @@ Conferir no PDF:
 - Item III exibe unidade, area privativa, fracao ideal e vagas.
 - Item VI agrupa corretamente as parcelas.
 - Item XI exibe local e data corretos.
-- Item XII possui dados de assinatura esperados.
+- Item XII possui incorporadora com representante legal, comprador/conjuge e testemunhas, sem assinatura do corretor.

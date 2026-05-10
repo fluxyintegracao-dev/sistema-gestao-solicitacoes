@@ -87,7 +87,10 @@ const VARIAVEIS_CONTRATO_COMERCIAL = [
   { chave: 'unidade.vagas_garagem', descricao: 'Resumo das vagas de garagem da unidade vendida' },
   { chave: 'corretor.nome', descricao: 'Nome do corretor' },
   { chave: 'corretor.cpf_cnpj', descricao: 'CPF/CNPJ do corretor' },
+  { chave: 'corretor.cpf_cnpj_formatado', descricao: 'CPF/CNPJ do corretor com rotulo' },
   { chave: 'corretor.creci', descricao: 'CRECI do corretor' },
+  { chave: 'corretor.creci_formatado', descricao: 'CRECI do corretor com rotulo' },
+  { chave: 'corretor.dados_identificacao', descricao: 'Dados do corretor com CPF e CRECI rotulados' },
   { chave: 'corretor.percentual_comissao', descricao: 'Percentual de comissao do corretor' },
   { chave: 'parcelas.resumo', descricao: 'Resumo das parcelas do contrato' },
   { chave: 'parcelas.quadro_resumo_texto', descricao: 'Linhas agrupadas para o item VI do quadro resumo' },
@@ -126,8 +129,8 @@ const LEGACY_BRACKET_ALIASES = {
   '[NOME DA ESPOSA(O)]': '{{cliente.conjuge_nome}}',
   '[regime de bens]': '{{cliente.regime_bens}}',
   '[Nome do Corretor]': '{{corretor.nome}}',
-  '[Nº do CPF do Corretor]': '{{corretor.cpf_cnpj}}',
-  '[Nº do CRECI do Corretor]': '{{corretor.creci}}',
+  '[Nº do CPF do Corretor]': '{{corretor.cpf_cnpj_formatado}}',
+  '[Nº do CRECI do Corretor]': '{{corretor.creci_formatado}}',
   '[Percentual]': '{{corretor.percentual_comissao}}',
   '[Valor em Reais]': '{{contrato.valor_total_formatado}}',
   '[Torre]': '{{unidade.torre}}',
@@ -151,8 +154,8 @@ Object.assign(LEGACY_BRACKET_ALIASES, {
   '[nº do RG]': '{{cliente.rg}}',
   '[profissão]': '{{cliente.profissao}}',
   '[Nº]': '{{cliente.numero}}',
-  '[Nº do CPF do Corretor]': '{{corretor.cpf_cnpj}}',
-  '[Nº do CRECI do Corretor]': '{{corretor.creci}}',
+  '[Nº do CPF do Corretor]': '{{corretor.cpf_cnpj_formatado}}',
+  '[Nº do CRECI do Corretor]': '{{corretor.creci_formatado}}',
   '[Unidade Autônoma]': '{{unidade.codigo}}',
   '[Área privativa]': '{{unidade.metragem_privativa}}',
   '[Fração Ideal]': '{{unidade.fracao_ideal}}',
@@ -516,18 +519,80 @@ function formatCpfAssinatura(value) {
   return cpf ? `CPF n\u00ba ${cpf}` : '';
 }
 
+function formatDocumentoRotulado(value) {
+  const documento = safeString(value).trim();
+  if (!documento) return '';
+  const digits = documento.replace(/\D/g, '');
+  const label = digits.length > 11 ? 'CNPJ' : 'CPF';
+  return `${label}: ${documento}`;
+}
+
+function formatCreciRotulado(value) {
+  const creci = safeString(value).trim();
+  return creci ? `CRECI: ${creci}` : '';
+}
+
+function normalizeTextForMatch(value) {
+  return safeString(value)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toUpperCase();
+}
+
 function replaceKnownEmpreendimentoTitle(tableXml, dados = {}) {
   const nome = safeString(dados?.empreendimento?.nome).trim();
   if (!nome) return tableXml;
 
-  return [
+  const labels = [
     'EDIFÍCIO AREIA PRETA',
     'EDIFÍCIO PEDRA MENINA',
     'EDIFÍCIO PIEMONT',
     'EDIFÍCIO PIEMONTE',
     'RESIDENCIAL COSTA DO MAR',
     'RESIDENCIAL COSTA MAR'
-  ].reduce((currentXml, label) => replaceAll(currentXml, label, escapeXml(nome)), tableXml);
+  ];
+  const normalizedLabels = new Set(labels.map(normalizeTextForMatch));
+  const escapedNome = escapeXml(nome);
+  const withDirectReplace = labels.reduce((currentXml, label) => replaceAll(currentXml, label, escapedNome), tableXml);
+
+  const withTextNodeReplace = withDirectReplace.replace(/(<w:t\b[^>]*>)([\s\S]*?)(<\/w:t>)/g, (full, open, text, close) => {
+    const decodedText = decodeXmlEntities(text);
+    return normalizedLabels.has(normalizeTextForMatch(decodedText))
+      ? `${open}${escapedNome}${close}`
+      : full;
+  });
+
+  return withTextNodeReplace
+    .replace(
+      /(<w:t\b[^>]*>)EDIF[ÍI]CIO\s*(<\/w:t>)([\s\S]{0,700}?<w:t\b[^>]*>)(AREIA PRETA|PEDRA MENINA|PIEMONT|PIEMONTE)(<\/w:t>)/gi,
+      (_full, open, close, middleOpen, _suffix, suffixClose) => `${open}${escapedNome}${close}${middleOpen}${suffixClose}`
+    )
+    .replace(
+      /(<w:t\b[^>]*>)RESIDENCIAL\s*(<\/w:t>)([\s\S]{0,700}?<w:t\b[^>]*>)(COSTA DO MAR|COSTA MAR)(<\/w:t>)/gi,
+      (_full, open, close, middleOpen, _suffix, suffixClose) => `${open}${escapedNome}${close}${middleOpen}${suffixClose}`
+    );
+}
+
+function extractRepresentanteLegalIncorporadora(bodyText = '') {
+  const text = safeString(bodyText).replace(/\s+/g, ' ').trim();
+  if (!text) return [];
+
+  const representedMatch = text.match(/representad[ao]\s+por(?:\s+(?:seu|sua)\s+(?:diretor|diretora|socio administrador|sócio administrador|administrador|administradora|procurador|procuradora|representante legal))?\s+([^,.;]+)/i);
+  if (!representedMatch) return [];
+
+  const startIndex = representedMatch.index || 0;
+  const afterRepresented = text.slice(startIndex);
+  const nome = representedMatch[1].trim();
+  const cpfMatch = afterRepresented.match(/CPF(?:\/MF)?\s*(?:n[ºo]\.?\s*)?([\d.-]{11,14})/i);
+  const rgMatch = afterRepresented.match(/RG\s*(?:n[ºo]\.?\s*)?([A-Za-z0-9./-]+(?:\s?[A-Za-z0-9./-]+)*?)(?=,?\s*(?:CPF|e\s+CPF|residente|domiciliad[ao]|$))/i);
+
+  return [
+    nome ? `Representante legal: ${nome}` : '',
+    cpfMatch ? `CPF nº ${cpfMatch[1]}` : '',
+    rgMatch ? `RG nº ${rgMatch[1].trim()}` : ''
+  ].filter(Boolean);
 }
 
 function extractIncorporadoraAssinaturaFromRows(rows = []) {
@@ -550,7 +615,11 @@ function extractIncorporadoraAssinaturaFromRows(rows = []) {
     .split(/\s*,\s*pessoa|\s+inscrita\s+no\s+CNPJ|\s+CNPJ(?:\/MF)?/i)[0]
     .trim();
 
-  return [nome, cnpj ? `CNPJ n\u00ba ${cnpj}` : ''].filter(Boolean).join('\n');
+  return [
+    nome,
+    cnpj ? `CNPJ n\u00ba ${cnpj}` : '',
+    ...extractRepresentanteLegalIncorporadora(bodyText)
+  ].filter(Boolean).join('\n');
 }
 
 function applyLegacyBracketAliases(zip) {
@@ -661,10 +730,13 @@ function buildAssinaturasQuadroResumo(dados = {}) {
     dados?.conjuge?.nome,
     dados?.conjuge?.cpf_cnpj ? `CPF/CNPJ: ${dados.conjuge.cpf_cnpj}` : ''
   ]);
-  addAssinatura('CORRETOR(A)', [
-    dados?.corretor?.nome,
-    dados?.corretor?.cpf_cnpj ? `CPF/CNPJ: ${dados.corretor.cpf_cnpj}` : '',
-    dados?.corretor?.creci ? `CRECI: ${dados.corretor.creci}` : ''
+  addAssinatura('TESTEMUNHA 1', [
+    dados?.testemunha_1?.nome,
+    dados?.testemunha_1?.cpf ? formatCpfAssinatura(dados.testemunha_1.cpf) : ''
+  ]);
+  addAssinatura('TESTEMUNHA 2', [
+    dados?.testemunha_2?.nome,
+    dados?.testemunha_2?.cpf ? formatCpfAssinatura(dados.testemunha_2.cpf) : ''
   ]);
 
   return linhas.length ? linhas : [assinaturaLinha, 'Assinaturas'];
@@ -694,6 +766,10 @@ function applyQuadroResumoAutomation(zip, dados = {}) {
       return replaceRowsInTable(tableXml, (rows) => {
         const nextRows = [...rows];
         const incorporadoraAssinatura = extractIncorporadoraAssinaturaFromRows(nextRows);
+        const quadroResumoIndex = nextRows.findIndex((row) => normalizeXmlText(row).includes('QUADRO RESUMO'));
+        if (quadroResumoIndex > 0) {
+          nextRows[quadroResumoIndex - 1] = replaceKnownEmpreendimentoTitle(nextRows[quadroResumoIndex - 1], dados);
+        }
 
         const objetoIndex = nextRows.findIndex((row) => {
           const text = normalizeXmlText(row);
@@ -972,6 +1048,16 @@ function buildDadosContrato(contrato, customVariables = {}) {
   const valorTotalExtenso = formatCurrencyExtenso(raw.valor_total);
   const valorTotalComExtenso = `${valorTotalFormatado} (${valorTotalExtenso})`;
   const itemIIITexto = buildItemIIITexto(raw, empreendimento, unidade);
+  const corretorNome = safeString(corretor.nome || raw.corretor_nome);
+  const corretorCpfCnpj = safeString(corretor.cpf_cnpj);
+  const corretorCreci = safeString(corretor.creci);
+  const corretorCpfCnpjFormatado = formatDocumentoRotulado(corretorCpfCnpj);
+  const corretorCreciFormatado = formatCreciRotulado(corretorCreci);
+  const corretorDadosIdentificacao = [
+    corretorNome,
+    corretorCpfCnpjFormatado,
+    corretorCreciFormatado
+  ].filter(Boolean).join(', ');
 
   const dados = {
     contrato: {
@@ -1063,11 +1149,14 @@ function buildDadosContrato(contrato, customVariables = {}) {
       valor_base_venda_formatado: formatCurrency(unidade.valor_base_venda)
     },
     corretor: {
-      nome: safeString(corretor.nome || raw.corretor_nome),
-      cpf_cnpj: safeString(corretor.cpf_cnpj),
+      nome: corretorNome,
+      cpf_cnpj: corretorCpfCnpj,
+      cpf_cnpj_formatado: corretorCpfCnpjFormatado,
       telefone: safeString(corretor.telefone),
       email: safeString(corretor.email),
-      creci: safeString(corretor.creci),
+      creci: corretorCreci,
+      creci_formatado: corretorCreciFormatado,
+      dados_identificacao: corretorDadosIdentificacao,
       percentual_comissao: raw.comissao_percentual ? `${safeString(raw.comissao_percentual)}%` : ''
     },
     testemunha_1: {
@@ -1102,7 +1191,7 @@ function buildDadosContrato(contrato, customVariables = {}) {
     assinaturas: {
       comprador: buildAssinaturaPessoa(cliente.nome, cliente.cpf_cnpj),
       conjuge: buildAssinaturaPessoa(conjuge.nome || cliente.conjuge_nome, conjuge.cpf_cnpj),
-      corretor: buildAssinaturaPessoa(corretor.nome || raw.corretor_nome, corretor.cpf_cnpj),
+      corretor: corretorDadosIdentificacao,
       vendedora: safeString(empreendimento.nome),
       testemunha_1: buildAssinaturaPessoa(raw.testemunha_1_nome, raw.testemunha_1_cpf),
       testemunha_2: buildAssinaturaPessoa(raw.testemunha_2_nome, raw.testemunha_2_cpf)
@@ -1116,7 +1205,8 @@ function buildDadosContrato(contrato, customVariables = {}) {
         assinaturas: { vendedora: safeString(empreendimento.nome) },
         cliente,
         conjuge,
-        corretor
+        testemunha_1: { nome: raw.testemunha_1_nome, cpf: raw.testemunha_1_cpf },
+        testemunha_2: { nome: raw.testemunha_2_nome, cpf: raw.testemunha_2_cpf }
       }).join('\n')
     },
     custom: customVariables || {}
