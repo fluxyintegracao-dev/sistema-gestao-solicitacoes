@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { HiOutlinePencilSquare } from 'react-icons/hi2';
+import { HiOutlinePencilSquare, HiPlus, HiXMark } from 'react-icons/hi2';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { getMinhasObras } from '../services/obras';
@@ -635,6 +635,7 @@ export default function ComercialContratos() {
   const [pessoaRapidaModal, setPessoaRapidaModal] = useState(null);
   const [pessoaRapidaForm, setPessoaRapidaForm] = useState(defaultPessoaRapidaForm());
   const [compradorSelecionarId, setCompradorSelecionarId] = useState('');
+  const [mostrarCompradorAdicional, setMostrarCompradorAdicional] = useState(false);
   const [distratoForm, setDistratoForm] = useState(defaultDistratoForm());
   const [trocaForm, setTrocaForm] = useState(defaultTrocaForm());
   const [error, setError] = useState('');
@@ -1287,6 +1288,7 @@ export default function ComercialContratos() {
       parceiro_id: current.parceiro_id || id
     }));
     setCompradorSelecionarId('');
+    setMostrarCompradorAdicional(false);
   }
 
   function removerComprador(parceiroId) {
@@ -1366,6 +1368,7 @@ export default function ComercialContratos() {
             ], principalId)
           };
         });
+        setMostrarCompradorAdicional(false);
       } else {
         setCorretores((current) => [...current, pessoa].sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || ''))));
         setForm((current) => ({
@@ -1598,8 +1601,20 @@ export default function ComercialContratos() {
                 </span>
               )}
             </label>
-            <label className="sol-filter-field">
-              <span className="sol-filter-label">Comprador principal</span>
+            <div className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-bg)] p-3">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <span className="sol-filter-label">Comprador principal</span>
+                {!form.id && (
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-sm inline-flex h-8 w-8 items-center justify-center p-0"
+                    onClick={() => setMostrarCompradorAdicional(true)}
+                    title="Adicionar comprador"
+                  >
+                    <HiPlus className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
               <select className="input w-full" value={form.parceiro_id} onChange={(e) => selecionarClientePrincipal(e.target.value)} required disabled={Boolean(form.id)}>
                 <option value="">Selecione</option>
                 {clientes.map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}
@@ -1609,7 +1624,45 @@ export default function ComercialContratos() {
                   Cadastro rapido
                 </button>
               )}
-            </label>
+              {compradoresContrato[0]?.parceiro?.conjuge_nome && (
+                <p className="mt-2 text-xs text-[var(--c-muted)]">
+                  Conjuge: {compradoresContrato[0].parceiro.conjuge_nome}
+                </p>
+              )}
+            </div>
+            {!form.id && mostrarCompradorAdicional && (
+              <div className="rounded-2xl border border-blue-200 bg-blue-50/40 p-3">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <span className="sol-filter-label">Comprador adicional</span>
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-sm inline-flex h-8 w-8 items-center justify-center p-0"
+                    onClick={() => {
+                      setCompradorSelecionarId('');
+                      setMostrarCompradorAdicional(false);
+                    }}
+                    title="Fechar comprador adicional"
+                  >
+                    <HiXMark className="h-4 w-4" />
+                  </button>
+                </div>
+                <select className="input w-full" value={compradorSelecionarId} onChange={(e) => setCompradorSelecionarId(e.target.value)}>
+                  <option value="">Selecionar cliente cadastrado</option>
+                  {clientesDisponiveisComprador.map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}
+                </select>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <button type="button" className="btn btn-primary btn-sm" onClick={() => adicionarComprador()} disabled={!compradorSelecionarId}>
+                    Adicionar
+                  </button>
+                  <button type="button" className="btn btn-outline btn-sm" onClick={() => abrirCadastroRapidoPessoa('cliente')}>
+                    Cadastro rapido
+                  </button>
+                </div>
+                <p className="mt-2 text-xs text-[var(--c-muted)]">
+                  O comprador adicional entra no contrato e nas assinaturas. O principal continua vinculado aos titulos financeiros.
+                </p>
+              </div>
+            )}
             <label className="sol-filter-field">
               <span className="sol-filter-label">Obra</span>
               <input
@@ -1630,56 +1683,6 @@ export default function ComercialContratos() {
               )}
             </label>
           </div>
-          <section className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-bg)] p-4">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <p className="text-sm font-semibold text-[var(--c-text)]">Compradores do contrato</p>
-                <p className="text-xs text-[var(--c-muted)]">
-                  O comprador principal permanece vinculado aos titulos financeiros. Compradores adicionais entram no contrato e nas assinaturas.
-                </p>
-              </div>
-              <button type="button" className="btn btn-outline btn-sm" onClick={() => abrirCadastroRapidoPessoa('cliente')}>
-                Cadastro rapido
-              </button>
-            </div>
-
-            <div className="mt-3 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
-              <select className="input w-full" value={compradorSelecionarId} onChange={(e) => setCompradorSelecionarId(e.target.value)}>
-                <option value="">Selecionar cliente cadastrado</option>
-                {clientesDisponiveisComprador.map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}
-              </select>
-              <button type="button" className="btn btn-outline" onClick={() => adicionarComprador()} disabled={!compradorSelecionarId}>
-                Adicionar comprador
-              </button>
-            </div>
-
-            <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-              {compradoresContrato.map((item) => (
-                <div key={item.parceiro_id} className="rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-[var(--c-text)]">{item.parceiro?.nome || `Cliente ${item.parceiro_id}`}</p>
-                      <p className="text-xs text-[var(--c-muted)]">{maskCpfCnpj(item.parceiro?.cpf_cnpj || '') || 'CPF/CNPJ nao informado'}</p>
-                      {item.parceiro?.conjuge_nome && (
-                        <p className="mt-1 text-xs text-[var(--c-muted)]">Conjuge: {item.parceiro.conjuge_nome}</p>
-                      )}
-                    </div>
-                    <span className={`rounded-full px-2 py-1 text-xs font-semibold ${item.principal ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'}`}>
-                      {item.principal ? 'Principal' : `Comprador ${item.ordem}`}
-                    </span>
-                  </div>
-                  {!item.principal && (
-                    <button type="button" className="btn btn-outline btn-sm mt-3" onClick={() => removerComprador(item.parceiro_id)}>
-                      Remover
-                    </button>
-                  )}
-                </div>
-              ))}
-              {!compradoresContrato.length && (
-                <div className="app-empty-card md:col-span-2 xl:col-span-3">Selecione o comprador principal para iniciar a lista.</div>
-              )}
-            </div>
-          </section>
           <div className="grid gap-3 md:grid-cols-4">
             <label className="sol-filter-field">
               <span className="sol-filter-label">Contrato</span>
@@ -1820,6 +1823,39 @@ export default function ComercialContratos() {
               </label>
             </div>
           </div>
+          {compradoresContrato.length > 1 && (
+            <section className="rounded-xl border border-[var(--c-border)] bg-[var(--c-bg)] p-3">
+              <div className="mb-3">
+                <p className="text-sm font-semibold text-[var(--c-text)]">Compradores vinculados ao contrato</p>
+                <p className="text-xs text-[var(--c-muted)]">
+                  Lista de conferencia para assinaturas e dados do contrato.
+                </p>
+              </div>
+              <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                {compradoresContrato.map((item) => (
+                  <div key={item.parceiro_id} className="rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-[var(--c-text)]">{item.parceiro?.nome || `Cliente ${item.parceiro_id}`}</p>
+                        <p className="text-xs text-[var(--c-muted)]">{maskCpfCnpj(item.parceiro?.cpf_cnpj || '') || 'CPF/CNPJ nao informado'}</p>
+                        {item.parceiro?.conjuge_nome && (
+                          <p className="mt-1 text-xs text-[var(--c-muted)]">Conjuge: {item.parceiro.conjuge_nome}</p>
+                        )}
+                      </div>
+                      <span className={`rounded-full px-2 py-1 text-xs font-semibold ${item.principal ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'}`}>
+                        {item.principal ? 'Principal' : `Comprador ${item.ordem}`}
+                      </span>
+                    </div>
+                    {!item.principal && !form.id && (
+                      <button type="button" className="btn btn-outline btn-sm mt-3" onClick={() => removerComprador(item.parceiro_id)}>
+                        Remover
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
           <label className="sol-filter-field"><span className="sol-filter-label">Observacoes</span><textarea className="input min-h-[92px] w-full" value={form.observacoes} onChange={(e) => setForm((c) => ({ ...c, observacoes: e.target.value }))} /></label>
 
           {!form.id && (
