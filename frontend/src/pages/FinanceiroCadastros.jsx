@@ -1,15 +1,21 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
+  atualizarCartaoFinanceiro,
   atualizarCategoriaFinanceira,
   atualizarContaBancaria,
+  atualizarFormaPagamentoFinanceira,
   atualizarPaymentAccount,
   atualizarPaymentBeneficiary,
+  criarCartaoFinanceiro,
   criarCategoriaFinanceira,
   criarContaBancaria,
+  criarFormaPagamentoFinanceira,
+  getCartoesFinanceiros,
   criarPaymentAccount,
   criarPaymentBeneficiary,
   getCategoriasFinanceiras,
   getContasBancarias,
+  getFormasPagamentoFinanceiras,
   getPaymentAccounts,
   getPaymentBeneficiaries
 } from '../services/financeiro';
@@ -33,6 +39,37 @@ function defaultCategoriaForm() {
     nome: '',
     tipo: 'AMBOS',
     descricao: '',
+    ativo: true
+  };
+}
+
+function defaultFormaPagamentoForm() {
+  return {
+    id: null,
+    nome: '',
+    codigo: '',
+    tipo: 'OUTROS',
+    permite_parcelamento: false,
+    gera_fatura: false,
+    gera_boleto: false,
+    exige_cartao: false,
+    exige_cheque: false,
+    ordem: 0,
+    ativo: true
+  };
+}
+
+function defaultCartaoForm() {
+  return {
+    id: null,
+    nome: '',
+    titular: '',
+    bandeira: '',
+    ultimos_digitos: '',
+    conta_bancaria_id: '',
+    dia_fechamento: 25,
+    dia_vencimento: 5,
+    observacoes: '',
     ativo: true
   };
 }
@@ -89,6 +126,37 @@ function pickCategoriaFormData(categoria = {}) {
     tipo: categoria.tipo || 'AMBOS',
     descricao: categoria.descricao || '',
     ativo: categoria.ativo !== false
+  };
+}
+
+function pickFormaPagamentoFormData(forma = {}) {
+  return {
+    id: forma.id || null,
+    nome: forma.nome || '',
+    codigo: forma.codigo || '',
+    tipo: forma.tipo || 'OUTROS',
+    permite_parcelamento: forma.permite_parcelamento === true,
+    gera_fatura: forma.gera_fatura === true,
+    gera_boleto: forma.gera_boleto === true,
+    exige_cartao: forma.exige_cartao === true,
+    exige_cheque: forma.exige_cheque === true,
+    ordem: Number(forma.ordem || 0),
+    ativo: forma.ativo !== false
+  };
+}
+
+function pickCartaoFormData(cartao = {}) {
+  return {
+    id: cartao.id || null,
+    nome: cartao.nome || '',
+    titular: cartao.titular || '',
+    bandeira: cartao.bandeira || '',
+    ultimos_digitos: cartao.ultimos_digitos || '',
+    conta_bancaria_id: cartao.conta_bancaria_id ? String(cartao.conta_bancaria_id) : '',
+    dia_fechamento: Number(cartao.dia_fechamento || 25),
+    dia_vencimento: Number(cartao.dia_vencimento || 5),
+    observacoes: cartao.observacoes || '',
+    ativo: cartao.ativo !== false
   };
 }
 
@@ -165,13 +233,19 @@ export default function FinanceiroCadastros() {
   const [contas, setContas] = useState([]);
   const [paymentAccounts, setPaymentAccounts] = useState([]);
   const [categorias, setCategorias] = useState([]);
+  const [formasPagamento, setFormasPagamento] = useState([]);
+  const [cartoes, setCartoes] = useState([]);
   const [contaForm, setContaForm] = useState(defaultContaForm());
   const [paymentAccountForm, setPaymentAccountForm] = useState(defaultPaymentAccountForm());
   const [categoriaForm, setCategoriaForm] = useState(defaultCategoriaForm());
+  const [formaPagamentoForm, setFormaPagamentoForm] = useState(defaultFormaPagamentoForm());
+  const [cartaoForm, setCartaoForm] = useState(defaultCartaoForm());
   const [loading, setLoading] = useState(true);
   const [savingConta, setSavingConta] = useState(false);
   const [savingPaymentAccount, setSavingPaymentAccount] = useState(false);
   const [savingCategoria, setSavingCategoria] = useState(false);
+  const [savingFormaPagamento, setSavingFormaPagamento] = useState(false);
+  const [savingCartao, setSavingCartao] = useState(false);
   const [error, setError] = useState('');
   const [categoriaFiltro, setCategoriaFiltro] = useState('');
   const [categoriaTipoFiltro, setCategoriaTipoFiltro] = useState('TODAS');
@@ -184,14 +258,18 @@ export default function FinanceiroCadastros() {
     try {
       setLoading(true);
       setError('');
-      const [contasData, categoriasData, paymentAccountsData] = await Promise.all([
+      const [contasData, categoriasData, paymentAccountsData, formasData, cartoesData] = await Promise.all([
         getContasBancarias(),
         getCategoriasFinanceiras(),
-        getPaymentAccounts().catch(() => [])
+        getPaymentAccounts().catch(() => []),
+        getFormasPagamentoFinanceiras().catch(() => []),
+        getCartoesFinanceiros().catch(() => [])
       ]);
       setContas(Array.isArray(contasData) ? contasData : []);
       setCategorias(Array.isArray(categoriasData) ? categoriasData : []);
       setPaymentAccounts(Array.isArray(paymentAccountsData) ? paymentAccountsData : []);
+      setFormasPagamento(Array.isArray(formasData) ? formasData : []);
+      setCartoes(Array.isArray(cartoesData) ? cartoesData : []);
     } catch (err) {
       setError(err?.message || 'Erro ao carregar cadastros financeiros');
     } finally {
@@ -328,6 +406,52 @@ export default function FinanceiroCadastros() {
       setError(err?.message || 'Erro ao salvar categoria financeira');
     } finally {
       setSavingCategoria(false);
+    }
+  }
+
+  async function handleSalvarFormaPagamento(event) {
+    event.preventDefault();
+    try {
+      setSavingFormaPagamento(true);
+      setError('');
+      const { id, ...payload } = pickFormaPagamentoFormData(formaPagamentoForm);
+      if (formaPagamentoForm.id) {
+        await atualizarFormaPagamentoFinanceira(formaPagamentoForm.id, payload);
+      } else {
+        await criarFormaPagamentoFinanceira(payload);
+      }
+      setFormaPagamentoForm(defaultFormaPagamentoForm());
+      await carregar();
+    } catch (err) {
+      setError(err?.message || 'Erro ao salvar forma de pagamento');
+    } finally {
+      setSavingFormaPagamento(false);
+    }
+  }
+
+  async function handleSalvarCartao(event) {
+    event.preventDefault();
+    try {
+      setSavingCartao(true);
+      setError('');
+      const { id, ...payload } = pickCartaoFormData(cartaoForm);
+      const cleanPayload = {
+        ...payload,
+        conta_bancaria_id: payload.conta_bancaria_id ? Number(payload.conta_bancaria_id) : null,
+        dia_fechamento: Number(payload.dia_fechamento || 25),
+        dia_vencimento: Number(payload.dia_vencimento || 5)
+      };
+      if (cartaoForm.id) {
+        await atualizarCartaoFinanceiro(cartaoForm.id, cleanPayload);
+      } else {
+        await criarCartaoFinanceiro(cleanPayload);
+      }
+      setCartaoForm(defaultCartaoForm());
+      await carregar();
+    } catch (err) {
+      setError(err?.message || 'Erro ao salvar cartao');
+    } finally {
+      setSavingCartao(false);
     }
   }
 
@@ -736,6 +860,173 @@ export default function FinanceiroCadastros() {
                   ))}
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-6 grid gap-6 xl:grid-cols-2">
+          <div className="card sol-surface-card">
+            <div className="flex flex-col gap-1 md:flex-row md:items-start md:justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-[var(--c-text)]">
+                  {formaPagamentoForm.id ? 'Editar forma de pagamento' : 'Nova forma de pagamento'}
+                </h2>
+                <p className="text-sm text-[var(--c-muted)]">
+                  Define como o titulo sera gerado: boleto, cartao, cheque, pix ou outros fluxos.
+                </p>
+              </div>
+            </div>
+
+            <form className="mt-4 space-y-3" onSubmit={handleSalvarFormaPagamento}>
+              <div className="grid gap-3 md:grid-cols-2">
+                <input className="input w-full" placeholder="Nome" value={formaPagamentoForm.nome} onChange={(e) => setFormaPagamentoForm((c) => ({ ...c, nome: e.target.value }))} required />
+                <input className="input w-full" placeholder="Codigo" value={formaPagamentoForm.codigo} onChange={(e) => setFormaPagamentoForm((c) => ({ ...c, codigo: e.target.value }))} required />
+              </div>
+              <div className="grid gap-3 md:grid-cols-2">
+                <select className="input w-full" value={formaPagamentoForm.tipo} onChange={(e) => setFormaPagamentoForm((c) => ({ ...c, tipo: e.target.value }))}>
+                  <option value="BOLETO">Boleto</option>
+                  <option value="PIX">Pix</option>
+                  <option value="TRANSFERENCIA">Transferencia</option>
+                  <option value="CARTAO_CREDITO">Cartao de credito</option>
+                  <option value="CARTAO_DEBITO">Cartao de debito</option>
+                  <option value="CHEQUE">Cheque</option>
+                  <option value="DINHEIRO">Dinheiro</option>
+                  <option value="OUTROS">Outros</option>
+                </select>
+                <input className="input w-full" type="number" min="0" placeholder="Ordem" value={formaPagamentoForm.ordem} onChange={(e) => setFormaPagamentoForm((c) => ({ ...c, ordem: e.target.value }))} />
+              </div>
+              <div className="grid gap-2 text-sm text-[var(--c-text)] sm:grid-cols-2">
+                {[
+                  ['permite_parcelamento', 'Permite parcelamento'],
+                  ['gera_fatura', 'Gera fatura'],
+                  ['gera_boleto', 'Gera boleto'],
+                  ['exige_cartao', 'Exige cartao'],
+                  ['exige_cheque', 'Exige cheque'],
+                  ['ativo', 'Ativa']
+                ].map(([field, label]) => (
+                  <label key={field} className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(formaPagamentoForm[field])}
+                      onChange={(e) => setFormaPagamentoForm((c) => ({ ...c, [field]: e.target.checked }))}
+                    />
+                    {label}
+                  </label>
+                ))}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button type="submit" className="btn btn-primary" disabled={savingFormaPagamento}>
+                  {savingFormaPagamento ? 'Salvando...' : (formaPagamentoForm.id ? 'Salvar alteracoes' : 'Criar forma')}
+                </button>
+                {formaPagamentoForm.id && (
+                  <button type="button" className="btn btn-outline" onClick={() => setFormaPagamentoForm(defaultFormaPagamentoForm())}>
+                    Cancelar
+                  </button>
+                )}
+              </div>
+            </form>
+
+            <div className="mt-4 app-list-stack">
+              {formasPagamento.length === 0 ? (
+                <div className="app-note">Nenhuma forma de pagamento cadastrada.</div>
+              ) : formasPagamento.map((forma) => (
+                <div key={forma.id} className="app-list-card">
+                  <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                    <div className="text-sm">
+                      <div className="font-medium text-[var(--c-text)]">{forma.nome}</div>
+                      <div className="text-[var(--c-muted)]">
+                        {forma.codigo} - {forma.tipo}
+                        {forma.permite_parcelamento ? ' - parcelavel' : ''}
+                        {forma.gera_fatura ? ' - fatura' : ''}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={statusClass(forma.ativo)}>{forma.ativo ? 'ATIVA' : 'INATIVA'}</span>
+                      <button type="button" className="btn btn-outline" onClick={() => setFormaPagamentoForm(pickFormaPagamentoFormData(forma))}>
+                        Editar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="card sol-surface-card">
+            <div className="flex flex-col gap-1 md:flex-row md:items-start md:justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-[var(--c-text)]">
+                  {cartaoForm.id ? 'Editar cartao' : 'Novo cartao'}
+                </h2>
+                <p className="text-sm text-[var(--c-muted)]">
+                  Cartoes cadastrados agrupam titulos por fatura conforme fechamento e vencimento.
+                </p>
+              </div>
+            </div>
+
+            <form className="mt-4 space-y-3" onSubmit={handleSalvarCartao}>
+              <div className="grid gap-3 md:grid-cols-2">
+                <input className="input w-full" placeholder="Nome do cartao" value={cartaoForm.nome} onChange={(e) => setCartaoForm((c) => ({ ...c, nome: e.target.value }))} required />
+                <input className="input w-full" placeholder="Titular" value={cartaoForm.titular} onChange={(e) => setCartaoForm((c) => ({ ...c, titular: e.target.value }))} required />
+              </div>
+              <div className="grid gap-3 md:grid-cols-3">
+                <input className="input w-full" placeholder="Bandeira" value={cartaoForm.bandeira} onChange={(e) => setCartaoForm((c) => ({ ...c, bandeira: e.target.value }))} />
+                <input className="input w-full" maxLength={4} inputMode="numeric" placeholder="4 ultimos digitos" value={cartaoForm.ultimos_digitos} onChange={(e) => setCartaoForm((c) => ({ ...c, ultimos_digitos: e.target.value.replace(/\D/g, '').slice(0, 4) }))} required />
+                <select className="input w-full" value={cartaoForm.conta_bancaria_id} onChange={(e) => setCartaoForm((c) => ({ ...c, conta_bancaria_id: e.target.value }))}>
+                  <option value="">Conta de pagamento opcional</option>
+                  {contas.map((conta) => (
+                    <option key={conta.id} value={conta.id}>{conta.nome}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="grid gap-3 md:grid-cols-2">
+                <label className="sol-filter-field">
+                  <span className="sol-filter-label">Dia de fechamento</span>
+                  <input className="input w-full" type="number" min="1" max="31" value={cartaoForm.dia_fechamento} onChange={(e) => setCartaoForm((c) => ({ ...c, dia_fechamento: e.target.value }))} required />
+                </label>
+                <label className="sol-filter-field">
+                  <span className="sol-filter-label">Dia de vencimento</span>
+                  <input className="input w-full" type="number" min="1" max="31" value={cartaoForm.dia_vencimento} onChange={(e) => setCartaoForm((c) => ({ ...c, dia_vencimento: e.target.value }))} required />
+                </label>
+              </div>
+              <textarea className="input min-h-[72px] w-full" placeholder="Observacoes" value={cartaoForm.observacoes} onChange={(e) => setCartaoForm((c) => ({ ...c, observacoes: e.target.value }))} />
+              <label className="flex items-center gap-2 text-sm text-[var(--c-text)]">
+                <input type="checkbox" checked={cartaoForm.ativo} onChange={(e) => setCartaoForm((c) => ({ ...c, ativo: e.target.checked }))} />
+                Cartao ativo
+              </label>
+              <div className="flex flex-wrap gap-2">
+                <button type="submit" className="btn btn-primary" disabled={savingCartao}>
+                  {savingCartao ? 'Salvando...' : (cartaoForm.id ? 'Salvar alteracoes' : 'Criar cartao')}
+                </button>
+                {cartaoForm.id && (
+                  <button type="button" className="btn btn-outline" onClick={() => setCartaoForm(defaultCartaoForm())}>
+                    Cancelar
+                  </button>
+                )}
+              </div>
+            </form>
+
+            <div className="mt-4 app-list-stack">
+              {cartoes.length === 0 ? (
+                <div className="app-note">Nenhum cartao cadastrado.</div>
+              ) : cartoes.map((cartao) => (
+                <div key={cartao.id} className="app-list-card">
+                  <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                    <div className="text-sm">
+                      <div className="font-medium text-[var(--c-text)]">{cartao.nome}</div>
+                      <div className="text-[var(--c-muted)]">
+                        {cartao.bandeira || 'Bandeira nao informada'} final {cartao.ultimos_digitos} - fecha dia {cartao.dia_fechamento}, vence dia {cartao.dia_vencimento}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={statusClass(cartao.ativo)}>{cartao.ativo ? 'ATIVO' : 'INATIVO'}</span>
+                      <button type="button" className="btn btn-outline" onClick={() => setCartaoForm(pickCartaoFormData(cartao))}>
+                        Editar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>

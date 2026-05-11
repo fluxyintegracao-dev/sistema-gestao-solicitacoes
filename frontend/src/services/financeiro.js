@@ -127,6 +127,31 @@ export async function confirmarConciliacaoBancaria(id, data) {
   return parseJson(response, 'Erro ao confirmar conciliacao bancaria');
 }
 
+export async function getFaturasAssociacaoConciliacao(id, params = {}) {
+  const query = new URLSearchParams(
+    Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== '')
+  ).toString();
+  const url = query
+    ? `${API_URL}/financeiro/conciliacoes/${id}/faturas-cartao?${query}`
+    : `${API_URL}/financeiro/conciliacoes/${id}/faturas-cartao`;
+
+  const response = await fetch(url, {
+    headers: authHeaders()
+  });
+
+  return parseJson(response, 'Erro ao buscar faturas para conciliacao');
+}
+
+export async function confirmarConciliacaoFaturaCartao(id, data) {
+  const response = await fetch(`${API_URL}/financeiro/conciliacoes/${id}/confirmar-fatura`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+
+  return parseJson(response, 'Erro ao conciliar fatura de cartao');
+}
+
 export async function criarTituloConciliacaoBancaria(id, data) {
   const response = await fetch(`${API_URL}/financeiro/conciliacoes/${id}/criar-titulo`, {
     method: 'POST',
@@ -329,6 +354,85 @@ export async function getContasBancarias() {
   });
 
   return parseJson(response, 'Erro ao buscar contas bancarias');
+}
+
+export async function getFormasPagamentoFinanceiras() {
+  const response = await fetch(`${API_URL}/financeiro/formas-pagamento`, {
+    headers: authHeaders()
+  });
+
+  return parseJson(response, 'Erro ao buscar formas de pagamento');
+}
+
+export async function criarFormaPagamentoFinanceira(data) {
+  const response = await fetch(`${API_URL}/financeiro/formas-pagamento`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+
+  return parseJson(response, 'Erro ao criar forma de pagamento');
+}
+
+export async function atualizarFormaPagamentoFinanceira(id, data) {
+  const response = await fetch(`${API_URL}/financeiro/formas-pagamento/${id}`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+
+  return parseJson(response, 'Erro ao atualizar forma de pagamento');
+}
+
+export async function getCartoesFinanceiros() {
+  const response = await fetch(`${API_URL}/financeiro/cartoes`, {
+    headers: authHeaders()
+  });
+
+  return parseJson(response, 'Erro ao buscar cartoes financeiros');
+}
+
+export async function criarCartaoFinanceiro(data) {
+  const response = await fetch(`${API_URL}/financeiro/cartoes`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+
+  return parseJson(response, 'Erro ao criar cartao financeiro');
+}
+
+export async function atualizarCartaoFinanceiro(id, data) {
+  const response = await fetch(`${API_URL}/financeiro/cartoes/${id}`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+
+  return parseJson(response, 'Erro ao atualizar cartao financeiro');
+}
+
+export async function getFaturasCartaoFinanceiro(params = {}) {
+  const query = new URLSearchParams(
+    Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== '')
+  ).toString();
+  const url = query ? `${API_URL}/financeiro/faturas-cartao?${query}` : `${API_URL}/financeiro/faturas-cartao`;
+
+  const response = await fetch(url, {
+    headers: authHeaders()
+  });
+
+  return parseJson(response, 'Erro ao buscar faturas de cartao');
+}
+
+export async function baixarFaturaCartaoFinanceiro(id, data) {
+  const response = await fetch(`${API_URL}/financeiro/faturas-cartao/${id}/baixar`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+
+  return parseJson(response, 'Erro ao baixar fatura de cartao');
 }
 
 export async function criarContaBancaria(data) {

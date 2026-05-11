@@ -79,6 +79,10 @@ db.ArquivoModelo = require('./ArquivoModelo')(sequelize, Sequelize);
 db.SecurityEventLog = require('./SecurityEventLog')(sequelize, Sequelize);
 db.ContaBancaria = require('./ContaBancaria')(sequelize, Sequelize);
 db.CategoriaFinanceira = require('./CategoriaFinanceira')(sequelize, Sequelize);
+db.FormaPagamentoFinanceira = require('./FormaPagamentoFinanceira')(sequelize, Sequelize);
+db.CartaoFinanceiro = require('./CartaoFinanceiro')(sequelize, Sequelize);
+db.FaturaCartaoFinanceiro = require('./FaturaCartaoFinanceiro')(sequelize, Sequelize);
+db.FaturaCartaoTitulo = require('./FaturaCartaoTitulo')(sequelize, Sequelize);
 db.TituloFinanceiro = require('./TituloFinanceiro')(sequelize, Sequelize);
 db.TituloFinanceiroSequencia = require('./TituloFinanceiroSequencia')(sequelize, Sequelize);
 db.MovimentoFinanceiro = require('./MovimentoFinanceiro')(sequelize, Sequelize);
@@ -1953,6 +1957,56 @@ db.CategoriaFinanceira.belongsTo(db.User, {
   as: 'criadoPor'
 });
 
+db.User.hasMany(db.FormaPagamentoFinanceira, {
+  foreignKey: 'criado_por',
+  as: 'formasPagamentoFinanceirasCriadas'
+});
+
+db.FormaPagamentoFinanceira.belongsTo(db.User, {
+  foreignKey: 'criado_por',
+  as: 'criadoPor'
+});
+
+db.User.hasMany(db.CartaoFinanceiro, {
+  foreignKey: 'criado_por',
+  as: 'cartoesFinanceirosCriados'
+});
+
+db.CartaoFinanceiro.belongsTo(db.User, {
+  foreignKey: 'criado_por',
+  as: 'criadoPor'
+});
+
+db.ContaBancaria.hasMany(db.CartaoFinanceiro, {
+  foreignKey: 'conta_bancaria_id',
+  as: 'cartoesFinanceiros'
+});
+
+db.CartaoFinanceiro.belongsTo(db.ContaBancaria, {
+  foreignKey: 'conta_bancaria_id',
+  as: 'contaBancaria'
+});
+
+db.CartaoFinanceiro.hasMany(db.FaturaCartaoFinanceiro, {
+  foreignKey: 'cartao_id',
+  as: 'faturas'
+});
+
+db.FaturaCartaoFinanceiro.belongsTo(db.CartaoFinanceiro, {
+  foreignKey: 'cartao_id',
+  as: 'cartao'
+});
+
+db.ContaBancaria.hasMany(db.FaturaCartaoFinanceiro, {
+  foreignKey: 'conta_bancaria_id',
+  as: 'faturasCartao'
+});
+
+db.FaturaCartaoFinanceiro.belongsTo(db.ContaBancaria, {
+  foreignKey: 'conta_bancaria_id',
+  as: 'contaBancaria'
+});
+
 db.Obra.hasMany(db.TituloFinanceiro, {
   foreignKey: 'obra_id',
   as: 'titulosFinanceiros'
@@ -1981,6 +2035,56 @@ db.CategoriaFinanceira.hasMany(db.TituloFinanceiro, {
 db.TituloFinanceiro.belongsTo(db.CategoriaFinanceira, {
   foreignKey: 'categoria_financeira_id',
   as: 'categoriaFinanceira'
+});
+
+db.FormaPagamentoFinanceira.hasMany(db.TituloFinanceiro, {
+  foreignKey: 'forma_pagamento_id',
+  as: 'titulos'
+});
+
+db.TituloFinanceiro.belongsTo(db.FormaPagamentoFinanceira, {
+  foreignKey: 'forma_pagamento_id',
+  as: 'formaPagamento'
+});
+
+db.CartaoFinanceiro.hasMany(db.TituloFinanceiro, {
+  foreignKey: 'cartao_id',
+  as: 'titulos'
+});
+
+db.TituloFinanceiro.belongsTo(db.CartaoFinanceiro, {
+  foreignKey: 'cartao_id',
+  as: 'cartao'
+});
+
+db.FaturaCartaoFinanceiro.hasMany(db.TituloFinanceiro, {
+  foreignKey: 'fatura_cartao_id',
+  as: 'titulos'
+});
+
+db.TituloFinanceiro.belongsTo(db.FaturaCartaoFinanceiro, {
+  foreignKey: 'fatura_cartao_id',
+  as: 'faturaCartao'
+});
+
+db.FaturaCartaoFinanceiro.hasMany(db.FaturaCartaoTitulo, {
+  foreignKey: 'fatura_cartao_id',
+  as: 'itens'
+});
+
+db.FaturaCartaoTitulo.belongsTo(db.FaturaCartaoFinanceiro, {
+  foreignKey: 'fatura_cartao_id',
+  as: 'fatura'
+});
+
+db.TituloFinanceiro.hasOne(db.FaturaCartaoTitulo, {
+  foreignKey: 'titulo_financeiro_id',
+  as: 'faturaVinculo'
+});
+
+db.FaturaCartaoTitulo.belongsTo(db.TituloFinanceiro, {
+  foreignKey: 'titulo_financeiro_id',
+  as: 'titulo'
 });
 
 db.Solicitacao.hasMany(db.TituloFinanceiro, {
@@ -2024,6 +2128,16 @@ db.MovimentoFinanceiro.belongsTo(db.ContaBancaria, {
   as: 'contaBancaria'
 });
 
+db.FaturaCartaoFinanceiro.hasMany(db.MovimentoFinanceiro, {
+  foreignKey: 'fatura_cartao_id',
+  as: 'movimentos'
+});
+
+db.MovimentoFinanceiro.belongsTo(db.FaturaCartaoFinanceiro, {
+  foreignKey: 'fatura_cartao_id',
+  as: 'faturaCartao'
+});
+
 db.User.hasMany(db.MovimentoFinanceiro, {
   foreignKey: 'criado_por',
   as: 'movimentosFinanceirosCriados'
@@ -2062,6 +2176,16 @@ db.MovimentoFinanceiro.hasMany(db.ConciliacaoBancaria, {
 db.ConciliacaoBancaria.belongsTo(db.MovimentoFinanceiro, {
   foreignKey: 'movimento_financeiro_id',
   as: 'movimento'
+});
+
+db.FaturaCartaoFinanceiro.hasMany(db.ConciliacaoBancaria, {
+  foreignKey: 'fatura_cartao_id',
+  as: 'conciliacoes'
+});
+
+db.ConciliacaoBancaria.belongsTo(db.FaturaCartaoFinanceiro, {
+  foreignKey: 'fatura_cartao_id',
+  as: 'faturaCartao'
 });
 
 db.ContaBancaria.hasMany(db.ConciliacaoBancaria, {

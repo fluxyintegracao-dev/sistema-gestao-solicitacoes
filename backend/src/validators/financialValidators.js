@@ -555,7 +555,11 @@ function validateFinanceTituloCreateFromSolicitacaoBody(body = {}) {
       'linha_digitavel',
       'codigo_barras',
       'identificador_externo',
-      'boleto_emitido_em'
+      'boleto_emitido_em',
+      'forma_pagamento_id',
+      'cartao_id',
+      'quantidade_parcelas',
+      'data_compra'
     ],
     'Geracao de titulo financeiro'
   );
@@ -577,7 +581,11 @@ function validateFinanceTituloCreateFromSolicitacaoBody(body = {}) {
     linha_digitavel: parseOptionalText(body.linha_digitavel, 'Linha digitavel', 255),
     codigo_barras: parseOptionalText(body.codigo_barras, 'Codigo de barras', 255),
     identificador_externo: parseOptionalText(body.identificador_externo, 'Identificador externo', 120),
-    boleto_emitido_em: parseDateOnly(body.boleto_emitido_em, 'Data de emissao do boleto')
+    boleto_emitido_em: parseDateOnly(body.boleto_emitido_em, 'Data de emissao do boleto'),
+    forma_pagamento_id: parseInteger(body.forma_pagamento_id, 'Forma de pagamento'),
+    cartao_id: parseInteger(body.cartao_id, 'Cartao'),
+    quantidade_parcelas: parseInteger(body.quantidade_parcelas, 'Quantidade de parcelas'),
+    data_compra: parseDateOnly(body.data_compra, 'Data da compra')
   };
 }
 
@@ -602,7 +610,11 @@ function validateFinanceTituloCreateBody(body = {}) {
       'linha_digitavel',
       'codigo_barras',
       'identificador_externo',
-      'boleto_emitido_em'
+      'boleto_emitido_em',
+      'forma_pagamento_id',
+      'cartao_id',
+      'quantidade_parcelas',
+      'data_compra'
     ],
     'Criacao manual de titulo financeiro'
   );
@@ -625,7 +637,11 @@ function validateFinanceTituloCreateBody(body = {}) {
     linha_digitavel: parseOptionalText(body.linha_digitavel, 'Linha digitavel', 255),
     codigo_barras: parseOptionalText(body.codigo_barras, 'Codigo de barras', 255),
     identificador_externo: parseOptionalText(body.identificador_externo, 'Identificador externo', 120),
-    boleto_emitido_em: parseDateOnly(body.boleto_emitido_em, 'Data de emissao do boleto')
+    boleto_emitido_em: parseDateOnly(body.boleto_emitido_em, 'Data de emissao do boleto'),
+    forma_pagamento_id: parseInteger(body.forma_pagamento_id, 'Forma de pagamento'),
+    cartao_id: parseInteger(body.cartao_id, 'Cartao'),
+    quantidade_parcelas: parseInteger(body.quantidade_parcelas, 'Quantidade de parcelas'),
+    data_compra: parseDateOnly(body.data_compra, 'Data da compra')
   };
 }
 

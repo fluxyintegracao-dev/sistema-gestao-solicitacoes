@@ -27,6 +27,39 @@ module.exports = (sequelize, DataTypes) => sequelize.define(
       type: DataTypes.INTEGER,
       allowNull: true
     },
+    forma_pagamento_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true
+    },
+    cartao_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true
+    },
+    fatura_cartao_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true
+    },
+    grupo_parcelamento_id: {
+      type: DataTypes.STRING(80),
+      allowNull: true
+    },
+    numero_parcela: {
+      type: DataTypes.INTEGER,
+      allowNull: true
+    },
+    total_parcelas: {
+      type: DataTypes.INTEGER,
+      allowNull: true
+    },
+    data_compra: {
+      type: DataTypes.DATEONLY,
+      allowNull: true
+    },
+    origem_titulo: {
+      type: DataTypes.STRING(40),
+      allowNull: false,
+      defaultValue: 'MANUAL'
+    },
     tipo: {
       type: DataTypes.STRING(20),
       allowNull: false

@@ -4,6 +4,8 @@ const {
   ConciliacaoBancaria,
   ConciliacaoBancariaImportacao,
   ContaBancaria,
+  FaturaCartaoFinanceiro,
+  CartaoFinanceiro,
   MovimentoFinanceiro,
   Parceiro,
   sequelize,
@@ -15,6 +17,7 @@ const {
   getFinanceiroObraScopeIds
 } = require('./authorizationService');
 const { registrarEventoSeguranca } = require('./securityLogService');
+const { baixarFaturaCartao } = require('./faturaCartaoFinanceiroService');
 const { criarTituloManualComBaixaAtomica } = require('./tituloFinanceiroService');
 
 function createHttpError(statusCode, message) {
@@ -298,6 +301,17 @@ function buildConciliacaoInclude() {
           model: ContaBancaria,
           as: 'contaBancaria',
           attributes: ['id', 'nome']
+        }
+      ]
+    },
+    {
+      model: FaturaCartaoFinanceiro,
+      as: 'faturaCartao',
+      include: [
+        {
+          model: CartaoFinanceiro,
+          as: 'cartao',
+          attributes: ['id', 'nome', 'titular', 'bandeira', 'ultimos_digitos']
         }
       ]
     },
@@ -809,6 +823,17 @@ async function listarConciliacoes(req, filters = {}) {
             status: json.movimento.status
           }
         : null,
+      fatura_cartao: json.faturaCartao
+        ? {
+            id: json.faturaCartao.id,
+            competencia: json.faturaCartao.competencia,
+            status: json.faturaCartao.status,
+            valor_total: Number(json.faturaCartao.valor_total || 0),
+            data_vencimento: json.faturaCartao.data_vencimento,
+            cartao_nome: json.faturaCartao.cartao?.nome || '-',
+            cartao_final: json.faturaCartao.cartao?.ultimos_digitos || null
+          }
+        : null,
       sugestoes: analise.sugestoes,
       sugestao_automatica: analise.sugestao_automatica,
       total_candidatos: analise.total_candidatos,
@@ -1010,6 +1035,165 @@ async function resolveMovimentoForConciliacao(req, conciliacao, movimentoId) {
   }
 
   return movimento;
+}
+
+async function listarFaturasAssociacao(req, conciliacaoId, filters = {}) {
+  const conciliacao = await loadConciliacaoById(req, conciliacaoId);
+  const valorBancoAbsoluto = Math.abs(Number(conciliacao.valor || 0));
+  const valorInicial = normalizePositiveNumber(filters.valor_inicial, valorBancoAbsoluto);
+  const valorFinal = normalizePositiveNumber(filters.valor_final, valorBancoAbsoluto);
+  const dataInicial = filters.data_inicial || subtractDays(conciliacao.data_movimento, 7);
+  const dataFinal = filters.data_final || addDays(conciliacao.data_movimento, 7);
+  const limit = normalizeSearchLimit(filters.limit, 30);
+
+  const faturas = await FaturaCartaoFinanceiro.findAll({
+    where: {
+      status: {
+        [Op.in]: ['ABERTA', 'FECHADA', 'PARCIAL']
+      },
+      data_vencimento: {
+        [Op.between]: [dataInicial, dataFinal]
+      }
+    },
+    include: [
+      {
+        model: CartaoFinanceiro,
+        as: 'cartao',
+        attributes: ['id', 'nome', 'titular', 'bandeira', 'ultimos_digitos']
+      },
+      {
+        model: TituloFinanceiro,
+        as: 'titulos',
+        attributes: ['id'],
+        required: false
+      }
+    ],
+    order: [['data_vencimento', 'DESC'], ['id', 'DESC']]
+  });
+
+  const lower = Number(valorInicial || 0);
+  const upper = Number(valorFinal || lower);
+  const search = normalizeText(filters.documento || filters.busca || '');
+  const itens = faturas
+    .filter((fatura) => {
+      const valor = Math.abs(Number(fatura.valor_total || 0));
+      if (lower === upper) return Math.abs(valor - lower) <= 0.1;
+      return valor >= lower && valor <= upper;
+    })
+    .filter((fatura) => {
+      if (!search) return true;
+      const haystack = normalizeText([
+        fatura.competencia,
+        fatura.cartao?.nome,
+        fatura.cartao?.titular,
+        fatura.cartao?.bandeira,
+        fatura.cartao?.ultimos_digitos
+      ].filter(Boolean).join(' '));
+      return haystack.includes(search);
+    })
+    .slice(0, limit)
+    .map((fatura) => ({
+      id: fatura.id,
+      fatura_cartao_id: fatura.id,
+      cartao: fatura.cartao
+        ? {
+            id: fatura.cartao.id,
+            nome: fatura.cartao.nome,
+            titular: fatura.cartao.titular,
+            bandeira: fatura.cartao.bandeira,
+            ultimos_digitos: fatura.cartao.ultimos_digitos
+          }
+        : null,
+      cartao_nome: fatura.cartao?.nome || '-',
+      cartao_final: fatura.cartao?.ultimos_digitos || null,
+      competencia: fatura.competencia,
+      status: fatura.status,
+      data_fechamento: fatura.data_fechamento,
+      data_vencimento: fatura.data_vencimento,
+      valor_total: Number(fatura.valor_total || 0),
+      total_titulos: Array.isArray(fatura.titulos) ? fatura.titulos.length : 0,
+      diff_valor: roundCurrency(Math.abs(Math.abs(Number(fatura.valor_total || 0)) - valorBancoAbsoluto)),
+      diff_dias: calculateDiffDays(conciliacao.data_movimento, fatura.data_vencimento)
+    }));
+
+  return {
+    conciliacao: {
+      id: conciliacao.id,
+      conta_bancaria_id: conciliacao.conta_bancaria_id,
+      conta_bancaria_nome: conciliacao.contaBancaria?.nome || '-',
+      data_movimento: conciliacao.data_movimento,
+      valor: Number(conciliacao.valor || 0),
+      documento: conciliacao.documento,
+      descricao_banco: conciliacao.descricao_banco
+    },
+    meta: { total: itens.length, limit },
+    itens
+  };
+}
+
+async function confirmarConciliacaoFatura(req, conciliacaoId, payload = {}) {
+  await assertFinanceAccess(req);
+  const transaction = await sequelize.transaction();
+  try {
+    const conciliacao = await ConciliacaoBancaria.findByPk(conciliacaoId, {
+      transaction,
+      lock: transaction.LOCK.UPDATE
+    });
+    if (!conciliacao) throw createHttpError(404, 'Lancamento de conciliacao nao encontrado.');
+    if (String(conciliacao.status || '').toUpperCase() !== 'PENDENTE') {
+      throw createHttpError(400, 'Somente conciliacoes pendentes podem ser confirmadas.');
+    }
+
+    const faturaId = parseInteger(payload.fatura_cartao_id, 'Fatura de cartao');
+    const fatura = await FaturaCartaoFinanceiro.findByPk(faturaId, { transaction });
+    if (!fatura) throw createHttpError(400, 'Fatura de cartao invalida.');
+
+    const valorConciliacao = Math.abs(Number(conciliacao.valor || 0));
+    const valorFatura = Math.abs(Number(fatura.valor_total || 0));
+    if (Math.abs(valorConciliacao - valorFatura) > 0.1) {
+      throw createHttpError(400, 'O valor da fatura nao confere com o lancamento bancario.');
+    }
+
+    await baixarFaturaCartao(req, fatura.id, {
+      conta_bancaria_id: conciliacao.conta_bancaria_id,
+      data_movimento: conciliacao.data_movimento,
+      observacoes: `Baixa conciliada pelo lancamento bancario #${conciliacao.id}`
+    }, { transaction });
+
+    await conciliacao.update({
+      fatura_cartao_id: fatura.id,
+      movimento_financeiro_id: null,
+      titulo_financeiro_id: null,
+      status: 'CONCILIADO',
+      confirmado_por: req.user?.id || null,
+      confirmado_em: new Date()
+    }, { transaction });
+
+    await fatura.update({
+      conciliacao_bancaria_id: conciliacao.id
+    }, { transaction });
+
+    await transaction.commit();
+
+    await registrarEventoSeguranca({
+      req,
+      usuarioId: req.user?.id || null,
+      tipoEvento: 'FINANCIAL_BANK_RECONCILED_CARD_STATEMENT',
+      recursoTipo: 'CONCILIACAO_BANCARIA',
+      recursoId: conciliacao.id,
+      status: 'SUCCESS',
+      descricao: 'Lancamento bancario conciliado com fatura de cartao',
+      metadata: {
+        fatura_cartao_id: fatura.id,
+        valor_fatura: valorFatura
+      }
+    });
+
+    return loadConciliacaoById(req, conciliacao.id);
+  } catch (error) {
+    await transaction.rollback();
+    throw error;
+  }
 }
 
 async function finalizarConciliacao(req, conciliacao, movimento, { batch = false } = {}) {
@@ -1276,11 +1460,13 @@ async function ignorarConciliacao(req, conciliacaoId) {
 module.exports = {
   conciliarSugeridos,
   confirmarConciliacao,
+  confirmarConciliacaoFatura,
   criarTituloEConciliar,
   ignorarConciliacao,
   importOfx,
   listarImportacoes,
   listarConciliacoes,
+  listarFaturasAssociacao,
   listarMovimentosAssociacao,
   parseOfxTransactions
 };

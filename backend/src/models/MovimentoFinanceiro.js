@@ -10,6 +10,10 @@ module.exports = (sequelize, DataTypes) => sequelize.define(
       type: DataTypes.INTEGER,
       allowNull: false
     },
+    fatura_cartao_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true
+    },
     conta_bancaria_id: {
       type: DataTypes.INTEGER,
       allowNull: true
