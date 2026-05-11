@@ -61,7 +61,15 @@ const DEFAULT_SOLICITACOES_PAGE_SIZE = 25;
 const MAX_SOLICITACOES_PAGE_SIZE = 100;
 const TOKENS_DIRETORIA_OBRAS = new Set([
   'DIR_OBRAS_PUBLICAS',
-  'DIR_OBRAS_PRIVADAS'
+  'DIRETORIA_OBRAS_PUBLICAS',
+  'DIRETORIA_DE_OBRAS_PUBLICAS',
+  'DIR_DE_OBRAS_PUBLICAS',
+  'OBRAS_PUBLICAS',
+  'DIR_OBRAS_PRIVADAS',
+  'DIRETORIA_OBRAS_PRIVADAS',
+  'DIRETORIA_DE_OBRAS_PRIVADAS',
+  'DIR_DE_OBRAS_PRIVADAS',
+  'OBRAS_PRIVADAS'
 ]);
 const TOKENS_GEO_EQUIVALENTES = new Set([
   'GEO',
@@ -597,17 +605,62 @@ function isAdministrativoToken(valor) {
   return normalizarTokenComparacao(valor) === 'ADMINISTRATIVO';
 }
 
+function normalizarDiretoriaObrasToken(valor) {
+  const token = normalizarTokenComparacao(valor)
+    .replace(/[^A-Z0-9_]/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_+|_+$/g, '');
+
+  if (token.includes('OBRAS_PRIVAD')) return 'DIR_OBRAS_PRIVADAS';
+  if (token.includes('OBRAS_PUBLIC')) return 'DIR_OBRAS_PUBLICAS';
+  if (!TOKENS_DIRETORIA_OBRAS.has(token)) return null;
+  return token.includes('PRIVAD') ? 'DIR_OBRAS_PRIVADAS' : 'DIR_OBRAS_PUBLICAS';
+}
+
+function obterAliasesDiretoriaObras(tokenDiretoria) {
+  const token = normalizarDiretoriaObrasToken(tokenDiretoria);
+  if (token === 'DIR_OBRAS_PUBLICAS') {
+    return [
+      'DIR_OBRAS_PUBLICAS',
+      'DIRETORIA_OBRAS_PUBLICAS',
+      'DIRETORIA_DE_OBRAS_PUBLICAS',
+      'DIR_DE_OBRAS_PUBLICAS',
+      'DIR OBRAS PUBLICAS',
+      'DIRETORIA OBRAS PUBLICAS',
+      'DIRETORIA DE OBRAS PUBLICAS',
+      'Obras Publicas',
+      'OBRAS PUBLICAS'
+    ];
+  }
+
+  if (token === 'DIR_OBRAS_PRIVADAS') {
+    return [
+      'DIR_OBRAS_PRIVADAS',
+      'DIRETORIA_OBRAS_PRIVADAS',
+      'DIRETORIA_DE_OBRAS_PRIVADAS',
+      'DIR_DE_OBRAS_PRIVADAS',
+      'DIR OBRAS PRIVADAS',
+      'DIRETORIA OBRAS PRIVADAS',
+      'DIRETORIA DE OBRAS PRIVADAS',
+      'Obras Privadas',
+      'OBRAS PRIVADAS'
+    ];
+  }
+
+  return [];
+}
+
 function isDiretoriaObrasToken(valor) {
-  return TOKENS_DIRETORIA_OBRAS.has(normalizarTokenComparacao(valor));
+  return Boolean(normalizarDiretoriaObrasToken(valor));
 }
 
 function obterDiretoriaObrasUsuarioParaStatus(tokensSetor = [], diretoriasPermitidas = []) {
   const tokensNormalizados = (Array.isArray(tokensSetor) ? tokensSetor : [])
-    .map(normalizarTokenComparacao)
+    .map(token => normalizarDiretoriaObrasToken(token) || normalizarTokenComparacao(token))
     .filter(Boolean);
   const permitidas = (Array.isArray(diretoriasPermitidas) ? diretoriasPermitidas : [diretoriasPermitidas])
-    .map(normalizarTokenComparacao)
-    .filter(isDiretoriaObrasToken);
+    .map(normalizarDiretoriaObrasToken)
+    .filter(Boolean);
 
   if (permitidas.length === 0) return null;
 
@@ -2275,11 +2328,18 @@ module.exports = {
         };
 
         if (setorAtualStr) {
+          const aliasesDiretoria = obterAliasesDiretoriaObras(setorAtualStr);
           const setorRow = await Setor.findOne({
             where: {
               [Op.or]: [
                 { codigo: setorAtualStr },
                 { nome: setorAtualStr },
+                ...(aliasesDiretoria.length > 0
+                  ? [
+                    { codigo: { [Op.in]: aliasesDiretoria } },
+                    { nome: { [Op.in]: aliasesDiretoria } }
+                  ]
+                  : []),
                 Sequelize.where(
                   Sequelize.fn('LOWER', Sequelize.col('codigo')),
                   setorAtualStr.toLowerCase()
@@ -2295,6 +2355,7 @@ module.exports = {
 
           const tokensSetor = [
             setorAtualStr,
+            ...aliasesDiretoria,
             String(setorRow?.codigo || '').trim(),
             String(setorRow?.nome || '').trim()
           ].filter(Boolean);

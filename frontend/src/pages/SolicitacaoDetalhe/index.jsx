@@ -26,20 +26,40 @@ import {
 
 const TOKENS_DIRETORIA_OBRAS = new Set([
   'DIR_OBRAS_PUBLICAS',
-  'DIR_OBRAS_PRIVADAS'
+  'DIRETORIA_OBRAS_PUBLICAS',
+  'DIRETORIA_DE_OBRAS_PUBLICAS',
+  'DIR_DE_OBRAS_PUBLICAS',
+  'OBRAS_PUBLICAS',
+  'DIR_OBRAS_PRIVADAS',
+  'DIRETORIA_OBRAS_PRIVADAS',
+  'DIRETORIA_DE_OBRAS_PRIVADAS',
+  'DIR_DE_OBRAS_PRIVADAS',
+  'OBRAS_PRIVADAS'
 ]);
 
+function normalizarDiretoriaObrasToken(valor) {
+  const token = normalizarSetorToken(valor)
+    .replace(/[^A-Z0-9_]/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_+|_+$/g, '');
+
+  if (token.includes('OBRAS_PRIVAD')) return 'DIR_OBRAS_PRIVADAS';
+  if (token.includes('OBRAS_PUBLIC')) return 'DIR_OBRAS_PUBLICAS';
+  if (!TOKENS_DIRETORIA_OBRAS.has(token)) return null;
+  return token.includes('PRIVAD') ? 'DIR_OBRAS_PRIVADAS' : 'DIR_OBRAS_PUBLICAS';
+}
+
 function isDiretoriaObrasToken(valor) {
-  return TOKENS_DIRETORIA_OBRAS.has(normalizarSetorToken(valor));
+  return Boolean(normalizarDiretoriaObrasToken(valor));
 }
 
 function obterDiretoriaObrasUsuarioParaStatus(user, diretoriasPermitidas = []) {
   const tokensNormalizados = obterTokensSetorUsuario(user)
-    .map(normalizarSetorToken)
+    .map(token => normalizarDiretoriaObrasToken(token) || normalizarSetorToken(token))
     .filter(Boolean);
   const permitidas = (Array.isArray(diretoriasPermitidas) ? diretoriasPermitidas : [diretoriasPermitidas])
-    .map(normalizarSetorToken)
-    .filter(isDiretoriaObrasToken);
+    .map(normalizarDiretoriaObrasToken)
+    .filter(Boolean);
 
   if (permitidas.length === 0) return null;
 
