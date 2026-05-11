@@ -170,6 +170,18 @@ function usuarioPodeExcluirLote(permissoes, lote) {
   return permissoesTemClassificacao(permissoes, lote?.classificacao_alvo, 'classificacoesExcluiveis');
 }
 
+function usuarioPodeReabrirLote(permissoes, lote, req) {
+  if (!lote || String(lote.status || '').toUpperCase() !== STATUS_LOTE.FINALIZADO) return false;
+  if (!usuarioPodeVisualizarLote(permissoes, lote)) return false;
+  if (permissoes?.isSuperadmin) return true;
+  const usuarioId = Number(req.user?.id);
+  return Boolean(
+    permissoes?.isDirAdmin &&
+    Number.isInteger(usuarioId) &&
+    Number(lote.solicitado_por) === usuarioId
+  );
+}
+
 function calcularResumoPagamentoSolicitacao(solicitacao) {
   const valorTotal = Number(solicitacao?.valor);
   const valorPagoAcumulado = Number(solicitacao?.valor_pago_acumulado || 0);
@@ -242,6 +254,14 @@ function serializarLote(lote, resumoItens = null) {
     createdAt: lote.createdAt,
     updatedAt: lote.updatedAt
   };
+}
+
+function normalizarSolicitacaoIds(lista = []) {
+  return Array.from(new Set(
+    (Array.isArray(lista) ? lista : [])
+      .map(Number)
+      .filter((id) => Number.isInteger(id) && id > 0)
+  ));
 }
 
 async function carregarResumoItensPorLote(loteIds = []) {
@@ -347,6 +367,31 @@ async function listarSolicitacoesElegiveisParaLote(lote, busca = '', solicitacao
   return rows.map(serializarSolicitacaoPrioridade).filter((item) => Number(item.valor_prioridade) > 0);
 }
 
+async function substituirItensLote({ lote, solicitacoesSelecionadas, usuarioId, transaction }) {
+  const agora = new Date();
+  const valorUtilizado = solicitacoesSelecionadas.reduce((total, item) => total + formatarNumero(item.valor_prioridade), 0);
+
+  await PrioridadeLoteItem.destroy({
+    where: { lote_id: lote.id },
+    transaction
+  });
+
+  if (solicitacoesSelecionadas.length > 0) {
+    await PrioridadeLoteItem.bulkCreate(
+      solicitacoesSelecionadas.map((item) => ({
+        lote_id: lote.id,
+        solicitacao_id: item.id,
+        valor_considerado: item.valor_prioridade,
+        autorizado_por: usuarioId,
+        autorizado_em: agora
+      })),
+      { transaction }
+    );
+  }
+
+  return { valorUtilizado, agora };
+}
+
 async function obterSetoresPorTokens(tokens = []) {
   const lista = Array.from(new Set((Array.isArray(tokens) ? tokens : []).map(normalizarTokenSetor).filter(Boolean)));
   if (lista.length === 0) return [];
@@ -445,6 +490,8 @@ module.exports = {
         items: lotes.map((lote) => ({
           ...serializarLote(lote, resumoItens.get(Number(lote.id))),
           pode_finalizar: usuarioPodeFinalizarLote(permissoes, lote) && lote.status === STATUS_LOTE.ABERTO,
+          pode_salvar: usuarioPodeFinalizarLote(permissoes, lote) && lote.status === STATUS_LOTE.ABERTO,
+          pode_reabrir: usuarioPodeReabrirLote(permissoes, lote, req),
           pode_cancelar: usuarioPodeCancelarLote(permissoes, lote) && lote.status === STATUS_LOTE.ABERTO,
           pode_excluir: usuarioPodeExcluirLote(permissoes, lote)
         }))
@@ -515,6 +562,8 @@ module.exports = {
             solicitacao: item.solicitacao ? serializarSolicitacaoPrioridade(item.solicitacao) : null
           })),
           pode_finalizar: usuarioPodeFinalizarLote(permissoes, lote) && lote.status === STATUS_LOTE.ABERTO,
+          pode_salvar: usuarioPodeFinalizarLote(permissoes, lote) && lote.status === STATUS_LOTE.ABERTO,
+          pode_reabrir: usuarioPodeReabrirLote(permissoes, lote, req),
           pode_cancelar: usuarioPodeCancelarLote(permissoes, lote) && lote.status === STATUS_LOTE.ABERTO,
           pode_excluir: usuarioPodeExcluirLote(permissoes, lote)
         }
@@ -559,20 +608,81 @@ module.exports = {
         await transaction.rollback();
         return res.status(404).json({ error: 'Lote de prioridade nao encontrado.' });
       }
+      if (req.body?.reabrir === true) {
+        if (!usuarioPodeReabrirLote(permissoes, lote, req)) {
+          await transaction.rollback();
+          return res.status(403).json({ error: 'Usuario sem permissao para reabrir este lote.' });
+        }
+
+        const itens = await PrioridadeLoteItem.findAll({
+          where: { lote_id: lote.id },
+          attributes: ['solicitacao_id'],
+          transaction
+        });
+        const solicitacaoIdsReabrir = itens.map((item) => Number(item.solicitacao_id)).filter(Boolean);
+        if (solicitacaoIdsReabrir.length > 0) {
+          await Solicitacao.update(
+            {
+              prioridade_diretoria_ativa: false,
+              prioridade_diretoria_em: null,
+              prioridade_diretoria_lote_id: null
+            },
+            {
+              where: {
+                id: { [Op.in]: solicitacaoIdsReabrir },
+                prioridade_diretoria_lote_id: lote.id
+              },
+              transaction
+            }
+          );
+        }
+
+        await lote.update({
+          status: STATUS_LOTE.ABERTO,
+          finalizado_por: null,
+          finalizado_em: null
+        }, { transaction });
+
+        await transaction.commit();
+        const detalhe = await carregarLoteDetalhe(lote.id);
+        return res.json({
+          item: {
+            ...serializarLote(detalhe),
+            itens: (Array.isArray(detalhe.itens) ? detalhe.itens : []).map((item) => ({
+              id: item.id,
+              valor_considerado: formatarNumero(item.valor_considerado),
+              autorizado_em: item.autorizado_em,
+              autorizado_por: item.autorizado_por,
+              autorizado_por_nome: item?.autorizadoPor?.nome || '-',
+              solicitacao: item.solicitacao ? serializarSolicitacaoPrioridade(item.solicitacao) : null
+            })),
+            pode_finalizar: usuarioPodeFinalizarLote(permissoes, detalhe) && detalhe.status === STATUS_LOTE.ABERTO,
+            pode_salvar: usuarioPodeFinalizarLote(permissoes, detalhe) && detalhe.status === STATUS_LOTE.ABERTO,
+            pode_reabrir: usuarioPodeReabrirLote(permissoes, detalhe, req),
+            pode_cancelar: usuarioPodeCancelarLote(permissoes, detalhe) && detalhe.status === STATUS_LOTE.ABERTO,
+            pode_excluir: usuarioPodeExcluirLote(permissoes, detalhe)
+          }
+        });
+      }
+
       if (!usuarioPodeFinalizarLote(permissoes, lote)) {
         await transaction.rollback();
         return res.status(403).json({ error: 'Apenas a diretoria alvo pode finalizar este lote.' });
       }
+
       if (String(lote.status || '').toUpperCase() !== STATUS_LOTE.ABERTO) {
         await transaction.rollback();
         return res.status(400).json({ error: 'Somente lotes abertos podem ser finalizados.' });
       }
-      const solicitacaoIds = Array.from(new Set((Array.isArray(req.body?.solicitacao_ids) ? req.body.solicitacao_ids : []).map(Number).filter((id) => Number.isInteger(id) && id > 0)));
-      if (solicitacaoIds.length === 0) {
+      const modoRascunho = req.body?.rascunho === true;
+      const solicitacaoIds = normalizarSolicitacaoIds(req.body?.solicitacao_ids);
+      if (!modoRascunho && solicitacaoIds.length === 0) {
         await transaction.rollback();
         return res.status(400).json({ error: 'Selecione ao menos uma solicitacao para o lote.' });
       }
-      const solicitacoesSelecionadas = await listarSolicitacoesElegiveisParaLote(lote, '', solicitacaoIds);
+      const solicitacoesSelecionadas = solicitacaoIds.length > 0
+        ? await listarSolicitacoesElegiveisParaLote(lote, '', solicitacaoIds)
+        : [];
       if (solicitacoesSelecionadas.length !== solicitacaoIds.length) {
         await transaction.rollback();
         return res.status(400).json({ error: 'Uma ou mais solicitacoes selecionadas nao estao elegiveis para prioridade.' });
@@ -583,17 +693,40 @@ module.exports = {
         await transaction.rollback();
         return res.status(400).json({ error: 'O valor total das solicitacoes selecionadas excede o limite disponivel do lote.' });
       }
-      const agora = new Date();
-      await PrioridadeLoteItem.bulkCreate(
-        solicitacoesSelecionadas.map((item) => ({
-          lote_id: lote.id,
-          solicitacao_id: item.id,
-          valor_considerado: item.valor_prioridade,
-          autorizado_por: req.user.id,
-          autorizado_em: agora
-        })),
-        { transaction }
-      );
+      const { agora } = await substituirItensLote({
+        lote,
+        solicitacoesSelecionadas,
+        usuarioId: req.user.id,
+        transaction
+      });
+
+      if (modoRascunho) {
+        await lote.update({
+          valor_utilizado: valorUtilizado
+        }, { transaction });
+        await transaction.commit();
+
+        const detalhe = await carregarLoteDetalhe(lote.id);
+        return res.json({
+          item: {
+            ...serializarLote(detalhe),
+            itens: (Array.isArray(detalhe.itens) ? detalhe.itens : []).map((item) => ({
+              id: item.id,
+              valor_considerado: formatarNumero(item.valor_considerado),
+              autorizado_em: item.autorizado_em,
+              autorizado_por: item.autorizado_por,
+              autorizado_por_nome: item?.autorizadoPor?.nome || '-',
+              solicitacao: item.solicitacao ? serializarSolicitacaoPrioridade(item.solicitacao) : null
+            })),
+            pode_finalizar: usuarioPodeFinalizarLote(permissoes, detalhe) && detalhe.status === STATUS_LOTE.ABERTO,
+            pode_salvar: usuarioPodeFinalizarLote(permissoes, detalhe) && detalhe.status === STATUS_LOTE.ABERTO,
+            pode_reabrir: usuarioPodeReabrirLote(permissoes, detalhe, req),
+            pode_cancelar: usuarioPodeCancelarLote(permissoes, detalhe) && detalhe.status === STATUS_LOTE.ABERTO,
+            pode_excluir: usuarioPodeExcluirLote(permissoes, detalhe)
+          }
+        });
+      }
+
       await Solicitacao.update(
         {
           prioridade_diretoria_ativa: true,

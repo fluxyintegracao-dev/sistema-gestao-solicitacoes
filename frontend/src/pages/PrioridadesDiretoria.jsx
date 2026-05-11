@@ -8,7 +8,9 @@ import {
   getLotePrioridadeDiretoria,
   getPrioridadesDiretoriaContexto,
   getSolicitacoesDisponiveisPrioridadeDiretoria,
-  listarLotesPrioridadeDiretoria
+  listarLotesPrioridadeDiretoria,
+  reabrirLotePrioridadeDiretoria,
+  salvarRascunhoLotePrioridadeDiretoria
 } from '../services/prioridadesDiretoria';
 
 function moeda(valor) {
@@ -29,6 +31,20 @@ function statusClass(status) {
   if (value === 'FINALIZADO') return 'badge badge-success';
   if (value === 'CANCELADO') return 'badge badge-danger';
   return 'badge badge-warning';
+}
+
+function solicitacoesDoLote(lote) {
+  return (Array.isArray(lote?.itens) ? lote.itens : [])
+    .map(item => item?.solicitacao)
+    .filter(Boolean);
+}
+
+function mesclarSolicitacoes(base = [], extras = []) {
+  const mapa = new Map();
+  [...(Array.isArray(extras) ? extras : []), ...(Array.isArray(base) ? base : [])].forEach((item) => {
+    if (item?.id) mapa.set(String(item.id), item);
+  });
+  return Array.from(mapa.values());
 }
 
 export default function PrioridadesDiretoria() {
@@ -115,11 +131,12 @@ export default function PrioridadesDiretoria() {
       const detalheData = await getLotePrioridadeDiretoria(id);
       const detalhe = detalheData?.item || null;
       setLoteDetalhe(detalhe);
-      setSelecionados(new Set());
+      const solicitacoesSalvas = solicitacoesDoLote(detalhe);
+      setSelecionados(new Set(solicitacoesSalvas.map(item => String(item.id))));
 
       if (detalhe?.status === 'ABERTO') {
         const disponiveisData = await getSolicitacoesDisponiveisPrioridadeDiretoria(id, busca ? { busca } : {});
-        setDisponiveis(Array.isArray(disponiveisData?.items) ? disponiveisData.items : []);
+        setDisponiveis(mesclarSolicitacoes(Array.isArray(disponiveisData?.items) ? disponiveisData.items : [], solicitacoesSalvas));
       } else {
         setDisponiveis([]);
       }
@@ -137,7 +154,10 @@ export default function PrioridadesDiretoria() {
       loteDetalhe.id,
       busca ? { busca } : {}
     );
-    setDisponiveis(Array.isArray(dataDisponiveis?.items) ? dataDisponiveis.items : []);
+    setDisponiveis(mesclarSolicitacoes(
+      Array.isArray(dataDisponiveis?.items) ? dataDisponiveis.items : [],
+      solicitacoesDoLote(loteDetalhe)
+    ));
   }
 
   function alternarSolicitacao(id) {
@@ -150,11 +170,39 @@ export default function PrioridadesDiretoria() {
     });
   }
 
+  const solicitacoesExibidas = useMemo(() => (
+    loteDetalhe?.status === 'ABERTO'
+      ? mesclarSolicitacoes(disponiveis, solicitacoesDoLote(loteDetalhe))
+      : solicitacoesDoLote(loteDetalhe)
+  ), [disponiveis, loteDetalhe]);
+
   const selecionadas = useMemo(() => (
-    disponiveis.filter(item => selecionados.has(String(item.id)))
-  ), [disponiveis, selecionados]);
+    solicitacoesExibidas.filter(item => selecionados.has(String(item.id)))
+  ), [solicitacoesExibidas, selecionados]);
 
   const valorSelecionado = selecionadas.reduce((total, item) => total + Number(item.valor_prioridade || 0), 0);
+
+  async function salvarSelecaoLote() {
+    if (!loteDetalhe?.id) return;
+    const solicitacaoIds = Array.from(selecionados).map(Number).filter(Boolean);
+
+    try {
+      setOperando(true);
+      const dataLote = await salvarRascunhoLotePrioridadeDiretoria(loteDetalhe.id, { solicitacao_ids: solicitacaoIds });
+      const detalhe = dataLote?.item || null;
+      setLoteDetalhe(detalhe);
+      const solicitacoesSalvas = solicitacoesDoLote(detalhe);
+      setSelecionados(new Set(solicitacoesSalvas.map(item => String(item.id))));
+      setDisponiveis(mesclarSolicitacoes(disponiveis, solicitacoesSalvas));
+      await recarregarLotes();
+      alert('Selecao salva. Voce pode voltar depois para continuar este lote.');
+    } catch (error) {
+      console.error(error);
+      alert(error?.message || 'Erro ao salvar selecao do lote.');
+    } finally {
+      setOperando(false);
+    }
+  }
 
   async function finalizarLote() {
     if (!loteDetalhe?.id) return;
@@ -178,6 +226,27 @@ export default function PrioridadesDiretoria() {
     } catch (error) {
       console.error(error);
       alert(error?.message || 'Erro ao finalizar lote.');
+    } finally {
+      setOperando(false);
+    }
+  }
+
+  async function reabrirLote(lote) {
+    if (!window.confirm('Reabrir este lote finalizado para edicao? As solicitacoes voltam como selecao salva ate a nova finalizacao.')) return;
+    try {
+      setOperando(true);
+      const dataLote = await reabrirLotePrioridadeDiretoria(lote.id);
+      const detalhe = dataLote?.item || null;
+      setLoteDetalhe(detalhe);
+      const solicitacoesSalvas = solicitacoesDoLote(detalhe);
+      setSelecionados(new Set(solicitacoesSalvas.map(item => String(item.id))));
+      const disponiveisData = await getSolicitacoesDisponiveisPrioridadeDiretoria(lote.id, busca ? { busca } : {});
+      setDisponiveis(mesclarSolicitacoes(Array.isArray(disponiveisData?.items) ? disponiveisData.items : [], solicitacoesSalvas));
+      await recarregarLotes();
+      alert('Lote reaberto para edicao.');
+    } catch (error) {
+      console.error(error);
+      alert(error?.message || 'Erro ao reabrir lote.');
     } finally {
       setOperando(false);
     }
@@ -310,6 +379,7 @@ export default function PrioridadesDiretoria() {
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
+                  {loteDetalhe.pode_reabrir && <button type="button" className="btn btn-primary btn-sm" onClick={() => reabrirLote(loteDetalhe)} disabled={operando}>Reabrir lote</button>}
                   {loteDetalhe.pode_cancelar && <button type="button" className="btn btn-outline btn-sm" onClick={() => cancelarLote(loteDetalhe)}>Cancelar</button>}
                   {loteDetalhe.pode_excluir && <button type="button" className="btn btn-outline btn-sm" onClick={() => excluirLote(loteDetalhe)}>Excluir</button>}
                 </div>
@@ -323,6 +393,11 @@ export default function PrioridadesDiretoria() {
                       <input className="input" value={busca} onChange={event => setBusca(event.target.value)} placeholder="Codigo, obra, descricao ou tipo" />
                     </label>
                     <button type="button" className="btn btn-outline" onClick={buscarDisponiveis}>Buscar</button>
+                    {loteDetalhe.pode_salvar && (
+                      <button type="button" className="btn btn-outline" onClick={salvarSelecaoLote} disabled={operando}>
+                        Salvar selecao
+                      </button>
+                    )}
                     {loteDetalhe.pode_finalizar && (
                       <button type="button" className="btn btn-primary" onClick={finalizarLote} disabled={operando}>
                         Finalizar selecionadas
@@ -347,7 +422,7 @@ export default function PrioridadesDiretoria() {
                     </tr>
                   </thead>
                   <tbody>
-                    {(loteDetalhe.status === 'ABERTO' ? disponiveis : (loteDetalhe.itens || []).map(item => item.solicitacao).filter(Boolean)).map(item => (
+                    {solicitacoesExibidas.map(item => (
                       <tr key={item.id}>
                         {loteDetalhe.status === 'ABERTO' && (
                           <td>
@@ -365,7 +440,7 @@ export default function PrioridadesDiretoria() {
                         <td className="text-right font-semibold">{moeda(item.valor_prioridade)}</td>
                       </tr>
                     ))}
-                    {(loteDetalhe.status === 'ABERTO' ? disponiveis.length === 0 : !loteDetalhe.itens?.length) && (
+                    {solicitacoesExibidas.length === 0 && (
                       <tr>
                         <td colSpan={loteDetalhe.status === 'ABERTO' ? 5 : 4} className="text-center text-[var(--c-muted)] py-8">
                           Nenhuma solicitacao encontrada para este lote.
