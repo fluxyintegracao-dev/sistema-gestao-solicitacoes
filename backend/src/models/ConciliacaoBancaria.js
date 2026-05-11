@@ -18,6 +18,10 @@ module.exports = (sequelize, DataTypes) => sequelize.define(
       type: DataTypes.INTEGER,
       allowNull: true
     },
+    fatura_cartao_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true
+    },
     ofx_uid: {
       type: DataTypes.STRING(255),
       allowNull: true

@@ -266,6 +266,9 @@ const RhFechamentoController = require('./controllers/RhFechamentoController');
 const IntegracaoSiengeController = require('./controllers/IntegracaoSiengeController');
 const ContaBancariaController = require('./controllers/ContaBancariaController');
 const CategoriaFinanceiraController = require('./controllers/CategoriaFinanceiraController');
+const FormaPagamentoFinanceiraController = require('./controllers/FormaPagamentoFinanceiraController');
+const CartaoFinanceiroController = require('./controllers/CartaoFinanceiroController');
+const FaturaCartaoFinanceiroController = require('./controllers/FaturaCartaoFinanceiroController');
 const TituloFinanceiroController = require('./controllers/TituloFinanceiroController');
 const RelatorioFinanceiroController = require('./controllers/RelatorioFinanceiroController');
 const ConciliacaoBancariaController = require('./controllers/ConciliacaoBancariaController');
@@ -1123,6 +1126,8 @@ router.get('/financeiro/conciliacoes/:id/movimentos', allowFinanceiro, validateR
 router.post('/financeiro/conciliacoes/:id/criar-titulo', allowFinanceiro, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Conciliacao bancaria'), body: validateFinanceConciliacaoCriarTituloBody }), ConciliacaoBancariaController.criarTitulo);
 router.post('/financeiro/conciliacoes/:id/confirmar', allowFinanceiro, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Conciliacao bancaria'), body: validateFinanceConciliacaoConfirmBody }), ConciliacaoBancariaController.confirmar);
 router.post('/financeiro/conciliacoes/:id/ignorar', allowFinanceiro, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Conciliacao bancaria') }), ConciliacaoBancariaController.ignorar);
+router.get('/financeiro/conciliacoes/:id/faturas-cartao', allowFinanceiro, validateRequest({ params: validateNumericIdParam('id', 'Conciliacao bancaria'), query: validateFinanceConciliacaoMovimentosQuery }), ConciliacaoBancariaController.faturas);
+router.post('/financeiro/conciliacoes/:id/confirmar-fatura', allowFinanceiro, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Conciliacao bancaria') }), ConciliacaoBancariaController.confirmarFatura);
 router.get('/financeiro/relatorios/fluxo-caixa', allowFinanceiro, validateRequest({ query: validateFinanceFluxoCaixaQuery }), RelatorioFinanceiroController.fluxoCaixa);
 router.get('/financeiro/relatorios/analitico', allowFinanceiro, validateRequest({ query: validateFinanceRelatorioAnaliticoQuery }), RelatorioFinanceiroController.analitico);
 router.get('/financeiro/relatorios/resultado-obras', allowFinanceiro, ResultadoObrasController.index);
@@ -1146,6 +1151,15 @@ router.patch('/financeiro/contas-bancarias/:id', allowFinanceiro, criticalRateLi
 router.get('/financeiro/categorias', allowFinanceiro, CategoriaFinanceiraController.index);
 router.post('/financeiro/categorias', allowFinanceiro, criticalRateLimit, validateRequest({ body: validateFinanceCadastroCategoriaBody }), CategoriaFinanceiraController.create);
 router.patch('/financeiro/categorias/:id', allowFinanceiro, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Categoria financeira'), body: validateFinanceCadastroCategoriaBody }), CategoriaFinanceiraController.update);
+router.get('/financeiro/formas-pagamento', allowFinanceiro, FormaPagamentoFinanceiraController.index);
+router.post('/financeiro/formas-pagamento', allowFinanceiro, criticalRateLimit, FormaPagamentoFinanceiraController.create);
+router.patch('/financeiro/formas-pagamento/:id', allowFinanceiro, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Forma de pagamento') }), FormaPagamentoFinanceiraController.update);
+router.get('/financeiro/cartoes', allowFinanceiro, CartaoFinanceiroController.index);
+router.post('/financeiro/cartoes', allowFinanceiro, criticalRateLimit, CartaoFinanceiroController.create);
+router.patch('/financeiro/cartoes/:id', allowFinanceiro, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Cartao financeiro') }), CartaoFinanceiroController.update);
+router.get('/financeiro/faturas-cartao', allowFinanceiro, FaturaCartaoFinanceiroController.index);
+router.get('/financeiro/faturas-cartao/:id', allowFinanceiro, validateRequest({ params: validateNumericIdParam('id', 'Fatura de cartao') }), FaturaCartaoFinanceiroController.show);
+router.post('/financeiro/faturas-cartao/:id/baixar', allowFinanceiro, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Fatura de cartao') }), FaturaCartaoFinanceiroController.baixar);
 
 // -------------------------------------------------------------------
 // COMPRAS - CADASTROS BASICOS

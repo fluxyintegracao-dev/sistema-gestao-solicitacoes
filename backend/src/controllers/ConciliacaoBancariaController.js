@@ -1,9 +1,11 @@
 const {
   conciliarSugeridos,
   confirmarConciliacao,
+  confirmarConciliacaoFatura,
   criarTituloEConciliar,
   ignorarConciliacao,
   importOfx,
+  listarFaturasAssociacao,
   listarImportacoes,
   listarConciliacoes,
   listarMovimentosAssociacao
@@ -82,6 +84,26 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return responderErro(res, error, 'Erro ao buscar movimentos para associacao manual');
+    }
+  },
+
+  async faturas(req, res) {
+    try {
+      const data = await listarFaturasAssociacao(req, req.params.id, req.query || {});
+      return res.json(data);
+    } catch (error) {
+      console.error(error);
+      return responderErro(res, error, 'Erro ao buscar faturas para conciliacao');
+    }
+  },
+
+  async confirmarFatura(req, res) {
+    try {
+      const data = await confirmarConciliacaoFatura(req, req.params.id, req.body || {});
+      return res.json(data);
+    } catch (error) {
+      console.error(error);
+      return responderErro(res, error, 'Erro ao conciliar fatura de cartao');
     }
   },
 

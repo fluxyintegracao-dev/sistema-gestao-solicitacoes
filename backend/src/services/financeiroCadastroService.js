@@ -1,6 +1,8 @@
 const {
+  CartaoFinanceiro,
   CategoriaFinanceira,
-  ContaBancaria
+  ContaBancaria,
+  FormaPagamentoFinanceira
 } = require('../models');
 const {
   canAccessFinanceiro
@@ -88,6 +90,83 @@ function sanitizeCategoriaPayload(payload = {}, { partial = false } = {}) {
   );
 }
 
+function normalizeCodigo(value, fallback = '') {
+  return String(value || fallback)
+    .trim()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .toUpperCase();
+}
+
+function sanitizeBoolean(value, fallback = false) {
+  if (value === undefined || value === null || value === '') return fallback;
+  return value === true || value === 'true' || value === 1 || value === '1';
+}
+
+function sanitizeFormaPagamentoPayload(payload = {}, { partial = false } = {}) {
+  const nome = sanitizeTextField(payload.nome);
+  const data = {
+    nome,
+    codigo: payload.codigo === undefined ? undefined : normalizeCodigo(payload.codigo, nome),
+    tipo: payload.tipo === undefined ? undefined : normalizeCodigo(payload.tipo),
+    permite_parcelamento: payload.permite_parcelamento === undefined ? undefined : sanitizeBoolean(payload.permite_parcelamento),
+    gera_fatura: payload.gera_fatura === undefined ? undefined : sanitizeBoolean(payload.gera_fatura),
+    gera_boleto: payload.gera_boleto === undefined ? undefined : sanitizeBoolean(payload.gera_boleto),
+    exige_cartao: payload.exige_cartao === undefined ? undefined : sanitizeBoolean(payload.exige_cartao),
+    exige_cheque: payload.exige_cheque === undefined ? undefined : sanitizeBoolean(payload.exige_cheque),
+    ordem: payload.ordem === undefined ? undefined : Number(payload.ordem || 0),
+    ativo: payload.ativo === undefined ? undefined : sanitizeBoolean(payload.ativo, true)
+  };
+
+  if (!partial) {
+    if (!String(data.nome || '').trim()) throw createHttpError(400, 'Nome da forma de pagamento e obrigatorio.');
+    data.codigo = data.codigo || normalizeCodigo(data.nome);
+    data.tipo = data.tipo || data.codigo;
+  }
+
+  if (data.ordem !== undefined && (!Number.isInteger(data.ordem) || data.ordem < 0)) {
+    throw createHttpError(400, 'Ordem da forma de pagamento invalida.');
+  }
+
+  return Object.fromEntries(Object.entries(data).filter(([, value]) => value !== undefined));
+}
+
+function sanitizeCartaoPayload(payload = {}, { partial = false } = {}) {
+  const data = {
+    nome: sanitizeTextField(payload.nome),
+    titular: sanitizeTextField(payload.titular),
+    bandeira: sanitizeTextField(payload.bandeira, { emptyAsNull: true }),
+    ultimos_digitos: payload.ultimos_digitos === undefined ? undefined : String(payload.ultimos_digitos || '').replace(/\D/g, '').slice(-4),
+    conta_bancaria_id: payload.conta_bancaria_id === undefined ? undefined : (payload.conta_bancaria_id ? Number(payload.conta_bancaria_id) : null),
+    dia_fechamento: payload.dia_fechamento === undefined ? undefined : Number(payload.dia_fechamento),
+    dia_vencimento: payload.dia_vencimento === undefined ? undefined : Number(payload.dia_vencimento),
+    ativo: payload.ativo === undefined ? undefined : sanitizeBoolean(payload.ativo, true),
+    observacoes: sanitizeTextField(payload.observacoes, { emptyAsNull: true })
+  };
+
+  if (!partial) {
+    if (!String(data.nome || '').trim()) throw createHttpError(400, 'Nome do cartao e obrigatorio.');
+    if (!String(data.titular || '').trim()) throw createHttpError(400, 'Titular do cartao e obrigatorio.');
+    if (!String(data.ultimos_digitos || '').trim() || data.ultimos_digitos.length !== 4) {
+      throw createHttpError(400, 'Informe os 4 ultimos digitos do cartao.');
+    }
+  }
+
+  for (const field of ['dia_fechamento', 'dia_vencimento']) {
+    if (data[field] !== undefined && (!Number.isInteger(data[field]) || data[field] < 1 || data[field] > 31)) {
+      throw createHttpError(400, `${field === 'dia_fechamento' ? 'Dia de fechamento' : 'Dia de vencimento'} invalido.`);
+    }
+  }
+
+  if (data.conta_bancaria_id !== undefined && data.conta_bancaria_id !== null && (!Number.isInteger(data.conta_bancaria_id) || data.conta_bancaria_id <= 0)) {
+    throw createHttpError(400, 'Conta bancaria do cartao invalida.');
+  }
+
+  return Object.fromEntries(Object.entries(data).filter(([, value]) => value !== undefined));
+}
+
 async function listarContasBancarias(req) {
   await assertFinanceAccess(req);
 
@@ -160,6 +239,91 @@ async function listarCategoriasFinanceiras(req) {
   });
 }
 
+async function listarFormasPagamentoFinanceiras(req) {
+  await assertFinanceAccess(req);
+
+  return FormaPagamentoFinanceira.findAll({
+    order: [['ordem', 'ASC'], ['nome', 'ASC']]
+  });
+}
+
+async function criarFormaPagamentoFinanceira(req, payload = {}) {
+  await assertFinanceAccess(req);
+  const data = sanitizeFormaPagamentoPayload(payload);
+  data.criado_por = req.user?.id || null;
+  data.atualizado_por = req.user?.id || null;
+
+  const forma = await FormaPagamentoFinanceira.create(data);
+
+  await registrarEventoSeguranca({
+    req,
+    usuarioId: req.user?.id || null,
+    tipoEvento: 'FINANCIAL_PAYMENT_METHOD_CREATED',
+    recursoTipo: 'FORMA_PAGAMENTO_FINANCEIRA',
+    recursoId: forma.id,
+    status: 'SUCCESS',
+    descricao: 'Forma de pagamento financeira criada',
+    metadata: { codigo: forma.codigo, tipo: forma.tipo }
+  });
+
+  return forma;
+}
+
+async function atualizarFormaPagamentoFinanceira(req, formaId, payload = {}) {
+  await assertFinanceAccess(req);
+
+  const forma = await FormaPagamentoFinanceira.findByPk(formaId);
+  if (!forma) throw createHttpError(404, 'Forma de pagamento nao encontrada.');
+
+  const data = sanitizeFormaPagamentoPayload(payload, { partial: true });
+  if (Object.keys(data).length === 0) {
+    throw createHttpError(400, 'Nenhum campo valido informado para atualizar a forma de pagamento.');
+  }
+
+  data.atualizado_por = req.user?.id || null;
+  await forma.update(data);
+  return forma;
+}
+
+async function listarCartoesFinanceiros(req) {
+  await assertFinanceAccess(req);
+
+  return CartaoFinanceiro.findAll({
+    include: [{ model: ContaBancaria, as: 'contaBancaria', attributes: ['id', 'nome', 'banco', 'agencia', 'conta'] }],
+    order: [['nome', 'ASC']]
+  });
+}
+
+async function criarCartaoFinanceiro(req, payload = {}) {
+  await assertFinanceAccess(req);
+  const data = sanitizeCartaoPayload(payload);
+  data.criado_por = req.user?.id || null;
+  data.atualizado_por = req.user?.id || null;
+
+  const cartao = await CartaoFinanceiro.create(data);
+  return CartaoFinanceiro.findByPk(cartao.id, {
+    include: [{ model: ContaBancaria, as: 'contaBancaria', attributes: ['id', 'nome', 'banco', 'agencia', 'conta'] }]
+  });
+}
+
+async function atualizarCartaoFinanceiro(req, cartaoId, payload = {}) {
+  await assertFinanceAccess(req);
+
+  const cartao = await CartaoFinanceiro.findByPk(cartaoId);
+  if (!cartao) throw createHttpError(404, 'Cartao nao encontrado.');
+
+  const data = sanitizeCartaoPayload(payload, { partial: true });
+  if (Object.keys(data).length === 0) {
+    throw createHttpError(400, 'Nenhum campo valido informado para atualizar o cartao.');
+  }
+
+  data.atualizado_por = req.user?.id || null;
+  await cartao.update(data);
+  return CartaoFinanceiro.findByPk(cartao.id, {
+    include: [{ model: ContaBancaria, as: 'contaBancaria', attributes: ['id', 'nome', 'banco', 'agencia', 'conta'] }]
+  });
+}
+
 async function criarCategoriaFinanceira(req, payload = {}) {
   await assertFinanceAccess(req);
   const data = sanitizeCategoriaPayload(payload);
@@ -218,10 +382,16 @@ async function atualizarCategoriaFinanceira(req, categoriaId, payload = {}) {
 }
 
 module.exports = {
+  atualizarCartaoFinanceiro,
   atualizarCategoriaFinanceira,
   atualizarContaBancaria,
+  atualizarFormaPagamentoFinanceira,
+  criarCartaoFinanceiro,
   criarCategoriaFinanceira,
   criarContaBancaria,
+  criarFormaPagamentoFinanceira,
+  listarCartoesFinanceiros,
   listarCategoriasFinanceiras,
-  listarContasBancarias
+  listarContasBancarias,
+  listarFormasPagamentoFinanceiras
 };

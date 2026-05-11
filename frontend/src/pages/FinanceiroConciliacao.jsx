@@ -3,10 +3,12 @@ import { Link } from 'react-router-dom';
 import {
   conciliarSugestoesBancarias,
   confirmarConciliacaoBancaria,
+  confirmarConciliacaoFaturaCartao,
   criarTituloConciliacaoBancaria,
   getConciliacoesBancarias,
   getCategoriasFinanceiras,
   getContasBancarias,
+  getFaturasAssociacaoConciliacao,
   getImportacoesConciliacao,
   getMovimentosAssociacaoConciliacao,
   ignorarConciliacaoBancaria,
@@ -315,7 +317,7 @@ function NovoTituloRapidoModal({ item, contas, onClose, onConciliar }) {
 
 // ─── ItemConciliacao — layout 2 colunas ──────────────────────────────────────
 
-function ItemConciliacao({ item, processingId, onConfirmar, onIgnorar, onAssociarManual, onNovoTitulo }) {
+function ItemConciliacao({ item, processingId, onConfirmar, onIgnorar, onAssociarManual, onAssociarFatura, onNovoTitulo }) {
   const [expandirSugestoes, setExpandirSugestoes] = useState(false);
 
   const isPendente = item.status === 'PENDENTE';
@@ -409,6 +411,11 @@ function ItemConciliacao({ item, processingId, onConfirmar, onIgnorar, onAssocia
                   className="flex h-5 w-5 items-center justify-center rounded border border-[var(--c-border)] bg-[var(--c-bg)] text-[var(--c-muted)] hover:border-[var(--c-primary)] hover:text-[var(--c-primary)] transition-colors"
                   onClick={() => onAssociarManual(item)}>
                   <KeyIcon className="h-2.5 w-2.5" />
+                </button>
+                <button type="button" title="Associar fatura de cartao"
+                  className="flex h-5 min-w-5 items-center justify-center rounded border border-[var(--c-border)] bg-[var(--c-bg)] px-1 text-[9px] font-semibold text-[var(--c-muted)] hover:border-[var(--c-primary)] hover:text-[var(--c-primary)] transition-colors"
+                  onClick={() => onAssociarFatura(item)}>
+                  Fat
                 </button>
               </div>
             </div>
@@ -603,6 +610,11 @@ export default function FinanceiroConciliacao() {
     loading: false, processing: false, error: '',
     dados: { conciliacao: null, meta: { total: 0, limit: 30 }, itens: [] }
   });
+  const [faturaModal, setFaturaModal] = useState({
+    open: false, item: null, filters: buildAssociacaoDefaults(null),
+    loading: false, processing: false, error: '',
+    dados: { conciliacao: null, meta: { total: 0, limit: 30 }, itens: [] }
+  });
 
   async function carregarContas() {
     try {
@@ -761,6 +773,85 @@ export default function FinanceiroConciliacao() {
     await carregarMovimentosAssociacao(associacaoModal.item.id, associacaoModal.filters);
   }
 
+  async function carregarFaturasAssociacao(conciliacaoId, filtersPayload, { manterAberto = true } = {}) {
+    try {
+      setFaturaModal((c) => ({ ...c, open: manterAberto, loading: true, error: '', filters: filtersPayload || c.filters }));
+      const response = await getFaturasAssociacaoConciliacao(conciliacaoId, filtersPayload);
+      setFaturaModal((c) => ({
+        ...c,
+        open: true,
+        loading: false,
+        error: '',
+        dados: {
+          conciliacao: response?.conciliacao || null,
+          meta: {
+            total: Number(response?.meta?.total || 0),
+            limit: Number(response?.meta?.limit || filtersPayload?.limit || c.filters.limit || 30)
+          },
+          itens: Array.isArray(response?.itens) ? response.itens : []
+        }
+      }));
+    } catch (err) {
+      setFaturaModal((c) => ({ ...c, open: true, loading: false, error: err?.message || 'Erro ao buscar faturas' }));
+    }
+  }
+
+  async function abrirAssociacaoFatura(item) {
+    const defaults = buildAssociacaoDefaults(item);
+    setFaturaModal({
+      open: true,
+      item,
+      filters: defaults,
+      loading: true,
+      processing: false,
+      error: '',
+      dados: { conciliacao: null, meta: { total: 0, limit: defaults.limit }, itens: [] }
+    });
+    await carregarFaturasAssociacao(item.id, defaults);
+  }
+
+  function fecharAssociacaoFatura() {
+    setFaturaModal({
+      open: false,
+      item: null,
+      filters: buildAssociacaoDefaults(null),
+      loading: false,
+      processing: false,
+      error: '',
+      dados: { conciliacao: null, meta: { total: 0, limit: 30 }, itens: [] }
+    });
+  }
+
+  async function consultarAssociacaoFatura(event) {
+    event.preventDefault();
+    if (!faturaModal.item?.id) return;
+    await carregarFaturasAssociacao(faturaModal.item.id, faturaModal.filters);
+  }
+
+  async function handleConfirmarFatura(conciliacaoId, faturaId) {
+    if (!Number.isInteger(Number(faturaId)) || Number(faturaId) <= 0) {
+      setFaturaModal((c) => ({ ...c, processing: false, error: 'Selecione uma fatura valida para conciliar.' }));
+      return;
+    }
+
+    try {
+      const processingKey = `fatura-${conciliacaoId}-${faturaId}`;
+      setProcessingId(processingKey);
+      setFaturaModal((c) => ({ ...c, processing: true, error: '' }));
+      setError('');
+      setFeedback('');
+      await confirmarConciliacaoFaturaCartao(conciliacaoId, { fatura_cartao_id: faturaId });
+      setFeedback('Fatura conciliada e titulos vinculados baixados com sucesso.');
+      fecharAssociacaoFatura();
+      await carregarConciliacoes();
+    } catch (err) {
+      setFaturaModal((c) => ({ ...c, processing: false, error: err?.message || 'Erro ao conciliar fatura' }));
+    } finally {
+      setProcessingId(null);
+      setFaturaModal((c) => ({ ...c, processing: false }));
+    }
+  }
+
   function aplicarFiltros(event) {
     event.preventDefault();
     setAppliedFilters({ ...filters, page: 1 });
@@ -906,6 +997,7 @@ export default function FinanceiroConciliacao() {
                     key={item.id} item={item} processingId={processingId}
                     onConfirmar={handleConfirmar} onIgnorar={handleIgnorar}
                     onAssociarManual={abrirAssociacaoManual}
+                    onAssociarFatura={abrirAssociacaoFatura}
                     onNovoTitulo={(it) => setNovoTituloItem(it)}
                   />
                 ))
@@ -1030,6 +1122,122 @@ export default function FinanceiroConciliacao() {
                         </div>
                       </div>
                     ))
+              }
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Associar fatura */}
+      {faturaModal.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6">
+          <div className="max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl dark:bg-[var(--c-surface)]">
+            <div className="flex items-start justify-between gap-3 border-b border-[var(--c-border)] pb-4">
+              <div>
+                <h2 className="text-lg font-semibold text-[var(--c-text)]">Associar fatura de cartao</h2>
+                <p className="mt-0.5 text-sm text-[var(--c-muted)]">
+                  Use esta opcao quando o lancamento bancario pagar uma fatura inteira; os titulos da fatura serao baixados individualmente.
+                </p>
+                {faturaModal.item && (
+                  <div className="mt-2 rounded-xl border border-[var(--c-border)] bg-[var(--c-bg)] px-3 py-2 text-sm">
+                    <span className="font-medium">{faturaModal.item.descricao_banco || 'Lancamento'}</span>
+                    {' - '}{formatDate(faturaModal.item.data_movimento)}
+                    {' - '}<ValorBanco value={faturaModal.item.valor} size="sm" />
+                    {faturaModal.item.documento ? ` - Doc. ${faturaModal.item.documento}` : ''}
+                  </div>
+                )}
+              </div>
+              <button type="button" className="btn btn-outline btn-sm shrink-0" onClick={fecharAssociacaoFatura}>Fechar</button>
+            </div>
+
+            <form className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4" onSubmit={consultarAssociacaoFatura}>
+              {[
+                { label: 'Data inicial', field: 'data_inicial', type: 'date' },
+                { label: 'Data final', field: 'data_final', type: 'date' },
+                { label: 'Texto / cartao', field: 'documento', type: 'text', placeholder: 'Cartao, titular ou competencia' },
+                { label: 'Valor inicial', field: 'valor_inicial', type: 'number' },
+                { label: 'Valor final', field: 'valor_final', type: 'number' }
+              ].map(({ label, field, type, placeholder }) => (
+                <label key={field} className="text-sm">
+                  <span className="mb-1 block text-[var(--c-muted)]">{label}</span>
+                  <input
+                    className="input w-full"
+                    type={type === 'number' ? 'text' : type}
+                    inputMode={type === 'number' ? 'decimal' : undefined}
+                    placeholder={placeholder}
+                    value={faturaModal.filters[field] || ''}
+                    onChange={(e) => setFaturaModal((c) => ({
+                      ...c,
+                      filters: {
+                        ...c.filters,
+                        [field]: type === 'number' ? normalizeCurrencyTyping(e.target.value) : e.target.value
+                      }
+                    }))}
+                  />
+                </label>
+              ))}
+              <label className="text-sm">
+                <span className="mb-1 block text-[var(--c-muted)]">Limite</span>
+                <select className="input w-full" value={faturaModal.filters.limit}
+                  onChange={(e) => setFaturaModal((c) => ({ ...c, filters: { ...c.filters, limit: Number(e.target.value || 30) } }))}>
+                  {[20, 30, 50, 100].map((v) => <option key={v} value={v}>{v}</option>)}
+                </select>
+              </label>
+              <div className="flex items-end gap-2 xl:col-span-2">
+                <button type="submit" className="btn btn-primary" disabled={faturaModal.loading}>
+                  {faturaModal.loading ? 'Consultando...' : 'Consultar faturas'}
+                </button>
+                <button type="button" className="btn btn-outline" onClick={() => {
+                  const next = buildAssociacaoDefaults(faturaModal.item);
+                  setFaturaModal((c) => ({ ...c, filters: next }));
+                  if (faturaModal.item?.id) carregarFaturasAssociacao(faturaModal.item.id, next);
+                }}>Limpar</button>
+              </div>
+            </form>
+
+            {faturaModal.error && (
+              <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{faturaModal.error}</div>
+            )}
+            <div className="mt-3 rounded-xl border border-[var(--c-border)] bg-[var(--c-bg)] px-4 py-2 text-sm text-[var(--c-muted)]">
+              {faturaModal.dados.meta.total} fatura(s) encontrada(s)
+            </div>
+            <div className="mt-3 space-y-2">
+              {faturaModal.loading
+                ? <div className="rounded-xl border border-[var(--c-border)] px-4 py-8 text-center text-sm text-[var(--c-muted)]">Carregando faturas...</div>
+                : faturaModal.dados.itens.length === 0
+                  ? <div className="rounded-xl border border-dashed border-[var(--c-border)] px-4 py-8 text-center text-sm text-[var(--c-muted)]">Nenhuma fatura encontrada com os filtros atuais.</div>
+                  : faturaModal.dados.itens.map((fatura) => {
+                    const processingKey = `fatura-${faturaModal.item?.id}-${fatura.id}`;
+                    return (
+                      <div key={fatura.id} className="rounded-xl border border-[var(--c-border)] px-4 py-3">
+                        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                          <div className="space-y-1 text-sm">
+                            <p className="font-medium text-[var(--c-text)]">
+                              {fatura.cartao?.nome || 'Cartao'} - competencia {fatura.competencia}
+                            </p>
+                            <p className="text-[var(--c-muted)]">
+                              {formatDate(fatura.data_fechamento)} a vencer em {formatDate(fatura.data_vencimento)}
+                              {' - '}{fatura.total_titulos || 0} titulo(s)
+                            </p>
+                            <p className="text-[var(--c-muted)]">
+                              Valor da fatura: {formatCurrency(fatura.valor_total)}
+                            </p>
+                          </div>
+                          <div className="flex flex-col items-start gap-2 md:items-end">
+                            <span className={statusClass(fatura.status)}>{fatura.status}</span>
+                            <button
+                              type="button"
+                              className="btn btn-primary btn-sm"
+                              disabled={faturaModal.processing || processingId === processingKey}
+                              onClick={() => handleConfirmarFatura(faturaModal.item?.id, fatura.id)}
+                            >
+                              {faturaModal.processing || processingId === processingKey ? 'Associando...' : 'Associar fatura'}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
               }
             </div>
           </div>

@@ -6,7 +6,9 @@ import {
   atualizarPaymentBeneficiary,
   criarPaymentBeneficiary,
   criarTituloFinanceiro,
+  getCartoesFinanceiros,
   getCategoriasFinanceiras,
+  getFormasPagamentoFinanceiras,
   getPaymentAccounts,
   getPaymentBeneficiaries
 } from '../services/financeiro';
@@ -47,7 +49,11 @@ function buildDefaultForm(tipo = 'PAGAR') {
     data_emissao: today(),
     data_vencimento: today(),
     observacoes: '',
-    apropriacao_id: ''
+    apropriacao_id: '',
+    forma_pagamento_id: '',
+    cartao_id: '',
+    quantidade_parcelas: 1,
+    data_compra: today()
   };
 }
 
@@ -120,6 +126,8 @@ export default function FinanceiroTituloNovo() {
   const [parceiroDocumentoBusca, setParceiroDocumentoBusca] = useState('');
   const [parceiroNomeBusca, setParceiroNomeBusca] = useState('');
   const [paymentAccounts, setPaymentAccounts] = useState([]);
+  const [formasPagamento, setFormasPagamento] = useState([]);
+  const [cartoes, setCartoes] = useState([]);
   const [beneficiaries, setBeneficiaries] = useState([]);
   const [paymentDraft, setPaymentDraft] = useState({
     preparar_pagamento_pix: false,
@@ -140,10 +148,12 @@ export default function FinanceiroTituloNovo() {
       try {
         setLoadingBase(true);
         setError('');
-        const [obrasData, categoriasData, paymentAccountsData] = await Promise.all([
+        const [obrasData, categoriasData, paymentAccountsData, formasData, cartoesData] = await Promise.all([
           getMinhasObras({ modo: 'FINANCEIRO' }),
           getCategoriasFinanceiras(),
-          getPaymentAccounts().catch(() => [])
+          getPaymentAccounts().catch(() => []),
+          getFormasPagamentoFinanceiras().catch(() => []),
+          getCartoesFinanceiros().catch(() => [])
         ]);
 
         if (!active) return;
@@ -153,6 +163,8 @@ export default function FinanceiroTituloNovo() {
         setObras(obrasLista);
         setCategorias(categoriasLista);
         setPaymentAccounts(Array.isArray(paymentAccountsData) ? paymentAccountsData : []);
+        setFormasPagamento(Array.isArray(formasData) ? formasData : []);
+        setCartoes(Array.isArray(cartoesData) ? cartoesData : []);
         setPaymentDraft((current) => ({
           ...current,
           payment_account_id: current.payment_account_id || String(paymentAccountsData?.[0]?.id || '')
@@ -326,6 +338,10 @@ export default function FinanceiroTituloNovo() {
     }
     return `${parceiros.length} ${form.tipo === 'RECEBER' ? 'cliente(s)' : 'credor(es)'} encontrado(s) para "${termo}"`;
   }, [form.tipo, parceiros, parceiroDocumentoBusca, parceiroNomeBusca]);
+
+  const formaPagamentoSelecionada = useMemo(() => {
+    return formasPagamento.find((item) => String(item.id) === String(form.forma_pagamento_id)) || null;
+  }, [formasPagamento, form.forma_pagamento_id]);
 
   function preencherFavorecidoComParceiro(parceiro) {
     const pix = getParceiroPixPrincipal(parceiro);
@@ -630,6 +646,75 @@ export default function FinanceiroTituloNovo() {
                   required
                 />
               </label>
+
+              <label className="sol-filter-field xl:col-span-3">
+                <span className="sol-filter-label">Forma de pagamento</span>
+                <select
+                  className="input w-full"
+                  value={form.forma_pagamento_id}
+                  onChange={(event) => {
+                    const forma = formasPagamento.find((item) => String(item.id) === String(event.target.value));
+                    setForm((current) => ({
+                      ...current,
+                      forma_pagamento_id: event.target.value,
+                      cartao_id: forma?.exige_cartao ? current.cartao_id : '',
+                      quantidade_parcelas: forma?.permite_parcelamento ? current.quantidade_parcelas : 1
+                    }));
+                  }}
+                >
+                  <option value="">Nao informar</option>
+                  {formasPagamento.filter((item) => item.ativo !== false).map((forma) => (
+                    <option key={forma.id} value={forma.id}>
+                      {forma.nome}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              {formaPagamentoSelecionada?.exige_cartao && (
+                <>
+                  <label className="sol-filter-field xl:col-span-3">
+                    <span className="sol-filter-label">Cartao</span>
+                    <select
+                      className="input w-full"
+                      value={form.cartao_id}
+                      onChange={(event) => updateField('cartao_id', event.target.value)}
+                      required
+                    >
+                      <option value="">Selecione o cartao</option>
+                      {cartoes.filter((item) => item.ativo !== false).map((cartao) => (
+                        <option key={cartao.id} value={cartao.id}>
+                          {cartao.nome} final {cartao.ultimos_digitos}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="sol-filter-field xl:col-span-2">
+                    <span className="sol-filter-label">Data da compra</span>
+                    <input
+                      type="date"
+                      className="input w-full"
+                      value={form.data_compra}
+                      onChange={(event) => updateField('data_compra', event.target.value)}
+                    />
+                  </label>
+                </>
+              )}
+
+              {formaPagamentoSelecionada?.permite_parcelamento && (
+                <label className="sol-filter-field xl:col-span-2">
+                  <span className="sol-filter-label">Parcelas</span>
+                  <input
+                    type="number"
+                    min="1"
+                    max="120"
+                    className="input w-full"
+                    value={form.quantidade_parcelas}
+                    onChange={(event) => updateField('quantidade_parcelas', event.target.value)}
+                  />
+                </label>
+              )}
 
               <label className="sol-filter-field xl:col-span-3">
                 <span className="sol-filter-label">Data de emissao</span>
