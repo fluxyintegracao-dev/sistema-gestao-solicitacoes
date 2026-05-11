@@ -49,6 +49,9 @@ module.exports = {
       if (!user)
         return res.status(401).json({ error: 'Usuário não encontrado' });
 
+      if (!user.ativo)
+        return res.status(403).json({ error: 'Usuario desativado' });
+
       if (!user.senha)
         return res.status(401).json({ error: 'Usuário sem senha cadastrada' });
 
