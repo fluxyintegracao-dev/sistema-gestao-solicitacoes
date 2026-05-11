@@ -3,7 +3,9 @@ import { Link } from 'react-router-dom';
 import { buscarParceiros } from '../../services/parceiros';
 import {
   gerarContaPorSolicitacao,
+  getCartoesFinanceiros,
   getCategoriasFinanceiras,
+  getFormasPagamentoFinanceiras,
   getTitulosFinanceirosPorSolicitacao
 } from '../../services/financeiro';
 
@@ -20,15 +22,6 @@ function formatDate(value) {
   const date = new Date(`${value}T00:00:00`);
   if (Number.isNaN(date.getTime())) return '-';
   return date.toLocaleDateString('pt-BR');
-}
-
-function suggestTipo(solicitacao) {
-  const tipo = String(solicitacao?.tipo?.nome || '').trim().toUpperCase();
-  const area = String(solicitacao?.area_responsavel || '').trim().toUpperCase();
-  if (tipo.includes('COMPRA') || area === 'COMPRAS') {
-    return 'PAGAR';
-  }
-  return 'RECEBER';
 }
 
 function normalizeSearchText(value) {
@@ -55,11 +48,15 @@ function today() {
 
 function buildDefaultForm(solicitacao) {
   return {
-    tipo: suggestTipo(solicitacao),
+    tipo: 'PAGAR',
     parceiro_id: solicitacao?.parceiro?.id ? String(solicitacao.parceiro.id) : '',
     categoria_financeira_id: '',
     valor: solicitacao?.valor ? String(solicitacao.valor) : '',
-    data_vencimento: solicitacao?.data_vencimento || today()
+    data_vencimento: solicitacao?.data_vencimento || today(),
+    forma_pagamento_id: '',
+    cartao_id: '',
+    quantidade_parcelas: '1',
+    data_compra: today()
   };
 }
 
@@ -69,6 +66,24 @@ function statusClass(status) {
   if (normalized === 'PARCIAL') return 'bg-amber-100 text-amber-700';
   if (normalized === 'CANCELADO' || normalized === 'ESTORNADO') return 'bg-rose-100 text-rose-700';
   return 'bg-slate-100 text-slate-700';
+}
+
+function SearchIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      className="h-4 w-4"
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="2"
+      viewBox="0 0 24 24"
+    >
+      <circle cx="11" cy="11" r="8" />
+      <path d="m21 21-4.3-4.3" />
+    </svg>
+  );
 }
 
 export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
@@ -87,6 +102,9 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [categoriaModalOpen, setCategoriaModalOpen] = useState(false);
   const [categoriaSearch, setCategoriaSearch] = useState('');
+  const [formasPagamento, setFormasPagamento] = useState([]);
+  const [cartoes, setCartoes] = useState([]);
+  const [loadingPagamento, setLoadingPagamento] = useState(false);
 
   function resetModalState(baseSolicitacao = solicitacao) {
     setForm(buildDefaultForm(baseSolicitacao));
@@ -177,9 +195,40 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
   }, [modalOpen]);
 
   useEffect(() => {
+    if (!modalOpen) return undefined;
+
+    let active = true;
+    setLoadingPagamento(true);
+
+    Promise.all([
+      getFormasPagamentoFinanceiras(),
+      getCartoesFinanceiros()
+    ])
+      .then(([formasData, cartoesData]) => {
+        if (!active) return;
+        setFormasPagamento(Array.isArray(formasData) ? formasData : []);
+        setCartoes(Array.isArray(cartoesData) ? cartoesData : []);
+      })
+      .catch((error) => {
+        if (!active) return;
+        setFormasPagamento([]);
+        setCartoes([]);
+        setErro(error?.message || 'Erro ao carregar formas de pagamento');
+      })
+      .finally(() => {
+        if (active) setLoadingPagamento(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [modalOpen]);
+
+  useEffect(() => {
     if (selectedCategory && !isCategoriaCompativel(selectedCategory, form.tipo)) {
       setSelectedCategory(null);
       setForm((current) => ({ ...current, categoria_financeira_id: '' }));
+      setCategoriaSearch('');
     }
   }, [form.tipo, selectedCategory]);
 
@@ -205,6 +254,45 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
     });
   }, [categoriaSearch, categorias, form.tipo]);
 
+  const formaPagamentoSelecionada = useMemo(() => {
+    return formasPagamento.find((item) => String(item.id) === String(form.forma_pagamento_id)) || null;
+  }, [formasPagamento, form.forma_pagamento_id]);
+
+  const categoriasAutocomplete = useMemo(() => {
+    if (!categoriaSearch.trim() || selectedCategory) {
+      return [];
+    }
+
+    return categoriasFiltradas.slice(0, 5);
+  }, [categoriaSearch, categoriasFiltradas, selectedCategory]);
+
+  function selecionarCategoria(categoria) {
+    setSelectedCategory(categoria);
+    setCategoriaSearch(categoria?.nome || '');
+    setForm((current) => ({
+      ...current,
+      categoria_financeira_id: categoria?.id ? String(categoria.id) : ''
+    }));
+    setCategoriaModalOpen(false);
+  }
+
+  function limparCategoria() {
+    setSelectedCategory(null);
+    setCategoriaSearch('');
+    setForm((current) => ({ ...current, categoria_financeira_id: '' }));
+  }
+
+  function updateFormaPagamento(formaPagamentoId) {
+    const forma = formasPagamento.find((item) => String(item.id) === String(formaPagamentoId));
+    setForm((current) => ({
+      ...current,
+      forma_pagamento_id: formaPagamentoId,
+      cartao_id: forma?.exige_cartao ? current.cartao_id : '',
+      quantidade_parcelas: forma?.permite_parcelamento ? (current.quantidade_parcelas || '1') : '1',
+      data_compra: forma?.exige_cartao ? (current.data_compra || today()) : current.data_compra
+    }));
+  }
+
   async function handleSubmit(event) {
     event.preventDefault();
     try {
@@ -215,6 +303,10 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
         tipo: form.tipo,
         parceiro_id: selectedPartner?.id || form.parceiro_id,
         categoria_financeira_id: form.categoria_financeira_id || undefined,
+        forma_pagamento_id: form.forma_pagamento_id || undefined,
+        cartao_id: form.cartao_id || undefined,
+        quantidade_parcelas: form.quantidade_parcelas || undefined,
+        data_compra: form.data_compra || undefined,
         valor: form.valor,
         data_vencimento: form.data_vencimento
       });
@@ -405,44 +497,145 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
               </div>
 
               <div className="space-y-2">
-                <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                  <span className="block text-sm text-slate-500">Categoria financeira</span>
+                <span className="block text-sm text-slate-500">Categoria financeira</span>
+                <div className="relative">
                   <div className="flex gap-2">
+                    <input
+                      className="input w-full"
+                      type="text"
+                      placeholder="Digite para buscar a categoria"
+                      value={categoriaSearch}
+                      onChange={(event) => {
+                        setCategoriaSearch(event.target.value);
+                        if (selectedCategory) {
+                          setSelectedCategory(null);
+                          setForm((current) => ({ ...current, categoria_financeira_id: '' }));
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-outline shrink-0"
+                      title="Pesquisar categorias"
+                      aria-label="Pesquisar categorias financeiras"
+                      onClick={() => setCategoriaModalOpen(true)}
+                    >
+                      <SearchIcon />
+                    </button>
                     {selectedCategory && (
                       <button
                         type="button"
-                        className="btn btn-outline"
-                        onClick={() => {
-                          setSelectedCategory(null);
-                          setForm((current) => ({ ...current, categoria_financeira_id: '' }));
-                        }}
+                        className="btn btn-outline shrink-0"
+                        onClick={limparCategoria}
                       >
                         Limpar
                       </button>
                     )}
-                    <button
-                      type="button"
-                      className="btn btn-outline"
-                      onClick={() => {
-                        setCategoriaSearch('');
-                        setCategoriaModalOpen(true);
-                      }}
-                    >
-                      Selecionar categoria
-                    </button>
                   </div>
+
+                  {categoriasAutocomplete.length > 0 && (
+                    <div className="absolute left-0 right-0 top-full z-10 mt-2 max-h-56 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-lg">
+                      {categoriasAutocomplete.map((categoria) => (
+                        <button
+                          key={categoria.id}
+                          type="button"
+                          className="w-full rounded-xl px-3 py-2 text-left text-sm hover:bg-slate-50"
+                          onClick={() => selecionarCategoria(categoria)}
+                        >
+                          <span className="block font-medium text-[var(--c-text)]">{categoria.nome}</span>
+                          <span className="block text-xs text-slate-500">
+                            {categoria.tipo} - {categoria.descricao || 'Sem descricao complementar'}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {categoriaSearch.trim() && !selectedCategory && !loadingCategorias && categoriasAutocomplete.length === 0 && (
+                    <div className="absolute left-0 right-0 top-full z-10 mt-2 rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-500 shadow-lg">
+                      Nenhuma categoria encontrada. Use a lupa para pesquisar com mais detalhes.
+                    </div>
+                  )}
                 </div>
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
-                  <div className="font-medium text-[var(--c-text)]">
-                    {selectedCategory?.nome || 'Nenhuma categoria selecionada'}
-                  </div>
-                  <div className="mt-1 text-xs text-slate-500">
-                    {selectedCategory
-                      ? `${selectedCategory.tipo} - ${selectedCategory.descricao || 'Sem descricao complementar'}`
-                      : 'Opcional. Use para classificar o titulo no financeiro.'}
-                  </div>
+                <div className="text-xs text-slate-500">
+                  {selectedCategory
+                    ? `${selectedCategory.tipo} - ${selectedCategory.descricao || 'Sem descricao complementar'}`
+                    : loadingCategorias
+                      ? 'Carregando categorias financeiras...'
+                      : 'Opcional. A lista considera o tipo da conta selecionado.'}
                 </div>
               </div>
+
+              <div className="grid gap-3 md:grid-cols-2">
+                <label className="text-sm">
+                  <span className="mb-1 block text-slate-500">Forma de pagamento</span>
+                  <select
+                    className="input w-full"
+                    value={form.forma_pagamento_id}
+                    onChange={(event) => updateFormaPagamento(event.target.value)}
+                    disabled={loadingPagamento}
+                  >
+                    <option value="">{loadingPagamento ? 'Carregando...' : 'Nao informar'}</option>
+                    {formasPagamento.filter((item) => item.ativo !== false).map((forma) => (
+                      <option key={forma.id} value={forma.id}>
+                        {forma.nome}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                {formaPagamentoSelecionada?.permite_parcelamento ? (
+                  <label className="text-sm">
+                    <span className="mb-1 block text-slate-500">Parcelas</span>
+                    <input
+                      className="input w-full"
+                      type="number"
+                      min="1"
+                      max="120"
+                      value={form.quantidade_parcelas}
+                      onChange={(event) => setForm((current) => ({ ...current, quantidade_parcelas: event.target.value }))}
+                    />
+                  </label>
+                ) : (
+                  <div className="text-sm">
+                    <span className="mb-1 block text-slate-500">Parcelas</span>
+                    <div className="input flex items-center bg-slate-50 text-slate-500">
+                      1 parcela
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {formaPagamentoSelecionada?.exige_cartao && (
+                <div className="grid gap-3 md:grid-cols-2">
+                  <label className="text-sm">
+                    <span className="mb-1 block text-slate-500">Cartao</span>
+                    <select
+                      className="input w-full"
+                      value={form.cartao_id}
+                      onChange={(event) => setForm((current) => ({ ...current, cartao_id: event.target.value }))}
+                      required
+                    >
+                      <option value="">Selecione o cartao</option>
+                      {cartoes.filter((item) => item.ativo !== false).map((cartao) => (
+                        <option key={cartao.id} value={cartao.id}>
+                          {cartao.nome} final {cartao.ultimos_digitos}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="text-sm">
+                    <span className="mb-1 block text-slate-500">Data da compra</span>
+                    <input
+                      className="input w-full"
+                      type="date"
+                      value={form.data_compra}
+                      onChange={(event) => setForm((current) => ({ ...current, data_compra: event.target.value }))}
+                    />
+                  </label>
+                </div>
+              )}
 
               <div className="space-y-2">
                 <span className="block text-sm text-slate-500">Parceiro</span>
@@ -502,7 +695,13 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
                 <button
                   type="submit"
                   className="btn btn-primary"
-                  disabled={saving || !selectedPartner?.id || !form.valor || !form.data_vencimento}
+                  disabled={
+                    saving ||
+                    !selectedPartner?.id ||
+                    !form.valor ||
+                    !form.data_vencimento ||
+                    (formaPagamentoSelecionada?.exige_cartao && !form.cartao_id)
+                  }
                 >
                   {saving ? 'Gerando...' : 'Confirmar'}
                 </button>
@@ -525,10 +724,7 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
               <button
                 type="button"
                 className="btn btn-outline"
-                onClick={() => {
-                  setCategoriaSearch('');
-                  setCategoriaModalOpen(false);
-                }}
+                onClick={() => setCategoriaModalOpen(false)}
               >
                 Fechar
               </button>
@@ -567,15 +763,7 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
                         ? 'border-blue-300 bg-blue-50'
                         : 'border-slate-200 hover:bg-slate-50'
                     }`}
-                    onClick={() => {
-                      setSelectedCategory(categoria);
-                      setForm((current) => ({
-                        ...current,
-                        categoria_financeira_id: String(categoria.id)
-                      }));
-                      setCategoriaSearch('');
-                      setCategoriaModalOpen(false);
-                    }}
+                    onClick={() => selecionarCategoria(categoria)}
                   >
                     <div className="flex flex-col gap-1 md:flex-row md:items-start md:justify-between">
                       <div>
