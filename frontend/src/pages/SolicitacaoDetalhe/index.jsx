@@ -196,6 +196,10 @@ export default function SolicitacaoDetalhe() {
   const usaFluxoAprovacaoDiretoria = Boolean(solicitacao.usa_fluxo_aprovacao_diretoria);
   const podeAprovarDiretoria = Boolean(solicitacao.acao_aprovar_diretoria_disponivel);
   const podeAlterarStatusDiretoriaApi = Boolean(solicitacao.pode_alterar_status_diretoria);
+  const solicitacaoEstaNaDiretoriaObras =
+    isDiretoriaObrasToken(solicitacao.area_responsavel) ||
+    isDiretoriaObrasToken(solicitacao.diretoria_responsavel) ||
+    isDiretoriaObrasToken(solicitacao.diretoria_fluxo_codigo);
   const diretoriaStatusUsuario = obterDiretoriaObrasUsuarioParaStatus(user, [
     solicitacao.area_responsavel,
     solicitacao.diretoria_fluxo_codigo,
@@ -203,12 +207,16 @@ export default function SolicitacaoDetalhe() {
   ]);
   const podeAlterarStatusDiretoria =
     Boolean(diretoriaStatusUsuario) ||
+    solicitacaoEstaNaDiretoriaObras ||
     podeAprovarDiretoria ||
     podeAlterarStatusDiretoriaApi;
   const setorParaStatus =
     perfil === 'SUPERADMIN'
       ? null
       : diretoriaStatusUsuario ||
+        (solicitacaoEstaNaDiretoriaObras
+          ? (solicitacao.area_responsavel || solicitacao.diretoria_responsavel || solicitacao.diretoria_fluxo_codigo)
+          : null) ||
         (podeAprovarDiretoria
           ? (solicitacao.area_responsavel || solicitacao.diretoria_responsavel)
           : null) ||
