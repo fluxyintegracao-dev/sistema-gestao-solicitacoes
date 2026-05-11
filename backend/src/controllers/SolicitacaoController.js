@@ -2236,6 +2236,23 @@ module.exports = {
           String(req.user?.perfil || '').trim().toUpperCase() === 'SUPERADMIN' ||
           setorPertenceAoUsuario(tokensSetorUsuario, solicitacao.area_responsavel)
         );
+      const diretoriaStatusUsuario = obterDiretoriaObrasUsuarioParaStatus(
+        tokensSetorUsuario,
+        [
+          solicitacao.area_responsavel,
+          solicitacao.diretoria_fluxo_codigo,
+          contextoAprovacaoDiretoria.diretoriaEsperada
+        ]
+      );
+      const podeAlterarStatusDiretoria =
+        podeAprovarDiretoria ||
+        (
+          Boolean(diretoriaStatusUsuario) &&
+          (
+            String(req.user?.perfil || '').trim().toUpperCase() === 'ADMIN' ||
+            String(req.user?.perfil || '').trim().toUpperCase() === 'USUARIO'
+          )
+        );
 
       const payload = solicitacao.toJSON ? solicitacao.toJSON() : solicitacao;
       const resumoFinanceiro = calcularResumoFinanceiroSolicitacao(payload);
@@ -2251,6 +2268,7 @@ module.exports = {
         });
       payload.usa_fluxo_aprovacao_diretoria = usaFluxoAprovacaoDiretoria;
       payload.acao_aprovar_diretoria_disponivel = podeAprovarDiretoria;
+      payload.pode_alterar_status_diretoria = podeAlterarStatusDiretoria;
       payload.setor_destino_aprovacao = contextoAprovacaoDiretoria.setorDestinoAprovacao || null;
       payload.diretoria_responsavel = contextoAprovacaoDiretoria.diretoriaEsperada || null;
 

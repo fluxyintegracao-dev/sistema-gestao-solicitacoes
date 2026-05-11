@@ -195,12 +195,16 @@ export default function SolicitacaoDetalhe() {
   const isSetorObra = setorTokens.includes('OBRA');
   const usaFluxoAprovacaoDiretoria = Boolean(solicitacao.usa_fluxo_aprovacao_diretoria);
   const podeAprovarDiretoria = Boolean(solicitacao.acao_aprovar_diretoria_disponivel);
+  const podeAlterarStatusDiretoriaApi = Boolean(solicitacao.pode_alterar_status_diretoria);
   const diretoriaStatusUsuario = obterDiretoriaObrasUsuarioParaStatus(user, [
     solicitacao.area_responsavel,
     solicitacao.diretoria_fluxo_codigo,
     solicitacao.diretoria_responsavel
   ]);
-  const podeAlterarStatusDiretoria = Boolean(diretoriaStatusUsuario) || podeAprovarDiretoria;
+  const podeAlterarStatusDiretoria =
+    Boolean(diretoriaStatusUsuario) ||
+    podeAprovarDiretoria ||
+    podeAlterarStatusDiretoriaApi;
   const setorParaStatus =
     perfil === 'SUPERADMIN'
       ? null
