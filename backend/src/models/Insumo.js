@@ -13,8 +13,7 @@ module.exports = (sequelize, DataTypes) => {
       },
       codigo: {
         type: DataTypes.STRING,
-        allowNull: true,
-        unique: true
+        allowNull: true
       },
       descricao: {
         type: DataTypes.TEXT,

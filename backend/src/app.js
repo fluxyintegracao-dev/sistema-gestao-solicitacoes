@@ -697,6 +697,10 @@ prepararBanco()
       db.Categoria.rawAttributes.nome.unique = false;
       db.Categoria.refreshAttributes();
     }
+    if (db.Insumo?.rawAttributes?.codigo) {
+      db.Insumo.rawAttributes.codigo.unique = false;
+      db.Insumo.refreshAttributes();
+    }
     if (db.SetorPermissao?.rawAttributes?.setor) {
       db.SetorPermissao.rawAttributes.setor.unique = false;
       db.SetorPermissao.refreshAttributes();
