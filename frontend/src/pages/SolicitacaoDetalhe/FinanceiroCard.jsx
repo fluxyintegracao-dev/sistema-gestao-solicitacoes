@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { buscarParceiros } from '../../services/parceiros';
+import { formatCurrencyInput, normalizeCurrencyTyping } from '../../utils/formatters';
 import {
   gerarContaPorSolicitacao,
   getCartoesFinanceiros,
@@ -51,7 +52,7 @@ function buildDefaultForm(solicitacao) {
     tipo: 'PAGAR',
     parceiro_id: solicitacao?.parceiro?.id ? String(solicitacao.parceiro.id) : '',
     categoria_financeira_id: '',
-    valor: solicitacao?.valor ? String(solicitacao.valor) : '',
+    valor: solicitacao?.valor ? formatCurrencyInput(solicitacao.valor) : '',
     data_vencimento: solicitacao?.data_vencimento || today(),
     forma_pagamento_id: '',
     cartao_id: '',
@@ -466,11 +467,12 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
                   <span className="mb-1 block text-slate-500">Valor</span>
                   <input
                     className="input w-full"
-                    type="number"
-                    min="0"
-                    step="0.01"
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="R$ 0,00"
                     value={form.valor}
-                    onChange={(event) => setForm((current) => ({ ...current, valor: event.target.value }))}
+                    onChange={(event) => setForm((current) => ({ ...current, valor: normalizeCurrencyTyping(event.target.value) }))}
+                    onBlur={(event) => setForm((current) => ({ ...current, valor: formatCurrencyInput(event.target.value) }))}
                     required
                   />
                 </label>
@@ -639,17 +641,10 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
 
               <div className="space-y-2">
                 <span className="block text-sm text-slate-500">Parceiro</span>
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
-                  <div className="font-medium text-[var(--c-text)]">{selectedPartner?.nome || 'Nenhum parceiro selecionado'}</div>
-                  <div className="mt-1 text-xs text-slate-500">
-                    {selectedPartner?.cpf_cnpj || 'Informe ou selecione um parceiro'} {selectedPartner?.telefone ? `- ${selectedPartner.telefone}` : ''}
-                  </div>
-                </div>
-
                 <input
                   className="input w-full"
                   type="text"
-                  placeholder="Buscar parceiro por nome ou CPF/CNPJ"
+                  placeholder={selectedPartner?.nome || 'Buscar parceiro por nome ou CPF/CNPJ'}
                   value={partnerSearch}
                   onChange={(event) => setPartnerSearch(event.target.value)}
                 />
