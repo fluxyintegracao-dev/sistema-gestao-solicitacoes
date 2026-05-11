@@ -13,8 +13,8 @@ async function removeColumnIfExists(queryInterface, sequelize, tableName, column
 }
 
 module.exports = {
-  async up(queryInterface, Sequelize) {
-    const sequelize = queryInterface.sequelize;
+  async up({ queryInterface, sequelize, DataTypes }) {
+    const Sequelize = DataTypes;
 
     if (!(await tableExists(sequelize, 'financeiro_formas_pagamento'))) {
       await queryInterface.createTable('financeiro_formas_pagamento', {
@@ -121,8 +121,7 @@ module.exports = {
     })), { ignoreDuplicates: true });
   },
 
-  async down(queryInterface, Sequelize) {
-    const sequelize = queryInterface.sequelize;
+  async down({ queryInterface, sequelize }) {
 
     await removeColumnIfExists(queryInterface, sequelize, 'conciliacoes_bancarias', 'fatura_cartao_id');
     await removeColumnIfExists(queryInterface, sequelize, 'movimentos_financeiros', 'fatura_cartao_id');
