@@ -48,6 +48,15 @@ function normalizarTexto(valor) {
     .replace(/[\u0300-\u036f]/g, '');
 }
 
+function isDiretoriaObras(valor) {
+  const texto = normalizarTexto(valor)
+    .replace(/[^A-Z0-9]+/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_+|_+$/g, '');
+
+  return texto.includes('OBRAS_PUBLIC') || texto.includes('OBRAS_PRIVAD');
+}
+
 export default function Header({
   solicitacao,
   onAlterarStatus,
@@ -103,6 +112,13 @@ export default function Header({
   const valorPagoAcumulado = solicitacao?.valor_pago_acumulado ?? 0;
   const saldoPagamento = solicitacao?.saldo_pagamento;
   const prioridadeDiretoriaAtiva = Boolean(solicitacao?.prioridade_diretoria_ativa);
+  const mostrarAlterarStatusDiretoria =
+    Boolean(solicitacao?.acao_aprovar_diretoria_disponivel) ||
+    Boolean(solicitacao?.pode_alterar_status_diretoria) ||
+    isDiretoriaObras(solicitacao?.area_responsavel) ||
+    isDiretoriaObras(solicitacao?.diretoria_responsavel) ||
+    isDiretoriaObras(solicitacao?.diretoria_fluxo_codigo);
+  const mostrarBotaoAlterarStatus = mostrarAlterarStatus || mostrarAlterarStatusDiretoria;
 
   return (
     <div className="sol-detail-header">
@@ -114,7 +130,7 @@ export default function Header({
         </div>
 
         <div className="sol-detail-actions">
-          {mostrarAlterarStatus && (
+          {mostrarBotaoAlterarStatus && (
             <button onClick={onAlterarStatus} className="btn btn-outline sol-detail-action-btn" type="button">
               Alterar status
             </button>
