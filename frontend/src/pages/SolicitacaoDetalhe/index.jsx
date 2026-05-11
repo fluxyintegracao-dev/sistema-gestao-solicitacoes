@@ -200,10 +200,14 @@ export default function SolicitacaoDetalhe() {
     solicitacao.diretoria_fluxo_codigo,
     solicitacao.diretoria_responsavel
   ]);
+  const podeAlterarStatusDiretoria = Boolean(diretoriaStatusUsuario) || podeAprovarDiretoria;
   const setorParaStatus =
     perfil === 'SUPERADMIN'
       ? null
       : diretoriaStatusUsuario ||
+        (podeAprovarDiretoria
+          ? (solicitacao.area_responsavel || solicitacao.diretoria_responsavel)
+          : null) ||
         (isSetorGeo
           ? 'GEO'
           : setorUsuario);
@@ -247,7 +251,7 @@ export default function SolicitacaoDetalhe() {
         solicitacao={solicitacao}
         onAlterarStatus={() => setModalStatus(true)}
         onEnviarSetor={podeAprovarDiretoria ? aprovarDiretoria : () => setModalEnviarSetor(true)}
-        mostrarAlterarStatus={!setorSemAlteracaoStatus || Boolean(diretoriaStatusUsuario)}
+        mostrarAlterarStatus={!setorSemAlteracaoStatus || podeAlterarStatusDiretoria}
         mostrarEnviarSetor={podeAprovarDiretoria || podeEnviarSetor}
         textoEnviarSetor={podeAprovarDiretoria ? 'Aprovar' : 'Enviar para outro setor'}
       />
@@ -289,7 +293,7 @@ export default function SolicitacaoDetalhe() {
       <ModalAlterarStatus
         aberto={modalStatus}
         setor={setorParaStatus}
-        exigirStatusCadastrado={Boolean(diretoriaStatusUsuario)}
+        exigirStatusCadastrado={podeAlterarStatusDiretoria}
         onClose={() => setModalStatus(false)}
         onSalvar={salvarStatus}
       />
