@@ -693,6 +693,10 @@ prepararBanco()
       db.TipoMacroContrato.rawAttributes.nome.unique = false;
       db.TipoMacroContrato.refreshAttributes();
     }
+    if (db.Categoria?.rawAttributes?.nome) {
+      db.Categoria.rawAttributes.nome.unique = false;
+      db.Categoria.refreshAttributes();
+    }
     if (db.SetorPermissao?.rawAttributes?.setor) {
       db.SetorPermissao.rawAttributes.setor.unique = false;
       db.SetorPermissao.refreshAttributes();
