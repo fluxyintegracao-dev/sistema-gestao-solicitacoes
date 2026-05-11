@@ -25,11 +25,44 @@ const {
   parseXlsxRows,
   registrarLogSolicitacaoCompra
 } = require('../services/comprasCotacao');
-const { uploadToS3 } = require('../services/s3');
+const { getPresignedUrl, uploadToS3 } = require('../services/s3');
 const { responderErroController } = require('../utils/controllerError');
 
 function buildItemKey(itemTipo, itemReferenciaId) {
   return `${normalizeText(itemTipo)}:${Number(itemReferenciaId)}`;
+}
+
+function isImageAttachment(item) {
+  const baseName = String(item?.arquivo_nome_original || item?.arquivo_url || '').split('?')[0].toLowerCase();
+  const extension = path.extname(baseName);
+  return extension === '.png' || extension === '.jpg' || extension === '.jpeg' || extension === '.webp';
+}
+
+function buildApiOrigin(req) {
+  const forwardedProto = String(req.headers?.['x-forwarded-proto'] || '')
+    .split(',')[0]
+    .trim();
+  const protocol = forwardedProto || req.protocol || 'http';
+  const host = String(req.get?.('host') || req.headers?.host || '').trim();
+  return host ? `${protocol}://${host}` : '';
+}
+
+async function resolvePublicAttachmentUrl(req, arquivoUrl) {
+  if (!arquivoUrl) {
+    return null;
+  }
+
+  const resolved = await getPresignedUrl(arquivoUrl, 300);
+  if (!resolved) {
+    return null;
+  }
+
+  if (String(resolved).startsWith('/')) {
+    const origin = buildApiOrigin(req);
+    return origin ? `${origin}${resolved}` : resolved;
+  }
+
+  return resolved;
 }
 
 async function carregarCotacaoPorToken(token) {
@@ -96,7 +129,7 @@ async function carregarCotacaoPorToken(token) {
   });
 }
 
-function serializarCotacaoPublica(cotacaoFornecedor) {
+async function serializarCotacaoPublica(cotacaoFornecedor, req) {
   const itensCotaveis = obterItensCotaveis(cotacaoFornecedor?.solicitacao || {});
   const respostasPorItem = new Map(
     (cotacaoFornecedor?.respostas || []).map((resposta) => {
@@ -124,16 +157,19 @@ function serializarCotacaoPublica(cotacaoFornecedor) {
       pdf_resposta_url: cotacaoFornecedor?.pdf_resposta_url || null
     },
     somente_leitura: normalizeText(cotacaoFornecedor?.solicitacao?.status) === 'ENCERRADO',
-    itens: itensCotaveis.map((item) => {
+    itens: await Promise.all(itensCotaveis.map(async (item) => {
       const resposta = respostasPorItem.get(buildItemKey(item.item_tipo, item.item_referencia_id));
       // apropriacao_resumo e apropriacao_linhas sao dados internos — nao enviados ao fornecedor
       const { apropriacao_resumo, apropriacao_linhas, ...itemPublico } = item;
+      const arquivoUrlPublica = await resolvePublicAttachmentUrl(req, itemPublico.arquivo_url);
       // Deriva status_disponibilidade para retrocompatibilidade com respostas antigas (apenas boolean)
       const statusDisponibilidade =
         resposta?.status_disponibilidade ||
         (resposta ? (resposta.disponivel ? 'DISPONIVEL' : 'NAO_TEM') : 'DISPONIVEL');
       return {
         ...itemPublico,
+        arquivo_url: arquivoUrlPublica,
+        arquivo_is_image: Boolean(arquivoUrlPublica && isImageAttachment(itemPublico)),
         disponivel: statusDisponibilidade !== 'NAO_TEM',
         status_disponibilidade: statusDisponibilidade,
         data_chegada: resposta?.data_chegada || '',
@@ -144,7 +180,7 @@ function serializarCotacaoPublica(cotacaoFornecedor) {
         resposta_item_id: resposta?.id || null,
         vencedor: Boolean(resposta?.vencedor)
       };
-    })
+    }))
   };
 }
 
@@ -335,7 +371,7 @@ module.exports = {
       }
 
       const atualizada = await carregarCotacaoPorToken(req.params.token);
-      return res.json(serializarCotacaoPublica(atualizada));
+      return res.json(await serializarCotacaoPublica(atualizada, req));
     } catch (error) {
       console.error(error);
       return res.status(500).json({ error: 'Erro ao buscar cotacao' });
@@ -363,7 +399,7 @@ module.exports = {
         condicao_pagamento: req.body?.condicao_pagamento
       });
       const atualizada = await carregarCotacaoPorToken(req.params.token);
-      return res.status(201).json(serializarCotacaoPublica(atualizada));
+      return res.status(201).json(await serializarCotacaoPublica(atualizada, req));
     } catch (error) {
       console.error(error);
       return responderErroController(res, error, 'Erro ao registrar resposta da cotacao', {
@@ -418,7 +454,7 @@ module.exports = {
         });
         const atualizada = await carregarCotacaoPorToken(token);
         return res.status(201).json({
-          ...serializarCotacaoPublica(atualizada),
+          ...await serializarCotacaoPublica(atualizada, req),
           pdf_resposta_url: url
         });
       }
@@ -491,7 +527,7 @@ module.exports = {
         valor_minimo_pedido: valorMinimoPedido
       });
       const atualizada = await carregarCotacaoPorToken(token);
-      return res.status(201).json(serializarCotacaoPublica(atualizada));
+      return res.status(201).json(await serializarCotacaoPublica(atualizada, req));
     } catch (error) {
       console.error(error);
       return responderErroController(res, error, 'Erro ao importar arquivo de cotacao', {

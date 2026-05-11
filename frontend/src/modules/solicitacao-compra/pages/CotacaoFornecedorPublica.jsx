@@ -60,6 +60,47 @@ const OPCOES_DISPONIBILIDADE = [
   { value: 'PARA_CHEGAR', label: 'Para chegar' }
 ];
 
+function AttachmentPreview({ item }) {
+  if (!item?.arquivo_url) {
+    return null;
+  }
+
+  const label = item.arquivo_nome_original || 'Abrir anexo';
+
+  if (item.arquivo_is_image) {
+    return (
+      <a
+        href={item.arquivo_url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="block w-[96px] shrink-0"
+        title={label}
+      >
+        <img
+          src={item.arquivo_url}
+          alt={label}
+          className="h-[74px] w-[96px] rounded-md border border-slate-200 object-cover bg-slate-50"
+        />
+        <span className="mt-1 block truncate text-[10px] text-[var(--sol-text-soft)]">
+          {label}
+        </span>
+      </a>
+    );
+  }
+
+  return (
+    <a
+      href={item.arquivo_url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex h-[74px] w-[96px] shrink-0 items-center justify-center rounded-md border border-slate-200 bg-slate-50 px-2 text-center text-[10px] font-medium text-slate-600 hover:bg-slate-100"
+      title={label}
+    >
+      Ver anexo
+    </a>
+  );
+}
+
 export default function CotacaoFornecedorPublica() {
   const { token } = useParams();
   const [dados, setDados] = useState(null);
@@ -306,7 +347,7 @@ export default function CotacaoFornecedorPublica() {
         {/* Tabela */}
         <div className="sol-surface-card rounded-lg solicitacoes-table-shell solicitacoes-table-compact cotacao-publica-table-shell">
           <div className="solicitacoes-table-scroll scrollbar-thin" style={{ scrollbarGutter: 'stable both-edges' }}>
-            <table className="table-fixed solicitacoes-table cotacao-publica-table" style={{ width: '100%', minWidth: '1100px', fontSize: '11px' }}>
+            <table className="table-fixed solicitacoes-table cotacao-publica-table" style={{ width: '100%', minWidth: '1180px', fontSize: '11px' }}>
               <colgroup>
                 <col style={{ width: '220px' }} />
                 <col style={{ width: '88px' }} />
@@ -408,14 +449,30 @@ export default function CotacaoFornecedorPublica() {
                         </div>
                       </td>
                       <td>
-                        <textarea
-                          className="input cotacao-publica-table-textarea text-xs"
-                          value={item.observacao}
-                          disabled={dados.somente_leitura}
-                          onChange={(e) => atualizarItem(index, 'observacao', e.target.value)}
-                          placeholder="Marca, condicoes ou restricoes"
-                          rows={2}
-                        />
+                        <div className="flex min-w-0 items-start gap-2">
+                          <AttachmentPreview item={item} />
+                          <div className="min-w-0 flex-1">
+                            {item.link_produto ? (
+                              <a
+                                href={item.link_produto}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="mb-1 block truncate text-[10px] font-medium text-sky-700 hover:underline"
+                                title={item.link_produto}
+                              >
+                                Link do produto
+                              </a>
+                            ) : null}
+                            <textarea
+                              className="input cotacao-publica-table-textarea text-xs"
+                              value={item.observacao}
+                              disabled={dados.somente_leitura}
+                              onChange={(e) => atualizarItem(index, 'observacao', e.target.value)}
+                              placeholder="Marca, condicoes ou restricoes"
+                              rows={2}
+                            />
+                          </div>
+                        </div>
                       </td>
                     </tr>
                   );

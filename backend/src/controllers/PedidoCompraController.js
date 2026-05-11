@@ -10,6 +10,7 @@ const {
   removerPedidoItem
 } = require('../services/pedidoCompraService');
 const {
+  getUserObraScopeIds,
   canAuditComprasPedidos,
   canManageComprasPedidos,
   canViewComprasPedidos
@@ -69,6 +70,16 @@ async function validarAcessoPedidos(req, res, options = {}) {
   return usuario;
 }
 
+async function buildHistoricoPrecoScope(req) {
+  const obraIds = await getUserObraScopeIds(req.user);
+
+  if (Array.isArray(obraIds) && obraIds.length === 0 && req.pedidoCompraResource?.obra_id) {
+    return [Number(req.pedidoCompraResource.obra_id)];
+  }
+
+  return obraIds;
+}
+
 module.exports = {
   async index(req, res) {
     try {
@@ -122,7 +133,9 @@ module.exports = {
         return;
       }
 
-      const pedido = await obterPedidoDetalhe(req.params.id);
+      const pedido = await obterPedidoDetalhe(req.params.id, {
+        obraIdsHistoricoPreco: await buildHistoricoPrecoScope(req)
+      });
       if (!pedido) {
         return res.status(404).json({ error: 'Pedido de compra nao encontrado' });
       }
@@ -185,7 +198,9 @@ module.exports = {
       });
 
       await transaction.commit();
-      const pedido = await obterPedidoDetalhe(req.params.id);
+      const pedido = await obterPedidoDetalhe(req.params.id, {
+        obraIdsHistoricoPreco: await buildHistoricoPrecoScope(req)
+      });
       return res.status(201).json(pedido);
     } catch (error) {
       await transaction.rollback();
@@ -212,7 +227,9 @@ module.exports = {
       });
 
       await transaction.commit();
-      const pedido = await obterPedidoDetalhe(req.params.id);
+      const pedido = await obterPedidoDetalhe(req.params.id, {
+        obraIdsHistoricoPreco: await buildHistoricoPrecoScope(req)
+      });
       return res.json(pedido);
     } catch (error) {
       await transaction.rollback();
@@ -240,7 +257,9 @@ module.exports = {
       });
 
       await transaction.commit();
-      const pedido = await obterPedidoDetalhe(req.params.id);
+      const pedido = await obterPedidoDetalhe(req.params.id, {
+        obraIdsHistoricoPreco: await buildHistoricoPrecoScope(req)
+      });
       return res.json(pedido);
     } catch (error) {
       await transaction.rollback();
@@ -267,7 +286,9 @@ module.exports = {
       });
 
       await transaction.commit();
-      const pedido = await obterPedidoDetalhe(req.params.id);
+      const pedido = await obterPedidoDetalhe(req.params.id, {
+        obraIdsHistoricoPreco: await buildHistoricoPrecoScope(req)
+      });
       return res.json(pedido);
     } catch (error) {
       await transaction.rollback();
@@ -283,7 +304,9 @@ module.exports = {
         return;
       }
 
-      const pedido = await obterPedidoDetalhe(req.params.id);
+      const pedido = await obterPedidoDetalhe(req.params.id, {
+        obraIdsHistoricoPreco: await buildHistoricoPrecoScope(req)
+      });
       if (!pedido) {
         return res.status(404).json({ error: 'Pedido de compra nao encontrado' });
       }

@@ -69,6 +69,9 @@ function obterItensCotaveis(solicitacao) {
       unidade: item.unidade?.sigla || '-',
       especificacao: item.especificacao || '',
       necessario_para: item.necessario_para || null,
+      link_produto: item.link_produto || null,
+      arquivo_url: item.arquivo_url || null,
+      arquivo_nome_original: item.arquivo_nome_original || null,
       apropriacao_resumo: apropriacoes.texto,
       apropriacao_linhas: apropriacoes.linhas
     };
@@ -86,6 +89,9 @@ function obterItensCotaveis(solicitacao) {
       unidade: item.unidade_sigla_manual || '-',
       especificacao: item.especificacao || '',
       necessario_para: item.necessario_para || null,
+      link_produto: item.link_produto || null,
+      arquivo_url: item.arquivo_url || null,
+      arquivo_nome_original: item.arquivo_nome_original || null,
       apropriacao_resumo: apropriacoes.texto,
       apropriacao_linhas: apropriacoes.linhas
     };

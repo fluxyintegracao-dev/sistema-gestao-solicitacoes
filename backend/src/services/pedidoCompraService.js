@@ -54,6 +54,78 @@ function buildPedidoCodigo(id) {
   return `PC-${String(id).padStart(5, '0')}`;
 }
 
+async function buscarUltimosPrecosPorInsumo(insumoIds, obraIdsEscopo = null, solicitacaoCompraIdIgnorar = null) {
+  const ids = [...new Set(
+    (Array.isArray(insumoIds) ? insumoIds : [])
+      .map((item) => Number(item))
+      .filter((item) => item > 0)
+  )];
+
+  if (!ids.length) {
+    return new Map();
+  }
+
+  const whereCompra = { status: 'ENCERRADO' };
+  if (Number(solicitacaoCompraIdIgnorar) > 0) {
+    whereCompra.id = { [Op.ne]: Number(solicitacaoCompraIdIgnorar) };
+  }
+
+  if (Array.isArray(obraIdsEscopo)) {
+    if (!obraIdsEscopo.length) {
+      return new Map();
+    }
+    whereCompra.obra_id = { [Op.in]: obraIdsEscopo.map((item) => Number(item)).filter((item) => item > 0) };
+  }
+
+  const respostas = await SolicitacaoCompraRespostaItem.findAll({
+    where: {
+      vencedor: true,
+      preco: { [Op.not]: null }
+    },
+    include: [{
+      model: SolicitacaoCompraItem,
+      as: 'itemCadastrado',
+      required: true,
+      attributes: ['id', 'insumo_id'],
+      where: {
+        insumo_id: { [Op.in]: ids }
+      },
+      include: [{
+        model: SolicitacaoCompra,
+        as: 'solicitacao',
+        required: true,
+        where: whereCompra,
+        attributes: ['id', 'updatedAt']
+      }]
+    }],
+    order: [
+      [{ model: SolicitacaoCompraItem, as: 'itemCadastrado' }, 'insumo_id', 'ASC'],
+      [
+        { model: SolicitacaoCompraItem, as: 'itemCadastrado' },
+        { model: SolicitacaoCompra, as: 'solicitacao' },
+        'updatedAt',
+        'DESC'
+      ]
+    ]
+  });
+
+  const mapaPrecos = new Map();
+  for (const resposta of respostas) {
+    const insumoId = Number(resposta?.itemCadastrado?.insumo_id || 0);
+    if (!insumoId || mapaPrecos.has(insumoId)) {
+      continue;
+    }
+
+    mapaPrecos.set(insumoId, roundMoney(resposta.preco));
+
+    if (mapaPrecos.size >= ids.length) {
+      break;
+    }
+  }
+
+  return mapaPrecos;
+}
+
 async function carregarSolicitacaoPedidos(id, transaction) {
   return SolicitacaoCompra.findByPk(id, {
     transaction,
@@ -580,7 +652,7 @@ async function listarAuditoriaItensPedido({ obraId, pedidoId, itemId, acao, q, o
   }));
 }
 
-async function obterPedidoDetalhe(id) {
+async function obterPedidoDetalhe(id, { obraIdsHistoricoPreco = null } = {}) {
   const pedido = await PedidoCompra.findByPk(id, {
     include: [
       { model: FornecedorCompra, as: 'fornecedor', attributes: ['id', 'nome', 'email', 'whatsapp', 'contato'] },
@@ -595,6 +667,11 @@ async function obterPedidoDetalhe(id) {
         model: PedidoCompraItem,
         as: 'itens',
         include: [
+          {
+            model: SolicitacaoCompraItem,
+            as: 'itemCadastrado',
+            attributes: ['id', 'insumo_id']
+          },
           {
             model: SolicitacaoCompraRespostaItem,
             as: 'respostaItem',
@@ -650,8 +727,30 @@ async function obterPedidoDetalhe(id) {
       };
     });
 
+  const ultimoPrecoPorInsumo = await buscarUltimosPrecosPorInsumo(
+    (pedido.itens || []).map((item) => item.itemCadastrado?.insumo_id),
+    obraIdsHistoricoPreco,
+    pedido.solicitacao_compra_id
+  );
+
+  const itens = (pedido.itens || []).map((item) => {
+    const itemJson = item.toJSON();
+    const { itemCadastrado, ...itemData } = itemJson;
+    const insumoId = Number(itemCadastrado?.insumo_id || 0) || null;
+
+    return {
+      ...itemData,
+      contexto_preco: {
+        insumo_id: insumoId,
+        preco_cotado: itemJson.respostaItem?.preco != null ? roundMoney(itemJson.respostaItem.preco) : null,
+        ultimo_preco_compra: insumoId ? (ultimoPrecoPorInsumo.get(insumoId) ?? null) : null
+      }
+    };
+  });
+
   return {
     ...pedido.toJSON(),
+    itens,
     status_configuracao: statusConfig,
     edicao_bloqueada: Boolean(statusConfig?.bloqueia_edicao),
     candidatos_adicao: candidatos

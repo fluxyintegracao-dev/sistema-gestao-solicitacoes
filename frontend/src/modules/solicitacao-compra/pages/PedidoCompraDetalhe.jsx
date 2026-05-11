@@ -20,6 +20,75 @@ function formatMoney(value) {
   });
 }
 
+function toNullableNumber(value) {
+  if (value === '' || value === null || value === undefined) {
+    return null;
+  }
+
+  const normalized = typeof value === 'string'
+    ? value.trim().replace(',', '.')
+    : value;
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function formatUnitPrice(value, unidade, fallback = '-') {
+  const parsed = toNullableNumber(value);
+  if (parsed === null) {
+    return fallback;
+  }
+
+  return `${formatMoney(parsed)}${unidade ? `/${unidade}` : ''}`;
+}
+
+function calculateVariationPercent(currentValue, referenceValue) {
+  const current = toNullableNumber(currentValue);
+  const reference = toNullableNumber(referenceValue);
+
+  if (current === null || reference === null || reference <= 0) {
+    return null;
+  }
+
+  return ((current - reference) / reference) * 100;
+}
+
+function formatVariationPercent(value, fallback = 'Sem historico') {
+  if (value === null || value === undefined) {
+    return fallback;
+  }
+
+  const normalized = Math.abs(value) < 0.005 ? 0 : value;
+  const signal = normalized > 0 ? '+' : '';
+  return `${signal}${normalized.toLocaleString('pt-BR', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  })}%`;
+}
+
+function getVariationTextClass(value) {
+  if (value === null || value === undefined || Math.abs(value) < 0.005) {
+    return 'text-[var(--c-muted)]';
+  }
+
+  return value > 0 ? 'text-red-600' : 'text-emerald-700';
+}
+
+function buildItemPriceContext(item, currentUnitPriceOverride = undefined) {
+  const contexto = item?.contexto_preco || {};
+  const precoCotado = toNullableNumber(contexto.preco_cotado);
+  const precoAtual = currentUnitPriceOverride !== undefined
+    ? toNullableNumber(currentUnitPriceOverride)
+    : toNullableNumber(item?.preco_unitario);
+  const ultimoPrecoCompra = toNullableNumber(contexto.ultimo_preco_compra);
+
+  return {
+    precoCotado,
+    precoAtual,
+    ultimoPrecoCompra,
+    variacaoUltimaCompra: calculateVariationPercent(precoAtual, ultimoPrecoCompra)
+  };
+}
+
 function formatQuantityIntegerPart(value) {
   const digits = String(value ?? '').replace(/\D/g, '');
   const normalized = digits.replace(/^0+(?=\d)/, '') || (digits ? '0' : '');
@@ -482,6 +551,12 @@ export default function PedidoCompraDetalhe() {
   const edicaoItemAtual = itemEditando ? edicoes[itemEditando.id] || {} : {};
   const itemEditandoAbaixoMinimo = isItemAbaixoMinimo(itemEditando);
   const itemEditandoSituacao = getItemSituacao(itemEditando);
+  const itemEditandoPrecoContext = itemEditando
+    ? buildItemPriceContext(itemEditando, edicaoItemAtual.preco_unitario ?? itemEditando.preco_unitario)
+    : null;
+  const itemEditandoValorTotalAtual = itemEditando
+    ? parseBrazilianQuantity(edicaoItemAtual.quantidade_pedido ?? itemEditando.quantidade_pedido) * (itemEditandoPrecoContext?.precoAtual ?? 0)
+    : 0;
   const modalProcessando = itemEditando ? savingItemId === itemEditando.id || removingItemId === itemEditando.id : false;
 
   return (
@@ -743,6 +818,7 @@ export default function PedidoCompraDetalhe() {
                   <tbody>
                     {itensFiltrados.map((item) => {
                       const situacao = getItemSituacao(item);
+                      const precoContext = buildItemPriceContext(item);
 
                       return (
                         <tr key={item.id} className={item.removido ? 'opacity-80' : ''}>
@@ -750,6 +826,20 @@ export default function PedidoCompraDetalhe() {
                             <div className="font-medium">{item.descricao}</div>
                             <div className="text-xs text-[var(--c-muted)]">
                               Minimo: {formatQuantityLabel(item.quantidade_minima_item, item.unidade)}
+                            </div>
+                            <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-[var(--c-muted)]">
+                              <span>
+                                Cotado: <span className="font-semibold text-[var(--c-text)]">{formatUnitPrice(precoContext.precoCotado, item.unidade)}</span>
+                              </span>
+                              <span>
+                                Atual: <span className="font-semibold text-[var(--c-text)]">{formatUnitPrice(precoContext.precoAtual, item.unidade)}</span>
+                              </span>
+                              <span>
+                                Ult. compra: <span className="font-semibold text-[var(--c-text)]">{formatUnitPrice(precoContext.ultimoPrecoCompra, item.unidade, 'Sem historico')}</span>
+                              </span>
+                              <span>
+                                Var.: <span className={`font-semibold ${getVariationTextClass(precoContext.variacaoUltimaCompra)}`}>{formatVariationPercent(precoContext.variacaoUltimaCompra)}</span>
+                              </span>
                             </div>
                           </td>
                           <td>{item.origem || '-'}</td>
@@ -937,8 +1027,26 @@ export default function PedidoCompraDetalhe() {
                     <div className="font-semibold">{formatQuantityLabel(itemEditando.quantidade_minima_item, itemEditando.unidade)}</div>
                   </div>
                   <div>
-                    <div className="text-[var(--c-muted)]">Valor atual</div>
-                    <div className="font-semibold">{formatMoney(itemEditando.valor_total)}</div>
+                    <div className="text-[var(--c-muted)]">Cotado pelo fornecedor</div>
+                    <div className="font-semibold">{formatUnitPrice(itemEditandoPrecoContext?.precoCotado, itemEditando.unidade)}</div>
+                  </div>
+                  <div>
+                    <div className="text-[var(--c-muted)]">Preco atual do pedido</div>
+                    <div className="font-semibold">{formatUnitPrice(itemEditandoPrecoContext?.precoAtual, itemEditando.unidade)}</div>
+                  </div>
+                  <div>
+                    <div className="text-[var(--c-muted)]">Ult. compra</div>
+                    <div className="font-semibold">{formatUnitPrice(itemEditandoPrecoContext?.ultimoPrecoCompra, itemEditando.unidade, 'Sem historico')}</div>
+                  </div>
+                  <div>
+                    <div className="text-[var(--c-muted)]">Variacao x ult. compra</div>
+                    <div className={`font-semibold ${getVariationTextClass(itemEditandoPrecoContext?.variacaoUltimaCompra)}`}>
+                      {formatVariationPercent(itemEditandoPrecoContext?.variacaoUltimaCompra)}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[var(--c-muted)]">Valor total atual</div>
+                    <div className="font-semibold">{formatMoney(itemEditandoValorTotalAtual)}</div>
                   </div>
                 </div>
 
