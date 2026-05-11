@@ -4,6 +4,7 @@ import { getStatusSetor } from '../../services/statusSetor';
 export default function ModalAlterarStatus({
   aberto,
   setor,
+  exigirStatusCadastrado = false,
   onClose,
   onSalvar
 }) {
@@ -49,7 +50,7 @@ export default function ModalAlterarStatus({
     'REJEITADA',
     'CONCLUIDA'
   ];
-  const lista = status.length > 0 ? status : fallback;
+  const lista = status.length > 0 || exigirStatusCadastrado ? status : fallback;
 
   if (!aberto) return null;
 
@@ -75,6 +76,11 @@ export default function ModalAlterarStatus({
               {s}
             </button>
           ))}
+          {!loading && lista.length === 0 && (
+            <p className="text-sm text-gray-500">
+              Nenhum status ativo cadastrado para este setor.
+            </p>
+          )}
         </div>
 
         <button

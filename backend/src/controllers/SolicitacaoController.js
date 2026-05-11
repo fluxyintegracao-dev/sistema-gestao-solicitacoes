@@ -59,6 +59,10 @@ const CHAVE_TIPOS_SOLICITACAO_POR_SETOR = 'TIPOS_SOLICITACAO_POR_SETOR';
 const CHAVE_SETORES_CRIACAO_TODAS_OBRAS = 'SETORES_CRIACAO_TODAS_OBRAS';
 const DEFAULT_SOLICITACOES_PAGE_SIZE = 25;
 const MAX_SOLICITACOES_PAGE_SIZE = 100;
+const TOKENS_DIRETORIA_OBRAS = new Set([
+  'DIR_OBRAS_PUBLICAS',
+  'DIR_OBRAS_PRIVADAS'
+]);
 const TOKENS_GEO_EQUIVALENTES = new Set([
   'GEO',
   'GERENCIA_DE_PROCESSOS',
@@ -591,6 +595,23 @@ function isGeoToken(valor) {
 
 function isAdministrativoToken(valor) {
   return normalizarTokenComparacao(valor) === 'ADMINISTRATIVO';
+}
+
+function isDiretoriaObrasToken(valor) {
+  return TOKENS_DIRETORIA_OBRAS.has(normalizarTokenComparacao(valor));
+}
+
+function obterDiretoriaObrasUsuarioParaStatus(tokensSetor = [], diretoriasPermitidas = []) {
+  const tokensNormalizados = (Array.isArray(tokensSetor) ? tokensSetor : [])
+    .map(normalizarTokenComparacao)
+    .filter(Boolean);
+  const permitidas = (Array.isArray(diretoriasPermitidas) ? diretoriasPermitidas : [diretoriasPermitidas])
+    .map(normalizarTokenComparacao)
+    .filter(isDiretoriaObrasToken);
+
+  if (permitidas.length === 0) return null;
+
+  return permitidas.find(token => tokensNormalizados.includes(token)) || null;
 }
 
 function expandirTokensComAliasesGeo(tokens = []) {
@@ -2202,6 +2223,9 @@ module.exports = {
       const perfil = String(req.user?.perfil || '').trim().toUpperCase();
       const isSuperadmin = perfil === 'SUPERADMIN';
       const areaUsuario = await obterAreaUsuario(req);
+      const tokensSetorUsuario = expandirTokensComAliasesGeo(
+        await obterTokensSetorUsuario(req, areaUsuario)
+      );
       const isSetorObra = await isSetorObraGeral(req);
 
       const solicitacao = await Solicitacao.findByPk(id);
@@ -2223,14 +2247,26 @@ module.exports = {
       }
 
       const setorAtual = solicitacao.area_responsavel;
+      const contextoAprovacaoDiretoria = await obterContextoAprovacaoDiretoria(solicitacao);
+      const diretoriaStatusUsuario = obterDiretoriaObrasUsuarioParaStatus(
+        tokensSetorUsuario,
+        [
+          setorAtual,
+          solicitacao.diretoria_fluxo_codigo,
+          contextoAprovacaoDiretoria.diretoriaEsperada
+        ]
+      );
       const tokensSetoresSemAlteracaoStatus = await obterTokensSetoresSemAlteracaoStatus();
-      if (setorEstaSemAlteracaoStatus(setorAtual, tokensSetoresSemAlteracaoStatus)) {
+      if (
+        !diretoriaStatusUsuario &&
+        setorEstaSemAlteracaoStatus(setorAtual, tokensSetoresSemAlteracaoStatus)
+      ) {
         return res.status(403).json({
           error: 'Alteracao de status desabilitada para o setor atual da solicitacao'
         });
       }
 
-      const setorValidacaoStatus = String(areaUsuario || setorAtual || '').trim();
+      const setorValidacaoStatus = String(diretoriaStatusUsuario || areaUsuario || setorAtual || '').trim();
 
       if (!isSuperadmin) {
         const setorAtualStr = setorValidacaoStatus;
@@ -2270,6 +2306,12 @@ module.exports = {
           where: whereSetor,
           attributes: ['nome']
         });
+
+        if (diretoriaStatusUsuario && etapas.length === 0) {
+          return res.status(400).json({
+            error: 'Nenhum status ativo cadastrado para esta diretoria'
+          });
+        }
 
         if (etapas.length > 0) {
           const permitidos = etapas

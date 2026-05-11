@@ -1,7 +1,7 @@
 import { API_URL, authHeaders } from './api';
 
 export async function getStatusSetor({ setor } = {}) {
-  const params = setor ? `?setor=${setor}` : '';
+  const params = setor ? `?setor=${encodeURIComponent(setor)}` : '';
   const res = await fetch(`${API_URL}/status-setor${params}`, {
     headers: authHeaders()
   });

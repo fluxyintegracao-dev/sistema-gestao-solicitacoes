@@ -17,18 +17,41 @@ import {
 } from '../../services/solicitacoes';
 import { getSetoresSemAlteracaoStatus } from '../../services/configuracoesSistema';
 import { API_URL, authHeaders } from '../../services/api';
-import { isGeoSetor, normalizarSetorToken, usuarioPodeEnviarSolicitacaoParaOutroSetor } from '../../utils/setor';
+import {
+  isGeoSetor,
+  normalizarSetorToken,
+  obterTokensSetorUsuario,
+  usuarioPodeEnviarSolicitacaoParaOutroSetor
+} from '../../utils/setor';
+
+const TOKENS_DIRETORIA_OBRAS = new Set([
+  'DIR_OBRAS_PUBLICAS',
+  'DIR_OBRAS_PRIVADAS'
+]);
+
+function isDiretoriaObrasToken(valor) {
+  return TOKENS_DIRETORIA_OBRAS.has(normalizarSetorToken(valor));
+}
+
+function obterDiretoriaObrasUsuarioParaStatus(user, diretoriasPermitidas = []) {
+  const tokensNormalizados = obterTokensSetorUsuario(user)
+    .map(normalizarSetorToken)
+    .filter(Boolean);
+  const permitidas = (Array.isArray(diretoriasPermitidas) ? diretoriasPermitidas : [diretoriasPermitidas])
+    .map(normalizarSetorToken)
+    .filter(isDiretoriaObrasToken);
+
+  if (permitidas.length === 0) return null;
+
+  return permitidas.find(token => tokensNormalizados.includes(token)) || null;
+}
 
 export default function SolicitacaoDetalhe() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  const setorTokens = [
-    String(user?.setor?.codigo || '').toUpperCase(),
-    String(user?.setor?.nome || '').toUpperCase(),
-    String(user?.area || '').toUpperCase()
-  ];
+  const setorTokens = obterTokensSetorUsuario(user);
 
   const isSetorGeo = setorTokens.some(isGeoSetor);
   const isSetorCompras = setorTokens.includes('COMPRAS');
@@ -44,12 +67,6 @@ export default function SolicitacaoDetalhe() {
 
   const perfil = String(user?.perfil || '').trim().toUpperCase();
   const setorUsuario = user?.setor?.codigo || user?.area || user?.setor?.nome || '';
-  const setorParaStatus =
-    perfil === 'SUPERADMIN'
-      ? null
-      : isSetorGeo
-        ? 'GEO'
-        : setorUsuario;
 
   useEffect(() => {
     carregar();
@@ -158,6 +175,18 @@ export default function SolicitacaoDetalhe() {
   const isSetorObra = setorTokens.includes('OBRA');
   const usaFluxoAprovacaoDiretoria = Boolean(solicitacao.usa_fluxo_aprovacao_diretoria);
   const podeAprovarDiretoria = Boolean(solicitacao.acao_aprovar_diretoria_disponivel);
+  const diretoriaStatusUsuario = obterDiretoriaObrasUsuarioParaStatus(user, [
+    solicitacao.area_responsavel,
+    solicitacao.diretoria_fluxo_codigo,
+    solicitacao.diretoria_responsavel
+  ]);
+  const setorParaStatus =
+    perfil === 'SUPERADMIN'
+      ? null
+      : diretoriaStatusUsuario ||
+        (isSetorGeo
+          ? 'GEO'
+          : setorUsuario);
   const podeEnviarSetor =
     !usaFluxoAprovacaoDiretoria &&
     !isSetorObra &&
@@ -198,7 +227,7 @@ export default function SolicitacaoDetalhe() {
         solicitacao={solicitacao}
         onAlterarStatus={() => setModalStatus(true)}
         onEnviarSetor={podeAprovarDiretoria ? aprovarDiretoria : () => setModalEnviarSetor(true)}
-        mostrarAlterarStatus={!setorSemAlteracaoStatus}
+        mostrarAlterarStatus={!setorSemAlteracaoStatus || Boolean(diretoriaStatusUsuario)}
         mostrarEnviarSetor={podeAprovarDiretoria || podeEnviarSetor}
         textoEnviarSetor={podeAprovarDiretoria ? 'Aprovar' : 'Enviar para outro setor'}
       />
@@ -240,6 +269,7 @@ export default function SolicitacaoDetalhe() {
       <ModalAlterarStatus
         aberto={modalStatus}
         setor={setorParaStatus}
+        exigirStatusCadastrado={Boolean(diretoriaStatusUsuario)}
         onClose={() => setModalStatus(false)}
         onSalvar={salvarStatus}
       />
