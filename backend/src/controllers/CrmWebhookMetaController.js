@@ -3,6 +3,7 @@ const { responderErroController } = require('../utils/controllerError');
 
 module.exports = {
   async verify(req, res) {
+    console.log('[META WEBHOOK VERIFY] QUERY', req.query);
     try {
       const mode = req.query['hub.mode'];
       const verifyToken = req.query['hub.verify_token'];
@@ -15,17 +16,22 @@ module.exports = {
 
       return res.status(200).send(String(challenge));
     } catch (error) {
+      console.error('[META ERROR]', error);
       return responderErroController(res, error, 'Erro ao verificar webhook Meta');
     }
   },
 
   async receive(req, res) {
+    console.log('[META WEBHOOK] REQUEST RECEBIDA');
+    console.log('[META WEBHOOK] HEADERS', req.headers);
+    console.log('[META WEBHOOK] BODY', JSON.stringify(req.body || {}));
     try {
       const signature = req.get('x-hub-signature-256');
       const rawBody = req.rawBody || JSON.stringify(req.body || {});
       const results = await receberEventoMeta(req.body || {}, signature, rawBody);
       return res.status(202).json({ received: true, results });
     } catch (error) {
+      console.error('[META ERROR]', error);
       return responderErroController(res, error, 'Erro ao receber webhook Meta');
     }
   }

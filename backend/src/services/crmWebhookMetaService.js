@@ -86,13 +86,16 @@ function validarAssinaturaMetaSync(rawBody, signature, secret) {
   const expected = 'sha256=' + crypto.createHmac('sha256', secret).update(rawBody).digest('hex');
   try {
     return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
-  } catch {
+  } catch (error) {
+    console.error('[META ERROR]', error);
     return false;
   }
 }
 
 async function validarAssinaturaMeta(rawBody, signature) {
   const secret = await getConfigValue('CRM_META_WEBHOOK_SECRET');
+  console.log('[META SIGNATURE] HEADER', signature ? 'PRESENTE' : 'AUSENTE');
+  console.log('[META SIGNATURE] SECRET CONFIGURADO', !!secret);
   if (!secret) {
     if (env.nodeEnv === 'production') {
       throw createHttpError('CRM_META_WEBHOOK_SECRET nao configurado para validar webhook Meta', 500);
@@ -142,13 +145,15 @@ async function buscarLeadMeta(leadgenId) {
   try {
     response = await fetch(url);
   } catch (error) {
+    console.error('[META ERROR]', error);
     throw createHttpError(`Falha de rede ao consultar lead Meta: ${error.message}`, 502);
   }
 
   let body = null;
   try {
     body = await response.json();
-  } catch {
+  } catch (error) {
+    console.error('[META ERROR]', error);
     body = null;
   }
 
@@ -252,6 +257,7 @@ async function marcarEventoComoDuplicado(event, lead) {
 }
 
 async function processarEventoMeta(eventId) {
+  console.log('[META PROCESS] PROCESSANDO EVENTO', eventId);
   const event = await CrmIntegrationMetaEvent.findByPk(eventId);
   if (!event) return;
   if (event.processing_status !== 'PENDING') return;
@@ -349,6 +355,7 @@ async function processarEventoMeta(eventId) {
         await marcarEventoComoDuplicado(event, processedLead);
         return;
       }
+      console.error('[META ERROR]', error);
       throw error;
     }
 
@@ -367,15 +374,19 @@ async function processarEventoMeta(eventId) {
       error_message: null
     });
   } catch (err) {
+    console.error('[META ERROR]', err);
     await event.update({
       processing_status: 'ERROR',
       error_message: err.message,
       processed_at: new Date()
-    }).catch(() => {});
+    }).catch((error) => {
+      console.error('[META ERROR]', error);
+    });
   }
 }
 
 async function receberEventoMeta(payload, signature, rawBody) {
+  console.log('[META EVENT] PAYLOAD RECEBIDO');
   const valido = await validarAssinaturaMeta(rawBody, signature);
   if (!valido) throw createHttpError('Assinatura invalida', 401);
 
