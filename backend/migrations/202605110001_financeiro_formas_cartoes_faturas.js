@@ -31,8 +31,8 @@ module.exports = {
         ativo: { type: Sequelize.BOOLEAN, allowNull: false, defaultValue: true },
         criado_por: { type: Sequelize.INTEGER, allowNull: true },
         atualizado_por: { type: Sequelize.INTEGER, allowNull: true },
-        createdAt: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.literal('CURRENT_TIMESTAMP') },
-        updatedAt: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.literal('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP') }
+        createdAt: { type: Sequelize.DATE, allowNull: false, defaultValue: sequelize.literal('CURRENT_TIMESTAMP') },
+        updatedAt: { type: Sequelize.DATE, allowNull: false, defaultValue: sequelize.literal('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP') }
       });
     }
 
@@ -50,8 +50,8 @@ module.exports = {
         observacoes: { type: Sequelize.TEXT, allowNull: true },
         criado_por: { type: Sequelize.INTEGER, allowNull: true },
         atualizado_por: { type: Sequelize.INTEGER, allowNull: true },
-        createdAt: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.literal('CURRENT_TIMESTAMP') },
-        updatedAt: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.literal('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP') }
+        createdAt: { type: Sequelize.DATE, allowNull: false, defaultValue: sequelize.literal('CURRENT_TIMESTAMP') },
+        updatedAt: { type: Sequelize.DATE, allowNull: false, defaultValue: sequelize.literal('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP') }
       });
     }
 
@@ -72,8 +72,8 @@ module.exports = {
         pago_por: { type: Sequelize.INTEGER, allowNull: true },
         criado_por: { type: Sequelize.INTEGER, allowNull: true },
         atualizado_por: { type: Sequelize.INTEGER, allowNull: true },
-        createdAt: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.literal('CURRENT_TIMESTAMP') },
-        updatedAt: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.literal('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP') }
+        createdAt: { type: Sequelize.DATE, allowNull: false, defaultValue: sequelize.literal('CURRENT_TIMESTAMP') },
+        updatedAt: { type: Sequelize.DATE, allowNull: false, defaultValue: sequelize.literal('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP') }
       });
       await queryInterface.addIndex('financeiro_faturas_cartao', ['cartao_id', 'competencia'], {
         unique: true,
@@ -86,8 +86,8 @@ module.exports = {
         id: { type: Sequelize.INTEGER, primaryKey: true, autoIncrement: true },
         fatura_cartao_id: { type: Sequelize.INTEGER, allowNull: false },
         titulo_financeiro_id: { type: Sequelize.INTEGER, allowNull: false, unique: true },
-        createdAt: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.literal('CURRENT_TIMESTAMP') },
-        updatedAt: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.literal('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP') }
+        createdAt: { type: Sequelize.DATE, allowNull: false, defaultValue: sequelize.literal('CURRENT_TIMESTAMP') },
+        updatedAt: { type: Sequelize.DATE, allowNull: false, defaultValue: sequelize.literal('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP') }
       });
     }
 
