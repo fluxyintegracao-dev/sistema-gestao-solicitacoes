@@ -105,6 +105,13 @@ function sanitizeBoolean(value, fallback = false) {
   return value === true || value === 'true' || value === 1 || value === '1';
 }
 
+function normalizarTipoCartao(value, fallback = 'CREDITO') {
+  const normalized = String(value || fallback).trim().toUpperCase();
+  if (normalized === 'CARTAO_CREDITO' || normalized === 'CREDITO') return 'CREDITO';
+  if (normalized === 'CARTAO_DEBITO' || normalized === 'DEBITO') return 'DEBITO';
+  throw createHttpError(400, 'Tipo do cartao deve ser credito ou debito.');
+}
+
 function sanitizeFormaPagamentoPayload(payload = {}, { partial = false } = {}) {
   const nome = sanitizeTextField(payload.nome);
   const data = {
@@ -137,6 +144,7 @@ function sanitizeCartaoPayload(payload = {}, { partial = false } = {}) {
   const data = {
     nome: sanitizeTextField(payload.nome),
     titular: sanitizeTextField(payload.titular),
+    tipo: payload.tipo === undefined ? undefined : normalizarTipoCartao(payload.tipo),
     bandeira: sanitizeTextField(payload.bandeira, { emptyAsNull: true }),
     ultimos_digitos: payload.ultimos_digitos === undefined ? undefined : String(payload.ultimos_digitos || '').replace(/\D/g, '').slice(-4),
     conta_bancaria_id: payload.conta_bancaria_id === undefined ? undefined : (payload.conta_bancaria_id ? Number(payload.conta_bancaria_id) : null),
@@ -149,6 +157,7 @@ function sanitizeCartaoPayload(payload = {}, { partial = false } = {}) {
   if (!partial) {
     if (!String(data.nome || '').trim()) throw createHttpError(400, 'Nome do cartao e obrigatorio.');
     if (!String(data.titular || '').trim()) throw createHttpError(400, 'Titular do cartao e obrigatorio.');
+    data.tipo = data.tipo || 'CREDITO';
     if (!String(data.ultimos_digitos || '').trim() || data.ultimos_digitos.length !== 4) {
       throw createHttpError(400, 'Informe os 4 ultimos digitos do cartao.');
     }

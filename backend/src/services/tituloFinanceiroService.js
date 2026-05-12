@@ -290,7 +290,7 @@ function buildTituloInclude({ includeMovimentos = false } = {}) {
     {
       model: CartaoFinanceiro,
       as: 'cartao',
-      attributes: ['id', 'nome', 'titular', 'bandeira', 'ultimos_digitos', 'dia_fechamento', 'dia_vencimento']
+      attributes: ['id', 'nome', 'titular', 'tipo', 'bandeira', 'ultimos_digitos', 'dia_fechamento', 'dia_vencimento']
     },
     {
       model: FaturaCartaoFinanceiro,
@@ -440,6 +440,34 @@ async function validarFormaPagamentoFinanceira(formaPagamentoId, payload = {}) {
 
   if (forma.exige_cartao && !payload.cartao_id) {
     throw createHttpError(400, 'Selecione o cartao para esta forma de pagamento.');
+  }
+
+  if (forma.exige_cartao && payload.cartao_id) {
+    const cartao = await CartaoFinanceiro.findByPk(payload.cartao_id);
+    if (!cartao || cartao.ativo === false) {
+      throw createHttpError(400, 'Cartao financeiro invalido ou inativo.');
+    }
+
+    const tipoForma = `${forma.tipo || ''} ${forma.codigo || ''}`.toUpperCase();
+    const tipoCartaoEsperado = tipoForma.includes('DEBITO')
+      ? 'DEBITO'
+      : tipoForma.includes('CREDITO')
+        ? 'CREDITO'
+        : null;
+    const tipoCartao = String(cartao.tipo || 'CREDITO').trim().toUpperCase();
+
+    if (tipoCartaoEsperado && tipoCartao !== tipoCartaoEsperado) {
+      throw createHttpError(
+        400,
+        tipoCartaoEsperado === 'CREDITO'
+          ? 'Selecione um cartao de credito para esta forma de pagamento.'
+          : 'Selecione um cartao de debito para esta forma de pagamento.'
+      );
+    }
+
+    if (forma.gera_fatura && tipoCartao !== 'CREDITO') {
+      throw createHttpError(400, 'Somente cartoes de credito podem gerar fatura.');
+    }
   }
 
   return forma;

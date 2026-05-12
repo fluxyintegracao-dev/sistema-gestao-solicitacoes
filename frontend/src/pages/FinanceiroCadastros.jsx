@@ -64,6 +64,7 @@ function defaultCartaoForm() {
     id: null,
     nome: '',
     titular: '',
+    tipo: 'CREDITO',
     bandeira: '',
     ultimos_digitos: '',
     conta_bancaria_id: '',
@@ -150,6 +151,7 @@ function pickCartaoFormData(cartao = {}) {
     id: cartao.id || null,
     nome: cartao.nome || '',
     titular: cartao.titular || '',
+    tipo: normalizarTipoCartao(cartao.tipo),
     bandeira: cartao.bandeira || '',
     ultimos_digitos: cartao.ultimos_digitos || '',
     conta_bancaria_id: cartao.conta_bancaria_id ? String(cartao.conta_bancaria_id) : '',
@@ -183,6 +185,15 @@ function pickPaymentAccountFormData(account = {}) {
 
 function statusClass(ativo) {
   return ativo ? 'app-status-pill bg-emerald-100 text-emerald-700' : 'app-status-pill bg-slate-100 text-slate-700';
+}
+
+function normalizarTipoCartao(value) {
+  const normalized = String(value || 'CREDITO').trim().toUpperCase();
+  return normalized === 'DEBITO' || normalized === 'CARTAO_DEBITO' ? 'DEBITO' : 'CREDITO';
+}
+
+function labelTipoCartao(value) {
+  return normalizarTipoCartao(value) === 'DEBITO' ? 'Debito' : 'Credito';
 }
 
 function normalizeSearchText(value) {
@@ -970,8 +981,14 @@ export default function FinanceiroCadastros() {
                 <input className="input w-full" placeholder="Titular" value={cartaoForm.titular} onChange={(e) => setCartaoForm((c) => ({ ...c, titular: e.target.value }))} required />
               </div>
               <div className="grid gap-3 md:grid-cols-3">
+                <select className="input w-full" value={cartaoForm.tipo} onChange={(e) => setCartaoForm((c) => ({ ...c, tipo: e.target.value }))}>
+                  <option value="CREDITO">Credito</option>
+                  <option value="DEBITO">Debito</option>
+                </select>
                 <input className="input w-full" placeholder="Bandeira" value={cartaoForm.bandeira} onChange={(e) => setCartaoForm((c) => ({ ...c, bandeira: e.target.value }))} />
                 <input className="input w-full" maxLength={4} inputMode="numeric" placeholder="4 ultimos digitos" value={cartaoForm.ultimos_digitos} onChange={(e) => setCartaoForm((c) => ({ ...c, ultimos_digitos: e.target.value.replace(/\D/g, '').slice(0, 4) }))} required />
+              </div>
+              <div className="grid gap-3 md:grid-cols-3">
                 <select className="input w-full" value={cartaoForm.conta_bancaria_id} onChange={(e) => setCartaoForm((c) => ({ ...c, conta_bancaria_id: e.target.value }))}>
                   <option value="">Conta de pagamento opcional</option>
                   {contas.map((conta) => (
@@ -1015,7 +1032,7 @@ export default function FinanceiroCadastros() {
                     <div className="text-sm">
                       <div className="font-medium text-[var(--c-text)]">{cartao.nome}</div>
                       <div className="text-[var(--c-muted)]">
-                        {cartao.bandeira || 'Bandeira nao informada'} final {cartao.ultimos_digitos} - fecha dia {cartao.dia_fechamento}, vence dia {cartao.dia_vencimento}
+                        {labelTipoCartao(cartao.tipo)} - {cartao.bandeira || 'Bandeira nao informada'} final {cartao.ultimos_digitos} - fecha dia {cartao.dia_fechamento}, vence dia {cartao.dia_vencimento}
                       </div>
                     </div>
                     <div className="flex items-center gap-2">

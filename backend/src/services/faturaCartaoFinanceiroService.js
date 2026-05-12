@@ -92,6 +92,9 @@ async function obterOuCriarFaturaCartao({ cartaoId, dataCompra, parcelaOffset = 
   if (!cartao || cartao.ativo === false) {
     throw createHttpError(400, 'Cartao financeiro invalido ou inativo.');
   }
+  if (String(cartao.tipo || 'CREDITO').trim().toUpperCase() !== 'CREDITO') {
+    throw createHttpError(400, 'Somente cartoes de credito podem gerar fatura.');
+  }
 
   const datas = calcularDatasFatura(cartao, dataCompra, parcelaOffset);
   const [fatura] = await FaturaCartaoFinanceiro.findOrCreate({

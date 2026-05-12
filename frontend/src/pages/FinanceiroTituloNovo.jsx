@@ -79,6 +79,23 @@ function labelTipoTitulo(tipoTitulo) {
   return tipoTitulo === 'RECEBER' ? 'receber' : 'pagar';
 }
 
+function getTipoCartaoPorForma(forma) {
+  const value = `${forma?.tipo || ''} ${forma?.codigo || ''}`.toUpperCase();
+  if (value.includes('DEBITO')) return 'DEBITO';
+  if (value.includes('CREDITO')) return 'CREDITO';
+  return null;
+}
+
+function cartaoCompativelComForma(cartao, forma) {
+  const tipoEsperado = getTipoCartaoPorForma(forma);
+  if (!tipoEsperado) return true;
+  return String(cartao?.tipo || 'CREDITO').trim().toUpperCase() === tipoEsperado;
+}
+
+function labelTipoCartao(value) {
+  return String(value || 'CREDITO').trim().toUpperCase() === 'DEBITO' ? 'debito' : 'credito';
+}
+
 function getParceiroPixOptions(parceiro) {
   if (!parceiro) return [];
   return [
@@ -342,6 +359,10 @@ export default function FinanceiroTituloNovo() {
   const formaPagamentoSelecionada = useMemo(() => {
     return formasPagamento.find((item) => String(item.id) === String(form.forma_pagamento_id)) || null;
   }, [formasPagamento, form.forma_pagamento_id]);
+
+  const cartoesFiltradosPorForma = useMemo(() => {
+    return cartoes.filter((item) => item.ativo !== false && cartaoCompativelComForma(item, formaPagamentoSelecionada));
+  }, [cartoes, formaPagamentoSelecionada]);
 
   function preencherFavorecidoComParceiro(parceiro) {
     const pix = getParceiroPixPrincipal(parceiro);
@@ -654,10 +675,12 @@ export default function FinanceiroTituloNovo() {
                   value={form.forma_pagamento_id}
                   onChange={(event) => {
                     const forma = formasPagamento.find((item) => String(item.id) === String(event.target.value));
+                    const cartaoAtual = cartoes.find((item) => String(item.id) === String(form.cartao_id));
+                    const manterCartao = forma?.exige_cartao && cartaoAtual && cartaoCompativelComForma(cartaoAtual, forma);
                     setForm((current) => ({
                       ...current,
                       forma_pagamento_id: event.target.value,
-                      cartao_id: forma?.exige_cartao ? current.cartao_id : '',
+                      cartao_id: manterCartao ? current.cartao_id : '',
                       quantidade_parcelas: forma?.permite_parcelamento ? current.quantidade_parcelas : 1
                     }));
                   }}
@@ -682,9 +705,9 @@ export default function FinanceiroTituloNovo() {
                       required
                     >
                       <option value="">Selecione o cartao</option>
-                      {cartoes.filter((item) => item.ativo !== false).map((cartao) => (
+                      {cartoesFiltradosPorForma.map((cartao) => (
                         <option key={cartao.id} value={cartao.id}>
-                          {cartao.nome} final {cartao.ultimos_digitos}
+                          {cartao.nome} final {cartao.ultimos_digitos} ({labelTipoCartao(cartao.tipo)})
                         </option>
                       ))}
                     </select>

@@ -14,6 +14,11 @@ module.exports = (sequelize, DataTypes) => sequelize.define(
       type: DataTypes.STRING(160),
       allowNull: false
     },
+    tipo: {
+      type: DataTypes.STRING(20),
+      allowNull: false,
+      defaultValue: 'CREDITO'
+    },
     bandeira: {
       type: DataTypes.STRING(60),
       allowNull: true
