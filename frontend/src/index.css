@@ -4238,6 +4238,26 @@ input[type="file"]:disabled {
   backdrop-filter: blur(12px);
 }
 
+.app-summary-grid--compact {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.55rem;
+}
+
+.app-summary-grid--compact .app-summary-card {
+  min-height: 62px;
+  padding: 0.52rem 0.65rem;
+}
+
+.app-summary-grid--compact .app-summary-value {
+  margin-top: 0.22rem;
+  font-size: 0.94rem;
+}
+
+.app-summary-grid--compact .app-summary-subvalue {
+  margin-top: 0.08rem;
+  font-size: 0.68rem;
+}
+
 :root:not(.dark) .app-summary-card {
   background: rgba(255, 255, 255, 0.56);
   border-color: rgba(145, 176, 218, 0.42);

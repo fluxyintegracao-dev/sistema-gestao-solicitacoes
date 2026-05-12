@@ -14,7 +14,7 @@ import {
   obterUrlAssinadaCompra,
   responderCotacaoPublica
 } from '../../../services/compras';
-import { buscarParceiros, listarCategoriasParceiro } from '../../../services/parceiros';
+import { listarCategoriasParceiro } from '../../../services/parceiros';
 import { useAuth } from '../../../contexts/AuthContext';
 import CompraPreviewModal from '../components/CompraPreviewModal';
 import { criarPreviewCompra } from '../utils/preview';
@@ -451,10 +451,8 @@ function SecaoEnvioFornecedores({
   podeComprar,
   categoriasFornecedor,
   fornecedores,
-  fornecedoresAvulsos,
   buscandoFornecedores,
   fornecedoresSelecionados,
-  fornecedoresAvulsosSelecionados,
   novoFornecedor,
   categoriaFornecedorId,
   fornecedorBusca,
@@ -463,7 +461,6 @@ function SecaoEnvioFornecedores({
   onChangeCategoriaFornecedorId,
   onBuscarFornecedores,
   onToggleFornecedor,
-  onToggleFornecedorAvulso,
   onChangeNovoFornecedor,
   onCriarFornecedorRapido,
   onEnviarFornecedores,
@@ -472,19 +469,19 @@ function SecaoEnvioFornecedores({
   const [selecionandoPorCategoria, setSelecionandoPorCategoria] = useState(false);
   const [categoriaSelecionada, setCategoriaSelecionada] = useState('');
 
-  // Filtra fornecedores avulsos que possuem a categoria selecionada
-  const fornecedoresAvulsosComCategoria = useMemo(() => {
+  // Filtra fornecedores que possuem a categoria selecionada
+  const fornecedoresComCategoria = useMemo(() => {
     if (!categoriaSelecionada) return [];
-    return fornecedoresAvulsos.filter((f) => {
+    return fornecedores.filter((f) => {
       const cats = Array.isArray(f.categoria_insumos) ? f.categoria_insumos : [];
       return cats.some((c) => String(c).toLowerCase().includes(categoriaSelecionada.toLowerCase()));
     });
-  }, [fornecedoresAvulsos, categoriaSelecionada]);
+  }, [fornecedores, categoriaSelecionada]);
 
   function selecionarTodosComCategoria() {
-    const ids = fornecedoresAvulsosComCategoria.map((f) => String(f.id));
-    const novos = ids.filter((id) => !fornecedoresAvulsosSelecionados.includes(id));
-    novos.forEach((id) => onToggleFornecedorAvulso(id, true));
+    const ids = fornecedoresComCategoria.map((f) => String(f.id));
+    const novos = ids.filter((id) => !fornecedoresSelecionados.includes(id));
+    novos.forEach((id) => onToggleFornecedor(id, true));
     setSelecionandoPorCategoria(false);
     setCategoriaSelecionada('');
   }
@@ -494,9 +491,9 @@ function SecaoEnvioFornecedores({
     const links = [];
     const publicBase = window.location.origin;
 
-    // Fornecedores avulsos selecionados
-    fornecedoresAvulsosSelecionados.forEach((id) => {
-      const f = fornecedoresAvulsos.find((x) => String(x.id) === id);
+    // Fornecedores selecionados
+    fornecedoresSelecionados.forEach((id) => {
+      const f = fornecedores.find((x) => String(x.id) === id);
       if (!f?.whatsapp) return;
 
       // Encontra o token da cotação para este fornecedor (se já gerado)
@@ -511,7 +508,7 @@ function SecaoEnvioFornecedores({
     });
 
     return links;
-  }, [fornecedoresAvulsosSelecionados, fornecedoresAvulsos, solicitacao, itensCombinados]);
+  }, [fornecedoresSelecionados, fornecedores, solicitacao, itensCombinados]);
 
   // Links para fornecedores já vinculados com WhatsApp
   const linksVinculados = useMemo(() => {
@@ -586,24 +583,30 @@ function SecaoEnvioFornecedores({
                       type="button"
                       className="btn btn-primary text-sm"
                       onClick={selecionarTodosComCategoria}
-                      disabled={!categoriaSelecionada.trim() || !fornecedoresAvulsosComCategoria.length}
+                      disabled={!categoriaSelecionada.trim() || !fornecedoresComCategoria.length}
                     >
-                      Selecionar {fornecedoresAvulsosComCategoria.length > 0 ? `(${fornecedoresAvulsosComCategoria.length})` : ''}
+                      Selecionar {fornecedoresComCategoria.length > 0 ? `(${fornecedoresComCategoria.length})` : ''}
                     </button>
                   </div>
-                  {categoriaSelecionada && fornecedoresAvulsosComCategoria.length === 0 && (
+                  {categoriaSelecionada && fornecedoresComCategoria.length === 0 && (
                     <p className="text-xs text-blue-600">Nenhum fornecedor cadastrado com esta categoria.</p>
                   )}
                 </div>
               )}
 
-              {/* Parceiros */}
               <div>
-                <div className="mb-2 text-sm font-medium">Parceiros cadastrados como fornecedores</div>
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-sm font-medium">Fornecedores</span>
+                  {fornecedoresSelecionados.length > 0 && (
+                    <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
+                      {fornecedoresSelecionados.length} selecionado(s)
+                    </span>
+                  )}
+                </div>
                 <div className="mb-3 grid gap-2 md:grid-cols-[minmax(0,1fr)_200px_auto]">
                   <input
                     className="input"
-                    placeholder="Buscar por nome ou CPF/CNPJ"
+                    placeholder="Buscar por nome, CNPJ, email ou contato"
                     value={fornecedorBusca}
                     onChange={(e) => onChangeFornecedorBusca(e.target.value)}
                   />
@@ -625,7 +628,7 @@ function SecaoEnvioFornecedores({
                   {buscandoFornecedores ? (
                     <div className="text-sm text-[var(--c-muted)]">Buscando...</div>
                   ) : fornecedores.length === 0 ? (
-                    <div className="text-sm text-[var(--c-muted)]">Nenhum parceiro fornecedor encontrado.</div>
+                    <div className="text-sm text-[var(--c-muted)]">Nenhum fornecedor encontrado.</div>
                   ) : (
                     fornecedores.map((f) => (
                       <label key={f.id} className="app-list-card flex items-start gap-2 px-3 py-2">
@@ -636,35 +639,9 @@ function SecaoEnvioFornecedores({
                         />
                         <div>
                           <div className="font-medium">{f.nome}</div>
-                          <div className="text-xs text-[var(--c-muted)]">
-                            {f.email || 'Sem email'} {f.telefone ? ` · ${f.telefone}` : ''}
-                          </div>
-                        </div>
-                      </label>
-                    ))
-                  )}
-                </div>
-              </div>
-
-              {/* Fornecedores avulsos */}
-              <div>
-                <div className="mb-2 text-sm font-medium">Fornecedores avulsos</div>
-                <div className="app-list-stack max-h-[180px] overflow-y-auto rounded-xl border border-[var(--c-border)] bg-white/70 p-3">
-                  {fornecedoresAvulsos.length === 0 ? (
-                    <div className="text-sm text-[var(--c-muted)]">Nenhum fornecedor avulso. Use o cadastro rapido ao lado.</div>
-                  ) : (
-                    fornecedoresAvulsos.map((f) => (
-                      <label key={f.id} className="app-list-card flex items-start gap-2 px-3 py-2">
-                        <input
-                          type="checkbox"
-                          checked={fornecedoresAvulsosSelecionados.includes(String(f.id))}
-                          onChange={(e) => onToggleFornecedorAvulso(String(f.id), e.target.checked)}
-                        />
-                        <div>
-                          <div className="font-medium">{f.nome}</div>
-                          <div className="text-xs text-[var(--c-muted)]">
-                            {f.whatsapp ? `WhatsApp: ${f.whatsapp}` : ''} {f.email || ''}
-                          </div>
+                          {f.whatsapp && (
+                            <div className="text-xs text-[var(--c-muted)]">WhatsApp: {f.whatsapp}</div>
+                          )}
                           {Array.isArray(f.categoria_insumos) && f.categoria_insumos.length > 0 && (
                             <div className="flex flex-wrap gap-1 mt-1">
                               {f.categoria_insumos.map((c) => (
@@ -672,6 +649,9 @@ function SecaoEnvioFornecedores({
                               ))}
                             </div>
                           )}
+                          <div className="text-xs text-[var(--c-muted)]">
+                            {f.email || 'Sem email'} {f.telefone ? ` · ${f.telefone}` : ''}
+                          </div>
                         </div>
                       </label>
                     ))
@@ -945,7 +925,6 @@ export default function SolicitacaoCompraDetalheView() {
   const { user } = useAuth();
   const [solicitacao, setSolicitacao] = useState(null);
   const [fornecedores, setFornecedores] = useState([]);
-  const [fornecedoresAvulsos, setFornecedoresAvulsos] = useState([]);
   const [categoriasFornecedor, setCategoriasFornecedor] = useState([]);
   const [categoriaFornecedorId, setCategoriaFornecedorId] = useState('');
   const [fornecedorBusca, setFornecedorBusca] = useState('');
@@ -961,7 +940,6 @@ export default function SolicitacaoCompraDetalheView() {
   const [criandoPedidoFornecedorId, setCriandoPedidoFornecedorId] = useState(null);
   const [numeroSienge, setNumeroSienge] = useState('');
   const [fornecedoresSelecionados, setFornecedoresSelecionados] = useState([]);
-  const [fornecedoresAvulsosSelecionados, setFornecedoresAvulsosSelecionados] = useState([]);
   const [novoFornecedor, setNovoFornecedor] = useState({ nome: '', email: '', whatsapp: '', contato: '' });
   const [vencedoresSelecionados, setVencedoresSelecionados] = useState({});
   const [cotacaoRevisaoArquivo, setCotacaoRevisaoArquivo] = useState(null);
@@ -983,10 +961,13 @@ export default function SolicitacaoCompraDetalheView() {
   async function carregarFornecedores() {
     try {
       setBuscandoFornecedores(true);
-      const params = { fornecedor: 1, limit: 200 };
-      if (categoriaFornecedorId) params.categoria_id = categoriaFornecedorId;
+      const params = { limit: 200 };
+      if (categoriaFornecedorId) {
+        const categoria = categoriasFornecedor.find((item) => String(item.id) === String(categoriaFornecedorId));
+        if (categoria?.nome) params.categoria = categoria.nome;
+      }
       if (fornecedorBusca.trim()) params.q = fornecedorBusca.trim();
-      const data = await buscarParceiros(params);
+      const data = await listarFornecedoresCompra(params);
       setFornecedores(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error(error);
@@ -999,16 +980,14 @@ export default function SolicitacaoCompraDetalheView() {
   async function carregarTudo() {
     try {
       setLoading(true);
-      const [dataSolicitacao, dataCategorias, dataAvulsos] = await Promise.all([
+      const [dataSolicitacao, dataCategorias] = await Promise.all([
         obterSolicitacaoCompra(id),
-        listarCategoriasParceiro(),
-        listarFornecedoresCompra({ somente_avulsos: 1 })
+        listarCategoriasParceiro()
       ]);
 
       setSolicitacao(dataSolicitacao || null);
       setNumeroSienge(dataSolicitacao?.numero_sienge || '');
       setCategoriasFornecedor(Array.isArray(dataCategorias) ? dataCategorias : []);
-      setFornecedoresAvulsos(Array.isArray(dataAvulsos) ? dataAvulsos : []);
       await carregarFornecedores();
 
       if ((dataSolicitacao?.fornecedores || []).length > 0) {
@@ -1140,8 +1119,7 @@ export default function SolicitacaoCompraDetalheView() {
   async function handleEnviarFornecedores() {
     try {
       const payload = [];
-      fornecedoresSelecionados.forEach((fornecedorId) => payload.push({ parceiro_id: Number(fornecedorId) }));
-      fornecedoresAvulsosSelecionados.forEach((fornecedorId) => payload.push({ fornecedor_id: Number(fornecedorId) }));
+      fornecedoresSelecionados.forEach((fornecedorId) => payload.push({ fornecedor_id: Number(fornecedorId) }));
       if (String(novoFornecedor.nome || '').trim()) {
         payload.push({ nome: novoFornecedor.nome, email: novoFornecedor.email, whatsapp: novoFornecedor.whatsapp, contato: novoFornecedor.contato });
       }
@@ -1150,7 +1128,6 @@ export default function SolicitacaoCompraDetalheView() {
       setEnviandoFornecedores(true);
       await enviarSolicitacaoCompraParaFornecedores(id, { fornecedores: payload });
       setFornecedoresSelecionados([]);
-      setFornecedoresAvulsosSelecionados([]);
       setNovoFornecedor({ nome: '', email: '', whatsapp: '', contato: '' });
       await carregarTudo();
       alert('Links de cotacao gerados. Use os botoes de WhatsApp para enviar a mensagem a cada fornecedor.');
@@ -1166,8 +1143,8 @@ export default function SolicitacaoCompraDetalheView() {
     try {
       if (!String(novoFornecedor.nome || '').trim()) { alert('Informe o nome do fornecedor.'); return; }
       const fornecedor = await criarFornecedorCompra(novoFornecedor);
-      setFornecedoresAvulsos((atual) => [...atual, fornecedor].sort((a, b) => String(a.nome).localeCompare(String(b.nome))));
-      setFornecedoresAvulsosSelecionados((atual) => [...atual, String(fornecedor.id)]);
+      setFornecedores((atual) => [...atual, fornecedor].sort((a, b) => String(a.nome).localeCompare(String(b.nome))));
+      setFornecedoresSelecionados((atual) => [...atual, String(fornecedor.id)]);
       setNovoFornecedor({ nome: '', email: '', whatsapp: '', contato: '' });
       alert('Fornecedor criado e selecionado.');
     } catch (error) {
@@ -1260,7 +1237,7 @@ export default function SolicitacaoCompraDetalheView() {
           </div>
         </div>
 
-        <div className="app-summary-grid">
+        <div className="app-summary-grid app-summary-grid--compact">
           <div className="app-summary-card">
             <div className="app-summary-label">Status</div>
             <div className="app-summary-value">
@@ -1294,7 +1271,7 @@ export default function SolicitacaoCompraDetalheView() {
           {/* Resumo operacional */}
           <div className="card sol-surface-card">
             <div className="card-header"><h2 className="font-semibold">Resumo</h2></div>
-            <div className="app-summary-grid">
+            <div className="app-summary-grid app-summary-grid--compact">
               {!isAvulsa && (
                 <div className="app-summary-card">
                   <div className="app-summary-label">Integrado Sienge</div>
@@ -1396,10 +1373,8 @@ export default function SolicitacaoCompraDetalheView() {
               podeComprar={podeComprar}
               categoriasFornecedor={categoriasFornecedor}
               fornecedores={fornecedores}
-              fornecedoresAvulsos={fornecedoresAvulsos}
               buscandoFornecedores={buscandoFornecedores}
               fornecedoresSelecionados={fornecedoresSelecionados}
-              fornecedoresAvulsosSelecionados={fornecedoresAvulsosSelecionados}
               novoFornecedor={novoFornecedor}
               categoriaFornecedorId={categoriaFornecedorId}
               fornecedorBusca={fornecedorBusca}
@@ -1409,9 +1384,6 @@ export default function SolicitacaoCompraDetalheView() {
               onBuscarFornecedores={carregarFornecedores}
               onToggleFornecedor={(id, checked) =>
                 setFornecedoresSelecionados((prev) => checked ? [...prev, id] : prev.filter((x) => x !== id))
-              }
-              onToggleFornecedorAvulso={(id, checked) =>
-                setFornecedoresAvulsosSelecionados((prev) => checked ? [...prev, id] : prev.filter((x) => x !== id))
               }
               onChangeNovoFornecedor={(field, value) => setNovoFornecedor((prev) => ({ ...prev, [field]: value }))}
               onCriarFornecedorRapido={handleCriarFornecedorRapido}
