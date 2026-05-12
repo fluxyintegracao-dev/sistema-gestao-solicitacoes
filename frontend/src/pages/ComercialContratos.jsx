@@ -372,6 +372,13 @@ function getModoComposicaoLabel(modo, modos = MODOS_COMPOSICAO) {
   return getOptionLabel(modos.find((item) => getOptionValue(item) === modo)) || 'Composicao';
 }
 
+function getModoComposicaoTipo(modo) {
+  const normalized = String(modo || '').trim().toUpperCase();
+  if (normalized === 'ENTRADA') return 'ENTRADA';
+  if (normalized === 'PERIODICO') return 'PERIODICO';
+  return 'MANUAL';
+}
+
 function buildParcelaCustomizada(index = 1, overrides = {}) {
   return {
     descricao: `Parcela ${index}`,
@@ -499,7 +506,8 @@ function clearStoredContratoDraft() {
 }
 
 function resolveGeneratorByModo(modo, current = {}) {
-  if (modo === 'ENTRADA') {
+  const tipoModo = getModoComposicaoTipo(modo);
+  if (tipoModo === 'ENTRADA') {
     return {
       ...current,
       modo,
@@ -514,6 +522,7 @@ function resolveGeneratorByModo(modo, current = {}) {
 }
 
 function gerarParcelasDoBloco(plano = {}, planoId = '', periodicidades = PERIODICIDADES) {
+  const tipoModo = getModoComposicaoTipo(plano.modo);
   const formaRecebimento = plano.forma_recebimento_prevista || '';
   const tituloBase = String(plano.titulo_bloco || '').trim();
   const tipoParcelaPadrao = plano.tipo_parcela || 'PARCELA';
@@ -529,7 +538,7 @@ function gerarParcelasDoBloco(plano = {}, planoId = '', periodicidades = PERIODI
     };
   }
 
-  if (plano.modo === 'ENTRADA') {
+  if (tipoModo === 'ENTRADA') {
     const valorEntrada = toNumber(plano.valor_parcela);
     if (valorEntrada <= 0 || !plano.primeiro_vencimento) {
       return { error: 'Informe valor e vencimento da entrada.' };
@@ -551,7 +560,7 @@ function gerarParcelasDoBloco(plano = {}, planoId = '', periodicidades = PERIODI
     };
   }
 
-  if (plano.modo === 'MANUAL') {
+  if (tipoModo === 'MANUAL') {
     const parcelas = (plano.parcelas_personalizadas || [])
       .map((item, index) => ({
         descricao: item.descricao || (tituloBase ? `${tituloBase} ${index + 1}` : `Lancamento ${index + 1}`),
@@ -787,7 +796,8 @@ export default function ComercialContratos() {
       };
 
       ensure(!modosComposicao.length || optionIsAvailable(modosComposicao, next.modo), { modo: firstOptionValue(modosComposicao, next.modo) });
-      if (next.modo !== 'ENTRADA') {
+      const tipoModo = getModoComposicaoTipo(next.modo);
+      if (tipoModo !== 'ENTRADA') {
         ensure(!parcelaTipos.length || optionIsAvailable(parcelaTipos, next.tipo_parcela), { tipo_parcela: firstOptionValue(parcelaTipos, next.tipo_parcela) });
       }
       ensure(!formasRecebimento.length || !next.forma_recebimento_prevista || optionIsAvailable(formasRecebimento, next.forma_recebimento_prevista), {
@@ -796,7 +806,7 @@ export default function ComercialContratos() {
       ensure(!parcelaReajusteTipos.length || optionIsAvailable(parcelaReajusteTipos, next.reajuste_tipo), {
         reajuste_tipo: firstOptionValue(parcelaReajusteTipos, next.reajuste_tipo)
       });
-      if (next.modo === 'PERIODICO') {
+      if (tipoModo === 'PERIODICO') {
         ensure(!periodicidades.length || optionIsAvailable(periodicidades, next.periodicidade), {
           periodicidade: firstOptionValue(periodicidades, next.periodicidade)
         });
@@ -1962,7 +1972,7 @@ export default function ComercialContratos() {
                 </label>
                 <label className="sol-filter-field">
                   <span className="sol-filter-label">Tipo da parcela</span>
-                  <select className="input w-full" value={generator.tipo_parcela} onChange={(e) => setGenerator((c) => ({ ...c, tipo_parcela: e.target.value }))} disabled={generator.modo === 'ENTRADA'}>
+                  <select className="input w-full" value={generator.tipo_parcela} onChange={(e) => setGenerator((c) => ({ ...c, tipo_parcela: e.target.value }))} disabled={getModoComposicaoTipo(generator.modo) === 'ENTRADA'}>
                     {parcelaTipos.map((tipo) => <option key={getOptionValue(tipo)} value={getOptionValue(tipo)}>{getOptionLabel(tipo)}</option>)}
                   </select>
                 </label>
@@ -1996,7 +2006,7 @@ export default function ComercialContratos() {
                 </label>
               )}
 
-              {generator.modo === 'ENTRADA' ? (
+              {getModoComposicaoTipo(generator.modo) === 'ENTRADA' ? (
                 <div className="grid gap-3 md:grid-cols-2">
                   <label className="sol-filter-field">
                     <span className="sol-filter-label">Valor da entrada</span>
@@ -2007,7 +2017,7 @@ export default function ComercialContratos() {
                     <input className="input w-full" type="date" value={generator.primeiro_vencimento} onChange={(e) => setGenerator((c) => ({ ...c, primeiro_vencimento: e.target.value }))} />
                   </label>
                 </div>
-              ) : generator.modo === 'PERIODICO' ? (
+              ) : getModoComposicaoTipo(generator.modo) === 'PERIODICO' ? (
                 <div className="grid gap-3 md:grid-cols-4">
                   <label className="sol-filter-field">
                     <span className="sol-filter-label">Periodicidade</span>
