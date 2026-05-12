@@ -12,16 +12,20 @@ import {
 } from 'react-icons/hi2';
 import { useAuth } from '../contexts/AuthContext';
 import {
+  baixarTituloFinanceiro,
   getCategoriasFinanceiras,
+  getContasBancarias,
   getTitulosFinanceiros
 } from '../services/financeiro';
 import { getMinhasObras } from '../services/obras';
 import { buscarParceiros } from '../services/parceiros';
 import { canViewIntegracaoSienge } from '../utils/acessoProduto';
+import { normalizeCurrencyTyping } from '../utils/formatters';
 import ParceiroAutocomplete from '../components/ui/ParceiroAutocomplete';
 
 const FILTER_STORAGE_KEY = 'fluxy.financeiro.titulos.filters';
 const FILTER_VISIBILITY_STORAGE_PREFIX = 'fluxy.financeiro.titulos.visibleFilters';
+const FORMAS_RECEBIMENTO = ['DINHEIRO', 'PIX', 'CARTAO', 'TRANSFERENCIA', 'BOLETO', 'CHEQUE', 'PERMUTA', 'BENS', 'OUTROS'];
 
 const FILTER_DEFINITIONS = [
   { id: 'codigo', label: 'Titulo', group: 'basic', span: 'xl:col-span-2' },
@@ -145,6 +149,30 @@ function getOrigemTitulo(titulo) {
   return 'Manual';
 }
 
+function today() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function contaBancariaObrigatoria(formaRecebimento) {
+  return !['DINHEIRO', 'CARTAO', 'PERMUTA', 'BENS', 'OUTROS'].includes(String(formaRecebimento || '').toUpperCase());
+}
+
+function isTituloBaixavel(titulo) {
+  return ['ABERTO', 'PARCIAL'].includes(String(titulo?.status || '').trim().toUpperCase()) && Number(titulo?.valor_saldo || 0) > 0;
+}
+
+function buildBaixaMassaForm(contasBancarias = []) {
+  return {
+    conta_bancaria_id: String(contasBancarias?.[0]?.id || ''),
+    forma_recebimento: '',
+    juros: '',
+    multa: '',
+    desconto: '',
+    data_movimento: today(),
+    observacoes: ''
+  };
+}
+
 export default function FinanceiroTitulos() {
   const { user } = useAuth();
   const [saveFilterCache, setSaveFilterCache] = useState(true);
@@ -163,10 +191,15 @@ export default function FinanceiroTitulos() {
   const [obras, setObras] = useState([]);
   const [parceiros, setParceiros] = useState([]);
   const [categorias, setCategorias] = useState([]);
+  const [contasBancarias, setContasBancarias] = useState([]);
   const [titulos, setTitulos] = useState([]);
   const [loading, setLoading] = useState(false);
   const [loadingOptions, setLoadingOptions] = useState(true);
   const [error, setError] = useState('');
+  const [selectedTituloIds, setSelectedTituloIds] = useState([]);
+  const [modalBaixaMassaOpen, setModalBaixaMassaOpen] = useState(false);
+  const [baixaMassaForm, setBaixaMassaForm] = useState(() => buildBaixaMassaForm([]));
+  const [savingBaixaMassa, setSavingBaixaMassa] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -175,13 +208,20 @@ export default function FinanceiroTitulos() {
     Promise.all([
       getMinhasObras({ modo: 'FINANCEIRO' }).catch(() => []),
       buscarParceiros({ ativo: true, limit: 200 }).catch(() => []),
-      getCategoriasFinanceiras().catch(() => [])
+      getCategoriasFinanceiras().catch(() => []),
+      getContasBancarias().catch(() => [])
     ])
-      .then(([obrasData, parceirosData, categoriasData]) => {
+      .then(([obrasData, parceirosData, categoriasData, contasData]) => {
         if (!active) return;
         setObras(Array.isArray(obrasData) ? obrasData : []);
         setParceiros(Array.isArray(parceirosData) ? parceirosData : []);
         setCategorias(Array.isArray(categoriasData) ? categoriasData : []);
+        const contasNormalizadas = Array.isArray(contasData) ? contasData : [];
+        setContasBancarias(contasNormalizadas);
+        setBaixaMassaForm((current) => ({
+          ...current,
+          conta_bancaria_id: current.conta_bancaria_id || String(contasNormalizadas?.[0]?.id || '')
+        }));
       })
       .finally(() => {
         if (active) {
@@ -214,6 +254,7 @@ export default function FinanceiroTitulos() {
       .then((data) => {
         if (active) {
           setTitulos(Array.isArray(data) ? data : []);
+          setSelectedTituloIds([]);
         }
       })
       .catch((err) => {
@@ -267,7 +308,7 @@ export default function FinanceiroTitulos() {
   }), [titulos]);
 
   const mostraColunaSienge = canViewIntegracaoSienge(user);
-  const totalColunas = mostraColunaSienge ? 14 : 13;
+  const totalColunas = mostraColunaSienge ? 15 : 14;
   const hasConsulted = Boolean(appliedFilters);
   const visibleFilterSet = useMemo(() => new Set(visibleFilterIds), [visibleFilterIds]);
   const basicVisibleFilters = useMemo(
@@ -283,6 +324,18 @@ export default function FinanceiroTitulos() {
   const parceiroLabel = draftFilters.tipo === 'PAGAR' ? 'Credor' : 'Cliente';
   const parceiroResultadoLabel = tipoReferencia === 'PAGAR' ? 'Credor' : 'Cliente';
   const categoriasLabel = draftFilters.tipo === 'PAGAR' ? 'contas a pagar' : 'contas a receber';
+  const titulosBaixaveis = useMemo(() => titulos.filter(isTituloBaixavel), [titulos]);
+  const selectedTituloSet = useMemo(() => new Set(selectedTituloIds.map((id) => Number(id))), [selectedTituloIds]);
+  const selectedTitulos = useMemo(
+    () => titulos.filter((titulo) => selectedTituloSet.has(Number(titulo.id))),
+    [titulos, selectedTituloSet]
+  );
+  const selectedTitulosBaixaveis = useMemo(() => selectedTitulos.filter(isTituloBaixavel), [selectedTitulos]);
+  const selectedSaldo = useMemo(() => selectedTitulosBaixaveis.reduce(
+    (total, titulo) => total + Number(titulo.valor_saldo || 0),
+    0
+  ), [selectedTitulosBaixaveis]);
+  const allBaixaveisSelected = titulosBaixaveis.length > 0 && titulosBaixaveis.every((titulo) => selectedTituloSet.has(Number(titulo.id)));
 
   function setFilter(name, value) {
     setDraftFilters((current) => ({
@@ -300,6 +353,7 @@ export default function FinanceiroTitulos() {
     setTitulos([]);
     setLoading(false);
     setError('');
+    setSelectedTituloIds([]);
   }
 
   function submitFilters(event) {
@@ -328,7 +382,94 @@ export default function FinanceiroTitulos() {
     setTitulos([]);
     setLoading(false);
     setError('');
+    setSelectedTituloIds([]);
     localStorage.removeItem(FILTER_STORAGE_KEY);
+  }
+
+  function toggleTituloSelecionado(titulo, checked) {
+    if (!isTituloBaixavel(titulo)) return;
+    const tituloId = Number(titulo.id);
+    setSelectedTituloIds((current) => {
+      const set = new Set(current.map((id) => Number(id)));
+      if (checked) {
+        set.add(tituloId);
+      } else {
+        set.delete(tituloId);
+      }
+      return Array.from(set);
+    });
+  }
+
+  function toggleTodosBaixaveis(checked) {
+    setSelectedTituloIds(checked ? titulosBaixaveis.map((titulo) => Number(titulo.id)) : []);
+  }
+
+  function abrirModalBaixaMassa() {
+    if (selectedTitulosBaixaveis.length === 0) {
+      setError('Selecione ao menos um titulo em aberto ou parcial para baixar.');
+      return;
+    }
+
+    setError('');
+    setBaixaMassaForm(buildBaixaMassaForm(contasBancarias));
+    setModalBaixaMassaOpen(true);
+  }
+
+  async function handleBaixaMassaSubmit(event) {
+    event.preventDefault();
+    if (selectedTitulosBaixaveis.length === 0) {
+      setError('Selecione ao menos um titulo em aberto ou parcial para baixar.');
+      return;
+    }
+
+    if (!baixaMassaForm.forma_recebimento) {
+      setError('Informe a forma de recebimento/pagamento da baixa em massa.');
+      return;
+    }
+
+    if (contaBancariaObrigatoria(baixaMassaForm.forma_recebimento) && !baixaMassaForm.conta_bancaria_id) {
+      setError('Conta bancaria e obrigatoria para esta forma de baixa.');
+      return;
+    }
+
+    try {
+      setSavingBaixaMassa(true);
+      setError('');
+
+      const falhas = [];
+      for (const titulo of selectedTitulosBaixaveis) {
+        try {
+          await baixarTituloFinanceiro(titulo.id, {
+            conta_bancaria_id: baixaMassaForm.conta_bancaria_id || null,
+            forma_recebimento: baixaMassaForm.forma_recebimento,
+            valor: Number(titulo.valor_saldo || 0),
+            juros: baixaMassaForm.juros || 0,
+            multa: baixaMassaForm.multa || 0,
+            desconto: baixaMassaForm.desconto || 0,
+            data_movimento: baixaMassaForm.data_movimento,
+            observacoes: baixaMassaForm.observacoes || `Baixa em massa registrada pela tela de titulos.`
+          });
+        } catch (err) {
+          falhas.push(`${getTituloCodigo(titulo)}: ${err?.message || 'erro ao baixar'}`);
+        }
+      }
+
+      const data = await getTitulosFinanceiros(compactFilters(pickVisibleFilters(appliedFilters, visibleFilterIds)));
+      setTitulos(Array.isArray(data) ? data : []);
+      setSelectedTituloIds([]);
+      setModalBaixaMassaOpen(false);
+
+      if (falhas.length > 0) {
+        setError(`Alguns titulos nao foram baixados: ${falhas.join(' | ')}`);
+      } else {
+        setError('');
+        alert(`${selectedTitulosBaixaveis.length} titulo(s) baixado(s) com sucesso.`);
+      }
+    } catch (err) {
+      setError(err?.message || 'Erro ao registrar baixas em massa.');
+    } finally {
+      setSavingBaixaMassa(false);
+    }
   }
 
   function persistVisibleFilters(nextIds) {
@@ -721,16 +862,50 @@ export default function FinanceiroTitulos() {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              onClick={abrirModalBaixaMassa}
+              disabled={selectedTitulosBaixaveis.length === 0 || savingBaixaMassa}
+              title="Baixar titulos selecionados"
+            >
+              Baixar selecionados
+              {selectedTitulosBaixaveis.length > 0 ? ` (${selectedTitulosBaixaveis.length})` : ''}
+            </button>
             <Link to="/financeiro/cadastros" className="btn btn-outline btn-sm">Cadastros</Link>
             <Link to="/financeiro/baixas" className="btn btn-outline btn-sm">Baixas</Link>
             <Link to="/financeiro/relatorios" className="btn btn-outline btn-sm">Gerar relatorio</Link>
           </div>
         </div>
 
+        {selectedTitulosBaixaveis.length > 0 ? (
+          <div className="flex flex-col gap-2 border-b border-[var(--c-border)] bg-[var(--c-bg)]/70 px-3 py-2 text-xs md:flex-row md:items-center md:justify-between">
+            <div className="font-medium text-[var(--c-text)]">
+              {selectedTitulosBaixaveis.length} titulo(s) selecionado(s) para baixa em massa
+            </div>
+            <div className="flex flex-wrap items-center gap-2 text-[var(--c-muted)]">
+              <span>Saldo selecionado: <strong className="text-[var(--c-text)]">{formatCurrency(selectedSaldo)}</strong></span>
+              <button type="button" className="btn btn-outline btn-sm" onClick={() => setSelectedTituloIds([])}>
+                Limpar selecao
+              </button>
+            </div>
+          </div>
+        ) : null}
+
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
               <tr className="border-b border-[var(--c-border)] bg-[var(--c-bg)]">
+                <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wide text-[var(--c-muted)] whitespace-nowrap">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 accent-[var(--c-primary)]"
+                    checked={allBaixaveisSelected}
+                    disabled={titulosBaixaveis.length === 0}
+                    onChange={(event) => toggleTodosBaixaveis(event.target.checked)}
+                    title="Selecionar todos os titulos filtrados baixaveis"
+                  />
+                </th>
                 {[
                   'Titulo',
                   'Status',
@@ -794,8 +969,20 @@ export default function FinanceiroTitulos() {
               {!loading && titulos.map((titulo) => (
                 <tr
                   key={titulo.id}
-                  className={`align-top transition-colors hover:bg-[var(--c-bg)] ${isOverdue(titulo) ? 'bg-rose-50/40' : ''}`}
+                  className={`align-top transition-colors hover:bg-[var(--c-bg)] ${
+                    selectedTituloSet.has(Number(titulo.id)) ? 'bg-blue-50/60' : isOverdue(titulo) ? 'bg-rose-50/40' : ''
+                  }`}
                 >
+                  <td className="px-3 py-2 whitespace-nowrap">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 accent-[var(--c-primary)]"
+                      checked={selectedTituloSet.has(Number(titulo.id))}
+                      disabled={!isTituloBaixavel(titulo)}
+                      onChange={(event) => toggleTituloSelecionado(titulo, event.target.checked)}
+                      title={isTituloBaixavel(titulo) ? 'Selecionar titulo para baixa' : 'Somente titulos abertos ou parciais podem ser baixados'}
+                    />
+                  </td>
                   <td className="px-3 py-2 whitespace-nowrap">
                     <Link
                       className="font-semibold text-[var(--c-primary)] hover:underline"
@@ -879,6 +1066,138 @@ export default function FinanceiroTitulos() {
           </table>
         </div>
       </div>
+
+      {modalBaixaMassaOpen ? (
+        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-slate-950/45 px-4 py-6 backdrop-blur-sm">
+          <form
+            className="w-full max-w-2xl rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-5 shadow-2xl"
+            onSubmit={handleBaixaMassaSubmit}
+          >
+            <div className="flex items-start justify-between gap-3 border-b border-[var(--c-border)] pb-3">
+              <div>
+                <h2 className="text-lg font-semibold text-[var(--c-text)]">Baixa em massa</h2>
+                <p className="text-xs text-[var(--c-muted)]">
+                  {selectedTitulosBaixaveis.length} titulo(s), saldo total {formatCurrency(selectedSaldo)}.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="rounded-md p-1 text-[var(--c-muted)] hover:bg-[var(--c-bg)] hover:text-[var(--c-text)]"
+                onClick={() => setModalBaixaMassaOpen(false)}
+                disabled={savingBaixaMassa}
+                title="Fechar"
+              >
+                <HiOutlineXMark className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              <label className="app-filter-field">
+                <span className="app-filter-label">Data da baixa</span>
+                <input
+                  className="input w-full input-sm"
+                  type="date"
+                  value={baixaMassaForm.data_movimento}
+                  onChange={(event) => setBaixaMassaForm((current) => ({ ...current, data_movimento: event.target.value }))}
+                  required
+                />
+              </label>
+
+              <label className="app-filter-field">
+                <span className="app-filter-label">Forma</span>
+                <select
+                  className="input w-full input-sm"
+                  value={baixaMassaForm.forma_recebimento}
+                  onChange={(event) => setBaixaMassaForm((current) => ({ ...current, forma_recebimento: event.target.value }))}
+                  required
+                >
+                  <option value="">Selecione</option>
+                  {FORMAS_RECEBIMENTO.map((forma) => (
+                    <option key={forma} value={forma}>{forma}</option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="app-filter-field md:col-span-2">
+                <span className="app-filter-label">Conta bancaria</span>
+                <select
+                  className="input w-full input-sm"
+                  value={baixaMassaForm.conta_bancaria_id}
+                  onChange={(event) => setBaixaMassaForm((current) => ({ ...current, conta_bancaria_id: event.target.value }))}
+                  required={contaBancariaObrigatoria(baixaMassaForm.forma_recebimento)}
+                  disabled={!contaBancariaObrigatoria(baixaMassaForm.forma_recebimento)}
+                >
+                  <option value="">Sem conta bancaria</option>
+                  {contasBancarias.map((conta) => (
+                    <option key={conta.id} value={conta.id}>
+                      {conta.nome}
+                      {conta.banco ? ` - ${conta.banco}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="app-filter-field">
+                <span className="app-filter-label">Juros por titulo</span>
+                <input
+                  className="input w-full input-sm"
+                  value={baixaMassaForm.juros}
+                  onChange={(event) => setBaixaMassaForm((current) => ({ ...current, juros: normalizeCurrencyTyping(event.target.value) }))}
+                  placeholder="0,00"
+                />
+              </label>
+
+              <label className="app-filter-field">
+                <span className="app-filter-label">Multa por titulo</span>
+                <input
+                  className="input w-full input-sm"
+                  value={baixaMassaForm.multa}
+                  onChange={(event) => setBaixaMassaForm((current) => ({ ...current, multa: normalizeCurrencyTyping(event.target.value) }))}
+                  placeholder="0,00"
+                />
+              </label>
+
+              <label className="app-filter-field md:col-span-2">
+                <span className="app-filter-label">Desconto por titulo</span>
+                <input
+                  className="input w-full input-sm"
+                  value={baixaMassaForm.desconto}
+                  onChange={(event) => setBaixaMassaForm((current) => ({ ...current, desconto: normalizeCurrencyTyping(event.target.value) }))}
+                  placeholder="0,00"
+                />
+              </label>
+
+              <label className="app-filter-field md:col-span-2">
+                <span className="app-filter-label">Observacoes</span>
+                <textarea
+                  className="input min-h-[92px] w-full"
+                  value={baixaMassaForm.observacoes}
+                  onChange={(event) => setBaixaMassaForm((current) => ({ ...current, observacoes: event.target.value }))}
+                  placeholder="Ex.: Baixa em massa conforme extrato bancario."
+                />
+              </label>
+            </div>
+
+            <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              Cada titulo sera baixado pelo saldo atual. Juros, multa e desconto informados aqui serao aplicados individualmente em cada titulo.
+            </div>
+
+            <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                onClick={() => setModalBaixaMassaOpen(false)}
+                disabled={savingBaixaMassa}
+              >
+                Cancelar
+              </button>
+              <button type="submit" className="btn btn-primary btn-sm" disabled={savingBaixaMassa}>
+                {savingBaixaMassa ? 'Baixando...' : `Confirmar ${selectedTitulosBaixaveis.length} baixa(s)`}
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : null}
     </div>
   );
 }
