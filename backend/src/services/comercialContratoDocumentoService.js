@@ -967,7 +967,7 @@ function buildConjugeAssinaturaLines(dados = {}) {
 }
 
 function buildCompradoresAssinaturaLines(dados = {}) {
-  const assinaturaLinha = '__________________________________________________________________';
+  const assinaturaLinha = '________________________________________';
   const compradores = Array.isArray(dados?.compradores?.itens) && dados.compradores.itens.length
     ? dados.compradores.itens
     : [{ cliente: dados?.cliente, conjuge: dados?.conjuge }];
@@ -1078,7 +1078,7 @@ function applyContratoAssinaturasAutomation(zip, dados = {}) {
       }
 
       if (testemunha2.cpf && normalized.includes('178.544.147')) {
-        return buildParagraphLines([formatCpfAssinatura(testemunha2.cpf), 'TESTEMUNHA'], { align: 'center' });
+        return buildParagraphLines([formatCpfAssinatura(testemunha2.cpf)], { align: 'center' });
       }
 
       if (normalized === 'TESTEMUNHA') {
@@ -1164,6 +1164,12 @@ function getParcelaPeriodicidadeLabel(parcela = {}) {
   return PERIODICIDADE_LABELS[periodicidade] || periodicidade;
 }
 
+function getParcelaFormaRecebimentoLabel(parcela = {}) {
+  return safeString(parcela.forma_recebimento_prevista)
+    .trim()
+    .toUpperCase();
+}
+
 function normalizeDescricaoGrupoParcela(descricao = '') {
   return normalizeTextForMatch(descricao)
     .replace(/\b\d+\s*\/\s*\d+\b/g, '')
@@ -1185,12 +1191,22 @@ function buildQuadroResumoParcelas(parcelas = []) {
     const elemento = getParcelaElemento(parcela);
     const reajusteTipo = String(parcela.reajuste_tipo || 'FIXA').trim().toUpperCase() === 'REAJUSTAVEL' ? 'R' : 'F';
     const periodicidade = getParcelaPeriodicidade(parcela);
-    const key = `${elemento}-${reajusteTipo}-${periodicidade || normalizeDescricaoGrupoParcela(parcela.descricao)}`;
+    const formaRecebimento = getParcelaFormaRecebimentoLabel(parcela);
+    const descricaoGrupo = normalizeDescricaoGrupoParcela(parcela.descricao);
+    const key = [
+      elemento,
+      formaRecebimento,
+      reajusteTipo,
+      periodicidade,
+      descricaoGrupo
+    ].filter(Boolean).join('-');
     if (!grupos.has(key)) {
       grupos.set(key, {
         elemento,
+        forma_recebimento: formaRecebimento,
         reajuste_codigo: reajusteTipo,
         periodicidade,
+        descricao_grupo: descricaoGrupo,
         parcelas: []
       });
     }
@@ -1207,7 +1223,10 @@ function buildQuadroResumoParcelas(parcelas = []) {
 
     return {
       item: String(index + 1).padStart(2, '0'),
-      elemento: [grupo.elemento, PERIODICIDADE_LABELS[grupo.periodicidade] || grupo.periodicidade].filter(Boolean).join(' - '),
+      elemento: [
+        [grupo.elemento, grupo.forma_recebimento].filter(Boolean).join(' - '),
+        PERIODICIDADE_LABELS[grupo.periodicidade] || grupo.periodicidade
+      ].filter(Boolean),
       quantidade: String(parcelasGrupo.length).padStart(2, '0'),
       reajuste_codigo: grupo.reajuste_codigo,
       primeiro_vencimento: formatDateBr(primeiroVencimento),
@@ -1221,7 +1240,7 @@ function buildQuadroResumoParcelas(parcelas = []) {
     itens,
     texto: itens
       .map((item) =>
-        `${item.item} ${item.elemento} ${item.quantidade} ${item.reajuste_codigo} ${item.primeiro_vencimento} ${item.total_formatado} ${item.ultimo_vencimento}`
+        `${item.item} ${Array.isArray(item.elemento) ? item.elemento.join(' - ') : item.elemento} ${item.quantidade} ${item.reajuste_codigo} ${item.primeiro_vencimento} ${item.total_formatado} ${item.ultimo_vencimento}`
       )
       .join('\n')
   };
