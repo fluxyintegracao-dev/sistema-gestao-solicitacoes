@@ -78,6 +78,45 @@ function distribuirParcelas(valorTotal, quantidade) {
   });
 }
 
+function somarValores(values = []) {
+  return roundCurrency(values.reduce((acc, value) => acc + Number(value || 0), 0));
+}
+
+function getValoresParcelas({ valorTotal, quantidade, parcelas = [], contexto = 'pagamento' }) {
+  const quantidadeNormalizada = Math.max(Number(quantidade || 1), 1);
+  const parcelasArray = Array.isArray(parcelas) ? parcelas : [];
+  const temValoresInformados = parcelasArray.some((parcela) => parcela?.valor != null);
+
+  if (temValoresInformados) {
+    if (parcelasArray.length < quantidadeNormalizada) {
+      throw createHttpError(400, `Informe o valor de todas as parcelas do ${contexto}.`);
+    }
+
+    const valores = Array.from({ length: quantidadeNormalizada }, (_, index) => {
+      const valor = Number(parcelasArray[index]?.valor);
+      if (!Number.isFinite(valor) || valor <= 0) {
+        throw createHttpError(400, `Informe um valor valido para a parcela ${index + 1} do ${contexto}.`);
+      }
+      return roundCurrency(valor);
+    });
+
+    return valores;
+  }
+
+  const total = Number(valorTotal);
+  if (!Number.isFinite(total) || total <= 0) {
+    throw createHttpError(400, `Informe o valor do ${contexto}.`);
+  }
+
+  return distribuirParcelas(total, quantidadeNormalizada);
+}
+
+function assertValoresIguais({ atual, esperado, mensagem }) {
+  if (Math.abs(roundCurrency(atual) - roundCurrency(esperado)) > 0.009) {
+    throw createHttpError(400, mensagem);
+  }
+}
+
 function normalizarTipoTitulo(value) {
   return String(value || 'PAGAR').trim().toUpperCase();
 }
@@ -882,8 +921,8 @@ async function criarTituloPorSolicitacao(req, solicitacaoId, payload = {}) {
     throw createHttpError(400, 'Parceiro e obrigatorio para gerar o titulo.');
   }
 
-  const valorOriginal = Number(payload.valor != null ? payload.valor : solicitacao.valor);
-  if (!Number.isFinite(valorOriginal) || valorOriginal <= 0) {
+  const valorSolicitacao = Number(solicitacao.valor != null ? solicitacao.valor : payload.valor);
+  if (!Number.isFinite(valorSolicitacao) || valorSolicitacao <= 0) {
     throw createHttpError(400, 'Valor invalido para gerar o titulo.');
   }
 
@@ -893,74 +932,126 @@ async function criarTituloPorSolicitacao(req, solicitacaoId, payload = {}) {
   ]);
   validarCompatibilidadeParceiroTitulo(parceiro, tipo);
 
-  const formaPagamento = await validarFormaPagamentoFinanceira(payload.forma_pagamento_id, payload);
-  const quantidadeParcelas = Math.max(Number(payload.quantidade_parcelas || 1), 1);
-  const dataVencimento = payload.data_vencimento || solicitacao.data_vencimento;
-  const valoresParcelas = distribuirParcelas(valorOriginal, quantidadeParcelas);
-  const grupoParcelamentoId = quantidadeParcelas > 1 ? `PARC-${crypto.randomUUID()}` : null;
-  const dataCompra = payload.data_compra || payload.data_emissao || getHoje();
+  const pagamentosPayload = Array.isArray(payload.pagamentos) && payload.pagamentos.length > 0
+    ? payload.pagamentos
+    : [payload];
+
+  const pagamentos = [];
+  for (const [pagamentoIndex, pagamentoPayload] of pagamentosPayload.entries()) {
+    const formaPagamento = await validarFormaPagamentoFinanceira(pagamentoPayload.forma_pagamento_id, pagamentoPayload);
+    const quantidadeParcelas = Math.max(
+      Number(pagamentoPayload.quantidade_parcelas || pagamentoPayload.parcelas?.length || 1),
+      1
+    );
+    const dataCompra = pagamentoPayload.data_compra || payload.data_compra || payload.data_emissao || getHoje();
+    const dataVencimento = pagamentoPayload.data_vencimento || payload.data_vencimento || solicitacao.data_vencimento;
+    const parcelas = Array.isArray(pagamentoPayload.parcelas) ? pagamentoPayload.parcelas : [];
+    const valorPagamentoInformado = pagamentoPayload.valor != null
+      ? Number(pagamentoPayload.valor)
+      : pagamentosPayload.length === 1
+        ? valorSolicitacao
+        : undefined;
+    const valoresParcelas = getValoresParcelas({
+      valorTotal: valorPagamentoInformado,
+      quantidade: quantidadeParcelas,
+      parcelas,
+      contexto: `pagamento ${pagamentoIndex + 1}`
+    });
+    const totalPagamento = somarValores(valoresParcelas);
+
+    if (valorPagamentoInformado != null) {
+      assertValoresIguais({
+        atual: totalPagamento,
+        esperado: valorPagamentoInformado,
+        mensagem: `A soma das parcelas do pagamento ${pagamentoIndex + 1} deve bater com o valor informado para ele.`
+      });
+    }
+
+    pagamentos.push({
+      formaPagamento,
+      payload: pagamentoPayload,
+      quantidadeParcelas,
+      valoresParcelas,
+      totalPagamento,
+      dataCompra,
+      dataVencimento,
+      grupoParcelamentoId: quantidadeParcelas > 1 ? `PARC-${crypto.randomUUID()}` : null
+    });
+  }
+
+  const valorOriginal = somarValores(pagamentos.map((pagamento) => pagamento.totalPagamento));
+  assertValoresIguais({
+    atual: valorOriginal,
+    esperado: valorSolicitacao,
+    mensagem: 'A soma dos titulos gerados precisa bater com o valor da solicitacao.'
+  });
+
   const descricaoBase = String(payload.descricao || descricaoPadraoTitulo(solicitacao)).trim();
 
   const transaction = await sequelize.transaction();
   const titulosCriados = [];
   try {
-    for (let index = 0; index < quantidadeParcelas; index += 1) {
-      const numeroParcela = index + 1;
-      const valorParcela = valoresParcelas[index];
-      const parcelaPayload = getParcelaPayload(payload.parcelas, index);
-      const vencimentoParcela = resolveVencimentoParcela({
-        formaPagamento,
-        parcela: parcelaPayload,
-        dataVencimentoBase: dataVencimento,
-        dataCompra,
-        index
-      });
-      const descricaoParcela = quantidadeParcelas > 1
-        ? `${descricaoBase.slice(0, 220)} - Parcela ${numeroParcela}/${quantidadeParcelas}`
-        : descricaoBase.slice(0, 255);
-      const chequeFields = buildChequeFields(formaPagamento, parcelaPayload, index);
-
-      const titulo = await TituloFinanceiro.create({
-        solicitacao_id: solicitacao.id,
-        obra_id: solicitacao.obra_id,
-        parceiro_id: parceiroId,
-        categoria_financeira_id: payload.categoria_financeira_id || null,
-        forma_pagamento_id: formaPagamento?.id || null,
-        cartao_id: payload.cartao_id || null,
-        grupo_parcelamento_id: grupoParcelamentoId,
-        numero_parcela: quantidadeParcelas > 1 ? numeroParcela : null,
-        total_parcelas: quantidadeParcelas > 1 ? quantidadeParcelas : null,
-        data_compra: dataCompra,
-        origem_titulo: 'SOLICITACAO',
-        tipo,
-        status: 'ABERTO',
-        descricao: descricaoParcela || descricaoPadraoTitulo(solicitacao),
-        numero_documento: parcelaPayload.numero_documento || payload.numero_documento || chequeFields.cheque_numero || null,
-        ...chequeFields,
-        valor_original: valorParcela,
-        valor_saldo: valorParcela,
-        valor_baixado: 0,
-        data_emissao: payload.data_emissao || getHoje(),
-        data_vencimento: vencimentoParcela,
-        data_quitacao: null,
-        observacoes: parcelaPayload.observacoes || payload.observacoes || null,
-        ...buildCobrancaFields(payload, tipo),
-        criado_por: req.user?.id || null,
-        atualizado_por: req.user?.id || null
-      }, { transaction });
-
-      if (formaPagamento?.gera_fatura && payload.cartao_id) {
-        const { fatura } = await obterOuCriarFaturaCartao({
-          cartaoId: payload.cartao_id,
-          dataCompra,
-          parcelaOffset: index,
-          usuarioId: req.user?.id || null,
-          transaction
+    for (const [pagamentoIndex, pagamento] of pagamentos.entries()) {
+      for (let index = 0; index < pagamento.quantidadeParcelas; index += 1) {
+        const numeroParcela = index + 1;
+        const valorParcela = pagamento.valoresParcelas[index];
+        const parcelaPayload = getParcelaPayload(pagamento.payload.parcelas, index);
+        const vencimentoParcela = resolveVencimentoParcela({
+          formaPagamento: pagamento.formaPagamento,
+          parcela: parcelaPayload,
+          dataVencimentoBase: pagamento.dataVencimento,
+          dataCompra: pagamento.dataCompra,
+          index
         });
-        await vincularTituloAFatura({ titulo, fatura, transaction });
-      }
+        const totalParcelasDoGrupo = pagamento.quantidadeParcelas;
+        const prefixoForma = pagamentos.length > 1 ? `Forma ${pagamentoIndex + 1} - ` : '';
+        const descricaoParcela = totalParcelasDoGrupo > 1
+          ? `${prefixoForma}${descricaoBase}`.slice(0, 205) + ` - Parcela ${numeroParcela}/${totalParcelasDoGrupo}`
+          : `${prefixoForma}${descricaoBase}`.slice(0, 255);
+        const chequeFields = buildChequeFields(pagamento.formaPagamento, parcelaPayload, index);
 
-      titulosCriados.push(titulo);
+        const titulo = await TituloFinanceiro.create({
+          solicitacao_id: solicitacao.id,
+          obra_id: solicitacao.obra_id,
+          parceiro_id: parceiroId,
+          categoria_financeira_id: payload.categoria_financeira_id || null,
+          forma_pagamento_id: pagamento.formaPagamento?.id || null,
+          cartao_id: pagamento.payload.cartao_id || null,
+          grupo_parcelamento_id: pagamento.grupoParcelamentoId,
+          numero_parcela: totalParcelasDoGrupo > 1 ? numeroParcela : null,
+          total_parcelas: totalParcelasDoGrupo > 1 ? totalParcelasDoGrupo : null,
+          data_compra: pagamento.dataCompra,
+          origem_titulo: 'SOLICITACAO',
+          tipo,
+          status: 'ABERTO',
+          descricao: descricaoParcela || descricaoPadraoTitulo(solicitacao),
+          numero_documento: parcelaPayload.numero_documento || pagamento.payload.numero_documento || payload.numero_documento || chequeFields.cheque_numero || null,
+          ...chequeFields,
+          valor_original: valorParcela,
+          valor_saldo: valorParcela,
+          valor_baixado: 0,
+          data_emissao: payload.data_emissao || getHoje(),
+          data_vencimento: vencimentoParcela,
+          data_quitacao: null,
+          observacoes: parcelaPayload.observacoes || pagamento.payload.observacoes || payload.observacoes || null,
+          ...buildCobrancaFields(payload, tipo),
+          criado_por: req.user?.id || null,
+          atualizado_por: req.user?.id || null
+        }, { transaction });
+
+        if (pagamento.formaPagamento?.gera_fatura && pagamento.payload.cartao_id) {
+          const { fatura } = await obterOuCriarFaturaCartao({
+            cartaoId: pagamento.payload.cartao_id,
+            dataCompra: pagamento.dataCompra,
+            parcelaOffset: index,
+            usuarioId: req.user?.id || null,
+            transaction
+          });
+          await vincularTituloAFatura({ titulo, fatura, transaction });
+        }
+
+        titulosCriados.push(titulo);
+      }
     }
 
     await Historico.create({
@@ -968,13 +1059,13 @@ async function criarTituloPorSolicitacao(req, solicitacaoId, payload = {}) {
       usuario_responsavel_id: req.user?.id || null,
       setor: getSetorUsuario(req),
       acao: 'TITULO_FINANCEIRO_CRIADO',
-      observacao: `${quantidadeParcelas} titulo(s) ${tipo} gerado(s) no valor de ${formatCurrency(valorOriginal)}`
+      observacao: `${titulosCriados.length} titulo(s) ${tipo} gerado(s) no valor de ${formatCurrency(valorOriginal)}`
     }, { transaction });
 
     await transaction.commit();
 
     const tituloCompleto = await carregarTituloPorId(req, titulosCriados[0].id);
-    if (quantidadeParcelas > 1) {
+    if (titulosCriados.length > 1) {
       tituloCompleto.setDataValue('parcelas_geradas', titulosCriados.map((titulo) => titulo.id));
     }
 
@@ -985,17 +1076,21 @@ async function criarTituloPorSolicitacao(req, solicitacaoId, payload = {}) {
       recursoTipo: 'TITULO_FINANCEIRO',
       recursoId: titulosCriados[0]?.id || null,
       status: 'SUCCESS',
-      descricao: quantidadeParcelas > 1 ? 'Titulos financeiros parcelados gerados a partir da solicitacao' : 'Titulo financeiro gerado a partir da solicitacao',
+      descricao: titulosCriados.length > 1 ? 'Titulos financeiros gerados a partir da solicitacao' : 'Titulo financeiro gerado a partir da solicitacao',
       metadata: {
         solicitacao_id: solicitacao.id,
         obra_id: solicitacao.obra_id,
         parceiro_id: parceiroId,
         tipo,
         valor_original: valorOriginal,
-        quantidade_parcelas: quantidadeParcelas,
-        grupo_parcelamento_id: grupoParcelamentoId,
-        forma_pagamento_id: formaPagamento?.id || null,
-        cartao_id: payload.cartao_id || null
+        quantidade_titulos: titulosCriados.length,
+        pagamentos: pagamentos.map((pagamento) => ({
+          valor: pagamento.totalPagamento,
+          quantidade_parcelas: pagamento.quantidadeParcelas,
+          grupo_parcelamento_id: pagamento.grupoParcelamentoId,
+          forma_pagamento_id: pagamento.formaPagamento?.id || null,
+          cartao_id: pagamento.payload.cartao_id || null
+        }))
       }
     });
 
@@ -1045,7 +1140,17 @@ async function criarTituloManual(req, payload = {}) {
   const formaPagamento = await validarFormaPagamentoFinanceira(payload.forma_pagamento_id, payload);
   const quantidadeParcelas = Math.max(Number(payload.quantidade_parcelas || 1), 1);
   const dataVencimento = payload.data_vencimento;
-  const valoresParcelas = distribuirParcelas(valorOriginal, quantidadeParcelas);
+  const valoresParcelas = getValoresParcelas({
+    valorTotal: valorOriginal,
+    quantidade: quantidadeParcelas,
+    parcelas: payload.parcelas,
+    contexto: 'titulo manual'
+  });
+  assertValoresIguais({
+    atual: somarValores(valoresParcelas),
+    esperado: valorOriginal,
+    mensagem: 'A soma das parcelas precisa bater com o valor do titulo.'
+  });
   const grupoParcelamentoId = quantidadeParcelas > 1 ? `PARC-${crypto.randomUUID()}` : null;
   const dataCompra = payload.data_compra || payload.data_emissao || getHoje();
   const transaction = await sequelize.transaction();

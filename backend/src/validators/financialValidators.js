@@ -125,6 +125,7 @@ function parseParcelasTitulo(value) {
     ensureAllowedKeys(
       item || {},
       [
+        'valor',
         'data_vencimento',
         'numero_documento',
         'observacoes',
@@ -138,6 +139,7 @@ function parseParcelasTitulo(value) {
     );
 
     return {
+      valor: parseDecimal(item?.valor, `Valor da parcela ${index + 1}`, { min: 0.01 }),
       data_vencimento: parseDateOnly(item?.data_vencimento, `Vencimento da parcela ${index + 1}`),
       numero_documento: parseOptionalText(item?.numero_documento, `Documento da parcela ${index + 1}`, 120),
       observacoes: parseOptionalText(item?.observacoes, `Observacoes da parcela ${index + 1}`, 1000),
@@ -146,6 +148,45 @@ function parseParcelasTitulo(value) {
       cheque_agencia: parseOptionalText(item?.cheque_agencia, `Agencia do cheque ${index + 1}`, 40),
       cheque_conta: parseOptionalText(item?.cheque_conta, `Conta do cheque ${index + 1}`, 60),
       cheque_emitente: parseOptionalText(item?.cheque_emitente, `Emitente do cheque ${index + 1}`, 160)
+    };
+  });
+}
+
+function parsePagamentosTitulo(value) {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (!Array.isArray(value)) {
+    throw new ValidationError('Pagamentos devem ser enviados em lista.');
+  }
+
+  return value.map((item, index) => {
+    ensureAllowedKeys(
+      item || {},
+      [
+        'valor',
+        'data_vencimento',
+        'numero_documento',
+        'observacoes',
+        'forma_pagamento_id',
+        'cartao_id',
+        'quantidade_parcelas',
+        'data_compra',
+        'parcelas'
+      ],
+      `Pagamento ${index + 1}`
+    );
+
+    return {
+      valor: parseDecimal(item?.valor, `Valor do pagamento ${index + 1}`, { min: 0.01 }),
+      data_vencimento: parseDateOnly(item?.data_vencimento, `Vencimento do pagamento ${index + 1}`),
+      numero_documento: parseOptionalText(item?.numero_documento, `Documento do pagamento ${index + 1}`, 120),
+      observacoes: parseOptionalText(item?.observacoes, `Observacoes do pagamento ${index + 1}`, 1000),
+      forma_pagamento_id: parseInteger(item?.forma_pagamento_id, `Forma de pagamento ${index + 1}`),
+      cartao_id: parseInteger(item?.cartao_id, `Cartao ${index + 1}`),
+      quantidade_parcelas: parseInteger(item?.quantidade_parcelas, `Quantidade de parcelas ${index + 1}`),
+      data_compra: parseDateOnly(item?.data_compra, `Data da compra ${index + 1}`),
+      parcelas: parseParcelasTitulo(item?.parcelas)
     };
   });
 }
@@ -597,7 +638,8 @@ function validateFinanceTituloCreateFromSolicitacaoBody(body = {}) {
       'cartao_id',
       'quantidade_parcelas',
       'data_compra',
-      'parcelas'
+      'parcelas',
+      'pagamentos'
     ],
     'Geracao de titulo financeiro'
   );
@@ -624,7 +666,8 @@ function validateFinanceTituloCreateFromSolicitacaoBody(body = {}) {
     cartao_id: parseInteger(body.cartao_id, 'Cartao'),
     quantidade_parcelas: parseInteger(body.quantidade_parcelas, 'Quantidade de parcelas'),
     data_compra: parseDateOnly(body.data_compra, 'Data da compra'),
-    parcelas: parseParcelasTitulo(body.parcelas)
+    parcelas: parseParcelasTitulo(body.parcelas),
+    pagamentos: parsePagamentosTitulo(body.pagamentos)
   };
 }
 
