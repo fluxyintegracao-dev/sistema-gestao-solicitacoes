@@ -115,10 +115,16 @@ function distribuirParcelasFormatadas(valorTotal, quantidade) {
   });
 }
 
-function buildParcelasDetalhadas(parcelasAtuais = [], quantidade = 1, dataBase = today(), valorTotal = '') {
+function buildParcelasDetalhadas(
+  parcelasAtuais = [],
+  quantidade = 1,
+  dataBase = today(),
+  valorTotal = '',
+  { redistribuirValores = false } = {}
+) {
   const valoresSugeridos = distribuirParcelasFormatadas(valorTotal, quantidade);
   return Array.from({ length: quantidade }, (_, index) => ({
-    valor: parcelasAtuais[index]?.valor || valoresSugeridos[index] || '',
+    valor: redistribuirValores ? (valoresSugeridos[index] || '') : (parcelasAtuais[index]?.valor || valoresSugeridos[index] || ''),
     data_vencimento: parcelasAtuais[index]?.data_vencimento || addMonths(dataBase || today(), index),
     numero_documento: parcelasAtuais[index]?.numero_documento || '',
     observacoes: parcelasAtuais[index]?.observacoes || '',
@@ -449,7 +455,13 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
         ...pagamento,
         quantidade_parcelas: value,
         parcelas: pagamentoUsaParcelasDetalhadas(pagamento)
-          ? buildParcelasDetalhadas(pagamento.parcelas, quantidade, pagamento.data_vencimento || today(), pagamento.valor)
+          ? buildParcelasDetalhadas(
+              pagamento.parcelas,
+              quantidade,
+              pagamento.data_vencimento || today(),
+              pagamento.valor,
+              { redistribuirValores: true }
+            )
           : pagamento.parcelas
       };
       return { ...current, pagamentos };
