@@ -934,18 +934,24 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
                           </select>
                         </label>
 
-                        <label className="text-sm">
+                        <div className="text-sm">
                           <span className="mb-1 block text-slate-500">Valor desta forma</span>
-                          <input
-                            className="input w-full"
-                            type="text"
-                            inputMode="decimal"
-                            placeholder="R$ 0,00"
-                            value={pagamento.valor}
-                            onChange={(event) => updateValorPagamento(pagamentoIndex, normalizeCurrencyTyping(event.target.value))}
-                            onBlur={(event) => updateValorPagamento(pagamentoIndex, formatCurrencyInput(event.target.value))}
-                          />
-                        </label>
+                          {usaDetalhe ? (
+                            <div className="input flex items-center bg-slate-50 text-slate-700">
+                              {pagamento.valor || 'R$ 0,00'}
+                            </div>
+                          ) : (
+                            <input
+                              className="input w-full"
+                              type="text"
+                              inputMode="decimal"
+                              placeholder="R$ 0,00"
+                              value={pagamento.valor}
+                              onChange={(event) => updateValorPagamento(pagamentoIndex, normalizeCurrencyTyping(event.target.value))}
+                              onBlur={(event) => updateValorPagamento(pagamentoIndex, formatCurrencyInput(event.target.value))}
+                            />
+                          )}
+                        </div>
                       </div>
 
                       <div className="grid gap-3 md:grid-cols-2">
