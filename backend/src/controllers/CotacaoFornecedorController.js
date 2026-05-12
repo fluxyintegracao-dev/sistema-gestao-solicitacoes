@@ -14,15 +14,11 @@ const {
   SolicitacaoCompraRespostaItem,
   Unidade
 } = require('../models');
-const { env } = require('../config/env');
 const {
   gerarModeloCotacaoCsv,
   gerarModeloCotacaoXlsx,
   normalizeText,
   obterItensCotaveis,
-  parseCsvRows,
-  parseDisponivel,
-  parseXlsxRows,
   registrarLogSolicitacaoCompra
 } = require('../services/comprasCotacao');
 const { getPresignedUrl, uploadToS3 } = require('../services/s3');
@@ -36,6 +32,27 @@ function isImageAttachment(item) {
   const baseName = String(item?.arquivo_nome_original || item?.arquivo_url || '').split('?')[0].toLowerCase();
   const extension = path.extname(baseName);
   return extension === '.png' || extension === '.jpg' || extension === '.jpeg' || extension === '.webp';
+}
+
+function isImagemCotacaoExtension(extension) {
+  return ['.png', '.jpg', '.jpeg'].includes(String(extension || '').toLowerCase());
+}
+
+function isArquivoRespostaCotacaoExtension(extension) {
+  return ['.pdf', '.png', '.jpg', '.jpeg'].includes(String(extension || '').toLowerCase());
+}
+
+function getTipoArquivoResposta(extension) {
+  const normalized = String(extension || '').toLowerCase();
+  if (normalized === '.pdf') return 'PDF';
+  if (isImagemCotacaoExtension(normalized)) return 'IMAGEM';
+  return 'ARQUIVO';
+}
+
+function getNomeTipoArquivoResposta(tipo = 'ARQUIVO') {
+  if (tipo === 'PDF') return 'PDF';
+  if (tipo === 'IMAGEM') return 'imagem';
+  return 'arquivo';
 }
 
 function buildApiOrigin(req) {
@@ -131,6 +148,9 @@ async function carregarCotacaoPorToken(token) {
 
 async function serializarCotacaoPublica(cotacaoFornecedor, req) {
   const itensCotaveis = obterItensCotaveis(cotacaoFornecedor?.solicitacao || {});
+  const arquivoRespostaUrl = await resolvePublicAttachmentUrl(req, cotacaoFornecedor?.pdf_resposta_url);
+  const arquivoRespostaExtension = path.extname(String(cotacaoFornecedor?.pdf_resposta_url || '').split('?')[0]).toLowerCase();
+  const arquivoRespostaTipo = arquivoRespostaUrl ? getTipoArquivoResposta(arquivoRespostaExtension) : null;
   const respostasPorItem = new Map(
     (cotacaoFornecedor?.respostas || []).map((resposta) => {
       const itemReferenciaId =
@@ -154,7 +174,10 @@ async function serializarCotacaoPublica(cotacaoFornecedor, req) {
       respondido_em: cotacaoFornecedor?.respondido_em,
       valor_minimo_pedido: cotacaoFornecedor?.valor_minimo_pedido ?? '',
       condicao_pagamento: cotacaoFornecedor?.condicao_pagamento || '',
-      pdf_resposta_url: cotacaoFornecedor?.pdf_resposta_url || null
+      pdf_resposta_url: arquivoRespostaUrl || null,
+      arquivo_resposta_url: arquivoRespostaUrl || null,
+      arquivo_resposta_tipo: arquivoRespostaTipo,
+      arquivo_resposta_is_image: Boolean(arquivoRespostaUrl && arquivoRespostaTipo === 'IMAGEM')
     },
     somente_leitura: normalizeText(cotacaoFornecedor?.solicitacao?.status) === 'ENCERRADO',
     itens: await Promise.all(itensCotaveis.map(async (item) => {
@@ -302,6 +325,28 @@ async function salvarRespostasCotacao(cotacaoFornecedor, itensResposta, options 
   });
 }
 
+async function registrarRespostaArquivoCotacao(cotacaoFornecedor, req, tipoArquivo = 'ARQUIVO') {
+  const url = await uploadToS3(req.file, `cotacoes-respostas/${String(tipoArquivo || 'arquivo').toLowerCase()}`);
+  await cotacaoFornecedor.update({
+    status: 'RESPONDIDO',
+    respondido_em: new Date(),
+    visualizado_em: cotacaoFornecedor.visualizado_em || new Date(),
+    pdf_resposta_url: url
+  });
+  await registrarLogSolicitacaoCompra({
+    solicitacaoCompraId: cotacaoFornecedor.solicitacao.id,
+    fornecedorCompraId: cotacaoFornecedor.fornecedor_compra_id,
+    tipoAcao: 'RESPOSTA_FORNECEDOR',
+    descricao: `Fornecedor ${cotacaoFornecedor.fornecedor?.nome || cotacaoFornecedor.fornecedor_compra_id} enviou resposta em ${getNomeTipoArquivoResposta(tipoArquivo)}`,
+    metadados: {
+      cotacao_fornecedor_id: cotacaoFornecedor.id,
+      tipo: tipoArquivo,
+      arquivo_nome: req.file?.originalname || null
+    }
+  });
+  return url;
+}
+
 module.exports = {
   async index(req, res) {
     try {
@@ -420,10 +465,10 @@ module.exports = {
       }
 
       const extension = path.extname(String(req.file.originalname || '')).toLowerCase();
-      const extensoesPermitidas = ['.csv', '.xlsx', '.xls', '.pdf'];
+      const extensoesPermitidas = ['.pdf', '.png', '.jpg', '.jpeg'];
       if (extension && !extensoesPermitidas.includes(extension)) {
         return res.status(400).json({
-          error: 'Formato invalido. Envie um arquivo CSV, Excel (.xlsx/.xls) ou PDF.'
+          error: 'Formato invalido. Envie um arquivo PDF ou imagem.'
         });
       }
 
@@ -436,96 +481,8 @@ module.exports = {
         return res.status(400).json({ error: 'Cotacao encerrada. Nao e mais possivel responder.' });
       }
 
-      // PDF: armazena o arquivo e marca a cotacao como respondida com PDF
-      if (extension === '.pdf') {
-        const url = await uploadToS3(req.file, 'cotacoes-pdf');
-        await cotacaoFornecedor.update({
-          status: 'RESPONDIDO',
-          respondido_em: new Date(),
-          visualizado_em: cotacaoFornecedor.visualizado_em || new Date(),
-          pdf_resposta_url: url
-        });
-        await registrarLogSolicitacaoCompra({
-          solicitacaoCompraId: cotacaoFornecedor.solicitacao.id,
-          fornecedorCompraId: cotacaoFornecedor.fornecedor_compra_id,
-          tipoAcao: 'RESPOSTA_FORNECEDOR',
-          descricao: `Fornecedor ${cotacaoFornecedor.fornecedor?.nome || cotacaoFornecedor.fornecedor_compra_id} enviou resposta em PDF`,
-          metadados: { cotacao_fornecedor_id: cotacaoFornecedor.id, tipo: 'PDF' }
-        });
-        const atualizada = await carregarCotacaoPorToken(token);
-        return res.status(201).json({
-          ...await serializarCotacaoPublica(atualizada, req),
-          pdf_resposta_url: url
-        });
-      }
-
-      // CSV ou Excel: parseia linhas estruturadas
-      let rows;
-      if (extension === '.csv') {
-        rows = parseCsvRows(req.file.buffer);
-      } else {
-        rows = parseXlsxRows(req.file.buffer);
-      }
-
-      if (!rows.length) {
-        return res.status(400).json({ error: 'Planilha vazia ou invalida' });
-      }
-      if (rows.length > env.csvImportMaxRows) {
-        return res.status(400).json({
-          error: `A planilha excede o limite de ${env.csvImportMaxRows} linhas para importacao.`
-        });
-      }
-
-      const requiredHeaders = ['PRODUTO_ID', 'NOME', 'QUANTIDADE', 'PRECO', 'PRAZO', 'DISPONIVEL'];
-      const headers = Object.keys(rows[0] || {});
-      const missingHeaders = requiredHeaders.filter((header) => !headers.includes(header));
-      if (missingHeaders.length) {
-        return res.status(400).json({
-          error: `Cabecalhos obrigatorios ausentes: ${missingHeaders.join(', ')}`
-        });
-      }
-
-      const itensCotaveis = obterItensCotaveis(cotacaoFornecedor.solicitacao);
-      const itensPorProdutoId = new Map(itensCotaveis.map((item) => [item.produto_id, item]));
-
-      let valorMinimoPedido = null;
-
-      const itensResposta = rows.map((row) => {
-        const produtoId = String(row.PRODUTO_ID || '').trim();
-        if (!produtoId) {
-          throw new Error('produto_id obrigatorio na planilha');
-        }
-
-        const item = itensPorProdutoId.get(produtoId);
-        if (!item) {
-          throw new Error(`produto_id invalido na planilha: ${produtoId}`);
-        }
-
-        if (
-          valorMinimoPedido === null &&
-          row.VALOR_MINIMO_PEDIDO !== undefined &&
-          String(row.VALOR_MINIMO_PEDIDO || '').trim() !== ''
-        ) {
-          valorMinimoPedido = String(row.VALOR_MINIMO_PEDIDO).replace(',', '.');
-        }
-
-        return {
-          item_tipo: item.item_tipo,
-          item_referencia_id: item.item_referencia_id,
-          disponivel: parseDisponivel(row.DISPONIVEL),
-          preco: row.PRECO ? String(row.PRECO).replace(',', '.') : '',
-          prazo: row.PRAZO || '',
-          observacao: `Importado via planilha por ${cotacaoFornecedor.fornecedor?.nome || 'fornecedor'}`,
-          quantidade_minima_item:
-            row.QUANTIDADE_MINIMA_ITEM && String(row.QUANTIDADE_MINIMA_ITEM).trim() !== ''
-              ? String(row.QUANTIDADE_MINIMA_ITEM).replace(',', '.')
-              : ''
-        };
-      });
-
-      await salvarRespostasCotacao(cotacaoFornecedor, itensResposta, {
-        valor_minimo_pedido: valorMinimoPedido
-      });
+      const tipoArquivo = getTipoArquivoResposta(extension);
+      await registrarRespostaArquivoCotacao(cotacaoFornecedor, req, tipoArquivo);
       const atualizada = await carregarCotacaoPorToken(token);
       return res.status(201).json(await serializarCotacaoPublica(atualizada, req));
     } catch (error) {

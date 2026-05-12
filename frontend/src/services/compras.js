@@ -417,7 +417,7 @@ export async function uploadPlanilhaCotacaoPublica(token, file) {
     method: 'POST',
     body: formData
   });
-  return handleJsonResponse(response, 'Erro ao enviar planilha da cotacao');
+  return handleJsonResponse(response, 'Erro ao enviar arquivo da cotacao');
 }
 
 export async function baixarModeloCotacaoPublica(token) {

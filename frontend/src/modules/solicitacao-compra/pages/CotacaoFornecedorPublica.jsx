@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import {
-  baixarModeloCotacaoPublicaXlsx,
   obterCotacaoPublica,
   responderCotacaoPublica,
   uploadPlanilhaCotacaoPublica
@@ -171,30 +170,15 @@ export default function CotacaoFornecedorPublica() {
     }
   }
 
-  async function handleBaixarModelo() {
-    try {
-      const blob = await baixarModeloCotacaoPublicaXlsx(token);
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `cotacao-${token}.xlsx`;
-      link.click();
-      window.setTimeout(() => window.URL.revokeObjectURL(url), 10000);
-    } catch (error) {
-      console.error(error);
-      alert(error.message || 'Erro ao baixar modelo');
-    }
-  }
-
   async function handleUploadArquivo(file) {
     try {
       if (!file) return;
       setEnviandoPlanilha(true);
-      await uploadPlanilhaCotacaoPublica(token, file);
+      const resposta = await uploadPlanilhaCotacaoPublica(token, file);
       await carregar();
-      const isPdf = String(file.name || '').toLowerCase().endsWith('.pdf');
-      alert(isPdf
-        ? 'PDF recebido. Nossa equipe ira revisar e inserir os precos manualmente.'
+      const tipoArquivoResposta = resposta?.cotacao?.arquivo_resposta_tipo;
+      alert(tipoArquivoResposta
+        ? 'Arquivo recebido. Nossa equipe ira revisar e registrar os precos quando necessario.'
         : 'Planilha importada com sucesso.');
     } catch (error) {
       console.error(error);
@@ -221,7 +205,9 @@ export default function CotacaoFornecedorPublica() {
   }
 
   const statusCotacao = dados.cotacao?.status || 'EM ABERTO';
-  const pdfRespostaUrl = dados.cotacao?.pdf_resposta_url || null;
+  const arquivoRespostaUrl = dados.cotacao?.arquivo_resposta_url || dados.cotacao?.pdf_resposta_url || null;
+  const arquivoRespostaTipo = dados.cotacao?.arquivo_resposta_tipo || 'ARQUIVO';
+  const arquivoRespostaIsImage = Boolean(dados.cotacao?.arquivo_resposta_is_image);
   const itensDisponiveis = itens.filter(
     (item) => (item.status_disponibilidade || 'DISPONIVEL') !== 'NAO_TEM'
   ).length;
@@ -234,7 +220,7 @@ export default function CotacaoFornecedorPublica() {
         <div className="mb-3">
           <h1 className="text-base font-semibold">Resposta de Cotacao</h1>
           <p className="text-xs text-[var(--sol-text-soft)]">
-            Preencha os itens online ou baixe o modelo Excel para responder por planilha.
+            Preencha os itens online ou envie a resposta em PDF ou imagem.
           </p>
         </div>
 
@@ -261,12 +247,23 @@ export default function CotacaoFornecedorPublica() {
             </div>
           )}
 
-          {pdfRespostaUrl && (
-            <div className="mb-2 flex items-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs text-blue-800">
-              <span>📄 PDF de resposta recebido. Nossa equipe ira revisar e inserir os precos.</span>
-              <a href={pdfRespostaUrl} target="_blank" rel="noopener noreferrer"
+          {arquivoRespostaUrl && (
+            <div className="mb-2 flex items-center gap-3 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800">
+              {arquivoRespostaIsImage && (
+                <a href={arquivoRespostaUrl} target="_blank" rel="noopener noreferrer" className="shrink-0">
+                  <img
+                    src={arquivoRespostaUrl}
+                    alt="Resposta anexada"
+                    className="h-12 w-16 rounded border border-blue-200 bg-white object-cover"
+                  />
+                </a>
+              )}
+              <span>
+                Arquivo de resposta recebido ({arquivoRespostaTipo}). Nossa equipe ira revisar e inserir os precos quando necessario.
+              </span>
+              <a href={arquivoRespostaUrl} target="_blank" rel="noopener noreferrer"
                 className="ml-auto shrink-0 rounded border border-blue-300 px-2 py-0.5 text-[11px] hover:bg-blue-100">
-                Ver PDF
+                Ver arquivo
               </a>
             </div>
           )}
@@ -309,23 +306,20 @@ export default function CotacaoFornecedorPublica() {
 
           {/* Ações do card */}
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <button type="button" className="btn btn-outline btn-sm text-xs h-7 px-3" onClick={handleBaixarModelo}>
-              Baixar modelo Excel
-            </button>
             <label className={`btn btn-outline btn-sm text-xs h-7 px-3 cursor-pointer ${enviandoPlanilha ? 'pointer-events-none opacity-60' : ''}`}>
               <input
                 type="file"
                 className="hidden"
-                accept=".csv,.xlsx,.xls,.pdf"
+                accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg"
                 onChange={(event) => {
                   const [file] = Array.from(event.target.files || []);
                   void handleUploadArquivo(file);
                   event.target.value = '';
                 }}
               />
-              {enviandoPlanilha ? 'Enviando...' : 'Importar planilha ou PDF'}
+              {enviandoPlanilha ? 'Enviando...' : 'Importar arquivo'}
             </label>
-            <span className="text-[10px] text-[var(--sol-text-soft)]">CSV, Excel ou PDF</span>
+            <span className="text-[10px] text-[var(--sol-text-soft)]">PDF ou imagem</span>
             {!dados.somente_leitura && (
               <button
                 type="button"

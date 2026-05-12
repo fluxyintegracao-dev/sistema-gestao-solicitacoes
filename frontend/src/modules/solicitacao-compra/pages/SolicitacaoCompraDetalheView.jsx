@@ -11,7 +11,8 @@ import {
   listarFornecedoresCompra,
   obterComparativoSolicitacaoCompra,
   obterSolicitacaoCompra,
-  obterUrlAssinadaCompra
+  obterUrlAssinadaCompra,
+  responderCotacaoPublica
 } from '../../../services/compras';
 import { buscarParceiros, listarCategoriasParceiro } from '../../../services/parceiros';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -78,6 +79,132 @@ function gerarMensagemCotacao(fornecedorNome, url, itens = []) {
 }
 
 // ── Modal de Pedido Final ──────────────────────────────────────────────────────
+
+function ModalRevisarRespostaArquivo({ fornecedor, itens, onSalvar, onFechar }) {
+  const [linhas, setLinhas] = useState(() => itens.map((item) => ({
+    ...item,
+    preco: '',
+    prazo: '',
+    disponivel: true,
+    observacao: '',
+    quantidade_minima_item: ''
+  })));
+  const [salvando, setSalvando] = useState(false);
+
+  function atualizarLinha(index, field, value) {
+    setLinhas((prev) => prev.map((linha, linhaIndex) => (
+      linhaIndex === index ? { ...linha, [field]: value } : linha
+    )));
+  }
+
+  async function handleSalvar() {
+    try {
+      setSalvando(true);
+      await onSalvar({
+        itens: linhas.map((linha) => ({
+          item_tipo: linha.item_tipo,
+          item_referencia_id: linha.item_referencia_id,
+          status_disponibilidade: linha.disponivel ? 'DISPONIVEL' : 'NAO_TEM',
+          disponivel: linha.disponivel,
+          preco: linha.disponivel ? linha.preco : '',
+          prazo: linha.disponivel ? linha.prazo : '',
+          observacao: linha.observacao,
+          quantidade_minima_item: linha.quantidade_minima_item
+        }))
+      });
+    } catch (error) {
+      console.error(error);
+      alert(error.message || 'Erro ao registrar resposta do fornecedor');
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 px-3 py-6">
+      <div className="w-full max-w-5xl rounded-2xl bg-[var(--c-surface)] shadow-xl">
+        <div className="flex items-center justify-between gap-3 border-b border-[var(--c-border)] px-5 py-4">
+          <div>
+            <h2 className="font-semibold text-[var(--c-text)]">Revisar resposta anexada</h2>
+            <p className="text-sm text-[var(--c-muted)]">{fornecedor?.fornecedor?.nome || 'Fornecedor'}</p>
+          </div>
+          <button type="button" className="btn btn-outline" onClick={onFechar}>Fechar</button>
+        </div>
+
+        <div className="px-5 py-4">
+          <p className="mb-3 text-sm text-[var(--c-muted)]">
+            Transcreva os valores do arquivo anexado para que a resposta entre no comparativo da cotacao.
+          </p>
+          <div className="overflow-x-auto rounded-xl border border-[var(--c-border)]">
+            <table className="w-full min-w-[880px] text-sm">
+              <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
+                <tr>
+                  <th className="px-3 py-2">Item</th>
+                  <th className="px-3 py-2">Qtd.</th>
+                  <th className="px-3 py-2">Disponivel</th>
+                  <th className="px-3 py-2">Preco unit.</th>
+                  <th className="px-3 py-2">Prazo</th>
+                  <th className="px-3 py-2">Obs.</th>
+                </tr>
+              </thead>
+              <tbody>
+                {linhas.map((linha, index) => (
+                  <tr key={`${linha.item_tipo}-${linha.item_referencia_id}`} className="border-t border-[var(--c-border)]">
+                    <td className="px-3 py-2">
+                      <div className="font-medium text-[var(--c-text)]">{linha.nome}</div>
+                      <div className="text-xs text-[var(--c-muted)]">{linha.especificacao}</div>
+                    </td>
+                    <td className="px-3 py-2 text-[var(--c-muted)]">{linha.quantidade} {linha.unidade}</td>
+                    <td className="px-3 py-2">
+                      <input
+                        type="checkbox"
+                        checked={linha.disponivel}
+                        onChange={(event) => atualizarLinha(index, 'disponivel', event.target.checked)}
+                      />
+                    </td>
+                    <td className="px-3 py-2">
+                      <input
+                        className="input h-9 w-full"
+                        value={linha.preco}
+                        disabled={!linha.disponivel}
+                        onChange={(event) => atualizarLinha(index, 'preco', event.target.value)}
+                        placeholder="0,00"
+                      />
+                    </td>
+                    <td className="px-3 py-2">
+                      <input
+                        className="input h-9 w-full"
+                        value={linha.prazo}
+                        disabled={!linha.disponivel}
+                        onChange={(event) => atualizarLinha(index, 'prazo', event.target.value)}
+                        placeholder="Ex.: 7 dias"
+                      />
+                    </td>
+                    <td className="px-3 py-2">
+                      <input
+                        className="input h-9 w-full"
+                        value={linha.observacao}
+                        onChange={(event) => atualizarLinha(index, 'observacao', event.target.value)}
+                        placeholder="Opcional"
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2 border-t border-[var(--c-border)] px-5 py-4">
+          <button type="button" className="btn btn-outline" onClick={onFechar}>Cancelar</button>
+          <button type="button" className="btn btn-primary" onClick={handleSalvar} disabled={salvando}>
+            {salvando ? 'Salvando...' : 'Salvar no comparativo'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function ModalPedidoFinal({ fornecedor, itensGanhos, solicitacaoId, onRemanejamento, onFechar }) {
   const [itensSelecionados, setItensSelecionados] = useState([]);
@@ -462,6 +589,11 @@ function SecaoEnvioFornecedores({
                           <div className="text-xs text-[var(--c-muted)]">
                             {f.email || 'Sem email'} {f.telefone ? ` · ${f.telefone}` : ''}
                           </div>
+                          {possuiRespostaArquivo && (
+                            <div className="text-xs font-semibold text-blue-700">
+                              Resposta por arquivo anexado
+                            </div>
+                          )}
                         </div>
                       </label>
                     ))
@@ -787,6 +919,7 @@ export default function SolicitacaoCompraDetalheView() {
   const [fornecedoresAvulsosSelecionados, setFornecedoresAvulsosSelecionados] = useState([]);
   const [novoFornecedor, setNovoFornecedor] = useState({ nome: '', email: '', whatsapp: '', contato: '' });
   const [vencedoresSelecionados, setVencedoresSelecionados] = useState({});
+  const [cotacaoRevisaoArquivo, setCotacaoRevisaoArquivo] = useState(null);
 
   const perfilUpper = String(user?.perfil || '').toUpperCase();
   const tokens = [
@@ -863,6 +996,7 @@ export default function SolicitacaoCompraDetalheView() {
   const itensCombinados = useMemo(() => {
     const itens = (solicitacao?.itens || []).map((item) => ({
       item_tipo: 'CADASTRADO',
+      item_referencia_id: item.id,
       nome: item.insumo?.nome || '-',
       unidade: item.unidade?.sigla || '-',
       quantidade: item.quantidade,
@@ -875,6 +1009,7 @@ export default function SolicitacaoCompraDetalheView() {
     }));
     const manuais = (solicitacao?.itensManuais || []).map((item) => ({
       item_tipo: 'MANUAL',
+      item_referencia_id: item.id,
       nome: item.nome_manual || '-',
       unidade: item.unidade_sigla_manual || '-',
       quantidade: item.quantidade,
@@ -1015,6 +1150,17 @@ export default function SolicitacaoCompraDetalheView() {
     } finally {
       setEncerrando(false);
     }
+  }
+
+  async function handleSalvarRevisaoArquivo(payload) {
+    if (!cotacaoRevisaoArquivo?.token) {
+      throw new Error('Cotacao do fornecedor nao localizada.');
+    }
+
+    await responderCotacaoPublica(cotacaoRevisaoArquivo.token, payload);
+    setCotacaoRevisaoArquivo(null);
+    await carregarTudo();
+    alert('Resposta registrada no comparativo.');
   }
 
   async function handleCriarPedidoFornecedor(fornecedorCompraId) {
@@ -1234,6 +1380,7 @@ export default function SolicitacaoCompraDetalheView() {
                 {solicitacao.fornecedores.map((cotacaoFornecedor) => {
                   const publicUrl = `${window.location.origin}/cotacao/${cotacaoFornecedor.token}`;
                   const pedidoFornecedor = pedidosPorFornecedor.get(Number(cotacaoFornecedor.fornecedor_compra_id));
+                  const possuiRespostaArquivo = Boolean(cotacaoFornecedor.pdf_resposta_url);
                   const linkWa = cotacaoFornecedor.fornecedor?.whatsapp
                     ? whatsappLink(cotacaoFornecedor.fornecedor.whatsapp, gerarMensagemCotacao(cotacaoFornecedor.fornecedor.nome, publicUrl, itensCombinados))
                     : null;
@@ -1254,6 +1401,16 @@ export default function SolicitacaoCompraDetalheView() {
                         <div className="flex flex-wrap gap-2">
                           <button type="button" className="btn btn-outline" onClick={() => copiarTexto(publicUrl)}>Copiar link</button>
                           <button type="button" className="btn btn-outline" onClick={() => window.open(publicUrl, '_blank', 'noopener,noreferrer')}>Abrir portal</button>
+                          {possuiRespostaArquivo && (
+                            <button type="button" className="btn btn-outline" onClick={() => window.open(publicUrl, '_blank', 'noopener,noreferrer')}>
+                              Ver anexo
+                            </button>
+                          )}
+                          {podeComprar && possuiRespostaArquivo && solicitacao.status !== 'ENCERRADO' && (
+                            <button type="button" className="btn btn-outline" onClick={() => setCotacaoRevisaoArquivo(cotacaoFornecedor)}>
+                              Revisar resposta
+                            </button>
+                          )}
                           {linkWa && (
                             <a href={linkWa} target="_blank" rel="noopener noreferrer" className="btn btn-outline">
                               WhatsApp
@@ -1332,6 +1489,14 @@ export default function SolicitacaoCompraDetalheView() {
       </div>
 
       <CompraPreviewModal preview={previewArquivo} onClose={() => setPreviewArquivo(null)} />
+      {cotacaoRevisaoArquivo && (
+        <ModalRevisarRespostaArquivo
+          fornecedor={cotacaoRevisaoArquivo}
+          itens={itensCombinados}
+          onSalvar={handleSalvarRevisaoArquivo}
+          onFechar={() => setCotacaoRevisaoArquivo(null)}
+        />
+      )}
     </div>
   );
 }
