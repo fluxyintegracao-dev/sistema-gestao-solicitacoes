@@ -73,7 +73,7 @@ const CHAVE_SETORES_VISIVEIS_POR_USUARIO = 'SETORES_VISIVEIS_POR_USUARIO';
 const CHAVE_TIPOS_SOLICITACAO_POR_SETOR = 'TIPOS_SOLICITACAO_POR_SETOR';
 const CHAVE_SETORES_CRIACAO_TODAS_OBRAS = 'SETORES_CRIACAO_TODAS_OBRAS';
 const DEFAULT_SOLICITACOES_PAGE_SIZE = 25;
-const MAX_SOLICITACOES_PAGE_SIZE = 100;
+const MAX_SOLICITACOES_PAGE_SIZE = 500;
 /* =====================================================
    FUNCAO AUXILIAR - VISIBILIDADE
 ===================================================== */
@@ -93,6 +93,10 @@ function parsePositiveInt(value, fallback) {
     return fallback;
   }
   return parsed;
+}
+
+function isAllLimit(value) {
+  return ['all', 'todos', 'todas'].includes(String(value || '').trim().toLowerCase());
 }
 
 async function montarResumoSolicitacoesLista(solicitacoes) {
@@ -871,15 +875,18 @@ module.exports = {
       } = req.query;
       const paginacaoSolicitada =
         req.query.page !== undefined || req.query.limit !== undefined;
+      const listarTodasSolicitacoes = isAllLimit(limit);
       const apenasObrasSolicitadas = ['1', 'true', 'sim'].includes(
         String(apenas_obras || '').trim().toLowerCase()
       );
       const paginaAtual = parsePositiveInt(page, 1);
-      const limitePorPagina = Math.min(
-        parsePositiveInt(limit, DEFAULT_SOLICITACOES_PAGE_SIZE),
-        MAX_SOLICITACOES_PAGE_SIZE
-      );
-      const offset = (paginaAtual - 1) * limitePorPagina;
+      const limitePorPagina = listarTodasSolicitacoes
+        ? null
+        : Math.min(
+            parsePositiveInt(limit, DEFAULT_SOLICITACOES_PAGE_SIZE),
+            MAX_SOLICITACOES_PAGE_SIZE
+          );
+      const offset = listarTodasSolicitacoes ? 0 : (paginaAtual - 1) * limitePorPagina;
 
       /* ===============================
         1) BUSCAR SOLICITACOES OCULTADAS
@@ -914,7 +921,7 @@ module.exports = {
             items: [],
             meta: {
               page: paginaAtual,
-              limit: limitePorPagina,
+              limit: listarTodasSolicitacoes ? 'all' : limitePorPagina,
               total: 0,
               total_pages: 0
             }
@@ -1484,7 +1491,7 @@ module.exports = {
           return res.json(await listarObrasDistinct(obraIdsVisiveis));
         }
 
-        const idsPagina = (paginacaoSolicitada
+        const idsPagina = (paginacaoSolicitada && !listarTodasSolicitacoes
           ? resultadoFiltro.slice(offset, offset + limitePorPagina)
           : resultadoFiltro
         ).map(item => Number(item.id));
@@ -1522,7 +1529,7 @@ module.exports = {
           where,
           include: includeBase,
           order: [['createdAt', 'DESC']],
-          ...(paginacaoSolicitada
+          ...(paginacaoSolicitada && !listarTodasSolicitacoes
             ? { limit: limitePorPagina, offset }
             : {})
         });
@@ -1544,11 +1551,13 @@ module.exports = {
         items: resultado,
         meta: {
           page: paginaAtual,
-          limit: limitePorPagina,
+          limit: listarTodasSolicitacoes ? 'all' : limitePorPagina,
           total: totalRegistros,
-          total_pages: totalRegistros > 0
-            ? Math.ceil(totalRegistros / limitePorPagina)
-            : 0
+          total_pages: listarTodasSolicitacoes
+            ? (totalRegistros > 0 ? 1 : 0)
+            : (totalRegistros > 0
+                ? Math.ceil(totalRegistros / limitePorPagina)
+                : 0)
         }
       });
 

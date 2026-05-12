@@ -51,6 +51,9 @@ function formatarDataParaFiltro(valor) {
   return `${ano}-${mes}-${dia}`;
 }
 
+const PAGE_SIZE_ALL = 'all';
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100, 200, 300, 500];
+
 export default function Solicitacoes({ arquivadas = false }) {
   const DEFAULT_VISIBLE_COLUMNS = [
     'data',
@@ -440,7 +443,9 @@ export default function Solicitacoes({ arquivadas = false }) {
 
     setMetaPaginacao((prev) => {
       const nextTotal = Math.max(0, Number(prev?.total || 0) + Number(totalDelta || 0));
-      const nextLimit = Math.max(1, Number(prev?.limit || limitePorPagina || 25));
+      const nextLimit = limitePorPagina === PAGE_SIZE_ALL
+        ? Math.max(nextTotal, solicitacoesRef.current.length, 1)
+        : Math.max(1, Number(prev?.limit || limitePorPagina || 25));
       return {
         ...prev,
         total: nextTotal,
@@ -506,10 +511,13 @@ export default function Solicitacoes({ arquivadas = false }) {
       const proximaLista = [resumo, ...listaAtual]
         .filter((item, index, array) => (
           array.findIndex((outro) => Number(outro.id) === Number(item.id)) === index
-        ))
-        .slice(0, limitePorPagina);
+        ));
 
-      aplicarListaLocal(proximaLista, { totalDelta: 1 });
+      const listaLimitada = limitePorPagina === PAGE_SIZE_ALL
+        ? proximaLista
+        : proximaLista.slice(0, Number(limitePorPagina || 25));
+
+      aplicarListaLocal(listaLimitada, { totalDelta: 1 });
     } catch (error) {
       const status = Number(error?.status || 0);
       if ((status === 403 || status === 404) && indiceAtual >= 0) {
@@ -565,7 +573,7 @@ export default function Solicitacoes({ arquivadas = false }) {
         paramsObj.arquivadas = '1';
       }
       paramsObj.page = String(paginaAtual);
-      paramsObj.limit = String(limitePorPagina);
+      paramsObj.limit = limitePorPagina === PAGE_SIZE_ALL ? PAGE_SIZE_ALL : String(limitePorPagina);
 
       const params = new URLSearchParams(paramsObj).toString();
 
@@ -590,7 +598,7 @@ export default function Solicitacoes({ arquivadas = false }) {
       });
       setMetaPaginacao({
         page: Number(data?.meta?.page || paginaAtual),
-        limit: Number(data?.meta?.limit || limitePorPagina),
+        limit: data?.meta?.limit === PAGE_SIZE_ALL ? PAGE_SIZE_ALL : Number(data?.meta?.limit || limitePorPagina),
         total: Number(data?.meta?.total || lista.length),
         total_pages: Number(data?.meta?.total_pages || (lista.length > 0 ? 1 : 0))
       });
@@ -618,7 +626,7 @@ export default function Solicitacoes({ arquivadas = false }) {
         paramsObj.arquivadas = '1';
       }
       paramsObj.page = String(paginaAtual);
-      paramsObj.limit = String(limitePorPagina);
+      paramsObj.limit = limitePorPagina === PAGE_SIZE_ALL ? PAGE_SIZE_ALL : String(limitePorPagina);
 
       const params = new URLSearchParams(paramsObj).toString();
       const res = await fetch(`${API_URL}/solicitacoes?${params}`, {
@@ -643,7 +651,7 @@ export default function Solicitacoes({ arquivadas = false }) {
       });
       setMetaPaginacao({
         page: Number(data?.meta?.page || paginaAtual),
-        limit: Number(data?.meta?.limit || limitePorPagina),
+        limit: data?.meta?.limit === PAGE_SIZE_ALL ? PAGE_SIZE_ALL : Number(data?.meta?.limit || limitePorPagina),
         total: Number(data?.meta?.total || lista.length),
         total_pages: Number(data?.meta?.total_pages || (lista.length > 0 ? 1 : 0))
       });
@@ -663,10 +671,14 @@ export default function Solicitacoes({ arquivadas = false }) {
   }, 0);
   const totalSolicitacoes = Number(metaPaginacao?.total || 0);
   const totalPaginas = Number(metaPaginacao?.total_pages || 0);
-  const paginaInicial = totalSolicitacoes === 0 ? 0 : ((paginaAtual - 1) * limitePorPagina) + 1;
+  const exibindoTodas = limitePorPagina === PAGE_SIZE_ALL;
+  const limiteNumericoAtual = exibindoTodas
+    ? Math.max(totalSolicitacoes, solicitacoes.length, 1)
+    : Number(limitePorPagina || 25);
+  const paginaInicial = totalSolicitacoes === 0 ? 0 : ((paginaAtual - 1) * limiteNumericoAtual) + 1;
   const paginaFinal = totalSolicitacoes === 0
     ? 0
-    : Math.min(totalSolicitacoes, paginaAtual * limitePorPagina);
+    : Math.min(totalSolicitacoes, paginaAtual * limiteNumericoAtual);
 
   const setorTokens = [
     String(user?.setor?.codigo || '').toUpperCase(),
@@ -1322,11 +1334,15 @@ export default function Solicitacoes({ arquivadas = false }) {
                 <select
                   className="input !w-auto min-w-[88px]"
                   value={limitePorPagina}
-                  onChange={(event) => setLimitePorPagina(Number(event.target.value) || 25)}
+                  onChange={(event) => {
+                    const valor = event.target.value;
+                    setLimitePorPagina(valor === PAGE_SIZE_ALL ? PAGE_SIZE_ALL : Number(valor) || 25);
+                  }}
                 >
-                  {[10, 25, 50, 100].map((opcao) => (
+                  {PAGE_SIZE_OPTIONS.map((opcao) => (
                     <option key={opcao} value={opcao}>{opcao}</option>
                   ))}
+                  <option value={PAGE_SIZE_ALL}>Todas</option>
                 </select>
               </label>
 
@@ -1335,18 +1351,18 @@ export default function Solicitacoes({ arquivadas = false }) {
                   type="button"
                   className="btn btn-outline"
                   onClick={() => setPaginaAtual((prev) => Math.max(1, prev - 1))}
-                  disabled={paginaAtual <= 1}
+                  disabled={exibindoTodas || paginaAtual <= 1}
                 >
                   Anterior
                 </button>
                 <span className="text-sm text-gray-700 dark:text-slate-200 min-w-[96px] text-center">
-                  Página {paginaAtual} de {Math.max(totalPaginas, 1)}
+                  {exibindoTodas ? 'Todas' : `Página ${paginaAtual} de ${Math.max(totalPaginas, 1)}`}
                 </span>
                 <button
                   type="button"
                   className="btn btn-outline"
                   onClick={() => setPaginaAtual((prev) => Math.min(Math.max(totalPaginas, 1), prev + 1))}
-                  disabled={totalPaginas === 0 || paginaAtual >= totalPaginas}
+                  disabled={exibindoTodas || totalPaginas === 0 || paginaAtual >= totalPaginas}
                 >
                   Próxima
                 </button>
