@@ -940,66 +940,12 @@ function isLocalDataContratoParagraph(text) {
   );
 }
 
-function splitSignatureLines(value) {
-  return safeString(value)
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean);
-}
-
-function getLine(lines = [], index = 0) {
-  return safeString(lines[index]).trim();
-}
-
 function isIncorporadoraNomeAssinatura(normalized = '') {
   return normalized.length <= 90 && /\bLTDA\b/.test(normalized) && (
     normalized.includes('SPE')
     || normalized.includes('INCORPORADORA')
     || normalized.includes('CONSTRUTORA')
   );
-}
-
-function buildClienteAssinaturaLines(dados = {}) {
-  return [
-    safeString(dados?.cliente?.nome).trim(),
-    formatDocumentoRotulado(dados?.cliente?.cpf_cnpj)
-  ].filter(Boolean);
-}
-
-function buildConjugeAssinaturaLines(dados = {}) {
-  return [
-    safeString(dados?.conjuge?.nome).trim(),
-    formatDocumentoRotulado(dados?.conjuge?.cpf_cnpj)
-  ].filter(Boolean);
-}
-
-function buildCompradoresAssinaturaLines(dados = {}) {
-  const assinaturaLinha = '________________________________________';
-  const compradores = Array.isArray(dados?.compradores?.itens) && dados.compradores.itens.length
-    ? dados.compradores.itens
-    : [{ cliente: dados?.cliente, conjuge: dados?.conjuge }];
-  const linhas = [];
-
-  compradores.forEach((comprador, index) => {
-    const label = compradores.length > 1 ? `COMPRADOR(A) ${index + 1}` : 'COMPRADOR(A)';
-    const clienteLines = [
-      comprador?.cliente?.nome,
-      formatDocumentoRotulado(comprador?.cliente?.cpf_cnpj)
-    ].map((item) => safeString(item).trim()).filter(Boolean);
-    if (clienteLines.length) {
-      linhas.push(assinaturaLinha, ...clienteLines, label);
-    }
-
-    const conjugeLines = [
-      comprador?.conjuge?.nome,
-      formatDocumentoRotulado(comprador?.conjuge?.cpf_cnpj)
-    ].map((item) => safeString(item).trim()).filter(Boolean);
-    if (conjugeLines.length) {
-      linhas.push(assinaturaLinha, ...conjugeLines, `CONJUGE ${compradores.length > 1 ? index + 1 : ''}`.trim());
-    }
-  });
-
-  return linhas;
 }
 
 function isAssinaturaContratoPlaceholder(normalized = '') {
@@ -1031,35 +977,40 @@ function buildAssinaturasDocumentoFinal(dados = {}, incorporadoraAssinatura = ''
 }
 
 function applyContratoAssinaturasAutomation(zip, dados = {}) {
-  const testemunha1 = dados?.testemunha_1 || {};
-  const testemunha2 = dados?.testemunha_2 || {};
   const localDataAssinatura = safeString(dados?.contrato?.local_data_assinatura).trim();
 
   zip.file(/word\/document\.xml$/).forEach((entry) => {
     const originalXml = entry.asText();
     let xml = originalXml;
-    const tableBlocks = [];
-    xml = xml.replace(/<w:tbl[\s\S]*?<\/w:tbl>/g, (tableXml) => {
-      const token = `__FLUXY_TABLE_BLOCK_${tableBlocks.length}__`;
-      tableBlocks.push({ token, tableXml });
-      return token;
-    });
-
     const incorporadoraAssinatura = dados?.assinaturas?.vendedora_dados
       || extractIncorporadoraAssinaturaFromDocumentXml(originalXml)
       || dados?.assinaturas?.vendedora
       || dados?.empreendimento?.nome;
-    const incorporadoraLines = splitSignatureLines(incorporadoraAssinatura);
-    const clienteLines = buildClienteAssinaturaLines(dados);
-    const conjugeLines = buildConjugeAssinaturaLines(dados);
-    const compradoresLines = buildCompradoresAssinaturaLines(dados);
-    let assinaturasCompradoresInseridas = false;
-    let ultimaAssinaturaPessoa = '';
+    const paragrafos = originalXml.match(/<w:p[\s\S]*?<\/w:p>/g) || [];
+    let memorialIndex = -1;
+    let assinaturaFinalMemorialIndex = -1;
+
+    paragrafos.forEach((paragraphXml, index) => {
+      const normalized = normalizeXmlText(paragraphXml);
+      if (normalized.includes('MEMORIAL DESCRITIVO')) {
+        memorialIndex = index;
+      }
+      if (memorialIndex >= 0 && index > memorialIndex && isIncorporadoraNomeAssinatura(normalized)) {
+        const previousNormalized = index > 0 ? normalizeXmlText(paragrafos[index - 1]) : '';
+        assinaturaFinalMemorialIndex = /^_+$/.test(previousNormalized.replace(/\s+/g, ''))
+          ? index - 1
+          : index;
+      }
+    });
+
     let aguardandoBlocoAssinaturaContrato = false;
     let removendoBlocoAssinaturaContrato = false;
     let testemunhasRemovidasDoBlocoContrato = 0;
+    let paragraphIndex = 0;
 
     xml = xml.replace(/<w:p[\s\S]*?<\/w:p>/g, (paragraphXml) => {
+      const currentIndex = paragraphIndex;
+      paragraphIndex += 1;
       const text = decodeXmlEntities(getXmlText(paragraphXml));
       const normalized = text
         .normalize('NFD')
@@ -1073,7 +1024,10 @@ function applyContratoAssinaturasAutomation(zip, dados = {}) {
         return buildParagraphLines([localDataAssinatura], { align: 'center' });
       }
 
-      if (aguardandoBlocoAssinaturaContrato && isAssinaturaContratoPlaceholder(normalized)) {
+      if (
+        (aguardandoBlocoAssinaturaContrato && isAssinaturaContratoPlaceholder(normalized))
+        || currentIndex === assinaturaFinalMemorialIndex
+      ) {
         aguardandoBlocoAssinaturaContrato = false;
         removendoBlocoAssinaturaContrato = true;
         return buildParagraphLines(buildAssinaturasDocumentoFinal(dados, incorporadoraAssinatura), {
@@ -1092,77 +1046,7 @@ function applyContratoAssinaturasAutomation(zip, dados = {}) {
         return '';
       }
 
-      if (isIncorporadoraNomeAssinatura(normalized)) {
-        removendoBlocoAssinaturaContrato = true;
-        testemunhasRemovidasDoBlocoContrato = 0;
-        return buildParagraphLines(buildAssinaturasDocumentoFinal(dados, incorporadoraAssinatura), {
-          align: 'center',
-          preserveBlankLines: true
-        });
-      }
-
-      if (/^CNPJ\b/.test(normalized)) {
-        return buildParagraphLines([getLine(incorporadoraLines, 1)], { align: 'center' });
-      }
-
-      if (/^REPRESENTAD[AO]\b/.test(normalized)) {
-        return buildParagraphLines([getLine(incorporadoraLines, 2)], { align: 'center' });
-      }
-
-      if (/^RG\b/.test(normalized) && normalized.includes('CPF')) {
-        return buildParagraphLines([getLine(incorporadoraLines, 3)], { align: 'center' });
-      }
-
-      if (normalized === 'INCORPORADORA') {
-        return buildParagraphLines(['INCORPORADORA'], { align: 'center' });
-      }
-
-      if (normalized === 'COMPRADOR 1') {
-        if (compradoresLines.length) {
-          assinaturasCompradoresInseridas = true;
-          return buildParagraphLines(compradoresLines, { align: 'center' });
-        }
-        ultimaAssinaturaPessoa = 'cliente';
-        return buildParagraphLines([getLine(clienteLines, 0)], { align: 'center' });
-      }
-
-      if (normalized === 'COMPRADOR 2') {
-        if (assinaturasCompradoresInseridas) return '';
-        ultimaAssinaturaPessoa = 'conjuge';
-        return buildParagraphLines([getLine(conjugeLines, 0)], { align: 'center' });
-      }
-
-      if (normalized === 'DESCRITO NO QUADRO RESUMO') {
-        if (assinaturasCompradoresInseridas) return '';
-        const lines = ultimaAssinaturaPessoa === 'conjuge' ? conjugeLines : clienteLines;
-        return buildParagraphLines([getLine(lines, 1)], { align: 'center' });
-      }
-
-      if (testemunha1.nome && normalized.includes('DALVINA DE OLIVEIRA LIMA')) {
-        return buildParagraphLines([testemunha1.nome], { align: 'center' });
-      }
-
-      if (testemunha1.cpf && normalized.includes('123.100.157')) {
-        return buildParagraphLines([formatCpfAssinatura(testemunha1.cpf)], { align: 'center' });
-      }
-
-      if (testemunha2.nome && normalized.includes('OTAVIO TEIXEIRA DE AZEVEDO')) {
-        return buildParagraphLines([testemunha2.nome], { align: 'center' });
-      }
-
-      if (testemunha2.cpf && normalized.includes('178.544.147')) {
-        return buildParagraphLines([formatCpfAssinatura(testemunha2.cpf)], { align: 'center' });
-      }
-
-      if (normalized === 'TESTEMUNHA') {
-        return buildParagraphLines(['TESTEMUNHA'], { align: 'center' });
-      }
-
       return paragraphXml;
-    });
-
-    tableBlocks.forEach(({ token, tableXml }) => {
-      xml = replaceAll(xml, token, tableXml);
     });
 
     zip.file(entry.name, xml);
