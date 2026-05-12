@@ -382,31 +382,6 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
   const diferencaPagamentos = useMemo(() => roundCurrency(valorSolicitacao - totalPagamentos), [valorSolicitacao, totalPagamentos]);
   const totalBateComSolicitacao = Math.abs(diferencaPagamentos) <= 0.009;
 
-  const pagamentosValidos = useMemo(() => {
-    const pagamentos = Array.isArray(form.pagamentos) ? form.pagamentos : [];
-    if (pagamentos.length === 0) return false;
-
-    return pagamentos.every((pagamento) => {
-      const forma = getFormaPagamento(pagamento.forma_pagamento_id);
-      const quantidade = getQuantidadeParcelas(pagamento);
-      const usaDetalhe = forma && (isFormaBoleto(forma) || isFormaCheque(forma));
-
-      if (forma?.exige_cartao && !pagamento.cartao_id) return false;
-      if (usaDetalhe) {
-        const parcelas = Array.isArray(pagamento.parcelas) ? pagamento.parcelas : [];
-        if (parcelas.length !== quantidade) return false;
-        return parcelas.every((parcela) => {
-          if (!parcela?.data_vencimento || currencyToNumber(parcela.valor) <= 0) return false;
-          if (!isFormaCheque(forma)) return true;
-          return Boolean(String(parcela.cheque_numero || '').trim() && String(parcela.cheque_emitente || '').trim());
-        });
-      }
-
-      if (!isFormaCartao(forma) && !pagamento.data_vencimento) return false;
-      return currencyToNumber(pagamento.valor) > 0;
-    });
-  }, [form.pagamentos, formasPagamento]);
-
   const categoriasAutocomplete = useMemo(() => {
     if (!categoriaSearch.trim() || selectedCategory) {
       return [];
@@ -507,7 +482,13 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
         ...parcelas[parcelaIndex],
         [field]: value
       };
-      pagamentos[pagamentoIndex] = { ...pagamento, parcelas };
+      pagamentos[pagamentoIndex] = {
+        ...pagamento,
+        parcelas,
+        valor: field === 'valor'
+          ? formatCurrencyInput(parcelas.reduce((acc, parcela) => acc + currencyToNumber(parcela.valor), 0))
+          : pagamento.valor
+      };
       return { ...current, pagamentos };
     });
   }
@@ -526,8 +507,80 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
     });
   }
 
+  function validarGeracaoConta() {
+    if (!selectedPartner?.id && !form.parceiro_id) {
+      return 'Selecione o credor antes de gerar a conta.';
+    }
+
+    if (valorSolicitacao <= 0) {
+      return 'A solicitacao precisa ter valor informado para gerar a conta.';
+    }
+
+    const pagamentos = Array.isArray(form.pagamentos) ? form.pagamentos : [];
+    if (pagamentos.length === 0) {
+      return 'Informe pelo menos uma forma de pagamento.';
+    }
+
+    for (const [pagamentoIndex, pagamento] of pagamentos.entries()) {
+      const forma = getFormaPagamento(pagamento.forma_pagamento_id);
+      const usaDetalhe = forma && (isFormaBoleto(forma) || isFormaCheque(forma));
+      const usaCartao = isFormaCartao(forma);
+      const valorPagamento = getValorPagamento(pagamento);
+      const labelForma = `forma de pagamento ${pagamentoIndex + 1}`;
+
+      if (valorPagamento <= 0) {
+        return `Informe o valor da ${labelForma}.`;
+      }
+
+      if (forma?.exige_cartao && !pagamento.cartao_id) {
+        return `Selecione o cartao da ${labelForma}.`;
+      }
+
+      if (usaDetalhe) {
+        const quantidade = getQuantidadeParcelas(pagamento);
+        const parcelas = Array.isArray(pagamento.parcelas) ? pagamento.parcelas : [];
+        if (parcelas.length !== quantidade) {
+          return `Confira a quantidade de parcelas da ${labelForma}.`;
+        }
+
+        for (const [parcelaIndex, parcela] of parcelas.entries()) {
+          const labelParcela = `parcela ${parcelaIndex + 1} da ${labelForma}`;
+          if (currencyToNumber(parcela.valor) <= 0) {
+            return `Informe o valor da ${labelParcela}.`;
+          }
+          if (!parcela.data_vencimento) {
+            return `Informe o vencimento da ${labelParcela}.`;
+          }
+          if (isFormaCheque(forma)) {
+            if (!String(parcela.cheque_numero || '').trim()) {
+              return `Informe o numero do cheque da ${labelParcela}.`;
+            }
+            if (!String(parcela.cheque_emitente || '').trim()) {
+              return `Informe o emitente do cheque da ${labelParcela}.`;
+            }
+          }
+        }
+      } else if (!usaCartao && !pagamento.data_vencimento) {
+        return `Informe o vencimento da ${labelForma}.`;
+      }
+    }
+
+    if (!totalBateComSolicitacao) {
+      const direcao = diferencaPagamentos > 0 ? 'faltam' : 'sobram';
+      return `A soma das formas de pagamento precisa ser igual ao valor da solicitacao. Valor da solicitacao: ${formatCurrency(valorSolicitacao)}. Total informado: ${formatCurrency(totalPagamentos)}. Ainda ${direcao} ${formatCurrency(Math.abs(diferencaPagamentos))}.`;
+    }
+
+    return '';
+  }
+
   async function handleSubmit(event) {
     event.preventDefault();
+    const erroValidacao = validarGeracaoConta();
+    if (erroValidacao) {
+      setErro(erroValidacao);
+      return;
+    }
+
     try {
       setSaving(true);
       setErro('');
@@ -1068,13 +1121,7 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
                 <button
                   type="submit"
                   className="btn btn-primary"
-                  disabled={
-                    saving ||
-                    !selectedPartner?.id ||
-                    !form.valor ||
-                    !pagamentosValidos ||
-                    !totalBateComSolicitacao
-                  }
+                  disabled={saving}
                 >
                   {saving ? 'Gerando...' : 'Confirmar'}
                 </button>
