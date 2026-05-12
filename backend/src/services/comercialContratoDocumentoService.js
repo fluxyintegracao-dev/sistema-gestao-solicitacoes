@@ -515,9 +515,11 @@ function decodeXmlEntities(value) {
 }
 
 function buildParagraphLines(lines = [], options = {}) {
-  return lines
-    .map((line) => safeString(line).trim())
-    .filter(Boolean)
+  const normalizedLines = lines
+    .map((line) => safeString(line).trim());
+
+  return normalizedLines
+    .filter((line) => options.preserveBlankLines || Boolean(line))
     .map((line) => buildParagraphXml([{ text: line }], options))
     .join('');
 }
@@ -762,16 +764,21 @@ function buildQuadroResumoPagamentoRows(sampleRow, dados = {}) {
   ], { align: 'center' }));
 }
 
-function buildAssinaturasQuadroResumo(dados = {}) {
+function buildAssinaturasQuadroResumo(dados = {}, options = {}) {
   const linhas = [];
   const assinaturaLinha = '__________________________________________________________________';
+  const espacoEntreAssinaturas = Math.max(1, Number(options.espacoEntreAssinaturas || 1));
   const addAssinatura = (titulo, partes = []) => {
     const conteudo = partes
       .flatMap((parte) => safeString(parte).split(/\r?\n/))
       .map((parte) => parte.trim())
       .filter(Boolean);
     if (!conteudo.length) return;
-    if (linhas.length) linhas.push('');
+    if (linhas.length) {
+      for (let index = 0; index < espacoEntreAssinaturas; index += 1) {
+        linhas.push('');
+      }
+    }
     linhas.push(assinaturaLinha);
     linhas.push(...conteudo);
     if (titulo) linhas.push(titulo);
@@ -1013,15 +1020,33 @@ function isAssinaturaContratoPlaceholder(normalized = '') {
   return false;
 }
 
+function buildAssinaturasDocumentoFinal(dados = {}, incorporadoraAssinatura = '') {
+  return buildAssinaturasQuadroResumo({
+    ...dados,
+    assinaturas: {
+      ...(dados.assinaturas || {}),
+      vendedora_dados: incorporadoraAssinatura
+    }
+  }, { espacoEntreAssinaturas: 2 });
+}
+
 function applyContratoAssinaturasAutomation(zip, dados = {}) {
   const testemunha1 = dados?.testemunha_1 || {};
   const testemunha2 = dados?.testemunha_2 || {};
   const localDataAssinatura = safeString(dados?.contrato?.local_data_assinatura).trim();
 
   zip.file(/word\/document\.xml$/).forEach((entry) => {
-    let xml = entry.asText();
+    const originalXml = entry.asText();
+    let xml = originalXml;
+    const tableBlocks = [];
+    xml = xml.replace(/<w:tbl[\s\S]*?<\/w:tbl>/g, (tableXml) => {
+      const token = `__FLUXY_TABLE_BLOCK_${tableBlocks.length}__`;
+      tableBlocks.push({ token, tableXml });
+      return token;
+    });
+
     const incorporadoraAssinatura = dados?.assinaturas?.vendedora_dados
-      || extractIncorporadoraAssinaturaFromDocumentXml(xml)
+      || extractIncorporadoraAssinaturaFromDocumentXml(originalXml)
       || dados?.assinaturas?.vendedora
       || dados?.empreendimento?.nome;
     const incorporadoraLines = splitSignatureLines(incorporadoraAssinatura);
@@ -1051,14 +1076,10 @@ function applyContratoAssinaturasAutomation(zip, dados = {}) {
       if (aguardandoBlocoAssinaturaContrato && isAssinaturaContratoPlaceholder(normalized)) {
         aguardandoBlocoAssinaturaContrato = false;
         removendoBlocoAssinaturaContrato = true;
-        const dadosAssinaturas = {
-          ...dados,
-          assinaturas: {
-            ...(dados.assinaturas || {}),
-            vendedora_dados: incorporadoraAssinatura
-          }
-        };
-        return buildParagraphLines(buildAssinaturasQuadroResumo(dadosAssinaturas), { align: 'center' });
+        return buildParagraphLines(buildAssinaturasDocumentoFinal(dados, incorporadoraAssinatura), {
+          align: 'center',
+          preserveBlankLines: true
+        });
       }
 
       if (removendoBlocoAssinaturaContrato && isAssinaturaContratoPlaceholder(normalized)) {
@@ -1072,7 +1093,12 @@ function applyContratoAssinaturasAutomation(zip, dados = {}) {
       }
 
       if (isIncorporadoraNomeAssinatura(normalized)) {
-        return buildParagraphLines([getLine(incorporadoraLines, 0)], { align: 'center' });
+        removendoBlocoAssinaturaContrato = true;
+        testemunhasRemovidasDoBlocoContrato = 0;
+        return buildParagraphLines(buildAssinaturasDocumentoFinal(dados, incorporadoraAssinatura), {
+          align: 'center',
+          preserveBlankLines: true
+        });
       }
 
       if (/^CNPJ\b/.test(normalized)) {
@@ -1133,6 +1159,10 @@ function applyContratoAssinaturasAutomation(zip, dados = {}) {
       }
 
       return paragraphXml;
+    });
+
+    tableBlocks.forEach(({ token, tableXml }) => {
+      xml = replaceAll(xml, token, tableXml);
     });
 
     zip.file(entry.name, xml);
