@@ -89,6 +89,9 @@ function ModalRevisarRespostaArquivo({ fornecedor, itens, onSalvar, onFechar }) 
     observacao: '',
     quantidade_minima_item: ''
   })));
+  const [valorMinimoPedido, setValorMinimoPedido] = useState(fornecedor?.valor_minimo_pedido ?? '');
+  const [condicaoPagamento, setCondicaoPagamento] = useState(fornecedor?.condicao_pagamento || '');
+  const [prazoEntrega, setPrazoEntrega] = useState(fornecedor?.prazo_entrega || '');
   const [salvando, setSalvando] = useState(false);
 
   function atualizarLinha(index, field, value) {
@@ -99,8 +102,24 @@ function ModalRevisarRespostaArquivo({ fornecedor, itens, onSalvar, onFechar }) 
 
   async function handleSalvar() {
     try {
+      if (valorMinimoPedido === '' || valorMinimoPedido === null || valorMinimoPedido === undefined) {
+        alert('Informe o VLR minimo pedido.');
+        return;
+      }
+      if (!String(condicaoPagamento || '').trim()) {
+        alert('Informe a condicao de pagamento.');
+        return;
+      }
+      if (!String(prazoEntrega || '').trim()) {
+        alert('Informe o prazo de entrega.');
+        return;
+      }
+
       setSalvando(true);
       await onSalvar({
+        valor_minimo_pedido: valorMinimoPedido,
+        condicao_pagamento: condicaoPagamento,
+        prazo_entrega: prazoEntrega,
         itens: linhas.map((linha) => ({
           item_tipo: linha.item_tipo,
           item_referencia_id: linha.item_referencia_id,
@@ -135,6 +154,37 @@ function ModalRevisarRespostaArquivo({ fornecedor, itens, onSalvar, onFechar }) 
           <p className="mb-3 text-sm text-[var(--c-muted)]">
             Transcreva os valores do arquivo anexado para que a resposta entre no comparativo da cotacao.
           </p>
+          <div className="mb-4 grid gap-3 md:grid-cols-3">
+            <label className="grid gap-1 text-sm">
+              <span className="text-xs font-semibold text-[var(--c-muted)]">VLR minimo pedido *</span>
+              <input
+                className="input"
+                type="number"
+                min="0"
+                step="0.01"
+                value={valorMinimoPedido}
+                onChange={(event) => setValorMinimoPedido(event.target.value)}
+              />
+            </label>
+            <label className="grid gap-1 text-sm">
+              <span className="text-xs font-semibold text-[var(--c-muted)]">Condicao de pagamento *</span>
+              <input
+                className="input"
+                value={condicaoPagamento}
+                onChange={(event) => setCondicaoPagamento(event.target.value)}
+                placeholder="Ex.: PIX, 30/60 dias"
+              />
+            </label>
+            <label className="grid gap-1 text-sm">
+              <span className="text-xs font-semibold text-[var(--c-muted)]">Prazo de entrega *</span>
+              <input
+                className="input"
+                value={prazoEntrega}
+                onChange={(event) => setPrazoEntrega(event.target.value)}
+                placeholder="Ex.: 7 dias"
+              />
+            </label>
+          </div>
           <div className="overflow-x-auto rounded-xl border border-[var(--c-border)]">
             <table className="w-full min-w-[880px] text-sm">
               <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
@@ -1369,6 +1419,28 @@ export default function SolicitacaoCompraDetalheView() {
               itensCombinados={itensCombinados}
             />
 
+            {Array.isArray(solicitacao.logs) && solicitacao.logs.some((log) => log.tipo_acao === 'RESPOSTA_INTERNA_COMPRAS') && (
+              <div className="card sol-surface-card">
+                <div className="card-header">
+                  <h2 className="font-semibold">Auditoria de respostas internas</h2>
+                </div>
+                <div className="app-list-stack">
+                  {solicitacao.logs
+                    .filter((log) => log.tipo_acao === 'RESPOSTA_INTERNA_COMPRAS')
+                    .map((log) => (
+                      <div key={log.id} className="rounded-lg border border-[var(--c-border)] px-3 py-2 text-sm">
+                        <div className="font-semibold text-[var(--c-text)]">
+                          {log.usuario?.nome || 'Usuario interno'} respondeu pelo fornecedor {log.fornecedor?.nome || '-'}
+                        </div>
+                        <div className="text-xs text-[var(--c-muted)]">
+                          {fmt(log.createdAt)} - {log.descricao}
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
+
             {/* Lista de fornecedores vinculados */}
             {solicitacao.fornecedores?.length > 0 && (
               <div className="app-list-stack mt-4">
@@ -1392,6 +1464,11 @@ export default function SolicitacaoCompraDetalheView() {
                           <div className="text-xs text-[var(--c-muted)]">
                             Status: {fmtStatus(cotacaoFornecedor.status)} · Respondido em {fmt(cotacaoFornecedor.respondido_em)}
                           </div>
+                          {cotacaoFornecedor.status === 'RESPONDIDO' && (
+                            <div className="text-xs text-[var(--c-muted)]">
+                              Pedido minimo: {cotacaoFornecedor.valor_minimo_pedido !== null && cotacaoFornecedor.valor_minimo_pedido !== undefined ? fmtMoeda(cotacaoFornecedor.valor_minimo_pedido) : '-'} - Condicao: {cotacaoFornecedor.condicao_pagamento || '-'} - Prazo entrega: {cotacaoFornecedor.prazo_entrega || '-'}
+                            </div>
+                          )}
                           {possuiRespostaArquivo && (
                             <div className="text-xs font-semibold text-blue-700">
                               Resposta por arquivo anexado

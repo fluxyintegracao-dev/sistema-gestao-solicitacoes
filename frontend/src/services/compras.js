@@ -408,10 +408,13 @@ export async function responderCotacaoPublica(token, data) {
   return handleJsonResponse(response, 'Erro ao enviar resposta da cotacao');
 }
 
-export async function uploadPlanilhaCotacaoPublica(token, file) {
+export async function uploadPlanilhaCotacaoPublica(token, file, data = {}) {
   const formData = new FormData();
   formData.append('token', token);
   formData.append('file', file);
+  formData.append('valor_minimo_pedido', data.valor_minimo_pedido ?? '');
+  formData.append('condicao_pagamento', data.condicao_pagamento ?? '');
+  formData.append('prazo_entrega', data.prazo_entrega ?? '');
 
   const response = await fetch(`${API_URL}/cotacoes/upload`, {
     method: 'POST',

@@ -40,6 +40,10 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.DATEONLY,
         allowNull: true
       },
+      prazo_entrega: {
+        type: DataTypes.STRING(120),
+        allowNull: true
+      },
       valor_minimo_pedido: {
         type: DataTypes.DECIMAL(12, 2),
         allowNull: true

@@ -1,4 +1,5 @@
 const path = require('path');
+const jwt = require('jsonwebtoken');
 const { Op } = require('sequelize');
 const {
   Apropriacao,
@@ -12,8 +13,10 @@ const {
   SolicitacaoCompraItemManual,
   SolicitacaoCompraItemManualApropriacao,
   SolicitacaoCompraRespostaItem,
-  Unidade
+  Unidade,
+  User
 } = require('../models');
+const { env } = require('../config/env');
 const {
   gerarModeloCotacaoCsv,
   gerarModeloCotacaoXlsx,
@@ -53,6 +56,65 @@ function getNomeTipoArquivoResposta(tipo = 'ARQUIVO') {
   if (tipo === 'PDF') return 'PDF';
   if (tipo === 'IMAGEM') return 'imagem';
   return 'arquivo';
+}
+
+async function identificarUsuarioInternoOpcional(req) {
+  try {
+    const authHeader = String(req.headers?.authorization || '').trim();
+    const cookieToken = String(req.cookies?.[env.authCookieName] || '').trim();
+    let token = null;
+
+    if (authHeader) {
+      const [scheme, headerToken] = authHeader.split(' ');
+      if (String(scheme || '').toLowerCase() === 'bearer' && headerToken) {
+        token = headerToken;
+      }
+    } else if (cookieToken) {
+      token = cookieToken;
+    }
+
+    if (!token) {
+      return null;
+    }
+
+    const decoded = jwt.verify(token, env.jwtSecret);
+    const usuario = await User.findByPk(decoded.id, {
+      attributes: ['id', 'nome', 'email', 'ativo']
+    });
+
+    if (!usuario || usuario.ativo === false) {
+      return null;
+    }
+
+    return usuario;
+  } catch {
+    return null;
+  }
+}
+
+function normalizarValorMinimoPedido(value) {
+  if (value === '' || value === null || value === undefined) {
+    throw new Error('Informe o VLR minimo pedido.');
+  }
+
+  const raw = String(value).trim();
+  const normalized = raw.includes(',')
+    ? Number(raw.replace(/\./g, '').replace(',', '.'))
+    : Number(raw);
+  if (!Number.isFinite(normalized) || normalized < 0) {
+    throw new Error('Valor minimo do pedido invalido.');
+  }
+
+  return normalized;
+}
+
+function normalizarCampoObrigatorio(value, label) {
+  const normalized = String(value || '').trim();
+  if (!normalized) {
+    throw new Error(`Informe ${label}.`);
+  }
+
+  return normalized;
 }
 
 function buildApiOrigin(req) {
@@ -172,6 +234,7 @@ async function serializarCotacaoPublica(cotacaoFornecedor, req) {
       enviado_em: cotacaoFornecedor?.enviado_em,
       visualizado_em: cotacaoFornecedor?.visualizado_em,
       respondido_em: cotacaoFornecedor?.respondido_em,
+      prazo_entrega: cotacaoFornecedor?.prazo_entrega || '',
       valor_minimo_pedido: cotacaoFornecedor?.valor_minimo_pedido ?? '',
       condicao_pagamento: cotacaoFornecedor?.condicao_pagamento || '',
       pdf_resposta_url: arquivoRespostaUrl || null,
@@ -215,16 +278,9 @@ async function salvarRespostasCotacao(cotacaoFornecedor, itensResposta, options 
   );
 
   const respostasPreparadas = [];
-  const valorMinimoPedido =
-    options.valor_minimo_pedido === '' ||
-    options.valor_minimo_pedido === null ||
-    options.valor_minimo_pedido === undefined
-      ? null
-      : Number(options.valor_minimo_pedido);
-
-  if (valorMinimoPedido !== null && (!Number.isFinite(valorMinimoPedido) || valorMinimoPedido < 0)) {
-    throw new Error('Valor minimo do pedido invalido.');
-  }
+  const valorMinimoPedido = normalizarValorMinimoPedido(options.valor_minimo_pedido);
+  const condicaoPagamento = normalizarCampoObrigatorio(options.condicao_pagamento, 'a condicao de pagamento');
+  const prazoEntrega = normalizarCampoObrigatorio(options.prazo_entrega, 'o prazo de entrega');
 
   for (const itemResposta of itensResposta) {
     const itemTipo = normalizeText(itemResposta.item_tipo);
@@ -308,40 +364,59 @@ async function salvarRespostasCotacao(cotacaoFornecedor, itensResposta, options 
     respondido_em: new Date(),
     visualizado_em: cotacaoFornecedor.visualizado_em || new Date(),
     valor_minimo_pedido: valorMinimoPedido,
-    condicao_pagamento: options.condicao_pagamento
-      ? String(options.condicao_pagamento).trim()
-      : null
+    condicao_pagamento: condicaoPagamento,
+    prazo_entrega: prazoEntrega
   });
 
+  const usuarioInterno = options.usuario_interno || null;
   await registrarLogSolicitacaoCompra({
     solicitacaoCompraId: cotacaoFornecedor.solicitacao.id,
+    usuarioId: usuarioInterno?.id || null,
     fornecedorCompraId: cotacaoFornecedor.fornecedor_compra_id,
-    tipoAcao: 'RESPOSTA_FORNECEDOR',
-    descricao: `Fornecedor ${cotacaoFornecedor.fornecedor?.nome || cotacaoFornecedor.fornecedor_compra_id} respondeu a cotacao`,
+    tipoAcao: usuarioInterno ? 'RESPOSTA_INTERNA_COMPRAS' : 'RESPOSTA_FORNECEDOR',
+    descricao: usuarioInterno
+      ? `Usuario interno ${usuarioInterno.nome || usuarioInterno.id} preencheu a cotacao do fornecedor ${cotacaoFornecedor.fornecedor?.nome || cotacaoFornecedor.fornecedor_compra_id}`
+      : `Fornecedor ${cotacaoFornecedor.fornecedor?.nome || cotacaoFornecedor.fornecedor_compra_id} respondeu a cotacao`,
     metadados: {
       cotacao_fornecedor_id: cotacaoFornecedor.id,
-      quantidade_itens: respostasPreparadas.length
+      quantidade_itens: respostasPreparadas.length,
+      origem_resposta: usuarioInterno ? 'INTERNA' : 'FORNECEDOR',
+      usuario_interno_id: usuarioInterno?.id || null,
+      usuario_interno_nome: usuarioInterno?.nome || null
     }
   });
 }
 
-async function registrarRespostaArquivoCotacao(cotacaoFornecedor, req, tipoArquivo = 'ARQUIVO') {
+async function registrarRespostaArquivoCotacao(cotacaoFornecedor, req, tipoArquivo = 'ARQUIVO', options = {}) {
+  const valorMinimoPedido = normalizarValorMinimoPedido(options.valor_minimo_pedido);
+  const condicaoPagamento = normalizarCampoObrigatorio(options.condicao_pagamento, 'a condicao de pagamento');
+  const prazoEntrega = normalizarCampoObrigatorio(options.prazo_entrega, 'o prazo de entrega');
   const url = await uploadToS3(req.file, `cotacoes-respostas/${String(tipoArquivo || 'arquivo').toLowerCase()}`);
   await cotacaoFornecedor.update({
     status: 'RESPONDIDO',
     respondido_em: new Date(),
     visualizado_em: cotacaoFornecedor.visualizado_em || new Date(),
+    valor_minimo_pedido: valorMinimoPedido,
+    condicao_pagamento: condicaoPagamento,
+    prazo_entrega: prazoEntrega,
     pdf_resposta_url: url
   });
+  const usuarioInterno = options.usuario_interno || null;
   await registrarLogSolicitacaoCompra({
     solicitacaoCompraId: cotacaoFornecedor.solicitacao.id,
+    usuarioId: usuarioInterno?.id || null,
     fornecedorCompraId: cotacaoFornecedor.fornecedor_compra_id,
-    tipoAcao: 'RESPOSTA_FORNECEDOR',
-    descricao: `Fornecedor ${cotacaoFornecedor.fornecedor?.nome || cotacaoFornecedor.fornecedor_compra_id} enviou resposta em ${getNomeTipoArquivoResposta(tipoArquivo)}`,
+    tipoAcao: usuarioInterno ? 'RESPOSTA_INTERNA_COMPRAS' : 'RESPOSTA_FORNECEDOR',
+    descricao: usuarioInterno
+      ? `Usuario interno ${usuarioInterno.nome || usuarioInterno.id} anexou resposta em ${getNomeTipoArquivoResposta(tipoArquivo)} para o fornecedor ${cotacaoFornecedor.fornecedor?.nome || cotacaoFornecedor.fornecedor_compra_id}`
+      : `Fornecedor ${cotacaoFornecedor.fornecedor?.nome || cotacaoFornecedor.fornecedor_compra_id} enviou resposta em ${getNomeTipoArquivoResposta(tipoArquivo)}`,
     metadados: {
       cotacao_fornecedor_id: cotacaoFornecedor.id,
       tipo: tipoArquivo,
-      arquivo_nome: req.file?.originalname || null
+      arquivo_nome: req.file?.originalname || null,
+      origem_resposta: usuarioInterno ? 'INTERNA' : 'FORNECEDOR',
+      usuario_interno_id: usuarioInterno?.id || null,
+      usuario_interno_nome: usuarioInterno?.nome || null
     }
   });
   return url;
@@ -434,6 +509,13 @@ module.exports = {
         return res.status(400).json({ error: 'Cotacao encerrada. Nao e mais possivel responder.' });
       }
 
+      const usuarioInterno = await identificarUsuarioInternoOpcional(req);
+      if (cotacaoFornecedor.pdf_resposta_url && !usuarioInterno) {
+        return res.status(400).json({
+          error: 'Esta cotacao ja foi respondida por arquivo. Para alterar a resposta, fale com a equipe de compras.'
+        });
+      }
+
       const itens = Array.isArray(req.body?.itens) ? req.body.itens : [];
       if (!itens.length) {
         return res.status(400).json({ error: 'Informe os itens da resposta' });
@@ -441,7 +523,9 @@ module.exports = {
 
       await salvarRespostasCotacao(cotacaoFornecedor, itens, {
         valor_minimo_pedido: req.body?.valor_minimo_pedido,
-        condicao_pagamento: req.body?.condicao_pagamento
+        condicao_pagamento: req.body?.condicao_pagamento,
+        prazo_entrega: req.body?.prazo_entrega,
+        usuario_interno: usuarioInterno
       });
       const atualizada = await carregarCotacaoPorToken(req.params.token);
       return res.status(201).json(await serializarCotacaoPublica(atualizada, req));
@@ -482,7 +566,13 @@ module.exports = {
       }
 
       const tipoArquivo = getTipoArquivoResposta(extension);
-      await registrarRespostaArquivoCotacao(cotacaoFornecedor, req, tipoArquivo);
+      const usuarioInterno = await identificarUsuarioInternoOpcional(req);
+      await registrarRespostaArquivoCotacao(cotacaoFornecedor, req, tipoArquivo, {
+        valor_minimo_pedido: req.body?.valor_minimo_pedido,
+        condicao_pagamento: req.body?.condicao_pagamento,
+        prazo_entrega: req.body?.prazo_entrega,
+        usuario_interno: usuarioInterno
+      });
       const atualizada = await carregarCotacaoPorToken(token);
       return res.status(201).json(await serializarCotacaoPublica(atualizada, req));
     } catch (error) {

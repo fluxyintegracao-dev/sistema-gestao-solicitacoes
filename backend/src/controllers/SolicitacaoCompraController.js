@@ -18,6 +18,7 @@ const {
   SolicitacaoCompraItemApropriacao,
   SolicitacaoCompraItemManual,
   SolicitacaoCompraItemManualApropriacao,
+  SolicitacaoCompraLog,
   SolicitacaoCompraRespostaItem,
   StatusArea,
   TipoSolicitacao,
@@ -409,6 +410,17 @@ async function carregarSolicitacaoCompra(id) {
             attributes: ['id', 'valor_total', 'removido']
           }
         ]
+      },
+      {
+        model: SolicitacaoCompraLog,
+        as: 'logs',
+        separate: true,
+        limit: 80,
+        order: [['createdAt', 'DESC']],
+        include: [
+          { model: User, as: 'usuario', attributes: ['id', 'nome', 'email'] },
+          { model: FornecedorCompra, as: 'fornecedor', attributes: ['id', 'nome'] }
+        ]
       }
     ]
   });
@@ -589,6 +601,7 @@ function montarComparativoSolicitacao(solicitacao) {
     email: cotacaoFornecedor.fornecedor?.email || '',
     whatsapp: cotacaoFornecedor.fornecedor?.whatsapp || '',
     valor_minimo_pedido: cotacaoFornecedor.valor_minimo_pedido ?? null,
+    prazo_entrega: cotacaoFornecedor.prazo_entrega || '',
     status: cotacaoFornecedor.status,
     token: cotacaoFornecedor.token,
     enviado_em: cotacaoFornecedor.enviado_em,

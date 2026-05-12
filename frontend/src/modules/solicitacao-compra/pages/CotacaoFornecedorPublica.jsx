@@ -109,6 +109,7 @@ export default function CotacaoFornecedorPublica() {
   const [enviandoPlanilha, setEnviandoPlanilha] = useState(false);
   const [valorMinimoPedido, setValorMinimoPedido] = useState('');
   const [condicaoPagamento, setCondicaoPagamento] = useState('');
+  const [prazoEntrega, setPrazoEntrega] = useState('');
 
   async function carregar() {
     try {
@@ -126,6 +127,7 @@ export default function CotacaoFornecedorPublica() {
       );
       setValorMinimoPedido(data?.cotacao?.valor_minimo_pedido ?? '');
       setCondicaoPagamento(data?.cotacao?.condicao_pagamento ?? '');
+      setPrazoEntrega(data?.cotacao?.prazo_entrega ?? '');
     } catch (error) {
       console.error(error);
       alert(error.message || 'Erro ao carregar cotacao');
@@ -142,7 +144,30 @@ export default function CotacaoFornecedorPublica() {
     );
   }
 
+  function validarCabecalhoResposta() {
+    if (valorMinimoPedido === '' || valorMinimoPedido === null || valorMinimoPedido === undefined) {
+      alert('Informe o VLR minimo pedido antes de enviar a resposta.');
+      return false;
+    }
+
+    if (!String(condicaoPagamento || '').trim()) {
+      alert('Informe a condicao de pagamento antes de enviar a resposta.');
+      return false;
+    }
+
+    if (!String(prazoEntrega || '').trim()) {
+      alert('Informe o prazo de entrega do pedido antes de enviar a resposta.');
+      return false;
+    }
+
+    return true;
+  }
+
   async function handleSalvarOnline() {
+    if (!validarCabecalhoResposta()) {
+      return;
+    }
+
     try {
       setSalvando(true);
       await responderCotacaoPublica(token, {
@@ -158,7 +183,8 @@ export default function CotacaoFornecedorPublica() {
           quantidade_minima_item: item.quantidade_minima_item
         })),
         valor_minimo_pedido: valorMinimoPedido,
-        condicao_pagamento: condicaoPagamento
+        condicao_pagamento: condicaoPagamento,
+        prazo_entrega: prazoEntrega
       });
       await carregar();
       alert('Resposta enviada com sucesso.');
@@ -173,8 +199,16 @@ export default function CotacaoFornecedorPublica() {
   async function handleUploadArquivo(file) {
     try {
       if (!file) return;
+      if (!validarCabecalhoResposta()) {
+        return;
+      }
+
       setEnviandoPlanilha(true);
-      const resposta = await uploadPlanilhaCotacaoPublica(token, file);
+      const resposta = await uploadPlanilhaCotacaoPublica(token, file, {
+        valor_minimo_pedido: valorMinimoPedido,
+        condicao_pagamento: condicaoPagamento,
+        prazo_entrega: prazoEntrega
+      });
       await carregar();
       const tipoArquivoResposta = resposta?.cotacao?.arquivo_resposta_tipo;
       alert(tipoArquivoResposta
@@ -208,6 +242,8 @@ export default function CotacaoFornecedorPublica() {
   const arquivoRespostaUrl = dados.cotacao?.arquivo_resposta_url || dados.cotacao?.pdf_resposta_url || null;
   const arquivoRespostaTipo = dados.cotacao?.arquivo_resposta_tipo || 'ARQUIVO';
   const arquivoRespostaIsImage = Boolean(dados.cotacao?.arquivo_resposta_is_image);
+  const respondidaPorArquivo = Boolean(arquivoRespostaUrl);
+  const formularioBloqueado = dados.somente_leitura || respondidaPorArquivo;
   const itensDisponiveis = itens.filter(
     (item) => (item.status_disponibilidade || 'DISPONIVEL') !== 'NAO_TEM'
   ).length;
@@ -259,7 +295,7 @@ export default function CotacaoFornecedorPublica() {
                 </a>
               )}
               <span>
-                Arquivo de resposta recebido ({arquivoRespostaTipo}). Nossa equipe ira revisar e inserir os precos quando necessario.
+                Esta cotacao ja foi respondida por arquivo ({arquivoRespostaTipo}). Para alterar a resposta, fale com a equipe de compras.
               </span>
               <a href={arquivoRespostaUrl} target="_blank" rel="noopener noreferrer"
                 className="ml-auto shrink-0 rounded border border-blue-300 px-2 py-0.5 text-[11px] hover:bg-blue-100">
@@ -279,23 +315,34 @@ export default function CotacaoFornecedorPublica() {
               <p className="text-xs font-semibold truncate">{dados.solicitacao?.obra?.nome || '-'}</p>
             </div>
             <div>
-              <p className="text-[10px] uppercase tracking-wide text-[var(--sol-text-soft)] mb-0.5">Vlr. minimo pedido</p>
+              <p className="text-[10px] uppercase tracking-wide text-[var(--sol-text-soft)] mb-0.5">Vlr. minimo pedido *</p>
               <CurrencyInput
                 className="input h-7 text-xs px-2 w-full"
                 value={valorMinimoPedido}
-                disabled={dados.somente_leitura}
+                disabled={formularioBloqueado}
                 onChange={setValorMinimoPedido}
               />
             </div>
             <div className="sm:col-span-2 lg:col-span-2">
-              <p className="text-[10px] uppercase tracking-wide text-[var(--sol-text-soft)] mb-0.5">Condicao de pagamento</p>
+              <p className="text-[10px] uppercase tracking-wide text-[var(--sol-text-soft)] mb-0.5">Condicao de pagamento *</p>
               <input
                 className="input h-7 text-xs px-2 w-full"
                 type="text"
                 value={condicaoPagamento}
-                disabled={dados.somente_leitura}
+                disabled={formularioBloqueado}
                 onChange={(e) => setCondicaoPagamento(e.target.value)}
                 placeholder="Ex.: 30/60 dias, PIX a vista..."
+              />
+            </div>
+            <div>
+              <p className="text-[10px] uppercase tracking-wide text-[var(--sol-text-soft)] mb-0.5">Prazo entrega *</p>
+              <input
+                className="input h-7 text-xs px-2 w-full"
+                type="text"
+                value={prazoEntrega}
+                disabled={formularioBloqueado}
+                onChange={(e) => setPrazoEntrega(e.target.value)}
+                placeholder="Ex.: 7 dias"
               />
             </div>
             <div>
@@ -306,7 +353,7 @@ export default function CotacaoFornecedorPublica() {
 
           {/* Ações do card */}
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <label className={`btn btn-outline btn-sm text-xs h-7 px-3 cursor-pointer ${enviandoPlanilha ? 'pointer-events-none opacity-60' : ''}`}>
+            <label className={`btn btn-outline btn-sm text-xs h-7 px-3 cursor-pointer ${(enviandoPlanilha || formularioBloqueado) ? 'pointer-events-none opacity-60' : ''}`}>
               <input
                 type="file"
                 className="hidden"
@@ -325,9 +372,10 @@ export default function CotacaoFornecedorPublica() {
                 type="button"
                 className="btn btn-primary btn-sm text-xs h-7 px-3 ml-auto"
                 onClick={handleSalvarOnline}
-                disabled={salvando}
+                disabled={salvando || respondidaPorArquivo}
+                title={respondidaPorArquivo ? 'Cotacao ja respondida por arquivo.' : undefined}
               >
-                {salvando ? 'Enviando...' : 'Enviar resposta'}
+                {respondidaPorArquivo ? 'Respondida por arquivo' : salvando ? 'Enviando...' : 'Enviar resposta'}
               </button>
             )}
           </div>
@@ -335,7 +383,9 @@ export default function CotacaoFornecedorPublica() {
 
         {/* Instrução resumida */}
         <p className="mt-2 mb-2 text-[11px] text-[var(--sol-text-soft)]">
-          Informe preco, prazo de entrega e disponibilidade para cada item.
+          {respondidaPorArquivo
+            ? 'A resposta por formulario fica bloqueada quando a cotacao ja foi respondida por arquivo.'
+            : 'Escolha apenas uma forma de resposta: preencha o formulario online ou envie um PDF/imagem.'}
         </p>
 
         {/* Tabela */}
@@ -393,7 +443,7 @@ export default function CotacaoFornecedorPublica() {
                         <CurrencyInput
                           className={`input cotacao-publica-table-input h-6 text-[11px] px-1.5${isNaoTem ? ' pointer-events-none' : ''}`}
                           value={isNaoTem ? '' : item.preco}
-                          disabled={dados.somente_leitura || isNaoTem}
+                          disabled={formularioBloqueado || isNaoTem}
                           onChange={(val) => atualizarItem(index, 'preco', val)}
                         />
                       </td>
@@ -401,7 +451,7 @@ export default function CotacaoFornecedorPublica() {
                         <input
                           className="input cotacao-publica-table-input h-6 text-[11px] px-1.5"
                           value={item.prazo}
-                          disabled={dados.somente_leitura || isNaoTem}
+                          disabled={formularioBloqueado || isNaoTem}
                           onChange={(e) => atualizarItem(index, 'prazo', e.target.value)}
                           placeholder="Ex.: 7 dias"
                         />
@@ -413,7 +463,7 @@ export default function CotacaoFornecedorPublica() {
                           min="0"
                           step="0.001"
                           value={isNaoTem ? '' : item.quantidade_minima_item}
-                          disabled={dados.somente_leitura || isNaoTem}
+                          disabled={formularioBloqueado || isNaoTem}
                           onChange={(e) => atualizarItem(index, 'quantidade_minima_item', e.target.value)}
                           placeholder="Opcional"
                         />
@@ -423,7 +473,7 @@ export default function CotacaoFornecedorPublica() {
                           <select
                             className="input cotacao-publica-table-input h-6 text-[11px] px-1.5"
                             value={statusDisp}
-                            disabled={dados.somente_leitura}
+                            disabled={formularioBloqueado}
                             onChange={(e) => atualizarItem(index, 'status_disponibilidade', e.target.value)}
                           >
                             {OPCOES_DISPONIBILIDADE.map((op) => (
@@ -435,7 +485,7 @@ export default function CotacaoFornecedorPublica() {
                               className="input cotacao-publica-table-input h-6 text-[11px] px-1.5"
                               type="date"
                               value={item.data_chegada || ''}
-                              disabled={dados.somente_leitura}
+                              disabled={formularioBloqueado}
                               onChange={(e) => atualizarItem(index, 'data_chegada', e.target.value)}
                               title="Data prevista de chegada"
                             />
@@ -460,7 +510,7 @@ export default function CotacaoFornecedorPublica() {
                             <textarea
                               className="input cotacao-publica-table-textarea text-xs"
                               value={item.observacao}
-                              disabled={dados.somente_leitura}
+                              disabled={formularioBloqueado}
                               onChange={(e) => atualizarItem(index, 'observacao', e.target.value)}
                               placeholder="Marca, condicoes ou restricoes"
                               rows={2}
@@ -491,9 +541,10 @@ export default function CotacaoFornecedorPublica() {
               type="button"
               className="btn btn-primary btn-sm text-xs h-7 px-4"
               onClick={handleSalvarOnline}
-              disabled={salvando}
+              disabled={salvando || respondidaPorArquivo}
+              title={respondidaPorArquivo ? 'Cotacao ja respondida por arquivo.' : undefined}
             >
-              {salvando ? 'Enviando...' : 'Enviar resposta'}
+              {respondidaPorArquivo ? 'Respondida por arquivo' : salvando ? 'Enviando...' : 'Enviar resposta'}
             </button>
           </div>
         )}
