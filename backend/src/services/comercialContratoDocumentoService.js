@@ -995,6 +995,24 @@ function buildCompradoresAssinaturaLines(dados = {}) {
   return linhas;
 }
 
+function isAssinaturaContratoPlaceholder(normalized = '') {
+  if (!normalized) return false;
+  if (/^_+$/.test(normalized.replace(/\s+/g, ''))) return true;
+  if (isIncorporadoraNomeAssinatura(normalized)) return true;
+  if (/^CNPJ\b/.test(normalized)) return true;
+  if (/^REPRESENTAD[AO]\b/.test(normalized)) return true;
+  if (/^RG\b/.test(normalized) && normalized.includes('CPF')) return true;
+  if (normalized === 'INCORPORADORA') return true;
+  if (normalized === 'COMPRADOR 1' || normalized === 'COMPRADOR 2') return true;
+  if (normalized === 'DESCRITO NO QUADRO RESUMO') return true;
+  if (normalized.includes('DALVINA DE OLIVEIRA LIMA')) return true;
+  if (normalized.includes('123.100.157')) return true;
+  if (normalized.includes('OTAVIO TEIXEIRA DE AZEVEDO')) return true;
+  if (normalized.includes('178.544.147')) return true;
+  if (normalized === 'TESTEMUNHA') return true;
+  return false;
+}
+
 function applyContratoAssinaturasAutomation(zip, dados = {}) {
   const testemunha1 = dados?.testemunha_1 || {};
   const testemunha2 = dados?.testemunha_2 || {};
@@ -1012,6 +1030,9 @@ function applyContratoAssinaturasAutomation(zip, dados = {}) {
     const compradoresLines = buildCompradoresAssinaturaLines(dados);
     let assinaturasCompradoresInseridas = false;
     let ultimaAssinaturaPessoa = '';
+    let aguardandoBlocoAssinaturaContrato = false;
+    let removendoBlocoAssinaturaContrato = false;
+    let testemunhasRemovidasDoBlocoContrato = 0;
 
     xml = xml.replace(/<w:p[\s\S]*?<\/w:p>/g, (paragraphXml) => {
       const text = decodeXmlEntities(getXmlText(paragraphXml));
@@ -1021,7 +1042,33 @@ function applyContratoAssinaturasAutomation(zip, dados = {}) {
         .toUpperCase();
 
       if (localDataAssinatura && isLocalDataContratoParagraph(text)) {
+        aguardandoBlocoAssinaturaContrato = true;
+        removendoBlocoAssinaturaContrato = false;
+        testemunhasRemovidasDoBlocoContrato = 0;
         return buildParagraphLines([localDataAssinatura], { align: 'center' });
+      }
+
+      if (aguardandoBlocoAssinaturaContrato && isAssinaturaContratoPlaceholder(normalized)) {
+        aguardandoBlocoAssinaturaContrato = false;
+        removendoBlocoAssinaturaContrato = true;
+        const dadosAssinaturas = {
+          ...dados,
+          assinaturas: {
+            ...(dados.assinaturas || {}),
+            vendedora_dados: incorporadoraAssinatura
+          }
+        };
+        return buildParagraphLines(buildAssinaturasQuadroResumo(dadosAssinaturas), { align: 'center' });
+      }
+
+      if (removendoBlocoAssinaturaContrato && isAssinaturaContratoPlaceholder(normalized)) {
+        if (normalized === 'TESTEMUNHA') {
+          testemunhasRemovidasDoBlocoContrato += 1;
+          if (testemunhasRemovidasDoBlocoContrato >= 2) {
+            removendoBlocoAssinaturaContrato = false;
+          }
+        }
+        return '';
       }
 
       if (isIncorporadoraNomeAssinatura(normalized)) {
