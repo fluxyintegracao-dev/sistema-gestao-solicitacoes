@@ -113,6 +113,43 @@ function parseNullableText(value, fieldName, max) {
   });
 }
 
+function parseParcelasTitulo(value) {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (!Array.isArray(value)) {
+    throw new ValidationError('Parcelas devem ser enviadas em lista.');
+  }
+
+  return value.map((item, index) => {
+    ensureAllowedKeys(
+      item || {},
+      [
+        'data_vencimento',
+        'numero_documento',
+        'observacoes',
+        'cheque_numero',
+        'cheque_banco',
+        'cheque_agencia',
+        'cheque_conta',
+        'cheque_emitente'
+      ],
+      `Parcela ${index + 1}`
+    );
+
+    return {
+      data_vencimento: parseDateOnly(item?.data_vencimento, `Vencimento da parcela ${index + 1}`),
+      numero_documento: parseOptionalText(item?.numero_documento, `Documento da parcela ${index + 1}`, 120),
+      observacoes: parseOptionalText(item?.observacoes, `Observacoes da parcela ${index + 1}`, 1000),
+      cheque_numero: parseOptionalText(item?.cheque_numero, `Numero do cheque ${index + 1}`, 60),
+      cheque_banco: parseOptionalText(item?.cheque_banco, `Banco do cheque ${index + 1}`, 120),
+      cheque_agencia: parseOptionalText(item?.cheque_agencia, `Agencia do cheque ${index + 1}`, 40),
+      cheque_conta: parseOptionalText(item?.cheque_conta, `Conta do cheque ${index + 1}`, 60),
+      cheque_emitente: parseOptionalText(item?.cheque_emitente, `Emitente do cheque ${index + 1}`, 160)
+    };
+  });
+}
+
 function parseEnum(value, fieldName, allowedValues = [], { required = false } = {}) {
   if (isBlank(value)) {
     if (required) {
@@ -559,7 +596,8 @@ function validateFinanceTituloCreateFromSolicitacaoBody(body = {}) {
       'forma_pagamento_id',
       'cartao_id',
       'quantidade_parcelas',
-      'data_compra'
+      'data_compra',
+      'parcelas'
     ],
     'Geracao de titulo financeiro'
   );
@@ -585,7 +623,8 @@ function validateFinanceTituloCreateFromSolicitacaoBody(body = {}) {
     forma_pagamento_id: parseInteger(body.forma_pagamento_id, 'Forma de pagamento'),
     cartao_id: parseInteger(body.cartao_id, 'Cartao'),
     quantidade_parcelas: parseInteger(body.quantidade_parcelas, 'Quantidade de parcelas'),
-    data_compra: parseDateOnly(body.data_compra, 'Data da compra')
+    data_compra: parseDateOnly(body.data_compra, 'Data da compra'),
+    parcelas: parseParcelasTitulo(body.parcelas)
   };
 }
 
@@ -614,7 +653,8 @@ function validateFinanceTituloCreateBody(body = {}) {
       'forma_pagamento_id',
       'cartao_id',
       'quantidade_parcelas',
-      'data_compra'
+      'data_compra',
+      'parcelas'
     ],
     'Criacao manual de titulo financeiro'
   );
@@ -641,7 +681,8 @@ function validateFinanceTituloCreateBody(body = {}) {
     forma_pagamento_id: parseInteger(body.forma_pagamento_id, 'Forma de pagamento'),
     cartao_id: parseInteger(body.cartao_id, 'Cartao'),
     quantidade_parcelas: parseInteger(body.quantidade_parcelas, 'Quantidade de parcelas'),
-    data_compra: parseDateOnly(body.data_compra, 'Data da compra')
+    data_compra: parseDateOnly(body.data_compra, 'Data da compra'),
+    parcelas: parseParcelasTitulo(body.parcelas)
   };
 }
 

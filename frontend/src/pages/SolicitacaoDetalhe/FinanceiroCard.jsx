@@ -60,8 +60,46 @@ function labelTipoCartao(value) {
   return String(value || 'CREDITO').trim().toUpperCase() === 'DEBITO' ? 'debito' : 'credito';
 }
 
+function isFormaCartao(forma) {
+  const value = `${forma?.tipo || ''} ${forma?.codigo || ''}`.toUpperCase();
+  return Boolean(forma?.exige_cartao) || value.includes('CARTAO');
+}
+
+function isFormaBoleto(forma) {
+  const value = `${forma?.tipo || ''} ${forma?.codigo || ''}`.toUpperCase();
+  return value.includes('BOLETO');
+}
+
+function isFormaCheque(forma) {
+  const value = `${forma?.tipo || ''} ${forma?.codigo || ''}`.toUpperCase();
+  return value.includes('CHEQUE');
+}
+
 function today() {
   return new Date().toISOString().slice(0, 10);
+}
+
+function addMonths(dateString, amount) {
+  const date = new Date(`${dateString || today()}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return today();
+  const day = date.getDate();
+  date.setMonth(date.getMonth() + Number(amount || 0), 1);
+  const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+  date.setDate(Math.min(day, lastDay));
+  return date.toISOString().slice(0, 10);
+}
+
+function buildParcelasDetalhadas(parcelasAtuais = [], quantidade = 1, dataBase = today()) {
+  return Array.from({ length: quantidade }, (_, index) => ({
+    data_vencimento: parcelasAtuais[index]?.data_vencimento || addMonths(dataBase || today(), index),
+    numero_documento: parcelasAtuais[index]?.numero_documento || '',
+    observacoes: parcelasAtuais[index]?.observacoes || '',
+    cheque_numero: parcelasAtuais[index]?.cheque_numero || '',
+    cheque_banco: parcelasAtuais[index]?.cheque_banco || '',
+    cheque_agencia: parcelasAtuais[index]?.cheque_agencia || '',
+    cheque_conta: parcelasAtuais[index]?.cheque_conta || '',
+    cheque_emitente: parcelasAtuais[index]?.cheque_emitente || ''
+  }));
 }
 
 function buildDefaultForm(solicitacao) {
@@ -74,7 +112,8 @@ function buildDefaultForm(solicitacao) {
     forma_pagamento_id: '',
     cartao_id: '',
     quantidade_parcelas: '1',
-    data_compra: today()
+    data_compra: today(),
+    parcelas: []
   };
 }
 
@@ -280,6 +319,48 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
     return cartoes.filter((item) => item.ativo !== false && cartaoCompativelComForma(item, formaPagamentoSelecionada));
   }, [cartoes, formaPagamentoSelecionada]);
 
+  const quantidadeParcelas = useMemo(() => {
+    return Math.max(Number(form.quantidade_parcelas || 1), 1);
+  }, [form.quantidade_parcelas]);
+
+  const usaParcelasDetalhadas = useMemo(() => {
+    return Boolean(formaPagamentoSelecionada) && (isFormaBoleto(formaPagamentoSelecionada) || isFormaCheque(formaPagamentoSelecionada));
+  }, [formaPagamentoSelecionada]);
+
+  const usaVencimentoGeral = useMemo(() => {
+    return !isFormaCartao(formaPagamentoSelecionada) && !usaParcelasDetalhadas;
+  }, [formaPagamentoSelecionada, usaParcelasDetalhadas]);
+
+  const parcelasDetalhadasValidas = useMemo(() => {
+    if (!usaParcelasDetalhadas) return true;
+    const parcelas = Array.isArray(form.parcelas) ? form.parcelas : [];
+    if (parcelas.length !== quantidadeParcelas) return false;
+
+    return parcelas.every((parcela) => {
+      if (!parcela?.data_vencimento) return false;
+      if (!isFormaCheque(formaPagamentoSelecionada)) return true;
+      return Boolean(String(parcela.cheque_numero || '').trim() && String(parcela.cheque_emitente || '').trim());
+    });
+  }, [form.parcelas, formaPagamentoSelecionada, quantidadeParcelas, usaParcelasDetalhadas]);
+
+  useEffect(() => {
+    if (!modalOpen) return;
+
+    setForm((current) => {
+      if (!usaParcelasDetalhadas) {
+        return Array.isArray(current.parcelas) && current.parcelas.length > 0
+          ? { ...current, parcelas: [] }
+          : current;
+      }
+
+      const normalizadas = buildParcelasDetalhadas(current.parcelas, quantidadeParcelas, current.data_vencimento || today());
+      if (JSON.stringify(normalizadas) === JSON.stringify(current.parcelas || [])) {
+        return current;
+      }
+      return { ...current, parcelas: normalizadas };
+    });
+  }, [modalOpen, quantidadeParcelas, usaParcelasDetalhadas]);
+
   const categoriasAutocomplete = useMemo(() => {
     if (!categoriaSearch.trim() || selectedCategory) {
       return [];
@@ -308,13 +389,39 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
     const forma = formasPagamento.find((item) => String(item.id) === String(formaPagamentoId));
     const cartaoAtual = cartoes.find((item) => String(item.id) === String(form.cartao_id));
     const manterCartao = forma?.exige_cartao && cartaoAtual && cartaoCompativelComForma(cartaoAtual, forma);
+    const usaParcelas = forma && (isFormaBoleto(forma) || isFormaCheque(forma));
     setForm((current) => ({
       ...current,
       forma_pagamento_id: formaPagamentoId,
       cartao_id: manterCartao ? current.cartao_id : '',
       quantidade_parcelas: forma?.permite_parcelamento ? (current.quantidade_parcelas || '1') : '1',
-      data_compra: forma?.exige_cartao ? (current.data_compra || today()) : current.data_compra
+      data_compra: forma?.exige_cartao ? (current.data_compra || today()) : current.data_compra,
+      parcelas: usaParcelas
+        ? buildParcelasDetalhadas(current.parcelas, Math.max(Number(current.quantidade_parcelas || 1), 1), current.data_vencimento || today())
+        : []
     }));
+  }
+
+  function updateQuantidadeParcelas(value) {
+    const quantidade = Math.max(Number(value || 1), 1);
+    setForm((current) => ({
+      ...current,
+      quantidade_parcelas: value,
+      parcelas: usaParcelasDetalhadas
+        ? buildParcelasDetalhadas(current.parcelas, quantidade, current.data_vencimento || today())
+        : current.parcelas
+    }));
+  }
+
+  function updateParcela(index, field, value) {
+    setForm((current) => {
+      const parcelas = buildParcelasDetalhadas(current.parcelas, quantidadeParcelas, current.data_vencimento || today());
+      parcelas[index] = {
+        ...parcelas[index],
+        [field]: value
+      };
+      return { ...current, parcelas };
+    });
   }
 
   async function handleSubmit(event) {
@@ -331,8 +438,9 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
         cartao_id: form.cartao_id || undefined,
         quantidade_parcelas: form.quantidade_parcelas || undefined,
         data_compra: form.data_compra || undefined,
+        parcelas: usaParcelasDetalhadas ? form.parcelas : undefined,
         valor: form.valor,
-        data_vencimento: form.data_vencimento
+        data_vencimento: usaVencimentoGeral ? form.data_vencimento : undefined
       });
 
       setModalOpen(false);
@@ -445,7 +553,7 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
 
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="card w-full max-w-2xl space-y-4">
+          <div className="card max-h-[92vh] w-full max-w-4xl space-y-4 overflow-y-auto">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h3 className="text-lg font-semibold text-[var(--c-text)]">Gerar conta</h3>
@@ -502,17 +610,27 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
               </div>
 
               <div className="grid gap-3 md:grid-cols-2">
-                <label className="text-sm">
-                  <span className="mb-1 block text-slate-500">Vencimento</span>
-                  <input
-                    className="input w-full"
-                    type="date"
-                    value={form.data_vencimento}
-                    onChange={(event) => setForm((current) => ({ ...current, data_vencimento: event.target.value }))}
-                    required
-                  />
-                </label>
-
+                {usaVencimentoGeral ? (
+                  <label className="text-sm">
+                    <span className="mb-1 block text-slate-500">Vencimento</span>
+                    <input
+                      className="input w-full"
+                      type="date"
+                      value={form.data_vencimento}
+                      onChange={(event) => setForm((current) => ({ ...current, data_vencimento: event.target.value }))}
+                      required
+                    />
+                  </label>
+                ) : (
+                  <div className="text-sm">
+                    <span className="mb-1 block text-slate-500">Vencimento</span>
+                    <div className="input flex items-center bg-slate-50 text-slate-500">
+                      {isFormaCartao(formaPagamentoSelecionada)
+                        ? 'Definido pela data da compra/fatura'
+                        : 'Definido nas parcelas abaixo'}
+                    </div>
+                  </div>
+                )}
                 <div className="text-sm">
                   <span className="mb-1 block text-slate-500">Obra</span>
                   <div className="input flex items-center bg-slate-50 text-slate-700">
@@ -618,7 +736,7 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
                       min="1"
                       max="120"
                       value={form.quantidade_parcelas}
-                      onChange={(event) => setForm((current) => ({ ...current, quantidade_parcelas: event.target.value }))}
+                      onChange={(event) => updateQuantidadeParcelas(event.target.value)}
                     />
                   </label>
                 ) : (
@@ -659,6 +777,100 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
                       onChange={(event) => setForm((current) => ({ ...current, data_compra: event.target.value }))}
                     />
                   </label>
+                </div>
+              )}
+
+              {usaParcelasDetalhadas && (
+                <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3">
+                  <div className="mb-3">
+                    <div className="text-sm font-semibold text-[var(--c-text)]">
+                      {isFormaCheque(formaPagamentoSelecionada) ? 'Cheques' : 'Boletos'} das parcelas
+                    </div>
+                    <div className="text-xs text-slate-500">
+                      Informe o vencimento de cada {isFormaCheque(formaPagamentoSelecionada) ? 'cheque' : 'boleto'} antes de confirmar.
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    {(form.parcelas || []).map((parcela, index) => (
+                      <div key={index} className="rounded-2xl border border-slate-200 bg-white p-3">
+                        <div className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                          Parcela {index + 1}/{quantidadeParcelas}
+                        </div>
+                        <div className="grid gap-3 md:grid-cols-2">
+                          <label className="text-sm">
+                            <span className="mb-1 block text-slate-500">Vencimento</span>
+                            <input
+                              className="input w-full"
+                              type="date"
+                              value={parcela.data_vencimento || ''}
+                              onChange={(event) => updateParcela(index, 'data_vencimento', event.target.value)}
+                              required
+                            />
+                          </label>
+
+                          {!isFormaCheque(formaPagamentoSelecionada) && (
+                            <label className="text-sm">
+                              <span className="mb-1 block text-slate-500">Documento do boleto</span>
+                              <input
+                                className="input w-full"
+                                value={parcela.numero_documento || ''}
+                                onChange={(event) => updateParcela(index, 'numero_documento', event.target.value)}
+                                placeholder="Nosso numero, linha ou referencia"
+                              />
+                            </label>
+                          )}
+
+                          {isFormaCheque(formaPagamentoSelecionada) && (
+                            <>
+                              <label className="text-sm">
+                                <span className="mb-1 block text-slate-500">Numero do cheque</span>
+                                <input
+                                  className="input w-full"
+                                  value={parcela.cheque_numero || ''}
+                                  onChange={(event) => updateParcela(index, 'cheque_numero', event.target.value)}
+                                  required
+                                />
+                              </label>
+                              <label className="text-sm">
+                                <span className="mb-1 block text-slate-500">Emitente</span>
+                                <input
+                                  className="input w-full"
+                                  value={parcela.cheque_emitente || ''}
+                                  onChange={(event) => updateParcela(index, 'cheque_emitente', event.target.value)}
+                                  required
+                                />
+                              </label>
+                              <label className="text-sm">
+                                <span className="mb-1 block text-slate-500">Banco</span>
+                                <input
+                                  className="input w-full"
+                                  value={parcela.cheque_banco || ''}
+                                  onChange={(event) => updateParcela(index, 'cheque_banco', event.target.value)}
+                                />
+                              </label>
+                              <label className="text-sm">
+                                <span className="mb-1 block text-slate-500">Agencia</span>
+                                <input
+                                  className="input w-full"
+                                  value={parcela.cheque_agencia || ''}
+                                  onChange={(event) => updateParcela(index, 'cheque_agencia', event.target.value)}
+                                />
+                              </label>
+                              <label className="text-sm">
+                                <span className="mb-1 block text-slate-500">Conta</span>
+                                <input
+                                  className="input w-full"
+                                  value={parcela.cheque_conta || ''}
+                                  onChange={(event) => updateParcela(index, 'cheque_conta', event.target.value)}
+                                />
+                              </label>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
 
@@ -717,7 +929,8 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
                     saving ||
                     !selectedPartner?.id ||
                     !form.valor ||
-                    !form.data_vencimento ||
+                    (usaVencimentoGeral && !form.data_vencimento) ||
+                    !parcelasDetalhadasValidas ||
                     (formaPagamentoSelecionada?.exige_cartao && !form.cartao_id)
                   }
                 >

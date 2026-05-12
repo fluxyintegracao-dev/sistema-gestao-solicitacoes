@@ -98,6 +98,78 @@ function normalizarStatusCobranca(value) {
   return STATUS_COBRANCA.includes(normalized) ? normalized : null;
 }
 
+function getTipoFormaPagamento(formaPagamento) {
+  return `${formaPagamento?.tipo || ''} ${formaPagamento?.codigo || ''}`.toUpperCase();
+}
+
+function isFormaCartao(formaPagamento) {
+  return Boolean(formaPagamento?.exige_cartao) || getTipoFormaPagamento(formaPagamento).includes('CARTAO');
+}
+
+function isFormaCartaoComFatura(formaPagamento) {
+  return Boolean(formaPagamento?.gera_fatura);
+}
+
+function isFormaBoleto(formaPagamento) {
+  return getTipoFormaPagamento(formaPagamento).includes('BOLETO');
+}
+
+function isFormaCheque(formaPagamento) {
+  return getTipoFormaPagamento(formaPagamento).includes('CHEQUE');
+}
+
+function getParcelaPayload(parcelas = [], index) {
+  if (!Array.isArray(parcelas)) return {};
+  return parcelas[index] || {};
+}
+
+function buildChequeFields(formaPagamento, parcela, index) {
+  if (!isFormaCheque(formaPagamento)) {
+    return {
+      cheque_numero: null,
+      cheque_banco: null,
+      cheque_agencia: null,
+      cheque_conta: null,
+      cheque_emitente: null
+    };
+  }
+
+  if (!String(parcela?.cheque_numero || '').trim()) {
+    throw createHttpError(400, `Informe o numero do cheque da parcela ${index + 1}.`);
+  }
+  if (!String(parcela?.cheque_emitente || '').trim()) {
+    throw createHttpError(400, `Informe o emitente do cheque da parcela ${index + 1}.`);
+  }
+
+  return {
+    cheque_numero: String(parcela.cheque_numero || '').trim(),
+    cheque_banco: parcela.cheque_banco || null,
+    cheque_agencia: parcela.cheque_agencia || null,
+    cheque_conta: parcela.cheque_conta || null,
+    cheque_emitente: String(parcela.cheque_emitente || '').trim()
+  };
+}
+
+function resolveVencimentoParcela({ formaPagamento, parcela, dataVencimentoBase, dataCompra, index }) {
+  if (isFormaCartao(formaPagamento)) {
+    return dataCompra;
+  }
+
+  if (isFormaBoleto(formaPagamento) || isFormaCheque(formaPagamento)) {
+    if (!parcela?.data_vencimento) {
+      const label = isFormaCheque(formaPagamento) ? 'cheque' : 'boleto';
+      throw createHttpError(400, `Informe o vencimento do ${label} da parcela ${index + 1}.`);
+    }
+    return parcela.data_vencimento;
+  }
+
+  if (!dataVencimentoBase) {
+    throw createHttpError(400, 'Data de vencimento e obrigatoria para gerar o titulo.');
+  }
+
+  return addMonths(dataVencimentoBase, index);
+}
+
 function getStatusCobrancaInicial(tipo, formaCobranca, statusCobranca = null) {
   if (String(tipo || '').toUpperCase() !== 'RECEBER') {
     return 'NAO_APLICAVEL';
@@ -815,11 +887,6 @@ async function criarTituloPorSolicitacao(req, solicitacaoId, payload = {}) {
     throw createHttpError(400, 'Valor invalido para gerar o titulo.');
   }
 
-  const dataVencimento = payload.data_vencimento || solicitacao.data_vencimento;
-  if (!dataVencimento) {
-    throw createHttpError(400, 'Data de vencimento e obrigatoria para gerar o titulo.');
-  }
-
   const [parceiro] = await Promise.all([
     validarParceiro(parceiroId),
     validarCategoriaFinanceira(payload.categoria_financeira_id, tipo)
@@ -828,6 +895,7 @@ async function criarTituloPorSolicitacao(req, solicitacaoId, payload = {}) {
 
   const formaPagamento = await validarFormaPagamentoFinanceira(payload.forma_pagamento_id, payload);
   const quantidadeParcelas = Math.max(Number(payload.quantidade_parcelas || 1), 1);
+  const dataVencimento = payload.data_vencimento || solicitacao.data_vencimento;
   const valoresParcelas = distribuirParcelas(valorOriginal, quantidadeParcelas);
   const grupoParcelamentoId = quantidadeParcelas > 1 ? `PARC-${crypto.randomUUID()}` : null;
   const dataCompra = payload.data_compra || payload.data_emissao || getHoje();
@@ -839,12 +907,18 @@ async function criarTituloPorSolicitacao(req, solicitacaoId, payload = {}) {
     for (let index = 0; index < quantidadeParcelas; index += 1) {
       const numeroParcela = index + 1;
       const valorParcela = valoresParcelas[index];
-      const vencimentoParcela = formaPagamento?.gera_fatura
-        ? dataVencimento
-        : addMonths(dataVencimento, index);
+      const parcelaPayload = getParcelaPayload(payload.parcelas, index);
+      const vencimentoParcela = resolveVencimentoParcela({
+        formaPagamento,
+        parcela: parcelaPayload,
+        dataVencimentoBase: dataVencimento,
+        dataCompra,
+        index
+      });
       const descricaoParcela = quantidadeParcelas > 1
         ? `${descricaoBase.slice(0, 220)} - Parcela ${numeroParcela}/${quantidadeParcelas}`
         : descricaoBase.slice(0, 255);
+      const chequeFields = buildChequeFields(formaPagamento, parcelaPayload, index);
 
       const titulo = await TituloFinanceiro.create({
         solicitacao_id: solicitacao.id,
@@ -861,14 +935,15 @@ async function criarTituloPorSolicitacao(req, solicitacaoId, payload = {}) {
         tipo,
         status: 'ABERTO',
         descricao: descricaoParcela || descricaoPadraoTitulo(solicitacao),
-        numero_documento: payload.numero_documento || null,
+        numero_documento: parcelaPayload.numero_documento || payload.numero_documento || chequeFields.cheque_numero || null,
+        ...chequeFields,
         valor_original: valorParcela,
         valor_saldo: valorParcela,
         valor_baixado: 0,
         data_emissao: payload.data_emissao || getHoje(),
         data_vencimento: vencimentoParcela,
         data_quitacao: null,
-        observacoes: payload.observacoes || null,
+        observacoes: parcelaPayload.observacoes || payload.observacoes || null,
         ...buildCobrancaFields(payload, tipo),
         criado_por: req.user?.id || null,
         atualizado_por: req.user?.id || null
@@ -893,7 +968,7 @@ async function criarTituloPorSolicitacao(req, solicitacaoId, payload = {}) {
       usuario_responsavel_id: req.user?.id || null,
       setor: getSetorUsuario(req),
       acao: 'TITULO_FINANCEIRO_CRIADO',
-      observacao: `${quantidadeParcelas} titulo(s) ${tipo} gerado(s) no valor de ${formatCurrency(valorOriginal)} com vencimento inicial em ${dataVencimento}`
+      observacao: `${quantidadeParcelas} titulo(s) ${tipo} gerado(s) no valor de ${formatCurrency(valorOriginal)}`
     }, { transaction });
 
     await transaction.commit();
@@ -954,11 +1029,6 @@ async function criarTituloManual(req, payload = {}) {
     throw createHttpError(400, 'Valor invalido para criar o titulo.');
   }
 
-  const dataVencimento = payload.data_vencimento;
-  if (!dataVencimento) {
-    throw createHttpError(400, 'Data de vencimento e obrigatoria para criar o titulo.');
-  }
-
   const descricao = String(payload.descricao || '').trim();
   if (!descricao) {
     throw createHttpError(400, 'Descricao e obrigatoria para criar o titulo manual.');
@@ -974,6 +1044,7 @@ async function criarTituloManual(req, payload = {}) {
 
   const formaPagamento = await validarFormaPagamentoFinanceira(payload.forma_pagamento_id, payload);
   const quantidadeParcelas = Math.max(Number(payload.quantidade_parcelas || 1), 1);
+  const dataVencimento = payload.data_vencimento;
   const valoresParcelas = distribuirParcelas(valorOriginal, quantidadeParcelas);
   const grupoParcelamentoId = quantidadeParcelas > 1 ? `PARC-${crypto.randomUUID()}` : null;
   const dataCompra = payload.data_compra || payload.data_emissao || getHoje();
@@ -984,12 +1055,18 @@ async function criarTituloManual(req, payload = {}) {
     for (let index = 0; index < quantidadeParcelas; index += 1) {
       const numeroParcela = index + 1;
       const valorParcela = valoresParcelas[index];
-      const vencimentoParcela = formaPagamento?.gera_fatura
-        ? dataVencimento
-        : addMonths(dataVencimento, index);
+      const parcelaPayload = getParcelaPayload(payload.parcelas, index);
+      const vencimentoParcela = resolveVencimentoParcela({
+        formaPagamento,
+        parcela: parcelaPayload,
+        dataVencimentoBase: dataVencimento,
+        dataCompra,
+        index
+      });
       const descricaoParcela = quantidadeParcelas > 1
         ? `${descricao.slice(0, 220)} - Parcela ${numeroParcela}/${quantidadeParcelas}`
         : descricao.slice(0, 255);
+      const chequeFields = buildChequeFields(formaPagamento, parcelaPayload, index);
 
       const titulo = await TituloFinanceiro.create({
         solicitacao_id: null,
@@ -1006,14 +1083,15 @@ async function criarTituloManual(req, payload = {}) {
         tipo,
         status: 'ABERTO',
         descricao: descricaoParcela || descricaoPadraoTituloManual(tipo),
-        numero_documento: payload.numero_documento || null,
+        numero_documento: parcelaPayload.numero_documento || payload.numero_documento || chequeFields.cheque_numero || null,
+        ...chequeFields,
         valor_original: valorParcela,
         valor_saldo: valorParcela,
         valor_baixado: 0,
         data_emissao: payload.data_emissao || getHoje(),
         data_vencimento: vencimentoParcela,
         data_quitacao: null,
-        observacoes: payload.observacoes || null,
+        observacoes: parcelaPayload.observacoes || payload.observacoes || null,
         ...buildCobrancaFields(payload, tipo),
         criado_por: req.user?.id || null,
         atualizado_por: req.user?.id || null
