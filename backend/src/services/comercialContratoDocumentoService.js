@@ -966,6 +966,13 @@ function isAssinaturaContratoPlaceholder(normalized = '') {
   return false;
 }
 
+function isAssinaturaModeloFixaResidual(normalized = '') {
+  return normalized.includes('DALVINA DE OLIVEIRA LIMA')
+    || normalized.includes('123.100.157')
+    || normalized.includes('OTAVIO TEIXEIRA DE AZEVEDO')
+    || normalized.includes('178.544.147');
+}
+
 function buildAssinaturasDocumentoFinal(dados = {}, incorporadoraAssinatura = '') {
   return buildAssinaturasQuadroResumo({
     ...dados,
@@ -1016,6 +1023,10 @@ function applyContratoAssinaturasAutomation(zip, dados = {}) {
         .normalize('NFD')
         .replace(/[\u0300-\u036f]/g, '')
         .toUpperCase();
+
+      if (isAssinaturaModeloFixaResidual(normalized)) {
+        return '';
+      }
 
       if (localDataAssinatura && isLocalDataContratoParagraph(text)) {
         aguardandoBlocoAssinaturaContrato = true;
