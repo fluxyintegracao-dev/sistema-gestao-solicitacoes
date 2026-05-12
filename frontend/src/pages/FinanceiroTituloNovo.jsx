@@ -29,6 +29,84 @@ function resolveTipo(value) {
   return String(value || '').trim().toUpperCase() === 'RECEBER' ? 'RECEBER' : 'PAGAR';
 }
 
+function formatCurrency(value) {
+  const number = Number(value || 0);
+  return number.toLocaleString('pt-BR', {
+    style: 'currency',
+    currency: 'BRL'
+  });
+}
+
+function currencyToNumber(value) {
+  if (value == null || value === '') return 0;
+  const raw = String(value).trim().replace(/[R$\s]/gi, '');
+  const normalized = raw.includes(',')
+    ? raw.replace(/\./g, '').replace(',', '.')
+    : raw;
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function roundCurrency(value) {
+  return Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;
+}
+
+function addMonths(dateString, amount) {
+  const date = new Date(`${dateString || today()}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return today();
+  const day = date.getDate();
+  date.setMonth(date.getMonth() + Number(amount || 0), 1);
+  const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+  date.setDate(Math.min(day, lastDay));
+  return date.toISOString().slice(0, 10);
+}
+
+function distribuirParcelasFormatadas(valorTotal, quantidade) {
+  const totalCentavos = Math.round(currencyToNumber(valorTotal) * 100);
+  if (!totalCentavos || !quantidade) return [];
+  const base = Math.floor(totalCentavos / quantidade);
+  let resto = totalCentavos - (base * quantidade);
+  return Array.from({ length: quantidade }, () => {
+    const centavos = base + (resto > 0 ? 1 : 0);
+    if (resto > 0) resto -= 1;
+    return formatCurrencyInput(centavos / 100);
+  });
+}
+
+function buildParcelasDetalhadas(
+  parcelasAtuais = [],
+  quantidade = 1,
+  dataBase = today(),
+  valorTotal = '',
+  { redistribuirValores = false } = {}
+) {
+  const valoresSugeridos = distribuirParcelasFormatadas(valorTotal, quantidade);
+  return Array.from({ length: quantidade }, (_, index) => ({
+    valor: redistribuirValores ? (valoresSugeridos[index] || '') : (parcelasAtuais[index]?.valor || valoresSugeridos[index] || ''),
+    data_vencimento: parcelasAtuais[index]?.data_vencimento || addMonths(dataBase || today(), index),
+    numero_documento: parcelasAtuais[index]?.numero_documento || '',
+    observacoes: parcelasAtuais[index]?.observacoes || '',
+    cheque_numero: parcelasAtuais[index]?.cheque_numero || '',
+    cheque_banco: parcelasAtuais[index]?.cheque_banco || '',
+    cheque_agencia: parcelasAtuais[index]?.cheque_agencia || '',
+    cheque_conta: parcelasAtuais[index]?.cheque_conta || '',
+    cheque_emitente: parcelasAtuais[index]?.cheque_emitente || ''
+  }));
+}
+
+function createPagamento(valor = '') {
+  return {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    valor,
+    data_vencimento: today(),
+    forma_pagamento_id: '',
+    cartao_id: '',
+    quantidade_parcelas: '1',
+    data_compra: today(),
+    parcelas: []
+  };
+}
+
 function buildDefaultForm(tipo = 'PAGAR') {
   return {
     tipo: resolveTipo(tipo),
@@ -53,7 +131,8 @@ function buildDefaultForm(tipo = 'PAGAR') {
     forma_pagamento_id: '',
     cartao_id: '',
     quantidade_parcelas: 1,
-    data_compra: today()
+    data_compra: today(),
+    pagamentos: [createPagamento('')]
   };
 }
 
@@ -94,6 +173,21 @@ function cartaoCompativelComForma(cartao, forma) {
 
 function labelTipoCartao(value) {
   return String(value || 'CREDITO').trim().toUpperCase() === 'DEBITO' ? 'debito' : 'credito';
+}
+
+function isFormaCartao(forma) {
+  const value = `${forma?.tipo || ''} ${forma?.codigo || ''}`.toUpperCase();
+  return Boolean(forma?.exige_cartao) || value.includes('CARTAO');
+}
+
+function isFormaBoleto(forma) {
+  const value = `${forma?.tipo || ''} ${forma?.codigo || ''}`.toUpperCase();
+  return value.includes('BOLETO');
+}
+
+function isFormaCheque(forma) {
+  const value = `${forma?.tipo || ''} ${forma?.codigo || ''}`.toUpperCase();
+  return value.includes('CHEQUE');
 }
 
 function getParceiroPixOptions(parceiro) {
@@ -356,13 +450,33 @@ export default function FinanceiroTituloNovo() {
     return `${parceiros.length} ${form.tipo === 'RECEBER' ? 'cliente(s)' : 'credor(es)'} encontrado(s) para "${termo}"`;
   }, [form.tipo, parceiros, parceiroDocumentoBusca, parceiroNomeBusca]);
 
-  const formaPagamentoSelecionada = useMemo(() => {
-    return formasPagamento.find((item) => String(item.id) === String(form.forma_pagamento_id)) || null;
-  }, [formasPagamento, form.forma_pagamento_id]);
+  function getFormaPagamento(formaPagamentoId) {
+    return formasPagamento.find((item) => String(item.id) === String(formaPagamentoId)) || null;
+  }
 
-  const cartoesFiltradosPorForma = useMemo(() => {
-    return cartoes.filter((item) => item.ativo !== false && cartaoCompativelComForma(item, formaPagamentoSelecionada));
-  }, [cartoes, formaPagamentoSelecionada]);
+  function getQuantidadeParcelas(pagamento) {
+    return Math.max(Number(pagamento?.quantidade_parcelas || 1), 1);
+  }
+
+  function pagamentoUsaParcelasDetalhadas(pagamento) {
+    const forma = getFormaPagamento(pagamento?.forma_pagamento_id);
+    return Boolean(forma) && (isFormaBoleto(forma) || isFormaCheque(forma));
+  }
+
+  function getValorPagamento(pagamento) {
+    if (pagamentoUsaParcelasDetalhadas(pagamento)) {
+      return roundCurrency((pagamento.parcelas || []).reduce((acc, parcela) => acc + currencyToNumber(parcela.valor), 0));
+    }
+    return roundCurrency(currencyToNumber(pagamento?.valor));
+  }
+
+  const totalPagamentos = useMemo(() => {
+    return roundCurrency((form.pagamentos || []).reduce((acc, pagamento) => acc + getValorPagamento(pagamento), 0));
+  }, [form.pagamentos, formasPagamento]);
+
+  const valorTitulo = useMemo(() => roundCurrency(currencyToNumber(form.valor)), [form.valor]);
+  const diferencaPagamentos = useMemo(() => roundCurrency(valorTitulo - totalPagamentos), [valorTitulo, totalPagamentos]);
+  const totalBateComTitulo = Math.abs(diferencaPagamentos) <= 0.009;
 
   function preencherFavorecidoComParceiro(parceiro) {
     const pix = getParceiroPixPrincipal(parceiro);
@@ -402,7 +516,6 @@ export default function FinanceiroTituloNovo() {
   }, [paymentDraft.usar_credor_como_favorecido, parceiroSelecionado]);
 
   function updateField(field, value) {
-    setForm((current) => ({ ...current, [field]: value }));
     if (field === 'tipo') {
       setSearchParams({ tipo: value });
       setParceiroDocumentoBusca('');
@@ -422,11 +535,207 @@ export default function FinanceiroTituloNovo() {
         identificador_externo: value === 'RECEBER' ? current.identificador_externo : '',
         boleto_emitido_em: value === 'RECEBER' ? current.boleto_emitido_em : ''
       }));
+      return;
     }
+
+    setForm((current) => {
+      const next = { ...current, [field]: value };
+      if (field === 'valor' && (current.pagamentos || []).length === 1) {
+        const pagamento = current.pagamentos[0] || createPagamento(value);
+        const quantidade = getQuantidadeParcelas(pagamento);
+        next.pagamentos = [{
+          ...pagamento,
+          valor: value,
+          parcelas: pagamentoUsaParcelasDetalhadas(pagamento)
+            ? buildParcelasDetalhadas(pagamento.parcelas, quantidade, pagamento.data_vencimento || today(), value)
+            : pagamento.parcelas
+        }];
+      }
+      return next;
+    });
+  }
+
+  function updatePagamento(index, changes) {
+    setForm((current) => {
+      const pagamentos = [...(current.pagamentos || [])];
+      pagamentos[index] = {
+        ...pagamentos[index],
+        ...changes
+      };
+      return { ...current, pagamentos };
+    });
+  }
+
+  function updateFormaPagamento(index, formaPagamentoId) {
+    setForm((current) => {
+      const pagamentos = [...(current.pagamentos || [])];
+      const pagamento = pagamentos[index] || createPagamento();
+      const forma = formasPagamento.find((item) => String(item.id) === String(formaPagamentoId));
+      const cartaoAtual = cartoes.find((item) => String(item.id) === String(pagamento.cartao_id));
+      const manterCartao = forma?.exige_cartao && cartaoAtual && cartaoCompativelComForma(cartaoAtual, forma);
+      const quantidade = forma?.permite_parcelamento ? getQuantidadeParcelas(pagamento) : 1;
+      const usaParcelas = forma && (isFormaBoleto(forma) || isFormaCheque(forma));
+      pagamentos[index] = {
+        ...pagamento,
+        forma_pagamento_id: formaPagamentoId,
+        cartao_id: manterCartao ? pagamento.cartao_id : '',
+        quantidade_parcelas: String(quantidade),
+        data_compra: forma?.exige_cartao ? (pagamento.data_compra || today()) : pagamento.data_compra,
+        parcelas: usaParcelas
+          ? buildParcelasDetalhadas(pagamento.parcelas, quantidade, pagamento.data_vencimento || today(), pagamento.valor)
+          : []
+      };
+      return { ...current, pagamentos };
+    });
+  }
+
+  function updateQuantidadeParcelas(index, value) {
+    const quantidade = Math.max(Number(value || 1), 1);
+    setForm((current) => {
+      const pagamentos = [...(current.pagamentos || [])];
+      const pagamento = pagamentos[index] || createPagamento();
+      pagamentos[index] = {
+        ...pagamento,
+        quantidade_parcelas: value,
+        parcelas: pagamentoUsaParcelasDetalhadas(pagamento)
+          ? buildParcelasDetalhadas(
+              pagamento.parcelas,
+              quantidade,
+              pagamento.data_vencimento || today(),
+              pagamento.valor,
+              { redistribuirValores: true }
+            )
+          : pagamento.parcelas
+      };
+      return { ...current, pagamentos };
+    });
+  }
+
+  function updateValorPagamento(index, value) {
+    setForm((current) => {
+      const pagamentos = [...(current.pagamentos || [])];
+      const pagamento = pagamentos[index] || createPagamento();
+      const quantidade = getQuantidadeParcelas(pagamento);
+      pagamentos[index] = {
+        ...pagamento,
+        valor: value,
+        parcelas: pagamentoUsaParcelasDetalhadas(pagamento)
+          ? buildParcelasDetalhadas(pagamento.parcelas, quantidade, pagamento.data_vencimento || today(), value)
+          : pagamento.parcelas
+      };
+      return { ...current, pagamentos };
+    });
+  }
+
+  function updateParcela(pagamentoIndex, parcelaIndex, field, value) {
+    setForm((current) => {
+      const pagamentos = [...(current.pagamentos || [])];
+      const pagamento = pagamentos[pagamentoIndex] || createPagamento();
+      const quantidade = getQuantidadeParcelas(pagamento);
+      const parcelas = buildParcelasDetalhadas(pagamento.parcelas, quantidade, pagamento.data_vencimento || today(), pagamento.valor);
+      parcelas[parcelaIndex] = {
+        ...parcelas[parcelaIndex],
+        [field]: value
+      };
+      pagamentos[pagamentoIndex] = {
+        ...pagamento,
+        parcelas,
+        valor: field === 'valor'
+          ? formatCurrencyInput(parcelas.reduce((acc, parcela) => acc + currencyToNumber(parcela.valor), 0))
+          : pagamento.valor
+      };
+      return { ...current, pagamentos };
+    });
+  }
+
+  function adicionarPagamento() {
+    setForm((current) => ({
+      ...current,
+      pagamentos: [...(current.pagamentos || []), createPagamento()]
+    }));
+  }
+
+  function removerPagamento(index) {
+    setForm((current) => {
+      const pagamentos = (current.pagamentos || []).filter((_, itemIndex) => itemIndex !== index);
+      return { ...current, pagamentos: pagamentos.length ? pagamentos : [createPagamento(current.valor)] };
+    });
+  }
+
+  function validarCadastroTitulo() {
+    if (!form.parceiro_id) {
+      return `Selecione o ${form.tipo === 'RECEBER' ? 'cliente' : 'credor'} na lista antes de salvar.`;
+    }
+
+    if (valorTitulo <= 0) {
+      return 'Informe o valor total do titulo.';
+    }
+
+    const pagamentos = Array.isArray(form.pagamentos) ? form.pagamentos : [];
+    if (pagamentos.length === 0) {
+      return 'Informe pelo menos uma forma de pagamento.';
+    }
+
+    for (const [pagamentoIndex, pagamento] of pagamentos.entries()) {
+      const forma = getFormaPagamento(pagamento.forma_pagamento_id);
+      const usaDetalhe = forma && (isFormaBoleto(forma) || isFormaCheque(forma));
+      const usaCartao = isFormaCartao(forma);
+      const valorPagamento = getValorPagamento(pagamento);
+      const labelForma = `forma de pagamento ${pagamentoIndex + 1}`;
+
+      if (valorPagamento <= 0) {
+        return `Informe o valor da ${labelForma}.`;
+      }
+
+      if (forma?.exige_cartao && !pagamento.cartao_id) {
+        return `Selecione o cartao da ${labelForma}.`;
+      }
+
+      if (usaDetalhe) {
+        const quantidade = getQuantidadeParcelas(pagamento);
+        const parcelas = Array.isArray(pagamento.parcelas) ? pagamento.parcelas : [];
+        if (parcelas.length !== quantidade) {
+          return `Confira a quantidade de parcelas da ${labelForma}.`;
+        }
+
+        for (const [parcelaIndex, parcela] of parcelas.entries()) {
+          const labelParcela = `parcela ${parcelaIndex + 1} da ${labelForma}`;
+          if (currencyToNumber(parcela.valor) <= 0) {
+            return `Informe o valor da ${labelParcela}.`;
+          }
+          if (!parcela.data_vencimento) {
+            return `Informe o vencimento da ${labelParcela}.`;
+          }
+          if (isFormaCheque(forma)) {
+            if (!String(parcela.cheque_numero || '').trim()) {
+              return `Informe o numero do cheque da ${labelParcela}.`;
+            }
+            if (!String(parcela.cheque_emitente || '').trim()) {
+              return `Informe o emitente do cheque da ${labelParcela}.`;
+            }
+          }
+        }
+      } else if (!usaCartao && !pagamento.data_vencimento) {
+        return `Informe o vencimento da ${labelForma}.`;
+      }
+    }
+
+    if (!totalBateComTitulo) {
+      const direcao = diferencaPagamentos > 0 ? 'faltam' : 'sobram';
+      return `A soma das formas de pagamento precisa ser igual ao valor do titulo. Valor do titulo: ${formatCurrency(valorTitulo)}. Total informado: ${formatCurrency(totalPagamentos)}. Ainda ${direcao} ${formatCurrency(Math.abs(diferencaPagamentos))}.`;
+    }
+
+    return '';
   }
 
   async function handleSubmit(event) {
     event.preventDefault();
+    const erroValidacao = validarCadastroTitulo();
+    if (erroValidacao) {
+      setError(erroValidacao);
+      return;
+    }
+
     try {
       setSaving(true);
       setError('');
@@ -438,10 +747,21 @@ export default function FinanceiroTituloNovo() {
         categoria_financeira_id: form.categoria_financeira_id ? Number(form.categoria_financeira_id) : undefined
       };
       delete payload.apropriacao_id;
-
-      if (!form.parceiro_id) {
-        throw new Error(`Selecione o ${form.tipo === 'RECEBER' ? 'cliente' : 'credor'} na lista antes de salvar.`);
-      }
+      payload.pagamentos = (form.pagamentos || []).map((pagamento) => {
+        const forma = getFormaPagamento(pagamento.forma_pagamento_id);
+        const usaDetalhe = forma && (isFormaBoleto(forma) || isFormaCheque(forma));
+        return {
+          valor: usaDetalhe ? undefined : pagamento.valor,
+          forma_pagamento_id: pagamento.forma_pagamento_id || undefined,
+          cartao_id: pagamento.cartao_id || undefined,
+          quantidade_parcelas: pagamento.quantidade_parcelas || undefined,
+          data_compra: isFormaCartao(forma) ? pagamento.data_compra : undefined,
+          data_vencimento: !isFormaCartao(forma) && !usaDetalhe ? pagamento.data_vencimento : undefined,
+          numero_documento: pagamento.numero_documento || undefined,
+          observacoes: pagamento.observacoes || undefined,
+          parcelas: usaDetalhe ? pagamento.parcelas : undefined
+        };
+      });
 
       if (form.tipo === 'PAGAR' && paymentDraft.preparar_pagamento_pix) {
         if (!form.parceiro_id || !paymentDraft.nome || !paymentDraft.cpf_cnpj || !paymentDraft.pix_tipo_chave || !paymentDraft.pix_chave) {
@@ -668,76 +988,13 @@ export default function FinanceiroTituloNovo() {
                 />
               </label>
 
-              <label className="sol-filter-field xl:col-span-3">
-                <span className="sol-filter-label">Forma de pagamento</span>
-                <select
-                  className="input w-full"
-                  value={form.forma_pagamento_id}
-                  onChange={(event) => {
-                    const forma = formasPagamento.find((item) => String(item.id) === String(event.target.value));
-                    const cartaoAtual = cartoes.find((item) => String(item.id) === String(form.cartao_id));
-                    const manterCartao = forma?.exige_cartao && cartaoAtual && cartaoCompativelComForma(cartaoAtual, forma);
-                    setForm((current) => ({
-                      ...current,
-                      forma_pagamento_id: event.target.value,
-                      cartao_id: manterCartao ? current.cartao_id : '',
-                      quantidade_parcelas: forma?.permite_parcelamento ? current.quantidade_parcelas : 1
-                    }));
-                  }}
-                >
-                  <option value="">Nao informar</option>
-                  {formasPagamento.filter((item) => item.ativo !== false).map((forma) => (
-                    <option key={forma.id} value={forma.id}>
-                      {forma.nome}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              {formaPagamentoSelecionada?.exige_cartao && (
-                <>
-                  <label className="sol-filter-field xl:col-span-3">
-                    <span className="sol-filter-label">Cartao</span>
-                    <select
-                      className="input w-full"
-                      value={form.cartao_id}
-                      onChange={(event) => updateField('cartao_id', event.target.value)}
-                      required
-                    >
-                      <option value="">Selecione o cartao</option>
-                      {cartoesFiltradosPorForma.map((cartao) => (
-                        <option key={cartao.id} value={cartao.id}>
-                          {cartao.nome} final {cartao.ultimos_digitos} ({labelTipoCartao(cartao.tipo)})
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <label className="sol-filter-field xl:col-span-2">
-                    <span className="sol-filter-label">Data da compra</span>
-                    <input
-                      type="date"
-                      className="input w-full"
-                      value={form.data_compra}
-                      onChange={(event) => updateField('data_compra', event.target.value)}
-                    />
-                  </label>
-                </>
-              )}
-
-              {formaPagamentoSelecionada?.permite_parcelamento && (
-                <label className="sol-filter-field xl:col-span-2">
-                  <span className="sol-filter-label">Parcelas</span>
-                  <input
-                    type="number"
-                    min="1"
-                    max="120"
-                    className="input w-full"
-                    value={form.quantidade_parcelas}
-                    onChange={(event) => updateField('quantidade_parcelas', event.target.value)}
-                  />
-                </label>
-              )}
+              <div className="sol-filter-field xl:col-span-3">
+                <span className="sol-filter-label">Total das formas</span>
+                <div className={`input flex items-center ${totalBateComTitulo ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
+                  {formatCurrency(totalPagamentos)}
+                  {!totalBateComTitulo && ` (${diferencaPagamentos > 0 ? 'faltam' : 'sobram'} ${formatCurrency(Math.abs(diferencaPagamentos))})`}
+                </div>
+              </div>
 
               <label className="sol-filter-field xl:col-span-3">
                 <span className="sol-filter-label">Data de emissao</span>
@@ -749,16 +1006,231 @@ export default function FinanceiroTituloNovo() {
                 />
               </label>
 
-              <label className="sol-filter-field xl:col-span-3">
-                <span className="sol-filter-label">Data de vencimento</span>
-                <input
-                  type="date"
-                  className="input w-full"
-                  value={form.data_vencimento}
-                  onChange={(event) => updateField('data_vencimento', event.target.value)}
-                  required
-                />
-              </label>
+              <div className="md:col-span-2 xl:col-span-12 space-y-3 rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface-muted)] p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-semibold text-[var(--c-text)]">Formas de pagamento</div>
+                    <div className="text-xs text-[var(--c-muted)]">
+                      Combine pix, cartao, boleto ou cheque ate fechar o valor total do titulo.
+                    </div>
+                  </div>
+                  <button type="button" className="btn btn-outline shrink-0" onClick={adicionarPagamento}>
+                    Adicionar
+                  </button>
+                </div>
+
+                {(form.pagamentos || []).map((pagamento, pagamentoIndex) => {
+                  const forma = getFormaPagamento(pagamento.forma_pagamento_id);
+                  const quantidade = getQuantidadeParcelas(pagamento);
+                  const usaDetalhe = forma && (isFormaBoleto(forma) || isFormaCheque(forma));
+                  const usaCartao = isFormaCartao(forma);
+                  const cartoesFiltrados = cartoes.filter((item) => item.ativo !== false && cartaoCompativelComForma(item, forma));
+
+                  return (
+                    <div key={pagamento.id || pagamentoIndex} className="space-y-3 rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--c-muted)]">
+                          Forma {pagamentoIndex + 1}
+                        </div>
+                        {(form.pagamentos || []).length > 1 && (
+                          <button type="button" className="text-sm font-semibold text-rose-600" onClick={() => removerPagamento(pagamentoIndex)}>
+                            Remover
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <label className="text-sm">
+                          <span className="mb-1 block text-[var(--c-muted)]">Forma de pagamento</span>
+                          <select
+                            className="input w-full"
+                            value={pagamento.forma_pagamento_id}
+                            onChange={(event) => updateFormaPagamento(pagamentoIndex, event.target.value)}
+                          >
+                            <option value="">Nao informar</option>
+                            {formasPagamento.filter((item) => item.ativo !== false).map((item) => (
+                              <option key={item.id} value={item.id}>{item.nome}</option>
+                            ))}
+                          </select>
+                        </label>
+
+                        <div className="text-sm">
+                          <span className="mb-1 block text-[var(--c-muted)]">Valor desta forma</span>
+                          {usaDetalhe ? (
+                            <div className="input flex items-center bg-slate-50 text-slate-700">
+                              {pagamento.valor || 'R$ 0,00'}
+                            </div>
+                          ) : (
+                            <input
+                              className="input w-full"
+                              type="text"
+                              inputMode="decimal"
+                              placeholder="R$ 0,00"
+                              value={pagamento.valor}
+                              onChange={(event) => updateValorPagamento(pagamentoIndex, normalizeCurrencyTyping(event.target.value))}
+                              onBlur={(event) => updateValorPagamento(pagamentoIndex, formatCurrencyInput(event.target.value))}
+                            />
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="grid gap-3 md:grid-cols-2">
+                        {forma?.permite_parcelamento ? (
+                          <label className="text-sm">
+                            <span className="mb-1 block text-[var(--c-muted)]">Parcelas</span>
+                            <input
+                              className="input w-full"
+                              type="number"
+                              min="1"
+                              max="120"
+                              value={pagamento.quantidade_parcelas}
+                              onChange={(event) => updateQuantidadeParcelas(pagamentoIndex, event.target.value)}
+                            />
+                          </label>
+                        ) : (
+                          <div className="text-sm">
+                            <span className="mb-1 block text-[var(--c-muted)]">Parcelas</span>
+                            <div className="input flex items-center bg-slate-50 text-slate-500">1 parcela</div>
+                          </div>
+                        )}
+
+                        {usaCartao ? (
+                          <label className="text-sm">
+                            <span className="mb-1 block text-[var(--c-muted)]">Data da compra</span>
+                            <input
+                              className="input w-full"
+                              type="date"
+                              value={pagamento.data_compra}
+                              onChange={(event) => updatePagamento(pagamentoIndex, { data_compra: event.target.value })}
+                            />
+                          </label>
+                        ) : usaDetalhe ? (
+                          <div className="text-sm">
+                            <span className="mb-1 block text-[var(--c-muted)]">Vencimento</span>
+                            <div className="input flex items-center bg-slate-50 text-slate-500">Definido nas parcelas</div>
+                          </div>
+                        ) : (
+                          <label className="text-sm">
+                            <span className="mb-1 block text-[var(--c-muted)]">Vencimento</span>
+                            <input
+                              className="input w-full"
+                              type="date"
+                              value={pagamento.data_vencimento}
+                              onChange={(event) => updatePagamento(pagamentoIndex, { data_vencimento: event.target.value })}
+                              required
+                            />
+                          </label>
+                        )}
+                      </div>
+
+                      {forma?.exige_cartao && (
+                        <label className="text-sm">
+                          <span className="mb-1 block text-[var(--c-muted)]">Cartao</span>
+                          <select
+                            className="input w-full"
+                            value={pagamento.cartao_id}
+                            onChange={(event) => updatePagamento(pagamentoIndex, { cartao_id: event.target.value })}
+                            required
+                          >
+                            <option value="">Selecione o cartao</option>
+                            {cartoesFiltrados.map((cartao) => (
+                              <option key={cartao.id} value={cartao.id}>
+                                {cartao.nome} final {cartao.ultimos_digitos} ({labelTipoCartao(cartao.tipo)})
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      )}
+
+                      {usaDetalhe && (
+                        <div className="space-y-3">
+                          <div className="text-xs text-[var(--c-muted)]">
+                            Informe vencimento e valor de cada {isFormaCheque(forma) ? 'cheque' : 'boleto'}.
+                          </div>
+                          {(pagamento.parcelas || []).map((parcela, parcelaIndex) => (
+                            <div key={parcelaIndex} className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface-muted)] p-3">
+                              <div className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--c-muted)]">
+                                Parcela {parcelaIndex + 1}/{quantidade}
+                              </div>
+                              <div className="grid gap-3 md:grid-cols-2">
+                                <label className="text-sm">
+                                  <span className="mb-1 block text-[var(--c-muted)]">Valor</span>
+                                  <input
+                                    className="input w-full"
+                                    type="text"
+                                    inputMode="decimal"
+                                    value={parcela.valor || ''}
+                                    onChange={(event) => updateParcela(pagamentoIndex, parcelaIndex, 'valor', normalizeCurrencyTyping(event.target.value))}
+                                    onBlur={(event) => updateParcela(pagamentoIndex, parcelaIndex, 'valor', formatCurrencyInput(event.target.value))}
+                                    required
+                                  />
+                                </label>
+                                <label className="text-sm">
+                                  <span className="mb-1 block text-[var(--c-muted)]">Vencimento</span>
+                                  <input
+                                    className="input w-full"
+                                    type="date"
+                                    value={parcela.data_vencimento || ''}
+                                    onChange={(event) => updateParcela(pagamentoIndex, parcelaIndex, 'data_vencimento', event.target.value)}
+                                    required
+                                  />
+                                </label>
+
+                                {!isFormaCheque(forma) && (
+                                  <label className="text-sm md:col-span-2">
+                                    <span className="mb-1 block text-[var(--c-muted)]">Documento do boleto</span>
+                                    <input
+                                      className="input w-full"
+                                      value={parcela.numero_documento || ''}
+                                      onChange={(event) => updateParcela(pagamentoIndex, parcelaIndex, 'numero_documento', event.target.value)}
+                                      placeholder="Nosso numero, linha ou referencia"
+                                    />
+                                  </label>
+                                )}
+
+                                {isFormaCheque(forma) && (
+                                  <>
+                                    <label className="text-sm">
+                                      <span className="mb-1 block text-[var(--c-muted)]">Numero do cheque</span>
+                                      <input
+                                        className="input w-full"
+                                        value={parcela.cheque_numero || ''}
+                                        onChange={(event) => updateParcela(pagamentoIndex, parcelaIndex, 'cheque_numero', event.target.value)}
+                                        required
+                                      />
+                                    </label>
+                                    <label className="text-sm">
+                                      <span className="mb-1 block text-[var(--c-muted)]">Emitente</span>
+                                      <input
+                                        className="input w-full"
+                                        value={parcela.cheque_emitente || ''}
+                                        onChange={(event) => updateParcela(pagamentoIndex, parcelaIndex, 'cheque_emitente', event.target.value)}
+                                        required
+                                      />
+                                    </label>
+                                    <label className="text-sm">
+                                      <span className="mb-1 block text-[var(--c-muted)]">Banco</span>
+                                      <input className="input w-full" value={parcela.cheque_banco || ''} onChange={(event) => updateParcela(pagamentoIndex, parcelaIndex, 'cheque_banco', event.target.value)} />
+                                    </label>
+                                    <label className="text-sm">
+                                      <span className="mb-1 block text-[var(--c-muted)]">Agencia</span>
+                                      <input className="input w-full" value={parcela.cheque_agencia || ''} onChange={(event) => updateParcela(pagamentoIndex, parcelaIndex, 'cheque_agencia', event.target.value)} />
+                                    </label>
+                                    <label className="text-sm">
+                                      <span className="mb-1 block text-[var(--c-muted)]">Conta</span>
+                                      <input className="input w-full" value={parcela.cheque_conta || ''} onChange={(event) => updateParcela(pagamentoIndex, parcelaIndex, 'cheque_conta', event.target.value)} />
+                                    </label>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
 
               {form.tipo === 'RECEBER' && (
                 <>

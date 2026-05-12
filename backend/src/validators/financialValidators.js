@@ -697,7 +697,8 @@ function validateFinanceTituloCreateBody(body = {}) {
       'cartao_id',
       'quantidade_parcelas',
       'data_compra',
-      'parcelas'
+      'parcelas',
+      'pagamentos'
     ],
     'Criacao manual de titulo financeiro'
   );
@@ -707,7 +708,7 @@ function validateFinanceTituloCreateBody(body = {}) {
     obra_id: parseInteger(body.obra_id, 'Obra', { required: true }),
     parceiro_id: parseInteger(body.parceiro_id, 'Parceiro', { required: true }),
     valor: parseDecimal(body.valor, 'Valor', { required: true, min: 0.01 }),
-    data_vencimento: parseDateOnly(body.data_vencimento, 'Data de vencimento', { required: true }),
+    data_vencimento: parseDateOnly(body.data_vencimento, 'Data de vencimento'),
     data_emissao: parseDateOnly(body.data_emissao, 'Data de emissao'),
     descricao: parseOptionalText(body.descricao, 'Descricao', 255, { required: true }),
     categoria_financeira_id: parseInteger(body.categoria_financeira_id, 'Categoria financeira'),
@@ -725,7 +726,8 @@ function validateFinanceTituloCreateBody(body = {}) {
     cartao_id: parseInteger(body.cartao_id, 'Cartao'),
     quantidade_parcelas: parseInteger(body.quantidade_parcelas, 'Quantidade de parcelas'),
     data_compra: parseDateOnly(body.data_compra, 'Data da compra'),
-    parcelas: parseParcelasTitulo(body.parcelas)
+    parcelas: parseParcelasTitulo(body.parcelas),
+    pagamentos: parsePagamentosTitulo(body.pagamentos)
   };
 }
 
