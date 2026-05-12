@@ -553,7 +553,7 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
 
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="card max-h-[92vh] w-full max-w-4xl space-y-4 overflow-y-auto">
+          <div className="card max-h-[92vh] w-full max-w-2xl space-y-4 overflow-y-auto">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h3 className="text-lg font-semibold text-[var(--c-text)]">Gerar conta</h3>
