@@ -527,13 +527,16 @@ function gerarParcelasDoBloco(plano = {}, planoId = '', periodicidades = PERIODI
   const tituloBase = String(plano.titulo_bloco || '').trim();
   const tipoParcelaPadrao = plano.tipo_parcela || 'PARCELA';
   const periodicidade = getPeriodicidadeConfig(plano.periodicidade, periodicidades);
+  const planoPeriodicidade = tipoModo === 'MANUAL'
+    ? ''
+    : (tipoModo === 'ENTRADA' ? 'AVISTA' : plano.periodicidade || '');
 
   function withPlanoMetadata(parcela, index, intervalMonths = null) {
     return {
       ...parcela,
       plano_pagamento_id: planoId || plano.id || '',
       plano_parcela_index: index,
-      plano_periodicidade: plano.periodicidade || '',
+      plano_periodicidade: planoPeriodicidade,
       plano_interval_months: intervalMonths
     };
   }

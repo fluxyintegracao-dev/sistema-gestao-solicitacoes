@@ -1170,6 +1170,12 @@ function getParcelaFormaRecebimentoLabel(parcela = {}) {
     .toUpperCase();
 }
 
+function getGrupoPeriodicidadeLabel(grupo = {}, parcelasGrupo = []) {
+  const periodicidade = safeString(grupo.periodicidade);
+  if (!periodicidade || periodicidade === 'AVISTA' || parcelasGrupo.length <= 1) return '';
+  return PERIODICIDADE_LABELS[periodicidade] || periodicidade;
+}
+
 function normalizeDescricaoGrupoParcela(descricao = '') {
   return normalizeTextForMatch(descricao)
     .replace(/\b\d+\s*\/\s*\d+\b/g, '')
@@ -1220,12 +1226,13 @@ function buildQuadroResumoParcelas(parcelas = []) {
     const total = parcelasGrupo.reduce((acc, item) => acc + Number(item.valor_original || item.valor || 0), 0);
     const primeiroVencimento = parcelasGrupo[0]?.data_vencimento;
     const ultimoVencimento = parcelasGrupo[parcelasGrupo.length - 1]?.data_vencimento;
+    const periodicidadeLabel = getGrupoPeriodicidadeLabel(grupo, parcelasGrupo);
 
     return {
       item: String(index + 1).padStart(2, '0'),
       elemento: [
         [grupo.elemento, grupo.forma_recebimento].filter(Boolean).join(' - '),
-        PERIODICIDADE_LABELS[grupo.periodicidade] || grupo.periodicidade
+        periodicidadeLabel
       ].filter(Boolean),
       quantidade: String(parcelasGrupo.length).padStart(2, '0'),
       reajuste_codigo: grupo.reajuste_codigo,
