@@ -589,11 +589,6 @@ function SecaoEnvioFornecedores({
                           <div className="text-xs text-[var(--c-muted)]">
                             {f.email || 'Sem email'} {f.telefone ? ` · ${f.telefone}` : ''}
                           </div>
-                          {possuiRespostaArquivo && (
-                            <div className="text-xs font-semibold text-blue-700">
-                              Resposta por arquivo anexado
-                            </div>
-                          )}
                         </div>
                       </label>
                     ))
@@ -1397,6 +1392,11 @@ export default function SolicitacaoCompraDetalheView() {
                           <div className="text-xs text-[var(--c-muted)]">
                             Status: {fmtStatus(cotacaoFornecedor.status)} · Respondido em {fmt(cotacaoFornecedor.respondido_em)}
                           </div>
+                          {possuiRespostaArquivo && (
+                            <div className="text-xs font-semibold text-blue-700">
+                              Resposta por arquivo anexado
+                            </div>
+                          )}
                         </div>
                         <div className="flex flex-wrap gap-2">
                           <button type="button" className="btn btn-outline" onClick={() => copiarTexto(publicUrl)}>Copiar link</button>
