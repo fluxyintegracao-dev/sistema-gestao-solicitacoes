@@ -7,6 +7,21 @@ const {
 const { criarNotificacao } = require('../services/notificacoes');
 const { uploadToS3, getPresignedUrl } = require('../services/s3');
 const { normalizeOriginalName } = require('../utils/fileName');
+const { obterTokensSetoresUsuario } = require('../services/usuariosSetores');
+
+function normalizarTokenSetor(valor) {
+  return String(valor || '')
+    .trim()
+    .toUpperCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[\s-]+/g, '_');
+}
+
+function usuarioPertenceAoSetorCompras(tokens = []) {
+  return (Array.isArray(tokens) ? tokens : [])
+    .some(token => normalizarTokenSetor(token) === 'COMPRAS');
+}
 
 class AnexoController {
 
@@ -145,10 +160,14 @@ class AnexoController {
       const { historicoId } = req.params;
       const usuario = await User.findByPk(req.user.id);
       const perfil = String(req.user?.perfil || '').trim().toUpperCase();
-      const setorUsuario = String(req.user?.area || req.user?.setor?.codigo || '').trim().toUpperCase();
       const isSuperadmin = perfil === 'SUPERADMIN' || perfil.includes('SUPERADMIN');
+      const tokensSetorUsuario = await obterTokensSetoresUsuario(req.user, [
+        req.user?.area,
+        usuario?.setor_id
+      ]);
+      const isSetorCompras = usuarioPertenceAoSetorCompras(tokensSetorUsuario);
 
-      if (!isSuperadmin && setorUsuario !== 'COMPRAS') {
+      if (!isSuperadmin && !isSetorCompras) {
         return res.status(403).json({ error: 'Apenas SUPERADMIN ou usuarios do setor COMPRAS podem remover anexo.' });
       }
 

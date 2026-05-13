@@ -74,8 +74,8 @@ export default function SolicitacaoDetalhe() {
   const setorTokens = obterTokensSetorUsuario(user);
 
   const isSetorGeo = setorTokens.some(isGeoSetor);
-  const isSetorCompras = setorTokens.includes('COMPRAS');
-  const isSetorFinanceiro = setorTokens.includes('FINANCEIRO');
+  const isSetorCompras = setorTokens.some(token => normalizarSetorToken(token) === 'COMPRAS');
+  const isSetorFinanceiro = setorTokens.some(token => normalizarSetorToken(token) === 'FINANCEIRO');
   const isSuperadmin = String(user?.perfil || '').trim().toUpperCase() === 'SUPERADMIN';
 
   const [solicitacao, setSolicitacao] = useState(null);
@@ -192,7 +192,7 @@ export default function SolicitacaoDetalhe() {
   if (loading || loadingConfiguracaoStatus) return <p>Carregando...</p>;
   if (!solicitacao) return null;
 
-  const isSetorObra = setorTokens.includes('OBRA');
+  const isSetorObra = setorTokens.some(token => normalizarSetorToken(token) === 'OBRA');
   const usaFluxoAprovacaoDiretoria = Boolean(solicitacao.usa_fluxo_aprovacao_diretoria);
   const podeAprovarDiretoria = Boolean(solicitacao.acao_aprovar_diretoria_disponivel);
   const podeAlterarStatusDiretoriaApi = Boolean(solicitacao.pode_alterar_status_diretoria);
