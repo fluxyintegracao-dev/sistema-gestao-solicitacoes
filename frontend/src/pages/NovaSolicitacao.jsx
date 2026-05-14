@@ -1043,70 +1043,72 @@ export default function NovaSolicitacao() {
             </select>
           </label>
 
-          <label className="grid gap-1 text-sm lg:col-span-6">
-            Credor
-            <div className="flex gap-2 nova-solicitacao-inline-actions">
-              <input
-                className="input input-sm"
-                placeholder="Buscar credor por nome ou CPF/CNPJ"
-                value={parceiroBusca}
-                onChange={e => {
-                  setParceiroBusca(e.target.value);
-                  setParceiroBuscaExecutada(false);
-                  setParceiroResultados([]);
-                  if (parceiroSelecionado) {
-                    setParceiroSelecionado(null);
-                    setForm(prev => ({ ...prev, parceiro_id: '' }));
-                  }
-                }}
-              />
-              <button
-                type="button"
-                className="btn btn-outline btn-sm"
-                onClick={buscarParceirosRelacionados}
-                disabled={parceiroBuscando}
-              >
-                {parceiroBuscando ? 'Buscando...' : 'Buscar'}
-              </button>
-              <button
-                type="button"
-                className="btn btn-outline btn-sm"
-                onClick={() => setModalParceiroAberto(true)}
-              >
-                Cadastrar
-              </button>
-              {form.parceiro_id && (
+          {exibirCampoCredor && (
+            <label className="grid gap-1 text-sm lg:col-span-6">
+              Credor
+              <div className="flex gap-2 nova-solicitacao-inline-actions">
+                <input
+                  className="input input-sm"
+                  placeholder="Buscar credor por nome ou CPF/CNPJ"
+                  value={parceiroBusca}
+                  onChange={e => {
+                    setParceiroBusca(e.target.value);
+                    setParceiroBuscaExecutada(false);
+                    setParceiroResultados([]);
+                    if (parceiroSelecionado) {
+                      setParceiroSelecionado(null);
+                      setForm(prev => ({ ...prev, parceiro_id: '' }));
+                    }
+                  }}
+                />
                 <button
                   type="button"
                   className="btn btn-outline btn-sm"
-                  onClick={limparParceiroSelecionado}
+                  onClick={buscarParceirosRelacionados}
+                  disabled={parceiroBuscando}
                 >
-                  Limpar
+                  {parceiroBuscando ? 'Buscando...' : 'Buscar'}
                 </button>
-              )}
-            </div>
-
-            {parceiroResultados.length > 1 && !parceiroSelecionado && (
-              <div className="nova-solicitacao-results-list mt-2 border rounded p-2 max-h-40 overflow-auto">
-                {parceiroResultados.map(item => (
+                <button
+                  type="button"
+                  className="btn btn-outline btn-sm"
+                  onClick={() => setModalParceiroAberto(true)}
+                >
+                  Cadastrar
+                </button>
+                {form.parceiro_id && (
                   <button
-                    key={item.id}
                     type="button"
-                    onClick={() => selecionarParceiro(item)}
-                    className="block w-full text-left text-sm p-2 hover:bg-gray-50 rounded nova-solicitacao-result-item"
+                    className="btn btn-outline btn-sm"
+                    onClick={limparParceiroSelecionado}
                   >
-                    {item.nome} - {item.cpf_cnpj}
+                    Limpar
                   </button>
-                ))}
+                )}
               </div>
-            )}
 
-            {parceiroBuscaExecutada && parceiroBusca.trim() && parceiroResultados.length === 0 && !parceiroBuscando && !parceiroSelecionado && (
-              <span className="text-xs text-gray-500">
-                Nenhum credor encontrado. Use o botao Cadastrar para criar uma nova pessoa como credor.
-              </span>
-            )}
-          </label>
+              {parceiroResultados.length > 1 && !parceiroSelecionado && (
+                <div className="nova-solicitacao-results-list mt-2 border rounded p-2 max-h-40 overflow-auto">
+                  {parceiroResultados.map(item => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => selecionarParceiro(item)}
+                      className="block w-full text-left text-sm p-2 hover:bg-gray-50 rounded nova-solicitacao-result-item"
+                    >
+                      {item.nome} - {item.cpf_cnpj}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {parceiroBuscaExecutada && parceiroBusca.trim() && parceiroResultados.length === 0 && !parceiroBuscando && !parceiroSelecionado && (
+                <span className="text-xs text-gray-500">
+                  Nenhum credor encontrado. Use o botao Cadastrar para criar uma nova pessoa como credor.
+                </span>
+              )}
+            </label>
+          )}
 
           {exibirCampoApropriacao && (
             <label className="grid gap-1 text-sm lg:col-span-6">
