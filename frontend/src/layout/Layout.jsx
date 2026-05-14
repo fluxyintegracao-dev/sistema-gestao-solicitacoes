@@ -3,6 +3,7 @@ import { useContext, useEffect, useMemo, useState } from 'react';
 import { AuthContext } from '../contexts/AuthContext';
 import NotificacoesBell from '../components/NotificacoesBell';
 import { getResumoConversas } from '../services/conversasInternas';
+import { getNotificacoes } from '../services/notificacoes';
 import { getProvisionamentoFinanceiroContexto } from '../services/provisoesFinanceiras';
 import { getPrioridadesDiretoriaContexto } from '../services/prioridadesDiretoria';
 import {
@@ -49,6 +50,7 @@ export default function Layout() {
   );
   const [inboxNovasCount, setInboxNovasCount] = useState(0);
   const [saidaNovasCount, setSaidaNovasCount] = useState(0);
+  const [prioridadesNovasCount, setPrioridadesNovasCount] = useState(0);
   const [provisionamentoContexto, setProvisionamentoContexto] = useState(null);
   const [prioridadesDiretoriaContexto, setPrioridadesDiretoriaContexto] = useState(null);
 
@@ -137,6 +139,62 @@ export default function Layout() {
       clearInterval(interval);
     };
   }, [user?.id]);
+
+  useEffect(() => {
+    const userId = Number(user?.id);
+    if (!Number.isInteger(userId) || userId <= 0) {
+      setPrioridadesNovasCount(0);
+      return undefined;
+    }
+
+    const storageKeyPrioridades = `prioridades_diretoria_last_seen_${userId}`;
+    let ativo = true;
+
+    const atualizarBadgePrioridades = async () => {
+      if (typeof document !== 'undefined' && document.hidden) {
+        return;
+      }
+      try {
+        const seenValue = localStorage.getItem(storageKeyPrioridades) || '';
+        const seenAt = seenValue ? new Date(seenValue).getTime() : 0;
+        const data = await getNotificacoes({ limit: 50 });
+        const total = Array.isArray(data?.itens)
+          ? data.itens.filter(item => {
+              if (String(item.tipo || '').toUpperCase() !== 'PRIORIDADE_DIRETORIA_LOTE_CRIADO') return false;
+              const createdAt = item.createdAt ? new Date(item.createdAt).getTime() : 0;
+              return createdAt > seenAt;
+            }).length
+          : 0;
+        if (ativo) setPrioridadesNovasCount(total);
+      } catch {
+        // sem bloqueio visual em caso de falha temporaria
+      }
+    };
+
+    const handlePrioridadesSeen = () => {
+      atualizarBadgePrioridades();
+    };
+
+    window.addEventListener('prioridades-diretoria:notificacoes:seen', handlePrioridadesSeen);
+    atualizarBadgePrioridades();
+    const interval = setInterval(atualizarBadgePrioridades, 60000);
+
+    return () => {
+      ativo = false;
+      window.removeEventListener('prioridades-diretoria:notificacoes:seen', handlePrioridadesSeen);
+      clearInterval(interval);
+    };
+  }, [user?.id]);
+
+  useEffect(() => {
+    const userId = Number(user?.id);
+    if (!Number.isInteger(userId) || userId <= 0) return;
+    if (!isPathActive(location.pathname, '/prioridades-diretoria')) return;
+
+    localStorage.setItem(`prioridades_diretoria_last_seen_${userId}`, new Date().toISOString());
+    setPrioridadesNovasCount(0);
+    window.dispatchEvent(new Event('prioridades-diretoria:notificacoes:seen'));
+  }, [location.pathname, user?.id]);
 
   useEffect(() => {
     let ativo = true;
@@ -657,6 +715,7 @@ export default function Layout() {
                               collapsed={collapsed}
                               inboxNovasCount={inboxNovasCount}
                               saidaNovasCount={saidaNovasCount}
+                              prioridadesNovasCount={prioridadesNovasCount}
                             />
                           ))}
                 </ul>
@@ -711,6 +770,7 @@ export default function Layout() {
                                 subItem
                                 inboxNovasCount={inboxNovasCount}
                                 saidaNovasCount={saidaNovasCount}
+                                prioridadesNovasCount={prioridadesNovasCount}
                               />
                             ))}
                           </ul>
@@ -807,11 +867,24 @@ function isPathActive(currentPath, targetPath) {
   return currentPath === targetPath || currentPath.startsWith(`${targetPath}/`);
 }
 
-function MenuItem({ to, label, icon: Icon, active, onSelect, collapsed, subItem = false, inboxNovasCount = 0, saidaNovasCount = 0 }) {
+function MenuItem({
+  to,
+  label,
+  icon: Icon,
+  active,
+  onSelect,
+  collapsed,
+  subItem = false,
+  inboxNovasCount = 0,
+  saidaNovasCount = 0,
+  prioridadesNovasCount = 0
+}) {
   const mostrarBadgeInbox = to === '/conversas/entrada';
   const mostrarBadgeSaida = to === '/conversas/saida';
+  const mostrarBadgePrioridades = to === '/prioridades-diretoria';
   const inboxCount = Number(inboxNovasCount || 0);
   const saidaCount = Number(saidaNovasCount || 0);
+  const prioridadesCount = Number(prioridadesNovasCount || 0);
   return (
     <li>
       <Link
@@ -831,6 +904,11 @@ function MenuItem({ to, label, icon: Icon, active, onSelect, collapsed, subItem 
         {!collapsed && mostrarBadgeSaida && saidaCount > 0 && (
           <span className="ml-auto inline-flex min-w-[20px] h-5 px-1.5 items-center justify-center rounded-full text-[11px] font-semibold bg-red-600 text-white">
             {saidaCount > 99 ? '99+' : saidaCount}
+          </span>
+        )}
+        {!collapsed && mostrarBadgePrioridades && prioridadesCount > 0 && (
+          <span className="ml-auto inline-flex min-w-[20px] h-5 px-1.5 items-center justify-center rounded-full text-[11px] font-semibold bg-red-600 text-white">
+            {prioridadesCount > 99 ? '99+' : prioridadesCount}
           </span>
         )}
       </Link>

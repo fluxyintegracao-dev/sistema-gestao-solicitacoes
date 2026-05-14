@@ -20,7 +20,10 @@ const {
 const {
   obterTokensSetoresUsuario: obterTokensSetoresUsuarioComVinculos
 } = require('../services/usuariosSetores');
-const { criarNotificacao } = require('../services/notificacoes');
+const {
+  criarNotificacao,
+  obterUsuariosAtivosPorSetores
+} = require('../services/notificacoes');
 
 const STATUS_LOTE = {
   ABERTO: 'ABERTO',
@@ -556,6 +559,41 @@ async function sincronizarItensLote({
   };
 }
 
+async function notificarCriacaoLotePrioridade({ lote, permissoes, usuarioId }) {
+  try {
+    const diretorias = Object.values(permissoes?.configuracao?.diretoriasPorClassificacao || {});
+    const destinatarios = await obterUsuariosAtivosPorSetores([
+      ...diretorias,
+      SETOR_FINANCEIRO_CODIGO
+    ]);
+
+    if (destinatarios.length === 0) return;
+
+    const isSolicitacaoDiretoria =
+      String(lote?.tipo_lote || TIPO_LOTE.DIR_ADMIN).toUpperCase() === TIPO_LOTE.SOLICITACAO_DIRETORIA;
+    const criador = lote?.setor_criador_nome || lote?.setor_criador_codigo || DIRETORIA_ADMIN_NOME;
+    const mensagem = isSolicitacaoDiretoria
+      ? `${criador} criou um pedido de prioridade financeira no lote #${lote.id}`
+      : `${DIRETORIA_ADMIN_NOME} criou o lote de prioridade #${lote.id}`;
+
+    await criarNotificacao({
+      solicitacao_id: null,
+      tipo: 'PRIORIDADE_DIRETORIA_LOTE_CRIADO',
+      mensagem,
+      metadata: {
+        prioridade_lote_id: lote.id,
+        rota: '/prioridades-diretoria',
+        tipo_lote: lote.tipo_lote || TIPO_LOTE.DIR_ADMIN
+      },
+      created_by: usuarioId,
+      destinatarios,
+      usarDestinatariosInformados: true
+    });
+  } catch (error) {
+    console.error('Erro ao notificar criacao de lote de prioridade:', error);
+  }
+}
+
 module.exports = {
   async contexto(req, res) {
     try {
@@ -685,6 +723,12 @@ module.exports = {
 
       const detalhe = await carregarLoteDetalhe(lote.id);
 
+      await notificarCriacaoLotePrioridade({
+        lote: detalhe,
+        permissoes,
+        usuarioId: req.user.id
+      });
+
       return res.status(201).json({
         item: {
           ...serializarLote(detalhe),
@@ -769,6 +813,12 @@ module.exports = {
       transactionFinalizada = true;
 
       const detalhe = await carregarLoteDetalhe(lote.id);
+
+      await notificarCriacaoLotePrioridade({
+        lote: detalhe,
+        permissoes,
+        usuarioId: req.user.id
+      });
 
       return res.status(201).json({
         item: {

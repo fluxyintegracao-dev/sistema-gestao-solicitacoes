@@ -6,6 +6,7 @@ const {
   Solicitacao,
   User,
   Setor,
+  UsuarioSetor,
   SetorPermissao,
   ConfiguracaoSistema
 } = require('../models');
@@ -113,6 +114,70 @@ async function obterSuperadmins() {
   return superadmins.map(a => a.id);
 }
 
+function normalizarTokenSetor(valor) {
+  return String(valor || '')
+    .trim()
+    .toUpperCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[\s-]+/g, '_');
+}
+
+async function obterUsuariosAtivosPorSetores(tokensSetores = []) {
+  const tokens = Array.from(
+    new Set((Array.isArray(tokensSetores) ? tokensSetores : [])
+      .map(normalizarTokenSetor)
+      .filter(Boolean))
+  );
+
+  if (tokens.length === 0) return [];
+
+  const setores = await Setor.findAll({
+    where: {
+      [Op.or]: [
+        { codigo: { [Op.in]: tokens } },
+        { nome: { [Op.in]: tokens } }
+      ]
+    },
+    attributes: ['id']
+  });
+
+  const setorIds = setores
+    .map(setor => Number(setor.id))
+    .filter(id => Number.isInteger(id) && id > 0);
+
+  if (setorIds.length === 0) return [];
+
+  const [usuariosPrimarios, vinculos] = await Promise.all([
+    User.findAll({
+      where: {
+        ativo: true,
+        setor_id: { [Op.in]: setorIds }
+      },
+      attributes: ['id']
+    }),
+    UsuarioSetor.findAll({
+      where: {
+        setor_id: { [Op.in]: setorIds }
+      },
+      include: [
+        {
+          model: User,
+          as: 'usuario',
+          attributes: ['id'],
+          where: { ativo: true },
+          required: true
+        }
+      ]
+    })
+  ]);
+
+  return Array.from(new Set([
+    ...usuariosPrimarios.map(usuario => Number(usuario.id)),
+    ...vinculos.map(vinculo => Number(vinculo?.usuario?.id || vinculo.user_id))
+  ].filter(id => Number.isInteger(id) && id > 0)));
+}
+
 async function obterModoRecebimentoSetor(tokensSetor = []) {
   if (!Array.isArray(tokensSetor) || tokensSetor.length === 0) {
     return 'TODOS_VISIVEIS';
@@ -196,8 +261,16 @@ async function criarNotificacao({
   destinatarios,
   usarDestinatariosInformados = false
 }) {
-  const { solicitacao, participantes } = await obterParticipantes(solicitacao_id);
-  if (!solicitacao) return null;
+  let solicitacao = null;
+  let participantes = [];
+  if (solicitacao_id) {
+    const resultado = await obterParticipantes(solicitacao_id);
+    solicitacao = resultado.solicitacao;
+    participantes = resultado.participantes;
+    if (!solicitacao) return null;
+  } else if (!usarDestinatariosInformados) {
+    return null;
+  }
 
   const destinatariosSet = new Set();
 
@@ -243,5 +316,6 @@ async function criarNotificacao({
 
 module.exports = {
   criarNotificacao,
+  obterUsuariosAtivosPorSetores,
   obterDestinatariosCriacaoSetor
 };

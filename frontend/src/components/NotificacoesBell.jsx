@@ -6,7 +6,11 @@ import {
   marcarTodasNotificacoesLidas
 } from '../services/notificacoes';
 
-const TIPOS_VISIVEIS = new Set(['MENCAO_COMENTARIO', 'SOLICITACAO_CRIADA']);
+const TIPOS_VISIVEIS = new Set([
+  'MENCAO_COMENTARIO',
+  'SOLICITACAO_CRIADA',
+  'PRIORIDADE_DIRETORIA_LOTE_CRIADO'
+]);
 
 export default function NotificacoesBell() {
   const [aberto, setAberto] = useState(false);
@@ -47,12 +51,17 @@ export default function NotificacoesBell() {
     await carregar();
   }
 
-  async function abrirSolicitacao(item) {
+  async function abrirNotificacao(item) {
     if (item.destinatario_id && !item.lida_em) {
       await marcarNotificacaoLida(item.destinatario_id);
     }
     await carregar();
-    if (item.solicitacao_id) {
+    if (item.metadata?.rota) {
+      navigate(item.metadata.rota);
+      if (item.metadata.rota === '/prioridades-diretoria') {
+        window.dispatchEvent(new Event('prioridades-diretoria:notificacoes:seen'));
+      }
+    } else if (item.solicitacao_id) {
       navigate(`/solicitacoes/${item.solicitacao_id}`);
     }
     setAberto(false);
@@ -104,7 +113,7 @@ export default function NotificacoesBell() {
               {itens.map(item => (
                 <button
                   key={item.destinatario_id}
-                  onClick={() => abrirSolicitacao(item)}
+                  onClick={() => abrirNotificacao(item)}
                   className="w-full text-left py-3 px-2 hover:bg-gray-50"
                 >
                   <div className="flex items-start justify-between gap-3">
