@@ -929,7 +929,7 @@ export default function Solicitacoes({ arquivadas = false }) {
           {mostrarSeletorColunas && (
             <div
               ref={seletorColunasRef}
-              className="absolute z-20 w-[320px] max-w-[calc(100vw-2rem)] bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl shadow-lg p-3"
+              className="absolute z-[80] w-[320px] max-w-[calc(100vw-2rem)] bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl shadow-lg p-3"
               style={{ left: `${seletorColunasLeft}px`, top: `${seletorColunasTop}px` }}
             >
               <div className="flex items-center justify-between mb-2">
