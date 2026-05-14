@@ -278,7 +278,7 @@ export default function TabelaSolicitacoes({
       >
         <table
           className={`text-sm table-fixed solicitacoes-table solicitacoes-table--${viewportMode}`}
-          style={{ width: '100%', minWidth: `${totalTableWidth}px` }}
+          style={{ width: `${totalTableWidth}px`, minWidth: '100%' }}
         >
         <colgroup>
           {columns.map((col, index) => (
@@ -293,7 +293,7 @@ export default function TabelaSolicitacoes({
               return (
                 <th
                   key={col.id}
-                  className="p-3 text-left relative select-none whitespace-nowrap text-xs uppercase tracking-wide text-gray-600 dark:text-slate-200 border-b border-gray-200 dark:border-slate-700 sticky top-0 z-10 bg-gray-50 dark:bg-slate-800"
+                  className="p-3 pr-5 text-left relative select-none whitespace-nowrap text-xs uppercase tracking-wide text-gray-600 dark:text-slate-200 border-b border-gray-200 dark:border-slate-700 sticky top-0 z-10 bg-gray-50 dark:bg-slate-800"
                   style={{ width: `${widths[index] ?? col.width}px` }}
                 >
                   {col.id === 'selecionar' ? (
@@ -321,6 +321,7 @@ export default function TabelaSolicitacoes({
                     <span
                       className="solicitacoes-column-resizer"
                       onPointerDown={(event) => iniciarResizeColuna(event, col, index)}
+                      onClick={(event) => event.stopPropagation()}
                       role="separator"
                       aria-orientation="vertical"
                       aria-label={`Redimensionar coluna ${col.label}`}
