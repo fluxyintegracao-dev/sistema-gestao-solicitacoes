@@ -34,6 +34,7 @@ const TIPO_LOTE = {
 };
 
 const DIRETORIA_ADMIN_CODIGO = 'DIR_ADMIN';
+const DIRETORIA_ADMIN_NOME = 'DIRETORIA ADMINISTRATIVA';
 const SETOR_FINANCEIRO_CODIGO = 'FINANCEIRO';
 
 function normalizarStatusLote(valor) {
@@ -234,7 +235,7 @@ function serializarLote(lote, resumoItens = null) {
     diretoria_alvo_codigo: lote.diretoria_alvo_codigo,
     tipo_lote: lote.tipo_lote || TIPO_LOTE.DIR_ADMIN,
     setor_criador_codigo: lote.setor_criador_codigo || DIRETORIA_ADMIN_CODIGO,
-    setor_criador_nome: lote.setor_criador_nome || lote.setor_criador_codigo || DIRETORIA_ADMIN_CODIGO,
+    setor_criador_nome: lote.setor_criador_nome || (lote.setor_criador_codigo === DIRETORIA_ADMIN_CODIGO ? DIRETORIA_ADMIN_NOME : lote.setor_criador_codigo) || DIRETORIA_ADMIN_NOME,
     valor_disponivel: valorDisponivel,
     valor_utilizado: valorUtilizado,
     saldo_disponivel: Math.max(valorDisponivel - valorUtilizado, 0),
@@ -645,7 +646,7 @@ module.exports = {
     try {
       const permissoes = await obterPermissoesPrioridade(req);
       if (!permissoes.podeSolicitarLote) {
-        return res.status(403).json({ error: 'Apenas DIR_ADMIN pode solicitar lotes de prioridade.' });
+        return res.status(403).json({ error: 'Apenas a Diretoria Administrativa pode solicitar lotes de prioridade.' });
       }
 
       const classificacaoAlvo = normalizarClassificacaoObra(req.body?.classificacao_alvo);
@@ -674,7 +675,7 @@ module.exports = {
         diretoria_alvo_codigo: diretoriaAlvoCodigo,
         tipo_lote: TIPO_LOTE.DIR_ADMIN,
         setor_criador_codigo: DIRETORIA_ADMIN_CODIGO,
-        setor_criador_nome: 'DIRETORIA ADMINISTRATIVA',
+        setor_criador_nome: DIRETORIA_ADMIN_NOME,
         valor_disponivel: valorDisponivel,
         valor_utilizado: 0,
         status: STATUS_LOTE.ABERTO,
@@ -729,7 +730,7 @@ module.exports = {
         valor_disponivel: 1,
         valor_utilizado: 0,
         status: STATUS_LOTE.ABERTO,
-        observacao: observacao || 'Solicitacao de prioridade enviada pela diretoria para aprovacao da DIR_ADMIN.',
+        observacao: observacao || 'Solicitacao de prioridade enviada pela diretoria para aprovacao da Diretoria Administrativa.',
         solicitado_por: req.user.id
       }, { transaction });
 
@@ -759,7 +760,7 @@ module.exports = {
           usuario_responsavel_id: req.user.id,
           setor: diretoriaCriadora.codigo,
           acao: 'PRIORIDADE_DIRETORIA_SOLICITADA',
-          observacao: `Solicitada prioridade para aprovacao da DIR_ADMIN no lote #${lote.id}`
+          observacao: `Solicitada prioridade para aprovacao da Diretoria Administrativa no lote #${lote.id}`
         })),
         { transaction }
       );
@@ -1235,7 +1236,7 @@ module.exports = {
       const permissoes = await obterPermissoesPrioridade(req);
       if (!permissoes.isSuperadmin && !permissoes.isDirAdmin) {
         await transaction.rollback();
-        return res.status(403).json({ error: 'Apenas DIR_ADMIN pode cancelar lotes.' });
+        return res.status(403).json({ error: 'Apenas a Diretoria Administrativa pode cancelar lotes.' });
       }
 
       const lote = await PrioridadeLote.findByPk(req.params.id, { transaction });

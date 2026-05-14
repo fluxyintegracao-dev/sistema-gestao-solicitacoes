@@ -711,7 +711,7 @@ export default function Solicitacoes({ arquivadas = false }) {
       return;
     }
 
-    if (!window.confirm(`Enviar ${selecionadasIds.length} solicitaÃ§Ã£o(Ãµes) para aprovaÃ§Ã£o de prioridade pela DIR_ADMIN?`)) {
+    if (!window.confirm(`Enviar ${selecionadasIds.length} solicitacao(oes) para aprovacao de prioridade pela Diretoria Administrativa?`)) {
       return;
     }
 
@@ -723,7 +723,7 @@ export default function Solicitacoes({ arquivadas = false }) {
       });
       setSelecionadasIds([]);
       await carregar();
-      alert('Lote de prioridade enviado para aprovaÃ§Ã£o da DIR_ADMIN.');
+      alert('Lote de prioridade enviado para aprovacao da Diretoria Administrativa.');
     } catch (error) {
       console.error(error);
       alert(error?.message || 'Erro ao solicitar prioridade para o financeiro.');
@@ -1158,7 +1158,7 @@ export default function Solicitacoes({ arquivadas = false }) {
               className="btn btn-outline !min-h-0 h-9 px-3 inline-flex items-center gap-2"
               onClick={solicitarPrioridadeFinanceiroSelecionadas}
               disabled={processandoMassa}
-              title="Enviar lote de prioridade para aprovaÃ§Ã£o da DIR_ADMIN"
+              title="Enviar lote de prioridade para aprovacao da Diretoria Administrativa"
             >
               <HiOutlineArrowRightOnRectangle className="w-4 h-4" />
               <span className="hidden sm:inline">Prioridade financeiro</span>

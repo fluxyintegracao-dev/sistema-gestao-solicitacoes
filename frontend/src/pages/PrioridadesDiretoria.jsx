@@ -463,7 +463,7 @@ export default function PrioridadesDiretoria() {
       <div>
         <h1 className="text-xl font-semibold">Prioridades da Diretoria</h1>
         <p className="text-sm text-gray-600 mt-0.5">
-          DIR_ADMIN solicita lotes com limite de caixa. Diretorias tambem podem enviar pedidos de urgencia para aprovacao da DIR_ADMIN.
+          Diretoria Administrativa solicita lotes com limite de caixa. Diretorias tambem podem enviar pedidos de urgencia para aprovacao da Diretoria Administrativa.
         </p>
       </div>
 
@@ -471,7 +471,7 @@ export default function PrioridadesDiretoria() {
         <form onSubmit={criarLote} className="bg-white rounded-xl shadow p-4 space-y-3">
           <div className="flex items-center justify-between gap-3">
             <h2 className="text-base font-medium">Solicitar prioridade</h2>
-            <span className="text-sm text-gray-500">Criacao de lote por DIR_ADMIN</span>
+            <span className="text-sm text-gray-500">Criacao de lote pela Diretoria Administrativa</span>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -662,7 +662,7 @@ export default function PrioridadesDiretoria() {
                 <ResumoCard
                   label={isLoteSolicitacaoDiretoria ? 'Aguardando caixa' : 'Saldo'}
                   value={formatarValor(resumoLote.saldoProjetado)}
-                  helper={isLoteSolicitacaoDiretoria ? 'Aprovacao pela DIR_ADMIN' : resumoLote.possuiPrevia ? 'Saldo projetado com a selecao atual' : null}
+                  helper={isLoteSolicitacaoDiretoria ? 'Aprovacao pela Diretoria Administrativa' : resumoLote.possuiPrevia ? 'Saldo projetado com a selecao atual' : null}
                   destaque={resumoLote.possuiPrevia}
                 />
                 <ResumoCard
