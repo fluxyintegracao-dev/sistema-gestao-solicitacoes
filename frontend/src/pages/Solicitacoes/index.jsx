@@ -714,9 +714,8 @@ export default function Solicitacoes({ arquivadas = false }) {
     { id: 'setor', label: 'Setor' },
     { id: 'responsavel', label: 'Responsável' },
     { id: 'status', label: 'Status' },
-    { id: 'vencimento', label: 'Vencimento' },
-    ...(arquivadas ? [{ id: 'acoes', label: 'Ações' }] : [])
-  ], [moduloContratosHabilitado, isSetorObra, arquivadas]);
+    { id: 'vencimento', label: 'Vencimento' }
+  ], [moduloContratosHabilitado, isSetorObra]);
 
   useEffect(() => {
     try {
