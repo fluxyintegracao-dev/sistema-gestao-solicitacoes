@@ -36,6 +36,7 @@ import {
 import {
   arquivarSolicitacoesEmMassa,
   deleteSolicitacao,
+  desarquivarSolicitacao,
   enviarSolicitacoesParaSetorEmMassa,
   getObrasVisiveisSolicitacoes,
   updateStatusSolicitacao
@@ -478,8 +479,7 @@ export default function Solicitacoes({ arquivadas = false }) {
     { id: 'responsavel', label: 'Responsável' },
     { id: 'status', label: 'Status' },
     { id: 'vencimento', label: 'Vencimento' },
-    ...(arquivadas ? [{ id: 'acoes', label: 'Ações' }] : [])
-  ], [isSetorObra, arquivadas]);
+  ], [isSetorObra]);
 
   useEffect(() => {
     try {
@@ -581,6 +581,45 @@ export default function Solicitacoes({ arquivadas = false }) {
     } catch (error) {
       console.error(error);
       alert('Erro ao arquivar solicitações em massa.');
+    } finally {
+      setProcessandoMassa(false);
+    }
+  }
+
+  async function desarquivarEmMassa() {
+    if (selecionadasIds.length === 0) {
+      alert('Selecione ao menos uma solicitacao.');
+      return;
+    }
+    if (!confirm(`Desarquivar ${selecionadasIds.length} solicitacao(oes)?`)) {
+      return;
+    }
+
+    try {
+      setProcessandoMassa(true);
+      let sucesso = 0;
+      const erros = [];
+      const solicitacoesPorId = new Map(solicitacoes.map(item => [Number(item.id), item]));
+
+      for (const solicitacaoId of selecionadasIds) {
+        try {
+          await desarquivarSolicitacao(solicitacaoId);
+          sucesso += 1;
+        } catch (error) {
+          const solicitacao = solicitacoesPorId.get(Number(solicitacaoId));
+          erros.push(`${solicitacao?.codigo || `ID ${solicitacaoId}`}: falha ao desarquivar`);
+        }
+      }
+
+      await carregar();
+      if (erros.length > 0) {
+        alert(`Desarquivamento concluido. Sucesso: ${sucesso}. Falhas: ${erros.length}.`);
+      } else {
+        alert('Solicitacoes desarquivadas com sucesso.');
+      }
+    } catch (error) {
+      console.error(error);
+      alert('Erro ao desarquivar solicitacoes.');
     } finally {
       setProcessandoMassa(false);
     }
@@ -1179,7 +1218,7 @@ export default function Solicitacoes({ arquivadas = false }) {
         </>
       )}
 
-      {!arquivadas && selecionadasIds.length > 0 && (
+      {selecionadasIds.length > 0 && (
         <div className="solicitacoes-massa-modal fixed left-1/2 -translate-x-1/2 bottom-4 z-40 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 shadow-xl rounded-2xl px-3 py-2 flex items-center gap-2">
           <span className="text-sm font-medium text-gray-700 dark:text-slate-200 px-2">
             {selecionadasIds.length} selecionada(s)
@@ -1197,7 +1236,7 @@ export default function Solicitacoes({ arquivadas = false }) {
             </button>
           )}
 
-          {selecionadaUnica && podeAssumirUnica && (
+          {!arquivadas && selecionadaUnica && podeAssumirUnica && (
             <button
               type="button"
               className="btn btn-outline !min-h-0 h-9 px-3 inline-flex items-center gap-2"
@@ -1210,7 +1249,7 @@ export default function Solicitacoes({ arquivadas = false }) {
             </button>
           )}
 
-          {selecionadaUnica && podeAtribuirUnica && (
+          {!arquivadas && selecionadaUnica && podeAtribuirUnica && (
             <button
               type="button"
               className="btn btn-outline !min-h-0 h-9 px-3 inline-flex items-center gap-2"
@@ -1234,29 +1273,31 @@ export default function Solicitacoes({ arquivadas = false }) {
             <span className="hidden sm:inline">Exportar</span>
           </button>
 
-          <button
-            type="button"
-            className="btn btn-outline !min-h-0 h-9 px-3 inline-flex items-center gap-2"
-            onClick={() => setModalStatusMassa(true)}
-            disabled={processandoMassa}
-            title="Alterar status das selecionadas"
-          >
-            <HiOutlinePencilSquare className="w-4 h-4" />
-            <span className="hidden sm:inline">Alterar status</span>
-          </button>
+          {!arquivadas && (
+            <button
+              type="button"
+              className="btn btn-outline !min-h-0 h-9 px-3 inline-flex items-center gap-2"
+              onClick={() => setModalStatusMassa(true)}
+              disabled={processandoMassa}
+              title="Alterar status das selecionadas"
+            >
+              <HiOutlinePencilSquare className="w-4 h-4" />
+              <span className="hidden sm:inline">Alterar status</span>
+            </button>
+          )}
 
           <button
             type="button"
             className="btn btn-outline !min-h-0 h-9 px-3 inline-flex items-center gap-2"
-            onClick={arquivarEmMassa}
+            onClick={arquivadas ? desarquivarEmMassa : arquivarEmMassa}
             disabled={processandoMassa}
-            title="Arquivar selecionadas"
+            title={arquivadas ? 'Desarquivar selecionadas' : 'Arquivar selecionadas'}
           >
             <HiOutlineFolderOpen className="w-4 h-4" />
-            <span className="hidden sm:inline">Arquivar</span>
+            <span className="hidden sm:inline">{arquivadas ? 'Desarquivar' : 'Arquivar'}</span>
           </button>
 
-          {podeSolicitarPrioridadeFinanceiro && (
+          {!arquivadas && podeSolicitarPrioridadeFinanceiro && (
             <button
               type="button"
               className="btn btn-outline !min-h-0 h-9 px-3 inline-flex items-center gap-2"
@@ -1269,7 +1310,7 @@ export default function Solicitacoes({ arquivadas = false }) {
             </button>
           )}
 
-          {selecionadaUnica && podeEnviarUnica && (
+          {!arquivadas && selecionadaUnica && podeEnviarUnica && (
             <button
               type="button"
               className="btn btn-outline !min-h-0 h-9 px-3 inline-flex items-center gap-2"
@@ -1282,7 +1323,7 @@ export default function Solicitacoes({ arquivadas = false }) {
             </button>
           )}
 
-          {selecionadasIds.length > 1 && podeEnviarMassa && (
+          {!arquivadas && selecionadasIds.length > 1 && podeEnviarMassa && (
             <button
               type="button"
               className="btn btn-outline !min-h-0 h-9 px-3 inline-flex items-center gap-2"
@@ -1295,7 +1336,7 @@ export default function Solicitacoes({ arquivadas = false }) {
             </button>
           )}
 
-          {podeAtribuirMassa && (
+          {!arquivadas && podeAtribuirMassa && (
             <button
               type="button"
               className="btn btn-outline !min-h-0 h-9 px-3 inline-flex items-center gap-2"

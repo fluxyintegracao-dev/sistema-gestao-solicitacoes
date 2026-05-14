@@ -19,6 +19,7 @@
 - exportacao
 - envio entre setores com regra padrao por setor atual da solicitacao
 - alteracao de status em massa reaproveitando a mesma regra do detalhe da solicitacao
+- solicitacoes arquivadas pelo usuario mantem selecao em massa e usam o painel flutuante para ver, exportar e desarquivar
 - permissao especial configuravel para envio fora do setor atual, sem liberar o setor OBRA
 
 ## Fluxo de aprovacao por diretoria
