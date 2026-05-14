@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   cancelarLotePrioridadeDiretoria,
   criarLotePrioridadeDiretoria,
@@ -32,6 +33,14 @@ function formatarData(valor) {
   return data.toLocaleDateString('pt-BR');
 }
 
+function normalizarBusca(valor) {
+  return String(valor || '')
+    .trim()
+    .toUpperCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+}
+
 function BadgeStatus({ status }) {
   const valor = String(status || '').trim().toUpperCase();
   const classes = {
@@ -48,6 +57,7 @@ function BadgeStatus({ status }) {
 }
 
 export default function PrioridadesDiretoria() {
+  const navigate = useNavigate();
   const [contexto, setContexto] = useState(null);
   const [lotes, setLotes] = useState([]);
   const [loteSelecionadoId, setLoteSelecionadoId] = useState(null);
@@ -57,6 +67,7 @@ export default function PrioridadesDiretoria() {
   const [selecionadasIds, setSelecionadasIds] = useState([]);
   const [selecionadasCache, setSelecionadasCache] = useState({});
   const [buscaDisponiveis, setBuscaDisponiveis] = useState('');
+  const [filtroItensLote, setFiltroItensLote] = useState('');
   const [filtroObraId, setFiltroObraId] = useState('');
   const [loading, setLoading] = useState(true);
   const [loadingDetalhe, setLoadingDetalhe] = useState(false);
@@ -104,6 +115,7 @@ export default function PrioridadesDiretoria() {
       setSelecionadasIds([]);
       setSelecionadasCache({});
       setBuscaDisponiveis('');
+      setFiltroItensLote('');
       setFiltroObraId('');
       return;
     }
@@ -117,6 +129,7 @@ export default function PrioridadesDiretoria() {
       setSelecionadasIds([]);
       setSelecionadasCache({});
       setBuscaDisponiveis('');
+      setFiltroItensLote('');
       setFiltroObraId('');
       return;
     }
@@ -186,6 +199,31 @@ export default function PrioridadesDiretoria() {
   ]);
 
   const excedeuLimite = !isLoteSolicitacaoDiretoria && resumoLote.valorUtilizadoProjetado > resumoLote.valorDisponivel;
+
+  const itensLoteFiltrados = useMemo(() => {
+    const itens = Array.isArray(detalhe?.itens) ? detalhe.itens : [];
+    const termo = normalizarBusca(filtroItensLote);
+    if (!termo) return itens;
+
+    return itens.filter((item) => {
+      const solicitacao = item?.solicitacao || {};
+      const campos = [
+        solicitacao.codigo,
+        solicitacao.numero_sienge,
+        solicitacao.obra?.nome,
+        solicitacao.obra?.codigo,
+        solicitacao.tipo?.nome
+      ].map(normalizarBusca);
+
+      return campos.some((campo) => campo.includes(termo));
+    });
+  }, [detalhe?.itens, filtroItensLote]);
+
+  function abrirSolicitacao(solicitacaoId) {
+    const id = Number(solicitacaoId);
+    if (!Number.isInteger(id) || id <= 0) return;
+    navigate(`/solicitacoes/${id}`);
+  }
 
   async function carregarInicial() {
     try {
@@ -679,7 +717,7 @@ export default function PrioridadesDiretoria() {
                       className="input"
                       value={buscaDisponiveis}
                       onChange={(event) => setBuscaDisponiveis(event.target.value)}
-                      placeholder="Buscar por codigo, SIENGE, descricao, obra ou tipo"
+                      placeholder="Filtrar por codigo, obra ou tipo"
                     />
                     <select
                       className="input"
@@ -742,11 +780,17 @@ export default function PrioridadesDiretoria() {
                         {!loadingDisponiveis && solicitacoesDisponiveis.map((item) => {
                           const checked = selecionadasIds.includes(Number(item.id));
                           return (
-                            <tr key={item.id} className="border-t">
+                            <tr
+                              key={item.id}
+                              className="border-t cursor-pointer hover:bg-blue-50/60"
+                              onClick={() => abrirSolicitacao(item.id)}
+                              title="Abrir solicitacao"
+                            >
                               <td className="px-3 py-2.5">
                                 <input
                                   type="checkbox"
                                   checked={checked}
+                                  onClick={(event) => event.stopPropagation()}
                                   onChange={() => alternarSolicitacao(item.id)}
                                 />
                               </td>
@@ -794,12 +838,26 @@ export default function PrioridadesDiretoria() {
 
               {detalhe.status !== 'ABERTO' && (
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <h3 className="text-base font-medium">Solicitacoes autorizadas</h3>
-                    <span className="text-sm text-gray-500">
-                      Finalizado em {formatarDataHora(detalhe.finalizado_em)}
-                    </span>
+                  <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+                    <div>
+                      <h3 className="text-base font-medium">Solicitacoes autorizadas</h3>
+                      <span className="text-sm text-gray-500">
+                        Finalizado em {formatarDataHora(detalhe.finalizado_em)}
+                      </span>
+                    </div>
+                    <input
+                      className="input lg:max-w-sm"
+                      value={filtroItensLote}
+                      onChange={(event) => setFiltroItensLote(event.target.value)}
+                      placeholder="Filtrar por codigo, obra ou tipo"
+                    />
                   </div>
+
+                  {filtroItensLote && (
+                    <span className="text-sm text-gray-500">
+                      Exibindo {itensLoteFiltrados.length} de {(detalhe.itens || []).length} solicitacao(oes)
+                    </span>
+                  )}
 
                   <div className="border rounded-xl overflow-hidden">
                     <table className="w-full text-sm">
@@ -821,8 +879,21 @@ export default function PrioridadesDiretoria() {
                           </tr>
                         )}
 
-                        {(detalhe.itens || []).map((item) => (
-                          <tr key={item.id} className="border-t">
+                        {(detalhe.itens || []).length > 0 && itensLoteFiltrados.length === 0 && (
+                          <tr>
+                            <td className="px-3 py-2.5 text-gray-500" colSpan={5}>
+                              Nenhuma solicitacao encontrada para o filtro informado.
+                            </td>
+                          </tr>
+                        )}
+
+                        {itensLoteFiltrados.map((item) => (
+                          <tr
+                            key={item.id}
+                            className="border-t cursor-pointer hover:bg-blue-50/60"
+                            onClick={() => abrirSolicitacao(item.solicitacao?.id)}
+                            title="Abrir solicitacao"
+                          >
                             <td className="px-3 py-2.5">
                               <div className="font-medium">{item.solicitacao?.codigo || `#${item.solicitacao?.id || '-'}`}</div>
                               <div className="text-xs text-gray-500">{item.solicitacao?.numero_sienge || '-'}</div>
