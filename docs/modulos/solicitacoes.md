@@ -18,6 +18,7 @@
 - acoes em massa
 - exportacao
 - envio entre setores com regra padrao por setor atual da solicitacao
+- alteracao de status em massa reaproveitando a mesma regra do detalhe da solicitacao
 - permissao especial configuravel para envio fora do setor atual, sem liberar o setor OBRA
 
 ## Fluxo de aprovacao por diretoria

@@ -8,13 +8,15 @@ import {
   HiOutlineFolderOpen,
   HiOutlineArrowRightOnRectangle,
   HiOutlineTrash,
-  HiOutlineXMark
+  HiOutlineXMark,
+  HiOutlinePencilSquare
 } from 'react-icons/hi2';
 import { useLocation, useNavigate } from 'react-router-dom';
 import Filtros from './Filtros';
 import TabelaSolicitacoes from './TabelaSolicitacoes';
 import ModalAtribuirResponsavel from './ModalAtribuirResponsavel';
 import ModalEnviarSetor from './ModalEnviarSetor';
+import ModalAlterarStatus from '../SolicitacaoDetalhe/ModalAlterarStatus';
 import { API_URL, authHeaders } from '../../services/api';
 import { getSetores } from '../../services/setores';
 import { getTiposSolicitacao } from '../../services/tiposSolicitacao';
@@ -35,7 +37,8 @@ import {
   arquivarSolicitacoesEmMassa,
   deleteSolicitacao,
   enviarSolicitacoesParaSetorEmMassa,
-  getObrasVisiveisSolicitacoes
+  getObrasVisiveisSolicitacoes,
+  updateStatusSolicitacao
 } from '../../services/solicitacoes';
 import { solicitarUrgenciaPrioridadeDiretoria } from '../../services/prioridadesDiretoria';
 
@@ -68,6 +71,7 @@ export default function Solicitacoes({ arquivadas = false }) {
   const [modalEnvioMassa, setModalEnvioMassa] = useState(false);
   const [modalAtribuir, setModalAtribuir] = useState(false);
   const [podeAlterarValorSolicitacao, setPodeAlterarValorSolicitacao] = useState(false);
+  const [modalStatusMassa, setModalStatusMassa] = useState(false);
   const [modalEnviarUnitario, setModalEnviarUnitario] = useState(false);
   const [modalAtribuirMassa, setModalAtribuirMassa] = useState(false);
   const [usuariosAtribuicao, setUsuariosAtribuicao] = useState([]);
@@ -534,6 +538,7 @@ export default function Solicitacoes({ arquivadas = false }) {
       if (event.key !== 'Escape') return;
       setMostrarSeletorColunas(false);
       setModalEnvioMassa(false);
+      setModalStatusMassa(false);
     }
 
     document.addEventListener('keydown', handleEscape);
@@ -758,6 +763,62 @@ export default function Solicitacoes({ arquivadas = false }) {
     }
   }
 
+  function mensagemErroStatusMassa(error) {
+    const raw = String(error?.message || '').trim();
+    if (!raw) return 'Erro ao alterar status';
+
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed?.error) return parsed.error;
+    } catch (_) {}
+
+    return raw;
+  }
+
+  async function alterarStatusSelecionadas(novoStatus) {
+    if (!novoStatus) return;
+    if (selecionadasIds.length === 0) {
+      alert('Selecione ao menos uma solicitacao.');
+      return;
+    }
+
+    if (!window.confirm(`Alterar status de ${selecionadasIds.length} solicitacao(oes) para "${novoStatus}"?`)) {
+      return;
+    }
+
+    try {
+      setModalStatusMassa(false);
+      setProcessandoMassa(true);
+      let sucesso = 0;
+      const erros = [];
+      const solicitacoesPorId = new Map(solicitacoes.map(item => [Number(item.id), item]));
+
+      for (const solicitacaoId of selecionadasIds) {
+        try {
+          await updateStatusSolicitacao(solicitacaoId, novoStatus);
+          sucesso += 1;
+        } catch (error) {
+          const solicitacao = solicitacoesPorId.get(Number(solicitacaoId));
+          const codigo = solicitacao?.codigo || `ID ${solicitacaoId}`;
+          erros.push(`${codigo}: ${mensagemErroStatusMassa(error)}`);
+        }
+      }
+
+      await carregar();
+
+      if (erros.length > 0) {
+        alert(`Alteracao de status concluida. Sucesso: ${sucesso}. Falhas: ${erros.length}.`);
+      } else {
+        alert('Status alterado em massa com sucesso.');
+      }
+    } catch (error) {
+      console.error(error);
+      alert('Erro ao alterar status em massa.');
+    } finally {
+      setProcessandoMassa(false);
+    }
+  }
+
   const selecionadaUnica = useMemo(() => {
     if (selecionadasIds.length !== 1) return null;
     const idSelecionado = Number(selecionadasIds[0]);
@@ -803,6 +864,11 @@ export default function Solicitacoes({ arquivadas = false }) {
       return solicitacao && usuarioPodeEnviarSolicitacaoParaOutroSetor(solicitacao.area_responsavel, user);
     });
   }, [selecionadasIds, isSetorObra, solicitacoes, user]);
+  const setorParaStatusMassa = useMemo(() => {
+    if (isSuperadmin) return null;
+    if (isAdminGEO) return 'GEO';
+    return user?.setor?.codigo || user?.area || user?.setor?.nome || '';
+  }, [isSuperadmin, isAdminGEO, user?.setor?.codigo, user?.area, user?.setor?.nome]);
 
   const isSetorObraSolicitacaoUnica = useMemo(() => {
     if (!selecionadaUnica) return false;
@@ -1171,6 +1237,17 @@ export default function Solicitacoes({ arquivadas = false }) {
           <button
             type="button"
             className="btn btn-outline !min-h-0 h-9 px-3 inline-flex items-center gap-2"
+            onClick={() => setModalStatusMassa(true)}
+            disabled={processandoMassa}
+            title="Alterar status das selecionadas"
+          >
+            <HiOutlinePencilSquare className="w-4 h-4" />
+            <span className="hidden sm:inline">Alterar status</span>
+          </button>
+
+          <button
+            type="button"
+            className="btn btn-outline !min-h-0 h-9 px-3 inline-flex items-center gap-2"
             onClick={arquivarEmMassa}
             disabled={processandoMassa}
             title="Arquivar selecionadas"
@@ -1360,6 +1437,14 @@ export default function Solicitacoes({ arquivadas = false }) {
           </div>
         </div>
       )}
+
+      <ModalAlterarStatus
+        aberto={modalStatusMassa && !arquivadas}
+        setor={setorParaStatusMassa}
+        exigirStatusCadastrado={!isSuperadmin}
+        onClose={() => setModalStatusMassa(false)}
+        onSalvar={alterarStatusSelecionadas}
+      />
     </div>
   );
 }
