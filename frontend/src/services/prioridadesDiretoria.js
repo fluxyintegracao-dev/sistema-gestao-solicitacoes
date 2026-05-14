@@ -54,6 +54,15 @@ export async function criarLotePrioridadeDiretoria(data) {
   return tratarResposta(res, 'Erro ao criar lote de prioridade');
 }
 
+export async function solicitarUrgenciaPrioridadeDiretoria(data) {
+  const res = await fetch(`${API_URL}/prioridades-diretoria/lotes/solicitar-urgencia`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+  return tratarResposta(res, 'Erro ao solicitar prioridade para o financeiro');
+}
+
 export async function getLotePrioridadeDiretoria(id) {
   const res = await fetch(`${API_URL}/prioridades-diretoria/lotes/${id}`, {
     headers: authHeaders()
@@ -79,19 +88,18 @@ export async function finalizarLotePrioridadeDiretoria(id, data) {
 }
 
 export async function salvarRascunhoLotePrioridadeDiretoria(id, data) {
-  const res = await fetch(`${API_URL}/prioridades-diretoria/lotes/${id}/finalizar`, {
+  const res = await fetch(`${API_URL}/prioridades-diretoria/lotes/${id}/salvar-selecao`, {
     method: 'POST',
     headers: authHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify({ ...data, rascunho: true })
+    body: JSON.stringify(data)
   });
   return tratarResposta(res, 'Erro ao salvar selecao do lote de prioridade');
 }
 
 export async function reabrirLotePrioridadeDiretoria(id) {
-  const res = await fetch(`${API_URL}/prioridades-diretoria/lotes/${id}/finalizar`, {
+  const res = await fetch(`${API_URL}/prioridades-diretoria/lotes/${id}/reabrir`, {
     method: 'POST',
-    headers: authHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify({ reabrir: true })
+    headers: authHeaders()
   });
   return tratarResposta(res, 'Erro ao reabrir lote de prioridade');
 }

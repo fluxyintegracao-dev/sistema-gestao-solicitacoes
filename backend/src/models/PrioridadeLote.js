@@ -14,6 +14,19 @@ module.exports = (sequelize, DataTypes) => sequelize.define(
       type: DataTypes.STRING(120),
       allowNull: false
     },
+    tipo_lote: {
+      type: DataTypes.STRING(60),
+      allowNull: false,
+      defaultValue: 'DIR_ADMIN'
+    },
+    setor_criador_codigo: {
+      type: DataTypes.STRING(120),
+      allowNull: true
+    },
+    setor_criador_nome: {
+      type: DataTypes.STRING(180),
+      allowNull: true
+    },
     valor_disponivel: {
       type: DataTypes.DECIMAL(14, 2),
       allowNull: false

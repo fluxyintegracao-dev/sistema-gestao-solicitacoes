@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import {
   cancelarLotePrioridadeDiretoria,
   criarLotePrioridadeDiretoria,
@@ -47,13 +47,25 @@ function mesclarSolicitacoes(base = [], extras = []) {
   return Array.from(mapa.values());
 }
 
+function normalizarBusca(valor) {
+  return String(valor || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+}
+
 export default function PrioridadesDiretoria() {
+  const navigate = useNavigate();
   const [contexto, setContexto] = useState(null);
   const [lotes, setLotes] = useState([]);
   const [loteDetalhe, setLoteDetalhe] = useState(null);
   const [disponiveis, setDisponiveis] = useState([]);
+  const [obrasDisponiveis, setObrasDisponiveis] = useState([]);
   const [selecionados, setSelecionados] = useState(new Set());
   const [busca, setBusca] = useState('');
+  const [filtroObraId, setFiltroObraId] = useState('');
+  const [filtroItensLote, setFiltroItensLote] = useState('');
   const [statusFiltro, setStatusFiltro] = useState('');
   const [loading, setLoading] = useState(true);
   const [operando, setOperando] = useState(false);
@@ -135,10 +147,15 @@ export default function PrioridadesDiretoria() {
       setSelecionados(new Set(solicitacoesSalvas.map(item => String(item.id))));
 
       if (detalhe?.status === 'ABERTO') {
-        const disponiveisData = await getSolicitacoesDisponiveisPrioridadeDiretoria(id, busca ? { busca } : {});
+        const params = {};
+        if (busca) params.busca = busca;
+        if (filtroObraId) params.obra_id = filtroObraId;
+        const disponiveisData = await getSolicitacoesDisponiveisPrioridadeDiretoria(id, params);
+        setObrasDisponiveis(Array.isArray(disponiveisData?.obras) ? disponiveisData.obras : []);
         setDisponiveis(mesclarSolicitacoes(Array.isArray(disponiveisData?.items) ? disponiveisData.items : [], solicitacoesSalvas));
       } else {
         setDisponiveis([]);
+        setObrasDisponiveis([]);
       }
     } catch (error) {
       console.error(error);
@@ -150,10 +167,14 @@ export default function PrioridadesDiretoria() {
 
   async function buscarDisponiveis() {
     if (!loteDetalhe?.id) return;
+    const params = {};
+    if (busca) params.busca = busca;
+    if (filtroObraId) params.obra_id = filtroObraId;
     const dataDisponiveis = await getSolicitacoesDisponiveisPrioridadeDiretoria(
       loteDetalhe.id,
-      busca ? { busca } : {}
+      params
     );
+    setObrasDisponiveis(Array.isArray(dataDisponiveis?.obras) ? dataDisponiveis.obras : []);
     setDisponiveis(mesclarSolicitacoes(
       Array.isArray(dataDisponiveis?.items) ? dataDisponiveis.items : [],
       solicitacoesDoLote(loteDetalhe)
@@ -170,11 +191,35 @@ export default function PrioridadesDiretoria() {
     });
   }
 
+  function abrirSolicitacao(id) {
+    const solicitacaoId = Number(id);
+    if (Number.isInteger(solicitacaoId) && solicitacaoId > 0) {
+      navigate(`/solicitacoes/${solicitacaoId}`);
+    }
+  }
+
   const solicitacoesExibidas = useMemo(() => (
     loteDetalhe?.status === 'ABERTO'
       ? mesclarSolicitacoes(disponiveis, solicitacoesDoLote(loteDetalhe))
       : solicitacoesDoLote(loteDetalhe)
   ), [disponiveis, loteDetalhe]);
+
+  const solicitacoesVisiveis = useMemo(() => {
+    const termo = normalizarBusca(filtroItensLote);
+    if (!termo) return solicitacoesExibidas;
+    return solicitacoesExibidas.filter((item) => {
+      const texto = [
+        item.codigo,
+        item.numero_sienge,
+        item.descricao,
+        item.obra?.nome,
+        item.obra?.codigo,
+        item.tipo?.nome,
+        item.status_global
+      ].map(normalizarBusca).join(' ');
+      return texto.includes(termo);
+    });
+  }, [solicitacoesExibidas, filtroItensLote]);
 
   const selecionadas = useMemo(() => (
     solicitacoesExibidas.filter(item => selecionados.has(String(item.id)))
@@ -240,7 +285,11 @@ export default function PrioridadesDiretoria() {
       setLoteDetalhe(detalhe);
       const solicitacoesSalvas = solicitacoesDoLote(detalhe);
       setSelecionados(new Set(solicitacoesSalvas.map(item => String(item.id))));
-      const disponiveisData = await getSolicitacoesDisponiveisPrioridadeDiretoria(lote.id, busca ? { busca } : {});
+      const params = {};
+      if (busca) params.busca = busca;
+      if (filtroObraId) params.obra_id = filtroObraId;
+      const disponiveisData = await getSolicitacoesDisponiveisPrioridadeDiretoria(lote.id, params);
+      setObrasDisponiveis(Array.isArray(disponiveisData?.obras) ? disponiveisData.obras : []);
       setDisponiveis(mesclarSolicitacoes(Array.isArray(disponiveisData?.items) ? disponiveisData.items : [], solicitacoesSalvas));
       await recarregarLotes();
       alert('Lote reaberto para edicao.');
@@ -387,10 +436,21 @@ export default function PrioridadesDiretoria() {
 
               {loteDetalhe.status === 'ABERTO' && (
                 <div className="rounded-2xl border border-[var(--c-border)] p-4 space-y-3">
-                  <div className="flex flex-col gap-2 md:flex-row md:items-end">
+                  <div className="grid grid-cols-1 md:grid-cols-[1fr_220px_auto_auto_auto] gap-2 md:items-end">
                     <label className="form-field flex-1">
                       <span className="form-label">Buscar solicitacao elegivel</span>
                       <input className="input" value={busca} onChange={event => setBusca(event.target.value)} placeholder="Codigo, obra, descricao ou tipo" />
+                    </label>
+                    <label className="form-field">
+                      <span className="form-label">Obra</span>
+                      <select className="input" value={filtroObraId} onChange={event => setFiltroObraId(event.target.value)}>
+                        <option value="">Todas as obras</option>
+                        {obrasDisponiveis.map((obra) => (
+                          <option key={obra.id} value={obra.id}>
+                            {obra.nome}
+                          </option>
+                        ))}
+                      </select>
                     </label>
                     <button type="button" className="btn btn-outline" onClick={buscarDisponiveis}>Buscar</button>
                     {loteDetalhe.pode_salvar && (
@@ -410,6 +470,18 @@ export default function PrioridadesDiretoria() {
                 </div>
               )}
 
+              <div className="rounded-2xl border border-[var(--c-border)] p-4">
+                <label className="form-field">
+                  <span className="form-label">Filtrar solicitacoes do lote</span>
+                  <input
+                    className="input"
+                    value={filtroItensLote}
+                    onChange={event => setFiltroItensLote(event.target.value)}
+                    placeholder="Codigo, obra, descricao, status ou tipo"
+                  />
+                </label>
+              </div>
+
               <div className="overflow-x-auto rounded-2xl border border-[var(--c-border)]">
                 <table className="table table-sm min-w-full">
                   <thead>
@@ -422,17 +494,26 @@ export default function PrioridadesDiretoria() {
                     </tr>
                   </thead>
                   <tbody>
-                    {solicitacoesExibidas.map(item => (
-                      <tr key={item.id}>
+                    {solicitacoesVisiveis.map(item => (
+                      <tr
+                        key={item.id}
+                        className="cursor-pointer hover:bg-[var(--c-primary-soft)]"
+                        onClick={() => abrirSolicitacao(item.id)}
+                      >
                         {loteDetalhe.status === 'ABERTO' && (
                           <td>
-                            <input type="checkbox" checked={selecionados.has(String(item.id))} onChange={() => alternarSolicitacao(item.id)} />
+                            <input
+                              type="checkbox"
+                              checked={selecionados.has(String(item.id))}
+                              onClick={event => event.stopPropagation()}
+                              onChange={() => alternarSolicitacao(item.id)}
+                            />
                           </td>
                         )}
                         <td>
-                          <Link className="font-semibold text-[var(--c-primary)]" to={`/solicitacoes/${item.id}`}>
+                          <span className="font-semibold text-[var(--c-primary)]">
                             {item.codigo || `#${item.id}`}
-                          </Link>
+                          </span>
                           <p className="text-xs text-[var(--c-muted)]">{item.tipo?.nome || '-'}</p>
                         </td>
                         <td>{item.obra?.nome || '-'}</td>
@@ -440,7 +521,7 @@ export default function PrioridadesDiretoria() {
                         <td className="text-right font-semibold">{moeda(item.valor_prioridade)}</td>
                       </tr>
                     ))}
-                    {solicitacoesExibidas.length === 0 && (
+                    {solicitacoesVisiveis.length === 0 && (
                       <tr>
                         <td colSpan={loteDetalhe.status === 'ABERTO' ? 5 : 4} className="text-center text-[var(--c-muted)] py-8">
                           Nenhuma solicitacao encontrada para este lote.

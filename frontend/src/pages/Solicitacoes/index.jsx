@@ -7,6 +7,7 @@ import {
   HiOutlineUserPlus,
   HiOutlineFolderOpen,
   HiOutlineArrowRightOnRectangle,
+  HiOutlineBanknotes,
   HiOutlineTrash,
   HiOutlineXMark
 } from 'react-icons/hi2';
@@ -31,6 +32,7 @@ import {
   getSolicitacaoResumoLista,
   getObrasVisiveisSolicitacoes
 } from '../../services/solicitacoes';
+import { solicitarUrgenciaPrioridadeDiretoria } from '../../services/prioridadesDiretoria';
 
 function normalizarTextoComparacao(valor) {
   return String(valor || '')
@@ -687,6 +689,11 @@ export default function Solicitacoes({ arquivadas = false }) {
   ];
   const isSetorObra = userHasSetorCapability(user, 'eh_setor_obra');
   const isSetorFinanceiro = userHasSetorCapability(user, 'eh_setor_financeiro');
+  const setorTokensNormalizados = setorTokens.map(normalizarTextoComparacao).filter(Boolean);
+  const isDiretoriaObrasPublicas = setorTokensNormalizados.includes('DIR_OBRAS_PUBLICAS');
+  const isDiretoriaObrasPrivadas = setorTokensNormalizados.includes('DIR_OBRAS_PRIVADAS');
+  const podeSolicitarPrioridadeFinanceiro = !arquivadas && (isDiretoriaObrasPublicas || isDiretoriaObrasPrivadas);
+  const classificacaoPrioridadeDiretoria = isDiretoriaObrasPublicas ? 'PUBLICA' : 'PRIVADA';
   const isAdminGEO = perfilUpper.startsWith('ADMIN') && userHasSetorCapability(user, 'eh_setor_geo');
   const isSuperadmin = perfilUpper === 'SUPERADMIN';
   const colunasStorageKey = useMemo(() => {
@@ -985,6 +992,45 @@ export default function Solicitacoes({ arquivadas = false }) {
     }
   }
 
+  async function solicitarPrioridadeFinanceiroSelecionadas() {
+    if (!podeSolicitarPrioridadeFinanceiro) {
+      alert('Apenas DIR_OBRAS_PUBLICAS ou DIR_OBRAS_PRIVADAS podem solicitar prioridade para o financeiro.');
+      return;
+    }
+
+    if (selecionadasIds.length === 0) {
+      alert('Selecione ao menos uma solicitacao.');
+      return;
+    }
+
+    const selecionadas = solicitacoes.filter(item => selecionadasIds.includes(Number(item.id)));
+    const foraFinanceiro = selecionadas.filter(item => normalizarTextoComparacao(item.area_responsavel) !== 'FINANCEIRO');
+    if (foraFinanceiro.length > 0) {
+      alert('Selecione apenas solicitacoes que estejam no setor FINANCEIRO para solicitar prioridade.');
+      return;
+    }
+
+    if (!window.confirm(`Enviar ${selecionadasIds.length} solicitacao(oes) para aprovacao de prioridade pela Diretoria Administrativa?`)) {
+      return;
+    }
+
+    try {
+      setProcessandoMassa(true);
+      await solicitarUrgenciaPrioridadeDiretoria({
+        solicitacao_ids: selecionadasIds,
+        classificacao_alvo: classificacaoPrioridadeDiretoria
+      });
+      setSelecionadasIds([]);
+      await carregar({ silent: true });
+      alert('Lote de prioridade enviado para aprovacao da Diretoria Administrativa.');
+    } catch (error) {
+      console.error(error);
+      alert(error?.message || 'Erro ao solicitar prioridade para o financeiro.');
+    } finally {
+      setProcessandoMassa(false);
+    }
+  }
+
   const selecionadaUnica = useMemo(() => {
     if (selecionadasIds.length !== 1) return null;
     const idSelecionado = Number(selecionadasIds[0]);
@@ -1256,6 +1302,18 @@ export default function Solicitacoes({ arquivadas = false }) {
             >
               Enviar em massa
             </button>
+            {podeSolicitarPrioridadeFinanceiro && (
+              <button
+                type="button"
+                className="btn btn-outline inline-flex items-center gap-2"
+                onClick={solicitarPrioridadeFinanceiroSelecionadas}
+                disabled={processandoMassa || selecionadasIds.length === 0}
+                title="Enviar lote de prioridade para aprovacao da Diretoria Administrativa"
+              >
+                <HiOutlineBanknotes className="w-4 h-4" />
+                <span className="hidden sm:inline">Prioridade financeiro</span>
+              </button>
+            )}
           </div>
 
           {mostrarSeletorColunas && typeof document !== 'undefined' && createPortal((
@@ -1426,6 +1484,19 @@ export default function Solicitacoes({ arquivadas = false }) {
             <HiDocumentArrowDown className="w-4 h-4" />
             <span className="hidden sm:inline">Exportar</span>
           </button>
+
+          {podeSolicitarPrioridadeFinanceiro && (
+            <button
+              type="button"
+              className="btn btn-outline !min-h-0 h-9 px-3 inline-flex items-center gap-2"
+              onClick={solicitarPrioridadeFinanceiroSelecionadas}
+              disabled={processandoMassa}
+              title="Solicitar prioridade financeira"
+            >
+              <HiOutlineBanknotes className="w-4 h-4" />
+              <span className="hidden sm:inline">Prioridade financeiro</span>
+            </button>
+          )}
 
           <button
             type="button"

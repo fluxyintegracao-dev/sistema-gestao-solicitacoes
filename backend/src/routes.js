@@ -838,8 +838,17 @@ router.delete('/solicitacoes/:id', validateRequest({ params: validateNumericIdPa
 router.get('/prioridades-diretoria/contexto', requireEnabledModule('SOLICITACOES'), PrioridadeDiretoriaController.contexto);
 router.get('/prioridades-diretoria/lotes', requireEnabledModule('SOLICITACOES'), PrioridadeDiretoriaController.index);
 router.post('/prioridades-diretoria/lotes', requireEnabledModule('SOLICITACOES'), auditSuccess({ eventType: 'DIRETORIA_PRIORITY_BATCH_CREATED', resourceType: 'PRIORIDADE_DIRETORIA', description: 'Lote de prioridade da diretoria criado' }), PrioridadeDiretoriaController.create);
+router.post('/prioridades-diretoria/lotes/solicitar-urgencia', requireEnabledModule('SOLICITACOES'), auditSuccess({ eventType: 'DIRETORIA_PRIORITY_BATCH_URGENT_REQUESTED', resourceType: 'PRIORIDADE_DIRETORIA', description: 'Pedido de prioridade financeira criado pela diretoria' }), PrioridadeDiretoriaController.solicitarUrgencia);
 router.get('/prioridades-diretoria/lotes/:id', requireEnabledModule('SOLICITACOES'), validateRequest({ params: validateNumericIdParam('id', 'Lote de prioridade') }), PrioridadeDiretoriaController.show);
 router.get('/prioridades-diretoria/lotes/:id/solicitacoes-disponiveis', requireEnabledModule('SOLICITACOES'), validateRequest({ params: validateNumericIdParam('id', 'Lote de prioridade') }), PrioridadeDiretoriaController.solicitacoesDisponiveis);
+router.post('/prioridades-diretoria/lotes/:id/salvar-selecao', requireEnabledModule('SOLICITACOES'), validateRequest({ params: validateNumericIdParam('id', 'Lote de prioridade') }), (req, res) => {
+  req.body = { ...(req.body || {}), rascunho: true };
+  return PrioridadeDiretoriaController.finalizar(req, res);
+});
+router.post('/prioridades-diretoria/lotes/:id/reabrir', requireEnabledModule('SOLICITACOES'), validateRequest({ params: validateNumericIdParam('id', 'Lote de prioridade') }), (req, res) => {
+  req.body = { ...(req.body || {}), reabrir: true };
+  return PrioridadeDiretoriaController.finalizar(req, res);
+});
 router.post('/prioridades-diretoria/lotes/:id/finalizar', requireEnabledModule('SOLICITACOES'), validateRequest({ params: validateNumericIdParam('id', 'Lote de prioridade') }), auditSuccess({ eventType: 'DIRETORIA_PRIORITY_BATCH_CLOSED', resourceType: 'PRIORIDADE_DIRETORIA', description: 'Lote de prioridade da diretoria finalizado', resourceIdResolver: (req) => req.params.id }), PrioridadeDiretoriaController.finalizar);
 router.post('/prioridades-diretoria/lotes/:id/cancelar', requireEnabledModule('SOLICITACOES'), validateRequest({ params: validateNumericIdParam('id', 'Lote de prioridade') }), PrioridadeDiretoriaController.cancelar);
 router.delete('/prioridades-diretoria/lotes/:id', requireEnabledModule('SOLICITACOES'), validateRequest({ params: validateNumericIdParam('id', 'Lote de prioridade') }), PrioridadeDiretoriaController.excluir);

@@ -34,7 +34,14 @@ const STATUS_LOTE = {
   CANCELADO: 'CANCELADO'
 };
 
+const TIPO_LOTE = {
+  DIR_ADMIN: 'DIR_ADMIN',
+  SOLICITACAO_DIRETORIA: 'SOLICITACAO_DIRETORIA'
+};
+
 const DIRETORIA_ADMIN_CODIGO = 'DIR_ADMIN';
+const DIRETORIA_ADMIN_NOME = 'DIRETORIA ADMINISTRATIVA';
+const SETOR_FINANCEIRO_CODIGO = 'FINANCEIRO';
 
 function normalizarStatusLote(valor) {
   const status = String(valor || '').trim().toUpperCase();
@@ -159,6 +166,9 @@ function usuarioPodeVisualizarLote(permissoes, lote) {
 }
 
 function usuarioPodeFinalizarLote(permissoes, lote) {
+  if (String(lote?.tipo_lote || TIPO_LOTE.DIR_ADMIN).toUpperCase() === TIPO_LOTE.SOLICITACAO_DIRETORIA) {
+    return Boolean(permissoes?.isSuperadmin || permissoes?.isDirAdmin);
+  }
   return permissoesTemClassificacao(permissoes, lote?.classificacao_alvo, 'classificacoesFinalizaveis');
 }
 
@@ -180,6 +190,25 @@ function usuarioPodeReabrirLote(permissoes, lote, req) {
     Number.isInteger(usuarioId) &&
     Number(lote.solicitado_por) === usuarioId
   );
+}
+
+function obterDiretoriaCriadora(permissoes, classificacaoSolicitada = null) {
+  const classificacoes = Array.isArray(permissoes?.classificacoesOperaveis)
+    ? permissoes.classificacoesOperaveis
+    : [];
+  const classificacaoNormalizada = normalizarClassificacaoObra(classificacaoSolicitada);
+  const classificacao = classificacaoNormalizada || classificacoes[0] || null;
+
+  if (!classificacao || !classificacoes.includes(classificacao)) return null;
+
+  const codigo = permissoes?.configuracao?.diretoriasPorClassificacao?.[classificacao] || null;
+  if (!codigo) return null;
+
+  return {
+    classificacao,
+    codigo,
+    nome: codigo
+  };
 }
 
 function calcularResumoPagamentoSolicitacao(solicitacao) {
@@ -240,6 +269,13 @@ function serializarLote(lote, resumoItens = null) {
     id: lote.id,
     classificacao_alvo: lote.classificacao_alvo,
     diretoria_alvo_codigo: lote.diretoria_alvo_codigo,
+    tipo_lote: lote.tipo_lote || TIPO_LOTE.DIR_ADMIN,
+    setor_criador_codigo: lote.setor_criador_codigo || DIRETORIA_ADMIN_CODIGO,
+    setor_criador_nome: lote.setor_criador_nome || (
+      lote.setor_criador_codigo === DIRETORIA_ADMIN_CODIGO
+        ? DIRETORIA_ADMIN_NOME
+        : lote.setor_criador_codigo
+    ) || DIRETORIA_ADMIN_NOME,
     valor_disponivel: valorDisponivel,
     valor_utilizado: valorUtilizado,
     saldo_disponivel: Math.max(valorDisponivel - valorUtilizado, 0),
@@ -315,6 +351,10 @@ async function listarSolicitacoesElegiveisParaLote(lote, busca = '', solicitacao
     { diretoria_fluxo_codigo: lote.diretoria_alvo_codigo },
     { prioridade_diretoria_ativa: false },
     { status_global: { [Op.ne]: 'PAGA' } },
+    Sequelize.where(
+      Sequelize.fn('UPPER', Sequelize.fn('TRIM', Sequelize.col('area_responsavel'))),
+      { [Op.eq]: SETOR_FINANCEIRO_CODIGO }
+    ),
     {
       [Op.or]: [
         {
@@ -525,6 +565,9 @@ module.exports = {
       const lote = await PrioridadeLote.create({
         classificacao_alvo: classificacaoAlvo,
         diretoria_alvo_codigo: diretoriaAlvoCodigo,
+        tipo_lote: TIPO_LOTE.DIR_ADMIN,
+        setor_criador_codigo: DIRETORIA_ADMIN_CODIGO,
+        setor_criador_nome: DIRETORIA_ADMIN_NOME,
         valor_disponivel: valorDisponivel,
         valor_utilizado: 0,
         status: STATUS_LOTE.ABERTO,
@@ -536,6 +579,96 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return res.status(500).json({ error: 'Erro ao criar lote de prioridade.' });
+    }
+  },
+
+  async solicitarUrgencia(req, res) {
+    const transaction = await PrioridadeLote.sequelize.transaction();
+    let transactionFinalizada = false;
+    try {
+      const permissoes = await obterPermissoesPrioridade(req);
+      if (!permissoes.podeAcessarModulo) {
+        await transaction.rollback();
+        return res.status(403).json({ error: 'Acesso negado ao modulo de prioridades.' });
+      }
+
+      const diretoriaCriadora = obterDiretoriaCriadora(permissoes, req.body?.classificacao_alvo);
+      if (!diretoriaCriadora) {
+        await transaction.rollback();
+        return res.status(403).json({ error: 'Apenas DIR_OBRAS_PUBLICAS ou DIR_OBRAS_PRIVADAS podem solicitar prioridade financeira.' });
+      }
+
+      const solicitacaoIds = normalizarSolicitacaoIds(req.body?.solicitacao_ids);
+      if (solicitacaoIds.length === 0) {
+        await transaction.rollback();
+        return res.status(400).json({ error: 'Selecione ao menos uma solicitacao para solicitar prioridade.' });
+      }
+
+      const observacao = String(req.body?.observacao || '').trim();
+      const lote = await PrioridadeLote.create({
+        classificacao_alvo: diretoriaCriadora.classificacao,
+        diretoria_alvo_codigo: diretoriaCriadora.codigo,
+        tipo_lote: TIPO_LOTE.SOLICITACAO_DIRETORIA,
+        setor_criador_codigo: diretoriaCriadora.codigo,
+        setor_criador_nome: diretoriaCriadora.nome,
+        valor_disponivel: 0,
+        valor_utilizado: 0,
+        status: STATUS_LOTE.ABERTO,
+        observacao: observacao || 'Solicitacao de prioridade enviada pela diretoria para aprovacao da Diretoria Administrativa.',
+        solicitado_por: req.user.id
+      }, { transaction });
+
+      const solicitacoesSelecionadas = await listarSolicitacoesElegiveisParaLote(
+        lote,
+        '',
+        solicitacaoIds,
+        null
+      );
+      if (solicitacoesSelecionadas.length !== solicitacaoIds.length) {
+        await transaction.rollback();
+        return res.status(400).json({ error: 'Selecione apenas solicitacoes elegiveis que estejam no setor FINANCEIRO e vinculadas a esta diretoria.' });
+      }
+
+      const { valorUtilizado } = await substituirItensLote({
+        lote,
+        solicitacoesSelecionadas,
+        usuarioId: req.user.id,
+        transaction
+      });
+
+      await lote.update({
+        valor_disponivel: valorUtilizado,
+        valor_utilizado: valorUtilizado
+      }, { transaction });
+
+      await transaction.commit();
+      transactionFinalizada = true;
+
+      const detalhe = await carregarLoteDetalhe(lote.id);
+      return res.status(201).json({
+        item: {
+          ...serializarLote(detalhe),
+          itens: (Array.isArray(detalhe.itens) ? detalhe.itens : []).map((item) => ({
+            id: item.id,
+            valor_considerado: formatarNumero(item.valor_considerado),
+            autorizado_em: item.autorizado_em,
+            autorizado_por: item.autorizado_por,
+            autorizado_por_nome: item?.autorizadoPor?.nome || '-',
+            solicitacao: item.solicitacao ? serializarSolicitacaoPrioridade(item.solicitacao) : null
+          })),
+          pode_finalizar: usuarioPodeFinalizarLote(permissoes, detalhe) && detalhe.status === STATUS_LOTE.ABERTO,
+          pode_salvar: usuarioPodeFinalizarLote(permissoes, detalhe) && detalhe.status === STATUS_LOTE.ABERTO,
+          pode_reabrir: usuarioPodeReabrirLote(permissoes, detalhe, req),
+          pode_cancelar: usuarioPodeCancelarLote(permissoes, detalhe) && detalhe.status === STATUS_LOTE.ABERTO,
+          pode_excluir: usuarioPodeExcluirLote(permissoes, detalhe)
+        }
+      });
+    } catch (error) {
+      if (!transactionFinalizada) {
+        await transaction.rollback();
+      }
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao solicitar prioridade para o financeiro.' });
     }
   },
 
@@ -588,7 +721,26 @@ module.exports = {
       const items = lote.status === STATUS_LOTE.ABERTO
         ? await listarSolicitacoesElegiveisParaLote(lote, req.query?.busca, null, req.query?.obra_id)
         : [];
-      return res.json({ items });
+
+      const obrasBase = lote.status === STATUS_LOTE.ABERTO
+        ? await listarSolicitacoesElegiveisParaLote(lote)
+        : [];
+      const obras = Array.from(
+        new Map(
+          obrasBase
+            .filter((item) => item?.obra?.id && item?.obra?.nome)
+            .map((item) => [
+              String(item.obra.id),
+              {
+                id: item.obra.id,
+                nome: item.obra.nome,
+                codigo: item.obra.codigo || null
+              }
+            ])
+        ).values()
+      ).sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR'));
+
+      return res.json({ items, obras });
     } catch (error) {
       console.error(error);
       return res.status(500).json({ error: 'Erro ao buscar solicitacoes disponiveis para prioridade.' });
@@ -689,7 +841,9 @@ module.exports = {
       }
       const valorUtilizado = solicitacoesSelecionadas.reduce((total, item) => total + formatarNumero(item.valor_prioridade), 0);
       const valorDisponivel = formatarNumero(lote.valor_disponivel);
-      if (valorUtilizado > valorDisponivel) {
+      const isSolicitacaoDiretoria =
+        String(lote.tipo_lote || TIPO_LOTE.DIR_ADMIN).toUpperCase() === TIPO_LOTE.SOLICITACAO_DIRETORIA;
+      if (!isSolicitacaoDiretoria && valorUtilizado > valorDisponivel) {
         await transaction.rollback();
         return res.status(400).json({ error: 'O valor total das solicitacoes selecionadas excede o limite disponivel do lote.' });
       }
@@ -702,6 +856,7 @@ module.exports = {
 
       if (modoRascunho) {
         await lote.update({
+          valor_disponivel: isSolicitacaoDiretoria ? valorUtilizado : lote.valor_disponivel,
           valor_utilizado: valorUtilizado
         }, { transaction });
         await transaction.commit();
@@ -750,6 +905,7 @@ module.exports = {
       );
       await lote.update({
         status: STATUS_LOTE.FINALIZADO,
+        valor_disponivel: isSolicitacaoDiretoria ? valorUtilizado : lote.valor_disponivel,
         valor_utilizado: valorUtilizado,
         finalizado_por: req.user.id,
         finalizado_em: agora
