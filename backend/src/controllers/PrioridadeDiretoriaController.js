@@ -410,10 +410,6 @@ async function listarSolicitacoesElegiveisParaLote(lote, busca = '', solicitacao
       Sequelize.fn('UPPER', Sequelize.col('status_global')),
       { [Op.ne]: 'PAGA' }
     ),
-    Sequelize.where(
-      Sequelize.fn('UPPER', Sequelize.fn('TRIM', Sequelize.col('area_responsavel'))),
-      { [Op.eq]: SETOR_FINANCEIRO_CODIGO }
-    ),
     {
       [Op.or]: [
         condicaoSolicitacaoAprovadaNoFluxo,
@@ -754,7 +750,7 @@ module.exports = {
 
       if (!diretoriaCriadora) {
         await transaction.rollback();
-        return res.status(403).json({ error: 'Apenas DIR_OBRAS_PUBLICAS ou DIR_OBRAS_PRIVADAS podem solicitar prioridade para o financeiro.' });
+        return res.status(403).json({ error: 'Apenas DIR_OBRAS_PUBLICAS ou DIR_OBRAS_PRIVADAS podem solicitar prioridade.' });
       }
 
       const solicitacaoIds = normalizarSolicitacaoIds(req.body?.solicitacao_ids);
@@ -842,7 +838,7 @@ module.exports = {
         await transaction.rollback();
       }
       console.error(error);
-      return res.status(500).json({ error: 'Erro ao solicitar prioridade para o financeiro.' });
+      return res.status(500).json({ error: 'Erro ao solicitar prioridade.' });
     }
   },
 

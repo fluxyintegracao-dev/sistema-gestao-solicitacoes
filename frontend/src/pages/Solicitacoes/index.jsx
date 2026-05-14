@@ -765,7 +765,7 @@ export default function Solicitacoes({ arquivadas = false }) {
 
   async function solicitarPrioridadeFinanceiroSelecionadas() {
     if (!podeSolicitarPrioridadeFinanceiro) {
-      alert('Apenas DIR_OBRAS_PUBLICAS ou DIR_OBRAS_PRIVADAS podem solicitar prioridade para o financeiro.');
+      alert('Apenas DIR_OBRAS_PUBLICAS ou DIR_OBRAS_PRIVADAS podem solicitar prioridade.');
       return;
     }
     if (selecionadasIds.length === 0) {
@@ -774,10 +774,10 @@ export default function Solicitacoes({ arquivadas = false }) {
     }
 
     const selecionadas = solicitacoes.filter(item => selecionadasIds.includes(Number(item.id)));
-    const foraFinanceiro = selecionadas.filter(item => normalizarSetorToken(item.area_responsavel) !== 'FINANCEIRO');
+    const pagas = selecionadas.filter(item => normalizarStatus(item.status_global) === 'PAGA');
 
-    if (foraFinanceiro.length > 0) {
-      alert('Selecione apenas solicitaÃ§Ãµes que estejam no setor FINANCEIRO para solicitar prioridade.');
+    if (pagas.length > 0) {
+      alert('Selecione apenas solicitacoes que ainda nao estejam com status PAGA para solicitar prioridade.');
       return;
     }
 
@@ -796,7 +796,7 @@ export default function Solicitacoes({ arquivadas = false }) {
       alert('Lote de prioridade enviado para aprovacao da Diretoria Administrativa.');
     } catch (error) {
       console.error(error);
-      alert(error?.message || 'Erro ao solicitar prioridade para o financeiro.');
+      alert(error?.message || 'Erro ao solicitar prioridade.');
     } finally {
       setProcessandoMassa(false);
     }
@@ -1306,7 +1306,7 @@ export default function Solicitacoes({ arquivadas = false }) {
               title="Enviar lote de prioridade para aprovacao da Diretoria Administrativa"
             >
               <HiOutlineArrowRightOnRectangle className="w-4 h-4" />
-              <span className="hidden sm:inline">Prioridade financeiro</span>
+              <span className="hidden sm:inline">Prioridade diretoria</span>
             </button>
           )}
 

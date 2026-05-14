@@ -79,8 +79,8 @@
 - lotes criados por `DIR_OBRAS_PUBLICAS` ou `DIR_OBRAS_PRIVADAS` sao pedidos de urgencia para aprovacao da `DIR_ADMIN`
 - nesses pedidos de urgencia, apenas `DIR_ADMIN` ou `SUPERADMIN` pode finalizar/aprovar o lote
 - `SUPERADMIN` pode excluir lotes sem itens autorizados
-- as solicitacoes elegiveis precisam estar atualmente no setor `FINANCEIRO`
-- alem disso, no fluxo novo de diretoria, precisam:
+- as solicitacoes elegiveis nao dependem do setor atual
+- no fluxo novo de diretoria, precisam:
   - ja passaram por `APROVADA_DIRETORIA`
   - ou ja sairam da diretoria alvo no fluxo novo
   - ainda nao foram priorizadas
