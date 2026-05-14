@@ -1402,6 +1402,39 @@ a {
   min-height: 32px;
 }
 
+.solicitacoes-column-resizer {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  z-index: 20;
+  width: 8px;
+  height: 100%;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.solicitacoes-column-resizer::after {
+  content: "";
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: 3px;
+  width: 2px;
+  border-radius: 999px;
+  background: transparent;
+  transition: background 0.15s ease;
+}
+
+.solicitacoes-column-resizer:hover::after,
+.is-resizing-column .solicitacoes-column-resizer::after {
+  background: color-mix(in srgb, var(--c-primary) 65%, var(--sol-border-color));
+}
+
+.is-resizing-column {
+  cursor: col-resize !important;
+  user-select: none;
+}
+
 @media (max-width: 1023px) {
   .solicitacoes-table-shell .solicitacoes-table th,
   .solicitacoes-table-shell .solicitacoes-table td {

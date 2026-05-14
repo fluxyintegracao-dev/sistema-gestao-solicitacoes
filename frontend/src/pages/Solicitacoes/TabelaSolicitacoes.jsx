@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { timestampOrdenacaoData } from '../../utils/dateLocal';
 
 const SORTABLE_COLUMNS = new Set(['data', 'vencimento', 'valor']);
+const MAX_COLUMN_WIDTH = 640;
 
 export default function TabelaSolicitacoes({
   solicitacoes,
@@ -17,6 +18,7 @@ export default function TabelaSolicitacoes({
   visibleColumns = null
 }) {
   const tableWrapRef = useRef(null);
+  const resizeStateRef = useRef(null);
   const [viewportWidth, setViewportWidth] = useState(() =>
     typeof window !== 'undefined' ? window.innerWidth : 1280
   );
@@ -117,12 +119,32 @@ export default function TabelaSolicitacoes({
     return userFiltered.filter(col => col.id === 'selecionar' || responsiveVisibleSet.has(col.id));
   }, [columnsBase, visibleSet, responsiveVisibleSet]);
 
-  const [widths, setWidths] = useState(() => columns.map(col => col.width));
+  const columnWidthsStorageKey = useMemo(() => {
+    const identificador = user?.id || user?.email || user?.nome || user?.perfil || 'anon';
+    const escopo = mostrarArquivadas ? 'arquivadas' : 'ativas';
+    const layout = isSetorObra ? 'obra' : 'geral';
+    return `solicitacoes:larguras-colunas:${escopo}:${layout}:${identificador}`;
+  }, [user?.id, user?.email, user?.nome, user?.perfil, mostrarArquivadas, isSetorObra]);
+  const [widthsById, setWidthsById] = useState({});
   const [ordenacao, setOrdenacao] = useState({ campo: 'data', direcao: 'desc' });
 
   useEffect(() => {
-    setWidths(columns.map(col => col.width));
-  }, [columns]);
+    try {
+      const salvo = localStorage.getItem(columnWidthsStorageKey);
+      const parsed = salvo ? JSON.parse(salvo) : {};
+      setWidthsById(parsed && typeof parsed === 'object' ? parsed : {});
+    } catch {
+      setWidthsById({});
+    }
+  }, [columnWidthsStorageKey]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(columnWidthsStorageKey, JSON.stringify(widthsById));
+    } catch (error) {
+      console.error('Erro ao salvar larguras das colunas', error);
+    }
+  }, [columnWidthsStorageKey, widthsById]);
 
   useEffect(() => {
     function handleResize() {
@@ -132,6 +154,14 @@ export default function TabelaSolicitacoes({
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  const widths = useMemo(() => {
+    return columns.map(col => {
+      const salvo = Number(widthsById[col.id]);
+      if (!Number.isFinite(salvo) || salvo <= 0) return col.width;
+      return Math.max(Number(col.min || 60), Math.min(MAX_COLUMN_WIDTH, salvo));
+    });
+  }, [columns, widthsById]);
 
   const totalTableWidth = useMemo(
     () => columns.reduce((acc, col, index) => acc + Number(widths[index] ?? col.width ?? 0), 0),
@@ -187,6 +217,58 @@ export default function TabelaSolicitacoes({
     return ordenacao.direcao === 'asc' ? ' ^' : ' v';
   }
 
+  function iniciarResizeColuna(event, col, index) {
+    if (col.id === 'selecionar') return;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    const pointerId = event.pointerId;
+    const startX = event.clientX;
+    const startWidth = Number(widths[index] ?? col.width);
+    const minWidth = Number(col.min || 60);
+
+    resizeStateRef.current = {
+      colId: col.id,
+      pointerId,
+      startX,
+      startWidth,
+      minWidth
+    };
+
+    const alvo = event.currentTarget;
+    alvo.setPointerCapture?.(pointerId);
+    document.body.classList.add('is-resizing-column');
+
+    function moverResize(moveEvent) {
+      const state = resizeStateRef.current;
+      if (!state || state.pointerId !== pointerId) return;
+
+      const delta = moveEvent.clientX - state.startX;
+      const largura = Math.max(
+        state.minWidth,
+        Math.min(MAX_COLUMN_WIDTH, Math.round(state.startWidth + delta))
+      );
+
+      setWidthsById(prev => ({
+        ...prev,
+        [state.colId]: largura
+      }));
+    }
+
+    function finalizarResize() {
+      resizeStateRef.current = null;
+      document.body.classList.remove('is-resizing-column');
+      window.removeEventListener('pointermove', moverResize);
+      window.removeEventListener('pointerup', finalizarResize);
+      window.removeEventListener('pointercancel', finalizarResize);
+    }
+
+    window.addEventListener('pointermove', moverResize);
+    window.addEventListener('pointerup', finalizarResize);
+    window.addEventListener('pointercancel', finalizarResize);
+  }
+
   return (
     <div className={`sol-surface-card rounded-xl solicitacoes-table-shell solicitacoes-table-shell--${viewportMode} solicitacoes-table-compact`}>
       <div
@@ -234,6 +316,16 @@ export default function TabelaSolicitacoes({
                     >
                       {col.label}{indicadorOrdenacao(col.id)}
                     </button>
+                  )}
+                  {col.id !== 'selecionar' && (
+                    <span
+                      className="solicitacoes-column-resizer"
+                      onPointerDown={(event) => iniciarResizeColuna(event, col, index)}
+                      role="separator"
+                      aria-orientation="vertical"
+                      aria-label={`Redimensionar coluna ${col.label}`}
+                      title="Arraste para ajustar a largura"
+                    />
                   )}
                 </th>
               );
