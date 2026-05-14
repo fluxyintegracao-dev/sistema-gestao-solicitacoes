@@ -52,6 +52,9 @@ const {
   obterTokensSetoresSemAlteracaoStatus,
   setorEstaSemAlteracaoStatus
 } = require('../services/solicitacao/setoresSemAlteracaoStatus');
+const {
+  usuarioPodeAlterarValorSolicitacao
+} = require('../services/solicitacao/permissaoAlterarValor');
 
 const CHAVE_AREAS_POR_SETOR_ORIGEM = 'AREAS_POR_SETOR_ORIGEM';
 const CHAVE_SETORES_VISIVEIS_POR_USUARIO = 'SETORES_VISIVEIS_POR_USUARIO';
@@ -2693,9 +2696,11 @@ module.exports = {
       const { valor } = req.body;
       const perfil = String(req.user?.perfil || '').trim().toUpperCase();
       const isGeo = await isSetorGeo(req);
+      const temPermissaoConfigurada = await usuarioPodeAlterarValorSolicitacao(req.user?.id);
       const podeEditar =
         perfil === 'SUPERADMIN' ||
-        (perfil.startsWith('ADMIN') && isGeo);
+        (perfil.startsWith('ADMIN') && isGeo) ||
+        temPermissaoConfigurada;
 
       if (!podeEditar) {
         return res.status(403).json({

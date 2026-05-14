@@ -32,7 +32,8 @@ export default function LinhaSolicitacao({
   selecaoHabilitada = false,
   selecionada = false,
   onToggleSelecionada,
-  viewportMode = 'desktop'
+  viewportMode = 'desktop',
+  podeEditarValorUsuario = false
 }) {
 
   const [modalAtribuir, setModalAtribuir] = useState(false);
@@ -61,7 +62,7 @@ export default function LinhaSolicitacao({
     String(user?.perfil || '').toUpperCase().startsWith('ADMIN') &&
     setorTokens.some(isGeoSetor);
   const isSuperadmin = String(user?.perfil || '').toUpperCase() === 'SUPERADMIN';
-  const podeEditarValor = isAdminGEO || isSuperadmin;
+  const podeEditarValor = isAdminGEO || isSuperadmin || Boolean(podeEditarValorUsuario);
   const setorNomeSolicitacao =
     (setoresMap?.[solicitacao.area_responsavel] || solicitacao.area_responsavel || '');
   const isSetorObraSolicitacao =

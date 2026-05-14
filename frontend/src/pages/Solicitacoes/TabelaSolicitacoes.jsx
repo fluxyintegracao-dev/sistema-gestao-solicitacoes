@@ -15,7 +15,8 @@ export default function TabelaSolicitacoes({
   selecionadasIds = [],
   onToggleSelecionada,
   onToggleSelecionarTodas,
-  visibleColumns = null
+  visibleColumns = null,
+  podeEditarValorUsuario = false
 }) {
   const tableWrapRef = useRef(null);
   const resizeStateRef = useRef(null);
@@ -349,6 +350,7 @@ export default function TabelaSolicitacoes({
               selecionada={idsSet.has(Number(s.id))}
               onToggleSelecionada={onToggleSelecionada}
               viewportMode={viewportMode}
+              podeEditarValorUsuario={podeEditarValorUsuario}
             />
           ))}
         </tbody>

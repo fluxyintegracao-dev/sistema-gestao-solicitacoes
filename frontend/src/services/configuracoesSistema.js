@@ -248,3 +248,32 @@ export async function salvarUsuariosEnvioQualquerSetor(data) {
   }
   return res.json();
 }
+
+export async function getUsuariosAlterarValorSolicitacao() {
+  const res = await fetch(`${API_URL}/configuracoes/usuarios-alterar-valor-solicitacao`, {
+    headers: authHeaders()
+  });
+  if (!res.ok) throw new Error('Erro ao buscar usuarios com permissao para alterar valor');
+  return res.json();
+}
+
+export async function salvarUsuariosAlterarValorSolicitacao(data) {
+  const res = await fetch(`${API_URL}/configuracoes/usuarios-alterar-valor-solicitacao`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.error || 'Erro ao salvar permissao para alterar valor');
+  }
+  return res.json();
+}
+
+export async function getMinhaPermissaoAlterarValorSolicitacao() {
+  const res = await fetch(`${API_URL}/configuracoes/usuarios-alterar-valor-solicitacao/minha-permissao`, {
+    headers: authHeaders()
+  });
+  if (!res.ok) throw new Error('Erro ao buscar permissao para alterar valor');
+  return res.json();
+}

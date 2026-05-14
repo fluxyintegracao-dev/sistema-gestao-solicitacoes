@@ -22,6 +22,8 @@ A visibilidade efetiva depende de combinacao entre:
 - assumir e enviar solicitacoes dependem do setor atual da solicitacao.
 - `SUPERADMIN` pode marcar usuarios com permissao especial para enviar solicitacoes fora do setor atual da solicitacao.
 - a permissao especial de envio nao remove o bloqueio do setor `OBRA`.
+- `SUPERADMIN` pode marcar usuarios com permissao especial para alterar o valor total da solicitacao em `Configuracoes > Alterar Valor da Solicitacao`.
+- `SUPERADMIN` e `ADMIN` do setor `GEO` continuam com permissao padrao para alterar o valor da solicitacao.
 - arquivamento de solicitacao e individual por usuario.
 - usuarios do setor OBRA trabalham com escopo restrito por obra/vinculo.
 - usuarios podem ter mais de um setor vinculado:

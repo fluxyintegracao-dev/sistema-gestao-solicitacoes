@@ -20,6 +20,7 @@ import { getSetores } from '../../services/setores';
 import { getTiposSolicitacao } from '../../services/tiposSolicitacao';
 import { getSetorPermissoes } from '../../services/setorPermissoes';
 import { getStatusSetor } from '../../services/statusSetor';
+import { getMinhaPermissaoAlterarValorSolicitacao } from '../../services/configuracoesSistema';
 import { useAuth } from '../../contexts/AuthContext';
 import { parseDateSmart } from '../../utils/dateLocal';
 import {
@@ -66,6 +67,7 @@ export default function Solicitacoes({ arquivadas = false }) {
   const [selecionadasIds, setSelecionadasIds] = useState([]);
   const [modalEnvioMassa, setModalEnvioMassa] = useState(false);
   const [modalAtribuir, setModalAtribuir] = useState(false);
+  const [podeAlterarValorSolicitacao, setPodeAlterarValorSolicitacao] = useState(false);
   const [modalEnviarUnitario, setModalEnviarUnitario] = useState(false);
   const [modalAtribuirMassa, setModalAtribuirMassa] = useState(false);
   const [usuariosAtribuicao, setUsuariosAtribuicao] = useState([]);
@@ -111,6 +113,30 @@ export default function Solicitacoes({ arquivadas = false }) {
     const escopo = arquivadas ? 'arquivadas' : 'ativas';
     return `solicitacoes:filtros:${escopo}:${identificador}`;
   }, [user?.id, user?.email, user?.nome, user?.perfil, arquivadas]);
+
+  useEffect(() => {
+    let ativo = true;
+
+    async function carregarPermissaoAlterarValor() {
+      try {
+        const data = await getMinhaPermissaoAlterarValorSolicitacao();
+        if (ativo) {
+          setPodeAlterarValorSolicitacao(Boolean(data?.pode_alterar_valor_solicitacao));
+        }
+      } catch (error) {
+        console.error('Erro ao carregar permissao para alterar valor da solicitacao', error);
+        if (ativo) {
+          setPodeAlterarValorSolicitacao(false);
+        }
+      }
+    }
+
+    carregarPermissaoAlterarValor();
+
+    return () => {
+      ativo = false;
+    };
+  }, [user?.id]);
 
   useEffect(() => {
     setPaginaAtual(1);
@@ -1037,6 +1063,7 @@ export default function Solicitacoes({ arquivadas = false }) {
             selecionadasIds={selecionadasIds}
             onToggleSelecionada={toggleSelecionada}
             onToggleSelecionarTodas={toggleSelecionarTodas}
+            podeEditarValorUsuario={podeAlterarValorSolicitacao}
           />
 
           <div className="sol-surface-card mt-4 p-3 md:p-4 rounded-xl flex flex-col md:flex-row md:items-center md:justify-between gap-3">

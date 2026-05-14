@@ -90,6 +90,11 @@ const SECOES_CONFIG = [
         to: '/usuarios-envio-qualquer-setor'
       },
       {
+        title: 'Alterar Valor da Solicitacao',
+        description: 'Marque usuarios que podem editar o valor total das solicitacoes.',
+        to: '/usuarios-alterar-valor-solicitacao'
+      },
+      {
         title: 'Recebimento por Setor',
         description: 'Defina se as solicitacoes chegam primeiro ao admin ou ficam visiveis para todos.',
         to: '/comportamento-recebimento-setor'

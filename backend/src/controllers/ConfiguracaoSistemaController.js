@@ -22,6 +22,11 @@ const {
   salvarUsuariosAcessoPrioridadeDiretoria,
   normalizarUsuarioIds
 } = require('../services/prioridadeDiretoriaAcesso');
+const {
+  obterConfiguracaoUsuariosAlterarValorSolicitacao,
+  salvarUsuariosAlterarValorSolicitacao,
+  usuarioPodeAlterarValorSolicitacao
+} = require('../services/solicitacao/permissaoAlterarValor');
 
 const CHAVE_TEMA = 'TEMA_SISTEMA';
 const CHAVE_AREAS_OBRA = 'AREAS_OBRA_VISIVEIS';
@@ -84,6 +89,26 @@ function normalizarListaSetores(lista) {
       .map(item => String(item || '').trim().toUpperCase())
       .filter(Boolean)
   )];
+}
+
+function normalizarTokenSetorConfiguracao(valor) {
+  return String(valor || '')
+    .trim()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+}
+
+function isSetorGeoConfiguracao(valor) {
+  return [
+    'GEO',
+    'GERENCIA_DE_PROCESSOS',
+    'GERENCIA_PROCESSOS',
+    'GERENCIAS_DE_PROCESSOS',
+    'GERENCIAS_PROCESSOS'
+  ].includes(normalizarTokenSetorConfiguracao(valor));
 }
 
 function normalizarIdList(lista) {
@@ -941,6 +966,113 @@ module.exports = {
       await transaction.rollback();
       console.error(error);
       return res.status(500).json({ error: 'Erro ao salvar permissao especial de envio' });
+    }
+  },
+
+  async getUsuariosAlterarValorSolicitacao(req, res) {
+    try {
+      const configuracao = await obterConfiguracaoUsuariosAlterarValorSolicitacao();
+      const selecionados = new Set(configuracao.usuario_ids.map((id) => Number(id)));
+
+      const usuariosRaw = await User.findAll({
+        attributes: [
+          'id',
+          'nome',
+          'email',
+          'perfil',
+          'ativo',
+          'setor_id'
+        ],
+        include: [
+          {
+            model: Setor,
+            as: 'setor',
+            attributes: ['id', 'nome', 'codigo']
+          }
+        ],
+        order: [
+          ['ativo', 'DESC'],
+          ['nome', 'ASC']
+        ]
+      });
+
+      const usuarios = usuariosRaw.map((usuario) => {
+        const plain = usuario.toJSON();
+        const perfil = String(plain.perfil || '').toUpperCase();
+        const permissaoPadrao = perfil === 'SUPERADMIN' ||
+          (perfil.startsWith('ADMIN') && [
+            plain?.setor?.codigo,
+            plain?.setor?.nome
+          ].some(isSetorGeoConfiguracao));
+
+        return {
+          ...plain,
+          pode_alterar_valor_solicitacao: permissaoPadrao || selecionados.has(Number(plain.id)),
+          permissao_padrao_alterar_valor_solicitacao: permissaoPadrao
+        };
+      });
+
+      return res.json({
+        usuario_ids: configuracao.usuario_ids,
+        usuarios
+      });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao buscar usuarios com permissao para alterar valor' });
+    }
+  },
+
+  async updateUsuariosAlterarValorSolicitacao(req, res) {
+    try {
+      const usuarioIds = normalizarUsuarioIds(req.body?.usuario_ids);
+
+      if (usuarioIds.length > 0) {
+        const usuariosValidos = await User.findAll({
+          where: {
+            id: { [Op.in]: usuarioIds },
+            ativo: true
+          },
+          attributes: ['id']
+        });
+        const idsValidos = usuariosValidos.map((usuario) => Number(usuario.id));
+        const idsValidosSet = new Set(idsValidos);
+        const idsInvalidos = usuarioIds.filter(id => !idsValidosSet.has(id));
+
+        if (idsInvalidos.length > 0) {
+          return res.status(400).json({
+            error: 'Um ou mais usuarios informados sao invalidos para esta permissao.',
+            usuario_ids_invalidos: idsInvalidos
+          });
+        }
+      }
+
+      const configuracao = await salvarUsuariosAlterarValorSolicitacao(usuarioIds);
+      return res.json(configuracao);
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao salvar usuarios com permissao para alterar valor' });
+    }
+  },
+
+  async getMinhaPermissaoAlterarValorSolicitacao(req, res) {
+    try {
+      const perfil = String(req.user?.perfil || '').trim().toUpperCase();
+      const isGeo = [
+        req.user?.area,
+        req.user?.setor?.codigo,
+        req.user?.setor?.nome,
+        ...(Array.isArray(req.user?.setores) ? req.user.setores : [])
+      ].some(isSetorGeoConfiguracao);
+      const permissaoConfigurada = await usuarioPodeAlterarValorSolicitacao(req.user?.id);
+
+      return res.json({
+        pode_alterar_valor_solicitacao: perfil === 'SUPERADMIN' ||
+          (perfil.startsWith('ADMIN') && isGeo) ||
+          permissaoConfigurada
+      });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao buscar permissao para alterar valor' });
     }
   }
 };
