@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   HiDocumentArrowDown,
   HiViewColumns,
@@ -632,11 +633,13 @@ export default function Solicitacoes({ arquivadas = false }) {
   function alternarSeletorColunas() {
     if (!mostrarSeletorColunas && botaoColunasRef.current) {
       const btnRect = botaoColunasRef.current.getBoundingClientRect();
-      const containerRect = botaoColunasRef.current
-        ?.closest('.acoes-massa-solicitacoes')
-        ?.getBoundingClientRect();
-      const left = Math.max(0, Math.round(btnRect.left - (containerRect?.left || 0)));
-      const top = Math.max(0, Math.round(btnRect.bottom - (containerRect?.top || 0) + 8));
+      const larguraModal = 320;
+      const margemTela = 8;
+      const left = Math.max(
+        margemTela,
+        Math.min(Math.round(btnRect.left), window.innerWidth - larguraModal - margemTela)
+      );
+      const top = Math.max(margemTela, Math.round(btnRect.bottom + 8));
       setSeletorColunasLeft(left);
       setSeletorColunasTop(top);
     }
@@ -926,10 +929,10 @@ export default function Solicitacoes({ arquivadas = false }) {
             </button>
           </div>
 
-          {mostrarSeletorColunas && (
+          {mostrarSeletorColunas && typeof document !== 'undefined' && createPortal((
             <div
               ref={seletorColunasRef}
-              className="absolute z-[80] w-[320px] max-w-[calc(100vw-2rem)] bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl shadow-lg p-3"
+              className="fixed z-[1000] w-[320px] max-w-[calc(100vw-2rem)] bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl shadow-lg p-3"
               style={{ left: `${seletorColunasLeft}px`, top: `${seletorColunasTop}px` }}
             >
               <div className="flex items-center justify-between mb-2">
@@ -960,7 +963,7 @@ export default function Solicitacoes({ arquivadas = false }) {
                 })}
               </div>
             </div>
-          )}
+          ), document.body)}
         </div>
       )}
 
