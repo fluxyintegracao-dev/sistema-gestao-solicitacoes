@@ -69,6 +69,7 @@ A visibilidade efetiva depende de combinacao entre:
   - diretorias podem salvar a selecao de um lote aberto sem finalizar; a selecao fica persistida para retomada posterior
   - lotes abertos listam solicitacoes elegiveis independentemente do setor atual
   - solicitacoes com status `PAGA` nao aparecem como disponiveis para prioridade
+  - solicitacoes ja adicionadas em outro lote podem aparecer em novos lotes abertos enquanto nao estiverem `PAGA`
   - no fluxo novo, a solicitacao precisa estar aprovada pela diretoria, e solicitacoes legadas sem fluxo de diretoria continuam elegiveis
   - `DIR_OBRAS_PUBLICAS` e `DIR_OBRAS_PRIVADAS` podem selecionar solicitacoes elegiveis e abrir um pedido de urgencia para aprovacao da `DIR_ADMIN`
   - pedidos de urgencia registram o setor criador do lote para diferenciar lotes solicitados pela `DIR_ADMIN` de lotes solicitados pelas proprias diretorias

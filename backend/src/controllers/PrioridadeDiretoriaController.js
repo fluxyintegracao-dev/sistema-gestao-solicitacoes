@@ -405,7 +405,6 @@ async function listarSolicitacoesElegiveisParaLote(lote, busca = '', solicitacao
 
   const condicoes = [
     { cancelada: false },
-    { prioridade_diretoria_ativa: false },
     Sequelize.where(
       Sequelize.fn('UPPER', Sequelize.col('status_global')),
       { [Op.ne]: 'PAGA' }
