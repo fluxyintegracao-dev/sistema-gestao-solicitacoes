@@ -45,6 +45,15 @@ export async function criarLotePrioridadeDiretoria(data) {
   return tratarResposta(res, 'Erro ao criar lote de prioridade');
 }
 
+export async function solicitarUrgenciaPrioridadeDiretoria(data) {
+  const res = await fetch(`${API_URL}/prioridades-diretoria/lotes/solicitar-urgencia`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+  return tratarResposta(res, 'Erro ao solicitar prioridade para o financeiro');
+}
+
 export async function getLotePrioridadeDiretoria(id) {
   const res = await fetch(`${API_URL}/prioridades-diretoria/lotes/${id}`, {
     headers: authHeaders()

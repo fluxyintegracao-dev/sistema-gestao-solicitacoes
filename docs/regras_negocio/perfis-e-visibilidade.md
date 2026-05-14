@@ -65,7 +65,11 @@ A visibilidade efetiva depende de combinacao entre:
   - `SUPERADMIN` pode finalizar lotes e excluir lotes sem itens autorizados
   - `SUPERADMIN` pode reabrir lotes finalizados para que a diretoria ajuste a selecao antes de finalizar novamente
   - diretorias podem salvar a selecao de um lote aberto sem finalizar; a selecao fica persistida para retomada posterior
-  - lotes abertos listam solicitacoes nao `PAGA` da classificacao da diretoria; no fluxo novo, a solicitacao precisa estar aprovada pela diretoria, e solicitacoes legadas sem fluxo de diretoria continuam elegiveis
+  - lotes abertos listam somente solicitacoes que estejam no setor `FINANCEIRO`
+  - no fluxo novo, a solicitacao precisa estar aprovada pela diretoria, e solicitacoes legadas sem fluxo de diretoria continuam elegiveis
+  - `DIR_OBRAS_PUBLICAS` e `DIR_OBRAS_PRIVADAS` podem selecionar solicitacoes no `FINANCEIRO` e abrir um pedido de urgencia para aprovacao da `DIR_ADMIN`
+  - pedidos de urgencia registram o setor criador do lote para diferenciar lotes solicitados pela `DIR_ADMIN` de lotes solicitados pelas proprias diretorias
+  - pedidos de urgencia so viram prioridade autorizada depois da finalizacao/aprovacao pela `DIR_ADMIN` ou `SUPERADMIN`
   - a autorizacao de prioridade nao muda o setor responsavel da solicitacao
   - a autorizacao marca a solicitacao como `prioridade_diretoria_ativa`
 

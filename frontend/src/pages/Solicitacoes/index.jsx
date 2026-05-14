@@ -24,6 +24,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { parseDateSmart } from '../../utils/dateLocal';
 import {
   isGeoSetor,
+  normalizarSetorToken,
   obterIdsSetoresUsuario,
   obterTokensSetorUsuario,
   solicitacaoEstaNoSetorDoUsuario,
@@ -35,6 +36,7 @@ import {
   enviarSolicitacoesParaSetorEmMassa,
   getObrasVisiveisSolicitacoes
 } from '../../services/solicitacoes';
+import { solicitarUrgenciaPrioridadeDiretoria } from '../../services/prioridadesDiretoria';
 
 export default function Solicitacoes({ arquivadas = false }) {
   const DEFAULT_VISIBLE_COLUMNS = [
@@ -415,8 +417,17 @@ export default function Solicitacoes({ arquivadas = false }) {
     String(user?.setor?.nome || '').toUpperCase(),
     String(user?.area || '').toUpperCase()
   ];
+  const setorTokensNormalizados = obterTokensSetorUsuario(user).map(normalizarSetorToken);
   const isSetorObra = setorTokens.includes('OBRA');
   const isSetorFinanceiro = setorTokens.includes('FINANCEIRO');
+  const isDiretoriaObrasPublicas = setorTokensNormalizados.includes('DIR_OBRAS_PUBLICAS');
+  const isDiretoriaObrasPrivadas = setorTokensNormalizados.includes('DIR_OBRAS_PRIVADAS');
+  const podeSolicitarPrioridadeFinanceiro = isDiretoriaObrasPublicas || isDiretoriaObrasPrivadas;
+  const classificacaoPrioridadeDiretoria = isDiretoriaObrasPublicas
+    ? 'PUBLICA'
+    : isDiretoriaObrasPrivadas
+      ? 'PRIVADA'
+      : '';
   const isAdminGEO = perfilUpper.startsWith('ADMIN') && setorTokens.some(isGeoSetor);
   const isSuperadmin = perfilUpper === 'SUPERADMIN';
   const colunasStorageKey = useMemo(() => {
@@ -677,6 +688,45 @@ export default function Solicitacoes({ arquivadas = false }) {
     } catch (error) {
       console.error(error);
       alert('Erro ao enviar solicitações em massa.');
+    } finally {
+      setProcessandoMassa(false);
+    }
+  }
+
+  async function solicitarPrioridadeFinanceiroSelecionadas() {
+    if (!podeSolicitarPrioridadeFinanceiro) {
+      alert('Apenas DIR_OBRAS_PUBLICAS ou DIR_OBRAS_PRIVADAS podem solicitar prioridade para o financeiro.');
+      return;
+    }
+    if (selecionadasIds.length === 0) {
+      alert('Selecione ao menos uma solicitaÃ§Ã£o.');
+      return;
+    }
+
+    const selecionadas = solicitacoes.filter(item => selecionadasIds.includes(Number(item.id)));
+    const foraFinanceiro = selecionadas.filter(item => normalizarSetorToken(item.area_responsavel) !== 'FINANCEIRO');
+
+    if (foraFinanceiro.length > 0) {
+      alert('Selecione apenas solicitaÃ§Ãµes que estejam no setor FINANCEIRO para solicitar prioridade.');
+      return;
+    }
+
+    if (!window.confirm(`Enviar ${selecionadasIds.length} solicitaÃ§Ã£o(Ãµes) para aprovaÃ§Ã£o de prioridade pela DIR_ADMIN?`)) {
+      return;
+    }
+
+    try {
+      setProcessandoMassa(true);
+      await solicitarUrgenciaPrioridadeDiretoria({
+        solicitacao_ids: selecionadasIds,
+        classificacao_alvo: classificacaoPrioridadeDiretoria
+      });
+      setSelecionadasIds([]);
+      await carregar();
+      alert('Lote de prioridade enviado para aprovaÃ§Ã£o da DIR_ADMIN.');
+    } catch (error) {
+      console.error(error);
+      alert(error?.message || 'Erro ao solicitar prioridade para o financeiro.');
     } finally {
       setProcessandoMassa(false);
     }
@@ -1101,6 +1151,19 @@ export default function Solicitacoes({ arquivadas = false }) {
             <HiOutlineFolderOpen className="w-4 h-4" />
             <span className="hidden sm:inline">Arquivar</span>
           </button>
+
+          {podeSolicitarPrioridadeFinanceiro && (
+            <button
+              type="button"
+              className="btn btn-outline !min-h-0 h-9 px-3 inline-flex items-center gap-2"
+              onClick={solicitarPrioridadeFinanceiroSelecionadas}
+              disabled={processandoMassa}
+              title="Enviar lote de prioridade para aprovaÃ§Ã£o da DIR_ADMIN"
+            >
+              <HiOutlineArrowRightOnRectangle className="w-4 h-4" />
+              <span className="hidden sm:inline">Prioridade financeiro</span>
+            </button>
+          )}
 
           {selecionadaUnica && podeEnviarUnica && (
             <button

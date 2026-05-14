@@ -76,6 +76,7 @@ export default function PrioridadesDiretoria() {
 
   const diretoriasDisponiveis = contexto?.diretorias_disponiveis || [];
   const permissoes = contexto?.permissoes || {};
+  const isLoteSolicitacaoDiretoria = String(detalhe?.tipo_lote || '').toUpperCase() === 'SOLICITACAO_DIRETORIA';
 
   useEffect(() => {
     carregarInicial();
@@ -156,7 +157,9 @@ export default function PrioridadesDiretoria() {
     const valorUtilizadoProjetado = abertoComSelecao
       ? totalSelecionado
       : valorUtilizadoBase;
-    const saldoProjetado = Math.max(valorDisponivel - valorUtilizadoProjetado, 0);
+    const saldoProjetado = isLoteSolicitacaoDiretoria
+      ? 0
+      : Math.max(valorDisponivel - valorUtilizadoProjetado, 0);
     const itensProjetados = abertoComSelecao
       ? solicitacoesSelecionadas.length
       : itensBase;
@@ -177,11 +180,12 @@ export default function PrioridadesDiretoria() {
     detalhe?.itens_count,
     detalhe?.status,
     detalhe?.pode_finalizar,
+    isLoteSolicitacaoDiretoria,
     solicitacoesSelecionadas.length,
     totalSelecionado
   ]);
 
-  const excedeuLimite = resumoLote.valorUtilizadoProjetado > resumoLote.valorDisponivel;
+  const excedeuLimite = !isLoteSolicitacaoDiretoria && resumoLote.valorUtilizadoProjetado > resumoLote.valorDisponivel;
 
   async function carregarInicial() {
     try {
@@ -459,7 +463,7 @@ export default function PrioridadesDiretoria() {
       <div>
         <h1 className="text-xl font-semibold">Prioridades da Diretoria</h1>
         <p className="text-sm text-gray-600 mt-0.5">
-          DIR_ADMIN solicita lotes de prioridade. Diretorias publicas e privadas autorizam solicitacoes dentro do limite aprovado.
+          DIR_ADMIN solicita lotes com limite de caixa. Diretorias tambem podem enviar pedidos de urgencia para aprovacao da DIR_ADMIN.
         </p>
       </div>
 
@@ -557,6 +561,9 @@ export default function PrioridadesDiretoria() {
                     <p className="text-xs text-gray-500 mt-0.5">
                       {lote.classificacao_alvo} - {lote.diretoria_alvo_codigo}
                     </p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Criador: {lote.setor_criador_nome || lote.setor_criador_codigo || '-'}
+                    </p>
                   </div>
                   <BadgeStatus status={lote.status} />
                 </div>
@@ -596,6 +603,10 @@ export default function PrioridadesDiretoria() {
                   <h2 className="text-lg font-semibold">Lote #{detalhe.id}</h2>
                   <p className="text-sm text-gray-600 mt-0.5">
                     {detalhe.classificacao_alvo} - {detalhe.diretoria_alvo_codigo}
+                  </p>
+                  <p className="text-sm text-gray-600 mt-0.5">
+                    Criador: <strong>{detalhe.setor_criador_nome || detalhe.setor_criador_codigo || '-'}</strong>
+                    {isLoteSolicitacaoDiretoria && ' | Pedido de urgencia da diretoria'}
                   </p>
                   {detalhe.observacao && (
                     <p className="text-sm text-gray-700 mt-2">{detalhe.observacao}</p>
@@ -638,7 +649,10 @@ export default function PrioridadesDiretoria() {
               </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                <ResumoCard label="Valor disponivel" value={formatarValor(resumoLote.valorDisponivel)} />
+                <ResumoCard
+                  label={isLoteSolicitacaoDiretoria ? 'Valor solicitado' : 'Valor disponivel'}
+                  value={formatarValor(resumoLote.valorDisponivel)}
+                />
                 <ResumoCard
                   label="Valor utilizado"
                   value={formatarValor(resumoLote.valorUtilizadoProjetado)}
@@ -646,9 +660,9 @@ export default function PrioridadesDiretoria() {
                   destaque={resumoLote.possuiPrevia}
                 />
                 <ResumoCard
-                  label="Saldo"
+                  label={isLoteSolicitacaoDiretoria ? 'Aguardando caixa' : 'Saldo'}
                   value={formatarValor(resumoLote.saldoProjetado)}
-                  helper={resumoLote.possuiPrevia ? 'Saldo projetado com a selecao atual' : null}
+                  helper={isLoteSolicitacaoDiretoria ? 'Aprovacao pela DIR_ADMIN' : resumoLote.possuiPrevia ? 'Saldo projetado com a selecao atual' : null}
                   destaque={resumoLote.possuiPrevia}
                 />
                 <ResumoCard

@@ -68,12 +68,17 @@
 - o lote registra:
   - classificacao alvo
   - diretoria alvo resolvida pela configuracao de aprovacao
+  - tipo do lote
+  - setor criador do lote
   - valor disponivel
   - valor utilizado
   - status do lote
 - apenas a diretoria alvo configurada, ou `SUPERADMIN`, pode finalizar o lote
+- lotes criados por `DIR_OBRAS_PUBLICAS` ou `DIR_OBRAS_PRIVADAS` sao pedidos de urgencia para aprovacao da `DIR_ADMIN`
+- nesses pedidos de urgencia, apenas `DIR_ADMIN` ou `SUPERADMIN` pode finalizar/aprovar o lote
 - `SUPERADMIN` pode excluir lotes sem itens autorizados
-- as solicitacoes elegiveis sao somente as do fluxo novo de diretoria que:
+- as solicitacoes elegiveis precisam estar atualmente no setor `FINANCEIRO`
+- alem disso, no fluxo novo de diretoria, precisam:
   - ja passaram por `APROVADA_DIRETORIA`
   - ou ja sairam da diretoria alvo no fluxo novo
   - ainda nao foram priorizadas
