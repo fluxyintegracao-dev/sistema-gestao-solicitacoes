@@ -56,6 +56,15 @@ function BadgeStatus({ status }) {
   );
 }
 
+function BadgeStatusSolicitacao({ status }) {
+  const valor = String(status || '').trim().toUpperCase();
+  return (
+    <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-medium text-slate-700">
+      {valor || '-'}
+    </span>
+  );
+}
+
 export default function PrioridadesDiretoria() {
   const navigate = useNavigate();
   const [contexto, setContexto] = useState(null);
@@ -760,18 +769,19 @@ export default function PrioridadesDiretoria() {
                           <th className="text-left px-3 py-2.5">Tipo</th>
                           <th className="text-left px-3 py-2.5">Vencimento</th>
                           <th className="text-right px-3 py-2.5">Valor</th>
+                          <th className="text-left px-3 py-2.5">Status</th>
                         </tr>
                       </thead>
                       <tbody>
                         {loadingDisponiveis && (
                           <tr>
-                            <td className="px-3 py-2.5" colSpan={6}>Carregando solicitacoes elegiveis...</td>
+                            <td className="px-3 py-2.5" colSpan={7}>Carregando solicitacoes elegiveis...</td>
                           </tr>
                         )}
 
                         {!loadingDisponiveis && solicitacoesDisponiveis.length === 0 && (
                           <tr>
-                            <td className="px-3 py-2.5 text-gray-500" colSpan={6}>
+                            <td className="px-3 py-2.5 text-gray-500" colSpan={7}>
                               Nenhuma solicitacao elegivel encontrada para este lote.
                             </td>
                           </tr>
@@ -802,6 +812,9 @@ export default function PrioridadesDiretoria() {
                               <td className="px-3 py-2.5">{item.tipo?.nome || '-'}</td>
                               <td className="px-3 py-2.5">{formatarData(item.data_vencimento)}</td>
                               <td className="px-3 py-2.5 text-right font-medium">{formatarValor(item.valor_prioridade)}</td>
+                              <td className="px-3 py-2.5">
+                                <BadgeStatusSolicitacao status={item.status_global} />
+                              </td>
                             </tr>
                           );
                         })}
@@ -868,12 +881,13 @@ export default function PrioridadesDiretoria() {
                           <th className="text-left px-3 py-2.5">Tipo</th>
                           <th className="text-left px-3 py-2.5">Autorizado em</th>
                           <th className="text-right px-3 py-2.5">Valor</th>
+                          <th className="text-left px-3 py-2.5">Status</th>
                         </tr>
                       </thead>
                       <tbody>
                         {(detalhe.itens || []).length === 0 && (
                           <tr>
-                            <td className="px-3 py-2.5 text-gray-500" colSpan={5}>
+                            <td className="px-3 py-2.5 text-gray-500" colSpan={6}>
                               Nenhuma solicitacao foi vinculada a este lote.
                             </td>
                           </tr>
@@ -881,7 +895,7 @@ export default function PrioridadesDiretoria() {
 
                         {(detalhe.itens || []).length > 0 && itensLoteFiltrados.length === 0 && (
                           <tr>
-                            <td className="px-3 py-2.5 text-gray-500" colSpan={5}>
+                            <td className="px-3 py-2.5 text-gray-500" colSpan={6}>
                               Nenhuma solicitacao encontrada para o filtro informado.
                             </td>
                           </tr>
@@ -902,6 +916,9 @@ export default function PrioridadesDiretoria() {
                             <td className="px-3 py-2.5">{item.solicitacao?.tipo?.nome || '-'}</td>
                             <td className="px-3 py-2.5">{formatarDataHora(item.autorizado_em)}</td>
                             <td className="px-3 py-2.5 text-right font-medium">{formatarValor(item.valor_considerado)}</td>
+                            <td className="px-3 py-2.5">
+                              <BadgeStatusSolicitacao status={item.solicitacao?.status_global} />
+                            </td>
                           </tr>
                         ))}
                       </tbody>
