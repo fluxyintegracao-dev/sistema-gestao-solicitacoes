@@ -28,6 +28,7 @@ import { hasEnabledModule } from '../../utils/acessoProduto';
 import {
   arquivarSolicitacoesEmMassa,
   deleteSolicitacao,
+  desarquivarSolicitacao,
   enviarSolicitacoesParaSetorEmMassa,
   getSolicitacaoResumoLista,
   getObrasVisiveisSolicitacoes
@@ -737,7 +738,7 @@ export default function Solicitacoes({ arquivadas = false }) {
     setColunasVisiveis(prev => {
       const validas = opcoesColunas.map(c => c.id);
       const filtradas = prev.filter(id => validas.includes(id));
-      const obrigatorias = ['codigo', 'status', 'acoes'];
+      const obrigatorias = ['codigo', 'status'];
       for (const obrigatoria of obrigatorias) {
         if (!filtradas.includes(obrigatoria) && validas.includes(obrigatoria)) {
           filtradas.push(obrigatoria);
@@ -827,7 +828,8 @@ export default function Solicitacoes({ arquivadas = false }) {
     try {
       setProcessandoMassa(true);
       const resultado = await arquivarSolicitacoesEmMassa(selecionadasIds);
-      await handleAtualizarLista({ type: 'refresh_item', id: selecionadaUnica.id });
+      setSelecionadasIds([]);
+      await carregar({ silent: true });
       if (resultado?.erros?.length > 0) {
         alert(`Arquivamento em massa concluído. Arquivadas: ${resultado.sucesso}. Falhas: ${resultado.erros.length}.`);
       } else {
@@ -836,6 +838,45 @@ export default function Solicitacoes({ arquivadas = false }) {
     } catch (error) {
       console.error(error);
       alert('Erro ao arquivar solicitações em massa.');
+    } finally {
+      setProcessandoMassa(false);
+    }
+  }
+
+  async function desarquivarEmMassa() {
+    if (selecionadasIds.length === 0) {
+      alert('Selecione ao menos uma solicitacao.');
+      return;
+    }
+    if (!confirm(`Desarquivar ${selecionadasIds.length} solicitacao(oes) da sua lista de arquivadas?`)) {
+      return;
+    }
+
+    try {
+      setProcessandoMassa(true);
+      let sucesso = 0;
+      const erros = [];
+
+      for (const solicitacaoId of selecionadasIds) {
+        try {
+          await desarquivarSolicitacao(solicitacaoId);
+          sucesso += 1;
+        } catch (error) {
+          erros.push({ id: solicitacaoId, error });
+        }
+      }
+
+      setSelecionadasIds([]);
+      await carregar({ silent: true });
+
+      if (erros.length > 0) {
+        alert(`Desarquivamento em massa concluido. Desarquivadas: ${sucesso}. Falhas: ${erros.length}.`);
+      } else {
+        alert('Solicitacoes desarquivadas com sucesso.');
+      }
+    } catch (error) {
+      console.error(error);
+      alert('Erro ao desarquivar solicitacoes em massa.');
     } finally {
       setProcessandoMassa(false);
     }
@@ -1430,7 +1471,7 @@ export default function Solicitacoes({ arquivadas = false }) {
         </>
       )}
 
-      {!arquivadas && selecionadasIds.length > 0 && (
+      {selecionadasIds.length > 0 && (
         <div className="solicitacoes-massa-modal fixed left-1/2 -translate-x-1/2 bottom-4 z-40 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 shadow-xl rounded-2xl px-3 py-2 flex items-center gap-2">
           <span className="text-sm font-medium text-gray-700 dark:text-slate-200 px-2">
             {selecionadasIds.length} selecionada(s)
@@ -1448,7 +1489,7 @@ export default function Solicitacoes({ arquivadas = false }) {
             </button>
           )}
 
-          {selecionadaUnica && podeAssumirUnica && (
+          {!arquivadas && selecionadaUnica && podeAssumirUnica && (
             <button
               type="button"
               className="btn btn-outline !min-h-0 h-9 px-3 inline-flex items-center gap-2"
@@ -1461,7 +1502,7 @@ export default function Solicitacoes({ arquivadas = false }) {
             </button>
           )}
 
-          {selecionadaUnica && podeAtribuirUnica && (
+          {!arquivadas && selecionadaUnica && podeAtribuirUnica && (
             <button
               type="button"
               className="btn btn-outline !min-h-0 h-9 px-3 inline-flex items-center gap-2"
@@ -1485,7 +1526,7 @@ export default function Solicitacoes({ arquivadas = false }) {
             <span className="hidden sm:inline">Exportar</span>
           </button>
 
-          {podeSolicitarPrioridadeFinanceiro && (
+          {!arquivadas && podeSolicitarPrioridadeFinanceiro && (
             <button
               type="button"
               className="btn btn-outline !min-h-0 h-9 px-3 inline-flex items-center gap-2"
@@ -1498,18 +1539,31 @@ export default function Solicitacoes({ arquivadas = false }) {
             </button>
           )}
 
-          <button
-            type="button"
-            className="btn btn-outline !min-h-0 h-9 px-3 inline-flex items-center gap-2"
-            onClick={arquivarEmMassa}
-            disabled={processandoMassa}
-            title="Arquivar selecionadas"
-          >
-            <HiOutlineFolderOpen className="w-4 h-4" />
-            <span className="hidden sm:inline">Arquivar</span>
-          </button>
+          {arquivadas ? (
+            <button
+              type="button"
+              className="btn btn-outline !min-h-0 h-9 px-3 inline-flex items-center gap-2"
+              onClick={desarquivarEmMassa}
+              disabled={processandoMassa}
+              title="Desarquivar selecionadas"
+            >
+              <HiOutlineFolderOpen className="w-4 h-4" />
+              <span className="hidden sm:inline">Desarquivar</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="btn btn-outline !min-h-0 h-9 px-3 inline-flex items-center gap-2"
+              onClick={arquivarEmMassa}
+              disabled={processandoMassa}
+              title="Arquivar selecionadas"
+            >
+              <HiOutlineFolderOpen className="w-4 h-4" />
+              <span className="hidden sm:inline">Arquivar</span>
+            </button>
+          )}
 
-          {selecionadaUnica && podeEnviarUnica && (
+          {!arquivadas && selecionadaUnica && podeEnviarUnica && (
             <button
               type="button"
               className="btn btn-outline !min-h-0 h-9 px-3 inline-flex items-center gap-2"
@@ -1522,7 +1576,7 @@ export default function Solicitacoes({ arquivadas = false }) {
             </button>
           )}
 
-          {selecionadasIds.length > 1 && podeEnviarMassa && (
+          {!arquivadas && selecionadasIds.length > 1 && podeEnviarMassa && (
             <button
               type="button"
               className="btn btn-outline !min-h-0 h-9 px-3 inline-flex items-center gap-2"
@@ -1535,7 +1589,7 @@ export default function Solicitacoes({ arquivadas = false }) {
             </button>
           )}
 
-          {podeAtribuirMassa && (
+          {!arquivadas && podeAtribuirMassa && (
             <button
               type="button"
               className="btn btn-outline !min-h-0 h-9 px-3 inline-flex items-center gap-2"
@@ -1548,7 +1602,7 @@ export default function Solicitacoes({ arquivadas = false }) {
             </button>
           )}
 
-          {selecionadaUnica && podeExcluirUnica && (
+          {!arquivadas && selecionadaUnica && podeExcluirUnica && (
             <button
               type="button"
               className="btn btn-outline !min-h-0 h-9 px-3 inline-flex items-center gap-2"

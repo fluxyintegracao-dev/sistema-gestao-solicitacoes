@@ -41,7 +41,7 @@ export default function TabelaSolicitacoes({
   const isSetorObra = userHasSetorCapability(user, 'eh_setor_obra');
   const moduloContratosHabilitado = hasEnabledModule(user, 'CONTRATOS');
 
-  const selecaoHabilitada = !mostrarArquivadas && typeof onToggleSelecionada === 'function';
+  const selecaoHabilitada = typeof onToggleSelecionada === 'function';
   const viewportMode = viewportWidth < 768 ? 'mobile' : viewportWidth < 1024 ? 'tablet' : 'desktop';
   const idsSet = useMemo(() => new Set((selecionadasIds || []).map(Number)), [selecionadasIds]);
   const todasSelecionadas = selecaoHabilitada && solicitacoes.length > 0 &&
