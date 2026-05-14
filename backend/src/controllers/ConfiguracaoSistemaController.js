@@ -37,6 +37,11 @@ const {
   normalizarTiposCompartilhados,
   normalizarAutomacoesStatus
 } = require('../services/solicitacao/configuracoesVisibilidadeAutomacao');
+const {
+  montarPayloadConfigCampos,
+  obterConfigCamposNovaSolicitacao,
+  salvarConfigCamposNovaSolicitacao
+} = require('../services/novaSolicitacaoCamposConfig');
 
 const CHAVE_TEMA = 'TEMA_SISTEMA';
 const CHAVE_AREAS_OBRA = 'AREAS_OBRA_VISIVEIS';
@@ -693,6 +698,29 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return res.status(500).json({ error: 'Erro ao salvar configuracao de tipos por setor' });
+    }
+  },
+
+  async getCamposNovaSolicitacao(req, res) {
+    try {
+      const config = await obterConfigCamposNovaSolicitacao();
+      return res.json(montarPayloadConfigCampos(config));
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao buscar configuracao dos campos da nova solicitacao' });
+    }
+  },
+
+  async updateCamposNovaSolicitacao(req, res) {
+    try {
+      const config = await salvarConfigCamposNovaSolicitacao({ regras: req.body?.regras });
+      return res.json({
+        ok: true,
+        ...montarPayloadConfigCampos(config)
+      });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao salvar configuracao dos campos da nova solicitacao' });
     }
   },
 

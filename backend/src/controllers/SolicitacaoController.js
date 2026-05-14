@@ -67,6 +67,10 @@ const {
 const {
   publishSolicitacaoRealtimeEvent
 } = require('../services/solicitacaoRealtimeService');
+const {
+  obterConfigCamposNovaSolicitacao,
+  resolverCamposNovaSolicitacao
+} = require('../services/novaSolicitacaoCamposConfig');
 
 const CHAVE_AREAS_POR_SETOR_ORIGEM = 'AREAS_POR_SETOR_ORIGEM';
 const CHAVE_SETORES_VISIVEIS_POR_USUARIO = 'SETORES_VISIVEIS_POR_USUARIO';
@@ -1710,35 +1714,44 @@ module.exports = {
         contratos: contratosDisponiveis,
         apropriacoes: apropriacoesDisponiveis
       });
+      const configCamposNovaSolicitacao = await obterConfigCamposNovaSolicitacao();
+      const camposNovaSolicitacao = resolverCamposNovaSolicitacao(
+        comportamentoTipo,
+        configCamposNovaSolicitacao,
+        tipo_solicitacao_id,
+        { apropriacoesDisponiveis }
+      );
+      const campoVisivel = (campo) => camposNovaSolicitacao?.[campo]?.visivel !== false;
+      const campoObrigatorio = (campo) => Boolean(camposNovaSolicitacao?.[campo]?.obrigatorio);
 
-      if (comportamentoTipo.exige_valor && (valor === '' || valor === null || valor === undefined)) {
+      if (campoObrigatorio('valor') && (valor === '' || valor === null || valor === undefined)) {
         return res.status(400).json({
           error: 'Para continuar, informe o valor da solicitacao.'
         });
       }
 
-      if (comportamentoTipo.exige_descricao && !descricao) {
+      if (campoObrigatorio('descricao') && !descricao) {
         return res.status(400).json({
           error: 'Campos obrigatorios nao informados'
         });
       }
 
-      if (comportamentoTipo.exige_subtipo && !tipo_sub_id) {
+      if (campoObrigatorio('subtipo') && !tipo_sub_id) {
         return res.status(400).json({
           error: 'Para continuar, selecione o subtipo.'
         });
       }
-      if (comportamentoTipo.exige_periodo_medicao && (!data_inicio_medicao || !data_fim_medicao)) {
+      if (campoObrigatorio('periodo_medicao') && (!data_inicio_medicao || !data_fim_medicao)) {
         return res.status(400).json({
           error: 'Para Medicao, informe data inicial e data final.'
         });
       }
-      if (!data_vencimento) {
+      if (campoObrigatorio('data_vencimento') && !data_vencimento) {
         return res.status(400).json({
           error: 'Informe a data de vencimento.'
         });
       }
-      if (data_vencimento) {
+      if (campoVisivel('data_vencimento') && data_vencimento) {
         const vencimentoStr = String(data_vencimento).trim();
         if (!/^\d{4}-\d{2}-\d{2}$/.test(vencimentoStr)) {
           return res.status(400).json({
@@ -1755,24 +1768,29 @@ module.exports = {
           });
         }
       }
-      if (comportamentoTipo.exige_contrato && !contrato_id) {
+      if (campoObrigatorio('contrato') && !contrato_id) {
         return res.status(400).json({
           error: 'Selecione um contrato.'
         });
       }
-      if (comportamentoTipo.exige_itens_apropriacao && !itens_apropriacao) {
+      if (campoObrigatorio('itens_apropriacao') && !itens_apropriacao) {
         return res.status(400).json({
           error: 'Para Abertura de Contrato, informe os itens de apropriacao.'
         });
       }
-      if (comportamentoTipo.exige_ref_contrato_abertura && !ref_contrato_abertura) {
+      if (campoObrigatorio('ref_contrato_abertura') && !ref_contrato_abertura) {
         return res.status(400).json({
           error: 'Para Abertura de Contrato, informe a ref do contrato.'
         });
       }
+      if (campoObrigatorio('credor') && !parceiro_id) {
+        return res.status(400).json({
+          error: 'Selecione o credor da solicitacao.'
+        });
+      }
 
       let apropriacao = null;
-      if (apropriacao_id !== undefined && apropriacao_id !== null && apropriacao_id !== '') {
+      if (campoVisivel('apropriacao_principal') && apropriacao_id !== undefined && apropriacao_id !== null && apropriacao_id !== '') {
         apropriacao = await Apropriacao.findByPk(Number(apropriacao_id), {
           attributes: ['id', 'obra_id', 'codigo', 'descricao']
         });
@@ -1790,7 +1808,7 @@ module.exports = {
         }
       }
 
-      if (comportamentoTipo.exige_apropriacao_principal && !apropriacao) {
+      if (campoObrigatorio('apropriacao_principal') && !apropriacao) {
         return res.status(400).json({
           error: 'Selecione a apropriacao principal da solicitacao.'
         });
@@ -1800,7 +1818,7 @@ module.exports = {
       const usuario = await User.findByPk(usuarioId);
       let parceiro = null;
 
-      if (parceiro_id !== undefined && parceiro_id !== null && parceiro_id !== '') {
+      if (campoVisivel('credor') && parceiro_id !== undefined && parceiro_id !== null && parceiro_id !== '') {
         parceiro = await Parceiro.findByPk(Number(parceiro_id), {
           attributes: ['id', 'nome', 'cpf_cnpj', 'fornecedor', 'ativo']
         });
@@ -1818,7 +1836,7 @@ module.exports = {
         }
       }
 
-      const valorPersistido = !comportamentoTipo.mostrar_valor
+      const valorPersistido = !campoVisivel('valor')
         ? null
         : (valor === '' || valor === undefined ? null : valor);
 
@@ -1831,18 +1849,18 @@ module.exports = {
         apropriacao_id: apropriacao?.id || null,
         tipo_solicitacao_id,
         tipo_macro_id: tipo_macro_id || null,
-        tipo_sub_id: tipo_sub_id || null,
-        descricao,
+        tipo_sub_id: campoVisivel('subtipo') ? (tipo_sub_id || null) : null,
+        descricao: campoVisivel('descricao') ? descricao : '',
         valor: valorPersistido,
         area_responsavel: usarFluxoDiretoria ? diretoriaFluxoCodigo : areaResponsavelPersistida,
         fluxo_aprovacao_diretoria: usarFluxoDiretoria,
         diretoria_fluxo_codigo: usarFluxoDiretoria ? diretoriaFluxoCodigo : null,
         setor_destino_pos_aprovacao: usarFluxoDiretoria ? areaResponsavelPersistida : null,
-        codigo_contrato,
-        contrato_id: contrato_id || null,
-        data_vencimento: data_vencimento || null,
-        data_inicio_medicao: data_inicio_medicao || null,
-        data_fim_medicao: data_fim_medicao || null,
+        codigo_contrato: campoVisivel('contrato') ? codigo_contrato : null,
+        contrato_id: campoVisivel('contrato') ? (contrato_id || null) : null,
+        data_vencimento: campoVisivel('data_vencimento') ? (data_vencimento || null) : null,
+        data_inicio_medicao: campoVisivel('periodo_medicao') ? (data_inicio_medicao || null) : null,
+        data_fim_medicao: campoVisivel('periodo_medicao') ? (data_fim_medicao || null) : null,
         criado_por: usuarioId,
         status_global: 'PENDENTE'
       });
@@ -1866,13 +1884,13 @@ module.exports = {
         }
       });
 
-      const itensTexto = itens_apropriacao
+      const itensTexto = campoVisivel('itens_apropriacao') && itens_apropriacao
         ? `Itens de apropriacao: ${String(itens_apropriacao).trim()}`
         : null;
       const apropriacaoTexto = apropriacao
         ? `Apropriacao principal: ${String(apropriacao.codigo || apropriacao.descricao || apropriacao.id).trim()}`
         : null;
-      const refTexto = ref_contrato_abertura
+      const refTexto = campoVisivel('ref_contrato_abertura') && ref_contrato_abertura
         ? `Ref. do contrato: ${String(ref_contrato_abertura).trim()}`
         : null;
       const descricaoHistorico = [apropriacaoTexto, itensTexto, refTexto].filter(Boolean).join(' | ') || null;
@@ -1881,10 +1899,10 @@ module.exports = {
         metadata.apropriacao_id = apropriacao.id;
         metadata.apropriacao_codigo = apropriacao.codigo;
       }
-      if (itens_apropriacao) {
+      if (campoVisivel('itens_apropriacao') && itens_apropriacao) {
         metadata.itens_apropriacao = String(itens_apropriacao).trim();
       }
-      if (ref_contrato_abertura) {
+      if (campoVisivel('ref_contrato_abertura') && ref_contrato_abertura) {
         metadata.ref_contrato_abertura = String(ref_contrato_abertura).trim();
       }
       if (usarFluxoDiretoria) {

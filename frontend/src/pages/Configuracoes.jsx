@@ -138,6 +138,12 @@ const SECOES_CONFIG = [
         to: '/tipos-solicitacao-por-setor'
       },
       {
+        title: 'Campos da Nova Solicitacao',
+        description: 'Defina campos visiveis e obrigatorios por tipo de solicitacao.',
+        to: '/nova-solicitacao-campos',
+        requireSuperadmin: true
+      },
+      {
         title: 'Aprovacao por Diretoria',
         description: 'Configure a diretoria que recebe primeiro as solicitacoes conforme a classificacao da obra.',
         to: '/aprovacao-diretoria'

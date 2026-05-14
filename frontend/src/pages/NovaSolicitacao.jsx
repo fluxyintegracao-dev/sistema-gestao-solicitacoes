@@ -8,7 +8,7 @@ import { getTiposSubContrato } from '../services/tiposSubContrato';
 import { getContratos } from '../services/contratos';
 import { buscarParceiros, criarParceiro, listarCategoriasParceiro } from '../services/parceiros';
 import { listarApropriacoes } from '../services/apropriacoes';
-import { getAprovacaoDiretoria, getAreasObra, getAreasPorSetorOrigem, getTiposSolicitacaoPorSetor } from '../services/configuracoesSistema';
+import { getAprovacaoDiretoria, getAreasObra, getAreasPorSetorOrigem, getCamposNovaSolicitacao, getTiposSolicitacaoPorSetor } from '../services/configuracoesSistema';
 import { useAuth } from '../contexts/AuthContext';
 import { HiPaperClip } from 'react-icons/hi2';
 import ApropriacaoAutocomplete from '../components/ui/ApropriacaoAutocomplete';
@@ -16,6 +16,7 @@ import PendingAttachmentsList from '../components/attachments/PendingAttachments
 import { userHasSetorCapability } from '../utils/setor';
 import { hasEnabledModule } from '../utils/acessoProduto';
 import { applyTipoSolicitacaoModuleAvailability, getTipoSolicitacaoBehavior } from '../utils/tipoSolicitacao';
+import { resolverCamposNovaSolicitacaoFrontend } from '../utils/novaSolicitacaoCampos';
 import { maskCep, maskCpfCnpj, maskPhone, onlyDigits } from '../utils/formatters';
 import {
   UPLOAD_MAX_FILE_SIZE_MB_PADRAO,
@@ -90,6 +91,7 @@ export default function NovaSolicitacao() {
   const [areasObra, setAreasObra] = useState([]);
   const [areasPorSetorOrigem, setAreasPorSetorOrigem] = useState({});
   const [tiposPorSetorConfig, setTiposPorSetorConfig] = useState({});
+  const [camposNovaSolicitacaoConfig, setCamposNovaSolicitacaoConfig] = useState({ regras: {} });
   const [aprovacaoDiretoriaConfig, setAprovacaoDiretoriaConfig] = useState({ diretorias: {}, destinos: {} });
   const [tiposSub, setTiposSub] = useState([]);
   const [contratos, setContratos] = useState([]);
@@ -142,11 +144,12 @@ export default function NovaSolicitacao() {
         setCategoriasParceiro([]);
       }
       try {
-        const [cfg, cfgSetorOrigem, cfgTiposPorSetor, cfgAprovacaoDiretoria] = await Promise.all([
+        const [cfg, cfgSetorOrigem, cfgTiposPorSetor, cfgAprovacaoDiretoria, cfgCamposNovaSolicitacao] = await Promise.all([
           getAreasObra(),
           getAreasPorSetorOrigem(),
           getTiposSolicitacaoPorSetor(),
-          getAprovacaoDiretoria()
+          getAprovacaoDiretoria(),
+          getCamposNovaSolicitacao()
         ]);
         setAreasObra(Array.isArray(cfg?.areas) ? cfg.areas : []);
         setAreasPorSetorOrigem(
@@ -163,11 +166,17 @@ export default function NovaSolicitacao() {
           diretorias: cfgAprovacaoDiretoria?.diretorias || {},
           destinos: cfgAprovacaoDiretoria?.destinos || {}
         });
+        setCamposNovaSolicitacaoConfig({
+          regras: cfgCamposNovaSolicitacao?.regras && typeof cfgCamposNovaSolicitacao.regras === 'object'
+            ? cfgCamposNovaSolicitacao.regras
+            : {}
+        });
       } catch (error) {
         console.error(error);
         setAreasObra([]);
         setAreasPorSetorOrigem({});
         setTiposPorSetorConfig({});
+        setCamposNovaSolicitacaoConfig({ regras: {} });
         setAprovacaoDiretoriaConfig({ diretorias: {}, destinos: {} });
       }
     }
@@ -338,18 +347,38 @@ export default function NovaSolicitacao() {
       apropriacoes: moduloApropriacoesHabilitado
     });
   }, [tipoSelecionado, moduloContratosHabilitado, moduloApropriacoesHabilitado]);
-  const subtipoObrigatorio = comportamentoTipo.exige_subtipo;
-  const medicaoObrigatoria = comportamentoTipo.exige_periodo_medicao;
-  const aberturaContratoObrigatoria = comportamentoTipo.exige_ref_contrato_abertura || comportamentoTipo.exige_itens_apropriacao;
+  const camposNovaSolicitacao = useMemo(() => (
+    resolverCamposNovaSolicitacaoFrontend(
+      comportamentoTipo,
+      camposNovaSolicitacaoConfig,
+      form.tipo_solicitacao_id,
+      { apropriacoesDisponiveis: moduloApropriacoesHabilitado }
+    )
+  ), [comportamentoTipo, camposNovaSolicitacaoConfig, form.tipo_solicitacao_id, moduloApropriacoesHabilitado]);
+  const campoVisivel = (campo) => camposNovaSolicitacao?.[campo]?.visivel !== false;
+  const campoObrigatorio = (campo) => Boolean(camposNovaSolicitacao?.[campo]?.obrigatorio);
+  const subtipoObrigatorio = campoObrigatorio('subtipo');
+  const medicaoObrigatoria = campoObrigatorio('periodo_medicao');
   const solicitacaoCompra = !comportamentoTipo.mostrar_apropriacao_principal && !comportamentoTipo.mostrar_valor;
   const exigeApropriacaoPrincipal =
     Boolean(form.tipo_solicitacao_id) &&
-    comportamentoTipo.exige_apropriacao_principal;
-  const tipoSemValor = !comportamentoTipo.mostrar_valor;
-  const exibirCamposContrato = comportamentoTipo.mostrar_contrato;
-  const exibirCampoApropriacao = moduloApropriacoesHabilitado && (comportamentoTipo.mostrar_apropriacao_principal || solicitacaoCompra);
-  const camposContratoObrigatorios = comportamentoTipo.exige_contrato;
-  const exibirCampoSubtipo = comportamentoTipo.mostrar_subtipo;
+    campoObrigatorio('apropriacao_principal');
+  const tipoSemValor = !campoVisivel('valor');
+  const exibirCamposContrato = campoVisivel('contrato');
+  const exibirCampoApropriacao = moduloApropriacoesHabilitado && campoVisivel('apropriacao_principal');
+  const camposContratoObrigatorios = campoObrigatorio('contrato');
+  const exibirCampoSubtipo = campoVisivel('subtipo');
+  const exibirCampoCredor = campoVisivel('credor');
+  const exibirDataVencimento = campoVisivel('data_vencimento');
+  const dataVencimentoObrigatoria = campoObrigatorio('data_vencimento');
+  const exibirPeriodoMedicao = campoVisivel('periodo_medicao');
+  const exibirRefContratoAbertura = campoVisivel('ref_contrato_abertura');
+  const exibirItensApropriacao = campoVisivel('itens_apropriacao');
+  const refContratoAberturaObrigatoria = campoObrigatorio('ref_contrato_abertura');
+  const itensApropriacaoObrigatorio = campoObrigatorio('itens_apropriacao');
+  const exibirDescricao = campoVisivel('descricao');
+  const descricaoObrigatoria = campoObrigatorio('descricao');
+  const exibirAnexos = campoVisivel('anexos');
 
   useEffect(() => {
     if (!exibirCamposContrato) {
@@ -371,7 +400,38 @@ export default function NovaSolicitacao() {
     if (!exigeApropriacaoPrincipal) {
       setForm(prev => ({ ...prev, apropriacao_id: '', itens_apropriacao: '' }));
     }
-  }, [exibirCamposContrato, tipoSemValor, exigeApropriacaoPrincipal]);
+    if (!exibirCampoCredor) {
+      limparParceiroSelecionado();
+    }
+    if (!exibirDataVencimento) {
+      setForm(prev => ({ ...prev, data_vencimento: '' }));
+    }
+    if (!exibirPeriodoMedicao) {
+      setForm(prev => ({ ...prev, data_inicio_medicao: '', data_fim_medicao: '' }));
+    }
+    if (!exibirRefContratoAbertura) {
+      setForm(prev => ({ ...prev, ref_contrato_abertura: '' }));
+    }
+    if (!exibirItensApropriacao) {
+      setForm(prev => ({ ...prev, itens_apropriacao: '' }));
+    }
+    if (!exibirAnexos) {
+      setArquivos([]);
+      if (anexosRef.current) {
+        anexosRef.current.value = '';
+      }
+    }
+  }, [
+    exibirCamposContrato,
+    tipoSemValor,
+    exigeApropriacaoPrincipal,
+    exibirCampoCredor,
+    exibirDataVencimento,
+    exibirPeriodoMedicao,
+    exibirRefContratoAbertura,
+    exibirItensApropriacao,
+    exibirAnexos
+  ]);
 
   function formatarMoeda(valor) {
     if (Number.isNaN(valor)) return '';
@@ -547,7 +607,7 @@ export default function NovaSolicitacao() {
       alert('Para Medicao, informe data inicial e data final.');
       return;
     }
-    if (!form.data_vencimento) {
+    if (dataVencimentoObrigatoria && !form.data_vencimento) {
       alert('Informe a data de vencimento.');
       return;
     }
@@ -559,38 +619,48 @@ export default function NovaSolicitacao() {
       alert('Informe a ref. do contrato.');
       return;
     }
-    if (aberturaContratoObrigatoria && !form.itens_apropriacao) {
+    if (itensApropriacaoObrigatorio && !form.itens_apropriacao) {
       alert('Para Abertura de Contrato, informe os itens de apropriacao.');
       return;
     }
-    if (aberturaContratoObrigatoria && !form.ref_contrato_abertura) {
+    if (refContratoAberturaObrigatoria && !form.ref_contrato_abertura) {
       alert('Para Abertura de Contrato, informe a ref do contrato.');
       return;
     }
+    if (campoObrigatorio('credor') && !form.parceiro_id) {
+      alert('Selecione o credor da solicitacao.');
+      return;
+    }
 
-    if (form.data_vencimento && String(form.data_vencimento) < String(hojeInput)) {
+    if (exibirDataVencimento && form.data_vencimento && String(form.data_vencimento) < String(hojeInput)) {
       alert('Data de vencimento não pode ser menor que a data atual.');
+      return;
+    }
+
+    if (descricaoObrigatoria && !form.descricao.trim()) {
+      alert('Informe a descricao da solicitacao.');
       return;
     }
 
     const payload = {
       ...form,
-      parceiro_id: form.parceiro_id || null,
-      apropriacao_id: form.apropriacao_id || null,
-      contrato_id: form.contrato_id || null,
-      tipo_sub_id: form.tipo_sub_id || null,
+      parceiro_id: exibirCampoCredor ? (form.parceiro_id || null) : null,
+      apropriacao_id: exibirCampoApropriacao ? (form.apropriacao_id || null) : null,
+      contrato_id: exibirCamposContrato ? (form.contrato_id || null) : null,
+      tipo_sub_id: exibirCampoSubtipo ? (form.tipo_sub_id || null) : null,
       tipo_macro_id: form.tipo_solicitacao_id || null,
-      data_vencimento: form.data_vencimento || null,
-      data_inicio_medicao: form.data_inicio_medicao || null,
-      data_fim_medicao: form.data_fim_medicao || null,
-      itens_apropriacao: form.itens_apropriacao || null,
-      ref_contrato_abertura: form.ref_contrato_abertura || null
+      data_vencimento: exibirDataVencimento ? (form.data_vencimento || null) : null,
+      data_inicio_medicao: exibirPeriodoMedicao ? (form.data_inicio_medicao || null) : null,
+      data_fim_medicao: exibirPeriodoMedicao ? (form.data_fim_medicao || null) : null,
+      itens_apropriacao: exibirItensApropriacao ? (form.itens_apropriacao || null) : null,
+      ref_contrato_abertura: exibirRefContratoAbertura ? (form.ref_contrato_abertura || null) : null,
+      descricao: exibirDescricao ? form.descricao : ''
     };
 
     try {
       const solicitacao = await createSolicitacao(payload);
 
-      if (arquivos.length > 0) {
+      if (exibirAnexos && arquivos.length > 0) {
         await uploadArquivos({
           files: extrairFilesAnexosPendentes(arquivos),
           solicitacao_id: solicitacao.id,
@@ -873,6 +943,7 @@ export default function NovaSolicitacao() {
             </div>
           </label>
 
+          {exibirCampoCredor && (
           <label className="grid gap-1 text-sm lg:col-span-6">
             Descrição da obra
             <div className="flex gap-2 nova-solicitacao-inline-actions">
@@ -900,6 +971,7 @@ export default function NovaSolicitacao() {
               </button>
             </div>
           </label>
+          )}
           </>
           )}
 
@@ -1075,7 +1147,7 @@ export default function NovaSolicitacao() {
                   placeholder="Buscar por referência do contrato"
                   value={refContratoBusca}
                   onChange={e => setRefContratoBusca(e.target.value)}
-                  required={medicaoObrigatoria}
+                  required={camposContratoObrigatorios}
                   disabled={!form.obra_id}
                 />
                 <button type="button" className="btn btn-outline btn-sm" onClick={buscarRefContrato}>
@@ -1178,11 +1250,12 @@ export default function NovaSolicitacao() {
                 value={valorTexto}
                 onChange={e => atualizarValor(e.target.value)}
                 placeholder="R$ 0,00"
-                required
+                required={campoObrigatorio('valor')}
               />
             </label>
           )}
 
+          {exibirDataVencimento && (
           <label className="grid gap-1 text-sm">
             Data de vencimento
             <input
@@ -1192,12 +1265,13 @@ export default function NovaSolicitacao() {
               className="input input-sm"
               value={form.data_vencimento}
               min={hojeInput}
-              required
+              required={dataVencimentoObrigatoria}
             />
           </label>
+          )}
         </div>
 
-        {medicaoObrigatoria && (
+        {exibirPeriodoMedicao && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 nova-solicitacao-grid-curta">
             <label className="grid gap-1 text-sm">
               Data inicial (Medição)
@@ -1207,7 +1281,7 @@ export default function NovaSolicitacao() {
                 onChange={handleChange}
                 className="input input-sm"
                 value={form.data_inicio_medicao}
-                required
+                required={medicaoObrigatoria}
               />
             </label>
             <label className="grid gap-1 text-sm">
@@ -1218,40 +1292,41 @@ export default function NovaSolicitacao() {
                 onChange={handleChange}
                 className="input input-sm"
                 value={form.data_fim_medicao}
-                required
+                required={medicaoObrigatoria}
               />
             </label>
           </div>
         )}
 
-        {aberturaContratoObrigatoria && (
+        {exibirRefContratoAbertura && (
           <label className="grid gap-1 text-sm">
             Ref. do Contrato
             <input
               name="ref_contrato_abertura"
               onChange={handleChange}
               className="input input-sm"
-              required
+              required={refContratoAberturaObrigatoria}
               value={form.ref_contrato_abertura}
               placeholder="Informe a ref do contrato"
             />
           </label>
         )}
 
-        {aberturaContratoObrigatoria && (
+        {exibirItensApropriacao && (
           <label className="grid gap-1 text-sm">
             Itens de Apropriação
             <textarea
               name="itens_apropriacao"
               onChange={handleChange}
               className="input input-sm nova-solicitacao-textarea text-[var(--c-text)] placeholder:text-[var(--c-muted)]"
-              required
+              required={itensApropriacaoObrigatorio}
               value={form.itens_apropriacao}
               placeholder="Descreva os itens de apropriação"
             />
           </label>
         )}
 
+        {exibirDescricao && (
         <label className="grid gap-1 text-sm">
           Descrição
           <textarea
@@ -1264,15 +1339,17 @@ export default function NovaSolicitacao() {
             }
             maxLength={50}
             className="input input-sm nova-solicitacao-textarea text-[var(--c-text)] placeholder:text-[var(--c-muted)]"
-            required={comportamentoTipo.exige_descricao}
+            required={descricaoObrigatoria}
             value={form.descricao}
           />
           <span className="text-xs text-gray-500">
             Descrição breve, com no máximo 50 caracteres.
           </span>
           </label>
+        )}
 
         <div className="nova-solicitacao-actions-bar">
+          {exibirAnexos && (
           <label className="grid gap-1 text-sm nova-solicitacao-anexos">
           Anexos
           <div className="flex items-center gap-2 flex-wrap nova-solicitacao-inline-actions nova-solicitacao-anexos-head">
@@ -1303,7 +1380,8 @@ export default function NovaSolicitacao() {
             itemClassName="nova-solicitacao-file-item flex items-center justify-between gap-3 text-sm bg-[var(--c-surface)] border border-[var(--c-border)] rounded px-2 py-1"
             removeButtonClassName="text-blue-600 font-semibold px-2"
           />
-        </label>
+          </label>
+          )}
 
           <div className="flex justify-end nova-solicitacao-footer">
           <button className="btn btn-primary btn-sm">

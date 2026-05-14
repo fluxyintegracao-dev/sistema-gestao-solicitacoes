@@ -123,6 +123,27 @@ export async function salvarTiposSolicitacaoPorSetor(data) {
   return res.json();
 }
 
+export async function getCamposNovaSolicitacao() {
+  const res = await fetch(`${API_URL}/configuracoes/nova-solicitacao-campos`, {
+    headers: authHeaders()
+  });
+  if (!res.ok) throw new Error('Erro ao buscar configuracao dos campos da nova solicitacao');
+  return res.json();
+}
+
+export async function salvarCamposNovaSolicitacao(data) {
+  const res = await fetch(`${API_URL}/configuracoes/nova-solicitacao-campos`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+  if (!res.ok) {
+    const payload = await res.json().catch(() => null);
+    throw new Error(payload?.error || 'Erro ao salvar configuracao dos campos da nova solicitacao');
+  }
+  return res.json();
+}
+
 export async function getAprovacaoDiretoria() {
   const res = await fetch(`${API_URL}/configuracoes/aprovacao-diretoria`, {
     headers: authHeaders()
