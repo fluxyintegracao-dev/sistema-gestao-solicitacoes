@@ -1719,7 +1719,10 @@ module.exports = {
         comportamentoTipo,
         configCamposNovaSolicitacao,
         tipo_solicitacao_id,
-        { apropriacoesDisponiveis }
+        {
+          apropriacoesDisponiveis,
+          areaResponsavel: areaResponsavelPersistida
+        }
       );
       const campoVisivel = (campo) => camposNovaSolicitacao?.[campo]?.visivel !== false;
       const campoObrigatorio = (campo) => Boolean(camposNovaSolicitacao?.[campo]?.obrigatorio);

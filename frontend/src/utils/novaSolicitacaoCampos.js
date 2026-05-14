@@ -23,6 +23,28 @@ function boolOrDefault(value, fallback) {
   return Boolean(fallback);
 }
 
+export function normalizarAreaNovaSolicitacao(value) {
+  return String(value || '')
+    .trim()
+    .toUpperCase();
+}
+
+function normalizarTipoKey(value) {
+  return String(value || '').trim();
+}
+
+function obterRegraCampos(config, tipoId, areaResponsavel) {
+  const tipoKey = normalizarTipoKey(tipoId);
+  const areaKey = normalizarAreaNovaSolicitacao(areaResponsavel);
+
+  return (
+    config?.regras?.[areaKey]?.tipos?.[tipoKey]?.campos ||
+    config?.regras?.__GLOBAL__?.tipos?.[tipoKey]?.campos ||
+    config?.regras?.[tipoKey]?.campos ||
+    {}
+  );
+}
+
 function padraoCampo(id, behavior = {}, contexto = {}) {
   const solicitacaoCompra = !behavior.mostrar_apropriacao_principal && !behavior.mostrar_valor;
   const apropriacoesDisponiveis = contexto.apropriacoesDisponiveis !== false;
@@ -81,7 +103,7 @@ function padraoCampo(id, behavior = {}, contexto = {}) {
 }
 
 export function resolverCamposNovaSolicitacaoFrontend(behavior, config, tipoId, contexto = {}) {
-  const regrasTipo = config?.regras?.[String(tipoId || '')]?.campos || {};
+  const regrasTipo = obterRegraCampos(config, tipoId, contexto.areaResponsavel);
   return CAMPOS_NOVA_SOLICITACAO.reduce((acc, campo) => {
     const padrao = padraoCampo(campo.id, behavior, contexto);
     const regra = regrasTipo[campo.id];
@@ -105,13 +127,9 @@ export function normalizarConfigCamposNovaSolicitacao(config) {
   const idsValidos = new Set(CAMPOS_NOVA_SOLICITACAO.map((campo) => campo.id));
   const regras = {};
 
-  Object.entries(regrasRaw).forEach(([tipoId, regraTipo]) => {
-    const tipoKey = String(tipoId || '').trim();
-    if (!tipoKey) return;
-    const camposRaw = regraTipo?.campos && typeof regraTipo.campos === 'object' ? regraTipo.campos : {};
+  function normalizarCampos(camposRaw) {
     const campos = {};
-
-    Object.entries(camposRaw).forEach(([campoId, regraCampo]) => {
+    Object.entries(camposRaw && typeof camposRaw === 'object' ? camposRaw : {}).forEach(([campoId, regraCampo]) => {
       if (!idsValidos.has(campoId)) return;
       const visivel = boolOrDefault(regraCampo?.visivel, true);
       campos[campoId] = {
@@ -119,8 +137,37 @@ export function normalizarConfigCamposNovaSolicitacao(config) {
         obrigatorio: campoId === 'anexos' ? false : (visivel ? boolOrDefault(regraCampo?.obrigatorio, false) : false)
       };
     });
+    return campos;
+  }
 
-    regras[tipoKey] = { campos };
+  Object.entries(regrasRaw).forEach(([areaOuTipo, regraAreaOuTipo]) => {
+    const areaKey = normalizarAreaNovaSolicitacao(areaOuTipo);
+    if (!areaKey) return;
+
+    if (regraAreaOuTipo?.tipos && typeof regraAreaOuTipo.tipos === 'object') {
+      const tipos = {};
+      Object.entries(regraAreaOuTipo.tipos).forEach(([tipoId, regraTipo]) => {
+        const tipoKey = normalizarTipoKey(tipoId);
+        if (!tipoKey) return;
+        tipos[tipoKey] = {
+          campos: normalizarCampos(regraTipo?.campos)
+        };
+      });
+
+      regras[areaKey] = { tipos };
+      return;
+    }
+
+    if (regraAreaOuTipo?.campos && typeof regraAreaOuTipo.campos === 'object') {
+      const tipoKey = normalizarTipoKey(areaOuTipo);
+      if (!tipoKey) return;
+      if (!regras.__GLOBAL__) {
+        regras.__GLOBAL__ = { tipos: {} };
+      }
+      regras.__GLOBAL__.tipos[tipoKey] = {
+        campos: normalizarCampos(regraAreaOuTipo.campos)
+      };
+    }
   });
 
   return { regras };

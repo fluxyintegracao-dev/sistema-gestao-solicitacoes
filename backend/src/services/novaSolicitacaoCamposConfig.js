@@ -133,34 +133,83 @@ function valorPadraoCampo(definicao, prop, behavior, contexto) {
   return Boolean(valor);
 }
 
+function normalizarAreaKey(value) {
+  return String(value || '')
+    .trim()
+    .toUpperCase();
+}
+
+function normalizarTipoKey(value) {
+  return String(value || '').trim();
+}
+
+function normalizarMapaCampos(camposRaw) {
+  const campos = {};
+  const idsValidos = new Set(CAMPOS_NOVA_SOLICITACAO.map((campo) => campo.id));
+
+  Object.entries(camposRaw && typeof camposRaw === 'object' ? camposRaw : {}).forEach(([campoId, regraCampo]) => {
+    if (!idsValidos.has(campoId)) return;
+    const definicao = CAMPOS_NOVA_SOLICITACAO.find((campo) => campo.id === campoId);
+    if (definicao?.fixo) return;
+    const visivel = boolOrDefault(regraCampo?.visivel, true);
+    campos[campoId] = {
+      visivel,
+      obrigatorio: definicao?.permiteObrigatorio === false
+        ? false
+        : (visivel ? boolOrDefault(regraCampo?.obrigatorio, false) : false)
+    };
+  });
+
+  return campos;
+}
+
 function normalizarConfigCampos(raw) {
   const regrasRaw = raw?.regras && typeof raw.regras === 'object' ? raw.regras : {};
   const regras = {};
-  const idsValidos = new Set(CAMPOS_NOVA_SOLICITACAO.map((campo) => campo.id));
 
-  Object.entries(regrasRaw).forEach(([tipoId, regraTipo]) => {
-    const tipoKey = String(tipoId || '').trim();
-    if (!tipoKey) return;
-    const camposRaw = regraTipo?.campos && typeof regraTipo.campos === 'object' ? regraTipo.campos : {};
-    const campos = {};
+  Object.entries(regrasRaw).forEach(([areaOuTipo, regraAreaOuTipo]) => {
+    const areaKey = normalizarAreaKey(areaOuTipo);
+    if (!areaKey) return;
 
-    Object.entries(camposRaw).forEach(([campoId, regraCampo]) => {
-      if (!idsValidos.has(campoId)) return;
-      const definicao = CAMPOS_NOVA_SOLICITACAO.find((campo) => campo.id === campoId);
-      if (definicao?.fixo) return;
-      const visivel = boolOrDefault(regraCampo?.visivel, true);
-      campos[campoId] = {
-        visivel,
-        obrigatorio: definicao?.permiteObrigatorio === false
-          ? false
-          : (visivel ? boolOrDefault(regraCampo?.obrigatorio, false) : false)
+    if (regraAreaOuTipo?.tipos && typeof regraAreaOuTipo.tipos === 'object') {
+      const tipos = {};
+      Object.entries(regraAreaOuTipo.tipos).forEach(([tipoId, regraTipo]) => {
+        const tipoKey = normalizarTipoKey(tipoId);
+        if (!tipoKey) return;
+        tipos[tipoKey] = {
+          campos: normalizarMapaCampos(regraTipo?.campos)
+        };
+      });
+
+      regras[areaKey] = { tipos };
+      return;
+    }
+
+    if (regraAreaOuTipo?.campos && typeof regraAreaOuTipo.campos === 'object') {
+      const tipoKey = normalizarTipoKey(areaOuTipo);
+      if (!tipoKey) return;
+      if (!regras.__GLOBAL__) {
+        regras.__GLOBAL__ = { tipos: {} };
+      }
+      regras.__GLOBAL__.tipos[tipoKey] = {
+        campos: normalizarMapaCampos(regraAreaOuTipo.campos)
       };
-    });
-
-    regras[tipoKey] = { campos };
+    }
   });
 
   return { regras };
+}
+
+function obterRegraCampos(config, tipoId, areaResponsavel) {
+  const tipoKey = normalizarTipoKey(tipoId);
+  const areaKey = normalizarAreaKey(areaResponsavel);
+
+  return (
+    config?.regras?.[areaKey]?.tipos?.[tipoKey]?.campos ||
+    config?.regras?.__GLOBAL__?.tipos?.[tipoKey]?.campos ||
+    config?.regras?.[tipoKey]?.campos ||
+    {}
+  );
 }
 
 async function obterConfigCamposNovaSolicitacao() {
@@ -199,7 +248,7 @@ function resolverCamposNovaSolicitacao(comportamentoTipo, config, tipoId, contex
     apropriacoesDisponiveis: contexto.apropriacoesDisponiveis !== false,
     solicitacaoCompra
   };
-  const regrasTipo = config?.regras?.[String(tipoId || '')]?.campos || {};
+  const regrasTipo = obterRegraCampos(config, tipoId, contexto.areaResponsavel);
   const campos = {};
 
   CAMPOS_NOVA_SOLICITACAO.forEach((definicao) => {

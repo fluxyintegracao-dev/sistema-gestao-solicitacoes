@@ -352,9 +352,12 @@ export default function NovaSolicitacao() {
       comportamentoTipo,
       camposNovaSolicitacaoConfig,
       form.tipo_solicitacao_id,
-      { apropriacoesDisponiveis: moduloApropriacoesHabilitado }
+      {
+        apropriacoesDisponiveis: moduloApropriacoesHabilitado,
+        areaResponsavel: form.area_responsavel
+      }
     )
-  ), [comportamentoTipo, camposNovaSolicitacaoConfig, form.tipo_solicitacao_id, moduloApropriacoesHabilitado]);
+  ), [comportamentoTipo, camposNovaSolicitacaoConfig, form.tipo_solicitacao_id, form.area_responsavel, moduloApropriacoesHabilitado]);
   const campoVisivel = (campo) => camposNovaSolicitacao?.[campo]?.visivel !== false;
   const campoObrigatorio = (campo) => Boolean(camposNovaSolicitacao?.[campo]?.obrigatorio);
   const subtipoObrigatorio = campoObrigatorio('subtipo');

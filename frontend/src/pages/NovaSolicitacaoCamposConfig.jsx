@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { getTiposSolicitacao } from '../services/tiposSolicitacao';
-import { getCamposNovaSolicitacao, salvarCamposNovaSolicitacao } from '../services/configuracoesSistema';
+import { getSetores } from '../services/setores';
+import { getCamposNovaSolicitacao, getTiposSolicitacaoPorSetor, salvarCamposNovaSolicitacao } from '../services/configuracoesSistema';
 import { useAuth } from '../contexts/AuthContext';
 import { hasEnabledModule } from '../utils/acessoProduto';
 import { applyTipoSolicitacaoModuleAvailability, getTipoSolicitacaoBehavior } from '../utils/tipoSolicitacao';
 import {
   CAMPOS_NOVA_SOLICITACAO,
   normalizarConfigCamposNovaSolicitacao,
+  normalizarAreaNovaSolicitacao,
   resolverCamposNovaSolicitacaoFrontend
 } from '../utils/novaSolicitacaoCampos';
 
@@ -14,7 +16,10 @@ export default function NovaSolicitacaoCamposConfig() {
   const { user } = useAuth();
   const moduloContratosHabilitado = hasEnabledModule(user, 'CONTRATOS');
   const moduloApropriacoesHabilitado = hasEnabledModule(user, 'OBRAS');
+  const [setores, setSetores] = useState([]);
   const [tipos, setTipos] = useState([]);
+  const [tiposPorSetorConfig, setTiposPorSetorConfig] = useState({});
+  const [areaSelecionada, setAreaSelecionada] = useState('');
   const [tipoSelecionadoId, setTipoSelecionadoId] = useState('');
   const [regras, setRegras] = useState({});
   const [loading, setLoading] = useState(true);
@@ -23,13 +28,24 @@ export default function NovaSolicitacaoCamposConfig() {
   useEffect(() => {
     async function load() {
       try {
-        const [tiposData, configData] = await Promise.all([
+        const [setoresData, tiposData, tiposPorSetorData, configData] = await Promise.all([
+          getSetores(),
           getTiposSolicitacao(),
+          getTiposSolicitacaoPorSetor(),
           getCamposNovaSolicitacao()
         ]);
+        const listaSetores = Array.isArray(setoresData) ? setoresData : [];
         const listaTipos = Array.isArray(tiposData) ? tiposData.filter((tipo) => tipo?.ativo !== false) : [];
+        const regrasTiposPorSetor = tiposPorSetorData?.regras && typeof tiposPorSetorData.regras === 'object'
+          ? tiposPorSetorData.regras
+          : {};
+        const primeiraArea = listaSetores.find((setor) => setor?.codigo)?.codigo || '';
+        const tiposPrimeiraArea = filtrarTiposPorArea(listaTipos, regrasTiposPorSetor, primeiraArea);
+        setSetores(listaSetores);
         setTipos(listaTipos);
-        setTipoSelecionadoId(listaTipos[0]?.id ? String(listaTipos[0].id) : '');
+        setTiposPorSetorConfig(regrasTiposPorSetor);
+        setAreaSelecionada(primeiraArea);
+        setTipoSelecionadoId(tiposPrimeiraArea[0]?.id ? String(tiposPrimeiraArea[0].id) : '');
         setRegras(normalizarConfigCamposNovaSolicitacao(configData).regras);
       } catch (error) {
         console.error(error);
@@ -42,9 +58,37 @@ export default function NovaSolicitacaoCamposConfig() {
     load();
   }, []);
 
+  function filtrarTiposPorArea(listaTipos, regrasTiposPorSetor, area) {
+    const areaKey = normalizarAreaNovaSolicitacao(area);
+    const tiposAtivos = Array.isArray(listaTipos)
+      ? listaTipos.filter((tipo) => tipo?.ativo !== false)
+      : [];
+    const tiposPermitidos = Array.isArray(regrasTiposPorSetor?.[areaKey]?.tipos)
+      ? regrasTiposPorSetor[areaKey].tipos.map(Number).filter(Number.isFinite)
+      : [];
+
+    if (tiposPermitidos.length === 0) {
+      return tiposAtivos;
+    }
+
+    const idsPermitidos = new Set(tiposPermitidos);
+    return tiposAtivos.filter((tipo) => idsPermitidos.has(Number(tipo.id)));
+  }
+
+  const tiposDaArea = useMemo(
+    () => filtrarTiposPorArea(tipos, tiposPorSetorConfig, areaSelecionada),
+    [tipos, tiposPorSetorConfig, areaSelecionada]
+  );
+
+  useEffect(() => {
+    if (!areaSelecionada) return;
+    if (tiposDaArea.some((tipo) => String(tipo.id) === String(tipoSelecionadoId))) return;
+    setTipoSelecionadoId(tiposDaArea[0]?.id ? String(tiposDaArea[0].id) : '');
+  }, [areaSelecionada, tipoSelecionadoId, tiposDaArea]);
+
   const tipoSelecionado = useMemo(
-    () => tipos.find((tipo) => String(tipo.id) === String(tipoSelecionadoId)) || null,
-    [tipos, tipoSelecionadoId]
+    () => tiposDaArea.find((tipo) => String(tipo.id) === String(tipoSelecionadoId)) || null,
+    [tiposDaArea, tipoSelecionadoId]
   );
 
   const comportamentoTipo = useMemo(() => {
@@ -60,16 +104,21 @@ export default function NovaSolicitacaoCamposConfig() {
       comportamentoTipo,
       { regras },
       tipoSelecionadoId,
-      { apropriacoesDisponiveis: moduloApropriacoesHabilitado }
+      {
+        apropriacoesDisponiveis: moduloApropriacoesHabilitado,
+        areaResponsavel: areaSelecionada
+      }
     )
-  ), [comportamentoTipo, regras, tipoSelecionadoId, moduloApropriacoesHabilitado]);
+  ), [comportamentoTipo, regras, tipoSelecionadoId, areaSelecionada, moduloApropriacoesHabilitado]);
 
   function atualizarCampo(campoId, patch) {
     const definicao = CAMPOS_NOVA_SOLICITACAO.find((campo) => campo.id === campoId);
-    if (definicao?.fixo || !tipoSelecionadoId) return;
+    if (definicao?.fixo || !tipoSelecionadoId || !areaSelecionada) return;
+    const areaKey = normalizarAreaNovaSolicitacao(areaSelecionada);
 
     setRegras((prev) => {
-      const atualTipo = prev[String(tipoSelecionadoId)]?.campos || {};
+      const atualTiposArea = prev[areaKey]?.tipos || {};
+      const atualTipo = atualTiposArea[String(tipoSelecionadoId)]?.campos || {};
       const atualCampo = atualTipo[campoId] || {
         visivel: camposResolvidos[campoId]?.visivel_padrao ?? true,
         obrigatorio: camposResolvidos[campoId]?.obrigatorio_padrao ?? false
@@ -85,10 +134,15 @@ export default function NovaSolicitacaoCamposConfig() {
 
       return {
         ...prev,
-        [String(tipoSelecionadoId)]: {
-          campos: {
-            ...atualTipo,
-            [campoId]: proximoCampo
+        [areaKey]: {
+          tipos: {
+            ...atualTiposArea,
+            [String(tipoSelecionadoId)]: {
+              campos: {
+                ...atualTipo,
+                [campoId]: proximoCampo
+              }
+            }
           }
         }
       };
@@ -96,10 +150,13 @@ export default function NovaSolicitacaoCamposConfig() {
   }
 
   function restaurarPadraoTipo() {
-    if (!tipoSelecionadoId) return;
+    if (!tipoSelecionadoId || !areaSelecionada) return;
+    const areaKey = normalizarAreaNovaSolicitacao(areaSelecionada);
     setRegras((prev) => {
       const next = { ...prev };
-      delete next[String(tipoSelecionadoId)];
+      const tiposArea = { ...(next[areaKey]?.tipos || {}) };
+      delete tiposArea[String(tipoSelecionadoId)];
+      next[areaKey] = { tipos: tiposArea };
       return next;
     });
   }
@@ -129,7 +186,7 @@ export default function NovaSolicitacaoCamposConfig() {
           <div>
             <h1 className="config-page-title">Campos da Nova Solicitacao</h1>
             <p className="config-page-subtitle">
-              Defina, por tipo, quais campos aparecem e quais ficam obrigatorios na abertura da solicitacao.
+              Defina, por area e tipo, quais campos aparecem e quais ficam obrigatorios na abertura da solicitacao.
             </p>
           </div>
           <button
@@ -145,8 +202,8 @@ export default function NovaSolicitacaoCamposConfig() {
 
       <section className="config-summary-card">
         <div>
-          <p className="config-summary-kicker">Regra por tipo</p>
-          <h2 className="config-summary-title">O formulario muda conforme o tipo selecionado</h2>
+          <p className="config-summary-kicker">Regra por area e tipo</p>
+          <h2 className="config-summary-title">O formulario muda conforme a area e o tipo selecionados</h2>
           <p className="config-summary-copy">
             Obra e area responsavel continuam fixas para preservar o fluxo operacional. Os demais campos podem ser exibidos, ocultados ou exigidos por tipo.
           </p>
@@ -156,22 +213,41 @@ export default function NovaSolicitacaoCamposConfig() {
       <div className="grid gap-5 lg:grid-cols-[320px_1fr]">
         <section className="card space-y-3">
           <label className="grid gap-2 text-sm">
+            Area responsavel
+            <select
+              className="input input-sm"
+              value={areaSelecionada}
+              onChange={(event) => setAreaSelecionada(event.target.value)}
+            >
+              {setores.map((setor) => (
+                <option key={setor.id} value={setor.codigo}>{setor.nome}</option>
+              ))}
+            </select>
+          </label>
+
+          <label className="grid gap-2 text-sm">
             Tipo de solicitacao
             <select
               className="input input-sm"
               value={tipoSelecionadoId}
               onChange={(event) => setTipoSelecionadoId(event.target.value)}
+              disabled={!areaSelecionada || tiposDaArea.length === 0}
             >
-              {tipos.map((tipo) => (
+              {tiposDaArea.map((tipo) => (
                 <option key={tipo.id} value={tipo.id}>{tipo.nome}</option>
               ))}
             </select>
           </label>
+          {tiposDaArea.length === 0 && (
+            <p className="text-xs text-[var(--c-muted)]">
+              Nenhum tipo ativo encontrado para esta area.
+            </p>
+          )}
           <button
             type="button"
             className="btn btn-outline btn-sm w-full"
             onClick={restaurarPadraoTipo}
-            disabled={!tipoSelecionadoId}
+            disabled={!areaSelecionada || !tipoSelecionadoId}
           >
             Restaurar padrao deste tipo
           </button>
