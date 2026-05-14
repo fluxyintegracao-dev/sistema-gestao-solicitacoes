@@ -491,6 +491,7 @@ export default function PrioridadesDiretoria() {
                       <th>Obra</th>
                       <th>Vencimento</th>
                       <th className="text-right">Valor</th>
+                      <th>Status</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -519,11 +520,16 @@ export default function PrioridadesDiretoria() {
                         <td>{item.obra?.nome || '-'}</td>
                         <td>{data(item.data_vencimento)}</td>
                         <td className="text-right font-semibold">{moeda(item.valor_prioridade)}</td>
+                        <td>
+                          <span className="badge badge-neutral">
+                            {item.status_global || '-'}
+                          </span>
+                        </td>
                       </tr>
                     ))}
                     {solicitacoesVisiveis.length === 0 && (
                       <tr>
-                        <td colSpan={loteDetalhe.status === 'ABERTO' ? 5 : 4} className="text-center text-[var(--c-muted)] py-8">
+                        <td colSpan={loteDetalhe.status === 'ABERTO' ? 6 : 5} className="text-center text-[var(--c-muted)] py-8">
                           Nenhuma solicitacao encontrada para este lote.
                         </td>
                       </tr>
