@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   listarInsumos,
   obterUrlAssinadaCompra,
@@ -87,7 +87,9 @@ function sincronizarQuantidadeRateioUnico(item, quantidade) {
 
 export default function NovaSolicitacaoCompra() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user } = useAuth();
+  const obraIdInicial = String(searchParams.get('obra_id') || '').trim();
   const hidratandoDraftRef = useRef(false);
   const draftCarregadoRef = useRef(false);
   const [obras, setObras] = useState([]);
@@ -183,6 +185,12 @@ export default function NovaSolicitacaoCompra() {
     }
 
     try {
+      if (obraIdInicial) {
+        setObraId(obraIdInicial);
+        draftCarregadoRef.current = true;
+        return;
+      }
+
       const salvo = window.localStorage.getItem(DRAFT_KEY);
       if (!salvo) {
         draftCarregadoRef.current = true;

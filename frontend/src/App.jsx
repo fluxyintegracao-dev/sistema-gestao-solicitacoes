@@ -86,6 +86,7 @@ const ComportamentoRecebimentoSetor = lazy(() => import('./pages/ComportamentoRe
 const TimeoutInatividade = lazy(() => import('./pages/TimeoutInatividade'));
 const TiposSolicitacaoPorSetor = lazy(() => import('./pages/TiposSolicitacaoPorSetor'));
 const NovaSolicitacaoCamposConfig = lazy(() => import('./pages/NovaSolicitacaoCamposConfig'));
+const NovaSolicitacaoAutomacaoDestinoConfig = lazy(() => import('./pages/NovaSolicitacaoAutomacaoDestinoConfig'));
 const TiposCompartilhadosSetor = lazy(() => import('./pages/TiposCompartilhadosSetor'));
 const AutomacaoStatusSetor = lazy(() => import('./pages/AutomacaoStatusSetor'));
 const SetoresCriacaoTodasObras = lazy(() => import('./pages/SetoresCriacaoTodasObras'));
@@ -536,6 +537,7 @@ export default function App() {
         <Route path="timeout-inatividade" element={<BusinessAdminRoute><TimeoutInatividade /></BusinessAdminRoute>} />
         <Route path="tipos-solicitacao-por-setor" element={<BusinessAdminRoute><TiposSolicitacaoPorSetor /></BusinessAdminRoute>} />
         <Route path="nova-solicitacao-campos" element={<SuperadminRoute><NovaSolicitacaoCamposConfig /></SuperadminRoute>} />
+        <Route path="nova-solicitacao-automacao-destino" element={<SuperadminRoute><NovaSolicitacaoAutomacaoDestinoConfig /></SuperadminRoute>} />
         <Route path="tipos-compartilhados-setor" element={<BusinessAdminRoute><TiposCompartilhadosSetor /></BusinessAdminRoute>} />
         <Route path="automacao-status-setor" element={<BusinessAdminRoute><AutomacaoStatusSetor /></BusinessAdminRoute>} />
         <Route path="setores-criacao-todas-obras" element={<BusinessAdminRoute><SetoresCriacaoTodasObras /></BusinessAdminRoute>} />

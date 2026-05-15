@@ -42,6 +42,11 @@ const {
   obterConfigCamposNovaSolicitacao,
   salvarConfigCamposNovaSolicitacao
 } = require('../services/novaSolicitacaoCamposConfig');
+const {
+  montarPayloadAutomacaoDestino,
+  obterConfigAutomacaoDestinoNovaSolicitacao,
+  salvarConfigAutomacaoDestinoNovaSolicitacao
+} = require('../services/novaSolicitacaoAutomacaoDestinoConfig');
 
 const CHAVE_TEMA = 'TEMA_SISTEMA';
 const CHAVE_AREAS_OBRA = 'AREAS_OBRA_VISIVEIS';
@@ -721,6 +726,29 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return res.status(500).json({ error: 'Erro ao salvar configuracao dos campos da nova solicitacao' });
+    }
+  },
+
+  async getAutomacaoDestinoNovaSolicitacao(req, res) {
+    try {
+      const config = await obterConfigAutomacaoDestinoNovaSolicitacao();
+      return res.json(montarPayloadAutomacaoDestino(config));
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao buscar automacao de destino da nova solicitacao' });
+    }
+  },
+
+  async updateAutomacaoDestinoNovaSolicitacao(req, res) {
+    try {
+      const config = await salvarConfigAutomacaoDestinoNovaSolicitacao({ regras: req.body?.regras });
+      return res.json({
+        ok: true,
+        ...montarPayloadAutomacaoDestino(config)
+      });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao salvar automacao de destino da nova solicitacao' });
     }
   },
 

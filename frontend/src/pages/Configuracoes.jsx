@@ -144,6 +144,12 @@ const SECOES_CONFIG = [
         requireSuperadmin: true
       },
       {
+        title: 'Automacao da Nova Solicitacao',
+        description: 'Redirecione tipos de solicitacao para telas especificas mantendo a obra selecionada.',
+        to: '/nova-solicitacao-automacao-destino',
+        requireSuperadmin: true
+      },
+      {
         title: 'Aprovacao por Diretoria',
         description: 'Configure a diretoria que recebe primeiro as solicitacoes conforme a classificacao da obra.',
         to: '/aprovacao-diretoria'

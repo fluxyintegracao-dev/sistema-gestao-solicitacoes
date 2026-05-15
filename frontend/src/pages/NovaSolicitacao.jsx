@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { getMinhasObras } from '../services/obras';
 import { getTiposSolicitacao } from '../services/tiposSolicitacao';
 import { getSetores } from '../services/setores';
@@ -8,7 +9,7 @@ import { getTiposSubContrato } from '../services/tiposSubContrato';
 import { getContratos } from '../services/contratos';
 import { buscarParceiros, criarParceiro, listarCategoriasParceiro } from '../services/parceiros';
 import { listarApropriacoes } from '../services/apropriacoes';
-import { getAprovacaoDiretoria, getAreasObra, getAreasPorSetorOrigem, getCamposNovaSolicitacao, getTiposSolicitacaoPorSetor } from '../services/configuracoesSistema';
+import { getAprovacaoDiretoria, getAreasObra, getAreasPorSetorOrigem, getAutomacaoDestinoNovaSolicitacao, getCamposNovaSolicitacao, getTiposSolicitacaoPorSetor } from '../services/configuracoesSistema';
 import { useAuth } from '../contexts/AuthContext';
 import { HiPaperClip } from 'react-icons/hi2';
 import ApropriacaoAutocomplete from '../components/ui/ApropriacaoAutocomplete';
@@ -17,6 +18,10 @@ import { userHasSetorCapability } from '../utils/setor';
 import { hasEnabledModule } from '../utils/acessoProduto';
 import { applyTipoSolicitacaoModuleAvailability, getTipoSolicitacaoBehavior } from '../utils/tipoSolicitacao';
 import { resolverCamposNovaSolicitacaoFrontend } from '../utils/novaSolicitacaoCampos';
+import {
+  normalizarConfigAutomacaoDestinoNovaSolicitacao,
+  obterRegraAutomacaoDestinoNovaSolicitacao
+} from '../utils/novaSolicitacaoAutomacaoDestino';
 import { maskCep, maskCpfCnpj, maskPhone, onlyDigits } from '../utils/formatters';
 import {
   UPLOAD_MAX_FILE_SIZE_MB_PADRAO,
@@ -80,6 +85,7 @@ function criarNovoParceiroPadrao() {
 }
 
 export default function NovaSolicitacao() {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const moduloContratosHabilitado = hasEnabledModule(user, 'CONTRATOS');
   const moduloApropriacoesHabilitado = hasEnabledModule(user, 'OBRAS');
@@ -92,6 +98,7 @@ export default function NovaSolicitacao() {
   const [areasPorSetorOrigem, setAreasPorSetorOrigem] = useState({});
   const [tiposPorSetorConfig, setTiposPorSetorConfig] = useState({});
   const [camposNovaSolicitacaoConfig, setCamposNovaSolicitacaoConfig] = useState({ regras: {} });
+  const [automacaoDestinoConfig, setAutomacaoDestinoConfig] = useState({ destinos_disponiveis: [], regras: {} });
   const [aprovacaoDiretoriaConfig, setAprovacaoDiretoriaConfig] = useState({ diretorias: {}, destinos: {} });
   const [tiposSub, setTiposSub] = useState([]);
   const [contratos, setContratos] = useState([]);
@@ -111,6 +118,7 @@ export default function NovaSolicitacao() {
   const [valorTexto, setValorTexto] = useState('');
   const anexosRef = useRef(null);
   const obraBuscaBlurTimeoutRef = useRef(null);
+  const automacaoDestinoExecutadaRef = useRef('');
 
   const [form, setForm] = useState({
     obra_id: '',
@@ -144,12 +152,13 @@ export default function NovaSolicitacao() {
         setCategoriasParceiro([]);
       }
       try {
-        const [cfg, cfgSetorOrigem, cfgTiposPorSetor, cfgAprovacaoDiretoria, cfgCamposNovaSolicitacao] = await Promise.all([
+        const [cfg, cfgSetorOrigem, cfgTiposPorSetor, cfgAprovacaoDiretoria, cfgCamposNovaSolicitacao, cfgAutomacaoDestino] = await Promise.all([
           getAreasObra(),
           getAreasPorSetorOrigem(),
           getTiposSolicitacaoPorSetor(),
           getAprovacaoDiretoria(),
-          getCamposNovaSolicitacao()
+          getCamposNovaSolicitacao(),
+          getAutomacaoDestinoNovaSolicitacao()
         ]);
         setAreasObra(Array.isArray(cfg?.areas) ? cfg.areas : []);
         setAreasPorSetorOrigem(
@@ -171,12 +180,14 @@ export default function NovaSolicitacao() {
             ? cfgCamposNovaSolicitacao.regras
             : {}
         });
+        setAutomacaoDestinoConfig(normalizarConfigAutomacaoDestinoNovaSolicitacao(cfgAutomacaoDestino));
       } catch (error) {
         console.error(error);
         setAreasObra([]);
         setAreasPorSetorOrigem({});
         setTiposPorSetorConfig({});
         setCamposNovaSolicitacaoConfig({ regras: {} });
+        setAutomacaoDestinoConfig({ destinos_disponiveis: [], regras: {} });
         setAprovacaoDiretoriaConfig({ diretorias: {}, destinos: {} });
       }
     }
@@ -818,6 +829,35 @@ export default function NovaSolicitacao() {
       return { ...prev, diretoria_fluxo_codigo: diretoriaSugerida || '' };
     });
   }, [form.obra_id, form.diretoria_fluxo_codigo, diretoriaSugerida]);
+
+  useEffect(() => {
+    if (!form.obra_id || !form.area_responsavel || !form.tipo_solicitacao_id) return;
+
+    const regra = obterRegraAutomacaoDestinoNovaSolicitacao(
+      automacaoDestinoConfig,
+      form.area_responsavel,
+      form.tipo_solicitacao_id
+    );
+    if (!regra) return;
+
+    const chaveExecucao = `${form.obra_id}:${form.area_responsavel}:${form.tipo_solicitacao_id}:${regra.destino}`;
+    if (automacaoDestinoExecutadaRef.current === chaveExecucao) return;
+    automacaoDestinoExecutadaRef.current = chaveExecucao;
+
+    const params = new URLSearchParams();
+    if (regra.preservar_obra !== false) {
+      params.set('obra_id', String(form.obra_id));
+    }
+    params.set('origem', 'nova-solicitacao');
+
+    navigate(`${regra.rota}?${params.toString()}`);
+  }, [
+    automacaoDestinoConfig,
+    form.area_responsavel,
+    form.obra_id,
+    form.tipo_solicitacao_id,
+    navigate
+  ]);
 
   return (
     <div className="page solicitacoes-page solicitacao-nova-page max-w-6xl mx-auto">

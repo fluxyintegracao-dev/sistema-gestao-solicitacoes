@@ -144,6 +144,27 @@ export async function salvarCamposNovaSolicitacao(data) {
   return res.json();
 }
 
+export async function getAutomacaoDestinoNovaSolicitacao() {
+  const res = await fetch(`${API_URL}/configuracoes/nova-solicitacao-automacao-destino`, {
+    headers: authHeaders()
+  });
+  if (!res.ok) throw new Error('Erro ao buscar automacao de destino da nova solicitacao');
+  return res.json();
+}
+
+export async function salvarAutomacaoDestinoNovaSolicitacao(data) {
+  const res = await fetch(`${API_URL}/configuracoes/nova-solicitacao-automacao-destino`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+  if (!res.ok) {
+    const payload = await res.json().catch(() => null);
+    throw new Error(payload?.error || 'Erro ao salvar automacao de destino da nova solicitacao');
+  }
+  return res.json();
+}
+
 export async function getAprovacaoDiretoria() {
   const res = await fetch(`${API_URL}/configuracoes/aprovacao-diretoria`, {
     headers: authHeaders()

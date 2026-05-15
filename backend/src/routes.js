@@ -1284,6 +1284,8 @@ router.get('/configuracoes/tipos-solicitacao-por-setor', ConfiguracaoSistemaCont
 router.patch('/configuracoes/tipos-solicitacao-por-setor', allowBusinessAdmin, ConfiguracaoSistemaController.updateTiposSolicitacaoPorSetor);
 router.get('/configuracoes/nova-solicitacao-campos', ConfiguracaoSistemaController.getCamposNovaSolicitacao);
 router.patch('/configuracoes/nova-solicitacao-campos', permit(['SUPERADMIN']), ConfiguracaoSistemaController.updateCamposNovaSolicitacao);
+router.get('/configuracoes/nova-solicitacao-automacao-destino', ConfiguracaoSistemaController.getAutomacaoDestinoNovaSolicitacao);
+router.patch('/configuracoes/nova-solicitacao-automacao-destino', permit(['SUPERADMIN']), ConfiguracaoSistemaController.updateAutomacaoDestinoNovaSolicitacao);
 router.get('/configuracoes/aprovacao-diretoria', ConfiguracaoSistemaController.getAprovacaoDiretoria);
 router.patch('/configuracoes/aprovacao-diretoria', allowBusinessAdmin, ConfiguracaoSistemaController.updateAprovacaoDiretoria);
 router.get('/configuracoes/usuarios-acesso-prioridade-diretoria', allowBusinessAdmin, ConfiguracaoSistemaController.getUsuariosAcessoPrioridadeDiretoria);
