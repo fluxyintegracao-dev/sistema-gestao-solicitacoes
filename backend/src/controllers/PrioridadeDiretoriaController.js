@@ -502,9 +502,14 @@ async function sincronizarItensLote({
     { transaction }
   );
 
-  if (solicitacoesSelecionadas.length !== idsSelecionados.length) {
+  const idsElegiveis = solicitacoesSelecionadas.map((item) => Number(item.id));
+  const idsElegiveisSet = new Set(idsElegiveis);
+  const idsIgnorados = idsSelecionados.filter((id) => !idsElegiveisSet.has(Number(id)));
+
+  if (solicitacoesSelecionadas.length === 0) {
     const error = new Error('Uma ou mais solicitacoes selecionadas nao estao elegiveis para prioridade.');
     error.status = 400;
+    error.solicitacao_ids_ignorados = idsIgnorados;
     throw error;
   }
 
@@ -516,12 +521,12 @@ async function sincronizarItensLote({
   await PrioridadeLoteItem.destroy({
     where: {
       lote_id: lote.id,
-      solicitacao_id: { [Op.notIn]: idsSelecionados }
+      solicitacao_id: { [Op.notIn]: idsElegiveis }
     },
     transaction
   });
 
-  for (const solicitacaoId of idsSelecionados) {
+  for (const solicitacaoId of idsElegiveis) {
     const item = mapaSolicitacoes.get(Number(solicitacaoId));
     const [registro, criado] = await PrioridadeLoteItem.findOrCreate({
       where: {
@@ -547,6 +552,7 @@ async function sincronizarItensLote({
 
   return {
     solicitacoesSelecionadas,
+    solicitacaoIdsIgnorados: idsIgnorados,
     valorUtilizado: solicitacoesSelecionadas.reduce(
       (total, item) => total + formatarNumero(item.valor_prioridade),
       0
@@ -784,7 +790,8 @@ module.exports = {
       } catch (error) {
         await transaction.rollback();
         return res.status(error.status || 400).json({
-          error: error.message || 'Erro ao criar lote de prioridade solicitado pela diretoria.'
+          error: error.message || 'Erro ao criar lote de prioridade solicitado pela diretoria.',
+          solicitacao_ids_ignorados: error.solicitacao_ids_ignorados || []
         });
       }
 
@@ -818,6 +825,7 @@ module.exports = {
       return res.status(201).json({
         item: {
           ...serializarLote(detalhe),
+          solicitacao_ids_ignorados: resultadoSincronizacao.solicitacaoIdsIgnorados || [],
           itens: (Array.isArray(detalhe.itens) ? detalhe.itens : []).map((item) => ({
             id: item.id,
             valor_considerado: formatarNumero(item.valor_considerado),
@@ -984,7 +992,8 @@ module.exports = {
       } catch (error) {
         await transaction.rollback();
         return res.status(error.status || 400).json({
-          error: error.message || 'Erro ao sincronizar solicitacoes do lote.'
+          error: error.message || 'Erro ao sincronizar solicitacoes do lote.',
+          solicitacao_ids_ignorados: error.solicitacao_ids_ignorados || []
         });
       }
 
@@ -1064,6 +1073,7 @@ module.exports = {
       return res.json({
         item: {
           ...serializarLote(detalhe),
+          solicitacao_ids_ignorados: resultadoSincronizacao.solicitacaoIdsIgnorados || [],
           itens: (Array.isArray(detalhe.itens) ? detalhe.itens : []).map((item) => ({
             id: item.id,
             valor_considerado: formatarNumero(item.valor_considerado),
@@ -1123,7 +1133,8 @@ module.exports = {
       } catch (error) {
         await transaction.rollback();
         return res.status(error.status || 400).json({
-          error: error.message || 'Erro ao salvar selecao do lote.'
+          error: error.message || 'Erro ao salvar selecao do lote.',
+          solicitacao_ids_ignorados: error.solicitacao_ids_ignorados || []
         });
       }
 
@@ -1149,6 +1160,7 @@ module.exports = {
       return res.json({
         item: {
           ...serializarLote(detalhe),
+          solicitacao_ids_ignorados: resultadoSincronizacao.solicitacaoIdsIgnorados || [],
           itens: (Array.isArray(detalhe.itens) ? detalhe.itens : []).map((item) => ({
             id: item.id,
             valor_considerado: formatarNumero(item.valor_considerado),

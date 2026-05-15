@@ -85,6 +85,7 @@
   - ou ja sairam da diretoria alvo no fluxo novo
   - nao estao `PAGA`
 - solicitacoes ja adicionadas/autorizadas em outros lotes podem aparecer em novos lotes abertos enquanto nao estiverem `PAGA`
+- ao salvar ou finalizar um lote, solicitacoes que deixaram de ser elegiveis sao ignoradas/removidas da selecao sem exigir que o usuario refaca toda a selecao
 - ao finalizar:
   - os itens entram em `prioridade_lote_itens`
   - a solicitacao recebe indicador de prioridade autorizada

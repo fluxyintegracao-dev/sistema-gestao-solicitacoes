@@ -383,6 +383,70 @@ export default function PrioridadesDiretoria() {
     });
   }
 
+  function obterIdsIgnoradosPrioridade(resposta) {
+    const ids = resposta?.item?.solicitacao_ids_ignorados || resposta?.solicitacao_ids_ignorados || [];
+    return Array.isArray(ids)
+      ? ids.map(Number).filter((id) => Number.isInteger(id) && id > 0)
+      : [];
+  }
+
+  function removerSelecionadasIgnoradas(idsIgnorados = []) {
+    if (!Array.isArray(idsIgnorados) || idsIgnorados.length === 0) return;
+    const ignoradosSet = new Set(idsIgnorados.map(Number));
+    setSelecionadasIds((atual) => atual.filter((id) => !ignoradosSet.has(Number(id))));
+    setSelecionadasCache((atual) => {
+      const proximo = { ...atual };
+      idsIgnorados.forEach((id) => {
+        delete proximo[String(id)];
+      });
+      return proximo;
+    });
+  }
+
+  function descreverSolicitacoesIgnoradas(idsIgnorados = []) {
+    if (!Array.isArray(idsIgnorados) || idsIgnorados.length === 0) return '';
+
+    const descricoes = idsIgnorados.map((id) => {
+      const item =
+        selecionadasCache[String(id)] ||
+        mapaDisponiveis.get(Number(id)) ||
+        solicitacoesDisponiveis.find((solicitacao) => Number(solicitacao.id) === Number(id));
+
+      const codigo = item?.codigo || `ID ${id}`;
+      const obra = item?.obra?.nome ? ` - ${item.obra.nome}` : '';
+      const status = item?.status_global ? ` - ${item.status_global}` : '';
+      return `${codigo}${obra}${status}`;
+    });
+
+    const limite = 12;
+    const visiveis = descricoes.slice(0, limite);
+    const restantes = descricoes.length - visiveis.length;
+    return [
+      'Solicitacoes que precisam ser revisadas:',
+      ...visiveis.map((item) => `- ${item}`),
+      ...(restantes > 0 ? [`- mais ${restantes} solicitacao(oes)`] : [])
+    ].join('\n');
+  }
+
+  function mensagemSolicitacoesIgnoradas(idsIgnorados = []) {
+    const detalheIgnorados = descreverSolicitacoesIgnoradas(idsIgnorados);
+    return detalheIgnorados ? `\n\n${detalheIgnorados}` : '';
+  }
+
+  async function tratarErroElegibilidade(error, fallback) {
+    const idsIgnorados = obterIdsIgnoradosPrioridade(error?.data);
+    if (idsIgnorados.length > 0) {
+      const complemento = mensagemSolicitacoesIgnoradas(idsIgnorados);
+      removerSelecionadasIgnoradas(idsIgnorados);
+      if (detalhe?.id) {
+        await carregarSolicitacoesDisponiveis(detalhe.id, buscaDisponiveis, filtroObraId);
+      }
+      alert(`${error?.message || fallback} ${idsIgnorados.length} solicitacao(oes) foram removidas da selecao. Tente novamente com as restantes.${complemento}`);
+      return;
+    }
+    alert(error?.message || fallback);
+  }
+
   async function finalizarLote() {
     if (!detalhe?.id || solicitacoesSelecionadas.length === 0) {
       alert('Selecione ao menos uma solicitacao.');
@@ -398,16 +462,20 @@ export default function PrioridadesDiretoria() {
 
     try {
       setFinalizando(true);
-      await finalizarLotePrioridadeDiretoria(detalhe.id, {
+      const resposta = await finalizarLotePrioridadeDiretoria(detalhe.id, {
         solicitacao_ids: selecionadasIds
       });
+      const idsIgnorados = obterIdsIgnoradosPrioridade(resposta);
+      const complemento = mensagemSolicitacoesIgnoradas(idsIgnorados);
       await carregarLotes();
       await carregarDetalheLote(detalhe.id);
       setSelecionadasIds([]);
-      alert('Lote finalizado com sucesso.');
+      alert(idsIgnorados.length > 0
+        ? `Lote finalizado com sucesso. ${idsIgnorados.length} solicitacao(oes) foram ignoradas por nao estarem mais elegiveis.${complemento}`
+        : 'Lote finalizado com sucesso.');
     } catch (error) {
       console.error(error);
-      alert(error?.message || 'Erro ao finalizar lote');
+      await tratarErroElegibilidade(error, 'Erro ao finalizar lote');
     } finally {
       setFinalizando(false);
     }
@@ -422,15 +490,19 @@ export default function PrioridadesDiretoria() {
 
     try {
       setSalvandoSelecao(true);
-      await salvarSelecaoLotePrioridadeDiretoria(detalhe.id, {
+      const resposta = await salvarSelecaoLotePrioridadeDiretoria(detalhe.id, {
         solicitacao_ids: selecionadasIds
       });
+      const idsIgnorados = obterIdsIgnoradosPrioridade(resposta);
+      const complemento = mensagemSolicitacoesIgnoradas(idsIgnorados);
       await carregarLotes();
       await carregarDetalheLote(detalhe.id);
-      alert('Selecao salva com sucesso.');
+      alert(idsIgnorados.length > 0
+        ? `Selecao salva com sucesso. ${idsIgnorados.length} solicitacao(oes) foram ignoradas por nao estarem mais elegiveis.${complemento}`
+        : 'Selecao salva com sucesso.');
     } catch (error) {
       console.error(error);
-      alert(error?.message || 'Erro ao salvar selecao do lote');
+      await tratarErroElegibilidade(error, 'Erro ao salvar selecao do lote');
     } finally {
       setSalvandoSelecao(false);
     }

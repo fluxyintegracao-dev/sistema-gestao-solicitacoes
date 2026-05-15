@@ -6,16 +6,19 @@ async function tratarResposta(res, fallback) {
   }
 
   let mensagem = fallback;
+  let payload = null;
   try {
-    const json = await res.json();
-    mensagem = json?.error || mensagem;
+    payload = await res.json();
+    mensagem = payload?.error || mensagem;
   } catch (_) {
     try {
       const text = await res.text();
       if (text) mensagem = text;
     } catch (_) {}
   }
-  throw new Error(mensagem);
+  const error = new Error(mensagem);
+  error.data = payload;
+  throw error;
 }
 
 export async function getPrioridadesDiretoriaContexto() {
