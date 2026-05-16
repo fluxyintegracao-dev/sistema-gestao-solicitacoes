@@ -156,6 +156,11 @@ const experienceSyncRouter = require('./routes/experienceSyncRouter');
 app.use('/api/experience-sync', experienceSyncRouter);
 app.use('/experience-sync', experienceSyncRouter);
 
+// Experience Leads - entrada isolada para CRM, protegida por secret
+const experienceLeadRouter = require('./routes/experienceLeadRouter');
+app.use('/api/experience', experienceLeadRouter);
+app.use('/experience', experienceLeadRouter);
+
 app.use('/api', routes);
 
 app.use((err, req, res, next) => {
