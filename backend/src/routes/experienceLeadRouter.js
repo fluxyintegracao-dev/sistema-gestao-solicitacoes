@@ -9,7 +9,11 @@ const router = express.Router();
 const { criarLead } = require('../services/crmService');
 
 function requireLeadSecret(req, res, next) {
-  const key = String(process.env.EXPERIENCE_LEAD_SECRET || '').trim();
+  const key = String(
+    process.env.EXPERIENCE_LEAD_SECRET
+    || process.env.FLUXY_CORE_LEAD_SECRET
+    || ''
+  ).trim();
   if (!key) {
     return res.status(503).json({ error: 'Integracao de leads do Experience nao configurada' });
   }
