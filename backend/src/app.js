@@ -151,6 +151,11 @@ app.use('/api', (req, res, next) => {
   next();
 });
 
+// Experience Sync — rota separada, protegida por API key (não usa JWT do CORE)
+const experienceSyncRouter = require('./routes/experienceSyncRouter');
+app.use('/api/experience-sync', experienceSyncRouter);
+app.use('/experience-sync', experienceSyncRouter);
+
 app.use('/api', routes);
 
 app.use((err, req, res, next) => {
