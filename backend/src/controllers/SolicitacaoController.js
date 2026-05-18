@@ -890,6 +890,27 @@ function montarLiteralHistoricoSetoresEnvolvidos(tokens = []) {
   )`);
 }
 
+function montarLiteralObrasPorClassificacao(classificacoes = []) {
+  const valores = Array.from(
+    new Set(
+      (Array.isArray(classificacoes) ? classificacoes : [classificacoes])
+        .map(normalizarClassificacaoObra)
+        .filter(Boolean)
+    )
+  );
+
+  if (valores.length === 0) return null;
+
+  const inList = valores.map(v => `'${v.replace(/'/g, "''")}'`).join(', ');
+
+  return Sequelize.literal(`EXISTS (
+    SELECT 1
+    FROM obras o
+    WHERE o.id = Solicitacao.obra_id
+      AND UPPER(COALESCE(o.classificacao_obra, '')) IN (${inList})
+  )`);
+}
+
 function parseObservacaoEnvioSetor(observacao) {
   const texto = String(observacao || '').trim();
   const match = texto.match(/^De\s+(.+?)\s+para\s+(.+)$/i);
@@ -1259,6 +1280,10 @@ module.exports = {
               { diretoria_fluxo_codigo: diretoriaPublicaConfigurada }
             ]
           });
+          const literalObrasPublicas = montarLiteralObrasPorClassificacao(['PUBLICA']);
+          if (literalObrasPublicas) {
+            condicoes.push(literalObrasPublicas);
+          }
         }
 
         if (usuarioDiretoriaObrasPrivadas && diretoriaPrivadaConfigurada) {
@@ -1268,6 +1293,10 @@ module.exports = {
               { diretoria_fluxo_codigo: diretoriaPrivadaConfigurada }
             ]
           });
+          const literalObrasPrivadas = montarLiteralObrasPorClassificacao(['PRIVADA']);
+          if (literalObrasPrivadas) {
+            condicoes.push(literalObrasPrivadas);
+          }
         }
 
         condicoes.push(...condicoesTiposCompartilhadosUsuario);

@@ -34,7 +34,7 @@
   - o setor destino vira o dono do fluxo para alteracoes de status e demais regras normais
   - a diretoria que aprovou continua com visibilidade pela regra do fluxo novo, mesmo depois do envio ao setor destino
   - o criador da solicitacao continua com visibilidade
-- solicitacoes antigas continuam no comportamento original; a visibilidade adicional da diretoria vale apenas para solicitacoes novas marcadas com o fluxo de aprovacao
+- `DIR_OBRAS_PUBLICAS` visualiza solicitacoes de obras `PUBLICA`, e `DIR_OBRAS_PRIVADAS` visualiza solicitacoes de obras `PRIVADA`, incluindo solicitacoes antigas que nao passaram pelo fluxo formal de aprovacao da diretoria
 
 ## Pagamentos parciais
 - pagamentos parciais sao registrados em `solicitacao_pagamentos`

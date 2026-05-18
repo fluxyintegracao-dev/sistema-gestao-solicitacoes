@@ -40,8 +40,9 @@ A visibilidade efetiva depende de combinacao entre:
   - a configuracao de destino por tipo permanece como fallback para registros antigos ou sem destino persistido
   - o setor destino vira o dono da solicitacao para seguir o fluxo normal
   - `DIR_OBRAS_PUBLICAS` e `DIR_OBRAS_PRIVADAS` continuam vendo solicitacoes novas do fluxo que pertencem a sua diretoria, mesmo apos aprovacao e envio
-  - essa visibilidade adicional depende do marcador formal `fluxo_aprovacao_diretoria`
-  - solicitacoes antigas continuam no comportamento anterior
+  - `DIR_OBRAS_PUBLICAS` tambem visualiza solicitacoes de obras `PUBLICA`, e `DIR_OBRAS_PRIVADAS` visualiza solicitacoes de obras `PRIVADA`, mesmo quando a solicitacao nao passou pelo fluxo formal de aprovacao da diretoria
+  - a visibilidade pelo fluxo formal continua usando `fluxo_aprovacao_diretoria`; a visibilidade geral das diretorias de obras usa a classificacao da obra
+  - solicitacoes antigas tambem entram na visibilidade da diretoria quando a classificacao da obra corresponde a diretoria publica ou privada
   - `DIR_ADMIN` nao ganha visibilidade global automatica; continua vendo apenas o que estiver no setor dela ou o que chegar por mencao/atribuicao
   - o criador da obra continua vendo a solicitacao
 - pagamentos parciais:
