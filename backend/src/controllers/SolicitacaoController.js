@@ -905,7 +905,7 @@ function montarLiteralObrasPorClassificacao(classificacoes = []) {
 
   return Sequelize.literal(`EXISTS (
     SELECT 1
-    FROM obras o
+    FROM \`Obras\` o
     WHERE o.id = Solicitacao.obra_id
       AND UPPER(COALESCE(o.classificacao_obra, '')) IN (${inList})
   )`);

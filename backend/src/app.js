@@ -376,7 +376,7 @@ async function prepararBanco() {
         ativo BOOLEAN DEFAULT TRUE,
         createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
         updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        CONSTRAINT fk_apropriacoes_obra FOREIGN KEY (obra_id) REFERENCES obras(id)
+        CONSTRAINT fk_apropriacoes_obra FOREIGN KEY (obra_id) REFERENCES \`Obras\`(id)
       )`
     );
   } catch (error) {
@@ -415,7 +415,7 @@ async function prepararBanco() {
         link_geral VARCHAR(500) NULL,
         createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
         updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        CONSTRAINT fk_solicitacao_compras_obra FOREIGN KEY (obra_id) REFERENCES obras(id),
+        CONSTRAINT fk_solicitacao_compras_obra FOREIGN KEY (obra_id) REFERENCES \`Obras\`(id),
         CONSTRAINT fk_solicitacao_compras_solicitante FOREIGN KEY (solicitante_id) REFERENCES users(id)
       )`
     );

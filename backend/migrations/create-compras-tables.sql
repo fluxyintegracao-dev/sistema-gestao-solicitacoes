@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS apropriacoes (
   ativo BOOLEAN DEFAULT TRUE,
   createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
   updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY (obra_id) REFERENCES obras(id)
+  FOREIGN KEY (obra_id) REFERENCES `Obras`(id)
 );
 
 -- Tabela de Solicitacoes de Compra
@@ -55,7 +55,7 @@ CREATE TABLE IF NOT EXISTS solicitacao_compras (
   link_geral VARCHAR(500),
   createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
   updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY (obra_id) REFERENCES obras(id),
+  FOREIGN KEY (obra_id) REFERENCES `Obras`(id),
   FOREIGN KEY (solicitante_id) REFERENCES users(id)
 );
 
