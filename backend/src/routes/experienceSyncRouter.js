@@ -18,7 +18,11 @@ function getPublicUnitPrice(unit = {}) {
 }
 
 function normalizeSituacao(value) {
-  return String(value || 'DISPONIVEL').toUpperCase();
+  const situacao = String(value || 'DISPONIVEL').toUpperCase();
+  if (['VENDIDO', 'VENDIDA'].includes(situacao)) return 'VENDIDO';
+  if (['RESERVADO', 'RESERVADA'].includes(situacao)) return 'RESERVADO';
+  if (situacao === 'DISPONIVEL') return 'DISPONIVEL';
+  return 'DISPONIVEL';
 }
 
 function isSoldUnit(unit = {}) {
@@ -98,7 +102,7 @@ router.get('/empreendimentos', requireSyncKey, async (req, res) => {
           torre: u.torre,
           pavimento: u.pavimento,
           tipologia: u.tipologia,
-          situacao: u.situacao,
+          situacao: normalizeSituacao(u.situacao),
           preco: getPublicUnitPrice(u),
           valor_base_venda: toNumberOrNull(u.valor_base_venda),
           valor_tabela: toNumberOrNull(u.valor_tabela),
