@@ -5,8 +5,25 @@
  * Nunca expõe dados financeiros, contratos ou clientes.
  */
 const express = require('express');
-const { Op } = require('sequelize');
 const router = express.Router();
+
+function toNumberOrNull(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : null;
+}
+
+function getPublicUnitPrice(unit = {}) {
+  return toNumberOrNull(unit.valor_base_venda) ?? toNumberOrNull(unit.valor_tabela);
+}
+
+function normalizeSituacao(value) {
+  return String(value || 'DISPONIVEL').toUpperCase();
+}
+
+function isSoldUnit(unit = {}) {
+  return normalizeSituacao(unit.situacao) === 'VENDIDO';
+}
 
 // Middleware: valida X-Experience-Sync-Key
 function requireSyncKey(req, res, next) {
@@ -47,10 +64,11 @@ router.get('/empreendimentos', requireSyncKey, async (req, res) => {
 
     const data = empreendimentos.map((emp) => {
       const unidades = emp.unidadesComerciais || [];
-      const disponiveis = unidades.filter((u) => u.situacao === 'DISPONIVEL');
+      const disponiveis = unidades.filter((u) => normalizeSituacao(u.situacao) === 'DISPONIVEL');
       const precos = unidades
-        .map((u) => Number(u.valor_tabela || u.valor_base_venda || 0))
-        .filter((v) => v > 0);
+        .filter((u) => !isSoldUnit(u))
+        .map(getPublicUnitPrice)
+        .filter((v) => v !== null && v > 0);
       const areas = unidades
         .map((u) => Number(u.metragem_privativa || 0))
         .filter((v) => v > 0);
@@ -81,7 +99,9 @@ router.get('/empreendimentos', requireSyncKey, async (req, res) => {
           pavimento: u.pavimento,
           tipologia: u.tipologia,
           situacao: u.situacao,
-          preco: Number(u.valor_tabela || u.valor_base_venda || 0) || null,
+          preco: getPublicUnitPrice(u),
+          valor_base_venda: toNumberOrNull(u.valor_base_venda),
+          valor_tabela: toNumberOrNull(u.valor_tabela),
           area_privativa: Number(u.metragem_privativa || 0) || null,
         })),
         synced_at: new Date().toISOString()
