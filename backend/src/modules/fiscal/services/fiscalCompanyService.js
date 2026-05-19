@@ -9,6 +9,8 @@ const {
 } = require('../../../models');
 const { registrarEventoSeguranca } = require('../../../services/securityLogService');
 
+const EMPRESA_GRUPO_ATTRIBUTES = ['id', 'codigo', 'nome', 'razao_social', 'cnpj'];
+
 function buildCompanyWhere(query = {}) {
   const where = {};
   if (query.ativo !== undefined) where.ativo = query.ativo;
@@ -55,7 +57,7 @@ async function listarFiscalCompanies(query = {}) {
       {
         model: EmpresaGrupo,
         as: 'empresa',
-        attributes: ['id', 'razao_social', 'nome_fantasia', 'cnpj'],
+        attributes: EMPRESA_GRUPO_ATTRIBUTES,
         required: false
       },
       {
@@ -123,7 +125,7 @@ async function criarFiscalCompany(req, payload) {
 
     return FiscalCompany.findByPk(company.id, {
       include: [
-        { model: EmpresaGrupo, as: 'empresa', attributes: ['id', 'razao_social', 'nome_fantasia', 'cnpj'], required: false },
+        { model: EmpresaGrupo, as: 'empresa', attributes: EMPRESA_GRUPO_ATTRIBUTES, required: false },
         { model: FiscalDfeSyncState, as: 'syncStates', required: false }
       ],
       transaction
@@ -178,7 +180,7 @@ async function atualizarFiscalCompany(req, id, payload) {
 
     return FiscalCompany.findByPk(company.id, {
       include: [
-        { model: EmpresaGrupo, as: 'empresa', attributes: ['id', 'razao_social', 'nome_fantasia', 'cnpj'], required: false },
+        { model: EmpresaGrupo, as: 'empresa', attributes: EMPRESA_GRUPO_ATTRIBUTES, required: false },
         { model: FiscalDfeSyncState, as: 'syncStates', required: false }
       ],
       transaction
