@@ -51,6 +51,46 @@ function formatarNumero(valor) {
   return Number.isFinite(numero) ? numero : 0;
 }
 
+function normalizarListaFiltro(valor) {
+  const valores = Array.isArray(valor) ? valor : [valor];
+  return valores
+    .flatMap((item) => String(item || '').split(','))
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function normalizarIdsFiltro(valor) {
+  return Array.from(
+    new Set(normalizarListaFiltro(valor)
+      .map(Number)
+      .filter((id) => Number.isInteger(id) && id > 0))
+  );
+}
+
+function normalizarStatusSolicitacaoFiltro(valor) {
+  return String(valor || '')
+    .trim()
+    .toUpperCase()
+    .replace(/_/g, '')
+    .replace(/\s+/g, '');
+}
+
+function normalizarFiltrosSolicitacoes(input = {}) {
+  const filtros = input && typeof input === 'object' && !Array.isArray(input)
+    ? input
+    : { obra_ids: input };
+
+  return {
+    obraIds: normalizarIdsFiltro(filtros.obra_ids ?? filtros.obra_id),
+    tipoIds: normalizarIdsFiltro(filtros.tipo_ids ?? filtros.tipo_id),
+    status: Array.from(
+      new Set(normalizarListaFiltro(filtros.status)
+        .map(normalizarStatusSolicitacaoFiltro)
+        .filter(Boolean))
+    )
+  };
+}
+
 function calcularResumoPagamentoSolicitacao(solicitacao) {
   const valorTotal = Number(solicitacao?.valor);
   const valorPagoAcumulado = Number(solicitacao?.valor_pago_acumulado || 0);
@@ -379,7 +419,8 @@ async function carregarLoteDetalhe(loteId) {
   });
 }
 
-async function listarSolicitacoesElegiveisParaLote(lote, busca = '', solicitacaoIds = null, obraId = null, options = {}) {
+async function listarSolicitacoesElegiveisParaLote(lote, busca = '', solicitacaoIds = null, filtrosInput = null, options = {}) {
+  const filtros = normalizarFiltrosSolicitacoes(filtrosInput);
   const condicaoSolicitacaoAprovadaNoFluxo = {
     [Op.and]: [
       { fluxo_aprovacao_diretoria: true },
@@ -434,9 +475,29 @@ async function listarSolicitacoesElegiveisParaLote(lote, busca = '', solicitacao
     condicoes.push({ id: { [Op.in]: idsFiltrados } });
   }
 
-  const obraIdNormalizado = Number(obraId);
-  if (Number.isInteger(obraIdNormalizado) && obraIdNormalizado > 0) {
-    condicoes.push({ obra_id: obraIdNormalizado });
+  if (filtros.obraIds.length > 0) {
+    condicoes.push({ obra_id: { [Op.in]: filtros.obraIds } });
+  }
+
+  if (filtros.tipoIds.length > 0) {
+    condicoes.push({ tipo_solicitacao_id: { [Op.in]: filtros.tipoIds } });
+  }
+
+  if (filtros.status.length > 0) {
+    condicoes.push(Sequelize.where(
+      Sequelize.fn(
+        'REPLACE',
+        Sequelize.fn(
+          'REPLACE',
+          Sequelize.fn('UPPER', Sequelize.col('Solicitacao.status_global')),
+          '_',
+          ''
+        ),
+        ' ',
+        ''
+      ),
+      { [Op.in]: filtros.status }
+    ));
   }
 
   const buscaNormalizada = String(busca || '').trim();
@@ -982,7 +1043,11 @@ module.exports = {
             lote,
             req.query?.busca,
             null,
-            req.query?.obra_id
+            {
+              obra_ids: req.query?.obra_ids ?? req.query?.obra_id,
+              status: req.query?.status,
+              tipo_ids: req.query?.tipo_ids ?? req.query?.tipo_id
+            }
           )
         : [];
 
@@ -1003,8 +1068,26 @@ module.exports = {
             ])
         ).values()
       ).sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR'));
+      const status = Array.from(
+        new Set(obrasBase
+          .map((item) => String(item.status_global || '').trim().toUpperCase())
+          .filter(Boolean))
+      ).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+      const tipos = Array.from(
+        new Map(
+          obrasBase
+            .filter((item) => item?.tipo?.id && item?.tipo?.nome)
+            .map((item) => [
+              String(item.tipo.id),
+              {
+                id: item.tipo.id,
+                nome: item.tipo.nome
+              }
+            ])
+        ).values()
+      ).sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR'));
 
-      return res.json({ items, obras });
+      return res.json({ items, obras, status, tipos });
     } catch (error) {
       console.error(error);
       return res.status(500).json({ error: 'Erro ao buscar solicitacoes disponiveis para prioridade.' });

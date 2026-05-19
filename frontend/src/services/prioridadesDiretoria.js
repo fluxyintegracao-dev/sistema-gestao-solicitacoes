@@ -65,7 +65,19 @@ export async function getLotePrioridadeDiretoria(id) {
 }
 
 export async function getSolicitacoesDisponiveisPrioridadeDiretoria(id, params = {}) {
-  const query = new URLSearchParams(params).toString();
+  const queryParams = new URLSearchParams();
+  Object.entries(params || {}).forEach(([chave, valor]) => {
+    if (Array.isArray(valor)) {
+      valor
+        .filter((item) => item !== undefined && item !== null && String(item).trim() !== '')
+        .forEach((item) => queryParams.append(chave, item));
+      return;
+    }
+    if (valor !== undefined && valor !== null && String(valor).trim() !== '') {
+      queryParams.append(chave, valor);
+    }
+  });
+  const query = queryParams.toString();
   const url = query
     ? `${API_URL}/prioridades-diretoria/lotes/${id}/solicitacoes-disponiveis?${query}`
     : `${API_URL}/prioridades-diretoria/lotes/${id}/solicitacoes-disponiveis`;

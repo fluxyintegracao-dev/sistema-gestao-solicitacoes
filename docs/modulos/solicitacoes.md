@@ -87,6 +87,7 @@
   - nao estao `PAGA`, `REJEITADA` ou `CANCELADA`
 - solicitacoes ja adicionadas/autorizadas em outros lotes podem aparecer em novos lotes abertos enquanto nao estiverem `PAGA`, `REJEITADA` ou `CANCELADA`
 - na tela de prioridades, a selecao em rascunho permanece ao trocar filtros ou navegar para outra pagina e so e removida quando o item e desmarcado ou quando o usuario aciona `Limpar selecao`
+- a selecao de solicitacoes pode ser filtrada por busca textual, multiplas obras, multiplos status e multiplos tipos de solicitacao ao mesmo tempo
 - ao salvar ou finalizar um lote, solicitacoes que deixaram de ser elegiveis sao ignoradas/removidas da selecao sem exigir que o usuario refaca toda a selecao
 - ao finalizar:
   - os itens entram em `prioridade_lote_itens`

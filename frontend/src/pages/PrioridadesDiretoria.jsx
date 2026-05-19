@@ -16,6 +16,11 @@ import {
 } from '../services/prioridadesDiretoria';
 
 const SELECAO_RASCUNHO_PREFIX = 'prioridades_diretoria_selecao_rascunho';
+const FILTROS_DISPONIVEIS_VAZIOS = {
+  obra_ids: [],
+  status: [],
+  tipo_ids: []
+};
 
 function formatarValor(valor) {
   const numero = Number(valor);
@@ -77,6 +82,49 @@ function BadgeStatusSolicitacao({ status }) {
   );
 }
 
+function FiltroMultiSelecao({ label, opcoes = [], selecionados = [], onChange, placeholder = 'Todos' }) {
+  const selecionadosSet = new Set((Array.isArray(selecionados) ? selecionados : []).map(String));
+  const texto = selecionadosSet.size > 0 ? `${selecionadosSet.size} selecionado(s)` : placeholder;
+
+  function alternarValor(valor) {
+    const chave = String(valor);
+    const proximo = new Set(selecionadosSet);
+    if (proximo.has(chave)) {
+      proximo.delete(chave);
+    } else {
+      proximo.add(chave);
+    }
+    onChange(Array.from(proximo));
+  }
+
+  return (
+    <details className="relative">
+      <summary className="input flex cursor-pointer list-none items-center justify-between gap-2">
+        <span className="truncate">{label}: {texto}</span>
+        <span className="text-xs text-gray-500">v</span>
+      </summary>
+      <div className="absolute z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white p-2 shadow-lg">
+        {opcoes.length === 0 && (
+          <p className="px-2 py-1.5 text-sm text-gray-500">Sem opcoes</p>
+        )}
+        {opcoes.map((opcao) => {
+          const valor = String(opcao.value);
+          return (
+            <label key={valor} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-gray-50">
+              <input
+                type="checkbox"
+                checked={selecionadosSet.has(valor)}
+                onChange={() => alternarValor(valor)}
+              />
+              <span className="truncate">{opcao.label}</span>
+            </label>
+          );
+        })}
+      </div>
+    </details>
+  );
+}
+
 export default function PrioridadesDiretoria() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -86,11 +134,17 @@ export default function PrioridadesDiretoria() {
   const [detalhe, setDetalhe] = useState(null);
   const [solicitacoesDisponiveis, setSolicitacoesDisponiveis] = useState([]);
   const [obrasDisponiveis, setObrasDisponiveis] = useState([]);
+  const [statusDisponiveis, setStatusDisponiveis] = useState([]);
+  const [tiposDisponiveis, setTiposDisponiveis] = useState([]);
   const [selecionadasIds, setSelecionadasIds] = useState([]);
   const [selecionadasCache, setSelecionadasCache] = useState({});
   const [buscaDisponiveis, setBuscaDisponiveis] = useState('');
   const [filtroItensLote, setFiltroItensLote] = useState('');
-  const [filtroObraId, setFiltroObraId] = useState('');
+  const [filtrosDisponiveis, setFiltrosDisponiveis] = useState({
+    obra_ids: [],
+    status: [],
+    tipo_ids: []
+  });
   const [loading, setLoading] = useState(true);
   const [loadingDetalhe, setLoadingDetalhe] = useState(false);
   const [loadingDisponiveis, setLoadingDisponiveis] = useState(false);
@@ -119,6 +173,30 @@ export default function PrioridadesDiretoria() {
     !detalhe?.pode_finalizar &&
     detalhe?.status === 'ABERTO'
   );
+  const opcoesObras = useMemo(() => (
+    obrasDisponiveis.map((obra) => ({
+      value: String(obra.id),
+      label: obra.nome
+    }))
+  ), [obrasDisponiveis]);
+  const opcoesStatusSolicitacao = useMemo(() => (
+    statusDisponiveis.map((status) => ({
+      value: String(status),
+      label: String(status)
+    }))
+  ), [statusDisponiveis]);
+  const opcoesTiposSolicitacao = useMemo(() => (
+    tiposDisponiveis.map((tipo) => ({
+      value: String(tipo.id),
+      label: tipo.nome
+    }))
+  ), [tiposDisponiveis]);
+  const filtrosDisponiveisAtivos = useMemo(() => (
+    Number(Boolean(buscaDisponiveis.trim())) +
+    filtrosDisponiveis.obra_ids.length +
+    filtrosDisponiveis.status.length +
+    filtrosDisponiveis.tipo_ids.length
+  ), [buscaDisponiveis, filtrosDisponiveis]);
 
   function chaveRascunhoSelecao(loteId) {
     const usuarioId = Number(user?.id);
@@ -179,11 +257,13 @@ export default function PrioridadesDiretoria() {
       setDetalhe(null);
       setSolicitacoesDisponiveis([]);
       setObrasDisponiveis([]);
+      setStatusDisponiveis([]);
+      setTiposDisponiveis([]);
       setSelecionadasIds([]);
       setSelecionadasCache({});
       setBuscaDisponiveis('');
       setFiltroItensLote('');
-      setFiltroObraId('');
+      setFiltrosDisponiveis(FILTROS_DISPONIVEIS_VAZIOS);
       return;
     }
     carregarDetalheLote(loteSelecionadoId);
@@ -193,20 +273,22 @@ export default function PrioridadesDiretoria() {
     if (!detalhe?.id || detalhe.status !== 'ABERTO' || !podeEditarSelecaoLote) {
       setSolicitacoesDisponiveis([]);
       setObrasDisponiveis([]);
+      setStatusDisponiveis([]);
+      setTiposDisponiveis([]);
       setSelecionadasIds([]);
       setSelecionadasCache({});
       setBuscaDisponiveis('');
       setFiltroItensLote('');
-      setFiltroObraId('');
+      setFiltrosDisponiveis(FILTROS_DISPONIVEIS_VAZIOS);
       return;
     }
 
     const timeout = setTimeout(() => {
-      carregarSolicitacoesDisponiveis(detalhe.id, buscaDisponiveis, filtroObraId);
+      carregarSolicitacoesDisponiveis(detalhe.id, buscaDisponiveis, filtrosDisponiveis);
     }, 250);
 
     return () => clearTimeout(timeout);
-  }, [detalhe?.id, detalhe?.status, podeEditarSelecaoLote, buscaDisponiveis, filtroObraId]);
+  }, [detalhe?.id, detalhe?.status, podeEditarSelecaoLote, buscaDisponiveis, filtrosDisponiveis]);
 
   useEffect(() => {
     if (!detalhe?.id || detalhe.status !== 'ABERTO' || !podeEditarSelecaoLote) return;
@@ -367,6 +449,8 @@ export default function PrioridadesDiretoria() {
       } else {
         setSolicitacoesDisponiveis([]);
         setObrasDisponiveis([]);
+        setStatusDisponiveis([]);
+        setTiposDisponiveis([]);
         setSelecionadasIds([]);
         setSelecionadasCache({});
         removerRascunhoSelecao(id);
@@ -381,17 +465,23 @@ export default function PrioridadesDiretoria() {
     }
   }
 
-  async function carregarSolicitacoesDisponiveis(id, busca = '', obraId = '') {
+  async function carregarSolicitacoesDisponiveis(id, busca = '', filtros = FILTROS_DISPONIVEIS_VAZIOS) {
     try {
       setLoadingDisponiveis(true);
       const params = {};
       if (busca) params.busca = busca;
-      if (obraId) params.obra_id = obraId;
+      if (filtros.obra_ids?.length) params.obra_ids = filtros.obra_ids;
+      if (filtros.status?.length) params.status = filtros.status;
+      if (filtros.tipo_ids?.length) params.tipo_ids = filtros.tipo_ids;
       const data = await getSolicitacoesDisponiveisPrioridadeDiretoria(id, params);
       const items = Array.isArray(data?.items) ? data.items : [];
       const obras = Array.isArray(data?.obras) ? data.obras : [];
+      const status = Array.isArray(data?.status) ? data.status : [];
+      const tipos = Array.isArray(data?.tipos) ? data.tipos : [];
       setSolicitacoesDisponiveis(items);
       setObrasDisponiveis(obras);
+      setStatusDisponiveis(status);
+      setTiposDisponiveis(tipos);
       setSelecionadasCache((atual) => {
         const proximo = { ...atual };
         items.forEach((item) => {
@@ -451,6 +541,18 @@ export default function PrioridadesDiretoria() {
     setSelecionadasIds([]);
     setSelecionadasCache({});
     removerRascunhoSelecao(detalhe?.id);
+  }
+
+  function atualizarFiltroDisponiveis(campo, valores) {
+    setFiltrosDisponiveis((atual) => ({
+      ...atual,
+      [campo]: Array.isArray(valores) ? valores.map(String) : []
+    }));
+  }
+
+  function limparFiltrosDisponiveis() {
+    setBuscaDisponiveis('');
+    setFiltrosDisponiveis(FILTROS_DISPONIVEIS_VAZIOS);
   }
 
   function alternarSolicitacao(id) {
@@ -531,7 +633,7 @@ export default function PrioridadesDiretoria() {
       const complemento = mensagemSolicitacoesIgnoradas(idsIgnorados);
       removerSelecionadasIgnoradas(idsIgnorados);
       if (detalhe?.id) {
-        await carregarSolicitacoesDisponiveis(detalhe.id, buscaDisponiveis, filtroObraId);
+        await carregarSolicitacoesDisponiveis(detalhe.id, buscaDisponiveis, filtrosDisponiveis);
       }
       alert(`${error?.message || fallback} ${idsIgnorados.length} solicitacao(oes) foram removidas da selecao. Tente novamente com as restantes.${complemento}`);
       return;
@@ -926,25 +1028,31 @@ export default function PrioridadesDiretoria() {
 
               {detalhe.status === 'ABERTO' && podeEditarSelecaoLote && (
                 <div className="space-y-3">
-                  <div className="grid grid-cols-1 xl:grid-cols-[minmax(220px,1.2fr)_minmax(220px,0.9fr)_minmax(240px,0.8fr)_auto] gap-3">
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-[minmax(210px,1fr)_minmax(170px,0.8fr)_minmax(170px,0.8fr)_minmax(190px,0.9fr)_minmax(250px,1fr)]">
                     <input
                       className="input"
                       value={buscaDisponiveis}
                       onChange={(event) => setBuscaDisponiveis(event.target.value)}
-                      placeholder="Filtrar por codigo, obra ou tipo"
+                      placeholder="Buscar por codigo, obra ou tipo"
                     />
-                    <select
-                      className="input"
-                      value={filtroObraId}
-                      onChange={(event) => setFiltroObraId(event.target.value)}
-                    >
-                      <option value="">Todas as obras</option>
-                      {obrasDisponiveis.map((obra) => (
-                        <option key={obra.id} value={obra.id}>
-                          {obra.nome}
-                        </option>
-                      ))}
-                    </select>
+                    <FiltroMultiSelecao
+                      label="Obras"
+                      opcoes={opcoesObras}
+                      selecionados={filtrosDisponiveis.obra_ids}
+                      onChange={(valores) => atualizarFiltroDisponiveis('obra_ids', valores)}
+                    />
+                    <FiltroMultiSelecao
+                      label="Status"
+                      opcoes={opcoesStatusSolicitacao}
+                      selecionados={filtrosDisponiveis.status}
+                      onChange={(valores) => atualizarFiltroDisponiveis('status', valores)}
+                    />
+                    <FiltroMultiSelecao
+                      label="Tipos"
+                      opcoes={opcoesTiposSolicitacao}
+                      selecionados={filtrosDisponiveis.tipo_ids}
+                      onChange={(valores) => atualizarFiltroDisponiveis('tipo_ids', valores)}
+                    />
                     <div className="rounded-xl border border-gray-200 px-3 py-2 text-sm bg-gray-50">
                       <span className="text-gray-600">Selecionadas:</span> <strong>{solicitacoesSelecionadas.length}</strong>
                       <span className="text-gray-400 mx-1.5">|</span>
@@ -956,6 +1064,16 @@ export default function PrioridadesDiretoria() {
                         </>
                       )}
                     </div>
+                  </div>
+                  <div className="flex flex-wrap justify-end gap-2">
+                    <button
+                      type="button"
+                      className="btn btn-outline whitespace-nowrap"
+                      onClick={limparFiltrosDisponiveis}
+                      disabled={filtrosDisponiveisAtivos === 0}
+                    >
+                      Limpar filtros
+                    </button>
                     <button
                       type="button"
                       className="btn btn-outline whitespace-nowrap"

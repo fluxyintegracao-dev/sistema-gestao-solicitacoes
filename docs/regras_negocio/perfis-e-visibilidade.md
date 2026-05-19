@@ -76,6 +76,7 @@ A visibilidade efetiva depende de combinacao entre:
   - pedidos de urgencia registram o setor criador do lote para diferenciar lotes solicitados pela `DIR_ADMIN` de lotes solicitados pelas proprias diretorias
   - pedidos de urgencia so viram prioridade autorizada depois da finalizacao/aprovacao pela `DIR_ADMIN`, setor `DIRETORIA` ou `SUPERADMIN`
   - na tela de selecao de prioridades, trocar filtros ou navegar para outra pagina nao remove itens ja selecionados; a selecao em rascunho so muda quando o usuario desmarca itens ou aciona `Limpar selecao`
+  - a tela de selecao de prioridades permite filtros combinados por busca textual, multiplas obras, multiplos status e multiplos tipos de solicitacao
   - a autorizacao de prioridade nao muda o setor responsavel da solicitacao
   - a autorizacao marca a solicitacao como `prioridade_diretoria_ativa`
 
