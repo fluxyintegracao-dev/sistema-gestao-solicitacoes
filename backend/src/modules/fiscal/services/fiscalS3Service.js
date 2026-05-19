@@ -2,6 +2,16 @@
 
 const path = require('path');
 const crypto = require('crypto');
+const { S3Client, PutObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3');
+const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
+
+const ALLOWED_FISCAL_MIME_TYPES = new Set([
+  'application/xml',
+  'text/xml',
+  'application/pdf',
+  'image/jpeg',
+  'image/png'
+]);
 
 function normalizePrefix(value) {
   return String(value || '').trim().replace(/^\/+|\/+$/g, '');
@@ -30,9 +40,43 @@ function getFiscalS3Config() {
   };
 }
 
+function createFiscalS3Client() {
+  const config = getFiscalS3Config();
+  const clientConfig = {
+    region: config.region
+  };
+
+  if (process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY) {
+    clientConfig.credentials = {
+      accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
+    };
+  }
+
+  return new S3Client(clientConfig);
+}
+
 function isFiscalS3Configured() {
   const config = getFiscalS3Config();
   return Boolean(config.bucket && config.region);
+}
+
+function assertFiscalS3Configured() {
+  if (!isFiscalS3Configured()) {
+    const error = new Error('Storage fiscal nao configurado. Informe FISCAL_S3_BUCKET e FISCAL_S3_REGION.');
+    error.statusCode = 400;
+    throw error;
+  }
+}
+
+function validateFiscalMimeType(contentType) {
+  const normalized = String(contentType || '').split(';')[0].trim().toLowerCase();
+  if (!ALLOWED_FISCAL_MIME_TYPES.has(normalized)) {
+    const error = new Error('Tipo de arquivo fiscal nao permitido.');
+    error.statusCode = 400;
+    throw error;
+  }
+  return normalized;
 }
 
 function buildFiscalObjectKey({
@@ -67,9 +111,91 @@ function calculateSha256(bufferOrString) {
     .digest('hex');
 }
 
+async function uploadFiscalObject({ key, body, contentType, metadata = {} }) {
+  assertFiscalS3Configured();
+  if (!key || String(key).includes('..') || path.isAbsolute(String(key))) {
+    const error = new Error('Chave de storage fiscal invalida.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const normalizedContentType = validateFiscalMimeType(contentType);
+  const config = getFiscalS3Config();
+  const client = createFiscalS3Client();
+  const buffer = Buffer.isBuffer(body) ? body : Buffer.from(String(body || ''), 'utf8');
+  const hash = calculateSha256(buffer);
+
+  await client.send(new PutObjectCommand({
+    Bucket: config.bucket,
+    Key: key,
+    Body: buffer,
+    ContentType: normalizedContentType,
+    ServerSideEncryption: 'AES256',
+    Metadata: {
+      ...Object.fromEntries(
+        Object.entries(metadata || {}).map(([itemKey, value]) => [
+          sanitizePathSegment(itemKey).toLowerCase(),
+          String(value == null ? '' : value).slice(0, 255)
+        ])
+      ),
+      sha256: hash
+    }
+  }));
+
+  return {
+    bucket: config.bucket,
+    key,
+    hash,
+    contentType: normalizedContentType
+  };
+}
+
+async function saveFiscalXml({ cnpj, documentType = 'nfe', accessKey, xml, date = new Date(), metadata = {} }) {
+  const key = buildFiscalObjectKey({
+    cnpj,
+    documentType,
+    accessKey,
+    folder: 'xml',
+    filename: 'original.xml',
+    date
+  });
+
+  return uploadFiscalObject({
+    key,
+    body: xml,
+    contentType: 'application/xml',
+    metadata
+  });
+}
+
+async function getFiscalObjectSignedUrl(key, expiresIn = null) {
+  assertFiscalS3Configured();
+  const config = getFiscalS3Config();
+  const client = createFiscalS3Client();
+  const safeExpires = Number(expiresIn || config.presignedExpiresSeconds || 300);
+
+  if (!key || String(key).includes('..') || path.isAbsolute(String(key))) {
+    const error = new Error('Chave de storage fiscal invalida.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const command = new GetObjectCommand({
+    Bucket: config.bucket,
+    Key: key
+  });
+
+  return getSignedUrl(client, command, { expiresIn: Math.min(Math.max(safeExpires, 60), 900) });
+}
+
 module.exports = {
+  assertFiscalS3Configured,
   buildFiscalObjectKey,
   calculateSha256,
   getFiscalS3Config,
-  isFiscalS3Configured
+  getFiscalObjectSignedUrl,
+  isFiscalS3Configured,
+  saveFiscalXml,
+  uploadFiscalObject,
+  validateFiscalMimeType
 };
