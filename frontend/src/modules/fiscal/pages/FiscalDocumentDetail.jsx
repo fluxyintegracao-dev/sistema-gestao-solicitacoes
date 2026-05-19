@@ -383,7 +383,7 @@ export default function FiscalDocumentDetail() {
   const events = documento?.events || [];
 
   return (
-    <div className="space-y-6">
+    <div className="fiscal-page space-y-6">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <Link className="text-sm font-semibold text-blue-600" to="/fiscal/documentos">Voltar para documentos fiscais</Link>

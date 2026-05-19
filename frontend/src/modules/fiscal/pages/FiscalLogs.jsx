@@ -103,7 +103,7 @@ export default function FiscalLogs() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="fiscal-page space-y-6">
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Fiscal</p>

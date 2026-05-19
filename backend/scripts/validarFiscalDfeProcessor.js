@@ -13,7 +13,14 @@ const {
 const {
   parseDistribuicaoDfeResponse
 } = require('../src/modules/fiscal/services/sefaz/sefazDfeResponseParserService');
+const {
+  buildConsChNFeRequest,
+  buildConsNsuRequest,
+  buildDistNsuRequest
+} = require('../src/modules/fiscal/services/sefaz/sefazDfeSoapBuilderService');
 const fixture = require('../src/modules/fiscal/services/sefaz/fixtures/nfeDistribuicaoNormalizada.fixture');
+
+const fullAccessKey = '12345678901234567890123456789012345678901234';
 
 const rawKey = buildFiscalRawSefazObjectKey({
   cnpj: fixture.company.cnpj,
@@ -33,7 +40,7 @@ assert.strictEqual(parsedSefazResponse.ult_nsu, '11');
 assert.strictEqual(parsedSefazResponse.max_nsu, '20');
 assert.strictEqual(parsedSefazResponse.documents.length, 2);
 assert.strictEqual(parsedSefazResponse.documents[0].nsu, '10');
-assert.strictEqual(parsedSefazResponse.documents[0].access_key, '12345678901234567890123456789012345678901234');
+assert.strictEqual(parsedSefazResponse.documents[0].access_key, fullAccessKey);
 assert.strictEqual(parsedSefazResponse.documents[0].schema_version, 'procNFe_v4.00');
 assert.ok(parsedSefazResponse.documents[0].xml.includes('<nfeProc'));
 assert.strictEqual(parsedSefazResponse.documents[1].summary.access_key, '98765432109876543210987654321098765432109876');
@@ -100,5 +107,36 @@ assert.strictEqual(eventPayload.event_protocol, '135260000000001');
 assert.strictEqual(eventPayload.event_description, 'Autorizado o uso da NF-e');
 assert.strictEqual(eventPayload.raw_event_json.event_type, 'autorizacao');
 assert.ok(eventPayload.event_date instanceof Date);
+
+const distNsuRequest = buildDistNsuRequest({
+  company: fixture.company,
+  ultNsu: '10'
+});
+
+assert.strictEqual(distNsuRequest.request_type, 'distNSU');
+assert.strictEqual(distNsuRequest.content_type, 'application/soap+xml; charset=utf-8');
+assert.strictEqual(distNsuRequest.tp_amb, '2');
+assert.strictEqual(distNsuRequest.cuf_autor, '32');
+assert.strictEqual(distNsuRequest.cnpj, '55666777000188');
+assert.ok(distNsuRequest.body.includes('<soap12:Envelope'));
+assert.ok(distNsuRequest.body.includes('<nfeDistDFeInteresse'));
+assert.ok(distNsuRequest.dist_dfe_xml.includes('<cUFAutor>32</cUFAutor>'));
+assert.ok(distNsuRequest.dist_dfe_xml.includes('<ultNSU>000000000000010</ultNSU>'));
+
+const consNsuRequest = buildConsNsuRequest({
+  company: fixture.company,
+  nsu: '11'
+});
+
+assert.strictEqual(consNsuRequest.request_type, 'consNSU');
+assert.ok(consNsuRequest.dist_dfe_xml.includes('<NSU>000000000000011</NSU>'));
+
+const consChNFeRequest = buildConsChNFeRequest({
+  company: fixture.company,
+  accessKey: fullAccessKey
+});
+
+assert.strictEqual(consChNFeRequest.request_type, 'consChNFe');
+assert.ok(consChNFeRequest.dist_dfe_xml.includes(`<chNFe>${fullAccessKey}</chNFe>`));
 
 console.log('Fiscal DFe processor fixture OK');

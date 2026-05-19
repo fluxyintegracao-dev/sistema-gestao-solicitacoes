@@ -131,7 +131,7 @@ export default function FiscalAccountingBatches() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="fiscal-page space-y-6">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Fiscal</p>

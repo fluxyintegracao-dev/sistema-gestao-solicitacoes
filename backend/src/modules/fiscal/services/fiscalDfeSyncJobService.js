@@ -6,6 +6,13 @@ const {
   FiscalDfeSyncState,
   FiscalSyncLog
 } = require('../../../models');
+const {
+  processarRetornoDistribuicaoDfe
+} = require('./fiscalDfeProcessorService');
+const {
+  saveRawSefazRequest,
+  saveRawSefazResponse
+} = require('./fiscalS3Service');
 const { consultarDistNsu } = require('./sefaz/sefazDfeDistributionService');
 
 const DEFAULT_LOCK_TTL_SECONDS = 15 * 60;
@@ -132,7 +139,7 @@ async function registrarTentativaSemSefaz(company, syncState, documentType, star
   return { log, status: 'skipped', message: responseMessage };
 }
 
-async function registrarTentativaStub(company, syncState, documentType, startedAt) {
+async function registrarTentativaSefaz(company, syncState, documentType, startedAt) {
   if (syncState.next_allowed_sync_at && new Date(syncState.next_allowed_sync_at).getTime() > startedAt.getTime()) {
     return registrarTentativaIgnorada(company, syncState, documentType, startedAt, {
       code: 'FISCAL_SYNC_THROTTLED',
@@ -163,11 +170,55 @@ async function registrarTentativaStub(company, syncState, documentType, startedA
   });
 
   try {
-    await consultarDistNsu({
+    const response = await consultarDistNsu({
       company,
       documentType,
       ultNsu: syncState.ult_nsu || '0'
     });
+
+    const rawRequest = response.raw_request_xml
+      ? await saveRawSefazRequest({
+        cnpj: company.cnpj,
+        syncLogId: log.id,
+        requestType: response.request_type || 'distNSU',
+        payload: response.raw_request_xml,
+        metadata: {
+          fiscal_company_id: company.id,
+          document_type: documentType
+        }
+      })
+      : null;
+
+    const rawResponse = response.raw_response_xml
+      ? await saveRawSefazResponse({
+        cnpj: company.cnpj,
+        syncLogId: log.id,
+        requestType: response.request_type || 'distNSU',
+        payload: response.raw_response_xml,
+        metadata: {
+          fiscal_company_id: company.id,
+          document_type: documentType,
+          response_code: response.response_code || ''
+        }
+      })
+      : null;
+
+    const processed = await processarRetornoDistribuicaoDfe({
+      company,
+      syncStateId: syncState.id,
+      syncLogId: log.id,
+      documentType,
+      response,
+      rawRequestStorageKey: rawRequest?.key || null,
+      rawResponseStorageKey: rawResponse?.key || null
+    });
+
+    return {
+      log,
+      status: 'success',
+      message: `Sincronizacao fiscal processada: ${processed.documents_processed} documento(s).`,
+      processed
+    };
   } catch (error) {
     const responseCode = error.statusCode === 501 ? 'FISCAL_SEFAZ_STUB' : 'FISCAL_SEFAZ_ERROR';
     const responseMessage = error.message || 'Falha controlada ao preparar consulta SEFAZ.';
@@ -189,22 +240,6 @@ async function registrarTentativaStub(company, syncState, documentType, startedA
 
     return { log, status: 'blocked', message: responseMessage };
   }
-
-  const responseMessage = 'Cliente SEFAZ retornou sem processamento nesta fase.';
-  await log.update({
-    finished_at: new Date(),
-    status: 'blocked',
-    response_code: 'FISCAL_SEFAZ_STUB',
-    response_message: responseMessage
-  });
-
-  await liberarSyncLock(syncState, lock.lockToken, {
-    status: 'blocked',
-    last_error_code: 'FISCAL_SEFAZ_STUB',
-    last_error_message: responseMessage
-  });
-
-  return { log, status: 'blocked', message: responseMessage };
 }
 
 async function executarSyncDfeControlado({ company, documentType = 'nfe' } = {}) {
@@ -216,7 +251,7 @@ async function executarSyncDfeControlado({ company, documentType = 'nfe' } = {})
     return registrarTentativaSemSefaz(company, syncState, documentType, startedAt);
   }
 
-  return registrarTentativaStub(company, syncState, documentType, startedAt);
+  return registrarTentativaSefaz(company, syncState, documentType, startedAt);
 }
 
 module.exports = {

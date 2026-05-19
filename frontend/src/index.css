@@ -416,6 +416,97 @@ textarea {
   font-size: 0.9375rem;
 }
 
+/* Modulo Fiscal: controles mais densos e com hierarquia operacional propria */
+.fiscal-page .btn-primary,
+.fiscal-page .btn-secondary,
+.fiscal-page .btn-outline {
+  min-height: 36px;
+  border-radius: 8px;
+  padding: 0.46rem 0.9rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  box-shadow: none;
+  transition: transform 0.16s ease, background-color 0.16s ease, border-color 0.16s ease, color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.fiscal-page .btn-primary {
+  background: #164534;
+  border-color: #164534;
+  color: #f6fbf8;
+  box-shadow: 0 10px 22px -18px rgba(6, 78, 59, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.16);
+}
+
+.fiscal-page .btn-primary:hover {
+  background: #0f3829;
+  border-color: #0f3829;
+  box-shadow: 0 14px 28px -18px rgba(6, 78, 59, 0.78), inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  transform: translateY(-1px);
+}
+
+.fiscal-page .btn-secondary,
+.fiscal-page .btn-outline {
+  background: #f8faf8;
+  border-color: #c9d7d0;
+  color: #18382f;
+}
+
+.fiscal-page .btn-secondary:hover,
+.fiscal-page .btn-outline:hover {
+  background: #eef5f1;
+  border-color: #8dad9c;
+  color: #0f3829;
+  transform: translateY(-1px);
+}
+
+.fiscal-page .btn-sm {
+  min-height: 30px;
+  border-radius: 6px;
+  padding: 0.25rem 0.58rem;
+  font-size: 0.75rem;
+}
+
+.fiscal-page .btn-primary:disabled,
+.fiscal-page .btn-secondary:disabled,
+.fiscal-page .btn-outline:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+  transform: none;
+  box-shadow: none;
+}
+
+.fiscal-page .btn-primary:focus-visible,
+.fiscal-page .btn-secondary:focus-visible,
+.fiscal-page .btn-outline:focus-visible {
+  outline: 2px solid #0f766e;
+  outline-offset: 2px;
+}
+
+.dark .fiscal-page .btn-primary {
+  background: #4fd1a2;
+  border-color: #4fd1a2;
+  color: #08241b;
+}
+
+.dark .fiscal-page .btn-primary:hover {
+  background: #7be0ba;
+  border-color: #7be0ba;
+}
+
+.dark .fiscal-page .btn-secondary,
+.dark .fiscal-page .btn-outline {
+  background: #0d1d1a;
+  border-color: #24443b;
+  color: #d6ebe3;
+}
+
+.dark .fiscal-page .btn-secondary:hover,
+.dark .fiscal-page .btn-outline:hover {
+  background: #132a25;
+  border-color: #3a6b5c;
+  color: #f0fff8;
+}
+
 .table {
   width: 100%;
   border-collapse: collapse;
