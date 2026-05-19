@@ -12,10 +12,13 @@ const {
   canViewFiscalSync
 } = require('../../../services/authorizationService');
 const FiscalDashboardController = require('../controllers/FiscalDashboardController');
+const FiscalCertificateController = require('../controllers/FiscalCertificateController');
 const FiscalCompanyController = require('../controllers/FiscalCompanyController');
 const FiscalDocumentController = require('../controllers/FiscalDocumentController');
 const FiscalSyncLogController = require('../controllers/FiscalSyncLogController');
 const {
+  validateFiscalCertificateCreateBody,
+  validateFiscalCertificateQuery,
   validateFiscalCompanyCreateBody,
   validateFiscalCompanyQuery,
   validateFiscalCompanyUpdateBody,
@@ -76,6 +79,10 @@ router.get('/dashboard', allowFiscal, FiscalDashboardController.dashboard);
 router.get('/companies', allowFiscalConfig, validateRequest({ query: validateFiscalCompanyQuery }), FiscalCompanyController.index);
 router.post('/companies', allowFiscalConfig, validateRequest({ body: validateFiscalCompanyCreateBody }), FiscalCompanyController.create);
 router.patch('/companies/:id', allowFiscalConfig, validateRequest({ params: validateNumericIdParam('id', 'Empresa fiscal'), body: validateFiscalCompanyUpdateBody }), FiscalCompanyController.update);
+
+router.get('/certificates', allowFiscalConfig, validateRequest({ query: validateFiscalCertificateQuery }), FiscalCertificateController.index);
+router.post('/certificates', allowFiscalConfig, validateRequest({ body: validateFiscalCertificateCreateBody }), FiscalCertificateController.create);
+router.post('/certificates/:id/validate', allowFiscalConfig, validateRequest({ params: validateNumericIdParam('id', 'Certificado fiscal') }), FiscalCertificateController.validate);
 
 router.get('/documents', allowFiscalDocuments, validateRequest({ query: validateFiscalDocumentQuery }), FiscalDocumentController.index);
 router.get('/documents/:id', allowFiscalDocuments, validateRequest({ params: validateNumericIdParam('id', 'Documento fiscal') }), FiscalDocumentController.show);

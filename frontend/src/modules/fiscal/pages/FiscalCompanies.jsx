@@ -1,5 +1,12 @@
 import { useEffect, useState } from 'react';
-import { createFiscalCompany, getFiscalCompanies, updateFiscalCompany } from '../services/fiscalApi';
+import {
+  createFiscalCertificate,
+  createFiscalCompany,
+  getFiscalCertificates,
+  getFiscalCompanies,
+  updateFiscalCompany,
+  validateFiscalCertificate
+} from '../services/fiscalApi';
 
 const EMPTY_FORM = {
   razao_social: '',
@@ -13,12 +20,31 @@ const EMPTY_FORM = {
   observacoes: ''
 };
 
+const EMPTY_CERTIFICATE_FORM = {
+  fiscal_company_id: '',
+  certificate_alias: '',
+  storage_type: 'local_secure_path',
+  certificate_path: '',
+  certificate_s3_key: '',
+  password: '',
+  valid_from: '',
+  valid_until: '',
+  serial_number: '',
+  issuer: '',
+  subject: '',
+  is_active: true
+};
+
 export default function FiscalCompanies() {
   const [companies, setCompanies] = useState([]);
   const [form, setForm] = useState(EMPTY_FORM);
   const [editingId, setEditingId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [certificates, setCertificates] = useState([]);
+  const [certificateForm, setCertificateForm] = useState(EMPTY_CERTIFICATE_FORM);
+  const [savingCertificate, setSavingCertificate] = useState(false);
+  const [validatingCertificateId, setValidatingCertificateId] = useState(null);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
 
@@ -26,8 +52,12 @@ export default function FiscalCompanies() {
     setLoading(true);
     setError('');
     try {
-      const result = await getFiscalCompanies();
-      setCompanies(result?.data || []);
+      const [companiesResult, certificatesResult] = await Promise.all([
+        getFiscalCompanies(),
+        getFiscalCertificates()
+      ]);
+      setCompanies(companiesResult?.data || []);
+      setCertificates(certificatesResult?.data || []);
     } catch (err) {
       setError(err.message || 'Erro ao buscar empresas fiscais');
     } finally {
@@ -41,6 +71,10 @@ export default function FiscalCompanies() {
 
   const updateField = (field, value) => {
     setForm((current) => ({ ...current, [field]: value }));
+  };
+
+  const updateCertificateField = (field, value) => {
+    setCertificateForm((current) => ({ ...current, [field]: value }));
   };
 
   const editCompany = (company) => {
@@ -82,6 +116,39 @@ export default function FiscalCompanies() {
       setError(err.message || 'Erro ao salvar empresa fiscal');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const submitCertificate = async (event) => {
+    event.preventDefault();
+    setSavingCertificate(true);
+    setError('');
+    setMessage('');
+    try {
+      await createFiscalCertificate(certificateForm);
+      setMessage('Certificado fiscal cadastrado sem expor segredo no frontend.');
+      setCertificateForm(EMPTY_CERTIFICATE_FORM);
+      await load();
+    } catch (err) {
+      setError(err.message || 'Erro ao salvar certificado fiscal');
+    } finally {
+      setSavingCertificate(false);
+    }
+  };
+
+  const validateCertificate = async (certificate) => {
+    setValidatingCertificateId(certificate.id);
+    setError('');
+    setMessage('');
+    try {
+      const result = await validateFiscalCertificate(certificate.id);
+      const hasError = (result?.checks || []).some((check) => check.status === 'ERROR');
+      setMessage(hasError ? 'Validacao concluida com pendencias. Revise os checks.' : 'Certificado validado administrativamente.');
+      await load();
+    } catch (err) {
+      setError(err.message || 'Erro ao validar certificado fiscal');
+    } finally {
+      setValidatingCertificateId(null);
     }
   };
 
@@ -174,6 +241,114 @@ export default function FiscalCompanies() {
           </tbody>
         </table>
       </div>
+
+      <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        <form onSubmit={submitCertificate} className="grid gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 md:grid-cols-2">
+          <div className="md:col-span-2">
+            <h2 className="text-base font-semibold text-slate-950 dark:text-white">Certificado A1</h2>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+              Cadastro seguro de metadados. O arquivo e a senha nao sao exibidos depois de salvar.
+            </p>
+          </div>
+          <label className="md:col-span-2">
+            <span className="text-sm font-medium text-slate-600 dark:text-slate-300">Empresa fiscal</span>
+            <select className="input mt-1" value={certificateForm.fiscal_company_id} onChange={(e) => updateCertificateField('fiscal_company_id', e.target.value)} required>
+              <option value="">Selecione</option>
+              {companies.map((company) => (
+                <option key={company.id} value={company.id}>{company.razao_social} - {company.cnpj}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span className="text-sm font-medium text-slate-600 dark:text-slate-300">Alias</span>
+            <input className="input mt-1" value={certificateForm.certificate_alias} onChange={(e) => updateCertificateField('certificate_alias', e.target.value)} required />
+          </label>
+          <label>
+            <span className="text-sm font-medium text-slate-600 dark:text-slate-300">Armazenamento</span>
+            <select className="input mt-1" value={certificateForm.storage_type} onChange={(e) => updateCertificateField('storage_type', e.target.value)}>
+              <option value="local_secure_path">Caminho local seguro</option>
+              <option value="s3_private">S3 privado</option>
+              <option value="secrets_manager">Secrets Manager futuro</option>
+            </select>
+          </label>
+          {certificateForm.storage_type === 'local_secure_path' ? (
+            <label className="md:col-span-2">
+              <span className="text-sm font-medium text-slate-600 dark:text-slate-300">Caminho local na EC2</span>
+              <input className="input mt-1" placeholder="/opt/fluxy/certs/fiscal/certificado.pfx" value={certificateForm.certificate_path} onChange={(e) => updateCertificateField('certificate_path', e.target.value)} required />
+            </label>
+          ) : null}
+          {certificateForm.storage_type === 's3_private' ? (
+            <label className="md:col-span-2">
+              <span className="text-sm font-medium text-slate-600 dark:text-slate-300">Chave S3 privada</span>
+              <input className="input mt-1" value={certificateForm.certificate_s3_key} onChange={(e) => updateCertificateField('certificate_s3_key', e.target.value)} required />
+            </label>
+          ) : null}
+          <label>
+            <span className="text-sm font-medium text-slate-600 dark:text-slate-300">Senha A1</span>
+            <input className="input mt-1" type="password" value={certificateForm.password} onChange={(e) => updateCertificateField('password', e.target.value)} />
+          </label>
+          <label>
+            <span className="text-sm font-medium text-slate-600 dark:text-slate-300">Valido ate</span>
+            <input className="input mt-1" type="date" value={certificateForm.valid_until} onChange={(e) => updateCertificateField('valid_until', e.target.value)} />
+          </label>
+          <label>
+            <span className="text-sm font-medium text-slate-600 dark:text-slate-300">Valido desde</span>
+            <input className="input mt-1" type="date" value={certificateForm.valid_from} onChange={(e) => updateCertificateField('valid_from', e.target.value)} />
+          </label>
+          <label>
+            <span className="text-sm font-medium text-slate-600 dark:text-slate-300">Numero de serie</span>
+            <input className="input mt-1" value={certificateForm.serial_number} onChange={(e) => updateCertificateField('serial_number', e.target.value)} />
+          </label>
+          <label className="md:col-span-2">
+            <span className="text-sm font-medium text-slate-600 dark:text-slate-300">Emissor</span>
+            <input className="input mt-1" value={certificateForm.issuer} onChange={(e) => updateCertificateField('issuer', e.target.value)} />
+          </label>
+          <label className="md:col-span-2">
+            <span className="text-sm font-medium text-slate-600 dark:text-slate-300">Titular</span>
+            <input className="input mt-1" value={certificateForm.subject} onChange={(e) => updateCertificateField('subject', e.target.value)} />
+          </label>
+          <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+            <input type="checkbox" checked={certificateForm.is_active} onChange={(e) => updateCertificateField('is_active', e.target.checked)} />
+            Definir como ativo
+          </label>
+          <div className="md:col-span-2">
+            <button className="btn-primary" type="submit" disabled={savingCertificate}>{savingCertificate ? 'Salvando...' : 'Cadastrar certificado'}</button>
+          </div>
+        </form>
+
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <div className="border-b border-slate-200 p-5 dark:border-slate-800">
+            <h2 className="text-base font-semibold text-slate-950 dark:text-white">Certificados cadastrados</h2>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Segredos criptografados nao retornam pela API.</p>
+          </div>
+          <div className="divide-y divide-slate-100 dark:divide-slate-800">
+            {certificates.length ? certificates.map((certificate) => (
+              <div key={certificate.id} className="p-5">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-medium text-slate-950 dark:text-white">{certificate.certificate_alias}</p>
+                    <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{certificate.company?.razao_social || 'Empresa nao vinculada'}</p>
+                    <p className="mt-1 text-xs uppercase tracking-wide text-slate-400">{certificate.storage_type} - {certificate.validation_status || 'pending'}</p>
+                  </div>
+                  <span className={`rounded-full px-3 py-1 text-xs font-semibold ${certificate.is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+                    {certificate.is_active ? 'Ativo' : 'Inativo'}
+                  </span>
+                </div>
+                <div className="mt-4 flex items-center justify-between gap-3">
+                  <span className="text-xs text-slate-500">
+                    Validade: {certificate.valid_until ? new Date(certificate.valid_until).toLocaleDateString('pt-BR') : 'nao informada'}
+                  </span>
+                  <button className="btn-secondary" type="button" onClick={() => validateCertificate(certificate)} disabled={validatingCertificateId === certificate.id}>
+                    {validatingCertificateId === certificate.id ? 'Validando...' : 'Validar'}
+                  </button>
+                </div>
+              </div>
+            )) : (
+              <div className="p-5 text-sm text-slate-500">Nenhum certificado cadastrado.</div>
+            )}
+          </div>
+        </div>
+      </section>
     </div>
   );
 }

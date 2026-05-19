@@ -64,6 +64,28 @@ function parseCnpj(value, { required = false } = {}) {
   return normalized;
 }
 
+function parseDateOnly(value, fieldName) {
+  const normalized = sanitizeString(value, fieldName, { max: 20 });
+  if (!normalized) return null;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(normalized)) {
+    throw new ValidationError(`${fieldName} deve estar no formato AAAA-MM-DD.`);
+  }
+  const date = new Date(`${normalized}T00:00:00.000Z`);
+  if (Number.isNaN(date.getTime())) {
+    throw new ValidationError(`${fieldName} invalida.`);
+  }
+  return date;
+}
+
+function parseOptionalSecret(value, fieldName, max = 500) {
+  if (value === undefined || value === null || value === '') return null;
+  const normalized = String(value);
+  if (normalized.length > max) {
+    throw new ValidationError(`${fieldName} excede o tamanho permitido.`);
+  }
+  return normalized;
+}
+
 function validateFiscalCompanyCreateBody(body = {}) {
   ensureAllowedKeys(body, [
     'empresa_id',
@@ -148,12 +170,65 @@ function validateFiscalSyncLogQuery(query = {}) {
   };
 }
 
+function validateFiscalCertificateQuery(query = {}) {
+  ensureAllowedKeys(query, ['company_id', 'is_active'], 'Filtro de certificados fiscais');
+  return {
+    company_id: parseOptionalInteger(query.company_id, 'Empresa fiscal'),
+    is_active: parseOptionalBoolean(query.is_active)
+  };
+}
+
+function validateFiscalCertificateCreateBody(body = {}) {
+  ensureAllowedKeys(body, [
+    'fiscal_company_id',
+    'certificate_alias',
+    'storage_type',
+    'certificate_path',
+    'certificate_s3_key',
+    'password',
+    'valid_from',
+    'valid_until',
+    'serial_number',
+    'issuer',
+    'subject',
+    'is_active'
+  ], 'Certificado fiscal');
+
+  const storageType = parseEnum(
+    body.storage_type,
+    'Tipo de armazenamento',
+    ['local_secure_path', 's3_private', 'secrets_manager'],
+    { fallback: 'local_secure_path' }
+  );
+
+  return {
+    fiscal_company_id: (() => {
+      const id = parseOptionalInteger(body.fiscal_company_id, 'Empresa fiscal');
+      if (!id) throw new ValidationError('Empresa fiscal e obrigatoria.');
+      return id;
+    })(),
+    certificate_alias: sanitizeString(body.certificate_alias, 'Alias do certificado', { required: true, max: 120 }),
+    storage_type: storageType,
+    certificate_path: sanitizeString(body.certificate_path, 'Caminho do certificado', { max: 500 }) || null,
+    certificate_s3_key: sanitizeString(body.certificate_s3_key, 'Chave S3 do certificado', { max: 500 }) || null,
+    password: parseOptionalSecret(body.password, 'Senha do certificado'),
+    valid_from: parseDateOnly(body.valid_from, 'Validade inicial'),
+    valid_until: parseDateOnly(body.valid_until, 'Validade final'),
+    serial_number: sanitizeString(body.serial_number, 'Numero de serie', { max: 160 }) || null,
+    issuer: sanitizeString(body.issuer, 'Emissor', { max: 2000 }) || null,
+    subject: sanitizeString(body.subject, 'Titular', { max: 2000 }) || null,
+    is_active: parseOptionalBoolean(body.is_active)
+  };
+}
+
 function validateFiscalSyncStateStatus(status) {
   return parseEnum(status, 'Status de sincronizacao', FISCAL_SYNC_STATUSES, { fallback: 'idle' });
 }
 
 module.exports = {
   digitsOnly,
+  validateFiscalCertificateCreateBody,
+  validateFiscalCertificateQuery,
   validateFiscalCompanyCreateBody,
   validateFiscalCompanyQuery,
   validateFiscalCompanyUpdateBody,

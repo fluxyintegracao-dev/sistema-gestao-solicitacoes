@@ -61,6 +61,30 @@ export async function updateFiscalCompany(id, payload) {
   return parseJson(response, 'Erro ao atualizar empresa fiscal');
 }
 
+export async function getFiscalCertificates(params = {}) {
+  const response = await fetch(buildUrl('/fiscal/certificates', params), {
+    headers: authHeaders()
+  });
+  return parseJson(response, 'Erro ao buscar certificados fiscais');
+}
+
+export async function createFiscalCertificate(payload) {
+  const response = await fetch(`${API_URL}/fiscal/certificates`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload)
+  });
+  return parseJson(response, 'Erro ao cadastrar certificado fiscal');
+}
+
+export async function validateFiscalCertificate(id) {
+  const response = await fetch(`${API_URL}/fiscal/certificates/${id}/validate`, {
+    method: 'POST',
+    headers: authHeaders()
+  });
+  return parseJson(response, 'Erro ao validar certificado fiscal');
+}
+
 export async function getFiscalDocuments(params = {}) {
   const response = await fetch(buildUrl('/fiscal/documents', params), {
     headers: authHeaders()
