@@ -26,6 +26,13 @@ function createHttpError(message, statusCode = 400) {
   return error;
 }
 
+function getDateOnlyEndOfDay(value) {
+  if (!value) return null;
+  const datePart = String(value instanceof Date ? value.toISOString() : value).slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(datePart)) return null;
+  return new Date(`${datePart}T23:59:59.999Z`);
+}
+
 async function listarLogsSincronizacao(query = {}) {
   const limit = query.limit || 50;
   const page = query.page || 1;
@@ -319,7 +326,7 @@ async function executarPreflightSincronizacaoFiscal(req, payload = {}) {
     ];
 
     if (certificate) {
-      const expiresAt = certificate.valid_until ? new Date(certificate.valid_until) : null;
+      const expiresAt = getDateOnlyEndOfDay(certificate.valid_until);
       const expired = expiresAt ? expiresAt.getTime() < Date.now() : false;
       checks.push(buildCheck(
         'CERTIFICATE_EXPIRATION',

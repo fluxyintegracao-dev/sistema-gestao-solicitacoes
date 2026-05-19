@@ -43,6 +43,14 @@ function StatusPill({ active, children }) {
   );
 }
 
+function formatDateOnly(value) {
+  if (!value) return 'nao informada';
+  const datePart = String(value).slice(0, 10);
+  const match = datePart.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return 'nao informada';
+  return `${match[3]}/${match[2]}/${match[1]}`;
+}
+
 export default function FiscalCompanies() {
   const [companies, setCompanies] = useState([]);
   const [form, setForm] = useState(EMPTY_FORM);
@@ -377,7 +385,7 @@ export default function FiscalCompanies() {
                 </div>
                 <div className="mt-4 flex items-center justify-between gap-3">
                   <span className="text-xs text-slate-500">
-                    Validade: {certificate.valid_until ? new Date(certificate.valid_until).toLocaleDateString('pt-BR') : 'nao informada'}
+                    Validade: {formatDateOnly(certificate.valid_until)}
                   </span>
                   <button className="btn-secondary" type="button" onClick={() => validateCertificate(certificate)} disabled={validatingCertificateId === certificate.id}>
                     {validatingCertificateId === certificate.id ? 'Validando...' : 'Validar'}

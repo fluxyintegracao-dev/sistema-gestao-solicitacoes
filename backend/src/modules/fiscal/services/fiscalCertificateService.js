@@ -51,6 +51,13 @@ function normalizeLocalPath(localPath) {
   return normalized;
 }
 
+function getDateOnlyEndOfDay(value) {
+  if (!value) return null;
+  const datePart = String(value instanceof Date ? value.toISOString() : value).slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(datePart)) return null;
+  return new Date(`${datePart}T23:59:59.999Z`);
+}
+
 async function validateLocalPfxFile({ certificatePath, passphrase }) {
   const normalized = normalizeLocalPath(certificatePath);
   const stat = await fs.stat(normalized);
@@ -199,7 +206,8 @@ async function validarFiscalCertificate(req, id) {
   let validationStatus = 'metadata_validated';
 
   if (certificate.valid_until) {
-    const expired = new Date(certificate.valid_until).getTime() < Date.now();
+    const validUntilEnd = getDateOnlyEndOfDay(certificate.valid_until);
+    const expired = validUntilEnd ? validUntilEnd.getTime() < Date.now() : false;
     checks.push({
       name: 'validade_informada',
       status: expired ? 'ERROR' : 'OK',
