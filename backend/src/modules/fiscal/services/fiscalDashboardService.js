@@ -185,6 +185,8 @@ async function getDiagnosticoFiscal() {
       distribution_url_https: sefazConfig.distributionUrl ? isHttpsUrl(sefazConfig.distributionUrl) : false,
       request_timeout_ms: sefazConfig.requestTimeoutMs,
       max_docs_per_run: sefazConfig.maxDocsPerRun,
+      empty_result_wait_minutes: sefazConfig.emptyResultWaitMinutes,
+      consumo_indevido_wait_minutes: sefazConfig.consumoIndevidoWaitMinutes,
       block_on_consumo_indevido: sefazConfig.blockOnConsumoIndevido,
       lock_ttl_seconds: Number(process.env.FISCAL_SEFAZ_LOCK_TTL_SECONDS || 900)
     },

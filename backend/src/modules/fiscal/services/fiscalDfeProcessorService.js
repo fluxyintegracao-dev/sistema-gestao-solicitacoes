@@ -200,6 +200,7 @@ async function processarRetornoDistribuicaoDfe({
           max_nsu: maxNsu != null ? String(maxNsu) : syncState.max_nsu,
           last_success_at: new Date(),
           last_attempt_at: startedAt,
+          next_allowed_sync_at: null,
           status: 'idle',
           last_error_code: null,
           last_error_message: null,

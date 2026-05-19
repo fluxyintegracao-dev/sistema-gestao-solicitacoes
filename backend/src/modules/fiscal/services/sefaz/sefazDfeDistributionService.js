@@ -30,6 +30,8 @@ function getSefazRuntimeConfig() {
     distributionUrl: process.env.FISCAL_SEFAZ_DFE_DISTRIBUTION_URL || null,
     requestTimeoutMs: Number(process.env.FISCAL_SEFAZ_REQUEST_TIMEOUT_MS || 30000),
     maxDocsPerRun: Number(process.env.FISCAL_SEFAZ_MAX_DOCS_PER_RUN || 50),
+    emptyResultWaitMinutes: Number(process.env.FISCAL_SEFAZ_EMPTY_RESULT_WAIT_MINUTES || 60),
+    consumoIndevidoWaitMinutes: Number(process.env.FISCAL_SEFAZ_CONSUMO_INDEVIDO_WAIT_MINUTES || 60),
     blockOnConsumoIndevido: process.env.FISCAL_SEFAZ_BLOCK_ON_CONSUMO_INDEVIDO !== 'false'
   };
 }
@@ -58,10 +60,42 @@ function normalizeCompanyContext(company) {
   };
 }
 
+function getDateOnlyEndOfDay(value) {
+  if (!value) return null;
+  const datePart = String(value instanceof Date ? value.toISOString() : value).slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(datePart)) return null;
+  return new Date(`${datePart}T23:59:59.999Z`);
+}
+
+function assertCertificateReadyForSefaz(certificate) {
+  if (!certificate) {
+    throw createHttpError('Certificado fiscal ativo nao encontrado para chamada SEFAZ.', 400);
+  }
+
+  if (certificate.storage_type !== 'local_secure_path') {
+    throw createHttpError('Nesta fase, chamadas SEFAZ reais aceitam apenas certificado em caminho local seguro.', 400);
+  }
+
+  if (certificate.validation_status !== 'pfx_valid') {
+    throw createHttpError('Valide administrativamente o certificado A1 antes de executar chamada real SEFAZ.', 400);
+  }
+
+  const expiresAt = getDateOnlyEndOfDay(certificate.valid_until);
+  if (expiresAt && expiresAt.getTime() < Date.now()) {
+    throw createHttpError('Certificado fiscal informado esta vencido.', 400);
+  }
+
+  if (!certificate.certificate_path) {
+    throw createHttpError('Caminho local do certificado fiscal nao esta configurado.', 400);
+  }
+
+  return certificate;
+}
+
 async function enviarConsultaDistribuicao({ company, documentType, soapRequest } = {}) {
   const companyContext = normalizeCompanyContext(company);
   const config = assertSefazRealEnabled();
-  const certificate = await obterCertificadoAtivoComSegredos(company.id);
+  const certificate = assertCertificateReadyForSefaz(await obterCertificadoAtivoComSegredos(company.id));
   const response = await postSoapRequest({
     endpointUrl: config.distributionUrl,
     soapRequest,
@@ -165,6 +199,7 @@ module.exports = {
   consultarPorNsu,
   enviarConsultaDistribuicao,
   enviarManifestacao,
+  assertCertificateReadyForSefaz,
   getSefazRuntimeConfig,
   normalizeCompanyContext
 };

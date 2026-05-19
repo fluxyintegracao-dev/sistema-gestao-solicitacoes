@@ -16,10 +16,66 @@ const {
 const { consultarDistNsu } = require('./sefaz/sefazDfeDistributionService');
 
 const DEFAULT_LOCK_TTL_SECONDS = 15 * 60;
+const SEFAZ_EMPTY_RESULT_CODE = '137';
+const SEFAZ_DOCUMENTS_FOUND_CODE = '138';
+const SEFAZ_CONSUMO_INDEVIDO_CODE = '656';
 
 function getLockTtlMs() {
   const seconds = Number(process.env.FISCAL_SEFAZ_LOCK_TTL_SECONDS || DEFAULT_LOCK_TTL_SECONDS);
   return Math.max(60, Math.min(seconds, 60 * 60)) * 1000;
+}
+
+function minutesFromEnv(name, fallback) {
+  const value = Number(process.env[name] || fallback);
+  if (!Number.isFinite(value) || value <= 0) return fallback;
+  return Math.max(5, Math.min(value, 24 * 60));
+}
+
+function addMinutes(date, minutes) {
+  return new Date(date.getTime() + minutes * 60 * 1000);
+}
+
+function getSefazPostResponsePolicy(response, startedAt) {
+  const responseCode = String(response?.response_code || '').trim();
+  if (responseCode === SEFAZ_EMPTY_RESULT_CODE) {
+    const minutes = minutesFromEnv('FISCAL_SEFAZ_EMPTY_RESULT_WAIT_MINUTES', 60);
+    return {
+      status: 'idle',
+      next_allowed_sync_at: addMinutes(startedAt, minutes),
+      response_code: responseCode,
+      response_message: response.response_message || 'Nenhum documento localizado pela SEFAZ.',
+      severity: 'success'
+    };
+  }
+
+  if (responseCode === SEFAZ_CONSUMO_INDEVIDO_CODE) {
+    const minutes = minutesFromEnv('FISCAL_SEFAZ_CONSUMO_INDEVIDO_WAIT_MINUTES', 60);
+    return {
+      status: 'blocked',
+      next_allowed_sync_at: addMinutes(startedAt, minutes),
+      response_code: responseCode,
+      response_message: response.response_message || 'SEFAZ retornou consumo indevido. Sincronizacao bloqueada temporariamente.',
+      severity: 'blocked'
+    };
+  }
+
+  if (responseCode && ![SEFAZ_DOCUMENTS_FOUND_CODE].includes(responseCode)) {
+    return {
+      status: 'idle',
+      next_allowed_sync_at: null,
+      response_code: responseCode,
+      response_message: response.response_message || 'Retorno SEFAZ processado com codigo nao classificado.',
+      severity: 'warn'
+    };
+  }
+
+  return {
+    status: 'idle',
+    next_allowed_sync_at: null,
+    response_code: responseCode || null,
+    response_message: response?.response_message || null,
+    severity: 'success'
+  };
 }
 
 async function ensureSyncState(company, documentType) {
@@ -175,6 +231,7 @@ async function registrarTentativaSefaz(company, syncState, documentType, started
       documentType,
       ultNsu: syncState.ult_nsu || '0'
     });
+    const responsePolicy = getSefazPostResponsePolicy(response, startedAt);
 
     const rawRequest = response.raw_request_xml
       ? await saveRawSefazRequest({
@@ -203,6 +260,34 @@ async function registrarTentativaSefaz(company, syncState, documentType, started
       })
       : null;
 
+    if (responsePolicy.status === 'blocked') {
+      await log.update({
+        finished_at: new Date(),
+        status: 'blocked',
+        response_ult_nsu: response.ult_nsu != null ? String(response.ult_nsu) : log.response_ult_nsu,
+        response_max_nsu: response.max_nsu != null ? String(response.max_nsu) : log.response_max_nsu,
+        response_code: responsePolicy.response_code,
+        response_message: responsePolicy.response_message,
+        error_message: responsePolicy.response_message,
+        raw_request_storage_key: rawRequest?.key || null,
+        raw_response_storage_key: rawResponse?.key || null
+      });
+
+      await liberarSyncLock(syncState, lock.lockToken, {
+        status: 'blocked',
+        next_allowed_sync_at: responsePolicy.next_allowed_sync_at,
+        last_error_code: responsePolicy.response_code,
+        last_error_message: responsePolicy.response_message,
+        consecutive_errors: Number(syncState.consecutive_errors || 0) + 1
+      });
+
+      return {
+        log,
+        status: 'blocked',
+        message: responsePolicy.response_message
+      };
+    }
+
     const processed = await processarRetornoDistribuicaoDfe({
       company,
       syncStateId: syncState.id,
@@ -212,6 +297,18 @@ async function registrarTentativaSefaz(company, syncState, documentType, started
       rawRequestStorageKey: rawRequest?.key || null,
       rawResponseStorageKey: rawResponse?.key || null
     });
+
+    if (responsePolicy.next_allowed_sync_at || responsePolicy.status === 'blocked') {
+      await syncState.update({
+        status: responsePolicy.status,
+        next_allowed_sync_at: responsePolicy.next_allowed_sync_at,
+        last_error_code: responsePolicy.status === 'blocked' ? responsePolicy.response_code : null,
+        last_error_message: responsePolicy.status === 'blocked' ? responsePolicy.response_message : null,
+        consecutive_errors: responsePolicy.status === 'blocked'
+          ? Number(syncState.consecutive_errors || 0) + 1
+          : 0
+      });
+    }
 
     return {
       log,
@@ -257,6 +354,7 @@ async function executarSyncDfeControlado({ company, documentType = 'nfe' } = {})
 module.exports = {
   ensureSyncState,
   executarSyncDfeControlado,
+  getSefazPostResponsePolicy,
   liberarSyncLock,
   tentarAdquirirSyncLock
 };

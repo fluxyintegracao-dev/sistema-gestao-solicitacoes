@@ -172,6 +172,8 @@ async function executarSincronizacaoManual(req, payload = {}) {
   }
 
   const hasBlocked = results.some((result) => result.status === 'blocked');
+  const hasSuccess = results.some((result) => result.status === 'success');
+  const hasSkipped = results.some((result) => result.status === 'skipped');
 
   await registrarEventoSeguranca({
     req,
@@ -189,10 +191,14 @@ async function executarSincronizacaoManual(req, payload = {}) {
   });
 
   return {
-    status: hasBlocked ? 'blocked' : 'skipped',
+    status: hasBlocked ? 'blocked' : hasSuccess ? 'success' : 'skipped',
     message: hasBlocked
-      ? 'Tentativa registrada. A integracao real com SEFAZ sera implementada na proxima fase.'
-      : 'Tentativa registrada. Ative FISCAL_SEFAZ_ENABLED apenas quando a integracao real estiver pronta.',
+      ? 'Tentativa registrada com bloqueio controlado. Revise os logs fiscais antes de nova execucao.'
+      : hasSuccess
+        ? 'Sincronizacao fiscal executada e registrada com sucesso.'
+        : hasSkipped
+          ? 'Tentativa registrada. SEFAZ esta desabilitada por configuracao neste ambiente.'
+          : 'Tentativa registrada sem empresas processadas.',
     logs: results.map((result) => result.log)
   };
 }

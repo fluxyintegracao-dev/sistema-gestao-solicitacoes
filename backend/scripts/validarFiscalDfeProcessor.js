@@ -18,6 +18,9 @@ const {
   buildConsNsuRequest,
   buildDistNsuRequest
 } = require('../src/modules/fiscal/services/sefaz/sefazDfeSoapBuilderService');
+const {
+  getSefazPostResponsePolicy
+} = require('../src/modules/fiscal/services/fiscalDfeSyncJobService');
 const fixture = require('../src/modules/fiscal/services/sefaz/fixtures/nfeDistribuicaoNormalizada.fixture');
 
 const fullAccessKey = '12345678901234567890123456789012345678901234';
@@ -138,5 +141,20 @@ const consChNFeRequest = buildConsChNFeRequest({
 
 assert.strictEqual(consChNFeRequest.request_type, 'consChNFe');
 assert.ok(consChNFeRequest.dist_dfe_xml.includes(`<chNFe>${fullAccessKey}</chNFe>`));
+
+const startedAt = new Date('2026-05-19T12:00:00.000Z');
+const emptyPolicy = getSefazPostResponsePolicy({
+  response_code: '137',
+  response_message: 'Nenhum documento localizado'
+}, startedAt);
+assert.strictEqual(emptyPolicy.status, 'idle');
+assert.strictEqual(emptyPolicy.next_allowed_sync_at.toISOString(), '2026-05-19T13:00:00.000Z');
+
+const consumoPolicy = getSefazPostResponsePolicy({
+  response_code: '656',
+  response_message: 'Consumo Indevido'
+}, startedAt);
+assert.strictEqual(consumoPolicy.status, 'blocked');
+assert.strictEqual(consumoPolicy.next_allowed_sync_at.toISOString(), '2026-05-19T13:00:00.000Z');
 
 console.log('Fiscal DFe processor fixture OK');

@@ -4,6 +4,7 @@ import {
   getFiscalCompanies,
   getFiscalDiagnostics,
   runFiscalFixtureSync,
+  runFiscalSyncPreflight,
   runFiscalStorageProbe
 } from '../services/fiscalApi';
 
@@ -20,6 +21,20 @@ function StatusBadge({ active }) {
   return (
     <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${active ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
       {active ? 'OK' : 'Pendente'}
+    </span>
+  );
+}
+
+function CheckStatusBadge({ status }) {
+  const normalized = String(status || 'WARN').toUpperCase();
+  const classes = normalized === 'OK'
+    ? 'bg-emerald-50 text-emerald-700'
+    : normalized === 'ERROR'
+      ? 'bg-red-50 text-red-700'
+      : 'bg-amber-50 text-amber-700';
+  return (
+    <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${classes}`}>
+      {normalized}
     </span>
   );
 }
@@ -45,6 +60,9 @@ export default function FiscalDiagnostics() {
   const [fixtureLoading, setFixtureLoading] = useState(false);
   const [fixtureResult, setFixtureResult] = useState(null);
   const [fixtureError, setFixtureError] = useState('');
+  const [preflightLoading, setPreflightLoading] = useState(false);
+  const [preflightResult, setPreflightResult] = useState(null);
+  const [preflightError, setPreflightError] = useState('');
   const [companies, setCompanies] = useState([]);
   const [fixtureCompanyId, setFixtureCompanyId] = useState('');
 
@@ -110,6 +128,23 @@ export default function FiscalDiagnostics() {
       setFixtureError(err.message || 'Erro ao processar fixture fiscal');
     } finally {
       setFixtureLoading(false);
+    }
+  };
+
+  const handlePreflight = async () => {
+    setPreflightLoading(true);
+    setPreflightError('');
+    setPreflightResult(null);
+    try {
+      const response = await runFiscalSyncPreflight({
+        document_type: 'nfe',
+        company_id: fixtureCompanyId || undefined
+      });
+      setPreflightResult(response);
+    } catch (err) {
+      setPreflightError(err.message || 'Erro ao executar preflight fiscal');
+    } finally {
+      setPreflightLoading(false);
     }
   };
 
@@ -248,8 +283,73 @@ export default function FiscalDiagnostics() {
             <Field label="Timeout SEFAZ" value={`${sefaz.request_timeout_ms || 30000}ms`} />
             <Field label="Max docs/run" value={sefaz.max_docs_per_run} />
             <Field label="Lock TTL" value={`${sefaz.lock_ttl_seconds || 900}s`} />
+            <Field label="Espera sem DFe" value={`${sefaz.empty_result_wait_minutes || 60}min`} />
+            <Field label="Espera consumo indevido" value={`${sefaz.consumo_indevido_wait_minutes || 60}min`} />
             <Field label="Bloqueio consumo indevido" value={sefaz.block_on_consumo_indevido ? 'Sim' : 'Nao'} />
           </Section>
+
+          <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+              <div>
+                <h2 className="text-base font-semibold text-slate-950 dark:text-white">Preflight SEFAZ</h2>
+                <p className="mt-1 max-w-2xl text-sm text-slate-600 dark:text-slate-300">
+                  Valida empresa, certificado, storage, endpoint e SOAP local antes de qualquer chamada real.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handlePreflight}
+                disabled={preflightLoading || !fixtureCompanyId}
+                className="btn-primary"
+              >
+                {preflightLoading ? 'Validando...' : 'Executar preflight'}
+              </button>
+            </div>
+            {preflightError ? <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{preflightError}</div> : null}
+            {preflightResult ? (
+              <div className="mt-4 space-y-3">
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  <Field label="Resultado" value={<StatusBadge active={preflightResult.ready} />} />
+                  <Field label="SEFAZ real" value={preflightResult.sefaz_enabled ? 'Habilitada' : 'Desabilitada'} />
+                  <Field label="Tipo" value={preflightResult.document_type} />
+                  <Field label="Empresas" value={preflightResult.companies?.length || 0} />
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/40">
+                  <p className="font-semibold text-slate-950 dark:text-white">Checks globais</p>
+                  <div className="mt-2 grid gap-2 md:grid-cols-2">
+                    {(preflightResult.global_checks || []).map((check) => (
+                      <div key={check.code} className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="font-medium text-slate-900 dark:text-white">{check.code}</span>
+                          <CheckStatusBadge status={check.status} />
+                        </div>
+                        <p className="mt-1 text-slate-600 dark:text-slate-300">{check.message}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                {(preflightResult.companies || []).map((item) => (
+                  <div key={item.company.id} className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/40">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="font-semibold text-slate-950 dark:text-white">{item.company.razao_social}</p>
+                      <CheckStatusBadge status={item.ready ? 'OK' : 'WARN'} />
+                    </div>
+                    <div className="mt-2 grid gap-2 md:grid-cols-2">
+                      {(item.checks || []).map((check) => (
+                        <div key={check.code} className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="font-medium text-slate-900 dark:text-white">{check.code}</span>
+                            <CheckStatusBadge status={check.status} />
+                          </div>
+                          <p className="mt-1 text-slate-600 dark:text-slate-300">{check.message}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </section>
 
           <Section title="Dados fiscais">
             <Field label="Empresas cadastradas" value={dados.empresas_total} />
