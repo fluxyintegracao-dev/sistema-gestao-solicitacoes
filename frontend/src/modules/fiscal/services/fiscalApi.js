@@ -36,6 +36,21 @@ export async function getFiscalDashboard() {
   return parseJson(response, 'Erro ao buscar painel fiscal');
 }
 
+export async function getFiscalDiagnostics() {
+  const response = await fetch(`${API_URL}/fiscal/diagnostics`, {
+    headers: authHeaders()
+  });
+  return parseJson(response, 'Erro ao buscar diagnostico fiscal');
+}
+
+export async function runFiscalStorageProbe() {
+  const response = await fetch(`${API_URL}/fiscal/diagnostics/storage-probe`, {
+    method: 'POST',
+    headers: authHeaders()
+  });
+  return parseJson(response, 'Erro ao executar teste de storage fiscal');
+}
+
 export async function getFiscalCompanies(params = {}) {
   const response = await fetch(buildUrl('/fiscal/companies', params), {
     headers: authHeaders()

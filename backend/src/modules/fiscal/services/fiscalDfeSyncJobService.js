@@ -1,10 +1,19 @@
 'use strict';
 
+const { randomUUID } = require('crypto');
+const { Op } = require('sequelize');
 const {
   FiscalDfeSyncState,
   FiscalSyncLog
 } = require('../../../models');
 const { consultarDistNsu } = require('./sefaz/sefazDfeDistributionService');
+
+const DEFAULT_LOCK_TTL_SECONDS = 15 * 60;
+
+function getLockTtlMs() {
+  const seconds = Number(process.env.FISCAL_SEFAZ_LOCK_TTL_SECONDS || DEFAULT_LOCK_TTL_SECONDS);
+  return Math.max(60, Math.min(seconds, 60 * 60)) * 1000;
+}
 
 async function ensureSyncState(company, documentType) {
   const [syncState] = await FiscalDfeSyncState.findOrCreate({
@@ -20,6 +29,78 @@ async function ensureSyncState(company, documentType) {
     }
   });
   return syncState;
+}
+
+async function registrarTentativaIgnorada(company, syncState, documentType, startedAt, { code, message }) {
+  const log = await FiscalSyncLog.create({
+    fiscal_company_id: company.id,
+    document_type: documentType,
+    ambiente_sefaz: company.ambiente_sefaz || 'homologacao',
+    started_at: startedAt,
+    finished_at: new Date(),
+    status: 'skipped',
+    request_type: 'distNSU',
+    request_nsu_start: syncState.ult_nsu || '0',
+    response_ult_nsu: syncState.ult_nsu || '0',
+    response_max_nsu: syncState.max_nsu || '0',
+    response_code: code,
+    response_message: message,
+    documents_found: 0,
+    documents_processed: 0
+  });
+
+  await syncState.update({
+    last_attempt_at: startedAt,
+    last_error_code: code,
+    last_error_message: message
+  });
+
+  return { log, status: 'skipped', message };
+}
+
+async function tentarAdquirirSyncLock(syncState, startedAt) {
+  const lockToken = randomUUID();
+  const lockedUntil = new Date(startedAt.getTime() + getLockTtlMs());
+
+  const [updated] = await FiscalDfeSyncState.update(
+    {
+      status: 'syncing',
+      lock_token: lockToken,
+      locked_until: lockedUntil,
+      last_attempt_at: startedAt
+    },
+    {
+      where: {
+        id: syncState.id,
+        [Op.or]: [
+          { locked_until: null },
+          { locked_until: { [Op.lt]: startedAt } },
+          { status: { [Op.ne]: 'syncing' } }
+        ]
+      }
+    }
+  );
+
+  if (!updated) return null;
+  await syncState.reload();
+  return { lockToken, lockedUntil };
+}
+
+async function liberarSyncLock(syncState, lockToken, updates = {}) {
+  await FiscalDfeSyncState.update(
+    {
+      ...updates,
+      lock_token: null,
+      locked_until: null
+    },
+    {
+      where: {
+        id: syncState.id,
+        lock_token: lockToken
+      }
+    }
+  );
+  await syncState.reload();
 }
 
 async function registrarTentativaSemSefaz(company, syncState, documentType, startedAt) {
@@ -52,6 +133,21 @@ async function registrarTentativaSemSefaz(company, syncState, documentType, star
 }
 
 async function registrarTentativaStub(company, syncState, documentType, startedAt) {
+  if (syncState.next_allowed_sync_at && new Date(syncState.next_allowed_sync_at).getTime() > startedAt.getTime()) {
+    return registrarTentativaIgnorada(company, syncState, documentType, startedAt, {
+      code: 'FISCAL_SYNC_THROTTLED',
+      message: 'Sincronizacao fiscal aguardando proxima janela permitida.'
+    });
+  }
+
+  const lock = await tentarAdquirirSyncLock(syncState, startedAt);
+  if (!lock) {
+    return registrarTentativaIgnorada(company, syncState, documentType, startedAt, {
+      code: 'FISCAL_SYNC_LOCKED',
+      message: 'Ja existe uma sincronizacao fiscal em andamento para esta empresa e tipo documental.'
+    });
+  }
+
   const log = await FiscalSyncLog.create({
     fiscal_company_id: company.id,
     document_type: documentType,
@@ -84,8 +180,7 @@ async function registrarTentativaStub(company, syncState, documentType, startedA
       error_message: responseMessage
     });
 
-    await syncState.update({
-      last_attempt_at: startedAt,
+    await liberarSyncLock(syncState, lock.lockToken, {
       status: 'blocked',
       last_error_code: responseCode,
       last_error_message: responseMessage,
@@ -101,6 +196,12 @@ async function registrarTentativaStub(company, syncState, documentType, startedA
     status: 'blocked',
     response_code: 'FISCAL_SEFAZ_STUB',
     response_message: responseMessage
+  });
+
+  await liberarSyncLock(syncState, lock.lockToken, {
+    status: 'blocked',
+    last_error_code: 'FISCAL_SEFAZ_STUB',
+    last_error_message: responseMessage
   });
 
   return { log, status: 'blocked', message: responseMessage };
@@ -120,5 +221,7 @@ async function executarSyncDfeControlado({ company, documentType = 'nfe' } = {})
 
 module.exports = {
   ensureSyncState,
-  executarSyncDfeControlado
+  executarSyncDfeControlado,
+  liberarSyncLock,
+  tentarAdquirirSyncLock
 };

@@ -1,6 +1,10 @@
 'use strict';
 
-const { getDashboardFiscal } = require('../services/fiscalDashboardService');
+const {
+  executarProbeStorageFiscal,
+  getDashboardFiscal,
+  getDiagnosticoFiscal
+} = require('../services/fiscalDashboardService');
 const { getFiscalS3Config, isFiscalS3Configured } = require('../services/fiscalS3Service');
 
 function handleError(res, error) {
@@ -34,7 +38,27 @@ async function dashboard(req, res) {
   }
 }
 
+async function diagnostics(req, res) {
+  try {
+    const data = await getDiagnosticoFiscal();
+    return res.json(data);
+  } catch (error) {
+    return handleError(res, error);
+  }
+}
+
+async function storageProbe(req, res) {
+  try {
+    const data = await executarProbeStorageFiscal({ req });
+    return res.json(data);
+  } catch (error) {
+    return handleError(res, error);
+  }
+}
+
 module.exports = {
   dashboard,
-  health
+  diagnostics,
+  health,
+  storageProbe
 };

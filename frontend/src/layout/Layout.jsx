@@ -35,6 +35,7 @@ import {
   HiOutlineInboxStack,
   HiOutlinePaperAirplane,
   HiOutlineSparkles,
+  HiOutlineKey,
   HiOutlineLifebuoy,
   HiOutlineChatBubbleOvalLeft
 } from 'react-icons/hi2';
@@ -381,6 +382,8 @@ export default function Layout() {
       addGroup('Fiscal', [
         item('/fiscal', 'Painel Fiscal', HiOutlineSquares2X2),
         fiscalConfigAccess ? item('/fiscal/empresas', 'Empresas Fiscais', HiOutlineBuildingOffice2) : null,
+        fiscalConfigAccess ? item('/fiscal/empresas#certificados', 'Certificados', HiOutlineKey) : null,
+        fiscalConfigAccess ? item('/fiscal/diagnostico', 'Diagnostico', HiOutlineAdjustmentsHorizontal) : null,
         fiscalDocumentsAccess ? item('/fiscal/documentos', 'Documentos Fiscais', HiOutlineDocumentText) : null,
         fiscalDocumentsAccess ? item('/fiscal/divergencias', 'Divergencias', HiOutlineExclamationTriangle) : null,
         fiscalDocumentsAccess ? item('/fiscal/exportacao-contabil', 'Exportacao Contabil', HiOutlineFolderOpen) : null,

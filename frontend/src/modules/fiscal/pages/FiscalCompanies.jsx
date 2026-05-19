@@ -242,7 +242,7 @@ export default function FiscalCompanies() {
         </table>
       </div>
 
-      <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+      <section id="certificados" className="grid gap-5 scroll-mt-24 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <form onSubmit={submitCertificate} className="grid gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 md:grid-cols-2">
           <div className="md:col-span-2">
             <h2 className="text-base font-semibold text-slate-950 dark:text-white">Certificado A1</h2>

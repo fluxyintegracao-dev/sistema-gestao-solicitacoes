@@ -131,6 +131,8 @@ const allowFiscalLogs = permit({
 
 router.get('/health', allowFiscal, FiscalDashboardController.health);
 router.get('/dashboard', allowFiscal, FiscalDashboardController.dashboard);
+router.get('/diagnostics', allowFiscalConfig, FiscalDashboardController.diagnostics);
+router.post('/diagnostics/storage-probe', allowFiscalConfig, FiscalDashboardController.storageProbe);
 
 router.get('/companies', allowFiscalConfig, validateRequest({ query: validateFiscalCompanyQuery }), FiscalCompanyController.index);
 router.post('/companies', allowFiscalConfig, validateRequest({ body: validateFiscalCompanyCreateBody }), FiscalCompanyController.create);

@@ -10,6 +10,7 @@ const ALLOWED_FISCAL_MIME_TYPES = new Set([
   'text/xml',
   'application/pdf',
   'application/zip',
+  'text/plain',
   'text/csv',
   'image/jpeg',
   'image/png'
