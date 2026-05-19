@@ -67,7 +67,7 @@
 
 ## Prioridades da diretoria
 - `DIR_ADMIN` e `SUPERADMIN` podem abrir lotes de prioridade para `PUBLICA` ou `PRIVADA`
-- `DIR_OBRAS_PUBLICAS` e `DIR_OBRAS_PRIVADAS` podem abrir pedidos de urgencia apenas para a propria classificacao e salvar a selecao para aprovacao da `DIR_ADMIN`
+- `DIR_OBRAS_PUBLICAS` e `DIR_OBRAS_PRIVADAS` podem abrir pedidos de urgencia apenas para a propria classificacao e finalizar o pedido para aprovacao da `DIR_ADMIN` ou do setor `DIRETORIA`
 - o lote registra:
   - classificacao alvo
   - diretoria alvo resolvida pela configuracao de aprovacao
@@ -78,7 +78,7 @@
   - status do lote
 - apenas a diretoria alvo configurada, ou `SUPERADMIN`, pode finalizar o lote
 - lotes criados por `DIR_OBRAS_PUBLICAS` ou `DIR_OBRAS_PRIVADAS` sao pedidos de urgencia para aprovacao da `DIR_ADMIN`
-- nesses pedidos de urgencia, apenas `DIR_ADMIN` ou `SUPERADMIN` pode finalizar/aprovar o lote
+- nesses pedidos de urgencia, apenas `DIR_ADMIN`, setor `DIRETORIA` ou `SUPERADMIN` pode finalizar/aprovar o lote
 - `SUPERADMIN` pode excluir lotes sem itens autorizados
 - as solicitacoes elegiveis nao dependem do setor atual
 - no fluxo novo de diretoria, precisam:
@@ -86,7 +86,7 @@
   - ou ja sairam da diretoria alvo no fluxo novo
   - nao estao `PAGA`, `REJEITADA` ou `CANCELADA`
 - solicitacoes ja adicionadas/autorizadas em outros lotes podem aparecer em novos lotes abertos enquanto nao estiverem `PAGA`, `REJEITADA` ou `CANCELADA`
-- na tela de prioridades, a selecao permanece ao trocar filtros e so e removida quando o item e desmarcado ou quando o usuario limpa filtros e selecao
+- na tela de prioridades, a selecao em rascunho permanece ao trocar filtros ou navegar para outra pagina e so e removida quando o item e desmarcado ou quando o usuario aciona `Limpar selecao`
 - ao salvar ou finalizar um lote, solicitacoes que deixaram de ser elegiveis sao ignoradas/removidas da selecao sem exigir que o usuario refaca toda a selecao
 - ao finalizar:
   - os itens entram em `prioridade_lote_itens`

@@ -38,6 +38,7 @@ const TIPO_LOTE = {
 
 const DIRETORIA_ADMIN_CODIGO = 'DIR_ADMIN';
 const DIRETORIA_ADMIN_NOME = 'DIRETORIA ADMINISTRATIVA';
+const DIRETORIA_GERAL_CODIGO = 'DIRETORIA';
 const SETOR_FINANCEIRO_CODIGO = 'FINANCEIRO';
 
 function normalizarStatusLote(valor) {
@@ -137,6 +138,8 @@ async function obterPermissoesPrioridade(req) {
   const tokensUsuario = await obterTokensSetorUsuario(req, areaUsuario);
   const isSuperadmin = perfil === 'SUPERADMIN';
   const isDirAdmin = isSuperadmin || usuarioPertenceAoSetor(tokensUsuario, DIRETORIA_ADMIN_CODIGO);
+  const isDiretoriaGeral = !isSuperadmin && usuarioPertenceAoSetor(tokensUsuario, DIRETORIA_GERAL_CODIGO);
+  const isAprovadorPrioridade = isDirAdmin || isDiretoriaGeral;
   const isLeitorConfigurado = await usuarioTemAcessoPrioridadeDiretoria(req.user?.id);
   const classificacoesOperaveis = ['PUBLICA', 'PRIVADA'].filter((classificacao) => {
     const diretoriaConfigurada = configuracao?.diretoriasPorClassificacao?.[classificacao];
@@ -150,15 +153,17 @@ async function obterPermissoesPrioridade(req) {
     tokensUsuario,
     isSuperadmin,
     isDirAdmin,
+    isDiretoriaGeral,
+    isAprovadorPrioridade,
     isLeitorConfigurado,
     podeSolicitarLote: isDirAdmin || classificacoesOperaveis.length > 0,
     classificacoesOperaveis,
-    podeAcessarModulo: isDirAdmin || classificacoesOperaveis.length > 0 || isLeitorConfigurado
+    podeAcessarModulo: isAprovadorPrioridade || classificacoesOperaveis.length > 0 || isLeitorConfigurado
   };
 }
 
 function usuarioPodeVisualizarLote(permissoes, lote) {
-  if (permissoes?.isSuperadmin || permissoes?.isDirAdmin) return true;
+  if (permissoes?.isSuperadmin || permissoes?.isAprovadorPrioridade) return true;
   if (Array.isArray(permissoes?.classificacoesOperaveis) && permissoes.classificacoesOperaveis.length > 0) {
     return permisssoesTemClassificacao(permissoes, lote?.classificacao_alvo);
   }
@@ -174,7 +179,7 @@ function permisssoesTemClassificacao(permissoes, classificacao) {
 function usuarioPodeFinalizarLote(permissoes, lote) {
   if (permissoes?.isSuperadmin) return true;
   if (String(lote?.tipo_lote || TIPO_LOTE.DIR_ADMIN).toUpperCase() === TIPO_LOTE.SOLICITACAO_DIRETORIA) {
-    return Boolean(permissoes?.isDirAdmin);
+    return Boolean(permissoes?.isAprovadorPrioridade);
   }
   return permisssoesTemClassificacao(permissoes, lote?.classificacao_alvo);
 }
@@ -182,7 +187,7 @@ function usuarioPodeFinalizarLote(permissoes, lote) {
 function usuarioPodeEditarSelecaoLote(permissoes, lote) {
   if (permissoes?.isSuperadmin) return true;
   if (String(lote?.tipo_lote || TIPO_LOTE.DIR_ADMIN).toUpperCase() === TIPO_LOTE.SOLICITACAO_DIRETORIA) {
-    return Boolean(permissoes?.isDirAdmin || permisssoesTemClassificacao(permissoes, lote?.classificacao_alvo));
+    return Boolean(permissoes?.isAprovadorPrioridade || permisssoesTemClassificacao(permissoes, lote?.classificacao_alvo));
   }
   return usuarioPodeFinalizarLote(permissoes, lote);
 }
@@ -600,6 +605,36 @@ async function notificarCriacaoLotePrioridade({ lote, permissoes, usuarioId }) {
   }
 }
 
+async function notificarPedidoUrgenciaFinalizado({ lote, usuarioId }) {
+  try {
+    const destinatarios = await obterUsuariosAtivosPorSetores([
+      DIRETORIA_ADMIN_CODIGO,
+      DIRETORIA_GERAL_CODIGO
+    ]);
+
+    if (destinatarios.length === 0) return;
+
+    const criador = lote?.setor_criador_nome || lote?.setor_criador_codigo || 'Diretoria de obras';
+    const mensagem = `${criador} finalizou o pedido de prioridade #${lote.id} para aprovacao`;
+
+    await criarNotificacao({
+      solicitacao_id: null,
+      tipo: 'PRIORIDADE_DIRETORIA_PEDIDO_ENVIADO',
+      mensagem,
+      metadata: {
+        prioridade_lote_id: lote.id,
+        rota: '/prioridades-diretoria',
+        tipo_lote: lote.tipo_lote || TIPO_LOTE.SOLICITACAO_DIRETORIA
+      },
+      created_by: usuarioId,
+      destinatarios,
+      usarDestinatariosInformados: true
+    });
+  } catch (error) {
+    console.error('Erro ao notificar envio de pedido de prioridade:', error);
+  }
+}
+
 module.exports = {
   async contexto(req, res) {
     try {
@@ -622,7 +657,8 @@ module.exports = {
           pode_acessar_modulo: permissoes.podeAcessarModulo,
           acesso_visualizacao_configurado: permissoes.isLeitorConfigurado,
           is_superadmin: permissoes.isSuperadmin,
-          is_dir_admin: permissoes.isDirAdmin
+          is_dir_admin: permissoes.isDirAdmin,
+          is_diretoria_aprovadora: permissoes.isAprovadorPrioridade
         },
         diretorias_disponiveis: diretoriasVisiveis
       });
@@ -1211,6 +1247,117 @@ module.exports = {
       }
       console.error(error);
       return res.status(500).json({ error: 'Erro ao salvar selecao do lote de prioridade.' });
+    }
+  },
+
+  async finalizarPedido(req, res) {
+    const transaction = await PrioridadeLote.sequelize.transaction();
+    let transactionFinalizada = false;
+
+    try {
+      const permissoes = await obterPermissoesPrioridade(req);
+      if (!permissoes.podeAcessarModulo) {
+        await transaction.rollback();
+        return res.status(403).json({ error: 'Acesso negado ao modulo de prioridades.' });
+      }
+
+      const lote = await PrioridadeLote.findByPk(req.params.id, { transaction });
+      if (!lote) {
+        await transaction.rollback();
+        return res.status(404).json({ error: 'Lote de prioridade nao encontrado.' });
+      }
+
+      const isSolicitacaoDiretoria =
+        String(lote.tipo_lote || TIPO_LOTE.DIR_ADMIN).toUpperCase() === TIPO_LOTE.SOLICITACAO_DIRETORIA;
+
+      if (!isSolicitacaoDiretoria) {
+        await transaction.rollback();
+        return res.status(400).json({ error: 'Apenas pedidos de urgencia das diretorias podem ser finalizados para aprovacao.' });
+      }
+
+      if (!usuarioPodeEditarSelecaoLote(permissoes, lote) || permissoes.isAprovadorPrioridade) {
+        await transaction.rollback();
+        return res.status(403).json({ error: 'Apenas a diretoria criadora pode finalizar este pedido para aprovacao.' });
+      }
+
+      if (String(lote.status || '').toUpperCase() !== STATUS_LOTE.ABERTO) {
+        await transaction.rollback();
+        return res.status(400).json({ error: 'Somente pedidos abertos podem ser enviados para aprovacao.' });
+      }
+
+      const solicitacaoIds = normalizarSolicitacaoIds(req.body?.solicitacao_ids);
+      if (solicitacaoIds.length === 0) {
+        await transaction.rollback();
+        return res.status(400).json({ error: 'Selecione ao menos uma solicitacao para finalizar o pedido.' });
+      }
+
+      let resultadoSincronizacao;
+      try {
+        resultadoSincronizacao = await sincronizarItensLote({
+          lote,
+          solicitacaoIds,
+          usuarioId: req.user.id,
+          transaction
+        });
+      } catch (error) {
+        await transaction.rollback();
+        return res.status(error.status || 400).json({
+          error: error.message || 'Erro ao finalizar pedido de prioridade.',
+          solicitacao_ids_ignorados: error.solicitacao_ids_ignorados || []
+        });
+      }
+
+      await lote.update({
+        valor_disponivel: resultadoSincronizacao.valorUtilizado,
+        valor_utilizado: resultadoSincronizacao.valorUtilizado
+      }, { transaction });
+
+      await Historico.bulkCreate(
+        resultadoSincronizacao.solicitacoesSelecionadas.map((item) => ({
+          solicitacao_id: item.id,
+          usuario_responsavel_id: req.user.id,
+          setor: lote.setor_criador_codigo || lote.diretoria_alvo_codigo,
+          acao: 'PRIORIDADE_DIRETORIA_SOLICITADA',
+          observacao: `Pedido de prioridade finalizado para aprovacao no lote #${lote.id}`
+        })),
+        { transaction }
+      );
+
+      await transaction.commit();
+      transactionFinalizada = true;
+
+      const detalhe = await carregarLoteDetalhe(lote.id);
+
+      await notificarPedidoUrgenciaFinalizado({
+        lote: detalhe,
+        usuarioId: req.user.id
+      });
+
+      return res.json({
+        item: {
+          ...serializarLote(detalhe),
+          solicitacao_ids_ignorados: resultadoSincronizacao.solicitacaoIdsIgnorados || [],
+          itens: (Array.isArray(detalhe.itens) ? detalhe.itens : []).map((item) => ({
+            id: item.id,
+            valor_considerado: formatarNumero(item.valor_considerado),
+            autorizado_em: item.autorizado_em,
+            autorizado_por: item.autorizado_por,
+            autorizado_por_nome: item?.autorizadoPor?.nome || '-',
+            solicitacao: item.solicitacao ? serializarSolicitacaoPrioridade(item.solicitacao) : null
+          })),
+          pode_finalizar: usuarioPodeFinalizarLote(permissoes, detalhe) && detalhe.status === STATUS_LOTE.ABERTO,
+          pode_editar_selecao: usuarioPodeEditarSelecaoLote(permissoes, detalhe) && detalhe.status === STATUS_LOTE.ABERTO,
+          pode_cancelar: (permissoes.isSuperadmin || permissoes.isDirAdmin) && detalhe.status === STATUS_LOTE.ABERTO,
+          pode_excluir: Boolean(permissoes.isSuperadmin),
+          pode_reabrir: false
+        }
+      });
+    } catch (error) {
+      if (!transactionFinalizada) {
+        await transaction.rollback();
+      }
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao finalizar pedido de prioridade.' });
     }
   },
 

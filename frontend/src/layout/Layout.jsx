@@ -160,7 +160,8 @@ export default function Layout() {
         const data = await getNotificacoes({ limit: 50 });
         const total = Array.isArray(data?.itens)
           ? data.itens.filter(item => {
-              if (String(item.tipo || '').toUpperCase() !== 'PRIORIDADE_DIRETORIA_LOTE_CRIADO') return false;
+              const tipo = String(item.tipo || '').toUpperCase();
+              if (!['PRIORIDADE_DIRETORIA_LOTE_CRIADO', 'PRIORIDADE_DIRETORIA_PEDIDO_ENVIADO'].includes(tipo)) return false;
               const createdAt = item.createdAt ? new Date(item.createdAt).getTime() : 0;
               return createdAt > seenAt;
             }).length

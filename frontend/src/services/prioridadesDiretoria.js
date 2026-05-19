@@ -93,6 +93,15 @@ export async function salvarSelecaoLotePrioridadeDiretoria(id, data) {
   return tratarResposta(res, 'Erro ao salvar selecao do lote de prioridade');
 }
 
+export async function finalizarPedidoPrioridadeDiretoria(id, data) {
+  const res = await fetch(`${API_URL}/prioridades-diretoria/lotes/${id}/finalizar-pedido`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+  return tratarResposta(res, 'Erro ao finalizar pedido de prioridade');
+}
+
 export async function reabrirLotePrioridadeDiretoria(id) {
   const res = await fetch(`${API_URL}/prioridades-diretoria/lotes/${id}/reabrir`, {
     method: 'POST',

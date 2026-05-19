@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import {
   cancelarLotePrioridadeDiretoria,
   criarLotePrioridadeDiretoria,
   excluirLotePrioridadeDiretoria,
+  finalizarPedidoPrioridadeDiretoria,
   finalizarLotePrioridadeDiretoria,
   getLotePrioridadeDiretoria,
   getPrioridadesDiretoriaContexto,
@@ -12,6 +14,8 @@ import {
   reabrirLotePrioridadeDiretoria,
   salvarSelecaoLotePrioridadeDiretoria
 } from '../services/prioridadesDiretoria';
+
+const SELECAO_RASCUNHO_PREFIX = 'prioridades_diretoria_selecao_rascunho';
 
 function formatarValor(valor) {
   const numero = Number(valor);
@@ -41,6 +45,14 @@ function normalizarBusca(valor) {
     .replace(/[\u0300-\u036f]/g, '');
 }
 
+function normalizarIdsSelecao(ids) {
+  return Array.from(
+    new Set((Array.isArray(ids) ? ids : [])
+      .map(Number)
+      .filter((id) => Number.isInteger(id) && id > 0))
+  );
+}
+
 function BadgeStatus({ status }) {
   const valor = String(status || '').trim().toUpperCase();
   const classes = {
@@ -67,6 +79,7 @@ function BadgeStatusSolicitacao({ status }) {
 
 export default function PrioridadesDiretoria() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [contexto, setContexto] = useState(null);
   const [lotes, setLotes] = useState([]);
   const [loteSelecionadoId, setLoteSelecionadoId] = useState(null);
@@ -84,6 +97,7 @@ export default function PrioridadesDiretoria() {
   const [salvandoLote, setSalvandoLote] = useState(false);
   const [finalizando, setFinalizando] = useState(false);
   const [salvandoSelecao, setSalvandoSelecao] = useState(false);
+  const [finalizandoPedido, setFinalizandoPedido] = useState(false);
   const [reabrindo, setReabrindo] = useState(false);
   const [cancelando, setCancelando] = useState(false);
   const [excluindo, setExcluindo] = useState(false);
@@ -99,6 +113,48 @@ export default function PrioridadesDiretoria() {
   const isLoteSolicitacaoDiretoria = String(detalhe?.tipo_lote || '').toUpperCase() === 'SOLICITACAO_DIRETORIA';
   const isCriacaoDirAdmin = Boolean(permissoes.is_dir_admin || permissoes.is_superadmin);
   const podeEditarSelecaoLote = Boolean(detalhe?.pode_editar_selecao || detalhe?.pode_finalizar);
+  const podeFinalizarPedidoDiretoria = Boolean(
+    isLoteSolicitacaoDiretoria &&
+    podeEditarSelecaoLote &&
+    !detalhe?.pode_finalizar &&
+    detalhe?.status === 'ABERTO'
+  );
+
+  function chaveRascunhoSelecao(loteId) {
+    const usuarioId = Number(user?.id);
+    if (!Number.isInteger(usuarioId) || usuarioId <= 0 || !loteId) return null;
+    return `${SELECAO_RASCUNHO_PREFIX}_${usuarioId}_${loteId}`;
+  }
+
+  function lerRascunhoSelecao(loteId) {
+    const chave = chaveRascunhoSelecao(loteId);
+    if (!chave) return null;
+    try {
+      const payload = JSON.parse(localStorage.getItem(chave) || 'null');
+      if (!payload) return null;
+      return {
+        ids: normalizarIdsSelecao(payload.ids),
+        cache: payload.cache && typeof payload.cache === 'object' ? payload.cache : {}
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  function salvarRascunhoSelecao(loteId, ids, cache) {
+    const chave = chaveRascunhoSelecao(loteId);
+    if (!chave) return;
+    localStorage.setItem(chave, JSON.stringify({
+      ids: normalizarIdsSelecao(ids),
+      cache: cache && typeof cache === 'object' ? cache : {},
+      updatedAt: new Date().toISOString()
+    }));
+  }
+
+  function removerRascunhoSelecao(loteId) {
+    const chave = chaveRascunhoSelecao(loteId);
+    if (chave) localStorage.removeItem(chave);
+  }
 
   useEffect(() => {
     carregarInicial();
@@ -151,6 +207,11 @@ export default function PrioridadesDiretoria() {
 
     return () => clearTimeout(timeout);
   }, [detalhe?.id, detalhe?.status, podeEditarSelecaoLote, buscaDisponiveis, filtroObraId]);
+
+  useEffect(() => {
+    if (!detalhe?.id || detalhe.status !== 'ABERTO' || !podeEditarSelecaoLote) return;
+    salvarRascunhoSelecao(detalhe.id, selecionadasIds, selecionadasCache);
+  }, [detalhe?.id, detalhe?.status, podeEditarSelecaoLote, selecionadasIds, selecionadasCache, user?.id]);
 
   const mapaDisponiveis = useMemo(() => {
     const mapa = new Map();
@@ -289,13 +350,26 @@ export default function PrioridadesDiretoria() {
             };
           }
         });
-        setSelecionadasIds(idsSalvos);
-        setSelecionadasCache(cacheSalvo);
+        const rascunho = lerRascunhoSelecao(id);
+        const idsRascunho = normalizarIdsSelecao(rascunho?.ids);
+        const cacheRascunho = rascunho?.cache && typeof rascunho.cache === 'object' ? rascunho.cache : {};
+
+        if (rascunho) {
+          setSelecionadasIds(idsRascunho);
+          setSelecionadasCache({
+            ...cacheSalvo,
+            ...cacheRascunho
+          });
+        } else {
+          setSelecionadasIds(idsSalvos);
+          setSelecionadasCache(cacheSalvo);
+        }
       } else {
         setSolicitacoesDisponiveis([]);
         setObrasDisponiveis([]);
         setSelecionadasIds([]);
         setSelecionadasCache({});
+        removerRascunhoSelecao(id);
       }
 
       setDetalhe(item);
@@ -364,7 +438,7 @@ export default function PrioridadesDiretoria() {
       }
       alert(isCriacaoDirAdmin
         ? 'Lote de prioridade criado com sucesso.'
-        : 'Pedido de prioridade criado. Selecione as solicitacoes e salve para aprovacao da DIR_ADMIN.');
+        : 'Pedido de prioridade criado. Selecione as solicitacoes e finalize o pedido para aprovacao.');
     } catch (error) {
       console.error(error);
       alert(error?.message || 'Erro ao criar lote de prioridade');
@@ -373,11 +447,10 @@ export default function PrioridadesDiretoria() {
     }
   }
 
-  function limparFiltrosDisponiveis() {
-    setBuscaDisponiveis('');
-    setFiltroObraId('');
+  function limparSelecaoDisponiveis() {
     setSelecionadasIds([]);
     setSelecionadasCache({});
+    removerRascunhoSelecao(detalhe?.id);
   }
 
   function alternarSolicitacao(id) {
@@ -486,6 +559,7 @@ export default function PrioridadesDiretoria() {
       });
       const idsIgnorados = obterIdsIgnoradosPrioridade(resposta);
       const complemento = mensagemSolicitacoesIgnoradas(idsIgnorados);
+      removerRascunhoSelecao(detalhe.id);
       await carregarLotes();
       await carregarDetalheLote(detalhe.id);
       setSelecionadasIds([]);
@@ -497,6 +571,40 @@ export default function PrioridadesDiretoria() {
       await tratarErroElegibilidade(error, 'Erro ao finalizar lote');
     } finally {
       setFinalizando(false);
+    }
+  }
+
+  async function finalizarPedidoDiretoria() {
+    if (!detalhe?.id || solicitacoesSelecionadas.length === 0) {
+      alert('Selecione ao menos uma solicitacao.');
+      return;
+    }
+    if (excedeuLimite) {
+      alert('O total selecionado excede o valor disponivel do lote.');
+      return;
+    }
+    if (!window.confirm(`Finalizar pedido com ${solicitacoesSelecionadas.length} solicitacao(oes) para aprovacao?`)) {
+      return;
+    }
+
+    try {
+      setFinalizandoPedido(true);
+      const resposta = await finalizarPedidoPrioridadeDiretoria(detalhe.id, {
+        solicitacao_ids: selecionadasIds
+      });
+      const idsIgnorados = obterIdsIgnoradosPrioridade(resposta);
+      const complemento = mensagemSolicitacoesIgnoradas(idsIgnorados);
+      removerRascunhoSelecao(detalhe.id);
+      await carregarLotes();
+      await carregarDetalheLote(detalhe.id);
+      alert(idsIgnorados.length > 0
+        ? `Pedido finalizado e enviado para aprovacao. ${idsIgnorados.length} solicitacao(oes) foram ignoradas por nao estarem mais elegiveis.${complemento}`
+        : 'Pedido finalizado e enviado para aprovacao.');
+    } catch (error) {
+      console.error(error);
+      await tratarErroElegibilidade(error, 'Erro ao finalizar pedido de prioridade');
+    } finally {
+      setFinalizandoPedido(false);
     }
   }
 
@@ -851,9 +959,9 @@ export default function PrioridadesDiretoria() {
                     <button
                       type="button"
                       className="btn btn-outline whitespace-nowrap"
-                      onClick={limparFiltrosDisponiveis}
+                      onClick={limparSelecaoDisponiveis}
                     >
-                      Limpar filtros e selecao
+                      Limpar selecao
                     </button>
                   </div>
 
@@ -935,6 +1043,16 @@ export default function PrioridadesDiretoria() {
                     >
                       {salvandoSelecao ? 'Salvando...' : 'Salvar selecao'}
                     </button>
+                    {podeFinalizarPedidoDiretoria && (
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        onClick={finalizarPedidoDiretoria}
+                        disabled={finalizandoPedido || solicitacoesSelecionadas.length === 0 || excedeuLimite}
+                      >
+                        {finalizandoPedido ? 'Finalizando...' : 'Finalizar pedido'}
+                      </button>
+                    )}
                     {detalhe.pode_finalizar && (
                       <button
                         type="button"
