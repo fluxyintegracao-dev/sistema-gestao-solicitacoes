@@ -97,18 +97,12 @@ async function saveDocumentXml(company, item, parsedXml) {
   });
 }
 
-async function upsertFiscalEvent(document, eventPayload, transaction) {
-  const where = {
-    fiscal_dfe_document_id: document.id,
-    event_type: eventPayload.event_type || 'unknown',
-    event_sequence: eventPayload.event_sequence || null,
-    event_protocol: eventPayload.event_protocol || null
-  };
+function buildFiscalEventPayload(document, eventPayload = {}) {
+  if (!document?.id) {
+    throw createHttpError('Documento fiscal e obrigatorio para processar evento fiscal.', 400);
+  }
 
-  const existing = await FiscalDfeEvent.findOne({ where, transaction });
-  if (existing) return existing;
-
-  return FiscalDfeEvent.create({
+  return {
     fiscal_dfe_document_id: document.id,
     event_type: eventPayload.event_type || 'unknown',
     event_sequence: eventPayload.event_sequence || null,
@@ -117,7 +111,22 @@ async function upsertFiscalEvent(document, eventPayload, transaction) {
     event_description: eventPayload.event_description || null,
     raw_event_xml_storage_key: eventPayload.raw_event_xml_storage_key || null,
     raw_event_json: eventPayload.raw_event_json || eventPayload
-  }, { transaction });
+  };
+}
+
+async function upsertFiscalEvent(document, eventPayload, transaction) {
+  const payload = buildFiscalEventPayload(document, eventPayload);
+  const where = {
+    fiscal_dfe_document_id: payload.fiscal_dfe_document_id,
+    event_type: payload.event_type,
+    event_sequence: payload.event_sequence,
+    event_protocol: payload.event_protocol
+  };
+
+  const existing = await FiscalDfeEvent.findOne({ where, transaction });
+  if (existing) return existing;
+
+  return FiscalDfeEvent.create(payload, { transaction });
 }
 
 async function processarDocumentoNormalizado(company, item, transaction) {
@@ -238,6 +247,7 @@ async function processarRetornoDistribuicaoDfe({
 
 module.exports = {
   buildDocumentPayload,
+  buildFiscalEventPayload,
   processarDocumentoNormalizado,
   processarRetornoDistribuicaoDfe
 };

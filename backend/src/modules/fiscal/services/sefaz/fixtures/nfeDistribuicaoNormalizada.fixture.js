@@ -1,6 +1,7 @@
 'use strict';
 
 const accessKey = '12345678901234567890123456789012345678901234';
+const summaryAccessKey = '98765432109876543210987654321098765432109876';
 
 const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <nfeProc versao="4.00">
@@ -66,6 +67,28 @@ module.exports = {
             event_description: 'Autorizado o uso da NF-e'
           }
         ]
+      },
+      {
+        nsu: '11',
+        document_type: 'nfe',
+        access_key: summaryAccessKey,
+        summary: {
+          nsu: '11',
+          access_key: summaryAccessKey,
+          schema_version: 'resNFe_v1.01',
+          issuer_cnpj: '99888777000166',
+          issuer_name: 'Fornecedor Somente Resumo LTDA',
+          recipient_cnpj: '55666777000188',
+          recipient_name: 'Empresa Monitorada Teste SPE LTDA',
+          emission_date: '2026-05-18T09:00:00-03:00',
+          total_value: 789.1,
+          document_number: '2002',
+          series: '2',
+          operation_nature: 'VENDA RESUMIDA',
+          sefaz_status_code: '100',
+          sefaz_status_description: 'Resumo recebido',
+          manifestation_status: 'pending'
+        }
       }
     ]
   }

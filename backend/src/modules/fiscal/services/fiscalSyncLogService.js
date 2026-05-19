@@ -2,10 +2,10 @@
 
 const {
   FiscalCompany,
-  FiscalDfeSyncState,
   FiscalSyncLog
 } = require('../../../models');
 const { registrarEventoSeguranca } = require('../../../services/securityLogService');
+const { executarSyncDfeControlado } = require('./fiscalDfeSyncJobService');
 
 function createHttpError(message, statusCode = 400) {
   const error = new Error(message);
@@ -80,22 +80,6 @@ async function listarEstadosSincronizacao(query = {}) {
   };
 }
 
-async function ensureSyncState(company, documentType) {
-  const [syncState] = await FiscalDfeSyncState.findOrCreate({
-    where: {
-      fiscal_company_id: company.id,
-      document_type: documentType,
-      ambiente_sefaz: company.ambiente_sefaz || 'homologacao'
-    },
-    defaults: {
-      ult_nsu: '0',
-      max_nsu: '0',
-      status: 'idle'
-    }
-  });
-  return syncState;
-}
-
 async function executarSincronizacaoManual(req, payload = {}) {
   const documentType = payload.document_type || 'nfe';
   const companyWhere = {
@@ -117,45 +101,13 @@ async function executarSincronizacaoManual(req, payload = {}) {
     throw createHttpError('Nenhuma empresa fiscal ativa e habilitada para sincronizacao.', 400);
   }
 
-  const sefazEnabled = process.env.FISCAL_SEFAZ_ENABLED === 'true';
-  const logs = [];
+  const results = [];
 
   for (const company of companies) {
-    const startedAt = new Date();
-    const syncState = await ensureSyncState(company, documentType);
-    const status = sefazEnabled ? 'blocked' : 'skipped';
-    const responseCode = sefazEnabled ? 'FISCAL_SEFAZ_STUB' : 'FISCAL_SEFAZ_DISABLED';
-    const responseMessage = sefazEnabled
-      ? 'Sincronizacao SEFAZ real ainda nao esta implementada nesta fase.'
-      : 'Sincronizacao SEFAZ desabilitada por FISCAL_SEFAZ_ENABLED=false.';
-
-    const log = await FiscalSyncLog.create({
-      fiscal_company_id: company.id,
-      document_type: documentType,
-      ambiente_sefaz: company.ambiente_sefaz || 'homologacao',
-      started_at: startedAt,
-      finished_at: new Date(),
-      status,
-      request_type: 'manual_probe',
-      request_nsu_start: syncState.ult_nsu || '0',
-      response_ult_nsu: syncState.ult_nsu || '0',
-      response_max_nsu: syncState.max_nsu || '0',
-      response_code: responseCode,
-      response_message: responseMessage,
-      documents_found: 0,
-      documents_processed: 0
-    });
-
-    await syncState.update({
-      last_attempt_at: startedAt,
-      status: sefazEnabled ? 'blocked' : 'idle',
-      last_error_code: sefazEnabled ? responseCode : null,
-      last_error_message: sefazEnabled ? responseMessage : null,
-      consecutive_errors: sefazEnabled ? Number(syncState.consecutive_errors || 0) + 1 : syncState.consecutive_errors
-    });
-
-    logs.push(log);
+    results.push(await executarSyncDfeControlado({ company, documentType }));
   }
+
+  const hasBlocked = results.some((result) => result.status === 'blocked');
 
   await registrarEventoSeguranca({
     req,
@@ -168,16 +120,16 @@ async function executarSincronizacaoManual(req, payload = {}) {
     metadata: {
       document_type: documentType,
       companies: companies.map((company) => company.id),
-      sefaz_enabled: sefazEnabled
+      sefaz_enabled: process.env.FISCAL_SEFAZ_ENABLED === 'true'
     }
   });
 
   return {
-    status: sefazEnabled ? 'blocked' : 'skipped',
-    message: sefazEnabled
+    status: hasBlocked ? 'blocked' : 'skipped',
+    message: hasBlocked
       ? 'Tentativa registrada. A integracao real com SEFAZ sera implementada na proxima fase.'
       : 'Tentativa registrada. Ative FISCAL_SEFAZ_ENABLED apenas quando a integracao real estiver pronta.',
-    logs
+    logs: results.map((result) => result.log)
   };
 }
 
