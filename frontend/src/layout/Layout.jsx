@@ -31,6 +31,7 @@ import {
   HiOutlineChevronLeft,
   HiOutlineArchiveBox,
   HiOutlineDocumentText,
+  HiOutlineExclamationTriangle,
   HiOutlineInboxStack,
   HiOutlinePaperAirplane,
   HiOutlineSparkles,
@@ -381,6 +382,8 @@ export default function Layout() {
         item('/fiscal', 'Painel Fiscal', HiOutlineSquares2X2),
         fiscalConfigAccess ? item('/fiscal/empresas', 'Empresas Fiscais', HiOutlineBuildingOffice2) : null,
         fiscalDocumentsAccess ? item('/fiscal/documentos', 'Documentos Fiscais', HiOutlineDocumentText) : null,
+        fiscalDocumentsAccess ? item('/fiscal/divergencias', 'Divergencias', HiOutlineExclamationTriangle) : null,
+        fiscalDocumentsAccess ? item('/fiscal/exportacao-contabil', 'Exportacao Contabil', HiOutlineFolderOpen) : null,
         fiscalLogsAccess ? item('/fiscal/logs', 'Logs de Sincronizacao', HiOutlineClipboardDocumentList) : null
       ]);
     }

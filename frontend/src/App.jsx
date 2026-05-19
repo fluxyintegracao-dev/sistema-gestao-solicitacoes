@@ -164,6 +164,9 @@ const CrmAdminIntegracoes = lazy(() => import('./modules/crm/pages/CrmAdminInteg
 const FiscalDashboard = lazy(() => import('./modules/fiscal/pages/FiscalDashboard'));
 const FiscalCompanies = lazy(() => import('./modules/fiscal/pages/FiscalCompanies'));
 const FiscalDocuments = lazy(() => import('./modules/fiscal/pages/FiscalDocuments'));
+const FiscalDocumentDetail = lazy(() => import('./modules/fiscal/pages/FiscalDocumentDetail'));
+const FiscalDivergences = lazy(() => import('./modules/fiscal/pages/FiscalDivergences'));
+const FiscalAccountingBatches = lazy(() => import('./modules/fiscal/pages/FiscalAccountingBatches'));
 const FiscalLogs = lazy(() => import('./modules/fiscal/pages/FiscalLogs'));
 
 function PublicPage({ children }) {
@@ -615,6 +618,9 @@ export default function App() {
         <Route path="fiscal" element={<FiscalRoute><FiscalDashboard /></FiscalRoute>} />
         <Route path="fiscal/empresas" element={<FiscalConfigRoute><FiscalCompanies /></FiscalConfigRoute>} />
         <Route path="fiscal/documentos" element={<FiscalDocumentsRoute><FiscalDocuments /></FiscalDocumentsRoute>} />
+        <Route path="fiscal/documentos/:id" element={<FiscalDocumentsRoute><FiscalDocumentDetail /></FiscalDocumentsRoute>} />
+        <Route path="fiscal/divergencias" element={<FiscalDocumentsRoute><FiscalDivergences /></FiscalDocumentsRoute>} />
+        <Route path="fiscal/exportacao-contabil" element={<FiscalDocumentsRoute><FiscalAccountingBatches /></FiscalDocumentsRoute>} />
         <Route path="fiscal/logs" element={<FiscalLogsRoute><FiscalLogs /></FiscalLogsRoute>} />
         <Route path="comercial/empreendimentos" element={<ComercialEmpreendimentosRoute><ComercialEmpreendimentos /></ComercialEmpreendimentosRoute>} />
         <Route path="comercial/unidades" element={<ComercialEmpreendimentosRoute><ComercialUnidades /></ComercialEmpreendimentosRoute>} />

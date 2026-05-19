@@ -1,12 +1,21 @@
 'use strict';
 
 const {
+  atualizarDivergenciaDocumentoFiscal,
+  criarDivergenciaDocumentoFiscal,
+  criarVinculoDocumentoFiscal,
   gerarUrlArquivoFiscal,
   ignorarDocumentoFiscal,
   importarArquivoDocumentoFiscal,
   listarDocumentosFiscais,
-  obterDocumentoFiscal
+  obterDocumentoFiscal,
+  validarDocumentoFiscal
 } = require('../services/fiscalDocumentService');
+const { buscarOpcoesVinculoFiscal } = require('../services/fiscalLinkSearchService');
+const {
+  atualizarSugestaoVinculoFiscal,
+  sugerirVinculosDocumentoFiscal
+} = require('../services/fiscalMatchingService');
 const { importarXmlFiscalManual } = require('../services/fiscalXmlImportService');
 
 function handleError(res, error) {
@@ -85,12 +94,92 @@ async function ignore(req, res) {
   }
 }
 
+async function validate(req, res) {
+  try {
+    const document = await validarDocumentoFiscal(req, req.params.id);
+    return res.json(document);
+  } catch (error) {
+    return handleError(res, error);
+  }
+}
+
+async function link(req, res) {
+  try {
+    const document = await criarVinculoDocumentoFiscal(req, req.params.id, req.body || {});
+    return res.status(201).json(document);
+  } catch (error) {
+    return handleError(res, error);
+  }
+}
+
+async function suggestLinks(req, res) {
+  try {
+    const result = await sugerirVinculosDocumentoFiscal(req, req.params.id);
+    return res.json(result);
+  } catch (error) {
+    return handleError(res, error);
+  }
+}
+
+async function updateLink(req, res) {
+  try {
+    const document = await atualizarSugestaoVinculoFiscal(
+      req,
+      req.params.id,
+      req.params.linkId,
+      req.body || {}
+    );
+    return res.json(document);
+  } catch (error) {
+    return handleError(res, error);
+  }
+}
+
+async function linkOptions(req, res) {
+  try {
+    const result = await buscarOpcoesVinculoFiscal(req.query || {});
+    return res.json(result);
+  } catch (error) {
+    return handleError(res, error);
+  }
+}
+
+async function createDivergence(req, res) {
+  try {
+    const document = await criarDivergenciaDocumentoFiscal(req, req.params.id, req.body || {});
+    return res.status(201).json(document);
+  } catch (error) {
+    return handleError(res, error);
+  }
+}
+
+async function updateDivergence(req, res) {
+  try {
+    const document = await atualizarDivergenciaDocumentoFiscal(
+      req,
+      req.params.id,
+      req.params.divergenceId,
+      req.body || {}
+    );
+    return res.json(document);
+  } catch (error) {
+    return handleError(res, error);
+  }
+}
+
 module.exports = {
+  createDivergence,
   ignore,
   index,
+  link,
+  linkOptions,
   pdfUrl,
   xmlUrl,
   uploadFile,
   uploadXml,
+  suggestLinks,
+  updateLink,
+  updateDivergence,
+  validate,
   show
 };

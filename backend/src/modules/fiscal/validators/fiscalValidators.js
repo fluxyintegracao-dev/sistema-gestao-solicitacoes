@@ -12,6 +12,16 @@ const {
   FISCAL_SYNC_STATUSES
 } = require('../constants/fiscalPermissions');
 
+const FISCAL_DOCUMENT_SOURCES = ['sefaz_distribution', 'manual_upload', 'batch_import'];
+const FISCAL_MANIFESTATION_STATUSES = [
+  'not_required',
+  'pending',
+  'ciencia_operacao',
+  'confirmacao_operacao',
+  'desconhecimento_operacao',
+  'operacao_nao_realizada'
+];
+
 function digitsOnly(value) {
   return String(value || '').replace(/\D/g, '');
 }
@@ -75,6 +85,20 @@ function parseDateOnly(value, fieldName) {
     throw new ValidationError(`${fieldName} invalida.`);
   }
   return date;
+}
+
+function parseDateOnlyString(value, fieldName) {
+  const parsed = parseDateOnly(value, fieldName);
+  return parsed ? parsed.toISOString().slice(0, 10) : null;
+}
+
+function parseOptionalDecimal(value, fieldName) {
+  if (value === undefined || value === null || value === '') return null;
+  const normalized = Number(String(value).replace(/\./g, '').replace(',', '.'));
+  if (!Number.isFinite(normalized) || normalized < 0) {
+    throw new ValidationError(`${fieldName} invalido.`);
+  }
+  return normalized;
 }
 
 function parseOptionalSecret(value, fieldName, max = 500) {
@@ -148,15 +172,51 @@ function validateFiscalCompanyQuery(query = {}) {
 }
 
 function validateFiscalDocumentQuery(query = {}) {
-  ensureAllowedKeys(query, ['company_id', 'status', 'document_type', 'q', 'limit', 'page'], 'Filtro de documentos fiscais');
-  return {
+  ensureAllowedKeys(query, [
+    'company_id',
+    'status',
+    'document_type',
+    'source',
+    'manifestation_status',
+    'issuer_cnpj',
+    'emission_start',
+    'emission_end',
+    'min_value',
+    'max_value',
+    'has_xml',
+    'has_pdf',
+    'q',
+    'limit',
+    'page'
+  ], 'Filtro de documentos fiscais');
+
+  const result = {
     company_id: parseOptionalInteger(query.company_id, 'Empresa fiscal'),
     status: parseEnum(query.status, 'Status do documento', FISCAL_DOCUMENT_STATUSES, { fallback: null }),
     document_type: parseEnum(query.document_type, 'Tipo documental', FISCAL_DOCUMENT_TYPES, { fallback: null }),
+    source: parseEnum(query.source, 'Origem do documento', FISCAL_DOCUMENT_SOURCES, { fallback: null }),
+    manifestation_status: parseEnum(query.manifestation_status, 'Status da manifestacao', FISCAL_MANIFESTATION_STATUSES, { fallback: null }),
+    issuer_cnpj: parseCnpj(query.issuer_cnpj),
+    emission_start: parseDateOnlyString(query.emission_start, 'Emissao inicial'),
+    emission_end: parseDateOnlyString(query.emission_end, 'Emissao final'),
+    min_value: parseOptionalDecimal(query.min_value, 'Valor minimo'),
+    max_value: parseOptionalDecimal(query.max_value, 'Valor maximo'),
+    has_xml: parseOptionalBoolean(query.has_xml),
+    has_pdf: parseOptionalBoolean(query.has_pdf),
     q: sanitizeString(query.q, 'Busca', { max: 120 }) || null,
     limit: Math.min(parseOptionalInteger(query.limit || 50, 'Limite') || 50, 200),
     page: parseOptionalInteger(query.page || 1, 'Pagina') || 1
   };
+
+  if (result.emission_start && result.emission_end && result.emission_start > result.emission_end) {
+    throw new ValidationError('Emissao inicial nao pode ser posterior a emissao final.');
+  }
+
+  if (result.min_value !== null && result.max_value !== null && result.min_value > result.max_value) {
+    throw new ValidationError('Valor minimo nao pode ser maior que o valor maximo.');
+  }
+
+  return result;
 }
 
 function validateFiscalSyncLogQuery(query = {}) {
@@ -170,11 +230,186 @@ function validateFiscalSyncLogQuery(query = {}) {
   };
 }
 
+function validateFiscalSyncStateQuery(query = {}) {
+  ensureAllowedKeys(query, ['company_id', 'status', 'document_type', 'ambiente_sefaz', 'limit', 'page'], 'Filtro de estados de sincronizacao fiscal');
+  return {
+    company_id: parseOptionalInteger(query.company_id, 'Empresa fiscal'),
+    status: parseEnum(query.status, 'Status de sincronizacao', FISCAL_SYNC_STATUSES, { fallback: null }),
+    document_type: parseEnum(query.document_type, 'Tipo documental', FISCAL_DOCUMENT_TYPES, { fallback: null }),
+    ambiente_sefaz: parseEnum(query.ambiente_sefaz, 'Ambiente SEFAZ', FISCAL_AMBIENTES_SEFAZ, { fallback: null }),
+    limit: Math.min(parseOptionalInteger(query.limit || 50, 'Limite') || 50, 200),
+    page: parseOptionalInteger(query.page || 1, 'Pagina') || 1
+  };
+}
+
 function validateFiscalSyncRunBody(body = {}) {
   ensureAllowedKeys(body, ['company_id', 'document_type'], 'Sincronizacao fiscal manual');
   return {
     company_id: parseOptionalInteger(body.company_id, 'Empresa fiscal'),
     document_type: parseEnum(body.document_type, 'Tipo documental', FISCAL_DOCUMENT_TYPES, { fallback: 'nfe' })
+  };
+}
+
+function validateFiscalDocumentLinkBody(body = {}) {
+  ensureAllowedKeys(body, [
+    'solicitacao_id',
+    'solicitacao_compra_id',
+    'pedido_id',
+    'pedido_item_id',
+    'financeiro_titulo_id',
+    'obra_id',
+    'centro_custo_id',
+    'plano_financeiro_id',
+    'fornecedor_id',
+    'matched_reason'
+  ], 'Vinculo de documento fiscal');
+
+  const result = {
+    solicitacao_id: parseOptionalInteger(body.solicitacao_id, 'Solicitacao'),
+    solicitacao_compra_id: parseOptionalInteger(body.solicitacao_compra_id, 'Solicitacao de compra'),
+    pedido_id: parseOptionalInteger(body.pedido_id, 'Pedido'),
+    pedido_item_id: parseOptionalInteger(body.pedido_item_id, 'Item do pedido'),
+    financeiro_titulo_id: parseOptionalInteger(body.financeiro_titulo_id, 'Titulo financeiro'),
+    obra_id: parseOptionalInteger(body.obra_id, 'Obra'),
+    centro_custo_id: parseOptionalInteger(body.centro_custo_id, 'Centro de custo'),
+    plano_financeiro_id: parseOptionalInteger(body.plano_financeiro_id, 'Plano financeiro'),
+    fornecedor_id: parseOptionalInteger(body.fornecedor_id, 'Fornecedor'),
+    matched_reason: sanitizeString(body.matched_reason, 'Motivo do vinculo', { max: 1000 }) || null
+  };
+
+  const hasTarget = Object.entries(result)
+    .some(([key, value]) => key !== 'matched_reason' && value);
+
+  if (!hasTarget) {
+    throw new ValidationError('Informe ao menos um registro para vincular ao documento fiscal.');
+  }
+
+  return result;
+}
+
+function validateFiscalLinkSearchQuery(query = {}) {
+  ensureAllowedKeys(query, ['type', 'q', 'limit'], 'Busca de vinculos fiscais');
+
+  return {
+    type: parseEnum(query.type, 'Tipo de busca', [
+      'solicitacao',
+      'solicitacao_compra',
+      'pedido',
+      'pedido_item',
+      'titulo',
+      'obra',
+      'fornecedor',
+      'centro_custo',
+      'plano_financeiro'
+    ], { required: true }),
+    q: sanitizeString(query.q, 'Busca', { max: 120 }) || null,
+    limit: Math.min(parseOptionalInteger(query.limit || 20, 'Limite') || 20, 50)
+  };
+}
+
+function validateFiscalDivergenceCreateBody(body = {}) {
+  ensureAllowedKeys(body, [
+    'fiscal_document_link_id',
+    'divergence_type',
+    'severity',
+    'description',
+    'expected_value',
+    'actual_value'
+  ], 'Divergencia fiscal');
+
+  return {
+    fiscal_document_link_id: parseOptionalInteger(body.fiscal_document_link_id, 'Vinculo fiscal'),
+    divergence_type: parseEnum(body.divergence_type, 'Tipo de divergencia', [
+      'supplier_mismatch',
+      'value_mismatch',
+      'quantity_mismatch',
+      'item_mismatch',
+      'missing_order',
+      'missing_receipt',
+      'duplicate_invoice',
+      'cancelled_document',
+      'unknown_cost_center',
+      'unknown_financial_plan',
+      'other'
+    ], { fallback: 'other' }),
+    severity: parseEnum(body.severity, 'Severidade', ['low', 'medium', 'high', 'critical'], { fallback: 'medium' }),
+    description: sanitizeString(body.description, 'Descricao da divergencia', { required: true, max: 2000 }),
+    expected_value: sanitizeString(body.expected_value, 'Valor esperado', { max: 255 }) || null,
+    actual_value: sanitizeString(body.actual_value, 'Valor encontrado', { max: 255 }) || null
+  };
+}
+
+function validateFiscalDivergenceUpdateBody(body = {}) {
+  ensureAllowedKeys(body, ['status'], 'Atualizacao de divergencia fiscal');
+
+  return {
+    status: parseEnum(body.status, 'Status da divergencia', ['open', 'resolved', 'ignored'], { required: true })
+  };
+}
+
+function validateFiscalDivergenceParams(params = {}) {
+  ensureAllowedKeys(params, ['id', 'divergenceId'], 'Parametros da divergencia fiscal');
+
+  const id = parseOptionalInteger(params.id, 'Documento fiscal');
+  const divergenceId = parseOptionalInteger(params.divergenceId, 'Divergencia fiscal');
+  if (!id || !divergenceId) {
+    throw new ValidationError('Parametros da divergencia fiscal invalidos.');
+  }
+
+  return { id, divergenceId };
+}
+
+function validateFiscalDivergenceQuery(query = {}) {
+  ensureAllowedKeys(query, [
+    'company_id',
+    'status',
+    'severity',
+    'divergence_type',
+    'q',
+    'limit',
+    'page'
+  ], 'Filtro de divergencias fiscais');
+
+  return {
+    company_id: parseOptionalInteger(query.company_id, 'Empresa fiscal'),
+    status: parseEnum(query.status, 'Status da divergencia', ['open', 'resolved', 'ignored'], { fallback: null }),
+    severity: parseEnum(query.severity, 'Severidade', ['low', 'medium', 'high', 'critical'], { fallback: null }),
+    divergence_type: parseEnum(query.divergence_type, 'Tipo de divergencia', [
+      'supplier_mismatch',
+      'value_mismatch',
+      'quantity_mismatch',
+      'item_mismatch',
+      'missing_order',
+      'missing_receipt',
+      'duplicate_invoice',
+      'cancelled_document',
+      'unknown_cost_center',
+      'unknown_financial_plan',
+      'other'
+    ], { fallback: null }),
+    q: sanitizeString(query.q, 'Busca', { max: 120 }) || null,
+    limit: Math.min(parseOptionalInteger(query.limit || 50, 'Limite') || 50, 200),
+    page: parseOptionalInteger(query.page || 1, 'Pagina') || 1
+  };
+}
+
+function validateFiscalDocumentLinkParams(params = {}) {
+  ensureAllowedKeys(params, ['id', 'linkId'], 'Parametros do vinculo fiscal');
+
+  const id = parseOptionalInteger(params.id, 'Documento fiscal');
+  const linkId = parseOptionalInteger(params.linkId, 'Vinculo fiscal');
+  if (!id || !linkId) {
+    throw new ValidationError('Parametros do vinculo fiscal invalidos.');
+  }
+
+  return { id, linkId };
+}
+
+function validateFiscalDocumentLinkUpdateBody(body = {}) {
+  ensureAllowedKeys(body, ['status'], 'Atualizacao de vinculo fiscal');
+
+  return {
+    status: parseEnum(body.status, 'Status do vinculo fiscal', ['confirmed', 'rejected'], { required: true })
   };
 }
 
@@ -229,19 +464,85 @@ function validateFiscalCertificateCreateBody(body = {}) {
   };
 }
 
+function parseAccountingReferenceMonth(value) {
+  const month = parseOptionalInteger(value, 'Mes de referencia');
+  if (!month || month < 1 || month > 12) {
+    throw new ValidationError('Mes de referencia deve estar entre 1 e 12.');
+  }
+  return month;
+}
+
+function parseAccountingReferenceYear(value) {
+  const year = parseOptionalInteger(value, 'Ano de referencia');
+  if (!year || year < 2000 || year > 2100) {
+    throw new ValidationError('Ano de referencia invalido.');
+  }
+  return year;
+}
+
+function validateFiscalAccountingBatchQuery(query = {}) {
+  ensureAllowedKeys(query, [
+    'company_id',
+    'status',
+    'reference_month',
+    'reference_year',
+    'limit',
+    'page'
+  ], 'Filtro de lotes contabeis fiscais');
+
+  return {
+    company_id: parseOptionalInteger(query.company_id, 'Empresa fiscal'),
+    status: parseEnum(query.status, 'Status do lote contabil', ['draft', 'generated', 'sent', 'cancelled'], { fallback: null }),
+    reference_month: query.reference_month ? parseAccountingReferenceMonth(query.reference_month) : null,
+    reference_year: query.reference_year ? parseAccountingReferenceYear(query.reference_year) : null,
+    limit: Math.min(parseOptionalInteger(query.limit || 50, 'Limite') || 50, 200),
+    page: parseOptionalInteger(query.page || 1, 'Pagina') || 1
+  };
+}
+
+function validateFiscalAccountingBatchCreateBody(body = {}) {
+  ensureAllowedKeys(body, [
+    'fiscal_company_id',
+    'reference_month',
+    'reference_year'
+  ], 'Lote contabil fiscal');
+
+  const fiscalCompanyId = parseOptionalInteger(body.fiscal_company_id, 'Empresa fiscal');
+  if (!fiscalCompanyId) {
+    throw new ValidationError('Empresa fiscal e obrigatoria para gerar o lote contabil.');
+  }
+
+  return {
+    fiscal_company_id: fiscalCompanyId,
+    reference_month: parseAccountingReferenceMonth(body.reference_month),
+    reference_year: parseAccountingReferenceYear(body.reference_year)
+  };
+}
+
 function validateFiscalSyncStateStatus(status) {
   return parseEnum(status, 'Status de sincronizacao', FISCAL_SYNC_STATUSES, { fallback: 'idle' });
 }
 
 module.exports = {
   digitsOnly,
+  validateFiscalAccountingBatchCreateBody,
+  validateFiscalAccountingBatchQuery,
   validateFiscalCertificateCreateBody,
   validateFiscalCertificateQuery,
   validateFiscalCompanyCreateBody,
   validateFiscalCompanyQuery,
   validateFiscalCompanyUpdateBody,
+  validateFiscalDivergenceCreateBody,
+  validateFiscalDivergenceParams,
+  validateFiscalDivergenceQuery,
+  validateFiscalDivergenceUpdateBody,
+  validateFiscalDocumentLinkParams,
+  validateFiscalDocumentLinkBody,
+  validateFiscalDocumentLinkUpdateBody,
+  validateFiscalLinkSearchQuery,
   validateFiscalDocumentQuery,
   validateFiscalSyncLogQuery,
   validateFiscalSyncRunBody,
+  validateFiscalSyncStateQuery,
   validateFiscalSyncStateStatus
 };

@@ -7,6 +7,7 @@ const { validateNumericIdParam } = require('../../../validators/securityValidato
 const {
   canAccessFiscal,
   canIgnoreFiscalDocuments,
+  canLinkFiscalDocuments,
   canManageFiscalConfig,
   canRunFiscalSync,
   canUploadFiscalDocuments,
@@ -15,8 +16,10 @@ const {
   canViewFiscalSync
 } = require('../../../services/authorizationService');
 const FiscalDashboardController = require('../controllers/FiscalDashboardController');
+const FiscalAccountingBatchController = require('../controllers/FiscalAccountingBatchController');
 const FiscalCertificateController = require('../controllers/FiscalCertificateController');
 const FiscalCompanyController = require('../controllers/FiscalCompanyController');
+const FiscalDivergenceController = require('../controllers/FiscalDivergenceController');
 const FiscalDocumentController = require('../controllers/FiscalDocumentController');
 const FiscalSyncLogController = require('../controllers/FiscalSyncLogController');
 const uploadFiscalFile = require('../config/uploadFiscalFile');
@@ -24,11 +27,22 @@ const uploadFiscalXml = require('../config/uploadFiscalXml');
 const {
   validateFiscalCertificateCreateBody,
   validateFiscalCertificateQuery,
+  validateFiscalAccountingBatchCreateBody,
+  validateFiscalAccountingBatchQuery,
   validateFiscalCompanyCreateBody,
   validateFiscalCompanyQuery,
   validateFiscalCompanyUpdateBody,
+  validateFiscalDivergenceCreateBody,
+  validateFiscalDivergenceParams,
+  validateFiscalDivergenceQuery,
+  validateFiscalDivergenceUpdateBody,
+  validateFiscalDocumentLinkBody,
+  validateFiscalDocumentLinkParams,
+  validateFiscalDocumentLinkUpdateBody,
+  validateFiscalLinkSearchQuery,
   validateFiscalDocumentQuery,
   validateFiscalSyncLogQuery,
+  validateFiscalSyncStateQuery,
   validateFiscalSyncRunBody
 } = require('../validators/fiscalValidators');
 
@@ -79,6 +93,15 @@ const allowFiscalDocumentIgnore = permit({
   )
 });
 
+const allowFiscalDocumentLink = permit({
+  resource: 'FISCAL_DOCUMENT_LINK',
+  custom: async (req) => (
+    (await canLinkFiscalDocuments(req.user))
+      ? true
+      : 'Acesso negado para vincular documento fiscal'
+  )
+});
+
 const allowFiscalSync = permit({
   resource: 'FISCAL_SYNC',
   custom: async (req) => (
@@ -117,15 +140,31 @@ router.get('/certificates', allowFiscalConfig, validateRequest({ query: validate
 router.post('/certificates', allowFiscalConfig, validateRequest({ body: validateFiscalCertificateCreateBody }), FiscalCertificateController.create);
 router.post('/certificates/:id/validate', allowFiscalConfig, validateRequest({ params: validateNumericIdParam('id', 'Certificado fiscal') }), FiscalCertificateController.validate);
 
+router.get('/accounting-batches', allowFiscalDocuments, validateRequest({ query: validateFiscalAccountingBatchQuery }), FiscalAccountingBatchController.index);
+router.post('/accounting-batches', allowFiscalDocumentLink, validateRequest({ body: validateFiscalAccountingBatchCreateBody }), FiscalAccountingBatchController.create);
+router.post('/accounting-batches/:id/generate', allowFiscalDocumentLink, validateRequest({ params: validateNumericIdParam('id', 'Lote contabil fiscal') }), FiscalAccountingBatchController.generate);
+router.get('/accounting-batches/:id/zip-url', allowFiscalDocuments, validateRequest({ params: validateNumericIdParam('id', 'Lote contabil fiscal') }), FiscalAccountingBatchController.zipUrl);
+router.get('/accounting-batches/:id', allowFiscalDocuments, validateRequest({ params: validateNumericIdParam('id', 'Lote contabil fiscal') }), FiscalAccountingBatchController.show);
+
+router.get('/divergences', allowFiscalDocuments, validateRequest({ query: validateFiscalDivergenceQuery }), FiscalDivergenceController.index);
+
 router.get('/documents', allowFiscalDocuments, validateRequest({ query: validateFiscalDocumentQuery }), FiscalDocumentController.index);
+router.get('/documents/link-options', allowFiscalDocumentLink, validateRequest({ query: validateFiscalLinkSearchQuery }), FiscalDocumentController.linkOptions);
 router.post('/documents/upload-xml', allowFiscalDocumentUpload, uploadFiscalXml.single('file'), FiscalDocumentController.uploadXml);
 router.post('/documents/:id/upload-file', allowFiscalDocumentUpload, validateRequest({ params: validateNumericIdParam('id', 'Documento fiscal') }), uploadFiscalFile.single('file'), FiscalDocumentController.uploadFile);
+router.post('/documents/:id/link', allowFiscalDocumentLink, validateRequest({ params: validateNumericIdParam('id', 'Documento fiscal'), body: validateFiscalDocumentLinkBody }), FiscalDocumentController.link);
+router.post('/documents/:id/suggest-links', allowFiscalDocumentLink, validateRequest({ params: validateNumericIdParam('id', 'Documento fiscal') }), FiscalDocumentController.suggestLinks);
+router.patch('/documents/:id/links/:linkId', allowFiscalDocumentLink, validateRequest({ params: validateFiscalDocumentLinkParams, body: validateFiscalDocumentLinkUpdateBody }), FiscalDocumentController.updateLink);
+router.post('/documents/:id/divergences', allowFiscalDocumentLink, validateRequest({ params: validateNumericIdParam('id', 'Documento fiscal'), body: validateFiscalDivergenceCreateBody }), FiscalDocumentController.createDivergence);
+router.patch('/documents/:id/divergences/:divergenceId', allowFiscalDocumentLink, validateRequest({ params: validateFiscalDivergenceParams, body: validateFiscalDivergenceUpdateBody }), FiscalDocumentController.updateDivergence);
+router.post('/documents/:id/validate', allowFiscalDocumentLink, validateRequest({ params: validateNumericIdParam('id', 'Documento fiscal') }), FiscalDocumentController.validate);
 router.post('/documents/:id/ignore', allowFiscalDocumentIgnore, validateRequest({ params: validateNumericIdParam('id', 'Documento fiscal') }), FiscalDocumentController.ignore);
 router.get('/documents/:id/xml-url', allowFiscalDocuments, validateRequest({ params: validateNumericIdParam('id', 'Documento fiscal') }), FiscalDocumentController.xmlUrl);
 router.get('/documents/:id/pdf-url', allowFiscalDocuments, validateRequest({ params: validateNumericIdParam('id', 'Documento fiscal') }), FiscalDocumentController.pdfUrl);
 router.get('/documents/:id', allowFiscalDocuments, validateRequest({ params: validateNumericIdParam('id', 'Documento fiscal') }), FiscalDocumentController.show);
 
 router.post('/sync/run-manual', allowFiscalSyncRun, validateRequest({ body: validateFiscalSyncRunBody }), FiscalSyncLogController.runManual);
+router.get('/sync/states', allowFiscalSync, validateRequest({ query: validateFiscalSyncStateQuery }), FiscalSyncLogController.states);
 router.get('/sync/logs', allowFiscalSync, allowFiscalLogs, validateRequest({ query: validateFiscalSyncLogQuery }), FiscalSyncLogController.index);
 
 module.exports = router;

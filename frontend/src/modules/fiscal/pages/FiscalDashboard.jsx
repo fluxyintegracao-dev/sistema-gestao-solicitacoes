@@ -12,6 +12,36 @@ function MetricCard({ label, value, detail }) {
   );
 }
 
+function formatMoney(value) {
+  return Number(value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+function formatDate(value) {
+  if (!value) return '-';
+  return new Date(value).toLocaleDateString('pt-BR');
+}
+
+function formatDateTime(value) {
+  if (!value) return '-';
+  return new Date(value).toLocaleString('pt-BR');
+}
+
+function StatusList({ title, items, labelKey }) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+      <h2 className="text-base font-semibold text-slate-950 dark:text-white">{title}</h2>
+      <div className="mt-4 space-y-2">
+        {items?.length ? items.map((item) => (
+          <div key={item[labelKey]} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm dark:bg-slate-950/40">
+            <span className="text-slate-600 dark:text-slate-300">{item[labelKey] || '-'}</span>
+            <strong className="text-slate-950 dark:text-white">{item.total}</strong>
+          </div>
+        )) : <p className="text-sm text-slate-500">Sem dados ainda.</p>}
+      </div>
+    </div>
+  );
+}
+
 export default function FiscalDashboard() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -37,6 +67,8 @@ export default function FiscalDashboard() {
 
   const resumo = data?.resumo || {};
   const modulo = data?.modulo || {};
+  const documentos = data?.documentos || {};
+  const sincronizacao = data?.sincronizacao || {};
 
   return (
     <div className="space-y-6">
@@ -64,6 +96,10 @@ export default function FiscalDashboard() {
             <MetricCard label="Documentos fiscais" value={resumo.documentos_total} />
             <MetricCard label="Pendentes" value={resumo.documentos_pendentes} />
             <MetricCard label="Divergencias abertas" value={resumo.divergencias_abertas} />
+            <MetricCard label="Com divergencia" value={resumo.documentos_com_divergencia} />
+            <MetricCard label="Validados" value={resumo.documentos_validados} />
+            <MetricCard label="Ignorados" value={resumo.documentos_ignorados} />
+            <MetricCard label="Ultimo sync" value={sincronizacao?.ultimo_log?.status || '-'} detail={formatDateTime(sincronizacao?.ultimo_log?.started_at)} />
           </div>
 
           <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
@@ -81,6 +117,78 @@ export default function FiscalDashboard() {
                 <span className="block text-slate-500">Prefixo S3</span>
                 <strong className="text-slate-950 dark:text-white">{modulo.storage_prefix || '-'}</strong>
               </div>
+            </div>
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <StatusList title="Documentos por status" items={documentos.por_status || []} labelKey="status" />
+            <StatusList title="Documentos por origem" items={documentos.por_origem || []} labelKey="source" />
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-base font-semibold text-slate-950 dark:text-white">Documentos recentes</h2>
+              <Link className="text-sm font-semibold text-blue-600" to="/fiscal/documentos">Ver todos</Link>
+            </div>
+            <div className="mt-4 overflow-hidden rounded-lg border border-slate-200 dark:border-slate-800">
+              <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
+                <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500 dark:bg-slate-950/40">
+                  <tr>
+                    <th className="px-4 py-3">Emissao</th>
+                    <th className="px-4 py-3">Fornecedor</th>
+                    <th className="px-4 py-3">Numero</th>
+                    <th className="px-4 py-3">Valor</th>
+                    <th className="px-4 py-3">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {documentos.recentes?.length ? documentos.recentes.map((item) => (
+                    <tr key={item.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/60">
+                      <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{formatDate(item.emission_date)}</td>
+                      <td className="px-4 py-3">
+                        <Link className="font-medium text-slate-950 hover:text-blue-600 dark:text-white" to={`/fiscal/documentos/${item.id}`}>
+                          {item.issuer_name || item.issuer_cnpj || '-'}
+                        </Link>
+                      </td>
+                      <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{item.document_number || '-'}</td>
+                      <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{formatMoney(item.total_value)}</td>
+                      <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{item.document_status}</td>
+                    </tr>
+                  )) : (
+                    <tr><td className="px-4 py-5 text-slate-500" colSpan={5}>Nenhum documento fiscal encontrado.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <h2 className="text-base font-semibold text-slate-950 dark:text-white">Logs recentes</h2>
+            <div className="mt-4 overflow-hidden rounded-lg border border-slate-200 dark:border-slate-800">
+              <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
+                <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500 dark:bg-slate-950/40">
+                  <tr>
+                    <th className="px-4 py-3">Inicio</th>
+                    <th className="px-4 py-3">Tipo</th>
+                    <th className="px-4 py-3">Status</th>
+                    <th className="px-4 py-3">Docs</th>
+                    <th className="px-4 py-3">Mensagem</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {sincronizacao.logs_recentes?.length ? sincronizacao.logs_recentes.map((log) => (
+                    <tr key={log.id}>
+                      <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{formatDateTime(log.started_at)}</td>
+                      <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{log.request_type}</td>
+                      <td className="px-4 py-3 font-medium text-slate-950 dark:text-white">{log.status}</td>
+                      <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{log.documents_processed || log.documents_found || 0}</td>
+                      <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{log.response_message || log.error_message || '-'}</td>
+                    </tr>
+                  )) : (
+                    <tr><td className="px-4 py-5 text-slate-500" colSpan={5}>Nenhum log fiscal registrado.</td></tr>
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
         </>

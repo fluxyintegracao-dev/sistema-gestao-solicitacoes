@@ -10,6 +10,21 @@ import {
 export default function FiscalDocuments() {
   const [documents, setDocuments] = useState([]);
   const [companies, setCompanies] = useState([]);
+  const [filters, setFilters] = useState({
+    company_id: '',
+    status: '',
+    document_type: '',
+    source: '',
+    manifestation_status: '',
+    issuer_cnpj: '',
+    emission_start: '',
+    emission_end: '',
+    min_value: '',
+    max_value: '',
+    has_xml: '',
+    has_pdf: '',
+    q: ''
+  });
   const [uploadCompanyId, setUploadCompanyId] = useState('');
   const [uploadFile, setUploadFile] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -23,7 +38,7 @@ export default function FiscalDocuments() {
     setError('');
     try {
       const [documentsResult, companiesResult] = await Promise.all([
-        getFiscalDocuments(),
+        getFiscalDocuments(filters),
         getFiscalCompanies({ ativo: true })
       ]);
       setDocuments(documentsResult?.data || []);
@@ -46,6 +61,44 @@ export default function FiscalDocuments() {
       mounted = false;
     };
   }, []);
+
+  const updateFilter = (key, value) => {
+    setFilters((current) => ({ ...current, [key]: value }));
+  };
+
+  const submitFilters = async (event) => {
+    event.preventDefault();
+    await load();
+  };
+
+  const clearFilters = async () => {
+    const emptyFilters = {
+      company_id: '',
+      status: '',
+      document_type: '',
+      source: '',
+      manifestation_status: '',
+      issuer_cnpj: '',
+      emission_start: '',
+      emission_end: '',
+      min_value: '',
+      max_value: '',
+      has_xml: '',
+      has_pdf: '',
+      q: ''
+    };
+    setFilters(emptyFilters);
+    setLoading(true);
+    setError('');
+    try {
+      const result = await getFiscalDocuments(emptyFilters);
+      setDocuments(result?.data || []);
+    } catch (err) {
+      setError(err.message || 'Erro ao limpar filtros fiscais');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const openFile = async (documentId, type) => {
     setOpeningFile(`${documentId}-${type}`);
@@ -105,6 +158,102 @@ export default function FiscalDocuments() {
 
       {error ? <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div> : null}
       {message ? <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">{message}</div> : null}
+
+      <form onSubmit={submitFilters} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
+          <input
+            className="input"
+            placeholder="Busca por chave, fornecedor ou numero"
+            value={filters.q}
+            onChange={(event) => updateFilter('q', event.target.value)}
+          />
+          <select className="input" value={filters.company_id} onChange={(event) => updateFilter('company_id', event.target.value)}>
+            <option value="">Todas as empresas</option>
+            {companies.map((company) => (
+              <option key={company.id} value={company.id}>{company.razao_social}</option>
+            ))}
+          </select>
+          <select className="input" value={filters.status} onChange={(event) => updateFilter('status', event.target.value)}>
+            <option value="">Todos os status</option>
+            <option value="pending_link">Pendente de vinculo</option>
+            <option value="linked_to_order">Vinculado</option>
+            <option value="with_divergence">Com divergencia</option>
+            <option value="validated">Validado</option>
+            <option value="ignored">Ignorado</option>
+            <option value="xml_downloaded">XML baixado</option>
+            <option value="discovered">Descoberto</option>
+          </select>
+          <select className="input" value={filters.document_type} onChange={(event) => updateFilter('document_type', event.target.value)}>
+            <option value="">Todos os tipos</option>
+            <option value="nfe">NFe</option>
+            <option value="cte">CTe</option>
+            <option value="nfse">NFSe</option>
+          </select>
+          <select className="input" value={filters.source} onChange={(event) => updateFilter('source', event.target.value)}>
+            <option value="">Todas as origens</option>
+            <option value="manual_upload">Upload manual</option>
+            <option value="sefaz_distribution">SEFAZ</option>
+            <option value="batch_import">Importacao em lote</option>
+          </select>
+          <select className="input" value={filters.manifestation_status} onChange={(event) => updateFilter('manifestation_status', event.target.value)}>
+            <option value="">Manifestacao</option>
+            <option value="pending">Pendente</option>
+            <option value="not_required">Nao requerida</option>
+            <option value="ciencia_operacao">Ciencia</option>
+            <option value="confirmacao_operacao">Confirmacao</option>
+            <option value="desconhecimento_operacao">Desconhecimento</option>
+            <option value="operacao_nao_realizada">Operacao nao realizada</option>
+          </select>
+          <input
+            className="input"
+            placeholder="CNPJ fornecedor"
+            value={filters.issuer_cnpj}
+            onChange={(event) => updateFilter('issuer_cnpj', event.target.value)}
+          />
+          <input
+            className="input"
+            type="date"
+            value={filters.emission_start}
+            onChange={(event) => updateFilter('emission_start', event.target.value)}
+            aria-label="Emissao inicial"
+          />
+          <input
+            className="input"
+            type="date"
+            value={filters.emission_end}
+            onChange={(event) => updateFilter('emission_end', event.target.value)}
+            aria-label="Emissao final"
+          />
+          <input
+            className="input"
+            placeholder="Valor minimo"
+            value={filters.min_value}
+            onChange={(event) => updateFilter('min_value', event.target.value)}
+          />
+          <input
+            className="input"
+            placeholder="Valor maximo"
+            value={filters.max_value}
+            onChange={(event) => updateFilter('max_value', event.target.value)}
+          />
+          <div className="grid grid-cols-2 gap-2">
+            <select className="input" value={filters.has_xml} onChange={(event) => updateFilter('has_xml', event.target.value)}>
+              <option value="">XML</option>
+              <option value="true">Com XML</option>
+              <option value="false">Sem XML</option>
+            </select>
+            <select className="input" value={filters.has_pdf} onChange={(event) => updateFilter('has_pdf', event.target.value)}>
+              <option value="">PDF</option>
+              <option value="true">Com PDF</option>
+              <option value="false">Sem PDF</option>
+            </select>
+          </div>
+        </div>
+        <div className="mt-3 flex justify-end gap-2">
+          <button className="btn-secondary" type="button" onClick={clearFilters}>Limpar</button>
+          <button className="btn-primary" type="submit">Filtrar</button>
+        </div>
+      </form>
 
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">

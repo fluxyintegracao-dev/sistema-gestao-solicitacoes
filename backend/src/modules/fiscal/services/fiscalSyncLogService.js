@@ -44,6 +44,42 @@ async function listarLogsSincronizacao(query = {}) {
   };
 }
 
+async function listarEstadosSincronizacao(query = {}) {
+  const limit = query.limit || 50;
+  const page = query.page || 1;
+  const offset = (page - 1) * limit;
+  const where = {};
+
+  if (query.company_id) where.fiscal_company_id = query.company_id;
+  if (query.status) where.status = query.status;
+  if (query.document_type) where.document_type = query.document_type;
+  if (query.ambiente_sefaz) where.ambiente_sefaz = query.ambiente_sefaz;
+
+  const result = await FiscalDfeSyncState.findAndCountAll({
+    where,
+    include: [
+      { model: FiscalCompany, as: 'company', attributes: ['id', 'razao_social', 'cnpj', 'uf', 'ambiente_sefaz'], required: false }
+    ],
+    order: [
+      ['status', 'ASC'],
+      ['last_attempt_at', 'DESC'],
+      ['id', 'DESC']
+    ],
+    limit,
+    offset
+  });
+
+  return {
+    data: result.rows,
+    pagination: {
+      total: result.count,
+      page,
+      limit,
+      pages: Math.ceil(result.count / limit)
+    }
+  };
+}
+
 async function ensureSyncState(company, documentType) {
   const [syncState] = await FiscalDfeSyncState.findOrCreate({
     where: {
@@ -147,5 +183,6 @@ async function executarSincronizacaoManual(req, payload = {}) {
 
 module.exports = {
   executarSincronizacaoManual,
+  listarEstadosSincronizacao,
   listarLogsSincronizacao
 };

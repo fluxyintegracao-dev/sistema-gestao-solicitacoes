@@ -9,6 +9,8 @@ const ALLOWED_FISCAL_MIME_TYPES = new Set([
   'application/xml',
   'text/xml',
   'application/pdf',
+  'application/zip',
+  'text/csv',
   'image/jpeg',
   'image/png'
 ]);
@@ -104,6 +106,27 @@ function buildFiscalObjectKey({
   return parts.join('/');
 }
 
+function buildFiscalAccountingBatchObjectKey({
+  cnpj,
+  referenceYear,
+  referenceMonth,
+  batchId,
+  filename
+}) {
+  const config = getFiscalS3Config();
+  const parts = [
+    config.prefix,
+    sanitizePathSegment(cnpj),
+    'accounting-batches',
+    sanitizePathSegment(referenceYear),
+    sanitizePathSegment(String(referenceMonth).padStart(2, '0')),
+    `lote-${sanitizePathSegment(batchId)}`,
+    sanitizePathSegment(filename)
+  ].filter(Boolean);
+
+  return parts.join('/');
+}
+
 function calculateSha256(bufferOrString) {
   return crypto
     .createHash('sha256')
@@ -150,6 +173,34 @@ async function uploadFiscalObject({ key, body, contentType, metadata = {} }) {
   };
 }
 
+async function streamToBuffer(stream) {
+  if (Buffer.isBuffer(stream)) return stream;
+  const chunks = [];
+  for await (const chunk of stream) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  return Buffer.concat(chunks);
+}
+
+async function getFiscalObjectBuffer(key) {
+  assertFiscalS3Configured();
+  const config = getFiscalS3Config();
+  const client = createFiscalS3Client();
+
+  if (!key || String(key).includes('..') || path.isAbsolute(String(key))) {
+    const error = new Error('Chave de storage fiscal invalida.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const response = await client.send(new GetObjectCommand({
+    Bucket: config.bucket,
+    Key: key
+  }));
+
+  return streamToBuffer(response.Body);
+}
+
 async function saveFiscalXml({ cnpj, documentType = 'nfe', accessKey, xml, date = new Date(), metadata = {} }) {
   const key = buildFiscalObjectKey({
     cnpj,
@@ -190,8 +241,10 @@ async function getFiscalObjectSignedUrl(key, expiresIn = null) {
 
 module.exports = {
   assertFiscalS3Configured,
+  buildFiscalAccountingBatchObjectKey,
   buildFiscalObjectKey,
   calculateSha256,
+  getFiscalObjectBuffer,
   getFiscalS3Config,
   getFiscalObjectSignedUrl,
   isFiscalS3Configured,

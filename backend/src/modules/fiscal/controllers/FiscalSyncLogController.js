@@ -2,6 +2,7 @@
 
 const {
   executarSincronizacaoManual,
+  listarEstadosSincronizacao,
   listarLogsSincronizacao
 } = require('../services/fiscalSyncLogService');
 
@@ -30,7 +31,17 @@ async function runManual(req, res) {
   }
 }
 
+async function states(req, res) {
+  try {
+    const result = await listarEstadosSincronizacao(req.query);
+    return res.json(result);
+  } catch (error) {
+    return handleError(res, error);
+  }
+}
+
 module.exports = {
   index,
-  runManual
+  runManual,
+  states
 };
