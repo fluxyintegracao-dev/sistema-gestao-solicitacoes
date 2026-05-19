@@ -69,12 +69,13 @@ A visibilidade efetiva depende de combinacao entre:
   - `SUPERADMIN` pode reabrir lotes finalizados para que a diretoria ajuste a selecao antes de finalizar novamente
   - diretorias podem salvar a selecao de um lote aberto sem finalizar; a selecao fica persistida para retomada posterior
   - lotes abertos listam solicitacoes elegiveis independentemente do setor atual
-  - solicitacoes com status `PAGA` nao aparecem como disponiveis para prioridade
-  - solicitacoes ja adicionadas em outro lote podem aparecer em novos lotes abertos enquanto nao estiverem `PAGA`
+  - solicitacoes com status `PAGA`, `REJEITADA` ou `CANCELADA` nao aparecem como disponiveis para prioridade
+  - solicitacoes ja adicionadas em outro lote podem aparecer em novos lotes abertos enquanto nao estiverem `PAGA`, `REJEITADA` ou `CANCELADA`
   - no fluxo novo, a solicitacao precisa estar aprovada pela diretoria, e solicitacoes legadas sem fluxo de diretoria continuam elegiveis
-  - `DIR_OBRAS_PUBLICAS` e `DIR_OBRAS_PRIVADAS` podem selecionar solicitacoes elegiveis e abrir um pedido de urgencia para aprovacao da `DIR_ADMIN`
+  - `DIR_OBRAS_PUBLICAS` e `DIR_OBRAS_PRIVADAS` podem criar um pedido de urgencia da propria classificacao, selecionar solicitacoes elegiveis na tela de prioridades e salvar a selecao para aprovacao da `DIR_ADMIN`
   - pedidos de urgencia registram o setor criador do lote para diferenciar lotes solicitados pela `DIR_ADMIN` de lotes solicitados pelas proprias diretorias
   - pedidos de urgencia so viram prioridade autorizada depois da finalizacao/aprovacao pela `DIR_ADMIN` ou `SUPERADMIN`
+  - na tela de selecao de prioridades, trocar filtros nao remove itens ja selecionados; a selecao so muda quando o usuario desmarca itens ou limpa filtros e selecao
   - a autorizacao de prioridade nao muda o setor responsavel da solicitacao
   - a autorizacao marca a solicitacao como `prioridade_diretoria_ativa`
 

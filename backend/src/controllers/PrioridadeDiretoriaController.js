@@ -151,7 +151,7 @@ async function obterPermissoesPrioridade(req) {
     isSuperadmin,
     isDirAdmin,
     isLeitorConfigurado,
-    podeSolicitarLote: isDirAdmin,
+    podeSolicitarLote: isDirAdmin || classificacoesOperaveis.length > 0,
     classificacoesOperaveis,
     podeAcessarModulo: isDirAdmin || classificacoesOperaveis.length > 0 || isLeitorConfigurado
   };
@@ -177,6 +177,14 @@ function usuarioPodeFinalizarLote(permissoes, lote) {
     return Boolean(permissoes?.isDirAdmin);
   }
   return permisssoesTemClassificacao(permissoes, lote?.classificacao_alvo);
+}
+
+function usuarioPodeEditarSelecaoLote(permissoes, lote) {
+  if (permissoes?.isSuperadmin) return true;
+  if (String(lote?.tipo_lote || TIPO_LOTE.DIR_ADMIN).toUpperCase() === TIPO_LOTE.SOLICITACAO_DIRETORIA) {
+    return Boolean(permissoes?.isDirAdmin || permisssoesTemClassificacao(permissoes, lote?.classificacao_alvo));
+  }
+  return usuarioPodeFinalizarLote(permissoes, lote);
 }
 
 function obterDiretoriaCriadora(permissoes, classificacaoSolicitada = null) {
@@ -405,10 +413,7 @@ async function listarSolicitacoesElegiveisParaLote(lote, busca = '', solicitacao
 
   const condicoes = [
     { cancelada: false },
-    Sequelize.where(
-      Sequelize.fn('UPPER', Sequelize.col('status_global')),
-      { [Op.ne]: 'PAGA' }
-    ),
+    Sequelize.literal("REPLACE(REPLACE(UPPER(`Solicitacao`.`status_global`), '_', ''), ' ', '') NOT IN ('PAGA', 'REJEITADA', 'CANCELADA')"),
     {
       [Op.or]: [
         condicaoSolicitacaoAprovadaNoFluxo,
@@ -605,6 +610,10 @@ module.exports = {
 
       const diretoriasTokens = Object.values(permissoes.configuracao?.diretoriasPorClassificacao || {});
       const diretoriasDb = await obterSetoresPorTokens(diretoriasTokens);
+      const diretoriasDisponiveis = serializarDiretoriasDisponiveis(permissoes.configuracao, diretoriasDb);
+      const diretoriasVisiveis = permissoes.isDirAdmin || permissoes.isSuperadmin
+        ? diretoriasDisponiveis
+        : diretoriasDisponiveis.filter((item) => permissoes.classificacoesOperaveis.includes(item.classificacao));
 
       return res.json({
         permissoes: {
@@ -615,7 +624,7 @@ module.exports = {
           is_superadmin: permissoes.isSuperadmin,
           is_dir_admin: permissoes.isDirAdmin
         },
-        diretorias_disponiveis: serializarDiretoriasDisponiveis(permissoes.configuracao, diretoriasDb)
+        diretorias_disponiveis: diretoriasVisiveis
       });
     } catch (error) {
       console.error(error);
@@ -670,6 +679,7 @@ module.exports = {
         items: lotes.map((lote) => ({
           ...serializarLote(lote, resumoItens.get(Number(lote.id))),
           pode_finalizar: usuarioPodeFinalizarLote(permissoes, lote) && lote.status === STATUS_LOTE.ABERTO,
+          pode_editar_selecao: usuarioPodeEditarSelecaoLote(permissoes, lote) && lote.status === STATUS_LOTE.ABERTO,
           pode_cancelar: (permissoes.isSuperadmin || permissoes.isDirAdmin) && lote.status === STATUS_LOTE.ABERTO,
           pode_excluir: Boolean(permissoes.isSuperadmin),
           pode_reabrir: Boolean(permissoes.isSuperadmin) && lote.status === STATUS_LOTE.FINALIZADO
@@ -685,18 +695,19 @@ module.exports = {
     try {
       const permissoes = await obterPermissoesPrioridade(req);
       if (!permissoes.podeSolicitarLote) {
-        return res.status(403).json({ error: 'Apenas a Diretoria Administrativa pode solicitar lotes de prioridade.' });
+        return res.status(403).json({ error: 'Apenas a Diretoria Administrativa ou diretorias de obras podem solicitar lotes de prioridade.' });
       }
 
       const classificacaoAlvo = normalizarClassificacaoObra(req.body?.classificacao_alvo);
       const valorDisponivel = Number(req.body?.valor_disponivel);
       const observacao = String(req.body?.observacao || '').trim();
+      const isSolicitacaoDiretoria = !permissoes.isDirAdmin && !permissoes.isSuperadmin;
 
       if (!classificacaoAlvo) {
         return res.status(400).json({ error: 'Informe a diretoria alvo do lote.' });
       }
 
-      if (!Number.isFinite(valorDisponivel) || valorDisponivel <= 0) {
+      if (!isSolicitacaoDiretoria && (!Number.isFinite(valorDisponivel) || valorDisponivel <= 0)) {
         return res.status(400).json({ error: 'Informe um valor disponivel valido para o lote.' });
       }
 
@@ -709,16 +720,26 @@ module.exports = {
         });
       }
 
+      const diretoriaCriadora = isSolicitacaoDiretoria
+        ? obterDiretoriaCriadora(permissoes, classificacaoAlvo)
+        : null;
+
+      if (isSolicitacaoDiretoria && !diretoriaCriadora) {
+        return res.status(403).json({ error: 'Voce nao pode solicitar prioridade para esta classificacao.' });
+      }
+
       const lote = await PrioridadeLote.create({
         classificacao_alvo: classificacaoAlvo,
         diretoria_alvo_codigo: diretoriaAlvoCodigo,
-        tipo_lote: TIPO_LOTE.DIR_ADMIN,
-        setor_criador_codigo: DIRETORIA_ADMIN_CODIGO,
-        setor_criador_nome: DIRETORIA_ADMIN_NOME,
-        valor_disponivel: valorDisponivel,
+        tipo_lote: isSolicitacaoDiretoria ? TIPO_LOTE.SOLICITACAO_DIRETORIA : TIPO_LOTE.DIR_ADMIN,
+        setor_criador_codigo: isSolicitacaoDiretoria ? diretoriaCriadora.codigo : DIRETORIA_ADMIN_CODIGO,
+        setor_criador_nome: isSolicitacaoDiretoria ? diretoriaCriadora.nome : DIRETORIA_ADMIN_NOME,
+        valor_disponivel: isSolicitacaoDiretoria ? 0 : valorDisponivel,
         valor_utilizado: 0,
         status: STATUS_LOTE.ABERTO,
-        observacao: observacao || null,
+        observacao: observacao || (isSolicitacaoDiretoria
+          ? 'Solicitacao de prioridade enviada pela diretoria para aprovacao da Diretoria Administrativa.'
+          : null),
         solicitado_por: req.user.id
       });
 
@@ -733,8 +754,9 @@ module.exports = {
       return res.status(201).json({
         item: {
           ...serializarLote(detalhe),
-          pode_finalizar: usuarioPodeFinalizarLote(permissoes, detalhe),
-          pode_cancelar: true,
+          pode_finalizar: usuarioPodeFinalizarLote(permissoes, detalhe) && detalhe.status === STATUS_LOTE.ABERTO,
+          pode_editar_selecao: usuarioPodeEditarSelecaoLote(permissoes, detalhe) && detalhe.status === STATUS_LOTE.ABERTO,
+          pode_cancelar: (permissoes.isSuperadmin || permissoes.isDirAdmin) && detalhe.status === STATUS_LOTE.ABERTO,
           pode_excluir: Boolean(permissoes.isSuperadmin),
           pode_reabrir: false
         }
@@ -835,6 +857,7 @@ module.exports = {
             solicitacao: item.solicitacao ? serializarSolicitacaoPrioridade(item.solicitacao) : null
           })),
           pode_finalizar: false,
+          pode_editar_selecao: usuarioPodeEditarSelecaoLote(permissoes, detalhe) && detalhe.status === STATUS_LOTE.ABERTO,
           pode_cancelar: false,
           pode_excluir: Boolean(permissoes.isSuperadmin),
           pode_reabrir: false
@@ -877,6 +900,7 @@ module.exports = {
             solicitacao: item.solicitacao ? serializarSolicitacaoPrioridade(item.solicitacao) : null
           })),
           pode_finalizar: usuarioPodeFinalizarLote(permissoes, lote) && lote.status === STATUS_LOTE.ABERTO,
+          pode_editar_selecao: usuarioPodeEditarSelecaoLote(permissoes, lote) && lote.status === STATUS_LOTE.ABERTO,
           pode_cancelar: (permissoes.isSuperadmin || permissoes.isDirAdmin) && lote.status === STATUS_LOTE.ABERTO,
           pode_excluir: Boolean(permissoes.isSuperadmin),
           pode_reabrir: Boolean(permissoes.isSuperadmin) && lote.status === STATUS_LOTE.FINALIZADO
@@ -909,8 +933,12 @@ module.exports = {
         !permissoes.isSuperadmin &&
         !permissoes.isDirAdmin &&
         !permisssoesTemClassificacao(permissoes, lote?.classificacao_alvo);
-      if (acessoSomenteLeitura && !usuarioPodeFinalizarLote(permissoes, lote)) {
+      if (acessoSomenteLeitura && !usuarioPodeEditarSelecaoLote(permissoes, lote)) {
         return res.status(403).json({ error: 'Acesso apenas para leitura dos lotes de prioridade.' });
+      }
+
+      if (!usuarioPodeEditarSelecaoLote(permissoes, lote)) {
+        return res.status(403).json({ error: 'Apenas a diretoria responsavel pode selecionar solicitacoes neste lote.' });
       }
 
       const items = lote.status === STATUS_LOTE.ABERTO
@@ -1082,6 +1110,7 @@ module.exports = {
             solicitacao: item.solicitacao ? serializarSolicitacaoPrioridade(item.solicitacao) : null
           })),
           pode_finalizar: false,
+          pode_editar_selecao: false,
           pode_cancelar: false,
           pode_reabrir: Boolean(permissoes.isSuperadmin)
         }
@@ -1112,9 +1141,9 @@ module.exports = {
         return res.status(404).json({ error: 'Lote de prioridade nao encontrado.' });
       }
 
-      if (!usuarioPodeFinalizarLote(permissoes, lote)) {
+      if (!usuarioPodeEditarSelecaoLote(permissoes, lote)) {
         await transaction.rollback();
-        return res.status(403).json({ error: 'Apenas a diretoria alvo pode salvar a selecao deste lote.' });
+        return res.status(403).json({ error: 'Apenas a diretoria responsavel pode salvar a selecao deste lote.' });
       }
 
       if (String(lote.status || '').toUpperCase() !== STATUS_LOTE.ABERTO) {
@@ -1170,6 +1199,7 @@ module.exports = {
             solicitacao: item.solicitacao ? serializarSolicitacaoPrioridade(item.solicitacao) : null
           })),
           pode_finalizar: usuarioPodeFinalizarLote(permissoes, detalhe) && detalhe.status === STATUS_LOTE.ABERTO,
+          pode_editar_selecao: usuarioPodeEditarSelecaoLote(permissoes, detalhe) && detalhe.status === STATUS_LOTE.ABERTO,
           pode_cancelar: (permissoes.isSuperadmin || permissoes.isDirAdmin) && detalhe.status === STATUS_LOTE.ABERTO,
           pode_excluir: Boolean(permissoes.isSuperadmin),
           pode_reabrir: false
@@ -1271,6 +1301,7 @@ module.exports = {
             solicitacao: item.solicitacao ? serializarSolicitacaoPrioridade(item.solicitacao) : null
           })),
           pode_finalizar: usuarioPodeFinalizarLote(permissoes, detalhe) && detalhe.status === STATUS_LOTE.ABERTO,
+          pode_editar_selecao: usuarioPodeEditarSelecaoLote(permissoes, detalhe) && detalhe.status === STATUS_LOTE.ABERTO,
           pode_cancelar: true,
           pode_excluir: true,
           pode_reabrir: false

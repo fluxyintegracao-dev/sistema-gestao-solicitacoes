@@ -97,6 +97,8 @@ export default function PrioridadesDiretoria() {
   const diretoriasDisponiveis = contexto?.diretorias_disponiveis || [];
   const permissoes = contexto?.permissoes || {};
   const isLoteSolicitacaoDiretoria = String(detalhe?.tipo_lote || '').toUpperCase() === 'SOLICITACAO_DIRETORIA';
+  const isCriacaoDirAdmin = Boolean(permissoes.is_dir_admin || permissoes.is_superadmin);
+  const podeEditarSelecaoLote = Boolean(detalhe?.pode_editar_selecao || detalhe?.pode_finalizar);
 
   useEffect(() => {
     carregarInicial();
@@ -132,7 +134,7 @@ export default function PrioridadesDiretoria() {
   }, [loteSelecionadoId]);
 
   useEffect(() => {
-    if (!detalhe?.id || detalhe.status !== 'ABERTO' || !detalhe.pode_finalizar) {
+    if (!detalhe?.id || detalhe.status !== 'ABERTO' || !podeEditarSelecaoLote) {
       setSolicitacoesDisponiveis([]);
       setObrasDisponiveis([]);
       setSelecionadasIds([]);
@@ -148,7 +150,7 @@ export default function PrioridadesDiretoria() {
     }, 250);
 
     return () => clearTimeout(timeout);
-  }, [detalhe?.id, detalhe?.status, detalhe?.pode_finalizar, buscaDisponiveis, filtroObraId]);
+  }, [detalhe?.id, detalhe?.status, podeEditarSelecaoLote, buscaDisponiveis, filtroObraId]);
 
   const mapaDisponiveis = useMemo(() => {
     const mapa = new Map();
@@ -174,7 +176,7 @@ export default function PrioridadesDiretoria() {
     const valorDisponivel = Number(detalhe?.valor_disponivel || 0);
     const valorUtilizadoBase = Number(detalhe?.valor_utilizado || 0);
     const itensBase = Number(detalhe?.itens?.length || detalhe?.itens_count || 0);
-    const abertoComSelecao = detalhe?.status === 'ABERTO' && detalhe?.pode_finalizar;
+    const abertoComSelecao = detalhe?.status === 'ABERTO' && podeEditarSelecaoLote;
 
     const valorUtilizadoProjetado = abertoComSelecao
       ? totalSelecionado
@@ -201,7 +203,7 @@ export default function PrioridadesDiretoria() {
     detalhe?.itens,
     detalhe?.itens_count,
     detalhe?.status,
-    detalhe?.pode_finalizar,
+    podeEditarSelecaoLote,
     isLoteSolicitacaoDiretoria,
     solicitacoesSelecionadas.length,
     totalSelecionado
@@ -341,24 +343,41 @@ export default function PrioridadesDiretoria() {
     event.preventDefault();
     try {
       setSalvandoLote(true);
-      await criarLotePrioridadeDiretoria({
+      const payload = {
         classificacao_alvo: formNovoLote.classificacao_alvo,
-        valor_disponivel: Number(formNovoLote.valor_disponivel),
         observacao: formNovoLote.observacao
-      });
+      };
+
+      if (isCriacaoDirAdmin) {
+        payload.valor_disponivel = Number(formNovoLote.valor_disponivel);
+      }
+
+      const resposta = await criarLotePrioridadeDiretoria(payload);
       setFormNovoLote({
         classificacao_alvo: diretoriasDisponiveis[0]?.classificacao || '',
         valor_disponivel: '',
         observacao: ''
       });
       await carregarLotes();
-      alert('Lote de prioridade criado com sucesso.');
+      if (resposta?.item?.id) {
+        setLoteSelecionadoId(resposta.item.id);
+      }
+      alert(isCriacaoDirAdmin
+        ? 'Lote de prioridade criado com sucesso.'
+        : 'Pedido de prioridade criado. Selecione as solicitacoes e salve para aprovacao da DIR_ADMIN.');
     } catch (error) {
       console.error(error);
       alert(error?.message || 'Erro ao criar lote de prioridade');
     } finally {
       setSalvandoLote(false);
     }
+  }
+
+  function limparFiltrosDisponiveis() {
+    setBuscaDisponiveis('');
+    setFiltroObraId('');
+    setSelecionadasIds([]);
+    setSelecionadasCache({});
   }
 
   function alternarSolicitacao(id) {
@@ -590,10 +609,14 @@ export default function PrioridadesDiretoria() {
         <form onSubmit={criarLote} className="bg-white rounded-xl shadow p-4 space-y-3">
           <div className="flex items-center justify-between gap-3">
             <h2 className="text-base font-medium">Solicitar prioridade</h2>
-            <span className="text-sm text-gray-500">Criacao de lote pela Diretoria Administrativa</span>
+            <span className="text-sm text-gray-500">
+              {isCriacaoDirAdmin
+                ? 'Criacao de lote pela Diretoria Administrativa'
+                : 'Pedido de urgencia para aprovacao da DIR_ADMIN'}
+            </span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className={`grid grid-cols-1 gap-3 ${isCriacaoDirAdmin ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}>
             <label className="grid gap-1 text-sm">
               Diretoria alvo
               <select
@@ -610,18 +633,20 @@ export default function PrioridadesDiretoria() {
               </select>
             </label>
 
-            <label className="grid gap-1 text-sm">
-              Valor disponivel
-              <input
-                className="input"
-                type="number"
-                min="0"
-                step="0.01"
-                value={formNovoLote.valor_disponivel}
-                onChange={(event) => atualizarCampoNovoLote('valor_disponivel', event.target.value)}
-                placeholder="0,00"
-              />
-            </label>
+            {isCriacaoDirAdmin && (
+              <label className="grid gap-1 text-sm">
+                Valor disponivel
+                <input
+                  className="input"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={formNovoLote.valor_disponivel}
+                  onChange={(event) => atualizarCampoNovoLote('valor_disponivel', event.target.value)}
+                  placeholder="0,00"
+                />
+              </label>
+            )}
 
             <label className="grid gap-1 text-sm md:col-span-1">
               Observacao
@@ -636,7 +661,7 @@ export default function PrioridadesDiretoria() {
 
           <div className="flex justify-end">
             <button type="submit" className="btn btn-primary" disabled={salvandoLote}>
-              {salvandoLote ? 'Salvando...' : 'Criar lote'}
+              {salvandoLote ? 'Salvando...' : isCriacaoDirAdmin ? 'Criar lote' : 'Criar pedido'}
             </button>
           </div>
         </form>
@@ -791,9 +816,9 @@ export default function PrioridadesDiretoria() {
                 />
               </div>
 
-              {detalhe.status === 'ABERTO' && detalhe.pode_finalizar && (
+              {detalhe.status === 'ABERTO' && podeEditarSelecaoLote && (
                 <div className="space-y-3">
-                  <div className="grid grid-cols-1 xl:grid-cols-[minmax(220px,1.2fr)_minmax(220px,0.9fr)_minmax(240px,0.8fr)] gap-3">
+                  <div className="grid grid-cols-1 xl:grid-cols-[minmax(220px,1.2fr)_minmax(220px,0.9fr)_minmax(240px,0.8fr)_auto] gap-3">
                     <input
                       className="input"
                       value={buscaDisponiveis}
@@ -823,6 +848,13 @@ export default function PrioridadesDiretoria() {
                         </>
                       )}
                     </div>
+                    <button
+                      type="button"
+                      className="btn btn-outline whitespace-nowrap"
+                      onClick={limparFiltrosDisponiveis}
+                    >
+                      Limpar filtros e selecao
+                    </button>
                   </div>
 
                   {excedeuLimite && (
@@ -903,21 +935,23 @@ export default function PrioridadesDiretoria() {
                     >
                       {salvandoSelecao ? 'Salvando...' : 'Salvar selecao'}
                     </button>
-                    <button
-                      type="button"
-                      className="btn btn-primary"
-                      onClick={finalizarLote}
-                      disabled={finalizando || solicitacoesSelecionadas.length === 0 || excedeuLimite}
-                    >
-                      {finalizando ? 'Finalizando...' : 'Finalizar lote'}
-                    </button>
+                    {detalhe.pode_finalizar && (
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        onClick={finalizarLote}
+                        disabled={finalizando || solicitacoesSelecionadas.length === 0 || excedeuLimite}
+                      >
+                        {finalizando ? 'Finalizando...' : 'Finalizar lote'}
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
 
-              {detalhe.status === 'ABERTO' && !detalhe.pode_finalizar && (
+              {detalhe.status === 'ABERTO' && !podeEditarSelecaoLote && (
                 <div className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-600">
-                  Este lote ainda esta aberto. Apenas a diretoria alvo ou o SUPERADMIN podem selecionar e finalizar as solicitacoes.
+                  Este lote ainda esta aberto. Apenas a diretoria responsavel pode selecionar solicitacoes.
                 </div>
               )}
 

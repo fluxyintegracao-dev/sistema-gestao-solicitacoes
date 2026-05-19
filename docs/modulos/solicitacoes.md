@@ -67,6 +67,7 @@
 
 ## Prioridades da diretoria
 - `DIR_ADMIN` e `SUPERADMIN` podem abrir lotes de prioridade para `PUBLICA` ou `PRIVADA`
+- `DIR_OBRAS_PUBLICAS` e `DIR_OBRAS_PRIVADAS` podem abrir pedidos de urgencia apenas para a propria classificacao e salvar a selecao para aprovacao da `DIR_ADMIN`
 - o lote registra:
   - classificacao alvo
   - diretoria alvo resolvida pela configuracao de aprovacao
@@ -83,8 +84,9 @@
 - no fluxo novo de diretoria, precisam:
   - ja passaram por `APROVADA_DIRETORIA`
   - ou ja sairam da diretoria alvo no fluxo novo
-  - nao estao `PAGA`
-- solicitacoes ja adicionadas/autorizadas em outros lotes podem aparecer em novos lotes abertos enquanto nao estiverem `PAGA`
+  - nao estao `PAGA`, `REJEITADA` ou `CANCELADA`
+- solicitacoes ja adicionadas/autorizadas em outros lotes podem aparecer em novos lotes abertos enquanto nao estiverem `PAGA`, `REJEITADA` ou `CANCELADA`
+- na tela de prioridades, a selecao permanece ao trocar filtros e so e removida quando o item e desmarcado ou quando o usuario limpa filtros e selecao
 - ao salvar ou finalizar um lote, solicitacoes que deixaram de ser elegiveis sao ignoradas/removidas da selecao sem exigir que o usuario refaca toda a selecao
 - ao finalizar:
   - os itens entram em `prioridade_lote_itens`
