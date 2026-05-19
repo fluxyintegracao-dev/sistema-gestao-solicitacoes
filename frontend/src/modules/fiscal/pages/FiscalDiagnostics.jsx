@@ -195,11 +195,16 @@ export default function FiscalDiagnostics() {
                 <button
                   type="button"
                   onClick={handleFixtureSync}
-                  disabled={fixtureLoading || !storage.configured || !dados.empresas_monitoradas || !fixtureCompanyId}
+                  disabled={fixtureLoading || !storage.configured || !fixtureCompanyId}
                   className="btn-primary"
                 >
                   {fixtureLoading ? 'Processando...' : 'Processar fixture DFe'}
                 </button>
+                {!dados.empresas_monitoradas ? (
+                  <p className="text-xs text-amber-700">
+                    A empresa selecionada precisa estar ativa e com o modulo fiscal habilitado. Se nao estiver, o backend retornara a orientacao.
+                  </p>
+                ) : null}
               </div>
             </div>
             {fixtureError ? <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{fixtureError}</div> : null}
