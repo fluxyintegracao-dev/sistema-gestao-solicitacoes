@@ -46,6 +46,7 @@ import {
   canAccessCompras,
   canAccessContratos,
   canAccessFinanceiro,
+  canAccessFiscal,
   canAccessPagamentos,
   canAccessProvisoes,
   canAccessPrioridadesDiretoria,
@@ -64,12 +65,15 @@ import {
   canViewRhDpObrigacoes,
   canAccessCrm,
   canCreateCrmLeads,
+  canManageFiscalConfig,
   canManageUsers,
   canViewCrmAtendimento,
   canViewCrmAutomacoes,
   canViewCrmConfiguracoes,
   canViewCrmDashboard,
   canViewCrmLeads,
+  canViewFiscalDocuments,
+  canViewFiscalLogs,
   canCreateComprasPedidos,
   canManageComprasCotacoes,
   canViewComprasCotacoes,
@@ -240,6 +244,10 @@ export default function Layout() {
   const comprasCotacoesManageAccess = canManageComprasCotacoes(user);
   const prioridadesDiretoriaAccess = canAccessPrioridadesDiretoria(user);
   const financeiroAccess = canAccessFinanceiro(user);
+  const fiscalAccess = canAccessFiscal(user);
+  const fiscalConfigAccess = canManageFiscalConfig(user);
+  const fiscalDocumentsAccess = canViewFiscalDocuments(user);
+  const fiscalLogsAccess = canViewFiscalLogs(user);
   const pagamentosAccess = canAccessPagamentos(user);
   const boletosAccess = canAccessBoletos(user);
   const financeiroModuleEnabled = hasEnabledModule(user, 'FINANCEIRO');
@@ -275,6 +283,7 @@ export default function Layout() {
       Comunicacao: HiOutlineChatBubbleLeftRight,
       Compras: HiOutlineWallet,
       Financeiro: HiOutlineWallet,
+      Fiscal: HiOutlineDocumentText,
       CRM: HiOutlineUsers,
       Comercial: HiOutlineBuildingOffice2,
       Provisionamento: HiOutlineBanknotes,
@@ -367,6 +376,15 @@ export default function Layout() {
       ]);
     }
 
+    if (fiscalAccess) {
+      addGroup('Fiscal', [
+        item('/fiscal', 'Painel Fiscal', HiOutlineSquares2X2),
+        fiscalConfigAccess ? item('/fiscal/empresas', 'Empresas Fiscais', HiOutlineBuildingOffice2) : null,
+        fiscalDocumentsAccess ? item('/fiscal/documentos', 'Documentos Fiscais', HiOutlineDocumentText) : null,
+        fiscalLogsAccess ? item('/fiscal/logs', 'Logs de Sincronizacao', HiOutlineClipboardDocumentList) : null
+      ]);
+    }
+
     if (crmAccess) {
       addGroup('CRM', [
         crmDashboardAccess ? item('/crm/dashboard', 'Dashboard', HiOutlineSquares2X2) : null,
@@ -409,7 +427,6 @@ export default function Layout() {
     if (rhDpAccess) {
       addGroup('RH/DP', [
         rhDpDashboardAccess ? item('/rh-dp', 'Visao do Modulo', HiOutlineUsers) : null,
-        rhDpEmpresasAccess ? item('/rh-dp/empresas', 'Empresas do Grupo', HiOutlineBuildingOffice2) : null,
         rhDpColaboradoresAccess ? item('/rh-dp/colaboradores', 'Colaboradores', HiOutlineUsers) : null,
         rhDpDocumentosAccess ? item('/rh-dp/documentos', 'Documentos', HiOutlineFolderOpen) : null,
         rhDpImportacoesAccess ? item('/rh-dp/importacoes', 'Importacoes', HiOutlineCloudArrowUp) : null,
@@ -433,6 +450,7 @@ export default function Layout() {
     if (gestaoUsuarios || businessAdmin) {
       addGroup('Cadastros', [
         gestaoUsuarios ? item('/usuarios', 'Usuarios', HiOutlineUsers) : null,
+        superadmin ? item('/empresas-grupo', 'Empresas do Grupo', HiOutlineBuildingOffice2) : null,
         businessAdmin && obrasAccess ? item('/obras', 'Obras', HiOutlineBuildingOffice2) : null,
         businessAdmin && obrasAccess ? item('/gestao-apropriacoes', 'Gestao de Apropriacoes', HiOutlineAdjustmentsHorizontal) : null,
         businessAdmin ? item('/setores', 'Setores', HiOutlineAdjustmentsHorizontal) : null,
@@ -491,6 +509,10 @@ export default function Layout() {
     crmLeadsAccess,
     crmLeadsCreateAccess,
     financeiroAccess,
+    fiscalAccess,
+    fiscalConfigAccess,
+    fiscalDocumentsAccess,
+    fiscalLogsAccess,
     pagamentosAccess,
     boletosAccess,
     financeiroModuleEnabled,

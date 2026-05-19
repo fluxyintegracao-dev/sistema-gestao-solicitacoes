@@ -626,6 +626,51 @@ export function canAccessComunicacao(user) {
   return true;
 }
 
+const FISCAL_PERMISSION_KEYS = [
+  'fiscal.view',
+  'fiscal.config.manage',
+  'fiscal.document.view',
+  'fiscal.document.link',
+  'fiscal.sync.view',
+  'fiscal.logs.view'
+];
+
+export function canAccessFiscal(user) {
+  if (!hasEnabledModule(user, 'FISCAL')) return false;
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasAnyPermissao(user, FISCAL_PERMISSION_KEYS);
+  }
+  return false;
+}
+
+export function canManageFiscalConfig(user) {
+  if (!hasEnabledModule(user, 'FISCAL')) return false;
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasPermissao(user, 'fiscal.config.manage');
+  }
+  return false;
+}
+
+export function canViewFiscalDocuments(user) {
+  if (!hasEnabledModule(user, 'FISCAL')) return false;
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasAnyPermissao(user, ['fiscal.document.view', 'fiscal.document.link']);
+  }
+  return false;
+}
+
+export function canViewFiscalLogs(user) {
+  if (!hasEnabledModule(user, 'FISCAL')) return false;
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasAnyPermissao(user, ['fiscal.sync.view', 'fiscal.logs.view']);
+  }
+  return false;
+}
+
 const CRM_PERFIS = ['SUPERADMIN', 'ADMIN', 'ADMINISTRADOR', 'ADMIN_CRM', 'GESTOR_COMERCIAL', 'COORDENADOR_CRM', 'DIRETORIA'];
 const CRM_PERFIS_EXPORT = ['SUPERADMIN', 'ADMIN', 'ADMINISTRADOR', 'ADMIN_CRM', 'GESTOR_COMERCIAL', 'COORDENADOR_CRM'];
 const CRM_PERFIS_REDISTRIBUTE = ['SUPERADMIN', 'ADMIN', 'ADMINISTRADOR', 'ADMIN_CRM', 'GESTOR_COMERCIAL', 'COORDENADOR_CRM'];

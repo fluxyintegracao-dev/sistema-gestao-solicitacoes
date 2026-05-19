@@ -266,6 +266,37 @@ const INTEGRACAO_SIENGE_AREA_PERMISSION_KEYS = [
   'integracao_sienge.geral.configurar'
 ];
 
+const FISCAL_PERMISSION_KEYS = [
+  'fiscal.view',
+  'fiscal.config.manage',
+  'fiscal.document.view',
+  'fiscal.document.link',
+  'fiscal.sync.view',
+  'fiscal.logs.view'
+];
+
+const FISCAL_CONFIG_KEYS = [
+  'fiscal.config.manage'
+];
+
+const FISCAL_DOCUMENT_VIEW_KEYS = [
+  'fiscal.document.view',
+  'fiscal.document.link'
+];
+
+const FISCAL_DOCUMENT_LINK_KEYS = [
+  'fiscal.document.link'
+];
+
+const FISCAL_SYNC_VIEW_KEYS = [
+  'fiscal.sync.view',
+  'fiscal.logs.view'
+];
+
+const FISCAL_LOGS_VIEW_KEYS = [
+  'fiscal.logs.view'
+];
+
 let setoresAcessoTodasObrasCache = {
   expiresAt: 0,
   setores: []
@@ -1297,6 +1328,78 @@ async function canAccessIntegracaoSienge(user) {
   ]);
 }
 
+async function canAccessFiscal(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, FISCAL_PERMISSION_KEYS);
+  }
+
+  return false;
+}
+
+async function canManageFiscalConfig(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, FISCAL_CONFIG_KEYS);
+  }
+
+  return false;
+}
+
+async function canViewFiscalDocuments(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, FISCAL_DOCUMENT_VIEW_KEYS);
+  }
+
+  return false;
+}
+
+async function canLinkFiscalDocuments(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, FISCAL_DOCUMENT_LINK_KEYS);
+  }
+
+  return false;
+}
+
+async function canViewFiscalSync(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, FISCAL_SYNC_VIEW_KEYS);
+  }
+
+  return false;
+}
+
+async function canViewFiscalLogs(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, FISCAL_LOGS_VIEW_KEYS);
+  }
+
+  return false;
+}
+
 async function canViewRhDpDashboard(user) {
   return userHasAreaOrRhDpLegacyPermission(user, ['rh_dp.dashboard.visualizar'], ['rh_dp_dashboard_view']);
 }
@@ -1544,6 +1647,7 @@ module.exports = {
   canAccessCrm,
   canAccessProvisoes,
   canAccessFinanceiro,
+  canAccessFiscal,
   canAccessIntegracaoSienge,
   canAccessRhDp,
   canAuditComprasPedidos,
@@ -1580,6 +1684,7 @@ module.exports = {
   canManageComprasPedidos,
   canManageCrmAutomacoes,
   canManageCrmConfiguracoes,
+  canManageFiscalConfig,
   canManageRhDpEmpresas,
   canFinalizePrioridadeDiretoriaLote,
   canRedistributeCrmLeads,
@@ -1587,6 +1692,7 @@ module.exports = {
   canReceiveCrmLeadAssignment,
   canReopenRhDpFechamento,
   canReadComercialBaseData,
+  canLinkFiscalDocuments,
   canPreparePagamentos,
   canManageIntegracaoSiengeConfig,
   canManageProvisoesCategorias,
@@ -1597,6 +1703,9 @@ module.exports = {
   canRetryIntegracaoSienge,
   canSendPagamentosBanco,
   canViewIntegracaoSienge,
+  canViewFiscalDocuments,
+  canViewFiscalLogs,
+  canViewFiscalSync,
   canViewPaymentBeneficiaries,
   canViewPrioridadesDiretoria,
   canSendCrmAtendimento,

@@ -12,6 +12,7 @@ import {
   canAccessCompras,
   canAccessContratos,
   canAccessFinanceiro,
+  canAccessFiscal,
   canAccessPagamentos,
   canAccessGestaoObras,
   canAccessPrioridadesDiretoria,
@@ -34,12 +35,15 @@ import {
   canViewRhDpDocumentos,
   canViewRhDpObrigacoes,
   canCreateCrmLeads,
+  canManageFiscalConfig,
   canManageUsers,
   canViewCrmAtendimento,
   canViewCrmAutomacoes,
   canViewCrmConfiguracoes,
   canViewCrmDashboard,
   canViewCrmLeads,
+  canViewFiscalDocuments,
+  canViewFiscalLogs,
   hasEnabledModule,
   isBusinessAdmin,
   isSuperadmin
@@ -157,6 +161,10 @@ const CrmAutomacoes = lazy(() => import('./modules/crm/pages/CrmAutomacoes'));
 const CrmAdminCanais = lazy(() => import('./modules/crm/pages/CrmAdminCanais'));
 const CrmAdminNumeros = lazy(() => import('./modules/crm/pages/CrmAdminNumeros'));
 const CrmAdminIntegracoes = lazy(() => import('./modules/crm/pages/CrmAdminIntegracoes'));
+const FiscalDashboard = lazy(() => import('./modules/fiscal/pages/FiscalDashboard'));
+const FiscalCompanies = lazy(() => import('./modules/fiscal/pages/FiscalCompanies'));
+const FiscalDocuments = lazy(() => import('./modules/fiscal/pages/FiscalDocuments'));
+const FiscalLogs = lazy(() => import('./modules/fiscal/pages/FiscalLogs'));
 
 function PublicPage({ children }) {
   return (
@@ -331,6 +339,38 @@ function CrmConfiguracoesRoute({ children }) {
   const { user } = useAuth();
   if (!canViewCrmConfiguracoes(user)) {
     return <Navigate to="/" replace />;
+  }
+  return children;
+}
+
+function FiscalRoute({ children }) {
+  const { user } = useAuth();
+  if (!canAccessFiscal(user)) {
+    return <Navigate to="/" replace />;
+  }
+  return children;
+}
+
+function FiscalConfigRoute({ children }) {
+  const { user } = useAuth();
+  if (!canManageFiscalConfig(user)) {
+    return <Navigate to="/fiscal" replace />;
+  }
+  return children;
+}
+
+function FiscalDocumentsRoute({ children }) {
+  const { user } = useAuth();
+  if (!canViewFiscalDocuments(user)) {
+    return <Navigate to="/fiscal" replace />;
+  }
+  return children;
+}
+
+function FiscalLogsRoute({ children }) {
+  const { user } = useAuth();
+  if (!canViewFiscalLogs(user)) {
+    return <Navigate to="/fiscal" replace />;
   }
   return children;
 }
@@ -572,6 +612,10 @@ export default function App() {
         <Route path="crm/admin/canais" element={<CrmConfiguracoesRoute><CrmAdminCanais /></CrmConfiguracoesRoute>} />
         <Route path="crm/admin/numeros" element={<CrmConfiguracoesRoute><CrmAdminNumeros /></CrmConfiguracoesRoute>} />
         <Route path="crm/admin/integracoes" element={<CrmConfiguracoesRoute><CrmAdminIntegracoes /></CrmConfiguracoesRoute>} />
+        <Route path="fiscal" element={<FiscalRoute><FiscalDashboard /></FiscalRoute>} />
+        <Route path="fiscal/empresas" element={<FiscalConfigRoute><FiscalCompanies /></FiscalConfigRoute>} />
+        <Route path="fiscal/documentos" element={<FiscalDocumentsRoute><FiscalDocuments /></FiscalDocumentsRoute>} />
+        <Route path="fiscal/logs" element={<FiscalLogsRoute><FiscalLogs /></FiscalLogsRoute>} />
         <Route path="comercial/empreendimentos" element={<ComercialEmpreendimentosRoute><ComercialEmpreendimentos /></ComercialEmpreendimentosRoute>} />
         <Route path="comercial/unidades" element={<ComercialEmpreendimentosRoute><ComercialUnidades /></ComercialEmpreendimentosRoute>} />
         <Route path="comercial/tabelas-preco" element={<ComercialEmpreendimentosRoute><ComercialTabelasPreco /></ComercialEmpreendimentosRoute>} />

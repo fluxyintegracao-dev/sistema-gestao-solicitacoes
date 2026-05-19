@@ -170,6 +170,43 @@ const MODULO_PERMISSION_GROUPS = [
     ]
   },
   {
+    modulo: 'FISCAL',
+    label: 'Fiscal',
+    descricao: 'Entrada fiscal, documentos fiscais, configuracoes e logs de sincronizacao.',
+    areas: [
+      {
+        key: 'fiscal.geral',
+        label: 'Acesso Fiscal',
+        permissoes: [
+          { key: 'fiscal.view', label: 'Acessar modulo fiscal', descricao: 'Exibe o menu e o painel inicial do modulo Fiscal.' }
+        ]
+      },
+      {
+        key: 'fiscal.config',
+        label: 'Configuracoes Fiscais',
+        permissoes: [
+          { key: 'fiscal.config.manage', label: 'Gerenciar configuracoes fiscais', descricao: 'Cadastrar empresas fiscais e parametrizacoes iniciais do modulo.' }
+        ]
+      },
+      {
+        key: 'fiscal.document',
+        label: 'Documentos Fiscais',
+        permissoes: [
+          { key: 'fiscal.document.view', label: 'Visualizar documentos fiscais', descricao: 'Consultar caixa de entrada e detalhes de documentos fiscais.' },
+          { key: 'fiscal.document.link', label: 'Vincular documentos fiscais', descricao: 'Preparar vinculos manuais entre documentos fiscais e outros modulos.' }
+        ]
+      },
+      {
+        key: 'fiscal.sync',
+        label: 'Sincronizacao Fiscal',
+        permissoes: [
+          { key: 'fiscal.sync.view', label: 'Visualizar sincronizacao', descricao: 'Consultar estado de NSU e sincronizacoes fiscais.' },
+          { key: 'fiscal.logs.view', label: 'Visualizar logs fiscais', descricao: 'Consultar logs de processamento e auditoria tecnica fiscal.' }
+        ]
+      }
+    ]
+  },
+  {
     modulo: 'OBRAS',
     label: 'Obras',
     descricao: 'Cadastro e gestão de obras.',

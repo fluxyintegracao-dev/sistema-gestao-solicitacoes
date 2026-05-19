@@ -132,6 +132,7 @@ const {
   validateFinanceConciliacaoImportacoesQuery,
   validateFinanceConciliacaoMovimentosQuery,
   validateFinanceConciliacaoQuery,
+  validateFinanceConciliacaoTarifaBody,
   validateFinanceConciliacaoTransferenciaBody,
   validateFinanceCaixaAberturaBody,
   validateFinanceCaixaFechamentoBody,
@@ -149,6 +150,7 @@ const {
   validateFinanceTituloEstornoBody,
   validateFinanceTituloMovimentoParams,
   validateFinanceTituloQuery,
+  validateFinanceTarifasBancariasConfigBody,
   validateFinanceTransferenciaBody,
   validateFinanceTransferenciaCancelBody,
   validateFinanceTransferenciaQuery
@@ -281,6 +283,7 @@ const RelatorioFinanceiroController = require('./controllers/RelatorioFinanceiro
 const ConciliacaoBancariaController = require('./controllers/ConciliacaoBancariaController');
 const CaixaFinanceiroController = require('./controllers/CaixaFinanceiroController');
 const TransferenciaFinanceiraController = require('./controllers/TransferenciaFinanceiraController');
+const TarifaBancariaConfigController = require('./controllers/TarifaBancariaConfigController');
 const ResultadoObrasController = require('./controllers/ResultadoObrasController');
 const PermissoesAreasController = require('./controllers/PermissoesAreasController');
 const BoletoController = require('./controllers/BoletoController');
@@ -296,6 +299,7 @@ const CrmWebhookGoogleController = require('./controllers/CrmWebhookGoogleContro
 const CrmConversationsController = require('./controllers/CrmConversationsController');
 const CrmAutomationController = require('./controllers/CrmAutomationController');
 const { requireCrmModule } = require('./middlewares/crmAccess');
+const fiscalRoutes = require('./modules/fiscal/routes');
 //console.log('AnexoController =>', AnexoController);
 
 const loginRateLimit = createRateLimit({
@@ -391,6 +395,8 @@ router.use('/provisoes-financeiras', requireEnabledModule('PROVISOES'));
 router.use('/rh', requireEnabledModule('RH_DP'));
 router.use('/integracoes/sienge', requireEnabledModule('INTEGRACAO_SIENGE'));
 router.use('/boletos', requireEnabledModule('BOLETOS'));
+router.use('/fiscal', requireEnabledModule('FISCAL'));
+router.use('/fiscal', fiscalRoutes);
 router.use('/arquivos-modelos', requireEnabledModule('BIBLIOTECA_MODELOS'));
 router.use('/conversas-internas', requireEnabledModule('COMUNICACAO_INTERNA'));
 
@@ -1160,6 +1166,7 @@ router.post('/financeiro/conciliacoes/:id/ignorar', allowFinanceiro, criticalRat
 router.get('/financeiro/conciliacoes/:id/faturas-cartao', allowFinanceiro, validateRequest({ params: validateNumericIdParam('id', 'Conciliacao bancaria'), query: validateFinanceConciliacaoMovimentosQuery }), ConciliacaoBancariaController.faturas);
 router.post('/financeiro/conciliacoes/:id/confirmar-fatura', allowFinanceiro, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Conciliacao bancaria') }), ConciliacaoBancariaController.confirmarFatura);
 router.post('/financeiro/conciliacoes/:id/confirmar-transferencia', allowFinanceiro, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Conciliacao bancaria'), body: validateFinanceConciliacaoTransferenciaBody }), ConciliacaoBancariaController.confirmarTransferencia);
+router.post('/financeiro/conciliacoes/:id/confirmar-tarifa', allowFinanceiro, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Conciliacao bancaria'), body: validateFinanceConciliacaoTarifaBody }), ConciliacaoBancariaController.confirmarTarifa);
 router.get('/financeiro/caixas', allowFinanceiro, validateRequest({ query: validateFinanceCaixaQuery }), CaixaFinanceiroController.index);
 router.post('/financeiro/caixas/abrir', allowFinanceiro, criticalRateLimit, validateRequest({ body: validateFinanceCaixaAberturaBody }), CaixaFinanceiroController.abrir);
 router.get('/financeiro/caixas/:id', allowFinanceiro, validateRequest({ params: validateNumericIdParam('id', 'Caixa financeiro') }), CaixaFinanceiroController.show);
@@ -1193,6 +1200,8 @@ router.patch('/financeiro/categorias/:id', allowFinanceiro, criticalRateLimit, v
 router.get('/financeiro/formas-pagamento', allowFinanceiro, FormaPagamentoFinanceiraController.index);
 router.post('/financeiro/formas-pagamento', allowFinanceiro, criticalRateLimit, FormaPagamentoFinanceiraController.create);
 router.patch('/financeiro/formas-pagamento/:id', allowFinanceiro, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Forma de pagamento') }), FormaPagamentoFinanceiraController.update);
+router.get('/financeiro/tarifas-bancarias-atalhos', allowFinanceiro, TarifaBancariaConfigController.index);
+router.patch('/financeiro/tarifas-bancarias-atalhos', permit(['SUPERADMIN']), criticalRateLimit, validateRequest({ body: validateFinanceTarifasBancariasConfigBody }), TarifaBancariaConfigController.update);
 router.get('/financeiro/cartoes', allowFinanceiro, CartaoFinanceiroController.index);
 router.post('/financeiro/cartoes', allowFinanceiro, criticalRateLimit, CartaoFinanceiroController.create);
 router.patch('/financeiro/cartoes/:id', allowFinanceiro, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Cartao financeiro') }), CartaoFinanceiroController.update);

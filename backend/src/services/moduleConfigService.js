@@ -69,6 +69,15 @@ const MODULE_CATALOG = [
     requiresAll: ['FINANCEIRO']
   },
   {
+    key: 'FISCAL',
+    label: 'Fiscal',
+    packageKey: 'FISCAL',
+    packageLabel: 'Pacote Fiscal',
+    description: 'Entrada fiscal, documentos DFe, logs de sincronizacao e vinculos fiscais.',
+    enabled: false,
+    locked: false
+  },
+  {
     key: 'OBRAS',
     label: 'Gestao de Obras',
     packageKey: 'OBRAS',

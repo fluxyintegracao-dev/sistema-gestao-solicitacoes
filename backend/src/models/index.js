@@ -143,6 +143,16 @@ db.CrmConversationParticipant = require('./CrmConversationParticipant')(sequeliz
 db.CrmAutomationRule = require('./CrmAutomationRule')(sequelize, Sequelize);
 db.CrmAutomationExecution = require('./CrmAutomationExecution')(sequelize, Sequelize);
 
+/* =====================
+   FISCAL
+===================== */
+db.FiscalCompany = require('../modules/fiscal/models/FiscalCompany')(sequelize, Sequelize);
+db.FiscalDfeSyncState = require('../modules/fiscal/models/FiscalDfeSyncState')(sequelize, Sequelize);
+db.FiscalDfeDocument = require('../modules/fiscal/models/FiscalDfeDocument')(sequelize, Sequelize);
+db.FiscalSyncLog = require('../modules/fiscal/models/FiscalSyncLog')(sequelize, Sequelize);
+db.FiscalDocumentLink = require('../modules/fiscal/models/FiscalDocumentLink')(sequelize, Sequelize);
+db.FiscalDivergence = require('../modules/fiscal/models/FiscalDivergence')(sequelize, Sequelize);
+
 const TITULO_FINANCEIRO_SEQUENCE_KEY = 'GLOBAL';
 
 function formatTituloFinanceiroCodigo(numero) {
@@ -2755,5 +2765,41 @@ db.CrmAutomationExecution.belongsTo(db.CrmConversation, { foreignKey: 'conversat
 db.CrmConversation.hasMany(db.CrmAutomationExecution, { foreignKey: 'conversation_id', as: 'automationExecutions' });
 db.CrmAutomationExecution.belongsTo(db.User, { foreignKey: 'created_by_user_id', as: 'criadoPor' });
 db.User.hasMany(db.CrmAutomationExecution, { foreignKey: 'created_by_user_id', as: 'crmAutomationExecutions' });
+
+/* ===== FISCAL ===== */
+db.EmpresaGrupo.hasMany(db.FiscalCompany, { foreignKey: 'empresa_id', as: 'fiscalCompanies' });
+db.FiscalCompany.belongsTo(db.EmpresaGrupo, { foreignKey: 'empresa_id', as: 'empresa' });
+
+db.User.hasMany(db.FiscalCompany, { foreignKey: 'created_by', as: 'fiscalCompaniesCriadas' });
+db.FiscalCompany.belongsTo(db.User, { foreignKey: 'created_by', as: 'criadoPor' });
+db.User.hasMany(db.FiscalCompany, { foreignKey: 'updated_by', as: 'fiscalCompaniesAtualizadas' });
+db.FiscalCompany.belongsTo(db.User, { foreignKey: 'updated_by', as: 'atualizadoPor' });
+
+db.FiscalCompany.hasMany(db.FiscalDfeSyncState, { foreignKey: 'fiscal_company_id', as: 'syncStates' });
+db.FiscalDfeSyncState.belongsTo(db.FiscalCompany, { foreignKey: 'fiscal_company_id', as: 'company' });
+
+db.FiscalCompany.hasMany(db.FiscalDfeDocument, { foreignKey: 'fiscal_company_id', as: 'documents' });
+db.FiscalDfeDocument.belongsTo(db.FiscalCompany, { foreignKey: 'fiscal_company_id', as: 'company' });
+
+db.FiscalCompany.hasMany(db.FiscalSyncLog, { foreignKey: 'fiscal_company_id', as: 'syncLogs' });
+db.FiscalSyncLog.belongsTo(db.FiscalCompany, { foreignKey: 'fiscal_company_id', as: 'company' });
+
+db.FiscalDfeDocument.hasMany(db.FiscalDocumentLink, { foreignKey: 'fiscal_dfe_document_id', as: 'links' });
+db.FiscalDocumentLink.belongsTo(db.FiscalDfeDocument, { foreignKey: 'fiscal_dfe_document_id', as: 'document' });
+
+db.FiscalDfeDocument.hasMany(db.FiscalDivergence, { foreignKey: 'fiscal_dfe_document_id', as: 'divergences' });
+db.FiscalDivergence.belongsTo(db.FiscalDfeDocument, { foreignKey: 'fiscal_dfe_document_id', as: 'document' });
+db.FiscalDocumentLink.hasMany(db.FiscalDivergence, { foreignKey: 'fiscal_document_link_id', as: 'divergences' });
+db.FiscalDivergence.belongsTo(db.FiscalDocumentLink, { foreignKey: 'fiscal_document_link_id', as: 'link' });
+
+db.FiscalDocumentLink.belongsTo(db.Solicitacao, { foreignKey: 'solicitacao_id', as: 'solicitacao' });
+db.FiscalDocumentLink.belongsTo(db.SolicitacaoCompra, { foreignKey: 'solicitacao_compra_id', as: 'solicitacaoCompra' });
+db.FiscalDocumentLink.belongsTo(db.PedidoCompra, { foreignKey: 'pedido_id', as: 'pedido' });
+db.FiscalDocumentLink.belongsTo(db.PedidoCompraItem, { foreignKey: 'pedido_item_id', as: 'pedidoItem' });
+db.FiscalDocumentLink.belongsTo(db.TituloFinanceiro, { foreignKey: 'financeiro_titulo_id', as: 'tituloFinanceiro' });
+db.FiscalDocumentLink.belongsTo(db.Obra, { foreignKey: 'obra_id', as: 'obra' });
+db.FiscalDocumentLink.belongsTo(db.Apropriacao, { foreignKey: 'centro_custo_id', as: 'centroCusto' });
+db.FiscalDocumentLink.belongsTo(db.CategoriaFinanceira, { foreignKey: 'plano_financeiro_id', as: 'planoFinanceiro' });
+db.FiscalDocumentLink.belongsTo(db.Parceiro, { foreignKey: 'fornecedor_id', as: 'fornecedor' });
 
 module.exports = db;
