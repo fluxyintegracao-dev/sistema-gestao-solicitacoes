@@ -1,6 +1,7 @@
 'use strict';
 
 const {
+  executarFixtureDistribuicaoFiscal,
   executarPreflightSincronizacaoFiscal,
   executarSincronizacaoManual,
   gerarUrlRawLogFiscal,
@@ -42,6 +43,15 @@ async function preflight(req, res) {
   }
 }
 
+async function runFixture(req, res) {
+  try {
+    const result = await executarFixtureDistribuicaoFiscal(req, req.body || {});
+    return res.status(202).json(result);
+  } catch (error) {
+    return handleError(res, error);
+  }
+}
+
 async function states(req, res) {
   try {
     const result = await listarEstadosSincronizacao(req.query);
@@ -64,6 +74,7 @@ module.exports = {
   index,
   preflight,
   rawUrl,
+  runFixture,
   runManual,
   states
 };

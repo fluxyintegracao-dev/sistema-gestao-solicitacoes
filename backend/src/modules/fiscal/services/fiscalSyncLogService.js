@@ -8,9 +8,17 @@ const {
 } = require('../../../models');
 const { registrarEventoSeguranca } = require('../../../services/securityLogService');
 const { executarSyncDfeControlado } = require('./fiscalDfeSyncJobService');
-const { getFiscalObjectSignedUrl, isFiscalS3Configured } = require('./fiscalS3Service');
+const {
+  getFiscalObjectSignedUrl,
+  isFiscalS3Configured,
+  saveRawSefazRequest,
+  saveRawSefazResponse
+} = require('./fiscalS3Service');
 const { isFiscalCryptoConfigured } = require('./fiscalCryptoService');
+const { processarXmlRetornoDistribuicaoDfe } = require('./fiscalDfeProcessorService');
 const { getSefazRuntimeConfig } = require('./sefaz/sefazDfeDistributionService');
+const { buildDistNsuRequest } = require('./sefaz/sefazDfeSoapBuilderService');
+const fixtureDistribuicaoDfe = require('./sefaz/fixtures/nfeDistribuicaoNormalizada.fixture');
 
 function createHttpError(message, statusCode = 400) {
   const error = new Error(message);
@@ -186,6 +194,22 @@ function buildCheck(code, status, message) {
   return { code, status, message };
 }
 
+function isHttpsUrl(value) {
+  try {
+    return new URL(value).protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+function assertFixturePermitida() {
+  const fiscalEnv = String(process.env.FISCAL_ENV || 'dev').toLowerCase();
+  const nodeEnv = String(process.env.NODE_ENV || 'development').toLowerCase();
+  if (nodeEnv === 'production' || fiscalEnv === 'prod' || fiscalEnv === 'production') {
+    throw createHttpError('Fixture fiscal local bloqueada em ambiente de producao.', 403);
+  }
+}
+
 async function executarPreflightSincronizacaoFiscal(req, payload = {}) {
   const documentType = payload.document_type || 'nfe';
   const sefazConfig = getSefazRuntimeConfig();
@@ -236,6 +260,22 @@ async function executarPreflightSincronizacaoFiscal(req, payload = {}) {
       isFiscalCryptoConfigured()
         ? 'Criptografia fiscal configurada.'
         : 'Configure FISCAL_CRYPTO_KEY antes de validar certificado e segredos.'
+    ),
+    buildCheck(
+      'FISCAL_SEFAZ_DFE_DISTRIBUTION_URL',
+      sefazConfig.distributionUrl
+        ? (isHttpsUrl(sefazConfig.distributionUrl) ? 'OK' : 'ERROR')
+        : (sefazConfig.enabled ? 'ERROR' : 'WARN'),
+      sefazConfig.distributionUrl
+        ? (isHttpsUrl(sefazConfig.distributionUrl)
+          ? 'Endpoint NFeDistribuicaoDFe configurado com HTTPS.'
+          : 'Endpoint NFeDistribuicaoDFe deve usar HTTPS.')
+        : 'Endpoint NFeDistribuicaoDFe ainda nao configurado.'
+    ),
+    buildCheck(
+      'FISCAL_SEFAZ_REQUEST_TIMEOUT_MS',
+      Number.isFinite(sefazConfig.requestTimeoutMs) && sefazConfig.requestTimeoutMs >= 5000 ? 'OK' : 'WARN',
+      `Timeout atual de chamada SEFAZ: ${sefazConfig.requestTimeoutMs || 30000}ms.`
     )
   ];
 
@@ -325,6 +365,24 @@ async function executarPreflightSincronizacaoFiscal(req, payload = {}) {
       ));
     }
 
+    try {
+      const previewRequest = buildDistNsuRequest({
+        company,
+        ultNsu: syncState?.ult_nsu || '0'
+      });
+      checks.push(buildCheck(
+        'SOAP_DIST_NSU',
+        'OK',
+        `SOAP distNSU preparado localmente para ambiente ${previewRequest.tp_amb} e UF ${previewRequest.cuf_autor}.`
+      ));
+    } catch (error) {
+      checks.push(buildCheck(
+        'SOAP_DIST_NSU',
+        'ERROR',
+        error.message || 'Nao foi possivel montar o SOAP distNSU para esta empresa.'
+      ));
+    }
+
     const companyReady = [...globalChecks, ...checks].every((check) => check.status !== 'ERROR');
     companiesResult.push({
       company: {
@@ -371,7 +429,137 @@ async function executarPreflightSincronizacaoFiscal(req, payload = {}) {
   };
 }
 
+async function executarFixtureDistribuicaoFiscal(req, payload = {}) {
+  assertFixturePermitida();
+
+  const documentType = payload.document_type || 'nfe';
+  const companyWhere = {
+    ativo: true,
+    modulo_fiscal_habilitado: true
+  };
+  if (payload.company_id) companyWhere.id = payload.company_id;
+
+  const company = await FiscalCompany.findOne({
+    where: companyWhere,
+    order: [['razao_social', 'ASC']]
+  });
+
+  if (!company) {
+    throw createHttpError(
+      payload.company_id
+        ? 'Empresa fiscal ativa e habilitada nao encontrada para fixture.'
+        : 'Nenhuma empresa fiscal ativa e habilitada para executar fixture.',
+      payload.company_id ? 404 : 400
+    );
+  }
+
+  const [syncState] = await FiscalDfeSyncState.findOrCreate({
+    where: {
+      fiscal_company_id: company.id,
+      document_type: documentType,
+      ambiente_sefaz: company.ambiente_sefaz || 'homologacao'
+    },
+    defaults: {
+      ult_nsu: '0',
+      max_nsu: '0',
+      status: 'idle'
+    }
+  });
+
+  const startedAt = new Date();
+  const log = await FiscalSyncLog.create({
+    fiscal_company_id: company.id,
+    document_type: documentType,
+    ambiente_sefaz: company.ambiente_sefaz || 'homologacao',
+    started_at: startedAt,
+    status: 'blocked',
+    request_type: 'fixture_distNSU',
+    request_nsu_start: syncState.ult_nsu || '0',
+    response_ult_nsu: syncState.ult_nsu || '0',
+    response_max_nsu: syncState.max_nsu || '0',
+    documents_found: 0,
+    documents_processed: 0
+  });
+
+  try {
+    const soapRequest = buildDistNsuRequest({
+      company,
+      ultNsu: syncState.ult_nsu || '0'
+    });
+
+    const [rawRequest, rawResponse] = await Promise.all([
+      saveRawSefazRequest({
+        cnpj: company.cnpj,
+        syncLogId: log.id,
+        requestType: 'fixture_distNSU',
+        payload: soapRequest.body,
+        metadata: {
+          fiscal_company_id: company.id,
+          document_type: documentType,
+          fixture: 'true'
+        }
+      }),
+      saveRawSefazResponse({
+        cnpj: company.cnpj,
+        syncLogId: log.id,
+        requestType: 'fixture_distNSU',
+        payload: fixtureDistribuicaoDfe.rawSefazResponseXml,
+        metadata: {
+          fiscal_company_id: company.id,
+          document_type: documentType,
+          fixture: 'true',
+          response_code: '138'
+        }
+      })
+    ]);
+
+    const processed = await processarXmlRetornoDistribuicaoDfe({
+      company,
+      syncStateId: syncState.id,
+      syncLogId: log.id,
+      documentType,
+      responseXml: fixtureDistribuicaoDfe.rawSefazResponseXml,
+      rawRequestStorageKey: rawRequest.key,
+      rawResponseStorageKey: rawResponse.key
+    });
+
+    await registrarEventoSeguranca({
+      req,
+      usuarioId: req.user?.id || null,
+      tipoEvento: 'FISCAL_SYNC_FIXTURE_RUN',
+      recursoTipo: 'FISCAL_SYNC',
+      recursoId: log.id,
+      status: 'SUCCESS',
+      descricao: 'Fixture local de distribuicao DFe processada em ambiente nao produtivo',
+      metadata: {
+        fiscal_company_id: company.id,
+        document_type: documentType,
+        documents_processed: processed.documents_processed
+      }
+    });
+
+    return {
+      status: 'success',
+      message: `Fixture fiscal processada: ${processed.documents_processed} documento(s).`,
+      log_id: log.id,
+      company_id: company.id,
+      processed
+    };
+  } catch (error) {
+    const message = error.message || 'Falha ao processar fixture fiscal.';
+    await log.update({
+      finished_at: new Date(),
+      status: 'error',
+      response_code: 'FISCAL_FIXTURE_ERROR',
+      response_message: message.slice(0, 255),
+      error_message: message
+    });
+    throw error;
+  }
+}
+
 module.exports = {
+  executarFixtureDistribuicaoFiscal,
   executarSincronizacaoManual,
   executarPreflightSincronizacaoFiscal,
   gerarUrlRawLogFiscal,

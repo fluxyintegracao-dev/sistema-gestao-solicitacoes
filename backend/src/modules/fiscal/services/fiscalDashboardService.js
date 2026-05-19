@@ -25,6 +25,14 @@ function maskConfiguredValue(value) {
   return `${text.slice(0, 4)}...${text.slice(-4)}`;
 }
 
+function isHttpsUrl(value) {
+  try {
+    return new URL(value).protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 async function getDashboardFiscal() {
   const [
     empresasAtivas,
@@ -172,6 +180,10 @@ async function getDiagnosticoFiscal() {
       enabled: sefazConfig.enabled,
       ambiente: sefazConfig.ambiente,
       uf: sefazConfig.uf,
+      distribution_url_configured: Boolean(sefazConfig.distributionUrl),
+      distribution_url_masked: maskConfiguredValue(sefazConfig.distributionUrl),
+      distribution_url_https: sefazConfig.distributionUrl ? isHttpsUrl(sefazConfig.distributionUrl) : false,
+      request_timeout_ms: sefazConfig.requestTimeoutMs,
       max_docs_per_run: sefazConfig.maxDocsPerRun,
       block_on_consumo_indevido: sefazConfig.blockOnConsumoIndevido,
       lock_ttl_seconds: Number(process.env.FISCAL_SEFAZ_LOCK_TTL_SECONDS || 900)

@@ -1,5 +1,11 @@
 import { useEffect, useState } from 'react';
-import { getFiscalDiagnostics, runFiscalStorageProbe } from '../services/fiscalApi';
+import { Link } from 'react-router-dom';
+import {
+  getFiscalCompanies,
+  getFiscalDiagnostics,
+  runFiscalFixtureSync,
+  runFiscalStorageProbe
+} from '../services/fiscalApi';
 
 function Field({ label, value }) {
   return (
@@ -36,13 +42,25 @@ export default function FiscalDiagnostics() {
   const [probeLoading, setProbeLoading] = useState(false);
   const [probeResult, setProbeResult] = useState(null);
   const [probeError, setProbeError] = useState('');
+  const [fixtureLoading, setFixtureLoading] = useState(false);
+  const [fixtureResult, setFixtureResult] = useState(null);
+  const [fixtureError, setFixtureError] = useState('');
+  const [companies, setCompanies] = useState([]);
+  const [fixtureCompanyId, setFixtureCompanyId] = useState('');
 
   useEffect(() => {
     let mounted = true;
     setLoading(true);
-    getFiscalDiagnostics()
-      .then((response) => {
-        if (mounted) setData(response);
+    Promise.all([
+      getFiscalDiagnostics(),
+      getFiscalCompanies({ ativo: true })
+    ])
+      .then(([diagnosticsResponse, companiesResponse]) => {
+        if (!mounted) return;
+        const nextCompanies = companiesResponse?.data || [];
+        setData(diagnosticsResponse);
+        setCompanies(nextCompanies);
+        setFixtureCompanyId((current) => current || String(nextCompanies.find((company) => company.modulo_fiscal_habilitado)?.id || nextCompanies[0]?.id || ''));
       })
       .catch((err) => {
         if (mounted) setError(err.message || 'Erro ao carregar diagnostico fiscal');
@@ -73,6 +91,25 @@ export default function FiscalDiagnostics() {
       setProbeError(err.message || 'Erro ao testar storage fiscal');
     } finally {
       setProbeLoading(false);
+    }
+  };
+
+  const handleFixtureSync = async () => {
+    setFixtureLoading(true);
+    setFixtureError('');
+    setFixtureResult(null);
+    try {
+      const response = await runFiscalFixtureSync({
+        document_type: 'nfe',
+        company_id: fixtureCompanyId || undefined
+      });
+      setFixtureResult(response);
+      const refreshedDiagnostics = await getFiscalDiagnostics();
+      setData(refreshedDiagnostics);
+    } catch (err) {
+      setFixtureError(err.message || 'Erro ao processar fixture fiscal');
+    } finally {
+      setFixtureLoading(false);
     }
   };
 
@@ -133,12 +170,77 @@ export default function FiscalDiagnostics() {
             ) : null}
           </section>
 
+          <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+              <div>
+                <h2 className="text-base font-semibold text-slate-950 dark:text-white">Ensaio local de DFe</h2>
+                <p className="mt-1 max-w-2xl text-sm text-slate-600 dark:text-slate-300">
+                  Processa uma fixture local de retorno SEFAZ para validar parser, S3 fiscal, logs e Caixa de Entrada sem consulta externa.
+                </p>
+              </div>
+              <div className="flex flex-col gap-2 sm:min-w-[280px]">
+                <select
+                  className="input"
+                  value={fixtureCompanyId}
+                  onChange={(event) => setFixtureCompanyId(event.target.value)}
+                  disabled={fixtureLoading || !companies.length}
+                >
+                  <option value="">Selecione a empresa fiscal</option>
+                  {companies.map((company) => (
+                    <option key={company.id} value={company.id}>
+                      {company.razao_social || company.nome_fantasia || company.cnpj}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={handleFixtureSync}
+                  disabled={fixtureLoading || !storage.configured || !dados.empresas_monitoradas || !fixtureCompanyId}
+                  className="btn-primary"
+                >
+                  {fixtureLoading ? 'Processando...' : 'Processar fixture DFe'}
+                </button>
+              </div>
+            </div>
+            {fixtureError ? <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{fixtureError}</div> : null}
+            {fixtureResult ? (
+              <div className="mt-4 space-y-3">
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  <Field label="Resultado" value={fixtureResult.status} />
+                  <Field label="Log" value={fixtureResult.log_id} />
+                  <Field label="Empresa" value={fixtureResult.company_id} />
+                  <Field label="Documentos" value={fixtureResult.processed?.documents_processed ?? 0} />
+                </div>
+                {fixtureResult.processed?.items?.length ? (
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/40">
+                    <p className="font-semibold text-slate-950 dark:text-white">Documentos processados</p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {fixtureResult.processed.items.map((item) => (
+                        <Link
+                          key={item.document_id}
+                          className="btn-secondary btn-sm"
+                          to={`/fiscal/documentos/${item.document_id}`}
+                        >
+                          NF {item.document_id}
+                        </Link>
+                      ))}
+                      <Link className="btn-outline btn-sm" to="/fiscal/documentos">Ver caixa de entrada</Link>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+          </section>
+
           <Section title="Criptografia e SEFAZ">
             <Field label="Crypto configurado" value={<StatusBadge active={crypto.configured} />} />
             <Field label="Crypto producao" value={<StatusBadge active={crypto.min_length_ok_for_production} />} />
             <Field label="SEFAZ habilitada" value={<StatusBadge active={sefaz.enabled} />} />
             <Field label="Ambiente SEFAZ" value={sefaz.ambiente} />
             <Field label="UF SEFAZ" value={sefaz.uf || 'pendente'} />
+            <Field label="Endpoint distribuição" value={<StatusBadge active={sefaz.distribution_url_configured && sefaz.distribution_url_https} />} />
+            <Field label="Endpoint" value={sefaz.distribution_url_masked || 'pendente'} />
+            <Field label="Timeout SEFAZ" value={`${sefaz.request_timeout_ms || 30000}ms`} />
             <Field label="Max docs/run" value={sefaz.max_docs_per_run} />
             <Field label="Lock TTL" value={`${sefaz.lock_ttl_seconds || 900}s`} />
             <Field label="Bloqueio consumo indevido" value={sefaz.block_on_consumo_indevido ? 'Sim' : 'Nao'} />

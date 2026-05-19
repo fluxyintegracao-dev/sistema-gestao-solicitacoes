@@ -167,6 +167,7 @@ router.get('/documents/:id/pdf-url', allowFiscalDocuments, validateRequest({ par
 router.get('/documents/:id', allowFiscalDocuments, validateRequest({ params: validateNumericIdParam('id', 'Documento fiscal') }), FiscalDocumentController.show);
 
 router.post('/sync/run-manual', allowFiscalSyncRun, validateRequest({ body: validateFiscalSyncRunBody }), FiscalSyncLogController.runManual);
+router.post('/sync/run-fixture', allowFiscalSyncRun, validateRequest({ body: validateFiscalSyncRunBody }), FiscalSyncLogController.runFixture);
 router.post('/sync/preflight', allowFiscalSyncRun, validateRequest({ body: validateFiscalSyncRunBody }), FiscalSyncLogController.preflight);
 router.get('/sync/states', allowFiscalSync, validateRequest({ query: validateFiscalSyncStateQuery }), FiscalSyncLogController.states);
 router.get('/sync/logs/:id/raw-url', allowFiscalSync, allowFiscalLogs, validateRequest({ params: validateNumericIdParam('id', 'Log fiscal'), query: validateFiscalSyncLogRawUrlQuery }), FiscalSyncLogController.rawUrl);

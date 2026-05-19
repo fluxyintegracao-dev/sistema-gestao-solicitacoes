@@ -291,6 +291,15 @@ export async function runFiscalManualSync(payload = {}) {
   return parseJson(response, 'Erro ao registrar tentativa de sincronizacao fiscal');
 }
 
+export async function runFiscalFixtureSync(payload = {}) {
+  const response = await fetch(`${API_URL}/fiscal/sync/run-fixture`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload)
+  });
+  return parseJson(response, 'Erro ao processar fixture fiscal');
+}
+
 export async function runFiscalSyncPreflight(payload = {}) {
   const response = await fetch(`${API_URL}/fiscal/sync/preflight`, {
     method: 'POST',
