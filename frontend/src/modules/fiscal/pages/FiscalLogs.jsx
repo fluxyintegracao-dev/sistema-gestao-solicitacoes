@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   getFiscalSyncLogs,
+  getFiscalSyncLogRawUrl,
   getFiscalSyncStates,
   runFiscalManualSync,
   runFiscalSyncPreflight
@@ -78,6 +79,20 @@ export default function FiscalLogs() {
       setError(err.message || 'Erro ao executar preflight fiscal');
     } finally {
       setPreflightRunning(false);
+    }
+  };
+
+  const openRawPayload = async (log, type) => {
+    setError('');
+    setMessage('');
+    try {
+      const result = await getFiscalSyncLogRawUrl(log.id, type);
+      if (result?.url) {
+        window.open(result.url, '_blank', 'noopener,noreferrer');
+        setMessage(`URL assinada do ${type === 'request' ? 'request' : 'response'} gerada por tempo limitado.`);
+      }
+    } catch (err) {
+      setError(err.message || 'Erro ao gerar URL do payload bruto fiscal');
     }
   };
 
@@ -222,11 +237,12 @@ export default function FiscalLogs() {
               <th className="px-4 py-3">Tipo</th>
               <th className="px-4 py-3">Status</th>
               <th className="px-4 py-3">Mensagem</th>
+              <th className="px-4 py-3">Raw</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
             {loading ? (
-              <tr><td className="px-4 py-5 text-slate-500" colSpan={5}>Carregando logs...</td></tr>
+              <tr><td className="px-4 py-5 text-slate-500" colSpan={6}>Carregando logs...</td></tr>
             ) : logs.length ? logs.map((log) => (
               <tr key={log.id}>
                 <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{formatDateTime(log.started_at)}</td>
@@ -234,9 +250,26 @@ export default function FiscalLogs() {
                 <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{log.document_type}</td>
                 <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{log.status}</td>
                 <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{log.response_message || log.error_message || '-'}</td>
+                <td className="px-4 py-3">
+                  <div className="flex flex-wrap gap-2">
+                    {log.raw_request_storage_key ? (
+                      <button className="btn-secondary text-xs" type="button" onClick={() => openRawPayload(log, 'request')}>
+                        Request
+                      </button>
+                    ) : null}
+                    {log.raw_response_storage_key ? (
+                      <button className="btn-secondary text-xs" type="button" onClick={() => openRawPayload(log, 'response')}>
+                        Response
+                      </button>
+                    ) : null}
+                    {!log.raw_request_storage_key && !log.raw_response_storage_key ? (
+                      <span className="text-xs text-slate-400">-</span>
+                    ) : null}
+                  </div>
+                </td>
               </tr>
             )) : (
-              <tr><td className="px-4 py-5 text-slate-500" colSpan={5}>Nenhum log fiscal registrado.</td></tr>
+              <tr><td className="px-4 py-5 text-slate-500" colSpan={6}>Nenhum log fiscal registrado.</td></tr>
             )}
           </tbody>
         </table>

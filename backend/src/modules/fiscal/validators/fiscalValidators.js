@@ -230,6 +230,13 @@ function validateFiscalSyncLogQuery(query = {}) {
   };
 }
 
+function validateFiscalSyncLogRawUrlQuery(query = {}) {
+  ensureAllowedKeys(query, ['type'], 'URL de payload bruto fiscal');
+  return {
+    type: parseEnum(query.type, 'Tipo de payload bruto', ['request', 'response'], { fallback: 'response' })
+  };
+}
+
 function validateFiscalSyncStateQuery(query = {}) {
   ensureAllowedKeys(query, ['company_id', 'status', 'document_type', 'ambiente_sefaz', 'limit', 'page'], 'Filtro de estados de sincronizacao fiscal');
   return {
@@ -541,6 +548,7 @@ module.exports = {
   validateFiscalDocumentLinkUpdateBody,
   validateFiscalLinkSearchQuery,
   validateFiscalDocumentQuery,
+  validateFiscalSyncLogRawUrlQuery,
   validateFiscalSyncLogQuery,
   validateFiscalSyncRunBody,
   validateFiscalSyncStateQuery,

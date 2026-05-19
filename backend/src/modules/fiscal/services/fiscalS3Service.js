@@ -10,6 +10,7 @@ const ALLOWED_FISCAL_MIME_TYPES = new Set([
   'text/xml',
   'application/pdf',
   'application/zip',
+  'application/json',
   'text/plain',
   'text/csv',
   'image/jpeg',
@@ -128,6 +129,33 @@ function buildFiscalAccountingBatchObjectKey({
   return parts.join('/');
 }
 
+function buildFiscalRawSefazObjectKey({
+  cnpj,
+  syncLogId = 'manual',
+  direction = 'response',
+  requestType = 'distNSU',
+  extension = 'xml',
+  date = new Date()
+}) {
+  const config = getFiscalS3Config();
+  const year = String(date.getFullYear());
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const parts = [
+    config.prefix,
+    sanitizePathSegment(cnpj),
+    'raw',
+    'sefaz',
+    year,
+    month,
+    day,
+    sanitizePathSegment(syncLogId),
+    `${sanitizePathSegment(direction)}-${sanitizePathSegment(requestType)}.${sanitizePathSegment(extension)}`
+  ].filter(Boolean);
+
+  return parts.join('/');
+}
+
 function calculateSha256(bufferOrString) {
   return crypto
     .createHash('sha256')
@@ -220,6 +248,52 @@ async function saveFiscalXml({ cnpj, documentType = 'nfe', accessKey, xml, date 
   });
 }
 
+async function saveRawSefazPayload({
+  cnpj,
+  syncLogId = 'manual',
+  direction = 'response',
+  requestType = 'distNSU',
+  payload,
+  contentType = 'application/xml',
+  date = new Date(),
+  metadata = {}
+}) {
+  const key = buildFiscalRawSefazObjectKey({
+    cnpj,
+    syncLogId,
+    direction,
+    requestType,
+    extension: contentType === 'application/json' ? 'json' : 'xml',
+    date
+  });
+
+  return uploadFiscalObject({
+    key,
+    body: payload,
+    contentType,
+    metadata: {
+      ...metadata,
+      fiscal_payload: 'raw_sefaz',
+      direction,
+      request_type: requestType
+    }
+  });
+}
+
+async function saveRawSefazRequest(options = {}) {
+  return saveRawSefazPayload({
+    ...options,
+    direction: 'request'
+  });
+}
+
+async function saveRawSefazResponse(options = {}) {
+  return saveRawSefazPayload({
+    ...options,
+    direction: 'response'
+  });
+}
+
 async function getFiscalObjectSignedUrl(key, expiresIn = null) {
   assertFiscalS3Configured();
   const config = getFiscalS3Config();
@@ -244,11 +318,15 @@ module.exports = {
   assertFiscalS3Configured,
   buildFiscalAccountingBatchObjectKey,
   buildFiscalObjectKey,
+  buildFiscalRawSefazObjectKey,
   calculateSha256,
   getFiscalObjectBuffer,
   getFiscalS3Config,
   getFiscalObjectSignedUrl,
   isFiscalS3Configured,
+  saveRawSefazPayload,
+  saveRawSefazRequest,
+  saveRawSefazResponse,
   saveFiscalXml,
   uploadFiscalObject,
   validateFiscalMimeType

@@ -8,7 +8,7 @@ const {
 } = require('../../../models');
 const { registrarEventoSeguranca } = require('../../../services/securityLogService');
 const { executarSyncDfeControlado } = require('./fiscalDfeSyncJobService');
-const { isFiscalS3Configured } = require('./fiscalS3Service');
+const { getFiscalObjectSignedUrl, isFiscalS3Configured } = require('./fiscalS3Service');
 const { isFiscalCryptoConfigured } = require('./fiscalCryptoService');
 const { getSefazRuntimeConfig } = require('./sefaz/sefazDfeDistributionService');
 
@@ -82,6 +82,50 @@ async function listarEstadosSincronizacao(query = {}) {
       limit,
       pages: Math.ceil(result.count / limit)
     }
+  };
+}
+
+async function gerarUrlRawLogFiscal(req, id, type = 'response') {
+  const normalizedType = type === 'request' ? 'request' : 'response';
+  const log = await FiscalSyncLog.findByPk(id);
+  if (!log) throw createHttpError('Log fiscal nao encontrado.', 404);
+
+  const key = normalizedType === 'request'
+    ? log.raw_request_storage_key
+    : log.raw_response_storage_key;
+
+  if (!key) {
+    throw createHttpError(
+      normalizedType === 'request'
+        ? 'Este log fiscal nao possui request bruto armazenado.'
+        : 'Este log fiscal nao possui response bruto armazenado.',
+      404
+    );
+  }
+
+  const url = await getFiscalObjectSignedUrl(key);
+
+  await registrarEventoSeguranca({
+    req,
+    usuarioId: req.user?.id || null,
+    tipoEvento: 'FISCAL_SYNC_RAW_URL_GENERATED',
+    recursoTipo: 'FISCAL_SYNC_LOG',
+    recursoId: log.id,
+    status: 'SUCCESS',
+    descricao: 'URL assinada de payload bruto fiscal gerada',
+    metadata: {
+      type: normalizedType,
+      key,
+      fiscal_company_id: log.fiscal_company_id,
+      document_type: log.document_type
+    }
+  });
+
+  return {
+    url,
+    expires_in_seconds: Number(process.env.FISCAL_S3_PRESIGNED_EXPIRES_SECONDS || 300),
+    type: normalizedType,
+    key
   };
 }
 
@@ -330,6 +374,7 @@ async function executarPreflightSincronizacaoFiscal(req, payload = {}) {
 module.exports = {
   executarSincronizacaoManual,
   executarPreflightSincronizacaoFiscal,
+  gerarUrlRawLogFiscal,
   listarEstadosSincronizacao,
   listarLogsSincronizacao
 };

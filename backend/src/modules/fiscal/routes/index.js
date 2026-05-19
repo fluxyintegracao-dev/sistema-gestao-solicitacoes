@@ -41,6 +41,7 @@ const {
   validateFiscalDocumentLinkUpdateBody,
   validateFiscalLinkSearchQuery,
   validateFiscalDocumentQuery,
+  validateFiscalSyncLogRawUrlQuery,
   validateFiscalSyncLogQuery,
   validateFiscalSyncStateQuery,
   validateFiscalSyncRunBody
@@ -168,6 +169,7 @@ router.get('/documents/:id', allowFiscalDocuments, validateRequest({ params: val
 router.post('/sync/run-manual', allowFiscalSyncRun, validateRequest({ body: validateFiscalSyncRunBody }), FiscalSyncLogController.runManual);
 router.post('/sync/preflight', allowFiscalSyncRun, validateRequest({ body: validateFiscalSyncRunBody }), FiscalSyncLogController.preflight);
 router.get('/sync/states', allowFiscalSync, validateRequest({ query: validateFiscalSyncStateQuery }), FiscalSyncLogController.states);
+router.get('/sync/logs/:id/raw-url', allowFiscalSync, allowFiscalLogs, validateRequest({ params: validateNumericIdParam('id', 'Log fiscal'), query: validateFiscalSyncLogRawUrlQuery }), FiscalSyncLogController.rawUrl);
 router.get('/sync/logs', allowFiscalSync, allowFiscalLogs, validateRequest({ query: validateFiscalSyncLogQuery }), FiscalSyncLogController.index);
 
 module.exports = router;

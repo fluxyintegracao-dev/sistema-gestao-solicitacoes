@@ -3,6 +3,7 @@
 const {
   executarPreflightSincronizacaoFiscal,
   executarSincronizacaoManual,
+  gerarUrlRawLogFiscal,
   listarEstadosSincronizacao,
   listarLogsSincronizacao
 } = require('../services/fiscalSyncLogService');
@@ -50,9 +51,19 @@ async function states(req, res) {
   }
 }
 
+async function rawUrl(req, res) {
+  try {
+    const result = await gerarUrlRawLogFiscal(req, req.params.id, req.query?.type);
+    return res.json(result);
+  } catch (error) {
+    return handleError(res, error);
+  }
+}
+
 module.exports = {
   index,
   preflight,
+  rawUrl,
   runManual,
   states
 };

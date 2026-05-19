@@ -6,7 +6,39 @@ const {
   buildFiscalEventPayload
 } = require('../src/modules/fiscal/services/fiscalDfeProcessorService');
 const { parseNfeXml } = require('../src/modules/fiscal/services/fiscalXmlParserService');
+const {
+  buildFiscalRawSefazObjectKey,
+  validateFiscalMimeType
+} = require('../src/modules/fiscal/services/fiscalS3Service');
+const {
+  parseDistribuicaoDfeResponse
+} = require('../src/modules/fiscal/services/sefaz/sefazDfeResponseParserService');
 const fixture = require('../src/modules/fiscal/services/sefaz/fixtures/nfeDistribuicaoNormalizada.fixture');
+
+const rawKey = buildFiscalRawSefazObjectKey({
+  cnpj: fixture.company.cnpj,
+  syncLogId: 99,
+  direction: 'response',
+  requestType: 'distNSU',
+  date: new Date('2026-05-19T12:00:00-03:00')
+});
+
+assert.strictEqual(rawKey, 'dev/55666777000188/raw/sefaz/2026/05/19/99/response-distNSU.xml');
+assert.strictEqual(validateFiscalMimeType('application/json; charset=utf-8'), 'application/json');
+
+const parsedSefazResponse = parseDistribuicaoDfeResponse(fixture.rawSefazResponseXml);
+assert.strictEqual(parsedSefazResponse.response_code, '138');
+assert.strictEqual(parsedSefazResponse.response_message, 'Documento localizado para teste local');
+assert.strictEqual(parsedSefazResponse.ult_nsu, '11');
+assert.strictEqual(parsedSefazResponse.max_nsu, '20');
+assert.strictEqual(parsedSefazResponse.documents.length, 2);
+assert.strictEqual(parsedSefazResponse.documents[0].nsu, '10');
+assert.strictEqual(parsedSefazResponse.documents[0].access_key, '12345678901234567890123456789012345678901234');
+assert.strictEqual(parsedSefazResponse.documents[0].schema_version, 'procNFe_v4.00');
+assert.ok(parsedSefazResponse.documents[0].xml.includes('<nfeProc'));
+assert.strictEqual(parsedSefazResponse.documents[1].summary.access_key, '98765432109876543210987654321098765432109876');
+assert.strictEqual(parsedSefazResponse.documents[1].summary.issuer_name, 'Fornecedor Somente Resumo LTDA');
+assert.strictEqual(Number(parsedSefazResponse.documents[1].summary.total_value), 789.1);
 
 const xmlItem = fixture.response.documents[0];
 const parsedXml = parseNfeXml(xmlItem.xml);

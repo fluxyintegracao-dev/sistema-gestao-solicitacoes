@@ -10,6 +10,7 @@ const {
 } = require('../../../models');
 const { saveFiscalXml } = require('./fiscalS3Service');
 const { parseNfeXml } = require('./fiscalXmlParserService');
+const { parseDistribuicaoDfeResponse } = require('./sefaz/sefazDfeResponseParserService');
 
 function createHttpError(message, statusCode = 400) {
   const error = new Error(message);
@@ -166,7 +167,9 @@ async function processarRetornoDistribuicaoDfe({
   syncStateId = null,
   syncLogId = null,
   documentType = 'nfe',
-  response = {}
+  response = {},
+  rawRequestStorageKey = null,
+  rawResponseStorageKey = null
 } = {}) {
   const fiscalCompany = company || await FiscalCompany.findByPk(fiscalCompanyId);
   if (!fiscalCompany) {
@@ -218,7 +221,9 @@ async function processarRetornoDistribuicaoDfe({
           response_code: response.response_code || response.code || syncLog.response_code,
           response_message: response.response_message || response.message || syncLog.response_message,
           documents_found: documents.length,
-          documents_processed: processed.length
+          documents_processed: processed.length,
+          raw_request_storage_key: rawRequestStorageKey || syncLog.raw_request_storage_key,
+          raw_response_storage_key: rawResponseStorageKey || syncLog.raw_response_storage_key
         }, { transaction });
       }
     }
@@ -245,9 +250,37 @@ async function processarRetornoDistribuicaoDfe({
   });
 }
 
+async function processarXmlRetornoDistribuicaoDfe({
+  fiscalCompanyId,
+  company,
+  syncStateId = null,
+  syncLogId = null,
+  documentType = 'nfe',
+  responseXml,
+  rawRequestStorageKey = null,
+  rawResponseStorageKey = null
+} = {}) {
+  if (!responseXml) {
+    throw createHttpError('XML de retorno SEFAZ e obrigatorio para processamento fiscal.', 400);
+  }
+
+  const response = parseDistribuicaoDfeResponse(responseXml);
+  return processarRetornoDistribuicaoDfe({
+    fiscalCompanyId,
+    company,
+    syncStateId,
+    syncLogId,
+    documentType,
+    response,
+    rawRequestStorageKey,
+    rawResponseStorageKey
+  });
+}
+
 module.exports = {
   buildDocumentPayload,
   buildFiscalEventPayload,
   processarDocumentoNormalizado,
-  processarRetornoDistribuicaoDfe
+  processarRetornoDistribuicaoDfe,
+  processarXmlRetornoDistribuicaoDfe
 };

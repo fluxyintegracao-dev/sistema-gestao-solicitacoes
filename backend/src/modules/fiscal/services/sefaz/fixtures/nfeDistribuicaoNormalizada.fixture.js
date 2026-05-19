@@ -1,5 +1,7 @@
 'use strict';
 
+const zlib = require('zlib');
+
 const accessKey = '12345678901234567890123456789012345678901234';
 const summaryAccessKey = '98765432109876543210987654321098765432109876';
 
@@ -40,6 +42,40 @@ const xml = `<?xml version="1.0" encoding="UTF-8"?>
   </protNFe>
 </nfeProc>`;
 
+const summaryXml = `<?xml version="1.0" encoding="UTF-8"?>
+<resNFe versao="1.01">
+  <chNFe>${summaryAccessKey}</chNFe>
+  <CNPJ>99888777000166</CNPJ>
+  <xNome>Fornecedor Somente Resumo LTDA</xNome>
+  <IE>123456789</IE>
+  <dhEmi>2026-05-18T09:00:00-03:00</dhEmi>
+  <tpNF>1</tpNF>
+  <vNF>789.10</vNF>
+  <digVal>abc</digVal>
+  <dhRecbto>2026-05-18T09:05:00-03:00</dhRecbto>
+  <nProt>135260000000002</nProt>
+  <cSitNFe>1</cSitNFe>
+</resNFe>`;
+
+function gzipBase64(content) {
+  return zlib.gzipSync(Buffer.from(content, 'utf8')).toString('base64');
+}
+
+const rawSefazResponseXml = `<?xml version="1.0" encoding="UTF-8"?>
+<retDistDFeInt versao="1.01" xmlns="http://www.portalfiscal.inf.br/nfe">
+  <tpAmb>2</tpAmb>
+  <verAplic>SVAN</verAplic>
+  <cStat>138</cStat>
+  <xMotivo>Documento localizado para teste local</xMotivo>
+  <dhResp>2026-05-19T12:00:00-03:00</dhResp>
+  <ultNSU>11</ultNSU>
+  <maxNSU>20</maxNSU>
+  <loteDistDFeInt>
+    <docZip NSU="10" schema="procNFe_v4.00">${gzipBase64(xml)}</docZip>
+    <docZip NSU="11" schema="resNFe_v1.01">${gzipBase64(summaryXml)}</docZip>
+  </loteDistDFeInt>
+</retDistDFeInt>`;
+
 module.exports = {
   company: {
     id: 1,
@@ -48,6 +84,8 @@ module.exports = {
     uf: 'ES',
     ambiente_sefaz: 'homologacao'
   },
+  rawSefazResponseXml,
+  summaryXml,
   response: {
     ult_nsu: '10',
     max_nsu: '20',

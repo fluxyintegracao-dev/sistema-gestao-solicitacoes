@@ -230,6 +230,13 @@ export async function getFiscalSyncLogs(params = {}) {
   return parseJson(response, 'Erro ao buscar logs fiscais');
 }
 
+export async function getFiscalSyncLogRawUrl(id, type = 'response') {
+  const response = await fetch(buildUrl(`/fiscal/sync/logs/${id}/raw-url`, { type }), {
+    headers: authHeaders()
+  });
+  return parseJson(response, 'Erro ao gerar URL do payload bruto fiscal');
+}
+
 export async function getFiscalSyncStates(params = {}) {
   const response = await fetch(buildUrl('/fiscal/sync/states', params), {
     headers: authHeaders()
