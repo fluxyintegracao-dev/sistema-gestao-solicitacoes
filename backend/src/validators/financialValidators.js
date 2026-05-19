@@ -257,6 +257,7 @@ function validateFinanceTituloQuery(query = {}) {
       'status',
       'q',
       'codigo',
+      'empresa_id',
       'obra_id',
       'parceiro_id',
       'categoria_financeira_id',
@@ -289,6 +290,7 @@ function validateFinanceTituloQuery(query = {}) {
     status: parseEnum(query.status, 'Status', ['ABERTO', 'PARCIAL', 'QUITADO', 'CANCELADO', 'ESTORNADO']),
     q: parseOptionalText(query.q, 'Busca', 120),
     codigo: parseOptionalText(query.codigo, 'Codigo do titulo', 40),
+    empresa_id: parseInteger(query.empresa_id, 'Empresa do grupo'),
     obra_id: parseInteger(query.obra_id, 'Obra'),
     parceiro_id: parseInteger(query.parceiro_id, 'Parceiro'),
     categoria_financeira_id: parseInteger(query.categoria_financeira_id, 'Categoria financeira'),
@@ -496,6 +498,19 @@ function validateFinanceConciliacaoConfirmBody(body = {}) {
   };
 }
 
+function validateFinanceConciliacaoTransferenciaBody(body = {}) {
+  ensureAllowedKeys(
+    body,
+    ['conta_contraparte_id', 'descricao'],
+    'Conciliacao bancaria por transferencia'
+  );
+
+  return {
+    conta_contraparte_id: parseInteger(body.conta_contraparte_id, 'Conta contraparte', { required: true }),
+    descricao: parseOptionalText(body.descricao, 'Descricao', 255)
+  };
+}
+
 function validateFinanceConciliacaoCriarTituloBody(body = {}) {
   ensureAllowedKeys(
     body,
@@ -618,6 +633,7 @@ function validateFinanceTituloCreateFromSolicitacaoBody(body = {}) {
     body,
     [
       'tipo',
+      'empresa_id',
       'parceiro_id',
       'valor',
       'data_vencimento',
@@ -646,6 +662,7 @@ function validateFinanceTituloCreateFromSolicitacaoBody(body = {}) {
 
   return {
     tipo: parseEnum(body.tipo, 'Tipo', ['PAGAR', 'RECEBER']),
+    empresa_id: parseInteger(body.empresa_id, 'Empresa do grupo'),
     parceiro_id: parseInteger(body.parceiro_id, 'Parceiro'),
     valor: parseDecimal(body.valor, 'Valor', { min: 0.01 }),
     data_vencimento: parseDateOnly(body.data_vencimento, 'Data de vencimento'),
@@ -676,6 +693,7 @@ function validateFinanceTituloCreateBody(body = {}) {
     body,
     [
       'tipo',
+      'empresa_id',
       'obra_id',
       'parceiro_id',
       'valor',
@@ -705,6 +723,7 @@ function validateFinanceTituloCreateBody(body = {}) {
 
   return {
     tipo: parseEnum(body.tipo, 'Tipo', ['PAGAR', 'RECEBER'], { required: true }),
+    empresa_id: parseInteger(body.empresa_id, 'Empresa do grupo'),
     obra_id: parseInteger(body.obra_id, 'Obra', { required: true }),
     parceiro_id: parseInteger(body.parceiro_id, 'Parceiro', { required: true }),
     valor: parseDecimal(body.valor, 'Valor', { required: true, min: 0.01 }),
@@ -834,6 +853,7 @@ function validateFinanceBoletoTituloQuery(query = {}) {
     [
       'q',
       'codigo',
+      'empresa_id',
       'numero_documento',
       'obra_id',
       'empreendimento_id',
@@ -856,6 +876,7 @@ function validateFinanceBoletoTituloQuery(query = {}) {
   return {
     q: parseOptionalText(query.q, 'Busca', 120),
     codigo: parseOptionalText(query.codigo, 'Codigo do titulo', 40),
+    empresa_id: parseInteger(query.empresa_id, 'Empresa do grupo'),
     numero_documento: parseOptionalText(query.numero_documento, 'Numero do documento', 120),
     obra_id: parseInteger(query.obra_id, 'Obra'),
     empreendimento_id: parseInteger(query.empreendimento_id, 'Empreendimento'),
@@ -870,7 +891,18 @@ function validateFinanceBoletoTituloQuery(query = {}) {
 function validateFinanceCadastroContaBody(body = {}) {
   ensureAllowedKeys(
     body,
-    ['nome', 'banco', 'agencia', 'conta', 'tipo_conta', 'ativo'],
+    [
+      'nome',
+      'banco',
+      'agencia',
+      'conta',
+      'tipo_conta',
+      'empresa_id',
+      'tipo_operacional',
+      'exige_abertura_fechamento',
+      'saldo_inicial',
+      'ativo'
+    ],
     'Conta bancaria'
   );
 
@@ -880,6 +912,10 @@ function validateFinanceCadastroContaBody(body = {}) {
     agencia: parseOptionalText(body.agencia, 'Agencia', 40),
     conta: parseOptionalText(body.conta, 'Conta', 60),
     tipo_conta: parseOptionalText(body.tipo_conta, 'Tipo de conta', 40),
+    empresa_id: parseInteger(body.empresa_id, 'Empresa do grupo'),
+    tipo_operacional: parseEnum(body.tipo_operacional, 'Tipo operacional', ['BANCARIA', 'CAIXA_INTERNO']),
+    exige_abertura_fechamento: parseBoolean(body.exige_abertura_fechamento, 'Exige abertura e fechamento'),
+    saldo_inicial: parseDecimal(body.saldo_inicial, 'Saldo inicial'),
     ativo: parseBoolean(body.ativo, 'Ativo')
   };
 }
@@ -899,16 +935,116 @@ function validateFinanceCadastroCategoriaBody(body = {}) {
   };
 }
 
+function validateFinanceCaixaQuery(query = {}) {
+  ensureAllowedKeys(
+    query,
+    ['conta_bancaria_id', 'empresa_id', 'status', 'limit'],
+    'Consulta de caixas financeiros'
+  );
+
+  return {
+    conta_bancaria_id: parseInteger(query.conta_bancaria_id, 'Conta financeira'),
+    empresa_id: parseInteger(query.empresa_id, 'Empresa do grupo'),
+    status: parseEnum(query.status, 'Status', ['ABERTO', 'FECHADO', 'TODOS']),
+    limit: parseInteger(query.limit, 'Limite')
+  };
+}
+
+function validateFinanceCaixaAberturaBody(body = {}) {
+  ensureAllowedKeys(
+    body,
+    ['conta_bancaria_id', 'data_abertura', 'saldo_abertura', 'observacoes'],
+    'Abertura de caixa'
+  );
+
+  return {
+    conta_bancaria_id: parseInteger(body.conta_bancaria_id, 'Conta financeira', { required: true }),
+    data_abertura: parseDateOnly(body.data_abertura, 'Data de abertura'),
+    saldo_abertura: parseDecimal(body.saldo_abertura, 'Saldo de abertura'),
+    observacoes: parseOptionalText(body.observacoes, 'Observacoes', 4000)
+  };
+}
+
+function validateFinanceCaixaFechamentoBody(body = {}) {
+  ensureAllowedKeys(
+    body,
+    ['data_fechamento', 'saldo_informado', 'observacoes'],
+    'Fechamento de caixa'
+  );
+
+  return {
+    data_fechamento: parseDateOnly(body.data_fechamento, 'Data de fechamento'),
+    saldo_informado: parseDecimal(body.saldo_informado, 'Saldo informado', { required: true }),
+    observacoes: parseOptionalText(body.observacoes, 'Observacoes', 4000)
+  };
+}
+
+function validateFinanceTransferenciaQuery(query = {}) {
+  ensureAllowedKeys(
+    query,
+    ['empresa_id', 'conta_bancaria_id', 'status', 'data_inicial', 'data_final', 'limit'],
+    'Consulta de transferencias financeiras'
+  );
+
+  const dataInicial = parseDateOnly(query.data_inicial, 'Data inicial');
+  const dataFinal = parseDateOnly(query.data_final, 'Data final');
+
+  if (dataInicial && dataFinal && dataInicial > dataFinal) {
+    throw new ValidationError('Data inicial nao pode ser maior que data final.');
+  }
+
+  return {
+    empresa_id: parseInteger(query.empresa_id, 'Empresa do grupo'),
+    conta_bancaria_id: parseInteger(query.conta_bancaria_id, 'Conta financeira'),
+    status: parseEnum(query.status, 'Status', ['ATIVA', 'CANCELADA', 'TODOS']),
+    data_inicial: dataInicial,
+    data_final: dataFinal,
+    limit: parseInteger(query.limit, 'Limite')
+  };
+}
+
+function validateFinanceTransferenciaBody(body = {}) {
+  ensureAllowedKeys(
+    body,
+    ['empresa_id', 'conta_origem_id', 'conta_destino_id', 'data_transferencia', 'valor', 'descricao'],
+    'Transferencia financeira'
+  );
+
+  return {
+    empresa_id: parseInteger(body.empresa_id, 'Empresa do grupo'),
+    conta_origem_id: parseInteger(body.conta_origem_id, 'Conta de origem', { required: true }),
+    conta_destino_id: parseInteger(body.conta_destino_id, 'Conta de destino', { required: true }),
+    data_transferencia: parseDateOnly(body.data_transferencia, 'Data da transferencia'),
+    valor: parseDecimal(body.valor, 'Valor da transferencia', { required: true, min: 0.01 }),
+    descricao: parseOptionalText(body.descricao, 'Descricao', 255)
+  };
+}
+
+function validateFinanceTransferenciaCancelBody(body = {}) {
+  ensureAllowedKeys(body, ['observacoes'], 'Cancelamento de transferencia financeira');
+
+  return {
+    observacoes: parseOptionalText(body.observacoes, 'Observacoes', 4000)
+  };
+}
+
 module.exports = {
   FORMAS_COBRANCA,
   STATUS_COBRANCA,
   validateFinanceConciliacaoCriarTituloBody,
   validateFinanceConciliacaoConciliarSugeridosBody,
   validateFinanceConciliacaoConfirmBody,
+  validateFinanceConciliacaoTransferenciaBody,
   validateFinanceConciliacaoImportBody,
   validateFinanceConciliacaoImportacoesQuery,
   validateFinanceConciliacaoMovimentosQuery,
   validateFinanceConciliacaoQuery,
+  validateFinanceCaixaAberturaBody,
+  validateFinanceCaixaFechamentoBody,
+  validateFinanceCaixaQuery,
+  validateFinanceTransferenciaBody,
+  validateFinanceTransferenciaCancelBody,
+  validateFinanceTransferenciaQuery,
   validateFinanceCadastroCategoriaBody,
   validateFinanceCadastroContaBody,
   validateFinanceBoletoTituloQuery,

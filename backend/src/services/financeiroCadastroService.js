@@ -2,6 +2,7 @@ const {
   CartaoFinanceiro,
   CategoriaFinanceira,
   ContaBancaria,
+  EmpresaGrupo,
   FormaPagamentoFinanceira
 } = require('../models');
 const {
@@ -48,12 +49,21 @@ async function assertFinanceAccess(req) {
 }
 
 function sanitizeContaPayload(payload = {}, { partial = false } = {}) {
+  const tipoOperacional = payload.tipo_operacional === undefined
+    ? undefined
+    : String(payload.tipo_operacional || '').trim().toUpperCase();
   const data = {
     nome: sanitizeTextField(payload.nome),
+    empresa_id: payload.empresa_id === undefined ? undefined : (payload.empresa_id ? Number(payload.empresa_id) : null),
+    tipo_operacional: tipoOperacional,
     banco: sanitizeTextField(payload.banco, { emptyAsNull: true }),
     agencia: sanitizeTextField(payload.agencia, { emptyAsNull: true }),
     conta: sanitizeTextField(payload.conta, { emptyAsNull: true }),
     tipo_conta: sanitizeTextField(payload.tipo_conta, { emptyAsNull: true }),
+    exige_abertura_fechamento: payload.exige_abertura_fechamento === undefined
+      ? undefined
+      : sanitizeBoolean(payload.exige_abertura_fechamento),
+    saldo_inicial: payload.saldo_inicial === undefined ? undefined : Number(payload.saldo_inicial || 0),
     ativo: payload.ativo
   };
 
@@ -61,6 +71,21 @@ function sanitizeContaPayload(payload = {}, { partial = false } = {}) {
     if (!String(data.nome || '').trim()) {
       throw createHttpError(400, 'Nome da conta bancaria e obrigatorio.');
     }
+    data.tipo_operacional = data.tipo_operacional || 'BANCARIA';
+    data.exige_abertura_fechamento = Boolean(data.exige_abertura_fechamento);
+    data.saldo_inicial = Number(data.saldo_inicial || 0);
+  }
+
+  if (data.tipo_operacional !== undefined && !['BANCARIA', 'CAIXA_INTERNO'].includes(data.tipo_operacional)) {
+    throw createHttpError(400, 'Tipo operacional da conta deve ser bancaria ou caixa interno.');
+  }
+
+  if (data.empresa_id !== undefined && data.empresa_id !== null && (!Number.isInteger(data.empresa_id) || data.empresa_id <= 0)) {
+    throw createHttpError(400, 'Empresa do grupo invalida para a conta.');
+  }
+
+  if (data.saldo_inicial !== undefined && !Number.isFinite(data.saldo_inicial)) {
+    throw createHttpError(400, 'Saldo inicial invalido.');
   }
 
   return Object.fromEntries(
@@ -180,13 +205,30 @@ async function listarContasBancarias(req) {
   await assertFinanceAccess(req);
 
   return ContaBancaria.findAll({
+    include: [
+      {
+        model: EmpresaGrupo,
+        as: 'empresa',
+        attributes: ['id', 'codigo', 'nome', 'razao_social', 'cnpj']
+      }
+    ],
     order: [['nome', 'ASC']]
   });
+}
+
+async function assertEmpresaGrupoAtiva(empresaId) {
+  if (!empresaId) return null;
+  const empresa = await EmpresaGrupo.findByPk(empresaId);
+  if (!empresa || empresa.ativo === false) {
+    throw createHttpError(400, 'Empresa do grupo invalida ou inativa.');
+  }
+  return empresa;
 }
 
 async function criarContaBancaria(req, payload = {}) {
   await assertFinanceAccess(req);
   const data = sanitizeContaPayload(payload);
+  await assertEmpresaGrupoAtiva(data.empresa_id);
   data.criado_por = req.user?.id || null;
   data.atualizado_por = req.user?.id || null;
 
@@ -205,7 +247,9 @@ async function criarContaBancaria(req, payload = {}) {
     }
   });
 
-  return conta;
+  return ContaBancaria.findByPk(conta.id, {
+    include: [{ model: EmpresaGrupo, as: 'empresa', attributes: ['id', 'codigo', 'nome', 'razao_social', 'cnpj'] }]
+  });
 }
 
 async function atualizarContaBancaria(req, contaId, payload = {}) {
@@ -219,6 +263,10 @@ async function atualizarContaBancaria(req, contaId, payload = {}) {
   const data = sanitizeContaPayload(payload, { partial: true });
   if (Object.keys(data).length === 0) {
     throw createHttpError(400, 'Nenhum campo valido informado para atualizar a conta bancaria.');
+  }
+
+  if (Object.prototype.hasOwnProperty.call(data, 'empresa_id')) {
+    await assertEmpresaGrupoAtiva(data.empresa_id);
   }
 
   data.atualizado_por = req.user?.id || null;
@@ -237,7 +285,9 @@ async function atualizarContaBancaria(req, contaId, payload = {}) {
     }
   });
 
-  return conta;
+  return ContaBancaria.findByPk(conta.id, {
+    include: [{ model: EmpresaGrupo, as: 'empresa', attributes: ['id', 'codigo', 'nome', 'razao_social', 'cnpj'] }]
+  });
 }
 
 async function listarCategoriasFinanceiras(req) {

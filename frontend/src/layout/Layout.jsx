@@ -360,6 +360,7 @@ export default function Layout() {
         financeiroAccess ? item('/financeiro/relatorios/analitico', 'Relatorio Analitico', HiOutlineDocumentText) : null,
         financeiroAccess ? item('/financeiro/baixas', 'Baixas Realizadas', HiOutlineBanknotes) : null,
         financeiroAccess ? item('/financeiro/conciliacao', 'Conciliacao OFX', HiOutlineBanknotes) : null,
+        financeiroAccess ? item('/financeiro/caixas', 'Caixas e Contas', HiOutlineBanknotes) : null,
         financeiroAccess ? item('/financeiro/cadastros', 'Cadastros Financeiros', HiOutlineRectangleGroup) : null,
         financeiroAccess ? item('/comprovantes/upload', 'Upload Comprovantes', HiOutlineCloudArrowUp) : null,
         financeiroAccess ? item('/comprovantes/pendentes', 'Comprovantes Pendentes', HiOutlineReceiptRefund) : null

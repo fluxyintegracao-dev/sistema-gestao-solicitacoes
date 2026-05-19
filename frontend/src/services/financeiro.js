@@ -152,6 +152,16 @@ export async function confirmarConciliacaoFaturaCartao(id, data) {
   return parseJson(response, 'Erro ao conciliar fatura de cartao');
 }
 
+export async function confirmarConciliacaoTransferencia(id, data) {
+  const response = await fetch(`${API_URL}/financeiro/conciliacoes/${id}/confirmar-transferencia`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+
+  return parseJson(response, 'Erro ao conciliar transferencia entre contas');
+}
+
 export async function criarTituloConciliacaoBancaria(id, data) {
   const response = await fetch(`${API_URL}/financeiro/conciliacoes/${id}/criar-titulo`, {
     method: 'POST',
@@ -180,6 +190,80 @@ export async function ignorarConciliacaoBancaria(id) {
   });
 
   return parseJson(response, 'Erro ao ignorar conciliacao bancaria');
+}
+
+export async function getCaixasFinanceiros(params = {}) {
+  const query = new URLSearchParams(
+    Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== '')
+  ).toString();
+  const url = query ? `${API_URL}/financeiro/caixas?${query}` : `${API_URL}/financeiro/caixas`;
+
+  const response = await fetch(url, {
+    headers: authHeaders()
+  });
+
+  return parseJson(response, 'Erro ao buscar caixas financeiros');
+}
+
+export async function getCaixaFinanceiro(id) {
+  const response = await fetch(`${API_URL}/financeiro/caixas/${id}`, {
+    headers: authHeaders()
+  });
+
+  return parseJson(response, 'Erro ao buscar caixa financeiro');
+}
+
+export async function abrirCaixaFinanceiro(data) {
+  const response = await fetch(`${API_URL}/financeiro/caixas/abrir`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+
+  return parseJson(response, 'Erro ao abrir caixa financeiro');
+}
+
+export async function fecharCaixaFinanceiro(id, data) {
+  const response = await fetch(`${API_URL}/financeiro/caixas/${id}/fechar`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+
+  return parseJson(response, 'Erro ao fechar caixa financeiro');
+}
+
+export async function getTransferenciasFinanceiras(params = {}) {
+  const query = new URLSearchParams(
+    Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== '')
+  ).toString();
+  const url = query ? `${API_URL}/financeiro/transferencias?${query}` : `${API_URL}/financeiro/transferencias`;
+
+  const response = await fetch(url, {
+    headers: authHeaders()
+  });
+
+  return parseJson(response, 'Erro ao buscar transferencias financeiras');
+}
+
+export async function criarTransferenciaFinanceira(data) {
+  const response = await fetch(`${API_URL}/financeiro/transferencias`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+
+  return parseJson(response, 'Erro ao registrar transferencia financeira');
+}
+
+export async function cancelarTransferenciaFinanceira(id, data = {}) {
+  const response = await fetch(`${API_URL}/financeiro/transferencias/${id}/cancelar`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+
+  return parseJson(response, 'Erro ao cancelar transferencia financeira');
 }
 
 export async function getMovimentosAssociacaoConciliacao(id, params = {}) {

@@ -65,6 +65,7 @@ const FinanceiroRelatorios = lazy(() => import('./pages/FinanceiroRelatorios'));
 const FinanceiroRelatorioAnalitico = lazy(() => import('./pages/FinanceiroRelatorioAnalitico'));
 const FinanceiroBaixas = lazy(() => import('./pages/FinanceiroBaixas'));
 const FinanceiroConciliacao = lazy(() => import('./pages/FinanceiroConciliacao'));
+const FinanceiroCaixas = lazy(() => import('./pages/FinanceiroCaixas'));
 const FinanceiroResultadoObras = lazy(() => import('./pages/FinanceiroResultadoObras'));
 const Obras = lazy(() => import('./pages/Obras'));
 const ObraGestao = lazy(() => import('./pages/ObraGestao'));
@@ -73,6 +74,7 @@ const Setores = lazy(() => import('./pages/Setores'));
 const TiposSolicitacao = lazy(() => import('./pages/TiposSolicitacao'));
 const GestaoContratos = lazy(() => import('./pages/GestaoContratos'));
 const Configuracoes = lazy(() => import('./pages/Configuracoes'));
+const EmpresasGrupo = lazy(() => import('./pages/EmpresasGrupo'));
 const AprovacaoDiretoria = lazy(() => import('./pages/AprovacaoDiretoria'));
 const TiposSubContrato = lazy(() => import('./pages/TiposSubContrato'));
 const StatusSetor = lazy(() => import('./pages/StatusSetor'));
@@ -525,6 +527,7 @@ export default function App() {
         <Route path="tipos-solicitacao" element={<BusinessAdminRoute><TiposSolicitacao /></BusinessAdminRoute>} />
         <Route path="gestao-contratos" element={<ContratosRoute><GestaoContratos /></ContratosRoute>} />
         <Route path="configuracoes" element={<BusinessAdminRoute><Configuracoes /></BusinessAdminRoute>} />
+        <Route path="empresas-grupo" element={<SuperadminRoute><EmpresasGrupo /></SuperadminRoute>} />
         <Route path="aprovacao-diretoria" element={<BusinessAdminRoute><AprovacaoDiretoria /></BusinessAdminRoute>} />
         <Route path="tipos-sub-contrato" element={<BusinessAdminRoute><TiposSubContrato /></BusinessAdminRoute>} />
         <Route path="status-setor" element={<BusinessAdminRoute><StatusSetor /></BusinessAdminRoute>} />
@@ -601,6 +604,7 @@ export default function App() {
         <Route path="financeiro/relatorios/resultado-obras" element={<FinanceiroRoute><FinanceiroResultadoObras /></FinanceiroRoute>} />
         <Route path="financeiro/baixas" element={<FinanceiroRoute><FinanceiroBaixas /></FinanceiroRoute>} />
         <Route path="financeiro/conciliacao" element={<FinanceiroRoute><FinanceiroConciliacao /></FinanceiroRoute>} />
+        <Route path="financeiro/caixas" element={<FinanceiroRoute><FinanceiroCaixas /></FinanceiroRoute>} />
         <Route path="financeiro/cadastros" element={<FinanceiroRoute><FinanceiroCadastros /></FinanceiroRoute>} />
         <Route path="relatorios/administrativos" element={<ModuloComprasRoute><BusinessAdminRoute><RelatoriosAdministrativos /></BusinessAdminRoute></ModuloComprasRoute>} />
         <Route path="perfil" element={<Perfil />} />

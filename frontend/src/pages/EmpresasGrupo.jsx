@@ -1,8 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
-import { criarRhEmpresaGrupo, atualizarRhEmpresaGrupo, getRhEmpresasGrupo } from '../services/rhDp';
-import { canAccessRhDpEmpresas } from '../utils/acessoProduto';
+import { atualizarEmpresaGrupo, criarEmpresaGrupo, getEmpresasGrupo } from '../services/empresasGrupo';
 
 function emptyForm() {
   return {
@@ -23,9 +21,7 @@ function formatDocumento(value) {
   return value || '-';
 }
 
-export default function RhDpEmpresas() {
-  const { user } = useAuth();
-  const podeEditar = canAccessRhDpEmpresas(user);
+export default function EmpresasGrupo() {
   const [empresas, setEmpresas] = useState([]);
   const [filtros, setFiltros] = useState({ q: '', ativo: '' });
   const [form, setForm] = useState(emptyForm());
@@ -39,7 +35,7 @@ export default function RhDpEmpresas() {
   async function carregar() {
     try {
       setCarregando(true);
-      const data = await getRhEmpresasGrupo({
+      const data = await getEmpresasGrupo({
         q: filtros.q || undefined,
         ativo: filtros.ativo === '' ? undefined : filtros.ativo
       });
@@ -59,7 +55,7 @@ export default function RhDpEmpresas() {
       nome: item.nome || '',
       razao_social: item.razao_social || '',
       cnpj: item.cnpj || '',
-      ativo: Boolean(item.ativo)
+      ativo: item.ativo !== false
     });
   }
 
@@ -67,12 +63,8 @@ export default function RhDpEmpresas() {
     setForm(emptyForm());
   }
 
-  async function salvar(e) {
-    e.preventDefault();
-    if (!podeEditar) {
-      return;
-    }
-
+  async function salvar(event) {
+    event.preventDefault();
     try {
       setSalvando(true);
       const payload = {
@@ -84,9 +76,9 @@ export default function RhDpEmpresas() {
       };
 
       if (form.id) {
-        await atualizarRhEmpresaGrupo(form.id, payload);
+        await atualizarEmpresaGrupo(form.id, payload);
       } else {
-        await criarRhEmpresaGrupo(payload);
+        await criarEmpresaGrupo(payload);
       }
 
       limparFormulario();
@@ -104,14 +96,14 @@ export default function RhDpEmpresas() {
       <div className="app-page-header">
         <div className="app-page-header-row">
           <div>
-            <h1 className="text-xl font-semibold md:text-2xl">RH/DP - Empresas do grupo</h1>
+            <h1 className="text-xl font-semibold md:text-2xl">Empresas do Grupo</h1>
             <p className="page-subtitle">
-              Consulta e manutencao das empresas do grupo usadas de forma central pelo RH/DP e financeiro.
+              Cadastro central usado por financeiro, pagamentos, RH/DP e demais modulos multiempresa.
             </p>
           </div>
           <div className="app-page-actions">
-            <Link to="/rh-dp" className="btn btn-outline">
-              Voltar ao RH/DP
+            <Link to="/configuracoes" className="btn btn-outline">
+              Voltar
             </Link>
           </div>
         </div>
@@ -123,12 +115,12 @@ export default function RhDpEmpresas() {
             className="form-control"
             placeholder="Buscar por nome, codigo ou CNPJ"
             value={filtros.q}
-            onChange={(e) => setFiltros((prev) => ({ ...prev, q: e.target.value }))}
+            onChange={(event) => setFiltros((prev) => ({ ...prev, q: event.target.value }))}
           />
           <select
             className="form-control"
             value={filtros.ativo}
-            onChange={(e) => setFiltros((prev) => ({ ...prev, ativo: e.target.value }))}
+            onChange={(event) => setFiltros((prev) => ({ ...prev, ativo: event.target.value }))}
           >
             <option value="">Todas</option>
             <option value="true">Ativas</option>
@@ -138,11 +130,9 @@ export default function RhDpEmpresas() {
             <button type="button" className="btn btn-outline" onClick={carregar} disabled={carregando}>
               Aplicar filtros
             </button>
-            {podeEditar && (
-              <button type="button" className="btn btn-primary" onClick={limparFormulario}>
-                Nova empresa
-              </button>
-            )}
+            <button type="button" className="btn btn-primary" onClick={limparFormulario}>
+              Nova empresa
+            </button>
           </div>
         </div>
       </div>
@@ -171,7 +161,7 @@ export default function RhDpEmpresas() {
                     <td>{item.ativo ? 'Sim' : 'Nao'}</td>
                     <td>
                       <button type="button" className="btn btn-outline" onClick={() => selecionarEmpresa(item)}>
-                        {podeEditar ? 'Editar' : 'Ver'}
+                        Editar
                       </button>
                     </td>
                   </tr>
@@ -194,7 +184,7 @@ export default function RhDpEmpresas() {
               {form.id ? 'Detalhe da empresa' : 'Nova empresa do grupo'}
             </h2>
             <p className="mt-1 text-sm text-slate-600">
-              Cadastro central usado pelo RH/DP para distribuicao de colaboradores por empresa operacional.
+              Essas empresas passam a ser a autoridade central para contas, caixa, pagamentos e RH/DP.
             </p>
           </div>
 
@@ -204,8 +194,7 @@ export default function RhDpEmpresas() {
               <input
                 className="form-control"
                 value={form.codigo}
-                onChange={(e) => setForm((prev) => ({ ...prev, codigo: e.target.value }))}
-                disabled={!podeEditar}
+                onChange={(event) => setForm((prev) => ({ ...prev, codigo: event.target.value }))}
               />
             </label>
             <label className="space-y-1 text-sm">
@@ -213,53 +202,49 @@ export default function RhDpEmpresas() {
               <input
                 className="form-control"
                 value={form.cnpj}
-                onChange={(e) => setForm((prev) => ({ ...prev, cnpj: e.target.value }))}
-                disabled={!podeEditar}
+                onChange={(event) => setForm((prev) => ({ ...prev, cnpj: event.target.value }))}
               />
             </label>
           </div>
 
-          <label className="space-y-1 text-sm block">
+          <label className="space-y-1 text-sm">
             <span>Nome</span>
             <input
               className="form-control"
               value={form.nome}
-              onChange={(e) => setForm((prev) => ({ ...prev, nome: e.target.value }))}
-              disabled={!podeEditar}
+              onChange={(event) => setForm((prev) => ({ ...prev, nome: event.target.value }))}
               required
             />
           </label>
 
-          <label className="space-y-1 text-sm block">
+          <label className="space-y-1 text-sm">
             <span>Razao social</span>
             <input
               className="form-control"
               value={form.razao_social}
-              onChange={(e) => setForm((prev) => ({ ...prev, razao_social: e.target.value }))}
-              disabled={!podeEditar}
+              onChange={(event) => setForm((prev) => ({ ...prev, razao_social: event.target.value }))}
             />
           </label>
 
           <label className="flex items-center gap-2 text-sm">
             <input
               type="checkbox"
-              checked={Boolean(form.ativo)}
-              onChange={(e) => setForm((prev) => ({ ...prev, ativo: e.target.checked }))}
-              disabled={!podeEditar}
+              checked={form.ativo}
+              onChange={(event) => setForm((prev) => ({ ...prev, ativo: event.target.checked }))}
             />
             Empresa ativa
           </label>
 
-          {podeEditar && (
-            <div className="app-page-actions">
-              <button type="submit" className="btn btn-primary" disabled={salvando}>
-                {form.id ? 'Salvar alteracoes' : 'Criar empresa'}
+          <div className="flex flex-wrap gap-2">
+            <button type="submit" className="btn btn-primary" disabled={salvando}>
+              {salvando ? 'Salvando...' : 'Salvar empresa'}
+            </button>
+            {form.id && (
+              <button type="button" className="btn btn-outline" onClick={limparFormulario}>
+                Cancelar edicao
               </button>
-              <button type="button" className="btn btn-outline" onClick={limparFormulario} disabled={salvando}>
-                Limpar
-              </button>
-            </div>
-          )}
+            )}
+          </div>
         </form>
       </div>
     </div>

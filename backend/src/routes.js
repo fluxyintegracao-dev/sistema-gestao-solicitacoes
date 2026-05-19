@@ -132,6 +132,10 @@ const {
   validateFinanceConciliacaoImportacoesQuery,
   validateFinanceConciliacaoMovimentosQuery,
   validateFinanceConciliacaoQuery,
+  validateFinanceConciliacaoTransferenciaBody,
+  validateFinanceCaixaAberturaBody,
+  validateFinanceCaixaFechamentoBody,
+  validateFinanceCaixaQuery,
   validateFinanceBoletoTituloQuery,
   validateFinanceBaixasQuery,
   validateFinanceCadastroCategoriaBody,
@@ -144,7 +148,10 @@ const {
   validateFinanceTituloCreateFromSolicitacaoBody,
   validateFinanceTituloEstornoBody,
   validateFinanceTituloMovimentoParams,
-  validateFinanceTituloQuery
+  validateFinanceTituloQuery,
+  validateFinanceTransferenciaBody,
+  validateFinanceTransferenciaCancelBody,
+  validateFinanceTransferenciaQuery
 } = require('./validators/financialValidators');
 const {
   validatePaymentAccountBody,
@@ -272,6 +279,8 @@ const FaturaCartaoFinanceiroController = require('./controllers/FaturaCartaoFina
 const TituloFinanceiroController = require('./controllers/TituloFinanceiroController');
 const RelatorioFinanceiroController = require('./controllers/RelatorioFinanceiroController');
 const ConciliacaoBancariaController = require('./controllers/ConciliacaoBancariaController');
+const CaixaFinanceiroController = require('./controllers/CaixaFinanceiroController');
+const TransferenciaFinanceiraController = require('./controllers/TransferenciaFinanceiraController');
 const ResultadoObrasController = require('./controllers/ResultadoObrasController');
 const PermissoesAreasController = require('./controllers/PermissoesAreasController');
 const BoletoController = require('./controllers/BoletoController');
@@ -554,6 +563,16 @@ const allowComercialContratosManage = permit({
 });
 
 const allowBusinessAdmin = permit(['SUPERADMIN', 'ADMINISTRADOR']);
+const allowEmpresasGrupoRead = permit({
+  resource: 'EMPRESAS_GRUPO',
+  custom: async (req) => (
+    ['SUPERADMIN', 'ADMINISTRADOR'].includes(String(req.user?.perfil || '').toUpperCase()) ||
+    (await canAccessFinanceiro(req.user)) ||
+    (await canManageRhDpEmpresas(req.user))
+      ? true
+      : 'Acesso negado para consultar empresas do grupo'
+  )
+});
 
 router.get('/apropriacoes', requireAnyEnabledModule(['OBRAS', 'SOLICITACOES', 'COMPRAS', 'FINANCEIRO']), ApropriacaoController.index);
 router.post('/apropriacoes', requireEnabledModule('OBRAS'), allowBusinessAdmin, ApropriacaoController.create);
@@ -1052,6 +1071,9 @@ router.post('/provisoes-financeiras/:id/comentarios', allowProvisoesEdit, critic
 // -------------------------------------------------------------------
 // RH/DP - BLOCO 2
 // -------------------------------------------------------------------
+router.get('/empresas-grupo', allowEmpresasGrupoRead, validateRequest({ query: validateRhEmpresaGrupoQuery }), RhEmpresaGrupoController.index);
+router.post('/empresas-grupo', allowBusinessAdmin, criticalRateLimit, validateRequest({ body: validateRhEmpresaGrupoCreateBody }), RhEmpresaGrupoController.create);
+router.patch('/empresas-grupo/:id', allowBusinessAdmin, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Empresa do grupo'), body: validateRhEmpresaGrupoUpdateBody }), RhEmpresaGrupoController.update);
 router.get('/rh/empresas-grupo', allowRhDpEmpresasManage, validateRequest({ query: validateRhEmpresaGrupoQuery }), RhEmpresaGrupoController.index);
 router.post('/rh/empresas-grupo', allowRhDpEmpresasManage, criticalRateLimit, validateRequest({ body: validateRhEmpresaGrupoCreateBody }), RhEmpresaGrupoController.create);
 router.patch('/rh/empresas-grupo/:id', allowRhDpEmpresasManage, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Empresa do grupo RH/DP'), body: validateRhEmpresaGrupoUpdateBody }), RhEmpresaGrupoController.update);
@@ -1137,6 +1159,14 @@ router.post('/financeiro/conciliacoes/:id/confirmar', allowFinanceiro, criticalR
 router.post('/financeiro/conciliacoes/:id/ignorar', allowFinanceiro, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Conciliacao bancaria') }), ConciliacaoBancariaController.ignorar);
 router.get('/financeiro/conciliacoes/:id/faturas-cartao', allowFinanceiro, validateRequest({ params: validateNumericIdParam('id', 'Conciliacao bancaria'), query: validateFinanceConciliacaoMovimentosQuery }), ConciliacaoBancariaController.faturas);
 router.post('/financeiro/conciliacoes/:id/confirmar-fatura', allowFinanceiro, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Conciliacao bancaria') }), ConciliacaoBancariaController.confirmarFatura);
+router.post('/financeiro/conciliacoes/:id/confirmar-transferencia', allowFinanceiro, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Conciliacao bancaria'), body: validateFinanceConciliacaoTransferenciaBody }), ConciliacaoBancariaController.confirmarTransferencia);
+router.get('/financeiro/caixas', allowFinanceiro, validateRequest({ query: validateFinanceCaixaQuery }), CaixaFinanceiroController.index);
+router.post('/financeiro/caixas/abrir', allowFinanceiro, criticalRateLimit, validateRequest({ body: validateFinanceCaixaAberturaBody }), CaixaFinanceiroController.abrir);
+router.get('/financeiro/caixas/:id', allowFinanceiro, validateRequest({ params: validateNumericIdParam('id', 'Caixa financeiro') }), CaixaFinanceiroController.show);
+router.post('/financeiro/caixas/:id/fechar', allowFinanceiro, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Caixa financeiro'), body: validateFinanceCaixaFechamentoBody }), CaixaFinanceiroController.fechar);
+router.get('/financeiro/transferencias', allowFinanceiro, validateRequest({ query: validateFinanceTransferenciaQuery }), TransferenciaFinanceiraController.index);
+router.post('/financeiro/transferencias', allowFinanceiro, criticalRateLimit, validateRequest({ body: validateFinanceTransferenciaBody }), TransferenciaFinanceiraController.create);
+router.post('/financeiro/transferencias/:id/cancelar', allowFinanceiro, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Transferencia financeira'), body: validateFinanceTransferenciaCancelBody }), TransferenciaFinanceiraController.cancelar);
 router.get('/financeiro/relatorios/fluxo-caixa', allowFinanceiro, validateRequest({ query: validateFinanceFluxoCaixaQuery }), RelatorioFinanceiroController.fluxoCaixa);
 router.get('/financeiro/relatorios/analitico', allowFinanceiro, validateRequest({ query: validateFinanceRelatorioAnaliticoQuery }), RelatorioFinanceiroController.analitico);
 router.get('/financeiro/relatorios/resultado-obras', allowFinanceiro, ResultadoObrasController.index);

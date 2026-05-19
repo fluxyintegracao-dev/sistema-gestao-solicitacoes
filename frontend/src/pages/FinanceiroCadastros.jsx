@@ -19,6 +19,7 @@ import {
   getPaymentAccounts,
   getPaymentBeneficiaries
 } from '../services/financeiro';
+import { getEmpresasGrupo } from '../services/empresasGrupo';
 import { maskCpfCnpj } from '../utils/formatters';
 
 function defaultContaForm() {
@@ -29,6 +30,10 @@ function defaultContaForm() {
     agencia: '',
     conta: '',
     tipo_conta: '',
+    empresa_id: '',
+    tipo_operacional: 'BANCARIA',
+    exige_abertura_fechamento: false,
+    saldo_inicial: '0',
     ativo: true
   };
 }
@@ -116,6 +121,10 @@ function pickContaFormData(conta = {}) {
     agencia: conta.agencia || '',
     conta: conta.conta || '',
     tipo_conta: conta.tipo_conta || '',
+    empresa_id: conta.empresa_id ? String(conta.empresa_id) : '',
+    tipo_operacional: conta.tipo_operacional || 'BANCARIA',
+    exige_abertura_fechamento: conta.exige_abertura_fechamento === true,
+    saldo_inicial: conta.saldo_inicial ?? '0',
     ativo: conta.ativo !== false
   };
 }
@@ -242,6 +251,7 @@ function categoriaTipoBadgeClass(tipo) {
 
 export default function FinanceiroCadastros() {
   const [contas, setContas] = useState([]);
+  const [empresasGrupo, setEmpresasGrupo] = useState([]);
   const [paymentAccounts, setPaymentAccounts] = useState([]);
   const [categorias, setCategorias] = useState([]);
   const [formasPagamento, setFormasPagamento] = useState([]);
@@ -269,18 +279,20 @@ export default function FinanceiroCadastros() {
     try {
       setLoading(true);
       setError('');
-      const [contasData, categoriasData, paymentAccountsData, formasData, cartoesData] = await Promise.all([
+      const [contasData, categoriasData, paymentAccountsData, formasData, cartoesData, empresasData] = await Promise.all([
         getContasBancarias(),
         getCategoriasFinanceiras(),
         getPaymentAccounts().catch(() => []),
         getFormasPagamentoFinanceiras().catch(() => []),
-        getCartoesFinanceiros().catch(() => [])
+        getCartoesFinanceiros().catch(() => []),
+        getEmpresasGrupo({ ativo: true }).catch(() => [])
       ]);
       setContas(Array.isArray(contasData) ? contasData : []);
       setCategorias(Array.isArray(categoriasData) ? categoriasData : []);
       setPaymentAccounts(Array.isArray(paymentAccountsData) ? paymentAccountsData : []);
       setFormasPagamento(Array.isArray(formasData) ? formasData : []);
       setCartoes(Array.isArray(cartoesData) ? cartoesData : []);
+      setEmpresasGrupo(Array.isArray(empresasData) ? empresasData : []);
     } catch (err) {
       setError(err?.message || 'Erro ao carregar cadastros financeiros');
     } finally {
@@ -349,10 +361,15 @@ export default function FinanceiroCadastros() {
       setSavingConta(true);
       setError('');
       const { id, ...contaPayload } = pickContaFormData(contaForm);
+      const cleanPayload = {
+        ...contaPayload,
+        empresa_id: contaPayload.empresa_id ? Number(contaPayload.empresa_id) : null,
+        saldo_inicial: contaPayload.saldo_inicial === '' ? 0 : contaPayload.saldo_inicial
+      };
       if (contaForm.id) {
-        await atualizarContaBancaria(contaForm.id, contaPayload);
+        await atualizarContaBancaria(contaForm.id, cleanPayload);
       } else {
-        await criarContaBancaria(contaPayload);
+        await criarContaBancaria(cleanPayload);
       }
       setContaForm(defaultContaForm());
       await carregar();
@@ -382,7 +399,7 @@ export default function FinanceiroCadastros() {
       setPaymentAccountForm(defaultPaymentAccountForm());
       await carregar();
     } catch (err) {
-      setError(err?.message || 'Erro ao salvar conta pagadora BB');
+      setError(err?.message || 'Erro ao salvar conta pagadora');
     } finally {
       setSavingPaymentAccount(false);
     }
@@ -541,7 +558,41 @@ export default function FinanceiroCadastros() {
                 {contaForm.id ? 'Editar conta bancaria' : 'Nova conta bancaria'}
               </h2>
               <form className="mt-4 space-y-3" onSubmit={handleSalvarConta}>
-                <input className="input w-full" placeholder="Nome" value={contaForm.nome} onChange={(e) => setContaForm((c) => ({ ...c, nome: e.target.value }))} required />
+                <label className="sol-filter-field">
+                  <span className="sol-filter-label">Nome</span>
+                  <input className="input w-full" placeholder="Ex.: Banco do Brasil CSC ou Caixa Interno Matriz" value={contaForm.nome} onChange={(e) => setContaForm((c) => ({ ...c, nome: e.target.value }))} required />
+                </label>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <label className="sol-filter-field">
+                    <span className="sol-filter-label">Empresa do grupo</span>
+                    <select className="input w-full" value={contaForm.empresa_id} onChange={(e) => setContaForm((c) => ({ ...c, empresa_id: e.target.value }))}>
+                      <option value="">Nao vinculada</option>
+                      {empresasGrupo.map((empresa) => (
+                        <option key={empresa.id} value={empresa.id}>
+                          {empresa.nome}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="sol-filter-field">
+                    <span className="sol-filter-label">Tipo operacional</span>
+                    <select
+                      className="input w-full"
+                      value={contaForm.tipo_operacional}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setContaForm((c) => ({
+                          ...c,
+                          tipo_operacional: value,
+                          exige_abertura_fechamento: value === 'CAIXA_INTERNO' ? true : c.exige_abertura_fechamento
+                        }));
+                      }}
+                    >
+                      <option value="BANCARIA">Conta bancaria</option>
+                      <option value="CAIXA_INTERNO">Caixa interno</option>
+                    </select>
+                  </label>
+                </div>
                 <div className="grid gap-3 md:grid-cols-2">
                   <input className="input w-full" placeholder="Banco" value={contaForm.banco} onChange={(e) => setContaForm((c) => ({ ...c, banco: e.target.value }))} />
                   <input className="input w-full" placeholder="Tipo da conta" value={contaForm.tipo_conta} onChange={(e) => setContaForm((c) => ({ ...c, tipo_conta: e.target.value }))} />
@@ -550,10 +601,20 @@ export default function FinanceiroCadastros() {
                   <input className="input w-full" placeholder="Agencia" value={contaForm.agencia} onChange={(e) => setContaForm((c) => ({ ...c, agencia: e.target.value }))} />
                   <input className="input w-full" placeholder="Conta" value={contaForm.conta} onChange={(e) => setContaForm((c) => ({ ...c, conta: e.target.value }))} />
                 </div>
-                <label className="flex items-center gap-2 text-sm text-[var(--c-text)]">
-                  <input type="checkbox" checked={contaForm.ativo} onChange={(e) => setContaForm((c) => ({ ...c, ativo: e.target.checked }))} />
-                  Conta ativa
+                <label className="sol-filter-field">
+                  <span className="sol-filter-label">Saldo inicial</span>
+                  <input className="input w-full" inputMode="decimal" placeholder="0,00" value={contaForm.saldo_inicial} onChange={(e) => setContaForm((c) => ({ ...c, saldo_inicial: e.target.value }))} />
                 </label>
+                <div className="grid gap-2 md:grid-cols-2">
+                  <label className="flex items-center gap-2 text-sm text-[var(--c-text)]">
+                    <input type="checkbox" checked={contaForm.exige_abertura_fechamento} onChange={(e) => setContaForm((c) => ({ ...c, exige_abertura_fechamento: e.target.checked }))} />
+                    Exige abertura e fechamento de caixa
+                  </label>
+                  <label className="flex items-center gap-2 text-sm text-[var(--c-text)]">
+                    <input type="checkbox" checked={contaForm.ativo} onChange={(e) => setContaForm((c) => ({ ...c, ativo: e.target.checked }))} />
+                    Conta ativa
+                  </label>
+                </div>
                 <div className="flex gap-2">
                   <button type="submit" className="btn btn-primary" disabled={savingConta}>
                     {savingConta ? 'Salvando...' : (contaForm.id ? 'Salvar alteracoes' : 'Criar conta')}
@@ -581,6 +642,9 @@ export default function FinanceiroCadastros() {
                           <div className="text-[var(--c-muted)]">
                             {conta.banco || 'Banco nao informado'} - {conta.agencia || '-'} / {conta.conta || '-'}
                           </div>
+                          <div className="mt-1 text-[var(--c-muted)]">
+                            {conta.empresa?.nome || 'Sem empresa vinculada'} - {conta.tipo_operacional === 'CAIXA_INTERNO' ? 'Caixa interno' : 'Conta bancaria'}
+                          </div>
                         </div>
                         <div className="flex items-center gap-2">
                           <span className={statusClass(conta.ativo)}>
@@ -601,10 +665,10 @@ export default function FinanceiroCadastros() {
               <div className="flex flex-col gap-1 md:flex-row md:items-start md:justify-between">
                 <div>
                   <h2 className="text-lg font-semibold text-[var(--c-text)]">
-                    {paymentAccountForm.id ? 'Editar conta pagadora BB' : 'Nova conta pagadora BB'}
+                    {paymentAccountForm.id ? 'Editar conta pagadora' : 'Nova conta pagadora'}
                   </h2>
                   <p className="text-sm text-[var(--c-muted)]">
-                    Vincula uma conta bancaria interna ao CNPJ pagador, convenio BB e futura empresa do grupo.
+                    Vincula uma conta bancaria interna ao CNPJ pagador, convenio bancario e empresa do grupo.
                   </p>
                 </div>
               </div>
@@ -640,8 +704,15 @@ export default function FinanceiroCadastros() {
                     />
                   </label>
                   <label className="sol-filter-field">
-                    <span className="sol-filter-label">Empresa ID</span>
-                    <input className="input w-full" inputMode="numeric" placeholder="Opcional nesta fase" value={paymentAccountForm.empresa_id} onChange={(e) => setPaymentAccountForm((c) => ({ ...c, empresa_id: e.target.value }))} />
+                    <span className="sol-filter-label">Empresa pagadora</span>
+                    <select className="input w-full" value={paymentAccountForm.empresa_id} onChange={(e) => setPaymentAccountForm((c) => ({ ...c, empresa_id: e.target.value }))}>
+                      <option value="">Nao vinculada</option>
+                      {empresasGrupo.map((empresa) => (
+                        <option key={empresa.id} value={empresa.id}>
+                          {empresa.nome}
+                        </option>
+                      ))}
+                    </select>
                   </label>
                 </div>
 
@@ -677,7 +748,7 @@ export default function FinanceiroCadastros() {
 
                 <div className="grid gap-3 md:grid-cols-2">
                   <label className="sol-filter-field">
-                    <span className="sol-filter-label">Convenio BB</span>
+                    <span className="sol-filter-label">Convenio bancario</span>
                     <input className="input w-full" value={paymentAccountForm.convenio} onChange={(e) => setPaymentAccountForm((c) => ({ ...c, convenio: e.target.value }))} required />
                   </label>
                   <label className="sol-filter-field">
@@ -717,9 +788,9 @@ export default function FinanceiroCadastros() {
             </div>
 
             <div className="card sol-surface-card space-y-3">
-              <h2 className="text-lg font-semibold text-[var(--c-text)]">Contas pagadoras BB</h2>
+              <h2 className="text-lg font-semibold text-[var(--c-text)]">Contas pagadoras</h2>
               {paymentAccounts.length === 0 ? (
-                <p className="text-sm text-[var(--c-muted)]">Nenhuma conta pagadora BB cadastrada.</p>
+                <p className="text-sm text-[var(--c-muted)]">Nenhuma conta pagadora cadastrada.</p>
               ) : (
                 <div className="app-list-stack">
                   {paymentAccounts.map((account) => (
@@ -733,7 +804,7 @@ export default function FinanceiroCadastros() {
                             CNPJ {account.cnpj_pagador} - Convenio {account.convenio || '-'}
                           </div>
                           <div className="text-[var(--c-muted)]">
-                            Empresa ID {account.empresa_id || 'matriz/central'} - {account.provider?.codigo || 'BB'} {account.ambiente}
+                            {account.empresa?.nome || 'Matriz/central'} - {account.provider?.nome || account.provider?.codigo || 'Provider'} {account.ambiente}
                           </div>
                         </div>
                         <div className="flex items-center gap-2">

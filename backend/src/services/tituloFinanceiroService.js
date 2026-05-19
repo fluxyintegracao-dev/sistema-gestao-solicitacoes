@@ -3,6 +3,7 @@ const { Op } = require('sequelize');
 const {
   CartaoFinanceiro,
   ContaBancaria,
+  EmpresaGrupo,
   sequelize,
   CategoriaFinanceira,
   FaturaCartaoFinanceiro,
@@ -30,6 +31,7 @@ const {
   obterOuCriarFaturaCartao,
   vincularTituloAFatura
 } = require('./faturaCartaoFinanceiroService');
+const { obterSessaoAbertaParaConta } = require('./financeiroCaixaSessionHelper');
 const { registrarEventoSeguranca } = require('./securityLogService');
 
 const FORMAS_COBRANCA = ['BOLETO', 'PIX', 'OUTROS'];
@@ -394,6 +396,11 @@ function buildTituloInclude({ includeMovimentos = false } = {}) {
       attributes: ['id', 'nome', 'tipo']
     },
     {
+      model: EmpresaGrupo,
+      as: 'empresa',
+      attributes: ['id', 'codigo', 'nome', 'razao_social', 'cnpj']
+    },
+    {
       model: FormaPagamentoFinanceira,
       as: 'formaPagamento',
       attributes: ['id', 'nome', 'codigo', 'tipo', 'permite_parcelamento', 'gera_fatura', 'gera_boleto', 'exige_cartao']
@@ -634,6 +641,21 @@ async function validarContaBancaria(contaBancariaId) {
   return conta;
 }
 
+async function validarEmpresaGrupo(empresaId) {
+  if (!empresaId) {
+    return null;
+  }
+  const id = Number(empresaId);
+  if (!Number.isInteger(id) || id <= 0) {
+    throw createHttpError(400, 'Empresa do grupo invalida.');
+  }
+  const empresa = await EmpresaGrupo.findByPk(id);
+  if (!empresa || empresa.ativo === false) {
+    throw createHttpError(400, 'Empresa do grupo invalida ou inativa.');
+  }
+  return empresa;
+}
+
 async function carregarTituloPorId(req, tituloId, { includeMovimentos = false } = {}) {
   await assertFinanceAccess(req);
 
@@ -700,6 +722,9 @@ async function listarTitulos(req, filters = {}) {
   }
   if (filters.codigo) {
     where.codigo = { [Op.like]: `%${filters.codigo}%` };
+  }
+  if (filters.empresa_id) {
+    where.empresa_id = Number(filters.empresa_id);
   }
   if (filters.numero_documento) {
     where.numero_documento = { [Op.like]: `%${filters.numero_documento}%` };
@@ -928,6 +953,7 @@ async function criarTituloPorSolicitacao(req, solicitacaoId, payload = {}) {
 
   const [parceiro] = await Promise.all([
     validarParceiro(parceiroId),
+    validarEmpresaGrupo(payload.empresa_id),
     validarCategoriaFinanceira(payload.categoria_financeira_id, tipo)
   ]);
   validarCompatibilidadeParceiroTitulo(parceiro, tipo);
@@ -1013,6 +1039,7 @@ async function criarTituloPorSolicitacao(req, solicitacaoId, payload = {}) {
         const titulo = await TituloFinanceiro.create({
           solicitacao_id: solicitacao.id,
           obra_id: solicitacao.obra_id,
+          empresa_id: payload.empresa_id || null,
           parceiro_id: parceiroId,
           categoria_financeira_id: payload.categoria_financeira_id || null,
           forma_pagamento_id: pagamento.formaPagamento?.id || null,
@@ -1132,6 +1159,7 @@ async function criarTituloManual(req, payload = {}) {
   const [obra, parceiro] = await Promise.all([
     validarObraTitulo(req, obraId),
     validarParceiro(parceiroId),
+    validarEmpresaGrupo(payload.empresa_id),
     validarCategoriaFinanceira(payload.categoria_financeira_id, tipo)
   ]);
 
@@ -1216,6 +1244,7 @@ async function criarTituloManual(req, payload = {}) {
         const titulo = await TituloFinanceiro.create({
           solicitacao_id: null,
           obra_id: obra.id,
+          empresa_id: payload.empresa_id || null,
           parceiro_id: parceiro.id,
           categoria_financeira_id: payload.categoria_financeira_id || null,
           forma_pagamento_id: pagamento.formaPagamento?.id || null,
@@ -1344,6 +1373,7 @@ async function criarTituloManualComBaixaAtomica(req, payload = {}, { transaction
     validarCategoriaFinanceira(payload.categoria_financeira_id, tipo),
     validarContaBancaria(contaBancariaId)
   ]);
+  await validarEmpresaGrupo(payload.empresa_id || conta?.empresa_id);
 
   validarCompatibilidadeParceiroTitulo(parceiro, tipo);
 
@@ -1366,9 +1396,11 @@ async function criarTituloManualComBaixaAtomica(req, payload = {}, { transaction
   const transaction = externalTransaction || await sequelize.transaction();
 
   try {
+    const caixaSessao = await obterSessaoAbertaParaConta(conta, dataMovimento, { transaction });
     const titulo = await TituloFinanceiro.create({
       solicitacao_id: null,
       obra_id: obra.id,
+      empresa_id: conta.empresa_id || payload.empresa_id || null,
       parceiro_id: parceiro.id,
       categoria_financeira_id: categoria?.id || null,
       tipo,
@@ -1396,6 +1428,8 @@ async function criarTituloManualComBaixaAtomica(req, payload = {}, { transaction
     const movimento = await MovimentoFinanceiro.create({
       titulo_financeiro_id: titulo.id,
       conta_bancaria_id: conta.id,
+      empresa_id: conta.empresa_id || titulo.empresa_id || null,
+      caixa_sessao_id: caixaSessao?.id || null,
       forma_recebimento: formaRecebimento,
       tipo_permuta: payload.tipo_permuta || null,
       categoria_bem: payload.categoria_bem || null,
@@ -1541,9 +1575,12 @@ async function baixarTitulo(req, tituloId, payload = {}) {
 
   const transaction = await sequelize.transaction();
   try {
+    const caixaSessao = await obterSessaoAbertaParaConta(conta, payload.data_movimento, { transaction });
     const movimento = await MovimentoFinanceiro.create({
       titulo_financeiro_id: titulo.id,
       conta_bancaria_id: conta?.id || null,
+      empresa_id: conta?.empresa_id || titulo.empresa_id || null,
+      caixa_sessao_id: caixaSessao?.id || null,
       forma_recebimento: formaRecebimento,
       tipo_permuta: payload.tipo_permuta || null,
       categoria_bem: payload.categoria_bem || null,

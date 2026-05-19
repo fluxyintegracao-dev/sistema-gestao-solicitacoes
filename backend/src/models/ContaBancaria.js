@@ -10,6 +10,15 @@ module.exports = (sequelize, DataTypes) => sequelize.define(
       type: DataTypes.STRING(120),
       allowNull: false
     },
+    empresa_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true
+    },
+    tipo_operacional: {
+      type: DataTypes.STRING(30),
+      allowNull: false,
+      defaultValue: 'BANCARIA'
+    },
     banco: {
       type: DataTypes.STRING(120),
       allowNull: true
@@ -25,6 +34,16 @@ module.exports = (sequelize, DataTypes) => sequelize.define(
     tipo_conta: {
       type: DataTypes.STRING(40),
       allowNull: true
+    },
+    exige_abertura_fechamento: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false
+    },
+    saldo_inicial: {
+      type: DataTypes.DECIMAL(14, 2),
+      allowNull: false,
+      defaultValue: 0
     },
     ativo: {
       type: DataTypes.BOOLEAN,

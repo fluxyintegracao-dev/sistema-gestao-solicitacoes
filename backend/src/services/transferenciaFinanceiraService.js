@@ -1,0 +1,239 @@
+const { Op } = require('sequelize');
+const {
+  ConciliacaoBancaria,
+  ContaBancaria,
+  EmpresaGrupo,
+  TransferenciaFinanceira,
+  User,
+  sequelize
+} = require('../models');
+const { canAccessFinanceiro } = require('./authorizationService');
+const { obterSessaoAbertaParaConta } = require('./financeiroCaixaSessionHelper');
+const { registrarEventoSeguranca } = require('./securityLogService');
+
+function createHttpError(statusCode, message) {
+  const error = new Error(message);
+  error.statusCode = statusCode;
+  return error;
+}
+
+function roundCurrency(value) {
+  return Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;
+}
+
+function today() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function parsePositiveInteger(value, fieldName) {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    throw createHttpError(400, `${fieldName} invalido.`);
+  }
+  return parsed;
+}
+
+function parseMoney(value, fieldName) {
+  const raw = String(value ?? '').trim().replace(/[R$\s]/gi, '');
+  const normalized = raw.includes(',')
+    ? raw.replace(/\./g, '').replace(',', '.')
+    : raw;
+  const parsed = Number(normalized);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    throw createHttpError(400, `${fieldName} deve ser maior que zero.`);
+  }
+  return roundCurrency(parsed);
+}
+
+function parseDate(value, fieldName, fallback = today()) {
+  const date = value || fallback;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date))) {
+    throw createHttpError(400, `${fieldName} invalida.`);
+  }
+  return String(date);
+}
+
+async function assertFinanceAccess(req) {
+  const allowed = await canAccessFinanceiro(req.user);
+  if (allowed) return;
+
+  await registrarEventoSeguranca({
+    req,
+    usuarioId: req.user?.id || null,
+    tipoEvento: 'AUTHZ_DENIED',
+    recursoTipo: 'TRANSFERENCIA_FINANCEIRA',
+    recursoId: req.originalUrl,
+    status: 'DENIED',
+    descricao: 'Usuario sem permissao para acessar transferencias financeiras'
+  });
+
+  throw createHttpError(403, 'Acesso negado para o modulo financeiro');
+}
+
+function includeTransferencia() {
+  return [
+    { model: EmpresaGrupo, as: 'empresa', attributes: ['id', 'codigo', 'nome', 'razao_social', 'cnpj'] },
+    { model: ContaBancaria, as: 'contaOrigem', attributes: ['id', 'nome', 'banco', 'agencia', 'conta', 'empresa_id', 'tipo_operacional'] },
+    { model: ContaBancaria, as: 'contaDestino', attributes: ['id', 'nome', 'banco', 'agencia', 'conta', 'empresa_id', 'tipo_operacional'] },
+    { model: ConciliacaoBancaria, as: 'conciliacaoOrigem', attributes: ['id', 'data_movimento', 'valor', 'status'] },
+    { model: ConciliacaoBancaria, as: 'conciliacaoDestino', attributes: ['id', 'data_movimento', 'valor', 'status'] },
+    { model: User, as: 'criadoPor', attributes: ['id', 'nome', 'email'] },
+    { model: User, as: 'canceladoPor', attributes: ['id', 'nome', 'email'] }
+  ];
+}
+
+async function carregarConta(contaId, { transaction = null } = {}) {
+  const id = parsePositiveInteger(contaId, 'Conta');
+  const conta = await ContaBancaria.findByPk(id, { transaction });
+  if (!conta || conta.ativo === false) {
+    throw createHttpError(400, 'Conta financeira invalida ou inativa.');
+  }
+  return conta;
+}
+
+async function montarPayloadTransferencia(req, payload = {}, { transaction = null } = {}) {
+  const [origem, destino] = await Promise.all([
+    carregarConta(payload.conta_origem_id, { transaction }),
+    carregarConta(payload.conta_destino_id, { transaction })
+  ]);
+
+  if (Number(origem.id) === Number(destino.id)) {
+    throw createHttpError(400, 'A conta de origem deve ser diferente da conta de destino.');
+  }
+
+  const dataTransferencia = parseDate(payload.data_transferencia, 'Data da transferencia');
+  const valor = parseMoney(payload.valor, 'Valor da transferencia');
+  const sessaoOrigem = await obterSessaoAbertaParaConta(origem, dataTransferencia, { transaction });
+  const sessaoDestino = await obterSessaoAbertaParaConta(destino, dataTransferencia, { transaction });
+  const empresaId = payload.empresa_id || origem.empresa_id || destino.empresa_id || null;
+
+  return {
+    empresa_id: empresaId,
+    conta_origem_id: origem.id,
+    conta_destino_id: destino.id,
+    caixa_sessao_origem_id: sessaoOrigem?.id || null,
+    caixa_sessao_destino_id: sessaoDestino?.id || null,
+    data_transferencia: dataTransferencia,
+    valor,
+    descricao: String(payload.descricao || '').trim().slice(0, 255) || null,
+    criado_por: req.user?.id || null
+  };
+}
+
+async function criarTransferenciaFinanceira(req, payload = {}, { transaction: externalTransaction = null } = {}) {
+  await assertFinanceAccess(req);
+  const ownTransaction = !externalTransaction;
+  const transaction = externalTransaction || await sequelize.transaction();
+
+  try {
+    const data = await montarPayloadTransferencia(req, payload, { transaction });
+    const transferencia = await TransferenciaFinanceira.create({
+      ...data,
+      conciliacao_origem_id: payload.conciliacao_origem_id || null,
+      conciliacao_destino_id: payload.conciliacao_destino_id || null,
+      status: 'ATIVA'
+    }, { transaction });
+
+    const afterCommit = async () => {
+      await registrarEventoSeguranca({
+        req,
+        usuarioId: req.user?.id || null,
+        tipoEvento: 'FINANCIAL_TRANSFER_CREATED',
+        recursoTipo: 'TRANSFERENCIA_FINANCEIRA',
+        recursoId: transferencia.id,
+        status: 'SUCCESS',
+        descricao: 'Transferencia financeira registrada',
+        metadata: {
+          conta_origem_id: data.conta_origem_id,
+          conta_destino_id: data.conta_destino_id,
+          valor: data.valor,
+          data_transferencia: data.data_transferencia
+        }
+      });
+    };
+
+    if (ownTransaction) {
+      await transaction.commit();
+      await afterCommit();
+    }
+
+    return {
+      transferencia: await TransferenciaFinanceira.findByPk(transferencia.id, {
+        include: includeTransferencia(),
+        transaction: ownTransaction ? null : transaction
+      }),
+      afterCommit: ownTransaction ? null : afterCommit
+    };
+  } catch (error) {
+    if (ownTransaction) await transaction.rollback();
+    throw error;
+  }
+}
+
+async function listarTransferenciasFinanceiras(req, filters = {}) {
+  await assertFinanceAccess(req);
+  const where = {};
+
+  if (filters.empresa_id) {
+    where.empresa_id = parsePositiveInteger(filters.empresa_id, 'Empresa do grupo');
+  }
+  if (filters.conta_bancaria_id) {
+    const contaId = parsePositiveInteger(filters.conta_bancaria_id, 'Conta');
+    where[Op.or] = [{ conta_origem_id: contaId }, { conta_destino_id: contaId }];
+  }
+  if (filters.status && String(filters.status).toUpperCase() !== 'TODOS') {
+    where.status = String(filters.status).toUpperCase();
+  }
+  if (filters.data_inicial || filters.data_final) {
+    where.data_transferencia = {};
+    if (filters.data_inicial) where.data_transferencia[Op.gte] = filters.data_inicial;
+    if (filters.data_final) where.data_transferencia[Op.lte] = filters.data_final;
+  }
+
+  return TransferenciaFinanceira.findAll({
+    where,
+    include: includeTransferencia(),
+    order: [['data_transferencia', 'DESC'], ['id', 'DESC']],
+    limit: Math.min(Math.max(Number(filters.limit || 100), 1), 300)
+  });
+}
+
+async function cancelarTransferenciaFinanceira(req, id, payload = {}) {
+  await assertFinanceAccess(req);
+  const transferencia = await TransferenciaFinanceira.findByPk(parsePositiveInteger(id, 'Transferencia'));
+  if (!transferencia) {
+    throw createHttpError(404, 'Transferencia financeira nao encontrada.');
+  }
+  if (String(transferencia.status || '').toUpperCase() !== 'ATIVA') {
+    throw createHttpError(400, 'Somente transferencias ativas podem ser canceladas.');
+  }
+  if (transferencia.conciliacao_origem_id || transferencia.conciliacao_destino_id) {
+    throw createHttpError(400, 'Nao e possivel cancelar uma transferencia ja conciliada.');
+  }
+
+  await transferencia.update({
+    status: 'CANCELADA',
+    cancelado_por: req.user?.id || null,
+    cancelado_em: new Date(),
+    observacoes_cancelamento: payload.observacoes || null
+  });
+
+  await registrarEventoSeguranca({
+    req,
+    usuarioId: req.user?.id || null,
+    tipoEvento: 'FINANCIAL_TRANSFER_CANCELED',
+    recursoTipo: 'TRANSFERENCIA_FINANCEIRA',
+    recursoId: transferencia.id,
+    status: 'SUCCESS',
+    descricao: 'Transferencia financeira cancelada'
+  });
+
+  return TransferenciaFinanceira.findByPk(transferencia.id, { include: includeTransferencia() });
+}
+
+module.exports = {
+  criarTransferenciaFinanceira,
+  includeTransferencia,
+  listarTransferenciasFinanceiras,
+  cancelarTransferenciaFinanceira
+};

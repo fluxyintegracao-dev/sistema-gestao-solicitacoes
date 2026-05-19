@@ -31,6 +31,12 @@ const SECOES_CONFIG = [
         to: '/parceiros'
       },
       {
+        title: 'Empresas do Grupo',
+        description: 'Cadastro central das empresas usado por financeiro, pagamentos e RH/DP.',
+        to: '/empresas-grupo',
+        requireSuperadmin: true
+      },
+      {
         title: 'Categorias de Parceiro',
         description: 'Cadastro de categorias para fornecedores.',
         to: '/parceiros-categorias'

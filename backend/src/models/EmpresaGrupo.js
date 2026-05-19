@@ -1,5 +1,5 @@
 module.exports = (sequelize, DataTypes) => sequelize.define(
-  'RhEmpresaGrupo',
+  'EmpresaGrupo',
   {
     id: {
       type: DataTypes.INTEGER,

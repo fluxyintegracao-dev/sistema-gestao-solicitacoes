@@ -8,6 +8,7 @@ const {
   TituloFinanceiro,
   sequelize
 } = require('../models');
+const { carregarContaBancaria, obterSessaoAbertaParaConta } = require('./financeiroCaixaSessionHelper');
 const { registrarEventoSeguranca } = require('./securityLogService');
 
 function createHttpError(statusCode, message) {
@@ -130,6 +131,13 @@ async function confirmBaixaFromPaymentIntent(req, id, payload = {}) {
     }
 
     const dataMovimento = payload.data_movimento || today();
+    const contaBancariaId = intent.paymentAccount?.conta_bancaria_id || null;
+    const contaBancaria = contaBancariaId
+      ? await carregarContaBancaria(contaBancariaId, { transaction })
+      : null;
+    const caixaSessao = contaBancaria
+      ? await obterSessaoAbertaParaConta(contaBancaria, dataMovimento, { transaction })
+      : null;
     const novoValorBaixado = roundCurrency(Number(titulo.valor_baixado || 0) + valorBaixa);
     const novoEstado = calcularStatusTitulo({
       valorOriginal: Number(titulo.valor_original || 0),
@@ -138,7 +146,9 @@ async function confirmBaixaFromPaymentIntent(req, id, payload = {}) {
 
     const movimento = await MovimentoFinanceiro.create({
       titulo_financeiro_id: titulo.id,
-      conta_bancaria_id: intent.paymentAccount?.conta_bancaria_id || null,
+      conta_bancaria_id: contaBancaria?.id || null,
+      empresa_id: contaBancaria?.empresa_id || titulo.empresa_id || null,
+      caixa_sessao_id: caixaSessao?.id || null,
       forma_recebimento: 'PIX',
       documento_referencia: intent.correlation_id,
       tipo_movimento: 'BAIXA',

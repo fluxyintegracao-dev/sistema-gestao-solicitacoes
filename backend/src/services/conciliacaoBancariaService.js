@@ -10,6 +10,7 @@ const {
   Parceiro,
   sequelize,
   TituloFinanceiro,
+  TransferenciaFinanceira,
   User
 } = require('../models');
 const {
@@ -19,6 +20,7 @@ const {
 const { registrarEventoSeguranca } = require('./securityLogService');
 const { baixarFaturaCartao } = require('./faturaCartaoFinanceiroService');
 const { criarTituloManualComBaixaAtomica } = require('./tituloFinanceiroService');
+const { criarTransferenciaFinanceira } = require('./transferenciaFinanceiraService');
 
 function createHttpError(statusCode, message) {
   const error = new Error(message);
@@ -278,7 +280,7 @@ function buildConciliacaoInclude() {
     {
       model: ContaBancaria,
       as: 'contaBancaria',
-      attributes: ['id', 'nome', 'banco', 'agencia', 'conta']
+      attributes: ['id', 'nome', 'banco', 'agencia', 'conta', 'empresa_id', 'tipo_operacional']
     },
     {
       model: TituloFinanceiro,
@@ -312,6 +314,22 @@ function buildConciliacaoInclude() {
           model: CartaoFinanceiro,
           as: 'cartao',
           attributes: ['id', 'nome', 'titular', 'bandeira', 'ultimos_digitos']
+        }
+      ]
+    },
+    {
+      model: TransferenciaFinanceira,
+      as: 'transferencia',
+      include: [
+        {
+          model: ContaBancaria,
+          as: 'contaOrigem',
+          attributes: ['id', 'nome', 'banco', 'agencia', 'conta']
+        },
+        {
+          model: ContaBancaria,
+          as: 'contaDestino',
+          attributes: ['id', 'nome', 'banco', 'agencia', 'conta']
         }
       ]
     },
@@ -356,7 +374,7 @@ async function importOfx(req, payload = {}) {
   }
 
   const contaBancariaId = parseInteger(payload.conta_bancaria_id, 'Conta bancaria');
-  await validarContaBancaria(contaBancariaId);
+  const contaBancaria = await validarContaBancaria(contaBancariaId);
 
   const transacoes = parseOfxTransactions(req.file.buffer);
   const arquivoHash = buildImportFingerprint(transacoes);
@@ -409,6 +427,7 @@ async function importOfx(req, payload = {}) {
 
     const created = await ConciliacaoBancaria.create({
       conta_bancaria_id: contaBancariaId,
+      empresa_id: contaBancaria.empresa_id || null,
       titulo_financeiro_id: null,
       movimento_financeiro_id: null,
       ofx_uid: transacao.ofx_uid,
@@ -431,6 +450,7 @@ async function importOfx(req, payload = {}) {
 
   const importacao = await ConciliacaoBancariaImportacao.create({
     conta_bancaria_id: contaBancariaId,
+    empresa_id: contaBancaria.empresa_id || null,
     arquivo_hash: arquivoHash,
     arquivo_nome: req.file.originalname,
     total_lidos: transacoes.length,
@@ -904,7 +924,7 @@ async function listarImportacoes(req, filters = {}) {
       {
         model: ContaBancaria,
         as: 'contaBancaria',
-        attributes: ['id', 'nome', 'banco', 'agencia', 'conta']
+        attributes: ['id', 'nome', 'banco', 'agencia', 'conta', 'empresa_id', 'tipo_operacional']
       },
       {
         model: User,
@@ -1196,6 +1216,84 @@ async function confirmarConciliacaoFatura(req, conciliacaoId, payload = {}) {
   }
 }
 
+async function confirmarConciliacaoTransferencia(req, conciliacaoId, payload = {}) {
+  await assertFinanceAccess(req);
+  const transaction = await sequelize.transaction();
+
+  try {
+    const conciliacao = await ConciliacaoBancaria.findByPk(conciliacaoId, {
+      transaction,
+      lock: transaction.LOCK.UPDATE
+    });
+    if (!conciliacao) throw createHttpError(404, 'Lancamento de conciliacao nao encontrado.');
+    if (String(conciliacao.status || '').toUpperCase() !== 'PENDENTE') {
+      throw createHttpError(400, 'Somente conciliacoes pendentes podem ser confirmadas.');
+    }
+
+    const contaAtualId = parseInteger(conciliacao.conta_bancaria_id, 'Conta do lancamento bancario');
+    const contaContraparteId = parseInteger(payload.conta_contraparte_id, 'Conta contraparte');
+    if (contaAtualId === contaContraparteId) {
+      throw createHttpError(400, 'A conta contraparte deve ser diferente da conta do lancamento bancario.');
+    }
+
+    const valor = roundCurrency(Math.abs(Number(conciliacao.valor || 0)));
+    if (valor <= 0) {
+      throw createHttpError(400, 'Valor do lancamento bancario invalido para transferencia.');
+    }
+
+    const isSaidaDaContaAtual = Number(conciliacao.valor || 0) < 0;
+    const payloadTransferencia = {
+      conta_origem_id: isSaidaDaContaAtual ? contaAtualId : contaContraparteId,
+      conta_destino_id: isSaidaDaContaAtual ? contaContraparteId : contaAtualId,
+      data_transferencia: conciliacao.data_movimento,
+      valor,
+      descricao: payload.descricao || `Transferencia conciliada pelo lancamento bancario #${conciliacao.id}`,
+      conciliacao_origem_id: isSaidaDaContaAtual ? conciliacao.id : null,
+      conciliacao_destino_id: isSaidaDaContaAtual ? null : conciliacao.id
+    };
+
+    const { transferencia, afterCommit } = await criarTransferenciaFinanceira(
+      req,
+      payloadTransferencia,
+      { transaction }
+    );
+
+    await conciliacao.update({
+      transferencia_financeira_id: transferencia.id,
+      movimento_financeiro_id: null,
+      titulo_financeiro_id: null,
+      fatura_cartao_id: null,
+      status: 'CONCILIADO',
+      confirmado_por: req.user?.id || null,
+      confirmado_em: new Date()
+    }, { transaction });
+
+    await transaction.commit();
+    if (afterCommit) await afterCommit();
+
+    await registrarEventoSeguranca({
+      req,
+      usuarioId: req.user?.id || null,
+      tipoEvento: 'FINANCIAL_BANK_RECONCILED_TRANSFER',
+      recursoTipo: 'CONCILIACAO_BANCARIA',
+      recursoId: conciliacao.id,
+      status: 'SUCCESS',
+      descricao: 'Lancamento bancario conciliado como transferencia entre contas',
+      metadata: {
+        transferencia_financeira_id: transferencia.id,
+        conta_origem_id: payloadTransferencia.conta_origem_id,
+        conta_destino_id: payloadTransferencia.conta_destino_id,
+        valor
+      }
+    });
+
+    return loadConciliacaoById(req, conciliacao.id);
+  } catch (error) {
+    await transaction.rollback();
+    throw error;
+  }
+}
+
 async function finalizarConciliacao(req, conciliacao, movimento, { batch = false } = {}) {
   await conciliacao.update({
     movimento_financeiro_id: movimento.id,
@@ -1461,6 +1559,7 @@ module.exports = {
   conciliarSugeridos,
   confirmarConciliacao,
   confirmarConciliacaoFatura,
+  confirmarConciliacaoTransferencia,
   criarTituloEConciliar,
   ignorarConciliacao,
   importOfx,

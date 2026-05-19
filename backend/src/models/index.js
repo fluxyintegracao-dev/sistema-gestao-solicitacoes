@@ -46,6 +46,7 @@ db.ProvisaoFinanceira = require('./ProvisaoFinanceira')(sequelize, Sequelize);
 db.ProvisaoFinanceiraHistorico = require('./ProvisaoFinanceiraHistorico')(sequelize, Sequelize);
 db.ProvisaoFinanceiraAnexo = require('./ProvisaoFinanceiraAnexo')(sequelize, Sequelize);
 db.ProvisaoFinanceiraSequencia = require('./ProvisaoFinanceiraSequencia')(sequelize, Sequelize);
+db.EmpresaGrupo = require('./EmpresaGrupo')(sequelize, Sequelize);
 db.RhEmpresaGrupo = require('./RhEmpresaGrupo')(sequelize, Sequelize);
 db.RhColaborador = require('./RhColaborador')(sequelize, Sequelize);
 db.RhColaboradorPagamento = require('./RhColaboradorPagamento')(sequelize, Sequelize);
@@ -86,6 +87,8 @@ db.FaturaCartaoTitulo = require('./FaturaCartaoTitulo')(sequelize, Sequelize);
 db.TituloFinanceiro = require('./TituloFinanceiro')(sequelize, Sequelize);
 db.TituloFinanceiroSequencia = require('./TituloFinanceiroSequencia')(sequelize, Sequelize);
 db.MovimentoFinanceiro = require('./MovimentoFinanceiro')(sequelize, Sequelize);
+db.CaixaFinanceiroSessao = require('./CaixaFinanceiroSessao')(sequelize, Sequelize);
+db.TransferenciaFinanceira = require('./TransferenciaFinanceira')(sequelize, Sequelize);
 db.ConciliacaoBancaria = require('./ConciliacaoBancaria')(sequelize, Sequelize);
 db.ConciliacaoBancariaImportacao = require('./ConciliacaoBancariaImportacao')(sequelize, Sequelize);
 db.PaymentProvider = require('./PaymentProvider')(sequelize, Sequelize);
@@ -1947,6 +1950,16 @@ db.ContaBancaria.belongsTo(db.User, {
   as: 'criadoPor'
 });
 
+db.EmpresaGrupo.hasMany(db.ContaBancaria, {
+  foreignKey: 'empresa_id',
+  as: 'contasFinanceiras'
+});
+
+db.ContaBancaria.belongsTo(db.EmpresaGrupo, {
+  foreignKey: 'empresa_id',
+  as: 'empresa'
+});
+
 db.User.hasMany(db.CategoriaFinanceira, {
   foreignKey: 'criado_por',
   as: 'categoriasFinanceirasCriadas'
@@ -2097,6 +2110,16 @@ db.TituloFinanceiro.belongsTo(db.Solicitacao, {
   as: 'solicitacao'
 });
 
+db.EmpresaGrupo.hasMany(db.TituloFinanceiro, {
+  foreignKey: 'empresa_id',
+  as: 'titulosFinanceiros'
+});
+
+db.TituloFinanceiro.belongsTo(db.EmpresaGrupo, {
+  foreignKey: 'empresa_id',
+  as: 'empresa'
+});
+
 db.User.hasMany(db.TituloFinanceiro, {
   foreignKey: 'criado_por',
   as: 'titulosFinanceirosCriados'
@@ -2126,6 +2149,136 @@ db.ContaBancaria.hasMany(db.MovimentoFinanceiro, {
 db.MovimentoFinanceiro.belongsTo(db.ContaBancaria, {
   foreignKey: 'conta_bancaria_id',
   as: 'contaBancaria'
+});
+
+db.EmpresaGrupo.hasMany(db.MovimentoFinanceiro, {
+  foreignKey: 'empresa_id',
+  as: 'movimentosFinanceiros'
+});
+
+db.MovimentoFinanceiro.belongsTo(db.EmpresaGrupo, {
+  foreignKey: 'empresa_id',
+  as: 'empresa'
+});
+
+db.EmpresaGrupo.hasMany(db.CaixaFinanceiroSessao, {
+  foreignKey: 'empresa_id',
+  as: 'sessoesCaixa'
+});
+
+db.CaixaFinanceiroSessao.belongsTo(db.EmpresaGrupo, {
+  foreignKey: 'empresa_id',
+  as: 'empresa'
+});
+
+db.ContaBancaria.hasMany(db.CaixaFinanceiroSessao, {
+  foreignKey: 'conta_bancaria_id',
+  as: 'sessoesCaixa'
+});
+
+db.CaixaFinanceiroSessao.belongsTo(db.ContaBancaria, {
+  foreignKey: 'conta_bancaria_id',
+  as: 'contaBancaria'
+});
+
+db.User.hasMany(db.CaixaFinanceiroSessao, {
+  foreignKey: 'aberto_por',
+  as: 'sessoesCaixaAbertas'
+});
+
+db.CaixaFinanceiroSessao.belongsTo(db.User, {
+  foreignKey: 'aberto_por',
+  as: 'abertoPor'
+});
+
+db.User.hasMany(db.CaixaFinanceiroSessao, {
+  foreignKey: 'fechado_por',
+  as: 'sessoesCaixaFechadas'
+});
+
+db.CaixaFinanceiroSessao.belongsTo(db.User, {
+  foreignKey: 'fechado_por',
+  as: 'fechadoPor'
+});
+
+db.CaixaFinanceiroSessao.hasMany(db.MovimentoFinanceiro, {
+  foreignKey: 'caixa_sessao_id',
+  as: 'movimentos'
+});
+
+db.MovimentoFinanceiro.belongsTo(db.CaixaFinanceiroSessao, {
+  foreignKey: 'caixa_sessao_id',
+  as: 'caixaSessao'
+});
+
+db.EmpresaGrupo.hasMany(db.TransferenciaFinanceira, {
+  foreignKey: 'empresa_id',
+  as: 'transferenciasFinanceiras'
+});
+
+db.TransferenciaFinanceira.belongsTo(db.EmpresaGrupo, {
+  foreignKey: 'empresa_id',
+  as: 'empresa'
+});
+
+db.ContaBancaria.hasMany(db.TransferenciaFinanceira, {
+  foreignKey: 'conta_origem_id',
+  as: 'transferenciasSaida'
+});
+
+db.TransferenciaFinanceira.belongsTo(db.ContaBancaria, {
+  foreignKey: 'conta_origem_id',
+  as: 'contaOrigem'
+});
+
+db.ContaBancaria.hasMany(db.TransferenciaFinanceira, {
+  foreignKey: 'conta_destino_id',
+  as: 'transferenciasEntrada'
+});
+
+db.TransferenciaFinanceira.belongsTo(db.ContaBancaria, {
+  foreignKey: 'conta_destino_id',
+  as: 'contaDestino'
+});
+
+db.CaixaFinanceiroSessao.hasMany(db.TransferenciaFinanceira, {
+  foreignKey: 'caixa_sessao_origem_id',
+  as: 'transferenciasSaida'
+});
+
+db.TransferenciaFinanceira.belongsTo(db.CaixaFinanceiroSessao, {
+  foreignKey: 'caixa_sessao_origem_id',
+  as: 'caixaSessaoOrigem'
+});
+
+db.CaixaFinanceiroSessao.hasMany(db.TransferenciaFinanceira, {
+  foreignKey: 'caixa_sessao_destino_id',
+  as: 'transferenciasEntrada'
+});
+
+db.TransferenciaFinanceira.belongsTo(db.CaixaFinanceiroSessao, {
+  foreignKey: 'caixa_sessao_destino_id',
+  as: 'caixaSessaoDestino'
+});
+
+db.User.hasMany(db.TransferenciaFinanceira, {
+  foreignKey: 'criado_por',
+  as: 'transferenciasFinanceirasCriadas'
+});
+
+db.TransferenciaFinanceira.belongsTo(db.User, {
+  foreignKey: 'criado_por',
+  as: 'criadoPor'
+});
+
+db.User.hasMany(db.TransferenciaFinanceira, {
+  foreignKey: 'cancelado_por',
+  as: 'transferenciasFinanceirasCanceladas'
+});
+
+db.TransferenciaFinanceira.belongsTo(db.User, {
+  foreignKey: 'cancelado_por',
+  as: 'canceladoPor'
 });
 
 db.FaturaCartaoFinanceiro.hasMany(db.MovimentoFinanceiro, {
@@ -2198,6 +2351,56 @@ db.ConciliacaoBancaria.belongsTo(db.ContaBancaria, {
   as: 'contaBancaria'
 });
 
+db.EmpresaGrupo.hasMany(db.ConciliacaoBancaria, {
+  foreignKey: 'empresa_id',
+  as: 'conciliacoesBancarias'
+});
+
+db.ConciliacaoBancaria.belongsTo(db.EmpresaGrupo, {
+  foreignKey: 'empresa_id',
+  as: 'empresa'
+});
+
+db.CaixaFinanceiroSessao.hasMany(db.ConciliacaoBancaria, {
+  foreignKey: 'caixa_sessao_id',
+  as: 'conciliacoes'
+});
+
+db.ConciliacaoBancaria.belongsTo(db.CaixaFinanceiroSessao, {
+  foreignKey: 'caixa_sessao_id',
+  as: 'caixaSessao'
+});
+
+db.TransferenciaFinanceira.hasMany(db.ConciliacaoBancaria, {
+  foreignKey: 'transferencia_financeira_id',
+  as: 'conciliacoes'
+});
+
+db.ConciliacaoBancaria.belongsTo(db.TransferenciaFinanceira, {
+  foreignKey: 'transferencia_financeira_id',
+  as: 'transferencia'
+});
+
+db.ConciliacaoBancaria.hasOne(db.TransferenciaFinanceira, {
+  foreignKey: 'conciliacao_origem_id',
+  as: 'transferenciaOrigem'
+});
+
+db.TransferenciaFinanceira.belongsTo(db.ConciliacaoBancaria, {
+  foreignKey: 'conciliacao_origem_id',
+  as: 'conciliacaoOrigem'
+});
+
+db.ConciliacaoBancaria.hasOne(db.TransferenciaFinanceira, {
+  foreignKey: 'conciliacao_destino_id',
+  as: 'transferenciaDestino'
+});
+
+db.TransferenciaFinanceira.belongsTo(db.ConciliacaoBancaria, {
+  foreignKey: 'conciliacao_destino_id',
+  as: 'conciliacaoDestino'
+});
+
 db.ContaBancaria.hasMany(db.ConciliacaoBancariaImportacao, {
   foreignKey: 'conta_bancaria_id',
   as: 'importacoesConciliacao'
@@ -2206,6 +2409,16 @@ db.ContaBancaria.hasMany(db.ConciliacaoBancariaImportacao, {
 db.ConciliacaoBancariaImportacao.belongsTo(db.ContaBancaria, {
   foreignKey: 'conta_bancaria_id',
   as: 'contaBancaria'
+});
+
+db.EmpresaGrupo.hasMany(db.ConciliacaoBancariaImportacao, {
+  foreignKey: 'empresa_id',
+  as: 'importacoesConciliacao'
+});
+
+db.ConciliacaoBancariaImportacao.belongsTo(db.EmpresaGrupo, {
+  foreignKey: 'empresa_id',
+  as: 'empresa'
 });
 
 db.User.hasMany(db.ConciliacaoBancaria, {
@@ -2261,12 +2474,12 @@ db.PaymentAccount.belongsTo(db.ContaBancaria, {
   as: 'contaBancaria'
 });
 
-db.RhEmpresaGrupo.hasMany(db.PaymentAccount, {
+db.EmpresaGrupo.hasMany(db.PaymentAccount, {
   foreignKey: 'empresa_id',
   as: 'paymentAccounts'
 });
 
-db.PaymentAccount.belongsTo(db.RhEmpresaGrupo, {
+db.PaymentAccount.belongsTo(db.EmpresaGrupo, {
   foreignKey: 'empresa_id',
   as: 'empresa'
 });
@@ -2359,6 +2572,16 @@ db.PaymentAccount.hasMany(db.PaymentBatch, {
 db.PaymentBatch.belongsTo(db.PaymentAccount, {
   foreignKey: 'payment_account_id',
   as: 'paymentAccount'
+});
+
+db.EmpresaGrupo.hasMany(db.PaymentBatch, {
+  foreignKey: 'empresa_id',
+  as: 'paymentBatches'
+});
+
+db.PaymentBatch.belongsTo(db.EmpresaGrupo, {
+  foreignKey: 'empresa_id',
+  as: 'empresa'
 });
 
 db.PaymentBatch.hasMany(db.PaymentBatchItem, {

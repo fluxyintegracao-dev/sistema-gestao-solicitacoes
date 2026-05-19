@@ -1,5 +1,6 @@
 const {
   ContaBancaria,
+  EmpresaGrupo,
   PaymentAccount,
   PaymentProvider,
   sequelize
@@ -83,6 +84,12 @@ async function validatePayload(payload = {}, { partial = false } = {}) {
     const empresaId = payload.empresa_id == null || payload.empresa_id === '' ? null : Number(payload.empresa_id);
     if (empresaId != null && (!Number.isInteger(empresaId) || empresaId <= 0)) {
       throw createHttpError(400, 'Empresa pagadora invalida.');
+    }
+    if (empresaId != null) {
+      const empresa = await EmpresaGrupo.findByPk(empresaId);
+      if (!empresa || empresa.ativo === false) {
+        throw createHttpError(400, 'Empresa pagadora invalida ou inativa.');
+      }
     }
     data.empresa_id = empresaId;
   }

@@ -9,6 +9,7 @@ const {
   TituloFinanceiro
 } = require('../models');
 const { canAccessFinanceiro, getFinanceiroObraScopeIds } = require('./authorizationService');
+const { obterSessaoAbertaParaConta } = require('./financeiroCaixaSessionHelper');
 const { registrarEventoSeguranca } = require('./securityLogService');
 
 function createHttpError(statusCode, message) {
@@ -200,6 +201,7 @@ async function baixarFaturaCartao(req, faturaId, payload = {}, { transaction: ex
 
     const dataMovimento = payload.data_movimento || payload.data_pagamento || fatura.data_vencimento;
     if (!dataMovimento) throw createHttpError(400, 'Data de pagamento da fatura e obrigatoria.');
+    const caixaSessao = await obterSessaoAbertaParaConta(conta, dataMovimento, { transaction });
 
     const movimentos = [];
     for (const titulo of fatura.titulos || []) {
@@ -213,6 +215,8 @@ async function baixarFaturaCartao(req, faturaId, payload = {}, { transaction: ex
         titulo_financeiro_id: titulo.id,
         fatura_cartao_id: fatura.id,
         conta_bancaria_id: conta.id,
+        empresa_id: conta.empresa_id || titulo.empresa_id || null,
+        caixa_sessao_id: caixaSessao?.id || null,
         forma_recebimento: 'CARTAO_CREDITO',
         tipo_movimento: 'BAIXA',
         status: 'ATIVO',

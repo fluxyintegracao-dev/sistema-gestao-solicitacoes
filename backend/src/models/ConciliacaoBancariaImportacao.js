@@ -10,6 +10,10 @@ module.exports = (sequelize, DataTypes) => sequelize.define(
       type: DataTypes.INTEGER,
       allowNull: false
     },
+    empresa_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true
+    },
     arquivo_hash: {
       type: DataTypes.STRING(64),
       allowNull: false

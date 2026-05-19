@@ -4,6 +4,7 @@ import {
   conciliarSugestoesBancarias,
   confirmarConciliacaoBancaria,
   confirmarConciliacaoFaturaCartao,
+  confirmarConciliacaoTransferencia,
   criarTituloConciliacaoBancaria,
   getConciliacoesBancarias,
   getCategoriasFinanceiras,
@@ -317,7 +318,7 @@ function NovoTituloRapidoModal({ item, contas, onClose, onConciliar }) {
 
 // ─── ItemConciliacao — layout 2 colunas ──────────────────────────────────────
 
-function ItemConciliacao({ item, processingId, onConfirmar, onIgnorar, onAssociarManual, onAssociarFatura, onNovoTitulo }) {
+function ItemConciliacao({ item, processingId, onConfirmar, onIgnorar, onAssociarManual, onAssociarFatura, onAssociarTransferencia, onNovoTitulo }) {
   const [expandirSugestoes, setExpandirSugestoes] = useState(false);
 
   const isPendente = item.status === 'PENDENTE';
@@ -417,6 +418,11 @@ function ItemConciliacao({ item, processingId, onConfirmar, onIgnorar, onAssocia
                   onClick={() => onAssociarFatura(item)}>
                   Fat
                 </button>
+                <button type="button" title="Conciliar como transferencia entre contas"
+                  className="flex h-5 min-w-5 items-center justify-center rounded border border-[var(--c-border)] bg-[var(--c-bg)] px-1 text-[9px] font-semibold text-[var(--c-muted)] hover:border-[var(--c-primary)] hover:text-[var(--c-primary)] transition-colors"
+                  onClick={() => onAssociarTransferencia(item)}>
+                  Transf
+                </button>
               </div>
             </div>
           )}
@@ -426,6 +432,13 @@ function ItemConciliacao({ item, processingId, onConfirmar, onIgnorar, onAssocia
               <p className="font-semibold text-[11px] text-[var(--c-text)] truncate">{item.titulo.descricao}</p>
               {item.titulo.parceiro_nome && <p className="text-[10px] text-[var(--c-muted)]">{item.titulo.parceiro_nome}</p>}
               {item.movimento && <p className="text-[10px] text-[var(--c-muted)]">Mov. #{item.movimento.id}</p>}
+            </div>
+          ) : !isPendente && item.transferencia ? (
+            <div className="flex-1 rounded border border-[var(--c-border)] bg-[var(--c-bg)] px-2 py-1.5 space-y-0.5">
+              <p className="font-semibold text-[11px] text-[var(--c-text)] truncate">Transferencia #{item.transferencia.id}</p>
+              <p className="text-[10px] text-[var(--c-muted)]">
+                {item.transferencia.contaOrigem?.nome || 'Origem'} para {item.transferencia.contaDestino?.nome || 'Destino'}
+              </p>
             </div>
           ) : !isPendente ? (
             <div className="flex flex-1 items-center justify-center py-1">
@@ -614,6 +627,14 @@ export default function FinanceiroConciliacao() {
     open: false, item: null, filters: buildAssociacaoDefaults(null),
     loading: false, processing: false, error: '',
     dados: { conciliacao: null, meta: { total: 0, limit: 30 }, itens: [] }
+  });
+  const [transferenciaModal, setTransferenciaModal] = useState({
+    open: false,
+    item: null,
+    conta_contraparte_id: '',
+    descricao: '',
+    processing: false,
+    error: ''
   });
 
   async function carregarContas() {
@@ -852,6 +873,56 @@ export default function FinanceiroConciliacao() {
     }
   }
 
+  function abrirAssociacaoTransferencia(item) {
+    const contasDisponiveis = contas.filter((conta) => String(conta.id) !== String(item?.conta_bancaria_id));
+    setTransferenciaModal({
+      open: true,
+      item,
+      conta_contraparte_id: String(contasDisponiveis[0]?.id || ''),
+      descricao: item?.descricao_banco ? `Transferencia - ${item.descricao_banco}` : 'Transferencia entre contas',
+      processing: false,
+      error: ''
+    });
+  }
+
+  function fecharAssociacaoTransferencia() {
+    setTransferenciaModal({
+      open: false,
+      item: null,
+      conta_contraparte_id: '',
+      descricao: '',
+      processing: false,
+      error: ''
+    });
+  }
+
+  async function handleConfirmarTransferencia(event) {
+    event.preventDefault();
+    if (!transferenciaModal.item?.id) return;
+    if (!transferenciaModal.conta_contraparte_id) {
+      setTransferenciaModal((current) => ({ ...current, error: 'Selecione a conta contraparte da transferencia.' }));
+      return;
+    }
+
+    try {
+      setProcessingId(`transferencia-${transferenciaModal.item.id}`);
+      setTransferenciaModal((current) => ({ ...current, processing: true, error: '' }));
+      setError('');
+      setFeedback('');
+      await confirmarConciliacaoTransferencia(transferenciaModal.item.id, {
+        conta_contraparte_id: transferenciaModal.conta_contraparte_id,
+        descricao: transferenciaModal.descricao
+      });
+      setFeedback('Lancamento conciliado como transferencia entre contas.');
+      fecharAssociacaoTransferencia();
+      await carregarConciliacoes();
+    } catch (err) {
+      setTransferenciaModal((current) => ({ ...current, processing: false, error: err?.message || 'Erro ao conciliar transferencia' }));
+    } finally {
+      setProcessingId(null);
+    }
+  }
+
   function aplicarFiltros(event) {
     event.preventDefault();
     setAppliedFilters({ ...filters, page: 1 });
@@ -998,6 +1069,7 @@ export default function FinanceiroConciliacao() {
                     onConfirmar={handleConfirmar} onIgnorar={handleIgnorar}
                     onAssociarManual={abrirAssociacaoManual}
                     onAssociarFatura={abrirAssociacaoFatura}
+                    onAssociarTransferencia={abrirAssociacaoTransferencia}
                     onNovoTitulo={(it) => setNovoTituloItem(it)}
                   />
                 ))
@@ -1024,6 +1096,70 @@ export default function FinanceiroConciliacao() {
             }
           }}
         />
+      )}
+
+      {/* Modal: Transferencia entre contas */}
+      {transferenciaModal.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6">
+          <div className="w-full max-w-xl rounded-2xl bg-white p-5 shadow-2xl dark:bg-[var(--c-surface)]">
+            <div className="flex items-start justify-between gap-3 border-b border-[var(--c-border)] pb-4">
+              <div>
+                <h2 className="text-lg font-semibold text-[var(--c-text)]">Conciliar transferencia</h2>
+                <p className="mt-0.5 text-sm text-[var(--c-muted)]">
+                  Informe a outra conta envolvida. O sistema define origem e destino pelo sinal do lancamento bancario.
+                </p>
+                {transferenciaModal.item && (
+                  <div className="mt-2 rounded-xl border border-[var(--c-border)] bg-[var(--c-bg)] px-3 py-2 text-sm">
+                    <span className="font-medium">{transferenciaModal.item.descricao_banco || 'Lancamento'}</span>
+                    {' - '}{formatDate(transferenciaModal.item.data_movimento)}
+                    {' - '}<ValorBanco value={transferenciaModal.item.valor} size="sm" />
+                  </div>
+                )}
+              </div>
+              <button type="button" className="btn btn-outline btn-sm shrink-0" onClick={fecharAssociacaoTransferencia}>Fechar</button>
+            </div>
+
+            <form className="mt-4 space-y-4" onSubmit={handleConfirmarTransferencia}>
+              <label className="text-sm">
+                <span className="mb-1 block text-[var(--c-muted)]">Conta contraparte</span>
+                <select
+                  className="input w-full"
+                  value={transferenciaModal.conta_contraparte_id}
+                  onChange={(e) => setTransferenciaModal((current) => ({ ...current, conta_contraparte_id: e.target.value }))}
+                  required
+                >
+                  <option value="">Selecione</option>
+                  {contas
+                    .filter((conta) => String(conta.id) !== String(transferenciaModal.item?.conta_bancaria_id))
+                    .map((conta) => (
+                      <option key={conta.id} value={conta.id}>
+                        {conta.nome}{conta.banco ? ` - ${conta.banco}` : ''}
+                      </option>
+                    ))}
+                </select>
+              </label>
+              <label className="text-sm">
+                <span className="mb-1 block text-[var(--c-muted)]">Descricao</span>
+                <input
+                  className="input w-full"
+                  value={transferenciaModal.descricao}
+                  onChange={(e) => setTransferenciaModal((current) => ({ ...current, descricao: e.target.value }))}
+                />
+              </label>
+              {transferenciaModal.error && (
+                <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                  {transferenciaModal.error}
+                </div>
+              )}
+              <div className="flex justify-end gap-2">
+                <button type="button" className="btn btn-outline" onClick={fecharAssociacaoTransferencia}>Cancelar</button>
+                <button type="submit" className="btn btn-primary" disabled={transferenciaModal.processing}>
+                  {transferenciaModal.processing ? 'Conciliando...' : 'Conciliar transferencia'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
 
       {/* Modal: Associação manual */}

@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const { Op } = require('sequelize');
 const {
   ContaBancaria,
+  EmpresaGrupo,
   Obra,
   Parceiro,
   PaymentAccount,
@@ -456,7 +457,8 @@ async function listPaymentAccounts(req) {
   return PaymentAccount.findAll({
     include: [
       { model: PaymentProvider, as: 'provider', attributes: ['id', 'codigo', 'nome', 'ambiente'] },
-      { model: ContaBancaria, as: 'contaBancaria', attributes: ['id', 'nome', 'banco', 'agencia', 'conta'] }
+      { model: ContaBancaria, as: 'contaBancaria', attributes: ['id', 'nome', 'banco', 'agencia', 'conta'] },
+      { model: EmpresaGrupo, as: 'empresa', attributes: ['id', 'codigo', 'nome', 'razao_social', 'cnpj'] }
     ],
     order: [['ativo', 'DESC'], ['id', 'ASC']]
   });

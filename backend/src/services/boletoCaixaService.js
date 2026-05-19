@@ -549,6 +549,9 @@ async function listarTitulosBoleto(req, filters = {}) {
   if (filters.numero_documento) {
     where.numero_documento = { [Op.like]: `%${filters.numero_documento}%` };
   }
+  if (filters.empresa_id) {
+    where.empresa_id = Number(filters.empresa_id);
+  }
   if (filters.obra_id) {
     where.obra_id = Number(filters.obra_id);
   }
