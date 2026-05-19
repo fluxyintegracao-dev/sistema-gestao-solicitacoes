@@ -1,6 +1,7 @@
 'use strict';
 
 const {
+  executarPreflightSincronizacaoFiscal,
   executarSincronizacaoManual,
   listarEstadosSincronizacao,
   listarLogsSincronizacao
@@ -31,6 +32,15 @@ async function runManual(req, res) {
   }
 }
 
+async function preflight(req, res) {
+  try {
+    const result = await executarPreflightSincronizacaoFiscal(req, req.body || {});
+    return res.json(result);
+  } catch (error) {
+    return handleError(res, error);
+  }
+}
+
 async function states(req, res) {
   try {
     const result = await listarEstadosSincronizacao(req.query);
@@ -42,6 +52,7 @@ async function states(req, res) {
 
 module.exports = {
   index,
+  preflight,
   runManual,
   states
 };

@@ -1,5 +1,10 @@
 import { useEffect, useState } from 'react';
-import { getFiscalSyncLogs, getFiscalSyncStates, runFiscalManualSync } from '../services/fiscalApi';
+import {
+  getFiscalSyncLogs,
+  getFiscalSyncStates,
+  runFiscalManualSync,
+  runFiscalSyncPreflight
+} from '../services/fiscalApi';
 
 function formatDateTime(value) {
   if (!value) return '-';
@@ -11,6 +16,8 @@ export default function FiscalLogs() {
   const [states, setStates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
+  const [preflightRunning, setPreflightRunning] = useState(false);
+  const [preflight, setPreflight] = useState(null);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
 
@@ -56,6 +63,30 @@ export default function FiscalLogs() {
     }
   };
 
+  const runPreflight = async () => {
+    setPreflightRunning(true);
+    setError('');
+    setMessage('');
+    try {
+      const result = await runFiscalSyncPreflight({ document_type: 'nfe' });
+      setPreflight(result);
+      setMessage(result?.ready
+        ? 'Preflight concluido. Ambiente pronto para a proxima etapa controlada.'
+        : 'Preflight concluido com pendencias. Revise os checks antes de ativar SEFAZ.');
+      await load();
+    } catch (err) {
+      setError(err.message || 'Erro ao executar preflight fiscal');
+    } finally {
+      setPreflightRunning(false);
+    }
+  };
+
+  const checkBadgeClass = (status) => {
+    if (status === 'OK') return 'bg-emerald-50 text-emerald-700';
+    if (status === 'ERROR') return 'bg-red-50 text-red-700';
+    return 'bg-amber-50 text-amber-700';
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
@@ -64,13 +95,76 @@ export default function FiscalLogs() {
           <h1 className="mt-2 text-2xl font-semibold text-slate-950 dark:text-white">Logs de sincronizacao</h1>
           <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Auditoria tecnica das sincronizacoes fiscais. Jobs reais serao ativados em fase posterior.</p>
         </div>
-        <button className="btn-primary" type="button" onClick={runManual} disabled={running}>
-          {running ? 'Registrando...' : 'Registrar tentativa manual'}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button className="btn-secondary" type="button" onClick={runPreflight} disabled={preflightRunning}>
+            {preflightRunning ? 'Validando...' : 'Executar preflight'}
+          </button>
+          <button className="btn-primary" type="button" onClick={runManual} disabled={running}>
+            {running ? 'Registrando...' : 'Registrar tentativa manual'}
+          </button>
+        </div>
       </div>
 
       {error ? <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div> : null}
       {message ? <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700">{message}</div> : null}
+
+      {preflight ? (
+        <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h2 className="text-base font-semibold text-slate-950 dark:text-white">Preflight da sincronizacao</h2>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                Validacao administrativa sem consulta real a SEFAZ.
+              </p>
+            </div>
+            <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${preflight.ready ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
+              {preflight.ready ? 'Pronto' : 'Com pendencias'}
+            </span>
+          </div>
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            <div className="rounded-lg border border-slate-200 p-3 dark:border-slate-800">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Checks gerais</p>
+              <div className="mt-3 space-y-2">
+                {(preflight.global_checks || []).map((check) => (
+                  <div key={check.code} className="flex items-start justify-between gap-3 rounded-lg bg-slate-50 p-3 text-sm dark:bg-slate-950/40">
+                    <div>
+                      <p className="font-medium text-slate-950 dark:text-white">{check.code}</p>
+                      <p className="mt-1 text-slate-500 dark:text-slate-400">{check.message}</p>
+                    </div>
+                    <span className={`shrink-0 rounded-full px-2 py-1 text-[11px] font-semibold ${checkBadgeClass(check.status)}`}>{check.status}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="rounded-lg border border-slate-200 p-3 dark:border-slate-800">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Empresas</p>
+              <div className="mt-3 space-y-3">
+                {(preflight.companies || []).map((item) => (
+                  <div key={item.company.id} className="rounded-lg bg-slate-50 p-3 text-sm dark:bg-slate-950/40">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="font-medium text-slate-950 dark:text-white">{item.company.razao_social}</p>
+                        <p className="text-xs text-slate-500">{item.company.cnpj} - {item.company.uf}</p>
+                      </div>
+                      <span className={`rounded-full px-2 py-1 text-[11px] font-semibold ${item.ready ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
+                        {item.ready ? 'Pronta' : 'Pendente'}
+                      </span>
+                    </div>
+                    <div className="mt-3 space-y-2">
+                      {(item.checks || []).map((check) => (
+                        <div key={`${item.company.id}-${check.code}`} className="flex items-start justify-between gap-2 text-xs">
+                          <span className="text-slate-500 dark:text-slate-400">{check.message}</span>
+                          <span className={`shrink-0 rounded-full px-2 py-0.5 font-semibold ${checkBadgeClass(check.status)}`}>{check.status}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+      ) : null}
 
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <div className="border-b border-slate-200 p-4 dark:border-slate-800">
