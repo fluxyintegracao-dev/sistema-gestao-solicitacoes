@@ -7,6 +7,14 @@ const {
   FiscalDocumentLink,
   FiscalDivergence
 } = require('../../../models');
+const { registrarEventoSeguranca } = require('../../../services/securityLogService');
+const { getFiscalObjectSignedUrl } = require('./fiscalS3Service');
+
+function createHttpError(message, statusCode = 400) {
+  const error = new Error(message);
+  error.statusCode = statusCode;
+  return error;
+}
 
 function buildDocumentWhere(query = {}) {
   const where = {};
@@ -61,15 +69,64 @@ async function obterDocumentoFiscal(id) {
   });
 
   if (!document) {
-    const error = new Error('Documento fiscal nao encontrado.');
-    error.statusCode = 404;
-    throw error;
+    throw createHttpError('Documento fiscal nao encontrado.', 404);
   }
 
   return document;
 }
 
+async function gerarUrlArquivoFiscal(req, id, tipoArquivo) {
+  const document = await FiscalDfeDocument.findByPk(id, {
+    include: [
+      { model: FiscalCompany, as: 'company', attributes: ['id', 'razao_social', 'cnpj', 'uf'], required: false }
+    ]
+  });
+
+  if (!document) {
+    throw createHttpError('Documento fiscal nao encontrado.', 404);
+  }
+
+  const tipo = String(tipoArquivo || '').toLowerCase();
+  const keyMap = {
+    xml: document.xml_storage_key,
+    pdf: document.pdf_storage_key || document.danfe_storage_key,
+    danfe: document.danfe_storage_key || document.pdf_storage_key
+  };
+  const storageKey = keyMap[tipo];
+
+  if (!storageKey) {
+    throw createHttpError(`Arquivo ${tipo.toUpperCase()} nao disponivel para este documento fiscal.`, 404);
+  }
+
+  const url = await getFiscalObjectSignedUrl(storageKey);
+
+  await registrarEventoSeguranca({
+    req,
+    usuarioId: req.user?.id || null,
+    tipoEvento: 'FISCAL_DOCUMENT_SIGNED_URL',
+    recursoTipo: 'FISCAL_DFE_DOCUMENT',
+    recursoId: document.id,
+    status: 'SUCCESS',
+    descricao: 'URL assinada de arquivo fiscal gerada',
+    metadata: {
+      fiscal_company_id: document.fiscal_company_id,
+      document_type: document.document_type,
+      file_type: tipo,
+      access_key: document.access_key,
+      storage_key: storageKey
+    }
+  });
+
+  return {
+    url,
+    expires_in_seconds: Number(process.env.FISCAL_S3_PRESIGNED_EXPIRES_SECONDS || 300),
+    file_type: tipo,
+    document_id: document.id
+  };
+}
+
 module.exports = {
+  gerarUrlArquivoFiscal,
   listarDocumentosFiscais,
   obterDocumentoFiscal
 };

@@ -85,6 +85,8 @@ router.post('/certificates', allowFiscalConfig, validateRequest({ body: validate
 router.post('/certificates/:id/validate', allowFiscalConfig, validateRequest({ params: validateNumericIdParam('id', 'Certificado fiscal') }), FiscalCertificateController.validate);
 
 router.get('/documents', allowFiscalDocuments, validateRequest({ query: validateFiscalDocumentQuery }), FiscalDocumentController.index);
+router.get('/documents/:id/xml-url', allowFiscalDocuments, validateRequest({ params: validateNumericIdParam('id', 'Documento fiscal') }), FiscalDocumentController.xmlUrl);
+router.get('/documents/:id/pdf-url', allowFiscalDocuments, validateRequest({ params: validateNumericIdParam('id', 'Documento fiscal') }), FiscalDocumentController.pdfUrl);
 router.get('/documents/:id', allowFiscalDocuments, validateRequest({ params: validateNumericIdParam('id', 'Documento fiscal') }), FiscalDocumentController.show);
 
 router.get('/sync/logs', allowFiscalSync, allowFiscalLogs, validateRequest({ query: validateFiscalSyncLogQuery }), FiscalSyncLogController.index);

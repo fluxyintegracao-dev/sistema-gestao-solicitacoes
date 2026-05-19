@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { getFiscalDocuments } from '../services/fiscalApi';
+import { getFiscalDocumentFileUrl, getFiscalDocuments } from '../services/fiscalApi';
 
 export default function FiscalDocuments() {
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [openingFile, setOpeningFile] = useState('');
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -24,6 +25,19 @@ export default function FiscalDocuments() {
     };
   }, []);
 
+  const openFile = async (documentId, type) => {
+    setOpeningFile(`${documentId}-${type}`);
+    setError('');
+    try {
+      const result = await getFiscalDocumentFileUrl(documentId, type);
+      if (result?.url) window.open(result.url, '_blank', 'noopener,noreferrer');
+    } catch (err) {
+      setError(err.message || 'Erro ao abrir arquivo fiscal');
+    } finally {
+      setOpeningFile('');
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -43,11 +57,12 @@ export default function FiscalDocuments() {
               <th className="px-4 py-3">Numero</th>
               <th className="px-4 py-3">Valor</th>
               <th className="px-4 py-3">Status</th>
+              <th className="px-4 py-3 text-right">Arquivos</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
             {loading ? (
-              <tr><td className="px-4 py-5 text-slate-500" colSpan={5}>Carregando documentos...</td></tr>
+              <tr><td className="px-4 py-5 text-slate-500" colSpan={6}>Carregando documentos...</td></tr>
             ) : documents.length ? documents.map((item) => (
               <tr key={item.id}>
                 <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{item.emission_date ? new Date(item.emission_date).toLocaleDateString('pt-BR') : '-'}</td>
@@ -55,9 +70,26 @@ export default function FiscalDocuments() {
                 <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{item.document_number || '-'}</td>
                 <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{Number(item.total_value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
                 <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{item.document_status}</td>
+                <td className="px-4 py-3">
+                  <div className="flex justify-end gap-2">
+                    {item.xml_storage_key ? (
+                      <button className="btn-secondary btn-sm" type="button" onClick={() => openFile(item.id, 'xml')} disabled={openingFile === `${item.id}-xml`}>
+                        XML
+                      </button>
+                    ) : null}
+                    {(item.pdf_storage_key || item.danfe_storage_key) ? (
+                      <button className="btn-secondary btn-sm" type="button" onClick={() => openFile(item.id, 'pdf')} disabled={openingFile === `${item.id}-pdf`}>
+                        PDF
+                      </button>
+                    ) : null}
+                    {!item.xml_storage_key && !item.pdf_storage_key && !item.danfe_storage_key ? (
+                      <span className="text-xs text-slate-400">Indisponivel</span>
+                    ) : null}
+                  </div>
+                </td>
               </tr>
             )) : (
-              <tr><td className="px-4 py-5 text-slate-500" colSpan={5}>Nenhum documento fiscal encontrado.</td></tr>
+              <tr><td className="px-4 py-5 text-slate-500" colSpan={6}>Nenhum documento fiscal encontrado.</td></tr>
             )}
           </tbody>
         </table>

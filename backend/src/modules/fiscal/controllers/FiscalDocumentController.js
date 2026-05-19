@@ -1,6 +1,7 @@
 'use strict';
 
 const {
+  gerarUrlArquivoFiscal,
   listarDocumentosFiscais,
   obterDocumentoFiscal
 } = require('../services/fiscalDocumentService');
@@ -30,7 +31,27 @@ async function show(req, res) {
   }
 }
 
+async function xmlUrl(req, res) {
+  try {
+    const result = await gerarUrlArquivoFiscal(req, req.params.id, 'xml');
+    return res.json(result);
+  } catch (error) {
+    return handleError(res, error);
+  }
+}
+
+async function pdfUrl(req, res) {
+  try {
+    const result = await gerarUrlArquivoFiscal(req, req.params.id, 'pdf');
+    return res.json(result);
+  } catch (error) {
+    return handleError(res, error);
+  }
+}
+
 module.exports = {
   index,
+  pdfUrl,
+  xmlUrl,
   show
 };

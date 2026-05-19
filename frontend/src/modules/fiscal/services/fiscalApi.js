@@ -92,6 +92,14 @@ export async function getFiscalDocuments(params = {}) {
   return parseJson(response, 'Erro ao buscar documentos fiscais');
 }
 
+export async function getFiscalDocumentFileUrl(id, type) {
+  const normalizedType = type === 'pdf' ? 'pdf' : 'xml';
+  const response = await fetch(`${API_URL}/fiscal/documents/${id}/${normalizedType}-url`, {
+    headers: authHeaders()
+  });
+  return parseJson(response, 'Erro ao gerar URL do arquivo fiscal');
+}
+
 export async function getFiscalSyncLogs(params = {}) {
   const response = await fetch(buildUrl('/fiscal/sync/logs', params), {
     headers: authHeaders()
