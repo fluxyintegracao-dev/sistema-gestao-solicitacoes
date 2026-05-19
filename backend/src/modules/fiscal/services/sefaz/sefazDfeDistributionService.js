@@ -16,18 +16,37 @@ const {
   obterCertificadoAtivoComSegredos
 } = require('../fiscalCertificateService');
 
+const NFE_DFE_DISTRIBUTION_ENDPOINTS = {
+  homologacao: 'https://hom.nfe.fazenda.gov.br/NFeDistribuicaoDFe/NFeDistribuicaoDFe.asmx',
+  producao: 'https://www1.nfe.fazenda.gov.br/NFeDistribuicaoDFe/NFeDistribuicaoDFe.asmx'
+};
+
 function createHttpError(message, statusCode = 400) {
   const error = new Error(message);
   error.statusCode = statusCode;
   return error;
 }
 
+function normalizeAmbienteName(value) {
+  const normalized = String(value || 'homologacao').trim().toLowerCase();
+  if (['producao', 'produção', 'prod'].includes(normalized)) return 'producao';
+  return 'homologacao';
+}
+
+function getSuggestedDistributionUrl(ambiente) {
+  return NFE_DFE_DISTRIBUTION_ENDPOINTS[normalizeAmbienteName(ambiente)];
+}
+
 function getSefazRuntimeConfig() {
+  const ambiente = normalizeAmbienteName(process.env.FISCAL_SEFAZ_AMBIENTE || 'homologacao');
+  const distributionUrl = process.env.FISCAL_SEFAZ_DFE_DISTRIBUTION_URL || null;
   return {
     enabled: process.env.FISCAL_SEFAZ_ENABLED === 'true',
-    ambiente: process.env.FISCAL_SEFAZ_AMBIENTE || 'homologacao',
+    ambiente,
     uf: process.env.FISCAL_SEFAZ_UF || null,
-    distributionUrl: process.env.FISCAL_SEFAZ_DFE_DISTRIBUTION_URL || null,
+    distributionUrl,
+    distributionUrlSource: distributionUrl ? 'env' : 'missing',
+    suggestedDistributionUrl: getSuggestedDistributionUrl(ambiente),
     requestTimeoutMs: Number(process.env.FISCAL_SEFAZ_REQUEST_TIMEOUT_MS || 30000),
     maxDocsPerRun: Number(process.env.FISCAL_SEFAZ_MAX_DOCS_PER_RUN || 50),
     emptyResultWaitMinutes: Number(process.env.FISCAL_SEFAZ_EMPTY_RESULT_WAIT_MINUTES || 60),
@@ -201,5 +220,6 @@ module.exports = {
   enviarManifestacao,
   assertCertificateReadyForSefaz,
   getSefazRuntimeConfig,
+  getSuggestedDistributionUrl,
   normalizeCompanyContext
 };

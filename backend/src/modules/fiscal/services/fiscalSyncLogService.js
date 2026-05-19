@@ -283,7 +283,7 @@ async function executarPreflightSincronizacaoFiscal(req, payload = {}) {
         ? (isHttpsUrl(sefazConfig.distributionUrl)
           ? 'Endpoint NFeDistribuicaoDFe configurado com HTTPS.'
           : 'Endpoint NFeDistribuicaoDFe deve usar HTTPS.')
-        : 'Endpoint NFeDistribuicaoDFe ainda nao configurado.'
+        : `Endpoint NFeDistribuicaoDFe ainda nao configurado. Sugestao oficial para ${sefazConfig.ambiente}: ${sefazConfig.suggestedDistributionUrl}.`
     ),
     buildCheck(
       'FISCAL_SEFAZ_REQUEST_TIMEOUT_MS',

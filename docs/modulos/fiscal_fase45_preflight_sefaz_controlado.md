@@ -19,6 +19,24 @@ FISCAL_SEFAZ_EMPTY_RESULT_WAIT_MINUTES=60
 FISCAL_SEFAZ_CONSUMO_INDEVIDO_WAIT_MINUTES=60
 ```
 
+## Endpoint NFeDistribuicaoDFe
+
+Fonte oficial: Portal Nacional da NF-e, menu **Servicos > Relacao de Servicos Web**.
+
+Ambiente de homologacao:
+
+```env
+FISCAL_SEFAZ_DFE_DISTRIBUTION_URL=https://hom.nfe.fazenda.gov.br/NFeDistribuicaoDFe/NFeDistribuicaoDFe.asmx
+```
+
+Ambiente de producao:
+
+```env
+FISCAL_SEFAZ_DFE_DISTRIBUTION_URL=https://www1.nfe.fazenda.gov.br/NFeDistribuicaoDFe/NFeDistribuicaoDFe.asmx
+```
+
+O sistema exibe esses enderecos como sugestao no diagnostico, mas nao usa endpoint implicito para chamada real. A variavel deve ser preenchida explicitamente antes de ativar `FISCAL_SEFAZ_ENABLED=true`.
+
 ## Regras operacionais
 
 - Manter `FISCAL_SEFAZ_ENABLED=false` ate o endpoint SEFAZ estar configurado e o preflight retornar sem erros.
@@ -36,4 +54,3 @@ FISCAL_SEFAZ_CONSUMO_INDEVIDO_WAIT_MINUTES=60
 6. `FISCAL_SEFAZ_DFE_DISTRIBUTION_URL` preenchido com HTTPS.
 7. Preflight fiscal sem checks `ERROR`.
 8. Só então avaliar `FISCAL_SEFAZ_ENABLED=true` em DEV.
-

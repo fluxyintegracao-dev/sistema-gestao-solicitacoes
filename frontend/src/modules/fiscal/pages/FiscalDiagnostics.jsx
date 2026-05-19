@@ -280,6 +280,7 @@ export default function FiscalDiagnostics() {
             <Field label="UF SEFAZ" value={sefaz.uf || 'pendente'} />
             <Field label="Endpoint distribuição" value={<StatusBadge active={sefaz.distribution_url_configured && sefaz.distribution_url_https} />} />
             <Field label="Endpoint" value={sefaz.distribution_url_masked || 'pendente'} />
+            <Field label="Endpoint sugerido" value={sefaz.suggested_distribution_url || 'pendente'} />
             <Field label="Timeout SEFAZ" value={`${sefaz.request_timeout_ms || 30000}ms`} />
             <Field label="Max docs/run" value={sefaz.max_docs_per_run} />
             <Field label="Lock TTL" value={`${sefaz.lock_ttl_seconds || 900}s`} />

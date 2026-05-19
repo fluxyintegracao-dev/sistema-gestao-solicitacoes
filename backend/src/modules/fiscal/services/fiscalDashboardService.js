@@ -183,6 +183,8 @@ async function getDiagnosticoFiscal() {
       distribution_url_configured: Boolean(sefazConfig.distributionUrl),
       distribution_url_masked: maskConfiguredValue(sefazConfig.distributionUrl),
       distribution_url_https: sefazConfig.distributionUrl ? isHttpsUrl(sefazConfig.distributionUrl) : false,
+      distribution_url_source: sefazConfig.distributionUrlSource,
+      suggested_distribution_url: sefazConfig.suggestedDistributionUrl,
       request_timeout_ms: sefazConfig.requestTimeoutMs,
       max_docs_per_run: sefazConfig.maxDocsPerRun,
       empty_result_wait_minutes: sefazConfig.emptyResultWaitMinutes,
