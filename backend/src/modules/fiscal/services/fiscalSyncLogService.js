@@ -332,7 +332,7 @@ async function executarPreflightSincronizacaoFiscal(req, payload = {}) {
       ));
       checks.push(buildCheck(
         'CERTIFICATE_VALIDATION_STATUS',
-        ['metadata_validated', 'local_path_accessible'].includes(certificate.validation_status) ? 'OK' : 'WARN',
+        ['metadata_validated', 'local_path_accessible', 'pfx_valid'].includes(certificate.validation_status) ? 'OK' : 'WARN',
         certificate.validation_status
           ? `Status atual do certificado: ${certificate.validation_status}.`
           : 'Certificado ainda nao validado administrativamente.'

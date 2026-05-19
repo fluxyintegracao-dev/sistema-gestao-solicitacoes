@@ -2,6 +2,7 @@
 
 const fs = require('fs/promises');
 const path = require('path');
+const tls = require('tls');
 const { Op } = require('sequelize');
 const {
   FiscalCertificate,
@@ -48,6 +49,29 @@ function normalizeLocalPath(localPath) {
     throw createHttpError('O caminho local do certificado deve ser absoluto.');
   }
   return normalized;
+}
+
+async function validateLocalPfxFile({ certificatePath, passphrase }) {
+  const normalized = normalizeLocalPath(certificatePath);
+  const stat = await fs.stat(normalized);
+  if (!stat.isFile()) {
+    throw createHttpError('O caminho informado nao aponta para um arquivo de certificado.');
+  }
+
+  const pfx = await fs.readFile(normalized);
+  if (!pfx.length) {
+    throw createHttpError('Arquivo de certificado vazio.');
+  }
+
+  tls.createSecureContext({
+    pfx,
+    ...(passphrase ? { passphrase } : {})
+  });
+
+  return {
+    normalized,
+    size: stat.size
+  };
 }
 
 async function listarFiscalCertificates(query = {}) {
@@ -192,6 +216,9 @@ async function validarFiscalCertificate(req, id) {
 
   if (certificate.storage_type === 'local_secure_path') {
     const certificatePath = decryptFiscalSecret(certificate.certificate_path_encrypted);
+    const passphrase = certificate.password_encrypted
+      ? decryptFiscalSecret(certificate.password_encrypted)
+      : null;
     const normalized = normalizeLocalPath(certificatePath);
     try {
       await fs.access(normalized);
@@ -208,6 +235,28 @@ async function validarFiscalCertificate(req, id) {
         message: 'Arquivo local nao encontrado ou sem permissao de leitura.'
       });
       validationStatus = 'local_path_error';
+    }
+
+    if (validationStatus !== 'local_path_error') {
+      try {
+        const pfxValidation = await validateLocalPfxFile({
+          certificatePath: normalized,
+          passphrase
+        });
+        checks.push({
+          name: 'pfx_abre_com_senha',
+          status: 'OK',
+          message: `Arquivo PFX carregado com sucesso pelo backend (${pfxValidation.size} bytes).`
+        });
+        if (validationStatus !== 'expired') validationStatus = 'pfx_valid';
+      } catch {
+        checks.push({
+          name: 'pfx_abre_com_senha',
+          status: 'ERROR',
+          message: 'Nao foi possivel abrir o PFX com a senha cadastrada. Revise arquivo e senha.'
+        });
+        validationStatus = 'pfx_error';
+      }
     }
   } else if (certificate.storage_type === 's3_private') {
     decryptFiscalSecret(certificate.certificate_s3_key_encrypted);
@@ -291,5 +340,6 @@ module.exports = {
   criarFiscalCertificate,
   listarFiscalCertificates,
   obterCertificadoAtivoComSegredos,
+  validateLocalPfxFile,
   validarFiscalCertificate
 };

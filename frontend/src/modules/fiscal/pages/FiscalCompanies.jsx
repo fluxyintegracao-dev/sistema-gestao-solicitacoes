@@ -53,6 +53,7 @@ export default function FiscalCompanies() {
   const [certificateForm, setCertificateForm] = useState(EMPTY_CERTIFICATE_FORM);
   const [savingCertificate, setSavingCertificate] = useState(false);
   const [validatingCertificateId, setValidatingCertificateId] = useState(null);
+  const [certificateValidation, setCertificateValidation] = useState(null);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
 
@@ -146,11 +147,17 @@ export default function FiscalCompanies() {
 
   const validateCertificate = async (certificate) => {
     setValidatingCertificateId(certificate.id);
+    setCertificateValidation(null);
     setError('');
     setMessage('');
     try {
       const result = await validateFiscalCertificate(certificate.id);
       const hasError = (result?.checks || []).some((check) => check.status === 'ERROR');
+      setCertificateValidation({
+        certificateId: certificate.id,
+        alias: certificate.certificate_alias,
+        checks: result?.checks || []
+      });
       setMessage(hasError ? 'Validacao concluida com pendencias. Revise os checks.' : 'Certificado validado administrativamente.');
       await load();
     } catch (err) {
@@ -337,6 +344,24 @@ export default function FiscalCompanies() {
             <h2 className="text-base font-semibold text-slate-950 dark:text-white">Certificados cadastrados</h2>
             <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Segredos criptografados nao retornam pela API.</p>
           </div>
+          {certificateValidation ? (
+            <div className="border-b border-slate-200 bg-slate-50 p-5 dark:border-slate-800 dark:bg-slate-950/40">
+              <p className="text-sm font-semibold text-slate-950 dark:text-white">
+                Validacao: {certificateValidation.alias}
+              </p>
+              <div className="mt-3 space-y-2">
+                {certificateValidation.checks.map((check) => (
+                  <div key={check.name} className="rounded-lg border border-slate-200 bg-white p-3 text-sm dark:border-slate-800 dark:bg-slate-900">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="font-medium text-slate-900 dark:text-white">{check.name}</span>
+                      <StatusPill active={check.status === 'OK'}>{check.status}</StatusPill>
+                    </div>
+                    <p className="mt-1 text-slate-600 dark:text-slate-300">{check.message}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
           <div className="divide-y divide-slate-100 dark:divide-slate-800">
             {certificates.length ? certificates.map((certificate) => (
               <div key={certificate.id} className="p-5">
