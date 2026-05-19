@@ -35,6 +35,14 @@ const EMPTY_CERTIFICATE_FORM = {
   is_active: true
 };
 
+function StatusPill({ active, children }) {
+  return (
+    <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${active ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
+      {children}
+    </span>
+  );
+}
+
 export default function FiscalCompanies() {
   const [companies, setCompanies] = useState([]);
   const [form, setForm] = useState(EMPTY_FORM);
@@ -220,23 +228,31 @@ export default function FiscalCompanies() {
               <th className="px-4 py-3">UF</th>
               <th className="px-4 py-3">Ambiente</th>
               <th className="px-4 py-3">Status</th>
+              <th className="px-4 py-3">Fiscal</th>
               <th className="px-4 py-3"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
             {loading ? (
-              <tr><td className="px-4 py-5 text-slate-500" colSpan={6}>Carregando empresas...</td></tr>
+              <tr><td className="px-4 py-5 text-slate-500" colSpan={7}>Carregando empresas...</td></tr>
             ) : companies.length ? companies.map((company) => (
               <tr key={company.id}>
                 <td className="px-4 py-3 font-medium text-slate-950 dark:text-white">{company.razao_social}</td>
                 <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{company.cnpj}</td>
                 <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{company.uf}</td>
                 <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{company.ambiente_sefaz}</td>
-                <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{company.ativo ? 'Ativa' : 'Inativa'}</td>
+                <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
+                  <StatusPill active={company.ativo}>{company.ativo ? 'Ativa' : 'Inativa'}</StatusPill>
+                </td>
+                <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
+                  <StatusPill active={company.modulo_fiscal_habilitado}>
+                    {company.modulo_fiscal_habilitado ? 'Monitorando' : 'Desligado'}
+                  </StatusPill>
+                </td>
                 <td className="px-4 py-3 text-right"><button className="btn-secondary" type="button" onClick={() => editCompany(company)}>Editar</button></td>
               </tr>
             )) : (
-              <tr><td className="px-4 py-5 text-slate-500" colSpan={6}>Nenhuma empresa fiscal cadastrada.</td></tr>
+              <tr><td className="px-4 py-5 text-slate-500" colSpan={7}>Nenhuma empresa fiscal cadastrada.</td></tr>
             )}
           </tbody>
         </table>
