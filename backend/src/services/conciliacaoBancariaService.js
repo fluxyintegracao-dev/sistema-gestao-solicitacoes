@@ -19,6 +19,8 @@ const {
 } = require('./authorizationService');
 const { registrarEventoSeguranca } = require('./securityLogService');
 const { baixarFaturaCartao } = require('./faturaCartaoFinanceiroService');
+const { obterSessaoAbertaParaConta } = require('./financeiroCaixaSessionHelper');
+const { listarTarifasBancariasConfig } = require('./financeiroCadastroService');
 const { criarTituloManualComBaixaAtomica } = require('./tituloFinanceiroService');
 const { criarTransferenciaFinanceira } = require('./transferenciaFinanceiraService');
 
@@ -38,6 +40,16 @@ function normalizeText(value) {
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/\s+/g, ' ')
     .trim()
+    .toUpperCase();
+}
+
+function normalizeConfigCode(value) {
+  return String(value || '')
+    .trim()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
     .toUpperCase();
 }
 
@@ -297,7 +309,7 @@ function buildConciliacaoInclude() {
     {
       model: MovimentoFinanceiro,
       as: 'movimento',
-      attributes: ['id', 'tipo_movimento', 'valor', 'valor_quitacao', 'data_movimento', 'status'],
+      attributes: ['id', 'tipo_movimento', 'valor', 'valor_quitacao', 'data_movimento', 'status', 'observacoes', 'documento_referencia'],
       include: [
         {
           model: ContaBancaria,
@@ -840,7 +852,9 @@ async function listarConciliacoes(req, filters = {}) {
             valor: Number(json.movimento.valor || 0),
             valor_quitacao: Number(json.movimento.valor_quitacao || 0),
             data_movimento: json.movimento.data_movimento,
-            status: json.movimento.status
+            status: json.movimento.status,
+            observacoes: json.movimento.observacoes || null,
+            documento_referencia: json.movimento.documento_referencia || null
           }
         : null,
       fatura_cartao: json.faturaCartao
@@ -1294,6 +1308,102 @@ async function confirmarConciliacaoTransferencia(req, conciliacaoId, payload = {
   }
 }
 
+async function confirmarConciliacaoTarifa(req, conciliacaoId, payload = {}) {
+  await assertFinanceAccess(req);
+
+  const codigoTarifa = normalizeConfigCode(payload.codigo);
+  if (!codigoTarifa) {
+    throw createHttpError(400, 'Selecione a tarifa bancaria.');
+  }
+
+  const atalhos = await listarTarifasBancariasConfig(req);
+  const tarifa = atalhos.find((item) => normalizeConfigCode(item.codigo) === codigoTarifa && item.ativo !== false);
+  if (!tarifa) {
+    throw createHttpError(400, 'Tarifa bancaria inativa ou nao configurada.');
+  }
+
+  const transaction = await sequelize.transaction();
+  try {
+    const conciliacao = await ConciliacaoBancaria.findByPk(conciliacaoId, {
+      transaction,
+      lock: transaction.LOCK.UPDATE
+    });
+    if (!conciliacao) throw createHttpError(404, 'Lancamento de conciliacao nao encontrado.');
+    if (String(conciliacao.status || '').toUpperCase() !== 'PENDENTE') {
+      throw createHttpError(400, 'Somente conciliacoes pendentes podem ser confirmadas.');
+    }
+
+    const valorBanco = Number(conciliacao.valor || 0);
+    if (valorBanco >= 0) {
+      throw createHttpError(400, 'Tarifas bancarias devem ser conciliadas em lancamentos de saida da conta.');
+    }
+
+    const conta = await ContaBancaria.findByPk(conciliacao.conta_bancaria_id, { transaction });
+    if (!conta || conta.ativo === false) {
+      throw createHttpError(400, 'Conta bancaria da conciliacao invalida ou inativa.');
+    }
+
+    const valor = roundCurrency(Math.abs(valorBanco));
+    if (valor <= 0) {
+      throw createHttpError(400, 'Valor do lancamento bancario invalido para tarifa.');
+    }
+
+    const sessao = await obterSessaoAbertaParaConta(conta, conciliacao.data_movimento, { transaction });
+    const descricao = String(payload.descricao || conciliacao.descricao_banco || tarifa.nome || '').trim().slice(0, 255);
+    const movimento = await MovimentoFinanceiro.create({
+      titulo_financeiro_id: null,
+      conta_bancaria_id: conta.id,
+      empresa_id: conciliacao.empresa_id || conta.empresa_id || null,
+      caixa_sessao_id: sessao?.id || null,
+      tipo_movimento: 'TARIFA_BANCARIA',
+      status: 'ATIVO',
+      valor,
+      juros: 0,
+      multa: 0,
+      desconto: 0,
+      valor_quitacao: valor,
+      data_movimento: conciliacao.data_movimento,
+      documento_referencia: conciliacao.documento || tarifa.codigo,
+      observacoes: `[${tarifa.codigo}] ${descricao || tarifa.nome}`,
+      criado_por: req.user?.id || null
+    }, { transaction });
+
+    await conciliacao.update({
+      transferencia_financeira_id: null,
+      movimento_financeiro_id: movimento.id,
+      titulo_financeiro_id: null,
+      fatura_cartao_id: null,
+      caixa_sessao_id: sessao?.id || null,
+      status: 'CONCILIADO',
+      confirmado_por: req.user?.id || null,
+      confirmado_em: new Date()
+    }, { transaction });
+
+    await transaction.commit();
+
+    await registrarEventoSeguranca({
+      req,
+      usuarioId: req.user?.id || null,
+      tipoEvento: 'FINANCIAL_BANK_RECONCILED_FEE',
+      recursoTipo: 'CONCILIACAO_BANCARIA',
+      recursoId: conciliacao.id,
+      status: 'SUCCESS',
+      descricao: 'Lancamento bancario conciliado como tarifa bancaria',
+      metadata: {
+        movimento_financeiro_id: movimento.id,
+        conta_bancaria_id: conta.id,
+        codigo_tarifa: tarifa.codigo,
+        valor
+      }
+    });
+
+    return loadConciliacaoById(req, conciliacao.id);
+  } catch (error) {
+    await transaction.rollback();
+    throw error;
+  }
+}
+
 async function finalizarConciliacao(req, conciliacao, movimento, { batch = false } = {}) {
   await conciliacao.update({
     movimento_financeiro_id: movimento.id,
@@ -1559,6 +1669,7 @@ module.exports = {
   conciliarSugeridos,
   confirmarConciliacao,
   confirmarConciliacaoFatura,
+  confirmarConciliacaoTarifa,
   confirmarConciliacaoTransferencia,
   criarTituloEConciliar,
   ignorarConciliacao,

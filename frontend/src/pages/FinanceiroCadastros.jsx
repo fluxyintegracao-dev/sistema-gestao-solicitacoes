@@ -6,6 +6,7 @@ import {
   atualizarFormaPagamentoFinanceira,
   atualizarPaymentAccount,
   atualizarPaymentBeneficiary,
+  atualizarTarifasBancariasAtalhos,
   criarCartaoFinanceiro,
   criarCategoriaFinanceira,
   criarContaBancaria,
@@ -17,7 +18,8 @@ import {
   getContasBancarias,
   getFormasPagamentoFinanceiras,
   getPaymentAccounts,
-  getPaymentBeneficiaries
+  getPaymentBeneficiaries,
+  getTarifasBancariasAtalhos
 } from '../services/financeiro';
 import { getEmpresasGrupo } from '../services/empresasGrupo';
 import { maskCpfCnpj } from '../utils/formatters';
@@ -255,6 +257,7 @@ export default function FinanceiroCadastros() {
   const [paymentAccounts, setPaymentAccounts] = useState([]);
   const [categorias, setCategorias] = useState([]);
   const [formasPagamento, setFormasPagamento] = useState([]);
+  const [tarifasBancariasAtalhos, setTarifasBancariasAtalhos] = useState([]);
   const [cartoes, setCartoes] = useState([]);
   const [contaForm, setContaForm] = useState(defaultContaForm());
   const [paymentAccountForm, setPaymentAccountForm] = useState(defaultPaymentAccountForm());
@@ -266,6 +269,7 @@ export default function FinanceiroCadastros() {
   const [savingPaymentAccount, setSavingPaymentAccount] = useState(false);
   const [savingCategoria, setSavingCategoria] = useState(false);
   const [savingFormaPagamento, setSavingFormaPagamento] = useState(false);
+  const [savingTarifasBancarias, setSavingTarifasBancarias] = useState(false);
   const [savingCartao, setSavingCartao] = useState(false);
   const [error, setError] = useState('');
   const [categoriaFiltro, setCategoriaFiltro] = useState('');
@@ -279,11 +283,12 @@ export default function FinanceiroCadastros() {
     try {
       setLoading(true);
       setError('');
-      const [contasData, categoriasData, paymentAccountsData, formasData, cartoesData, empresasData] = await Promise.all([
+      const [contasData, categoriasData, paymentAccountsData, formasData, tarifasData, cartoesData, empresasData] = await Promise.all([
         getContasBancarias(),
         getCategoriasFinanceiras(),
         getPaymentAccounts().catch(() => []),
         getFormasPagamentoFinanceiras().catch(() => []),
+        getTarifasBancariasAtalhos().catch(() => []),
         getCartoesFinanceiros().catch(() => []),
         getEmpresasGrupo({ ativo: true }).catch(() => [])
       ]);
@@ -291,6 +296,7 @@ export default function FinanceiroCadastros() {
       setCategorias(Array.isArray(categoriasData) ? categoriasData : []);
       setPaymentAccounts(Array.isArray(paymentAccountsData) ? paymentAccountsData : []);
       setFormasPagamento(Array.isArray(formasData) ? formasData : []);
+      setTarifasBancariasAtalhos(Array.isArray(tarifasData) ? tarifasData : []);
       setCartoes(Array.isArray(cartoesData) ? cartoesData : []);
       setEmpresasGrupo(Array.isArray(empresasData) ? empresasData : []);
     } catch (err) {
@@ -454,6 +460,35 @@ export default function FinanceiroCadastros() {
       setError(err?.message || 'Erro ao salvar forma de pagamento');
     } finally {
       setSavingFormaPagamento(false);
+    }
+  }
+
+  function handleAdicionarTarifaBancaria() {
+    setTarifasBancariasAtalhos((current) => ([
+      ...current,
+      { codigo: '', nome: '', descricao: '', ativo: true }
+    ]));
+  }
+
+  function handleAlterarTarifaBancaria(index, field, value) {
+    setTarifasBancariasAtalhos((current) => current.map((item, itemIndex) => (
+      itemIndex === index ? { ...item, [field]: value } : item
+    )));
+  }
+
+  function handleRemoverTarifaBancaria(index) {
+    setTarifasBancariasAtalhos((current) => current.filter((_, itemIndex) => itemIndex !== index));
+  }
+
+  async function handleSalvarTarifasBancarias() {
+    try {
+      setSavingTarifasBancarias(true);
+      await atualizarTarifasBancariasAtalhos({ itens: tarifasBancariasAtalhos });
+      await carregar();
+    } catch (err) {
+      setError(err?.message || 'Erro ao salvar atalhos de tarifas bancarias');
+    } finally {
+      setSavingTarifasBancarias(false);
     }
   }
 
@@ -1031,6 +1066,68 @@ export default function FinanceiroCadastros() {
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+
+          <div className="card sol-surface-card">
+            <div className="flex flex-col gap-1 md:flex-row md:items-start md:justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-[var(--c-text)]">Atalhos de tarifas bancarias</h2>
+                <p className="text-sm text-[var(--c-muted)]">
+                  Nomes exibidos no atalho da conciliacao bancaria para tarifas como TAR PIX, TAR TED e manutencao de conta.
+                </p>
+              </div>
+              <button type="button" className="btn btn-outline btn-sm" onClick={handleAdicionarTarifaBancaria}>
+                Adicionar
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-3">
+              {tarifasBancariasAtalhos.length === 0 ? (
+                <div className="app-note">Nenhum atalho de tarifa configurado.</div>
+              ) : tarifasBancariasAtalhos.map((tarifa, index) => (
+                <div key={`${tarifa.codigo || 'nova'}-${index}`} className="rounded-xl border border-[var(--c-border)] p-3">
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <input
+                      className="input w-full"
+                      placeholder="Nome exibido"
+                      value={tarifa.nome || ''}
+                      onChange={(e) => handleAlterarTarifaBancaria(index, 'nome', e.target.value)}
+                    />
+                    <input
+                      className="input w-full"
+                      placeholder="Codigo"
+                      value={tarifa.codigo || ''}
+                      onChange={(e) => handleAlterarTarifaBancaria(index, 'codigo', e.target.value)}
+                    />
+                  </div>
+                  <textarea
+                    className="input mt-3 min-h-[64px] w-full"
+                    placeholder="Descricao opcional"
+                    value={tarifa.descricao || ''}
+                    onChange={(e) => handleAlterarTarifaBancaria(index, 'descricao', e.target.value)}
+                  />
+                  <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                    <label className="flex items-center gap-2 text-sm text-[var(--c-text)]">
+                      <input
+                        type="checkbox"
+                        checked={tarifa.ativo !== false}
+                        onChange={(e) => handleAlterarTarifaBancaria(index, 'ativo', e.target.checked)}
+                      />
+                      Ativo
+                    </label>
+                    <button type="button" className="btn btn-outline btn-sm" onClick={() => handleRemoverTarifaBancaria(index)}>
+                      Remover
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-4 flex justify-end">
+              <button type="button" className="btn btn-primary" disabled={savingTarifasBancarias} onClick={handleSalvarTarifasBancarias}>
+                {savingTarifasBancarias ? 'Salvando...' : 'Salvar atalhos'}
+              </button>
             </div>
           </div>
 

@@ -1,6 +1,7 @@
 const {
   CartaoFinanceiro,
   CategoriaFinanceira,
+  ConfiguracaoSistema,
   ContaBancaria,
   EmpresaGrupo,
   FormaPagamentoFinanceira
@@ -28,6 +29,14 @@ function sanitizeTextField(value, { emptyAsNull = false } = {}) {
 
   return normalized;
 }
+
+const TARIFAS_BANCARIAS_CONFIG_KEY = 'FINANCEIRO_TARIFAS_BANCARIAS_ATALHOS';
+const TARIFAS_BANCARIAS_PADRAO = [
+  { codigo: 'TAR_PIX', nome: 'TAR PIX', ativo: true },
+  { codigo: 'TAR_TED', nome: 'TAR TED', ativo: true },
+  { codigo: 'TAR_TEV', nome: 'TAR TEV', ativo: true },
+  { codigo: 'TAR_MAN_CONT', nome: 'TAR MAN CONT', ativo: true }
+];
 
 async function assertFinanceAccess(req) {
   const allowed = await canAccessFinanceiro(req.user);
@@ -123,6 +132,96 @@ function normalizeCodigo(value, fallback = '') {
     .replace(/[^a-zA-Z0-9]+/g, '_')
     .replace(/^_+|_+$/g, '')
     .toUpperCase();
+}
+
+function isSuperadmin(user) {
+  return String(user?.perfil || '').trim().toUpperCase() === 'SUPERADMIN';
+}
+
+function normalizeTarifaBancariaConfigItem(item = {}, index = 0) {
+  const nome = sanitizeTextField(item.nome || item.codigo || `Tarifa ${index + 1}`);
+  const codigo = normalizeCodigo(item.codigo || nome);
+  if (!codigo) {
+    throw createHttpError(400, `Codigo da tarifa ${index + 1} e obrigatorio.`);
+  }
+  if (!nome) {
+    throw createHttpError(400, `Nome da tarifa ${index + 1} e obrigatorio.`);
+  }
+
+  return {
+    codigo,
+    nome: nome.slice(0, 80),
+    descricao: sanitizeTextField(item.descricao, { emptyAsNull: true }),
+    ativo: sanitizeBoolean(item.ativo, true)
+  };
+}
+
+function parseTarifasBancariasConfig(valor) {
+  if (!valor) return TARIFAS_BANCARIAS_PADRAO;
+
+  try {
+    const parsed = JSON.parse(valor);
+    if (!Array.isArray(parsed)) return TARIFAS_BANCARIAS_PADRAO;
+    return parsed.map(normalizeTarifaBancariaConfigItem).filter((item) => item.codigo && item.nome);
+  } catch {
+    return TARIFAS_BANCARIAS_PADRAO;
+  }
+}
+
+async function listarTarifasBancariasConfig(req) {
+  await assertFinanceAccess(req);
+
+  const config = await ConfiguracaoSistema.findOne({
+    where: { chave: TARIFAS_BANCARIAS_CONFIG_KEY }
+  });
+
+  return parseTarifasBancariasConfig(config?.valor);
+}
+
+async function salvarTarifasBancariasConfig(req, payload = {}) {
+  await assertFinanceAccess(req);
+  if (!isSuperadmin(req.user)) {
+    throw createHttpError(403, 'Somente SUPERADMIN pode configurar atalhos de tarifas bancarias.');
+  }
+
+  const itensPayload = Array.isArray(payload.itens) ? payload.itens : [];
+  if (!itensPayload.length) {
+    throw createHttpError(400, 'Informe pelo menos uma tarifa bancaria.');
+  }
+
+  const vistos = new Set();
+  const itens = itensPayload.map(normalizeTarifaBancariaConfigItem).map((item) => {
+    if (vistos.has(item.codigo)) {
+      throw createHttpError(400, `Codigo de tarifa duplicado: ${item.codigo}.`);
+    }
+    vistos.add(item.codigo);
+    return item;
+  });
+
+  const [config] = await ConfiguracaoSistema.findOrCreate({
+    where: { chave: TARIFAS_BANCARIAS_CONFIG_KEY },
+    defaults: {
+      chave: TARIFAS_BANCARIAS_CONFIG_KEY,
+      valor: JSON.stringify(itens)
+    }
+  });
+
+  if (!config.isNewRecord) {
+    await config.update({ valor: JSON.stringify(itens) });
+  }
+
+  await registrarEventoSeguranca({
+    req,
+    usuarioId: req.user?.id || null,
+    tipoEvento: 'FINANCIAL_BANK_FEE_SHORTCUTS_UPDATED',
+    recursoTipo: 'CONFIGURACAO_SISTEMA',
+    recursoId: TARIFAS_BANCARIAS_CONFIG_KEY,
+    status: 'SUCCESS',
+    descricao: 'Atalhos de tarifas bancarias atualizados',
+    metadata: { total: itens.length }
+  });
+
+  return itens;
 }
 
 function sanitizeBoolean(value, fallback = false) {
@@ -452,5 +551,7 @@ module.exports = {
   listarCartoesFinanceiros,
   listarCategoriasFinanceiras,
   listarContasBancarias,
-  listarFormasPagamentoFinanceiras
+  listarFormasPagamentoFinanceiras,
+  listarTarifasBancariasConfig,
+  salvarTarifasBancariasConfig
 };

@@ -8,7 +8,7 @@ module.exports = (sequelize, DataTypes) => sequelize.define(
     },
     titulo_financeiro_id: {
       type: DataTypes.INTEGER,
-      allowNull: false
+      allowNull: true
     },
     fatura_cartao_id: {
       type: DataTypes.INTEGER,

@@ -4,6 +4,7 @@ import {
   conciliarSugestoesBancarias,
   confirmarConciliacaoBancaria,
   confirmarConciliacaoFaturaCartao,
+  confirmarConciliacaoTarifaBancaria,
   confirmarConciliacaoTransferencia,
   criarTituloConciliacaoBancaria,
   getConciliacoesBancarias,
@@ -12,6 +13,7 @@ import {
   getFaturasAssociacaoConciliacao,
   getImportacoesConciliacao,
   getMovimentosAssociacaoConciliacao,
+  getTarifasBancariasAtalhos,
   ignorarConciliacaoBancaria,
   importarOfxConciliacao
 } from '../services/financeiro';
@@ -111,6 +113,72 @@ function ValorBanco({ value, size = 'lg' }) {
 }
 
 // ─── NovoTituloRapidoModal ────────────────────────────────────────────────────
+
+function AcoesRapidasConciliacaoModal({ item, tarifas, processingId, onClose, onNovoTitulo, onConfirmarTarifa }) {
+  const tarifasAtivas = Array.isArray(tarifas) ? tarifas.filter((tarifa) => tarifa.ativo !== false) : [];
+  const isSaida = Number(item?.valor || 0) < 0;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6">
+      <div className="w-full max-w-xl rounded-2xl bg-white p-5 shadow-2xl dark:bg-[var(--c-surface)]">
+        <div className="flex items-start justify-between gap-3 border-b border-[var(--c-border)] pb-4">
+          <div>
+            <h2 className="text-lg font-semibold text-[var(--c-text)]">Acoes rapidas</h2>
+            <p className="mt-0.5 text-sm text-[var(--c-muted)]">Escolha como registrar este lancamento bancario.</p>
+            {item && (
+              <div className="mt-2 rounded-xl border border-[var(--c-border)] bg-[var(--c-bg)] px-3 py-2 text-sm">
+                <span className="font-medium">{item.descricao_banco || 'Lancamento bancario'}</span>
+                {' - '}{formatDate(item.data_movimento)}
+                {' - '}<ValorBanco value={item.valor} size="sm" />
+              </div>
+            )}
+          </div>
+          <button type="button" className="btn btn-outline btn-sm shrink-0" onClick={onClose}>Fechar</button>
+        </div>
+
+        <div className="mt-4 grid gap-3">
+          <button
+            type="button"
+            className="rounded-xl border border-[var(--c-border)] px-4 py-3 text-left transition-colors hover:border-[var(--c-primary)] hover:bg-[var(--c-bg)]"
+            onClick={() => onNovoTitulo(item)}
+          >
+            <span className="block text-sm font-semibold text-[var(--c-text)]">Criar titulo + baixa</span>
+            <span className="mt-0.5 block text-xs text-[var(--c-muted)]">Usa o fluxo completo de contas a pagar/receber e concilia o movimento.</span>
+          </button>
+
+          <div className="rounded-xl border border-dashed border-[var(--c-border)] p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <p className="text-sm font-semibold text-[var(--c-text)]">Registrar tarifa bancaria</p>
+                <p className="text-xs text-[var(--c-muted)]">Cria somente movimento de conta, sem titulo financeiro.</p>
+              </div>
+              {!isSaida && <span className="rounded-full bg-amber-50 px-2 py-1 text-[11px] font-medium text-amber-700">Apenas saidas</span>}
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {tarifasAtivas.length === 0 ? (
+                <span className="text-xs text-[var(--c-muted)]">Nenhuma tarifa ativa configurada.</span>
+              ) : tarifasAtivas.map((tarifa) => {
+                const key = `tarifa-${item?.id}-${tarifa.codigo}`;
+                return (
+                  <button
+                    key={tarifa.codigo}
+                    type="button"
+                    className="btn btn-outline btn-sm"
+                    disabled={!isSaida || processingId === key}
+                    onClick={() => onConfirmarTarifa(item, tarifa)}
+                    title={tarifa.descricao || tarifa.nome}
+                  >
+                    {processingId === key ? 'Registrando...' : tarifa.nome}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function NovoTituloRapidoModal({ item, contas, onClose, onConciliar }) {
   const tipoInferido = Number(item?.valor || 0) < 0 ? 'PAGAR' : 'RECEBER';
@@ -318,7 +386,7 @@ function NovoTituloRapidoModal({ item, contas, onClose, onConciliar }) {
 
 // ─── ItemConciliacao — layout 2 colunas ──────────────────────────────────────
 
-function ItemConciliacao({ item, processingId, onConfirmar, onIgnorar, onAssociarManual, onAssociarFatura, onAssociarTransferencia, onNovoTitulo }) {
+function ItemConciliacao({ item, processingId, onConfirmar, onIgnorar, onAssociarManual, onAssociarFatura, onAssociarTransferencia, onAcoesRapidas }) {
   const [expandirSugestoes, setExpandirSugestoes] = useState(false);
 
   const isPendente = item.status === 'PENDENTE';
@@ -403,9 +471,9 @@ function ItemConciliacao({ item, processingId, onConfirmar, onIgnorar, onAssocia
             <div className="flex items-center justify-between gap-1">
               <p className="text-[9px] uppercase tracking-wide font-semibold text-[var(--c-muted)]">Lançamento Fluxy</p>
               <div className="flex items-center gap-0.5">
-                <button type="button" title="Novo título + baixa"
+                <button type="button" title="Acoes rapidas"
                   className="flex h-5 w-5 items-center justify-center rounded border border-[var(--c-border)] bg-[var(--c-bg)] text-[var(--c-muted)] hover:border-[var(--c-primary)] hover:text-[var(--c-primary)] transition-colors"
-                  onClick={() => onNovoTitulo(item)}>
+                  onClick={() => onAcoesRapidas(item)}>
                   <PlusIcon className="h-2.5 w-2.5" />
                 </button>
                 <button type="button" title="Associar manualmente"
@@ -432,6 +500,12 @@ function ItemConciliacao({ item, processingId, onConfirmar, onIgnorar, onAssocia
               <p className="font-semibold text-[11px] text-[var(--c-text)] truncate">{item.titulo.descricao}</p>
               {item.titulo.parceiro_nome && <p className="text-[10px] text-[var(--c-muted)]">{item.titulo.parceiro_nome}</p>}
               {item.movimento && <p className="text-[10px] text-[var(--c-muted)]">Mov. #{item.movimento.id}</p>}
+            </div>
+          ) : !isPendente && item.movimento?.tipo_movimento === 'TARIFA_BANCARIA' ? (
+            <div className="flex-1 rounded border border-[var(--c-border)] bg-[var(--c-bg)] px-2 py-1.5 space-y-0.5">
+              <p className="font-semibold text-[11px] text-[var(--c-text)] truncate">Tarifa bancaria</p>
+              <p className="text-[10px] text-[var(--c-muted)]">{item.movimento.observacoes || item.descricao_banco}</p>
+              <p className="text-[10px] text-[var(--c-muted)]">Mov. #{item.movimento.id}</p>
             </div>
           ) : !isPendente && item.transferencia ? (
             <div className="flex-1 rounded border border-[var(--c-border)] bg-[var(--c-bg)] px-2 py-1.5 space-y-0.5">
@@ -598,6 +672,7 @@ function FooterPaginacao({ meta, onAlterarPagina }) {
 
 export default function FinanceiroConciliacao() {
   const [contas, setContas] = useState([]);
+  const [tarifasBancarias, setTarifasBancarias] = useState([]);
   const [filters, setFilters] = useState({ status: 'PENDENTE', conta_bancaria_id: '', data_inicial: '', data_final: '', page: 1, page_size: 100 });
   const [appliedFilters, setAppliedFilters] = useState({ status: 'PENDENTE', conta_bancaria_id: '', data_inicial: '', data_final: '', page: 1, page_size: 100 });
   const [uploadForm, setUploadForm] = useState({ conta_bancaria_id: '', file: null });
@@ -617,6 +692,7 @@ export default function FinanceiroConciliacao() {
   const [error, setError] = useState('');
   const [feedback, setFeedback] = useState('');
   const [processingId, setProcessingId] = useState(null);
+  const [acoesRapidasItem, setAcoesRapidasItem] = useState(null);
   const [novoTituloItem, setNovoTituloItem] = useState(null); // item OFX para o modal de novo título
   const [associacaoModal, setAssociacaoModal] = useState({
     open: false, item: null, filters: buildAssociacaoDefaults(null),
@@ -645,6 +721,15 @@ export default function FinanceiroConciliacao() {
       setContas(normalized);
       setUploadForm((c) => ({ ...c, conta_bancaria_id: c.conta_bancaria_id || String(normalized[0]?.id || '') }));
     } catch { setContas([]); } finally { setLoadingContas(false); }
+  }
+
+  async function carregarTarifasBancarias() {
+    try {
+      const data = await getTarifasBancariasAtalhos();
+      setTarifasBancarias(Array.isArray(data) ? data : []);
+    } catch {
+      setTarifasBancarias([]);
+    }
   }
 
   async function carregarConciliacoes() {
@@ -689,7 +774,7 @@ export default function FinanceiroConciliacao() {
     } finally { setLoading(false); }
   }
 
-  useEffect(() => { carregarContas(); }, []);
+  useEffect(() => { carregarContas(); carregarTarifasBancarias(); }, []);
   useEffect(() => { carregarConciliacoes(); }, [appliedFilters]);
 
   const resumoFinanceiro = useMemo(() => ([
@@ -923,6 +1008,27 @@ export default function FinanceiroConciliacao() {
     }
   }
 
+  async function handleConfirmarTarifa(item, tarifa) {
+    if (!item?.id || !tarifa?.codigo) return;
+
+    try {
+      setProcessingId(`tarifa-${item.id}-${tarifa.codigo}`);
+      setError('');
+      setFeedback('');
+      await confirmarConciliacaoTarifaBancaria(item.id, {
+        codigo: tarifa.codigo,
+        descricao: item.descricao_banco || tarifa.nome
+      });
+      setFeedback(`Lancamento conciliado como ${tarifa.nome}.`);
+      setAcoesRapidasItem(null);
+      await carregarConciliacoes();
+    } catch (err) {
+      setError(err?.message || 'Erro ao conciliar tarifa bancaria');
+    } finally {
+      setProcessingId(null);
+    }
+  }
+
   function aplicarFiltros(event) {
     event.preventDefault();
     setAppliedFilters({ ...filters, page: 1 });
@@ -1070,7 +1176,7 @@ export default function FinanceiroConciliacao() {
                     onAssociarManual={abrirAssociacaoManual}
                     onAssociarFatura={abrirAssociacaoFatura}
                     onAssociarTransferencia={abrirAssociacaoTransferencia}
-                    onNovoTitulo={(it) => setNovoTituloItem(it)}
+                    onAcoesRapidas={(it) => setAcoesRapidasItem(it)}
                   />
                 ))
             }
@@ -1079,6 +1185,20 @@ export default function FinanceiroConciliacao() {
           </div>
         )
       }
+
+      {acoesRapidasItem && (
+        <AcoesRapidasConciliacaoModal
+          item={acoesRapidasItem}
+          tarifas={tarifasBancarias}
+          processingId={processingId}
+          onClose={() => setAcoesRapidasItem(null)}
+          onNovoTitulo={(item) => {
+            setAcoesRapidasItem(null);
+            setNovoTituloItem(item);
+          }}
+          onConfirmarTarifa={handleConfirmarTarifa}
+        />
+      )}
 
       {/* Modal: Novo título + baixa */}
       {novoTituloItem && (

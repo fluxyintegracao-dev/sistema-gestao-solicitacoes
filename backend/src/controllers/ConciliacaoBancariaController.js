@@ -2,6 +2,7 @@ const {
   conciliarSugeridos,
   confirmarConciliacao,
   confirmarConciliacaoFatura,
+  confirmarConciliacaoTarifa,
   confirmarConciliacaoTransferencia,
   criarTituloEConciliar,
   ignorarConciliacao,
@@ -115,6 +116,16 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return responderErro(res, error, 'Erro ao conciliar transferencia entre contas');
+    }
+  },
+
+  async confirmarTarifa(req, res) {
+    try {
+      const data = await confirmarConciliacaoTarifa(req, req.params.id, req.body || {});
+      return res.json(data);
+    } catch (error) {
+      console.error(error);
+      return responderErro(res, error, 'Erro ao conciliar tarifa bancaria');
     }
   },
 

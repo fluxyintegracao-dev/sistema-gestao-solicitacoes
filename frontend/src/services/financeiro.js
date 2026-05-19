@@ -162,6 +162,16 @@ export async function confirmarConciliacaoTransferencia(id, data) {
   return parseJson(response, 'Erro ao conciliar transferencia entre contas');
 }
 
+export async function confirmarConciliacaoTarifaBancaria(id, data) {
+  const response = await fetch(`${API_URL}/financeiro/conciliacoes/${id}/confirmar-tarifa`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+
+  return parseJson(response, 'Erro ao conciliar tarifa bancaria');
+}
+
 export async function criarTituloConciliacaoBancaria(id, data) {
   const response = await fetch(`${API_URL}/financeiro/conciliacoes/${id}/criar-titulo`, {
     method: 'POST',
@@ -446,6 +456,24 @@ export async function getFormasPagamentoFinanceiras() {
   });
 
   return parseJson(response, 'Erro ao buscar formas de pagamento');
+}
+
+export async function getTarifasBancariasAtalhos() {
+  const response = await fetch(`${API_URL}/financeiro/tarifas-bancarias-atalhos`, {
+    headers: authHeaders()
+  });
+
+  return parseJson(response, 'Erro ao buscar atalhos de tarifas bancarias');
+}
+
+export async function atualizarTarifasBancariasAtalhos(data) {
+  const response = await fetch(`${API_URL}/financeiro/tarifas-bancarias-atalhos`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+
+  return parseJson(response, 'Erro ao salvar atalhos de tarifas bancarias');
 }
 
 export async function criarFormaPagamentoFinanceira(data) {

@@ -511,6 +511,19 @@ function validateFinanceConciliacaoTransferenciaBody(body = {}) {
   };
 }
 
+function validateFinanceConciliacaoTarifaBody(body = {}) {
+  ensureAllowedKeys(
+    body,
+    ['codigo', 'descricao'],
+    'Conciliacao bancaria por tarifa'
+  );
+
+  return {
+    codigo: parseOptionalText(body.codigo, 'Codigo da tarifa', 80, { required: true }),
+    descricao: parseOptionalText(body.descricao, 'Descricao', 255)
+  };
+}
+
 function validateFinanceConciliacaoCriarTituloBody(body = {}) {
   ensureAllowedKeys(
     body,
@@ -1028,12 +1041,37 @@ function validateFinanceTransferenciaCancelBody(body = {}) {
   };
 }
 
+function validateFinanceTarifasBancariasConfigBody(body = {}) {
+  ensureAllowedKeys(body, ['itens'], 'Configuracao de tarifas bancarias');
+  if (!Array.isArray(body.itens)) {
+    throw new ValidationError('Tarifas bancarias devem ser enviadas em lista.');
+  }
+
+  return {
+    itens: body.itens.map((item, index) => {
+      ensureAllowedKeys(
+        item || {},
+        ['codigo', 'nome', 'descricao', 'ativo'],
+        `Tarifa bancaria ${index + 1}`
+      );
+
+      return {
+        codigo: parseOptionalText(item?.codigo, `Codigo da tarifa ${index + 1}`, 80, { required: true }),
+        nome: parseOptionalText(item?.nome, `Nome da tarifa ${index + 1}`, 80, { required: true }),
+        descricao: parseOptionalText(item?.descricao, `Descricao da tarifa ${index + 1}`, 255),
+        ativo: parseBoolean(item?.ativo, `Ativo da tarifa ${index + 1}`)
+      };
+    })
+  };
+}
+
 module.exports = {
   FORMAS_COBRANCA,
   STATUS_COBRANCA,
   validateFinanceConciliacaoCriarTituloBody,
   validateFinanceConciliacaoConciliarSugeridosBody,
   validateFinanceConciliacaoConfirmBody,
+  validateFinanceConciliacaoTarifaBody,
   validateFinanceConciliacaoTransferenciaBody,
   validateFinanceConciliacaoImportBody,
   validateFinanceConciliacaoImportacoesQuery,
@@ -1045,6 +1083,7 @@ module.exports = {
   validateFinanceTransferenciaBody,
   validateFinanceTransferenciaCancelBody,
   validateFinanceTransferenciaQuery,
+  validateFinanceTarifasBancariasConfigBody,
   validateFinanceCadastroCategoriaBody,
   validateFinanceCadastroContaBody,
   validateFinanceBoletoTituloQuery,
