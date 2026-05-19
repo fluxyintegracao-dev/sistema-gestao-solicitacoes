@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
+  getFiscalCompanies,
+  getFiscalDiagnostics,
   getFiscalSyncLogs,
   getFiscalSyncLogRawUrl,
   getFiscalSyncStates,
@@ -15,6 +17,9 @@ function formatDateTime(value) {
 export default function FiscalLogs() {
   const [logs, setLogs] = useState([]);
   const [states, setStates] = useState([]);
+  const [companies, setCompanies] = useState([]);
+  const [diagnostics, setDiagnostics] = useState(null);
+  const [selectedCompanyId, setSelectedCompanyId] = useState('');
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
   const [preflightRunning, setPreflightRunning] = useState(false);
@@ -26,12 +31,18 @@ export default function FiscalLogs() {
     setLoading(true);
     setError('');
     try {
-      const [logsResult, statesResult] = await Promise.all([
+      const [logsResult, statesResult, companiesResult, diagnosticsResult] = await Promise.all([
         getFiscalSyncLogs(),
-        getFiscalSyncStates()
+        getFiscalSyncStates(),
+        getFiscalCompanies({ ativo: true }),
+        getFiscalDiagnostics()
       ]);
+      const nextCompanies = companiesResult?.data || [];
       setLogs(logsResult?.data || []);
       setStates(statesResult?.data || []);
+      setCompanies(nextCompanies);
+      setDiagnostics(diagnosticsResult);
+      setSelectedCompanyId((current) => current || String(nextCompanies.find((company) => company.modulo_fiscal_habilitado)?.id || nextCompanies[0]?.id || ''));
     } catch (err) {
       setError(err.message || 'Erro ao buscar logs fiscais');
     } finally {
@@ -54,7 +65,10 @@ export default function FiscalLogs() {
     setError('');
     setMessage('');
     try {
-      const result = await runFiscalManualSync({ document_type: 'nfe' });
+      const result = await runFiscalManualSync({
+        document_type: 'nfe',
+        company_id: selectedCompanyId || undefined
+      });
       setMessage(result?.message || 'Tentativa de sincronizacao registrada.');
       await load();
     } catch (err) {
@@ -69,7 +83,10 @@ export default function FiscalLogs() {
     setError('');
     setMessage('');
     try {
-      const result = await runFiscalSyncPreflight({ document_type: 'nfe' });
+      const result = await runFiscalSyncPreflight({
+        document_type: 'nfe',
+        company_id: selectedCompanyId || undefined
+      });
       setPreflight(result);
       setMessage(result?.ready
         ? 'Preflight concluido. Ambiente pronto para a proxima etapa controlada.'
@@ -102,6 +119,13 @@ export default function FiscalLogs() {
     return 'bg-amber-50 text-amber-700';
   };
 
+  const sefazEnabled = Boolean(diagnostics?.sefaz?.enabled);
+  const endpointOk = Boolean(diagnostics?.sefaz?.distribution_url_configured && diagnostics?.sefaz?.distribution_url_https);
+  const manualActionLabel = sefazEnabled ? 'Sincronizar SEFAZ agora' : 'Registrar tentativa sem consultar';
+  const manualActionHelp = sefazEnabled
+    ? 'Executa uma chamada real ao Ambiente Nacional da NF-e para a empresa selecionada. O request e o response brutos serao armazenados no S3 fiscal privado.'
+    : 'SEFAZ esta desabilitada por FISCAL_SEFAZ_ENABLED=false. O botao apenas registra uma tentativa controlada, sem chamada externa.';
+
   return (
     <div className="fiscal-page space-y-6">
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
@@ -110,18 +134,63 @@ export default function FiscalLogs() {
           <h1 className="mt-2 text-2xl font-semibold text-slate-950 dark:text-white">Logs de sincronizacao</h1>
           <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Auditoria tecnica das sincronizacoes fiscais. Jobs reais serao ativados em fase posterior.</p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <button className="btn-secondary" type="button" onClick={runPreflight} disabled={preflightRunning}>
-            {preflightRunning ? 'Validando...' : 'Executar preflight'}
-          </button>
-          <button className="btn-primary" type="button" onClick={runManual} disabled={running}>
-            {running ? 'Registrando...' : 'Registrar tentativa manual'}
-          </button>
+        <div className="flex flex-col gap-2 md:min-w-[360px]">
+          <select
+            className="input"
+            value={selectedCompanyId}
+            onChange={(event) => setSelectedCompanyId(event.target.value)}
+            disabled={loading || !companies.length || running || preflightRunning}
+          >
+            <option value="">Todas as empresas monitoradas</option>
+            {companies.map((company) => (
+              <option key={company.id} value={company.id}>
+                {company.razao_social || company.nome_fantasia || company.cnpj}
+              </option>
+            ))}
+          </select>
+          <div className="flex flex-wrap gap-2">
+            <button className="btn-secondary" type="button" onClick={runPreflight} disabled={preflightRunning || !companies.length}>
+              {preflightRunning ? 'Validando...' : 'Executar preflight'}
+            </button>
+            <button className="btn-primary" type="button" onClick={runManual} disabled={running || !companies.length || (sefazEnabled && !endpointOk)}>
+              {running ? 'Executando...' : manualActionLabel}
+            </button>
+          </div>
+          <p className={`text-xs ${sefazEnabled ? 'text-red-700' : 'text-amber-700'}`}>
+            {manualActionHelp}
+          </p>
         </div>
       </div>
 
       {error ? <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div> : null}
       {message ? <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700">{message}</div> : null}
+
+      <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/40">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">SEFAZ real</p>
+            <p className={`mt-1 text-sm font-semibold ${sefazEnabled ? 'text-red-700' : 'text-slate-950 dark:text-white'}`}>
+              {sefazEnabled ? 'Habilitada' : 'Desabilitada'}
+            </p>
+          </div>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/40">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Endpoint</p>
+            <p className="mt-1 text-sm font-semibold text-slate-950 dark:text-white">
+              {endpointOk ? 'Configurado' : 'Pendente'}
+            </p>
+          </div>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/40">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Tipo documental</p>
+            <p className="mt-1 text-sm font-semibold text-slate-950 dark:text-white">nfe</p>
+          </div>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/40">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Escopo</p>
+            <p className="mt-1 text-sm font-semibold text-slate-950 dark:text-white">
+              {selectedCompanyId ? 'Empresa selecionada' : 'Todas monitoradas'}
+            </p>
+          </div>
+        </div>
+      </section>
 
       {preflight ? (
         <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">

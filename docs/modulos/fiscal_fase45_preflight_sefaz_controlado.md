@@ -43,6 +43,8 @@ O sistema exibe esses enderecos como sugestao no diagnostico, mas nao usa endpoi
 - A primeira chamada real deve ser manual, por empresa, em DEV.
 - Scheduler automatico continua fora do escopo desta fase.
 - Raw request/response segue armazenado apenas no S3 fiscal privado.
+- A tela de Logs de Sincronizacao exibe explicitamente se a acao manual apenas registra tentativa ou se executa chamada real.
+- Quando `FISCAL_SEFAZ_ENABLED=true`, o botao manual passa a representar chamada externa real ao Ambiente Nacional da NF-e.
 
 ## Checklist antes da primeira chamada real
 

@@ -199,6 +199,14 @@ async function executarSincronizacaoManual(req, payload = {}) {
         : hasSkipped
           ? 'Tentativa registrada. SEFAZ esta desabilitada por configuracao neste ambiente.'
           : 'Tentativa registrada sem empresas processadas.',
+    sefaz_enabled: process.env.FISCAL_SEFAZ_ENABLED === 'true',
+    document_type: documentType,
+    companies: companies.map((company) => ({
+      id: company.id,
+      razao_social: company.razao_social,
+      cnpj: company.cnpj,
+      ambiente_sefaz: company.ambiente_sefaz
+    })),
     logs: results.map((result) => result.log)
   };
 }
