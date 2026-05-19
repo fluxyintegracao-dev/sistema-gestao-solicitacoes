@@ -290,7 +290,12 @@ const FISCAL_DOCUMENT_LINK_KEYS = [
 
 const FISCAL_SYNC_VIEW_KEYS = [
   'fiscal.sync.view',
+  'fiscal.sync.run',
   'fiscal.logs.view'
+];
+
+const FISCAL_SYNC_RUN_KEYS = [
+  'fiscal.sync.run'
 ];
 
 const FISCAL_LOGS_VIEW_KEYS = [
@@ -1388,6 +1393,18 @@ async function canViewFiscalSync(user) {
   return false;
 }
 
+async function canRunFiscalSync(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, FISCAL_SYNC_RUN_KEYS);
+  }
+
+  return false;
+}
+
 async function canViewFiscalLogs(user) {
   if (isBusinessAdmin(user)) {
     return true;
@@ -1693,6 +1710,7 @@ module.exports = {
   canReopenRhDpFechamento,
   canReadComercialBaseData,
   canLinkFiscalDocuments,
+  canRunFiscalSync,
   canPreparePagamentos,
   canManageIntegracaoSiengeConfig,
   canManageProvisoesCategorias,

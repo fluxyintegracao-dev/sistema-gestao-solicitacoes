@@ -170,6 +170,14 @@ function validateFiscalSyncLogQuery(query = {}) {
   };
 }
 
+function validateFiscalSyncRunBody(body = {}) {
+  ensureAllowedKeys(body, ['company_id', 'document_type'], 'Sincronizacao fiscal manual');
+  return {
+    company_id: parseOptionalInteger(body.company_id, 'Empresa fiscal'),
+    document_type: parseEnum(body.document_type, 'Tipo documental', FISCAL_DOCUMENT_TYPES, { fallback: 'nfe' })
+  };
+}
+
 function validateFiscalCertificateQuery(query = {}) {
   ensureAllowedKeys(query, ['company_id', 'is_active'], 'Filtro de certificados fiscais');
   return {
@@ -234,5 +242,6 @@ module.exports = {
   validateFiscalCompanyUpdateBody,
   validateFiscalDocumentQuery,
   validateFiscalSyncLogQuery,
+  validateFiscalSyncRunBody,
   validateFiscalSyncStateStatus
 };

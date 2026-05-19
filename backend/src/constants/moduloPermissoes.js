@@ -201,6 +201,7 @@ const MODULO_PERMISSION_GROUPS = [
         label: 'Sincronizacao Fiscal',
         permissoes: [
           { key: 'fiscal.sync.view', label: 'Visualizar sincronizacao', descricao: 'Consultar estado de NSU e sincronizacoes fiscais.' },
+          { key: 'fiscal.sync.run', label: 'Executar sincronizacao manual', descricao: 'Iniciar tentativa manual controlada de sincronizacao fiscal em DEV.' },
           { key: 'fiscal.logs.view', label: 'Visualizar logs fiscais', descricao: 'Consultar logs de processamento e auditoria tecnica fiscal.' }
         ]
       }

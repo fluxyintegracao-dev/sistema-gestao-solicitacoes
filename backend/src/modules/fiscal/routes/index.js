@@ -7,6 +7,7 @@ const { validateNumericIdParam } = require('../../../validators/securityValidato
 const {
   canAccessFiscal,
   canManageFiscalConfig,
+  canRunFiscalSync,
   canViewFiscalDocuments,
   canViewFiscalLogs,
   canViewFiscalSync
@@ -23,7 +24,8 @@ const {
   validateFiscalCompanyQuery,
   validateFiscalCompanyUpdateBody,
   validateFiscalDocumentQuery,
-  validateFiscalSyncLogQuery
+  validateFiscalSyncLogQuery,
+  validateFiscalSyncRunBody
 } = require('../validators/fiscalValidators');
 
 const router = express.Router();
@@ -64,6 +66,15 @@ const allowFiscalSync = permit({
   )
 });
 
+const allowFiscalSyncRun = permit({
+  resource: 'FISCAL_SYNC_RUN',
+  custom: async (req) => (
+    (await canRunFiscalSync(req.user))
+      ? true
+      : 'Acesso negado para executar sincronizacao fiscal'
+  )
+});
+
 const allowFiscalLogs = permit({
   resource: 'FISCAL_LOGS',
   custom: async (req) => (
@@ -89,6 +100,7 @@ router.get('/documents/:id/xml-url', allowFiscalDocuments, validateRequest({ par
 router.get('/documents/:id/pdf-url', allowFiscalDocuments, validateRequest({ params: validateNumericIdParam('id', 'Documento fiscal') }), FiscalDocumentController.pdfUrl);
 router.get('/documents/:id', allowFiscalDocuments, validateRequest({ params: validateNumericIdParam('id', 'Documento fiscal') }), FiscalDocumentController.show);
 
+router.post('/sync/run-manual', allowFiscalSyncRun, validateRequest({ body: validateFiscalSyncRunBody }), FiscalSyncLogController.runManual);
 router.get('/sync/logs', allowFiscalSync, allowFiscalLogs, validateRequest({ query: validateFiscalSyncLogQuery }), FiscalSyncLogController.index);
 
 module.exports = router;

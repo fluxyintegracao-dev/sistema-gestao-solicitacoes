@@ -1,6 +1,9 @@
 'use strict';
 
-const { listarLogsSincronizacao } = require('../services/fiscalSyncLogService');
+const {
+  executarSincronizacaoManual,
+  listarLogsSincronizacao
+} = require('../services/fiscalSyncLogService');
 
 function handleError(res, error) {
   console.error('[fiscal] logs de sincronizacao:', error);
@@ -18,6 +21,16 @@ async function index(req, res) {
   }
 }
 
+async function runManual(req, res) {
+  try {
+    const result = await executarSincronizacaoManual(req, req.body || {});
+    return res.status(202).json(result);
+  } catch (error) {
+    return handleError(res, error);
+  }
+}
+
 module.exports = {
-  index
+  index,
+  runManual
 };

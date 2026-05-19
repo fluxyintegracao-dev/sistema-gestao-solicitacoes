@@ -106,3 +106,12 @@ export async function getFiscalSyncLogs(params = {}) {
   });
   return parseJson(response, 'Erro ao buscar logs fiscais');
 }
+
+export async function runFiscalManualSync(payload = {}) {
+  const response = await fetch(`${API_URL}/fiscal/sync/run-manual`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload)
+  });
+  return parseJson(response, 'Erro ao registrar tentativa de sincronizacao fiscal');
+}
