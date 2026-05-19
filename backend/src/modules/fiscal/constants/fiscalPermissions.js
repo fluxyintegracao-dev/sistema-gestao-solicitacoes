@@ -4,7 +4,9 @@ const FISCAL_PERMISSIONS = {
   VIEW: 'fiscal.view',
   CONFIG_MANAGE: 'fiscal.config.manage',
   DOCUMENT_VIEW: 'fiscal.document.view',
+  DOCUMENT_UPLOAD: 'fiscal.document.upload',
   DOCUMENT_LINK: 'fiscal.document.link',
+  DOCUMENT_IGNORE: 'fiscal.document.ignore',
   SYNC_VIEW: 'fiscal.sync.view',
   LOGS_VIEW: 'fiscal.logs.view'
 };

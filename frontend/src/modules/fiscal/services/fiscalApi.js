@@ -92,12 +92,54 @@ export async function getFiscalDocuments(params = {}) {
   return parseJson(response, 'Erro ao buscar documentos fiscais');
 }
 
+export async function getFiscalDocument(id) {
+  const response = await fetch(`${API_URL}/fiscal/documents/${id}`, {
+    headers: authHeaders()
+  });
+  return parseJson(response, 'Erro ao buscar documento fiscal');
+}
+
 export async function getFiscalDocumentFileUrl(id, type) {
   const normalizedType = type === 'pdf' ? 'pdf' : 'xml';
   const response = await fetch(`${API_URL}/fiscal/documents/${id}/${normalizedType}-url`, {
     headers: authHeaders()
   });
   return parseJson(response, 'Erro ao gerar URL do arquivo fiscal');
+}
+
+export async function uploadFiscalXml({ companyId, file }) {
+  const formData = new FormData();
+  formData.append('fiscal_company_id', companyId);
+  formData.append('file', file);
+
+  const response = await fetch(`${API_URL}/fiscal/documents/upload-xml`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: formData
+  });
+  return parseJson(response, 'Erro ao importar XML fiscal');
+}
+
+export async function uploadFiscalDocumentFile({ documentId, fileType = 'danfe', file }) {
+  const formData = new FormData();
+  formData.append('file_type', fileType);
+  formData.append('file', file);
+
+  const response = await fetch(`${API_URL}/fiscal/documents/${documentId}/upload-file`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: formData
+  });
+  return parseJson(response, 'Erro ao importar arquivo fiscal');
+}
+
+export async function ignoreFiscalDocument(id, payload = {}) {
+  const response = await fetch(`${API_URL}/fiscal/documents/${id}/ignore`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload)
+  });
+  return parseJson(response, 'Erro ao ignorar documento fiscal');
 }
 
 export async function getFiscalSyncLogs(params = {}) {

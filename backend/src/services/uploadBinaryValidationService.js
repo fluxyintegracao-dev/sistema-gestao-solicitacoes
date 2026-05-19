@@ -30,7 +30,9 @@ const allowedProfiles = {
     '.jpeg',
     '.rar'
   ]),
-  ofx: new Set(['.ofx'])
+  ofx: new Set(['.ofx']),
+  fiscal_file: new Set(['.pdf', '.png', '.jpg', '.jpeg']),
+  fiscal_xml: new Set(['.xml'])
 };
 
 function bufferStartsWith(buffer, signature) {
@@ -159,6 +161,32 @@ function assertOfxBinary(file) {
   }
 }
 
+function assertFiscalXmlBinary(file) {
+  const buffer = file?.buffer;
+  const extension = String(path.extname(file?.originalname || '') || '').toLowerCase();
+
+  if (extension !== '.xml') {
+    throw new UploadSecurityError('Extensao de arquivo fiscal nao permitida.', 400, 'UPLOAD_EXTENSION_UNSUPPORTED');
+  }
+
+  if (!hasPrintableText(buffer)) {
+    throw new UploadSecurityError('XML fiscal invalido ou corrompido.', 400, 'UPLOAD_BINARY_MISMATCH');
+  }
+
+  const body = buffer.toString('utf8', 0, Math.min(buffer.length, 256 * 1024)).toLowerCase();
+  const looksLikeFiscalXml =
+    body.includes('<nfeproc') ||
+    body.includes('<nfe ') ||
+    body.includes('<nfe>') ||
+    body.includes('<chave') ||
+    body.includes('<chnfe') ||
+    body.includes('infnfe');
+
+  if (!looksLikeFiscalXml) {
+    throw new UploadSecurityError('XML fiscal nao identificado como NFe.', 400, 'UPLOAD_BINARY_MISMATCH');
+  }
+}
+
 function assertProfileAllowed(profile, file) {
   const extension = String(path.extname(file?.originalname || '') || '').toLowerCase();
   const allowedExtensions = allowedProfiles[profile] || allowedProfiles.documents;
@@ -177,6 +205,16 @@ function assertFileBinaryMatchesProfile(file, profile = 'documents') {
 
   if (profile === 'ofx') {
     assertOfxBinary(file);
+    return;
+  }
+
+  if (profile === 'fiscal_xml') {
+    assertFiscalXmlBinary(file);
+    return;
+  }
+
+  if (profile === 'fiscal_file') {
+    assertDocumentBinary(file);
     return;
   }
 

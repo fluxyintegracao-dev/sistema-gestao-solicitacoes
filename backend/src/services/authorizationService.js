@@ -270,8 +270,11 @@ const FISCAL_PERMISSION_KEYS = [
   'fiscal.view',
   'fiscal.config.manage',
   'fiscal.document.view',
+  'fiscal.document.upload',
   'fiscal.document.link',
+  'fiscal.document.ignore',
   'fiscal.sync.view',
+  'fiscal.sync.run',
   'fiscal.logs.view'
 ];
 
@@ -281,11 +284,21 @@ const FISCAL_CONFIG_KEYS = [
 
 const FISCAL_DOCUMENT_VIEW_KEYS = [
   'fiscal.document.view',
-  'fiscal.document.link'
+  'fiscal.document.upload',
+  'fiscal.document.link',
+  'fiscal.document.ignore'
+];
+
+const FISCAL_DOCUMENT_UPLOAD_KEYS = [
+  'fiscal.document.upload'
 ];
 
 const FISCAL_DOCUMENT_LINK_KEYS = [
   'fiscal.document.link'
+];
+
+const FISCAL_DOCUMENT_IGNORE_KEYS = [
+  'fiscal.document.ignore'
 ];
 
 const FISCAL_SYNC_VIEW_KEYS = [
@@ -1381,6 +1394,30 @@ async function canLinkFiscalDocuments(user) {
   return false;
 }
 
+async function canUploadFiscalDocuments(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, FISCAL_DOCUMENT_UPLOAD_KEYS);
+  }
+
+  return false;
+}
+
+async function canIgnoreFiscalDocuments(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, FISCAL_DOCUMENT_IGNORE_KEYS);
+  }
+
+  return false;
+}
+
 async function canViewFiscalSync(user) {
   if (isBusinessAdmin(user)) {
     return true;
@@ -1702,6 +1739,7 @@ module.exports = {
   canManageCrmAutomacoes,
   canManageCrmConfiguracoes,
   canManageFiscalConfig,
+  canIgnoreFiscalDocuments,
   canManageRhDpEmpresas,
   canFinalizePrioridadeDiretoriaLote,
   canRedistributeCrmLeads,
@@ -1711,6 +1749,7 @@ module.exports = {
   canReadComercialBaseData,
   canLinkFiscalDocuments,
   canRunFiscalSync,
+  canUploadFiscalDocuments,
   canPreparePagamentos,
   canManageIntegracaoSiengeConfig,
   canManageProvisoesCategorias,

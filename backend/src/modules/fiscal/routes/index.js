@@ -6,8 +6,10 @@ const { validateRequest } = require('../../../middlewares/validation');
 const { validateNumericIdParam } = require('../../../validators/securityValidators');
 const {
   canAccessFiscal,
+  canIgnoreFiscalDocuments,
   canManageFiscalConfig,
   canRunFiscalSync,
+  canUploadFiscalDocuments,
   canViewFiscalDocuments,
   canViewFiscalLogs,
   canViewFiscalSync
@@ -17,6 +19,8 @@ const FiscalCertificateController = require('../controllers/FiscalCertificateCon
 const FiscalCompanyController = require('../controllers/FiscalCompanyController');
 const FiscalDocumentController = require('../controllers/FiscalDocumentController');
 const FiscalSyncLogController = require('../controllers/FiscalSyncLogController');
+const uploadFiscalFile = require('../config/uploadFiscalFile');
+const uploadFiscalXml = require('../config/uploadFiscalXml');
 const {
   validateFiscalCertificateCreateBody,
   validateFiscalCertificateQuery,
@@ -54,6 +58,24 @@ const allowFiscalDocuments = permit({
     (await canViewFiscalDocuments(req.user))
       ? true
       : 'Acesso negado para documentos fiscais'
+  )
+});
+
+const allowFiscalDocumentUpload = permit({
+  resource: 'FISCAL_DOCUMENT_UPLOAD',
+  custom: async (req) => (
+    (await canUploadFiscalDocuments(req.user))
+      ? true
+      : 'Acesso negado para importar XML fiscal'
+  )
+});
+
+const allowFiscalDocumentIgnore = permit({
+  resource: 'FISCAL_DOCUMENT_IGNORE',
+  custom: async (req) => (
+    (await canIgnoreFiscalDocuments(req.user))
+      ? true
+      : 'Acesso negado para ignorar documento fiscal'
   )
 });
 
@@ -96,6 +118,9 @@ router.post('/certificates', allowFiscalConfig, validateRequest({ body: validate
 router.post('/certificates/:id/validate', allowFiscalConfig, validateRequest({ params: validateNumericIdParam('id', 'Certificado fiscal') }), FiscalCertificateController.validate);
 
 router.get('/documents', allowFiscalDocuments, validateRequest({ query: validateFiscalDocumentQuery }), FiscalDocumentController.index);
+router.post('/documents/upload-xml', allowFiscalDocumentUpload, uploadFiscalXml.single('file'), FiscalDocumentController.uploadXml);
+router.post('/documents/:id/upload-file', allowFiscalDocumentUpload, validateRequest({ params: validateNumericIdParam('id', 'Documento fiscal') }), uploadFiscalFile.single('file'), FiscalDocumentController.uploadFile);
+router.post('/documents/:id/ignore', allowFiscalDocumentIgnore, validateRequest({ params: validateNumericIdParam('id', 'Documento fiscal') }), FiscalDocumentController.ignore);
 router.get('/documents/:id/xml-url', allowFiscalDocuments, validateRequest({ params: validateNumericIdParam('id', 'Documento fiscal') }), FiscalDocumentController.xmlUrl);
 router.get('/documents/:id/pdf-url', allowFiscalDocuments, validateRequest({ params: validateNumericIdParam('id', 'Documento fiscal') }), FiscalDocumentController.pdfUrl);
 router.get('/documents/:id', allowFiscalDocuments, validateRequest({ params: validateNumericIdParam('id', 'Documento fiscal') }), FiscalDocumentController.show);

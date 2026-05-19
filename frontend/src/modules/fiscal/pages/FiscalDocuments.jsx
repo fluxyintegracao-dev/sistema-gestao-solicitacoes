@@ -1,25 +1,47 @@
 import { useEffect, useState } from 'react';
-import { getFiscalDocumentFileUrl, getFiscalDocuments } from '../services/fiscalApi';
+import { Link } from 'react-router-dom';
+import {
+  getFiscalCompanies,
+  getFiscalDocumentFileUrl,
+  getFiscalDocuments,
+  uploadFiscalXml
+} from '../services/fiscalApi';
 
 export default function FiscalDocuments() {
   const [documents, setDocuments] = useState([]);
+  const [companies, setCompanies] = useState([]);
+  const [uploadCompanyId, setUploadCompanyId] = useState('');
+  const [uploadFile, setUploadFile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
   const [openingFile, setOpeningFile] = useState('');
   const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
+
+  const load = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const [documentsResult, companiesResult] = await Promise.all([
+        getFiscalDocuments(),
+        getFiscalCompanies({ ativo: true })
+      ]);
+      setDocuments(documentsResult?.data || []);
+      const nextCompanies = companiesResult?.data || [];
+      setCompanies(nextCompanies);
+      setUploadCompanyId((current) => current || String(nextCompanies[0]?.id || ''));
+    } catch (err) {
+      setError(err.message || 'Erro ao buscar documentos fiscais');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     let mounted = true;
-    setLoading(true);
-    getFiscalDocuments()
-      .then((result) => {
-        if (mounted) setDocuments(result?.data || []);
-      })
-      .catch((err) => {
-        if (mounted) setError(err.message || 'Erro ao buscar documentos fiscais');
-      })
-      .finally(() => {
-        if (mounted) setLoading(false);
-      });
+    load().finally(() => {
+      if (!mounted) return;
+    });
     return () => {
       mounted = false;
     };
@@ -38,15 +60,51 @@ export default function FiscalDocuments() {
     }
   };
 
+  const submitUpload = async (event) => {
+    event.preventDefault();
+    if (!uploadCompanyId || !uploadFile) {
+      setError('Selecione a empresa fiscal e o arquivo XML.');
+      return;
+    }
+
+    setUploading(true);
+    setError('');
+    setMessage('');
+    try {
+      const result = await uploadFiscalXml({ companyId: uploadCompanyId, file: uploadFile });
+      setMessage(result?.duplicate ? 'XML reimportado sem duplicar documento.' : 'XML fiscal importado com sucesso.');
+      setUploadFile(null);
+      event.target.reset();
+      await load();
+    } catch (err) {
+      setError(err.message || 'Erro ao importar XML fiscal');
+    } finally {
+      setUploading(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Fiscal</p>
-        <h1 className="mt-2 text-2xl font-semibold text-slate-950 dark:text-white">Documentos fiscais</h1>
-        <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Caixa inicial de documentos DFe. A sincronizacao SEFAZ real ainda nao esta ativa nesta fase.</p>
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Fiscal</p>
+          <h1 className="mt-2 text-2xl font-semibold text-slate-950 dark:text-white">Documentos fiscais</h1>
+          <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Caixa inicial de documentos DFe. A sincronizacao SEFAZ real ainda nao esta ativa nesta fase.</p>
+        </div>
+        <form onSubmit={submitUpload} className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:flex-row">
+          <select className="input min-w-[220px]" value={uploadCompanyId} onChange={(event) => setUploadCompanyId(event.target.value)} required>
+            <option value="">Empresa fiscal</option>
+            {companies.map((company) => (
+              <option key={company.id} value={company.id}>{company.razao_social}</option>
+            ))}
+          </select>
+          <input className="input" type="file" accept=".xml,application/xml,text/xml" onChange={(event) => setUploadFile(event.target.files?.[0] || null)} required />
+          <button className="btn-primary whitespace-nowrap" type="submit" disabled={uploading}>{uploading ? 'Importando...' : 'Importar XML'}</button>
+        </form>
       </div>
 
       {error ? <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div> : null}
+      {message ? <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">{message}</div> : null}
 
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
@@ -54,6 +112,7 @@ export default function FiscalDocuments() {
             <tr>
               <th className="px-4 py-3">Emissao</th>
               <th className="px-4 py-3">Fornecedor</th>
+              <th className="px-4 py-3">Chave</th>
               <th className="px-4 py-3">Numero</th>
               <th className="px-4 py-3">Valor</th>
               <th className="px-4 py-3">Status</th>
@@ -62,16 +121,24 @@ export default function FiscalDocuments() {
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
             {loading ? (
-              <tr><td className="px-4 py-5 text-slate-500" colSpan={6}>Carregando documentos...</td></tr>
+              <tr><td className="px-4 py-5 text-slate-500" colSpan={7}>Carregando documentos...</td></tr>
             ) : documents.length ? documents.map((item) => (
-              <tr key={item.id}>
+              <tr key={item.id} className="hover:bg-slate-50 dark:hover:bg-slate-950/40">
                 <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{item.emission_date ? new Date(item.emission_date).toLocaleDateString('pt-BR') : '-'}</td>
-                <td className="px-4 py-3 font-medium text-slate-950 dark:text-white">{item.issuer_name || item.issuer_cnpj || '-'}</td>
+                <td className="px-4 py-3 font-medium text-slate-950 dark:text-white">
+                  <Link className="hover:text-blue-600" to={`/fiscal/documentos/${item.id}`}>
+                    {item.issuer_name || item.issuer_cnpj || '-'}
+                  </Link>
+                </td>
+                <td className="max-w-[240px] truncate px-4 py-3 text-xs text-slate-500" title={item.access_key}>{item.access_key || '-'}</td>
                 <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{item.document_number || '-'}</td>
                 <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{Number(item.total_value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
                 <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{item.document_status}</td>
                 <td className="px-4 py-3">
                   <div className="flex justify-end gap-2">
+                    <Link className="btn-secondary btn-sm" to={`/fiscal/documentos/${item.id}`}>
+                      Detalhes
+                    </Link>
                     {item.xml_storage_key ? (
                       <button className="btn-secondary btn-sm" type="button" onClick={() => openFile(item.id, 'xml')} disabled={openingFile === `${item.id}-xml`}>
                         XML
@@ -89,7 +156,7 @@ export default function FiscalDocuments() {
                 </td>
               </tr>
             )) : (
-              <tr><td className="px-4 py-5 text-slate-500" colSpan={6}>Nenhum documento fiscal encontrado.</td></tr>
+              <tr><td className="px-4 py-5 text-slate-500" colSpan={7}>Nenhum documento fiscal encontrado.</td></tr>
             )}
           </tbody>
         </table>

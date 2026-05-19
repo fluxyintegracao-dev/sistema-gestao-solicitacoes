@@ -193,7 +193,9 @@ const MODULO_PERMISSION_GROUPS = [
         label: 'Documentos Fiscais',
         permissoes: [
           { key: 'fiscal.document.view', label: 'Visualizar documentos fiscais', descricao: 'Consultar caixa de entrada e detalhes de documentos fiscais.' },
-          { key: 'fiscal.document.link', label: 'Vincular documentos fiscais', descricao: 'Preparar vinculos manuais entre documentos fiscais e outros modulos.' }
+          { key: 'fiscal.document.upload', label: 'Importar XML fiscal', descricao: 'Importar XML fiscal manualmente para a caixa fiscal.' },
+          { key: 'fiscal.document.link', label: 'Vincular documentos fiscais', descricao: 'Preparar vinculos manuais entre documentos fiscais e outros modulos.' },
+          { key: 'fiscal.document.ignore', label: 'Ignorar documentos fiscais', descricao: 'Marcar documentos fiscais como ignorados na caixa fiscal.' }
         ]
       },
       {

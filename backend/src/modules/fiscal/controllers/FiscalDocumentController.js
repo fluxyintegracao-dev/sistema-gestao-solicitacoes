@@ -2,9 +2,12 @@
 
 const {
   gerarUrlArquivoFiscal,
+  ignorarDocumentoFiscal,
+  importarArquivoDocumentoFiscal,
   listarDocumentosFiscais,
   obterDocumentoFiscal
 } = require('../services/fiscalDocumentService');
+const { importarXmlFiscalManual } = require('../services/fiscalXmlImportService');
 
 function handleError(res, error) {
   console.error('[fiscal] documento fiscal:', error);
@@ -49,9 +52,45 @@ async function pdfUrl(req, res) {
   }
 }
 
+async function uploadXml(req, res) {
+  try {
+    const result = await importarXmlFiscalManual(req, {
+      file: req.file,
+      body: req.body || {}
+    });
+    return res.status(result.created ? 201 : 200).json(result);
+  } catch (error) {
+    return handleError(res, error);
+  }
+}
+
+async function uploadFile(req, res) {
+  try {
+    const result = await importarArquivoDocumentoFiscal(req, req.params.id, {
+      file: req.file,
+      body: req.body || {}
+    });
+    return res.status(200).json(result);
+  } catch (error) {
+    return handleError(res, error);
+  }
+}
+
+async function ignore(req, res) {
+  try {
+    const document = await ignorarDocumentoFiscal(req, req.params.id, req.body || {});
+    return res.json(document);
+  } catch (error) {
+    return handleError(res, error);
+  }
+}
+
 module.exports = {
+  ignore,
   index,
   pdfUrl,
   xmlUrl,
+  uploadFile,
+  uploadXml,
   show
 };
