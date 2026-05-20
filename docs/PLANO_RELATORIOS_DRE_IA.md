@@ -34,6 +34,8 @@ Base multiempresa e DRE gerencial:
 - A aba Cotacoes foi incorporada dentro de Compras.
 - A auditoria de compras passou a ser acessada por Compras > Relatorios, mantendo a rota antiga apenas como compatibilidade.
 - Os hubs de Solicitacoes, Compras, Fiscal, CRM, Comercial, Provisionamento, RH/DP e Contratos ja agrupam relatorios existentes e visoes planejadas.
+- Financeiro ganhou Diagnostico da DRE para apontar cadastros e titulos que impedem uma DRE confiavel.
+- O filtro por obra da DRE foi ajustado para aplicar o escopo no titulo financeiro, preservando o include da obra apenas como dimensao.
 
 Documentacao operacional complementar:
 
@@ -679,6 +681,7 @@ Criar futuramente:
 - Garantir empresa em titulos financeiros.
 - Definir competencia dos titulos.
 - Identificar transacoes intercompany.
+- Usar Financeiro > Relatorios > Diagnostico DRE antes de fechar a virada operacional do financeiro.
 
 ### Fase 4 - DRE Financeira
 

@@ -68,6 +68,7 @@ const FinanceiroBoletos = lazy(() => import('./pages/FinanceiroBoletos'));
 const FinanceiroCadastros = lazy(() => import('./pages/FinanceiroCadastros'));
 const FinanceiroRelatorios = lazy(() => import('./pages/FinanceiroRelatorios'));
 const FinanceiroDre = lazy(() => import('./pages/FinanceiroDre'));
+const FinanceiroDiagnosticoDre = lazy(() => import('./pages/FinanceiroDiagnosticoDre'));
 const FinanceiroRelatorioAnalitico = lazy(() => import('./pages/FinanceiroRelatorioAnalitico'));
 const FinanceiroBaixas = lazy(() => import('./pages/FinanceiroBaixas'));
 const FinanceiroConciliacao = lazy(() => import('./pages/FinanceiroConciliacao'));
@@ -673,6 +674,7 @@ export default function App() {
         <Route path="financeiro/boletos" element={<BoletosRoute><FinanceiroBoletos /></BoletosRoute>} />
         <Route path="financeiro/relatorios" element={<FinanceiroRoute><FinanceiroRelatorios /></FinanceiroRoute>} />
         <Route path="financeiro/relatorios/dre" element={<FinanceiroRoute><FinanceiroDre /></FinanceiroRoute>} />
+        <Route path="financeiro/relatorios/dre/diagnostico" element={<FinanceiroRoute><FinanceiroDiagnosticoDre /></FinanceiroRoute>} />
         <Route path="financeiro/relatorios/analitico" element={<FinanceiroRoute><FinanceiroRelatorioAnalitico /></FinanceiroRoute>} />
         <Route path="financeiro/relatorios/resultado-obras" element={<FinanceiroRoute><FinanceiroResultadoObras /></FinanceiroRoute>} />
         <Route path="financeiro/relatorios/centros-custo" element={<FinanceiroRoute><FinanceiroResultadoCentrosCusto /></FinanceiroRoute>} />

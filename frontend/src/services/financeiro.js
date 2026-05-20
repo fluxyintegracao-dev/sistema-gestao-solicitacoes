@@ -792,6 +792,14 @@ export async function getDreFinanceira(params = {}) {
   return parseJson(response, 'Erro ao buscar DRE financeira');
 }
 
+export async function getDiagnosticoDreFinanceira() {
+  const response = await fetch(`${API_URL}/financeiro/relatorios/dre/diagnostico`, {
+    headers: authHeaders()
+  });
+
+  return parseJson(response, 'Erro ao buscar diagnostico da DRE');
+}
+
 export async function getPaymentBeneficiaries(params = {}) {
   const query = new URLSearchParams(
     Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== '')

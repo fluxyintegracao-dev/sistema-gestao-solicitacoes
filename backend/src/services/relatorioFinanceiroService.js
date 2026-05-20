@@ -1,4 +1,4 @@
-const { Op } = require('sequelize');
+const { Op, col, where: sequelizeWhere } = require('sequelize');
 const {
   CategoriaFinanceira,
   ContaBancaria,
@@ -763,6 +763,31 @@ function getEmpresaIdsDaHolding(empresas = [], holdingId = null) {
   return Array.from(ids);
 }
 
+function getObraIncludeWhereFromTituloScope(tituloScope) {
+  if (!tituloScope || !tituloScope.obra_id) {
+    return {};
+  }
+
+  return {
+    id: tituloScope.obra_id
+  };
+}
+
+function emptyDreSummary() {
+  return {
+    resumo: {
+      receitas: 0,
+      despesas: 0,
+      resultado: 0,
+      margem_resultado: null,
+      empresas_com_movimento: 0,
+      titulos_considerados: 0
+    },
+    linhas: [],
+    empresas: []
+  };
+}
+
 function getLinhaDre(titulo) {
   const categoria = titulo.categoriaFinanceira;
   const tipo = String(titulo.tipo || '').toUpperCase();
@@ -859,16 +884,33 @@ async function gerarDreGerencial(req, filters = {}) {
   await assertFinanceAccess(req);
 
   const periodo = resolvePeriodo(filters);
-  const obraWhere = await resolveObraScope(req, filters.obra_id);
+  const obraScopeWhere = await resolveObraScope(req, filters.obra_id);
   const empresas = await EmpresaGrupo.findAll({
     attributes: ['id', 'codigo', 'nome', 'razao_social', 'cnpj', 'tipo_empresa', 'holding_id', 'ativo'],
     order: [['tipo_empresa', 'ASC'], ['nome', 'ASC']]
   });
   const empresaIdsHolding = getEmpresaIdsDaHolding(empresas, filters.holding_id);
 
+  if (obraScopeWhere === null) {
+    return {
+      filtro: {
+        periodo: periodo.periodo,
+        descricao: periodo.descricao,
+        data_inicial: periodo.data_inicial,
+        data_final: periodo.data_final,
+        empresa_id: filters.empresa_id ? Number(filters.empresa_id) : null,
+        holding_id: filters.holding_id ? Number(filters.holding_id) : null,
+        obra_id: filters.obra_id ? Number(filters.obra_id) : null,
+        excluir_intercompany: filters.excluir_intercompany !== false
+      },
+      ...emptyDreSummary()
+    };
+  }
+
   const tituloWhere = {
     considera_dre: true,
-    ...getCompetenciaWhere(periodo)
+    ...getCompetenciaWhere(periodo),
+    ...obraScopeWhere
   };
 
   if (filters.empresa_id) {
@@ -888,7 +930,6 @@ async function gerarDreGerencial(req, filters = {}) {
         model: Obra,
         as: 'obra',
         attributes: ['id', 'codigo', 'nome', 'tipo_centro_custo', 'empresa_grupo_id'],
-        where: obraWhere,
         required: true
       },
       {
@@ -924,8 +965,401 @@ async function gerarDreGerencial(req, filters = {}) {
   };
 }
 
+function toPlain(model) {
+  return model?.get ? model.get({ plain: true }) : model;
+}
+
+function buildTituloDiagnosticoWhere(scopeWhere = {}, extraWhere = {}) {
+  return {
+    considera_dre: true,
+    ...scopeWhere,
+    ...extraWhere
+  };
+}
+
+function getTituloDiagnosticoInclude(extraIncludes = []) {
+  const hasCategoriaOverride = extraIncludes.some((include) => include?.as === 'categoriaFinanceira');
+
+  return [
+    {
+      model: Obra,
+      as: 'obra',
+      attributes: ['id', 'codigo', 'nome', 'tipo_centro_custo', 'empresa_grupo_id'],
+      required: true
+    },
+    {
+      model: EmpresaGrupo,
+      as: 'empresa',
+      attributes: ['id', 'codigo', 'nome', 'tipo_empresa', 'holding_id'],
+      required: false
+    },
+    !hasCategoriaOverride
+      ? {
+          model: CategoriaFinanceira,
+          as: 'categoriaFinanceira',
+          attributes: ['id', 'nome', 'tipo', 'dre_grupo', 'dre_subgrupo', 'dre_ordem', 'considera_dre'],
+          required: false
+        }
+      : null,
+    ...extraIncludes
+  ].filter(Boolean);
+}
+
+function mapTituloDiagnostico(titulo) {
+  const item = toPlain(titulo);
+  return {
+    id: item.id,
+    codigo: item.codigo,
+    tipo: item.tipo,
+    status: item.status,
+    descricao: item.descricao,
+    valor_original: Number(item.valor_original || 0),
+    data_emissao: item.data_emissao,
+    data_vencimento: item.data_vencimento,
+    competencia_data: item.competencia_data,
+    empresa_id: item.empresa_id,
+    empresa_nome: item.empresa?.nome || null,
+    obra_id: item.obra_id,
+    obra_nome: item.obra?.nome || null,
+    obra_empresa_grupo_id: item.obra?.empresa_grupo_id || null,
+    categoria_id: item.categoria_financeira_id,
+    categoria_nome: item.categoriaFinanceira?.nome || null
+  };
+}
+
+function mapObraDiagnostico(obra) {
+  const item = toPlain(obra);
+  return {
+    id: item.id,
+    codigo: item.codigo,
+    nome: item.nome,
+    tipo_centro_custo: item.tipo_centro_custo,
+    empresa_grupo_id: item.empresa_grupo_id,
+    empresa_nome: item.empresaGrupo?.nome || null
+  };
+}
+
+function mapEmpresaDiagnostico(empresa) {
+  const item = toPlain(empresa);
+  return {
+    id: item.id,
+    codigo: item.codigo,
+    nome: item.nome,
+    tipo_empresa: item.tipo_empresa,
+    holding_id: item.holding_id,
+    holding_nome: item.holding?.nome || null
+  };
+}
+
+function mapCategoriaDiagnostico(categoria) {
+  const item = toPlain(categoria);
+  return {
+    id: item.id,
+    nome: item.nome,
+    tipo: item.tipo,
+    dre_grupo: item.dre_grupo,
+    dre_subgrupo: item.dre_subgrupo,
+    dre_ordem: item.dre_ordem,
+    considera_dre: item.considera_dre
+  };
+}
+
+function buildDiagnosticoItem({ codigo, titulo, severidade, descricao, total, acao, exemplos }) {
+  return {
+    codigo,
+    titulo,
+    severidade,
+    descricao,
+    total: Number(total || 0),
+    acao_recomendada: acao,
+    exemplos: exemplos || []
+  };
+}
+
+async function countTitulosDiagnostico(scopeWhere, extraWhere = {}, extraIncludes = []) {
+  return TituloFinanceiro.count({
+    where: buildTituloDiagnosticoWhere(scopeWhere, extraWhere),
+    include: getTituloDiagnosticoInclude(extraIncludes),
+    distinct: true
+  });
+}
+
+async function sampleTitulosDiagnostico(scopeWhere, extraWhere = {}, extraIncludes = []) {
+  const titulos = await TituloFinanceiro.findAll({
+    where: buildTituloDiagnosticoWhere(scopeWhere, extraWhere),
+    include: getTituloDiagnosticoInclude(extraIncludes),
+    order: [['id', 'DESC']],
+    limit: 8
+  });
+
+  return titulos.map(mapTituloDiagnostico);
+}
+
+async function gerarDiagnosticoDre(req) {
+  await assertFinanceAccess(req);
+
+  const obraScopeWhere = await resolveObraScope(req);
+  const tituloScopeWhere = obraScopeWhere || { id: -1 };
+  const obraIncludeWhere = obraScopeWhere === null ? { id: -1 } : getObraIncludeWhereFromTituloScope(obraScopeWhere);
+  const categoriaSemGrupoWhere = {
+    ativo: true,
+    considera_dre: true,
+    [Op.or]: [{ dre_grupo: null }, { dre_grupo: '' }]
+  };
+
+  const [
+    totalTitulosDre,
+    totalEmpresas,
+    totalHoldings,
+    totalEmpresasOperacionaisSemHolding,
+    totalObrasSemEmpresa,
+    totalCategoriasSemDre,
+    empresasOperacionaisSemHolding,
+    obrasSemEmpresa,
+    categoriasSemDre,
+    titulosSemEmpresa,
+    titulosSemCompetencia,
+    titulosSemCategoria,
+    titulosCategoriaSemDre,
+    titulosEmpresaDivergente,
+    titulosIntercompanyInconsistente
+  ] = await Promise.all([
+    countTitulosDiagnostico(tituloScopeWhere),
+    EmpresaGrupo.count({ where: { ativo: true } }),
+    EmpresaGrupo.count({ where: { ativo: true, tipo_empresa: 'HOLDING' } }),
+    EmpresaGrupo.count({
+      where: {
+        ativo: true,
+        tipo_empresa: { [Op.ne]: 'HOLDING' },
+        holding_id: null
+      }
+    }),
+    Obra.count({
+      where: {
+        ativo: true,
+        empresa_grupo_id: null,
+        ...obraIncludeWhere
+      }
+    }),
+    CategoriaFinanceira.count({ where: categoriaSemGrupoWhere }),
+    EmpresaGrupo.findAll({
+      where: {
+        ativo: true,
+        tipo_empresa: { [Op.ne]: 'HOLDING' },
+        holding_id: null
+      },
+      include: [{ model: EmpresaGrupo, as: 'holding', attributes: ['id', 'nome'], required: false }],
+      order: [['nome', 'ASC']],
+      limit: 8
+    }),
+    Obra.findAll({
+      where: {
+        ativo: true,
+        empresa_grupo_id: null,
+        ...obraIncludeWhere
+      },
+      include: [{ model: EmpresaGrupo, as: 'empresaGrupo', attributes: ['id', 'nome'], required: false }],
+      order: [['nome', 'ASC']],
+      limit: 8
+    }),
+    CategoriaFinanceira.findAll({
+      where: categoriaSemGrupoWhere,
+      order: [['tipo', 'ASC'], ['nome', 'ASC']],
+      limit: 8
+    }),
+    countTitulosDiagnostico(tituloScopeWhere, { empresa_id: null }),
+    countTitulosDiagnostico(tituloScopeWhere, { competencia_data: null }),
+    countTitulosDiagnostico(tituloScopeWhere, { categoria_financeira_id: null }),
+    countTitulosDiagnostico(tituloScopeWhere, {}, [
+      {
+        model: CategoriaFinanceira,
+        as: 'categoriaFinanceira',
+        attributes: ['id', 'nome', 'tipo', 'dre_grupo', 'dre_subgrupo', 'dre_ordem', 'considera_dre'],
+        where: categoriaSemGrupoWhere,
+        required: true
+      }
+    ]),
+    TituloFinanceiro.count({
+      where: {
+        considera_dre: true,
+        ...tituloScopeWhere,
+        empresa_id: { [Op.ne]: null },
+        [Op.and]: sequelizeWhere(col('TituloFinanceiro.empresa_id'), Op.ne, col('obra.empresa_grupo_id'))
+      },
+      include: [
+        {
+          model: Obra,
+          as: 'obra',
+          attributes: [],
+          where: {
+            empresa_grupo_id: { [Op.ne]: null }
+          },
+          required: true
+        }
+      ],
+      distinct: true
+    }),
+    countTitulosDiagnostico(tituloScopeWhere, {
+      [Op.or]: [
+        { intercompany: true, empresa_contraparte_id: null },
+        { intercompany: false, empresa_contraparte_id: { [Op.ne]: null } }
+      ]
+    })
+  ]);
+
+  const [
+    exemplosTitulosSemEmpresa,
+    exemplosTitulosSemCompetencia,
+    exemplosTitulosSemCategoria,
+    exemplosTitulosCategoriaSemDre,
+    exemplosEmpresaDivergente,
+    exemplosIntercompany
+  ] = await Promise.all([
+    sampleTitulosDiagnostico(tituloScopeWhere, { empresa_id: null }),
+    sampleTitulosDiagnostico(tituloScopeWhere, { competencia_data: null }),
+    sampleTitulosDiagnostico(tituloScopeWhere, { categoria_financeira_id: null }),
+    sampleTitulosDiagnostico(tituloScopeWhere, {}, [
+      {
+        model: CategoriaFinanceira,
+        as: 'categoriaFinanceira',
+        attributes: ['id', 'nome', 'tipo', 'dre_grupo', 'dre_subgrupo', 'dre_ordem', 'considera_dre'],
+        where: categoriaSemGrupoWhere,
+        required: true
+      }
+    ]),
+    TituloFinanceiro.findAll({
+      where: {
+        considera_dre: true,
+        ...tituloScopeWhere,
+        empresa_id: { [Op.ne]: null },
+        [Op.and]: sequelizeWhere(col('TituloFinanceiro.empresa_id'), Op.ne, col('obra.empresa_grupo_id'))
+      },
+      include: getTituloDiagnosticoInclude(),
+      order: [['id', 'DESC']],
+      limit: 8
+    }).then((items) => items.map(mapTituloDiagnostico)),
+    sampleTitulosDiagnostico(tituloScopeWhere, {
+      [Op.or]: [
+        { intercompany: true, empresa_contraparte_id: null },
+        { intercompany: false, empresa_contraparte_id: { [Op.ne]: null } }
+      ]
+    })
+  ]);
+
+  const itens = [
+    buildDiagnosticoItem({
+      codigo: 'EMPRESAS_SEM_HOLDING',
+      titulo: 'Empresas operacionais sem holding',
+      severidade: 'ALTA',
+      descricao: 'Empresas operacionais sem holding deixam o consolidado da Holding incompleto.',
+      total: totalEmpresasOperacionaisSemHolding,
+      acao: 'Cadastre a Holding e vincule cada empresa operacional em Empresas do Grupo.',
+      exemplos: empresasOperacionaisSemHolding.map(mapEmpresaDiagnostico)
+    }),
+    buildDiagnosticoItem({
+      codigo: 'OBRAS_SEM_EMPRESA',
+      titulo: 'Obras/Centros de custo sem empresa',
+      severidade: 'ALTA',
+      descricao: 'Obras e centros de custo precisam apontar para a empresa operacional correta.',
+      total: totalObrasSemEmpresa,
+      acao: 'Edite o cadastro de Obras/Centros de Custo e informe a empresa do grupo.',
+      exemplos: obrasSemEmpresa.map(mapObraDiagnostico)
+    }),
+    buildDiagnosticoItem({
+      codigo: 'CATEGORIAS_SEM_DRE',
+      titulo: 'Categorias financeiras sem grupo DRE',
+      severidade: 'ALTA',
+      descricao: 'Categorias sem grupo DRE geram linhas nao classificadas no resultado.',
+      total: totalCategoriasSemDre,
+      acao: 'Classifique cada categoria em Cadastros Financeiros com grupo, subgrupo e ordem DRE.',
+      exemplos: categoriasSemDre.map(mapCategoriaDiagnostico)
+    }),
+    buildDiagnosticoItem({
+      codigo: 'TITULOS_SEM_EMPRESA',
+      titulo: 'Titulos sem empresa',
+      severidade: 'CRITICA',
+      descricao: 'Titulos sem empresa nao sustentam DRE isolada por empresa nem consolidado confiavel.',
+      total: titulosSemEmpresa,
+      acao: 'Vincule a empresa do grupo no titulo ou corrija a obra/centro de custo para herdar a empresa.',
+      exemplos: exemplosTitulosSemEmpresa
+    }),
+    buildDiagnosticoItem({
+      codigo: 'TITULOS_SEM_COMPETENCIA',
+      titulo: 'Titulos sem competencia DRE',
+      severidade: 'ALTA',
+      descricao: 'A DRE por competencia usa fallback de emissao/compra/vencimento quando a competencia nao esta definida.',
+      total: titulosSemCompetencia,
+      acao: 'Informe competencia_data nos titulos importados/criados, preferencialmente pelo mes economico correto.',
+      exemplos: exemplosTitulosSemCompetencia
+    }),
+    buildDiagnosticoItem({
+      codigo: 'TITULOS_SEM_CATEGORIA',
+      titulo: 'Titulos sem categoria financeira',
+      severidade: 'ALTA',
+      descricao: 'Sem categoria, o titulo entra em linhas genericas da DRE.',
+      total: titulosSemCategoria,
+      acao: 'Classifique o titulo com uma categoria financeira apropriada.',
+      exemplos: exemplosTitulosSemCategoria
+    }),
+    buildDiagnosticoItem({
+      codigo: 'TITULOS_CATEGORIA_SEM_DRE',
+      titulo: 'Titulos com categoria sem grupo DRE',
+      severidade: 'ALTA',
+      descricao: 'A categoria existe, mas nao informa onde o valor deve entrar na DRE.',
+      total: titulosCategoriaSemDre,
+      acao: 'Complete a classificacao DRE das categorias financeiras usadas nesses titulos.',
+      exemplos: exemplosTitulosCategoriaSemDre
+    }),
+    buildDiagnosticoItem({
+      codigo: 'EMPRESA_DIFERE_OBRA',
+      titulo: 'Empresa do titulo diferente da empresa da obra/centro',
+      severidade: 'MEDIA',
+      descricao: 'Divergencias entre titulo e obra podem distorcer resultado por empresa e por centro de custo.',
+      total: titulosEmpresaDivergente,
+      acao: 'Revise se o titulo ou a obra/centro de custo estao vinculados a empresa correta.',
+      exemplos: exemplosEmpresaDivergente
+    }),
+    buildDiagnosticoItem({
+      codigo: 'INTERCOMPANY_INCONSISTENTE',
+      titulo: 'Intercompany inconsistente',
+      severidade: 'MEDIA',
+      descricao: 'Transacoes entre empresas precisam de flag e contraparte consistentes para consolidacao.',
+      total: titulosIntercompanyInconsistente,
+      acao: 'Marque intercompany apenas quando houver contraparte do grupo e informe a empresa contraparte.',
+      exemplos: exemplosIntercompany
+    })
+  ];
+
+  const totalCriticas = itens
+    .filter((item) => item.severidade === 'CRITICA')
+    .reduce((sum, item) => sum + item.total, 0);
+  const totalAltas = itens
+    .filter((item) => item.severidade === 'ALTA')
+    .reduce((sum, item) => sum + item.total, 0);
+  const totalMedias = itens
+    .filter((item) => item.severidade === 'MEDIA')
+    .reduce((sum, item) => sum + item.total, 0);
+  const totalPendencias = totalCriticas + totalAltas + totalMedias;
+
+  return {
+    gerado_em: new Date().toISOString(),
+    resumo: {
+      status: totalCriticas > 0 ? 'CRITICO' : totalAltas > 0 ? 'ATENCAO' : totalPendencias > 0 ? 'REVISAR' : 'OK',
+      total_pendencias: totalPendencias,
+      pendencias_criticas: totalCriticas,
+      pendencias_altas: totalAltas,
+      pendencias_medias: totalMedias,
+      total_titulos_dre: totalTitulosDre,
+      total_empresas: totalEmpresas,
+      total_holdings: totalHoldings
+    },
+    itens
+  };
+}
+
 module.exports = {
   gerarRelatorioAnalitico,
   gerarRelatorioFluxoCaixa,
-  gerarDreGerencial
+  gerarDreGerencial,
+  gerarDiagnosticoDre
 };

@@ -1,4 +1,5 @@
 const {
+  gerarDiagnosticoDre,
   gerarDreGerencial,
   gerarRelatorioAnalitico,
   gerarRelatorioFluxoCaixa
@@ -37,6 +38,16 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return responderErro(res, error, 'Erro ao gerar DRE financeira');
+    }
+  },
+
+  async diagnosticoDre(req, res) {
+    try {
+      const diagnostico = await gerarDiagnosticoDre(req);
+      return res.json(diagnostico);
+    } catch (error) {
+      console.error(error);
+      return responderErro(res, error, 'Erro ao gerar diagnostico da DRE');
     }
   }
 };

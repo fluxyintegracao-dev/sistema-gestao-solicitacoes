@@ -139,6 +139,9 @@ export default function FinanceiroDre() {
             <Link to="/financeiro/cadastros" className="btn btn-outline">
               Categorias DRE
             </Link>
+            <Link to="/financeiro/relatorios/dre/diagnostico" className="btn btn-outline">
+              Diagnostico
+            </Link>
           </div>
         </div>
       </div>
