@@ -467,6 +467,9 @@ textarea {
 }
 
 .fiscal-page .fiscal-documents-actions .btn-sm {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-height: 24px;
   border-radius: 5px;
   padding: 0.16rem 0.42rem;

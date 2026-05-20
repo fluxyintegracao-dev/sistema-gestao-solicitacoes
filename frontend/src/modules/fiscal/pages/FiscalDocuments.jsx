@@ -453,7 +453,7 @@ export default function FiscalDocuments() {
                       </>
                     ) : null}
                     {!item.xml_storage_key && !item.pdf_storage_key && !item.danfe_storage_key ? (
-                      <span className="text-xs text-slate-400">Indisponivel</span>
+                      <span className="inline-flex min-h-6 items-center text-xs text-slate-400">Indisponivel</span>
                     ) : null}
                   </div>
                 </td>
