@@ -18,6 +18,27 @@ export async function salvarTemaSistema(data) {
   return res.json();
 }
 
+export async function getSuporteWhatsapp() {
+  const res = await fetch(`${API_URL}/configuracoes/suporte-whatsapp`, {
+    headers: authHeaders()
+  });
+  if (!res.ok) throw new Error('Erro ao buscar WhatsApp de suporte');
+  return res.json();
+}
+
+export async function salvarSuporteWhatsapp(data) {
+  const res = await fetch(`${API_URL}/configuracoes/suporte-whatsapp`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+  if (!res.ok) {
+    const payload = await res.json().catch(() => null);
+    throw new Error(payload?.error || 'Erro ao salvar WhatsApp de suporte');
+  }
+  return res.json();
+}
+
 export async function getTimeoutInatividade() {
   const res = await fetch(`${API_URL}/configuracoes/timeout-inatividade`, {
     headers: authHeaders()

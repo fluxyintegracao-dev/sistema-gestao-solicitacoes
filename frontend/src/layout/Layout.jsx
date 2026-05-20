@@ -6,6 +6,7 @@ import NotificacoesBell from '../components/NotificacoesBell';
 import fluxyMark from '../assets/fluxy_mark_cropped.png';
 import { getResumoConversas } from '../services/conversasInternas';
 import { getInstalacaoPublica } from '../services/instalacao';
+import { getSuporteWhatsapp } from '../services/configuracoesSistema';
 import {
   HiOutlineSquares2X2,
   HiOutlinePlusCircle,
@@ -107,6 +108,7 @@ export default function Layout() {
     company_name: '',
     logo_url: ''
   });
+  const [suporteWhatsappUrl, setSuporteWhatsappUrl] = useState(null);
   const nativeApp = isNativeApp();
 
   const sidebarWidth = isMobileViewport ? 304 : (collapsed ? 86 : 286);
@@ -220,6 +222,23 @@ export default function Layout() {
         }));
       })
       .catch(() => {});
+
+    return () => {
+      ativo = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let ativo = true;
+
+    getSuporteWhatsapp()
+      .then((data) => {
+        if (!ativo) return;
+        setSuporteWhatsappUrl(data?.url || null);
+      })
+      .catch(() => {
+        if (ativo) setSuporteWhatsappUrl(null);
+      });
 
     return () => {
       ativo = false;
@@ -816,7 +835,14 @@ export default function Layout() {
                   className="theme-toggle topbar-support-btn"
                   type="button"
                   aria-label="Suporte"
-                  title="Suporte"
+                  title={suporteWhatsappUrl ? 'Abrir suporte no WhatsApp' : 'WhatsApp de suporte nao configurado'}
+                  onClick={() => {
+                    if (suporteWhatsappUrl) {
+                      window.open(suporteWhatsappUrl, '_blank', 'noopener,noreferrer');
+                    } else if (superadmin) {
+                      navigate('/configuracoes-suporte');
+                    }
+                  }}
                 >
                   <HiOutlineLifebuoy size={18} />
                   <span className="hidden sm:inline">Suporte</span>

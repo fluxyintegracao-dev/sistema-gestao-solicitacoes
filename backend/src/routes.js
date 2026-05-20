@@ -1325,6 +1325,8 @@ router.patch('/setor-permissoes', allowBusinessAdmin, validateRequest({ body: va
 // -------------------------------------------------------------------
 
 router.patch('/configuracoes/tema', allowBusinessAdmin, ConfiguracaoSistemaController.updateTema);
+router.get('/configuracoes/suporte-whatsapp', ConfiguracaoSistemaController.getSuporteWhatsapp);
+router.patch('/configuracoes/suporte-whatsapp', permit(['SUPERADMIN']), ConfiguracaoSistemaController.updateSuporteWhatsapp);
 router.get('/configuracoes/timeout-inatividade', ConfiguracaoSistemaController.getTimeoutInatividade);
 router.patch('/configuracoes/timeout-inatividade', allowBusinessAdmin, ConfiguracaoSistemaController.updateTimeoutInatividade);
 router.get('/configuracoes/areas-obra', ConfiguracaoSistemaController.getAreasObra);

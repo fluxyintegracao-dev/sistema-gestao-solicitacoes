@@ -65,6 +65,17 @@ const SECOES_CONFIG = [
     ]
   },
   {
+    title: 'Suporte',
+    requireSuperadmin: true,
+    itens: [
+      {
+        title: 'WhatsApp do Suporte',
+        description: 'Configure o numero aberto pelo botao Suporte no topo do sistema.',
+        to: '/configuracoes-suporte'
+      }
+    ]
+  },
+  {
     title: 'Compras',
     itens: [
       {

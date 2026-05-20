@@ -59,6 +59,7 @@ const CHAVE_SETORES_ACESSO_TODAS_OBRAS = 'SETORES_ACESSO_TODAS_OBRAS';
 const CHAVE_USUARIOS_ACESSO_FINANCEIRO = 'USUARIOS_ACESSO_FINANCEIRO';
 const CHAVE_USUARIOS_PERMISSOES_RH_DP = 'USUARIOS_PERMISSOES_RH_DP';
 const CHAVE_COMERCIAL_CATEGORIAS_CONTRATO = 'COMERCIAL_CATEGORIAS_CONTRATO_VENDA';
+const CHAVE_SUPORTE_WHATSAPP = 'SUPORTE_WHATSAPP_NUMERO';
 const TIMEOUT_INATIVIDADE_PADRAO_MINUTOS = 20;
 
 const COMERCIAL_CONTRATO_OPCOES_PAGAMENTO = {
@@ -183,6 +184,33 @@ function normalizarIdList(lista) {
       .map(item => Number(item))
       .filter(item => Number.isInteger(item) && item > 0)
   )];
+}
+
+function normalizarWhatsappSuporte(value) {
+  const raw = String(value || '').trim();
+  const digits = raw.replace(/\D/g, '');
+
+  if (!digits) {
+    return {
+      whatsapp: '',
+      whatsapp_digits: '',
+      url: null
+    };
+  }
+
+  const normalized = digits.startsWith('55') ? digits : `55${digits}`;
+
+  if (normalized.length < 12 || normalized.length > 13) {
+    const error = new Error('Informe um WhatsApp valido com DDD. Exemplo: (27) 99999-9999.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  return {
+    whatsapp: normalized,
+    whatsapp_digits: normalized,
+    url: `https://wa.me/${normalized}`
+  };
 }
 
 function normalizarCodigoOpcao(value, fallback = '') {
@@ -463,6 +491,46 @@ module.exports = {
     }
   }
   ,
+
+  async getSuporteWhatsapp(req, res) {
+    try {
+      const item = await ConfiguracaoSistema.findOne({
+        where: { chave: CHAVE_SUPORTE_WHATSAPP },
+        order: [['id', 'DESC']]
+      });
+
+      return res.json(normalizarWhatsappSuporte(item?.valor || ''));
+    } catch (error) {
+      console.error(error);
+      return res.json({ whatsapp: '', whatsapp_digits: '', url: null });
+    }
+  },
+
+  async updateSuporteWhatsapp(req, res) {
+    try {
+      const config = normalizarWhatsappSuporte(req.body?.whatsapp);
+      const existente = await ConfiguracaoSistema.findOne({
+        where: { chave: CHAVE_SUPORTE_WHATSAPP },
+        order: [['id', 'DESC']]
+      });
+
+      if (existente) {
+        await existente.update({ valor: config.whatsapp });
+      } else {
+        await ConfiguracaoSistema.create({
+          chave: CHAVE_SUPORTE_WHATSAPP,
+          valor: config.whatsapp
+        });
+      }
+
+      return res.json({ ok: true, ...config });
+    } catch (error) {
+      console.error(error);
+      return res.status(error.statusCode || 500).json({
+        error: error.statusCode ? error.message : 'Erro ao salvar WhatsApp de suporte'
+      });
+    }
+  },
 
   async getAreasObra(req, res) {
     try {
