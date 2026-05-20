@@ -14,6 +14,7 @@ const {
   getFinanceiroObraScopeIds
 } = require('./authorizationService');
 const { registrarEventoSeguranca } = require('./securityLogService');
+const { isCategoriaRedutora } = require('../constants/dreCategorias');
 
 function createHttpError(statusCode, message) {
   const error = new Error(message);
@@ -828,13 +829,19 @@ function summarizeDreRows(titulos = [], empresas = []) {
 
     const tipo = String(titulo.tipo || '').toUpperCase();
     const rawValue = Number(titulo.valor_original || 0);
-    const signedValue = tipo === 'RECEBER' ? rawValue : -rawValue;
+    const baseSignedValue = tipo === 'RECEBER' ? rawValue : -rawValue;
+    const signedValue = isCategoriaRedutora(titulo.categoriaFinanceira)
+      ? baseSignedValue * -1
+      : baseSignedValue;
     const empresaId = titulo.empresa_id ? Number(titulo.empresa_id) : null;
     const empresa = empresaId ? empresasById.get(empresaId) : null;
     const empresaKey = empresaId ? String(empresaId) : 'SEM_EMPRESA';
 
-    addToMap(linhasMap, linha.grupo, {
+    const linhaKey = `${linha.grupo}::${linha.subgrupo || ''}`;
+    addToMap(linhasMap, linhaKey, {
+      linha_key: linhaKey,
       grupo: linha.grupo,
+      subgrupo: linha.subgrupo,
       ordem: linha.ordem
     }, signedValue);
 
@@ -857,7 +864,11 @@ function summarizeDreRows(titulos = [], empresas = []) {
   }
 
   const linhas = Array.from(linhasMap.values())
-    .sort((a, b) => Number(a.ordem || 999) - Number(b.ordem || 999) || String(a.grupo).localeCompare(String(b.grupo)));
+    .sort((a, b) => (
+      Number(a.ordem || 999) - Number(b.ordem || 999) ||
+      String(a.grupo).localeCompare(String(b.grupo)) ||
+      String(a.subgrupo || '').localeCompare(String(b.subgrupo || ''))
+    ));
 
   const empresasResumo = Array.from(empresasMap.values())
     .sort((a, b) => String(a.empresa_nome).localeCompare(String(b.empresa_nome)));

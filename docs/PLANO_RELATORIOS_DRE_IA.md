@@ -36,6 +36,8 @@ Base multiempresa e DRE gerencial:
 - Os hubs de Solicitacoes, Compras, Fiscal, CRM, Comercial, Provisionamento, RH/DP e Contratos ja agrupam relatorios existentes e visoes planejadas.
 - Financeiro ganhou Diagnostico da DRE para apontar cadastros e titulos que impedem uma DRE confiavel.
 - O filtro por obra da DRE foi ajustado para aplicar o escopo no titulo financeiro, preservando o include da obra apenas como dimensao.
+- A classificacao inicial da DRE passou a ser derivada das categorias financeiras ja cadastradas pelo plano SIENGE; categorias redutoras invertem o sinal na DRE e categorias patrimoniais/financeiras que nao representam resultado ficam fora da DRE.
+- A DRE passou a apresentar linhas por grupo e subgrupo gerencial da categoria financeira, evitando consolidar categorias diferentes em uma unica linha ampla demais.
 
 Documentacao operacional complementar:
 
@@ -682,6 +684,7 @@ Criar futuramente:
 - Definir competencia dos titulos.
 - Identificar transacoes intercompany.
 - Usar Financeiro > Relatorios > Diagnostico DRE antes de fechar a virada operacional do financeiro.
+- Revisar a classificacao gerada em Financeiro > Cadastros > Categorias financeiras, principalmente categorias especificas criadas manualmente depois da carga inicial.
 
 ### Fase 4 - DRE Financeira
 

@@ -10,6 +10,10 @@ const {
   canAccessFinanceiro
 } = require('./authorizationService');
 const { registrarEventoSeguranca } = require('./securityLogService');
+const {
+  classificarCategoriaFinanceiraDre,
+  isDreClassificationBlank
+} = require('../constants/dreCategorias');
 
 function createHttpError(statusCode, message) {
   const error = new Error(message);
@@ -130,6 +134,21 @@ function sanitizeCategoriaPayload(payload = {}, { partial = false } = {}) {
   return Object.fromEntries(
     Object.entries(data).filter(([, value]) => value !== undefined)
   );
+}
+
+function aplicarClassificacaoDreAutomatica(data = {}) {
+  if (!isDreClassificationBlank(data)) {
+    return data;
+  }
+
+  const classificacao = classificarCategoriaFinanceiraDre(data);
+  return {
+    ...data,
+    dre_grupo: classificacao.dre_grupo,
+    dre_subgrupo: classificacao.dre_subgrupo,
+    dre_ordem: classificacao.dre_ordem,
+    considera_dre: data.considera_dre === false ? false : classificacao.considera_dre
+  };
 }
 
 function normalizeCodigo(value, fallback = '') {
@@ -492,7 +511,7 @@ async function atualizarCartaoFinanceiro(req, cartaoId, payload = {}) {
 
 async function criarCategoriaFinanceira(req, payload = {}) {
   await assertFinanceAccess(req);
-  const data = sanitizeCategoriaPayload(payload);
+  const data = aplicarClassificacaoDreAutomatica(sanitizeCategoriaPayload(payload));
   data.criado_por = req.user?.id || null;
   data.atualizado_por = req.user?.id || null;
 

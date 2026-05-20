@@ -258,8 +258,13 @@ export default function FinanceiroDre() {
                 </thead>
                 <tbody>
                   {(relatorio?.linhas || []).length ? (relatorio.linhas.map((linha) => (
-                    <tr key={linha.grupo}>
-                      <td className="font-medium text-[var(--c-text)]">{linha.grupo}</td>
+                    <tr key={linha.linha_key || `${linha.grupo}-${linha.subgrupo || ''}`}>
+                      <td>
+                        <div className="font-medium text-[var(--c-text)]">{linha.grupo}</div>
+                        {linha.subgrupo && (
+                          <div className="text-xs text-[var(--c-muted)]">{linha.subgrupo}</div>
+                        )}
+                      </td>
                       <td>{linha.titulos}</td>
                       <td className="font-semibold" style={{ color: Number(linha.valor || 0) >= 0 ? '#15803d' : '#b91c1c' }}>
                         {formatCurrency(linha.valor)}
