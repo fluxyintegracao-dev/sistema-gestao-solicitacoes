@@ -318,14 +318,47 @@ async function registrarTentativaSefaz(company, syncState, documentType, started
     };
   } catch (error) {
     const responseCode = error.statusCode === 501 ? 'FISCAL_SEFAZ_STUB' : 'FISCAL_SEFAZ_ERROR';
-    const responseMessage = error.message || 'Falha controlada ao preparar consulta SEFAZ.';
+    const responseMessage = error.http_status
+      ? `${error.message || 'Falha controlada ao preparar consulta SEFAZ.'} HTTP ${error.http_status}.`
+      : (error.message || 'Falha controlada ao preparar consulta SEFAZ.');
+    const [rawRequest, rawResponse] = await Promise.all([
+      error.raw_request_xml
+        ? saveRawSefazRequest({
+          cnpj: company.cnpj,
+          syncLogId: log.id,
+          requestType: 'distNSU',
+          payload: error.raw_request_xml,
+          metadata: {
+            fiscal_company_id: company.id,
+            document_type: documentType,
+            error: 'true'
+          }
+        })
+        : null,
+      error.raw_response_xml
+        ? saveRawSefazResponse({
+          cnpj: company.cnpj,
+          syncLogId: log.id,
+          requestType: 'distNSU',
+          payload: error.raw_response_xml,
+          metadata: {
+            fiscal_company_id: company.id,
+            document_type: documentType,
+            error: 'true',
+            http_status: String(error.http_status || '')
+          }
+        })
+        : null
+    ]);
 
     await log.update({
       finished_at: new Date(),
       status: 'blocked',
       response_code: responseCode,
       response_message: responseMessage,
-      error_message: responseMessage
+      error_message: responseMessage,
+      raw_request_storage_key: rawRequest?.key || null,
+      raw_response_storage_key: rawResponse?.key || null
     });
 
     await liberarSyncLock(syncState, lock.lockToken, {

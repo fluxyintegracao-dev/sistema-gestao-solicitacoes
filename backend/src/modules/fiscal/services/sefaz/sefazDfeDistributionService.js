@@ -115,12 +115,21 @@ async function enviarConsultaDistribuicao({ company, documentType, soapRequest }
   const companyContext = normalizeCompanyContext(company);
   const config = assertSefazRealEnabled();
   const certificate = assertCertificateReadyForSefaz(await obterCertificadoAtivoComSegredos(company.id));
-  const response = await postSoapRequest({
-    endpointUrl: config.distributionUrl,
-    soapRequest,
-    certificate,
-    timeoutMs: config.requestTimeoutMs
-  });
+  let response;
+  try {
+    response = await postSoapRequest({
+      endpointUrl: config.distributionUrl,
+      soapRequest,
+      certificate,
+      timeoutMs: config.requestTimeoutMs
+    });
+  } catch (error) {
+    error.raw_request_xml = soapRequest.body;
+    error.raw_response_xml = error.details?.body || null;
+    error.http_status = error.details?.http_status || error.statusCode || null;
+    error.elapsed_ms = error.details?.elapsed_ms || null;
+    throw error;
+  }
   const parsed = parseDistribuicaoDfeResponse(response.body);
 
   return {
