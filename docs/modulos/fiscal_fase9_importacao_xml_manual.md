@@ -53,7 +53,16 @@ Requer `.env` DEV com:
 FISCAL_S3_BUCKET=...
 FISCAL_S3_REGION=sa-east-1
 FISCAL_S3_PREFIX=dev
+FISCAL_XML_UPLOAD_MAX_MB=200
+FISCAL_XML_UPLOAD_MAX_FILES=200
+FISCAL_XML_IMPORT_MAX_FILES=2000
 ```
+
+Onde:
+
+- `FISCAL_XML_UPLOAD_MAX_MB` limita o tamanho do arquivo enviado, incluindo ZIP.
+- `FISCAL_XML_UPLOAD_MAX_FILES` limita quantos arquivos soltos podem ser selecionados no mesmo envio.
+- `FISCAL_XML_IMPORT_MAX_FILES` limita quantos XMLs podem ser processados dentro de um ZIP/envio.
 
 ## Ainda pendente
 

@@ -48,6 +48,7 @@ const {
 } = require('../validators/fiscalValidators');
 
 const router = express.Router();
+const fiscalXmlUploadMaxFiles = Math.max(1, Number(process.env.FISCAL_XML_UPLOAD_MAX_FILES || 50));
 
 const allowFiscal = permit({
   resource: 'FISCAL',
@@ -155,7 +156,7 @@ router.get('/documents', allowFiscalDocuments, validateRequest({ query: validate
 router.get('/documents/link-options', allowFiscalDocumentLink, validateRequest({ query: validateFiscalLinkSearchQuery }), FiscalDocumentController.linkOptions);
 router.post('/documents/upload-xml', allowFiscalDocumentUpload, uploadFiscalXml.fields([
   { name: 'file', maxCount: 1 },
-  { name: 'files', maxCount: 20 }
+  { name: 'files', maxCount: fiscalXmlUploadMaxFiles }
 ]), FiscalDocumentController.uploadXml);
 router.post('/documents/:id/upload-file', allowFiscalDocumentUpload, validateRequest({ params: validateNumericIdParam('id', 'Documento fiscal') }), uploadFiscalFile.single('file'), FiscalDocumentController.uploadFile);
 router.post('/documents/:id/link', allowFiscalDocumentLink, validateRequest({ params: validateNumericIdParam('id', 'Documento fiscal'), body: validateFiscalDocumentLinkBody }), FiscalDocumentController.link);
