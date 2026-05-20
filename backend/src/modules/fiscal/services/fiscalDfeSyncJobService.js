@@ -35,15 +35,20 @@ function addMinutes(date, minutes) {
   return new Date(date.getTime() + minutes * 60 * 1000);
 }
 
+function isSefazRejectionMessage(message) {
+  return /\b(rejei[cç][aã]o|erro|falha)\b/i.test(String(message || ''));
+}
+
 function getSefazPostResponsePolicy(response, startedAt) {
   const responseCode = String(response?.response_code || '').trim();
+  const responseMessage = response?.response_message || null;
   if (responseCode === SEFAZ_EMPTY_RESULT_CODE) {
     const minutes = minutesFromEnv('FISCAL_SEFAZ_EMPTY_RESULT_WAIT_MINUTES', 60);
     return {
       status: 'idle',
       next_allowed_sync_at: addMinutes(startedAt, minutes),
       response_code: responseCode,
-      response_message: response.response_message || 'Nenhum documento localizado pela SEFAZ.',
+      response_message: responseMessage || 'Nenhum documento localizado pela SEFAZ.',
       severity: 'success'
     };
   }
@@ -54,18 +59,30 @@ function getSefazPostResponsePolicy(response, startedAt) {
       status: 'blocked',
       next_allowed_sync_at: addMinutes(startedAt, minutes),
       response_code: responseCode,
-      response_message: response.response_message || 'SEFAZ retornou consumo indevido. Sincronizacao bloqueada temporariamente.',
+      response_message: responseMessage || 'SEFAZ retornou consumo indevido. Sincronizacao bloqueada temporariamente.',
       severity: 'blocked'
     };
   }
 
   if (responseCode && ![SEFAZ_DOCUMENTS_FOUND_CODE].includes(responseCode)) {
+    const minutes = minutesFromEnv('FISCAL_SEFAZ_CONSUMO_INDEVIDO_WAIT_MINUTES', 60);
     return {
-      status: 'idle',
-      next_allowed_sync_at: null,
+      status: 'blocked',
+      next_allowed_sync_at: addMinutes(startedAt, minutes),
       response_code: responseCode,
-      response_message: response.response_message || 'Retorno SEFAZ processado com codigo nao classificado.',
-      severity: 'warn'
+      response_message: responseMessage || 'Retorno SEFAZ processado com codigo nao classificado.',
+      severity: 'blocked'
+    };
+  }
+
+  if (!responseCode && isSefazRejectionMessage(responseMessage)) {
+    const minutes = minutesFromEnv('FISCAL_SEFAZ_CONSUMO_INDEVIDO_WAIT_MINUTES', 60);
+    return {
+      status: 'blocked',
+      next_allowed_sync_at: addMinutes(startedAt, minutes),
+      response_code: 'FISCAL_SEFAZ_REJECTION',
+      response_message: responseMessage,
+      severity: 'blocked'
     };
   }
 
@@ -73,7 +90,7 @@ function getSefazPostResponsePolicy(response, startedAt) {
     status: 'idle',
     next_allowed_sync_at: null,
     response_code: responseCode || null,
-    response_message: response?.response_message || null,
+    response_message: responseMessage,
     severity: 'success'
   };
 }
