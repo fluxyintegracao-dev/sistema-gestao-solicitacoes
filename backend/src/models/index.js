@@ -86,6 +86,12 @@ db.FaturaCartaoFinanceiro = require('./FaturaCartaoFinanceiro')(sequelize, Seque
 db.FaturaCartaoTitulo = require('./FaturaCartaoTitulo')(sequelize, Sequelize);
 db.TituloFinanceiro = require('./TituloFinanceiro')(sequelize, Sequelize);
 db.TituloFinanceiroSequencia = require('./TituloFinanceiroSequencia')(sequelize, Sequelize);
+db.BoletoCaixaConvenio = require('./BoletoCaixaConvenio')(sequelize, Sequelize);
+db.BoletoCaixa = require('./BoletoCaixa')(sequelize, Sequelize);
+db.BoletoCaixaRemessa = require('./BoletoCaixaRemessa')(sequelize, Sequelize);
+db.BoletoCaixaRemessaItem = require('./BoletoCaixaRemessaItem')(sequelize, Sequelize);
+db.BoletoCaixaRetorno = require('./BoletoCaixaRetorno')(sequelize, Sequelize);
+db.BoletoCaixaOcorrencia = require('./BoletoCaixaOcorrencia')(sequelize, Sequelize);
 db.MovimentoFinanceiro = require('./MovimentoFinanceiro')(sequelize, Sequelize);
 db.CaixaFinanceiroSessao = require('./CaixaFinanceiroSessao')(sequelize, Sequelize);
 db.TransferenciaFinanceira = require('./TransferenciaFinanceira')(sequelize, Sequelize);
@@ -2142,6 +2148,136 @@ db.User.hasMany(db.TituloFinanceiro, {
 db.TituloFinanceiro.belongsTo(db.User, {
   foreignKey: 'criado_por',
   as: 'criadoPor'
+});
+
+db.EmpresaGrupo.hasMany(db.BoletoCaixaConvenio, {
+  foreignKey: 'empresa_id',
+  as: 'conveniosBoletoCaixa'
+});
+
+db.BoletoCaixaConvenio.belongsTo(db.EmpresaGrupo, {
+  foreignKey: 'empresa_id',
+  as: 'empresa'
+});
+
+db.ContaBancaria.hasMany(db.BoletoCaixaConvenio, {
+  foreignKey: 'conta_bancaria_id',
+  as: 'conveniosBoletoCaixa'
+});
+
+db.BoletoCaixaConvenio.belongsTo(db.ContaBancaria, {
+  foreignKey: 'conta_bancaria_id',
+  as: 'contaBancaria'
+});
+
+db.TituloFinanceiro.hasMany(db.BoletoCaixa, {
+  foreignKey: 'titulo_financeiro_id',
+  as: 'boletosCaixa'
+});
+
+db.BoletoCaixa.belongsTo(db.TituloFinanceiro, {
+  foreignKey: 'titulo_financeiro_id',
+  as: 'titulo'
+});
+
+db.BoletoCaixaConvenio.hasMany(db.BoletoCaixa, {
+  foreignKey: 'convenio_id',
+  as: 'boletos'
+});
+
+db.BoletoCaixa.belongsTo(db.BoletoCaixaConvenio, {
+  foreignKey: 'convenio_id',
+  as: 'convenio'
+});
+
+db.EmpresaGrupo.hasMany(db.BoletoCaixa, {
+  foreignKey: 'empresa_id',
+  as: 'boletosCaixa'
+});
+
+db.BoletoCaixa.belongsTo(db.EmpresaGrupo, {
+  foreignKey: 'empresa_id',
+  as: 'empresa'
+});
+
+db.Parceiro.hasMany(db.BoletoCaixa, {
+  foreignKey: 'parceiro_id',
+  as: 'boletosCaixa'
+});
+
+db.BoletoCaixa.belongsTo(db.Parceiro, {
+  foreignKey: 'parceiro_id',
+  as: 'pagador'
+});
+
+db.BoletoCaixaConvenio.hasMany(db.BoletoCaixaRemessa, {
+  foreignKey: 'convenio_id',
+  as: 'remessas'
+});
+
+db.BoletoCaixaRemessa.belongsTo(db.BoletoCaixaConvenio, {
+  foreignKey: 'convenio_id',
+  as: 'convenio'
+});
+
+db.BoletoCaixaRemessa.hasMany(db.BoletoCaixaRemessaItem, {
+  foreignKey: 'remessa_id',
+  as: 'itens'
+});
+
+db.BoletoCaixaRemessaItem.belongsTo(db.BoletoCaixaRemessa, {
+  foreignKey: 'remessa_id',
+  as: 'remessa'
+});
+
+db.BoletoCaixa.hasMany(db.BoletoCaixaRemessaItem, {
+  foreignKey: 'boleto_id',
+  as: 'itensRemessa'
+});
+
+db.BoletoCaixaRemessaItem.belongsTo(db.BoletoCaixa, {
+  foreignKey: 'boleto_id',
+  as: 'boleto'
+});
+
+db.BoletoCaixaConvenio.hasMany(db.BoletoCaixaRetorno, {
+  foreignKey: 'convenio_id',
+  as: 'retornos'
+});
+
+db.BoletoCaixaRetorno.belongsTo(db.BoletoCaixaConvenio, {
+  foreignKey: 'convenio_id',
+  as: 'convenio'
+});
+
+db.BoletoCaixaRemessa.hasMany(db.BoletoCaixaRetorno, {
+  foreignKey: 'remessa_id',
+  as: 'retornos'
+});
+
+db.BoletoCaixaRetorno.belongsTo(db.BoletoCaixaRemessa, {
+  foreignKey: 'remessa_id',
+  as: 'remessa'
+});
+
+db.BoletoCaixaRetorno.hasMany(db.BoletoCaixaOcorrencia, {
+  foreignKey: 'retorno_id',
+  as: 'ocorrencias'
+});
+
+db.BoletoCaixaOcorrencia.belongsTo(db.BoletoCaixaRetorno, {
+  foreignKey: 'retorno_id',
+  as: 'retorno'
+});
+
+db.BoletoCaixa.hasMany(db.BoletoCaixaOcorrencia, {
+  foreignKey: 'boleto_id',
+  as: 'ocorrencias'
+});
+
+db.BoletoCaixaOcorrencia.belongsTo(db.BoletoCaixa, {
+  foreignKey: 'boleto_id',
+  as: 'boleto'
 });
 
 db.TituloFinanceiro.hasMany(db.MovimentoFinanceiro, {

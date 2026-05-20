@@ -3,6 +3,8 @@ const { Op } = require('sequelize');
 const {
   ContratoComercial,
   ContratoComercialParcela,
+  BoletoCaixa,
+  BoletoCaixaConvenio,
   Empreendimento,
   Obra,
   Parceiro,
@@ -143,6 +145,87 @@ function resolverNossoNumero(titulo) {
 
   const sequencia = padLeft(titulo?.id, 15);
   return `14${sequencia}`;
+}
+
+async function obterOuCriarConvenioCaixaPadrao(req) {
+  validarConfiguracaoCaixaParaGeracao();
+
+  const ambiente = env.caixaBoletoAmbiente === 'PRODUCAO' ? 'PRODUCAO' : 'TESTE';
+  const codigoBeneficiario = resolverCodigoBeneficiario();
+  const [convenio] = await BoletoCaixaConvenio.findOrCreate({
+    where: {
+      codigo_beneficiario: codigoBeneficiario,
+      ambiente
+    },
+    defaults: {
+      banco_codigo: '104',
+      banco_nome: 'CAIXA ECONOMICA FEDERAL',
+      agencia: onlyDigits(env.caixaAgencia).padStart(5, '0').slice(-5),
+      agencia_dv: '',
+      codigo_beneficiario: codigoBeneficiario,
+      beneficiario_nome: env.caixaBeneficiarioNome || env.companyLegalName || env.companyName || env.productName,
+      beneficiario_cpf_cnpj: env.caixaBeneficiarioCpfCnpj,
+      beneficiario_endereco: env.caixaBeneficiarioEndereco || null,
+      carteira_codigo: '1',
+      modalidade_nosso_numero: '14',
+      layout_arquivo_versao: '081',
+      layout_lote_versao: '067',
+      ambiente,
+      homologado: Boolean(env.caixaBoletoHomologado),
+      local_pagamento: env.caixaLocalPagamento || null,
+      instrucao_padrao: env.caixaBoletoInstrucao || null,
+      ativo: true,
+      criado_por: req.user?.id || null,
+      atualizado_por: req.user?.id || null
+    }
+  });
+
+  return convenio;
+}
+
+async function sincronizarBoletoCaixaOperacional(req, titulo, boleto) {
+  const convenio = await obterOuCriarConvenioCaixaPadrao(req);
+  const existente = await BoletoCaixa.findOne({
+    where: {
+      titulo_financeiro_id: titulo.id,
+      convenio_id: convenio.id
+    }
+  });
+
+  const payload = {
+    titulo_financeiro_id: titulo.id,
+    convenio_id: convenio.id,
+    empresa_id: titulo.empresa_id || null,
+    parceiro_id: titulo.parceiro_id || null,
+    ambiente: boleto.ambiente,
+    status: 'GERADO',
+    nosso_numero: boleto.nosso_numero,
+    nosso_numero_base: boleto.nosso_numero_base,
+    linha_digitavel: boleto.linha_digitavel,
+    codigo_barras: boleto.codigo_barras,
+    campo_livre: boleto.campo_livre,
+    valor: titulo.valor_saldo || titulo.valor_original,
+    data_emissao: titulo.data_emissao || new Date().toISOString().slice(0, 10),
+    data_vencimento: titulo.data_vencimento,
+    atualizado_por: req.user?.id || null
+  };
+
+  if (existente) {
+    const statusTravados = ['REMETIDO', 'REGISTRADO', 'LIQUIDADO', 'BAIXADO'];
+    await existente.update({
+      ...payload,
+      status_bancario: statusTravados.includes(existente.status_bancario)
+        ? existente.status_bancario
+        : 'NAO_REMETIDO'
+    });
+    return existente;
+  }
+
+  return BoletoCaixa.create({
+    ...payload,
+    status_bancario: 'NAO_REMETIDO',
+    criado_por: req.user?.id || null
+  });
 }
 
 function montarCampoLivre({ codigoBeneficiario, nossoNumero }) {
@@ -622,6 +705,8 @@ async function gerarBoletoTitulo(req, tituloId) {
     boleto_emitido_em: hoje,
     atualizado_por: req.user?.id || null
   });
+
+  await sincronizarBoletoCaixaOperacional(req, titulo, boleto);
 
   await registrarEventoSeguranca({
     req,

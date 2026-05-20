@@ -224,6 +224,7 @@ const {
 
 const uploadComprovantes = require('./config/uploadComprovantes');
 const uploadOfx = require('./config/uploadOfx');
+const uploadCnab = require('./config/uploadCnab');
 
 // Controllers
 const SolicitacaoController = require('./controllers/SolicitacaoController');
@@ -287,6 +288,7 @@ const TarifaBancariaConfigController = require('./controllers/TarifaBancariaConf
 const ResultadoObrasController = require('./controllers/ResultadoObrasController');
 const PermissoesAreasController = require('./controllers/PermissoesAreasController');
 const BoletoController = require('./controllers/BoletoController');
+const BoletoCaixaCnabController = require('./controllers/BoletoCaixaCnabController');
 const PaymentBeneficiaryController = require('./controllers/PaymentBeneficiaryController');
 const PaymentController = require('./controllers/PaymentController');
 const CrmLeadsController = require('./controllers/CrmLeadsController');
@@ -1191,6 +1193,13 @@ router.get('/boletos/titulos/:id', allowBoletosRead, validateRequest({ params: v
 router.get('/boletos/titulos/:id/pdf', allowBoletosRead, validateRequest({ params: validateNumericIdParam('id', 'Titulo financeiro') }), BoletoController.pdf);
 router.post('/boletos/titulos/:id/amostra', allowBoletosGenerate, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Titulo financeiro') }), BoletoController.amostra);
 router.post('/boletos/titulos/:id/gerar', allowBoletosGenerate, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Titulo financeiro') }), BoletoController.gerar);
+router.get('/boletos/caixa/convenios', allowBoletosRead, BoletoCaixaCnabController.convenios);
+router.get('/boletos/caixa/remessas', allowBoletosRead, BoletoCaixaCnabController.remessas);
+router.post('/boletos/caixa/remessas', allowBoletosGenerate, criticalRateLimit, BoletoCaixaCnabController.gerarRemessa);
+router.get('/boletos/caixa/retornos', allowBoletosRead, BoletoCaixaCnabController.retornos);
+router.post('/boletos/caixa/retornos/validar', allowBoletosRead, uploadRateLimit, uploadCnab.single('file'), BoletoCaixaCnabController.validarRetorno);
+router.post('/boletos/caixa/retornos', allowBoletosGenerate, criticalRateLimit, uploadCnab.single('file'), BoletoCaixaCnabController.importarRetorno);
+router.get('/boletos/caixa/ocorrencias', allowBoletosRead, BoletoCaixaCnabController.ocorrencias);
 router.get('/financeiro/contas-bancarias', allowFinanceiro, ContaBancariaController.index);
 router.post('/financeiro/contas-bancarias', allowFinanceiro, criticalRateLimit, validateRequest({ body: validateFinanceCadastroContaBody }), ContaBancariaController.create);
 router.patch('/financeiro/contas-bancarias/:id', allowFinanceiro, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Conta bancaria'), body: validateFinanceCadastroContaBody }), ContaBancariaController.update);

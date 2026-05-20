@@ -396,6 +396,91 @@ export async function baixarPdfBoletoTitulo(id, { amostra = false } = {}) {
   };
 }
 
+export async function getBoletoCaixaConvenios(params = {}) {
+  const query = new URLSearchParams(
+    Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== '')
+  ).toString();
+  const url = query ? `${API_URL}/boletos/caixa/convenios?${query}` : `${API_URL}/boletos/caixa/convenios`;
+  const response = await fetch(url, {
+    headers: authHeaders()
+  });
+
+  return parseJson(response, 'Erro ao buscar convenios Caixa');
+}
+
+export async function getBoletoCaixaRemessas(params = {}) {
+  const query = new URLSearchParams(
+    Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== '')
+  ).toString();
+  const url = query ? `${API_URL}/boletos/caixa/remessas?${query}` : `${API_URL}/boletos/caixa/remessas`;
+  const response = await fetch(url, {
+    headers: authHeaders()
+  });
+
+  return parseJson(response, 'Erro ao buscar remessas Caixa');
+}
+
+export async function gerarBoletoCaixaRemessa({ convenioId, tituloIds = [], boletoIds = [] }) {
+  const response = await fetch(`${API_URL}/boletos/caixa/remessas?download=1`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({
+      convenio_id: convenioId,
+      titulo_ids: tituloIds,
+      boleto_ids: boletoIds
+    })
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    try {
+      const parsed = JSON.parse(text);
+      throw new Error(parsed?.error || 'Erro ao gerar remessa Caixa');
+    } catch (error) {
+      if (error instanceof SyntaxError) {
+        throw new Error(text || 'Erro ao gerar remessa Caixa');
+      }
+      throw error;
+    }
+  }
+
+  const blob = await response.blob();
+  const disposition = response.headers.get('content-disposition') || '';
+  const filenameMatch = disposition.match(/filename="?([^"]+)"?/i);
+  return {
+    blob,
+    filename: filenameMatch?.[1] || 'remessa-caixa.rem',
+    remessaId: response.headers.get('x-remessa-id'),
+    hash: response.headers.get('x-remessa-hash')
+  };
+}
+
+export async function getBoletoCaixaRetornos(params = {}) {
+  const query = new URLSearchParams(
+    Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== '')
+  ).toString();
+  const url = query ? `${API_URL}/boletos/caixa/retornos?${query}` : `${API_URL}/boletos/caixa/retornos`;
+  const response = await fetch(url, {
+    headers: authHeaders()
+  });
+
+  return parseJson(response, 'Erro ao buscar retornos Caixa');
+}
+
+export async function importarBoletoCaixaRetorno({ convenioId, file }) {
+  const formData = new FormData();
+  formData.append('convenio_id', convenioId);
+  formData.append('file', file);
+
+  const response = await fetch(`${API_URL}/boletos/caixa/retornos`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: formData
+  });
+
+  return parseJson(response, 'Erro ao importar retorno Caixa');
+}
+
 export async function getTituloFinanceiroAuditoria(id) {
   const response = await fetch(`${API_URL}/financeiro/titulos/${id}/auditoria`, {
     headers: authHeaders()

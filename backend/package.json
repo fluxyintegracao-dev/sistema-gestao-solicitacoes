@@ -6,6 +6,8 @@
     "dev": "node server.js",
     "migrate": "node src/database/runMigrations.js",
     "test:boleto-caixa": "node scripts/validarBoletoCaixaCalculos.js",
+    "test:boleto-caixa-cnab": "node scripts/validarBoletoCaixaCnab240.js",
+    "test:boleto-caixa-retorno": "node scripts/validarBoletoCaixaRetornoCnab240.js",
     "test:fiscal-dfe-processor": "node scripts/validarFiscalDfeProcessor.js",
     "test:payments": "node scripts/validarPagamentosEngine.js",
     "test:ultimo-preco": "node scripts/testarUltimoPrecoInsumo.js"

@@ -2,11 +2,16 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   baixarPdfBoletoTitulo,
+  gerarBoletoCaixaRemessa,
   gerarAmostraBoletoTitulo,
   gerarBoletoTitulo,
+  getBoletoCaixaConvenios,
+  getBoletoCaixaRemessas,
+  getBoletoCaixaRetornos,
   getBoletoTitulo,
   getBoletosConfig,
-  getTitulosParaBoleto
+  getTitulosParaBoleto,
+  importarBoletoCaixaRetorno
 } from '../services/financeiro';
 import { getEmpreendimentosComerciais } from '../services/comercial';
 import { buscarParceiros } from '../services/parceiros';
@@ -322,6 +327,14 @@ export default function FinanceiroBoletos() {
   const [error, setError] = useState('');
   const [feedback, setFeedback] = useState('');
   const [resultadoMassa, setResultadoMassa] = useState(null);
+  const [conveniosCaixa, setConveniosCaixa] = useState([]);
+  const [convenioSelecionadoId, setConvenioSelecionadoId] = useState('');
+  const [remessasCaixa, setRemessasCaixa] = useState([]);
+  const [retornosCaixa, setRetornosCaixa] = useState([]);
+  const [retornoFile, setRetornoFile] = useState(null);
+  const [gerandoRemessa, setGerandoRemessa] = useState(false);
+  const [importandoRetorno, setImportandoRetorno] = useState(false);
+  const [cnabFeedback, setCnabFeedback] = useState('');
 
   function prepararFiltrosBoleto(rawFilters = filters) {
     const boletoFilters = { ...rawFilters };
@@ -338,14 +351,29 @@ export default function FinanceiroBoletos() {
     try {
       setLoadingOptions(true);
       setError('');
-      const [configData, empreendimentosData, clientesData] = await Promise.all([
+      const [
+        configData,
+        empreendimentosData,
+        clientesData,
+        conveniosData,
+        remessasData,
+        retornosData
+      ] = await Promise.all([
         getBoletosConfig(),
         comercialHabilitado ? getEmpreendimentosComerciais() : Promise.resolve([]),
-        buscarParceiros({ cliente: 1, ativo: 1, limit: 500 })
+        buscarParceiros({ cliente: 1, ativo: 1, limit: 500 }),
+        getBoletoCaixaConvenios({ ativo: 1 }),
+        getBoletoCaixaRemessas(),
+        getBoletoCaixaRetornos()
       ]);
       setConfig(configData);
       setEmpreendimentos(Array.isArray(empreendimentosData) ? empreendimentosData : []);
       setClientes(Array.isArray(clientesData) ? clientesData : []);
+      const listaConvenios = Array.isArray(conveniosData) ? conveniosData : [];
+      setConveniosCaixa(listaConvenios);
+      setRemessasCaixa(Array.isArray(remessasData) ? remessasData : []);
+      setRetornosCaixa(Array.isArray(retornosData) ? retornosData : []);
+      setConvenioSelecionadoId((current) => current || String(listaConvenios[0]?.id || ''));
     } catch (err) {
       setError(err?.message || 'Erro ao carregar configuracoes de boletos');
     } finally {
@@ -615,6 +643,81 @@ export default function FinanceiroBoletos() {
     }
   }
 
+  async function onGerarRemessa() {
+    if (!selecionados.length) {
+      setError('Selecione os titulos com boleto gerado para montar a remessa.');
+      setCnabFeedback('');
+      return;
+    }
+
+    if (!convenioSelecionadoId) {
+      setError('Cadastre ou selecione um convenio Caixa antes de gerar a remessa.');
+      setCnabFeedback('');
+      return;
+    }
+
+    try {
+      setGerandoRemessa(true);
+      setError('');
+      setCnabFeedback('');
+      const data = await gerarBoletoCaixaRemessa({
+        convenioId: convenioSelecionadoId,
+        tituloIds: selecionados
+      });
+      const url = URL.createObjectURL(data.blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = data.filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      setSelecionados([]);
+      setCnabFeedback(`Remessa ${data.filename} gerada para homologacao. Hash ${data.hash || '-'}.`);
+      await carregarBase();
+      await carregarTitulos(appliedFilters);
+    } catch (err) {
+      setError(err?.message || 'Erro ao gerar remessa Caixa');
+    } finally {
+      setGerandoRemessa(false);
+    }
+  }
+
+  async function onImportarRetorno() {
+    if (!retornoFile) {
+      setError('Selecione o arquivo de retorno da Caixa.');
+      setCnabFeedback('');
+      return;
+    }
+
+    if (!convenioSelecionadoId) {
+      setError('Selecione o convenio Caixa para importar o retorno.');
+      setCnabFeedback('');
+      return;
+    }
+
+    try {
+      setImportandoRetorno(true);
+      setError('');
+      setCnabFeedback('');
+      const data = await importarBoletoCaixaRetorno({
+        convenioId: convenioSelecionadoId,
+        file: retornoFile
+      });
+      const quantidade = data?.parsed?.ocorrencias?.length || data?.retorno?.quantidade_ocorrencias || 0;
+      setRetornoFile(null);
+      setCnabFeedback(data?.duplicate
+        ? 'Retorno ja importado anteriormente. Nenhuma duplicidade foi criada.'
+        : `Retorno importado com ${quantidade} ocorrencia(s).`);
+      await carregarBase();
+      await carregarTitulos(appliedFilters);
+    } catch (err) {
+      setError(err?.message || 'Erro ao importar retorno Caixa');
+    } finally {
+      setImportandoRetorno(false);
+    }
+  }
+
   return (
     <div className="page solicitacoes-page space-y-5 md:space-y-6">
       <style>
@@ -664,6 +767,112 @@ export default function FinanceiroBoletos() {
           Emissao real bloqueada: defina CAIXA_BOLETO_HOMOLOGADO=true somente apos homologacao formal com a Caixa.
         </div>
       )}
+
+      {cnabFeedback && (
+        <div className="app-alert border-emerald-200 bg-emerald-50 text-emerald-700">{cnabFeedback}</div>
+      )}
+
+      <section className="sol-surface-card rounded-2xl p-4 md:p-5">
+        <div className="sol-filtros-head">
+          <div>
+            <p className="sol-filtros-title">Remessa e retorno Caixa</p>
+            <p className="sol-filtros-subtitle">Use depois de gerar os boletos e antes da homologacao na agencia.</p>
+          </div>
+          <div className="flex flex-wrap gap-2 text-xs text-[var(--c-muted)]">
+            <span className="rounded-full bg-[var(--c-bg)] px-3 py-1">Remessas {remessasCaixa.length}</span>
+            <span className="rounded-full bg-[var(--c-bg)] px-3 py-1">Retornos {retornosCaixa.length}</span>
+          </div>
+        </div>
+
+        <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+          <div className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-bg)] p-3">
+            <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+              <label className="sol-filter-field">
+                <span className="sol-filter-label">Convenio Caixa</span>
+                <select
+                  className="input w-full"
+                  value={convenioSelecionadoId}
+                  onChange={(event) => setConvenioSelecionadoId(event.target.value)}
+                  disabled={loadingOptions || gerandoRemessa || importandoRetorno}
+                >
+                  <option value="">Selecione</option>
+                  {conveniosCaixa.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.beneficiario_nome} - {item.codigo_beneficiario}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={onGerarRemessa}
+                disabled={!selecionados.length || !convenioSelecionadoId || gerandoRemessa}
+                title="Gerar arquivo de remessa CNAB 240"
+              >
+                {gerandoRemessa ? 'Gerando...' : `Gerar remessa (${selecionados.length})`}
+              </button>
+            </div>
+            <p className="mt-2 text-xs text-[var(--c-muted)]">
+              A remessa usa os titulos selecionados na tabela. Gere o boleto antes de montar o arquivo CNAB.
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-bg)] p-3">
+            <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+              <label className="sol-filter-field">
+                <span className="sol-filter-label">Retorno Caixa</span>
+                <input
+                  className="input w-full"
+                  type="file"
+                  accept=".ret,.crt,.rem,.cnab,.txt"
+                  onChange={(event) => setRetornoFile(event.target.files?.[0] || null)}
+                  disabled={!convenioSelecionadoId || importandoRetorno}
+                />
+              </label>
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={onImportarRetorno}
+                disabled={!retornoFile || !convenioSelecionadoId || importandoRetorno}
+                title="Importar arquivo de retorno CNAB 240"
+              >
+                {importandoRetorno ? 'Importando...' : 'Importar retorno'}
+              </button>
+            </div>
+            <p className="mt-2 text-xs text-[var(--c-muted)]">
+              O retorno registra ocorrencias bancarias e nao baixa titulos automaticamente nesta fase.
+            </p>
+          </div>
+        </div>
+
+        {remessasCaixa.length > 0 && (
+          <div className="mt-4 overflow-hidden rounded-2xl border border-[var(--c-border)]">
+            <table className="min-w-full divide-y divide-[var(--c-border)] text-sm">
+              <thead className="bg-[var(--c-bg)] text-left text-xs uppercase tracking-[0.14em] text-[var(--c-muted)]">
+                <tr>
+                  <th className="px-4 py-3">Ultimas remessas</th>
+                  <th className="px-4 py-3">Arquivo</th>
+                  <th className="px-4 py-3">Boletos</th>
+                  <th className="px-4 py-3 text-right">Valor</th>
+                  <th className="px-4 py-3">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--c-border)]">
+                {remessasCaixa.slice(0, 3).map((item) => (
+                  <tr key={item.id}>
+                    <td className="px-4 py-3 font-semibold">#{item.numero_remessa}</td>
+                    <td className="px-4 py-3">{item.nome_arquivo}</td>
+                    <td className="px-4 py-3">{item.quantidade_boletos}</td>
+                    <td className="px-4 py-3 text-right">{formatCurrency(item.valor_total)}</td>
+                    <td className="px-4 py-3">{item.status}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
 
       <form className="sol-surface-card rounded-2xl p-4 md:p-5" onSubmit={aplicarFiltros}>
         <div className="sol-filtros-head">
