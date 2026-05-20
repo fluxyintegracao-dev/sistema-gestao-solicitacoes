@@ -35,6 +35,14 @@ function sanitizePathSegment(value) {
   return normalized;
 }
 
+function sanitizeMetadataValue(value) {
+  return String(value == null ? '' : value)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^\x20-\x7E]/g, '-')
+    .slice(0, 255);
+}
+
 function getFiscalS3Config() {
   return {
     bucket: process.env.FISCAL_S3_BUCKET || null,
@@ -187,7 +195,7 @@ async function uploadFiscalObject({ key, body, contentType, metadata = {} }) {
       ...Object.fromEntries(
         Object.entries(metadata || {}).map(([itemKey, value]) => [
           sanitizePathSegment(itemKey).toLowerCase(),
-          String(value == null ? '' : value).slice(0, 255)
+          sanitizeMetadataValue(value)
         ])
       ),
       sha256: hash
