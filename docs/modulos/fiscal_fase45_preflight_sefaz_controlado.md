@@ -26,7 +26,7 @@ Fonte oficial: Portal Nacional da NF-e, menu **Servicos > Relacao de Servicos We
 Ambiente de homologacao:
 
 ```env
-FISCAL_SEFAZ_DFE_DISTRIBUTION_URL=https://hom.nfe.fazenda.gov.br/NFeDistribuicaoDFe/NFeDistribuicaoDFe.asmx
+FISCAL_SEFAZ_DFE_DISTRIBUTION_URL=https://hom1.nfe.fazenda.gov.br/NFeDistribuicaoDFe/NFeDistribuicaoDFe.asmx
 ```
 
 Ambiente de producao:

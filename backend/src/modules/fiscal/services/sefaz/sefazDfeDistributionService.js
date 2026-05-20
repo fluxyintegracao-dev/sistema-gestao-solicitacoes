@@ -17,7 +17,7 @@ const {
 } = require('../fiscalCertificateService');
 
 const NFE_DFE_DISTRIBUTION_ENDPOINTS = {
-  homologacao: 'https://hom.nfe.fazenda.gov.br/NFeDistribuicaoDFe/NFeDistribuicaoDFe.asmx',
+  homologacao: 'https://hom1.nfe.fazenda.gov.br/NFeDistribuicaoDFe/NFeDistribuicaoDFe.asmx',
   producao: 'https://www1.nfe.fazenda.gov.br/NFeDistribuicaoDFe/NFeDistribuicaoDFe.asmx'
 };
 
