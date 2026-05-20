@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   baixarBoletoCaixaHomologacaoCsv,
@@ -341,6 +341,7 @@ export default function FinanceiroBoletos() {
   const [baixandoHomologacaoId, setBaixandoHomologacaoId] = useState(null);
   const [baixandoPacoteId, setBaixandoPacoteId] = useState(null);
   const [cnabFeedback, setCnabFeedback] = useState('');
+  const retornoInputRef = useRef(null);
 
   function prepararFiltrosBoleto(rawFilters = filters) {
     const boletoFilters = { ...rawFilters };
@@ -691,7 +692,8 @@ export default function FinanceiroBoletos() {
 
   async function onImportarRetorno() {
     if (!retornoFile) {
-      setError('Selecione o arquivo de retorno da Caixa.');
+      retornoInputRef.current?.click();
+      setError('');
       setCnabFeedback('');
       return;
     }
@@ -890,21 +892,35 @@ export default function FinanceiroBoletos() {
               <label className="sol-filter-field">
                 <span className="sol-filter-label">Retorno Caixa</span>
                 <input
-                  className="input w-full"
+                  ref={retornoInputRef}
+                  className="sr-only"
                   type="file"
                   accept=".ret,.crt,.rem,.cnab,.txt"
                   onChange={(event) => setRetornoFile(event.target.files?.[0] || null)}
                   disabled={!convenioSelecionadoId || importandoRetorno}
                 />
+                <button
+                  type="button"
+                  className="input flex w-full items-center justify-between text-left"
+                  onClick={() => retornoInputRef.current?.click()}
+                  disabled={!convenioSelecionadoId || importandoRetorno}
+                >
+                  <span className={retornoFile ? 'text-[var(--c-text)]' : 'text-[var(--c-muted)]'}>
+                    {retornoFile ? retornoFile.name : 'Selecionar arquivo de retorno'}
+                  </span>
+                  <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--c-muted)]">
+                    Buscar
+                  </span>
+                </button>
               </label>
               <button
                 type="button"
                 className="btn btn-outline"
                 onClick={onImportarRetorno}
-                disabled={!retornoFile || !convenioSelecionadoId || importandoRetorno}
+                disabled={!convenioSelecionadoId || importandoRetorno}
                 title="Importar arquivo de retorno CNAB 240"
               >
-                {importandoRetorno ? 'Importando...' : 'Importar retorno'}
+                {importandoRetorno ? 'Importando...' : retornoFile ? 'Importar retorno' : 'Selecionar retorno'}
               </button>
             </div>
             <p className="mt-2 text-xs text-[var(--c-muted)]">
