@@ -70,6 +70,7 @@ function extractAccessKey(xml) {
 function parseNfeItems(raw) {
   return pickBlocks(raw, 'det').map((detBlock, index) => {
     const prodBlock = pickBlock(detBlock, 'prod');
+    const impostoBlock = pickBlock(detBlock, 'imposto');
     const nItem = String(detBlock.match(/\bnItem=["']([^"']+)["']/i)?.[1] || index + 1).trim();
 
     return {
@@ -77,17 +78,92 @@ function parseNfeItems(raw) {
       cProd: pickTag(prodBlock, 'cProd') || null,
       xProd: pickTag(prodBlock, 'xProd') || null,
       NCM: pickTag(prodBlock, 'NCM') || null,
+      CST: pickTag(impostoBlock, 'CST') || pickTag(impostoBlock, 'CSOSN') || null,
       CFOP: pickTag(prodBlock, 'CFOP') || null,
       uCom: pickTag(prodBlock, 'uCom') || null,
       qCom: parseDecimal(pickTag(prodBlock, 'qCom')),
       vUnCom: parseDecimal(pickTag(prodBlock, 'vUnCom')),
-      vProd: parseDecimal(pickTag(prodBlock, 'vProd'))
+      vProd: parseDecimal(pickTag(prodBlock, 'vProd')),
+      vDesc: parseDecimal(pickTag(prodBlock, 'vDesc')),
+      vBC: parseDecimal(pickTag(impostoBlock, 'vBC')),
+      vICMS: parseDecimal(pickTag(impostoBlock, 'vICMS')),
+      vIPI: parseDecimal(pickTag(impostoBlock, 'vIPI')),
+      pICMS: parseDecimal(pickTag(impostoBlock, 'pICMS')),
+      pIPI: parseDecimal(pickTag(impostoBlock, 'pIPI')),
+      vTotTrib: parseDecimal(pickTag(impostoBlock, 'vTotTrib'))
     };
   });
 }
 
 function countNfeItemBlocks(raw) {
   return pickBlocks(raw, 'det').length;
+}
+
+function parseAddress(block, tagName) {
+  const addressBlock = pickBlock(block, tagName);
+  return {
+    street: pickTag(addressBlock, 'xLgr') || null,
+    number: pickTag(addressBlock, 'nro') || null,
+    complement: pickTag(addressBlock, 'xCpl') || null,
+    district: pickTag(addressBlock, 'xBairro') || null,
+    city_code: pickTag(addressBlock, 'cMun') || null,
+    city: pickTag(addressBlock, 'xMun') || null,
+    uf: pickTag(addressBlock, 'UF') || null,
+    cep: pickTag(addressBlock, 'CEP') || null,
+    phone: pickTag(addressBlock, 'fone') || null
+  };
+}
+
+function parseTotals(totalBlock) {
+  return {
+    vBC: parseDecimal(pickTag(totalBlock, 'vBC')),
+    vICMS: parseDecimal(pickTag(totalBlock, 'vICMS')),
+    vBCST: parseDecimal(pickTag(totalBlock, 'vBCST')),
+    vST: parseDecimal(pickTag(totalBlock, 'vST')),
+    vII: parseDecimal(pickTag(totalBlock, 'vII')),
+    vFCPUFDest: parseDecimal(pickTag(totalBlock, 'vFCPUFDest')),
+    vICMSUFDest: parseDecimal(pickTag(totalBlock, 'vICMSUFDest')),
+    vICMSUFRemet: parseDecimal(pickTag(totalBlock, 'vICMSUFRemet')),
+    vProd: parseDecimal(pickTag(totalBlock, 'vProd')),
+    vFrete: parseDecimal(pickTag(totalBlock, 'vFrete')),
+    vSeg: parseDecimal(pickTag(totalBlock, 'vSeg')),
+    vDesc: parseDecimal(pickTag(totalBlock, 'vDesc')),
+    vOutro: parseDecimal(pickTag(totalBlock, 'vOutro')),
+    vIPI: parseDecimal(pickTag(totalBlock, 'vIPI')),
+    vTotTrib: parseDecimal(pickTag(totalBlock, 'vTotTrib')),
+    vNF: parseDecimal(pickTag(totalBlock, 'vNF'))
+  };
+}
+
+function parseTransport(raw) {
+  const transpBlock = pickBlock(raw, 'transp');
+  const transportaBlock = pickBlock(transpBlock, 'transporta');
+  const veicTranspBlock = pickBlock(transpBlock, 'veicTransp');
+  const volBlock = pickBlock(transpBlock, 'vol');
+  return {
+    modFrete: pickTag(transpBlock, 'modFrete') || null,
+    carrier: {
+      name: pickTag(transportaBlock, 'xNome') || null,
+      cnpj: onlyDigits(pickTag(transportaBlock, 'CNPJ') || pickTag(transportaBlock, 'CPF')) || null,
+      ie: pickTag(transportaBlock, 'IE') || null,
+      address: pickTag(transportaBlock, 'xEnder') || null,
+      city: pickTag(transportaBlock, 'xMun') || null,
+      uf: pickTag(transportaBlock, 'UF') || null
+    },
+    vehicle: {
+      plate: pickTag(veicTranspBlock, 'placa') || null,
+      uf: pickTag(veicTranspBlock, 'UF') || null,
+      rntc: pickTag(veicTranspBlock, 'RNTC') || null
+    },
+    volumes: {
+      quantity: parseDecimal(pickTag(volBlock, 'qVol')),
+      species: pickTag(volBlock, 'esp') || null,
+      brand: pickTag(volBlock, 'marca') || null,
+      numbering: pickTag(volBlock, 'nVol') || null,
+      gross_weight: parseDecimal(pickTag(volBlock, 'pesoB')),
+      net_weight: parseDecimal(pickTag(volBlock, 'pesoL'))
+    }
+  };
 }
 
 function parseNfeXml(xml) {
@@ -103,12 +179,15 @@ function parseNfeXml(xml) {
   const emitBlock = pickBlock(raw, 'emit');
   const destBlock = pickBlock(raw, 'dest');
   const totalBlock = pickBlock(raw, 'ICMSTot') || pickBlock(raw, 'total');
+  const ideBlock = pickBlock(raw, 'ide');
+  const infAdicBlock = pickBlock(raw, 'infAdic');
 
   const issuerCnpj = onlyDigits(pickTag(emitBlock, 'CNPJ') || pickTag(emitBlock, 'CPF'));
   const recipientCnpj = onlyDigits(pickTag(destBlock, 'CNPJ') || pickTag(destBlock, 'CPF'));
   const emissionValue = pickTag(raw, 'dhEmi') || pickTag(raw, 'dEmi');
   const totalValue = parseDecimal(pickTag(totalBlock, 'vNF'));
   const items = parseNfeItems(raw);
+  const totals = parseTotals(totalBlock);
 
   return {
     access_key: accessKey,
@@ -131,24 +210,40 @@ function parseNfeXml(xml) {
         nNF: pickTag(raw, 'nNF') || null,
         serie: pickTag(raw, 'serie') || null,
         dhEmi: emissionValue || null,
+        dhSaiEnt: pickTag(ideBlock, 'dhSaiEnt') || pickTag(ideBlock, 'dSaiEnt') || null,
+        hSaiEnt: pickTag(ideBlock, 'hSaiEnt') || null,
+        tpNF: pickTag(ideBlock, 'tpNF') || null,
         vNF: totalValue
       },
       emit: {
         cnpj: issuerCnpj || null,
         name: pickTag(emitBlock, 'xNome') || null,
+        fantasy_name: pickTag(emitBlock, 'xFant') || null,
         ie: pickTag(emitBlock, 'IE') || null,
-        uf: pickTag(pickBlock(emitBlock, 'enderEmit'), 'UF') || null
+        im: pickTag(emitBlock, 'IM') || null,
+        cnae: pickTag(emitBlock, 'CNAE') || null,
+        uf: pickTag(pickBlock(emitBlock, 'enderEmit'), 'UF') || null,
+        address: parseAddress(emitBlock, 'enderEmit')
       },
       dest: {
         cnpj: recipientCnpj || null,
         name: pickTag(destBlock, 'xNome') || null,
         ie: pickTag(destBlock, 'IE') || null,
-        uf: pickTag(pickBlock(destBlock, 'enderDest'), 'UF') || null
+        email: pickTag(destBlock, 'email') || null,
+        uf: pickTag(pickBlock(destBlock, 'enderDest'), 'UF') || null,
+        address: parseAddress(destBlock, 'enderDest')
       },
       protNFe: {
         cStat: pickTag(raw, 'cStat') || null,
         xMotivo: pickTag(raw, 'xMotivo') || null,
-        nProt: pickTag(raw, 'nProt') || null
+        nProt: pickTag(raw, 'nProt') || null,
+        dhRecbto: pickTag(raw, 'dhRecbto') || null
+      },
+      totals,
+      transport: parseTransport(raw),
+      additional_info: {
+        infCpl: pickTag(infAdicBlock, 'infCpl') || null,
+        infAdFisco: pickTag(infAdicBlock, 'infAdFisco') || null
       },
       item_count: items.length,
       items
