@@ -11,6 +11,8 @@ const uploadMaxBytes = Math.max(1, uploadMaxMb) * 1024 * 1024;
 const allowedMimeTypes = new Set([
   'application/xml',
   'text/xml',
+  'application/zip',
+  'application/x-zip-compressed',
   'application/octet-stream'
 ]);
 
@@ -23,12 +25,12 @@ const upload = multer({
     const extension = String(path.extname(file.originalname || '') || '').toLowerCase();
     const mime = String(file.mimetype || '').toLowerCase();
 
-    if (extension === '.xml' && (!mime || allowedMimeTypes.has(mime))) {
+    if (['.xml', '.zip'].includes(extension) && (!mime || allowedMimeTypes.has(mime))) {
       cb(null, true);
       return;
     }
 
-    cb(new Error('Somente XML fiscal e permitido nesta importacao.'));
+    cb(new Error('Somente XML fiscal ou ZIP com XMLs fiscais e permitido nesta importacao.'));
   }
 });
 

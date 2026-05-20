@@ -153,7 +153,10 @@ router.get('/divergences', allowFiscalDocuments, validateRequest({ query: valida
 
 router.get('/documents', allowFiscalDocuments, validateRequest({ query: validateFiscalDocumentQuery }), FiscalDocumentController.index);
 router.get('/documents/link-options', allowFiscalDocumentLink, validateRequest({ query: validateFiscalLinkSearchQuery }), FiscalDocumentController.linkOptions);
-router.post('/documents/upload-xml', allowFiscalDocumentUpload, uploadFiscalXml.single('file'), FiscalDocumentController.uploadXml);
+router.post('/documents/upload-xml', allowFiscalDocumentUpload, uploadFiscalXml.fields([
+  { name: 'file', maxCount: 1 },
+  { name: 'files', maxCount: 20 }
+]), FiscalDocumentController.uploadXml);
 router.post('/documents/:id/upload-file', allowFiscalDocumentUpload, validateRequest({ params: validateNumericIdParam('id', 'Documento fiscal') }), uploadFiscalFile.single('file'), FiscalDocumentController.uploadFile);
 router.post('/documents/:id/link', allowFiscalDocumentLink, validateRequest({ params: validateNumericIdParam('id', 'Documento fiscal'), body: validateFiscalDocumentLinkBody }), FiscalDocumentController.link);
 router.post('/documents/:id/suggest-links', allowFiscalDocumentLink, validateRequest({ params: validateNumericIdParam('id', 'Documento fiscal') }), FiscalDocumentController.suggestLinks);

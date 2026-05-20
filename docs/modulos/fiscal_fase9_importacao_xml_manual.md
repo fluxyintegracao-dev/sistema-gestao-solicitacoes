@@ -3,6 +3,7 @@
 ## Escopo entregue
 
 - Importacao manual de XML de NFe na caixa fiscal.
+- Importacao em lote por multiplos XMLs ou ZIP com XMLs exportados por outro sistema.
 - Upload protegido por autenticacao e permissao fiscal.
 - Validacao basica de extensao/conteudo XML.
 - Extração inicial de metadados da NFe:
@@ -25,7 +26,8 @@
 Formato multipart:
 
 - `fiscal_company_id`
-- `file`
+- `file` para compatibilidade com envio unitario; ou
+- `files` para envio multiplo de XMLs/ZIP.
 
 ## Permissao adicionada
 
@@ -40,6 +42,8 @@ SUPERADMIN/ADMIN continuam com acesso administrativo por regra geral.
 - Nao consulta SEFAZ.
 - Reimportar a mesma chave atualiza o documento existente e marca `is_duplicate=true`, sem criar duplicidade.
 - O XML fica privado no S3 fiscal.
+- Importacao manual ou em lote nao altera `fiscal_dfe_sync_states.ult_nsu`.
+- ZIPs sao aceitos somente como pacote de transporte; apenas arquivos `.xml` internos sao processados.
 
 ## Dependencias
 
@@ -54,7 +58,7 @@ FISCAL_S3_PREFIX=dev
 ## Ainda pendente
 
 - Parser XML robusto com biblioteca propria para XML fiscal.
-- Upload de PDF/DANFE manual.
+- Integracao automatica com API SIENGE, se o contrato/API disponivel retornar XML completo ou link exportavel.
 - Validacao de assinatura XML.
 - Cruzamento com pedidos, compras e financeiro.
 - Consulta SEFAZ real por NSU.

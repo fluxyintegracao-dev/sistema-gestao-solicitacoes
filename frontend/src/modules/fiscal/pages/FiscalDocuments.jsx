@@ -26,7 +26,7 @@ export default function FiscalDocuments() {
     q: ''
   });
   const [uploadCompanyId, setUploadCompanyId] = useState('');
-  const [uploadFile, setUploadFile] = useState(null);
+  const [uploadFiles, setUploadFiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [openingFile, setOpeningFile] = useState('');
@@ -115,8 +115,8 @@ export default function FiscalDocuments() {
 
   const submitUpload = async (event) => {
     event.preventDefault();
-    if (!uploadCompanyId || !uploadFile) {
-      setError('Selecione a empresa fiscal e o arquivo XML.');
+    if (!uploadCompanyId || !uploadFiles.length) {
+      setError('Selecione a empresa fiscal e ao menos um XML ou ZIP fiscal.');
       return;
     }
 
@@ -124,9 +124,16 @@ export default function FiscalDocuments() {
     setError('');
     setMessage('');
     try {
-      const result = await uploadFiscalXml({ companyId: uploadCompanyId, file: uploadFile });
-      setMessage(result?.duplicate ? 'XML reimportado sem duplicar documento.' : 'XML fiscal importado com sucesso.');
-      setUploadFile(null);
+      const result = await uploadFiscalXml({ companyId: uploadCompanyId, files: uploadFiles });
+      const falhas = Number(result?.failed_count || 0);
+      const importados = Number(result?.imported_count || 0);
+      const duplicados = Number(result?.duplicate_count || 0);
+      setMessage(
+        falhas
+          ? `${importados} XML(s) importado(s), ${duplicados} reimportado(s) e ${falhas} arquivo(s) com erro.`
+          : `${importados} XML(s) importado(s) com sucesso. ${duplicados ? `${duplicados} ja existiam e foram atualizados.` : ''}`
+      );
+      setUploadFiles([]);
       event.target.reset();
       await load();
     } catch (err) {
@@ -142,7 +149,7 @@ export default function FiscalDocuments() {
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Fiscal</p>
           <h1 className="mt-2 text-2xl font-semibold text-slate-950 dark:text-white">Documentos fiscais</h1>
-          <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Caixa inicial de documentos DFe. A sincronizacao SEFAZ real ainda nao esta ativa nesta fase.</p>
+          <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Caixa de documentos DFe com importacao manual de XMLs individuais ou ZIP exportado por outro sistema.</p>
         </div>
         <form onSubmit={submitUpload} className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:flex-row">
           <select className="input min-w-[220px]" value={uploadCompanyId} onChange={(event) => setUploadCompanyId(event.target.value)} required>
@@ -151,8 +158,20 @@ export default function FiscalDocuments() {
               <option key={company.id} value={company.id}>{company.razao_social}</option>
             ))}
           </select>
-          <input className="input" type="file" accept=".xml,application/xml,text/xml" onChange={(event) => setUploadFile(event.target.files?.[0] || null)} required />
-          <button className="btn-primary whitespace-nowrap" type="submit" disabled={uploading}>{uploading ? 'Importando...' : 'Importar XML'}</button>
+          <label className="input flex min-w-[260px] cursor-pointer items-center justify-between gap-3">
+            <span className="truncate text-sm text-slate-700 dark:text-slate-200">
+              {uploadFiles.length ? `${uploadFiles.length} arquivo(s) selecionado(s)` : 'Selecionar XMLs ou ZIP'}
+            </span>
+            <input
+              className="sr-only"
+              type="file"
+              accept=".xml,.zip,application/xml,text/xml,application/zip"
+              multiple
+              onChange={(event) => setUploadFiles(Array.from(event.target.files || []))}
+              required
+            />
+          </label>
+          <button className="btn-primary whitespace-nowrap" type="submit" disabled={uploading}>{uploading ? 'Importando...' : 'Importar XML/ZIP'}</button>
         </form>
       </div>
 

@@ -122,10 +122,16 @@ export async function getFiscalDocumentFileUrl(id, type) {
   return parseJson(response, 'Erro ao gerar URL do arquivo fiscal');
 }
 
-export async function uploadFiscalXml({ companyId, file }) {
+export async function uploadFiscalXml({ companyId, file, files }) {
   const formData = new FormData();
   formData.append('fiscal_company_id', companyId);
-  formData.append('file', file);
+
+  const uploadFiles = Array.isArray(files) ? files.filter(Boolean) : [];
+  if (uploadFiles.length) {
+    uploadFiles.forEach((item) => formData.append('files', item));
+  } else {
+    formData.append('file', file);
+  }
 
   const response = await fetch(`${API_URL}/fiscal/documents/upload-xml`, {
     method: 'POST',

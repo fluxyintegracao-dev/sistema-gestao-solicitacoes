@@ -65,9 +65,10 @@ async function uploadXml(req, res) {
   try {
     const result = await importarXmlFiscalManual(req, {
       file: req.file,
+      files: req.files,
       body: req.body || {}
     });
-    return res.status(result.created ? 201 : 200).json(result);
+    return res.status(result.created_count > 0 || result.created ? 201 : 200).json(result);
   } catch (error) {
     return handleError(res, error);
   }

@@ -32,7 +32,7 @@ const allowedProfiles = {
   ]),
   ofx: new Set(['.ofx']),
   fiscal_file: new Set(['.pdf', '.png', '.jpg', '.jpeg']),
-  fiscal_xml: new Set(['.xml'])
+  fiscal_xml: new Set(['.xml', '.zip'])
 };
 
 function bufferStartsWith(buffer, signature) {
@@ -165,8 +165,15 @@ function assertFiscalXmlBinary(file) {
   const buffer = file?.buffer;
   const extension = String(path.extname(file?.originalname || '') || '').toLowerCase();
 
-  if (extension !== '.xml') {
+  if (!['.xml', '.zip'].includes(extension)) {
     throw new UploadSecurityError('Extensao de arquivo fiscal nao permitida.', 400, 'UPLOAD_EXTENSION_UNSUPPORTED');
+  }
+
+  if (extension === '.zip') {
+    if (!hasZipSignature(buffer)) {
+      throw new UploadSecurityError('ZIP fiscal invalido ou corrompido.', 400, 'UPLOAD_BINARY_MISMATCH');
+    }
+    return;
   }
 
   if (!hasPrintableText(buffer)) {
