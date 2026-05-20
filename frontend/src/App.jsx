@@ -8,6 +8,7 @@ import {
   canAccessBiblioteca,
   canAccessBoletos,
   canAccessCadastroObras,
+  canAccessComercial,
   canAccessComunicacao,
   canAccessCompras,
   canAccessContratos,
@@ -73,6 +74,7 @@ const FinanceiroConciliacao = lazy(() => import('./pages/FinanceiroConciliacao')
 const FinanceiroCaixas = lazy(() => import('./pages/FinanceiroCaixas'));
 const FinanceiroResultadoObras = lazy(() => import('./pages/FinanceiroResultadoObras'));
 const FinanceiroResultadoCentrosCusto = lazy(() => import('./pages/FinanceiroResultadoCentrosCusto'));
+const ModuloRelatorios = lazy(() => import('./pages/ModuloRelatorios'));
 const Obras = lazy(() => import('./pages/Obras'));
 const ObraGestao = lazy(() => import('./pages/ObraGestao'));
 const RelatoriosAdministrativos = lazy(() => import('./pages/RelatoriosAdministrativos'));
@@ -406,6 +408,14 @@ function ContratosRoute({ children }) {
   return children;
 }
 
+function ComercialRoute({ children }) {
+  const { user } = useAuth();
+  if (!canAccessComercial(user)) {
+    return <Navigate to="/" replace />;
+  }
+  return children;
+}
+
 function ComercialEmpreendimentosRoute({ children }) {
   const { user } = useAuth();
   if (!canViewComercialEmpreendimentos(user)) {
@@ -552,6 +562,7 @@ export default function App() {
         <Route index element={<Dashboard />} />
 
         <Route path="solicitacoes" element={<Solicitacoes />} />
+        <Route path="solicitacoes/relatorios" element={<ModuloRelatorios modulo="solicitacoes" />} />
         <Route path="solicitacoes-arquivadas" element={<SolicitacoesArquivadas />} />
         <Route path="solicitacoes/:id" element={<SolicitacaoDetalhe />} />
         <Route path="prioridades-diretoria" element={<PrioridadesDiretoriaRoute><PrioridadesDiretoria /></PrioridadesDiretoriaRoute>} />
@@ -606,6 +617,7 @@ export default function App() {
         <Route path="parceiros" element={<BusinessAdminRoute><Parceiros /></BusinessAdminRoute>} />
         <Route path="parceiros-categorias" element={<BusinessAdminRoute><ParceiroCategorias /></BusinessAdminRoute>} />
         <Route path="crm/dashboard" element={<CrmDashboardRoute><CrmDashboard /></CrmDashboardRoute>} />
+        <Route path="crm/relatorios" element={<CrmDashboardRoute><ModuloRelatorios modulo="crm" /></CrmDashboardRoute>} />
         <Route path="crm/dashboard-gerencial" element={<CrmDashboardRoute><CrmDashboardGerencial /></CrmDashboardRoute>} />
         <Route path="crm/dashboard-sla" element={<CrmDashboardRoute><CrmDashboardSla /></CrmDashboardRoute>} />
         <Route path="crm/dashboard-distribuicao" element={<CrmDashboardRoute><CrmDashboardDistribuicao /></CrmDashboardRoute>} />
@@ -621,6 +633,7 @@ export default function App() {
         <Route path="crm/admin/numeros" element={<CrmConfiguracoesRoute><CrmAdminNumeros /></CrmConfiguracoesRoute>} />
         <Route path="crm/admin/integracoes" element={<CrmConfiguracoesRoute><CrmAdminIntegracoes /></CrmConfiguracoesRoute>} />
         <Route path="fiscal" element={<FiscalRoute><FiscalDashboard /></FiscalRoute>} />
+        <Route path="fiscal/relatorios" element={<FiscalRoute><ModuloRelatorios modulo="fiscal" /></FiscalRoute>} />
         <Route path="fiscal/empresas" element={<FiscalConfigRoute><FiscalCompanies /></FiscalConfigRoute>} />
         <Route path="fiscal/diagnostico" element={<FiscalConfigRoute><FiscalDiagnostics /></FiscalConfigRoute>} />
         <Route path="fiscal/documentos" element={<FiscalDocumentsRoute><FiscalDocuments /></FiscalDocumentsRoute>} />
@@ -629,17 +642,20 @@ export default function App() {
         <Route path="fiscal/exportacao-contabil" element={<FiscalDocumentsRoute><FiscalAccountingBatches /></FiscalDocumentsRoute>} />
         <Route path="fiscal/logs" element={<FiscalLogsRoute><FiscalLogs /></FiscalLogsRoute>} />
         <Route path="comercial/empreendimentos" element={<ComercialEmpreendimentosRoute><ComercialEmpreendimentos /></ComercialEmpreendimentosRoute>} />
+        <Route path="comercial/relatorios" element={<ComercialRoute><ModuloRelatorios modulo="comercial" /></ComercialRoute>} />
         <Route path="comercial/unidades" element={<ComercialEmpreendimentosRoute><ComercialUnidades /></ComercialEmpreendimentosRoute>} />
         <Route path="comercial/tabelas-preco" element={<ComercialEmpreendimentosRoute><ComercialTabelasPreco /></ComercialEmpreendimentosRoute>} />
         <Route path="comercial/mapa-unidades" element={<ComercialEmpreendimentosRoute><ComercialMapaUnidades /></ComercialEmpreendimentosRoute>} />
         <Route path="comercial/contratos" element={<ComercialContratosRoute><ComercialContratos /></ComercialContratosRoute>} />
         <Route path="comercial/modelos-contrato" element={<ComercialContratosRoute><ComercialModelosContrato /></ComercialContratosRoute>} />
         <Route path="provisoes-financeiras" element={<ProvisionamentosRoute><ProvisionamentosFinanceiros /></ProvisionamentosRoute>} />
+        <Route path="provisoes-financeiras/relatorios" element={<ProvisionamentosDashboardRoute><ModuloRelatorios modulo="provisionamento" /></ProvisionamentosDashboardRoute>} />
         <Route path="provisoes-financeiras/nova" element={<ProvisionamentosCreateRoute><NovaProvisaoFinanceira /></ProvisionamentosCreateRoute>} />
         <Route path="provisoes-financeiras/:id" element={<ProvisionamentosRoute><ProvisionamentoFinanceiroDetalhe /></ProvisionamentosRoute>} />
         <Route path="provisoes-financeiras/dashboard" element={<ProvisionamentosDashboardRoute><DashboardProvisionamentoFinanceiro /></ProvisionamentosDashboardRoute>} />
         <Route path="provisoes-financeiras/categorias" element={<ProvisionamentosCategoriasRoute><GestaoCategoriasMacro /></ProvisionamentosCategoriasRoute>} />
         <Route path="rh-dp" element={<RhDpDashboardRoute><RhDpInicio /></RhDpDashboardRoute>} />
+        <Route path="rh-dp/relatorios" element={<RhDpDashboardRoute><ModuloRelatorios modulo="rhdp" /></RhDpDashboardRoute>} />
         <Route path="rh-dp/empresas" element={<RhDpEmpresasRoute><RhDpEmpresas /></RhDpEmpresasRoute>} />
         <Route path="rh-dp/colaboradores" element={<RhDpColaboradoresRoute><RhDpColaboradores /></RhDpColaboradoresRoute>} />
         <Route path="rh-dp/documentos" element={<RhDpDocumentosRoute><RhDpDocumentos /></RhDpDocumentosRoute>} />
@@ -664,8 +680,11 @@ export default function App() {
         <Route path="financeiro/conciliacao" element={<FinanceiroRoute><FinanceiroConciliacao /></FinanceiroRoute>} />
         <Route path="financeiro/caixas" element={<FinanceiroRoute><FinanceiroCaixas /></FinanceiroRoute>} />
         <Route path="financeiro/cadastros" element={<FinanceiroRoute><FinanceiroCadastros /></FinanceiroRoute>} />
+        <Route path="compras/relatorios" element={<ModuloComprasRoute><ModuloRelatorios modulo="compras" /></ModuloComprasRoute>} />
+        <Route path="compras/relatorios/auditoria" element={<ModuloComprasRoute><BusinessAdminRoute><RelatoriosAdministrativos /></BusinessAdminRoute></ModuloComprasRoute>} />
         <Route path="relatorios/administrativos" element={<ModuloComprasRoute><BusinessAdminRoute><RelatoriosAdministrativos /></BusinessAdminRoute></ModuloComprasRoute>} />
         <Route path="perfil" element={<Perfil />} />
+        <Route path="contratos/relatorios" element={<ContratosRoute><ModuloRelatorios modulo="contratos" /></ContratosRoute>} />
         <Route path="solicitacoes-compra" element={<ModuloComprasRoute><SolicitacoesCompra /></ModuloComprasRoute>} />
         <Route path="solicitacoes-compra/:id" element={<ModuloComprasRoute><SolicitacaoCompraDetalhe /></ModuloComprasRoute>} />
         <Route path="solicitacoes-compra/nova" element={<ComprasPedidosCreateRoute><NovaSolicitacaoCompra /></ComprasPedidosCreateRoute>} />

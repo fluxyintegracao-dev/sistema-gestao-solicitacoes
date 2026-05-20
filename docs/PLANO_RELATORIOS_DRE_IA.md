@@ -30,6 +30,10 @@ Base multiempresa e DRE gerencial:
 - A DRE permite filtrar por periodo, Holding, empresa, obra/centro de custo e excluir intercompany.
 - O resultado consolidado da Holding e o resultado isolado por empresa ficam disponiveis na mesma resposta gerencial.
 - Integracao SIENGE ganhou uma carga inicial financeira por CSV para importar credores/clientes e titulos em aberto em uma base limpa.
+- Navegacao inicial dos hubs de relatorios foi criada por modulo.
+- A aba Cotacoes foi incorporada dentro de Compras.
+- A auditoria de compras passou a ser acessada por Compras > Relatorios, mantendo a rota antiga apenas como compatibilidade.
+- Os hubs de Solicitacoes, Compras, Fiscal, CRM, Comercial, Provisionamento, RH/DP e Contratos ja agrupam relatorios existentes e visoes planejadas.
 
 Documentacao operacional complementar:
 

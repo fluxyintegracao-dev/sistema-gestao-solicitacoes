@@ -343,6 +343,7 @@ export default function Layout() {
 
     addGroup('Solicitacoes', [
       item('/solicitacoes', solicitacoesLabel, HiOutlineDocumentText),
+      item('/solicitacoes/relatorios', 'Relatorios', HiOutlineDocumentText),
       item('/solicitacoes-arquivadas', 'Arquivadas', HiOutlineArchiveBox),
       prioridadesDiretoriaAccess ? item('/prioridades-diretoria', 'Prioridades Diretoria', HiOutlineBanknotes) : null,
       perfil !== 'SETOR' && perfil !== 'FINANCEIRO'
@@ -367,17 +368,14 @@ export default function Layout() {
         item('/solicitacoes-compra', 'Solicitacoes de Compra', HiOutlineClipboardDocumentList),
         comprasPedidosCreateAccess ? item('/solicitacoes-compra/nova', 'Nova Solicitacao de Compra', HiOutlinePlusCircle) : null,
         comprasPedidosAccess ? item('/pedidos-compra', 'Pedidos de Compra', HiOutlineDocumentText) : null,
+        item('/compras/relatorios', 'Relatorios de Compras', HiOutlineDocumentText),
+        moduloCotacoesHabilitado && comprasCotacoesAccess ? item('/cotacoes', 'Cotacoes', HiOutlineInboxStack) : null,
+        moduloCotacoesHabilitado && comprasCotacoesManageAccess ? item('/cotacoes/nova', 'Nova Cotacao Avulsa', HiOutlinePlusCircle) : null,
+        moduloCotacoesHabilitado && comprasCotacoesManageAccess ? item('/gestao-fornecedores', 'Fornecedores', HiOutlineUsers) : null,
+        moduloCotacoesHabilitado && businessAdmin && comprasCotacoesAccess ? item('/configuracoes-cotacao', 'Config. Cotacoes', HiOutlineAdjustmentsHorizontal) : null,
         businessAdmin ? item('/gestao-insumos', 'Gestao de Insumos', HiOutlineRectangleGroup) : null,
         businessAdmin ? item('/gestao-unidades', 'Gestao de Unidades', HiOutlineBuildingOffice2) : null,
         businessAdmin ? item('/gestao-categorias', 'Gestao de Categorias', HiOutlineFolderOpen) : null
-      ]);
-    }
-
-    if (moduloCotacoesHabilitado && comprasCotacoesAccess) {
-      addGroup('Cotacoes', [
-        item('/cotacoes', 'Cotacoes', HiOutlineInboxStack),
-        comprasCotacoesManageAccess ? item('/cotacoes/nova', 'Nova Cotacao Avulsa', HiOutlinePlusCircle) : null,
-        comprasCotacoesManageAccess ? item('/gestao-fornecedores', 'Fornecedores', HiOutlineUsers) : null
       ]);
     }
 
@@ -387,7 +385,6 @@ export default function Layout() {
         pagamentosAccess ? item('/financeiro/pagamentos', 'Pagamentos em Massa', HiOutlinePaperAirplane) : null,
         boletosAccess ? item('/financeiro/boletos', 'Boletos', HiOutlineDocumentText) : null,
         financeiroAccess ? item('/financeiro/relatorios', 'Relatorios Financeiros', HiOutlineDocumentText) : null,
-        financeiroAccess ? item('/financeiro/relatorios/analitico', 'Relatorio Analitico', HiOutlineDocumentText) : null,
         financeiroAccess ? item('/financeiro/baixas', 'Baixas Realizadas', HiOutlineBanknotes) : null,
         financeiroAccess ? item('/financeiro/conciliacao', 'Conciliacao OFX', HiOutlineBanknotes) : null,
         financeiroAccess ? item('/financeiro/caixas', 'Caixas e Contas', HiOutlineBanknotes) : null,
@@ -400,6 +397,7 @@ export default function Layout() {
     if (fiscalAccess) {
       addGroup('Fiscal', [
         item('/fiscal', 'Painel Fiscal', HiOutlineSquares2X2),
+        item('/fiscal/relatorios', 'Relatorios Fiscais', HiOutlineDocumentText),
         fiscalConfigAccess ? item('/fiscal/empresas', 'Empresas Fiscais', HiOutlineBuildingOffice2) : null,
         fiscalConfigAccess ? item('/fiscal/empresas#certificados', 'Certificados', HiOutlineKey) : null,
         fiscalConfigAccess ? item('/fiscal/diagnostico', 'Diagnostico', HiOutlineAdjustmentsHorizontal) : null,
@@ -413,9 +411,7 @@ export default function Layout() {
     if (crmAccess) {
       addGroup('CRM', [
         crmDashboardAccess ? item('/crm/dashboard', 'Dashboard', HiOutlineSquares2X2) : null,
-        crmDashboardAccess ? item('/crm/dashboard-gerencial', 'Gerencial', HiOutlineSquares2X2) : null,
-        crmDashboardAccess ? item('/crm/dashboard-sla', 'SLA', HiOutlineClipboardDocumentList) : null,
-        crmDashboardAccess ? item('/crm/dashboard-distribuicao', 'Distribuicao', HiOutlineAdjustmentsHorizontal) : null,
+        crmDashboardAccess ? item('/crm/relatorios', 'Relatorios CRM', HiOutlineDocumentText) : null,
         crmAtendimentoAccess ? item('/crm/inbox', 'Inbox', HiOutlineChatBubbleLeftRight) : null,
         crmLeadsAccess ? item('/crm/leads', 'Leads', HiOutlineUsers) : null,
         crmLeadsAccess ? item('/crm/carteira', 'Minha Carteira', HiOutlineUsers) : null,
@@ -431,6 +427,7 @@ export default function Layout() {
 
     if (comercialAccess) {
       addGroup('Comercial', [
+        item('/comercial/relatorios', 'Relatorios Comerciais', HiOutlineDocumentText),
         comercialEmpreendimentosAccess ? item('/comercial/empreendimentos', 'Empreendimentos', HiOutlineBuildingOffice2) : null,
         comercialEmpreendimentosAccess ? item('/comercial/unidades', 'Unidades', HiOutlineRectangleGroup) : null,
         comercialEmpreendimentosAccess ? item('/comercial/mapa-unidades', 'Mapa de Unidades', HiOutlineSquares2X2) : null,
@@ -443,6 +440,7 @@ export default function Layout() {
     if (provisoesAccess) {
       addGroup('Provisionamento', [
         provisoesDashboardAccess ? item('/provisoes-financeiras/dashboard', 'Dashboard de Previsao', HiOutlineSquares2X2) : null,
+        provisoesDashboardAccess ? item('/provisoes-financeiras/relatorios', 'Relatorios', HiOutlineDocumentText) : null,
         provisoesListaAccess ? item('/provisoes-financeiras', 'Provisionamentos', HiOutlineBanknotes) : null,
         provisoesCreateAccess ? item('/provisoes-financeiras/nova', 'Nova Provisao', HiOutlinePlusCircle) : null,
         provisoesCategoriasAccess ? item('/provisoes-financeiras/categorias', 'Categorias Macro', HiOutlineFolderOpen) : null
@@ -452,6 +450,7 @@ export default function Layout() {
     if (rhDpAccess) {
       addGroup('RH/DP', [
         rhDpDashboardAccess ? item('/rh-dp', 'Visao do Modulo', HiOutlineUsers) : null,
+        rhDpDashboardAccess ? item('/rh-dp/relatorios', 'Relatorios', HiOutlineDocumentText) : null,
         rhDpColaboradoresAccess ? item('/rh-dp/colaboradores', 'Colaboradores', HiOutlineUsers) : null,
         rhDpDocumentosAccess ? item('/rh-dp/documentos', 'Documentos', HiOutlineFolderOpen) : null,
         rhDpImportacoesAccess ? item('/rh-dp/importacoes', 'Importacoes', HiOutlineCloudArrowUp) : null,
@@ -463,12 +462,6 @@ export default function Layout() {
     if (integracaoSiengeAccess) {
       addGroup('Integracoes', [
         item('/integracao-sienge', 'SIENGE', HiOutlineAdjustmentsHorizontal)
-      ]);
-    }
-
-    if (businessAdmin && comprasAccess) {
-      addGroup('Relatorios', [
-        item('/relatorios/administrativos', 'Auditoria de Compras', HiOutlineDocumentText)
       ]);
     }
 
@@ -487,6 +480,7 @@ export default function Layout() {
 
     if (contratosAccess) {
       addGroup('Contratos', [
+        item('/contratos/relatorios', 'Relatorios', HiOutlineDocumentText),
         item('/gestao-contratos', 'Gestao de Contratos', HiOutlineBanknotes)
       ]);
     }
