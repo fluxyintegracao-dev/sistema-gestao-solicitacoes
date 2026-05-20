@@ -107,6 +107,10 @@ function sanitizeCategoriaPayload(payload = {}, { partial = false } = {}) {
     nome: sanitizeTextField(payload.nome),
     tipo: sanitizeTextField(payload.tipo),
     descricao: sanitizeTextField(payload.descricao, { emptyAsNull: true }),
+    dre_grupo: sanitizeTextField(payload.dre_grupo, { emptyAsNull: true }),
+    dre_subgrupo: sanitizeTextField(payload.dre_subgrupo, { emptyAsNull: true }),
+    dre_ordem: payload.dre_ordem != null && payload.dre_ordem !== '' ? Number(payload.dre_ordem) : payload.dre_ordem,
+    considera_dre: payload.considera_dre,
     ativo: payload.ativo
   };
 
@@ -117,6 +121,10 @@ function sanitizeCategoriaPayload(payload = {}, { partial = false } = {}) {
     if (!String(data.tipo || '').trim()) {
       throw createHttpError(400, 'Tipo da categoria financeira e obrigatorio.');
     }
+  }
+
+  if (data.dre_ordem !== undefined && data.dre_ordem !== null && !Number.isInteger(data.dre_ordem)) {
+    throw createHttpError(400, 'Ordem DRE invalida.');
   }
 
   return Object.fromEntries(

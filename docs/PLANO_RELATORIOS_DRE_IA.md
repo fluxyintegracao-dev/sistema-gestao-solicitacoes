@@ -17,6 +17,19 @@ Este plano tambem prepara o sistema para uma futura camada de IA aplicada a rela
 - A Holding deve enxergar resultado consolidado e resultado isolado por empresa.
 - Empresas, obras, centros de custo, titulos, compras, fiscal e provisionamentos precisam compartilhar dimensoes comuns.
 
+## Implementacao Inicial Entregue
+
+Base multiempresa e DRE gerencial:
+
+- Cadastro de Empresas do Grupo passou a distinguir Holding e Empresa operacional.
+- Empresa operacional pode ser vinculada a uma Holding controladora.
+- Obras e Centros de Custo passam a ter vinculo com Empresa do Grupo.
+- Titulos financeiros passam a ter competencia, empresa do grupo, contraparte intercompany e flag de consideracao na DRE.
+- Categorias financeiras passam a ter classificacao gerencial de DRE.
+- Financeiro > Relatorios ganhou acesso a DRE Gerencial.
+- A DRE permite filtrar por periodo, Holding, empresa, obra/centro de custo e excluir intercompany.
+- O resultado consolidado da Holding e o resultado isolado por empresa ficam disponiveis na mesma resposta gerencial.
+
 ## Ajuste de Navegacao
 
 ### Compras
@@ -701,4 +714,3 @@ Prioridade sugerida:
 - Definir tratamento de intercompany.
 - Definir se obras e centros de custo terao empresa obrigatoria imediatamente ou por fase de saneamento.
 - Definir se o sistema tera Balanco Gerencial e Patrimonio Liquido em fase futura.
-

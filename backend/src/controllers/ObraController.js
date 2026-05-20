@@ -1,4 +1,4 @@
-const { Obra, UsuarioObra, Setor, ConfiguracaoSistema } = require('../models');
+const { Obra, UsuarioObra, Setor, ConfiguracaoSistema, EmpresaGrupo } = require('../models');
 const { Op } = require('sequelize');
 const {
   listarObrasGestao,
@@ -29,7 +29,7 @@ function applyCentroCustoScope(where, escopo = 'OBRAS') {
 }
 
 function buildObraWhere(query = {}, defaultScope = 'OBRAS') {
-  const { codigo, descricao, escopo } = query;
+  const { codigo, descricao, escopo, empresa_grupo_id } = query;
   const where = {};
 
   applyCentroCustoScope(where, escopo || defaultScope);
@@ -40,9 +40,48 @@ function buildObraWhere(query = {}, defaultScope = 'OBRAS') {
   if (descricao) {
     where.nome = { [Op.like]: `%${descricao}%` };
   }
+  if (empresa_grupo_id) {
+    where.empresa_grupo_id = Number(empresa_grupo_id);
+  }
 
   return where;
 }
+
+async function validarEmpresaGrupoOperacional(empresaGrupoId) {
+  if (!empresaGrupoId) {
+    return null;
+  }
+
+  const id = Number(empresaGrupoId);
+  if (!Number.isInteger(id) || id <= 0) {
+    const error = new Error('Empresa do grupo invalida');
+    error.status = 400;
+    throw error;
+  }
+
+  const empresa = await EmpresaGrupo.findByPk(id);
+  if (!empresa || empresa.ativo === false) {
+    const error = new Error('Empresa do grupo nao encontrada ou inativa');
+    error.status = 400;
+    throw error;
+  }
+  if (String(empresa.tipo_empresa || 'OPERACIONAL').trim().toUpperCase() === 'HOLDING') {
+    const error = new Error('Vincule obras e centros de custo a uma empresa operacional, nao diretamente a Holding');
+    error.status = 400;
+    throw error;
+  }
+
+  return empresa;
+}
+
+const OBRA_INCLUDE = [
+  {
+    model: EmpresaGrupo,
+    as: 'empresaGrupo',
+    attributes: ['id', 'codigo', 'nome', 'razao_social', 'cnpj', 'tipo_empresa', 'holding_id'],
+    required: false
+  }
+];
 
 async function obterSetoresCriacaoTodasObras() {
   const item = await ConfiguracaoSistema.findOne({
@@ -105,10 +144,11 @@ module.exports = {
   async index(req, res) {
     const where = buildObraWhere(req.query, 'OBRAS');
 
-    const obras = await Obra.findAll({
-      where,
-      order: [['nome', 'ASC']]
-    });
+      const obras = await Obra.findAll({
+        where,
+        include: OBRA_INCLUDE,
+        order: [['nome', 'ASC']]
+      });
     res.json(obras);
   },
 
@@ -125,6 +165,7 @@ module.exports = {
         const where = buildObraWhere({ codigo, descricao, escopo: defaultScope }, 'TODOS');
         const obras = await Obra.findAll({
           where,
+          include: OBRA_INCLUDE,
           order: [['nome', 'ASC']]
         });
         return res.json(obras);
@@ -134,6 +175,7 @@ module.exports = {
         const where = buildObraWhere({ codigo, descricao, escopo: defaultScope }, 'TODOS');
         const obras = await Obra.findAll({
           where,
+          include: OBRA_INCLUDE,
           order: [['nome', 'ASC']]
         });
         return res.json(obras);
@@ -151,6 +193,7 @@ module.exports = {
           const where = buildObraWhere({ codigo, descricao, escopo: defaultScope }, 'TODOS');
           const obras = await Obra.findAll({
             where,
+            include: OBRA_INCLUDE,
             order: [['nome', 'ASC']]
           });
           return res.json(obras);
@@ -159,7 +202,8 @@ module.exports = {
 
       if (codigo) {
         const obra = await Obra.findOne({
-          where: buildObraWhere({ codigo, escopo: defaultScope }, 'TODOS')
+          where: buildObraWhere({ codigo, escopo: defaultScope }, 'TODOS'),
+          include: OBRA_INCLUDE
         });
         if (!obra) return res.json([]);
 
@@ -175,6 +219,7 @@ module.exports = {
           {
             model: Obra,
             as: 'obra',
+            include: OBRA_INCLUDE,
             where: buildObraWhere({ descricao, escopo: defaultScope }, 'TODOS')
           }
         ]
@@ -190,7 +235,7 @@ module.exports = {
   },
 
   async create(req, res) {
-    const { nome, codigo, cidade, classificacao, vgv, planilha_geral, margem_custo_esperada, tipo_centro_custo } = req.body;
+    const { nome, codigo, cidade, classificacao, vgv, planilha_geral, margem_custo_esperada, tipo_centro_custo, empresa_grupo_id } = req.body;
 
     if (!nome || !codigo) {
       return res.status(400).json({ error: 'Nome e codigo sao obrigatorios' });
@@ -212,10 +257,17 @@ module.exports = {
       return res.status(400).json({ error: 'Codigo de obra ja cadastrado' });
     }
 
+    try {
+      await validarEmpresaGrupoOperacional(empresa_grupo_id);
+    } catch (error) {
+      return res.status(error.status || 500).json({ error: error.message || 'Erro ao validar empresa do grupo' });
+    }
+
     const obra = await Obra.create({
       codigo: String(codigo).toUpperCase(),
       cidade: cidade || null,
       nome,
+      empresa_grupo_id: empresa_grupo_id ? Number(empresa_grupo_id) : null,
       ativo: true,
       tipo_centro_custo: tipoCentroCustoNorm,
       classificacao: classificacaoNorm,
@@ -229,7 +281,7 @@ module.exports = {
 
   async update(req, res) {
     const { id } = req.params;
-    const { nome, codigo, cidade, classificacao, vgv, planilha_geral, margem_custo_esperada, tipo_centro_custo } = req.body;
+    const { nome, codigo, cidade, classificacao, vgv, planilha_geral, margem_custo_esperada, tipo_centro_custo, empresa_grupo_id } = req.body;
 
     const dados = {};
     if (nome) dados.nome = nome;
@@ -257,6 +309,14 @@ module.exports = {
     if (vgv !== undefined) dados.vgv = vgv != null ? Number(vgv) : null;
     if (planilha_geral !== undefined) dados.planilha_geral = planilha_geral != null ? Number(planilha_geral) : null;
     if (margem_custo_esperada !== undefined) dados.margem_custo_esperada = margem_custo_esperada != null ? Number(margem_custo_esperada) : null;
+    if (empresa_grupo_id !== undefined) {
+      try {
+        await validarEmpresaGrupoOperacional(empresa_grupo_id);
+      } catch (error) {
+        return res.status(error.status || 500).json({ error: error.message || 'Erro ao validar empresa do grupo' });
+      }
+      dados.empresa_grupo_id = empresa_grupo_id ? Number(empresa_grupo_id) : null;
+    }
 
     if (Object.keys(dados).length === 0) {
       return res.status(400).json({ error: 'Nada para atualizar' });

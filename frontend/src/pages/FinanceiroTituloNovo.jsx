@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { getMinhasObras } from '../services/obras';
 import { buscarParceiros } from '../services/parceiros';
+import { getEmpresasGrupo } from '../services/empresasGrupo';
 import {
   atualizarPaymentBeneficiary,
   criarPaymentBeneficiary,
@@ -129,6 +130,10 @@ function buildDefaultForm(tipo = 'PAGAR') {
     boleto_emitido_em: '',
     valor: '',
     data_emissao: today(),
+    competencia_data: today(),
+    considera_dre: true,
+    intercompany: false,
+    empresa_contraparte_id: '',
     data_vencimento: today(),
     observacoes: '',
     apropriacao_id: '',
@@ -230,6 +235,7 @@ export default function FinanceiroTituloNovo() {
   const initialTipo = resolveTipo(searchParams.get('tipo'));
   const [form, setForm] = useState(() => buildDefaultForm(initialTipo));
   const [obras, setObras] = useState([]);
+  const [empresasGrupo, setEmpresasGrupo] = useState([]);
   const [categorias, setCategorias] = useState([]);
   const [parceiros, setParceiros] = useState([]);
   const [apropriacoes, setApropriacoes] = useState([]);
@@ -263,9 +269,10 @@ export default function FinanceiroTituloNovo() {
       try {
         setLoadingBase(true);
         setError('');
-        const [obrasData, categoriasData, paymentAccountsData, formasData, cartoesData] = await Promise.all([
+        const [obrasData, categoriasData, empresasData, paymentAccountsData, formasData, cartoesData] = await Promise.all([
           getMinhasObras({ modo: 'FINANCEIRO', escopo: 'TODOS' }),
           getCategoriasFinanceiras(),
+          getEmpresasGrupo({ ativo: 1 }).catch(() => []),
           getPaymentAccounts().catch(() => []),
           getFormasPagamentoFinanceiras().catch(() => []),
           getCartoesFinanceiros().catch(() => [])
@@ -277,6 +284,7 @@ export default function FinanceiroTituloNovo() {
         const categoriasLista = Array.isArray(categoriasData) ? categoriasData : [];
         setObras(obrasLista);
         setCategorias(categoriasLista);
+        setEmpresasGrupo(Array.isArray(empresasData) ? empresasData : []);
         setPaymentAccounts(Array.isArray(paymentAccountsData) ? paymentAccountsData : []);
         setFormasPagamento(Array.isArray(formasData) ? formasData : []);
         setCartoes(Array.isArray(cartoesData) ? cartoesData : []);
@@ -526,6 +534,15 @@ export default function FinanceiroTituloNovo() {
   }, [paymentDraft.usar_credor_como_favorecido, parceiroSelecionado]);
 
   function updateField(field, value) {
+    if (field === 'intercompany') {
+      setForm((current) => ({
+        ...current,
+        intercompany: Boolean(value),
+        empresa_contraparte_id: value ? current.empresa_contraparte_id : ''
+      }));
+      return;
+    }
+
     if (field === 'tipo') {
       setSearchParams({ tipo: value });
       setParceiroDocumentoBusca('');
@@ -757,6 +774,12 @@ export default function FinanceiroTituloNovo() {
         apropriacao_id: form.apropriacao_id ? Number(form.apropriacao_id) : undefined,
         categoria_financeira_id: form.categoria_financeira_id ? Number(form.categoria_financeira_id) : undefined
       };
+      payload.empresa_contraparte_id = form.intercompany && form.empresa_contraparte_id
+        ? Number(form.empresa_contraparte_id)
+        : undefined;
+      payload.considera_dre = Boolean(form.considera_dre);
+      payload.intercompany = Boolean(form.intercompany);
+      payload.competencia_data = form.competencia_data || form.data_emissao || undefined;
       payload.pagamentos = (form.pagamentos || []).map((pagamento) => {
         const forma = getFormaPagamento(pagamento.forma_pagamento_id);
         const usaDetalhe = forma && (isFormaBoleto(forma) || isFormaCheque(forma));
@@ -1015,6 +1038,59 @@ export default function FinanceiroTituloNovo() {
                   onChange={(event) => updateField('data_emissao', event.target.value)}
                 />
               </label>
+
+              <label className="sol-filter-field xl:col-span-3">
+                <span className="sol-filter-label">Competencia DRE</span>
+                <input
+                  type="date"
+                  className="input w-full"
+                  value={form.competencia_data}
+                  onChange={(event) => updateField('competencia_data', event.target.value)}
+                />
+                <span className="app-note mt-2">Use o mes/periodo economico do fato gerador.</span>
+              </label>
+
+              <label className="sol-filter-field xl:col-span-3">
+                <span className="sol-filter-label">DRE</span>
+                <span className="flex min-h-[42px] items-center gap-2 rounded-lg border border-[var(--c-border)] bg-[var(--c-bg)] px-3 text-sm text-[var(--c-text)]">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(form.considera_dre)}
+                    onChange={(event) => updateField('considera_dre', event.target.checked)}
+                  />
+                  Considerar na DRE gerencial
+                </span>
+              </label>
+
+              <div className="sol-filter-field md:col-span-2 xl:col-span-6">
+                <span className="sol-filter-label">Intercompany</span>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <label className="flex min-h-[42px] items-center gap-2 rounded-lg border border-[var(--c-border)] bg-[var(--c-bg)] px-3 text-sm text-[var(--c-text)]">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(form.intercompany)}
+                      onChange={(event) => updateField('intercompany', event.target.checked)}
+                    />
+                    Movimentacao entre empresas do grupo
+                  </label>
+                  <select
+                    className="input w-full"
+                    value={form.empresa_contraparte_id}
+                    onChange={(event) => updateField('empresa_contraparte_id', event.target.value)}
+                    disabled={!form.intercompany}
+                  >
+                    <option value="">Contraparte do grupo</option>
+                    {empresasGrupo
+                      .filter((empresa) => empresa.ativo !== false && String(empresa.tipo_empresa || 'OPERACIONAL').toUpperCase() !== 'HOLDING')
+                      .map((empresa) => (
+                        <option key={empresa.id} value={empresa.id}>{empresa.nome}</option>
+                      ))}
+                  </select>
+                </div>
+                <span className="app-note mt-2">
+                  Por padrao a DRE consolidada exclui intercompany para evitar resultado duplicado.
+                </span>
+              </div>
 
               <div className="md:col-span-2 xl:col-span-12 space-y-3 rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface-muted)] p-4">
                 <div className="flex items-center justify-between gap-3">

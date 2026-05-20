@@ -194,34 +194,40 @@ function parseCpfCnpj(value, fieldName) {
 }
 
 function validateRhEmpresaGrupoQuery(query = {}) {
-  ensureAllowedKeys(query, ['q', 'ativo'], 'Consulta de empresas do grupo');
+  ensureAllowedKeys(query, ['q', 'ativo', 'tipo_empresa', 'holding_id'], 'Consulta de empresas do grupo');
 
   return {
     q: parseOptionalText(query.q, 'Busca', 120),
-    ativo: parseBoolean(query.ativo, 'Ativo')
+    ativo: parseBoolean(query.ativo, 'Ativo'),
+    tipo_empresa: parseEnum(query.tipo_empresa, 'Tipo de empresa', ['HOLDING', 'OPERACIONAL']),
+    holding_id: parseInteger(query.holding_id, 'Holding')
   };
 }
 
 function validateRhEmpresaGrupoCreateBody(body = {}) {
-  ensureAllowedKeys(body, ['codigo', 'nome', 'razao_social', 'cnpj', 'ativo'], 'Empresa do grupo');
+  ensureAllowedKeys(body, ['codigo', 'nome', 'razao_social', 'cnpj', 'tipo_empresa', 'holding_id', 'ativo'], 'Empresa do grupo');
 
   return {
     codigo: parseOptionalText(body.codigo, 'Codigo', 60),
     nome: parseOptionalText(body.nome, 'Nome', 160, { required: true }),
     razao_social: parseOptionalText(body.razao_social, 'Razao social', 200),
     cnpj: parseCpfCnpj(body.cnpj, 'CNPJ'),
+    tipo_empresa: parseEnum(body.tipo_empresa, 'Tipo de empresa', ['HOLDING', 'OPERACIONAL']),
+    holding_id: parseInteger(body.holding_id, 'Holding'),
     ativo: parseBoolean(body.ativo, 'Ativo')
   };
 }
 
 function validateRhEmpresaGrupoUpdateBody(body = {}) {
-  ensureAllowedKeys(body, ['codigo', 'nome', 'razao_social', 'cnpj', 'ativo'], 'Atualizacao de empresa do grupo');
+  ensureAllowedKeys(body, ['codigo', 'nome', 'razao_social', 'cnpj', 'tipo_empresa', 'holding_id', 'ativo'], 'Atualizacao de empresa do grupo');
 
   const payload = {
     codigo: parseOptionalText(body.codigo, 'Codigo', 60),
     nome: parseOptionalText(body.nome, 'Nome', 160),
     razao_social: parseOptionalText(body.razao_social, 'Razao social', 200),
     cnpj: parseCpfCnpj(body.cnpj, 'CNPJ'),
+    tipo_empresa: parseEnum(body.tipo_empresa, 'Tipo de empresa', ['HOLDING', 'OPERACIONAL']),
+    holding_id: parseInteger(body.holding_id, 'Holding'),
     ativo: parseBoolean(body.ativo, 'Ativo')
   };
 

@@ -1,4 +1,5 @@
 const {
+  gerarDreGerencial,
   gerarRelatorioAnalitico,
   gerarRelatorioFluxoCaixa
 } = require('../services/relatorioFinanceiroService');
@@ -26,6 +27,16 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return responderErro(res, error, 'Erro ao gerar relatorio analitico financeiro');
+    }
+  },
+
+  async dre(req, res) {
+    try {
+      const relatorio = await gerarDreGerencial(req, req.query || {});
+      return res.json(relatorio);
+    } catch (error) {
+      console.error(error);
+      return responderErro(res, error, 'Erro ao gerar DRE financeira');
     }
   }
 };

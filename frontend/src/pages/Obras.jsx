@@ -16,6 +16,7 @@ import {
   ativarObra,
   desativarObra
 } from '../services/obras';
+import { getEmpresasGrupo } from '../services/empresasGrupo';
 import { useAuth } from '../contexts/AuthContext';
 import { canAccessGestaoObras, isBusinessAdmin } from '../utils/acessoProduto';
 
@@ -132,6 +133,7 @@ function initialFormState() {
   return {
     id: null,
     tipo_centro_custo: 'OBRA',
+    empresa_grupo_id: '',
     codigo: '',
     nome: '',
     cidade: '',
@@ -146,6 +148,7 @@ export default function Obras() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [obras, setObras] = useState([]);
+  const [empresasGrupo, setEmpresasGrupo] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [busca, setBusca] = useState('');
@@ -157,7 +160,17 @@ export default function Obras() {
 
   useEffect(() => {
     carregarObras();
+    carregarEmpresasGrupo();
   }, [gestaoObrasHabilitada]);
+
+  async function carregarEmpresasGrupo() {
+    try {
+      const data = await getEmpresasGrupo({ ativo: true });
+      setEmpresasGrupo(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error(error);
+    }
+  }
 
   async function carregarObras() {
     try {
@@ -193,6 +206,7 @@ export default function Obras() {
     setForm({
       id: obra.id,
       tipo_centro_custo: obra.tipo_centro_custo || 'OBRA',
+      empresa_grupo_id: obra.empresa_grupo_id ? String(obra.empresa_grupo_id) : '',
       codigo: obra.codigo || '',
       nome: obra.nome || '',
       cidade: obra.cidade || '',
@@ -218,6 +232,7 @@ export default function Obras() {
       const cadastroEhObra = tipoCadastro === 'OBRA';
       const payload = {
         tipo_centro_custo: tipoCadastro,
+        empresa_grupo_id: form.empresa_grupo_id ? Number(form.empresa_grupo_id) : null,
         codigo: String(form.codigo || '').trim().toUpperCase(),
         nome: String(form.nome || '').trim(),
         cidade: String(form.cidade || '').trim(),
@@ -272,6 +287,7 @@ export default function Obras() {
         obra.codigo,
         obra.nome,
         obra.cidade,
+        obra.empresaGrupo?.nome,
         getTipoCadastroLabel(obra)
       ]
         .map((value) => String(value || '').toLowerCase())
@@ -410,6 +426,9 @@ export default function Obras() {
                     >
                       <HiOutlineMapPin className="h-4 w-4" />
                       {obra.cidade || 'Cidade nao informada'}
+                    </div>
+                    <div className="mt-2 text-xs font-semibold uppercase tracking-[0.14em]" style={{ color: 'var(--c-muted)' }}>
+                      Empresa: {obra.empresaGrupo?.nome || 'Nao vinculada'}
                     </div>
                   </div>
 
@@ -624,6 +643,24 @@ export default function Obras() {
                 >
                   <option value="OBRA">Obra</option>
                   <option value="CENTRO_CUSTO">Centro de custo</option>
+                </select>
+              </label>
+
+              <label className="grid gap-1 text-sm font-medium md:col-span-3" style={{ color: 'var(--c-text)' }}>
+                Empresa do grupo
+                <select
+                  className="input"
+                  value={form.empresa_grupo_id}
+                  onChange={(event) => setForm((current) => ({ ...current, empresa_grupo_id: event.target.value }))}
+                >
+                  <option value="">Selecione a empresa operacional</option>
+                  {empresasGrupo
+                    .filter((empresa) => String(empresa.tipo_empresa || 'OPERACIONAL').toUpperCase() !== 'HOLDING')
+                    .map((empresa) => (
+                      <option key={empresa.id} value={empresa.id}>
+                        {empresa.nome}
+                      </option>
+                    ))}
                 </select>
               </label>
 

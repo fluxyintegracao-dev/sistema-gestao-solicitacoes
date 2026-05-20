@@ -1025,6 +1025,16 @@ db.ContratoComercial.belongsTo(db.TituloFinanceiro, {
   as: 'tituloFinanceiroComissao'
 });
 
+db.EmpresaGrupo.belongsTo(db.EmpresaGrupo, {
+  foreignKey: 'holding_id',
+  as: 'holding'
+});
+
+db.EmpresaGrupo.hasMany(db.EmpresaGrupo, {
+  foreignKey: 'holding_id',
+  as: 'empresasControladas'
+});
+
 db.RhEmpresaGrupo.hasMany(db.RhColaborador, {
   foreignKey: 'empresa_grupo_id',
   as: 'colaboradores'
@@ -2050,6 +2060,16 @@ db.TituloFinanceiro.belongsTo(db.Obra, {
   as: 'obra'
 });
 
+db.EmpresaGrupo.hasMany(db.Obra, {
+  foreignKey: 'empresa_grupo_id',
+  as: 'obrasCentrosCusto'
+});
+
+db.Obra.belongsTo(db.EmpresaGrupo, {
+  foreignKey: 'empresa_grupo_id',
+  as: 'empresaGrupo'
+});
+
 db.Apropriacao.hasMany(db.TituloFinanceiro, {
   foreignKey: 'apropriacao_id',
   as: 'titulosFinanceiros'
@@ -2148,6 +2168,16 @@ db.EmpresaGrupo.hasMany(db.TituloFinanceiro, {
 db.TituloFinanceiro.belongsTo(db.EmpresaGrupo, {
   foreignKey: 'empresa_id',
   as: 'empresa'
+});
+
+db.EmpresaGrupo.hasMany(db.TituloFinanceiro, {
+  foreignKey: 'empresa_contraparte_id',
+  as: 'titulosIntercompanyContraparte'
+});
+
+db.TituloFinanceiro.belongsTo(db.EmpresaGrupo, {
+  foreignKey: 'empresa_contraparte_id',
+  as: 'empresaContraparte'
 });
 
 db.User.hasMany(db.TituloFinanceiro, {

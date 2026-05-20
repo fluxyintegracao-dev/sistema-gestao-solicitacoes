@@ -14,12 +14,17 @@ const {
 const { ValidationError } = require('../middlewares/validation');
 const { uploadToS3, getPresignedUrl } = require('./s3');
 const { normalizeOriginalName } = require('../utils/fileName');
+const {
+  TIPO_EMPRESA_HOLDING,
+  TIPO_EMPRESA_OPERACIONAL,
+  normalizeTipoEmpresaGrupo
+} = require('../constants/empresaGrupo');
 
 const COLABORADOR_INCLUDE = [
   {
     model: RhEmpresaGrupo,
     as: 'empresaGrupo',
-    attributes: ['id', 'codigo', 'nome', 'razao_social', 'cnpj', 'ativo']
+    attributes: ['id', 'codigo', 'nome', 'razao_social', 'cnpj', 'tipo_empresa', 'holding_id', 'ativo']
   },
   {
     model: Obra,
@@ -667,20 +672,64 @@ async function listarEmpresasGrupoRh(filters = {}) {
   if (filters.ativo !== undefined) {
     where.ativo = filters.ativo;
   }
+  if (filters.tipo_empresa) {
+    where.tipo_empresa = normalizeTipoEmpresaGrupo(filters.tipo_empresa);
+  }
+  if (filters.holding_id) {
+    where.holding_id = filters.holding_id;
+  }
 
   return RhEmpresaGrupo.findAll({
     where,
-    order: [['nome', 'ASC']]
+    order: [['tipo_empresa', 'ASC'], ['nome', 'ASC']]
   });
+}
+
+async function normalizeEmpresaGrupoHierarchy(data = {}, currentId = null, transaction = null) {
+  const payload = { ...data };
+
+  if (payload.tipo_empresa !== undefined) {
+    payload.tipo_empresa = normalizeTipoEmpresaGrupo(payload.tipo_empresa);
+  }
+  if (!payload.tipo_empresa && !currentId) {
+    payload.tipo_empresa = TIPO_EMPRESA_OPERACIONAL;
+  }
+
+  const tipo = payload.tipo_empresa || TIPO_EMPRESA_OPERACIONAL;
+  if (tipo === TIPO_EMPRESA_HOLDING) {
+    payload.holding_id = null;
+    return payload;
+  }
+
+  if (payload.holding_id !== undefined && payload.holding_id !== null) {
+    const holdingId = Number(payload.holding_id);
+    if (!Number.isInteger(holdingId) || holdingId <= 0) {
+      throw new ValidationError('Holding invalida.');
+    }
+    if (currentId && Number(currentId) === holdingId) {
+      throw new ValidationError('Uma empresa nao pode ser holding de si propria.');
+    }
+
+    const holding = await RhEmpresaGrupo.findByPk(holdingId, { transaction });
+    if (!holding || holding.ativo === false) {
+      throw new ValidationError('Holding nao encontrada ou inativa.');
+    }
+    if (normalizeTipoEmpresaGrupo(holding.tipo_empresa) !== TIPO_EMPRESA_HOLDING) {
+      throw new ValidationError('A empresa controladora precisa estar marcada como Holding.');
+    }
+  }
+
+  return payload;
 }
 
 async function criarEmpresaGrupoRh(data, user) {
   return sequelize.transaction(async (transaction) => {
-    await assertUniqueEmpresaGrupo(data, null, transaction);
+    const normalized = await normalizeEmpresaGrupoHierarchy(data, null, transaction);
+    await assertUniqueEmpresaGrupo(normalized, null, transaction);
 
     const created = await RhEmpresaGrupo.create(
       {
-        ...data,
+        ...normalized,
         criado_por: user?.id || null,
         atualizado_por: user?.id || null
       },
@@ -698,11 +747,12 @@ async function atualizarEmpresaGrupoRh(id, data, user) {
       throw new ValidationError('Empresa do grupo nao encontrada.', 404);
     }
 
-    await assertUniqueEmpresaGrupo(data, empresa.id, transaction);
+    const normalized = await normalizeEmpresaGrupoHierarchy(data, empresa.id, transaction);
+    await assertUniqueEmpresaGrupo(normalized, empresa.id, transaction);
 
     await empresa.update(
       {
-        ...data,
+        ...normalized,
         atualizado_por: user?.id || null
       },
       { transaction }

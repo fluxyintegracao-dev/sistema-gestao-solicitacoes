@@ -22,6 +22,15 @@ module.exports = (sequelize, DataTypes) => sequelize.define(
       type: DataTypes.STRING(20),
       allowNull: true
     },
+    tipo_empresa: {
+      type: DataTypes.STRING(30),
+      allowNull: false,
+      defaultValue: 'OPERACIONAL'
+    },
+    holding_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true
+    },
     ativo: {
       type: DataTypes.BOOLEAN,
       allowNull: false,

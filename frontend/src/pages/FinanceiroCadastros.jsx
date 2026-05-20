@@ -46,6 +46,10 @@ function defaultCategoriaForm() {
     nome: '',
     tipo: 'AMBOS',
     descricao: '',
+    dre_grupo: '',
+    dre_subgrupo: '',
+    dre_ordem: '',
+    considera_dre: true,
     ativo: true
   };
 }
@@ -137,6 +141,10 @@ function pickCategoriaFormData(categoria = {}) {
     nome: categoria.nome || '',
     tipo: categoria.tipo || 'AMBOS',
     descricao: categoria.descricao || '',
+    dre_grupo: categoria.dre_grupo || '',
+    dre_subgrupo: categoria.dre_subgrupo || '',
+    dre_ordem: categoria.dre_ordem ?? '',
+    considera_dre: categoria.considera_dre !== false,
     ativo: categoria.ativo !== false
   };
 }
@@ -871,6 +879,31 @@ export default function FinanceiroCadastros() {
                   <option value="RECEBER">Receber</option>
                 </select>
                 <textarea className="input min-h-[96px] w-full" placeholder="Descricao" value={categoriaForm.descricao} onChange={(e) => setCategoriaForm((c) => ({ ...c, descricao: e.target.value }))} />
+                <div className="grid gap-3 md:grid-cols-3">
+                  <input
+                    className="input w-full"
+                    placeholder="Grupo DRE"
+                    value={categoriaForm.dre_grupo}
+                    onChange={(e) => setCategoriaForm((c) => ({ ...c, dre_grupo: e.target.value }))}
+                  />
+                  <input
+                    className="input w-full"
+                    placeholder="Subgrupo DRE"
+                    value={categoriaForm.dre_subgrupo}
+                    onChange={(e) => setCategoriaForm((c) => ({ ...c, dre_subgrupo: e.target.value }))}
+                  />
+                  <input
+                    className="input w-full"
+                    placeholder="Ordem DRE"
+                    type="number"
+                    value={categoriaForm.dre_ordem}
+                    onChange={(e) => setCategoriaForm((c) => ({ ...c, dre_ordem: e.target.value }))}
+                  />
+                </div>
+                <label className="flex items-center gap-2 text-sm text-[var(--c-text)]">
+                  <input type="checkbox" checked={categoriaForm.considera_dre} onChange={(e) => setCategoriaForm((c) => ({ ...c, considera_dre: e.target.checked }))} />
+                  Considerar na DRE
+                </label>
                 <label className="flex items-center gap-2 text-sm text-[var(--c-text)]">
                   <input type="checkbox" checked={categoriaForm.ativo} onChange={(e) => setCategoriaForm((c) => ({ ...c, ativo: e.target.checked }))} />
                   Categoria ativa
@@ -958,6 +991,9 @@ export default function FinanceiroCadastros() {
                                   </div>
                                   <div className="mt-1 text-[var(--c-muted)]">
                                     {categoria.descricao || 'Sem descricao complementar.'}
+                                  </div>
+                                  <div className="mt-1 text-xs text-[var(--c-muted)]">
+                                    DRE: {categoria.considera_dre === false ? 'Nao considera' : `${categoria.dre_grupo || 'Nao classificada'}${categoria.dre_subgrupo ? ` / ${categoria.dre_subgrupo}` : ''}`}
                                   </div>
                                 </div>
                                 <div className="flex items-center gap-2">

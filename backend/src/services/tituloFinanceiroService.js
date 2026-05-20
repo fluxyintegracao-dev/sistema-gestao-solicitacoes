@@ -379,7 +379,7 @@ function buildTituloInclude({ includeMovimentos = false } = {}) {
     {
       model: Obra,
       as: 'obra',
-      attributes: ['id', 'nome', 'codigo']
+      attributes: ['id', 'nome', 'codigo', 'empresa_grupo_id']
     },
     {
       model: Parceiro,
@@ -494,7 +494,7 @@ async function carregarSolicitacaoFinanceira(req, solicitacaoId) {
       {
         model: Obra,
         as: 'obra',
-        attributes: ['id', 'nome', 'codigo']
+        attributes: ['id', 'nome', 'codigo', 'empresa_grupo_id']
       },
       {
         model: Parceiro,
@@ -613,7 +613,7 @@ function validarCompatibilidadeParceiroTitulo(parceiro, tipoTitulo) {
 
 async function validarObraTitulo(req, obraId) {
   const obra = await Obra.findByPk(obraId, {
-    attributes: ['id', 'nome', 'codigo', 'tipo_centro_custo']
+    attributes: ['id', 'nome', 'codigo', 'tipo_centro_custo', 'empresa_grupo_id']
   });
 
   if (!obra) {
@@ -672,6 +672,24 @@ async function validarEmpresaGrupo(empresaId) {
     throw createHttpError(400, 'Empresa do grupo invalida ou inativa.');
   }
   return empresa;
+}
+
+function resolverEmpresaTitulo({ empresaIdInformada, obra }) {
+  const empresaInformada = empresaIdInformada ? Number(empresaIdInformada) : null;
+  const empresaDaObra = obra?.empresa_grupo_id ? Number(obra.empresa_grupo_id) : null;
+
+  if (empresaInformada && empresaDaObra && empresaInformada !== empresaDaObra) {
+    throw createHttpError(
+      400,
+      'A empresa do titulo deve ser a mesma vinculada a obra/centro de custo selecionado.'
+    );
+  }
+
+  return empresaInformada || empresaDaObra || null;
+}
+
+function resolverCompetenciaTitulo(payload = {}, fallbackData = null) {
+  return payload.competencia_data || payload.data_emissao || payload.data_compra || fallbackData || null;
 }
 
 async function carregarTituloPorId(req, tituloId, { includeMovimentos = false } = {}) {
@@ -895,7 +913,7 @@ async function listarBaixasRealizadas(req, filters = {}) {
           {
             model: Obra,
             as: 'obra',
-            attributes: ['id', 'nome', 'codigo']
+            attributes: ['id', 'nome', 'codigo', 'empresa_grupo_id']
           },
           {
             model: Parceiro,
@@ -969,9 +987,14 @@ async function criarTituloPorSolicitacao(req, solicitacaoId, payload = {}) {
     throw createHttpError(400, 'Valor invalido para gerar o titulo.');
   }
 
+  const empresaTituloId = resolverEmpresaTitulo({
+    empresaIdInformada: payload.empresa_id,
+    obra: solicitacao.obra
+  });
+
   const [parceiro] = await Promise.all([
     validarParceiro(parceiroId),
-    validarEmpresaGrupo(payload.empresa_id),
+    validarEmpresaGrupo(empresaTituloId),
     validarCategoriaFinanceira(payload.categoria_financeira_id, tipo)
   ]);
   validarCompatibilidadeParceiroTitulo(parceiro, tipo);
@@ -1058,7 +1081,8 @@ async function criarTituloPorSolicitacao(req, solicitacaoId, payload = {}) {
           solicitacao_id: solicitacao.id,
           obra_id: solicitacao.obra_id,
           apropriacao_id: solicitacao.apropriacao_id || null,
-          empresa_id: payload.empresa_id || null,
+          empresa_id: empresaTituloId,
+          empresa_contraparte_id: payload.empresa_contraparte_id || null,
           parceiro_id: parceiroId,
           categoria_financeira_id: payload.categoria_financeira_id || null,
           forma_pagamento_id: pagamento.formaPagamento?.id || null,
@@ -1067,6 +1091,9 @@ async function criarTituloPorSolicitacao(req, solicitacaoId, payload = {}) {
           numero_parcela: totalParcelasDoGrupo > 1 ? numeroParcela : null,
           total_parcelas: totalParcelasDoGrupo > 1 ? totalParcelasDoGrupo : null,
           data_compra: pagamento.dataCompra,
+          competencia_data: resolverCompetenciaTitulo(payload, pagamento.dataCompra),
+          considera_dre: payload.considera_dre !== false,
+          intercompany: Boolean(payload.intercompany),
           origem_titulo: 'SOLICITACAO',
           tipo,
           status: 'ABERTO',
@@ -1178,9 +1205,13 @@ async function criarTituloManual(req, payload = {}) {
   const [obra, parceiro] = await Promise.all([
     validarObraTitulo(req, obraId),
     validarParceiro(parceiroId),
-    validarEmpresaGrupo(payload.empresa_id),
     validarCategoriaFinanceira(payload.categoria_financeira_id, tipo)
   ]);
+  const empresaTituloId = resolverEmpresaTitulo({
+    empresaIdInformada: payload.empresa_id,
+    obra
+  });
+  await validarEmpresaGrupo(empresaTituloId);
   const apropriacao = await validarApropriacaoTitulo(payload.apropriacao_id, obra.id);
 
   validarCompatibilidadeParceiroTitulo(parceiro, tipo);
@@ -1265,7 +1296,8 @@ async function criarTituloManual(req, payload = {}) {
           solicitacao_id: null,
           obra_id: obra.id,
           apropriacao_id: apropriacao?.id || null,
-          empresa_id: payload.empresa_id || null,
+          empresa_id: empresaTituloId,
+          empresa_contraparte_id: payload.empresa_contraparte_id || null,
           parceiro_id: parceiro.id,
           categoria_financeira_id: payload.categoria_financeira_id || null,
           forma_pagamento_id: pagamento.formaPagamento?.id || null,
@@ -1274,6 +1306,9 @@ async function criarTituloManual(req, payload = {}) {
           numero_parcela: pagamento.quantidadeParcelas > 1 ? numeroParcela : null,
           total_parcelas: pagamento.quantidadeParcelas > 1 ? pagamento.quantidadeParcelas : null,
           data_compra: pagamento.dataCompra,
+          competencia_data: resolverCompetenciaTitulo(payload, pagamento.dataCompra),
+          considera_dre: payload.considera_dre !== false,
+          intercompany: Boolean(payload.intercompany),
           origem_titulo: 'MANUAL',
           tipo,
           status: 'ABERTO',

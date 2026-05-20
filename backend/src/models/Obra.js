@@ -13,6 +13,10 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.STRING,
       allowNull: false
     },
+    empresa_grupo_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true
+    },
     ativo: {
       type: DataTypes.BOOLEAN,
       allowNull: false,

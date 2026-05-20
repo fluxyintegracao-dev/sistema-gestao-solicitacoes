@@ -335,6 +335,28 @@ function validateFinanceFluxoCaixaQuery(query = {}) {
   };
 }
 
+function validateFinanceDreQuery(query = {}) {
+  ensureAllowedKeys(
+    query,
+    ['periodo', 'data_inicial', 'data_final', 'empresa_id', 'holding_id', 'obra_id', 'excluir_intercompany'],
+    'Consulta de DRE'
+  );
+
+  const base = validateFinanceFluxoCaixaQuery({
+    periodo: query.periodo,
+    data_inicial: query.data_inicial,
+    data_final: query.data_final,
+    obra_id: query.obra_id
+  });
+
+  return {
+    ...base,
+    empresa_id: parseInteger(query.empresa_id, 'Empresa do grupo'),
+    holding_id: parseInteger(query.holding_id, 'Holding'),
+    excluir_intercompany: parseBoolean(query.excluir_intercompany, 'Excluir intercompany')
+  };
+}
+
 function validateFinanceBaixasQuery(query = {}) {
   ensureAllowedKeys(
     query,
@@ -668,6 +690,10 @@ function validateFinanceTituloCreateFromSolicitacaoBody(body = {}) {
       'cartao_id',
       'quantidade_parcelas',
       'data_compra',
+      'competencia_data',
+      'considera_dre',
+      'intercompany',
+      'empresa_contraparte_id',
       'parcelas',
       'pagamentos'
     ],
@@ -697,6 +723,10 @@ function validateFinanceTituloCreateFromSolicitacaoBody(body = {}) {
     cartao_id: parseInteger(body.cartao_id, 'Cartao'),
     quantidade_parcelas: parseInteger(body.quantidade_parcelas, 'Quantidade de parcelas'),
     data_compra: parseDateOnly(body.data_compra, 'Data da compra'),
+    competencia_data: parseDateOnly(body.competencia_data, 'Data de competencia'),
+    considera_dre: parseBoolean(body.considera_dre, 'Considera DRE'),
+    intercompany: parseBoolean(body.intercompany, 'Intercompany'),
+    empresa_contraparte_id: parseInteger(body.empresa_contraparte_id, 'Empresa contraparte'),
     parcelas: parseParcelasTitulo(body.parcelas),
     pagamentos: parsePagamentosTitulo(body.pagamentos)
   };
@@ -729,6 +759,10 @@ function validateFinanceTituloCreateBody(body = {}) {
       'cartao_id',
       'quantidade_parcelas',
       'data_compra',
+      'competencia_data',
+      'considera_dre',
+      'intercompany',
+      'empresa_contraparte_id',
       'parcelas',
       'pagamentos'
     ],
@@ -760,6 +794,10 @@ function validateFinanceTituloCreateBody(body = {}) {
     cartao_id: parseInteger(body.cartao_id, 'Cartao'),
     quantidade_parcelas: parseInteger(body.quantidade_parcelas, 'Quantidade de parcelas'),
     data_compra: parseDateOnly(body.data_compra, 'Data da compra'),
+    competencia_data: parseDateOnly(body.competencia_data, 'Data de competencia'),
+    considera_dre: parseBoolean(body.considera_dre, 'Considera DRE'),
+    intercompany: parseBoolean(body.intercompany, 'Intercompany'),
+    empresa_contraparte_id: parseInteger(body.empresa_contraparte_id, 'Empresa contraparte'),
     parcelas: parseParcelasTitulo(body.parcelas),
     pagamentos: parsePagamentosTitulo(body.pagamentos)
   };
@@ -938,7 +976,7 @@ function validateFinanceCadastroContaBody(body = {}) {
 function validateFinanceCadastroCategoriaBody(body = {}) {
   ensureAllowedKeys(
     body,
-    ['nome', 'tipo', 'descricao', 'ativo'],
+    ['nome', 'tipo', 'descricao', 'dre_grupo', 'dre_subgrupo', 'dre_ordem', 'considera_dre', 'ativo'],
     'Categoria financeira'
   );
 
@@ -946,6 +984,10 @@ function validateFinanceCadastroCategoriaBody(body = {}) {
     nome: parseOptionalText(body.nome, 'Nome', 120),
     tipo: parseEnum(body.tipo, 'Tipo', ['PAGAR', 'RECEBER', 'AMBOS']),
     descricao: parseOptionalText(body.descricao, 'Descricao', 255),
+    dre_grupo: parseOptionalText(body.dre_grupo, 'Grupo DRE', 80),
+    dre_subgrupo: parseOptionalText(body.dre_subgrupo, 'Subgrupo DRE', 120),
+    dre_ordem: parseInteger(body.dre_ordem, 'Ordem DRE'),
+    considera_dre: parseBoolean(body.considera_dre, 'Considera DRE'),
     ativo: parseBoolean(body.ativo, 'Ativo')
   };
 }
@@ -1090,6 +1132,7 @@ module.exports = {
   validateFinanceCadastroContaBody,
   validateFinanceBoletoTituloQuery,
   validateFinanceBaixasQuery,
+  validateFinanceDreQuery,
   validateFinanceFluxoCaixaQuery,
   validateFinanceRelatorioAnaliticoQuery,
   validateFinanceTituloBaixaBody,

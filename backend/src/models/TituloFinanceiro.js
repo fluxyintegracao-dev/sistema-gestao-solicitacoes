@@ -27,6 +27,10 @@ module.exports = (sequelize, DataTypes) => sequelize.define(
       type: DataTypes.INTEGER,
       allowNull: true
     },
+    empresa_contraparte_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true
+    },
     parceiro_id: {
       type: DataTypes.INTEGER,
       allowNull: false
@@ -62,6 +66,20 @@ module.exports = (sequelize, DataTypes) => sequelize.define(
     data_compra: {
       type: DataTypes.DATEONLY,
       allowNull: true
+    },
+    competencia_data: {
+      type: DataTypes.DATEONLY,
+      allowNull: true
+    },
+    considera_dre: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: true
+    },
+    intercompany: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false
     },
     origem_titulo: {
       type: DataTypes.STRING(40),

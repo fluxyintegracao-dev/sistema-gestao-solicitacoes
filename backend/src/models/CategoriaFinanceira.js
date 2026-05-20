@@ -19,6 +19,23 @@ module.exports = (sequelize, DataTypes) => sequelize.define(
       type: DataTypes.STRING(255),
       allowNull: true
     },
+    dre_grupo: {
+      type: DataTypes.STRING(80),
+      allowNull: true
+    },
+    dre_subgrupo: {
+      type: DataTypes.STRING(120),
+      allowNull: true
+    },
+    dre_ordem: {
+      type: DataTypes.INTEGER,
+      allowNull: true
+    },
+    considera_dre: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: true
+    },
     ativo: {
       type: DataTypes.BOOLEAN,
       allowNull: false,

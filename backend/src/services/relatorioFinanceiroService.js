@@ -2,6 +2,7 @@ const { Op } = require('sequelize');
 const {
   CategoriaFinanceira,
   ContaBancaria,
+  EmpresaGrupo,
   MovimentoFinanceiro,
   Obra,
   Parceiro,
@@ -719,7 +720,212 @@ async function gerarRelatorioAnalitico(req, filters = {}) {
   };
 }
 
+function getCompetenciaWhere(periodo) {
+  return {
+    [Op.or]: [
+      { competencia_data: { [Op.between]: [periodo.data_inicial, periodo.data_final] } },
+      {
+        competencia_data: null,
+        data_emissao: { [Op.between]: [periodo.data_inicial, periodo.data_final] }
+      },
+      {
+        competencia_data: null,
+        data_emissao: null,
+        data_compra: { [Op.between]: [periodo.data_inicial, periodo.data_final] }
+      },
+      {
+        competencia_data: null,
+        data_emissao: null,
+        data_compra: null,
+        data_vencimento: { [Op.between]: [periodo.data_inicial, periodo.data_final] }
+      }
+    ]
+  };
+}
+
+function getEmpresaIdsDaHolding(empresas = [], holdingId = null) {
+  if (!holdingId) return null;
+
+  const id = Number(holdingId);
+  const ids = new Set([id]);
+  let changed = true;
+
+  while (changed) {
+    changed = false;
+    for (const empresa of empresas) {
+      if (empresa.holding_id && ids.has(Number(empresa.holding_id)) && !ids.has(Number(empresa.id))) {
+        ids.add(Number(empresa.id));
+        changed = true;
+      }
+    }
+  }
+
+  return Array.from(ids);
+}
+
+function getLinhaDre(titulo) {
+  const categoria = titulo.categoriaFinanceira;
+  const tipo = String(titulo.tipo || '').toUpperCase();
+  const grupoCategoria = String(categoria?.dre_grupo || '').trim();
+
+  if (grupoCategoria) {
+    return {
+      grupo: grupoCategoria,
+      subgrupo: categoria?.dre_subgrupo || null,
+      ordem: categoria?.dre_ordem ?? 999,
+      considera_dre: categoria?.considera_dre !== false
+    };
+  }
+
+  return tipo === 'RECEBER'
+    ? { grupo: 'Receitas nao classificadas', subgrupo: null, ordem: 900, considera_dre: true }
+    : { grupo: 'Custos e despesas nao classificados', subgrupo: null, ordem: 910, considera_dre: true };
+}
+
+function addToMap(map, key, seed, amount) {
+  if (!map.has(key)) {
+    map.set(key, { ...seed, valor: 0, titulos: 0 });
+  }
+  const item = map.get(key);
+  item.valor += amount;
+  item.titulos += 1;
+  return item;
+}
+
+function summarizeDreRows(titulos = [], empresas = []) {
+  const empresasById = new Map(empresas.map((empresa) => [Number(empresa.id), empresa]));
+  const linhasMap = new Map();
+  const empresasMap = new Map();
+
+  for (const titulo of titulos) {
+    const linha = getLinhaDre(titulo);
+    if (!linha.considera_dre || titulo.considera_dre === false) continue;
+
+    const tipo = String(titulo.tipo || '').toUpperCase();
+    const rawValue = Number(titulo.valor_original || 0);
+    const signedValue = tipo === 'RECEBER' ? rawValue : -rawValue;
+    const empresaId = titulo.empresa_id ? Number(titulo.empresa_id) : null;
+    const empresa = empresaId ? empresasById.get(empresaId) : null;
+    const empresaKey = empresaId ? String(empresaId) : 'SEM_EMPRESA';
+
+    addToMap(linhasMap, linha.grupo, {
+      grupo: linha.grupo,
+      ordem: linha.ordem
+    }, signedValue);
+
+    const empresaResumo = addToMap(empresasMap, empresaKey, {
+      empresa_id: empresaId,
+      empresa_nome: empresa?.nome || 'Sem empresa vinculada',
+      tipo_empresa: empresa?.tipo_empresa || null,
+      holding_id: empresa?.holding_id || null,
+      receitas: 0,
+      despesas: 0,
+      resultado: 0
+    }, 0);
+
+    if (signedValue >= 0) {
+      empresaResumo.receitas += signedValue;
+    } else {
+      empresaResumo.despesas += Math.abs(signedValue);
+    }
+    empresaResumo.resultado += signedValue;
+  }
+
+  const linhas = Array.from(linhasMap.values())
+    .sort((a, b) => Number(a.ordem || 999) - Number(b.ordem || 999) || String(a.grupo).localeCompare(String(b.grupo)));
+
+  const empresasResumo = Array.from(empresasMap.values())
+    .sort((a, b) => String(a.empresa_nome).localeCompare(String(b.empresa_nome)));
+
+  const receitas = empresasResumo.reduce((sum, item) => sum + Number(item.receitas || 0), 0);
+  const despesas = empresasResumo.reduce((sum, item) => sum + Number(item.despesas || 0), 0);
+  const resultado = receitas - despesas;
+
+  return {
+    resumo: {
+      receitas,
+      despesas,
+      resultado,
+      margem_resultado: receitas > 0 ? Number(((resultado / receitas) * 100).toFixed(2)) : null,
+      empresas_com_movimento: empresasResumo.length,
+      titulos_considerados: titulos.length
+    },
+    linhas,
+    empresas: empresasResumo
+  };
+}
+
+async function gerarDreGerencial(req, filters = {}) {
+  await assertFinanceAccess(req);
+
+  const periodo = resolvePeriodo(filters);
+  const obraWhere = await resolveObraScope(req, filters.obra_id);
+  const empresas = await EmpresaGrupo.findAll({
+    attributes: ['id', 'codigo', 'nome', 'razao_social', 'cnpj', 'tipo_empresa', 'holding_id', 'ativo'],
+    order: [['tipo_empresa', 'ASC'], ['nome', 'ASC']]
+  });
+  const empresaIdsHolding = getEmpresaIdsDaHolding(empresas, filters.holding_id);
+
+  const tituloWhere = {
+    considera_dre: true,
+    ...getCompetenciaWhere(periodo)
+  };
+
+  if (filters.empresa_id) {
+    tituloWhere.empresa_id = Number(filters.empresa_id);
+  } else if (empresaIdsHolding) {
+    tituloWhere.empresa_id = { [Op.in]: empresaIdsHolding };
+  }
+
+  if (filters.excluir_intercompany !== false) {
+    tituloWhere.intercompany = false;
+  }
+
+  const titulos = await TituloFinanceiro.findAll({
+    where: tituloWhere,
+    include: [
+      {
+        model: Obra,
+        as: 'obra',
+        attributes: ['id', 'codigo', 'nome', 'tipo_centro_custo', 'empresa_grupo_id'],
+        where: obraWhere,
+        required: true
+      },
+      {
+        model: EmpresaGrupo,
+        as: 'empresa',
+        attributes: ['id', 'codigo', 'nome', 'razao_social', 'cnpj', 'tipo_empresa', 'holding_id'],
+        required: false
+      },
+      {
+        model: CategoriaFinanceira,
+        as: 'categoriaFinanceira',
+        attributes: ['id', 'nome', 'tipo', 'dre_grupo', 'dre_subgrupo', 'dre_ordem', 'considera_dre'],
+        required: false
+      }
+    ],
+    order: [['data_emissao', 'ASC'], ['data_vencimento', 'ASC']]
+  });
+
+  const summary = summarizeDreRows(titulos, empresas);
+
+  return {
+    filtro: {
+      periodo: periodo.periodo,
+      descricao: periodo.descricao,
+      data_inicial: periodo.data_inicial,
+      data_final: periodo.data_final,
+      empresa_id: filters.empresa_id ? Number(filters.empresa_id) : null,
+      holding_id: filters.holding_id ? Number(filters.holding_id) : null,
+      obra_id: filters.obra_id ? Number(filters.obra_id) : null,
+      excluir_intercompany: filters.excluir_intercompany !== false
+    },
+    ...summary
+  };
+}
+
 module.exports = {
   gerarRelatorioAnalitico,
-  gerarRelatorioFluxoCaixa
+  gerarRelatorioFluxoCaixa,
+  gerarDreGerencial
 };

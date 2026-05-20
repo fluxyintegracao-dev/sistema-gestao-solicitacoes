@@ -780,6 +780,18 @@ export async function getResultadoCentrosCusto() {
   return parseJson(response, 'Erro ao buscar resultado de centros de custo');
 }
 
+export async function getDreFinanceira(params = {}) {
+  const query = new URLSearchParams(
+    Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== '')
+  ).toString();
+  const url = query ? `${API_URL}/financeiro/relatorios/dre?${query}` : `${API_URL}/financeiro/relatorios/dre`;
+  const response = await fetch(url, {
+    headers: authHeaders()
+  });
+
+  return parseJson(response, 'Erro ao buscar DRE financeira');
+}
+
 export async function getPaymentBeneficiaries(params = {}) {
   const query = new URLSearchParams(
     Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== '')
