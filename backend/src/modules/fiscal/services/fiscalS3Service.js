@@ -39,7 +39,8 @@ function sanitizeMetadataValue(value) {
   return String(value == null ? '' : value)
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^\x20-\x7E]/g, '-')
+    .replace(/[^a-zA-Z0-9._=-]/g, '-')
+    .replace(/-+/g, '-')
     .slice(0, 255);
 }
 

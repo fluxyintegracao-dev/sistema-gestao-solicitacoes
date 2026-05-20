@@ -118,8 +118,7 @@ async function importarXmlItem(req, { company, item }) {
     date: parsed.emission_date || new Date(),
     metadata: {
       fiscal_company_id: company.id,
-      source: item.source,
-      original_name: item.originalname
+      source: item.source
     }
   });
 
