@@ -60,15 +60,17 @@ function extractXmlItemsFromZip(file) {
       const entryName = ensureSafeZipEntryName(entry.name);
       if (path.extname(entryName).toLowerCase() !== '.xml') return null;
 
-      const xml = entry.asText();
-      if (Buffer.byteLength(xml, 'utf8') > MAX_XML_SIZE_BYTES) {
+      const buffer = entry.asNodeBuffer();
+      if (buffer.length > MAX_XML_SIZE_BYTES) {
         throw createHttpError(`XML ${entryName} excede o tamanho maximo permitido.`);
       }
+      const xml = buffer.toString('utf8');
 
       return {
         originalname: `${file.originalname || 'importacao.zip'}:${entryName}`,
         xml,
-        size: Buffer.byteLength(xml, 'utf8'),
+        buffer,
+        size: buffer.length,
         source: 'batch_import'
       };
     })
@@ -91,6 +93,7 @@ function extractXmlItems(files) {
       items.push({
         originalname: file.originalname || 'nfe.xml',
         xml: file.buffer.toString('utf8'),
+        buffer: file.buffer,
         size: file.size || file.buffer.length,
         source: 'manual_upload'
       });
@@ -114,7 +117,7 @@ async function importarXmlItem(req, { company, item }) {
     cnpj: company.cnpj,
     documentType: 'nfe',
     accessKey: parsed.access_key,
-    xml: item.xml,
+    xml: item.buffer || item.xml,
     date: parsed.emission_date || new Date(),
     metadata: {
       fiscal_company_id: company.id,
