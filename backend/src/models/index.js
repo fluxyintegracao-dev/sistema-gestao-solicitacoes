@@ -2280,6 +2280,16 @@ db.BoletoCaixaOcorrencia.belongsTo(db.BoletoCaixa, {
   as: 'boleto'
 });
 
+db.TituloFinanceiro.hasMany(db.BoletoCaixaOcorrencia, {
+  foreignKey: 'titulo_financeiro_id',
+  as: 'ocorrenciasBoletoCaixa'
+});
+
+db.BoletoCaixaOcorrencia.belongsTo(db.TituloFinanceiro, {
+  foreignKey: 'titulo_financeiro_id',
+  as: 'titulo'
+});
+
 db.TituloFinanceiro.hasMany(db.MovimentoFinanceiro, {
   foreignKey: 'titulo_financeiro_id',
   as: 'movimentos',
@@ -2289,6 +2299,16 @@ db.TituloFinanceiro.hasMany(db.MovimentoFinanceiro, {
 db.MovimentoFinanceiro.belongsTo(db.TituloFinanceiro, {
   foreignKey: 'titulo_financeiro_id',
   as: 'titulo'
+});
+
+db.MovimentoFinanceiro.hasMany(db.BoletoCaixaOcorrencia, {
+  foreignKey: 'movimento_financeiro_id',
+  as: 'ocorrenciasBoletoCaixa'
+});
+
+db.BoletoCaixaOcorrencia.belongsTo(db.MovimentoFinanceiro, {
+  foreignKey: 'movimento_financeiro_id',
+  as: 'movimentoFinanceiro'
 });
 
 db.ContaBancaria.hasMany(db.MovimentoFinanceiro, {

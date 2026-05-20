@@ -9,10 +9,12 @@ const {
   BoletoCaixaRemessa,
   BoletoCaixaRemessaItem,
   BoletoCaixaRetorno,
+  MovimentoFinanceiro,
   Parceiro,
   TituloFinanceiro,
   sequelize
 } = db;
+const { carregarContaBancaria, obterSessaoAbertaParaConta } = require('./financeiroCaixaSessionHelper');
 
 function formatarNumeroArquivo(value) {
   return String(value || 1).padStart(6, '0');
@@ -213,6 +215,206 @@ function statusBancarioPorOcorrencia(tipo) {
   return 'OCORRENCIA';
 }
 
+function getHoje() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function roundCurrency(value) {
+  const number = Number(value || 0);
+  return Math.round((number + Number.EPSILON) * 100) / 100;
+}
+
+function calcularStatusTitulo({ valorOriginal, valorBaixado }) {
+  const saldo = roundCurrency(valorOriginal - valorBaixado);
+  if (saldo <= 0) {
+    return { status: 'QUITADO', valor_saldo: 0 };
+  }
+  return { status: 'PARCIAL', valor_saldo: saldo };
+}
+
+function mensagemErro(error) {
+  return String(error?.message || error || 'Erro ao aplicar baixa financeira.').slice(0, 1000);
+}
+
+async function marcarOcorrenciaSemBaixa(ocorrenciaCriada, statusAplicacao, erroMensagem, transaction) {
+  await ocorrenciaCriada.update(
+    {
+      status_aplicacao: statusAplicacao,
+      erro_mensagem: erroMensagem || null
+    },
+    { transaction }
+  );
+
+  return {
+    aplicada: false,
+    status_aplicacao: statusAplicacao,
+    erro_mensagem: erroMensagem || null
+  };
+}
+
+async function aplicarBaixaFinanceiraPorLiquidacao({ boleto, convenio, retorno, ocorrenciaCriada, ocorrencia, usuarioId, transaction }) {
+  if (ocorrencia.tipo !== 'LIQUIDACAO') {
+    return { aplicada: false, status_aplicacao: ocorrenciaCriada.status_aplicacao };
+  }
+
+  if (!boleto || !boleto.titulo_financeiro_id) {
+    return marcarOcorrenciaSemBaixa(
+      ocorrenciaCriada,
+      'PENDENTE_TITULO',
+      'Ocorrencia de liquidacao sem boleto ou titulo financeiro vinculado.',
+      transaction
+    );
+  }
+
+  if (ocorrenciaCriada.movimento_financeiro_id) {
+    return { aplicada: false, status_aplicacao: 'BAIXADO_FINANCEIRO' };
+  }
+
+  if (!convenio.conta_bancaria_id) {
+    return marcarOcorrenciaSemBaixa(
+      ocorrenciaCriada,
+      'PENDENTE_CONTA_BANCARIA',
+      'Convenio Caixa sem conta bancaria vinculada para registrar a baixa.',
+      transaction
+    );
+  }
+
+  try {
+    const titulo = await TituloFinanceiro.findByPk(boleto.titulo_financeiro_id, {
+      transaction,
+      lock: transaction.LOCK.UPDATE
+    });
+
+    if (!titulo) {
+      return marcarOcorrenciaSemBaixa(
+        ocorrenciaCriada,
+        'PENDENTE_TITULO',
+        'Titulo financeiro vinculado ao boleto nao foi encontrado.',
+        transaction
+      );
+    }
+
+    if (String(titulo.tipo || '').toUpperCase() !== 'RECEBER') {
+      return marcarOcorrenciaSemBaixa(
+        ocorrenciaCriada,
+        'IGNORADO_TIPO_TITULO',
+        'Somente titulos a receber sao baixados automaticamente pelo retorno de boleto.',
+        transaction
+      );
+    }
+
+    const statusAtual = String(titulo.status || '').toUpperCase();
+    const saldoAtual = roundCurrency(titulo.valor_saldo);
+    if (!['ABERTO', 'PARCIAL'].includes(statusAtual) || saldoAtual <= 0) {
+      return marcarOcorrenciaSemBaixa(
+        ocorrenciaCriada,
+        'IGNORADO_TITULO_QUITADO',
+        'Titulo nao esta em aberto/parcial ou ja nao possui saldo para baixa.',
+        transaction
+      );
+    }
+
+    const documentoReferencia = `RETORNO_CAIXA:${retorno.id}:OCORRENCIA:${ocorrenciaCriada.id}`;
+    const movimentoExistente = await MovimentoFinanceiro.findOne({
+      where: { documento_referencia: documentoReferencia },
+      transaction,
+      lock: transaction.LOCK.UPDATE
+    });
+
+    if (movimentoExistente) {
+      await ocorrenciaCriada.update(
+        {
+          movimento_financeiro_id: movimentoExistente.id,
+          status_aplicacao: 'BAIXADO_FINANCEIRO',
+          erro_mensagem: null
+        },
+        { transaction }
+      );
+      return { aplicada: false, status_aplicacao: 'BAIXADO_FINANCEIRO' };
+    }
+
+    const valorPago = roundCurrency(Math.max(
+      Number(ocorrencia.valor_pago || 0),
+      Number(ocorrencia.valor_liquido || 0)
+    ));
+    if (valorPago <= 0) {
+      return marcarOcorrenciaSemBaixa(
+        ocorrenciaCriada,
+        'ERRO_BAIXA_FINANCEIRA',
+        'Valor pago no retorno Caixa esta zerado ou invalido.',
+        transaction
+      );
+    }
+
+    const valorPrincipal = Math.min(valorPago, saldoAtual);
+    const juros = roundCurrency(Math.max(valorPago - valorPrincipal, 0));
+    const dataMovimento = ocorrencia.data_credito || ocorrencia.data_ocorrencia || getHoje();
+    const contaBancaria = await carregarContaBancaria(convenio.conta_bancaria_id, { transaction });
+    const caixaSessao = await obterSessaoAbertaParaConta(contaBancaria, dataMovimento, { transaction });
+    const novoValorBaixado = roundCurrency(Number(titulo.valor_baixado || 0) + valorPrincipal);
+    const novoEstado = calcularStatusTitulo({
+      valorOriginal: Number(titulo.valor_original || 0),
+      valorBaixado: novoValorBaixado
+    });
+
+    const movimento = await MovimentoFinanceiro.create(
+      {
+        titulo_financeiro_id: titulo.id,
+        conta_bancaria_id: contaBancaria.id,
+        empresa_id: contaBancaria.empresa_id || titulo.empresa_id || convenio.empresa_id || null,
+        caixa_sessao_id: caixaSessao?.id || null,
+        forma_recebimento: 'BOLETO',
+        documento_referencia: documentoReferencia,
+        tipo_movimento: 'BAIXA',
+        status: 'ATIVO',
+        valor: valorPrincipal,
+        juros,
+        multa: 0,
+        desconto: 0,
+        valor_quitacao: valorPago,
+        data_movimento: dataMovimento,
+        observacoes: `Baixa automatica por retorno Caixa ${retorno.nome_arquivo || retorno.id}. Nosso numero ${ocorrencia.nosso_numero || boleto.nosso_numero_base}.`,
+        criado_por: usuarioId || null
+      },
+      { transaction }
+    );
+
+    await titulo.update(
+      {
+        valor_baixado: novoValorBaixado,
+        valor_saldo: novoEstado.valor_saldo,
+        status: novoEstado.status,
+        data_quitacao: novoEstado.status === 'QUITADO' ? dataMovimento : null,
+        status_cobranca: titulo.forma_cobranca ? 'CONCILIADO' : titulo.status_cobranca,
+        atualizado_por: usuarioId || null
+      },
+      { transaction }
+    );
+
+    await ocorrenciaCriada.update(
+      {
+        movimento_financeiro_id: movimento.id,
+        status_aplicacao: 'BAIXADO_FINANCEIRO',
+        erro_mensagem: null
+      },
+      { transaction }
+    );
+
+    return {
+      aplicada: true,
+      status_aplicacao: 'BAIXADO_FINANCEIRO',
+      movimento
+    };
+  } catch (error) {
+    return marcarOcorrenciaSemBaixa(
+      ocorrenciaCriada,
+      'ERRO_BAIXA_FINANCEIRA',
+      mensagemErro(error),
+      transaction
+    );
+  }
+}
+
 async function importarRetornoCnab240Caixa({ convenioId, content, nomeArquivo, usuarioId }) {
   const parsed = parseRetornoCnab240Caixa(content);
   if (!parsed.valid) {
@@ -259,6 +461,7 @@ async function importarRetornoCnab240Caixa({ convenioId, content, nomeArquivo, u
     );
 
     const ocorrenciasCriadas = [];
+    let baixasAplicadas = 0;
     for (const ocorrencia of parsed.ocorrencias) {
       const boleto = ocorrencia.nosso_numero
         ? await BoletoCaixa.findOne({
@@ -311,11 +514,26 @@ async function importarRetornoCnab240Caixa({ convenioId, content, nomeArquivo, u
           { transaction }
         );
       }
+
+      const resultadoBaixa = await aplicarBaixaFinanceiraPorLiquidacao({
+        boleto,
+        convenio,
+        retorno,
+        ocorrenciaCriada,
+        ocorrencia,
+        usuarioId,
+        transaction
+      });
+
+      if (resultadoBaixa.aplicada) {
+        baixasAplicadas += 1;
+      }
     }
 
     return {
       duplicate: false,
       retorno,
+      baixas_aplicadas: baixasAplicadas,
       ocorrencias: ocorrenciasCriadas,
       parsed
     };
@@ -324,6 +542,7 @@ async function importarRetornoCnab240Caixa({ convenioId, content, nomeArquivo, u
 
 module.exports = {
   boletoParaCnab,
+  aplicarBaixaFinanceiraPorLiquidacao,
   gerarRemessaParaBoletosCaixa,
   importarRetornoCnab240Caixa,
   nomeArquivoRemessa,

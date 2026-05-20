@@ -15,14 +15,14 @@ Ja existe:
 - PDF de boleto/amostra;
 - bloqueio de emissao real por `CAIXA_BOLETO_HOMOLOGADO=false`;
 - vinculo dos dados de cobranca no `titulos_financeiros`.
-
-Ainda falta:
-
 - cadastro operacional completo do convenio Caixa;
 - tabelas proprias de boletos/remessas/retornos/ocorrencias;
 - geracao de arquivo de remessa CNAB 240;
 - importacao e processamento de retorno CNAB 240;
 - baixa financeira por retorno liquidado;
+
+Ainda falta:
+
 - pacote de homologacao com evidencias e validacoes.
 
 ## Fase 1 - Base de dados e governanca
@@ -111,6 +111,8 @@ Baixa financeira:
 - somente por ocorrencia de liquidacao confirmada;
 - idempotente por retorno/ocorrencia/boleto;
 - sem duplicar movimento financeiro.
+- se o convenio nao tiver conta bancaria, a ocorrencia fica pendente de conta e nao baixa o titulo;
+- se o titulo ja estiver quitado, a ocorrencia fica registrada sem gerar novo movimento.
 
 ## Fase 6 - Tela operacional
 

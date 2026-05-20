@@ -705,10 +705,11 @@ export default function FinanceiroBoletos() {
         file: retornoFile
       });
       const quantidade = data?.parsed?.ocorrencias?.length || data?.retorno?.quantidade_ocorrencias || 0;
+      const baixas = Number(data?.baixas_aplicadas || 0);
       setRetornoFile(null);
       setCnabFeedback(data?.duplicate
         ? 'Retorno ja importado anteriormente. Nenhuma duplicidade foi criada.'
-        : `Retorno importado com ${quantidade} ocorrencia(s).`);
+        : `Retorno importado com ${quantidade} ocorrencia(s) e ${baixas} baixa(s) financeira(s) aplicada(s).`);
       await carregarBase();
       await carregarTitulos(appliedFilters);
     } catch (err) {
@@ -841,7 +842,7 @@ export default function FinanceiroBoletos() {
               </button>
             </div>
             <p className="mt-2 text-xs text-[var(--c-muted)]">
-              O retorno registra ocorrencias bancarias e nao baixa titulos automaticamente nesta fase.
+              Liquidacoes do retorno baixam os titulos vinculados de forma idempotente, sem duplicar movimentos ja aplicados.
             </p>
           </div>
         </div>

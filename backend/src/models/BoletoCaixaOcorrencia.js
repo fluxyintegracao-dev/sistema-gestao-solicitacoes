@@ -5,6 +5,7 @@ module.exports = (sequelize, DataTypes) => sequelize.define(
     retorno_id: { type: DataTypes.INTEGER, allowNull: false },
     boleto_id: { type: DataTypes.INTEGER, allowNull: true },
     titulo_financeiro_id: { type: DataTypes.INTEGER, allowNull: true },
+    movimento_financeiro_id: { type: DataTypes.INTEGER, allowNull: true },
     nosso_numero_base: { type: DataTypes.STRING(20), allowNull: true },
     codigo_movimento: { type: DataTypes.STRING(2), allowNull: false },
     descricao_movimento: { type: DataTypes.STRING(160), allowNull: true },
