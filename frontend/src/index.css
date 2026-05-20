@@ -466,6 +466,15 @@ textarea {
   font-size: 0.75rem;
 }
 
+.fiscal-page .fiscal-documents-actions .btn-sm {
+  min-height: 24px;
+  border-radius: 5px;
+  padding: 0.16rem 0.42rem;
+  font-size: 0.68rem;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
 .fiscal-page .btn-primary:disabled,
 .fiscal-page .btn-secondary:disabled,
 .fiscal-page .btn-outline:disabled {

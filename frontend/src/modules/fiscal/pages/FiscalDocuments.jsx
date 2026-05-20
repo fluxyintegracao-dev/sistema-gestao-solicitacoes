@@ -406,7 +406,7 @@ export default function FiscalDocuments() {
                 <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{Number(item.total_value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
                 <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{item.document_status}</td>
                 <td className="px-4 py-3">
-                  <div className="flex justify-end gap-2">
+                  <div className="fiscal-documents-actions flex justify-end gap-1.5">
                     <Link className="btn-secondary btn-sm" to={`/fiscal/documentos/${item.id}`}>
                       Detalhes
                     </Link>
