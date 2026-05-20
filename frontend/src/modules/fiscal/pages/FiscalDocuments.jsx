@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
+  generateFiscalDocumentDanfe,
   getFiscalCompanies,
   getFiscalDocumentFileUrl,
   getFiscalDocuments,
@@ -30,6 +31,8 @@ export default function FiscalDocuments() {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [openingFile, setOpeningFile] = useState('');
+  const [generatingDanfe, setGeneratingDanfe] = useState('');
+  const [importReport, setImportReport] = useState(null);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
 
@@ -113,6 +116,20 @@ export default function FiscalDocuments() {
     }
   };
 
+  const generateDanfe = async (documentId) => {
+    setGeneratingDanfe(String(documentId));
+    setError('');
+    try {
+      const result = await generateFiscalDocumentDanfe(documentId);
+      if (result?.url) window.open(result.url, '_blank', 'noopener,noreferrer');
+      await load();
+    } catch (err) {
+      setError(err.message || 'Erro ao gerar DANFE fiscal');
+    } finally {
+      setGeneratingDanfe('');
+    }
+  };
+
   const submitUpload = async (event) => {
     event.preventDefault();
     if (!uploadCompanyId || !uploadFiles.length) {
@@ -125,6 +142,7 @@ export default function FiscalDocuments() {
     setMessage('');
     try {
       const result = await uploadFiscalXml({ companyId: uploadCompanyId, files: uploadFiles });
+      setImportReport(result || null);
       const falhas = Number(result?.failed_count || 0);
       const importados = Number(result?.imported_count || 0);
       const duplicados = Number(result?.duplicate_count || 0);
@@ -138,6 +156,7 @@ export default function FiscalDocuments() {
       await load();
     } catch (err) {
       setError(err.message || 'Erro ao importar XML fiscal');
+      setImportReport(null);
     } finally {
       setUploading(false);
     }
@@ -177,6 +196,40 @@ export default function FiscalDocuments() {
 
       {error ? <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div> : null}
       {message ? <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">{message}</div> : null}
+      {importReport ? (
+        <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Relatorio de importacao</p>
+              <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+                {Number(importReport.total || 0)} XML(s) lido(s), {Number(importReport.imported_count || 0)} processado(s),
+                {' '}{Number(importReport.duplicate_count || 0)} reimportado(s) e {Number(importReport.failed_count || 0)} com erro.
+              </p>
+            </div>
+            <button className="btn-secondary btn-sm" type="button" onClick={() => setImportReport(null)}>Fechar</button>
+          </div>
+          {importReport.failed?.length ? (
+            <div className="mt-4 overflow-hidden rounded-lg border border-red-200 dark:border-red-900/60">
+              <table className="min-w-full divide-y divide-red-100 text-sm dark:divide-red-900/60">
+                <thead className="bg-red-50 text-left text-xs font-semibold uppercase text-red-700 dark:bg-red-950/30 dark:text-red-200">
+                  <tr>
+                    <th className="px-4 py-3">Arquivo</th>
+                    <th className="px-4 py-3">Motivo</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-red-100 dark:divide-red-900/60">
+                  {importReport.failed.map((item, index) => (
+                    <tr key={`${item.original_name}-${index}`}>
+                      <td className="max-w-[520px] truncate px-4 py-3 text-slate-700 dark:text-slate-200" title={item.original_name}>{item.original_name}</td>
+                      <td className="px-4 py-3 text-red-700 dark:text-red-200">{item.error || 'Erro ao importar XML fiscal.'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
 
       <form onSubmit={submitFilters} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
@@ -312,9 +365,19 @@ export default function FiscalDocuments() {
                         XML
                       </button>
                     ) : null}
-                    {(item.pdf_storage_key || item.danfe_storage_key) ? (
+                    {item.pdf_storage_key ? (
                       <button className="btn-secondary btn-sm" type="button" onClick={() => openFile(item.id, 'pdf')} disabled={openingFile === `${item.id}-pdf`}>
                         PDF
+                      </button>
+                    ) : null}
+                    {item.xml_storage_key ? (
+                      <button
+                        className="btn-secondary btn-sm"
+                        type="button"
+                        onClick={() => (item.danfe_storage_key ? openFile(item.id, 'pdf') : generateDanfe(item.id))}
+                        disabled={generatingDanfe === String(item.id) || openingFile === `${item.id}-pdf`}
+                      >
+                        {generatingDanfe === String(item.id) ? 'Gerando...' : 'DANFE'}
                       </button>
                     ) : null}
                     {!item.xml_storage_key && !item.pdf_storage_key && !item.danfe_storage_key ? (

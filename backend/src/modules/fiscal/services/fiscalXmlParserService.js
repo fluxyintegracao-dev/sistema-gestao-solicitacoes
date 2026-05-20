@@ -26,6 +26,11 @@ function pickBlock(xml, tagName) {
   return match ? match[0] : '';
 }
 
+function pickBlocks(xml, tagName) {
+  const pattern = new RegExp(`<[^:>/]*:?${tagName}(?:\\s[^>]*)?>[\\s\\S]*?<\\/[^:>]*:?${tagName}>`, 'gi');
+  return String(xml || '').match(pattern) || [];
+}
+
 function onlyDigits(value) {
   return String(value || '').replace(/\D/g, '');
 }
@@ -55,12 +60,32 @@ function extractAccessKey(xml) {
   return null;
 }
 
+function parseNfeItems(raw) {
+  return pickBlocks(raw, 'det').map((detBlock, index) => {
+    const prodBlock = pickBlock(detBlock, 'prod');
+    const nItem = String(detBlock.match(/\bnItem=["']([^"']+)["']/i)?.[1] || index + 1).trim();
+
+    return {
+      nItem,
+      cProd: pickTag(prodBlock, 'cProd') || null,
+      xProd: pickTag(prodBlock, 'xProd') || null,
+      NCM: pickTag(prodBlock, 'NCM') || null,
+      CFOP: pickTag(prodBlock, 'CFOP') || null,
+      uCom: pickTag(prodBlock, 'uCom') || null,
+      qCom: parseDecimal(pickTag(prodBlock, 'qCom')),
+      vUnCom: parseDecimal(pickTag(prodBlock, 'vUnCom')),
+      vProd: parseDecimal(pickTag(prodBlock, 'vProd'))
+    };
+  });
+}
+
 function parseNfeXml(xml) {
   const raw = String(xml || '');
   const accessKey = extractAccessKey(raw);
   if (!accessKey) {
     const error = new Error('Nao foi possivel identificar a chave de acesso da NFe no XML.');
     error.statusCode = 400;
+    error.code = 'NFE_ACCESS_KEY_NOT_FOUND';
     throw error;
   }
 
@@ -72,6 +97,7 @@ function parseNfeXml(xml) {
   const recipientCnpj = onlyDigits(pickTag(destBlock, 'CNPJ') || pickTag(destBlock, 'CPF'));
   const emissionValue = pickTag(raw, 'dhEmi') || pickTag(raw, 'dEmi');
   const totalValue = parseDecimal(pickTag(totalBlock, 'vNF'));
+  const items = parseNfeItems(raw);
 
   return {
     access_key: accessKey,
@@ -112,7 +138,8 @@ function parseNfeXml(xml) {
         cStat: pickTag(raw, 'cStat') || null,
         xMotivo: pickTag(raw, 'xMotivo') || null,
         nProt: pickTag(raw, 'nProt') || null
-      }
+      },
+      items
     }
   };
 }

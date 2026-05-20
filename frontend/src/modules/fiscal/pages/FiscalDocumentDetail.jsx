@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
   createFiscalDivergence,
+  generateFiscalDocumentDanfe,
   getFiscalDocument,
   getFiscalDocumentFileUrl,
   getFiscalLinkOptions,
@@ -96,6 +97,7 @@ export default function FiscalDocumentDetail() {
   const [documento, setDocumento] = useState(null);
   const [loading, setLoading] = useState(true);
   const [openingFile, setOpeningFile] = useState('');
+  const [generatingDanfe, setGeneratingDanfe] = useState(false);
   const [fileType, setFileType] = useState('danfe');
   const [uploadFile, setUploadFile] = useState(null);
   const [uploadingFile, setUploadingFile] = useState(false);
@@ -159,6 +161,22 @@ export default function FiscalDocumentDetail() {
       setError(err.message || 'Erro ao abrir arquivo fiscal');
     } finally {
       setOpeningFile('');
+    }
+  };
+
+  const generateDanfe = async () => {
+    setGeneratingDanfe(true);
+    setError('');
+    setMessage('');
+    try {
+      const result = await generateFiscalDocumentDanfe(id);
+      setDocumento(result?.document || await getFiscalDocument(id));
+      setMessage('DANFE gerado com sucesso.');
+      if (result?.url) window.open(result.url, '_blank', 'noopener,noreferrer');
+    } catch (err) {
+      setError(err.message || 'Erro ao gerar DANFE fiscal');
+    } finally {
+      setGeneratingDanfe(false);
     }
   };
 
@@ -404,6 +422,11 @@ export default function FiscalDocumentDetail() {
               {openingFile === 'pdf' ? 'Abrindo...' : 'Abrir PDF'}
             </button>
           ) : null}
+          {documento?.xml_storage_key ? (
+            <button className="btn-secondary" type="button" onClick={generateDanfe} disabled={generatingDanfe}>
+              {generatingDanfe ? 'Gerando DANFE...' : documento?.danfe_storage_key ? 'Regerar DANFE' : 'Gerar DANFE'}
+            </button>
+          ) : null}
           <button className="btn-secondary" type="button" onClick={ignoreDocument} disabled={ignoring || documento?.document_status === 'ignored'}>
             {ignoring ? 'Ignorando...' : documento?.document_status === 'ignored' ? 'Ignorado' : 'Ignorar'}
           </button>
@@ -446,6 +469,18 @@ export default function FiscalDocumentDetail() {
           <Field label="DANFE" value={documento?.danfe_storage_key ? 'Disponivel' : 'Indisponivel'} />
           <Field label="PDF" value={documento?.pdf_storage_key ? 'Disponivel' : 'Indisponivel'} />
         </div>
+        {documento?.xml_storage_key ? (
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button className="btn-secondary" type="button" onClick={generateDanfe} disabled={generatingDanfe}>
+              {generatingDanfe ? 'Gerando...' : documento?.danfe_storage_key ? 'Regerar DANFE pelo XML' : 'Gerar DANFE pelo XML'}
+            </button>
+            {documento?.danfe_storage_key ? (
+              <button className="btn-secondary" type="button" onClick={() => openFile('pdf')} disabled={openingFile === 'pdf'}>
+                {openingFile === 'pdf' ? 'Abrindo...' : 'Abrir DANFE'}
+              </button>
+            ) : null}
+          </div>
+        ) : null}
         <form onSubmit={submitFileUpload} className="mt-4 grid gap-3 rounded-lg border border-slate-200 p-4 dark:border-slate-800 lg:grid-cols-[180px_1fr_auto]">
           <select className="input" value={fileType} onChange={(event) => setFileType(event.target.value)}>
             <option value="danfe">DANFE</option>

@@ -159,6 +159,7 @@ router.post('/documents/upload-xml', allowFiscalDocumentUpload, uploadFiscalXml.
   { name: 'files', maxCount: fiscalXmlUploadMaxFiles }
 ]), FiscalDocumentController.uploadXml);
 router.post('/documents/:id/upload-file', allowFiscalDocumentUpload, validateRequest({ params: validateNumericIdParam('id', 'Documento fiscal') }), uploadFiscalFile.single('file'), FiscalDocumentController.uploadFile);
+router.post('/documents/:id/generate-danfe', allowFiscalDocumentUpload, validateRequest({ params: validateNumericIdParam('id', 'Documento fiscal') }), FiscalDocumentController.generateDanfe);
 router.post('/documents/:id/link', allowFiscalDocumentLink, validateRequest({ params: validateNumericIdParam('id', 'Documento fiscal'), body: validateFiscalDocumentLinkBody }), FiscalDocumentController.link);
 router.post('/documents/:id/suggest-links', allowFiscalDocumentLink, validateRequest({ params: validateNumericIdParam('id', 'Documento fiscal') }), FiscalDocumentController.suggestLinks);
 router.patch('/documents/:id/links/:linkId', allowFiscalDocumentLink, validateRequest({ params: validateFiscalDocumentLinkParams, body: validateFiscalDocumentLinkUpdateBody }), FiscalDocumentController.updateLink);

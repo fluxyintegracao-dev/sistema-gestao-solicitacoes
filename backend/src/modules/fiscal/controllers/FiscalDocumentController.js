@@ -16,6 +16,7 @@ const {
   atualizarSugestaoVinculoFiscal,
   sugerirVinculosDocumentoFiscal
 } = require('../services/fiscalMatchingService');
+const { gerarDanfeDocumentoFiscal } = require('../services/fiscalDanfeService');
 const { importarXmlFiscalManual } = require('../services/fiscalXmlImportService');
 
 function handleError(res, error) {
@@ -81,6 +82,15 @@ async function uploadFile(req, res) {
       body: req.body || {}
     });
     return res.status(200).json(result);
+  } catch (error) {
+    return handleError(res, error);
+  }
+}
+
+async function generateDanfe(req, res) {
+  try {
+    const result = await gerarDanfeDocumentoFiscal(req, req.params.id);
+    return res.status(201).json(result);
   } catch (error) {
     return handleError(res, error);
   }
@@ -170,6 +180,7 @@ async function updateDivergence(req, res) {
 
 module.exports = {
   createDivergence,
+  generateDanfe,
   ignore,
   index,
   link,

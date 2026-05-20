@@ -154,6 +154,14 @@ export async function uploadFiscalDocumentFile({ documentId, fileType = 'danfe',
   return parseJson(response, 'Erro ao importar arquivo fiscal');
 }
 
+export async function generateFiscalDocumentDanfe(documentId) {
+  const response = await fetch(`${API_URL}/fiscal/documents/${documentId}/generate-danfe`, {
+    method: 'POST',
+    headers: authHeaders()
+  });
+  return parseJson(response, 'Erro ao gerar DANFE fiscal');
+}
+
 export async function ignoreFiscalDocument(id, payload = {}) {
   const response = await fetch(`${API_URL}/fiscal/documents/${id}/ignore`, {
     method: 'POST',
