@@ -63,6 +63,7 @@ function buildTargets(link) {
     financeiro_titulo_id: link.financeiro_titulo_id || null,
     obra_id: link.obra_id || null,
     centro_custo_id: link.centro_custo_id || null,
+    apropriacao_id: link.apropriacao_id || null,
     plano_financeiro_id: link.plano_financeiro_id || null,
     fornecedor_id: link.fornecedor_id || null
   };

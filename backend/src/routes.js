@@ -286,6 +286,7 @@ const CaixaFinanceiroController = require('./controllers/CaixaFinanceiroControll
 const TransferenciaFinanceiraController = require('./controllers/TransferenciaFinanceiraController');
 const TarifaBancariaConfigController = require('./controllers/TarifaBancariaConfigController');
 const ResultadoObrasController = require('./controllers/ResultadoObrasController');
+const ResultadoCentrosCustoController = require('./controllers/ResultadoCentrosCustoController');
 const PermissoesAreasController = require('./controllers/PermissoesAreasController');
 const BoletoController = require('./controllers/BoletoController');
 const BoletoCaixaCnabController = require('./controllers/BoletoCaixaCnabController');
@@ -1179,6 +1180,7 @@ router.post('/financeiro/transferencias/:id/cancelar', allowFinanceiro, critical
 router.get('/financeiro/relatorios/fluxo-caixa', allowFinanceiro, validateRequest({ query: validateFinanceFluxoCaixaQuery }), RelatorioFinanceiroController.fluxoCaixa);
 router.get('/financeiro/relatorios/analitico', allowFinanceiro, validateRequest({ query: validateFinanceRelatorioAnaliticoQuery }), RelatorioFinanceiroController.analitico);
 router.get('/financeiro/relatorios/resultado-obras', allowFinanceiro, ResultadoObrasController.index);
+router.get('/financeiro/relatorios/centros-custo', allowFinanceiro, ResultadoCentrosCustoController.index);
 router.get('/financeiro/baixas', allowFinanceiro, validateRequest({ query: validateFinanceBaixasQuery }), TituloFinanceiroController.baixas);
 router.get('/financeiro/titulos', allowFinanceiro, validateRequest({ query: validateFinanceTituloQuery }), TituloFinanceiroController.index);
 router.post('/financeiro/titulos', allowFinanceiro, criticalRateLimit, validateRequest({ body: validateFinanceTituloCreateBody }), TituloFinanceiroController.create);

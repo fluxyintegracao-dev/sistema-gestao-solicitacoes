@@ -1,11 +1,12 @@
 const { Obra, TituloFinanceiro } = require('../models');
 const { Op, fn, col, literal } = require('sequelize');
+const { TIPO_CENTRO_CUSTO_OBRA } = require('../constants/centroCusto');
 
 module.exports = {
   async index(req, res) {
     try {
       const obras = await Obra.findAll({
-        where: { ativo: true },
+        where: { ativo: true, tipo_centro_custo: TIPO_CENTRO_CUSTO_OBRA },
         order: [['nome', 'ASC']]
       });
 

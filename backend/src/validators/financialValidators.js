@@ -259,6 +259,7 @@ function validateFinanceTituloQuery(query = {}) {
       'codigo',
       'empresa_id',
       'obra_id',
+      'apropriacao_id',
       'parceiro_id',
       'categoria_financeira_id',
       'solicitacao_id',
@@ -737,7 +738,8 @@ function validateFinanceTituloCreateBody(body = {}) {
   return {
     tipo: parseEnum(body.tipo, 'Tipo', ['PAGAR', 'RECEBER'], { required: true }),
     empresa_id: parseInteger(body.empresa_id, 'Empresa do grupo'),
-    obra_id: parseInteger(body.obra_id, 'Obra', { required: true }),
+    obra_id: parseInteger(body.obra_id, 'Obra/Centro de custo', { required: true }),
+    apropriacao_id: parseInteger(body.apropriacao_id, 'Apropriacao'),
     parceiro_id: parseInteger(body.parceiro_id, 'Parceiro', { required: true }),
     valor: parseDecimal(body.valor, 'Valor', { required: true, min: 0.01 }),
     data_vencimento: parseDateOnly(body.data_vencimento, 'Data de vencimento'),

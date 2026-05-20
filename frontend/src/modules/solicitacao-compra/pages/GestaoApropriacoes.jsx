@@ -36,7 +36,7 @@ export default function GestaoApropriacoes() {
   useEffect(() => {
     (async () => {
       try {
-        const data = await getObras();
+        const data = await getObras({ escopo: 'OBRAS' });
         const lista = Array.isArray(data) ? data : [];
         setObras(lista);
       } catch (error) {

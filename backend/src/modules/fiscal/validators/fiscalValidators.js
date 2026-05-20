@@ -266,6 +266,7 @@ function validateFiscalDocumentLinkBody(body = {}) {
     'financeiro_titulo_id',
     'obra_id',
     'centro_custo_id',
+    'apropriacao_id',
     'plano_financeiro_id',
     'fornecedor_id',
     'matched_reason'
@@ -279,6 +280,7 @@ function validateFiscalDocumentLinkBody(body = {}) {
     financeiro_titulo_id: parseOptionalInteger(body.financeiro_titulo_id, 'Titulo financeiro'),
     obra_id: parseOptionalInteger(body.obra_id, 'Obra'),
     centro_custo_id: parseOptionalInteger(body.centro_custo_id, 'Centro de custo'),
+    apropriacao_id: parseOptionalInteger(body.apropriacao_id, 'Apropriacao'),
     plano_financeiro_id: parseOptionalInteger(body.plano_financeiro_id, 'Plano financeiro'),
     fornecedor_id: parseOptionalInteger(body.fornecedor_id, 'Fornecedor'),
     matched_reason: sanitizeString(body.matched_reason, 'Motivo do vinculo', { max: 1000 }) || null
@@ -307,6 +309,7 @@ function validateFiscalLinkSearchQuery(query = {}) {
       'obra',
       'fornecedor',
       'centro_custo',
+      'apropriacao',
       'plano_financeiro'
     ], { required: true }),
     q: sanitizeString(query.q, 'Busca', { max: 120 }) || null,

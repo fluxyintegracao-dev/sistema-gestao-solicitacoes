@@ -2050,6 +2050,16 @@ db.TituloFinanceiro.belongsTo(db.Obra, {
   as: 'obra'
 });
 
+db.Apropriacao.hasMany(db.TituloFinanceiro, {
+  foreignKey: 'apropriacao_id',
+  as: 'titulosFinanceiros'
+});
+
+db.TituloFinanceiro.belongsTo(db.Apropriacao, {
+  foreignKey: 'apropriacao_id',
+  as: 'apropriacao'
+});
+
 db.Parceiro.hasMany(db.TituloFinanceiro, {
   foreignKey: 'parceiro_id',
   as: 'titulosFinanceiros'
@@ -2966,7 +2976,8 @@ db.FiscalDocumentLink.belongsTo(db.PedidoCompra, { foreignKey: 'pedido_id', as: 
 db.FiscalDocumentLink.belongsTo(db.PedidoCompraItem, { foreignKey: 'pedido_item_id', as: 'pedidoItem' });
 db.FiscalDocumentLink.belongsTo(db.TituloFinanceiro, { foreignKey: 'financeiro_titulo_id', as: 'tituloFinanceiro' });
 db.FiscalDocumentLink.belongsTo(db.Obra, { foreignKey: 'obra_id', as: 'obra' });
-db.FiscalDocumentLink.belongsTo(db.Apropriacao, { foreignKey: 'centro_custo_id', as: 'centroCusto' });
+db.FiscalDocumentLink.belongsTo(db.Obra, { foreignKey: 'centro_custo_id', as: 'centroCusto' });
+db.FiscalDocumentLink.belongsTo(db.Apropriacao, { foreignKey: 'apropriacao_id', as: 'apropriacao' });
 db.FiscalDocumentLink.belongsTo(db.CategoriaFinanceira, { foreignKey: 'plano_financeiro_id', as: 'planoFinanceiro' });
 db.FiscalDocumentLink.belongsTo(db.Parceiro, { foreignKey: 'fornecedor_id', as: 'fornecedor' });
 

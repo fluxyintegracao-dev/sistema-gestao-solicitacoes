@@ -216,6 +216,27 @@ const SEARCHERS = {
   centro_custo: {
     field: 'centro_custo_id',
     async find({ q, limit }) {
+      const where = buildWhere(q, ['codigo', 'nome', 'cidade'], { ativo: true });
+
+      const rows = await Obra.findAll({
+        where,
+        attributes: ['id', 'codigo', 'nome', 'cidade', 'tipo_centro_custo'],
+        order: [['nome', 'ASC']],
+        limit
+      });
+
+      return rows.map((row) => normalizeOption(
+        'centro_custo',
+        row,
+        `${row.codigo ? `${row.codigo} - ` : ''}${row.nome || 'Centro de custo'}`,
+        row.tipo_centro_custo === 'OBRA' ? 'Obra' : 'Centro de custo',
+        row.toJSON()
+      ));
+    }
+  },
+  apropriacao: {
+    field: 'apropriacao_id',
+    async find({ q, limit }) {
       const id = numericId(q);
       const where = buildWhere(q, ['codigo', 'descricao'], { ativo: true });
       if (id) {
@@ -230,9 +251,9 @@ const SEARCHERS = {
       });
 
       return rows.map((row) => normalizeOption(
-        'centro_custo',
+        'apropriacao',
         row,
-        `${row.codigo} - ${row.descricao || 'Centro de custo'}`,
+        `${row.codigo} - ${row.descricao || 'Apropriacao'}`,
         row.obra_id ? `Obra #${row.obra_id}` : '',
         row.toJSON()
       ));

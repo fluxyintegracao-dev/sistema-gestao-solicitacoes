@@ -18,6 +18,11 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: false,
       defaultValue: true
     },
+    tipo_centro_custo: {
+      type: DataTypes.STRING(30),
+      allowNull: false,
+      defaultValue: 'OBRA'
+    },
     classificacao: {
       type: DataTypes.STRING(20),
       allowNull: true,

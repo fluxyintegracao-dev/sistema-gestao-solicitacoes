@@ -10,6 +10,7 @@ module.exports = (sequelize, DataTypes) => sequelize.define(
     financeiro_titulo_id: { type: DataTypes.INTEGER, allowNull: true },
     obra_id: { type: DataTypes.INTEGER, allowNull: true },
     centro_custo_id: { type: DataTypes.INTEGER, allowNull: true },
+    apropriacao_id: { type: DataTypes.INTEGER, allowNull: true },
     plano_financeiro_id: { type: DataTypes.INTEGER, allowNull: true },
     fornecedor_id: { type: DataTypes.INTEGER, allowNull: true },
     link_status: { type: DataTypes.STRING(30), allowNull: false, defaultValue: 'suggested' },

@@ -24,6 +24,7 @@ const LINK_SEARCH_TYPES = [
   { value: 'obra', label: 'Obra', field: 'obra_id' },
   { value: 'fornecedor', label: 'Fornecedor', field: 'fornecedor_id' },
   { value: 'centro_custo', label: 'Centro de custo', field: 'centro_custo_id' },
+  { value: 'apropriacao', label: 'Apropriacao', field: 'apropriacao_id' },
   { value: 'plano_financeiro', label: 'Plano financeiro', field: 'plano_financeiro_id' }
 ];
 
@@ -111,6 +112,7 @@ export default function FiscalDocumentDetail() {
     obra_id: '',
     fornecedor_id: '',
     centro_custo_id: '',
+    apropriacao_id: '',
     plano_financeiro_id: '',
     matched_reason: ''
   });
@@ -373,6 +375,7 @@ export default function FiscalDocumentDetail() {
         obra_id: '',
         fornecedor_id: '',
         centro_custo_id: '',
+        apropriacao_id: '',
         plano_financeiro_id: '',
         matched_reason: ''
       });
@@ -545,6 +548,7 @@ export default function FiscalDocumentDetail() {
                   {link.obra_id ? <span>Obra #{link.obra_id}</span> : null}
                   {link.fornecedor_id ? <span>Fornecedor #{link.fornecedor_id}</span> : null}
                   {link.centro_custo_id ? <span>Centro de custo #{link.centro_custo_id}</span> : null}
+                  {link.apropriacao_id ? <span>Apropriacao #{link.apropriacao_id}</span> : null}
                   {link.plano_financeiro_id ? <span>Plano financeiro #{link.plano_financeiro_id}</span> : null}
                 </div>
               </div>
@@ -662,6 +666,7 @@ export default function FiscalDocumentDetail() {
             <input className="input" inputMode="numeric" placeholder="ID obra" value={linkForm.obra_id} onChange={(event) => updateLinkField('obra_id', event.target.value)} />
             <input className="input" inputMode="numeric" placeholder="ID fornecedor" value={linkForm.fornecedor_id} onChange={(event) => updateLinkField('fornecedor_id', event.target.value)} />
             <input className="input" inputMode="numeric" placeholder="ID centro de custo" value={linkForm.centro_custo_id} onChange={(event) => updateLinkField('centro_custo_id', event.target.value)} />
+            <input className="input" inputMode="numeric" placeholder="ID apropriacao" value={linkForm.apropriacao_id} onChange={(event) => updateLinkField('apropriacao_id', event.target.value)} />
             <input className="input" inputMode="numeric" placeholder="ID plano financeiro" value={linkForm.plano_financeiro_id} onChange={(event) => updateLinkField('plano_financeiro_id', event.target.value)} />
           </div>
           <textarea className="input mt-3 min-h-[84px]" placeholder="Motivo ou observacao do vinculo" value={linkForm.matched_reason} onChange={(event) => updateLinkField('matched_reason', event.target.value)} />

@@ -520,6 +520,9 @@ export default function FinanceiroRelatorios() {
             <Link to="/financeiro/relatorios/resultado-obras" className="btn btn-outline">
               Resultado de Obras
             </Link>
+            <Link to="/financeiro/relatorios/centros-custo" className="btn btn-outline">
+              Centros de Custo
+            </Link>
             <Link to="/financeiro/titulos" className="btn btn-outline">
               Titulos
             </Link>

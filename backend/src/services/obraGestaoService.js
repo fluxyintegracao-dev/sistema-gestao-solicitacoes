@@ -1,4 +1,5 @@
 const { Op } = require('sequelize');
+const { TIPO_CENTRO_CUSTO_OBRA } = require('../constants/centroCusto');
 const {
   Obra,
   Apropriacao,
@@ -280,7 +281,7 @@ function buildKpis({ buckets, custosExecutados, pedidos }) {
 
 async function carregarDadosObra(obraId) {
   const obra = await Obra.findByPk(obraId);
-  if (!obra) {
+  if (!obra || String(obra.tipo_centro_custo || TIPO_CENTRO_CUSTO_OBRA).toUpperCase() !== TIPO_CENTRO_CUSTO_OBRA) {
     return null;
   }
 
@@ -481,6 +482,7 @@ async function obterGestaoObra(obraId) {
 
 async function listarObrasGestao() {
   const obras = await Obra.findAll({
+    where: { tipo_centro_custo: TIPO_CENTRO_CUSTO_OBRA },
     order: [['nome', 'ASC']]
   });
 
@@ -545,6 +547,7 @@ async function listarObrasGestao() {
       nome: obra.nome,
       cidade: obra.cidade || '',
       ativo: Boolean(obra.ativo),
+      tipo_centro_custo: obra.tipo_centro_custo || TIPO_CENTRO_CUSTO_OBRA,
       classificacao: obra.classificacao || null,
       vgv: obra.vgv != null ? Number(obra.vgv) : null,
       planilha_geral: obra.planilha_geral != null ? Number(obra.planilha_geral) : null,

@@ -120,9 +120,18 @@ function getExecucaoPercentual(orcado, executado) {
   return Math.max(0, Math.min(100, Number(((Number(executado || 0) / base) * 100).toFixed(1))));
 }
 
+function isCadastroObra(obra) {
+  return String(obra?.tipo_centro_custo || 'OBRA').trim().toUpperCase() === 'OBRA';
+}
+
+function getTipoCadastroLabel(obra) {
+  return isCadastroObra(obra) ? 'Obra' : 'Centro de custo';
+}
+
 function initialFormState() {
   return {
     id: null,
+    tipo_centro_custo: 'OBRA',
     codigo: '',
     nome: '',
     cidade: '',
@@ -153,8 +162,20 @@ export default function Obras() {
   async function carregarObras() {
     try {
       setLoading(true);
-      const data = gestaoObrasHabilitada ? await getObrasGestao() : await getObras();
-      setObras(Array.isArray(data) ? data : []);
+      const cadastrosData = await getObras({ escopo: 'TODOS' });
+      let lista = Array.isArray(cadastrosData) ? cadastrosData : [];
+
+      if (gestaoObrasHabilitada) {
+        const gestaoData = await getObrasGestao();
+        const resumoPorId = new Map((Array.isArray(gestaoData) ? gestaoData : [])
+          .map((obra) => [Number(obra.id), obra]));
+        lista = lista.map((obra) => ({
+          ...obra,
+          resumo: resumoPorId.get(Number(obra.id))?.resumo || obra.resumo
+        }));
+      }
+
+      setObras(lista);
     } catch (error) {
       console.error(error);
       alert(error.message || 'Erro ao carregar obras');
@@ -171,6 +192,7 @@ export default function Obras() {
   function abrirModalEditarObra(obra) {
     setForm({
       id: obra.id,
+      tipo_centro_custo: obra.tipo_centro_custo || 'OBRA',
       codigo: obra.codigo || '',
       nome: obra.nome || '',
       cidade: obra.cidade || '',
@@ -192,18 +214,21 @@ export default function Obras() {
 
     try {
       setSaving(true);
+      const tipoCadastro = String(form.tipo_centro_custo || 'OBRA').trim().toUpperCase();
+      const cadastroEhObra = tipoCadastro === 'OBRA';
       const payload = {
+        tipo_centro_custo: tipoCadastro,
         codigo: String(form.codigo || '').trim().toUpperCase(),
         nome: String(form.nome || '').trim(),
         cidade: String(form.cidade || '').trim(),
-        classificacao: form.classificacao || null,
-        vgv: form.classificacao === 'PRIVADA' && form.vgv !== '' ? Number(form.vgv) : null,
-        planilha_geral: form.classificacao === 'PUBLICA' && form.planilha_geral !== '' ? Number(form.planilha_geral) : null,
-        margem_custo_esperada: form.margem_custo_esperada !== '' ? Number(form.margem_custo_esperada) : null
+        classificacao: cadastroEhObra ? (form.classificacao || null) : null,
+        vgv: cadastroEhObra && form.classificacao === 'PRIVADA' && form.vgv !== '' ? Number(form.vgv) : null,
+        planilha_geral: cadastroEhObra && form.classificacao === 'PUBLICA' && form.planilha_geral !== '' ? Number(form.planilha_geral) : null,
+        margem_custo_esperada: cadastroEhObra && form.margem_custo_esperada !== '' ? Number(form.margem_custo_esperada) : null
       };
 
       if (!payload.codigo || !payload.nome) {
-        alert('Informe codigo e nome da obra.');
+        alert('Informe codigo e nome do cadastro.');
         return;
       }
 
@@ -246,7 +271,8 @@ export default function Obras() {
       const texto = [
         obra.codigo,
         obra.nome,
-        obra.cidade
+        obra.cidade,
+        getTipoCadastroLabel(obra)
       ]
         .map((value) => String(value || '').toLowerCase())
         .join(' ');
@@ -273,11 +299,11 @@ export default function Obras() {
             >
               Portfólio operacional
             </span>
-            <h1 className="page-title">Gestão de Obras</h1>
+            <h1 className="page-title">Gestão de Obras e Centros de Custo</h1>
             <p className="page-subtitle">
               {gestaoObrasHabilitada
-                ? 'Controle visual das obras com leitura rapida de orcamento, executado e acesso ao gerenciamento por abas.'
-                : 'Cadastro basico de obras utilizado pelo nucleo de solicitacoes. A gestao detalhada por obra esta desabilitada nesta instalacao.'}
+                ? 'Controle das obras reais com orçamento e dos centros de custo administrativos usados nas solicitações.'
+                : 'Cadastro basico de obras e centros de custo utilizado pelo nucleo de solicitacoes.'}
             </p>
           </div>
 
@@ -295,7 +321,7 @@ export default function Obras() {
                 onClick={abrirModalNovaObra}
               >
                 <HiOutlinePlus className="h-5 w-5" />
-                Nova obra
+                Novo cadastro
               </button>
             )}
           </div>
@@ -309,9 +335,9 @@ export default function Obras() {
         </div>
       ) : obrasFiltradas.length === 0 ? (
         <div className="app-empty-card">
-          <h2 className="text-lg font-bold" style={{ color: 'var(--c-text)' }}>Nenhuma obra encontrada</h2>
+          <h2 className="text-lg font-bold" style={{ color: 'var(--c-text)' }}>Nenhum cadastro encontrado</h2>
           <p className="mt-2 text-sm" style={{ color: 'var(--c-muted)' }}>
-            Ajuste o filtro ou cadastre uma nova obra para iniciar o gerenciamento.
+            Ajuste o filtro ou cadastre uma nova obra/centro de custo para iniciar o gerenciamento.
           </p>
         </div>
       ) : (
@@ -320,6 +346,7 @@ export default function Obras() {
             const orcado = Number(obra.resumo?.orcado || 0);
             const executado = Number(obra.resumo?.executado || 0);
             const percentual = getExecucaoPercentual(orcado, executado);
+            const cadastroEhObra = isCadastroObra(obra);
 
             return (
               <article
@@ -349,7 +376,10 @@ export default function Obras() {
                     >
                       {obra.ativo ? 'Ativa' : 'Inativa'}
                     </span>
-                    {obra.classificacao && (
+                    <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-600">
+                      {getTipoCadastroLabel(obra)}
+                    </span>
+                    {cadastroEhObra && obra.classificacao && (
                       <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] ${
                         obra.classificacao === 'PRIVADA'
                           ? 'border-violet-200 bg-violet-50 text-violet-700'
@@ -383,7 +413,7 @@ export default function Obras() {
                     </div>
                   </div>
 
-                  {(obra.vgv != null || obra.planilha_geral != null || obra.margem_custo_esperada != null) && (
+                  {cadastroEhObra && (obra.vgv != null || obra.planilha_geral != null || obra.margem_custo_esperada != null) && (
                     <div className="mt-4 flex flex-wrap gap-3">
                       {obra.vgv != null && (
                         <div>
@@ -420,7 +450,7 @@ export default function Obras() {
                     </div>
                   )}
 
-                  {gestaoObrasHabilitada ? (
+                  {gestaoObrasHabilitada && cadastroEhObra ? (
                     <>
                       <div className="mt-8 grid grid-cols-2 gap-4">
                         <div>
@@ -475,17 +505,19 @@ export default function Obras() {
                         Modo atual
                       </div>
                       <div className="mt-2 text-sm font-semibold" style={{ color: 'var(--c-text)' }}>
-                        Cadastro basico ativo
+                        {cadastroEhObra ? 'Cadastro basico ativo' : 'Centro de custo ativo'}
                       </div>
                       <p className="mt-2 text-sm" style={{ color: 'var(--c-muted)' }}>
-                        Esta obra continua disponivel para solicitacoes e configuracoes basicas, sem dashboard e sem abas de gestao.
+                        {cadastroEhObra
+                          ? 'Esta obra continua disponivel para solicitacoes e configuracoes basicas.'
+                          : 'Este centro de custo esta disponivel para solicitacoes e titulos financeiros sem estrutura de obra.'}
                       </p>
                     </div>
                   )}
 
                   <div className="mt-auto pt-7">
                     <div className="flex flex-wrap gap-2">
-                      {gestaoObrasHabilitada ? (
+                      {gestaoObrasHabilitada && cadastroEhObra ? (
                         <button
                           type="button"
                           className="btn btn-primary inline-flex flex-1 items-center justify-center gap-2"
@@ -496,7 +528,7 @@ export default function Obras() {
                         </button>
                       ) : (
                         <div className="inline-flex min-h-[44px] flex-1 items-center rounded-xl border border-[var(--ui-border)] bg-[var(--ui-canvas)] px-4 text-sm font-medium text-[var(--c-muted)]">
-                          Gestao de obras desabilitada no plano
+                          {cadastroEhObra ? 'Gestao de obras desabilitada no plano' : 'Centro de custo sem abas de obra'}
                         </div>
                       )}
                       {podeGerenciarCadastro && (
@@ -542,10 +574,10 @@ export default function Obras() {
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h2 className="text-xl font-bold" style={{ color: 'var(--c-text)' }}>
-                  {form.id ? 'Editar obra' : 'Nova obra'}
+                  {form.id ? 'Editar cadastro' : 'Novo cadastro'}
                 </h2>
                 <p className="mt-1 text-sm" style={{ color: 'var(--c-muted)' }}>
-                  Mantenha os dados principais da obra alinhados para o módulo operacional e financeiro.
+                  Mantenha obras reais e centros de custo administrativos alinhados para o modulo operacional e financeiro.
                 </p>
               </div>
               <button type="button" className="btn btn-outline" onClick={fecharModal}>
@@ -555,7 +587,7 @@ export default function Obras() {
 
             <form onSubmit={handleSubmit} className="mt-6 grid gap-4 md:grid-cols-3">
               <label className="grid gap-1 text-sm font-medium" style={{ color: 'var(--c-text)' }}>
-                Código da obra
+                Código
                 <input
                   className="input"
                   value={form.codigo}
@@ -566,7 +598,7 @@ export default function Obras() {
               </label>
 
               <label className="grid gap-1 text-sm font-medium md:col-span-2" style={{ color: 'var(--c-text)' }}>
-                Nome da obra
+                Nome
                 <input
                   className="input"
                   value={form.nome}
@@ -574,6 +606,25 @@ export default function Obras() {
                   placeholder="Ex: Muro São Domingos"
                   required
                 />
+              </label>
+
+              <label className="grid gap-1 text-sm font-medium md:col-span-3" style={{ color: 'var(--c-text)' }}>
+                Tipo de cadastro
+                <select
+                  className="input"
+                  value={form.tipo_centro_custo}
+                  onChange={(event) => setForm((current) => ({
+                    ...current,
+                    tipo_centro_custo: event.target.value,
+                    classificacao: event.target.value === 'OBRA' ? current.classificacao : '',
+                    vgv: event.target.value === 'OBRA' ? current.vgv : '',
+                    planilha_geral: event.target.value === 'OBRA' ? current.planilha_geral : '',
+                    margem_custo_esperada: event.target.value === 'OBRA' ? current.margem_custo_esperada : ''
+                  }))}
+                >
+                  <option value="OBRA">Obra</option>
+                  <option value="CENTRO_CUSTO">Centro de custo</option>
+                </select>
               </label>
 
               <label className="grid gap-1 text-sm font-medium md:col-span-3" style={{ color: 'var(--c-text)' }}>
@@ -586,6 +637,8 @@ export default function Obras() {
                 />
               </label>
 
+              {form.tipo_centro_custo === 'OBRA' && (
+              <>
               <label className="grid gap-1 text-sm font-medium" style={{ color: 'var(--c-text)' }}>
                 Classificação
                 <select
@@ -632,13 +685,15 @@ export default function Obras() {
                   />
                 </label>
               )}
+              </>
+              )}
 
               <div className="flex flex-wrap justify-end gap-3 md:col-span-3">
                 <button type="button" className="btn btn-outline" onClick={fecharModal} disabled={saving}>
                   Cancelar
                 </button>
                 <button type="submit" className="btn btn-primary" disabled={saving}>
-                  {saving ? 'Salvando...' : form.id ? 'Salvar obra' : 'Criar obra'}
+                  {saving ? 'Salvando...' : form.id ? 'Salvar cadastro' : 'Criar cadastro'}
                 </button>
               </div>
             </form>
@@ -648,4 +703,3 @@ export default function Obras() {
     </div>
   );
 }
-

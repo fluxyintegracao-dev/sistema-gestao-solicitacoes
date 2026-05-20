@@ -1,4 +1,5 @@
 const { Apropriacao, Obra } = require('../models');
+const { isObraCentroCusto } = require('../constants/centroCusto');
 
 function parseBoolean(value, fallback) {
   if (typeof value === 'boolean') {
@@ -68,6 +69,9 @@ module.exports = {
       if (!obra) {
         return res.status(400).json({ error: 'Obra nao encontrada' });
       }
+      if (!isObraCentroCusto(obra.tipo_centro_custo)) {
+        return res.status(400).json({ error: 'Apropriacoes so podem ser cadastradas para registros marcados como obra.' });
+      }
 
       const apropriacao = await Apropriacao.create({
         obra_id,
@@ -97,7 +101,23 @@ module.exports = {
       const ativo = parseBoolean(req.body?.ativo, apropriacao.ativo);
       const valorOrcado = parseValorOrcado(req.body?.valor_orcado, Number(apropriacao.valor_orcado || 0));
 
+      if (req.body?.obra_id && Number(req.body.obra_id) !== Number(apropriacao.obra_id)) {
+        const obra = await Obra.findByPk(req.body.obra_id);
+        if (!obra) {
+          return res.status(400).json({ error: 'Obra nao encontrada' });
+        }
+        if (!isObraCentroCusto(obra.tipo_centro_custo)) {
+          return res.status(400).json({ error: 'Apropriacoes so podem ser vinculadas a registros marcados como obra.' });
+        }
+      } else {
+        const obra = await Obra.findByPk(apropriacao.obra_id);
+        if (obra && !isObraCentroCusto(obra.tipo_centro_custo)) {
+          return res.status(400).json({ error: 'Este centro de custo nao aceita apropriacoes porque nao esta marcado como obra.' });
+        }
+      }
+
       await apropriacao.update({
+        obra_id: req.body?.obra_id || apropriacao.obra_id,
         codigo: codigo || apropriacao.codigo,
         descricao: descricao === '' ? null : descricao,
         valor_orcado: valorOrcado,

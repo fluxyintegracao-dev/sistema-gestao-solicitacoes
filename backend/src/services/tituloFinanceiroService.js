@@ -4,6 +4,7 @@ const {
   CartaoFinanceiro,
   ContaBancaria,
   EmpresaGrupo,
+  Apropriacao,
   sequelize,
   CategoriaFinanceira,
   FaturaCartaoFinanceiro,
@@ -612,7 +613,7 @@ function validarCompatibilidadeParceiroTitulo(parceiro, tipoTitulo) {
 
 async function validarObraTitulo(req, obraId) {
   const obra = await Obra.findByPk(obraId, {
-    attributes: ['id', 'nome', 'codigo']
+    attributes: ['id', 'nome', 'codigo', 'tipo_centro_custo']
   });
 
   if (!obra) {
@@ -628,6 +629,23 @@ async function validarObraTitulo(req, obraId) {
   );
 
   return obra;
+}
+
+async function validarApropriacaoTitulo(apropriacaoId, obraId) {
+  if (!apropriacaoId) {
+    return null;
+  }
+
+  const apropriacao = await Apropriacao.findByPk(apropriacaoId);
+  if (!apropriacao || apropriacao.ativo === false) {
+    throw createHttpError(400, 'Apropriacao informada nao foi encontrada.');
+  }
+
+  if (Number(apropriacao.obra_id) !== Number(obraId)) {
+    throw createHttpError(400, 'A apropriacao informada nao pertence a obra/centro de custo selecionado.');
+  }
+
+  return apropriacao;
 }
 
 async function validarContaBancaria(contaBancariaId) {
@@ -1039,6 +1057,7 @@ async function criarTituloPorSolicitacao(req, solicitacaoId, payload = {}) {
         const titulo = await TituloFinanceiro.create({
           solicitacao_id: solicitacao.id,
           obra_id: solicitacao.obra_id,
+          apropriacao_id: solicitacao.apropriacao_id || null,
           empresa_id: payload.empresa_id || null,
           parceiro_id: parceiroId,
           categoria_financeira_id: payload.categoria_financeira_id || null,
@@ -1162,6 +1181,7 @@ async function criarTituloManual(req, payload = {}) {
     validarEmpresaGrupo(payload.empresa_id),
     validarCategoriaFinanceira(payload.categoria_financeira_id, tipo)
   ]);
+  const apropriacao = await validarApropriacaoTitulo(payload.apropriacao_id, obra.id);
 
   validarCompatibilidadeParceiroTitulo(parceiro, tipo);
 
@@ -1244,6 +1264,7 @@ async function criarTituloManual(req, payload = {}) {
         const titulo = await TituloFinanceiro.create({
           solicitacao_id: null,
           obra_id: obra.id,
+          apropriacao_id: apropriacao?.id || null,
           empresa_id: payload.empresa_id || null,
           parceiro_id: parceiro.id,
           categoria_financeira_id: payload.categoria_financeira_id || null,
@@ -1374,6 +1395,7 @@ async function criarTituloManualComBaixaAtomica(req, payload = {}, { transaction
     validarContaBancaria(contaBancariaId)
   ]);
   await validarEmpresaGrupo(payload.empresa_id || conta?.empresa_id);
+  const apropriacao = await validarApropriacaoTitulo(payload.apropriacao_id, obra.id);
 
   validarCompatibilidadeParceiroTitulo(parceiro, tipo);
 
@@ -1400,6 +1422,7 @@ async function criarTituloManualComBaixaAtomica(req, payload = {}, { transaction
     const titulo = await TituloFinanceiro.create({
       solicitacao_id: null,
       obra_id: obra.id,
+      apropriacao_id: apropriacao?.id || null,
       empresa_id: conta.empresa_id || payload.empresa_id || null,
       parceiro_id: parceiro.id,
       categoria_financeira_id: categoria?.id || null,

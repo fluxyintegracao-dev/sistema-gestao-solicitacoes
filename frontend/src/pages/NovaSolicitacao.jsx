@@ -51,6 +51,14 @@ function formatarRotuloBuscaObra(obra) {
   return codigo || nome;
 }
 
+function isCadastroObra(obra) {
+  return String(obra?.tipo_centro_custo || 'OBRA').trim().toUpperCase() === 'OBRA';
+}
+
+function getTipoCentroCustoLabel(obra) {
+  return isCadastroObra(obra) ? 'Obra' : 'Centro de custo';
+}
+
 const PIX_TIPOS_CHAVE = [
   { value: 'CPF', label: 'CPF' },
   { value: 'CNPJ', label: 'CNPJ' },
@@ -139,9 +147,15 @@ export default function NovaSolicitacao() {
     data_fim_medicao: ''
   });
 
+  const obraSelecionada = useMemo(
+    () => obras.find((obra) => String(obra.id) === String(form.obra_id)) || null,
+    [obras, form.obra_id]
+  );
+  const obraSelecionadaEhObra = isCadastroObra(obraSelecionada);
+
   useEffect(() => {
     async function load() {
-      setObras(await getMinhasObras({ modo: 'CRIACAO' }));
+      setObras(await getMinhasObras({ modo: 'CRIACAO', escopo: 'TODOS' }));
       setTipos(await getTiposSolicitacao());
       setSetores(await getSetores());
       try {
@@ -229,6 +243,22 @@ export default function NovaSolicitacao() {
       return;
     }
 
+    if (!obraSelecionadaEhObra) {
+      setContratos([]);
+      setContratosRef([]);
+      setApropriacoes([]);
+      setRefContratoBusca('');
+      setRefResultados([]);
+      setForm(prev => ({
+        ...prev,
+        contrato_id: '',
+        codigo_contrato: '',
+        apropriacao_id: '',
+        itens_apropriacao: ''
+      }));
+      return;
+    }
+
     async function loadDependenciasObra() {
       const tarefas = [
         moduloContratosHabilitado
@@ -259,7 +289,7 @@ export default function NovaSolicitacao() {
     }
 
     loadDependenciasObra();
-  }, [form.obra_id, moduloContratosHabilitado, moduloApropriacoesHabilitado]);
+  }, [form.obra_id, obraSelecionadaEhObra, moduloContratosHabilitado, moduloApropriacoesHabilitado]);
 
   function handleChange(e) {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -376,10 +406,11 @@ export default function NovaSolicitacao() {
   const solicitacaoCompra = !comportamentoTipo.mostrar_apropriacao_principal && !comportamentoTipo.mostrar_valor;
   const exigeApropriacaoPrincipal =
     Boolean(form.tipo_solicitacao_id) &&
+    obraSelecionadaEhObra &&
     campoObrigatorio('apropriacao_principal');
   const tipoSemValor = !campoVisivel('valor');
-  const exibirCamposContrato = campoVisivel('contrato');
-  const exibirCampoApropriacao = moduloApropriacoesHabilitado && campoVisivel('apropriacao_principal');
+  const exibirCamposContrato = obraSelecionadaEhObra && campoVisivel('contrato');
+  const exibirCampoApropriacao = obraSelecionadaEhObra && moduloApropriacoesHabilitado && campoVisivel('apropriacao_principal');
   const camposContratoObrigatorios = campoObrigatorio('contrato');
   const exibirCampoSubtipo = campoVisivel('subtipo');
   const exibirCampoCredor = campoVisivel('credor');
@@ -387,7 +418,7 @@ export default function NovaSolicitacao() {
   const dataVencimentoObrigatoria = campoObrigatorio('data_vencimento');
   const exibirPeriodoMedicao = campoVisivel('periodo_medicao');
   const exibirRefContratoAbertura = campoVisivel('ref_contrato_abertura');
-  const exibirItensApropriacao = campoVisivel('itens_apropriacao');
+  const exibirItensApropriacao = obraSelecionadaEhObra && campoVisivel('itens_apropriacao');
   const refContratoAberturaObrigatoria = campoObrigatorio('ref_contrato_abertura');
   const itensApropriacaoObrigatorio = campoObrigatorio('itens_apropriacao');
   const exibirDescricao = campoVisivel('descricao');
@@ -533,15 +564,17 @@ export default function NovaSolicitacao() {
   }
 
   function selecionarObra(obra) {
-    setForm(prev => ({ ...prev, obra_id: String(obra.id) }));
+    setForm(prev => ({
+      ...prev,
+      obra_id: String(obra.id),
+      contrato_id: '',
+      codigo_contrato: '',
+      apropriacao_id: '',
+      itens_apropriacao: ''
+    }));
     setObraBusca(formatarRotuloBuscaObra(obra));
     setObraBuscaAtiva(false);
   }
-
-  const obraSelecionada = useMemo(
-    () => obras.find((obra) => String(obra.id) === String(form.obra_id)) || null,
-    [obras, form.obra_id]
-  );
 
   const obrasFiltradas = useMemo(() => {
     const termo = normalizarBusca(obraBusca);
@@ -600,7 +633,7 @@ export default function NovaSolicitacao() {
     e.preventDefault();
 
     if (!form.obra_id) {
-      alert('Selecione uma obra');
+      alert('Selecione uma obra/centro de custo');
       return;
     }
 
@@ -759,13 +792,10 @@ export default function NovaSolicitacao() {
   const contratosDisponiveis = contratosRef.length > 0 ? contratosRef : contratos;
   const hoje = new Date();
   const hojeInput = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-${String(hoje.getDate()).padStart(2, '0')}`;
-  const obraSelecionadaAtual = useMemo(() => (
-    Array.isArray(obras)
-      ? obras.find(obra => String(obra.id) === String(form.obra_id))
-      : null
-  ), [obras, form.obra_id]);
   const classificacaoObraSelecionada = String(
-    obraSelecionadaAtual?.classificacao || obraSelecionadaAtual?.classificacao_obra || ''
+    obraSelecionadaEhObra
+      ? obraSelecionada?.classificacao || obraSelecionada?.classificacao_obra || ''
+      : ''
   ).trim().toUpperCase();
   const diretoriaSugerida = classificacaoObraSelecionada
     ? aprovacaoDiretoriaConfig?.diretorias?.[classificacaoObraSelecionada] || ''
@@ -878,11 +908,11 @@ export default function NovaSolicitacao() {
         <div className="nova-solicitacao-body">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 nova-solicitacao-grid-principal">
           <label className="grid gap-1 text-sm lg:col-span-12">
-            Obra
+            Obra/Centro de Custo
             <div className="relative nova-solicitacao-obra-field">
               <input
                 className="input input-sm nova-solicitacao-obra-input"
-                placeholder="Digite o codigo ou nome da obra"
+                placeholder="Digite o codigo ou nome da obra/centro de custo"
                 value={obraBusca}
                 onChange={e => handleChangeBuscaObra(e.target.value)}
                 onFocus={handleFocusBuscaObra}
@@ -917,7 +947,7 @@ export default function NovaSolicitacao() {
                           <div className="text-xs text-[var(--c-muted)]">{formatarLocalidadeObra(obra)}</div>
                         </div>
                         <span className="nova-solicitacao-obra-badge">
-                          {obra.codigo || 'Sem codigo'}
+                          {getTipoCentroCustoLabel(obra)} - {obra.codigo || 'Sem codigo'}
                         </span>
                       </div>
                     </button>
@@ -926,12 +956,12 @@ export default function NovaSolicitacao() {
               )}
             </div>
             <span className="text-xs text-gray-500">
-              Digite parte do nome ou do codigo para filtrar as obras enquanto voce preenche.
+              Digite parte do nome ou do codigo para filtrar obras e centros de custo enquanto voce preenche.
               {obrasFiltradas.length === 1 && mostrarSugestoesObra ? ' Pressione Enter para selecionar o unico resultado.' : ''}
             </span>
             {mostrarSugestoesObra && obrasFiltradas.length === 0 && (
               <span className="text-xs text-gray-500">
-                Nenhuma obra encontrada com esse termo.
+                Nenhuma obra/centro de custo encontrada com esse termo.
               </span>
             )}
             {obraSelecionada && (
@@ -939,7 +969,7 @@ export default function NovaSolicitacao() {
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--c-muted)]">
-                      Obra selecionada
+                      {getTipoCentroCustoLabel(obraSelecionada)} selecionada
                     </div>
                     <div className="mt-1 text-sm font-semibold text-[var(--c-text)] break-words">
                       {obraSelecionada.nome || 'Obra sem nome'}
@@ -1029,7 +1059,7 @@ export default function NovaSolicitacao() {
               disabled={!form.obra_id}
             >
               <option value="">
-                {form.obra_id ? 'Selecione' : 'Selecione a obra primeiro'}
+                {form.obra_id ? 'Selecione' : 'Selecione a obra/centro de custo primeiro'}
               </option>
               {setoresFiltrados.map(s => (
                 <option key={s.id} value={s.codigo}>
@@ -1039,7 +1069,7 @@ export default function NovaSolicitacao() {
             </select>
             {!form.obra_id && (
               <span className="text-xs text-gray-500">
-                Selecione a obra para habilitar a área responsável.
+                Selecione a obra/centro de custo para habilitar a area responsavel.
               </span>
             )}
           </label>
@@ -1055,7 +1085,7 @@ export default function NovaSolicitacao() {
             >
               <option value="">
                 {!form.obra_id
-                  ? 'Selecione a obra primeiro'
+                  ? 'Selecione a obra/centro de custo primeiro'
                   : diretoriaSugerida
                     ? 'Selecione'
                     : 'Sem diretoria configurada'}

@@ -297,6 +297,7 @@ async function criarVinculoDocumentoFiscal(req, id, payload = {}) {
     'financeiro_titulo_id',
     'obra_id',
     'centro_custo_id',
+    'apropriacao_id',
     'plano_financeiro_id',
     'fornecedor_id'
   ];

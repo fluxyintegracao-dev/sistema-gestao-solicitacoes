@@ -29,6 +29,10 @@ function resolveTipo(value) {
   return String(value || '').trim().toUpperCase() === 'RECEBER' ? 'RECEBER' : 'PAGAR';
 }
 
+function isCadastroObra(obra) {
+  return String(obra?.tipo_centro_custo || 'OBRA').trim().toUpperCase() === 'OBRA';
+}
+
 function formatCurrency(value) {
   const number = Number(value || 0);
   return number.toLocaleString('pt-BR', {
@@ -260,7 +264,7 @@ export default function FinanceiroTituloNovo() {
         setLoadingBase(true);
         setError('');
         const [obrasData, categoriasData, paymentAccountsData, formasData, cartoesData] = await Promise.all([
-          getMinhasObras({ modo: 'FINANCEIRO' }),
+          getMinhasObras({ modo: 'FINANCEIRO', escopo: 'TODOS' }),
           getCategoriasFinanceiras(),
           getPaymentAccounts().catch(() => []),
           getFormasPagamentoFinanceiras().catch(() => []),
@@ -340,8 +344,14 @@ export default function FinanceiroTituloNovo() {
     };
   }, [form.tipo, parceiroDocumentoBusca, parceiroNomeBusca]);
 
+  const obraSelecionada = useMemo(
+    () => obras.find((obra) => String(obra.id) === String(form.obra_id)) || null,
+    [obras, form.obra_id]
+  );
+  const obraSelecionadaEhObra = isCadastroObra(obraSelecionada);
+
   useEffect(() => {
-    if (!moduloApropriacoesHabilitado || !form.obra_id) {
+    if (!moduloApropriacoesHabilitado || !form.obra_id || !obraSelecionadaEhObra) {
       setApropriacoes([]);
       setForm((current) => ({ ...current, apropriacao_id: '' }));
       setLoadingApropriacoes(false);
@@ -375,7 +385,7 @@ export default function FinanceiroTituloNovo() {
     return () => {
       active = false;
     };
-  }, [form.obra_id, moduloApropriacoesHabilitado]);
+  }, [form.obra_id, obraSelecionadaEhObra, moduloApropriacoesHabilitado]);
 
   useEffect(() => {
     if (form.tipo !== 'PAGAR' || !form.parceiro_id) {
@@ -744,9 +754,9 @@ export default function FinanceiroTituloNovo() {
         ...form,
         obra_id: Number(form.obra_id),
         parceiro_id: Number(form.parceiro_id),
+        apropriacao_id: form.apropriacao_id ? Number(form.apropriacao_id) : undefined,
         categoria_financeira_id: form.categoria_financeira_id ? Number(form.categoria_financeira_id) : undefined
       };
-      delete payload.apropriacao_id;
       payload.pagamentos = (form.pagamentos || []).map((pagamento) => {
         const forma = getFormaPagamento(pagamento.forma_pagamento_id);
         const usaDetalhe = forma && (isFormaBoleto(forma) || isFormaCheque(forma));
@@ -864,14 +874,14 @@ export default function FinanceiroTituloNovo() {
               </label>
 
               <label className="sol-filter-field xl:col-span-3">
-                <span className="sol-filter-label">Obra</span>
+                <span className="sol-filter-label">Obra/Centro de Custo</span>
                 <select
                   className="input w-full"
                   value={form.obra_id}
                   onChange={(event) => updateField('obra_id', event.target.value)}
                   required
                 >
-                  <option value="">Selecione a obra</option>
+                  <option value="">Selecione a obra/centro de custo</option>
                   {obras.map((obra) => (
                     <option key={obra.id} value={obra.id}>
                       {obra.codigo ? `${obra.codigo} - ${obra.nome}` : obra.nome}
@@ -1325,7 +1335,7 @@ export default function FinanceiroTituloNovo() {
                 </>
               )}
 
-              {moduloApropriacoesHabilitado && (
+              {moduloApropriacoesHabilitado && obraSelecionadaEhObra && (
               <label className="sol-filter-field xl:col-span-4">
                 <span className="sol-filter-label">Item de apropriacão</span>
                 <select

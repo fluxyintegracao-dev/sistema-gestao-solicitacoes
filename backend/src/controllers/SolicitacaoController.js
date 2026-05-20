@@ -71,6 +71,7 @@ const {
   obterConfigCamposNovaSolicitacao,
   resolverCamposNovaSolicitacao
 } = require('../services/novaSolicitacaoCamposConfig');
+const { isObraCentroCusto } = require('../constants/centroCusto');
 
 const CHAVE_AREAS_POR_SETOR_ORIGEM = 'AREAS_POR_SETOR_ORIGEM';
 const CHAVE_SETORES_VISIVEIS_POR_USUARIO = 'SETORES_VISIVEIS_POR_USUARIO';
@@ -1626,11 +1627,12 @@ module.exports = {
       const areaResponsavelPersistida = resolveSetorPersistenciaValue(setorDestinoSelecionado, area_responsavel);
 
       const obraSelecionada = await Obra.findByPk(obra_id, {
-        attributes: ['id', 'codigo', 'nome', 'classificacao']
+        attributes: ['id', 'codigo', 'nome', 'classificacao', 'tipo_centro_custo']
       });
       if (!obraSelecionada) {
-        return res.status(400).json({ error: 'Obra informada nao foi encontrada.' });
+        return res.status(400).json({ error: 'Obra/Centro de custo informado nao foi encontrado.' });
       }
+      const registroSelecionadoEhObra = isObraCentroCusto(obraSelecionada.tipo_centro_custo);
 
       const configAprovacaoDiretoria = await obterConfiguracaoAprovacaoDiretoria();
       const diretoriaConfiguradaObra = obterDiretoriaParaObra(
@@ -1793,7 +1795,13 @@ module.exports = {
       }
 
       let apropriacao = null;
-      if (campoVisivel('apropriacao_principal') && apropriacao_id !== undefined && apropriacao_id !== null && apropriacao_id !== '') {
+      if (!registroSelecionadoEhObra && apropriacao_id !== undefined && apropriacao_id !== null && apropriacao_id !== '') {
+        return res.status(400).json({
+          error: 'Apropriacao so pode ser vinculada a registros classificados como obra.'
+        });
+      }
+
+      if (registroSelecionadoEhObra && campoVisivel('apropriacao_principal') && apropriacao_id !== undefined && apropriacao_id !== null && apropriacao_id !== '') {
         apropriacao = await Apropriacao.findByPk(Number(apropriacao_id), {
           attributes: ['id', 'obra_id', 'codigo', 'descricao']
         });
@@ -1811,7 +1819,7 @@ module.exports = {
         }
       }
 
-      if (campoObrigatorio('apropriacao_principal') && !apropriacao) {
+      if (registroSelecionadoEhObra && campoObrigatorio('apropriacao_principal') && !apropriacao) {
         return res.status(400).json({
           error: 'Selecione a apropriacao principal da solicitacao.'
         });

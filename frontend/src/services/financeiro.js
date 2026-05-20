@@ -772,6 +772,14 @@ export async function getResultadoObras() {
   return parseJson(response, 'Erro ao buscar resultado de obras');
 }
 
+export async function getResultadoCentrosCusto() {
+  const response = await fetch(`${API_URL}/financeiro/relatorios/centros-custo`, {
+    headers: authHeaders()
+  });
+
+  return parseJson(response, 'Erro ao buscar resultado de centros de custo');
+}
+
 export async function getPaymentBeneficiaries(params = {}) {
   const query = new URLSearchParams(
     Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== '')

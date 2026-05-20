@@ -5,7 +5,44 @@ const {
   obterGestaoObra
 } = require('../services/obraGestaoService');
 const { canAccessFinanceiro } = require('../services/authorizationService');
+const {
+  TIPO_CENTRO_CUSTO_OBRA,
+  TIPOS_CENTRO_CUSTO,
+  normalizeTipoCentroCusto
+} = require('../constants/centroCusto');
 const CHAVE_SETORES_CRIACAO_TODAS_OBRAS = 'SETORES_CRIACAO_TODAS_OBRAS';
+
+function applyCentroCustoScope(where, escopo = 'OBRAS') {
+  const scope = String(escopo || 'OBRAS').trim().toUpperCase();
+
+  if (['TODOS', 'OBRA_CENTRO_CUSTO', 'CENTROS_CUSTO'].includes(scope)) {
+    return where;
+  }
+
+  if (['CENTRO_CUSTO', 'CENTRO_CUSTO_PURO'].includes(scope)) {
+    where.tipo_centro_custo = { [Op.ne]: TIPO_CENTRO_CUSTO_OBRA };
+    return where;
+  }
+
+  where.tipo_centro_custo = TIPO_CENTRO_CUSTO_OBRA;
+  return where;
+}
+
+function buildObraWhere(query = {}, defaultScope = 'OBRAS') {
+  const { codigo, descricao, escopo } = query;
+  const where = {};
+
+  applyCentroCustoScope(where, escopo || defaultScope);
+
+  if (codigo) {
+    where.codigo = String(codigo).toUpperCase();
+  }
+  if (descricao) {
+    where.nome = { [Op.like]: `%${descricao}%` };
+  }
+
+  return where;
+}
 
 async function obterSetoresCriacaoTodasObras() {
   const item = await ConfiguracaoSistema.findOne({
@@ -66,15 +103,7 @@ module.exports = {
   },
 
   async index(req, res) {
-    const { codigo, descricao } = req.query;
-    const where = {};
-
-    if (codigo) {
-      where.codigo = String(codigo).toUpperCase();
-    }
-    if (descricao) {
-      where.nome = { [Op.like]: `%${descricao}%` };
-    }
+    const where = buildObraWhere(req.query, 'OBRAS');
 
     const obras = await Obra.findAll({
       where,
@@ -88,11 +117,12 @@ module.exports = {
       const { id: usuarioId, perfil } = req.user;
       const { codigo, descricao, modo } = req.query;
       const modoNormalizado = String(modo || '').trim().toUpperCase();
+      const defaultScope = String(req.query?.escopo || '').trim()
+        ? req.query.escopo
+        : 'TODOS';
 
       if (perfil === 'SUPERADMIN') {
-        const where = {};
-        if (codigo) where.codigo = String(codigo).toUpperCase();
-        if (descricao) where.nome = { [Op.like]: `%${descricao}%` };
+        const where = buildObraWhere({ codigo, descricao, escopo: defaultScope }, 'TODOS');
         const obras = await Obra.findAll({
           where,
           order: [['nome', 'ASC']]
@@ -101,9 +131,7 @@ module.exports = {
       }
 
       if (modoNormalizado === 'FINANCEIRO' && await canAccessFinanceiro(req.user)) {
-        const where = {};
-        if (codigo) where.codigo = String(codigo).toUpperCase();
-        if (descricao) where.nome = { [Op.like]: `%${descricao}%` };
+        const where = buildObraWhere({ codigo, descricao, escopo: defaultScope }, 'TODOS');
         const obras = await Obra.findAll({
           where,
           order: [['nome', 'ASC']]
@@ -120,9 +148,7 @@ module.exports = {
 
         const podeCriarEmTodas = tokensUsuario.some(token => setoresPermitidos.includes(token));
         if (podeCriarEmTodas) {
-          const where = {};
-          if (codigo) where.codigo = String(codigo).toUpperCase();
-          if (descricao) where.nome = { [Op.like]: `%${descricao}%` };
+          const where = buildObraWhere({ codigo, descricao, escopo: defaultScope }, 'TODOS');
           const obras = await Obra.findAll({
             where,
             order: [['nome', 'ASC']]
@@ -133,7 +159,7 @@ module.exports = {
 
       if (codigo) {
         const obra = await Obra.findOne({
-          where: { codigo: String(codigo).toUpperCase() }
+          where: buildObraWhere({ codigo, escopo: defaultScope }, 'TODOS')
         });
         if (!obra) return res.json([]);
 
@@ -149,7 +175,7 @@ module.exports = {
           {
             model: Obra,
             as: 'obra',
-            where: descricao ? { nome: { [Op.like]: `%${descricao}%` } } : undefined
+            where: buildObraWhere({ descricao, escopo: defaultScope }, 'TODOS')
           }
         ]
       });
@@ -164,7 +190,7 @@ module.exports = {
   },
 
   async create(req, res) {
-    const { nome, codigo, cidade, classificacao, vgv, planilha_geral, margem_custo_esperada } = req.body;
+    const { nome, codigo, cidade, classificacao, vgv, planilha_geral, margem_custo_esperada, tipo_centro_custo } = req.body;
 
     if (!nome || !codigo) {
       return res.status(400).json({ error: 'Nome e codigo sao obrigatorios' });
@@ -173,6 +199,10 @@ module.exports = {
     const classificacaoNorm = classificacao ? String(classificacao).trim().toUpperCase() : null;
     if (classificacaoNorm && !['PRIVADA', 'PUBLICA'].includes(classificacaoNorm)) {
       return res.status(400).json({ error: 'Classificacao invalida. Use PRIVADA ou PUBLICA' });
+    }
+    const tipoCentroCustoNorm = normalizeTipoCentroCusto(tipo_centro_custo);
+    if (tipo_centro_custo && !TIPOS_CENTRO_CUSTO.includes(String(tipo_centro_custo).trim().toUpperCase())) {
+      return res.status(400).json({ error: 'Tipo de centro de custo invalido. Use OBRA ou CENTRO_CUSTO' });
     }
 
     const existente = await Obra.findOne({
@@ -187,6 +217,7 @@ module.exports = {
       cidade: cidade || null,
       nome,
       ativo: true,
+      tipo_centro_custo: tipoCentroCustoNorm,
       classificacao: classificacaoNorm,
       vgv: vgv != null ? Number(vgv) : null,
       planilha_geral: planilha_geral != null ? Number(planilha_geral) : null,
@@ -198,7 +229,7 @@ module.exports = {
 
   async update(req, res) {
     const { id } = req.params;
-    const { nome, codigo, cidade, classificacao, vgv, planilha_geral, margem_custo_esperada } = req.body;
+    const { nome, codigo, cidade, classificacao, vgv, planilha_geral, margem_custo_esperada, tipo_centro_custo } = req.body;
 
     const dados = {};
     if (nome) dados.nome = nome;
@@ -215,6 +246,13 @@ module.exports = {
         return res.status(400).json({ error: 'Classificacao invalida. Use PRIVADA ou PUBLICA' });
       }
       dados.classificacao = classificacaoNorm;
+    }
+    if (tipo_centro_custo !== undefined) {
+      const tipoCentroCustoNorm = String(tipo_centro_custo || '').trim().toUpperCase();
+      if (!TIPOS_CENTRO_CUSTO.includes(tipoCentroCustoNorm)) {
+        return res.status(400).json({ error: 'Tipo de centro de custo invalido. Use OBRA ou CENTRO_CUSTO' });
+      }
+      dados.tipo_centro_custo = tipoCentroCustoNorm;
     }
     if (vgv !== undefined) dados.vgv = vgv != null ? Number(vgv) : null;
     if (planilha_geral !== undefined) dados.planilha_geral = planilha_geral != null ? Number(planilha_geral) : null;
