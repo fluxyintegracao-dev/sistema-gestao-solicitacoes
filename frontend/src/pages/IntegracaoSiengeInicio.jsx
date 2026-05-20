@@ -7,6 +7,7 @@ import {
   hasEnabledModule
 } from '../utils/acessoProduto';
 import {
+  baixarModeloCargaInicialSienge,
   buscarIntegracaoSiengeCredorParceiro,
   cadastrarIntegracaoSiengeCredorParceiro,
   criarIntegracaoSiengeFila,
@@ -15,6 +16,7 @@ import {
   getIntegracaoSiengeFila,
   getIntegracaoSiengeLogs,
   getIntegracaoSiengeSaude,
+  importarCargaInicialSienge,
   reprocessarIntegracaoSiengeFila,
   salvarIntegracaoSiengeConfig,
   salvarIntegracaoSiengeCredorParceiroMapeamento
@@ -122,6 +124,9 @@ export default function IntegracaoSiengeInicio() {
     processar_agora: false,
     forcar_recriar_payload: false
   });
+  const [arquivoCargaInicial, setArquivoCargaInicial] = useState(null);
+  const [importandoCargaInicial, setImportandoCargaInicial] = useState(false);
+  const [resultadoCargaInicial, setResultadoCargaInicial] = useState(null);
 
   useEffect(() => {
     carregarTudo();
@@ -361,6 +366,40 @@ export default function IntegracaoSiengeInicio() {
     await carregarTudo(filtrosFila);
   }
 
+  async function baixarModeloCargaInicial() {
+    try {
+      const blob = await baixarModeloCargaInicialSienge();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'modelo-carga-inicial-sienge.csv';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error(error);
+      alert(error?.message || 'Erro ao baixar modelo da carga inicial SIENGE');
+    }
+  }
+
+  async function enviarCargaInicial(event) {
+    event.preventDefault();
+    if (!arquivoCargaInicial || !canEditConfig) return;
+
+    try {
+      setImportandoCargaInicial(true);
+      const data = await importarCargaInicialSienge(arquivoCargaInicial);
+      setResultadoCargaInicial(data);
+      await carregarTudo();
+    } catch (error) {
+      console.error(error);
+      alert(error?.message || 'Erro ao importar carga inicial SIENGE');
+    } finally {
+      setImportandoCargaInicial(false);
+    }
+  }
+
   const resumoFila = useMemo(() => {
     return {
       total: Number(fila?.resumo?.total || 0),
@@ -402,6 +441,92 @@ export default function IntegracaoSiengeInicio() {
         <StatusCard titulo="Pendentes" valor={resumoFila.pendentes} />
         <StatusCard titulo="Sucesso" valor={resumoFila.sucesso} />
         <StatusCard titulo="Erro" valor={resumoFila.erro} />
+      </section>
+
+      <section className="sol-surface-card rounded-xl p-4 md:p-5">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="max-w-3xl">
+            <h2 className="text-lg font-semibold text-slate-900">Carga inicial financeira</h2>
+            <p className="mt-1 text-sm leading-6 text-slate-500">
+              Importe cadastros de credores/clientes e titulos em aberto exportados do SIENGE. Cada linha precisa apontar
+              para uma obra ou centro de custo ja vinculado a uma empresa do grupo para manter DRE e relatorios consistentes.
+            </p>
+          </div>
+          <button type="button" className="btn btn-outline btn-sm" onClick={baixarModeloCargaInicial}>
+            Baixar modelo CSV
+          </button>
+        </div>
+
+        <form className="mt-4 flex flex-col gap-3 md:flex-row md:items-end" onSubmit={enviarCargaInicial}>
+          <label className="sol-filter-field flex-1">
+            <span className="sol-filter-label">Arquivo CSV</span>
+            <input
+              type="file"
+              className="input w-full"
+              accept=".csv,text/csv"
+              disabled={!canEditConfig || importandoCargaInicial}
+              onChange={(event) => {
+                setArquivoCargaInicial(event.target.files?.[0] || null);
+                setResultadoCargaInicial(null);
+              }}
+            />
+          </label>
+          <button
+            type="submit"
+            className="btn btn-primary btn-sm"
+            disabled={!canEditConfig || !arquivoCargaInicial || importandoCargaInicial}
+          >
+            {importandoCargaInicial ? 'Importando...' : 'Importar carga inicial'}
+          </button>
+        </form>
+
+        {!canEditConfig ? (
+          <p className="mt-3 text-xs text-slate-500">
+            Somente usuarios com permissao de configuracao da Integracao SIENGE podem importar carga inicial.
+          </p>
+        ) : null}
+
+        {resultadoCargaInicial ? (
+          <div className={`mt-4 rounded-xl border px-4 py-3 ${
+            resultadoCargaInicial.erros?.length
+              ? 'border-amber-200 bg-amber-50 text-amber-800'
+              : 'border-emerald-200 bg-emerald-50 text-emerald-800'
+          }`}>
+            <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+              <p className="text-sm font-semibold">
+                {resultadoCargaInicial.processados || 0} titulo(s) processado(s), {resultadoCargaInicial.erros?.length || 0} erro(s).
+              </p>
+              <p className="text-xs">
+                Criados: {resultadoCargaInicial.titulos_criados || 0} | Atualizados: {resultadoCargaInicial.titulos_atualizados || 0} | Parceiros criados: {resultadoCargaInicial.parceiros_criados || 0}
+              </p>
+            </div>
+
+            {resultadoCargaInicial.erros?.length ? (
+              <div className="mt-3 max-h-64 overflow-auto rounded-lg border border-amber-200 bg-white/70">
+                <table className="min-w-full text-left text-xs">
+                  <thead className="bg-amber-100 text-amber-900">
+                    <tr>
+                      <th className="px-3 py-2">Linha</th>
+                      <th className="px-3 py-2">Parceiro</th>
+                      <th className="px-3 py-2">Documento</th>
+                      <th className="px-3 py-2">Motivo</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {resultadoCargaInicial.erros.map((erro, index) => (
+                      <tr key={`${erro.linha}-${index}`} className="border-t border-amber-100">
+                        <td className="px-3 py-2">{erro.linha}</td>
+                        <td className="px-3 py-2">{erro.parceiro || '-'}</td>
+                        <td className="px-3 py-2">{erro.documento || erro.identificador_externo || '-'}</td>
+                        <td className="px-3 py-2">{erro.motivo}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </section>
 
       <section className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">

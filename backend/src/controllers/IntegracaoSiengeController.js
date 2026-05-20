@@ -12,6 +12,10 @@ const {
   salvarConfiguracaoSienge,
   salvarMapeamentoCredorParceiro
 } = require('../services/integracaoSiengeService');
+const {
+  gerarModeloCargaInicialSiengeCsv,
+  importarCargaInicialSienge
+} = require('../services/siengeCargaInicialService');
 const { responderErroController } = require('../utils/controllerError');
 
 module.exports = {
@@ -92,6 +96,31 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return responderErroController(res, error, 'Erro ao listar logs da Integracao SIENGE');
+    }
+  },
+
+  async modeloCargaInicial(req, res) {
+    try {
+      const csv = gerarModeloCargaInicialSiengeCsv();
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', 'attachment; filename="modelo-carga-inicial-sienge.csv"');
+      return res.send(csv);
+    } catch (error) {
+      console.error(error);
+      return responderErroController(res, error, 'Erro ao gerar modelo de carga inicial SIENGE');
+    }
+  },
+
+  async importarCargaInicial(req, res) {
+    try {
+      const data = await importarCargaInicialSienge({
+        file: req.file,
+        user: req.user
+      });
+      return res.json(data);
+    } catch (error) {
+      console.error(error);
+      return responderErroController(res, error, 'Erro ao importar carga inicial SIENGE');
     }
   },
 

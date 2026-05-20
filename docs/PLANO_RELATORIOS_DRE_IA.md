@@ -29,6 +29,11 @@ Base multiempresa e DRE gerencial:
 - Financeiro > Relatorios ganhou acesso a DRE Gerencial.
 - A DRE permite filtrar por periodo, Holding, empresa, obra/centro de custo e excluir intercompany.
 - O resultado consolidado da Holding e o resultado isolado por empresa ficam disponiveis na mesma resposta gerencial.
+- Integracao SIENGE ganhou uma carga inicial financeira por CSV para importar credores/clientes e titulos em aberto em uma base limpa.
+
+Documentacao operacional complementar:
+
+- `docs/IMPLANTACAO_FINANCEIRO_LIMPO_SIENGE.md`
 
 ## Ajuste de Navegacao
 

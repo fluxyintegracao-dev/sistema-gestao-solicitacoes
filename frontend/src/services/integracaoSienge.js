@@ -119,3 +119,28 @@ export async function getIntegracaoSiengeLogs(params = {}) {
   });
   return parseJson(response, 'Erro ao listar logs da Integracao SIENGE');
 }
+
+export async function importarCargaInicialSienge(file) {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const response = await fetch(`${API_URL}/integracoes/sienge/carga-inicial`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: formData
+  });
+
+  return parseJson(response, 'Erro ao importar carga inicial SIENGE');
+}
+
+export async function baixarModeloCargaInicialSienge() {
+  const response = await fetch(`${API_URL}/integracoes/sienge/carga-inicial/modelo`, {
+    headers: authHeaders()
+  });
+
+  if (!response.ok) {
+    await parseJson(response, 'Erro ao baixar modelo da carga inicial SIENGE');
+  }
+
+  return response.blob();
+}

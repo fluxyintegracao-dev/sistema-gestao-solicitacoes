@@ -1128,6 +1128,8 @@ router.get('/integracoes/sienge/fila/:id', allowIntegracaoSiengeRead, validateRe
 router.post('/integracoes/sienge/fila', allowIntegracaoSiengeRetry, criticalRateLimit, validateRequest({ body: validateSiengeFilaCreateBody }), IntegracaoSiengeController.filaCreate);
 router.post('/integracoes/sienge/fila/:id/reprocessar', allowIntegracaoSiengeRetry, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Fila SIENGE'), body: validateSiengeFilaRetryBody }), IntegracaoSiengeController.filaRetry);
 router.get('/integracoes/sienge/logs', allowIntegracaoSiengeRead, validateRequest({ query: validateSiengeLogQuery }), IntegracaoSiengeController.logs);
+router.get('/integracoes/sienge/carga-inicial/modelo', allowIntegracaoSiengeRead, IntegracaoSiengeController.modeloCargaInicial);
+router.post('/integracoes/sienge/carga-inicial', allowIntegracaoSiengeConfigManage, uploadRateLimit, uploadComprovantes.single('file'), IntegracaoSiengeController.importarCargaInicial);
 
 // -------------------------------------------------------------------
 // FINANCEIRO
