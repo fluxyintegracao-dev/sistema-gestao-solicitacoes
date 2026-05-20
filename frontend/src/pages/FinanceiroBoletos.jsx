@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
+  baixarBoletoCaixaHomologacaoCsv,
+  baixarBoletoCaixaHomologacaoPacote,
+  baixarBoletoCaixaRemessa,
   baixarPdfBoletoTitulo,
   gerarBoletoCaixaRemessa,
   gerarAmostraBoletoTitulo,
@@ -334,6 +337,9 @@ export default function FinanceiroBoletos() {
   const [retornoFile, setRetornoFile] = useState(null);
   const [gerandoRemessa, setGerandoRemessa] = useState(false);
   const [importandoRetorno, setImportandoRetorno] = useState(false);
+  const [baixandoRemessaId, setBaixandoRemessaId] = useState(null);
+  const [baixandoHomologacaoId, setBaixandoHomologacaoId] = useState(null);
+  const [baixandoPacoteId, setBaixandoPacoteId] = useState(null);
   const [cnabFeedback, setCnabFeedback] = useState('');
 
   function prepararFiltrosBoleto(rawFilters = filters) {
@@ -719,6 +725,66 @@ export default function FinanceiroBoletos() {
     }
   }
 
+  async function salvarBlob(data) {
+    const url = URL.createObjectURL(data.blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = data.filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  async function onBaixarRemessa(item) {
+    try {
+      setBaixandoRemessaId(item.id);
+      setError('');
+      setCnabFeedback('');
+      const data = await baixarBoletoCaixaRemessa(item.id);
+      await salvarBlob(data);
+      setCnabFeedback(data.hashConfere
+        ? `Remessa #${item.numero_remessa} baixada com hash conferido.`
+        : `Remessa #${item.numero_remessa} baixada, mas o hash regenerado difere do original. Confira o relatorio.`);
+    } catch (err) {
+      setError(err?.message || 'Erro ao baixar remessa Caixa');
+    } finally {
+      setBaixandoRemessaId(null);
+    }
+  }
+
+  async function onBaixarHomologacao(item) {
+    try {
+      setBaixandoHomologacaoId(item.id);
+      setError('');
+      setCnabFeedback('');
+      const data = await baixarBoletoCaixaHomologacaoCsv(item.id);
+      await salvarBlob(data);
+      setCnabFeedback(`Relatorio de homologacao da remessa #${item.numero_remessa} baixado.`);
+    } catch (err) {
+      setError(err?.message || 'Erro ao baixar relatorio de homologacao Caixa');
+    } finally {
+      setBaixandoHomologacaoId(null);
+    }
+  }
+
+  async function onBaixarPacoteHomologacao(item) {
+    try {
+      setBaixandoPacoteId(item.id);
+      setError('');
+      setCnabFeedback('');
+      const data = await baixarBoletoCaixaHomologacaoPacote(item.id);
+      await salvarBlob(data);
+      setCnabFeedback(data.hashConfere
+        ? `Pacote de homologacao da remessa #${item.numero_remessa} baixado com hash conferido.`
+        : `Pacote de homologacao da remessa #${item.numero_remessa} baixado, mas o hash regenerado difere do original.`);
+    } catch (err) {
+      setError(err?.message || 'Erro ao baixar pacote de homologacao Caixa');
+    } finally {
+      setBaixandoPacoteId(null);
+    }
+  }
+
   return (
     <div className="page solicitacoes-page space-y-5 md:space-y-6">
       <style>
@@ -857,16 +923,45 @@ export default function FinanceiroBoletos() {
                   <th className="px-4 py-3">Boletos</th>
                   <th className="px-4 py-3 text-right">Valor</th>
                   <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3 text-right">Evidencias</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--c-border)]">
-                {remessasCaixa.slice(0, 3).map((item) => (
+                {remessasCaixa.slice(0, 5).map((item) => (
                   <tr key={item.id}>
                     <td className="px-4 py-3 font-semibold">#{item.numero_remessa}</td>
                     <td className="px-4 py-3">{item.nome_arquivo}</td>
                     <td className="px-4 py-3">{item.quantidade_boletos}</td>
                     <td className="px-4 py-3 text-right">{formatCurrency(item.valor_total)}</td>
                     <td className="px-4 py-3">{item.status}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex justify-end gap-2">
+                        <button
+                          type="button"
+                          className="btn btn-outline btn-sm"
+                          onClick={() => onBaixarRemessa(item)}
+                          disabled={baixandoRemessaId === item.id || baixandoHomologacaoId === item.id || baixandoPacoteId === item.id}
+                        >
+                          {baixandoRemessaId === item.id ? 'REM...' : 'REM'}
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-outline btn-sm"
+                          onClick={() => onBaixarHomologacao(item)}
+                          disabled={baixandoRemessaId === item.id || baixandoHomologacaoId === item.id || baixandoPacoteId === item.id}
+                        >
+                          {baixandoHomologacaoId === item.id ? 'CSV...' : 'CSV'}
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-primary btn-sm"
+                          onClick={() => onBaixarPacoteHomologacao(item)}
+                          disabled={baixandoRemessaId === item.id || baixandoHomologacaoId === item.id || baixandoPacoteId === item.id}
+                        >
+                          {baixandoPacoteId === item.id ? 'ZIP...' : 'ZIP'}
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>

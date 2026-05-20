@@ -455,6 +455,90 @@ export async function gerarBoletoCaixaRemessa({ convenioId, tituloIds = [], bole
   };
 }
 
+export async function baixarBoletoCaixaRemessa(id) {
+  const response = await fetch(`${API_URL}/boletos/caixa/remessas/${id}/download`, {
+    headers: authHeaders()
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    try {
+      const parsed = JSON.parse(text);
+      throw new Error(parsed?.error || 'Erro ao baixar remessa Caixa');
+    } catch (error) {
+      if (error instanceof SyntaxError) {
+        throw new Error(text || 'Erro ao baixar remessa Caixa');
+      }
+      throw error;
+    }
+  }
+
+  const blob = await response.blob();
+  const disposition = response.headers.get('content-disposition') || '';
+  const filenameMatch = disposition.match(/filename="?([^"]+)"?/i);
+  return {
+    blob,
+    filename: filenameMatch?.[1] || `remessa-caixa-${id}.rem`,
+    hash: response.headers.get('x-remessa-hash'),
+    hashConfere: response.headers.get('x-remessa-hash-confere') === 'true'
+  };
+}
+
+export async function baixarBoletoCaixaHomologacaoCsv(id) {
+  const response = await fetch(`${API_URL}/boletos/caixa/remessas/${id}/homologacao?format=csv`, {
+    headers: authHeaders()
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    try {
+      const parsed = JSON.parse(text);
+      throw new Error(parsed?.error || 'Erro ao baixar relatorio de homologacao Caixa');
+    } catch (error) {
+      if (error instanceof SyntaxError) {
+        throw new Error(text || 'Erro ao baixar relatorio de homologacao Caixa');
+      }
+      throw error;
+    }
+  }
+
+  const blob = await response.blob();
+  const disposition = response.headers.get('content-disposition') || '';
+  const filenameMatch = disposition.match(/filename="?([^"]+)"?/i);
+  return {
+    blob,
+    filename: filenameMatch?.[1] || `homologacao-caixa-remessa-${id}.csv`
+  };
+}
+
+export async function baixarBoletoCaixaHomologacaoPacote(id) {
+  const response = await fetch(`${API_URL}/boletos/caixa/remessas/${id}/homologacao-pacote`, {
+    headers: authHeaders()
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    try {
+      const parsed = JSON.parse(text);
+      throw new Error(parsed?.error || 'Erro ao baixar pacote de homologacao Caixa');
+    } catch (error) {
+      if (error instanceof SyntaxError) {
+        throw new Error(text || 'Erro ao baixar pacote de homologacao Caixa');
+      }
+      throw error;
+    }
+  }
+
+  const blob = await response.blob();
+  const disposition = response.headers.get('content-disposition') || '';
+  const filenameMatch = disposition.match(/filename="?([^"]+)"?/i);
+  return {
+    blob,
+    filename: filenameMatch?.[1] || `homologacao-caixa-remessa-${id}.zip`,
+    hashConfere: response.headers.get('x-remessa-hash-confere') === 'true'
+  };
+}
+
 export async function getBoletoCaixaRetornos(params = {}) {
   const query = new URLSearchParams(
     Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== '')

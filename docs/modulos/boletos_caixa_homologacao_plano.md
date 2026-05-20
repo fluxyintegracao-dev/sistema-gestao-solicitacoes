@@ -21,9 +21,11 @@ Ja existe:
 - importacao e processamento de retorno CNAB 240;
 - baixa financeira por retorno liquidado;
 
-Ainda falta:
+Ultima etapa implementada:
 
-- pacote de homologacao com evidencias e validacoes.
+- pacote de homologacao com download da remessa regenerada;
+- relatorio CSV/JSON com dados dos boletos e validacao de hash;
+- pacote ZIP com REM, relatorios, README e PDFs dos boletos vinculados a remessa.
 
 ## Fase 1 - Base de dados e governanca
 
@@ -135,6 +137,13 @@ Gerar evidencias:
 - relatorio com nosso numero, linha digitavel, codigo de barras, valor, vencimento, pagador e beneficiario;
 - resultado da validacao CNAB;
 - retorno importado e interpretado quando a Caixa devolver.
+
+Status atual:
+
+- `GET /api/boletos/caixa/remessas/:id/download` baixa a remessa `.REM` regenerada.
+- `GET /api/boletos/caixa/remessas/:id/homologacao?format=csv` baixa o resumo de homologacao.
+- `GET /api/boletos/caixa/remessas/:id/homologacao-pacote` baixa o pacote `.zip` para a agencia.
+- A tela `Financeiro > Boletos` exibe os atalhos `REM`, `CSV` e `ZIP` nas remessas recentes.
 
 ## Fase 8 - Conformidade operacional
 

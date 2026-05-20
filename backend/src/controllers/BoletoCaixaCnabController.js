@@ -1,7 +1,11 @@
 const db = require('../models');
 const {
   gerarRemessaParaBoletosCaixa,
-  importarRetornoCnab240Caixa
+  gerarPacoteHomologacaoRemessaCaixa,
+  gerarRelatorioHomologacaoRemessaCaixa,
+  importarRetornoCnab240Caixa,
+  regenerarArquivoRemessaCaixa,
+  relatorioHomologacaoToCsv
 } = require('../services/boletoCaixaOperacaoService');
 const { parseRetornoCnab240Caixa } = require('../services/boletoCaixaRetornoCnab240Service');
 const { responderErroController } = require('../utils/controllerError');
@@ -101,6 +105,54 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return responderErroController(res, error, 'Erro ao gerar remessa Caixa');
+    }
+  },
+
+  async downloadRemessa(req, res) {
+    try {
+      const data = await regenerarArquivoRemessaCaixa(req.params.id);
+      res.setHeader('Content-Type', 'text/plain; charset=latin1');
+      res.setHeader('Content-Disposition', `attachment; filename="${data.remessa.nome_arquivo}"`);
+      res.setHeader('X-Remessa-Id', String(data.remessa.id));
+      res.setHeader('X-Remessa-Hash', data.cnab.hash);
+      res.setHeader('X-Remessa-Hash-Confere', data.hash_confere ? 'true' : 'false');
+      return res.send(data.cnab.content);
+    } catch (error) {
+      console.error(error);
+      return responderErroController(res, error, 'Erro ao baixar remessa Caixa');
+    }
+  },
+
+  async homologacaoRemessa(req, res) {
+    try {
+      const relatorio = await gerarRelatorioHomologacaoRemessaCaixa(req.params.id);
+      const format = String(req.query?.format || '').toLowerCase();
+
+      if (format === 'csv') {
+        const filename = `homologacao-caixa-remessa-${relatorio.remessa.numero_remessa || relatorio.remessa.id}.csv`;
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        return res.send(relatorioHomologacaoToCsv(relatorio));
+      }
+
+      return res.json(relatorio);
+    } catch (error) {
+      console.error(error);
+      return responderErroController(res, error, 'Erro ao gerar relatorio de homologacao Caixa');
+    }
+  },
+
+  async pacoteHomologacaoRemessa(req, res) {
+    try {
+      const data = await gerarPacoteHomologacaoRemessaCaixa(req, req.params.id);
+      res.setHeader('Content-Type', 'application/zip');
+      res.setHeader('Content-Disposition', `attachment; filename="${data.filename}"`);
+      res.setHeader('X-Remessa-Id', String(data.relatorio.remessa.id));
+      res.setHeader('X-Remessa-Hash-Confere', data.relatorio.remessa.hash_confere ? 'true' : 'false');
+      return res.end(data.buffer);
+    } catch (error) {
+      console.error(error);
+      return responderErroController(res, error, 'Erro ao gerar pacote de homologacao Caixa');
     }
   },
 

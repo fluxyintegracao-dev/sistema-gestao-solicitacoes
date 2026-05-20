@@ -1,6 +1,9 @@
+const PizZip = require('pizzip');
 const db = require('../models');
 const { gerarRemessaCnab240Caixa } = require('./boletoCaixaCnab240Service');
+const { gerarPdfBoletoTitulo } = require('./boletoCaixaService');
 const { parseRetornoCnab240Caixa } = require('./boletoCaixaRetornoCnab240Service');
+const { registrarEventoSeguranca } = require('./securityLogService');
 
 const {
   BoletoCaixa,
@@ -82,6 +85,19 @@ function validarBoletosParaRemessa(boletos = []) {
   };
 }
 
+function safePlain(modelOrObject) {
+  return typeof modelOrObject?.get === 'function' ? modelOrObject.get({ plain: true }) : modelOrObject;
+}
+
+function csvValue(value) {
+  const text = value === null || value === undefined ? '' : String(value);
+  return `"${text.replace(/"/g, '""')}"`;
+}
+
+function documentoParceiro(parceiro = {}) {
+  return parceiro.cpf_cnpj || parceiro.cnpj || parceiro.cpf || '';
+}
+
 async function carregarBoletosParaRemessa(boletoIds, transaction) {
   return BoletoCaixa.findAll({
     where: { id: boletoIds },
@@ -97,6 +113,311 @@ async function carregarBoletosParaRemessa(boletoIds, transaction) {
     ],
     transaction
   });
+}
+
+async function carregarRemessaCompleta(remessaId, transaction = null) {
+  const id = Number(remessaId || 0);
+  if (!Number.isInteger(id) || id <= 0) {
+    throw new Error('Remessa Caixa invalida.');
+  }
+
+  const remessa = await BoletoCaixaRemessa.findByPk(id, {
+    include: [
+      {
+        model: BoletoCaixaConvenio,
+        as: 'convenio',
+        include: [
+          { model: db.EmpresaGrupo, as: 'empresa' },
+          { model: db.ContaBancaria, as: 'contaBancaria' }
+        ]
+      },
+      {
+        model: BoletoCaixaRemessaItem,
+        as: 'itens',
+        include: [
+          {
+            model: BoletoCaixa,
+            as: 'boleto',
+            include: [
+              { model: TituloFinanceiro, as: 'titulo' },
+              { model: Parceiro, as: 'pagador' }
+            ]
+          }
+        ]
+      }
+    ],
+    order: [[{ model: BoletoCaixaRemessaItem, as: 'itens' }, 'sequencial_lote', 'ASC']],
+    transaction
+  });
+
+  if (!remessa) {
+    throw new Error('Remessa Caixa nao encontrada.');
+  }
+
+  if (!remessa.convenio) {
+    throw new Error('Convenio da remessa Caixa nao encontrado.');
+  }
+
+  return remessa;
+}
+
+async function regenerarArquivoRemessaCaixa(remessaId) {
+  const remessa = await carregarRemessaCompleta(remessaId);
+  const plain = safePlain(remessa);
+  const boletos = (plain.itens || [])
+    .map((item) => item.boleto)
+    .filter(Boolean)
+    .map(boletoParaCnab);
+
+  if (!boletos.length) {
+    throw new Error('Remessa Caixa sem boletos vinculados para regenerar arquivo.');
+  }
+
+  const cnab = gerarRemessaCnab240Caixa({
+    convenio: plain.convenio,
+    boletos,
+    numeroRemessa: plain.numero_remessa,
+    generatedAt: plain.gerado_em || plain.createdAt || new Date()
+  });
+
+  return {
+    remessa,
+    cnab,
+    hash_confere: cnab.hash === plain.cnab_hash
+  };
+}
+
+async function gerarRelatorioHomologacaoRemessaCaixa(remessaId) {
+  const { remessa, cnab, hash_confere: hashConfere } = await regenerarArquivoRemessaCaixa(remessaId);
+  const plain = safePlain(remessa);
+  const convenio = plain.convenio || {};
+  const boletos = (plain.itens || []).map((item) => {
+    const boleto = item.boleto || {};
+    const titulo = boleto.titulo || {};
+    const pagador = boleto.pagador || {};
+    return {
+      sequencial: item.sequencial_lote,
+      boleto_id: boleto.id,
+      titulo_financeiro_id: boleto.titulo_financeiro_id || titulo.id,
+      numero_documento: titulo.numero_documento || titulo.codigo || boleto.titulo_financeiro_id,
+      nosso_numero: boleto.nosso_numero,
+      nosso_numero_base: boleto.nosso_numero_base,
+      linha_digitavel: boleto.linha_digitavel,
+      codigo_barras: boleto.codigo_barras,
+      valor: Number(boleto.valor || titulo.valor_saldo || titulo.valor_original || 0),
+      vencimento: boleto.data_vencimento || titulo.data_vencimento,
+      emissao: boleto.data_emissao || titulo.data_emissao,
+      pagador_nome: pagador.nome || pagador.razao_social || pagador.nome_fantasia || '',
+      pagador_documento: documentoParceiro(pagador),
+      status_bancario: boleto.status_bancario,
+      codigo_movimento_remessa: item.codigo_movimento_remessa
+    };
+  });
+
+  const alertas = [];
+  if (!cnab.valid) {
+    alertas.push('Arquivo CNAB regenerado possui erros de validacao.');
+  }
+  if (!hashConfere) {
+    alertas.push('Hash regenerado difere do hash armazenado na remessa. Conferir dados alterados apos a geracao.');
+  }
+  if (!convenio.homologado) {
+    alertas.push('Convenio marcado como nao homologado. Manter producao bloqueada ate retorno formal da Caixa.');
+  }
+  if (!convenio.conta_bancaria_id) {
+    alertas.push('Convenio sem conta bancaria vinculada. Retornos liquidados nao baixarao titulos automaticamente.');
+  }
+
+  return {
+    gerado_em: new Date().toISOString(),
+    remessa: {
+      id: plain.id,
+      numero_remessa: plain.numero_remessa,
+      nome_arquivo: plain.nome_arquivo,
+      status: plain.status,
+      homologacao: Boolean(plain.homologacao),
+      quantidade_boletos: plain.quantidade_boletos,
+      quantidade_registros: plain.quantidade_registros,
+      valor_total: Number(plain.valor_total || 0),
+      hash_armazenado: plain.cnab_hash,
+      hash_regenerado: cnab.hash,
+      hash_confere: hashConfere,
+      gerado_em: plain.gerado_em
+    },
+    convenio: {
+      id: convenio.id,
+      banco_codigo: convenio.banco_codigo,
+      banco_nome: convenio.banco_nome,
+      agencia: convenio.agencia,
+      agencia_dv: convenio.agencia_dv,
+      conta: convenio.conta,
+      conta_dv: convenio.conta_dv,
+      codigo_beneficiario: convenio.codigo_beneficiario,
+      beneficiario_nome: convenio.beneficiario_nome,
+      beneficiario_cpf_cnpj: convenio.beneficiario_cpf_cnpj,
+      carteira_codigo: convenio.carteira_codigo,
+      modalidade_nosso_numero: convenio.modalidade_nosso_numero,
+      layout_arquivo_versao: convenio.layout_arquivo_versao,
+      layout_lote_versao: convenio.layout_lote_versao,
+      ambiente: convenio.ambiente,
+      homologado: Boolean(convenio.homologado)
+    },
+    validacao: {
+      cnab_valido: Boolean(cnab.valid),
+      erros: cnab.validation?.errors || [],
+      quantidade_registros_regenerada: cnab.quantidade_registros,
+      quantidade_boletos_regenerada: cnab.quantidade_boletos,
+      valor_total_regenerado: cnab.valor_total,
+      alertas
+    },
+    checklist: [
+      { item: 'Arquivo REM gerado em CNAB 240', ok: Boolean(cnab.valid) },
+      { item: 'Hash do arquivo regenerado confere com a remessa armazenada', ok: hashConfere },
+      { item: 'Todos os boletos possuem pagador com CPF/CNPJ', ok: boletos.every((boleto) => Boolean(boleto.pagador_documento)) },
+      { item: 'Todos os boletos possuem linha digitavel e codigo de barras', ok: boletos.every((boleto) => Boolean(boleto.linha_digitavel && boleto.codigo_barras)) },
+      { item: 'Convenio ainda bloqueado como nao homologado ate aprovacao da Caixa', ok: !convenio.homologado || !plain.homologacao }
+    ],
+    boletos
+  };
+}
+
+function relatorioHomologacaoToCsv(relatorio) {
+  const header = [
+    'sequencial',
+    'boleto_id',
+    'titulo_financeiro_id',
+    'numero_documento',
+    'nosso_numero',
+    'linha_digitavel',
+    'codigo_barras',
+    'valor',
+    'vencimento',
+    'pagador_nome',
+    'pagador_documento',
+    'status_bancario'
+  ];
+
+  const rows = relatorio.boletos.map((boleto) => header.map((field) => csvValue(boleto[field])).join(';'));
+  const metadata = [
+    ['remessa_id', relatorio.remessa.id],
+    ['numero_remessa', relatorio.remessa.numero_remessa],
+    ['nome_arquivo', relatorio.remessa.nome_arquivo],
+    ['hash_armazenado', relatorio.remessa.hash_armazenado],
+    ['hash_regenerado', relatorio.remessa.hash_regenerado],
+    ['hash_confere', relatorio.remessa.hash_confere],
+    ['cnab_valido', relatorio.validacao.cnab_valido],
+    ['valor_total', relatorio.remessa.valor_total]
+  ].map((row) => row.map(csvValue).join(';'));
+
+  return [
+    'campo;valor',
+    ...metadata,
+    '',
+    header.join(';'),
+    ...rows
+  ].join('\r\n');
+}
+
+function nomeSeguroArquivo(value, fallback = 'arquivo') {
+  return String(value || fallback)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^\w.-]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+    .toLowerCase() || fallback;
+}
+
+function montarReadmeHomologacao(relatorio) {
+  const linhas = [
+    'FLUXY - Pacote de Homologacao Caixa CNAB 240',
+    '',
+    `Gerado em: ${relatorio.gerado_em}`,
+    `Remessa: ${relatorio.remessa.numero_remessa || relatorio.remessa.id}`,
+    `Arquivo: ${relatorio.remessa.nome_arquivo}`,
+    `Quantidade de boletos: ${relatorio.remessa.quantidade_boletos}`,
+    `Valor total: ${relatorio.remessa.valor_total}`,
+    `Hash armazenado: ${relatorio.remessa.hash_armazenado || '-'}`,
+    `Hash regenerado: ${relatorio.remessa.hash_regenerado || '-'}`,
+    `Hash confere: ${relatorio.remessa.hash_confere ? 'SIM' : 'NAO'}`,
+    '',
+    'Arquivos do pacote:',
+    '- remessa/: arquivo CNAB 240 para envio/validacao pela Caixa.',
+    '- relatorios/homologacao.csv: resumo operacional dos boletos.',
+    '- relatorios/homologacao.json: evidencia tecnica com validacoes.',
+    '- pdfs/: demonstrativos dos boletos incluidos na remessa.',
+    '',
+    'Observacoes:',
+    '- Manter emissao em producao bloqueada ate a homologacao formal da Caixa.',
+    '- Usar o retorno CNAB devolvido pela Caixa para validar registro/rejeicoes/liquidacoes.',
+    '- Conferir convenio, beneficiario, pagador, nosso numero, linha digitavel, codigo de barras, vencimento e valor.'
+  ];
+
+  if (relatorio.validacao?.alertas?.length) {
+    linhas.push('', 'Alertas:', ...relatorio.validacao.alertas.map((alerta) => `- ${alerta}`));
+  }
+
+  return linhas.join('\r\n');
+}
+
+async function gerarPacoteHomologacaoRemessaCaixa(req, remessaId) {
+  const arquivo = await regenerarArquivoRemessaCaixa(remessaId);
+  const relatorio = await gerarRelatorioHomologacaoRemessaCaixa(remessaId);
+  const zip = new PizZip();
+  const pdfErrors = [];
+
+  zip.file(`remessa/${arquivo.remessa.nome_arquivo}`, arquivo.cnab.content);
+  zip.file('relatorios/homologacao.csv', relatorioHomologacaoToCsv(relatorio));
+  zip.file('relatorios/homologacao.json', JSON.stringify(relatorio, null, 2));
+  zip.file('README.txt', montarReadmeHomologacao(relatorio));
+
+  for (const boleto of relatorio.boletos || []) {
+    if (!boleto.titulo_financeiro_id) {
+      pdfErrors.push(`Boleto ${boleto.boleto_id || '-'} sem titulo financeiro vinculado.`);
+      continue;
+    }
+
+    try {
+      const pdf = await gerarPdfBoletoTitulo(req, boleto.titulo_financeiro_id, { amostra: false });
+      zip.file(`pdfs/${nomeSeguroArquivo(pdf.filename, `boleto-${boleto.boleto_id}.pdf`)}`, pdf.buffer);
+    } catch (error) {
+      pdfErrors.push(`Boleto ${boleto.boleto_id || '-'} / titulo ${boleto.titulo_financeiro_id}: ${error.message}`);
+    }
+  }
+
+  if (pdfErrors.length) {
+    zip.file('pdfs/ERROS.txt', pdfErrors.join('\r\n'));
+  }
+
+  const buffer = zip.generate({
+    type: 'nodebuffer',
+    compression: 'DEFLATE',
+    compressionOptions: { level: 6 }
+  });
+
+  await registrarEventoSeguranca({
+    req,
+    usuarioId: req?.user?.id || null,
+    tipoEvento: 'BOLETO_CAIXA_HOMOLOGACAO_PACOTE_GERADO',
+    recursoTipo: 'BOLETO_CAIXA_REMESSA',
+    recursoId: String(relatorio.remessa.id),
+    status: 'SUCCESS',
+    descricao: `Pacote de homologacao Caixa gerado para a remessa #${relatorio.remessa.numero_remessa || relatorio.remessa.id}`,
+    metadata: JSON.stringify({
+      remessa_id: relatorio.remessa.id,
+      numero_remessa: relatorio.remessa.numero_remessa,
+      quantidade_boletos: relatorio.remessa.quantidade_boletos,
+      valor_total: relatorio.remessa.valor_total,
+      hash_confere: relatorio.remessa.hash_confere,
+      pdfs_com_erro: pdfErrors.length
+    })
+  });
+
+  return {
+    buffer,
+    filename: nomeSeguroArquivo(`homologacao-caixa-remessa-${relatorio.remessa.numero_remessa || relatorio.remessa.id}.zip`),
+    relatorio
+  };
 }
 
 async function gerarRemessaParaBoletosCaixa({ convenioId, boletoIds, tituloIds, usuarioId }) {
@@ -543,9 +864,13 @@ async function importarRetornoCnab240Caixa({ convenioId, content, nomeArquivo, u
 module.exports = {
   boletoParaCnab,
   aplicarBaixaFinanceiraPorLiquidacao,
+  gerarPacoteHomologacaoRemessaCaixa,
+  gerarRelatorioHomologacaoRemessaCaixa,
   gerarRemessaParaBoletosCaixa,
   importarRetornoCnab240Caixa,
   nomeArquivoRemessa,
+  regenerarArquivoRemessaCaixa,
+  relatorioHomologacaoToCsv,
   statusBancarioPorOcorrencia,
   validarBoletosParaRemessa
 };

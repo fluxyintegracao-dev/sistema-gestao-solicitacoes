@@ -1196,6 +1196,9 @@ router.post('/boletos/titulos/:id/gerar', allowBoletosGenerate, criticalRateLimi
 router.get('/boletos/caixa/convenios', allowBoletosRead, BoletoCaixaCnabController.convenios);
 router.get('/boletos/caixa/remessas', allowBoletosRead, BoletoCaixaCnabController.remessas);
 router.post('/boletos/caixa/remessas', allowBoletosGenerate, criticalRateLimit, BoletoCaixaCnabController.gerarRemessa);
+router.get('/boletos/caixa/remessas/:id/download', allowBoletosRead, validateRequest({ params: validateNumericIdParam('id', 'Remessa Caixa') }), BoletoCaixaCnabController.downloadRemessa);
+router.get('/boletos/caixa/remessas/:id/homologacao', allowBoletosRead, validateRequest({ params: validateNumericIdParam('id', 'Remessa Caixa') }), BoletoCaixaCnabController.homologacaoRemessa);
+router.get('/boletos/caixa/remessas/:id/homologacao-pacote', allowBoletosRead, validateRequest({ params: validateNumericIdParam('id', 'Remessa Caixa') }), BoletoCaixaCnabController.pacoteHomologacaoRemessa);
 router.get('/boletos/caixa/retornos', allowBoletosRead, BoletoCaixaCnabController.retornos);
 router.post('/boletos/caixa/retornos/validar', allowBoletosRead, uploadRateLimit, uploadCnab.single('file'), BoletoCaixaCnabController.validarRetorno);
 router.post('/boletos/caixa/retornos', allowBoletosGenerate, criticalRateLimit, uploadCnab.single('file'), BoletoCaixaCnabController.importarRetorno);
