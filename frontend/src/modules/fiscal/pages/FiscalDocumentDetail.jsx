@@ -262,6 +262,7 @@ export default function FiscalDocumentDetail() {
   const selectLinkOption = (option) => {
     const target = getLinkSearchType(option.type);
     updateLinkField(target.field, option.id);
+    setLinkSearchResults([]);
     setMessage(`${target.label} #${option.id} selecionado para o vinculo.`);
   };
 
@@ -613,7 +614,14 @@ export default function FiscalDocumentDetail() {
           <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">Registrar vinculo manual</p>
           <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/40">
             <div className="grid gap-3 md:grid-cols-[220px_1fr_auto]">
-              <select className="input" value={linkSearchType} onChange={(event) => setLinkSearchType(event.target.value)}>
+              <select
+                className="input"
+                value={linkSearchType}
+                onChange={(event) => {
+                  setLinkSearchType(event.target.value);
+                  setLinkSearchResults([]);
+                }}
+              >
                 {LINK_SEARCH_TYPES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
               </select>
               <input
