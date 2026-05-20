@@ -149,8 +149,32 @@ function classificarPagar(codigo, nome) {
     return dreClassification('Outras despesas', 'Acoes judiciais', 800);
   }
 
+  if (startsWithAny(codigo, ['2.04.01.01', '2.04.01.02', '2.04.01.03', '2.04.01.06', '2.04.01.07'])) {
+    return dreClassification('Deducoes da receita bruta', 'Tributos sobre faturamento', 130);
+  }
+
+  if (startsWithAny(codigo, ['2.04.01.04', '2.04.01.05'])) {
+    return dreClassification('Impostos sobre o resultado', 'IRPJ e CSLL', 850);
+  }
+
+  if (startsWithAny(codigo, ['2.04.02'])) {
+    return dreClassification('Custos com pessoal', 'Encargos sociais e trabalhistas', 255);
+  }
+
+  if (startsWithAny(codigo, ['2.04.03'])) {
+    return dreClassification('Despesas administrativas', 'Tributos retidos de terceiros', 430);
+  }
+
+  if (startsWithAny(codigo, ['2.04.04', '2.04.05'])) {
+    return dreClassification('Despesas administrativas', 'Tributos, taxas e contribuicoes operacionais', 435);
+  }
+
   if (startsWithAny(codigo, ['2.04.06'])) {
     return foraDaDre('Aplicacoes ou transferencias financeiras');
+  }
+
+  if (startsWithAny(codigo, ['2.04.07'])) {
+    return dreClassification('Outras despesas operacionais', 'Multas, autuacoes e infracoes', 660);
   }
 
   if (startsWithAny(codigo, ['2.04'])) {

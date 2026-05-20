@@ -121,6 +121,7 @@ export default function FinanceiroDre() {
 
   const resumo = relatorio?.resumo || {};
   const resultadoPositivo = Number(resumo.resultado || 0) >= 0;
+  const ebitdaPositivo = Number(resumo.ebitda || 0) >= 0;
 
   return (
     <div className="page solicitacoes-page space-y-6">
@@ -213,25 +214,27 @@ export default function FinanceiroDre() {
 
       <div className="app-summary-grid">
         <div className="app-summary-card">
-          <span className="app-summary-label">Receitas</span>
-          <strong className="app-summary-value">{formatCurrency(resumo.receitas)}</strong>
-          <span className="app-summary-subvalue">Competencia do periodo</span>
+          <span className="app-summary-label">Receita liquida</span>
+          <strong className="app-summary-value">{formatCurrency(resumo.receita_liquida)}</strong>
+          <span className="app-summary-subvalue">Receita bruta menos deducoes</span>
         </div>
         <div className="app-summary-card">
-          <span className="app-summary-label">Custos e despesas</span>
-          <strong className="app-summary-value">{formatCurrency(resumo.despesas)}</strong>
-          <span className="app-summary-subvalue">Valores que reduzem resultado</span>
+          <span className="app-summary-label">EBITDA</span>
+          <strong className="app-summary-value" style={{ color: ebitdaPositivo ? '#15803d' : '#b91c1c' }}>
+            {formatCurrency(resumo.ebitda)}
+          </strong>
+          <span className="app-summary-subvalue">Margem {formatPercent(resumo.margem_ebitda)}</span>
         </div>
         <div className="app-summary-card">
-          <span className="app-summary-label">Resultado</span>
+          <span className="app-summary-label">Lucro/Prejuizo liquido</span>
           <strong className="app-summary-value" style={{ color: resultadoPositivo ? '#15803d' : '#b91c1c' }}>
-            {formatCurrency(resumo.resultado)}
+            {formatCurrency(resumo.lucro_prejuizo_liquido ?? resumo.resultado)}
           </strong>
           <span className="app-summary-subvalue">{resultadoPositivo ? 'Gerando patrimonio' : 'Destruindo patrimonio'}</span>
         </div>
         <div className="app-summary-card">
-          <span className="app-summary-label">Margem</span>
-          <strong className="app-summary-value">{formatPercent(resumo.margem_resultado)}</strong>
+          <span className="app-summary-label">Margem liquida</span>
+          <strong className="app-summary-value">{formatPercent(resumo.margem_liquida ?? resumo.margem_resultado)}</strong>
           <span className="app-summary-subvalue">{resumo.empresas_com_movimento || 0} empresa(s) com movimento</span>
         </div>
       </div>
@@ -239,10 +242,10 @@ export default function FinanceiroDre() {
       {loading ? (
         <div className="app-empty-card">Carregando DRE...</div>
       ) : (
-        <div className="grid gap-6 xl:grid-cols-[1fr,1.2fr]">
+        <>
           <section className="card sol-surface-card app-table-shell">
             <div className="border-b border-[var(--c-border)] px-4 py-3">
-              <h2 className="text-lg font-semibold text-[var(--c-text)]">DRE por linha gerencial</h2>
+              <h2 className="text-lg font-semibold text-[var(--c-text)]">DRE estruturada</h2>
               <p className="text-sm text-[var(--c-muted)]">
                 {formatDate(relatorio?.filtro?.data_inicial)} ate {formatDate(relatorio?.filtro?.data_final)}
               </p>
@@ -251,66 +254,102 @@ export default function FinanceiroDre() {
               <table className="table">
                 <thead>
                   <tr>
-                    <th>Linha</th>
-                    <th>Titulos</th>
+                    <th>Etapa</th>
                     <th>Valor</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {(relatorio?.linhas || []).length ? (relatorio.linhas.map((linha) => (
-                    <tr key={linha.linha_key || `${linha.grupo}-${linha.subgrupo || ''}`}>
-                      <td>
-                        <div className="font-medium text-[var(--c-text)]">{linha.grupo}</div>
-                        {linha.subgrupo && (
-                          <div className="text-xs text-[var(--c-muted)]">{linha.subgrupo}</div>
-                        )}
-                      </td>
-                      <td>{linha.titulos}</td>
-                      <td className="font-semibold" style={{ color: Number(linha.valor || 0) >= 0 ? '#15803d' : '#b91c1c' }}>
-                        {formatCurrency(linha.valor)}
-                      </td>
-                    </tr>
-                  ))) : (
-                    <tr><td colSpan={3} className="text-center text-[var(--c-muted)]">Nenhum titulo encontrado.</td></tr>
+                  {(relatorio?.demonstrativo || []).length ? (relatorio.demonstrativo.map((linha) => {
+                    const destaque = ['subtotal', 'total'].includes(linha.tipo);
+                    return (
+                      <tr key={linha.codigo} style={destaque ? { background: 'rgba(37, 99, 235, 0.06)' } : null}>
+                        <td className={destaque ? 'font-semibold text-[var(--c-text)]' : 'text-[var(--c-text)]'}>
+                          {linha.label}
+                        </td>
+                        <td className="font-semibold" style={{ color: Number(linha.valor || 0) >= 0 ? '#15803d' : '#b91c1c' }}>
+                          {formatCurrency(linha.valor)}
+                        </td>
+                      </tr>
+                    );
+                  })) : (
+                    <tr><td colSpan={2} className="text-center text-[var(--c-muted)]">Nenhum titulo encontrado.</td></tr>
                   )}
                 </tbody>
               </table>
             </div>
           </section>
 
-          <section className="card sol-surface-card app-table-shell">
-            <div className="border-b border-[var(--c-border)] px-4 py-3">
-              <h2 className="text-lg font-semibold text-[var(--c-text)]">Resultado por empresa</h2>
-              <p className="text-sm text-[var(--c-muted)]">Visao isolada para comparar empresas abaixo da Holding.</p>
-            </div>
-            <div className="table-wrapper">
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Empresa</th>
-                    <th>Receitas</th>
-                    <th>Custos/Despesas</th>
-                    <th>Resultado</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(relatorio?.empresas || []).length ? (relatorio.empresas.map((empresa) => (
-                    <tr key={empresa.empresa_id || 'sem-empresa'}>
-                      <td className="font-medium text-[var(--c-text)]">{empresa.empresa_nome}</td>
-                      <td>{formatCurrency(empresa.receitas)}</td>
-                      <td>{formatCurrency(empresa.despesas)}</td>
-                      <td className="font-semibold" style={{ color: Number(empresa.resultado || 0) >= 0 ? '#15803d' : '#b91c1c' }}>
-                        {formatCurrency(empresa.resultado)}
-                      </td>
+          <div className="grid gap-6 xl:grid-cols-[1fr,1.2fr]">
+            <section className="card sol-surface-card app-table-shell">
+              <div className="border-b border-[var(--c-border)] px-4 py-3">
+                <h2 className="text-lg font-semibold text-[var(--c-text)]">Linhas gerenciais</h2>
+                <p className="text-sm text-[var(--c-muted)]">Abertura por grupo e subgrupo da categoria financeira.</p>
+              </div>
+              <div className="table-wrapper">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Linha</th>
+                      <th>Titulos</th>
+                      <th>Valor</th>
                     </tr>
-                  ))) : (
-                    <tr><td colSpan={4} className="text-center text-[var(--c-muted)]">Nenhuma empresa com movimento.</td></tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        </div>
+                  </thead>
+                  <tbody>
+                    {(relatorio?.linhas || []).length ? (relatorio.linhas.map((linha) => (
+                      <tr key={linha.linha_key || `${linha.grupo}-${linha.subgrupo || ''}`}>
+                        <td>
+                          <div className="font-medium text-[var(--c-text)]">{linha.grupo}</div>
+                          {linha.subgrupo && (
+                            <div className="text-xs text-[var(--c-muted)]">{linha.subgrupo}</div>
+                          )}
+                        </td>
+                        <td>{linha.titulos}</td>
+                        <td className="font-semibold" style={{ color: Number(linha.valor || 0) >= 0 ? '#15803d' : '#b91c1c' }}>
+                          {formatCurrency(linha.valor)}
+                        </td>
+                      </tr>
+                    ))) : (
+                      <tr><td colSpan={3} className="text-center text-[var(--c-muted)]">Nenhum titulo encontrado.</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <section className="card sol-surface-card app-table-shell">
+              <div className="border-b border-[var(--c-border)] px-4 py-3">
+                <h2 className="text-lg font-semibold text-[var(--c-text)]">Resultado por empresa</h2>
+                <p className="text-sm text-[var(--c-muted)]">Visao isolada para comparar empresas abaixo da Holding.</p>
+              </div>
+              <div className="table-wrapper">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Empresa</th>
+                      <th>Receitas</th>
+                      <th>Custos/Despesas</th>
+                      <th>Resultado</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(relatorio?.empresas || []).length ? (relatorio.empresas.map((empresa) => (
+                      <tr key={empresa.empresa_id || 'sem-empresa'}>
+                        <td className="font-medium text-[var(--c-text)]">{empresa.empresa_nome}</td>
+                        <td>{formatCurrency(empresa.receitas)}</td>
+                        <td>{formatCurrency(empresa.despesas)}</td>
+                        <td className="font-semibold" style={{ color: Number(empresa.resultado || 0) >= 0 ? '#15803d' : '#b91c1c' }}>
+                          {formatCurrency(empresa.resultado)}
+                        </td>
+                      </tr>
+                    ))) : (
+                      <tr><td colSpan={4} className="text-center text-[var(--c-muted)]">Nenhuma empresa com movimento.</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </div>
+        </>
       )}
     </div>
   );

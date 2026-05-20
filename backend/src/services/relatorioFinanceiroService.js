@@ -775,16 +775,20 @@ function getObraIncludeWhereFromTituloScope(tituloScope) {
 }
 
 function emptyDreSummary() {
+  const demonstrativo = buildDreDemonstrativo([]);
+
   return {
     resumo: {
       receitas: 0,
       despesas: 0,
       resultado: 0,
       margem_resultado: null,
+      ...demonstrativo.metricas,
       empresas_com_movimento: 0,
       titulos_considerados: 0
     },
     linhas: [],
+    demonstrativo: demonstrativo.linhas,
     empresas: []
   };
 }
@@ -816,6 +820,116 @@ function addToMap(map, key, seed, amount) {
   item.valor += amount;
   item.titulos += 1;
   return item;
+}
+
+const DRE_NATUREZA_POR_GRUPO = {
+  'Receita operacional bruta': 'receita_bruta',
+  'Deducoes da receita bruta': 'deducoes_receita',
+  'Custos das obras e servicos': 'custos',
+  'Custos com pessoal': 'custos',
+  'Custos com frota e equipamentos': 'custos',
+  'Despesas comerciais': 'despesas_operacionais',
+  'Despesas administrativas': 'despesas_operacionais',
+  'Outras receitas operacionais': 'outras_operacionais',
+  'Outras despesas operacionais': 'outras_operacionais',
+  'Outras despesas': 'outras_operacionais',
+  'Deducoes de custos e despesas': 'outras_operacionais',
+  'Depreciacao e amortizacao': 'depreciacao_amortizacao',
+  'Resultado financeiro': 'resultado_financeiro',
+  'Impostos sobre o resultado': 'impostos_resultado',
+  'Tributos e contribuicoes': 'outras_operacionais',
+  'Receitas nao classificadas': 'outras_operacionais',
+  'Custos e despesas nao classificados': 'outras_operacionais'
+};
+
+function getDreNatureza(linha = {}) {
+  return DRE_NATUREZA_POR_GRUPO[String(linha.grupo || '').trim()] || 'outras_operacionais';
+}
+
+function sumDreNatureza(totais, naturezas = []) {
+  return roundCurrency(naturezas.reduce((sum, natureza) => sum + Number(totais[natureza] || 0), 0));
+}
+
+function buildDreRow({ codigo, label, valor, tipo = 'grupo', ordem }) {
+  return {
+    codigo,
+    label,
+    valor: roundCurrency(valor),
+    tipo,
+    ordem
+  };
+}
+
+function buildDreDemonstrativo(linhas = []) {
+  const totais = {
+    receita_bruta: 0,
+    deducoes_receita: 0,
+    custos: 0,
+    despesas_operacionais: 0,
+    outras_operacionais: 0,
+    depreciacao_amortizacao: 0,
+    resultado_financeiro: 0,
+    impostos_resultado: 0
+  };
+
+  for (const linha of linhas) {
+    const natureza = getDreNatureza(linha);
+    totais[natureza] = roundCurrency(Number(totais[natureza] || 0) + Number(linha.valor || 0));
+  }
+
+  const receitaBruta = sumDreNatureza(totais, ['receita_bruta']);
+  const deducoesReceita = sumDreNatureza(totais, ['deducoes_receita']);
+  const receitaLiquida = roundCurrency(receitaBruta + deducoesReceita);
+  const custos = sumDreNatureza(totais, ['custos']);
+  const lucroBruto = roundCurrency(receitaLiquida + custos);
+  const despesasOperacionais = sumDreNatureza(totais, ['despesas_operacionais']);
+  const outrasOperacionais = sumDreNatureza(totais, ['outras_operacionais']);
+  const ebitda = roundCurrency(lucroBruto + despesasOperacionais + outrasOperacionais);
+  const depreciacaoAmortizacao = sumDreNatureza(totais, ['depreciacao_amortizacao']);
+  const ebit = roundCurrency(ebitda + depreciacaoAmortizacao);
+  const resultadoFinanceiro = sumDreNatureza(totais, ['resultado_financeiro']);
+  const resultadoAntesImpostos = roundCurrency(ebit + resultadoFinanceiro);
+  const impostosResultado = sumDreNatureza(totais, ['impostos_resultado']);
+  const lucroPrejuizoLiquido = roundCurrency(resultadoAntesImpostos + impostosResultado);
+  const margemEbitda = receitaLiquida > 0 ? Number(((ebitda / receitaLiquida) * 100).toFixed(2)) : null;
+  const margemLiquida = receitaLiquida > 0 ? Number(((lucroPrejuizoLiquido / receitaLiquida) * 100).toFixed(2)) : null;
+
+  return {
+    linhas: [
+      buildDreRow({ codigo: 'receita_bruta', label: 'Receita operacional bruta', valor: receitaBruta, ordem: 100 }),
+      buildDreRow({ codigo: 'deducoes_receita', label: '(-) Deducoes da receita bruta', valor: deducoesReceita, ordem: 120 }),
+      buildDreRow({ codigo: 'receita_liquida', label: '= Receita liquida', valor: receitaLiquida, tipo: 'subtotal', ordem: 190 }),
+      buildDreRow({ codigo: 'custos', label: '(-) Custos diretos e operacionais', valor: custos, ordem: 200 }),
+      buildDreRow({ codigo: 'lucro_bruto', label: '= Lucro bruto', valor: lucroBruto, tipo: 'subtotal', ordem: 290 }),
+      buildDreRow({ codigo: 'despesas_operacionais', label: '(-) Despesas operacionais', valor: despesasOperacionais, ordem: 400 }),
+      buildDreRow({ codigo: 'outras_operacionais', label: '+/- Outras receitas e despesas operacionais', valor: outrasOperacionais, ordem: 650 }),
+      buildDreRow({ codigo: 'ebitda', label: '= EBITDA', valor: ebitda, tipo: 'subtotal', ordem: 690 }),
+      buildDreRow({ codigo: 'depreciacao_amortizacao', label: '(-) Depreciacao e amortizacao', valor: depreciacaoAmortizacao, ordem: 695 }),
+      buildDreRow({ codigo: 'ebit', label: '= Resultado operacional (EBIT)', valor: ebit, tipo: 'subtotal', ordem: 699 }),
+      buildDreRow({ codigo: 'resultado_financeiro', label: '+/- Resultado financeiro', valor: resultadoFinanceiro, ordem: 700 }),
+      buildDreRow({ codigo: 'resultado_antes_impostos', label: '= Resultado antes de IRPJ/CSLL', valor: resultadoAntesImpostos, tipo: 'subtotal', ordem: 790 }),
+      buildDreRow({ codigo: 'impostos_resultado', label: '(-) IRPJ e CSLL', valor: impostosResultado, ordem: 850 }),
+      buildDreRow({ codigo: 'lucro_prejuizo_liquido', label: '= Lucro/Prejuizo liquido', valor: lucroPrejuizoLiquido, tipo: 'total', ordem: 990 })
+    ],
+    metricas: {
+      receita_bruta: receitaBruta,
+      deducoes_receita: deducoesReceita,
+      receita_liquida: receitaLiquida,
+      custos,
+      lucro_bruto: lucroBruto,
+      despesas_operacionais: despesasOperacionais,
+      outras_operacionais: outrasOperacionais,
+      ebitda,
+      depreciacao_amortizacao: depreciacaoAmortizacao,
+      ebit,
+      resultado_financeiro: resultadoFinanceiro,
+      resultado_antes_impostos: resultadoAntesImpostos,
+      impostos_resultado: impostosResultado,
+      lucro_prejuizo_liquido: lucroPrejuizoLiquido,
+      margem_ebitda: margemEbitda,
+      margem_liquida: margemLiquida
+    }
+  };
 }
 
 function summarizeDreRows(titulos = [], empresas = []) {
@@ -875,18 +989,21 @@ function summarizeDreRows(titulos = [], empresas = []) {
 
   const receitas = empresasResumo.reduce((sum, item) => sum + Number(item.receitas || 0), 0);
   const despesas = empresasResumo.reduce((sum, item) => sum + Number(item.despesas || 0), 0);
-  const resultado = receitas - despesas;
+  const demonstrativo = buildDreDemonstrativo(linhas);
+  const resultado = demonstrativo.metricas.lucro_prejuizo_liquido;
 
   return {
     resumo: {
-      receitas,
-      despesas,
+      receitas: roundCurrency(receitas),
+      despesas: roundCurrency(despesas),
       resultado,
-      margem_resultado: receitas > 0 ? Number(((resultado / receitas) * 100).toFixed(2)) : null,
+      margem_resultado: demonstrativo.metricas.margem_liquida,
+      ...demonstrativo.metricas,
       empresas_com_movimento: empresasResumo.length,
       titulos_considerados: titulos.length
     },
     linhas,
+    demonstrativo: demonstrativo.linhas,
     empresas: empresasResumo
   };
 }

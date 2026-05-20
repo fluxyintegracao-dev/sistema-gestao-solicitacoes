@@ -38,6 +38,8 @@ Base multiempresa e DRE gerencial:
 - O filtro por obra da DRE foi ajustado para aplicar o escopo no titulo financeiro, preservando o include da obra apenas como dimensao.
 - A classificacao inicial da DRE passou a ser derivada das categorias financeiras ja cadastradas pelo plano SIENGE; categorias redutoras invertem o sinal na DRE e categorias patrimoniais/financeiras que nao representam resultado ficam fora da DRE.
 - A DRE passou a apresentar linhas por grupo e subgrupo gerencial da categoria financeira, evitando consolidar categorias diferentes em uma unica linha ampla demais.
+- A DRE passou a ter demonstrativo estruturado com Receita Liquida, Lucro Bruto, EBITDA, EBIT, Resultado Financeiro, Resultado antes de IRPJ/CSLL e Lucro/Prejuizo Liquido.
+- As categorias financeiras SIENGE foram reavaliadas para separar tributos sobre faturamento, encargos trabalhistas, tributos operacionais, resultado financeiro e IRPJ/CSLL.
 
 Documentacao operacional complementar:
 
@@ -373,18 +375,20 @@ Observacao importante: DRE mostra lucro ou prejuizo do periodo. Para concluir ge
 ### Estrutura sugerida da DRE
 
 1. Receita operacional bruta.
-2. Deducoes da receita.
+2. Deducoes da receita bruta.
 3. Receita liquida.
-4. Custos diretos.
+4. Custos diretos e operacionais.
 5. Lucro bruto.
 6. Despesas operacionais.
-7. Resultado operacional.
-8. Resultado financeiro.
-9. Resultado antes de impostos.
-10. Impostos sobre resultado, quando aplicavel.
-11. Lucro/prejuizo liquido gerencial.
-12. Margem liquida.
-13. EBITDA gerencial, se a classificacao permitir.
+7. Outras receitas e despesas operacionais.
+8. EBITDA.
+9. Depreciacao e amortizacao, quando houver categoria propria.
+10. Resultado operacional (EBIT).
+11. Resultado financeiro.
+12. Resultado antes de IRPJ/CSLL.
+13. IRPJ e CSLL.
+14. Lucro/prejuizo liquido gerencial.
+15. Margem EBITDA e margem liquida.
 
 ### Consolidacao da Holding
 
