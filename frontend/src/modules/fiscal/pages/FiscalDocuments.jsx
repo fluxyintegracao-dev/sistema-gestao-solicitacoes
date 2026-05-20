@@ -420,15 +420,37 @@ export default function FiscalDocuments() {
                         PDF
                       </button>
                     ) : null}
-                    {item.xml_storage_key ? (
+                    {item.xml_storage_key && !item.danfe_storage_key ? (
                       <button
                         className="btn-secondary btn-sm"
                         type="button"
-                        onClick={() => (item.danfe_storage_key ? openFile(item.id, 'pdf') : generateDanfe(item.id))}
-                        disabled={generatingDanfe === String(item.id) || openingFile === `${item.id}-pdf`}
+                        onClick={() => generateDanfe(item.id)}
+                        disabled={generatingDanfe === String(item.id)}
                       >
-                        {generatingDanfe === String(item.id) ? 'Gerando...' : 'DANFE'}
+                        {generatingDanfe === String(item.id) ? 'Gerando...' : 'Gerar DANFE'}
                       </button>
+                    ) : null}
+                    {item.danfe_storage_key ? (
+                      <>
+                        <button
+                          className="btn-secondary btn-sm"
+                          type="button"
+                          onClick={() => openFile(item.id, 'danfe')}
+                          disabled={openingFile === `${item.id}-danfe`}
+                        >
+                          Abrir DANFE
+                        </button>
+                        {item.xml_storage_key ? (
+                          <button
+                            className="btn-secondary btn-sm"
+                            type="button"
+                            onClick={() => generateDanfe(item.id)}
+                            disabled={generatingDanfe === String(item.id)}
+                          >
+                            {generatingDanfe === String(item.id) ? 'Gerando...' : 'Regerar DANFE'}
+                          </button>
+                        ) : null}
+                      </>
                     ) : null}
                     {!item.xml_storage_key && !item.pdf_storage_key && !item.danfe_storage_key ? (
                       <span className="text-xs text-slate-400">Indisponivel</span>
