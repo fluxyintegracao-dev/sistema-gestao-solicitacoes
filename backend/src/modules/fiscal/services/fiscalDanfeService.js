@@ -1,5 +1,6 @@
 'use strict';
 
+const bwipjs = require('bwip-js');
 const PDFDocument = require('pdfkit');
 const { FiscalCompany, FiscalDfeDocument } = require('../../../models');
 const { registrarEventoSeguranca } = require('../../../services/securityLogService');
@@ -229,7 +230,23 @@ function sectionTitle(doc, title, x, y, width) {
   doc.font('Helvetica-Bold').fontSize(7).fillColor(COLORS.ink).text(title, x, y - 8, { width });
 }
 
-function drawBarcode(doc, key, x, y, width, height) {
+async function buildAccessKeyBarcode(key) {
+  const digits = onlyDigits(key);
+  if (!/^\d{44}$/.test(digits)) return null;
+
+  return bwipjs.toBuffer({
+    bcid: 'code128',
+    text: digits,
+    scale: 3,
+    height: 10,
+    includetext: false,
+    backgroundcolor: 'FFFFFF',
+    paddingwidth: 0,
+    paddingheight: 0
+  });
+}
+
+function drawFallbackBarcode(doc, key, x, y, width, height) {
   const digits = onlyDigits(key);
   if (!digits) return;
   const narrow = Math.max(0.8, width / 320);
@@ -253,6 +270,15 @@ function drawBarcode(doc, key, x, y, width, height) {
       if (cursor > x + width) return;
     }
   }
+}
+
+function drawBarcode(doc, barcodeBuffer, key, x, y, width, height) {
+  if (barcodeBuffer) {
+    doc.image(barcodeBuffer, x, y, { width, height });
+    return;
+  }
+
+  drawFallbackBarcode(doc, key, x, y, width, height);
 }
 
 function drawReceiptStub(doc, payload, left, top, width) {
@@ -281,7 +307,7 @@ function drawReceiptStub(doc, payload, left, top, width) {
   return top + height + 12;
 }
 
-function drawHeader(doc, payload, left, y, width) {
+function drawHeader(doc, payload, left, y, width, barcodeBuffer) {
   const issuerWidth = 210;
   const danfeWidth = 150;
   const keyWidth = width - issuerWidth - danfeWidth;
@@ -308,7 +334,7 @@ function drawHeader(doc, payload, left, y, width) {
 
   const keyX = left + issuerWidth + danfeWidth;
   label(doc, 'CHAVE DE ACESSO', keyX, y, keyWidth);
-  drawBarcode(doc, payload.accessKey, keyX + 10, y + 13, keyWidth - 20, 26);
+  drawBarcode(doc, barcodeBuffer, payload.accessKey, keyX + 10, y + 13, keyWidth - 20, 26);
   doc.font('Helvetica-Bold').fontSize(7).text(formatAccessKey(payload.accessKey), keyX + 8, y + 45, { width: keyWidth - 16, align: 'center' });
   doc.font('Helvetica').fontSize(6).text(
     'Consulta de autenticidade no portal nacional da NF-e\nwww.nfe.fazenda.gov.br/portal ou no site da Sefaz Autorizadora',
@@ -516,9 +542,11 @@ function drawAdditionalInfo(doc, payload, left, y, width, bottom) {
   return y + height;
 }
 
-function buildDanfePdfBuffer({ document, parsed }) {
+async function buildDanfePdfBuffer({ document, parsed }) {
+  const payload = buildDanfePayload(document, parsed);
+  const barcodeBuffer = await buildAccessKeyBarcode(payload.accessKey);
+
   return new Promise((resolve, reject) => {
-    const payload = buildDanfePayload(document, parsed);
     const chunks = [];
     const doc = new PDFDocument({ size: 'A4', margin: 18, bufferPages: false });
 
@@ -532,7 +560,7 @@ function buildDanfePdfBuffer({ document, parsed }) {
     let y = doc.page.margins.top;
 
     y = drawReceiptStub(doc, payload, left, y, width);
-    y = drawHeader(doc, payload, left, y, width);
+    y = drawHeader(doc, payload, left, y, width, barcodeBuffer);
     y = drawNatureAndProtocol(doc, payload, left, y, width);
     y = drawRecipient(doc, payload, left, y, width);
     y = drawTotals(doc, payload, left, y, width);
