@@ -39,6 +39,10 @@ function isSefazRejectionMessage(message) {
   return /\b(rejei[cç][aã]o|erro|falha)\b/i.test(String(message || ''));
 }
 
+function hasNsuValue(value) {
+  return value !== null && value !== undefined && String(value).trim() !== '';
+}
+
 function getSefazPostResponsePolicy(response, startedAt) {
   const responseCode = String(response?.response_code || '').trim();
   const responseMessage = response?.response_message || null;
@@ -292,6 +296,8 @@ async function registrarTentativaSefaz(company, syncState, documentType, started
 
       await liberarSyncLock(syncState, lock.lockToken, {
         status: 'blocked',
+        ult_nsu: hasNsuValue(response.ult_nsu) ? String(response.ult_nsu) : syncState.ult_nsu,
+        max_nsu: hasNsuValue(response.max_nsu) ? String(response.max_nsu) : syncState.max_nsu,
         next_allowed_sync_at: responsePolicy.next_allowed_sync_at,
         last_error_code: responsePolicy.response_code,
         last_error_message: responsePolicy.response_message,
