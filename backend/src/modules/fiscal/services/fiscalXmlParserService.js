@@ -15,20 +15,27 @@ function decodeXmlEntities(value = '') {
 }
 
 function pickTag(xml, tagName) {
-  const pattern = new RegExp(`<[^:>/]*:?${tagName}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/[^:>]*:?${tagName}>`, 'i');
+  const escaped = escapeRegExp(tagName);
+  const pattern = new RegExp(`<(?:[A-Za-z_][\\w.-]*:)?${escaped}(?=[\\s>/])[^>]*>([\\s\\S]*?)<\\/(?:[A-Za-z_][\\w.-]*:)?${escaped}>`, 'i');
   const match = String(xml || '').match(pattern);
   return match ? decodeXmlEntities(match[1]) : null;
 }
 
 function pickBlock(xml, tagName) {
-  const pattern = new RegExp(`<[^:>/]*:?${tagName}(?:\\s[^>]*)?>[\\s\\S]*?<\\/[^:>]*:?${tagName}>`, 'i');
+  const escaped = escapeRegExp(tagName);
+  const pattern = new RegExp(`<(?:[A-Za-z_][\\w.-]*:)?${escaped}(?=[\\s>/])[^>]*>[\\s\\S]*?<\\/(?:[A-Za-z_][\\w.-]*:)?${escaped}>`, 'i');
   const match = String(xml || '').match(pattern);
   return match ? match[0] : '';
 }
 
 function pickBlocks(xml, tagName) {
-  const pattern = new RegExp(`<[^:>/]*:?${tagName}(?:\\s[^>]*)?>[\\s\\S]*?<\\/[^:>]*:?${tagName}>`, 'gi');
+  const escaped = escapeRegExp(tagName);
+  const pattern = new RegExp(`<(?:[A-Za-z_][\\w.-]*:)?${escaped}(?=[\\s>/])[^>]*>[\\s\\S]*?<\\/(?:[A-Za-z_][\\w.-]*:)?${escaped}>`, 'gi');
   return String(xml || '').match(pattern) || [];
+}
+
+function escapeRegExp(value) {
+  return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 function onlyDigits(value) {
@@ -77,6 +84,10 @@ function parseNfeItems(raw) {
       vProd: parseDecimal(pickTag(prodBlock, 'vProd'))
     };
   });
+}
+
+function countNfeItemBlocks(raw) {
+  return pickBlocks(raw, 'det').length;
 }
 
 function parseNfeXml(xml) {
@@ -139,11 +150,13 @@ function parseNfeXml(xml) {
         xMotivo: pickTag(raw, 'xMotivo') || null,
         nProt: pickTag(raw, 'nProt') || null
       },
+      item_count: items.length,
       items
     }
   };
 }
 
 module.exports = {
+  countNfeItemBlocks,
   parseNfeXml
 };

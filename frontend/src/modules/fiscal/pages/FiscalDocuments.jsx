@@ -8,6 +8,24 @@ import {
   uploadFiscalXml
 } from '../services/fiscalApi';
 
+function getImportFileInfo(originalName = '') {
+  const raw = String(originalName || '');
+  const separatorIndex = raw.indexOf(':');
+  const container = separatorIndex > -1 ? raw.slice(0, separatorIndex) : '';
+  const entry = separatorIndex > -1 ? raw.slice(separatorIndex + 1) : raw;
+  const normalizedEntry = entry.replace(/\\/g, '/');
+  const parts = normalizedEntry.split('/').filter(Boolean);
+  const fileName = parts.at(-1) || raw || '-';
+  const folder = parts.slice(0, -1).join('/');
+
+  return {
+    container,
+    folder,
+    fileName,
+    fullPath: raw
+  };
+}
+
 export default function FiscalDocuments() {
   const [documents, setDocuments] = useState([]);
   const [companies, setCompanies] = useState([]);
@@ -162,6 +180,25 @@ export default function FiscalDocuments() {
     }
   };
 
+  const copyImportFailures = async () => {
+    const failures = importReport?.failed || [];
+    if (!failures.length) return;
+
+    const text = failures
+      .map((item) => {
+        const file = getImportFileInfo(item.original_name);
+        return `${file.fileName} | ${file.fullPath} | ${item.error || 'Erro ao importar XML fiscal.'}`;
+      })
+      .join('\n');
+
+    try {
+      await navigator.clipboard.writeText(text);
+      setMessage('Lista de erros copiada para a area de transferencia.');
+    } catch {
+      setError('Nao foi possivel copiar a lista de erros automaticamente.');
+    }
+  };
+
   return (
     <div className="fiscal-page space-y-6">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
@@ -206,7 +243,12 @@ export default function FiscalDocuments() {
                 {' '}{Number(importReport.duplicate_count || 0)} reimportado(s) e {Number(importReport.failed_count || 0)} com erro.
               </p>
             </div>
-            <button className="btn-secondary btn-sm" type="button" onClick={() => setImportReport(null)}>Fechar</button>
+            <div className="flex flex-wrap gap-2">
+              {importReport.failed?.length ? (
+                <button className="btn-secondary btn-sm" type="button" onClick={copyImportFailures}>Copiar erros</button>
+              ) : null}
+              <button className="btn-secondary btn-sm" type="button" onClick={() => setImportReport(null)}>Fechar</button>
+            </div>
           </div>
           {importReport.failed?.length ? (
             <div className="mt-4 overflow-hidden rounded-lg border border-red-200 dark:border-red-900/60">
@@ -218,12 +260,20 @@ export default function FiscalDocuments() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-red-100 dark:divide-red-900/60">
-                  {importReport.failed.map((item, index) => (
-                    <tr key={`${item.original_name}-${index}`}>
-                      <td className="max-w-[520px] truncate px-4 py-3 text-slate-700 dark:text-slate-200" title={item.original_name}>{item.original_name}</td>
-                      <td className="px-4 py-3 text-red-700 dark:text-red-200">{item.error || 'Erro ao importar XML fiscal.'}</td>
-                    </tr>
-                  ))}
+                  {importReport.failed.map((item, index) => {
+                    const file = getImportFileInfo(item.original_name);
+                    return (
+                      <tr key={`${item.original_name}-${index}`}>
+                        <td className="px-4 py-3 text-slate-700 dark:text-slate-200" title={file.fullPath}>
+                          <p className="break-all text-sm font-semibold text-slate-950 dark:text-white">{file.fileName}</p>
+                          <p className="mt-1 break-all text-xs text-slate-500 dark:text-slate-400">
+                            {[file.container, file.folder].filter(Boolean).join(':') || file.fullPath}
+                          </p>
+                        </td>
+                        <td className="px-4 py-3 text-red-700 dark:text-red-200">{item.error || 'Erro ao importar XML fiscal.'}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

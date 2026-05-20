@@ -9,7 +9,7 @@ const {
   getFiscalObjectSignedUrl,
   uploadFiscalObject
 } = require('./fiscalS3Service');
-const { parseNfeXml } = require('./fiscalXmlParserService');
+const { countNfeItemBlocks, parseNfeXml } = require('./fiscalXmlParserService');
 
 function createHttpError(message, statusCode = 400) {
   const error = new Error(message);
@@ -256,6 +256,13 @@ async function gerarDanfeDocumentoFiscal(req, id) {
   const xmlBuffer = await getFiscalObjectBuffer(document.xml_storage_key);
   const xml = xmlBuffer.toString('utf8');
   const parsed = parseNfeXml(xml);
+  const xmlItemCount = countNfeItemBlocks(xml);
+  const parsedItemCount = parsed.parsed_xml_json?.items?.length || 0;
+
+  if (xmlItemCount > 0 && parsedItemCount === 0) {
+    throw createHttpError('Nao foi possivel extrair os itens do XML fiscal para gerar o DANFE. Verifique o XML importado.', 422);
+  }
+
   const pdfBuffer = await buildDanfePdfBuffer({ document, parsed });
   const storage = await uploadFiscalObject({
     key: buildFiscalObjectKey({
@@ -273,7 +280,8 @@ async function gerarDanfeDocumentoFiscal(req, id) {
       fiscal_company_id: document.fiscal_company_id,
       file_type: 'danfe',
       generated_by: 'fluxy',
-      access_key: document.access_key || parsed.access_key
+      access_key: document.access_key || parsed.access_key,
+      item_count: String(parsedItemCount)
     }
   });
 
@@ -293,7 +301,8 @@ async function gerarDanfeDocumentoFiscal(req, id) {
     metadata: {
       fiscal_company_id: document.fiscal_company_id,
       access_key: document.access_key,
-      storage_key: storage.key
+      storage_key: storage.key,
+      item_count: parsedItemCount
     }
   });
 
