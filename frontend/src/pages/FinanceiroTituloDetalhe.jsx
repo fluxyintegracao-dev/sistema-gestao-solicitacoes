@@ -17,6 +17,7 @@ import {
   canRetryIntegracaoSienge,
   canViewIntegracaoSienge
 } from '../utils/acessoProduto';
+import { getEmpresasGrupo } from '../services/empresasGrupo';
 import { formatCurrencyInput, normalizeCurrencyTyping } from '../utils/formatters';
 
 const FORMAS_RECEBIMENTO = ['DINHEIRO', 'PIX', 'CARTAO', 'TRANSFERENCIA', 'BOLETO', 'CHEQUE', 'PERMUTA', 'BENS', 'OUTROS'];
@@ -65,7 +66,8 @@ function contaBancariaObrigatoria(formaRecebimento) {
 function buildBaixaForm(titulo, contasBancarias, movimento = null) {
   if (movimento) {
     return {
-      conta_bancaria_id: String(movimento.conta_bancaria_id || movimento.contaBancaria?.id || contasBancarias?.[0]?.id || ''),
+      empresa_id: String(movimento.empresa_id || movimento.empresa?.id || titulo?.empresa_id || ''),
+      conta_bancaria_id: String(movimento.conta_bancaria_id || movimento.contaBancaria?.id || ''),
       forma_recebimento: movimento?.forma_recebimento || '',
       tipo_permuta: movimento?.tipo_permuta || '',
       categoria_bem: movimento?.categoria_bem || '',
@@ -82,7 +84,8 @@ function buildBaixaForm(titulo, contasBancarias, movimento = null) {
   }
 
   return {
-    conta_bancaria_id: String(contasBancarias?.[0]?.id || ''),
+    empresa_id: String(titulo?.empresa_id || ''),
+    conta_bancaria_id: '',
     forma_recebimento: '',
     tipo_permuta: '',
     categoria_bem: '',
@@ -193,6 +196,7 @@ export default function FinanceiroTituloDetalhe() {
   const { user } = useAuth();
   const [titulo, setTitulo] = useState(null);
   const [contasBancarias, setContasBancarias] = useState([]);
+  const [empresasGrupo, setEmpresasGrupo] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [auditoria, setAuditoria] = useState([]);
@@ -209,18 +213,20 @@ export default function FinanceiroTituloDetalhe() {
     try {
       setLoading(true);
       setError('');
-      const [tituloData, contasData, auditoriaData] = await Promise.all([
+      const [tituloData, contasData, empresasData, auditoriaData] = await Promise.all([
         getTituloFinanceiroById(id),
         getContasBancarias(),
+        getEmpresasGrupo({ ativo: true }),
         getTituloFinanceiroAuditoria(id)
       ]);
       setTitulo(tituloData);
       setContasBancarias(Array.isArray(contasData) ? contasData : []);
+      setEmpresasGrupo(Array.isArray(empresasData) ? empresasData : []);
       setAuditoria(Array.isArray(auditoriaData) ? auditoriaData : []);
       setCobrancaForm(buildCobrancaForm(tituloData));
       setBaixaForm((current) => ({
         ...buildBaixaForm(tituloData, Array.isArray(contasData) ? contasData : []),
-        conta_bancaria_id: current.conta_bancaria_id || String(contasData?.[0]?.id || '')
+        conta_bancaria_id: current.conta_bancaria_id || ''
       }));
     } catch (err) {
       setError(err?.message || 'Erro ao carregar titulo financeiro');
@@ -238,6 +244,11 @@ export default function FinanceiroTituloDetalhe() {
       ? titulo.movimentos.filter((item) => String(item.status || '').toUpperCase() === 'ATIVO')
       : [];
   }, [titulo]);
+
+  const contasBancariasBaixa = useMemo(() => {
+    if (!baixaForm.empresa_id) return [];
+    return contasBancarias.filter((conta) => String(conta.empresa_id || '') === String(baixaForm.empresa_id));
+  }, [baixaForm.empresa_id, contasBancarias]);
 
   const podeOperarIntegracaoSienge = useMemo(() => {
     return canRetryIntegracaoSienge(user) && canQueueTituloSienge(titulo);
@@ -273,6 +284,14 @@ export default function FinanceiroTituloDetalhe() {
 
   async function handleBaixaSubmit(event) {
     event.preventDefault();
+    if (!baixaForm.empresa_id) {
+      setError('Informe a empresa pagadora da baixa.');
+      return;
+    }
+    if (contaBancariaObrigatoria(baixaForm.forma_recebimento) && !baixaForm.conta_bancaria_id) {
+      setError('Informe a conta bancaria da empresa pagadora.');
+      return;
+    }
     try {
       setSavingBaixa(true);
       setError('');
@@ -816,6 +835,9 @@ export default function FinanceiroTituloDetalhe() {
                         {formatDate(movimento.data_movimento)} - {movimento.contaBancaria?.nome || 'Sem conta'}
                       </div>
                       <div className="text-[var(--c-muted)]">
+                        Empresa pagadora: {movimento.empresa?.nome || movimento.empresa?.razao_social || 'Nao informada'}
+                      </div>
+                      <div className="text-[var(--c-muted)]">
                         Forma de recebimento: {movimento.forma_recebimento || 'Nao informada'}
                       </div>
                       <div className="text-[var(--c-muted)]">
@@ -972,15 +994,37 @@ export default function FinanceiroTituloDetalhe() {
                 </label>
 
                 <label className="text-sm">
+                  <span className="mb-1 block text-slate-500">Empresa pagadora</span>
+                  <select
+                    className="input w-full"
+                    value={baixaForm.empresa_id}
+                    onChange={(event) => setBaixaForm((current) => ({
+                      ...current,
+                      empresa_id: event.target.value,
+                      conta_bancaria_id: ''
+                    }))}
+                    required
+                  >
+                    <option value="">Selecione</option>
+                    {empresasGrupo.map((empresa) => (
+                      <option key={empresa.id} value={empresa.id}>
+                        {empresa.nome || empresa.razao_social || `Empresa #${empresa.id}`}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="text-sm">
                   <span className="mb-1 block text-slate-500">Conta bancaria</span>
                   <select
                     className="input w-full"
                     value={baixaForm.conta_bancaria_id}
                     onChange={(event) => setBaixaForm((current) => ({ ...current, conta_bancaria_id: event.target.value }))}
                     required={contaBancariaObrigatoria(baixaForm.forma_recebimento)}
+                    disabled={!baixaForm.empresa_id}
                   >
-                    <option value="">Selecione</option>
-                    {contasBancarias.map((conta) => (
+                    <option value="">{baixaForm.empresa_id ? 'Selecione' : 'Selecione a empresa pagadora'}</option>
+                    {contasBancariasBaixa.map((conta) => (
                       <option key={conta.id} value={conta.id}>
                         {conta.nome}
                       </option>
@@ -1122,7 +1166,7 @@ export default function FinanceiroTituloDetalhe() {
                 <button
                   type="submit"
                   className="btn btn-primary"
-                  disabled={savingBaixa || (contaBancariaObrigatoria(baixaForm.forma_recebimento) && !baixaForm.conta_bancaria_id) || !baixaForm.valor}
+                  disabled={savingBaixa || !baixaForm.empresa_id || (contaBancariaObrigatoria(baixaForm.forma_recebimento) && !baixaForm.conta_bancaria_id) || !baixaForm.valor}
                 >
                   {savingBaixa ? 'Salvando...' : corrigindoMovimentoId ? 'Salvar correcao' : 'Confirmar baixa'}
                 </button>

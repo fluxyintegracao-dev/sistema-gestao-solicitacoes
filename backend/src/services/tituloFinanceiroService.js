@@ -445,7 +445,12 @@ function buildTituloInclude({ includeMovimentos = false } = {}) {
         {
           model: ContaBancaria,
           as: 'contaBancaria',
-          attributes: ['id', 'nome', 'banco', 'agencia', 'conta']
+          attributes: ['id', 'nome', 'banco', 'agencia', 'conta', 'empresa_id']
+        },
+        {
+          model: EmpresaGrupo,
+          as: 'empresa',
+          attributes: ['id', 'codigo', 'nome', 'razao_social', 'cnpj']
         },
         {
           model: User,
@@ -672,6 +677,29 @@ async function validarEmpresaGrupo(empresaId) {
     throw createHttpError(400, 'Empresa do grupo invalida ou inativa.');
   }
   return empresa;
+}
+
+async function validarEmpresaBaixa({ empresaId, conta, titulo = null }) {
+  const empresa = await validarEmpresaGrupo(empresaId);
+  if (!empresa) {
+    throw createHttpError(400, 'Empresa pagadora e obrigatoria para registrar a baixa.');
+  }
+
+  const empresaBaixaId = Number(empresa.id);
+  if (conta && !conta.empresa_id) {
+    throw createHttpError(400, 'A conta bancaria selecionada nao possui empresa vinculada.');
+  }
+
+  if (conta?.empresa_id && Number(conta.empresa_id) !== empresaBaixaId) {
+    throw createHttpError(400, 'A empresa pagadora deve ser a mesma vinculada a conta bancaria selecionada.');
+  }
+
+  const empresaEsperadaTitulo = titulo?.empresa_id || titulo?.obra?.empresa_grupo_id || null;
+  if (empresaEsperadaTitulo && Number(empresaEsperadaTitulo) !== empresaBaixaId) {
+    throw createHttpError(400, 'A empresa pagadora deve ser a mesma vinculada ao titulo financeiro.');
+  }
+
+  return empresaBaixaId;
 }
 
 function resolverEmpresaTitulo({ empresaIdInformada, obra }) {
@@ -1429,7 +1457,13 @@ async function criarTituloManualComBaixaAtomica(req, payload = {}, { transaction
     validarCategoriaFinanceira(payload.categoria_financeira_id, tipo),
     validarContaBancaria(contaBancariaId)
   ]);
-  await validarEmpresaGrupo(payload.empresa_id || conta?.empresa_id);
+  const empresaBaixaId = await validarEmpresaBaixa({
+    empresaId: payload.empresa_id,
+    conta
+  });
+  if (obra.empresa_grupo_id && Number(obra.empresa_grupo_id) !== empresaBaixaId) {
+    throw createHttpError(400, 'A empresa pagadora deve ser a mesma vinculada a obra/centro de custo selecionado.');
+  }
   const apropriacao = await validarApropriacaoTitulo(payload.apropriacao_id, obra.id);
 
   validarCompatibilidadeParceiroTitulo(parceiro, tipo);
@@ -1458,7 +1492,7 @@ async function criarTituloManualComBaixaAtomica(req, payload = {}, { transaction
       solicitacao_id: null,
       obra_id: obra.id,
       apropriacao_id: apropriacao?.id || null,
-      empresa_id: conta.empresa_id || payload.empresa_id || null,
+      empresa_id: empresaBaixaId,
       parceiro_id: parceiro.id,
       categoria_financeira_id: categoria?.id || null,
       tipo,
@@ -1486,7 +1520,7 @@ async function criarTituloManualComBaixaAtomica(req, payload = {}, { transaction
     const movimento = await MovimentoFinanceiro.create({
       titulo_financeiro_id: titulo.id,
       conta_bancaria_id: conta.id,
-      empresa_id: conta.empresa_id || titulo.empresa_id || null,
+      empresa_id: empresaBaixaId,
       caixa_sessao_id: caixaSessao?.id || null,
       forma_recebimento: formaRecebimento,
       tipo_permuta: payload.tipo_permuta || null,
@@ -1625,6 +1659,12 @@ async function baixarTitulo(req, tituloId, payload = {}) {
 
   const formaRecebimento = normalizarFormaRecebimento(payload.forma_recebimento);
   const conta = await validarContaBancaria(payload.conta_bancaria_id);
+  const empresaBaixaId = await validarEmpresaBaixa({
+    empresaId: payload.empresa_id,
+    conta,
+    titulo
+  });
+  const empresaTituloId = titulo.empresa_id || empresaBaixaId;
   const novoValorBaixado = roundCurrency(Number(titulo.valor_baixado || 0) + valorBaixa);
   const novoEstado = calcularStatusTitulo({
     valorOriginal: Number(titulo.valor_original || 0),
@@ -1633,11 +1673,13 @@ async function baixarTitulo(req, tituloId, payload = {}) {
 
   const transaction = await sequelize.transaction();
   try {
-    const caixaSessao = await obterSessaoAbertaParaConta(conta, payload.data_movimento, { transaction });
+    const caixaSessao = conta
+      ? await obterSessaoAbertaParaConta(conta, payload.data_movimento, { transaction })
+      : null;
     const movimento = await MovimentoFinanceiro.create({
       titulo_financeiro_id: titulo.id,
       conta_bancaria_id: conta?.id || null,
-      empresa_id: conta?.empresa_id || titulo.empresa_id || null,
+      empresa_id: empresaBaixaId,
       caixa_sessao_id: caixaSessao?.id || null,
       forma_recebimento: formaRecebimento,
       tipo_permuta: payload.tipo_permuta || null,
@@ -1658,6 +1700,7 @@ async function baixarTitulo(req, tituloId, payload = {}) {
     }, { transaction });
 
     await titulo.update({
+      empresa_id: empresaTituloId,
       valor_baixado: novoValorBaixado,
       valor_saldo: novoEstado.valor_saldo,
       status: novoEstado.status,

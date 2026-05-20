@@ -558,6 +558,7 @@ function validateFinanceConciliacaoCriarTituloBody(body = {}) {
       'data_vencimento',
       'data_emissao',
       'descricao',
+      'empresa_id',
       'categoria_financeira_id',
       'observacoes',
       'numero_documento',
@@ -590,6 +591,7 @@ function validateFinanceConciliacaoCriarTituloBody(body = {}) {
     data_vencimento: parseDateOnly(body.data_vencimento, 'Data de vencimento', { required: true }),
     data_emissao: parseDateOnly(body.data_emissao, 'Data de emissao'),
     descricao: parseOptionalText(body.descricao, 'Descricao', 255, { required: true }),
+    empresa_id: parseInteger(body.empresa_id, 'Empresa pagadora', { required: true }),
     categoria_financeira_id: parseInteger(body.categoria_financeira_id, 'Categoria financeira'),
     observacoes: parseOptionalText(body.observacoes, 'Observacoes', 4000),
     numero_documento: parseOptionalText(body.numero_documento, 'Numero do documento', 120),
@@ -845,6 +847,7 @@ function validateFinanceTituloBaixaBody(body = {}) {
   ensureAllowedKeys(
     body,
     [
+      'empresa_id',
       'conta_bancaria_id',
       'forma_recebimento',
       'tipo_permuta',
@@ -869,6 +872,7 @@ function validateFinanceTituloBaixaBody(body = {}) {
   );
 
   const contaBancariaId = parseInteger(body.conta_bancaria_id, 'Conta bancaria');
+  const empresaId = parseInteger(body.empresa_id, 'Empresa pagadora', { required: true });
   const exigeContaBancaria = !formaRecebimento || !['DINHEIRO', 'CARTAO', 'PERMUTA', 'BENS', 'OUTROS'].includes(formaRecebimento);
 
   if (exigeContaBancaria && !contaBancariaId) {
@@ -876,6 +880,7 @@ function validateFinanceTituloBaixaBody(body = {}) {
   }
 
   return {
+    empresa_id: empresaId,
     conta_bancaria_id: contaBancariaId,
     forma_recebimento: formaRecebimento,
     tipo_permuta: parseOptionalText(body.tipo_permuta, 'Tipo de permuta', 80),

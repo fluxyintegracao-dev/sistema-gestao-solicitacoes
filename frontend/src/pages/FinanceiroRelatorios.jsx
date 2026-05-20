@@ -644,7 +644,7 @@ export default function FinanceiroRelatorios() {
         <RelatorioMetric
           label="Variacao"
           value={formatCurrency(relatorio.resumo.variacao_realizado_vs_previsto)}
-          detail="Realizado menos projetado"
+          detail="Delta entre saldos liquidos"
           positive={variacaoPositiva}
         />
         <RelatorioMetric

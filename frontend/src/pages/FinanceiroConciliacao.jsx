@@ -183,13 +183,16 @@ function AcoesRapidasConciliacaoModal({ item, tarifas, processingId, onClose, on
 function NovoTituloRapidoModal({ item, contas, onClose, onConciliar }) {
   const tipoInferido = Number(item?.valor || 0) < 0 ? 'PAGAR' : 'RECEBER';
   const valorAbs = Math.abs(Number(item?.valor || 0));
+  const contaInicialId = String(item?.conta_bancaria_id || contas[0]?.id || '');
+  const contaInicial = contas.find((conta) => String(conta.id) === contaInicialId);
 
   const [form, setForm] = useState({
     tipo: tipoInferido,
     descricao: item?.descricao_banco || '',
     valor: valorAbs ? formatCurrencyInput(valorAbs) : '',
     data_vencimento: item?.data_movimento || today(),
-    conta_bancaria_id: String(item?.conta_bancaria_id || contas[0]?.id || ''),
+    conta_bancaria_id: contaInicialId,
+    empresa_id: String(contaInicial?.empresa_id || ''),
     obra_id: '',
     categoria_financeira_id: '',
     parceiro_id: '',
@@ -244,6 +247,7 @@ function NovoTituloRapidoModal({ item, contas, onClose, onConciliar }) {
     const valor = parseCurrencyInput(form.valor);
     if (!form.valor || valor <= 0) { setErro('Informe um valor válido.'); return; }
     if (!form.conta_bancaria_id) { setErro('Selecione a conta bancária.'); return; }
+    if (!form.empresa_id) { setErro('A conta bancaria precisa estar vinculada a uma empresa pagadora.'); return; }
     if (!form.obra_id) { setErro('Selecione a obra.'); return; }
     if (!form.parceiro_id) { setErro('Selecione um parceiro (obrigatório).'); return; }
 
@@ -257,6 +261,7 @@ function NovoTituloRapidoModal({ item, contas, onClose, onConciliar }) {
         valor,
         data_vencimento: form.data_vencimento,
         conta_bancaria_id: Number(form.conta_bancaria_id),
+        empresa_id: Number(form.empresa_id),
         data_movimento: form.data_pagamento,
         categoria_financeira_id: form.categoria_financeira_id ? Number(form.categoria_financeira_id) : undefined,
         parceiro_id: form.parceiro_id ? Number(form.parceiro_id) : undefined
@@ -315,6 +320,15 @@ function NovoTituloRapidoModal({ item, contas, onClose, onConciliar }) {
               <option value="">Selecione</option>
               {contas.map((ct) => <option key={ct.id} value={ct.id}>{ct.nome}</option>)}
             </select>
+          </label>
+
+          <label className="app-filter-field">
+            <span className="app-filter-label">Empresa pagadora *</span>
+            <input
+              className="input w-full"
+              value={contas.find((ct) => String(ct.id) === String(form.conta_bancaria_id))?.empresa?.nome || form.empresa_id || ''}
+              disabled
+            />
           </label>
 
           <label className="app-filter-field">

@@ -941,7 +941,7 @@ async function gerarDreGerencial(req, filters = {}) {
         model: Obra,
         as: 'obra',
         attributes: ['id', 'codigo', 'nome', 'tipo_centro_custo', 'empresa_grupo_id'],
-        required: true
+        required: false
       },
       {
         model: EmpresaGrupo,

@@ -19,6 +19,7 @@ import {
 } from '../services/financeiro';
 import { getMinhasObras } from '../services/obras';
 import { buscarParceiros } from '../services/parceiros';
+import { getEmpresasGrupo } from '../services/empresasGrupo';
 import { canViewIntegracaoSienge } from '../utils/acessoProduto';
 import { normalizeCurrencyTyping } from '../utils/formatters';
 import ParceiroAutocomplete from '../components/ui/ParceiroAutocomplete';
@@ -163,7 +164,8 @@ function isTituloBaixavel(titulo) {
 
 function buildBaixaMassaForm(contasBancarias = []) {
   return {
-    conta_bancaria_id: String(contasBancarias?.[0]?.id || ''),
+    empresa_id: '',
+    conta_bancaria_id: '',
     forma_recebimento: '',
     juros: '',
     multa: '',
@@ -192,6 +194,7 @@ export default function FinanceiroTitulos() {
   const [parceiros, setParceiros] = useState([]);
   const [categorias, setCategorias] = useState([]);
   const [contasBancarias, setContasBancarias] = useState([]);
+  const [empresasGrupo, setEmpresasGrupo] = useState([]);
   const [titulos, setTitulos] = useState([]);
   const [loading, setLoading] = useState(false);
   const [loadingOptions, setLoadingOptions] = useState(true);
@@ -209,19 +212,17 @@ export default function FinanceiroTitulos() {
       getMinhasObras({ modo: 'FINANCEIRO' }).catch(() => []),
       buscarParceiros({ ativo: true, limit: 200 }).catch(() => []),
       getCategoriasFinanceiras().catch(() => []),
-      getContasBancarias().catch(() => [])
+      getContasBancarias().catch(() => []),
+      getEmpresasGrupo({ ativo: true }).catch(() => [])
     ])
-      .then(([obrasData, parceirosData, categoriasData, contasData]) => {
+      .then(([obrasData, parceirosData, categoriasData, contasData, empresasData]) => {
         if (!active) return;
         setObras(Array.isArray(obrasData) ? obrasData : []);
         setParceiros(Array.isArray(parceirosData) ? parceirosData : []);
         setCategorias(Array.isArray(categoriasData) ? categoriasData : []);
         const contasNormalizadas = Array.isArray(contasData) ? contasData : [];
         setContasBancarias(contasNormalizadas);
-        setBaixaMassaForm((current) => ({
-          ...current,
-          conta_bancaria_id: current.conta_bancaria_id || String(contasNormalizadas?.[0]?.id || '')
-        }));
+        setEmpresasGrupo(Array.isArray(empresasData) ? empresasData : []);
       })
       .finally(() => {
         if (active) {
@@ -335,6 +336,10 @@ export default function FinanceiroTitulos() {
     (total, titulo) => total + Number(titulo.valor_saldo || 0),
     0
   ), [selectedTitulosBaixaveis]);
+  const contasBancariasBaixaMassa = useMemo(() => {
+    if (!baixaMassaForm.empresa_id) return [];
+    return contasBancarias.filter((conta) => String(conta.empresa_id || '') === String(baixaMassaForm.empresa_id));
+  }, [baixaMassaForm.empresa_id, contasBancarias]);
   const allBaixaveisSelected = titulosBaixaveis.length > 0 && titulosBaixaveis.every((titulo) => selectedTituloSet.has(Number(titulo.id)));
 
   function setFilter(name, value) {
@@ -427,6 +432,11 @@ export default function FinanceiroTitulos() {
       return;
     }
 
+    if (!baixaMassaForm.empresa_id) {
+      setError('Informe a empresa pagadora da baixa em massa.');
+      return;
+    }
+
     if (contaBancariaObrigatoria(baixaMassaForm.forma_recebimento) && !baixaMassaForm.conta_bancaria_id) {
       setError('Conta bancaria e obrigatoria para esta forma de baixa.');
       return;
@@ -440,6 +450,7 @@ export default function FinanceiroTitulos() {
       for (const titulo of selectedTitulosBaixaveis) {
         try {
           await baixarTituloFinanceiro(titulo.id, {
+            empresa_id: baixaMassaForm.empresa_id,
             conta_bancaria_id: baixaMassaForm.conta_bancaria_id || null,
             forma_recebimento: baixaMassaForm.forma_recebimento,
             valor: Number(titulo.valor_saldo || 0),
@@ -1119,16 +1130,37 @@ export default function FinanceiroTitulos() {
               </label>
 
               <label className="app-filter-field md:col-span-2">
+                <span className="app-filter-label">Empresa pagadora</span>
+                <select
+                  className="input w-full input-sm"
+                  value={baixaMassaForm.empresa_id}
+                  onChange={(event) => setBaixaMassaForm((current) => ({
+                    ...current,
+                    empresa_id: event.target.value,
+                    conta_bancaria_id: ''
+                  }))}
+                  required
+                >
+                  <option value="">Selecione</option>
+                  {empresasGrupo.map((empresa) => (
+                    <option key={empresa.id} value={empresa.id}>
+                      {empresa.nome || empresa.razao_social || `Empresa #${empresa.id}`}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="app-filter-field md:col-span-2">
                 <span className="app-filter-label">Conta bancaria</span>
                 <select
                   className="input w-full input-sm"
                   value={baixaMassaForm.conta_bancaria_id}
                   onChange={(event) => setBaixaMassaForm((current) => ({ ...current, conta_bancaria_id: event.target.value }))}
                   required={contaBancariaObrigatoria(baixaMassaForm.forma_recebimento)}
-                  disabled={!contaBancariaObrigatoria(baixaMassaForm.forma_recebimento)}
+                  disabled={!baixaMassaForm.empresa_id || !contaBancariaObrigatoria(baixaMassaForm.forma_recebimento)}
                 >
-                  <option value="">Sem conta bancaria</option>
-                  {contasBancarias.map((conta) => (
+                  <option value="">{baixaMassaForm.empresa_id ? 'Sem conta bancaria' : 'Selecione a empresa pagadora'}</option>
+                  {contasBancariasBaixaMassa.map((conta) => (
                     <option key={conta.id} value={conta.id}>
                       {conta.nome}
                       {conta.banco ? ` - ${conta.banco}` : ''}
@@ -1191,7 +1223,7 @@ export default function FinanceiroTitulos() {
               >
                 Cancelar
               </button>
-              <button type="submit" className="btn btn-primary btn-sm" disabled={savingBaixaMassa}>
+              <button type="submit" className="btn btn-primary btn-sm" disabled={savingBaixaMassa || !baixaMassaForm.empresa_id || (contaBancariaObrigatoria(baixaMassaForm.forma_recebimento) && !baixaMassaForm.conta_bancaria_id)}>
                 {savingBaixaMassa ? 'Baixando...' : `Confirmar ${selectedTitulosBaixaveis.length} baixa(s)`}
               </button>
             </div>
