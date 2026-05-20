@@ -291,7 +291,6 @@ export default function Dashboard() {
   const financeiro = dados.financeiro;
   const saldoAberto = financeiro.total_receber_aberto - financeiro.total_pagar_aberto;
   const resultadoMes = financeiro.movimentado_mes_receber - financeiro.movimentado_mes_pagar;
-  const totalVencido = financeiro.pagar_vencido + financeiro.receber_vencido;
   const totalSolicitacoesValor = useMemo(
     () => dados.valoresPorStatus.reduce((acc, item) => acc + Number(item.valor_total || 0), 0),
     [dados.valoresPorStatus]
@@ -393,11 +392,19 @@ export default function Dashboard() {
     const items = [];
 
     if (dados.visao.financeiro) {
-      if (totalVencido > 0) {
+      if (financeiro.pagar_vencido > 0) {
         items.push({
           tone: 'red',
-          title: 'Titulos vencidos exigem atencao',
-          message: `${formatCurrency(totalVencido)} ainda estao expostos entre pagar e receber em aberto.`
+          title: 'Pagamentos vencidos exigem acao',
+          message: `${formatCurrency(financeiro.pagar_vencido)} em contas a pagar vencidas precisam ser regularizados.`
+        });
+      }
+
+      if (financeiro.receber_vencido > 0) {
+        items.push({
+          tone: 'amber',
+          title: 'Recebiveis vencidos impactam caixa',
+          message: `${formatCurrency(financeiro.receber_vencido)} em contas a receber vencidas pedem cobranca ativa.`
         });
       }
 
@@ -435,7 +442,7 @@ export default function Dashboard() {
     }
 
     return items.slice(0, 4);
-  }, [dados.visao, financeiro.conciliacao_pendente_quantidade, saldoAberto, solicitacoesPendentes, totalVencido]);
+  }, [dados.visao, financeiro.conciliacao_pendente_quantidade, financeiro.pagar_vencido, financeiro.receber_vencido, saldoAberto, solicitacoesPendentes]);
 
   const quickActions = useMemo(() => {
     const actions = [];
@@ -563,10 +570,17 @@ export default function Dashboard() {
               href="/financeiro/relatorios"
             />
             <MetricTile
-              label="Vencidos em aberto"
-              value={formatCurrency(totalVencido)}
-              detail={`${financeiro.quantidade_pagar_vencido + financeiro.quantidade_receber_vencido} titulo(s) exigem revisao`}
-              tone={totalVencido > 0 ? 'red' : 'green'}
+              label="A pagar vencido"
+              value={formatCurrency(financeiro.pagar_vencido)}
+              detail={`${financeiro.quantidade_pagar_vencido} titulo(s) a pagar vencido(s)`}
+              tone={financeiro.pagar_vencido > 0 ? 'red' : 'green'}
+              href="/financeiro/titulos"
+            />
+            <MetricTile
+              label="A receber vencido"
+              value={formatCurrency(financeiro.receber_vencido)}
+              detail={`${financeiro.quantidade_receber_vencido} titulo(s) a receber vencido(s)`}
+              tone={financeiro.receber_vencido > 0 ? 'amber' : 'green'}
               href="/financeiro/titulos"
             />
             <MetricTile
