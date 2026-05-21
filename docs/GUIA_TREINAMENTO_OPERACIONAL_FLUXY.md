@@ -1270,6 +1270,8 @@ Cuidados:
 - chamada de webhook sem identificador do evento do provedor tambem deve ser recusada, porque nao permite evitar duplicidade nem rastrear o retorno com seguranca;
 - se o banco reenviar a mesma notificacao com o mesmo identificador de evento, o sistema deve reaproveitar o evento ja registrado e nao duplicar retorno, baixa ou reconciliacao;
 - tentativas invalidas, eventos aceitos e notificacoes duplicadas devem ficar registrados na auditoria de seguranca para conferencia posterior;
+- usuarios com permissao de auditoria de pagamentos podem consultar eventos tecnicos por status, tipo de evento, lote, intencao, identificador do provedor e periodo de recebimento;
+- a auditoria tecnica serve para investigar comunicacao com banco, webhook, polling e respostas de provider; ela nao substitui a baixa financeira nem comprova sozinha a liquidacao do titulo;
 - se o banco rejeitar ou falhar, corrigir a causa antes de reprocessar;
 - se um lote for cancelado ou rejeitado, os titulos devem ser revisados antes de entrar em novo lote;
 - cancelar lote em rascunho ou revisao exige justificativa; cancelar lote pendente de aprovacao ou ja aprovado exige justificativa e MFA;

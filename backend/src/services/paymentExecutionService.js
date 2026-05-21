@@ -747,6 +747,60 @@ async function listBbTransactions(req, id) {
   });
 }
 
+function parsePositiveInteger(value, fallback, max = 100) {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0) return fallback;
+  return Math.min(parsed, max);
+}
+
+async function listPaymentEvents(query = {}) {
+  const where = {};
+  const limit = parsePositiveInteger(query.limit, 50, 200);
+
+  if (query.status) where.processing_status = String(query.status).trim().toUpperCase();
+  if (query.event_type) where.event_type = String(query.event_type).trim().toUpperCase();
+  if (query.provider_event_id) where.provider_event_id = String(query.provider_event_id).trim();
+  const paymentBatchId = parsePositiveInteger(query.payment_batch_id, null, Number.MAX_SAFE_INTEGER);
+  const paymentIntentId = parsePositiveInteger(query.payment_intent_id, null, Number.MAX_SAFE_INTEGER);
+  if (paymentBatchId) where.payment_batch_id = paymentBatchId;
+  if (paymentIntentId) where.payment_intent_id = paymentIntentId;
+
+  const receivedAt = {};
+  if (query.data_inicio) receivedAt[Op.gte] = new Date(`${String(query.data_inicio).slice(0, 10)}T00:00:00`);
+  if (query.data_fim) receivedAt[Op.lte] = new Date(`${String(query.data_fim).slice(0, 10)}T23:59:59`);
+  if (Object.keys(receivedAt).length) where.received_at = receivedAt;
+
+  const eventos = await PaymentEvent.findAll({
+    where,
+    include: [
+      { model: PaymentProvider, as: 'provider', attributes: ['id', 'codigo', 'nome', 'ambiente'] },
+      { model: PaymentBatch, as: 'batch', attributes: ['id', 'codigo', 'status', 'valor_total', 'quantidade_itens'] },
+      { model: PaymentIntent, as: 'intent', attributes: ['id', 'status', 'valor', 'titulo_financeiro_id'] }
+    ],
+    order: [['received_at', 'DESC'], ['id', 'DESC']],
+    limit
+  });
+
+  return eventos.map((evento) => ({
+    id: evento.id,
+    payment_batch_id: evento.payment_batch_id,
+    payment_intent_id: evento.payment_intent_id,
+    provider_id: evento.provider_id,
+    provider: evento.provider || null,
+    batch: evento.batch || null,
+    intent: evento.intent || null,
+    event_type: evento.event_type,
+    provider_event_id: evento.provider_event_id,
+    payload: sanitizePayload(evento.payload || {}),
+    received_at: evento.received_at,
+    processed_at: evento.processed_at,
+    processing_status: evento.processing_status,
+    processing_error: evento.processing_error,
+    createdAt: evento.createdAt,
+    updatedAt: evento.updatedAt
+  }));
+}
+
 async function getBbHealth() {
   return bancoDoBrasilSandboxProvider.getHealth();
 }
@@ -919,6 +973,7 @@ module.exports = {
   getBbHealth,
   handleBbWebhook,
   listBbTransactions,
+  listPaymentEvents,
   markBatchAsBankConfirmedMock,
   processBbSubmitPixBatchJob,
   processBbReleaseBatchJob,

@@ -1157,6 +1157,7 @@ router.post('/financeiro/pagamentos/lotes/:id/enviar-banco', allowPagamentosSend
 router.post('/financeiro/pagamentos/lotes/:id/enviar-bb-sandbox', allowPagamentosSend, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Lote de pagamento'), body: validatePaymentMfaBody }), PaymentController.enviarBbSandbox);
 router.post('/financeiro/pagamentos/lotes/:id/sincronizar-status-bb', allowPagamentosAudit, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Lote de pagamento') }), PaymentController.sincronizarStatusBb);
 router.get('/financeiro/pagamentos/lotes/:id/transacoes-bb', allowPagamentosAudit, validateRequest({ params: validateNumericIdParam('id', 'Lote de pagamento') }), PaymentController.transacoesBb);
+router.get('/financeiro/pagamentos/eventos', allowPagamentosAudit, PaymentController.eventos);
 router.post('/financeiro/pagamentos/lotes/:id/reprocessar', allowPagamentosReprocess, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Lote de pagamento'), body: validatePaymentMfaBody }), PaymentController.reprocessarLote);
 router.post('/financeiro/pagamentos/lotes/:id/simular-retorno-banco', allowPagamentosSend, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Lote de pagamento'), body: validatePaymentMockReturnBody }), PaymentController.simularRetornoBanco);
 router.get('/financeiro/pagamentos/aguardando-baixa', allowPagamentosConfirmBaixa, PaymentController.aguardandoBaixa);

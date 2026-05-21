@@ -1046,6 +1046,19 @@ export async function getPaymentBatchBbTransactions(id) {
   return parseJson(response, 'Erro ao buscar transacoes BB');
 }
 
+export async function getPaymentEvents(params = {}) {
+  const query = new URLSearchParams(
+    Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== '')
+  ).toString();
+  const url = query ? `${API_URL}/financeiro/pagamentos/eventos?${query}` : `${API_URL}/financeiro/pagamentos/eventos`;
+
+  const response = await fetch(url, {
+    headers: authHeaders()
+  });
+
+  return parseJson(response, 'Erro ao buscar eventos tecnicos de pagamento');
+}
+
 export async function getBbPaymentsHealth() {
   const response = await fetch(`${API_URL}/financeiro/pagamentos/bb/health`, {
     headers: authHeaders()

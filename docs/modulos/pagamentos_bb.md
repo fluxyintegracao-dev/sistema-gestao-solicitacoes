@@ -263,6 +263,7 @@ Rotas internas FLUXY adicionadas:
 - `POST /api/financeiro/pagamentos/lotes/:id/enviar-bb-sandbox`
 - `POST /api/financeiro/pagamentos/lotes/:id/sincronizar-status-bb`
 - `GET /api/financeiro/pagamentos/lotes/:id/transacoes-bb`
+- `GET /api/financeiro/pagamentos/eventos`
 - `POST /api/payments/bb/webhook`
 
 Fluxo sandbox real:
@@ -306,7 +307,19 @@ Webhook:
 - rota preparada em `/api/payments/bb/webhook`;
 - por padrao `BB_WEBHOOK_ENABLED=false`;
 - quando desabilitado, responde como indisponivel;
+- quando habilitado, exige `BB_WEBHOOK_SECRET`;
+- o segredo deve vir no header configurado em `BB_WEBHOOK_SECRET_HEADER` ou no padrao `x-fluxy-bb-webhook-secret`;
+- payload sem identificador do evento do provedor e recusado para preservar idempotencia e rastreabilidade;
+- notificacao repetida com o mesmo identificador reaproveita o evento ja registrado;
+- eventos aceitos, duplicados e recusados sao registrados na auditoria de seguranca;
 - validacao mTLS via Nginx/EC2 deve ser fechada em fase posterior.
+
+Auditoria tecnica:
+
+- usuarios com permissao `financeiro.pagamentos.auditar` podem consultar `GET /api/financeiro/pagamentos/eventos`;
+- filtros disponiveis: `status`, `event_type`, `provider_event_id`, `payment_batch_id`, `payment_intent_id`, `data_inicio`, `data_fim` e `limit`;
+- a auditoria tecnica mostra comunicacao com banco/provider, polling e webhook;
+- evento tecnico nao equivale a baixa financeira e nao deve ser usado sozinho como comprovante de liquidacao.
 
 Homologacao BB - pendencias:
 

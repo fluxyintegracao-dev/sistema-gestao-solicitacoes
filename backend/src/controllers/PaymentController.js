@@ -18,6 +18,7 @@ const {
   getBbHealth,
   handleBbWebhook,
   listBbTransactions,
+  listPaymentEvents,
   markBatchAsBankConfirmedMock,
   reprocessBatch,
   sincronizarStatusBb: sincronizarStatusBbService
@@ -154,6 +155,16 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return responderErro(res, error, 'Erro ao listar transacoes BB');
+    }
+  },
+
+  async eventos(req, res) {
+    try {
+      const data = await listPaymentEvents(req.query || {});
+      return res.json(data);
+    } catch (error) {
+      console.error(error);
+      return responderErro(res, error, 'Erro ao listar eventos tecnicos de pagamento');
     }
   },
 

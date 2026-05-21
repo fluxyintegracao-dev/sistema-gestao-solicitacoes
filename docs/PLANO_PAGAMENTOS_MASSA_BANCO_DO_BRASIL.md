@@ -975,6 +975,7 @@ Status sugeridos:
 - Webhook/retorno real do BB deve exigir identificador do evento do provedor; evento sem identificador nao entra na fila porque nao permite idempotencia nem rastreabilidade confiavel.
 - Webhook/retorno real do BB deve ser idempotente por esse identificador do evento do provedor, evitando criar eventos duplicados quando o banco reenviar a mesma notificacao.
 - Webhook/retorno real do BB deve registrar evento de seguranca para tentativa invalida, evento aceito e notificacao duplicada.
+- Eventos tecnicos de pagamento devem ser consultaveis por auditoria financeira com filtros de status, tipo de evento, lote, intencao, identificador do provedor e periodo de recebimento.
 - OFX ou retorno bancario pode reforcar conciliacao, mas nao deve duplicar baixa; se ja houver reconciliacao tecnica da intencao, a baixa deve atualizar o registro existente.
 - Reprocessamento deve reutilizar idempotency key quando tecnicamente correto.
 
@@ -1166,7 +1167,7 @@ Antes de escrever codigo da integracao BB, decidir:
 - Aprovacao.
 - Envio ao banco.
 - Painel de acompanhamento.
-- Tela de auditoria tecnica.
+- Tela de auditoria tecnica, consumindo endpoint de eventos tecnicos de pagamento com filtros por status, evento, lote, intencao, identificador do provedor e periodo.
 
 ### Etapa 4 - Provider BB
 

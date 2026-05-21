@@ -2915,6 +2915,16 @@ db.PaymentTransaction.belongsTo(db.PaymentProvider, {
   as: 'provider'
 });
 
+db.PaymentProvider.hasMany(db.PaymentEvent, {
+  foreignKey: 'provider_id',
+  as: 'events'
+});
+
+db.PaymentEvent.belongsTo(db.PaymentProvider, {
+  foreignKey: 'provider_id',
+  as: 'provider'
+});
+
 db.PaymentBatch.hasMany(db.PaymentEvent, {
   foreignKey: 'payment_batch_id',
   as: 'events'

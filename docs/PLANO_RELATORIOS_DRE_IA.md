@@ -65,6 +65,7 @@ Base multiempresa e DRE gerencial:
 - O cancelamento de lote de pagamento pendente de aprovacao ou aprovado passou a exigir MFA step-up, mantendo rascunho/revisao cancelaveis apenas com justificativa.
 - O retorno bancario mockado passou a exigir MFA step-up e justificativa, preservando rastreabilidade mesmo no ambiente de desenvolvimento.
 - O webhook real do Banco do Brasil passou a exigir segredo compartilhado configurado no ambiente, recusar payload sem identificador do evento, registrar auditoria de seguranca e tratar notificacoes repetidas como idempotentes pelo identificador do evento do provedor.
+- A auditoria de pagamentos passou a ter consulta backend para eventos tecnicos por status, tipo, lote, intencao, identificador do provedor e periodo.
 
 Documentacao operacional complementar:
 

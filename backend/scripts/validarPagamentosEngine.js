@@ -163,6 +163,7 @@ function validateRoutesAndCriticalGuards() {
     '/financeiro/pagamentos/lotes/:id/enviar-bb-sandbox',
     '/financeiro/pagamentos/lotes/:id/sincronizar-status-bb',
     '/financeiro/pagamentos/lotes/:id/transacoes-bb',
+    '/financeiro/pagamentos/eventos',
     '/financeiro/pagamentos/bb/health',
     '/payments/bb/webhook',
     '/financeiro/pagamentos/lotes/:id/reprocessar',
@@ -196,6 +197,10 @@ function validateRoutesAndCriticalGuards() {
   assert(
     executionService.includes('BB_WEBHOOK_DUPLICATE_EVENT'),
     'Idempotencia/auditoria de webhook BB duplicado nao encontrada.'
+  );
+  assert(
+    executionService.includes('async function listPaymentEvents') && executionService.includes("event_type: 'BB_WEBHOOK_RECEIVED'"),
+    'Consulta de auditoria tecnica de eventos de pagamento nao encontrada.'
   );
   assert(
     executionService.includes('Ja existe um job de envio pendente ou em processamento'),
