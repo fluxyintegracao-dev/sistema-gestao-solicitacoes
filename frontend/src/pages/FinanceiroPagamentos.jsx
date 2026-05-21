@@ -570,6 +570,30 @@ export default function FinanceiroPagamentos() {
     }));
   }
 
+  function handleMockBankReturn(resultado) {
+    if (!selectedBatch?.id) return;
+    if (!String(mfaCode || '').trim()) {
+      setError('Informe o codigo MFA para registrar retorno bancario mockado.');
+      return;
+    }
+    const justificativa = window.prompt(
+      resultado === 'CONFIRMADO'
+        ? 'Informe a justificativa/evidencia para confirmar o retorno bancario mockado:'
+        : 'Informe a justificativa/evidencia para registrar falha no retorno bancario mockado:'
+    );
+    if (justificativa === null) return;
+    const motivo = justificativa.trim();
+    if (!motivo) {
+      setError('Informe uma justificativa para registrar o retorno bancario mockado.');
+      return;
+    }
+    runBatchAction(resultado === 'CONFIRMADO' ? 'retorno' : 'falha-mock', (id) => simularRetornoPaymentBatch(id, {
+      resultado,
+      codigo_mfa: mfaCode,
+      justificativa: motivo
+    }));
+  }
+
   return (
     <div className="page solicitacoes-page">
       <div className="app-page-header">
@@ -948,11 +972,11 @@ export default function FinanceiroPagamentos() {
                         </button>
                         {!isBbSandbox && (
                           <>
-                            <button type="button" className="btn btn-outline" onClick={() => runBatchAction('retorno', (id) => simularRetornoPaymentBatch(id, { resultado: 'CONFIRMADO' }))} disabled={!canSend || !['ENVIADO_AO_BANCO', 'PROCESSANDO_BANCO'].includes(selectedBatch.status) || actionLoading === 'retorno'}>
-                              Confirmar banco
+                            <button type="button" className="btn btn-outline" onClick={() => handleMockBankReturn('CONFIRMADO')} disabled={!canSend || !['ENVIADO_AO_BANCO', 'PROCESSANDO_BANCO'].includes(selectedBatch.status) || !mfaCode || actionLoading === 'retorno'}>
+                              Confirmar banco com MFA
                             </button>
-                            <button type="button" className="btn btn-outline" onClick={() => runBatchAction('falha-mock', (id) => simularRetornoPaymentBatch(id, { resultado: 'FALHA' }))} disabled={!canSend || !['ENVIADO_AO_BANCO', 'PROCESSANDO_BANCO'].includes(selectedBatch.status) || actionLoading === 'falha-mock'}>
-                              Falha mock
+                            <button type="button" className="btn btn-outline" onClick={() => handleMockBankReturn('FALHA')} disabled={!canSend || !['ENVIADO_AO_BANCO', 'PROCESSANDO_BANCO'].includes(selectedBatch.status) || !mfaCode || actionLoading === 'falha-mock'}>
+                              Falha mock com MFA
                             </button>
                           </>
                         )}

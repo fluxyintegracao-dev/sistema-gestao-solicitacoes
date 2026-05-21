@@ -1262,6 +1262,8 @@ Cuidados:
 - lote aprovado ainda nao significa pagamento realizado;
 - pagamento realizado depende de confirmacao bancaria;
 - a confirmacao de baixa so deve aparecer quando o pagamento tiver data/hora de confirmacao bancaria registrada;
+- em ambiente mock/desenvolvimento, registrar confirmacao ou falha bancaria simulada exige MFA e justificativa/evidencia operacional;
+- retorno mockado nao e baixa financeira; ele apenas simula o evento bancario que libera a etapa posterior de baixa;
 - se o banco rejeitar ou falhar, corrigir a causa antes de reprocessar;
 - se um lote for cancelado ou rejeitado, os titulos devem ser revisados antes de entrar em novo lote;
 - cancelar lote em rascunho ou revisao exige justificativa; cancelar lote pendente de aprovacao ou ja aprovado exige justificativa e MFA;

@@ -753,6 +753,12 @@ async function handleBbWebhook(req) {
 }
 
 async function markBatchAsBankConfirmedMock(req, id, payload = {}) {
+  await verifyMfaStepUp(req, payload.codigo_mfa || payload.mfa_code);
+  const justificativa = String(payload.justificativa || '').trim();
+  if (!justificativa) {
+    throw createHttpError(400, 'Justificativa obrigatoria para retorno bancario mockado.');
+  }
+
   const resultado = String(payload.resultado || 'CONFIRMADO').trim().toUpperCase();
   const batch = await PaymentBatch.findByPk(id, {
     include: [{ model: PaymentBatchItem, as: 'items' }]
@@ -812,7 +818,11 @@ async function markBatchAsBankConfirmedMock(req, id, payload = {}) {
       ? 'Retorno mockado marcou falha de integracao no lote'
       : rejected
         ? 'Retorno mockado rejeitou o lote'
-        : 'Retorno mockado confirmou o lote'
+        : 'Retorno mockado confirmou o lote',
+    metadata: {
+      resultado,
+      justificativa
+    }
   });
 
   return PaymentBatch.findByPk(batch.id);

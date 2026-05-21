@@ -134,9 +134,12 @@ function validatePaymentCancelBody(payload = {}) {
 }
 
 function validatePaymentMockReturnBody(payload = {}) {
-  ensureAllowedKeys(payload, ['resultado'], 'Retorno bancario mockado');
+  ensureAllowedKeys(payload, ['resultado', 'codigo_mfa', 'mfa_code', 'justificativa'], 'Retorno bancario mockado');
   return cleanUndefined({
-    resultado: parseEnum(payload.resultado || 'CONFIRMADO', 'Resultado', ['CONFIRMADO', 'REJEITADO', 'FALHA'], { required: true })
+    resultado: parseEnum(payload.resultado || 'CONFIRMADO', 'Resultado', ['CONFIRMADO', 'REJEITADO', 'FALHA'], { required: true }),
+    codigo_mfa: parseOptionalText(payload.codigo_mfa, 'Codigo MFA', 12),
+    mfa_code: parseOptionalText(payload.mfa_code, 'Codigo MFA', 12),
+    justificativa: parseOptionalText(payload.justificativa, 'Justificativa', 500)
   });
 }
 
