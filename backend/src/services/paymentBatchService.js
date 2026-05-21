@@ -18,6 +18,7 @@ const {
 } = require('../models');
 const { registrarEventoSeguranca } = require('./securityLogService');
 const { toSnapshot: beneficiarySnapshot } = require('./paymentBeneficiaryService');
+const { validatePaymentBatchIntegrity } = require('./paymentBatchIntegrityService');
 const {
   ACTIVE_INTENT_STATUSES,
   validateBeneficiaryComplete,
@@ -349,18 +350,17 @@ async function getBatchDetail(req, id, { transaction = null } = {}) {
 }
 
 async function submitBatchForApproval(req, id) {
-  const batch = await PaymentBatch.findByPk(id, {
-    include: [{ model: PaymentBatchItem, as: 'items' }]
-  });
-  if (!batch) throw createHttpError(404, 'Lote de pagamento nao encontrado.');
-  if (!['RASCUNHO', 'EM_REVISAO'].includes(String(batch.status || '').toUpperCase())) {
-    throw createHttpError(400, 'Apenas lotes em rascunho/revisao podem ser enviados para aprovacao.');
-  }
-  if (!batch.items?.length) {
-    throw createHttpError(400, 'Lote sem itens.');
-  }
-
+  let submittedBatchId = Number(id);
   await sequelize.transaction(async (transaction) => {
+    const batch = await validatePaymentBatchIntegrity(id, {
+      transaction,
+      lock: transaction.LOCK.UPDATE,
+      expectedBatchStatuses: ['RASCUNHO', 'EM_REVISAO'],
+      expectedIntentStatuses: ['EM_LOTE'],
+      phaseLabel: 'envio para aprovacao'
+    });
+    submittedBatchId = batch.id;
+
     await batch.update({
       status: 'PENDENTE_APROVACAO',
       aprovacao_status: 'PENDENTE',
@@ -384,7 +384,7 @@ async function submitBatchForApproval(req, id) {
     usuarioId: req.user?.id || null,
     tipoEvento: 'PAYMENT_BATCH_SUBMITTED',
     recursoTipo: 'PAYMENT_BATCH',
-    recursoId: batch.id,
+    recursoId: submittedBatchId,
     status: 'SUCCESS',
     descricao: 'Lote submetido para aprovacao'
   });

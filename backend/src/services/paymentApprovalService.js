@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const { Op } = require('sequelize');
 const { PaymentApproval, PaymentBatch, PaymentBatchItem, PaymentIntent, User, sequelize } = require('../models');
 const { verifyTotpCode } = require('./mfaService');
+const { validatePaymentBatchIntegrity } = require('./paymentBatchIntegrityService');
 const { registrarEventoSeguranca } = require('./securityLogService');
 
 function createHttpError(statusCode, message) {
@@ -42,18 +43,29 @@ async function approveBatchWithMfa(req, id, payload = {}) {
   const mfaVerifiedAt = await verifyMfaStepUp(req, payload.codigo_mfa || payload.mfa_code);
 
   return sequelize.transaction(async (transaction) => {
-    const batch = await PaymentBatch.findByPk(id, {
-      include: [{ model: PaymentBatchItem, as: 'items' }],
+    const batch = await validatePaymentBatchIntegrity(id, {
       transaction,
-      lock: transaction.LOCK.UPDATE
+      lock: transaction.LOCK.UPDATE,
+      expectedBatchStatuses: ['PENDENTE_APROVACAO'],
+      expectedIntentStatuses: ['PENDENTE_APROVACAO'],
+      phaseLabel: 'aprovacao'
     });
 
-    if (!batch) throw createHttpError(404, 'Lote de pagamento nao encontrado.');
-    if (String(batch.status || '').toUpperCase() !== 'PENDENTE_APROVACAO') {
-      throw createHttpError(400, 'Lote nao esta pendente de aprovacao.');
-    }
     if (Number(batch.created_by) === Number(req.user?.id)) {
       throw createHttpError(403, 'Criador do lote nao pode aprovar o proprio lote nesta versao.');
+    }
+    const approvalAlreadyRegistered = await PaymentApproval.findOne({
+      where: {
+        entity_type: 'BATCH',
+        entity_id: batch.id,
+        acao: 'APPROVE',
+        status: 'APROVADO',
+        aprovado_por: req.user.id
+      },
+      transaction
+    });
+    if (approvalAlreadyRegistered) {
+      throw createHttpError(409, 'Este usuario ja aprovou este lote. A dupla aprovacao exige aprovadores diferentes.');
     }
 
     await PaymentApproval.create({

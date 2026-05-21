@@ -12,6 +12,7 @@ const {
 } = require('../models');
 const { env } = require('../config/env');
 const { countValidApprovals, verifyMfaStepUp } = require('./paymentApprovalService');
+const { validatePaymentBatchIntegrity } = require('./paymentBatchIntegrityService');
 const bancoDoBrasilProvider = require('./paymentProviderBancoDoBrasil');
 const bancoDoBrasilSandboxProvider = require('./bancoDoBrasilPayments/BancoDoBrasilPaymentProvider');
 const { sanitizePayload } = require('./bancoDoBrasilPayments/bancoDoBrasilErrors');
@@ -139,6 +140,11 @@ async function enqueueSendBatch(req, id, payload = {}) {
   if ((await countValidApprovals(batch.id)) < 2) {
     throw createHttpError(400, 'Lote exige duas aprovacoes validas.');
   }
+  await validatePaymentBatchIntegrity(batch.id, {
+    expectedBatchStatuses: ['APROVADO'],
+    expectedIntentStatuses: ['APROVADO'],
+    phaseLabel: 'envio ao banco'
+  });
 
   await ensureNoPendingSendJob(batch.id);
   const job = await createSendBatchJob(batch.id);
@@ -371,6 +377,11 @@ async function enqueueBbSandboxSendBatch(req, id, payload = {}) {
   if ((await countValidApprovals(batch.id)) < 2) {
     throw createHttpError(400, 'Lote exige duas aprovacoes validas.');
   }
+  await validatePaymentBatchIntegrity(batch.id, {
+    expectedBatchStatuses: ['APROVADO'],
+    expectedIntentStatuses: ['APROVADO'],
+    phaseLabel: 'envio BB sandbox'
+  });
 
   await ensureNoPendingSendJob(batch.id);
   const job = await createPaymentJob(batch.id, 'BB_SUBMIT_PIX_BATCH');

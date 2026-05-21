@@ -1254,6 +1254,7 @@ Regra de rejeicao:
 - a justificativa deve explicar o problema encontrado;
 - nao usar textos genericos como "rejeitado pela operacao";
 - exemplos validos: favorecido incorreto, conta pagadora incorreta, data programada errada, titulo incluido indevidamente, valor divergente.
+- a dupla aprovacao exige aprovadores diferentes; um mesmo usuario nao deve aprovar duas vezes o mesmo lote.
 
 Cuidados:
 
@@ -1272,6 +1273,8 @@ Cuidados:
 - se a empresa pagadora escolhida for diferente da empresa da conta bancaria interna, o cadastro deve ser bloqueado;
 - ao buscar titulos elegiveis, a lista deve considerar a empresa da conta pagadora selecionada para reduzir erro operacional;
 - o sistema bloqueia lote quando o titulo pertence a empresa diferente da conta pagadora;
+- antes de submeter, aprovar ou enviar o lote, o sistema deve reconferir saldo, empresa, conta pagadora, favorecido, quantidade de itens e valor total;
+- se titulo, favorecido ou saldo mudarem depois da montagem do lote, nao force aprovacao: cancele ou rejeite e gere novo lote com os dados atuais;
 - se uma empresa for pagar titulo de outra, nao forcar o lote comum: primeiro modele a operacao intercompany correta;
 - a baixa gerada apos confirmacao bancaria usa a empresa da conta pagadora do lote e exige que ela seja igual a empresa do titulo.
 

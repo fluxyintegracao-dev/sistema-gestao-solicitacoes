@@ -963,6 +963,9 @@ Status sugeridos:
 - Titulo `ABERTO` ou `PARCIAL` pode gerar PaymentIntent.
 - PaymentIntent aprovado deve travar valor, favorecido e conta pagadora.
 - Mudanca de valor/favorecido/data apos aprovacao deve invalidar aprovacao.
+- Antes de submeter, aprovar ou enviar o lote, a engine deve reconferir os dados travados contra o estado atual do titulo, saldo, favorecido, conta pagadora, empresa, quantidade de itens e total do lote.
+- Se qualquer dado sensivel mudar depois da montagem do lote, a operacao correta e cancelar/rejeitar e gerar um novo lote, nao aprovar usando informacao antiga.
+- A dupla aprovacao deve exigir aprovadores distintos; o mesmo usuario nao pode contar duas aprovacoes para o mesmo lote.
 - Envio ao banco nao cria baixa.
 - Confirmacao bancaria cria baixa em transacao atomica.
 - OFX ou retorno bancario pode reforcar conciliacao, mas nao deve duplicar baixa.

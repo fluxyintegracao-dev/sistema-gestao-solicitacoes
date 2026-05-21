@@ -59,6 +59,7 @@ Base multiempresa e DRE gerencial:
 - A carga inicial SIENGE deixou de usar emissao ou vencimento como fallback de competencia DRE; titulos considerados na DRE agora exigem competencia real e categoria financeira classificada.
 - O cadastro de conta pagadora do pagamento em massa passou a exigir empresa pagadora igual a empresa da conta bancaria interna, evitando lote com caixa de empresa divergente.
 - A tela de pagamentos em massa passou a buscar titulos elegiveis pela empresa da conta pagadora selecionada e a exibir a empresa do titulo na conferencia do lote.
+- O lote de pagamento passou a ter validacao de integridade antes de submeter, aprovar ou enviar, reconferindo titulo, saldo, empresa, favorecido, conta pagadora, quantidade de itens e total.
 
 Documentacao operacional complementar:
 
