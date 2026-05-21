@@ -125,7 +125,7 @@ function buildEmpreendimentoInclude() {
     {
       model: Obra,
       as: 'obra',
-      attributes: ['id', 'nome', 'codigo']
+      attributes: ['id', 'nome', 'codigo', 'empresa_grupo_id']
     }
   ];
 }
@@ -202,7 +202,7 @@ function buildContratoInclude({ includeParcelas = false } = {}) {
     {
       model: Obra,
       as: 'obra',
-      attributes: ['id', 'nome', 'codigo']
+      attributes: ['id', 'nome', 'codigo', 'empresa_grupo_id']
     },
     {
       model: CategoriaFinanceira,
@@ -257,6 +257,7 @@ function buildContratoInclude({ includeParcelas = false } = {}) {
             'valor_original',
             'valor_saldo',
             'valor_baixado',
+            'empresa_id',
             'data_vencimento',
             'data_quitacao'
           ]
@@ -321,7 +322,7 @@ function buildTabelaPrecoInclude({ includeItens = true } = {}) {
 
 async function ensureObraExists(obraId) {
   const obra = await Obra.findByPk(obraId, {
-    attributes: ['id', 'nome', 'codigo']
+    attributes: ['id', 'nome', 'codigo', 'empresa_grupo_id']
   });
 
   if (!obra) {
@@ -329,6 +330,17 @@ async function ensureObraExists(obraId) {
   }
 
   return obra;
+}
+
+function getEmpresaObraParaTitulo(obra, contexto = 'obra') {
+  const empresaId = obra?.empresa_grupo_id ? Number(obra.empresa_grupo_id) : null;
+  if (!Number.isInteger(empresaId) || empresaId <= 0) {
+    throw createHttpError(
+      400,
+      `A ${contexto} precisa estar vinculada a uma empresa do grupo antes de gerar titulos financeiros.`
+    );
+  }
+  return empresaId;
 }
 
 async function ensureCategoriaFinanceiraReceber(categoriaId) {
@@ -1255,7 +1267,11 @@ async function carregarContratoComercial(id) {
   return anexarIndicadoresContratos(contrato, { manterParcelas: true });
 }
 
-function buildTituloContratoPayload({ contrato, parcela, categoriaFinanceiraId, usuarioId }) {
+function buildTituloContratoPayload({ contrato, parcela, categoriaFinanceiraId, empresaId, usuarioId }) {
+  if (!Number.isInteger(Number(empresaId)) || Number(empresaId) <= 0) {
+    throw createHttpError(400, 'Empresa do contrato comercial e obrigatoria para gerar titulo financeiro.');
+  }
+
   const formaPrevista = String(parcela.forma_recebimento_prevista || '').trim().toUpperCase();
   const formaCobranca = ['BOLETO', 'PIX', 'OUTROS'].includes(formaPrevista) ? formaPrevista : null;
   const sequenciaDocumento = formaPrevista === 'BOLETO'
@@ -1265,6 +1281,7 @@ function buildTituloContratoPayload({ contrato, parcela, categoriaFinanceiraId, 
   return {
     solicitacao_id: null,
     obra_id: contrato.obra_id,
+    empresa_id: Number(empresaId),
     parceiro_id: contrato.parceiro_id,
     categoria_financeira_id: categoriaFinanceiraId || null,
     tipo: 'RECEBER',
@@ -1291,12 +1308,17 @@ function buildTituloContratoPayload({ contrato, parcela, categoriaFinanceiraId, 
   };
 }
 
-function buildTituloComissaoPayload({ contrato, corretorParceiro, categoriaFinanceiraId, usuarioId }) {
+function buildTituloComissaoPayload({ contrato, corretorParceiro, categoriaFinanceiraId, empresaId, usuarioId }) {
+  if (!Number.isInteger(Number(empresaId)) || Number(empresaId) <= 0) {
+    throw createHttpError(400, 'Empresa do contrato comercial e obrigatoria para gerar titulo de comissao.');
+  }
+
   const valorComissao = calcularValorComissao(contrato.valor_total, contrato.comissao_percentual);
 
   return {
     solicitacao_id: null,
     obra_id: contrato.obra_id,
+    empresa_id: Number(empresaId),
     parceiro_id: corretorParceiro.id,
     categoria_financeira_id: categoriaFinanceiraId || null,
     tipo: 'PAGAR',
@@ -1328,7 +1350,8 @@ async function sincronizarTituloComissao({
   transaction,
   contrato,
   corretorParceiro,
-  categoriaFinanceiraComissaoId
+  categoriaFinanceiraComissaoId,
+  empresaId
 }) {
   const contratoAtual = await ContratoComercial.findByPk(contrato.id, { transaction });
   const tituloExistente = contratoAtual?.titulo_financeiro_comissao_id
@@ -1359,6 +1382,7 @@ async function sincronizarTituloComissao({
     contrato,
     corretorParceiro,
     categoriaFinanceiraId: categoriaFinanceiraComissaoId,
+    empresaId,
     usuarioId: req.user?.id || null
   });
 
@@ -1370,9 +1394,10 @@ async function sincronizarTituloComissao({
     const parceiroAlterado = Number(tituloExistente.parceiro_id) !== Number(payload.parceiro_id);
     const valorAlterado = roundCurrency(tituloExistente.valor_original) !== roundCurrency(payload.valor_original);
     const categoriaAlterada = Number(tituloExistente.categoria_financeira_id || 0) !== Number(payload.categoria_financeira_id || 0);
+    const empresaAlterada = Number(tituloExistente.empresa_id || 0) !== Number(payload.empresa_id || 0);
 
-    if (parceiroAlterado || valorAlterado || categoriaAlterada) {
-      throw createHttpError(400, 'Nao e possivel alterar corretor, categoria ou valor da comissao com pagamento ja registrado.');
+    if (parceiroAlterado || valorAlterado || categoriaAlterada || empresaAlterada) {
+      throw createHttpError(400, 'Nao e possivel alterar corretor, categoria, empresa ou valor da comissao com pagamento ja registrado.');
     }
   }
 
@@ -1381,6 +1406,7 @@ async function sincronizarTituloComissao({
 
   await tituloExistente.update({
     parceiro_id: payload.parceiro_id,
+    empresa_id: payload.empresa_id,
     categoria_financeira_id: payload.categoria_financeira_id,
     descricao: payload.descricao,
     numero_documento: payload.numero_documento,
@@ -1416,6 +1442,7 @@ async function criarContratoComercial(req, payload = {}) {
     await ensureCategoriaFinanceiraPagar(payload.categoria_financeira_comissao_id);
     await ensureCategoriaPermitidaNoComercial(payload.categoria_financeira_comissao_id, 'comissao');
   }
+  const empresaContratoId = getEmpresaObraParaTitulo(obra, 'obra do contrato comercial');
 
   if (Number(unidade.empreendimento_id) !== Number(empreendimento.id)) {
     throw createHttpError(400, 'A unidade selecionada nao pertence ao empreendimento informado.');
@@ -1481,6 +1508,7 @@ async function criarContratoComercial(req, payload = {}) {
           contrato,
           parcela,
           categoriaFinanceiraId: payload.categoria_financeira_id,
+          empresaId: empresaContratoId,
           usuarioId: req.user?.id || null
         }),
         { transaction }
@@ -1506,7 +1534,8 @@ async function criarContratoComercial(req, payload = {}) {
       transaction,
       contrato,
       corretorParceiro,
-      categoriaFinanceiraComissaoId: payload.categoria_financeira_comissao_id || null
+      categoriaFinanceiraComissaoId: payload.categoria_financeira_comissao_id || null,
+      empresaId: empresaContratoId
     });
 
     if (tituloComissao && Number(contrato.titulo_financeiro_comissao_id || 0) !== Number(tituloComissao.id || 0)) {
@@ -1569,6 +1598,10 @@ async function atualizarContratoComercial(req, id, payload = {}) {
     await ensureCategoriaFinanceiraPagar(payload.categoria_financeira_comissao_id);
     await ensureCategoriaPermitidaNoComercial(payload.categoria_financeira_comissao_id, 'comissao');
   }
+  const obraContrato = Object.prototype.hasOwnProperty.call(payload, 'obra_id')
+    ? await ensureObraExists(payload.obra_id)
+    : (contrato.obra || await ensureObraExists(contrato.obra_id));
+  const empresaContratoId = getEmpresaObraParaTitulo(obraContrato, 'obra do contrato comercial');
 
   const transaction = await sequelize.transaction();
   try {
@@ -1633,6 +1666,7 @@ async function atualizarContratoComercial(req, id, payload = {}) {
         await TituloFinanceiro.update(
           {
             categoria_financeira_id: payload.categoria_financeira_id || null,
+            empresa_id: empresaContratoId,
             atualizado_por: req.user?.id || null
           },
           {
@@ -1668,7 +1702,8 @@ async function atualizarContratoComercial(req, id, payload = {}) {
       categoriaFinanceiraComissaoId:
         Object.prototype.hasOwnProperty.call(updateData, 'categoria_financeira_comissao_id')
           ? updateData.categoria_financeira_comissao_id
-          : contratoAtualizado.categoria_financeira_comissao_id
+          : contratoAtualizado.categoria_financeira_comissao_id,
+      empresaId: empresaContratoId
     });
 
     if (tituloComissao && Number(contratoAtualizado.titulo_financeiro_comissao_id || 0) !== Number(tituloComissao.id || 0)) {
@@ -1804,7 +1839,8 @@ async function distratarContratoComercial(req, id, payload = {}) {
       transaction,
       contrato: contratoAtualizado,
       corretorParceiro: contrato.corretorParceiro || null,
-      categoriaFinanceiraComissaoId: contratoAtualizado.categoria_financeira_comissao_id
+      categoriaFinanceiraComissaoId: contratoAtualizado.categoria_financeira_comissao_id,
+      empresaId: getEmpresaObraParaTitulo(contrato.obra, 'obra do contrato comercial')
     });
 
     if (tituloComissao && Number(contratoAtualizado.titulo_financeiro_comissao_id || 0) !== Number(tituloComissao.id || 0)) {
@@ -1890,6 +1926,7 @@ async function trocarUnidadeContratoComercial(req, id, payload = {}) {
   await ensureUnidadeDisponivelParaContrato(unidadeDestino, contrato.parceiro_id, contrato.id);
   const empreendimentoDestino = await ensureEmpreendimentoExists(unidadeDestino.empreendimento_id);
   const obraDestino = empreendimentoDestino.obra_id ? await ensureObraExists(empreendimentoDestino.obra_id) : await ensureObraExists(contrato.obra_id);
+  const empresaDestinoId = getEmpresaObraParaTitulo(obraDestino, 'obra do contrato comercial');
   const valorAtual = roundCurrency(contrato.valor_total);
   const novoValorTotal = payload.novo_valor_total != null ? roundCurrency(payload.novo_valor_total) : valorAtual;
   const diferenca = roundCurrency(novoValorTotal - valorAtual);
@@ -1936,6 +1973,7 @@ async function trocarUnidadeContratoComercial(req, id, payload = {}) {
           },
           parcela: parcelaAjuste,
           categoriaFinanceiraId: contrato.categoria_financeira_id,
+          empresaId: empresaDestinoId,
           usuarioId: req.user?.id || null
         }),
         { transaction }
@@ -1982,7 +2020,8 @@ async function trocarUnidadeContratoComercial(req, id, payload = {}) {
       transaction,
       contrato: contratoAtualizado,
       corretorParceiro: contrato.corretorParceiro || null,
-      categoriaFinanceiraComissaoId: contratoAtualizado.categoria_financeira_comissao_id
+      categoriaFinanceiraComissaoId: contratoAtualizado.categoria_financeira_comissao_id,
+      empresaId: empresaDestinoId
     });
 
     if (tituloComissao && Number(contratoAtualizado.titulo_financeiro_comissao_id || 0) !== Number(tituloComissao.id || 0)) {

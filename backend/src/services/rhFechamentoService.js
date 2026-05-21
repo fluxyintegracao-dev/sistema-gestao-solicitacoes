@@ -47,7 +47,7 @@ const FECHAMENTO_INCLUDE = [
       {
         model: Obra,
         as: 'obra',
-        attributes: ['id', 'codigo', 'nome']
+        attributes: ['id', 'codigo', 'nome', 'empresa_grupo_id']
       }
     ]
   },
@@ -129,7 +129,7 @@ async function carregarApuracaoParaFechamento(apuracaoId, transaction) {
       {
         model: Obra,
         as: 'obra',
-        attributes: ['id', 'codigo', 'nome']
+        attributes: ['id', 'codigo', 'nome', 'empresa_grupo_id']
       },
       {
         model: RhFechamento,
@@ -223,6 +223,20 @@ function validarItemElegivelParaFechamento(item, apuracao) {
   };
 }
 
+function validarEmpresaApuracaoParaTitulo(apuracao) {
+  const empresaApuracaoId = apuracao?.empresa_grupo_id ? Number(apuracao.empresa_grupo_id) : null;
+  if (!Number.isInteger(empresaApuracaoId) || empresaApuracaoId <= 0) {
+    throw new ValidationError('A apuracao RH/DP precisa estar vinculada a uma empresa do grupo antes de gerar titulos financeiros.');
+  }
+
+  const empresaObraId = apuracao?.obra?.empresa_grupo_id ? Number(apuracao.obra.empresa_grupo_id) : null;
+  if (empresaObraId && empresaObraId !== empresaApuracaoId) {
+    throw new ValidationError('A empresa da apuracao RH/DP deve ser a mesma vinculada a obra/centro de custo informado.');
+  }
+
+  return empresaApuracaoId;
+}
+
 async function syncParceiroFavorecido({ colaborador, favorecidoNome, favorecidoDocumento, email, telefone }, transaction) {
   const digits = normalizeDigits(favorecidoDocumento);
   const tipoPessoa = inferTipoPessoa(digits);
@@ -274,13 +288,18 @@ async function syncParceiroFavorecido({ colaborador, favorecidoNome, favorecidoD
   return parceiro;
 }
 
-function buildTituloRhPayload({ apuracao, item, parceiro, dataVencimento, categoriaFinanceiraId, usuarioId }) {
+function buildTituloRhPayload({ apuracao, item, parceiro, dataVencimento, categoriaFinanceiraId, empresaId, usuarioId }) {
+  if (!Number.isInteger(Number(empresaId)) || Number(empresaId) <= 0) {
+    throw new ValidationError('Empresa da apuracao RH/DP e obrigatoria para gerar titulo financeiro.');
+  }
+
   const colaborador = item.colaborador;
   const competencia = apuracao.competencia;
 
   return {
     solicitacao_id: null,
     obra_id: Number(apuracao.obra_id || colaborador.obra_id),
+    empresa_id: Number(empresaId),
     parceiro_id: parceiro.id,
     categoria_financeira_id: categoriaFinanceiraId || null,
     tipo: 'PAGAR',
@@ -505,6 +524,7 @@ async function fecharApuracaoRh(apuracaoId, data, user) {
     const categoria = await ensureCategoriaFinanceiraPagar(data.categoria_financeira_id, transaction);
     const dataFechamento = data.data_fechamento || getToday();
     const dataVencimento = data.data_vencimento || getLastDayOfCompetencia(apuracao.competencia);
+    const empresaTituloId = validarEmpresaApuracaoParaTitulo(apuracao);
 
     const fechamento = await RhFechamento.create(
       {
@@ -545,6 +565,7 @@ async function fecharApuracaoRh(apuracaoId, data, user) {
           parceiro,
           dataVencimento,
           categoriaFinanceiraId: categoria?.id || null,
+          empresaId: empresaTituloId,
           usuarioId: user?.id || null
         }),
         { transaction }

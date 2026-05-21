@@ -81,7 +81,7 @@ function contaBancariaObrigatoria(formaRecebimento) {
 function buildBaixaForm(titulo, contasBancarias, movimento = null) {
   if (movimento) {
     return {
-      empresa_id: String(movimento.empresa_id || movimento.empresa?.id || titulo?.empresa_id || ''),
+      empresa_id: String(movimento.empresa_id || movimento.empresa?.id || ''),
       conta_bancaria_id: String(movimento.conta_bancaria_id || movimento.contaBancaria?.id || ''),
       forma_recebimento: movimento?.forma_recebimento || '',
       tipo_permuta: movimento?.tipo_permuta || '',
@@ -284,7 +284,7 @@ export default function FinanceiroTituloDetalhe() {
   const podeVerIntegracaoSienge = useMemo(() => canViewIntegracaoSienge(user), [user]);
 
   const filaSienge = titulo?.integracaoSienge || null;
-  const empresaTituloId = String(titulo?.empresa_id || titulo?.obra?.empresa_grupo_id || '');
+  const empresaTituloId = String(titulo?.empresa_id || '');
   const baixaEmpresaDiferente = Boolean(
     empresaTituloId &&
     baixaForm.empresa_id &&

@@ -1588,6 +1588,24 @@ Controlar empreendimentos, unidades, tabelas de preco, mapa de unidades e contra
 5. Gerar ou acompanhar contrato de venda.
 6. Alimentar relatorios comerciais.
 
+### 15.2.1 Titulos financeiros do contrato comercial
+
+Quando um contrato comercial gera parcelas a receber ou comissao a pagar, os titulos financeiros precisam nascer com a empresa correta.
+
+Regra operacional:
+
+- a empresa dos titulos do contrato vem da obra vinculada ao contrato comercial;
+- a obra do contrato precisa estar vinculada a uma empresa do grupo;
+- se trocar a unidade para obra de outra empresa, os novos titulos e comissoes passam a usar a empresa da nova obra;
+- titulos ja baixados nao devem ter empresa, corretor, categoria ou valor alterados para ajustar cadastro posterior;
+- se a empresa da obra estiver errada, corrija o cadastro da obra antes de gerar ou alterar contrato.
+
+Cuidados:
+
+- contrato comercial sem obra com empresa vinculada nao deve gerar titulo financeiro;
+- parcela de venda e comissao precisam alimentar DRE, caixa previsto e relatorios por empresa corretamente;
+- nao usar empresa da conta bancaria futura para definir empresa do contrato; a conta aparece somente na baixa/recebimento.
+
 ### 15.3 Impacto gerencial
 
 O modulo comercial apoia:
@@ -1658,6 +1676,24 @@ Passo a passo:
 - empresa errada em colaborador distorce custo de folha;
 - fechamento sem conferencia prejudica financeiro;
 - documentos incompletos aumentam risco trabalhista.
+
+### 17.4 Fechamento RH/DP e titulos financeiros
+
+Quando a apuracao RH/DP e fechada, o sistema gera titulos a pagar para os favorecidos.
+
+Regras:
+
+- a apuracao precisa estar vinculada a uma empresa do grupo;
+- se a apuracao tambem tiver obra/centro de custo, essa obra precisa estar vinculada a mesma empresa da apuracao;
+- os titulos de folha nascem com a empresa da apuracao RH/DP;
+- a baixa futura deve informar a empresa pagadora real e a conta bancaria correspondente;
+- se uma empresa pagar folha de outra empresa, a baixa deve ser tratada como intercompany, nao como ajuste manual de empresa no titulo.
+
+Cuidados:
+
+- nao fechar apuracao com empresa incorreta;
+- nao usar empresa do colaborador para corrigir uma apuracao criada errada;
+- conferir categoria financeira da folha antes do fechamento para manter DRE e endividamento corretos.
 
 ---
 
