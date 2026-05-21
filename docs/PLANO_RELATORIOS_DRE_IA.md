@@ -406,6 +406,295 @@ Exemplo:
 - Na visao individual, isso pode aparecer como despesa em A e receita em B.
 - Na visao consolidada, pode ser necessario eliminar essa operacao para nao inflar receita/despesa da Holding.
 
+### Camadas analiticas do financeiro do grupo
+
+O financeiro do FLUXY deve ser estruturado em quatro camadas analiticas. Essas camadas precisam conversar diretamente com a operacao: criacao de titulos na solicitacao, titulo manual, baixa, conciliacao bancaria, transferencias, registros financeiros, categorias, centros de custo, obras e empresas.
+
+#### 1. Visao consolidada do grupo
+
+Esta deve ser a tela principal da Diretoria. O foco nao e "Empresa A" ou "Empresa B" isoladamente, mas sim:
+
+```txt
+GRUPO CONSOLIDADO
+```
+
+Nesta visao, por padrao:
+
+- Eliminar intercompany.
+- Eliminar transferencias internas.
+- Eliminar aportes entre empresas.
+- Eliminar movimentacoes espelho.
+- Manter apenas receitas e despesas que representam geracao ou consumo real de riqueza fora do grupo.
+
+Objetivo:
+
+- Medir a saude economica e financeira real do grupo.
+- Evitar que circulacao interna de caixa pareca receita nova.
+- Evitar que uma empresa operacional pareca deficitária apenas porque concentra folha, impostos ou pagamentos administrativos.
+
+O que deve aparecer:
+
+- Resultado operacional consolidado.
+- Receita real externa.
+- Custo de obras.
+- Despesas administrativas.
+- Despesas financeiras.
+- EBITDA.
+- Lucro/prejuizo liquido.
+- Geracao operacional de caixa.
+- Necessidade futura de caixa.
+
+Indicadores principais:
+
+- Caixa consolidado.
+- Geracao operacional de caixa.
+- Burn rate administrativo.
+- Resultado por obra.
+- Resultado por incorporacao.
+- Inadimplencia.
+- Endividamento.
+- Compromissos futuros.
+- Necessidade futura de caixa.
+
+#### 2. Visao por empresa
+
+A visao por empresa continua sendo necessaria, mas nao deve ser apresentada como ranking simples de lucro/prejuizo.
+
+Ela deve mostrar:
+
+| Indicador | Explicacao |
+| --- | --- |
+| Resultado operacional proprio | Resultado sem intercompany. |
+| Intercompany liquido | Quanto a empresa recebeu ou enviou para empresas do grupo. |
+| Resultado final | Resultado apos transferencias internas. |
+| Dependencia do grupo | Percentual do caixa vindo de outras empresas do grupo. |
+| Consumo operacional | Quanto a empresa consome para operar. |
+| Geracao operacional | Quanto a empresa gera com receitas externas. |
+
+Essa separacao e essencial porque algumas empresas podem ter folha, impostos, despesas administrativas ou funcoes operacionais sem receita recorrente externa. Isso nao significa necessariamente problema; pode significar que a empresa existe para uma funcao especifica dentro do grupo.
+
+Exemplo:
+
+```txt
+Empresa RH/Folha
+Receita externa: R$ 0
+Despesa: R$ 400 mil
+Lucro isolado: negativo
+Interpretacao correta: centro operacional de folha, nao empresa comercial deficitária.
+```
+
+#### Tipo gerencial da empresa
+
+Adicionar no cadastro de Empresas do Grupo um `tipo_gerencial`, separado do tipo societario simples.
+
+Tipos recomendados:
+
+- Holding.
+- Tesouraria.
+- SPE.
+- Administrativa.
+- Operacional.
+- Patrimonial.
+- Comercial.
+- RH/Folha.
+- Investimentos.
+
+Esse campo muda a interpretacao do resultado. Uma empresa "RH/Folha" pode ter resultado individual negativo e ainda assim estar correta; uma empresa "Operacional" ou "Comercial" precisa ser analisada por capacidade de gerar receita externa; uma empresa "Tesouraria" precisa ser analisada por concentracao, disponibilidade, transferencias e risco de caixa.
+
+#### 3. Relatorio intercompany
+
+Esse relatorio deve se tornar uma das principais visoes de controle do grupo.
+
+Ele deve responder:
+
+- Quem financia quem.
+- Qual empresa depende de outra.
+- Onde existe drenagem de caixa.
+- Onde existe concentracao financeira.
+- Quais empresas sao superavitarias.
+- Quais empresas consomem caixa de forma recorrente.
+- Quais movimentacoes internas sao excessivas.
+- Onde existe risco de caixa oculto.
+
+Estrutura recomendada:
+
+| Origem | Destino | Tipo | Motivo | Valor | Competencia |
+| --- | --- | --- | --- | --- | --- |
+| Empresa A | Empresa B | Emprestimo | Folha | 100k | Mai/26 |
+
+Tipos de intercompany:
+
+- Aporte.
+- Emprestimo.
+- Reembolso.
+- Rateio.
+- Cobertura de caixa.
+- Folha.
+- Administrativo.
+- Imposto.
+- Transferencia operacional.
+
+O relatorio deve permitir filtrar por empresa origem, empresa destino, tipo, motivo, periodo, competencia, conta bancaria, titulo financeiro e movimento financeiro.
+
+#### 4. Fluxo de caixa futuro consolidado
+
+Esta e uma das visoes com maior potencial estrategico do FLUXY.
+
+O problema central de grupos de construcao muitas vezes nao e apenas lucro contábil ou gerencial. E:
+
+- Descasamento de caixa.
+- Concentracao de pagamento.
+- Obra consumindo caixa antes da receita.
+- Atraso de cliente.
+- Financiamento.
+- Intercompany escondendo problema real.
+- Receita em uma empresa e pagamentos em outra.
+
+O fluxo projetado consolidado deve considerar:
+
+- Contas a pagar.
+- Contas a receber.
+- Provisoes.
+- Pedidos.
+- Contratos.
+- Medicoes.
+- Folha.
+- Impostos.
+- Intercompany previsto.
+- Inadimplencia projetada.
+
+Niveis obrigatorios:
+
+1. Caixa individual por empresa.
+2. Caixa consolidado do grupo.
+3. Caixa consolidado eliminando intercompany.
+
+Essa visao deve mostrar se o grupo gera caixa, se precisa de caixa futuro, onde ocorre o pico de necessidade e qual empresa operacional ou tesouraria precisara suportar as demais.
+
+### Revisao da estrutura financeira atual
+
+Estrutura atual identificada:
+
+- `empresas_grupo` ja diferencia Holding e empresa operacional por `tipo_empresa` e possui `holding_id`.
+- `contas_bancarias` ja possui `empresa_id`.
+- `titulos_financeiros` ja possui `empresa_id`, `empresa_contraparte_id`, `intercompany`, `competencia_data`, `considera_dre`, `obra_id`, `apropriacao_id` e `categoria_financeira_id`.
+- `movimentos_financeiros` ja possui `empresa_id`, `conta_bancaria_id`, `titulo_financeiro_id`, valores de baixa e data do movimento.
+- Categorias financeiras ja possuem classificacao DRE (`dre_grupo`, `dre_subgrupo`, `dre_ordem`, `considera_dre`).
+- A baixa de titulo ja exige empresa pagadora explicita.
+- A DRE ja usa competencia e categoria financeira como base gerencial.
+
+Conclusao:
+
+- A base atual esta no caminho correto e nao precisa ser destruida.
+- O proximo passo nao e trocar a estrutura, mas adicionar dimensoes gerenciais e regras de consolidacao.
+- O sistema deve evitar deducoes silenciosas ou "fallbacks" operacionais para informacoes essenciais. Empresa, categoria, centro de custo, competencia e intercompany precisam ser informados ou herdados por regra clara e visivel.
+
+### Reorganizacao recomendada sem quebrar a operacao
+
+#### Empresas do Grupo
+
+Adicionar campos:
+
+- `tipo_gerencial`.
+- `empresa_caixa` boolean.
+- `empresa_operacional` boolean.
+- `consolidar_no_grupo` boolean.
+- `elimina_intercompany` boolean.
+
+Uso:
+
+- `tipo_empresa` continua representando classificacao basica como Holding ou Operacional.
+- `tipo_gerencial` passa a orientar dashboards, interpretacao executiva e alertas.
+- `empresa_caixa` identifica empresa que concentra entradas/saidas de capital.
+- `consolidar_no_grupo` define se entra nos relatorios consolidados.
+- `elimina_intercompany` define se suas operacoes internas devem ser eliminadas no consolidado.
+
+#### Titulos financeiros
+
+Manter a estrutura atual, mas evoluir a intercompany:
+
+- `intercompany_group_id` para agrupar movimentacoes espelho.
+- `empresa_origem_id`.
+- `empresa_destino_id`.
+- `tipo_intercompany`.
+- `motivo_intercompany`.
+- `elimina_consolidado`.
+- `transferencia_interna`.
+
+Regras operacionais:
+
+- Titulo comum exige empresa, obra/centro, categoria e competencia.
+- Titulo intercompany exige empresa origem, empresa destino, tipo e motivo.
+- Titulo intercompany nao deve afetar DRE consolidada principal quando `elimina_consolidado = true`.
+- Titulo intercompany pode afetar visao individual por empresa e relatorio intercompany.
+- Quando houver lancamento espelho, o sistema deve vincular ambos pelo mesmo `intercompany_group_id`.
+
+#### Movimentos financeiros e baixas
+
+Adicionar ou padronizar:
+
+- `intercompany_group_id`.
+- `empresa_origem_id`.
+- `empresa_destino_id`.
+- `tipo_intercompany`.
+- `elimina_consolidado`.
+- `transferencia_interna`.
+
+Regras operacionais:
+
+- Toda baixa deve informar empresa pagadora/recebedora explicitamente.
+- Conta bancaria precisa pertencer a empresa informada.
+- Em transferencia entre contas da mesma empresa: classificar como transferencia interna de caixa, fora da DRE.
+- Em transferencia entre empresas: classificar como intercompany, com origem, destino, tipo e motivo.
+- A conciliacao bancaria deve sugerir classificacao intercompany quando identificar transferencia entre contas do grupo, mas a confirmacao deve ser humana.
+
+#### Criacao de titulo na tela de detalhes da solicitacao
+
+Ao criar titulo a partir da solicitacao:
+
+- Herdar obra/centro de custo da solicitacao.
+- Herdar empresa da obra/centro de custo.
+- Exigir categoria financeira.
+- Exigir competencia.
+- Permitir marcar intercompany apenas quando fizer sentido operacional.
+- Se intercompany for marcado, exigir contraparte, tipo e motivo.
+- Exibir claramente se o titulo entrara ou nao na DRE consolidada.
+
+#### Titulo manual
+
+Ao criar titulo manual:
+
+- Exigir empresa.
+- Exigir obra/centro de custo.
+- Exigir categoria financeira.
+- Exigir competencia.
+- Exigir classificacao intercompany quando houver contraparte do grupo.
+- Mostrar uma pre-visualizacao simples: "Impacto na DRE", "Impacto no Caixa" e "Eliminado no Consolidado".
+
+#### Conciliacao bancaria
+
+Ao conciliar:
+
+- Conta bancaria define empresa do movimento.
+- Se a contrapartida for outra conta do grupo, sugerir transferencia interna ou intercompany.
+- Se a conciliacao criar titulo automaticamente, aplicar as mesmas regras do titulo manual.
+- Nao criar titulo sem empresa, categoria e competencia quando esse titulo for usado em DRE.
+
+#### Categorias financeiras
+
+Nao tentar resolver tudo apenas por plano de contas. Esse e o erro classico.
+
+Separar:
+
+- Plano de contas/categorias financeiras.
+- Estrutura societaria.
+- Classificacao gerencial da empresa.
+- Engine de consolidacao.
+- Engine intercompany.
+- Engine analitica.
+
+Categorias continuam definindo linha DRE, mas nao devem sozinhas decidir se uma operacao e intercompany, eliminavel, transferencia interna ou movimento patrimonial.
+
 ### Modelo de dados recomendado
 
 O sistema ja possui `empresa_id` em titulos financeiros e usa `obra_id` em solicitacoes, compras, contratos, financeiro e provisionamento. Para a DRE ser real, recomenda-se padronizar as dimensoes:
@@ -699,7 +988,29 @@ Criar futuramente:
 - Criar comparativo mensal e acumulado.
 - Criar graficos de margem e resultado.
 
-### Fase 5 - Relatorios prioritarios
+### Fase 5 - Consolidacao gerencial e intercompany
+
+- Adicionar tipo gerencial da empresa.
+- Marcar empresas caixa, operacionais, administrativas, RH/Folha, SPE, patrimoniais e investimentos.
+- Criar campos de intercompany em titulos e movimentos.
+- Criar agrupamento de operacoes espelho por `intercompany_group_id`.
+- Criar tipos e motivos de intercompany.
+- Criar relatorio intercompany.
+- Atualizar criacao de titulo por solicitacao para exigir dimensoes gerenciais completas.
+- Atualizar titulo manual para mostrar impacto na DRE, caixa e consolidado.
+- Atualizar baixa/conciliacao para tratar transferencias internas e intercompany explicitamente.
+- Criar diagnostico de operacoes financeiras sem classificacao gerencial completa.
+
+### Fase 6 - Fluxo de caixa futuro consolidado
+
+- Criar caixa individual por empresa.
+- Criar caixa consolidado do grupo.
+- Criar caixa consolidado eliminando intercompany.
+- Incluir contas a pagar, contas a receber, provisoes, pedidos, contratos, medicoes, folha, impostos, inadimplencia projetada e intercompany previsto.
+- Criar alertas de necessidade futura de caixa.
+- Criar indicadores de descasamento de caixa por obra, empresa e grupo.
+
+### Fase 7 - Relatorios prioritarios
 
 Prioridade sugerida:
 
@@ -713,13 +1024,14 @@ Prioridade sugerida:
 8. RH/DP.
 9. Contratos.
 
-### Fase 6 - Painel executivo
+### Fase 8 - Painel executivo
 
 - Consolidar indicadores dos modulos.
 - Criar visoes por perfil executivo.
 - Exibir alertas e riscos.
+- Criar tela principal do diretor com Grupo Consolidado, Caixa Consolidado, EBITDA, Lucro Liquido, Necessidade Futura de Caixa, Intercompany Liquido, Resultado por Obra e Endividamento.
 
-### Fase 7 - Preparacao para IA
+### Fase 9 - Preparacao para IA
 
 - Criar arquitetura de IA.
 - Criar logs e permissoes.
@@ -732,5 +1044,10 @@ Prioridade sugerida:
 - Definir plano de contas/categorias DRE da Holding.
 - Definir regra de competencia por tipo de titulo.
 - Definir tratamento de intercompany.
+- Definir os tipos gerenciais oficiais das empresas do grupo.
+- Definir quais empresas funcionam como tesouraria/concentradoras de caixa.
+- Definir tipos e motivos oficiais de intercompany.
+- Definir quando uma operacao intercompany deve gerar lancamento espelho automatico.
+- Definir regras de eliminacao no consolidado por tipo de operacao.
 - Definir se obras e centros de custo terao empresa obrigatoria imediatamente ou por fase de saneamento.
 - Definir se o sistema tera Balanco Gerencial e Patrimonio Liquido em fase futura.
