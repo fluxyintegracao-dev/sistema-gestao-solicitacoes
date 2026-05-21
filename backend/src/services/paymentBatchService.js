@@ -202,7 +202,7 @@ async function createBatchFromTitulos(req, payload = {}) {
       codigo: buildBatchCode(),
       provider_id: provider.id,
       payment_account_id: paymentAccount.id,
-      empresa_id: paymentAccount.empresa_id || null,
+      empresa_id: paymentAccount.empresa_id,
       status: 'RASCUNHO',
       quantidade_itens: 0,
       valor_total: 0,

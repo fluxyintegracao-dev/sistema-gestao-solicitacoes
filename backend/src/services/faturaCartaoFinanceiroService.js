@@ -190,13 +190,16 @@ async function baixarFaturaCartao(req, faturaId, payload = {}, { transaction: ex
       throw createHttpError(400, 'Somente faturas abertas, fechadas ou parciais podem ser baixadas.');
     }
 
-    const contaId = Number(payload.conta_bancaria_id || fatura.conta_bancaria_id || 0);
+    const contaId = Number(payload.conta_bancaria_id || 0);
     if (!Number.isInteger(contaId) || contaId <= 0) {
       throw createHttpError(400, 'Conta bancaria e obrigatoria para baixar a fatura.');
     }
     const conta = await ContaBancaria.findByPk(contaId, { transaction });
     if (!conta || conta.ativo === false) {
       throw createHttpError(400, 'Conta bancaria invalida para baixar a fatura.');
+    }
+    if (!conta.empresa_id) {
+      throw createHttpError(400, 'Conta bancaria da baixa da fatura nao possui empresa vinculada.');
     }
 
     const dataMovimento = payload.data_movimento || payload.data_pagamento || fatura.data_vencimento;
@@ -210,12 +213,18 @@ async function baixarFaturaCartao(req, faturaId, payload = {}, { transaction: ex
 
       const valorBaixa = roundCurrency(titulo.valor_saldo || titulo.valor_original);
       if (valorBaixa <= 0) continue;
+      if (!titulo.empresa_id) {
+        throw createHttpError(400, `Titulo ${titulo.codigo || titulo.id} da fatura nao possui empresa vinculada.`);
+      }
+      if (Number(titulo.empresa_id) !== Number(conta.empresa_id)) {
+        throw createHttpError(400, `Titulo ${titulo.codigo || titulo.id} pertence a empresa diferente da conta bancaria da baixa.`);
+      }
 
       const movimento = await MovimentoFinanceiro.create({
         titulo_financeiro_id: titulo.id,
         fatura_cartao_id: fatura.id,
         conta_bancaria_id: conta.id,
-        empresa_id: conta.empresa_id || titulo.empresa_id || null,
+        empresa_id: conta.empresa_id,
         caixa_sessao_id: caixaSessao?.id || null,
         forma_recebimento: 'CARTAO_CREDITO',
         tipo_movimento: 'BAIXA',

@@ -131,10 +131,23 @@ async function confirmBaixaFromPaymentIntent(req, id, payload = {}) {
     }
 
     const dataMovimento = payload.data_movimento || today();
+    const paymentAccount = intent.paymentAccount;
+    if (!paymentAccount?.empresa_id) {
+      throw createHttpError(400, 'Conta pagadora do pagamento nao possui empresa pagadora vinculada.');
+    }
     const contaBancariaId = intent.paymentAccount?.conta_bancaria_id || null;
+    if (!contaBancariaId) {
+      throw createHttpError(400, 'Conta pagadora do pagamento nao possui conta bancaria vinculada.');
+    }
     const contaBancaria = contaBancariaId
       ? await carregarContaBancaria(contaBancariaId, { transaction })
       : null;
+    if (!contaBancaria?.empresa_id) {
+      throw createHttpError(400, 'Conta bancaria vinculada ao pagamento nao possui empresa vinculada.');
+    }
+    if (Number(contaBancaria.empresa_id) !== Number(paymentAccount.empresa_id)) {
+      throw createHttpError(400, 'Empresa da conta bancaria diverge da empresa pagadora do lote.');
+    }
     const caixaSessao = contaBancaria
       ? await obterSessaoAbertaParaConta(contaBancaria, dataMovimento, { transaction })
       : null;
@@ -147,7 +160,7 @@ async function confirmBaixaFromPaymentIntent(req, id, payload = {}) {
     const movimento = await MovimentoFinanceiro.create({
       titulo_financeiro_id: titulo.id,
       conta_bancaria_id: contaBancaria?.id || null,
-      empresa_id: contaBancaria?.empresa_id || titulo.empresa_id || null,
+      empresa_id: paymentAccount.empresa_id,
       caixa_sessao_id: caixaSessao?.id || null,
       forma_recebimento: 'PIX',
       documento_referencia: intent.correlation_id,

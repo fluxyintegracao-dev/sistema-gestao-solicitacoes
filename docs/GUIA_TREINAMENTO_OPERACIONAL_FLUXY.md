@@ -1016,7 +1016,27 @@ Cuidados:
 - transferencia entre contas da mesma empresa e transferencia interna de caixa;
 - transferencia entre contas de empresas diferentes deve ter tipo e motivo intercompany.
 
-### 11.8.1 Pagamentos em Massa
+### 11.8.1 Conciliar fatura de cartao
+
+Quando usar:
+
+- quando o lancamento bancario representa o pagamento de uma fatura de cartao inteira;
+- quando os titulos da fatura ja foram criados e vinculados ao cartao correto.
+
+Regras:
+
+- a baixa da fatura exige conta bancaria informada de forma explicita;
+- a conta bancaria usada na baixa precisa estar vinculada a empresa real que pagou a fatura;
+- todos os titulos da fatura precisam estar vinculados a mesma empresa da conta bancaria;
+- se uma empresa pagar fatura/titulo de outra empresa, nao conciliar como fatura comum antes de modelar a operacao intercompany real.
+
+Cuidados:
+
+- nao usar a conta do cartao como substituto automatico da empresa pagadora;
+- se a fatura tiver titulos de empresas diferentes, revisar os titulos antes de baixar;
+- uma fatura conciliada baixa os titulos individualmente e afeta DRE, caixa realizado e relatorios por empresa.
+
+### 11.8.2 Pagamentos em Massa
 
 Tela:
 
@@ -1074,6 +1094,7 @@ Cuidados:
 - nao usar conta pagadora sem empresa vinculada para "resolver depois";
 - se a conta pagadora aparecer como incompleta, corrigir o cadastro antes de gerar lote;
 - a empresa pagadora nao deve ser deduzida pela conta bancaria ou pelo nome do banco: ela precisa estar preenchida explicitamente.
+- a baixa gerada apos confirmacao bancaria usa a empresa da conta pagadora do lote; se a conta bancaria interna estiver sem empresa ou com empresa diferente, o cadastro deve ser corrigido antes da baixa.
 
 ### 11.9 Grupo Consolidado
 
