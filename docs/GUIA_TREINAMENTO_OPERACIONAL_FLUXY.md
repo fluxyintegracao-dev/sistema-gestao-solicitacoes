@@ -1686,7 +1686,12 @@ Regra operacional:
 
 - a empresa dos titulos do contrato vem da obra vinculada ao contrato comercial;
 - a obra do contrato precisa estar vinculada a uma empresa do grupo;
+- cada parcela precisa ter competencia DRE informada explicitamente;
+- a competencia DRE da parcela representa o periodo economico da receita, e nao deve ser preenchida automaticamente pelo vencimento;
+- a categoria financeira da venda precisa estar marcada para DRE e possuir grupo DRE classificado;
+- se houver comissao, a categoria financeira da comissao tambem precisa estar marcada para DRE e possuir grupo DRE classificado;
 - se trocar a unidade para obra de outra empresa, os novos titulos e comissoes passam a usar a empresa da nova obra;
+- se a troca de unidade aumentar o valor do contrato, informe a competencia DRE real do ajuste;
 - titulos ja baixados nao devem ter empresa, corretor, categoria ou valor alterados para ajustar cadastro posterior;
 - se a empresa da obra estiver errada, corrija o cadastro da obra antes de gerar ou alterar contrato.
 
@@ -1694,6 +1699,7 @@ Cuidados:
 
 - contrato comercial sem obra com empresa vinculada nao deve gerar titulo financeiro;
 - parcela de venda e comissao precisam alimentar DRE, caixa previsto e relatorios por empresa corretamente;
+- nao preencher competencia DRE por conveniencia com a data de vencimento se a receita pertence a outro periodo;
 - nao usar empresa da conta bancaria futura para definir empresa do contrato; a conta aparece somente na baixa/recebimento.
 
 ### 15.3 Impacto gerencial

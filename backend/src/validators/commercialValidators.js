@@ -460,7 +460,7 @@ function normalizeParcelas(parcelas) {
 
     ensureAllowedKeys(
       item,
-      ['sequencia', 'descricao', 'tipo_parcela', 'forma_recebimento_prevista', 'periodicidade', 'reajuste_tipo', 'data_vencimento', 'valor', 'observacoes'],
+      ['sequencia', 'descricao', 'tipo_parcela', 'forma_recebimento_prevista', 'periodicidade', 'reajuste_tipo', 'data_vencimento', 'competencia_data', 'valor', 'observacoes'],
       `Parcela ${index + 1}`
     );
 
@@ -476,6 +476,7 @@ function normalizeParcelas(parcelas) {
       periodicidade: parseOptionalText(item.periodicidade, `Periodicidade da parcela ${index + 1}`, 30),
       reajuste_tipo: parseCommercialOption(item.reajuste_tipo, `Tipo de reajuste da parcela ${index + 1}`, { fallback: 'FIXA' }),
       data_vencimento: parseDateOnly(item.data_vencimento, `Vencimento da parcela ${index + 1}`, { required: true }),
+      competencia_data: parseDateOnly(item.competencia_data, `Competencia DRE da parcela ${index + 1}`, { required: true }),
       valor: parseDecimal(item.valor, `Valor da parcela ${index + 1}`, { required: true, min: 0.01 }),
       observacoes: parseOptionalText(item.observacoes, `Observacoes da parcela ${index + 1}`, 1000)
     };
@@ -605,6 +606,7 @@ function validateComercialContratoCreateBody(body = {}) {
       'indice_reajuste',
       'corretor_nome',
       'comissao_percentual',
+      'competencia_comissao_data',
       'possui_vaga_garagem',
       'quantidade_vagas_garagem',
       'vagas_garagem_posicao',
@@ -642,6 +644,7 @@ function validateComercialContratoCreateBody(body = {}) {
     indice_reajuste: parseOptionalText(body.indice_reajuste, 'Indice de reajuste', 60),
     corretor_nome: parseOptionalText(body.corretor_nome, 'Corretor', 160),
     comissao_percentual: parseDecimal(body.comissao_percentual, 'Comissao percentual', { min: 0 }),
+    competencia_comissao_data: parseDateOnly(body.competencia_comissao_data, 'Competencia DRE da comissao'),
     possui_vaga_garagem: parseBoolean(body.possui_vaga_garagem, 'Possui vaga de garagem') || false,
     quantidade_vagas_garagem: parseInteger(body.quantidade_vagas_garagem, 'Quantidade de vagas de garagem'),
     vagas_garagem_posicao: parseOptionalText(body.vagas_garagem_posicao, 'Posicao das vagas de garagem', 255),
@@ -664,6 +667,10 @@ function validateComercialContratoCreateBody(body = {}) {
     data.vagas_garagem_posicao = null;
   }
 
+  if (Number(data.comissao_percentual || 0) > 0 && !data.competencia_comissao_data) {
+    throw new ValidationError('Competencia DRE da comissao e obrigatoria quando houver comissao.');
+  }
+
   return data;
 }
 
@@ -680,6 +687,7 @@ function validateComercialContratoUpdateBody(body = {}) {
       'indice_reajuste',
       'corretor_nome',
       'comissao_percentual',
+      'competencia_comissao_data',
       'possui_vaga_garagem',
       'quantidade_vagas_garagem',
       'vagas_garagem_posicao',
@@ -710,6 +718,7 @@ function validateComercialContratoUpdateBody(body = {}) {
     indice_reajuste: parseOptionalText(body.indice_reajuste, 'Indice de reajuste', 60),
     corretor_nome: parseOptionalText(body.corretor_nome, 'Corretor', 160),
     comissao_percentual: parseDecimal(body.comissao_percentual, 'Comissao percentual', { min: 0 }),
+    competencia_comissao_data: parseDateOnly(body.competencia_comissao_data, 'Competencia DRE da comissao'),
     possui_vaga_garagem: parseBoolean(body.possui_vaga_garagem, 'Possui vaga de garagem'),
     quantidade_vagas_garagem: parseInteger(body.quantidade_vagas_garagem, 'Quantidade de vagas de garagem'),
     vagas_garagem_posicao: parseOptionalText(body.vagas_garagem_posicao, 'Posicao das vagas de garagem', 255),
@@ -750,7 +759,7 @@ function validateComercialContratoDistratoBody(body = {}) {
 function validateComercialContratoTrocaUnidadeBody(body = {}) {
   ensureAllowedKeys(
     body,
-    ['unidade_comercial_destino_id', 'novo_valor_total', 'data_efetiva', 'observacoes'],
+    ['unidade_comercial_destino_id', 'novo_valor_total', 'data_efetiva', 'competencia_data', 'observacoes'],
     'Troca de unidade do contrato comercial'
   );
 
@@ -758,6 +767,7 @@ function validateComercialContratoTrocaUnidadeBody(body = {}) {
     unidade_comercial_destino_id: parseInteger(body.unidade_comercial_destino_id, 'Nova unidade', { required: true }),
     novo_valor_total: parseDecimal(body.novo_valor_total, 'Novo valor total', { min: 0.01 }),
     data_efetiva: parseDateOnly(body.data_efetiva, 'Data efetiva'),
+    competencia_data: parseDateOnly(body.competencia_data, 'Competencia DRE do ajuste'),
     observacoes: parseOptionalText(body.observacoes, 'Observacoes', 4000)
   };
 }

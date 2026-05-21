@@ -109,6 +109,7 @@ function defaultForm() {
     indice_reajuste: '',
     corretor_nome: '',
     comissao_percentual: '',
+    competencia_comissao_data: '',
     possui_vaga_garagem: false,
     quantidade_vagas_garagem: '',
     vagas_garagem_posicao_especifica: false,
@@ -133,6 +134,7 @@ function defaultGenerator() {
     quantidade_parcelas: '12',
     valor_parcela: '',
     primeiro_vencimento: today(),
+    competencia_data: '',
     forma_recebimento_prevista: 'BOLETO',
     reajuste_tipo: 'FIXA',
     detalhe_forma_recebimento: '',
@@ -142,6 +144,7 @@ function defaultGenerator() {
         tipo_parcela: 'PARCELA',
         reajuste_tipo: 'FIXA',
         data_vencimento: today(),
+        competencia_data: '',
         valor: '',
         observacoes: ''
       }
@@ -162,6 +165,7 @@ function defaultTrocaForm() {
     unidade_comercial_destino_id: '',
     novo_valor_total: '',
     data_efetiva: today(),
+    competencia_data: '',
     observacoes: ''
   };
 }
@@ -385,6 +389,7 @@ function buildParcelaCustomizada(index = 1, overrides = {}) {
     tipo_parcela: 'PARCELA',
     reajuste_tipo: 'FIXA',
     data_vencimento: today(),
+    competencia_data: '',
     valor: '',
     observacoes: '',
     ...overrides
@@ -459,6 +464,7 @@ function pickEditForm(contrato = {}) {
     indice_reajuste: contrato.indice_reajuste || '',
     corretor_nome: contrato.corretor_nome || '',
     comissao_percentual: contrato.comissao_percentual || '',
+    competencia_comissao_data: contrato.competencia_comissao_data || '',
     possui_vaga_garagem: Boolean(contrato.possui_vaga_garagem),
     quantidade_vagas_garagem: contrato.quantidade_vagas_garagem ? String(contrato.quantidade_vagas_garagem) : '',
     vagas_garagem_posicao_especifica: Boolean(contrato.vagas_garagem_posicao),
@@ -543,8 +549,8 @@ function gerarParcelasDoBloco(plano = {}, planoId = '', periodicidades = PERIODI
 
   if (tipoModo === 'ENTRADA') {
     const valorEntrada = toNumber(plano.valor_parcela);
-    if (valorEntrada <= 0 || !plano.primeiro_vencimento) {
-      return { error: 'Informe valor e vencimento da entrada.' };
+    if (valorEntrada <= 0 || !plano.primeiro_vencimento || !plano.competencia_data) {
+      return { error: 'Informe valor, vencimento e competencia DRE da entrada.' };
     }
 
     const parcela = withPlanoMetadata({
@@ -553,6 +559,7 @@ function gerarParcelasDoBloco(plano = {}, planoId = '', periodicidades = PERIODI
       forma_recebimento_prevista: formaRecebimento,
       reajuste_tipo: plano.reajuste_tipo || 'FIXA',
       data_vencimento: plano.primeiro_vencimento,
+      competencia_data: plano.competencia_data,
       valor: valorEntrada.toFixed(2),
       observacoes: buildObservacoesParcela('', plano.detalhe_forma_recebimento)
     }, 0, 0);
@@ -571,13 +578,14 @@ function gerarParcelasDoBloco(plano = {}, planoId = '', periodicidades = PERIODI
         forma_recebimento_prevista: formaRecebimento,
         reajuste_tipo: item.reajuste_tipo || plano.reajuste_tipo || 'FIXA',
         data_vencimento: item.data_vencimento,
+        competencia_data: item.competencia_data,
         valor: toNumber(item.valor).toFixed(2),
         observacoes: buildObservacoesParcela(item.observacoes, plano.detalhe_forma_recebimento)
       }))
-      .filter((item) => item.data_vencimento && toNumber(item.valor) > 0);
+      .filter((item) => item.data_vencimento && item.competencia_data && toNumber(item.valor) > 0);
 
     if (!parcelas.length) {
-      return { error: 'Informe ao menos um lancamento manual com data e valor.' };
+      return { error: 'Informe ao menos um lancamento manual com vencimento, competencia DRE e valor.' };
     }
 
     return {
@@ -593,8 +601,8 @@ function gerarParcelasDoBloco(plano = {}, planoId = '', periodicidades = PERIODI
     : Math.max(0, Number(plano.quantidade_parcelas || 0));
   const valorParcela = toNumber(plano.valor_parcela);
 
-  if (!quantidade || valorParcela <= 0) {
-    return { error: 'Informe quantidade e valor validos para a composicao periodica.' };
+  if (!quantidade || valorParcela <= 0 || !plano.competencia_data) {
+    return { error: 'Informe quantidade, valor e primeira competencia DRE validos para a composicao periodica.' };
   }
 
   const parcelas = Array.from({ length: quantidade }).map((_, index) => withPlanoMetadata({
@@ -603,6 +611,7 @@ function gerarParcelasDoBloco(plano = {}, planoId = '', periodicidades = PERIODI
     forma_recebimento_prevista: formaRecebimento,
     reajuste_tipo: plano.reajuste_tipo || 'FIXA',
     data_vencimento: addMonths(plano.primeiro_vencimento || today(), index * intervalMonths),
+    competencia_data: addMonths(plano.competencia_data, index * intervalMonths),
     valor: valorParcela.toFixed(2),
     observacoes: buildObservacoesParcela('', plano.detalhe_forma_recebimento)
   }, index, intervalMonths));
@@ -737,7 +746,8 @@ export default function ComercialContratos() {
       const permitidas = new Set((categoriaConfig.contrato_venda_categoria_ids || []).map(Number));
       return categorias.filter((item) => {
         const compativel = ['RECEBER', 'AMBOS'].includes(String(item.tipo || '').toUpperCase());
-        return compativel && (!categoriaConfigLoaded || permitidas.has(Number(item.id)));
+        const classificadaDre = item?.considera_dre !== false && String(item?.dre_grupo || '').trim();
+        return compativel && classificadaDre && (!categoriaConfigLoaded || permitidas.has(Number(item.id)));
       });
     },
     [categorias, categoriaConfig.contrato_venda_categoria_ids, categoriaConfigLoaded]
@@ -748,7 +758,8 @@ export default function ComercialContratos() {
       const permitidas = new Set((categoriaConfig.comissao_categoria_ids || []).map(Number));
       return categorias.filter((item) => {
         const compativel = ['PAGAR', 'AMBOS'].includes(String(item.tipo || '').toUpperCase());
-        return compativel && (!categoriaConfigLoaded || permitidas.has(Number(item.id)));
+        const classificadaDre = item?.considera_dre !== false && String(item?.dre_grupo || '').trim();
+        return compativel && classificadaDre && (!categoriaConfigLoaded || permitidas.has(Number(item.id)));
       });
     },
     [categorias, categoriaConfig.comissao_categoria_ids, categoriaConfigLoaded]
@@ -1170,6 +1181,12 @@ export default function ComercialContratos() {
 
   async function handleTrocaUnidadeContrato() {
     if (!contratoSelecionado?.id) return;
+    const novoValor = toNumber(trocaForm.novo_valor_total);
+    const valorAtual = toNumber(contratoSelecionado.valor_total);
+    if (novoValor > valorAtual && !hasText(trocaForm.competencia_data)) {
+      setError('Informe a competencia DRE do ajuste quando a troca aumentar o valor do contrato.');
+      return;
+    }
     try {
       setProcessingAction('troca');
       setError('');
@@ -1449,6 +1466,7 @@ export default function ComercialContratos() {
     if (!hasText(form.corretor_nome)) camposFaltando.push('Corretor no contrato');
     if (!hasText(form.categoria_financeira_comissao_id)) camposFaltando.push('Categoria comissao');
     if (!hasText(form.comissao_percentual) || toNumber(form.comissao_percentual) <= 0) camposFaltando.push('Comissao %');
+    if (!hasText(form.competencia_comissao_data)) camposFaltando.push('Competencia DRE da comissao');
     if (!hasText(form.valor_total) || roundCurrency(form.valor_total) <= 0) camposFaltando.push('Valor total');
     if (form.possui_vaga_garagem && (!hasText(form.quantidade_vagas_garagem) || Number(form.quantidade_vagas_garagem) <= 0)) camposFaltando.push('Quantidade de vagas');
     if (form.possui_vaga_garagem && form.vagas_garagem_posicao_especifica && !hasText(form.vagas_garagem_posicao)) camposFaltando.push('Posicao das vagas');
@@ -1468,6 +1486,7 @@ export default function ComercialContratos() {
         || !hasText(item.forma_recebimento_prevista)
         || !hasText(item.reajuste_tipo)
         || !hasText(item.data_vencimento)
+        || !hasText(item.competencia_data)
         || roundCurrency(item.valor || item.valor_original) <= 0
       );
       if (parcelaIncompleta) camposFaltando.push('Dados das parcelas');
@@ -1512,6 +1531,7 @@ export default function ComercialContratos() {
           indice_reajuste: form.indice_reajuste || undefined,
           corretor_nome: form.corretor_nome || undefined,
           comissao_percentual: form.comissao_percentual || undefined,
+          competencia_comissao_data: form.competencia_comissao_data || undefined,
           possui_vaga_garagem: Boolean(form.possui_vaga_garagem),
           quantidade_vagas_garagem: form.possui_vaga_garagem ? Number(form.quantidade_vagas_garagem || 0) : null,
           vagas_garagem_posicao: form.possui_vaga_garagem && form.vagas_garagem_posicao_especifica ? form.vagas_garagem_posicao || null : null,
@@ -1546,6 +1566,7 @@ export default function ComercialContratos() {
           indice_reajuste: form.indice_reajuste || undefined,
           corretor_nome: form.corretor_nome || undefined,
           comissao_percentual: form.comissao_percentual || undefined,
+          competencia_comissao_data: form.competencia_comissao_data || undefined,
           possui_vaga_garagem: Boolean(form.possui_vaga_garagem),
           quantidade_vagas_garagem: form.possui_vaga_garagem ? Number(form.quantidade_vagas_garagem || 0) : null,
           vagas_garagem_posicao: form.possui_vaga_garagem && form.vagas_garagem_posicao_especifica ? form.vagas_garagem_posicao || null : null,
@@ -1564,6 +1585,7 @@ export default function ComercialContratos() {
             periodicidade: item.plano_periodicidade || item.periodicidade || undefined,
             reajuste_tipo: item.reajuste_tipo || 'FIXA',
             data_vencimento: item.data_vencimento,
+            competencia_data: item.competencia_data,
             valor: item.valor || item.valor_original,
             observacoes: item.observacoes || undefined
           }))
@@ -1747,9 +1769,12 @@ export default function ComercialContratos() {
             <label className="sol-filter-field">
               <span className="sol-filter-label">Categoria financeira</span>
               <select className="input w-full" value={form.categoria_financeira_id} onChange={(e) => setForm((c) => ({ ...c, categoria_financeira_id: e.target.value }))}>
-                <option value="">Nao vincular</option>
-                {categoriasCompativeis.map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}
+                <option value="">Selecione uma categoria de receita DRE</option>
+                {categoriasCompativeis.map((item) => <option key={item.id} value={item.id}>{item.nome}{item.dre_grupo ? ` - ${item.dre_grupo}` : ''}</option>)}
               </select>
+              {!categoriasCompativeis.length ? (
+                <span className="mt-1 text-xs text-amber-600">Cadastre/libere uma categoria RECEBER/AMBOS marcada para DRE e com grupo DRE.</span>
+              ) : null}
             </label>
           </div>
           <div className="grid gap-3 md:grid-cols-4">
@@ -1833,9 +1858,16 @@ export default function ComercialContratos() {
             <label className="sol-filter-field">
               <span className="sol-filter-label">Categoria comissao</span>
               <select className="input w-full" value={form.categoria_financeira_comissao_id} onChange={(e) => setForm((c) => ({ ...c, categoria_financeira_comissao_id: e.target.value }))}>
-                <option value="">Nao vincular</option>
-                {categoriasCompativeisPagar.map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}
+                <option value="">Selecione uma categoria de comissao DRE</option>
+                {categoriasCompativeisPagar.map((item) => <option key={item.id} value={item.id}>{item.nome}{item.dre_grupo ? ` - ${item.dre_grupo}` : ''}</option>)}
               </select>
+              {!categoriasCompativeisPagar.length ? (
+                <span className="mt-1 text-xs text-amber-600">Cadastre/libere uma categoria PAGAR/AMBOS marcada para DRE e com grupo DRE.</span>
+              ) : null}
+            </label>
+            <label className="sol-filter-field">
+              <span className="sol-filter-label">Competencia DRE comissao</span>
+              <input className="input w-full" type="date" value={form.competencia_comissao_data} onChange={(e) => setForm((c) => ({ ...c, competencia_comissao_data: e.target.value }))} />
             </label>
           </div>
           <div className="grid gap-3 md:grid-cols-4">
@@ -2010,7 +2042,7 @@ export default function ComercialContratos() {
               )}
 
               {getModoComposicaoTipo(generator.modo) === 'ENTRADA' ? (
-                <div className="grid gap-3 md:grid-cols-2">
+                <div className="grid gap-3 md:grid-cols-3">
                   <label className="sol-filter-field">
                     <span className="sol-filter-label">Valor da entrada</span>
                     <input className="input w-full" inputMode="decimal" value={generator.valor_parcela} onChange={(e) => setGenerator((c) => ({ ...c, valor_parcela: normalizeCurrencyTyping(e.target.value) }))} onBlur={(e) => setGenerator((c) => ({ ...c, valor_parcela: formatCurrencyInput(e.target.value) }))} placeholder="R$ 0,00" />
@@ -2019,9 +2051,13 @@ export default function ComercialContratos() {
                     <span className="sol-filter-label">Vencimento da entrada</span>
                     <input className="input w-full" type="date" value={generator.primeiro_vencimento} onChange={(e) => setGenerator((c) => ({ ...c, primeiro_vencimento: e.target.value }))} />
                   </label>
+                  <label className="sol-filter-field">
+                    <span className="sol-filter-label">Competencia DRE</span>
+                    <input className="input w-full" type="date" value={generator.competencia_data} onChange={(e) => setGenerator((c) => ({ ...c, competencia_data: e.target.value }))} />
+                  </label>
                 </div>
               ) : getModoComposicaoTipo(generator.modo) === 'PERIODICO' ? (
-                <div className="grid gap-3 md:grid-cols-4">
+                <div className="grid gap-3 md:grid-cols-5">
                   <label className="sol-filter-field">
                     <span className="sol-filter-label">Periodicidade</span>
                   <select className="input w-full" value={generator.periodicidade} onChange={(e) => setGenerator((c) => ({ ...c, periodicidade: e.target.value, quantidade_parcelas: e.target.value === 'AVISTA' ? '1' : c.quantidade_parcelas }))}>
@@ -2040,6 +2076,10 @@ export default function ComercialContratos() {
                     <span className="sol-filter-label">Primeiro vencimento</span>
                     <input className="input w-full" type="date" value={generator.primeiro_vencimento} onChange={(e) => setGenerator((c) => ({ ...c, primeiro_vencimento: e.target.value }))} />
                   </label>
+                  <label className="sol-filter-field">
+                    <span className="sol-filter-label">Primeira competencia DRE</span>
+                    <input className="input w-full" type="date" value={generator.competencia_data} onChange={(e) => setGenerator((c) => ({ ...c, competencia_data: e.target.value }))} />
+                  </label>
                 </div>
               ) : (
                 <div className="space-y-3 rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4">
@@ -2057,7 +2097,7 @@ export default function ComercialContratos() {
 
                   <div className="space-y-3">
                     {(generator.parcelas_personalizadas || []).map((item, index) => (
-                      <div key={`custom-${index}`} className="grid gap-3 rounded-2xl border border-[var(--c-border)] p-3 md:grid-cols-[minmax(0,1.4fr)_160px_160px_170px_160px_auto]">
+                      <div key={`custom-${index}`} className="grid gap-3 rounded-2xl border border-[var(--c-border)] p-3 md:grid-cols-[minmax(0,1.4fr)_150px_150px_160px_160px_150px_auto]">
                         <label className="sol-filter-field">
                           <span className="sol-filter-label">Descricao</span>
                           <input className="input w-full" value={item.descricao} onChange={(e) => updateParcelaCustomizada(index, 'descricao', e.target.value)} />
@@ -2077,6 +2117,10 @@ export default function ComercialContratos() {
                         <label className="sol-filter-field">
                           <span className="sol-filter-label">Vencimento</span>
                           <input className="input w-full" type="date" value={item.data_vencimento} onChange={(e) => updateParcelaCustomizada(index, 'data_vencimento', e.target.value)} />
+                        </label>
+                        <label className="sol-filter-field">
+                          <span className="sol-filter-label">Competencia DRE</span>
+                          <input className="input w-full" type="date" value={item.competencia_data || ''} onChange={(e) => updateParcelaCustomizada(index, 'competencia_data', e.target.value)} />
                         </label>
                         <label className="sol-filter-field">
                           <span className="sol-filter-label">Valor</span>
@@ -2161,6 +2205,7 @@ export default function ComercialContratos() {
                         <th className="px-3 py-3 text-left">Reajuste</th>
                         <th className="px-3 py-3 text-left">Detalhe</th>
                         <th className="px-3 py-3 text-left">Vencimento</th>
+                        <th className="px-3 py-3 text-left">Competencia DRE</th>
                         <th className="px-3 py-3 text-right">Valor</th>
                         <th className="px-3 py-3 text-right">Acoes</th>
                       </tr>
@@ -2224,6 +2269,13 @@ export default function ComercialContratos() {
                                   <input className="input w-full" type="date" value={item.data_vencimento} onChange={(e) => updateParcela(index, 'data_vencimento', e.target.value)} />
                                 ) : (
                                   <span className="text-[var(--c-muted)]">{formatDate(item.data_vencimento)}</span>
+                                )}
+                              </td>
+                              <td className="px-3 py-3">
+                                {isEditing ? (
+                                  <input className="input w-full" type="date" value={item.competencia_data || ''} onChange={(e) => updateParcela(index, 'competencia_data', e.target.value)} />
+                                ) : (
+                                  <span className="text-[var(--c-muted)]">{formatDate(item.competencia_data)}</span>
                                 )}
                               </td>
                               <td className="px-3 py-3 text-right">
@@ -2377,6 +2429,9 @@ export default function ComercialContratos() {
                   ? `${Number(contratoSelecionado.comissao_percentual).toLocaleString('pt-BR')}%`
                   : '-'}
               </div>
+              <div className="mt-1 text-xs text-[var(--c-muted)]">
+                Competencia DRE: {formatDate(contratoSelecionado.competencia_comissao_data)}
+              </div>
             </div>
             <div className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4">
               <div className="text-xs uppercase tracking-[0.18em] text-[var(--c-muted)]">Categoria comissao</div>
@@ -2456,7 +2511,7 @@ export default function ComercialContratos() {
             </div>
 
             {showTroca && (
-              <div className="grid gap-3 rounded-2xl border border-[var(--c-border)] bg-[var(--c-bg)] p-4 md:grid-cols-4">
+              <div className="grid gap-3 rounded-2xl border border-[var(--c-border)] bg-[var(--c-bg)] p-4 md:grid-cols-5">
                 <label className="sol-filter-field">
                   <span className="sol-filter-label">Nova unidade</span>
                   <select className="input w-full" value={trocaForm.unidade_comercial_destino_id} onChange={(e) => setTrocaForm((current) => ({ ...current, unidade_comercial_destino_id: e.target.value }))}>
@@ -2473,10 +2528,14 @@ export default function ComercialContratos() {
                   <input className="input w-full" type="date" value={trocaForm.data_efetiva} onChange={(e) => setTrocaForm((current) => ({ ...current, data_efetiva: e.target.value }))} />
                 </label>
                 <label className="sol-filter-field">
+                  <span className="sol-filter-label">Competencia DRE do ajuste</span>
+                  <input className="input w-full" type="date" value={trocaForm.competencia_data} onChange={(e) => setTrocaForm((current) => ({ ...current, competencia_data: e.target.value }))} />
+                </label>
+                <label className="sol-filter-field">
                   <span className="sol-filter-label">Observacoes</span>
                   <input className="input w-full" value={trocaForm.observacoes} onChange={(e) => setTrocaForm((current) => ({ ...current, observacoes: e.target.value }))} />
                 </label>
-                <div className="md:col-span-4">
+                <div className="md:col-span-5">
                   <button type="button" className="btn btn-primary" onClick={handleTrocaUnidadeContrato} disabled={processingAction === 'troca'}>
                     {processingAction === 'troca' ? 'Aplicando troca...' : 'Confirmar troca de unidade'}
                   </button>
@@ -2617,6 +2676,7 @@ export default function ComercialContratos() {
                   <th className="px-4 py-3 text-left">Reajuste</th>
                   <th className="px-4 py-3 text-left">Detalhe</th>
                   <th className="px-4 py-3 text-left">Vencimento</th>
+                  <th className="px-4 py-3 text-left">Competencia DRE</th>
                   <th className="px-4 py-3 text-right">Valor</th>
                   <th className="px-4 py-3 text-left">Status financeiro</th>
                   <th className="px-4 py-3 text-right">Acao</th>
@@ -2631,6 +2691,7 @@ export default function ComercialContratos() {
                     <td className="px-4 py-3 text-[var(--c-text)]">{String(parcela.reajuste_tipo || 'FIXA') === 'REAJUSTAVEL' ? 'Reajustavel (R)' : 'Fixa (F)'}</td>
                     <td className="px-4 py-3 text-[var(--c-text)]">{parcela.observacoes || '-'}</td>
                     <td className="px-4 py-3 text-[var(--c-text)]">{formatDate(parcela.data_vencimento)}</td>
+                    <td className="px-4 py-3 text-[var(--c-text)]">{formatDate(parcela.competencia_data || parcela.tituloFinanceiro?.competencia_data)}</td>
                     <td className="px-4 py-3 text-right text-[var(--c-text)]">{formatCurrency(parcela.valor_original)}</td>
                     <td className="px-4 py-3">
                       <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${statusClass(parcela.tituloFinanceiro?.status || 'ABERTO')}`}>

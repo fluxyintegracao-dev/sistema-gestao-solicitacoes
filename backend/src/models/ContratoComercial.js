@@ -78,6 +78,10 @@ module.exports = (sequelize, DataTypes) => sequelize.define(
       type: DataTypes.DECIMAL(8, 2),
       allowNull: true
     },
+    competencia_comissao_data: {
+      type: DataTypes.DATEONLY,
+      allowNull: true
+    },
     possui_vaga_garagem: {
       type: DataTypes.BOOLEAN,
       allowNull: false,

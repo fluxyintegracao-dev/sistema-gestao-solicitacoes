@@ -204,16 +204,16 @@ function buildContratoInclude({ includeParcelas = false } = {}) {
       as: 'obra',
       attributes: ['id', 'nome', 'codigo', 'empresa_grupo_id']
     },
-    {
-      model: CategoriaFinanceira,
-      as: 'categoriaFinanceira',
-      attributes: ['id', 'nome', 'tipo']
-    },
-    {
-      model: CategoriaFinanceira,
-      as: 'categoriaFinanceiraComissao',
-      attributes: ['id', 'nome', 'tipo']
-    },
+  {
+    model: CategoriaFinanceira,
+    as: 'categoriaFinanceira',
+    attributes: ['id', 'nome', 'tipo', 'dre_grupo', 'dre_subgrupo', 'considera_dre']
+  },
+  {
+    model: CategoriaFinanceira,
+    as: 'categoriaFinanceiraComissao',
+    attributes: ['id', 'nome', 'tipo', 'dre_grupo', 'dre_subgrupo', 'considera_dre']
+  },
     {
       model: TituloFinanceiro,
       as: 'tituloFinanceiroComissao',
@@ -258,6 +258,8 @@ function buildContratoInclude({ includeParcelas = false } = {}) {
             'valor_saldo',
             'valor_baixado',
             'empresa_id',
+            'competencia_data',
+            'considera_dre',
             'data_vencimento',
             'data_quitacao'
           ]
@@ -345,7 +347,7 @@ function getEmpresaObraParaTitulo(obra, contexto = 'obra') {
 
 async function ensureCategoriaFinanceiraReceber(categoriaId) {
   if (!categoriaId) {
-    return null;
+    throw createHttpError(400, 'Categoria financeira e obrigatoria para contratos comerciais.');
   }
 
   const categoria = await CategoriaFinanceira.findByPk(categoriaId);
@@ -358,12 +360,20 @@ async function ensureCategoriaFinanceiraReceber(categoriaId) {
     throw createHttpError(400, 'Categoria financeira incompativel com contratos comerciais.');
   }
 
+  if (categoria.considera_dre === false) {
+    throw createHttpError(400, 'A categoria financeira do contrato comercial precisa estar marcada para DRE.');
+  }
+
+  if (!String(categoria.dre_grupo || '').trim()) {
+    throw createHttpError(400, 'A categoria financeira do contrato comercial precisa ter grupo DRE classificado.');
+  }
+
   return categoria;
 }
 
 async function ensureCategoriaFinanceiraPagar(categoriaId) {
   if (!categoriaId) {
-    return null;
+    throw createHttpError(400, 'Categoria financeira da comissao e obrigatoria para gerar titulo de comissao.');
   }
 
   const categoria = await CategoriaFinanceira.findByPk(categoriaId);
@@ -374,6 +384,14 @@ async function ensureCategoriaFinanceiraPagar(categoriaId) {
   const tipo = String(categoria.tipo || '').trim().toUpperCase();
   if (!['PAGAR', 'AMBOS'].includes(tipo)) {
     throw createHttpError(400, 'Categoria financeira da comissao incompativel com contas a pagar.');
+  }
+
+  if (categoria.considera_dre === false) {
+    throw createHttpError(400, 'A categoria financeira da comissao precisa estar marcada para DRE.');
+  }
+
+  if (!String(categoria.dre_grupo || '').trim()) {
+    throw createHttpError(400, 'A categoria financeira da comissao precisa ter grupo DRE classificado.');
   }
 
   return categoria;
@@ -1283,7 +1301,10 @@ function buildTituloContratoPayload({ contrato, parcela, categoriaFinanceiraId, 
     obra_id: contrato.obra_id,
     empresa_id: Number(empresaId),
     parceiro_id: contrato.parceiro_id,
-    categoria_financeira_id: categoriaFinanceiraId || null,
+    categoria_financeira_id: categoriaFinanceiraId,
+    competencia_data: parcela.competencia_data,
+    considera_dre: true,
+    origem_titulo: 'COMERCIAL',
     tipo: 'RECEBER',
     status: 'ABERTO',
     descricao: `${contrato.numero} - ${parcela.descricao}`.slice(0, 255),
@@ -1314,13 +1335,19 @@ function buildTituloComissaoPayload({ contrato, corretorParceiro, categoriaFinan
   }
 
   const valorComissao = calcularValorComissao(contrato.valor_total, contrato.comissao_percentual);
+  if (!contrato.competencia_comissao_data) {
+    throw createHttpError(400, 'Competencia DRE da comissao e obrigatoria para gerar titulo de comissao.');
+  }
 
   return {
     solicitacao_id: null,
     obra_id: contrato.obra_id,
     empresa_id: Number(empresaId),
     parceiro_id: corretorParceiro.id,
-    categoria_financeira_id: categoriaFinanceiraId || null,
+    categoria_financeira_id: categoriaFinanceiraId,
+    competencia_data: contrato.competencia_comissao_data,
+    considera_dre: true,
+    origem_titulo: 'COMERCIAL',
     tipo: 'PAGAR',
     status: 'ABERTO',
     descricao: `Comissao de corretagem - ${contrato.numero}`.slice(0, 255),
@@ -1378,6 +1405,9 @@ async function sincronizarTituloComissao({
     return tituloExistente;
   }
 
+  await ensureCategoriaFinanceiraPagar(categoriaFinanceiraComissaoId);
+  await ensureCategoriaPermitidaNoComercial(categoriaFinanceiraComissaoId, 'comissao');
+
   const payload = buildTituloComissaoPayload({
     contrato,
     corretorParceiro,
@@ -1408,6 +1438,9 @@ async function sincronizarTituloComissao({
     parceiro_id: payload.parceiro_id,
     empresa_id: payload.empresa_id,
     categoria_financeira_id: payload.categoria_financeira_id,
+    competencia_data: payload.competencia_data,
+    considera_dre: payload.considera_dre,
+    origem_titulo: payload.origem_titulo,
     descricao: payload.descricao,
     numero_documento: payload.numero_documento,
     valor_original: payload.valor_original,
@@ -1433,10 +1466,8 @@ async function criarContratoComercial(req, payload = {}) {
     ensureCompradoresClientes(compradoresNormalizados)
   ]);
 
-  if (payload.categoria_financeira_id) {
-    await ensureCategoriaFinanceiraReceber(payload.categoria_financeira_id);
-    await ensureCategoriaPermitidaNoComercial(payload.categoria_financeira_id, 'contrato');
-  }
+  await ensureCategoriaFinanceiraReceber(payload.categoria_financeira_id);
+  await ensureCategoriaPermitidaNoComercial(payload.categoria_financeira_id, 'contrato');
 
   if (payload.categoria_financeira_comissao_id) {
     await ensureCategoriaFinanceiraPagar(payload.categoria_financeira_comissao_id);
@@ -1482,6 +1513,7 @@ async function criarContratoComercial(req, payload = {}) {
       indice_reajuste: payload.indice_reajuste || null,
       corretor_nome: payload.corretor_nome || corretorParceiro?.nome || null,
       comissao_percentual: payload.comissao_percentual ?? null,
+      competencia_comissao_data: payload.competencia_comissao_data || null,
       possui_vaga_garagem: Boolean(payload.possui_vaga_garagem),
       quantidade_vagas_garagem: payload.possui_vaga_garagem ? (payload.quantidade_vagas_garagem || null) : null,
       vagas_garagem_posicao: payload.possui_vaga_garagem ? (payload.vagas_garagem_posicao || null) : null,
@@ -1524,6 +1556,7 @@ async function criarContratoComercial(req, payload = {}) {
         periodicidade: parcela.periodicidade || null,
         reajuste_tipo: parcela.reajuste_tipo || 'FIXA',
         data_vencimento: parcela.data_vencimento,
+        competencia_data: parcela.competencia_data,
         valor_original: roundCurrency(parcela.valor),
         observacoes: parcela.observacoes || null
       }, { transaction });
@@ -1584,7 +1617,7 @@ async function atualizarContratoComercial(req, id, payload = {}) {
     ? await ensureCompradoresClientes(normalizarCompradoresPayload(payload.compradores, contrato.parceiro_id))
     : null;
 
-  if (payload.categoria_financeira_id) {
+  if (Object.prototype.hasOwnProperty.call(payload, 'categoria_financeira_id')) {
     await ensureCategoriaFinanceiraReceber(payload.categoria_financeira_id);
     await ensureCategoriaPermitidaNoComercial(payload.categoria_financeira_id, 'contrato');
   }
@@ -1931,6 +1964,10 @@ async function trocarUnidadeContratoComercial(req, id, payload = {}) {
   const novoValorTotal = payload.novo_valor_total != null ? roundCurrency(payload.novo_valor_total) : valorAtual;
   const diferenca = roundCurrency(novoValorTotal - valorAtual);
   const dataEfetiva = payload.data_efetiva || getToday();
+  const competenciaAjuste = payload.competencia_data || null;
+  if (diferenca > 0 && !competenciaAjuste) {
+    throw createHttpError(400, 'Competencia DRE do ajuste e obrigatoria quando a troca de unidade aumenta o valor do contrato.');
+  }
   const observacoesTroca = mergeObservacoes(
     payload.observacoes,
     `Troca de unidade: ${contrato.unidadeComercial?.codigo || contrato.unidade_comercial_id} -> ${unidadeDestino.codigo}`
@@ -1959,6 +1996,7 @@ async function trocarUnidadeContratoComercial(req, id, payload = {}) {
         forma_recebimento_prevista: 'OUTROS',
         reajuste_tipo: 'FIXA',
         data_vencimento: dataEfetiva,
+        competencia_data: competenciaAjuste,
         valor: diferenca,
         observacoes: observacoesTroca
       };
@@ -1988,6 +2026,7 @@ async function trocarUnidadeContratoComercial(req, id, payload = {}) {
         forma_recebimento_prevista: parcelaAjuste.forma_recebimento_prevista,
         reajuste_tipo: parcelaAjuste.reajuste_tipo,
         data_vencimento: parcelaAjuste.data_vencimento,
+        competencia_data: parcelaAjuste.competencia_data,
         valor_original: roundCurrency(parcelaAjuste.valor),
         observacoes: parcelaAjuste.observacoes
       }, { transaction });

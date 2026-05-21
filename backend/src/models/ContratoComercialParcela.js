@@ -44,6 +44,10 @@ module.exports = (sequelize, DataTypes) => sequelize.define(
       type: DataTypes.DATEONLY,
       allowNull: false
     },
+    competencia_data: {
+      type: DataTypes.DATEONLY,
+      allowNull: true
+    },
     valor_original: {
       type: DataTypes.DECIMAL(14, 2),
       allowNull: false
