@@ -101,6 +101,27 @@ async function validarContaBancaria(contaBancariaId) {
   return conta;
 }
 
+async function validarEmpresaConciliacaoComConta(conciliacao, { transaction = null } = {}) {
+  const conta = await ContaBancaria.findByPk(conciliacao.conta_bancaria_id, { transaction });
+  if (!conta || conta.ativo === false) {
+    throw createHttpError(400, 'Conta bancaria da conciliacao invalida ou inativa.');
+  }
+
+  const empresaConciliacaoId = conciliacao.empresa_id ? Number(conciliacao.empresa_id) : null;
+  const empresaContaId = conta.empresa_id ? Number(conta.empresa_id) : null;
+  if (!empresaConciliacaoId) {
+    throw createHttpError(400, 'Lancamento bancario sem empresa vinculada. Reimporte o OFX apos corrigir a conta bancaria.');
+  }
+  if (!empresaContaId) {
+    throw createHttpError(400, 'Conta bancaria da conciliacao sem empresa vinculada.');
+  }
+  if (empresaConciliacaoId !== empresaContaId) {
+    throw createHttpError(400, 'A empresa do lancamento bancario deve ser a mesma vinculada a conta bancaria.');
+  }
+
+  return { conta, empresaId: empresaConciliacaoId };
+}
+
 function decodeOfxBuffer(buffer) {
   const headerSnippet = buffer.toString('latin1', 0, Math.min(buffer.length, 2048));
   const encoding = (headerSnippet.match(/ENCODING:([^\r\n]+)/i)?.[1] || '').trim().toUpperCase();
@@ -1268,6 +1289,7 @@ async function confirmarConciliacaoTransferencia(req, conciliacaoId, payload = {
     if (contaAtualId === contaContraparteId) {
       throw createHttpError(400, 'A conta contraparte deve ser diferente da conta do lancamento bancario.');
     }
+    await validarEmpresaConciliacaoComConta(conciliacao, { transaction });
 
     const valor = roundCurrency(Math.abs(Number(conciliacao.valor || 0)));
     if (valor <= 0) {
@@ -1364,22 +1386,7 @@ async function confirmarConciliacaoTarifa(req, conciliacaoId, payload = {}) {
       throw createHttpError(400, 'Tarifas bancarias devem ser conciliadas em lancamentos de saida da conta.');
     }
 
-    const conta = await ContaBancaria.findByPk(conciliacao.conta_bancaria_id, { transaction });
-    if (!conta || conta.ativo === false) {
-      throw createHttpError(400, 'Conta bancaria da conciliacao invalida ou inativa.');
-    }
-
-    const empresaConciliacaoId = conciliacao.empresa_id ? Number(conciliacao.empresa_id) : null;
-    const empresaContaId = conta.empresa_id ? Number(conta.empresa_id) : null;
-    if (!empresaConciliacaoId) {
-      throw createHttpError(400, 'Lancamento bancario sem empresa vinculada. Reimporte o OFX apos corrigir a conta bancaria.');
-    }
-    if (!empresaContaId) {
-      throw createHttpError(400, 'Conta bancaria da conciliacao sem empresa vinculada.');
-    }
-    if (empresaConciliacaoId !== empresaContaId) {
-      throw createHttpError(400, 'A empresa do lancamento bancario deve ser a mesma vinculada a conta bancaria.');
-    }
+    const { conta, empresaId: empresaConciliacaoId } = await validarEmpresaConciliacaoComConta(conciliacao, { transaction });
 
     const valor = roundCurrency(Math.abs(valorBanco));
     if (valor <= 0) {

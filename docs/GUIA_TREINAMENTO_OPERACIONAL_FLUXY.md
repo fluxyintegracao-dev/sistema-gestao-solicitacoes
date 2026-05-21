@@ -1092,6 +1092,7 @@ Cuidados:
 
 - a conta bancaria escolhida para importar OFX precisa estar vinculada a empresa do grupo;
 - o lancamento bancario importado carrega a empresa da conta bancaria, sem fallback por titulo, parceiro ou descricao;
+- ao conciliar como transferencia, a empresa do lancamento OFX precisa continuar igual a empresa da conta importada;
 - ao confirmar conciliacao, o movimento financeiro precisa ser da mesma conta e da mesma empresa do lancamento bancario;
 - tarifa bancaria conciliada usa a empresa do lancamento bancario e exige que essa empresa seja a mesma da conta;
 - OFX nao deve criar baixa automaticamente sem conferencia;
