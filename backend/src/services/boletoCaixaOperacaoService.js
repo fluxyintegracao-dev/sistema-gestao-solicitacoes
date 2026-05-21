@@ -43,13 +43,16 @@ function boletoParaCnab(boleto) {
   };
 }
 
-function validarBoletosParaRemessa(boletos = []) {
+function validarBoletosParaRemessa(boletos = [], { convenio = null } = {}) {
   const erros = [];
   const nossosNumeros = new Set();
+  const empresaConvenioId = convenio?.empresa_id ? Number(convenio.empresa_id) : null;
 
   boletos.forEach((boleto) => {
     const plain = typeof boleto.get === 'function' ? boleto.get({ plain: true }) : boleto;
     const label = `Boleto ${plain.id || plain.nosso_numero_base || ''}`.trim();
+    const empresaBoletoId = plain.empresa_id ? Number(plain.empresa_id) : null;
+    const empresaTituloId = plain.titulo?.empresa_id ? Number(plain.titulo.empresa_id) : null;
 
     if (!plain.nosso_numero_base && !plain.nosso_numero) {
       erros.push(`${label}: nosso numero ausente.`);
@@ -77,11 +80,53 @@ function validarBoletosParaRemessa(boletos = []) {
     if (plain.status_bancario && !['NAO_REMETIDO', 'REJEITADO'].includes(plain.status_bancario)) {
       erros.push(`${label}: status bancario ${plain.status_bancario} nao permite nova remessa de entrada.`);
     }
+
+    if (!empresaBoletoId) {
+      erros.push(`${label}: empresa do boleto ausente.`);
+    }
+
+    if (!empresaTituloId) {
+      erros.push(`${label}: empresa do titulo ausente.`);
+    }
+
+    if (empresaBoletoId && empresaTituloId && empresaBoletoId !== empresaTituloId) {
+      erros.push(`${label}: empresa do boleto difere da empresa do titulo.`);
+    }
+
+    if (empresaConvenioId && empresaBoletoId && empresaBoletoId !== empresaConvenioId) {
+      erros.push(`${label}: empresa do boleto difere da empresa do convenio Caixa.`);
+    }
   });
 
   return {
     valido: erros.length === 0,
     erros
+  };
+}
+
+async function validarConvenioOperacionalCaixa(convenio, transaction) {
+  if (!convenio?.empresa_id) {
+    throw new Error('Convenio Caixa precisa estar vinculado a empresa do grupo antes da operacao bancaria.');
+  }
+
+  if (!convenio.conta_bancaria_id) {
+    throw new Error('Convenio Caixa precisa estar vinculado a conta bancaria antes da operacao bancaria.');
+  }
+
+  const contaBancaria = await carregarContaBancaria(convenio.conta_bancaria_id, { transaction });
+  if (!contaBancaria.empresa_id) {
+    throw new Error('Conta bancaria do convenio Caixa precisa estar vinculada a empresa do grupo.');
+  }
+
+  const empresaConvenioId = Number(convenio.empresa_id);
+  const empresaContaId = Number(contaBancaria.empresa_id);
+  if (empresaConvenioId !== empresaContaId) {
+    throw new Error('Empresa do convenio Caixa deve ser a mesma empresa vinculada a conta bancaria.');
+  }
+
+  return {
+    empresaId: empresaConvenioId,
+    contaBancaria
   };
 }
 
@@ -432,6 +477,7 @@ async function gerarRemessaParaBoletosCaixa({ convenioId, boletoIds, tituloIds, 
     if (!convenio || !convenio.ativo) {
       throw new Error('Convenio Caixa ativo nao encontrado.');
     }
+    const { empresaId: empresaConvenioId } = await validarConvenioOperacionalCaixa(convenio, transaction);
 
     const whereBoletos = boletoIdList.length
       ? { id: boletoIdList }
@@ -452,7 +498,7 @@ async function gerarRemessaParaBoletosCaixa({ convenioId, boletoIds, tituloIds, 
       throw new Error('Um ou mais boletos selecionados nao foram encontrados.');
     }
 
-    const validacao = validarBoletosParaRemessa(boletos);
+    const validacao = validarBoletosParaRemessa(boletos, { convenio });
     if (!validacao.valido) {
       throw new Error(validacao.erros.join(' '));
     }
@@ -473,7 +519,7 @@ async function gerarRemessaParaBoletosCaixa({ convenioId, boletoIds, tituloIds, 
     const remessa = await BoletoCaixaRemessa.create(
       {
         convenio_id: convenio.id,
-        empresa_id: convenio.empresa_id,
+        empresa_id: empresaConvenioId,
         numero_remessa: numeroRemessa,
         nome_arquivo: nomeArquivoRemessa(numeroRemessa, generatedAt),
         status: 'GERADA',
@@ -800,6 +846,7 @@ async function importarRetornoCnab240Caixa({ convenioId, content, nomeArquivo, u
     if (!convenio) {
       throw new Error('Convenio Caixa nao encontrado para importar retorno.');
     }
+    const { empresaId: empresaConvenioId } = await validarConvenioOperacionalCaixa(convenio, transaction);
 
     const valorLiquidado = parsed.ocorrencias
       .filter((ocorrencia) => ocorrencia.tipo === 'LIQUIDACAO')
@@ -808,7 +855,7 @@ async function importarRetornoCnab240Caixa({ convenioId, content, nomeArquivo, u
     const retorno = await BoletoCaixaRetorno.create(
       {
         convenio_id: convenio.id,
-        empresa_id: convenio.empresa_id,
+        empresa_id: empresaConvenioId,
         nome_arquivo: nomeArquivo || 'RETORNO_CAIXA.RET',
         status: 'IMPORTADO',
         arquivo_hash: parsed.hash,

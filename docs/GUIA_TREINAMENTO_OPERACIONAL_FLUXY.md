@@ -1007,6 +1007,32 @@ Regras:
 - se o convenio Caixa estiver vinculado a uma empresa diferente, corrigir o convenio ou o titulo antes de emitir;
 - a baixa pelo retorno bancario continua validando conta, convenio e titulo separadamente.
 
+### 11.5.3 Remessa e retorno Caixa
+
+Antes de gerar remessa Caixa:
+
+1. Conferir se o convenio Caixa possui empresa do grupo.
+2. Conferir se o convenio Caixa possui conta bancaria.
+3. Conferir se a conta bancaria do convenio possui a mesma empresa do convenio.
+4. Conferir se todos os boletos selecionados possuem empresa.
+5. Conferir se a empresa de cada boleto e a mesma empresa do respectivo titulo.
+6. Conferir se todos os boletos da remessa pertencem a empresa do convenio.
+
+Antes de importar retorno Caixa:
+
+1. Selecionar o convenio correto.
+2. Conferir se o convenio possui empresa do grupo.
+3. Conferir se o convenio possui conta bancaria.
+4. Conferir se a conta bancaria pertence a mesma empresa do convenio.
+
+Regras:
+
+- remessa nao deve ser gerada com convenio sem empresa;
+- remessa nao deve misturar boletos de empresas diferentes da empresa do convenio;
+- retorno nao deve ser importado em convenio sem empresa ou sem conta bancaria;
+- a baixa automatica so ocorre quando titulo, boleto, convenio e conta bancaria estao coerentes;
+- divergencia de empresa no retorno deve ser tratada como revisao operacional ou baixa intercompany manual, nunca como ajuste por deducao.
+
 ### 11.6 Corrigir baixa
 
 Quando usar:
