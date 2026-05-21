@@ -1378,7 +1378,17 @@ Passo a passo para analisar:
 6. Conferir EBITDA.
 7. Conferir Resultado Financeiro.
 8. Conferir Lucro/Prejuizo Liquido.
-9. Abrir diagnostico se algum numero parecer inconsistente.
+9. Conferir o Comparativo mensal para entender tendencia, variacao e acumulado.
+10. Abrir diagnostico se algum numero parecer inconsistente.
+
+Cuidados:
+
+- DRE usa competencia, nao data de pagamento;
+- baixa financeira confirma caixa, mas nao muda a competencia economica;
+- intercompany deve ser eliminado na visao consolidada principal;
+- categorias sem grupo DRE prejudicam o demonstrativo;
+- titulo sem competencia nao deve ser usado como base de fechamento;
+- o comparativo mensal usa as mesmas regras da DRE. Se um mes parecer errado, revisar competencia e categoria dos titulos daquele mes.
 
 ### 11.11 Diagnostico da DRE
 

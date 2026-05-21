@@ -400,6 +400,30 @@ function validateFinanceDreQuery(query = {}) {
   };
 }
 
+function validateFinanceDreComparativoQuery(query = {}) {
+  ensureAllowedKeys(
+    query,
+    ['periodo', 'data_inicial', 'data_final', 'empresa_id', 'holding_id', 'obra_id', 'excluir_intercompany', 'meses'],
+    'Consulta de comparativo mensal da DRE'
+  );
+
+  const base = validateFinanceDreQuery({
+    periodo: query.periodo,
+    data_inicial: query.data_inicial,
+    data_final: query.data_final,
+    empresa_id: query.empresa_id,
+    holding_id: query.holding_id,
+    obra_id: query.obra_id,
+    excluir_intercompany: query.excluir_intercompany
+  });
+  const meses = parseInteger(query.meses, 'Meses');
+
+  return {
+    ...base,
+    meses: meses ? Math.min(Math.max(meses, 1), 24) : undefined
+  };
+}
+
 function validateFinanceEndividamentoQuery(query = {}) {
   ensureAllowedKeys(
     query,
@@ -1289,6 +1313,7 @@ module.exports = {
   validateFinanceBoletoTituloQuery,
   validateFinanceBaixasQuery,
   validateFinanceDreQuery,
+  validateFinanceDreComparativoQuery,
   validateFinanceEndividamentoQuery,
   validateFinanceFluxoCaixaQuery,
   validateFinanceFluxoConsolidadoQuery,

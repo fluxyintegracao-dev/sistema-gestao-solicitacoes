@@ -1880,6 +1880,108 @@ function getFluxoPisoPrevisto(serie = []) {
   return serie.reduce((min, item) => Math.min(min, Number(item.saldo_previsto || 0)), 0);
 }
 
+function diffInMonthsInclusive(start, end) {
+  return ((end.getFullYear() - start.getFullYear()) * 12) + (end.getMonth() - start.getMonth()) + 1;
+}
+
+function buildDreComparativoPeriodos(filters = {}) {
+  const periodoBase = resolvePeriodo(filters);
+  const dataInicial = parseDateOnly(periodoBase.data_inicial);
+  const dataFinal = parseDateOnly(periodoBase.data_final);
+  const customMonths = diffInMonthsInclusive(startOfMonth(dataInicial), startOfMonth(dataFinal));
+  const meses = Math.min(Math.max(Number(filters.meses || customMonths || 12), 1), 24);
+  const endCursor = startOfMonth(dataFinal);
+  const startCursor = filters.meses
+    ? addMonths(endCursor, (meses - 1) * -1)
+    : startOfMonth(dataInicial);
+  const periodos = [];
+  let cursor = startCursor;
+
+  while (cursor <= endCursor && periodos.length < 24) {
+    const inicio = startOfMonth(cursor);
+    const fim = endOfMonth(inicio);
+    const referencia = `${inicio.getFullYear()}-${pad(inicio.getMonth() + 1)}`;
+
+    periodos.push({
+      referencia,
+      label: formatBucketLabel(inicio, 'MES'),
+      data_inicial: toDateOnly(inicio),
+      data_final: toDateOnly(fim)
+    });
+
+    cursor = addMonths(cursor, 1);
+  }
+
+  return periodos;
+}
+
+async function gerarDreComparativoMensal(req, filters = {}) {
+  await assertFinanceAccess(req);
+
+  const periodos = buildDreComparativoPeriodos(filters);
+  let acumuladoResultado = 0;
+  let acumuladoEbitda = 0;
+  let acumuladoReceita = 0;
+  const serie = [];
+
+  for (const periodo of periodos) {
+    const dre = await gerarDreGerencial(req, {
+      ...filters,
+      periodo: 'PERSONALIZADO',
+      data_inicial: periodo.data_inicial,
+      data_final: periodo.data_final
+    });
+    const resumo = dre?.resumo || {};
+    const receitaLiquida = roundCurrency(resumo.receita_liquida || 0);
+    const ebitda = roundCurrency(resumo.ebitda || 0);
+    const lucroLiquido = roundCurrency(resumo.lucro_prejuizo_liquido ?? resumo.resultado ?? 0);
+
+    acumuladoReceita = roundCurrency(acumuladoReceita + receitaLiquida);
+    acumuladoEbitda = roundCurrency(acumuladoEbitda + ebitda);
+    acumuladoResultado = roundCurrency(acumuladoResultado + lucroLiquido);
+
+    serie.push({
+      referencia: periodo.referencia,
+      label: periodo.label,
+      data_inicial: periodo.data_inicial,
+      data_final: periodo.data_final,
+      receita_liquida: receitaLiquida,
+      ebitda,
+      lucro_prejuizo_liquido: lucroLiquido,
+      margem_ebitda: resumo.margem_ebitda ?? null,
+      margem_liquida: resumo.margem_liquida ?? resumo.margem_resultado ?? null,
+      acumulado_receita_liquida: acumuladoReceita,
+      acumulado_ebitda: acumuladoEbitda,
+      acumulado_lucro_prejuizo_liquido: acumuladoResultado,
+      titulos_considerados: Number(resumo.titulos_considerados || 0),
+      movimentos_avulsos_considerados: Number(resumo.movimentos_avulsos_considerados || 0)
+    });
+  }
+
+  const margemEbitdaAcumulada = acumuladoReceita > 0 ? Number(((acumuladoEbitda / acumuladoReceita) * 100).toFixed(2)) : null;
+  const margemLiquidaAcumulada = acumuladoReceita > 0 ? Number(((acumuladoResultado / acumuladoReceita) * 100).toFixed(2)) : null;
+
+  return {
+    filtro: {
+      meses: serie.length,
+      holding_id: filters.holding_id ? Number(filters.holding_id) : null,
+      empresa_id: filters.empresa_id ? Number(filters.empresa_id) : null,
+      obra_id: filters.obra_id ? Number(filters.obra_id) : null,
+      excluir_intercompany: filters.excluir_intercompany !== false,
+      data_inicial: serie[0]?.data_inicial || null,
+      data_final: serie[serie.length - 1]?.data_final || null
+    },
+    resumo: {
+      receita_liquida: acumuladoReceita,
+      ebitda: acumuladoEbitda,
+      lucro_prejuizo_liquido: acumuladoResultado,
+      margem_ebitda: margemEbitdaAcumulada,
+      margem_liquida: margemLiquidaAcumulada
+    },
+    serie
+  };
+}
+
 function buildExecutiveRisk({ codigo, titulo, severidade, descricao, valor = null, acao, rota = null }) {
   return {
     codigo,
@@ -3125,6 +3227,7 @@ module.exports = {
   gerarRelatorioFluxoCaixa,
   gerarRelatorioFluxoConsolidado,
   gerarPainelExecutivoGrupo,
+  gerarDreComparativoMensal,
   gerarRelatorioEndividamento,
   gerarRelatorioIntercompany,
   gerarDreGerencial,

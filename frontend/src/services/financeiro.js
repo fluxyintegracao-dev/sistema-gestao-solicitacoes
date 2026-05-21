@@ -822,6 +822,21 @@ export async function getDreFinanceira(params = {}) {
   return parseJson(response, 'Erro ao buscar DRE financeira');
 }
 
+export async function getDreComparativoFinanceiro(params = {}) {
+  const query = new URLSearchParams(
+    Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== '')
+  ).toString();
+  const url = query
+    ? `${API_URL}/financeiro/relatorios/dre/comparativo?${query}`
+    : `${API_URL}/financeiro/relatorios/dre/comparativo`;
+
+  const response = await fetch(url, {
+    headers: authHeaders()
+  });
+
+  return parseJson(response, 'Erro ao buscar comparativo mensal da DRE');
+}
+
 export async function getDiagnosticoDreFinanceira() {
   const response = await fetch(`${API_URL}/financeiro/relatorios/dre/diagnostico`, {
     headers: authHeaders()

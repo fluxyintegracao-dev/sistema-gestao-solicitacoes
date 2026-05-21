@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getEmpresasGrupo } from '../services/empresasGrupo';
-import { getDreFinanceira } from '../services/financeiro';
+import { getDreComparativoFinanceiro, getDreFinanceira } from '../services/financeiro';
 import { getMinhasObras } from '../services/obras';
 
 const DEFAULT_FILTERS = {
@@ -33,6 +33,24 @@ function formatCurrency(value) {
   });
 }
 
+function formatCompactCurrency(value) {
+  const numeric = Number(value || 0);
+  const abs = Math.abs(numeric);
+  if (abs >= 1000000) {
+    return `${numeric < 0 ? '-' : ''}R$ ${(abs / 1000000).toLocaleString('pt-BR', {
+      minimumFractionDigits: 1,
+      maximumFractionDigits: 1
+    })} mi`;
+  }
+  if (abs >= 1000) {
+    return `${numeric < 0 ? '-' : ''}R$ ${(abs / 1000).toLocaleString('pt-BR', {
+      minimumFractionDigits: 1,
+      maximumFractionDigits: 1
+    })} mil`;
+  }
+  return formatCurrency(numeric);
+}
+
 function formatPercent(value) {
   if (value == null || Number.isNaN(Number(value))) return '-';
   return `${Number(value).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
@@ -48,12 +66,111 @@ function labelTipoGerencial(value) {
   return TIPOS_GERENCIAIS_LABEL[String(value || '').toUpperCase()] || 'Operacional';
 }
 
+function metricColor(value) {
+  return Number(value || 0) >= 0 ? '#15803d' : '#b91c1c';
+}
+
+function DreComparativoCard({ comparativo }) {
+  const serie = Array.isArray(comparativo?.serie) ? comparativo.serie : [];
+  const maxAbs = Math.max(1, ...serie.map((item) => Math.abs(Number(item.lucro_prejuizo_liquido || 0))));
+  const ultimo = serie[serie.length - 1] || null;
+  const anterior = serie[serie.length - 2] || null;
+  const variacao = ultimo && anterior
+    ? Number(ultimo.lucro_prejuizo_liquido || 0) - Number(anterior.lucro_prejuizo_liquido || 0)
+    : 0;
+
+  return (
+    <section className="card sol-surface-card">
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold text-[var(--c-text)]">Comparativo mensal</h2>
+          <p className="text-sm text-[var(--c-muted)]">
+            Serie mensal por competencia real, usando as mesmas regras da DRE do periodo.
+          </p>
+        </div>
+        <div className="grid grid-cols-2 gap-2 text-sm md:grid-cols-4">
+          <div className="rounded-lg border border-[var(--c-border)] px-3 py-2">
+            <span className="block text-xs uppercase text-[var(--c-muted)]">Receita acum.</span>
+            <strong>{formatCompactCurrency(comparativo?.resumo?.receita_liquida)}</strong>
+          </div>
+          <div className="rounded-lg border border-[var(--c-border)] px-3 py-2">
+            <span className="block text-xs uppercase text-[var(--c-muted)]">EBITDA acum.</span>
+            <strong style={{ color: metricColor(comparativo?.resumo?.ebitda) }}>{formatCompactCurrency(comparativo?.resumo?.ebitda)}</strong>
+          </div>
+          <div className="rounded-lg border border-[var(--c-border)] px-3 py-2">
+            <span className="block text-xs uppercase text-[var(--c-muted)]">Lucro acum.</span>
+            <strong style={{ color: metricColor(comparativo?.resumo?.lucro_prejuizo_liquido) }}>{formatCompactCurrency(comparativo?.resumo?.lucro_prejuizo_liquido)}</strong>
+          </div>
+          <div className="rounded-lg border border-[var(--c-border)] px-3 py-2">
+            <span className="block text-xs uppercase text-[var(--c-muted)]">Variacao</span>
+            <strong style={{ color: metricColor(variacao) }}>{formatCompactCurrency(variacao)}</strong>
+          </div>
+        </div>
+      </div>
+
+      {serie.length === 0 ? (
+        <div className="app-empty-card">Nenhum mes encontrado para o comparativo.</div>
+      ) : (
+        <>
+          <div className="grid min-h-[220px] grid-cols-6 items-end gap-2 md:grid-cols-12">
+            {serie.map((item) => {
+              const lucro = Number(item.lucro_prejuizo_liquido || 0);
+              const height = Math.max(10, Math.round((Math.abs(lucro) / maxAbs) * 180));
+              const positive = lucro >= 0;
+              return (
+                <div key={item.referencia} className="flex min-w-0 flex-col items-center gap-2">
+                  <div className="flex h-[190px] w-full items-end justify-center border-b border-[var(--c-border)]">
+                    <div
+                      className={`w-full max-w-[34px] rounded-t-md ${positive ? 'bg-emerald-500' : 'bg-rose-500'}`}
+                      style={{ height }}
+                      title={`${item.label}: ${formatCurrency(lucro)}`}
+                    />
+                  </div>
+                  <span className="truncate text-[11px] font-semibold text-[var(--c-muted)]">{item.label}</span>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="mt-4 overflow-x-auto">
+            <table className="min-w-full text-left text-xs">
+              <thead className="uppercase text-[var(--c-muted)]">
+                <tr>
+                  <th className="px-2 py-2">Mes</th>
+                  <th className="px-2 py-2">Receita liquida</th>
+                  <th className="px-2 py-2">EBITDA</th>
+                  <th className="px-2 py-2">Lucro/Prejuizo</th>
+                  <th className="px-2 py-2">Acumulado</th>
+                  <th className="px-2 py-2">Titulos</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {serie.map((item) => (
+                  <tr key={item.referencia}>
+                    <td className="px-2 py-2 font-semibold text-[var(--c-text)]">{item.label}</td>
+                    <td className="px-2 py-2">{formatCurrency(item.receita_liquida)}</td>
+                    <td className="px-2 py-2" style={{ color: metricColor(item.ebitda) }}>{formatCurrency(item.ebitda)}</td>
+                    <td className="px-2 py-2 font-semibold" style={{ color: metricColor(item.lucro_prejuizo_liquido) }}>{formatCurrency(item.lucro_prejuizo_liquido)}</td>
+                    <td className="px-2 py-2 font-semibold" style={{ color: metricColor(item.acumulado_lucro_prejuizo_liquido) }}>{formatCurrency(item.acumulado_lucro_prejuizo_liquido)}</td>
+                    <td className="px-2 py-2">{item.titulos_considerados}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
+
 export default function FinanceiroDre() {
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [appliedFilters, setAppliedFilters] = useState(DEFAULT_FILTERS);
   const [empresas, setEmpresas] = useState([]);
   const [obras, setObras] = useState([]);
   const [relatorio, setRelatorio] = useState(null);
+  const [comparativo, setComparativo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -85,18 +202,28 @@ export default function FinanceiroDre() {
     setLoading(true);
     setError('');
 
-    getDreFinanceira({
+    const params = {
       ...appliedFilters,
       excluir_intercompany: appliedFilters.excluir_intercompany ? 'true' : 'false'
-    })
-      .then((data) => {
+    };
+
+    Promise.all([
+      getDreFinanceira(params),
+      getDreComparativoFinanceiro({
+        ...params,
+        meses: appliedFilters.periodo === 'PERSONALIZADO' ? '' : '12'
+      })
+    ])
+      .then(([dreData, comparativoData]) => {
         if (!active) return;
-        setRelatorio(data || null);
+        setRelatorio(dreData || null);
+        setComparativo(comparativoData || null);
       })
       .catch((err) => {
         if (!active) return;
         setError(err?.message || 'Erro ao carregar DRE');
         setRelatorio(null);
+        setComparativo(null);
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -259,6 +386,8 @@ export default function FinanceiroDre() {
         <div className="app-empty-card">Carregando DRE...</div>
       ) : (
         <>
+          <DreComparativoCard comparativo={comparativo} />
+
           <section className="card sol-surface-card app-table-shell">
             <div className="border-b border-[var(--c-border)] px-4 py-3">
               <h2 className="text-lg font-semibold text-[var(--c-text)]">DRE estruturada</h2>

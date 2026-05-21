@@ -39,6 +39,7 @@ Base multiempresa e DRE gerencial:
 - A classificacao inicial da DRE passou a ser derivada das categorias financeiras ja cadastradas pelo plano SIENGE; categorias redutoras invertem o sinal na DRE e categorias patrimoniais/financeiras que nao representam resultado ficam fora da DRE.
 - A DRE passou a apresentar linhas por grupo e subgrupo gerencial da categoria financeira, evitando consolidar categorias diferentes em uma unica linha ampla demais.
 - A DRE passou a ter demonstrativo estruturado com Receita Liquida, Lucro Bruto, EBITDA, EBIT, Resultado Financeiro, Resultado antes de IRPJ/CSLL e Lucro/Prejuizo Liquido.
+- A DRE passou a ter comparativo mensal/acumulado (`/financeiro/relatorios/dre/comparativo`), calculado por competencia real e pelas mesmas regras da DRE gerencial.
 - As categorias financeiras SIENGE foram reavaliadas para separar tributos sobre faturamento, encargos trabalhistas, tributos operacionais, resultado financeiro e IRPJ/CSLL.
 - A visao por empresa da DRE passou a usar as mesmas metricas economicas do consolidado: Receita Liquida, EBITDA, Lucro/Prejuizo Liquido e Margem Liquida.
 - A primeira camada operacional de Intercompany foi adicionada ao Financeiro, com origem, destino, tipo, motivo e regra explicita de eliminacao no consolidado.
