@@ -147,6 +147,10 @@ function getTituloEmpresaLabel(titulo = {}) {
   return titulo?.empresa?.nome || titulo?.empresa?.razao_social || (titulo?.empresa_id ? `Empresa #${titulo.empresa_id}` : 'Empresa pendente');
 }
 
+function getAccountLabel(account = {}) {
+  return account?.contaBancaria?.nome || account?.empresa?.nome || account?.empresa?.razao_social || (account?.id ? `Conta pagadora #${account.id}` : 'Conta pagadora pendente');
+}
+
 function getTituloPaymentAccountPendencies(titulo = {}, account = null) {
   const pendencies = [];
   const tituloEmpresaId = getTituloEmpresaId(titulo);
@@ -1039,6 +1043,12 @@ export default function FinanceiroPagamentos() {
                           </div>
                           <div className="text-sm text-[var(--c-muted)]">
                             Confirmado pelo banco em {formatDateTime(intent.confirmado_banco_em)}
+                          </div>
+                          <div className="mt-1 text-xs text-[var(--c-muted)]">
+                            Empresa: {getTituloEmpresaLabel(intent.titulo)} - Conta: {getAccountLabel(intent.paymentAccount)}
+                          </div>
+                          <div className="text-xs text-[var(--c-muted)]">
+                            Favorecido: {intent.beneficiary?.nome || 'Favorecido pendente'} {intent.beneficiary?.pix_chave ? `- ${intent.beneficiary.pix_chave}` : ''}
                           </div>
                         </div>
                         <button

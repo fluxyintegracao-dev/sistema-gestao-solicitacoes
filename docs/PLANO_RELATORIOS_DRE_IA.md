@@ -60,6 +60,7 @@ Base multiempresa e DRE gerencial:
 - O cadastro de conta pagadora do pagamento em massa passou a exigir empresa pagadora igual a empresa da conta bancaria interna, evitando lote com caixa de empresa divergente.
 - A tela de pagamentos em massa passou a buscar titulos elegiveis pela empresa da conta pagadora selecionada e a exibir a empresa do titulo na conferencia do lote.
 - O lote de pagamento passou a ter validacao de integridade antes de submeter, aprovar ou enviar, reconferindo titulo, saldo, empresa, favorecido, conta pagadora, quantidade de itens e total.
+- A confirmacao de baixa de pagamento em massa passou a exigir confirmacao bancaria registrada e a reaproveitar reconciliacao tecnica existente, evitando duplicidade na baixa/reconciliacao.
 
 Documentacao operacional complementar:
 

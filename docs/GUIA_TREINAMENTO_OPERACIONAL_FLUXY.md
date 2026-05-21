@@ -1261,6 +1261,7 @@ Cuidados:
 - baixa financeira nao deve ocorrer no momento da geracao do lote;
 - lote aprovado ainda nao significa pagamento realizado;
 - pagamento realizado depende de confirmacao bancaria;
+- a confirmacao de baixa so deve aparecer quando o pagamento tiver data/hora de confirmacao bancaria registrada;
 - se o banco rejeitar ou falhar, corrigir a causa antes de reprocessar;
 - se um lote for cancelado ou rejeitado, os titulos devem ser revisados antes de entrar em novo lote;
 - conta pagadora precisa representar a empresa real que vai movimentar o caixa;
@@ -1275,6 +1276,7 @@ Cuidados:
 - o sistema bloqueia lote quando o titulo pertence a empresa diferente da conta pagadora;
 - antes de submeter, aprovar ou enviar o lote, o sistema deve reconferir saldo, empresa, conta pagadora, favorecido, quantidade de itens e valor total;
 - se titulo, favorecido ou saldo mudarem depois da montagem do lote, nao force aprovacao: cancele ou rejeite e gere novo lote com os dados atuais;
+- se ja existir conciliacao/reconciliacao tecnica para a intencao de pagamento, a baixa deve atualizar esse registro, nao criar uma reconciliacao duplicada;
 - se uma empresa for pagar titulo de outra, nao forcar o lote comum: primeiro modele a operacao intercompany correta;
 - a baixa gerada apos confirmacao bancaria usa a empresa da conta pagadora do lote e exige que ela seja igual a empresa do titulo.
 

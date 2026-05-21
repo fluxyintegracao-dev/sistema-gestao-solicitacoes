@@ -1,8 +1,11 @@
 const {
+  ContaBancaria,
+  EmpresaGrupo,
   MovimentoFinanceiro,
   PaymentAccount,
   PaymentBatch,
   PaymentBatchItem,
+  PaymentBeneficiary,
   PaymentIntent,
   PaymentReconciliation,
   TituloFinanceiro,
@@ -87,8 +90,20 @@ async function listPaymentsAwaitingBaixaConfirmation(req) {
   return PaymentIntent.findAll({
     where: { status: 'AGUARDANDO_CONFIRMACAO_BAIXA' },
     include: [
-      { model: TituloFinanceiro, as: 'titulo' },
-      { model: PaymentAccount, as: 'paymentAccount' }
+      {
+        model: TituloFinanceiro,
+        as: 'titulo',
+        include: [{ model: EmpresaGrupo, as: 'empresa', attributes: ['id', 'codigo', 'nome', 'razao_social'] }]
+      },
+      {
+        model: PaymentAccount,
+        as: 'paymentAccount',
+        include: [
+          { model: ContaBancaria, as: 'contaBancaria', attributes: ['id', 'nome', 'banco', 'agencia', 'conta', 'empresa_id'] },
+          { model: EmpresaGrupo, as: 'empresa', attributes: ['id', 'codigo', 'nome', 'razao_social', 'cnpj'] }
+        ]
+      },
+      { model: PaymentBeneficiary, as: 'beneficiary', attributes: ['id', 'nome', 'cpf_cnpj', 'pix_tipo_chave', 'pix_chave'] }
     ],
     order: [['confirmado_banco_em', 'ASC'], ['id', 'ASC']]
   });
@@ -104,6 +119,9 @@ async function confirmBaixaFromPaymentIntent(req, id, payload = {}) {
     if (!intent) throw createHttpError(404, 'Intencao de pagamento nao encontrada.');
     if (String(intent.status || '').toUpperCase() !== 'AGUARDANDO_CONFIRMACAO_BAIXA') {
       throw createHttpError(400, 'Pagamento nao esta aguardando confirmacao de baixa.');
+    }
+    if (!intent.confirmado_banco_em) {
+      throw createHttpError(400, 'Pagamento ainda nao possui data/hora de confirmacao bancaria registrada.');
     }
 
     const existing = await PaymentReconciliation.findOne({
@@ -178,7 +196,7 @@ async function confirmBaixaFromPaymentIntent(req, id, payload = {}) {
       desconto: 0,
       valor_quitacao: valorBaixa,
       data_movimento: dataMovimento,
-      observacoes: payload.observacoes || 'Baixa confirmada a partir de pagamento bancario mockado.',
+      observacoes: payload.observacoes || `Baixa confirmada a partir do pagamento bancario #${intent.id}.`,
       criado_por: req.user?.id || null
     }, { transaction });
 
@@ -199,15 +217,22 @@ async function confirmBaixaFromPaymentIntent(req, id, payload = {}) {
 
     await recalcularStatusLotePorIntent(intent.id, { transaction });
 
-    await PaymentReconciliation.create({
-      payment_intent_id: intent.id,
+    const reconciliationPayload = {
       movimento_financeiro_id: movimento.id,
-      conciliacao_bancaria_id: null,
+      conciliacao_bancaria_id: existing?.conciliacao_bancaria_id || null,
       status: 'BAIXADO',
       matched_by: 'MANUAL_FINANCEIRO',
       matched_at: new Date(),
-      created_by: req.user?.id || null
-    }, { transaction });
+      created_by: existing?.created_by || req.user?.id || null
+    };
+    if (existing) {
+      await existing.update(reconciliationPayload, { transaction });
+    } else {
+      await PaymentReconciliation.create({
+        payment_intent_id: intent.id,
+        ...reconciliationPayload
+      }, { transaction });
+    }
 
     await registrarEventoSeguranca({
       req,

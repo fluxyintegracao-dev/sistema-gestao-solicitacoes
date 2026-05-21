@@ -967,8 +967,8 @@ Status sugeridos:
 - Se qualquer dado sensivel mudar depois da montagem do lote, a operacao correta e cancelar/rejeitar e gerar um novo lote, nao aprovar usando informacao antiga.
 - A dupla aprovacao deve exigir aprovadores distintos; o mesmo usuario nao pode contar duas aprovacoes para o mesmo lote.
 - Envio ao banco nao cria baixa.
-- Confirmacao bancaria cria baixa em transacao atomica.
-- OFX ou retorno bancario pode reforcar conciliacao, mas nao deve duplicar baixa.
+- Confirmacao bancaria registrada cria baixa em transacao atomica.
+- OFX ou retorno bancario pode reforcar conciliacao, mas nao deve duplicar baixa; se ja houver reconciliacao tecnica da intencao, a baixa deve atualizar o registro existente.
 - Reprocessamento deve reutilizar idempotency key quando tecnicamente correto.
 
 ## 16. Fluxo operacional recomendado
