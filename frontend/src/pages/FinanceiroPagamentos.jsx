@@ -22,6 +22,7 @@ import {
   getPaymentBatchBbTransactions,
   getPaymentBatches,
   getPaymentEligibleTitulos,
+  getPaymentEvents,
   getPaymentsAwaitingBaixa,
   rejeitarPaymentBatch,
   reprocessarPaymentBatch,
@@ -43,8 +44,18 @@ import {
 const TABS = [
   { id: 'titulos', label: 'Titulos elegiveis' },
   { id: 'lotes', label: 'Lotes' },
-  { id: 'baixas', label: 'Confirmar baixa' }
+  { id: 'baixas', label: 'Confirmar baixa' },
+  { id: 'auditoria', label: 'Auditoria tecnica', requiresAudit: true }
 ];
+
+const PAYMENT_EVENT_TYPES = [
+  'BB_WEBHOOK_RECEIVED',
+  'BB_BATCH_STATUS_SYNCED',
+  'BB_SUBMIT_PIX_BATCH_RESPONSE',
+  'BB_RELEASE_BATCH_RESPONSE'
+];
+
+const PAYMENT_EVENT_STATUSES = ['PENDENTE', 'PROCESSADO', 'ERRO'];
 
 const BATCH_STEPS = [
   { statuses: ['RASCUNHO'], label: 'Rascunho' },
@@ -237,6 +248,19 @@ function getBatchStepIndex(status) {
   return index >= 0 ? index : -1;
 }
 
+function getEventPayloadSummary(event = {}) {
+  const payload = event.payload || {};
+  const candidates = [
+    payload.status,
+    payload.estado,
+    payload.situacao,
+    payload.codigoEstado,
+    payload.mensagem,
+    payload.error?.message
+  ].filter(Boolean);
+  return candidates.length ? candidates.join(' - ') : 'Payload preservado para auditoria tecnica.';
+}
+
 export default function FinanceiroPagamentos() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('titulos');
@@ -247,6 +271,7 @@ export default function FinanceiroPagamentos() {
   const [selectedBatch, setSelectedBatch] = useState(null);
   const [bbHealth, setBbHealth] = useState(null);
   const [bbTransactions, setBbTransactions] = useState([]);
+  const [paymentEvents, setPaymentEvents] = useState([]);
   const [awaitingBaixa, setAwaitingBaixa] = useState([]);
   const [filters, setFilters] = useState({
     vencimento_inicial: '',
@@ -258,6 +283,16 @@ export default function FinanceiroPagamentos() {
   const [batchForm, setBatchForm] = useState({
     payment_account_id: '',
     data_programada: today()
+  });
+  const [eventFilters, setEventFilters] = useState({
+    status: '',
+    event_type: '',
+    provider_event_id: '',
+    payment_batch_id: '',
+    payment_intent_id: '',
+    data_inicio: '',
+    data_fim: '',
+    limit: '50'
   });
   const [mfaCode, setMfaCode] = useState('');
   const [actionLoading, setActionLoading] = useState('');
@@ -272,6 +307,7 @@ export default function FinanceiroPagamentos() {
   const canReprocess = useMemo(() => canReprocessPagamentos(user), [user]);
   const canConfirmBaixa = useMemo(() => canConfirmarBaixaPagamento(user), [user]);
   const isBbSandbox = Boolean(bbHealth?.sandboxRealEnabled);
+  const visibleTabs = useMemo(() => TABS.filter((tab) => !tab.requiresAudit || canAudit), [canAudit]);
 
   async function loadBase() {
     try {
@@ -334,14 +370,34 @@ export default function FinanceiroPagamentos() {
     }
   }
 
+  async function loadPaymentEvents() {
+    try {
+      setActionLoading('eventos');
+      setError('');
+      const data = await getPaymentEvents(compactFilters(eventFilters));
+      setPaymentEvents(Array.isArray(data) ? data : []);
+    } catch (err) {
+      setError(err?.message || 'Erro ao buscar eventos tecnicos de pagamento');
+    } finally {
+      setActionLoading('');
+    }
+  }
+
   async function refreshAfterAction(batchId = selectedBatch?.id) {
     await loadBase();
     if (batchId) await loadBatch(batchId);
+    if (activeTab === 'auditoria' && canAudit) await loadPaymentEvents();
   }
 
   useEffect(() => {
     loadBase();
   }, []);
+
+  useEffect(() => {
+    if (activeTab === 'auditoria' && canAudit && paymentEvents.length === 0) {
+      loadPaymentEvents();
+    }
+  }, [activeTab, canAudit]);
 
   const selectedTotal = useMemo(() => {
     const selected = new Set(selectedIds.map(String));
@@ -448,6 +504,14 @@ export default function FinanceiroPagamentos() {
       return buildBatchGuidance(selectedBatch, validApprovals.length, isBbSandbox);
     }
 
+    if (activeTab === 'auditoria') {
+      return {
+        eyebrow: 'Auditoria tecnica',
+        title: `${paymentEvents.length} evento(s) tecnico(s) na consulta`,
+        body: 'Use essa leitura para investigar webhook, polling, respostas do provider e status de processamento. Evento tecnico nao substitui baixa financeira.'
+      };
+    }
+
     if (awaitingBaixa.length > 0) {
       return {
         eyebrow: 'Baixa financeira',
@@ -461,7 +525,7 @@ export default function FinanceiroPagamentos() {
       title: 'Nenhuma baixa pendente',
       body: 'Quando o banco confirmar pagamentos, eles aparecerao aqui para baixa semiautomatica.'
     };
-  }, [activeTab, awaitingBaixa, isBbSandbox, paymentOverview.activeAccounts, selectedBatch, titulosOverview, validApprovals.length]);
+  }, [activeTab, awaitingBaixa, isBbSandbox, paymentEvents.length, paymentOverview.activeAccounts, selectedBatch, titulosOverview, validApprovals.length]);
 
   const selectedBatchStepIndex = useMemo(() => getBatchStepIndex(selectedBatch?.status), [selectedBatch?.status]);
   const cancelRequiresMfa = ['PENDENTE_APROVACAO', 'APROVADO'].includes(String(selectedBatch?.status || '').toUpperCase());
@@ -618,7 +682,7 @@ export default function FinanceiroPagamentos() {
 
       <div className="solicitacoes-toolbar">
         <div className="finance-category-toggle-group" role="tablist" aria-label="Navegacao de pagamentos">
-          {TABS.map((tab) => (
+          {visibleTabs.map((tab) => (
             <button
               key={tab.id}
               type="button"
@@ -653,7 +717,7 @@ export default function FinanceiroPagamentos() {
           <button
             type="button"
             className="card sol-surface-card text-left transition hover:-translate-y-0.5 hover:border-[var(--c-primary)]"
-            onClick={() => setActiveTab('lotes')}
+            onClick={() => setActiveTab(canAudit ? 'auditoria' : 'lotes')}
           >
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--c-muted)]">Aguardando aprovacao</p>
             <p className="mt-2 text-2xl font-semibold text-[var(--c-text)]">{paymentOverview.pendingApprovalCount}</p>
@@ -1095,6 +1159,132 @@ export default function FinanceiroPagamentos() {
                   ))}
                 </div>
               )}
+            </section>
+          )}
+
+          {activeTab === 'auditoria' && canAudit && (
+            <section className="space-y-4">
+              <div className="card sol-surface-card">
+                <div className="sol-filtros-head">
+                  <div>
+                    <p className="sol-filtros-title">Eventos tecnicos</p>
+                    <p className="sol-filtros-subtitle">Consulta para investigar provider, webhook, polling e respostas bancarias sem acionar baixa financeira.</p>
+                  </div>
+                </div>
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-12">
+                  <label className="sol-filter-field xl:col-span-2">
+                    <span className="sol-filter-label">Status</span>
+                    <select className="input w-full" value={eventFilters.status} onChange={(e) => setEventFilters((c) => ({ ...c, status: e.target.value }))}>
+                      <option value="">Todos</option>
+                      {PAYMENT_EVENT_STATUSES.map((status) => <option key={status} value={status}>{status}</option>)}
+                    </select>
+                  </label>
+                  <label className="sol-filter-field xl:col-span-3">
+                    <span className="sol-filter-label">Tipo de evento</span>
+                    <select className="input w-full" value={eventFilters.event_type} onChange={(e) => setEventFilters((c) => ({ ...c, event_type: e.target.value }))}>
+                      <option value="">Todos</option>
+                      {PAYMENT_EVENT_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}
+                    </select>
+                  </label>
+                  <label className="sol-filter-field xl:col-span-3">
+                    <span className="sol-filter-label">ID evento provedor</span>
+                    <input className="input w-full" value={eventFilters.provider_event_id} onChange={(e) => setEventFilters((c) => ({ ...c, provider_event_id: e.target.value }))} />
+                  </label>
+                  <label className="sol-filter-field xl:col-span-1">
+                    <span className="sol-filter-label">Lote</span>
+                    <input className="input w-full" inputMode="numeric" value={eventFilters.payment_batch_id} onChange={(e) => setEventFilters((c) => ({ ...c, payment_batch_id: e.target.value }))} />
+                  </label>
+                  <label className="sol-filter-field xl:col-span-1">
+                    <span className="sol-filter-label">Intent</span>
+                    <input className="input w-full" inputMode="numeric" value={eventFilters.payment_intent_id} onChange={(e) => setEventFilters((c) => ({ ...c, payment_intent_id: e.target.value }))} />
+                  </label>
+                  <label className="sol-filter-field xl:col-span-1">
+                    <span className="sol-filter-label">Limite</span>
+                    <input className="input w-full" inputMode="numeric" value={eventFilters.limit} onChange={(e) => setEventFilters((c) => ({ ...c, limit: e.target.value }))} />
+                  </label>
+                  <label className="sol-filter-field xl:col-span-2">
+                    <span className="sol-filter-label">Recebido de</span>
+                    <input className="input w-full" type="date" value={eventFilters.data_inicio} onChange={(e) => setEventFilters((c) => ({ ...c, data_inicio: e.target.value }))} />
+                  </label>
+                  <label className="sol-filter-field xl:col-span-2">
+                    <span className="sol-filter-label">Recebido ate</span>
+                    <input className="input w-full" type="date" value={eventFilters.data_fim} onChange={(e) => setEventFilters((c) => ({ ...c, data_fim: e.target.value }))} />
+                  </label>
+                </div>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <button type="button" className="btn btn-primary" onClick={loadPaymentEvents} disabled={actionLoading === 'eventos'}>
+                    <HiOutlineArrowPath className="h-4 w-4" />
+                    {actionLoading === 'eventos' ? 'Consultando...' : 'Consultar eventos'}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-outline"
+                    onClick={() => {
+                      setEventFilters({
+                        status: '',
+                        event_type: '',
+                        provider_event_id: '',
+                        payment_batch_id: '',
+                        payment_intent_id: '',
+                        data_inicio: '',
+                        data_fim: '',
+                        limit: '50'
+                      });
+                    }}
+                  >
+                    Limpar
+                  </button>
+                  <span className="app-status-pill bg-slate-100 text-slate-700">{paymentEvents.length} evento(s)</span>
+                </div>
+              </div>
+
+              <div className="card sol-surface-card">
+                {paymentEvents.length === 0 ? (
+                  <div className="app-empty-card">Nenhum evento tecnico encontrado para os filtros atuais.</div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full text-left text-sm">
+                      <thead className="text-xs uppercase text-[var(--c-muted)]">
+                        <tr>
+                          <th className="px-3 py-2">Recebido</th>
+                          <th className="px-3 py-2">Evento</th>
+                          <th className="px-3 py-2">Provider</th>
+                          <th className="px-3 py-2">Referencia</th>
+                          <th className="px-3 py-2">Status</th>
+                          <th className="px-3 py-2">Resumo</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {paymentEvents.map((event) => (
+                          <tr key={event.id}>
+                            <td className="px-3 py-3 whitespace-nowrap">{formatDateTime(event.received_at)}</td>
+                            <td className="px-3 py-3">
+                              <span className="font-medium text-[var(--c-text)]">{event.event_type}</span>
+                              <div className="text-xs text-[var(--c-muted)]">Evento #{event.id}</div>
+                            </td>
+                            <td className="px-3 py-3">
+                              {event.provider?.codigo || `Provider #${event.provider_id}`}
+                              <div className="text-xs text-[var(--c-muted)]">{event.provider?.ambiente || '-'}</div>
+                            </td>
+                            <td className="px-3 py-3">
+                              <div className="font-medium text-[var(--c-text)]">{event.provider_event_id || '-'}</div>
+                              <div className="text-xs text-[var(--c-muted)]">
+                                {event.batch ? `Lote ${event.batch.codigo}` : event.payment_batch_id ? `Lote #${event.payment_batch_id}` : 'Sem lote'}
+                                {event.intent ? ` - Intent #${event.intent.id}` : event.payment_intent_id ? ` - Intent #${event.payment_intent_id}` : ''}
+                              </div>
+                            </td>
+                            <td className="px-3 py-3">
+                              <span className={statusClass(event.processing_status)}>{event.processing_status}</span>
+                              {event.processing_error && <div className="mt-1 text-xs text-rose-700">{event.processing_error}</div>}
+                            </td>
+                            <td className="px-3 py-3 max-w-xl text-[var(--c-muted)]">{getEventPayloadSummary(event)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
             </section>
           )}
         </>
