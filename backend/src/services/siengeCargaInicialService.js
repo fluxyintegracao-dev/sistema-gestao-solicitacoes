@@ -303,6 +303,9 @@ async function resolverCategoria(row, tipo, transaction) {
     if (!categoria || categoria.ativo === false) {
       throw criarErro(`Categoria financeira id ${categoriaId} nao encontrada ou inativa.`);
     }
+    if (!['AMBOS', tipo].includes(String(categoria.tipo || '').toUpperCase())) {
+      throw criarErro(`Categoria financeira "${categoria.nome}" nao e compativel com titulo ${tipo}.`);
+    }
     return categoria;
   }
 
@@ -325,6 +328,24 @@ async function resolverCategoria(row, tipo, transaction) {
   }
 
   return categorias[0];
+}
+
+function validarClassificacaoDreImportacao({ categoria, competenciaData, consideraDre, linha }) {
+  if (!consideraDre) return;
+
+  const referenciaLinha = linha ? ` na linha ${linha}` : '';
+  if (!competenciaData) {
+    throw criarErro(`Competencia DRE e obrigatoria para titulo considerado na DRE${referenciaLinha}.`);
+  }
+  if (!categoria) {
+    throw criarErro(`Categoria financeira e obrigatoria para titulo considerado na DRE${referenciaLinha}.`);
+  }
+  if (categoria.considera_dre === false) {
+    throw criarErro(`Categoria financeira "${categoria.nome}" esta marcada para nao considerar na DRE.`);
+  }
+  if (!normalizeText(categoria.dre_grupo)) {
+    throw criarErro(`Categoria financeira "${categoria.nome}" nao possui grupo DRE classificado.`);
+  }
 }
 
 async function resolverEmpresaContraparte(row, transaction) {
@@ -474,10 +495,7 @@ async function processarLinha(row, user) {
     const valorOriginal = parseDecimal(getRowValue(row, ['valor', 'valor_original', 'valor_saldo']), 'Valor');
     const dataVencimento = parseDateOnly(getRowValue(row, ['data_vencimento', 'vencimento']), 'Data de vencimento');
     const dataEmissao = parseDateOnly(getRowValue(row, ['data_emissao', 'emissao']), 'Data de emissao', { required: false });
-    const competenciaData =
-      parseDateOnly(getRowValue(row, ['competencia_data', 'competencia']), 'Competencia DRE', { required: false })
-      || dataEmissao
-      || dataVencimento;
+    const competenciaData = parseDateOnly(getRowValue(row, ['competencia_data', 'competencia']), 'Competencia DRE', { required: false });
     const identificadorExterno = getRowValue(row, ['identificador_externo', 'titulo_sienge_id', 'bill_id', 'id_sienge']).slice(0, 120);
     const externalCreditorId = getRowValue(row, ['external_creditor_id', 'creditor_id', 'credor_sienge_id']).slice(0, 120);
     const numeroDocumento = getRowValue(row, ['numero_documento', 'documento', 'numero_nota']).slice(0, 120) || null;
@@ -491,6 +509,15 @@ async function processarLinha(row, user) {
     const obra = await resolverObra(row, transaction);
     const categoria = await resolverCategoria(row, tipo, transaction);
     const empresaContraparte = await resolverEmpresaContraparte(row, transaction);
+    if (intercompany && !empresaContraparte) {
+      throw criarErro(`Empresa contraparte e obrigatoria para titulo intercompany na linha ${row._linha}.`);
+    }
+    validarClassificacaoDreImportacao({
+      categoria,
+      competenciaData,
+      consideraDre,
+      linha: row._linha
+    });
     const parceiroResult = await upsertParceiro(row, tipo, transaction);
     const tituloExistente = await localizarTituloExistente({
       identificadorExterno,

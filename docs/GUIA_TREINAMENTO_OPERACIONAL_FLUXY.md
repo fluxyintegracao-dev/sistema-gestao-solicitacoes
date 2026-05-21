@@ -916,6 +916,51 @@ Regra de consistencia:
 - a DRE nao aceita titulo em categoria generica ou sem grupo DRE;
 - se a competencia real ainda nao estiver definida, desmarque `Considerar na DRE` e trate a pendencia depois no Diagnostico DRE.
 
+### 11.3.1 Importar carga inicial SIENGE
+
+Tela:
+
+- `Integracao SIENGE`;
+- bloco `Carga inicial financeira`.
+
+Objetivo:
+
+- importar titulos em aberto do SIENGE sem trazer historico desnecessario;
+- criar ou atualizar parceiros;
+- registrar titulos com obra/centro de custo, empresa, categoria e competencia real.
+
+Regras obrigatorias:
+
+- cada linha precisa informar `obra_id` ou `obra_codigo`;
+- a obra/centro de custo precisa estar vinculada a uma empresa do grupo;
+- quando `considera_dre = sim`, a linha precisa informar `competencia_data`;
+- quando `considera_dre = sim`, a linha precisa informar `categoria_id` ou `categoria_nome`;
+- a categoria precisa ser compativel com o tipo do titulo: `PAGAR`, `RECEBER` ou `AMBOS`;
+- a categoria precisa estar marcada para DRE e possuir grupo DRE classificado;
+- quando `intercompany = sim`, a linha precisa informar a empresa contraparte;
+- o sistema nao usa vencimento nem emissao como substituto automatico da competencia DRE.
+
+Passo a passo:
+
+1. Revisar empresas do grupo.
+2. Revisar obras e centros de custo.
+3. Revisar categorias financeiras e classificacao DRE.
+4. Baixar o modelo CSV na tela de Integracao SIENGE.
+5. Preencher os dados exportados do SIENGE.
+6. Conferir competencia DRE de cada titulo considerado na DRE.
+7. Conferir categoria financeira de cada titulo considerado na DRE.
+8. Importar o CSV.
+9. Corrigir os erros informados linha a linha.
+10. Reimportar o CSV corrigido.
+11. Conferir Diagnostico DRE, Titulos e Fluxo de Caixa.
+
+Cuidados:
+
+- nao marcar `considera_dre = sim` quando a equipe ainda nao sabe a competencia economica;
+- nao usar categoria generica para passar pela importacao;
+- nao importar titulo intercompany sem contraparte;
+- nao tratar erro da importacao como problema tecnico antes de revisar o cadastro operacional.
+
 ### 11.4 Criar titulo a partir da solicitacao
 
 Tela:

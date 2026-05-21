@@ -58,10 +58,10 @@ Campos recomendados:
 - `external_creditor_id`: id do credor/cliente no SIENGE.
 - `numero_documento`: numero de nota, documento ou parcela.
 - `data_emissao`.
-- `competencia_data`: competencia da DRE. Se vier vazia, o sistema usa emissao ou vencimento.
-- `categoria_id` ou `categoria_nome`.
+- `competencia_data`: competencia economica da DRE. Obrigatoria quando `considera_dre = sim`.
+- `categoria_id` ou `categoria_nome`: obrigatoria quando `considera_dre = sim`; a categoria precisa estar marcada para DRE e possuir grupo DRE classificado.
 - `intercompany`: `sim` quando a contraparte for outra empresa do grupo.
-- `empresa_contraparte_id` ou `empresa_contraparte_codigo`: usado quando `intercompany = sim`.
+- `empresa_contraparte_id` ou `empresa_contraparte_codigo`: obrigatorio quando `intercompany = sim`.
 - `considera_dre`: por padrao `sim`.
 
 ## Regras de consistencia
@@ -71,6 +71,8 @@ Campos recomendados:
 - A empresa operacional precisa estar vinculada a Holding quando fizer parte do grupo.
 - Titulo intercompany deve informar a contraparte para permitir consolidacao correta.
 - Categorias financeiras devem ser classificadas em grupo/subgrupo DRE para que o relatorio executivo fique util.
+- Titulo considerado na DRE precisa trazer competencia real no CSV; o sistema nao usa emissao nem vencimento como substituto automatico.
+- Titulo considerado na DRE precisa trazer categoria financeira compativel com PAGAR/RECEBER, marcada para DRE e com grupo DRE preenchido.
 - Titulos importados ficam com origem `SIENGE_IMPORT`.
 - O sistema grava mapeamento SIENGE de parceiros e titulos quando os ids externos forem informados.
 

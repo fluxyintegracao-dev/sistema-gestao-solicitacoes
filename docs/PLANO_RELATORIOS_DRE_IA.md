@@ -56,6 +56,7 @@ Base multiempresa e DRE gerencial:
 - Grupo Consolidado passou a exibir Endividamento Aberto como indicador executivo derivado do relatorio de endividamento.
 - O cadastro operacional de categorias financeiras deixou de preencher grupo DRE automaticamente; categoria marcada para DRE agora exige grupo DRE explicito.
 - Atalhos de tarifas bancarias passaram a aceitar somente categorias de saida classificadas para DRE e bloqueiam categorias de endividamento, investimento, patrimonio, intercompany ou transferencia interna.
+- A carga inicial SIENGE deixou de usar emissao ou vencimento como fallback de competencia DRE; titulos considerados na DRE agora exigem competencia real e categoria financeira classificada.
 
 Documentacao operacional complementar:
 

@@ -449,7 +449,8 @@ export default function IntegracaoSiengeInicio() {
             <h2 className="text-lg font-semibold text-slate-900">Carga inicial financeira</h2>
             <p className="mt-1 text-sm leading-6 text-slate-500">
               Importe cadastros de credores/clientes e titulos em aberto exportados do SIENGE. Cada linha precisa apontar
-              para uma obra ou centro de custo ja vinculado a uma empresa do grupo para manter DRE e relatorios consistentes.
+              para uma obra ou centro de custo ja vinculado a uma empresa do grupo. Titulos considerados na DRE tambem
+              precisam trazer competencia e categoria financeira ja classificada para DRE.
             </p>
           </div>
           <button type="button" className="btn btn-outline btn-sm" onClick={baixarModeloCargaInicial}>
