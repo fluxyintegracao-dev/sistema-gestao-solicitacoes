@@ -123,6 +123,9 @@ async function confirmBaixaFromPaymentIntent(req, id, payload = {}) {
     if (!['ABERTO', 'PARCIAL'].includes(String(titulo.status || '').toUpperCase())) {
       throw createHttpError(400, 'Titulo nao permite baixa neste status.');
     }
+    if (!titulo.empresa_id) {
+      throw createHttpError(400, 'Titulo financeiro nao possui empresa pagadora vinculada.');
+    }
 
     const valorBaixa = roundCurrency(intent.valor);
     const saldoAtual = roundCurrency(titulo.valor_saldo);
@@ -147,6 +150,9 @@ async function confirmBaixaFromPaymentIntent(req, id, payload = {}) {
     }
     if (Number(contaBancaria.empresa_id) !== Number(paymentAccount.empresa_id)) {
       throw createHttpError(400, 'Empresa da conta bancaria diverge da empresa pagadora do lote.');
+    }
+    if (Number(titulo.empresa_id) !== Number(paymentAccount.empresa_id)) {
+      throw createHttpError(400, 'Empresa do titulo diverge da empresa pagadora do lote.');
     }
     const caixaSessao = contaBancaria
       ? await obterSessaoAbertaParaConta(contaBancaria, dataMovimento, { transaction })

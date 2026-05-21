@@ -1,5 +1,6 @@
 const { Op } = require('sequelize');
 const {
+  ContaBancaria,
   EmpresaGrupo,
   PaymentAccount,
   PaymentBeneficiary,
@@ -55,7 +56,9 @@ async function validateBeneficiaryComplete(beneficiary) {
 }
 
 async function validatePaymentAccount(paymentAccountId) {
-  const account = await PaymentAccount.findByPk(paymentAccountId);
+  const account = await PaymentAccount.findByPk(paymentAccountId, {
+    include: [{ model: ContaBancaria, as: 'contaBancaria' }]
+  });
   if (!account || account.ativo === false) {
     throw createHttpError(400, 'Conta pagadora nao encontrada ou inativa.');
   }
@@ -68,6 +71,15 @@ async function validatePaymentAccount(paymentAccountId) {
   }
   if (onlyDigits(account.cnpj_pagador).length !== 14) {
     throw createHttpError(400, 'Conta pagadora sem CNPJ pagador valido.');
+  }
+  if (!account.conta_bancaria_id || !account.contaBancaria) {
+    throw createHttpError(400, 'Conta pagadora sem conta bancaria financeira vinculada.');
+  }
+  if (!account.contaBancaria.empresa_id) {
+    throw createHttpError(400, 'Conta bancaria financeira vinculada ao pagamento nao possui empresa vinculada.');
+  }
+  if (Number(account.contaBancaria.empresa_id) !== Number(account.empresa_id)) {
+    throw createHttpError(400, 'Empresa da conta bancaria financeira diverge da empresa pagadora configurada.');
   }
   const requiredFields = [
     ['provider_id', 'provider de pagamento'],

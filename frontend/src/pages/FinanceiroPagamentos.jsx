@@ -122,12 +122,41 @@ function getPaymentAccountPendencies(account = {}) {
   const pendencies = [];
   if (account?.ativo === false) pendencies.push('Conta inativa.');
   if (!account?.empresa_id && !account?.empresa?.id) pendencies.push('Empresa pagadora pendente.');
+  if (account?.empresa_id && account?.contaBancaria?.empresa_id && Number(account.empresa_id) !== Number(account.contaBancaria.empresa_id)) {
+    pendencies.push('Empresa da conta bancaria diverge da empresa pagadora.');
+  }
   if (onlyDigits(account?.cnpj_pagador).length !== 14) pendencies.push('CNPJ pagador incompleto.');
   if (!account?.banco_codigo) pendencies.push('Banco pendente.');
   if (!account?.agencia) pendencies.push('Agencia pendente.');
   if (!account?.conta) pendencies.push('Conta pendente.');
   if (!account?.tipo_conta) pendencies.push('Tipo de conta pendente.');
   if (!account?.convenio) pendencies.push('Convenio pendente.');
+  return pendencies;
+}
+
+function getPaymentAccountEmpresaId(account = {}) {
+  return Number(account?.empresa_id || account?.empresa?.id || 0);
+}
+
+function getTituloEmpresaId(titulo = {}) {
+  return Number(titulo?.empresa_id || titulo?.empresa?.id || 0);
+}
+
+function getTituloPaymentAccountPendencies(titulo = {}, account = null) {
+  const pendencies = [];
+  const tituloEmpresaId = getTituloEmpresaId(titulo);
+  const accountEmpresaId = getPaymentAccountEmpresaId(account);
+
+  if (!tituloEmpresaId) {
+    pendencies.push('Titulo sem empresa pagadora.');
+  }
+  if (!accountEmpresaId) {
+    pendencies.push('Selecione uma conta pagadora completa.');
+  }
+  if (tituloEmpresaId && accountEmpresaId && tituloEmpresaId !== accountEmpresaId) {
+    pendencies.push('Empresa do titulo diferente da conta pagadora.');
+  }
+
   return pendencies;
 }
 
@@ -340,16 +369,31 @@ export default function FinanceiroPagamentos() {
     [selectedPaymentAccount]
   );
 
+  const selectedTitulosAccountPendencies = useMemo(() => {
+    const selected = new Set(selectedIds.map(String));
+    return titulos
+      .filter((titulo) => selected.has(String(titulo.id)))
+      .map((titulo) => ({
+        titulo,
+        pendencias: getTituloPaymentAccountPendencies(titulo, selectedPaymentAccount)
+      }))
+      .filter((item) => item.pendencias.length > 0);
+  }, [selectedIds, selectedPaymentAccount, titulos]);
+
   const titulosOverview = useMemo(() => {
     const eligible = titulos.filter((titulo) => titulo.elegivel_pagamento);
+    const compatible = eligible.filter((titulo) => getTituloPaymentAccountPendencies(titulo, selectedPaymentAccount).length === 0);
     return {
       total: titulos.length,
       eligibleCount: eligible.length,
+      compatibleCount: compatible.length,
       blockedCount: Math.max(titulos.length - eligible.length, 0),
+      companyBlockedCount: Math.max(eligible.length - compatible.length, 0),
       selectedCount: selectedIds.length,
-      selectedTotal
+      selectedTotal,
+      selectedCompanyBlockedCount: selectedTitulosAccountPendencies.length
     };
-  }, [selectedIds.length, selectedTotal, titulos]);
+  }, [selectedIds.length, selectedPaymentAccount, selectedTitulosAccountPendencies.length, selectedTotal, titulos]);
 
   const pageGuidance = useMemo(() => {
     if (activeTab === 'titulos') {
@@ -373,14 +417,16 @@ export default function FinanceiroPagamentos() {
         return {
           eyebrow: 'Lote em montagem',
           title: `${titulosOverview.selectedCount} titulo(s) selecionado(s)`,
-          body: `${formatCurrency(titulosOverview.selectedTotal)} pronto para gerar lote, desde que conta pagadora e data estejam corretas.`
+          body: titulosOverview.selectedCompanyBlockedCount
+            ? `${titulosOverview.selectedCompanyBlockedCount} titulo(s) selecionado(s) nao pertencem a empresa da conta pagadora.`
+            : `${formatCurrency(titulosOverview.selectedTotal)} pronto para gerar lote, desde que conta pagadora e data estejam corretas.`
         };
       }
       return {
         eyebrow: 'Conferencia',
-        title: `${titulosOverview.eligibleCount} titulo(s) elegivel(is)`,
-        body: titulosOverview.blockedCount
-          ? `${titulosOverview.blockedCount} titulo(s) ficaram bloqueados por pendencias cadastrais.`
+        title: `${titulosOverview.compatibleCount} titulo(s) pronto(s) para a conta selecionada`,
+        body: titulosOverview.blockedCount || titulosOverview.companyBlockedCount
+          ? `${titulosOverview.blockedCount} com pendencias cadastrais e ${titulosOverview.companyBlockedCount} de outra empresa para esta conta.`
           : 'Selecione os titulos que realmente devem ser pagos neste lote.'
       };
     }
@@ -418,6 +464,10 @@ export default function FinanceiroPagamentos() {
     try {
       if (!selectedIds.length) {
         setError('Selecione ao menos um titulo elegivel.');
+        return;
+      }
+      if (selectedTitulosAccountPendencies.length > 0) {
+        setError('Remova da selecao os titulos cuja empresa diverge da conta pagadora.');
         return;
       }
       setActionLoading('criar-lote');
@@ -664,14 +714,21 @@ export default function FinanceiroPagamentos() {
                     <HiOutlineClock className="h-4 w-4" />
                     {actionLoading === 'titulos' ? 'Buscando...' : 'Buscar elegiveis'}
                   </button>
-                  <button type="button" className="btn btn-outline" onClick={handleCriarLote} disabled={!canPrepare || !selectedIds.length || !batchForm.payment_account_id || selectedPaymentAccountPendencies.length > 0 || actionLoading === 'criar-lote'}>
+                  <button type="button" className="btn btn-outline" onClick={handleCriarLote} disabled={!canPrepare || !selectedIds.length || !batchForm.payment_account_id || selectedPaymentAccountPendencies.length > 0 || selectedTitulosAccountPendencies.length > 0 || actionLoading === 'criar-lote'}>
                     <HiOutlineBanknotes className="h-4 w-4" />
                     {actionLoading === 'criar-lote' ? 'Gerando...' : `Gerar lote (${selectedIds.length})`}
                   </button>
                   <span className="app-status-pill bg-slate-100 text-slate-700">{formatCurrency(selectedTotal)}</span>
                 </div>
+                {selectedTitulosAccountPendencies.length > 0 && (
+                  <div className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+                    Remova da selecao os titulos de outra empresa antes de gerar o lote:
+                    {' '}
+                    {selectedTitulosAccountPendencies.map(({ titulo }) => getTituloCodigo(titulo)).join(', ')}.
+                  </div>
+                )}
                 {titulosOverview.total > 0 && (
-                  <div className="mt-4 grid gap-2 rounded-lg border border-slate-200 bg-slate-50/80 p-3 text-sm md:grid-cols-4">
+                  <div className="mt-4 grid gap-2 rounded-lg border border-slate-200 bg-slate-50/80 p-3 text-sm md:grid-cols-5">
                     <div>
                       <span className="block text-xs uppercase tracking-[0.14em] text-[var(--c-muted)]">Listados</span>
                       <strong className="text-[var(--c-text)]">{titulosOverview.total}</strong>
@@ -679,6 +736,10 @@ export default function FinanceiroPagamentos() {
                     <div>
                       <span className="block text-xs uppercase tracking-[0.14em] text-[var(--c-muted)]">Elegiveis</span>
                       <strong className="text-emerald-700">{titulosOverview.eligibleCount}</strong>
+                    </div>
+                    <div>
+                      <span className="block text-xs uppercase tracking-[0.14em] text-[var(--c-muted)]">Para esta conta</span>
+                      <strong className={titulosOverview.companyBlockedCount ? 'text-amber-700' : 'text-emerald-700'}>{titulosOverview.compatibleCount}</strong>
                     </div>
                     <div>
                       <span className="block text-xs uppercase tracking-[0.14em] text-[var(--c-muted)]">Com pendencia</span>
@@ -710,13 +771,16 @@ export default function FinanceiroPagamentos() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
-                        {titulos.map((titulo) => (
-                          <tr key={titulo.id} className={titulo.elegivel_pagamento ? '' : 'bg-amber-50/50'}>
+                        {titulos.map((titulo) => {
+                          const accountPendencies = getTituloPaymentAccountPendencies(titulo, selectedPaymentAccount);
+                          const canSelectTitulo = titulo.elegivel_pagamento && accountPendencies.length === 0;
+                          return (
+                          <tr key={titulo.id} className={canSelectTitulo ? '' : 'bg-amber-50/50'}>
                             <td className="px-3 py-3">
                               <input
                                 type="checkbox"
                                 checked={selectedIds.map(String).includes(String(titulo.id))}
-                                disabled={!titulo.elegivel_pagamento}
+                                disabled={!canSelectTitulo}
                                 onChange={() => toggleTitulo(titulo.id)}
                               />
                             </td>
@@ -731,14 +795,15 @@ export default function FinanceiroPagamentos() {
                             <td className="px-3 py-3">{formatDate(titulo.data_vencimento)}</td>
                             <td className="px-3 py-3 text-right font-medium">{formatCurrency(titulo.valor_saldo)}</td>
                             <td className="px-3 py-3">
-                              {titulo.elegivel_pagamento ? (
+                              {canSelectTitulo ? (
                                 <span className="app-status-pill bg-emerald-100 text-emerald-700">ELEGIVEL</span>
                               ) : (
-                                <span className="text-xs text-amber-700">{(titulo.pendencias_pagamento || []).join(' ')}</span>
+                                <span className="text-xs text-amber-700">{[...(titulo.pendencias_pagamento || []), ...accountPendencies].join(' ')}</span>
                               )}
                             </td>
                           </tr>
-                        ))}
+                        );
+                        })}
                       </tbody>
                     </table>
                   </div>

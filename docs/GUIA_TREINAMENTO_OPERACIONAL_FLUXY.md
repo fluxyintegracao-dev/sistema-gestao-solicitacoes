@@ -1160,7 +1160,7 @@ Fluxo correto:
 4. Filtrar vencimento, parceiro, obra ou centro de custo quando necessario.
 5. Clicar em `Buscar elegiveis`.
 6. Conferir credor, favorecido PIX, vencimento e saldo de cada titulo.
-7. Selecionar apenas os titulos que realmente devem ser pagos.
+7. Selecionar apenas os titulos que realmente devem ser pagos e que pertencem a mesma empresa da conta pagadora escolhida.
 8. Conferir conta pagadora e data programada.
 9. Clicar em `Gerar lote`.
 10. Entrar em `Lotes`.
@@ -1191,7 +1191,10 @@ Cuidados:
 - nao usar conta pagadora sem empresa vinculada para "resolver depois";
 - se a conta pagadora aparecer como incompleta, corrigir o cadastro antes de gerar lote;
 - a empresa pagadora nao deve ser deduzida pela conta bancaria ou pelo nome do banco: ela precisa estar preenchida explicitamente.
-- a baixa gerada apos confirmacao bancaria usa a empresa da conta pagadora do lote; se a conta bancaria interna estiver sem empresa ou com empresa diferente, o cadastro deve ser corrigido antes da baixa.
+- a empresa da conta bancaria interna precisa ser igual a empresa pagadora configurada na conta pagadora;
+- o sistema bloqueia lote quando o titulo pertence a empresa diferente da conta pagadora;
+- se uma empresa for pagar titulo de outra, nao forcar o lote comum: primeiro modele a operacao intercompany correta;
+- a baixa gerada apos confirmacao bancaria usa a empresa da conta pagadora do lote e exige que ela seja igual a empresa do titulo.
 
 ### 11.9 Grupo Consolidado
 

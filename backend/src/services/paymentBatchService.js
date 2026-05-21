@@ -75,6 +75,7 @@ function snapshotTitulo(titulo) {
     valor_baixado: data.valor_baixado,
     data_vencimento: data.data_vencimento,
     obra_id: data.obra_id,
+    empresa_id: data.empresa_id,
     parceiro_id: data.parceiro_id,
     parceiro: data.parceiro ? {
       id: data.parceiro.id,
@@ -224,6 +225,12 @@ async function createBatchFromTitulos(req, payload = {}) {
 
       await validateBeneficiaryComplete(beneficiary);
       await validateTituloEligibleForPayment(titulo, { beneficiary, transaction });
+      if (!titulo.empresa_id) {
+        throw createHttpError(400, `Titulo ${titulo.codigo || `#${titulo.id}`} nao possui empresa pagadora vinculada.`);
+      }
+      if (Number(titulo.empresa_id) !== Number(paymentAccount.empresa_id)) {
+        throw createHttpError(400, `Titulo ${titulo.codigo || `#${titulo.id}`} pertence a outra empresa. Selecione a conta pagadora da mesma empresa do titulo ou registre a operacao intercompany correta antes de gerar o lote.`);
+      }
 
       const valor = Number(titulo.valor_saldo || 0);
       const intent = await PaymentIntent.create({
