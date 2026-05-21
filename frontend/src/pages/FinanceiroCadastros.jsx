@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   atualizarCartaoFinanceiro,
   atualizarCategoriaFinanceira,
@@ -305,6 +305,8 @@ export default function FinanceiroCadastros() {
   const [favorecidos, setFavorecidos] = useState([]);
   const [savingFavorecido, setSavingFavorecido] = useState(false);
   const [loadingFavorecidos, setLoadingFavorecidos] = useState(false);
+  const categoriaFormRef = useRef(null);
+  const categoriaNomeInputRef = useRef(null);
 
   async function carregar() {
     try {
@@ -469,6 +471,14 @@ export default function FinanceiroCadastros() {
     } finally {
       setSavingCategoria(false);
     }
+  }
+
+  function handleEditarCategoria(categoria) {
+    setCategoriaForm(pickCategoriaFormData(categoria));
+    window.setTimeout(() => {
+      categoriaFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      categoriaNomeInputRef.current?.focus({ preventScroll: true });
+    }, 0);
   }
 
   async function handleSalvarFormaPagamento(event) {
@@ -887,12 +897,12 @@ export default function FinanceiroCadastros() {
           </div>
 
           <div className="space-y-4">
-            <div className="card sol-surface-card">
+            <div className="card sol-surface-card" ref={categoriaFormRef}>
               <h2 className="text-lg font-semibold text-[var(--c-text)]">
                 {categoriaForm.id ? 'Editar categoria financeira' : 'Nova categoria financeira'}
               </h2>
               <form className="mt-4 space-y-3" onSubmit={handleSalvarCategoria}>
-                <input className="input w-full" placeholder="Nome" value={categoriaForm.nome} onChange={(e) => setCategoriaForm((c) => ({ ...c, nome: e.target.value }))} required />
+                <input ref={categoriaNomeInputRef} className="input w-full" placeholder="Nome" value={categoriaForm.nome} onChange={(e) => setCategoriaForm((c) => ({ ...c, nome: e.target.value }))} required />
                 <select className="input w-full" value={categoriaForm.tipo} onChange={(e) => setCategoriaForm((c) => ({ ...c, tipo: e.target.value }))}>
                   <option value="AMBOS">Ambos</option>
                   <option value="PAGAR">Pagar</option>
@@ -1035,7 +1045,7 @@ export default function FinanceiroCadastros() {
                                   <span className={statusClass(categoria.ativo)}>
                                     {categoria.ativo ? 'ATIVA' : 'INATIVA'}
                                   </span>
-                                  <button type="button" className="btn btn-outline" onClick={() => setCategoriaForm(pickCategoriaFormData(categoria))}>
+                                  <button type="button" className="btn btn-outline" onClick={() => handleEditarCategoria(categoria)}>
                                     Editar
                                   </button>
                                 </div>

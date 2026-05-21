@@ -513,10 +513,28 @@ Passo a passo:
 3. Classificar a categoria para DRE.
 4. Identificar categorias que nao entram na DRE.
 5. Separar receita, custo, despesa, resultado financeiro, imposto e patrimonio.
+6. Definir a classificacao gerencial da categoria.
+
+Como classificar endividamento:
+
+- o sistema nao deve tentar descobrir endividamento pelo nome da categoria, pelo nome do fornecedor ou pela descricao do titulo;
+- somente categorias marcadas com `Classificacao gerencial = Endividamento` entram no relatorio de Endividamento;
+- essa regra evita que juros bancarios, tarifas, despesas financeiras comuns ou transferencias internas sejam tratadas como principal de divida;
+- a trilha correta deve ser sempre: `Relatorio de Endividamento -> Titulo financeiro -> Categoria financeira -> Classificacao gerencial = Endividamento`.
+
+Exemplos:
+
+- `Principal de financiamento bancario`: classificacao gerencial `Endividamento`;
+- `Principal de emprestimo`: classificacao gerencial `Endividamento`;
+- `Antecipacao de recebiveis`: classificacao gerencial `Endividamento`, quando a empresa tratar como divida financeira;
+- `Juros sobre financiamento`: manter como categoria de resultado financeiro da DRE, nao como principal de endividamento;
+- `Tarifa bancaria`: manter como despesa financeira, nao como endividamento;
+- `Transferencia entre empresas do grupo`: tratar como intercompany quando aplicavel, nao como divida externa consolidada.
 
 Cuidados:
 
 - categoria errada distorce a DRE;
+- categoria de endividamento errada distorce o passivo gerencial;
 - categorias muito genericas atrapalham analise;
 - categorias duplicadas confundem operadores.
 
