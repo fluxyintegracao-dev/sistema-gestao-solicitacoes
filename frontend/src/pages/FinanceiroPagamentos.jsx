@@ -46,6 +46,14 @@ const TABS = [
   { id: 'baixas', label: 'Confirmar baixa' }
 ];
 
+const BATCH_STEPS = [
+  { statuses: ['RASCUNHO'], label: 'Rascunho' },
+  { statuses: ['PENDENTE_APROVACAO'], label: 'Aprovacao' },
+  { statuses: ['APROVADO'], label: 'Aprovado' },
+  { statuses: ['ENVIADO_AO_BANCO', 'PROCESSANDO_BANCO'], label: 'Banco' },
+  { statuses: ['AGUARDANDO_CONFIRMACAO_BAIXA', 'BAIXADO'], label: 'Baixa' }
+];
+
 function today() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -92,6 +100,10 @@ function sumBy(list, fieldName) {
   return (Array.isArray(list) ? list : []).reduce((acc, item) => acc + Number(item?.[fieldName] || 0), 0);
 }
 
+function normalizeStatus(value) {
+  return String(value || '').toUpperCase();
+}
+
 function getTituloCodigo(titulo) {
   return titulo?.codigo || `#${titulo?.id}`;
 }
@@ -100,6 +112,74 @@ function getBeneficiaryLabel(titulo) {
   const beneficiary = titulo?.favorecido_pagamento;
   if (!beneficiary) return 'Sem favorecido';
   return `${beneficiary.nome || 'Favorecido'} - ${beneficiary.pix_tipo_chave || 'PIX'} ${beneficiary.pix_chave || ''}`;
+}
+
+function buildBatchGuidance(batch, approvalsCount, isBbSandbox) {
+  const status = normalizeStatus(batch?.status);
+  if (!batch) {
+    return {
+      eyebrow: 'Revisao de lote',
+      title: 'Selecione um lote para continuar',
+      body: 'Escolha um lote na lista para conferir itens, aprovacoes e historico tecnico.',
+      targetTab: 'lotes',
+      actionLabel: 'Ver lotes'
+    };
+  }
+  if (status === 'RASCUNHO') {
+    return {
+      eyebrow: 'Proximo passo',
+      title: 'Submeter o lote para aprovacao',
+      body: 'Confira conta pagadora, valor total e favorecidos antes de iniciar a dupla aprovacao.'
+    };
+  }
+  if (status === 'PENDENTE_APROVACAO') {
+    return {
+      eyebrow: 'Aprovacao',
+      title: `${approvalsCount}/2 aprovacoes registradas`,
+      body: 'Cada aprovador deve conferir os itens e informar MFA proprio. O criador do lote nao aprova o proprio lote.'
+    };
+  }
+  if (status === 'APROVADO') {
+    return {
+      eyebrow: 'Envio bancario',
+      title: isBbSandbox ? 'Enviar para BB Sandbox' : 'Enviar em modo mock',
+      body: 'Depois do envio, aguarde retorno bancario. A baixa financeira ainda nao deve ser feita nesta etapa.'
+    };
+  }
+  if (['ENVIADO_AO_BANCO', 'PROCESSANDO_BANCO'].includes(status)) {
+    return {
+      eyebrow: 'Retorno bancario',
+      title: 'Acompanhar retorno do banco',
+      body: isBbSandbox ? 'Use a sincronizacao BB para atualizar as transacoes.' : 'Use o retorno mock para simular confirmacao ou falha.'
+    };
+  }
+  if (status === 'AGUARDANDO_CONFIRMACAO_BAIXA') {
+    return {
+      eyebrow: 'Baixa financeira',
+      title: 'Confirmar baixa dos pagamentos liquidados',
+      body: 'Somente pagamentos confirmados pelo banco devem virar baixa financeira no titulo.',
+      targetTab: 'baixas',
+      actionLabel: 'Ver baixas pendentes'
+    };
+  }
+  if (['REJEITADO', 'FALHA_INTEGRACAO', 'PARCIALMENTE_REJEITADO'].includes(status)) {
+    return {
+      eyebrow: 'Correcao',
+      title: 'Corrigir causa antes de reprocessar',
+      body: 'Revise favorecido, conta pagadora, retorno tecnico e justificativas antes de gerar novo envio.'
+    };
+  }
+  return {
+    eyebrow: 'Status do lote',
+    title: batch.status || 'Lote selecionado',
+    body: 'Confira historico, itens e transacoes para definir a proxima acao operacional.'
+  };
+}
+
+function getBatchStepIndex(status) {
+  const normalized = normalizeStatus(status);
+  const index = BATCH_STEPS.findIndex((step) => step.statuses.includes(normalized));
+  return index >= 0 ? index : -1;
 }
 
 export default function FinanceiroPagamentos() {
@@ -215,8 +295,8 @@ export default function FinanceiroPagamentos() {
 
   const paymentOverview = useMemo(() => {
     const activeAccounts = accounts.filter((account) => account?.ativo !== false);
-    const pendingApproval = batches.filter((batch) => batch?.status === 'PENDENTE_APROVACAO');
-    const bankProcessing = batches.filter((batch) => ['ENVIADO_AO_BANCO', 'PROCESSANDO_BANCO', 'FALHA_INTEGRACAO'].includes(batch?.status));
+    const pendingApproval = batches.filter((batch) => normalizeStatus(batch?.status) === 'PENDENTE_APROVACAO');
+    const bankProcessing = batches.filter((batch) => ['ENVIADO_AO_BANCO', 'PROCESSANDO_BANCO', 'FALHA_INTEGRACAO'].includes(normalizeStatus(batch?.status)));
 
     return {
       activeAccounts: activeAccounts.length,
@@ -231,6 +311,72 @@ export default function FinanceiroPagamentos() {
       modeLabel: isBbSandbox ? 'BB Sandbox' : 'Mock interno'
     };
   }, [accounts, awaitingBaixa, batches, bbHealth, isBbSandbox]);
+
+  const titulosOverview = useMemo(() => {
+    const eligible = titulos.filter((titulo) => titulo.elegivel_pagamento);
+    return {
+      total: titulos.length,
+      eligibleCount: eligible.length,
+      blockedCount: Math.max(titulos.length - eligible.length, 0),
+      selectedCount: selectedIds.length,
+      selectedTotal
+    };
+  }, [selectedIds.length, selectedTotal, titulos]);
+
+  const pageGuidance = useMemo(() => {
+    if (activeTab === 'titulos') {
+      if (paymentOverview.activeAccounts === 0) {
+        return {
+          eyebrow: 'Preparacao',
+          title: 'Cadastre uma conta pagadora ativa',
+          body: 'Sem conta pagadora ativa, o financeiro nao consegue montar lote com empresa, CNPJ e convenio corretos.',
+          targetTab: 'titulos',
+          actionLabel: 'Selecionar titulos'
+        };
+      }
+      if (!titulosOverview.total) {
+        return {
+          eyebrow: 'Preparacao',
+          title: 'Busque os titulos elegiveis',
+          body: 'Use os filtros para montar uma lista curta e conferir favorecidos antes de gerar o lote.'
+        };
+      }
+      if (titulosOverview.selectedCount > 0) {
+        return {
+          eyebrow: 'Lote em montagem',
+          title: `${titulosOverview.selectedCount} titulo(s) selecionado(s)`,
+          body: `${formatCurrency(titulosOverview.selectedTotal)} pronto para gerar lote, desde que conta pagadora e data estejam corretas.`
+        };
+      }
+      return {
+        eyebrow: 'Conferencia',
+        title: `${titulosOverview.eligibleCount} titulo(s) elegivel(is)`,
+        body: titulosOverview.blockedCount
+          ? `${titulosOverview.blockedCount} titulo(s) ficaram bloqueados por pendencias cadastrais.`
+          : 'Selecione os titulos que realmente devem ser pagos neste lote.'
+      };
+    }
+
+    if (activeTab === 'lotes') {
+      return buildBatchGuidance(selectedBatch, validApprovals.length, isBbSandbox);
+    }
+
+    if (awaitingBaixa.length > 0) {
+      return {
+        eyebrow: 'Baixa financeira',
+        title: `${awaitingBaixa.length} pagamento(s) aguardando baixa`,
+        body: `${formatCurrency(sumBy(awaitingBaixa, 'valor'))} ja foi confirmado pelo banco e precisa de baixa operacional.`
+      };
+    }
+
+    return {
+      eyebrow: 'Baixa financeira',
+      title: 'Nenhuma baixa pendente',
+      body: 'Quando o banco confirmar pagamentos, eles aparecerao aqui para baixa semiautomatica.'
+    };
+  }, [activeTab, awaitingBaixa, isBbSandbox, paymentOverview.activeAccounts, selectedBatch, titulosOverview, validApprovals.length]);
+
+  const selectedBatchStepIndex = useMemo(() => getBatchStepIndex(selectedBatch?.status), [selectedBatch?.status]);
 
   function toggleTitulo(id) {
     setSelectedIds((current) => (
@@ -365,7 +511,11 @@ export default function FinanceiroPagamentos() {
 
       {!loading && (
         <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <div className="card sol-surface-card">
+          <button
+            type="button"
+            className="card sol-surface-card text-left transition hover:-translate-y-0.5 hover:border-[var(--c-primary)]"
+            onClick={() => setActiveTab('titulos')}
+          >
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--c-muted)]">Conta pagadora</p>
             <p className="mt-2 text-2xl font-semibold text-[var(--c-text)]">
               {paymentOverview.activeAccounts}/{paymentOverview.totalAccounts}
@@ -373,23 +523,53 @@ export default function FinanceiroPagamentos() {
             <p className="mt-1 text-sm text-[var(--c-muted)]">
               {paymentOverview.activeAccounts > 0 ? 'Conta ativa pronta para preparar lotes.' : 'Cadastre uma conta ativa antes de gerar lote.'}
             </p>
-          </div>
-          <div className="card sol-surface-card">
+          </button>
+          <button
+            type="button"
+            className="card sol-surface-card text-left transition hover:-translate-y-0.5 hover:border-[var(--c-primary)]"
+            onClick={() => setActiveTab('lotes')}
+          >
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--c-muted)]">Aguardando aprovacao</p>
             <p className="mt-2 text-2xl font-semibold text-[var(--c-text)]">{paymentOverview.pendingApprovalCount}</p>
             <p className="mt-1 text-sm text-[var(--c-muted)]">{formatCurrency(paymentOverview.pendingApprovalValue)} pendente de dupla conferencia.</p>
-          </div>
-          <div className="card sol-surface-card">
+          </button>
+          <button
+            type="button"
+            className="card sol-surface-card text-left transition hover:-translate-y-0.5 hover:border-[var(--c-primary)]"
+            onClick={() => setActiveTab('lotes')}
+          >
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--c-muted)]">Banco / retorno</p>
             <p className="mt-2 text-2xl font-semibold text-[var(--c-text)]">{paymentOverview.bankProcessingCount}</p>
             <p className="mt-1 text-sm text-[var(--c-muted)]">
               {paymentOverview.modeLabel} - {isBbSandbox ? (paymentOverview.certificateConfigured ? 'certificado configurado' : 'certificado pendente') : 'retorno simulado'}
             </p>
-          </div>
-          <div className="card sol-surface-card">
+            <p className="mt-1 text-xs font-medium text-[var(--c-muted)]">{formatCurrency(paymentOverview.bankProcessingValue)} em acompanhamento.</p>
+          </button>
+          <button
+            type="button"
+            className="card sol-surface-card text-left transition hover:-translate-y-0.5 hover:border-[var(--c-primary)]"
+            onClick={() => setActiveTab('baixas')}
+          >
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--c-muted)]">Baixa pendente</p>
             <p className="mt-2 text-2xl font-semibold text-[var(--c-text)]">{paymentOverview.awaitingBaixaCount}</p>
             <p className="mt-1 text-sm text-[var(--c-muted)]">{formatCurrency(paymentOverview.awaitingBaixaValue)} confirmado pelo banco aguardando baixa.</p>
+          </button>
+        </section>
+      )}
+
+      {!loading && (
+        <section className="rounded-lg border border-slate-200 bg-white/80 p-4 shadow-sm">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--c-muted)]">{pageGuidance.eyebrow}</p>
+              <h2 className="mt-1 text-lg font-semibold text-[var(--c-text)]">{pageGuidance.title}</h2>
+              <p className="mt-1 text-sm text-[var(--c-muted)]">{pageGuidance.body}</p>
+            </div>
+            {pageGuidance.targetTab && pageGuidance.targetTab !== activeTab && (
+              <button type="button" className="btn btn-outline" onClick={() => setActiveTab(pageGuidance.targetTab)}>
+                {pageGuidance.actionLabel || 'Abrir etapa'}
+              </button>
+            )}
           </div>
         </section>
       )}
@@ -454,6 +634,26 @@ export default function FinanceiroPagamentos() {
                   </button>
                   <span className="app-status-pill bg-slate-100 text-slate-700">{formatCurrency(selectedTotal)}</span>
                 </div>
+                {titulosOverview.total > 0 && (
+                  <div className="mt-4 grid gap-2 rounded-lg border border-slate-200 bg-slate-50/80 p-3 text-sm md:grid-cols-4">
+                    <div>
+                      <span className="block text-xs uppercase tracking-[0.14em] text-[var(--c-muted)]">Listados</span>
+                      <strong className="text-[var(--c-text)]">{titulosOverview.total}</strong>
+                    </div>
+                    <div>
+                      <span className="block text-xs uppercase tracking-[0.14em] text-[var(--c-muted)]">Elegiveis</span>
+                      <strong className="text-emerald-700">{titulosOverview.eligibleCount}</strong>
+                    </div>
+                    <div>
+                      <span className="block text-xs uppercase tracking-[0.14em] text-[var(--c-muted)]">Com pendencia</span>
+                      <strong className={titulosOverview.blockedCount ? 'text-amber-700' : 'text-[var(--c-text)]'}>{titulosOverview.blockedCount}</strong>
+                    </div>
+                    <div>
+                      <span className="block text-xs uppercase tracking-[0.14em] text-[var(--c-muted)]">Selecionado</span>
+                      <strong className="text-[var(--c-primary)]">{formatCurrency(titulosOverview.selectedTotal)}</strong>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="card sol-surface-card">
@@ -556,6 +756,24 @@ export default function FinanceiroPagamentos() {
                         <span className="app-status-pill bg-slate-100 text-slate-700">{formatCurrency(selectedBatch.valor_total)}</span>
                         <span className="app-status-pill bg-slate-100 text-slate-700">{validApprovals.length}/2 aprovacoes</span>
                       </div>
+                    </div>
+
+                    <div className="grid gap-2 md:grid-cols-5">
+                      {BATCH_STEPS.map((step, index) => {
+                        const isCurrent = index === selectedBatchStepIndex;
+                        const isDone = selectedBatchStepIndex > index;
+                        const tone = isCurrent
+                          ? 'border-[var(--c-primary)] bg-blue-50 text-[var(--c-primary)]'
+                          : isDone
+                            ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                            : 'border-slate-200 bg-slate-50 text-slate-500';
+                        return (
+                          <div key={step.label} className={`rounded-lg border px-3 py-2 text-sm font-semibold ${tone}`}>
+                            <span className="mr-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-white/80 text-xs">{index + 1}</span>
+                            {step.label}
+                          </div>
+                        );
+                      })}
                     </div>
 
                     <div className="grid gap-3 md:grid-cols-[minmax(180px,260px)_1fr]">
