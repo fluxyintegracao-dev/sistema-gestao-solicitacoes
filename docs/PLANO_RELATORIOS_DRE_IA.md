@@ -62,6 +62,7 @@ Base multiempresa e DRE gerencial:
 - O lote de pagamento passou a ter validacao de integridade antes de submeter, aprovar ou enviar, reconferindo titulo, saldo, empresa, favorecido, conta pagadora, quantidade de itens e total.
 - A confirmacao de baixa de pagamento em massa passou a exigir confirmacao bancaria registrada e a reaproveitar reconciliacao tecnica existente, evitando duplicidade na baixa/reconciliacao.
 - As aprovacoes de lote de pagamento passaram a gravar hash de integridade do conteudo aprovado, e envio/reprocessamento conferem esse hash para impedir que um lote alterado siga com aprovacao antiga.
+- O cancelamento de lote de pagamento pendente de aprovacao ou aprovado passou a exigir MFA step-up, mantendo rascunho/revisao cancelaveis apenas com justificativa.
 
 Documentacao operacional complementar:
 

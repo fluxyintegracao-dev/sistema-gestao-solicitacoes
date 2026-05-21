@@ -125,9 +125,11 @@ function validatePaymentRejectBody(payload = {}) {
 }
 
 function validatePaymentCancelBody(payload = {}) {
-  ensureAllowedKeys(payload, ['justificativa'], 'Cancelamento de lote');
+  ensureAllowedKeys(payload, ['justificativa', 'codigo_mfa', 'mfa_code'], 'Cancelamento de lote');
   return cleanUndefined({
-    justificativa: parseOptionalText(payload.justificativa, 'Justificativa', 500)
+    justificativa: parseOptionalText(payload.justificativa, 'Justificativa', 500),
+    codigo_mfa: parseOptionalText(payload.codigo_mfa, 'Codigo MFA', 12),
+    mfa_code: parseOptionalText(payload.mfa_code, 'Codigo MFA', 12)
   });
 }
 

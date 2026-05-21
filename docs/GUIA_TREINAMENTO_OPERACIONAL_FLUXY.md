@@ -1264,6 +1264,8 @@ Cuidados:
 - a confirmacao de baixa so deve aparecer quando o pagamento tiver data/hora de confirmacao bancaria registrada;
 - se o banco rejeitar ou falhar, corrigir a causa antes de reprocessar;
 - se um lote for cancelado ou rejeitado, os titulos devem ser revisados antes de entrar em novo lote;
+- cancelar lote em rascunho ou revisao exige justificativa; cancelar lote pendente de aprovacao ou ja aprovado exige justificativa e MFA;
+- nao usar cancelamento de lote aprovado para esconder erro de cadastro: registre a causa na justificativa e corrija a origem antes de montar novo lote;
 - conta pagadora precisa representar a empresa real que vai movimentar o caixa;
 - nao usar conta pagadora sem empresa vinculada para "resolver depois";
 - se a conta pagadora aparecer como incompleta, corrigir o cadastro antes de gerar lote;

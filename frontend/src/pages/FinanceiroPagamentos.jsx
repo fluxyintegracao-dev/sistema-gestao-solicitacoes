@@ -464,6 +464,7 @@ export default function FinanceiroPagamentos() {
   }, [activeTab, awaitingBaixa, isBbSandbox, paymentOverview.activeAccounts, selectedBatch, titulosOverview, validApprovals.length]);
 
   const selectedBatchStepIndex = useMemo(() => getBatchStepIndex(selectedBatch?.status), [selectedBatch?.status]);
+  const cancelRequiresMfa = ['PENDENTE_APROVACAO', 'APROVADO'].includes(String(selectedBatch?.status || '').toUpperCase());
 
   function toggleTitulo(id) {
     setSelectedIds((current) => (
@@ -535,10 +536,15 @@ export default function FinanceiroPagamentos() {
 
   function handleCancelBatch() {
     if (!selectedBatch?.id) return;
+    if (cancelRequiresMfa && !String(mfaCode || '').trim()) {
+      setError('Informe o codigo MFA para cancelar lote pendente de aprovacao ou aprovado.');
+      return;
+    }
     const justificativa = window.prompt('Informe o motivo do cancelamento do lote:');
     if (justificativa === null) return;
     runBatchAction('cancelar', (id) => cancelarPaymentBatch(id, {
-      justificativa: justificativa.trim() || 'Cancelado pela operacao financeira.'
+      justificativa: justificativa.trim() || 'Cancelado pela operacao financeira.',
+      codigo_mfa: cancelRequiresMfa ? mfaCode : undefined
     }));
   }
 
@@ -918,7 +924,7 @@ export default function FinanceiroPagamentos() {
                         </button>
                         <button type="button" className="btn btn-outline" onClick={handleCancelBatch} disabled={!canCancel || !['RASCUNHO', 'EM_REVISAO', 'PENDENTE_APROVACAO', 'APROVADO'].includes(selectedBatch.status) || actionLoading === 'cancelar'}>
                           <HiOutlineXCircle className="h-4 w-4" />
-                          Cancelar
+                          {cancelRequiresMfa ? 'Cancelar com MFA' : 'Cancelar'}
                         </button>
                         {!isBbSandbox && (
                           <button type="button" className="btn btn-primary" onClick={() => runBatchAction('enviar', (id) => enviarPaymentBatchBanco(id, { codigo_mfa: mfaCode }))} disabled={!canSend || selectedBatch.status !== 'APROVADO' || !mfaCode || actionLoading === 'enviar'}>

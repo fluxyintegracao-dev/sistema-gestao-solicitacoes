@@ -19,6 +19,7 @@ const {
 const { registrarEventoSeguranca } = require('./securityLogService');
 const { toSnapshot: beneficiarySnapshot } = require('./paymentBeneficiaryService');
 const { validatePaymentBatchIntegrity } = require('./paymentBatchIntegrityService');
+const { verifyMfaStepUp } = require('./paymentApprovalService');
 const {
   ACTIVE_INTENT_STATUSES,
   validateBeneficiaryComplete,
@@ -408,6 +409,9 @@ async function cancelBatch(req, id, payload = {}) {
     const cancelableStatuses = ['RASCUNHO', 'EM_REVISAO', 'PENDENTE_APROVACAO', 'APROVADO'];
     if (!cancelableStatuses.includes(statusAtual)) {
       throw createHttpError(400, 'Lote nao pode ser cancelado neste status.');
+    }
+    if (['PENDENTE_APROVACAO', 'APROVADO'].includes(statusAtual)) {
+      await verifyMfaStepUp(req, payload.codigo_mfa || payload.mfa_code);
     }
 
     const intentIds = (batch.items || []).map((item) => item.payment_intent_id);

@@ -969,6 +969,7 @@ Status sugeridos:
 - Envio ao banco nao cria baixa.
 - Confirmacao bancaria registrada cria baixa em transacao atomica.
 - Cada aprovacao grava hash de integridade do lote aprovado; envio e reprocessamento bloqueiam o lote se os dados atuais nao corresponderem aos hashes aprovados.
+- Cancelamento de lote ja submetido ou aprovado exige MFA step-up, alem de justificativa operacional.
 - OFX ou retorno bancario pode reforcar conciliacao, mas nao deve duplicar baixa; se ja houver reconciliacao tecnica da intencao, a baixa deve atualizar o registro existente.
 - Reprocessamento deve reutilizar idempotency key quando tecnicamente correto.
 
