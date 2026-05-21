@@ -259,6 +259,14 @@ const CATEGORIA_CLASSIFICACAO_GERENCIAL = [
   ['OUTROS', 'Outros']
 ];
 
+const CLASSIFICACOES_INCOMPATIVEIS_COM_TARIFA = new Set([
+  'ENDIVIDAMENTO',
+  'INVESTIMENTO',
+  'PATRIMONIAL',
+  'INTERCOMPANY',
+  'TRANSFERENCIA_INTERNA'
+]);
+
 function categoriaTipoLabel(tipo) {
   return CATEGORIA_TIPO_META[tipo]?.label || tipo;
 }
@@ -276,6 +284,21 @@ function categoriaTipoBadgeClass(tipo) {
     return 'finance-category-type-pill finance-category-type-pill--receber';
   }
   return 'finance-category-type-pill finance-category-type-pill--ambos';
+}
+
+function categoriaPossuiGrupoDre(categoria = {}) {
+  return categoria.considera_dre !== false && Boolean(String(categoria.dre_grupo || '').trim());
+}
+
+function categoriaAptaParaTarifaBancaria(categoria = {}) {
+  const tipo = String(categoria.tipo || '').trim().toUpperCase();
+  const classificacao = String(categoria.classificacao_gerencial || '').trim().toUpperCase();
+  return (
+    categoria.ativo !== false &&
+    ['PAGAR', 'AMBOS'].includes(tipo) &&
+    categoriaPossuiGrupoDre(categoria) &&
+    !CLASSIFICACOES_INCOMPATIVEIS_COM_TARIFA.has(classificacao)
+  );
 }
 
 export default function FinanceiroCadastros() {
@@ -393,10 +416,7 @@ export default function FinanceiroCadastros() {
 
   const categoriasTarifasBancarias = useMemo(() => (
     [...categorias]
-      .filter((categoria) => {
-        const tipo = String(categoria.tipo || '').trim().toUpperCase();
-        return categoria.ativo !== false && ['PAGAR', 'AMBOS'].includes(tipo);
-      })
+      .filter(categoriaAptaParaTarifaBancaria)
       .sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR', { sensitivity: 'base' }))
   ), [categorias]);
 
@@ -472,6 +492,10 @@ export default function FinanceiroCadastros() {
       setSavingCategoria(true);
       setError('');
       const { id, ...categoriaPayload } = pickCategoriaFormData(categoriaForm);
+      if (categoriaPayload.considera_dre !== false && !String(categoriaPayload.dre_grupo || '').trim()) {
+        setError('Informe o grupo DRE ou desmarque "Considerar na DRE" para salvar a categoria.');
+        return;
+      }
       if (categoriaForm.id) {
         await atualizarCategoriaFinanceira(categoriaForm.id, categoriaPayload);
       } else {
@@ -534,6 +558,13 @@ export default function FinanceiroCadastros() {
   async function handleSalvarTarifasBancarias() {
     try {
       setSavingTarifasBancarias(true);
+      setError('');
+      const categoriasAptas = new Set(categoriasTarifasBancarias.map((categoria) => String(categoria.id)));
+      const tarifaInvalida = tarifasBancariasAtalhos.find((tarifa) => !tarifa.categoria_financeira_id || !categoriasAptas.has(String(tarifa.categoria_financeira_id)));
+      if (tarifaInvalida) {
+        setError(`O atalho ${tarifaInvalida.nome || tarifaInvalida.codigo || 'de tarifa'} precisa usar uma categoria ativa, de saida e classificada para DRE.`);
+        return;
+      }
       await atualizarTarifasBancariasAtalhos({ itens: tarifasBancariasAtalhos });
       await carregar();
     } catch (err) {
@@ -934,9 +965,14 @@ export default function FinanceiroCadastros() {
                   </select>
                 </label>
                 <textarea className="input min-h-[96px] w-full" placeholder="Descricao" value={categoriaForm.descricao} onChange={(e) => setCategoriaForm((c) => ({ ...c, descricao: e.target.value }))} />
+                {categoriaForm.considera_dre && !String(categoriaForm.dre_grupo || '').trim() && (
+                  <div className="app-alert border-amber-200 bg-amber-50 text-amber-800">
+                    Para entrar na DRE, esta categoria precisa de grupo DRE definido de forma explicita. O sistema nao classifica automaticamente pelo nome.
+                  </div>
+                )}
                 <div className="grid gap-3 md:grid-cols-3">
                   <input
-                    className="input w-full"
+                    className={`input w-full ${categoriaForm.considera_dre && !String(categoriaForm.dre_grupo || '').trim() ? 'border-amber-300 bg-amber-50' : ''}`}
                     placeholder="Grupo DRE"
                     value={categoriaForm.dre_grupo}
                     onChange={(e) => setCategoriaForm((c) => ({ ...c, dre_grupo: e.target.value }))}
@@ -1168,7 +1204,7 @@ export default function FinanceiroCadastros() {
               <div>
                 <h2 className="text-lg font-semibold text-[var(--c-text)]">Atalhos de tarifas bancarias</h2>
                 <p className="text-sm text-[var(--c-muted)]">
-                  Atalhos da conciliacao bancaria para tarifas como TAR PIX, TAR TED e manutencao de conta. Cada atalho precisa de categoria financeira para refletir na DRE.
+                  Atalhos da conciliacao bancaria para tarifas como TAR PIX, TAR TED e manutencao de conta. Cada atalho precisa de categoria financeira de saida e classificada para DRE.
                 </p>
               </div>
               <button type="button" className="btn btn-outline btn-sm" onClick={handleAdicionarTarifaBancaria}>
@@ -1210,10 +1246,13 @@ export default function FinanceiroCadastros() {
                     <option value="">Categoria financeira da tarifa</option>
                     {categoriasTarifasBancarias.map((categoria) => (
                       <option key={categoria.id} value={categoria.id}>
-                        {categoria.nome} ({categoriaTipoLabel(String(categoria.tipo || 'AMBOS').toUpperCase())})
+                        {categoria.nome} ({categoria.dre_grupo}{categoria.dre_subgrupo ? ` / ${categoria.dre_subgrupo}` : ''})
                       </option>
                     ))}
                   </select>
+                  <div className="mt-2 text-xs text-[var(--c-muted)]">
+                    A lista mostra apenas categorias ativas de pagar/ambos, com grupo DRE e sem classificacao de endividamento, investimento, patrimonial, intercompany ou transferencia interna.
+                  </div>
                   <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
                     <label className="flex items-center gap-2 text-sm text-[var(--c-text)]">
                       <input

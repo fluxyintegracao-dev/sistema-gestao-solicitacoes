@@ -11,10 +11,6 @@ const {
 } = require('./authorizationService');
 const { registrarEventoSeguranca } = require('./securityLogService');
 const {
-  classificarCategoriaFinanceiraDre,
-  isDreClassificationBlank
-} = require('../constants/dreCategorias');
-const {
   CLASSIFICACOES_GERENCIAIS_FINANCEIRAS
 } = require('../constants/categoriaFinanceiraGerencial');
 
@@ -151,19 +147,14 @@ function sanitizeCategoriaPayload(payload = {}, { partial = false } = {}) {
   );
 }
 
-function aplicarClassificacaoDreAutomatica(data = {}) {
-  if (!isDreClassificationBlank(data)) {
-    return data;
+function validarCategoriaDreExplicita(data = {}) {
+  if (data.considera_dre === false) {
+    return;
   }
 
-  const classificacao = classificarCategoriaFinanceiraDre(data);
-  return {
-    ...data,
-    dre_grupo: classificacao.dre_grupo,
-    dre_subgrupo: classificacao.dre_subgrupo,
-    dre_ordem: classificacao.dre_ordem,
-    considera_dre: data.considera_dre === false ? false : classificacao.considera_dre
-  };
+  if (!String(data.dre_grupo || '').trim()) {
+    throw createHttpError(400, 'Categoria considerada na DRE precisa ter grupo DRE informado.');
+  }
 }
 
 function normalizeCodigo(value, fallback = '') {
@@ -227,7 +218,25 @@ async function listarTarifasBancariasConfig(req) {
     where: { chave: TARIFAS_BANCARIAS_CONFIG_KEY }
   });
 
-  return parseTarifasBancariasConfig(config?.valor);
+  const itens = parseTarifasBancariasConfig(config?.valor);
+  const categoriaIds = [...new Set(itens.map((item) => item.categoria_financeira_id).filter(Boolean))];
+  if (!categoriaIds.length) {
+    return itens;
+  }
+
+  const categorias = await CategoriaFinanceira.findAll({
+    where: { id: categoriaIds },
+    attributes: ['id', 'nome', 'tipo', 'dre_grupo', 'dre_subgrupo', 'considera_dre', 'classificacao_gerencial', 'ativo']
+  });
+  const categoriasById = new Map(categorias.map((categoria) => [Number(categoria.id), categoria]));
+
+  return itens.map((item) => {
+    const categoria = categoriasById.get(Number(item.categoria_financeira_id));
+    return {
+      ...item,
+      categoria_financeira: categoria ? categoria.get({ plain: true }) : null
+    };
+  });
 }
 
 async function salvarTarifasBancariasConfig(req, payload = {}) {
@@ -265,6 +274,13 @@ async function salvarTarifasBancariasConfig(req, payload = {}) {
     }
     if (categoria.ativo === false) {
       throw createHttpError(400, `Categoria financeira da tarifa ${item.nome} esta inativa.`);
+    }
+    if (categoria.considera_dre === false || !String(categoria.dre_grupo || '').trim()) {
+      throw createHttpError(400, `Categoria financeira da tarifa ${item.nome} precisa estar classificada para DRE.`);
+    }
+    const classificacaoGerencial = String(categoria.classificacao_gerencial || '').trim().toUpperCase();
+    if (['ENDIVIDAMENTO', 'INVESTIMENTO', 'PATRIMONIAL', 'INTERCOMPANY', 'TRANSFERENCIA_INTERNA'].includes(classificacaoGerencial)) {
+      throw createHttpError(400, `Categoria financeira da tarifa ${item.nome} nao pode ser ${classificacaoGerencial.toLowerCase().replace(/_/g, ' ')}.`);
     }
   }
 
@@ -554,7 +570,8 @@ async function atualizarCartaoFinanceiro(req, cartaoId, payload = {}) {
 
 async function criarCategoriaFinanceira(req, payload = {}) {
   await assertFinanceAccess(req);
-  const data = aplicarClassificacaoDreAutomatica(sanitizeCategoriaPayload(payload));
+  const data = sanitizeCategoriaPayload(payload);
+  validarCategoriaDreExplicita(data);
   data.criado_por = req.user?.id || null;
   data.atualizado_por = req.user?.id || null;
 
@@ -589,6 +606,11 @@ async function atualizarCategoriaFinanceira(req, categoriaId, payload = {}) {
   if (Object.keys(data).length === 0) {
     throw createHttpError(400, 'Nenhum campo valido informado para atualizar a categoria financeira.');
   }
+
+  validarCategoriaDreExplicita({
+    ...categoria.get({ plain: true }),
+    ...data
+  });
 
   data.atualizado_por = req.user?.id || null;
   await categoria.update(data);

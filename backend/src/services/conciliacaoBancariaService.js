@@ -1408,6 +1408,13 @@ async function confirmarConciliacaoTarifa(req, conciliacaoId, payload = {}) {
     if (categoria.ativo === false) {
       throw createHttpError(400, 'Categoria financeira da tarifa bancaria esta inativa.');
     }
+    if (categoria.considera_dre === false || !String(categoria.dre_grupo || '').trim()) {
+      throw createHttpError(400, 'Categoria financeira da tarifa bancaria precisa estar classificada para DRE.');
+    }
+    const classificacaoGerencial = String(categoria.classificacao_gerencial || '').trim().toUpperCase();
+    if (['ENDIVIDAMENTO', 'INVESTIMENTO', 'PATRIMONIAL', 'INTERCOMPANY', 'TRANSFERENCIA_INTERNA'].includes(classificacaoGerencial)) {
+      throw createHttpError(400, 'Categoria financeira da tarifa bancaria nao pode ser endividamento, investimento, patrimonial, intercompany ou transferencia interna.');
+    }
 
     const sessao = await obterSessaoAbertaParaConta(conta, conciliacao.data_movimento, { transaction });
     const descricao = String(payload.descricao || conciliacao.descricao_banco || tarifa.nome || '').trim().slice(0, 255);

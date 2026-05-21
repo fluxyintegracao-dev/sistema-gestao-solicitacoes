@@ -522,6 +522,8 @@ Regra para a DRE:
 - titulo sem categoria ou com categoria sem grupo DRE fica fora do demonstrativo ate a classificacao ser corrigida;
 - essas pendencias aparecem no Diagnostico DRE para revisao antes do fechamento;
 - se uma categoria realmente nao deve entrar na DRE, marque essa decisao de forma explicita no cadastro da categoria.
+- ao cadastrar ou editar categoria marcada como `Considerar na DRE`, o grupo DRE precisa ser preenchido manualmente;
+- o sistema nao deve classificar DRE automaticamente pelo nome da categoria no cadastro operacional.
 
 Como classificar endividamento:
 
@@ -544,6 +546,8 @@ Atalhos de tarifa bancaria:
 - todo atalho de tarifa usado na conciliacao precisa ter uma categoria financeira explicita;
 - use categoria do tipo `PAGAR` ou `AMBOS`;
 - normalmente a categoria deve ficar no grupo DRE `Resultado financeiro`, salvo decisao gerencial diferente;
+- a categoria da tarifa precisa estar marcada para DRE e ter grupo DRE classificado;
+- nao usar categoria de endividamento, investimento, patrimonial, intercompany ou transferencia interna em atalho de tarifa;
 - sem categoria, o sistema bloqueia o uso do atalho porque a tarifa ficaria sem leitura gerencial;
 - a tarifa conciliada pelo atalho entra como movimento financeiro avulso, com empresa real da conta bancaria e categoria real configurada;
 - nao usar atalho de tarifa para fornecedor, compra, imposto, folha ou qualquer despesa que precise de titulo, parceiro, obra ou centro de custo.
@@ -1123,6 +1127,7 @@ Cuidados:
 - tarifa bancaria conciliada usa a empresa do lancamento bancario e exige que essa empresa seja a mesma da conta;
 - tarifa bancaria conciliada pelo atalho exige categoria financeira configurada em `Financeiro > Cadastros`;
 - a categoria da tarifa define onde o valor entra na DRE;
+- a categoria da tarifa precisa ser categoria de resultado, nao categoria de divida, patrimonio, intercompany ou transferencia interna;
 - OFX nao deve criar baixa automaticamente sem conferencia;
 - OFX da conta errada distorce conciliacao;
 - baixa precisa existir para ser conciliada;

@@ -54,6 +54,8 @@ Base multiempresa e DRE gerencial:
 - Categorias financeiras passaram a ter `classificacao_gerencial` explicita para separar operacional, endividamento, investimento, patrimonial, intercompany, transferencia interna, imposto, folha e outros.
 - Financeiro > Relatorios ganhou Endividamento Gerencial, usando somente titulos a pagar em aberto cuja categoria esteja marcada como `ENDIVIDAMENTO`, sem inferir divida pelo nome do fornecedor, descricao ou texto da categoria.
 - Grupo Consolidado passou a exibir Endividamento Aberto como indicador executivo derivado do relatorio de endividamento.
+- O cadastro operacional de categorias financeiras deixou de preencher grupo DRE automaticamente; categoria marcada para DRE agora exige grupo DRE explicito.
+- Atalhos de tarifas bancarias passaram a aceitar somente categorias de saida classificadas para DRE e bloqueiam categorias de endividamento, investimento, patrimonio, intercompany ou transferencia interna.
 
 Documentacao operacional complementar:
 

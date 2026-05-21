@@ -33,6 +33,14 @@ const TIPOS_INTERCOMPANY = [
   { value: 'TRANSFERENCIA_OPERACIONAL', label: 'Transferencia operacional' }
 ];
 
+const CLASSIFICACOES_INCOMPATIVEIS_COM_TARIFA = new Set([
+  'ENDIVIDAMENTO',
+  'INVESTIMENTO',
+  'PATRIMONIAL',
+  'INTERCOMPANY',
+  'TRANSFERENCIA_INTERNA'
+]);
+
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
 function formatCurrency(value) {
@@ -92,6 +100,37 @@ function getContaEmpresaId(conta) {
 
 function getContaEmpresaNome(conta) {
   return conta?.empresa?.nome || conta?.empresa?.razao_social || (conta?.empresa_id ? `Empresa #${conta.empresa_id}` : 'Sem empresa vinculada');
+}
+
+function tarifaAtalhoAptaParaConciliacao(tarifa = {}) {
+  if (!tarifa.categoria_financeira_id) {
+    return { ok: false, motivo: 'Configure uma categoria financeira para este atalho.' };
+  }
+
+  const categoria = tarifa.categoria_financeira;
+  if (!categoria) {
+    return { ok: true, motivo: tarifa.descricao || tarifa.nome || '' };
+  }
+
+  const tipo = String(categoria.tipo || '').trim().toUpperCase();
+  if (!['PAGAR', 'AMBOS'].includes(tipo)) {
+    return { ok: false, motivo: 'A categoria da tarifa deve ser de pagar ou ambos.' };
+  }
+  if (categoria.ativo === false) {
+    return { ok: false, motivo: 'A categoria da tarifa esta inativa.' };
+  }
+  if (categoria.considera_dre === false || !String(categoria.dre_grupo || '').trim()) {
+    return { ok: false, motivo: 'A categoria da tarifa precisa estar classificada para DRE.' };
+  }
+  const classificacao = String(categoria.classificacao_gerencial || '').trim().toUpperCase();
+  if (CLASSIFICACOES_INCOMPATIVEIS_COM_TARIFA.has(classificacao)) {
+    return { ok: false, motivo: 'A categoria da tarifa nao pode ser divida, patrimonio, intercompany ou transferencia interna.' };
+  }
+
+  return {
+    ok: true,
+    motivo: `${categoria.nome}${categoria.dre_grupo ? ` - ${categoria.dre_grupo}` : ''}`
+  };
 }
 
 function KeyIcon({ className = 'h-4 w-4' }) {
@@ -179,15 +218,15 @@ function AcoesRapidasConciliacaoModal({ item, tarifas, processingId, onClose, on
                 <span className="text-xs text-[var(--c-muted)]">Nenhuma tarifa ativa configurada.</span>
               ) : tarifasAtivas.map((tarifa) => {
                 const key = `tarifa-${item?.id}-${tarifa.codigo}`;
-                const hasCategoria = Boolean(tarifa.categoria_financeira_id);
+                const elegibilidade = tarifaAtalhoAptaParaConciliacao(tarifa);
                 return (
                   <button
                     key={tarifa.codigo}
                     type="button"
                     className="btn btn-outline btn-sm"
-                    disabled={!isSaida || !hasCategoria || processingId === key}
+                    disabled={!isSaida || !elegibilidade.ok || processingId === key}
                     onClick={() => onConfirmarTarifa(item, tarifa)}
-                    title={!hasCategoria ? 'Configure a categoria financeira deste atalho em Financeiro > Cadastros.' : (tarifa.descricao || tarifa.nome)}
+                    title={!isSaida ? 'Tarifas bancarias devem ser lancamentos de saida.' : elegibilidade.motivo}
                   >
                     {processingId === key ? 'Registrando...' : tarifa.nome}
                   </button>
