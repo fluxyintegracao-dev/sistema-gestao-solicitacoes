@@ -671,6 +671,46 @@ async function aplicarBaixaFinanceiraPorLiquidacao({ boleto, convenio, retorno, 
     const juros = roundCurrency(Math.max(valorPago - valorPrincipal, 0));
     const dataMovimento = ocorrencia.data_credito || ocorrencia.data_ocorrencia || getHoje();
     const contaBancaria = await carregarContaBancaria(convenio.conta_bancaria_id, { transaction });
+    const empresaContaId = contaBancaria.empresa_id ? Number(contaBancaria.empresa_id) : null;
+    const empresaTituloId = titulo.empresa_id ? Number(titulo.empresa_id) : null;
+    const empresaConvenioId = convenio.empresa_id ? Number(convenio.empresa_id) : null;
+
+    if (!empresaContaId) {
+      return marcarOcorrenciaSemBaixa(
+        ocorrenciaCriada,
+        'ERRO_CONFIGURACAO_CONTA',
+        'A conta bancaria do convenio nao possui empresa vinculada. Corrija o cadastro antes de aplicar a baixa.',
+        transaction
+      );
+    }
+
+    if (!empresaTituloId) {
+      return marcarOcorrenciaSemBaixa(
+        ocorrenciaCriada,
+        'PENDENTE_TITULO',
+        'Titulo sem empresa vinculada. Corrija a empresa do titulo antes de aplicar a baixa por retorno bancario.',
+        transaction
+      );
+    }
+
+    if (empresaConvenioId && empresaConvenioId !== empresaContaId) {
+      return marcarOcorrenciaSemBaixa(
+        ocorrenciaCriada,
+        'ERRO_CONFIGURACAO_CONVENIO',
+        'A empresa do convenio Caixa deve ser a mesma empresa vinculada a conta bancaria do recebimento.',
+        transaction
+      );
+    }
+
+    if (empresaTituloId !== empresaContaId) {
+      return marcarOcorrenciaSemBaixa(
+        ocorrenciaCriada,
+        'PENDENTE_INTERCOMPANY',
+        'Retorno bancario recebido em conta de empresa diferente da empresa do titulo. Registre baixa intercompany manual para manter rastreabilidade.',
+        transaction
+      );
+    }
+
     const caixaSessao = await obterSessaoAbertaParaConta(contaBancaria, dataMovimento, { transaction });
     const novoValorBaixado = roundCurrency(Number(titulo.valor_baixado || 0) + valorPrincipal);
     const novoEstado = calcularStatusTitulo({
@@ -682,7 +722,7 @@ async function aplicarBaixaFinanceiraPorLiquidacao({ boleto, convenio, retorno, 
       {
         titulo_financeiro_id: titulo.id,
         conta_bancaria_id: contaBancaria.id,
-        empresa_id: contaBancaria.empresa_id || titulo.empresa_id || convenio.empresa_id || null,
+        empresa_id: empresaContaId,
         caixa_sessao_id: caixaSessao?.id || null,
         forma_recebimento: 'BOLETO',
         documento_referencia: documentoReferencia,

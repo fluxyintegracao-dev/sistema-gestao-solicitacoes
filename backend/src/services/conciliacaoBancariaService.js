@@ -387,6 +387,13 @@ async function importOfx(req, payload = {}) {
 
   const contaBancariaId = parseInteger(payload.conta_bancaria_id, 'Conta bancaria');
   const contaBancaria = await validarContaBancaria(contaBancariaId);
+  const empresaContaId = contaBancaria.empresa_id ? Number(contaBancaria.empresa_id) : null;
+  if (!empresaContaId) {
+    throw createHttpError(
+      400,
+      'A conta bancaria selecionada precisa estar vinculada a uma empresa antes de importar OFX.'
+    );
+  }
 
   const transacoes = parseOfxTransactions(req.file.buffer);
   const arquivoHash = buildImportFingerprint(transacoes);
@@ -439,7 +446,7 @@ async function importOfx(req, payload = {}) {
 
     const created = await ConciliacaoBancaria.create({
       conta_bancaria_id: contaBancariaId,
-      empresa_id: contaBancaria.empresa_id || null,
+      empresa_id: empresaContaId,
       titulo_financeiro_id: null,
       movimento_financeiro_id: null,
       ofx_uid: transacao.ofx_uid,
@@ -462,7 +469,7 @@ async function importOfx(req, payload = {}) {
 
   const importacao = await ConciliacaoBancariaImportacao.create({
     conta_bancaria_id: contaBancariaId,
-    empresa_id: contaBancaria.empresa_id || null,
+    empresa_id: empresaContaId,
     arquivo_hash: arquivoHash,
     arquivo_nome: req.file.originalname,
     total_lidos: transacoes.length,
@@ -1043,6 +1050,18 @@ async function resolveMovimentoForConciliacao(req, conciliacao, movimentoId) {
     throw createHttpError(400, 'O movimento selecionado pertence a outra conta bancaria.');
   }
 
+  const empresaConciliacaoId = conciliacao.empresa_id ? Number(conciliacao.empresa_id) : null;
+  const empresaMovimentoId = movimento.empresa_id ? Number(movimento.empresa_id) : null;
+  if (!empresaConciliacaoId) {
+    throw createHttpError(400, 'Lancamento bancario sem empresa vinculada. Reimporte o OFX apos corrigir a conta bancaria.');
+  }
+  if (!empresaMovimentoId) {
+    throw createHttpError(400, 'Movimento financeiro sem empresa vinculada. Corrija o movimento antes de conciliar.');
+  }
+  if (empresaConciliacaoId !== empresaMovimentoId) {
+    throw createHttpError(400, 'A empresa do movimento financeiro deve ser a mesma empresa do lancamento bancario.');
+  }
+
   if (String(movimento.titulo?.tipo || '').toUpperCase() !== getSignalByValue(conciliacao.valor)) {
     throw createHttpError(400, 'O tipo do titulo nao e compativel com o sinal do lancamento bancario.');
   }
@@ -1350,6 +1369,18 @@ async function confirmarConciliacaoTarifa(req, conciliacaoId, payload = {}) {
       throw createHttpError(400, 'Conta bancaria da conciliacao invalida ou inativa.');
     }
 
+    const empresaConciliacaoId = conciliacao.empresa_id ? Number(conciliacao.empresa_id) : null;
+    const empresaContaId = conta.empresa_id ? Number(conta.empresa_id) : null;
+    if (!empresaConciliacaoId) {
+      throw createHttpError(400, 'Lancamento bancario sem empresa vinculada. Reimporte o OFX apos corrigir a conta bancaria.');
+    }
+    if (!empresaContaId) {
+      throw createHttpError(400, 'Conta bancaria da conciliacao sem empresa vinculada.');
+    }
+    if (empresaConciliacaoId !== empresaContaId) {
+      throw createHttpError(400, 'A empresa do lancamento bancario deve ser a mesma vinculada a conta bancaria.');
+    }
+
     const valor = roundCurrency(Math.abs(valorBanco));
     if (valor <= 0) {
       throw createHttpError(400, 'Valor do lancamento bancario invalido para tarifa.');
@@ -1360,7 +1391,7 @@ async function confirmarConciliacaoTarifa(req, conciliacaoId, payload = {}) {
     const movimento = await MovimentoFinanceiro.create({
       titulo_financeiro_id: null,
       conta_bancaria_id: conta.id,
-      empresa_id: conciliacao.empresa_id || conta.empresa_id || null,
+      empresa_id: empresaConciliacaoId,
       caixa_sessao_id: sessao?.id || null,
       tipo_movimento: 'TARIFA_BANCARIA',
       status: 'ATIVO',

@@ -963,6 +963,31 @@ Exemplo:
 - nesse caso, marque baixa intercompany, escolha o tipo correto e registre o motivo;
 - o caixa realizado ficara na Empresa B e o titulo continuara mostrando a responsabilidade economica da Empresa A.
 
+### 11.5.1 Baixa automatica por retorno de boleto
+
+Quando o banco retorna liquidacao de boleto, o sistema pode aplicar a baixa automaticamente somente se os cadastros estiverem consistentes.
+
+Antes de importar retorno de boleto, conferir:
+
+1. O titulo a receber possui empresa do grupo informada.
+2. O convenio bancario possui empresa do grupo informada.
+3. A conta bancaria do convenio possui empresa vinculada.
+4. A empresa da conta bancaria e a mesma empresa do convenio.
+5. A empresa do titulo e a mesma empresa da conta bancaria que recebeu o dinheiro.
+
+Se a conta bancaria do retorno pertencer a empresa diferente da empresa do titulo:
+
+- nao aplicar baixa automatica;
+- revisar se existe uma operacao intercompany real;
+- registrar a baixa manual como intercompany, informando origem, destino, tipo e motivo;
+- nao ajustar o titulo ou o retorno apenas para "passar" no processamento.
+
+Motivo:
+
+- retorno bancario confirma recebimento real na conta;
+- DRE e caixa consolidado dependem da empresa correta no titulo e na baixa;
+- recebimento por empresa diferente sem intercompany distorce resultado por empresa e consolidado.
+
 ### 11.6 Corrigir baixa
 
 Quando usar:
@@ -1020,6 +1045,10 @@ Passo a passo:
 
 Cuidados:
 
+- a conta bancaria escolhida para importar OFX precisa estar vinculada a empresa do grupo;
+- o lancamento bancario importado carrega a empresa da conta bancaria, sem fallback por titulo, parceiro ou descricao;
+- ao confirmar conciliacao, o movimento financeiro precisa ser da mesma conta e da mesma empresa do lancamento bancario;
+- tarifa bancaria conciliada usa a empresa do lancamento bancario e exige que essa empresa seja a mesma da conta;
 - OFX nao deve criar baixa automaticamente sem conferencia;
 - OFX da conta errada distorce conciliacao;
 - baixa precisa existir para ser conciliada;
