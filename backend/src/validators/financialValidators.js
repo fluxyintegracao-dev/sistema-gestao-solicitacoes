@@ -367,6 +367,41 @@ function validateFinanceDreQuery(query = {}) {
   };
 }
 
+function validateFinanceIntercompanyQuery(query = {}) {
+  ensureAllowedKeys(
+    query,
+    [
+      'periodo',
+      'data_inicial',
+      'data_final',
+      'holding_id',
+      'empresa_id',
+      'tipo_intercompany',
+      'status',
+      'elimina_consolidado',
+      'limit'
+    ],
+    'Consulta de intercompany financeiro'
+  );
+
+  const base = validateFinanceFluxoCaixaQuery({
+    periodo: query.periodo,
+    data_inicial: query.data_inicial,
+    data_final: query.data_final
+  });
+  const limit = parseInteger(query.limit, 'Limite');
+
+  return {
+    ...base,
+    holding_id: parseInteger(query.holding_id, 'Holding'),
+    empresa_id: parseInteger(query.empresa_id, 'Empresa do grupo'),
+    tipo_intercompany: parseEnum(query.tipo_intercompany, 'Tipo intercompany', TIPOS_INTERCOMPANY),
+    status: parseEnum(query.status, 'Status', ['ABERTO', 'PARCIAL', 'QUITADO', 'CANCELADO', 'ESTORNADO']),
+    elimina_consolidado: parseBoolean(query.elimina_consolidado, 'Eliminar no consolidado'),
+    limit: limit ? Math.min(limit, 1000) : undefined
+  };
+}
+
 function validateFinanceBaixasQuery(query = {}) {
   ensureAllowedKeys(
     query,
@@ -1166,6 +1201,7 @@ module.exports = {
   validateFinanceBaixasQuery,
   validateFinanceDreQuery,
   validateFinanceFluxoCaixaQuery,
+  validateFinanceIntercompanyQuery,
   validateFinanceRelatorioAnaliticoQuery,
   validateFinanceTituloBaixaBody,
   validateFinanceTituloCobrancaBody,

@@ -41,6 +41,9 @@ Base multiempresa e DRE gerencial:
 - A DRE passou a ter demonstrativo estruturado com Receita Liquida, Lucro Bruto, EBITDA, EBIT, Resultado Financeiro, Resultado antes de IRPJ/CSLL e Lucro/Prejuizo Liquido.
 - As categorias financeiras SIENGE foram reavaliadas para separar tributos sobre faturamento, encargos trabalhistas, tributos operacionais, resultado financeiro e IRPJ/CSLL.
 - A visao por empresa da DRE passou a usar as mesmas metricas economicas do consolidado: Receita Liquida, EBITDA, Lucro/Prejuizo Liquido e Margem Liquida.
+- A primeira camada operacional de Intercompany foi adicionada ao Financeiro, com origem, destino, tipo, motivo e regra explicita de eliminacao no consolidado.
+- Financeiro > Relatorios ganhou Relatorio Intercompany para analisar fluxos entre empresas, tipos de intercompany, valores previstos, valores realizados e titulos analiticos.
+- A DRE passou a combinar filtro de periodo e exclusao de intercompany sem sobrescrever uma regra pela outra.
 
 Documentacao operacional complementar:
 

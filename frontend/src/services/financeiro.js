@@ -800,6 +800,21 @@ export async function getDiagnosticoDreFinanceira() {
   return parseJson(response, 'Erro ao buscar diagnostico da DRE');
 }
 
+export async function getRelatorioIntercompanyFinanceiro(params = {}) {
+  const query = new URLSearchParams(
+    Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== '')
+  ).toString();
+  const url = query
+    ? `${API_URL}/financeiro/relatorios/intercompany?${query}`
+    : `${API_URL}/financeiro/relatorios/intercompany`;
+
+  const response = await fetch(url, {
+    headers: authHeaders()
+  });
+
+  return parseJson(response, 'Erro ao buscar relatorio intercompany');
+}
+
 export async function getPaymentBeneficiaries(params = {}) {
   const query = new URLSearchParams(
     Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== '')

@@ -517,6 +517,9 @@ export default function FinanceiroRelatorios() {
             <Link to="/financeiro/relatorios/dre/diagnostico" className="btn btn-outline">
               Diagnostico DRE
             </Link>
+            <Link to="/financeiro/relatorios/intercompany" className="btn btn-outline">
+              Intercompany
+            </Link>
             <Link to="/financeiro/relatorios/analitico" className="btn btn-outline">
               Analitico
             </Link>

@@ -1102,6 +1102,42 @@ Cuidados:
 - empresa com prejuizo isolado pode ser normal se ela for centro operacional, RH/Folha ou administrativa;
 - analise consolidada deve eliminar espelhos internos.
 
+### 11.14 Relatorio Intercompany
+
+Tela:
+
+- `Financeiro > Relatorios > Intercompany`.
+
+Objetivo:
+
+- mostrar quem transfere, financia, reembolsa ou cobre caixa de quem dentro do grupo.
+
+Passo a passo:
+
+1. Selecionar periodo.
+2. Filtrar por holding, se necessario.
+3. Filtrar por empresa, se a analise for individual.
+4. Filtrar por tipo de intercompany quando a duvida for especifica.
+5. Conferir valor previsto.
+6. Conferir valor realizado por baixas ativas.
+7. Conferir relacoes entre empresas.
+8. Abrir titulos analiticos quando algum valor precisar de explicacao.
+
+Como interpretar:
+
+- valor previsto mostra os titulos intercompany registrados;
+- valor realizado mostra o que ja foi baixado no periodo;
+- origem indica a empresa que enviou, financiou ou suportou o recurso;
+- destino indica a empresa beneficiada;
+- valores marcados como eliminados nao devem gerar riqueza no consolidado do grupo.
+
+Cuidados:
+
+- se origem ou destino estiver vazio, o lancamento precisa ser corrigido;
+- se o tipo estiver errado, a leitura gerencial ficara errada;
+- se um aporte for registrado como receita comum, a DRE consolidada sera distorcida;
+- se uma transferencia interna nao for marcada como intercompany, o grupo pode parecer maior ou mais lucrativo do que realmente e.
+
 ---
 
 ## 12. Modulo Fiscal
@@ -1788,4 +1824,3 @@ Para o sistema entregar valor:
 - diretoria precisa usar os relatorios e cobrar correcao de origem.
 
 Quando a operacao e consistente, os relatorios deixam de ser apenas telas e passam a ser instrumentos reais de gestao.
-
