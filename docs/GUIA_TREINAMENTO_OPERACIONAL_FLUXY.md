@@ -1267,6 +1267,9 @@ Cuidados:
 - se a conta pagadora aparecer como incompleta, corrigir o cadastro antes de gerar lote;
 - a empresa pagadora nao deve ser deduzida pela conta bancaria ou pelo nome do banco: ela precisa estar preenchida explicitamente.
 - a empresa da conta bancaria interna precisa ser igual a empresa pagadora configurada na conta pagadora;
+- ao selecionar a conta bancaria interna no cadastro da conta pagadora, o sistema preenche a empresa vinculada a essa conta;
+- se a conta bancaria interna nao tiver empresa vinculada, ela nao pode virar conta pagadora;
+- se a empresa pagadora escolhida for diferente da empresa da conta bancaria interna, o cadastro deve ser bloqueado;
 - o sistema bloqueia lote quando o titulo pertence a empresa diferente da conta pagadora;
 - se uma empresa for pagar titulo de outra, nao forcar o lote comum: primeiro modele a operacao intercompany correta;
 - a baixa gerada apos confirmacao bancaria usa a empresa da conta pagadora do lote e exige que ela seja igual a empresa do titulo.

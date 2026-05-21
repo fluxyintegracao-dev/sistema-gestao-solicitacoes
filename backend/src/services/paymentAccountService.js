@@ -40,14 +40,19 @@ async function resolveProvider(providerId, { transaction = null } = {}) {
 
 async function validatePayload(payload = {}, { partial = false } = {}) {
   const data = {};
+  let contaBancaria = null;
+  let empresa = null;
 
   if (!partial || payload.conta_bancaria_id != null) {
     const contaBancariaId = Number(payload.conta_bancaria_id);
     if (!Number.isInteger(contaBancariaId) || contaBancariaId <= 0) {
       throw createHttpError(400, 'Conta bancaria interna e obrigatoria.');
     }
-    const contaBancaria = await ContaBancaria.findByPk(contaBancariaId);
+    contaBancaria = await ContaBancaria.findByPk(contaBancariaId);
     if (!contaBancaria) throw createHttpError(404, 'Conta bancaria interna nao encontrada.');
+    if (!contaBancaria.empresa_id) {
+      throw createHttpError(400, 'A conta bancaria interna precisa estar vinculada a uma empresa do grupo antes de virar conta pagadora.');
+    }
     data.conta_bancaria_id = contaBancariaId;
   }
 
@@ -89,12 +94,32 @@ async function validatePayload(payload = {}, { partial = false } = {}) {
       throw createHttpError(400, 'Empresa pagadora invalida.');
     }
     if (empresaId != null) {
-      const empresa = await EmpresaGrupo.findByPk(empresaId);
+      empresa = await EmpresaGrupo.findByPk(empresaId);
       if (!empresa || empresa.ativo === false) {
         throw createHttpError(400, 'Empresa pagadora invalida ou inativa.');
       }
     }
     data.empresa_id = empresaId;
+  }
+
+  const contaBancariaIdParaValidar = data.conta_bancaria_id || payload.conta_bancaria_id;
+  const empresaIdParaValidar = data.empresa_id !== undefined ? data.empresa_id : payload.empresa_id;
+  if (contaBancariaIdParaValidar && empresaIdParaValidar) {
+    if (!contaBancaria) {
+      contaBancaria = await ContaBancaria.findByPk(Number(contaBancariaIdParaValidar));
+    }
+    if (!empresa) {
+      empresa = await EmpresaGrupo.findByPk(Number(empresaIdParaValidar));
+    }
+    if (!contaBancaria?.empresa_id) {
+      throw createHttpError(400, 'A conta bancaria interna precisa estar vinculada a uma empresa do grupo antes de virar conta pagadora.');
+    }
+    if (!empresa || empresa.ativo === false) {
+      throw createHttpError(400, 'Empresa pagadora invalida ou inativa.');
+    }
+    if (Number(contaBancaria.empresa_id) !== Number(empresa.id)) {
+      throw createHttpError(400, 'A empresa pagadora deve ser a mesma vinculada a conta bancaria interna.');
+    }
   }
 
   if (payload.ambiente !== undefined) {
@@ -173,6 +198,17 @@ async function updatePaymentAccount(req, id, payload = {}) {
   const previous = snapshot(account);
   const data = await validatePayload(payload, { partial: true });
   if (data.provider_id) await resolveProvider(data.provider_id);
+  const contaBancariaIdFinal = data.conta_bancaria_id || account.conta_bancaria_id;
+  const empresaIdFinal = data.empresa_id !== undefined ? data.empresa_id : account.empresa_id;
+  if (contaBancariaIdFinal && empresaIdFinal) {
+    const contaBancaria = await ContaBancaria.findByPk(Number(contaBancariaIdFinal));
+    if (!contaBancaria?.empresa_id) {
+      throw createHttpError(400, 'A conta bancaria interna precisa estar vinculada a uma empresa do grupo antes de virar conta pagadora.');
+    }
+    if (Number(contaBancaria.empresa_id) !== Number(empresaIdFinal)) {
+      throw createHttpError(400, 'A empresa pagadora deve ser a mesma vinculada a conta bancaria interna.');
+    }
+  }
 
   await account.update({
     ...data,

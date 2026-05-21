@@ -204,6 +204,10 @@ function pickPaymentAccountFormData(account = {}) {
   };
 }
 
+function getContaEmpresaId(conta = {}) {
+  return conta?.empresa_id ? String(conta.empresa_id) : '';
+}
+
 function statusClass(ativo) {
   return ativo ? 'app-status-pill bg-emerald-100 text-emerald-700' : 'app-status-pill bg-slate-100 text-slate-700';
 }
@@ -455,6 +459,16 @@ export default function FinanceiroCadastros() {
         setError('Informe a empresa pagadora real da conta pagadora.');
         return;
       }
+      const contaSelecionada = contas.find((item) => String(item.id) === String(payload.conta_bancaria_id));
+      const empresaContaId = getContaEmpresaId(contaSelecionada);
+      if (!empresaContaId) {
+        setError('A conta bancaria interna precisa estar vinculada a uma empresa do grupo antes de virar conta pagadora.');
+        return;
+      }
+      if (String(payload.empresa_id) !== empresaContaId) {
+        setError('A empresa pagadora deve ser a mesma vinculada a conta bancaria interna.');
+        return;
+      }
       const cleanPayload = {
         ...payload,
         conta_bancaria_id: Number(payload.conta_bancaria_id),
@@ -479,6 +493,7 @@ export default function FinanceiroCadastros() {
     setPaymentAccountForm((current) => ({
       ...current,
       conta_bancaria_id: contaBancariaId,
+      empresa_id: getContaEmpresaId(conta) || current.empresa_id,
       banco_codigo: current.banco_codigo || '001',
       agencia: conta?.agencia || current.agencia,
       conta: conta?.conta || current.conta,
