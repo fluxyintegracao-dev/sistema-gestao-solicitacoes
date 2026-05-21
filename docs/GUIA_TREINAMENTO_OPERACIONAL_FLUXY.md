@@ -1038,7 +1038,7 @@ Leitura inicial da tela:
 Fluxo correto:
 
 1. Abrir `Financeiro > Pagamentos em Massa`.
-2. Conferir se existe conta pagadora cadastrada e ativa.
+2. Conferir se existe conta pagadora cadastrada, ativa e vinculada a empresa pagadora real.
 3. Entrar em `Titulos elegiveis`.
 4. Filtrar vencimento, parceiro, obra ou centro de custo quando necessario.
 5. Clicar em `Buscar elegiveis`.
@@ -1070,7 +1070,10 @@ Cuidados:
 - pagamento realizado depende de confirmacao bancaria;
 - se o banco rejeitar ou falhar, corrigir a causa antes de reprocessar;
 - se um lote for cancelado ou rejeitado, os titulos devem ser revisados antes de entrar em novo lote;
-- conta pagadora precisa representar a empresa real que vai movimentar o caixa.
+- conta pagadora precisa representar a empresa real que vai movimentar o caixa;
+- nao usar conta pagadora sem empresa vinculada para "resolver depois";
+- se a conta pagadora aparecer como incompleta, corrigir o cadastro antes de gerar lote;
+- a empresa pagadora nao deve ser deduzida pela conta bancaria ou pelo nome do banco: ela precisa estar preenchida explicitamente.
 
 ### 11.9 Grupo Consolidado
 

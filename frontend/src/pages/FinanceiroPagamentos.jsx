@@ -114,6 +114,23 @@ function getBeneficiaryLabel(titulo) {
   return `${beneficiary.nome || 'Favorecido'} - ${beneficiary.pix_tipo_chave || 'PIX'} ${beneficiary.pix_chave || ''}`;
 }
 
+function onlyDigits(value) {
+  return String(value || '').replace(/\D/g, '');
+}
+
+function getPaymentAccountPendencies(account = {}) {
+  const pendencies = [];
+  if (account?.ativo === false) pendencies.push('Conta inativa.');
+  if (!account?.empresa_id && !account?.empresa?.id) pendencies.push('Empresa pagadora pendente.');
+  if (onlyDigits(account?.cnpj_pagador).length !== 14) pendencies.push('CNPJ pagador incompleto.');
+  if (!account?.banco_codigo) pendencies.push('Banco pendente.');
+  if (!account?.agencia) pendencies.push('Agencia pendente.');
+  if (!account?.conta) pendencies.push('Conta pendente.');
+  if (!account?.tipo_conta) pendencies.push('Tipo de conta pendente.');
+  if (!account?.convenio) pendencies.push('Convenio pendente.');
+  return pendencies;
+}
+
 function buildBatchGuidance(batch, approvalsCount, isBbSandbox) {
   const status = normalizeStatus(batch?.status);
   if (!batch) {
@@ -228,13 +245,15 @@ export default function FinanceiroPagamentos() {
         getPaymentsAwaitingBaixa().catch(() => []),
         getBbPaymentsHealth().catch(() => null)
       ]);
-      setAccounts(Array.isArray(accountsData) ? accountsData : []);
+      const accountList = Array.isArray(accountsData) ? accountsData : [];
+      const firstOperationalAccount = accountList.find((account) => getPaymentAccountPendencies(account).length === 0);
+      setAccounts(accountList);
       setBatches(Array.isArray(batchesData) ? batchesData : []);
       setAwaitingBaixa(Array.isArray(baixaData) ? baixaData : []);
       setBbHealth(bbHealthData);
       setBatchForm((current) => ({
         ...current,
-        payment_account_id: current.payment_account_id || String(accountsData?.[0]?.id || '')
+        payment_account_id: current.payment_account_id || String(firstOperationalAccount?.id || '')
       }));
     } catch (err) {
       setError(err?.message || 'Erro ao carregar pagamentos');
@@ -294,7 +313,7 @@ export default function FinanceiroPagamentos() {
   ), [selectedBatch]);
 
   const paymentOverview = useMemo(() => {
-    const activeAccounts = accounts.filter((account) => account?.ativo !== false);
+    const activeAccounts = accounts.filter((account) => getPaymentAccountPendencies(account).length === 0);
     const pendingApproval = batches.filter((batch) => normalizeStatus(batch?.status) === 'PENDENTE_APROVACAO');
     const bankProcessing = batches.filter((batch) => ['ENVIADO_AO_BANCO', 'PROCESSANDO_BANCO', 'FALHA_INTEGRACAO'].includes(normalizeStatus(batch?.status)));
 
@@ -312,6 +331,15 @@ export default function FinanceiroPagamentos() {
     };
   }, [accounts, awaitingBaixa, batches, bbHealth, isBbSandbox]);
 
+  const selectedPaymentAccount = useMemo(() => (
+    accounts.find((account) => String(account.id) === String(batchForm.payment_account_id))
+  ), [accounts, batchForm.payment_account_id]);
+
+  const selectedPaymentAccountPendencies = useMemo(
+    () => (selectedPaymentAccount ? getPaymentAccountPendencies(selectedPaymentAccount) : []),
+    [selectedPaymentAccount]
+  );
+
   const titulosOverview = useMemo(() => {
     const eligible = titulos.filter((titulo) => titulo.elegivel_pagamento);
     return {
@@ -328,8 +356,8 @@ export default function FinanceiroPagamentos() {
       if (paymentOverview.activeAccounts === 0) {
         return {
           eyebrow: 'Preparacao',
-          title: 'Cadastre uma conta pagadora ativa',
-          body: 'Sem conta pagadora ativa, o financeiro nao consegue montar lote com empresa, CNPJ e convenio corretos.',
+          title: 'Cadastre uma conta pagadora completa',
+          body: 'Sem empresa pagadora, CNPJ, dados bancarios e convenio, o financeiro nao consegue montar lote com informacoes reais.',
           targetTab: 'titulos',
           actionLabel: 'Selecionar titulos'
         };
@@ -608,12 +636,20 @@ export default function FinanceiroPagamentos() {
                     <span className="sol-filter-label">Conta pagadora</span>
                     <select className="input w-full" value={batchForm.payment_account_id} onChange={(e) => setBatchForm((c) => ({ ...c, payment_account_id: e.target.value }))}>
                       <option value="">Selecione</option>
-                      {accounts.map((account) => (
-                        <option key={account.id} value={account.id}>
-                          {account.contaBancaria?.nome || `Conta ${account.id}`} - CNPJ {account.cnpj_pagador} - Conv. {account.convenio || '-'}
-                        </option>
-                      ))}
+                      {accounts.map((account) => {
+                        const pendencies = getPaymentAccountPendencies(account);
+                        return (
+                          <option key={account.id} value={account.id} disabled={pendencies.length > 0}>
+                            {account.contaBancaria?.nome || `Conta ${account.id}`} - {account.empresa?.nome || 'Empresa pendente'} - CNPJ {account.cnpj_pagador || '-'} - Conv. {account.convenio || '-'}{pendencies.length ? ' - INCOMPLETA' : ''}
+                          </option>
+                        );
+                      })}
                     </select>
+                    {selectedPaymentAccountPendencies.length > 0 && (
+                      <span className="mt-2 block text-xs font-medium text-rose-700">
+                        {selectedPaymentAccountPendencies.join(' ')}
+                      </span>
+                    )}
                     <span className="app-note mt-2">
                       Cadastre em Financeiro &gt; Cadastros Financeiros &gt; Contas pagadoras BB.
                     </span>
@@ -628,7 +664,7 @@ export default function FinanceiroPagamentos() {
                     <HiOutlineClock className="h-4 w-4" />
                     {actionLoading === 'titulos' ? 'Buscando...' : 'Buscar elegiveis'}
                   </button>
-                  <button type="button" className="btn btn-outline" onClick={handleCriarLote} disabled={!canPrepare || !selectedIds.length || !batchForm.payment_account_id || actionLoading === 'criar-lote'}>
+                  <button type="button" className="btn btn-outline" onClick={handleCriarLote} disabled={!canPrepare || !selectedIds.length || !batchForm.payment_account_id || selectedPaymentAccountPendencies.length > 0 || actionLoading === 'criar-lote'}>
                     <HiOutlineBanknotes className="h-4 w-4" />
                     {actionLoading === 'criar-lote' ? 'Gerando...' : `Gerar lote (${selectedIds.length})`}
                   </button>

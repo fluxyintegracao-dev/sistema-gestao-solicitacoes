@@ -80,8 +80,11 @@ async function validatePayload(payload = {}, { partial = false } = {}) {
     }
   }
 
-  if (payload.empresa_id !== undefined) {
+  if (!partial || payload.empresa_id !== undefined) {
     const empresaId = payload.empresa_id == null || payload.empresa_id === '' ? null : Number(payload.empresa_id);
+    if (empresaId == null) {
+      throw createHttpError(400, 'Empresa pagadora e obrigatoria para conta pagadora.');
+    }
     if (empresaId != null && (!Number.isInteger(empresaId) || empresaId <= 0)) {
       throw createHttpError(400, 'Empresa pagadora invalida.');
     }

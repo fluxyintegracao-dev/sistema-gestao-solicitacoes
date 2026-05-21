@@ -422,10 +422,14 @@ export default function FinanceiroCadastros() {
       setSavingPaymentAccount(true);
       setError('');
       const { id, ...payload } = pickPaymentAccountFormData(paymentAccountForm);
+      if (!payload.empresa_id) {
+        setError('Informe a empresa pagadora real da conta pagadora.');
+        return;
+      }
       const cleanPayload = {
         ...payload,
         conta_bancaria_id: Number(payload.conta_bancaria_id),
-        empresa_id: payload.empresa_id ? Number(payload.empresa_id) : null
+        empresa_id: Number(payload.empresa_id)
       };
       if (paymentAccountForm.id) {
         await atualizarPaymentAccount(paymentAccountForm.id, cleanPayload);
@@ -778,8 +782,8 @@ export default function FinanceiroCadastros() {
                   </label>
                   <label className="sol-filter-field">
                     <span className="sol-filter-label">Empresa pagadora</span>
-                    <select className="input w-full" value={paymentAccountForm.empresa_id} onChange={(e) => setPaymentAccountForm((c) => ({ ...c, empresa_id: e.target.value }))}>
-                      <option value="">Nao vinculada</option>
+                    <select className="input w-full" value={paymentAccountForm.empresa_id} onChange={(e) => setPaymentAccountForm((c) => ({ ...c, empresa_id: e.target.value }))} required>
+                      <option value="">Selecione a empresa pagadora</option>
                       {empresasGrupo.map((empresa) => (
                         <option key={empresa.id} value={empresa.id}>
                           {empresa.nome}
@@ -876,8 +880,8 @@ export default function FinanceiroCadastros() {
                           <div className="text-[var(--c-muted)]">
                             CNPJ {account.cnpj_pagador} - Convenio {account.convenio || '-'}
                           </div>
-                          <div className="text-[var(--c-muted)]">
-                            {account.empresa?.nome || 'Matriz/central'} - {account.provider?.nome || account.provider?.codigo || 'Provider'} {account.ambiente}
+                          <div className={account.empresa_id || account.empresa?.id ? 'text-[var(--c-muted)]' : 'font-medium text-rose-700'}>
+                            {account.empresa?.nome || 'Empresa pagadora nao vinculada'} - {account.provider?.nome || account.provider?.codigo || 'Provider'} {account.ambiente}
                           </div>
                         </div>
                         <div className="flex items-center gap-2">

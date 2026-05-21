@@ -1,5 +1,6 @@
 const { Op } = require('sequelize');
 const {
+  EmpresaGrupo,
   PaymentAccount,
   PaymentBeneficiary,
   PaymentIntent,
@@ -33,6 +34,10 @@ function toNumber(value) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function onlyDigits(value) {
+  return String(value || '').replace(/\D+/g, '');
+}
+
 async function validateUserCanPrepareBatch(req) {
   if (!(await canPreparePagamentos(req.user))) {
     throw createHttpError(403, 'Usuario sem permissao para preparar lote de pagamento.');
@@ -53,6 +58,29 @@ async function validatePaymentAccount(paymentAccountId) {
   const account = await PaymentAccount.findByPk(paymentAccountId);
   if (!account || account.ativo === false) {
     throw createHttpError(400, 'Conta pagadora nao encontrada ou inativa.');
+  }
+  if (!account.empresa_id) {
+    throw createHttpError(400, 'Conta pagadora sem empresa pagadora vinculada.');
+  }
+  const empresa = await EmpresaGrupo.findByPk(account.empresa_id);
+  if (!empresa || empresa.ativo === false) {
+    throw createHttpError(400, 'Empresa pagadora da conta nao encontrada ou inativa.');
+  }
+  if (onlyDigits(account.cnpj_pagador).length !== 14) {
+    throw createHttpError(400, 'Conta pagadora sem CNPJ pagador valido.');
+  }
+  const requiredFields = [
+    ['provider_id', 'provider de pagamento'],
+    ['banco_codigo', 'codigo do banco'],
+    ['agencia', 'agencia'],
+    ['conta', 'conta'],
+    ['tipo_conta', 'tipo de conta'],
+    ['convenio', 'convenio']
+  ];
+  for (const [field, label] of requiredFields) {
+    if (!account[field]) {
+      throw createHttpError(400, `Conta pagadora sem ${label}.`);
+    }
   }
   return account;
 }
