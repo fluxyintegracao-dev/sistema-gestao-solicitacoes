@@ -1091,7 +1091,8 @@ function emptyDreSummary() {
       margem_resultado: null,
       ...demonstrativo.metricas,
       empresas_com_movimento: 0,
-      titulos_considerados: 0
+      titulos_considerados: 0,
+      movimentos_avulsos_considerados: 0
     },
     linhas: [],
     demonstrativo: demonstrativo.linhas,
@@ -1099,9 +1100,8 @@ function emptyDreSummary() {
   };
 }
 
-function getLinhaDre(titulo) {
-  const categoria = titulo.categoriaFinanceira;
-  const tipo = String(titulo.tipo || '').toUpperCase();
+function getLinhaDrePorCategoria(categoria, tipo) {
+  const normalizedTipo = String(tipo || '').toUpperCase();
   const grupoCategoria = String(categoria?.dre_grupo || '').trim();
 
   if (grupoCategoria) {
@@ -1113,18 +1113,22 @@ function getLinhaDre(titulo) {
     };
   }
 
-  return tipo === 'RECEBER'
+  return normalizedTipo === 'RECEBER'
     ? { grupo: 'Receitas nao classificadas', subgrupo: null, ordem: 900, considera_dre: true }
     : { grupo: 'Custos e despesas nao classificados', subgrupo: null, ordem: 910, considera_dre: true };
 }
 
-function addToMap(map, key, seed, amount) {
+function getLinhaDre(titulo) {
+  return getLinhaDrePorCategoria(titulo.categoriaFinanceira, titulo.tipo);
+}
+
+function addToMap(map, key, seed, amount, countField = 'titulos') {
   if (!map.has(key)) {
-    map.set(key, { ...seed, valor: 0, titulos: 0 });
+    map.set(key, { ...seed, valor: 0, titulos: 0, movimentos: 0 });
   }
   const item = map.get(key);
   item.valor += amount;
-  item.titulos += 1;
+  item[countField] = Number(item[countField] || 0) + 1;
   return item;
 }
 
@@ -1246,33 +1250,22 @@ function sortDreLinhas(linhas = []) {
   ));
 }
 
-function summarizeDreRows(titulos = [], empresas = []) {
+function summarizeDreRows(titulos = [], empresas = [], movimentosAvulsos = []) {
   const empresasById = new Map(empresas.map((empresa) => [Number(empresa.id), empresa]));
   const linhasMap = new Map();
   const empresasMap = new Map();
   const empresaLinhasMaps = new Map();
 
-  for (const titulo of titulos) {
-    const linha = getLinhaDre(titulo);
-    if (!linha.considera_dre || titulo.considera_dre === false) continue;
-
-    const tipo = String(titulo.tipo || '').toUpperCase();
-    const rawValue = Number(titulo.valor_original || 0);
-    const baseSignedValue = tipo === 'RECEBER' ? rawValue : -rawValue;
-    const signedValue = isCategoriaRedutora(titulo.categoriaFinanceira)
-      ? baseSignedValue * -1
-      : baseSignedValue;
-    const empresaId = titulo.empresa_id ? Number(titulo.empresa_id) : null;
+  function addDreValue({ linha, signedValue, empresaId, countField }) {
     const empresa = empresaId ? empresasById.get(empresaId) : null;
     const empresaKey = empresaId ? String(empresaId) : 'SEM_EMPRESA';
-
     const linhaKey = `${linha.grupo}::${linha.subgrupo || ''}`;
     addToMap(linhasMap, linhaKey, {
       linha_key: linhaKey,
       grupo: linha.grupo,
       subgrupo: linha.subgrupo,
       ordem: linha.ordem
-    }, signedValue);
+    }, signedValue, countField);
 
     if (!empresaLinhasMaps.has(empresaKey)) {
       empresaLinhasMaps.set(empresaKey, new Map());
@@ -1282,7 +1275,7 @@ function summarizeDreRows(titulos = [], empresas = []) {
       grupo: linha.grupo,
       subgrupo: linha.subgrupo,
       ordem: linha.ordem
-    }, signedValue);
+    }, signedValue, countField);
 
     const empresaResumo = addToMap(empresasMap, empresaKey, {
       empresa_id: empresaId,
@@ -1296,7 +1289,7 @@ function summarizeDreRows(titulos = [], empresas = []) {
       receitas: 0,
       despesas: 0,
       resultado: 0
-    }, 0);
+    }, 0, countField);
 
     if (signedValue >= 0) {
       empresaResumo.receitas += signedValue;
@@ -1304,6 +1297,32 @@ function summarizeDreRows(titulos = [], empresas = []) {
       empresaResumo.despesas += Math.abs(signedValue);
     }
     empresaResumo.resultado += signedValue;
+  }
+
+  for (const titulo of titulos) {
+    const linha = getLinhaDre(titulo);
+    if (!linha.considera_dre || titulo.considera_dre === false) continue;
+
+    const tipo = String(titulo.tipo || '').toUpperCase();
+    const rawValue = Number(titulo.valor_original || 0);
+    const baseSignedValue = tipo === 'RECEBER' ? rawValue : -rawValue;
+    const signedValue = isCategoriaRedutora(titulo.categoriaFinanceira)
+      ? baseSignedValue * -1
+      : baseSignedValue;
+    const empresaId = titulo.empresa_id ? Number(titulo.empresa_id) : null;
+
+    addDreValue({ linha, signedValue, empresaId, countField: 'titulos' });
+  }
+
+  for (const movimento of movimentosAvulsos) {
+    const categoria = movimento.categoriaFinanceira;
+    const linha = getLinhaDrePorCategoria(categoria, 'PAGAR');
+    if (!linha.considera_dre || categoria?.considera_dre === false) continue;
+
+    const rawValue = Number(movimento.valor_quitacao || movimento.valor || 0);
+    const signedValue = isCategoriaRedutora(categoria) ? Math.abs(rawValue) : -Math.abs(rawValue);
+    const empresaId = movimento.empresa_id ? Number(movimento.empresa_id) : null;
+    addDreValue({ linha, signedValue, empresaId, countField: 'movimentos' });
   }
 
   const linhas = sortDreLinhas(linhasMap.values());
@@ -1339,7 +1358,8 @@ function summarizeDreRows(titulos = [], empresas = []) {
       margem_resultado: demonstrativo.metricas.margem_liquida,
       ...demonstrativo.metricas,
       empresas_com_movimento: empresasResumo.length,
-      titulos_considerados: titulos.length
+      titulos_considerados: titulos.length,
+      movimentos_avulsos_considerados: movimentosAvulsos.length
     },
     linhas,
     demonstrativo: demonstrativo.linhas,
@@ -1446,7 +1466,52 @@ async function gerarDreGerencial(req, filters = {}) {
     order: [['data_emissao', 'ASC'], ['data_vencimento', 'ASC']]
   });
 
-  const summary = summarizeDreRows(titulos, empresas);
+  const movimentoAvulsoWhere = {
+    titulo_financeiro_id: null,
+    status: 'ATIVO',
+    tipo_movimento: 'TARIFA_BANCARIA',
+    categoria_financeira_id: { [Op.ne]: null },
+    data_movimento: {
+      [Op.gte]: periodo.data_inicial,
+      [Op.lte]: periodo.data_final
+    }
+  };
+
+  if (filters.empresa_id) {
+    movimentoAvulsoWhere.empresa_id = Number(filters.empresa_id);
+  } else if (empresaIdsHolding) {
+    movimentoAvulsoWhere.empresa_id = { [Op.in]: empresaIdsHolding };
+  }
+
+  if (filters.excluir_intercompany !== false) {
+    movimentoAvulsoWhere[Op.or] = [
+      { transferencia_interna: false },
+      { elimina_consolidado: false }
+    ];
+  }
+
+  const movimentosAvulsos = filters.obra_id
+    ? []
+    : await MovimentoFinanceiro.findAll({
+        where: movimentoAvulsoWhere,
+        include: [
+          {
+            model: EmpresaGrupo,
+            as: 'empresa',
+            attributes: ['id', 'codigo', 'nome', 'razao_social', 'tipo_empresa', 'tipo_gerencial', 'holding_id'],
+            required: false
+          },
+          {
+            model: CategoriaFinanceira,
+            as: 'categoriaFinanceira',
+            attributes: ['id', 'nome', 'tipo', 'dre_grupo', 'dre_subgrupo', 'dre_ordem', 'considera_dre'],
+            required: true
+          }
+        ],
+        order: [['data_movimento', 'ASC']]
+      });
+
+  const summary = summarizeDreRows(titulos, empresas, movimentosAvulsos);
 
   return {
     filtro: {

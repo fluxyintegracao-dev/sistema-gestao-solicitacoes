@@ -391,6 +391,15 @@ export default function FinanceiroCadastros() {
     return grupos.filter((grupo) => grupo.key === categoriaTipoFiltro);
   }, [categoriaTipoFiltro, categoriasFiltradas]);
 
+  const categoriasTarifasBancarias = useMemo(() => (
+    [...categorias]
+      .filter((categoria) => {
+        const tipo = String(categoria.tipo || '').trim().toUpperCase();
+        return categoria.ativo !== false && ['PAGAR', 'AMBOS'].includes(tipo);
+      })
+      .sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR', { sensitivity: 'base' }))
+  ), [categorias]);
+
   async function handleSalvarConta(event) {
     event.preventDefault();
     try {
@@ -508,7 +517,7 @@ export default function FinanceiroCadastros() {
   function handleAdicionarTarifaBancaria() {
     setTarifasBancariasAtalhos((current) => ([
       ...current,
-      { codigo: '', nome: '', descricao: '', ativo: true }
+      { codigo: '', nome: '', descricao: '', categoria_financeira_id: '', ativo: true }
     ]));
   }
 
@@ -1159,7 +1168,7 @@ export default function FinanceiroCadastros() {
               <div>
                 <h2 className="text-lg font-semibold text-[var(--c-text)]">Atalhos de tarifas bancarias</h2>
                 <p className="text-sm text-[var(--c-muted)]">
-                  Nomes exibidos no atalho da conciliacao bancaria para tarifas como TAR PIX, TAR TED e manutencao de conta.
+                  Atalhos da conciliacao bancaria para tarifas como TAR PIX, TAR TED e manutencao de conta. Cada atalho precisa de categoria financeira para refletir na DRE.
                 </p>
               </div>
               <button type="button" className="btn btn-outline btn-sm" onClick={handleAdicionarTarifaBancaria}>
@@ -1192,6 +1201,19 @@ export default function FinanceiroCadastros() {
                     value={tarifa.descricao || ''}
                     onChange={(e) => handleAlterarTarifaBancaria(index, 'descricao', e.target.value)}
                   />
+                  <select
+                    className="input mt-3 w-full"
+                    value={tarifa.categoria_financeira_id || ''}
+                    onChange={(e) => handleAlterarTarifaBancaria(index, 'categoria_financeira_id', e.target.value)}
+                    required
+                  >
+                    <option value="">Categoria financeira da tarifa</option>
+                    {categoriasTarifasBancarias.map((categoria) => (
+                      <option key={categoria.id} value={categoria.id}>
+                        {categoria.nome} ({categoriaTipoLabel(String(categoria.tipo || 'AMBOS').toUpperCase())})
+                      </option>
+                    ))}
+                  </select>
                   <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
                     <label className="flex items-center gap-2 text-sm text-[var(--c-text)]">
                       <input

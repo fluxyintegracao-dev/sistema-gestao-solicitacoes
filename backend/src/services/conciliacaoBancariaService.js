@@ -4,6 +4,7 @@ const {
   ConciliacaoBancaria,
   ConciliacaoBancariaImportacao,
   ContaBancaria,
+  CategoriaFinanceira,
   FaturaCartaoFinanceiro,
   CartaoFinanceiro,
   MovimentoFinanceiro,
@@ -1392,11 +1393,27 @@ async function confirmarConciliacaoTarifa(req, conciliacaoId, payload = {}) {
     if (valor <= 0) {
       throw createHttpError(400, 'Valor do lancamento bancario invalido para tarifa.');
     }
+    const categoriaId = Number(tarifa.categoria_financeira_id || 0);
+    if (!Number.isInteger(categoriaId) || categoriaId <= 0) {
+      throw createHttpError(400, 'Configure uma categoria financeira para este atalho de tarifa bancaria antes de conciliar.');
+    }
+    const categoria = await CategoriaFinanceira.findByPk(categoriaId, { transaction });
+    if (!categoria) {
+      throw createHttpError(400, 'Categoria financeira configurada para a tarifa bancaria nao foi encontrada.');
+    }
+    const tipoCategoria = String(categoria.tipo || '').trim().toUpperCase();
+    if (!['PAGAR', 'AMBOS'].includes(tipoCategoria)) {
+      throw createHttpError(400, 'Categoria financeira da tarifa bancaria deve ser do tipo PAGAR ou AMBOS.');
+    }
+    if (categoria.ativo === false) {
+      throw createHttpError(400, 'Categoria financeira da tarifa bancaria esta inativa.');
+    }
 
     const sessao = await obterSessaoAbertaParaConta(conta, conciliacao.data_movimento, { transaction });
     const descricao = String(payload.descricao || conciliacao.descricao_banco || tarifa.nome || '').trim().slice(0, 255);
     const movimento = await MovimentoFinanceiro.create({
       titulo_financeiro_id: null,
+      categoria_financeira_id: categoria.id,
       conta_bancaria_id: conta.id,
       empresa_id: empresaConciliacaoId,
       caixa_sessao_id: sessao?.id || null,
@@ -1437,6 +1454,7 @@ async function confirmarConciliacaoTarifa(req, conciliacaoId, payload = {}) {
       metadata: {
         movimento_financeiro_id: movimento.id,
         conta_bancaria_id: conta.id,
+        categoria_financeira_id: categoria.id,
         codigo_tarifa: tarifa.codigo,
         valor
       }

@@ -2100,6 +2100,16 @@ db.TituloFinanceiro.belongsTo(db.CategoriaFinanceira, {
   as: 'categoriaFinanceira'
 });
 
+db.CategoriaFinanceira.hasMany(db.MovimentoFinanceiro, {
+  foreignKey: 'categoria_financeira_id',
+  as: 'movimentos'
+});
+
+db.MovimentoFinanceiro.belongsTo(db.CategoriaFinanceira, {
+  foreignKey: 'categoria_financeira_id',
+  as: 'categoriaFinanceira'
+});
+
 db.FormaPagamentoFinanceira.hasMany(db.TituloFinanceiro, {
   foreignKey: 'forma_pagamento_id',
   as: 'titulos'

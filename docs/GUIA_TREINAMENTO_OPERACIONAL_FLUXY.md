@@ -531,6 +531,15 @@ Exemplos:
 - `Tarifa bancaria`: manter como despesa financeira, nao como endividamento;
 - `Transferencia entre empresas do grupo`: tratar como intercompany quando aplicavel, nao como divida externa consolidada.
 
+Atalhos de tarifa bancaria:
+
+- todo atalho de tarifa usado na conciliacao precisa ter uma categoria financeira explicita;
+- use categoria do tipo `PAGAR` ou `AMBOS`;
+- normalmente a categoria deve ficar no grupo DRE `Resultado financeiro`, salvo decisao gerencial diferente;
+- sem categoria, o sistema bloqueia o uso do atalho porque a tarifa ficaria sem leitura gerencial;
+- a tarifa conciliada pelo atalho entra como movimento financeiro avulso, com empresa real da conta bancaria e categoria real configurada;
+- nao usar atalho de tarifa para fornecedor, compra, imposto, folha ou qualquer despesa que precise de titulo, parceiro, obra ou centro de custo.
+
 Cuidados:
 
 - categoria errada distorce a DRE;
@@ -1095,6 +1104,8 @@ Cuidados:
 - ao conciliar como transferencia, a empresa do lancamento OFX precisa continuar igual a empresa da conta importada;
 - ao confirmar conciliacao, o movimento financeiro precisa ser da mesma conta e da mesma empresa do lancamento bancario;
 - tarifa bancaria conciliada usa a empresa do lancamento bancario e exige que essa empresa seja a mesma da conta;
+- tarifa bancaria conciliada pelo atalho exige categoria financeira configurada em `Financeiro > Cadastros`;
+- a categoria da tarifa define onde o valor entra na DRE;
 - OFX nao deve criar baixa automaticamente sem conferencia;
 - OFX da conta errada distorce conciliacao;
 - baixa precisa existir para ser conciliada;

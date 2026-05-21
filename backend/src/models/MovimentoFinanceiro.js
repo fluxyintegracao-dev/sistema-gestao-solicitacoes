@@ -14,6 +14,10 @@ module.exports = (sequelize, DataTypes) => sequelize.define(
       type: DataTypes.INTEGER,
       allowNull: true
     },
+    categoria_financeira_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true
+    },
     conta_bancaria_id: {
       type: DataTypes.INTEGER,
       allowNull: true

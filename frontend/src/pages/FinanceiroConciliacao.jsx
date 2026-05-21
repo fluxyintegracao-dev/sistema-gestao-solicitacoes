@@ -170,7 +170,7 @@ function AcoesRapidasConciliacaoModal({ item, tarifas, processingId, onClose, on
             <div className="flex items-center justify-between gap-2">
               <div>
                 <p className="text-sm font-semibold text-[var(--c-text)]">Registrar tarifa bancaria</p>
-                <p className="text-xs text-[var(--c-muted)]">Cria somente movimento de conta, sem titulo financeiro.</p>
+                <p className="text-xs text-[var(--c-muted)]">Cria movimento avulso de tarifa com categoria financeira explicita para DRE.</p>
               </div>
               {!isSaida && <span className="rounded-full bg-amber-50 px-2 py-1 text-[11px] font-medium text-amber-700">Apenas saidas</span>}
             </div>
@@ -179,14 +179,15 @@ function AcoesRapidasConciliacaoModal({ item, tarifas, processingId, onClose, on
                 <span className="text-xs text-[var(--c-muted)]">Nenhuma tarifa ativa configurada.</span>
               ) : tarifasAtivas.map((tarifa) => {
                 const key = `tarifa-${item?.id}-${tarifa.codigo}`;
+                const hasCategoria = Boolean(tarifa.categoria_financeira_id);
                 return (
                   <button
                     key={tarifa.codigo}
                     type="button"
                     className="btn btn-outline btn-sm"
-                    disabled={!isSaida || processingId === key}
+                    disabled={!isSaida || !hasCategoria || processingId === key}
                     onClick={() => onConfirmarTarifa(item, tarifa)}
-                    title={tarifa.descricao || tarifa.nome}
+                    title={!hasCategoria ? 'Configure a categoria financeira deste atalho em Financeiro > Cadastros.' : (tarifa.descricao || tarifa.nome)}
                   >
                     {processingId === key ? 'Registrando...' : tarifa.nome}
                   </button>
@@ -1078,6 +1079,10 @@ export default function FinanceiroConciliacao() {
 
   async function handleConfirmarTarifa(item, tarifa) {
     if (!item?.id || !tarifa?.codigo) return;
+    if (!tarifa.categoria_financeira_id) {
+      setError('Configure a categoria financeira deste atalho de tarifa em Financeiro > Cadastros antes de conciliar.');
+      return;
+    }
 
     try {
       setProcessingId(`tarifa-${item.id}-${tarifa.codigo}`);

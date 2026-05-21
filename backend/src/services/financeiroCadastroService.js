@@ -39,10 +39,10 @@ function sanitizeTextField(value, { emptyAsNull = false } = {}) {
 
 const TARIFAS_BANCARIAS_CONFIG_KEY = 'FINANCEIRO_TARIFAS_BANCARIAS_ATALHOS';
 const TARIFAS_BANCARIAS_PADRAO = [
-  { codigo: 'TAR_PIX', nome: 'TAR PIX', ativo: true },
-  { codigo: 'TAR_TED', nome: 'TAR TED', ativo: true },
-  { codigo: 'TAR_TEV', nome: 'TAR TEV', ativo: true },
-  { codigo: 'TAR_MAN_CONT', nome: 'TAR MAN CONT', ativo: true }
+  { codigo: 'TAR_PIX', nome: 'TAR PIX', categoria_financeira_id: null, ativo: true },
+  { codigo: 'TAR_TED', nome: 'TAR TED', categoria_financeira_id: null, ativo: true },
+  { codigo: 'TAR_TEV', nome: 'TAR TEV', categoria_financeira_id: null, ativo: true },
+  { codigo: 'TAR_MAN_CONT', nome: 'TAR MAN CONT', categoria_financeira_id: null, ativo: true }
 ];
 
 async function assertFinanceAccess(req) {
@@ -180,19 +180,29 @@ function isSuperadmin(user) {
   return String(user?.perfil || '').trim().toUpperCase() === 'SUPERADMIN';
 }
 
-function normalizeTarifaBancariaConfigItem(item = {}, index = 0) {
+function normalizeTarifaBancariaConfigItem(item = {}, index = 0, { requireCategoria = false } = {}) {
   const nome = sanitizeTextField(item.nome || item.codigo || `Tarifa ${index + 1}`);
   const codigo = normalizeCodigo(item.codigo || nome);
+  const categoriaFinanceiraId = item.categoria_financeira_id === undefined || item.categoria_financeira_id === null || item.categoria_financeira_id === ''
+    ? null
+    : Number(item.categoria_financeira_id);
   if (!codigo) {
     throw createHttpError(400, `Codigo da tarifa ${index + 1} e obrigatorio.`);
   }
   if (!nome) {
     throw createHttpError(400, `Nome da tarifa ${index + 1} e obrigatorio.`);
   }
+  if (requireCategoria && (!Number.isInteger(categoriaFinanceiraId) || categoriaFinanceiraId <= 0)) {
+    throw createHttpError(400, `Categoria financeira da tarifa ${index + 1} e obrigatoria.`);
+  }
+  if (categoriaFinanceiraId !== null && (!Number.isInteger(categoriaFinanceiraId) || categoriaFinanceiraId <= 0)) {
+    throw createHttpError(400, `Categoria financeira da tarifa ${index + 1} e invalida.`);
+  }
 
   return {
     codigo,
     nome: nome.slice(0, 80),
+    categoria_financeira_id: categoriaFinanceiraId,
     descricao: sanitizeTextField(item.descricao, { emptyAsNull: true }),
     ativo: sanitizeBoolean(item.ativo, true)
   };
@@ -232,13 +242,31 @@ async function salvarTarifasBancariasConfig(req, payload = {}) {
   }
 
   const vistos = new Set();
-  const itens = itensPayload.map(normalizeTarifaBancariaConfigItem).map((item) => {
+  const itens = itensPayload.map((item, index) => normalizeTarifaBancariaConfigItem(item, index, { requireCategoria: true })).map((item) => {
     if (vistos.has(item.codigo)) {
       throw createHttpError(400, `Codigo de tarifa duplicado: ${item.codigo}.`);
     }
     vistos.add(item.codigo);
     return item;
   });
+  const categoriaIds = [...new Set(itens.map((item) => item.categoria_financeira_id).filter(Boolean))];
+  const categorias = await CategoriaFinanceira.findAll({
+    where: { id: categoriaIds }
+  });
+  const categoriasById = new Map(categorias.map((categoria) => [Number(categoria.id), categoria]));
+  for (const item of itens) {
+    const categoria = categoriasById.get(Number(item.categoria_financeira_id));
+    if (!categoria) {
+      throw createHttpError(400, `Categoria financeira nao encontrada para a tarifa ${item.nome}.`);
+    }
+    const tipoCategoria = String(categoria.tipo || '').trim().toUpperCase();
+    if (!['PAGAR', 'AMBOS'].includes(tipoCategoria)) {
+      throw createHttpError(400, `Categoria financeira da tarifa ${item.nome} deve ser do tipo PAGAR ou AMBOS.`);
+    }
+    if (categoria.ativo === false) {
+      throw createHttpError(400, `Categoria financeira da tarifa ${item.nome} esta inativa.`);
+    }
+  }
 
   const [config] = await ConfiguracaoSistema.findOrCreate({
     where: { chave: TARIFAS_BANCARIAS_CONFIG_KEY },

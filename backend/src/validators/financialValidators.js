@@ -1246,7 +1246,7 @@ function validateFinanceTarifasBancariasConfigBody(body = {}) {
     itens: body.itens.map((item, index) => {
       ensureAllowedKeys(
         item || {},
-        ['codigo', 'nome', 'descricao', 'ativo'],
+        ['codigo', 'nome', 'descricao', 'categoria_financeira_id', 'ativo'],
         `Tarifa bancaria ${index + 1}`
       );
 
@@ -1254,6 +1254,7 @@ function validateFinanceTarifasBancariasConfigBody(body = {}) {
         codigo: parseOptionalText(item?.codigo, `Codigo da tarifa ${index + 1}`, 80, { required: true }),
         nome: parseOptionalText(item?.nome, `Nome da tarifa ${index + 1}`, 80, { required: true }),
         descricao: parseOptionalText(item?.descricao, `Descricao da tarifa ${index + 1}`, 255),
+        categoria_financeira_id: parseInteger(item?.categoria_financeira_id, `Categoria financeira da tarifa ${index + 1}`, { required: true }),
         ativo: parseBoolean(item?.ativo, `Ativo da tarifa ${index + 1}`)
       };
     })
