@@ -17,7 +17,8 @@ const { normalizeOriginalName } = require('../utils/fileName');
 const {
   TIPO_EMPRESA_HOLDING,
   TIPO_EMPRESA_OPERACIONAL,
-  normalizeTipoEmpresaGrupo
+  normalizeTipoEmpresaGrupo,
+  normalizeTipoGerencialEmpresaGrupo
 } = require('../constants/empresaGrupo');
 
 const COLABORADOR_INCLUDE = [
@@ -675,6 +676,12 @@ async function listarEmpresasGrupoRh(filters = {}) {
   if (filters.tipo_empresa) {
     where.tipo_empresa = normalizeTipoEmpresaGrupo(filters.tipo_empresa);
   }
+  if (filters.tipo_gerencial) {
+    where.tipo_gerencial = normalizeTipoGerencialEmpresaGrupo(filters.tipo_gerencial);
+  }
+  if (filters.consolidar_no_grupo !== undefined) {
+    where.consolidar_no_grupo = filters.consolidar_no_grupo;
+  }
   if (filters.holding_id) {
     where.holding_id = filters.holding_id;
   }
@@ -691,13 +698,24 @@ async function normalizeEmpresaGrupoHierarchy(data = {}, currentId = null, trans
   if (payload.tipo_empresa !== undefined) {
     payload.tipo_empresa = normalizeTipoEmpresaGrupo(payload.tipo_empresa);
   }
+  if (payload.tipo_gerencial !== undefined) {
+    payload.tipo_gerencial = normalizeTipoGerencialEmpresaGrupo(payload.tipo_gerencial);
+  }
   if (!payload.tipo_empresa && !currentId) {
     payload.tipo_empresa = TIPO_EMPRESA_OPERACIONAL;
+  }
+  if (!payload.tipo_gerencial && !currentId) {
+    payload.tipo_gerencial = payload.tipo_empresa === TIPO_EMPRESA_HOLDING
+      ? TIPO_EMPRESA_HOLDING
+      : TIPO_EMPRESA_OPERACIONAL;
   }
 
   const tipo = payload.tipo_empresa || TIPO_EMPRESA_OPERACIONAL;
   if (tipo === TIPO_EMPRESA_HOLDING) {
     payload.holding_id = null;
+    if (payload.empresa_operacional === undefined) {
+      payload.empresa_operacional = false;
+    }
     return payload;
   }
 

@@ -27,6 +27,31 @@ module.exports = (sequelize, DataTypes) => sequelize.define(
       allowNull: false,
       defaultValue: 'OPERACIONAL'
     },
+    tipo_gerencial: {
+      type: DataTypes.STRING(40),
+      allowNull: false,
+      defaultValue: 'OPERACIONAL'
+    },
+    empresa_caixa: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false
+    },
+    empresa_operacional: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: true
+    },
+    consolidar_no_grupo: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: true
+    },
+    elimina_intercompany: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: true
+    },
     holding_id: {
       type: DataTypes.INTEGER,
       allowNull: true

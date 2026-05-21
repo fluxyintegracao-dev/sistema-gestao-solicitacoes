@@ -10,6 +10,11 @@ function emptyForm() {
     razao_social: '',
     cnpj: '',
     tipo_empresa: 'OPERACIONAL',
+    tipo_gerencial: 'OPERACIONAL',
+    empresa_caixa: false,
+    empresa_operacional: true,
+    consolidar_no_grupo: true,
+    elimina_intercompany: true,
     holding_id: '',
     ativo: true
   };
@@ -21,6 +26,22 @@ function formatDocumento(value) {
     return digits.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
   }
   return value || '-';
+}
+
+const TIPOS_GERENCIAIS = [
+  ['HOLDING', 'Holding'],
+  ['TESOURARIA', 'Tesouraria'],
+  ['SPE', 'SPE'],
+  ['ADMINISTRATIVA', 'Administrativa'],
+  ['OPERACIONAL', 'Operacional'],
+  ['PATRIMONIAL', 'Patrimonial'],
+  ['COMERCIAL', 'Comercial'],
+  ['RH_FOLHA', 'RH/Folha'],
+  ['INVESTIMENTOS', 'Investimentos']
+];
+
+function labelTipoGerencial(value) {
+  return TIPOS_GERENCIAIS.find(([key]) => key === String(value || '').toUpperCase())?.[1] || 'Operacional';
 }
 
 export default function EmpresasGrupo() {
@@ -58,6 +79,11 @@ export default function EmpresasGrupo() {
       razao_social: item.razao_social || '',
       cnpj: item.cnpj || '',
       tipo_empresa: item.tipo_empresa || 'OPERACIONAL',
+      tipo_gerencial: item.tipo_gerencial || 'OPERACIONAL',
+      empresa_caixa: Boolean(item.empresa_caixa),
+      empresa_operacional: item.empresa_operacional !== false,
+      consolidar_no_grupo: item.consolidar_no_grupo !== false,
+      elimina_intercompany: item.elimina_intercompany !== false,
       holding_id: item.holding_id ? String(item.holding_id) : '',
       ativo: item.ativo !== false
     });
@@ -77,6 +103,11 @@ export default function EmpresasGrupo() {
         razao_social: form.razao_social || undefined,
         cnpj: form.cnpj || undefined,
         tipo_empresa: form.tipo_empresa || 'OPERACIONAL',
+        tipo_gerencial: form.tipo_gerencial || 'OPERACIONAL',
+        empresa_caixa: Boolean(form.empresa_caixa),
+        empresa_operacional: Boolean(form.empresa_operacional),
+        consolidar_no_grupo: Boolean(form.consolidar_no_grupo),
+        elimina_intercompany: Boolean(form.elimina_intercompany),
         holding_id: form.tipo_empresa === 'HOLDING' ? null : (form.holding_id ? Number(form.holding_id) : null),
         ativo: Boolean(form.ativo)
       };
@@ -155,6 +186,8 @@ export default function EmpresasGrupo() {
                   <th>Nome</th>
                   <th>Razao social</th>
                   <th>Tipo</th>
+                  <th>Gerencial</th>
+                  <th>Consolida</th>
                   <th>Holding</th>
                   <th>CNPJ</th>
                   <th>Ativa</th>
@@ -168,6 +201,8 @@ export default function EmpresasGrupo() {
                     <td>{item.nome}</td>
                     <td>{item.razao_social || '-'}</td>
                     <td>{String(item.tipo_empresa || 'OPERACIONAL') === 'HOLDING' ? 'Holding' : 'Empresa operacional'}</td>
+                    <td>{labelTipoGerencial(item.tipo_gerencial)}</td>
+                    <td>{item.consolidar_no_grupo !== false ? 'Sim' : 'Nao'}</td>
                     <td>{item.holding_id ? (empresas.find((empresa) => Number(empresa.id) === Number(item.holding_id))?.nome || item.holding_id) : '-'}</td>
                     <td>{formatDocumento(item.cnpj)}</td>
                     <td>{item.ativo ? 'Sim' : 'Nao'}</td>
@@ -180,7 +215,7 @@ export default function EmpresasGrupo() {
                 ))}
                 {!empresas.length && (
                   <tr>
-                    <td colSpan="8" align="center">
+                    <td colSpan="10" align="center">
                       {carregando ? 'Carregando...' : 'Nenhuma empresa do grupo cadastrada'}
                     </td>
                   </tr>
@@ -228,6 +263,8 @@ export default function EmpresasGrupo() {
                 onChange={(event) => setForm((prev) => ({
                   ...prev,
                   tipo_empresa: event.target.value,
+                  tipo_gerencial: event.target.value === 'HOLDING' ? 'HOLDING' : prev.tipo_gerencial,
+                  empresa_operacional: event.target.value === 'HOLDING' ? false : prev.empresa_operacional,
                   holding_id: event.target.value === 'HOLDING' ? '' : prev.holding_id
                 }))}
               >
@@ -235,6 +272,21 @@ export default function EmpresasGrupo() {
                 <option value="OPERACIONAL">Empresa operacional</option>
               </select>
             </label>
+            <label className="space-y-1 text-sm">
+              <span>Tipo gerencial</span>
+              <select
+                className="form-control"
+                value={form.tipo_gerencial}
+                onChange={(event) => setForm((prev) => ({ ...prev, tipo_gerencial: event.target.value }))}
+              >
+                {TIPOS_GERENCIAIS.map(([value, label]) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-2">
             <label className="space-y-1 text-sm">
               <span>Holding controladora</span>
               <select
@@ -250,7 +302,7 @@ export default function EmpresasGrupo() {
                     <option key={holding.id} value={holding.id}>
                       {holding.nome}
                     </option>
-                  ))}
+                ))}
               </select>
             </label>
           </div>
@@ -282,6 +334,44 @@ export default function EmpresasGrupo() {
             />
             Empresa ativa
           </label>
+
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <p className="text-sm font-semibold text-slate-800">Classificacao gerencial</p>
+            <div className="mt-3 grid gap-2 md:grid-cols-2">
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={form.empresa_caixa}
+                  onChange={(event) => setForm((prev) => ({ ...prev, empresa_caixa: event.target.checked }))}
+                />
+                Empresa caixa / tesouraria
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={form.empresa_operacional}
+                  onChange={(event) => setForm((prev) => ({ ...prev, empresa_operacional: event.target.checked }))}
+                />
+                Empresa operacional
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={form.consolidar_no_grupo}
+                  onChange={(event) => setForm((prev) => ({ ...prev, consolidar_no_grupo: event.target.checked }))}
+                />
+                Consolidar no grupo
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={form.elimina_intercompany}
+                  onChange={(event) => setForm((prev) => ({ ...prev, elimina_intercompany: event.target.checked }))}
+                />
+                Eliminar intercompany no consolidado
+              </label>
+            </div>
+          </div>
 
           <div className="flex flex-wrap gap-2">
             <button type="submit" className="btn btn-primary" disabled={salvando}>

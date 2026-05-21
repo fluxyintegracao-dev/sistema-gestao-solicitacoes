@@ -575,7 +575,7 @@ Essa visao deve mostrar se o grupo gera caixa, se precisa de caixa futuro, onde 
 
 Estrutura atual identificada:
 
-- `empresas_grupo` ja diferencia Holding e empresa operacional por `tipo_empresa` e possui `holding_id`.
+- `empresas_grupo` ja diferencia Holding e empresa operacional por `tipo_empresa`, possui `holding_id` e passa a registrar classificacao gerencial para consolidacao executiva.
 - `contas_bancarias` ja possui `empresa_id`.
 - `titulos_financeiros` ja possui `empresa_id`, `empresa_contraparte_id`, `intercompany`, `competencia_data`, `considera_dre`, `obra_id`, `apropriacao_id` e `categoria_financeira_id`.
 - `movimentos_financeiros` ja possui `empresa_id`, `conta_bancaria_id`, `titulo_financeiro_id`, valores de baixa e data do movimento.
@@ -593,7 +593,7 @@ Conclusao:
 
 #### Empresas do Grupo
 
-Adicionar campos:
+Campos implementados como primeira etapa da consolidacao gerencial:
 
 - `tipo_gerencial`.
 - `empresa_caixa` boolean.

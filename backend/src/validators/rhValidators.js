@@ -3,6 +3,7 @@ const {
   ValidationError,
   sanitizeString
 } = require('../middlewares/validation');
+const { TIPOS_GERENCIAIS_EMPRESA_GRUPO } = require('../constants/empresaGrupo');
 
 const RH_TIPOS_VINCULO = ['CLT', 'NAO_CLT'];
 const RH_STATUS_COLABORADOR = ['ATIVO', 'INATIVO', 'AFASTADO'];
@@ -194,18 +195,33 @@ function parseCpfCnpj(value, fieldName) {
 }
 
 function validateRhEmpresaGrupoQuery(query = {}) {
-  ensureAllowedKeys(query, ['q', 'ativo', 'tipo_empresa', 'holding_id'], 'Consulta de empresas do grupo');
+  ensureAllowedKeys(query, ['q', 'ativo', 'tipo_empresa', 'tipo_gerencial', 'holding_id', 'consolidar_no_grupo'], 'Consulta de empresas do grupo');
 
   return {
     q: parseOptionalText(query.q, 'Busca', 120),
     ativo: parseBoolean(query.ativo, 'Ativo'),
     tipo_empresa: parseEnum(query.tipo_empresa, 'Tipo de empresa', ['HOLDING', 'OPERACIONAL']),
+    tipo_gerencial: parseEnum(query.tipo_gerencial, 'Tipo gerencial', TIPOS_GERENCIAIS_EMPRESA_GRUPO),
+    consolidar_no_grupo: parseBoolean(query.consolidar_no_grupo, 'Consolidar no grupo'),
     holding_id: parseInteger(query.holding_id, 'Holding')
   };
 }
 
 function validateRhEmpresaGrupoCreateBody(body = {}) {
-  ensureAllowedKeys(body, ['codigo', 'nome', 'razao_social', 'cnpj', 'tipo_empresa', 'holding_id', 'ativo'], 'Empresa do grupo');
+  ensureAllowedKeys(body, [
+    'codigo',
+    'nome',
+    'razao_social',
+    'cnpj',
+    'tipo_empresa',
+    'tipo_gerencial',
+    'empresa_caixa',
+    'empresa_operacional',
+    'consolidar_no_grupo',
+    'elimina_intercompany',
+    'holding_id',
+    'ativo'
+  ], 'Empresa do grupo');
 
   return {
     codigo: parseOptionalText(body.codigo, 'Codigo', 60),
@@ -213,13 +229,31 @@ function validateRhEmpresaGrupoCreateBody(body = {}) {
     razao_social: parseOptionalText(body.razao_social, 'Razao social', 200),
     cnpj: parseCpfCnpj(body.cnpj, 'CNPJ'),
     tipo_empresa: parseEnum(body.tipo_empresa, 'Tipo de empresa', ['HOLDING', 'OPERACIONAL']),
+    tipo_gerencial: parseEnum(body.tipo_gerencial, 'Tipo gerencial', TIPOS_GERENCIAIS_EMPRESA_GRUPO),
+    empresa_caixa: parseBoolean(body.empresa_caixa, 'Empresa caixa'),
+    empresa_operacional: parseBoolean(body.empresa_operacional, 'Empresa operacional'),
+    consolidar_no_grupo: parseBoolean(body.consolidar_no_grupo, 'Consolidar no grupo'),
+    elimina_intercompany: parseBoolean(body.elimina_intercompany, 'Eliminar intercompany'),
     holding_id: parseInteger(body.holding_id, 'Holding'),
     ativo: parseBoolean(body.ativo, 'Ativo')
   };
 }
 
 function validateRhEmpresaGrupoUpdateBody(body = {}) {
-  ensureAllowedKeys(body, ['codigo', 'nome', 'razao_social', 'cnpj', 'tipo_empresa', 'holding_id', 'ativo'], 'Atualizacao de empresa do grupo');
+  ensureAllowedKeys(body, [
+    'codigo',
+    'nome',
+    'razao_social',
+    'cnpj',
+    'tipo_empresa',
+    'tipo_gerencial',
+    'empresa_caixa',
+    'empresa_operacional',
+    'consolidar_no_grupo',
+    'elimina_intercompany',
+    'holding_id',
+    'ativo'
+  ], 'Atualizacao de empresa do grupo');
 
   const payload = {
     codigo: parseOptionalText(body.codigo, 'Codigo', 60),
@@ -227,6 +261,11 @@ function validateRhEmpresaGrupoUpdateBody(body = {}) {
     razao_social: parseOptionalText(body.razao_social, 'Razao social', 200),
     cnpj: parseCpfCnpj(body.cnpj, 'CNPJ'),
     tipo_empresa: parseEnum(body.tipo_empresa, 'Tipo de empresa', ['HOLDING', 'OPERACIONAL']),
+    tipo_gerencial: parseEnum(body.tipo_gerencial, 'Tipo gerencial', TIPOS_GERENCIAIS_EMPRESA_GRUPO),
+    empresa_caixa: parseBoolean(body.empresa_caixa, 'Empresa caixa'),
+    empresa_operacional: parseBoolean(body.empresa_operacional, 'Empresa operacional'),
+    consolidar_no_grupo: parseBoolean(body.consolidar_no_grupo, 'Consolidar no grupo'),
+    elimina_intercompany: parseBoolean(body.elimina_intercompany, 'Eliminar intercompany'),
     holding_id: parseInteger(body.holding_id, 'Holding'),
     ativo: parseBoolean(body.ativo, 'Ativo')
   };

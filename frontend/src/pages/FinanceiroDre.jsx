@@ -14,6 +14,18 @@ const DEFAULT_FILTERS = {
   excluir_intercompany: true
 };
 
+const TIPOS_GERENCIAIS_LABEL = {
+  HOLDING: 'Holding',
+  TESOURARIA: 'Tesouraria',
+  SPE: 'SPE',
+  ADMINISTRATIVA: 'Administrativa',
+  OPERACIONAL: 'Operacional',
+  PATRIMONIAL: 'Patrimonial',
+  COMERCIAL: 'Comercial',
+  RH_FOLHA: 'RH/Folha',
+  INVESTIMENTOS: 'Investimentos'
+};
+
 function formatCurrency(value) {
   return Number(value || 0).toLocaleString('pt-BR', {
     style: 'currency',
@@ -30,6 +42,10 @@ function formatDate(value) {
   if (!value) return '-';
   const [year, month, day] = String(value).split('-');
   return year && month && day ? `${day}/${month}/${year}` : value;
+}
+
+function labelTipoGerencial(value) {
+  return TIPOS_GERENCIAIS_LABEL[String(value || '').toUpperCase()] || 'Operacional';
 }
 
 export default function FinanceiroDre() {
@@ -326,6 +342,7 @@ export default function FinanceiroDre() {
                   <thead>
                     <tr>
                       <th>Empresa</th>
+                      <th>Perfil</th>
                       <th>Receita liquida</th>
                       <th>EBITDA</th>
                       <th>Lucro/Prejuizo</th>
@@ -336,6 +353,11 @@ export default function FinanceiroDre() {
                     {(relatorio?.empresas || []).length ? (relatorio.empresas.map((empresa) => (
                       <tr key={empresa.empresa_id || 'sem-empresa'}>
                         <td className="font-medium text-[var(--c-text)]">{empresa.empresa_nome}</td>
+                        <td>
+                          <div>{labelTipoGerencial(empresa.tipo_gerencial)}</div>
+                          {empresa.empresa_caixa ? <div className="text-xs text-[var(--c-muted)]">Caixa/Tesouraria</div> : null}
+                          {empresa.consolidar_no_grupo === false ? <div className="text-xs text-amber-700">Fora do consolidado</div> : null}
+                        </td>
                         <td>{formatCurrency(empresa.receita_liquida)}</td>
                         <td className="font-semibold" style={{ color: Number(empresa.ebitda || 0) >= 0 ? '#15803d' : '#b91c1c' }}>
                           {formatCurrency(empresa.ebitda)}
@@ -346,7 +368,7 @@ export default function FinanceiroDre() {
                         <td>{formatPercent(empresa.margem_liquida ?? empresa.margem_resultado)}</td>
                       </tr>
                     ))) : (
-                      <tr><td colSpan={5} className="text-center text-[var(--c-muted)]">Nenhuma empresa com movimento.</td></tr>
+                      <tr><td colSpan={6} className="text-center text-[var(--c-muted)]">Nenhuma empresa com movimento.</td></tr>
                     )}
                   </tbody>
                 </table>

@@ -982,6 +982,10 @@ function summarizeDreRows(titulos = [], empresas = []) {
       empresa_id: empresaId,
       empresa_nome: empresa?.nome || 'Sem empresa vinculada',
       tipo_empresa: empresa?.tipo_empresa || null,
+      tipo_gerencial: empresa?.tipo_gerencial || null,
+      empresa_caixa: empresa?.empresa_caixa === true,
+      empresa_operacional: empresa?.empresa_operacional !== false,
+      consolidar_no_grupo: empresa?.consolidar_no_grupo !== false,
       holding_id: empresa?.holding_id || null,
       receitas: 0,
       despesas: 0,
@@ -1043,7 +1047,21 @@ async function gerarDreGerencial(req, filters = {}) {
   const periodo = resolvePeriodo(filters);
   const obraScopeWhere = await resolveObraScope(req, filters.obra_id);
   const empresas = await EmpresaGrupo.findAll({
-    attributes: ['id', 'codigo', 'nome', 'razao_social', 'cnpj', 'tipo_empresa', 'holding_id', 'ativo'],
+    attributes: [
+      'id',
+      'codigo',
+      'nome',
+      'razao_social',
+      'cnpj',
+      'tipo_empresa',
+      'tipo_gerencial',
+      'empresa_caixa',
+      'empresa_operacional',
+      'consolidar_no_grupo',
+      'elimina_intercompany',
+      'holding_id',
+      'ativo'
+    ],
     order: [['tipo_empresa', 'ASC'], ['nome', 'ASC']]
   });
   const empresaIdsHolding = getEmpresaIdsDaHolding(empresas, filters.holding_id);
@@ -1203,6 +1221,10 @@ function mapEmpresaDiagnostico(empresa) {
     codigo: item.codigo,
     nome: item.nome,
     tipo_empresa: item.tipo_empresa,
+    tipo_gerencial: item.tipo_gerencial,
+    empresa_caixa: item.empresa_caixa,
+    empresa_operacional: item.empresa_operacional,
+    consolidar_no_grupo: item.consolidar_no_grupo,
     holding_id: item.holding_id,
     holding_nome: item.holding?.nome || null
   };
@@ -1268,6 +1290,7 @@ async function gerarDiagnosticoDre(req) {
     totalTitulosDre,
     totalEmpresas,
     totalHoldings,
+    totalEmpresasCaixa,
     totalEmpresasOperacionaisSemHolding,
     totalObrasSemEmpresa,
     totalCategoriasSemDre,
@@ -1284,6 +1307,7 @@ async function gerarDiagnosticoDre(req) {
     countTitulosDiagnostico(tituloScopeWhere),
     EmpresaGrupo.count({ where: { ativo: true } }),
     EmpresaGrupo.count({ where: { ativo: true, tipo_empresa: 'HOLDING' } }),
+    EmpresaGrupo.count({ where: { ativo: true, empresa_caixa: true } }),
     EmpresaGrupo.count({
       where: {
         ativo: true,
@@ -1414,6 +1438,15 @@ async function gerarDiagnosticoDre(req) {
       exemplos: empresasOperacionaisSemHolding.map(mapEmpresaDiagnostico)
     }),
     buildDiagnosticoItem({
+      codigo: 'SEM_EMPRESA_CAIXA',
+      titulo: 'Nenhuma empresa marcada como caixa/tesouraria',
+      severidade: 'MEDIA',
+      descricao: 'A visao consolidada de caixa precisa saber qual empresa centraliza ou suporta capital do grupo.',
+      total: totalEmpresasCaixa > 0 ? 0 : 1,
+      acao: 'Marque a empresa caixa/tesouraria em Empresas do Grupo quando existir uma concentradora de caixa.',
+      exemplos: []
+    }),
+    buildDiagnosticoItem({
       codigo: 'OBRAS_SEM_EMPRESA',
       titulo: 'Obras/Centros de custo sem empresa',
       severidade: 'ALTA',
@@ -1508,7 +1541,8 @@ async function gerarDiagnosticoDre(req) {
       pendencias_medias: totalMedias,
       total_titulos_dre: totalTitulosDre,
       total_empresas: totalEmpresas,
-      total_holdings: totalHoldings
+      total_holdings: totalHoldings,
+      total_empresas_caixa: totalEmpresasCaixa
     },
     itens
   };
