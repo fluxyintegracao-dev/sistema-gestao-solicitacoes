@@ -61,6 +61,7 @@ Base multiempresa e DRE gerencial:
 - A tela de pagamentos em massa passou a buscar titulos elegiveis pela empresa da conta pagadora selecionada e a exibir a empresa do titulo na conferencia do lote.
 - O lote de pagamento passou a ter validacao de integridade antes de submeter, aprovar ou enviar, reconferindo titulo, saldo, empresa, favorecido, conta pagadora, quantidade de itens e total.
 - A confirmacao de baixa de pagamento em massa passou a exigir confirmacao bancaria registrada e a reaproveitar reconciliacao tecnica existente, evitando duplicidade na baixa/reconciliacao.
+- As aprovacoes de lote de pagamento passaram a gravar hash de integridade do conteudo aprovado, e envio/reprocessamento conferem esse hash para impedir que um lote alterado siga com aprovacao antiga.
 
 Documentacao operacional complementar:
 

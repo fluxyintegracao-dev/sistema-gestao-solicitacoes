@@ -1276,6 +1276,9 @@ Cuidados:
 - o sistema bloqueia lote quando o titulo pertence a empresa diferente da conta pagadora;
 - antes de submeter, aprovar ou enviar o lote, o sistema deve reconferir saldo, empresa, conta pagadora, favorecido, quantidade de itens e valor total;
 - se titulo, favorecido ou saldo mudarem depois da montagem do lote, nao force aprovacao: cancele ou rejeite e gere novo lote com os dados atuais;
+- cada aprovacao grava um hash de integridade do lote, com dados de conta pagadora, empresa, titulos, valores e favorecidos;
+- se o lote mudar depois de uma aprovacao, o envio ao banco ou reprocessamento deve ser bloqueado ate que um novo lote seja gerado e aprovado novamente;
+- a aprovacao nao serve apenas como clique de autorizacao: ela registra exatamente quais dados financeiros foram aprovados naquele momento;
 - se ja existir conciliacao/reconciliacao tecnica para a intencao de pagamento, a baixa deve atualizar esse registro, nao criar uma reconciliacao duplicada;
 - se uma empresa for pagar titulo de outra, nao forcar o lote comum: primeiro modele a operacao intercompany correta;
 - a baixa gerada apos confirmacao bancaria usa a empresa da conta pagadora do lote e exige que ela seja igual a empresa do titulo.

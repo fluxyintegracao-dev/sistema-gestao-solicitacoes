@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const {
   ContaBancaria,
   Parceiro,
@@ -39,6 +40,13 @@ function getTitleLabel(titulo) {
 
 function getSnapshotValue(snapshot, field) {
   return snapshot && Object.prototype.hasOwnProperty.call(snapshot, field) ? snapshot[field] : null;
+}
+
+function buildIntegrityHash(snapshot) {
+  return crypto
+    .createHash('sha256')
+    .update(JSON.stringify(snapshot))
+    .digest('hex');
 }
 
 function validateBeneficiarySnapshot(intent, beneficiary, tituloLabel) {
@@ -126,6 +134,7 @@ async function validatePaymentBatchIntegrity(batchId, options = {}) {
 
   const allowedIntentStatuses = expectedIntentStatuses.map(normalizeStatus);
   let total = 0;
+  const itemSnapshots = [];
   for (const item of items) {
     const intent = item.intent;
     if (!intent) throw createHttpError(400, `Item #${item.id} sem intencao de pagamento vinculada.`);
@@ -170,6 +179,30 @@ async function validatePaymentBatchIntegrity(batchId, options = {}) {
     }
     validateBeneficiarySnapshot(intent, intent.beneficiary, tituloLabel);
 
+    itemSnapshots.push({
+      sequencia: Number(item.sequencia || 0),
+      item_id: Number(item.id || 0),
+      payment_intent_id: Number(intent.id || 0),
+      titulo_financeiro_id: Number(titulo.id || 0),
+      titulo_codigo: titulo.codigo || null,
+      titulo_empresa_id: Number(titulo.empresa_id || 0),
+      titulo_parceiro_id: Number(titulo.parceiro_id || 0),
+      titulo_valor_saldo: toCurrencyNumber(titulo.valor_saldo),
+      titulo_status: normalizeStatus(titulo.status),
+      payment_account_id: Number(intent.payment_account_id || 0),
+      payment_beneficiary_id: Number(intent.payment_beneficiary_id || 0),
+      provider_id: Number(intent.provider_id || 0),
+      metodo: normalizeStatus(intent.metodo),
+      valor: toCurrencyNumber(intent.valor),
+      data_pagamento: intent.data_pagamento || null,
+      beneficiary_snapshot: {
+        nome: intent.beneficiary?.nome || null,
+        cpf_cnpj: onlyDigits(intent.beneficiary?.cpf_cnpj),
+        pix_tipo_chave: normalizeStatus(intent.beneficiary?.pix_tipo_chave),
+        pix_chave: String(intent.beneficiary?.pix_chave || '').trim()
+      }
+    });
+
     total += toCurrencyNumber(item.valor);
   }
 
@@ -179,6 +212,22 @@ async function validatePaymentBatchIntegrity(batchId, options = {}) {
   if (!sameMoney(batch.valor_total, total)) {
     throw createHttpError(409, 'Valor total do lote diverge da soma dos itens.');
   }
+
+  const integritySnapshot = {
+    batch_id: Number(batch.id || 0),
+    provider_id: Number(batch.provider_id || 0),
+    payment_account_id: Number(batch.payment_account_id || 0),
+    empresa_id: Number(batch.empresa_id || 0),
+    conta_bancaria_id: Number(batch.paymentAccount?.conta_bancaria_id || 0),
+    conta_bancaria_empresa_id: Number(batch.paymentAccount?.contaBancaria?.empresa_id || 0),
+    quantidade_itens: items.length,
+    valor_total: toCurrencyNumber(batch.valor_total),
+    data_programada: batch.data_programada || null,
+    items: itemSnapshots.sort((a, b) => a.sequencia - b.sequencia || a.payment_intent_id - b.payment_intent_id)
+  };
+
+  batch.setDataValue('integrity_snapshot', integritySnapshot);
+  batch.setDataValue('integrity_hash', buildIntegrityHash(integritySnapshot));
 
   return batch;
 }

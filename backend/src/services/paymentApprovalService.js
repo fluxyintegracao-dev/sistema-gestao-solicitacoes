@@ -1,4 +1,3 @@
-const crypto = require('crypto');
 const { Op } = require('sequelize');
 const { PaymentApproval, PaymentBatch, PaymentBatchItem, PaymentIntent, User, sequelize } = require('../models');
 const { verifyTotpCode } = require('./mfaService');
@@ -39,6 +38,43 @@ async function countValidApprovals(batchId, { transaction = null } = {}) {
   });
 }
 
+function getBatchIntegrityHash(batch) {
+  const integrityHash = batch?.getDataValue?.('integrity_hash');
+  if (!integrityHash) {
+    throw createHttpError(500, 'Hash de integridade do lote nao foi gerado pela validacao.');
+  }
+  return integrityHash;
+}
+
+async function assertApprovalHashesMatchCurrentBatch(batch, { transaction = null, requireTwoApprovals = false } = {}) {
+  const currentHash = getBatchIntegrityHash(batch);
+  const approvals = await PaymentApproval.findAll({
+    where: {
+      entity_type: 'BATCH',
+      entity_id: batch.id,
+      acao: 'APPROVE',
+      status: 'APROVADO'
+    },
+    order: [['aprovado_em', 'ASC'], ['id', 'ASC']],
+    transaction
+  });
+
+  if (requireTwoApprovals && approvals.length < 2) {
+    throw createHttpError(400, 'Lote exige duas aprovacoes validas.');
+  }
+
+  for (const approval of approvals) {
+    if (!approval.snapshot_hash) {
+      throw createHttpError(409, 'Lote possui aprovacao sem hash de integridade. Gere um novo lote para garantir rastreabilidade completa.');
+    }
+    if (approval.snapshot_hash !== currentHash) {
+      throw createHttpError(409, 'Os dados do lote mudaram depois da aprovacao. Gere um novo lote para coletar novas aprovacoes.');
+    }
+  }
+
+  return true;
+}
+
 async function approveBatchWithMfa(req, id, payload = {}) {
   const mfaVerifiedAt = await verifyMfaStepUp(req, payload.codigo_mfa || payload.mfa_code);
 
@@ -67,6 +103,9 @@ async function approveBatchWithMfa(req, id, payload = {}) {
     if (approvalAlreadyRegistered) {
       throw createHttpError(409, 'Este usuario ja aprovou este lote. A dupla aprovacao exige aprovadores diferentes.');
     }
+    await assertApprovalHashesMatchCurrentBatch(batch, { transaction });
+
+    const integrityHash = getBatchIntegrityHash(batch);
 
     await PaymentApproval.create({
       entity_type: 'BATCH',
@@ -78,10 +117,7 @@ async function approveBatchWithMfa(req, id, payload = {}) {
       aprovado_em: new Date(),
       justificativa: payload.justificativa || null,
       mfa_verified_at: mfaVerifiedAt,
-      snapshot_hash: crypto
-        .createHash('sha256')
-        .update(JSON.stringify({ batch_id: batch.id, valor_total: batch.valor_total, quantidade_itens: batch.quantidade_itens }))
-        .digest('hex')
+      snapshot_hash: integrityHash
     }, { transaction });
 
     const approvals = await countValidApprovals(batch.id, { transaction });
@@ -168,6 +204,7 @@ async function rejectBatch(req, id, payload = {}) {
 }
 
 module.exports = {
+  assertApprovalHashesMatchCurrentBatch,
   approveBatchWithMfa,
   countValidApprovals,
   rejectBatch,

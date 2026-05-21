@@ -11,7 +11,11 @@ const {
   sequelize
 } = require('../models');
 const { env } = require('../config/env');
-const { countValidApprovals, verifyMfaStepUp } = require('./paymentApprovalService');
+const {
+  assertApprovalHashesMatchCurrentBatch,
+  countValidApprovals,
+  verifyMfaStepUp
+} = require('./paymentApprovalService');
 const { validatePaymentBatchIntegrity } = require('./paymentBatchIntegrityService');
 const bancoDoBrasilProvider = require('./paymentProviderBancoDoBrasil');
 const bancoDoBrasilSandboxProvider = require('./bancoDoBrasilPayments/BancoDoBrasilPaymentProvider');
@@ -140,11 +144,12 @@ async function enqueueSendBatch(req, id, payload = {}) {
   if ((await countValidApprovals(batch.id)) < 2) {
     throw createHttpError(400, 'Lote exige duas aprovacoes validas.');
   }
-  await validatePaymentBatchIntegrity(batch.id, {
+  const integrityBatch = await validatePaymentBatchIntegrity(batch.id, {
     expectedBatchStatuses: ['APROVADO'],
     expectedIntentStatuses: ['APROVADO'],
     phaseLabel: 'envio ao banco'
   });
+  await assertApprovalHashesMatchCurrentBatch(integrityBatch, { requireTwoApprovals: true });
 
   await ensureNoPendingSendJob(batch.id);
   const job = await createSendBatchJob(batch.id);
@@ -170,6 +175,11 @@ async function reprocessBatch(req, id, payload = {}) {
   if ((await countValidApprovals(batch.id)) < 2) {
     throw createHttpError(400, 'Lote exige duas aprovacoes validas para reprocessamento.');
   }
+  const integrityBatch = await validatePaymentBatchIntegrity(batch.id, {
+    expectedBatchStatuses: reprocessableBatchStatuses,
+    phaseLabel: 'reprocessamento'
+  });
+  await assertApprovalHashesMatchCurrentBatch(integrityBatch, { requireTwoApprovals: true });
 
   await ensureNoPendingSendJob(batch.id);
 
@@ -271,6 +281,14 @@ async function processSendBatchJob(req, jobId) {
       lock: transaction.LOCK.UPDATE
     });
     if (!batch) throw createHttpError(404, 'Lote de pagamento nao encontrado.');
+    const integrityBatch = await validatePaymentBatchIntegrity(batch.id, {
+      transaction,
+      lock: transaction.LOCK.UPDATE,
+      expectedBatchStatuses: ['APROVADO'],
+      expectedIntentStatuses: ['APROVADO'],
+      phaseLabel: 'processamento do envio ao banco'
+    });
+    await assertApprovalHashesMatchCurrentBatch(integrityBatch, { transaction, requireTwoApprovals: true });
 
     const intentIds = batch.items.map((item) => item.payment_intent_id);
     const attemptNumber = await PaymentTransaction.count({
@@ -377,11 +395,12 @@ async function enqueueBbSandboxSendBatch(req, id, payload = {}) {
   if ((await countValidApprovals(batch.id)) < 2) {
     throw createHttpError(400, 'Lote exige duas aprovacoes validas.');
   }
-  await validatePaymentBatchIntegrity(batch.id, {
+  const integrityBatch = await validatePaymentBatchIntegrity(batch.id, {
     expectedBatchStatuses: ['APROVADO'],
     expectedIntentStatuses: ['APROVADO'],
     phaseLabel: 'envio BB sandbox'
   });
+  await assertApprovalHashesMatchCurrentBatch(integrityBatch, { requireTwoApprovals: true });
 
   await ensureNoPendingSendJob(batch.id);
   const job = await createPaymentJob(batch.id, 'BB_SUBMIT_PIX_BATCH');
@@ -403,6 +422,12 @@ async function processBbSubmitPixBatchJob(req, jobId) {
 
   const batch = await getBatchWithPaymentGraph(job.entity_id);
   if (!batch) throw createHttpError(404, 'Lote de pagamento nao encontrado.');
+  const integrityBatch = await validatePaymentBatchIntegrity(batch.id, {
+    expectedBatchStatuses: ['APROVADO'],
+    expectedIntentStatuses: ['APROVADO'],
+    phaseLabel: 'processamento do envio BB sandbox'
+  });
+  await assertApprovalHashesMatchCurrentBatch(integrityBatch, { requireTwoApprovals: true });
 
   const startedAt = new Date();
   const attemptNumber = await PaymentTransaction.count({

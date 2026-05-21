@@ -968,6 +968,7 @@ Status sugeridos:
 - A dupla aprovacao deve exigir aprovadores distintos; o mesmo usuario nao pode contar duas aprovacoes para o mesmo lote.
 - Envio ao banco nao cria baixa.
 - Confirmacao bancaria registrada cria baixa em transacao atomica.
+- Cada aprovacao grava hash de integridade do lote aprovado; envio e reprocessamento bloqueiam o lote se os dados atuais nao corresponderem aos hashes aprovados.
 - OFX ou retorno bancario pode reforcar conciliacao, mas nao deve duplicar baixa; se ja houver reconciliacao tecnica da intencao, a baixa deve atualizar o registro existente.
 - Reprocessamento deve reutilizar idempotency key quando tecnicamente correto.
 
