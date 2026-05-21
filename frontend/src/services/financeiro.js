@@ -837,6 +837,21 @@ export async function getDreComparativoFinanceiro(params = {}) {
   return parseJson(response, 'Erro ao buscar comparativo mensal da DRE');
 }
 
+export async function getDreComparativoEmpresasFinanceiro(params = {}) {
+  const query = new URLSearchParams(
+    Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== '')
+  ).toString();
+  const url = query
+    ? `${API_URL}/financeiro/relatorios/dre/empresas?${query}`
+    : `${API_URL}/financeiro/relatorios/dre/empresas`;
+
+  const response = await fetch(url, {
+    headers: authHeaders()
+  });
+
+  return parseJson(response, 'Erro ao buscar comparativo da DRE por empresa');
+}
+
 export async function getDiagnosticoDreFinanceira() {
   const response = await fetch(`${API_URL}/financeiro/relatorios/dre/diagnostico`, {
     headers: authHeaders()

@@ -1,5 +1,6 @@
 const {
   gerarDiagnosticoDre,
+  gerarDreComparativoEmpresas,
   gerarDreComparativoMensal,
   gerarDreGerencial,
   gerarPainelExecutivoGrupo,
@@ -73,6 +74,16 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return responderErro(res, error, 'Erro ao gerar comparativo mensal da DRE');
+    }
+  },
+
+  async dreComparativoEmpresas(req, res) {
+    try {
+      const relatorio = await gerarDreComparativoEmpresas(req, req.query || {});
+      return res.json(relatorio);
+    } catch (error) {
+      console.error(error);
+      return responderErro(res, error, 'Erro ao gerar comparativo da DRE por empresa');
     }
   },
 

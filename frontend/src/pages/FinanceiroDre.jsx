@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getEmpresasGrupo } from '../services/empresasGrupo';
-import { getDreComparativoFinanceiro, getDreFinanceira } from '../services/financeiro';
+import { getDreComparativoEmpresasFinanceiro, getDreComparativoFinanceiro, getDreFinanceira } from '../services/financeiro';
 import { getMinhasObras } from '../services/obras';
 
 const DEFAULT_FILTERS = {
@@ -164,6 +164,100 @@ function DreComparativoCard({ comparativo }) {
   );
 }
 
+function DreComparativoEmpresasCard({ comparativo }) {
+  const empresas = Array.isArray(comparativo?.empresas) ? comparativo.empresas : [];
+  const maxAbs = Math.max(1, ...empresas.map((empresa) => Math.abs(Number(empresa.resultado_final || 0))));
+
+  return (
+    <section className="card sol-surface-card app-table-shell">
+      <div className="border-b border-[var(--c-border)] px-4 py-3">
+        <h2 className="text-lg font-semibold text-[var(--c-text)]">Comparativo por empresa</h2>
+        <p className="text-sm text-[var(--c-muted)]">
+          Resultado operacional proprio sem intercompany, efeito intercompany e resultado final por empresa.
+        </p>
+      </div>
+
+      <div className="grid gap-3 p-4 md:grid-cols-4">
+        <div className="rounded-lg border border-[var(--c-border)] px-3 py-2">
+          <span className="block text-xs uppercase text-[var(--c-muted)]">Resultado proprio</span>
+          <strong style={{ color: metricColor(comparativo?.resumo?.resultado_operacional_proprio) }}>
+            {formatCompactCurrency(comparativo?.resumo?.resultado_operacional_proprio)}
+          </strong>
+        </div>
+        <div className="rounded-lg border border-[var(--c-border)] px-3 py-2">
+          <span className="block text-xs uppercase text-[var(--c-muted)]">Intercompany liquido</span>
+          <strong style={{ color: metricColor(comparativo?.resumo?.intercompany_liquido) }}>
+            {formatCompactCurrency(comparativo?.resumo?.intercompany_liquido)}
+          </strong>
+        </div>
+        <div className="rounded-lg border border-[var(--c-border)] px-3 py-2">
+          <span className="block text-xs uppercase text-[var(--c-muted)]">Resultado final</span>
+          <strong style={{ color: metricColor(comparativo?.resumo?.resultado_final) }}>
+            {formatCompactCurrency(comparativo?.resumo?.resultado_final)}
+          </strong>
+        </div>
+        <div className="rounded-lg border border-[var(--c-border)] px-3 py-2">
+          <span className="block text-xs uppercase text-[var(--c-muted)]">Empresas</span>
+          <strong>{comparativo?.resumo?.empresas_com_movimento || 0}</strong>
+        </div>
+      </div>
+
+      {empresas.length === 0 ? (
+        <div className="app-empty-card mx-4 mb-4">Nenhuma empresa com movimento na DRE.</div>
+      ) : (
+        <div className="table-wrapper">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Empresa</th>
+                <th>Perfil</th>
+                <th>Resultado proprio</th>
+                <th>Intercompany liquido</th>
+                <th>Resultado final</th>
+                <th>Dependencia</th>
+              </tr>
+            </thead>
+            <tbody>
+              {empresas.map((empresa) => {
+                const resultadoFinal = Number(empresa.resultado_final || 0);
+                const barWidth = Math.max(8, Math.round((Math.abs(resultadoFinal) / maxAbs) * 100));
+                return (
+                  <tr key={empresa.empresa_id || 'sem-empresa'}>
+                    <td>
+                      <div className="font-medium text-[var(--c-text)]">{empresa.empresa_nome}</div>
+                      <div className="mt-1 h-1.5 rounded-full bg-slate-100">
+                        <div
+                          className={`h-1.5 rounded-full ${resultadoFinal >= 0 ? 'bg-emerald-500' : 'bg-rose-500'}`}
+                          style={{ width: `${barWidth}%` }}
+                        />
+                      </div>
+                    </td>
+                    <td>
+                      <div>{labelTipoGerencial(empresa.tipo_gerencial)}</div>
+                      {empresa.empresa_caixa ? <div className="text-xs text-[var(--c-muted)]">Caixa/Tesouraria</div> : null}
+                      {empresa.consolidar_no_grupo === false ? <div className="text-xs text-amber-700">Fora do consolidado</div> : null}
+                    </td>
+                    <td className="font-semibold" style={{ color: metricColor(empresa.resultado_operacional_proprio) }}>
+                      {formatCurrency(empresa.resultado_operacional_proprio)}
+                    </td>
+                    <td className="font-semibold" style={{ color: metricColor(empresa.intercompany_liquido) }}>
+                      {formatCurrency(empresa.intercompany_liquido)}
+                    </td>
+                    <td className="font-semibold" style={{ color: metricColor(empresa.resultado_final) }}>
+                      {formatCurrency(empresa.resultado_final)}
+                    </td>
+                    <td>{formatPercent(empresa.dependencia_grupo)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
+
 export default function FinanceiroDre() {
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [appliedFilters, setAppliedFilters] = useState(DEFAULT_FILTERS);
@@ -171,6 +265,7 @@ export default function FinanceiroDre() {
   const [obras, setObras] = useState([]);
   const [relatorio, setRelatorio] = useState(null);
   const [comparativo, setComparativo] = useState(null);
+  const [comparativoEmpresas, setComparativoEmpresas] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -212,18 +307,21 @@ export default function FinanceiroDre() {
       getDreComparativoFinanceiro({
         ...params,
         meses: appliedFilters.periodo === 'PERSONALIZADO' ? '' : '12'
-      })
+      }),
+      getDreComparativoEmpresasFinanceiro(params)
     ])
-      .then(([dreData, comparativoData]) => {
+      .then(([dreData, comparativoData, comparativoEmpresasData]) => {
         if (!active) return;
         setRelatorio(dreData || null);
         setComparativo(comparativoData || null);
+        setComparativoEmpresas(comparativoEmpresasData || null);
       })
       .catch((err) => {
         if (!active) return;
         setError(err?.message || 'Erro ao carregar DRE');
         setRelatorio(null);
         setComparativo(null);
+        setComparativoEmpresas(null);
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -387,6 +485,7 @@ export default function FinanceiroDre() {
       ) : (
         <>
           <DreComparativoCard comparativo={comparativo} />
+          <DreComparativoEmpresasCard comparativo={comparativoEmpresas} />
 
           <section className="card sol-surface-card app-table-shell">
             <div className="border-b border-[var(--c-border)] px-4 py-3">

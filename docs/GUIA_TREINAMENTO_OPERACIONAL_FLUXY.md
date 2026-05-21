@@ -1379,7 +1379,8 @@ Passo a passo para analisar:
 7. Conferir Resultado Financeiro.
 8. Conferir Lucro/Prejuizo Liquido.
 9. Conferir o Comparativo mensal para entender tendencia, variacao e acumulado.
-10. Abrir diagnostico se algum numero parecer inconsistente.
+10. Conferir o Comparativo por empresa para separar resultado operacional proprio, intercompany liquido e resultado final.
+11. Abrir diagnostico se algum numero parecer inconsistente.
 
 Cuidados:
 
@@ -1389,6 +1390,7 @@ Cuidados:
 - categorias sem grupo DRE prejudicam o demonstrativo;
 - titulo sem competencia nao deve ser usado como base de fechamento;
 - o comparativo mensal usa as mesmas regras da DRE. Se um mes parecer errado, revisar competencia e categoria dos titulos daquele mes.
+- o comparativo por empresa usa duas leituras da mesma DRE: uma eliminando intercompany para medir a operacao propria e outra mantendo intercompany para mostrar o resultado final da empresa.
 
 ### 11.11 Diagnostico da DRE
 

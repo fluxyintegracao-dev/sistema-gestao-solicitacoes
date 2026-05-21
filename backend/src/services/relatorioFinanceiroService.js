@@ -1982,6 +1982,108 @@ async function gerarDreComparativoMensal(req, filters = {}) {
   };
 }
 
+function indexDreEmpresas(empresas = []) {
+  return new Map(empresas.map((empresa) => [String(empresa.empresa_id || 'SEM_EMPRESA'), empresa]));
+}
+
+function buildDreEmpresaComparativoItem(empresa, finalPorEmpresa) {
+  const key = String(empresa.empresa_id || 'SEM_EMPRESA');
+  const finalEmpresa = finalPorEmpresa.get(key) || empresa;
+  const resultadoOperacional = Number(empresa.lucro_prejuizo_liquido ?? empresa.resultado ?? 0);
+  const resultadoFinal = Number(finalEmpresa.lucro_prejuizo_liquido ?? finalEmpresa.resultado ?? 0);
+  const intercompanyLiquido = roundCurrency(resultadoFinal - resultadoOperacional);
+  const receitaOperacional = roundCurrency(empresa.receita_liquida || 0);
+  const dependenciaGrupo = receitaOperacional > 0 && intercompanyLiquido > 0
+    ? Number(((intercompanyLiquido / receitaOperacional) * 100).toFixed(2))
+    : 0;
+
+  return {
+    empresa_id: empresa.empresa_id || null,
+    empresa_nome: empresa.empresa_nome,
+    tipo_empresa: empresa.tipo_empresa || null,
+    tipo_gerencial: empresa.tipo_gerencial || null,
+    empresa_caixa: empresa.empresa_caixa === true,
+    empresa_operacional: empresa.empresa_operacional !== false,
+    consolidar_no_grupo: empresa.consolidar_no_grupo !== false,
+    holding_id: empresa.holding_id || null,
+    receita_liquida_operacional: receitaOperacional,
+    ebitda_operacional: roundCurrency(empresa.ebitda || 0),
+    resultado_operacional_proprio: roundCurrency(resultadoOperacional),
+    margem_operacional: empresa.margem_liquida ?? empresa.margem_resultado ?? null,
+    intercompany_liquido: intercompanyLiquido,
+    resultado_final: roundCurrency(resultadoFinal),
+    margem_final: finalEmpresa.margem_liquida ?? finalEmpresa.margem_resultado ?? null,
+    dependencia_grupo: dependenciaGrupo,
+    titulos_operacionais: Number(empresa.titulos || 0),
+    titulos_finais: Number(finalEmpresa.titulos || 0)
+  };
+}
+
+async function gerarDreComparativoEmpresas(req, filters = {}) {
+  await assertFinanceAccess(req);
+
+  const filtrosBase = {
+    ...filters,
+    excluir_intercompany: true
+  };
+  const filtrosFinal = {
+    ...filters,
+    excluir_intercompany: false
+  };
+  const [dreOperacional, dreFinal] = await Promise.all([
+    gerarDreGerencial(req, filtrosBase),
+    gerarDreGerencial(req, filtrosFinal)
+  ]);
+  const finalPorEmpresa = indexDreEmpresas(dreFinal.empresas || []);
+  const operacionalPorEmpresa = indexDreEmpresas(dreOperacional.empresas || []);
+  const empresasKeys = new Set([
+    ...operacionalPorEmpresa.keys(),
+    ...finalPorEmpresa.keys()
+  ]);
+  const empresas = Array.from(empresasKeys)
+    .map((key) => {
+      const operacional = operacionalPorEmpresa.get(key);
+      const final = finalPorEmpresa.get(key);
+      return buildDreEmpresaComparativoItem(operacional || final, finalPorEmpresa);
+    })
+    .sort((a, b) => Math.abs(Number(b.resultado_final || 0)) - Math.abs(Number(a.resultado_final || 0)));
+
+  const resumo = empresas.reduce((acc, empresa) => ({
+    receita_liquida_operacional: roundCurrency(acc.receita_liquida_operacional + empresa.receita_liquida_operacional),
+    ebitda_operacional: roundCurrency(acc.ebitda_operacional + empresa.ebitda_operacional),
+    resultado_operacional_proprio: roundCurrency(acc.resultado_operacional_proprio + empresa.resultado_operacional_proprio),
+    intercompany_liquido: roundCurrency(acc.intercompany_liquido + empresa.intercompany_liquido),
+    resultado_final: roundCurrency(acc.resultado_final + empresa.resultado_final),
+    empresas_com_movimento: acc.empresas_com_movimento + 1
+  }), {
+    receita_liquida_operacional: 0,
+    ebitda_operacional: 0,
+    resultado_operacional_proprio: 0,
+    intercompany_liquido: 0,
+    resultado_final: 0,
+    empresas_com_movimento: 0
+  });
+
+  return {
+    filtro: {
+      ...dreOperacional.filtro,
+      comparacao: 'EMPRESAS',
+      regra_operacional_propria: 'DRE com intercompany eliminado',
+      regra_resultado_final: 'DRE com intercompany mantido'
+    },
+    resumo: {
+      ...resumo,
+      margem_operacional: resumo.receita_liquida_operacional > 0
+        ? Number(((resumo.resultado_operacional_proprio / resumo.receita_liquida_operacional) * 100).toFixed(2))
+        : null,
+      margem_final: resumo.receita_liquida_operacional > 0
+        ? Number(((resumo.resultado_final / resumo.receita_liquida_operacional) * 100).toFixed(2))
+        : null
+    },
+    empresas
+  };
+}
+
 function buildExecutiveRisk({ codigo, titulo, severidade, descricao, valor = null, acao, rota = null }) {
   return {
     codigo,
@@ -3228,6 +3330,7 @@ module.exports = {
   gerarRelatorioFluxoConsolidado,
   gerarPainelExecutivoGrupo,
   gerarDreComparativoMensal,
+  gerarDreComparativoEmpresas,
   gerarRelatorioEndividamento,
   gerarRelatorioIntercompany,
   gerarDreGerencial,

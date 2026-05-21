@@ -1191,6 +1191,7 @@ router.get('/financeiro/relatorios/fluxo-caixa', allowFinanceiro, validateReques
 router.get('/financeiro/relatorios/fluxo-consolidado', allowFinanceiro, validateRequest({ query: validateFinanceFluxoConsolidadoQuery }), RelatorioFinanceiroController.fluxoConsolidado);
 router.get('/financeiro/relatorios/analitico', allowFinanceiro, validateRequest({ query: validateFinanceRelatorioAnaliticoQuery }), RelatorioFinanceiroController.analitico);
 router.get('/financeiro/relatorios/dre/comparativo', allowFinanceiro, validateRequest({ query: validateFinanceDreComparativoQuery }), RelatorioFinanceiroController.dreComparativo);
+router.get('/financeiro/relatorios/dre/empresas', allowFinanceiro, validateRequest({ query: validateFinanceDreQuery }), RelatorioFinanceiroController.dreComparativoEmpresas);
 router.get('/financeiro/relatorios/dre', allowFinanceiro, validateRequest({ query: validateFinanceDreQuery }), RelatorioFinanceiroController.dre);
 router.get('/financeiro/relatorios/dre/diagnostico', allowFinanceiro, RelatorioFinanceiroController.diagnosticoDre);
 router.get('/financeiro/relatorios/intercompany', allowFinanceiro, validateRequest({ query: validateFinanceIntercompanyQuery }), RelatorioFinanceiroController.intercompany);
