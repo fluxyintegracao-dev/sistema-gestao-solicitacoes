@@ -212,6 +212,8 @@ function NovoTituloRapidoModal({ item, contas, onClose, onConciliar }) {
     descricao: item?.descricao_banco || '',
     valor: valorAbs ? formatCurrencyInput(valorAbs) : '',
     data_vencimento: item?.data_movimento || today(),
+    competencia_data: item?.data_movimento || '',
+    considera_dre: true,
     conta_bancaria_id: contaInicialId,
     empresa_id: String(contaInicial?.empresa_id || ''),
     obra_id: '',
@@ -259,6 +261,12 @@ function NovoTituloRapidoModal({ item, contas, onClose, onConciliar }) {
     const t = String(c.tipo || '').toUpperCase();
     return t === form.tipo || t === 'AMBOS';
   });
+  const selectedCategory = categorias.find((categoria) => String(categoria.id) === String(form.categoria_financeira_id)) || null;
+  const categoriaClassificadaDre = Boolean(
+    selectedCategory &&
+    selectedCategory.considera_dre !== false &&
+    String(selectedCategory.dre_grupo || '').trim()
+  );
 
   async function handleSalvar(e) {
     e.preventDefault();
@@ -271,6 +279,8 @@ function NovoTituloRapidoModal({ item, contas, onClose, onConciliar }) {
     if (!form.empresa_id) { setErro('A conta bancaria precisa estar vinculada a uma empresa pagadora.'); return; }
     if (!form.obra_id) { setErro('Selecione a obra.'); return; }
     if (!form.parceiro_id) { setErro('Selecione um parceiro (obrigatório).'); return; }
+    if (form.considera_dre && !form.competencia_data) { setErro('Informe a competencia DRE real do titulo.'); return; }
+    if (form.considera_dre && !categoriaClassificadaDre) { setErro('Para considerar na DRE, selecione uma categoria financeira com grupo DRE classificado.'); return; }
 
     try {
       setSaving(true);
@@ -281,6 +291,8 @@ function NovoTituloRapidoModal({ item, contas, onClose, onConciliar }) {
         descricao: form.descricao.trim(),
         valor,
         data_vencimento: form.data_vencimento,
+        competencia_data: form.competencia_data || undefined,
+        considera_dre: Boolean(form.considera_dre),
         conta_bancaria_id: Number(form.conta_bancaria_id),
         empresa_id: Number(form.empresa_id),
         data_movimento: form.data_pagamento,
@@ -377,12 +389,51 @@ function NovoTituloRapidoModal({ item, contas, onClose, onConciliar }) {
           </div>
 
           <label className="app-filter-field">
+            <span className="app-filter-label">Competencia DRE</span>
+            <input
+              className="input w-full"
+              type="date"
+              value={form.competencia_data}
+              onChange={(e) => setForm((c) => ({ ...c, competencia_data: e.target.value }))}
+              required={Boolean(form.considera_dre)}
+            />
+            <span className="mt-1 block text-xs text-[var(--c-muted)]">
+              {form.considera_dre
+                ? 'Obrigatoria para DRE. Informe o periodo economico real.'
+                : 'Opcional quando o titulo nao entra na DRE.'}
+            </span>
+          </label>
+
+          <label className="app-filter-field">
             <span className="app-filter-label">Categoria</span>
-            <select className="input w-full" value={form.categoria_financeira_id}
+            <select
+              className={`input w-full ${form.considera_dre && !categoriaClassificadaDre ? 'border-amber-300 bg-amber-50' : ''}`}
+              value={form.categoria_financeira_id}
+              required={Boolean(form.considera_dre)}
               onChange={(e) => setForm((c) => ({ ...c, categoria_financeira_id: e.target.value }))}>
               <option value="">Sem categoria</option>
               {categoriasFiltradas.map((cat) => <option key={cat.id} value={cat.id}>{cat.nome}</option>)}
             </select>
+            <span className="mt-1 block text-xs text-[var(--c-muted)]">
+              {selectedCategory
+                ? selectedCategory.considera_dre === false
+                  ? 'Categoria fora da DRE.'
+                  : selectedCategory.dre_grupo
+                    ? `${selectedCategory.dre_grupo}${selectedCategory.dre_subgrupo ? ` / ${selectedCategory.dre_subgrupo}` : ''}`
+                    : 'Categoria sem grupo DRE classificado.'
+                : form.considera_dre
+                  ? 'Obrigatoria para DRE. Selecione categoria com grupo DRE classificado.'
+                  : 'Opcional.'}
+            </span>
+          </label>
+
+          <label className="flex items-center gap-2 rounded-xl border border-[var(--c-border)] bg-[var(--c-bg)] px-3 py-2.5 text-sm text-[var(--c-text)]">
+            <input
+              type="checkbox"
+              checked={Boolean(form.considera_dre)}
+              onChange={(e) => setForm((c) => ({ ...c, considera_dre: e.target.checked }))}
+            />
+            Considerar este titulo na DRE gerencial
           </label>
 
           <div className="app-filter-field">

@@ -907,7 +907,9 @@ Regra de consistencia:
 - se a obra/centro de custo estiver vinculado a uma empresa, a empresa do titulo precisa coincidir com esse cadastro;
 - se a empresa estiver incorreta, corrija o cadastro operacional antes de gerar o titulo.
 - quando `Considerar na DRE` estiver marcado, a competencia DRE e obrigatoria;
+- quando `Considerar na DRE` estiver marcado, a categoria financeira tambem e obrigatoria e precisa ter grupo DRE classificado;
 - a DRE nao deduz competencia por emissao, compra ou vencimento;
+- a DRE nao aceita titulo em categoria generica ou sem grupo DRE;
 - se a competencia real ainda nao estiver definida, desmarque `Considerar na DRE` e trate a pendencia depois no Diagnostico DRE.
 
 ### 11.4 Criar titulo a partir da solicitacao
@@ -945,6 +947,7 @@ Cuidados:
 - o sistema nao deve criar titulo sem empresa do grupo informada.
 - nao salvar quando a previa apontar DRE pendente de categoria, salvo em caso conscientemente fora da DRE.
 - titulo considerado na DRE precisa ter competencia DRE informada explicitamente;
+- titulo considerado na DRE precisa ter categoria financeira com grupo DRE classificado;
 - nao usar data de emissao, data da compra ou vencimento como substituto automatico da competencia economica.
 
 ### 11.5 Registrar baixa de titulo
@@ -1126,6 +1129,14 @@ Cuidados:
 - conciliacao e conferencia, nao substitui operacao financeira;
 - transferencia entre contas da mesma empresa e transferencia interna de caixa;
 - transferencia entre contas de empresas diferentes deve ter tipo e motivo intercompany.
+
+Criacao rapida de titulo pela conciliacao:
+
+- use apenas quando o lancamento bancario representa um titulo real que ainda nao foi cadastrado;
+- informe parceiro, obra/centro de custo, empresa, competencia DRE e categoria financeira;
+- se marcar `Considerar na DRE`, a categoria precisa ter grupo DRE classificado;
+- a competencia DRE nao deve ser deduzida pela data do OFX, vencimento ou pagamento;
+- se a categoria ou competencia ainda nao estiver clara, nao crie como DRE: registre fora da DRE e trate a pendencia antes do fechamento.
 
 ### 11.8.1 Conciliar fatura de cartao
 

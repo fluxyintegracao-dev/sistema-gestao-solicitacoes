@@ -154,6 +154,7 @@ function createPagamento(solicitacao, valor = '') {
     id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
     valor,
     data_vencimento: solicitacao?.data_vencimento || today(),
+    competencia_data: '',
     forma_pagamento_id: '',
     cartao_id: '',
     quantidade_parcelas: '1',
@@ -231,22 +232,28 @@ function getCategoriaDreResumo(categoria) {
   return `${grupo}${subgrupo}`;
 }
 
+function isCategoriaClassificadaParaDre(categoria) {
+  return Boolean(categoria && categoria.considera_dre !== false && String(categoria.dre_grupo || '').trim());
+}
+
 function ImpactoGerencialPreview({ form, categoria, empresasGrupo, totalPagamentos }) {
   const valorTitulo = roundCurrency(currencyToNumber(form.valor));
   const valorCaixa = roundCurrency(totalPagamentos || valorTitulo);
   const categoriaSelecionada = Boolean(categoria);
-  const categoriaEntraDre = categoriaSelecionada && categoria?.considera_dre !== false;
+  const categoriaEntraDre = isCategoriaClassificadaParaDre(categoria);
   const dreAtiva = form.considera_dre !== false && categoriaEntraDre;
   const origem = getEmpresaNome(empresasGrupo, form.empresa_origem_id);
   const destino = getEmpresaNome(empresasGrupo, form.empresa_destino_id);
 
   const dreTexto = !form.considera_dre
     ? 'Nao entra na DRE'
-    : !categoriaSelecionada
-      ? 'Pendente de categoria'
-      : !categoriaEntraDre
+      : !categoriaSelecionada
+        ? 'Pendente de categoria'
+      : categoria?.considera_dre === false
         ? 'Categoria fora da DRE'
-        : 'Entra na DRE gerencial';
+        : !String(categoria?.dre_grupo || '').trim()
+          ? 'Categoria sem grupo DRE'
+          : 'Entra na DRE gerencial';
 
   const consolidadoTexto = form.intercompany
     ? form.elimina_consolidado
@@ -660,6 +667,14 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
       return 'Selecione o credor antes de gerar a conta.';
     }
 
+    if (form.considera_dre !== false && !isCategoriaClassificadaParaDre(selectedCategory)) {
+      return 'Para considerar na DRE, selecione uma categoria financeira com grupo DRE classificado.';
+    }
+
+    if (form.considera_dre !== false && !form.competencia_data) {
+      return 'Informe a competencia DRE real do titulo.';
+    }
+
     if (valorSolicitacao <= 0) {
       return 'A solicitacao precisa ter valor informado para gerar a conta.';
     }
@@ -747,6 +762,7 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
         empresa_id: Number(form.empresa_id),
         parceiro_id: selectedPartner?.id || form.parceiro_id,
         categoria_financeira_id: form.categoria_financeira_id || undefined,
+        competencia_data: form.competencia_data || undefined,
         valor: form.valor,
         considera_dre: form.considera_dre !== false,
         intercompany: Boolean(form.intercompany),
@@ -1009,7 +1025,7 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
                 <div className="relative">
                   <div className="flex gap-2">
                     <input
-                      className="input w-full"
+                      className={`input w-full ${form.considera_dre !== false && !isCategoriaClassificadaParaDre(selectedCategory) ? 'border-amber-300 bg-amber-50' : ''}`}
                       type="text"
                       placeholder="Digite para buscar a categoria"
                       value={categoriaSearch}
@@ -1048,14 +1064,14 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
                           key={categoria.id}
                           type="button"
                           className="w-full rounded-xl px-3 py-2 text-left text-sm hover:bg-slate-50"
-                          onClick={() => selecionarCategoria(categoria)}
-                        >
-                          <span className="block font-medium text-[var(--c-text)]">{categoria.nome}</span>
-                          <span className="block text-xs text-slate-500">
-                            {categoria.tipo} - {categoria.descricao || 'Sem descricao complementar'}
+                        onClick={() => selecionarCategoria(categoria)}
+                      >
+                        <span className="block font-medium text-[var(--c-text)]">{categoria.nome}</span>
+                        <span className="block text-xs text-slate-500">
+                            {categoria.tipo} - {getCategoriaDreResumo(categoria)}
                           </span>
-                        </button>
-                      ))}
+                      </button>
+                    ))}
                     </div>
                   )}
 
@@ -1067,12 +1083,30 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
                 </div>
                 <div className="text-xs text-slate-500">
                   {selectedCategory
-                    ? `${selectedCategory.tipo} - ${selectedCategory.descricao || 'Sem descricao complementar'}`
+                    ? `${selectedCategory.tipo} - ${getCategoriaDreResumo(selectedCategory)}`
                     : loadingCategorias
                       ? 'Carregando categorias financeiras...'
-                      : 'Opcional. A lista considera o tipo da conta selecionado.'}
+                      : form.considera_dre !== false
+                        ? 'Obrigatoria para DRE. Selecione categoria com grupo DRE classificado.'
+                        : 'Opcional. A lista considera o tipo da conta selecionado.'}
                 </div>
               </div>
+
+              <label className="app-filter-field">
+                <span className="app-filter-label">Competencia DRE</span>
+                <input
+                  className="input w-full"
+                  type="date"
+                  value={form.competencia_data}
+                  onChange={(event) => setForm((current) => ({ ...current, competencia_data: event.target.value }))}
+                  required={form.considera_dre !== false}
+                />
+                <span className="mt-1 block text-xs text-slate-500">
+                  {form.considera_dre !== false
+                    ? 'Obrigatoria para DRE. Informe o periodo economico real.'
+                    : 'Opcional quando o titulo nao entra na DRE.'}
+                </span>
+              </label>
 
               <label className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm text-[var(--c-text)]">
                 <input

@@ -573,6 +573,33 @@ async function validarCategoriaFinanceira(categoriaId, tipoTitulo) {
   return categoria;
 }
 
+function validarCategoriaDreTitulo(categoria, payload = {}) {
+  if (payload.considera_dre === false) {
+    return;
+  }
+
+  if (!categoria) {
+    throw createHttpError(
+      400,
+      'Categoria financeira e obrigatoria para titulos considerados na DRE. Informe uma categoria classificada ou desmarque Considerar na DRE.'
+    );
+  }
+
+  if (categoria.considera_dre === false) {
+    throw createHttpError(
+      400,
+      'A categoria financeira selecionada esta marcada fora da DRE. Escolha uma categoria de DRE ou desmarque Considerar na DRE.'
+    );
+  }
+
+  if (!String(categoria.dre_grupo || '').trim()) {
+    throw createHttpError(
+      400,
+      'A categoria financeira selecionada nao possui grupo DRE. Classifique a categoria antes de criar titulo considerado na DRE.'
+    );
+  }
+}
+
 async function validarFormaPagamentoFinanceira(formaPagamentoId, payload = {}) {
   if (!formaPagamentoId) {
     return null;
@@ -1170,12 +1197,13 @@ async function criarTituloPorSolicitacao(req, solicitacaoId, payload = {}) {
     obra: solicitacao.obra
   });
 
-  const [parceiro] = await Promise.all([
+  const [parceiro,, categoria] = await Promise.all([
     validarParceiro(parceiroId),
     validarEmpresaGrupo(empresaTituloId),
     validarCategoriaFinanceira(payload.categoria_financeira_id, tipo)
   ]);
   validarCompatibilidadeParceiroTitulo(parceiro, tipo);
+  validarCategoriaDreTitulo(categoria, payload);
   const intercompanyFields = await validarIntercompanyTitulo(payload);
 
   const pagamentosPayload = Array.isArray(payload.pagamentos) && payload.pagamentos.length > 0
@@ -1263,7 +1291,7 @@ async function criarTituloPorSolicitacao(req, solicitacaoId, payload = {}) {
           empresa_id: empresaTituloId,
           ...intercompanyFields,
           parceiro_id: parceiroId,
-          categoria_financeira_id: payload.categoria_financeira_id || null,
+          categoria_financeira_id: categoria?.id || null,
           forma_pagamento_id: pagamento.formaPagamento?.id || null,
           cartao_id: pagamento.payload.cartao_id || null,
           grupo_parcelamento_id: pagamento.grupoParcelamentoId,
@@ -1380,7 +1408,7 @@ async function criarTituloManual(req, payload = {}) {
     throw createHttpError(400, 'Descricao e obrigatoria para criar o titulo manual.');
   }
 
-  const [obra, parceiro] = await Promise.all([
+  const [obra, parceiro, categoria] = await Promise.all([
     validarObraTitulo(req, obraId),
     validarParceiro(parceiroId),
     validarCategoriaFinanceira(payload.categoria_financeira_id, tipo)
@@ -1393,6 +1421,7 @@ async function criarTituloManual(req, payload = {}) {
   const apropriacao = await validarApropriacaoTitulo(payload.apropriacao_id, obra.id);
 
   validarCompatibilidadeParceiroTitulo(parceiro, tipo);
+  validarCategoriaDreTitulo(categoria, payload);
   const intercompanyFields = await validarIntercompanyTitulo(payload);
 
   const pagamentosPayload = Array.isArray(payload.pagamentos) && payload.pagamentos.length > 0
@@ -1478,7 +1507,7 @@ async function criarTituloManual(req, payload = {}) {
           empresa_id: empresaTituloId,
           ...intercompanyFields,
           parceiro_id: parceiro.id,
-          categoria_financeira_id: payload.categoria_financeira_id || null,
+          categoria_financeira_id: categoria?.id || null,
           forma_pagamento_id: pagamento.formaPagamento?.id || null,
           cartao_id: pagamento.payload.cartao_id || null,
           grupo_parcelamento_id: pagamento.grupoParcelamentoId,
@@ -1617,6 +1646,7 @@ async function criarTituloManualComBaixaAtomica(req, payload = {}, { transaction
   const apropriacao = await validarApropriacaoTitulo(payload.apropriacao_id, obra.id);
 
   validarCompatibilidadeParceiroTitulo(parceiro, tipo);
+  validarCategoriaDreTitulo(categoria, payload);
   const intercompanyFields = await validarIntercompanyTitulo(payload);
 
   const valorBaixa = roundCurrency(payload.valor);
@@ -1655,6 +1685,9 @@ async function criarTituloManualComBaixaAtomica(req, payload = {}, { transaction
       valor_saldo: roundCurrency(valorOriginal),
       valor_baixado: 0,
       data_emissao: payload.data_emissao || getHoje(),
+      data_compra: payload.data_compra || payload.data_movimento || null,
+      competencia_data: resolverCompetenciaTitulo(payload),
+      considera_dre: payload.considera_dre !== false,
       data_vencimento: dataVencimento,
       data_quitacao: null,
       observacoes: payload.observacoes || null,

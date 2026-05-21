@@ -262,22 +262,28 @@ function getCategoriaDreResumo(categoria) {
   return `${grupo}${subgrupo}`;
 }
 
+function isCategoriaClassificadaParaDre(categoria) {
+  return Boolean(categoria && categoria.considera_dre !== false && String(categoria.dre_grupo || '').trim());
+}
+
 function ImpactoGerencialPreview({ form, categoria, empresasGrupo, totalPagamentos }) {
   const valorTitulo = roundCurrency(currencyToNumber(form.valor));
   const valorCaixa = roundCurrency(totalPagamentos || valorTitulo);
   const categoriaSelecionada = Boolean(categoria);
-  const categoriaEntraDre = categoriaSelecionada && categoria?.considera_dre !== false;
+  const categoriaEntraDre = isCategoriaClassificadaParaDre(categoria);
   const dreAtiva = form.considera_dre !== false && categoriaEntraDre;
   const origem = getEmpresaNome(empresasGrupo, form.empresa_origem_id);
   const destino = getEmpresaNome(empresasGrupo, form.empresa_destino_id);
 
   const dreTexto = !form.considera_dre
     ? 'Nao entra na DRE'
-    : !categoriaSelecionada
-      ? 'Pendente de categoria'
-      : !categoriaEntraDre
+      : !categoriaSelecionada
+        ? 'Pendente de categoria'
+      : categoria?.considera_dre === false
         ? 'Categoria fora da DRE'
-        : 'Entra na DRE gerencial';
+        : !String(categoria?.dre_grupo || '').trim()
+          ? 'Categoria sem grupo DRE'
+          : 'Entra na DRE gerencial';
 
   const consolidadoTexto = form.intercompany
     ? form.elimina_consolidado
@@ -828,6 +834,10 @@ export default function FinanceiroTituloNovo() {
       return `Selecione o ${form.tipo === 'RECEBER' ? 'cliente' : 'credor'} na lista antes de salvar.`;
     }
 
+    if (form.considera_dre && !isCategoriaClassificadaParaDre(categoria)) {
+      return 'Para considerar na DRE, selecione uma categoria financeira com grupo DRE classificado.';
+    }
+
     if (valorTitulo <= 0) {
       return 'Informe o valor total do titulo.';
     }
@@ -1095,9 +1105,10 @@ export default function FinanceiroTituloNovo() {
               <label className="sol-filter-field xl:col-span-3">
                 <span className="sol-filter-label">Categoria financeira</span>
                 <select
-                  className="input w-full"
+                  className={`input w-full ${form.considera_dre && !isCategoriaClassificadaParaDre(categoria) ? 'border-amber-300 bg-amber-50' : ''}`}
                   value={form.categoria_financeira_id}
                   onChange={(event) => updateField('categoria_financeira_id', event.target.value)}
+                  required={Boolean(form.considera_dre)}
                 >
                   <option value="">Sem categoria</option>
                   {categoriasFiltradas.map((categoria) => (
@@ -1107,7 +1118,9 @@ export default function FinanceiroTituloNovo() {
                   ))}
                 </select>
                 <span className="app-note mt-2">
-                  {categoriaResumo}
+                  {form.considera_dre && !isCategoriaClassificadaParaDre(categoria)
+                    ? `${categoriaResumo}. Para DRE, selecione categoria com grupo DRE classificado.`
+                    : categoriaResumo}
                 </span>
               </label>
 
