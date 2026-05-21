@@ -166,7 +166,8 @@ export default function RhDpApuracao() {
       const data = await getCategoriasFinanceiras();
       setCategoriasFinanceiras(Array.isArray(data) ? data.filter((item) => {
         const tipo = String(item?.tipo || '').trim().toUpperCase();
-        return !tipo || tipo === 'PAGAR' || tipo === 'AMBOS';
+        const hasDreGroup = String(item?.dre_grupo || '').trim();
+        return (!tipo || tipo === 'PAGAR' || tipo === 'AMBOS') && item?.considera_dre !== false && hasDreGroup;
       }) : []);
     } catch (error) {
       console.error(error);
@@ -696,6 +697,7 @@ export default function RhDpApuracao() {
                 <h3 className="text-base font-semibold text-slate-900">Fechamento da competencia</h3>
                 <p className="text-sm text-slate-600">
                   O fechamento gera titulos <strong>PAGAR</strong> no financeiro central e vincula cada item da apuracao ao respectivo titulo.
+                  A categoria financeira deve estar marcada para DRE e com grupo DRE classificado.
                 </p>
               </div>
 
@@ -729,12 +731,20 @@ export default function RhDpApuracao() {
                     value={fechamentoForm.categoria_financeira_id}
                     onChange={(event) => setFechamentoForm((current) => ({ ...current, categoria_financeira_id: event.target.value }))}
                     disabled={fechando || carregandoCategorias}
+                    required
                   >
-                    <option value="">Nao informar</option>
+                    <option value="">Selecione a categoria da folha</option>
                     {categoriasFinanceiras.map((item) => (
-                      <option key={item.id} value={item.id}>{item.nome}</option>
+                      <option key={item.id} value={item.id}>
+                        {item.nome}{item.dre_grupo ? ` - ${item.dre_grupo}` : ''}
+                      </option>
                     ))}
                   </select>
+                  {!carregandoCategorias && !categoriasFinanceiras.length ? (
+                    <span className="mt-1 block text-xs text-amber-700">
+                      Cadastre uma categoria PAGAR/AMBOS marcada para DRE e com grupo DRE antes de fechar.
+                    </span>
+                  ) : null}
                 </label>
               </div>
 

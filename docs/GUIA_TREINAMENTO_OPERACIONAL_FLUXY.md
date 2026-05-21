@@ -1776,6 +1776,9 @@ Regras:
 - a apuracao precisa estar vinculada a uma empresa do grupo;
 - se a apuracao tambem tiver obra/centro de custo, essa obra precisa estar vinculada a mesma empresa da apuracao;
 - os titulos de folha nascem com a empresa da apuracao RH/DP;
+- a categoria financeira da folha e obrigatoria no fechamento;
+- a categoria financeira da folha precisa estar marcada para DRE e possuir grupo DRE classificado;
+- a competencia DRE dos titulos de folha nasce da competencia da apuracao RH/DP, nao da data de pagamento ou vencimento;
 - a baixa futura deve informar a empresa pagadora real e a conta bancaria correspondente;
 - se uma empresa pagar folha de outra empresa, a baixa deve ser tratada como intercompany, nao como ajuste manual de empresa no titulo.
 
@@ -1783,7 +1786,8 @@ Cuidados:
 
 - nao fechar apuracao com empresa incorreta;
 - nao usar empresa do colaborador para corrigir uma apuracao criada errada;
-- conferir categoria financeira da folha antes do fechamento para manter DRE e endividamento corretos.
+- conferir categoria financeira da folha antes do fechamento para manter DRE e endividamento corretos;
+- se nao existir categoria correta para folha, primeiro ajuste o cadastro financeiro e somente depois feche a competencia.
 
 ---
 

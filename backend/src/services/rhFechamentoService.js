@@ -54,7 +54,7 @@ const FECHAMENTO_INCLUDE = [
   {
     model: CategoriaFinanceira,
     as: 'categoriaFinanceira',
-    attributes: ['id', 'nome', 'tipo']
+    attributes: ['id', 'nome', 'tipo', 'dre_grupo', 'dre_subgrupo', 'considera_dre']
   },
   {
     model: User,
@@ -101,7 +101,7 @@ function inferTipoPessoa(documento) {
 
 async function ensureCategoriaFinanceiraPagar(categoriaFinanceiraId, transaction) {
   if (!categoriaFinanceiraId) {
-    return null;
+    throw new ValidationError('Categoria financeira e obrigatoria para gerar titulos de fechamento RH/DP.');
   }
 
   const categoria = await CategoriaFinanceira.findByPk(categoriaFinanceiraId, { transaction });
@@ -112,6 +112,14 @@ async function ensureCategoriaFinanceiraPagar(categoriaFinanceiraId, transaction
   const tipo = String(categoria.tipo || '').trim().toUpperCase();
   if (tipo && tipo !== 'AMBOS' && tipo !== 'PAGAR') {
     throw new ValidationError('A categoria financeira do fechamento deve ser compativel com titulos a pagar.');
+  }
+
+  if (categoria.considera_dre === false) {
+    throw new ValidationError('A categoria financeira do fechamento RH/DP precisa estar marcada para DRE.');
+  }
+
+  if (!String(categoria.dre_grupo || '').trim()) {
+    throw new ValidationError('A categoria financeira do fechamento RH/DP precisa ter grupo DRE classificado.');
   }
 
   return categoria;
@@ -295,13 +303,17 @@ function buildTituloRhPayload({ apuracao, item, parceiro, dataVencimento, catego
 
   const colaborador = item.colaborador;
   const competencia = apuracao.competencia;
+  const competenciaData = getLastDayOfCompetencia(competencia);
 
   return {
     solicitacao_id: null,
     obra_id: Number(apuracao.obra_id || colaborador.obra_id),
     empresa_id: Number(empresaId),
     parceiro_id: parceiro.id,
-    categoria_financeira_id: categoriaFinanceiraId || null,
+    categoria_financeira_id: categoriaFinanceiraId,
+    competencia_data: competenciaData,
+    considera_dre: true,
+    origem_titulo: 'RH_DP',
     tipo: 'PAGAR',
     status: 'ABERTO',
     descricao: `Folha RH/DP ${competencia} - ${colaborador.nome}`.slice(0, 255),
