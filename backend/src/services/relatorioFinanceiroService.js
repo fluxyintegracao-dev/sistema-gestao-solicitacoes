@@ -1086,21 +1086,24 @@ function emptyDreSummary() {
 }
 
 function getLinhaDrePorCategoria(categoria, tipo) {
-  const normalizedTipo = String(tipo || '').toUpperCase();
   const grupoCategoria = String(categoria?.dre_grupo || '').trim();
 
-  if (grupoCategoria) {
+  if (!categoria || !grupoCategoria) {
     return {
-      grupo: grupoCategoria,
-      subgrupo: categoria?.dre_subgrupo || null,
-      ordem: categoria?.dre_ordem ?? 999,
-      considera_dre: categoria?.considera_dre !== false
+      grupo: null,
+      subgrupo: null,
+      ordem: 999,
+      considera_dre: false,
+      motivo_exclusao: !categoria ? 'SEM_CATEGORIA' : 'CATEGORIA_SEM_GRUPO_DRE'
     };
   }
 
-  return normalizedTipo === 'RECEBER'
-    ? { grupo: 'Receitas nao classificadas', subgrupo: null, ordem: 900, considera_dre: true }
-    : { grupo: 'Custos e despesas nao classificados', subgrupo: null, ordem: 910, considera_dre: true };
+  return {
+    grupo: grupoCategoria,
+    subgrupo: categoria?.dre_subgrupo || null,
+    ordem: categoria?.dre_ordem ?? 999,
+    considera_dre: categoria?.considera_dre !== false
+  };
 }
 
 function getLinhaDre(titulo) {
@@ -1132,9 +1135,7 @@ const DRE_NATUREZA_POR_GRUPO = {
   'Depreciacao e amortizacao': 'depreciacao_amortizacao',
   'Resultado financeiro': 'resultado_financeiro',
   'Impostos sobre o resultado': 'impostos_resultado',
-  'Tributos e contribuicoes': 'outras_operacionais',
-  'Receitas nao classificadas': 'outras_operacionais',
-  'Custos e despesas nao classificados': 'outras_operacionais'
+  'Tributos e contribuicoes': 'outras_operacionais'
 };
 
 function getDreNatureza(linha = {}) {
@@ -2769,7 +2770,7 @@ async function gerarDiagnosticoDre(req) {
       codigo: 'CATEGORIAS_SEM_DRE',
       titulo: 'Categorias financeiras sem grupo DRE',
       severidade: 'ALTA',
-      descricao: 'Categorias sem grupo DRE geram linhas nao classificadas no resultado.',
+      descricao: 'Categorias sem grupo DRE nao entram no demonstrativo executivo ate serem classificadas.',
       total: totalCategoriasSemDre,
       acao: 'Classifique cada categoria em Cadastros Financeiros com grupo, subgrupo e ordem DRE.',
       exemplos: categoriasSemDre.map(mapCategoriaDiagnostico)
@@ -2796,7 +2797,7 @@ async function gerarDiagnosticoDre(req) {
       codigo: 'TITULOS_SEM_CATEGORIA',
       titulo: 'Titulos sem categoria financeira',
       severidade: 'ALTA',
-      descricao: 'Sem categoria, o titulo entra em linhas genericas da DRE.',
+      descricao: 'Sem categoria, o titulo nao entra no demonstrativo executivo da DRE.',
       total: titulosSemCategoria,
       acao: 'Classifique o titulo com uma categoria financeira apropriada.',
       exemplos: exemplosTitulosSemCategoria
@@ -2805,7 +2806,7 @@ async function gerarDiagnosticoDre(req) {
       codigo: 'TITULOS_CATEGORIA_SEM_DRE',
       titulo: 'Titulos com categoria sem grupo DRE',
       severidade: 'ALTA',
-      descricao: 'A categoria existe, mas nao informa onde o valor deve entrar na DRE.',
+      descricao: 'A categoria existe, mas nao informa onde o valor deve entrar na DRE; por isso o titulo fica fora do demonstrativo executivo.',
       total: titulosCategoriaSemDre,
       acao: 'Complete a classificacao DRE das categorias financeiras usadas nesses titulos.',
       exemplos: exemplosTitulosCategoriaSemDre

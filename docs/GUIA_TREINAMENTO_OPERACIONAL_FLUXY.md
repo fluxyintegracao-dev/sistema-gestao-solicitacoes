@@ -515,6 +515,14 @@ Passo a passo:
 5. Separar receita, custo, despesa, resultado financeiro, imposto e patrimonio.
 6. Definir a classificacao gerencial da categoria.
 
+Regra para a DRE:
+
+- a DRE executiva nao deve criar linha generica para titulo sem categoria;
+- a DRE executiva nao deve criar linha generica para categoria sem grupo DRE;
+- titulo sem categoria ou com categoria sem grupo DRE fica fora do demonstrativo ate a classificacao ser corrigida;
+- essas pendencias aparecem no Diagnostico DRE para revisao antes do fechamento;
+- se uma categoria realmente nao deve entrar na DRE, marque essa decisao de forma explicita no cadastro da categoria.
+
 Como classificar endividamento:
 
 - o sistema nao deve tentar descobrir endividamento pelo nome da categoria, pelo nome do fornecedor ou pela descricao do titulo;
@@ -544,6 +552,7 @@ Cuidados:
 
 - categoria errada distorce a DRE;
 - categoria de endividamento errada distorce o passivo gerencial;
+- categoria sem grupo DRE deixa titulo fora do demonstrativo executivo;
 - categorias muito genericas atrapalham analise;
 - categorias duplicadas confundem operadores.
 
