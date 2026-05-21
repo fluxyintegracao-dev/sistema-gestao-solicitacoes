@@ -511,6 +511,9 @@ export default function FinanceiroRelatorios() {
             </p>
           </div>
           <div className="app-page-actions">
+            <Link to="/financeiro/relatorios/fluxo-consolidado" className="btn btn-outline">
+              Fluxo Consolidado
+            </Link>
             <Link to="/financeiro/relatorios/dre" className="btn btn-outline">
               DRE
             </Link>

@@ -467,6 +467,311 @@ async function gerarRelatorioFluxoCaixa(req, filters = {}) {
   };
 }
 
+function buildFluxoCompanyWhere(filters = {}, empresas = []) {
+  if (filters.empresa_id) {
+    return { empresa_id: Number(filters.empresa_id) };
+  }
+
+  const empresaIdsHolding = getEmpresaIdsDaHolding(empresas, filters.holding_id);
+  if (empresaIdsHolding) {
+    return { empresa_id: { [Op.in]: empresaIdsHolding } };
+  }
+
+  return {};
+}
+
+function applyIntercompanyExclusion(where, excluirIntercompany) {
+  if (excluirIntercompany === false) {
+    return where;
+  }
+
+  const andConditions = Array.isArray(where[Op.and]) ? where[Op.and] : [];
+  return {
+    ...where,
+    [Op.and]: [
+      ...andConditions,
+      {
+        [Op.or]: [
+          { intercompany: false },
+          { elimina_consolidado: false }
+        ]
+      }
+    ]
+  };
+}
+
+function getEmpresaFluxoLabel(empresaId, empresasById, vazioLabel) {
+  if (!empresaId) return vazioLabel;
+  const empresa = empresasById.get(Number(empresaId));
+  return empresa?.nome || empresa?.razao_social || `Empresa #${empresaId}`;
+}
+
+function emptyFluxoEmpresa(empresaId, empresasById, vazioLabel) {
+  return {
+    empresa_id: empresaId || null,
+    empresa_nome: getEmpresaFluxoLabel(empresaId, empresasById, vazioLabel),
+    entradas_previstas: 0,
+    saidas_previstas: 0,
+    saldo_previsto: 0,
+    entradas_realizadas: 0,
+    saidas_realizadas: 0,
+    saldo_realizado: 0,
+    titulos_previstos: 0,
+    movimentos_realizados: 0
+  };
+}
+
+function addFluxoEmpresa(map, empresaId, empresasById, vazioLabel, tipo, valor, origem) {
+  const key = empresaId ? String(empresaId) : vazioLabel;
+  if (!map.has(key)) {
+    map.set(key, emptyFluxoEmpresa(empresaId, empresasById, vazioLabel));
+  }
+
+  const item = map.get(key);
+  const amount = roundCurrency(valor);
+  const isReceber = String(tipo || '').toUpperCase() === 'RECEBER';
+
+  if (origem === 'PREVISTO') {
+    if (isReceber) {
+      item.entradas_previstas = roundCurrency(item.entradas_previstas + amount);
+    } else {
+      item.saidas_previstas = roundCurrency(item.saidas_previstas + amount);
+    }
+    item.titulos_previstos += 1;
+  } else {
+    if (isReceber) {
+      item.entradas_realizadas = roundCurrency(item.entradas_realizadas + amount);
+    } else {
+      item.saidas_realizadas = roundCurrency(item.saidas_realizadas + amount);
+    }
+    item.movimentos_realizados += 1;
+  }
+
+  item.saldo_previsto = roundCurrency(item.entradas_previstas - item.saidas_previstas);
+  item.saldo_realizado = roundCurrency(item.entradas_realizadas - item.saidas_realizadas);
+
+  return item;
+}
+
+async function carregarTitulosFluxoConsolidado(periodo, tituloScopeWhere) {
+  return TituloFinanceiro.findAll({
+    attributes: [
+      'id',
+      'codigo',
+      'tipo',
+      'status',
+      'empresa_id',
+      'obra_id',
+      'data_vencimento',
+      'valor_saldo',
+      'intercompany',
+      'elimina_consolidado',
+      'empresa_origem_id',
+      'empresa_destino_id',
+      'tipo_intercompany'
+    ],
+    where: {
+      status: {
+        [Op.in]: ['ABERTO', 'PARCIAL']
+      },
+      valor_saldo: {
+        [Op.gt]: 0
+      },
+      data_vencimento: {
+        [Op.between]: [periodo.data_inicial, periodo.data_final]
+      },
+      ...tituloScopeWhere
+    },
+    raw: true
+  });
+}
+
+async function carregarMovimentosFluxoConsolidado(periodo, tituloScopeWhere, movimentoScopeWhere = {}) {
+  return MovimentoFinanceiro.findAll({
+    attributes: ['id', 'empresa_id', 'data_movimento', 'valor_quitacao'],
+    where: {
+      status: 'ATIVO',
+      data_movimento: {
+        [Op.between]: [periodo.data_inicial, periodo.data_final]
+      },
+      ...movimentoScopeWhere
+    },
+    include: [
+      {
+        model: TituloFinanceiro,
+        as: 'titulo',
+        attributes: [
+          'id',
+          'tipo',
+          'empresa_id',
+          'obra_id',
+          'intercompany',
+          'elimina_consolidado',
+          'empresa_origem_id',
+          'empresa_destino_id',
+          'tipo_intercompany'
+        ],
+        required: true,
+        where: tituloScopeWhere
+      }
+    ],
+    raw: false
+  });
+}
+
+function summarizeFluxoConsolidado({ previstos, realizados, empresas }) {
+  const empresasById = new Map(empresas.map((empresa) => [Number(empresa.id), empresa]));
+  const empresasMap = new Map();
+  const vazioTitulo = 'SEM_EMPRESA_TITULO';
+  const vazioBaixa = 'SEM_EMPRESA_BAIXA';
+  const intercompany = {
+    previsto_eliminado: 0,
+    realizado_eliminado: 0,
+    titulos_eliminados: 0,
+    movimentos_eliminados: 0
+  };
+
+  for (const titulo of previstos) {
+    const valor = roundCurrency(titulo.valor_saldo);
+    addFluxoEmpresa(empresasMap, titulo.empresa_id, empresasById, vazioTitulo, titulo.tipo, valor, 'PREVISTO');
+
+    if (titulo.intercompany === true && titulo.elimina_consolidado === true) {
+      intercompany.previsto_eliminado = roundCurrency(intercompany.previsto_eliminado + valor);
+      intercompany.titulos_eliminados += 1;
+    }
+  }
+
+  for (const movimento of realizados) {
+    const valor = roundCurrency(movimento.valor_quitacao);
+    const titulo = movimento.titulo || {};
+    addFluxoEmpresa(empresasMap, movimento.empresa_id, empresasById, vazioBaixa, titulo.tipo, valor, 'REALIZADO');
+
+    if (titulo.intercompany === true && titulo.elimina_consolidado === true) {
+      intercompany.realizado_eliminado = roundCurrency(intercompany.realizado_eliminado + valor);
+      intercompany.movimentos_eliminados += 1;
+    }
+  }
+
+  const empresasResumo = Array.from(empresasMap.values())
+    .map((item) => ({
+      ...item,
+      variacao_realizado_vs_previsto: roundCurrency(item.saldo_realizado - item.saldo_previsto)
+    }))
+    .sort((a, b) => Math.abs(Number(b.saldo_previsto || 0)) - Math.abs(Number(a.saldo_previsto || 0)));
+
+  const resumo = empresasResumo.reduce((acc, item) => ({
+    entradas_previstas: roundCurrency(acc.entradas_previstas + item.entradas_previstas),
+    saidas_previstas: roundCurrency(acc.saidas_previstas + item.saidas_previstas),
+    saldo_previsto: roundCurrency(acc.saldo_previsto + item.saldo_previsto),
+    entradas_realizadas: roundCurrency(acc.entradas_realizadas + item.entradas_realizadas),
+    saidas_realizadas: roundCurrency(acc.saidas_realizadas + item.saidas_realizadas),
+    saldo_realizado: roundCurrency(acc.saldo_realizado + item.saldo_realizado),
+    titulos_previstos: acc.titulos_previstos + item.titulos_previstos,
+    movimentos_realizados: acc.movimentos_realizados + item.movimentos_realizados
+  }), {
+    entradas_previstas: 0,
+    saidas_previstas: 0,
+    saldo_previsto: 0,
+    entradas_realizadas: 0,
+    saidas_realizadas: 0,
+    saldo_realizado: 0,
+    titulos_previstos: 0,
+    movimentos_realizados: 0
+  });
+
+  resumo.variacao_realizado_vs_previsto = roundCurrency(resumo.saldo_realizado - resumo.saldo_previsto);
+
+  return {
+    resumo: {
+      ...resumo,
+      empresas_com_movimento: empresasResumo.length,
+      intercompany_previsto_eliminado: intercompany.previsto_eliminado,
+      intercompany_realizado_eliminado: intercompany.realizado_eliminado,
+      intercompany_titulos_eliminados: intercompany.titulos_eliminados,
+      intercompany_movimentos_eliminados: intercompany.movimentos_eliminados
+    },
+    empresas: empresasResumo
+  };
+}
+
+async function gerarRelatorioFluxoConsolidado(req, filters = {}) {
+  const periodo = resolvePeriodo(filters);
+  const obraWhere = await resolveObraScope(req, filters.obra_id);
+  const empresas = await EmpresaGrupo.findAll({
+    attributes: ['id', 'codigo', 'nome', 'razao_social', 'tipo_empresa', 'tipo_gerencial', 'holding_id'],
+    order: [['tipo_empresa', 'ASC'], ['nome', 'ASC']]
+  });
+
+  if (obraWhere === null) {
+    return {
+      filtro: {
+        periodo: periodo.periodo,
+        descricao: periodo.descricao,
+        data_inicial: periodo.data_inicial,
+        data_final: periodo.data_final,
+        agrupamento: periodo.agrupamento,
+        holding_id: filters.holding_id ? Number(filters.holding_id) : null,
+        empresa_id: filters.empresa_id ? Number(filters.empresa_id) : null,
+        obra_id: filters.obra_id ? Number(filters.obra_id) : null,
+        excluir_intercompany: filters.excluir_intercompany !== false
+      },
+      resumo: {
+        entradas_previstas: 0,
+        saidas_previstas: 0,
+        saldo_previsto: 0,
+        entradas_realizadas: 0,
+        saidas_realizadas: 0,
+        saldo_realizado: 0,
+        variacao_realizado_vs_previsto: 0,
+        empresas_com_movimento: 0,
+        titulos_previstos: 0,
+        movimentos_realizados: 0,
+        intercompany_previsto_eliminado: 0,
+        intercompany_realizado_eliminado: 0
+      },
+      serie: [],
+      empresas: []
+    };
+  }
+
+  const companyScopeWhere = buildFluxoCompanyWhere(filters, empresas);
+  const tituloScopeWhere = applyIntercompanyExclusion({
+    ...obraWhere,
+    ...companyScopeWhere
+  }, filters.excluir_intercompany);
+  const movimentoTituloScopeWhere = applyIntercompanyExclusion({
+    ...obraWhere
+  }, filters.excluir_intercompany);
+
+  const [previstos, realizados] = await Promise.all([
+    carregarTitulosFluxoConsolidado(periodo, tituloScopeWhere),
+    carregarMovimentosFluxoConsolidado(periodo, movimentoTituloScopeWhere, companyScopeWhere)
+  ]);
+
+  const serie = acumularSerie({
+    buckets: createBuckets(periodo),
+    previstos,
+    realizados,
+    agrupamento: periodo.agrupamento
+  });
+
+  return {
+    filtro: {
+      periodo: periodo.periodo,
+      descricao: periodo.descricao,
+      data_inicial: periodo.data_inicial,
+      data_final: periodo.data_final,
+      agrupamento: periodo.agrupamento,
+      holding_id: filters.holding_id ? Number(filters.holding_id) : null,
+      empresa_id: filters.empresa_id ? Number(filters.empresa_id) : null,
+      obra_id: filters.obra_id ? Number(filters.obra_id) : null,
+      excluir_intercompany: filters.excluir_intercompany !== false
+    },
+    ...summarizeFluxoConsolidado({ previstos, realizados, empresas }),
+    serie
+  };
+}
+
 async function gerarRelatorioAnalitico(req, filters = {}) {
   const obraWhere = await resolveObraScope(req, filters.obra_id);
   if (obraWhere === null) {
@@ -1865,6 +2170,7 @@ async function gerarDiagnosticoDre(req) {
 module.exports = {
   gerarRelatorioAnalitico,
   gerarRelatorioFluxoCaixa,
+  gerarRelatorioFluxoConsolidado,
   gerarRelatorioIntercompany,
   gerarDreGerencial,
   gerarDiagnosticoDre

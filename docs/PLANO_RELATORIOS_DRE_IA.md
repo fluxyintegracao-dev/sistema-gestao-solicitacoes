@@ -44,6 +44,8 @@ Base multiempresa e DRE gerencial:
 - A primeira camada operacional de Intercompany foi adicionada ao Financeiro, com origem, destino, tipo, motivo e regra explicita de eliminacao no consolidado.
 - Financeiro > Relatorios ganhou Relatorio Intercompany para analisar fluxos entre empresas, tipos de intercompany, valores previstos, valores realizados e titulos analiticos.
 - A DRE passou a combinar filtro de periodo e exclusao de intercompany sem sobrescrever uma regra pela outra.
+- Financeiro > Relatorios ganhou Fluxo de Caixa Consolidado para analisar previsto x realizado por Holding, empresa e obra/centro de custo, eliminando intercompany quando solicitado.
+- No Fluxo de Caixa Consolidado, o previsto usa a empresa do titulo e o realizado usa a empresa informada na baixa, sem deduzir empresa por fallback operacional.
 
 Documentacao operacional complementar:
 

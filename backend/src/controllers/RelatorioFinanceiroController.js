@@ -1,6 +1,7 @@
 const {
   gerarDiagnosticoDre,
   gerarDreGerencial,
+  gerarRelatorioFluxoConsolidado,
   gerarRelatorioIntercompany,
   gerarRelatorioAnalitico,
   gerarRelatorioFluxoCaixa
@@ -19,6 +20,16 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return responderErro(res, error, 'Erro ao gerar relatorio de fluxo de caixa');
+    }
+  },
+
+  async fluxoConsolidado(req, res) {
+    try {
+      const relatorio = await gerarRelatorioFluxoConsolidado(req, req.query || {});
+      return res.json(relatorio);
+    } catch (error) {
+      console.error(error);
+      return responderErro(res, error, 'Erro ao gerar fluxo de caixa consolidado');
     }
   },
 

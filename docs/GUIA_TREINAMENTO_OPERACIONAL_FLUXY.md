@@ -1138,6 +1138,56 @@ Cuidados:
 - se um aporte for registrado como receita comum, a DRE consolidada sera distorcida;
 - se uma transferencia interna nao for marcada como intercompany, o grupo pode parecer maior ou mais lucrativo do que realmente e.
 
+### 11.15 Fluxo de Caixa Consolidado
+
+Tela:
+
+- `Financeiro > Relatorios > Fluxo Consolidado`.
+
+Objetivo:
+
+- enxergar o caixa previsto e realizado do grupo por Holding, empresa e obra/centro de custo;
+- comparar entradas e saidas previstas com baixas efetivamente registradas;
+- eliminar intercompany quando a analise for consolidada do grupo;
+- identificar empresas que geram caixa, consomem caixa ou dependem de movimentacoes internas.
+
+Passo a passo:
+
+1. Selecionar o periodo.
+2. Filtrar por Holding quando quiser analisar apenas um grupo societario.
+3. Filtrar por empresa quando quiser analisar uma empresa especifica.
+4. Filtrar por obra/centro de custo quando a analise for operacional.
+5. Manter `Eliminar intercompany no consolidado` marcado para a visao executiva principal.
+6. Clicar em `Atualizar fluxo`.
+7. Conferir os cards de entradas, saidas e saldo.
+8. Conferir a tabela `Resumo por empresa`.
+9. Conferir a serie consolidada para enxergar concentracao por periodo.
+
+Como interpretar:
+
+- entradas previstas sao titulos a receber em aberto ou parciais;
+- saidas previstas sao titulos a pagar em aberto ou parciais;
+- saldo previsto e entradas previstas menos saidas previstas;
+- entradas realizadas sao baixas de titulos a receber;
+- saidas realizadas sao baixas de titulos a pagar;
+- saldo realizado e entradas realizadas menos saidas realizadas;
+- intercompany eliminado mostra valores internos retirados da visao consolidada.
+
+Regra operacional importante:
+
+- o previsto usa a empresa informada no titulo financeiro;
+- o realizado usa a empresa informada na baixa do titulo;
+- a baixa deve ter empresa pagadora/recebedora correta, normalmente derivada da conta bancaria usada;
+- se a baixa ficar sem empresa, ela aparece separada e precisa ser corrigida.
+
+Cuidados:
+
+- nao usar transferencia interna como receita real do grupo;
+- nao deixar titulo sem empresa;
+- nao deixar baixa sem conta bancaria ou empresa;
+- conferir se aportes, emprestimos, reembolsos e coberturas de caixa estao marcados como intercompany;
+- usar este relatorio junto com a DRE: DRE mostra resultado por competencia, Fluxo Consolidado mostra caixa.
+
 ---
 
 ## 12. Modulo Fiscal

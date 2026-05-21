@@ -345,6 +345,36 @@ function validateFinanceFluxoCaixaQuery(query = {}) {
   };
 }
 
+function validateFinanceFluxoConsolidadoQuery(query = {}) {
+  ensureAllowedKeys(
+    query,
+    [
+      'periodo',
+      'data_inicial',
+      'data_final',
+      'holding_id',
+      'empresa_id',
+      'obra_id',
+      'excluir_intercompany'
+    ],
+    'Consulta de fluxo de caixa consolidado'
+  );
+
+  const base = validateFinanceFluxoCaixaQuery({
+    periodo: query.periodo,
+    data_inicial: query.data_inicial,
+    data_final: query.data_final,
+    obra_id: query.obra_id
+  });
+
+  return {
+    ...base,
+    holding_id: parseInteger(query.holding_id, 'Holding'),
+    empresa_id: parseInteger(query.empresa_id, 'Empresa do grupo'),
+    excluir_intercompany: parseBoolean(query.excluir_intercompany, 'Excluir intercompany')
+  };
+}
+
 function validateFinanceDreQuery(query = {}) {
   ensureAllowedKeys(
     query,
@@ -1201,6 +1231,7 @@ module.exports = {
   validateFinanceBaixasQuery,
   validateFinanceDreQuery,
   validateFinanceFluxoCaixaQuery,
+  validateFinanceFluxoConsolidadoQuery,
   validateFinanceIntercompanyQuery,
   validateFinanceRelatorioAnaliticoQuery,
   validateFinanceTituloBaixaBody,
