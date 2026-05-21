@@ -6,6 +6,7 @@ const {
   MovimentoFinanceiro,
   Obra,
   Parceiro,
+  TransferenciaFinanceira,
   User,
   TituloFinanceiro
 } = require('../models');
@@ -1474,20 +1475,25 @@ function getIntercompanyMovimentoValor(movimento) {
   return roundCurrency(movimento.valor_quitacao || movimento.valor || 0);
 }
 
-function addIntercompanyResumo(map, key, seed, previsto, realizado, count = 1) {
+function getIntercompanyTransferenciaValor(transferencia) {
+  return roundCurrency(transferencia.valor || 0);
+}
+
+function addIntercompanyResumo(map, key, seed, previsto, realizado, count = 1, countField = 'titulos') {
   if (!map.has(key)) {
     map.set(key, {
       ...seed,
       valor_previsto: 0,
       valor_realizado: 0,
-      titulos: 0
+      titulos: 0,
+      transferencias: 0
     });
   }
 
   const item = map.get(key);
   item.valor_previsto = roundCurrency(item.valor_previsto + Number(previsto || 0));
   item.valor_realizado = roundCurrency(item.valor_realizado + Number(realizado || 0));
-  item.titulos += count;
+  item[countField] = Number(item[countField] || 0) + count;
 
   return item;
 }
@@ -1540,7 +1546,34 @@ function mapIntercompanyTitulo(titulo) {
   };
 }
 
-function summarizeIntercompany(titulos = []) {
+function mapIntercompanyTransferencia(transferencia) {
+  const item = toPlain(transferencia);
+  const valor = getIntercompanyTransferenciaValor(item);
+
+  return {
+    id: item.id,
+    status: item.status,
+    descricao: item.descricao,
+    data_transferencia: item.data_transferencia,
+    valor_realizado: valor,
+    valor_previsto: 0,
+    intercompany_group_id: item.intercompany_group_id,
+    tipo_intercompany: item.tipo_intercompany,
+    motivo_intercompany: item.motivo_intercompany,
+    elimina_consolidado: item.elimina_consolidado === true,
+    transferencia_interna: item.transferencia_interna === true,
+    empresa_origem_id: item.empresa_origem_id,
+    empresa_origem_nome: getEmpresaNome(item.empresaOrigem),
+    empresa_destino_id: item.empresa_destino_id,
+    empresa_destino_nome: getEmpresaNome(item.empresaDestino),
+    conta_origem_id: item.conta_origem_id,
+    conta_origem_nome: item.contaOrigem?.nome || null,
+    conta_destino_id: item.conta_destino_id,
+    conta_destino_nome: item.contaDestino?.nome || null
+  };
+}
+
+function summarizeIntercompany(titulos = [], transferencias = []) {
   const porTipo = new Map();
   const porOrigem = new Map();
   const porDestino = new Map();
@@ -1549,6 +1582,7 @@ function summarizeIntercompany(titulos = []) {
 
   const resumo = {
     titulos: titulos.length,
+    transferencias: transferencias.length,
     valor_previsto: 0,
     valor_realizado: 0,
     valor_eliminado_consolidado: 0,
@@ -1607,6 +1641,50 @@ function summarizeIntercompany(titulos = []) {
     }, previsto, realizado);
   }
 
+  for (const transferencia of transferencias) {
+    const valor = getIntercompanyTransferenciaValor(transferencia);
+    const tipo = transferencia.tipo_intercompany || 'SEM_TIPO';
+    const origemId = transferencia.empresa_origem_id || null;
+    const destinoId = transferencia.empresa_destino_id || null;
+    const origemNome = getEmpresaNome(transferencia.empresaOrigem);
+    const destinoNome = getEmpresaNome(transferencia.empresaDestino);
+    const relacaoKey = `${origemId || 'SEM_ORIGEM'}:${destinoId || 'SEM_DESTINO'}`;
+
+    resumo.valor_realizado = roundCurrency(resumo.valor_realizado + valor);
+    if (transferencia.elimina_consolidado === true) {
+      resumo.valor_eliminado_consolidado = roundCurrency(resumo.valor_eliminado_consolidado + valor);
+    } else {
+      resumo.valor_nao_eliminado_consolidado = roundCurrency(resumo.valor_nao_eliminado_consolidado + valor);
+    }
+    if (transferencia.transferencia_interna === true) {
+      resumo.transferencias_internas += 1;
+    }
+    if (transferencia.intercompany_group_id) {
+      grupos.set(transferencia.intercompany_group_id, true);
+    }
+
+    addIntercompanyResumo(porTipo, tipo, {
+      tipo_intercompany: tipo
+    }, 0, valor, 1, 'transferencias');
+
+    addIntercompanyResumo(porOrigem, String(origemId || 'SEM_ORIGEM'), {
+      empresa_id: origemId,
+      empresa_nome: origemNome
+    }, 0, valor, 1, 'transferencias');
+
+    addIntercompanyResumo(porDestino, String(destinoId || 'SEM_DESTINO'), {
+      empresa_id: destinoId,
+      empresa_nome: destinoNome
+    }, 0, valor, 1, 'transferencias');
+
+    addIntercompanyResumo(relacoes, relacaoKey, {
+      empresa_origem_id: origemId,
+      empresa_origem_nome: origemNome,
+      empresa_destino_id: destinoId,
+      empresa_destino_nome: destinoNome
+    }, 0, valor, 1, 'transferencias');
+  }
+
   resumo.grupos_intercompany = grupos.size;
   resumo.relacoes_empresas = relacoes.size;
 
@@ -1630,6 +1708,8 @@ function summarizeIntercompany(titulos = []) {
 async function gerarRelatorioIntercompany(req, filters = {}) {
   await assertFinanceAccess(req);
 
+  const tituloStatuses = ['ABERTO', 'PARCIAL', 'QUITADO', 'CANCELADO', 'ESTORNADO'];
+  const transferenciaStatuses = ['ATIVA', 'CANCELADA'];
   const periodo = resolvePeriodo(filters);
   const empresas = await EmpresaGrupo.findAll({
     attributes: ['id', 'codigo', 'nome', 'razao_social', 'tipo_empresa', 'tipo_gerencial', 'holding_id'],
@@ -1666,7 +1746,7 @@ async function gerarRelatorioIntercompany(req, filters = {}) {
     where.tipo_intercompany = filters.tipo_intercompany;
   }
   if (filters.status) {
-    where.status = filters.status;
+    where.status = tituloStatuses.includes(filters.status) ? filters.status : '__SEM_STATUS__';
   }
   if (filters.elimina_consolidado !== undefined) {
     where.elimina_consolidado = filters.elimina_consolidado;
@@ -1728,6 +1808,80 @@ async function gerarRelatorioIntercompany(req, filters = {}) {
     limit: filters.limit || 1000
   });
 
+  const transferenciaAndConditions = [{
+    data_transferencia: {
+      [Op.between]: [periodo.data_inicial, periodo.data_final]
+    }
+  }];
+
+  if (filters.empresa_id) {
+    const empresaId = Number(filters.empresa_id);
+    transferenciaAndConditions.push({
+      [Op.or]: [
+        { empresa_id: empresaId },
+        { empresa_origem_id: empresaId },
+        { empresa_destino_id: empresaId }
+      ]
+    });
+  } else if (empresaIdsHolding) {
+    transferenciaAndConditions.push({
+      [Op.or]: [
+        { empresa_id: { [Op.in]: empresaIdsHolding } },
+        { empresa_origem_id: { [Op.in]: empresaIdsHolding } },
+        { empresa_destino_id: { [Op.in]: empresaIdsHolding } }
+      ]
+    });
+  }
+
+  const whereTransferencias = {
+    tipo_intercompany: { [Op.ne]: null },
+    [Op.and]: transferenciaAndConditions
+  };
+
+  if (filters.tipo_intercompany) {
+    whereTransferencias.tipo_intercompany = filters.tipo_intercompany;
+  }
+  if (filters.status) {
+    whereTransferencias.status = transferenciaStatuses.includes(filters.status) ? filters.status : '__SEM_STATUS__';
+  } else if (!filters.status) {
+    whereTransferencias.status = 'ATIVA';
+  }
+  if (filters.elimina_consolidado !== undefined) {
+    whereTransferencias.elimina_consolidado = filters.elimina_consolidado;
+  }
+
+  const transferencias = await TransferenciaFinanceira.findAll({
+    where: whereTransferencias,
+    include: [
+      {
+        model: EmpresaGrupo,
+        as: 'empresaOrigem',
+        attributes: ['id', 'codigo', 'nome', 'razao_social', 'tipo_empresa', 'tipo_gerencial', 'holding_id'],
+        required: false
+      },
+      {
+        model: EmpresaGrupo,
+        as: 'empresaDestino',
+        attributes: ['id', 'codigo', 'nome', 'razao_social', 'tipo_empresa', 'tipo_gerencial', 'holding_id'],
+        required: false
+      },
+      {
+        model: ContaBancaria,
+        as: 'contaOrigem',
+        attributes: ['id', 'nome', 'banco', 'agencia', 'conta', 'empresa_id'],
+        required: false
+      },
+      {
+        model: ContaBancaria,
+        as: 'contaDestino',
+        attributes: ['id', 'nome', 'banco', 'agencia', 'conta', 'empresa_id'],
+        required: false
+      }
+    ],
+    order: [['data_transferencia', 'ASC'], ['id', 'ASC']],
+    limit: filters.limit || 1000
+  });
+
   return {
     filtro: {
       periodo: periodo.periodo,
@@ -1741,8 +1895,9 @@ async function gerarRelatorioIntercompany(req, filters = {}) {
       elimina_consolidado: filters.elimina_consolidado ?? null,
       limit: filters.limit || 1000
     },
-    ...summarizeIntercompany(titulos),
-    titulos: titulos.map(mapIntercompanyTitulo)
+    ...summarizeIntercompany(titulos, transferencias),
+    titulos: titulos.map(mapIntercompanyTitulo),
+    transferencias: transferencias.map(mapIntercompanyTransferencia)
   };
 }
 

@@ -50,7 +50,9 @@ function labelStatus(value) {
     PARCIAL: 'Parcial',
     QUITADO: 'Quitado',
     CANCELADO: 'Cancelado',
-    ESTORNADO: 'Estornado'
+    ESTORNADO: 'Estornado',
+    ATIVA: 'Ativa',
+    CANCELADA: 'Cancelada'
   };
   return labels[String(value || '').toUpperCase()] || value || '-';
 }
@@ -152,6 +154,7 @@ export default function FinanceiroIntercompany() {
   const relacoes = Array.isArray(relatorio?.relacoes) ? relatorio.relacoes : [];
   const porTipo = Array.isArray(relatorio?.por_tipo) ? relatorio.por_tipo : [];
   const titulos = Array.isArray(relatorio?.titulos) ? relatorio.titulos : [];
+  const transferencias = Array.isArray(relatorio?.transferencias) ? relatorio.transferencias : [];
 
   function updateFilter(field, value) {
     setFilters((current) => ({
@@ -265,14 +268,16 @@ export default function FinanceiroIntercompany() {
                 <option value="QUITADO">Quitado</option>
                 <option value="CANCELADO">Cancelado</option>
                 <option value="ESTORNADO">Estornado</option>
+                <option value="ATIVA">Transferencia ativa</option>
+                <option value="CANCELADA">Transferencia cancelada</option>
               </select>
             </label>
             <label className="app-filter-field">
               <span className="app-filter-label">Limite</span>
               <select className="input w-full input-sm" value={filters.limit} onChange={(event) => updateFilter('limit', event.target.value)}>
-                <option value="100">100 titulos</option>
-                <option value="500">500 titulos</option>
-                <option value="1000">1000 titulos</option>
+                <option value="100">100 registros</option>
+                <option value="500">500 registros</option>
+                <option value="1000">1000 registros</option>
               </select>
             </label>
           </div>
@@ -287,9 +292,10 @@ export default function FinanceiroIntercompany() {
 
       <div className="app-summary-grid">
         <Metric label="Valor previsto" value={formatCurrency(resumo.valor_previsto)} detail={`${resumo.titulos || 0} titulo(s)`} />
-        <Metric label="Valor realizado" value={formatCurrency(resumo.valor_realizado)} detail="Baixas ativas no periodo" />
+        <Metric label="Valor realizado" value={formatCurrency(resumo.valor_realizado)} detail="Baixas e transferencias ativas" />
         <Metric label="Eliminado consolidado" value={formatCurrency(resumo.valor_eliminado_consolidado)} detail="Movimento interno do grupo" positive={Number(resumo.valor_eliminado_consolidado || 0) >= 0} />
         <Metric label="Nao eliminado" value={formatCurrency(resumo.valor_nao_eliminado_consolidado)} detail="Permanece na visao consolidada" />
+        <Metric label="Transferencias" value={String(resumo.transferencias || 0)} detail="Registros financeiros" />
         <Metric label="Relacoes" value={String(resumo.relacoes_empresas || 0)} detail="Origem x destino" />
         <Metric label="Grupos" value={String(resumo.grupos_intercompany || 0)} detail="Identificadores intercompany" />
       </div>
@@ -313,19 +319,21 @@ export default function FinanceiroIntercompany() {
                       <th>Origem</th>
                       <th>Destino</th>
                       <th>Titulos</th>
+                      <th>Transferencias</th>
                       <th>Previsto</th>
                       <th>Realizado</th>
                     </tr>
                   </thead>
                   <tbody>
                     {relacoes.length === 0 ? (
-                      <EmptyRow colSpan={5} message="Nenhuma relacao intercompany encontrada no periodo." />
+                      <EmptyRow colSpan={6} message="Nenhuma relacao intercompany encontrada no periodo." />
                     ) : (
                       relacoes.map((item) => (
                         <tr key={`${item.empresa_origem_id || 'o'}-${item.empresa_destino_id || 'd'}`}>
                           <td className="font-medium text-[var(--c-text)]">{item.empresa_origem_nome}</td>
                           <td>{item.empresa_destino_nome}</td>
                           <td>{item.titulos}</td>
+                          <td>{item.transferencias}</td>
                           <td>{formatCurrency(item.valor_previsto)}</td>
                           <td>{formatCurrency(item.valor_realizado)}</td>
                         </tr>
@@ -349,24 +357,76 @@ export default function FinanceiroIntercompany() {
                     <tr>
                       <th>Tipo</th>
                       <th>Titulos</th>
-                      <th>Previsto</th>
+                      <th>Transferencias</th>
+                      <th>Realizado</th>
                     </tr>
                   </thead>
                   <tbody>
                     {porTipo.length === 0 ? (
-                      <EmptyRow colSpan={3} message="Nenhum tipo encontrado." />
+                      <EmptyRow colSpan={4} message="Nenhum tipo encontrado." />
                     ) : (
                       porTipo.map((item) => (
                         <tr key={item.tipo_intercompany}>
                           <td className="font-medium text-[var(--c-text)]">{labelTipo(item.tipo_intercompany)}</td>
                           <td>{item.titulos}</td>
-                          <td>{formatCurrency(item.valor_previsto)}</td>
+                          <td>{item.transferencias}</td>
+                          <td>{formatCurrency(item.valor_realizado)}</td>
                         </tr>
                       ))
                     )}
                   </tbody>
                 </table>
               </div>
+            </div>
+          </section>
+
+          <section className="card sol-surface-card app-table-shell">
+            <div className="border-b border-[var(--c-border)] px-4 py-3">
+              <h2 className="text-lg font-semibold text-[var(--c-text)]">Transferencias financeiras intercompany</h2>
+              <p className="text-sm text-[var(--c-muted)]">
+                Registros efetivos entre contas de empresas diferentes, vindos do caixa ou da conciliacao bancaria.
+              </p>
+            </div>
+            <div className="table-wrapper">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Data</th>
+                    <th>Origem</th>
+                    <th>Destino</th>
+                    <th>Tipo</th>
+                    <th>Status</th>
+                    <th>Valor</th>
+                    <th>Consolidado</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {transferencias.length === 0 ? (
+                    <EmptyRow colSpan={7} message="Nenhuma transferencia intercompany encontrada para os filtros atuais." />
+                  ) : (
+                    transferencias.map((transferencia) => (
+                      <tr key={transferencia.id}>
+                        <td>{formatDate(transferencia.data_transferencia)}</td>
+                        <td>
+                          <span className="font-medium text-[var(--c-text)]">{transferencia.empresa_origem_nome}</span>
+                          <div className="text-xs text-[var(--c-muted)]">{transferencia.conta_origem_nome || '-'}</div>
+                        </td>
+                        <td>
+                          <span className="font-medium text-[var(--c-text)]">{transferencia.empresa_destino_nome}</span>
+                          <div className="text-xs text-[var(--c-muted)]">{transferencia.conta_destino_nome || '-'}</div>
+                        </td>
+                        <td>
+                          {labelTipo(transferencia.tipo_intercompany)}
+                          <div className="text-xs text-[var(--c-muted)]">{transferencia.motivo_intercompany || transferencia.descricao || '-'}</div>
+                        </td>
+                        <td>{labelStatus(transferencia.status)}</td>
+                        <td>{formatCurrency(transferencia.valor_realizado)}</td>
+                        <td>{transferencia.elimina_consolidado ? 'Elimina' : 'Mantem'}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
             </div>
           </section>
 

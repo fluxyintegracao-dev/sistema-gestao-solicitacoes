@@ -298,7 +298,7 @@ function validateFinanceTituloQuery(query = {}) {
 
   return {
     tipo: parseEnum(query.tipo, 'Tipo', ['PAGAR', 'RECEBER']),
-    status: parseEnum(query.status, 'Status', ['ABERTO', 'PARCIAL', 'QUITADO', 'CANCELADO', 'ESTORNADO']),
+    status: parseEnum(query.status, 'Status', ['ABERTO', 'PARCIAL', 'QUITADO', 'CANCELADO', 'ESTORNADO', 'ATIVA', 'CANCELADA']),
     q: parseOptionalText(query.q, 'Busca', 120),
     codigo: parseOptionalText(query.codigo, 'Codigo do titulo', 40),
     empresa_id: parseInteger(query.empresa_id, 'Empresa do grupo'),

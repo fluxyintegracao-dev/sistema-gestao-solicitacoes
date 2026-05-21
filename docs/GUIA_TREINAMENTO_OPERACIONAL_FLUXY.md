@@ -1136,13 +1136,14 @@ Passo a passo:
 4. Filtrar por tipo de intercompany quando a duvida for especifica.
 5. Conferir valor previsto.
 6. Conferir valor realizado por baixas ativas.
-7. Conferir relacoes entre empresas.
-8. Abrir titulos analiticos quando algum valor precisar de explicacao.
+7. Conferir transferencias financeiras intercompany registradas no caixa ou conciliacao.
+8. Conferir relacoes entre empresas.
+9. Abrir titulos analiticos quando algum valor precisar de explicacao.
 
 Como interpretar:
 
 - valor previsto mostra os titulos intercompany registrados;
-- valor realizado mostra o que ja foi baixado no periodo;
+- valor realizado mostra o que ja foi baixado no periodo e as transferencias financeiras intercompany efetivas;
 - origem indica a empresa que enviou, financiou ou suportou o recurso;
 - destino indica a empresa beneficiada;
 - valores marcados como eliminados nao devem gerar riqueza no consolidado do grupo.
