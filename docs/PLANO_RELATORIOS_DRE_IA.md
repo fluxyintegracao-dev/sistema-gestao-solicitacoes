@@ -51,6 +51,9 @@ Base multiempresa e DRE gerencial:
 - O Relatorio Intercompany passou a combinar titulos intercompany com transferencias financeiras intercompany, separando previsto, realizado por baixa e transferencias efetivas entre contas do grupo.
 - As telas de titulo manual e geracao de conta pela solicitacao passaram a exibir uma previa de impacto gerencial antes de salvar, mostrando efeito na DRE, no fluxo de caixa previsto e no consolidado/intercompany.
 - O Diagnostico da DRE passou a apontar tambem baixas sem empresa, baixas com empresa divergente sem intercompany completo, transferencias intercompany incompletas e transferencias internas inconsistentes.
+- Categorias financeiras passaram a ter `classificacao_gerencial` explicita para separar operacional, endividamento, investimento, patrimonial, intercompany, transferencia interna, imposto, folha e outros.
+- Financeiro > Relatorios ganhou Endividamento Gerencial, usando somente titulos a pagar em aberto cuja categoria esteja marcada como `ENDIVIDAMENTO`, sem inferir divida pelo nome do fornecedor, descricao ou texto da categoria.
+- Grupo Consolidado passou a exibir Endividamento Aberto como indicador executivo derivado do relatorio de endividamento.
 
 Documentacao operacional complementar:
 
@@ -1042,7 +1045,8 @@ Prioridade sugerida:
 - Criar tela principal do diretor com Grupo Consolidado, Caixa Consolidado, EBITDA, Lucro Liquido, Necessidade Futura de Caixa, Intercompany Liquido, Resultado por Obra e Endividamento.
   - Status inicial implementado no Financeiro: `Financeiro > Relatorios > Grupo Consolidado`.
   - A primeira versao cruza DRE gerencial, Fluxo Consolidado, Intercompany e Resultado de Obras sem duplicar regra de calculo.
-  - Endividamento consolidado permanece como etapa posterior, dependente da classificacao de titulos/dividas e limites por empresa.
+  - Endividamento consolidado iniciado com classificacao gerencial explicita nas categorias financeiras e relatorio proprio em `Financeiro > Relatorios > Endividamento`.
+  - A regra atual e conservadora: so entra no endividamento o titulo a pagar em aberto vinculado a categoria marcada como `ENDIVIDAMENTO`.
 
 ### Fase 9 - Preparacao para IA
 

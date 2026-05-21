@@ -142,6 +142,7 @@ const {
   validateFinanceCadastroCategoriaBody,
   validateFinanceCadastroContaBody,
   validateFinanceDreQuery,
+  validateFinanceEndividamentoQuery,
   validateFinanceFluxoCaixaQuery,
   validateFinanceFluxoConsolidadoQuery,
   validateFinanceIntercompanyQuery,
@@ -1188,6 +1189,7 @@ router.get('/financeiro/relatorios/analitico', allowFinanceiro, validateRequest(
 router.get('/financeiro/relatorios/dre', allowFinanceiro, validateRequest({ query: validateFinanceDreQuery }), RelatorioFinanceiroController.dre);
 router.get('/financeiro/relatorios/dre/diagnostico', allowFinanceiro, RelatorioFinanceiroController.diagnosticoDre);
 router.get('/financeiro/relatorios/intercompany', allowFinanceiro, validateRequest({ query: validateFinanceIntercompanyQuery }), RelatorioFinanceiroController.intercompany);
+router.get('/financeiro/relatorios/endividamento', allowFinanceiro, validateRequest({ query: validateFinanceEndividamentoQuery }), RelatorioFinanceiroController.endividamento);
 router.get('/financeiro/relatorios/resultado-obras', allowFinanceiro, ResultadoObrasController.index);
 router.get('/financeiro/relatorios/centros-custo', allowFinanceiro, ResultadoCentrosCustoController.index);
 router.get('/financeiro/baixas', allowFinanceiro, validateRequest({ query: validateFinanceBaixasQuery }), TituloFinanceiroController.baixas);

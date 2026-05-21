@@ -5,6 +5,9 @@ const {
 } = require('../middlewares/validation');
 const { COMERCIAL_FORMA_RECEBIMENTO } = require('./commercialValidators');
 const { TIPOS_INTERCOMPANY } = require('../constants/intercompany');
+const {
+  CLASSIFICACOES_GERENCIAIS_FINANCEIRAS
+} = require('../constants/categoriaFinanceiraGerencial');
 
 const CATEGORIAS_BEM = ['VEICULO', 'IMOVEL', 'TERRENO', 'SERVICO', 'MATERIAL', 'CREDITO', 'OUTROS'];
 const FORMAS_COBRANCA = ['BOLETO', 'PIX', 'OUTROS'];
@@ -394,6 +397,30 @@ function validateFinanceDreQuery(query = {}) {
     empresa_id: parseInteger(query.empresa_id, 'Empresa do grupo'),
     holding_id: parseInteger(query.holding_id, 'Holding'),
     excluir_intercompany: parseBoolean(query.excluir_intercompany, 'Excluir intercompany')
+  };
+}
+
+function validateFinanceEndividamentoQuery(query = {}) {
+  ensureAllowedKeys(
+    query,
+    ['periodo', 'data_inicial', 'data_final', 'empresa_id', 'holding_id', 'obra_id', 'excluir_intercompany', 'limit'],
+    'Consulta de endividamento financeiro'
+  );
+
+  const base = validateFinanceFluxoCaixaQuery({
+    periodo: query.periodo,
+    data_inicial: query.data_inicial,
+    data_final: query.data_final,
+    obra_id: query.obra_id
+  });
+  const limit = parseInteger(query.limit, 'Limite');
+
+  return {
+    ...base,
+    empresa_id: parseInteger(query.empresa_id, 'Empresa do grupo'),
+    holding_id: parseInteger(query.holding_id, 'Holding'),
+    excluir_intercompany: parseBoolean(query.excluir_intercompany, 'Excluir intercompany'),
+    limit: limit ? Math.min(limit, 500) : undefined
   };
 }
 
@@ -1086,7 +1113,7 @@ function validateFinanceCadastroContaBody(body = {}) {
 function validateFinanceCadastroCategoriaBody(body = {}) {
   ensureAllowedKeys(
     body,
-    ['nome', 'tipo', 'descricao', 'dre_grupo', 'dre_subgrupo', 'dre_ordem', 'considera_dre', 'ativo'],
+    ['nome', 'tipo', 'descricao', 'dre_grupo', 'dre_subgrupo', 'dre_ordem', 'considera_dre', 'classificacao_gerencial', 'ativo'],
     'Categoria financeira'
   );
 
@@ -1098,6 +1125,7 @@ function validateFinanceCadastroCategoriaBody(body = {}) {
     dre_subgrupo: parseOptionalText(body.dre_subgrupo, 'Subgrupo DRE', 120),
     dre_ordem: parseInteger(body.dre_ordem, 'Ordem DRE'),
     considera_dre: parseBoolean(body.considera_dre, 'Considera DRE'),
+    classificacao_gerencial: parseEnum(body.classificacao_gerencial, 'Classificacao gerencial', CLASSIFICACOES_GERENCIAIS_FINANCEIRAS),
     ativo: parseBoolean(body.ativo, 'Ativo')
   };
 }
@@ -1256,6 +1284,7 @@ module.exports = {
   validateFinanceBoletoTituloQuery,
   validateFinanceBaixasQuery,
   validateFinanceDreQuery,
+  validateFinanceEndividamentoQuery,
   validateFinanceFluxoCaixaQuery,
   validateFinanceFluxoConsolidadoQuery,
   validateFinanceIntercompanyQuery,

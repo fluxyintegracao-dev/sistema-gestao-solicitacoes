@@ -830,6 +830,21 @@ export async function getRelatorioIntercompanyFinanceiro(params = {}) {
   return parseJson(response, 'Erro ao buscar relatorio intercompany');
 }
 
+export async function getRelatorioEndividamentoFinanceiro(params = {}) {
+  const query = new URLSearchParams(
+    Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== '')
+  ).toString();
+  const url = query
+    ? `${API_URL}/financeiro/relatorios/endividamento?${query}`
+    : `${API_URL}/financeiro/relatorios/endividamento`;
+
+  const response = await fetch(url, {
+    headers: authHeaders()
+  });
+
+  return parseJson(response, 'Erro ao buscar relatorio de endividamento');
+}
+
 export async function getPaymentBeneficiaries(params = {}) {
   const query = new URLSearchParams(
     Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== '')

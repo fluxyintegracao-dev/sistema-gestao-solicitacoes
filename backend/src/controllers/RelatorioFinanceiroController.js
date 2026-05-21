@@ -1,6 +1,7 @@
 const {
   gerarDiagnosticoDre,
   gerarDreGerencial,
+  gerarRelatorioEndividamento,
   gerarRelatorioFluxoConsolidado,
   gerarRelatorioIntercompany,
   gerarRelatorioAnalitico,
@@ -60,6 +61,16 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return responderErro(res, error, 'Erro ao gerar diagnostico da DRE');
+    }
+  },
+
+  async endividamento(req, res) {
+    try {
+      const relatorio = await gerarRelatorioEndividamento(req, req.query || {});
+      return res.json(relatorio);
+    } catch (error) {
+      console.error(error);
+      return responderErro(res, error, 'Erro ao gerar relatorio de endividamento');
     }
   },
 

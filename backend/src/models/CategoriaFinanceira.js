@@ -36,6 +36,11 @@ module.exports = (sequelize, DataTypes) => sequelize.define(
       allowNull: false,
       defaultValue: true
     },
+    classificacao_gerencial: {
+      type: DataTypes.STRING(40),
+      allowNull: false,
+      defaultValue: 'OPERACIONAL'
+    },
     ativo: {
       type: DataTypes.BOOLEAN,
       allowNull: false,

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { getEmpresasGrupo } from '../services/empresasGrupo';
 import {
   getDreFinanceira,
+  getRelatorioEndividamentoFinanceiro,
   getRelatorioFluxoConsolidado,
   getRelatorioIntercompanyFinanceiro,
   getResultadoObras
@@ -70,6 +71,7 @@ export default function FinanceiroExecutivoGrupo() {
   const [dre, setDre] = useState(null);
   const [fluxo, setFluxo] = useState(null);
   const [intercompany, setIntercompany] = useState(null);
+  const [endividamento, setEndividamento] = useState(null);
   const [obras, setObras] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingEmpresas, setLoadingEmpresas] = useState(true);
@@ -115,17 +117,19 @@ export default function FinanceiroExecutivoGrupo() {
         holding_id: appliedFilters.holding_id,
         elimina_consolidado: appliedFilters.excluir_intercompany ? 'true' : ''
       }),
+      getRelatorioEndividamentoFinanceiro(commonParams),
       getResultadoObras()
     ])
-      .then(([dreResult, fluxoResult, intercompanyResult, obrasResult]) => {
+      .then(([dreResult, fluxoResult, intercompanyResult, endividamentoResult, obrasResult]) => {
         if (!active) return;
 
         setDre(dreResult.status === 'fulfilled' ? dreResult.value : null);
         setFluxo(fluxoResult.status === 'fulfilled' ? fluxoResult.value : null);
         setIntercompany(intercompanyResult.status === 'fulfilled' ? intercompanyResult.value : null);
+        setEndividamento(endividamentoResult.status === 'fulfilled' ? endividamentoResult.value : null);
         setObras(obrasResult.status === 'fulfilled' && Array.isArray(obrasResult.value) ? obrasResult.value : []);
 
-        const failed = [dreResult, fluxoResult, intercompanyResult, obrasResult].find((item) => item.status === 'rejected');
+        const failed = [dreResult, fluxoResult, intercompanyResult, endividamentoResult, obrasResult].find((item) => item.status === 'rejected');
         setError(failed?.reason?.message || '');
       })
       .finally(() => {
@@ -145,6 +149,7 @@ export default function FinanceiroExecutivoGrupo() {
   const dreResumo = dre?.resumo || {};
   const fluxoResumo = fluxo?.resumo || {};
   const intercompanyResumo = intercompany?.resumo || {};
+  const endividamentoResumo = endividamento?.resumo || {};
   const empresasFluxo = Array.isArray(fluxo?.empresas) ? fluxo.empresas : [];
   const empresasDre = Array.isArray(dre?.empresas) ? dre.empresas : [];
   const relacoesIntercompany = Array.isArray(intercompany?.relacoes) ? intercompany.relacoes : [];
@@ -204,6 +209,9 @@ export default function FinanceiroExecutivoGrupo() {
             </Link>
             <Link to="/financeiro/relatorios/intercompany" className="btn btn-outline">
               Intercompany
+            </Link>
+            <Link to="/financeiro/relatorios/endividamento" className="btn btn-outline">
+              Endividamento
             </Link>
           </div>
         </div>
@@ -281,6 +289,12 @@ export default function FinanceiroExecutivoGrupo() {
           label="Intercompany eliminado"
           value={formatCurrency(intercompanyResumo.valor_eliminado_consolidado)}
           detail={`${intercompanyResumo.relacoes_empresas || 0} relacao(oes) entre empresas`}
+        />
+        <Metric
+          label="Endividamento aberto"
+          value={formatCurrency(endividamentoResumo.saldo_total)}
+          detail={`${endividamentoResumo.titulos || 0} titulo(s) classificados`}
+          color={Number(endividamentoResumo.saldo_total || 0) > 0 ? '#b91c1c' : '#15803d'}
         />
         <Metric
           label="Saldo previsto"

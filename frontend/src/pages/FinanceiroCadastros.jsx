@@ -46,6 +46,7 @@ function defaultCategoriaForm() {
     nome: '',
     tipo: 'AMBOS',
     descricao: '',
+    classificacao_gerencial: 'OPERACIONAL',
     dre_grupo: '',
     dre_subgrupo: '',
     dre_ordem: '',
@@ -141,6 +142,7 @@ function pickCategoriaFormData(categoria = {}) {
     nome: categoria.nome || '',
     tipo: categoria.tipo || 'AMBOS',
     descricao: categoria.descricao || '',
+    classificacao_gerencial: categoria.classificacao_gerencial || 'OPERACIONAL',
     dre_grupo: categoria.dre_grupo || '',
     dre_subgrupo: categoria.dre_subgrupo || '',
     dre_ordem: categoria.dre_ordem ?? '',
@@ -245,8 +247,25 @@ const CATEGORIA_TIPO_META = {
   }
 };
 
+const CATEGORIA_CLASSIFICACAO_GERENCIAL = [
+  ['OPERACIONAL', 'Operacional'],
+  ['ENDIVIDAMENTO', 'Endividamento'],
+  ['INVESTIMENTO', 'Investimento'],
+  ['PATRIMONIAL', 'Patrimonial'],
+  ['INTERCOMPANY', 'Intercompany'],
+  ['TRANSFERENCIA_INTERNA', 'Transferencia interna'],
+  ['IMPOSTO', 'Imposto'],
+  ['FOLHA', 'Folha'],
+  ['OUTROS', 'Outros']
+];
+
 function categoriaTipoLabel(tipo) {
   return CATEGORIA_TIPO_META[tipo]?.label || tipo;
+}
+
+function categoriaClassificacaoLabel(value) {
+  const normalized = String(value || 'OPERACIONAL').trim().toUpperCase();
+  return CATEGORIA_CLASSIFICACAO_GERENCIAL.find(([key]) => key === normalized)?.[1] || normalized;
 }
 
 function categoriaTipoBadgeClass(tipo) {
@@ -335,7 +354,8 @@ export default function FinanceiroCadastros() {
         const nome = normalizeSearchText(categoria.nome);
         const descricao = normalizeSearchText(categoria.descricao);
         const tipo = normalizeSearchText(tipoCategoria);
-        return nome.includes(search) || descricao.includes(search) || tipo.includes(search);
+        const classificacao = normalizeSearchText(categoria.classificacao_gerencial);
+        return nome.includes(search) || descricao.includes(search) || tipo.includes(search) || classificacao.includes(search);
       })
       .sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR', { sensitivity: 'base' }));
   }, [categoriaFiltro, categoriaTipoFiltro, categorias]);
@@ -878,6 +898,18 @@ export default function FinanceiroCadastros() {
                   <option value="PAGAR">Pagar</option>
                   <option value="RECEBER">Receber</option>
                 </select>
+                <label className="app-filter-field">
+                  <span className="app-filter-label">Classificacao gerencial</span>
+                  <select
+                    className="input w-full"
+                    value={categoriaForm.classificacao_gerencial}
+                    onChange={(e) => setCategoriaForm((c) => ({ ...c, classificacao_gerencial: e.target.value }))}
+                  >
+                    {CATEGORIA_CLASSIFICACAO_GERENCIAL.map(([value, label]) => (
+                      <option key={value} value={value}>{label}</option>
+                    ))}
+                  </select>
+                </label>
                 <textarea className="input min-h-[96px] w-full" placeholder="Descricao" value={categoriaForm.descricao} onChange={(e) => setCategoriaForm((c) => ({ ...c, descricao: e.target.value }))} />
                 <div className="grid gap-3 md:grid-cols-3">
                   <input
@@ -994,6 +1026,9 @@ export default function FinanceiroCadastros() {
                                   </div>
                                   <div className="mt-1 text-xs text-[var(--c-muted)]">
                                     DRE: {categoria.considera_dre === false ? 'Nao considera' : `${categoria.dre_grupo || 'Nao classificada'}${categoria.dre_subgrupo ? ` / ${categoria.dre_subgrupo}` : ''}`}
+                                  </div>
+                                  <div className="mt-1 text-xs text-[var(--c-muted)]">
+                                    Gerencial: {categoriaClassificacaoLabel(categoria.classificacao_gerencial)}
                                   </div>
                                 </div>
                                 <div className="flex items-center gap-2">

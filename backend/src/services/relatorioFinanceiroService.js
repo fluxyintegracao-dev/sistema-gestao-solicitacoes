@@ -1573,6 +1573,254 @@ function mapIntercompanyTransferencia(transferencia) {
   };
 }
 
+function emptyEndividamentoResumo() {
+  return {
+    titulos: 0,
+    saldo_total: 0,
+    saldo_vencido: 0,
+    saldo_periodo: 0,
+    saldo_30_dias: 0,
+    valor_original_total: 0,
+    valor_baixado_total: 0,
+    empresas_com_divida: 0,
+    categorias_com_divida: 0
+  };
+}
+
+function addEndividamentoResumo(map, key, base, titulo, periodo, hoje, limite30) {
+  const item = map.get(key) || {
+    ...base,
+    titulos: 0,
+    saldo_total: 0,
+    saldo_vencido: 0,
+    saldo_periodo: 0,
+    saldo_30_dias: 0,
+    valor_original_total: 0,
+    valor_baixado_total: 0
+  };
+  const saldo = roundCurrency(titulo.valor_saldo || 0);
+  const original = roundCurrency(titulo.valor_original || 0);
+  const baixado = roundCurrency(titulo.valor_baixado || 0);
+  const vencimento = titulo.data_vencimento;
+
+  item.titulos += 1;
+  item.saldo_total = roundCurrency(item.saldo_total + saldo);
+  item.valor_original_total = roundCurrency(item.valor_original_total + original);
+  item.valor_baixado_total = roundCurrency(item.valor_baixado_total + baixado);
+
+  if (vencimento && vencimento < hoje) {
+    item.saldo_vencido = roundCurrency(item.saldo_vencido + saldo);
+  }
+  if (vencimento && vencimento >= periodo.data_inicial && vencimento <= periodo.data_final) {
+    item.saldo_periodo = roundCurrency(item.saldo_periodo + saldo);
+  }
+  if (vencimento && vencimento >= hoje && vencimento <= limite30) {
+    item.saldo_30_dias = roundCurrency(item.saldo_30_dias + saldo);
+  }
+
+  map.set(key, item);
+  return item;
+}
+
+function mapTituloEndividamento(titulo, periodo, hoje, limite30) {
+  const item = toPlain(titulo);
+  const vencimento = item.data_vencimento;
+
+  return {
+    id: item.id,
+    codigo: item.codigo,
+    descricao: item.descricao,
+    numero_documento: item.numero_documento,
+    status: item.status,
+    data_vencimento: vencimento,
+    vencido: Boolean(vencimento && vencimento < hoje),
+    vence_no_periodo: Boolean(vencimento && vencimento >= periodo.data_inicial && vencimento <= periodo.data_final),
+    vence_30_dias: Boolean(vencimento && vencimento >= hoje && vencimento <= limite30),
+    valor_original: roundCurrency(item.valor_original || 0),
+    valor_baixado: roundCurrency(item.valor_baixado || 0),
+    valor_saldo: roundCurrency(item.valor_saldo || 0),
+    empresa_id: item.empresa_id,
+    empresa_nome: getEmpresaNome(item.empresa),
+    categoria_id: item.categoria_financeira_id,
+    categoria_nome: item.categoriaFinanceira?.nome || 'Categoria sem nome',
+    obra_id: item.obra_id,
+    obra_nome: item.obra?.nome || null,
+    parceiro_id: item.parceiro_id,
+    parceiro_nome: item.parceiro?.nome || item.parceiro?.razao_social || null,
+    intercompany: item.intercompany === true,
+    elimina_consolidado: item.elimina_consolidado === true
+  };
+}
+
+function summarizeEndividamento(titulos = [], periodo) {
+  const resumo = emptyEndividamentoResumo();
+  const porEmpresa = new Map();
+  const porCategoria = new Map();
+  const hoje = toDateOnly(new Date());
+  const limite30Date = new Date();
+  limite30Date.setDate(limite30Date.getDate() + 30);
+  const limite30 = toDateOnly(limite30Date);
+
+  for (const tituloModel of titulos) {
+    const titulo = toPlain(tituloModel);
+    const saldo = roundCurrency(titulo.valor_saldo || 0);
+    const original = roundCurrency(titulo.valor_original || 0);
+    const baixado = roundCurrency(titulo.valor_baixado || 0);
+    const vencimento = titulo.data_vencimento;
+    const empresaId = titulo.empresa_id || null;
+    const categoriaId = titulo.categoria_financeira_id || null;
+
+    resumo.titulos += 1;
+    resumo.saldo_total = roundCurrency(resumo.saldo_total + saldo);
+    resumo.valor_original_total = roundCurrency(resumo.valor_original_total + original);
+    resumo.valor_baixado_total = roundCurrency(resumo.valor_baixado_total + baixado);
+
+    if (vencimento && vencimento < hoje) {
+      resumo.saldo_vencido = roundCurrency(resumo.saldo_vencido + saldo);
+    }
+    if (vencimento && vencimento >= periodo.data_inicial && vencimento <= periodo.data_final) {
+      resumo.saldo_periodo = roundCurrency(resumo.saldo_periodo + saldo);
+    }
+    if (vencimento && vencimento >= hoje && vencimento <= limite30) {
+      resumo.saldo_30_dias = roundCurrency(resumo.saldo_30_dias + saldo);
+    }
+
+    addEndividamentoResumo(
+      porEmpresa,
+      String(empresaId || 'SEM_EMPRESA'),
+      {
+        empresa_id: empresaId,
+        empresa_nome: getEmpresaNome(titulo.empresa)
+      },
+      titulo,
+      periodo,
+      hoje,
+      limite30
+    );
+    addEndividamentoResumo(
+      porCategoria,
+      String(categoriaId || 'SEM_CATEGORIA'),
+      {
+        categoria_id: categoriaId,
+        categoria_nome: titulo.categoriaFinanceira?.nome || 'Categoria sem nome'
+      },
+      titulo,
+      periodo,
+      hoje,
+      limite30
+    );
+  }
+
+  const sortBySaldo = (items) => Array.from(items.values())
+    .sort((a, b) => Number(b.saldo_total || 0) - Number(a.saldo_total || 0));
+
+  const empresas = sortBySaldo(porEmpresa);
+  const categorias = sortBySaldo(porCategoria);
+
+  return {
+    resumo: {
+      ...resumo,
+      empresas_com_divida: empresas.length,
+      categorias_com_divida: categorias.length
+    },
+    empresas,
+    categorias,
+    titulos: titulos
+      .map((titulo) => mapTituloEndividamento(titulo, periodo, hoje, limite30))
+      .sort((a, b) => (
+        String(a.data_vencimento || '').localeCompare(String(b.data_vencimento || '')) ||
+        Number(b.valor_saldo || 0) - Number(a.valor_saldo || 0)
+      ))
+  };
+}
+
+async function gerarRelatorioEndividamento(req, filters = {}) {
+  await assertFinanceAccess(req);
+
+  const periodo = resolvePeriodo(filters);
+  const obraScopeWhere = await resolveObraScope(req, filters.obra_id);
+  const empresas = await EmpresaGrupo.findAll({
+    attributes: ['id', 'codigo', 'nome', 'razao_social', 'tipo_empresa', 'tipo_gerencial', 'holding_id'],
+    order: [['tipo_empresa', 'ASC'], ['nome', 'ASC']]
+  });
+
+  if (obraScopeWhere === null) {
+    return {
+      filtro: {
+        periodo: periodo.periodo,
+        descricao: periodo.descricao,
+        data_inicial: periodo.data_inicial,
+        data_final: periodo.data_final,
+        holding_id: filters.holding_id ? Number(filters.holding_id) : null,
+        empresa_id: filters.empresa_id ? Number(filters.empresa_id) : null,
+        obra_id: filters.obra_id ? Number(filters.obra_id) : null,
+        excluir_intercompany: filters.excluir_intercompany !== false
+      },
+      resumo: emptyEndividamentoResumo(),
+      empresas: [],
+      categorias: [],
+      titulos: []
+    };
+  }
+
+  const companyScopeWhere = buildFluxoCompanyWhere(filters, empresas);
+  const where = applyIntercompanyExclusion({
+    tipo: 'PAGAR',
+    status: { [Op.in]: ['ABERTO', 'PARCIAL'] },
+    valor_saldo: { [Op.gt]: 0 },
+    ...obraScopeWhere,
+    ...companyScopeWhere
+  }, filters.excluir_intercompany);
+
+  const titulos = await TituloFinanceiro.findAll({
+    where,
+    include: [
+      {
+        model: CategoriaFinanceira,
+        as: 'categoriaFinanceira',
+        attributes: ['id', 'nome', 'tipo', 'classificacao_gerencial', 'dre_grupo', 'dre_subgrupo'],
+        required: true,
+        where: { classificacao_gerencial: 'ENDIVIDAMENTO' }
+      },
+      {
+        model: EmpresaGrupo,
+        as: 'empresa',
+        attributes: ['id', 'codigo', 'nome', 'razao_social', 'tipo_empresa', 'tipo_gerencial', 'holding_id'],
+        required: false
+      },
+      {
+        model: Obra,
+        as: 'obra',
+        attributes: ['id', 'codigo', 'nome', 'tipo_centro_custo'],
+        required: false
+      },
+      {
+        model: Parceiro,
+        as: 'parceiro',
+        attributes: ['id', 'nome', 'razao_social'],
+        required: false
+      }
+    ],
+    order: [['data_vencimento', 'ASC'], ['id', 'ASC']],
+    limit: filters.limit || 1000
+  });
+
+  return {
+    filtro: {
+      periodo: periodo.periodo,
+      descricao: periodo.descricao,
+      data_inicial: periodo.data_inicial,
+      data_final: periodo.data_final,
+      holding_id: filters.holding_id ? Number(filters.holding_id) : null,
+      empresa_id: filters.empresa_id ? Number(filters.empresa_id) : null,
+      obra_id: filters.obra_id ? Number(filters.obra_id) : null,
+      excluir_intercompany: filters.excluir_intercompany !== false,
+      classificacao_gerencial: 'ENDIVIDAMENTO'
+    },
+    ...summarizeEndividamento(titulos, periodo)
+  };
+}
+
 function summarizeIntercompany(titulos = [], transferencias = []) {
   const porTipo = new Map();
   const porOrigem = new Map();
@@ -2600,6 +2848,7 @@ module.exports = {
   gerarRelatorioAnalitico,
   gerarRelatorioFluxoCaixa,
   gerarRelatorioFluxoConsolidado,
+  gerarRelatorioEndividamento,
   gerarRelatorioIntercompany,
   gerarDreGerencial,
   gerarDiagnosticoDre

@@ -1020,7 +1020,8 @@ Passo a passo para analisar:
 6. Conferir `Lucro/Prejuizo liquido`.
 7. Conferir `Necessidade futura de caixa`.
 8. Conferir o volume de `Intercompany eliminado`.
-9. Abrir DRE, Fluxo Consolidado ou Intercompany quando algum indicador precisar de detalhe.
+9. Conferir `Endividamento aberto`.
+10. Abrir DRE, Fluxo Consolidado, Intercompany ou Endividamento quando algum indicador precisar de detalhe.
 
 Como interpretar:
 
@@ -1028,6 +1029,7 @@ Como interpretar:
 - EBITDA e Lucro/Prejuizo Liquido vem da DRE gerencial.
 - Necessidade futura de caixa vem do menor saldo previsto dentro do periodo analisado.
 - Intercompany eliminado mostra movimentacoes internas retiradas da leitura consolidada.
+- Endividamento aberto vem somente de categorias financeiras marcadas explicitamente como `Endividamento`.
 - Resultado por empresa mostra onde o resultado liquido esta concentrado.
 - Obras por caixa compara recebido menos executado na base atual de obras.
 
@@ -1036,6 +1038,7 @@ Cuidados:
 - esta tela nao substitui a conferencia analitica;
 - se algum numero parecer errado, abrir primeiro o Diagnostico DRE;
 - empresa, baixa e intercompany precisam estar preenchidos corretamente para a leitura executiva ficar confiavel.
+- se endividamento estiver zerado indevidamente, revisar primeiro o cadastro da categoria financeira do titulo.
 
 ### 11.10 DRE Gerencial
 
@@ -1107,7 +1110,51 @@ Rotina recomendada:
 - administrador corrige cadastros;
 - diretoria acompanha pendencias criticas.
 
-### 11.12 Resultado de Obras
+### 11.12 Endividamento Gerencial
+
+Tela:
+
+- `Financeiro > Relatorios > Endividamento`.
+
+Objetivo:
+
+- mostrar dividas e compromissos financeiros abertos do grupo sem inferencia por texto;
+- separar principal de divida de juros, tarifas e despesas financeiras da DRE;
+- permitir leitura por Holding, empresa, obra/centro de custo e vencimento.
+
+Regra mais importante:
+
+- o titulo so entra no relatorio de endividamento quando sua categoria financeira estiver com `Classificacao gerencial = Endividamento`.
+
+Passo a passo para preparar as categorias:
+
+1. Abrir `Financeiro > Cadastros`.
+2. Ir em `Categorias financeiras`.
+3. Editar a categoria usada para emprestimos, financiamentos, antecipacoes, parcelamentos ou principal de divida.
+4. Selecionar `Classificacao gerencial = Endividamento`.
+5. Salvar.
+6. Manter juros, multas, tarifas bancarias e despesas financeiras comuns como categorias de resultado financeiro da DRE, nao como principal de endividamento.
+
+Passo a passo para analisar:
+
+1. Abrir `Financeiro > Relatorios > Endividamento`.
+2. Selecionar periodo.
+3. Filtrar por Holding, empresa ou obra/centro de custo quando necessario.
+4. Manter `Eliminar intercompany no consolidado` marcado na leitura principal.
+5. Conferir `Endividamento aberto`.
+6. Conferir `Saldo vencido`.
+7. Conferir `Vence no periodo` e `Vence em 30 dias`.
+8. Abrir a lista de titulos classificados quando houver divergencia.
+
+Cuidados:
+
+- nao classificar uma despesa comum como endividamento apenas para aparecer no relatorio;
+- nao deixar categoria de emprestimo como operacional;
+- endividamento e uma classificacao gerencial da categoria financeira, nao uma deducao automatica pelo nome do fornecedor ou descricao do titulo;
+- juros e tarifas devem aparecer no resultado financeiro da DRE quando forem despesa do periodo;
+- amortizacao/principal de divida deve aparecer no endividamento e no fluxo de caixa, mas nao deve inflar despesa operacional da DRE.
+
+### 11.13 Resultado de Obras
 
 Tela:
 
@@ -1125,7 +1172,7 @@ Passo a passo:
 4. Identificar obras consumindo caixa.
 5. Abrir detalhes quando houver divergencia.
 
-### 11.13 Centros de Custo
+### 11.14 Centros de Custo
 
 Tela:
 
@@ -1143,7 +1190,7 @@ Exemplos:
 - Diretoria;
 - Matriz.
 
-### 11.14 Intercompany
+### 11.15 Intercompany
 
 Quando marcar intercompany:
 

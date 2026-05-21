@@ -14,6 +14,9 @@ const {
   classificarCategoriaFinanceiraDre,
   isDreClassificationBlank
 } = require('../constants/dreCategorias');
+const {
+  CLASSIFICACOES_GERENCIAIS_FINANCEIRAS
+} = require('../constants/categoriaFinanceiraGerencial');
 
 function createHttpError(statusCode, message) {
   const error = new Error(message);
@@ -107,6 +110,9 @@ function sanitizeContaPayload(payload = {}, { partial = false } = {}) {
 }
 
 function sanitizeCategoriaPayload(payload = {}, { partial = false } = {}) {
+  const classificacaoGerencial = payload.classificacao_gerencial === undefined
+    ? undefined
+    : String(payload.classificacao_gerencial || '').trim().toUpperCase();
   const data = {
     nome: sanitizeTextField(payload.nome),
     tipo: sanitizeTextField(payload.tipo),
@@ -115,6 +121,7 @@ function sanitizeCategoriaPayload(payload = {}, { partial = false } = {}) {
     dre_subgrupo: sanitizeTextField(payload.dre_subgrupo, { emptyAsNull: true }),
     dre_ordem: payload.dre_ordem != null && payload.dre_ordem !== '' ? Number(payload.dre_ordem) : payload.dre_ordem,
     considera_dre: payload.considera_dre,
+    classificacao_gerencial: classificacaoGerencial,
     ativo: payload.ativo
   };
 
@@ -129,6 +136,14 @@ function sanitizeCategoriaPayload(payload = {}, { partial = false } = {}) {
 
   if (data.dre_ordem !== undefined && data.dre_ordem !== null && !Number.isInteger(data.dre_ordem)) {
     throw createHttpError(400, 'Ordem DRE invalida.');
+  }
+
+  if (!partial && !data.classificacao_gerencial) {
+    data.classificacao_gerencial = 'OPERACIONAL';
+  }
+
+  if (data.classificacao_gerencial !== undefined && !CLASSIFICACOES_GERENCIAIS_FINANCEIRAS.includes(data.classificacao_gerencial)) {
+    throw createHttpError(400, 'Classificacao gerencial da categoria invalida.');
   }
 
   return Object.fromEntries(
