@@ -22,6 +22,36 @@ module.exports = (sequelize, DataTypes) => sequelize.define(
       type: DataTypes.INTEGER,
       allowNull: true
     },
+    intercompany_group_id: {
+      type: DataTypes.STRING(80),
+      allowNull: true
+    },
+    empresa_origem_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true
+    },
+    empresa_destino_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true
+    },
+    tipo_intercompany: {
+      type: DataTypes.STRING(40),
+      allowNull: true
+    },
+    motivo_intercompany: {
+      type: DataTypes.STRING(255),
+      allowNull: true
+    },
+    elimina_consolidado: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false
+    },
+    transferencia_interna: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false
+    },
     caixa_sessao_id: {
       type: DataTypes.INTEGER,
       allowNull: true

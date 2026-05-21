@@ -34,6 +34,7 @@ const {
 } = require('./faturaCartaoFinanceiroService');
 const { obterSessaoAbertaParaConta } = require('./financeiroCaixaSessionHelper');
 const { registrarEventoSeguranca } = require('./securityLogService');
+const { normalizeTipoIntercompany } = require('../constants/intercompany');
 
 const FORMAS_COBRANCA = ['BOLETO', 'PIX', 'OUTROS'];
 const STATUS_COBRANCA = ['NAO_APLICAVEL', 'PENDENTE_EMISSAO', 'EMITIDO', 'PAGO_BANCO', 'CONCILIADO', 'CANCELADO'];
@@ -402,6 +403,21 @@ function buildTituloInclude({ includeMovimentos = false } = {}) {
       attributes: ['id', 'codigo', 'nome', 'razao_social', 'cnpj']
     },
     {
+      model: EmpresaGrupo,
+      as: 'empresaContraparte',
+      attributes: ['id', 'codigo', 'nome', 'razao_social', 'cnpj']
+    },
+    {
+      model: EmpresaGrupo,
+      as: 'empresaOrigem',
+      attributes: ['id', 'codigo', 'nome', 'razao_social', 'cnpj']
+    },
+    {
+      model: EmpresaGrupo,
+      as: 'empresaDestino',
+      attributes: ['id', 'codigo', 'nome', 'razao_social', 'cnpj']
+    },
+    {
       model: FormaPagamentoFinanceira,
       as: 'formaPagamento',
       attributes: ['id', 'nome', 'codigo', 'tipo', 'permite_parcelamento', 'gera_fatura', 'gera_boleto', 'exige_cartao']
@@ -450,6 +466,16 @@ function buildTituloInclude({ includeMovimentos = false } = {}) {
         {
           model: EmpresaGrupo,
           as: 'empresa',
+          attributes: ['id', 'codigo', 'nome', 'razao_social', 'cnpj']
+        },
+        {
+          model: EmpresaGrupo,
+          as: 'empresaOrigem',
+          attributes: ['id', 'codigo', 'nome', 'razao_social', 'cnpj']
+        },
+        {
+          model: EmpresaGrupo,
+          as: 'empresaDestino',
           attributes: ['id', 'codigo', 'nome', 'razao_social', 'cnpj']
         },
         {
@@ -718,6 +744,69 @@ function resolverEmpresaTitulo({ empresaIdInformada, obra }) {
 
 function resolverCompetenciaTitulo(payload = {}, fallbackData = null) {
   return payload.competencia_data || payload.data_emissao || payload.data_compra || fallbackData || null;
+}
+
+async function validarIntercompanyTitulo(payload = {}) {
+  const isIntercompany = Boolean(payload.intercompany);
+
+  if (!isIntercompany) {
+    return {
+      intercompany: false,
+      empresa_contraparte_id: null,
+      intercompany_group_id: null,
+      empresa_origem_id: null,
+      empresa_destino_id: null,
+      tipo_intercompany: null,
+      motivo_intercompany: null,
+      elimina_consolidado: false,
+      transferencia_interna: false
+    };
+  }
+
+  const tipoIntercompany = normalizeTipoIntercompany(payload.tipo_intercompany);
+  if (!tipoIntercompany) {
+    throw createHttpError(400, 'Tipo intercompany e obrigatorio para movimentos entre empresas.');
+  }
+
+  const [empresaOrigem, empresaDestino, empresaContraparte] = await Promise.all([
+    validarEmpresaGrupo(payload.empresa_origem_id),
+    validarEmpresaGrupo(payload.empresa_destino_id),
+    validarEmpresaGrupo(payload.empresa_contraparte_id)
+  ]);
+
+  if (!empresaOrigem || !empresaDestino) {
+    throw createHttpError(400, 'Empresa origem e empresa destino sao obrigatorias para intercompany.');
+  }
+  if (Number(empresaOrigem.id) === Number(empresaDestino.id)) {
+    throw createHttpError(400, 'Empresa origem e empresa destino nao podem ser iguais.');
+  }
+  if (!empresaContraparte) {
+    throw createHttpError(400, 'Empresa contraparte e obrigatoria para intercompany.');
+  }
+
+  return {
+    intercompany: true,
+    empresa_contraparte_id: Number(empresaContraparte.id),
+    intercompany_group_id: payload.intercompany_group_id || `IC-${crypto.randomUUID()}`,
+    empresa_origem_id: Number(empresaOrigem.id),
+    empresa_destino_id: Number(empresaDestino.id),
+    tipo_intercompany: tipoIntercompany,
+    motivo_intercompany: payload.motivo_intercompany || null,
+    elimina_consolidado: payload.elimina_consolidado !== false,
+    transferencia_interna: payload.transferencia_interna !== false
+  };
+}
+
+function buildMovimentoIntercompanyFields(titulo = {}) {
+  return {
+    intercompany_group_id: titulo.intercompany_group_id || null,
+    empresa_origem_id: titulo.empresa_origem_id || null,
+    empresa_destino_id: titulo.empresa_destino_id || null,
+    tipo_intercompany: titulo.tipo_intercompany || null,
+    motivo_intercompany: titulo.motivo_intercompany || null,
+    elimina_consolidado: Boolean(titulo.elimina_consolidado),
+    transferencia_interna: Boolean(titulo.transferencia_interna)
+  };
 }
 
 async function carregarTituloPorId(req, tituloId, { includeMovimentos = false } = {}) {
@@ -1026,6 +1115,7 @@ async function criarTituloPorSolicitacao(req, solicitacaoId, payload = {}) {
     validarCategoriaFinanceira(payload.categoria_financeira_id, tipo)
   ]);
   validarCompatibilidadeParceiroTitulo(parceiro, tipo);
+  const intercompanyFields = await validarIntercompanyTitulo(payload);
 
   const pagamentosPayload = Array.isArray(payload.pagamentos) && payload.pagamentos.length > 0
     ? payload.pagamentos
@@ -1110,7 +1200,7 @@ async function criarTituloPorSolicitacao(req, solicitacaoId, payload = {}) {
           obra_id: solicitacao.obra_id,
           apropriacao_id: solicitacao.apropriacao_id || null,
           empresa_id: empresaTituloId,
-          empresa_contraparte_id: payload.empresa_contraparte_id || null,
+          ...intercompanyFields,
           parceiro_id: parceiroId,
           categoria_financeira_id: payload.categoria_financeira_id || null,
           forma_pagamento_id: pagamento.formaPagamento?.id || null,
@@ -1121,7 +1211,6 @@ async function criarTituloPorSolicitacao(req, solicitacaoId, payload = {}) {
           data_compra: pagamento.dataCompra,
           competencia_data: resolverCompetenciaTitulo(payload, pagamento.dataCompra),
           considera_dre: payload.considera_dre !== false,
-          intercompany: Boolean(payload.intercompany),
           origem_titulo: 'SOLICITACAO',
           tipo,
           status: 'ABERTO',
@@ -1243,6 +1332,7 @@ async function criarTituloManual(req, payload = {}) {
   const apropriacao = await validarApropriacaoTitulo(payload.apropriacao_id, obra.id);
 
   validarCompatibilidadeParceiroTitulo(parceiro, tipo);
+  const intercompanyFields = await validarIntercompanyTitulo(payload);
 
   const pagamentosPayload = Array.isArray(payload.pagamentos) && payload.pagamentos.length > 0
     ? payload.pagamentos
@@ -1325,7 +1415,7 @@ async function criarTituloManual(req, payload = {}) {
           obra_id: obra.id,
           apropriacao_id: apropriacao?.id || null,
           empresa_id: empresaTituloId,
-          empresa_contraparte_id: payload.empresa_contraparte_id || null,
+          ...intercompanyFields,
           parceiro_id: parceiro.id,
           categoria_financeira_id: payload.categoria_financeira_id || null,
           forma_pagamento_id: pagamento.formaPagamento?.id || null,
@@ -1336,7 +1426,6 @@ async function criarTituloManual(req, payload = {}) {
           data_compra: pagamento.dataCompra,
           competencia_data: resolverCompetenciaTitulo(payload, pagamento.dataCompra),
           considera_dre: payload.considera_dre !== false,
-          intercompany: Boolean(payload.intercompany),
           origem_titulo: 'MANUAL',
           tipo,
           status: 'ABERTO',
@@ -1467,6 +1556,7 @@ async function criarTituloManualComBaixaAtomica(req, payload = {}, { transaction
   const apropriacao = await validarApropriacaoTitulo(payload.apropriacao_id, obra.id);
 
   validarCompatibilidadeParceiroTitulo(parceiro, tipo);
+  const intercompanyFields = await validarIntercompanyTitulo(payload);
 
   const valorBaixa = roundCurrency(payload.valor);
   const juros = roundCurrency(payload.juros || 0);
@@ -1493,6 +1583,7 @@ async function criarTituloManualComBaixaAtomica(req, payload = {}, { transaction
       obra_id: obra.id,
       apropriacao_id: apropriacao?.id || null,
       empresa_id: empresaBaixaId,
+      ...intercompanyFields,
       parceiro_id: parceiro.id,
       categoria_financeira_id: categoria?.id || null,
       tipo,
@@ -1521,6 +1612,7 @@ async function criarTituloManualComBaixaAtomica(req, payload = {}, { transaction
       titulo_financeiro_id: titulo.id,
       conta_bancaria_id: conta.id,
       empresa_id: empresaBaixaId,
+      ...intercompanyFields,
       caixa_sessao_id: caixaSessao?.id || null,
       forma_recebimento: formaRecebimento,
       tipo_permuta: payload.tipo_permuta || null,
@@ -1680,6 +1772,7 @@ async function baixarTitulo(req, tituloId, payload = {}) {
       titulo_financeiro_id: titulo.id,
       conta_bancaria_id: conta?.id || null,
       empresa_id: empresaBaixaId,
+      ...buildMovimentoIntercompanyFields(titulo),
       caixa_sessao_id: caixaSessao?.id || null,
       forma_recebimento: formaRecebimento,
       tipo_permuta: payload.tipo_permuta || null,

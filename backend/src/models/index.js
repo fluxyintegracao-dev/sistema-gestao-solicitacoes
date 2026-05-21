@@ -2180,6 +2180,26 @@ db.TituloFinanceiro.belongsTo(db.EmpresaGrupo, {
   as: 'empresaContraparte'
 });
 
+db.EmpresaGrupo.hasMany(db.TituloFinanceiro, {
+  foreignKey: 'empresa_origem_id',
+  as: 'titulosIntercompanyOrigem'
+});
+
+db.TituloFinanceiro.belongsTo(db.EmpresaGrupo, {
+  foreignKey: 'empresa_origem_id',
+  as: 'empresaOrigem'
+});
+
+db.EmpresaGrupo.hasMany(db.TituloFinanceiro, {
+  foreignKey: 'empresa_destino_id',
+  as: 'titulosIntercompanyDestino'
+});
+
+db.TituloFinanceiro.belongsTo(db.EmpresaGrupo, {
+  foreignKey: 'empresa_destino_id',
+  as: 'empresaDestino'
+});
+
 db.User.hasMany(db.TituloFinanceiro, {
   foreignKey: 'criado_por',
   as: 'titulosFinanceirosCriados'
@@ -2369,6 +2389,26 @@ db.EmpresaGrupo.hasMany(db.MovimentoFinanceiro, {
 db.MovimentoFinanceiro.belongsTo(db.EmpresaGrupo, {
   foreignKey: 'empresa_id',
   as: 'empresa'
+});
+
+db.EmpresaGrupo.hasMany(db.MovimentoFinanceiro, {
+  foreignKey: 'empresa_origem_id',
+  as: 'movimentosIntercompanyOrigem'
+});
+
+db.MovimentoFinanceiro.belongsTo(db.EmpresaGrupo, {
+  foreignKey: 'empresa_origem_id',
+  as: 'empresaOrigem'
+});
+
+db.EmpresaGrupo.hasMany(db.MovimentoFinanceiro, {
+  foreignKey: 'empresa_destino_id',
+  as: 'movimentosIntercompanyDestino'
+});
+
+db.MovimentoFinanceiro.belongsTo(db.EmpresaGrupo, {
+  foreignKey: 'empresa_destino_id',
+  as: 'empresaDestino'
 });
 
 db.EmpresaGrupo.hasMany(db.CaixaFinanceiroSessao, {

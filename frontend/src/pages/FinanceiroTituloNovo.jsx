@@ -21,6 +21,17 @@ import { formatCurrencyInput, maskCpfCnpj, normalizeCurrencyTyping, onlyDigits }
 const FORMAS_COBRANCA = ['BOLETO', 'PIX', 'OUTROS'];
 const STATUS_COBRANCA = ['PENDENTE_EMISSAO', 'EMITIDO', 'PAGO_BANCO', 'CONCILIADO', 'CANCELADO'];
 const PIX_TIPOS_CHAVE = ['CPF', 'CNPJ', 'EMAIL', 'TELEFONE', 'ALEATORIA'];
+const TIPOS_INTERCOMPANY = [
+  ['APORTE', 'Aporte'],
+  ['EMPRESTIMO', 'Emprestimo'],
+  ['REEMBOLSO', 'Reembolso'],
+  ['RATEIO', 'Rateio'],
+  ['COBERTURA_CAIXA', 'Cobertura de caixa'],
+  ['FOLHA', 'Folha'],
+  ['ADMINISTRATIVO', 'Administrativo'],
+  ['IMPOSTO', 'Imposto'],
+  ['TRANSFERENCIA_OPERACIONAL', 'Transferencia operacional']
+];
 
 function today() {
   return new Date().toISOString().slice(0, 10);
@@ -134,6 +145,13 @@ function buildDefaultForm(tipo = 'PAGAR') {
     considera_dre: true,
     intercompany: false,
     empresa_contraparte_id: '',
+    intercompany_group_id: '',
+    empresa_origem_id: '',
+    empresa_destino_id: '',
+    tipo_intercompany: '',
+    motivo_intercompany: '',
+    elimina_consolidado: true,
+    transferencia_interna: true,
     data_vencimento: today(),
     observacoes: '',
     apropriacao_id: '',
@@ -538,7 +556,14 @@ export default function FinanceiroTituloNovo() {
       setForm((current) => ({
         ...current,
         intercompany: Boolean(value),
-        empresa_contraparte_id: value ? current.empresa_contraparte_id : ''
+        empresa_contraparte_id: value ? current.empresa_contraparte_id : '',
+        intercompany_group_id: value ? current.intercompany_group_id : '',
+        empresa_origem_id: value ? current.empresa_origem_id : '',
+        empresa_destino_id: value ? current.empresa_destino_id : '',
+        tipo_intercompany: value ? current.tipo_intercompany : '',
+        motivo_intercompany: value ? current.motivo_intercompany : '',
+        elimina_consolidado: value ? current.elimina_consolidado : true,
+        transferencia_interna: value ? current.transferencia_interna : true
       }));
       return;
     }
@@ -752,6 +777,15 @@ export default function FinanceiroTituloNovo() {
       return `A soma das formas de pagamento precisa ser igual ao valor do titulo. Valor do titulo: ${formatCurrency(valorTitulo)}. Total informado: ${formatCurrency(totalPagamentos)}. Ainda ${direcao} ${formatCurrency(Math.abs(diferencaPagamentos))}.`;
     }
 
+    if (form.intercompany) {
+      if (!form.empresa_origem_id) return 'Informe a empresa origem do intercompany.';
+      if (!form.empresa_destino_id) return 'Informe a empresa destino do intercompany.';
+      if (String(form.empresa_origem_id) === String(form.empresa_destino_id)) {
+        return 'Empresa origem e destino nao podem ser iguais no intercompany.';
+      }
+      if (!form.tipo_intercompany) return 'Informe o tipo intercompany.';
+    }
+
     return '';
   }
 
@@ -776,7 +810,20 @@ export default function FinanceiroTituloNovo() {
       };
       payload.empresa_contraparte_id = form.intercompany && form.empresa_contraparte_id
         ? Number(form.empresa_contraparte_id)
+        : form.intercompany && form.empresa_destino_id
+          ? Number(form.empresa_destino_id)
+          : undefined;
+      payload.empresa_origem_id = form.intercompany && form.empresa_origem_id
+        ? Number(form.empresa_origem_id)
         : undefined;
+      payload.empresa_destino_id = form.intercompany && form.empresa_destino_id
+        ? Number(form.empresa_destino_id)
+        : undefined;
+      payload.tipo_intercompany = form.intercompany ? form.tipo_intercompany || undefined : undefined;
+      payload.motivo_intercompany = form.intercompany ? form.motivo_intercompany || undefined : undefined;
+      payload.intercompany_group_id = form.intercompany ? form.intercompany_group_id || undefined : undefined;
+      payload.elimina_consolidado = form.intercompany ? Boolean(form.elimina_consolidado) : false;
+      payload.transferencia_interna = form.intercompany ? Boolean(form.transferencia_interna) : false;
       payload.considera_dre = Boolean(form.considera_dre);
       payload.intercompany = Boolean(form.intercompany);
       payload.competencia_data = form.competencia_data || form.data_emissao || undefined;
@@ -1064,7 +1111,7 @@ export default function FinanceiroTituloNovo() {
 
               <div className="sol-filter-field md:col-span-2 xl:col-span-6">
                 <span className="sol-filter-label">Intercompany</span>
-                <div className="grid gap-3 md:grid-cols-2">
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                   <label className="flex min-h-[42px] items-center gap-2 rounded-lg border border-[var(--c-border)] bg-[var(--c-bg)] px-3 text-sm text-[var(--c-text)]">
                     <input
                       type="checkbox"
@@ -1075,20 +1122,80 @@ export default function FinanceiroTituloNovo() {
                   </label>
                   <select
                     className="input w-full"
-                    value={form.empresa_contraparte_id}
-                    onChange={(event) => updateField('empresa_contraparte_id', event.target.value)}
+                    value={form.empresa_origem_id}
+                    onChange={(event) => updateField('empresa_origem_id', event.target.value)}
                     disabled={!form.intercompany}
                   >
-                    <option value="">Contraparte do grupo</option>
+                    <option value="">Empresa origem</option>
                     {empresasGrupo
                       .filter((empresa) => empresa.ativo !== false && String(empresa.tipo_empresa || 'OPERACIONAL').toUpperCase() !== 'HOLDING')
                       .map((empresa) => (
                         <option key={empresa.id} value={empresa.id}>{empresa.nome}</option>
                       ))}
                   </select>
+                  <select
+                    className="input w-full"
+                    value={form.empresa_destino_id}
+                    onChange={(event) => setForm((current) => ({
+                      ...current,
+                      empresa_destino_id: event.target.value,
+                      empresa_contraparte_id: event.target.value
+                    }))}
+                    disabled={!form.intercompany}
+                  >
+                    <option value="">Empresa destino</option>
+                    {empresasGrupo
+                      .filter((empresa) => empresa.ativo !== false && String(empresa.tipo_empresa || 'OPERACIONAL').toUpperCase() !== 'HOLDING')
+                      .map((empresa) => (
+                        <option key={empresa.id} value={empresa.id}>{empresa.nome}</option>
+                      ))}
+                  </select>
+                  <select
+                    className="input w-full"
+                    value={form.tipo_intercompany}
+                    onChange={(event) => updateField('tipo_intercompany', event.target.value)}
+                    disabled={!form.intercompany}
+                  >
+                    <option value="">Tipo intercompany</option>
+                    {TIPOS_INTERCOMPANY.map(([value, label]) => (
+                      <option key={value} value={value}>{label}</option>
+                    ))}
+                  </select>
+                  <input
+                    className="input w-full"
+                    value={form.intercompany_group_id}
+                    onChange={(event) => updateField('intercompany_group_id', event.target.value)}
+                    disabled={!form.intercompany}
+                    placeholder="Grupo intercompany opcional"
+                  />
+                  <input
+                    className="input w-full"
+                    value={form.motivo_intercompany}
+                    onChange={(event) => updateField('motivo_intercompany', event.target.value)}
+                    disabled={!form.intercompany}
+                    placeholder="Motivo"
+                  />
+                  <label className="flex min-h-[42px] items-center gap-2 rounded-lg border border-[var(--c-border)] bg-[var(--c-bg)] px-3 text-sm text-[var(--c-text)]">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(form.elimina_consolidado)}
+                      onChange={(event) => updateField('elimina_consolidado', event.target.checked)}
+                      disabled={!form.intercompany}
+                    />
+                    Eliminar no consolidado
+                  </label>
+                  <label className="flex min-h-[42px] items-center gap-2 rounded-lg border border-[var(--c-border)] bg-[var(--c-bg)] px-3 text-sm text-[var(--c-text)]">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(form.transferencia_interna)}
+                      onChange={(event) => updateField('transferencia_interna', event.target.checked)}
+                      disabled={!form.intercompany}
+                    />
+                    Transferencia interna
+                  </label>
                 </div>
                 <span className="app-note mt-2">
-                  Por padrao a DRE consolidada exclui intercompany para evitar resultado duplicado.
+                  Informe origem, destino e tipo. A DRE consolidada elimina apenas o que estiver marcado para eliminacao.
                 </span>
               </div>
 

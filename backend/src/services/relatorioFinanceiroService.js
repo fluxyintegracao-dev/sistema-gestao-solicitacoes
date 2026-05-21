@@ -1095,7 +1095,10 @@ async function gerarDreGerencial(req, filters = {}) {
   }
 
   if (filters.excluir_intercompany !== false) {
-    tituloWhere.intercompany = false;
+    tituloWhere[Op.or] = [
+      { intercompany: false },
+      { elimina_consolidado: false }
+    ];
   }
 
   const titulos = await TituloFinanceiro.findAll({
@@ -1110,7 +1113,19 @@ async function gerarDreGerencial(req, filters = {}) {
       {
         model: EmpresaGrupo,
         as: 'empresa',
-        attributes: ['id', 'codigo', 'nome', 'razao_social', 'cnpj', 'tipo_empresa', 'holding_id'],
+        attributes: [
+          'id',
+          'codigo',
+          'nome',
+          'razao_social',
+          'cnpj',
+          'tipo_empresa',
+          'tipo_gerencial',
+          'empresa_caixa',
+          'empresa_operacional',
+          'consolidar_no_grupo',
+          'holding_id'
+        ],
         required: false
       },
       {
@@ -1194,6 +1209,11 @@ function mapTituloDiagnostico(titulo) {
     competencia_data: item.competencia_data,
     empresa_id: item.empresa_id,
     empresa_nome: item.empresa?.nome || null,
+    intercompany: item.intercompany,
+    empresa_contraparte_id: item.empresa_contraparte_id,
+    empresa_origem_id: item.empresa_origem_id,
+    empresa_destino_id: item.empresa_destino_id,
+    tipo_intercompany: item.tipo_intercompany,
     obra_id: item.obra_id,
     obra_nome: item.obra?.nome || null,
     obra_empresa_grupo_id: item.obra?.empresa_grupo_id || null,
@@ -1383,6 +1403,10 @@ async function gerarDiagnosticoDre(req) {
     countTitulosDiagnostico(tituloScopeWhere, {
       [Op.or]: [
         { intercompany: true, empresa_contraparte_id: null },
+        { intercompany: true, empresa_origem_id: null },
+        { intercompany: true, empresa_destino_id: null },
+        { intercompany: true, tipo_intercompany: null },
+        { intercompany: true, tipo_intercompany: '' },
         { intercompany: false, empresa_contraparte_id: { [Op.ne]: null } }
       ]
     })
@@ -1422,6 +1446,10 @@ async function gerarDiagnosticoDre(req) {
     sampleTitulosDiagnostico(tituloScopeWhere, {
       [Op.or]: [
         { intercompany: true, empresa_contraparte_id: null },
+        { intercompany: true, empresa_origem_id: null },
+        { intercompany: true, empresa_destino_id: null },
+        { intercompany: true, tipo_intercompany: null },
+        { intercompany: true, tipo_intercompany: '' },
         { intercompany: false, empresa_contraparte_id: { [Op.ne]: null } }
       ]
     })
@@ -1513,9 +1541,9 @@ async function gerarDiagnosticoDre(req) {
       codigo: 'INTERCOMPANY_INCONSISTENTE',
       titulo: 'Intercompany inconsistente',
       severidade: 'MEDIA',
-      descricao: 'Transacoes entre empresas precisam de flag e contraparte consistentes para consolidacao.',
+      descricao: 'Transacoes entre empresas precisam de origem, destino, tipo, flag e contraparte consistentes para consolidacao.',
       total: titulosIntercompanyInconsistente,
-      acao: 'Marque intercompany apenas quando houver contraparte do grupo e informe a empresa contraparte.',
+      acao: 'Marque intercompany apenas quando houver origem e destino reais, informe o tipo e a contraparte do grupo.',
       exemplos: exemplosIntercompany
     })
   ];

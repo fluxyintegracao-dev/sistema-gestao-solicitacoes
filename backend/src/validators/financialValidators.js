@@ -4,10 +4,20 @@ const {
   sanitizeString
 } = require('../middlewares/validation');
 const { COMERCIAL_FORMA_RECEBIMENTO } = require('./commercialValidators');
+const { TIPOS_INTERCOMPANY } = require('../constants/intercompany');
 
 const CATEGORIAS_BEM = ['VEICULO', 'IMOVEL', 'TERRENO', 'SERVICO', 'MATERIAL', 'CREDITO', 'OUTROS'];
 const FORMAS_COBRANCA = ['BOLETO', 'PIX', 'OUTROS'];
 const STATUS_COBRANCA = ['NAO_APLICAVEL', 'PENDENTE_EMISSAO', 'EMITIDO', 'PAGO_BANCO', 'CONCILIADO', 'CANCELADO'];
+const CAMPOS_INTERCOMPANY_TITULO = [
+  'intercompany_group_id',
+  'empresa_origem_id',
+  'empresa_destino_id',
+  'tipo_intercompany',
+  'motivo_intercompany',
+  'elimina_consolidado',
+  'transferencia_interna'
+];
 
 function isBlank(value) {
   return value == null || String(value).trim() === '';
@@ -696,6 +706,7 @@ function validateFinanceTituloCreateFromSolicitacaoBody(body = {}) {
       'considera_dre',
       'intercompany',
       'empresa_contraparte_id',
+      ...CAMPOS_INTERCOMPANY_TITULO,
       'parcelas',
       'pagamentos'
     ],
@@ -729,6 +740,13 @@ function validateFinanceTituloCreateFromSolicitacaoBody(body = {}) {
     considera_dre: parseBoolean(body.considera_dre, 'Considera DRE'),
     intercompany: parseBoolean(body.intercompany, 'Intercompany'),
     empresa_contraparte_id: parseInteger(body.empresa_contraparte_id, 'Empresa contraparte'),
+    intercompany_group_id: parseOptionalText(body.intercompany_group_id, 'Grupo intercompany', 80),
+    empresa_origem_id: parseInteger(body.empresa_origem_id, 'Empresa origem'),
+    empresa_destino_id: parseInteger(body.empresa_destino_id, 'Empresa destino'),
+    tipo_intercompany: parseEnum(body.tipo_intercompany, 'Tipo intercompany', TIPOS_INTERCOMPANY),
+    motivo_intercompany: parseOptionalText(body.motivo_intercompany, 'Motivo intercompany', 255),
+    elimina_consolidado: parseBoolean(body.elimina_consolidado, 'Eliminar no consolidado'),
+    transferencia_interna: parseBoolean(body.transferencia_interna, 'Transferencia interna'),
     parcelas: parseParcelasTitulo(body.parcelas),
     pagamentos: parsePagamentosTitulo(body.pagamentos)
   };
@@ -741,6 +759,7 @@ function validateFinanceTituloCreateBody(body = {}) {
       'tipo',
       'empresa_id',
       'obra_id',
+      'apropriacao_id',
       'parceiro_id',
       'valor',
       'data_vencimento',
@@ -765,6 +784,7 @@ function validateFinanceTituloCreateBody(body = {}) {
       'considera_dre',
       'intercompany',
       'empresa_contraparte_id',
+      ...CAMPOS_INTERCOMPANY_TITULO,
       'parcelas',
       'pagamentos'
     ],
@@ -800,6 +820,13 @@ function validateFinanceTituloCreateBody(body = {}) {
     considera_dre: parseBoolean(body.considera_dre, 'Considera DRE'),
     intercompany: parseBoolean(body.intercompany, 'Intercompany'),
     empresa_contraparte_id: parseInteger(body.empresa_contraparte_id, 'Empresa contraparte'),
+    intercompany_group_id: parseOptionalText(body.intercompany_group_id, 'Grupo intercompany', 80),
+    empresa_origem_id: parseInteger(body.empresa_origem_id, 'Empresa origem'),
+    empresa_destino_id: parseInteger(body.empresa_destino_id, 'Empresa destino'),
+    tipo_intercompany: parseEnum(body.tipo_intercompany, 'Tipo intercompany', TIPOS_INTERCOMPANY),
+    motivo_intercompany: parseOptionalText(body.motivo_intercompany, 'Motivo intercompany', 255),
+    elimina_consolidado: parseBoolean(body.elimina_consolidado, 'Eliminar no consolidado'),
+    transferencia_interna: parseBoolean(body.transferencia_interna, 'Transferencia interna'),
     parcelas: parseParcelasTitulo(body.parcelas),
     pagamentos: parsePagamentosTitulo(body.pagamentos)
   };

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { buscarParceiros } from '../../services/parceiros';
+import { getEmpresasGrupo } from '../../services/empresasGrupo';
 import { formatCurrencyInput, normalizeCurrencyTyping } from '../../utils/formatters';
 import {
   gerarContaPorSolicitacao,
@@ -9,6 +10,18 @@ import {
   getFormasPagamentoFinanceiras,
   getTitulosFinanceirosPorSolicitacao
 } from '../../services/financeiro';
+
+const TIPOS_INTERCOMPANY = [
+  ['APORTE', 'Aporte'],
+  ['EMPRESTIMO', 'Emprestimo'],
+  ['REEMBOLSO', 'Reembolso'],
+  ['RATEIO', 'Rateio'],
+  ['COBERTURA_CAIXA', 'Cobertura de caixa'],
+  ['FOLHA', 'Folha'],
+  ['ADMINISTRATIVO', 'Administrativo'],
+  ['IMPOSTO', 'Imposto'],
+  ['TRANSFERENCIA_OPERACIONAL', 'Transferencia operacional']
+];
 
 function formatCurrency(value) {
   const number = Number(value || 0);
@@ -161,6 +174,14 @@ function buildDefaultForm(solicitacao) {
     cartao_id: '',
     quantidade_parcelas: '1',
     data_compra: today(),
+    intercompany: false,
+    empresa_origem_id: '',
+    empresa_destino_id: '',
+    tipo_intercompany: '',
+    motivo_intercompany: '',
+    intercompany_group_id: '',
+    elimina_consolidado: true,
+    transferencia_interna: true,
     parcelas: [],
     pagamentos: [createPagamento(solicitacao, valorSolicitacao)]
   };
@@ -210,6 +231,7 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
   const [categoriaSearch, setCategoriaSearch] = useState('');
   const [formasPagamento, setFormasPagamento] = useState([]);
   const [cartoes, setCartoes] = useState([]);
+  const [empresasGrupo, setEmpresasGrupo] = useState([]);
   const [loadingPagamento, setLoadingPagamento] = useState(false);
 
   function resetModalState(baseSolicitacao = solicitacao) {
@@ -293,6 +315,23 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
       })
       .finally(() => {
         if (active) setLoadingCategorias(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [modalOpen]);
+
+  useEffect(() => {
+    if (!modalOpen) return undefined;
+
+    let active = true;
+    getEmpresasGrupo({ ativo: true })
+      .then((data) => {
+        if (active) setEmpresasGrupo(Array.isArray(data) ? data : []);
+      })
+      .catch(() => {
+        if (active) setEmpresasGrupo([]);
       });
 
     return () => {
@@ -582,6 +621,15 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
       return `A soma das formas de pagamento precisa ser igual ao valor da solicitacao. Valor da solicitacao: ${formatCurrency(valorSolicitacao)}. Total informado: ${formatCurrency(totalPagamentos)}. Ainda ${direcao} ${formatCurrency(Math.abs(diferencaPagamentos))}.`;
     }
 
+    if (form.intercompany) {
+      if (!form.empresa_origem_id) return 'Informe a empresa origem do intercompany.';
+      if (!form.empresa_destino_id) return 'Informe a empresa destino do intercompany.';
+      if (String(form.empresa_origem_id) === String(form.empresa_destino_id)) {
+        return 'Empresa origem e destino nao podem ser iguais no intercompany.';
+      }
+      if (!form.tipo_intercompany) return 'Informe o tipo intercompany.';
+    }
+
     return '';
   }
 
@@ -602,6 +650,15 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
         parceiro_id: selectedPartner?.id || form.parceiro_id,
         categoria_financeira_id: form.categoria_financeira_id || undefined,
         valor: form.valor,
+        intercompany: Boolean(form.intercompany),
+        empresa_contraparte_id: form.intercompany && form.empresa_destino_id ? Number(form.empresa_destino_id) : undefined,
+        empresa_origem_id: form.intercompany && form.empresa_origem_id ? Number(form.empresa_origem_id) : undefined,
+        empresa_destino_id: form.intercompany && form.empresa_destino_id ? Number(form.empresa_destino_id) : undefined,
+        tipo_intercompany: form.intercompany ? form.tipo_intercompany || undefined : undefined,
+        motivo_intercompany: form.intercompany ? form.motivo_intercompany || undefined : undefined,
+        intercompany_group_id: form.intercompany ? form.intercompany_group_id || undefined : undefined,
+        elimina_consolidado: form.intercompany ? Boolean(form.elimina_consolidado) : false,
+        transferencia_interna: form.intercompany ? Boolean(form.transferencia_interna) : false,
         pagamentos: (form.pagamentos || []).map((pagamento) => {
           const forma = getFormaPagamento(pagamento.forma_pagamento_id);
           const usaDetalhe = forma && (isFormaBoleto(forma) || isFormaCheque(forma));
@@ -895,6 +952,69 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
                       ? 'Carregando categorias financeiras...'
                       : 'Opcional. A lista considera o tipo da conta selecionado.'}
                 </div>
+              </div>
+
+              <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-3">
+                <label className="flex items-center gap-2 text-sm text-[var(--c-text)]">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(form.intercompany)}
+                    onChange={(event) => setForm((current) => ({
+                      ...current,
+                      intercompany: event.target.checked,
+                      empresa_origem_id: event.target.checked ? current.empresa_origem_id : '',
+                      empresa_destino_id: event.target.checked ? current.empresa_destino_id : '',
+                      tipo_intercompany: event.target.checked ? current.tipo_intercompany : '',
+                      motivo_intercompany: event.target.checked ? current.motivo_intercompany : '',
+                      intercompany_group_id: event.target.checked ? current.intercompany_group_id : ''
+                    }))}
+                  />
+                  Movimentacao entre empresas do grupo
+                </label>
+                {form.intercompany && (
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <select
+                      className="input w-full"
+                      value={form.empresa_origem_id}
+                      onChange={(event) => setForm((current) => ({ ...current, empresa_origem_id: event.target.value }))}
+                    >
+                      <option value="">Empresa origem</option>
+                      {empresasGrupo
+                        .filter((empresa) => empresa.ativo !== false && String(empresa.tipo_empresa || 'OPERACIONAL').toUpperCase() !== 'HOLDING')
+                        .map((empresa) => (
+                          <option key={empresa.id} value={empresa.id}>{empresa.nome}</option>
+                        ))}
+                    </select>
+                    <select
+                      className="input w-full"
+                      value={form.empresa_destino_id}
+                      onChange={(event) => setForm((current) => ({ ...current, empresa_destino_id: event.target.value }))}
+                    >
+                      <option value="">Empresa destino</option>
+                      {empresasGrupo
+                        .filter((empresa) => empresa.ativo !== false && String(empresa.tipo_empresa || 'OPERACIONAL').toUpperCase() !== 'HOLDING')
+                        .map((empresa) => (
+                          <option key={empresa.id} value={empresa.id}>{empresa.nome}</option>
+                        ))}
+                    </select>
+                    <select
+                      className="input w-full"
+                      value={form.tipo_intercompany}
+                      onChange={(event) => setForm((current) => ({ ...current, tipo_intercompany: event.target.value }))}
+                    >
+                      <option value="">Tipo intercompany</option>
+                      {TIPOS_INTERCOMPANY.map(([value, label]) => (
+                        <option key={value} value={value}>{label}</option>
+                      ))}
+                    </select>
+                    <input
+                      className="input w-full"
+                      value={form.motivo_intercompany}
+                      onChange={(event) => setForm((current) => ({ ...current, motivo_intercompany: event.target.value }))}
+                      placeholder="Motivo"
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-3">

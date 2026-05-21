@@ -24,6 +24,17 @@ const FORMAS_RECEBIMENTO = ['DINHEIRO', 'PIX', 'CARTAO', 'TRANSFERENCIA', 'BOLET
 const CATEGORIAS_BEM = ['VEICULO', 'IMOVEL', 'TERRENO', 'SERVICO', 'MATERIAL', 'CREDITO', 'OUTROS'];
 const FORMAS_COBRANCA = ['BOLETO', 'PIX', 'OUTROS'];
 const STATUS_COBRANCA = ['PENDENTE_EMISSAO', 'EMITIDO', 'PAGO_BANCO', 'CONCILIADO', 'CANCELADO'];
+const TIPOS_INTERCOMPANY_LABEL = {
+  APORTE: 'Aporte',
+  EMPRESTIMO: 'Emprestimo',
+  REEMBOLSO: 'Reembolso',
+  RATEIO: 'Rateio',
+  COBERTURA_CAIXA: 'Cobertura de caixa',
+  FOLHA: 'Folha',
+  ADMINISTRATIVO: 'Administrativo',
+  IMPOSTO: 'Imposto',
+  TRANSFERENCIA_OPERACIONAL: 'Transferencia operacional'
+};
 
 function formatCurrency(value) {
   const number = Number(value || 0);
@@ -45,6 +56,10 @@ function formatDateTime(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '-';
   return date.toLocaleString('pt-BR');
+}
+
+function labelTipoIntercompany(value) {
+  return TIPOS_INTERCOMPANY_LABEL[String(value || '').toUpperCase()] || value || '-';
 }
 
 function statusClass(status) {
@@ -493,6 +508,32 @@ export default function FinanceiroTituloDetalhe() {
                 <div className="text-[var(--c-muted)]">Categoria</div>
                 <div className="font-medium text-[var(--c-text)]">{titulo.categoriaFinanceira?.nome || '-'}</div>
               </div>
+              <div>
+                <div className="text-[var(--c-muted)]">Intercompany</div>
+                <div className="font-medium text-[var(--c-text)]">{titulo.intercompany ? 'Sim' : 'Nao'}</div>
+              </div>
+              {titulo.intercompany && (
+                <>
+                  <div>
+                    <div className="text-[var(--c-muted)]">Origem</div>
+                    <div className="font-medium text-[var(--c-text)]">{titulo.empresaOrigem?.nome || '-'}</div>
+                  </div>
+                  <div>
+                    <div className="text-[var(--c-muted)]">Destino</div>
+                    <div className="font-medium text-[var(--c-text)]">{titulo.empresaDestino?.nome || '-'}</div>
+                  </div>
+                  <div>
+                    <div className="text-[var(--c-muted)]">Tipo intercompany</div>
+                    <div className="font-medium text-[var(--c-text)]">{labelTipoIntercompany(titulo.tipo_intercompany)}</div>
+                  </div>
+                  <div>
+                    <div className="text-[var(--c-muted)]">Consolidado</div>
+                    <div className="font-medium text-[var(--c-text)]">
+                      {titulo.elimina_consolidado ? 'Elimina no consolidado' : 'Mantem no consolidado'}
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           </div>
 
@@ -846,6 +887,14 @@ export default function FinanceiroTituloDetalhe() {
                       <div className="text-[var(--c-muted)]">
                         Quitacao {formatCurrency(movimento.valor_quitacao)}
                       </div>
+                      {(movimento.intercompany_group_id || movimento.tipo_intercompany) && (
+                        <div className="text-[var(--c-muted)]">
+                          Intercompany: {labelTipoIntercompany(movimento.tipo_intercompany)}
+                          {movimento.empresaOrigem?.nome || movimento.empresaDestino?.nome
+                            ? ` - ${movimento.empresaOrigem?.nome || 'Origem'} -> ${movimento.empresaDestino?.nome || 'Destino'}`
+                            : ''}
+                        </div>
+                      )}
                       {(movimento.tipo_permuta || movimento.categoria_bem || movimento.descricao_bem || movimento.valor_referencia_bem) && (
                         <div className="text-[var(--c-muted)]">
                           {movimento.tipo_permuta ? `Permuta: ${movimento.tipo_permuta}. ` : ''}
