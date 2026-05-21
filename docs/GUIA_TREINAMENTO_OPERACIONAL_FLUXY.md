@@ -897,6 +897,9 @@ Regra de consistencia:
 - o sistema nao deve herdar silenciosamente a empresa da obra, da baixa ou da conta bancaria;
 - se a obra/centro de custo estiver vinculado a uma empresa, a empresa do titulo precisa coincidir com esse cadastro;
 - se a empresa estiver incorreta, corrija o cadastro operacional antes de gerar o titulo.
+- quando `Considerar na DRE` estiver marcado, a competencia DRE e obrigatoria;
+- a DRE nao deduz competencia por emissao, compra ou vencimento;
+- se a competencia real ainda nao estiver definida, desmarque `Considerar na DRE` e trate a pendencia depois no Diagnostico DRE.
 
 ### 11.4 Criar titulo a partir da solicitacao
 
@@ -932,6 +935,8 @@ Cuidados:
 - a empresa do titulo precisa ser conferida no modal de geracao;
 - o sistema nao deve criar titulo sem empresa do grupo informada.
 - nao salvar quando a previa apontar DRE pendente de categoria, salvo em caso conscientemente fora da DRE.
+- titulo considerado na DRE precisa ter competencia DRE informada explicitamente;
+- nao usar data de emissao, data da compra ou vencimento como substituto automatico da competencia economica.
 
 ### 11.5 Registrar baixa de titulo
 

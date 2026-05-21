@@ -1029,24 +1029,9 @@ async function gerarRelatorioAnalitico(req, filters = {}) {
 
 function getCompetenciaWhere(periodo) {
   return {
-    [Op.or]: [
-      { competencia_data: { [Op.between]: [periodo.data_inicial, periodo.data_final] } },
-      {
-        competencia_data: null,
-        data_emissao: { [Op.between]: [periodo.data_inicial, periodo.data_final] }
-      },
-      {
-        competencia_data: null,
-        data_emissao: null,
-        data_compra: { [Op.between]: [periodo.data_inicial, periodo.data_final] }
-      },
-      {
-        competencia_data: null,
-        data_emissao: null,
-        data_compra: null,
-        data_vencimento: { [Op.between]: [periodo.data_inicial, periodo.data_final] }
-      }
-    ]
+    competencia_data: {
+      [Op.between]: [periodo.data_inicial, periodo.data_final]
+    }
   };
 }
 
@@ -2802,7 +2787,7 @@ async function gerarDiagnosticoDre(req) {
       codigo: 'TITULOS_SEM_COMPETENCIA',
       titulo: 'Titulos sem competencia DRE',
       severidade: 'ALTA',
-      descricao: 'A DRE por competencia usa fallback de emissao/compra/vencimento quando a competencia nao esta definida.',
+      descricao: 'A DRE por competencia considera somente competencia_data. Titulos sem competencia nao entram na DRE ate serem corrigidos.',
       total: titulosSemCompetencia,
       acao: 'Informe competencia_data nos titulos importados/criados, preferencialmente pelo mes economico correto.',
       exemplos: exemplosTitulosSemCompetencia

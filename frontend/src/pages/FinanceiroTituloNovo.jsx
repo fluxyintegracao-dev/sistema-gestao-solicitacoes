@@ -936,7 +936,7 @@ export default function FinanceiroTituloNovo() {
       payload.transferencia_interna = form.intercompany ? Boolean(form.transferencia_interna) : false;
       payload.considera_dre = Boolean(form.considera_dre);
       payload.intercompany = Boolean(form.intercompany);
-      payload.competencia_data = form.competencia_data || form.data_emissao || undefined;
+      payload.competencia_data = form.competencia_data || undefined;
       payload.pagamentos = (form.pagamentos || []).map((pagamento) => {
         const forma = getFormaPagamento(pagamento.forma_pagamento_id);
         const usaDetalhe = forma && (isFormaBoleto(forma) || isFormaCheque(forma));
@@ -1225,8 +1225,13 @@ export default function FinanceiroTituloNovo() {
                   className="input w-full"
                   value={form.competencia_data}
                   onChange={(event) => updateField('competencia_data', event.target.value)}
+                  required={Boolean(form.considera_dre)}
                 />
-                <span className="app-note mt-2">Use o mes/periodo economico do fato gerador.</span>
+                <span className="app-note mt-2">
+                  {form.considera_dre
+                    ? 'Obrigatoria para DRE. Use o mes/periodo economico real do fato gerador.'
+                    : 'Opcional quando o titulo nao entra na DRE.'}
+                </span>
               </label>
 
               <label className="sol-filter-field xl:col-span-3">

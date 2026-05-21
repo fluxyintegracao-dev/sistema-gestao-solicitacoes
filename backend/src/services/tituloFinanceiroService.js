@@ -744,8 +744,16 @@ function resolverEmpresaTitulo({ empresaIdInformada, obra }) {
   return empresaInformada;
 }
 
-function resolverCompetenciaTitulo(payload = {}, fallbackData = null) {
-  return payload.competencia_data || payload.data_emissao || payload.data_compra || fallbackData || null;
+function resolverCompetenciaTitulo(payload = {}) {
+  const competenciaData = payload.competencia_data || null;
+  if (payload.considera_dre !== false && !competenciaData) {
+    throw createHttpError(
+      400,
+      'Competencia DRE e obrigatoria para titulos considerados na DRE. Informe a competencia economica real ou desmarque Considerar na DRE.'
+    );
+  }
+
+  return competenciaData;
 }
 
 async function validarIntercompanyTitulo(payload = {}) {
@@ -1262,7 +1270,7 @@ async function criarTituloPorSolicitacao(req, solicitacaoId, payload = {}) {
           numero_parcela: totalParcelasDoGrupo > 1 ? numeroParcela : null,
           total_parcelas: totalParcelasDoGrupo > 1 ? totalParcelasDoGrupo : null,
           data_compra: pagamento.dataCompra,
-          competencia_data: resolverCompetenciaTitulo(payload, pagamento.dataCompra),
+          competencia_data: resolverCompetenciaTitulo(payload),
           considera_dre: payload.considera_dre !== false,
           origem_titulo: 'SOLICITACAO',
           tipo,
@@ -1477,7 +1485,7 @@ async function criarTituloManual(req, payload = {}) {
           numero_parcela: pagamento.quantidadeParcelas > 1 ? numeroParcela : null,
           total_parcelas: pagamento.quantidadeParcelas > 1 ? pagamento.quantidadeParcelas : null,
           data_compra: pagamento.dataCompra,
-          competencia_data: resolverCompetenciaTitulo(payload, pagamento.dataCompra),
+          competencia_data: resolverCompetenciaTitulo(payload),
           considera_dre: payload.considera_dre !== false,
           origem_titulo: 'MANUAL',
           tipo,
