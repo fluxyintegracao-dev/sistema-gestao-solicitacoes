@@ -88,6 +88,10 @@ function compactFilters(filters = {}) {
   );
 }
 
+function sumBy(list, fieldName) {
+  return (Array.isArray(list) ? list : []).reduce((acc, item) => acc + Number(item?.[fieldName] || 0), 0);
+}
+
 function getTituloCodigo(titulo) {
   return titulo?.codigo || `#${titulo?.id}`;
 }
@@ -208,6 +212,25 @@ export default function FinanceiroPagamentos() {
       ? selectedBatch.approvals.filter((approval) => approval.acao === 'APPROVE' && approval.status === 'APROVADO')
       : []
   ), [selectedBatch]);
+
+  const paymentOverview = useMemo(() => {
+    const activeAccounts = accounts.filter((account) => account?.ativo !== false);
+    const pendingApproval = batches.filter((batch) => batch?.status === 'PENDENTE_APROVACAO');
+    const bankProcessing = batches.filter((batch) => ['ENVIADO_AO_BANCO', 'PROCESSANDO_BANCO', 'FALHA_INTEGRACAO'].includes(batch?.status));
+
+    return {
+      activeAccounts: activeAccounts.length,
+      totalAccounts: accounts.length,
+      pendingApprovalCount: pendingApproval.length,
+      pendingApprovalValue: sumBy(pendingApproval, 'valor_total'),
+      bankProcessingCount: bankProcessing.length,
+      bankProcessingValue: sumBy(bankProcessing, 'valor_total'),
+      awaitingBaixaCount: awaitingBaixa.length,
+      awaitingBaixaValue: sumBy(awaitingBaixa, 'valor'),
+      certificateConfigured: Boolean(bbHealth?.certificateConfigured),
+      modeLabel: isBbSandbox ? 'BB Sandbox' : 'Mock interno'
+    };
+  }, [accounts, awaitingBaixa, batches, bbHealth, isBbSandbox]);
 
   function toggleTitulo(id) {
     setSelectedIds((current) => (
@@ -339,6 +362,37 @@ export default function FinanceiroPagamentos() {
           Atualizar
         </button>
       </div>
+
+      {!loading && (
+        <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <div className="card sol-surface-card">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--c-muted)]">Conta pagadora</p>
+            <p className="mt-2 text-2xl font-semibold text-[var(--c-text)]">
+              {paymentOverview.activeAccounts}/{paymentOverview.totalAccounts}
+            </p>
+            <p className="mt-1 text-sm text-[var(--c-muted)]">
+              {paymentOverview.activeAccounts > 0 ? 'Conta ativa pronta para preparar lotes.' : 'Cadastre uma conta ativa antes de gerar lote.'}
+            </p>
+          </div>
+          <div className="card sol-surface-card">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--c-muted)]">Aguardando aprovacao</p>
+            <p className="mt-2 text-2xl font-semibold text-[var(--c-text)]">{paymentOverview.pendingApprovalCount}</p>
+            <p className="mt-1 text-sm text-[var(--c-muted)]">{formatCurrency(paymentOverview.pendingApprovalValue)} pendente de dupla conferencia.</p>
+          </div>
+          <div className="card sol-surface-card">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--c-muted)]">Banco / retorno</p>
+            <p className="mt-2 text-2xl font-semibold text-[var(--c-text)]">{paymentOverview.bankProcessingCount}</p>
+            <p className="mt-1 text-sm text-[var(--c-muted)]">
+              {paymentOverview.modeLabel} - {isBbSandbox ? (paymentOverview.certificateConfigured ? 'certificado configurado' : 'certificado pendente') : 'retorno simulado'}
+            </p>
+          </div>
+          <div className="card sol-surface-card">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--c-muted)]">Baixa pendente</p>
+            <p className="mt-2 text-2xl font-semibold text-[var(--c-text)]">{paymentOverview.awaitingBaixaCount}</p>
+            <p className="mt-1 text-sm text-[var(--c-muted)]">{formatCurrency(paymentOverview.awaitingBaixaValue)} confirmado pelo banco aguardando baixa.</p>
+          </div>
+        </section>
+      )}
 
       {loading ? (
         <div className="app-empty-card">Carregando pagamentos...</div>

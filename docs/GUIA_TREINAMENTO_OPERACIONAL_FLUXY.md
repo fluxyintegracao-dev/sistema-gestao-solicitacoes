@@ -1028,6 +1028,13 @@ Objetivo:
 - manter separacao entre aprovacao, envio bancario e baixa financeira;
 - registrar rastreabilidade operacional antes de qualquer baixa.
 
+Leitura inicial da tela:
+
+- `Conta pagadora`: mostra quantas contas pagadoras ativas existem para preparar lotes;
+- `Aguardando aprovacao`: mostra lotes que ainda dependem de conferencia e aprovacao;
+- `Banco / retorno`: mostra lotes enviados, em processamento ou com falha tecnica;
+- `Baixa pendente`: mostra pagamentos confirmados pelo banco que ainda aguardam confirmacao de baixa financeira.
+
 Fluxo correto:
 
 1. Abrir `Financeiro > Pagamentos em Massa`.

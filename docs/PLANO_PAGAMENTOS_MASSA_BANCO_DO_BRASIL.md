@@ -14,6 +14,41 @@ Apesar disso, o sistema ainda nao possui uma camada de execucao bancaria. Hoje o
 
 Conclusao pratica: antes de integrar a API do Banco do Brasil, o FLUXY precisa criar um motor transacional de pagamentos, separado da baixa financeira. A baixa deve ocorrer somente apos confirmacao bancaria confiavel, e nao no momento do envio do lote.
 
+### 1.1 Atualizacao de execucao em 2026-05-21
+
+Parte da base planejada neste documento ja foi implementada no ambiente de desenvolvimento.
+
+Hoje o FLUXY ja possui:
+
+- cadastro de contas pagadoras;
+- cadastro de favorecidos bancarios com PIX;
+- selecao de titulos a pagar elegiveis;
+- geracao de lotes de pagamento;
+- snapshot de titulo e favorecido na intencao de pagamento;
+- controle de lote separado da baixa financeira;
+- dupla aprovacao com MFA;
+- rejeicao de lote com justificativa obrigatoria;
+- envio em modo mock e em modo BB Sandbox quando configurado;
+- retorno bancario simulado no mock;
+- sincronizacao e historico tecnico para BB Sandbox;
+- confirmacao semiautomatica da baixa apenas depois da confirmacao bancaria;
+- tela operacional de pagamentos com indicadores de conta pagadora, aprovacao, banco/retorno e baixas pendentes.
+
+O que ainda nao deve ser tratado como pronto para producao bancaria real:
+
+- validacao final dos endpoints vigentes do BB Developers;
+- contrato definitivo de payload e resposta do Banco do Brasil;
+- homologacao formal com o banco;
+- politica de limites por usuario, conta e lote;
+- cofre definitivo para certificados, client secret e app key;
+- rotina operacional de conciliacao bancaria automatica pos-retorno;
+- testes integrados de ponta a ponta em ambiente homologado.
+
+Diretriz mantida:
+
+- nenhuma baixa financeira deve ser criada apenas pela geracao, aprovacao ou envio do lote;
+- baixa financeira so deve ocorrer depois de confirmacao bancaria confiavel e conferencia operacional quando aplicavel.
+
 ## 2. Fontes analisadas
 
 Principais documentos:
