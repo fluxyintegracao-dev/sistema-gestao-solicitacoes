@@ -1040,6 +1040,9 @@ Prioridade sugerida:
 - Criar visoes por perfil executivo.
 - Exibir alertas e riscos.
 - Criar tela principal do diretor com Grupo Consolidado, Caixa Consolidado, EBITDA, Lucro Liquido, Necessidade Futura de Caixa, Intercompany Liquido, Resultado por Obra e Endividamento.
+  - Status inicial implementado no Financeiro: `Financeiro > Relatorios > Grupo Consolidado`.
+  - A primeira versao cruza DRE gerencial, Fluxo Consolidado, Intercompany e Resultado de Obras sem duplicar regra de calculo.
+  - Endividamento consolidado permanece como etapa posterior, dependente da classificacao de titulos/dividas e limites por empresa.
 
 ### Fase 9 - Preparacao para IA
 

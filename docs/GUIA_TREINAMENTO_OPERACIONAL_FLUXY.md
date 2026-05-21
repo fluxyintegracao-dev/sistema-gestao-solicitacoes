@@ -998,7 +998,46 @@ Cuidados:
 - transferencia entre contas da mesma empresa e transferencia interna de caixa;
 - transferencia entre contas de empresas diferentes deve ter tipo e motivo intercompany.
 
-### 11.9 DRE Gerencial
+### 11.9 Grupo Consolidado
+
+Tela:
+
+- `Financeiro > Relatorios > Grupo Consolidado`.
+
+Objetivo:
+
+- ser a primeira leitura executiva do financeiro;
+- reunir DRE, caixa, intercompany e obras em uma visao unica;
+- indicar rapidamente se o grupo esta gerando patrimonio, consumindo caixa ou dependendo de movimentacoes internas.
+
+Passo a passo para analisar:
+
+1. Selecionar o periodo.
+2. Selecionar a Holding quando a analise for de um grupo especifico.
+3. Manter `Eliminar intercompany no consolidado` marcado para a leitura principal.
+4. Conferir `Caixa consolidado realizado`.
+5. Conferir `EBITDA`.
+6. Conferir `Lucro/Prejuizo liquido`.
+7. Conferir `Necessidade futura de caixa`.
+8. Conferir o volume de `Intercompany eliminado`.
+9. Abrir DRE, Fluxo Consolidado ou Intercompany quando algum indicador precisar de detalhe.
+
+Como interpretar:
+
+- Caixa consolidado realizado vem das baixas financeiras registradas.
+- EBITDA e Lucro/Prejuizo Liquido vem da DRE gerencial.
+- Necessidade futura de caixa vem do menor saldo previsto dentro do periodo analisado.
+- Intercompany eliminado mostra movimentacoes internas retiradas da leitura consolidada.
+- Resultado por empresa mostra onde o resultado liquido esta concentrado.
+- Obras por caixa compara recebido menos executado na base atual de obras.
+
+Cuidados:
+
+- esta tela nao substitui a conferencia analitica;
+- se algum numero parecer errado, abrir primeiro o Diagnostico DRE;
+- empresa, baixa e intercompany precisam estar preenchidos corretamente para a leitura executiva ficar confiavel.
+
+### 11.10 DRE Gerencial
 
 Tela:
 
@@ -1036,7 +1075,7 @@ Passo a passo para analisar:
 8. Conferir Lucro/Prejuizo Liquido.
 9. Abrir diagnostico se algum numero parecer inconsistente.
 
-### 11.10 Diagnostico da DRE
+### 11.11 Diagnostico da DRE
 
 Tela:
 
@@ -1068,7 +1107,7 @@ Rotina recomendada:
 - administrador corrige cadastros;
 - diretoria acompanha pendencias criticas.
 
-### 11.11 Resultado de Obras
+### 11.12 Resultado de Obras
 
 Tela:
 
@@ -1086,7 +1125,7 @@ Passo a passo:
 4. Identificar obras consumindo caixa.
 5. Abrir detalhes quando houver divergencia.
 
-### 11.12 Centros de Custo
+### 11.13 Centros de Custo
 
 Tela:
 
@@ -1104,7 +1143,7 @@ Exemplos:
 - Diretoria;
 - Matriz.
 
-### 11.13 Intercompany
+### 11.14 Intercompany
 
 Quando marcar intercompany:
 
@@ -1133,7 +1172,7 @@ Cuidados:
 - empresa com prejuizo isolado pode ser normal se ela for centro operacional, RH/Folha ou administrativa;
 - analise consolidada deve eliminar espelhos internos.
 
-### 11.14 Relatorio Intercompany
+### 11.15 Relatorio Intercompany
 
 Tela:
 
@@ -1170,7 +1209,7 @@ Cuidados:
 - se um aporte for registrado como receita comum, a DRE consolidada sera distorcida;
 - se uma transferencia interna nao for marcada como intercompany, o grupo pode parecer maior ou mais lucrativo do que realmente e.
 
-### 11.15 Fluxo de Caixa Consolidado
+### 11.16 Fluxo de Caixa Consolidado
 
 Tela:
 
