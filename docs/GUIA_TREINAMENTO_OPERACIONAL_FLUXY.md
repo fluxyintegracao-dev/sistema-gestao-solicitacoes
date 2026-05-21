@@ -1016,6 +1016,55 @@ Cuidados:
 - transferencia entre contas da mesma empresa e transferencia interna de caixa;
 - transferencia entre contas de empresas diferentes deve ter tipo e motivo intercompany.
 
+### 11.8.1 Pagamentos em Massa
+
+Tela:
+
+- `Financeiro > Pagamentos em Massa`.
+
+Objetivo:
+
+- preparar lotes de pagamento a partir de titulos a pagar elegiveis;
+- manter separacao entre aprovacao, envio bancario e baixa financeira;
+- registrar rastreabilidade operacional antes de qualquer baixa.
+
+Fluxo correto:
+
+1. Abrir `Financeiro > Pagamentos em Massa`.
+2. Conferir se existe conta pagadora cadastrada e ativa.
+3. Entrar em `Titulos elegiveis`.
+4. Filtrar vencimento, parceiro, obra ou centro de custo quando necessario.
+5. Clicar em `Buscar elegiveis`.
+6. Conferir credor, favorecido PIX, vencimento e saldo de cada titulo.
+7. Selecionar apenas os titulos que realmente devem ser pagos.
+8. Conferir conta pagadora e data programada.
+9. Clicar em `Gerar lote`.
+10. Entrar em `Lotes`.
+11. Selecionar o lote criado.
+12. Clicar em `Submeter`.
+13. Aprovadores conferem valor, itens, conta pagadora e favorecidos.
+14. Cada aprovador informa MFA e clica em `Aprovar`.
+15. Depois das aprovacoes exigidas, enviar ao banco ou ao ambiente mock/sandbox.
+16. Aguardar confirmacao bancaria.
+17. Entrar em `Confirmar baixa`.
+18. Confirmar a baixa somente dos pagamentos efetivamente confirmados pelo banco.
+
+Regra de rejeicao:
+
+- rejeitar lote exige justificativa real;
+- a justificativa deve explicar o problema encontrado;
+- nao usar textos genericos como "rejeitado pela operacao";
+- exemplos validos: favorecido incorreto, conta pagadora incorreta, data programada errada, titulo incluido indevidamente, valor divergente.
+
+Cuidados:
+
+- baixa financeira nao deve ocorrer no momento da geracao do lote;
+- lote aprovado ainda nao significa pagamento realizado;
+- pagamento realizado depende de confirmacao bancaria;
+- se o banco rejeitar ou falhar, corrigir a causa antes de reprocessar;
+- se um lote for cancelado ou rejeitado, os titulos devem ser revisados antes de entrar em novo lote;
+- conta pagadora precisa representar a empresa real que vai movimentar o caixa.
+
 ### 11.9 Grupo Consolidado
 
 Tela:

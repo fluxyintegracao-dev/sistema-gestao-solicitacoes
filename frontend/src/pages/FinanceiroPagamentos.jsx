@@ -277,6 +277,18 @@ export default function FinanceiroPagamentos() {
     }));
   }
 
+  function handleRejectBatch() {
+    if (!selectedBatch?.id) return;
+    const justificativa = window.prompt('Informe o motivo da rejeicao do lote:');
+    if (justificativa === null) return;
+    const motivo = justificativa.trim();
+    if (!motivo) {
+      setError('Informe uma justificativa para rejeitar o lote.');
+      return;
+    }
+    runBatchAction('rejeitar', (id) => rejeitarPaymentBatch(id, { justificativa: motivo }));
+  }
+
   function handleReprocessBatch() {
     if (!selectedBatch?.id) return;
     const justificativa = window.prompt('Informe o motivo do reprocessamento do lote:');
@@ -508,7 +520,7 @@ export default function FinanceiroPagamentos() {
                           <HiOutlineCheckCircle className="h-4 w-4" />
                           Aprovar
                         </button>
-                        <button type="button" className="btn btn-outline" onClick={() => runBatchAction('rejeitar', (id) => rejeitarPaymentBatch(id, { justificativa: 'Rejeitado pela operacao financeira.' }))} disabled={!canApprove || !['PENDENTE_APROVACAO', 'APROVADO'].includes(selectedBatch.status) || actionLoading === 'rejeitar'}>
+                        <button type="button" className="btn btn-outline" onClick={handleRejectBatch} disabled={!canApprove || !['PENDENTE_APROVACAO', 'APROVADO'].includes(selectedBatch.status) || actionLoading === 'rejeitar'}>
                           <HiOutlineXCircle className="h-4 w-4" />
                           Rejeitar
                         </button>

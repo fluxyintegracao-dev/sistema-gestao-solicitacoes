@@ -105,6 +105,11 @@ async function approveBatchWithMfa(req, id, payload = {}) {
 }
 
 async function rejectBatch(req, id, payload = {}) {
+  const justificativa = String(payload.justificativa || '').trim();
+  if (!justificativa) {
+    throw createHttpError(400, 'Justificativa obrigatoria para rejeitar lote de pagamento.');
+  }
+
   const batch = await PaymentBatch.findByPk(id, {
     include: [{ model: PaymentBatchItem, as: 'items' }]
   });
@@ -122,13 +127,13 @@ async function rejectBatch(req, id, payload = {}) {
       status: 'REJEITADO',
       aprovado_por: req.user.id,
       aprovado_em: new Date(),
-      justificativa: payload.justificativa || null
+      justificativa
     }, { transaction });
 
     const intentIds = batch.items.map((item) => item.payment_intent_id);
     await batch.update({ status: 'REJEITADO', aprovacao_status: 'REJEITADO' }, { transaction });
     await PaymentIntent.update(
-      { status: 'CANCELADO', cancelado_em: new Date(), motivo_cancelamento: payload.justificativa || 'Lote rejeitado', updated_by: req.user.id },
+      { status: 'CANCELADO', cancelado_em: new Date(), motivo_cancelamento: justificativa, updated_by: req.user.id },
       { where: { id: { [Op.in]: intentIds } }, transaction }
     );
     await PaymentBatchItem.update(

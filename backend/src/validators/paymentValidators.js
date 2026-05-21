@@ -46,6 +46,11 @@ function parseOptionalText(value, fieldName, max = 255) {
   return sanitizeString(value, fieldName, { required: false, max });
 }
 
+function parseRequiredText(value, fieldName, max = 255) {
+  if (isBlank(value)) throw new ValidationError(`${fieldName} e obrigatoria.`);
+  return sanitizeString(value, fieldName, { required: true, max });
+}
+
 function cleanUndefined(data) {
   return Object.fromEntries(Object.entries(data).filter(([, value]) => value !== undefined));
 }
@@ -112,6 +117,13 @@ function validatePaymentMfaBody(payload = {}) {
   });
 }
 
+function validatePaymentRejectBody(payload = {}) {
+  ensureAllowedKeys(payload, ['justificativa'], 'Rejeicao de lote');
+  return {
+    justificativa: parseRequiredText(payload.justificativa, 'Justificativa', 500)
+  };
+}
+
 function validatePaymentCancelBody(payload = {}) {
   ensureAllowedKeys(payload, ['justificativa'], 'Cancelamento de lote');
   return cleanUndefined({
@@ -162,5 +174,6 @@ module.exports = {
   validatePaymentBeneficiaryUpdateBody,
   validatePaymentCancelBody,
   validatePaymentMockReturnBody,
+  validatePaymentRejectBody,
   validatePaymentMfaBody
 };
