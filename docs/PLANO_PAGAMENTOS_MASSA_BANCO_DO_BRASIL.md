@@ -972,7 +972,8 @@ Status sugeridos:
 - Cancelamento de lote ja submetido ou aprovado exige MFA step-up, alem de justificativa operacional.
 - Retorno bancario mockado exige MFA step-up e justificativa, porque simula o evento bancario que habilita baixa posterior.
 - Webhook/retorno real do BB deve ficar desabilitado por padrao e, quando habilitado, exigir segredo compartilhado em header configurado; chamada sem segredo valido nao deve gerar evento financeiro.
-- Webhook/retorno real do BB deve ser idempotente por identificador do evento do provedor, evitando criar eventos duplicados quando o banco reenviar a mesma notificacao.
+- Webhook/retorno real do BB deve exigir identificador do evento do provedor; evento sem identificador nao entra na fila porque nao permite idempotencia nem rastreabilidade confiavel.
+- Webhook/retorno real do BB deve ser idempotente por esse identificador do evento do provedor, evitando criar eventos duplicados quando o banco reenviar a mesma notificacao.
 - Webhook/retorno real do BB deve registrar evento de seguranca para tentativa invalida, evento aceito e notificacao duplicada.
 - OFX ou retorno bancario pode reforcar conciliacao, mas nao deve duplicar baixa; se ja houver reconciliacao tecnica da intencao, a baixa deve atualizar o registro existente.
 - Reprocessamento deve reutilizar idempotency key quando tecnicamente correto.

@@ -780,27 +780,39 @@ async function handleBbWebhook(req) {
   if (!provider) throw createHttpError(404, 'Provider BB nao encontrado.');
 
   const providerEventId = getBbWebhookProviderEventId(req.body || {});
-  if (providerEventId) {
-    const existingEvent = await PaymentEvent.findOne({
-      where: {
-        provider_id: provider.id,
-        event_type: 'BB_WEBHOOK_RECEIVED',
-        provider_event_id: providerEventId
-      },
-      order: [['createdAt', 'DESC']]
+  if (!providerEventId) {
+    await registrarEventoSeguranca({
+      req,
+      tipoEvento: 'BB_WEBHOOK_MISSING_EVENT_ID',
+      recursoTipo: 'PAYMENT_EVENT',
+      status: 'FAILURE',
+      descricao: 'Webhook BB rejeitado por ausencia de identificador do evento',
+      metadata: {
+        payload_keys: Object.keys(req.body || {}).slice(0, 30)
+      }
     });
-    if (existingEvent) {
-      await registrarEventoSeguranca({
-        req,
-        tipoEvento: 'BB_WEBHOOK_DUPLICATE_EVENT',
-        recursoTipo: 'PAYMENT_EVENT',
-        recursoId: existingEvent.id,
-        status: 'INFO',
-        descricao: 'Webhook BB duplicado reaproveitou evento existente',
-        metadata: { provider_event_id: providerEventId }
-      });
-      return existingEvent;
-    }
+    throw createHttpError(400, 'Webhook BB sem identificador do evento do provedor.');
+  }
+
+  const existingEvent = await PaymentEvent.findOne({
+    where: {
+      provider_id: provider.id,
+      event_type: 'BB_WEBHOOK_RECEIVED',
+      provider_event_id: providerEventId
+    },
+    order: [['createdAt', 'DESC']]
+  });
+  if (existingEvent) {
+    await registrarEventoSeguranca({
+      req,
+      tipoEvento: 'BB_WEBHOOK_DUPLICATE_EVENT',
+      recursoTipo: 'PAYMENT_EVENT',
+      recursoId: existingEvent.id,
+      status: 'INFO',
+      descricao: 'Webhook BB duplicado reaproveitou evento existente',
+      metadata: { provider_event_id: providerEventId }
+    });
+    return existingEvent;
   }
 
   const event = await PaymentEvent.create({

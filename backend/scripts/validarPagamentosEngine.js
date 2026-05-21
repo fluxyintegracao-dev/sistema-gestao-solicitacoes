@@ -186,6 +186,18 @@ function validateRoutesAndCriticalGuards() {
     'MFA step-up nao encontrado na execucao/reprocessamento.'
   );
   assert(
+    executionService.includes('BB_WEBHOOK_SECRET nao configurado') && executionService.includes('Segredo do webhook BB invalido'),
+    'Validacao de segredo do webhook BB nao encontrada.'
+  );
+  assert(
+    executionService.includes('Webhook BB sem identificador do evento do provedor'),
+    'Guarda contra webhook BB sem identificador nao encontrada.'
+  );
+  assert(
+    executionService.includes('BB_WEBHOOK_DUPLICATE_EVENT'),
+    'Idempotencia/auditoria de webhook BB duplicado nao encontrada.'
+  );
+  assert(
     executionService.includes('Ja existe um job de envio pendente ou em processamento'),
     'Bloqueio de job duplicado nao encontrado.'
   );

@@ -1267,6 +1267,7 @@ Cuidados:
 - retorno real por webhook do Banco do Brasil so deve ser ativado quando `BB_WEBHOOK_ENABLED=true` e `BB_WEBHOOK_SECRET` estiver configurado no ambiente;
 - o webhook real precisa receber o segredo no header definido em `BB_WEBHOOK_SECRET_HEADER` ou no padrao `x-fluxy-bb-webhook-secret`;
 - chamada de webhook sem segredo valido deve ser tratada como tentativa invalida e nao deve criar evento financeiro;
+- chamada de webhook sem identificador do evento do provedor tambem deve ser recusada, porque nao permite evitar duplicidade nem rastrear o retorno com seguranca;
 - se o banco reenviar a mesma notificacao com o mesmo identificador de evento, o sistema deve reaproveitar o evento ja registrado e nao duplicar retorno, baixa ou reconciliacao;
 - tentativas invalidas, eventos aceitos e notificacoes duplicadas devem ficar registrados na auditoria de seguranca para conferencia posterior;
 - se o banco rejeitar ou falhar, corrigir a causa antes de reprocessar;
