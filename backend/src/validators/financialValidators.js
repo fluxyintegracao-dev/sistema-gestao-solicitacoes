@@ -952,7 +952,12 @@ function validateFinanceTituloBaixaBody(body = {}) {
       'multa',
       'desconto',
       'data_movimento',
-      'observacoes'
+      'observacoes',
+      'intercompany',
+      'tipo_intercompany',
+      'motivo_intercompany',
+      'elimina_consolidado',
+      'transferencia_interna'
     ],
     'Baixa de titulo financeiro'
   );
@@ -985,7 +990,12 @@ function validateFinanceTituloBaixaBody(body = {}) {
     multa: parseDecimal(body.multa, 'Multa', { min: 0 }),
     desconto: parseDecimal(body.desconto, 'Desconto', { min: 0 }),
     data_movimento: parseDateOnly(body.data_movimento, 'Data do movimento', { required: true }),
-    observacoes: parseOptionalText(body.observacoes, 'Observacoes', 4000)
+    observacoes: parseOptionalText(body.observacoes, 'Observacoes', 4000),
+    intercompany: parseBoolean(body.intercompany, 'Intercompany'),
+    tipo_intercompany: parseEnum(body.tipo_intercompany, 'Tipo intercompany', TIPOS_INTERCOMPANY),
+    motivo_intercompany: parseOptionalText(body.motivo_intercompany, 'Motivo intercompany', 255),
+    elimina_consolidado: parseBoolean(body.elimina_consolidado, 'Eliminar no consolidado'),
+    transferencia_interna: parseBoolean(body.transferencia_interna, 'Transferencia interna')
   };
 }
 

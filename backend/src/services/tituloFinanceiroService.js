@@ -705,7 +705,7 @@ async function validarEmpresaGrupo(empresaId) {
   return empresa;
 }
 
-async function validarEmpresaBaixa({ empresaId, conta, titulo = null }) {
+async function validarEmpresaBaixa({ empresaId, conta }) {
   const empresa = await validarEmpresaGrupo(empresaId);
   if (!empresa) {
     throw createHttpError(400, 'Empresa pagadora e obrigatoria para registrar a baixa.');
@@ -718,11 +718,6 @@ async function validarEmpresaBaixa({ empresaId, conta, titulo = null }) {
 
   if (conta?.empresa_id && Number(conta.empresa_id) !== empresaBaixaId) {
     throw createHttpError(400, 'A empresa pagadora deve ser a mesma vinculada a conta bancaria selecionada.');
-  }
-
-  const empresaEsperadaTitulo = titulo?.empresa_id || titulo?.obra?.empresa_grupo_id || null;
-  if (empresaEsperadaTitulo && Number(empresaEsperadaTitulo) !== empresaBaixaId) {
-    throw createHttpError(400, 'A empresa pagadora deve ser a mesma vinculada ao titulo financeiro.');
   }
 
   return empresaBaixaId;
@@ -806,6 +801,50 @@ function buildMovimentoIntercompanyFields(titulo = {}) {
     motivo_intercompany: titulo.motivo_intercompany || null,
     elimina_consolidado: Boolean(titulo.elimina_consolidado),
     transferencia_interna: Boolean(titulo.transferencia_interna)
+  };
+}
+
+async function validarIntercompanyBaixa({ payload = {}, titulo = {}, empresaBaixaId }) {
+  const empresaTituloId = titulo?.empresa_id || titulo?.obra?.empresa_grupo_id || null;
+  const empresasDiferentes = Boolean(
+    empresaTituloId &&
+    empresaBaixaId &&
+    Number(empresaTituloId) !== Number(empresaBaixaId)
+  );
+
+  if (!empresasDiferentes) {
+    if (payload.intercompany && !titulo.intercompany) {
+      throw createHttpError(
+        400,
+        'A baixa so deve ser marcada como intercompany quando a empresa da baixa for diferente da empresa do titulo.'
+      );
+    }
+    return buildMovimentoIntercompanyFields(titulo);
+  }
+
+  if (!payload.intercompany) {
+    throw createHttpError(
+      400,
+      'A empresa da baixa e diferente da empresa do titulo. Marque a baixa como intercompany e informe o tipo para manter rastreabilidade.'
+    );
+  }
+
+  const tipoIntercompany = normalizeTipoIntercompany(payload.tipo_intercompany);
+  if (!tipoIntercompany) {
+    throw createHttpError(400, 'Tipo intercompany e obrigatorio quando outra empresa paga ou recebe a baixa.');
+  }
+
+  await validarEmpresaGrupo(empresaTituloId);
+
+  const isPagar = String(titulo.tipo || '').toUpperCase() === 'PAGAR';
+  return {
+    intercompany_group_id: payload.intercompany_group_id || `IC-BAIXA-${crypto.randomUUID()}`,
+    empresa_origem_id: isPagar ? Number(empresaBaixaId) : Number(empresaTituloId),
+    empresa_destino_id: isPagar ? Number(empresaTituloId) : Number(empresaBaixaId),
+    tipo_intercompany: tipoIntercompany,
+    motivo_intercompany: payload.motivo_intercompany || null,
+    elimina_consolidado: payload.elimina_consolidado !== false,
+    transferencia_interna: payload.transferencia_interna !== false
   };
 }
 
@@ -1753,10 +1792,14 @@ async function baixarTitulo(req, tituloId, payload = {}) {
   const conta = await validarContaBancaria(payload.conta_bancaria_id);
   const empresaBaixaId = await validarEmpresaBaixa({
     empresaId: payload.empresa_id,
-    conta,
-    titulo
+    conta
   });
-  const empresaTituloId = titulo.empresa_id || empresaBaixaId;
+  const movimentoIntercompanyFields = await validarIntercompanyBaixa({
+    payload,
+    titulo,
+    empresaBaixaId
+  });
+  const empresaTituloId = titulo.empresa_id || titulo.obra?.empresa_grupo_id || empresaBaixaId;
   const novoValorBaixado = roundCurrency(Number(titulo.valor_baixado || 0) + valorBaixa);
   const novoEstado = calcularStatusTitulo({
     valorOriginal: Number(titulo.valor_original || 0),
@@ -1772,7 +1815,7 @@ async function baixarTitulo(req, tituloId, payload = {}) {
       titulo_financeiro_id: titulo.id,
       conta_bancaria_id: conta?.id || null,
       empresa_id: empresaBaixaId,
-      ...buildMovimentoIntercompanyFields(titulo),
+      ...movimentoIntercompanyFields,
       caixa_sessao_id: caixaSessao?.id || null,
       forma_recebimento: formaRecebimento,
       tipo_permuta: payload.tipo_permuta || null,
@@ -1822,12 +1865,15 @@ async function baixarTitulo(req, tituloId, payload = {}) {
       recursoId: titulo.id,
       status: 'SUCCESS',
       descricao: 'Baixa financeira registrada no titulo',
-      metadata: {
-        movimento_id: movimento.id,
-        conta_bancaria_id: conta?.id || null,
-        forma_recebimento: formaRecebimento,
-        tipo_permuta: payload.tipo_permuta || null,
-        categoria_bem: payload.categoria_bem || null,
+        metadata: {
+          movimento_id: movimento.id,
+          conta_bancaria_id: conta?.id || null,
+          empresa_baixa_id: empresaBaixaId,
+          intercompany_group_id: movimentoIntercompanyFields.intercompany_group_id || null,
+          tipo_intercompany: movimentoIntercompanyFields.tipo_intercompany || null,
+          forma_recebimento: formaRecebimento,
+          tipo_permuta: payload.tipo_permuta || null,
+          categoria_bem: payload.categoria_bem || null,
         valor: valorBaixa,
         juros,
         multa,

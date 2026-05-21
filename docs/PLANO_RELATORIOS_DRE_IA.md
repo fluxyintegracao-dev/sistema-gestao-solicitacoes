@@ -46,6 +46,7 @@ Base multiempresa e DRE gerencial:
 - A DRE passou a combinar filtro de periodo e exclusao de intercompany sem sobrescrever uma regra pela outra.
 - Financeiro > Relatorios ganhou Fluxo de Caixa Consolidado para analisar previsto x realizado por Holding, empresa e obra/centro de custo, eliminando intercompany quando solicitado.
 - No Fluxo de Caixa Consolidado, o previsto usa a empresa do titulo e o realizado usa a empresa informada na baixa, sem deduzir empresa por fallback operacional.
+- A baixa financeira passou a permitir empresa pagadora/recebedora diferente da empresa do titulo apenas quando o usuario marca a baixa como intercompany e informa o tipo, mantendo a relacao interna rastreavel.
 
 Documentacao operacional complementar:
 

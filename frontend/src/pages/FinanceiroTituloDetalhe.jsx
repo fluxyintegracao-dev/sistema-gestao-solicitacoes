@@ -94,7 +94,12 @@ function buildBaixaForm(titulo, contasBancarias, movimento = null) {
       multa: formatCurrencyInput(movimento?.multa, { emptyZero: false }),
       desconto: formatCurrencyInput(movimento?.desconto, { emptyZero: false }),
       data_movimento: movimento?.data_movimento || today(),
-      observacoes: movimento?.observacoes || ''
+      observacoes: movimento?.observacoes || '',
+      intercompany: Boolean(movimento?.intercompany_group_id || movimento?.tipo_intercompany),
+      tipo_intercompany: movimento?.tipo_intercompany || '',
+      motivo_intercompany: movimento?.motivo_intercompany || '',
+      elimina_consolidado: movimento?.elimina_consolidado !== false,
+      transferencia_interna: movimento?.transferencia_interna !== false
     };
   }
 
@@ -112,7 +117,12 @@ function buildBaixaForm(titulo, contasBancarias, movimento = null) {
     multa: formatCurrencyInput(0, { emptyZero: false }),
     desconto: formatCurrencyInput(0, { emptyZero: false }),
     data_movimento: today(),
-    observacoes: ''
+    observacoes: '',
+    intercompany: false,
+    tipo_intercompany: '',
+    motivo_intercompany: '',
+    elimina_consolidado: true,
+    transferencia_interna: true
   };
 }
 
@@ -173,6 +183,9 @@ function formatAuditMetadata(metadata) {
     valor_original: 'Valor original',
     movimento_id: 'Movimento',
     conta_bancaria_id: 'Conta bancaria',
+    empresa_baixa_id: 'Empresa da baixa',
+    intercompany_group_id: 'Grupo intercompany',
+    tipo_intercompany: 'Tipo intercompany',
     forma_recebimento: 'Forma de recebimento',
     tipo_permuta: 'Tipo de permuta',
     categoria_bem: 'Categoria do bem',
@@ -271,6 +284,13 @@ export default function FinanceiroTituloDetalhe() {
   const podeVerIntegracaoSienge = useMemo(() => canViewIntegracaoSienge(user), [user]);
 
   const filaSienge = titulo?.integracaoSienge || null;
+  const empresaTituloId = String(titulo?.empresa_id || titulo?.obra?.empresa_grupo_id || '');
+  const baixaEmpresaDiferente = Boolean(
+    empresaTituloId &&
+    baixaForm.empresa_id &&
+    String(baixaForm.empresa_id) !== empresaTituloId
+  );
+  const mostrarIntercompanyBaixa = baixaEmpresaDiferente || baixaForm.intercompany;
 
   async function handleSalvarCobranca(event) {
     event.preventDefault();
@@ -305,6 +325,14 @@ export default function FinanceiroTituloDetalhe() {
     }
     if (contaBancariaObrigatoria(baixaForm.forma_recebimento) && !baixaForm.conta_bancaria_id) {
       setError('Informe a conta bancaria da empresa pagadora.');
+      return;
+    }
+    if (baixaEmpresaDiferente && !baixaForm.intercompany) {
+      setError('A empresa da baixa e diferente da empresa do titulo. Marque como intercompany e informe o tipo.');
+      return;
+    }
+    if (baixaForm.intercompany && !baixaForm.tipo_intercompany) {
+      setError('Informe o tipo de intercompany da baixa.');
       return;
     }
     try {
@@ -1043,15 +1071,19 @@ export default function FinanceiroTituloDetalhe() {
                 </label>
 
                 <label className="text-sm">
-                  <span className="mb-1 block text-slate-500">Empresa pagadora</span>
+                  <span className="mb-1 block text-slate-500">Empresa pagadora/recebedora</span>
                   <select
                     className="input w-full"
                     value={baixaForm.empresa_id}
-                    onChange={(event) => setBaixaForm((current) => ({
-                      ...current,
-                      empresa_id: event.target.value,
-                      conta_bancaria_id: ''
-                    }))}
+                    onChange={(event) => {
+                      const empresaSelecionada = event.target.value;
+                      setBaixaForm((current) => ({
+                        ...current,
+                        empresa_id: empresaSelecionada,
+                        conta_bancaria_id: '',
+                        intercompany: Boolean(empresaTituloId && empresaSelecionada && empresaSelecionada !== empresaTituloId) || current.intercompany
+                      }));
+                    }}
                     required
                   >
                     <option value="">Selecione</option>
@@ -1072,7 +1104,7 @@ export default function FinanceiroTituloDetalhe() {
                     required={contaBancariaObrigatoria(baixaForm.forma_recebimento)}
                     disabled={!baixaForm.empresa_id}
                   >
-                    <option value="">{baixaForm.empresa_id ? 'Selecione' : 'Selecione a empresa pagadora'}</option>
+                    <option value="">{baixaForm.empresa_id ? 'Selecione' : 'Selecione a empresa da baixa'}</option>
                     {contasBancariasBaixa.map((conta) => (
                       <option key={conta.id} value={conta.id}>
                         {conta.nome}
@@ -1091,6 +1123,78 @@ export default function FinanceiroTituloDetalhe() {
                     required
                   />
                 </label>
+              </div>
+
+              <div className="rounded-xl border border-[var(--c-border)] bg-[var(--c-bg)] p-3">
+                <label className="flex items-start gap-2 text-sm text-[var(--c-text)]">
+                  <input
+                    type="checkbox"
+                    className="mt-1"
+                    checked={Boolean(baixaForm.intercompany)}
+                    disabled={baixaEmpresaDiferente}
+                    onChange={(event) => setBaixaForm((current) => ({
+                      ...current,
+                      intercompany: event.target.checked,
+                      tipo_intercompany: event.target.checked ? current.tipo_intercompany : '',
+                      motivo_intercompany: event.target.checked ? current.motivo_intercompany : ''
+                    }))}
+                  />
+                  <span>
+                    <span className="block font-semibold">Baixa intercompany</span>
+                    <span className="block text-xs text-[var(--c-muted)]">
+                      Use quando uma empresa paga ou recebe um titulo que pertence a outra empresa do grupo.
+                    </span>
+                  </span>
+                </label>
+
+                {mostrarIntercompanyBaixa && (
+                  <div className="mt-3 grid gap-3 md:grid-cols-2">
+                    <label className="text-sm">
+                      <span className="mb-1 block text-slate-500">Tipo intercompany</span>
+                      <select
+                        className="input w-full"
+                        value={baixaForm.tipo_intercompany}
+                        onChange={(event) => setBaixaForm((current) => ({ ...current, tipo_intercompany: event.target.value }))}
+                        required={Boolean(baixaForm.intercompany)}
+                      >
+                        <option value="">Selecione</option>
+                        {Object.entries(TIPOS_INTERCOMPANY_LABEL).map(([value, label]) => (
+                          <option key={value} value={value}>{label}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="text-sm">
+                      <span className="mb-1 block text-slate-500">Motivo</span>
+                      <input
+                        className="input w-full"
+                        value={baixaForm.motivo_intercompany}
+                        onChange={(event) => setBaixaForm((current) => ({ ...current, motivo_intercompany: event.target.value }))}
+                        placeholder="Ex.: pagamento feito pela tesouraria"
+                      />
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-[var(--c-text)]">
+                      <input
+                        type="checkbox"
+                        checked={baixaForm.elimina_consolidado !== false}
+                        onChange={(event) => setBaixaForm((current) => ({ ...current, elimina_consolidado: event.target.checked }))}
+                      />
+                      Eliminar relacao interna no consolidado
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-[var(--c-text)]">
+                      <input
+                        type="checkbox"
+                        checked={baixaForm.transferencia_interna !== false}
+                        onChange={(event) => setBaixaForm((current) => ({ ...current, transferencia_interna: event.target.checked }))}
+                      />
+                      Tratar como transferencia interna
+                    </label>
+                    {baixaEmpresaDiferente && (
+                      <div className="md:col-span-2 rounded-lg bg-white/70 px-3 py-2 text-xs text-[var(--c-muted)]">
+                        O sistema registrara a relacao entre a empresa do titulo e a empresa da baixa de forma explicita.
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -1215,7 +1319,13 @@ export default function FinanceiroTituloDetalhe() {
                 <button
                   type="submit"
                   className="btn btn-primary"
-                  disabled={savingBaixa || !baixaForm.empresa_id || (contaBancariaObrigatoria(baixaForm.forma_recebimento) && !baixaForm.conta_bancaria_id) || !baixaForm.valor}
+                  disabled={
+                    savingBaixa ||
+                    !baixaForm.empresa_id ||
+                    (contaBancariaObrigatoria(baixaForm.forma_recebimento) && !baixaForm.conta_bancaria_id) ||
+                    !baixaForm.valor ||
+                    (Boolean(baixaForm.intercompany) && !baixaForm.tipo_intercompany)
+                  }
                 >
                   {savingBaixa ? 'Salvando...' : corrigindoMovimentoId ? 'Salvar correcao' : 'Confirmar baixa'}
                 </button>

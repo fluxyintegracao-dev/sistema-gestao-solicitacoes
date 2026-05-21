@@ -904,14 +904,24 @@ Passo a passo:
 10. Informar forma de pagamento ou recebimento.
 11. Informar valor pago ou recebido.
 12. Informar juros, multa ou desconto se houver.
-13. Anexar comprovante quando aplicavel.
-14. Salvar.
+13. Se a empresa da baixa for diferente da empresa do titulo, marcar baixa intercompany.
+14. Informar o tipo intercompany e o motivo.
+15. Anexar comprovante quando aplicavel.
+16. Salvar.
 
 Regra fundamental:
 
 - a empresa pagadora ou recebedora deve ser informada explicitamente.
+- empresa diferente da empresa do titulo so deve ser usada quando houver relacao intercompany real.
 
 Nao usar deducao automatica para substituir dado real.
+
+Exemplo:
+
+- titulo de despesa pertence a Empresa A;
+- a conta bancaria usada na baixa pertence a Empresa B;
+- nesse caso, marque baixa intercompany, escolha o tipo correto e registre o motivo;
+- o caixa realizado ficara na Empresa B e o titulo continuara mostrando a responsabilidade economica da Empresa A.
 
 ### 11.6 Corrigir baixa
 
