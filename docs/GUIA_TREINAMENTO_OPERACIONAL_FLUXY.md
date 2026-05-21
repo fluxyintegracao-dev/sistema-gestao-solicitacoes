@@ -850,8 +850,17 @@ Passo a passo:
 10. Marcar se considera na DRE.
 11. Marcar intercompany somente se for movimentacao entre empresas do grupo.
 12. Se for intercompany, informar origem, destino, tipo e motivo.
-13. Revisar.
-14. Salvar.
+13. Conferir a previa de impacto gerencial.
+14. Revisar.
+15. Salvar.
+
+Na previa de impacto gerencial, confira:
+
+- se o titulo entra ou nao na DRE;
+- se a categoria financeira esta classificada para DRE;
+- se o valor aparece como entrada ou saida prevista no caixa;
+- se uma operacao intercompany sera eliminada ou mantida no consolidado;
+- se origem e destino estao coerentes quando houver intercompany.
 
 ### 11.4 Criar titulo a partir da solicitacao
 
@@ -876,13 +885,15 @@ Passo a passo:
 11. Informar vencimento.
 12. Informar valor.
 13. Informar intercompany se for o caso.
-14. Salvar.
+14. Conferir a previa de impacto gerencial.
+15. Salvar.
 
 Cuidados:
 
 - se o titulo nasce de solicitacao errada, corrija a solicitacao antes;
 - nao gerar titulo duplicado;
 - conferir se ja existe titulo relacionado.
+- nao salvar quando a previa apontar DRE pendente de categoria, salvo em caso conscientemente fora da DRE.
 
 ### 11.5 Registrar baixa de titulo
 

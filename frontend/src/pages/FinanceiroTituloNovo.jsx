@@ -245,6 +245,83 @@ function getParceiroPixPrincipal(parceiro) {
   return getParceiroPixOptions(parceiro)[0] || null;
 }
 
+function getEmpresaNome(empresas, empresaId) {
+  return empresas.find((empresa) => String(empresa.id) === String(empresaId))?.nome || '';
+}
+
+function getCategoriaDreResumo(categoria) {
+  if (!categoria) return 'Sem categoria financeira';
+  if (categoria.considera_dre === false) return 'Categoria fora da DRE';
+  const grupo = categoria.dre_grupo || 'Grupo DRE nao classificado';
+  const subgrupo = categoria.dre_subgrupo ? ` / ${categoria.dre_subgrupo}` : '';
+  return `${grupo}${subgrupo}`;
+}
+
+function ImpactoGerencialPreview({ form, categoria, empresasGrupo, totalPagamentos }) {
+  const valorTitulo = roundCurrency(currencyToNumber(form.valor));
+  const valorCaixa = roundCurrency(totalPagamentos || valorTitulo);
+  const categoriaSelecionada = Boolean(categoria);
+  const categoriaEntraDre = categoriaSelecionada && categoria?.considera_dre !== false;
+  const dreAtiva = form.considera_dre !== false && categoriaEntraDre;
+  const origem = getEmpresaNome(empresasGrupo, form.empresa_origem_id);
+  const destino = getEmpresaNome(empresasGrupo, form.empresa_destino_id);
+
+  const dreTexto = !form.considera_dre
+    ? 'Nao entra na DRE'
+    : !categoriaSelecionada
+      ? 'Pendente de categoria'
+      : !categoriaEntraDre
+        ? 'Categoria fora da DRE'
+        : 'Entra na DRE gerencial';
+
+  const consolidadoTexto = form.intercompany
+    ? form.elimina_consolidado
+      ? 'Elimina no consolidado'
+      : 'Mantem no consolidado'
+    : 'Movimento externo';
+
+  const caixaTexto = valorCaixa > 0
+    ? `${form.tipo === 'RECEBER' ? 'Entrada' : 'Saida'} prevista de ${formatCurrency(valorCaixa)}`
+    : 'Valor ainda nao informado';
+
+  return (
+    <div className="md:col-span-2 xl:col-span-12 rounded-xl border border-[var(--c-border)] bg-[var(--c-bg)] p-4">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <div className="text-sm font-semibold text-[var(--c-text)]">Impacto gerencial antes de salvar</div>
+          <div className="text-xs text-[var(--c-muted)]">Conferencia operacional para DRE, caixa e consolidado.</div>
+        </div>
+        {form.intercompany && (
+          <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
+            Intercompany
+          </span>
+        )}
+      </div>
+      <div className="grid gap-3 md:grid-cols-3">
+        <div className={`rounded-lg border px-3 py-2 ${dreAtiva ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.16em]">DRE</div>
+          <div className="mt-1 text-sm font-semibold">{dreTexto}</div>
+          <div className="mt-1 text-xs opacity-80">{getCategoriaDreResumo(categoria)}</div>
+        </div>
+        <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-blue-800">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.16em]">Caixa</div>
+          <div className="mt-1 text-sm font-semibold">{caixaTexto}</div>
+          <div className="mt-1 text-xs opacity-80">Considerado no fluxo previsto ate a baixa.</div>
+        </div>
+        <div className={`rounded-lg border px-3 py-2 ${form.intercompany ? 'border-violet-200 bg-violet-50 text-violet-800' : 'border-slate-200 bg-slate-50 text-slate-700'}`}>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.16em]">Consolidado</div>
+          <div className="mt-1 text-sm font-semibold">{consolidadoTexto}</div>
+          <div className="mt-1 text-xs opacity-80">
+            {form.intercompany
+              ? `${origem || 'Origem nao informada'} -> ${destino || 'Destino nao informado'}`
+              : 'Nao ha eliminacao intercompany.'}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function FinanceiroTituloNovo() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -471,6 +548,10 @@ export default function FinanceiroTituloNovo() {
 
     return `${especificas} categoria(s) de contas a ${labelTipoTitulo(form.tipo)} disponivel(is).`;
   }, [categoriasFiltradas, form.tipo]);
+
+  const categoriaSelecionada = useMemo(() => {
+    return categorias.find((categoria) => String(categoria.id) === String(form.categoria_financeira_id)) || null;
+  }, [categorias, form.categoria_financeira_id]);
 
   const parceiroSelecionado = useMemo(() => {
     return parceiros.find((item) => String(item.id) === String(form.parceiro_id)) || null;
@@ -1198,6 +1279,13 @@ export default function FinanceiroTituloNovo() {
                   Informe origem, destino e tipo. A DRE consolidada elimina apenas o que estiver marcado para eliminacao.
                 </span>
               </div>
+
+              <ImpactoGerencialPreview
+                form={form}
+                categoria={categoriaSelecionada}
+                empresasGrupo={empresasGrupo}
+                totalPagamentos={totalPagamentos}
+              />
 
               <div className="md:col-span-2 xl:col-span-12 space-y-3 rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface-muted)] p-4">
                 <div className="flex items-center justify-between gap-3">

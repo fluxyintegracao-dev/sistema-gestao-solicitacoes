@@ -49,6 +49,7 @@ Base multiempresa e DRE gerencial:
 - A baixa financeira passou a permitir empresa pagadora/recebedora diferente da empresa do titulo apenas quando o usuario marca a baixa como intercompany e informa o tipo, mantendo a relacao interna rastreavel.
 - Transferencias financeiras e conciliacao bancaria passaram a classificar explicitamente transferencia interna e transferencia intercompany, exigindo tipo e motivo quando as contas pertencem a empresas diferentes.
 - O Relatorio Intercompany passou a combinar titulos intercompany com transferencias financeiras intercompany, separando previsto, realizado por baixa e transferencias efetivas entre contas do grupo.
+- As telas de titulo manual e geracao de conta pela solicitacao passaram a exibir uma previa de impacto gerencial antes de salvar, mostrando efeito na DRE, no fluxo de caixa previsto e no consolidado/intercompany.
 
 Documentacao operacional complementar:
 

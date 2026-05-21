@@ -174,6 +174,7 @@ function buildDefaultForm(solicitacao) {
     cartao_id: '',
     quantidade_parcelas: '1',
     data_compra: today(),
+    considera_dre: true,
     intercompany: false,
     empresa_origem_id: '',
     empresa_destino_id: '',
@@ -210,6 +211,83 @@ function SearchIcon() {
       <circle cx="11" cy="11" r="8" />
       <path d="m21 21-4.3-4.3" />
     </svg>
+  );
+}
+
+function getEmpresaNome(empresas, empresaId) {
+  return empresas.find((empresa) => String(empresa.id) === String(empresaId))?.nome || '';
+}
+
+function getCategoriaDreResumo(categoria) {
+  if (!categoria) return 'Sem categoria financeira';
+  if (categoria.considera_dre === false) return 'Categoria fora da DRE';
+  const grupo = categoria.dre_grupo || 'Grupo DRE nao classificado';
+  const subgrupo = categoria.dre_subgrupo ? ` / ${categoria.dre_subgrupo}` : '';
+  return `${grupo}${subgrupo}`;
+}
+
+function ImpactoGerencialPreview({ form, categoria, empresasGrupo, totalPagamentos }) {
+  const valorTitulo = roundCurrency(currencyToNumber(form.valor));
+  const valorCaixa = roundCurrency(totalPagamentos || valorTitulo);
+  const categoriaSelecionada = Boolean(categoria);
+  const categoriaEntraDre = categoriaSelecionada && categoria?.considera_dre !== false;
+  const dreAtiva = form.considera_dre !== false && categoriaEntraDre;
+  const origem = getEmpresaNome(empresasGrupo, form.empresa_origem_id);
+  const destino = getEmpresaNome(empresasGrupo, form.empresa_destino_id);
+
+  const dreTexto = !form.considera_dre
+    ? 'Nao entra na DRE'
+    : !categoriaSelecionada
+      ? 'Pendente de categoria'
+      : !categoriaEntraDre
+        ? 'Categoria fora da DRE'
+        : 'Entra na DRE gerencial';
+
+  const consolidadoTexto = form.intercompany
+    ? form.elimina_consolidado
+      ? 'Elimina no consolidado'
+      : 'Mantem no consolidado'
+    : 'Movimento externo';
+
+  const caixaTexto = valorCaixa > 0
+    ? `${form.tipo === 'RECEBER' ? 'Entrada' : 'Saida'} prevista de ${formatCurrency(valorCaixa)}`
+    : 'Valor ainda nao informado';
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-3">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <div className="text-sm font-semibold text-[var(--c-text)]">Impacto gerencial antes de salvar</div>
+          <div className="text-xs text-slate-500">Confira DRE, caixa e consolidado deste titulo.</div>
+        </div>
+        {form.intercompany && (
+          <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
+            Intercompany
+          </span>
+        )}
+      </div>
+      <div className="grid gap-3 md:grid-cols-3">
+        <div className={`rounded-xl border px-3 py-2 ${dreAtiva ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.16em]">DRE</div>
+          <div className="mt-1 text-sm font-semibold">{dreTexto}</div>
+          <div className="mt-1 text-xs opacity-80">{getCategoriaDreResumo(categoria)}</div>
+        </div>
+        <div className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-blue-800">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.16em]">Caixa</div>
+          <div className="mt-1 text-sm font-semibold">{caixaTexto}</div>
+          <div className="mt-1 text-xs opacity-80">Vai para o fluxo previsto ate a baixa.</div>
+        </div>
+        <div className={`rounded-xl border px-3 py-2 ${form.intercompany ? 'border-violet-200 bg-violet-50 text-violet-800' : 'border-slate-200 bg-slate-50 text-slate-700'}`}>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.16em]">Consolidado</div>
+          <div className="mt-1 text-sm font-semibold">{consolidadoTexto}</div>
+          <div className="mt-1 text-xs opacity-80">
+            {form.intercompany
+              ? `${origem || 'Origem nao informada'} -> ${destino || 'Destino nao informado'}`
+              : 'Nao ha eliminacao intercompany.'}
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -650,6 +728,7 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
         parceiro_id: selectedPartner?.id || form.parceiro_id,
         categoria_financeira_id: form.categoria_financeira_id || undefined,
         valor: form.valor,
+        considera_dre: form.considera_dre !== false,
         intercompany: Boolean(form.intercompany),
         empresa_contraparte_id: form.intercompany && form.empresa_destino_id ? Number(form.empresa_destino_id) : undefined,
         empresa_origem_id: form.intercompany && form.empresa_origem_id ? Number(form.empresa_origem_id) : undefined,
@@ -954,6 +1033,15 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
                 </div>
               </div>
 
+              <label className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm text-[var(--c-text)]">
+                <input
+                  type="checkbox"
+                  checked={form.considera_dre !== false}
+                  onChange={(event) => setForm((current) => ({ ...current, considera_dre: event.target.checked }))}
+                />
+                Considerar este titulo na DRE gerencial
+              </label>
+
               <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-3">
                 <label className="flex items-center gap-2 text-sm text-[var(--c-text)]">
                   <input
@@ -1016,6 +1104,13 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
                   </div>
                 )}
               </div>
+
+              <ImpactoGerencialPreview
+                form={form}
+                categoria={selectedCategory}
+                empresasGrupo={empresasGrupo}
+                totalPagamentos={totalPagamentos}
+              />
 
               <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-3">
                 <div className="flex items-center justify-between gap-3">
