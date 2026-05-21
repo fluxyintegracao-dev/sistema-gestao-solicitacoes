@@ -163,7 +163,9 @@ const env = {
   bbSandboxRealEnabled: parseBoolean(process.env.BB_SANDBOX_REAL_ENABLED, false),
   bbWebhookEnabled: parseBoolean(process.env.BB_WEBHOOK_ENABLED, false),
   bbWebhookPath: String(process.env.BB_WEBHOOK_PATH || '/api/payments/bb/webhook').trim(),
-  bbWebhookRequireMtls: parseBoolean(process.env.BB_WEBHOOK_REQUIRE_MTLS, true)
+  bbWebhookRequireMtls: parseBoolean(process.env.BB_WEBHOOK_REQUIRE_MTLS, true),
+  bbWebhookSecret: String(process.env.BB_WEBHOOK_SECRET || '').trim(),
+  bbWebhookSecretHeader: String(process.env.BB_WEBHOOK_SECRET_HEADER || 'x-fluxy-bb-webhook-secret').trim().toLowerCase()
 };
 
 env.siengeResolvedBaseUrl = buildSiengeApiBaseUrl({

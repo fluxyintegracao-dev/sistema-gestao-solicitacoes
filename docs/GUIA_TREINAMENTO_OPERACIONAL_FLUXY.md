@@ -1264,6 +1264,11 @@ Cuidados:
 - a confirmacao de baixa so deve aparecer quando o pagamento tiver data/hora de confirmacao bancaria registrada;
 - em ambiente mock/desenvolvimento, registrar confirmacao ou falha bancaria simulada exige MFA e justificativa/evidencia operacional;
 - retorno mockado nao e baixa financeira; ele apenas simula o evento bancario que libera a etapa posterior de baixa;
+- retorno real por webhook do Banco do Brasil so deve ser ativado quando `BB_WEBHOOK_ENABLED=true` e `BB_WEBHOOK_SECRET` estiver configurado no ambiente;
+- o webhook real precisa receber o segredo no header definido em `BB_WEBHOOK_SECRET_HEADER` ou no padrao `x-fluxy-bb-webhook-secret`;
+- chamada de webhook sem segredo valido deve ser tratada como tentativa invalida e nao deve criar evento financeiro;
+- se o banco reenviar a mesma notificacao com o mesmo identificador de evento, o sistema deve reaproveitar o evento ja registrado e nao duplicar retorno, baixa ou reconciliacao;
+- tentativas invalidas, eventos aceitos e notificacoes duplicadas devem ficar registrados na auditoria de seguranca para conferencia posterior;
 - se o banco rejeitar ou falhar, corrigir a causa antes de reprocessar;
 - se um lote for cancelado ou rejeitado, os titulos devem ser revisados antes de entrar em novo lote;
 - cancelar lote em rascunho ou revisao exige justificativa; cancelar lote pendente de aprovacao ou ja aprovado exige justificativa e MFA;

@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const { Op } = require('sequelize');
 const {
   PaymentBatch,
@@ -29,6 +30,24 @@ function createHttpError(statusCode, message) {
   const error = new Error(message);
   error.statusCode = statusCode;
   return error;
+}
+
+function timingSafeEqualText(left, right) {
+  const leftBuffer = Buffer.from(String(left || ''), 'utf8');
+  const rightBuffer = Buffer.from(String(right || ''), 'utf8');
+  return leftBuffer.length === rightBuffer.length && crypto.timingSafeEqual(leftBuffer, rightBuffer);
+}
+
+function getBbWebhookProviderEventId(body = {}) {
+  return String(
+    body.id
+      || body.eventId
+      || body.provider_event_id
+      || body.numeroRequisicao
+      || body.numero_requisicao
+      || body.numeroLote
+      || ''
+  ).trim() || null;
 }
 
 async function buildBbNumeroRequisicao(batchId) {
@@ -737,19 +756,73 @@ async function handleBbWebhook(req) {
     throw createHttpError(404, 'Webhook BB desabilitado.');
   }
 
+  if (!env.bbWebhookSecret) {
+    throw createHttpError(500, 'BB_WEBHOOK_SECRET nao configurado para validar webhook BB.');
+  }
+
+  const headerName = env.bbWebhookSecretHeader || 'x-fluxy-bb-webhook-secret';
+  const receivedSecret = req.get(headerName);
+  if (!timingSafeEqualText(receivedSecret, env.bbWebhookSecret)) {
+    await registrarEventoSeguranca({
+      req,
+      tipoEvento: 'BB_WEBHOOK_INVALID_SECRET',
+      recursoTipo: 'PAYMENT_EVENT',
+      status: 'FAILURE',
+      descricao: 'Webhook BB rejeitado por segredo invalido',
+      metadata: { header_name: headerName }
+    });
+    throw createHttpError(403, 'Segredo do webhook BB invalido.');
+  }
+
   const provider = await PaymentProvider.findOne({
     where: { codigo: env.bbPaymentsProvider || 'BB' }
   });
   if (!provider) throw createHttpError(404, 'Provider BB nao encontrado.');
 
-  return PaymentEvent.create({
+  const providerEventId = getBbWebhookProviderEventId(req.body || {});
+  if (providerEventId) {
+    const existingEvent = await PaymentEvent.findOne({
+      where: {
+        provider_id: provider.id,
+        event_type: 'BB_WEBHOOK_RECEIVED',
+        provider_event_id: providerEventId
+      },
+      order: [['createdAt', 'DESC']]
+    });
+    if (existingEvent) {
+      await registrarEventoSeguranca({
+        req,
+        tipoEvento: 'BB_WEBHOOK_DUPLICATE_EVENT',
+        recursoTipo: 'PAYMENT_EVENT',
+        recursoId: existingEvent.id,
+        status: 'INFO',
+        descricao: 'Webhook BB duplicado reaproveitou evento existente',
+        metadata: { provider_event_id: providerEventId }
+      });
+      return existingEvent;
+    }
+  }
+
+  const event = await PaymentEvent.create({
     provider_id: provider.id,
     event_type: 'BB_WEBHOOK_RECEIVED',
-    provider_event_id: req.body?.id || req.body?.numeroRequisicao || null,
+    provider_event_id: providerEventId,
     payload: sanitizePayload(req.body || {}),
     received_at: new Date(),
     processing_status: 'PENDENTE'
   });
+
+  await registrarEventoSeguranca({
+    req,
+    tipoEvento: 'BB_WEBHOOK_RECEIVED',
+    recursoTipo: 'PAYMENT_EVENT',
+    recursoId: event.id,
+    status: 'SUCCESS',
+    descricao: 'Webhook BB recebido e registrado para processamento',
+    metadata: { provider_event_id: providerEventId }
+  });
+
+  return event;
 }
 
 async function markBatchAsBankConfirmedMock(req, id, payload = {}) {
