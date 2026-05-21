@@ -932,10 +932,19 @@ function buildDreDemonstrativo(linhas = []) {
   };
 }
 
+function sortDreLinhas(linhas = []) {
+  return Array.from(linhas).sort((a, b) => (
+    Number(a.ordem || 999) - Number(b.ordem || 999) ||
+    String(a.grupo).localeCompare(String(b.grupo)) ||
+    String(a.subgrupo || '').localeCompare(String(b.subgrupo || ''))
+  ));
+}
+
 function summarizeDreRows(titulos = [], empresas = []) {
   const empresasById = new Map(empresas.map((empresa) => [Number(empresa.id), empresa]));
   const linhasMap = new Map();
   const empresasMap = new Map();
+  const empresaLinhasMaps = new Map();
 
   for (const titulo of titulos) {
     const linha = getLinhaDre(titulo);
@@ -953,6 +962,16 @@ function summarizeDreRows(titulos = [], empresas = []) {
 
     const linhaKey = `${linha.grupo}::${linha.subgrupo || ''}`;
     addToMap(linhasMap, linhaKey, {
+      linha_key: linhaKey,
+      grupo: linha.grupo,
+      subgrupo: linha.subgrupo,
+      ordem: linha.ordem
+    }, signedValue);
+
+    if (!empresaLinhasMaps.has(empresaKey)) {
+      empresaLinhasMaps.set(empresaKey, new Map());
+    }
+    addToMap(empresaLinhasMaps.get(empresaKey), linhaKey, {
       linha_key: linhaKey,
       grupo: linha.grupo,
       subgrupo: linha.subgrupo,
@@ -977,14 +996,24 @@ function summarizeDreRows(titulos = [], empresas = []) {
     empresaResumo.resultado += signedValue;
   }
 
-  const linhas = Array.from(linhasMap.values())
-    .sort((a, b) => (
-      Number(a.ordem || 999) - Number(b.ordem || 999) ||
-      String(a.grupo).localeCompare(String(b.grupo)) ||
-      String(a.subgrupo || '').localeCompare(String(b.subgrupo || ''))
-    ));
+  const linhas = sortDreLinhas(linhasMap.values());
 
-  const empresasResumo = Array.from(empresasMap.values())
+  const empresasResumo = Array.from(empresasMap.entries())
+    .map(([empresaKey, empresaResumo]) => {
+      const empresaLinhas = sortDreLinhas((empresaLinhasMaps.get(empresaKey) || new Map()).values());
+      const empresaDre = buildDreDemonstrativo(empresaLinhas);
+
+      return {
+        ...empresaResumo,
+        receitas: roundCurrency(empresaResumo.receitas),
+        despesas: roundCurrency(empresaResumo.despesas),
+        resultado: empresaDre.metricas.lucro_prejuizo_liquido,
+        margem_resultado: empresaDre.metricas.margem_liquida,
+        ...empresaDre.metricas,
+        linhas: empresaLinhas,
+        demonstrativo: empresaDre.linhas
+      };
+    })
     .sort((a, b) => String(a.empresa_nome).localeCompare(String(b.empresa_nome)));
 
   const receitas = empresasResumo.reduce((sum, item) => sum + Number(item.receitas || 0), 0);

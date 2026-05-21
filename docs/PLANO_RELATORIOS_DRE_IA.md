@@ -40,6 +40,7 @@ Base multiempresa e DRE gerencial:
 - A DRE passou a apresentar linhas por grupo e subgrupo gerencial da categoria financeira, evitando consolidar categorias diferentes em uma unica linha ampla demais.
 - A DRE passou a ter demonstrativo estruturado com Receita Liquida, Lucro Bruto, EBITDA, EBIT, Resultado Financeiro, Resultado antes de IRPJ/CSLL e Lucro/Prejuizo Liquido.
 - As categorias financeiras SIENGE foram reavaliadas para separar tributos sobre faturamento, encargos trabalhistas, tributos operacionais, resultado financeiro e IRPJ/CSLL.
+- A visao por empresa da DRE passou a usar as mesmas metricas economicas do consolidado: Receita Liquida, EBITDA, Lucro/Prejuizo Liquido e Margem Liquida.
 
 Documentacao operacional complementar:
 

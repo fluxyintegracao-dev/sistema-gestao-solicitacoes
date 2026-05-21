@@ -326,23 +326,27 @@ export default function FinanceiroDre() {
                   <thead>
                     <tr>
                       <th>Empresa</th>
-                      <th>Receitas</th>
-                      <th>Custos/Despesas</th>
-                      <th>Resultado</th>
+                      <th>Receita liquida</th>
+                      <th>EBITDA</th>
+                      <th>Lucro/Prejuizo</th>
+                      <th>Margem liquida</th>
                     </tr>
                   </thead>
                   <tbody>
                     {(relatorio?.empresas || []).length ? (relatorio.empresas.map((empresa) => (
                       <tr key={empresa.empresa_id || 'sem-empresa'}>
                         <td className="font-medium text-[var(--c-text)]">{empresa.empresa_nome}</td>
-                        <td>{formatCurrency(empresa.receitas)}</td>
-                        <td>{formatCurrency(empresa.despesas)}</td>
-                        <td className="font-semibold" style={{ color: Number(empresa.resultado || 0) >= 0 ? '#15803d' : '#b91c1c' }}>
-                          {formatCurrency(empresa.resultado)}
+                        <td>{formatCurrency(empresa.receita_liquida)}</td>
+                        <td className="font-semibold" style={{ color: Number(empresa.ebitda || 0) >= 0 ? '#15803d' : '#b91c1c' }}>
+                          {formatCurrency(empresa.ebitda)}
                         </td>
+                        <td className="font-semibold" style={{ color: Number((empresa.lucro_prejuizo_liquido ?? empresa.resultado) || 0) >= 0 ? '#15803d' : '#b91c1c' }}>
+                          {formatCurrency(empresa.lucro_prejuizo_liquido ?? empresa.resultado)}
+                        </td>
+                        <td>{formatPercent(empresa.margem_liquida ?? empresa.margem_resultado)}</td>
                       </tr>
                     ))) : (
-                      <tr><td colSpan={4} className="text-center text-[var(--c-muted)]">Nenhuma empresa com movimento.</td></tr>
+                      <tr><td colSpan={5} className="text-center text-[var(--c-muted)]">Nenhuma empresa com movimento.</td></tr>
                     )}
                   </tbody>
                 </table>
