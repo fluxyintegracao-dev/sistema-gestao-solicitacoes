@@ -185,6 +185,14 @@ async function obterOuCriarConvenioCaixaPadrao(req) {
 
 async function sincronizarBoletoCaixaOperacional(req, titulo, boleto) {
   const convenio = await obterOuCriarConvenioCaixaPadrao(req);
+  const empresaTituloId = titulo.empresa_id ? Number(titulo.empresa_id) : null;
+  if (!Number.isInteger(empresaTituloId) || empresaTituloId <= 0) {
+    throw createHttpError(400, 'Titulo sem empresa vinculada. Corrija a empresa do titulo antes de gerar boleto.');
+  }
+  if (convenio.empresa_id && Number(convenio.empresa_id) !== empresaTituloId) {
+    throw createHttpError(400, 'A empresa do convenio Caixa deve ser a mesma empresa do titulo financeiro.');
+  }
+
   const existente = await BoletoCaixa.findOne({
     where: {
       titulo_financeiro_id: titulo.id,
@@ -195,7 +203,7 @@ async function sincronizarBoletoCaixaOperacional(req, titulo, boleto) {
   const payload = {
     titulo_financeiro_id: titulo.id,
     convenio_id: convenio.id,
-    empresa_id: titulo.empresa_id || null,
+    empresa_id: empresaTituloId,
     parceiro_id: titulo.parceiro_id || null,
     ambiente: boleto.ambiente,
     status: 'GERADO',
@@ -435,6 +443,9 @@ function validarTituloParaBoleto(titulo) {
   }
   if (!titulo.parceiro?.nome || !titulo.parceiro?.cpf_cnpj) {
     throw createHttpError(400, 'O pagador precisa ter nome e CPF/CNPJ cadastrado.');
+  }
+  if (!titulo.empresa_id) {
+    throw createHttpError(400, 'Titulo sem empresa vinculada. Corrija a empresa do titulo antes de gerar boleto.');
   }
   if (toMoneyCents(titulo.valor_saldo || titulo.valor_original) > 999999999) {
     throw createHttpError(400, 'O valor do boleto nao pode exceder R$ 9.999.999,99.');

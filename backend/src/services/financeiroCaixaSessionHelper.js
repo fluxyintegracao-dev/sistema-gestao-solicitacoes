@@ -44,6 +44,18 @@ async function obterSessaoAbertaParaConta(contaOrId, dataMovimento = today(), { 
   });
 
   if (sessao && String(sessao.data_abertura || '') <= String(dataMovimento || today())) {
+    if (!sessao.empresa_id) {
+      throw createHttpError(
+        400,
+        `O caixa aberto da conta ${conta.nome || conta.id} nao possui empresa vinculada. Feche e reabra o caixa apos corrigir a conta financeira.`
+      );
+    }
+    if (conta.empresa_id && Number(sessao.empresa_id) !== Number(conta.empresa_id)) {
+      throw createHttpError(
+        400,
+        `O caixa aberto da conta ${conta.nome || conta.id} esta vinculado a empresa diferente da conta financeira. Reabra o caixa apos corrigir o cadastro.`
+      );
+    }
     return sessao;
   }
 

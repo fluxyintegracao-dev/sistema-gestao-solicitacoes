@@ -110,6 +110,9 @@ async function carregarConta(contaBancariaId) {
   if (!conta || conta.ativo === false) {
     throw createHttpError(400, 'Conta financeira invalida ou inativa.');
   }
+  if (!conta.empresa_id) {
+    throw createHttpError(400, 'A conta financeira precisa estar vinculada a uma empresa do grupo antes de abrir caixa.');
+  }
   return conta;
 }
 
@@ -244,7 +247,7 @@ async function abrirSessaoCaixa(req, payload = {}) {
   const dataAbertura = parseDate(payload.data_abertura, 'Data de abertura', today());
 
   const sessao = await CaixaFinanceiroSessao.create({
-    empresa_id: conta.empresa_id || null,
+    empresa_id: Number(conta.empresa_id),
     conta_bancaria_id: conta.id,
     data_abertura: dataAbertura,
     status: 'ABERTO',
@@ -264,7 +267,7 @@ async function abrirSessaoCaixa(req, payload = {}) {
     descricao: 'Sessao de caixa aberta',
     metadata: {
       conta_bancaria_id: conta.id,
-      empresa_id: conta.empresa_id || null,
+      empresa_id: Number(conta.empresa_id),
       saldo_abertura: saldoAbertura
     }
   });

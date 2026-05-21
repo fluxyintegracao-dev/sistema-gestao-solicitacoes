@@ -556,6 +556,8 @@ Cuidados:
 
 - toda baixa deve indicar a empresa pagadora ou recebedora de forma explicita;
 - a conta bancaria ajuda a conferencia, mas nao deve ser usada como unica inferencia gerencial;
+- contas usadas em abertura/fechamento de caixa precisam ter empresa do grupo vinculada;
+- nao abrir caixa em conta sem empresa, porque isso cria saldo realizado sem dono gerencial;
 - OFX deve ser importado na conta correta.
 
 ### 7.8 Etapa 8 - Treinar usuarios por perfil
@@ -987,6 +989,23 @@ Motivo:
 - retorno bancario confirma recebimento real na conta;
 - DRE e caixa consolidado dependem da empresa correta no titulo e na baixa;
 - recebimento por empresa diferente sem intercompany distorce resultado por empresa e consolidado.
+
+### 11.5.2 Geracao de boleto Caixa
+
+Antes de gerar boleto:
+
+1. Conferir se o titulo e `RECEBER`.
+2. Conferir se o titulo esta `ABERTO` ou `PARCIAL`.
+3. Conferir se o titulo possui empresa do grupo informada.
+4. Conferir se o pagador possui nome e CPF/CNPJ.
+5. Conferir se o convenio Caixa, quando tiver empresa informada, pertence a mesma empresa do titulo.
+
+Regras:
+
+- boleto nao deve nascer sem empresa do titulo;
+- a empresa do boleto vem do titulo financeiro, nao da conta futura do retorno;
+- se o convenio Caixa estiver vinculado a uma empresa diferente, corrigir o convenio ou o titulo antes de emitir;
+- a baixa pelo retorno bancario continua validando conta, convenio e titulo separadamente.
 
 ### 11.6 Corrigir baixa
 
