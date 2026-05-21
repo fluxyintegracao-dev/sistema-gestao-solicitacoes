@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const { Op } = require('sequelize');
 const {
   ConciliacaoBancaria,
@@ -10,6 +11,7 @@ const {
 const { canAccessFinanceiro } = require('./authorizationService');
 const { obterSessaoAbertaParaConta } = require('./financeiroCaixaSessionHelper');
 const { registrarEventoSeguranca } = require('./securityLogService');
+const { normalizeTipoIntercompany } = require('../constants/intercompany');
 
 function createHttpError(statusCode, message) {
   const error = new Error(message);
@@ -73,6 +75,8 @@ async function assertFinanceAccess(req) {
 function includeTransferencia() {
   return [
     { model: EmpresaGrupo, as: 'empresa', attributes: ['id', 'codigo', 'nome', 'razao_social', 'cnpj'] },
+    { model: EmpresaGrupo, as: 'empresaOrigem', attributes: ['id', 'codigo', 'nome', 'razao_social', 'cnpj'] },
+    { model: EmpresaGrupo, as: 'empresaDestino', attributes: ['id', 'codigo', 'nome', 'razao_social', 'cnpj'] },
     { model: ContaBancaria, as: 'contaOrigem', attributes: ['id', 'nome', 'banco', 'agencia', 'conta', 'empresa_id', 'tipo_operacional'] },
     { model: ContaBancaria, as: 'contaDestino', attributes: ['id', 'nome', 'banco', 'agencia', 'conta', 'empresa_id', 'tipo_operacional'] },
     { model: ConciliacaoBancaria, as: 'conciliacaoOrigem', attributes: ['id', 'data_movimento', 'valor', 'status'] },
@@ -105,10 +109,32 @@ async function montarPayloadTransferencia(req, payload = {}, { transaction = nul
   const valor = parseMoney(payload.valor, 'Valor da transferencia');
   const sessaoOrigem = await obterSessaoAbertaParaConta(origem, dataTransferencia, { transaction });
   const sessaoDestino = await obterSessaoAbertaParaConta(destino, dataTransferencia, { transaction });
-  const empresaId = payload.empresa_id || origem.empresa_id || destino.empresa_id || null;
+  const empresaOrigemId = parsePositiveInteger(origem.empresa_id, 'Empresa da conta de origem');
+  const empresaDestinoId = parsePositiveInteger(destino.empresa_id, 'Empresa da conta de destino');
+  const empresasDiferentes = empresaOrigemId !== empresaDestinoId;
+  const tipoIntercompany = empresasDiferentes
+    ? normalizeTipoIntercompany(payload.tipo_intercompany)
+    : null;
+
+  if (empresasDiferentes && !tipoIntercompany) {
+    throw createHttpError(400, 'Transferencia entre empresas exige tipo intercompany.');
+  }
+
+  const motivoIntercompany = empresasDiferentes
+    ? String(payload.motivo_intercompany || payload.descricao || '').trim().slice(0, 255)
+    : null;
+
+  if (empresasDiferentes && !motivoIntercompany) {
+    throw createHttpError(400, 'Transferencia entre empresas exige motivo intercompany.');
+  }
 
   return {
-    empresa_id: empresaId,
+    empresa_id: empresaOrigemId,
+    intercompany_group_id: empresasDiferentes
+      ? (String(payload.intercompany_group_id || '').trim().slice(0, 80) || `IC-TRANSF-${crypto.randomUUID()}`)
+      : null,
+    empresa_origem_id: empresaOrigemId,
+    empresa_destino_id: empresaDestinoId,
     conta_origem_id: origem.id,
     conta_destino_id: destino.id,
     caixa_sessao_origem_id: sessaoOrigem?.id || null,
@@ -116,6 +142,10 @@ async function montarPayloadTransferencia(req, payload = {}, { transaction = nul
     data_transferencia: dataTransferencia,
     valor,
     descricao: String(payload.descricao || '').trim().slice(0, 255) || null,
+    tipo_intercompany: tipoIntercompany,
+    motivo_intercompany: motivoIntercompany || null,
+    elimina_consolidado: payload.elimina_consolidado === false ? false : true,
+    transferencia_interna: true,
     criado_por: req.user?.id || null
   };
 }
@@ -146,6 +176,10 @@ async function criarTransferenciaFinanceira(req, payload = {}, { transaction: ex
         metadata: {
           conta_origem_id: data.conta_origem_id,
           conta_destino_id: data.conta_destino_id,
+          empresa_origem_id: data.empresa_origem_id,
+          empresa_destino_id: data.empresa_destino_id,
+          tipo_intercompany: data.tipo_intercompany,
+          elimina_consolidado: data.elimina_consolidado,
           valor: data.valor,
           data_transferencia: data.data_transferencia
         }
@@ -173,13 +207,21 @@ async function criarTransferenciaFinanceira(req, payload = {}, { transaction: ex
 async function listarTransferenciasFinanceiras(req, filters = {}) {
   await assertFinanceAccess(req);
   const where = {};
+  const andConditions = [];
 
   if (filters.empresa_id) {
-    where.empresa_id = parsePositiveInteger(filters.empresa_id, 'Empresa do grupo');
+    const empresaId = parsePositiveInteger(filters.empresa_id, 'Empresa do grupo');
+    andConditions.push({
+      [Op.or]: [
+        { empresa_id: empresaId },
+        { empresa_origem_id: empresaId },
+        { empresa_destino_id: empresaId }
+      ]
+    });
   }
   if (filters.conta_bancaria_id) {
     const contaId = parsePositiveInteger(filters.conta_bancaria_id, 'Conta');
-    where[Op.or] = [{ conta_origem_id: contaId }, { conta_destino_id: contaId }];
+    andConditions.push({ [Op.or]: [{ conta_origem_id: contaId }, { conta_destino_id: contaId }] });
   }
   if (filters.status && String(filters.status).toUpperCase() !== 'TODOS') {
     where.status = String(filters.status).toUpperCase();
@@ -188,6 +230,9 @@ async function listarTransferenciasFinanceiras(req, filters = {}) {
     where.data_transferencia = {};
     if (filters.data_inicial) where.data_transferencia[Op.gte] = filters.data_inicial;
     if (filters.data_final) where.data_transferencia[Op.lte] = filters.data_final;
+  }
+  if (andConditions.length > 0) {
+    where[Op.and] = andConditions;
   }
 
   return TransferenciaFinanceira.findAll({

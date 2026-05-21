@@ -21,6 +21,18 @@ import { buscarParceiros } from '../services/parceiros';
 import { getMinhasObras } from '../services/obras';
 import { formatCurrencyInput, normalizeCurrencyTyping, parseCurrencyInput } from '../utils/formatters';
 
+const TIPOS_INTERCOMPANY = [
+  { value: 'APORTE', label: 'Aporte' },
+  { value: 'EMPRESTIMO', label: 'Emprestimo' },
+  { value: 'REEMBOLSO', label: 'Reembolso' },
+  { value: 'RATEIO', label: 'Rateio' },
+  { value: 'COBERTURA_CAIXA', label: 'Cobertura de caixa' },
+  { value: 'FOLHA', label: 'Folha' },
+  { value: 'ADMINISTRATIVO', label: 'Administrativo' },
+  { value: 'IMPOSTO', label: 'Imposto' },
+  { value: 'TRANSFERENCIA_OPERACIONAL', label: 'Transferencia operacional' }
+];
+
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
 function formatCurrency(value) {
@@ -73,6 +85,14 @@ function buildAssociacaoDefaults(item) {
 }
 
 // ─── ícones ───────────────────────────────────────────────────────────────────
+
+function getContaEmpresaId(conta) {
+  return String(conta?.empresa_id || conta?.empresa?.id || '');
+}
+
+function getContaEmpresaNome(conta) {
+  return conta?.empresa?.nome || conta?.empresa?.razao_social || (conta?.empresa_id ? `Empresa #${conta.empresa_id}` : 'Sem empresa vinculada');
+}
 
 function KeyIcon({ className = 'h-4 w-4' }) {
   return (
@@ -723,9 +743,26 @@ export default function FinanceiroConciliacao() {
     item: null,
     conta_contraparte_id: '',
     descricao: '',
+    tipo_intercompany: '',
+    motivo_intercompany: '',
+    elimina_consolidado: true,
     processing: false,
     error: ''
   });
+
+  const contaAtualTransferencia = useMemo(
+    () => contas.find((conta) => String(conta.id) === String(transferenciaModal.item?.conta_bancaria_id)),
+    [contas, transferenciaModal.item?.conta_bancaria_id]
+  );
+  const contaContraparteTransferencia = useMemo(
+    () => contas.find((conta) => String(conta.id) === String(transferenciaModal.conta_contraparte_id)),
+    [contas, transferenciaModal.conta_contraparte_id]
+  );
+  const transferenciaEntreEmpresas = Boolean(
+    getContaEmpresaId(contaAtualTransferencia) &&
+    getContaEmpresaId(contaContraparteTransferencia) &&
+    getContaEmpresaId(contaAtualTransferencia) !== getContaEmpresaId(contaContraparteTransferencia)
+  );
 
   async function carregarContas() {
     try {
@@ -979,6 +1016,9 @@ export default function FinanceiroConciliacao() {
       item,
       conta_contraparte_id: String(contasDisponiveis[0]?.id || ''),
       descricao: item?.descricao_banco ? `Transferencia - ${item.descricao_banco}` : 'Transferencia entre contas',
+      tipo_intercompany: '',
+      motivo_intercompany: item?.descricao_banco || '',
+      elimina_consolidado: true,
       processing: false,
       error: ''
     });
@@ -990,6 +1030,9 @@ export default function FinanceiroConciliacao() {
       item: null,
       conta_contraparte_id: '',
       descricao: '',
+      tipo_intercompany: '',
+      motivo_intercompany: '',
+      elimina_consolidado: true,
       processing: false,
       error: ''
     });
@@ -1002,6 +1045,14 @@ export default function FinanceiroConciliacao() {
       setTransferenciaModal((current) => ({ ...current, error: 'Selecione a conta contraparte da transferencia.' }));
       return;
     }
+    if (transferenciaEntreEmpresas && !transferenciaModal.tipo_intercompany) {
+      setTransferenciaModal((current) => ({ ...current, error: 'Selecione o tipo intercompany da transferencia.' }));
+      return;
+    }
+    if (transferenciaEntreEmpresas && !String(transferenciaModal.motivo_intercompany || '').trim()) {
+      setTransferenciaModal((current) => ({ ...current, error: 'Informe o motivo intercompany da transferencia.' }));
+      return;
+    }
 
     try {
       setProcessingId(`transferencia-${transferenciaModal.item.id}`);
@@ -1010,7 +1061,10 @@ export default function FinanceiroConciliacao() {
       setFeedback('');
       await confirmarConciliacaoTransferencia(transferenciaModal.item.id, {
         conta_contraparte_id: transferenciaModal.conta_contraparte_id,
-        descricao: transferenciaModal.descricao
+        descricao: transferenciaModal.descricao,
+        tipo_intercompany: transferenciaEntreEmpresas ? transferenciaModal.tipo_intercompany : undefined,
+        motivo_intercompany: transferenciaEntreEmpresas ? transferenciaModal.motivo_intercompany : undefined,
+        elimina_consolidado: transferenciaEntreEmpresas ? transferenciaModal.elimina_consolidado : true
       });
       setFeedback('Lancamento conciliado como transferencia entre contas.');
       fecharAssociacaoTransferencia();
@@ -1259,7 +1313,7 @@ export default function FinanceiroConciliacao() {
                 <select
                   className="input w-full"
                   value={transferenciaModal.conta_contraparte_id}
-                  onChange={(e) => setTransferenciaModal((current) => ({ ...current, conta_contraparte_id: e.target.value }))}
+                  onChange={(e) => setTransferenciaModal((current) => ({ ...current, conta_contraparte_id: e.target.value, tipo_intercompany: '', error: '' }))}
                   required
                 >
                   <option value="">Selecione</option>
@@ -1272,6 +1326,50 @@ export default function FinanceiroConciliacao() {
                     ))}
                 </select>
               </label>
+              {contaAtualTransferencia && contaContraparteTransferencia ? (
+                <div className={`rounded-xl border px-4 py-3 text-sm ${transferenciaEntreEmpresas ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-emerald-200 bg-emerald-50 text-emerald-800'}`}>
+                  <strong>{transferenciaEntreEmpresas ? 'Transferencia intercompany' : 'Transferencia interna da mesma empresa'}</strong>
+                  <div className="mt-1">
+                    {getContaEmpresaNome(contaAtualTransferencia)} para {getContaEmpresaNome(contaContraparteTransferencia)}.
+                  </div>
+                </div>
+              ) : null}
+              {transferenciaEntreEmpresas ? (
+                <>
+                  <label className="text-sm">
+                    <span className="mb-1 block text-[var(--c-muted)]">Tipo intercompany</span>
+                    <select
+                      className="input w-full"
+                      value={transferenciaModal.tipo_intercompany}
+                      onChange={(e) => setTransferenciaModal((current) => ({ ...current, tipo_intercompany: e.target.value }))}
+                      required
+                    >
+                      <option value="">Selecione</option>
+                      {TIPOS_INTERCOMPANY.map((tipo) => (
+                        <option key={tipo.value} value={tipo.value}>{tipo.label}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="text-sm">
+                    <span className="mb-1 block text-[var(--c-muted)]">Motivo intercompany</span>
+                    <input
+                      className="input w-full"
+                      value={transferenciaModal.motivo_intercompany}
+                      onChange={(e) => setTransferenciaModal((current) => ({ ...current, motivo_intercompany: e.target.value }))}
+                      placeholder="Ex.: cobertura de caixa para folha"
+                      required
+                    />
+                  </label>
+                  <label className="flex items-center gap-2 rounded-xl border border-[var(--c-border)] px-3 py-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={transferenciaModal.elimina_consolidado}
+                      onChange={(e) => setTransferenciaModal((current) => ({ ...current, elimina_consolidado: e.target.checked }))}
+                    />
+                    <span>Eliminar do consolidado do grupo</span>
+                  </label>
+                </>
+              ) : null}
               <label className="text-sm">
                 <span className="mb-1 block text-[var(--c-muted)]">Descricao</span>
                 <input

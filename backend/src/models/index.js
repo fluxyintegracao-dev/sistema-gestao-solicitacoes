@@ -2471,6 +2471,26 @@ db.TransferenciaFinanceira.belongsTo(db.EmpresaGrupo, {
   as: 'empresa'
 });
 
+db.EmpresaGrupo.hasMany(db.TransferenciaFinanceira, {
+  foreignKey: 'empresa_origem_id',
+  as: 'transferenciasIntercompanyOrigem'
+});
+
+db.TransferenciaFinanceira.belongsTo(db.EmpresaGrupo, {
+  foreignKey: 'empresa_origem_id',
+  as: 'empresaOrigem'
+});
+
+db.EmpresaGrupo.hasMany(db.TransferenciaFinanceira, {
+  foreignKey: 'empresa_destino_id',
+  as: 'transferenciasIntercompanyDestino'
+});
+
+db.TransferenciaFinanceira.belongsTo(db.EmpresaGrupo, {
+  foreignKey: 'empresa_destino_id',
+  as: 'empresaDestino'
+});
+
 db.ContaBancaria.hasMany(db.TransferenciaFinanceira, {
   foreignKey: 'conta_origem_id',
   as: 'transferenciasSaida'

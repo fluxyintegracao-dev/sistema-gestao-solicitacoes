@@ -599,13 +599,16 @@ function validateFinanceConciliacaoConfirmBody(body = {}) {
 function validateFinanceConciliacaoTransferenciaBody(body = {}) {
   ensureAllowedKeys(
     body,
-    ['conta_contraparte_id', 'descricao'],
+    ['conta_contraparte_id', 'descricao', 'tipo_intercompany', 'motivo_intercompany', 'elimina_consolidado'],
     'Conciliacao bancaria por transferencia'
   );
 
   return {
     conta_contraparte_id: parseInteger(body.conta_contraparte_id, 'Conta contraparte', { required: true }),
-    descricao: parseOptionalText(body.descricao, 'Descricao', 255)
+    descricao: parseOptionalText(body.descricao, 'Descricao', 255),
+    tipo_intercompany: parseEnum(body.tipo_intercompany, 'Tipo intercompany', TIPOS_INTERCOMPANY),
+    motivo_intercompany: parseOptionalText(body.motivo_intercompany, 'Motivo intercompany', 255),
+    elimina_consolidado: parseBoolean(body.elimina_consolidado, 'Eliminar no consolidado')
   };
 }
 
@@ -1170,7 +1173,17 @@ function validateFinanceTransferenciaQuery(query = {}) {
 function validateFinanceTransferenciaBody(body = {}) {
   ensureAllowedKeys(
     body,
-    ['empresa_id', 'conta_origem_id', 'conta_destino_id', 'data_transferencia', 'valor', 'descricao'],
+    [
+      'empresa_id',
+      'conta_origem_id',
+      'conta_destino_id',
+      'data_transferencia',
+      'valor',
+      'descricao',
+      'tipo_intercompany',
+      'motivo_intercompany',
+      'elimina_consolidado'
+    ],
     'Transferencia financeira'
   );
 
@@ -1180,7 +1193,10 @@ function validateFinanceTransferenciaBody(body = {}) {
     conta_destino_id: parseInteger(body.conta_destino_id, 'Conta de destino', { required: true }),
     data_transferencia: parseDateOnly(body.data_transferencia, 'Data da transferencia'),
     valor: parseDecimal(body.valor, 'Valor da transferencia', { required: true, min: 0.01 }),
-    descricao: parseOptionalText(body.descricao, 'Descricao', 255)
+    descricao: parseOptionalText(body.descricao, 'Descricao', 255),
+    tipo_intercompany: parseEnum(body.tipo_intercompany, 'Tipo intercompany', TIPOS_INTERCOMPANY),
+    motivo_intercompany: parseOptionalText(body.motivo_intercompany, 'Motivo intercompany', 255),
+    elimina_consolidado: parseBoolean(body.elimina_consolidado, 'Eliminar no consolidado')
   };
 }
 

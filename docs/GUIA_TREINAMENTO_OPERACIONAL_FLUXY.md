@@ -973,14 +973,19 @@ Passo a passo:
 4. Conferir sugestoes de conciliacao.
 5. Comparar data, valor e historico.
 6. Confirmar conciliacao quando o movimento bater.
-7. Resolver divergencias manualmente.
+7. Quando o lancamento for transferencia entre contas, selecionar a conta contraparte.
+8. Se as contas forem de empresas diferentes, selecionar o tipo intercompany e informar o motivo.
+9. Manter `Eliminar do consolidado do grupo` marcado quando a transferencia nao representar riqueza externa.
+10. Resolver divergencias manualmente.
 
 Cuidados:
 
 - OFX nao deve criar baixa automaticamente sem conferencia;
 - OFX da conta errada distorce conciliacao;
 - baixa precisa existir para ser conciliada;
-- conciliacao e conferencia, nao substitui operacao financeira.
+- conciliacao e conferencia, nao substitui operacao financeira;
+- transferencia entre contas da mesma empresa e transferencia interna de caixa;
+- transferencia entre contas de empresas diferentes deve ter tipo e motivo intercompany.
 
 ### 11.9 DRE Gerencial
 
@@ -1088,7 +1093,6 @@ Exemplos:
 
 Quando marcar intercompany:
 
-- transferencia interna;
 - aporte;
 - emprestimo;
 - cobertura de caixa;
@@ -1096,6 +1100,8 @@ Quando marcar intercompany:
 - rateio;
 - folha paga por outra empresa;
 - imposto pago por outra empresa.
+
+Transferencia entre contas da mesma empresa nao deve ser tratada como receita ou despesa. Ela e apenas transferencia interna de caixa e deve ficar fora da DRE.
 
 Campos obrigatorios:
 

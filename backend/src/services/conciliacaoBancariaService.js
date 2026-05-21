@@ -1262,6 +1262,9 @@ async function confirmarConciliacaoTransferencia(req, conciliacaoId, payload = {
       data_transferencia: conciliacao.data_movimento,
       valor,
       descricao: payload.descricao || `Transferencia conciliada pelo lancamento bancario #${conciliacao.id}`,
+      tipo_intercompany: payload.tipo_intercompany || null,
+      motivo_intercompany: payload.motivo_intercompany || null,
+      elimina_consolidado: payload.elimina_consolidado === false ? false : true,
       conciliacao_origem_id: isSaidaDaContaAtual ? conciliacao.id : null,
       conciliacao_destino_id: isSaidaDaContaAtual ? null : conciliacao.id
     };
@@ -1297,6 +1300,10 @@ async function confirmarConciliacaoTransferencia(req, conciliacaoId, payload = {
         transferencia_financeira_id: transferencia.id,
         conta_origem_id: payloadTransferencia.conta_origem_id,
         conta_destino_id: payloadTransferencia.conta_destino_id,
+        empresa_origem_id: transferencia.empresa_origem_id,
+        empresa_destino_id: transferencia.empresa_destino_id,
+        tipo_intercompany: transferencia.tipo_intercompany,
+        elimina_consolidado: transferencia.elimina_consolidado,
         valor
       }
     });

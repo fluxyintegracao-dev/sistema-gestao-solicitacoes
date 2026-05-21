@@ -47,6 +47,7 @@ Base multiempresa e DRE gerencial:
 - Financeiro > Relatorios ganhou Fluxo de Caixa Consolidado para analisar previsto x realizado por Holding, empresa e obra/centro de custo, eliminando intercompany quando solicitado.
 - No Fluxo de Caixa Consolidado, o previsto usa a empresa do titulo e o realizado usa a empresa informada na baixa, sem deduzir empresa por fallback operacional.
 - A baixa financeira passou a permitir empresa pagadora/recebedora diferente da empresa do titulo apenas quando o usuario marca a baixa como intercompany e informa o tipo, mantendo a relacao interna rastreavel.
+- Transferencias financeiras e conciliacao bancaria passaram a classificar explicitamente transferencia interna e transferencia intercompany, exigindo tipo e motivo quando as contas pertencem a empresas diferentes.
 
 Documentacao operacional complementar:
 

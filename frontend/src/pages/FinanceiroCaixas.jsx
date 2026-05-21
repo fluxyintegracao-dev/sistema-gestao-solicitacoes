@@ -10,6 +10,18 @@ import {
 } from '../services/financeiro';
 import { getEmpresasGrupo } from '../services/empresasGrupo';
 
+const TIPOS_INTERCOMPANY = [
+  { value: 'APORTE', label: 'Aporte' },
+  { value: 'EMPRESTIMO', label: 'Emprestimo' },
+  { value: 'REEMBOLSO', label: 'Reembolso' },
+  { value: 'RATEIO', label: 'Rateio' },
+  { value: 'COBERTURA_CAIXA', label: 'Cobertura de caixa' },
+  { value: 'FOLHA', label: 'Folha' },
+  { value: 'ADMINISTRATIVO', label: 'Administrativo' },
+  { value: 'IMPOSTO', label: 'Imposto' },
+  { value: 'TRANSFERENCIA_OPERACIONAL', label: 'Transferencia operacional' }
+];
+
 const DEFAULT_FILTERS = {
   status: 'ABERTO',
   empresa_id: '',
@@ -54,6 +66,14 @@ function contaLabel(conta) {
   return `${conta.nome || `Conta ${conta.id}`} - ${sufixo}`;
 }
 
+function getContaEmpresaId(conta) {
+  return String(conta?.empresa_id || conta?.empresa?.id || '');
+}
+
+function getContaEmpresaNome(conta) {
+  return conta?.empresa?.nome || conta?.empresa?.razao_social || (conta?.empresa_id ? `Empresa #${conta.empresa_id}` : 'Sem empresa vinculada');
+}
+
 export default function FinanceiroCaixas() {
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [appliedFilters, setAppliedFilters] = useState(DEFAULT_FILTERS);
@@ -73,13 +93,30 @@ export default function FinanceiroCaixas() {
     conta_destino_id: '',
     data_transferencia: today(),
     valor: '',
-    descricao: ''
+    descricao: '',
+    tipo_intercompany: '',
+    motivo_intercompany: '',
+    elimina_consolidado: true
   });
   const [loading, setLoading] = useState(true);
   const [loadingOptions, setLoadingOptions] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+
+  const contaOrigemTransferencia = useMemo(
+    () => contas.find((conta) => String(conta.id) === String(transferenciaForm.conta_origem_id)),
+    [contas, transferenciaForm.conta_origem_id]
+  );
+  const contaDestinoTransferencia = useMemo(
+    () => contas.find((conta) => String(conta.id) === String(transferenciaForm.conta_destino_id)),
+    [contas, transferenciaForm.conta_destino_id]
+  );
+  const transferenciaEntreEmpresas = Boolean(
+    getContaEmpresaId(contaOrigemTransferencia) &&
+    getContaEmpresaId(contaDestinoTransferencia) &&
+    getContaEmpresaId(contaOrigemTransferencia) !== getContaEmpresaId(contaDestinoTransferencia)
+  );
 
   useEffect(() => {
     let active = true;
@@ -216,18 +253,35 @@ export default function FinanceiroCaixas() {
 
   async function handleTransferencia(event) {
     event.preventDefault();
+    if (transferenciaEntreEmpresas && !transferenciaForm.tipo_intercompany) {
+      setError('Transferencia entre empresas exige tipo intercompany.');
+      return;
+    }
+    if (transferenciaEntreEmpresas && !String(transferenciaForm.motivo_intercompany || '').trim()) {
+      setError('Transferencia entre empresas exige motivo intercompany.');
+      return;
+    }
+
     try {
       setSaving(true);
       setError('');
       setMessage('');
-      await criarTransferenciaFinanceira(transferenciaForm);
+      await criarTransferenciaFinanceira({
+        ...transferenciaForm,
+        tipo_intercompany: transferenciaEntreEmpresas ? transferenciaForm.tipo_intercompany : undefined,
+        motivo_intercompany: transferenciaEntreEmpresas ? transferenciaForm.motivo_intercompany : undefined,
+        elimina_consolidado: transferenciaEntreEmpresas ? transferenciaForm.elimina_consolidado : true
+      });
       setMessage('Transferencia registrada com sucesso.');
       setTransferenciaForm({
         conta_origem_id: '',
         conta_destino_id: '',
         data_transferencia: today(),
         valor: '',
-        descricao: ''
+        descricao: '',
+        tipo_intercompany: '',
+        motivo_intercompany: '',
+        elimina_consolidado: true
       });
       setAppliedFilters((current) => ({ ...current }));
     } catch (err) {
@@ -391,7 +445,7 @@ export default function FinanceiroCaixas() {
               <select
                 className="input w-full"
                 value={transferenciaForm.conta_origem_id}
-                onChange={(e) => setTransferenciaForm((current) => ({ ...current, conta_origem_id: e.target.value }))}
+                onChange={(e) => setTransferenciaForm((current) => ({ ...current, conta_origem_id: e.target.value, tipo_intercompany: '' }))}
                 required
                 disabled={loadingOptions}
               >
@@ -406,7 +460,7 @@ export default function FinanceiroCaixas() {
               <select
                 className="input w-full"
                 value={transferenciaForm.conta_destino_id}
-                onChange={(e) => setTransferenciaForm((current) => ({ ...current, conta_destino_id: e.target.value }))}
+                onChange={(e) => setTransferenciaForm((current) => ({ ...current, conta_destino_id: e.target.value, tipo_intercompany: '' }))}
                 required
                 disabled={loadingOptions}
               >
@@ -437,6 +491,50 @@ export default function FinanceiroCaixas() {
                 />
               </label>
             </div>
+            {contaOrigemTransferencia && contaDestinoTransferencia ? (
+              <div className={`rounded-xl border px-3 py-2 text-sm ${transferenciaEntreEmpresas ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-emerald-200 bg-emerald-50 text-emerald-800'}`}>
+                <strong>{transferenciaEntreEmpresas ? 'Transferencia intercompany' : 'Transferencia interna da mesma empresa'}</strong>
+                <div className="mt-1">
+                  {getContaEmpresaNome(contaOrigemTransferencia)} para {getContaEmpresaNome(contaDestinoTransferencia)}.
+                </div>
+              </div>
+            ) : null}
+            {transferenciaEntreEmpresas ? (
+              <>
+                <label className="sol-filter-field">
+                  <span className="sol-filter-label">Tipo intercompany</span>
+                  <select
+                    className="input w-full"
+                    value={transferenciaForm.tipo_intercompany}
+                    onChange={(e) => setTransferenciaForm((current) => ({ ...current, tipo_intercompany: e.target.value }))}
+                    required
+                  >
+                    <option value="">Selecione</option>
+                    {TIPOS_INTERCOMPANY.map((tipo) => (
+                      <option key={tipo.value} value={tipo.value}>{tipo.label}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="sol-filter-field">
+                  <span className="sol-filter-label">Motivo intercompany</span>
+                  <input
+                    className="input w-full"
+                    value={transferenciaForm.motivo_intercompany}
+                    onChange={(e) => setTransferenciaForm((current) => ({ ...current, motivo_intercompany: e.target.value }))}
+                    placeholder="Ex.: cobertura de caixa para folha"
+                    required
+                  />
+                </label>
+                <label className="flex items-center gap-2 rounded-xl border border-[var(--c-border)] px-3 py-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={transferenciaForm.elimina_consolidado}
+                    onChange={(e) => setTransferenciaForm((current) => ({ ...current, elimina_consolidado: e.target.checked }))}
+                  />
+                  <span>Eliminar do consolidado do grupo</span>
+                </label>
+              </>
+            ) : null}
             <label className="sol-filter-field">
               <span className="sol-filter-label">Descricao</span>
               <input
@@ -556,6 +654,12 @@ export default function FinanceiroCaixas() {
                         <div className="mt-1 text-[var(--c-muted)]">
                           {contaLabel(transferencia.contaOrigem)} para {contaLabel(transferencia.contaDestino)}
                         </div>
+                        {transferencia.tipo_intercompany ? (
+                          <div className="mt-1 text-amber-700">
+                            Intercompany: {transferencia.tipo_intercompany}
+                            {transferencia.motivo_intercompany ? ` - ${transferencia.motivo_intercompany}` : ''}
+                          </div>
+                        ) : null}
                         {transferencia.descricao ? (
                           <div className="mt-1 text-[var(--c-muted)]">{transferencia.descricao}</div>
                         ) : null}
