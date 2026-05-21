@@ -1234,7 +1234,7 @@ Fluxo correto:
 3. Entrar em `Titulos elegiveis`.
 4. Filtrar vencimento, parceiro, obra ou centro de custo quando necessario.
 5. Clicar em `Buscar elegiveis`.
-6. Conferir credor, favorecido PIX, vencimento e saldo de cada titulo.
+6. Conferir credor, empresa do titulo, favorecido PIX, vencimento e saldo de cada titulo.
 7. Selecionar apenas os titulos que realmente devem ser pagos e que pertencem a mesma empresa da conta pagadora escolhida.
 8. Conferir conta pagadora e data programada.
 9. Clicar em `Gerar lote`.
@@ -1270,6 +1270,7 @@ Cuidados:
 - ao selecionar a conta bancaria interna no cadastro da conta pagadora, o sistema preenche a empresa vinculada a essa conta;
 - se a conta bancaria interna nao tiver empresa vinculada, ela nao pode virar conta pagadora;
 - se a empresa pagadora escolhida for diferente da empresa da conta bancaria interna, o cadastro deve ser bloqueado;
+- ao buscar titulos elegiveis, a lista deve considerar a empresa da conta pagadora selecionada para reduzir erro operacional;
 - o sistema bloqueia lote quando o titulo pertence a empresa diferente da conta pagadora;
 - se uma empresa for pagar titulo de outra, nao forcar o lote comum: primeiro modele a operacao intercompany correta;
 - a baixa gerada apos confirmacao bancaria usa a empresa da conta pagadora do lote e exige que ela seja igual a empresa do titulo.

@@ -108,6 +108,7 @@ async function listarTitulosElegiveis(req, filters = {}) {
   if (filters.obra_id) where.obra_id = Number(filters.obra_id);
   if (filters.parceiro_id) where.parceiro_id = Number(filters.parceiro_id);
   if (filters.categoria_financeira_id) where.categoria_financeira_id = Number(filters.categoria_financeira_id);
+  if (filters.empresa_id) where.empresa_id = Number(filters.empresa_id);
   if (filters.vencimento_inicial || filters.vencimento_final) {
     where.data_vencimento = {};
     if (filters.vencimento_inicial) where.data_vencimento[Op.gte] = filters.vencimento_inicial;
@@ -129,6 +130,7 @@ async function listarTitulosElegiveis(req, filters = {}) {
         }]
       },
       { model: Obra, as: 'obra', attributes: ['id', 'codigo', 'nome'] },
+      { model: EmpresaGrupo, as: 'empresa', attributes: ['id', 'codigo', 'nome', 'razao_social'] },
       {
         model: PaymentIntent,
         as: 'paymentIntents',
@@ -293,7 +295,7 @@ async function listBatches(req, filters = {}) {
       {
         model: PaymentAccount,
         as: 'paymentAccount',
-        include: [{ model: ContaBancaria, as: 'contaBancaria', attributes: ['id', 'nome', 'banco', 'agencia', 'conta'] }]
+        include: [{ model: ContaBancaria, as: 'contaBancaria', attributes: ['id', 'nome', 'banco', 'agencia', 'conta', 'empresa_id'] }]
       }
     ],
     order: [['createdAt', 'DESC']],
@@ -308,7 +310,7 @@ async function getBatchDetail(req, id, { transaction = null } = {}) {
       {
         model: PaymentAccount,
         as: 'paymentAccount',
-        include: [{ model: ContaBancaria, as: 'contaBancaria', attributes: ['id', 'nome', 'banco', 'agencia', 'conta'] }]
+        include: [{ model: ContaBancaria, as: 'contaBancaria', attributes: ['id', 'nome', 'banco', 'agencia', 'conta', 'empresa_id'] }]
       },
       {
         model: PaymentBatchItem,
@@ -464,7 +466,7 @@ async function listPaymentAccounts(req) {
   return PaymentAccount.findAll({
     include: [
       { model: PaymentProvider, as: 'provider', attributes: ['id', 'codigo', 'nome', 'ambiente'] },
-      { model: ContaBancaria, as: 'contaBancaria', attributes: ['id', 'nome', 'banco', 'agencia', 'conta'] },
+      { model: ContaBancaria, as: 'contaBancaria', attributes: ['id', 'nome', 'banco', 'agencia', 'conta', 'empresa_id'] },
       { model: EmpresaGrupo, as: 'empresa', attributes: ['id', 'codigo', 'nome', 'razao_social', 'cnpj'] }
     ],
     order: [['ativo', 'DESC'], ['id', 'ASC']]

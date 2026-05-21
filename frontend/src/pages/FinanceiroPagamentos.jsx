@@ -122,6 +122,7 @@ function getPaymentAccountPendencies(account = {}) {
   const pendencies = [];
   if (account?.ativo === false) pendencies.push('Conta inativa.');
   if (!account?.empresa_id && !account?.empresa?.id) pendencies.push('Empresa pagadora pendente.');
+  if (account?.contaBancaria && !account.contaBancaria.empresa_id) pendencies.push('Conta bancaria interna sem empresa vinculada.');
   if (account?.empresa_id && account?.contaBancaria?.empresa_id && Number(account.empresa_id) !== Number(account.contaBancaria.empresa_id)) {
     pendencies.push('Empresa da conta bancaria diverge da empresa pagadora.');
   }
@@ -140,6 +141,10 @@ function getPaymentAccountEmpresaId(account = {}) {
 
 function getTituloEmpresaId(titulo = {}) {
   return Number(titulo?.empresa_id || titulo?.empresa?.id || 0);
+}
+
+function getTituloEmpresaLabel(titulo = {}) {
+  return titulo?.empresa?.nome || titulo?.empresa?.razao_social || (titulo?.empresa_id ? `Empresa #${titulo.empresa_id}` : 'Empresa pendente');
 }
 
 function getTituloPaymentAccountPendencies(titulo = {}, account = null) {
@@ -295,7 +300,11 @@ export default function FinanceiroPagamentos() {
     try {
       setActionLoading('titulos');
       setError('');
-      const data = await getPaymentEligibleTitulos(compactFilters(filters));
+      const accountEmpresaId = getPaymentAccountEmpresaId(selectedPaymentAccount);
+      const data = await getPaymentEligibleTitulos(compactFilters({
+        ...filters,
+        empresa_id: accountEmpresaId || ''
+      }));
       setTitulos(Array.isArray(data) ? data : []);
       setSelectedIds([]);
     } catch (err) {
@@ -458,6 +467,11 @@ export default function FinanceiroPagamentos() {
         ? current.filter((item) => String(item) !== String(id))
         : [...current, id]
     ));
+  }
+
+  function handlePaymentAccountChange(value) {
+    setBatchForm((current) => ({ ...current, payment_account_id: value }));
+    setSelectedIds([]);
   }
 
   async function handleCriarLote() {
@@ -684,7 +698,7 @@ export default function FinanceiroPagamentos() {
                   </label>
                   <label className="sol-filter-field xl:col-span-2">
                     <span className="sol-filter-label">Conta pagadora</span>
-                    <select className="input w-full" value={batchForm.payment_account_id} onChange={(e) => setBatchForm((c) => ({ ...c, payment_account_id: e.target.value }))}>
+                    <select className="input w-full" value={batchForm.payment_account_id} onChange={(e) => handlePaymentAccountChange(e.target.value)}>
                       <option value="">Selecione</option>
                       {accounts.map((account) => {
                         const pendencies = getPaymentAccountPendencies(account);
@@ -789,6 +803,7 @@ export default function FinanceiroPagamentos() {
                                 {getTituloCodigo(titulo)}
                               </Link>
                               <div className="text-xs text-[var(--c-muted)]">{titulo.numero_documento || 'Sem documento'}</div>
+                              <div className="text-xs text-[var(--c-muted)]">{getTituloEmpresaLabel(titulo)}</div>
                             </td>
                             <td className="px-3 py-3">{titulo.parceiro?.nome || '-'}</td>
                             <td className="px-3 py-3">{getBeneficiaryLabel(titulo)}</td>

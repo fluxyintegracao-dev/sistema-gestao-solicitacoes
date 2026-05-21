@@ -1126,6 +1126,7 @@ Antes de escrever codigo da integracao BB, decidir:
 - Criar relacao empresa pagadora.
 - Disponibilizar em Cadastros Financeiros a manutencao de contas pagadoras BB, vinculando conta bancaria interna, CNPJ pagador, convenio, ambiente, referencias seguras de credenciais e empresa pagadora obrigatoria.
 - A empresa pagadora da conta pagadora precisa ser a mesma empresa vinculada a conta bancaria interna; o cadastro nao deve permitir divergencia para evitar lote com caixa de empresa errada.
+- Na tela de pagamentos, a busca de titulos elegiveis deve usar a empresa da conta pagadora selecionada, e a lista deve mostrar a empresa do titulo para conferencia antes da geracao do lote.
 - Na criacao de nova conta a pagar, separar a consulta de credor em dois usos: consulta por CPF/CNPJ e busca por nome com lista de resultados selecionaveis.
 - Ao selecionar credor pelo nome, preencher automaticamente o CPF/CNPJ exibido na consulta.
 - No preparo PIX do titulo, permitir marcar "usar o mesmo credor como favorecido" para preencher nome, CPF/CNPJ, tipo de chave e chave PIX a partir do cadastro da pessoa.

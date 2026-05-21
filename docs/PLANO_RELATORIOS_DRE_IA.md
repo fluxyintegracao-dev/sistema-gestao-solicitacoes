@@ -58,6 +58,7 @@ Base multiempresa e DRE gerencial:
 - Atalhos de tarifas bancarias passaram a aceitar somente categorias de saida classificadas para DRE e bloqueiam categorias de endividamento, investimento, patrimonio, intercompany ou transferencia interna.
 - A carga inicial SIENGE deixou de usar emissao ou vencimento como fallback de competencia DRE; titulos considerados na DRE agora exigem competencia real e categoria financeira classificada.
 - O cadastro de conta pagadora do pagamento em massa passou a exigir empresa pagadora igual a empresa da conta bancaria interna, evitando lote com caixa de empresa divergente.
+- A tela de pagamentos em massa passou a buscar titulos elegiveis pela empresa da conta pagadora selecionada e a exibir a empresa do titulo na conferencia do lote.
 
 Documentacao operacional complementar:
 
