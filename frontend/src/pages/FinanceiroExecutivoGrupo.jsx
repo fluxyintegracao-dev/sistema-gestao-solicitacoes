@@ -2,10 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getEmpresasGrupo } from '../services/empresasGrupo';
 import {
-  getDreFinanceira,
-  getRelatorioEndividamentoFinanceiro,
-  getRelatorioFluxoConsolidado,
-  getRelatorioIntercompanyFinanceiro,
+  getRelatorioGrupoConsolidado,
   getResultadoObras
 } from '../services/financeiro';
 
@@ -35,6 +32,14 @@ function formatDate(value) {
 
 function metricColor(value) {
   return Number(value || 0) >= 0 ? '#15803d' : '#b91c1c';
+}
+
+function severityClass(severidade) {
+  const normalized = String(severidade || '').toUpperCase();
+  if (normalized === 'CRITICA') return 'bg-rose-100 text-rose-800';
+  if (normalized === 'ALTA') return 'bg-amber-100 text-amber-800';
+  if (normalized === 'MEDIA') return 'bg-blue-100 text-blue-800';
+  return 'bg-slate-100 text-slate-700';
 }
 
 function getFluxoPiso(serie = []) {
@@ -68,10 +73,7 @@ export default function FinanceiroExecutivoGrupo() {
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [appliedFilters, setAppliedFilters] = useState(DEFAULT_FILTERS);
   const [empresas, setEmpresas] = useState([]);
-  const [dre, setDre] = useState(null);
-  const [fluxo, setFluxo] = useState(null);
-  const [intercompany, setIntercompany] = useState(null);
-  const [endividamento, setEndividamento] = useState(null);
+  const [painel, setPainel] = useState(null);
   const [obras, setObras] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingEmpresas, setLoadingEmpresas] = useState(true);
@@ -110,26 +112,16 @@ export default function FinanceiroExecutivoGrupo() {
     };
 
     Promise.allSettled([
-      getDreFinanceira(commonParams),
-      getRelatorioFluxoConsolidado(commonParams),
-      getRelatorioIntercompanyFinanceiro({
-        periodo: appliedFilters.periodo,
-        holding_id: appliedFilters.holding_id,
-        elimina_consolidado: appliedFilters.excluir_intercompany ? 'true' : ''
-      }),
-      getRelatorioEndividamentoFinanceiro(commonParams),
+      getRelatorioGrupoConsolidado(commonParams),
       getResultadoObras()
     ])
-      .then(([dreResult, fluxoResult, intercompanyResult, endividamentoResult, obrasResult]) => {
+      .then(([painelResult, obrasResult]) => {
         if (!active) return;
 
-        setDre(dreResult.status === 'fulfilled' ? dreResult.value : null);
-        setFluxo(fluxoResult.status === 'fulfilled' ? fluxoResult.value : null);
-        setIntercompany(intercompanyResult.status === 'fulfilled' ? intercompanyResult.value : null);
-        setEndividamento(endividamentoResult.status === 'fulfilled' ? endividamentoResult.value : null);
+        setPainel(painelResult.status === 'fulfilled' ? painelResult.value : null);
         setObras(obrasResult.status === 'fulfilled' && Array.isArray(obrasResult.value) ? obrasResult.value : []);
 
-        const failed = [dreResult, fluxoResult, intercompanyResult, endividamentoResult, obrasResult].find((item) => item.status === 'rejected');
+        const failed = [painelResult, obrasResult].find((item) => item.status === 'rejected');
         setError(failed?.reason?.message || '');
       })
       .finally(() => {
@@ -146,19 +138,20 @@ export default function FinanceiroExecutivoGrupo() {
     [empresas]
   );
 
-  const dreResumo = dre?.resumo || {};
-  const fluxoResumo = fluxo?.resumo || {};
-  const intercompanyResumo = intercompany?.resumo || {};
-  const endividamentoResumo = endividamento?.resumo || {};
+  const executivoResumo = painel?.resumo || {};
+  const dre = painel?.fontes?.dre || null;
+  const fluxo = painel?.fontes?.fluxo || null;
+  const intercompany = painel?.fontes?.intercompany || null;
   const empresasFluxo = Array.isArray(fluxo?.empresas) ? fluxo.empresas : [];
   const empresasDre = Array.isArray(dre?.empresas) ? dre.empresas : [];
   const relacoesIntercompany = Array.isArray(intercompany?.relacoes) ? intercompany.relacoes : [];
-  const dataInicial = dre?.filtro?.data_inicial || fluxo?.filtro?.data_inicial || intercompany?.filtro?.data_inicial;
-  const dataFinal = dre?.filtro?.data_final || fluxo?.filtro?.data_final || intercompany?.filtro?.data_final;
+  const riscos = Array.isArray(painel?.riscos) ? painel.riscos : [];
+  const dataInicial = painel?.filtro?.data_inicial || dre?.filtro?.data_inicial || fluxo?.filtro?.data_inicial || intercompany?.filtro?.data_inicial;
+  const dataFinal = painel?.filtro?.data_final || dre?.filtro?.data_final || fluxo?.filtro?.data_final || intercompany?.filtro?.data_final;
   const periodoTexto = dataInicial && dataFinal ? `${formatDate(dataInicial)} ate ${formatDate(dataFinal)}` : '';
-  const pisoCaixaPrevisto = getFluxoPiso(fluxo?.serie);
-  const necessidadeCaixa = Math.max(0, Math.abs(Math.min(0, pisoCaixaPrevisto)));
-  const lucroLiquido = dreResumo.lucro_prejuizo_liquido ?? dreResumo.resultado;
+  const pisoCaixaPrevisto = executivoResumo.piso_caixa_previsto ?? getFluxoPiso(fluxo?.serie);
+  const necessidadeCaixa = executivoResumo.necessidade_futura_caixa ?? Math.max(0, Math.abs(Math.min(0, pisoCaixaPrevisto)));
+  const lucroLiquido = executivoResumo.lucro_prejuizo_liquido ?? dre?.resumo?.lucro_prejuizo_liquido ?? dre?.resumo?.resultado;
 
   const topEmpresasCaixa = empresasFluxo.slice(0, 6);
   const topEmpresasResultado = empresasDre
@@ -263,15 +256,15 @@ export default function FinanceiroExecutivoGrupo() {
       <div className="app-summary-grid">
         <Metric
           label="Caixa consolidado realizado"
-          value={formatCurrency(fluxoResumo.saldo_realizado)}
-          detail={`${fluxoResumo.movimentos_realizados || 0} baixa(s) no periodo`}
-          color={metricColor(fluxoResumo.saldo_realizado)}
+          value={formatCurrency(executivoResumo.caixa_realizado)}
+          detail={`${fluxo?.resumo?.movimentos_realizados || 0} baixa(s) no periodo`}
+          color={metricColor(executivoResumo.caixa_realizado)}
         />
         <Metric
           label="EBITDA"
-          value={formatCurrency(dreResumo.ebitda)}
-          detail={`Margem ${formatPercent(dreResumo.margem_ebitda)}`}
-          color={metricColor(dreResumo.ebitda)}
+          value={formatCurrency(executivoResumo.ebitda)}
+          detail={`Margem ${formatPercent(executivoResumo.margem_ebitda)}`}
+          color={metricColor(executivoResumo.ebitda)}
         />
         <Metric
           label="Lucro/Prejuizo liquido"
@@ -287,20 +280,26 @@ export default function FinanceiroExecutivoGrupo() {
         />
         <Metric
           label="Intercompany eliminado"
-          value={formatCurrency(intercompanyResumo.valor_eliminado_consolidado)}
-          detail={`${intercompanyResumo.relacoes_empresas || 0} relacao(oes) entre empresas`}
+          value={formatCurrency(executivoResumo.intercompany_eliminado)}
+          detail={`${intercompany?.resumo?.relacoes_empresas || 0} relacao(oes) entre empresas`}
         />
         <Metric
           label="Endividamento aberto"
-          value={formatCurrency(endividamentoResumo.saldo_total)}
-          detail={`${endividamentoResumo.titulos || 0} titulo(s) classificados`}
-          color={Number(endividamentoResumo.saldo_total || 0) > 0 ? '#b91c1c' : '#15803d'}
+          value={formatCurrency(executivoResumo.endividamento_aberto)}
+          detail={`${painel?.fontes?.endividamento?.resumo?.titulos || 0} titulo(s) classificados`}
+          color={Number(executivoResumo.endividamento_aberto || 0) > 0 ? '#b91c1c' : '#15803d'}
         />
         <Metric
           label="Saldo previsto"
-          value={formatCurrency(fluxoResumo.saldo_previsto)}
+          value={formatCurrency(executivoResumo.saldo_previsto)}
           detail="Entradas previstas menos saidas previstas"
-          color={metricColor(fluxoResumo.saldo_previsto)}
+          color={metricColor(executivoResumo.saldo_previsto)}
+        />
+        <Metric
+          label="Pendencias de consistencia"
+          value={String(executivoResumo.pendencias_dados || 0)}
+          detail={`${executivoResumo.pendencias_criticas || 0} critica(s), ${executivoResumo.pendencias_altas || 0} alta(s)`}
+          color={Number(executivoResumo.pendencias_criticas || 0) > 0 ? '#b91c1c' : Number(executivoResumo.pendencias_altas || 0) > 0 ? '#b45309' : '#15803d'}
         />
       </div>
 
@@ -350,28 +349,36 @@ export default function FinanceiroExecutivoGrupo() {
               <div className="border-b border-[var(--c-border)] px-4 py-3">
                 <h2 className="text-lg font-semibold text-[var(--c-text)]">Leitura executiva</h2>
                 <p className="text-sm text-[var(--c-muted)]">
-                  Sinais que pedem atencao na reuniao de diretoria.
+                  Riscos calculados pelo backend com base nos dados reais cadastrados.
                 </p>
               </div>
               <div className="space-y-3 p-4 text-sm text-[var(--c-text)]">
-                <div className="rounded-lg border border-[var(--c-border)] p-3">
-                  <strong>Resultado:</strong>{' '}
-                  {Number(lucroLiquido || 0) >= 0
-                    ? 'o periodo esta gerando patrimonio na visao DRE.'
-                    : 'o periodo esta consumindo patrimonio na visao DRE.'}
-                </div>
-                <div className="rounded-lg border border-[var(--c-border)] p-3">
-                  <strong>Caixa:</strong>{' '}
-                  {necessidadeCaixa > 0
-                    ? `ha necessidade minima projetada de ${formatCurrency(necessidadeCaixa)}.`
-                    : 'nao ha piso negativo no fluxo previsto do periodo.'}
-                </div>
-                <div className="rounded-lg border border-[var(--c-border)] p-3">
-                  <strong>Intercompany:</strong>{' '}
-                  {Number(intercompanyResumo.valor_eliminado_consolidado || 0) > 0
-                    ? 'existem movimentos internos eliminados da visao consolidada.'
-                    : 'nao ha valor intercompany eliminado para os filtros atuais.'}
-                </div>
+                {riscos.length === 0 ? (
+                  <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-emerald-800">
+                    Nenhum risco executivo automatico encontrado para os filtros atuais. Ainda assim, valide a DRE e o diagnostico antes de fechamento oficial.
+                  </div>
+                ) : (
+                  riscos.slice(0, 5).map((risco) => (
+                    <div key={risco.codigo} className="rounded-lg border border-[var(--c-border)] p-3">
+                      <div className="mb-2 flex items-start justify-between gap-2">
+                        <strong>{risco.titulo}</strong>
+                        <span className={`app-status-pill ${severityClass(risco.severidade)}`}>{risco.severidade}</span>
+                      </div>
+                      <p className="text-[var(--c-muted)]">{risco.descricao}</p>
+                      {risco.valor !== null && risco.valor !== undefined ? (
+                        <p className="mt-2 font-semibold text-[var(--c-text)]">
+                          {typeof risco.valor === 'number' ? formatCurrency(risco.valor) : risco.valor}
+                        </p>
+                      ) : null}
+                      <p className="mt-2 text-xs text-[var(--c-muted)]">{risco.acao_recomendada}</p>
+                      {risco.rota ? (
+                        <Link to={risco.rota} className="mt-3 inline-flex text-xs font-semibold text-[var(--c-primary)]">
+                          Abrir detalhe
+                        </Link>
+                      ) : null}
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           </section>

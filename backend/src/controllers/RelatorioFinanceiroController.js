@@ -1,6 +1,7 @@
 const {
   gerarDiagnosticoDre,
   gerarDreGerencial,
+  gerarPainelExecutivoGrupo,
   gerarRelatorioEndividamento,
   gerarRelatorioFluxoConsolidado,
   gerarRelatorioIntercompany,
@@ -14,6 +15,16 @@ function responderErro(res, error, fallbackMessage) {
 }
 
 module.exports = {
+  async grupoConsolidado(req, res) {
+    try {
+      const relatorio = await gerarPainelExecutivoGrupo(req, req.query || {});
+      return res.json(relatorio);
+    } catch (error) {
+      console.error(error);
+      return responderErro(res, error, 'Erro ao gerar painel executivo do grupo');
+    }
+  },
+
   async fluxoCaixa(req, res) {
     try {
       const relatorio = await gerarRelatorioFluxoCaixa(req, req.query || {});

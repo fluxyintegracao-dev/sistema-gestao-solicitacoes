@@ -1185,6 +1185,7 @@ router.post('/financeiro/caixas/:id/fechar', allowFinanceiro, criticalRateLimit,
 router.get('/financeiro/transferencias', allowFinanceiro, validateRequest({ query: validateFinanceTransferenciaQuery }), TransferenciaFinanceiraController.index);
 router.post('/financeiro/transferencias', allowFinanceiro, criticalRateLimit, validateRequest({ body: validateFinanceTransferenciaBody }), TransferenciaFinanceiraController.create);
 router.post('/financeiro/transferencias/:id/cancelar', allowFinanceiro, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Transferencia financeira'), body: validateFinanceTransferenciaCancelBody }), TransferenciaFinanceiraController.cancelar);
+router.get('/financeiro/relatorios/grupo-consolidado', allowFinanceiro, validateRequest({ query: validateFinanceDreQuery }), RelatorioFinanceiroController.grupoConsolidado);
 router.get('/financeiro/relatorios/fluxo-caixa', allowFinanceiro, validateRequest({ query: validateFinanceFluxoCaixaQuery }), RelatorioFinanceiroController.fluxoCaixa);
 router.get('/financeiro/relatorios/fluxo-consolidado', allowFinanceiro, validateRequest({ query: validateFinanceFluxoConsolidadoQuery }), RelatorioFinanceiroController.fluxoConsolidado);
 router.get('/financeiro/relatorios/analitico', allowFinanceiro, validateRequest({ query: validateFinanceRelatorioAnaliticoQuery }), RelatorioFinanceiroController.analitico);

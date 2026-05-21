@@ -1872,6 +1872,231 @@ async function gerarRelatorioEndividamento(req, filters = {}) {
   };
 }
 
+function getFluxoPisoPrevisto(serie = []) {
+  if (!Array.isArray(serie) || serie.length === 0) {
+    return 0;
+  }
+
+  return serie.reduce((min, item) => Math.min(min, Number(item.saldo_previsto || 0)), 0);
+}
+
+function buildExecutiveRisk({ codigo, titulo, severidade, descricao, valor = null, acao, rota = null }) {
+  return {
+    codigo,
+    titulo,
+    severidade,
+    descricao,
+    valor,
+    acao_recomendada: acao,
+    rota
+  };
+}
+
+function buildExecutiveRisks({ dre, fluxo, intercompany, endividamento, diagnostico }) {
+  const riscos = [];
+  const dreResumo = dre?.resumo || {};
+  const fluxoResumo = fluxo?.resumo || {};
+  const intercompanyResumo = intercompany?.resumo || {};
+  const endividamentoResumo = endividamento?.resumo || {};
+  const diagnosticoResumo = diagnostico?.resumo || {};
+  const lucroLiquido = Number(dreResumo.lucro_prejuizo_liquido ?? dreResumo.resultado ?? 0);
+  const ebitda = Number(dreResumo.ebitda || 0);
+  const pisoPrevisto = getFluxoPisoPrevisto(fluxo?.serie);
+  const necessidadeCaixa = Math.max(0, Math.abs(Math.min(0, pisoPrevisto)));
+  const pendenciasCriticas = Number(diagnosticoResumo.pendencias_criticas || 0);
+  const pendenciasAltas = Number(diagnosticoResumo.pendencias_altas || 0);
+  const saldoVencidoEndividamento = Number(endividamentoResumo.saldo_vencido || 0);
+  const intercompanyNaoEliminado = Number(intercompanyResumo.valor_nao_eliminado_consolidado || 0);
+
+  if (lucroLiquido < 0) {
+    riscos.push(buildExecutiveRisk({
+      codigo: 'LUCRO_LIQUIDO_NEGATIVO',
+      titulo: 'Prejuizo liquido no periodo',
+      severidade: 'ALTA',
+      descricao: 'A DRE gerencial indica consumo de patrimonio no periodo selecionado.',
+      valor: roundCurrency(lucroLiquido),
+      acao: 'Abra a DRE para localizar categorias e empresas que puxaram o resultado para baixo.',
+      rota: '/financeiro/relatorios/dre'
+    }));
+  }
+
+  if (ebitda < 0) {
+    riscos.push(buildExecutiveRisk({
+      codigo: 'EBITDA_NEGATIVO',
+      titulo: 'EBITDA negativo',
+      severidade: 'ALTA',
+      descricao: 'A operacao principal nao esta cobrindo seus custos e despesas operacionais no periodo.',
+      valor: roundCurrency(ebitda),
+      acao: 'Revise receita liquida, custo de obras e despesas administrativas antes de analisar resultado financeiro.',
+      rota: '/financeiro/relatorios/dre'
+    }));
+  }
+
+  if (necessidadeCaixa > 0) {
+    riscos.push(buildExecutiveRisk({
+      codigo: 'NECESSIDADE_CAIXA',
+      titulo: 'Necessidade futura de caixa',
+      severidade: 'CRITICA',
+      descricao: 'O fluxo previsto atinge saldo negativo dentro do periodo analisado.',
+      valor: roundCurrency(necessidadeCaixa),
+      acao: 'Abra o fluxo consolidado para ver quando o caixa fica negativo e quais pagamentos concentram o risco.',
+      rota: '/financeiro/relatorios/fluxo-consolidado'
+    }));
+  }
+
+  if (pendenciasCriticas > 0 || pendenciasAltas > 0) {
+    riscos.push(buildExecutiveRisk({
+      codigo: 'QUALIDADE_DADOS_DRE',
+      titulo: 'Pendencias que afetam a confiabilidade gerencial',
+      severidade: pendenciasCriticas > 0 ? 'CRITICA' : 'ALTA',
+      descricao: 'Existem cadastros, titulos, baixas ou transferencias que impedem leitura totalmente confiavel.',
+      valor: pendenciasCriticas + pendenciasAltas,
+      acao: 'Execute o Diagnostico DRE e corrija os itens criticos antes de usar a tela em fechamento executivo.',
+      rota: '/financeiro/relatorios/dre/diagnostico'
+    }));
+  }
+
+  if (saldoVencidoEndividamento > 0) {
+    riscos.push(buildExecutiveRisk({
+      codigo: 'ENDIVIDAMENTO_VENCIDO',
+      titulo: 'Endividamento vencido',
+      severidade: 'ALTA',
+      descricao: 'Ha titulos classificados como endividamento com vencimento anterior a hoje.',
+      valor: roundCurrency(saldoVencidoEndividamento),
+      acao: 'Abra o relatorio de endividamento e priorize renegociacao, quitacao ou reclassificacao quando o cadastro estiver errado.',
+      rota: '/financeiro/relatorios/endividamento'
+    }));
+  }
+
+  if (intercompanyNaoEliminado > 0) {
+    riscos.push(buildExecutiveRisk({
+      codigo: 'INTERCOMPANY_NAO_ELIMINADO',
+      titulo: 'Intercompany nao eliminado no consolidado',
+      severidade: 'MEDIA',
+      descricao: 'Existem movimentos entre empresas marcados para permanecer no consolidado.',
+      valor: roundCurrency(intercompanyNaoEliminado),
+      acao: 'Confirme se esses movimentos realmente devem permanecer no resultado consolidado do grupo.',
+      rota: '/financeiro/relatorios/intercompany'
+    }));
+  }
+
+  if (Number(fluxoResumo.movimentos_realizados || 0) === 0 && Number(fluxoResumo.saldo_previsto || 0) !== 0) {
+    riscos.push(buildExecutiveRisk({
+      codigo: 'SEM_BAIXAS_PERIODO',
+      titulo: 'Sem baixas realizadas no periodo',
+      severidade: 'MEDIA',
+      descricao: 'Ha fluxo previsto, mas nenhum movimento realizado para o periodo filtrado.',
+      valor: Number(fluxoResumo.saldo_previsto || 0),
+      acao: 'Confira se as baixas ainda nao foram registradas ou se o periodo escolhido e apenas projetado.',
+      rota: '/financeiro/baixas'
+    }));
+  }
+
+  return riscos.sort((a, b) => {
+    const peso = { CRITICA: 0, ALTA: 1, MEDIA: 2, BAIXA: 3 };
+    return (peso[a.severidade] ?? 9) - (peso[b.severidade] ?? 9);
+  });
+}
+
+function buildExecutiveResumo({ dre, fluxo, intercompany, endividamento, diagnostico }) {
+  const dreResumo = dre?.resumo || {};
+  const fluxoResumo = fluxo?.resumo || {};
+  const intercompanyResumo = intercompany?.resumo || {};
+  const endividamentoResumo = endividamento?.resumo || {};
+  const diagnosticoResumo = diagnostico?.resumo || {};
+  const lucroLiquido = Number(dreResumo.lucro_prejuizo_liquido ?? dreResumo.resultado ?? 0);
+  const pisoPrevisto = getFluxoPisoPrevisto(fluxo?.serie);
+  const necessidadeCaixa = Math.max(0, Math.abs(Math.min(0, pisoPrevisto)));
+
+  return {
+    receita_liquida: roundCurrency(dreResumo.receita_liquida || dreResumo.receitas || 0),
+    ebitda: roundCurrency(dreResumo.ebitda || 0),
+    margem_ebitda: Number(dreResumo.margem_ebitda || 0),
+    lucro_prejuizo_liquido: roundCurrency(lucroLiquido),
+    margem_liquida: Number(dreResumo.margem_liquida ?? dreResumo.margem_resultado ?? 0),
+    caixa_realizado: roundCurrency(fluxoResumo.saldo_realizado || 0),
+    saldo_previsto: roundCurrency(fluxoResumo.saldo_previsto || 0),
+    piso_caixa_previsto: roundCurrency(pisoPrevisto),
+    necessidade_futura_caixa: roundCurrency(necessidadeCaixa),
+    intercompany_eliminado: roundCurrency(intercompanyResumo.valor_eliminado_consolidado || 0),
+    intercompany_nao_eliminado: roundCurrency(intercompanyResumo.valor_nao_eliminado_consolidado || 0),
+    endividamento_aberto: roundCurrency(endividamentoResumo.saldo_total || 0),
+    endividamento_vencido: roundCurrency(endividamentoResumo.saldo_vencido || 0),
+    pendencias_dados: Number(diagnosticoResumo.total_pendencias || 0),
+    pendencias_criticas: Number(diagnosticoResumo.pendencias_criticas || 0),
+    pendencias_altas: Number(diagnosticoResumo.pendencias_altas || 0)
+  };
+}
+
+async function gerarPainelExecutivoGrupo(req, filters = {}) {
+  await assertFinanceAccess(req);
+
+  const filtrosBase = {
+    periodo: filters.periodo,
+    data_inicial: filters.data_inicial,
+    data_final: filters.data_final,
+    holding_id: filters.holding_id,
+    excluir_intercompany: filters.excluir_intercompany !== false
+  };
+  const intercompanyFilters = {
+    periodo: filters.periodo,
+    data_inicial: filters.data_inicial,
+    data_final: filters.data_final,
+    holding_id: filters.holding_id,
+    elimina_consolidado: filters.excluir_intercompany !== false ? true : undefined
+  };
+
+  const [
+    dre,
+    fluxo,
+    intercompany,
+    endividamento,
+    diagnostico
+  ] = await Promise.all([
+    gerarDreGerencial(req, filtrosBase),
+    gerarRelatorioFluxoConsolidado(req, filtrosBase),
+    gerarRelatorioIntercompany(req, intercompanyFilters),
+    gerarRelatorioEndividamento(req, filtrosBase),
+    gerarDiagnosticoDre(req)
+  ]);
+
+  const resumo = buildExecutiveResumo({
+    dre,
+    fluxo,
+    intercompany,
+    endividamento,
+    diagnostico
+  });
+  const riscos = buildExecutiveRisks({
+    dre,
+    fluxo,
+    intercompany,
+    endividamento,
+    diagnostico
+  });
+
+  return {
+    gerado_em: new Date().toISOString(),
+    filtro: {
+      periodo: dre?.filtro?.periodo || fluxo?.filtro?.periodo || filters.periodo || 'MES_ATUAL',
+      descricao: dre?.filtro?.descricao || fluxo?.filtro?.descricao || null,
+      data_inicial: dre?.filtro?.data_inicial || fluxo?.filtro?.data_inicial || null,
+      data_final: dre?.filtro?.data_final || fluxo?.filtro?.data_final || null,
+      holding_id: filters.holding_id ? Number(filters.holding_id) : null,
+      excluir_intercompany: filtrosBase.excluir_intercompany
+    },
+    resumo,
+    riscos,
+    fontes: {
+      dre,
+      fluxo,
+      intercompany,
+      endividamento,
+      diagnostico
+    }
+  };
+}
+
 function summarizeIntercompany(titulos = [], transferencias = []) {
   const porTipo = new Map();
   const porOrigem = new Map();
@@ -2899,6 +3124,7 @@ module.exports = {
   gerarRelatorioAnalitico,
   gerarRelatorioFluxoCaixa,
   gerarRelatorioFluxoConsolidado,
+  gerarPainelExecutivoGrupo,
   gerarRelatorioEndividamento,
   gerarRelatorioIntercompany,
   gerarDreGerencial,

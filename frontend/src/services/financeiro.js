@@ -49,6 +49,21 @@ export async function getRelatorioFluxoCaixa(params = {}) {
   return parseJson(response, 'Erro ao buscar relatorio de fluxo de caixa');
 }
 
+export async function getRelatorioGrupoConsolidado(params = {}) {
+  const query = new URLSearchParams(
+    Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== '')
+  ).toString();
+  const url = query
+    ? `${API_URL}/financeiro/relatorios/grupo-consolidado?${query}`
+    : `${API_URL}/financeiro/relatorios/grupo-consolidado`;
+
+  const response = await fetch(url, {
+    headers: authHeaders()
+  });
+
+  return parseJson(response, 'Erro ao buscar painel executivo do grupo');
+}
+
 export async function getRelatorioFluxoConsolidado(params = {}) {
   const query = new URLSearchParams(
     Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== '')

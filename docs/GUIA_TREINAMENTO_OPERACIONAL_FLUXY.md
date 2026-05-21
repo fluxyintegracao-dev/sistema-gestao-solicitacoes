@@ -1318,7 +1318,9 @@ Passo a passo para analisar:
 7. Conferir `Necessidade futura de caixa`.
 8. Conferir o volume de `Intercompany eliminado`.
 9. Conferir `Endividamento aberto`.
-10. Abrir DRE, Fluxo Consolidado, Intercompany ou Endividamento quando algum indicador precisar de detalhe.
+10. Conferir `Pendencias de consistencia`.
+11. Ler a caixa `Leitura executiva`, que mostra riscos calculados pelo backend e a acao recomendada.
+12. Abrir DRE, Fluxo Consolidado, Intercompany, Endividamento ou Diagnostico DRE quando algum indicador pedir detalhe.
 
 Como interpretar:
 
@@ -1329,6 +1331,8 @@ Como interpretar:
 - Endividamento aberto vem somente de categorias financeiras marcadas explicitamente como `Endividamento`.
 - Resultado por empresa mostra onde o resultado liquido esta concentrado.
 - Obras por caixa compara recebido menos executado na base atual de obras.
+- Pendencias de consistencia mostram se existem dados operacionais que podem tornar a leitura gerencial incompleta.
+- A Leitura executiva nao e opiniao livre do usuario: ela e gerada pelo backend a partir de DRE, fluxo, intercompany, endividamento e diagnostico.
 
 Cuidados:
 
@@ -1336,6 +1340,7 @@ Cuidados:
 - se algum numero parecer errado, abrir primeiro o Diagnostico DRE;
 - empresa, baixa e intercompany precisam estar preenchidos corretamente para a leitura executiva ficar confiavel.
 - se endividamento estiver zerado indevidamente, revisar primeiro o cadastro da categoria financeira do titulo.
+- se a tela apontar risco critico, nao usar o relatorio como fechamento executivo antes de corrigir ou justificar esse risco.
 
 ### 11.10 DRE Gerencial
 

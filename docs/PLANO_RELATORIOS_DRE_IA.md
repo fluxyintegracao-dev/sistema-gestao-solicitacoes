@@ -54,6 +54,7 @@ Base multiempresa e DRE gerencial:
 - Categorias financeiras passaram a ter `classificacao_gerencial` explicita para separar operacional, endividamento, investimento, patrimonial, intercompany, transferencia interna, imposto, folha e outros.
 - Financeiro > Relatorios ganhou Endividamento Gerencial, usando somente titulos a pagar em aberto cuja categoria esteja marcada como `ENDIVIDAMENTO`, sem inferir divida pelo nome do fornecedor, descricao ou texto da categoria.
 - Grupo Consolidado passou a exibir Endividamento Aberto como indicador executivo derivado do relatorio de endividamento.
+- Grupo Consolidado passou a consumir um endpoint executivo proprio (`/financeiro/relatorios/grupo-consolidado`), que centraliza DRE, fluxo consolidado, intercompany, endividamento e diagnostico de consistencia. A tela deixa de montar a leitura executiva apenas no frontend e passa a exibir riscos calculados no backend com base em dados reais.
 - O cadastro operacional de categorias financeiras deixou de preencher grupo DRE automaticamente; categoria marcada para DRE agora exige grupo DRE explicito.
 - Atalhos de tarifas bancarias passaram a aceitar somente categorias de saida classificadas para DRE e bloqueiam categorias de endividamento, investimento, patrimonio, intercompany ou transferencia interna.
 - A carga inicial SIENGE deixou de usar emissao ou vencimento como fallback de competencia DRE; titulos considerados na DRE agora exigem competencia real e categoria financeira classificada.
@@ -1057,6 +1058,7 @@ Prioridade sugerida:
 - Criar tela principal do diretor com Grupo Consolidado, Caixa Consolidado, EBITDA, Lucro Liquido, Necessidade Futura de Caixa, Intercompany Liquido, Resultado por Obra e Endividamento.
   - Status inicial implementado no Financeiro: `Financeiro > Relatorios > Grupo Consolidado`.
   - A primeira versao cruza DRE gerencial, Fluxo Consolidado, Intercompany e Resultado de Obras sem duplicar regra de calculo.
+  - A segunda versao centraliza a leitura executiva no backend, retornando resumo, fontes e riscos/acoes recomendadas para evitar interpretacao espalhada no frontend.
   - Endividamento consolidado iniciado com classificacao gerencial explicita nas categorias financeiras e relatorio proprio em `Financeiro > Relatorios > Endividamento`.
   - A regra atual e conservadora: so entra no endividamento o titulo a pagar em aberto vinculado a categoria marcada como `ENDIVIDAMENTO`.
 
