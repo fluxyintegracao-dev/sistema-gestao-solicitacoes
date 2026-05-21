@@ -880,6 +880,13 @@ Na previa de impacto gerencial, confira:
 - se uma operacao intercompany sera eliminada ou mantida no consolidado;
 - se origem e destino estao coerentes quando houver intercompany.
 
+Regra de consistencia:
+
+- a empresa do titulo deve ser informada na tela antes de salvar;
+- o sistema nao deve herdar silenciosamente a empresa da obra, da baixa ou da conta bancaria;
+- se a obra/centro de custo estiver vinculado a uma empresa, a empresa do titulo precisa coincidir com esse cadastro;
+- se a empresa estiver incorreta, corrija o cadastro operacional antes de gerar o titulo.
+
 ### 11.4 Criar titulo a partir da solicitacao
 
 Tela:
@@ -911,6 +918,8 @@ Cuidados:
 - se o titulo nasce de solicitacao errada, corrija a solicitacao antes;
 - nao gerar titulo duplicado;
 - conferir se ja existe titulo relacionado.
+- a empresa do titulo precisa ser conferida no modal de geracao;
+- o sistema nao deve criar titulo sem empresa do grupo informada.
 - nao salvar quando a previa apontar DRE pendente de categoria, salvo em caso conscientemente fora da DRE.
 
 ### 11.5 Registrar baixa de titulo
@@ -942,6 +951,8 @@ Regra fundamental:
 
 - a empresa pagadora ou recebedora deve ser informada explicitamente.
 - empresa diferente da empresa do titulo so deve ser usada quando houver relacao intercompany real.
+- a baixa nao preenche nem corrige a empresa do titulo; se o titulo estiver sem empresa, corrija o titulo antes da baixa.
+- a conta bancaria selecionada precisa estar vinculada a mesma empresa informada na baixa.
 
 Nao usar deducao automatica para substituir dado real.
 
@@ -1393,7 +1404,7 @@ Regra operacional importante:
 
 - o previsto usa a empresa informada no titulo financeiro;
 - o realizado usa a empresa informada na baixa do titulo;
-- a baixa deve ter empresa pagadora/recebedora correta, normalmente derivada da conta bancaria usada;
+- a baixa deve ter empresa pagadora/recebedora correta e essa empresa deve ser validada contra a conta bancaria usada;
 - se a baixa ficar sem empresa, ela aparece separada e precisa ser corrigida.
 
 Cuidados:
