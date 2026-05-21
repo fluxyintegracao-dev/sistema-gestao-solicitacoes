@@ -2009,6 +2009,147 @@ function mapCategoriaDiagnostico(categoria) {
   };
 }
 
+function getMovimentoDiagnosticoInclude(scopeWhere) {
+  return [
+    {
+      model: TituloFinanceiro,
+      as: 'titulo',
+      attributes: ['id', 'codigo', 'descricao', 'tipo', 'status', 'empresa_id', 'obra_id', 'considera_dre'],
+      where: buildTituloDiagnosticoWhere(scopeWhere),
+      required: true,
+      include: [
+        {
+          model: Obra,
+          as: 'obra',
+          attributes: ['id', 'codigo', 'nome', 'tipo_centro_custo', 'empresa_grupo_id'],
+          required: false
+        },
+        {
+          model: EmpresaGrupo,
+          as: 'empresa',
+          attributes: ['id', 'codigo', 'nome', 'tipo_empresa', 'holding_id'],
+          required: false
+        }
+      ]
+    },
+    {
+      model: EmpresaGrupo,
+      as: 'empresa',
+      attributes: ['id', 'codigo', 'nome', 'tipo_empresa', 'holding_id'],
+      required: false
+    },
+    {
+      model: EmpresaGrupo,
+      as: 'empresaOrigem',
+      attributes: ['id', 'codigo', 'nome'],
+      required: false
+    },
+    {
+      model: EmpresaGrupo,
+      as: 'empresaDestino',
+      attributes: ['id', 'codigo', 'nome'],
+      required: false
+    },
+    {
+      model: ContaBancaria,
+      as: 'contaBancaria',
+      attributes: ['id', 'nome', 'banco', 'agencia', 'conta'],
+      required: false
+    }
+  ];
+}
+
+function mapMovimentoDiagnostico(movimento) {
+  const item = toPlain(movimento);
+  return {
+    id: item.id,
+    tipo: item.tipo_movimento,
+    status: item.status,
+    descricao: item.observacoes || item.titulo?.descricao || null,
+    valor: Number(item.valor_quitacao || item.valor || 0),
+    valor_quitacao: Number(item.valor_quitacao || 0),
+    data_movimento: item.data_movimento,
+    empresa_id: item.empresa_id,
+    empresa_nome: item.empresa?.nome || null,
+    titulo_id: item.titulo_financeiro_id,
+    titulo_codigo: item.titulo?.codigo || null,
+    titulo_descricao: item.titulo?.descricao || null,
+    titulo_empresa_id: item.titulo?.empresa_id || null,
+    titulo_empresa_nome: item.titulo?.empresa?.nome || null,
+    obra_id: item.titulo?.obra_id || null,
+    obra_nome: item.titulo?.obra?.nome || null,
+    intercompany_group_id: item.intercompany_group_id,
+    empresa_origem_id: item.empresa_origem_id,
+    empresa_origem_nome: item.empresaOrigem?.nome || null,
+    empresa_destino_id: item.empresa_destino_id,
+    empresa_destino_nome: item.empresaDestino?.nome || null,
+    tipo_intercompany: item.tipo_intercompany,
+    transferencia_interna: item.transferencia_interna,
+    elimina_consolidado: item.elimina_consolidado,
+    conta_bancaria_nome: item.contaBancaria?.nome || null
+  };
+}
+
+function getTransferenciaDiagnosticoInclude() {
+  return [
+    {
+      model: EmpresaGrupo,
+      as: 'empresa',
+      attributes: ['id', 'codigo', 'nome', 'tipo_empresa', 'holding_id'],
+      required: false
+    },
+    {
+      model: EmpresaGrupo,
+      as: 'empresaOrigem',
+      attributes: ['id', 'codigo', 'nome', 'tipo_empresa', 'holding_id'],
+      required: false
+    },
+    {
+      model: EmpresaGrupo,
+      as: 'empresaDestino',
+      attributes: ['id', 'codigo', 'nome', 'tipo_empresa', 'holding_id'],
+      required: false
+    },
+    {
+      model: ContaBancaria,
+      as: 'contaOrigem',
+      attributes: ['id', 'nome', 'banco', 'agencia', 'conta'],
+      required: false
+    },
+    {
+      model: ContaBancaria,
+      as: 'contaDestino',
+      attributes: ['id', 'nome', 'banco', 'agencia', 'conta'],
+      required: false
+    }
+  ];
+}
+
+function mapTransferenciaDiagnostico(transferencia) {
+  const item = toPlain(transferencia);
+  return {
+    id: item.id,
+    tipo: item.tipo_intercompany || 'TRANSFERENCIA',
+    status: item.status,
+    descricao: item.descricao || item.motivo_intercompany || null,
+    valor: Number(item.valor || 0),
+    data_transferencia: item.data_transferencia,
+    empresa_id: item.empresa_id,
+    empresa_nome: item.empresa?.nome || null,
+    empresa_origem_id: item.empresa_origem_id,
+    empresa_origem_nome: item.empresaOrigem?.nome || null,
+    empresa_destino_id: item.empresa_destino_id,
+    empresa_destino_nome: item.empresaDestino?.nome || null,
+    tipo_intercompany: item.tipo_intercompany,
+    motivo_intercompany: item.motivo_intercompany,
+    intercompany_group_id: item.intercompany_group_id,
+    transferencia_interna: item.transferencia_interna,
+    elimina_consolidado: item.elimina_consolidado,
+    conta_origem_nome: item.contaOrigem?.nome || null,
+    conta_destino_nome: item.contaDestino?.nome || null
+  };
+}
+
 function buildDiagnosticoItem({ codigo, titulo, severidade, descricao, total, acao, exemplos }) {
   return {
     codigo,
@@ -2051,6 +2192,47 @@ async function gerarDiagnosticoDre(req) {
     considera_dre: true,
     [Op.or]: [{ dre_grupo: null }, { dre_grupo: '' }]
   };
+  const movimentoEmpresaDivergenteWhere = {
+    status: 'ATIVO',
+    empresa_id: { [Op.ne]: null },
+    [Op.and]: sequelizeWhere(col('MovimentoFinanceiro.empresa_id'), Op.ne, col('titulo.empresa_id')),
+    [Op.or]: [
+      { tipo_intercompany: null },
+      { tipo_intercompany: '' },
+      { empresa_origem_id: null },
+      { empresa_destino_id: null }
+    ]
+  };
+  const transferenciaIntercompanyIncompletaWhere = {
+    status: 'ATIVA',
+    [Op.or]: [
+      { empresa_origem_id: null },
+      { empresa_destino_id: null },
+      {
+        [Op.and]: [
+          sequelizeWhere(col('TransferenciaFinanceira.empresa_origem_id'), Op.ne, col('TransferenciaFinanceira.empresa_destino_id')),
+          {
+            [Op.or]: [
+              { tipo_intercompany: null },
+              { tipo_intercompany: '' },
+              { motivo_intercompany: null },
+              { motivo_intercompany: '' }
+            ]
+          }
+        ]
+      }
+    ]
+  };
+  const transferenciaInternaInconsistenteWhere = {
+    status: 'ATIVA',
+    [Op.and]: [
+      sequelizeWhere(col('TransferenciaFinanceira.empresa_origem_id'), Op.eq, col('TransferenciaFinanceira.empresa_destino_id'))
+    ],
+    [Op.or]: [
+      { transferencia_interna: false },
+      { tipo_intercompany: { [Op.ne]: null } }
+    ]
+  };
 
   const [
     totalTitulosDre,
@@ -2068,7 +2250,11 @@ async function gerarDiagnosticoDre(req) {
     titulosSemCategoria,
     titulosCategoriaSemDre,
     titulosEmpresaDivergente,
-    titulosIntercompanyInconsistente
+    titulosIntercompanyInconsistente,
+    movimentosSemEmpresa,
+    movimentosEmpresaDivergenteSemIntercompany,
+    transferenciasIntercompanyIncompletas,
+    transferenciasInternasInconsistentes
   ] = await Promise.all([
     countTitulosDiagnostico(tituloScopeWhere),
     EmpresaGrupo.count({ where: { ativo: true } }),
@@ -2155,6 +2341,27 @@ async function gerarDiagnosticoDre(req) {
         { intercompany: true, tipo_intercompany: '' },
         { intercompany: false, empresa_contraparte_id: { [Op.ne]: null } }
       ]
+    }),
+    MovimentoFinanceiro.count({
+      where: {
+        status: 'ATIVO',
+        empresa_id: null
+      },
+      include: getMovimentoDiagnosticoInclude(tituloScopeWhere),
+      distinct: true
+    }),
+    MovimentoFinanceiro.count({
+      where: movimentoEmpresaDivergenteWhere,
+      include: getMovimentoDiagnosticoInclude(tituloScopeWhere),
+      distinct: true
+    }),
+    TransferenciaFinanceira.count({
+      where: transferenciaIntercompanyIncompletaWhere,
+      distinct: true
+    }),
+    TransferenciaFinanceira.count({
+      where: transferenciaInternaInconsistenteWhere,
+      distinct: true
     })
   ]);
 
@@ -2164,7 +2371,11 @@ async function gerarDiagnosticoDre(req) {
     exemplosTitulosSemCategoria,
     exemplosTitulosCategoriaSemDre,
     exemplosEmpresaDivergente,
-    exemplosIntercompany
+    exemplosIntercompany,
+    exemplosMovimentosSemEmpresa,
+    exemplosMovimentosEmpresaDivergente,
+    exemplosTransferenciasIntercompanyIncompletas,
+    exemplosTransferenciasInternasInconsistentes
   ] = await Promise.all([
     sampleTitulosDiagnostico(tituloScopeWhere, { empresa_id: null }),
     sampleTitulosDiagnostico(tituloScopeWhere, { competencia_data: null }),
@@ -2198,7 +2409,34 @@ async function gerarDiagnosticoDre(req) {
         { intercompany: true, tipo_intercompany: '' },
         { intercompany: false, empresa_contraparte_id: { [Op.ne]: null } }
       ]
-    })
+    }),
+    MovimentoFinanceiro.findAll({
+      where: {
+        status: 'ATIVO',
+        empresa_id: null
+      },
+      include: getMovimentoDiagnosticoInclude(tituloScopeWhere),
+      order: [['id', 'DESC']],
+      limit: 8
+    }).then((items) => items.map(mapMovimentoDiagnostico)),
+    MovimentoFinanceiro.findAll({
+      where: movimentoEmpresaDivergenteWhere,
+      include: getMovimentoDiagnosticoInclude(tituloScopeWhere),
+      order: [['id', 'DESC']],
+      limit: 8
+    }).then((items) => items.map(mapMovimentoDiagnostico)),
+    TransferenciaFinanceira.findAll({
+      where: transferenciaIntercompanyIncompletaWhere,
+      include: getTransferenciaDiagnosticoInclude(),
+      order: [['id', 'DESC']],
+      limit: 8
+    }).then((items) => items.map(mapTransferenciaDiagnostico)),
+    TransferenciaFinanceira.findAll({
+      where: transferenciaInternaInconsistenteWhere,
+      include: getTransferenciaDiagnosticoInclude(),
+      order: [['id', 'DESC']],
+      limit: 8
+    }).then((items) => items.map(mapTransferenciaDiagnostico))
   ]);
 
   const itens = [
@@ -2291,6 +2529,42 @@ async function gerarDiagnosticoDre(req) {
       total: titulosIntercompanyInconsistente,
       acao: 'Marque intercompany apenas quando houver origem e destino reais, informe o tipo e a contraparte do grupo.',
       exemplos: exemplosIntercompany
+    }),
+    buildDiagnosticoItem({
+      codigo: 'BAIXAS_SEM_EMPRESA',
+      titulo: 'Baixas sem empresa pagadora/recebedora',
+      severidade: 'CRITICA',
+      descricao: 'Toda baixa precisa informar a empresa real que pagou ou recebeu. Sem isso, caixa por empresa e consolidado ficam incompletos.',
+      total: movimentosSemEmpresa,
+      acao: 'Corrija a baixa informando a empresa pagadora/recebedora real. Evite qualquer deducao por conta bancaria sem confirmacao operacional.',
+      exemplos: exemplosMovimentosSemEmpresa
+    }),
+    buildDiagnosticoItem({
+      codigo: 'BAIXAS_EMPRESA_DIVERGENTE_SEM_INTERCOMPANY',
+      titulo: 'Baixas com empresa diferente sem intercompany completo',
+      severidade: 'ALTA',
+      descricao: 'Quando a empresa da baixa e diferente da empresa do titulo, a operacao precisa ter origem, destino e tipo intercompany.',
+      total: movimentosEmpresaDivergenteSemIntercompany,
+      acao: 'Revise a baixa e informe a classificacao intercompany real ou corrija a empresa pagadora/recebedora.',
+      exemplos: exemplosMovimentosEmpresaDivergente
+    }),
+    buildDiagnosticoItem({
+      codigo: 'TRANSFERENCIAS_INTERCOMPANY_INCOMPLETAS',
+      titulo: 'Transferencias intercompany incompletas',
+      severidade: 'ALTA',
+      descricao: 'Transferencias entre empresas diferentes precisam de origem, destino, tipo e motivo para explicar quem financia quem.',
+      total: transferenciasIntercompanyIncompletas,
+      acao: 'Complete tipo e motivo intercompany nas transferencias entre empresas do grupo.',
+      exemplos: exemplosTransferenciasIntercompanyIncompletas
+    }),
+    buildDiagnosticoItem({
+      codigo: 'TRANSFERENCIAS_INTERNAS_INCONSISTENTES',
+      titulo: 'Transferencias internas inconsistentes',
+      severidade: 'MEDIA',
+      descricao: 'Transferencias entre contas da mesma empresa devem ser tratadas como transferencia interna de caixa, sem intercompany.',
+      total: transferenciasInternasInconsistentes,
+      acao: 'Marque como transferencia interna e remova classificacao intercompany quando origem e destino forem a mesma empresa.',
+      exemplos: exemplosTransferenciasInternasInconsistentes
     })
   ];
 

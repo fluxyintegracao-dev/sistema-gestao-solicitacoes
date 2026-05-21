@@ -50,6 +50,7 @@ Base multiempresa e DRE gerencial:
 - Transferencias financeiras e conciliacao bancaria passaram a classificar explicitamente transferencia interna e transferencia intercompany, exigindo tipo e motivo quando as contas pertencem a empresas diferentes.
 - O Relatorio Intercompany passou a combinar titulos intercompany com transferencias financeiras intercompany, separando previsto, realizado por baixa e transferencias efetivas entre contas do grupo.
 - As telas de titulo manual e geracao de conta pela solicitacao passaram a exibir uma previa de impacto gerencial antes de salvar, mostrando efeito na DRE, no fluxo de caixa previsto e no consolidado/intercompany.
+- O Diagnostico da DRE passou a apontar tambem baixas sem empresa, baixas com empresa divergente sem intercompany completo, transferencias intercompany incompletas e transferencias internas inconsistentes.
 
 Documentacao operacional complementar:
 

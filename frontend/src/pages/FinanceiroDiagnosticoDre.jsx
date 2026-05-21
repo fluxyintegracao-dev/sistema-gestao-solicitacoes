@@ -66,12 +66,17 @@ function SummaryCard({ label, value, detail, colorClass = '' }) {
 }
 
 function ExampleLine({ item }) {
+  const valorExemplo = item.valor_original ?? item.valor_quitacao ?? item.valor;
   const title =
     item.descricao ||
+    item.titulo_descricao ||
     item.nome ||
     item.empresa_nome ||
+    item.empresa_origem_nome ||
+    item.empresa_destino_nome ||
     item.obra_nome ||
     item.categoria_nome ||
+    item.titulo_codigo ||
     item.codigo ||
     `Registro #${item.id}`;
 
@@ -79,19 +84,26 @@ function ExampleLine({ item }) {
     <li className="rounded-lg border border-slate-200 bg-white px-3 py-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="text-sm font-semibold text-slate-900">{title}</span>
-        {item.valor_original != null ? (
-          <span className="text-xs font-semibold text-slate-500">{formatMoney(item.valor_original)}</span>
+        {valorExemplo != null ? (
+          <span className="text-xs font-semibold text-slate-500">{formatMoney(valorExemplo)}</span>
         ) : null}
       </div>
       <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
         {item.id ? <span>ID {item.id}</span> : null}
         {item.codigo ? <span>Codigo {item.codigo}</span> : null}
+        {item.titulo_codigo ? <span>Titulo {item.titulo_codigo}</span> : null}
         {item.tipo ? <span>Tipo {item.tipo}</span> : null}
         {item.status ? <span>Status {item.status}</span> : null}
         {item.empresa_nome ? <span>Empresa {item.empresa_nome}</span> : null}
+        {item.titulo_empresa_nome ? <span>Empresa do titulo {item.titulo_empresa_nome}</span> : null}
+        {item.empresa_origem_nome ? <span>Origem {item.empresa_origem_nome}</span> : null}
+        {item.empresa_destino_nome ? <span>Destino {item.empresa_destino_nome}</span> : null}
         {item.obra_nome ? <span>Obra/Centro {item.obra_nome}</span> : null}
         {item.categoria_nome ? <span>Categoria {item.categoria_nome}</span> : null}
         {item.competencia_data ? <span>Competencia {item.competencia_data}</span> : null}
+        {item.data_movimento ? <span>Movimento {item.data_movimento}</span> : null}
+        {item.data_transferencia ? <span>Transferencia {item.data_transferencia}</span> : null}
+        {item.tipo_intercompany ? <span>Intercompany {item.tipo_intercompany}</span> : null}
       </div>
     </li>
   );
@@ -226,8 +238,9 @@ export default function FinanceiroDiagnosticoDre() {
         <p className="mt-2 text-sm leading-6 text-slate-600">
           Antes de confiar na DRE da Holding, corrija primeiro pendencias criticas, depois pendencias altas.
           A regra operacional recomendada e: toda obra/centro de custo pertence a uma empresa operacional,
-          todo titulo financeiro herda ou informa essa empresa, toda categoria financeira tem grupo DRE,
-          e toda competencia representa o mes economico real do custo ou receita.
+            todo titulo financeiro herda ou informa essa empresa, toda categoria financeira tem grupo DRE,
+          toda competencia representa o mes economico real do custo ou receita, e toda baixa ou transferencia
+          entre empresas possui classificacao intercompany completa quando representar relacao interna do grupo.
         </p>
       </section>
 

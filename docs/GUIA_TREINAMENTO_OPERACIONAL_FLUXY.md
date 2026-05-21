@@ -1056,7 +1056,11 @@ O diagnostico deve ser usado para encontrar:
 - intercompany sem destino;
 - intercompany sem tipo;
 - obra sem empresa;
-- centro de custo sem empresa.
+- centro de custo sem empresa;
+- baixa sem empresa pagadora ou recebedora;
+- baixa com empresa diferente do titulo sem intercompany completo;
+- transferencia entre empresas sem tipo ou motivo intercompany;
+- transferencia interna entre contas da mesma empresa marcada como intercompany.
 
 Rotina recomendada:
 
