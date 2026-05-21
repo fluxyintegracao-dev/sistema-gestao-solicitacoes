@@ -45,6 +45,10 @@ function isCadastroObra(obra) {
   return String(obra?.tipo_centro_custo || 'OBRA').trim().toUpperCase() === 'OBRA';
 }
 
+function getEmpresaObraId(obra) {
+  return obra?.empresa_grupo_id ? String(obra.empresa_grupo_id) : '';
+}
+
 function formatCurrency(value) {
   const number = Number(value || 0);
   return number.toLocaleString('pt-BR', {
@@ -127,6 +131,7 @@ function buildDefaultForm(tipo = 'PAGAR') {
   return {
     tipo: resolveTipo(tipo),
     obra_id: '',
+    empresa_id: '',
     parceiro_id: '',
     categoria_financeira_id: '',
     descricao: '',
@@ -387,10 +392,14 @@ export default function FinanceiroTituloNovo() {
           ...current,
           payment_account_id: current.payment_account_id || String(paymentAccountsData?.[0]?.id || '')
         }));
-        setForm((current) => ({
-          ...current,
-          obra_id: current.obra_id || String(obrasLista[0]?.id || '')
-        }));
+        setForm((current) => {
+          const obraPadrao = obrasLista.find((obra) => String(obra.id) === String(current.obra_id)) || obrasLista[0];
+          return {
+            ...current,
+            obra_id: current.obra_id || String(obraPadrao?.id || ''),
+            empresa_id: current.empresa_id || getEmpresaObraId(obraPadrao)
+          };
+        });
       } catch (err) {
         if (!active) return;
         setError(err?.message || 'Erro ao carregar dados do financeiro');
@@ -452,6 +461,12 @@ export default function FinanceiroTituloNovo() {
     [obras, form.obra_id]
   );
   const obraSelecionadaEhObra = isCadastroObra(obraSelecionada);
+  const empresaDaObraId = getEmpresaObraId(obraSelecionada);
+  const empresaTituloDivergente = Boolean(
+    form.empresa_id &&
+    empresaDaObraId &&
+    String(form.empresa_id) !== String(empresaDaObraId)
+  );
 
   useEffect(() => {
     if (!moduloApropriacoesHabilitado || !form.obra_id || !obraSelecionadaEhObra) {
@@ -673,6 +688,11 @@ export default function FinanceiroTituloNovo() {
 
     setForm((current) => {
       const next = { ...current, [field]: value };
+      if (field === 'obra_id') {
+        const obra = obras.find((item) => String(item.id) === String(value));
+        next.empresa_id = getEmpresaObraId(obra);
+        next.apropriacao_id = '';
+      }
       if (field === 'valor' && (current.pagamentos || []).length === 1) {
         const pagamento = current.pagamentos[0] || createPagamento(value);
         const quantidade = getQuantidadeParcelas(pagamento);
@@ -796,6 +816,14 @@ export default function FinanceiroTituloNovo() {
   }
 
   function validarCadastroTitulo() {
+    if (!form.empresa_id) {
+      return 'Informe a empresa real do titulo.';
+    }
+
+    if (empresaTituloDivergente) {
+      return 'A empresa do titulo deve ser a mesma vinculada a obra/centro de custo selecionado.';
+    }
+
     if (!form.parceiro_id) {
       return `Selecione o ${form.tipo === 'RECEBER' ? 'cliente' : 'credor'} na lista antes de salvar.`;
     }
@@ -885,6 +913,7 @@ export default function FinanceiroTituloNovo() {
       const payload = {
         ...form,
         obra_id: Number(form.obra_id),
+        empresa_id: Number(form.empresa_id),
         parceiro_id: Number(form.parceiro_id),
         apropriacao_id: form.apropriacao_id ? Number(form.apropriacao_id) : undefined,
         categoria_financeira_id: form.categoria_financeira_id ? Number(form.categoria_financeira_id) : undefined
@@ -1039,6 +1068,28 @@ export default function FinanceiroTituloNovo() {
                     </option>
                   ))}
                 </select>
+              </label>
+
+              <label className="sol-filter-field xl:col-span-3">
+                <span className="sol-filter-label">Empresa do titulo</span>
+                <select
+                  className={`input w-full ${empresaTituloDivergente ? 'border-rose-300 bg-rose-50' : ''}`}
+                  value={form.empresa_id}
+                  onChange={(event) => updateField('empresa_id', event.target.value)}
+                  required
+                >
+                  <option value="">Selecione a empresa real</option>
+                  {empresasGrupo.map((empresa) => (
+                    <option key={empresa.id} value={empresa.id}>
+                      {empresa.nome}
+                    </option>
+                  ))}
+                </select>
+                <span className={`app-note mt-2 ${empresaTituloDivergente ? 'text-rose-600' : ''}`}>
+                  {empresaTituloDivergente
+                    ? 'A empresa deve coincidir com a empresa vinculada ao cadastro selecionado.'
+                    : 'Informe a empresa economica responsavel pelo titulo.'}
+                </span>
               </label>
 
               <label className="sol-filter-field xl:col-span-3">

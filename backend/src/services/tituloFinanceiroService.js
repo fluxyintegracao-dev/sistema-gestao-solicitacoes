@@ -727,6 +727,13 @@ function resolverEmpresaTitulo({ empresaIdInformada, obra }) {
   const empresaInformada = empresaIdInformada ? Number(empresaIdInformada) : null;
   const empresaDaObra = obra?.empresa_grupo_id ? Number(obra.empresa_grupo_id) : null;
 
+  if (!Number.isInteger(empresaInformada) || empresaInformada <= 0) {
+    throw createHttpError(
+      400,
+      'Empresa do titulo e obrigatoria. Informe a empresa real antes de salvar.'
+    );
+  }
+
   if (empresaInformada && empresaDaObra && empresaInformada !== empresaDaObra) {
     throw createHttpError(
       400,
@@ -734,7 +741,7 @@ function resolverEmpresaTitulo({ empresaIdInformada, obra }) {
     );
   }
 
-  return empresaInformada || empresaDaObra || null;
+  return empresaInformada;
 }
 
 function resolverCompetenciaTitulo(payload = {}, fallbackData = null) {
@@ -805,7 +812,14 @@ function buildMovimentoIntercompanyFields(titulo = {}) {
 }
 
 async function validarIntercompanyBaixa({ payload = {}, titulo = {}, empresaBaixaId }) {
-  const empresaTituloId = titulo?.empresa_id || titulo?.obra?.empresa_grupo_id || null;
+  const empresaTituloId = titulo?.empresa_id ? Number(titulo.empresa_id) : null;
+  if (!empresaTituloId) {
+    throw createHttpError(
+      400,
+      'Titulo sem empresa vinculada. Corrija a empresa do titulo antes de registrar baixa.'
+    );
+  }
+
   const empresasDiferentes = Boolean(
     empresaTituloId &&
     empresaBaixaId &&
@@ -1799,7 +1813,14 @@ async function baixarTitulo(req, tituloId, payload = {}) {
     titulo,
     empresaBaixaId
   });
-  const empresaTituloId = titulo.empresa_id || titulo.obra?.empresa_grupo_id || empresaBaixaId;
+  const empresaTituloId = titulo.empresa_id ? Number(titulo.empresa_id) : null;
+  if (!empresaTituloId) {
+    throw createHttpError(
+      400,
+      'Titulo sem empresa vinculada. Corrija a empresa do titulo antes de registrar baixa.'
+    );
+  }
+
   const novoValorBaixado = roundCurrency(Number(titulo.valor_baixado || 0) + valorBaixa);
   const novoEstado = calcularStatusTitulo({
     valorOriginal: Number(titulo.valor_original || 0),
