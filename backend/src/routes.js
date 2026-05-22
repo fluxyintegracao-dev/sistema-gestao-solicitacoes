@@ -58,6 +58,7 @@ const {
   validateCompraRelatorioEconomiaCotacoesQuery,
   validateCompraRelatorioFornecedoresQuery,
   validateCompraRelatorioPendenciasCotacoesQuery,
+  validateCompraRelatorioPrecosInsumosQuery,
   validateContratoCreateBody,
   validateContratoQuery,
   validateContratoUpdateBody,
@@ -1301,6 +1302,7 @@ router.get('/compras/relatorios/categorias-insumos', validateRequest({ query: va
 router.get('/compras/relatorios/compras-fornecedor', validateRequest({ query: validateCompraRelatorioComprasFornecedorQuery }), scopeCompraListAccess, RelatorioComprasController.comprasPorFornecedor);
 router.get('/compras/relatorios/demanda-pedidos', validateRequest({ query: validateCompraRelatorioDemandaPedidosQuery }), scopeCompraListAccess, RelatorioComprasController.demandaPedidos);
 router.get('/compras/relatorios/pendencias-cotacoes', validateRequest({ query: validateCompraRelatorioPendenciasCotacoesQuery }), scopeCompraListAccess, RelatorioComprasController.pendenciasCotacoes);
+router.get('/compras/relatorios/precos-insumos', validateRequest({ query: validateCompraRelatorioPrecosInsumosQuery }), scopeCompraListAccess, RelatorioComprasController.precosInsumosFornecedores);
 router.get('/compras/relatorios/ciclo', validateRequest({ query: validateCompraRelatorioCicloQuery }), scopeCompraListAccess, RelatorioComprasController.ciclo);
 router.get('/compras/relatorios/economia-cotacoes', validateRequest({ query: validateCompraRelatorioEconomiaCotacoesQuery }), scopeCompraListAccess, RelatorioComprasController.economiaCotacoes);
 router.get('/compras/relatorios/fornecedores', validateRequest({ query: validateCompraRelatorioFornecedoresQuery }), scopeCompraListAccess, RelatorioComprasController.fornecedores);

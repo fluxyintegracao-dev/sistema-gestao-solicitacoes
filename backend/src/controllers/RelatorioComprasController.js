@@ -7,7 +7,8 @@ const {
   relatorioDemandaPedidosCompras,
   relatorioEconomiaCotacoes,
   relatorioFornecedoresCompras,
-  relatorioPendenciasCotacoesCompras
+  relatorioPendenciasCotacoesCompras,
+  relatorioPrecosInsumosFornecedores
 } = require('../services/relatorioComprasService');
 
 async function carregarUsuario(userId) {
@@ -75,6 +76,27 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return res.status(500).json({ error: 'Erro ao buscar relatorio de compras por fornecedor' });
+    }
+  },
+
+  async precosInsumosFornecedores(req, res) {
+    try {
+      const usuario = await validarAcessoRelatorioCompras(req, res);
+      if (!usuario) {
+        return;
+      }
+
+      const relatorio = await relatorioPrecosInsumosFornecedores({
+        obraId: req.query?.obra_id,
+        dataInicio: req.query?.data_inicio,
+        dataFim: req.query?.data_fim,
+        obraIds: req.compraScopeObraIds
+      });
+
+      return res.json(relatorio);
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao buscar relatorio de precos por insumo e fornecedor' });
     }
   },
 

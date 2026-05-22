@@ -457,6 +457,27 @@ function validateCompraRelatorioComprasFornecedorQuery(query = {}) {
   };
 }
 
+function validateCompraRelatorioPrecosInsumosQuery(query = {}) {
+  ensureAllowedKeys(
+    query,
+    ['obra_id', 'data_inicio', 'data_fim'],
+    'Consulta do relatorio de precos por insumo e fornecedor'
+  );
+
+  const dataInicio = parseDateOnly(query.data_inicio, 'Data inicial');
+  const dataFim = parseDateOnly(query.data_fim, 'Data final');
+
+  if (dataInicio && dataFim && dataInicio > dataFim) {
+    throw new ValidationError('Data inicial nao pode ser maior que a data final.');
+  }
+
+  return {
+    obra_id: parseInteger(query.obra_id, 'Obra'),
+    data_inicio: dataInicio,
+    data_fim: dataFim
+  };
+}
+
 function validateCompraRelatorioEconomiaCotacoesQuery(query = {}) {
   ensureAllowedKeys(
     query,
@@ -779,6 +800,7 @@ module.exports = {
   validateCompraRelatorioEconomiaCotacoesQuery,
   validateCompraRelatorioFornecedoresQuery,
   validateCompraRelatorioPendenciasCotacoesQuery,
+  validateCompraRelatorioPrecosInsumosQuery,
   validateContratoCreateBody,
   validateContratoQuery,
   validateContratoUpdateBody,

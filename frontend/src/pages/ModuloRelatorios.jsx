@@ -70,6 +70,7 @@ const HUBS = {
           { titulo: 'Demanda e pedidos', descricao: 'Solicitacoes e pedidos por status, obra/centro e valor pedido.', to: '/compras/relatorios/demanda-pedidos', status: 'Disponivel', permissao: 'comprasCotacoes' },
           { titulo: 'Compras por fornecedor', descricao: 'Valor efetivamente pedido por fornecedor, obra/centro, status e pedido emitido.', to: '/compras/relatorios/compras-fornecedor', status: 'Disponivel', permissao: 'comprasCotacoes' },
           { titulo: 'Categorias e insumos', descricao: 'Valor pedido por categoria, insumo e obra/centro com base nos itens dos pedidos.', to: '/compras/relatorios/categorias-insumos', status: 'Disponivel', permissao: 'comprasCotacoes' },
+          { titulo: 'Precos por insumo', descricao: 'Preco medio de compra por insumo e fornecedor a partir dos itens reais dos pedidos.', to: '/compras/relatorios/precos-insumos', status: 'Disponivel', permissao: 'comprasCotacoes' },
           { titulo: 'Cotacoes', descricao: 'Lista de cotacoes, status de resposta e encerramento.', to: '/cotacoes', status: 'Disponivel', permissao: 'comprasCotacoes' },
           { titulo: 'Pedidos de compra', descricao: 'Pedidos emitidos, status e detalhamento por fornecedor.', to: '/pedidos-compra', status: 'Disponivel', permissao: 'comprasPedidos' },
           { titulo: 'Economia em cotacoes', descricao: 'Comparativo entre menor preco disponivel e vencedor selecionado.', to: '/compras/relatorios/economia-cotacoes', status: 'Disponivel', permissao: 'comprasCotacoes' },

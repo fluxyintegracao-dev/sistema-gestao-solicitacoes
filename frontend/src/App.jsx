@@ -86,6 +86,7 @@ const FinanceiroResultadoCentrosCusto = lazy(() => import('./pages/FinanceiroRes
   const ComprasRelatorioComprasFornecedor = lazy(() => import('./pages/ComprasRelatorioComprasFornecedor'));
   const ComprasRelatorioDemandaPedidos = lazy(() => import('./pages/ComprasRelatorioDemandaPedidos'));
   const ComprasRelatorioPendenciasCotacoes = lazy(() => import('./pages/ComprasRelatorioPendenciasCotacoes'));
+  const ComprasRelatorioPrecosInsumos = lazy(() => import('./pages/ComprasRelatorioPrecosInsumos'));
   const ComprasRelatorioCiclo = lazy(() => import('./pages/ComprasRelatorioCiclo'));
 const ComprasRelatorioEconomiaCotacoes = lazy(() => import('./pages/ComprasRelatorioEconomiaCotacoes'));
 const ComprasRelatorioFornecedores = lazy(() => import('./pages/ComprasRelatorioFornecedores'));
@@ -707,6 +708,7 @@ export default function App() {
         <Route path="compras/relatorios/compras-fornecedor" element={<ModuloComprasRoute><ComprasCotacoesRoute><ComprasRelatorioComprasFornecedor /></ComprasCotacoesRoute></ModuloComprasRoute>} />
         <Route path="compras/relatorios/demanda-pedidos" element={<ModuloComprasRoute><ComprasCotacoesRoute><ComprasRelatorioDemandaPedidos /></ComprasCotacoesRoute></ModuloComprasRoute>} />
         <Route path="compras/relatorios/pendencias-cotacoes" element={<ModuloComprasRoute><ComprasCotacoesRoute><ComprasRelatorioPendenciasCotacoes /></ComprasCotacoesRoute></ModuloComprasRoute>} />
+        <Route path="compras/relatorios/precos-insumos" element={<ModuloComprasRoute><ComprasCotacoesRoute><ComprasRelatorioPrecosInsumos /></ComprasCotacoesRoute></ModuloComprasRoute>} />
         <Route path="compras/relatorios/ciclo" element={<ModuloComprasRoute><ComprasCotacoesRoute><ComprasRelatorioCiclo /></ComprasCotacoesRoute></ModuloComprasRoute>} />
         <Route path="compras/relatorios/economia-cotacoes" element={<ModuloComprasRoute><ComprasCotacoesRoute><ComprasRelatorioEconomiaCotacoes /></ComprasCotacoesRoute></ModuloComprasRoute>} />
         <Route path="compras/relatorios/fornecedores" element={<ModuloComprasRoute><ComprasCotacoesRoute><ComprasRelatorioFornecedores /></ComprasCotacoesRoute></ModuloComprasRoute>} />

@@ -2056,6 +2056,24 @@ Importante:
 - O relatorio nao mede melhor preco, taxa de resposta ou desempenho de cotacao. Para isso, use `Fornecedores` ou `Economia em cotacoes`.
 - A concentracao top 5 mostra quanto do valor total do periodo esta concentrado nos cinco maiores fornecedores por valor pedido.
 
+Relatorio de Precos por Insumo:
+
+1. Acesse `Compras > Relatorios`.
+2. Abra `Precos por insumo`.
+3. Filtre por obra/centro de custo e por periodo de criacao do pedido.
+4. Leia os cards para entender quantidade de itens analisados, itens distintos, fornecedores, pedidos, valor total e itens que possuem mais de um fornecedor para comparacao.
+5. Use `Insumos por preco medio` para ver o preco medio geral de cada item comprado e o fornecedor com menor preco medio naquele item.
+6. Use `Comparativo por fornecedor` para comparar, item a item, o preco medio de cada fornecedor contra o menor preco medio do mesmo item.
+7. Use `Categorias` para ver em quais categorias esta concentrado o valor analisado.
+
+Importante:
+
+- O preco medio e calculado com itens reais de pedidos: `valor_total` dividido pela `quantidade_pedido`.
+- O relatorio nao usa resposta de cotacao para calcular preco medio. Ele usa somente pedido emitido.
+- Item cadastrado usa o cadastro real de insumo e categoria.
+- Item manual aparece como item manual. O sistema nao tenta adivinhar categoria por texto.
+- A diferenca exibida no comparativo nao e economia realizada. Ela apenas mostra a distancia objetiva entre o preco medio do fornecedor e o menor preco medio observado para o mesmo item no periodo filtrado.
+
 Relatorio de Fornecedores:
 
 1. Acesse `Compras > Relatorios`.

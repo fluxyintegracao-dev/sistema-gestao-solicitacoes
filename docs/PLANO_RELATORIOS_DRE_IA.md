@@ -76,6 +76,7 @@ Base multiempresa e DRE gerencial:
 - Compras > Relatorios ganhou Pendencias de Cotacoes, destacando cotacoes sem minimo de respostas e fornecedores com prazo vencido sem resposta a partir de campos estruturados.
 - Compras > Relatorios ganhou Demanda e Pedidos, consolidando solicitacoes de compra e pedidos por status, obra/centro de custo, valor pedido e analitico com base em registros reais.
 - Compras > Relatorios ganhou Compras por Fornecedor, consolidando valor efetivamente pedido por fornecedor, obra/centro, status e pedido emitido com base em pedidos de compra reais.
+- Compras > Relatorios ganhou Precos por Insumo, comparando preco medio de compra por item e fornecedor a partir dos itens reais dos pedidos.
 - Compras > Relatorios ganhou Categorias e Insumos, consolidando valor pedido por categoria, insumo/item e obra/centro com base nos itens reais dos pedidos.
 - Solicitacoes > Relatorios ganhou Painel Operacional, consolidando volume, abertas, concluidas, funil, distribuicao por status, setor, obra/centro de custo, tipo, criador, responsavel atual, tempos por etapa, aging por setor e gargalos com base em solicitacoes e historicos reais do fluxo.
 
@@ -190,7 +191,7 @@ Relatorios:
 - Tempo medio entre solicitacao, cotacao, aprovacao e pedido.
 - Auditoria de itens de pedido.
 - Fornecedores mais acionados. [Entregue em Relatorio de Fornecedores por acionamento em cotacao e em Compras por Fornecedor por pedido emitido]
-- Fornecedores com melhor preco medio.
+- Fornecedores com melhor preco medio. [Entregue em Precos por Insumo com preco medio calculado por item real de pedido]
 - Fornecedores com menor taxa de resposta.
 
 Graficos:

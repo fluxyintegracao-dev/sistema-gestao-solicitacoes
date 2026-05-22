@@ -228,6 +228,21 @@ function createInsumoComprasResumo({ key, descricao, unidade, categoria }) {
   };
 }
 
+function createPrecoInsumoResumo({ key, descricao, unidade, categoria, origem }) {
+  return {
+    key,
+    descricao,
+    unidade: unidade || null,
+    categoria_id: categoria?.id || null,
+    categoria_nome: categoria?.nome || 'Itens manuais/sem categoria',
+    origem: origem || 'MANUAL',
+    pedidos_ids: new Set(),
+    fornecedores: new Map(),
+    quantidade_total: 0,
+    valor_total: 0
+  };
+}
+
 function finalizeComprasResumo(item) {
   return {
     ...item,
@@ -737,6 +752,282 @@ async function relatorioComprasPorFornecedor({ obraId, dataInicio, dataFim, obra
     obras,
     status: finalizeResumoMap(statusMap),
     pedidos: linhasPedidos.slice(0, 100)
+  };
+}
+
+async function relatorioPrecosInsumosFornecedores({ obraId, dataInicio, dataFim, obraIds } = {}) {
+  const itens = await PedidoCompraItem.findAll({
+    where: { removido: false },
+    attributes: [
+      'id',
+      'pedido_compra_id',
+      'descricao',
+      'unidade',
+      'quantidade_pedido',
+      'preco_unitario',
+      'valor_total',
+      'item_tipo'
+    ],
+    include: [
+      {
+        model: PedidoCompra,
+        as: 'pedido',
+        attributes: ['id', 'obra_id', 'fornecedor_compra_id', 'status', 'createdAt'],
+        required: true,
+        where: buildPedidoCriacaoWhere({ obraId, obraIds, dataInicio, dataFim }),
+        include: [
+          { model: Obra, as: 'obra', attributes: ['id', 'nome'] },
+          { model: FornecedorCompra, as: 'fornecedor', attributes: ['id', 'nome', 'cnpj', 'cidade', 'estado'] }
+        ]
+      },
+      {
+        model: SolicitacaoCompraItem,
+        as: 'itemCadastrado',
+        attributes: ['id', 'insumo_id'],
+        include: [
+          {
+            model: Insumo,
+            as: 'insumo',
+            attributes: ['id', 'nome', 'codigo', 'categoria_id'],
+            include: [
+              { model: Categoria, as: 'categoria', attributes: ['id', 'nome'] }
+            ]
+          }
+        ]
+      },
+      {
+        model: SolicitacaoCompraItemManual,
+        as: 'itemManual',
+        attributes: ['id', 'nome_manual']
+      }
+    ],
+    order: [[{ model: PedidoCompra, as: 'pedido' }, 'createdAt', 'DESC'], ['id', 'DESC']]
+  });
+
+  const itensMap = new Map();
+  const fornecedoresIds = new Set();
+  const pedidosIds = new Set();
+  const categoriasMap = new Map();
+
+  itens.forEach((item) => {
+    const plain = item.toJSON ? item.toJSON() : item;
+    const pedido = plain.pedido || {};
+    const fornecedor = pedido.fornecedor || null;
+    const insumo = plain.itemCadastrado?.insumo || null;
+    const categoria = insumo?.categoria || null;
+    const descricao = insumo?.nome || plain.itemManual?.nome_manual || plain.descricao || 'Item sem descricao';
+    const unidade = plain.unidade || null;
+    const itemKey = insumo?.id
+      ? `INSUMO:${insumo.id}`
+      : `MANUAL:${String(descricao).trim().toUpperCase()}:${String(unidade || '').trim().toUpperCase()}`;
+    const fornecedorKey = fornecedor?.id ? String(fornecedor.id) : 'SEM_FORNECEDOR';
+    const quantidade = toNumber(plain.quantidade_pedido);
+    const valor = roundMoney(plain.valor_total);
+    const precoReferencia = quantidade > 0 ? roundMoney(valor / quantidade) : roundMoney(plain.preco_unitario);
+
+    pedidosIds.add(Number(plain.pedido_compra_id));
+    if (fornecedor?.id) {
+      fornecedoresIds.add(Number(fornecedor.id));
+    }
+
+    if (!itensMap.has(itemKey)) {
+      itensMap.set(itemKey, createPrecoInsumoResumo({
+        key: itemKey,
+        descricao,
+        unidade,
+        categoria,
+        origem: insumo?.id ? 'INSUMO' : 'MANUAL'
+      }));
+    }
+
+    const itemResumo = itensMap.get(itemKey);
+    itemResumo.pedidos_ids.add(Number(plain.pedido_compra_id));
+    itemResumo.quantidade_total += quantidade;
+    itemResumo.valor_total = roundMoney(itemResumo.valor_total + valor);
+
+    const categoriaKey = categoria?.id ? String(categoria.id) : 'SEM_CATEGORIA';
+    if (!categoriasMap.has(categoriaKey)) {
+      categoriasMap.set(categoriaKey, {
+        key: categoriaKey,
+        categoria_id: categoria?.id || null,
+        categoria_nome: categoria?.nome || 'Itens manuais/sem categoria',
+        itens: new Set(),
+        fornecedores: new Set(),
+        valor_total: 0
+      });
+    }
+    const categoriaResumo = categoriasMap.get(categoriaKey);
+    categoriaResumo.itens.add(itemKey);
+    if (fornecedor?.id) {
+      categoriaResumo.fornecedores.add(Number(fornecedor.id));
+    }
+    categoriaResumo.valor_total = roundMoney(categoriaResumo.valor_total + valor);
+
+    if (!itemResumo.fornecedores.has(fornecedorKey)) {
+      itemResumo.fornecedores.set(fornecedorKey, {
+        key: fornecedorKey,
+        fornecedor_id: fornecedor?.id || null,
+        fornecedor_nome: fornecedor?.nome || 'Sem fornecedor',
+        cnpj: fornecedor?.cnpj || null,
+        cidade: fornecedor?.cidade || null,
+        estado: fornecedor?.estado || null,
+        pedidos_ids: new Set(),
+        ocorrencias: 0,
+        quantidade_total: 0,
+        valor_total: 0,
+        menor_preco_unitario: null,
+        maior_preco_unitario: null,
+        ultimo_preco_unitario: null,
+        ultimo_pedido_em: null
+      });
+    }
+
+    const fornecedorResumo = itemResumo.fornecedores.get(fornecedorKey);
+    fornecedorResumo.pedidos_ids.add(Number(plain.pedido_compra_id));
+    fornecedorResumo.ocorrencias += 1;
+    fornecedorResumo.quantidade_total += quantidade;
+    fornecedorResumo.valor_total = roundMoney(fornecedorResumo.valor_total + valor);
+    fornecedorResumo.menor_preco_unitario = fornecedorResumo.menor_preco_unitario == null
+      ? precoReferencia
+      : Math.min(fornecedorResumo.menor_preco_unitario, precoReferencia);
+    fornecedorResumo.maior_preco_unitario = fornecedorResumo.maior_preco_unitario == null
+      ? precoReferencia
+      : Math.max(fornecedorResumo.maior_preco_unitario, precoReferencia);
+
+    const dataPedido = toDate(pedido.createdAt);
+    const ultimoPedido = toDate(fornecedorResumo.ultimo_pedido_em);
+    if (dataPedido && (!ultimoPedido || dataPedido >= ultimoPedido)) {
+      fornecedorResumo.ultimo_pedido_em = pedido.createdAt;
+      fornecedorResumo.ultimo_preco_unitario = precoReferencia;
+    }
+  });
+
+  const itensResumo = [];
+  const comparativo = [];
+
+  itensMap.forEach((itemResumo) => {
+    const fornecedores = Array.from(itemResumo.fornecedores.values())
+      .map((fornecedor) => ({
+        ...fornecedor,
+        pedidos: fornecedor.pedidos_ids.size,
+        pedidos_ids: undefined,
+        quantidade_total: Number(toNumber(fornecedor.quantidade_total).toFixed(3)),
+        valor_total: roundMoney(fornecedor.valor_total),
+        preco_medio: fornecedor.quantidade_total > 0
+          ? roundMoney(fornecedor.valor_total / fornecedor.quantidade_total)
+          : 0,
+        menor_preco_unitario: roundMoney(fornecedor.menor_preco_unitario),
+        maior_preco_unitario: roundMoney(fornecedor.maior_preco_unitario),
+        ultimo_preco_unitario: roundMoney(fornecedor.ultimo_preco_unitario)
+      }))
+      .sort((a, b) => {
+        if (Number(a.preco_medio || 0) !== Number(b.preco_medio || 0)) {
+          return Number(a.preco_medio || 0) - Number(b.preco_medio || 0);
+        }
+        return String(a.fornecedor_nome || '').localeCompare(String(b.fornecedor_nome || ''), 'pt-BR');
+      });
+
+    const precosValidos = fornecedores.map((fornecedor) => Number(fornecedor.preco_medio || 0)).filter((value) => value > 0);
+    const menorPrecoMedio = precosValidos.length ? Math.min(...precosValidos) : 0;
+    const melhorFornecedor = fornecedores.find((fornecedor) => Number(fornecedor.preco_medio || 0) === menorPrecoMedio) || null;
+
+    itensResumo.push({
+      key: itemResumo.key,
+      descricao: itemResumo.descricao,
+      unidade: itemResumo.unidade,
+      categoria_id: itemResumo.categoria_id,
+      categoria_nome: itemResumo.categoria_nome,
+      origem: itemResumo.origem,
+      fornecedores: fornecedores.length,
+      pedidos: itemResumo.pedidos_ids.size,
+      quantidade_total: Number(toNumber(itemResumo.quantidade_total).toFixed(3)),
+      valor_total: roundMoney(itemResumo.valor_total),
+      preco_medio_geral: itemResumo.quantidade_total > 0 ? roundMoney(itemResumo.valor_total / itemResumo.quantidade_total) : 0,
+      menor_preco_medio: roundMoney(menorPrecoMedio),
+      melhor_fornecedor: melhorFornecedor ? {
+        id: melhorFornecedor.fornecedor_id,
+        nome: melhorFornecedor.fornecedor_nome
+      } : null
+    });
+
+    fornecedores.forEach((fornecedor) => {
+      const diferenca = menorPrecoMedio > 0 ? roundMoney(fornecedor.preco_medio - menorPrecoMedio) : 0;
+      comparativo.push({
+        item_key: itemResumo.key,
+        descricao: itemResumo.descricao,
+        unidade: itemResumo.unidade,
+        categoria_nome: itemResumo.categoria_nome,
+        origem: itemResumo.origem,
+        fornecedor_id: fornecedor.fornecedor_id,
+        fornecedor_nome: fornecedor.fornecedor_nome,
+        pedidos: fornecedor.pedidos,
+        ocorrencias: fornecedor.ocorrencias,
+        quantidade_total: fornecedor.quantidade_total,
+        valor_total: fornecedor.valor_total,
+        preco_medio: fornecedor.preco_medio,
+        menor_preco_medio_item: roundMoney(menorPrecoMedio),
+        diferenca_menor_preco_medio: diferenca,
+        diferenca_percentual: menorPrecoMedio > 0 ? Number(((diferenca / menorPrecoMedio) * 100).toFixed(2)) : 0,
+        menor_preco_unitario: fornecedor.menor_preco_unitario,
+        maior_preco_unitario: fornecedor.maior_preco_unitario,
+        ultimo_preco_unitario: fornecedor.ultimo_preco_unitario,
+        ultimo_pedido_em: fornecedor.ultimo_pedido_em
+      });
+    });
+  });
+
+  const sortByValue = (a, b) => {
+    if (Number(b.valor_total || 0) !== Number(a.valor_total || 0)) {
+      return Number(b.valor_total || 0) - Number(a.valor_total || 0);
+    }
+    return String(a.descricao || a.categoria_nome || '').localeCompare(
+      String(b.descricao || b.categoria_nome || ''),
+      'pt-BR'
+    );
+  };
+
+  const categorias = Array.from(categoriasMap.values())
+    .map((item) => ({
+      key: item.key,
+      categoria_id: item.categoria_id,
+      categoria_nome: item.categoria_nome,
+      itens: item.itens.size,
+      fornecedores: item.fornecedores.size,
+      valor_total: roundMoney(item.valor_total)
+    }))
+    .sort(sortByValue);
+
+  itensResumo.sort(sortByValue);
+  comparativo.sort((a, b) => {
+    if (Number(b.valor_total || 0) !== Number(a.valor_total || 0)) {
+      return Number(b.valor_total || 0) - Number(a.valor_total || 0);
+    }
+    if (String(a.descricao || '') !== String(b.descricao || '')) {
+      return String(a.descricao || '').localeCompare(String(b.descricao || ''), 'pt-BR');
+    }
+    return Number(a.preco_medio || 0) - Number(b.preco_medio || 0);
+  });
+
+  const valorTotal = roundMoney(itens.reduce((sum, item) => sum + toNumber(item.valor_total), 0));
+
+  return {
+    filtros: {
+      obra_id: obraId || null,
+      data_inicio: dataInicio || null,
+      data_fim: dataFim || null
+    },
+    resumo: {
+      itens_lancados: itens.length,
+      itens_distintos: itensResumo.length,
+      fornecedores: fornecedoresIds.size,
+      pedidos: pedidosIds.size,
+      categorias: categorias.length,
+      valor_total: valorTotal,
+      itens_com_mais_de_um_fornecedor: itensResumo.filter((item) => Number(item.fornecedores || 0) > 1).length
+    },
+    itens: itensResumo.slice(0, 100),
+    comparativo: comparativo.slice(0, 150),
+    categorias
   };
 }
 
@@ -1382,5 +1673,6 @@ module.exports = {
   relatorioDemandaPedidosCompras,
   relatorioEconomiaCotacoes,
   relatorioFornecedoresCompras,
-  relatorioPendenciasCotacoesCompras
+  relatorioPendenciasCotacoesCompras,
+  relatorioPrecosInsumosFornecedores
 };
