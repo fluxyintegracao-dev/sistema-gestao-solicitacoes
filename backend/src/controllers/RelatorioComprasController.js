@@ -5,7 +5,8 @@ const {
   relatorioCicloCompras,
   relatorioDemandaPedidosCompras,
   relatorioEconomiaCotacoes,
-  relatorioFornecedoresCompras
+  relatorioFornecedoresCompras,
+  relatorioPendenciasCotacoesCompras
 } = require('../services/relatorioComprasService');
 
 async function carregarUsuario(userId) {
@@ -34,6 +35,27 @@ async function validarAcessoRelatorioCompras(req, res) {
 }
 
 module.exports = {
+  async pendenciasCotacoes(req, res) {
+    try {
+      const usuario = await validarAcessoRelatorioCompras(req, res);
+      if (!usuario) {
+        return;
+      }
+
+      const relatorio = await relatorioPendenciasCotacoesCompras({
+        obraId: req.query?.obra_id,
+        dataInicio: req.query?.data_inicio,
+        dataFim: req.query?.data_fim,
+        obraIds: req.compraScopeObraIds
+      });
+
+      return res.json(relatorio);
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao buscar relatorio de pendencias de cotacoes' });
+    }
+  },
+
   async categoriasInsumos(req, res) {
     try {
       const usuario = await validarAcessoRelatorioCompras(req, res);

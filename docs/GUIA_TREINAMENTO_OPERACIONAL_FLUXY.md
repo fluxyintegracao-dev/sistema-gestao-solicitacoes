@@ -2070,6 +2070,23 @@ Importante:
 - Quando o vencedor tem exatamente o mesmo valor do menor preco disponivel, mesmo que seja outro fornecedor empatado, o item conta como `Menor preco`.
 - Esse relatorio nao deduz justificativa por texto. Ele apenas mostra objetivamente onde a escolha ficou no menor preco e onde ficou acima.
 
+Relatorio de Pendencias de Cotacoes:
+
+1. Acesse `Compras > Relatorios`.
+2. Abra `Pendencias de cotacoes`.
+3. Filtre por obra/centro de custo e por periodo de criacao da cotacao, se necessario.
+4. Leia os cards para identificar quantidade de cotacoes analisadas, cotacoes sem minimo de respostas, cotacoes com prazo vencido, fornecedores vencidos sem resposta e taxa geral de resposta.
+5. Use a tabela `Cotacoes com pendencias` para priorizar as cotacoes que precisam de cobranca, reenvio, complemento de fornecedores ou revisao antes do encerramento.
+6. Use `Fornecedores vencidos sem resposta` para acionar fornecedores que receberam a cotacao, possuem prazo registrado e ainda nao responderam.
+7. Use `Pendencias por obra/centro` para identificar onde as pendencias estao concentradas.
+
+Importante:
+
+- O minimo exigido vem da configuracao real `COTACOES_MIN_COTACOES`.
+- Uma cotacao aparece como `Sem minimo` quando possui menos respostas reais que o minimo configurado.
+- Um fornecedor aparece como vencido quando `prazo_resposta` e anterior a data atual e `respondido_em` ainda nao esta preenchido.
+- O relatorio nao deduz vencimento por texto, nome de fornecedor ou status visual. Ele usa apenas os campos estruturados do processo de cotacao.
+
 Relatorio de Ciclo de Compras:
 
 1. Acesse `Compras > Relatorios`.

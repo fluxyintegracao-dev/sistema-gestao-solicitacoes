@@ -73,6 +73,7 @@ Base multiempresa e DRE gerencial:
 - Compras > Relatorios ganhou Ciclo de Compras, medindo tempos entre criacao, liberacao, envio para fornecedores, resposta, encerramento e geracao de pedido com base nas datas reais registradas no fluxo.
 - Compras > Relatorios ganhou Economia em Cotacoes, comparando menor preco disponivel com o fornecedor vencedor em cotacoes encerradas para evidenciar economia, sobrepreco e aderencia ao menor preco.
 - Compras > Relatorios ganhou Relatorio de Fornecedores, com participacao em cotacoes, taxa de resposta, prazo medio, itens respondidos, itens vencedores, valor cotado e valor vencedor calculados por dados estruturados do processo de cotacao.
+- Compras > Relatorios ganhou Pendencias de Cotacoes, destacando cotacoes sem minimo de respostas e fornecedores com prazo vencido sem resposta a partir de campos estruturados.
 - Compras > Relatorios ganhou Demanda e Pedidos, consolidando solicitacoes de compra e pedidos por status, obra/centro de custo, valor pedido e analitico com base em registros reais.
 - Compras > Relatorios ganhou Categorias e Insumos, consolidando valor pedido por categoria, insumo/item e obra/centro com base nos itens reais dos pedidos.
 - Solicitacoes > Relatorios ganhou Painel Operacional, consolidando volume, abertas, concluidas, funil, distribuicao por status, setor, obra/centro de custo, tipo, criador, responsavel atual, tempos por etapa, aging por setor e gargalos com base em solicitacoes e historicos reais do fluxo.
@@ -183,8 +184,8 @@ Relatorios:
 - Compras por obra/centro de custo. [Entregue inicialmente por valor de pedidos em Demanda e Pedidos]
 - Compras por categoria/insumo. [Entregue em Categorias e Insumos]
 - Economia obtida em cotacoes.
-- Cotacoes sem minimo de fornecedores.
-- Cotacoes vencidas ou sem resposta.
+- Cotacoes sem minimo de fornecedores. [Entregue em Pendencias de Cotacoes como minimo de respostas reais]
+- Cotacoes vencidas ou sem resposta. [Entregue em Pendencias de Cotacoes por prazo_resposta e respondido_em]
 - Tempo medio entre solicitacao, cotacao, aprovacao e pedido.
 - Auditoria de itens de pedido.
 - Fornecedores mais acionados.

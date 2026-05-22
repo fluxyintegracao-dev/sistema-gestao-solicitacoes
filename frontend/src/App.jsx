@@ -84,6 +84,7 @@ const FinanceiroResultadoCentrosCusto = lazy(() => import('./pages/FinanceiroRes
   const ModuloRelatorios = lazy(() => import('./pages/ModuloRelatorios'));
   const ComprasRelatorioCategoriasInsumos = lazy(() => import('./pages/ComprasRelatorioCategoriasInsumos'));
   const ComprasRelatorioDemandaPedidos = lazy(() => import('./pages/ComprasRelatorioDemandaPedidos'));
+  const ComprasRelatorioPendenciasCotacoes = lazy(() => import('./pages/ComprasRelatorioPendenciasCotacoes'));
   const ComprasRelatorioCiclo = lazy(() => import('./pages/ComprasRelatorioCiclo'));
 const ComprasRelatorioEconomiaCotacoes = lazy(() => import('./pages/ComprasRelatorioEconomiaCotacoes'));
 const ComprasRelatorioFornecedores = lazy(() => import('./pages/ComprasRelatorioFornecedores'));
@@ -703,6 +704,7 @@ export default function App() {
         <Route path="compras/relatorios/auditoria" element={<ModuloComprasRoute><BusinessAdminRoute><RelatoriosAdministrativos /></BusinessAdminRoute></ModuloComprasRoute>} />
         <Route path="compras/relatorios/categorias-insumos" element={<ModuloComprasRoute><ComprasCotacoesRoute><ComprasRelatorioCategoriasInsumos /></ComprasCotacoesRoute></ModuloComprasRoute>} />
         <Route path="compras/relatorios/demanda-pedidos" element={<ModuloComprasRoute><ComprasCotacoesRoute><ComprasRelatorioDemandaPedidos /></ComprasCotacoesRoute></ModuloComprasRoute>} />
+        <Route path="compras/relatorios/pendencias-cotacoes" element={<ModuloComprasRoute><ComprasCotacoesRoute><ComprasRelatorioPendenciasCotacoes /></ComprasCotacoesRoute></ModuloComprasRoute>} />
         <Route path="compras/relatorios/ciclo" element={<ModuloComprasRoute><ComprasCotacoesRoute><ComprasRelatorioCiclo /></ComprasCotacoesRoute></ModuloComprasRoute>} />
         <Route path="compras/relatorios/economia-cotacoes" element={<ModuloComprasRoute><ComprasCotacoesRoute><ComprasRelatorioEconomiaCotacoes /></ComprasCotacoesRoute></ModuloComprasRoute>} />
         <Route path="compras/relatorios/fornecedores" element={<ModuloComprasRoute><ComprasCotacoesRoute><ComprasRelatorioFornecedores /></ComprasCotacoesRoute></ModuloComprasRoute>} />

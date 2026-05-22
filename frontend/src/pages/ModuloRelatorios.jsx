@@ -72,6 +72,7 @@ const HUBS = {
           { titulo: 'Cotacoes', descricao: 'Lista de cotacoes, status de resposta e encerramento.', to: '/cotacoes', status: 'Disponivel', permissao: 'comprasCotacoes' },
           { titulo: 'Pedidos de compra', descricao: 'Pedidos emitidos, status e detalhamento por fornecedor.', to: '/pedidos-compra', status: 'Disponivel', permissao: 'comprasPedidos' },
           { titulo: 'Economia em cotacoes', descricao: 'Comparativo entre menor preco disponivel e vencedor selecionado.', to: '/compras/relatorios/economia-cotacoes', status: 'Disponivel', permissao: 'comprasCotacoes' },
+          { titulo: 'Pendencias de cotacoes', descricao: 'Cotacoes sem minimo de respostas e fornecedores com prazo vencido sem retorno.', to: '/compras/relatorios/pendencias-cotacoes', status: 'Disponivel', permissao: 'comprasCotacoes' },
           { titulo: 'Fornecedores', descricao: 'Ranking por volume, resposta, prazo medio e recorrencia nas cotacoes.', to: '/compras/relatorios/fornecedores', status: 'Disponivel', permissao: 'comprasCotacoes' },
           { titulo: 'Ciclo de compras', descricao: 'Tempo medio entre solicitacao, cotacao, encerramento e pedido.', to: '/compras/relatorios/ciclo', status: 'Disponivel', permissao: 'comprasCotacoes' }
         ]

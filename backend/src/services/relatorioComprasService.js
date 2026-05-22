@@ -1,6 +1,7 @@
 const { Op } = require('sequelize');
 const {
   Categoria,
+  ConfiguracaoSistema,
   FornecedorCompra,
   Insumo,
   Obra,
@@ -62,6 +63,10 @@ function maxDate(values) {
     return null;
   }
   return dates.reduce((max, date) => (date > max ? date : max), dates[0]);
+}
+
+function todayDateOnly() {
+  return new Date().toISOString().slice(0, 10);
 }
 
 function calculateRespostaValor(resposta) {
@@ -231,6 +236,15 @@ function finalizeComprasResumo(item) {
     quantidade_total: Number(toNumber(item.quantidade_total).toFixed(3)),
     valor_total: roundMoney(item.valor_total)
   };
+}
+
+async function getMinimoCotacoesConfig() {
+  const registro = await ConfiguracaoSistema.findOne({
+    where: { chave: 'COTACOES_MIN_COTACOES' },
+    order: [['id', 'DESC']]
+  });
+  const minimo = Number(registro?.valor || 3);
+  return Number.isFinite(minimo) && minimo > 0 ? minimo : 3;
 }
 
 function createFornecedorResumo(fornecedor) {
@@ -686,6 +700,163 @@ async function relatorioCategoriasInsumosCompras({ obraId, dataInicio, dataFim, 
   };
 }
 
+async function relatorioPendenciasCotacoesCompras({ obraId, dataInicio, dataFim, obraIds } = {}) {
+  const minimoCotacoes = await getMinimoCotacoesConfig();
+  const hoje = todayDateOnly();
+  const solicitacoes = await SolicitacaoCompra.findAll({
+    where: buildSolicitacaoCriacaoWhere({ obraId, obraIds, dataInicio, dataFim }),
+    attributes: ['id', 'titulo', 'obra_id', 'status', 'createdAt', 'encerrado_em'],
+    include: [
+      { model: Obra, as: 'obra', attributes: ['id', 'nome'] },
+      {
+        model: SolicitacaoCompraFornecedor,
+        as: 'fornecedores',
+        attributes: [
+          'id',
+          'fornecedor_compra_id',
+          'status',
+          'enviado_em',
+          'visualizado_em',
+          'respondido_em',
+          'prazo_resposta'
+        ],
+        include: [
+          { model: FornecedorCompra, as: 'fornecedor', attributes: ['id', 'nome'] }
+        ]
+      }
+    ],
+    order: [['createdAt', 'DESC'], ['id', 'DESC']]
+  });
+
+  const cotacoes = [];
+  const fornecedoresVencidos = [];
+  const obrasMap = new Map();
+  const resumo = {
+    cotacoes: 0,
+    cotacoes_abertas: 0,
+    cotacoes_sem_minimo: 0,
+    cotacoes_com_prazo_vencido: 0,
+    fornecedores_enviados: 0,
+    fornecedores_respondidos: 0,
+    fornecedores_sem_resposta: 0,
+    fornecedores_vencidos_sem_resposta: 0,
+    minimo_cotacoes: minimoCotacoes
+  };
+
+  solicitacoes.forEach((solicitacao) => {
+    const plain = solicitacao.toJSON ? solicitacao.toJSON() : solicitacao;
+    const fornecedores = plain.fornecedores || [];
+    if (!fornecedores.length) {
+      return;
+    }
+
+    const encerrada = Boolean(plain.encerrado_em) || String(plain.status || '').toUpperCase() === 'ENCERRADO';
+    const respondidos = fornecedores.filter((fornecedor) => fornecedor.respondido_em).length;
+    const semResposta = fornecedores.filter((fornecedor) => !fornecedor.respondido_em).length;
+    const vencidosSemResposta = fornecedores.filter((fornecedor) => (
+      !fornecedor.respondido_em &&
+      fornecedor.prazo_resposta &&
+      String(fornecedor.prazo_resposta).slice(0, 10) < hoje
+    ));
+    const semMinimo = respondidos < minimoCotacoes;
+    const temPrazoVencido = vencidosSemResposta.length > 0;
+
+    resumo.cotacoes += 1;
+    resumo.fornecedores_enviados += fornecedores.length;
+    resumo.fornecedores_respondidos += respondidos;
+    resumo.fornecedores_sem_resposta += semResposta;
+    resumo.fornecedores_vencidos_sem_resposta += vencidosSemResposta.length;
+
+    if (!encerrada) {
+      resumo.cotacoes_abertas += 1;
+    }
+    if (semMinimo) {
+      resumo.cotacoes_sem_minimo += 1;
+    }
+    if (temPrazoVencido) {
+      resumo.cotacoes_com_prazo_vencido += 1;
+    }
+
+    const obraKey = plain.obra_id ? String(plain.obra_id) : 'SEM_OBRA';
+    if (!obrasMap.has(obraKey)) {
+      obrasMap.set(obraKey, {
+        key: obraKey,
+        obra_id: plain.obra_id || null,
+        obra_nome: plain.obra?.nome || 'Sem obra/centro',
+        cotacoes: 0,
+        sem_minimo: 0,
+        vencidas: 0
+      });
+    }
+    const obraResumo = obrasMap.get(obraKey);
+    obraResumo.cotacoes += 1;
+    if (semMinimo) {
+      obraResumo.sem_minimo += 1;
+    }
+    if (temPrazoVencido) {
+      obraResumo.vencidas += 1;
+    }
+
+    cotacoes.push({
+      id: plain.id,
+      titulo: plain.titulo || null,
+      status: plain.status || null,
+      obra: plain.obra ? { id: plain.obra.id, nome: plain.obra.nome } : null,
+      criada_em: plain.createdAt || null,
+      encerrada_em: plain.encerrado_em || null,
+      encerrada,
+      fornecedores_enviados: fornecedores.length,
+      fornecedores_respondidos: respondidos,
+      fornecedores_sem_resposta: semResposta,
+      fornecedores_vencidos_sem_resposta: vencidosSemResposta.length,
+      minimo_cotacoes: minimoCotacoes,
+      sem_minimo: semMinimo,
+      prazo_vencido: temPrazoVencido
+    });
+
+    vencidosSemResposta.forEach((fornecedor) => {
+      fornecedoresVencidos.push({
+        cotacao_id: plain.id,
+        cotacao_titulo: plain.titulo || null,
+        obra: plain.obra ? { id: plain.obra.id, nome: plain.obra.nome } : null,
+        fornecedor_id: fornecedor.fornecedor?.id || fornecedor.fornecedor_compra_id || null,
+        fornecedor_nome: fornecedor.fornecedor?.nome || 'Fornecedor sem cadastro',
+        enviado_em: fornecedor.enviado_em || null,
+        visualizado_em: fornecedor.visualizado_em || null,
+        prazo_resposta: fornecedor.prazo_resposta || null
+      });
+    });
+  });
+
+  resumo.taxa_resposta = resumo.fornecedores_enviados > 0
+    ? Number(((resumo.fornecedores_respondidos / resumo.fornecedores_enviados) * 100).toFixed(2))
+    : 0;
+
+  const obras = Array.from(obrasMap.values()).sort((a, b) => {
+    if (Number(b.sem_minimo || 0) !== Number(a.sem_minimo || 0)) {
+      return Number(b.sem_minimo || 0) - Number(a.sem_minimo || 0);
+    }
+    if (Number(b.vencidas || 0) !== Number(a.vencidas || 0)) {
+      return Number(b.vencidas || 0) - Number(a.vencidas || 0);
+    }
+    return String(a.obra_nome || '').localeCompare(String(b.obra_nome || ''), 'pt-BR');
+  });
+
+  return {
+    filtros: {
+      obra_id: obraId || null,
+      data_inicio: dataInicio || null,
+      data_fim: dataFim || null
+    },
+    resumo,
+    cotacoes: cotacoes
+      .sort((a, b) => Number(b.prazo_vencido) - Number(a.prazo_vencido) || Number(b.sem_minimo) - Number(a.sem_minimo))
+      .slice(0, 100),
+    fornecedores_vencidos: fornecedoresVencidos.slice(0, 100),
+    obras
+  };
+}
+
 function buildItemKey(tipo, id) {
   return `${String(tipo || '').toUpperCase()}:${Number(id || 0)}`;
 }
@@ -1021,5 +1192,6 @@ module.exports = {
   relatorioCategoriasInsumosCompras,
   relatorioDemandaPedidosCompras,
   relatorioEconomiaCotacoes,
-  relatorioFornecedoresCompras
+  relatorioFornecedoresCompras,
+  relatorioPendenciasCotacoesCompras
 };
