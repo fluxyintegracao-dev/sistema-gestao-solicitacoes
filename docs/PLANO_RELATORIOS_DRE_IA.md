@@ -86,6 +86,7 @@ Base multiempresa e DRE gerencial:
 - Compras > Relatorios > Economia em Cotacoes ganhou grafico de economia e sobrepreco por cotacao, agregando somente itens com vencedor definitivo em cotacoes encerradas.
 - Compras > Relatorios > Ciclo de Compras ganhou grafico de ciclo medio por etapa, calculado somente por datas reais registradas no fluxo de compra.
 - Solicitacoes > Relatorios ganhou Painel Operacional, consolidando volume, abertas, concluidas, funil, distribuicao por status, setor, obra/centro de custo, tipo, criador, responsavel atual, tempos por etapa, aging por setor e gargalos com base em solicitacoes e historicos reais do fluxo.
+- Solicitacoes > Relatorios > Painel Operacional ganhou graficos de ranking por setor atual, distribuicao por status e volume por obra/centro, usando os mesmos agrupamentos reais do relatorio analitico.
 
 Documentacao operacional complementar:
 
@@ -167,7 +168,7 @@ Relatorios:
 - Solicitacoes por obra/centro de custo. [Entregue no Painel Operacional]
 - Tempo medio por etapa. [Entregue como medicao real entre criacao, assuncao, envio, aprovacao diretoria e conclusao]
 - Solicitacoes paradas acima do SLA. [Entregue inicialmente como gargalos acima de 3 dias sem movimentacao e aging por setor atual]
-- Ranking de setores com maior volume.
+- Ranking de setores com maior volume. [Entregue no Painel Operacional como grafico por setor atual]
 - Ranking de usuarios responsaveis. [Entregue por ultimo responsavel atribuido/assumido no historico]
 - Solicitacoes por tipo macro/subtipo. [Entregue por tipo de solicitacao]
 - Funil: criada, assumida, enviada, aprovada, concluida. [Entregue no Painel Operacional]
@@ -178,7 +179,7 @@ Graficos:
 - Evolucao mensal.
 - Aging por status.
 - Heatmap setor x status.
-- Volume por obra/centro de custo.
+- Volume por obra/centro de custo. [Entregue no Painel Operacional como grafico por obra/centro]
 - SLA por setor.
 
 ### Compras

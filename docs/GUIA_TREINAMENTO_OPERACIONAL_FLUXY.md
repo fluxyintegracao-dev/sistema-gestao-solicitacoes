@@ -1972,12 +1972,13 @@ Painel Operacional de Solicitacoes:
 3. Filtre por periodo, data inicial/final e obra/centro de custo quando precisar restringir a analise.
 4. Leia os cards principais para entender total criado, quantas estao abertas, quantas foram concluidas, valor aberto, media de dias em aberto e maior tempo parado.
 5. Use o bloco de funil para acompanhar solicitacoes criadas, assumidas, enviadas, aprovadas pela diretoria e concluidas.
-6. Use `Tempos por etapa` para medir o tempo real entre criacao, assuncao/atribuicao, primeiro envio, aprovacao da diretoria e conclusao.
-7. Use `Aging por setor atual` para identificar setores com solicitacoes abertas paradas ha mais tempo.
-8. Use as tabelas por status, setor e obra/centro para descobrir onde a demanda esta concentrada.
-9. Use as tabelas por tipo, responsavel atual e criador para identificar padroes de demanda e filas individuais.
-10. Revise a tabela `Gargalos operacionais` para localizar solicitacoes abertas ha pelo menos 3 dias sem nova movimentacao.
-11. Clique no codigo da solicitacao em gargalo para abrir o detalhe e tomar acao operacional.
+6. Use os graficos de ranking por setor, distribuicao por status e volume por obra/centro para enxergar rapidamente onde a demanda esta concentrada.
+7. Use `Tempos por etapa` para medir o tempo real entre criacao, assuncao/atribuicao, primeiro envio, aprovacao da diretoria e conclusao.
+8. Use `Aging por setor atual` para identificar setores com solicitacoes abertas paradas ha mais tempo.
+9. Use as tabelas por status, setor e obra/centro para descobrir onde a demanda esta concentrada.
+10. Use as tabelas por tipo, responsavel atual e criador para identificar padroes de demanda e filas individuais.
+11. Revise a tabela `Gargalos operacionais` para localizar solicitacoes abertas ha pelo menos 3 dias sem nova movimentacao.
+12. Clique no codigo da solicitacao em gargalo para abrir o detalhe e tomar acao operacional.
 
 Importante:
 
@@ -1985,6 +1986,7 @@ Importante:
 - O setor exibido vem do campo atual da solicitacao, nao de uma interpretacao textual.
 - O responsavel atual vem do ultimo historico real de atribuicao ou assuncao da solicitacao.
 - Os tempos por etapa entram na media somente quando a data real daquela etapa existe.
+- Os graficos do painel usam os mesmos agrupamentos das tabelas analiticas; eles nao criam uma classificacao paralela nem inferem setor, status ou obra por texto.
 - A parada operacional usa a ultima movimentacao registrada no historico; se nao houver historico, usa a propria data de atualizacao/criacao da solicitacao.
 - O filtro de acesso respeita o mesmo conceito operacional do modulo: usuarios de obra veem suas obras vinculadas, usuarios de setor veem suas solicitacoes criadas ou do setor, e administradores veem a visao ampla.
 

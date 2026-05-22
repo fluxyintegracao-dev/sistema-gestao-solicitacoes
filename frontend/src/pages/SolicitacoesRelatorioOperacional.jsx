@@ -103,6 +103,13 @@ function formatNumber(value, digits = 0) {
   });
 }
 
+function formatPercent(value) {
+  return `${Number(value || 0).toLocaleString('pt-BR', {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1
+  })}%`;
+}
+
 function formatDate(value) {
   if (!value) return '-';
   const parsed = new Date(value);
@@ -203,6 +210,21 @@ export default function SolicitacoesRelatorioOperacional() {
   const temposEtapas = useMemo(() => (Array.isArray(relatorio?.tempos_etapas) ? relatorio.tempos_etapas : []), [relatorio]);
   const agingSetor = useMemo(() => (Array.isArray(relatorio?.aging_setor) ? relatorio.aging_setor : []), [relatorio]);
   const gargalos = useMemo(() => (Array.isArray(relatorio?.gargalos) ? relatorio.gargalos : []), [relatorio]);
+  const topSetores = useMemo(() => porSetor.slice(0, 8), [porSetor]);
+  const topStatus = useMemo(() => porStatus.slice(0, 8), [porStatus]);
+  const topObras = useMemo(() => porObra.slice(0, 8), [porObra]);
+  const maiorTotalSetor = useMemo(
+    () => Math.max(...topSetores.map((item) => Number(item.total || 0)), 0),
+    [topSetores]
+  );
+  const maiorTotalStatus = useMemo(
+    () => Math.max(...topStatus.map((item) => Number(item.total || 0)), 0),
+    [topStatus]
+  );
+  const maiorTotalObra = useMemo(
+    () => Math.max(...topObras.map((item) => Number(item.total || 0)), 0),
+    [topObras]
+  );
 
   function aplicarFiltros(event) {
     event.preventDefault();
@@ -350,6 +372,103 @@ export default function SolicitacoesRelatorioOperacional() {
             <strong>{formatNumber(resumo.concluidas)}</strong>
             <span>concluidas</span>
           </div>
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-4 xl:grid-cols-3">
+        <div className="card sol-surface-card">
+          <h2 className="text-lg font-bold text-[var(--c-text)] mb-1">Ranking por setor atual</h2>
+          <p className="page-subtitle mb-3">Setores com maior volume de solicitacoes no periodo filtrado.</p>
+          {loading ? (
+            <div className="text-sm text-[var(--c-muted)] py-4">Carregando setores...</div>
+          ) : topSetores.length === 0 ? (
+            <div className="app-empty-card">Sem dados por setor no periodo.</div>
+          ) : (
+            <div className="grid gap-3">
+              {topSetores.map((item, index) => {
+                const total = Number(item.total || 0);
+                const width = maiorTotalSetor > 0 ? Math.max(4, (total / maiorTotalSetor) * 100) : 0;
+                return (
+                  <div key={`setor-grafico-${item.key}`} className="grid gap-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <span className="text-xs font-bold text-[var(--c-muted)]">#{index + 1}</span>
+                        <strong className="ml-2 text-sm text-[var(--c-text)]">{formatLabel(item.setor || item.key)}</strong>
+                      </div>
+                      <strong className="text-sm tabular-nums text-[var(--c-text)]">{formatNumber(total)}</strong>
+                    </div>
+                    <div className="h-3 rounded-full bg-slate-100 overflow-hidden">
+                      <div className="h-full rounded-full bg-[var(--c-primary)]" style={{ width: `${width}%` }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div className="card sol-surface-card">
+          <h2 className="text-lg font-bold text-[var(--c-text)] mb-1">Distribuicao por status</h2>
+          <p className="page-subtitle mb-3">Participacao de cada status no volume filtrado.</p>
+          {loading ? (
+            <div className="text-sm text-[var(--c-muted)] py-4">Carregando status...</div>
+          ) : topStatus.length === 0 ? (
+            <div className="app-empty-card">Sem dados por status no periodo.</div>
+          ) : (
+            <div className="grid gap-3">
+              {topStatus.map((item) => {
+                const total = Number(item.total || 0);
+                const width = maiorTotalStatus > 0 ? Math.max(4, (total / maiorTotalStatus) * 100) : 0;
+                const percent = Number(resumo.total_solicitacoes || 0) > 0
+                  ? (total / Number(resumo.total_solicitacoes || 0)) * 100
+                  : 0;
+                return (
+                  <div key={`status-grafico-${item.key}`} className="grid gap-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <strong className="text-sm text-[var(--c-text)]">{formatLabel(item.status || item.key)}</strong>
+                      <span className="text-sm font-bold tabular-nums text-[var(--c-text)]">
+                        {formatNumber(total)} | {formatPercent(percent)}
+                      </span>
+                    </div>
+                    <div className="h-3 rounded-full bg-slate-100 overflow-hidden">
+                      <div className="h-full rounded-full bg-[var(--c-success)]" style={{ width: `${width}%` }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div className="card sol-surface-card">
+          <h2 className="text-lg font-bold text-[var(--c-text)] mb-1">Volume por obra/centro</h2>
+          <p className="page-subtitle mb-3">Origens operacionais que mais abriram solicitacoes.</p>
+          {loading ? (
+            <div className="text-sm text-[var(--c-muted)] py-4">Carregando obras...</div>
+          ) : topObras.length === 0 ? (
+            <div className="app-empty-card">Sem dados por obra/centro no periodo.</div>
+          ) : (
+            <div className="grid gap-3">
+              {topObras.map((item, index) => {
+                const total = Number(item.total || 0);
+                const width = maiorTotalObra > 0 ? Math.max(4, (total / maiorTotalObra) * 100) : 0;
+                return (
+                  <div key={`obra-grafico-${item.key}`} className="grid gap-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <span className="text-xs font-bold text-[var(--c-muted)]">#{index + 1}</span>
+                        <strong className="ml-2 text-sm text-[var(--c-text)]">{item.obra_nome || 'Sem obra/centro'}</strong>
+                      </div>
+                      <strong className="text-sm tabular-nums text-[var(--c-text)]">{formatNumber(total)}</strong>
+                    </div>
+                    <div className="h-3 rounded-full bg-slate-100 overflow-hidden">
+                      <div className="h-full rounded-full bg-[var(--c-warning)]" style={{ width: `${width}%` }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
 
