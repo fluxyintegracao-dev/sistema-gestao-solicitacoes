@@ -83,6 +83,7 @@ const FinanceiroResultadoObras = lazy(() => import('./pages/FinanceiroResultadoO
 const FinanceiroResultadoCentrosCusto = lazy(() => import('./pages/FinanceiroResultadoCentrosCusto'));
   const ModuloRelatorios = lazy(() => import('./pages/ModuloRelatorios'));
   const ComprasRelatorioCategoriasInsumos = lazy(() => import('./pages/ComprasRelatorioCategoriasInsumos'));
+  const ComprasRelatorioComprasFornecedor = lazy(() => import('./pages/ComprasRelatorioComprasFornecedor'));
   const ComprasRelatorioDemandaPedidos = lazy(() => import('./pages/ComprasRelatorioDemandaPedidos'));
   const ComprasRelatorioPendenciasCotacoes = lazy(() => import('./pages/ComprasRelatorioPendenciasCotacoes'));
   const ComprasRelatorioCiclo = lazy(() => import('./pages/ComprasRelatorioCiclo'));
@@ -703,6 +704,7 @@ export default function App() {
         <Route path="compras/relatorios" element={<ModuloComprasRoute><ModuloRelatorios modulo="compras" /></ModuloComprasRoute>} />
         <Route path="compras/relatorios/auditoria" element={<ModuloComprasRoute><BusinessAdminRoute><RelatoriosAdministrativos /></BusinessAdminRoute></ModuloComprasRoute>} />
         <Route path="compras/relatorios/categorias-insumos" element={<ModuloComprasRoute><ComprasCotacoesRoute><ComprasRelatorioCategoriasInsumos /></ComprasCotacoesRoute></ModuloComprasRoute>} />
+        <Route path="compras/relatorios/compras-fornecedor" element={<ModuloComprasRoute><ComprasCotacoesRoute><ComprasRelatorioComprasFornecedor /></ComprasCotacoesRoute></ModuloComprasRoute>} />
         <Route path="compras/relatorios/demanda-pedidos" element={<ModuloComprasRoute><ComprasCotacoesRoute><ComprasRelatorioDemandaPedidos /></ComprasCotacoesRoute></ModuloComprasRoute>} />
         <Route path="compras/relatorios/pendencias-cotacoes" element={<ModuloComprasRoute><ComprasCotacoesRoute><ComprasRelatorioPendenciasCotacoes /></ComprasCotacoesRoute></ModuloComprasRoute>} />
         <Route path="compras/relatorios/ciclo" element={<ModuloComprasRoute><ComprasCotacoesRoute><ComprasRelatorioCiclo /></ComprasCotacoesRoute></ModuloComprasRoute>} />

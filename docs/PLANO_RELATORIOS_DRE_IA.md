@@ -75,6 +75,7 @@ Base multiempresa e DRE gerencial:
 - Compras > Relatorios ganhou Relatorio de Fornecedores, com participacao em cotacoes, taxa de resposta, prazo medio, itens respondidos, itens vencedores, valor cotado e valor vencedor calculados por dados estruturados do processo de cotacao.
 - Compras > Relatorios ganhou Pendencias de Cotacoes, destacando cotacoes sem minimo de respostas e fornecedores com prazo vencido sem resposta a partir de campos estruturados.
 - Compras > Relatorios ganhou Demanda e Pedidos, consolidando solicitacoes de compra e pedidos por status, obra/centro de custo, valor pedido e analitico com base em registros reais.
+- Compras > Relatorios ganhou Compras por Fornecedor, consolidando valor efetivamente pedido por fornecedor, obra/centro, status e pedido emitido com base em pedidos de compra reais.
 - Compras > Relatorios ganhou Categorias e Insumos, consolidando valor pedido por categoria, insumo/item e obra/centro com base nos itens reais dos pedidos.
 - Solicitacoes > Relatorios ganhou Painel Operacional, consolidando volume, abertas, concluidas, funil, distribuicao por status, setor, obra/centro de custo, tipo, criador, responsavel atual, tempos por etapa, aging por setor e gargalos com base em solicitacoes e historicos reais do fluxo.
 
@@ -180,7 +181,7 @@ Relatorios:
 
 - Solicitacoes de compra por status. [Entregue em Demanda e Pedidos]
 - Pedidos de compra por status. [Entregue em Demanda e Pedidos]
-- Compras por fornecedor.
+- Compras por fornecedor. [Entregue em Compras por Fornecedor com base em pedidos de compra reais]
 - Compras por obra/centro de custo. [Entregue inicialmente por valor de pedidos em Demanda e Pedidos]
 - Compras por categoria/insumo. [Entregue em Categorias e Insumos]
 - Economia obtida em cotacoes.
@@ -188,7 +189,7 @@ Relatorios:
 - Cotacoes vencidas ou sem resposta. [Entregue em Pendencias de Cotacoes por prazo_resposta e respondido_em]
 - Tempo medio entre solicitacao, cotacao, aprovacao e pedido.
 - Auditoria de itens de pedido.
-- Fornecedores mais acionados.
+- Fornecedores mais acionados. [Entregue em Relatorio de Fornecedores por acionamento em cotacao e em Compras por Fornecedor por pedido emitido]
 - Fornecedores com melhor preco medio.
 - Fornecedores com menor taxa de resposta.
 

@@ -2038,6 +2038,24 @@ Importante:
 - Itens manuais aparecem como `Itens manuais/sem categoria`, porque nao ha categoria real cadastrada para eles.
 - O relatorio nao classifica item por nome ou palavra-chave.
 
+Relatorio de Compras por Fornecedor:
+
+1. Acesse `Compras > Relatorios`.
+2. Abra `Compras por fornecedor`.
+3. Filtre por obra/centro de custo e por periodo de criacao do pedido.
+4. Leia os cards para entender quantidade de pedidos emitidos, fornecedores com pedido, valor total pedido, ticket medio, concentracao dos 5 maiores fornecedores e pedidos que nao atingiram minimo cadastrado.
+5. Use `Fornecedores por valor pedido` para avaliar quais fornecedores concentram compras efetivas.
+6. Use `Compras por obra/centro` para identificar onde o valor comprado esta concentrado.
+7. Use `Pedidos recentes` para abrir o pedido ou a solicitacao de compra de origem.
+
+Importante:
+
+- Este relatorio usa pedidos de compra emitidos, nao respostas de cotacao.
+- O valor vem do campo real `valor_total` do pedido de compra.
+- Itens removidos do pedido nao entram na quantidade de itens exibida.
+- O relatorio nao mede melhor preco, taxa de resposta ou desempenho de cotacao. Para isso, use `Fornecedores` ou `Economia em cotacoes`.
+- A concentracao top 5 mostra quanto do valor total do periodo esta concentrado nos cinco maiores fornecedores por valor pedido.
+
 Relatorio de Fornecedores:
 
 1. Acesse `Compras > Relatorios`.

@@ -552,6 +552,194 @@ async function relatorioDemandaPedidosCompras({ obraId, dataInicio, dataFim, obr
   };
 }
 
+async function relatorioComprasPorFornecedor({ obraId, dataInicio, dataFim, obraIds } = {}) {
+  const pedidos = await PedidoCompra.findAll({
+    where: buildPedidoCriacaoWhere({ obraId, obraIds, dataInicio, dataFim }),
+    attributes: [
+      'id',
+      'obra_id',
+      'fornecedor_compra_id',
+      'solicitacao_compra_id',
+      'status',
+      'valor_total',
+      'valor_minimo_pedido',
+      'atingiu_pedido_minimo',
+      'createdAt',
+      'encerrado_em'
+    ],
+    include: [
+      { model: FornecedorCompra, as: 'fornecedor', attributes: ['id', 'nome', 'cnpj', 'email', 'whatsapp', 'cidade', 'estado'] },
+      { model: Obra, as: 'obra', attributes: ['id', 'nome'] },
+      { model: SolicitacaoCompra, as: 'solicitacao', attributes: ['id', 'titulo', 'status'] },
+      { model: PedidoCompraItem, as: 'itens', attributes: ['id', 'valor_total', 'quantidade_pedido', 'removido'] }
+    ],
+    order: [['createdAt', 'DESC'], ['id', 'DESC']]
+  });
+
+  const fornecedoresMap = new Map();
+  const obrasMap = new Map();
+  const statusMap = new Map();
+  const linhasPedidos = [];
+
+  pedidos.forEach((pedido) => {
+    const plain = pedido.toJSON ? pedido.toJSON() : pedido;
+    const fornecedor = plain.fornecedor || null;
+    const fornecedorKey = fornecedor?.id ? String(fornecedor.id) : 'SEM_FORNECEDOR';
+    const valor = roundMoney(plain.valor_total);
+    const itensValidos = (plain.itens || []).filter((item) => !item.removido);
+    const statusKey = normalizeStatus(plain.status);
+
+    if (!fornecedoresMap.has(fornecedorKey)) {
+      fornecedoresMap.set(fornecedorKey, {
+        key: fornecedorKey,
+        fornecedor_id: fornecedor?.id || null,
+        fornecedor_nome: fornecedor?.nome || 'Sem fornecedor',
+        cnpj: fornecedor?.cnpj || null,
+        email: fornecedor?.email || null,
+        whatsapp: fornecedor?.whatsapp || null,
+        cidade: fornecedor?.cidade || null,
+        estado: fornecedor?.estado || null,
+        pedidos: 0,
+        pedidos_encerrados: 0,
+        pedidos_minimo_nao_atingido: 0,
+        itens: 0,
+        obras_ids: new Set(),
+        obras_nomes: new Set(),
+        status: new Map(),
+        valor_total: 0,
+        primeiro_pedido_em: null,
+        ultimo_pedido_em: null
+      });
+    }
+
+    const fornecedorResumo = fornecedoresMap.get(fornecedorKey);
+    fornecedorResumo.pedidos += 1;
+    fornecedorResumo.pedidos_encerrados += plain.encerrado_em ? 1 : 0;
+    fornecedorResumo.pedidos_minimo_nao_atingido += plain.atingiu_pedido_minimo === false ? 1 : 0;
+    fornecedorResumo.itens += itensValidos.length;
+    fornecedorResumo.valor_total = roundMoney(fornecedorResumo.valor_total + valor);
+    fornecedorResumo.primeiro_pedido_em = minDate([fornecedorResumo.primeiro_pedido_em, plain.createdAt].filter(Boolean));
+    fornecedorResumo.ultimo_pedido_em = maxDate([fornecedorResumo.ultimo_pedido_em, plain.createdAt].filter(Boolean));
+
+    if (plain.obra_id) {
+      fornecedorResumo.obras_ids.add(Number(plain.obra_id));
+      fornecedorResumo.obras_nomes.add(plain.obra?.nome || `Obra ${plain.obra_id}`);
+    }
+
+    fornecedorResumo.status.set(statusKey, (fornecedorResumo.status.get(statusKey) || 0) + 1);
+
+    const statusResumo = incrementResumoMap(statusMap, statusKey, formatStatusLabel(statusKey));
+    statusResumo.valor_total = roundMoney(statusResumo.valor_total + valor);
+
+    const obraKey = plain.obra_id ? String(plain.obra_id) : 'SEM_OBRA';
+    if (!obrasMap.has(obraKey)) {
+      obrasMap.set(obraKey, {
+        key: obraKey,
+        obra_id: plain.obra_id || null,
+        obra_nome: plain.obra?.nome || 'Sem obra/centro',
+        fornecedores_ids: new Set(),
+        pedidos: 0,
+        itens: 0,
+        valor_total: 0
+      });
+    }
+    const obraResumo = obrasMap.get(obraKey);
+    if (fornecedor?.id) {
+      obraResumo.fornecedores_ids.add(Number(fornecedor.id));
+    }
+    obraResumo.pedidos += 1;
+    obraResumo.itens += itensValidos.length;
+    obraResumo.valor_total = roundMoney(obraResumo.valor_total + valor);
+
+    linhasPedidos.push({
+      id: plain.id,
+      status: statusKey,
+      status_label: formatStatusLabel(statusKey),
+      fornecedor: fornecedor ? {
+        id: fornecedor.id,
+        nome: fornecedor.nome,
+        cnpj: fornecedor.cnpj || null
+      } : null,
+      obra: plain.obra ? { id: plain.obra.id, nome: plain.obra.nome } : null,
+      solicitacao: plain.solicitacao ? {
+        id: plain.solicitacao.id,
+        titulo: plain.solicitacao.titulo || null,
+        status: plain.solicitacao.status || null
+      } : null,
+      criado_em: plain.createdAt || null,
+      encerrado_em: plain.encerrado_em || null,
+      itens: itensValidos.length,
+      valor_total: valor,
+      valor_minimo_pedido: plain.valor_minimo_pedido == null ? null : roundMoney(plain.valor_minimo_pedido),
+      atingiu_pedido_minimo: plain.atingiu_pedido_minimo !== false
+    });
+  });
+
+  const sortByValue = (a, b) => {
+    if (Number(b.valor_total || 0) !== Number(a.valor_total || 0)) {
+      return Number(b.valor_total || 0) - Number(a.valor_total || 0);
+    }
+    return String(a.fornecedor_nome || a.obra_nome || '').localeCompare(
+      String(b.fornecedor_nome || b.obra_nome || ''),
+      'pt-BR'
+    );
+  };
+
+  const fornecedores = Array.from(fornecedoresMap.values())
+    .map((item) => ({
+      ...item,
+      obras: item.obras_ids.size,
+      obras_nomes: Array.from(item.obras_nomes).sort((a, b) => a.localeCompare(b, 'pt-BR')).slice(0, 5),
+      ticket_medio: item.pedidos > 0 ? roundMoney(item.valor_total / item.pedidos) : 0,
+      valor_total: roundMoney(item.valor_total),
+      status: Array.from(item.status.entries()).map(([key, total]) => ({
+        key,
+        label: formatStatusLabel(key),
+        total
+      })).sort((a, b) => Number(b.total || 0) - Number(a.total || 0)),
+      obras_ids: undefined
+    }))
+    .sort(sortByValue);
+
+  const obras = Array.from(obrasMap.values())
+    .map((item) => ({
+      ...item,
+      fornecedores: item.fornecedores_ids.size,
+      fornecedores_ids: undefined,
+      valor_total: roundMoney(item.valor_total),
+      ticket_medio: item.pedidos > 0 ? roundMoney(item.valor_total / item.pedidos) : 0
+    }))
+    .sort(sortByValue);
+
+  const valorTotal = roundMoney(pedidos.reduce((sum, pedido) => sum + toNumber(pedido.valor_total), 0));
+  const top5Valor = fornecedores.slice(0, 5).reduce((sum, fornecedor) => sum + toNumber(fornecedor.valor_total), 0);
+  const itensTotal = fornecedores.reduce((sum, fornecedor) => sum + Number(fornecedor.itens || 0), 0);
+
+  return {
+    filtros: {
+      obra_id: obraId || null,
+      data_inicio: dataInicio || null,
+      data_fim: dataFim || null
+    },
+    resumo: {
+      pedidos: pedidos.length,
+      fornecedores: fornecedores.length,
+      obras: obras.length,
+      itens: itensTotal,
+      valor_total: valorTotal,
+      ticket_medio_pedido: pedidos.length > 0 ? roundMoney(valorTotal / pedidos.length) : 0,
+      pedidos_minimo_nao_atingido: fornecedores.reduce((sum, fornecedor) => (
+        sum + Number(fornecedor.pedidos_minimo_nao_atingido || 0)
+      ), 0),
+      concentracao_top5: valorTotal > 0 ? Number(((top5Valor / valorTotal) * 100).toFixed(2)) : 0
+    },
+    fornecedores,
+    obras,
+    status: finalizeResumoMap(statusMap),
+    pedidos: linhasPedidos.slice(0, 100)
+  };
+}
+
 async function relatorioCategoriasInsumosCompras({ obraId, dataInicio, dataFim, obraIds } = {}) {
   const itens = await PedidoCompraItem.findAll({
     where: { removido: false },
@@ -1190,6 +1378,7 @@ async function relatorioCicloCompras({ obraId, dataInicio, dataFim, obraIds } = 
 module.exports = {
   relatorioCicloCompras,
   relatorioCategoriasInsumosCompras,
+  relatorioComprasPorFornecedor,
   relatorioDemandaPedidosCompras,
   relatorioEconomiaCotacoes,
   relatorioFornecedoresCompras,

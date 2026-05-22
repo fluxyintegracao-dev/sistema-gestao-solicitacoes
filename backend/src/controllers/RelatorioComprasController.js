@@ -3,6 +3,7 @@ const { canViewComprasCotacoes } = require('../services/authorizationService');
 const {
   relatorioCategoriasInsumosCompras,
   relatorioCicloCompras,
+  relatorioComprasPorFornecedor,
   relatorioDemandaPedidosCompras,
   relatorioEconomiaCotacoes,
   relatorioFornecedoresCompras,
@@ -53,6 +54,27 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return res.status(500).json({ error: 'Erro ao buscar relatorio de pendencias de cotacoes' });
+    }
+  },
+
+  async comprasPorFornecedor(req, res) {
+    try {
+      const usuario = await validarAcessoRelatorioCompras(req, res);
+      if (!usuario) {
+        return;
+      }
+
+      const relatorio = await relatorioComprasPorFornecedor({
+        obraId: req.query?.obra_id,
+        dataInicio: req.query?.data_inicio,
+        dataFim: req.query?.data_fim,
+        obraIds: req.compraScopeObraIds
+      });
+
+      return res.json(relatorio);
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao buscar relatorio de compras por fornecedor' });
     }
   },
 

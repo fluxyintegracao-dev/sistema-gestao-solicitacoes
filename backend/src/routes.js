@@ -53,6 +53,7 @@ const {
   validateCompraQuery,
   validateCompraRelatorioCategoriasInsumosQuery,
   validateCompraRelatorioCicloQuery,
+  validateCompraRelatorioComprasFornecedorQuery,
   validateCompraRelatorioDemandaPedidosQuery,
   validateCompraRelatorioEconomiaCotacoesQuery,
   validateCompraRelatorioFornecedoresQuery,
@@ -1297,6 +1298,7 @@ router.post('/compras/solicitacoes/:id/pedidos', criticalRateLimit, validateRequ
 router.get('/compras/pedidos', validateRequest({ query: validateCompraPedidoQuery }), scopeCompraListAccess, PedidoCompraController.index);
 router.get('/compras/relatorios/auditoria-itens-pedido', validateRequest({ query: validateCompraPedidoAuditoriaQuery }), scopeCompraListAccess, PedidoCompraController.auditoria);
 router.get('/compras/relatorios/categorias-insumos', validateRequest({ query: validateCompraRelatorioCategoriasInsumosQuery }), scopeCompraListAccess, RelatorioComprasController.categoriasInsumos);
+router.get('/compras/relatorios/compras-fornecedor', validateRequest({ query: validateCompraRelatorioComprasFornecedorQuery }), scopeCompraListAccess, RelatorioComprasController.comprasPorFornecedor);
 router.get('/compras/relatorios/demanda-pedidos', validateRequest({ query: validateCompraRelatorioDemandaPedidosQuery }), scopeCompraListAccess, RelatorioComprasController.demandaPedidos);
 router.get('/compras/relatorios/pendencias-cotacoes', validateRequest({ query: validateCompraRelatorioPendenciasCotacoesQuery }), scopeCompraListAccess, RelatorioComprasController.pendenciasCotacoes);
 router.get('/compras/relatorios/ciclo', validateRequest({ query: validateCompraRelatorioCicloQuery }), scopeCompraListAccess, RelatorioComprasController.ciclo);
