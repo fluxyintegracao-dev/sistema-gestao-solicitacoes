@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import {
   atualizarCobrancaTituloFinanceiro,
@@ -220,7 +220,6 @@ function formatAuditMetadata(metadata) {
 
 export default function FinanceiroTituloDetalhe() {
   const { id } = useParams();
-  const navigate = useNavigate();
   const { user } = useAuth();
   const [titulo, setTitulo] = useState(null);
   const [contasBancarias, setContasBancarias] = useState([]);
@@ -455,9 +454,9 @@ export default function FinanceiroTituloDetalhe() {
       <div className="page solicitacoes-page">
         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div>
-            <button type="button" className="btn btn-outline mb-3" onClick={() => navigate(-1)}>
+            <Link className="btn btn-outline mb-3" to="/financeiro/titulos">
               Voltar
-            </button>
+            </Link>
             <h1 className="page-title">Titulo {titulo.codigo || `#${titulo.id}`}</h1>
             <p className="text-sm text-[var(--c-muted)]">{titulo.descricao || 'Sem descricao'}</p>
           </div>
