@@ -211,11 +211,28 @@ export default function FinanceiroTituloEditar() {
     () => categorias.filter((categoria) => categoriaCompativel(categoria, form?.tipo)),
     [categorias, form?.tipo]
   );
+  const obraSelecionada = useMemo(
+    () => obras.find((obra) => String(obra.id) === String(form?.obra_id)) || null,
+    [obras, form?.obra_id]
+  );
+  const empresaDaObraId = getEmpresaObraId(obraSelecionada);
+  const empresaTravadaPelaObra = Boolean(empresaDaObraId);
   const categoriaSelecionada = useMemo(
     () => categorias.find((categoria) => String(categoria.id) === String(form?.categoria_financeira_id)) || null,
     [categorias, form?.categoria_financeira_id]
   );
   const bloqueio = useMemo(() => getTituloBloqueado(titulo), [titulo]);
+
+  useEffect(() => {
+    if (!form || !empresaDaObraId || String(form.empresa_id || '') === String(empresaDaObraId)) {
+      return;
+    }
+
+    setForm((current) => ({
+      ...current,
+      empresa_id: empresaDaObraId
+    }));
+  }, [empresaDaObraId, form]);
 
   function updateField(field, value) {
     setForm((current) => {
@@ -366,12 +383,21 @@ export default function FinanceiroTituloEditar() {
 
           <label className="form-field">
             <span>Empresa real</span>
-            <select value={form.empresa_id} onChange={(event) => updateField('empresa_id', event.target.value)} disabled>
+            <select
+              value={form.empresa_id}
+              onChange={(event) => updateField('empresa_id', event.target.value)}
+              disabled={Boolean(bloqueio) || empresaTravadaPelaObra}
+            >
               <option value="">Selecione</option>
               {empresasGrupo.map((empresa) => (
                 <option key={empresa.id} value={empresa.id}>{empresa.nome || empresa.razao_social}</option>
               ))}
             </select>
+            <small className="text-xs text-[var(--c-muted)]">
+              {empresaTravadaPelaObra
+                ? 'Preenchida pela empresa vinculada a obra/centro de custo.'
+                : 'Informe a empresa real para regularizar titulos antigos sem empresa vinculada.'}
+            </small>
           </label>
 
           <label className="form-field xl:col-span-2">
