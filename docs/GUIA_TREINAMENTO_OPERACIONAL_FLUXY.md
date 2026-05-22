@@ -1991,6 +1991,22 @@ Importante:
 - O valor vencedor usa apenas itens marcados como vencedores no encerramento da cotacao.
 - O prazo medio usa a diferenca entre `enviado_em` e `respondido_em`; se a resposta nao tiver data registrada, ela nao entra no calculo do prazo medio.
 
+Relatorio de Economia em Cotacoes:
+
+1. Acesse `Compras > Relatorios`.
+2. Abra `Economia em cotacoes`.
+3. Filtre por obra/centro de custo e por periodo de encerramento da cotacao.
+4. Confira os cards de cotacoes encerradas, percentual de itens no menor preco, economia total e sobrepreco.
+5. Na tabela, compare item a item o menor preco disponivel com o fornecedor vencedor selecionado.
+6. Quando a coluna `Sinal` mostrar `Acima do menor`, o vencedor escolhido nao foi o menor preco disponivel para aquele item.
+
+Importante:
+
+- O relatorio considera somente cotacoes encerradas, porque apenas cotacoes encerradas possuem vencedor definitivo.
+- O menor preco considera respostas disponiveis com preco informado.
+- A economia e calculada como `menor preco disponivel - preco vencedor`; valor negativo indica escolha acima do menor preco.
+- Esse relatorio nao deduz justificativa por texto. Ele apenas mostra objetivamente onde a escolha ficou no menor preco e onde ficou acima.
+
 ### 20.4 Relatorios Financeiros
 
 Devem responder:

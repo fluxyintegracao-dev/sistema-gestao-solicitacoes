@@ -1,6 +1,9 @@
 const { User } = require('../models');
 const { canViewComprasCotacoes } = require('../services/authorizationService');
-const { relatorioFornecedoresCompras } = require('../services/relatorioComprasService');
+const {
+  relatorioEconomiaCotacoes,
+  relatorioFornecedoresCompras
+} = require('../services/relatorioComprasService');
 
 async function carregarUsuario(userId) {
   if (!userId) {
@@ -28,6 +31,27 @@ async function validarAcessoRelatorioCompras(req, res) {
 }
 
 module.exports = {
+  async economiaCotacoes(req, res) {
+    try {
+      const usuario = await validarAcessoRelatorioCompras(req, res);
+      if (!usuario) {
+        return;
+      }
+
+      const relatorio = await relatorioEconomiaCotacoes({
+        obraId: req.query?.obra_id,
+        dataInicio: req.query?.data_inicio,
+        dataFim: req.query?.data_fim,
+        obraIds: req.compraScopeObraIds
+      });
+
+      return res.json(relatorio);
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao buscar relatorio de economia em cotacoes' });
+    }
+  },
+
   async fornecedores(req, res) {
     try {
       const usuario = await validarAcessoRelatorioCompras(req, res);

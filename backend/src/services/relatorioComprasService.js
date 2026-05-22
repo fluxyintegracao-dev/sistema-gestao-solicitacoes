@@ -1,11 +1,13 @@
 const { Op } = require('sequelize');
 const {
   FornecedorCompra,
+  Insumo,
   SolicitacaoCompra,
   SolicitacaoCompraFornecedor,
   SolicitacaoCompraItem,
   SolicitacaoCompraItemManual,
-  SolicitacaoCompraRespostaItem
+  SolicitacaoCompraRespostaItem,
+  Unidade
 } = require('../models');
 
 function toNumber(value) {
@@ -55,6 +57,22 @@ function buildSolicitacaoWhere({ obraId, obraIds }) {
       where.id = { [Op.in]: [] };
     } else if (!obraId) {
       where.obra_id = { [Op.in]: obraIds };
+    }
+  }
+
+  return where;
+}
+
+function buildSolicitacaoPeriodoWhere({ obraId, obraIds, dataInicio, dataFim }) {
+  const where = buildSolicitacaoWhere({ obraId, obraIds });
+
+  if (dataInicio || dataFim) {
+    where.encerrado_em = {};
+    if (dataInicio) {
+      where.encerrado_em[Op.gte] = new Date(`${dataInicio}T00:00:00.000`);
+    }
+    if (dataFim) {
+      where.encerrado_em[Op.lte] = new Date(`${dataFim}T23:59:59.999`);
     }
   }
 
@@ -256,6 +274,231 @@ async function relatorioFornecedoresCompras({ obraId, dataInicio, dataFim, obraI
   };
 }
 
+function buildItemKey(tipo, id) {
+  return `${String(tipo || '').toUpperCase()}:${Number(id || 0)}`;
+}
+
+function getItemDescricao(item) {
+  if (!item) {
+    return '-';
+  }
+  return item.insumo?.nome || item.nome_manual || item.especificacao || '-';
+}
+
+function getItemUnidade(item) {
+  if (!item) {
+    return '-';
+  }
+  return item.unidade_sigla_manual || item.unidade?.sigla || '-';
+}
+
+function mapItensSolicitacao(solicitacao) {
+  const mapa = new Map();
+
+  (solicitacao.itens || []).forEach((item) => {
+    mapa.set(buildItemKey('CADASTRADO', item.id), {
+      item_tipo: 'CADASTRADO',
+      item_referencia_id: item.id,
+      descricao: getItemDescricao(item),
+      unidade: getItemUnidade(item),
+      quantidade: toNumber(item.quantidade)
+    });
+  });
+
+  (solicitacao.itensManuais || []).forEach((item) => {
+    mapa.set(buildItemKey('MANUAL', item.id), {
+      item_tipo: 'MANUAL',
+      item_referencia_id: item.id,
+      descricao: getItemDescricao(item),
+      unidade: getItemUnidade(item),
+      quantidade: toNumber(item.quantidade)
+    });
+  });
+
+  return mapa;
+}
+
+function getRespostaItemKey(resposta) {
+  const itemReferenciaId = resposta.solicitacao_compra_item_id || resposta.solicitacao_compra_item_manual_id;
+  return buildItemKey(resposta.item_tipo, itemReferenciaId);
+}
+
+function buildEconomiaLinha({ solicitacao, itemBase, respostas }) {
+  const respostasValidas = respostas
+    .filter((resposta) => resposta.disponivel && resposta.preco != null && toNumber(resposta.preco) > 0)
+    .map((resposta) => {
+      const precoUnitario = roundMoney(resposta.preco);
+      return {
+        resposta_item_id: resposta.id,
+        fornecedor_id: resposta.fornecedor_info?.id || null,
+        fornecedor_nome: resposta.fornecedor_info?.nome || 'Fornecedor sem cadastro',
+        preco_unitario: precoUnitario,
+        valor_total: roundMoney(precoUnitario * itemBase.quantidade),
+        vencedor: Boolean(resposta.vencedor)
+      };
+    });
+
+  if (!respostasValidas.length) {
+    return null;
+  }
+
+  const menor = respostasValidas.reduce((acc, atual) => {
+    if (!acc) {
+      return atual;
+    }
+    return atual.preco_unitario < acc.preco_unitario ? atual : acc;
+  }, null);
+  const vencedor = respostasValidas.find((resposta) => resposta.vencedor) || null;
+  if (!vencedor) {
+    return null;
+  }
+
+  const economia = roundMoney(menor.valor_total - vencedor.valor_total);
+  const selecionouMenorPreco = Number(vencedor.resposta_item_id) === Number(menor.resposta_item_id);
+
+  return {
+    solicitacao: {
+      id: solicitacao.id,
+      titulo: solicitacao.titulo || null,
+      obra_id: solicitacao.obra_id || null,
+      encerrado_em: solicitacao.encerrado_em || null
+    },
+    item: itemBase,
+    respostas_validas: respostasValidas.length,
+    menor_preco: menor,
+    vencedor,
+    economia,
+    sobrepreco: economia < 0 ? Math.abs(economia) : 0,
+    selecionou_menor_preco: selecionouMenorPreco
+  };
+}
+
+async function relatorioEconomiaCotacoes({ obraId, dataInicio, dataFim, obraIds } = {}) {
+  const solicitacoes = await SolicitacaoCompra.findAll({
+    where: {
+      ...buildSolicitacaoPeriodoWhere({ obraId, obraIds, dataInicio, dataFim }),
+      status: 'ENCERRADO'
+    },
+    attributes: ['id', 'titulo', 'obra_id', 'status', 'encerrado_em'],
+    include: [
+      {
+        model: SolicitacaoCompraItem,
+        as: 'itens',
+        attributes: ['id', 'quantidade', 'especificacao', 'unidade_sigla_manual'],
+        include: [
+          { model: Insumo, as: 'insumo', attributes: ['id', 'nome'] },
+          { model: Unidade, as: 'unidade', attributes: ['id', 'sigla'] }
+        ]
+      },
+      {
+        model: SolicitacaoCompraItemManual,
+        as: 'itensManuais',
+        attributes: ['id', 'nome_manual', 'quantidade', 'especificacao', 'unidade_sigla_manual']
+      },
+      {
+        model: SolicitacaoCompraFornecedor,
+        as: 'fornecedores',
+        attributes: ['id', 'fornecedor_compra_id'],
+        include: [
+          {
+            model: FornecedorCompra,
+            as: 'fornecedor',
+            attributes: ['id', 'nome']
+          },
+          {
+            model: SolicitacaoCompraRespostaItem,
+            as: 'respostas',
+            attributes: [
+              'id',
+              'item_tipo',
+              'solicitacao_compra_item_id',
+              'solicitacao_compra_item_manual_id',
+              'disponivel',
+              'preco',
+              'vencedor'
+            ]
+          }
+        ]
+      }
+    ],
+    order: [['encerrado_em', 'DESC'], ['id', 'DESC']]
+  });
+
+  const linhas = [];
+  const resumo = {
+    cotacoes_encerradas: solicitacoes.length,
+    itens_com_vencedor: 0,
+    itens_menor_preco: 0,
+    itens_acima_menor_preco: 0,
+    valor_menor_preco: 0,
+    valor_vencedor: 0,
+    economia_total: 0,
+    sobrepreco_total: 0
+  };
+
+  solicitacoes.forEach((solicitacao) => {
+    const itensMap = mapItensSolicitacao(solicitacao);
+    const respostasPorItem = new Map();
+
+    (solicitacao.fornecedores || []).forEach((fornecedorCotacao) => {
+      (fornecedorCotacao.respostas || []).forEach((resposta) => {
+        const key = getRespostaItemKey(resposta);
+        if (!respostasPorItem.has(key)) {
+          respostasPorItem.set(key, []);
+        }
+        const respostaJson = resposta.toJSON ? resposta.toJSON() : resposta;
+        respostasPorItem.get(key).push({
+          ...respostaJson,
+          fornecedor_info: {
+            id: fornecedorCotacao.fornecedor?.id || fornecedorCotacao.fornecedor_compra_id || null,
+            nome: fornecedorCotacao.fornecedor?.nome || 'Fornecedor sem cadastro'
+          }
+        });
+      });
+    });
+
+    itensMap.forEach((itemBase, key) => {
+      const linha = buildEconomiaLinha({
+        solicitacao,
+        itemBase,
+        respostas: respostasPorItem.get(key) || []
+      });
+      if (!linha) {
+        return;
+      }
+
+      linhas.push(linha);
+      resumo.itens_com_vencedor += 1;
+      resumo.valor_menor_preco = roundMoney(resumo.valor_menor_preco + linha.menor_preco.valor_total);
+      resumo.valor_vencedor = roundMoney(resumo.valor_vencedor + linha.vencedor.valor_total);
+
+      if (linha.selecionou_menor_preco) {
+        resumo.itens_menor_preco += 1;
+      } else {
+        resumo.itens_acima_menor_preco += 1;
+        resumo.sobrepreco_total = roundMoney(resumo.sobrepreco_total + linha.sobrepreco);
+      }
+
+      resumo.economia_total = roundMoney(resumo.economia_total + linha.economia);
+    });
+  });
+
+  resumo.percentual_menor_preco = resumo.itens_com_vencedor > 0
+    ? Number(((resumo.itens_menor_preco / resumo.itens_com_vencedor) * 100).toFixed(2))
+    : 0;
+
+  return {
+    filtros: {
+      obra_id: obraId || null,
+      data_inicio: dataInicio || null,
+      data_fim: dataFim || null
+    },
+    resumo,
+    itens: linhas
+  };
+}
+
 module.exports = {
+  relatorioEconomiaCotacoes,
   relatorioFornecedoresCompras
 };

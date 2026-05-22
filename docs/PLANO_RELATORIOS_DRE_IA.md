@@ -70,6 +70,7 @@ Base multiempresa e DRE gerencial:
 - O webhook real do Banco do Brasil passou a exigir segredo compartilhado configurado no ambiente, recusar payload sem identificador do evento, registrar auditoria de seguranca e tratar notificacoes repetidas como idempotentes pelo identificador do evento do provedor.
 - A auditoria de pagamentos passou a ter consulta backend para eventos tecnicos por status, tipo, lote, intencao, identificador do provedor e periodo.
 - O Fluxo de Caixa Consolidado passou a destacar necessidade futura de caixa, pior periodo previsto, empresas com saldo previsto negativo, obras/centros com saldo previsto negativo e alertas de consistencia para fluxo sem empresa ou obra/centro.
+- Compras > Relatorios ganhou Economia em Cotacoes, comparando menor preco disponivel com o fornecedor vencedor em cotacoes encerradas para evidenciar economia, sobrepreco e aderencia ao menor preco.
 - Compras > Relatorios ganhou Relatorio de Fornecedores, com participacao em cotacoes, taxa de resposta, prazo medio, itens respondidos, itens vencedores, valor cotado e valor vencedor calculados por dados estruturados do processo de cotacao.
 
 Documentacao operacional complementar:

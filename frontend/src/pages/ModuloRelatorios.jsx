@@ -68,13 +68,13 @@ const HUBS = {
           { titulo: 'Auditoria de compras', descricao: 'Acompanhamento administrativo de compras e evidencias do processo.', to: '/compras/relatorios/auditoria', status: 'Disponivel', permissao: 'businessAdmin' },
           { titulo: 'Cotacoes', descricao: 'Lista de cotacoes, status de resposta e encerramento.', to: '/cotacoes', status: 'Disponivel', permissao: 'comprasCotacoes' },
           { titulo: 'Pedidos de compra', descricao: 'Pedidos emitidos, status e detalhamento por fornecedor.', to: '/pedidos-compra', status: 'Disponivel', permissao: 'comprasPedidos' },
+          { titulo: 'Economia em cotacoes', descricao: 'Comparativo entre menor preco disponivel e vencedor selecionado.', to: '/compras/relatorios/economia-cotacoes', status: 'Disponivel', permissao: 'comprasCotacoes' },
           { titulo: 'Fornecedores', descricao: 'Ranking por volume, resposta, prazo medio e recorrencia nas cotacoes.', to: '/compras/relatorios/fornecedores', status: 'Disponivel', permissao: 'comprasCotacoes' }
         ]
       },
       {
         titulo: 'Proximas visoes',
         itens: [
-          { titulo: 'Economia em cotacoes', descricao: 'Comparativo entre menor preco, selecionado e justificativas.', status: 'Planejado' },
           { titulo: 'Ciclo de compras', descricao: 'Tempo medio entre solicitacao, cotacao, aprovacao e pedido.', status: 'Planejado' }
         ]
       }
