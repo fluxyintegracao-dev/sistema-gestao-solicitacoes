@@ -339,6 +339,16 @@ export async function criarTituloFinanceiro(data) {
   return parseJson(response, 'Erro ao criar titulo financeiro');
 }
 
+export async function atualizarTituloFinanceiro(id, data) {
+  const response = await fetch(`${API_URL}/financeiro/titulos/${id}`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+
+  return parseJson(response, 'Erro ao editar titulo financeiro');
+}
+
 export async function atualizarCobrancaTituloFinanceiro(id, data) {
   const response = await fetch(`${API_URL}/financeiro/titulos/${id}/cobranca`, {
     method: 'PATCH',

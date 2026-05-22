@@ -272,6 +272,15 @@ export default function FinanceiroTituloDetalhe() {
       ? titulo.movimentos.filter((item) => String(item.status || '').toUpperCase() === 'ATIVO')
       : [];
   }, [titulo]);
+  const pagamentosAtivos = useMemo(() => {
+    return Array.isArray(titulo?.paymentIntents)
+      ? titulo.paymentIntents.filter((item) => !['CANCELADO', 'REJEITADO', 'REJEITADO_BANCO'].includes(String(item.status || '').toUpperCase()))
+      : [];
+  }, [titulo]);
+  const podeEditarTitulo = String(titulo?.status || '').toUpperCase() === 'ABERTO'
+    && Number(titulo?.valor_baixado || 0) === 0
+    && movimentosAtivos.length === 0
+    && pagamentosAtivos.length === 0;
 
   const contasBancariasBaixa = useMemo(() => {
     if (!baixaForm.empresa_id) return [];
@@ -457,6 +466,11 @@ export default function FinanceiroTituloDetalhe() {
             {titulo.solicitacao?.id && (
               <Link className="btn btn-outline" to={`/solicitacoes/${titulo.solicitacao.id}`}>
                 Abrir solicitacao
+              </Link>
+            )}
+            {podeEditarTitulo && (
+              <Link className="btn btn-outline" to={`/financeiro/titulos/${titulo.id}/editar`}>
+                Editar titulo
               </Link>
             )}
             <button

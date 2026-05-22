@@ -155,6 +155,7 @@ const {
   validateFinanceTituloEstornoBody,
   validateFinanceTituloMovimentoParams,
   validateFinanceTituloQuery,
+  validateFinanceTituloUpdateBody,
   validateFinanceTarifasBancariasConfigBody,
   validateFinanceTransferenciaBody,
   validateFinanceTransferenciaCancelBody,
@@ -1203,6 +1204,7 @@ router.get('/financeiro/titulos', allowFinanceiro, validateRequest({ query: vali
 router.post('/financeiro/titulos', allowFinanceiro, criticalRateLimit, validateRequest({ body: validateFinanceTituloCreateBody }), TituloFinanceiroController.create);
 router.get('/financeiro/titulos/:id', allowFinanceiro, validateRequest({ params: validateNumericIdParam('id', 'Titulo financeiro') }), TituloFinanceiroController.show);
 router.get('/financeiro/titulos/:id/auditoria', allowFinanceiro, validateRequest({ params: validateNumericIdParam('id', 'Titulo financeiro') }), TituloFinanceiroController.auditoria);
+router.patch('/financeiro/titulos/:id', allowFinanceiro, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Titulo financeiro'), body: validateFinanceTituloUpdateBody }), TituloFinanceiroController.update);
 router.patch('/financeiro/titulos/:id/cobranca', allowFinanceiro, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Titulo financeiro'), body: validateFinanceTituloCobrancaBody }), TituloFinanceiroController.atualizarCobranca);
 router.post('/financeiro/titulos/:id/baixas', allowFinanceiro, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Titulo financeiro'), body: validateFinanceTituloBaixaBody }), TituloFinanceiroController.baixar);
 router.post('/financeiro/titulos/:id/movimentos/:movimentoId/estornar', allowFinanceiro, criticalRateLimit, validateRequest({ params: validateFinanceTituloMovimentoParams, body: validateFinanceTituloEstornoBody }), TituloFinanceiroController.estornarMovimento);

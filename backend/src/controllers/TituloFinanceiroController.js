@@ -1,5 +1,6 @@
 const {
   atualizarCobrancaTitulo,
+  atualizarTitulo,
   baixarTitulo,
   carregarTituloPorId,
   criarTituloManual,
@@ -86,6 +87,16 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return responderErro(res, error, 'Erro ao criar titulo financeiro manual');
+    }
+  },
+
+  async update(req, res) {
+    try {
+      const titulo = await atualizarTitulo(req, req.params.id, req.body || {});
+      return res.json(titulo);
+    } catch (error) {
+      console.error(error);
+      return responderErro(res, error, 'Erro ao editar titulo financeiro');
     }
   },
 

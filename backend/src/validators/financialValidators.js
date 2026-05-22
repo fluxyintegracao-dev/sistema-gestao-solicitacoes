@@ -955,6 +955,74 @@ function validateFinanceTituloCreateBody(body = {}) {
   };
 }
 
+function validateFinanceTituloUpdateBody(body = {}) {
+  ensureAllowedKeys(
+    body,
+    [
+      'tipo',
+      'empresa_id',
+      'obra_id',
+      'apropriacao_id',
+      'parceiro_id',
+      'valor',
+      'data_vencimento',
+      'data_emissao',
+      'descricao',
+      'categoria_financeira_id',
+      'observacoes',
+      'numero_documento',
+      'forma_cobranca',
+      'status_cobranca',
+      'banco_cobranca',
+      'nosso_numero',
+      'linha_digitavel',
+      'codigo_barras',
+      'identificador_externo',
+      'boleto_emitido_em',
+      'competencia_data',
+      'considera_dre',
+      'intercompany',
+      'empresa_contraparte_id',
+      ...CAMPOS_INTERCOMPANY_TITULO
+    ],
+    'Edicao de titulo financeiro'
+  );
+
+  return {
+    tipo: parseEnum(body.tipo, 'Tipo', ['PAGAR', 'RECEBER'], { required: true }),
+    empresa_id: parseInteger(body.empresa_id, 'Empresa do grupo', { required: true }),
+    obra_id: parseInteger(body.obra_id, 'Obra/Centro de custo', { required: true }),
+    apropriacao_id: parseInteger(body.apropriacao_id, 'Apropriacao'),
+    parceiro_id: parseInteger(body.parceiro_id, 'Parceiro', { required: true }),
+    valor: parseDecimal(body.valor, 'Valor', { required: true, min: 0.01 }),
+    data_vencimento: parseDateOnly(body.data_vencimento, 'Data de vencimento', { required: true }),
+    data_emissao: parseDateOnly(body.data_emissao, 'Data de emissao'),
+    descricao: parseOptionalText(body.descricao, 'Descricao', 255, { required: true }),
+    categoria_financeira_id: parseInteger(body.categoria_financeira_id, 'Categoria financeira'),
+    observacoes: parseOptionalText(body.observacoes, 'Observacoes', 4000),
+    numero_documento: parseOptionalText(body.numero_documento, 'Numero do documento', 120),
+    forma_cobranca: parseEnum(body.forma_cobranca, 'Forma de cobranca', FORMAS_COBRANCA),
+    status_cobranca: parseEnum(body.status_cobranca, 'Status da cobranca', STATUS_COBRANCA),
+    banco_cobranca: parseOptionalText(body.banco_cobranca, 'Banco da cobranca', 120),
+    nosso_numero: parseOptionalText(body.nosso_numero, 'Nosso numero', 120),
+    linha_digitavel: parseOptionalText(body.linha_digitavel, 'Linha digitavel', 255),
+    codigo_barras: parseOptionalText(body.codigo_barras, 'Codigo de barras', 255),
+    identificador_externo: parseOptionalText(body.identificador_externo, 'Identificador externo', 120),
+    boleto_emitido_em: parseDateOnly(body.boleto_emitido_em, 'Data de emissao do boleto'),
+    competencia_data: parseDateOnly(body.competencia_data, 'Data de competencia'),
+    considera_dre: parseBoolean(body.considera_dre, 'Considera DRE'),
+    intercompany: parseBoolean(body.intercompany, 'Intercompany'),
+    empresa_contraparte_id: parseInteger(body.empresa_contraparte_id, 'Empresa contraparte'),
+    intercompany_group_id: parseOptionalText(body.intercompany_group_id, 'Grupo intercompany', 80),
+    empresa_origem_id: parseInteger(body.empresa_origem_id, 'Empresa origem'),
+    empresa_destino_id: parseInteger(body.empresa_destino_id, 'Empresa destino'),
+    tipo_intercompany: parseEnum(body.tipo_intercompany, 'Tipo intercompany', TIPOS_INTERCOMPANY),
+    motivo_intercompany: parseOptionalText(body.motivo_intercompany, 'Motivo intercompany', 255),
+    elimina_consolidado: parseBoolean(body.elimina_consolidado, 'Eliminar no consolidado'),
+    transferencia_interna: parseBoolean(body.transferencia_interna, 'Transferencia interna')
+  };
+}
+
 function validateFinanceTituloCobrancaBody(body = {}) {
   ensureAllowedKeys(
     body,
@@ -1323,6 +1391,7 @@ module.exports = {
   validateFinanceTituloCobrancaBody,
   validateFinanceTituloCreateBody,
   validateFinanceTituloCreateFromSolicitacaoBody,
+  validateFinanceTituloUpdateBody,
   validateFinanceTituloEstornoBody,
   validateFinanceTituloMovimentoParams,
   validateFinanceTituloQuery

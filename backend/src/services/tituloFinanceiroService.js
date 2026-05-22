@@ -919,6 +919,153 @@ async function carregarTituloPorId(req, tituloId, { includeMovimentos = false } 
   return titulo;
 }
 
+function assertTituloEditavel(titulo) {
+  const status = String(titulo?.status || '').trim().toUpperCase();
+  const valorBaixado = Number(titulo?.valor_baixado || 0);
+  const movimentosAtivos = Array.isArray(titulo?.movimentos)
+    ? titulo.movimentos.filter((item) => String(item?.status || '').trim().toUpperCase() === 'ATIVO')
+    : [];
+  const paymentIntentsAtivos = Array.isArray(titulo?.paymentIntents)
+    ? titulo.paymentIntents.filter((intent) => {
+        const intentStatus = String(intent?.status || '').trim().toUpperCase();
+        return !['CANCELADO', 'REJEITADO', 'REJEITADO_BANCO'].includes(intentStatus);
+      })
+    : [];
+
+  if (status !== 'ABERTO') {
+    throw createHttpError(400, 'Somente titulos em aberto podem ser editados.');
+  }
+
+  if (valorBaixado > 0 || movimentosAtivos.length > 0) {
+    throw createHttpError(400, 'Titulo com baixa registrada nao pode ser editado. Estorne a baixa antes de corrigir o lancamento.');
+  }
+
+  if (paymentIntentsAtivos.length > 0) {
+    throw createHttpError(400, 'Titulo com pagamento em massa vinculado nao pode ser editado. Cancele ou rejeite o pagamento antes de corrigir o lancamento.');
+  }
+}
+
+async function atualizarTitulo(req, tituloId, payload = {}) {
+  await assertFinanceAccess(req);
+
+  const titulo = await carregarTituloPorId(req, tituloId, { includeMovimentos: true });
+  assertTituloEditavel(titulo);
+
+  const tipo = normalizarTipoTitulo(payload.tipo || titulo.tipo);
+  if (!['PAGAR', 'RECEBER'].includes(tipo)) {
+    throw createHttpError(400, 'Tipo de titulo invalido.');
+  }
+
+  const obraId = Number(payload.obra_id);
+  if (!Number.isInteger(obraId) || obraId <= 0) {
+    throw createHttpError(400, 'Obra/Centro de custo e obrigatorio para editar o titulo.');
+  }
+
+  const parceiroId = Number(payload.parceiro_id);
+  if (!Number.isInteger(parceiroId) || parceiroId <= 0) {
+    throw createHttpError(400, 'Parceiro e obrigatorio para editar o titulo.');
+  }
+
+  const valorOriginal = Number(payload.valor);
+  if (!Number.isFinite(valorOriginal) || valorOriginal <= 0) {
+    throw createHttpError(400, 'Valor invalido para editar o titulo.');
+  }
+
+  const descricao = String(payload.descricao || '').trim();
+  if (!descricao) {
+    throw createHttpError(400, 'Descricao e obrigatoria para editar o titulo.');
+  }
+
+  if (titulo.fatura_cartao_id && roundCurrency(valorOriginal) !== roundCurrency(titulo.valor_original)) {
+    throw createHttpError(
+      400,
+      'Titulo vinculado a fatura de cartao nao permite alterar valor por esta tela. Ajuste a fatura ou cancele o lancamento de origem.'
+    );
+  }
+
+  const [obra, parceiro, categoria] = await Promise.all([
+    validarObraTitulo(req, obraId),
+    validarParceiro(parceiroId),
+    validarCategoriaFinanceira(payload.categoria_financeira_id, tipo)
+  ]);
+  const empresaTituloId = resolverEmpresaTitulo({
+    empresaIdInformada: payload.empresa_id,
+    obra
+  });
+  await validarEmpresaGrupo(empresaTituloId);
+  const apropriacao = await validarApropriacaoTitulo(payload.apropriacao_id, obra.id);
+
+  validarCompatibilidadeParceiroTitulo(parceiro, tipo);
+  validarCategoriaDreTitulo(categoria, payload);
+  const intercompanyFields = await validarIntercompanyTitulo(payload);
+  const competenciaData = resolverCompetenciaTitulo(payload);
+
+  const antes = {
+    tipo: titulo.tipo,
+    empresa_id: titulo.empresa_id,
+    obra_id: titulo.obra_id,
+    apropriacao_id: titulo.apropriacao_id,
+    parceiro_id: titulo.parceiro_id,
+    categoria_financeira_id: titulo.categoria_financeira_id,
+    valor_original: roundCurrency(titulo.valor_original),
+    data_vencimento: titulo.data_vencimento,
+    competencia_data: titulo.competencia_data,
+    considera_dre: titulo.considera_dre,
+    intercompany: titulo.intercompany
+  };
+
+  await titulo.update({
+    obra_id: obra.id,
+    apropriacao_id: apropriacao?.id || null,
+    empresa_id: empresaTituloId,
+    ...intercompanyFields,
+    parceiro_id: parceiro.id,
+    categoria_financeira_id: categoria?.id || null,
+    tipo,
+    descricao,
+    numero_documento: payload.numero_documento || null,
+    valor_original: roundCurrency(valorOriginal),
+    valor_saldo: roundCurrency(valorOriginal),
+    valor_baixado: 0,
+    data_emissao: payload.data_emissao || null,
+    data_vencimento: payload.data_vencimento,
+    data_quitacao: null,
+    competencia_data: competenciaData,
+    considera_dre: payload.considera_dre !== false,
+    observacoes: payload.observacoes || null,
+    ...buildCobrancaFields(payload, tipo),
+    atualizado_por: req.user?.id || null
+  });
+
+  await registrarEventoSeguranca({
+    req,
+    usuarioId: req.user?.id || null,
+    tipoEvento: 'FINANCIAL_TITLE_UPDATED',
+    recursoTipo: 'TITULO_FINANCEIRO',
+    recursoId: titulo.id,
+    status: 'SUCCESS',
+    descricao: 'Titulo financeiro editado antes da baixa',
+    metadata: {
+      antes,
+      depois: {
+        tipo,
+        empresa_id: empresaTituloId,
+        obra_id: obra.id,
+        apropriacao_id: apropriacao?.id || null,
+        parceiro_id: parceiro.id,
+        categoria_financeira_id: categoria?.id || null,
+        valor_original: roundCurrency(valorOriginal),
+        data_vencimento: payload.data_vencimento,
+        competencia_data: competenciaData,
+        considera_dre: payload.considera_dre !== false,
+        intercompany: Boolean(intercompanyFields.intercompany)
+      }
+    }
+  });
+
+  return carregarTituloPorId(req, titulo.id, { includeMovimentos: true });
+}
+
 async function listarTitulos(req, filters = {}) {
   await assertFinanceAccess(req);
 
@@ -2139,6 +2286,7 @@ async function listarAuditoriaTitulo(req, tituloId) {
 
 module.exports = {
   atualizarCobrancaTitulo,
+  atualizarTitulo,
   baixarTitulo,
   carregarTituloPorId,
   criarTituloManual,
