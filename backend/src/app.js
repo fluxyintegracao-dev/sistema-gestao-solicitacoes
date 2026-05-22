@@ -701,6 +701,14 @@ prepararBanco()
       db.Insumo.rawAttributes.codigo.unique = false;
       db.Insumo.refreshAttributes();
     }
+    if (db.ProvisaoFinanceira?.rawAttributes?.codigo) {
+      db.ProvisaoFinanceira.rawAttributes.codigo.unique = false;
+      db.ProvisaoFinanceira.refreshAttributes();
+    }
+    if (db.ProvisaoFinanceiraSequencia?.rawAttributes?.obra_id) {
+      db.ProvisaoFinanceiraSequencia.rawAttributes.obra_id.unique = false;
+      db.ProvisaoFinanceiraSequencia.refreshAttributes();
+    }
     if (db.SetorPermissao?.rawAttributes?.setor) {
       db.SetorPermissao.rawAttributes.setor.unique = false;
       db.SetorPermissao.refreshAttributes();
