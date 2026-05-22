@@ -226,6 +226,63 @@ h1, h2, h3, h4, h5, h6 {
   border: none;
 }
 
+.compras-fornecedores-table-shell {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.compras-fornecedores-table {
+  min-width: 1040px;
+  table-layout: fixed;
+}
+
+.compras-fornecedores-table th,
+.compras-fornecedores-table td {
+  padding-inline: 0.85rem;
+  vertical-align: top;
+}
+
+.compras-fornecedores-table th {
+  white-space: normal;
+  line-height: 1.15;
+}
+
+.compras-fornecedores-table td {
+  overflow-wrap: anywhere;
+}
+
+.compras-fornecedores-table .text-right {
+  text-align: right;
+}
+
+.compras-fornecedores-col--fornecedor {
+  width: 220px;
+}
+
+.compras-fornecedores-col--curta {
+  width: 82px;
+}
+
+.compras-fornecedores-col--resposta {
+  width: 118px;
+}
+
+.compras-fornecedores-col--prazo {
+  width: 104px;
+}
+
+.compras-fornecedores-col--itens {
+  width: 128px;
+}
+
+.compras-fornecedores-col--valor {
+  width: 136px;
+}
+
+.compras-fornecedores-col--data {
+  width: 118px;
+}
+
 .card {
   background: var(--ui-surface);
   border: 1px solid var(--ui-border);

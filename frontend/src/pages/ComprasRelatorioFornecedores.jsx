@@ -251,19 +251,30 @@ export default function ComprasRelatorioFornecedores() {
       </div>
 
       <div className="mt-4 card sol-surface-card overflow-hidden">
-        <div className="sol-table-wrapper">
-          <table className="sol-table">
+        <div className="sol-table-wrapper compras-fornecedores-table-shell">
+          <table className="sol-table compras-fornecedores-table">
+            <colgroup>
+              <col className="compras-fornecedores-col--fornecedor" />
+              <col className="compras-fornecedores-col--curta" />
+              <col className="compras-fornecedores-col--resposta" />
+              <col className="compras-fornecedores-col--prazo" />
+              <col className="compras-fornecedores-col--itens" />
+              <col className="compras-fornecedores-col--itens" />
+              <col className="compras-fornecedores-col--valor" />
+              <col className="compras-fornecedores-col--valor" />
+              <col className="compras-fornecedores-col--data" />
+            </colgroup>
             <thead>
               <tr>
                 <th>Fornecedor</th>
-                <th>Cotacoes</th>
-                <th>Resposta</th>
-                <th>Prazo medio</th>
-                <th>Itens respondidos</th>
-                <th>Itens vencedores</th>
-                <th>Valor cotado</th>
-                <th>Valor vencedor</th>
-                <th>Ultima cotacao</th>
+                <th className="text-right">Cotacoes</th>
+                <th className="text-right">Resposta</th>
+                <th className="text-right">Prazo medio</th>
+                <th className="text-right">Itens respondidos</th>
+                <th className="text-right">Itens vencedores</th>
+                <th className="text-right">Valor cotado</th>
+                <th className="text-right">Valor vencedor</th>
+                <th className="text-right">Ultima cotacao</th>
               </tr>
             </thead>
             <tbody>
@@ -290,20 +301,20 @@ export default function ComprasRelatorioFornecedores() {
                           .join(' · ') || 'Sem dados complementares'}
                       </div>
                     </td>
-                    <td>{Number(item.cotacoes_enviadas || 0).toLocaleString('pt-BR')}</td>
-                    <td>
+                    <td className="text-right">{Number(item.cotacoes_enviadas || 0).toLocaleString('pt-BR')}</td>
+                    <td className="text-right">
                       <strong>{formatPercent(item.taxa_resposta)}</strong>
                       <div className="text-xs text-[var(--c-muted)]">
                         {Number(item.cotacoes_respondidas || 0).toLocaleString('pt-BR')} de{' '}
                         {Number(item.cotacoes_enviadas || 0).toLocaleString('pt-BR')}
                       </div>
                     </td>
-                    <td>{formatHours(item.prazo_medio_resposta_horas)}</td>
-                    <td>{Number(item.itens_respondidos || 0).toLocaleString('pt-BR')}</td>
-                    <td>{Number(item.itens_vencedores || 0).toLocaleString('pt-BR')}</td>
-                    <td>{formatMoney(item.valor_cotado)}</td>
-                    <td>{formatMoney(item.valor_vencedor)}</td>
-                    <td>{formatDate(item.ultima_cotacao)}</td>
+                    <td className="text-right">{formatHours(item.prazo_medio_resposta_horas)}</td>
+                    <td className="text-right">{Number(item.itens_respondidos || 0).toLocaleString('pt-BR')}</td>
+                    <td className="text-right">{Number(item.itens_vencedores || 0).toLocaleString('pt-BR')}</td>
+                    <td className="text-right tabular-nums">{formatMoney(item.valor_cotado)}</td>
+                    <td className="text-right tabular-nums">{formatMoney(item.valor_vencedor)}</td>
+                    <td className="text-right tabular-nums">{formatDate(item.ultima_cotacao)}</td>
                   </tr>
                 ))
               )}
