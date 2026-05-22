@@ -51,6 +51,7 @@ const {
   validateCompraPedidoAuditoriaQuery,
   validateCompraPedidoQuery,
   validateCompraQuery,
+  validateCompraRelatorioFornecedoresQuery,
   validateContratoCreateBody,
   validateContratoQuery,
   validateContratoUpdateBody,
@@ -264,6 +265,7 @@ const SolicitacaoCompraController = require('./controllers/SolicitacaoCompraCont
 const FornecedorCompraController = require('./controllers/FornecedorCompraController');
 const CotacaoFornecedorController = require('./controllers/CotacaoFornecedorController');
 const PedidoCompraController = require('./controllers/PedidoCompraController');
+const RelatorioComprasController = require('./controllers/RelatorioComprasController');
 const ParceiroController = require('./controllers/ParceiroController');
 const ParceiroCategoriaController = require('./controllers/ParceiroCategoriaController');
 const ComercialEmpreendimentoController = require('./controllers/ComercialEmpreendimentoController');
@@ -1287,6 +1289,7 @@ router.patch('/compras/solicitacoes/:id/encerrar', validateRequest({ params: val
 router.post('/compras/solicitacoes/:id/pedidos', criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Solicitacao de compra'), body: validateCompraPedidoCreateBody }), requireCompraAccess, PedidoCompraController.createFromSolicitacao);
 router.get('/compras/pedidos', validateRequest({ query: validateCompraPedidoQuery }), scopeCompraListAccess, PedidoCompraController.index);
 router.get('/compras/relatorios/auditoria-itens-pedido', validateRequest({ query: validateCompraPedidoAuditoriaQuery }), scopeCompraListAccess, PedidoCompraController.auditoria);
+router.get('/compras/relatorios/fornecedores', validateRequest({ query: validateCompraRelatorioFornecedoresQuery }), scopeCompraListAccess, RelatorioComprasController.fornecedores);
 router.get('/compras/pedidos/:id', validateRequest({ params: validateNumericIdParam('id', 'Pedido de compra') }), requirePedidoCompraAccess, PedidoCompraController.show);
 router.post('/compras/pedidos/:id/itens', criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Pedido de compra'), body: validateCompraPedidoItemAddBody }), requirePedidoCompraAccess, PedidoCompraController.addItem);
 router.patch('/compras/pedidos/:id/status', criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Pedido de compra'), body: validateCompraPedidoStatusBody }), requirePedidoCompraAccess, PedidoCompraController.updateStatus);

@@ -289,6 +289,18 @@ export async function listarAuditoriaItensPedidoCompra(params = {}) {
   return handleJsonResponse(response, 'Erro ao buscar auditoria dos itens do pedido');
 }
 
+export async function obterRelatorioFornecedoresCompras(params = {}) {
+  const query = buildQueryString(params);
+  const url = query
+    ? `${API_URL}/compras/relatorios/fornecedores?${query}`
+    : `${API_URL}/compras/relatorios/fornecedores`;
+
+  const response = await fetch(url, {
+    headers: authHeaders()
+  });
+  return handleJsonResponse(response, 'Erro ao buscar relatorio de fornecedores de compras');
+}
+
 export async function atualizarStatusPedidoCompra(id, data) {
   const response = await fetch(`${API_URL}/compras/pedidos/${id}/status`, {
     method: 'PATCH',

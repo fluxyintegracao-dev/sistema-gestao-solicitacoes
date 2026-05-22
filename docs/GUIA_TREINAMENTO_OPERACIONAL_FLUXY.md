@@ -1976,6 +1976,21 @@ Devem responder:
 - compras sem cotacao suficiente;
 - tempo medio de resposta de fornecedor.
 
+Relatorio de Fornecedores:
+
+1. Acesse `Compras > Relatorios`.
+2. Abra `Fornecedores`.
+3. Filtre por obra/centro de custo e por periodo de envio da cotacao, se necessario.
+4. Leia os cards principais para entender quantos fornecedores participaram, quantas cotacoes foram enviadas, qual foi a taxa de resposta e qual valor foi vencedor.
+5. Na tabela, avalie cada fornecedor por quantidade de cotacoes enviadas, respostas recebidas, prazo medio de resposta, itens respondidos, itens vencedores, valor cotado e valor vencedor.
+6. Use esse relatorio para identificar fornecedores recorrentes, fornecedores que respondem pouco, fornecedores com bom desempenho e fornecedores que concentram valor vencedor.
+
+Importante:
+
+- O valor cotado usa apenas respostas disponiveis com preco informado.
+- O valor vencedor usa apenas itens marcados como vencedores no encerramento da cotacao.
+- O prazo medio usa a diferenca entre `enviado_em` e `respondido_em`; se a resposta nao tiver data registrada, ela nao entra no calculo do prazo medio.
+
 ### 20.4 Relatorios Financeiros
 
 Devem responder:
