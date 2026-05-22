@@ -43,6 +43,7 @@ const HUBS = {
       {
         titulo: 'Operacao',
         itens: [
+          { titulo: 'Painel operacional', descricao: 'Volume, funil, gargalos e distribuicao por status, setor e obra/centro.', to: '/solicitacoes/relatorios/operacional', status: 'Disponivel' },
           { titulo: 'Solicitacoes abertas', descricao: 'Base operacional para filtros por status, setor, tipo e responsavel.', to: '/solicitacoes', status: 'Disponivel' },
           { titulo: 'Solicitacoes arquivadas', descricao: 'Historico de solicitacoes encerradas ou fora da fila operacional.', to: '/solicitacoes-arquivadas', status: 'Disponivel' },
           { titulo: 'SLA por setor', descricao: 'Tempo medio por etapa, solicitacoes paradas e gargalos por area.', status: 'Planejado' }

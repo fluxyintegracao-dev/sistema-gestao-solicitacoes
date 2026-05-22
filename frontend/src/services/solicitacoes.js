@@ -44,6 +44,29 @@ export async function getObrasVisiveisSolicitacoes(params = {}) {
   return res.json();
 }
 
+export async function obterRelatorioSolicitacoesOperacional(params = {}) {
+  const query = new URLSearchParams();
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      query.set(key, value);
+    }
+  });
+
+  const url = query.toString()
+    ? `${API_URL}/solicitacoes/relatorios/operacional?${query.toString()}`
+    : `${API_URL}/solicitacoes/relatorios/operacional`;
+
+  const res = await fetch(url, {
+    headers: authHeaders()
+  });
+
+  if (!res.ok) {
+    throw buildResponseError(res.status, 'Erro ao buscar relatorio operacional de solicitacoes', await parseJsonSafe(res));
+  }
+
+  return res.json();
+}
+
 export async function createSolicitacao(data) {
   const res = await fetch(`${API_URL}/solicitacoes`, {
     method: 'POST',

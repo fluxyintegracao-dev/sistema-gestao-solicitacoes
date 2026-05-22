@@ -1965,6 +1965,24 @@ Devem responder:
 - quais tipos de solicitacao sao mais frequentes;
 - qual tempo medio de atendimento.
 
+Painel Operacional de Solicitacoes:
+
+1. Acesse `Solicitacoes > Relatorios`.
+2. Abra `Painel operacional`.
+3. Filtre por periodo, data inicial/final e obra/centro de custo quando precisar restringir a analise.
+4. Leia os cards principais para entender total criado, quantas estao abertas, quantas foram concluidas, valor aberto, media de dias em aberto e maior tempo parado.
+5. Use o bloco de funil para acompanhar solicitacoes criadas, assumidas, enviadas, aprovadas pela diretoria e concluidas.
+6. Use as tabelas por status, setor e obra/centro para descobrir onde a demanda esta concentrada.
+7. Revise a tabela `Gargalos operacionais` para localizar solicitacoes abertas ha pelo menos 3 dias sem nova movimentacao.
+8. Clique no codigo da solicitacao em gargalo para abrir o detalhe e tomar acao operacional.
+
+Importante:
+
+- O relatorio usa somente solicitacoes e historicos reais registrados no sistema.
+- O setor exibido vem do campo atual da solicitacao, nao de uma interpretacao textual.
+- A parada operacional usa a ultima movimentacao registrada no historico; se nao houver historico, usa a propria data de atualizacao/criacao da solicitacao.
+- O filtro de acesso respeita o mesmo conceito operacional do modulo: usuarios de obra veem suas obras vinculadas, usuarios de setor veem suas solicitacoes criadas ou do setor, e administradores veem a visao ampla.
+
 ### 20.3 Relatorios de Compras
 
 Devem responder:

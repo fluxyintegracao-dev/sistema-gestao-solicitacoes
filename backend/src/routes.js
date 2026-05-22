@@ -238,6 +238,7 @@ const uploadCnab = require('./config/uploadCnab');
 
 // Controllers
 const SolicitacaoController = require('./controllers/SolicitacaoController');
+const RelatorioSolicitacoesController = require('./controllers/RelatorioSolicitacoesController');
 const PrioridadeDiretoriaController = require('./controllers/PrioridadeDiretoriaController');
 const UsuarioController = require('./controllers/UsuarioController');
 const CargoController = require('./controllers/CargoController');
@@ -856,6 +857,7 @@ router.post('/solicitacoes', validateRequest({ body: validateSolicitacaoCreateBo
 router.get('/solicitacoes/filtros/obras', SolicitacaoController.obrasVisiveis);
 router.get('/solicitacoes', SolicitacaoController.index);
 router.get('/solicitacoes/resumo', SolicitacaoController.resumo);
+router.get('/solicitacoes/relatorios/operacional', RelatorioSolicitacoesController.operacional);
 router.get('/solicitacoes/:id/resumo-lista', validateRequest({ params: validateNumericIdParam('id', 'Solicitacao') }), SolicitacaoController.resumoLista);
 router.get('/solicitacoes/:id', validateRequest({ params: validateNumericIdParam('id', 'Solicitacao') }), SolicitacaoController.show);
 router.patch('/solicitacoes/:id/status', validateRequest({ params: validateNumericIdParam('id', 'Solicitacao'), body: validateSolicitacaoStatusBody }), auditSuccess({ eventType: 'SOLICITACAO_STATUS_UPDATED', resourceType: 'SOLICITACAO', description: 'Status da solicitacao atualizado', resourceIdResolver: (req) => req.params.id }), SolicitacaoController.updateStatus);

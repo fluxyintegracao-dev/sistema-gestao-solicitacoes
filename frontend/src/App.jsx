@@ -55,6 +55,7 @@ const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Solicitacoes = lazy(() => import('./pages/Solicitacoes'));
 const SolicitacaoDetalhe = lazy(() => import('./pages/SolicitacaoDetalhe'));
 const SolicitacoesArquivadas = lazy(() => import('./pages/SolicitacoesArquivadas'));
+const SolicitacoesRelatorioOperacional = lazy(() => import('./pages/SolicitacoesRelatorioOperacional'));
 const Usuarios = lazy(() => import('./pages/Usuarios'));
 const UsuarioNovo = lazy(() => import('./pages/UsuarioNovo'));
 const NovaSolicitacao = lazy(() => import('./pages/NovaSolicitacao'));
@@ -572,6 +573,7 @@ export default function App() {
 
         <Route path="solicitacoes" element={<Solicitacoes />} />
         <Route path="solicitacoes/relatorios" element={<ModuloRelatorios modulo="solicitacoes" />} />
+        <Route path="solicitacoes/relatorios/operacional" element={<SolicitacoesRelatorioOperacional />} />
         <Route path="solicitacoes-arquivadas" element={<SolicitacoesArquivadas />} />
         <Route path="solicitacoes/:id" element={<SolicitacaoDetalhe />} />
         <Route path="prioridades-diretoria" element={<PrioridadesDiretoriaRoute><PrioridadesDiretoria /></PrioridadesDiretoriaRoute>} />

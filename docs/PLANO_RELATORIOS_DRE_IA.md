@@ -73,6 +73,7 @@ Base multiempresa e DRE gerencial:
 - Compras > Relatorios ganhou Ciclo de Compras, medindo tempos entre criacao, liberacao, envio para fornecedores, resposta, encerramento e geracao de pedido com base nas datas reais registradas no fluxo.
 - Compras > Relatorios ganhou Economia em Cotacoes, comparando menor preco disponivel com o fornecedor vencedor em cotacoes encerradas para evidenciar economia, sobrepreco e aderencia ao menor preco.
 - Compras > Relatorios ganhou Relatorio de Fornecedores, com participacao em cotacoes, taxa de resposta, prazo medio, itens respondidos, itens vencedores, valor cotado e valor vencedor calculados por dados estruturados do processo de cotacao.
+- Solicitacoes > Relatorios ganhou Painel Operacional, consolidando volume, abertas, concluidas, funil, distribuicao por status, setor, obra/centro de custo e gargalos com base em solicitacoes e historicos reais do fluxo.
 
 Documentacao operacional complementar:
 
@@ -147,17 +148,17 @@ Objetivo: medir fluxo operacional, gargalos, SLA e produtividade.
 
 Relatorios:
 
-- Sintetico geral de solicitacoes.
-- Solicitacoes por status.
-- Solicitacoes por setor atual.
-- Solicitacoes por area responsavel.
-- Solicitacoes por obra/centro de custo.
+- Sintetico geral de solicitacoes. [Entregue no Painel Operacional]
+- Solicitacoes por status. [Entregue no Painel Operacional]
+- Solicitacoes por setor atual. [Entregue no Painel Operacional]
+- Solicitacoes por area responsavel. [Entregue parcialmente por setor atual]
+- Solicitacoes por obra/centro de custo. [Entregue no Painel Operacional]
 - Tempo medio por etapa.
-- Solicitacoes paradas acima do SLA.
+- Solicitacoes paradas acima do SLA. [Entregue inicialmente como gargalos acima de 3 dias sem movimentacao]
 - Ranking de setores com maior volume.
 - Ranking de usuarios responsaveis.
 - Solicitacoes por tipo macro/subtipo.
-- Funil: criada, assumida, enviada, aprovada, concluida.
+- Funil: criada, assumida, enviada, aprovada, concluida. [Entregue no Painel Operacional]
 - Relatorio analitico de solicitacoes.
 
 Graficos:
