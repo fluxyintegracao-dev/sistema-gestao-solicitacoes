@@ -18,6 +18,7 @@ A visibilidade efetiva depende de combinacao entre:
 - `SUPERADMIN` continua como excecao administrativa ampla.
 - numero do pedido permanece restrito ao escopo GEO.
 - lista de status no detalhe segue o setor do usuario logado.
+- para status de solicitacao, `GEO`, `GERENCIA DE PROCESSOS` e `GERENCIA_PROCESSOS` sao tratados como o mesmo setor.
 - o `SUPERADMIN` pode configurar setores sem alteracao de status; nesses setores o detalhe oculta o botao `Alterar status` e o backend bloqueia a troca por API.
 - assumir e enviar solicitacoes dependem do setor atual da solicitacao.
 - `SUPERADMIN` pode marcar usuarios com permissao especial para enviar solicitacoes fora do setor atual da solicitacao.

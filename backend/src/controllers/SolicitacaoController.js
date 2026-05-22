@@ -683,6 +683,10 @@ function expandirTokensComAliasesGeo(tokens = []) {
   ]));
 }
 
+function obterAliasesGeoSetor(setor) {
+  return isGeoToken(setor) ? VALORES_AREA_GEO_EQUIVALENTES : [];
+}
+
 function setorPertenceAoUsuario(tokensSetor = [], setorSolicitacao = null) {
   const setorNormalizado = normalizarTokenComparacao(setorSolicitacao);
   if (!setorNormalizado) return false;
@@ -2379,6 +2383,7 @@ module.exports = {
 
         if (setorAtualStr) {
           const aliasesDiretoria = obterAliasesDiretoriaObras(setorAtualStr);
+          const aliasesGeo = obterAliasesGeoSetor(setorAtualStr);
           const setorRow = await Setor.findOne({
             where: {
               [Op.or]: [
@@ -2388,6 +2393,12 @@ module.exports = {
                   ? [
                     { codigo: { [Op.in]: aliasesDiretoria } },
                     { nome: { [Op.in]: aliasesDiretoria } }
+                  ]
+                  : []),
+                ...(aliasesGeo.length > 0
+                  ? [
+                    { codigo: { [Op.in]: aliasesGeo } },
+                    { nome: { [Op.in]: aliasesGeo } }
                   ]
                   : []),
                 Sequelize.where(
@@ -2406,6 +2417,7 @@ module.exports = {
           const tokensSetor = [
             setorAtualStr,
             ...aliasesDiretoria,
+            ...aliasesGeo,
             String(setorRow?.codigo || '').trim(),
             String(setorRow?.nome || '').trim()
           ].filter(Boolean);

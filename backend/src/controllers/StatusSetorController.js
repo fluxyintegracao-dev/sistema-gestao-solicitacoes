@@ -1,6 +1,39 @@
 const { EtapaSetor, Setor } = require('../models');
 const { Op } = require('sequelize');
 
+const TOKENS_GEO_EQUIVALENTES = new Set([
+  'GEO',
+  'GERENCIA_DE_PROCESSOS',
+  'GERENCIAS_DE_PROCESSOS',
+  'GERENCIA_PROCESSOS',
+  'GERENCIAS_PROCESSOS'
+]);
+
+const VALORES_AREA_GEO_EQUIVALENTES = [
+  'GEO',
+  'GERENCIA DE PROCESSOS',
+  'GERENCIA_DE_PROCESSOS',
+  'GERENCIA_PROCESSOS',
+  'GERENCIAS DE PROCESSOS',
+  'GERENCIAS_DE_PROCESSOS',
+  'GERENCIAS_PROCESSOS'
+];
+
+function normalizarTokenComparacao(valor) {
+  return String(valor || '')
+    .trim()
+    .toUpperCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[\s-]+/g, '_');
+}
+
+function obterAliasesGeo(setor) {
+  return TOKENS_GEO_EQUIVALENTES.has(normalizarTokenComparacao(setor))
+    ? VALORES_AREA_GEO_EQUIVALENTES
+    : [];
+}
+
 module.exports = {
   async index(req, res) {
     try {
@@ -8,19 +41,26 @@ module.exports = {
       const perfil = String(req.user?.perfil || '').trim().toUpperCase();
       const where = {};
       if (setor) {
+        const aliasesGeo = obterAliasesGeo(setor);
         const setorRow = await Setor.findOne({
           where: {
             [Op.or]: [
               { codigo: setor },
-              { nome: setor }
+              { nome: setor },
+              ...(aliasesGeo.length > 0
+                ? [
+                  { codigo: { [Op.in]: aliasesGeo } },
+                  { nome: { [Op.in]: aliasesGeo } }
+                ]
+                : [])
             ]
           },
           attributes: ['codigo', 'nome']
         });
-        const tokens = [setor];
+        const tokens = [setor, ...aliasesGeo];
         if (setorRow?.codigo) tokens.push(setorRow.codigo);
         if (setorRow?.nome) tokens.push(setorRow.nome);
-        where.setor = { [Op.in]: tokens };
+        where.setor = { [Op.in]: Array.from(new Set(tokens.filter(Boolean))) };
       }
 
       const itens = await EtapaSetor.findAll({
