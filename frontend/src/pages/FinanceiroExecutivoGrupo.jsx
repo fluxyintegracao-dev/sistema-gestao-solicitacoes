@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { ResizableTable, ResizableTh } from '../components/ResizableTable';
 import { getEmpresasGrupo } from '../services/empresasGrupo';
 import {
   getRelatorioGrupoConsolidado,
@@ -11,6 +12,23 @@ const DEFAULT_FILTERS = {
   holding_id: '',
   excluir_intercompany: true
 };
+
+const EMPRESAS_CAIXA_COLUMNS = [
+  { key: 'empresa', width: 250, minWidth: 180 },
+  { key: 'entradas', width: 150, minWidth: 120 },
+  { key: 'saidas', width: 150, minWidth: 120 },
+  { key: 'saldo', width: 140, minWidth: 115 }
+];
+
+const RESULTADO_COLUMNS = [
+  { key: 'nome', width: 220, minWidth: 160 },
+  { key: 'resultado', width: 150, minWidth: 120 }
+];
+
+const INTERCOMPANY_COLUMNS = [
+  { key: 'relacao', width: 280, minWidth: 180 },
+  { key: 'valor', width: 140, minWidth: 115 }
+];
 
 function formatCurrency(value) {
   return Number(value || 0).toLocaleString('pt-BR', {
@@ -316,13 +334,17 @@ export default function FinanceiroExecutivoGrupo() {
                 </p>
               </div>
               <div className="table-wrapper">
-                <table className="table">
+                <ResizableTable
+                  columns={EMPRESAS_CAIXA_COLUMNS}
+                  storageKey="fluxy.financeiro.grupoConsolidado.empresasCaixa.columnWidths"
+                  className="table"
+                >
                   <thead>
                     <tr>
-                      <th>Empresa</th>
-                      <th>Entradas</th>
-                      <th>Saidas</th>
-                      <th>Saldo</th>
+                      <ResizableTh columnKey="empresa">Empresa</ResizableTh>
+                      <ResizableTh columnKey="entradas" className="text-right">Entradas</ResizableTh>
+                      <ResizableTh columnKey="saidas" className="text-right">Saidas</ResizableTh>
+                      <ResizableTh columnKey="saldo" className="text-right">Saldo</ResizableTh>
                     </tr>
                   </thead>
                   <tbody>
@@ -332,16 +354,16 @@ export default function FinanceiroExecutivoGrupo() {
                       topEmpresasCaixa.map((empresa) => (
                         <tr key={empresa.empresa_id || empresa.empresa_nome}>
                           <td className="font-semibold text-[var(--c-text)]">{empresa.empresa_nome}</td>
-                          <td>{formatCurrency(empresa.entradas_realizadas)}</td>
-                          <td>{formatCurrency(empresa.saidas_realizadas)}</td>
-                          <td className="font-semibold" style={{ color: metricColor(empresa.saldo_realizado) }}>
+                          <td className="text-right">{formatCurrency(empresa.entradas_realizadas)}</td>
+                          <td className="text-right">{formatCurrency(empresa.saidas_realizadas)}</td>
+                          <td className="text-right font-semibold" style={{ color: metricColor(empresa.saldo_realizado) }}>
                             {formatCurrency(empresa.saldo_realizado)}
                           </td>
                         </tr>
                       ))
                     )}
                   </tbody>
-                </table>
+                </ResizableTable>
               </div>
             </div>
 
@@ -390,11 +412,15 @@ export default function FinanceiroExecutivoGrupo() {
                 <p className="text-sm text-[var(--c-muted)]">Ordenado pelas empresas com menor resultado liquido.</p>
               </div>
               <div className="table-wrapper">
-                <table className="table">
+                <ResizableTable
+                  columns={RESULTADO_COLUMNS}
+                  storageKey="fluxy.financeiro.grupoConsolidado.resultadoEmpresas.columnWidths"
+                  className="table"
+                >
                   <thead>
                     <tr>
-                      <th>Empresa</th>
-                      <th>Resultado</th>
+                      <ResizableTh columnKey="nome">Empresa</ResizableTh>
+                      <ResizableTh columnKey="resultado" className="text-right">Resultado</ResizableTh>
                     </tr>
                   </thead>
                   <tbody>
@@ -404,14 +430,14 @@ export default function FinanceiroExecutivoGrupo() {
                       topEmpresasResultado.map((empresa) => (
                         <tr key={empresa.empresa_id || empresa.empresa_nome}>
                           <td className="font-semibold text-[var(--c-text)]">{empresa.empresa_nome}</td>
-                          <td className="font-semibold" style={{ color: metricColor(empresa.resultado) }}>
+                          <td className="text-right font-semibold" style={{ color: metricColor(empresa.resultado) }}>
                             {formatCurrency(empresa.resultado)}
                           </td>
                         </tr>
                       ))
                     )}
                   </tbody>
-                </table>
+                </ResizableTable>
               </div>
             </div>
 
@@ -421,11 +447,15 @@ export default function FinanceiroExecutivoGrupo() {
                 <p className="text-sm text-[var(--c-muted)]">Recebido menos executado na base atual de obras.</p>
               </div>
               <div className="table-wrapper">
-                <table className="table">
+                <ResizableTable
+                  columns={RESULTADO_COLUMNS}
+                  storageKey="fluxy.financeiro.grupoConsolidado.resultadoObras.columnWidths"
+                  className="table"
+                >
                   <thead>
                     <tr>
-                      <th>Obra</th>
-                      <th>Resultado</th>
+                      <ResizableTh columnKey="nome">Obra</ResizableTh>
+                      <ResizableTh columnKey="resultado" className="text-right">Resultado</ResizableTh>
                     </tr>
                   </thead>
                   <tbody>
@@ -435,14 +465,14 @@ export default function FinanceiroExecutivoGrupo() {
                       topObras.map((obra) => (
                         <tr key={obra.id}>
                           <td className="font-semibold text-[var(--c-text)]">{obra.nome}</td>
-                          <td className="font-semibold" style={{ color: metricColor(obra.resultado_caixa) }}>
+                          <td className="text-right font-semibold" style={{ color: metricColor(obra.resultado_caixa) }}>
                             {formatCurrency(obra.resultado_caixa)}
                           </td>
                         </tr>
                       ))
                     )}
                   </tbody>
-                </table>
+                </ResizableTable>
               </div>
             </div>
 
@@ -452,11 +482,15 @@ export default function FinanceiroExecutivoGrupo() {
                 <p className="text-sm text-[var(--c-muted)]">Origem e destino de movimentos intercompany.</p>
               </div>
               <div className="table-wrapper">
-                <table className="table">
+                <ResizableTable
+                  columns={INTERCOMPANY_COLUMNS}
+                  storageKey="fluxy.financeiro.grupoConsolidado.intercompany.columnWidths"
+                  className="table"
+                >
                   <thead>
                     <tr>
-                      <th>Relacao</th>
-                      <th>Valor</th>
+                      <ResizableTh columnKey="relacao">Relacao</ResizableTh>
+                      <ResizableTh columnKey="valor" className="text-right">Valor</ResizableTh>
                     </tr>
                   </thead>
                   <tbody>
@@ -468,12 +502,12 @@ export default function FinanceiroExecutivoGrupo() {
                           <td className="font-semibold text-[var(--c-text)]">
                             {relacao.empresa_origem_nome}{' -> '}{relacao.empresa_destino_nome}
                           </td>
-                          <td>{formatCurrency(relacao.valor_realizado || relacao.valor_previsto)}</td>
+                          <td className="text-right">{formatCurrency(relacao.valor_realizado || relacao.valor_previsto)}</td>
                         </tr>
                       ))
                     )}
                   </tbody>
-                </table>
+                </ResizableTable>
               </div>
             </div>
           </section>

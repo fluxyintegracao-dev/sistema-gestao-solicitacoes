@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { ResizableTable, ResizableTh } from '../components/ResizableTable';
 import { getRelatorioFluxoCaixa } from '../services/financeiro';
 import { getMinhasObras } from '../services/obras';
 
@@ -35,6 +36,18 @@ const EMPTY_RELATORIO = {
   },
   serie: []
 };
+
+const DETALHAMENTO_COLUMNS = [
+  { key: 'periodo', width: 150, minWidth: 120 },
+  { key: 'entradas_previstas', width: 170, minWidth: 140 },
+  { key: 'saidas_previstas', width: 160, minWidth: 140 },
+  { key: 'saldo_previsto', width: 150, minWidth: 130 },
+  { key: 'acumulado_previsto', width: 175, minWidth: 145 },
+  { key: 'entradas_realizadas', width: 175, minWidth: 145 },
+  { key: 'saidas_realizadas', width: 165, minWidth: 140 },
+  { key: 'saldo_realizado', width: 155, minWidth: 130 },
+  { key: 'acumulado_realizado', width: 180, minWidth: 145 }
+];
 
 function formatCurrency(value) {
   return Number(value || 0).toLocaleString('pt-BR', {
@@ -683,18 +696,22 @@ export default function FinanceiroRelatorios() {
             </div>
 
             <div className="table-wrapper">
-              <table className="table">
+              <ResizableTable
+                columns={DETALHAMENTO_COLUMNS}
+                storageKey="fluxy.financeiro.relatorios.detalhamento.columnWidths"
+                className="table"
+              >
                 <thead>
                   <tr>
-                    <th>Periodo</th>
-                    <th>Entradas previstas</th>
-                    <th>Saidas previstas</th>
-                    <th>Saldo previsto</th>
-                    <th>Acumulado previsto</th>
-                    <th>Entradas realizadas</th>
-                    <th>Saidas realizadas</th>
-                    <th>Saldo realizado</th>
-                    <th>Acumulado realizado</th>
+                    <ResizableTh columnKey="periodo">Periodo</ResizableTh>
+                    <ResizableTh columnKey="entradas_previstas" className="text-right">Entradas previstas</ResizableTh>
+                    <ResizableTh columnKey="saidas_previstas" className="text-right">Saidas previstas</ResizableTh>
+                    <ResizableTh columnKey="saldo_previsto" className="text-right">Saldo previsto</ResizableTh>
+                    <ResizableTh columnKey="acumulado_previsto" className="text-right">Acumulado previsto</ResizableTh>
+                    <ResizableTh columnKey="entradas_realizadas" className="text-right">Entradas realizadas</ResizableTh>
+                    <ResizableTh columnKey="saidas_realizadas" className="text-right">Saidas realizadas</ResizableTh>
+                    <ResizableTh columnKey="saldo_realizado" className="text-right">Saldo realizado</ResizableTh>
+                    <ResizableTh columnKey="acumulado_realizado" className="text-right">Acumulado realizado</ResizableTh>
                   </tr>
                 </thead>
                 <tbody>
@@ -708,23 +725,23 @@ export default function FinanceiroRelatorios() {
                     relatorio.serie.map((item) => (
                       <tr key={item.referencia}>
                         <td className="font-medium text-[var(--c-text)]">{item.label}</td>
-                        <td className="text-[var(--c-text)]">{formatCurrency(item.entradas_previstas)}</td>
-                        <td className="text-[var(--c-text)]">{formatCurrency(item.saidas_previstas)}</td>
-                        <td className="font-medium" style={{ color: item.saldo_previsto >= 0 ? '#15803d' : '#b91c1c' }}>
+                        <td className="text-right text-[var(--c-text)]">{formatCurrency(item.entradas_previstas)}</td>
+                        <td className="text-right text-[var(--c-text)]">{formatCurrency(item.saidas_previstas)}</td>
+                        <td className="text-right font-medium" style={{ color: item.saldo_previsto >= 0 ? '#15803d' : '#b91c1c' }}>
                           {formatCurrency(item.saldo_previsto)}
                         </td>
-                        <td className="text-[var(--c-text)]">{formatCurrency(item.saldo_previsto_acumulado)}</td>
-                        <td className="text-[var(--c-text)]">{formatCurrency(item.entradas_realizadas)}</td>
-                        <td className="text-[var(--c-text)]">{formatCurrency(item.saidas_realizadas)}</td>
-                        <td className="font-medium" style={{ color: item.saldo_realizado >= 0 ? '#15803d' : '#b91c1c' }}>
+                        <td className="text-right text-[var(--c-text)]">{formatCurrency(item.saldo_previsto_acumulado)}</td>
+                        <td className="text-right text-[var(--c-text)]">{formatCurrency(item.entradas_realizadas)}</td>
+                        <td className="text-right text-[var(--c-text)]">{formatCurrency(item.saidas_realizadas)}</td>
+                        <td className="text-right font-medium" style={{ color: item.saldo_realizado >= 0 ? '#15803d' : '#b91c1c' }}>
                           {formatCurrency(item.saldo_realizado)}
                         </td>
-                        <td className="text-[var(--c-text)]">{formatCurrency(item.saldo_realizado_acumulado)}</td>
+                        <td className="text-right text-[var(--c-text)]">{formatCurrency(item.saldo_realizado_acumulado)}</td>
                       </tr>
                     ))
                   )}
                 </tbody>
-              </table>
+              </ResizableTable>
             </div>
           </section>
         </>

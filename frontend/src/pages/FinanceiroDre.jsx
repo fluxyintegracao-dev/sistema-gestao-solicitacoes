@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { ResizableTable, ResizableTh } from '../components/ResizableTable';
 import { getEmpresasGrupo } from '../services/empresasGrupo';
 import { getDreComparativoEmpresasFinanceiro, getDreComparativoFinanceiro, getDreFinanceira } from '../services/financeiro';
 import { getMinhasObras } from '../services/obras';
@@ -13,6 +14,44 @@ const DEFAULT_FILTERS = {
   obra_id: '',
   excluir_intercompany: true
 };
+
+const COMPARATIVO_COLUMNS = [
+  { key: 'mes', width: 120, minWidth: 90 },
+  { key: 'receita_liquida', width: 160, minWidth: 130 },
+  { key: 'ebitda', width: 140, minWidth: 120 },
+  { key: 'lucro_prejuizo', width: 165, minWidth: 135 },
+  { key: 'acumulado', width: 150, minWidth: 130 },
+  { key: 'titulos', width: 100, minWidth: 80 }
+];
+
+const COMPARATIVO_EMPRESAS_COLUMNS = [
+  { key: 'empresa', width: 270, minWidth: 190 },
+  { key: 'perfil', width: 150, minWidth: 120 },
+  { key: 'resultado_proprio', width: 175, minWidth: 145 },
+  { key: 'intercompany_liquido', width: 180, minWidth: 145 },
+  { key: 'resultado_final', width: 165, minWidth: 135 },
+  { key: 'dependencia', width: 130, minWidth: 110 }
+];
+
+const DRE_ESTRUTURADA_COLUMNS = [
+  { key: 'etapa', width: 360, minWidth: 220 },
+  { key: 'valor', width: 180, minWidth: 140 }
+];
+
+const LINHAS_COLUMNS = [
+  { key: 'linha', width: 280, minWidth: 190 },
+  { key: 'titulos', width: 110, minWidth: 90 },
+  { key: 'valor', width: 170, minWidth: 130 }
+];
+
+const EMPRESAS_RESULTADO_COLUMNS = [
+  { key: 'empresa', width: 250, minWidth: 180 },
+  { key: 'perfil', width: 150, minWidth: 120 },
+  { key: 'receita_liquida', width: 160, minWidth: 130 },
+  { key: 'ebitda', width: 140, minWidth: 120 },
+  { key: 'lucro_prejuizo', width: 160, minWidth: 130 },
+  { key: 'margem_liquida', width: 135, minWidth: 110 }
+];
 
 const TIPOS_GERENCIAIS_LABEL = {
   HOLDING: 'Holding',
@@ -133,30 +172,34 @@ function DreComparativoCard({ comparativo }) {
           </div>
 
           <div className="mt-4 overflow-x-auto">
-            <table className="min-w-full text-left text-xs">
+            <ResizableTable
+              columns={COMPARATIVO_COLUMNS}
+              storageKey="fluxy.financeiro.dre.comparativo.columnWidths"
+              className="min-w-full text-left text-xs"
+            >
               <thead className="uppercase text-[var(--c-muted)]">
                 <tr>
-                  <th className="px-2 py-2">Mes</th>
-                  <th className="px-2 py-2">Receita liquida</th>
-                  <th className="px-2 py-2">EBITDA</th>
-                  <th className="px-2 py-2">Lucro/Prejuizo</th>
-                  <th className="px-2 py-2">Acumulado</th>
-                  <th className="px-2 py-2">Titulos</th>
+                  <ResizableTh columnKey="mes" className="px-2 py-2">Mes</ResizableTh>
+                  <ResizableTh columnKey="receita_liquida" className="px-2 py-2 text-right">Receita liquida</ResizableTh>
+                  <ResizableTh columnKey="ebitda" className="px-2 py-2 text-right">EBITDA</ResizableTh>
+                  <ResizableTh columnKey="lucro_prejuizo" className="px-2 py-2 text-right">Lucro/Prejuizo</ResizableTh>
+                  <ResizableTh columnKey="acumulado" className="px-2 py-2 text-right">Acumulado</ResizableTh>
+                  <ResizableTh columnKey="titulos" className="px-2 py-2 text-right">Titulos</ResizableTh>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {serie.map((item) => (
                   <tr key={item.referencia}>
                     <td className="px-2 py-2 font-semibold text-[var(--c-text)]">{item.label}</td>
-                    <td className="px-2 py-2">{formatCurrency(item.receita_liquida)}</td>
-                    <td className="px-2 py-2" style={{ color: metricColor(item.ebitda) }}>{formatCurrency(item.ebitda)}</td>
-                    <td className="px-2 py-2 font-semibold" style={{ color: metricColor(item.lucro_prejuizo_liquido) }}>{formatCurrency(item.lucro_prejuizo_liquido)}</td>
-                    <td className="px-2 py-2 font-semibold" style={{ color: metricColor(item.acumulado_lucro_prejuizo_liquido) }}>{formatCurrency(item.acumulado_lucro_prejuizo_liquido)}</td>
-                    <td className="px-2 py-2">{item.titulos_considerados}</td>
+                    <td className="px-2 py-2 text-right">{formatCurrency(item.receita_liquida)}</td>
+                    <td className="px-2 py-2 text-right" style={{ color: metricColor(item.ebitda) }}>{formatCurrency(item.ebitda)}</td>
+                    <td className="px-2 py-2 text-right font-semibold" style={{ color: metricColor(item.lucro_prejuizo_liquido) }}>{formatCurrency(item.lucro_prejuizo_liquido)}</td>
+                    <td className="px-2 py-2 text-right font-semibold" style={{ color: metricColor(item.acumulado_lucro_prejuizo_liquido) }}>{formatCurrency(item.acumulado_lucro_prejuizo_liquido)}</td>
+                    <td className="px-2 py-2 text-right">{item.titulos_considerados}</td>
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </ResizableTable>
           </div>
         </>
       )}
@@ -206,15 +249,19 @@ function DreComparativoEmpresasCard({ comparativo }) {
         <div className="app-empty-card mx-4 mb-4">Nenhuma empresa com movimento na DRE.</div>
       ) : (
         <div className="table-wrapper">
-          <table className="table">
+          <ResizableTable
+            columns={COMPARATIVO_EMPRESAS_COLUMNS}
+            storageKey="fluxy.financeiro.dre.comparativoEmpresas.columnWidths"
+            className="table"
+          >
             <thead>
               <tr>
-                <th>Empresa</th>
-                <th>Perfil</th>
-                <th>Resultado proprio</th>
-                <th>Intercompany liquido</th>
-                <th>Resultado final</th>
-                <th>Dependencia</th>
+                <ResizableTh columnKey="empresa">Empresa</ResizableTh>
+                <ResizableTh columnKey="perfil">Perfil</ResizableTh>
+                <ResizableTh columnKey="resultado_proprio" className="text-right">Resultado proprio</ResizableTh>
+                <ResizableTh columnKey="intercompany_liquido" className="text-right">Intercompany liquido</ResizableTh>
+                <ResizableTh columnKey="resultado_final" className="text-right">Resultado final</ResizableTh>
+                <ResizableTh columnKey="dependencia" className="text-right">Dependencia</ResizableTh>
               </tr>
             </thead>
             <tbody>
@@ -237,21 +284,21 @@ function DreComparativoEmpresasCard({ comparativo }) {
                       {empresa.empresa_caixa ? <div className="text-xs text-[var(--c-muted)]">Caixa/Tesouraria</div> : null}
                       {empresa.consolidar_no_grupo === false ? <div className="text-xs text-amber-700">Fora do consolidado</div> : null}
                     </td>
-                    <td className="font-semibold" style={{ color: metricColor(empresa.resultado_operacional_proprio) }}>
+                    <td className="text-right font-semibold" style={{ color: metricColor(empresa.resultado_operacional_proprio) }}>
                       {formatCurrency(empresa.resultado_operacional_proprio)}
                     </td>
-                    <td className="font-semibold" style={{ color: metricColor(empresa.intercompany_liquido) }}>
+                    <td className="text-right font-semibold" style={{ color: metricColor(empresa.intercompany_liquido) }}>
                       {formatCurrency(empresa.intercompany_liquido)}
                     </td>
-                    <td className="font-semibold" style={{ color: metricColor(empresa.resultado_final) }}>
+                    <td className="text-right font-semibold" style={{ color: metricColor(empresa.resultado_final) }}>
                       {formatCurrency(empresa.resultado_final)}
                     </td>
-                    <td>{formatPercent(empresa.dependencia_grupo)}</td>
+                    <td className="text-right">{formatPercent(empresa.dependencia_grupo)}</td>
                   </tr>
                 );
               })}
             </tbody>
-          </table>
+          </ResizableTable>
         </div>
       )}
     </section>
@@ -495,11 +542,15 @@ export default function FinanceiroDre() {
               </p>
             </div>
             <div className="table-wrapper">
-              <table className="table">
+              <ResizableTable
+                columns={DRE_ESTRUTURADA_COLUMNS}
+                storageKey="fluxy.financeiro.dre.estruturada.columnWidths"
+                className="table"
+              >
                 <thead>
                   <tr>
-                    <th>Etapa</th>
-                    <th>Valor</th>
+                    <ResizableTh columnKey="etapa">Etapa</ResizableTh>
+                    <ResizableTh columnKey="valor" className="text-right">Valor</ResizableTh>
                   </tr>
                 </thead>
                 <tbody>
@@ -510,7 +561,7 @@ export default function FinanceiroDre() {
                         <td className={destaque ? 'font-semibold text-[var(--c-text)]' : 'text-[var(--c-text)]'}>
                           {linha.label}
                         </td>
-                        <td className="font-semibold" style={{ color: Number(linha.valor || 0) >= 0 ? '#15803d' : '#b91c1c' }}>
+                        <td className="text-right font-semibold" style={{ color: Number(linha.valor || 0) >= 0 ? '#15803d' : '#b91c1c' }}>
                           {formatCurrency(linha.valor)}
                         </td>
                       </tr>
@@ -519,7 +570,7 @@ export default function FinanceiroDre() {
                     <tr><td colSpan={2} className="text-center text-[var(--c-muted)]">Nenhum titulo encontrado.</td></tr>
                   )}
                 </tbody>
-              </table>
+              </ResizableTable>
             </div>
           </section>
 
@@ -530,12 +581,16 @@ export default function FinanceiroDre() {
                 <p className="text-sm text-[var(--c-muted)]">Abertura por grupo e subgrupo da categoria financeira.</p>
               </div>
               <div className="table-wrapper">
-                <table className="table">
+                <ResizableTable
+                  columns={LINHAS_COLUMNS}
+                  storageKey="fluxy.financeiro.dre.linhas.columnWidths"
+                  className="table"
+                >
                   <thead>
                     <tr>
-                      <th>Linha</th>
-                      <th>Titulos</th>
-                      <th>Valor</th>
+                      <ResizableTh columnKey="linha">Linha</ResizableTh>
+                      <ResizableTh columnKey="titulos" className="text-right">Titulos</ResizableTh>
+                      <ResizableTh columnKey="valor" className="text-right">Valor</ResizableTh>
                     </tr>
                   </thead>
                   <tbody>
@@ -547,8 +602,8 @@ export default function FinanceiroDre() {
                             <div className="text-xs text-[var(--c-muted)]">{linha.subgrupo}</div>
                           )}
                         </td>
-                        <td>{linha.titulos}</td>
-                        <td className="font-semibold" style={{ color: Number(linha.valor || 0) >= 0 ? '#15803d' : '#b91c1c' }}>
+                        <td className="text-right">{linha.titulos}</td>
+                        <td className="text-right font-semibold" style={{ color: Number(linha.valor || 0) >= 0 ? '#15803d' : '#b91c1c' }}>
                           {formatCurrency(linha.valor)}
                         </td>
                       </tr>
@@ -556,7 +611,7 @@ export default function FinanceiroDre() {
                       <tr><td colSpan={3} className="text-center text-[var(--c-muted)]">Nenhum titulo encontrado.</td></tr>
                     )}
                   </tbody>
-                </table>
+                </ResizableTable>
               </div>
             </section>
 
@@ -566,15 +621,19 @@ export default function FinanceiroDre() {
                 <p className="text-sm text-[var(--c-muted)]">Visao isolada para comparar empresas abaixo da Holding.</p>
               </div>
               <div className="table-wrapper">
-                <table className="table">
+                <ResizableTable
+                  columns={EMPRESAS_RESULTADO_COLUMNS}
+                  storageKey="fluxy.financeiro.dre.empresasResultado.columnWidths"
+                  className="table"
+                >
                   <thead>
                     <tr>
-                      <th>Empresa</th>
-                      <th>Perfil</th>
-                      <th>Receita liquida</th>
-                      <th>EBITDA</th>
-                      <th>Lucro/Prejuizo</th>
-                      <th>Margem liquida</th>
+                      <ResizableTh columnKey="empresa">Empresa</ResizableTh>
+                      <ResizableTh columnKey="perfil">Perfil</ResizableTh>
+                      <ResizableTh columnKey="receita_liquida" className="text-right">Receita liquida</ResizableTh>
+                      <ResizableTh columnKey="ebitda" className="text-right">EBITDA</ResizableTh>
+                      <ResizableTh columnKey="lucro_prejuizo" className="text-right">Lucro/Prejuizo</ResizableTh>
+                      <ResizableTh columnKey="margem_liquida" className="text-right">Margem liquida</ResizableTh>
                     </tr>
                   </thead>
                   <tbody>
@@ -586,20 +645,20 @@ export default function FinanceiroDre() {
                           {empresa.empresa_caixa ? <div className="text-xs text-[var(--c-muted)]">Caixa/Tesouraria</div> : null}
                           {empresa.consolidar_no_grupo === false ? <div className="text-xs text-amber-700">Fora do consolidado</div> : null}
                         </td>
-                        <td>{formatCurrency(empresa.receita_liquida)}</td>
-                        <td className="font-semibold" style={{ color: Number(empresa.ebitda || 0) >= 0 ? '#15803d' : '#b91c1c' }}>
+                        <td className="text-right">{formatCurrency(empresa.receita_liquida)}</td>
+                        <td className="text-right font-semibold" style={{ color: Number(empresa.ebitda || 0) >= 0 ? '#15803d' : '#b91c1c' }}>
                           {formatCurrency(empresa.ebitda)}
                         </td>
-                        <td className="font-semibold" style={{ color: Number((empresa.lucro_prejuizo_liquido ?? empresa.resultado) || 0) >= 0 ? '#15803d' : '#b91c1c' }}>
+                        <td className="text-right font-semibold" style={{ color: Number((empresa.lucro_prejuizo_liquido ?? empresa.resultado) || 0) >= 0 ? '#15803d' : '#b91c1c' }}>
                           {formatCurrency(empresa.lucro_prejuizo_liquido ?? empresa.resultado)}
                         </td>
-                        <td>{formatPercent(empresa.margem_liquida ?? empresa.margem_resultado)}</td>
+                        <td className="text-right">{formatPercent(empresa.margem_liquida ?? empresa.margem_resultado)}</td>
                       </tr>
                     ))) : (
                       <tr><td colSpan={6} className="text-center text-[var(--c-muted)]">Nenhuma empresa com movimento.</td></tr>
                     )}
                   </tbody>
-                </table>
+                </ResizableTable>
               </div>
             </section>
           </div>
