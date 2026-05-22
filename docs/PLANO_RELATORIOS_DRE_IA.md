@@ -82,6 +82,7 @@ Base multiempresa e DRE gerencial:
 - Compras > Relatorios > Compras por Fornecedor ganhou ranking visual Top 10 por valor efetivamente pedido, sem criar nova metrica e sem inferencia de desempenho.
 - Compras > Relatorios ganhou Precos por Insumo, comparando preco medio de compra por item e fornecedor a partir dos itens reais dos pedidos.
 - Compras > Relatorios ganhou Categorias e Insumos, consolidando valor pedido por categoria, insumo/item e obra/centro com base nos itens reais dos pedidos.
+- Compras > Relatorios > Categorias e Insumos ganhou grafico Top 10 de compras por categoria, usando somente valores reais dos itens dos pedidos.
 - Solicitacoes > Relatorios ganhou Painel Operacional, consolidando volume, abertas, concluidas, funil, distribuicao por status, setor, obra/centro de custo, tipo, criador, responsavel atual, tempos por etapa, aging por setor e gargalos com base em solicitacoes e historicos reais do fluxo.
 
 Documentacao operacional complementar:
@@ -202,7 +203,7 @@ Graficos:
 
 - Curva mensal de compras. [Entregue em Evolucao Mensal com base na criacao real dos pedidos de compra]
 - Ranking de fornecedores. [Entregue em Compras por Fornecedor como ranking visual Top 10 por valor efetivamente pedido]
-- Compras por categoria.
+- Compras por categoria. [Entregue em Categorias e Insumos como grafico Top 10 por valor real de itens dos pedidos]
 - Economia por cotacao.
 - Ciclo medio de compras.
 

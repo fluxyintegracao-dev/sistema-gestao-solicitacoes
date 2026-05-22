@@ -137,6 +137,11 @@ export default function ComprasRelatorioCategoriasInsumos() {
   const categorias = useMemo(() => (Array.isArray(relatorio?.categorias) ? relatorio.categorias : []), [relatorio]);
   const insumos = useMemo(() => (Array.isArray(relatorio?.insumos) ? relatorio.insumos : []), [relatorio]);
   const obrasResumo = useMemo(() => (Array.isArray(relatorio?.obras) ? relatorio.obras : []), [relatorio]);
+  const topCategorias = useMemo(() => categorias.slice(0, 10), [categorias]);
+  const maiorValorCategoria = useMemo(
+    () => Math.max(...topCategorias.map((item) => Number(item.valor_total || 0)), 0),
+    [topCategorias]
+  );
 
   function aplicarFiltros(event) {
     event.preventDefault();
@@ -250,6 +255,49 @@ export default function ComprasRelatorioCategoriasInsumos() {
           <strong>{formatMoney(resumo.ticket_medio_item)}</strong>
           <small>Valor medio por item</small>
         </div>
+      </div>
+
+      <div className="mt-4 card sol-surface-card">
+        <div className="app-page-header-row">
+          <div>
+            <h2 className="text-lg font-bold text-[var(--c-text)]">Compras por categoria</h2>
+            <p className="page-subtitle">
+              Top 10 categorias por valor efetivamente pedido no periodo filtrado.
+            </p>
+          </div>
+        </div>
+        {loading ? (
+          <div className="text-sm text-[var(--c-muted)] py-4">Carregando categorias...</div>
+        ) : topCategorias.length === 0 ? (
+          <div className="app-empty-card mt-3">Sem itens de pedido para montar o grafico.</div>
+        ) : (
+          <div className="grid gap-3 mt-3">
+            {topCategorias.map((item, index) => {
+              const valor = Number(item.valor_total || 0);
+              const percentual = maiorValorCategoria > 0 ? Math.max(4, (valor / maiorValorCategoria) * 100) : 0;
+              return (
+                <div key={`categoria-grafico-${item.key}`} className="grid gap-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <span className="text-xs font-bold text-[var(--c-muted)]">#{index + 1}</span>
+                      <strong className="ml-2 text-sm text-[var(--c-text)]">{item.categoria_nome}</strong>
+                      <span className="ml-2 text-xs text-[var(--c-muted)]">
+                        {formatNumber(item.itens)} item(ns)
+                      </span>
+                    </div>
+                    <strong className="text-sm tabular-nums text-[var(--c-text)]">{formatMoney(valor)}</strong>
+                  </div>
+                  <div className="h-3 rounded-full bg-slate-100 overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-[var(--c-primary)]"
+                      style={{ width: `${percentual}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       <div className="mt-4 grid gap-4 xl:grid-cols-2">

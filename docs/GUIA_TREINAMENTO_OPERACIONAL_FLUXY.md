@@ -2043,9 +2043,10 @@ Relatorio de Categorias e Insumos:
 2. Abra `Categorias e insumos`.
 3. Filtre por obra/centro de custo e por periodo de criacao do pedido.
 4. Leia os cards para entender quantidade de itens, pedidos, categorias movimentadas, valor total e ticket medio por item.
-5. Use `Por categoria` para entender quais grupos de insumo concentram valor.
-6. Use `Por obra/centro` para ver onde o consumo dos itens esta concentrado.
-7. Use `Por insumo/item` para identificar os itens de maior valor pedido.
+5. Use `Compras por categoria` para visualizar rapidamente as 10 categorias com maior valor real de itens pedidos.
+6. Use `Por categoria` para entender quais grupos de insumo concentram valor.
+7. Use `Por obra/centro` para ver onde o consumo dos itens esta concentrado.
+8. Use `Por insumo/item` para identificar os itens de maior valor pedido.
 
 Importante:
 
@@ -2054,6 +2055,7 @@ Importante:
 - Itens cadastrados puxam a categoria do cadastro de insumos.
 - Itens manuais aparecem como `Itens manuais/sem categoria`, porque nao ha categoria real cadastrada para eles.
 - O relatorio nao classifica item por nome ou palavra-chave.
+- O grafico de compras por categoria nao cria metrica nova. Ele usa o mesmo valor real dos itens dos pedidos exibidos na tabela.
 
 Relatorio de Compras por Fornecedor:
 
