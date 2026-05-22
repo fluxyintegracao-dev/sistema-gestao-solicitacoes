@@ -73,6 +73,7 @@ Base multiempresa e DRE gerencial:
 - Compras > Relatorios ganhou Ciclo de Compras, medindo tempos entre criacao, liberacao, envio para fornecedores, resposta, encerramento e geracao de pedido com base nas datas reais registradas no fluxo.
 - Compras > Relatorios ganhou Economia em Cotacoes, comparando menor preco disponivel com o fornecedor vencedor em cotacoes encerradas para evidenciar economia, sobrepreco e aderencia ao menor preco.
 - Compras > Relatorios ganhou Relatorio de Fornecedores, com participacao em cotacoes, taxa de resposta, prazo medio, itens respondidos, itens vencedores, valor cotado e valor vencedor calculados por dados estruturados do processo de cotacao.
+- Compras > Relatorios ganhou Demanda e Pedidos, consolidando solicitacoes de compra e pedidos por status, obra/centro de custo, valor pedido e analitico com base em registros reais.
 - Solicitacoes > Relatorios ganhou Painel Operacional, consolidando volume, abertas, concluidas, funil, distribuicao por status, setor, obra/centro de custo, tipo, criador, responsavel atual, tempos por etapa, aging por setor e gargalos com base em solicitacoes e historicos reais do fluxo.
 
 Documentacao operacional complementar:
@@ -175,10 +176,10 @@ Objetivo: controlar demanda, pedidos, fornecedores, cotacoes e eficiencia de com
 
 Relatorios:
 
-- Solicitacoes de compra por status.
-- Pedidos de compra por status.
+- Solicitacoes de compra por status. [Entregue em Demanda e Pedidos]
+- Pedidos de compra por status. [Entregue em Demanda e Pedidos]
 - Compras por fornecedor.
-- Compras por obra/centro de custo.
+- Compras por obra/centro de custo. [Entregue inicialmente por valor de pedidos em Demanda e Pedidos]
 - Compras por categoria/insumo.
 - Economia obtida em cotacoes.
 - Cotacoes sem minimo de fornecedores.

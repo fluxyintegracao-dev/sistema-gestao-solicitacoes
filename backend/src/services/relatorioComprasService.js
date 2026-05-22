@@ -2,6 +2,7 @@ const { Op } = require('sequelize');
 const {
   FornecedorCompra,
   Insumo,
+  Obra,
   PedidoCompra,
   SolicitacaoCompra,
   SolicitacaoCompraFornecedor,
@@ -135,6 +136,63 @@ function buildSolicitacaoCriacaoWhere({ obraId, obraIds, dataInicio, dataFim }) 
   }
 
   return where;
+}
+
+function buildPedidoCriacaoWhere({ obraId, obraIds, dataInicio, dataFim }) {
+  const where = buildSolicitacaoWhere({ obraId, obraIds });
+
+  if (dataInicio || dataFim) {
+    where.createdAt = {};
+    if (dataInicio) {
+      where.createdAt[Op.gte] = new Date(`${dataInicio}T00:00:00.000`);
+    }
+    if (dataFim) {
+      where.createdAt[Op.lte] = new Date(`${dataFim}T23:59:59.999`);
+    }
+  }
+
+  return where;
+}
+
+function normalizeStatus(value) {
+  return String(value || 'SEM_STATUS').trim().toUpperCase() || 'SEM_STATUS';
+}
+
+function formatStatusLabel(value) {
+  return normalizeStatus(value)
+    .replace(/_/g, ' ')
+    .toLowerCase()
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function incrementResumoMap(map, key, label, defaults = {}) {
+  const mapKey = key || 'SEM_INFORMACAO';
+  if (!map.has(mapKey)) {
+    map.set(mapKey, {
+      key: mapKey,
+      label: label || formatStatusLabel(mapKey),
+      total: 0,
+      valor_total: 0,
+      ...defaults
+    });
+  }
+  const item = map.get(mapKey);
+  item.total += 1;
+  return item;
+}
+
+function finalizeResumoMap(map) {
+  return Array.from(map.values())
+    .map((item) => ({
+      ...item,
+      valor_total: roundMoney(item.valor_total)
+    }))
+    .sort((a, b) => {
+      if (Number(b.total || 0) !== Number(a.total || 0)) {
+        return Number(b.total || 0) - Number(a.total || 0);
+      }
+      return String(a.label || '').localeCompare(String(b.label || ''), 'pt-BR');
+    });
 }
 
 function createFornecedorResumo(fornecedor) {
@@ -329,6 +387,116 @@ async function relatorioFornecedoresCompras({ obraId, dataInicio, dataFim, obraI
     },
     resumo: resumoGeral,
     fornecedores
+  };
+}
+
+async function relatorioDemandaPedidosCompras({ obraId, dataInicio, dataFim, obraIds } = {}) {
+  const [solicitacoes, pedidos] = await Promise.all([
+    SolicitacaoCompra.findAll({
+      where: buildSolicitacaoCriacaoWhere({ obraId, obraIds, dataInicio, dataFim }),
+      attributes: ['id', 'titulo', 'obra_id', 'status', 'createdAt', 'liberado_para_compra_em', 'encerrado_em'],
+      include: [
+        { model: Obra, as: 'obra', attributes: ['id', 'nome'] },
+        { model: PedidoCompra, as: 'pedidos', attributes: ['id', 'status', 'valor_total', 'createdAt'] }
+      ],
+      order: [['createdAt', 'DESC'], ['id', 'DESC']]
+    }),
+    PedidoCompra.findAll({
+      where: buildPedidoCriacaoWhere({ obraId, obraIds, dataInicio, dataFim }),
+      attributes: ['id', 'obra_id', 'status', 'valor_total', 'createdAt', 'encerrado_em', 'solicitacao_compra_id'],
+      include: [
+        { model: Obra, as: 'obra', attributes: ['id', 'nome'] },
+        { model: SolicitacaoCompra, as: 'solicitacao', attributes: ['id', 'titulo', 'status'] }
+      ],
+      order: [['createdAt', 'DESC'], ['id', 'DESC']]
+    })
+  ]);
+
+  const solicitacoesPorStatus = new Map();
+  const pedidosPorStatus = new Map();
+  const solicitacoesPorObra = new Map();
+  const pedidosPorObra = new Map();
+  const linhasSolicitacoes = [];
+  const linhasPedidos = [];
+
+  solicitacoes.forEach((solicitacao) => {
+    const plain = solicitacao.toJSON ? solicitacao.toJSON() : solicitacao;
+    const statusKey = normalizeStatus(plain.status);
+    const statusResumo = incrementResumoMap(solicitacoesPorStatus, statusKey, formatStatusLabel(statusKey));
+    const valorPedidos = (plain.pedidos || []).reduce((sum, pedido) => sum + toNumber(pedido.valor_total), 0);
+    statusResumo.valor_total = roundMoney(statusResumo.valor_total + valorPedidos);
+
+    const obraKey = plain.obra_id ? String(plain.obra_id) : 'SEM_OBRA';
+    const obraResumo = incrementResumoMap(solicitacoesPorObra, obraKey, plain.obra?.nome || 'Sem obra/centro');
+    obraResumo.valor_total = roundMoney(obraResumo.valor_total + valorPedidos);
+
+    linhasSolicitacoes.push({
+      id: plain.id,
+      titulo: plain.titulo || null,
+      status: statusKey,
+      status_label: formatStatusLabel(statusKey),
+      obra: plain.obra ? { id: plain.obra.id, nome: plain.obra.nome } : null,
+      criado_em: plain.createdAt || null,
+      liberado_em: plain.liberado_para_compra_em || null,
+      encerrado_em: plain.encerrado_em || null,
+      pedidos: (plain.pedidos || []).length,
+      valor_pedidos: roundMoney(valorPedidos)
+    });
+  });
+
+  pedidos.forEach((pedido) => {
+    const plain = pedido.toJSON ? pedido.toJSON() : pedido;
+    const statusKey = normalizeStatus(plain.status);
+    const valor = roundMoney(plain.valor_total);
+    const statusResumo = incrementResumoMap(pedidosPorStatus, statusKey, formatStatusLabel(statusKey));
+    statusResumo.valor_total = roundMoney(statusResumo.valor_total + valor);
+
+    const obraKey = plain.obra_id ? String(plain.obra_id) : 'SEM_OBRA';
+    const obraResumo = incrementResumoMap(pedidosPorObra, obraKey, plain.obra?.nome || 'Sem obra/centro');
+    obraResumo.valor_total = roundMoney(obraResumo.valor_total + valor);
+
+    linhasPedidos.push({
+      id: plain.id,
+      status: statusKey,
+      status_label: formatStatusLabel(statusKey),
+      obra: plain.obra ? { id: plain.obra.id, nome: plain.obra.nome } : null,
+      solicitacao: plain.solicitacao ? {
+        id: plain.solicitacao.id,
+        titulo: plain.solicitacao.titulo || null,
+        status: plain.solicitacao.status || null
+      } : null,
+      criado_em: plain.createdAt || null,
+      encerrado_em: plain.encerrado_em || null,
+      valor_total: valor
+    });
+  });
+
+  const resumo = {
+    solicitacoes: solicitacoes.length,
+    solicitacoes_liberadas: solicitacoes.filter((item) => item.liberado_para_compra_em).length,
+    solicitacoes_encerradas: solicitacoes.filter((item) => item.encerrado_em).length,
+    pedidos: pedidos.length,
+    pedidos_encerrados: pedidos.filter((item) => item.encerrado_em).length,
+    valor_pedidos: roundMoney(pedidos.reduce((sum, pedido) => sum + toNumber(pedido.valor_total), 0))
+  };
+
+  resumo.ticket_medio_pedido = resumo.pedidos > 0
+    ? roundMoney(resumo.valor_pedidos / resumo.pedidos)
+    : 0;
+
+  return {
+    filtros: {
+      obra_id: obraId || null,
+      data_inicio: dataInicio || null,
+      data_fim: dataFim || null
+    },
+    resumo,
+    solicitacoes_por_status: finalizeResumoMap(solicitacoesPorStatus),
+    pedidos_por_status: finalizeResumoMap(pedidosPorStatus),
+    solicitacoes_por_obra: finalizeResumoMap(solicitacoesPorObra),
+    pedidos_por_obra: finalizeResumoMap(pedidosPorObra),
+    solicitacoes: linhasSolicitacoes.slice(0, 100),
+    pedidos: linhasPedidos.slice(0, 100)
   };
 }
 
@@ -664,6 +832,7 @@ async function relatorioCicloCompras({ obraId, dataInicio, dataFim, obraIds } = 
 
 module.exports = {
   relatorioCicloCompras,
+  relatorioDemandaPedidosCompras,
   relatorioEconomiaCotacoes,
   relatorioFornecedoresCompras
 };

@@ -1994,10 +1994,30 @@ Devem responder:
 
 - quanto foi cotado;
 - quanto foi comprado;
+- quais solicitacoes de compra e pedidos estao em cada status;
+- qual obra/centro concentra demanda e valor pedido;
 - economia gerada;
 - fornecedores mais usados;
 - compras sem cotacao suficiente;
 - tempo medio de resposta de fornecedor.
+
+Relatorio de Demanda e Pedidos:
+
+1. Acesse `Compras > Relatorios`.
+2. Abra `Demanda e pedidos`.
+3. Filtre por obra/centro de custo e por periodo de criacao.
+4. Leia os cards para entender quantas solicitacoes de compra foram criadas, quantas foram liberadas, quantos pedidos existem, valor total pedido e ticket medio.
+5. Use `Solicitacoes por status` para identificar onde a demanda esta parada.
+6. Use `Pedidos por status` para identificar pedidos abertos, encerrados ou em outro status operacional.
+7. Use as tabelas por obra/centro para ver onde estao concentrados volume e valor.
+8. Nos analiticos, clique no codigo da solicitacao ou do pedido para abrir o detalhe.
+
+Importante:
+
+- O valor financeiro do relatorio vem dos pedidos de compra gravados no sistema.
+- A quantidade de solicitacoes vem da tabela real de solicitacoes de compra.
+- O relatorio nao transforma cotacao em pedido por deducao. Uma compra so entra como pedido quando existe pedido gerado.
+- O periodo considera a data de criacao da solicitacao de compra e a data de criacao do pedido, conforme a tabela analisada.
 
 Relatorio de Fornecedores:
 

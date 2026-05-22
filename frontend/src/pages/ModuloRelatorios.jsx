@@ -67,6 +67,7 @@ const HUBS = {
         titulo: 'Relatorios disponiveis',
         itens: [
           { titulo: 'Auditoria de compras', descricao: 'Acompanhamento administrativo de compras e evidencias do processo.', to: '/compras/relatorios/auditoria', status: 'Disponivel', permissao: 'businessAdmin' },
+          { titulo: 'Demanda e pedidos', descricao: 'Solicitacoes e pedidos por status, obra/centro e valor pedido.', to: '/compras/relatorios/demanda-pedidos', status: 'Disponivel', permissao: 'comprasCotacoes' },
           { titulo: 'Cotacoes', descricao: 'Lista de cotacoes, status de resposta e encerramento.', to: '/cotacoes', status: 'Disponivel', permissao: 'comprasCotacoes' },
           { titulo: 'Pedidos de compra', descricao: 'Pedidos emitidos, status e detalhamento por fornecedor.', to: '/pedidos-compra', status: 'Disponivel', permissao: 'comprasPedidos' },
           { titulo: 'Economia em cotacoes', descricao: 'Comparativo entre menor preco disponivel e vencedor selecionado.', to: '/compras/relatorios/economia-cotacoes', status: 'Disponivel', permissao: 'comprasCotacoes' },
