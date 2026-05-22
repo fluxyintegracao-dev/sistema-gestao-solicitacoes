@@ -73,7 +73,7 @@ Base multiempresa e DRE gerencial:
 - Compras > Relatorios ganhou Ciclo de Compras, medindo tempos entre criacao, liberacao, envio para fornecedores, resposta, encerramento e geracao de pedido com base nas datas reais registradas no fluxo.
 - Compras > Relatorios ganhou Economia em Cotacoes, comparando menor preco disponivel com o fornecedor vencedor em cotacoes encerradas para evidenciar economia, sobrepreco e aderencia ao menor preco.
 - Compras > Relatorios ganhou Relatorio de Fornecedores, com participacao em cotacoes, taxa de resposta, prazo medio, itens respondidos, itens vencedores, valor cotado e valor vencedor calculados por dados estruturados do processo de cotacao.
-- Solicitacoes > Relatorios ganhou Painel Operacional, consolidando volume, abertas, concluidas, funil, distribuicao por status, setor, obra/centro de custo, tipo, criador, responsavel atual e gargalos com base em solicitacoes e historicos reais do fluxo.
+- Solicitacoes > Relatorios ganhou Painel Operacional, consolidando volume, abertas, concluidas, funil, distribuicao por status, setor, obra/centro de custo, tipo, criador, responsavel atual, tempos por etapa, aging por setor e gargalos com base em solicitacoes e historicos reais do fluxo.
 
 Documentacao operacional complementar:
 
@@ -153,8 +153,8 @@ Relatorios:
 - Solicitacoes por setor atual. [Entregue no Painel Operacional]
 - Solicitacoes por area responsavel. [Entregue parcialmente por setor atual]
 - Solicitacoes por obra/centro de custo. [Entregue no Painel Operacional]
-- Tempo medio por etapa.
-- Solicitacoes paradas acima do SLA. [Entregue inicialmente como gargalos acima de 3 dias sem movimentacao]
+- Tempo medio por etapa. [Entregue como medicao real entre criacao, assuncao, envio, aprovacao diretoria e conclusao]
+- Solicitacoes paradas acima do SLA. [Entregue inicialmente como gargalos acima de 3 dias sem movimentacao e aging por setor atual]
 - Ranking de setores com maior volume.
 - Ranking de usuarios responsaveis. [Entregue por ultimo responsavel atribuido/assumido no historico]
 - Solicitacoes por tipo macro/subtipo. [Entregue por tipo de solicitacao]

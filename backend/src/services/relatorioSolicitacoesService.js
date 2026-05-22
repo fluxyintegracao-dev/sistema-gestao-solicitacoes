@@ -109,6 +109,18 @@ function sortByTotalDesc(items) {
   return Array.from(items.values()).sort((a, b) => Number(b.total || 0) - Number(a.total || 0));
 }
 
+function sortHistoricosAsc(historicosItem = []) {
+  return [...historicosItem].sort((a, b) => {
+    const dateA = toDate(a.createdAt)?.getTime() || 0;
+    const dateB = toDate(b.createdAt)?.getTime() || 0;
+    return dateA - dateB;
+  });
+}
+
+function getFirstHistorico(historicosItem = [], predicate) {
+  return sortHistoricosAsc(historicosItem).find(predicate);
+}
+
 function getLatestResponsavel(historicosItem = []) {
   return historicosItem.find((item) =>
     ['RESPONSAVEL_ATRIBUIDO', 'RESPONSAVEL_ASSUMIU'].includes(String(item.acao || '').toUpperCase()) &&
@@ -118,6 +130,34 @@ function getLatestResponsavel(historicosItem = []) {
 
 function isConcluida(status) {
   return STATUS_CONCLUIDOS.has(normalizeToken(status));
+}
+
+function addDuration(map, key, label, start, end) {
+  const dias = diffDays(start, end);
+  if (dias == null) return;
+  if (!map.has(key)) {
+    map.set(key, {
+      key,
+      label,
+      amostras: 0,
+      soma_dias: 0,
+      maior_dias: 0
+    });
+  }
+  const item = map.get(key);
+  item.amostras += 1;
+  item.soma_dias += dias;
+  item.maior_dias = Math.max(item.maior_dias, dias);
+}
+
+function finalizeDurations(map) {
+  return Array.from(map.values()).map((item) => ({
+    key: item.key,
+    label: item.label,
+    amostras: item.amostras,
+    media_dias: item.amostras > 0 ? Number((item.soma_dias / item.amostras).toFixed(1)) : 0,
+    maior_dias: Number(item.maior_dias.toFixed(1))
+  }));
 }
 
 async function getSolicitacaoScopeWhere(user) {
@@ -217,7 +257,7 @@ async function relatorioSolicitacoesOperacional({ user, periodo, dataInicio, dat
   const historicos = ids.length
     ? await Historico.findAll({
         where: { solicitacao_id: { [Op.in]: ids } },
-        attributes: ['solicitacao_id', 'usuario_responsavel_id', 'acao', 'setor', 'createdAt'],
+        attributes: ['solicitacao_id', 'usuario_responsavel_id', 'acao', 'setor', 'status_novo', 'createdAt'],
         include: [
           { model: User, as: 'usuario', attributes: ['id', 'nome'] }
         ],
@@ -240,6 +280,8 @@ async function relatorioSolicitacoesOperacional({ user, periodo, dataInicio, dat
   const tipoMap = new Map();
   const criadorMap = new Map();
   const responsavelMap = new Map();
+  const tempoEtapasMap = new Map();
+  const agingSetorMap = new Map();
   const now = new Date();
   const gargalos = [];
   const resumo = {
@@ -263,6 +305,15 @@ async function relatorioSolicitacoesOperacional({ user, periodo, dataInicio, dat
     const concluida = isConcluida(plain.status_global);
     const historicosItem = historicosPorSolicitacao.get(Number(plain.id)) || [];
     const responsavelAtual = getLatestResponsavel(historicosItem);
+    const primeiraAssuncao = getFirstHistorico(historicosItem, (item) =>
+      ['RESPONSAVEL_ATRIBUIDO', 'RESPONSAVEL_ASSUMIU'].includes(String(item.acao || '').toUpperCase())
+    );
+    const primeiroEnvio = getFirstHistorico(historicosItem, (item) =>
+      String(item.acao || '').toUpperCase() === 'ENVIADA_SETOR'
+    );
+    const historicoConclusao = getFirstHistorico(historicosItem, (item) =>
+      String(item.acao || '').toUpperCase() === 'STATUS_ALTERADO' && isConcluida(item.status_novo)
+    );
     const ultimaMovimentacao = historicosItem[0]?.createdAt || plain.updatedAt || plain.createdAt;
     const diasParada = concluida ? 0 : diffDays(ultimaMovimentacao, now);
     const diasAberta = concluida ? 0 : diffDays(plain.createdAt, now);
@@ -279,8 +330,23 @@ async function relatorioSolicitacoesOperacional({ user, periodo, dataInicio, dat
       }
       if (diasParada != null) {
         resumo.maior_tempo_parado_dias = Math.max(resumo.maior_tempo_parado_dias, diasParada);
+        const aging = incrementMap(agingSetorMap, plain.area_responsavel, { setor: plain.area_responsavel });
+        aging.valor_aberto = toNumber(aging.valor_aberto) + valor;
+        aging.soma_dias_parada = toNumber(aging.soma_dias_parada) + diasParada;
+        aging.maior_dias_parada = Math.max(toNumber(aging.maior_dias_parada), diasParada);
       }
     }
+
+    addDuration(tempoEtapasMap, 'CRIACAO_ASSUNCAO', 'Criacao ate assuncao/atribuicao', plain.createdAt, primeiraAssuncao?.createdAt);
+    addDuration(tempoEtapasMap, 'CRIACAO_PRIMEIRO_ENVIO', 'Criacao ate primeiro envio', plain.createdAt, primeiroEnvio?.createdAt);
+    addDuration(tempoEtapasMap, 'CRIACAO_APROVACAO_DIRETORIA', 'Criacao ate aprovacao diretoria', plain.createdAt, plain.aprovada_diretoria_em);
+    addDuration(
+      tempoEtapasMap,
+      'CRIACAO_CONCLUSAO',
+      'Criacao ate conclusao',
+      plain.createdAt,
+      historicoConclusao?.createdAt || (concluida ? plain.updatedAt : null)
+    );
 
     if (plain.aprovada_diretoria_em) {
       resumo.aprovadas_diretoria += 1;
@@ -363,6 +429,14 @@ async function relatorioSolicitacoesOperacional({ user, periodo, dataInicio, dat
     por_tipo: sortByTotalDesc(tipoMap).slice(0, 20),
     por_criador: sortByTotalDesc(criadorMap).slice(0, 20),
     por_responsavel: sortByTotalDesc(responsavelMap).slice(0, 20),
+    tempos_etapas: finalizeDurations(tempoEtapasMap),
+    aging_setor: sortByTotalDesc(agingSetorMap)
+      .map((item) => ({
+        ...item,
+        valor_aberto: Number(toNumber(item.valor_aberto).toFixed(2)),
+        media_dias_parada: item.total > 0 ? Number((toNumber(item.soma_dias_parada) / item.total).toFixed(1)) : 0,
+        maior_dias_parada: Number(toNumber(item.maior_dias_parada).toFixed(1))
+      })),
     gargalos: gargalos
       .sort((a, b) => Number(b.dias_parada || 0) - Number(a.dias_parada || 0))
       .slice(0, 30)

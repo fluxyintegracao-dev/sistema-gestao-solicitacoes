@@ -44,6 +44,21 @@ const USUARIO_COLUMNS = [
   { key: 'valor', width: 140, minWidth: 110 }
 ];
 
+const TEMPO_COLUMNS = [
+  { key: 'etapa', width: 260, minWidth: 180 },
+  { key: 'amostras', width: 110, minWidth: 90 },
+  { key: 'media', width: 120, minWidth: 100 },
+  { key: 'maior', width: 120, minWidth: 100 }
+];
+
+const AGING_SETOR_COLUMNS = [
+  { key: 'setor', width: 210, minWidth: 140 },
+  { key: 'abertas', width: 100, minWidth: 80 },
+  { key: 'media', width: 130, minWidth: 100 },
+  { key: 'maior', width: 130, minWidth: 100 },
+  { key: 'valor', width: 140, minWidth: 110 }
+];
+
 const GARGALO_COLUMNS = [
   { key: 'codigo', width: 130, minWidth: 100 },
   { key: 'setor', width: 150, minWidth: 110 },
@@ -93,6 +108,12 @@ function formatDate(value) {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return '-';
   return parsed.toLocaleDateString('pt-BR');
+}
+
+function formatDays(value) {
+  const numeric = Number(value || 0);
+  if (!Number.isFinite(numeric) || numeric <= 0) return '-';
+  return `${formatNumber(numeric, 1)} dia(s)`;
 }
 
 function formatLabel(value) {
@@ -179,6 +200,8 @@ export default function SolicitacoesRelatorioOperacional() {
   const porTipo = useMemo(() => (Array.isArray(relatorio?.por_tipo) ? relatorio.por_tipo : []), [relatorio]);
   const porCriador = useMemo(() => (Array.isArray(relatorio?.por_criador) ? relatorio.por_criador : []), [relatorio]);
   const porResponsavel = useMemo(() => (Array.isArray(relatorio?.por_responsavel) ? relatorio.por_responsavel : []), [relatorio]);
+  const temposEtapas = useMemo(() => (Array.isArray(relatorio?.tempos_etapas) ? relatorio.tempos_etapas : []), [relatorio]);
+  const agingSetor = useMemo(() => (Array.isArray(relatorio?.aging_setor) ? relatorio.aging_setor : []), [relatorio]);
   const gargalos = useMemo(() => (Array.isArray(relatorio?.gargalos) ? relatorio.gargalos : []), [relatorio]);
 
   function aplicarFiltros(event) {
@@ -326,6 +349,76 @@ export default function SolicitacoesRelatorioOperacional() {
           <div className="app-empty-card">
             <strong>{formatNumber(resumo.concluidas)}</strong>
             <span>concluidas</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-4 xl:grid-cols-2">
+        <div className="card sol-surface-card overflow-hidden">
+          <h2 className="text-lg font-bold text-[var(--c-text)] mb-1">Tempos por etapa</h2>
+          <p className="page-subtitle mb-3">Medias calculadas apenas quando a etapa possui data real registrada.</p>
+          <div className="sol-table-wrapper">
+            <ResizableTable className="sol-table" columns={TEMPO_COLUMNS} storageKey="fluxy.solicitacoes.relatorio.tempos.columns">
+              <thead>
+                <tr>
+                  <ResizableTh columnKey="etapa">Etapa</ResizableTh>
+                  <ResizableTh columnKey="amostras" className="text-right">Amostras</ResizableTh>
+                  <ResizableTh columnKey="media" className="text-right">Media</ResizableTh>
+                  <ResizableTh columnKey="maior" className="text-right">Maior</ResizableTh>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <EmptyRow colSpan={4}>Carregando tempos...</EmptyRow>
+                ) : temposEtapas.length === 0 ? (
+                  <EmptyRow colSpan={4}>Sem etapas com datas suficientes no periodo.</EmptyRow>
+                ) : (
+                  temposEtapas.map((item) => (
+                    <tr key={item.key}>
+                      <td>{item.label}</td>
+                      <td className="text-right">{formatNumber(item.amostras)}</td>
+                      <td className="text-right">{formatDays(item.media_dias)}</td>
+                      <td className="text-right">{formatDays(item.maior_dias)}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </ResizableTable>
+          </div>
+        </div>
+
+        <div className="card sol-surface-card overflow-hidden">
+          <h2 className="text-lg font-bold text-[var(--c-text)] mb-1">Aging por setor atual</h2>
+          <p className="page-subtitle mb-3">Solicitacoes abertas agrupadas pelo setor em que estao paradas agora.</p>
+          <div className="sol-table-wrapper">
+            <ResizableTable className="sol-table" columns={AGING_SETOR_COLUMNS} storageKey="fluxy.solicitacoes.relatorio.agingSetor.columns">
+              <thead>
+                <tr>
+                  <ResizableTh columnKey="setor">Setor</ResizableTh>
+                  <ResizableTh columnKey="abertas" className="text-right">Abertas</ResizableTh>
+                  <ResizableTh columnKey="media" className="text-right">Media parada</ResizableTh>
+                  <ResizableTh columnKey="maior" className="text-right">Maior parada</ResizableTh>
+                  <ResizableTh columnKey="valor" className="text-right">Valor aberto</ResizableTh>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <EmptyRow colSpan={5}>Carregando aging...</EmptyRow>
+                ) : agingSetor.length === 0 ? (
+                  <EmptyRow colSpan={5}>Sem solicitacoes abertas nos filtros selecionados.</EmptyRow>
+                ) : (
+                  agingSetor.map((item) => (
+                    <tr key={item.key}>
+                      <td>{formatLabel(item.setor || item.key)}</td>
+                      <td className="text-right">{formatNumber(item.total)}</td>
+                      <td className="text-right">{formatDays(item.media_dias_parada)}</td>
+                      <td className="text-right">{formatDays(item.maior_dias_parada)}</td>
+                      <td className="text-right">{formatCurrency(item.valor_aberto)}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </ResizableTable>
           </div>
         </div>
       </div>
