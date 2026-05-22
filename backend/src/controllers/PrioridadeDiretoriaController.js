@@ -27,6 +27,7 @@ const {
 
 const STATUS_LOTE = {
   ABERTO: 'ABERTO',
+  AGUARDANDO_APROVACAO: 'AGUARDANDO_APROVACAO',
   FINALIZADO: 'FINALIZADO',
   CANCELADO: 'CANCELADO'
 };
@@ -230,6 +231,41 @@ function usuarioPodeEditarSelecaoLote(permissoes, lote) {
     return Boolean(permissoes?.isAprovadorPrioridade || permisssoesTemClassificacao(permissoes, lote?.classificacao_alvo));
   }
   return usuarioPodeFinalizarLote(permissoes, lote);
+}
+
+function isSolicitacaoDiretoriaLote(lote) {
+  return String(lote?.tipo_lote || TIPO_LOTE.DIR_ADMIN).toUpperCase() === TIPO_LOTE.SOLICITACAO_DIRETORIA;
+}
+
+function statusLote(lote) {
+  return String(lote?.status || '').toUpperCase();
+}
+
+function loteAceitaSelecao(permissoes, lote) {
+  const status = statusLote(lote);
+  if (status === STATUS_LOTE.ABERTO) {
+    return usuarioPodeEditarSelecaoLote(permissoes, lote);
+  }
+  if (status === STATUS_LOTE.AGUARDANDO_APROVACAO && isSolicitacaoDiretoriaLote(lote)) {
+    return usuarioPodeFinalizarLote(permissoes, lote);
+  }
+  return false;
+}
+
+function loteAceitaFinalizacao(permissoes, lote) {
+  if (!usuarioPodeFinalizarLote(permissoes, lote)) return false;
+  const status = statusLote(lote);
+  if (isSolicitacaoDiretoriaLote(lote)) {
+    return [STATUS_LOTE.ABERTO, STATUS_LOTE.AGUARDANDO_APROVACAO].includes(status);
+  }
+  return status === STATUS_LOTE.ABERTO;
+}
+
+function lotePodeSerCancelado(permissoes, lote) {
+  return Boolean(
+    (permissoes?.isSuperadmin || permissoes?.isDirAdmin) &&
+    [STATUS_LOTE.ABERTO, STATUS_LOTE.AGUARDANDO_APROVACAO].includes(statusLote(lote))
+  );
 }
 
 function obterDiretoriaCriadora(permissoes, classificacaoSolicitada = null) {
@@ -775,9 +811,9 @@ module.exports = {
       return res.json({
         items: lotes.map((lote) => ({
           ...serializarLote(lote, resumoItens.get(Number(lote.id))),
-          pode_finalizar: usuarioPodeFinalizarLote(permissoes, lote) && lote.status === STATUS_LOTE.ABERTO,
-          pode_editar_selecao: usuarioPodeEditarSelecaoLote(permissoes, lote) && lote.status === STATUS_LOTE.ABERTO,
-          pode_cancelar: (permissoes.isSuperadmin || permissoes.isDirAdmin) && lote.status === STATUS_LOTE.ABERTO,
+          pode_finalizar: loteAceitaFinalizacao(permissoes, lote),
+          pode_editar_selecao: loteAceitaSelecao(permissoes, lote),
+          pode_cancelar: lotePodeSerCancelado(permissoes, lote),
           pode_excluir: Boolean(permissoes.isSuperadmin),
           pode_reabrir: Boolean(permissoes.isSuperadmin) && lote.status === STATUS_LOTE.FINALIZADO
         }))
@@ -851,9 +887,9 @@ module.exports = {
       return res.status(201).json({
         item: {
           ...serializarLote(detalhe),
-          pode_finalizar: usuarioPodeFinalizarLote(permissoes, detalhe) && detalhe.status === STATUS_LOTE.ABERTO,
-          pode_editar_selecao: usuarioPodeEditarSelecaoLote(permissoes, detalhe) && detalhe.status === STATUS_LOTE.ABERTO,
-          pode_cancelar: (permissoes.isSuperadmin || permissoes.isDirAdmin) && detalhe.status === STATUS_LOTE.ABERTO,
+          pode_finalizar: loteAceitaFinalizacao(permissoes, detalhe),
+          pode_editar_selecao: loteAceitaSelecao(permissoes, detalhe),
+          pode_cancelar: lotePodeSerCancelado(permissoes, detalhe),
           pode_excluir: Boolean(permissoes.isSuperadmin),
           pode_reabrir: false
         }
@@ -915,6 +951,7 @@ module.exports = {
       }
 
       await lote.update({
+        status: STATUS_LOTE.AGUARDANDO_APROVACAO,
         valor_disponivel: resultadoSincronizacao.valorUtilizado,
         valor_utilizado: resultadoSincronizacao.valorUtilizado
       }, { transaction });
@@ -954,7 +991,7 @@ module.exports = {
             solicitacao: item.solicitacao ? serializarSolicitacaoPrioridade(item.solicitacao) : null
           })),
           pode_finalizar: false,
-          pode_editar_selecao: usuarioPodeEditarSelecaoLote(permissoes, detalhe) && detalhe.status === STATUS_LOTE.ABERTO,
+          pode_editar_selecao: loteAceitaSelecao(permissoes, detalhe),
           pode_cancelar: false,
           pode_excluir: Boolean(permissoes.isSuperadmin),
           pode_reabrir: false
@@ -996,9 +1033,9 @@ module.exports = {
             autorizado_por_nome: item?.autorizadoPor?.nome || '-',
             solicitacao: item.solicitacao ? serializarSolicitacaoPrioridade(item.solicitacao) : null
           })),
-          pode_finalizar: usuarioPodeFinalizarLote(permissoes, lote) && lote.status === STATUS_LOTE.ABERTO,
-          pode_editar_selecao: usuarioPodeEditarSelecaoLote(permissoes, lote) && lote.status === STATUS_LOTE.ABERTO,
-          pode_cancelar: (permissoes.isSuperadmin || permissoes.isDirAdmin) && lote.status === STATUS_LOTE.ABERTO,
+          pode_finalizar: loteAceitaFinalizacao(permissoes, lote),
+          pode_editar_selecao: loteAceitaSelecao(permissoes, lote),
+          pode_cancelar: lotePodeSerCancelado(permissoes, lote),
           pode_excluir: Boolean(permissoes.isSuperadmin),
           pode_reabrir: Boolean(permissoes.isSuperadmin) && lote.status === STATUS_LOTE.FINALIZADO
         }
@@ -1034,11 +1071,13 @@ module.exports = {
         return res.status(403).json({ error: 'Acesso apenas para leitura dos lotes de prioridade.' });
       }
 
-      if (!usuarioPodeEditarSelecaoLote(permissoes, lote)) {
+      const podeSelecionarLote = loteAceitaSelecao(permissoes, lote);
+
+      if (!podeSelecionarLote) {
         return res.status(403).json({ error: 'Apenas a diretoria responsavel pode selecionar solicitacoes neste lote.' });
       }
 
-      const items = lote.status === STATUS_LOTE.ABERTO
+      const items = podeSelecionarLote
         ? await listarSolicitacoesElegiveisParaLote(
             lote,
             req.query?.busca,
@@ -1051,7 +1090,7 @@ module.exports = {
           )
         : [];
 
-      const obrasBase = lote.status === STATUS_LOTE.ABERTO
+      const obrasBase = podeSelecionarLote
         ? await listarSolicitacoesElegiveisParaLote(lote)
         : [];
       const obras = Array.from(
@@ -1116,9 +1155,16 @@ module.exports = {
         return res.status(403).json({ error: 'Apenas a diretoria alvo pode finalizar este lote.' });
       }
 
-      if (String(lote.status || '').toUpperCase() !== STATUS_LOTE.ABERTO) {
+      const isSolicitacaoDiretoria =
+        String(lote.tipo_lote || TIPO_LOTE.DIR_ADMIN).toUpperCase() === TIPO_LOTE.SOLICITACAO_DIRETORIA;
+
+      if (!loteAceitaFinalizacao(permissoes, lote)) {
         await transaction.rollback();
-        return res.status(400).json({ error: 'Somente lotes abertos podem ser finalizados.' });
+        return res.status(400).json({
+          error: isSolicitacaoDiretoria
+            ? 'Somente pedidos abertos ou aguardando aprovacao podem ser finalizados.'
+            : 'Somente lotes abertos podem ser finalizados.'
+        });
       }
 
       const solicitacaoIds = normalizarSolicitacaoIds(req.body?.solicitacao_ids);
@@ -1146,8 +1192,6 @@ module.exports = {
 
       const { solicitacoesSelecionadas, valorUtilizado } = resultadoSincronizacao;
       const valorDisponivel = formatarNumero(lote.valor_disponivel);
-      const isSolicitacaoDiretoria =
-        String(lote.tipo_lote || TIPO_LOTE.DIR_ADMIN).toUpperCase() === TIPO_LOTE.SOLICITACAO_DIRETORIA;
 
       if (!isSolicitacaoDiretoria && valorUtilizado > valorDisponivel) {
         await transaction.rollback();
@@ -1260,14 +1304,14 @@ module.exports = {
         return res.status(404).json({ error: 'Lote de prioridade nao encontrado.' });
       }
 
-      if (!usuarioPodeEditarSelecaoLote(permissoes, lote)) {
+      if (!loteAceitaSelecao(permissoes, lote)) {
         await transaction.rollback();
         return res.status(403).json({ error: 'Apenas a diretoria responsavel pode salvar a selecao deste lote.' });
       }
 
-      if (String(lote.status || '').toUpperCase() !== STATUS_LOTE.ABERTO) {
+      if (![STATUS_LOTE.ABERTO, STATUS_LOTE.AGUARDANDO_APROVACAO].includes(statusLote(lote))) {
         await transaction.rollback();
-        return res.status(400).json({ error: 'Somente lotes abertos podem ter selecao salva.' });
+        return res.status(400).json({ error: 'Somente lotes abertos ou aguardando aprovacao podem ter selecao salva.' });
       }
 
       let resultadoSincronizacao;
@@ -1317,9 +1361,9 @@ module.exports = {
             autorizado_por_nome: item?.autorizadoPor?.nome || '-',
             solicitacao: item.solicitacao ? serializarSolicitacaoPrioridade(item.solicitacao) : null
           })),
-          pode_finalizar: usuarioPodeFinalizarLote(permissoes, detalhe) && detalhe.status === STATUS_LOTE.ABERTO,
-          pode_editar_selecao: usuarioPodeEditarSelecaoLote(permissoes, detalhe) && detalhe.status === STATUS_LOTE.ABERTO,
-          pode_cancelar: (permissoes.isSuperadmin || permissoes.isDirAdmin) && detalhe.status === STATUS_LOTE.ABERTO,
+          pode_finalizar: loteAceitaFinalizacao(permissoes, detalhe),
+          pode_editar_selecao: loteAceitaSelecao(permissoes, detalhe),
+          pode_cancelar: lotePodeSerCancelado(permissoes, detalhe),
           pode_excluir: Boolean(permissoes.isSuperadmin),
           pode_reabrir: false
         }
@@ -1391,6 +1435,7 @@ module.exports = {
       }
 
       await lote.update({
+        status: STATUS_LOTE.AGUARDANDO_APROVACAO,
         valor_disponivel: resultadoSincronizacao.valorUtilizado,
         valor_utilizado: resultadoSincronizacao.valorUtilizado
       }, { transaction });
@@ -1428,9 +1473,9 @@ module.exports = {
             autorizado_por_nome: item?.autorizadoPor?.nome || '-',
             solicitacao: item.solicitacao ? serializarSolicitacaoPrioridade(item.solicitacao) : null
           })),
-          pode_finalizar: usuarioPodeFinalizarLote(permissoes, detalhe) && detalhe.status === STATUS_LOTE.ABERTO,
-          pode_editar_selecao: usuarioPodeEditarSelecaoLote(permissoes, detalhe) && detalhe.status === STATUS_LOTE.ABERTO,
-          pode_cancelar: (permissoes.isSuperadmin || permissoes.isDirAdmin) && detalhe.status === STATUS_LOTE.ABERTO,
+          pode_finalizar: loteAceitaFinalizacao(permissoes, detalhe),
+          pode_editar_selecao: loteAceitaSelecao(permissoes, detalhe),
+          pode_cancelar: lotePodeSerCancelado(permissoes, detalhe),
           pode_excluir: Boolean(permissoes.isSuperadmin),
           pode_reabrir: false
         }
@@ -1530,8 +1575,8 @@ module.exports = {
             autorizado_por_nome: item?.autorizadoPor?.nome || '-',
             solicitacao: item.solicitacao ? serializarSolicitacaoPrioridade(item.solicitacao) : null
           })),
-          pode_finalizar: usuarioPodeFinalizarLote(permissoes, detalhe) && detalhe.status === STATUS_LOTE.ABERTO,
-          pode_editar_selecao: usuarioPodeEditarSelecaoLote(permissoes, detalhe) && detalhe.status === STATUS_LOTE.ABERTO,
+          pode_finalizar: loteAceitaFinalizacao(permissoes, detalhe),
+          pode_editar_selecao: loteAceitaSelecao(permissoes, detalhe),
           pode_cancelar: true,
           pode_excluir: true,
           pode_reabrir: false
@@ -1563,9 +1608,9 @@ module.exports = {
         return res.status(404).json({ error: 'Lote de prioridade nao encontrado.' });
       }
 
-      if (String(lote.status || '').toUpperCase() !== STATUS_LOTE.ABERTO) {
+      if (![STATUS_LOTE.ABERTO, STATUS_LOTE.AGUARDANDO_APROVACAO].includes(statusLote(lote))) {
         await transaction.rollback();
-        return res.status(400).json({ error: 'Apenas lotes abertos podem ser cancelados.' });
+        return res.status(400).json({ error: 'Apenas lotes abertos ou aguardando aprovacao podem ser cancelados.' });
       }
 
       await Solicitacao.update(

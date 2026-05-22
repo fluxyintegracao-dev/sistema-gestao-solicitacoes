@@ -68,6 +68,7 @@
 ## Prioridades da diretoria
 - `DIR_ADMIN` e `SUPERADMIN` podem abrir lotes de prioridade para `PUBLICA` ou `PRIVADA`
 - `DIR_OBRAS_PUBLICAS` e `DIR_OBRAS_PRIVADAS` podem abrir pedidos de urgencia apenas para a propria classificacao e finalizar o pedido para aprovacao da `DIR_ADMIN` ou do setor `DIRETORIA`
+- ao finalizar o pedido de urgencia, o lote deixa de ficar `ABERTO` e passa para `AGUARDANDO_APROVACAO`
 - o lote registra:
   - classificacao alvo
   - diretoria alvo resolvida pela configuracao de aprovacao

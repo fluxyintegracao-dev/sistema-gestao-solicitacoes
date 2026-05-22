@@ -21,6 +21,7 @@ const FILTROS_DISPONIVEIS_VAZIOS = {
   status: [],
   tipo_ids: []
 };
+const STATUS_LOTE_COM_SELECAO = new Set(['ABERTO', 'AGUARDANDO_APROVACAO']);
 
 function formatarValor(valor) {
   const numero = Number(valor);
@@ -62,6 +63,7 @@ function BadgeStatus({ status }) {
   const valor = String(status || '').trim().toUpperCase();
   const classes = {
     ABERTO: 'bg-amber-100 text-amber-800 border-amber-200',
+    AGUARDANDO_APROVACAO: 'bg-blue-100 text-blue-800 border-blue-200',
     FINALIZADO: 'bg-emerald-100 text-emerald-800 border-emerald-200',
     CANCELADO: 'bg-slate-100 text-slate-700 border-slate-200'
   };
@@ -167,11 +169,13 @@ export default function PrioridadesDiretoria() {
   const isLoteSolicitacaoDiretoria = String(detalhe?.tipo_lote || '').toUpperCase() === 'SOLICITACAO_DIRETORIA';
   const isCriacaoDirAdmin = Boolean(permissoes.is_dir_admin || permissoes.is_superadmin);
   const podeEditarSelecaoLote = Boolean(detalhe?.pode_editar_selecao || detalhe?.pode_finalizar);
+  const statusDetalhe = String(detalhe?.status || '').toUpperCase();
+  const statusPermiteSelecao = STATUS_LOTE_COM_SELECAO.has(statusDetalhe);
   const podeFinalizarPedidoDiretoria = Boolean(
     isLoteSolicitacaoDiretoria &&
     podeEditarSelecaoLote &&
     !detalhe?.pode_finalizar &&
-    detalhe?.status === 'ABERTO'
+    statusDetalhe === 'ABERTO'
   );
   const opcoesObras = useMemo(() => (
     obrasDisponiveis.map((obra) => ({
@@ -270,7 +274,7 @@ export default function PrioridadesDiretoria() {
   }, [loteSelecionadoId]);
 
   useEffect(() => {
-    if (!detalhe?.id || detalhe.status !== 'ABERTO' || !podeEditarSelecaoLote) {
+    if (!detalhe?.id || !statusPermiteSelecao || !podeEditarSelecaoLote) {
       setSolicitacoesDisponiveis([]);
       setObrasDisponiveis([]);
       setStatusDisponiveis([]);
@@ -288,12 +292,12 @@ export default function PrioridadesDiretoria() {
     }, 250);
 
     return () => clearTimeout(timeout);
-  }, [detalhe?.id, detalhe?.status, podeEditarSelecaoLote, buscaDisponiveis, filtrosDisponiveis]);
+  }, [detalhe?.id, statusPermiteSelecao, podeEditarSelecaoLote, buscaDisponiveis, filtrosDisponiveis]);
 
   useEffect(() => {
-    if (!detalhe?.id || detalhe.status !== 'ABERTO' || !podeEditarSelecaoLote) return;
+    if (!detalhe?.id || !statusPermiteSelecao || !podeEditarSelecaoLote) return;
     salvarRascunhoSelecao(detalhe.id, selecionadasIds, selecionadasCache);
-  }, [detalhe?.id, detalhe?.status, podeEditarSelecaoLote, selecionadasIds, selecionadasCache, user?.id]);
+  }, [detalhe?.id, statusPermiteSelecao, podeEditarSelecaoLote, selecionadasIds, selecionadasCache, user?.id]);
 
   const mapaDisponiveis = useMemo(() => {
     const mapa = new Map();
@@ -319,7 +323,7 @@ export default function PrioridadesDiretoria() {
     const valorDisponivel = Number(detalhe?.valor_disponivel || 0);
     const valorUtilizadoBase = Number(detalhe?.valor_utilizado || 0);
     const itensBase = Number(detalhe?.itens?.length || detalhe?.itens_count || 0);
-    const abertoComSelecao = detalhe?.status === 'ABERTO' && podeEditarSelecaoLote;
+    const abertoComSelecao = statusPermiteSelecao && podeEditarSelecaoLote;
 
     const valorUtilizadoProjetado = abertoComSelecao
       ? totalSelecionado
@@ -345,7 +349,7 @@ export default function PrioridadesDiretoria() {
     detalhe?.valor_utilizado,
     detalhe?.itens,
     detalhe?.itens_count,
-    detalhe?.status,
+    statusPermiteSelecao,
     podeEditarSelecaoLote,
     isLoteSolicitacaoDiretoria,
     solicitacoesSelecionadas.length,
@@ -418,8 +422,9 @@ export default function PrioridadesDiretoria() {
       const data = await getLotePrioridadeDiretoria(id);
       const item = data?.item || null;
       const itensSalvos = Array.isArray(item?.itens) ? item.itens : [];
+      const statusItem = String(item?.status || '').toUpperCase();
 
-      if (item?.status === 'ABERTO') {
+      if (STATUS_LOTE_COM_SELECAO.has(statusItem)) {
         const idsSalvos = itensSalvos
           .map((linha) => Number(linha?.solicitacao?.id))
           .filter((numero) => Number.isInteger(numero) && numero > 0);
@@ -432,9 +437,13 @@ export default function PrioridadesDiretoria() {
             };
           }
         });
-        const rascunho = lerRascunhoSelecao(id);
+        const rascunho = statusItem === 'ABERTO' ? lerRascunhoSelecao(id) : null;
         const idsRascunho = normalizarIdsSelecao(rascunho?.ids);
         const cacheRascunho = rascunho?.cache && typeof rascunho.cache === 'object' ? rascunho.cache : {};
+
+        if (statusItem !== 'ABERTO') {
+          removerRascunhoSelecao(id);
+        }
 
         if (rascunho) {
           setSelecionadasIds(idsRascunho);
@@ -888,6 +897,7 @@ export default function PrioridadesDiretoria() {
             >
               <option value="">Todos</option>
               <option value="ABERTO">Abertos</option>
+              <option value="AGUARDANDO_APROVACAO">Aguardando aprovacao</option>
               <option value="FINALIZADO">Finalizados</option>
               <option value="CANCELADO">Cancelados</option>
             </select>
@@ -1020,13 +1030,13 @@ export default function PrioridadesDiretoria() {
                   destaque={resumoLote.possuiPrevia}
                 />
                 <ResumoCard
-                  label={detalhe?.status === 'ABERTO' ? 'Itens selecionados' : 'Itens autorizados'}
+                  label={statusPermiteSelecao ? 'Itens selecionados' : 'Itens autorizados'}
                   value={String(resumoLote.itensProjetados)}
                   helper={resumoLote.possuiPrevia ? `${solicitacoesSelecionadas.length} item(ns) selecionado(s)` : null}
                 />
               </div>
 
-              {detalhe.status === 'ABERTO' && podeEditarSelecaoLote && (
+              {statusPermiteSelecao && podeEditarSelecaoLote && (
                 <div className="space-y-3">
                   <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-[minmax(210px,1fr)_minmax(170px,0.8fr)_minmax(170px,0.8fr)_minmax(190px,0.9fr)_minmax(250px,1fr)]">
                     <input
@@ -1185,19 +1195,27 @@ export default function PrioridadesDiretoria() {
                 </div>
               )}
 
-              {detalhe.status === 'ABERTO' && !podeEditarSelecaoLote && (
+              {statusPermiteSelecao && !podeEditarSelecaoLote && (
                 <div className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-600">
-                  Este lote ainda esta aberto. Apenas a diretoria responsavel pode selecionar solicitacoes.
+                  {statusDetalhe === 'AGUARDANDO_APROVACAO'
+                    ? 'Este pedido ja foi enviado para aprovacao. A DIR_ADMIN, o setor DIRETORIA ou o SUPERADMIN podem finalizar o lote.'
+                    : 'Este lote ainda esta aberto. Apenas a diretoria responsavel pode selecionar solicitacoes.'}
                 </div>
               )}
 
-              {detalhe.status !== 'ABERTO' && (
+              {(!statusPermiteSelecao || !podeEditarSelecaoLote) && (
                 <div className="space-y-3">
                   <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
                     <div>
-                      <h3 className="text-base font-medium">Solicitacoes autorizadas</h3>
+                      <h3 className="text-base font-medium">
+                        {statusDetalhe === 'FINALIZADO' ? 'Solicitacoes autorizadas' : 'Solicitacoes vinculadas'}
+                      </h3>
                       <span className="text-sm text-gray-500">
-                        Finalizado em {formatarDataHora(detalhe.finalizado_em)}
+                        {statusDetalhe === 'FINALIZADO'
+                          ? `Finalizado em ${formatarDataHora(detalhe.finalizado_em)}`
+                          : statusDetalhe === 'AGUARDANDO_APROVACAO'
+                            ? 'Pedido aguardando aprovacao'
+                            : 'Lote aberto'}
                       </span>
                     </div>
                     <input
@@ -1221,7 +1239,9 @@ export default function PrioridadesDiretoria() {
                           <th className="text-left px-3 py-2.5">Codigo</th>
                           <th className="text-left px-3 py-2.5">Obra</th>
                           <th className="text-left px-3 py-2.5">Tipo</th>
-                          <th className="text-left px-3 py-2.5">Autorizado em</th>
+                          <th className="text-left px-3 py-2.5">
+                            {statusDetalhe === 'FINALIZADO' ? 'Autorizado em' : 'Vinculado em'}
+                          </th>
                           <th className="text-right px-3 py-2.5">Valor</th>
                           <th className="text-left px-3 py-2.5">Status</th>
                         </tr>
@@ -1256,7 +1276,9 @@ export default function PrioridadesDiretoria() {
                             </td>
                             <td className="px-3 py-2.5">{item.solicitacao?.obra?.nome || '-'}</td>
                             <td className="px-3 py-2.5">{item.solicitacao?.tipo?.nome || '-'}</td>
-                            <td className="px-3 py-2.5">{formatarDataHora(item.autorizado_em)}</td>
+                            <td className="px-3 py-2.5">
+                              {statusDetalhe === 'FINALIZADO' ? formatarDataHora(item.autorizado_em) : '-'}
+                            </td>
                             <td className="px-3 py-2.5 text-right font-medium">{formatarValor(item.valor_considerado)}</td>
                             <td className="px-3 py-2.5">
                               <BadgeStatusSolicitacao status={item.solicitacao?.status_global} />
