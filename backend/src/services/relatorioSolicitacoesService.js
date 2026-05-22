@@ -109,6 +109,13 @@ function sortByTotalDesc(items) {
   return Array.from(items.values()).sort((a, b) => Number(b.total || 0) - Number(a.total || 0));
 }
 
+function getLatestResponsavel(historicosItem = []) {
+  return historicosItem.find((item) =>
+    ['RESPONSAVEL_ATRIBUIDO', 'RESPONSAVEL_ASSUMIU'].includes(String(item.acao || '').toUpperCase()) &&
+    item.usuario
+  );
+}
+
 function isConcluida(status) {
   return STATUS_CONCLUIDOS.has(normalizeToken(status));
 }
@@ -210,7 +217,10 @@ async function relatorioSolicitacoesOperacional({ user, periodo, dataInicio, dat
   const historicos = ids.length
     ? await Historico.findAll({
         where: { solicitacao_id: { [Op.in]: ids } },
-        attributes: ['solicitacao_id', 'acao', 'setor', 'createdAt'],
+        attributes: ['solicitacao_id', 'usuario_responsavel_id', 'acao', 'setor', 'createdAt'],
+        include: [
+          { model: User, as: 'usuario', attributes: ['id', 'nome'] }
+        ],
         order: [['createdAt', 'DESC']]
       })
     : [];
@@ -228,6 +238,8 @@ async function relatorioSolicitacoesOperacional({ user, periodo, dataInicio, dat
   const setorMap = new Map();
   const obraMap = new Map();
   const tipoMap = new Map();
+  const criadorMap = new Map();
+  const responsavelMap = new Map();
   const now = new Date();
   const gargalos = [];
   const resumo = {
@@ -250,6 +262,7 @@ async function relatorioSolicitacoesOperacional({ user, periodo, dataInicio, dat
     const valor = toNumber(plain.valor);
     const concluida = isConcluida(plain.status_global);
     const historicosItem = historicosPorSolicitacao.get(Number(plain.id)) || [];
+    const responsavelAtual = getLatestResponsavel(historicosItem);
     const ultimaMovimentacao = historicosItem[0]?.createdAt || plain.updatedAt || plain.createdAt;
     const diasParada = concluida ? 0 : diffDays(ultimaMovimentacao, now);
     const diasAberta = concluida ? 0 : diffDays(plain.createdAt, now);
@@ -291,6 +304,14 @@ async function relatorioSolicitacoesOperacional({ user, periodo, dataInicio, dat
       tipo_solicitacao_id: plain.tipo_solicitacao_id || null,
       tipo_nome: plain.tipo?.nome || 'Sem tipo'
     }).valor_total += valor;
+    incrementMap(criadorMap, plain.criado_por || 'SEM_CRIADOR', {
+      usuario_id: plain.criado_por || null,
+      usuario_nome: plain.criador?.nome || 'Sem criador'
+    }).valor_total += valor;
+    incrementMap(responsavelMap, responsavelAtual?.usuario_responsavel_id || 'SEM_RESPONSAVEL', {
+      usuario_id: responsavelAtual?.usuario_responsavel_id || null,
+      usuario_nome: responsavelAtual?.usuario?.nome || 'Sem responsavel'
+    }).valor_total += valor;
 
     if (!concluida && Number(diasParada || 0) >= 3) {
       gargalos.push({
@@ -302,6 +323,7 @@ async function relatorioSolicitacoesOperacional({ user, periodo, dataInicio, dat
         obra_nome: plain.obra?.nome || null,
         tipo_nome: plain.tipo?.nome || null,
         criado_por_nome: plain.criador?.nome || null,
+        responsavel_nome: responsavelAtual?.usuario?.nome || null,
         criada_em: plain.createdAt,
         ultima_movimentacao_em: ultimaMovimentacao,
         dias_parada: diasParada,
@@ -339,6 +361,8 @@ async function relatorioSolicitacoesOperacional({ user, periodo, dataInicio, dat
     por_setor: sortByTotalDesc(setorMap),
     por_obra: sortByTotalDesc(obraMap).slice(0, 20),
     por_tipo: sortByTotalDesc(tipoMap).slice(0, 20),
+    por_criador: sortByTotalDesc(criadorMap).slice(0, 20),
+    por_responsavel: sortByTotalDesc(responsavelMap).slice(0, 20),
     gargalos: gargalos
       .sort((a, b) => Number(b.dias_parada || 0) - Number(a.dias_parada || 0))
       .slice(0, 30)

@@ -32,10 +32,23 @@ const OBRA_COLUMNS = [
   { key: 'valor', width: 140, minWidth: 110 }
 ];
 
+const TIPO_COLUMNS = [
+  { key: 'tipo', width: 230, minWidth: 150 },
+  { key: 'total', width: 100, minWidth: 80 },
+  { key: 'valor', width: 140, minWidth: 110 }
+];
+
+const USUARIO_COLUMNS = [
+  { key: 'usuario', width: 230, minWidth: 150 },
+  { key: 'total', width: 100, minWidth: 80 },
+  { key: 'valor', width: 140, minWidth: 110 }
+];
+
 const GARGALO_COLUMNS = [
   { key: 'codigo', width: 130, minWidth: 100 },
   { key: 'setor', width: 150, minWidth: 110 },
   { key: 'status', width: 150, minWidth: 110 },
+  { key: 'responsavel', width: 170, minWidth: 120 },
   { key: 'obra', width: 210, minWidth: 140 },
   { key: 'tipo', width: 180, minWidth: 120 },
   { key: 'dias', width: 112, minWidth: 92 },
@@ -163,6 +176,9 @@ export default function SolicitacoesRelatorioOperacional() {
   const porStatus = useMemo(() => (Array.isArray(relatorio?.por_status) ? relatorio.por_status : []), [relatorio]);
   const porSetor = useMemo(() => (Array.isArray(relatorio?.por_setor) ? relatorio.por_setor : []), [relatorio]);
   const porObra = useMemo(() => (Array.isArray(relatorio?.por_obra) ? relatorio.por_obra : []), [relatorio]);
+  const porTipo = useMemo(() => (Array.isArray(relatorio?.por_tipo) ? relatorio.por_tipo : []), [relatorio]);
+  const porCriador = useMemo(() => (Array.isArray(relatorio?.por_criador) ? relatorio.por_criador : []), [relatorio]);
+  const porResponsavel = useMemo(() => (Array.isArray(relatorio?.por_responsavel) ? relatorio.por_responsavel : []), [relatorio]);
   const gargalos = useMemo(() => (Array.isArray(relatorio?.gargalos) ? relatorio.gargalos : []), [relatorio]);
 
   function aplicarFiltros(event) {
@@ -411,6 +427,98 @@ export default function SolicitacoesRelatorioOperacional() {
         </div>
       </div>
 
+      <div className="mt-4 grid gap-4 xl:grid-cols-3">
+        <div className="card sol-surface-card overflow-hidden">
+          <h2 className="text-lg font-bold text-[var(--c-text)] mb-3">Por tipo</h2>
+          <div className="sol-table-wrapper">
+            <ResizableTable className="sol-table" columns={TIPO_COLUMNS} storageKey="fluxy.solicitacoes.relatorio.tipo.columns">
+              <thead>
+                <tr>
+                  <ResizableTh columnKey="tipo">Tipo</ResizableTh>
+                  <ResizableTh columnKey="total" className="text-right">Qtd.</ResizableTh>
+                  <ResizableTh columnKey="valor" className="text-right">Valor</ResizableTh>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <EmptyRow colSpan={3}>Carregando...</EmptyRow>
+                ) : porTipo.length === 0 ? (
+                  <EmptyRow colSpan={3}>Sem dados no periodo.</EmptyRow>
+                ) : (
+                  porTipo.map((item) => (
+                    <tr key={item.key}>
+                      <td>{item.tipo_nome || 'Sem tipo'}</td>
+                      <td className="text-right">{formatNumber(item.total)}</td>
+                      <td className="text-right">{formatCurrency(item.valor_total)}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </ResizableTable>
+          </div>
+        </div>
+
+        <div className="card sol-surface-card overflow-hidden">
+          <h2 className="text-lg font-bold text-[var(--c-text)] mb-3">Por responsavel atual</h2>
+          <div className="sol-table-wrapper">
+            <ResizableTable className="sol-table" columns={USUARIO_COLUMNS} storageKey="fluxy.solicitacoes.relatorio.responsavel.columns">
+              <thead>
+                <tr>
+                  <ResizableTh columnKey="usuario">Responsavel</ResizableTh>
+                  <ResizableTh columnKey="total" className="text-right">Qtd.</ResizableTh>
+                  <ResizableTh columnKey="valor" className="text-right">Valor</ResizableTh>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <EmptyRow colSpan={3}>Carregando...</EmptyRow>
+                ) : porResponsavel.length === 0 ? (
+                  <EmptyRow colSpan={3}>Sem dados no periodo.</EmptyRow>
+                ) : (
+                  porResponsavel.map((item) => (
+                    <tr key={item.key}>
+                      <td>{item.usuario_nome || 'Sem responsavel'}</td>
+                      <td className="text-right">{formatNumber(item.total)}</td>
+                      <td className="text-right">{formatCurrency(item.valor_total)}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </ResizableTable>
+          </div>
+        </div>
+
+        <div className="card sol-surface-card overflow-hidden">
+          <h2 className="text-lg font-bold text-[var(--c-text)] mb-3">Por criador</h2>
+          <div className="sol-table-wrapper">
+            <ResizableTable className="sol-table" columns={USUARIO_COLUMNS} storageKey="fluxy.solicitacoes.relatorio.criador.columns">
+              <thead>
+                <tr>
+                  <ResizableTh columnKey="usuario">Criador</ResizableTh>
+                  <ResizableTh columnKey="total" className="text-right">Qtd.</ResizableTh>
+                  <ResizableTh columnKey="valor" className="text-right">Valor</ResizableTh>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <EmptyRow colSpan={3}>Carregando...</EmptyRow>
+                ) : porCriador.length === 0 ? (
+                  <EmptyRow colSpan={3}>Sem dados no periodo.</EmptyRow>
+                ) : (
+                  porCriador.map((item) => (
+                    <tr key={item.key}>
+                      <td>{item.usuario_nome || 'Sem criador'}</td>
+                      <td className="text-right">{formatNumber(item.total)}</td>
+                      <td className="text-right">{formatCurrency(item.valor_total)}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </ResizableTable>
+          </div>
+        </div>
+      </div>
+
       <div className="mt-4 card sol-surface-card overflow-hidden">
         <div className="app-page-header-row mb-3">
           <div>
@@ -425,6 +533,7 @@ export default function SolicitacoesRelatorioOperacional() {
                 <ResizableTh columnKey="codigo">Solicitacao</ResizableTh>
                 <ResizableTh columnKey="setor">Setor</ResizableTh>
                 <ResizableTh columnKey="status">Status</ResizableTh>
+                <ResizableTh columnKey="responsavel">Responsavel</ResizableTh>
                 <ResizableTh columnKey="obra">Obra / Centro</ResizableTh>
                 <ResizableTh columnKey="tipo">Tipo</ResizableTh>
                 <ResizableTh columnKey="dias" className="text-right">Parada</ResizableTh>
@@ -433,9 +542,9 @@ export default function SolicitacoesRelatorioOperacional() {
             </thead>
             <tbody>
               {loading ? (
-                <EmptyRow colSpan={7}>Carregando gargalos...</EmptyRow>
+                <EmptyRow colSpan={8}>Carregando gargalos...</EmptyRow>
               ) : gargalos.length === 0 ? (
-                <EmptyRow colSpan={7}>Nenhum gargalo encontrado nos filtros selecionados.</EmptyRow>
+                <EmptyRow colSpan={8}>Nenhum gargalo encontrado nos filtros selecionados.</EmptyRow>
               ) : (
                 gargalos.map((item) => (
                   <tr key={item.id}>
@@ -447,6 +556,7 @@ export default function SolicitacoesRelatorioOperacional() {
                     </td>
                     <td>{formatLabel(item.setor)}</td>
                     <td>{formatLabel(item.status)}</td>
+                    <td>{item.responsavel_nome || '-'}</td>
                     <td>{item.obra_nome || '-'}</td>
                     <td>{item.tipo_nome || '-'}</td>
                     <td className="text-right">
