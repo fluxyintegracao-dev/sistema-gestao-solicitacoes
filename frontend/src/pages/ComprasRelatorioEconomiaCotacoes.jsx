@@ -231,7 +231,7 @@ export default function ComprasRelatorioEconomiaCotacoes() {
           <strong className="dashboard-metric-value" style={{ color: metricColor(resumo.economia_total) }}>
             {formatMoney(resumo.economia_total)}
           </strong>
-          <small className="dashboard-metric-detail">Menor preco menos vencedor</small>
+          <small className="dashboard-metric-detail">Economia efetiva, sem sobrepreco</small>
         </div>
         <div className="dashboard-metric-card dashboard-metric-card--red">
           <span className="dashboard-metric-label">Sobrepreco</span>
@@ -251,19 +251,20 @@ export default function ComprasRelatorioEconomiaCotacoes() {
                 <th>Menor preco</th>
                 <th>Vencedor</th>
                 <th>Economia</th>
+                <th>Sobrepreco</th>
                 <th>Sinal</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="text-center text-[var(--c-muted)] py-6">
+                  <td colSpan={8} className="text-center text-[var(--c-muted)] py-6">
                     Carregando economia das cotacoes...
                   </td>
                 </tr>
               ) : itens.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center text-[var(--c-muted)] py-6">
+                  <td colSpan={8} className="text-center text-[var(--c-muted)] py-6">
                     Nenhum item com vencedor encontrado para os filtros selecionados.
                   </td>
                 </tr>
@@ -295,6 +296,9 @@ export default function ComprasRelatorioEconomiaCotacoes() {
                     </td>
                     <td style={{ color: metricColor(linha.economia), fontWeight: 700 }}>
                       {formatMoney(linha.economia)}
+                    </td>
+                    <td style={{ color: Number(linha.sobrepreco || 0) > 0 ? 'var(--c-danger)' : 'var(--c-muted)', fontWeight: 700 }}>
+                      {formatMoney(linha.sobrepreco)}
                     </td>
                     <td>
                       {linha.selecionou_menor_preco ? (

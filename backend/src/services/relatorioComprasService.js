@@ -411,8 +411,10 @@ function buildEconomiaLinha({ solicitacao, itemBase, respostas }) {
     return null;
   }
 
-  const economia = roundMoney(menor.valor_total - vencedor.valor_total);
-  const selecionouMenorPreco = Number(vencedor.resposta_item_id) === Number(menor.resposta_item_id);
+  const diferencaVencedorMenor = roundMoney(vencedor.valor_total - menor.valor_total);
+  const sobrepreco = diferencaVencedorMenor > 0 ? diferencaVencedorMenor : 0;
+  const economia = diferencaVencedorMenor < 0 ? Math.abs(diferencaVencedorMenor) : 0;
+  const selecionouMenorPreco = sobrepreco === 0;
 
   return {
     solicitacao: {
@@ -426,7 +428,7 @@ function buildEconomiaLinha({ solicitacao, itemBase, respostas }) {
     menor_preco: menor,
     vencedor,
     economia,
-    sobrepreco: economia < 0 ? Math.abs(economia) : 0,
+    sobrepreco,
     selecionou_menor_preco: selecionouMenorPreco
   };
 }

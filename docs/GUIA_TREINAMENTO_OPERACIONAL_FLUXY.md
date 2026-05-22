@@ -2004,7 +2004,8 @@ Importante:
 
 - O relatorio considera somente cotacoes encerradas, porque apenas cotacoes encerradas possuem vencedor definitivo.
 - O menor preco considera respostas disponiveis com preco informado.
-- A economia e calculada como `menor preco disponivel - preco vencedor`; valor negativo indica escolha acima do menor preco.
+- A economia nunca deve ser negativa. Quando o vencedor fica acima do menor preco disponivel, o valor entra em `Sobrepreco`.
+- Quando o vencedor tem exatamente o mesmo valor do menor preco disponivel, mesmo que seja outro fornecedor empatado, o item conta como `Menor preco`.
 - Esse relatorio nao deduz justificativa por texto. Ele apenas mostra objetivamente onde a escolha ficou no menor preco e onde ficou acima.
 
 Relatorio de Ciclo de Compras:
