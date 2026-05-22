@@ -69,6 +69,23 @@ function todayDateOnly() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function monthKeyFromDate(value) {
+  const date = toDate(value);
+  if (!date) {
+    return 'SEM_DATA';
+  }
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  return `${date.getFullYear()}-${month}`;
+}
+
+function monthLabelFromKey(key) {
+  if (!key || key === 'SEM_DATA') {
+    return 'Sem data';
+  }
+  const [year, month] = String(key).split('-');
+  return `${month}/${year}`;
+}
+
 function calculateRespostaValor(resposta) {
   if (!resposta || !resposta.disponivel || resposta.preco == null) {
     return 0;
@@ -1031,6 +1048,164 @@ async function relatorioPrecosInsumosFornecedores({ obraId, dataInicio, dataFim,
   };
 }
 
+async function relatorioEvolucaoCompras({ obraId, dataInicio, dataFim, obraIds } = {}) {
+  const pedidos = await PedidoCompra.findAll({
+    where: buildPedidoCriacaoWhere({ obraId, obraIds, dataInicio, dataFim }),
+    attributes: ['id', 'obra_id', 'fornecedor_compra_id', 'status', 'valor_total', 'createdAt', 'encerrado_em'],
+    include: [
+      { model: Obra, as: 'obra', attributes: ['id', 'nome'] },
+      { model: FornecedorCompra, as: 'fornecedor', attributes: ['id', 'nome'] },
+      { model: PedidoCompraItem, as: 'itens', attributes: ['id', 'valor_total', 'removido'] }
+    ],
+    order: [['createdAt', 'ASC'], ['id', 'ASC']]
+  });
+
+  const mesesMap = new Map();
+  const obrasMap = new Map();
+  const statusMap = new Map();
+  const fornecedoresIds = new Set();
+
+  pedidos.forEach((pedido) => {
+    const plain = pedido.toJSON ? pedido.toJSON() : pedido;
+    const mesKey = monthKeyFromDate(plain.createdAt);
+    const statusKey = normalizeStatus(plain.status);
+    const valor = roundMoney(plain.valor_total);
+    const itensValidos = (plain.itens || []).filter((item) => !item.removido);
+
+    if (plain.fornecedor?.id) {
+      fornecedoresIds.add(Number(plain.fornecedor.id));
+    }
+
+    if (!mesesMap.has(mesKey)) {
+      mesesMap.set(mesKey, {
+        key: mesKey,
+        mes: mesKey,
+        label: monthLabelFromKey(mesKey),
+        pedidos: 0,
+        pedidos_encerrados: 0,
+        fornecedores_ids: new Set(),
+        obras_ids: new Set(),
+        itens: 0,
+        valor_total: 0,
+        status: new Map()
+      });
+    }
+    const mesResumo = mesesMap.get(mesKey);
+    mesResumo.pedidos += 1;
+    mesResumo.pedidos_encerrados += plain.encerrado_em ? 1 : 0;
+    mesResumo.itens += itensValidos.length;
+    mesResumo.valor_total = roundMoney(mesResumo.valor_total + valor);
+    mesResumo.status.set(statusKey, (mesResumo.status.get(statusKey) || 0) + 1);
+    if (plain.fornecedor?.id) {
+      mesResumo.fornecedores_ids.add(Number(plain.fornecedor.id));
+    }
+    if (plain.obra_id) {
+      mesResumo.obras_ids.add(Number(plain.obra_id));
+    }
+
+    const statusResumo = incrementResumoMap(statusMap, statusKey, formatStatusLabel(statusKey));
+    statusResumo.valor_total = roundMoney(statusResumo.valor_total + valor);
+
+    const obraKey = plain.obra_id ? String(plain.obra_id) : 'SEM_OBRA';
+    if (!obrasMap.has(obraKey)) {
+      obrasMap.set(obraKey, {
+        key: obraKey,
+        obra_id: plain.obra_id || null,
+        obra_nome: plain.obra?.nome || 'Sem obra/centro',
+        pedidos: 0,
+        fornecedores_ids: new Set(),
+        itens: 0,
+        valor_total: 0,
+        meses: new Map()
+      });
+    }
+    const obraResumo = obrasMap.get(obraKey);
+    obraResumo.pedidos += 1;
+    obraResumo.itens += itensValidos.length;
+    obraResumo.valor_total = roundMoney(obraResumo.valor_total + valor);
+    if (plain.fornecedor?.id) {
+      obraResumo.fornecedores_ids.add(Number(plain.fornecedor.id));
+    }
+    if (!obraResumo.meses.has(mesKey)) {
+      obraResumo.meses.set(mesKey, { pedidos: 0, valor_total: 0 });
+    }
+    const obraMes = obraResumo.meses.get(mesKey);
+    obraMes.pedidos += 1;
+    obraMes.valor_total = roundMoney(obraMes.valor_total + valor);
+  });
+
+  const meses = Array.from(mesesMap.values())
+    .map((item) => ({
+      ...item,
+      fornecedores: item.fornecedores_ids.size,
+      obras: item.obras_ids.size,
+      fornecedores_ids: undefined,
+      obras_ids: undefined,
+      valor_total: roundMoney(item.valor_total),
+      ticket_medio: item.pedidos > 0 ? roundMoney(item.valor_total / item.pedidos) : 0,
+      status: Array.from(item.status.entries()).map(([key, total]) => ({
+        key,
+        label: formatStatusLabel(key),
+        total
+      })).sort((a, b) => Number(b.total || 0) - Number(a.total || 0))
+    }))
+    .sort((a, b) => String(a.key).localeCompare(String(b.key)));
+
+  const obras = Array.from(obrasMap.values())
+    .map((item) => ({
+      ...item,
+      fornecedores: item.fornecedores_ids.size,
+      fornecedores_ids: undefined,
+      valor_total: roundMoney(item.valor_total),
+      ticket_medio: item.pedidos > 0 ? roundMoney(item.valor_total / item.pedidos) : 0,
+      meses: Array.from(item.meses.entries()).map(([key, value]) => ({
+        mes: key,
+        label: monthLabelFromKey(key),
+        pedidos: value.pedidos,
+        valor_total: roundMoney(value.valor_total)
+      })).sort((a, b) => String(a.mes).localeCompare(String(b.mes)))
+    }))
+    .sort((a, b) => {
+      if (Number(b.valor_total || 0) !== Number(a.valor_total || 0)) {
+        return Number(b.valor_total || 0) - Number(a.valor_total || 0);
+      }
+      return String(a.obra_nome || '').localeCompare(String(b.obra_nome || ''), 'pt-BR');
+    });
+
+  const valorTotal = roundMoney(pedidos.reduce((sum, pedido) => sum + toNumber(pedido.valor_total), 0));
+  const melhorMes = meses.reduce((best, item) => {
+    if (!best || Number(item.valor_total || 0) > Number(best.valor_total || 0)) {
+      return item;
+    }
+    return best;
+  }, null);
+
+  return {
+    filtros: {
+      obra_id: obraId || null,
+      data_inicio: dataInicio || null,
+      data_fim: dataFim || null
+    },
+    resumo: {
+      pedidos: pedidos.length,
+      meses: meses.length,
+      fornecedores: fornecedoresIds.size,
+      obras: obras.length,
+      valor_total: valorTotal,
+      ticket_medio: pedidos.length > 0 ? roundMoney(valorTotal / pedidos.length) : 0,
+      maior_mes: melhorMes ? {
+        mes: melhorMes.mes,
+        label: melhorMes.label,
+        valor_total: melhorMes.valor_total,
+        pedidos: melhorMes.pedidos
+      } : null
+    },
+    meses,
+    obras,
+    status: finalizeResumoMap(statusMap)
+  };
+}
+
 async function relatorioCategoriasInsumosCompras({ obraId, dataInicio, dataFim, obraIds } = {}) {
   const itens = await PedidoCompraItem.findAll({
     where: { removido: false },
@@ -1672,6 +1847,7 @@ module.exports = {
   relatorioComprasPorFornecedor,
   relatorioDemandaPedidosCompras,
   relatorioEconomiaCotacoes,
+  relatorioEvolucaoCompras,
   relatorioFornecedoresCompras,
   relatorioPendenciasCotacoesCompras,
   relatorioPrecosInsumosFornecedores

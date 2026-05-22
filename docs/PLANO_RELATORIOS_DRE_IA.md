@@ -70,7 +70,9 @@ Base multiempresa e DRE gerencial:
 - O webhook real do Banco do Brasil passou a exigir segredo compartilhado configurado no ambiente, recusar payload sem identificador do evento, registrar auditoria de seguranca e tratar notificacoes repetidas como idempotentes pelo identificador do evento do provedor.
 - A auditoria de pagamentos passou a ter consulta backend para eventos tecnicos por status, tipo, lote, intencao, identificador do provedor e periodo.
 - O Fluxo de Caixa Consolidado passou a destacar necessidade futura de caixa, pior periodo previsto, empresas com saldo previsto negativo, obras/centros com saldo previsto negativo e alertas de consistencia para fluxo sem empresa ou obra/centro.
+- Base Mestre de Insumos e Normalizacao de Itens foi registrada como etapa futura em standby, dependente de alinhamento operacional com diretoria e governanca de cadastro.
 - Compras > Relatorios ganhou Ciclo de Compras, medindo tempos entre criacao, liberacao, envio para fornecedores, resposta, encerramento e geracao de pedido com base nas datas reais registradas no fluxo.
+- Compras > Relatorios ganhou Evolucao Mensal, mostrando curva mensal de pedidos emitidos por valor, ticket medio, fornecedores, obras/centros e status.
 - Compras > Relatorios ganhou Economia em Cotacoes, comparando menor preco disponivel com o fornecedor vencedor em cotacoes encerradas para evidenciar economia, sobrepreco e aderencia ao menor preco.
 - Compras > Relatorios ganhou Relatorio de Fornecedores, com participacao em cotacoes, taxa de resposta, prazo medio, itens respondidos, itens vencedores, valor cotado e valor vencedor calculados por dados estruturados do processo de cotacao.
 - Compras > Relatorios ganhou Pendencias de Cotacoes, destacando cotacoes sem minimo de respostas e fornecedores com prazo vencido sem resposta a partir de campos estruturados.
@@ -196,11 +198,29 @@ Relatorios:
 
 Graficos:
 
-- Curva mensal de compras.
+- Curva mensal de compras. [Entregue em Evolucao Mensal com base na criacao real dos pedidos de compra]
 - Ranking de fornecedores.
 - Compras por categoria.
 - Economia por cotacao.
 - Ciclo medio de compras.
+
+#### Standby: Base Mestre de Insumos e Normalizacao de Itens
+
+Motivo do standby:
+
+- A empresa ainda nao possui base unica de insumos.
+- A obra pode solicitar itens com descricoes livres ou codigos diferentes a cada pedido.
+- Compras consegue cotar e comprar, mas a analise historica de preco por insumo fica limitada quando o mesmo item nasce com cadastros diferentes.
+
+Diretriz futura:
+
+- Pedido da obra deve continuar flexivel para nao travar a operacao.
+- Cadastro mestre de insumos deve ser governado, com codigo unico Fluxy, permissao restrita e revisao antes de criar novo cadastro.
+- Antes de criar novo insumo mestre, o sistema deve sugerir similares e permitir vincular o item solicitado a um insumo existente.
+- Itens nao classificados devem aparecer em fila de saneamento cadastral.
+- Relatorios de preco, ultimo preco, economia e curva ABC devem priorizar `insumo_mestre_id` quando essa camada existir.
+
+Status: planejado, em standby ate alinhamento com diretoria e definicao de disciplina operacional do setor responsavel.
 
 ### Financeiro
 

@@ -85,6 +85,7 @@ const FinanceiroResultadoCentrosCusto = lazy(() => import('./pages/FinanceiroRes
   const ComprasRelatorioCategoriasInsumos = lazy(() => import('./pages/ComprasRelatorioCategoriasInsumos'));
   const ComprasRelatorioComprasFornecedor = lazy(() => import('./pages/ComprasRelatorioComprasFornecedor'));
   const ComprasRelatorioDemandaPedidos = lazy(() => import('./pages/ComprasRelatorioDemandaPedidos'));
+  const ComprasRelatorioEvolucao = lazy(() => import('./pages/ComprasRelatorioEvolucao'));
   const ComprasRelatorioPendenciasCotacoes = lazy(() => import('./pages/ComprasRelatorioPendenciasCotacoes'));
   const ComprasRelatorioPrecosInsumos = lazy(() => import('./pages/ComprasRelatorioPrecosInsumos'));
   const ComprasRelatorioCiclo = lazy(() => import('./pages/ComprasRelatorioCiclo'));
@@ -707,6 +708,7 @@ export default function App() {
         <Route path="compras/relatorios/categorias-insumos" element={<ModuloComprasRoute><ComprasCotacoesRoute><ComprasRelatorioCategoriasInsumos /></ComprasCotacoesRoute></ModuloComprasRoute>} />
         <Route path="compras/relatorios/compras-fornecedor" element={<ModuloComprasRoute><ComprasCotacoesRoute><ComprasRelatorioComprasFornecedor /></ComprasCotacoesRoute></ModuloComprasRoute>} />
         <Route path="compras/relatorios/demanda-pedidos" element={<ModuloComprasRoute><ComprasCotacoesRoute><ComprasRelatorioDemandaPedidos /></ComprasCotacoesRoute></ModuloComprasRoute>} />
+        <Route path="compras/relatorios/evolucao" element={<ModuloComprasRoute><ComprasCotacoesRoute><ComprasRelatorioEvolucao /></ComprasCotacoesRoute></ModuloComprasRoute>} />
         <Route path="compras/relatorios/pendencias-cotacoes" element={<ModuloComprasRoute><ComprasCotacoesRoute><ComprasRelatorioPendenciasCotacoes /></ComprasCotacoesRoute></ModuloComprasRoute>} />
         <Route path="compras/relatorios/precos-insumos" element={<ModuloComprasRoute><ComprasCotacoesRoute><ComprasRelatorioPrecosInsumos /></ComprasCotacoesRoute></ModuloComprasRoute>} />
         <Route path="compras/relatorios/ciclo" element={<ModuloComprasRoute><ComprasCotacoesRoute><ComprasRelatorioCiclo /></ComprasCotacoesRoute></ModuloComprasRoute>} />

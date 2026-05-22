@@ -2020,6 +2020,23 @@ Importante:
 - O relatorio nao transforma cotacao em pedido por deducao. Uma compra so entra como pedido quando existe pedido gerado.
 - O periodo considera a data de criacao da solicitacao de compra e a data de criacao do pedido, conforme a tabela analisada.
 
+Relatorio de Evolucao Mensal:
+
+1. Acesse `Compras > Relatorios`.
+2. Abra `Evolucao mensal`.
+3. Filtre por obra/centro de custo e por periodo de criacao do pedido.
+4. Leia os cards para entender quantidade de pedidos, meses com movimento, valor total, ticket medio, maior mes e fornecedores envolvidos.
+5. Use `Curva mensal` para avaliar se o volume de compras esta subindo, caindo ou concentrado em algum mes.
+6. Use `Compras por obra/centro` para entender quais obras ou centros puxam a curva de compras.
+7. Use `Pedidos por status` para conferir se a curva esta concentrada em pedidos abertos, encerrados ou outro status operacional.
+
+Importante:
+
+- O periodo e agrupamento mensal usam a data real de criacao do pedido de compra.
+- O relatorio nao usa data de cotacao, data de solicitacao ou data de baixa financeira.
+- O valor vem do `valor_total` real do pedido.
+- Essa visao mostra comportamento mensal de compras, nao fluxo de caixa financeiro.
+
 Relatorio de Categorias e Insumos:
 
 1. Acesse `Compras > Relatorios`.
