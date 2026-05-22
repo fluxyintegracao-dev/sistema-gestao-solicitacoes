@@ -51,6 +51,7 @@ const {
   validateCompraPedidoAuditoriaQuery,
   validateCompraPedidoQuery,
   validateCompraQuery,
+  validateCompraRelatorioCicloQuery,
   validateCompraRelatorioEconomiaCotacoesQuery,
   validateCompraRelatorioFornecedoresQuery,
   validateContratoCreateBody,
@@ -1290,6 +1291,7 @@ router.patch('/compras/solicitacoes/:id/encerrar', validateRequest({ params: val
 router.post('/compras/solicitacoes/:id/pedidos', criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Solicitacao de compra'), body: validateCompraPedidoCreateBody }), requireCompraAccess, PedidoCompraController.createFromSolicitacao);
 router.get('/compras/pedidos', validateRequest({ query: validateCompraPedidoQuery }), scopeCompraListAccess, PedidoCompraController.index);
 router.get('/compras/relatorios/auditoria-itens-pedido', validateRequest({ query: validateCompraPedidoAuditoriaQuery }), scopeCompraListAccess, PedidoCompraController.auditoria);
+router.get('/compras/relatorios/ciclo', validateRequest({ query: validateCompraRelatorioCicloQuery }), scopeCompraListAccess, RelatorioComprasController.ciclo);
 router.get('/compras/relatorios/economia-cotacoes', validateRequest({ query: validateCompraRelatorioEconomiaCotacoesQuery }), scopeCompraListAccess, RelatorioComprasController.economiaCotacoes);
 router.get('/compras/relatorios/fornecedores', validateRequest({ query: validateCompraRelatorioFornecedoresQuery }), scopeCompraListAccess, RelatorioComprasController.fornecedores);
 router.get('/compras/pedidos/:id', validateRequest({ params: validateNumericIdParam('id', 'Pedido de compra') }), requirePedidoCompraAccess, PedidoCompraController.show);

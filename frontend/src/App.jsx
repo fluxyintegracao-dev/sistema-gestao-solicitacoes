@@ -81,6 +81,7 @@ const FinanceiroCaixas = lazy(() => import('./pages/FinanceiroCaixas'));
 const FinanceiroResultadoObras = lazy(() => import('./pages/FinanceiroResultadoObras'));
 const FinanceiroResultadoCentrosCusto = lazy(() => import('./pages/FinanceiroResultadoCentrosCusto'));
 const ModuloRelatorios = lazy(() => import('./pages/ModuloRelatorios'));
+const ComprasRelatorioCiclo = lazy(() => import('./pages/ComprasRelatorioCiclo'));
 const ComprasRelatorioEconomiaCotacoes = lazy(() => import('./pages/ComprasRelatorioEconomiaCotacoes'));
 const ComprasRelatorioFornecedores = lazy(() => import('./pages/ComprasRelatorioFornecedores'));
 const Obras = lazy(() => import('./pages/Obras'));
@@ -696,6 +697,7 @@ export default function App() {
         <Route path="financeiro/cadastros" element={<FinanceiroRoute><FinanceiroCadastros /></FinanceiroRoute>} />
         <Route path="compras/relatorios" element={<ModuloComprasRoute><ModuloRelatorios modulo="compras" /></ModuloComprasRoute>} />
         <Route path="compras/relatorios/auditoria" element={<ModuloComprasRoute><BusinessAdminRoute><RelatoriosAdministrativos /></BusinessAdminRoute></ModuloComprasRoute>} />
+        <Route path="compras/relatorios/ciclo" element={<ModuloComprasRoute><ComprasCotacoesRoute><ComprasRelatorioCiclo /></ComprasCotacoesRoute></ModuloComprasRoute>} />
         <Route path="compras/relatorios/economia-cotacoes" element={<ModuloComprasRoute><ComprasCotacoesRoute><ComprasRelatorioEconomiaCotacoes /></ComprasCotacoesRoute></ModuloComprasRoute>} />
         <Route path="compras/relatorios/fornecedores" element={<ModuloComprasRoute><ComprasCotacoesRoute><ComprasRelatorioFornecedores /></ComprasCotacoesRoute></ModuloComprasRoute>} />
         <Route path="relatorios/administrativos" element={<ModuloComprasRoute><BusinessAdminRoute><RelatoriosAdministrativos /></BusinessAdminRoute></ModuloComprasRoute>} />

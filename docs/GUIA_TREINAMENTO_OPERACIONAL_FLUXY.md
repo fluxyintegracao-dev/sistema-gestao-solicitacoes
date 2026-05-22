@@ -2007,6 +2007,21 @@ Importante:
 - A economia e calculada como `menor preco disponivel - preco vencedor`; valor negativo indica escolha acima do menor preco.
 - Esse relatorio nao deduz justificativa por texto. Ele apenas mostra objetivamente onde a escolha ficou no menor preco e onde ficou acima.
 
+Relatorio de Ciclo de Compras:
+
+1. Acesse `Compras > Relatorios`.
+2. Abra `Ciclo de compras`.
+3. Filtre por obra/centro de custo e por periodo de criacao da solicitacao de compra.
+4. Confira os cards de quantidade de solicitacoes, taxa de resposta dos fornecedores, tempo medio da criacao ate o encerramento e tempo medio ate pedido.
+5. Analise os blocos intermediarios para ver onde o processo esta consumindo mais tempo: criacao ate liberacao, liberacao ate primeiro envio e envio ate primeira resposta.
+6. Na tabela, revise cada solicitacao individualmente para identificar gargalos especificos.
+
+Importante:
+
+- O relatorio usa somente datas reais gravadas pelo sistema: criacao, liberacao para compra, envio para fornecedores, resposta de fornecedores, encerramento e criacao do pedido.
+- Quando uma etapa ainda nao aconteceu, o tempo aparece como `-` e nao entra na media daquela etapa.
+- O periodo do filtro considera a data de criacao da solicitacao de compra.
+
 ### 20.4 Relatorios Financeiros
 
 Devem responder:

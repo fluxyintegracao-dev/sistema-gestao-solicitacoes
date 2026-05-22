@@ -2,6 +2,7 @@ const { Op } = require('sequelize');
 const {
   FornecedorCompra,
   Insumo,
+  PedidoCompra,
   SolicitacaoCompra,
   SolicitacaoCompraFornecedor,
   SolicitacaoCompraItem,
@@ -17,6 +18,47 @@ function toNumber(value) {
 
 function roundMoney(value) {
   return Math.round(toNumber(value) * 100) / 100;
+}
+
+function toDate(value) {
+  if (!value) {
+    return null;
+  }
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function diffHours(start, end) {
+  const startedAt = toDate(start);
+  const endedAt = toDate(end);
+  if (!startedAt || !endedAt || endedAt < startedAt) {
+    return null;
+  }
+  return Number(((endedAt.getTime() - startedAt.getTime()) / 36e5).toFixed(2));
+}
+
+function average(values) {
+  const validValues = values.filter((value) => Number.isFinite(Number(value)));
+  if (!validValues.length) {
+    return null;
+  }
+  return Number((validValues.reduce((sum, value) => sum + Number(value), 0) / validValues.length).toFixed(2));
+}
+
+function minDate(values) {
+  const dates = values.map(toDate).filter(Boolean);
+  if (!dates.length) {
+    return null;
+  }
+  return dates.reduce((min, date) => (date < min ? date : min), dates[0]);
+}
+
+function maxDate(values) {
+  const dates = values.map(toDate).filter(Boolean);
+  if (!dates.length) {
+    return null;
+  }
+  return dates.reduce((max, date) => (date > max ? date : max), dates[0]);
 }
 
 function calculateRespostaValor(resposta) {
@@ -73,6 +115,22 @@ function buildSolicitacaoPeriodoWhere({ obraId, obraIds, dataInicio, dataFim }) 
     }
     if (dataFim) {
       where.encerrado_em[Op.lte] = new Date(`${dataFim}T23:59:59.999`);
+    }
+  }
+
+  return where;
+}
+
+function buildSolicitacaoCriacaoWhere({ obraId, obraIds, dataInicio, dataFim }) {
+  const where = buildSolicitacaoWhere({ obraId, obraIds });
+
+  if (dataInicio || dataFim) {
+    where.createdAt = {};
+    if (dataInicio) {
+      where.createdAt[Op.gte] = new Date(`${dataInicio}T00:00:00.000`);
+    }
+    if (dataFim) {
+      where.createdAt[Op.lte] = new Date(`${dataFim}T23:59:59.999`);
     }
   }
 
@@ -498,7 +556,112 @@ async function relatorioEconomiaCotacoes({ obraId, dataInicio, dataFim, obraIds 
   };
 }
 
+function buildCicloLinha(solicitacao) {
+  const criadoEm = toDate(solicitacao.createdAt);
+  const liberadoEm = toDate(solicitacao.liberado_para_compra_em);
+  const encerradoEm = toDate(solicitacao.encerrado_em);
+  const fornecedores = solicitacao.fornecedores || [];
+  const pedidos = solicitacao.pedidos || [];
+  const primeiroEnvio = minDate(fornecedores.map((fornecedor) => fornecedor.enviado_em));
+  const primeiraResposta = minDate(fornecedores.map((fornecedor) => fornecedor.respondido_em));
+  const ultimaResposta = maxDate(fornecedores.map((fornecedor) => fornecedor.respondido_em));
+  const primeiroPedido = minDate(pedidos.map((pedido) => pedido.createdAt));
+
+  const tempos = {
+    criacao_para_liberacao_horas: diffHours(criadoEm, liberadoEm),
+    liberacao_para_envio_horas: diffHours(liberadoEm, primeiroEnvio),
+    envio_para_primeira_resposta_horas: diffHours(primeiroEnvio, primeiraResposta),
+    envio_para_ultima_resposta_horas: diffHours(primeiroEnvio, ultimaResposta),
+    criacao_para_encerramento_horas: diffHours(criadoEm, encerradoEm),
+    encerramento_para_pedido_horas: diffHours(encerradoEm, primeiroPedido),
+    ciclo_total_ate_pedido_horas: diffHours(criadoEm, primeiroPedido)
+  };
+
+  return {
+    solicitacao: {
+      id: solicitacao.id,
+      titulo: solicitacao.titulo || null,
+      obra_id: solicitacao.obra_id || null,
+      status: solicitacao.status,
+      criado_em: solicitacao.createdAt || null,
+      liberado_em: solicitacao.liberado_para_compra_em || null,
+      primeiro_envio: primeiroEnvio,
+      primeira_resposta: primeiraResposta,
+      ultima_resposta: ultimaResposta,
+      encerrado_em: solicitacao.encerrado_em || null,
+      primeiro_pedido: primeiroPedido
+    },
+    contadores: {
+      fornecedores_enviados: fornecedores.filter((fornecedor) => fornecedor.enviado_em).length,
+      fornecedores_respondidos: fornecedores.filter((fornecedor) => fornecedor.respondido_em).length,
+      pedidos_gerados: pedidos.length
+    },
+    tempos
+  };
+}
+
+async function relatorioCicloCompras({ obraId, dataInicio, dataFim, obraIds } = {}) {
+  const solicitacoes = await SolicitacaoCompra.findAll({
+    where: buildSolicitacaoCriacaoWhere({ obraId, obraIds, dataInicio, dataFim }),
+    attributes: [
+      'id',
+      'titulo',
+      'obra_id',
+      'status',
+      'liberado_para_compra_em',
+      'encerrado_em',
+      'createdAt'
+    ],
+    include: [
+      {
+        model: SolicitacaoCompraFornecedor,
+        as: 'fornecedores',
+        attributes: ['id', 'enviado_em', 'respondido_em']
+      },
+      {
+        model: PedidoCompra,
+        as: 'pedidos',
+        attributes: ['id', 'createdAt']
+      }
+    ],
+    order: [['createdAt', 'DESC'], ['id', 'DESC']]
+  });
+
+  const linhas = solicitacoes.map(buildCicloLinha);
+  const resumo = {
+    solicitacoes: linhas.length,
+    solicitacoes_liberadas: linhas.filter((linha) => linha.solicitacao.liberado_em).length,
+    cotacoes_enviadas: linhas.filter((linha) => linha.solicitacao.primeiro_envio).length,
+    cotacoes_com_resposta: linhas.filter((linha) => linha.solicitacao.primeira_resposta).length,
+    cotacoes_encerradas: linhas.filter((linha) => linha.solicitacao.encerrado_em).length,
+    solicitacoes_com_pedido: linhas.filter((linha) => linha.solicitacao.primeiro_pedido).length,
+    fornecedores_enviados: linhas.reduce((sum, linha) => sum + linha.contadores.fornecedores_enviados, 0),
+    fornecedores_respondidos: linhas.reduce((sum, linha) => sum + linha.contadores.fornecedores_respondidos, 0),
+    tempo_medio_criacao_liberacao_horas: average(linhas.map((linha) => linha.tempos.criacao_para_liberacao_horas)),
+    tempo_medio_liberacao_envio_horas: average(linhas.map((linha) => linha.tempos.liberacao_para_envio_horas)),
+    tempo_medio_envio_primeira_resposta_horas: average(linhas.map((linha) => linha.tempos.envio_para_primeira_resposta_horas)),
+    tempo_medio_criacao_encerramento_horas: average(linhas.map((linha) => linha.tempos.criacao_para_encerramento_horas)),
+    tempo_medio_encerramento_pedido_horas: average(linhas.map((linha) => linha.tempos.encerramento_para_pedido_horas)),
+    tempo_medio_ciclo_total_ate_pedido_horas: average(linhas.map((linha) => linha.tempos.ciclo_total_ate_pedido_horas))
+  };
+
+  resumo.taxa_resposta_fornecedor = resumo.fornecedores_enviados > 0
+    ? Number(((resumo.fornecedores_respondidos / resumo.fornecedores_enviados) * 100).toFixed(2))
+    : 0;
+
+  return {
+    filtros: {
+      obra_id: obraId || null,
+      data_inicio: dataInicio || null,
+      data_fim: dataFim || null
+    },
+    resumo,
+    solicitacoes: linhas
+  };
+}
+
 module.exports = {
+  relatorioCicloCompras,
   relatorioEconomiaCotacoes,
   relatorioFornecedoresCompras
 };

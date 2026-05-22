@@ -457,6 +457,27 @@ function validateCompraRelatorioEconomiaCotacoesQuery(query = {}) {
   };
 }
 
+function validateCompraRelatorioCicloQuery(query = {}) {
+  ensureAllowedKeys(
+    query,
+    ['obra_id', 'data_inicio', 'data_fim'],
+    'Consulta do relatorio de ciclo de compras'
+  );
+
+  const dataInicio = parseDateOnly(query.data_inicio, 'Data inicial');
+  const dataFim = parseDateOnly(query.data_fim, 'Data final');
+
+  if (dataInicio && dataFim && dataInicio > dataFim) {
+    throw new ValidationError('Data inicial nao pode ser maior que a data final.');
+  }
+
+  return {
+    obra_id: parseInteger(query.obra_id, 'Obra'),
+    data_inicio: dataInicio,
+    data_fim: dataFim
+  };
+}
+
 function validateCompraPedidoCreateBody(body = {}) {
   ensureAllowedKeys(body, ['fornecedor_compra_id'], 'Criacao de pedido de compra');
 
@@ -667,6 +688,7 @@ module.exports = {
   validateCompraPedidoAuditoriaQuery,
   validateCompraPedidoQuery,
   validateCompraQuery,
+  validateCompraRelatorioCicloQuery,
   validateCompraRelatorioEconomiaCotacoesQuery,
   validateCompraRelatorioFornecedoresQuery,
   validateContratoCreateBody,
