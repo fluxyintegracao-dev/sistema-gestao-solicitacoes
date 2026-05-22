@@ -109,6 +109,19 @@ function sortByTotalDesc(items) {
   return Array.from(items.values()).sort((a, b) => Number(b.total || 0) - Number(a.total || 0));
 }
 
+function formatMonthKey(value) {
+  const date = toDate(value);
+  if (!date) return null;
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  return `${date.getFullYear()}-${month}`;
+}
+
+function formatMonthLabel(monthKey) {
+  if (!monthKey || !/^\d{4}-\d{2}$/.test(monthKey)) return 'Sem mes';
+  const [year, month] = monthKey.split('-');
+  return `${month}/${year}`;
+}
+
 function sortHistoricosAsc(historicosItem = []) {
   return [...historicosItem].sort((a, b) => {
     const dateA = toDate(a.createdAt)?.getTime() || 0;
@@ -282,6 +295,9 @@ async function relatorioSolicitacoesOperacional({ user, periodo, dataInicio, dat
   const responsavelMap = new Map();
   const tempoEtapasMap = new Map();
   const agingSetorMap = new Map();
+  const agingStatusMap = new Map();
+  const evolucaoMensalMap = new Map();
+  const setorStatusMap = new Map();
   const now = new Date();
   const gargalos = [];
   const resumo = {
@@ -317,8 +333,29 @@ async function relatorioSolicitacoesOperacional({ user, periodo, dataInicio, dat
     const ultimaMovimentacao = historicosItem[0]?.createdAt || plain.updatedAt || plain.createdAt;
     const diasParada = concluida ? 0 : diffDays(ultimaMovimentacao, now);
     const diasAberta = concluida ? 0 : diffDays(plain.createdAt, now);
+    const mesCriacao = formatMonthKey(plain.createdAt) || 'SEM_MES';
 
     resumo.valor_total += valor;
+    const evolucao = incrementMap(evolucaoMensalMap, mesCriacao, {
+      mes: mesCriacao,
+      mes_label: formatMonthLabel(mesCriacao),
+      abertas: 0,
+      concluidas: 0
+    });
+    evolucao.valor_total = toNumber(evolucao.valor_total) + valor;
+    if (concluida) {
+      evolucao.concluidas += 1;
+    } else {
+      evolucao.abertas += 1;
+    }
+
+    const setorStatusKey = `${plain.area_responsavel || 'NAO_INFORMADO'}|${plain.status_global || 'NAO_INFORMADO'}`;
+    const setorStatus = incrementMap(setorStatusMap, setorStatusKey, {
+      setor: plain.area_responsavel,
+      status: plain.status_global
+    });
+    setorStatus.valor_total = toNumber(setorStatus.valor_total) + valor;
+
     if (concluida) {
       resumo.concluidas += 1;
     } else {
@@ -334,6 +371,11 @@ async function relatorioSolicitacoesOperacional({ user, periodo, dataInicio, dat
         aging.valor_aberto = toNumber(aging.valor_aberto) + valor;
         aging.soma_dias_parada = toNumber(aging.soma_dias_parada) + diasParada;
         aging.maior_dias_parada = Math.max(toNumber(aging.maior_dias_parada), diasParada);
+
+        const agingStatus = incrementMap(agingStatusMap, plain.status_global, { status: plain.status_global });
+        agingStatus.valor_aberto = toNumber(agingStatus.valor_aberto) + valor;
+        agingStatus.soma_dias_parada = toNumber(agingStatus.soma_dias_parada) + diasParada;
+        agingStatus.maior_dias_parada = Math.max(toNumber(agingStatus.maior_dias_parada), diasParada);
       }
     }
 
@@ -430,7 +472,25 @@ async function relatorioSolicitacoesOperacional({ user, periodo, dataInicio, dat
     por_criador: sortByTotalDesc(criadorMap).slice(0, 20),
     por_responsavel: sortByTotalDesc(responsavelMap).slice(0, 20),
     tempos_etapas: finalizeDurations(tempoEtapasMap),
+    evolucao_mensal: Array.from(evolucaoMensalMap.values())
+      .map((item) => ({
+        ...item,
+        valor_total: Number(toNumber(item.valor_total).toFixed(2))
+      }))
+      .sort((a, b) => String(a.mes).localeCompare(String(b.mes))),
+    setor_status: sortByTotalDesc(setorStatusMap)
+      .map((item) => ({
+        ...item,
+        valor_total: Number(toNumber(item.valor_total).toFixed(2))
+      })),
     aging_setor: sortByTotalDesc(agingSetorMap)
+      .map((item) => ({
+        ...item,
+        valor_aberto: Number(toNumber(item.valor_aberto).toFixed(2)),
+        media_dias_parada: item.total > 0 ? Number((toNumber(item.soma_dias_parada) / item.total).toFixed(1)) : 0,
+        maior_dias_parada: Number(toNumber(item.maior_dias_parada).toFixed(1))
+      })),
+    aging_status: sortByTotalDesc(agingStatusMap)
       .map((item) => ({
         ...item,
         valor_aberto: Number(toNumber(item.valor_aberto).toFixed(2)),

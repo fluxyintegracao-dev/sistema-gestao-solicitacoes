@@ -87,6 +87,7 @@ Base multiempresa e DRE gerencial:
 - Compras > Relatorios > Ciclo de Compras ganhou grafico de ciclo medio por etapa, calculado somente por datas reais registradas no fluxo de compra.
 - Solicitacoes > Relatorios ganhou Painel Operacional, consolidando volume, abertas, concluidas, funil, distribuicao por status, setor, obra/centro de custo, tipo, criador, responsavel atual, tempos por etapa, aging por setor e gargalos com base em solicitacoes e historicos reais do fluxo.
 - Solicitacoes > Relatorios > Painel Operacional ganhou graficos de ranking por setor atual, distribuicao por status e volume por obra/centro, usando os mesmos agrupamentos reais do relatorio analitico.
+- Solicitacoes > Relatorios > Painel Operacional ganhou evolucao mensal, aging por status e mapa setor x status, calculados no backend a partir das solicitacoes filtradas e dos historicos reais.
 
 Documentacao operacional complementar:
 
@@ -176,9 +177,9 @@ Relatorios:
 
 Graficos:
 
-- Evolucao mensal.
-- Aging por status.
-- Heatmap setor x status.
+- Evolucao mensal. [Entregue no Painel Operacional como grafico por mes de criacao]
+- Aging por status. [Entregue no Painel Operacional com abertas por status e media real de dias parados]
+- Heatmap setor x status. [Entregue no Painel Operacional como mapa setor atual x status atual]
 - Volume por obra/centro de custo. [Entregue no Painel Operacional como grafico por obra/centro]
 - SLA por setor.
 

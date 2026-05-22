@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { ResizableTable, ResizableTh } from '../components/ResizableTable';
 import {
@@ -208,11 +208,42 @@ export default function SolicitacoesRelatorioOperacional() {
   const porCriador = useMemo(() => (Array.isArray(relatorio?.por_criador) ? relatorio.por_criador : []), [relatorio]);
   const porResponsavel = useMemo(() => (Array.isArray(relatorio?.por_responsavel) ? relatorio.por_responsavel : []), [relatorio]);
   const temposEtapas = useMemo(() => (Array.isArray(relatorio?.tempos_etapas) ? relatorio.tempos_etapas : []), [relatorio]);
+  const evolucaoMensal = useMemo(() => (Array.isArray(relatorio?.evolucao_mensal) ? relatorio.evolucao_mensal : []), [relatorio]);
+  const setorStatus = useMemo(() => (Array.isArray(relatorio?.setor_status) ? relatorio.setor_status : []), [relatorio]);
   const agingSetor = useMemo(() => (Array.isArray(relatorio?.aging_setor) ? relatorio.aging_setor : []), [relatorio]);
+  const agingStatus = useMemo(() => (Array.isArray(relatorio?.aging_status) ? relatorio.aging_status : []), [relatorio]);
   const gargalos = useMemo(() => (Array.isArray(relatorio?.gargalos) ? relatorio.gargalos : []), [relatorio]);
   const topSetores = useMemo(() => porSetor.slice(0, 8), [porSetor]);
   const topStatus = useMemo(() => porStatus.slice(0, 8), [porStatus]);
   const topObras = useMemo(() => porObra.slice(0, 8), [porObra]);
+  const topAgingStatus = useMemo(() => agingStatus.slice(0, 8), [agingStatus]);
+  const topSetoresHeatmap = useMemo(() => {
+    const mapa = new Map();
+    setorStatus.forEach((item) => {
+      const key = item.setor || 'NAO_INFORMADO';
+      const atual = mapa.get(key) || { key, setor: item.setor, total: 0 };
+      atual.total += Number(item.total || 0);
+      mapa.set(key, atual);
+    });
+    return Array.from(mapa.values()).sort((a, b) => b.total - a.total).slice(0, 6);
+  }, [setorStatus]);
+  const topStatusHeatmap = useMemo(() => {
+    const mapa = new Map();
+    setorStatus.forEach((item) => {
+      const key = item.status || 'NAO_INFORMADO';
+      const atual = mapa.get(key) || { key, status: item.status, total: 0 };
+      atual.total += Number(item.total || 0);
+      mapa.set(key, atual);
+    });
+    return Array.from(mapa.values()).sort((a, b) => b.total - a.total).slice(0, 6);
+  }, [setorStatus]);
+  const heatmapLookup = useMemo(() => {
+    const mapa = new Map();
+    setorStatus.forEach((item) => {
+      mapa.set(`${item.setor || 'NAO_INFORMADO'}|${item.status || 'NAO_INFORMADO'}`, item);
+    });
+    return mapa;
+  }, [setorStatus]);
   const maiorTotalSetor = useMemo(
     () => Math.max(...topSetores.map((item) => Number(item.total || 0)), 0),
     [topSetores]
@@ -224,6 +255,18 @@ export default function SolicitacoesRelatorioOperacional() {
   const maiorTotalObra = useMemo(
     () => Math.max(...topObras.map((item) => Number(item.total || 0)), 0),
     [topObras]
+  );
+  const maiorTotalEvolucao = useMemo(
+    () => Math.max(...evolucaoMensal.map((item) => Number(item.total || 0)), 0),
+    [evolucaoMensal]
+  );
+  const maiorAgingStatus = useMemo(
+    () => Math.max(...topAgingStatus.map((item) => Number(item.media_dias_parada || 0)), 0),
+    [topAgingStatus]
+  );
+  const maiorHeatmap = useMemo(
+    () => Math.max(...setorStatus.map((item) => Number(item.total || 0)), 0),
+    [setorStatus]
   );
 
   function aplicarFiltros(event) {
@@ -470,6 +513,122 @@ export default function SolicitacoesRelatorioOperacional() {
             </div>
           )}
         </div>
+      </div>
+
+      <div className="mt-4 grid gap-4 xl:grid-cols-2">
+        <div className="card sol-surface-card">
+          <h2 className="text-lg font-bold text-[var(--c-text)] mb-1">Evolucao mensal</h2>
+          <p className="page-subtitle mb-3">Solicitacoes criadas por mes dentro do periodo filtrado.</p>
+          {loading ? (
+            <div className="text-sm text-[var(--c-muted)] py-4">Carregando evolucao...</div>
+          ) : evolucaoMensal.length === 0 ? (
+            <div className="app-empty-card">Sem dados mensais para o filtro selecionado.</div>
+          ) : (
+            <div className="grid gap-3">
+              {evolucaoMensal.map((item) => {
+                const total = Number(item.total || 0);
+                const width = maiorTotalEvolucao > 0 ? Math.max(4, (total / maiorTotalEvolucao) * 100) : 0;
+                return (
+                  <div key={`evolucao-${item.mes}`} className="grid gap-2">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <strong className="text-sm text-[var(--c-text)]">{item.mes_label || item.mes}</strong>
+                      <span className="text-sm font-bold tabular-nums text-[var(--c-text)]">
+                        {formatNumber(total)} criada(s)
+                      </span>
+                    </div>
+                    <div className="h-3 rounded-full bg-slate-100 overflow-hidden">
+                      <div className="h-full rounded-full bg-[var(--c-primary)]" style={{ width: `${width}%` }} />
+                    </div>
+                    <div className="text-xs text-[var(--c-muted)]">
+                      {formatNumber(item.concluidas)} concluida(s) | {formatNumber(item.abertas)} aberta(s)
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div className="card sol-surface-card">
+          <h2 className="text-lg font-bold text-[var(--c-text)] mb-1">Aging por status</h2>
+          <p className="page-subtitle mb-3">Tempo medio parado das solicitacoes abertas em cada status atual.</p>
+          {loading ? (
+            <div className="text-sm text-[var(--c-muted)] py-4">Carregando aging por status...</div>
+          ) : topAgingStatus.length === 0 ? (
+            <div className="app-empty-card">Sem solicitacoes abertas para calcular aging por status.</div>
+          ) : (
+            <div className="grid gap-3">
+              {topAgingStatus.map((item) => {
+                const media = Number(item.media_dias_parada || 0);
+                const width = maiorAgingStatus > 0 ? Math.max(4, (media / maiorAgingStatus) * 100) : 0;
+                return (
+                  <div key={`aging-status-${item.key}`} className="grid gap-2">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <strong className="text-sm text-[var(--c-text)]">{formatLabel(item.status || item.key)}</strong>
+                      <span className="text-sm font-bold tabular-nums text-[var(--c-text)]">
+                        {formatDays(media)} | {formatNumber(item.total)} aberta(s)
+                      </span>
+                    </div>
+                    <div className="h-3 rounded-full bg-slate-100 overflow-hidden">
+                      <div className="h-full rounded-full bg-[var(--c-danger)]" style={{ width: `${width}%` }} />
+                    </div>
+                    <div className="text-xs text-[var(--c-muted)]">
+                      Maior parada: {formatDays(item.maior_dias_parada)}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="mt-4 card sol-surface-card">
+        <h2 className="text-lg font-bold text-[var(--c-text)] mb-1">Mapa setor x status</h2>
+        <p className="page-subtitle mb-3">Cruzamento dos setores e status com maior volume no periodo filtrado.</p>
+        {loading ? (
+          <div className="text-sm text-[var(--c-muted)] py-4">Carregando matriz...</div>
+        ) : topSetoresHeatmap.length === 0 || topStatusHeatmap.length === 0 ? (
+          <div className="app-empty-card">Sem dados suficientes para montar o mapa setor x status.</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <div
+              className="grid min-w-[720px] gap-2"
+              style={{ gridTemplateColumns: `minmax(150px, 1.2fr) repeat(${topStatusHeatmap.length}, minmax(96px, 1fr))` }}
+            >
+              <div className="text-xs font-bold uppercase tracking-[0.12em] text-[var(--c-muted)]">Setor</div>
+              {topStatusHeatmap.map((statusItem) => (
+                <div key={`heatmap-head-${statusItem.key}`} className="text-xs font-bold uppercase tracking-[0.12em] text-[var(--c-muted)] text-center">
+                  {formatLabel(statusItem.status || statusItem.key)}
+                </div>
+              ))}
+              {topSetoresHeatmap.map((setorItem) => (
+                <Fragment key={`heatmap-row-${setorItem.key}`}>
+                  <div className="text-sm font-bold text-[var(--c-text)] py-2">
+                    {formatLabel(setorItem.setor || setorItem.key)}
+                  </div>
+                  {topStatusHeatmap.map((statusItem) => {
+                    const item = heatmapLookup.get(`${setorItem.setor || 'NAO_INFORMADO'}|${statusItem.status || 'NAO_INFORMADO'}`);
+                    const total = Number(item?.total || 0);
+                    const opacity = maiorHeatmap > 0 ? Math.min(0.95, Math.max(0.08, total / maiorHeatmap)) : 0.08;
+                    return (
+                      <div
+                        key={`heatmap-cell-${setorItem.key}-${statusItem.key}`}
+                        className="rounded-lg px-3 py-2 text-center text-sm font-bold"
+                        style={{
+                          backgroundColor: `rgba(37, 99, 235, ${opacity})`,
+                          color: opacity > 0.45 ? '#fff' : 'var(--c-text)'
+                        }}
+                      >
+                        {formatNumber(total)}
+                      </div>
+                    );
+                  })}
+                </Fragment>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="mt-4 grid gap-4 xl:grid-cols-2">
