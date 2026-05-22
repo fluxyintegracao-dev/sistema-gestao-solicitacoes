@@ -142,6 +142,64 @@ export default function ComprasRelatorioEconomiaCotacoes() {
     () => (Array.isArray(relatorio?.itens) ? relatorio.itens : []),
     [relatorio]
   );
+  const cotacoesResumo = useMemo(() => {
+    const mapa = new Map();
+
+    itens.forEach((linha) => {
+      const solicitacaoId = linha?.solicitacao?.id;
+      if (!solicitacaoId) {
+        return;
+      }
+
+      if (!mapa.has(solicitacaoId)) {
+        mapa.set(solicitacaoId, {
+          solicitacao: linha.solicitacao,
+          itens: 0,
+          itens_menor_preco: 0,
+          itens_acima_menor_preco: 0,
+          valor_menor_preco: 0,
+          valor_vencedor: 0,
+          economia: 0,
+          sobrepreco: 0
+        });
+      }
+
+      const atual = mapa.get(solicitacaoId);
+      atual.itens += 1;
+      atual.valor_menor_preco += Number(linha?.menor_preco?.valor_total || 0);
+      atual.valor_vencedor += Number(linha?.vencedor?.valor_total || 0);
+      atual.economia += Number(linha?.economia || 0);
+      atual.sobrepreco += Number(linha?.sobrepreco || 0);
+
+      if (linha.selecionou_menor_preco) {
+        atual.itens_menor_preco += 1;
+      } else {
+        atual.itens_acima_menor_preco += 1;
+      }
+    });
+
+    return Array.from(mapa.values())
+      .map((cotacao) => ({
+        ...cotacao,
+        valor_menor_preco: Number(cotacao.valor_menor_preco.toFixed(2)),
+        valor_vencedor: Number(cotacao.valor_vencedor.toFixed(2)),
+        economia: Number(cotacao.economia.toFixed(2)),
+        sobrepreco: Number(cotacao.sobrepreco.toFixed(2)),
+        percentual_menor_preco: cotacao.itens > 0
+          ? Number(((cotacao.itens_menor_preco / cotacao.itens) * 100).toFixed(2))
+          : 0
+      }))
+      .sort((a, b) => (
+        b.sobrepreco - a.sobrepreco
+        || b.economia - a.economia
+        || b.valor_vencedor - a.valor_vencedor
+      ))
+      .slice(0, 8);
+  }, [itens]);
+  const maiorImpactoCotacao = useMemo(
+    () => Math.max(...cotacoesResumo.flatMap((item) => [Number(item.economia || 0), Number(item.sobrepreco || 0)]), 0),
+    [cotacoesResumo]
+  );
 
   function aplicarFiltros(event) {
     event.preventDefault();
@@ -250,6 +308,63 @@ export default function ComprasRelatorioEconomiaCotacoes() {
           <strong className="dashboard-metric-value">{formatMoney(resumo.sobrepreco_total)}</strong>
           <small className="dashboard-metric-detail">{Number(resumo.itens_acima_menor_preco || 0).toLocaleString('pt-BR')} item(ns) acima</small>
         </div>
+      </div>
+
+      <div className="mt-4 card sol-surface-card">
+        <div className="app-page-header-row">
+          <div>
+            <h2 className="text-lg font-bold text-[var(--c-text)]">Economia e sobrepreco por cotacao</h2>
+            <p className="page-subtitle">
+              Cotacoes com maior impacto financeiro, somando os itens vencidos no periodo filtrado.
+            </p>
+          </div>
+        </div>
+        {loading ? (
+          <div className="text-sm text-[var(--c-muted)] py-4">Carregando cotacoes...</div>
+        ) : cotacoesResumo.length === 0 ? (
+          <div className="app-empty-card mt-3">Sem cotacoes encerradas com vencedor para montar o grafico.</div>
+        ) : (
+          <div className="grid gap-4 mt-3">
+            {cotacoesResumo.map((cotacao) => {
+              const economia = Number(cotacao.economia || 0);
+              const sobrepreco = Number(cotacao.sobrepreco || 0);
+              const economiaWidth = maiorImpactoCotacao > 0 ? Math.max(3, (economia / maiorImpactoCotacao) * 100) : 0;
+              const sobreprecoWidth = maiorImpactoCotacao > 0 ? Math.max(3, (sobrepreco / maiorImpactoCotacao) * 100) : 0;
+              return (
+                <div key={`cotacao-impacto-${cotacao.solicitacao.id}`} className="grid gap-2">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <strong className="text-sm text-[var(--c-text)]">SC #{cotacao.solicitacao.id}</strong>
+                      <span className="ml-2 text-xs text-[var(--c-muted)]">
+                        {cotacao.itens} item(ns) | {formatPercent(cotacao.percentual_menor_preco)} no menor preco
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-3 text-xs font-bold">
+                      <span style={{ color: 'var(--c-success)' }}>Economia {formatMoney(economia)}</span>
+                      <span style={{ color: sobrepreco > 0 ? 'var(--c-danger)' : 'var(--c-muted)' }}>
+                        Sobrepreco {formatMoney(sobrepreco)}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="grid gap-1.5">
+                    <div className="h-2.5 rounded-full bg-slate-100 overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-[var(--c-success)]"
+                        style={{ width: `${economiaWidth}%` }}
+                      />
+                    </div>
+                    <div className="h-2.5 rounded-full bg-slate-100 overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-[var(--c-danger)]"
+                        style={{ width: `${sobreprecoWidth}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       <div className="mt-4 card sol-surface-card overflow-hidden">

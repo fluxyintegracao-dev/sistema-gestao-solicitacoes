@@ -2118,8 +2118,9 @@ Relatorio de Economia em Cotacoes:
 2. Abra `Economia em cotacoes`.
 3. Filtre por obra/centro de custo e por periodo de encerramento da cotacao.
 4. Confira os cards de cotacoes encerradas, percentual de itens no menor preco, economia total e sobrepreco.
-5. Na tabela, compare item a item o menor preco disponivel com o fornecedor vencedor selecionado.
-6. Quando a coluna `Sinal` mostrar `Acima do menor`, o vencedor escolhido nao foi o menor preco disponivel para aquele item.
+5. Use o grafico `Economia e sobrepreco por cotacao` para localizar rapidamente quais cotacoes concentraram maior impacto financeiro.
+6. Na tabela, compare item a item o menor preco disponivel com o fornecedor vencedor selecionado.
+7. Quando a coluna `Sinal` mostrar `Acima do menor`, o vencedor escolhido nao foi o menor preco disponivel para aquele item.
 
 Importante:
 
@@ -2127,6 +2128,7 @@ Importante:
 - O menor preco considera respostas disponiveis com preco informado.
 - A economia nunca deve ser negativa. Quando o vencedor fica acima do menor preco disponivel, o valor entra em `Sobrepreco`.
 - Quando o vencedor tem exatamente o mesmo valor do menor preco disponivel, mesmo que seja outro fornecedor empatado, o item conta como `Menor preco`.
+- O grafico por cotacao nao cria nova metrica. Ele apenas soma, por solicitacao de compra, os mesmos valores de economia e sobrepreco exibidos nos itens da tabela.
 - Esse relatorio nao deduz justificativa por texto. Ele apenas mostra objetivamente onde a escolha ficou no menor preco e onde ficou acima.
 
 Relatorio de Pendencias de Cotacoes:
@@ -2152,14 +2154,16 @@ Relatorio de Ciclo de Compras:
 2. Abra `Ciclo de compras`.
 3. Filtre por obra/centro de custo e por periodo de criacao da solicitacao de compra.
 4. Confira os cards de quantidade de solicitacoes, taxa de resposta dos fornecedores, tempo medio da criacao ate o encerramento e tempo medio ate pedido.
-5. Analise os blocos intermediarios para ver onde o processo esta consumindo mais tempo: criacao ate liberacao, liberacao ate primeiro envio e envio ate primeira resposta.
-6. Na tabela, revise cada solicitacao individualmente para identificar gargalos especificos.
+5. Use o grafico `Ciclo medio por etapa` para identificar onde o processo esta consumindo mais tempo.
+6. Analise os blocos intermediarios para ver os tempos principais: criacao ate liberacao, liberacao ate primeiro envio e envio ate primeira resposta.
+7. Na tabela, revise cada solicitacao individualmente para identificar gargalos especificos.
 
 Importante:
 
 - O relatorio usa somente datas reais gravadas pelo sistema: criacao, liberacao para compra, envio para fornecedores, resposta de fornecedores, encerramento e criacao do pedido.
 - Quando uma etapa ainda nao aconteceu, o tempo aparece como `-` e nao entra na media daquela etapa.
 - O periodo do filtro considera a data de criacao da solicitacao de compra.
+- O grafico de ciclo medio nao estima prazos ausentes. Ele exibe apenas medias calculadas a partir das datas que existem no fluxo.
 
 ### 20.4 Relatorios Financeiros
 

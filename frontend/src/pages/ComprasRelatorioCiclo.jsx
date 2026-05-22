@@ -141,6 +141,42 @@ export default function ComprasRelatorioCiclo() {
     () => (Array.isArray(relatorio?.solicitacoes) ? relatorio.solicitacoes : []),
     [relatorio]
   );
+  const etapasCiclo = useMemo(() => ([
+    {
+      key: 'criacao_liberacao',
+      label: 'Criacao ate liberacao',
+      value: resumo.tempo_medio_criacao_liberacao_horas,
+      detail: 'Pedido revisado e liberado para compras'
+    },
+    {
+      key: 'liberacao_envio',
+      label: 'Liberacao ate envio',
+      value: resumo.tempo_medio_liberacao_envio_horas,
+      detail: 'Tempo ate primeiro fornecedor receber cotacao'
+    },
+    {
+      key: 'envio_resposta',
+      label: 'Envio ate primeira resposta',
+      value: resumo.tempo_medio_envio_primeira_resposta_horas,
+      detail: 'Resposta inicial dos fornecedores'
+    },
+    {
+      key: 'criacao_encerramento',
+      label: 'Criacao ate encerramento',
+      value: resumo.tempo_medio_criacao_encerramento_horas,
+      detail: 'Tempo medio ate fechar a cotacao'
+    },
+    {
+      key: 'ciclo_pedido',
+      label: 'Ciclo ate pedido',
+      value: resumo.tempo_medio_ciclo_total_ate_pedido_horas,
+      detail: 'Tempo medio ate existir pedido de compra'
+    }
+  ]).filter((etapa) => etapa.value !== null && etapa.value !== undefined), [resumo]);
+  const maiorTempoEtapa = useMemo(
+    () => Math.max(...etapasCiclo.map((etapa) => Number(etapa.value || 0)), 0),
+    [etapasCiclo]
+  );
 
   function aplicarFiltros(event) {
     event.preventDefault();
@@ -247,6 +283,46 @@ export default function ComprasRelatorioCiclo() {
           <strong className="dashboard-metric-value">{formatHours(resumo.tempo_medio_ciclo_total_ate_pedido_horas)}</strong>
           <small className="dashboard-metric-detail">{Number(resumo.solicitacoes_com_pedido || 0).toLocaleString('pt-BR')} com pedido</small>
         </div>
+      </div>
+
+      <div className="mt-4 card sol-surface-card">
+        <div className="app-page-header-row">
+          <div>
+            <h2 className="text-lg font-bold text-[var(--c-text)]">Ciclo medio por etapa</h2>
+            <p className="page-subtitle">
+              Gargalos do processo calculados pelas datas reais registradas na solicitacao, cotacao e pedido.
+            </p>
+          </div>
+        </div>
+        {loading ? (
+          <div className="text-sm text-[var(--c-muted)] py-4">Carregando etapas do ciclo...</div>
+        ) : etapasCiclo.length === 0 ? (
+          <div className="app-empty-card mt-3">Sem datas suficientes para montar o grafico do ciclo.</div>
+        ) : (
+          <div className="grid gap-3 mt-3">
+            {etapasCiclo.map((etapa) => {
+              const valor = Number(etapa.value || 0);
+              const percentual = maiorTempoEtapa > 0 ? Math.max(4, (valor / maiorTempoEtapa) * 100) : 0;
+              return (
+                <div key={`ciclo-etapa-${etapa.key}`} className="grid gap-2">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <strong className="text-sm text-[var(--c-text)]">{etapa.label}</strong>
+                      <span className="ml-2 text-xs text-[var(--c-muted)]">{etapa.detail}</span>
+                    </div>
+                    <strong className="text-sm tabular-nums text-[var(--c-text)]">{formatHours(valor)}</strong>
+                  </div>
+                  <div className="h-3 rounded-full bg-slate-100 overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-[var(--c-primary)]"
+                      style={{ width: `${percentual}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       <div className="mt-4 card sol-surface-card">
