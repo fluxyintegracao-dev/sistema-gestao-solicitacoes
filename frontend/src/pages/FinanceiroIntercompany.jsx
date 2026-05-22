@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { ResizableTable, ResizableTh } from '../components/ResizableTable';
 import { getEmpresasGrupo } from '../services/empresasGrupo';
 import { getRelatorioIntercompanyFinanceiro } from '../services/financeiro';
 
@@ -25,6 +26,44 @@ const TIPOS_INTERCOMPANY = [
   ['ADMINISTRATIVO', 'Administrativo'],
   ['IMPOSTO', 'Imposto'],
   ['TRANSFERENCIA_OPERACIONAL', 'Transferencia operacional']
+];
+
+const RELACOES_COLUMNS = [
+  { key: 'origem', width: 180, minWidth: 130 },
+  { key: 'destino', width: 180, minWidth: 130 },
+  { key: 'titulos', width: 88, minWidth: 76 },
+  { key: 'transferencias', width: 124, minWidth: 104 },
+  { key: 'previsto', width: 132, minWidth: 112 },
+  { key: 'realizado', width: 132, minWidth: 112 }
+];
+
+const TIPOS_COLUMNS = [
+  { key: 'tipo', width: 180, minWidth: 130 },
+  { key: 'titulos', width: 88, minWidth: 76 },
+  { key: 'transferencias', width: 124, minWidth: 104 },
+  { key: 'realizado', width: 132, minWidth: 112 }
+];
+
+const TRANSFERENCIAS_COLUMNS = [
+  { key: 'data', width: 112, minWidth: 96 },
+  { key: 'origem', width: 190, minWidth: 140 },
+  { key: 'destino', width: 190, minWidth: 140 },
+  { key: 'tipo', width: 190, minWidth: 140 },
+  { key: 'status', width: 118, minWidth: 96 },
+  { key: 'valor', width: 132, minWidth: 112 },
+  { key: 'consolidado', width: 120, minWidth: 104 }
+];
+
+const TITULOS_COLUMNS = [
+  { key: 'titulo', width: 160, minWidth: 120 },
+  { key: 'competencia', width: 126, minWidth: 108 },
+  { key: 'origem', width: 160, minWidth: 120 },
+  { key: 'destino', width: 160, minWidth: 120 },
+  { key: 'tipo', width: 168, minWidth: 128 },
+  { key: 'status', width: 118, minWidth: 96 },
+  { key: 'previsto', width: 132, minWidth: 112 },
+  { key: 'realizado', width: 132, minWidth: 112 },
+  { key: 'consolidado', width: 120, minWidth: 104 }
 ];
 
 function formatCurrency(value) {
@@ -313,15 +352,19 @@ export default function FinanceiroIntercompany() {
                 </p>
               </div>
               <div className="table-wrapper">
-                <table className="table">
+                <ResizableTable
+                  className="table"
+                  columns={RELACOES_COLUMNS}
+                  storageKey="fluxy.financeiro.intercompany.relacoes.columnWidths"
+                >
                   <thead>
                     <tr>
-                      <th>Origem</th>
-                      <th>Destino</th>
-                      <th>Titulos</th>
-                      <th>Transferencias</th>
-                      <th>Previsto</th>
-                      <th>Realizado</th>
+                      <ResizableTh columnKey="origem">Origem</ResizableTh>
+                      <ResizableTh columnKey="destino">Destino</ResizableTh>
+                      <ResizableTh columnKey="titulos" className="text-right">Titulos</ResizableTh>
+                      <ResizableTh columnKey="transferencias" className="text-right">Transferencias</ResizableTh>
+                      <ResizableTh columnKey="previsto" className="text-right">Previsto</ResizableTh>
+                      <ResizableTh columnKey="realizado" className="text-right">Realizado</ResizableTh>
                     </tr>
                   </thead>
                   <tbody>
@@ -332,15 +375,15 @@ export default function FinanceiroIntercompany() {
                         <tr key={`${item.empresa_origem_id || 'o'}-${item.empresa_destino_id || 'd'}`}>
                           <td className="font-medium text-[var(--c-text)]">{item.empresa_origem_nome}</td>
                           <td>{item.empresa_destino_nome}</td>
-                          <td>{item.titulos}</td>
-                          <td>{item.transferencias}</td>
-                          <td>{formatCurrency(item.valor_previsto)}</td>
-                          <td>{formatCurrency(item.valor_realizado)}</td>
+                          <td className="text-right">{item.titulos}</td>
+                          <td className="text-right">{item.transferencias}</td>
+                          <td className="text-right">{formatCurrency(item.valor_previsto)}</td>
+                          <td className="text-right">{formatCurrency(item.valor_realizado)}</td>
                         </tr>
                       ))
                     )}
                   </tbody>
-                </table>
+                </ResizableTable>
               </div>
             </div>
 
@@ -352,13 +395,17 @@ export default function FinanceiroIntercompany() {
                 </p>
               </div>
               <div className="table-wrapper">
-                <table className="table">
+                <ResizableTable
+                  className="table"
+                  columns={TIPOS_COLUMNS}
+                  storageKey="fluxy.financeiro.intercompany.tipos.columnWidths"
+                >
                   <thead>
                     <tr>
-                      <th>Tipo</th>
-                      <th>Titulos</th>
-                      <th>Transferencias</th>
-                      <th>Realizado</th>
+                      <ResizableTh columnKey="tipo">Tipo</ResizableTh>
+                      <ResizableTh columnKey="titulos" className="text-right">Titulos</ResizableTh>
+                      <ResizableTh columnKey="transferencias" className="text-right">Transferencias</ResizableTh>
+                      <ResizableTh columnKey="realizado" className="text-right">Realizado</ResizableTh>
                     </tr>
                   </thead>
                   <tbody>
@@ -368,14 +415,14 @@ export default function FinanceiroIntercompany() {
                       porTipo.map((item) => (
                         <tr key={item.tipo_intercompany}>
                           <td className="font-medium text-[var(--c-text)]">{labelTipo(item.tipo_intercompany)}</td>
-                          <td>{item.titulos}</td>
-                          <td>{item.transferencias}</td>
-                          <td>{formatCurrency(item.valor_realizado)}</td>
+                          <td className="text-right">{item.titulos}</td>
+                          <td className="text-right">{item.transferencias}</td>
+                          <td className="text-right">{formatCurrency(item.valor_realizado)}</td>
                         </tr>
                       ))
                     )}
                   </tbody>
-                </table>
+                </ResizableTable>
               </div>
             </div>
           </section>
@@ -388,16 +435,20 @@ export default function FinanceiroIntercompany() {
               </p>
             </div>
             <div className="table-wrapper">
-              <table className="table">
+              <ResizableTable
+                className="table"
+                columns={TRANSFERENCIAS_COLUMNS}
+                storageKey="fluxy.financeiro.intercompany.transferencias.columnWidths"
+              >
                 <thead>
                   <tr>
-                    <th>Data</th>
-                    <th>Origem</th>
-                    <th>Destino</th>
-                    <th>Tipo</th>
-                    <th>Status</th>
-                    <th>Valor</th>
-                    <th>Consolidado</th>
+                    <ResizableTh columnKey="data">Data</ResizableTh>
+                    <ResizableTh columnKey="origem">Origem</ResizableTh>
+                    <ResizableTh columnKey="destino">Destino</ResizableTh>
+                    <ResizableTh columnKey="tipo">Tipo</ResizableTh>
+                    <ResizableTh columnKey="status">Status</ResizableTh>
+                    <ResizableTh columnKey="valor" className="text-right">Valor</ResizableTh>
+                    <ResizableTh columnKey="consolidado">Consolidado</ResizableTh>
                   </tr>
                 </thead>
                 <tbody>
@@ -420,13 +471,13 @@ export default function FinanceiroIntercompany() {
                           <div className="text-xs text-[var(--c-muted)]">{transferencia.motivo_intercompany || transferencia.descricao || '-'}</div>
                         </td>
                         <td>{labelStatus(transferencia.status)}</td>
-                        <td>{formatCurrency(transferencia.valor_realizado)}</td>
+                        <td className="text-right">{formatCurrency(transferencia.valor_realizado)}</td>
                         <td>{transferencia.elimina_consolidado ? 'Elimina' : 'Mantem'}</td>
                       </tr>
                     ))
                   )}
                 </tbody>
-              </table>
+              </ResizableTable>
             </div>
           </section>
 
@@ -438,18 +489,22 @@ export default function FinanceiroIntercompany() {
               </p>
             </div>
             <div className="table-wrapper">
-              <table className="table">
+              <ResizableTable
+                className="table"
+                columns={TITULOS_COLUMNS}
+                storageKey="fluxy.financeiro.intercompany.titulos.columnWidths"
+              >
                 <thead>
                   <tr>
-                    <th>Titulo</th>
-                    <th>Competencia</th>
-                    <th>Origem</th>
-                    <th>Destino</th>
-                    <th>Tipo</th>
-                    <th>Status</th>
-                    <th>Previsto</th>
-                    <th>Realizado</th>
-                    <th>Consolidado</th>
+                    <ResizableTh columnKey="titulo">Titulo</ResizableTh>
+                    <ResizableTh columnKey="competencia">Competencia</ResizableTh>
+                    <ResizableTh columnKey="origem">Origem</ResizableTh>
+                    <ResizableTh columnKey="destino">Destino</ResizableTh>
+                    <ResizableTh columnKey="tipo">Tipo</ResizableTh>
+                    <ResizableTh columnKey="status">Status</ResizableTh>
+                    <ResizableTh columnKey="previsto" className="text-right">Previsto</ResizableTh>
+                    <ResizableTh columnKey="realizado" className="text-right">Realizado</ResizableTh>
+                    <ResizableTh columnKey="consolidado">Consolidado</ResizableTh>
                   </tr>
                 </thead>
                 <tbody>
@@ -469,14 +524,14 @@ export default function FinanceiroIntercompany() {
                         <td>{titulo.empresa_destino_nome}</td>
                         <td>{labelTipo(titulo.tipo_intercompany)}</td>
                         <td>{labelStatus(titulo.status)}</td>
-                        <td>{formatCurrency(titulo.valor_previsto)}</td>
-                        <td>{formatCurrency(titulo.valor_realizado)}</td>
+                        <td className="text-right">{formatCurrency(titulo.valor_previsto)}</td>
+                        <td className="text-right">{formatCurrency(titulo.valor_realizado)}</td>
                         <td>{titulo.elimina_consolidado ? 'Elimina' : 'Mantem'}</td>
                       </tr>
                     ))
                   )}
                 </tbody>
-              </table>
+              </ResizableTable>
             </div>
           </section>
         </>

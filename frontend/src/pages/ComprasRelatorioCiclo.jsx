@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { ResizableTable, ResizableTh } from '../components/ResizableTable';
 import { obterRelatorioCicloCompras } from '../services/compras';
 import { getMinhasObras } from '../services/obras';
 
@@ -8,6 +9,16 @@ const DEFAULT_FILTERS = {
   data_inicio: '',
   data_fim: ''
 };
+
+const TABLE_COLUMNS = [
+  { key: 'solicitacao', width: 170, minWidth: 128 },
+  { key: 'status', width: 118, minWidth: 96 },
+  { key: 'datas', width: 178, minWidth: 140 },
+  { key: 'fornecedores', width: 124, minWidth: 108 },
+  { key: 'criacao_encerramento', width: 160, minWidth: 130 },
+  { key: 'encerramento_pedido', width: 160, minWidth: 130 },
+  { key: 'ciclo_total', width: 132, minWidth: 112 }
+];
 
 function readFilters(searchParams) {
   return {
@@ -257,16 +268,20 @@ export default function ComprasRelatorioCiclo() {
 
       <div className="mt-4 card sol-surface-card overflow-hidden">
         <div className="sol-table-wrapper">
-          <table className="sol-table">
+          <ResizableTable
+            className="sol-table"
+            columns={TABLE_COLUMNS}
+            storageKey="fluxy.compras.relatorioCiclo.columnWidths"
+          >
             <thead>
               <tr>
-                <th>Solicitacao</th>
-                <th>Status</th>
-                <th>Datas</th>
-                <th>Fornecedores</th>
-                <th>Criacao → encerramento</th>
-                <th>Encerramento → pedido</th>
-                <th>Ciclo total</th>
+                <ResizableTh columnKey="solicitacao">Solicitacao</ResizableTh>
+                <ResizableTh columnKey="status">Status</ResizableTh>
+                <ResizableTh columnKey="datas">Datas</ResizableTh>
+                <ResizableTh columnKey="fornecedores" className="text-right">Fornecedores</ResizableTh>
+                <ResizableTh columnKey="criacao_encerramento" className="text-right">Criacao → encerramento</ResizableTh>
+                <ResizableTh columnKey="encerramento_pedido" className="text-right">Encerramento → pedido</ResizableTh>
+                <ResizableTh columnKey="ciclo_total" className="text-right">Ciclo total</ResizableTh>
               </tr>
             </thead>
             <tbody>
@@ -294,18 +309,18 @@ export default function ComprasRelatorioCiclo() {
                       <div>Criada: {formatDate(linha.solicitacao.criado_em)}</div>
                       <div className="text-xs text-[var(--c-muted)]">Encerrada: {formatDate(linha.solicitacao.encerrado_em)}</div>
                     </td>
-                    <td>
+                    <td className="text-right">
                       {Number(linha.contadores.fornecedores_respondidos || 0).toLocaleString('pt-BR')} de{' '}
                       {Number(linha.contadores.fornecedores_enviados || 0).toLocaleString('pt-BR')}
                     </td>
-                    <td>{formatHours(linha.tempos.criacao_para_encerramento_horas)}</td>
-                    <td>{formatHours(linha.tempos.encerramento_para_pedido_horas)}</td>
-                    <td>{formatHours(linha.tempos.ciclo_total_ate_pedido_horas)}</td>
+                    <td className="text-right">{formatHours(linha.tempos.criacao_para_encerramento_horas)}</td>
+                    <td className="text-right">{formatHours(linha.tempos.encerramento_para_pedido_horas)}</td>
+                    <td className="text-right">{formatHours(linha.tempos.ciclo_total_ate_pedido_horas)}</td>
                   </tr>
                 ))
               )}
             </tbody>
-          </table>
+          </ResizableTable>
         </div>
       </div>
     </div>

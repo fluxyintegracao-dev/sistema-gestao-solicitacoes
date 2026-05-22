@@ -226,6 +226,71 @@ h1, h2, h3, h4, h5, h6 {
   border: none;
 }
 
+.resizable-table {
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.resizable-table th,
+.resizable-table td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.resizable-th {
+  position: relative;
+  user-select: none;
+}
+
+.resizable-th-label {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  padding-right: 0.45rem;
+  text-overflow: ellipsis;
+}
+
+.resizable-th-handle {
+  position: absolute;
+  top: 0;
+  right: -4px;
+  bottom: 0;
+  z-index: 2;
+  width: 9px;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.resizable-th-handle::after {
+  content: '';
+  position: absolute;
+  top: 22%;
+  right: 4px;
+  bottom: 22%;
+  width: 1px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--c-border) 84%, var(--c-primary));
+  opacity: 0;
+  transition: opacity 0.14s ease, background 0.14s ease;
+}
+
+.resizable-th:hover .resizable-th-handle::after,
+.resizable-th-handle:focus-visible::after,
+.is-column-resizing .resizable-th-handle::after {
+  opacity: 1;
+}
+
+.resizable-th-handle:focus-visible {
+  outline: 2px solid var(--ui-focus-ring);
+  outline-offset: -2px;
+}
+
+.is-column-resizing {
+  cursor: col-resize;
+  user-select: none;
+}
+
 .compras-fornecedores-table-shell {
   width: 100%;
   overflow-x: auto;
@@ -253,34 +318,6 @@ h1, h2, h3, h4, h5, h6 {
 
 .compras-fornecedores-table .text-right {
   text-align: right;
-}
-
-.compras-fornecedores-col--fornecedor {
-  width: 220px;
-}
-
-.compras-fornecedores-col--curta {
-  width: 82px;
-}
-
-.compras-fornecedores-col--resposta {
-  width: 118px;
-}
-
-.compras-fornecedores-col--prazo {
-  width: 104px;
-}
-
-.compras-fornecedores-col--itens {
-  width: 128px;
-}
-
-.compras-fornecedores-col--valor {
-  width: 136px;
-}
-
-.compras-fornecedores-col--data {
-  width: 118px;
 }
 
 .card {

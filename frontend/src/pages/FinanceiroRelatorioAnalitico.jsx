@@ -12,6 +12,7 @@ import {
   getContasBancarias,
   getRelatorioAnaliticoFinanceiro
 } from '../services/financeiro';
+import { ResizableTable, ResizableTh } from '../components/ResizableTable';
 import { getMinhasObras } from '../services/obras';
 import { buscarParceiros } from '../services/parceiros';
 
@@ -58,6 +59,18 @@ const COLUMN_DEFINITIONS = [
   { id: 'usuario_baixa', label: 'Usuario baixa', kind: 'text' },
   { id: 'origem', label: 'Origem', kind: 'text' }
 ];
+
+function getColumnWidth(column) {
+  if (column.id === 'titulo_codigo') return 122;
+  if (column.id === 'parceiro_nome') return 220;
+  if (column.id === 'obra_nome') return 200;
+  if (column.id === 'categoria_nome') return 190;
+  if (column.id === 'numero_documento') return 140;
+  if (column.kind === 'currency') return 142;
+  if (column.kind === 'date') return 122;
+  if (column.kind === 'status') return 128;
+  return 150;
+}
 
 function compact(params = {}) {
   return Object.fromEntries(
@@ -189,6 +202,17 @@ export default function FinanceiroRelatorioAnalitico() {
     const map = new Map(COLUMN_DEFINITIONS.map((item) => [item.id, item]));
     return columnOrder.map((id) => map.get(id)).filter(Boolean).filter((column) => visibleColumns.has(column.id));
   }, [columnOrder, visibleColumns]);
+  const tableColumns = useMemo(
+    () => [
+      ...columns.map((column) => ({
+        key: column.id,
+        width: getColumnWidth(column),
+        minWidth: column.kind === 'currency' ? 118 : 96
+      })),
+      { key: 'acoes', width: 84, minWidth: 72 }
+    ],
+    [columns]
+  );
 
   function setFilter(name, value) {
     setFilters((current) => ({
@@ -401,12 +425,17 @@ export default function FinanceiroRelatorioAnalitico() {
 
       <section className="card sol-surface-card overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-xs">
+          <ResizableTable
+            className="w-full text-xs"
+            columns={tableColumns}
+            storageKey="fluxy.financeiro.relatorioAnalitico.columnWidths"
+          >
             <thead>
               <tr className="border-b border-[var(--c-border)] bg-[var(--c-bg)]">
                 {columns.map((column) => (
-                  <th
+                  <ResizableTh
                     key={column.id}
+                    columnKey={column.id}
                     draggable
                     onDragStart={() => setDraggingColumn(column.id)}
                     onDragOver={(event) => event.preventDefault()}
@@ -415,9 +444,14 @@ export default function FinanceiroRelatorioAnalitico() {
                     title="Arraste para reposicionar"
                   >
                     {column.label}
-                  </th>
+                  </ResizableTh>
                 ))}
-                <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wide text-[var(--c-muted)] whitespace-nowrap">Acoes</th>
+                <ResizableTh
+                  columnKey="acoes"
+                  className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wide text-[var(--c-muted)] whitespace-nowrap"
+                >
+                  Acoes
+                </ResizableTh>
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--c-border)]">
@@ -450,7 +484,7 @@ export default function FinanceiroRelatorioAnalitico() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </ResizableTable>
         </div>
       </section>
     </div>

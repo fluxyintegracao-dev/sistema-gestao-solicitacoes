@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { ResizableTable, ResizableTh } from '../components/ResizableTable';
 import { getEmpresasGrupo } from '../services/empresasGrupo';
 import { getRelatorioEndividamentoFinanceiro } from '../services/financeiro';
 import { getMinhasObras } from '../services/obras';
@@ -13,6 +14,27 @@ const DEFAULT_FILTERS = {
   obra_id: '',
   excluir_intercompany: true
 };
+
+const EMPRESAS_COLUMNS = [
+  { key: 'empresa', width: 190, minWidth: 130 },
+  { key: 'titulos', width: 86, minWidth: 74 },
+  { key: 'saldo', width: 132, minWidth: 112 }
+];
+
+const CATEGORIAS_COLUMNS = [
+  { key: 'categoria', width: 190, minWidth: 130 },
+  { key: 'titulos', width: 86, minWidth: 74 },
+  { key: 'saldo', width: 132, minWidth: 112 }
+];
+
+const TITULOS_COLUMNS = [
+  { key: 'vencimento', width: 116, minWidth: 98 },
+  { key: 'titulo', width: 180, minWidth: 130 },
+  { key: 'empresa', width: 170, minWidth: 128 },
+  { key: 'categoria', width: 180, minWidth: 130 },
+  { key: 'parceiro', width: 190, minWidth: 130 },
+  { key: 'saldo', width: 132, minWidth: 112 }
+];
 
 function formatCurrency(value) {
   return Number(value || 0).toLocaleString('pt-BR', {
@@ -258,12 +280,16 @@ export default function FinanceiroEndividamento() {
               <p className="text-sm text-[var(--c-muted)]">Saldo aberto por empresa do titulo.</p>
             </div>
             <div className="table-wrapper">
-              <table className="table">
+              <ResizableTable
+                className="table"
+                columns={EMPRESAS_COLUMNS}
+                storageKey="fluxy.financeiro.endividamento.empresas.columnWidths"
+              >
                 <thead>
                   <tr>
-                    <th>Empresa</th>
-                    <th>Titulos</th>
-                    <th>Saldo</th>
+                    <ResizableTh columnKey="empresa">Empresa</ResizableTh>
+                    <ResizableTh columnKey="titulos" className="text-right">Titulos</ResizableTh>
+                    <ResizableTh columnKey="saldo" className="text-right">Saldo</ResizableTh>
                   </tr>
                 </thead>
                 <tbody>
@@ -273,13 +299,13 @@ export default function FinanceiroEndividamento() {
                     empresasResumo.map((empresa) => (
                       <tr key={empresa.empresa_id || empresa.empresa_nome}>
                         <td className="font-semibold text-[var(--c-text)]">{empresa.empresa_nome}</td>
-                        <td>{empresa.titulos}</td>
-                        <td className="font-semibold">{formatCurrency(empresa.saldo_total)}</td>
+                        <td className="text-right">{empresa.titulos}</td>
+                        <td className="text-right font-semibold">{formatCurrency(empresa.saldo_total)}</td>
                       </tr>
                     ))
                   )}
                 </tbody>
-              </table>
+              </ResizableTable>
             </div>
           </section>
 
@@ -289,12 +315,16 @@ export default function FinanceiroEndividamento() {
               <p className="text-sm text-[var(--c-muted)]">Apenas categorias marcadas como Endividamento.</p>
             </div>
             <div className="table-wrapper">
-              <table className="table">
+              <ResizableTable
+                className="table"
+                columns={CATEGORIAS_COLUMNS}
+                storageKey="fluxy.financeiro.endividamento.categorias.columnWidths"
+              >
                 <thead>
                   <tr>
-                    <th>Categoria</th>
-                    <th>Titulos</th>
-                    <th>Saldo</th>
+                    <ResizableTh columnKey="categoria">Categoria</ResizableTh>
+                    <ResizableTh columnKey="titulos" className="text-right">Titulos</ResizableTh>
+                    <ResizableTh columnKey="saldo" className="text-right">Saldo</ResizableTh>
                   </tr>
                 </thead>
                 <tbody>
@@ -304,13 +334,13 @@ export default function FinanceiroEndividamento() {
                     categoriasResumo.map((categoria) => (
                       <tr key={categoria.categoria_id || categoria.categoria_nome}>
                         <td className="font-semibold text-[var(--c-text)]">{categoria.categoria_nome}</td>
-                        <td>{categoria.titulos}</td>
-                        <td className="font-semibold">{formatCurrency(categoria.saldo_total)}</td>
+                        <td className="text-right">{categoria.titulos}</td>
+                        <td className="text-right font-semibold">{formatCurrency(categoria.saldo_total)}</td>
                       </tr>
                     ))
                   )}
                 </tbody>
-              </table>
+              </ResizableTable>
             </div>
           </section>
 
@@ -322,15 +352,19 @@ export default function FinanceiroEndividamento() {
               </p>
             </div>
             <div className="table-wrapper">
-              <table className="table">
+              <ResizableTable
+                className="table"
+                columns={TITULOS_COLUMNS}
+                storageKey="fluxy.financeiro.endividamento.titulos.columnWidths"
+              >
                 <thead>
                   <tr>
-                    <th>Vencimento</th>
-                    <th>Titulo</th>
-                    <th>Empresa</th>
-                    <th>Categoria</th>
-                    <th>Parceiro</th>
-                    <th>Saldo</th>
+                    <ResizableTh columnKey="vencimento">Vencimento</ResizableTh>
+                    <ResizableTh columnKey="titulo">Titulo</ResizableTh>
+                    <ResizableTh columnKey="empresa">Empresa</ResizableTh>
+                    <ResizableTh columnKey="categoria">Categoria</ResizableTh>
+                    <ResizableTh columnKey="parceiro">Parceiro</ResizableTh>
+                    <ResizableTh columnKey="saldo" className="text-right">Saldo</ResizableTh>
                   </tr>
                 </thead>
                 <tbody>
@@ -347,12 +381,12 @@ export default function FinanceiroEndividamento() {
                         <td>{titulo.empresa_nome}</td>
                         <td>{titulo.categoria_nome}</td>
                         <td>{titulo.parceiro_nome || '-'}</td>
-                        <td className="font-semibold">{formatCurrency(titulo.valor_saldo)}</td>
+                        <td className="text-right font-semibold">{formatCurrency(titulo.valor_saldo)}</td>
                       </tr>
                     ))
                   )}
                 </tbody>
-              </table>
+              </ResizableTable>
             </div>
           </section>
         </div>

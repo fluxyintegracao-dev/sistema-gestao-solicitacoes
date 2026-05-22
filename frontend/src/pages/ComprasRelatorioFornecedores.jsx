@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { ResizableTable, ResizableTh } from '../components/ResizableTable';
 import { obterRelatorioFornecedoresCompras } from '../services/compras';
 import { getMinhasObras } from '../services/obras';
 
@@ -8,6 +9,18 @@ const DEFAULT_FILTERS = {
   data_inicio: '',
   data_fim: ''
 };
+
+const TABLE_COLUMNS = [
+  { key: 'fornecedor', width: 220, minWidth: 160 },
+  { key: 'cotacoes', width: 82, minWidth: 76 },
+  { key: 'resposta', width: 118, minWidth: 92 },
+  { key: 'prazo', width: 104, minWidth: 84 },
+  { key: 'itens_respondidos', width: 128, minWidth: 104 },
+  { key: 'itens_vencedores', width: 128, minWidth: 104 },
+  { key: 'valor_cotado', width: 136, minWidth: 112 },
+  { key: 'valor_vencedor', width: 136, minWidth: 112 },
+  { key: 'ultima_cotacao', width: 118, minWidth: 104 }
+];
 
 function readFilters(searchParams) {
   return {
@@ -252,29 +265,22 @@ export default function ComprasRelatorioFornecedores() {
 
       <div className="mt-4 card sol-surface-card overflow-hidden">
         <div className="sol-table-wrapper compras-fornecedores-table-shell">
-          <table className="sol-table compras-fornecedores-table">
-            <colgroup>
-              <col className="compras-fornecedores-col--fornecedor" />
-              <col className="compras-fornecedores-col--curta" />
-              <col className="compras-fornecedores-col--resposta" />
-              <col className="compras-fornecedores-col--prazo" />
-              <col className="compras-fornecedores-col--itens" />
-              <col className="compras-fornecedores-col--itens" />
-              <col className="compras-fornecedores-col--valor" />
-              <col className="compras-fornecedores-col--valor" />
-              <col className="compras-fornecedores-col--data" />
-            </colgroup>
+          <ResizableTable
+            className="sol-table compras-fornecedores-table"
+            columns={TABLE_COLUMNS}
+            storageKey="fluxy.compras.relatorioFornecedores.columnWidths"
+          >
             <thead>
               <tr>
-                <th>Fornecedor</th>
-                <th className="text-right">Cotacoes</th>
-                <th className="text-right">Resposta</th>
-                <th className="text-right">Prazo medio</th>
-                <th className="text-right">Itens respondidos</th>
-                <th className="text-right">Itens vencedores</th>
-                <th className="text-right">Valor cotado</th>
-                <th className="text-right">Valor vencedor</th>
-                <th className="text-right">Ultima cotacao</th>
+                <ResizableTh columnKey="fornecedor">Fornecedor</ResizableTh>
+                <ResizableTh columnKey="cotacoes" className="text-right">Cotacoes</ResizableTh>
+                <ResizableTh columnKey="resposta" className="text-right">Resposta</ResizableTh>
+                <ResizableTh columnKey="prazo" className="text-right">Prazo medio</ResizableTh>
+                <ResizableTh columnKey="itens_respondidos" className="text-right">Itens respondidos</ResizableTh>
+                <ResizableTh columnKey="itens_vencedores" className="text-right">Itens vencedores</ResizableTh>
+                <ResizableTh columnKey="valor_cotado" className="text-right">Valor cotado</ResizableTh>
+                <ResizableTh columnKey="valor_vencedor" className="text-right">Valor vencedor</ResizableTh>
+                <ResizableTh columnKey="ultima_cotacao" className="text-right">Ultima cotacao</ResizableTh>
               </tr>
             </thead>
             <tbody>
@@ -319,7 +325,7 @@ export default function ComprasRelatorioFornecedores() {
                 ))
               )}
             </tbody>
-          </table>
+          </ResizableTable>
         </div>
       </div>
     </div>

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { ResizableTable, ResizableTh } from '../components/ResizableTable';
 import { obterRelatorioEconomiaCotacoes } from '../services/compras';
 import { getMinhasObras } from '../services/obras';
 
@@ -8,6 +9,17 @@ const DEFAULT_FILTERS = {
   data_inicio: '',
   data_fim: ''
 };
+
+const TABLE_COLUMNS = [
+  { key: 'cotacao', width: 150, minWidth: 118 },
+  { key: 'item', width: 210, minWidth: 150 },
+  { key: 'quantidade', width: 90, minWidth: 72 },
+  { key: 'menor_preco', width: 158, minWidth: 124 },
+  { key: 'vencedor', width: 158, minWidth: 124 },
+  { key: 'economia', width: 122, minWidth: 104 },
+  { key: 'sobrepreco', width: 124, minWidth: 104 },
+  { key: 'sinal', width: 132, minWidth: 112 }
+];
 
 function readFilters(searchParams) {
   return {
@@ -242,17 +254,21 @@ export default function ComprasRelatorioEconomiaCotacoes() {
 
       <div className="mt-4 card sol-surface-card overflow-hidden">
         <div className="sol-table-wrapper">
-          <table className="sol-table">
+          <ResizableTable
+            className="sol-table"
+            columns={TABLE_COLUMNS}
+            storageKey="fluxy.compras.relatorioEconomiaCotacoes.columnWidths"
+          >
             <thead>
               <tr>
-                <th>Cotacao</th>
-                <th>Item</th>
-                <th>Qtd.</th>
-                <th>Menor preco</th>
-                <th>Vencedor</th>
-                <th>Economia</th>
-                <th>Sobrepreco</th>
-                <th>Sinal</th>
+                <ResizableTh columnKey="cotacao">Cotacao</ResizableTh>
+                <ResizableTh columnKey="item">Item</ResizableTh>
+                <ResizableTh columnKey="quantidade" className="text-right">Qtd.</ResizableTh>
+                <ResizableTh columnKey="menor_preco" className="text-right">Menor preco</ResizableTh>
+                <ResizableTh columnKey="vencedor" className="text-right">Vencedor</ResizableTh>
+                <ResizableTh columnKey="economia" className="text-right">Economia</ResizableTh>
+                <ResizableTh columnKey="sobrepreco" className="text-right">Sobrepreco</ResizableTh>
+                <ResizableTh columnKey="sinal">Sinal</ResizableTh>
               </tr>
             </thead>
             <tbody>
@@ -281,23 +297,23 @@ export default function ComprasRelatorioEconomiaCotacoes() {
                       <strong>{linha.item.descricao}</strong>
                       <div className="text-xs text-[var(--c-muted)]">{linha.item.unidade}</div>
                     </td>
-                    <td>{Number(linha.item.quantidade || 0).toLocaleString('pt-BR')}</td>
-                    <td>
+                    <td className="text-right">{Number(linha.item.quantidade || 0).toLocaleString('pt-BR')}</td>
+                    <td className="text-right">
                       <strong>{formatMoney(linha.menor_preco.valor_total)}</strong>
                       <div className="text-xs text-[var(--c-muted)]">
                         {linha.menor_preco.fornecedor_nome} · {formatMoney(linha.menor_preco.preco_unitario)}
                       </div>
                     </td>
-                    <td>
+                    <td className="text-right">
                       <strong>{formatMoney(linha.vencedor.valor_total)}</strong>
                       <div className="text-xs text-[var(--c-muted)]">
                         {linha.vencedor.fornecedor_nome} · {formatMoney(linha.vencedor.preco_unitario)}
                       </div>
                     </td>
-                    <td style={{ color: metricColor(linha.economia), fontWeight: 700 }}>
+                    <td className="text-right" style={{ color: metricColor(linha.economia), fontWeight: 700 }}>
                       {formatMoney(linha.economia)}
                     </td>
-                    <td style={{ color: Number(linha.sobrepreco || 0) > 0 ? 'var(--c-danger)' : 'var(--c-muted)', fontWeight: 700 }}>
+                    <td className="text-right" style={{ color: Number(linha.sobrepreco || 0) > 0 ? 'var(--c-danger)' : 'var(--c-muted)', fontWeight: 700 }}>
                       {formatMoney(linha.sobrepreco)}
                     </td>
                     <td>
@@ -311,7 +327,7 @@ export default function ComprasRelatorioEconomiaCotacoes() {
                 ))
               )}
             </tbody>
-          </table>
+          </ResizableTable>
         </div>
       </div>
     </div>
