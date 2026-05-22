@@ -1996,6 +1996,7 @@ Devem responder:
 - quanto foi comprado;
 - quais solicitacoes de compra e pedidos estao em cada status;
 - qual obra/centro concentra demanda e valor pedido;
+- quais categorias e insumos concentram o valor comprado;
 - economia gerada;
 - fornecedores mais usados;
 - compras sem cotacao suficiente;
@@ -2018,6 +2019,24 @@ Importante:
 - A quantidade de solicitacoes vem da tabela real de solicitacoes de compra.
 - O relatorio nao transforma cotacao em pedido por deducao. Uma compra so entra como pedido quando existe pedido gerado.
 - O periodo considera a data de criacao da solicitacao de compra e a data de criacao do pedido, conforme a tabela analisada.
+
+Relatorio de Categorias e Insumos:
+
+1. Acesse `Compras > Relatorios`.
+2. Abra `Categorias e insumos`.
+3. Filtre por obra/centro de custo e por periodo de criacao do pedido.
+4. Leia os cards para entender quantidade de itens, pedidos, categorias movimentadas, valor total e ticket medio por item.
+5. Use `Por categoria` para entender quais grupos de insumo concentram valor.
+6. Use `Por obra/centro` para ver onde o consumo dos itens esta concentrado.
+7. Use `Por insumo/item` para identificar os itens de maior valor pedido.
+
+Importante:
+
+- O relatorio usa somente itens reais dos pedidos de compra.
+- Itens de pedidos removidos nao entram no relatorio.
+- Itens cadastrados puxam a categoria do cadastro de insumos.
+- Itens manuais aparecem como `Itens manuais/sem categoria`, porque nao ha categoria real cadastrada para eles.
+- O relatorio nao classifica item por nome ou palavra-chave.
 
 Relatorio de Fornecedores:
 

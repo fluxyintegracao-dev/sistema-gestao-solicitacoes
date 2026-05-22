@@ -337,6 +337,18 @@ export async function obterRelatorioDemandaPedidosCompras(params = {}) {
   return handleJsonResponse(response, 'Erro ao buscar relatorio de demanda e pedidos de compras');
 }
 
+export async function obterRelatorioCategoriasInsumosCompras(params = {}) {
+  const query = buildQueryString(params);
+  const url = query
+    ? `${API_URL}/compras/relatorios/categorias-insumos?${query}`
+    : `${API_URL}/compras/relatorios/categorias-insumos`;
+
+  const response = await fetch(url, {
+    headers: authHeaders()
+  });
+  return handleJsonResponse(response, 'Erro ao buscar relatorio de compras por categoria e insumo');
+}
+
 export async function atualizarStatusPedidoCompra(id, data) {
   const response = await fetch(`${API_URL}/compras/pedidos/${id}/status`, {
     method: 'PATCH',
