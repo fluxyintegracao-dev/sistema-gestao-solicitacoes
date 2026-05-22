@@ -2061,9 +2061,10 @@ Relatorio de Compras por Fornecedor:
 2. Abra `Compras por fornecedor`.
 3. Filtre por obra/centro de custo e por periodo de criacao do pedido.
 4. Leia os cards para entender quantidade de pedidos emitidos, fornecedores com pedido, valor total pedido, ticket medio, concentracao dos 5 maiores fornecedores e pedidos que nao atingiram minimo cadastrado.
-5. Use `Fornecedores por valor pedido` para avaliar quais fornecedores concentram compras efetivas.
-6. Use `Compras por obra/centro` para identificar onde o valor comprado esta concentrado.
-7. Use `Pedidos recentes` para abrir o pedido ou a solicitacao de compra de origem.
+5. Use o `Ranking visual de fornecedores` para identificar rapidamente os 10 fornecedores com maior valor efetivamente pedido no periodo.
+6. Use `Fornecedores por valor pedido` para avaliar quais fornecedores concentram compras efetivas.
+7. Use `Compras por obra/centro` para identificar onde o valor comprado esta concentrado.
+8. Use `Pedidos recentes` para abrir o pedido ou a solicitacao de compra de origem.
 
 Importante:
 
@@ -2071,6 +2072,7 @@ Importante:
 - O valor vem do campo real `valor_total` do pedido de compra.
 - Itens removidos do pedido nao entram na quantidade de itens exibida.
 - O relatorio nao mede melhor preco, taxa de resposta ou desempenho de cotacao. Para isso, use `Fornecedores` ou `Economia em cotacoes`.
+- O ranking visual nao cria uma metrica nova. Ele apenas transforma o valor total pedido por fornecedor em barra para facilitar leitura executiva.
 - A concentracao top 5 mostra quanto do valor total do periodo esta concentrado nos cinco maiores fornecedores por valor pedido.
 
 Relatorio de Precos por Insumo:

@@ -164,6 +164,11 @@ export default function ComprasRelatorioComprasFornecedor() {
   const pedidos = useMemo(() => (
     Array.isArray(relatorio?.pedidos) ? relatorio.pedidos : []
   ), [relatorio]);
+  const topFornecedores = useMemo(() => fornecedores.slice(0, 10), [fornecedores]);
+  const maiorValorFornecedor = useMemo(
+    () => Math.max(...topFornecedores.map((item) => Number(item.valor_total || 0)), 0),
+    [topFornecedores]
+  );
 
   function aplicarFiltros(event) {
     event.preventDefault();
@@ -280,6 +285,49 @@ export default function ComprasRelatorioComprasFornecedor() {
           <strong>{formatNumber(resumo.pedidos_minimo_nao_atingido)}</strong>
           <small>Pedidos abaixo do minimo cadastrado</small>
         </div>
+      </div>
+
+      <div className="mt-4 card sol-surface-card">
+        <div className="app-page-header-row">
+          <div>
+            <h2 className="text-lg font-bold text-[var(--c-text)]">Ranking visual de fornecedores</h2>
+            <p className="page-subtitle">
+              Top 10 por valor efetivamente pedido no periodo filtrado.
+            </p>
+          </div>
+        </div>
+        {loading ? (
+          <div className="text-sm text-[var(--c-muted)] py-4">Carregando ranking...</div>
+        ) : topFornecedores.length === 0 ? (
+          <div className="app-empty-card mt-3">Sem pedidos emitidos para montar o ranking.</div>
+        ) : (
+          <div className="grid gap-3 mt-3">
+            {topFornecedores.map((item, index) => {
+              const valor = Number(item.valor_total || 0);
+              const percentual = maiorValorFornecedor > 0 ? Math.max(4, (valor / maiorValorFornecedor) * 100) : 0;
+              return (
+                <div key={`ranking-${item.key}`} className="grid gap-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <span className="text-xs font-bold text-[var(--c-muted)]">#{index + 1}</span>
+                      <strong className="ml-2 text-sm text-[var(--c-text)]">{item.fornecedor_nome}</strong>
+                      <span className="ml-2 text-xs text-[var(--c-muted)]">
+                        {formatNumber(item.pedidos)} pedido(s)
+                      </span>
+                    </div>
+                    <strong className="text-sm tabular-nums text-[var(--c-text)]">{formatMoney(valor)}</strong>
+                  </div>
+                  <div className="h-3 rounded-full bg-slate-100 overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-[var(--c-primary)]"
+                      style={{ width: `${percentual}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       <div className="mt-4 card sol-surface-card overflow-hidden">
