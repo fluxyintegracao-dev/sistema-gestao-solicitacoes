@@ -2097,14 +2097,16 @@ Relatorio de Fornecedores:
 2. Abra `Fornecedores`.
 3. Filtre por obra/centro de custo e por periodo de envio da cotacao, se necessario.
 4. Leia os cards principais para entender quantos fornecedores participaram, quantas cotacoes foram enviadas, qual foi a taxa de resposta e qual valor foi vencedor.
-5. Na tabela, avalie cada fornecedor por quantidade de cotacoes enviadas, respostas recebidas, prazo medio de resposta, itens respondidos, itens vencedores, valor cotado e valor vencedor.
-6. Use esse relatorio para identificar fornecedores recorrentes, fornecedores que respondem pouco, fornecedores com bom desempenho e fornecedores que concentram valor vencedor.
+5. Use a tabela `Fornecedores com menor taxa de resposta` para identificar quem recebeu cotacoes e respondeu pouco.
+6. Na base analitica, avalie cada fornecedor por quantidade de cotacoes enviadas, respostas recebidas, cotacoes sem resposta, taxa de visualizacao, prazo medio de resposta, itens respondidos, itens vencedores, valor cotado e valor vencedor.
+7. Use esse relatorio para identificar fornecedores recorrentes, fornecedores que respondem pouco, fornecedores com bom desempenho e fornecedores que concentram valor vencedor.
 
 Importante:
 
 - O valor cotado usa apenas respostas disponiveis com preco informado.
 - O valor vencedor usa apenas itens marcados como vencedores no encerramento da cotacao.
 - O prazo medio usa a diferenca entre `enviado_em` e `respondido_em`; se a resposta nao tiver data registrada, ela nao entra no calculo do prazo medio.
+- A classificacao de baixa resposta nao e uma inferencia comercial. Ela usa somente cotacoes enviadas e respondidas, e exige amostra minima de 2 participacoes para evitar conclusoes por uma unica cotacao.
 
 Relatorio de Economia em Cotacoes:
 

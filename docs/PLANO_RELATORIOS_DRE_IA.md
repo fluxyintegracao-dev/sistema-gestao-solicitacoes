@@ -75,6 +75,7 @@ Base multiempresa e DRE gerencial:
 - Compras > Relatorios ganhou Evolucao Mensal, mostrando curva mensal de pedidos emitidos por valor, ticket medio, fornecedores, obras/centros e status.
 - Compras > Relatorios ganhou Economia em Cotacoes, comparando menor preco disponivel com o fornecedor vencedor em cotacoes encerradas para evidenciar economia, sobrepreco e aderencia ao menor preco.
 - Compras > Relatorios ganhou Relatorio de Fornecedores, com participacao em cotacoes, taxa de resposta, prazo medio, itens respondidos, itens vencedores, valor cotado e valor vencedor calculados por dados estruturados do processo de cotacao.
+- Compras > Relatorios > Fornecedores ganhou destaque de baixa resposta, listando fornecedores com menor taxa de retorno apenas quando existe amostra minima de participacoes reais.
 - Compras > Relatorios ganhou Pendencias de Cotacoes, destacando cotacoes sem minimo de respostas e fornecedores com prazo vencido sem resposta a partir de campos estruturados.
 - Compras > Relatorios ganhou Demanda e Pedidos, consolidando solicitacoes de compra e pedidos por status, obra/centro de custo, valor pedido e analitico com base em registros reais.
 - Compras > Relatorios ganhou Compras por Fornecedor, consolidando valor efetivamente pedido por fornecedor, obra/centro, status e pedido emitido com base em pedidos de compra reais.
@@ -194,7 +195,7 @@ Relatorios:
 - Auditoria de itens de pedido.
 - Fornecedores mais acionados. [Entregue em Relatorio de Fornecedores por acionamento em cotacao e em Compras por Fornecedor por pedido emitido]
 - Fornecedores com melhor preco medio. [Entregue em Precos por Insumo com preco medio calculado por item real de pedido]
-- Fornecedores com menor taxa de resposta.
+- Fornecedores com menor taxa de resposta. [Entregue em Relatorio de Fornecedores com ranking de baixa resposta baseado em cotacoes enviadas e respondidas]
 
 Graficos:
 

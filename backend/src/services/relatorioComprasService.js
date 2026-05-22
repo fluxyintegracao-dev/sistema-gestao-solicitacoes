@@ -309,16 +309,30 @@ function finalizeFornecedorResumo(resumo) {
   const taxaResposta = resumo.cotacoes_enviadas > 0
     ? (resumo.cotacoes_respondidas / resumo.cotacoes_enviadas) * 100
     : 0;
+  const taxaVisualizacao = resumo.cotacoes_enviadas > 0
+    ? (resumo.cotacoes_visualizadas / resumo.cotacoes_enviadas) * 100
+    : 0;
   const prazoMedio = resumo.prazo_respostas_com_data > 0
     ? resumo.prazo_total_resposta_horas / resumo.prazo_respostas_com_data
     : null;
+  const cotacoesSemResposta = Math.max(0, resumo.cotacoes_enviadas - resumo.cotacoes_respondidas);
+  const classificacaoResposta = resumo.cotacoes_enviadas < 2
+    ? 'SEM_AMOSTRA'
+    : taxaResposta < 50
+      ? 'BAIXA_RESPOSTA'
+      : taxaResposta < 80
+        ? 'ATENCAO'
+        : 'RESPONSIVO';
 
   return {
     fornecedor: resumo.fornecedor,
     cotacoes_enviadas: resumo.cotacoes_enviadas,
     cotacoes_visualizadas: resumo.cotacoes_visualizadas,
     cotacoes_respondidas: resumo.cotacoes_respondidas,
+    cotacoes_sem_resposta: cotacoesSemResposta,
     taxa_resposta: Number(taxaResposta.toFixed(2)),
+    taxa_visualizacao: Number(taxaVisualizacao.toFixed(2)),
+    classificacao_resposta: classificacaoResposta,
     prazo_medio_resposta_horas: prazoMedio != null ? Number(prazoMedio.toFixed(2)) : null,
     itens_respondidos: resumo.itens_respondidos,
     itens_vencedores: resumo.itens_vencedores,
@@ -462,6 +476,26 @@ async function relatorioFornecedoresCompras({ obraId, dataInicio, dataFim, obraI
   resumoGeral.taxa_resposta = resumoGeral.cotacoes_enviadas > 0
     ? Number(((resumoGeral.cotacoes_respondidas / resumoGeral.cotacoes_enviadas) * 100).toFixed(2))
     : 0;
+  resumoGeral.taxa_visualizacao = resumoGeral.cotacoes_enviadas > 0
+    ? Number(((resumoGeral.cotacoes_visualizadas / resumoGeral.cotacoes_enviadas) * 100).toFixed(2))
+    : 0;
+  resumoGeral.cotacoes_sem_resposta = Math.max(0, resumoGeral.cotacoes_enviadas - resumoGeral.cotacoes_respondidas);
+  resumoGeral.fornecedores_baixa_resposta = fornecedores.filter(
+    (fornecedor) => fornecedor.classificacao_resposta === 'BAIXA_RESPOSTA'
+  ).length;
+
+  const fornecedoresBaixaResposta = fornecedores
+    .filter((fornecedor) => fornecedor.cotacoes_enviadas >= 2)
+    .sort((a, b) => {
+      if (Number(a.taxa_resposta || 0) !== Number(b.taxa_resposta || 0)) {
+        return Number(a.taxa_resposta || 0) - Number(b.taxa_resposta || 0);
+      }
+      if (Number(b.cotacoes_sem_resposta || 0) !== Number(a.cotacoes_sem_resposta || 0)) {
+        return Number(b.cotacoes_sem_resposta || 0) - Number(a.cotacoes_sem_resposta || 0);
+      }
+      return String(a.fornecedor.nome).localeCompare(String(b.fornecedor.nome), 'pt-BR');
+    })
+    .slice(0, 20);
 
   return {
     filtros: {
@@ -470,7 +504,8 @@ async function relatorioFornecedoresCompras({ obraId, dataInicio, dataFim, obraI
       data_fim: dataFim || null
     },
     resumo: resumoGeral,
-    fornecedores
+    fornecedores,
+    fornecedores_baixa_resposta: fornecedoresBaixaResposta
   };
 }
 
