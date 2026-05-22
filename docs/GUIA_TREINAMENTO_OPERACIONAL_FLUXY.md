@@ -1582,6 +1582,7 @@ Objetivo:
 - comparar entradas e saidas previstas com baixas efetivamente registradas;
 - eliminar intercompany quando a analise for consolidada do grupo;
 - identificar empresas que geram caixa, consomem caixa ou dependem de movimentacoes internas.
+- identificar necessidade futura de caixa e descasamento por empresa ou obra/centro.
 
 Passo a passo:
 
@@ -1592,8 +1593,11 @@ Passo a passo:
 5. Manter `Eliminar intercompany no consolidado` marcado para a visao executiva principal.
 6. Clicar em `Atualizar fluxo`.
 7. Conferir os cards de entradas, saidas e saldo.
-8. Conferir a tabela `Resumo por empresa`.
-9. Conferir a serie consolidada para enxergar concentracao por periodo.
+8. Conferir o card de necessidade futura de caixa.
+9. Ler os alertas do fluxo.
+10. Conferir a tabela `Resumo por empresa`.
+11. Conferir a tabela `Resumo por obra/centro de custo`.
+12. Conferir a serie consolidada para enxergar concentracao por periodo.
 
 Como interpretar:
 
@@ -1604,6 +1608,9 @@ Como interpretar:
 - saidas realizadas sao baixas de titulos a pagar;
 - saldo realizado e entradas realizadas menos saidas realizadas;
 - intercompany eliminado mostra valores internos retirados da visao consolidada.
+- necessidade futura de caixa mostra o valor necessario para cobrir o menor saldo previsto acumulado dentro do periodo filtrado;
+- alertas de empresa ou obra negativa mostram descasamento previsto, nao saldo bancario real;
+- se aparecer fluxo sem empresa ou sem obra/centro, corrija o cadastro antes de usar o dado em decisao executiva.
 
 Regra operacional importante:
 

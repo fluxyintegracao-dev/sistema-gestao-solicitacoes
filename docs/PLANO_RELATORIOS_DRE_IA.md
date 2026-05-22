@@ -69,6 +69,7 @@ Base multiempresa e DRE gerencial:
 - O retorno bancario mockado passou a exigir MFA step-up e justificativa, preservando rastreabilidade mesmo no ambiente de desenvolvimento.
 - O webhook real do Banco do Brasil passou a exigir segredo compartilhado configurado no ambiente, recusar payload sem identificador do evento, registrar auditoria de seguranca e tratar notificacoes repetidas como idempotentes pelo identificador do evento do provedor.
 - A auditoria de pagamentos passou a ter consulta backend para eventos tecnicos por status, tipo, lote, intencao, identificador do provedor e periodo.
+- O Fluxo de Caixa Consolidado passou a destacar necessidade futura de caixa, pior periodo previsto, empresas com saldo previsto negativo, obras/centros com saldo previsto negativo e alertas de consistencia para fluxo sem empresa ou obra/centro.
 
 Documentacao operacional complementar:
 
@@ -1037,6 +1038,7 @@ Criar futuramente:
 - Incluir contas a pagar, contas a receber, provisoes, pedidos, contratos, medicoes, folha, impostos, inadimplencia projetada e intercompany previsto.
 - Criar alertas de necessidade futura de caixa.
 - Criar indicadores de descasamento de caixa por obra, empresa e grupo.
+  - Status inicial: fluxo consolidado ja mostra alertas de necessidade futura de caixa, descasamento por empresa e descasamento por obra/centro com base nos titulos e baixas do periodo.
 
 ### Fase 7 - Relatorios prioritarios
 

@@ -522,10 +522,61 @@ function emptyFluxoEmpresa(empresaId, empresasById, vazioLabel) {
   };
 }
 
+function emptyFluxoObra(obraId, obrasById, vazioLabel) {
+  const obra = obraId ? obrasById.get(Number(obraId)) : null;
+  return {
+    obra_id: obraId || null,
+    obra_nome: obra?.nome || vazioLabel,
+    obra_codigo: obra?.codigo || null,
+    tipo_centro_custo: obra?.tipo_centro_custo || null,
+    empresa_grupo_id: obra?.empresa_grupo_id || null,
+    entradas_previstas: 0,
+    saidas_previstas: 0,
+    saldo_previsto: 0,
+    entradas_realizadas: 0,
+    saidas_realizadas: 0,
+    saldo_realizado: 0,
+    titulos_previstos: 0,
+    movimentos_realizados: 0
+  };
+}
+
 function addFluxoEmpresa(map, empresaId, empresasById, vazioLabel, tipo, valor, origem) {
   const key = empresaId ? String(empresaId) : vazioLabel;
   if (!map.has(key)) {
     map.set(key, emptyFluxoEmpresa(empresaId, empresasById, vazioLabel));
+  }
+
+  const item = map.get(key);
+  const amount = roundCurrency(valor);
+  const isReceber = String(tipo || '').toUpperCase() === 'RECEBER';
+
+  if (origem === 'PREVISTO') {
+    if (isReceber) {
+      item.entradas_previstas = roundCurrency(item.entradas_previstas + amount);
+    } else {
+      item.saidas_previstas = roundCurrency(item.saidas_previstas + amount);
+    }
+    item.titulos_previstos += 1;
+  } else {
+    if (isReceber) {
+      item.entradas_realizadas = roundCurrency(item.entradas_realizadas + amount);
+    } else {
+      item.saidas_realizadas = roundCurrency(item.saidas_realizadas + amount);
+    }
+    item.movimentos_realizados += 1;
+  }
+
+  item.saldo_previsto = roundCurrency(item.entradas_previstas - item.saidas_previstas);
+  item.saldo_realizado = roundCurrency(item.entradas_realizadas - item.saidas_realizadas);
+
+  return item;
+}
+
+function addFluxoObra(map, obraId, obrasById, vazioLabel, tipo, valor, origem) {
+  const key = obraId ? String(obraId) : vazioLabel;
+  if (!map.has(key)) {
+    map.set(key, emptyFluxoObra(obraId, obrasById, vazioLabel));
   }
 
   const item = map.get(key);
@@ -620,7 +671,144 @@ async function carregarMovimentosFluxoConsolidado(periodo, tituloScopeWhere, mov
   });
 }
 
-function summarizeFluxoConsolidado({ previstos, realizados, empresas }) {
+function summarizeFluxoObras({ previstos, realizados, obras }) {
+  const obrasById = new Map(obras.map((obra) => [Number(obra.id), obra]));
+  const obrasMap = new Map();
+  const vazioTitulo = 'SEM_OBRA_TITULO';
+  const vazioBaixa = 'SEM_OBRA_BAIXA';
+
+  for (const titulo of previstos) {
+    addFluxoObra(
+      obrasMap,
+      titulo.obra_id,
+      obrasById,
+      vazioTitulo,
+      titulo.tipo,
+      titulo.valor_saldo,
+      'PREVISTO'
+    );
+  }
+
+  for (const movimento of realizados) {
+    const titulo = movimento.titulo || {};
+    addFluxoObra(
+      obrasMap,
+      titulo.obra_id,
+      obrasById,
+      vazioBaixa,
+      titulo.tipo,
+      movimento.valor_quitacao,
+      'REALIZADO'
+    );
+  }
+
+  return Array.from(obrasMap.values())
+    .map((item) => ({
+      ...item,
+      variacao_realizado_vs_previsto: roundCurrency(item.saldo_realizado - item.saldo_previsto)
+    }))
+    .sort((a, b) => Math.abs(Number(b.saldo_previsto || 0)) - Math.abs(Number(a.saldo_previsto || 0)));
+}
+
+function buildFluxoConsolidadoAlert({ codigo, severidade, titulo, descricao, valor = null, acao, rota = null }) {
+  return {
+    codigo,
+    severidade,
+    titulo,
+    descricao,
+    valor: valor == null ? null : roundCurrency(valor),
+    acao,
+    rota
+  };
+}
+
+function summarizeFluxoConsolidadoInsights({ resumo, empresasResumo, obrasResumo, serie }) {
+  const alertas = [];
+  const piorPeriodo = serie.reduce((pior, item) => {
+    if (!pior) return item;
+    return Number(item.saldo_previsto_acumulado || 0) < Number(pior.saldo_previsto_acumulado || 0) ? item : pior;
+  }, null);
+  const necessidadeFuturaCaixa = piorPeriodo && Number(piorPeriodo.saldo_previsto_acumulado || 0) < 0
+    ? Math.abs(roundCurrency(piorPeriodo.saldo_previsto_acumulado))
+    : 0;
+  const empresasNegativas = empresasResumo.filter((empresa) => Number(empresa.saldo_previsto || 0) < 0);
+  const obrasNegativas = obrasResumo.filter((obra) => Number(obra.saldo_previsto || 0) < 0);
+  const empresasSemVinculo = empresasResumo.filter((empresa) => !empresa.empresa_id);
+  const obrasSemVinculo = obrasResumo.filter((obra) => !obra.obra_id);
+
+  if (necessidadeFuturaCaixa > 0) {
+    alertas.push(buildFluxoConsolidadoAlert({
+      codigo: 'NECESSIDADE_FUTURA_CAIXA',
+      severidade: 'ALTA',
+      titulo: 'Necessidade futura de caixa no periodo',
+      descricao: `O menor saldo previsto acumulado ocorre em ${piorPeriodo.label}.`,
+      valor: necessidadeFuturaCaixa,
+      acao: 'Revisar recebimentos previstos, pagamentos concentrados e necessidade de cobertura financeira real.'
+    }));
+  }
+
+  if (empresasNegativas.length > 0) {
+    const total = empresasNegativas.reduce((sum, empresa) => sum + Math.abs(Number(empresa.saldo_previsto || 0)), 0);
+    alertas.push(buildFluxoConsolidadoAlert({
+      codigo: 'EMPRESAS_SALDO_PREVISTO_NEGATIVO',
+      severidade: empresasNegativas.length > 2 ? 'ALTA' : 'MEDIA',
+      titulo: 'Empresas com saldo previsto negativo',
+      descricao: `${empresasNegativas.length} empresa(s) apresentam mais saidas previstas do que entradas previstas no periodo.`,
+      valor: total,
+      acao: 'Abrir a tabela por empresa e confirmar se o descasamento sera coberto por caixa proprio ou intercompany formal.'
+    }));
+  }
+
+  if (obrasNegativas.length > 0) {
+    const total = obrasNegativas.reduce((sum, obra) => sum + Math.abs(Number(obra.saldo_previsto || 0)), 0);
+    alertas.push(buildFluxoConsolidadoAlert({
+      codigo: 'OBRAS_SALDO_PREVISTO_NEGATIVO',
+      severidade: obrasNegativas.length > 3 ? 'ALTA' : 'MEDIA',
+      titulo: 'Obras/Centros consumindo caixa previsto',
+      descricao: `${obrasNegativas.length} obra(s) ou centro(s) apresentam saldo previsto negativo no periodo.`,
+      valor: total,
+      acao: 'Revisar cronograma de recebimentos, pedidos, contratos e pagamentos vinculados ao centro de custo.'
+    }));
+  }
+
+  if (empresasSemVinculo.length > 0) {
+    alertas.push(buildFluxoConsolidadoAlert({
+      codigo: 'FLUXO_SEM_EMPRESA',
+      severidade: 'ALTA',
+      titulo: 'Fluxo com empresa ausente',
+      descricao: 'Existem titulos ou baixas sem empresa explicita no fluxo consolidado.',
+      acao: 'Corrigir empresa no titulo ou na baixa. O sistema nao deve deduzir empresa para relatorio executivo.'
+    }));
+  }
+
+  if (obrasSemVinculo.length > 0) {
+    alertas.push(buildFluxoConsolidadoAlert({
+      codigo: 'FLUXO_SEM_OBRA_CENTRO_CUSTO',
+      severidade: 'MEDIA',
+      titulo: 'Fluxo sem obra/centro de custo',
+      descricao: 'Existem titulos ou baixas sem obra/centro de custo vinculados.',
+      acao: 'Revisar o cadastro quando a movimentacao precisar aparecer em relatorios por obra ou centro de custo.'
+    }));
+  }
+
+  return {
+    indicadores: {
+      necessidade_futura_caixa: roundCurrency(necessidadeFuturaCaixa),
+      pior_periodo_previsto: piorPeriodo ? {
+        referencia: piorPeriodo.referencia,
+        label: piorPeriodo.label,
+        saldo_previsto_acumulado: roundCurrency(piorPeriodo.saldo_previsto_acumulado || 0)
+      } : null,
+      empresas_saldo_previsto_negativo: empresasNegativas.length,
+      obras_saldo_previsto_negativo: obrasNegativas.length,
+      empresas_sem_vinculo: empresasSemVinculo.length,
+      obras_sem_vinculo: obrasSemVinculo.length
+    },
+    alertas
+  };
+}
+
+function summarizeFluxoConsolidado({ previstos, realizados, empresas, obras, serie }) {
   const empresasById = new Map(empresas.map((empresa) => [Number(empresa.id), empresa]));
   const empresasMap = new Map();
   const vazioTitulo = 'SEM_EMPRESA_TITULO';
@@ -681,17 +869,23 @@ function summarizeFluxoConsolidado({ previstos, realizados, empresas }) {
   });
 
   resumo.variacao_realizado_vs_previsto = roundCurrency(resumo.saldo_realizado - resumo.saldo_previsto);
+  const obrasResumo = summarizeFluxoObras({ previstos, realizados, obras });
+  const insights = summarizeFluxoConsolidadoInsights({ resumo, empresasResumo, obrasResumo, serie });
 
   return {
     resumo: {
       ...resumo,
+      ...insights.indicadores,
       empresas_com_movimento: empresasResumo.length,
+      obras_com_movimento: obrasResumo.length,
       intercompany_previsto_eliminado: intercompany.previsto_eliminado,
       intercompany_realizado_eliminado: intercompany.realizado_eliminado,
       intercompany_titulos_eliminados: intercompany.titulos_eliminados,
       intercompany_movimentos_eliminados: intercompany.movimentos_eliminados
     },
-    empresas: empresasResumo
+    alertas: insights.alertas,
+    empresas: empresasResumo,
+    obras: obrasResumo
   };
 }
 
@@ -728,10 +922,16 @@ async function gerarRelatorioFluxoConsolidado(req, filters = {}) {
         titulos_previstos: 0,
         movimentos_realizados: 0,
         intercompany_previsto_eliminado: 0,
-        intercompany_realizado_eliminado: 0
+        intercompany_realizado_eliminado: 0,
+        necessidade_futura_caixa: 0,
+        pior_periodo_previsto: null,
+        empresas_saldo_previsto_negativo: 0,
+        obras_saldo_previsto_negativo: 0
       },
+      alertas: [],
       serie: [],
-      empresas: []
+      empresas: [],
+      obras: []
     };
   }
 
@@ -755,6 +955,21 @@ async function gerarRelatorioFluxoConsolidado(req, filters = {}) {
     realizados,
     agrupamento: periodo.agrupamento
   });
+  const obraIds = new Set();
+  previstos.forEach((titulo) => {
+    if (titulo.obra_id) obraIds.add(Number(titulo.obra_id));
+  });
+  realizados.forEach((movimento) => {
+    const obraId = movimento.titulo?.obra_id;
+    if (obraId) obraIds.add(Number(obraId));
+  });
+  const obras = obraIds.size
+    ? await Obra.findAll({
+        attributes: ['id', 'codigo', 'nome', 'tipo_centro_custo', 'empresa_grupo_id'],
+        where: { id: { [Op.in]: Array.from(obraIds) } },
+        raw: true
+      })
+    : [];
 
   return {
     filtro: {
@@ -768,7 +983,7 @@ async function gerarRelatorioFluxoConsolidado(req, filters = {}) {
       obra_id: filters.obra_id ? Number(filters.obra_id) : null,
       excluir_intercompany: filters.excluir_intercompany !== false
     },
-    ...summarizeFluxoConsolidado({ previstos, realizados, empresas }),
+    ...summarizeFluxoConsolidado({ previstos, realizados, empresas, obras, serie }),
     serie
   };
 }

@@ -46,6 +46,13 @@ function Metric({ label, value, detail, positive = null }) {
   );
 }
 
+function severityClass(severidade) {
+  const level = String(severidade || '').toUpperCase();
+  if (level === 'ALTA') return 'border-rose-200 bg-rose-50 text-rose-800';
+  if (level === 'MEDIA') return 'border-amber-200 bg-amber-50 text-amber-800';
+  return 'border-sky-200 bg-sky-50 text-sky-800';
+}
+
 function EmptyRow({ colSpan, message }) {
   return (
     <tr>
@@ -132,6 +139,8 @@ export default function FinanceiroFluxoConsolidado() {
   const resumo = relatorio?.resumo || {};
   const serie = Array.isArray(relatorio?.serie) ? relatorio.serie : [];
   const empresasResumo = Array.isArray(relatorio?.empresas) ? relatorio.empresas : [];
+  const obrasResumo = Array.isArray(relatorio?.obras) ? relatorio.obras : [];
+  const alertas = Array.isArray(relatorio?.alertas) ? relatorio.alertas : [];
   const periodoTexto = relatorio?.filtro?.data_inicial && relatorio?.filtro?.data_final
     ? `${formatDate(relatorio.filtro.data_inicial)} ate ${formatDate(relatorio.filtro.data_final)}`
     : '';
@@ -250,6 +259,7 @@ export default function FinanceiroFluxoConsolidado() {
         <Metric label="Saidas previstas" value={formatCurrency(resumo.saidas_previstas)} detail="Pagamentos em aberto" />
         <Metric label="Saldo previsto" value={formatCurrency(resumo.saldo_previsto)} detail="Receber menos pagar" positive={Number(resumo.saldo_previsto || 0) >= 0} />
         <Metric label="Saldo realizado" value={formatCurrency(resumo.saldo_realizado)} detail={`${resumo.movimentos_realizados || 0} baixa(s)`} positive={Number(resumo.saldo_realizado || 0) >= 0} />
+        <Metric label="Necessidade futura" value={formatCurrency(resumo.necessidade_futura_caixa)} detail={resumo.pior_periodo_previsto?.label ? `Pior periodo: ${resumo.pior_periodo_previsto.label}` : 'Menor saldo previsto acumulado'} positive={Number(resumo.necessidade_futura_caixa || 0) === 0} />
         <Metric label="Intercompany previsto eliminado" value={formatCurrency(resumo.intercompany_previsto_eliminado)} detail={`${resumo.intercompany_titulos_eliminados || 0} titulo(s)`} />
         <Metric label="Intercompany realizado eliminado" value={formatCurrency(resumo.intercompany_realizado_eliminado)} detail={`${resumo.intercompany_movimentos_eliminados || 0} baixa(s)`} />
       </div>
@@ -258,6 +268,34 @@ export default function FinanceiroFluxoConsolidado() {
         <div className="app-empty-card">Carregando fluxo consolidado...</div>
       ) : (
         <>
+          <section className="card sol-surface-card">
+            <div className="mb-4">
+              <h2 className="text-lg font-semibold text-[var(--c-text)]">Alertas do fluxo</h2>
+              <p className="text-sm text-[var(--c-muted)]">
+                Alertas calculados com base no fluxo previsto e realizado do periodo filtrado.
+              </p>
+            </div>
+            {alertas.length === 0 ? (
+              <div className="app-empty-card">Nenhum alerta critico encontrado para os filtros atuais.</div>
+            ) : (
+              <div className="grid gap-3 md:grid-cols-2">
+                {alertas.map((alerta) => (
+                  <div key={alerta.codigo} className={`rounded-lg border px-4 py-3 ${severityClass(alerta.severidade)}`}>
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div>
+                        <span className="text-xs font-semibold uppercase">{alerta.severidade}</span>
+                        <h3 className="font-semibold">{alerta.titulo}</h3>
+                      </div>
+                      {alerta.valor != null ? <strong>{formatCurrency(alerta.valor)}</strong> : null}
+                    </div>
+                    <p className="mt-2 text-sm">{alerta.descricao}</p>
+                    <p className="mt-2 text-xs font-semibold">{alerta.acao}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+
           <section className="card sol-surface-card app-table-shell">
             <div className="border-b border-[var(--c-border)] px-4 py-3">
               <h2 className="text-lg font-semibold text-[var(--c-text)]">Resumo por empresa</h2>
@@ -294,6 +332,52 @@ export default function FinanceiroFluxoConsolidado() {
                         <td>{formatCurrency(empresa.saidas_realizadas)}</td>
                         <td className="font-medium" style={{ color: Number(empresa.saldo_realizado || 0) >= 0 ? '#15803d' : '#b91c1c' }}>
                           {formatCurrency(empresa.saldo_realizado)}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section className="card sol-surface-card app-table-shell">
+            <div className="border-b border-[var(--c-border)] px-4 py-3">
+              <h2 className="text-lg font-semibold text-[var(--c-text)]">Resumo por obra/centro de custo</h2>
+              <p className="text-sm text-[var(--c-muted)]">
+                Identifica obras e centros que consomem ou geram caixa previsto no periodo.
+              </p>
+            </div>
+            <div className="table-wrapper">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Obra/Centro</th>
+                    <th>Tipo</th>
+                    <th>Entradas previstas</th>
+                    <th>Saidas previstas</th>
+                    <th>Saldo previsto</th>
+                    <th>Saldo realizado</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {obrasResumo.length === 0 ? (
+                    <EmptyRow colSpan={6} message="Nenhuma obra ou centro de custo encontrado para os filtros atuais." />
+                  ) : (
+                    obrasResumo.map((obra) => (
+                      <tr key={obra.obra_id || obra.obra_nome}>
+                        <td>
+                          <div className="font-semibold text-[var(--c-text)]">{obra.obra_nome}</div>
+                          {obra.obra_codigo ? <div className="text-xs text-[var(--c-muted)]">{obra.obra_codigo}</div> : null}
+                        </td>
+                        <td>{obra.tipo_centro_custo || '-'}</td>
+                        <td>{formatCurrency(obra.entradas_previstas)}</td>
+                        <td>{formatCurrency(obra.saidas_previstas)}</td>
+                        <td className="font-medium" style={{ color: Number(obra.saldo_previsto || 0) >= 0 ? '#15803d' : '#b91c1c' }}>
+                          {formatCurrency(obra.saldo_previsto)}
+                        </td>
+                        <td className="font-medium" style={{ color: Number(obra.saldo_realizado || 0) >= 0 ? '#15803d' : '#b91c1c' }}>
+                          {formatCurrency(obra.saldo_realizado)}
                         </td>
                       </tr>
                     ))
