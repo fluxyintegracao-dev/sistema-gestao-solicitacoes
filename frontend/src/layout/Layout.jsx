@@ -37,6 +37,18 @@ import {
 import { BsBuildingsFill } from 'react-icons/bs';
 import { isGeoSetor, normalizarSetorToken } from '../utils/setor';
 
+const SETORES_PRIORIDADES_DIRETORIA = new Set([
+  'DIR_ADMIN',
+  'DIRETORIA_ADMINISTRATIVA',
+  'DIR_ADMINISTRATIVA',
+  'DIR_OBRAS_PUBLICAS',
+  'DIRETORIA_OBRAS_PUBLICAS',
+  'DIRETORIA_DE_OBRAS_PUBLICAS',
+  'DIR_OBRAS_PRIVADAS',
+  'DIRETORIA_OBRAS_PRIVADAS',
+  'DIRETORIA_DE_OBRAS_PRIVADAS'
+]);
+
 export default function Layout() {
   const { user, logout } = useContext(AuthContext);
   const location = useLocation();
@@ -272,9 +284,7 @@ export default function Layout() {
   const isSetorObra = setorTokens.includes('OBRA');
   const hasPrioridadesDiretoriaAccess =
     perfilUpper === 'SUPERADMIN' ||
-    setorTokensNormalizados.includes('DIR_ADMIN') ||
-    setorTokensNormalizados.includes('DIR_OBRAS_PUBLICAS') ||
-    setorTokensNormalizados.includes('DIR_OBRAS_PRIVADAS') ||
+    setorTokensNormalizados.some((token) => SETORES_PRIORIDADES_DIRETORIA.has(token)) ||
     Boolean(prioridadesDiretoriaContexto?.permissoes?.pode_acessar_modulo);
   const hasProvisionamentoAccess =
     perfilUpper === 'SUPERADMIN' ||

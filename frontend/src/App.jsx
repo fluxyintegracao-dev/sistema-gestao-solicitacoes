@@ -72,6 +72,18 @@ import { useAuth } from './contexts/AuthContext';
 import { isGeoSetor, normalizarSetorToken } from './utils/setor';
 import { getPrioridadesDiretoriaContexto } from './services/prioridadesDiretoria';
 
+const SETORES_PRIORIDADES_DIRETORIA = new Set([
+  'DIR_ADMIN',
+  'DIRETORIA_ADMINISTRATIVA',
+  'DIR_ADMINISTRATIVA',
+  'DIR_OBRAS_PUBLICAS',
+  'DIRETORIA_OBRAS_PUBLICAS',
+  'DIRETORIA_DE_OBRAS_PUBLICAS',
+  'DIR_OBRAS_PRIVADAS',
+  'DIRETORIA_OBRAS_PRIVADAS',
+  'DIRETORIA_DE_OBRAS_PRIVADAS'
+]);
+
 function GestaoUsuariosRoute({ children }) {
   const { user } = useAuth();
   const perfil = String(user?.perfil || '').toUpperCase();
@@ -129,9 +141,7 @@ function PrioridadesDiretoriaRoute({ children }) {
 
   const permitido =
     perfil === 'SUPERADMIN' ||
-    tokens.includes('DIR_ADMIN') ||
-    tokens.includes('DIR_OBRAS_PUBLICAS') ||
-    tokens.includes('DIR_OBRAS_PRIVADAS');
+    tokens.some((token) => SETORES_PRIORIDADES_DIRETORIA.has(token));
 
   useEffect(() => {
     let ativo = true;

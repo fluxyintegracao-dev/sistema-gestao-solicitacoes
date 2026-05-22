@@ -61,6 +61,7 @@ A visibilidade efetiva depende de combinacao entre:
   - as automacoes legadas ja existentes no fluxo atual continuam valendo
 - prioridades da diretoria:
   - `DIR_ADMIN` nao ganha visibilidade global automatica de solicitacoes, mas pode abrir lotes de prioridade
+  - para prioridades, usuarios vinculados ao setor `DIR_ADMIN` ou ao nome `DIRETORIA ADMINISTRATIVA` sao tratados como aprovadores administrativos
   - `DIR_OBRAS_PUBLICAS` e `DIR_OBRAS_PRIVADAS` operam apenas lotes da propria classificacao configurada
   - `SUPERADMIN` pode configurar usuarios com acesso de leitura a pagina de prioridades da diretoria
   - usuarios configurados para leitura podem consultar lotes e solicitacoes ja vinculadas, mas nao criam, finalizam, cancelam ou excluem lotes

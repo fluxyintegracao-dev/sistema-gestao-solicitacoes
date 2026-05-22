@@ -41,6 +41,17 @@ const DIRETORIA_ADMIN_CODIGO = 'DIR_ADMIN';
 const DIRETORIA_ADMIN_NOME = 'DIRETORIA ADMINISTRATIVA';
 const DIRETORIA_GERAL_CODIGO = 'DIRETORIA';
 const SETOR_FINANCEIRO_CODIGO = 'FINANCEIRO';
+const DIRETORIA_ADMIN_ALIASES = [
+  DIRETORIA_ADMIN_CODIGO,
+  DIRETORIA_ADMIN_NOME,
+  'DIRETORIA_ADMINISTRATIVA',
+  'DIR ADMIN'
+];
+const DIRETORIA_GERAL_ALIASES = [
+  DIRETORIA_GERAL_CODIGO,
+  'DIRETORIA GERAL',
+  'DIRETORIA_GERAL'
+];
 
 function normalizarStatusLote(valor) {
   const status = String(valor || '').trim().toUpperCase();
@@ -157,6 +168,11 @@ function usuarioPertenceAoSetor(tokensUsuario = [], tokenSetor = null) {
   return (Array.isArray(tokensUsuario) ? tokensUsuario : []).includes(token);
 }
 
+function usuarioPertenceAAlgumSetor(tokensUsuario = [], tokensSetor = []) {
+  return (Array.isArray(tokensSetor) ? tokensSetor : [])
+    .some((tokenSetor) => usuarioPertenceAoSetor(tokensUsuario, tokenSetor));
+}
+
 async function obterSetoresPorTokens(tokens = []) {
   const lista = Array.from(new Set((Array.isArray(tokens) ? tokens : []).map(normalizarTokenSetor).filter(Boolean)));
   if (lista.length === 0) return [];
@@ -178,8 +194,8 @@ async function obterPermissoesPrioridade(req) {
   const areaUsuario = await obterAreaUsuario(req);
   const tokensUsuario = await obterTokensSetorUsuario(req, areaUsuario);
   const isSuperadmin = perfil === 'SUPERADMIN';
-  const isDirAdmin = isSuperadmin || usuarioPertenceAoSetor(tokensUsuario, DIRETORIA_ADMIN_CODIGO);
-  const isDiretoriaGeral = !isSuperadmin && usuarioPertenceAoSetor(tokensUsuario, DIRETORIA_GERAL_CODIGO);
+  const isDirAdmin = isSuperadmin || usuarioPertenceAAlgumSetor(tokensUsuario, DIRETORIA_ADMIN_ALIASES);
+  const isDiretoriaGeral = !isSuperadmin && usuarioPertenceAAlgumSetor(tokensUsuario, DIRETORIA_GERAL_ALIASES);
   const isAprovadorPrioridade = isDirAdmin || isDiretoriaGeral;
   const isLeitorConfigurado = await usuarioTemAcessoPrioridadeDiretoria(req.user?.id);
   const classificacoesOperaveis = ['PUBLICA', 'PRIVADA'].filter((classificacao) => {
