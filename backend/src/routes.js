@@ -1373,6 +1373,8 @@ router.get('/configuracoes/areas-obra', ConfiguracaoSistemaController.getAreasOb
 router.patch('/configuracoes/areas-obra', allowBusinessAdmin, ConfiguracaoSistemaController.updateAreasObra);
 router.get('/configuracoes/areas-por-setor-origem', ConfiguracaoSistemaController.getAreasPorSetorOrigem);
 router.patch('/configuracoes/areas-por-setor-origem', allowBusinessAdmin, ConfiguracaoSistemaController.updateAreasPorSetorOrigem);
+router.get('/configuracoes/solicitacoes-sla-setor', allowBusinessAdmin, ConfiguracaoSistemaController.getSlaSolicitacoesSetor);
+router.patch('/configuracoes/solicitacoes-sla-setor', allowBusinessAdmin, ConfiguracaoSistemaController.updateSlaSolicitacoesSetor);
 router.get('/configuracoes/setores-visiveis-usuario', allowBusinessAdmin, ConfiguracaoSistemaController.getSetoresVisiveisPorUsuario);
 router.patch('/configuracoes/setores-visiveis-usuario', allowBusinessAdmin, ConfiguracaoSistemaController.updateSetoresVisiveisPorUsuario);
 router.get('/configuracoes/tipos-solicitacao-por-setor', ConfiguracaoSistemaController.getTiposSolicitacaoPorSetor);

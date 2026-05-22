@@ -3,6 +3,7 @@ const {
   Historico,
   Obra,
   Solicitacao,
+  Setor,
   TipoSolicitacao,
   User,
   UsuarioObra
@@ -13,6 +14,10 @@ const {
   resolveUserSetor
 } = require('./setorCapabilityService');
 const { obterTokensSetoresUsuario } = require('./usuariosSetores');
+const {
+  normalizeSetorToken,
+  obterSlaSolicitacoesPorSetor
+} = require('./solicitacaoSlaConfig');
 
 const STATUS_CONCLUIDOS = new Set([
   'PAGA',
@@ -120,6 +125,42 @@ function formatMonthLabel(monthKey) {
   if (!monthKey || !/^\d{4}-\d{2}$/.test(monthKey)) return 'Sem mes';
   const [year, month] = monthKey.split('-');
   return `${month}/${year}`;
+}
+
+function buildSetorLookup(setores = []) {
+  const tokens = new Map();
+  const labels = new Map();
+
+  setores.forEach((setor) => {
+    const codigo = normalizeSetorToken(setor?.codigo);
+    if (!codigo) return;
+
+    labels.set(codigo, {
+      setor: codigo,
+      setor_nome: setor?.nome || setor?.codigo || codigo
+    });
+
+    [setor?.codigo, setor?.nome, setor?.id].forEach((value) => {
+      const token = normalizeSetorToken(value);
+      if (token) tokens.set(token, codigo);
+    });
+  });
+
+  return { tokens, labels };
+}
+
+function resolveSetorSlaKey(value, lookup) {
+  const token = normalizeSetorToken(value);
+  if (!token) return 'NAO_INFORMADO';
+  return lookup.tokens.get(token) || token;
+}
+
+function sortSlaSetor(items) {
+  return Array.from(items.values()).sort((a, b) => {
+    const vencidasDiff = Number(b.vencidas || 0) - Number(a.vencidas || 0);
+    if (vencidasDiff !== 0) return vencidasDiff;
+    return Number(b.total || 0) - Number(a.total || 0);
+  });
 }
 
 function sortHistoricosAsc(historicosItem = []) {
@@ -277,6 +318,15 @@ async function relatorioSolicitacoesOperacional({ user, periodo, dataInicio, dat
         order: [['createdAt', 'DESC']]
       })
     : [];
+  const [slaConfig, setoresDb] = await Promise.all([
+    obterSlaSolicitacoesPorSetor(),
+    Setor.findAll({ attributes: ['id', 'codigo', 'nome', 'ativo'] })
+  ]);
+  const setorLookup = buildSetorLookup(setoresDb);
+  const slaSetores = slaConfig?.setores && typeof slaConfig.setores === 'object'
+    ? slaConfig.setores
+    : {};
+  const slaConfigurado = Object.values(slaSetores).some((regra) => regra?.ativo && Number(regra?.dias) > 0);
 
   const historicosPorSolicitacao = new Map();
   historicos.forEach((historico) => {
@@ -298,6 +348,8 @@ async function relatorioSolicitacoesOperacional({ user, periodo, dataInicio, dat
   const agingStatusMap = new Map();
   const evolucaoMensalMap = new Map();
   const setorStatusMap = new Map();
+  const slaSetorMap = new Map();
+  const setoresSemSlaMap = new Map();
   const now = new Date();
   const gargalos = [];
   const resumo = {
@@ -376,6 +428,37 @@ async function relatorioSolicitacoesOperacional({ user, periodo, dataInicio, dat
         agingStatus.valor_aberto = toNumber(agingStatus.valor_aberto) + valor;
         agingStatus.soma_dias_parada = toNumber(agingStatus.soma_dias_parada) + diasParada;
         agingStatus.maior_dias_parada = Math.max(toNumber(agingStatus.maior_dias_parada), diasParada);
+
+        const slaKey = resolveSetorSlaKey(plain.area_responsavel, setorLookup);
+        const slaRegra = slaSetores[slaKey];
+        const setorLabel = setorLookup.labels.get(slaKey) || {
+          setor: slaKey,
+          setor_nome: plain.area_responsavel || 'Nao informado'
+        };
+
+        if (slaRegra?.ativo && Number(slaRegra.dias) > 0) {
+          const slaItem = incrementMap(slaSetorMap, slaKey, {
+            ...setorLabel,
+            sla_dias: Number(slaRegra.dias),
+            vencidas: 0,
+            no_prazo: 0,
+            valor_vencido: 0,
+            maior_dias_parada: 0
+          });
+          slaItem.maior_dias_parada = Math.max(toNumber(slaItem.maior_dias_parada), diasParada);
+          if (diasParada > Number(slaRegra.dias)) {
+            slaItem.vencidas += 1;
+            slaItem.valor_vencido = toNumber(slaItem.valor_vencido) + valor;
+          } else {
+            slaItem.no_prazo += 1;
+          }
+        } else {
+          const semSla = incrementMap(setoresSemSlaMap, slaKey, {
+            ...setorLabel,
+            valor_aberto: 0
+          });
+          semSla.valor_aberto = toNumber(semSla.valor_aberto) + valor;
+        }
       }
     }
 
@@ -472,6 +555,19 @@ async function relatorioSolicitacoesOperacional({ user, periodo, dataInicio, dat
     por_criador: sortByTotalDesc(criadorMap).slice(0, 20),
     por_responsavel: sortByTotalDesc(responsavelMap).slice(0, 20),
     tempos_etapas: finalizeDurations(tempoEtapasMap),
+    sla_configurado: slaConfigurado,
+    sla_setor: sortSlaSetor(slaSetorMap)
+      .map((item) => ({
+        ...item,
+        percentual_vencido: item.total > 0 ? Number(((Number(item.vencidas || 0) / item.total) * 100).toFixed(1)) : 0,
+        valor_vencido: Number(toNumber(item.valor_vencido).toFixed(2)),
+        maior_dias_parada: Number(toNumber(item.maior_dias_parada).toFixed(1))
+      })),
+    setores_sem_sla: sortByTotalDesc(setoresSemSlaMap)
+      .map((item) => ({
+        ...item,
+        valor_aberto: Number(toNumber(item.valor_aberto).toFixed(2))
+      })),
     evolucao_mensal: Array.from(evolucaoMensalMap.values())
       .map((item) => ({
         ...item,

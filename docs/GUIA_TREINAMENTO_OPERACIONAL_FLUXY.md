@@ -1917,6 +1917,7 @@ Configurar comportamento do sistema, permissoes, modulos e regras.
 - setores;
 - permissoes;
 - areas por setor;
+- SLA de solicitacoes por setor;
 - tipos de solicitacao;
 - status por setor;
 - modulos ativos;
@@ -1934,6 +1935,26 @@ Configurar comportamento do sistema, permissoes, modulos e regras.
 - registrar motivo da mudanca;
 - evitar permissao ampla sem necessidade;
 - revisar acessos periodicamente.
+
+### 19.4 SLA de solicitacoes por setor
+
+Use esta configuracao quando a empresa quiser tratar atraso de solicitacoes por prazo real acordado com cada setor.
+
+Passo a passo:
+
+1. Acesse `Configuracoes`.
+2. Abra `SLA de Solicitacoes por Setor`.
+3. Para cada setor ativo, informe o prazo real em dias.
+4. Marque `Usar no relatorio` apenas quando aquele prazo estiver validado pela gestao.
+5. Salve a configuracao.
+6. Revise o `Painel operacional` de solicitacoes para conferir os setores vencidos, no prazo e sem SLA configurado.
+
+Importante:
+
+- O sistema nao considera uma solicitacao como vencida se o setor nao tiver SLA configurado.
+- Setores sem SLA aparecem no relatorio como pendencia de cadastro, e nao como atraso operacional.
+- O prazo deve representar uma regra real da empresa, aprovada pelo responsavel do fluxo.
+- Se o setor mudar de regra, altere a configuracao antes de usar o relatorio em reunioes gerenciais.
 
 ---
 
@@ -1976,12 +1997,14 @@ Painel Operacional de Solicitacoes:
 7. Use `Evolucao mensal` para comparar quantas solicitacoes foram criadas, concluidas e permaneceram abertas em cada mes filtrado.
 8. Use `Aging por status` para identificar em quais status as solicitacoes abertas estao ficando paradas por mais tempo.
 9. Use `Mapa setor x status` para cruzar setores e status e localizar concentracoes operacionais que precisam de acao.
-10. Use `Tempos por etapa` para medir o tempo real entre criacao, assuncao/atribuicao, primeiro envio, aprovacao da diretoria e conclusao.
-11. Use `Aging por setor atual` para identificar setores com solicitacoes abertas paradas ha mais tempo.
-12. Use as tabelas por status, setor e obra/centro para descobrir onde a demanda esta concentrada.
-13. Use as tabelas por tipo, responsavel atual e criador para identificar padroes de demanda e filas individuais.
-14. Revise a tabela `Gargalos operacionais` para localizar solicitacoes abertas ha pelo menos 3 dias sem nova movimentacao.
-15. Clique no codigo da solicitacao em gargalo para abrir o detalhe e tomar acao operacional.
+10. Use `SLA por setor` para identificar solicitacoes abertas que passaram do prazo real configurado para o setor atual.
+11. Use `Setores sem SLA configurado` para completar a configuracao antes de cobrar atraso formalmente.
+12. Use `Tempos por etapa` para medir o tempo real entre criacao, assuncao/atribuicao, primeiro envio, aprovacao da diretoria e conclusao.
+13. Use `Aging por setor atual` para identificar setores com solicitacoes abertas paradas ha mais tempo.
+14. Use as tabelas por status, setor e obra/centro para descobrir onde a demanda esta concentrada.
+15. Use as tabelas por tipo, responsavel atual e criador para identificar padroes de demanda e filas individuais.
+16. Revise a tabela `Gargalos operacionais` para localizar solicitacoes abertas ha pelo menos 3 dias sem nova movimentacao.
+17. Clique no codigo da solicitacao em gargalo para abrir o detalhe e tomar acao operacional.
 
 Importante:
 
@@ -1991,6 +2014,7 @@ Importante:
 - Os tempos por etapa entram na media somente quando a data real daquela etapa existe.
 - Os graficos do painel usam os mesmos agrupamentos das tabelas analiticas; eles nao criam uma classificacao paralela nem inferem setor, status ou obra por texto.
 - Evolucao mensal, aging por status e mapa setor x status sao calculados no backend usando o filtro aplicado e os campos reais da solicitacao/historico.
+- SLA vencido depende de regra cadastrada em `Configuracoes > SLA de Solicitacoes por Setor`; sem regra ativa, o setor nao entra como vencido.
 - A parada operacional usa a ultima movimentacao registrada no historico; se nao houver historico, usa a propria data de atualizacao/criacao da solicitacao.
 - O filtro de acesso respeita o mesmo conceito operacional do modulo: usuarios de obra veem suas obras vinculadas, usuarios de setor veem suas solicitacoes criadas ou do setor, e administradores veem a visao ampla.
 

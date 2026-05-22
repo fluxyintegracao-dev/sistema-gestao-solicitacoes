@@ -47,6 +47,10 @@ const {
   obterConfigAutomacaoDestinoNovaSolicitacao,
   salvarConfigAutomacaoDestinoNovaSolicitacao
 } = require('../services/novaSolicitacaoAutomacaoDestinoConfig');
+const {
+  obterSlaSolicitacoesPorSetor,
+  salvarSlaSolicitacoesPorSetor
+} = require('../services/solicitacaoSlaConfig');
 
 const CHAVE_TEMA = 'TEMA_SISTEMA';
 const CHAVE_AREAS_OBRA = 'AREAS_OBRA_VISIVEIS';
@@ -634,6 +638,26 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return res.status(500).json({ error: 'Erro ao salvar configuracao de areas por setor' });
+    }
+  },
+
+  async getSlaSolicitacoesSetor(req, res) {
+    try {
+      const config = await obterSlaSolicitacoesPorSetor();
+      return res.json(config);
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao buscar SLA de solicitacoes por setor' });
+    }
+  },
+
+  async updateSlaSolicitacoesSetor(req, res) {
+    try {
+      const config = await salvarSlaSolicitacoesPorSetor(req.body || {});
+      return res.json({ ok: true, ...config });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao salvar SLA de solicitacoes por setor' });
     }
   },
 

@@ -108,6 +108,27 @@ export async function salvarAreasPorSetorOrigem(data) {
   return res.json();
 }
 
+export async function getSlaSolicitacoesSetor() {
+  const res = await fetch(`${API_URL}/configuracoes/solicitacoes-sla-setor`, {
+    headers: authHeaders()
+  });
+  if (!res.ok) throw new Error('Erro ao buscar SLA de solicitacoes por setor');
+  return res.json();
+}
+
+export async function salvarSlaSolicitacoesSetor(data) {
+  const res = await fetch(`${API_URL}/configuracoes/solicitacoes-sla-setor`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+  if (!res.ok) {
+    const payload = await res.json().catch(() => null);
+    throw new Error(payload?.error || 'Erro ao salvar SLA de solicitacoes por setor');
+  }
+  return res.json();
+}
+
 export async function getSetoresVisiveisPorUsuario() {
   const res = await fetch(`${API_URL}/configuracoes/setores-visiveis-usuario`, {
     headers: authHeaders()

@@ -140,6 +140,11 @@ const SECOES_CONFIG = [
         to: '/areas-por-setor-origem'
       },
       {
+        title: 'SLA de Solicitacoes por Setor',
+        description: 'Defina o prazo real em dias usado no relatorio operacional de solicitacoes.',
+        to: '/solicitacoes-sla-setor'
+      },
+      {
         title: 'Setores Visiveis por Usuario',
         description: 'Defina setores extras que cada usuario pode visualizar quando atribuido.',
         to: '/setores-visiveis-usuario'
