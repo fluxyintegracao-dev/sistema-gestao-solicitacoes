@@ -6,9 +6,11 @@ const {
   FiscalDfeDocument,
   FiscalDfeSyncState,
   FiscalDivergence,
+  FiscalDocumentLink,
   FiscalSyncLog,
   sequelize
 } = require('../../../models');
+const { Op } = require('sequelize');
 const { registrarEventoSeguranca } = require('../../../services/securityLogService');
 const {
   getFiscalS3Config,
@@ -128,6 +130,224 @@ async function getDashboardFiscal() {
       ultimo_log: ultimoLog,
       logs_recentes: logsRecentes
     }
+  };
+}
+
+function toNumber(value) {
+  const parsed = Number(value || 0);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function toDateOnly(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toISOString().slice(0, 10);
+}
+
+function formatMonthKey(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'sem_data';
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function incrementBucket(map, key, amount = 1) {
+  const normalizedKey = key || 'sem_informacao';
+  map.set(normalizedKey, toNumber(map.get(normalizedKey)) + toNumber(amount));
+}
+
+function buildFiscalReportWhere(query = {}) {
+  const where = {};
+  if (query.company_id) where.fiscal_company_id = query.company_id;
+  if (query.status) where.document_status = query.status;
+  if (query.source) where.source = query.source;
+
+  if (query.data_inicio || query.data_fim) {
+    where.emission_date = {};
+    if (query.data_inicio) where.emission_date[Op.gte] = `${query.data_inicio} 00:00:00`;
+    if (query.data_fim) where.emission_date[Op.lte] = `${query.data_fim} 23:59:59`;
+  }
+
+  return where;
+}
+
+function mapBuckets(map, labelKey = 'label') {
+  return Array.from(map.entries())
+    .map(([label, total]) => ({ [labelKey]: label, total: toNumber(total) }))
+    .sort((a, b) => b.total - a.total);
+}
+
+async function getRelatorioFiscalOperacional(query = {}) {
+  const where = buildFiscalReportWhere(query);
+
+  const [documents, companies] = await Promise.all([
+    FiscalDfeDocument.findAll({
+      where,
+      include: [
+        { model: FiscalCompany, as: 'company', attributes: ['id', 'razao_social', 'cnpj', 'uf'], required: false }
+      ],
+      attributes: [
+        'id',
+        'fiscal_company_id',
+        'document_type',
+        'access_key',
+        'issuer_cnpj',
+        'issuer_name',
+        'recipient_name',
+        'document_number',
+        'emission_date',
+        'received_at',
+        'total_value',
+        'document_status',
+        'manifestation_status',
+        'source',
+        'xml_storage_key',
+        'pdf_storage_key',
+        'danfe_storage_key',
+        'createdAt'
+      ],
+      order: [['emission_date', 'DESC'], ['id', 'DESC']]
+    }),
+    FiscalCompany.findAll({
+      attributes: ['id', 'razao_social', 'cnpj', 'uf', 'ativo'],
+      order: [['razao_social', 'ASC']]
+    })
+  ]);
+
+  const documentIds = documents.map((item) => item.id);
+  const [
+    confirmedLinks,
+    openDivergences
+  ] = documentIds.length ? await Promise.all([
+    FiscalDocumentLink.findAll({
+      where: {
+        fiscal_dfe_document_id: { [Op.in]: documentIds },
+        link_status: { [Op.in]: ['confirmed', 'manually_linked'] }
+      },
+      attributes: ['id', 'fiscal_dfe_document_id', 'link_status'],
+      raw: true
+    }),
+    FiscalDivergence.findAll({
+      where: {
+        fiscal_dfe_document_id: { [Op.in]: documentIds },
+        status: 'open'
+      },
+      attributes: ['id', 'fiscal_dfe_document_id', 'divergence_type', 'severity', 'status'],
+      raw: true
+    })
+  ]) : [[], []];
+
+  const linkedDocumentIds = new Set(confirmedLinks.map((item) => Number(item.fiscal_dfe_document_id)));
+  const openDivergenceDocumentIds = new Set(openDivergences.map((item) => Number(item.fiscal_dfe_document_id)));
+  const divergencesByDocument = openDivergences.reduce((acc, item) => {
+    const key = Number(item.fiscal_dfe_document_id);
+    acc.set(key, toNumber(acc.get(key)) + 1);
+    return acc;
+  }, new Map());
+
+  const byStatus = new Map();
+  const byCompany = new Map();
+  const byIssuer = new Map();
+  const byMonth = new Map();
+  const byType = new Map();
+  const bySource = new Map();
+  const divergenceByType = new Map();
+  const divergenceBySeverity = new Map();
+
+  let totalValue = 0;
+  let validated = 0;
+  let ignored = 0;
+  let pending = 0;
+  let withoutXml = 0;
+  let withoutDanfe = 0;
+  let withoutConfirmedLink = 0;
+  let withOpenDivergence = 0;
+
+  documents.forEach((document) => {
+    const plain = document.get({ plain: true });
+    const value = toNumber(plain.total_value);
+    totalValue += value;
+
+    if (plain.document_status === 'validated') validated += 1;
+    if (plain.document_status === 'ignored') ignored += 1;
+    if (!['validated', 'ignored', 'cancelled'].includes(plain.document_status)) pending += 1;
+    if (!plain.xml_storage_key) withoutXml += 1;
+    if (!plain.pdf_storage_key && !plain.danfe_storage_key) withoutDanfe += 1;
+    if (!linkedDocumentIds.has(plain.id)) withoutConfirmedLink += 1;
+    if (openDivergenceDocumentIds.has(plain.id)) withOpenDivergence += 1;
+
+    incrementBucket(byStatus, plain.document_status);
+    incrementBucket(byCompany, plain.company?.razao_social || plain.recipient_name || `Empresa fiscal #${plain.fiscal_company_id}`);
+    incrementBucket(byIssuer, plain.issuer_name || plain.issuer_cnpj || 'Fornecedor sem identificacao');
+    incrementBucket(byMonth, formatMonthKey(plain.emission_date || plain.createdAt));
+    incrementBucket(byType, plain.document_type);
+    incrementBucket(bySource, plain.source);
+  });
+
+  openDivergences.forEach((item) => {
+    incrementBucket(divergenceByType, item.divergence_type);
+    incrementBucket(divergenceBySeverity, item.severity);
+  });
+
+  const documentsWithRisk = documents
+    .map((document) => {
+      const plain = document.get({ plain: true });
+      const missingXml = !plain.xml_storage_key;
+      const missingDanfe = !plain.pdf_storage_key && !plain.danfe_storage_key;
+      const missingLink = !linkedDocumentIds.has(plain.id);
+      const divergenceCount = toNumber(divergencesByDocument.get(plain.id));
+      return {
+        id: plain.id,
+        document_number: plain.document_number,
+        issuer_name: plain.issuer_name,
+        issuer_cnpj: plain.issuer_cnpj,
+        emission_date: toDateOnly(plain.emission_date),
+        total_value: toNumber(plain.total_value),
+        document_status: plain.document_status,
+        company_name: plain.company?.razao_social || null,
+        without_confirmed_link: missingLink,
+        open_divergences: divergenceCount,
+        missing_xml: missingXml,
+        missing_danfe: missingDanfe
+      };
+    })
+    .filter((item) => item.without_confirmed_link || item.open_divergences > 0 || item.missing_xml || item.missing_danfe)
+    .slice(0, 40);
+
+  return {
+    filtros: {
+      company_id: query.company_id || null,
+      data_inicio: query.data_inicio || null,
+      data_fim: query.data_fim || null,
+      status: query.status || null,
+      source: query.source || null
+    },
+    empresas: companies,
+    resumo: {
+      documentos_total: documents.length,
+      valor_total: totalValue,
+      documentos_validados: validated,
+      documentos_pendentes: pending,
+      documentos_ignorados: ignored,
+      documentos_sem_vinculo_confirmado: withoutConfirmedLink,
+      documentos_com_divergencia_aberta: withOpenDivergence,
+      documentos_sem_xml: withoutXml,
+      documentos_sem_danfe: withoutDanfe,
+      divergencias_abertas: openDivergences.length
+    },
+    agrupamentos: {
+      por_status: mapBuckets(byStatus, 'status'),
+      por_empresa: mapBuckets(byCompany, 'empresa'),
+      por_fornecedor: mapBuckets(byIssuer, 'fornecedor').slice(0, 20),
+      por_mes: Array.from(byMonth.entries())
+        .map(([mes, total]) => ({ mes, total: toNumber(total) }))
+        .sort((a, b) => a.mes.localeCompare(b.mes)),
+      por_tipo_documento: mapBuckets(byType, 'tipo'),
+      por_origem: mapBuckets(bySource, 'origem'),
+      divergencias_por_tipo: mapBuckets(divergenceByType, 'tipo'),
+      divergencias_por_severidade: mapBuckets(divergenceBySeverity, 'severidade')
+    },
+    documentos_criticos: documentsWithRisk
   };
 }
 
@@ -261,5 +481,6 @@ async function executarProbeStorageFiscal({ req = null } = {}) {
 module.exports = {
   executarProbeStorageFiscal,
   getDiagnosticoFiscal,
-  getDashboardFiscal
+  getDashboardFiscal,
+  getRelatorioFiscalOperacional
 };

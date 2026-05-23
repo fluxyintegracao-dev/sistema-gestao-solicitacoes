@@ -3,7 +3,8 @@
 const {
   executarProbeStorageFiscal,
   getDashboardFiscal,
-  getDiagnosticoFiscal
+  getDiagnosticoFiscal,
+  getRelatorioFiscalOperacional
 } = require('../services/fiscalDashboardService');
 const { getFiscalS3Config, isFiscalS3Configured } = require('../services/fiscalS3Service');
 
@@ -47,6 +48,15 @@ async function diagnostics(req, res) {
   }
 }
 
+async function operationalReport(req, res) {
+  try {
+    const data = await getRelatorioFiscalOperacional(req.query || {});
+    return res.json(data);
+  } catch (error) {
+    return handleError(res, error);
+  }
+}
+
 async function storageProbe(req, res) {
   try {
     const data = await executarProbeStorageFiscal({ req });
@@ -60,5 +70,6 @@ module.exports = {
   dashboard,
   diagnostics,
   health,
+  operationalReport,
   storageProbe
 };

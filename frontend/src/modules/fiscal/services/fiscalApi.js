@@ -36,6 +36,13 @@ export async function getFiscalDashboard() {
   return parseJson(response, 'Erro ao buscar painel fiscal');
 }
 
+export async function getFiscalOperationalReport(params = {}) {
+  const response = await fetch(buildUrl('/fiscal/reports/operational', params), {
+    headers: authHeaders()
+  });
+  return parseJson(response, 'Erro ao buscar relatorio fiscal operacional');
+}
+
 export async function getFiscalDiagnostics() {
   const response = await fetch(`${API_URL}/fiscal/diagnostics`, {
     headers: authHeaders()

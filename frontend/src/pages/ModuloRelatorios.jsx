@@ -46,7 +46,7 @@ const HUBS = {
           { titulo: 'Painel operacional', descricao: 'Volume, funil, gargalos e distribuicao por status, setor e obra/centro.', to: '/solicitacoes/relatorios/operacional', status: 'Disponivel' },
           { titulo: 'Solicitacoes abertas', descricao: 'Base operacional para filtros por status, setor, tipo e responsavel.', to: '/solicitacoes', status: 'Disponivel' },
           { titulo: 'Solicitacoes arquivadas', descricao: 'Historico de solicitacoes encerradas ou fora da fila operacional.', to: '/solicitacoes-arquivadas', status: 'Disponivel' },
-          { titulo: 'SLA por setor', descricao: 'Tempo medio por etapa, solicitacoes paradas e gargalos por area.', status: 'Planejado' }
+          { titulo: 'SLA por setor', descricao: 'Configuracao real de prazos por setor para leitura do painel operacional.', to: '/solicitacoes-sla-setor', status: 'Disponivel', permissao: 'businessAdmin' }
         ]
       },
       {
@@ -94,6 +94,7 @@ const HUBS = {
       {
         titulo: 'Disponiveis',
         itens: [
+          { titulo: 'Painel operacional fiscal', descricao: 'Documentos, vinculos confirmados, divergencias abertas e arquivos fiscais por periodo.', to: '/fiscal/relatorios/operacional', status: 'Disponivel', permissao: 'fiscalDocuments' },
           { titulo: 'Documentos fiscais', descricao: 'Caixa de DFe importados e documentos vinculados.', to: '/fiscal/documentos', status: 'Disponivel', permissao: 'fiscalDocuments' },
           { titulo: 'Divergencias fiscais', descricao: 'Pendencias entre fiscal, compras e financeiro.', to: '/fiscal/divergencias', status: 'Disponivel', permissao: 'fiscalDocuments' },
           { titulo: 'Logs de sincronizacao', descricao: 'Auditoria de chamadas SEFAZ e importacoes manuais.', to: '/fiscal/logs', status: 'Disponivel', permissao: 'fiscalLogs' }

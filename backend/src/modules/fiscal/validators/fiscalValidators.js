@@ -219,6 +219,30 @@ function validateFiscalDocumentQuery(query = {}) {
   return result;
 }
 
+function validateFiscalOperationalReportQuery(query = {}) {
+  ensureAllowedKeys(query, [
+    'company_id',
+    'data_inicio',
+    'data_fim',
+    'status',
+    'source'
+  ], 'Filtro do relatorio fiscal operacional');
+
+  const result = {
+    company_id: parseOptionalInteger(query.company_id, 'Empresa fiscal'),
+    data_inicio: parseDateOnlyString(query.data_inicio, 'Data inicial'),
+    data_fim: parseDateOnlyString(query.data_fim, 'Data final'),
+    status: parseEnum(query.status, 'Status do documento', FISCAL_DOCUMENT_STATUSES, { fallback: null }),
+    source: parseEnum(query.source, 'Origem do documento', FISCAL_DOCUMENT_SOURCES, { fallback: null })
+  };
+
+  if (result.data_inicio && result.data_fim && result.data_inicio > result.data_fim) {
+    throw new ValidationError('Data inicial nao pode ser posterior a data final.');
+  }
+
+  return result;
+}
+
 function validateFiscalSyncLogQuery(query = {}) {
   ensureAllowedKeys(query, ['company_id', 'status', 'document_type', 'limit', 'page'], 'Filtro de logs fiscais');
   return {
@@ -551,6 +575,7 @@ module.exports = {
   validateFiscalDocumentLinkUpdateBody,
   validateFiscalLinkSearchQuery,
   validateFiscalDocumentQuery,
+  validateFiscalOperationalReportQuery,
   validateFiscalSyncLogRawUrlQuery,
   validateFiscalSyncLogQuery,
   validateFiscalSyncRunBody,

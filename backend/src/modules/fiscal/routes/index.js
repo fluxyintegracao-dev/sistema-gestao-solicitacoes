@@ -41,6 +41,7 @@ const {
   validateFiscalDocumentLinkUpdateBody,
   validateFiscalLinkSearchQuery,
   validateFiscalDocumentQuery,
+  validateFiscalOperationalReportQuery,
   validateFiscalSyncLogRawUrlQuery,
   validateFiscalSyncLogQuery,
   validateFiscalSyncStateQuery,
@@ -133,6 +134,7 @@ const allowFiscalLogs = permit({
 
 router.get('/health', allowFiscal, FiscalDashboardController.health);
 router.get('/dashboard', allowFiscal, FiscalDashboardController.dashboard);
+router.get('/reports/operational', allowFiscalDocuments, validateRequest({ query: validateFiscalOperationalReportQuery }), FiscalDashboardController.operationalReport);
 router.get('/diagnostics', allowFiscalConfig, FiscalDashboardController.diagnostics);
 router.post('/diagnostics/storage-probe', allowFiscalConfig, FiscalDashboardController.storageProbe);
 

@@ -271,11 +271,11 @@ Objetivo: controlar entrada fiscal, divergencias, XMLs, eventos, escrituração 
 Relatorios:
 
 - Documentos fiscais importados.
-- Documentos por empresa fiscal.
-- Documentos por fornecedor.
-- Documentos vinculados e nao vinculados.
-- Divergencias fiscais abertas.
-- Divergencias por tipo.
+- Documentos por empresa fiscal. [Entregue no Relatorio Fiscal Operacional]
+- Documentos por fornecedor. [Entregue no Relatorio Fiscal Operacional]
+- Documentos vinculados e nao vinculados. [Entregue por vinculo confirmado/manual real, sem inferencia por status textual]
+- Divergencias fiscais abertas. [Entregue no Relatorio Fiscal Operacional]
+- Divergencias por tipo. [Entregue no Relatorio Fiscal Operacional]
 - XMLs importados manualmente x SEFAZ.
 - Logs de sincronizacao.
 - Eventos fiscais.
@@ -285,9 +285,9 @@ Relatorios:
 
 Graficos:
 
-- Documentos por mes.
-- Divergencias por severidade.
-- Documentos sem vinculo.
+- Documentos por mes. [Entregue no Relatorio Fiscal Operacional]
+- Divergencias por severidade. [Entregue no Relatorio Fiscal Operacional]
+- Documentos sem vinculo. [Entregue no Relatorio Fiscal Operacional]
 - Ranking de fornecedores com divergencia.
 - Evolucao da regularidade fiscal.
 

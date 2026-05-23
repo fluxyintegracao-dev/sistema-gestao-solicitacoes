@@ -1705,6 +1705,42 @@ Impacto:
 - facilita auditoria;
 - reduz documentos sem origem.
 
+### 12.6 Relatorio Fiscal Operacional
+
+Tela:
+
+- `Fiscal > Relatorios > Painel operacional fiscal`.
+
+Objetivo:
+
+- acompanhar documentos fiscais importados no periodo;
+- identificar documentos sem vinculo confirmado;
+- acompanhar divergencias abertas;
+- localizar XMLs ou DANFEs/PDFs ausentes;
+- enxergar volume por empresa fiscal e por fornecedor.
+
+Passo a passo:
+
+1. Entrar em `Fiscal > Relatorios`.
+2. Abrir `Painel operacional fiscal`.
+3. Filtrar por empresa fiscal, periodo de emissao, status ou origem.
+4. Conferir os cards de documentos, valor fiscal, sem vinculo, divergencias, pendentes e arquivos ausentes.
+5. Abrir a tabela `Documentos que exigem acao`.
+6. Clicar no documento para corrigir vinculo, divergencia, XML ou DANFE/PDF.
+
+Regra importante:
+
+- o relatorio considera como vinculo real apenas vinculos confirmados ou criados manualmente no documento fiscal;
+- o sistema nao deve deduzir vinculo por nome, valor, fornecedor ou status textual;
+- se o documento esta correto operacionalmente, mas aparece sem vinculo, o usuario precisa registrar o vinculo real.
+
+Rotina recomendada:
+
+- diariamente, importar XMLs e revisar erros de importacao;
+- diariamente, abrir o painel operacional fiscal e resolver documentos sem vinculo ou com divergencia;
+- semanalmente, revisar fornecedores com maior volume e documentos sem arquivo fiscal completo;
+- mensalmente, conferir documentos validados antes de exportacao contabil ou fechamento.
+
 ---
 
 ## 13. Modulo Contratos
@@ -2390,7 +2426,8 @@ Todos os dias:
 2. Conferir erros.
 3. Vincular documentos.
 4. Gerar DANFE quando necessario.
-5. Conferir divergencias.
+5. Abrir o Relatorio Fiscal Operacional.
+6. Conferir divergencias, documentos sem vinculo e arquivos fiscais ausentes.
 
 ### 22.6 Diretoria
 
