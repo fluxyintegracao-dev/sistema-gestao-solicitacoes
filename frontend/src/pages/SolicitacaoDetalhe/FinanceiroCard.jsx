@@ -266,7 +266,7 @@ function ImpactoGerencialPreview({ form, categoria, empresasGrupo, totalPagament
     : 'Valor ainda nao informado';
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-3">
+    <div className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-bg)] p-3">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div>
           <div className="text-sm font-semibold text-[var(--c-text)]">Impacto gerencial antes de salvar</div>
@@ -1117,7 +1117,7 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
                 Considerar este titulo na DRE gerencial
               </label>
 
-              <div className="financeiro-formas-pagamento space-y-3 rounded-2xl border border-slate-200 bg-white p-3">
+              <div className="financeiro-formas-pagamento space-y-3 rounded-2xl border border-[var(--c-border)] bg-[var(--c-bg)] p-3">
                 <label className="flex items-center gap-2 text-sm text-[var(--c-text)]">
                   <input
                     type="checkbox"
