@@ -7872,6 +7872,137 @@ body {
   max-width: none;
 }
 
+/* Dark theme compatibility for legacy light utility cards across modules. */
+.dark .layout-shell :is(.bg-white, .bg-slate-50, .bg-slate-100, .bg-gray-50, .bg-gray-100, .bg-zinc-50) {
+  background-color: rgba(15, 23, 42, 0.72) !important;
+  color: var(--shell-text) !important;
+}
+
+.dark .layout-shell :is(.bg-blue-50, .bg-sky-50, .bg-indigo-50, .bg-cyan-50) {
+  background-color: rgba(37, 99, 235, 0.16) !important;
+  color: #dbeafe !important;
+}
+
+.dark .layout-shell :is(.bg-emerald-50, .bg-green-50, .bg-teal-50, .bg-lime-50) {
+  background-color: rgba(16, 185, 129, 0.16) !important;
+  color: #d1fae5 !important;
+}
+
+.dark .layout-shell :is(.bg-amber-50, .bg-yellow-50, .bg-orange-50) {
+  background-color: rgba(245, 158, 11, 0.17) !important;
+  color: #fef3c7 !important;
+}
+
+.dark .layout-shell :is(.bg-rose-50, .bg-red-50, .bg-pink-50) {
+  background-color: rgba(239, 68, 68, 0.16) !important;
+  color: #fee2e2 !important;
+}
+
+.dark .layout-shell :is(.bg-purple-50, .bg-violet-50, .bg-fuchsia-50) {
+  background-color: rgba(139, 92, 246, 0.16) !important;
+  color: #ede9fe !important;
+}
+
+.dark .layout-shell :is(.text-slate-950, .text-slate-900, .text-slate-800, .text-gray-950, .text-gray-900, .text-gray-800, .text-gray-700, .text-zinc-900) {
+  color: var(--shell-text) !important;
+}
+
+.dark .layout-shell :is(.text-slate-700, .text-slate-600, .text-slate-500, .text-slate-400, .text-gray-600, .text-gray-500, .text-gray-400, .text-zinc-600) {
+  color: var(--shell-muted) !important;
+}
+
+.dark .layout-shell :is(.text-blue-900, .text-blue-800, .text-sky-900, .text-sky-800, .text-indigo-900, .text-indigo-800, .text-cyan-900, .text-cyan-800) {
+  color: #bfdbfe !important;
+}
+
+.dark .layout-shell :is(.text-blue-700, .text-sky-700, .text-indigo-700, .text-cyan-700) {
+  color: #93c5fd !important;
+}
+
+.dark .layout-shell :is(.text-emerald-900, .text-emerald-800, .text-green-900, .text-green-800, .text-teal-900, .text-teal-800, .text-lime-900, .text-lime-800) {
+  color: #bbf7d0 !important;
+}
+
+.dark .layout-shell :is(.text-emerald-700, .text-green-700, .text-teal-700, .text-lime-700) {
+  color: #86efac !important;
+}
+
+.dark .layout-shell :is(.text-amber-900, .text-amber-800, .text-yellow-900, .text-yellow-800, .text-orange-900, .text-orange-800) {
+  color: #fde68a !important;
+}
+
+.dark .layout-shell :is(.text-amber-700, .text-yellow-700, .text-orange-700) {
+  color: #fcd34d !important;
+}
+
+.dark .layout-shell :is(.text-rose-900, .text-rose-800, .text-red-900, .text-red-800, .text-pink-900, .text-pink-800) {
+  color: #fecaca !important;
+}
+
+.dark .layout-shell :is(.text-rose-700, .text-red-700, .text-pink-700) {
+  color: #fca5a5 !important;
+}
+
+.dark .layout-shell :is(.text-purple-900, .text-purple-800, .text-violet-900, .text-violet-800, .text-fuchsia-900, .text-fuchsia-800) {
+  color: #ddd6fe !important;
+}
+
+.dark .layout-shell :is(.text-purple-700, .text-violet-700, .text-fuchsia-700) {
+  color: #c4b5fd !important;
+}
+
+.dark .layout-shell :is(.border-slate-100, .border-slate-200, .border-slate-300, .border-gray-100, .border-gray-200, .border-gray-300, .border-zinc-200) {
+  border-color: var(--shell-border) !important;
+}
+
+.dark .layout-shell :is(.border-blue-200, .border-sky-200, .border-indigo-200, .border-cyan-200) {
+  border-color: rgba(96, 165, 250, 0.36) !important;
+}
+
+.dark .layout-shell :is(.border-emerald-200, .border-green-200, .border-teal-200, .border-lime-200) {
+  border-color: rgba(52, 211, 153, 0.34) !important;
+}
+
+.dark .layout-shell :is(.border-amber-200, .border-yellow-200, .border-orange-200) {
+  border-color: rgba(251, 191, 36, 0.36) !important;
+}
+
+.dark .layout-shell :is(.border-rose-200, .border-red-200, .border-pink-200) {
+  border-color: rgba(248, 113, 113, 0.36) !important;
+}
+
+.dark .layout-shell :is(.border-purple-200, .border-violet-200, .border-fuchsia-200) {
+  border-color: rgba(167, 139, 250, 0.36) !important;
+}
+
+.dark .layout-shell :is(.divide-slate-100, .divide-slate-200, .divide-gray-100, .divide-gray-200) > :not([hidden]) ~ :not([hidden]) {
+  border-color: var(--shell-border) !important;
+}
+
+.dark .layout-shell :is(.shadow, .shadow-sm, .shadow-md, .shadow-lg, .shadow-xl, .shadow-2xl) {
+  box-shadow: var(--shell-shadow) !important;
+}
+
+.dark .layout-shell :is(.hover\:bg-white:hover, .hover\:bg-slate-50:hover, .hover\:bg-slate-100:hover, .hover\:bg-gray-50:hover, .hover\:bg-gray-100:hover) {
+  background-color: rgba(37, 99, 235, 0.14) !important;
+}
+
+.dark .layout-shell :is(.hover\:bg-blue-50:hover, .hover\:bg-sky-50:hover, .hover\:bg-indigo-50:hover) {
+  background-color: rgba(37, 99, 235, 0.22) !important;
+}
+
+.dark .layout-shell :is(.hover\:text-slate-900:hover, .hover\:text-gray-900:hover, .hover\:text-blue-900:hover, .hover\:text-sky-900:hover) {
+  color: var(--shell-text) !important;
+}
+
+.dark .layout-shell :is(button:disabled, input:disabled, select:disabled, textarea:disabled, [aria-disabled="true"]) {
+  opacity: 0.72;
+}
+
+.dark .layout-shell :is(button:disabled, input:disabled, select:disabled, textarea:disabled, [aria-disabled="true"]) :is(.text-slate-950, .text-slate-900, .text-slate-800, .text-gray-900, .text-gray-800) {
+  color: var(--shell-muted) !important;
+}
+
 @media (min-width: 768px) {
   .layout-content-shell {
     padding: 1.35rem 1.35rem 2.2rem;
