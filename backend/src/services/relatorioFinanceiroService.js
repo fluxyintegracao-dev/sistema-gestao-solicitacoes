@@ -6,6 +6,7 @@ const {
   MovimentoFinanceiro,
   Obra,
   Parceiro,
+  sequelize,
   TransferenciaFinanceira,
   User,
   TituloFinanceiro
@@ -16,6 +17,7 @@ const {
 } = require('./authorizationService');
 const { registrarEventoSeguranca } = require('./securityLogService');
 const { isCategoriaRedutora } = require('../constants/dreCategorias');
+const { columnExists, tableExists } = require('../database/schemaUtils');
 
 function createHttpError(statusCode, message) {
   const error = new Error(message);
@@ -1733,6 +1735,171 @@ function getEmpresaNome(empresa) {
   return empresa?.nome || empresa?.razao_social || 'Sem empresa';
 }
 
+async function getExistingTableAttributes(tableName, attributes = []) {
+  const exists = await tableExists(sequelize, tableName);
+  if (!exists) {
+    return [];
+  }
+
+  const checks = await Promise.all(attributes.map(async (attribute) => ({
+    attribute,
+    exists: await columnExists(sequelize, tableName, attribute)
+  })));
+
+  return checks
+    .filter((item) => item.exists)
+    .map((item) => item.attribute);
+}
+
+function getModelTableName(model) {
+  const tableName = model?.getTableName?.();
+  if (typeof tableName === 'string') {
+    return tableName;
+  }
+  return tableName?.tableName || tableName?.toString?.() || null;
+}
+
+async function getMissingTableAttributes(tableName, attributes = []) {
+  const exists = await tableExists(sequelize, tableName);
+  if (!exists) {
+    return attributes.map((attribute) => `${tableName}.${attribute}`);
+  }
+
+  const checks = await Promise.all(attributes.map(async (attribute) => ({
+    attribute,
+    exists: await columnExists(sequelize, tableName, attribute)
+  })));
+
+  return checks
+    .filter((item) => !item.exists)
+    .map((item) => `${tableName}.${item.attribute}`);
+}
+
+async function getIntercompanyReportSchema() {
+  const empresaTable = getModelTableName(EmpresaGrupo) || 'empresas_grupo';
+  const categoriaTable = getModelTableName(CategoriaFinanceira) || 'categorias_financeiras';
+  const obraTable = getModelTableName(Obra) || 'Obras';
+  const contaTable = getModelTableName(ContaBancaria) || 'contas_bancarias';
+  const tituloTable = getModelTableName(TituloFinanceiro) || 'titulos_financeiros';
+  const transferenciaTable = getModelTableName(TransferenciaFinanceira) || 'transferencias_financeiras';
+
+  const [
+    empresaAttributes,
+    categoriaAttributes,
+    obraAttributes,
+    contaAttributes,
+    tituloAttributes,
+    tituloMissing,
+    transferenciaAttributes,
+    transferenciaMissing
+  ] = await Promise.all([
+    getExistingTableAttributes(empresaTable, [
+      'id',
+      'codigo',
+      'nome',
+      'razao_social',
+      'tipo_empresa',
+      'tipo_gerencial',
+      'holding_id'
+    ]),
+    getExistingTableAttributes(categoriaTable, [
+      'id',
+      'nome',
+      'tipo',
+      'dre_grupo',
+      'dre_subgrupo'
+    ]),
+    getExistingTableAttributes(obraTable, [
+      'id',
+      'codigo',
+      'nome',
+      'tipo_centro_custo'
+    ]),
+    getExistingTableAttributes(contaTable, [
+      'id',
+      'nome',
+      'banco',
+      'agencia',
+      'conta',
+      'empresa_id'
+    ]),
+    getExistingTableAttributes(tituloTable, [
+      'id',
+      'codigo',
+      'tipo',
+      'status',
+      'descricao',
+      'numero_documento',
+      'data_emissao',
+      'data_vencimento',
+      'competencia_data',
+      'valor_original',
+      'valor_saldo',
+      'intercompany',
+      'intercompany_group_id',
+      'empresa_id',
+      'empresa_origem_id',
+      'empresa_destino_id',
+      'tipo_intercompany',
+      'motivo_intercompany',
+      'elimina_consolidado',
+      'transferencia_interna',
+      'parceiro_id',
+      'categoria_financeira_id',
+      'obra_id'
+    ]),
+    getMissingTableAttributes(tituloTable, [
+      'competencia_data',
+      'intercompany',
+      'empresa_origem_id',
+      'empresa_destino_id',
+      'tipo_intercompany',
+      'elimina_consolidado',
+      'transferencia_interna'
+    ]),
+    getExistingTableAttributes(transferenciaTable, [
+      'id',
+      'empresa_id',
+      'intercompany_group_id',
+      'empresa_origem_id',
+      'empresa_destino_id',
+      'conta_origem_id',
+      'conta_destino_id',
+      'data_transferencia',
+      'valor',
+      'descricao',
+      'tipo_intercompany',
+      'motivo_intercompany',
+      'elimina_consolidado',
+      'transferencia_interna',
+      'status'
+    ]),
+    getMissingTableAttributes(transferenciaTable, [
+      'empresa_id',
+      'empresa_origem_id',
+      'empresa_destino_id',
+      'data_transferencia',
+      'valor',
+      'tipo_intercompany',
+      'elimina_consolidado',
+      'transferencia_interna',
+      'status'
+    ])
+  ]);
+
+  return {
+    empresaAttributes: empresaAttributes.length ? empresaAttributes : ['id', 'nome'],
+    categoriaAttributes: categoriaAttributes.length ? categoriaAttributes : ['id', 'nome'],
+    obraAttributes: obraAttributes.length ? obraAttributes : ['id', 'nome'],
+    contaAttributes: contaAttributes.length ? contaAttributes : ['id', 'nome'],
+    tituloAttributes,
+    tituloMissing,
+    transferenciaAttributes,
+    transferenciaMissing,
+    pronto: tituloMissing.length === 0 && transferenciaMissing.length === 0
+  };
+}
+
 function getIntercompanyTituloValor(titulo) {
   return roundCurrency(titulo.valor_original || titulo.valor_saldo || 0);
 }
@@ -2654,12 +2821,49 @@ async function gerarRelatorioIntercompany(req, filters = {}) {
   const tituloStatuses = ['ABERTO', 'PARCIAL', 'QUITADO', 'CANCELADO', 'ESTORNADO'];
   const transferenciaStatuses = ['ATIVA', 'CANCELADA'];
   const periodo = resolvePeriodo(filters);
+  const schema = await getIntercompanyReportSchema();
+  const empresaOrder = [
+    ...(schema.empresaAttributes.includes('tipo_empresa') ? [['tipo_empresa', 'ASC']] : []),
+    ...(schema.empresaAttributes.includes('nome') ? [['nome', 'ASC']] : [['id', 'ASC']])
+  ];
   const empresas = await EmpresaGrupo.findAll({
-    attributes: ['id', 'codigo', 'nome', 'razao_social', 'tipo_empresa', 'tipo_gerencial', 'holding_id'],
-    order: [['tipo_empresa', 'ASC'], ['nome', 'ASC']]
+    attributes: schema.empresaAttributes,
+    order: empresaOrder
   });
   const empresaIdsHolding = getEmpresaIdsDaHolding(empresas, filters.holding_id);
   const andConditions = [getCompetenciaWhere(periodo)];
+
+  const emptyReport = (extra = {}) => ({
+    filtro: {
+      periodo: periodo.periodo,
+      descricao: periodo.descricao,
+      data_inicial: periodo.data_inicial,
+      data_final: periodo.data_final,
+      holding_id: filters.holding_id ? Number(filters.holding_id) : null,
+      empresa_id: filters.empresa_id ? Number(filters.empresa_id) : null,
+      tipo_intercompany: filters.tipo_intercompany || null,
+      status: filters.status || null,
+      elimina_consolidado: filters.elimina_consolidado ?? null,
+      limit: filters.limit || 1000
+    },
+    ...summarizeIntercompany([], []),
+    titulos: [],
+    transferencias: [],
+    schema: {
+      pronto: schema.pronto,
+      pendencias: [
+        ...schema.tituloMissing,
+        ...schema.transferenciaMissing
+      ],
+      ...extra
+    }
+  });
+
+  if (schema.tituloMissing.length) {
+    return emptyReport({
+      mensagem: 'O relatorio intercompany depende de migrations financeiras pendentes no banco.'
+    });
+  }
 
   if (filters.empresa_id) {
     const empresaId = Number(filters.empresa_id);
@@ -2697,23 +2901,24 @@ async function gerarRelatorioIntercompany(req, filters = {}) {
 
   const titulos = await TituloFinanceiro.findAll({
     where,
+    attributes: schema.tituloAttributes,
     include: [
       {
         model: EmpresaGrupo,
         as: 'empresa',
-        attributes: ['id', 'codigo', 'nome', 'razao_social', 'tipo_empresa', 'tipo_gerencial', 'holding_id'],
+        attributes: schema.empresaAttributes,
         required: false
       },
       {
         model: EmpresaGrupo,
         as: 'empresaOrigem',
-        attributes: ['id', 'codigo', 'nome', 'razao_social', 'tipo_empresa', 'tipo_gerencial', 'holding_id'],
+        attributes: schema.empresaAttributes,
         required: false
       },
       {
         model: EmpresaGrupo,
         as: 'empresaDestino',
-        attributes: ['id', 'codigo', 'nome', 'razao_social', 'tipo_empresa', 'tipo_gerencial', 'holding_id'],
+        attributes: schema.empresaAttributes,
         required: false
       },
       {
@@ -2725,13 +2930,13 @@ async function gerarRelatorioIntercompany(req, filters = {}) {
       {
         model: CategoriaFinanceira,
         as: 'categoriaFinanceira',
-        attributes: ['id', 'nome', 'tipo', 'dre_grupo', 'dre_subgrupo'],
+        attributes: schema.categoriaAttributes,
         required: false
       },
       {
         model: Obra,
         as: 'obra',
-        attributes: ['id', 'codigo', 'nome', 'tipo_centro_custo'],
+        attributes: schema.obraAttributes,
         required: false
       },
       {
@@ -2776,54 +2981,59 @@ async function gerarRelatorioIntercompany(req, filters = {}) {
     });
   }
 
-  const whereTransferencias = {
-    tipo_intercompany: { [Op.ne]: null },
-    [Op.and]: transferenciaAndConditions
-  };
+  let transferencias = [];
 
-  if (filters.tipo_intercompany) {
-    whereTransferencias.tipo_intercompany = filters.tipo_intercompany;
-  }
-  if (filters.status) {
-    whereTransferencias.status = transferenciaStatuses.includes(filters.status) ? filters.status : '__SEM_STATUS__';
-  } else if (!filters.status) {
-    whereTransferencias.status = 'ATIVA';
-  }
-  if (filters.elimina_consolidado !== undefined) {
-    whereTransferencias.elimina_consolidado = filters.elimina_consolidado;
-  }
+  if (!schema.transferenciaMissing.length) {
+    const whereTransferencias = {
+      tipo_intercompany: { [Op.ne]: null },
+      [Op.and]: transferenciaAndConditions
+    };
 
-  const transferencias = await TransferenciaFinanceira.findAll({
-    where: whereTransferencias,
-    include: [
-      {
-        model: EmpresaGrupo,
-        as: 'empresaOrigem',
-        attributes: ['id', 'codigo', 'nome', 'razao_social', 'tipo_empresa', 'tipo_gerencial', 'holding_id'],
-        required: false
-      },
-      {
-        model: EmpresaGrupo,
-        as: 'empresaDestino',
-        attributes: ['id', 'codigo', 'nome', 'razao_social', 'tipo_empresa', 'tipo_gerencial', 'holding_id'],
-        required: false
-      },
-      {
-        model: ContaBancaria,
-        as: 'contaOrigem',
-        attributes: ['id', 'nome', 'banco', 'agencia', 'conta', 'empresa_id'],
-        required: false
-      },
-      {
-        model: ContaBancaria,
-        as: 'contaDestino',
-        attributes: ['id', 'nome', 'banco', 'agencia', 'conta', 'empresa_id'],
-        required: false
-      }
-    ],
-    order: [['data_transferencia', 'ASC'], ['id', 'ASC']],
-    limit: filters.limit || 1000
-  });
+    if (filters.tipo_intercompany) {
+      whereTransferencias.tipo_intercompany = filters.tipo_intercompany;
+    }
+    if (filters.status) {
+      whereTransferencias.status = transferenciaStatuses.includes(filters.status) ? filters.status : '__SEM_STATUS__';
+    } else if (!filters.status) {
+      whereTransferencias.status = 'ATIVA';
+    }
+    if (filters.elimina_consolidado !== undefined) {
+      whereTransferencias.elimina_consolidado = filters.elimina_consolidado;
+    }
+
+    transferencias = await TransferenciaFinanceira.findAll({
+      where: whereTransferencias,
+      attributes: schema.transferenciaAttributes,
+      include: [
+        {
+          model: EmpresaGrupo,
+          as: 'empresaOrigem',
+          attributes: schema.empresaAttributes,
+          required: false
+        },
+        {
+          model: EmpresaGrupo,
+          as: 'empresaDestino',
+          attributes: schema.empresaAttributes,
+          required: false
+        },
+        {
+          model: ContaBancaria,
+          as: 'contaOrigem',
+          attributes: schema.contaAttributes,
+          required: false
+        },
+        {
+          model: ContaBancaria,
+          as: 'contaDestino',
+          attributes: schema.contaAttributes,
+          required: false
+        }
+      ],
+      order: [['data_transferencia', 'ASC'], ['id', 'ASC']],
+      limit: filters.limit || 1000
+    });
+  }
 
   return {
     filtro: {
@@ -2840,7 +3050,14 @@ async function gerarRelatorioIntercompany(req, filters = {}) {
     },
     ...summarizeIntercompany(titulos, transferencias),
     titulos: titulos.map(mapIntercompanyTitulo),
-    transferencias: transferencias.map(mapIntercompanyTransferencia)
+    transferencias: transferencias.map(mapIntercompanyTransferencia),
+    schema: {
+      pronto: schema.pronto,
+      pendencias: [
+        ...schema.tituloMissing,
+        ...schema.transferenciaMissing
+      ]
+    }
   };
 }
 

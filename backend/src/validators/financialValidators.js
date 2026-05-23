@@ -477,7 +477,7 @@ function validateFinanceIntercompanyQuery(query = {}) {
     holding_id: parseInteger(query.holding_id, 'Holding'),
     empresa_id: parseInteger(query.empresa_id, 'Empresa do grupo'),
     tipo_intercompany: parseEnum(query.tipo_intercompany, 'Tipo intercompany', TIPOS_INTERCOMPANY),
-    status: parseEnum(query.status, 'Status', ['ABERTO', 'PARCIAL', 'QUITADO', 'CANCELADO', 'ESTORNADO']),
+    status: parseEnum(query.status, 'Status', ['ABERTO', 'PARCIAL', 'QUITADO', 'CANCELADO', 'ESTORNADO', 'ATIVA', 'CANCELADA']),
     elimina_consolidado: parseBoolean(query.elimina_consolidado, 'Eliminar no consolidado'),
     limit: limit ? Math.min(limit, 1000) : undefined
   };

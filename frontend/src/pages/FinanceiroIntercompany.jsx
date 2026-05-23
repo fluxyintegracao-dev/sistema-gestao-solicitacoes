@@ -194,6 +194,9 @@ export default function FinanceiroIntercompany() {
   const porTipo = Array.isArray(relatorio?.por_tipo) ? relatorio.por_tipo : [];
   const titulos = Array.isArray(relatorio?.titulos) ? relatorio.titulos : [];
   const transferencias = Array.isArray(relatorio?.transferencias) ? relatorio.transferencias : [];
+  const schemaPendencias = Array.isArray(relatorio?.schema?.pendencias)
+    ? relatorio.schema.pendencias
+    : [];
 
   function updateFilter(field, value) {
     setFilters((current) => ({
@@ -328,6 +331,12 @@ export default function FinanceiroIntercompany() {
       </form>
 
       {error ? <div className="app-alert app-alert--error">{error}</div> : null}
+      {!error && schemaPendencias.length ? (
+        <div className="app-alert">
+          Existem migrations pendentes para o relatorio intercompany: {schemaPendencias.join(', ')}.
+          Atualize o banco para liberar todos os dados da visao.
+        </div>
+      ) : null}
 
       <div className="app-summary-grid">
         <Metric label="Valor previsto" value={formatCurrency(resumo.valor_previsto)} detail={`${resumo.titulos || 0} titulo(s)`} />
