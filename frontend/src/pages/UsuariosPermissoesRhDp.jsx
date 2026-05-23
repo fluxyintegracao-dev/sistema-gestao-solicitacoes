@@ -130,7 +130,7 @@ export default function UsuariosPermissoesRhDp() {
   }
 
   return (
-    <div className="page solicitacoes-page space-y-6">
+    <div className="page solicitacoes-page rhdp-page space-y-6">
       <div>
         <h1 className="page-title">Permissoes RH/DP e SIENGE por usuario</h1>
         <p className="page-subtitle mt-1">

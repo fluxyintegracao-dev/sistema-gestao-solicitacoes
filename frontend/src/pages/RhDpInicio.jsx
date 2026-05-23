@@ -30,7 +30,7 @@ export default function RhDpInicio() {
   const podeVerFechamentos = canViewRhDpObrigacoes(user) && financeiroHabilitado;
 
   return (
-    <div className="space-y-6">
+    <div className="rhdp-page space-y-6">
       <section className="rounded-[28px] border border-sky-100 bg-[radial-gradient(circle_at_top_left,_rgba(191,219,254,0.45),_transparent_26%),radial-gradient(circle_at_top_right,_rgba(186,230,253,0.45),_transparent_24%),linear-gradient(135deg,_rgba(255,255,255,0.94),_rgba(239,246,255,0.9))] px-6 py-6 shadow-sm">
         <div className="max-w-4xl space-y-3">
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Modulo planejado</p>

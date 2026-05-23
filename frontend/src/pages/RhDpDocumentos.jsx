@@ -195,7 +195,7 @@ export default function RhDpDocumentos() {
   const totalPaginas = Number(meta.total_pages || 0);
 
   return (
-    <div className="page solicitacoes-page space-y-6">
+    <div className="page solicitacoes-page rhdp-page space-y-6">
       <div className="app-page-header">
         <div className="app-page-header-row">
           <div>

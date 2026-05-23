@@ -820,6 +820,109 @@ textarea {
   color: var(--shell-text) !important;
 }
 
+.dark .layout-shell .rhdp-page {
+  --rhdp-surface: color-mix(in srgb, var(--ui-surface) 91%, #1d4ed8 9%);
+  --rhdp-surface-muted: color-mix(in srgb, var(--ui-surface-soft) 86%, #2563eb 14%);
+  --rhdp-border: color-mix(in srgb, var(--ui-border) 78%, #93c5fd 22%);
+}
+
+.dark .layout-shell .rhdp-page :is(
+  .bg-white,
+  .bg-slate-50,
+  .bg-slate-100,
+  .bg-gray-50,
+  .bg-gray-100,
+  [class*="bg-white/"],
+  [class*="bg-slate-50/"],
+  [class*="bg-slate-100/"]
+) {
+  background-color: var(--rhdp-surface) !important;
+  color: var(--shell-text) !important;
+}
+
+.dark .layout-shell .rhdp-page :is(
+  [class*="bg-sky-50"],
+  [class*="bg-blue-50"],
+  [class*="bg-indigo-50"],
+  [class*="bg-cyan-50"]
+) {
+  background: color-mix(in srgb, #2563eb 18%, var(--rhdp-surface)) !important;
+  color: #dbeafe !important;
+}
+
+.dark .layout-shell .rhdp-page :is(
+  [class*="bg-emerald-50"],
+  [class*="bg-green-50"],
+  [class*="bg-teal-50"]
+) {
+  background: color-mix(in srgb, #10b981 18%, var(--rhdp-surface)) !important;
+  color: #d1fae5 !important;
+}
+
+.dark .layout-shell .rhdp-page :is(
+  [class*="bg-amber-50"],
+  [class*="bg-yellow-50"],
+  [class*="bg-orange-50"]
+) {
+  background: color-mix(in srgb, #f59e0b 18%, var(--rhdp-surface)) !important;
+  color: #fef3c7 !important;
+}
+
+.dark .layout-shell .rhdp-page :is(
+  [class*="bg-rose-50"],
+  [class*="bg-red-50"],
+  [class*="bg-pink-50"]
+) {
+  background: color-mix(in srgb, #ef4444 18%, var(--rhdp-surface)) !important;
+  color: #fee2e2 !important;
+}
+
+.dark .layout-shell .rhdp-page :is(
+  .border-slate-100,
+  .border-slate-200,
+  .border-slate-300,
+  .border-sky-100,
+  .border-sky-200,
+  .border-emerald-100,
+  .border-emerald-200,
+  .border-amber-100,
+  .border-amber-200,
+  .border-rose-100,
+  .border-rose-200
+) {
+  border-color: var(--rhdp-border) !important;
+}
+
+.dark .layout-shell .rhdp-page :is(
+  .text-slate-950,
+  .text-slate-900,
+  .text-slate-800,
+  .text-slate-700
+) {
+  color: var(--shell-text) !important;
+}
+
+.dark .layout-shell .rhdp-page :is(
+  .text-slate-600,
+  .text-slate-500,
+  .text-slate-400
+) {
+  color: var(--shell-muted) !important;
+}
+
+.dark .layout-shell .rhdp-page :is(
+  section[class*="bg-[radial-gradient"],
+  section[class*="bg-[linear-gradient"],
+  .rounded-2xl[class*="bg-[radial-gradient"],
+  .rounded-2xl[class*="bg-[linear-gradient"]
+) {
+  background:
+    radial-gradient(circle at top left, rgba(37, 99, 235, 0.2), transparent 30%),
+    linear-gradient(135deg, var(--rhdp-surface), color-mix(in srgb, var(--ui-canvas) 84%, #1d4ed8 16%)) !important;
+  border-color: var(--rhdp-border) !important;
+  color: var(--shell-text) !important;
+}
+
 .table {
   width: 100%;
   border-collapse: collapse;

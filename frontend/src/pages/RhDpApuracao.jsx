@@ -359,7 +359,7 @@ export default function RhDpApuracao() {
   }, [apuracoes]);
 
   return (
-    <div className="page solicitacoes-page space-y-6">
+    <div className="page solicitacoes-page rhdp-page space-y-6">
       <div className="app-page-header">
         <div className="app-page-header-row">
           <div>
