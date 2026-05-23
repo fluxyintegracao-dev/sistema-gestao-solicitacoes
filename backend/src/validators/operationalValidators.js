@@ -185,6 +185,30 @@ function validateContratoQuery(query = {}) {
   };
 }
 
+function validateContratoRelatorioOperacionalQuery(query = {}) {
+  ensureAllowedKeys(
+    query,
+    ['obra_id', 'ref', 'codigo', 'ativo', 'data_inicio', 'data_fim'],
+    'Relatorio operacional de contratos'
+  );
+
+  const dataInicio = parseDateOnly(query.data_inicio, 'Data inicial');
+  const dataFim = parseDateOnly(query.data_fim, 'Data final');
+
+  if (dataInicio && dataFim && dataInicio > dataFim) {
+    throw new ValidationError('Data inicial nao pode ser maior que a data final.');
+  }
+
+  return {
+    obra_id: parseInteger(query.obra_id, 'Obra'),
+    ref: parseOptionalText(query.ref, 'Referencia', 255),
+    codigo: parseOptionalText(query.codigo, 'Codigo', 255),
+    ativo: parseBoolean(query.ativo, 'Ativo'),
+    data_inicio: dataInicio,
+    data_fim: dataFim
+  };
+}
+
 function validateContratoCreateBody(body = {}) {
   ensureAllowedKeys(
     body,
@@ -825,6 +849,7 @@ module.exports = {
   validateCompraRelatorioPrecosInsumosQuery,
   validateContratoCreateBody,
   validateContratoQuery,
+  validateContratoRelatorioOperacionalQuery,
   validateContratoUpdateBody,
   validateSolicitacaoArquivarMassaBody,
   validateSolicitacaoComentarioBody,

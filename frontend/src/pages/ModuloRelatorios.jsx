@@ -205,14 +205,15 @@ const HUBS = {
       {
         titulo: 'Disponiveis',
         itens: [
+          { titulo: 'Painel operacional de contratos', descricao: 'Contratos por status, empresa, obra/centro, valores, saldos e pendencias cadastrais.', to: '/contratos/relatorios/operacional', status: 'Disponivel', permissao: 'contratos' },
           { titulo: 'Gestao de contratos', descricao: 'Base operacional de contratos, anexos e vinculos.', to: '/gestao-contratos', status: 'Disponivel', permissao: 'contratos' }
         ]
       },
       {
         titulo: 'Proximas visoes',
         itens: [
-          { titulo: 'Contratos a vencer', descricao: 'Prazos, renovacoes, reajustes e alertas por responsavel.', status: 'Planejado' },
-          { titulo: 'Contratos por centro de custo', descricao: 'Compromissos contratuais por obra, empresa e fornecedor.', status: 'Planejado' }
+          { titulo: 'Contratos a vencer', descricao: 'Prazos, renovacoes, reajustes e alertas por responsavel apos cadastro estruturado de vencimento.', status: 'Planejado' },
+          { titulo: 'Saldo contratual detalhado', descricao: 'Abertura dos compromissos por contrato, solicitacao vinculada e comprovantes.', status: 'Planejado' }
         ]
       }
     ]

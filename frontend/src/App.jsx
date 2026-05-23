@@ -98,6 +98,7 @@ const RelatoriosAdministrativos = lazy(() => import('./pages/RelatoriosAdministr
 const Setores = lazy(() => import('./pages/Setores'));
 const TiposSolicitacao = lazy(() => import('./pages/TiposSolicitacao'));
 const GestaoContratos = lazy(() => import('./pages/GestaoContratos'));
+const ContratosRelatorioOperacional = lazy(() => import('./pages/ContratosRelatorioOperacional'));
 const Configuracoes = lazy(() => import('./pages/Configuracoes'));
 const ConfiguracoesSuporte = lazy(() => import('./pages/ConfiguracoesSuporte'));
 const EmpresasGrupo = lazy(() => import('./pages/EmpresasGrupo'));
@@ -721,6 +722,7 @@ export default function App() {
         <Route path="relatorios/administrativos" element={<ModuloComprasRoute><BusinessAdminRoute><RelatoriosAdministrativos /></BusinessAdminRoute></ModuloComprasRoute>} />
         <Route path="perfil" element={<Perfil />} />
         <Route path="contratos/relatorios" element={<ContratosRoute><ModuloRelatorios modulo="contratos" /></ContratosRoute>} />
+        <Route path="contratos/relatorios/operacional" element={<ContratosRoute><ContratosRelatorioOperacional /></ContratosRoute>} />
         <Route path="solicitacoes-compra" element={<ModuloComprasRoute><SolicitacoesCompra /></ModuloComprasRoute>} />
         <Route path="solicitacoes-compra/:id" element={<ModuloComprasRoute><SolicitacaoCompraDetalhe /></ModuloComprasRoute>} />
         <Route path="solicitacoes-compra/nova" element={<ComprasPedidosCreateRoute><NovaSolicitacaoCompra /></ComprasPedidosCreateRoute>} />

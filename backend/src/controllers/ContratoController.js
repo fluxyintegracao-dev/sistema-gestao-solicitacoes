@@ -2,6 +2,7 @@ const { Op } = require('sequelize');
 const {
   Contrato,
   ContratoAnexo,
+  EmpresaGrupo,
   Obra,
   TipoSolicitacao,
   TipoSubContrato,
@@ -208,6 +209,109 @@ async function registrarNegacaoContrato(req, contratoId, obraId, descricao) {
       obra_id: obraId || null
     }
   });
+}
+
+function toNumber(value) {
+  const numero = Number(value || 0);
+  return Number.isFinite(numero) ? numero : 0;
+}
+
+function getContratoMetrics(contrato) {
+  const solicitacoes = contrato.solicitacoes || [];
+  const totalPagoStatus = solicitacoes.reduce((acc, solicitacao) => {
+    if (String(solicitacao.status_global || '').toUpperCase() !== 'PAGA') {
+      return acc;
+    }
+    return acc + toNumber(solicitacao.valor);
+  }, 0);
+
+  const valorContrato = toNumber(contrato.valor_total);
+  const ajusteSolicitado = toNumber(contrato.ajuste_solicitado);
+  const ajustePago = toNumber(contrato.ajuste_pago);
+  const totalSolicitado = valorContrato + ajusteSolicitado;
+  const totalPago = totalPagoStatus + ajustePago;
+
+  return {
+    valor_contrato: valorContrato,
+    ajuste_solicitado: ajusteSolicitado,
+    ajuste_pago: ajustePago,
+    total_solicitado: totalSolicitado,
+    total_pago: totalPago,
+    total_a_pagar: Math.max(totalSolicitado - totalPago, 0),
+    total_solicitacoes: solicitacoes.length,
+    total_anexos: (contrato.anexos || []).length
+  };
+}
+
+function createContratoAccumulator(label, extras = {}) {
+  return {
+    label,
+    total: 0,
+    ativos: 0,
+    inativos: 0,
+    sem_anexo: 0,
+    valor_total: 0,
+    total_solicitado: 0,
+    total_pago: 0,
+    total_a_pagar: 0,
+    solicitacoes: 0,
+    ...extras
+  };
+}
+
+function addContratoToGroup(map, key, label, contrato, metrics, extras = {}) {
+  const groupKey = key || 'SEM_INFORMACAO';
+  if (!map.has(groupKey)) {
+    map.set(groupKey, createContratoAccumulator(label || 'Sem informacao', extras));
+  }
+
+  const item = map.get(groupKey);
+  item.total += 1;
+  item.ativos += contrato.ativo ? 1 : 0;
+  item.inativos += contrato.ativo ? 0 : 1;
+  item.sem_anexo += metrics.total_anexos > 0 ? 0 : 1;
+  item.valor_total += metrics.valor_contrato;
+  item.total_solicitado += metrics.total_solicitado;
+  item.total_pago += metrics.total_pago;
+  item.total_a_pagar += metrics.total_a_pagar;
+  item.solicitacoes += metrics.total_solicitacoes;
+  return item;
+}
+
+function sortContratoGroups(map, valueKey = 'valor_total') {
+  return Array.from(map.values()).sort((a, b) => {
+    const valueDiff = toNumber(b[valueKey]) - toNumber(a[valueKey]);
+    if (valueDiff !== 0) return valueDiff;
+    return String(a.label || '').localeCompare(String(b.label || ''), 'pt-BR');
+  });
+}
+
+function emptyContratoOperationalReport() {
+  return {
+    filtros: {},
+    resumo: {
+      total_contratos: 0,
+      ativos: 0,
+      inativos: 0,
+      sem_anexo: 0,
+      com_anexo: 0,
+      valor_total: 0,
+      ajuste_solicitado: 0,
+      ajuste_pago: 0,
+      total_solicitado: 0,
+      total_pago: 0,
+      total_a_pagar: 0,
+      solicitacoes_vinculadas: 0
+    },
+    por_status: [],
+    por_obra: [],
+    por_empresa: [],
+    por_referencia: [],
+    por_tipo_macro: [],
+    por_tipo_sub: [],
+    por_mes_cadastro: [],
+    pendencias_cadastrais: []
+  };
 }
 
 module.exports = {
@@ -594,6 +698,187 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return res.status(500).json({ error: 'Erro ao gerar resumo de contratos' });
+    }
+  },
+
+  async relatorioOperacional(req, res) {
+    try {
+      const podeVisualizarContratos = await canAccessContratos(req.user);
+      const restringirPorObra = await shouldRestrictContratosToObras(req.user);
+      const acessoGlobalContratos = !restringirPorObra && await canAccessContratosGlobal(req.user);
+      const obrasPermitidas = isSuperadmin(req.user) ? null : await getUserObraScopeIds(req.user);
+
+      if (!podeVisualizarContratos) {
+        return res.status(403).json({
+          error: 'Acesso negado',
+          code: 'CONTRATOS_PERMISSAO_VISUALIZAR_AUSENTE'
+        });
+      }
+
+      const { obra_id, ref, codigo, ativo, data_inicio, data_fim } = req.query;
+      const where = {};
+
+      if (!acessoGlobalContratos && obrasPermitidas && obrasPermitidas.length > 0) {
+        if (obra_id && !obrasPermitidas.includes(Number(obra_id))) {
+          await registrarNegacaoContrato(
+            req,
+            null,
+            Number(obra_id),
+            'Usuario tentou consultar relatorio de contratos de obra fora do seu escopo'
+          );
+          return res.status(403).json({ error: 'Acesso negado para esta obra' });
+        }
+        where.obra_id = obra_id ? Number(obra_id) : { [Op.in]: obrasPermitidas };
+      } else if (!acessoGlobalContratos && obrasPermitidas !== null) {
+        return res.json(emptyContratoOperationalReport());
+      } else if (obra_id) {
+        where.obra_id = Number(obra_id);
+      }
+
+      if (ref) {
+        where.ref_contrato = { [Op.like]: `%${String(ref).trim()}%` };
+      }
+      if (codigo) {
+        where.codigo = { [Op.like]: `%${String(codigo).trim()}%` };
+      }
+      if (ativo !== undefined) {
+        where.ativo = Boolean(ativo);
+      }
+      if (data_inicio || data_fim) {
+        where.createdAt = {};
+        if (data_inicio) {
+          where.createdAt[Op.gte] = new Date(`${data_inicio}T00:00:00.000`);
+        }
+        if (data_fim) {
+          where.createdAt[Op.lte] = new Date(`${data_fim}T23:59:59.999`);
+        }
+      }
+
+      const contratos = await Contrato.findAll({
+        where,
+        include: [
+          {
+            model: Obra,
+            as: 'obra',
+            attributes: ['id', 'nome', 'codigo', 'tipo_centro_custo', 'empresa_grupo_id'],
+            include: [
+              {
+                model: EmpresaGrupo,
+                as: 'empresaGrupo',
+                attributes: ['id', 'nome', 'razao_social', 'tipo_empresa']
+              }
+            ]
+          },
+          { model: TipoSolicitacao, as: 'tipoMacro', attributes: ['id', 'nome'] },
+          { model: TipoSubContrato, as: 'tipoSub', attributes: ['id', 'nome'] },
+          {
+            model: Solicitacao,
+            as: 'solicitacoes',
+            attributes: ['id', 'valor', 'status_global']
+          },
+          {
+            model: ContratoAnexo,
+            as: 'anexos',
+            attributes: ['id']
+          }
+        ],
+        order: [['createdAt', 'DESC']]
+      });
+
+      const resumo = emptyContratoOperationalReport().resumo;
+      const porStatus = new Map();
+      const porObra = new Map();
+      const porEmpresa = new Map();
+      const porReferencia = new Map();
+      const porTipoMacro = new Map();
+      const porTipoSub = new Map();
+      const porMesCadastro = new Map();
+      const pendenciasCadastrais = [];
+
+      for (const contrato of contratos) {
+        const metrics = getContratoMetrics(contrato);
+        const statusKey = contrato.ativo ? 'ATIVO' : 'INATIVO';
+        const obra = contrato.obra;
+        const empresa = obra?.empresaGrupo;
+        const empresaLabel = empresa?.nome || empresa?.razao_social || 'Sem empresa vinculada';
+        const obraLabel = obra
+          ? `${obra.codigo ? `${obra.codigo} - ` : ''}${obra.nome}`
+          : 'Sem obra/centro';
+        const refLabel = contrato.ref_contrato || 'Sem referencia';
+        const tipoMacroLabel = contrato.tipoMacro?.nome || 'Sem tipo macro';
+        const tipoSubLabel = contrato.tipoSub?.nome || 'Sem tipo sub';
+        const mesCadastro = contrato.createdAt
+          ? new Date(contrato.createdAt).toISOString().slice(0, 7)
+          : 'Sem data';
+
+        resumo.total_contratos += 1;
+        resumo.ativos += contrato.ativo ? 1 : 0;
+        resumo.inativos += contrato.ativo ? 0 : 1;
+        resumo.sem_anexo += metrics.total_anexos > 0 ? 0 : 1;
+        resumo.com_anexo += metrics.total_anexos > 0 ? 1 : 0;
+        resumo.valor_total += metrics.valor_contrato;
+        resumo.ajuste_solicitado += metrics.ajuste_solicitado;
+        resumo.ajuste_pago += metrics.ajuste_pago;
+        resumo.total_solicitado += metrics.total_solicitado;
+        resumo.total_pago += metrics.total_pago;
+        resumo.total_a_pagar += metrics.total_a_pagar;
+        resumo.solicitacoes_vinculadas += metrics.total_solicitacoes;
+
+        addContratoToGroup(porStatus, statusKey, contrato.ativo ? 'Ativos' : 'Inativos', contrato, metrics);
+        addContratoToGroup(porObra, obra?.id, obraLabel, contrato, metrics, {
+          obra_id: obra?.id || null,
+          codigo: obra?.codigo || null,
+          tipo_centro_custo: obra?.tipo_centro_custo || null,
+          empresa: empresaLabel
+        });
+        addContratoToGroup(porEmpresa, empresa?.id, empresaLabel, contrato, metrics, {
+          empresa_id: empresa?.id || null,
+          tipo_empresa: empresa?.tipo_empresa || null
+        });
+        addContratoToGroup(porReferencia, refLabel, refLabel, contrato, metrics);
+        addContratoToGroup(porTipoMacro, contrato.tipoMacro?.id, tipoMacroLabel, contrato, metrics);
+        addContratoToGroup(porTipoSub, contrato.tipoSub?.id, tipoSubLabel, contrato, metrics);
+        addContratoToGroup(porMesCadastro, mesCadastro, mesCadastro, contrato, metrics);
+
+        const pendencias = [];
+        if (metrics.total_anexos === 0) pendencias.push('Sem anexo');
+        if (!obra?.empresa_grupo_id) pendencias.push('Obra/centro sem empresa do grupo');
+        if (!contrato.ref_contrato) pendencias.push('Sem referencia do contrato');
+        if (metrics.valor_contrato <= 0) pendencias.push('Valor do contrato zerado');
+
+        if (pendencias.length > 0) {
+          pendenciasCadastrais.push({
+            id: contrato.id,
+            codigo: contrato.codigo,
+            referencia: contrato.ref_contrato || null,
+            obra: obraLabel,
+            empresa: empresaLabel,
+            valor_total: metrics.valor_contrato,
+            total_a_pagar: metrics.total_a_pagar,
+            pendencias
+          });
+        }
+      }
+
+      return res.json({
+        filtros: { obra_id, ref, codigo, ativo, data_inicio, data_fim },
+        resumo,
+        por_status: sortContratoGroups(porStatus, 'total'),
+        por_obra: sortContratoGroups(porObra, 'valor_total'),
+        por_empresa: sortContratoGroups(porEmpresa, 'valor_total'),
+        por_referencia: sortContratoGroups(porReferencia, 'valor_total').slice(0, 50),
+        por_tipo_macro: sortContratoGroups(porTipoMacro, 'valor_total'),
+        por_tipo_sub: sortContratoGroups(porTipoSub, 'valor_total'),
+        por_mes_cadastro: Array.from(porMesCadastro.entries())
+          .sort(([a], [b]) => String(a).localeCompare(String(b)))
+          .map(([, item]) => item),
+        pendencias_cadastrais: pendenciasCadastrais
+          .sort((a, b) => b.pendencias.length - a.pendencias.length || toNumber(b.valor_total) - toNumber(a.valor_total))
+          .slice(0, 80)
+      });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao gerar relatorio operacional de contratos' });
     }
   },
 

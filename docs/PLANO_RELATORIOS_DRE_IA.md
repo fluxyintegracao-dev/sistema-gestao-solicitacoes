@@ -89,6 +89,7 @@ Base multiempresa e DRE gerencial:
 - Solicitacoes > Relatorios > Painel Operacional ganhou graficos de ranking por setor atual, distribuicao por status e volume por obra/centro, usando os mesmos agrupamentos reais do relatorio analitico.
 - Solicitacoes > Relatorios > Painel Operacional ganhou evolucao mensal, aging por status e mapa setor x status, calculados no backend a partir das solicitacoes filtradas e dos historicos reais.
 - Solicitacoes ganhou configuracao explicita de SLA por setor e o Painel Operacional passou a exibir vencidos/no prazo somente quando houver regra real cadastrada para o setor.
+- Contratos > Relatorios ganhou Painel Operacional de Contratos, consolidando contratos ativos/inativos, valores, saldos, solicitacoes vinculadas, pendencias cadastrais, obras/centros, empresas do grupo e referencias com base nos campos estruturados existentes.
 
 Documentacao operacional complementar:
 
@@ -401,23 +402,25 @@ Objetivo: controlar contratos operacionais, vencimentos, valores e riscos.
 
 Relatorios:
 
-- Contratos ativos.
-- Contratos por status.
-- Contratos por fornecedor/cliente.
-- Contratos por obra/centro de custo.
+- Contratos ativos. [Entregue no Painel Operacional de Contratos]
+- Contratos por status. [Entregue no Painel Operacional de Contratos]
+- Contratos por fornecedor/cliente. [Entregue inicialmente por Ref. do Contrato, usando o campo real existente]
+- Contratos por obra/centro de custo. [Entregue no Painel Operacional de Contratos]
 - Contratos proximos do vencimento.
 - Contratos vencidos.
-- Contratos sem anexo/documento.
-- Valores contratados.
-- Saldo contratual.
-- Contratos vinculados a solicitacoes, compras e financeiro.
+- Contratos sem anexo/documento. [Entregue como pendencia cadastral explicita]
+- Valores contratados. [Entregue no Painel Operacional de Contratos]
+- Saldo contratual. [Entregue com a mesma logica real do resumo de contratos: solicitado menos pago]
+- Contratos vinculados a solicitacoes, compras e financeiro. [Entregue inicialmente por quantidade de solicitacoes vinculadas]
 
 Graficos:
 
-- Contratos por status.
+- Contratos por status. [Entregue no Painel Operacional de Contratos]
 - Vencimentos nos proximos meses.
-- Valor contratado por fornecedor.
-- Contratos por obra.
+- Valor contratado por fornecedor. [Entregue inicialmente por Ref. do Contrato]
+- Contratos por obra. [Entregue no Painel Operacional de Contratos]
+
+Observacao operacional: o cadastro atual de contratos operacionais nao possui data estruturada de vencimento, renovacao ou reajuste. Por isso, os relatorios de contratos a vencer e vencidos permanecem planejados ate existir campo proprio no cadastro. O sistema nao deve inferir vencimento por descricao, nome de arquivo ou texto livre.
 - Saldo contratual.
 
 ## DRE Gerencial da Holding

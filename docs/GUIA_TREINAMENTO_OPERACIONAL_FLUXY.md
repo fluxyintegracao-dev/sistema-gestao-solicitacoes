@@ -1766,6 +1766,40 @@ Controlar contratos vinculados a solicitacoes, modelos, gestao e acompanhamento.
 - contrato sem obra ou centro de custo prejudica resultado;
 - anexos precisam estar legiveis.
 
+### 13.4 Relatorio Operacional de Contratos
+
+Caminho: Contratos > Relatorios > Painel operacional de contratos.
+
+Objetivo:
+
+- acompanhar quantos contratos estao ativos e inativos;
+- enxergar valor contratado, valor ja pago e saldo a pagar;
+- identificar contratos sem anexo;
+- separar contratos por empresa do grupo, obra/centro de custo e referencia;
+- localizar pendencias cadastrais que prejudicam analise executiva.
+
+Passo a passo:
+
+1. Abrir Contratos > Relatorios.
+2. Entrar em Painel operacional de contratos.
+3. Filtrar por obra/centro, status, codigo, referencia ou data de cadastro.
+4. Conferir os cards de Contratos, Valor contratado, A pagar e Sem anexo.
+5. Revisar as tabelas por empresa do grupo, obra/centro, referencia e status.
+6. Abrir a tabela Pendencias cadastrais e corrigir contratos sem anexo, sem empresa do grupo, sem referencia ou com valor zerado.
+
+Regras importantes:
+
+- o saldo a pagar segue a mesma logica da gestao de contratos: valor do contrato + ajuste solicitado menos solicitacoes pagas e ajuste pago;
+- o relatorio nao tenta descobrir vencimento por texto livre ou nome de arquivo;
+- como o cadastro atual nao possui campo estruturado de vencimento de contrato, relatorios de contratos a vencer ficam para uma etapa futura;
+- obra ou centro sem empresa do grupo deixa o contrato fraco para analise multiempresa.
+
+Rotina recomendada:
+
+- semanalmente, revisar contratos sem anexo;
+- mensalmente, conferir contratos com obra/centro sem empresa do grupo;
+- antes de reunioes de diretoria, validar saldos a pagar dos maiores contratos.
+
 ---
 
 ## 14. Modulo CRM
@@ -2305,11 +2339,18 @@ Devem responder:
 Devem responder:
 
 - contratos ativos;
-- contratos vencendo;
-- contratos por obra;
-- contratos por parceiro;
-- pendencias de assinatura;
-- valores contratados.
+- contratos por obra ou centro de custo;
+- contratos por empresa do grupo;
+- contratos por referencia/parceiro operacional;
+- contratos sem anexo;
+- valores contratados;
+- saldos a pagar;
+- contratos vinculados a solicitacoes.
+
+Observacao:
+
+- contratos vencendo e contratos vencidos so devem entrar quando o cadastro tiver data estruturada de vencimento, renovacao ou reajuste;
+- nao treinar a equipe a interpretar vencimento por descricao, observacao ou nome de arquivo.
 
 ---
 

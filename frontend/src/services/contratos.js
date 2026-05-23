@@ -26,6 +26,29 @@ export async function getContratosResumo({ obra_id, ref, codigo } = {}) {
   return res.json();
 }
 
+export async function getContratosRelatorioOperacional({
+  obra_id,
+  ref,
+  codigo,
+  ativo,
+  data_inicio,
+  data_fim
+} = {}) {
+  const search = new URLSearchParams();
+  if (obra_id) search.set('obra_id', obra_id);
+  if (ref) search.set('ref', ref);
+  if (codigo) search.set('codigo', codigo);
+  if (ativo !== undefined && ativo !== '') search.set('ativo', ativo);
+  if (data_inicio) search.set('data_inicio', data_inicio);
+  if (data_fim) search.set('data_fim', data_fim);
+  const params = search.toString() ? `?${search.toString()}` : '';
+  const res = await fetch(`${API_URL}/contratos/relatorios/operacional${params}`, {
+    headers: authHeaders()
+  });
+  if (!res.ok) throw new Error('Erro ao buscar relatorio operacional de contratos');
+  return res.json();
+}
+
 export async function criarContrato(data) {
   const res = await fetch(`${API_URL}/contratos`, {
     method: 'POST',
