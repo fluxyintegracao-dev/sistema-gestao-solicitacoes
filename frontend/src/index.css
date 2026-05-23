@@ -2736,15 +2736,38 @@ a:hover {
   box-shadow: 0 16px 34px rgba(15, 23, 42, 0.12);
 }
 
+.dark .solicitacao-nova-page .nova-solicitacao-obra-results {
+  border-color: color-mix(in srgb, var(--c-primary) 36%, var(--shell-border));
+  background: color-mix(in srgb, var(--shell-panel-strong) 92%, #0b1220);
+  box-shadow: 0 22px 48px rgba(0, 0, 0, 0.36);
+}
+
 .solicitacao-nova-page .nova-solicitacao-obra-result {
   border: 1px solid transparent;
   transition: border-color 0.18s ease, background-color 0.18s ease, transform 0.18s ease;
+}
+
+.dark .solicitacao-nova-page .nova-solicitacao-obra-result {
+  color: var(--shell-text);
+}
+
+.dark .solicitacao-nova-page .nova-solicitacao-obra-result .text-\[var\(--c-text\)\] {
+  color: var(--shell-text) !important;
+}
+
+.dark .solicitacao-nova-page .nova-solicitacao-obra-result .text-\[var\(--c-muted\)\] {
+  color: var(--shell-muted) !important;
 }
 
 .solicitacao-nova-page .nova-solicitacao-obra-result:hover {
   border-color: color-mix(in srgb, var(--c-primary) 22%, var(--sol-border-color));
   background: color-mix(in srgb, var(--c-primary) 5%, #ffffff);
   transform: translateY(-1px);
+}
+
+.dark .solicitacao-nova-page .nova-solicitacao-obra-result:hover {
+  border-color: color-mix(in srgb, var(--c-primary) 48%, var(--shell-border));
+  background: rgba(37, 99, 235, 0.16);
 }
 
 .solicitacao-nova-page .nova-solicitacao-obra-selection {
@@ -2765,6 +2788,11 @@ a:hover {
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.01em;
+}
+
+.dark .solicitacao-nova-page .nova-solicitacao-obra-badge {
+  background: rgba(37, 99, 235, 0.18);
+  color: #bfdbfe;
 }
 
 .solicitacao-nova-page .nova-solicitacao-obra-badge-selected {
