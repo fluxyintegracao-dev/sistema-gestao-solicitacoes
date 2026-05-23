@@ -213,7 +213,7 @@ export default function SolicitacoesCompra() {
         </div>
       </div>
 
-      <div className="card sol-surface-card app-table-shell">
+      <div className="card sol-surface-card app-table-shell compras-solicitacoes-table-shell">
         {loading ? (
           <div className="py-8 text-center text-sm text-[var(--c-muted)]">Carregando...</div>
         ) : solicitacoesFiltradas.length === 0 ? (

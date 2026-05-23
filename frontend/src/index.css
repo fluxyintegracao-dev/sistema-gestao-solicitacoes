@@ -7594,6 +7594,26 @@ body {
   border-radius: 0 1rem 1rem 0;
 }
 
+.dark .layout-shell .compras-solicitacoes-table-shell .table tbody tr:nth-child(odd),
+.dark .layout-shell .compras-solicitacoes-table-shell .table tbody tr:nth-child(even),
+.dark .layout-shell .compras-solicitacoes-table-shell .table tbody tr:hover {
+  background: transparent;
+}
+
+.dark .layout-shell .compras-solicitacoes-table-shell .table tbody tr:nth-child(odd) td {
+  background: rgba(15, 23, 42, 0.76);
+  color: var(--shell-text);
+}
+
+.dark .layout-shell .compras-solicitacoes-table-shell .table tbody tr:nth-child(even) td {
+  background: rgba(30, 41, 59, 0.66);
+  color: var(--shell-text);
+}
+
+.dark .layout-shell .compras-solicitacoes-table-shell .table tbody tr:hover td {
+  background: color-mix(in srgb, var(--shell-primary) 16%, rgba(15, 23, 42, 0.82));
+}
+
 .layout-shell .app-status-pill,
 .layout-shell .badge {
   display: inline-flex;
