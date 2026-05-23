@@ -67,11 +67,11 @@ function DetailTableEmpty({ message }) {
   );
 }
 
-function KpiCard({ label, value, accent = '', helper }) {
+function KpiCard({ label, value, accentColor, helper }) {
   return (
     <div className="app-summary-card">
       <div className="app-summary-label">{label}</div>
-      <div className={`app-summary-value ${accent}`} style={!accent ? { color: 'var(--c-text)' } : undefined}>
+      <div className="app-summary-value" style={{ color: accentColor || 'var(--c-text)' }}>
         {value}
       </div>
       {helper ? <div className="app-summary-subvalue">{helper}</div> : null}
@@ -79,14 +79,14 @@ function KpiCard({ label, value, accent = '', helper }) {
   );
 }
 
-function CompactHeaderMetric({ label, value, accent = '' }) {
+function CompactHeaderMetric({ label, value, accentColor }) {
   return (
     <div
       className="rounded-xl border px-3 py-2"
       style={{ borderColor: 'var(--ui-border)', background: 'var(--ui-canvas)' }}
     >
       <div className="text-xs font-medium" style={{ color: 'var(--c-muted)' }}>{label}</div>
-      <div className={`mt-1 text-lg font-bold leading-none ${accent}`} style={!accent ? { color: 'var(--c-text)' } : undefined}>
+      <div className="mt-1 text-lg font-bold leading-none" style={{ color: accentColor || 'var(--c-text)' }}>
         {value}
       </div>
     </div>
@@ -277,7 +277,7 @@ export default function ObraGestao() {
 
           <div className="grid gap-2.5 sm:grid-cols-2 lg:min-w-[320px]">
             <CompactHeaderMetric label="Custo pago" value={formatCurrency(kpis.custo_pago)} />
-            <CompactHeaderMetric label="Saldo projetado" value={formatCurrency(kpis.saldo_projetado)} accent="text-[#08a56e]" />
+            <CompactHeaderMetric label="Saldo projetado" value={formatCurrency(kpis.saldo_projetado)} accentColor="var(--accent-green)" />
           </div>
         </div>
 
@@ -290,12 +290,8 @@ export default function ObraGestao() {
                 key={tab.id}
                 type="button"
                 onClick={() => changeTab(tab.id)}
-                className={`inline-flex min-h-[40px] items-center gap-2 rounded-xl border px-3.5 py-1.5 text-[11px] font-bold uppercase tracking-[0.16em] transition ${
-                  active
-                    ? 'border-[#2c63f3] bg-[#eef4ff] text-[#214de5]'
-                    : 'border-transparent bg-transparent hover:border-[#d4dfef]'
-                }`}
-                style={!active ? { color: 'var(--c-muted)' } : undefined}
+                className="obra-tab-btn"
+                data-active={active ? 'true' : undefined}
               >
                 <Icon className="h-4 w-4" />
                 {tab.label}
@@ -309,8 +305,8 @@ export default function ObraGestao() {
         <>
           <section className="app-summary-grid">
             <KpiCard label="Investimento total" value={formatCurrency(kpis.investimento_total)} />
-            <KpiCard label="Custo executado" value={formatCurrency(kpis.custo_executado)} accent="text-[#2454ff]" />
-            <KpiCard label="Diferenca / saldo" value={formatCurrency(kpis.diferenca_saldo)} accent="text-[#08a56e]" />
+            <KpiCard label="Custo executado" value={formatCurrency(kpis.custo_executado)} accentColor="var(--accent-blue)" />
+            <KpiCard label="Diferenca / saldo" value={formatCurrency(kpis.diferenca_saldo)} accentColor="var(--accent-green)" />
             <KpiCard label="Eficiencia" value={percent(kpis.eficiencia)} helper="do orcamento" />
           </section>
 
@@ -335,10 +331,10 @@ export default function ObraGestao() {
                         </div>
                       </div>
                       <div className="space-y-1.5">
-                        <div className="h-2.5 overflow-hidden rounded-full bg-[#eef3fb]">
-                          <div className="h-full rounded-full bg-[#e1e9f6]" style={{ width: widthOrcado }} />
+                        <div className="h-2.5 overflow-hidden rounded-full obra-bar-track">
+                          <div className="h-full rounded-full obra-bar-fill-soft" style={{ width: widthOrcado }} />
                         </div>
-                        <div className="h-2.5 overflow-hidden rounded-full bg-[#eef3fb]">
+                        <div className="h-2.5 overflow-hidden rounded-full obra-bar-track">
                           <div className="h-full rounded-full bg-[linear-gradient(90deg,#2454ff_0%,#35b6ff_100%)]" style={{ width: widthPago }} />
                         </div>
                       </div>
@@ -362,9 +358,9 @@ export default function ObraGestao() {
                           Orc: {formatCurrency(item.valor_orcado)} &nbsp;|&nbsp; Exec: {formatCurrency(item.pago)}
                         </div>
                       </div>
-                      <div className="text-sm font-bold text-[#2454ff]">{percent(item.percentual_execucao)}</div>
+                      <div className="text-sm font-bold obra-accent-blue">{percent(item.percentual_execucao)}</div>
                     </div>
-                    <div className="mt-2.5 h-2 overflow-hidden rounded-full bg-[#ecf2fb]">
+                    <div className="mt-2.5 h-2 overflow-hidden rounded-full obra-bar-track">
                       <div
                         className="h-full rounded-full bg-[linear-gradient(90deg,#2454ff_0%,#35b6ff_100%)]"
                         style={{ width: `${Math.min(100, Number(item.percentual_execucao || 0))}%` }}
@@ -500,7 +496,7 @@ export default function ObraGestao() {
             </div>
             <div className="rounded-xl border px-3 py-2 text-right" style={{ borderColor: 'var(--ui-border)', background: 'var(--ui-canvas)' }}>
               <div className="text-xs font-medium uppercase" style={{ color: 'var(--c-muted)' }}>Total pago</div>
-              <div className="mt-1 text-lg font-bold text-[#2454ff]">{formatCurrency(data.custos.total_pago)}</div>
+              <div className="mt-1 text-lg font-bold obra-accent-blue">{formatCurrency(data.custos.total_pago)}</div>
             </div>
           </div>
 
@@ -530,7 +526,7 @@ export default function ObraGestao() {
                         </div>
                       </td>
                       <td className="px-4 py-3 text-sm font-semibold uppercase" style={{ color: 'var(--c-text)' }}>{item.parceiro_nome}</td>
-                      <td className="px-4 py-3 text-xs font-semibold uppercase text-[#2454ff]">{item.origem}</td>
+                      <td className="px-4 py-3 text-xs font-semibold uppercase obra-accent-blue">{item.origem}</td>
                       <td className="px-4 py-3 text-sm" style={{ color: 'var(--c-text)' }}>{item.codigo_referencia}</td>
                       <td className="px-4 py-3 text-right text-sm font-semibold" style={{ color: 'var(--c-text)' }}>{formatCurrency(item.total)}</td>
                     </tr>
@@ -582,7 +578,7 @@ export default function ObraGestao() {
                       <td className="px-4 py-3 text-sm" style={{ color: 'var(--c-text)' }}>
                         <div className="line-clamp-2 max-w-[620px]">{item.descricao}</div>
                       </td>
-                      <td className="px-4 py-3 text-xs font-semibold uppercase text-[#2454ff]">{item.status}</td>
+                      <td className="px-4 py-3 text-xs font-semibold uppercase obra-accent-blue">{item.status}</td>
                       <td className="px-4 py-3 text-right text-sm font-semibold" style={{ color: 'var(--c-text)' }}>{formatCurrency(item.valor_saldo)}</td>
                       <td className="px-4 py-3 text-right">
                         <button
@@ -624,7 +620,7 @@ export default function ObraGestao() {
                       <div className="text-right">
                         <div className="text-xs font-medium uppercase" style={{ color: 'var(--c-muted)' }}>Pedido</div>
                         <div className="mt-1 text-sm font-semibold" style={{ color: 'var(--c-text)' }}>{item.numero_pedido}</div>
-                        <div className="mt-0.5 text-sm font-bold text-[#2454ff]">{formatCurrency(item.valor)}</div>
+                        <div className="mt-0.5 text-sm font-bold obra-accent-blue">{formatCurrency(item.valor)}</div>
                       </div>
                     </div>
                   </div>
@@ -651,7 +647,7 @@ export default function ObraGestao() {
                         <div className="mt-1 text-sm font-semibold uppercase" style={{ color: 'var(--c-text)' }}>{item.status}</div>
                       </div>
                       <div className="text-right text-xs" style={{ color: 'var(--c-text)' }}>
-                        <div>Sienge: {item.numero_sienge ? <span className="font-semibold text-[#2454ff]">{item.numero_sienge}</span> : '-'}</div>
+                        <div>Sienge: {item.numero_sienge ? <span className="font-semibold obra-accent-blue">{item.numero_sienge}</span> : '-'}</div>
                         <div className="mt-1">Criado em: {formatDate(item.createdAt)}</div>
                       </div>
                     </div>
@@ -697,7 +693,7 @@ export default function ObraGestao() {
                 <tbody>
                   {data.arquivos.itens.map((item) => (
                     <tr key={item.id} className="border-t" style={{ borderColor: 'var(--ui-border)' }}>
-                      <td className="px-4 py-3 text-xs font-semibold uppercase text-[#2454ff]">{item.tipo}</td>
+                      <td className="px-4 py-3 text-xs font-semibold uppercase obra-accent-blue">{item.tipo}</td>
                       <td className="px-4 py-3 text-sm" style={{ color: 'var(--c-text)' }}>{item.origem}</td>
                       <td className="px-4 py-3 text-sm font-medium" style={{ color: 'var(--c-text)' }}>{item.nome_original}</td>
                       <td className="px-4 py-3 text-sm" style={{ color: 'var(--c-text)' }}>{formatDate(item.createdAt)}</td>
@@ -728,9 +724,9 @@ export default function ObraGestao() {
             <h3 className="text-sm font-semibold" style={{ color: 'var(--c-text)' }}>Custo (Pedidos + A Pagar + Pago)</h3>
 
             <div className="mt-4 app-summary-grid">
-              <KpiCard label="Pedidos" value={formatCurrency(data.relatorio_final.resumo.pedidos)} accent="text-[#234fe3]" />
-              <KpiCard label="A pagar" value={formatCurrency(data.relatorio_final.resumo.a_pagar)} accent="text-[#cc7600]" />
-              <KpiCard label="Pago" value={formatCurrency(data.relatorio_final.resumo.pago)} accent="text-[#08a56e]" />
+              <KpiCard label="Pedidos" value={formatCurrency(data.relatorio_final.resumo.pedidos)} accentColor="var(--accent-blue)" />
+              <KpiCard label="A pagar" value={formatCurrency(data.relatorio_final.resumo.a_pagar)} accentColor="var(--accent-amber)" />
+              <KpiCard label="Pago" value={formatCurrency(data.relatorio_final.resumo.pago)} accentColor="var(--accent-green)" />
               <KpiCard label="Custo total" value={formatCurrency(data.relatorio_final.resumo.custo_total)} />
             </div>
 
@@ -754,9 +750,9 @@ export default function ObraGestao() {
                     {data.relatorio_final.itens.map((item) => (
                       <tr key={item.id} className="border-t" style={{ borderColor: 'var(--ui-border)' }}>
                         <td className="px-4 py-3 text-sm font-semibold uppercase" style={{ color: 'var(--c-text)' }}>{item.descricao}</td>
-                        <td className="px-4 py-3 text-right text-sm font-semibold text-[#234fe3]">{formatCurrency(item.pedidos)}</td>
-                        <td className="px-4 py-3 text-right text-sm font-semibold text-[#cc7600]">{formatCurrency(item.a_pagar)}</td>
-                        <td className="px-4 py-3 text-right text-sm font-semibold text-[#08a56e]">{formatCurrency(item.pago)}</td>
+                        <td className="px-4 py-3 text-right text-sm font-semibold obra-accent-blue">{formatCurrency(item.pedidos)}</td>
+                        <td className="px-4 py-3 text-right text-sm font-semibold obra-accent-amber">{formatCurrency(item.a_pagar)}</td>
+                        <td className="px-4 py-3 text-right text-sm font-semibold obra-accent-green">{formatCurrency(item.pago)}</td>
                         <td className="px-4 py-3 text-right text-sm font-semibold" style={{ color: 'var(--c-text)' }}>{formatCurrency(item.custo_total)}</td>
                       </tr>
                     ))}

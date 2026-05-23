@@ -581,30 +581,26 @@ export default function Obras() {
 
       {/* Modal */}
       {modalAberto && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.45)' }}>
-          <div
-            className="w-full max-w-2xl rounded-2xl border p-6"
-            style={{
-              background: 'var(--ui-surface)',
-              borderColor: 'var(--ui-border)',
-              boxShadow: '0 30px 60px rgba(0,0,0,0.2)'
-            }}
-          >
-            <div className="flex items-start justify-between gap-4">
+        <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && fecharModal()}>
+          <div className="modal-dialog modal-dialog--lg">
+            <div className="modal-header">
               <div>
-                <h2 className="text-xl font-bold" style={{ color: 'var(--c-text)' }}>
+                <h2 className="modal-title">
                   {form.id ? 'Editar cadastro' : 'Novo cadastro'}
                 </h2>
-                <p className="mt-1 text-sm" style={{ color: 'var(--c-muted)' }}>
+                <p className="modal-subtitle">
                   Mantenha obras reais e centros de custo administrativos alinhados para o modulo operacional e financeiro.
                 </p>
               </div>
-              <button type="button" className="btn btn-outline" onClick={fecharModal}>
-                Fechar
+              <button type="button" className="modal-close-btn" onClick={fecharModal} aria-label="Fechar">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                  <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                </svg>
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="mt-6 grid gap-4 md:grid-cols-3">
+            <div className="modal-body">
+            <form id="obras-form" onSubmit={handleSubmit} className="grid gap-4 md:grid-cols-3">
               <label className="grid gap-1 text-sm font-medium" style={{ color: 'var(--c-text)' }}>
                 Código
                 <input
@@ -725,15 +721,22 @@ export default function Obras() {
               </>
               )}
 
-              <div className="flex flex-wrap justify-end gap-3 md:col-span-3">
-                <button type="button" className="btn btn-outline" onClick={fecharModal} disabled={saving}>
-                  Cancelar
-                </button>
-                <button type="submit" className="btn btn-primary" disabled={saving}>
-                  {saving ? 'Salvando...' : form.id ? 'Salvar cadastro' : 'Criar cadastro'}
-                </button>
-              </div>
+              <div className="flex flex-wrap justify-end gap-3 md:col-span-3" style={{ display: 'none' }} />
             </form>
+            </div>
+            <div className="modal-footer">
+              <button type="button" className="btn btn-outline" onClick={fecharModal} disabled={saving}>
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                form="obras-form"
+                className="btn btn-primary"
+                disabled={saving}
+              >
+                {saving ? 'Salvando...' : form.id ? 'Salvar cadastro' : 'Criar cadastro'}
+              </button>
+            </div>
           </div>
         </div>
       )}

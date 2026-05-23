@@ -14,6 +14,69 @@
   --c-warning: #d97706;
   --c-danger: #e03131;
   --c-success: #0ca678;
+  /* Accent financeiro (usado em ObraGestao, DRE, etc.) */
+  --accent-blue: #2454ff;
+  --accent-green: #08a56e;
+  --accent-amber: #cc7600;
+  --accent-slate: #3f628f;
+  --accent-blue-bg: #eef3fb;
+  --accent-green-bg: #edfaf4;
+  --accent-amber-bg: #fff8ed;
+  /* Input tokens */
+  --input-bg: #ffffff;
+  --input-bg-soft: #f8fafc;
+  --input-border: #e4e9f0;
+  --input-text: #0f1c2e;
+  --input-placeholder: #94a3b8;
+  --input-bg-disabled: #f1f5f9;
+  --input-text-disabled: #94a3b8;
+  /* Z-index scale */
+  --z-dropdown: 25;
+  --z-sticky: 20;
+  --z-sidebar: 30;
+  --z-modal: 50;
+  --z-toast: 60;
+  /* Modal tokens */
+  --modal-overlay: rgba(15, 23, 42, 0.48);
+  --modal-bg: #ffffff;
+  --modal-border: #e4e9f0;
+  --modal-radius: 16px;
+  --modal-shadow: 0 24px 64px rgba(15, 23, 42, 0.2), 0 8px 20px rgba(15, 23, 42, 0.1);
+  --modal-max-w-sm: 480px;
+  --modal-max-w-md: 640px;
+  --modal-max-w-lg: 860px;
+  --modal-max-w-xl: 1120px;
+  /* Status badge tokens */
+  --status-pending-bg: #fff7ed;
+  --status-pending-text: #92400e;
+  --status-pending-border: #fed7aa;
+  --status-approved-bg: #ecfdf5;
+  --status-approved-text: #065f46;
+  --status-approved-border: #a7f3d0;
+  --status-rejected-bg: #fef2f2;
+  --status-rejected-text: #991b1b;
+  --status-rejected-border: #fecaca;
+  --status-paid-bg: #eff6ff;
+  --status-paid-text: #1e40af;
+  --status-paid-border: #bfdbfe;
+  --status-overdue-bg: #fff1f2;
+  --status-overdue-text: #9f1239;
+  --status-overdue-border: #fecdd3;
+  --status-analysis-bg: #f5f3ff;
+  --status-analysis-text: #5b21b6;
+  --status-analysis-border: #ddd6fe;
+  --status-archived-bg: #f8fafc;
+  --status-archived-text: #475569;
+  --status-archived-border: #cbd5e1;
+  --status-intercompany-bg: #ecfeff;
+  --status-intercompany-text: #155e75;
+  --status-intercompany-border: #a5f3fc;
+  --status-dre-yes-bg: #f0fdf4;
+  --status-dre-yes-text: #14532d;
+  --status-dre-yes-border: #bbf7d0;
+  --status-dre-no-bg: #fafafa;
+  --status-dre-no-text: #525252;
+  --status-dre-no-border: #e5e5e5;
   /* Nav (light) */
   --nav-bg: #ffffff;
   --nav-border: #eaeff6;
@@ -66,7 +129,7 @@
   --c-surface: #152136;
   --c-border: #243352;
   --c-text: #e8edf8;
-  --c-muted: #8898b8;
+  --c-muted: #94a8cc;
   --c-primary: #748ffc;
   --c-primary-600: #5c7cfa;
   --c-secondary: #a78bfa;
@@ -74,6 +137,58 @@
   --c-danger: #ff6b6b;
   --c-success: #38d9a9;
   --tone-glass: rgba(13, 21, 36, 0.92);
+  /* Accent financeiro (dark) */
+  --accent-blue: #748ffc;
+  --accent-green: #38d9a9;
+  --accent-amber: #fbbf24;
+  --accent-slate: #7a90b8;
+  --accent-blue-bg: rgba(116, 143, 252, 0.1);
+  --accent-green-bg: rgba(56, 217, 169, 0.1);
+  --accent-amber-bg: rgba(251, 191, 36, 0.1);
+  /* Input tokens (dark) */
+  --input-bg: #1a2a44;
+  --input-bg-soft: #1e3050;
+  --input-border: #2e4068;
+  --input-text: #e8edf8;
+  --input-placeholder: #5a7098;
+  --input-bg-disabled: #111e35;
+  --input-text-disabled: #5a7098;
+  /* Modal tokens (dark) */
+  --modal-overlay: rgba(4, 8, 20, 0.62);
+  --modal-bg: #152136;
+  --modal-border: #243352;
+  --modal-shadow: 0 24px 64px rgba(0, 0, 0, 0.52), 0 8px 20px rgba(0, 0, 0, 0.36);
+  /* Status badge tokens (dark) */
+  --status-pending-bg: rgba(251, 191, 36, 0.12);
+  --status-pending-text: #fbbf24;
+  --status-pending-border: rgba(251, 191, 36, 0.22);
+  --status-approved-bg: rgba(56, 217, 169, 0.1);
+  --status-approved-text: #38d9a9;
+  --status-approved-border: rgba(56, 217, 169, 0.2);
+  --status-rejected-bg: rgba(255, 107, 107, 0.1);
+  --status-rejected-text: #ff6b6b;
+  --status-rejected-border: rgba(255, 107, 107, 0.2);
+  --status-paid-bg: rgba(116, 143, 252, 0.1);
+  --status-paid-text: #748ffc;
+  --status-paid-border: rgba(116, 143, 252, 0.2);
+  --status-overdue-bg: rgba(255, 107, 107, 0.12);
+  --status-overdue-text: #fca5a5;
+  --status-overdue-border: rgba(255, 107, 107, 0.24);
+  --status-analysis-bg: rgba(167, 139, 250, 0.1);
+  --status-analysis-text: #a78bfa;
+  --status-analysis-border: rgba(167, 139, 250, 0.2);
+  --status-archived-bg: rgba(148, 168, 204, 0.08);
+  --status-archived-text: #94a8cc;
+  --status-archived-border: rgba(148, 168, 204, 0.16);
+  --status-intercompany-bg: rgba(34, 211, 238, 0.1);
+  --status-intercompany-text: #22d3ee;
+  --status-intercompany-border: rgba(34, 211, 238, 0.2);
+  --status-dre-yes-bg: rgba(56, 217, 169, 0.1);
+  --status-dre-yes-text: #38d9a9;
+  --status-dre-yes-border: rgba(56, 217, 169, 0.18);
+  --status-dre-no-bg: rgba(148, 168, 204, 0.06);
+  --status-dre-no-text: #94a8cc;
+  --status-dre-no-border: rgba(148, 168, 204, 0.12);
   /* Nav (dark) */
   --nav-bg: #101d34;
   --nav-border: #1e2e4a;
@@ -388,7 +503,7 @@ h1, h2, h3, h4, h5, h6 {
 .form-control::placeholder,
 select::placeholder,
 textarea::placeholder {
-  color: #9ca3af;
+  color: var(--input-placeholder);
 }
 
 input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
@@ -1369,8 +1484,8 @@ a:hover {
   min-height: 50px !important;
   padding: 0.76rem 1rem !important;
   border-radius: 12px !important;
-  background: #0f4d9e !important;
-  border-color: rgba(24, 94, 163, 0.7) !important;
+  background: #f4f8ff !important;
+  border-color: rgba(59, 91, 219, 0.28) !important;
   box-shadow: inset 0 1px 2px rgba(0, 18, 55, 0.04) !important;
   color: #0a1e42 !important;
   font-size: 0.94rem !important;
@@ -3488,9 +3603,9 @@ a:hover {
   margin-bottom: 0.8rem;
   padding: 0.7rem 0.9rem;
   border-radius: 12px;
-  border: 1px solid #f4d48a;
-  background: #fff7df;
-  color: #9a6700;
+  border: 1px solid var(--status-pending-border);
+  background: var(--status-pending-bg);
+  color: var(--status-pending-text);
   font-size: 0.83rem;
   font-weight: 500;
 }
@@ -3518,7 +3633,7 @@ a:hover {
   margin-top: 0.12rem;
   font-size: 0.95rem;
   font-weight: 700;
-  color: #102544;
+  color: var(--c-text);
   line-height: 1.28;
 }
 
@@ -3526,15 +3641,15 @@ a:hover {
   min-height: 36px !important;
   padding-top: 0.35rem !important;
   padding-bottom: 0.35rem !important;
-  border: 1px solid #b9cbe2 !important;
-  background: #f9fbff !important;
-  color: #102544 !important;
+  border: 1px solid var(--input-border) !important;
+  background: var(--input-bg) !important;
+  color: var(--input-text) !important;
 }
 
 .cotacao-publica-summary-hint {
   margin: 0.3rem 0 0;
   font-size: 0.72rem;
-  color: #60799d;
+  color: var(--c-muted);
   line-height: 1.25;
 }
 
@@ -3563,14 +3678,14 @@ a:hover {
   min-height: 32px;
   font-size: 0.82rem;
   font-weight: 700;
-  color: #17375f;
+  color: var(--c-text);
 }
 
 .cotacao-publica-cell-description strong {
   display: block;
   font-size: 0.84rem;
   line-height: 1.3;
-  color: #102544;
+  color: var(--c-text);
   word-break: break-word;
 }
 
@@ -3579,15 +3694,15 @@ a:hover {
   align-items: center;
   min-height: 32px;
   font-size: 0.82rem;
-  color: #355274;
+  color: var(--c-muted);
 }
 
 .cotacao-publica-table-input,
 .cotacao-publica-table-textarea {
   width: 100%;
-  border: 1px solid #b9cbe2 !important;
-  background: #f9fbff !important;
-  color: #102544 !important;
+  border: 1px solid var(--input-border) !important;
+  background: var(--input-bg) !important;
+  color: var(--input-text) !important;
 }
 
 .cotacao-publica-table-input {
@@ -3613,9 +3728,9 @@ a:hover {
   min-width: 108px;
   padding: 0.3rem 0.65rem;
   border-radius: 10px;
-  border: 1px solid #b9cde4;
-  background: #eef4fc;
-  color: #17375f;
+  border: 1px solid var(--ui-border-strong);
+  background: var(--ui-surface-soft);
+  color: var(--c-text);
   font-size: 0.78rem;
   font-weight: 600;
   white-space: nowrap;
@@ -3629,7 +3744,7 @@ a:hover {
 .cotacao-publica-table-empty {
   padding: 1.25rem !important;
   text-align: center;
-  color: #60799d !important;
+  color: var(--c-muted) !important;
   font-weight: 500;
 }
 
@@ -8058,4 +8173,490 @@ body {
   .dashboard-hero-card {
     padding: 1.2rem !important;
   }
+}
+
+/* ============================
+   ObraGestao — acento financeiro
+============================ */
+.obra-accent-blue { color: var(--accent-blue); }
+.obra-accent-green { color: var(--accent-green); }
+.obra-accent-amber { color: var(--accent-amber); }
+
+.obra-bar-track {
+  background: var(--accent-blue-bg);
+}
+
+.obra-bar-fill-soft {
+  background: color-mix(in srgb, var(--accent-blue) 22%, var(--ui-surface-soft));
+}
+
+.obra-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 40px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  padding: 0.375rem 0.875rem;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--c-muted);
+  background: transparent;
+  transition: border-color 0.18s ease, background 0.18s ease, color 0.18s ease;
+}
+
+.obra-tab-btn:hover {
+  border-color: var(--ui-border-strong);
+  color: var(--c-text);
+}
+
+.obra-tab-btn[data-active] {
+  border-color: var(--c-primary);
+  background: color-mix(in srgb, var(--c-primary) 10%, var(--ui-surface));
+  color: var(--c-primary);
+}
+
+/* ============================
+   Modal padronizado
+   Uso: <div class="modal-overlay"> <div class="modal-dialog"> ...
+============================ */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: var(--modal-overlay);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.modal-dialog {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  width: 100%;
+  max-width: var(--modal-max-w-md);
+  max-height: min(90vh, 860px);
+  background: var(--modal-bg);
+  border: 1px solid var(--modal-border);
+  border-radius: var(--modal-radius);
+  box-shadow: var(--modal-shadow);
+  overflow: hidden;
+}
+
+.modal-dialog--sm { max-width: var(--modal-max-w-sm); }
+.modal-dialog--md { max-width: var(--modal-max-w-md); }
+.modal-dialog--lg { max-width: var(--modal-max-w-lg); }
+.modal-dialog--xl { max-width: var(--modal-max-w-xl); }
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--modal-border);
+  background: color-mix(in srgb, var(--modal-bg) 94%, var(--c-bg));
+  flex-shrink: 0;
+}
+
+.modal-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--c-text);
+  line-height: 1.3;
+}
+
+.modal-subtitle {
+  margin: 0.15rem 0 0;
+  font-size: 0.8rem;
+  color: var(--c-muted);
+}
+
+.modal-close-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid var(--modal-border);
+  background: transparent;
+  color: var(--c-muted);
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.modal-close-btn:hover {
+  background: var(--ui-surface-soft);
+  color: var(--c-text);
+  border-color: var(--ui-border-strong);
+}
+
+.modal-body {
+  overflow-y: auto;
+  padding: 1.25rem;
+  background: var(--modal-bg);
+  overscroll-behavior: contain;
+}
+
+.modal-body--compact {
+  padding: 1rem 1.25rem;
+}
+
+.modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.65rem;
+  padding: 0.9rem 1.25rem;
+  border-top: 1px solid var(--modal-border);
+  background: color-mix(in srgb, var(--modal-bg) 94%, var(--c-bg));
+  flex-shrink: 0;
+}
+
+.modal-footer--between {
+  justify-content: space-between;
+}
+
+/* Scrollbar discreta dentro do modal */
+.modal-body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.modal-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.modal-body::-webkit-scrollbar-thumb {
+  background: var(--ui-border-strong);
+  border-radius: 999px;
+}
+
+.modal-body::-webkit-scrollbar-thumb:hover {
+  background: var(--c-muted);
+}
+
+@media (max-width: 639px) {
+  .modal-overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .modal-dialog {
+    max-width: 100%;
+    max-height: 92vh;
+    border-radius: var(--modal-radius) var(--modal-radius) 0 0;
+  }
+}
+
+/* ============================
+   Sistema de status badges
+============================ */
+.badge-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  min-height: 22px;
+  padding: 0.18rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+.badge-status--pending {
+  background: var(--status-pending-bg);
+  color: var(--status-pending-text);
+  border-color: var(--status-pending-border);
+}
+
+.badge-status--approved {
+  background: var(--status-approved-bg);
+  color: var(--status-approved-text);
+  border-color: var(--status-approved-border);
+}
+
+.badge-status--rejected {
+  background: var(--status-rejected-bg);
+  color: var(--status-rejected-text);
+  border-color: var(--status-rejected-border);
+}
+
+.badge-status--paid {
+  background: var(--status-paid-bg);
+  color: var(--status-paid-text);
+  border-color: var(--status-paid-border);
+}
+
+.badge-status--overdue {
+  background: var(--status-overdue-bg);
+  color: var(--status-overdue-text);
+  border-color: var(--status-overdue-border);
+}
+
+.badge-status--analysis {
+  background: var(--status-analysis-bg);
+  color: var(--status-analysis-text);
+  border-color: var(--status-analysis-border);
+}
+
+.badge-status--archived {
+  background: var(--status-archived-bg);
+  color: var(--status-archived-text);
+  border-color: var(--status-archived-border);
+}
+
+.badge-status--intercompany {
+  background: var(--status-intercompany-bg);
+  color: var(--status-intercompany-text);
+  border-color: var(--status-intercompany-border);
+}
+
+.badge-status--dre-yes {
+  background: var(--status-dre-yes-bg);
+  color: var(--status-dre-yes-text);
+  border-color: var(--status-dre-yes-border);
+}
+
+.badge-status--dre-no {
+  background: var(--status-dre-no-bg);
+  color: var(--status-dre-no-text);
+  border-color: var(--status-dre-no-border);
+}
+
+/* Dot indicator para badges */
+.badge-status__dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: currentColor;
+  flex-shrink: 0;
+}
+
+/* Variante maior */
+.badge-status--md {
+  min-height: 26px;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.78rem;
+}
+
+/* ============================
+   Botão disabled global
+============================ */
+.btn:disabled,
+.btn[aria-disabled="true"] {
+  opacity: 0.52;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* Botão loading */
+.btn--loading {
+  pointer-events: none;
+  opacity: 0.8;
+}
+
+/* ============================
+   Inputs via token (escuro)
+============================ */
+.dark .input,
+.dark .form-control,
+.dark select,
+.dark textarea {
+  background: var(--input-bg);
+  border-color: var(--input-border);
+  color: var(--input-text);
+}
+
+.dark .input:disabled,
+.dark .form-control:disabled,
+.dark select:disabled,
+.dark textarea:disabled {
+  background: var(--input-bg-disabled);
+  color: var(--input-text-disabled);
+  -webkit-text-fill-color: var(--input-text-disabled);
+  opacity: 1;
+  cursor: not-allowed;
+}
+
+/* ============================
+   Scrollbar global discreta
+============================ */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--ui-border-strong);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--c-muted);
+  background-clip: content-box;
+}
+
+/* ============================
+   Empty state padronizado
+============================ */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+  padding: 2.5rem 1.5rem;
+  text-align: center;
+}
+
+.empty-state__icon {
+  color: var(--c-muted);
+  opacity: 0.6;
+}
+
+.empty-state__title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--c-text);
+}
+
+.empty-state__description {
+  margin: 0;
+  font-size: 0.84rem;
+  color: var(--c-muted);
+  max-width: 36ch;
+  line-height: 1.5;
+}
+
+/* ============================
+   Loading state padronizado
+============================ */
+.loading-spinner {
+  display: inline-block;
+  width: 1.25rem;
+  height: 1.25rem;
+  border: 2px solid var(--ui-border);
+  border-top-color: var(--c-primary);
+  border-radius: 999px;
+  animation: spin 0.65s linear infinite;
+}
+
+.loading-spinner--sm {
+  width: 1rem;
+  height: 1rem;
+}
+
+.loading-spinner--lg {
+  width: 1.75rem;
+  height: 1.75rem;
+  border-width: 3px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ============================
+   Formulários — layout padrão
+============================ */
+.form-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.form-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--c-text);
+  line-height: 1.3;
+}
+
+.form-label--required::after {
+  content: ' *';
+  color: var(--c-danger);
+  font-weight: 700;
+}
+
+.form-hint {
+  font-size: 0.75rem;
+  color: var(--c-muted);
+  line-height: 1.4;
+  margin-top: 0.2rem;
+}
+
+.form-error {
+  font-size: 0.75rem;
+  color: var(--c-danger);
+  font-weight: 600;
+  line-height: 1.3;
+  margin-top: 0.2rem;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.input--error,
+.form-control--error {
+  border-color: var(--c-danger) !important;
+  box-shadow: 0 0 0 3px rgba(224, 49, 49, 0.12);
+}
+
+/* ============================
+   Tooltip padronizado
+============================ */
+.tooltip-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.tooltip-content {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--z-dropdown);
+  white-space: nowrap;
+  max-width: 220px;
+  white-space: normal;
+  padding: 0.4rem 0.65rem;
+  border-radius: 8px;
+  background: var(--c-text);
+  color: var(--c-bg);
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.35;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  box-shadow: var(--ui-shadow-md);
+}
+
+.tooltip-wrap:hover .tooltip-content,
+.tooltip-wrap:focus-within .tooltip-content {
+  opacity: 1;
 }

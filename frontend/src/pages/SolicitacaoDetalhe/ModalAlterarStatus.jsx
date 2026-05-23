@@ -54,40 +54,51 @@ export default function ModalAlterarStatus({
   if (!aberto) return null;
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center z-50" style={{ background: 'rgba(0,0,0,0.4)' }}>
+    <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="modal-dialog modal-dialog--sm">
 
-      <div className="card w-full max-w-sm">
-
-        <h2 className="font-semibold mb-4" style={{ color: 'var(--c-text)' }}>
-          Alterar Status
-        </h2>
-
-        <div className="space-y-2">
-          {loading && (
-            <p className="text-sm" style={{ color: 'var(--c-muted)' }}>Carregando status...</p>
-          )}
-          {!loading && lista.map(s => (
-            <button
-              key={s}
-              onClick={() => onSalvar(s)}
-              className="w-full p-2 rounded border hover:opacity-80 transition-opacity text-left"
-              style={{ borderColor: 'var(--ui-border)', color: 'var(--c-text)', background: 'var(--ui-canvas)' }}
-            >
-              {s}
-            </button>
-          ))}
+        <div className="modal-header">
+          <h2 className="modal-title">Alterar Status</h2>
+          <button
+            onClick={onClose}
+            className="modal-close-btn"
+            aria-label="Fechar"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
+          </button>
         </div>
 
-        <button
-          onClick={onClose}
-          className="mt-4 text-sm"
-          style={{ color: 'var(--c-muted)' }}
-        >
-          Cancelar
-        </button>
+        <div className="modal-body">
+          {loading ? (
+            <div className="empty-state" style={{ padding: '1.5rem' }}>
+              <div className="loading-spinner" />
+              <p className="empty-state__description">Carregando status...</p>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+              {lista.map(s => (
+                <button
+                  key={s}
+                  onClick={() => onSalvar(s)}
+                  className="btn btn-secondary"
+                  style={{ justifyContent: 'flex-start', textAlign: 'left' }}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="modal-footer">
+          <button onClick={onClose} className="btn btn-ghost btn-sm">
+            Cancelar
+          </button>
+        </div>
 
       </div>
-
     </div>
   );
 }
