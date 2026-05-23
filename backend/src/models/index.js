@@ -164,6 +164,22 @@ db.FiscalDivergence = require('../modules/fiscal/models/FiscalDivergence')(seque
 db.FiscalAccountingBatch = require('../modules/fiscal/models/FiscalAccountingBatch')(sequelize, Sequelize);
 db.FiscalAccountingBatchItem = require('../modules/fiscal/models/FiscalAccountingBatchItem')(sequelize, Sequelize);
 
+/* =====================
+   SST
+===================== */
+db.SstRisco = require('../modules/sst/models/SstRisco')(sequelize, Sequelize);
+db.SstAgenteNocivo = require('../modules/sst/models/SstAgenteNocivo')(sequelize, Sequelize);
+db.SstPgr = require('../modules/sst/models/SstPgr')(sequelize, Sequelize);
+db.SstPcmso = require('../modules/sst/models/SstPcmso')(sequelize, Sequelize);
+db.SstAso = require('../modules/sst/models/SstAso')(sequelize, Sequelize);
+db.SstExame = require('../modules/sst/models/SstExame')(sequelize, Sequelize);
+db.SstEpiEntrega = require('../modules/sst/models/SstEpiEntrega')(sequelize, Sequelize);
+db.SstTreinamento = require('../modules/sst/models/SstTreinamento')(sequelize, Sequelize);
+db.SstAcidente = require('../modules/sst/models/SstAcidente')(sequelize, Sequelize);
+db.SstDocumento = require('../modules/sst/models/SstDocumento')(sequelize, Sequelize);
+db.SstEventoEsocial = require('../modules/sst/models/SstEventoEsocial')(sequelize, Sequelize);
+db.SstEventoOperacional = require('../modules/sst/models/SstEventoOperacional')(sequelize, Sequelize);
+
 const TITULO_FINANCEIRO_SEQUENCE_KEY = 'GLOBAL';
 
 function formatTituloFinanceiroCodigo(numero) {
@@ -3129,5 +3145,41 @@ db.FiscalAccountingBatch.hasMany(db.FiscalAccountingBatchItem, { foreignKey: 'ba
 db.FiscalAccountingBatchItem.belongsTo(db.FiscalAccountingBatch, { foreignKey: 'batch_id', as: 'batch' });
 db.FiscalDfeDocument.hasMany(db.FiscalAccountingBatchItem, { foreignKey: 'fiscal_dfe_document_id', as: 'accountingBatchItems' });
 db.FiscalAccountingBatchItem.belongsTo(db.FiscalDfeDocument, { foreignKey: 'fiscal_dfe_document_id', as: 'document' });
+
+/* ===== SST ===== */
+[
+  db.SstRisco,
+  db.SstAgenteNocivo,
+  db.SstPgr,
+  db.SstPcmso,
+  db.SstAso,
+  db.SstExame,
+  db.SstEpiEntrega,
+  db.SstTreinamento,
+  db.SstAcidente,
+  db.SstDocumento,
+  db.SstEventoEsocial,
+  db.SstEventoOperacional
+].forEach((model) => {
+  if (model?.rawAttributes?.empresa_id) {
+    db.EmpresaGrupo.hasMany(model, { foreignKey: 'empresa_id', as: `${model.name}Registros` });
+    model.belongsTo(db.EmpresaGrupo, { foreignKey: 'empresa_id', as: 'empresa' });
+  }
+  if (model?.rawAttributes?.obra_id) {
+    db.Obra.hasMany(model, { foreignKey: 'obra_id', as: `${model.name}Registros` });
+    model.belongsTo(db.Obra, { foreignKey: 'obra_id', as: 'obra' });
+  }
+  if (model?.rawAttributes?.colaborador_id) {
+    db.RhColaborador.hasMany(model, { foreignKey: 'colaborador_id', as: `${model.name}Registros` });
+    model.belongsTo(db.RhColaborador, { foreignKey: 'colaborador_id', as: 'colaborador' });
+  }
+  if (model?.rawAttributes?.criado_por) {
+    model.belongsTo(db.User, { foreignKey: 'criado_por', as: 'criadoPor' });
+    model.belongsTo(db.User, { foreignKey: 'atualizado_por', as: 'atualizadoPor' });
+  }
+});
+
+db.SstRisco.hasMany(db.SstAgenteNocivo, { foreignKey: 'risco_id', as: 'agentes' });
+db.SstAgenteNocivo.belongsTo(db.SstRisco, { foreignKey: 'risco_id', as: 'risco' });
 
 module.exports = db;

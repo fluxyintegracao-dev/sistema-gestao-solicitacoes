@@ -18,6 +18,7 @@ import {
   canViewRhDpObrigacoes,
   canViewSolicitacoesRelatorioOperacional,
   canViewSolicitacoesRelatorios,
+  canViewSstDashboard,
   hasPermissao,
   isBusinessAdmin
 } from '../utils/acessoProduto';
@@ -39,7 +40,8 @@ const PERMISSIONS = {
   rhDpImportacoes: canExecuteRhDpImportacoes,
   rhDpObrigacoes: canViewRhDpObrigacoes,
   solicitacoesRelatorioOperacional: canViewSolicitacoesRelatorioOperacional,
-  solicitacoesRelatorios: canViewSolicitacoesRelatorios
+  solicitacoesRelatorios: canViewSolicitacoesRelatorios,
+  sstDashboard: canViewSstDashboard
 };
 
 const HUBS = {
@@ -205,6 +207,31 @@ const HUBS = {
         itens: [
           { titulo: 'Obrigacoes por vencimento', descricao: 'Agenda gerencial de pagamentos e obrigacoes de DP.', status: 'Planejado' },
           { titulo: 'Custo de mao de obra', descricao: 'Custo por empresa, obra, centro de custo e tipo de vinculo.', status: 'Planejado' }
+        ]
+      }
+    ]
+  },
+  sst: {
+    modulo: 'SST',
+    titulo: 'Relatorios SST',
+    subtitulo: 'Conformidade, vencimentos, riscos, ASO, EPIs, treinamentos, acidentes e base futura para eSocial.',
+    secoes: [
+      {
+        titulo: 'Disponiveis',
+        itens: [
+          { titulo: 'Dashboard SST', descricao: 'Score de conformidade, riscos criticos, inaptos e vencimentos proximos.', to: '/sst', status: 'Disponivel', permissao: 'sstDashboard', permissaoKey: 'sst.dashboard.visualizar', componentKey: 'relatorios.sst.dashboard' },
+          { titulo: 'Riscos ocupacionais', descricao: 'Base operacional de riscos por empresa, obra, setor e funcao.', to: '/sst/riscos', status: 'Disponivel', permissaoKey: 'sst.riscos.visualizar', componentKey: 'relatorios.sst.riscos' },
+          { titulo: 'ASO e exames', descricao: 'Aptidao, exames vencidos/vencendo e restricoes por colaborador.', to: '/sst/aso', status: 'Disponivel', permissaoKey: 'sst.aso.visualizar', componentKey: 'relatorios.sst.aso' },
+          { titulo: 'EPI e treinamentos', descricao: 'Entregas, certificados, NRs e vencimentos criticos.', to: '/sst/epi', status: 'Disponivel', permissaoKey: 'sst.epi.visualizar', componentKey: 'relatorios.sst.epi' },
+          { titulo: 'Acidentes e incidentes', descricao: 'Ocorrencias, gravidade, CAT, afastamento e obra impactada.', to: '/sst/acidentes', status: 'Disponivel', permissaoKey: 'sst.acidentes.visualizar', componentKey: 'relatorios.sst.acidentes' },
+          { titulo: 'Eventos operacionais', descricao: 'Alertas gerados pelo backend para rastreabilidade, automacoes futuras e auditoria SST.', to: '/sst/eventos', status: 'Disponivel', permissaoKey: 'sst.analytics.visualizar', componentKey: 'relatorios.sst.eventos' }
+        ]
+      },
+      {
+        titulo: 'Proximas visoes',
+        itens: [
+          { titulo: 'Mapa de risco e heatmap', descricao: 'Mapa executivo por obra, severidade e probabilidade.', status: 'Planejado', componentKey: 'relatorios.sst.mapa_risco' },
+          { titulo: 'Prontidao eSocial SST', descricao: 'Pendencias para S-2210, S-2220 e S-2240 antes da transmissao oficial.', status: 'Planejado', componentKey: 'relatorios.sst.esocial_prontidao' }
         ]
       }
     ]

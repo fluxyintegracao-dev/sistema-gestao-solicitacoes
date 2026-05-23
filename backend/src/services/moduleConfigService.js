@@ -134,6 +134,16 @@ const MODULE_CATALOG = [
     locked: false
   },
   {
+    key: 'SST',
+    label: 'SST',
+    packageKey: 'SST',
+    packageLabel: 'Pacote SST',
+    description: 'Saude e seguranca do trabalho com riscos, ASO, exames, EPI, treinamentos, acidentes e base futura eSocial.',
+    enabled: false,
+    locked: false,
+    recommendedWith: ['RH_DP', 'OBRAS']
+  },
+  {
     key: 'INTEGRACAO_SIENGE',
     label: 'Integracao SIENGE',
     packageKey: 'INTEGRACOES',

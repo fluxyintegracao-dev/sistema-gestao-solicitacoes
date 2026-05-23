@@ -349,6 +349,39 @@ const FISCAL_LOGS_VIEW_KEYS = [
   'fiscal.logs.view'
 ];
 
+const SST_DASHBOARD_KEYS = [
+  'sst.dashboard.visualizar',
+  'sst.analytics.visualizar'
+];
+
+const SST_AREA_PERMISSION_KEYS = [
+  ...SST_DASHBOARD_KEYS,
+  'sst.analytics.gerenciar',
+  'sst.riscos.visualizar',
+  'sst.riscos.gerenciar',
+  'sst.agentes.visualizar',
+  'sst.agentes.gerenciar',
+  'sst.pgr.visualizar',
+  'sst.pgr.gerenciar',
+  'sst.pcmso.visualizar',
+  'sst.pcmso.gerenciar',
+  'sst.aso.visualizar',
+  'sst.aso.gerenciar',
+  'sst.exames.visualizar',
+  'sst.exames.gerenciar',
+  'sst.epi.visualizar',
+  'sst.epi.gerenciar',
+  'sst.treinamentos.visualizar',
+  'sst.treinamentos.gerenciar',
+  'sst.acidentes.visualizar',
+  'sst.acidentes.gerenciar',
+  'sst.documentos.visualizar',
+  'sst.documentos.gerenciar',
+  'sst.esocial.visualizar',
+  'sst.esocial.preparar',
+  'sst.configuracoes.gerenciar'
+];
+
 let setoresAcessoTodasObrasCache = {
   expiresAt: 0,
   setores: []
@@ -1515,6 +1548,67 @@ async function canViewFiscalLogs(user) {
   return false;
 }
 
+async function canAccessSst(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, SST_AREA_PERMISSION_KEYS);
+  }
+
+  return false;
+}
+
+async function canViewSstDashboard(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, SST_DASHBOARD_KEYS);
+  }
+
+  return false;
+}
+
+async function canViewSstArea(user, area) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  const normalizedArea = String(area || '').trim().toLowerCase();
+  const keys = [
+    `sst.${normalizedArea}.visualizar`,
+    `sst.${normalizedArea}.gerenciar`,
+    normalizedArea === 'esocial' ? 'sst.esocial.preparar' : null,
+    normalizedArea === 'analytics' ? 'sst.analytics.visualizar' : null
+  ].filter(Boolean);
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, keys);
+  }
+
+  return false;
+}
+
+async function canManageSstArea(user, area) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  const normalizedArea = String(area || '').trim().toLowerCase();
+  const manageKey = normalizedArea === 'esocial'
+    ? 'sst.esocial.preparar'
+    : `sst.${normalizedArea}.gerenciar`;
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, [manageKey]);
+  }
+
+  return false;
+}
+
 async function canViewRhDpDashboard(user) {
   return userHasAreaOrRhDpLegacyPermission(user, ['rh_dp.dashboard.visualizar', 'rh_dp.relatorios.visualizar'], ['rh_dp_dashboard_view']);
 }
@@ -1763,6 +1857,7 @@ module.exports = {
   canAccessProvisoes,
   canAccessFinanceiro,
   canAccessFiscal,
+  canAccessSst,
   canAccessIntegracaoSienge,
   canAccessRhDp,
   canAuditComprasPedidos,
@@ -1824,6 +1919,9 @@ module.exports = {
   canViewFiscalDocuments,
   canViewFiscalLogs,
   canViewFiscalSync,
+  canManageSstArea,
+  canViewSstArea,
+  canViewSstDashboard,
   canViewPaymentBeneficiaries,
   canViewPrioridadesDiretoria,
   canViewSolicitacoesRelatorioOperacional,

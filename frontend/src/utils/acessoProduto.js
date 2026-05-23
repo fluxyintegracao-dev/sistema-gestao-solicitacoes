@@ -732,6 +732,82 @@ export function canViewFiscalLogs(user) {
   return false;
 }
 
+const SST_PERMISSION_KEYS = [
+  'sst.dashboard.visualizar',
+  'sst.analytics.visualizar',
+  'sst.analytics.gerenciar',
+  'sst.riscos.visualizar',
+  'sst.riscos.gerenciar',
+  'sst.agentes.visualizar',
+  'sst.agentes.gerenciar',
+  'sst.pgr.visualizar',
+  'sst.pgr.gerenciar',
+  'sst.pcmso.visualizar',
+  'sst.pcmso.gerenciar',
+  'sst.aso.visualizar',
+  'sst.aso.gerenciar',
+  'sst.exames.visualizar',
+  'sst.exames.gerenciar',
+  'sst.epi.visualizar',
+  'sst.epi.gerenciar',
+  'sst.treinamentos.visualizar',
+  'sst.treinamentos.gerenciar',
+  'sst.acidentes.visualizar',
+  'sst.acidentes.gerenciar',
+  'sst.documentos.visualizar',
+  'sst.documentos.gerenciar',
+  'sst.esocial.visualizar',
+  'sst.esocial.preparar',
+  'sst.configuracoes.gerenciar'
+];
+
+export function canAccessSst(user) {
+  if (!hasEnabledModule(user, 'SST')) return false;
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasAnyPermissao(user, SST_PERMISSION_KEYS);
+  }
+  return false;
+}
+
+export function canViewSstDashboard(user) {
+  if (!hasEnabledModule(user, 'SST')) return false;
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasAnyPermissao(user, ['sst.dashboard.visualizar', 'sst.analytics.visualizar']);
+  }
+  return false;
+}
+
+export function canViewSstArea(user, area) {
+  if (!hasEnabledModule(user, 'SST')) return false;
+  if (isBusinessAdmin(user)) return true;
+  const normalizedArea = String(area || '').trim().toLowerCase();
+  const keys = [
+    `sst.${normalizedArea}.visualizar`,
+    `sst.${normalizedArea}.gerenciar`,
+    normalizedArea === 'esocial' ? 'sst.esocial.preparar' : null,
+    normalizedArea === 'analytics' ? 'sst.analytics.visualizar' : null
+  ].filter(Boolean);
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasAnyPermissao(user, keys);
+  }
+  return false;
+}
+
+export function canManageSstArea(user, area) {
+  if (!hasEnabledModule(user, 'SST')) return false;
+  if (isBusinessAdmin(user)) return true;
+  const normalizedArea = String(area || '').trim().toLowerCase();
+  const key = normalizedArea === 'esocial'
+    ? 'sst.esocial.preparar'
+    : `sst.${normalizedArea}.gerenciar`;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasPermissao(user, key);
+  }
+  return false;
+}
+
 const CRM_PERFIS = ['SUPERADMIN', 'ADMIN', 'ADMINISTRADOR', 'ADMIN_CRM', 'GESTOR_COMERCIAL', 'COORDENADOR_CRM', 'DIRETORIA'];
 const CRM_PERFIS_EXPORT = ['SUPERADMIN', 'ADMIN', 'ADMINISTRADOR', 'ADMIN_CRM', 'GESTOR_COMERCIAL', 'COORDENADOR_CRM'];
 const CRM_PERFIS_REDISTRIBUTE = ['SUPERADMIN', 'ADMIN', 'ADMINISTRADOR', 'ADMIN_CRM', 'GESTOR_COMERCIAL', 'COORDENADOR_CRM'];

@@ -37,6 +37,10 @@ import {
   canViewRhDpObrigacoes,
   canViewSolicitacoesRelatorioOperacional,
   canViewSolicitacoesRelatorios,
+  canAccessSst,
+  canManageSstArea,
+  canViewSstArea,
+  canViewSstDashboard,
   canCreateCrmLeads,
   canManageFiscalConfig,
   canManageUsers,
@@ -201,6 +205,9 @@ const FiscalDivergences = lazy(() => import('./modules/fiscal/pages/FiscalDiverg
 const FiscalAccountingBatches = lazy(() => import('./modules/fiscal/pages/FiscalAccountingBatches'));
 const FiscalLogs = lazy(() => import('./modules/fiscal/pages/FiscalLogs'));
 const FiscalOperationalReport = lazy(() => import('./modules/fiscal/pages/FiscalOperationalReport'));
+const SstDashboard = lazy(() => import('./modules/sst/pages/SstDashboard'));
+const SstCrudPage = lazy(() => import('./modules/sst/pages/SstCrudPage'));
+const SstConfiguracoes = lazy(() => import('./modules/sst/pages/SstConfiguracoes'));
 
 function PublicPage({ children }) {
   return (
@@ -423,6 +430,44 @@ function FiscalLogsRoute({ children }) {
   const { user } = useAuth();
   if (!canViewFiscalLogs(user)) {
     return <Navigate to="/fiscal" replace />;
+  }
+  return children;
+}
+
+function SstRoute({ children }) {
+  const { user } = useAuth();
+  if (!canAccessSst(user)) {
+    return <Navigate to="/" replace />;
+  }
+  return children;
+}
+
+function SstDashboardRoute({ children }) {
+  const { user } = useAuth();
+  if (!canViewSstDashboard(user)) {
+    return <Navigate to="/" replace />;
+  }
+  return children;
+}
+
+function SstAreaRoute({ area, children }) {
+  const { user } = useAuth();
+  if (!canAccessSst(user)) {
+    return <Navigate to="/" replace />;
+  }
+  if (!canViewSstArea(user, area)) {
+    return <Navigate to="/sst" replace />;
+  }
+  return children;
+}
+
+function SstConfigRoute({ children }) {
+  const { user } = useAuth();
+  if (!canAccessSst(user)) {
+    return <Navigate to="/" replace />;
+  }
+  if (!canManageSstArea(user, 'configuracoes')) {
+    return <Navigate to="/sst" replace />;
   }
   return children;
 }
@@ -715,6 +760,10 @@ export default function App() {
         <Route path="rh-dp/apuracao" element={<RhDpApuracaoRoute><RhDpApuracao /></RhDpApuracaoRoute>} />
         <Route path="rh-dp/fechamentos" element={<RhDpFinanceiroRoute><RhDpFechamentos /></RhDpFinanceiroRoute>} />
         <Route path="integracao-sienge" element={<IntegracaoSiengeRoute><IntegracaoSiengeInicio /></IntegracaoSiengeRoute>} />
+        <Route path="sst" element={<SstDashboardRoute><SstDashboard /></SstDashboardRoute>} />
+        <Route path="sst/relatorios" element={<SstDashboardRoute><ModuloRelatorios modulo="sst" /></SstDashboardRoute>} />
+        <Route path="sst/configuracoes" element={<SstConfigRoute><SstConfiguracoes /></SstConfigRoute>} />
+        <Route path="sst/:resource" element={<SstRoute><SstCrudPage /></SstRoute>} />
 
         <Route path="comprovantes/upload" element={<FinanceiroRoute><UploadComprovantes /></FinanceiroRoute>} />
         <Route path="comprovantes/pendentes" element={<FinanceiroRoute><ComprovantesPendentes /></FinanceiroRoute>} />

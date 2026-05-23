@@ -33,6 +33,8 @@ import {
   HiOutlineArchiveBox,
   HiOutlineDocumentText,
   HiOutlineExclamationTriangle,
+  HiOutlineShieldCheck,
+  HiOutlineClipboardDocumentCheck,
   HiOutlineInboxStack,
   HiOutlinePaperAirplane,
   HiOutlineSparkles,
@@ -56,9 +58,11 @@ import {
   canAccessRhDp,
   canAccessRhDpDashboard,
   canAccessRhDpEmpresas,
+  canAccessSst,
   canCreateProvisionamentos,
   canExecuteRhDpImportacoes,
   canManageProvisionamentoCategorias,
+  canManageSstArea,
   canViewIntegracaoSienge,
   canViewProvisionamentos,
   canViewProvisionamentosDashboard,
@@ -67,6 +71,8 @@ import {
   canViewRhDpDocumentos,
   canViewRhDpObrigacoes,
   canViewSolicitacoesRelatorios,
+  canViewSstArea,
+  canViewSstDashboard,
   canAccessCrm,
   canCreateCrmLeads,
   canManageFiscalConfig,
@@ -290,6 +296,8 @@ export default function Layout() {
   const rhDpImportacoesAccess = canExecuteRhDpImportacoes(user);
   const rhDpApuracaoAccess = canViewRhDpApuracao(user);
   const rhDpObrigacoesAccess = canViewRhDpObrigacoes(user) && financeiroModuleEnabled;
+  const sstAccess = canAccessSst(user);
+  const sstDashboardAccess = canViewSstDashboard(user);
   const integracaoSiengeAccess = canViewIntegracaoSienge(user);
   const obrasAccess = canAccessCadastroObras(user);
   const contratosAccess = canAccessContratos(user);
@@ -311,6 +319,7 @@ export default function Layout() {
       Comercial: HiOutlineBuildingOffice2,
       Provisionamento: HiOutlineBanknotes,
       'RH/DP': HiOutlineUsers,
+      SST: HiOutlineShieldCheck,
       Integracoes: HiOutlineAdjustmentsHorizontal,
       Relatorios: HiOutlineDocumentText,
       Cadastros: HiOutlineRectangleGroup,
@@ -461,6 +470,23 @@ export default function Layout() {
       ]);
     }
 
+    if (sstAccess) {
+      addGroup('SST', [
+        sstDashboardAccess ? item('/sst', 'Dashboard SST', HiOutlineShieldCheck) : null,
+        sstDashboardAccess ? item('/sst/relatorios', 'Relatorios SST', HiOutlineDocumentText) : null,
+        canViewSstArea(user, 'riscos') ? item('/sst/riscos', 'Riscos', HiOutlineExclamationTriangle) : null,
+        canViewSstArea(user, 'aso') ? item('/sst/aso', 'ASO', HiOutlineClipboardDocumentCheck) : null,
+        canViewSstArea(user, 'exames') ? item('/sst/exames', 'Exames', HiOutlineDocumentText) : null,
+        canViewSstArea(user, 'epi') ? item('/sst/epi', 'EPI', HiOutlineShieldCheck) : null,
+        canViewSstArea(user, 'treinamentos') ? item('/sst/treinamentos', 'Treinamentos', HiOutlineUsers) : null,
+        canViewSstArea(user, 'acidentes') ? item('/sst/acidentes', 'Acidentes', HiOutlineExclamationTriangle) : null,
+        canViewSstArea(user, 'documentos') ? item('/sst/documentos', 'Documentos', HiOutlineFolderOpen) : null,
+        canViewSstArea(user, 'esocial') ? item('/sst/esocial', 'eSocial', HiOutlineAdjustmentsHorizontal) : null,
+        canViewSstArea(user, 'analytics') ? item('/sst/eventos', 'Eventos', HiOutlineClipboardDocumentList) : null,
+        canManageSstArea(user, 'configuracoes') ? item('/sst/configuracoes', 'Configuracoes', HiOutlineCog6Tooth) : null
+      ]);
+    }
+
     if (integracaoSiengeAccess) {
       addGroup('Integracoes', [
         item('/integracao-sienge', 'SIENGE', HiOutlineAdjustmentsHorizontal)
@@ -557,6 +583,8 @@ export default function Layout() {
     rhDpEmpresasAccess,
     rhDpImportacoesAccess,
     rhDpObrigacoesAccess,
+    sstAccess,
+    sstDashboardAccess,
     superadmin
   ]);
 

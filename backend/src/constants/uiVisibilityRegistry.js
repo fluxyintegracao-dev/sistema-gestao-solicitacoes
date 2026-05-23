@@ -99,6 +99,21 @@ const UI_VISIBILITY_COMPONENTS = [
         ]
       },
       {
+        key: 'relatorios.hub.sst',
+        path: '/sst/relatorios',
+        label: 'Relatorios SST',
+        components: [
+          { key: 'relatorios.sst.dashboard', label: 'Dashboard SST', type: 'card' },
+          { key: 'relatorios.sst.riscos', label: 'Riscos ocupacionais', type: 'card' },
+          { key: 'relatorios.sst.aso', label: 'ASO e exames', type: 'card' },
+          { key: 'relatorios.sst.epi', label: 'EPI e treinamentos', type: 'card' },
+          { key: 'relatorios.sst.acidentes', label: 'Acidentes e incidentes', type: 'card' },
+          { key: 'relatorios.sst.eventos', label: 'Eventos operacionais', type: 'card' },
+          { key: 'relatorios.sst.mapa_risco', label: 'Mapa de risco e heatmap', type: 'card' },
+          { key: 'relatorios.sst.esocial_prontidao', label: 'Prontidao eSocial SST', type: 'card' }
+        ]
+      },
+      {
         key: 'relatorios.hub.contratos',
         path: '/contratos/relatorios',
         label: 'Relatorios de Contratos',
@@ -116,6 +131,91 @@ const UI_VISIBILITY_COMPONENTS = [
           { key: 'relatorios.fiscal.documentos', label: 'Documentos fiscais', type: 'card' },
           { key: 'relatorios.fiscal.divergencias', label: 'Divergencias fiscais', type: 'card' },
           { key: 'relatorios.fiscal.logs', label: 'Logs de sincronizacao', type: 'card' }
+        ]
+      }
+    ]
+  },
+  {
+    module: 'SST',
+    label: 'SST',
+    description: 'Dashboards e tabelas operacionais de Saude e Seguranca do Trabalho.',
+    pages: [
+      {
+        key: 'sst.dashboard',
+        path: '/sst',
+        label: 'Dashboard SST',
+        components: [
+          { key: 'sst.dashboard.metricas_principais', label: 'Cards principais', type: 'dashboard' },
+          { key: 'sst.dashboard.vencimentos', label: 'Cards de vencimentos', type: 'dashboard' },
+          { key: 'sst.dashboard.operacao', label: 'Atalhos operacionais', type: 'dashboard' }
+        ]
+      },
+      {
+        key: 'sst.riscos',
+        path: '/sst/riscos',
+        label: 'Riscos ocupacionais',
+        components: [
+          { key: 'sst.riscos.tabela', label: 'Tabela de riscos', type: 'table' }
+        ]
+      },
+      {
+        key: 'sst.agentes',
+        path: '/sst/agentes',
+        label: 'Agentes nocivos',
+        components: [
+          { key: 'sst.agentes.tabela', label: 'Tabela de agentes nocivos', type: 'table' }
+        ]
+      },
+      {
+        key: 'sst.programas',
+        path: '/sst/pgr e /sst/pcmso',
+        label: 'PGR e PCMSO',
+        components: [
+          { key: 'sst.pgr.tabela', label: 'Tabela de PGR', type: 'table' },
+          { key: 'sst.pcmso.tabela', label: 'Tabela de PCMSO', type: 'table' }
+        ]
+      },
+      {
+        key: 'sst.saude_ocupacional',
+        path: '/sst/aso e /sst/exames',
+        label: 'ASO e exames',
+        components: [
+          { key: 'sst.aso.tabela', label: 'Tabela de ASO', type: 'table' },
+          { key: 'sst.exames.tabela', label: 'Tabela de exames', type: 'table' }
+        ]
+      },
+      {
+        key: 'sst.operacao',
+        path: '/sst/epi, /sst/treinamentos e /sst/acidentes',
+        label: 'EPI, treinamentos e acidentes',
+        components: [
+          { key: 'sst.epi.tabela', label: 'Tabela de EPI', type: 'table' },
+          { key: 'sst.treinamentos.tabela', label: 'Tabela de treinamentos', type: 'table' },
+          { key: 'sst.acidentes.tabela', label: 'Tabela de acidentes', type: 'table' }
+        ]
+      },
+      {
+        key: 'sst.documentos',
+        path: '/sst/documentos',
+        label: 'Documentos SST',
+        components: [
+          { key: 'sst.documentos.tabela', label: 'Tabela de documentos', type: 'table' }
+        ]
+      },
+      {
+        key: 'sst.esocial',
+        path: '/sst/esocial',
+        label: 'eSocial SST',
+        components: [
+          { key: 'sst.esocial.tabela', label: 'Tabela de eventos eSocial', type: 'table' }
+        ]
+      },
+      {
+        key: 'sst.eventos',
+        path: '/sst/eventos',
+        label: 'Eventos operacionais SST',
+        components: [
+          { key: 'sst.eventos.tabela', label: 'Tabela de eventos operacionais', type: 'table' }
         ]
       }
     ]

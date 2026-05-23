@@ -501,6 +501,87 @@ const MODULO_PERMISSION_GROUPS = [
     ]
   },
   {
+    modulo: 'SST',
+    label: 'SST',
+    descricao: 'Saude e seguranca do trabalho, conformidade operacional, documentos e base futura eSocial.',
+    areas: [
+      {
+        key: 'sst.dashboard',
+        label: 'Dashboard SST',
+        permissoes: [
+          { key: 'sst.dashboard.visualizar', label: 'Visualizar dashboard', descricao: 'Acessar indicadores de conformidade, vencimentos, riscos e acidentes.' },
+          { key: 'sst.analytics.visualizar', label: 'Visualizar analytics', descricao: 'Acessar leituras analiticas, eventos operacionais e futuras visoes inteligentes do SST.' },
+          { key: 'sst.analytics.gerenciar', label: 'Gerenciar eventos analytics', descricao: 'Tratar eventos operacionais SST sem alterar a origem do fato registrado.' }
+        ]
+      },
+      {
+        key: 'sst.riscos',
+        label: 'Riscos e Agentes',
+        permissoes: [
+          { key: 'sst.riscos.visualizar', label: 'Visualizar riscos', descricao: 'Consultar riscos ocupacionais por empresa, obra, setor e funcao.' },
+          { key: 'sst.riscos.gerenciar', label: 'Gerenciar riscos', descricao: 'Criar e editar riscos ocupacionais.' },
+          { key: 'sst.agentes.visualizar', label: 'Visualizar agentes nocivos', descricao: 'Consultar agentes nocivos e limites de tolerancia.' },
+          { key: 'sst.agentes.gerenciar', label: 'Gerenciar agentes nocivos', descricao: 'Criar e editar agentes nocivos.' }
+        ]
+      },
+      {
+        key: 'sst.programas',
+        label: 'PGR e PCMSO',
+        permissoes: [
+          { key: 'sst.pgr.visualizar', label: 'Visualizar PGR', descricao: 'Consultar PGR por empresa e obra.' },
+          { key: 'sst.pgr.gerenciar', label: 'Gerenciar PGR', descricao: 'Criar e editar PGR.' },
+          { key: 'sst.pcmso.visualizar', label: 'Visualizar PCMSO', descricao: 'Consultar PCMSO por empresa e obra.' },
+          { key: 'sst.pcmso.gerenciar', label: 'Gerenciar PCMSO', descricao: 'Criar e editar PCMSO.' }
+        ]
+      },
+      {
+        key: 'sst.saude_ocupacional',
+        label: 'ASO e Exames',
+        permissoes: [
+          { key: 'sst.aso.visualizar', label: 'Visualizar ASO', descricao: 'Consultar ASOs de colaboradores.' },
+          { key: 'sst.aso.gerenciar', label: 'Gerenciar ASO', descricao: 'Criar e editar ASOs.' },
+          { key: 'sst.exames.visualizar', label: 'Visualizar exames', descricao: 'Consultar exames ocupacionais.' },
+          { key: 'sst.exames.gerenciar', label: 'Gerenciar exames', descricao: 'Criar e editar exames ocupacionais.' }
+        ]
+      },
+      {
+        key: 'sst.operacao',
+        label: 'EPI, Treinamentos e Acidentes',
+        permissoes: [
+          { key: 'sst.epi.visualizar', label: 'Visualizar EPI', descricao: 'Consultar entregas e vencimentos de EPI.' },
+          { key: 'sst.epi.gerenciar', label: 'Gerenciar EPI', descricao: 'Criar e editar entregas de EPI.' },
+          { key: 'sst.treinamentos.visualizar', label: 'Visualizar treinamentos', descricao: 'Consultar treinamentos e certificados.' },
+          { key: 'sst.treinamentos.gerenciar', label: 'Gerenciar treinamentos', descricao: 'Criar e editar treinamentos.' },
+          { key: 'sst.acidentes.visualizar', label: 'Visualizar acidentes', descricao: 'Consultar acidentes e incidentes.' },
+          { key: 'sst.acidentes.gerenciar', label: 'Gerenciar acidentes', descricao: 'Registrar e editar acidentes e incidentes.' }
+        ]
+      },
+      {
+        key: 'sst.documentos',
+        label: 'Documentos SST',
+        permissoes: [
+          { key: 'sst.documentos.visualizar', label: 'Visualizar documentos', descricao: 'Consultar documentos SST e URLs assinadas.' },
+          { key: 'sst.documentos.gerenciar', label: 'Gerenciar documentos', descricao: 'Enviar e editar documentos SST.' }
+        ]
+      },
+      {
+        key: 'sst.esocial',
+        label: 'eSocial SST',
+        permissoes: [
+          { key: 'sst.esocial.visualizar', label: 'Visualizar eventos eSocial', descricao: 'Consultar preparacao e retornos futuros dos eventos S-2210, S-2220 e S-2240.' },
+          { key: 'sst.esocial.preparar', label: 'Preparar eventos eSocial', descricao: 'Preparar registros para transmissao futura, sem envio ao governo nesta fase.' }
+        ]
+      },
+      {
+        key: 'sst.configuracoes',
+        label: 'Configuracoes SST',
+        permissoes: [
+          { key: 'sst.configuracoes.gerenciar', label: 'Gerenciar configuracoes SST', descricao: 'Configurar parametros, catalogos e regras futuras do modulo SST.' }
+        ]
+      }
+    ]
+  },
+  {
     modulo: 'BIBLIOTECA_MODELOS',
     label: 'Biblioteca de Modelos',
     descricao: 'Arquivos e documentos modelo compartilhados.',

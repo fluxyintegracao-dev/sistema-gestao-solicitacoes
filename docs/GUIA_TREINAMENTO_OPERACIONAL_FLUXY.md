@@ -2865,3 +2865,152 @@ Para o sistema entregar valor:
 - diretoria precisa usar os relatorios e cobrar correcao de origem.
 
 Quando a operacao e consistente, os relatorios deixam de ser apenas telas e passam a ser instrumentos reais de gestao.
+
+---
+
+## 29. Modulo SST - Saude e Seguranca do Trabalho
+
+### 29.1 Objetivo operacional
+
+O modulo SST centraliza informacoes de Saude e Seguranca do Trabalho para apoiar conformidade, prevencao, rastreabilidade e tomada de decisao.
+
+Ele deve ser usado para controlar:
+
+- riscos ocupacionais;
+- agentes nocivos;
+- PGR;
+- PCMSO;
+- ASO;
+- exames ocupacionais;
+- entregas de EPI;
+- treinamentos obrigatorios;
+- acidentes e incidentes;
+- documentos SST;
+- preparacao futura para eSocial.
+
+### 29.2 Regra de governanca
+
+SST envolve dados trabalhistas, operacionais e, em alguns casos, informacoes sensiveis de saude ocupacional.
+
+Por isso:
+
+- o modulo deve ser habilitado pelo superadmin;
+- cada usuario precisa ter permissao explicita para visualizar ou gerenciar areas SST;
+- a visibilidade de dashboards e tabelas controla apenas o que aparece na tela;
+- permissao de area controla acesso real aos dados;
+- dados de ASO, exames, restricoes, acidentes e documentos devem ser acessados somente por usuarios autorizados.
+
+### 29.3 Caminhos iniciais
+
+Caminhos previstos:
+
+- `SST > Dashboard SST`;
+- `SST > Relatorios SST`;
+- `SST > Riscos`;
+- `SST > Agentes nocivos`;
+- `SST > PGR`;
+- `SST > PCMSO`;
+- `SST > ASO`;
+- `SST > Exames`;
+- `SST > EPI`;
+- `SST > Treinamentos`;
+- `SST > Acidentes`;
+- `SST > Documentos`;
+- `SST > eSocial`;
+- `SST > Eventos`;
+- `SST > Configuracoes`.
+
+### 29.4 Como cadastrar registros SST
+
+Passo a passo geral:
+
+1. Abrir a area SST desejada.
+2. Conferir se a empresa do grupo foi informada quando aplicavel.
+3. Conferir se a obra foi informada quando o fato estiver ligado a uma obra.
+4. Informar colaborador quando o registro estiver ligado a uma pessoa.
+5. Preencher datas, validade e status com base em documento real.
+6. Anexar comprovante quando houver.
+7. Salvar o registro.
+8. Conferir se o registro apareceu na tabela.
+9. Conferir o dashboard para verificar se algum vencimento ou risco foi atualizado.
+
+Nas tabelas SST, use os filtros de empresa, obra/centro, colaborador, status e busca textual antes de tomar decisoes. O filtro nao cria dado, apenas reduz a visualizacao aos registros reais cadastrados.
+
+### 29.5 Informacoes que nao devem ser inferidas
+
+Para manter seguranca juridica e qualidade dos relatorios:
+
+- nao deduzir empresa se ela nao estiver informada;
+- nao deduzir obra se o documento nao disser;
+- nao criar ASO sem data real de exame;
+- nao marcar colaborador como apto sem laudo;
+- nao criar acidente sem data, local e descricao;
+- nao cadastrar treinamento sem certificado ou evidencia;
+- nao classificar risco critico sem criterio definido pelo responsavel SST.
+
+### 29.6 Dashboard SST
+
+O dashboard SST deve apoiar leitura rapida de:
+
+- score de conformidade;
+- riscos criticos;
+- colaboradores inaptos;
+- exames vencidos;
+- exames vencendo;
+- EPI vencendo;
+- treinamentos vencendo;
+- documentos vencendo.
+
+Esses numeros so serao confiaveis se os cadastros tiverem empresa, obra, colaborador, data e validade preenchidos corretamente.
+
+### 29.7 Eventos operacionais SST
+
+A area `SST > Eventos` mostra ocorrencias geradas pelo backend a partir de fatos reais cadastrados.
+
+Exemplos iniciais:
+
+- risco critico identificado;
+- colaborador marcado como inapto;
+- acidente ou incidente registrado.
+
+Uso correto:
+
+1. Abrir `SST > Eventos`.
+2. Filtrar por empresa, obra, colaborador ou status.
+3. Conferir a mensagem e a origem operacional.
+4. Tratar o evento quando houver permissao de analytics.
+
+Usuarios com permissao de gerenciamento de analytics podem usar `Atualizar vencimentos` para gerar alertas de ASO, exames, EPI, treinamentos e documentos com base no prazo configurado em `SST > Configuracoes`. O sistema nao deve duplicar evento aberto para a mesma origem.
+
+Eventos nao substituem o registro original. Eles servem para alerta, auditoria, dashboard, automacoes futuras e base de IA.
+
+### 29.8 Preparacao futura para eSocial
+
+O FLUXY esta sendo preparado para futuramente apoiar eventos SST do eSocial:
+
+- `S-2210` - Comunicacao de Acidente de Trabalho;
+- `S-2220` - Monitoramento da Saude do Trabalhador;
+- `S-2240` - Condicoes Ambientais do Trabalho.
+
+Importante:
+
+- a transmissao oficial ainda depende dos leiautes, XSDs e manuais vigentes do eSocial;
+- tambem depende de certificado digital e ambiente correto;
+- nenhum evento deve ser transmitido sem validacao tecnica e autorizacao operacional;
+- todo envio futuro deve guardar protocolo, recibo, retorno e erro.
+
+### 29.9 Checklist para liberar SST
+
+Antes de liberar o modulo SST para usuarios:
+
+- modulo `SST` habilitado;
+- permissoes de area configuradas;
+- visibilidade de dashboards/tabelas revisada;
+- configuracoes SST revisadas pelo responsavel;
+- empresas do grupo cadastradas;
+- obras cadastradas;
+- colaboradores cadastrados no RH/DP;
+- responsavel SST definido;
+- politica de anexos e documentos definida;
+- rotina de conferencia de vencimentos definida;
+- orientacao sobre dados sensiveis realizada.
