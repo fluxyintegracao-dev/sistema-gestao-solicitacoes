@@ -14,6 +14,7 @@ Ja entregue:
 - tabela `provisao_financeira_historico`
 - tabela `provisao_financeira_anexos`
 - tabela `provisao_financeira_sequencias`
+- tabela `solicitacao_provisao` para integracao futura com solicitacoes
 - listagem de provisionamentos com filtros, ordenacao e colunas configuraveis
 - tela `Nova Provisao`
 - tela de detalhe da provisao com edicao, comentarios, anexos e historico
@@ -23,6 +24,7 @@ Ja entregue:
 - anexos permitidos ja na tela `Nova Provisao`
 - escopo de acesso por obra baseado nas obras liberadas ao usuario
 - permissao granular por area dentro de `Configuracoes -> Permissoes de Areas por Usuario`
+- configuracao SUPERADMIN `Fluxo do Provisionamento`, com modo informativo por padrao
 
 ## Objetivo
 
@@ -63,6 +65,14 @@ Quando habilitado na instalacao, o modulo deve cobrir:
 
 ## Matriz granular atual
 
+## Integracao futura com solicitacoes
+
+- a integracao com solicitacoes nasce desligada e so deve ser ativada pelo SUPERADMIN;
+- enquanto o modo estiver como `INFORMATIVO`, o provisionamento serve para registro e leitura gerencial;
+- quando a integracao for ativada, o usuario deve escolher explicitamente a provisao correta;
+- o vinculo real fica registrado em `solicitacao_provisao`;
+- o sistema nao deve deduzir sozinho qual provisao pertence a uma solicitacao.
+
 Permissoes registradas no sistema:
 
 - `provisoes.lista.visualizar`
@@ -82,7 +92,9 @@ Regras vigentes:
 ## Estrutura tecnica principal
 
 - migration base: [202604120002_provisionamento_financeiro_base.js](C:/Projetos/sistema_gestao_solicitacoes/backend/migrations/202604120002_provisionamento_financeiro_base.js)
+- migration de integracao futura: [202605230001_solicitacao_provisao_config.js](C:/Projetos/sistema_gestao_solicitacoes/backend/migrations/202605230001_solicitacao_provisao_config.js)
 - service principal: [provisaoFinanceiraService.js](C:/Projetos/sistema_gestao_solicitacoes/backend/src/services/provisaoFinanceiraService.js)
+- service de configuracao: [provisionamentoFluxoConfigService.js](C:/Projetos/sistema_gestao_solicitacoes/backend/src/services/provisionamentoFluxoConfigService.js)
 - rotas: [routes.js](C:/Projetos/sistema_gestao_solicitacoes/backend/src/routes.js)
 - servico frontend: [provisoesFinanceiras.js](C:/Projetos/sistema_gestao_solicitacoes/frontend/src/services/provisoesFinanceiras.js)
 
@@ -91,5 +103,6 @@ Regras vigentes:
 Se o produto evoluir essa frente, o caminho coerente e:
 
 1. integrar provisoes ao financeiro central quando houver regra de materializacao
-2. ampliar dashboards por periodo, obra e categoria
-3. consolidar indicadores comparando previsto x realizado
+2. habilitar, quando aprovado pela diretoria, a exigencia de provisao por tipo de solicitacao
+3. ampliar dashboards por periodo, obra e categoria
+4. consolidar indicadores comparando previsto x realizado

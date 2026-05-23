@@ -6,6 +6,7 @@ const {
 
 const STATUS_PROVISAO = ['PREVISTO', 'EM_ANALISE', 'APROVADO', 'CANCELADO', 'REALIZADO'];
 const PRIORIDADES_PROVISAO = ['BAIXA', 'MEDIA', 'ALTA', 'CRITICA'];
+const MODOS_PROVISIONAMENTO = ['INFORMATIVO', 'CONTROLADO', 'INTEGRADO'];
 
 function isBlank(value) {
   return value == null || String(value).trim() === '';
@@ -113,8 +114,17 @@ function parseBoolean(value, fieldName) {
 
   const normalized = String(value).trim().toLowerCase();
   if (['true', '1', 'sim', 'yes'].includes(normalized)) return true;
-  if (['false', '0', 'nao', 'não', 'no'].includes(normalized)) return false;
+  if (['false', '0', 'nao', 'no'].includes(normalized)) return false;
   throw new ValidationError(`${fieldName} invalido.`);
+}
+
+function parseIdArray(value, fieldName) {
+  if (value === undefined || value === null || value === '') return undefined;
+  if (!Array.isArray(value)) {
+    throw new ValidationError(`${fieldName} deve ser uma lista.`);
+  }
+
+  return [...new Set(value.map((item) => parseInteger(item, fieldName, { required: true })))];
 }
 
 function validateProvisaoCategoriaQuery(query = {}) {
@@ -320,7 +330,40 @@ function validateProvisaoAnexoLinkParams(params = {}) {
   };
 }
 
+function validateProvisionamentoFluxoConfigBody(body = {}) {
+  ensureAllowedKeys(
+    body,
+    [
+      'modo_operacional',
+      'aprovacao_ativa',
+      'controle_vencimento_ativo',
+      'integracao_solicitacoes_ativa',
+      'exigir_provisao_na_solicitacao',
+      'bloquear_solicitacao_sem_provisao',
+      'validar_saldo_provisao',
+      'somente_provisoes_aprovadas',
+      'permitir_multiplas_provisoes_por_solicitacao',
+      'tipos_solicitacao_exigem_provisao'
+    ],
+    'Configuracao do fluxo de provisionamento'
+  );
+
+  return {
+    modo_operacional: parseEnum(body.modo_operacional, 'Modo operacional', MODOS_PROVISIONAMENTO),
+    aprovacao_ativa: parseBoolean(body.aprovacao_ativa, 'Aprovacao ativa'),
+    controle_vencimento_ativo: parseBoolean(body.controle_vencimento_ativo, 'Controle de vencimento ativo'),
+    integracao_solicitacoes_ativa: parseBoolean(body.integracao_solicitacoes_ativa, 'Integracao com solicitacoes ativa'),
+    exigir_provisao_na_solicitacao: parseBoolean(body.exigir_provisao_na_solicitacao, 'Exigir provisao na solicitacao'),
+    bloquear_solicitacao_sem_provisao: parseBoolean(body.bloquear_solicitacao_sem_provisao, 'Bloquear solicitacao sem provisao'),
+    validar_saldo_provisao: parseBoolean(body.validar_saldo_provisao, 'Validar saldo da provisao'),
+    somente_provisoes_aprovadas: parseBoolean(body.somente_provisoes_aprovadas, 'Somente provisoes aprovadas'),
+    permitir_multiplas_provisoes_por_solicitacao: parseBoolean(body.permitir_multiplas_provisoes_por_solicitacao, 'Permitir multiplas provisoes por solicitacao'),
+    tipos_solicitacao_exigem_provisao: parseIdArray(body.tipos_solicitacao_exigem_provisao, 'Tipos de solicitacao')
+  };
+}
+
 module.exports = {
+  validateProvisionamentoFluxoConfigBody,
   validateProvisaoAnexoLinkParams,
   validateProvisaoCategoriaCreateBody,
   validateProvisaoCategoriaQuery,

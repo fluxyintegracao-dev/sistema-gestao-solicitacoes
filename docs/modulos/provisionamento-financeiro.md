@@ -110,6 +110,25 @@ Restricao por obra:
 - `provisao_financeira_permissoes`
 - `provisao_financeira_permissao_obras`
 - `provisao_financeira_sequencias`
+- `solicitacao_provisao`
+
+## Preparacao para integracao com solicitacoes
+
+O modulo passa a ter uma configuracao propria em `PROVISIONAMENTO_FLUXO_CONFIG`, administrada pelo SUPERADMIN em `Configuracoes > Provisionamento > Fluxo do Provisionamento`.
+
+Modos previstos:
+
+- `INFORMATIVO`: modo atual da empresa. Permite cadastrar e consultar provisoes, sem obrigar aprovacao, vencimento ou vinculo com solicitacao.
+- `CONTROLADO`: prepara aprovacao e controle de vencimento, sem exigir provisao na solicitacao.
+- `INTEGRADO`: permite exigir provisao em tipos de solicitacao definidos pelo SUPERADMIN.
+
+Regras importantes:
+
+- o modo padrao e `INFORMATIVO`;
+- a integracao com solicitacoes nasce desligada;
+- nenhuma solicitacao deve ser bloqueada enquanto `exigir_provisao_na_solicitacao` e `bloquear_solicitacao_sem_provisao` estiverem desligados;
+- o vinculo real entre solicitacao e provisao deve ser registrado em `solicitacao_provisao`;
+- o sistema pode ajudar a localizar provisoes compativeis, mas a escolha do vinculo precisa ser uma acao explicita do usuario.
 
 ## Ponto de entrada atual
 - backend:
@@ -130,10 +149,13 @@ Restricao por obra:
   - `GET /provisoes-financeiras/categorias`
   - `POST /provisoes-financeiras/categorias`
   - `PUT /provisoes-financeiras/categorias/:id`
+  - `GET /configuracoes/provisionamento-fluxo`
+  - `PATCH /configuracoes/provisionamento-fluxo`
   - `GET /configuracoes/provisoes-financeiras/permissoes`
   - `PATCH /configuracoes/provisoes-financeiras/permissoes`
 - frontend:
   - `Configuracoes -> Provisionamento Financeiro`
+  - `Configuracoes -> Fluxo do Provisionamento`
   - `Provisionamento -> Provisionamentos`
   - `Provisionamento -> Nova Provisao`
   - `Provisionamento -> Categorias Macro` para `SUPERADMIN`

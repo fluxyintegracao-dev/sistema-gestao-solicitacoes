@@ -132,6 +132,7 @@ const ArquivosModelosConfig = lazy(() => import('./pages/ArquivosModelosConfig')
 const ConfiguracoesCotacao = lazy(() => import('./pages/ConfiguracoesCotacao'));
 const ConfiguracoesStatusPedidoCompra = lazy(() => import('./pages/ConfiguracoesStatusPedidoCompra'));
 const ConfiguracoesComercialCategorias = lazy(() => import('./pages/ConfiguracoesComercialCategorias'));
+const ConfiguracoesProvisionamentoFluxo = lazy(() => import('./pages/ConfiguracoesProvisionamentoFluxo'));
 const ConfiguracoesModulos = lazy(() => import('./pages/ConfiguracoesModulos'));
 const Parceiros = lazy(() => import('./pages/Parceiros'));
 const ParceiroCategorias = lazy(() => import('./pages/ParceiroCategorias'));
@@ -635,6 +636,7 @@ export default function App() {
         <Route path="configuracoes-cotacao" element={<EnabledModuleRoute moduleKey="COMPRAS"><EnabledModuleRoute moduleKey="COTACOES"><BusinessAdminRoute><ConfiguracoesCotacao /></BusinessAdminRoute></EnabledModuleRoute></EnabledModuleRoute>} />
         <Route path="configuracoes-status-pedidos-compra" element={<EnabledModuleRoute moduleKey="COMPRAS"><BusinessAdminRoute><ConfiguracoesStatusPedidoCompra /></BusinessAdminRoute></EnabledModuleRoute>} />
         <Route path="configuracoes-comercial-categorias" element={<EnabledModuleRoute moduleKey="COMERCIAL"><SuperadminRoute><ConfiguracoesComercialCategorias /></SuperadminRoute></EnabledModuleRoute>} />
+        <Route path="configuracoes-provisionamento-fluxo" element={<EnabledModuleRoute moduleKey="PROVISOES"><SuperadminRoute><ConfiguracoesProvisionamentoFluxo /></SuperadminRoute></EnabledModuleRoute>} />
         <Route path="configuracoes-modulos" element={<SuperadminRoute><ConfiguracoesModulos /></SuperadminRoute>} />
         <Route path="parceiros" element={<BusinessAdminRoute><Parceiros /></BusinessAdminRoute>} />
         <Route path="parceiros-categorias" element={<BusinessAdminRoute><ParceiroCategorias /></BusinessAdminRoute>} />

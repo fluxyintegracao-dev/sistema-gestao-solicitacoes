@@ -112,6 +112,18 @@ const SECOES_CONFIG = [
     ]
   },
   {
+    title: 'Provisionamento',
+    requireSuperadmin: true,
+    itens: [
+      {
+        title: 'Fluxo do Provisionamento',
+        description: 'Configure o modo informativo, controlado ou integrado com solicitacoes.',
+        to: '/configuracoes-provisionamento-fluxo',
+        requireModule: 'PROVISOES'
+      }
+    ]
+  },
+  {
     title: 'Status e Vinculos',
     itens: [
       {

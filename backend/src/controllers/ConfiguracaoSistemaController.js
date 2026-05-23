@@ -51,6 +51,10 @@ const {
   obterSlaSolicitacoesPorSetor,
   salvarSlaSolicitacoesPorSetor
 } = require('../services/solicitacaoSlaConfig');
+const {
+  obterProvisionamentoFluxoConfig,
+  salvarProvisionamentoFluxoConfig
+} = require('../services/provisionamentoFluxoConfigService');
 
 const CHAVE_TEMA = 'TEMA_SISTEMA';
 const CHAVE_AREAS_OBRA = 'AREAS_OBRA_VISIVEIS';
@@ -1476,6 +1480,26 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return res.status(500).json({ error: 'Erro ao salvar categorias comerciais do contrato' });
+    }
+  },
+
+  async getProvisionamentoFluxo(req, res) {
+    try {
+      const config = await obterProvisionamentoFluxoConfig();
+      return res.json(config);
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao buscar configuracao do fluxo de provisionamento' });
+    }
+  },
+
+  async setProvisionamentoFluxo(req, res) {
+    try {
+      const config = await salvarProvisionamentoFluxoConfig(req.body || {});
+      return res.json(config);
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao salvar configuracao do fluxo de provisionamento' });
     }
   },
 

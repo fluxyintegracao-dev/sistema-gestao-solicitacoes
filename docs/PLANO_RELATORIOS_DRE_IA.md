@@ -91,6 +91,7 @@ Base multiempresa e DRE gerencial:
 - Solicitacoes ganhou configuracao explicita de SLA por setor e o Painel Operacional passou a exibir vencidos/no prazo somente quando houver regra real cadastrada para o setor.
 - Contratos > Relatorios ganhou Painel Operacional de Contratos, consolidando contratos ativos/inativos, valores, saldos, solicitacoes vinculadas, pendencias cadastrais, obras/centros, empresas do grupo e referencias com base nos campos estruturados existentes.
 - Provisionamento > Relatorios ganhou Painel Operacional de Provisionamento, reutilizando as regras reais do dashboard e da listagem para exibir pressao futura de caixa, vencidos nao tratados, proximos 7/30 dias, curva mensal, pipeline por status, obra/centro, categoria macro, curva semanal e analitico do recorte.
+- Provisionamento ganhou preparacao estrutural para integracao futura com solicitacoes: tabela `solicitacao_provisao`, configuracao `PROVISIONAMENTO_FLUXO_CONFIG` e tela SUPERADMIN para alternar entre modo informativo, controlado e integrado sem ativar bloqueios por padrao.
 
 Documentacao operacional complementar:
 
@@ -373,6 +374,8 @@ Graficos:
 - Pressao de caixa futura. [Entregue nos cards de 7 e 30 dias]
 
 Observacao operacional: o relatorio de provisionamento usa os endpoints e escopos existentes do modulo. Ele nao cria relacao automatica entre provisao, titulo e baixa; a comparacao provisao x titulo financeiro gerado permanece planejada ate existir vinculo estruturado entre esses registros.
+
+Observacao de arquitetura: a integracao futura com solicitacoes deve usar `solicitacao_provisao`. O modo inicial do cliente permanece `INFORMATIVO`, sem obrigatoriedade de aprovacao, vencimento ou vinculo. A exigencia de provisao por tipo de solicitacao so deve ser ligada pelo SUPERADMIN depois de treinamento operacional e alinhamento com diretoria.
 
 ### RH/DP
 

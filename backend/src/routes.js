@@ -122,7 +122,8 @@ const {
   validateProvisaoFinanceiraCreateBody,
   validateProvisaoFinanceiraQuery,
   validateProvisaoFinanceiraUpdateBody,
-  validateProvisaoIdParams
+  validateProvisaoIdParams,
+  validateProvisionamentoFluxoConfigBody
 } = require('./validators/provisaoValidators');
 const {
   validateSiengeConfigBody,
@@ -1411,6 +1412,8 @@ router.get('/configuracoes/status-pedidos-compra', ConfiguracaoSistemaController
 router.patch('/configuracoes/status-pedidos-compra', allowBusinessAdmin, ConfiguracaoSistemaController.setStatusPedidosCompra);
 router.get('/configuracoes/comercial-categorias-contrato', allowBusinessAdmin, ConfiguracaoSistemaController.getComercialCategoriasContrato);
 router.patch('/configuracoes/comercial-categorias-contrato', permit(['SUPERADMIN']), ConfiguracaoSistemaController.setComercialCategoriasContrato);
+router.get('/configuracoes/provisionamento-fluxo', requireEnabledModule('PROVISOES'), permit(['SUPERADMIN']), ConfiguracaoSistemaController.getProvisionamentoFluxo);
+router.patch('/configuracoes/provisionamento-fluxo', requireEnabledModule('PROVISOES'), permit(['SUPERADMIN']), validateRequest({ body: validateProvisionamentoFluxoConfigBody }), ConfiguracaoSistemaController.setProvisionamentoFluxo);
 router.get('/configuracoes/modulos', ConfiguracaoSistemaController.getModulos);
 router.patch('/configuracoes/modulos', permit(['SUPERADMIN']), ConfiguracaoSistemaController.setModulos);
 

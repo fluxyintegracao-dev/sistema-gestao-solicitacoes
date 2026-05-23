@@ -1910,6 +1910,38 @@ Usar provisionamento para:
 - provisao nao substitui titulo financeiro;
 - provisao ajuda fluxo futuro, mas precisa ser revisada.
 
+### 16.4.1 Modos do Provisionamento
+
+Caminho: Configuracoes > Provisionamento > Fluxo do Provisionamento.
+
+O SUPERADMIN define como o modulo deve operar.
+
+Modos disponiveis:
+
+1. Informativo.
+   - E o modo atual recomendado para a operacao inicial.
+   - Permite criar provisoes e acompanhar o que foi solicitado.
+   - Nao exige aprovacao.
+   - Nao bloqueia solicitacao.
+   - Nao obriga vinculo com provisao.
+
+2. Controlado.
+   - Prepara aprovacao e controle de vencimento.
+   - Deve ser usado quando a diretoria decidir que provisoes precisam de etapa formal de analise.
+   - Ainda nao exige provisao na criacao de solicitacao.
+
+3. Integrado.
+   - Prepara o vinculo entre solicitacao e provisao.
+   - Permite marcar quais tipos de solicitacao exigem provisao.
+   - Deve ser ativado somente depois de treinamento operacional.
+
+Regra institucional:
+
+- enquanto o modo estiver como Informativo, a equipe deve criar provisoes para dar visibilidade futura de caixa;
+- o sistema nao deve deduzir sozinho qual provisao pertence a uma solicitacao;
+- quando a integracao for ativada, o usuario devera escolher explicitamente a provisao correta;
+- o registro tecnico desse vinculo fica na tabela `solicitacao_provisao`.
+
 ### 16.5 Relatorio Operacional de Provisionamento
 
 Caminho: Provisionamento > Relatorios > Painel operacional.

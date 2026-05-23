@@ -446,6 +446,30 @@ export async function salvarComercialCategoriasContrato(data) {
   return res.json();
 }
 
+export async function getProvisionamentoFluxoConfig() {
+  const res = await fetch(`${API_URL}/configuracoes/provisionamento-fluxo`, {
+    headers: authHeaders()
+  });
+  if (!res.ok) {
+    const txt = await res.text();
+    throw new Error(txt || 'Erro ao buscar configuracao do fluxo de provisionamento');
+  }
+  return res.json();
+}
+
+export async function salvarProvisionamentoFluxoConfig(data) {
+  const res = await fetch(`${API_URL}/configuracoes/provisionamento-fluxo`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+  if (!res.ok) {
+    const payload = await res.json().catch(() => null);
+    throw new Error(payload?.error || 'Erro ao salvar configuracao do fluxo de provisionamento');
+  }
+  return res.json();
+}
+
 export async function getModulosSistema() {
   const res = await fetch(`${API_URL}/configuracoes/modulos`, {
     headers: authHeaders()

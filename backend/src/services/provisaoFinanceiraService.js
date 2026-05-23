@@ -22,6 +22,7 @@ const {
 } = require('./authorizationService');
 const { gerarCodigoProvisionamentoFinanceiro } = require('./provisaoFinanceira/gerarCodigo');
 const { registrarHistoricoProvisionamento } = require('./provisaoFinanceira/historico');
+const { obterProvisionamentoFluxoConfig } = require('./provisionamentoFluxoConfigService');
 
 const STATUS_PROVISAO = ['previsto', 'em_analise', 'aprovado', 'cancelado', 'realizado'];
 const STATUS_ABERTOS = ['previsto', 'em_analise', 'aprovado'];
@@ -461,9 +462,10 @@ async function updateCategoriaProvisionamentoStatus(id, ativo) {
 }
 
 async function getProvisionamentoContext(user) {
-  const [obras, criadoresFiltro] = await Promise.all([
+  const [obras, criadoresFiltro, configuracaoFluxo] = await Promise.all([
     listScopedObras(user),
-    listCriadoresFiltro(user)
+    listCriadoresFiltro(user),
+    obterProvisionamentoFluxoConfig()
   ]);
 
   return {
@@ -480,7 +482,8 @@ async function getProvisionamentoContext(user) {
     obras_criacao: obras,
     criadores_filtro: criadoresFiltro,
     prioridades_disponiveis: PRIORIDADES,
-    status_disponiveis: STATUS_PROVISAO
+    status_disponiveis: STATUS_PROVISAO,
+    configuracao_fluxo: configuracaoFluxo
   };
 }
 

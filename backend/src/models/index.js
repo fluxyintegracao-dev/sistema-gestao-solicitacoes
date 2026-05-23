@@ -46,6 +46,7 @@ db.ProvisaoFinanceira = require('./ProvisaoFinanceira')(sequelize, Sequelize);
 db.ProvisaoFinanceiraHistorico = require('./ProvisaoFinanceiraHistorico')(sequelize, Sequelize);
 db.ProvisaoFinanceiraAnexo = require('./ProvisaoFinanceiraAnexo')(sequelize, Sequelize);
 db.ProvisaoFinanceiraSequencia = require('./ProvisaoFinanceiraSequencia')(sequelize, Sequelize);
+db.SolicitacaoProvisao = require('./SolicitacaoProvisao')(sequelize, Sequelize);
 db.EmpresaGrupo = require('./EmpresaGrupo')(sequelize, Sequelize);
 db.RhEmpresaGrupo = require('./RhEmpresaGrupo')(sequelize, Sequelize);
 db.RhColaborador = require('./RhColaborador')(sequelize, Sequelize);
@@ -1013,6 +1014,36 @@ db.Obra.hasOne(db.ProvisaoFinanceiraSequencia, {
 db.ProvisaoFinanceiraSequencia.belongsTo(db.Obra, {
   foreignKey: 'obra_id',
   as: 'obra'
+});
+
+db.Solicitacao.hasMany(db.SolicitacaoProvisao, {
+  foreignKey: 'solicitacao_id',
+  as: 'provisoesVinculadas'
+});
+
+db.SolicitacaoProvisao.belongsTo(db.Solicitacao, {
+  foreignKey: 'solicitacao_id',
+  as: 'solicitacao'
+});
+
+db.ProvisaoFinanceira.hasMany(db.SolicitacaoProvisao, {
+  foreignKey: 'provisao_financeira_id',
+  as: 'solicitacoesVinculadas'
+});
+
+db.SolicitacaoProvisao.belongsTo(db.ProvisaoFinanceira, {
+  foreignKey: 'provisao_financeira_id',
+  as: 'provisao'
+});
+
+db.User.hasMany(db.SolicitacaoProvisao, {
+  foreignKey: 'usuario_vinculo_id',
+  as: 'vinculosSolicitacaoProvisao'
+});
+
+db.SolicitacaoProvisao.belongsTo(db.User, {
+  foreignKey: 'usuario_vinculo_id',
+  as: 'usuarioVinculo'
 });
 
 db.TituloFinanceiro.hasMany(db.ContratoComercial, {
