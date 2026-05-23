@@ -220,6 +220,7 @@ const HUBS = {
         titulo: 'Disponiveis',
         itens: [
           { titulo: 'Dashboard SST', descricao: 'Score de conformidade, riscos criticos, inaptos e vencimentos proximos.', to: '/sst', status: 'Disponivel', permissao: 'sstDashboard', permissaoKey: 'sst.dashboard.visualizar', componentKey: 'relatorios.sst.dashboard' },
+          { titulo: 'Operacional SST', descricao: 'Conformidade, eventos abertos, auditoria, riscos criticos e prontidao tecnica eSocial.', to: '/sst/relatorios/operacional', status: 'Disponivel', permissao: 'sstDashboard', permissaoKey: 'sst.analytics.visualizar', componentKey: 'relatorios.sst.operacional' },
           { titulo: 'Riscos ocupacionais', descricao: 'Base operacional de riscos por empresa, obra, setor e funcao.', to: '/sst/riscos', status: 'Disponivel', permissaoKey: 'sst.riscos.visualizar', componentKey: 'relatorios.sst.riscos' },
           { titulo: 'ASO e exames', descricao: 'Aptidao, exames vencidos/vencendo e restricoes por colaborador.', to: '/sst/aso', status: 'Disponivel', permissaoKey: 'sst.aso.visualizar', componentKey: 'relatorios.sst.aso' },
           { titulo: 'EPI e treinamentos', descricao: 'Entregas, certificados, NRs e vencimentos criticos.', to: '/sst/epi', status: 'Disponivel', permissaoKey: 'sst.epi.visualizar', componentKey: 'relatorios.sst.epi' },

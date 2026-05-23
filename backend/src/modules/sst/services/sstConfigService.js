@@ -29,6 +29,28 @@ function normalizeConfig(input = {}) {
       config[key] = Number.isFinite(parsed) && parsed > 0 ? Math.round(parsed) : fallback;
       return;
     }
+    if (typeof fallback === 'boolean') {
+      if (typeof input[key] === 'boolean') {
+        config[key] = input[key];
+        return;
+      }
+      const normalized = String(input[key] ?? '').trim().toLowerCase();
+      if (['true', '1', 'sim', 's', 'yes'].includes(normalized)) {
+        config[key] = true;
+        return;
+      }
+      if (['false', '0', 'nao', 'n', 'no'].includes(normalized)) {
+        config[key] = false;
+        return;
+      }
+      config[key] = fallback;
+      return;
+    }
+    if (typeof fallback === 'string') {
+      const value = String(input[key] ?? fallback).trim();
+      config[key] = value || fallback;
+      return;
+    }
     config[key] = normalizeList(input[key], fallback);
   });
   return config;

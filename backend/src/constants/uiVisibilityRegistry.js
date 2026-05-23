@@ -104,6 +104,7 @@ const UI_VISIBILITY_COMPONENTS = [
         label: 'Relatorios SST',
         components: [
           { key: 'relatorios.sst.dashboard', label: 'Dashboard SST', type: 'card' },
+          { key: 'relatorios.sst.operacional', label: 'Relatorio operacional SST', type: 'card' },
           { key: 'relatorios.sst.riscos', label: 'Riscos ocupacionais', type: 'card' },
           { key: 'relatorios.sst.aso', label: 'ASO e exames', type: 'card' },
           { key: 'relatorios.sst.epi', label: 'EPI e treinamentos', type: 'card' },

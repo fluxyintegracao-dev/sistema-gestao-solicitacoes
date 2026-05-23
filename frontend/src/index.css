@@ -923,6 +923,102 @@ textarea {
   color: var(--shell-text) !important;
 }
 
+.dark .layout-shell .sst-page {
+  --sst-surface: color-mix(in srgb, var(--ui-surface) 91%, #0f766e 9%);
+  --sst-surface-muted: color-mix(in srgb, var(--ui-surface-soft) 86%, #0d9488 14%);
+  --sst-border: color-mix(in srgb, var(--ui-border) 78%, #5eead4 22%);
+}
+
+.dark .layout-shell .sst-page :is(
+  .bg-white,
+  .bg-slate-50,
+  .bg-slate-100,
+  .bg-gray-50,
+  .bg-gray-100,
+  [class*="bg-white/"],
+  [class*="bg-slate-50/"],
+  [class*="bg-slate-100/"]
+) {
+  background-color: var(--sst-surface) !important;
+  color: var(--shell-text) !important;
+}
+
+.dark .layout-shell .sst-page :is(
+  [class*="bg-sky-50"],
+  [class*="bg-blue-50"],
+  [class*="bg-indigo-50"],
+  [class*="bg-cyan-50"]
+) {
+  background: color-mix(in srgb, #0ea5e9 18%, var(--sst-surface)) !important;
+  color: #e0f2fe !important;
+}
+
+.dark .layout-shell .sst-page :is(
+  [class*="bg-emerald-50"],
+  [class*="bg-green-50"],
+  [class*="bg-teal-50"]
+) {
+  background: color-mix(in srgb, #10b981 18%, var(--sst-surface)) !important;
+  color: #d1fae5 !important;
+}
+
+.dark .layout-shell .sst-page :is(
+  [class*="bg-amber-50"],
+  [class*="bg-yellow-50"],
+  [class*="bg-orange-50"]
+) {
+  background: color-mix(in srgb, #f59e0b 18%, var(--sst-surface)) !important;
+  color: #fef3c7 !important;
+}
+
+.dark .layout-shell .sst-page :is(
+  [class*="bg-rose-50"],
+  [class*="bg-red-50"],
+  [class*="bg-pink-50"]
+) {
+  background: color-mix(in srgb, #ef4444 18%, var(--sst-surface)) !important;
+  color: #fee2e2 !important;
+}
+
+.dark .layout-shell .sst-page :is(
+  .border-slate-100,
+  .border-slate-200,
+  .border-slate-300,
+  .border-sky-100,
+  .border-sky-200,
+  .border-emerald-100,
+  .border-emerald-200,
+  .border-amber-100,
+  .border-amber-200,
+  .border-rose-100,
+  .border-rose-200
+) {
+  border-color: var(--sst-border) !important;
+}
+
+.dark .layout-shell .sst-page :is(
+  .text-slate-950,
+  .text-slate-900,
+  .text-slate-800,
+  .text-slate-700
+) {
+  color: var(--shell-text) !important;
+}
+
+.dark .layout-shell .sst-page :is(
+  .text-slate-600,
+  .text-slate-500,
+  .text-slate-400
+) {
+  color: var(--shell-muted) !important;
+}
+
+.dark .layout-shell .sst-page :is(input, select, textarea) {
+  background-color: var(--ui-surface-soft) !important;
+  border-color: var(--sst-border) !important;
+  color: var(--shell-text) !important;
+}
+
 .table {
   width: 100%;
   border-collapse: collapse;

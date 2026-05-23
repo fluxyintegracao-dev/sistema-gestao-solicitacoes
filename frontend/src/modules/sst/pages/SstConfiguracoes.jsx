@@ -17,6 +17,8 @@ const LIST_FIELDS = [
   ['status_esocial', 'Status eSocial']
 ];
 
+const ESOCIAL_AMBIENTES = ['NAO_CONFIGURADO', 'PRODUCAO_RESTRITA', 'PRODUCAO'];
+
 function listToText(value) {
   return Array.isArray(value) ? value.join('\n') : '';
 }
@@ -75,7 +77,7 @@ export default function SstConfiguracoes() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="sst-page space-y-5">
       <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
         <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">SST</p>
         <h1 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">Configuracoes SST</h1>
@@ -107,14 +109,55 @@ export default function SstConfiguracoes() {
       </section>
 
       <form onSubmit={submit} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-        <label className="block max-w-xs">
-          <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Dias de alerta de validade</span>
-          <input
-            type="number"
-            min="1"
-            value={form.dias_alerta_validade || 30}
-            onChange={(event) => setForm((current) => ({ ...current, dias_alerta_validade: event.target.value }))}
-            className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100"
+        <div className="grid gap-4 md:grid-cols-3">
+          <label className="block">
+            <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Dias de alerta de validade</span>
+            <input
+              type="number"
+              min="1"
+              value={form.dias_alerta_validade || 30}
+              onChange={(event) => setForm((current) => ({ ...current, dias_alerta_validade: event.target.value }))}
+              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100"
+            />
+          </label>
+          <label className="block">
+            <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Ambiente eSocial</span>
+            <select
+              value={form.esocial_ambiente || 'NAO_CONFIGURADO'}
+              onChange={(event) => setForm((current) => ({ ...current, esocial_ambiente: event.target.value }))}
+              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100"
+            >
+              {ESOCIAL_AMBIENTES.map((ambiente) => <option key={ambiente} value={ambiente}>{ambiente}</option>)}
+            </select>
+          </label>
+          <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <label className="flex items-start gap-2 text-sm font-semibold text-slate-700">
+              <input
+                type="checkbox"
+                checked={Boolean(form.esocial_documentacao_oficial_validada)}
+                onChange={(event) => setForm((current) => ({ ...current, esocial_documentacao_oficial_validada: event.target.checked }))}
+                className="mt-1 h-4 w-4 rounded border-slate-300 text-sky-600"
+              />
+              Documentacao oficial validada
+            </label>
+            <label className="flex items-start gap-2 text-sm font-semibold text-slate-700">
+              <input
+                type="checkbox"
+                checked={Boolean(form.esocial_transmissao_habilitada)}
+                onChange={(event) => setForm((current) => ({ ...current, esocial_transmissao_habilitada: event.target.checked }))}
+                className="mt-1 h-4 w-4 rounded border-slate-300 text-sky-600"
+              />
+              Habilitar transmissao futura
+            </label>
+          </div>
+        </div>
+
+        <label className="mt-4 block">
+          <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Observacoes tecnicas eSocial</span>
+          <textarea
+            value={form.esocial_observacoes_tecnicas || ''}
+            onChange={(event) => setForm((current) => ({ ...current, esocial_observacoes_tecnicas: event.target.value }))}
+            className="mt-1 min-h-20 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100"
           />
         </label>
 

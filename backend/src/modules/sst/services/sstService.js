@@ -10,7 +10,11 @@ const {
   SstAso,
   SstDocumento,
   SstEpiEntrega,
+  SstAcidente,
+  SstEventoEsocial,
+  SstEventoOperacional,
   SstExame,
+  SstHistorico,
   SstRisco,
   SstTreinamento
 } = require('../../../models');
@@ -106,6 +110,9 @@ async function getResource(resource, id) {
 async function createResource(resource, payload, user) {
   const config = getConfig(resource);
   const model = getModel(resource);
+  if (!config.createFields?.length) {
+    throw new ValidationError('Este recurso SST nao permite criacao direta.', 400);
+  }
   const item = await sequelize.transaction(async (transaction) => {
     const created = await model.create({
       ...payload,
@@ -114,6 +121,14 @@ async function createResource(resource, payload, user) {
     }, { transaction });
 
     await emitEventForResource(resource, created, user, transaction);
+    await registrarHistoricoSst({
+      resource,
+      item: created,
+      acao: 'CRIADO',
+      depois: created.toJSON(),
+      user,
+      transaction
+    });
     return created;
   });
 
@@ -121,13 +136,27 @@ async function createResource(resource, payload, user) {
 }
 
 async function updateResource(resource, id, payload, user) {
+  const config = getConfig(resource);
+  if (!config.updateFields?.length) {
+    throw new ValidationError('Este recurso SST nao permite edicao direta.', 400);
+  }
   const item = await getResource(resource, id);
+  const antes = item.toJSON();
   await sequelize.transaction(async (transaction) => {
     await item.update({
       ...payload,
       atualizado_por: user?.id || null
     }, { transaction });
     await emitEventForResource(resource, item, user, transaction);
+    await registrarHistoricoSst({
+      resource,
+      item,
+      acao: 'ATUALIZADO',
+      antes,
+      depois: item.toJSON(),
+      user,
+      transaction
+    });
   });
   return getResource(resource, id);
 }
@@ -225,6 +254,115 @@ async function dashboard(query = {}) {
   };
 }
 
+async function relatorioOperacional(query = {}) {
+  const sstConfig = await getSstConfig();
+  const baseQuery = { ...query, search: null };
+  const filtros = {
+    empresa_id: baseQuery.empresa_id || null,
+    obra_id: baseQuery.obra_id || null,
+    colaborador_id: baseQuery.colaborador_id || null
+  };
+
+  const dashboardData = await dashboard(baseQuery);
+  const [
+    riscosCriticos,
+    acidentesRecentes,
+    eventosAbertos,
+    documentosPendentes,
+    esocialEventos,
+    historicosRecentes
+  ] = await Promise.all([
+    SstRisco.findAll({
+      where: { ...buildWhere(baseQuery, SstRisco), severidade: { [Op.in]: ['ALTA', 'CRITICA'] }, ativo: true },
+      include: buildInclude(SstRisco),
+      order: [['severidade', 'DESC'], ['updatedAt', 'DESC']],
+      limit: 50
+    }),
+    SstAcidente.findAll({
+      where: buildWhere(baseQuery, SstAcidente),
+      include: buildInclude(SstAcidente),
+      order: [['data_ocorrencia', 'DESC'], ['id', 'DESC']],
+      limit: 50
+    }),
+    SstEventoOperacional.findAll({
+      where: { ...buildWhere(baseQuery, SstEventoOperacional), status: 'ABERTO' },
+      include: buildInclude(SstEventoOperacional),
+      order: [['createdAt', 'DESC']],
+      limit: 80
+    }),
+    SstDocumento.findAll({
+      where: { ...buildWhere(baseQuery, SstDocumento), status: { [Op.in]: ['ENVIADO', 'REJEITADO', 'VENCIDO'] } },
+      include: buildInclude(SstDocumento),
+      order: [['validade', 'ASC'], ['updatedAt', 'DESC']],
+      limit: 50
+    }),
+    SstEventoEsocial.findAll({
+      where: buildWhere(baseQuery, SstEventoEsocial),
+      include: buildInclude(SstEventoEsocial),
+      order: [['updatedAt', 'DESC']],
+      limit: 50
+    }),
+    SstHistorico.findAll({
+      where: buildWhere(baseQuery, SstHistorico),
+      include: buildInclude(SstHistorico),
+      order: [['createdAt', 'DESC']],
+      limit: 80
+    })
+  ]);
+
+  const statusEsocial = esocialEventos.reduce((acc, item) => {
+    const status = item.status || 'SEM_STATUS';
+    acc[status] = (acc[status] || 0) + 1;
+    return acc;
+  }, {});
+
+  return {
+    filtros,
+    cards: dashboardData.cards,
+    periodo_alerta_dias: dashboardData.periodo_alerta_dias,
+    prontidao_esocial: {
+      transmissao_habilitada: Boolean(sstConfig.esocial_transmissao_habilitada),
+      documentacao_oficial_validada: Boolean(sstConfig.esocial_documentacao_oficial_validada),
+      ambiente: sstConfig.esocial_ambiente || 'NAO_CONFIGURADO',
+      observacoes_tecnicas: sstConfig.esocial_observacoes_tecnicas || null,
+      eventos_preparados: esocialEventos.length,
+      status: statusEsocial,
+      bloqueio_produto: !sstConfig.esocial_transmissao_habilitada || !sstConfig.esocial_documentacao_oficial_validada
+    },
+    riscos_criticos: riscosCriticos,
+    acidentes_recentes: acidentesRecentes,
+    eventos_abertos: eventosAbertos,
+    documentos_pendentes: documentosPendentes,
+    esocial_eventos: esocialEventos,
+    historicos_recentes: historicosRecentes
+  };
+}
+
+async function registrarHistoricoSst({
+  resource,
+  item,
+  acao,
+  antes = null,
+  depois = null,
+  user = null,
+  transaction = null
+}) {
+  const plain = typeof item?.toJSON === 'function' ? item.toJSON() : item;
+  await SstHistorico.create({
+    empresa_id: plain?.empresa_id || null,
+    obra_id: plain?.obra_id || null,
+    colaborador_id: plain?.colaborador_id || null,
+    recurso: resource,
+    recurso_id: plain?.id || null,
+    acao,
+    resumo: `${acao} em ${resource}${plain?.id ? ` #${plain.id}` : ''}`,
+    antes: antes ? JSON.stringify(antes) : null,
+    depois: depois ? JSON.stringify(depois) : null,
+    criado_por: user?.id || null,
+    atualizado_por: user?.id || null
+  }, { transaction });
+}
+
 async function emitEventForResource(resource, item, user, transaction) {
   const plain = typeof item?.toJSON === 'function' ? item.toJSON() : item;
   if (resource === 'acidentes') {
@@ -278,6 +416,7 @@ module.exports = {
   getDocumentSignedUrl,
   getResource,
   listResource,
+  relatorioOperacional,
   updateResource,
   uploadDocument
 };

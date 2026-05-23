@@ -59,7 +59,7 @@ export default function SstDashboard() {
   const visibleNav = SST_NAV.filter(([key]) => canViewSstArea(user, key === 'eventos' ? 'analytics' : key));
 
   return (
-    <div className="space-y-6">
+    <div className="sst-page space-y-6">
       <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
         <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">SST</p>
         <div className="mt-3 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">

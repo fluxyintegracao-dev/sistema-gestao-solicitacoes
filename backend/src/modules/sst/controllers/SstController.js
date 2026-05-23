@@ -35,6 +35,16 @@ module.exports = {
     }
   },
 
+  async relatorioOperacional(req, res) {
+    try {
+      const data = await sstService.relatorioOperacional(req.query);
+      return res.json(data);
+    } catch (error) {
+      console.error(error);
+      return res.status(error.statusCode || 500).json({ error: error.message || 'Erro ao carregar relatorio operacional SST' });
+    }
+  },
+
   async index(req, res) {
     try {
       const data = await sstService.listResource(req.params.resource, req.query);

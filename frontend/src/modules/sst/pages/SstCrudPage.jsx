@@ -174,7 +174,7 @@ export default function SstCrudPage() {
   };
 
   return (
-    <div className="space-y-5">
+    <div className="sst-page space-y-5">
       <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
         <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div>

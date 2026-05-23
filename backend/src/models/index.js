@@ -179,6 +179,7 @@ db.SstAcidente = require('../modules/sst/models/SstAcidente')(sequelize, Sequeli
 db.SstDocumento = require('../modules/sst/models/SstDocumento')(sequelize, Sequelize);
 db.SstEventoEsocial = require('../modules/sst/models/SstEventoEsocial')(sequelize, Sequelize);
 db.SstEventoOperacional = require('../modules/sst/models/SstEventoOperacional')(sequelize, Sequelize);
+db.SstHistorico = require('../modules/sst/models/SstHistorico')(sequelize, Sequelize);
 
 const TITULO_FINANCEIRO_SEQUENCE_KEY = 'GLOBAL';
 
@@ -3159,7 +3160,8 @@ db.FiscalAccountingBatchItem.belongsTo(db.FiscalDfeDocument, { foreignKey: 'fisc
   db.SstAcidente,
   db.SstDocumento,
   db.SstEventoEsocial,
-  db.SstEventoOperacional
+  db.SstEventoOperacional,
+  db.SstHistorico
 ].forEach((model) => {
   if (model?.rawAttributes?.empresa_id) {
     db.EmpresaGrupo.hasMany(model, { foreignKey: 'empresa_id', as: `${model.name}Registros` });

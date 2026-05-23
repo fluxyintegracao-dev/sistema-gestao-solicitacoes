@@ -203,6 +203,16 @@ const SST_RESOURCE_CONFIG = {
     ],
     updateFields: ['status', 'mensagem', 'payload'],
     requiredFields: ['tipo_evento', 'mensagem']
+  },
+  historicos: {
+    modelName: 'SstHistorico',
+    tableName: 'sst_historicos',
+    area: 'analytics',
+    label: 'Historico SST',
+    listOrder: [['createdAt', 'DESC']],
+    createFields: [],
+    updateFields: [],
+    requiredFields: []
   }
 };
 
@@ -237,7 +247,11 @@ const DEFAULT_SST_CONFIG = {
   status_epi: ['ENTREGUE', 'SUBSTITUIDO', 'DEVOLVIDO'],
   status_programa: ['ATIVO', 'VENCIDO', 'SUBSTITUIDO'],
   eventos_esocial: ['S-2210', 'S-2220', 'S-2240'],
-  status_esocial: ['PREPARADO', 'PENDENTE_DOCUMENTACAO', 'REJEITADO', 'PROCESSADO']
+  status_esocial: ['PREPARADO', 'PENDENTE_DOCUMENTACAO', 'REJEITADO', 'PROCESSADO'],
+  esocial_ambiente: 'NAO_CONFIGURADO',
+  esocial_transmissao_habilitada: false,
+  esocial_documentacao_oficial_validada: false,
+  esocial_observacoes_tecnicas: 'Transmissao bloqueada ate anexar leiautes/XSDs oficiais dos eventos S-2210, S-2220 e S-2240.'
 };
 
 module.exports = {

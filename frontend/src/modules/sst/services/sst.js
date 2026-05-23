@@ -26,6 +26,13 @@ export async function getSstDashboard(params = {}) {
   return parseResponse(res, 'Erro ao carregar dashboard SST');
 }
 
+export async function getSstRelatorioOperacional(params = {}) {
+  const res = await fetch(`${API_URL}/sst/relatorio-operacional${toQuery(params)}`, {
+    headers: authHeaders()
+  });
+  return parseResponse(res, 'Erro ao carregar relatorio operacional SST');
+}
+
 export async function getSstConfig() {
   const res = await fetch(`${API_URL}/sst/configuracoes`, {
     headers: authHeaders()

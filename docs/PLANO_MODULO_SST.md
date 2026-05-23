@@ -855,8 +855,9 @@ Este quadro deve ser atualizado a cada etapa implementada.
 | Fase 0 - Fundacao modular | Concluido | 2026-05-23 | Modulo `SST` registrado no catalogo modular, permissoes granulares registradas, visibilidade de dashboards/tabelas registrada, rotas base protegidas e menu/hub de relatorios criados. | `backend/src/services/moduleConfigService.js`, `backend/src/constants/moduloPermissoes.js`, `backend/src/constants/uiVisibilityRegistry.js`, `backend/src/routes.js`, `frontend/src/App.jsx`, `frontend/src/layout/Layout.jsx`, `frontend/src/pages/ModuloRelatorios.jsx` |
 | Fase 1 - MVP operacional | Concluido no escopo inicial | 2026-05-23 | Estrutura backend e frontend criada com entidades, migrations, CRUD generico, seletores reais de empresa/obra/colaborador, filtros operacionais, upload de documentos via S3, dashboard basico e configuracoes parametrizaveis. | `backend/migrations/202605230001_sst_base.js`, `backend/src/modules/sst/`, `frontend/src/modules/sst/`, `backend/src/models/index.js` |
 | Fase 2 - Eventos e analytics | Em andamento | 2026-05-23 | Eventos operacionais basicos disparados por risco critico, colaborador inapto e acidente registrado; dashboard usa o prazo parametrizado nas configuracoes SST; tela de eventos foi exposta com permissao propria de analytics; rotina manual idempotente gera eventos de vencimento sem duplicar alertas abertos. | `backend/src/modules/sst/services/sstEventService.js`, `backend/src/modules/sst/services/sstService.js`, `frontend/src/modules/sst/pages/SstCrudPage.jsx` |
+| Fase 2 - Auditoria e relatorio operacional | Concluido no escopo atual | 2026-05-23 | Adicionada tabela de historico SST para registrar criacao/alteracao, relatorio operacional com eventos abertos, riscos criticos, acidentes recentes, pendencias documentais e bloco de prontidao eSocial sem transmissao. | `backend/migrations/202605230002_sst_historico_relatorio_operacional.js`, `backend/src/modules/sst/models/SstHistorico.js`, `backend/src/modules/sst/services/sstService.js`, `frontend/src/modules/sst/pages/SstRelatorioOperacional.jsx` |
 | Fase 3 - Integracoes internas | Pendente | - | RH/DP, Obras, Compras e Financeiro. | - |
-| Fase 4 - eSocial preparado | Pendente | - | Estrutura tecnica sem transmissao. | - |
+| Fase 4 - eSocial preparado | Parcial | 2026-05-23 | Estrutura de evento eSocial e configuracoes de bloqueio tecnico preparadas. A transmissao oficial permanece bloqueada ate chegada dos leiautes/XSDs oficiais dos eventos SST. | `backend/src/modules/sst/models/SstEventoEsocial.js`, `backend/src/modules/sst/constants/sstConstants.js`, `frontend/src/modules/sst/pages/SstConfiguracoes.jsx` |
 | Fase 5 - IA e automacoes | Pendente | - | Camada futura de inteligencia. | - |
 
 ---
@@ -937,3 +938,35 @@ Avancar a Fase 2:
 - ampliar dashboard com filtros executivos por empresa e obra;
 - preparar mapa de risco e heatmap operacional;
 - manter eSocial apenas como preparacao tecnica ate receber documentacao oficial vigente.
+
+---
+
+## 19. Arquivos tecnicos eSocial recebidos em 2026-05-23
+
+Pasta analisada:
+
+```text
+SST ARQUIVOS/
+  998566-mensagensdosistema-v2-5.pdf
+  entes-federados-responsaveis.csv
+  manualorientacaodesenvolvedoresocialv1-15.pdf
+  pacote-de-comunicacao-esocial-v1-6.zip
+```
+
+Leitura tecnica:
+
+- o pacote de comunicacao contem WSDLs e XSDs de envio/consulta de lotes, retorno de processamento e download de eventos;
+- os arquivos ajudam a estruturar a camada de comunicacao futura;
+- nao foram identificados, nesta pasta, os XSDs/leiautes especificos dos eventos `S-2210`, `S-2220` e `S-2240`;
+- por isso, a geracao XML oficial e a transmissao ao governo seguem bloqueadas por produto.
+
+Decisao implementada:
+
+- criar configuracoes explicitas:
+  - `esocial_ambiente`;
+  - `esocial_documentacao_oficial_validada`;
+  - `esocial_transmissao_habilitada`;
+  - `esocial_observacoes_tecnicas`;
+- exibir no relatorio operacional se a transmissao esta bloqueada;
+- manter eventos eSocial apenas como registros internos preparados;
+- nao inferir leiaute, assinatura, regra de transmissao ou validacao sem documento oficial.

@@ -2906,6 +2906,7 @@ Caminhos previstos:
 
 - `SST > Dashboard SST`;
 - `SST > Relatorios SST`;
+- `SST > Relatorios SST > Operacional SST`;
 - `SST > Riscos`;
 - `SST > Agentes nocivos`;
 - `SST > PGR`;
@@ -2984,7 +2985,31 @@ Usuarios com permissao de gerenciamento de analytics podem usar `Atualizar venci
 
 Eventos nao substituem o registro original. Eles servem para alerta, auditoria, dashboard, automacoes futuras e base de IA.
 
-### 29.8 Preparacao futura para eSocial
+### 29.8 Relatorio operacional SST
+
+O relatorio `SST > Relatorios SST > Operacional SST` consolida a leitura gerencial do modulo.
+
+Ele mostra:
+
+- cards de conformidade;
+- vencimentos dentro do prazo configurado;
+- eventos operacionais abertos;
+- riscos criticos;
+- acidentes e incidentes recentes;
+- historico recente de criacao e alteracao;
+- prontidao tecnica eSocial.
+
+Uso correto:
+
+1. Abrir `SST > Relatorios SST`.
+2. Entrar em `Operacional SST`.
+3. Filtrar por empresa e obra quando a analise for localizada.
+4. Clicar em `Atualizar vencimentos` para gerar alertas com base nos dados reais cadastrados.
+5. Conferir os eventos abertos antes de tomar decisao.
+
+O historico do relatorio registra criacao e alteracao de registros SST. Ele nao substitui assinatura, protocolo oficial ou documento de origem, mas ajuda a auditar quem fez a movimentacao e quando.
+
+### 29.9 Preparacao futura para eSocial
 
 O FLUXY esta sendo preparado para futuramente apoiar eventos SST do eSocial:
 
@@ -2998,8 +3023,19 @@ Importante:
 - tambem depende de certificado digital e ambiente correto;
 - nenhum evento deve ser transmitido sem validacao tecnica e autorizacao operacional;
 - todo envio futuro deve guardar protocolo, recibo, retorno e erro.
+- os arquivos de comunicacao do eSocial ja ajudam na arquitetura de envio e consulta, mas ainda faltam os leiautes/XSDs especificos dos eventos SST.
 
-### 29.9 Checklist para liberar SST
+Configuracoes operacionais:
+
+1. Abrir `SST > Configuracoes`.
+2. Conferir `Ambiente eSocial`.
+3. Marcar `Documentacao oficial validada` somente depois de validar leiautes e XSDs oficiais dos eventos.
+4. Marcar `Habilitar transmissao futura` somente quando a decisao tecnica e operacional estiver aprovada.
+5. Registrar observacoes tecnicas claras.
+
+Enquanto a documentacao oficial nao estiver validada, o relatorio operacional deve mostrar a transmissao como bloqueada. Isso e proposital para evitar envio por inferencia.
+
+### 29.10 Checklist para liberar SST
 
 Antes de liberar o modulo SST para usuarios:
 

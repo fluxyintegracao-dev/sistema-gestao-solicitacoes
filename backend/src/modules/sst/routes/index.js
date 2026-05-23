@@ -69,6 +69,7 @@ router.patch('/configuracoes', (req, res, next) => {
   return next();
 }, allowSstResource('MANAGE'), SstController.updateConfig);
 router.get('/dashboard', allowSstDashboard, validateRequest({ query: validateSstQuery }), SstController.dashboard);
+router.get('/relatorio-operacional', allowSstDashboard, validateRequest({ query: validateSstQuery }), SstController.relatorioOperacional);
 router.post('/eventos/sincronizar-vencimentos', (req, res, next) => {
   req.params.resource = 'eventos';
   return next();

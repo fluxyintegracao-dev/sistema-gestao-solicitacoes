@@ -208,6 +208,7 @@ const FiscalOperationalReport = lazy(() => import('./modules/fiscal/pages/Fiscal
 const SstDashboard = lazy(() => import('./modules/sst/pages/SstDashboard'));
 const SstCrudPage = lazy(() => import('./modules/sst/pages/SstCrudPage'));
 const SstConfiguracoes = lazy(() => import('./modules/sst/pages/SstConfiguracoes'));
+const SstRelatorioOperacional = lazy(() => import('./modules/sst/pages/SstRelatorioOperacional'));
 
 function PublicPage({ children }) {
   return (
@@ -762,6 +763,7 @@ export default function App() {
         <Route path="integracao-sienge" element={<IntegracaoSiengeRoute><IntegracaoSiengeInicio /></IntegracaoSiengeRoute>} />
         <Route path="sst" element={<SstDashboardRoute><SstDashboard /></SstDashboardRoute>} />
         <Route path="sst/relatorios" element={<SstDashboardRoute><ModuloRelatorios modulo="sst" /></SstDashboardRoute>} />
+        <Route path="sst/relatorios/operacional" element={<SstDashboardRoute><SstRelatorioOperacional /></SstDashboardRoute>} />
         <Route path="sst/configuracoes" element={<SstConfigRoute><SstConfiguracoes /></SstConfigRoute>} />
         <Route path="sst/:resource" element={<SstRoute><SstCrudPage /></SstRoute>} />
 
