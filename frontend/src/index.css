@@ -2797,7 +2797,7 @@ a:hover {
 
 .dark .financeiro-formas-pagamento {
   border-color: var(--shell-border) !important;
-  background: rgba(15, 23, 42, 0.72) !important;
+  background: var(--c-bg) !important;
   color: var(--shell-text);
 }
 
@@ -8167,7 +8167,7 @@ body {
 
 .dark .layout-shell .financeiro-formas-pagamento {
   border-color: var(--shell-border) !important;
-  background: rgba(15, 23, 42, 0.82) !important;
+  background: var(--c-bg) !important;
   color: var(--shell-text) !important;
 }
 

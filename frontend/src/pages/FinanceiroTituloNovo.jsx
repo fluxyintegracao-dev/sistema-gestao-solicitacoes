@@ -1356,7 +1356,7 @@ export default function FinanceiroTituloNovo() {
                 totalPagamentos={totalPagamentos}
               />
 
-              <div className="md:col-span-2 xl:col-span-12 space-y-3 rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface-muted)] p-4">
+              <div className="financeiro-formas-pagamento md:col-span-2 xl:col-span-12 space-y-3 rounded-2xl border border-[var(--c-border)] bg-[var(--c-bg)] p-4">
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <div className="text-sm font-semibold text-[var(--c-text)]">Formas de pagamento</div>

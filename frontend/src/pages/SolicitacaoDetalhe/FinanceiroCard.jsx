@@ -1117,7 +1117,7 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
                 Considerar este titulo na DRE gerencial
               </label>
 
-              <div className="financeiro-formas-pagamento space-y-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-3">
+              <div className="financeiro-formas-pagamento space-y-3 rounded-2xl border border-slate-200 bg-white p-3">
                 <label className="flex items-center gap-2 text-sm text-[var(--c-text)]">
                   <input
                     type="checkbox"
