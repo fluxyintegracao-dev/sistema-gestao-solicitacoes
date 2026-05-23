@@ -2350,6 +2350,26 @@ Devem responder:
 - resultado por empresa;
 - intercompany.
 
+Relatorio principal para diretoria:
+
+- `Financeiro > Relatorios > Grupo Consolidado`.
+
+Como treinar:
+
+1. Explicar que esta e a tela executiva principal do grupo.
+2. Conferir se o filtro de Holding esta correto.
+3. Usar a opcao de eliminar intercompany quando a pergunta for "quanto o grupo gerou de riqueza real".
+4. Usar DRE para resultado economico por competencia.
+5. Usar Fluxo Consolidado para caixa previsto e realizado.
+6. Usar Endividamento apenas depois que as categorias financeiras estiverem classificadas explicitamente como endividamento.
+7. Usar Diagnostico DRE antes de apresentar fechamento para diretoria.
+
+Ponto de controle:
+
+- nenhum valor executivo deve ser interpretado como oficial se existem pendencias criticas no Diagnostico DRE;
+- baixa financeira precisa ter empresa pagadora ou recebedora real;
+- titulo considerado na DRE precisa ter empresa, competencia e categoria financeira classificadas.
+
 ### 20.5 Relatorios Fiscais
 
 Devem responder:
@@ -2373,6 +2393,24 @@ Devem responder:
 - funil;
 - produtividade comercial.
 
+Relatorio disponivel:
+
+- `CRM > Relatorios > Executivo CRM`.
+
+Como treinar:
+
+1. Abrir `CRM > Relatorios`.
+2. Entrar em `Executivo CRM`.
+3. Selecionar a janela de dias.
+4. Ler primeiro os cards de leads ativos, entradas, conversao, leads sem responsavel, backlog SLA e conversas em fila.
+5. Usar os rankings de origem, carteira por responsavel e redistribuicoes para orientar a rotina comercial.
+
+Ponto de controle:
+
+- lead sem responsavel e problema operacional real;
+- tarefa vencida e conversa sem leitura indicam risco de perda de oportunidade;
+- o relatorio consolida os dashboards existentes, sem criar meta ou simulacao.
+
 ### 20.7 Relatorios Comerciais
 
 Devem responder:
@@ -2382,6 +2420,25 @@ Devem responder:
 - contratos;
 - receita esperada;
 - desempenho por empreendimento.
+
+Relatorio disponivel:
+
+- `Comercial > Relatorios > Painel comercial operacional`.
+
+Como treinar:
+
+1. Abrir `Comercial > Relatorios`.
+2. Entrar em `Painel comercial operacional`.
+3. Filtrar por periodo, empreendimento, obra/centro ou status de contrato.
+4. Conferir VGV da carteira, contratos no periodo, unidades disponiveis, unidades reservadas, descontos e comissao prevista.
+5. Usar a tabela analitica para localizar o contrato que originou o numero do card.
+
+Ponto de controle:
+
+- VGV da carteira considera contratos com status `ATIVO`, `INADIMPLENTE` ou `QUITADO`;
+- distratos aparecem separados e nao devem ser tratados como venda ativa;
+- estoque disponivel vem da situacao cadastrada na unidade comercial;
+- desconto e comissao dependem do preenchimento correto do contrato.
 
 ### 20.8 Relatorios de Provisionamento
 
@@ -2404,6 +2461,24 @@ Devem responder:
 - fechamentos;
 - custos de folha;
 - apuracoes.
+
+Relatorio disponivel:
+
+- `RH/DP > Relatorios > Painel operacional RH/DP`.
+
+Como treinar:
+
+1. Abrir `RH/DP > Relatorios`.
+2. Entrar em `Painel operacional RH/DP`.
+3. Filtrar por empresa, obra/centro, tipo de vinculo ou status.
+4. Conferir headcount ativo, afastados, documentos vencidos/a vencer, apuracoes, fechamentos e base mensal cadastrada.
+5. Abrir a tabela de documentos criticos para tratar vencidos, a vencer e rejeitados.
+
+Ponto de controle:
+
+- a base mensal cadastrada usa salario base ou valor contratual informado no colaborador;
+- apuracoes e fechamentos refletem apenas competencias e vencimentos reais do modulo RH/DP;
+- documento sem validade aparece como sem validade e nao deve ser tratado como vencido por deducao.
 
 ### 20.10 Relatorios de Contratos
 

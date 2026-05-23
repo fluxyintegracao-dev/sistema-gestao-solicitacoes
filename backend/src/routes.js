@@ -79,6 +79,7 @@ const {
   validateComercialContratoCreateBody,
   validateComercialContratoDistratoBody,
   validateComercialContratoQuery,
+  validateComercialRelatorioOperacionalQuery,
   validateComercialContratoTrocaUnidadeBody,
   validateComercialContratoUpdateBody,
   validateComercialEmpreendimentoCreateBody,
@@ -105,6 +106,7 @@ const {
   validateRhDocumentoUpdateBody,
   validateRhFechamentoQuery,
   validateRhFecharApuracaoBody,
+  validateRhRelatorioOperacionalQuery,
   validateRhReabrirFechamentoBody,
   validateRhImportacaoCreateBody,
   validateRhImportacaoQuery,
@@ -284,6 +286,7 @@ const ComercialUnidadeController = require('./controllers/ComercialUnidadeContro
 const ComercialContratoController = require('./controllers/ComercialContratoController');
 const ComercialContratoDocumentoController = require('./controllers/ComercialContratoDocumentoController');
 const ComercialTabelaPrecoController = require('./controllers/ComercialTabelaPrecoController');
+const ComercialRelatorioController = require('./controllers/ComercialRelatorioController');
 const ProvisaoFinanceiraController = require('./controllers/ProvisaoFinanceiraController');
 const ProvisaoCategoriaMacroController = require('./controllers/ProvisaoCategoriaMacroController');
 const ProvisaoFinanceiraDashboardController = require('./controllers/ProvisaoFinanceiraDashboardController');
@@ -293,6 +296,7 @@ const RhDocumentoController = require('./controllers/RhDocumentoController');
 const RhImportacaoController = require('./controllers/RhImportacaoController');
 const RhApuracaoController = require('./controllers/RhApuracaoController');
 const RhFechamentoController = require('./controllers/RhFechamentoController');
+const RhRelatorioController = require('./controllers/RhRelatorioController');
 const IntegracaoSiengeController = require('./controllers/IntegracaoSiengeController');
 const ContaBancariaController = require('./controllers/ContaBancariaController');
 const CategoriaFinanceiraController = require('./controllers/CategoriaFinanceiraController');
@@ -1062,6 +1066,7 @@ router.get('/comercial/tabelas-preco', allowComercialEmpreendimentosRead, valida
 router.post('/comercial/tabelas-preco', allowComercialEmpreendimentosManage, criticalRateLimit, validateRequest({ body: validateComercialTabelaPrecoCreateBody }), ComercialTabelaPrecoController.create);
 router.patch('/comercial/tabelas-preco/:id', allowComercialEmpreendimentosManage, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Tabela de preco comercial'), body: validateComercialTabelaPrecoUpdateBody }), ComercialTabelaPrecoController.update);
 router.post('/comercial/tabelas-preco/:id/ativar', allowComercialEmpreendimentosManage, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Tabela de preco comercial') }), ComercialTabelaPrecoController.ativar);
+router.get('/comercial/relatorios/operacional', allowComercialContratosRead, validateRequest({ query: validateComercialRelatorioOperacionalQuery }), ComercialRelatorioController.operacional);
 router.get('/comercial/contratos-variaveis', allowComercialContratosRead, ComercialContratoDocumentoController.variaveis);
 router.get('/comercial/contratos-modelos', allowComercialContratosRead, ComercialContratoDocumentoController.listarModelos);
 router.post('/comercial/contratos-modelos', allowComercialContratosManage, uploadRateLimit, uploadComprovantes.single('file'), ComercialContratoDocumentoController.criarModelo);
@@ -1107,6 +1112,7 @@ router.patch('/empresas-grupo/:id', allowBusinessAdmin, criticalRateLimit, valid
 router.get('/rh/empresas-grupo', allowRhDpEmpresasManage, validateRequest({ query: validateRhEmpresaGrupoQuery }), RhEmpresaGrupoController.index);
 router.post('/rh/empresas-grupo', allowRhDpEmpresasManage, criticalRateLimit, validateRequest({ body: validateRhEmpresaGrupoCreateBody }), RhEmpresaGrupoController.create);
 router.patch('/rh/empresas-grupo/:id', allowRhDpEmpresasManage, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Empresa do grupo RH/DP'), body: validateRhEmpresaGrupoUpdateBody }), RhEmpresaGrupoController.update);
+router.get('/rh/relatorios/operacional', allowRhDpColaboradoresRead, validateRequest({ query: validateRhRelatorioOperacionalQuery }), RhRelatorioController.operacional);
 router.get('/rh/colaboradores', allowRhDpColaboradoresRead, validateRequest({ query: validateRhColaboradorQuery }), RhColaboradorController.index);
 router.get('/rh/colaboradores/:id', allowRhDpColaboradoresRead, validateRequest({ params: validateNumericIdParam('id', 'Colaborador RH/DP') }), RhColaboradorController.show);
 router.post('/rh/colaboradores', allowRhDpColaboradoresWrite, criticalRateLimit, validateRequest({ body: validateRhColaboradorCreateBody }), RhColaboradorController.create);

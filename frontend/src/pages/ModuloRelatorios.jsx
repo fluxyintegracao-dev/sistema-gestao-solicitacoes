@@ -13,6 +13,7 @@ import {
   canViewProvisionamentos,
   canViewProvisionamentosDashboard,
   canViewRhDpApuracao,
+  canViewRhDpColaboradores,
   canViewRhDpObrigacoes,
   isBusinessAdmin
 } from '../utils/acessoProduto';
@@ -30,6 +31,7 @@ const PERMISSIONS = {
   provisoesDashboard: canViewProvisionamentosDashboard,
   provisoesLista: canViewProvisionamentos,
   rhDpApuracao: canViewRhDpApuracao,
+  rhDpColaboradores: canViewRhDpColaboradores,
   rhDpImportacoes: canExecuteRhDpImportacoes,
   rhDpObrigacoes: canViewRhDpObrigacoes
 };
@@ -117,6 +119,7 @@ const HUBS = {
       {
         titulo: 'Dashboards disponiveis',
         itens: [
+          { titulo: 'Executivo CRM', descricao: 'Consolida conversao, carteira, SLA e distribuicao para leitura da diretoria.', to: '/crm/relatorios/executivo', status: 'Disponivel', permissao: 'crmDashboard' },
           { titulo: 'Dashboard CRM', descricao: 'Visao principal de leads e atividades.', to: '/crm/dashboard', status: 'Disponivel', permissao: 'crmDashboard' },
           { titulo: 'Gerencial', descricao: 'Indicadores gerenciais de carteira e conversao.', to: '/crm/dashboard-gerencial', status: 'Disponivel', permissao: 'crmDashboard' },
           { titulo: 'SLA', descricao: 'Tempo de atendimento, atraso e cumprimento de prazos.', to: '/crm/dashboard-sla', status: 'Disponivel', permissao: 'crmDashboard' },
@@ -140,6 +143,7 @@ const HUBS = {
       {
         titulo: 'Disponiveis',
         itens: [
+          { titulo: 'Painel comercial operacional', descricao: 'Contratos, VGV, unidades, estoque e documentos por empreendimento e obra.', to: '/comercial/relatorios/operacional', status: 'Disponivel', permissao: 'comercialContratos' },
           { titulo: 'Mapa de unidades', descricao: 'Estoque comercial e situacao das unidades.', to: '/comercial/mapa-unidades', status: 'Disponivel', permissao: 'comercialEmpreendimentos' },
           { titulo: 'Contratos de venda', descricao: 'Carteira de contratos e situacao comercial.', to: '/comercial/contratos', status: 'Disponivel', permissao: 'comercialContratos' },
           { titulo: 'Tabelas de preco', descricao: 'Precos por empreendimento e unidade.', to: '/comercial/tabelas-preco', status: 'Disponivel', permissao: 'comercialEmpreendimentos' }
@@ -184,6 +188,7 @@ const HUBS = {
       {
         titulo: 'Disponiveis',
         itens: [
+          { titulo: 'Painel operacional RH/DP', descricao: 'Headcount, documentos criticos, apuracoes, fechamentos e base cadastrada.', to: '/rh-dp/relatorios/operacional', status: 'Disponivel', permissao: 'rhDpColaboradores' },
           { titulo: 'Apuracao', descricao: 'Pre-folha, eventos e ajustes por competencia.', to: '/rh-dp/apuracao', status: 'Disponivel', permissao: 'rhDpApuracao' },
           { titulo: 'Fechamentos', descricao: 'Competencias fechadas e titulos gerados ao financeiro.', to: '/rh-dp/fechamentos', status: 'Disponivel', permissao: 'rhDpObrigacoes' },
           { titulo: 'Importacoes', descricao: 'Historico de importacoes e lotes processados.', to: '/rh-dp/importacoes', status: 'Disponivel', permissao: 'rhDpImportacoes' }

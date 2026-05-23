@@ -325,6 +325,35 @@ function validateRhColaboradorQuery(query = {}) {
   };
 }
 
+function validateRhRelatorioOperacionalQuery(query = {}) {
+  ensureAllowedKeys(
+    query,
+    ['periodo', 'data_inicial', 'data_final', 'empresa_grupo_id', 'obra_id', 'tipo_vinculo', 'status'],
+    'Relatorio operacional RH/DP'
+  );
+
+  const dataInicial = parseDateOnly(query.data_inicial, 'Data inicial');
+  const dataFinal = parseDateOnly(query.data_final, 'Data final');
+
+  if ((dataInicial && !dataFinal) || (!dataInicial && dataFinal)) {
+    throw new ValidationError('Informe data inicial e data final para filtrar por periodo personalizado.');
+  }
+
+  if (dataInicial && dataFinal && dataInicial > dataFinal) {
+    throw new ValidationError('Data inicial nao pode ser maior que a data final.');
+  }
+
+  return {
+    periodo: parseEnum(query.periodo, 'Periodo', ['MES_ATUAL', '30_DIAS', '90_DIAS', 'ANO_ATUAL']),
+    data_inicial: dataInicial,
+    data_final: dataFinal,
+    empresa_grupo_id: parseInteger(query.empresa_grupo_id, 'Empresa do grupo'),
+    obra_id: parseInteger(query.obra_id, 'Obra'),
+    tipo_vinculo: parseEnum(query.tipo_vinculo, 'Tipo de vinculo', RH_TIPOS_VINCULO),
+    status: parseEnum(query.status, 'Status', RH_STATUS_COLABORADOR)
+  };
+}
+
 function validateRhColaboradorCreateBody(body = {}) {
   ensureAllowedKeys(
     body,
@@ -690,6 +719,7 @@ module.exports = {
   validateRhFechamentoQuery,
   validateRhFecharApuracaoBody,
   validateRhReabrirFechamentoBody,
+  validateRhRelatorioOperacionalQuery,
   validateRhImportacaoCreateBody,
   validateRhImportacaoQuery,
   validateRhEmpresaGrupoCreateBody,

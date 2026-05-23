@@ -126,6 +126,15 @@ export async function getContratosComerciais(params = {}) {
   return parseJson(response, 'Erro ao buscar contratos comerciais');
 }
 
+export async function getRelatorioComercialOperacional(params = {}) {
+  const query = buildQuery(params);
+  const url = query ? `${API_URL}/comercial/relatorios/operacional?${query}` : `${API_URL}/comercial/relatorios/operacional`;
+  const response = await fetch(url, {
+    headers: authHeaders()
+  });
+  return parseJson(response, 'Erro ao buscar relatorio comercial');
+}
+
 export async function getContratoComercialById(id) {
   const response = await fetch(`${API_URL}/comercial/contratos/${id}`, {
     headers: authHeaders()

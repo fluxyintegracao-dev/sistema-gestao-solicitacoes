@@ -524,6 +524,34 @@ function validateComercialContratoQuery(query = {}) {
   };
 }
 
+function validateComercialRelatorioOperacionalQuery(query = {}) {
+  ensureAllowedKeys(
+    query,
+    ['periodo', 'data_inicial', 'data_final', 'empreendimento_id', 'obra_id', 'status'],
+    'Relatorio comercial operacional'
+  );
+
+  const dataInicial = parseDateOnly(query.data_inicial, 'Data inicial');
+  const dataFinal = parseDateOnly(query.data_final, 'Data final');
+
+  if ((dataInicial && !dataFinal) || (!dataInicial && dataFinal)) {
+    throw new ValidationError('Informe data inicial e data final para filtrar por periodo personalizado.');
+  }
+
+  if (dataInicial && dataFinal && dataInicial > dataFinal) {
+    throw new ValidationError('Data inicial nao pode ser maior que a data final.');
+  }
+
+  return {
+    periodo: parseEnum(query.periodo, 'Periodo', ['MES_ATUAL', '30_DIAS', '90_DIAS', 'ANO_ATUAL']),
+    data_inicial: dataInicial,
+    data_final: dataFinal,
+    empreendimento_id: parseInteger(query.empreendimento_id, 'Empreendimento'),
+    obra_id: parseInteger(query.obra_id, 'Obra'),
+    status: parseEnum(query.status, 'Status', CONTRATO_STATUS)
+  };
+}
+
 function validateComercialTabelaPrecoQuery(query = {}) {
   ensureAllowedKeys(
     query,
@@ -781,6 +809,7 @@ module.exports = {
   validateComercialContratoDistratoBody,
   validateComercialContratoCreateBody,
   validateComercialContratoQuery,
+  validateComercialRelatorioOperacionalQuery,
   validateComercialContratoTrocaUnidadeBody,
   validateComercialContratoUpdateBody,
   validateComercialEmpreendimentoCreateBody,

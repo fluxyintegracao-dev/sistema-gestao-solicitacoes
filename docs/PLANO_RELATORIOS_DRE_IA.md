@@ -92,6 +92,10 @@ Base multiempresa e DRE gerencial:
 - Contratos > Relatorios ganhou Painel Operacional de Contratos, consolidando contratos ativos/inativos, valores, saldos, solicitacoes vinculadas, pendencias cadastrais, obras/centros, empresas do grupo e referencias com base nos campos estruturados existentes.
 - Provisionamento > Relatorios ganhou Painel Operacional de Provisionamento, reutilizando as regras reais do dashboard e da listagem para exibir pressao futura de caixa, vencidos nao tratados, proximos 7/30 dias, curva mensal, pipeline por status, obra/centro, categoria macro, curva semanal e analitico do recorte.
 - Provisionamento ganhou preparacao estrutural para integracao futura com solicitacoes: tabela `solicitacao_provisao`, configuracao `PROVISIONAMENTO_FLUXO_CONFIG` e tela SUPERADMIN para alternar entre modo informativo, controlado e integrado sem ativar bloqueios por padrao.
+- RH/DP > Relatorios ganhou Painel Operacional RH/DP, consolidando headcount por empresa, obra/centro, tipo de vinculo, documentos criticos, apuracoes, fechamentos e base mensal cadastrada a partir dos cadastros reais.
+- CRM > Relatorios ganhou Relatorio Executivo CRM, consolidando os dashboards existentes de gerencial, SLA e distribuicao em uma leitura unica para diretoria.
+- Comercial > Relatorios ganhou Relatorio Comercial Operacional, consolidando contratos, VGV da carteira, distratos, unidades, estoque disponivel, descontos, comissao prevista e documentos comerciais por empreendimento e obra.
+- Financeiro Executivo segue centralizado em Financeiro > Relatorios > Grupo Consolidado, agora tratado como a porta principal para DRE, caixa, intercompany, endividamento, obras e alertas de consistencia.
 
 Documentacao operacional complementar:
 

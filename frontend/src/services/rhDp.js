@@ -63,6 +63,15 @@ export async function getRhColaboradores(params = {}) {
   return parseJson(response, 'Erro ao buscar colaboradores RH/DP');
 }
 
+export async function getRhRelatorioOperacional(params = {}) {
+  const query = buildQuery(params);
+  const url = query ? `${API_URL}/rh/relatorios/operacional?${query}` : `${API_URL}/rh/relatorios/operacional`;
+  const response = await fetch(url, {
+    headers: authHeaders()
+  });
+  return parseJson(response, 'Erro ao buscar relatorio operacional RH/DP');
+}
+
 export async function getRhColaborador(id) {
   const response = await fetch(`${API_URL}/rh/colaboradores/${id}`, {
     headers: authHeaders()

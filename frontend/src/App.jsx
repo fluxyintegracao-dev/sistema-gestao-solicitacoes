@@ -142,6 +142,7 @@ const ComercialContratos = lazy(() => import('./pages/ComercialContratos'));
 const ComercialModelosContrato = lazy(() => import('./pages/ComercialModelosContrato'));
 const ComercialTabelasPreco = lazy(() => import('./pages/ComercialTabelasPreco'));
 const ComercialMapaUnidades = lazy(() => import('./pages/ComercialMapaUnidades'));
+const ComercialRelatorioOperacional = lazy(() => import('./pages/ComercialRelatorioOperacional'));
 const DashboardProvisionamentoFinanceiro = lazy(() => import('./modules/provisionamento-financeiro/pages/DashboardProvisionamentoFinanceiro'));
 const ProvisionamentoRelatorioOperacional = lazy(() => import('./modules/provisionamento-financeiro/pages/ProvisionamentoRelatorioOperacional'));
 const ProvisionamentosFinanceiros = lazy(() => import('./modules/provisionamento-financeiro/pages/ProvisionamentosFinanceiros'));
@@ -155,6 +156,7 @@ const RhDpDocumentos = lazy(() => import('./pages/RhDpDocumentos'));
 const RhDpImportacoes = lazy(() => import('./pages/RhDpImportacoes'));
 const RhDpApuracao = lazy(() => import('./pages/RhDpApuracao'));
 const RhDpFechamentos = lazy(() => import('./pages/RhDpFechamentos'));
+const RhDpRelatorioOperacional = lazy(() => import('./pages/RhDpRelatorioOperacional'));
 const IntegracaoSiengeInicio = lazy(() => import('./pages/IntegracaoSiengeInicio'));
 const SolicitacoesCompra = lazy(() => import('./modules/solicitacao-compra/pages/SolicitacoesCompra'));
 const CotacaoFornecedorPublica = lazy(() => import('./modules/solicitacao-compra/pages/CotacaoFornecedorPublica'));
@@ -179,6 +181,7 @@ const CrmDashboard = lazy(() => import('./modules/crm/pages/CrmDashboard'));
 const CrmDashboardGerencial = lazy(() => import('./modules/crm/pages/CrmDashboardGerencial'));
 const CrmDashboardSla = lazy(() => import('./modules/crm/pages/CrmDashboardSla'));
 const CrmDashboardDistribuicao = lazy(() => import('./modules/crm/pages/CrmDashboardDistribuicao'));
+const CrmRelatorioExecutivo = lazy(() => import('./pages/CrmRelatorioExecutivo'));
 const CrmTarefas = lazy(() => import('./modules/crm/pages/CrmTarefas'));
 const CrmCarteira = lazy(() => import('./modules/crm/pages/CrmCarteira'));
 const CrmInbox = lazy(() => import('./modules/crm/pages/CrmInbox'));
@@ -642,6 +645,7 @@ export default function App() {
         <Route path="parceiros-categorias" element={<BusinessAdminRoute><ParceiroCategorias /></BusinessAdminRoute>} />
         <Route path="crm/dashboard" element={<CrmDashboardRoute><CrmDashboard /></CrmDashboardRoute>} />
         <Route path="crm/relatorios" element={<CrmDashboardRoute><ModuloRelatorios modulo="crm" /></CrmDashboardRoute>} />
+        <Route path="crm/relatorios/executivo" element={<CrmDashboardRoute><CrmRelatorioExecutivo /></CrmDashboardRoute>} />
         <Route path="crm/dashboard-gerencial" element={<CrmDashboardRoute><CrmDashboardGerencial /></CrmDashboardRoute>} />
         <Route path="crm/dashboard-sla" element={<CrmDashboardRoute><CrmDashboardSla /></CrmDashboardRoute>} />
         <Route path="crm/dashboard-distribuicao" element={<CrmDashboardRoute><CrmDashboardDistribuicao /></CrmDashboardRoute>} />
@@ -668,6 +672,7 @@ export default function App() {
         <Route path="fiscal/logs" element={<FiscalLogsRoute><FiscalLogs /></FiscalLogsRoute>} />
         <Route path="comercial/empreendimentos" element={<ComercialEmpreendimentosRoute><ComercialEmpreendimentos /></ComercialEmpreendimentosRoute>} />
         <Route path="comercial/relatorios" element={<ComercialRoute><ModuloRelatorios modulo="comercial" /></ComercialRoute>} />
+        <Route path="comercial/relatorios/operacional" element={<ComercialContratosRoute><ComercialRelatorioOperacional /></ComercialContratosRoute>} />
         <Route path="comercial/unidades" element={<ComercialEmpreendimentosRoute><ComercialUnidades /></ComercialEmpreendimentosRoute>} />
         <Route path="comercial/tabelas-preco" element={<ComercialEmpreendimentosRoute><ComercialTabelasPreco /></ComercialEmpreendimentosRoute>} />
         <Route path="comercial/mapa-unidades" element={<ComercialEmpreendimentosRoute><ComercialMapaUnidades /></ComercialEmpreendimentosRoute>} />
@@ -682,6 +687,7 @@ export default function App() {
         <Route path="provisoes-financeiras/categorias" element={<ProvisionamentosCategoriasRoute><GestaoCategoriasMacro /></ProvisionamentosCategoriasRoute>} />
         <Route path="rh-dp" element={<RhDpDashboardRoute><RhDpInicio /></RhDpDashboardRoute>} />
         <Route path="rh-dp/relatorios" element={<RhDpDashboardRoute><ModuloRelatorios modulo="rhdp" /></RhDpDashboardRoute>} />
+        <Route path="rh-dp/relatorios/operacional" element={<RhDpColaboradoresRoute><RhDpRelatorioOperacional /></RhDpColaboradoresRoute>} />
         <Route path="rh-dp/empresas" element={<RhDpEmpresasRoute><RhDpEmpresas /></RhDpEmpresasRoute>} />
         <Route path="rh-dp/colaboradores" element={<RhDpColaboradoresRoute><RhDpColaboradores /></RhDpColaboradoresRoute>} />
         <Route path="rh-dp/documentos" element={<RhDpDocumentosRoute><RhDpDocumentos /></RhDpDocumentosRoute>} />
