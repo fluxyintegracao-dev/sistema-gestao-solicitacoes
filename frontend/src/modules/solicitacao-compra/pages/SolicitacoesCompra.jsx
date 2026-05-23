@@ -32,22 +32,22 @@ function classNameStatus(status) {
   const valor = String(status || '').toUpperCase();
 
   if (valor === 'ENVIADO' || valor === 'ABERTA') {
-    return 'app-status-pill bg-blue-100 text-blue-700';
+    return 'app-status-pill compra-status-pill compra-status-blue bg-blue-100 text-blue-700';
   }
 
   if (valor === 'INTEGRADO_SIENGE') {
-    return 'app-status-pill bg-amber-100 text-amber-700';
+    return 'app-status-pill compra-status-pill compra-status-warning bg-amber-100 text-amber-700';
   }
 
   if (valor === 'LIBERADO_PARA_COMPRA') {
-    return 'app-status-pill bg-emerald-100 text-emerald-700';
+    return 'app-status-pill compra-status-pill compra-status-success bg-emerald-100 text-emerald-700';
   }
 
   if (valor === 'FINALIZADA' || valor === 'ENCERRADO') {
-    return 'app-status-pill bg-slate-100 text-slate-700';
+    return 'app-status-pill compra-status-pill compra-status-muted bg-slate-100 text-slate-700';
   }
 
-  return 'app-status-pill bg-indigo-100 text-indigo-700';
+  return 'app-status-pill compra-status-pill compra-status-default bg-indigo-100 text-indigo-700';
 }
 
 export default function SolicitacoesCompra() {

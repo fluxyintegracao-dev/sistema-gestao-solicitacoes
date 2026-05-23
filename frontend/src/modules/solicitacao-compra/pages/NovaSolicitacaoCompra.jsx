@@ -101,13 +101,6 @@ export default function NovaSolicitacaoCompra() {
   const [linkGeral, setLinkGeral] = useState('');
   const [buscaInsumo, setBuscaInsumo] = useState('');
   const [itens, setItens] = useState([]);
-  const [itensSelecionados, setItensSelecionados] = useState([]);
-  const [edicaoMassa, setEdicaoMassa] = useState({
-    apropriacao_id: '',
-    necessario_para: '',
-    quantidade: '',
-    link_produto: ''
-  });
   const [uploadingArquivos, setUploadingArquivos] = useState({});
   const [loading, setLoading] = useState(false);
   const [modalManualAberto, setModalManualAberto] = useState(false);
@@ -281,7 +274,6 @@ export default function NovaSolicitacaoCompra() {
     });
   }, [buscaInsumo, insumos]);
 
-  const todosSelecionados = itens.length > 0 && itensSelecionados.length === itens.length;
   const itensPendentesApropriacao = useMemo(
     () => itens.filter((item) => !validarRateiosItem(item).ok).length,
     [itens]
@@ -451,66 +443,8 @@ export default function NovaSolicitacaoCompra() {
     fecharModalApropriacao();
   }
 
-  function toggleSelecionado(index) {
-    setItensSelecionados((atual) =>
-      atual.includes(index) ? atual.filter((itemIndex) => itemIndex !== index) : [...atual, index]
-    );
-  }
-
-  function toggleTodos() {
-    setItensSelecionados((atual) => (atual.length === itens.length ? [] : itens.map((_, index) => index)));
-  }
-
-  function aplicarEdicaoMassa() {
-    if (!itensSelecionados.length) {
-      alert('Selecione ao menos um item para aplicar as alteracoes em massa.');
-      return;
-    }
-
-    if (
-      !edicaoMassa.apropriacao_id &&
-      !edicaoMassa.necessario_para &&
-      !edicaoMassa.quantidade &&
-      !edicaoMassa.link_produto
-    ) {
-      alert('Informe ao menos um campo para aplicar aos itens selecionados.');
-      return;
-    }
-
-    setItens((atual) =>
-      atual.map((item, index) => {
-        if (!itensSelecionados.includes(index)) {
-          return item;
-        }
-
-        const quantidadeAtualizada = edicaoMassa.quantidade || item.quantidade;
-        let atualizado = {
-          ...item,
-          quantidade: quantidadeAtualizada,
-          necessario_para: edicaoMassa.necessario_para || item.necessario_para,
-          link_produto: edicaoMassa.link_produto || item.link_produto
-        };
-
-        if (edicaoMassa.apropriacao_id) {
-          atualizado = aplicarApropriacaoUnica(atualizado, edicaoMassa.apropriacao_id);
-        } else if (edicaoMassa.quantidade) {
-          atualizado = sincronizarQuantidadeRateioUnico(atualizado, quantidadeAtualizada);
-        } else {
-          atualizado = sincronizarItemComRateios(atualizado);
-        }
-
-        return atualizado;
-      })
-    );
-  }
-
   function removerItem(index) {
     setItens((atual) => atual.filter((_, itemIndex) => itemIndex !== index));
-    setItensSelecionados((atual) =>
-      atual
-        .filter((itemIndex) => itemIndex !== index)
-        .map((itemIndex) => (itemIndex > index ? itemIndex - 1 : itemIndex))
-    );
     setUploadingArquivos((atual) => {
       const proximo = {};
       Object.entries(atual).forEach(([chave, valor]) => {
@@ -781,80 +715,9 @@ export default function NovaSolicitacaoCompra() {
             <h2 className="font-semibold">Itens da solicitação</h2>
             <div className="flex flex-wrap items-center gap-3 text-sm text-[var(--c-muted)]">
               <span>{itens.length} item(ns)</span>
-              {itens.length > 0 && <span>{itensSelecionados.length} selecionado(s)</span>}
               {itens.length > 0 && <span>{itensPendentesApropriacao} pendente(s) de rateio fechado</span>}
             </div>
           </div>
-
-          {itens.length > 0 && (
-            <div className="mb-5 grid gap-4 rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <h3 className="font-medium">Ajustes em massa</h3>
-                  <p className="text-sm text-[var(--c-muted)]">
-                    Selecione os itens abaixo e aplique quantidade, apropriacao unica, prazo ou link de uma vez.
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <button type="button" className="btn btn-outline" onClick={toggleTodos}>
-                    {todosSelecionados ? 'Desmarcar todos' : 'Selecionar todos'}
-                  </button>
-                  <button type="button" className="btn btn-outline" onClick={limparLista}>
-                    Limpar lista
-                  </button>
-                </div>
-              </div>
-              <div className="grid gap-3 xl:grid-cols-4">
-                <div className="grid gap-2">
-                  <label className="text-sm font-medium">Apropriacao unica</label>
-                  <ApropriacaoAutocomplete
-                    value={edicaoMassa.apropriacao_id}
-                    options={apropriacoes}
-                    onChange={(id) => setEdicaoMassa((atual) => ({ ...atual, apropriacao_id: id }))}
-                    placeholder="Manter atual / buscar..."
-                  />
-                </div>
-
-                <div className="grid gap-2">
-                  <label className="text-sm font-medium">Quantidade</label>
-                  <input
-                    type="number"
-                    min="0.01"
-                    step="0.01"
-                    className="input"
-                    placeholder="Ex.: 10"
-                    value={edicaoMassa.quantidade}
-                    onChange={(event) => setEdicaoMassa((atual) => ({ ...atual, quantidade: event.target.value }))}
-                  />
-                </div>
-
-                <div className="grid gap-2">
-                  <label className="text-sm font-medium">Necessario para</label>
-                  <input
-                    type="date"
-                    className="input"
-                    value={edicaoMassa.necessario_para}
-                    onChange={(event) => setEdicaoMassa((atual) => ({ ...atual, necessario_para: event.target.value }))}
-                  />
-                </div>
-
-                <div className="grid gap-2">
-                  <label className="text-sm font-medium">Link do produto</label>
-                  <input
-                    type="url"
-                    className="input"
-                    placeholder="https://"
-                    value={edicaoMassa.link_produto}
-                    onChange={(event) => setEdicaoMassa((atual) => ({ ...atual, link_produto: event.target.value }))}
-                  />
-                </div>
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                <button type="button" className="btn btn-primary" onClick={aplicarEdicaoMassa}>Aplicar nos selecionados</button>
-              </div>
-            </div>
-          )}
 
           {itens.length === 0 ? (
             <div className="compra-itens-empty py-8 text-center text-sm text-[var(--c-muted)]">Adicione itens a partir da lista de insumos ou crie item manual.</div>
@@ -863,9 +726,6 @@ export default function NovaSolicitacaoCompra() {
               <table className="table compra-itens-table">
                 <thead>
                   <tr>
-                    <th className="w-12 text-center">
-                      <input type="checkbox" checked={todosSelecionados} onChange={toggleTodos} />
-                    </th>
                     <th>Insumo</th>
                     <th>Unidade</th>
                     <th>Quantidade *</th>
@@ -880,13 +740,6 @@ export default function NovaSolicitacaoCompra() {
                 <tbody>
                   {itens.map((item, index) => (
                     <tr key={`${item.manual ? 'manual' : item.insumo_id}-${index}`}>
-                      <td className="align-top text-center">
-                        <input
-                          type="checkbox"
-                          checked={itensSelecionados.includes(index)}
-                          onChange={() => toggleSelecionado(index)}
-                        />
-                      </td>
                       <td>
                         <input
                           className={`input min-w-[240px] ${item.manual ? 'border-red-300 text-red-700' : ''}`}
