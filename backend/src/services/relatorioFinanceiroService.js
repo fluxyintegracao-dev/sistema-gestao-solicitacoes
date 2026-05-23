@@ -1780,6 +1780,7 @@ async function getIntercompanyReportSchema() {
   const categoriaTable = getModelTableName(CategoriaFinanceira) || 'categorias_financeiras';
   const obraTable = getModelTableName(Obra) || 'Obras';
   const contaTable = getModelTableName(ContaBancaria) || 'contas_bancarias';
+  const parceiroTable = getModelTableName(Parceiro) || 'parceiros';
   const tituloTable = getModelTableName(TituloFinanceiro) || 'titulos_financeiros';
   const transferenciaTable = getModelTableName(TransferenciaFinanceira) || 'transferencias_financeiras';
 
@@ -1788,6 +1789,7 @@ async function getIntercompanyReportSchema() {
     categoriaAttributes,
     obraAttributes,
     contaAttributes,
+    parceiroAttributes,
     tituloAttributes,
     tituloMissing,
     transferenciaAttributes,
@@ -1822,6 +1824,11 @@ async function getIntercompanyReportSchema() {
       'agencia',
       'conta',
       'empresa_id'
+    ]),
+    getExistingTableAttributes(parceiroTable, [
+      'id',
+      'nome',
+      'razao_social'
     ]),
     getExistingTableAttributes(tituloTable, [
       'id',
@@ -1892,11 +1899,101 @@ async function getIntercompanyReportSchema() {
     categoriaAttributes: categoriaAttributes.length ? categoriaAttributes : ['id', 'nome'],
     obraAttributes: obraAttributes.length ? obraAttributes : ['id', 'nome'],
     contaAttributes: contaAttributes.length ? contaAttributes : ['id', 'nome'],
+    parceiroAttributes: parceiroAttributes.length ? parceiroAttributes : ['id', 'nome'],
     tituloAttributes,
     tituloMissing,
     transferenciaAttributes,
     transferenciaMissing,
     pronto: tituloMissing.length === 0 && transferenciaMissing.length === 0
+  };
+}
+
+async function getEndividamentoReportSchema() {
+  const empresaTable = getModelTableName(EmpresaGrupo) || 'empresas_grupo';
+  const categoriaTable = getModelTableName(CategoriaFinanceira) || 'categorias_financeiras';
+  const obraTable = getModelTableName(Obra) || 'Obras';
+  const parceiroTable = getModelTableName(Parceiro) || 'parceiros';
+  const tituloTable = getModelTableName(TituloFinanceiro) || 'titulos_financeiros';
+
+  const [
+    empresaAttributes,
+    categoriaAttributes,
+    obraAttributes,
+    parceiroAttributes,
+    tituloAttributes,
+    tituloMissing,
+    categoriaMissing
+  ] = await Promise.all([
+    getExistingTableAttributes(empresaTable, [
+      'id',
+      'codigo',
+      'nome',
+      'razao_social',
+      'tipo_empresa',
+      'tipo_gerencial',
+      'holding_id'
+    ]),
+    getExistingTableAttributes(categoriaTable, [
+      'id',
+      'nome',
+      'tipo',
+      'classificacao_gerencial',
+      'dre_grupo',
+      'dre_subgrupo'
+    ]),
+    getExistingTableAttributes(obraTable, [
+      'id',
+      'codigo',
+      'nome',
+      'tipo_centro_custo'
+    ]),
+    getExistingTableAttributes(parceiroTable, [
+      'id',
+      'nome',
+      'razao_social'
+    ]),
+    getExistingTableAttributes(tituloTable, [
+      'id',
+      'codigo',
+      'descricao',
+      'numero_documento',
+      'tipo',
+      'status',
+      'data_vencimento',
+      'valor_original',
+      'valor_baixado',
+      'valor_saldo',
+      'empresa_id',
+      'categoria_financeira_id',
+      'obra_id',
+      'parceiro_id',
+      'intercompany',
+      'elimina_consolidado'
+    ]),
+    getMissingTableAttributes(tituloTable, [
+      'tipo',
+      'status',
+      'data_vencimento',
+      'valor_saldo',
+      'empresa_id',
+      'categoria_financeira_id',
+      'intercompany',
+      'elimina_consolidado'
+    ]),
+    getMissingTableAttributes(categoriaTable, [
+      'classificacao_gerencial'
+    ])
+  ]);
+
+  return {
+    empresaAttributes: empresaAttributes.length ? empresaAttributes : ['id', 'nome'],
+    categoriaAttributes: categoriaAttributes.length ? categoriaAttributes : ['id', 'nome'],
+    obraAttributes: obraAttributes.length ? obraAttributes : ['id', 'nome'],
+    parceiroAttributes: parceiroAttributes.length ? parceiroAttributes : ['id', 'nome'],
+    tituloAttributes,
+    tituloMissing,
+    categoriaMissing,
+    pronto: tituloMissing.length === 0 && categoriaMissing.length === 0
   };
 }
 
@@ -2172,28 +2269,50 @@ async function gerarRelatorioEndividamento(req, filters = {}) {
 
   const periodo = resolvePeriodo(filters);
   const obraScopeWhere = await resolveObraScope(req, filters.obra_id);
+  const schema = await getEndividamentoReportSchema();
+  const empresaOrder = [
+    ...(schema.empresaAttributes.includes('tipo_empresa') ? [['tipo_empresa', 'ASC']] : []),
+    ...(schema.empresaAttributes.includes('nome') ? [['nome', 'ASC']] : [['id', 'ASC']])
+  ];
   const empresas = await EmpresaGrupo.findAll({
-    attributes: ['id', 'codigo', 'nome', 'razao_social', 'tipo_empresa', 'tipo_gerencial', 'holding_id'],
-    order: [['tipo_empresa', 'ASC'], ['nome', 'ASC']]
+    attributes: schema.empresaAttributes,
+    order: empresaOrder
+  });
+
+  const emptyReport = (extra = {}) => ({
+    filtro: {
+      periodo: periodo.periodo,
+      descricao: periodo.descricao,
+      data_inicial: periodo.data_inicial,
+      data_final: periodo.data_final,
+      holding_id: filters.holding_id ? Number(filters.holding_id) : null,
+      empresa_id: filters.empresa_id ? Number(filters.empresa_id) : null,
+      obra_id: filters.obra_id ? Number(filters.obra_id) : null,
+      excluir_intercompany: filters.excluir_intercompany !== false,
+      classificacao_gerencial: 'ENDIVIDAMENTO'
+    },
+    resumo: emptyEndividamentoResumo(),
+    empresas: [],
+    categorias: [],
+    titulos: [],
+    schema: {
+      pronto: schema.pronto,
+      pendencias: [
+        ...schema.tituloMissing,
+        ...schema.categoriaMissing
+      ],
+      ...extra
+    }
   });
 
   if (obraScopeWhere === null) {
-    return {
-      filtro: {
-        periodo: periodo.periodo,
-        descricao: periodo.descricao,
-        data_inicial: periodo.data_inicial,
-        data_final: periodo.data_final,
-        holding_id: filters.holding_id ? Number(filters.holding_id) : null,
-        empresa_id: filters.empresa_id ? Number(filters.empresa_id) : null,
-        obra_id: filters.obra_id ? Number(filters.obra_id) : null,
-        excluir_intercompany: filters.excluir_intercompany !== false
-      },
-      resumo: emptyEndividamentoResumo(),
-      empresas: [],
-      categorias: [],
-      titulos: []
-    };
+    return emptyReport();
+  }
+
+  if (!schema.pronto) {
+    return emptyReport({
+      mensagem: 'O relatorio de endividamento depende de migrations financeiras pendentes no banco.'
+    });
   }
 
   const companyScopeWhere = buildFluxoCompanyWhere(filters, empresas);
@@ -2207,30 +2326,31 @@ async function gerarRelatorioEndividamento(req, filters = {}) {
 
   const titulos = await TituloFinanceiro.findAll({
     where,
+    attributes: schema.tituloAttributes,
     include: [
       {
         model: CategoriaFinanceira,
         as: 'categoriaFinanceira',
-        attributes: ['id', 'nome', 'tipo', 'classificacao_gerencial', 'dre_grupo', 'dre_subgrupo'],
+        attributes: schema.categoriaAttributes,
         required: true,
         where: { classificacao_gerencial: 'ENDIVIDAMENTO' }
       },
       {
         model: EmpresaGrupo,
         as: 'empresa',
-        attributes: ['id', 'codigo', 'nome', 'razao_social', 'tipo_empresa', 'tipo_gerencial', 'holding_id'],
+        attributes: schema.empresaAttributes,
         required: false
       },
       {
         model: Obra,
         as: 'obra',
-        attributes: ['id', 'codigo', 'nome', 'tipo_centro_custo'],
+        attributes: schema.obraAttributes,
         required: false
       },
       {
         model: Parceiro,
         as: 'parceiro',
-        attributes: ['id', 'nome', 'razao_social'],
+        attributes: schema.parceiroAttributes,
         required: false
       }
     ],
@@ -2250,7 +2370,14 @@ async function gerarRelatorioEndividamento(req, filters = {}) {
       excluir_intercompany: filters.excluir_intercompany !== false,
       classificacao_gerencial: 'ENDIVIDAMENTO'
     },
-    ...summarizeEndividamento(titulos, periodo)
+    ...summarizeEndividamento(titulos, periodo),
+    schema: {
+      pronto: schema.pronto,
+      pendencias: [
+        ...schema.tituloMissing,
+        ...schema.categoriaMissing
+      ]
+    }
   };
 }
 
@@ -2924,7 +3051,7 @@ async function gerarRelatorioIntercompany(req, filters = {}) {
       {
         model: Parceiro,
         as: 'parceiro',
-        attributes: ['id', 'nome', 'razao_social'],
+        attributes: schema.parceiroAttributes,
         required: false
       },
       {

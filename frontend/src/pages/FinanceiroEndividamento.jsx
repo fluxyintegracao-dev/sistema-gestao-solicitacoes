@@ -149,6 +149,9 @@ export default function FinanceiroEndividamento() {
   const empresasResumo = Array.isArray(relatorio?.empresas) ? relatorio.empresas : [];
   const categoriasResumo = Array.isArray(relatorio?.categorias) ? relatorio.categorias : [];
   const titulos = Array.isArray(relatorio?.titulos) ? relatorio.titulos : [];
+  const schemaPendencias = Array.isArray(relatorio?.schema?.pendencias)
+    ? relatorio.schema.pendencias
+    : [];
   const periodoTexto = relatorio?.filtro?.data_inicial && relatorio?.filtro?.data_final
     ? `${formatDate(relatorio.filtro.data_inicial)} ate ${formatDate(relatorio.filtro.data_final)}`
     : '';
@@ -260,6 +263,12 @@ export default function FinanceiroEndividamento() {
       </form>
 
       {error ? <div className="app-alert app-alert--warning">{error}</div> : null}
+      {!error && schemaPendencias.length ? (
+        <div className="app-alert">
+          Existem migrations pendentes para o relatorio de endividamento: {schemaPendencias.join(', ')}.
+          Atualize o banco para liberar a classificacao gerencial das categorias.
+        </div>
+      ) : null}
 
       <div className="app-summary-grid">
         <Metric label="Endividamento aberto" value={formatCurrency(resumo.saldo_total)} detail={`${resumo.titulos || 0} titulo(s)`} critical={Number(resumo.saldo_total || 0) > 0} />
