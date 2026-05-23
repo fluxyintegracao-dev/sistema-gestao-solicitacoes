@@ -2094,6 +2094,67 @@ Importante:
 - O prazo deve representar uma regra real da empresa, aprovada pelo responsavel do fluxo.
 - Se o setor mudar de regra, altere a configuracao antes de usar o relatorio em reunioes gerenciais.
 
+### 19.5 Permissoes de areas por usuario
+
+Use esta configuracao para definir quem pode acessar, visualizar, criar, editar, aprovar, auditar ou executar acoes dentro de cada modulo.
+
+Regra principal:
+
+- permissao de area controla acesso e operacao;
+- se o usuario tiver permissoes configuradas, ele passa a operar somente o que estiver marcado;
+- SUPERADMIN e ADMINISTRADOR continuam como perfis administrativos com acesso amplo;
+- evitar liberar acesso por perfil amplo quando a necessidade real for apenas um relatorio ou uma acao especifica.
+
+Passo a passo:
+
+1. Acesse `Configuracoes`.
+2. Abra `Permissoes de Areas por Usuario`.
+3. Selecione o usuario.
+4. Marque apenas as permissoes necessarias para a rotina daquela pessoa.
+5. Salve.
+6. Peça para o usuario sair e entrar novamente caso a sessao ainda esteja com permissoes antigas.
+
+Cuidados importantes:
+
+- permissoes de relatorio nao substituem permissao operacional;
+- uma pessoa pode ter acesso a relatorios sem poder criar, editar ou baixar titulos;
+- auditoria deve ser liberada somente para liderancas ou usuarios responsaveis por conferencia;
+- quando um modulo ganhar uma nova tela, revisar se existe permissao correspondente antes de treinar a equipe;
+- se um usuario nao encontra uma tela, verificar primeiro permissoes de area e depois modulos habilitados.
+
+### 19.6 Visibilidade de dashboards e tabelas
+
+Use esta configuracao quando a empresa quiser esconder temporariamente algum card, dashboard ou tabela sem alterar permissao de acesso do usuario.
+
+Essa configuracao nao deve ser usada como controle de seguranca. Ela controla apresentacao da tela.
+
+Exemplo:
+
+- a diretoria ainda nao quer exibir uma tabela de intercompany;
+- um relatorio esta em validacao e deve ficar oculto;
+- determinada visao esta correta tecnicamente, mas ainda nao faz sentido para o momento operacional.
+
+Passo a passo:
+
+1. Acesse `Configuracoes`.
+2. Abra `Visibilidade de Dashboards e Tabelas`.
+3. Pesquise pela pagina ou pelo nome do bloco.
+4. Desative o componente que nao deve aparecer.
+5. Salve.
+6. Atualize a pagina onde o dashboard ou tabela estava visivel.
+
+Diferença entre permissao e visibilidade:
+
+- `Permissoes de Areas por Usuario`: define quem pode acessar e executar a rotina.
+- `Visibilidade de Dashboards e Tabelas`: define quais blocos aparecem para usuarios que ja possuem acesso.
+
+Boas praticas:
+
+- nao esconder informacao para corrigir dado errado; primeiro corrija o cadastro ou o fluxo operacional;
+- registrar internamente o motivo de ocultar um bloco;
+- revisar blocos ocultos antes de reunioes de diretoria;
+- quando um bloco voltar a fazer sentido, reativar a visualizacao em configuracoes.
+
 ---
 
 ## 20. Relatorios por modulo

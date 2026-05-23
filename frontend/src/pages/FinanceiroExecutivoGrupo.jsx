@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ResizableTable, ResizableTh } from '../components/ResizableTable';
+import { useUiVisibility } from '../hooks/useUiVisibility';
 import { getEmpresasGrupo } from '../services/empresasGrupo';
 import {
   getRelatorioGrupoConsolidado,
@@ -88,6 +89,7 @@ function EmptyRow({ colSpan, message }) {
 }
 
 export default function FinanceiroExecutivoGrupo() {
+  const { isVisible } = useUiVisibility();
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [appliedFilters, setAppliedFilters] = useState(DEFAULT_FILTERS);
   const [empresas, setEmpresas] = useState([]);
@@ -271,61 +273,64 @@ export default function FinanceiroExecutivoGrupo() {
         </div>
       ) : null}
 
-      <div className="app-summary-grid">
-        <Metric
-          label="Caixa consolidado realizado"
-          value={formatCurrency(executivoResumo.caixa_realizado)}
-          detail={`${fluxo?.resumo?.movimentos_realizados || 0} baixa(s) no periodo`}
-          color={metricColor(executivoResumo.caixa_realizado)}
-        />
-        <Metric
-          label="EBITDA"
-          value={formatCurrency(executivoResumo.ebitda)}
-          detail={`Margem ${formatPercent(executivoResumo.margem_ebitda)}`}
-          color={metricColor(executivoResumo.ebitda)}
-        />
-        <Metric
-          label="Lucro/Prejuizo liquido"
-          value={formatCurrency(lucroLiquido)}
-          detail={Number(lucroLiquido || 0) >= 0 ? 'Geracao patrimonial' : 'Consumo patrimonial'}
-          color={metricColor(lucroLiquido)}
-        />
-        <Metric
-          label="Necessidade futura de caixa"
-          value={formatCurrency(necessidadeCaixa)}
-          detail={`Piso previsto ${formatCurrency(pisoCaixaPrevisto)}`}
-          color={necessidadeCaixa > 0 ? '#b91c1c' : '#15803d'}
-        />
-        <Metric
-          label="Intercompany eliminado"
-          value={formatCurrency(executivoResumo.intercompany_eliminado)}
-          detail={`${intercompany?.resumo?.relacoes_empresas || 0} relacao(oes) entre empresas`}
-        />
-        <Metric
-          label="Endividamento aberto"
-          value={formatCurrency(executivoResumo.endividamento_aberto)}
-          detail={`${painel?.fontes?.endividamento?.resumo?.titulos || 0} titulo(s) classificados`}
-          color={Number(executivoResumo.endividamento_aberto || 0) > 0 ? '#b91c1c' : '#15803d'}
-        />
-        <Metric
-          label="Saldo previsto"
-          value={formatCurrency(executivoResumo.saldo_previsto)}
-          detail="Entradas previstas menos saidas previstas"
-          color={metricColor(executivoResumo.saldo_previsto)}
-        />
-        <Metric
-          label="Pendencias de consistencia"
-          value={String(executivoResumo.pendencias_dados || 0)}
-          detail={`${executivoResumo.pendencias_criticas || 0} critica(s), ${executivoResumo.pendencias_altas || 0} alta(s)`}
-          color={Number(executivoResumo.pendencias_criticas || 0) > 0 ? '#b91c1c' : Number(executivoResumo.pendencias_altas || 0) > 0 ? '#b45309' : '#15803d'}
-        />
-      </div>
+      {isVisible('financeiro.grupo_consolidado.metricas') ? (
+        <div className="app-summary-grid">
+          <Metric
+            label="Caixa consolidado realizado"
+            value={formatCurrency(executivoResumo.caixa_realizado)}
+            detail={`${fluxo?.resumo?.movimentos_realizados || 0} baixa(s) no periodo`}
+            color={metricColor(executivoResumo.caixa_realizado)}
+          />
+          <Metric
+            label="EBITDA"
+            value={formatCurrency(executivoResumo.ebitda)}
+            detail={`Margem ${formatPercent(executivoResumo.margem_ebitda)}`}
+            color={metricColor(executivoResumo.ebitda)}
+          />
+          <Metric
+            label="Lucro/Prejuizo liquido"
+            value={formatCurrency(lucroLiquido)}
+            detail={Number(lucroLiquido || 0) >= 0 ? 'Geracao patrimonial' : 'Consumo patrimonial'}
+            color={metricColor(lucroLiquido)}
+          />
+          <Metric
+            label="Necessidade futura de caixa"
+            value={formatCurrency(necessidadeCaixa)}
+            detail={`Piso previsto ${formatCurrency(pisoCaixaPrevisto)}`}
+            color={necessidadeCaixa > 0 ? '#b91c1c' : '#15803d'}
+          />
+          <Metric
+            label="Intercompany eliminado"
+            value={formatCurrency(executivoResumo.intercompany_eliminado)}
+            detail={`${intercompany?.resumo?.relacoes_empresas || 0} relacao(oes) entre empresas`}
+          />
+          <Metric
+            label="Endividamento aberto"
+            value={formatCurrency(executivoResumo.endividamento_aberto)}
+            detail={`${painel?.fontes?.endividamento?.resumo?.titulos || 0} titulo(s) classificados`}
+            color={Number(executivoResumo.endividamento_aberto || 0) > 0 ? '#b91c1c' : '#15803d'}
+          />
+          <Metric
+            label="Saldo previsto"
+            value={formatCurrency(executivoResumo.saldo_previsto)}
+            detail="Entradas previstas menos saidas previstas"
+            color={metricColor(executivoResumo.saldo_previsto)}
+          />
+          <Metric
+            label="Pendencias de consistencia"
+            value={String(executivoResumo.pendencias_dados || 0)}
+            detail={`${executivoResumo.pendencias_criticas || 0} critica(s), ${executivoResumo.pendencias_altas || 0} alta(s)`}
+            color={Number(executivoResumo.pendencias_criticas || 0) > 0 ? '#b91c1c' : Number(executivoResumo.pendencias_altas || 0) > 0 ? '#b45309' : '#15803d'}
+          />
+        </div>
+      ) : null}
 
       {loading ? (
         <div className="app-empty-card">Carregando painel executivo...</div>
       ) : (
         <>
           <section className="grid gap-4 xl:grid-cols-3">
+            {isVisible('financeiro.grupo_consolidado.caixa_empresas') ? (
             <div className="card sol-surface-card app-table-shell xl:col-span-2">
               <div className="border-b border-[var(--c-border)] px-4 py-3">
                 <h2 className="text-lg font-semibold text-[var(--c-text)]">Empresas por caixa realizado</h2>
@@ -366,7 +371,9 @@ export default function FinanceiroExecutivoGrupo() {
                 </ResizableTable>
               </div>
             </div>
+            ) : null}
 
+            {isVisible('financeiro.grupo_consolidado.riscos') ? (
             <div className="card sol-surface-card">
               <div className="border-b border-[var(--c-border)] px-4 py-3">
                 <h2 className="text-lg font-semibold text-[var(--c-text)]">Leitura executiva</h2>
@@ -403,9 +410,11 @@ export default function FinanceiroExecutivoGrupo() {
                 )}
               </div>
             </div>
+            ) : null}
           </section>
 
           <section className="grid gap-4 xl:grid-cols-3">
+            {isVisible('financeiro.grupo_consolidado.resultado_empresas') ? (
             <div className="card sol-surface-card app-table-shell">
               <div className="border-b border-[var(--c-border)] px-4 py-3">
                 <h2 className="text-lg font-semibold text-[var(--c-text)]">Resultado por empresa</h2>
@@ -440,7 +449,9 @@ export default function FinanceiroExecutivoGrupo() {
                 </ResizableTable>
               </div>
             </div>
+            ) : null}
 
+            {isVisible('financeiro.grupo_consolidado.resultado_obras') ? (
             <div className="card sol-surface-card app-table-shell">
               <div className="border-b border-[var(--c-border)] px-4 py-3">
                 <h2 className="text-lg font-semibold text-[var(--c-text)]">Obras por caixa</h2>
@@ -475,7 +486,9 @@ export default function FinanceiroExecutivoGrupo() {
                 </ResizableTable>
               </div>
             </div>
+            ) : null}
 
+            {isVisible('financeiro.grupo_consolidado.intercompany') ? (
             <div className="card sol-surface-card app-table-shell">
               <div className="border-b border-[var(--c-border)] px-4 py-3">
                 <h2 className="text-lg font-semibold text-[var(--c-text)]">Maiores relacoes internas</h2>
@@ -510,6 +523,7 @@ export default function FinanceiroExecutivoGrupo() {
                 </ResizableTable>
               </div>
             </div>
+            ) : null}
           </section>
         </>
       )}

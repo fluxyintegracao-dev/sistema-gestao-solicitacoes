@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useUiVisibility } from '../hooks/useUiVisibility';
 import {
   canAccessContratos,
   canExecuteRhDpImportacoes,
@@ -68,18 +69,18 @@ const HUBS = {
       {
         titulo: 'Relatorios disponiveis',
         itens: [
-          { titulo: 'Auditoria de compras', descricao: 'Acompanhamento administrativo de compras e evidencias do processo.', to: '/compras/relatorios/auditoria', status: 'Disponivel', permissao: 'businessAdmin' },
-          { titulo: 'Demanda e pedidos', descricao: 'Solicitacoes e pedidos por status, obra/centro e valor pedido.', to: '/compras/relatorios/demanda-pedidos', status: 'Disponivel', permissao: 'comprasCotacoes' },
-          { titulo: 'Evolucao mensal', descricao: 'Curva mensal de compras emitidas por valor, pedidos, obras e status.', to: '/compras/relatorios/evolucao', status: 'Disponivel', permissao: 'comprasCotacoes' },
-          { titulo: 'Compras por fornecedor', descricao: 'Valor efetivamente pedido por fornecedor, obra/centro, status e pedido emitido.', to: '/compras/relatorios/compras-fornecedor', status: 'Disponivel', permissao: 'comprasCotacoes' },
-          { titulo: 'Categorias e insumos', descricao: 'Valor pedido por categoria, insumo e obra/centro com base nos itens dos pedidos.', to: '/compras/relatorios/categorias-insumos', status: 'Disponivel', permissao: 'comprasCotacoes' },
-          { titulo: 'Precos por insumo', descricao: 'Preco medio de compra por insumo e fornecedor a partir dos itens reais dos pedidos.', to: '/compras/relatorios/precos-insumos', status: 'Disponivel', permissao: 'comprasCotacoes' },
-          { titulo: 'Cotacoes', descricao: 'Lista de cotacoes, status de resposta e encerramento.', to: '/cotacoes', status: 'Disponivel', permissao: 'comprasCotacoes' },
-          { titulo: 'Pedidos de compra', descricao: 'Pedidos emitidos, status e detalhamento por fornecedor.', to: '/pedidos-compra', status: 'Disponivel', permissao: 'comprasPedidos' },
-          { titulo: 'Economia em cotacoes', descricao: 'Comparativo entre menor preco disponivel e vencedor selecionado.', to: '/compras/relatorios/economia-cotacoes', status: 'Disponivel', permissao: 'comprasCotacoes' },
-          { titulo: 'Pendencias de cotacoes', descricao: 'Cotacoes sem minimo de respostas e fornecedores com prazo vencido sem retorno.', to: '/compras/relatorios/pendencias-cotacoes', status: 'Disponivel', permissao: 'comprasCotacoes' },
-          { titulo: 'Fornecedores', descricao: 'Ranking por volume, resposta, prazo medio e recorrencia nas cotacoes.', to: '/compras/relatorios/fornecedores', status: 'Disponivel', permissao: 'comprasCotacoes' },
-          { titulo: 'Ciclo de compras', descricao: 'Tempo medio entre solicitacao, cotacao, encerramento e pedido.', to: '/compras/relatorios/ciclo', status: 'Disponivel', permissao: 'comprasCotacoes' }
+          { titulo: 'Auditoria de compras', descricao: 'Acompanhamento administrativo de compras e evidencias do processo.', to: '/compras/relatorios/auditoria', status: 'Disponivel', permissao: 'businessAdmin', componentKey: 'relatorios.compras.auditoria' },
+          { titulo: 'Demanda e pedidos', descricao: 'Solicitacoes e pedidos por status, obra/centro e valor pedido.', to: '/compras/relatorios/demanda-pedidos', status: 'Disponivel', permissao: 'comprasCotacoes', componentKey: 'relatorios.compras.demanda_pedidos' },
+          { titulo: 'Evolucao mensal', descricao: 'Curva mensal de compras emitidas por valor, pedidos, obras e status.', to: '/compras/relatorios/evolucao', status: 'Disponivel', permissao: 'comprasCotacoes', componentKey: 'relatorios.compras.evolucao' },
+          { titulo: 'Compras por fornecedor', descricao: 'Valor efetivamente pedido por fornecedor, obra/centro, status e pedido emitido.', to: '/compras/relatorios/compras-fornecedor', status: 'Disponivel', permissao: 'comprasCotacoes', componentKey: 'relatorios.compras.compras_fornecedor' },
+          { titulo: 'Categorias e insumos', descricao: 'Valor pedido por categoria, insumo e obra/centro com base nos itens dos pedidos.', to: '/compras/relatorios/categorias-insumos', status: 'Disponivel', permissao: 'comprasCotacoes', componentKey: 'relatorios.compras.categorias_insumos' },
+          { titulo: 'Precos por insumo', descricao: 'Preco medio de compra por insumo e fornecedor a partir dos itens reais dos pedidos.', to: '/compras/relatorios/precos-insumos', status: 'Disponivel', permissao: 'comprasCotacoes', componentKey: 'relatorios.compras.precos_insumos' },
+          { titulo: 'Cotacoes', descricao: 'Lista de cotacoes, status de resposta e encerramento.', to: '/cotacoes', status: 'Disponivel', permissao: 'comprasCotacoes', componentKey: 'relatorios.compras.cotacoes' },
+          { titulo: 'Pedidos de compra', descricao: 'Pedidos emitidos, status e detalhamento por fornecedor.', to: '/pedidos-compra', status: 'Disponivel', permissao: 'comprasPedidos', componentKey: 'relatorios.compras.pedidos_compra' },
+          { titulo: 'Economia em cotacoes', descricao: 'Comparativo entre menor preco disponivel e vencedor selecionado.', to: '/compras/relatorios/economia-cotacoes', status: 'Disponivel', permissao: 'comprasCotacoes', componentKey: 'relatorios.compras.economia_cotacoes' },
+          { titulo: 'Pendencias de cotacoes', descricao: 'Cotacoes sem minimo de respostas e fornecedores com prazo vencido sem retorno.', to: '/compras/relatorios/pendencias-cotacoes', status: 'Disponivel', permissao: 'comprasCotacoes', componentKey: 'relatorios.compras.pendencias_cotacoes' },
+          { titulo: 'Fornecedores', descricao: 'Ranking por volume, resposta, prazo medio e recorrencia nas cotacoes.', to: '/compras/relatorios/fornecedores', status: 'Disponivel', permissao: 'comprasCotacoes', componentKey: 'relatorios.compras.fornecedores' },
+          { titulo: 'Ciclo de compras', descricao: 'Tempo medio entre solicitacao, cotacao, encerramento e pedido.', to: '/compras/relatorios/ciclo', status: 'Disponivel', permissao: 'comprasCotacoes', componentKey: 'relatorios.compras.ciclo' }
         ]
       },
       {
@@ -96,10 +97,10 @@ const HUBS = {
       {
         titulo: 'Disponiveis',
         itens: [
-          { titulo: 'Painel operacional fiscal', descricao: 'Documentos, vinculos confirmados, divergencias abertas e arquivos fiscais por periodo.', to: '/fiscal/relatorios/operacional', status: 'Disponivel', permissao: 'fiscalDocuments' },
-          { titulo: 'Documentos fiscais', descricao: 'Caixa de DFe importados e documentos vinculados.', to: '/fiscal/documentos', status: 'Disponivel', permissao: 'fiscalDocuments' },
-          { titulo: 'Divergencias fiscais', descricao: 'Pendencias entre fiscal, compras e financeiro.', to: '/fiscal/divergencias', status: 'Disponivel', permissao: 'fiscalDocuments' },
-          { titulo: 'Logs de sincronizacao', descricao: 'Auditoria de chamadas SEFAZ e importacoes manuais.', to: '/fiscal/logs', status: 'Disponivel', permissao: 'fiscalLogs' }
+          { titulo: 'Painel operacional fiscal', descricao: 'Documentos, vinculos confirmados, divergencias abertas e arquivos fiscais por periodo.', to: '/fiscal/relatorios/operacional', status: 'Disponivel', permissao: 'fiscalDocuments', componentKey: 'relatorios.fiscal.operacional' },
+          { titulo: 'Documentos fiscais', descricao: 'Caixa de DFe importados e documentos vinculados.', to: '/fiscal/documentos', status: 'Disponivel', permissao: 'fiscalDocuments', componentKey: 'relatorios.fiscal.documentos' },
+          { titulo: 'Divergencias fiscais', descricao: 'Pendencias entre fiscal, compras e financeiro.', to: '/fiscal/divergencias', status: 'Disponivel', permissao: 'fiscalDocuments', componentKey: 'relatorios.fiscal.divergencias' },
+          { titulo: 'Logs de sincronizacao', descricao: 'Auditoria de chamadas SEFAZ e importacoes manuais.', to: '/fiscal/logs', status: 'Disponivel', permissao: 'fiscalLogs', componentKey: 'relatorios.fiscal.logs' }
         ]
       },
       {
@@ -119,11 +120,11 @@ const HUBS = {
       {
         titulo: 'Dashboards disponiveis',
         itens: [
-          { titulo: 'Executivo CRM', descricao: 'Consolida conversao, carteira, SLA e distribuicao para leitura da diretoria.', to: '/crm/relatorios/executivo', status: 'Disponivel', permissao: 'crmDashboard' },
-          { titulo: 'Dashboard CRM', descricao: 'Visao principal de leads e atividades.', to: '/crm/dashboard', status: 'Disponivel', permissao: 'crmDashboard' },
-          { titulo: 'Gerencial', descricao: 'Indicadores gerenciais de carteira e conversao.', to: '/crm/dashboard-gerencial', status: 'Disponivel', permissao: 'crmDashboard' },
-          { titulo: 'SLA', descricao: 'Tempo de atendimento, atraso e cumprimento de prazos.', to: '/crm/dashboard-sla', status: 'Disponivel', permissao: 'crmDashboard' },
-          { titulo: 'Distribuicao', descricao: 'Distribuicao de leads e carga por responsavel.', to: '/crm/dashboard-distribuicao', status: 'Disponivel', permissao: 'crmDashboard' }
+          { titulo: 'Executivo CRM', descricao: 'Consolida conversao, carteira, SLA e distribuicao para leitura da diretoria.', to: '/crm/relatorios/executivo', status: 'Disponivel', permissao: 'crmDashboard', componentKey: 'relatorios.crm.executivo' },
+          { titulo: 'Dashboard CRM', descricao: 'Visao principal de leads e atividades.', to: '/crm/dashboard', status: 'Disponivel', permissao: 'crmDashboard', componentKey: 'relatorios.crm.dashboard' },
+          { titulo: 'Gerencial', descricao: 'Indicadores gerenciais de carteira e conversao.', to: '/crm/dashboard-gerencial', status: 'Disponivel', permissao: 'crmDashboard', componentKey: 'relatorios.crm.gerencial' },
+          { titulo: 'SLA', descricao: 'Tempo de atendimento, atraso e cumprimento de prazos.', to: '/crm/dashboard-sla', status: 'Disponivel', permissao: 'crmDashboard', componentKey: 'relatorios.crm.sla' },
+          { titulo: 'Distribuicao', descricao: 'Distribuicao de leads e carga por responsavel.', to: '/crm/dashboard-distribuicao', status: 'Disponivel', permissao: 'crmDashboard', componentKey: 'relatorios.crm.distribuicao' }
         ]
       },
       {
@@ -143,10 +144,10 @@ const HUBS = {
       {
         titulo: 'Disponiveis',
         itens: [
-          { titulo: 'Painel comercial operacional', descricao: 'Contratos, VGV, unidades, estoque e documentos por empreendimento e obra.', to: '/comercial/relatorios/operacional', status: 'Disponivel', permissao: 'comercialContratos' },
-          { titulo: 'Mapa de unidades', descricao: 'Estoque comercial e situacao das unidades.', to: '/comercial/mapa-unidades', status: 'Disponivel', permissao: 'comercialEmpreendimentos' },
-          { titulo: 'Contratos de venda', descricao: 'Carteira de contratos e situacao comercial.', to: '/comercial/contratos', status: 'Disponivel', permissao: 'comercialContratos' },
-          { titulo: 'Tabelas de preco', descricao: 'Precos por empreendimento e unidade.', to: '/comercial/tabelas-preco', status: 'Disponivel', permissao: 'comercialEmpreendimentos' }
+          { titulo: 'Painel comercial operacional', descricao: 'Contratos, VGV, unidades, estoque e documentos por empreendimento e obra.', to: '/comercial/relatorios/operacional', status: 'Disponivel', permissao: 'comercialContratos', componentKey: 'relatorios.comercial.operacional' },
+          { titulo: 'Mapa de unidades', descricao: 'Estoque comercial e situacao das unidades.', to: '/comercial/mapa-unidades', status: 'Disponivel', permissao: 'comercialEmpreendimentos', componentKey: 'relatorios.comercial.mapa_unidades' },
+          { titulo: 'Contratos de venda', descricao: 'Carteira de contratos e situacao comercial.', to: '/comercial/contratos', status: 'Disponivel', permissao: 'comercialContratos', componentKey: 'relatorios.comercial.contratos' },
+          { titulo: 'Tabelas de preco', descricao: 'Precos por empreendimento e unidade.', to: '/comercial/tabelas-preco', status: 'Disponivel', permissao: 'comercialEmpreendimentos', componentKey: 'relatorios.comercial.tabelas_preco' }
         ]
       },
       {
@@ -166,9 +167,9 @@ const HUBS = {
       {
         titulo: 'Disponiveis',
         itens: [
-          { titulo: 'Painel operacional', descricao: 'Pressao futura, vencidos nao tratados, prioridades e concentracao por obra e categoria.', to: '/provisoes-financeiras/relatorios/operacional', status: 'Disponivel', permissao: 'provisoesDashboard' },
-          { titulo: 'Dashboard de previsao', descricao: 'Resumo gerencial das provisoes financeiras.', to: '/provisoes-financeiras/dashboard', status: 'Disponivel', permissao: 'provisoesDashboard' },
-          { titulo: 'Provisionamentos', descricao: 'Lista analitica de provisoes e status.', to: '/provisoes-financeiras', status: 'Disponivel', permissao: 'provisoesLista' }
+          { titulo: 'Painel operacional', descricao: 'Pressao futura, vencidos nao tratados, prioridades e concentracao por obra e categoria.', to: '/provisoes-financeiras/relatorios/operacional', status: 'Disponivel', permissao: 'provisoesDashboard', componentKey: 'relatorios.provisionamento.operacional' },
+          { titulo: 'Dashboard de previsao', descricao: 'Resumo gerencial das provisoes financeiras.', to: '/provisoes-financeiras/dashboard', status: 'Disponivel', permissao: 'provisoesDashboard', componentKey: 'relatorios.provisionamento.dashboard' },
+          { titulo: 'Provisionamentos', descricao: 'Lista analitica de provisoes e status.', to: '/provisoes-financeiras', status: 'Disponivel', permissao: 'provisoesLista', componentKey: 'relatorios.provisionamento.lista' }
         ]
       },
       {
@@ -188,10 +189,10 @@ const HUBS = {
       {
         titulo: 'Disponiveis',
         itens: [
-          { titulo: 'Painel operacional RH/DP', descricao: 'Headcount, documentos criticos, apuracoes, fechamentos e base cadastrada.', to: '/rh-dp/relatorios/operacional', status: 'Disponivel', permissao: 'rhDpColaboradores' },
-          { titulo: 'Apuracao', descricao: 'Pre-folha, eventos e ajustes por competencia.', to: '/rh-dp/apuracao', status: 'Disponivel', permissao: 'rhDpApuracao' },
-          { titulo: 'Fechamentos', descricao: 'Competencias fechadas e titulos gerados ao financeiro.', to: '/rh-dp/fechamentos', status: 'Disponivel', permissao: 'rhDpObrigacoes' },
-          { titulo: 'Importacoes', descricao: 'Historico de importacoes e lotes processados.', to: '/rh-dp/importacoes', status: 'Disponivel', permissao: 'rhDpImportacoes' }
+          { titulo: 'Painel operacional RH/DP', descricao: 'Headcount, documentos criticos, apuracoes, fechamentos e base cadastrada.', to: '/rh-dp/relatorios/operacional', status: 'Disponivel', permissao: 'rhDpColaboradores', componentKey: 'relatorios.rhdp.operacional' },
+          { titulo: 'Apuracao', descricao: 'Pre-folha, eventos e ajustes por competencia.', to: '/rh-dp/apuracao', status: 'Disponivel', permissao: 'rhDpApuracao', componentKey: 'relatorios.rhdp.apuracao' },
+          { titulo: 'Fechamentos', descricao: 'Competencias fechadas e titulos gerados ao financeiro.', to: '/rh-dp/fechamentos', status: 'Disponivel', permissao: 'rhDpObrigacoes', componentKey: 'relatorios.rhdp.fechamentos' },
+          { titulo: 'Importacoes', descricao: 'Historico de importacoes e lotes processados.', to: '/rh-dp/importacoes', status: 'Disponivel', permissao: 'rhDpImportacoes', componentKey: 'relatorios.rhdp.importacoes' }
         ]
       },
       {
@@ -211,8 +212,8 @@ const HUBS = {
       {
         titulo: 'Disponiveis',
         itens: [
-          { titulo: 'Painel operacional de contratos', descricao: 'Contratos por status, empresa, obra/centro, valores, saldos e pendencias cadastrais.', to: '/contratos/relatorios/operacional', status: 'Disponivel', permissao: 'contratos' },
-          { titulo: 'Gestao de contratos', descricao: 'Base operacional de contratos, anexos e vinculos.', to: '/gestao-contratos', status: 'Disponivel', permissao: 'contratos' }
+          { titulo: 'Painel operacional de contratos', descricao: 'Contratos por status, empresa, obra/centro, valores, saldos e pendencias cadastrais.', to: '/contratos/relatorios/operacional', status: 'Disponivel', permissao: 'contratos', componentKey: 'relatorios.contratos.operacional' },
+          { titulo: 'Gestao de contratos', descricao: 'Base operacional de contratos, anexos e vinculos.', to: '/gestao-contratos', status: 'Disponivel', permissao: 'contratos', componentKey: 'relatorios.contratos.gestao' }
         ]
       },
       {
@@ -261,8 +262,13 @@ function ReportCard({ item }) {
 
 export default function ModuloRelatorios({ modulo }) {
   const { user } = useAuth();
+  const { isVisible } = useUiVisibility();
   const hub = HUBS[modulo] || HUBS.solicitacoes;
   const podeVerItem = (item) => {
+    if (item.componentKey && !isVisible(item.componentKey)) {
+      return false;
+    }
+
     if (!item.permissao) {
       return true;
     }

@@ -401,6 +401,27 @@ export async function salvarPermissoesAreas(data) {
   return res.json();
 }
 
+export async function getVisibilidadeUi() {
+  const res = await fetch(`${API_URL}/configuracoes/visibilidade-ui`, {
+    headers: authHeaders()
+  });
+  if (!res.ok) throw new Error('Erro ao buscar configuracao de visibilidade');
+  return res.json();
+}
+
+export async function salvarVisibilidadeUi(data) {
+  const res = await fetch(`${API_URL}/configuracoes/visibilidade-ui`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+  if (!res.ok) {
+    const payload = await res.json().catch(() => null);
+    throw new Error(payload?.error || 'Erro ao salvar configuracao de visibilidade');
+  }
+  return res.json();
+}
+
 export async function getStatusPedidosCompra() {
   const res = await fetch(`${API_URL}/configuracoes/status-pedidos-compra`, {
     headers: authHeaders()

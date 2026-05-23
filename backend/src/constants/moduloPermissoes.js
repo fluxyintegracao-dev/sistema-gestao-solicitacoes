@@ -53,6 +53,13 @@ const MODULO_PERMISSION_GROUPS = [
           { key: 'solicitacoes.prioridades.cancelar', label: 'Cancelar lotes', descricao: 'Cancelar lotes abertos sem itens autorizados.' },
           { key: 'solicitacoes.prioridades.excluir', label: 'Excluir lotes', descricao: 'Excluir lotes sem solicitações autorizadas.' }
         ]
+      },
+      {
+        key: 'solicitacoes.relatorios',
+        label: 'Relatórios de Solicitações',
+        permissoes: [
+          { key: 'solicitacoes.relatorios.visualizar', label: 'Visualizar relatórios', descricao: 'Acessar os relatórios operacionais de solicitações.' }
+        ]
       }
     ]
   },
@@ -77,6 +84,15 @@ const MODULO_PERMISSION_GROUPS = [
         permissoes: [
           { key: 'compras.cotacoes.visualizar', label: 'Visualizar cotações', descricao: 'Ver cotações e comparativo de fornecedores.' },
           { key: 'compras.cotacoes.gerenciar', label: 'Gerenciar cotações', descricao: 'Criar, editar e encerrar cotações.' }
+        ]
+      },
+      {
+        key: 'compras.relatorios',
+        label: 'Relatórios de Compras',
+        permissoes: [
+          { key: 'compras.relatorios.visualizar', label: 'Visualizar hub de relatórios', descricao: 'Acessar a página central de relatórios de compras.' },
+          { key: 'compras.relatorios.cotacoes', label: 'Relatórios de cotações', descricao: 'Acessar análises de economia, pendências, fornecedores e ciclo de cotação.' },
+          { key: 'compras.relatorios.pedidos', label: 'Relatórios de pedidos', descricao: 'Acessar demanda, evolução, categorias, insumos e compras por fornecedor.' }
         ]
       }
     ]
@@ -108,7 +124,15 @@ const MODULO_PERMISSION_GROUPS = [
         label: 'Relatórios Financeiros',
         permissoes: [
           { key: 'financeiro.relatorios.visualizar', label: 'Visualizar relatórios', descricao: 'Acessar fluxo de caixa e relatórios gerenciais.' },
-          { key: 'financeiro.relatorios.resultado_obras', label: 'Resultado de obras', descricao: 'Ver dashboard financeiro por obra.' }
+          { key: 'financeiro.relatorios.grupo_consolidado', label: 'Grupo consolidado', descricao: 'Acessar a visão executiva consolidada do grupo.' },
+          { key: 'financeiro.relatorios.fluxo_consolidado', label: 'Fluxo consolidado', descricao: 'Acessar fluxo de caixa consolidado por empresa e grupo.' },
+          { key: 'financeiro.relatorios.dre', label: 'DRE gerencial', descricao: 'Acessar a DRE gerencial por grupo e empresa.' },
+          { key: 'financeiro.relatorios.diagnostico_dre', label: 'Diagnóstico DRE', descricao: 'Ver inconsistências cadastrais que afetam a DRE.' },
+          { key: 'financeiro.relatorios.intercompany', label: 'Intercompany', descricao: 'Acessar movimentações e relações financeiras entre empresas.' },
+          { key: 'financeiro.relatorios.endividamento', label: 'Endividamento', descricao: 'Acessar relatório de dívidas classificadas explicitamente.' },
+          { key: 'financeiro.relatorios.analitico', label: 'Analítico financeiro', descricao: 'Acessar base analítica de títulos e movimentos financeiros.' },
+          { key: 'financeiro.relatorios.resultado_obras', label: 'Resultado de obras', descricao: 'Ver dashboard financeiro por obra.' },
+          { key: 'financeiro.relatorios.centros_custo', label: 'Centros de custo', descricao: 'Ver resultado financeiro por centro de custo.' }
         ]
       },
       {
@@ -206,6 +230,13 @@ const MODULO_PERMISSION_GROUPS = [
           { key: 'fiscal.sync.run', label: 'Executar sincronizacao manual', descricao: 'Iniciar tentativa manual controlada de sincronizacao fiscal em DEV.' },
           { key: 'fiscal.logs.view', label: 'Visualizar logs fiscais', descricao: 'Consultar logs de processamento e auditoria tecnica fiscal.' }
         ]
+      },
+      {
+        key: 'fiscal.relatorios',
+        label: 'Relatórios Fiscais',
+        permissoes: [
+          { key: 'fiscal.relatorios.visualizar', label: 'Visualizar relatórios fiscais', descricao: 'Acessar o hub e o painel operacional fiscal.' }
+        ]
       }
     ]
   },
@@ -245,6 +276,13 @@ const MODULO_PERMISSION_GROUPS = [
           { key: 'contratos.geral.criar', label: 'Criar contratos', descricao: 'Abrir novos contratos.' },
           { key: 'contratos.geral.editar', label: 'Editar contratos', descricao: 'Alterar dados e status de contratos existentes.' }
         ]
+      },
+      {
+        key: 'contratos.relatorios',
+        label: 'Relatórios de Contratos',
+        permissoes: [
+          { key: 'contratos.relatorios.visualizar', label: 'Visualizar relatórios', descricao: 'Acessar relatórios operacionais e gerenciais de contratos.' }
+        ]
       }
     ]
   },
@@ -268,6 +306,13 @@ const MODULO_PERMISSION_GROUPS = [
           { key: 'comercial.vendas.visualizar', label: 'Visualizar vendas', descricao: 'Ver propostas, vendas e contratos comerciais.' },
           { key: 'comercial.vendas.criar', label: 'Criar proposta/venda', descricao: 'Registrar novas propostas e vendas.' },
           { key: 'comercial.vendas.contratos', label: 'Gerenciar contratos comerciais', descricao: 'Emitir e gerenciar contratos de venda.' }
+        ]
+      },
+      {
+        key: 'comercial.relatorios',
+        label: 'Relatórios Comerciais',
+        permissoes: [
+          { key: 'comercial.relatorios.visualizar', label: 'Visualizar relatórios', descricao: 'Acessar relatórios de VGV, contratos, unidades e estoque comercial.' }
         ]
       }
     ]
@@ -316,6 +361,13 @@ const MODULO_PERMISSION_GROUPS = [
         permissoes: [
           { key: 'crm.configuracoes.visualizar', label: 'Visualizar configuracoes', descricao: 'Ver canais, numeros e integracoes.' },
           { key: 'crm.configuracoes.gerenciar', label: 'Gerenciar configuracoes', descricao: 'Criar, editar e remover canais, numeros e integracoes.' }
+        ]
+      },
+      {
+        key: 'crm.relatorios',
+        label: 'Relatórios CRM',
+        permissoes: [
+          { key: 'crm.relatorios.visualizar', label: 'Visualizar relatórios', descricao: 'Acessar relatórios executivos e gerenciais do CRM.' }
         ]
       }
     ]
@@ -378,6 +430,13 @@ const MODULO_PERMISSION_GROUPS = [
           { key: 'rh_dp.fechamento.reabrir', label: 'Reabrir fechamento', descricao: 'Reabrir competencias fechadas quando necessario.' },
           { key: 'rh_dp.obrigacoes.visualizar', label: 'Visualizar obrigacoes', descricao: 'Acessar fechamentos e titulos gerados.' }
         ]
+      },
+      {
+        key: 'rh_dp.relatorios',
+        label: 'Relatórios RH/DP',
+        permissoes: [
+          { key: 'rh_dp.relatorios.visualizar', label: 'Visualizar relatórios', descricao: 'Acessar relatórios operacionais de colaboradores, documentos e apurações.' }
+        ]
       }
     ]
   },
@@ -415,7 +474,8 @@ const MODULO_PERMISSION_GROUPS = [
         key: 'provisoes.dashboard',
         label: 'Dashboard de Previsao',
         permissoes: [
-          { key: 'provisoes.dashboard.visualizar', label: 'Visualizar dashboard', descricao: 'Acessar a leitura gerencial de previsao por obra, periodo e categoria.' }
+          { key: 'provisoes.dashboard.visualizar', label: 'Visualizar dashboard', descricao: 'Acessar a leitura gerencial de previsao por obra, periodo e categoria.' },
+          { key: 'provisoes.relatorios.visualizar', label: 'Visualizar relatórios', descricao: 'Acessar relatórios operacionais e gerenciais de provisionamento.' }
         ]
       },
       {
@@ -423,6 +483,13 @@ const MODULO_PERMISSION_GROUPS = [
         label: 'Categorias Macro',
         permissoes: [
           { key: 'provisoes.categorias.gerenciar', label: 'Gerenciar categorias macro', descricao: 'Criar, editar, ativar e desativar categorias macro do modulo.' }
+        ]
+      },
+      {
+        key: 'provisoes.status',
+        label: 'Status e Aprovação',
+        permissoes: [
+          { key: 'provisoes.status.gerenciar', label: 'Gerenciar status', descricao: 'Habilita ações futuras de aprovação, tratamento e controle de status das provisões.' }
         ]
       }
     ]

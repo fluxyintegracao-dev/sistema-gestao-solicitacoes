@@ -105,7 +105,10 @@ export function canAccessCompras(user) {
       'compras.pedidos.aprovar',
       'compras.pedidos.auditoria',
       'compras.cotacoes.visualizar',
-      'compras.cotacoes.gerenciar'
+      'compras.cotacoes.gerenciar',
+      'compras.relatorios.visualizar',
+      'compras.relatorios.cotacoes',
+      'compras.relatorios.pedidos'
     ]);
   }
 
@@ -135,7 +138,9 @@ export function canViewComprasPedidos(user) {
       'compras.pedidos.visualizar',
       'compras.pedidos.criar',
       'compras.pedidos.aprovar',
-      'compras.pedidos.auditoria'
+      'compras.pedidos.auditoria',
+      'compras.relatorios.visualizar',
+      'compras.relatorios.pedidos'
     ]);
   }
   return canAccessCompras(user);
@@ -152,7 +157,9 @@ export function canViewComprasCotacoes(user) {
   if (hasConfiguredAreaPermissions(user)) {
     return hasAnyPermissao(user, [
       'compras.cotacoes.visualizar',
-      'compras.cotacoes.gerenciar'
+      'compras.cotacoes.gerenciar',
+      'compras.relatorios.visualizar',
+      'compras.relatorios.cotacoes'
     ]);
   }
   return canAccessCompras(user);
@@ -179,7 +186,15 @@ export function canAccessFinanceiro(user) {
       'financeiro.titulos.estornar',
       'financeiro.comprovantes.excluir',
       'financeiro.relatorios.visualizar',
+      'financeiro.relatorios.grupo_consolidado',
+      'financeiro.relatorios.fluxo_consolidado',
+      'financeiro.relatorios.dre',
+      'financeiro.relatorios.diagnostico_dre',
+      'financeiro.relatorios.intercompany',
+      'financeiro.relatorios.endividamento',
+      'financeiro.relatorios.analitico',
       'financeiro.relatorios.resultado_obras',
+      'financeiro.relatorios.centros_custo',
       'financeiro.conciliacao.visualizar',
       'financeiro.conciliacao.importar',
       'financeiro.conciliacao.conciliar',
@@ -195,7 +210,8 @@ export function canAccessFinanceiro(user) {
       'financeiro.pagamentos.auditar',
       'financeiro.pagamentos.configurar',
       'financeiro.favorecidos.visualizar',
-      'financeiro.favorecidos.gerenciar'
+      'financeiro.favorecidos.gerenciar',
+      'financeiro.favorecidos.auditar'
     ]);
   }
 
@@ -353,7 +369,8 @@ export function canAccessContratos(user) {
     return hasAnyPermissao(user, [
       'contratos.geral.visualizar',
       'contratos.geral.criar',
-      'contratos.geral.editar'
+      'contratos.geral.editar',
+      'contratos.relatorios.visualizar'
     ]);
   }
   return isAdminGeo(user) || userHasSetorCapability(user, 'eh_setor_obra');
@@ -367,7 +384,8 @@ export function canAccessComercial(user) {
     'comercial.empreendimentos.gerenciar',
     'comercial.vendas.visualizar',
     'comercial.vendas.criar',
-    'comercial.vendas.contratos'
+    'comercial.vendas.contratos',
+    'comercial.relatorios.visualizar'
   ]);
 }
 
@@ -386,7 +404,8 @@ export function canViewComercialContratos(user) {
   return hasAnyExplicitPermissao(user, [
     'comercial.vendas.visualizar',
     'comercial.vendas.criar',
-    'comercial.vendas.contratos'
+    'comercial.vendas.contratos',
+    'comercial.relatorios.visualizar'
   ]);
 }
 
@@ -402,7 +421,8 @@ const RH_DP_AREA_PERMISSION_KEYS = [
   'rh_dp.apuracao.editar',
   'rh_dp.fechamento.executar',
   'rh_dp.fechamento.reabrir',
-  'rh_dp.obrigacoes.visualizar'
+  'rh_dp.obrigacoes.visualizar',
+  'rh_dp.relatorios.visualizar'
 ];
 
 const RH_DP_LEGACY_TO_AREA = {
@@ -458,6 +478,8 @@ export function canAccessProvisoes(user) {
     hasPermissao(user, 'provisoes.cadastro.criar') ||
     hasPermissao(user, 'provisoes.cadastro.editar') ||
     hasPermissao(user, 'provisoes.dashboard.visualizar') ||
+    hasPermissao(user, 'provisoes.relatorios.visualizar') ||
+    hasPermissao(user, 'provisoes.status.gerenciar') ||
     hasPermissao(user, 'provisoes.categorias.gerenciar')
   );
 }
@@ -489,7 +511,11 @@ export function hasIntegracaoSiengeCapability(user, capability) {
 }
 
 export function canAccessRhDpDashboard(user) {
-  return canAccessRhDp(user) && hasRhDpCapability(user, 'rh_dp_dashboard_view');
+  if (!canAccessRhDp(user)) return false;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasAnyPermissao(user, ['rh_dp.dashboard.visualizar', 'rh_dp.relatorios.visualizar']);
+  }
+  return hasRhDpCapability(user, 'rh_dp_dashboard_view');
 }
 
 export function canAccessRhDpEmpresas(user) {
@@ -595,7 +621,10 @@ export function canManageProvisionamentosStatus(user) {
 }
 
 export function canViewProvisionamentosDashboard(user) {
-  return canAccessProvisoes(user) && hasPermissao(user, 'provisoes.dashboard.visualizar');
+  return canAccessProvisoes(user) && hasAnyPermissao(user, [
+    'provisoes.dashboard.visualizar',
+    'provisoes.relatorios.visualizar'
+  ]);
 }
 
 export function canManageProvisionamentoCategorias(user) {
@@ -630,9 +659,13 @@ const FISCAL_PERMISSION_KEYS = [
   'fiscal.view',
   'fiscal.config.manage',
   'fiscal.document.view',
+  'fiscal.document.upload',
   'fiscal.document.link',
+  'fiscal.document.ignore',
   'fiscal.sync.view',
-  'fiscal.logs.view'
+  'fiscal.sync.run',
+  'fiscal.logs.view',
+  'fiscal.relatorios.visualizar'
 ];
 
 export function canAccessFiscal(user) {
@@ -657,7 +690,7 @@ export function canViewFiscalDocuments(user) {
   if (!hasEnabledModule(user, 'FISCAL')) return false;
   if (isBusinessAdmin(user)) return true;
   if (hasConfiguredAreaPermissions(user)) {
-    return hasAnyPermissao(user, ['fiscal.document.view', 'fiscal.document.link']);
+    return hasAnyPermissao(user, ['fiscal.document.view', 'fiscal.document.upload', 'fiscal.document.link', 'fiscal.document.ignore', 'fiscal.relatorios.visualizar']);
   }
   return false;
 }
@@ -666,7 +699,7 @@ export function canViewFiscalLogs(user) {
   if (!hasEnabledModule(user, 'FISCAL')) return false;
   if (isBusinessAdmin(user)) return true;
   if (hasConfiguredAreaPermissions(user)) {
-    return hasAnyPermissao(user, ['fiscal.sync.view', 'fiscal.logs.view']);
+    return hasAnyPermissao(user, ['fiscal.sync.view', 'fiscal.sync.run', 'fiscal.logs.view', 'fiscal.relatorios.visualizar']);
   }
   return false;
 }
@@ -674,7 +707,7 @@ export function canViewFiscalLogs(user) {
 const CRM_PERFIS = ['SUPERADMIN', 'ADMIN', 'ADMINISTRADOR', 'ADMIN_CRM', 'GESTOR_COMERCIAL', 'COORDENADOR_CRM', 'DIRETORIA'];
 const CRM_PERFIS_EXPORT = ['SUPERADMIN', 'ADMIN', 'ADMINISTRADOR', 'ADMIN_CRM', 'GESTOR_COMERCIAL', 'COORDENADOR_CRM'];
 const CRM_PERFIS_REDISTRIBUTE = ['SUPERADMIN', 'ADMIN', 'ADMINISTRADOR', 'ADMIN_CRM', 'GESTOR_COMERCIAL', 'COORDENADOR_CRM'];
-const CRM_DASHBOARD_KEYS = ['crm.dashboard.visualizar'];
+const CRM_DASHBOARD_KEYS = ['crm.dashboard.visualizar', 'crm.relatorios.visualizar'];
 const CRM_LEADS_VIEW_KEYS = [
   'crm.leads.visualizar',
   'crm.leads.criar',

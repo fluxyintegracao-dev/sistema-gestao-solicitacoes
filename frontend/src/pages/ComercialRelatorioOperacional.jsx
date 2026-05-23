@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ResizableTable, ResizableTh } from '../components/ResizableTable';
+import { useUiVisibility } from '../hooks/useUiVisibility';
 import { getEmpreendimentosComerciais, getRelatorioComercialOperacional } from '../services/comercial';
 import { getObras } from '../services/obras';
 
@@ -100,6 +101,7 @@ function EmptyRow({ colSpan, message }) {
 }
 
 export default function ComercialRelatorioOperacional() {
+  const { isVisible } = useUiVisibility();
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [appliedFilters, setAppliedFilters] = useState(DEFAULT_FILTERS);
   const [empreendimentos, setEmpreendimentos] = useState([]);
@@ -242,6 +244,7 @@ export default function ComercialRelatorioOperacional() {
         <div className="app-empty-card">Carregando relatorio comercial...</div>
       ) : (
         <>
+          {isVisible('comercial.relatorio_operacional.metricas') ? (
           <div className="app-summary-grid">
             <Metric label="VGV carteira" value={formatCurrency(resumo.vgv_carteira)} detail={`${resumo.contratos_carteira || 0} contrato(s) ativo/quitado/inadimplente`} tone="success" />
             <Metric label="Contratos no periodo" value={resumo.contratos_periodo || 0} detail={`${resumo.contratos_distratados || 0} distrato(s)`} />
@@ -250,13 +253,17 @@ export default function ComercialRelatorioOperacional() {
             <Metric label="Descontos concedidos" value={formatCurrency(resumo.descontos_concedidos)} detail="Contratos da carteira no recorte" tone={resumo.descontos_concedidos > 0 ? 'warning' : 'default'} />
             <Metric label="Comissao prevista" value={formatCurrency(resumo.comissao_prevista)} detail="Percentual cadastrado no contrato" />
           </div>
+          ) : null}
 
+          {isVisible('comercial.relatorio_operacional.distribuicoes_principais') ? (
           <div className="grid gap-4 xl:grid-cols-3">
             <DistributionList title="VGV por empreendimento" rows={contratos.vgv_por_empreendimento || []} valueKey="valor" formatter={formatCurrency} />
             <DistributionList title="Contratos por status" rows={contratos.por_status || []} />
             <DistributionList title="Unidades por situacao" rows={unidades.por_situacao || []} />
           </div>
+          ) : null}
 
+          {isVisible('comercial.relatorio_operacional.contratos') ? (
           <section className="card sol-surface-card app-table-shell">
             <div className="border-b border-[var(--c-border)] px-4 py-3">
               <h2 className="text-lg font-semibold text-[var(--c-text)]">Contratos comerciais</h2>
@@ -295,12 +302,15 @@ export default function ComercialRelatorioOperacional() {
               </ResizableTable>
             </div>
           </section>
+          ) : null}
 
+          {isVisible('comercial.relatorio_operacional.distribuicoes_secundarias') ? (
           <div className="grid gap-4 xl:grid-cols-3">
             <DistributionList title="Estoque disponivel por empreendimento" rows={unidades.estoque_por_empreendimento || []} valueKey="valor" formatter={formatCurrency} />
             <DistributionList title="Contratos por corretor" rows={contratos.por_corretor || []} />
             <DistributionList title="Contratos por mes" rows={contratos.por_mes || []} />
           </div>
+          ) : null}
         </>
       )}
     </div>

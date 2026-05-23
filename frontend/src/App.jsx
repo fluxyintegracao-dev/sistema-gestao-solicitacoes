@@ -101,6 +101,7 @@ const GestaoContratos = lazy(() => import('./pages/GestaoContratos'));
 const ContratosRelatorioOperacional = lazy(() => import('./pages/ContratosRelatorioOperacional'));
 const Configuracoes = lazy(() => import('./pages/Configuracoes'));
 const ConfiguracoesSuporte = lazy(() => import('./pages/ConfiguracoesSuporte'));
+const ConfiguracoesVisibilidadeUi = lazy(() => import('./pages/ConfiguracoesVisibilidadeUi'));
 const EmpresasGrupo = lazy(() => import('./pages/EmpresasGrupo'));
 const AprovacaoDiretoria = lazy(() => import('./pages/AprovacaoDiretoria'));
 const TiposSubContrato = lazy(() => import('./pages/TiposSubContrato'));
@@ -612,6 +613,7 @@ export default function App() {
         <Route path="gestao-contratos" element={<ContratosRoute><GestaoContratos /></ContratosRoute>} />
         <Route path="configuracoes" element={<BusinessAdminRoute><Configuracoes /></BusinessAdminRoute>} />
         <Route path="configuracoes-suporte" element={<SuperadminRoute><ConfiguracoesSuporte /></SuperadminRoute>} />
+        <Route path="configuracoes-visibilidade-ui" element={<SuperadminRoute><ConfiguracoesVisibilidadeUi /></SuperadminRoute>} />
         <Route path="empresas-grupo" element={<SuperadminRoute><EmpresasGrupo /></SuperadminRoute>} />
         <Route path="aprovacao-diretoria" element={<BusinessAdminRoute><AprovacaoDiretoria /></BusinessAdminRoute>} />
         <Route path="tipos-sub-contrato" element={<BusinessAdminRoute><TiposSubContrato /></BusinessAdminRoute>} />

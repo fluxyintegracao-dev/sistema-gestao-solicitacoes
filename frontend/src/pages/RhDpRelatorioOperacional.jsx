@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ResizableTable, ResizableTh } from '../components/ResizableTable';
+import { useUiVisibility } from '../hooks/useUiVisibility';
 import { getObras } from '../services/obras';
 import { getRhEmpresasGrupo, getRhRelatorioOperacional } from '../services/rhDp';
 
@@ -108,6 +109,7 @@ function EmptyRow({ colSpan, message }) {
 }
 
 export default function RhDpRelatorioOperacional() {
+  const { isVisible } = useUiVisibility();
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [appliedFilters, setAppliedFilters] = useState(DEFAULT_FILTERS);
   const [empresas, setEmpresas] = useState([]);
@@ -249,6 +251,7 @@ export default function RhDpRelatorioOperacional() {
         <div className="app-empty-card">Carregando relatorio RH/DP...</div>
       ) : (
         <>
+          {isVisible('rhdp.relatorio_operacional.metricas') ? (
           <div className="app-summary-grid">
             <Metric label="Colaboradores ativos" value={resumo.colaboradores_ativos || 0} detail={`${resumo.colaboradores_total || 0} no recorte`} tone="success" />
             <Metric label="Afastados" value={resumo.colaboradores_afastados || 0} detail="Status cadastral atual" tone={resumo.colaboradores_afastados > 0 ? 'warning' : 'default'} />
@@ -257,13 +260,17 @@ export default function RhDpRelatorioOperacional() {
             <Metric label="Fechamentos no periodo" value={resumo.fechamentos_periodo || 0} detail={formatCurrency(resumo.total_fechado)} />
             <Metric label="Base mensal cadastrada" value={formatCurrency(resumo.base_mensal_cadastrada)} detail="Salario base ou valor contratual" />
           </div>
+          ) : null}
 
+          {isVisible('rhdp.relatorio_operacional.distribuicoes') ? (
           <div className="grid gap-4 xl:grid-cols-3">
             <DistributionList title="Headcount por empresa" rows={colaboradores.por_empresa || []} />
             <DistributionList title="Headcount por obra/centro" rows={colaboradores.por_obra || []} />
             <DistributionList title="Base cadastrada por empresa" rows={colaboradores.base_cadastrada_por_empresa || []} valueKey="valor" formatter={formatCurrency} />
           </div>
+          ) : null}
 
+          {isVisible('rhdp.relatorio_operacional.colaboradores') ? (
           <section className="card sol-surface-card app-table-shell">
             <div className="border-b border-[var(--c-border)] px-4 py-3">
               <h2 className="text-lg font-semibold text-[var(--c-text)]">Colaboradores</h2>
@@ -300,7 +307,9 @@ export default function RhDpRelatorioOperacional() {
               </ResizableTable>
             </div>
           </section>
+          ) : null}
 
+          {isVisible('rhdp.relatorio_operacional.documentos') ? (
           <section className="card sol-surface-card app-table-shell">
             <div className="border-b border-[var(--c-border)] px-4 py-3">
               <h2 className="text-lg font-semibold text-[var(--c-text)]">Documentos criticos</h2>
@@ -333,6 +342,7 @@ export default function RhDpRelatorioOperacional() {
               </ResizableTable>
             </div>
           </section>
+          ) : null}
         </>
       )}
     </div>

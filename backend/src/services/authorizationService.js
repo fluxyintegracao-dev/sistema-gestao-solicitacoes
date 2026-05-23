@@ -19,7 +19,15 @@ const FINANCEIRO_PERMISSION_KEYS = [
   'financeiro.titulos.estornar',
   'financeiro.comprovantes.excluir',
   'financeiro.relatorios.visualizar',
+  'financeiro.relatorios.grupo_consolidado',
+  'financeiro.relatorios.fluxo_consolidado',
+  'financeiro.relatorios.dre',
+  'financeiro.relatorios.diagnostico_dre',
+  'financeiro.relatorios.intercompany',
+  'financeiro.relatorios.endividamento',
+  'financeiro.relatorios.analitico',
   'financeiro.relatorios.resultado_obras',
+  'financeiro.relatorios.centros_custo',
   'financeiro.conciliacao.visualizar',
   'financeiro.conciliacao.importar',
   'financeiro.conciliacao.conciliar',
@@ -94,7 +102,9 @@ const COMPRAS_PEDIDOS_VIEW_KEYS = [
   'compras.pedidos.visualizar',
   'compras.pedidos.criar',
   'compras.pedidos.aprovar',
-  'compras.pedidos.auditoria'
+  'compras.pedidos.auditoria',
+  'compras.relatorios.visualizar',
+  'compras.relatorios.pedidos'
 ];
 
 const COMPRAS_PEDIDOS_MANAGE_KEYS = [
@@ -108,7 +118,9 @@ const COMPRAS_PEDIDOS_AUDIT_KEYS = [
 
 const COMPRAS_COTACOES_VIEW_KEYS = [
   'compras.cotacoes.visualizar',
-  'compras.cotacoes.gerenciar'
+  'compras.cotacoes.gerenciar',
+  'compras.relatorios.visualizar',
+  'compras.relatorios.cotacoes'
 ];
 
 const COMPRAS_COTACOES_MANAGE_KEYS = [
@@ -122,7 +134,8 @@ const COMPRAS_PERMISSION_KEYS = [
 
 const COMERCIAL_EMPREENDIMENTOS_VIEW_KEYS = [
   'comercial.empreendimentos.visualizar',
-  'comercial.empreendimentos.gerenciar'
+  'comercial.empreendimentos.gerenciar',
+  'comercial.relatorios.visualizar'
 ];
 
 const COMERCIAL_EMPREENDIMENTOS_MANAGE_KEYS = [
@@ -132,7 +145,8 @@ const COMERCIAL_EMPREENDIMENTOS_MANAGE_KEYS = [
 const COMERCIAL_CONTRATOS_VIEW_KEYS = [
   'comercial.vendas.visualizar',
   'comercial.vendas.criar',
-  'comercial.vendas.contratos'
+  'comercial.vendas.contratos',
+  'comercial.relatorios.visualizar'
 ];
 
 const COMERCIAL_CONTRATOS_CREATE_KEYS = [
@@ -157,7 +171,8 @@ const COMERCIAL_BASE_READ_KEYS = [
 const CONTRATOS_VIEW_KEYS = [
   'contratos.geral.visualizar',
   'contratos.geral.criar',
-  'contratos.geral.editar'
+  'contratos.geral.editar',
+  'contratos.relatorios.visualizar'
 ];
 
 const CONTRATOS_CREATE_KEYS = [
@@ -170,7 +185,8 @@ const CONTRATOS_MANAGE_KEYS = [
 ];
 
 const CRM_DASHBOARD_KEYS = [
-  'crm.dashboard.visualizar'
+  'crm.dashboard.visualizar',
+  'crm.relatorios.visualizar'
 ];
 
 const CRM_LEADS_VIEW_KEYS = [
@@ -257,7 +273,8 @@ const RH_DP_AREA_PERMISSION_KEYS = [
   'rh_dp.apuracao.editar',
   'rh_dp.fechamento.executar',
   'rh_dp.fechamento.reabrir',
-  'rh_dp.obrigacoes.visualizar'
+  'rh_dp.obrigacoes.visualizar',
+  'rh_dp.relatorios.visualizar'
 ];
 
 const INTEGRACAO_SIENGE_AREA_PERMISSION_KEYS = [
@@ -275,7 +292,8 @@ const FISCAL_PERMISSION_KEYS = [
   'fiscal.document.ignore',
   'fiscal.sync.view',
   'fiscal.sync.run',
-  'fiscal.logs.view'
+  'fiscal.logs.view',
+  'fiscal.relatorios.visualizar'
 ];
 
 const FISCAL_CONFIG_KEYS = [
@@ -286,7 +304,8 @@ const FISCAL_DOCUMENT_VIEW_KEYS = [
   'fiscal.document.view',
   'fiscal.document.upload',
   'fiscal.document.link',
-  'fiscal.document.ignore'
+  'fiscal.document.ignore',
+  'fiscal.relatorios.visualizar'
 ];
 
 const FISCAL_DOCUMENT_UPLOAD_KEYS = [
@@ -304,7 +323,8 @@ const FISCAL_DOCUMENT_IGNORE_KEYS = [
 const FISCAL_SYNC_VIEW_KEYS = [
   'fiscal.sync.view',
   'fiscal.sync.run',
-  'fiscal.logs.view'
+  'fiscal.logs.view',
+  'fiscal.relatorios.visualizar'
 ];
 
 const FISCAL_SYNC_RUN_KEYS = [
@@ -1104,7 +1124,8 @@ async function canAccessRhDp(user) {
     'rh_dp_apuracao_edit',
     'rh_dp_fechamento_execute',
     'rh_dp_fechamento_reopen',
-    'rh_dp_obrigacoes_view'
+    'rh_dp_obrigacoes_view',
+    'rh_dp.relatorios.visualizar'
   ]);
 }
 
@@ -1119,6 +1140,7 @@ async function canAccessProvisoes(user) {
     'provisoes.cadastro.editar',
     'provisoes.status.gerenciar',
     'provisoes.dashboard.visualizar',
+    'provisoes.relatorios.visualizar',
     'provisoes.categorias.gerenciar'
   ]);
 }
@@ -1283,6 +1305,7 @@ async function canViewProvisoes(user) {
     'provisoes.lista.visualizar',
     'provisoes.cadastro.criar',
     'provisoes.cadastro.editar',
+    'provisoes.relatorios.visualizar',
     'provisoes.categorias.gerenciar'
   ]);
 }
@@ -1319,7 +1342,7 @@ async function canViewProvisoesDashboard(user) {
     return true;
   }
 
-  return userHasAreaPermission(user, ['provisoes.dashboard.visualizar']);
+  return userHasAreaPermission(user, ['provisoes.dashboard.visualizar', 'provisoes.relatorios.visualizar']);
 }
 
 async function canManageProvisoesCategorias(user) {
@@ -1455,7 +1478,7 @@ async function canViewFiscalLogs(user) {
 }
 
 async function canViewRhDpDashboard(user) {
-  return userHasAreaOrRhDpLegacyPermission(user, ['rh_dp.dashboard.visualizar'], ['rh_dp_dashboard_view']);
+  return userHasAreaOrRhDpLegacyPermission(user, ['rh_dp.dashboard.visualizar', 'rh_dp.relatorios.visualizar'], ['rh_dp_dashboard_view']);
 }
 
 async function canManageRhDpEmpresas(user) {

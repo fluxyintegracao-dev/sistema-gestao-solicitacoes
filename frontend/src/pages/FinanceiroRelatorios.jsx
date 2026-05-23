@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ResizableTable, ResizableTh } from '../components/ResizableTable';
+import { useUiVisibility } from '../hooks/useUiVisibility';
 import { getRelatorioFluxoCaixa } from '../services/financeiro';
 import { getMinhasObras } from '../services/obras';
 
@@ -427,6 +428,7 @@ function FluxoComparativoCard({ serie }) {
 }
 
 export default function FinanceiroRelatorios() {
+  const { isVisible } = useUiVisibility();
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [appliedFilters, setAppliedFilters] = useState(DEFAULT_FILTERS);
   const [obras, setObras] = useState([]);
@@ -524,36 +526,54 @@ export default function FinanceiroRelatorios() {
             </p>
           </div>
           <div className="app-page-actions">
-            <Link to="/financeiro/relatorios/grupo-consolidado" className="btn btn-primary">
-              Grupo Consolidado
-            </Link>
-            <Link to="/financeiro/relatorios/fluxo-consolidado" className="btn btn-outline">
-              Fluxo Consolidado
-            </Link>
-            <Link to="/financeiro/relatorios/dre" className="btn btn-outline">
-              DRE
-            </Link>
-            <Link to="/financeiro/relatorios/dre/diagnostico" className="btn btn-outline">
-              Diagnostico DRE
-            </Link>
-            <Link to="/financeiro/relatorios/intercompany" className="btn btn-outline">
-              Intercompany
-            </Link>
-            <Link to="/financeiro/relatorios/endividamento" className="btn btn-outline">
-              Endividamento
-            </Link>
-            <Link to="/financeiro/relatorios/analitico" className="btn btn-outline">
-              Analitico
-            </Link>
+            {isVisible('relatorios.financeiro.grupo_consolidado') ? (
+              <Link to="/financeiro/relatorios/grupo-consolidado" className="btn btn-primary">
+                Grupo Consolidado
+              </Link>
+            ) : null}
+            {isVisible('relatorios.financeiro.fluxo_consolidado') ? (
+              <Link to="/financeiro/relatorios/fluxo-consolidado" className="btn btn-outline">
+                Fluxo Consolidado
+              </Link>
+            ) : null}
+            {isVisible('relatorios.financeiro.dre') ? (
+              <Link to="/financeiro/relatorios/dre" className="btn btn-outline">
+                DRE
+              </Link>
+            ) : null}
+            {isVisible('relatorios.financeiro.diagnostico_dre') ? (
+              <Link to="/financeiro/relatorios/dre/diagnostico" className="btn btn-outline">
+                Diagnostico DRE
+              </Link>
+            ) : null}
+            {isVisible('relatorios.financeiro.intercompany') ? (
+              <Link to="/financeiro/relatorios/intercompany" className="btn btn-outline">
+                Intercompany
+              </Link>
+            ) : null}
+            {isVisible('relatorios.financeiro.endividamento') ? (
+              <Link to="/financeiro/relatorios/endividamento" className="btn btn-outline">
+                Endividamento
+              </Link>
+            ) : null}
+            {isVisible('relatorios.financeiro.analitico') ? (
+              <Link to="/financeiro/relatorios/analitico" className="btn btn-outline">
+                Analitico
+              </Link>
+            ) : null}
             <Link to="/financeiro/baixas" className="btn btn-outline">
               Baixas
             </Link>
-            <Link to="/financeiro/relatorios/resultado-obras" className="btn btn-outline">
-              Resultado de Obras
-            </Link>
-            <Link to="/financeiro/relatorios/centros-custo" className="btn btn-outline">
-              Centros de Custo
-            </Link>
+            {isVisible('relatorios.financeiro.resultado_obras') ? (
+              <Link to="/financeiro/relatorios/resultado-obras" className="btn btn-outline">
+                Resultado de Obras
+              </Link>
+            ) : null}
+            {isVisible('relatorios.financeiro.centros_custo') ? (
+              <Link to="/financeiro/relatorios/centros-custo" className="btn btn-outline">
+                Centros de Custo
+              </Link>
+            ) : null}
             <Link to="/financeiro/titulos" className="btn btn-outline">
               Titulos
             </Link>
@@ -618,6 +638,7 @@ export default function FinanceiroRelatorios() {
         </div>
       ) : null}
 
+      {isVisible('financeiro.fluxo_caixa.metricas') ? (
       <div className="app-summary-grid">
         <RelatorioMetric
           label="Entradas previstas"
@@ -678,6 +699,7 @@ export default function FinanceiroRelatorios() {
           detail={`${relatorio.serie.length} ponto(s) na visualizacao`}
         />
       </div>
+      ) : null}
 
       {loading ? (
         <div className="app-empty-card">
@@ -685,8 +707,11 @@ export default function FinanceiroRelatorios() {
         </div>
       ) : (
         <>
-          <FluxoComparativoCard serie={relatorio.serie} />
+          {isVisible('financeiro.fluxo_caixa.grafico') ? (
+            <FluxoComparativoCard serie={relatorio.serie} />
+          ) : null}
 
+          {isVisible('financeiro.fluxo_caixa.detalhamento') ? (
           <section className="card sol-surface-card app-table-shell">
             <div className="border-b border-[var(--c-border)] px-4 py-3">
               <h2 className="text-lg font-semibold text-[var(--c-text)]">Detalhamento por periodo</h2>
@@ -744,6 +769,7 @@ export default function FinanceiroRelatorios() {
               </ResizableTable>
             </div>
           </section>
+          ) : null}
         </>
       )}
     </div>

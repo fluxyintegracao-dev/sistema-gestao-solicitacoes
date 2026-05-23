@@ -72,6 +72,11 @@ const SECOES_CONFIG = [
         title: 'WhatsApp do Suporte',
         description: 'Configure o numero aberto pelo botao Suporte no topo do sistema.',
         to: '/configuracoes-suporte'
+      },
+      {
+        title: 'Visibilidade de Dashboards e Tabelas',
+        description: 'Defina quais cards, dashboards e tabelas ficam visiveis nas telas do sistema.',
+        to: '/configuracoes-visibilidade-ui'
       }
     ]
   },

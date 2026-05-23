@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useUiVisibility } from '../hooks/useUiVisibility';
 import {
   obterDashboardDistribuicaoCrm,
   obterDashboardGerencialCrm,
@@ -58,6 +59,7 @@ function DistributionList({ title, subtitle, rows, labelGetter, valueGetter }) {
 }
 
 export default function CrmRelatorioExecutivo() {
+  const { isVisible } = useUiVisibility();
   const [dias, setDias] = useState(30);
   const [gerencial, setGerencial] = useState(null);
   const [sla, setSla] = useState(null);
@@ -150,6 +152,7 @@ export default function CrmRelatorioExecutivo() {
         <div className="app-empty-card">Carregando relatorio executivo CRM...</div>
       ) : (
         <>
+          {isVisible('crm.relatorio_executivo.metricas') ? (
           <div className="app-summary-grid">
             <Metric label="Leads ativos" value={gerencial?.kpis?.leadsAtivos || 0} detail="Carteira comercial atual" tone="info" />
             <Metric label="Entradas no periodo" value={gerencial?.kpis?.leadsPeriodo || 0} detail={`${dias} dia(s)`} />
@@ -158,7 +161,9 @@ export default function CrmRelatorioExecutivo() {
             <Metric label="Backlog SLA" value={sla?.kpis?.leadsSemAtividade || 0} detail={`${sla?.kpis?.tarefasVencidas || 0} tarefa(s) vencida(s)`} tone={sla?.kpis?.tarefasVencidas > 0 ? 'danger' : 'warning'} />
             <Metric label="Conversas em fila" value={(sla?.kpis?.conversasAbertas || 0) + (sla?.kpis?.conversasPendentes || 0)} detail={`${sla?.kpis?.mensagensNaoLidas || 0} nao lida(s)`} />
           </div>
+          ) : null}
 
+          {isVisible('crm.relatorio_executivo.leitura') ? (
           <section className="card sol-surface-card p-4">
             <h2 className="text-base font-semibold text-[var(--c-text)]">Leitura executiva</h2>
             <p className="mt-2 text-sm text-[var(--c-muted)]">
@@ -168,7 +173,9 @@ export default function CrmRelatorioExecutivo() {
               Os numeros vem dos dashboards operacionais do CRM. Esta tela apenas consolida a leitura para diretoria.
             </p>
           </section>
+          ) : null}
 
+          {isVisible('crm.relatorio_executivo.distribuicoes') ? (
           <div className="grid gap-4 xl:grid-cols-3">
             <DistributionList
               title="Origens de leads"
@@ -192,6 +199,7 @@ export default function CrmRelatorioExecutivo() {
               valueGetter={(row) => row.total}
             />
           </div>
+          ) : null}
         </>
       )}
     </div>

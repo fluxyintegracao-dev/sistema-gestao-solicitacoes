@@ -268,6 +268,7 @@ const AnexoController = require('./controllers/AnexoController');
 const NotificacaoController = require('./controllers/NotificacaoController');
 const SetorPermissaoController = require('./controllers/SetorPermissaoController');
 const ConfiguracaoSistemaController = require('./controllers/ConfiguracaoSistemaController');
+const UiVisibilityConfigController = require('./controllers/UiVisibilityConfigController');
 const ConversaInternaController = require('./controllers/ConversaInternaController');
 const ArquivoModeloController = require('./controllers/ArquivoModeloController');
 const UnidadeController = require('./controllers/UnidadeController');
@@ -1412,6 +1413,8 @@ router.patch('/configuracoes/usuarios-permissoes-rh-dp', allowBusinessAdmin, Con
 router.get('/configuracoes/permissoes-areas/registry', allowBusinessAdmin, PermissoesAreasController.registry);
 router.get('/configuracoes/permissoes-areas', allowBusinessAdmin, PermissoesAreasController.get);
 router.put('/configuracoes/permissoes-areas', allowBusinessAdmin, PermissoesAreasController.save);
+router.get('/configuracoes/visibilidade-ui', UiVisibilityConfigController.show);
+router.patch('/configuracoes/visibilidade-ui', permit(['SUPERADMIN']), UiVisibilityConfigController.update);
 router.get('/configuracoes/cotacoes', requireEnabledModule('COTACOES'), ConfiguracaoSistemaController.getCotacoesConfig);
 router.patch('/configuracoes/cotacoes', requireEnabledModule('COTACOES'), allowBusinessAdmin, ConfiguracaoSistemaController.setCotacoesConfig);
 router.get('/configuracoes/status-pedidos-compra', ConfiguracaoSistemaController.getStatusPedidosCompra);
