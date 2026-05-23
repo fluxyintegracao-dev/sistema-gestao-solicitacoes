@@ -263,20 +263,22 @@ function ReportCard({ item }) {
   const content = (
     <>
       <div className="flex items-start justify-between gap-3">
-        <h3 className="text-sm font-semibold text-slate-950">{item.titulo}</h3>
+        <h3 className="text-sm font-semibold text-[var(--c-text)]">{item.titulo}</h3>
         <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
-          item.to ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'
+          item.to
+            ? 'border border-emerald-200 bg-emerald-50 text-emerald-700'
+            : 'border border-[var(--c-border)] bg-[var(--c-surface)] text-[var(--c-muted)]'
         }`}>
           {item.status}
         </span>
       </div>
-      <p className="mt-2 text-sm leading-6 text-slate-500">{item.descricao}</p>
+      <p className="mt-2 text-sm leading-6 text-[var(--c-muted)]">{item.descricao}</p>
     </>
   );
 
   if (!item.to) {
     return (
-      <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50/70 p-4">
+      <div className="rounded-lg border border-dashed border-[var(--c-border)] bg-[var(--c-bg)] p-4">
         {content}
       </div>
     );
@@ -285,7 +287,7 @@ function ReportCard({ item }) {
   return (
     <Link
       to={item.to}
-      className="block rounded-lg border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-sky-200 hover:shadow-md"
+      className="block rounded-lg border border-[var(--c-border)] bg-[var(--c-bg)] p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-sky-200 hover:shadow-md"
     >
       {content}
     </Link>
@@ -317,17 +319,17 @@ export default function ModuloRelatorios({ modulo }) {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-lg border border-sky-100 bg-[linear-gradient(135deg,_rgba(255,255,255,0.96),_rgba(239,246,255,0.9))] px-6 py-6 shadow-sm">
-        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">{hub.modulo}</p>
-        <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">{hub.titulo}</h1>
-        <p className="mt-3 max-w-4xl text-sm leading-6 text-slate-600">{hub.subtitulo}</p>
+      <section className="rounded-lg border border-[var(--c-border)] bg-[var(--c-bg)] px-6 py-6 shadow-sm">
+        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--c-muted)]">{hub.modulo}</p>
+        <h1 className="mt-3 text-3xl font-semibold tracking-tight text-[var(--c-text)]">{hub.titulo}</h1>
+        <p className="mt-3 max-w-4xl text-sm leading-6 text-[var(--c-muted)]">{hub.subtitulo}</p>
       </section>
 
       {hub.secoes.map((secao) => (
         <section key={secao.titulo} className="sol-surface-card rounded-lg p-4 md:p-5">
           <div className="mb-4 flex items-center justify-between gap-3">
-            <h2 className="text-lg font-semibold text-slate-900">{secao.titulo}</h2>
-            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+            <h2 className="text-lg font-semibold text-[var(--c-text)]">{secao.titulo}</h2>
+            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--c-muted)]">
               {secao.itens.filter(podeVerItem).length} visoes
             </span>
           </div>
