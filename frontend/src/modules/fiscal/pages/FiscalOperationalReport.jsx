@@ -230,7 +230,7 @@ export default function FiscalOperationalReport() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="fiscal-page space-y-6">
       <section className="rounded-lg border border-sky-100 bg-[linear-gradient(135deg,_rgba(255,255,255,0.97),_rgba(239,246,255,0.92))] p-5 shadow-sm">
         <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div>
