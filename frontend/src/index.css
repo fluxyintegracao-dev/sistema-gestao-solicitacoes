@@ -7677,6 +7677,108 @@ body {
   color: #c7d2fe !important;
 }
 
+.dark .layout-shell .solicitacoes-page .resizable-table tbody tr,
+.dark .layout-shell .solicitacoes-page .sol-table tbody tr,
+.dark .layout-shell .solicitacoes-page table.w-full tbody tr,
+.dark .layout-shell .solicitacoes-page table.min-w-full tbody tr {
+  background: transparent;
+}
+
+.dark .layout-shell .solicitacoes-page .resizable-table tbody tr:nth-child(odd) td,
+.dark .layout-shell .solicitacoes-page .sol-table tbody tr:nth-child(odd) td,
+.dark .layout-shell .solicitacoes-page table.w-full tbody tr:nth-child(odd) td,
+.dark .layout-shell .solicitacoes-page table.min-w-full tbody tr:nth-child(odd) td {
+  background: rgba(15, 23, 42, 0.76);
+  color: var(--shell-text);
+}
+
+.dark .layout-shell .solicitacoes-page .resizable-table tbody tr:nth-child(even) td,
+.dark .layout-shell .solicitacoes-page .sol-table tbody tr:nth-child(even) td,
+.dark .layout-shell .solicitacoes-page table.w-full tbody tr:nth-child(even) td,
+.dark .layout-shell .solicitacoes-page table.min-w-full tbody tr:nth-child(even) td {
+  background: rgba(30, 41, 59, 0.66);
+  color: var(--shell-text);
+}
+
+.dark .layout-shell .solicitacoes-page .resizable-table tbody tr:hover td,
+.dark .layout-shell .solicitacoes-page .sol-table tbody tr:hover td,
+.dark .layout-shell .solicitacoes-page table.w-full tbody tr:hover td,
+.dark .layout-shell .solicitacoes-page table.min-w-full tbody tr:hover td {
+  background: color-mix(in srgb, var(--shell-primary) 16%, rgba(15, 23, 42, 0.82));
+}
+
+.dark .layout-shell .solicitacoes-page .resizable-table thead th,
+.dark .layout-shell .solicitacoes-page .sol-table thead th,
+.dark .layout-shell .solicitacoes-page table.w-full thead th,
+.dark .layout-shell .solicitacoes-page table.min-w-full thead th {
+  background: rgba(15, 23, 42, 0.72);
+  color: var(--shell-muted);
+}
+
+.dark .layout-shell .solicitacoes-page .resizable-table .app-status-pill,
+.dark .layout-shell .solicitacoes-page .sol-table .app-status-pill,
+.dark .layout-shell .solicitacoes-page table.w-full .app-status-pill,
+.dark .layout-shell .solicitacoes-page table.min-w-full .app-status-pill {
+  border: 1px solid var(--shell-border);
+}
+
+.dark .layout-shell .solicitacoes-page .resizable-table .bg-emerald-100,
+.dark .layout-shell .solicitacoes-page .sol-table .bg-emerald-100,
+.dark .layout-shell .solicitacoes-page table.w-full .bg-emerald-100,
+.dark .layout-shell .solicitacoes-page table.min-w-full .bg-emerald-100 {
+  background: rgba(16, 185, 129, 0.16) !important;
+  border-color: rgba(52, 211, 153, 0.35);
+  color: #86efac !important;
+}
+
+.dark .layout-shell .solicitacoes-page .resizable-table .bg-amber-100,
+.dark .layout-shell .solicitacoes-page .resizable-table .bg-yellow-100,
+.dark .layout-shell .solicitacoes-page .sol-table .bg-amber-100,
+.dark .layout-shell .solicitacoes-page .sol-table .bg-yellow-100,
+.dark .layout-shell .solicitacoes-page table.w-full .bg-amber-100,
+.dark .layout-shell .solicitacoes-page table.w-full .bg-yellow-100,
+.dark .layout-shell .solicitacoes-page table.min-w-full .bg-amber-100,
+.dark .layout-shell .solicitacoes-page table.min-w-full .bg-yellow-100 {
+  background: rgba(245, 158, 11, 0.16) !important;
+  border-color: rgba(245, 158, 11, 0.35);
+  color: #fde68a !important;
+}
+
+.dark .layout-shell .solicitacoes-page .resizable-table .bg-rose-100,
+.dark .layout-shell .solicitacoes-page .resizable-table .bg-red-100,
+.dark .layout-shell .solicitacoes-page .sol-table .bg-rose-100,
+.dark .layout-shell .solicitacoes-page .sol-table .bg-red-100,
+.dark .layout-shell .solicitacoes-page table.w-full .bg-rose-100,
+.dark .layout-shell .solicitacoes-page table.w-full .bg-red-100,
+.dark .layout-shell .solicitacoes-page table.min-w-full .bg-rose-100,
+.dark .layout-shell .solicitacoes-page table.min-w-full .bg-red-100 {
+  background: rgba(244, 63, 94, 0.16) !important;
+  border-color: rgba(251, 113, 133, 0.35);
+  color: #fda4af !important;
+}
+
+.dark .layout-shell .solicitacoes-page .resizable-table .bg-blue-100,
+.dark .layout-shell .solicitacoes-page .resizable-table .bg-sky-100,
+.dark .layout-shell .solicitacoes-page .sol-table .bg-blue-100,
+.dark .layout-shell .solicitacoes-page .sol-table .bg-sky-100,
+.dark .layout-shell .solicitacoes-page table.w-full .bg-blue-100,
+.dark .layout-shell .solicitacoes-page table.w-full .bg-sky-100,
+.dark .layout-shell .solicitacoes-page table.min-w-full .bg-blue-100,
+.dark .layout-shell .solicitacoes-page table.min-w-full .bg-sky-100 {
+  background: rgba(59, 130, 246, 0.16) !important;
+  border-color: rgba(96, 165, 250, 0.35);
+  color: #bfdbfe !important;
+}
+
+.dark .layout-shell .solicitacoes-page .resizable-table .bg-slate-100,
+.dark .layout-shell .solicitacoes-page .sol-table .bg-slate-100,
+.dark .layout-shell .solicitacoes-page table.w-full .bg-slate-100,
+.dark .layout-shell .solicitacoes-page table.min-w-full .bg-slate-100 {
+  background: rgba(148, 163, 184, 0.14) !important;
+  border-color: var(--shell-border);
+  color: var(--shell-muted) !important;
+}
+
 .dark .layout-shell .compras-solicitacoes-table-shell .compra-status-pill {
   border: 1px solid var(--shell-border);
 }
