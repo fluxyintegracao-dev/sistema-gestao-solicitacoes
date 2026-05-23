@@ -142,6 +142,7 @@ const ComercialModelosContrato = lazy(() => import('./pages/ComercialModelosCont
 const ComercialTabelasPreco = lazy(() => import('./pages/ComercialTabelasPreco'));
 const ComercialMapaUnidades = lazy(() => import('./pages/ComercialMapaUnidades'));
 const DashboardProvisionamentoFinanceiro = lazy(() => import('./modules/provisionamento-financeiro/pages/DashboardProvisionamentoFinanceiro'));
+const ProvisionamentoRelatorioOperacional = lazy(() => import('./modules/provisionamento-financeiro/pages/ProvisionamentoRelatorioOperacional'));
 const ProvisionamentosFinanceiros = lazy(() => import('./modules/provisionamento-financeiro/pages/ProvisionamentosFinanceiros'));
 const NovaProvisaoFinanceira = lazy(() => import('./modules/provisionamento-financeiro/pages/NovaProvisaoFinanceira'));
 const ProvisionamentoFinanceiroDetalhe = lazy(() => import('./modules/provisionamento-financeiro/pages/ProvisionamentoFinanceiroDetalhe'));
@@ -672,6 +673,7 @@ export default function App() {
         <Route path="comercial/modelos-contrato" element={<ComercialContratosRoute><ComercialModelosContrato /></ComercialContratosRoute>} />
         <Route path="provisoes-financeiras" element={<ProvisionamentosRoute><ProvisionamentosFinanceiros /></ProvisionamentosRoute>} />
         <Route path="provisoes-financeiras/relatorios" element={<ProvisionamentosDashboardRoute><ModuloRelatorios modulo="provisionamento" /></ProvisionamentosDashboardRoute>} />
+        <Route path="provisoes-financeiras/relatorios/operacional" element={<ProvisionamentosDashboardRoute><ProvisionamentoRelatorioOperacional /></ProvisionamentosDashboardRoute>} />
         <Route path="provisoes-financeiras/nova" element={<ProvisionamentosCreateRoute><NovaProvisaoFinanceira /></ProvisionamentosCreateRoute>} />
         <Route path="provisoes-financeiras/:id" element={<ProvisionamentosRoute><ProvisionamentoFinanceiroDetalhe /></ProvisionamentosRoute>} />
         <Route path="provisoes-financeiras/dashboard" element={<ProvisionamentosDashboardRoute><DashboardProvisionamentoFinanceiro /></ProvisionamentosDashboardRoute>} />

@@ -162,6 +162,7 @@ const HUBS = {
       {
         titulo: 'Disponiveis',
         itens: [
+          { titulo: 'Painel operacional', descricao: 'Pressao futura, vencidos nao tratados, prioridades e concentracao por obra e categoria.', to: '/provisoes-financeiras/relatorios/operacional', status: 'Disponivel', permissao: 'provisoesDashboard' },
           { titulo: 'Dashboard de previsao', descricao: 'Resumo gerencial das provisoes financeiras.', to: '/provisoes-financeiras/dashboard', status: 'Disponivel', permissao: 'provisoesDashboard' },
           { titulo: 'Provisionamentos', descricao: 'Lista analitica de provisoes e status.', to: '/provisoes-financeiras', status: 'Disponivel', permissao: 'provisoesLista' }
         ]
@@ -169,8 +170,8 @@ const HUBS = {
       {
         titulo: 'Proximas visoes',
         itens: [
-          { titulo: 'Aging de provisoes', descricao: 'Previsoes vencidas, realizadas e pendentes por categoria.', status: 'Planejado' },
-          { titulo: 'Impacto projetado no caixa', descricao: 'Provisoes por periodo, obra e empresa do grupo.', status: 'Planejado' }
+          { titulo: 'Integracao com fluxo consolidado', descricao: 'Comparar provisao, titulo financeiro e baixa efetiva no fluxo de caixa.', status: 'Planejado' },
+          { titulo: 'Empresa do grupo', descricao: 'Separar provisoes por empresa quando a obra/centro estiver plenamente vinculada.', status: 'Planejado' }
         ]
       }
     ]

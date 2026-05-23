@@ -90,6 +90,7 @@ Base multiempresa e DRE gerencial:
 - Solicitacoes > Relatorios > Painel Operacional ganhou evolucao mensal, aging por status e mapa setor x status, calculados no backend a partir das solicitacoes filtradas e dos historicos reais.
 - Solicitacoes ganhou configuracao explicita de SLA por setor e o Painel Operacional passou a exibir vencidos/no prazo somente quando houver regra real cadastrada para o setor.
 - Contratos > Relatorios ganhou Painel Operacional de Contratos, consolidando contratos ativos/inativos, valores, saldos, solicitacoes vinculadas, pendencias cadastrais, obras/centros, empresas do grupo e referencias com base nos campos estruturados existentes.
+- Provisionamento > Relatorios ganhou Painel Operacional de Provisionamento, reutilizando as regras reais do dashboard e da listagem para exibir pressao futura de caixa, vencidos nao tratados, proximos 7/30 dias, curva mensal, pipeline por status, obra/centro, categoria macro, curva semanal e analitico do recorte.
 
 Documentacao operacional complementar:
 
@@ -352,24 +353,26 @@ Objetivo: prever desembolso, antecipar pressao de caixa e comparar previsao x re
 
 Relatorios:
 
-- Provisionamentos por periodo.
-- Provisionamentos por obra.
-- Provisionamentos por centro de custo.
-- Provisionamentos por categoria macro.
-- Vencidos nao tratados.
-- Proximos 7/15/30 dias.
+- Provisionamentos por periodo. [Entregue no Painel Operacional de Provisionamento]
+- Provisionamentos por obra. [Entregue no Painel Operacional de Provisionamento]
+- Provisionamentos por centro de custo. [Entregue junto com obras/centros no Painel Operacional de Provisionamento]
+- Provisionamentos por categoria macro. [Entregue no Painel Operacional de Provisionamento]
+- Vencidos nao tratados. [Entregue no Painel Operacional de Provisionamento]
+- Proximos 7/15/30 dias. [Entregue para 7 e 30 dias no Painel Operacional de Provisionamento]
 - Previsao x titulo financeiro gerado.
 - Previsao x realizado.
-- Itens criticos.
-- Concentracao por obra ou fornecedor.
+- Itens criticos. [Entregue para prioridade critica nos proximos 7 dias]
+- Concentracao por obra ou fornecedor. [Entregue por obra/centro; fornecedor permanece planejado]
 
 Graficos:
 
-- Curva semanal/mensal de previsao.
-- Previsao por obra.
-- Previsao por categoria.
-- Aging de provisionamentos.
-- Pressao de caixa futura.
+- Curva semanal/mensal de previsao. [Entregue no Painel Operacional de Provisionamento]
+- Previsao por obra. [Entregue no Painel Operacional de Provisionamento]
+- Previsao por categoria. [Entregue no Painel Operacional de Provisionamento]
+- Aging de provisionamentos. [Entregue inicialmente por vencidas nao tratadas e status do pipeline]
+- Pressao de caixa futura. [Entregue nos cards de 7 e 30 dias]
+
+Observacao operacional: o relatorio de provisionamento usa os endpoints e escopos existentes do modulo. Ele nao cria relacao automatica entre provisao, titulo e baixa; a comparacao provisao x titulo financeiro gerado permanece planejada ate existir vinculo estruturado entre esses registros.
 
 ### RH/DP
 

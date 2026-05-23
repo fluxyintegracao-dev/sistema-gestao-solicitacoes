@@ -1910,6 +1910,42 @@ Usar provisionamento para:
 - provisao nao substitui titulo financeiro;
 - provisao ajuda fluxo futuro, mas precisa ser revisada.
 
+### 16.5 Relatorio Operacional de Provisionamento
+
+Caminho: Provisionamento > Relatorios > Painel operacional.
+
+Objetivo:
+
+- antecipar pressao futura de caixa;
+- identificar valores previstos nos proximos 7 e 30 dias;
+- acompanhar provisoes vencidas nao tratadas;
+- enxergar concentracao por obra ou centro de custo;
+- enxergar concentracao por categoria macro;
+- revisar itens criticos e o pipeline por status.
+
+Passo a passo:
+
+1. Abrir Provisionamento > Relatorios.
+2. Entrar em Painel operacional.
+3. Filtrar por obra/centro, categoria macro, status, prioridade e periodo.
+4. Conferir os cards Total previsto, Proximos 7 dias, Proximos 30 dias e Vencidas nao tratadas.
+5. Revisar a curva mensal prevista para identificar picos de desembolso.
+6. Conferir as tabelas por obra/centro, categoria macro, status e semana.
+7. Abrir o analitico e tratar provisoes com data vencida, prioridade critica ou alto valor.
+
+Regras importantes:
+
+- provisao e previsao, nao e obrigacao final;
+- quando o compromisso virar obrigacao real, deve ser criado ou vinculado ao titulo financeiro correto;
+- o relatorio nao tenta deduzir baixa ou pagamento a partir da provisao;
+- previsao x titulo financeiro gerado so deve ser analisado quando existir vinculo estruturado entre provisao e titulo.
+
+Rotina recomendada:
+
+- diariamente, revisar vencidas nao tratadas;
+- semanalmente, revisar proximos 7 e 30 dias;
+- mensalmente, comparar grandes provisoes com titulos financeiros efetivamente criados.
+
 ---
 
 ## 17. Modulo RH/DP
@@ -2323,6 +2359,9 @@ Devem responder:
 - compromissos por data;
 - necessidade futura de caixa;
 - provisoes vencidas ou nao revisadas.
+- concentracao por obra/centro;
+- concentracao por categoria macro;
+- prioridades criticas proximas.
 
 ### 20.9 Relatorios RH/DP
 
