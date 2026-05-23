@@ -2118,6 +2118,8 @@ Cuidados importantes:
 
 - permissoes de relatorio nao substituem permissao operacional;
 - uma pessoa pode ter acesso a relatorios sem poder criar, editar ou baixar titulos;
+- relatorios tambem devem ser liberados de forma granular quando houver risco de exposicao de dados entre setores;
+- no modulo de solicitacoes, a permissao `solicitacoes.relatorios.visualizar` libera o hub de relatorios, enquanto permissoes como `solicitacoes.relatorios.operacional`, `solicitacoes.relatorios.abertas` e `solicitacoes.relatorios.arquivadas` permitem controlar cada visao separadamente;
 - auditoria deve ser liberada somente para liderancas ou usuarios responsaveis por conferencia;
 - quando um modulo ganhar uma nova tela, revisar se existe permissao correspondente antes de treinar a equipe;
 - se um usuario nao encontra uma tela, verificar primeiro permissoes de area e depois modulos habilitados.

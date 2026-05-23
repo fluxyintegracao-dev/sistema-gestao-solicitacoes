@@ -35,6 +35,8 @@ import {
   canViewRhDpColaboradores,
   canViewRhDpDocumentos,
   canViewRhDpObrigacoes,
+  canViewSolicitacoesRelatorioOperacional,
+  canViewSolicitacoesRelatorios,
   canCreateCrmLeads,
   canManageFiscalConfig,
   canManageUsers,
@@ -236,6 +238,22 @@ function BusinessAdminRoute({ children }) {
 function EnabledModuleRoute({ moduleKey, children }) {
   const { user } = useAuth();
   if (!hasEnabledModule(user, moduleKey)) {
+    return <Navigate to="/" replace />;
+  }
+  return children;
+}
+
+function SolicitacoesRelatoriosRoute({ children }) {
+  const { user } = useAuth();
+  if (!canViewSolicitacoesRelatorios(user)) {
+    return <Navigate to="/" replace />;
+  }
+  return children;
+}
+
+function SolicitacoesRelatorioOperacionalRoute({ children }) {
+  const { user } = useAuth();
+  if (!canViewSolicitacoesRelatorioOperacional(user)) {
     return <Navigate to="/" replace />;
   }
   return children;
@@ -587,8 +605,8 @@ export default function App() {
         <Route index element={<Dashboard />} />
 
         <Route path="solicitacoes" element={<Solicitacoes />} />
-        <Route path="solicitacoes/relatorios" element={<ModuloRelatorios modulo="solicitacoes" />} />
-        <Route path="solicitacoes/relatorios/operacional" element={<SolicitacoesRelatorioOperacional />} />
+        <Route path="solicitacoes/relatorios" element={<SolicitacoesRelatoriosRoute><ModuloRelatorios modulo="solicitacoes" /></SolicitacoesRelatoriosRoute>} />
+        <Route path="solicitacoes/relatorios/operacional" element={<SolicitacoesRelatorioOperacionalRoute><SolicitacoesRelatorioOperacional /></SolicitacoesRelatorioOperacionalRoute>} />
         <Route path="solicitacoes-sla-setor" element={<BusinessAdminRoute><SolicitacoesSlaSetor /></BusinessAdminRoute>} />
         <Route path="solicitacoes-arquivadas" element={<SolicitacoesArquivadas />} />
         <Route path="solicitacoes/:id" element={<SolicitacaoDetalhe />} />

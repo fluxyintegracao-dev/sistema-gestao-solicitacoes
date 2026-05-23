@@ -56,6 +56,34 @@ export function canAccessSolicitacoes(user) {
   return hasEnabledModule(user, 'SOLICITACOES');
 }
 
+const SOLICITACOES_RELATORIOS_KEYS = [
+  'solicitacoes.relatorios.visualizar',
+  'solicitacoes.relatorios.operacional',
+  'solicitacoes.relatorios.abertas',
+  'solicitacoes.relatorios.arquivadas',
+  'solicitacoes.relatorios.sla_setor',
+  'solicitacoes.relatorios.funil',
+  'solicitacoes.relatorios.volume_obra_centro'
+];
+
+export function canViewSolicitacoesRelatorios(user) {
+  if (!canAccessSolicitacoes(user)) return false;
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasAnyPermissao(user, SOLICITACOES_RELATORIOS_KEYS);
+  }
+  return true;
+}
+
+export function canViewSolicitacoesRelatorioOperacional(user) {
+  if (!canAccessSolicitacoes(user)) return false;
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasPermissao(user, 'solicitacoes.relatorios.operacional');
+  }
+  return true;
+}
+
 export function canAccessPrioridadesDiretoria(user) {
   if (!canAccessSolicitacoes(user)) return false;
   if (isBusinessAdmin(user)) return true;

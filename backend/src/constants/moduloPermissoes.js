@@ -58,7 +58,13 @@ const MODULO_PERMISSION_GROUPS = [
         key: 'solicitacoes.relatorios',
         label: 'Relatórios de Solicitações',
         permissoes: [
-          { key: 'solicitacoes.relatorios.visualizar', label: 'Visualizar relatórios', descricao: 'Acessar os relatórios operacionais de solicitações.' }
+          { key: 'solicitacoes.relatorios.visualizar', label: 'Visualizar hub de relatórios', descricao: 'Acessar a página central de relatórios de solicitações.' },
+          { key: 'solicitacoes.relatorios.operacional', label: 'Painel operacional', descricao: 'Acessar o relatório operacional de volume, gargalos, status, setores e obra/centro.' },
+          { key: 'solicitacoes.relatorios.abertas', label: 'Solicitações abertas', descricao: 'Acessar a base operacional de solicitações abertas a partir do hub de relatórios.' },
+          { key: 'solicitacoes.relatorios.arquivadas', label: 'Solicitações arquivadas', descricao: 'Acessar o histórico de solicitações arquivadas a partir do hub de relatórios.' },
+          { key: 'solicitacoes.relatorios.sla_setor', label: 'SLA por setor', descricao: 'Acessar a configuração de SLA por setor usada na leitura dos relatórios.' },
+          { key: 'solicitacoes.relatorios.funil', label: 'Funil de solicitações', descricao: 'Preparar acesso futuro ao funil gerencial de solicitações.' },
+          { key: 'solicitacoes.relatorios.volume_obra_centro', label: 'Volume por obra/centro de custo', descricao: 'Preparar acesso futuro ao relatório de demanda por obra ou centro de custo.' }
         ]
       }
     ]

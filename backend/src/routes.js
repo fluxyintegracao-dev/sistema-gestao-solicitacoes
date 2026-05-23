@@ -239,7 +239,8 @@ const {
   canViewRhDpApuracao,
   canViewRhDpColaboradores,
   canViewRhDpDocumentos,
-  canViewRhDpObrigacoes
+  canViewRhDpObrigacoes,
+  canViewSolicitacoesRelatorioOperacional
 } = require('./services/authorizationService');
 
 const uploadComprovantes = require('./config/uploadComprovantes');
@@ -597,6 +598,14 @@ const allowComercialContratosManage = permit({
 });
 
 const allowBusinessAdmin = permit(['SUPERADMIN', 'ADMINISTRADOR']);
+const allowSolicitacoesRelatorioOperacional = permit({
+  resource: 'SOLICITACOES_RELATORIOS',
+  custom: async (req) => (
+    (await canViewSolicitacoesRelatorioOperacional(req.user))
+      ? true
+      : 'Acesso negado ao relatorio operacional de solicitacoes'
+  )
+});
 const allowEmpresasGrupoRead = permit({
   resource: 'EMPRESAS_GRUPO',
   custom: async (req) => (
@@ -870,7 +879,7 @@ router.post('/solicitacoes', validateRequest({ body: validateSolicitacaoCreateBo
 router.get('/solicitacoes/filtros/obras', SolicitacaoController.obrasVisiveis);
 router.get('/solicitacoes', SolicitacaoController.index);
 router.get('/solicitacoes/resumo', SolicitacaoController.resumo);
-router.get('/solicitacoes/relatorios/operacional', RelatorioSolicitacoesController.operacional);
+router.get('/solicitacoes/relatorios/operacional', allowSolicitacoesRelatorioOperacional, RelatorioSolicitacoesController.operacional);
 router.get('/solicitacoes/:id/resumo-lista', validateRequest({ params: validateNumericIdParam('id', 'Solicitacao') }), SolicitacaoController.resumoLista);
 router.get('/solicitacoes/:id', validateRequest({ params: validateNumericIdParam('id', 'Solicitacao') }), SolicitacaoController.show);
 router.patch('/solicitacoes/:id/status', validateRequest({ params: validateNumericIdParam('id', 'Solicitacao'), body: validateSolicitacaoStatusBody }), auditSuccess({ eventType: 'SOLICITACAO_STATUS_UPDATED', resourceType: 'SOLICITACAO', description: 'Status da solicitacao atualizado', resourceIdResolver: (req) => req.params.id }), SolicitacaoController.updateStatus);

@@ -16,6 +16,9 @@ import {
   canViewRhDpApuracao,
   canViewRhDpColaboradores,
   canViewRhDpObrigacoes,
+  canViewSolicitacoesRelatorioOperacional,
+  canViewSolicitacoesRelatorios,
+  hasPermissao,
   isBusinessAdmin
 } from '../utils/acessoProduto';
 
@@ -34,7 +37,9 @@ const PERMISSIONS = {
   rhDpApuracao: canViewRhDpApuracao,
   rhDpColaboradores: canViewRhDpColaboradores,
   rhDpImportacoes: canExecuteRhDpImportacoes,
-  rhDpObrigacoes: canViewRhDpObrigacoes
+  rhDpObrigacoes: canViewRhDpObrigacoes,
+  solicitacoesRelatorioOperacional: canViewSolicitacoesRelatorioOperacional,
+  solicitacoesRelatorios: canViewSolicitacoesRelatorios
 };
 
 const HUBS = {
@@ -46,17 +51,17 @@ const HUBS = {
       {
         titulo: 'Operacao',
         itens: [
-          { titulo: 'Painel operacional', descricao: 'Volume, funil, gargalos e distribuicao por status, setor e obra/centro.', to: '/solicitacoes/relatorios/operacional', status: 'Disponivel', componentKey: 'relatorios.solicitacoes.operacional' },
-          { titulo: 'Solicitacoes abertas', descricao: 'Base operacional para filtros por status, setor, tipo e responsavel.', to: '/solicitacoes', status: 'Disponivel', componentKey: 'relatorios.solicitacoes.abertas' },
-          { titulo: 'Solicitacoes arquivadas', descricao: 'Historico de solicitacoes encerradas ou fora da fila operacional.', to: '/solicitacoes-arquivadas', status: 'Disponivel', componentKey: 'relatorios.solicitacoes.arquivadas' },
-          { titulo: 'SLA por setor', descricao: 'Configuracao real de prazos por setor para leitura do painel operacional.', to: '/solicitacoes-sla-setor', status: 'Disponivel', permissao: 'businessAdmin', componentKey: 'relatorios.solicitacoes.sla_setor' }
+          { titulo: 'Painel operacional', descricao: 'Volume, funil, gargalos e distribuicao por status, setor e obra/centro.', to: '/solicitacoes/relatorios/operacional', status: 'Disponivel', permissao: 'solicitacoesRelatorioOperacional', permissaoKey: 'solicitacoes.relatorios.operacional', componentKey: 'relatorios.solicitacoes.operacional' },
+          { titulo: 'Solicitacoes abertas', descricao: 'Base operacional para filtros por status, setor, tipo e responsavel.', to: '/solicitacoes', status: 'Disponivel', permissao: 'solicitacoesRelatorios', permissaoKey: 'solicitacoes.relatorios.abertas', componentKey: 'relatorios.solicitacoes.abertas' },
+          { titulo: 'Solicitacoes arquivadas', descricao: 'Historico de solicitacoes encerradas ou fora da fila operacional.', to: '/solicitacoes-arquivadas', status: 'Disponivel', permissao: 'solicitacoesRelatorios', permissaoKey: 'solicitacoes.relatorios.arquivadas', componentKey: 'relatorios.solicitacoes.arquivadas' },
+          { titulo: 'SLA por setor', descricao: 'Configuracao real de prazos por setor para leitura do painel operacional.', to: '/solicitacoes-sla-setor', status: 'Disponivel', permissao: 'businessAdmin', permissaoKey: 'solicitacoes.relatorios.sla_setor', componentKey: 'relatorios.solicitacoes.sla_setor' }
         ]
       },
       {
         titulo: 'Gestao',
         itens: [
-          { titulo: 'Funil de solicitacoes', descricao: 'Criadas, assumidas, enviadas, aprovadas, concluidas e arquivadas.', status: 'Planejado', componentKey: 'relatorios.solicitacoes.funil' },
-          { titulo: 'Volume por obra/centro de custo', descricao: 'Demanda operacional por origem de custo.', status: 'Planejado', componentKey: 'relatorios.solicitacoes.volume_obra_centro' }
+          { titulo: 'Funil de solicitacoes', descricao: 'Criadas, assumidas, enviadas, aprovadas, concluidas e arquivadas.', status: 'Planejado', permissao: 'solicitacoesRelatorios', permissaoKey: 'solicitacoes.relatorios.funil', componentKey: 'relatorios.solicitacoes.funil' },
+          { titulo: 'Volume por obra/centro de custo', descricao: 'Demanda operacional por origem de custo.', status: 'Planejado', permissao: 'solicitacoesRelatorios', permissaoKey: 'solicitacoes.relatorios.volume_obra_centro', componentKey: 'relatorios.solicitacoes.volume_obra_centro' }
         ]
       }
     ]
@@ -269,12 +274,18 @@ export default function ModuloRelatorios({ modulo }) {
       return false;
     }
 
-    if (!item.permissao) {
-      return true;
+    if (item.permissao) {
+      const check = PERMISSIONS[item.permissao];
+      if (typeof check === 'function' && !check(user)) {
+        return false;
+      }
     }
 
-    const check = PERMISSIONS[item.permissao];
-    return typeof check === 'function' ? check(user) : true;
+    if (item.permissaoKey) {
+      return hasPermissao(user, item.permissaoKey);
+    }
+
+    return true;
   };
 
   return (

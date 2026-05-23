@@ -66,6 +66,7 @@ import {
   canViewRhDpColaboradores,
   canViewRhDpDocumentos,
   canViewRhDpObrigacoes,
+  canViewSolicitacoesRelatorios,
   canAccessCrm,
   canCreateCrmLeads,
   canManageFiscalConfig,
@@ -264,6 +265,7 @@ export default function Layout() {
   const comprasCotacoesAccess = canViewComprasCotacoes(user);
   const comprasCotacoesManageAccess = canManageComprasCotacoes(user);
   const prioridadesDiretoriaAccess = canAccessPrioridadesDiretoria(user);
+  const solicitacoesRelatoriosAccess = canViewSolicitacoesRelatorios(user);
   const financeiroAccess = canAccessFinanceiro(user);
   const fiscalAccess = canAccessFiscal(user);
   const fiscalConfigAccess = canManageFiscalConfig(user);
@@ -343,7 +345,7 @@ export default function Layout() {
 
     addGroup('Solicitacoes', [
       item('/solicitacoes', solicitacoesLabel, HiOutlineDocumentText),
-      item('/solicitacoes/relatorios', 'Relatorios', HiOutlineDocumentText),
+      solicitacoesRelatoriosAccess ? item('/solicitacoes/relatorios', 'Relatorios', HiOutlineDocumentText) : null,
       item('/solicitacoes-arquivadas', 'Arquivadas', HiOutlineArchiveBox),
       prioridadesDiretoriaAccess ? item('/prioridades-diretoria', 'Prioridades Diretoria', HiOutlineBanknotes) : null,
       perfil !== 'SETOR' && perfil !== 'FINANCEIRO'
@@ -541,6 +543,7 @@ export default function Layout() {
     moduloCotacoesHabilitado,
     obrasAccess,
     prioridadesDiretoriaAccess,
+    solicitacoesRelatoriosAccess,
     provisoesAccess,
     provisoesCategoriasAccess,
     provisoesCreateAccess,

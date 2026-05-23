@@ -98,6 +98,20 @@ const SOLICITACOES_PRIORIDADES_DELETE_KEYS = [
   'solicitacoes.prioridades.excluir'
 ];
 
+const SOLICITACOES_RELATORIOS_VIEW_KEYS = [
+  'solicitacoes.relatorios.visualizar',
+  'solicitacoes.relatorios.operacional',
+  'solicitacoes.relatorios.abertas',
+  'solicitacoes.relatorios.arquivadas',
+  'solicitacoes.relatorios.sla_setor',
+  'solicitacoes.relatorios.funil',
+  'solicitacoes.relatorios.volume_obra_centro'
+];
+
+const SOLICITACOES_RELATORIO_OPERACIONAL_KEYS = [
+  'solicitacoes.relatorios.operacional'
+];
+
 const COMPRAS_PEDIDOS_VIEW_KEYS = [
   'compras.pedidos.visualizar',
   'compras.pedidos.criar',
@@ -946,6 +960,30 @@ async function canDeleteSolicitacaoAnexo(user) {
   return userHasSetorCapability(user, 'eh_setor_compras');
 }
 
+async function canViewSolicitacoesRelatorios(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, SOLICITACOES_RELATORIOS_VIEW_KEYS);
+  }
+
+  return true;
+}
+
+async function canViewSolicitacoesRelatorioOperacional(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, SOLICITACOES_RELATORIO_OPERACIONAL_KEYS);
+  }
+
+  return true;
+}
+
 async function canViewPrioridadesDiretoria(user) {
   if (isBusinessAdmin(user)) {
     return true;
@@ -1788,6 +1826,8 @@ module.exports = {
   canViewFiscalSync,
   canViewPaymentBeneficiaries,
   canViewPrioridadesDiretoria,
+  canViewSolicitacoesRelatorioOperacional,
+  canViewSolicitacoesRelatorios,
   canSendCrmAtendimento,
   canViewComercialContratos,
   canViewComercialEmpreendimentos,
