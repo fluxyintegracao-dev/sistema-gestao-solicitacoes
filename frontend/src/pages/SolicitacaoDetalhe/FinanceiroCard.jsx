@@ -1117,7 +1117,7 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
                 Considerar este titulo na DRE gerencial
               </label>
 
-              <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-3">
+              <div className="financeiro-formas-pagamento space-y-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-3">
                 <label className="flex items-center gap-2 text-sm text-[var(--c-text)]">
                   <input
                     type="checkbox"
@@ -1208,7 +1208,7 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
                   const cartoesFiltrados = cartoes.filter((item) => item.ativo !== false && cartaoCompativelComForma(item, forma));
 
                   return (
-                    <div key={pagamento.id || pagamentoIndex} className="space-y-3 rounded-2xl border border-slate-200 bg-white p-3">
+                    <div key={pagamento.id || pagamentoIndex} className="financeiro-forma-pagamento-item space-y-3 rounded-2xl border border-slate-200 bg-white p-3">
                       <div className="flex items-center justify-between gap-2">
                         <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
                           Forma {pagamentoIndex + 1}
@@ -1239,7 +1239,7 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
                         <div className="text-sm">
                           <span className="mb-1 block text-slate-500">Valor desta forma</span>
                           {usaDetalhe ? (
-                            <div className="input flex items-center bg-slate-50 text-slate-700">
+                            <div className="financeiro-forma-pagamento-readonly input flex items-center bg-slate-50 text-slate-700">
                               {pagamento.valor || 'R$ 0,00'}
                             </div>
                           ) : (
@@ -1272,7 +1272,7 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
                         ) : (
                           <div className="text-sm">
                             <span className="mb-1 block text-slate-500">Parcelas</span>
-                            <div className="input flex items-center bg-slate-50 text-slate-500">1 parcela</div>
+                            <div className="financeiro-forma-pagamento-readonly input flex items-center bg-slate-50 text-slate-500">1 parcela</div>
                           </div>
                         )}
 
@@ -1289,7 +1289,7 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
                         ) : usaDetalhe ? (
                           <div className="text-sm">
                             <span className="mb-1 block text-slate-500">Vencimento</span>
-                            <div className="input flex items-center bg-slate-50 text-slate-500">Definido nas parcelas</div>
+                            <div className="financeiro-forma-pagamento-readonly input flex items-center bg-slate-50 text-slate-500">Definido nas parcelas</div>
                           </div>
                         ) : (
                           <label className="text-sm">
@@ -1330,7 +1330,7 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
                             Informe vencimento e valor de cada {isFormaCheque(forma) ? 'cheque' : 'boleto'}.
                           </div>
                           {(pagamento.parcelas || []).map((parcela, parcelaIndex) => (
-                            <div key={parcelaIndex} className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                            <div key={parcelaIndex} className="financeiro-forma-pagamento-parcela rounded-2xl border border-slate-200 bg-slate-50 p-3">
                               <div className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
                                 Parcela {parcelaIndex + 1}/{quantidade}
                               </div>

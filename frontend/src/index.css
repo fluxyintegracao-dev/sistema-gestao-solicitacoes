@@ -2795,6 +2795,33 @@ a:hover {
   color: #bfdbfe;
 }
 
+.dark .financeiro-formas-pagamento {
+  border-color: var(--shell-border) !important;
+  background: rgba(15, 23, 42, 0.72) !important;
+  color: var(--shell-text);
+}
+
+.dark .financeiro-formas-pagamento :is(.text-\[var\(--c-text\)\], .text-slate-700) {
+  color: var(--shell-text) !important;
+}
+
+.dark .financeiro-formas-pagamento :is(.text-slate-500, .text-slate-400) {
+  color: var(--shell-muted) !important;
+}
+
+.dark .financeiro-forma-pagamento-item,
+.dark .financeiro-forma-pagamento-parcela {
+  border-color: var(--shell-border) !important;
+  background: rgba(30, 41, 59, 0.74) !important;
+  color: var(--shell-text);
+}
+
+.dark .financeiro-forma-pagamento-readonly {
+  border-color: color-mix(in srgb, var(--shell-border) 84%, var(--shell-primary)) !important;
+  background: rgba(15, 23, 42, 0.78) !important;
+  color: var(--shell-text) !important;
+}
+
 .solicitacao-nova-page .nova-solicitacao-obra-badge-selected {
   background: color-mix(in srgb, var(--c-primary) 16%, #ffffff);
 }
