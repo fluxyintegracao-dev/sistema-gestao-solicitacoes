@@ -894,7 +894,7 @@ export default function NovaSolicitacaoCompra() {
 
       {modalApropriacaoIndex !== null && itemModalAtual && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
-          <div className="card w-full max-w-3xl">
+          <div className="card w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <div className="card-header flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h2 className="font-semibold">Apropriar item</h2>
