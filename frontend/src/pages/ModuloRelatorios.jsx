@@ -46,17 +46,17 @@ const HUBS = {
       {
         titulo: 'Operacao',
         itens: [
-          { titulo: 'Painel operacional', descricao: 'Volume, funil, gargalos e distribuicao por status, setor e obra/centro.', to: '/solicitacoes/relatorios/operacional', status: 'Disponivel' },
-          { titulo: 'Solicitacoes abertas', descricao: 'Base operacional para filtros por status, setor, tipo e responsavel.', to: '/solicitacoes', status: 'Disponivel' },
-          { titulo: 'Solicitacoes arquivadas', descricao: 'Historico de solicitacoes encerradas ou fora da fila operacional.', to: '/solicitacoes-arquivadas', status: 'Disponivel' },
-          { titulo: 'SLA por setor', descricao: 'Configuracao real de prazos por setor para leitura do painel operacional.', to: '/solicitacoes-sla-setor', status: 'Disponivel', permissao: 'businessAdmin' }
+          { titulo: 'Painel operacional', descricao: 'Volume, funil, gargalos e distribuicao por status, setor e obra/centro.', to: '/solicitacoes/relatorios/operacional', status: 'Disponivel', componentKey: 'relatorios.solicitacoes.operacional' },
+          { titulo: 'Solicitacoes abertas', descricao: 'Base operacional para filtros por status, setor, tipo e responsavel.', to: '/solicitacoes', status: 'Disponivel', componentKey: 'relatorios.solicitacoes.abertas' },
+          { titulo: 'Solicitacoes arquivadas', descricao: 'Historico de solicitacoes encerradas ou fora da fila operacional.', to: '/solicitacoes-arquivadas', status: 'Disponivel', componentKey: 'relatorios.solicitacoes.arquivadas' },
+          { titulo: 'SLA por setor', descricao: 'Configuracao real de prazos por setor para leitura do painel operacional.', to: '/solicitacoes-sla-setor', status: 'Disponivel', permissao: 'businessAdmin', componentKey: 'relatorios.solicitacoes.sla_setor' }
         ]
       },
       {
         titulo: 'Gestao',
         itens: [
-          { titulo: 'Funil de solicitacoes', descricao: 'Criadas, assumidas, enviadas, aprovadas, concluidas e arquivadas.', status: 'Planejado' },
-          { titulo: 'Volume por obra/centro de custo', descricao: 'Demanda operacional por origem de custo.', status: 'Planejado' }
+          { titulo: 'Funil de solicitacoes', descricao: 'Criadas, assumidas, enviadas, aprovadas, concluidas e arquivadas.', status: 'Planejado', componentKey: 'relatorios.solicitacoes.funil' },
+          { titulo: 'Volume por obra/centro de custo', descricao: 'Demanda operacional por origem de custo.', status: 'Planejado', componentKey: 'relatorios.solicitacoes.volume_obra_centro' }
         ]
       }
     ]

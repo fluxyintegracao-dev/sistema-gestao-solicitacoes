@@ -7,6 +7,19 @@ const UI_VISIBILITY_COMPONENTS = [
     description: 'Cards de entrada para relatorios por modulo.',
     pages: [
       {
+        key: 'relatorios.hub.solicitacoes',
+        path: '/solicitacoes/relatorios',
+        label: 'Relatorios de Solicitacoes',
+        components: [
+          { key: 'relatorios.solicitacoes.operacional', label: 'Painel operacional', type: 'card' },
+          { key: 'relatorios.solicitacoes.abertas', label: 'Solicitacoes abertas', type: 'card' },
+          { key: 'relatorios.solicitacoes.arquivadas', label: 'Solicitacoes arquivadas', type: 'card' },
+          { key: 'relatorios.solicitacoes.sla_setor', label: 'SLA por setor', type: 'card' },
+          { key: 'relatorios.solicitacoes.funil', label: 'Funil de solicitacoes', type: 'card' },
+          { key: 'relatorios.solicitacoes.volume_obra_centro', label: 'Volume por obra/centro de custo', type: 'card' }
+        ]
+      },
+      {
         key: 'relatorios.hub.compras',
         path: '/compras/relatorios',
         label: 'Relatorios de Compras',
