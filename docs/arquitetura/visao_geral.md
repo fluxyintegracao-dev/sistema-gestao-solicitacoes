@@ -65,6 +65,8 @@ Responsavel por:
 
 Nao existe dependencia de `sync({ alter: true })`.
 
+A migration historica `202603280001_legacy_schema_bootstrap.js` preserva compatibilidade com bancos antigos, mas nao executa `sequelize.sync()` por padrao. Qualquer bootstrap legado com `sync()` exige a variavel explicita `ALLOW_LEGACY_SCHEMA_BOOTSTRAP_SYNC=true` e deve ser tratado como operacao excepcional e controlada.
+
 ## Modularidade de Produto
 
 O FLUXY usa configuracao central de modulos habilitados para controlar menu, rotas e disponibilidade funcional por instalacao.

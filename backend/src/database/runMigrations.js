@@ -62,13 +62,15 @@ async function runMigrations() {
       return originalAddColumn(table, column, definition, options);
     };
 
-    await migration.up({
-      DataTypes: Sequelize.DataTypes,
-      queryInterface: qi,
-      sequelize
-    });
-
-    qi.addColumn = originalAddColumn;
+    try {
+      await migration.up({
+        DataTypes: Sequelize.DataTypes,
+        queryInterface: qi,
+        sequelize
+      });
+    } finally {
+      qi.addColumn = originalAddColumn;
+    }
 
     await sequelize.query(
       `INSERT INTO ${MIGRATIONS_TABLE} (name) VALUES (${sequelize.escape(fileName)})`
