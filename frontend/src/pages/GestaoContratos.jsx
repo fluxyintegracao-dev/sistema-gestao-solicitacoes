@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { HiArrowDownTray, HiArrowUpTray, HiPaperClip } from 'react-icons/hi2';
+import { useEffect, useMemo, useState } from 'react';
+import { HiArrowDownTray, HiArrowUpTray, HiPaperClip, HiDocumentArrowDown } from 'react-icons/hi2';
 import { useAuth } from '../contexts/AuthContext';
 import { isGeoSetor } from '../utils/setor';
 import { API_URL, authHeaders, fileUrl } from '../services/api';
@@ -14,6 +14,9 @@ import {
   importarContratosEmMassa,
   uploadContratoAnexos
 } from '../services/contratos';
+import { getMinhaPermissaoListarTodasSolicitacoes } from '../services/configuracoesSistema';
+
+const LIMITE_TODOS_CONTRATOS = 'ALL';
 
 export default function GestaoContratos() {
   const { user } = useAuth();
@@ -51,6 +54,10 @@ export default function GestaoContratos() {
   const [anexos, setAnexos] = useState([]);
   const [uploadAnexos, setUploadAnexos] = useState([]);
   const [importandoContratos, setImportandoContratos] = useState(false);
+  const [selecionadosIds, setSelecionadosIds] = useState([]);
+  const [paginaAtual, setPaginaAtual] = useState(1);
+  const [limitePorPagina, setLimitePorPagina] = useState(25);
+  const [podeListarTodosContratos, setPodeListarTodosContratos] = useState(false);
 
   const setorTokens = [
     String(user?.setor?.nome || '').toUpperCase(),
@@ -72,11 +79,41 @@ export default function GestaoContratos() {
     }
   }, [podeAcessar, isSetorObra]);
 
+  useEffect(() => {
+    let ativo = true;
+
+    async function carregarPermissaoListarTodos() {
+      try {
+        const data = await getMinhaPermissaoListarTodasSolicitacoes();
+        if (ativo) {
+          setPodeListarTodosContratos(Boolean(data?.pode_listar_todas_solicitacoes));
+        }
+      } catch (error) {
+        console.error('Erro ao carregar permissao para listar todos os contratos', error);
+        if (ativo) {
+          setPodeListarTodosContratos(false);
+        }
+      }
+    }
+
+    carregarPermissaoListarTodos();
+
+    return () => {
+      ativo = false;
+    };
+  }, [user?.id]);
+
+  useEffect(() => {
+    setPaginaAtual(1);
+    setSelecionadosIds([]);
+  }, [filtros]);
+
   async function carregar(overrideFiltros) {
     try {
       setLoading(true);
       const data = await getContratosResumo(overrideFiltros ?? filtros);
       setContratos(Array.isArray(data) ? data : []);
+      setSelecionadosIds([]);
     } catch (error) {
       console.error(error);
       alert('Erro ao carregar contratos');
@@ -151,6 +188,239 @@ export default function GestaoContratos() {
       style: 'currency',
       currency: 'BRL'
     });
+  }
+
+  const totalContratos = contratos.length;
+  const listandoTodosContratos = limitePorPagina === LIMITE_TODOS_CONTRATOS;
+  const limitePaginacaoNumerico = listandoTodosContratos
+    ? Math.max(totalContratos, 1)
+    : Number(limitePorPagina) || 25;
+  const totalPaginas = listandoTodosContratos
+    ? (totalContratos > 0 ? 1 : 0)
+    : (totalContratos > 0 ? Math.ceil(totalContratos / limitePaginacaoNumerico) : 0);
+  const paginaSegura = Math.min(Math.max(1, paginaAtual), Math.max(totalPaginas, 1));
+  const indiceInicial = totalContratos === 0
+    ? 0
+    : listandoTodosContratos
+      ? 0
+      : (paginaSegura - 1) * limitePaginacaoNumerico;
+  const indiceFinal = totalContratos === 0
+    ? 0
+    : listandoTodosContratos
+      ? totalContratos
+      : Math.min(totalContratos, indiceInicial + limitePaginacaoNumerico);
+  const contratosPagina = useMemo(
+    () => listandoTodosContratos ? contratos : contratos.slice(indiceInicial, indiceFinal),
+    [contratos, indiceInicial, indiceFinal, listandoTodosContratos]
+  );
+  const idsPagina = useMemo(
+    () => contratosPagina.map(contrato => Number(contrato.id)).filter(Boolean),
+    [contratosPagina]
+  );
+  const selecionadosSet = useMemo(
+    () => new Set(selecionadosIds.map(Number)),
+    [selecionadosIds]
+  );
+  const todosPaginaSelecionados = idsPagina.length > 0 &&
+    idsPagina.every(id => selecionadosSet.has(id));
+  const algunsPaginaSelecionados = idsPagina.some(id => selecionadosSet.has(id));
+
+  function toggleSelecionado(id) {
+    const idNum = Number(id);
+    if (!idNum) return;
+    setSelecionadosIds(prev =>
+      prev.includes(idNum)
+        ? prev.filter(item => item !== idNum)
+        : [...prev, idNum]
+    );
+  }
+
+  function toggleSelecionarPagina() {
+    if (idsPagina.length === 0) return;
+    setSelecionadosIds(prev => {
+      const atual = new Set(prev.map(Number));
+      const deveLimpar = idsPagina.every(id => atual.has(id));
+      if (deveLimpar) {
+        idsPagina.forEach(id => atual.delete(id));
+      } else {
+        idsPagina.forEach(id => atual.add(id));
+      }
+      return Array.from(atual);
+    });
+  }
+
+  function formatarValorExportacao(valor) {
+    const n = Number(valor);
+    if (Number.isNaN(n)) return '';
+    return n.toFixed(2).replace('.', ',');
+  }
+
+  function exportarSelecionadosExcel() {
+    if (selecionadosIds.length === 0) {
+      alert('Selecione ao menos um contrato.');
+      return;
+    }
+
+    const selecionados = contratos.filter(item => selecionadosIds.includes(Number(item.id)));
+    if (selecionados.length === 0) {
+      alert('Nenhum contrato selecionado para exportar.');
+      return;
+    }
+
+    const linhas = [
+      [
+        'Contrato',
+        'Obra',
+        'Codigo da obra',
+        'Ref. do Contrato',
+        'Descricao',
+        'Itens de Apropriacao',
+        'Solicitado',
+        'Pago',
+        'A pagar',
+        'Ajuste Solicitado',
+        'Ajuste Pago',
+        'Qtd. Solicitacoes'
+      ],
+      ...selecionados.map(item => [
+        item.codigo || '',
+        item.obra?.nome || '',
+        item.obra?.codigo || '',
+        item.ref_contrato || '',
+        item.descricao || '',
+        item.itens_apropriacao || '',
+        formatarValorExportacao(item.total_solicitado),
+        formatarValorExportacao(item.total_pago),
+        formatarValorExportacao(item.total_a_pagar),
+        formatarValorExportacao(item.ajuste_solicitado),
+        formatarValorExportacao(item.ajuste_pago),
+        item.total_solicitacoes || 0
+      ])
+    ];
+
+    const csv = linhas
+      .map(colunas => colunas
+        .map(valor => `"${String(valor ?? '').replace(/"/g, '""')}"`)
+        .join(';'))
+      .join('\r\n');
+
+    const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const dataRef = new Date().toISOString().slice(0, 10);
+    a.href = url;
+    a.download = `contratos-selecionados-${dataRef}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+  }
+
+  function renderAcoesMassa() {
+    return (
+      <div className="solicitacoes-toolbar sol-surface-card relative p-3 md:p-4 rounded-xl flex flex-col sm:flex-row sm:items-center gap-3">
+        <div className="text-sm text-gray-600 dark:text-slate-300">
+          Selecionados: <strong>{selecionadosIds.length}</strong>
+        </div>
+        <div className="flex flex-wrap gap-2 sm:ml-auto">
+          <button
+            type="button"
+            className="btn btn-outline inline-flex items-center gap-2"
+            onClick={exportarSelecionadosExcel}
+            disabled={selecionadosIds.length === 0}
+            title="Exportar selecionados para Excel (.csv)"
+            aria-label="Exportar selecionados para Excel"
+          >
+            <HiDocumentArrowDown className="w-4 h-4" />
+            <span>Exportar</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  function renderPaginacao() {
+    return (
+      <div className="sol-surface-card mt-4 p-3 md:p-4 rounded-xl flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+        <div className="text-sm text-gray-600 dark:text-slate-300">
+          {totalContratos > 0
+            ? `Exibindo ${indiceInicial + 1}-${indiceFinal} de ${totalContratos} contratos`
+            : 'Nenhum contrato encontrado'}
+        </div>
+
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+          <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-slate-300">
+            <span>Por pagina</span>
+            <select
+              className="input !w-auto min-w-[88px]"
+              value={limitePorPagina}
+              onChange={(event) => {
+                const value = event.target.value;
+                setLimitePorPagina(value === LIMITE_TODOS_CONTRATOS ? value : Number(value) || 25);
+                setPaginaAtual(1);
+              }}
+            >
+              {[10, 25, 50, 100].map((opcao) => (
+                <option key={opcao} value={opcao}>{opcao}</option>
+              ))}
+              {podeListarTodosContratos && (
+                <option value={LIMITE_TODOS_CONTRATOS}>Todas</option>
+              )}
+            </select>
+          </label>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              className="btn btn-outline"
+              onClick={() => setPaginaAtual((prev) => Math.max(1, prev - 1))}
+              disabled={listandoTodosContratos || paginaSegura <= 1}
+            >
+              Anterior
+            </button>
+            <span className="text-sm text-gray-700 dark:text-slate-200 min-w-[96px] text-center">
+              {listandoTodosContratos
+                ? 'Todas'
+                : `Pagina ${paginaSegura} de ${Math.max(totalPaginas, 1)}`}
+            </span>
+            <button
+              type="button"
+              className="btn btn-outline"
+              onClick={() => setPaginaAtual((prev) => Math.min(Math.max(totalPaginas, 1), prev + 1))}
+              disabled={listandoTodosContratos || totalPaginas === 0 || paginaSegura >= totalPaginas}
+            >
+              Proxima
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  function renderCheckboxCabecalho() {
+    return (
+      <input
+        type="checkbox"
+        checked={todosPaginaSelecionados}
+        ref={el => {
+          if (el) el.indeterminate = !todosPaginaSelecionados && algunsPaginaSelecionados;
+        }}
+        onChange={toggleSelecionarPagina}
+        aria-label="Selecionar contratos da pagina"
+      />
+    );
+  }
+
+  function renderCheckboxLinha(contrato) {
+    const id = Number(contrato.id);
+    return (
+      <input
+        type="checkbox"
+        checked={selecionadosSet.has(id)}
+        onChange={() => toggleSelecionado(id)}
+        aria-label={`Selecionar contrato ${contrato.codigo || id}`}
+      />
+    );
   }
 
   async function handleCriarContrato(e) {
@@ -541,11 +811,13 @@ export default function GestaoContratos() {
         <h1 className="text-2xl font-semibold">Gestão de Contratos</h1>
 
         {renderFiltros()}
+        {renderAcoesMassa()}
 
         <div className="bg-white rounded-xl shadow overflow-x-auto">
           <table className="min-w-full text-sm">
             <thead className="bg-gray-100">
               <tr>
+                <th className="text-left p-3 w-10">{renderCheckboxCabecalho()}</th>
                 <th className="text-left p-3">Contrato</th>
                 <th className="text-left p-3">Obra</th>
                 <th className="text-left p-3">Ref. do Contrato</th>
@@ -559,13 +831,14 @@ export default function GestaoContratos() {
             <tbody>
               {contratos.length === 0 && (
                 <tr>
-                  <td colSpan="8" className="p-4 text-center text-gray-500">
+                  <td colSpan="9" className="p-4 text-center text-gray-500">
                     Nenhum contrato encontrado.
                   </td>
                 </tr>
               )}
-              {contratos.map(c => (
+              {contratosPagina.map(c => (
                 <tr key={c.id} className="border-t">
+                  <td className="p-3">{renderCheckboxLinha(c)}</td>
                   <td className="p-3 font-medium">{c.codigo}</td>
                   <td className="p-3">{c.obra?.nome || '-'}</td>
                   <td className="p-3">{c.ref_contrato || '-'}</td>
@@ -594,6 +867,8 @@ export default function GestaoContratos() {
             </tbody>
           </table>
         </div>
+
+        {renderPaginacao()}
       </div>
     );
   }
@@ -769,11 +1044,13 @@ export default function GestaoContratos() {
       </form>
 
       {renderFiltros()}
+      {renderAcoesMassa()}
 
       <div className="bg-white rounded-xl shadow overflow-x-auto">
         <table className="min-w-full text-sm">
           <thead className="bg-gray-100">
             <tr>
+              <th className="text-left p-3 w-10">{renderCheckboxCabecalho()}</th>
               <th className="text-left p-3">Contrato</th>
               <th className="text-left p-3">Obra</th>
               <th className="text-left p-3">Ref. do Contrato</th>
@@ -797,8 +1074,9 @@ export default function GestaoContratos() {
                 </td>
               </tr>
             )}
-            {contratos.map(c => (
+            {contratosPagina.map(c => (
               <tr key={c.id} className="border-t">
+                <td className="p-3">{renderCheckboxLinha(c)}</td>
                 <td className="p-3 font-medium">
                   {editandoId === c.id ? (
                     <input
@@ -970,6 +1248,8 @@ export default function GestaoContratos() {
           </tbody>
         </table>
       </div>
+
+      {renderPaginacao()}
 
       {modalAnexos && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
