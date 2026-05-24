@@ -27,6 +27,11 @@ const {
   salvarUsuariosAlterarValorSolicitacao,
   usuarioPodeAlterarValorSolicitacao
 } = require('../services/solicitacao/permissaoAlterarValor');
+const {
+  obterConfiguracaoUsuariosListarTodasSolicitacoes,
+  salvarUsuariosListarTodasSolicitacoes,
+  usuarioPodeListarTodasSolicitacoes
+} = require('../services/solicitacao/permissaoListarTodas');
 
 const CHAVE_TEMA = 'TEMA_SISTEMA';
 const CHAVE_AREAS_OBRA = 'AREAS_OBRA_VISIVEIS';
@@ -1073,6 +1078,101 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return res.status(500).json({ error: 'Erro ao buscar permissao para alterar valor' });
+    }
+  },
+
+  async getUsuariosListarTodasSolicitacoes(req, res) {
+    try {
+      const configuracao = await obterConfiguracaoUsuariosListarTodasSolicitacoes();
+      const selecionados = new Set(configuracao.usuario_ids.map((id) => Number(id)));
+
+      const usuariosRaw = await User.findAll({
+        attributes: [
+          'id',
+          'nome',
+          'email',
+          'perfil',
+          'ativo',
+          'setor_id'
+        ],
+        include: [
+          {
+            model: Setor,
+            as: 'setor',
+            attributes: ['id', 'nome', 'codigo']
+          }
+        ],
+        order: [
+          ['ativo', 'DESC'],
+          ['nome', 'ASC']
+        ]
+      });
+
+      const usuarios = usuariosRaw.map((usuario) => {
+        const plain = usuario.toJSON();
+        const perfil = String(plain.perfil || '').toUpperCase();
+        const permissaoPadrao = perfil === 'SUPERADMIN';
+
+        return {
+          ...plain,
+          pode_listar_todas_solicitacoes: permissaoPadrao || selecionados.has(Number(plain.id)),
+          permissao_padrao_listar_todas_solicitacoes: permissaoPadrao
+        };
+      });
+
+      return res.json({
+        usuario_ids: configuracao.usuario_ids,
+        usuarios
+      });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao buscar usuarios com permissao para listar todas as solicitacoes' });
+    }
+  },
+
+  async updateUsuariosListarTodasSolicitacoes(req, res) {
+    try {
+      const usuarioIds = normalizarUsuarioIds(req.body?.usuario_ids);
+
+      if (usuarioIds.length > 0) {
+        const usuariosValidos = await User.findAll({
+          where: {
+            id: { [Op.in]: usuarioIds },
+            ativo: true
+          },
+          attributes: ['id']
+        });
+        const idsValidos = usuariosValidos.map((usuario) => Number(usuario.id));
+        const idsValidosSet = new Set(idsValidos);
+        const idsInvalidos = usuarioIds.filter(id => !idsValidosSet.has(id));
+
+        if (idsInvalidos.length > 0) {
+          return res.status(400).json({
+            error: 'Um ou mais usuarios informados sao invalidos para esta permissao.',
+            usuario_ids_invalidos: idsInvalidos
+          });
+        }
+      }
+
+      const configuracao = await salvarUsuariosListarTodasSolicitacoes(usuarioIds);
+      return res.json(configuracao);
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao salvar usuarios com permissao para listar todas as solicitacoes' });
+    }
+  },
+
+  async getMinhaPermissaoListarTodasSolicitacoes(req, res) {
+    try {
+      const perfil = String(req.user?.perfil || '').trim().toUpperCase();
+      const permissaoConfigurada = await usuarioPodeListarTodasSolicitacoes(req.user?.id);
+
+      return res.json({
+        pode_listar_todas_solicitacoes: perfil === 'SUPERADMIN' || permissaoConfigurada
+      });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao buscar permissao para listar todas as solicitacoes' });
     }
   }
 };

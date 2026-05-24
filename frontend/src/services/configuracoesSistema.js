@@ -277,3 +277,32 @@ export async function getMinhaPermissaoAlterarValorSolicitacao() {
   if (!res.ok) throw new Error('Erro ao buscar permissao para alterar valor');
   return res.json();
 }
+
+export async function getUsuariosListarTodasSolicitacoes() {
+  const res = await fetch(`${API_URL}/configuracoes/usuarios-listar-todas-solicitacoes`, {
+    headers: authHeaders()
+  });
+  if (!res.ok) throw new Error('Erro ao buscar usuarios com permissao para listar todas as solicitacoes');
+  return res.json();
+}
+
+export async function salvarUsuariosListarTodasSolicitacoes(data) {
+  const res = await fetch(`${API_URL}/configuracoes/usuarios-listar-todas-solicitacoes`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.error || 'Erro ao salvar permissao para listar todas as solicitacoes');
+  }
+  return res.json();
+}
+
+export async function getMinhaPermissaoListarTodasSolicitacoes() {
+  const res = await fetch(`${API_URL}/configuracoes/usuarios-listar-todas-solicitacoes/minha-permissao`, {
+    headers: authHeaders()
+  });
+  if (!res.ok) throw new Error('Erro ao buscar permissao para listar todas as solicitacoes');
+  return res.json();
+}

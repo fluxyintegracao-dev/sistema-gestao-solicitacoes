@@ -388,6 +388,9 @@ router.patch('/configuracoes/usuarios-envio-qualquer-setor', permit(['SUPERADMIN
 router.get('/configuracoes/usuarios-alterar-valor-solicitacao/minha-permissao', ConfiguracaoSistemaController.getMinhaPermissaoAlterarValorSolicitacao);
 router.get('/configuracoes/usuarios-alterar-valor-solicitacao', permit(['SUPERADMIN']), ConfiguracaoSistemaController.getUsuariosAlterarValorSolicitacao);
 router.patch('/configuracoes/usuarios-alterar-valor-solicitacao', permit(['SUPERADMIN']), ConfiguracaoSistemaController.updateUsuariosAlterarValorSolicitacao);
+router.get('/configuracoes/usuarios-listar-todas-solicitacoes/minha-permissao', ConfiguracaoSistemaController.getMinhaPermissaoListarTodasSolicitacoes);
+router.get('/configuracoes/usuarios-listar-todas-solicitacoes', permit(['SUPERADMIN']), ConfiguracaoSistemaController.getUsuariosListarTodasSolicitacoes);
+router.patch('/configuracoes/usuarios-listar-todas-solicitacoes', permit(['SUPERADMIN']), ConfiguracaoSistemaController.updateUsuariosListarTodasSolicitacoes);
 router.get('/configuracoes/provisoes-financeiras/permissoes', permit(['SUPERADMIN']), ProvisaoFinanceiraConfiguracaoController.getPermissoes);
 router.patch('/configuracoes/provisoes-financeiras/permissoes', permit(['SUPERADMIN']), ProvisaoFinanceiraConfiguracaoController.updatePermissoes);
 

@@ -22,7 +22,10 @@ import { getSetores } from '../../services/setores';
 import { getTiposSolicitacao } from '../../services/tiposSolicitacao';
 import { getSetorPermissoes } from '../../services/setorPermissoes';
 import { getStatusSetor } from '../../services/statusSetor';
-import { getMinhaPermissaoAlterarValorSolicitacao } from '../../services/configuracoesSistema';
+import {
+  getMinhaPermissaoAlterarValorSolicitacao,
+  getMinhaPermissaoListarTodasSolicitacoes
+} from '../../services/configuracoesSistema';
 import { useAuth } from '../../contexts/AuthContext';
 import { parseDateSmart } from '../../utils/dateLocal';
 import {
@@ -42,6 +45,8 @@ import {
   updateStatusSolicitacao
 } from '../../services/solicitacoes';
 import { solicitarUrgenciaPrioridadeDiretoria } from '../../services/prioridadesDiretoria';
+
+const LIMITE_TODAS_SOLICITACOES = 'ALL';
 
 export default function Solicitacoes({ arquivadas = false }) {
   const DEFAULT_VISIBLE_COLUMNS = [
@@ -73,6 +78,7 @@ export default function Solicitacoes({ arquivadas = false }) {
   const [modalAtribuir, setModalAtribuir] = useState(false);
   const [podeAlterarValorSolicitacao, setPodeAlterarValorSolicitacao] = useState(false);
   const [modalStatusMassa, setModalStatusMassa] = useState(false);
+  const [podeListarTodasSolicitacoes, setPodeListarTodasSolicitacoes] = useState(false);
   const [modalEnviarUnitario, setModalEnviarUnitario] = useState(false);
   const [modalAtribuirMassa, setModalAtribuirMassa] = useState(false);
   const [usuariosAtribuicao, setUsuariosAtribuicao] = useState([]);
@@ -137,6 +143,30 @@ export default function Solicitacoes({ arquivadas = false }) {
     }
 
     carregarPermissaoAlterarValor();
+
+    return () => {
+      ativo = false;
+    };
+  }, [user?.id]);
+
+  useEffect(() => {
+    let ativo = true;
+
+    async function carregarPermissaoListarTodas() {
+      try {
+        const data = await getMinhaPermissaoListarTodasSolicitacoes();
+        if (ativo) {
+          setPodeListarTodasSolicitacoes(Boolean(data?.pode_listar_todas_solicitacoes));
+        }
+      } catch (error) {
+        console.error('Erro ao carregar permissao para listar todas as solicitacoes', error);
+        if (ativo) {
+          setPodeListarTodasSolicitacoes(false);
+        }
+      }
+    }
+
+    carregarPermissaoListarTodas();
 
     return () => {
       ativo = false;
@@ -390,7 +420,9 @@ export default function Solicitacoes({ arquivadas = false }) {
         paramsObj.arquivadas = '1';
       }
       paramsObj.page = String(paginaAtual);
-      paramsObj.limit = String(limitePorPagina);
+      paramsObj.limit = limitePorPagina === LIMITE_TODAS_SOLICITACOES
+        ? LIMITE_TODAS_SOLICITACOES
+        : String(limitePorPagina);
 
       const params = new URLSearchParams(paramsObj).toString();
 
@@ -416,7 +448,7 @@ export default function Solicitacoes({ arquivadas = false }) {
       });
       setMetaPaginacao({
         page: Number(data?.meta?.page || paginaAtual),
-        limit: Number(data?.meta?.limit || limitePorPagina),
+        limit: data?.meta?.limit || limitePorPagina,
         total: Number(data?.meta?.total || lista.length),
         total_pages: Number(data?.meta?.total_pages || (lista.length > 0 ? 1 : 0))
       });
@@ -438,10 +470,20 @@ export default function Solicitacoes({ arquivadas = false }) {
   }, 0);
   const totalSolicitacoes = Number(metaPaginacao?.total || 0);
   const totalPaginas = Number(metaPaginacao?.total_pages || 0);
-  const paginaInicial = totalSolicitacoes === 0 ? 0 : ((paginaAtual - 1) * limitePorPagina) + 1;
+  const listandoTodasSolicitacoes = limitePorPagina === LIMITE_TODAS_SOLICITACOES;
+  const limitePaginacaoNumerico = listandoTodasSolicitacoes
+    ? Math.max(totalSolicitacoes, solicitacoes.length, 1)
+    : Number(limitePorPagina) || 25;
+  const paginaInicial = totalSolicitacoes === 0
+    ? 0
+    : listandoTodasSolicitacoes
+      ? 1
+      : ((paginaAtual - 1) * limitePaginacaoNumerico) + 1;
   const paginaFinal = totalSolicitacoes === 0
     ? 0
-    : Math.min(totalSolicitacoes, paginaAtual * limitePorPagina);
+    : listandoTodasSolicitacoes
+      ? totalSolicitacoes
+      : Math.min(totalSolicitacoes, paginaAtual * limitePaginacaoNumerico);
 
   const setorTokens = [
     String(user?.setor?.codigo || '').toUpperCase(),
@@ -1184,11 +1226,17 @@ export default function Solicitacoes({ arquivadas = false }) {
                 <select
                   className="input !w-auto min-w-[88px]"
                   value={limitePorPagina}
-                  onChange={(event) => setLimitePorPagina(Number(event.target.value) || 25)}
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    setLimitePorPagina(value === LIMITE_TODAS_SOLICITACOES ? value : Number(value) || 25);
+                  }}
                 >
                   {[10, 25, 50, 100].map((opcao) => (
                     <option key={opcao} value={opcao}>{opcao}</option>
                   ))}
+                  {podeListarTodasSolicitacoes && (
+                    <option value={LIMITE_TODAS_SOLICITACOES}>Todas</option>
+                  )}
                 </select>
               </label>
 
@@ -1197,7 +1245,7 @@ export default function Solicitacoes({ arquivadas = false }) {
                   type="button"
                   className="btn btn-outline"
                   onClick={() => setPaginaAtual((prev) => Math.max(1, prev - 1))}
-                  disabled={paginaAtual <= 1}
+                  disabled={listandoTodasSolicitacoes || paginaAtual <= 1}
                 >
                   Anterior
                 </button>
@@ -1208,7 +1256,7 @@ export default function Solicitacoes({ arquivadas = false }) {
                   type="button"
                   className="btn btn-outline"
                   onClick={() => setPaginaAtual((prev) => Math.min(Math.max(totalPaginas, 1), prev + 1))}
-                  disabled={totalPaginas === 0 || paginaAtual >= totalPaginas}
+                  disabled={listandoTodasSolicitacoes || totalPaginas === 0 || paginaAtual >= totalPaginas}
                 >
                   Próxima
                 </button>

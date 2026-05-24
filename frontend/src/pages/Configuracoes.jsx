@@ -95,6 +95,11 @@ const SECOES_CONFIG = [
         to: '/usuarios-alterar-valor-solicitacao'
       },
       {
+        title: 'Listar Todas as Solicitacoes',
+        description: 'Marque usuarios que podem usar a opcao Todas na paginacao.',
+        to: '/usuarios-listar-todas-solicitacoes'
+      },
+      {
         title: 'Recebimento por Setor',
         description: 'Defina se as solicitacoes chegam primeiro ao admin ou ficam visiveis para todos.',
         to: '/comportamento-recebimento-setor'

@@ -55,6 +55,9 @@ const {
 const {
   usuarioPodeAlterarValorSolicitacao
 } = require('../services/solicitacao/permissaoAlterarValor');
+const {
+  usuarioPodeListarTodasSolicitacoes
+} = require('../services/solicitacao/permissaoListarTodas');
 
 const CHAVE_AREAS_POR_SETOR_ORIGEM = 'AREAS_POR_SETOR_ORIGEM';
 const CHAVE_SETORES_VISIVEIS_POR_USUARIO = 'SETORES_VISIVEIS_POR_USUARIO';
@@ -960,15 +963,30 @@ module.exports = {
       } = req.query;
       const paginacaoSolicitada =
         req.query.page !== undefined || req.query.limit !== undefined;
+      const listarTodasSolicitadas = ['ALL', 'TODAS', 'TODOS'].includes(
+        String(limit || '').trim().toUpperCase()
+      );
+      if (listarTodasSolicitadas) {
+        const permissaoListarTodas = perfil === 'SUPERADMIN' ||
+          await usuarioPodeListarTodasSolicitacoes(usuarioId);
+        if (!permissaoListarTodas) {
+          return res.status(403).json({
+            error: 'Usuario sem permissao para listar todas as solicitacoes.'
+          });
+        }
+      }
       const apenasObrasSolicitadas = ['1', 'true', 'sim'].includes(
         String(apenas_obras || '').trim().toLowerCase()
       );
       const paginaAtual = parsePositiveInt(page, 1);
-      const limitePorPagina = Math.min(
-        parsePositiveInt(limit, DEFAULT_SOLICITACOES_PAGE_SIZE),
-        MAX_SOLICITACOES_PAGE_SIZE
-      );
-      const offset = (paginaAtual - 1) * limitePorPagina;
+      const limitePorPagina = listarTodasSolicitadas
+        ? null
+        : Math.min(
+            parsePositiveInt(limit, DEFAULT_SOLICITACOES_PAGE_SIZE),
+            MAX_SOLICITACOES_PAGE_SIZE
+          );
+      const limiteMeta = listarTodasSolicitadas ? 'ALL' : limitePorPagina;
+      const offset = listarTodasSolicitadas ? 0 : (paginaAtual - 1) * limitePorPagina;
 
       /* ===============================
         1) BUSCAR SOLICITACOES OCULTADAS
@@ -1003,7 +1021,7 @@ module.exports = {
             items: [],
             meta: {
               page: paginaAtual,
-              limit: limitePorPagina,
+              limit: limiteMeta,
               total: 0,
               total_pages: 0
             }
@@ -1149,7 +1167,7 @@ module.exports = {
               items: [],
               meta: {
                 page: paginaAtual,
-                limit: limitePorPagina,
+                limit: limiteMeta,
                 total: 0,
                 total_pages: 0
               }
@@ -1707,7 +1725,9 @@ module.exports = {
         }
 
         const idsPagina = (paginacaoSolicitada
-          ? resultadoFiltro.slice(offset, offset + limitePorPagina)
+          ? listarTodasSolicitadas
+            ? resultadoFiltro
+            : resultadoFiltro.slice(offset, offset + limitePorPagina)
           : resultadoFiltro
         ).map(item => Number(item.id));
 
@@ -1744,7 +1764,7 @@ module.exports = {
           where,
           include: includeBase,
           order: [['createdAt', 'DESC']],
-          ...(paginacaoSolicitada
+          ...(paginacaoSolicitada && !listarTodasSolicitadas
             ? { limit: limitePorPagina, offset }
             : {})
         });
@@ -1765,12 +1785,12 @@ module.exports = {
       return res.json({
         items: resultado,
         meta: {
-          page: paginaAtual,
-          limit: limitePorPagina,
+          page: listarTodasSolicitadas ? 1 : paginaAtual,
+          limit: limiteMeta,
           total: totalRegistros,
-          total_pages: totalRegistros > 0
-            ? Math.ceil(totalRegistros / limitePorPagina)
-            : 0
+          total_pages: listarTodasSolicitadas
+            ? (totalRegistros > 0 ? 1 : 0)
+            : (totalRegistros > 0 ? Math.ceil(totalRegistros / limitePorPagina) : 0)
         }
       });
 
