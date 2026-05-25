@@ -31,6 +31,15 @@ const MODULE_CATALOG = [
     locked: false
   },
   {
+    key: 'TREINAMENTO',
+    label: 'Central de Treinamento',
+    packageKey: 'INSTITUCIONAL',
+    packageLabel: 'Pacote Institucional',
+    description: 'Perguntas, respostas, videos, guias e trilhas de treinamento com materiais em S3.',
+    enabled: true,
+    locked: false
+  },
+  {
     key: 'COMPRAS',
     label: 'Solicitacoes de Compra',
     packageKey: 'COMPRAS',

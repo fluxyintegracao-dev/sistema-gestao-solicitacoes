@@ -597,6 +597,29 @@ const MODULO_PERMISSION_GROUPS = [
     ]
   },
   {
+    modulo: 'TREINAMENTO',
+    label: 'Treinamento',
+    descricao: 'Central interna de perguntas, respostas, videos, guias e trilhas por perfil.',
+    areas: [
+      {
+        key: 'treinamento.conteudos',
+        label: 'Conteudos de Treinamento',
+        permissoes: [
+          { key: 'treinamento.conteudos.visualizar', label: 'Visualizar treinamentos', descricao: 'Acessar FAQ, videos, guias e trilhas publicadas.' },
+          { key: 'treinamento.conteudos.gerenciar', label: 'Gerenciar conteudos', descricao: 'Criar, editar, arquivar e anexar materiais de treinamento.' },
+          { key: 'treinamento.conteudos.publicar', label: 'Publicar conteudos', descricao: 'Liberar conteudos de treinamento para os usuarios.' }
+        ]
+      },
+      {
+        key: 'treinamento.relatorios',
+        label: 'Relatorios de Treinamento',
+        permissoes: [
+          { key: 'treinamento.relatorios.visualizar', label: 'Visualizar relatorios', descricao: 'Consultar leitura, aderencia e uso dos materiais de treinamento.' }
+        ]
+      }
+    ]
+  },
+  {
     modulo: 'COMUNICACAO_INTERNA',
     label: 'Comunicação Interna',
     descricao: 'Mensagens e avisos internos entre usuários.',

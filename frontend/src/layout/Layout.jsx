@@ -41,7 +41,8 @@ import {
   HiOutlineKey,
   HiOutlineCreditCard,
   HiOutlineLifebuoy,
-  HiOutlineChatBubbleOvalLeft
+  HiOutlineChatBubbleOvalLeft,
+  HiOutlineAcademicCap
 } from 'react-icons/hi2';
 import {
   canAccessBiblioteca,
@@ -60,6 +61,7 @@ import {
   canAccessRhDpDashboard,
   canAccessRhDpEmpresas,
   canAccessSst,
+  canAccessTreinamento,
   canCreateProvisionamentos,
   canExecuteRhDpImportacoes,
   canManageProvisionamentoCategorias,
@@ -303,6 +305,7 @@ export default function Layout() {
   const obrasAccess = canAccessCadastroObras(user);
   const contratosAccess = canAccessContratos(user);
   const bibliotecaAccess = canAccessBiblioteca(user);
+  const treinamentoAccess = canAccessTreinamento(user);
   const comunicacaoAccess = canAccessComunicacao(user);
   const brandLabel = instalacao.product_name || 'Fluxy';
   const brandInitial = String(brandLabel || 'F').trim().charAt(0).toUpperCase() || 'F';
@@ -327,6 +330,7 @@ export default function Layout() {
       Contratos: HiOutlineBanknotes,
       Configuracoes: HiOutlineCog6Tooth,
       Biblioteca: HiOutlineFolderOpen,
+      Treinamento: HiOutlineAcademicCap,
       Cotacoes: HiOutlineInboxStack,
       Conta: HiOutlineUserCircle
     };
@@ -372,6 +376,12 @@ export default function Layout() {
     if (bibliotecaAccess) {
       addGroup('Biblioteca', [
         item('/arquivos-modelos', 'Arquivos Modelos', HiOutlineFolderOpen)
+      ]);
+    }
+
+    if (treinamentoAccess) {
+      addGroup('Treinamento', [
+        item('/treinamento', 'Central de Treinamento', HiOutlineAcademicCap)
       ]);
     }
 
@@ -587,7 +597,8 @@ export default function Layout() {
     rhDpObrigacoesAccess,
     sstAccess,
     sstDashboardAccess,
-    superadmin
+    superadmin,
+    treinamentoAccess
   ]);
 
   const flatMenuItems = useMemo(

@@ -38,6 +38,16 @@ export const MODULE_GOVERNANCE = [
     permissionsEffect: 'Permissoes definem upload e gestao por pagina; leitura segue a regra da pagina ativa.'
   },
   {
+    key: 'TREINAMENTO',
+    label: 'Central de Treinamento',
+    packageLabel: 'Pacote Institucional',
+    role: 'Institucionalizacao e onboarding',
+    dependency: 'Independente dos demais modulos. Usa S3 para videos e documentos privados.',
+    usedIn: ['Central de Treinamento', 'Perguntas e Respostas', 'Videos', 'Guias por modulo'],
+    disabledEffect: 'Oculta a central de treinamento e bloqueia endpoints de conteudo e arquivos.',
+    permissionsEffect: 'Permissoes de treinamento controlam visualizacao, gestao e publicacao.'
+  },
+  {
     key: 'COMPRAS',
     label: 'Solicitacoes de Compra',
     packageLabel: 'Pacote Compras',

@@ -38,6 +38,7 @@ import {
   canViewSolicitacoesRelatorioOperacional,
   canViewSolicitacoesRelatorios,
   canAccessSst,
+  canAccessTreinamento,
   canManageSstArea,
   canViewSstArea,
   canViewSstDashboard,
@@ -138,6 +139,7 @@ const ComunicacaoInterna = lazy(() => import('./pages/ComunicacaoInterna'));
 const PrioridadesDiretoria = lazy(() => import('./pages/PrioridadesDiretoria'));
 const ArquivosModelos = lazy(() => import('./pages/ArquivosModelos'));
 const ArquivosModelosConfig = lazy(() => import('./pages/ArquivosModelosConfig'));
+const Treinamento = lazy(() => import('./pages/Treinamento'));
 const ConfiguracoesCotacao = lazy(() => import('./pages/ConfiguracoesCotacao'));
 const ConfiguracoesStatusPedidoCompra = lazy(() => import('./pages/ConfiguracoesStatusPedidoCompra'));
 const ConfiguracoesComercialCategorias = lazy(() => import('./pages/ConfiguracoesComercialCategorias'));
@@ -344,6 +346,14 @@ function ComunicacaoRoute({ children }) {
 function BibliotecaRoute({ children }) {
   const { user } = useAuth();
   if (!canAccessBiblioteca(user)) {
+    return <Navigate to="/" replace />;
+  }
+  return children;
+}
+
+function TreinamentoRoute({ children }) {
+  const { user } = useAuth();
+  if (!canAccessTreinamento(user)) {
     return <Navigate to="/" replace />;
   }
   return children;
@@ -664,6 +674,7 @@ export default function App() {
         <Route path="conversas/saida" element={<ComunicacaoRoute><ComunicacaoInterna /></ComunicacaoRoute>} />
         <Route path="conversas/:id" element={<ComunicacaoRoute><ComunicacaoInterna /></ComunicacaoRoute>} />
         <Route path="arquivos-modelos" element={<BibliotecaRoute><ArquivosModelos /></BibliotecaRoute>} />
+        <Route path="treinamento" element={<EnabledModuleRoute moduleKey="TREINAMENTO"><TreinamentoRoute><Treinamento /></TreinamentoRoute></EnabledModuleRoute>} />
 
         <Route path="nova-solicitacao" element={<NovaSolicitacao />} />
 

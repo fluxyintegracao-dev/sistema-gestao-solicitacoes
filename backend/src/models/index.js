@@ -78,6 +78,8 @@ db.ConversaInternaAnexo = require('./ConversaInternaAnexo')(sequelize, Sequelize
 db.ConversaInternaParticipante = require('./ConversaInternaParticipante')(sequelize, Sequelize);
 db.ConversaInternaArquivoUsuario = require('./ConversaInternaArquivoUsuario')(sequelize, Sequelize);
 db.ArquivoModelo = require('./ArquivoModelo')(sequelize, Sequelize);
+db.TreinamentoConteudo = require('./TreinamentoConteudo')(sequelize, Sequelize);
+db.TreinamentoLeituraUsuario = require('./TreinamentoLeituraUsuario')(sequelize, Sequelize);
 db.SecurityEventLog = require('./SecurityEventLog')(sequelize, Sequelize);
 db.ContaBancaria = require('./ContaBancaria')(sequelize, Sequelize);
 db.CategoriaFinanceira = require('./CategoriaFinanceira')(sequelize, Sequelize);
@@ -3193,5 +3195,13 @@ db.FiscalAccountingBatchItem.belongsTo(db.FiscalDfeDocument, { foreignKey: 'fisc
 
 db.SstRisco.hasMany(db.SstAgenteNocivo, { foreignKey: 'risco_id', as: 'agentes' });
 db.SstAgenteNocivo.belongsTo(db.SstRisco, { foreignKey: 'risco_id', as: 'risco' });
+
+/* ===== TREINAMENTO ===== */
+db.TreinamentoConteudo.belongsTo(db.User, { foreignKey: 'criado_por', as: 'criadoPor' });
+db.TreinamentoConteudo.belongsTo(db.User, { foreignKey: 'atualizado_por', as: 'atualizadoPor' });
+db.TreinamentoConteudo.belongsTo(db.User, { foreignKey: 'publicado_por', as: 'publicadoPor' });
+db.TreinamentoConteudo.hasMany(db.TreinamentoLeituraUsuario, { foreignKey: 'conteudo_id', as: 'leituras' });
+db.TreinamentoLeituraUsuario.belongsTo(db.TreinamentoConteudo, { foreignKey: 'conteudo_id', as: 'conteudo' });
+db.TreinamentoLeituraUsuario.belongsTo(db.User, { foreignKey: 'usuario_id', as: 'usuario' });
 
 module.exports = db;

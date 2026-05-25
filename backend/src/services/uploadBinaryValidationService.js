@@ -14,6 +14,7 @@ const RAR_SIGNATURES = [
   Buffer.from([0x52, 0x61, 0x72, 0x21, 0x1a, 0x07, 0x00]),
   Buffer.from([0x52, 0x61, 0x72, 0x21, 0x1a, 0x07, 0x01, 0x00])
 ];
+const WEBM_SIGNATURE = Buffer.from([0x1a, 0x45, 0xdf, 0xa3]);
 
 const allowedProfiles = {
   documents: new Set([
@@ -32,7 +33,22 @@ const allowedProfiles = {
   ]),
   ofx: new Set(['.ofx']),
   fiscal_file: new Set(['.pdf', '.png', '.jpg', '.jpeg']),
-  fiscal_xml: new Set(['.xml', '.zip'])
+  fiscal_xml: new Set(['.xml', '.zip']),
+  training_media: new Set([
+    '.pdf',
+    '.doc',
+    '.docx',
+    '.xls',
+    '.xlsx',
+    '.csv',
+    '.ppt',
+    '.pptx',
+    '.png',
+    '.jpg',
+    '.jpeg',
+    '.mp4',
+    '.webm'
+  ])
 };
 
 function bufferStartsWith(buffer, signature) {
@@ -194,6 +210,31 @@ function assertFiscalXmlBinary(file) {
   }
 }
 
+function assertTrainingMediaBinary(file) {
+  const extension = String(path.extname(file?.originalname || '') || '').toLowerCase();
+  const buffer = file?.buffer;
+
+  if (extension === '.mp4') {
+    if (
+      !Buffer.isBuffer(buffer) ||
+      buffer.length < 12 ||
+      buffer.toString('latin1', 4, 8) !== 'ftyp'
+    ) {
+      throw new UploadSecurityError('Video MP4 invalido ou corrompido.', 400, 'UPLOAD_BINARY_MISMATCH');
+    }
+    return;
+  }
+
+  if (extension === '.webm') {
+    if (!bufferStartsWith(buffer, WEBM_SIGNATURE)) {
+      throw new UploadSecurityError('Video WebM invalido ou corrompido.', 400, 'UPLOAD_BINARY_MISMATCH');
+    }
+    return;
+  }
+
+  assertDocumentBinary(file);
+}
+
 function assertProfileAllowed(profile, file) {
   const extension = String(path.extname(file?.originalname || '') || '').toLowerCase();
   const allowedExtensions = allowedProfiles[profile] || allowedProfiles.documents;
@@ -217,6 +258,11 @@ function assertFileBinaryMatchesProfile(file, profile = 'documents') {
 
   if (profile === 'fiscal_xml') {
     assertFiscalXmlBinary(file);
+    return;
+  }
+
+  if (profile === 'training_media') {
+    assertTrainingMediaBinary(file);
     return;
   }
 

@@ -196,6 +196,7 @@ const {
   canConfirmarBaixaPagamento,
   canCreateProvisoes,
   canAccessFinanceiro,
+  canAccessTreinamento,
   canAccessComprovantes,
   canCancelPagamentos,
   canCreateComercialContratos,
@@ -220,6 +221,7 @@ const {
   canManageRhDpDocumentos,
   canManageRhDpEmpresas,
   canManageUsers,
+  canManageTreinamento,
   canReopenRhDpFechamento,
   canRetryIntegracaoSienge,
   canReadComercialBaseData,
@@ -246,6 +248,7 @@ const {
 const uploadComprovantes = require('./config/uploadComprovantes');
 const uploadOfx = require('./config/uploadOfx');
 const uploadCnab = require('./config/uploadCnab');
+const uploadTreinamentoFile = require('./config/uploadTreinamentoFile');
 
 // Controllers
 const SolicitacaoController = require('./controllers/SolicitacaoController');
@@ -272,6 +275,7 @@ const ConfiguracaoSistemaController = require('./controllers/ConfiguracaoSistema
 const UiVisibilityConfigController = require('./controllers/UiVisibilityConfigController');
 const ConversaInternaController = require('./controllers/ConversaInternaController');
 const ArquivoModeloController = require('./controllers/ArquivoModeloController');
+const TreinamentoController = require('./controllers/TreinamentoController');
 const UnidadeController = require('./controllers/UnidadeController');
 const CategoriaController = require('./controllers/CategoriaController');
 const InsumoController = require('./controllers/InsumoController');
@@ -429,6 +433,7 @@ router.use('/fiscal', requireEnabledModule('FISCAL'));
 router.use('/fiscal', fiscalRoutes);
 router.use('/sst', requireEnabledModule('SST'));
 router.use('/sst', sstRoutes);
+router.use('/treinamento', requireEnabledModule('TREINAMENTO'));
 router.use('/arquivos-modelos', requireEnabledModule('BIBLIOTECA_MODELOS'));
 router.use('/conversas-internas', requireEnabledModule('COMUNICACAO_INTERNA'));
 
@@ -462,6 +467,24 @@ const allowFinanceiro = permit({
     (await canAccessFinanceiro(req.user))
       ? true
       : 'Acesso negado para o modulo financeiro'
+  )
+});
+
+const allowTreinamentoRead = permit({
+  resource: 'TREINAMENTO',
+  custom: async (req) => (
+    (await canAccessTreinamento(req.user))
+      ? true
+      : 'Acesso negado para a central de treinamento'
+  )
+});
+
+const allowTreinamentoManage = permit({
+  resource: 'TREINAMENTO',
+  custom: async (req) => (
+    (await canManageTreinamento(req.user))
+      ? true
+      : 'Acesso negado para gerenciar treinamentos'
   )
 });
 
@@ -619,6 +642,17 @@ const allowEmpresasGrupoRead = permit({
       : 'Acesso negado para consultar empresas do grupo'
   )
 });
+
+router.get('/treinamento/resumo', allowTreinamentoRead, TreinamentoController.resumo);
+router.get('/treinamento', allowTreinamentoRead, TreinamentoController.index);
+router.post('/treinamento', allowTreinamentoManage, criticalRateLimit, TreinamentoController.create);
+router.get('/treinamento/:id', allowTreinamentoRead, validateRequest({ params: validateNumericIdParam('id', 'Conteudo de treinamento') }), TreinamentoController.show);
+router.patch('/treinamento/:id', allowTreinamentoManage, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Conteudo de treinamento') }), TreinamentoController.update);
+router.delete('/treinamento/:id', allowTreinamentoManage, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Conteudo de treinamento') }), TreinamentoController.destroy);
+router.post('/treinamento/:id/publicar', allowTreinamentoManage, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Conteudo de treinamento') }), TreinamentoController.publicar);
+router.post('/treinamento/:id/leitura', allowTreinamentoRead, validateRequest({ params: validateNumericIdParam('id', 'Conteudo de treinamento') }), TreinamentoController.leitura);
+router.post('/treinamento/:id/upload', allowTreinamentoManage, uploadRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Conteudo de treinamento') }), uploadTreinamentoFile.single('file'), TreinamentoController.upload);
+router.get('/treinamento/:id/arquivo', allowTreinamentoRead, validateRequest({ params: validateNumericIdParam('id', 'Conteudo de treinamento') }), TreinamentoController.arquivoUrl);
 
 router.get('/apropriacoes', requireAnyEnabledModule(['OBRAS', 'SOLICITACOES', 'COMPRAS', 'FINANCEIRO']), ApropriacaoController.index);
 router.post('/apropriacoes', requireEnabledModule('OBRAS'), allowBusinessAdmin, ApropriacaoController.create);

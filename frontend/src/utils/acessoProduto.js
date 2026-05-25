@@ -671,6 +671,41 @@ export function canAccessBiblioteca(user) {
   return true;
 }
 
+export function canAccessTreinamento(user) {
+  if (!hasEnabledModule(user, 'TREINAMENTO')) return false;
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasAnyPermissao(user, [
+      'treinamento.conteudos.visualizar',
+      'treinamento.conteudos.gerenciar',
+      'treinamento.conteudos.publicar',
+      'treinamento.relatorios.visualizar'
+    ]);
+  }
+  return true;
+}
+
+export function canManageTreinamento(user) {
+  if (!hasEnabledModule(user, 'TREINAMENTO')) return false;
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasAnyPermissao(user, [
+      'treinamento.conteudos.gerenciar',
+      'treinamento.conteudos.publicar'
+    ]);
+  }
+  return false;
+}
+
+export function canPublishTreinamento(user) {
+  if (!hasEnabledModule(user, 'TREINAMENTO')) return false;
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasPermissao(user, 'treinamento.conteudos.publicar');
+  }
+  return false;
+}
+
 export function canAccessComunicacao(user) {
   if (!hasEnabledModule(user, 'COMUNICACAO_INTERNA')) return false;
   if (isBusinessAdmin(user)) return true;

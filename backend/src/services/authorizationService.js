@@ -349,6 +349,22 @@ const FISCAL_LOGS_VIEW_KEYS = [
   'fiscal.logs.view'
 ];
 
+const TREINAMENTO_VIEW_KEYS = [
+  'treinamento.conteudos.visualizar',
+  'treinamento.conteudos.gerenciar',
+  'treinamento.conteudos.publicar',
+  'treinamento.relatorios.visualizar'
+];
+
+const TREINAMENTO_MANAGE_KEYS = [
+  'treinamento.conteudos.gerenciar',
+  'treinamento.conteudos.publicar'
+];
+
+const TREINAMENTO_PUBLISH_KEYS = [
+  'treinamento.conteudos.publicar'
+];
+
 const SST_DASHBOARD_KEYS = [
   'sst.dashboard.visualizar',
   'sst.analytics.visualizar'
@@ -1548,6 +1564,42 @@ async function canViewFiscalLogs(user) {
   return false;
 }
 
+async function canAccessTreinamento(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, TREINAMENTO_VIEW_KEYS);
+  }
+
+  return true;
+}
+
+async function canManageTreinamento(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, TREINAMENTO_MANAGE_KEYS);
+  }
+
+  return false;
+}
+
+async function canPublishTreinamento(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, TREINAMENTO_PUBLISH_KEYS);
+  }
+
+  return false;
+}
+
 async function canAccessSst(user) {
   if (isBusinessAdmin(user)) {
     return true;
@@ -1858,6 +1910,7 @@ module.exports = {
   canAccessFinanceiro,
   canAccessFiscal,
   canAccessSst,
+  canAccessTreinamento,
   canAccessIntegracaoSienge,
   canAccessRhDp,
   canAuditComprasPedidos,
@@ -1913,6 +1966,8 @@ module.exports = {
   canManageRhDpColaboradores,
   canManageRhDpDocumentos,
   getFinanceiroObraScopeIds,
+  canManageTreinamento,
+  canPublishTreinamento,
   canRetryIntegracaoSienge,
   canSendPagamentosBanco,
   canViewIntegracaoSienge,
