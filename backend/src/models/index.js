@@ -2619,6 +2619,16 @@ db.MovimentoFinanceiro.belongsTo(db.FaturaCartaoFinanceiro, {
   as: 'faturaCartao'
 });
 
+db.CartaoFinanceiro.hasMany(db.MovimentoFinanceiro, {
+  foreignKey: 'cartao_id',
+  as: 'movimentos'
+});
+
+db.MovimentoFinanceiro.belongsTo(db.CartaoFinanceiro, {
+  foreignKey: 'cartao_id',
+  as: 'cartao'
+});
+
 db.User.hasMany(db.MovimentoFinanceiro, {
   foreignKey: 'criado_por',
   as: 'movimentosFinanceirosCriados'

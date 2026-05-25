@@ -1067,6 +1067,7 @@ function validateFinanceTituloBaixaBody(body = {}) {
     [
       'empresa_id',
       'conta_bancaria_id',
+      'cartao_id',
       'forma_recebimento',
       'tipo_permuta',
       'categoria_bem',
@@ -1095,6 +1096,7 @@ function validateFinanceTituloBaixaBody(body = {}) {
   );
 
   const contaBancariaId = parseInteger(body.conta_bancaria_id, 'Conta bancaria');
+  const cartaoId = parseInteger(body.cartao_id, 'Cartao');
   const empresaId = parseInteger(body.empresa_id, 'Empresa pagadora', { required: true });
   const exigeContaBancaria = !formaRecebimento || !['DINHEIRO', 'CARTAO', 'PERMUTA', 'BENS', 'OUTROS'].includes(formaRecebimento);
 
@@ -1102,9 +1104,14 @@ function validateFinanceTituloBaixaBody(body = {}) {
     throw new ValidationError('Conta bancaria e obrigatoria para esta forma de recebimento.');
   }
 
+  if (formaRecebimento === 'CARTAO' && !cartaoId) {
+    throw new ValidationError('Informe o cartao utilizado na baixa.');
+  }
+
   return {
     empresa_id: empresaId,
     conta_bancaria_id: contaBancariaId,
+    cartao_id: cartaoId,
     forma_recebimento: formaRecebimento,
     tipo_permuta: parseOptionalText(body.tipo_permuta, 'Tipo de permuta', 80),
     categoria_bem: parseEnum(body.categoria_bem, 'Categoria do bem', CATEGORIAS_BEM),

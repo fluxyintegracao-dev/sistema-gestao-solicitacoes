@@ -14,6 +14,7 @@ import { useAuth } from '../contexts/AuthContext';
 import {
   baixarTituloFinanceiro,
   getCategoriasFinanceiras,
+  getCartoesFinanceiros,
   getContasBancarias,
   getTitulosFinanceiros
 } from '../services/financeiro';
@@ -158,6 +159,21 @@ function contaBancariaObrigatoria(formaRecebimento) {
   return !['DINHEIRO', 'CARTAO', 'PERMUTA', 'BENS', 'OUTROS'].includes(String(formaRecebimento || '').toUpperCase());
 }
 
+function isCartaoForma(formaRecebimento) {
+  return String(formaRecebimento || '').toUpperCase() === 'CARTAO';
+}
+
+function isCartaoDebito(cartao) {
+  return String(cartao?.tipo || '').toUpperCase() === 'DEBITO';
+}
+
+function getCartaoLabel(cartao) {
+  const tipo = isCartaoDebito(cartao) ? 'Debito' : 'Credito';
+  const bandeira = cartao?.bandeira ? `${cartao.bandeira} ` : '';
+  const final = cartao?.ultimos_digitos ? ` final ${cartao.ultimos_digitos}` : '';
+  return `${cartao?.nome || 'Cartao'} - ${tipo} - ${bandeira}${final}`.trim();
+}
+
 function isTituloBaixavel(titulo) {
   return ['ABERTO', 'PARCIAL'].includes(String(titulo?.status || '').trim().toUpperCase()) && Number(titulo?.valor_saldo || 0) > 0;
 }
@@ -166,6 +182,7 @@ function buildBaixaMassaForm(contasBancarias = []) {
   return {
     empresa_id: '',
     conta_bancaria_id: '',
+    cartao_id: '',
     forma_recebimento: '',
     juros: '',
     multa: '',
@@ -194,6 +211,7 @@ export default function FinanceiroTitulos() {
   const [parceiros, setParceiros] = useState([]);
   const [categorias, setCategorias] = useState([]);
   const [contasBancarias, setContasBancarias] = useState([]);
+  const [cartoes, setCartoes] = useState([]);
   const [empresasGrupo, setEmpresasGrupo] = useState([]);
   const [titulos, setTitulos] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -213,15 +231,17 @@ export default function FinanceiroTitulos() {
       buscarParceiros({ ativo: true, limit: 200 }).catch(() => []),
       getCategoriasFinanceiras().catch(() => []),
       getContasBancarias().catch(() => []),
+      getCartoesFinanceiros().catch(() => []),
       getEmpresasGrupo({ ativo: true }).catch(() => [])
     ])
-      .then(([obrasData, parceirosData, categoriasData, contasData, empresasData]) => {
+      .then(([obrasData, parceirosData, categoriasData, contasData, cartoesData, empresasData]) => {
         if (!active) return;
         setObras(Array.isArray(obrasData) ? obrasData : []);
         setParceiros(Array.isArray(parceirosData) ? parceirosData : []);
         setCategorias(Array.isArray(categoriasData) ? categoriasData : []);
         const contasNormalizadas = Array.isArray(contasData) ? contasData : [];
         setContasBancarias(contasNormalizadas);
+        setCartoes(Array.isArray(cartoesData) ? cartoesData : []);
         setEmpresasGrupo(Array.isArray(empresasData) ? empresasData : []);
       })
       .finally(() => {
@@ -340,6 +360,19 @@ export default function FinanceiroTitulos() {
     if (!baixaMassaForm.empresa_id) return [];
     return contasBancarias.filter((conta) => String(conta.empresa_id || '') === String(baixaMassaForm.empresa_id));
   }, [baixaMassaForm.empresa_id, contasBancarias]);
+  const selectedCartaoBaixaMassa = useMemo(
+    () => cartoes.find((cartao) => String(cartao.id) === String(baixaMassaForm.cartao_id)) || null,
+    [cartoes, baixaMassaForm.cartao_id]
+  );
+  const cartoesBaixaMassa = useMemo(() => cartoes.filter((cartao) => {
+    if (cartao.ativo === false) return false;
+    if (!baixaMassaForm.empresa_id) return true;
+    if (!isCartaoDebito(cartao)) return true;
+    const contaCartao = contasBancarias.find((conta) => String(conta.id) === String(cartao.conta_bancaria_id));
+    return String(contaCartao?.empresa_id || '') === String(baixaMassaForm.empresa_id);
+  }), [baixaMassaForm.empresa_id, cartoes, contasBancarias]);
+  const baixaMassaUsaCartao = isCartaoForma(baixaMassaForm.forma_recebimento);
+  const baixaMassaCartaoDebito = baixaMassaUsaCartao && isCartaoDebito(selectedCartaoBaixaMassa);
   const allBaixaveisSelected = titulosBaixaveis.length > 0 && titulosBaixaveis.every((titulo) => selectedTituloSet.has(Number(titulo.id)));
 
   function setFilter(name, value) {
@@ -437,6 +470,16 @@ export default function FinanceiroTitulos() {
       return;
     }
 
+    if (baixaMassaUsaCartao && !baixaMassaForm.cartao_id) {
+      setError('Informe o cartao utilizado na baixa em massa.');
+      return;
+    }
+
+    if (baixaMassaCartaoDebito && !baixaMassaForm.conta_bancaria_id) {
+      setError('Cartao de debito precisa ter conta bancaria vinculada.');
+      return;
+    }
+
     if (contaBancariaObrigatoria(baixaMassaForm.forma_recebimento) && !baixaMassaForm.conta_bancaria_id) {
       setError('Conta bancaria e obrigatoria para esta forma de baixa.');
       return;
@@ -452,6 +495,7 @@ export default function FinanceiroTitulos() {
           await baixarTituloFinanceiro(titulo.id, {
             empresa_id: baixaMassaForm.empresa_id,
             conta_bancaria_id: baixaMassaForm.conta_bancaria_id || null,
+            cartao_id: baixaMassaForm.cartao_id || null,
             forma_recebimento: baixaMassaForm.forma_recebimento,
             valor: Number(titulo.valor_saldo || 0),
             juros: baixaMassaForm.juros || 0,
@@ -1120,7 +1164,12 @@ export default function FinanceiroTitulos() {
                   <select
                     className="input w-full input-sm"
                     value={baixaMassaForm.forma_recebimento}
-                    onChange={(event) => setBaixaMassaForm((current) => ({ ...current, forma_recebimento: event.target.value }))}
+                    onChange={(event) => setBaixaMassaForm((current) => ({
+                      ...current,
+                      forma_recebimento: event.target.value,
+                      cartao_id: '',
+                      conta_bancaria_id: isCartaoForma(event.target.value) ? '' : current.conta_bancaria_id
+                    }))}
                     required
                   >
                     <option value="">Selecione</option>
@@ -1138,7 +1187,8 @@ export default function FinanceiroTitulos() {
                     onChange={(event) => setBaixaMassaForm((current) => ({
                       ...current,
                       empresa_id: event.target.value,
-                      conta_bancaria_id: ''
+                      conta_bancaria_id: '',
+                      cartao_id: ''
                     }))}
                     required
                   >
@@ -1151,16 +1201,52 @@ export default function FinanceiroTitulos() {
                   </select>
                 </label>
 
+                {baixaMassaUsaCartao ? (
+                  <label className="app-filter-field md:col-span-2">
+                    <span className="app-filter-label">Cartao utilizado</span>
+                    <select
+                      className="input w-full input-sm"
+                      value={baixaMassaForm.cartao_id}
+                      onChange={(event) => {
+                        const cartaoSelecionado = cartoes.find((cartao) => String(cartao.id) === String(event.target.value));
+                        const contaCartao = isCartaoDebito(cartaoSelecionado) ? String(cartaoSelecionado?.conta_bancaria_id || '') : '';
+                        setBaixaMassaForm((current) => ({
+                          ...current,
+                          cartao_id: event.target.value,
+                          conta_bancaria_id: contaCartao
+                        }));
+                      }}
+                      required
+                    >
+                      <option value="">Selecione o cartao</option>
+                      {cartoesBaixaMassa.map((cartao) => (
+                        <option key={cartao.id} value={cartao.id}>
+                          {getCartaoLabel(cartao)}
+                        </option>
+                      ))}
+                    </select>
+                    {baixaMassaCartaoDebito ? (
+                      <span className="mt-1 block text-xs text-[var(--c-muted)]">
+                        Cartao de debito baixa pela conta bancaria vinculada ao cartao.
+                      </span>
+                    ) : null}
+                  </label>
+                ) : null}
+
                 <label className="app-filter-field md:col-span-2">
                   <span className="app-filter-label">Conta bancaria</span>
                   <select
                     className="input w-full input-sm"
                     value={baixaMassaForm.conta_bancaria_id}
                     onChange={(event) => setBaixaMassaForm((current) => ({ ...current, conta_bancaria_id: event.target.value }))}
-                    required={contaBancariaObrigatoria(baixaMassaForm.forma_recebimento)}
-                    disabled={!baixaMassaForm.empresa_id || !contaBancariaObrigatoria(baixaMassaForm.forma_recebimento)}
+                    required={contaBancariaObrigatoria(baixaMassaForm.forma_recebimento) || baixaMassaCartaoDebito}
+                    disabled={!baixaMassaForm.empresa_id || baixaMassaUsaCartao || !contaBancariaObrigatoria(baixaMassaForm.forma_recebimento)}
                   >
-                    <option value="">{baixaMassaForm.empresa_id ? 'Sem conta bancaria' : 'Selecione a empresa pagadora'}</option>
+                    <option value="">
+                      {baixaMassaUsaCartao
+                        ? (baixaMassaCartaoDebito ? 'Conta vinculada ao cartao' : 'Cartao de credito sem baixa bancaria imediata')
+                        : (baixaMassaForm.empresa_id ? 'Sem conta bancaria' : 'Selecione a empresa pagadora')}
+                    </option>
                     {contasBancariasBaixaMassa.map((conta) => (
                       <option key={conta.id} value={conta.id}>
                         {conta.nome}
@@ -1225,7 +1311,17 @@ export default function FinanceiroTitulos() {
               >
                 Cancelar
               </button>
-              <button type="submit" className="btn btn-primary btn-sm" disabled={savingBaixaMassa || !baixaMassaForm.empresa_id || (contaBancariaObrigatoria(baixaMassaForm.forma_recebimento) && !baixaMassaForm.conta_bancaria_id)}>
+              <button
+                type="submit"
+                className="btn btn-primary btn-sm"
+                disabled={
+                  savingBaixaMassa ||
+                  !baixaMassaForm.empresa_id ||
+                  (baixaMassaUsaCartao && !baixaMassaForm.cartao_id) ||
+                  (baixaMassaCartaoDebito && !baixaMassaForm.conta_bancaria_id) ||
+                  (contaBancariaObrigatoria(baixaMassaForm.forma_recebimento) && !baixaMassaForm.conta_bancaria_id)
+                }
+              >
                 {savingBaixaMassa ? 'Baixando...' : `Confirmar ${selectedTitulosBaixaveis.length} baixa(s)`}
               </button>
             </div>

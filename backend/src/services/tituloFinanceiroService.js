@@ -129,6 +129,75 @@ function normalizarFormaRecebimento(value) {
   return value ? String(value || '').trim().toUpperCase() : null;
 }
 
+async function resolverCartaoBaixa({ formaRecebimento, cartaoId, conta, empresaBaixaId, dataMovimento, usuarioId, transaction }) {
+  if (String(formaRecebimento || '').toUpperCase() !== 'CARTAO') {
+    if (cartaoId) {
+      throw createHttpError(400, 'Cartao deve ser informado apenas quando a forma de recebimento for CARTAO.');
+    }
+
+    return {
+      cartao: null,
+      conta: conta || null,
+      fatura: null,
+      formaRecebimento
+    };
+  }
+
+  if (!cartaoId) {
+    throw createHttpError(400, 'Informe o cartao utilizado na baixa.');
+  }
+
+  const cartao = await CartaoFinanceiro.findByPk(cartaoId, {
+    include: [{ model: ContaBancaria, as: 'contaBancaria' }],
+    transaction
+  });
+
+  if (!cartao || cartao.ativo === false) {
+    throw createHttpError(400, 'Cartao financeiro invalido ou inativo.');
+  }
+
+  const tipoCartao = String(cartao.tipo || 'CREDITO').trim().toUpperCase();
+
+  if (tipoCartao === 'DEBITO') {
+    const contaCartao = cartao.contaBancaria || (cartao.conta_bancaria_id
+      ? await ContaBancaria.findByPk(cartao.conta_bancaria_id, { transaction })
+      : null);
+
+    if (!contaCartao || contaCartao.ativo === false) {
+      throw createHttpError(400, 'Cartao de debito precisa ter uma conta bancaria ativa vinculada.');
+    }
+
+    if (conta && Number(conta.id) !== Number(contaCartao.id)) {
+      throw createHttpError(400, 'A conta bancaria informada deve ser a mesma vinculada ao cartao de debito.');
+    }
+
+    if (Number(contaCartao.empresa_id || 0) !== Number(empresaBaixaId || 0)) {
+      throw createHttpError(400, 'A conta bancaria vinculada ao cartao de debito deve pertencer a empresa pagadora.');
+    }
+
+    return {
+      cartao,
+      conta: contaCartao,
+      fatura: null,
+      formaRecebimento: 'CARTAO_DEBITO'
+    };
+  }
+
+  const { fatura } = await obterOuCriarFaturaCartao({
+    cartaoId: cartao.id,
+    dataCompra: dataMovimento,
+    usuarioId,
+    transaction
+  });
+
+  return {
+    cartao,
+    conta: null,
+    fatura,
+    formaRecebimento: 'CARTAO_CREDITO'
+  };
+}
+
 function normalizarFormaCobranca(value) {
   if (!value) return null;
   const normalized = String(value || '').trim().toUpperCase();
@@ -462,6 +531,11 @@ function buildTituloInclude({ includeMovimentos = false } = {}) {
           model: ContaBancaria,
           as: 'contaBancaria',
           attributes: ['id', 'nome', 'banco', 'agencia', 'conta', 'empresa_id']
+        },
+        {
+          model: CartaoFinanceiro,
+          as: 'cartao',
+          attributes: ['id', 'nome', 'titular', 'tipo', 'bandeira', 'ultimos_digitos', 'conta_bancaria_id']
         },
         {
           model: EmpresaGrupo,
@@ -2177,16 +2251,30 @@ async function baixarTitulo(req, tituloId, payload = {}) {
 
   const transaction = await sequelize.transaction();
   try {
-    const caixaSessao = conta
-      ? await obterSessaoAbertaParaConta(conta, payload.data_movimento, { transaction })
+    const cartaoBaixa = await resolverCartaoBaixa({
+      formaRecebimento,
+      cartaoId: payload.cartao_id,
+      conta,
+      empresaBaixaId,
+      dataMovimento: payload.data_movimento,
+      usuarioId: req.user?.id || null,
+      transaction
+    });
+    const contaMovimento = cartaoBaixa.conta || conta;
+    const formaMovimento = cartaoBaixa.formaRecebimento;
+
+    const caixaSessao = contaMovimento
+      ? await obterSessaoAbertaParaConta(contaMovimento, payload.data_movimento, { transaction })
       : null;
     const movimento = await MovimentoFinanceiro.create({
       titulo_financeiro_id: titulo.id,
-      conta_bancaria_id: conta?.id || null,
+      conta_bancaria_id: contaMovimento?.id || null,
+      fatura_cartao_id: cartaoBaixa.fatura?.id || null,
+      cartao_id: cartaoBaixa.cartao?.id || null,
       empresa_id: empresaBaixaId,
       ...movimentoIntercompanyFields,
       caixa_sessao_id: caixaSessao?.id || null,
-      forma_recebimento: formaRecebimento,
+      forma_recebimento: formaMovimento,
       tipo_permuta: payload.tipo_permuta || null,
       categoria_bem: payload.categoria_bem || null,
       descricao_bem: payload.descricao_bem || null,
@@ -2206,6 +2294,8 @@ async function baixarTitulo(req, tituloId, payload = {}) {
 
     await titulo.update({
       empresa_id: empresaTituloId,
+      cartao_id: cartaoBaixa.cartao?.id || titulo.cartao_id || null,
+      fatura_cartao_id: cartaoBaixa.fatura?.id || titulo.fatura_cartao_id || null,
       valor_baixado: novoValorBaixado,
       valor_saldo: novoEstado.valor_saldo,
       status: novoEstado.status,
@@ -2213,6 +2303,14 @@ async function baixarTitulo(req, tituloId, payload = {}) {
       status_cobranca: titulo.forma_cobranca ? 'CONCILIADO' : titulo.status_cobranca,
       atualizado_por: req.user?.id || null
     }, { transaction });
+
+    if (cartaoBaixa.fatura) {
+      await vincularTituloAFatura({
+        titulo,
+        fatura: cartaoBaixa.fatura,
+        transaction
+      });
+    }
 
     if (titulo.solicitacao_id) {
       await Historico.create({
@@ -2236,11 +2334,13 @@ async function baixarTitulo(req, tituloId, payload = {}) {
       descricao: 'Baixa financeira registrada no titulo',
         metadata: {
           movimento_id: movimento.id,
-          conta_bancaria_id: conta?.id || null,
+          conta_bancaria_id: contaMovimento?.id || null,
+          cartao_id: cartaoBaixa.cartao?.id || null,
+          fatura_cartao_id: cartaoBaixa.fatura?.id || null,
           empresa_baixa_id: empresaBaixaId,
           intercompany_group_id: movimentoIntercompanyFields.intercompany_group_id || null,
           tipo_intercompany: movimentoIntercompanyFields.tipo_intercompany || null,
-          forma_recebimento: formaRecebimento,
+          forma_recebimento: formaMovimento,
           tipo_permuta: payload.tipo_permuta || null,
           categoria_bem: payload.categoria_bem || null,
         valor: valorBaixa,
@@ -2267,6 +2367,8 @@ async function baixarTitulo(req, tituloId, payload = {}) {
         tipo_movimento: movimento.tipo_movimento,
         status: movimento.status,
         conta_bancaria_id: movimento.conta_bancaria_id,
+        cartao_id: movimento.cartao_id,
+        fatura_cartao_id: movimento.fatura_cartao_id,
         valor: movimento.valor,
         valor_quitacao: movimento.valor_quitacao,
         data_movimento: movimento.data_movimento

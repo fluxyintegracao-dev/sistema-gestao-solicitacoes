@@ -5,6 +5,7 @@ import {
   atualizarCobrancaTituloFinanceiro,
   baixarTituloFinanceiro,
   estornarMovimentoFinanceiro,
+  getCartoesFinanceiros,
   getContasBancarias,
   getTituloFinanceiroAuditoria,
   getTituloFinanceiroById
@@ -78,12 +79,33 @@ function contaBancariaObrigatoria(formaRecebimento) {
   return !['DINHEIRO', 'CARTAO', 'PERMUTA', 'BENS', 'OUTROS'].includes(String(formaRecebimento || '').toUpperCase());
 }
 
+function isCartaoForma(formaRecebimento) {
+  return String(formaRecebimento || '').toUpperCase() === 'CARTAO';
+}
+
+function isCartaoDebito(cartao) {
+  return String(cartao?.tipo || '').toUpperCase() === 'DEBITO';
+}
+
+function getCartaoLabel(cartao) {
+  const tipo = isCartaoDebito(cartao) ? 'Debito' : 'Credito';
+  const bandeira = cartao?.bandeira ? `${cartao.bandeira} ` : '';
+  const final = cartao?.ultimos_digitos ? ` final ${cartao.ultimos_digitos}` : '';
+  return `${cartao?.nome || 'Cartao'} - ${tipo} - ${bandeira}${final}`.trim();
+}
+
+function normalizeFormaBaixaForm(formaRecebimento) {
+  const normalized = String(formaRecebimento || '').toUpperCase();
+  return normalized.startsWith('CARTAO_') ? 'CARTAO' : normalized;
+}
+
 function buildBaixaForm(titulo, contasBancarias, movimento = null) {
   if (movimento) {
     return {
       empresa_id: String(movimento.empresa_id || movimento.empresa?.id || ''),
       conta_bancaria_id: String(movimento.conta_bancaria_id || movimento.contaBancaria?.id || ''),
-      forma_recebimento: movimento?.forma_recebimento || '',
+      cartao_id: String(movimento.cartao_id || movimento.cartao?.id || ''),
+      forma_recebimento: normalizeFormaBaixaForm(movimento?.forma_recebimento),
       tipo_permuta: movimento?.tipo_permuta || '',
       categoria_bem: movimento?.categoria_bem || '',
       descricao_bem: movimento?.descricao_bem || '',
@@ -106,6 +128,7 @@ function buildBaixaForm(titulo, contasBancarias, movimento = null) {
   return {
     empresa_id: String(titulo?.empresa_id || ''),
     conta_bancaria_id: '',
+    cartao_id: '',
     forma_recebimento: '',
     tipo_permuta: '',
     categoria_bem: '',
@@ -223,6 +246,7 @@ export default function FinanceiroTituloDetalhe() {
   const { user } = useAuth();
   const [titulo, setTitulo] = useState(null);
   const [contasBancarias, setContasBancarias] = useState([]);
+  const [cartoes, setCartoes] = useState([]);
   const [empresasGrupo, setEmpresasGrupo] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -240,20 +264,23 @@ export default function FinanceiroTituloDetalhe() {
     try {
       setLoading(true);
       setError('');
-      const [tituloData, contasData, empresasData, auditoriaData] = await Promise.all([
+      const [tituloData, contasData, cartoesData, empresasData, auditoriaData] = await Promise.all([
         getTituloFinanceiroById(id),
         getContasBancarias(),
+        getCartoesFinanceiros(),
         getEmpresasGrupo({ ativo: true }),
         getTituloFinanceiroAuditoria(id)
       ]);
       setTitulo(tituloData);
       setContasBancarias(Array.isArray(contasData) ? contasData : []);
+      setCartoes(Array.isArray(cartoesData) ? cartoesData : []);
       setEmpresasGrupo(Array.isArray(empresasData) ? empresasData : []);
       setAuditoria(Array.isArray(auditoriaData) ? auditoriaData : []);
       setCobrancaForm(buildCobrancaForm(tituloData));
       setBaixaForm((current) => ({
         ...buildBaixaForm(tituloData, Array.isArray(contasData) ? contasData : []),
-        conta_bancaria_id: current.conta_bancaria_id || ''
+        conta_bancaria_id: current.conta_bancaria_id || '',
+        cartao_id: current.cartao_id || ''
       }));
     } catch (err) {
       setError(err?.message || 'Erro ao carregar titulo financeiro');
@@ -285,6 +312,19 @@ export default function FinanceiroTituloDetalhe() {
     if (!baixaForm.empresa_id) return [];
     return contasBancarias.filter((conta) => String(conta.empresa_id || '') === String(baixaForm.empresa_id));
   }, [baixaForm.empresa_id, contasBancarias]);
+  const selectedCartaoBaixa = useMemo(
+    () => cartoes.find((cartao) => String(cartao.id) === String(baixaForm.cartao_id)) || null,
+    [cartoes, baixaForm.cartao_id]
+  );
+  const cartoesBaixa = useMemo(() => cartoes.filter((cartao) => {
+    if (cartao.ativo === false) return false;
+    if (!baixaForm.empresa_id) return true;
+    if (!isCartaoDebito(cartao)) return true;
+    const contaCartao = contasBancarias.find((conta) => String(conta.id) === String(cartao.conta_bancaria_id));
+    return String(contaCartao?.empresa_id || '') === String(baixaForm.empresa_id);
+  }), [baixaForm.empresa_id, cartoes, contasBancarias]);
+  const baixaUsaCartao = isCartaoForma(baixaForm.forma_recebimento);
+  const baixaCartaoDebito = baixaUsaCartao && isCartaoDebito(selectedCartaoBaixa);
 
   const podeOperarIntegracaoSienge = useMemo(() => {
     return canRetryIntegracaoSienge(user) && canQueueTituloSienge(titulo);
@@ -329,6 +369,14 @@ export default function FinanceiroTituloDetalhe() {
     event.preventDefault();
     if (!baixaForm.empresa_id) {
       setError('Informe a empresa pagadora da baixa.');
+      return;
+    }
+    if (baixaUsaCartao && !baixaForm.cartao_id) {
+      setError('Informe o cartao utilizado na baixa.');
+      return;
+    }
+    if (baixaCartaoDebito && !baixaForm.conta_bancaria_id) {
+      setError('Cartao de debito precisa ter conta bancaria vinculada.');
       return;
     }
     if (contaBancariaObrigatoria(baixaForm.forma_recebimento) && !baixaForm.conta_bancaria_id) {
@@ -1075,7 +1123,12 @@ export default function FinanceiroTituloDetalhe() {
                   <select
                     className="input w-full"
                     value={baixaForm.forma_recebimento}
-                    onChange={(event) => setBaixaForm((current) => ({ ...current, forma_recebimento: event.target.value }))}
+                    onChange={(event) => setBaixaForm((current) => ({
+                      ...current,
+                      forma_recebimento: event.target.value,
+                      cartao_id: '',
+                      conta_bancaria_id: isCartaoForma(event.target.value) ? '' : current.conta_bancaria_id
+                    }))}
                   >
                     <option value="">Nao informar</option>
                     {FORMAS_RECEBIMENTO.map((item) => (
@@ -1095,6 +1148,7 @@ export default function FinanceiroTituloDetalhe() {
                         ...current,
                         empresa_id: empresaSelecionada,
                         conta_bancaria_id: '',
+                        cartao_id: '',
                         intercompany: Boolean(empresaTituloId && empresaSelecionada && empresaSelecionada !== empresaTituloId) || current.intercompany
                       }));
                     }}
@@ -1109,16 +1163,52 @@ export default function FinanceiroTituloDetalhe() {
                   </select>
                 </label>
 
+                {baixaUsaCartao ? (
+                  <label className="text-sm md:col-span-2">
+                    <span className="mb-1 block text-slate-500">Cartao utilizado</span>
+                    <select
+                      className="input w-full"
+                      value={baixaForm.cartao_id}
+                      onChange={(event) => {
+                        const cartaoSelecionado = cartoes.find((cartao) => String(cartao.id) === String(event.target.value));
+                        const contaCartao = isCartaoDebito(cartaoSelecionado) ? String(cartaoSelecionado?.conta_bancaria_id || '') : '';
+                        setBaixaForm((current) => ({
+                          ...current,
+                          cartao_id: event.target.value,
+                          conta_bancaria_id: contaCartao
+                        }));
+                      }}
+                      required
+                    >
+                      <option value="">Selecione o cartao</option>
+                      {cartoesBaixa.map((cartao) => (
+                        <option key={cartao.id} value={cartao.id}>
+                          {getCartaoLabel(cartao)}
+                        </option>
+                      ))}
+                    </select>
+                    {baixaCartaoDebito ? (
+                      <span className="mt-1 block text-xs text-[var(--c-muted)]">
+                        Cartao de debito baixa pela conta bancaria vinculada ao cartao.
+                      </span>
+                    ) : null}
+                  </label>
+                ) : null}
+
                 <label className="text-sm">
                   <span className="mb-1 block text-slate-500">Conta bancaria</span>
                   <select
                     className="input w-full"
                     value={baixaForm.conta_bancaria_id}
                     onChange={(event) => setBaixaForm((current) => ({ ...current, conta_bancaria_id: event.target.value }))}
-                    required={contaBancariaObrigatoria(baixaForm.forma_recebimento)}
-                    disabled={!baixaForm.empresa_id}
+                    required={contaBancariaObrigatoria(baixaForm.forma_recebimento) || baixaCartaoDebito}
+                    disabled={!baixaForm.empresa_id || baixaUsaCartao}
                   >
-                    <option value="">{baixaForm.empresa_id ? 'Selecione' : 'Selecione a empresa da baixa'}</option>
+                    <option value="">
+                      {baixaUsaCartao
+                        ? (baixaCartaoDebito ? 'Conta vinculada ao cartao' : 'Cartao de credito sem baixa bancaria imediata')
+                        : (baixaForm.empresa_id ? 'Selecione' : 'Selecione a empresa da baixa')}
+                    </option>
                     {contasBancariasBaixa.map((conta) => (
                       <option key={conta.id} value={conta.id}>
                         {conta.nome}
@@ -1337,6 +1427,8 @@ export default function FinanceiroTituloDetalhe() {
                   disabled={
                     savingBaixa ||
                     !baixaForm.empresa_id ||
+                    (baixaUsaCartao && !baixaForm.cartao_id) ||
+                    (baixaCartaoDebito && !baixaForm.conta_bancaria_id) ||
                     (contaBancariaObrigatoria(baixaForm.forma_recebimento) && !baixaForm.conta_bancaria_id) ||
                     !baixaForm.valor ||
                     (Boolean(baixaForm.intercompany) && !baixaForm.tipo_intercompany)
