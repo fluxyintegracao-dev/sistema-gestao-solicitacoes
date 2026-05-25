@@ -18,6 +18,11 @@ const {
   obterTokensSetoresSemAlteracaoStatus
 } = require('../services/solicitacao/setoresSemAlteracaoStatus');
 const {
+  obterConfiguracaoSetoresAlteracaoStatusLivre,
+  salvarConfiguracaoSetoresAlteracaoStatusLivre,
+  obterTokensSetoresAlteracaoStatusLivre
+} = require('../services/solicitacao/setoresAlteracaoStatusLivre');
+const {
   obterUsuariosAcessoPrioridadeDiretoria,
   salvarUsuariosAcessoPrioridadeDiretoria,
   normalizarUsuarioIds
@@ -802,6 +807,35 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return res.status(500).json({ error: 'Erro ao salvar configuracao de setores sem alteracao de status' });
+    }
+  },
+
+  async getSetoresAlteracaoStatusLivre(req, res) {
+    try {
+      const configuracao = await obterConfiguracaoSetoresAlteracaoStatusLivre();
+      const tokens = await obterTokensSetoresAlteracaoStatusLivre();
+      return res.json({
+        setores: configuracao.setores,
+        tokens
+      });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao buscar configuracao de setores com alteracao livre de status' });
+    }
+  },
+
+  async updateSetoresAlteracaoStatusLivre(req, res) {
+    try {
+      const configuracao = await salvarConfiguracaoSetoresAlteracaoStatusLivre(req.body?.setores);
+      const tokens = await obterTokensSetoresAlteracaoStatusLivre();
+      return res.json({
+        ok: true,
+        setores: configuracao.setores,
+        tokens
+      });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao salvar configuracao de setores com alteracao livre de status' });
     }
   },
 

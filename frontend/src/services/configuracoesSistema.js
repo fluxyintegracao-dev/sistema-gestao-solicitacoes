@@ -207,6 +207,27 @@ export async function salvarSetoresSemAlteracaoStatus(data) {
   return res.json();
 }
 
+export async function getSetoresAlteracaoStatusLivre() {
+  const res = await fetch(`${API_URL}/configuracoes/setores-alteracao-status-livre`, {
+    headers: authHeaders()
+  });
+  if (!res.ok) throw new Error('Erro ao buscar configuracao de setores com alteracao livre de status');
+  return res.json();
+}
+
+export async function salvarSetoresAlteracaoStatusLivre(data) {
+  const res = await fetch(`${API_URL}/configuracoes/setores-alteracao-status-livre`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.error || 'Erro ao salvar configuracao de setores com alteracao livre de status');
+  }
+  return res.json();
+}
+
 export async function getUsuariosAcessoPrioridadeDiretoria() {
   const res = await fetch(`${API_URL}/configuracoes/usuarios-acesso-prioridade-diretoria`, {
     headers: authHeaders()

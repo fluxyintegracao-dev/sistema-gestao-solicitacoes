@@ -381,6 +381,8 @@ router.get('/configuracoes/setores-criacao-todas-obras', ConfiguracaoSistemaCont
 router.patch('/configuracoes/setores-criacao-todas-obras', permit(['SUPERADMIN']), ConfiguracaoSistemaController.updateSetoresCriacaoTodasObras);
 router.get('/configuracoes/setores-sem-alteracao-status', ConfiguracaoSistemaController.getSetoresSemAlteracaoStatus);
 router.patch('/configuracoes/setores-sem-alteracao-status', permit(['SUPERADMIN']), ConfiguracaoSistemaController.updateSetoresSemAlteracaoStatus);
+router.get('/configuracoes/setores-alteracao-status-livre', ConfiguracaoSistemaController.getSetoresAlteracaoStatusLivre);
+router.patch('/configuracoes/setores-alteracao-status-livre', permit(['SUPERADMIN']), ConfiguracaoSistemaController.updateSetoresAlteracaoStatusLivre);
 router.get('/configuracoes/usuarios-acesso-prioridade-diretoria', permit(['SUPERADMIN']), ConfiguracaoSistemaController.getUsuariosAcessoPrioridadeDiretoria);
 router.patch('/configuracoes/usuarios-acesso-prioridade-diretoria', permit(['SUPERADMIN']), ConfiguracaoSistemaController.updateUsuariosAcessoPrioridadeDiretoria);
 router.get('/configuracoes/usuarios-envio-qualquer-setor', permit(['SUPERADMIN']), ConfiguracaoSistemaController.getUsuariosEnvioQualquerSetor);

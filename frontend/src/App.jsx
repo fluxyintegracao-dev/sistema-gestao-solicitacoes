@@ -41,6 +41,7 @@ import TiposCompartilhadosSetor from './pages/TiposCompartilhadosSetor';
 import AutomacaoStatusSetor from './pages/AutomacaoStatusSetor';
 import SetoresCriacaoTodasObras from './pages/SetoresCriacaoTodasObras';
 import SetoresSemAlteracaoStatus from './pages/SetoresSemAlteracaoStatus';
+import SetoresAlteracaoStatusLivre from './pages/SetoresAlteracaoStatusLivre';
 import UsuariosAcessoPrioridadeDiretoria from './pages/UsuariosAcessoPrioridadeDiretoria';
 import UsuariosEnvioQualquerSetor from './pages/UsuariosEnvioQualquerSetor';
 import UsuariosAlterarValorSolicitacao from './pages/UsuariosAlterarValorSolicitacao';
@@ -254,6 +255,7 @@ export default function App() {
         <Route path="automacao-status-setor" element={<SuperadminRoute><AutomacaoStatusSetor /></SuperadminRoute>} />
         <Route path="setores-criacao-todas-obras" element={<SetoresCriacaoTodasObras />} />
         <Route path="setores-sem-alteracao-status" element={<SuperadminRoute><SetoresSemAlteracaoStatus /></SuperadminRoute>} />
+        <Route path="setores-alteracao-status-livre" element={<SuperadminRoute><SetoresAlteracaoStatusLivre /></SuperadminRoute>} />
         <Route path="usuarios-acesso-prioridade-diretoria" element={<SuperadminRoute><UsuariosAcessoPrioridadeDiretoria /></SuperadminRoute>} />
         <Route path="arquivos-modelos-config" element={<SuperadminRoute><ArquivosModelosConfig /></SuperadminRoute>} />
         <Route path="provisionamento-financeiro-config" element={<SuperadminRoute><ConfiguracaoProvisionamentoFinanceiro /></SuperadminRoute>} />

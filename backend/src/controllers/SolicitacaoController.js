@@ -53,6 +53,10 @@ const {
   setorEstaSemAlteracaoStatus
 } = require('../services/solicitacao/setoresSemAlteracaoStatus');
 const {
+  obterTokensSetoresAlteracaoStatusLivre,
+  setorTemAlteracaoStatusLivre
+} = require('../services/solicitacao/setoresAlteracaoStatusLivre');
+const {
   usuarioPodeAlterarValorSolicitacao
 } = require('../services/solicitacao/permissaoAlterarValor');
 const {
@@ -2383,13 +2387,30 @@ module.exports = {
           contextoAprovacaoDiretoria.diretoriaEsperada
         ]
       );
+      const tokensSetoresAlteracaoStatusLivre = await obterTokensSetoresAlteracaoStatusLivre();
+      const usuarioTemAlteracaoStatusLivre = tokensSetorUsuario.some(token =>
+        setorTemAlteracaoStatusLivre(token, tokensSetoresAlteracaoStatusLivre)
+      );
       const tokensSetoresSemAlteracaoStatus = await obterTokensSetoresSemAlteracaoStatus();
       if (
+        !isSuperadmin &&
+        !usuarioTemAlteracaoStatusLivre &&
         !diretoriaStatusUsuario &&
         setorEstaSemAlteracaoStatus(setorAtual, tokensSetoresSemAlteracaoStatus)
       ) {
         return res.status(403).json({
           error: 'Alteracao de status desabilitada para o setor atual da solicitacao'
+        });
+      }
+
+      if (
+        !isSuperadmin &&
+        !usuarioTemAlteracaoStatusLivre &&
+        !diretoriaStatusUsuario &&
+        !setorPertenceAoUsuario(tokensSetorUsuario, setorAtual)
+      ) {
+        return res.status(403).json({
+          error: 'Voce so pode alterar status de solicitacoes que estejam no seu setor atual.'
         });
       }
 

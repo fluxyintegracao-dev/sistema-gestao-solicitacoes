@@ -15,7 +15,10 @@ import {
   aprovarDiretoriaSolicitacao,
   updateStatusSolicitacao
 } from '../../services/solicitacoes';
-import { getSetoresSemAlteracaoStatus } from '../../services/configuracoesSistema';
+import {
+  getSetoresAlteracaoStatusLivre,
+  getSetoresSemAlteracaoStatus
+} from '../../services/configuracoesSistema';
 import { API_URL, authHeaders } from '../../services/api';
 import {
   isGeoSetor,
@@ -53,6 +56,14 @@ function isDiretoriaObrasToken(valor) {
   return Boolean(normalizarDiretoriaObrasToken(valor));
 }
 
+function tokensSetorEquivalentes(tokenA, tokenB) {
+  const a = normalizarSetorToken(tokenA);
+  const b = normalizarSetorToken(tokenB);
+  if (!a || !b) return false;
+  if (a === b) return true;
+  return isGeoSetor(a) && isGeoSetor(b);
+}
+
 function obterDiretoriaObrasUsuarioParaStatus(user, diretoriasPermitidas = []) {
   const tokensNormalizados = obterTokensSetorUsuario(user)
     .map(token => normalizarDiretoriaObrasToken(token) || normalizarSetorToken(token))
@@ -83,6 +94,7 @@ export default function SolicitacaoDetalhe() {
   const [modalStatus, setModalStatus] = useState(false);
   const [modalEnviarSetor, setModalEnviarSetor] = useState(false);
   const [tokensSetoresSemAlteracaoStatus, setTokensSetoresSemAlteracaoStatus] = useState([]);
+  const [tokensSetoresAlteracaoStatusLivre, setTokensSetoresAlteracaoStatusLivre] = useState([]);
   const [loadingConfiguracaoStatus, setLoadingConfiguracaoStatus] = useState(true);
 
   const perfil = String(user?.perfil || '').trim().toUpperCase();
@@ -96,14 +108,22 @@ export default function SolicitacaoDetalhe() {
     async function carregarConfiguracaoStatus() {
       try {
         setLoadingConfiguracaoStatus(true);
-        const configuracao = await getSetoresSemAlteracaoStatus();
-        const tokens = Array.isArray(configuracao?.tokens)
-          ? configuracao.tokens
-          : configuracao?.setores;
-        setTokensSetoresSemAlteracaoStatus(Array.isArray(tokens) ? tokens : []);
+        const [configuracaoSemAlteracao, configuracaoAlteracaoLivre] = await Promise.all([
+          getSetoresSemAlteracaoStatus(),
+          getSetoresAlteracaoStatusLivre()
+        ]);
+        const tokensSemAlteracao = Array.isArray(configuracaoSemAlteracao?.tokens)
+          ? configuracaoSemAlteracao.tokens
+          : configuracaoSemAlteracao?.setores;
+        const tokensAlteracaoLivre = Array.isArray(configuracaoAlteracaoLivre?.tokens)
+          ? configuracaoAlteracaoLivre.tokens
+          : configuracaoAlteracaoLivre?.setores;
+        setTokensSetoresSemAlteracaoStatus(Array.isArray(tokensSemAlteracao) ? tokensSemAlteracao : []);
+        setTokensSetoresAlteracaoStatusLivre(Array.isArray(tokensAlteracaoLivre) ? tokensAlteracaoLivre : []);
       } catch (error) {
-        console.error('Erro ao carregar configuracao de setores sem alteracao de status', error);
+        console.error('Erro ao carregar configuracao de setores para alteracao de status', error);
         setTokensSetoresSemAlteracaoStatus([]);
+        setTokensSetoresAlteracaoStatusLivre([]);
       } finally {
         setLoadingConfiguracaoStatus(false);
       }
@@ -228,12 +248,20 @@ export default function SolicitacaoDetalhe() {
     !isSetorObra &&
     usuarioPodeEnviarSolicitacaoParaOutroSetor(solicitacao.area_responsavel, user);
   const setorSolicitacaoToken = normalizarSetorToken(solicitacao.area_responsavel);
-  const setorSemAlteracaoStatus = tokensSetoresSemAlteracaoStatus.some(token => {
-    const tokenNormalizado = normalizarSetorToken(token);
-    if (!tokenNormalizado || !setorSolicitacaoToken) return false;
-    if (tokenNormalizado === setorSolicitacaoToken) return true;
-    return isGeoSetor(tokenNormalizado) && isGeoSetor(setorSolicitacaoToken);
-  });
+  const setorSemAlteracaoStatus = tokensSetoresSemAlteracaoStatus.some(token =>
+    tokensSetorEquivalentes(token, setorSolicitacaoToken)
+  );
+  const usuarioTemAlteracaoStatusLivre = tokensSetoresAlteracaoStatusLivre.some(tokenLiberado =>
+    setorTokens.some(tokenUsuario => tokensSetorEquivalentes(tokenLiberado, tokenUsuario))
+  );
+  const solicitacaoEstaNoSetorDoUsuario = setorTokens.some(tokenUsuario =>
+    tokensSetorEquivalentes(tokenUsuario, solicitacao.area_responsavel)
+  );
+  const podeAlterarStatus =
+    isSuperadmin ||
+    usuarioTemAlteracaoStatusLivre ||
+    podeAlterarStatusDiretoria ||
+    (solicitacaoEstaNoSetorDoUsuario && !setorSemAlteracaoStatus);
 
   const atualizadoEm = new Date(solicitacao.updatedAt || solicitacao.createdAt).toLocaleString('pt-BR');
 
@@ -263,7 +291,7 @@ export default function SolicitacaoDetalhe() {
         solicitacao={solicitacao}
         onAlterarStatus={() => setModalStatus(true)}
         onEnviarSetor={podeAprovarDiretoria ? aprovarDiretoria : () => setModalEnviarSetor(true)}
-        mostrarAlterarStatus={!setorSemAlteracaoStatus || podeAlterarStatusDiretoria}
+        mostrarAlterarStatus={podeAlterarStatus}
         mostrarEnviarSetor={podeAprovarDiretoria || podeEnviarSetor}
         textoEnviarSetor={podeAprovarDiretoria ? 'Aprovar' : 'Enviar para outro setor'}
       />

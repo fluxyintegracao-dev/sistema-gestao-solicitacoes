@@ -125,6 +125,11 @@ const SECOES_CONFIG = [
         to: '/setores-sem-alteracao-status'
       },
       {
+        title: 'Setores com Alteracao Livre de Status',
+        description: 'Permita que setores alterem status mesmo fora do setor atual da solicitacao.',
+        to: '/setores-alteracao-status-livre'
+      },
+      {
         title: 'Acesso a Prioridade Diretoria',
         description: 'Defina usuarios que podem consultar lotes e solicitacoes priorizadas.',
         to: '/usuarios-acesso-prioridade-diretoria'
