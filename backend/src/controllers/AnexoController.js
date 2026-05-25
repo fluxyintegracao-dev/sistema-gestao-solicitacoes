@@ -23,7 +23,7 @@ async function validarAcessoSolicitacao(req, solicitacao) {
     return {
       permitido: false,
       status: 404,
-      error: 'Solicitacao nao encontrada'
+      error: 'Solicitação não encontrada'
     };
   }
 
@@ -36,13 +36,13 @@ async function validarAcessoSolicitacao(req, solicitacao) {
       recursoTipo: 'SOLICITACAO',
       recursoId: solicitacao.id,
       status: 'DENIED',
-      descricao: 'Usuario sem acesso a obra da solicitacao'
+      descricao: 'Usuário sem acesso à obra da solicitação'
     });
 
     return {
       permitido: false,
       status: 403,
-      error: 'Acesso negado para a obra da solicitacao'
+      error: 'Acesso negado para a obra da solicitação'
     };
   }
 
@@ -60,7 +60,7 @@ class AnexoController {
       const usuario = await User.findByPk(req.user.id);
 
       if (!solicitacao_id) {
-        return res.status(400).json({ error: 'solicitacao_id Ã© obrigatÃ³rio' });
+        return res.status(400).json({ error: 'solicitacao_id é obrigatório' });
       }
 
       if (!tipo) {
@@ -94,7 +94,7 @@ class AnexoController {
       }
 
       if (!solicitacao) {
-        return res.status(404).json({ error: 'SolicitaÃ§Ã£o nÃ£o encontrada' });
+        return res.status(404).json({ error: 'Solicitação não encontrada' });
       }
 
       const codigo = solicitacao.codigo;

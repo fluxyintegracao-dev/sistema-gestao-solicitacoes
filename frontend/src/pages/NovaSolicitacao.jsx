@@ -638,7 +638,7 @@ export default function NovaSolicitacao() {
     }
 
     if (exigeApropriacaoPrincipal && !form.apropriacao_id) {
-      alert('Selecione a apropriacao principal da solicitacao.');
+      alert('Selecione a apropriação principal da solicitação.');
       return;
     }
 
@@ -647,7 +647,7 @@ export default function NovaSolicitacao() {
       return;
     }
     if (!tipoSemValor && (form.valor === '' || form.valor === null || form.valor === undefined)) {
-      alert('Informe o valor da solicitacao.');
+      alert('Informe o valor da solicitação.');
       return;
     }
     if (medicaoObrigatoria && (!form.data_inicio_medicao || !form.data_fim_medicao)) {
@@ -675,7 +675,7 @@ export default function NovaSolicitacao() {
       return;
     }
     if (campoObrigatorio('credor') && !form.parceiro_id) {
-      alert('Selecione o credor da solicitacao.');
+      alert('Selecione o credor da solicitação.');
       return;
     }
 
@@ -685,7 +685,7 @@ export default function NovaSolicitacao() {
     }
 
     if (descricaoObrigatoria && !form.descricao.trim()) {
-      alert('Informe a descricao da solicitacao.');
+      alert('Informe a descrição da solicitação.');
       return;
     }
 
@@ -752,7 +752,7 @@ export default function NovaSolicitacao() {
       }
     } catch (error) {
       console.error(error);
-      alert(error?.message || 'Erro ao criar solicitacao');
+      alert(error?.message || 'Erro ao criar solicitação');
     }
   }
 
@@ -893,12 +893,8 @@ export default function NovaSolicitacao() {
     <div className="page solicitacoes-page solicitacao-nova-page max-w-6xl mx-auto">
       <h1 className="page-title">Nova Solicitação</h1>
 
-      <p className="page-subtitle hidden">
-        Preencha os dados essenciais da solicitaÃ§Ã£o com um fluxo mais direto e operacional.
-      </p>
-
       <p className="page-subtitle">
-        Preencha os dados essenciais da solicitacao com um fluxo mais direto e operacional.
+        Preencha os dados essenciais da solicitação com um fluxo mais direto e operacional.
       </p>
 
       <form
@@ -912,7 +908,7 @@ export default function NovaSolicitacao() {
             <div className="relative nova-solicitacao-obra-field">
               <input
                 className="input input-sm nova-solicitacao-obra-input"
-                placeholder="Digite o codigo ou nome da obra/centro de custo"
+                placeholder="Digite o código ou nome da obra/centro de custo"
                 value={obraBusca}
                 onChange={e => handleChangeBuscaObra(e.target.value)}
                 onFocus={handleFocusBuscaObra}
@@ -947,7 +943,7 @@ export default function NovaSolicitacao() {
                           <div className="text-xs text-[var(--c-muted)]">{formatarLocalidadeObra(obra)}</div>
                         </div>
                         <span className="nova-solicitacao-obra-badge">
-                          {getTipoCentroCustoLabel(obra)} - {obra.codigo || 'Sem codigo'}
+                          {getTipoCentroCustoLabel(obra)} - {obra.codigo || 'Sem código'}
                         </span>
                       </div>
                     </button>
@@ -956,8 +952,8 @@ export default function NovaSolicitacao() {
               )}
             </div>
             <span className="text-xs text-gray-500">
-              Digite parte do nome ou do codigo para filtrar obras e centros de custo enquanto voce preenche.
-              {obrasFiltradas.length === 1 && mostrarSugestoesObra ? ' Pressione Enter para selecionar o unico resultado.' : ''}
+              Digite parte do nome ou do código para filtrar obras e centros de custo enquanto você preenche.
+              {obrasFiltradas.length === 1 && mostrarSugestoesObra ? ' Pressione Enter para selecionar o único resultado.' : ''}
             </span>
             {mostrarSugestoesObra && obrasFiltradas.length === 0 && (
               <span className="text-xs text-gray-500">
@@ -975,7 +971,7 @@ export default function NovaSolicitacao() {
                       {obraSelecionada.nome || 'Obra sem nome'}
                     </div>
                     <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-[var(--c-muted)]">
-                      <span>Codigo: {obraSelecionada.codigo || '-'}</span>
+                      <span>Código: {obraSelecionada.codigo || '-'}</span>
                       <span>{formatarLocalidadeObra(obraSelecionada)}</span>
                     </div>
                   </div>
@@ -1069,7 +1065,7 @@ export default function NovaSolicitacao() {
             </select>
             {!form.obra_id && (
               <span className="text-xs text-gray-500">
-                Selecione a obra/centro de custo para habilitar a area responsavel.
+                Selecione a obra/centro de custo para habilitar a área responsável.
               </span>
             )}
           </label>
@@ -1193,16 +1189,16 @@ export default function NovaSolicitacao() {
                 disabledPlaceholder={
                   !form.obra_id
                     ? 'Selecione a obra primeiro'
-                    : 'Nao se aplica para solicitacao de compra'
+                    : 'Não se aplica para solicitação de compra'
                 }
               />
               {solicitacaoCompra ? (
                 <span className="text-xs text-gray-500">
-                  Para solicitacao de compra, a apropriacao e feita por item no modulo de compras.
+                  Para solicitação de compra, a apropriação é feita por item no módulo de compras.
                 </span>
               ) : exigeApropriacaoPrincipal ? (
                 <span className="text-xs text-gray-500">
-                  Campo obrigatorio para solicitacoes gerais vinculadas a esta obra.
+                  Campo obrigatório para solicitações gerais vinculadas a esta obra.
                 </span>
               ) : null}
               {form.obra_id && apropriacoes.length === 0 && !solicitacaoCompra && (
@@ -1474,7 +1470,7 @@ export default function NovaSolicitacao() {
               <div>
                 <h2 className="text-xl font-semibold" style={{ color: 'var(--c-text)' }}>Cadastrar Credor</h2>
                 <p className="text-sm" style={{ color: 'var(--c-muted)' }}>
-                  Informe os dados principais para vincular o credor a esta solicitacao.
+                  Informe os dados principais para vincular o credor a esta solicitação.
                 </p>
               </div>
               <button

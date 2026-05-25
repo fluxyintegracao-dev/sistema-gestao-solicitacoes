@@ -314,8 +314,8 @@ export default function Layout() {
     const item = (to, label, icon) => ({ to, label, icon });
     const groupIcons = {
       Painel: HiOutlineSquares2X2,
-      Solicitacoes: HiOutlineClipboardDocumentList,
-      Comunicacao: HiOutlineChatBubbleLeftRight,
+      Solicitações: HiOutlineClipboardDocumentList,
+      Comunicação: HiOutlineChatBubbleLeftRight,
       Compras: HiOutlineWallet,
       Financeiro: HiOutlineWallet,
       Fiscal: HiOutlineDocumentText,
@@ -324,14 +324,14 @@ export default function Layout() {
       Provisionamento: HiOutlineBanknotes,
       'RH/DP': HiOutlineUsers,
       SST: HiOutlineShieldCheck,
-      Integracoes: HiOutlineAdjustmentsHorizontal,
-      Relatorios: HiOutlineDocumentText,
+      Integrações: HiOutlineAdjustmentsHorizontal,
+      Relatórios: HiOutlineDocumentText,
       Cadastros: HiOutlineRectangleGroup,
       Contratos: HiOutlineBanknotes,
-      Configuracoes: HiOutlineCog6Tooth,
+      Configurações: HiOutlineCog6Tooth,
       Biblioteca: HiOutlineFolderOpen,
       Treinamento: HiOutlineAcademicCap,
-      Cotacoes: HiOutlineInboxStack,
+      Cotações: HiOutlineInboxStack,
       Conta: HiOutlineUserCircle
     };
 
@@ -346,10 +346,10 @@ export default function Layout() {
     const canSeeDashboard = businessAdmin || financeiroAccess || perfil === 'ADMIN';
     const solicitacoesLabel =
       perfil === 'USUARIO'
-        ? 'Minhas Solicitacoes'
+        ? 'Minhas Solicitações'
         : ['SETOR', 'FINANCEIRO'].includes(perfil)
-          ? 'Solicitacoes do Setor'
-          : 'Solicitacoes';
+          ? 'Solicitações do Setor'
+          : 'Solicitações';
 
     if (canSeeDashboard) {
       addGroup('Painel', [
@@ -357,9 +357,9 @@ export default function Layout() {
       ]);
     }
 
-    addGroup('Solicitacoes', [
+    addGroup('Solicitações', [
       item('/solicitacoes', solicitacoesLabel, HiOutlineDocumentText),
-      solicitacoesRelatoriosAccess ? item('/solicitacoes/relatorios', 'Relatorios', HiOutlineDocumentText) : null,
+      solicitacoesRelatoriosAccess ? item('/solicitacoes/relatorios', 'Relatórios', HiOutlineDocumentText) : null,
       item('/solicitacoes-arquivadas', 'Arquivadas', HiOutlineArchiveBox),
       prioridadesDiretoriaAccess ? item('/prioridades-diretoria', 'Prioridades Diretoria', HiOutlineBanknotes) : null,
       perfil !== 'SETOR' && perfil !== 'FINANCEIRO'
@@ -368,8 +368,8 @@ export default function Layout() {
     ]);
 
     if (comunicacaoAccess) {
-      addGroup('Comunicacao', [
-        item('/comunicacao-interna', 'Comunicacao Interna', HiOutlineChatBubbleLeftRight)
+      addGroup('Comunicação', [
+        item('/comunicacao-interna', 'Comunicação Interna', HiOutlineChatBubbleLeftRight)
       ]);
     }
 
@@ -387,17 +387,17 @@ export default function Layout() {
 
     if (comprasAccess) {
       addGroup('Compras', [
-        item('/solicitacoes-compra', 'Solicitacoes de Compra', HiOutlineClipboardDocumentList),
+        item('/solicitacoes-compra', 'Solicitações de Compra', HiOutlineClipboardDocumentList),
         comprasPedidosCreateAccess ? item('/solicitacoes-compra/nova', 'Nova Solicitacao de Compra', HiOutlinePlusCircle) : null,
         comprasPedidosAccess ? item('/pedidos-compra', 'Pedidos de Compra', HiOutlineDocumentText) : null,
-        item('/compras/relatorios', 'Relatorios de Compras', HiOutlineDocumentText),
-        moduloCotacoesHabilitado && comprasCotacoesAccess ? item('/cotacoes', 'Cotacoes', HiOutlineInboxStack) : null,
-        moduloCotacoesHabilitado && comprasCotacoesManageAccess ? item('/cotacoes/nova', 'Nova Cotacao Avulsa', HiOutlinePlusCircle) : null,
+        item('/compras/relatorios', 'Relatórios de Compras', HiOutlineDocumentText),
+        moduloCotacoesHabilitado && comprasCotacoesAccess ? item('/cotacoes', 'Cotações', HiOutlineInboxStack) : null,
+        moduloCotacoesHabilitado && comprasCotacoesManageAccess ? item('/cotacoes/nova', 'Nova Cotação Avulsa', HiOutlinePlusCircle) : null,
         moduloCotacoesHabilitado && comprasCotacoesManageAccess ? item('/gestao-fornecedores', 'Fornecedores', HiOutlineUsers) : null,
-        moduloCotacoesHabilitado && businessAdmin && comprasCotacoesAccess ? item('/configuracoes-cotacao', 'Config. Cotacoes', HiOutlineAdjustmentsHorizontal) : null,
-        businessAdmin ? item('/gestao-insumos', 'Gestao de Insumos', HiOutlineRectangleGroup) : null,
-        businessAdmin ? item('/gestao-unidades', 'Gestao de Unidades', HiOutlineBuildingOffice2) : null,
-        businessAdmin ? item('/gestao-categorias', 'Gestao de Categorias', HiOutlineFolderOpen) : null
+        moduloCotacoesHabilitado && businessAdmin && comprasCotacoesAccess ? item('/configuracoes-cotacao', 'Config. Cotações', HiOutlineAdjustmentsHorizontal) : null,
+        businessAdmin ? item('/gestao-insumos', 'Gestão de Insumos', HiOutlineRectangleGroup) : null,
+        businessAdmin ? item('/gestao-unidades', 'Gestão de Unidades', HiOutlineBuildingOffice2) : null,
+        businessAdmin ? item('/gestao-categorias', 'Gestão de Categorias', HiOutlineFolderOpen) : null
       ]);
     }
 
@@ -407,7 +407,7 @@ export default function Layout() {
         pagamentosAccess ? item('/financeiro/pagamentos', 'Pagamentos em Massa', HiOutlinePaperAirplane) : null,
         boletosAccess ? item('/financeiro/boletos', 'Boletos', HiOutlineDocumentText) : null,
         financeiroAccess ? item('/financeiro/faturas-cartao', 'Faturas de Cartao', HiOutlineCreditCard) : null,
-        financeiroAccess ? item('/financeiro/relatorios', 'Relatorios Financeiros', HiOutlineDocumentText) : null,
+        financeiroAccess ? item('/financeiro/relatorios', 'Relatórios Financeiros', HiOutlineDocumentText) : null,
         financeiroAccess ? item('/financeiro/baixas', 'Baixas Realizadas', HiOutlineBanknotes) : null,
         financeiroAccess ? item('/financeiro/conciliacao', 'Conciliacao OFX', HiOutlineBanknotes) : null,
         financeiroAccess ? item('/financeiro/caixas', 'Caixas e Contas', HiOutlineBanknotes) : null,
@@ -420,7 +420,7 @@ export default function Layout() {
     if (fiscalAccess) {
       addGroup('Fiscal', [
         item('/fiscal', 'Painel Fiscal', HiOutlineSquares2X2),
-        item('/fiscal/relatorios', 'Relatorios Fiscais', HiOutlineDocumentText),
+        item('/fiscal/relatorios', 'Relatórios Fiscais', HiOutlineDocumentText),
         fiscalConfigAccess ? item('/fiscal/empresas', 'Empresas Fiscais', HiOutlineBuildingOffice2) : null,
         fiscalConfigAccess ? item('/fiscal/empresas#certificados', 'Certificados', HiOutlineKey) : null,
         fiscalConfigAccess ? item('/fiscal/diagnostico', 'Diagnostico', HiOutlineAdjustmentsHorizontal) : null,
@@ -434,7 +434,7 @@ export default function Layout() {
     if (crmAccess) {
       addGroup('CRM', [
         crmDashboardAccess ? item('/crm/dashboard', 'Dashboard', HiOutlineSquares2X2) : null,
-        crmDashboardAccess ? item('/crm/relatorios', 'Relatorios CRM', HiOutlineDocumentText) : null,
+        crmDashboardAccess ? item('/crm/relatorios', 'Relatórios CRM', HiOutlineDocumentText) : null,
         crmAtendimentoAccess ? item('/crm/inbox', 'Inbox', HiOutlineChatBubbleLeftRight) : null,
         crmLeadsAccess ? item('/crm/leads', 'Leads', HiOutlineUsers) : null,
         crmLeadsAccess ? item('/crm/carteira', 'Minha Carteira', HiOutlineUsers) : null,
@@ -443,14 +443,14 @@ export default function Layout() {
         crmLeadsAccess ? item('/crm/tarefas', 'Tarefas', HiOutlineClipboardDocumentList) : null,
         crmAutomacoesAccess ? item('/crm/automacoes', 'Automacoes', HiOutlineAdjustmentsHorizontal) : null,
         crmConfiguracoesAccess ? item('/crm/admin/canais', 'Canais', HiOutlineCog6Tooth) : null,
-        crmConfiguracoesAccess ? item('/crm/admin/numeros', 'Numeros', HiOutlinePaperAirplane) : null,
-        crmConfiguracoesAccess ? item('/crm/admin/integracoes', 'Integracoes', HiOutlineAdjustmentsHorizontal) : null
+        crmConfiguracoesAccess ? item('/crm/admin/numeros', 'Números', HiOutlinePaperAirplane) : null,
+        crmConfiguracoesAccess ? item('/crm/admin/integracoes', 'Integrações', HiOutlineAdjustmentsHorizontal) : null
       ]);
     }
 
     if (comercialAccess) {
       addGroup('Comercial', [
-        item('/comercial/relatorios', 'Relatorios Comerciais', HiOutlineDocumentText),
+        item('/comercial/relatorios', 'Relatórios Comerciais', HiOutlineDocumentText),
         comercialEmpreendimentosAccess ? item('/comercial/empreendimentos', 'Empreendimentos', HiOutlineBuildingOffice2) : null,
         comercialEmpreendimentosAccess ? item('/comercial/unidades', 'Unidades', HiOutlineRectangleGroup) : null,
         comercialEmpreendimentosAccess ? item('/comercial/mapa-unidades', 'Mapa de Unidades', HiOutlineSquares2X2) : null,
@@ -463,7 +463,7 @@ export default function Layout() {
     if (provisoesAccess) {
       addGroup('Provisionamento', [
         provisoesDashboardAccess ? item('/provisoes-financeiras/dashboard', 'Dashboard de Previsao', HiOutlineSquares2X2) : null,
-        provisoesDashboardAccess ? item('/provisoes-financeiras/relatorios', 'Relatorios', HiOutlineDocumentText) : null,
+        provisoesDashboardAccess ? item('/provisoes-financeiras/relatorios', 'Relatórios', HiOutlineDocumentText) : null,
         provisoesListaAccess ? item('/provisoes-financeiras', 'Provisionamentos', HiOutlineBanknotes) : null,
         provisoesCreateAccess ? item('/provisoes-financeiras/nova', 'Nova Provisao', HiOutlinePlusCircle) : null,
         provisoesCategoriasAccess ? item('/provisoes-financeiras/categorias', 'Categorias Macro', HiOutlineFolderOpen) : null
@@ -473,7 +473,7 @@ export default function Layout() {
     if (rhDpAccess) {
       addGroup('RH/DP', [
         rhDpDashboardAccess ? item('/rh-dp', 'Visao do Modulo', HiOutlineUsers) : null,
-        rhDpDashboardAccess ? item('/rh-dp/relatorios', 'Relatorios', HiOutlineDocumentText) : null,
+        rhDpDashboardAccess ? item('/rh-dp/relatorios', 'Relatórios', HiOutlineDocumentText) : null,
         rhDpColaboradoresAccess ? item('/rh-dp/colaboradores', 'Colaboradores', HiOutlineUsers) : null,
         rhDpDocumentosAccess ? item('/rh-dp/documentos', 'Documentos', HiOutlineFolderOpen) : null,
         rhDpImportacoesAccess ? item('/rh-dp/importacoes', 'Importacoes', HiOutlineCloudArrowUp) : null,
@@ -485,7 +485,7 @@ export default function Layout() {
     if (sstAccess) {
       addGroup('SST', [
         sstDashboardAccess ? item('/sst', 'Dashboard SST', HiOutlineShieldCheck) : null,
-        sstDashboardAccess ? item('/sst/relatorios', 'Relatorios SST', HiOutlineDocumentText) : null,
+        sstDashboardAccess ? item('/sst/relatorios', 'Relatórios SST', HiOutlineDocumentText) : null,
         canViewSstArea(user, 'riscos') ? item('/sst/riscos', 'Riscos', HiOutlineExclamationTriangle) : null,
         canViewSstArea(user, 'aso') ? item('/sst/aso', 'ASO', HiOutlineClipboardDocumentCheck) : null,
         canViewSstArea(user, 'exames') ? item('/sst/exames', 'Exames', HiOutlineDocumentText) : null,
@@ -495,22 +495,22 @@ export default function Layout() {
         canViewSstArea(user, 'documentos') ? item('/sst/documentos', 'Documentos', HiOutlineFolderOpen) : null,
         canViewSstArea(user, 'esocial') ? item('/sst/esocial', 'eSocial', HiOutlineAdjustmentsHorizontal) : null,
         canViewSstArea(user, 'analytics') ? item('/sst/eventos', 'Eventos', HiOutlineClipboardDocumentList) : null,
-        canManageSstArea(user, 'configuracoes') ? item('/sst/configuracoes', 'Configuracoes', HiOutlineCog6Tooth) : null
+        canManageSstArea(user, 'configuracoes') ? item('/sst/configuracoes', 'Configurações', HiOutlineCog6Tooth) : null
       ]);
     }
 
     if (integracaoSiengeAccess) {
-      addGroup('Integracoes', [
+      addGroup('Integrações', [
         item('/integracao-sienge', 'SIENGE', HiOutlineAdjustmentsHorizontal)
       ]);
     }
 
     if (gestaoUsuarios || businessAdmin) {
       addGroup('Cadastros', [
-        gestaoUsuarios ? item('/usuarios', 'Usuarios', HiOutlineUsers) : null,
+        gestaoUsuarios ? item('/usuarios', 'Usuários', HiOutlineUsers) : null,
         superadmin ? item('/empresas-grupo', 'Empresas do Grupo', HiOutlineBuildingOffice2) : null,
         businessAdmin && obrasAccess ? item('/obras', 'Obras', HiOutlineBuildingOffice2) : null,
-        businessAdmin && obrasAccess ? item('/gestao-apropriacoes', 'Gestao de Apropriacoes', HiOutlineAdjustmentsHorizontal) : null,
+        businessAdmin && obrasAccess ? item('/gestao-apropriacoes', 'Gestão de Apropriações', HiOutlineAdjustmentsHorizontal) : null,
         businessAdmin ? item('/setores', 'Setores', HiOutlineAdjustmentsHorizontal) : null,
         businessAdmin ? item('/tipos-solicitacao', 'Tipos de Solicitacao', HiOutlineClipboardDocumentList) : null,
         businessAdmin ? item('/parceiros', 'Cadastro de Pessoas', HiOutlineUsers) : null,
@@ -520,20 +520,20 @@ export default function Layout() {
 
     if (contratosAccess) {
       addGroup('Contratos', [
-        item('/contratos/relatorios', 'Relatorios', HiOutlineDocumentText),
-        item('/gestao-contratos', 'Gestao de Contratos', HiOutlineBanknotes)
+        item('/contratos/relatorios', 'Relatórios', HiOutlineDocumentText),
+        item('/gestao-contratos', 'Gestão de Contratos', HiOutlineBanknotes)
       ]);
     }
 
     if (businessAdmin) {
-      addGroup('Configuracoes', [
-        item('/configuracoes', 'Configuracoes', HiOutlineCog6Tooth),
+      addGroup('Configurações', [
+        item('/configuracoes', 'Configurações', HiOutlineCog6Tooth),
         item('/aprovacao-diretoria', 'Aprovacao Diretoria', HiOutlineAdjustmentsHorizontal),
         item('/usuarios-acesso-prioridade-diretoria', 'Acesso Prioridades', HiOutlineUsers),
         item('/usuarios-envio-qualquer-setor', 'Envio Livre por Usuario', HiOutlineUsers),
         item('/tipos-compartilhados-setor', 'Tipos Compartilhados', HiOutlineClipboardDocumentList),
         item('/automacao-status-setor', 'Automacao por Status', HiOutlinePaperAirplane),
-        moduloCotacoesHabilitado && comprasCotacoesAccess ? item('/configuracoes-cotacao', 'Config. Cotacoes', HiOutlineAdjustmentsHorizontal) : null,
+        moduloCotacoesHabilitado && comprasCotacoesAccess ? item('/configuracoes-cotacao', 'Config. Cotações', HiOutlineAdjustmentsHorizontal) : null,
         comprasAccess ? item('/configuracoes-status-pedidos-compra', 'Status dos Pedidos', HiOutlineClipboardDocumentList) : null,
         superadmin && comercialAccess ? item('/configuracoes-comercial-categorias', 'Categorias Comerciais', HiOutlineArchiveBox) : null,
         superadmin ? item('/configuracoes-modulos', 'Modulos e Planos', HiOutlineCog6Tooth) : null,
@@ -717,7 +717,7 @@ export default function Layout() {
                     const isGroupActive = group.items.some((item) => isPathActive(location.pathname, item.to));
                     const groupId = `submenu-${String(group.label).toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
                     const GroupIcon = group.icon;
-                    const unreadCount = group.label === 'Comunicacao' ? notificationCount : 0;
+                    const unreadCount = group.label === 'Comunicação' ? notificationCount : 0;
 
                     return (
                       <li key={group.label} className={`nav-group ${isGroupActive ? 'active' : ''}`}>

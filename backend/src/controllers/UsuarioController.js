@@ -248,13 +248,13 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return res.status(500).json({
-        error: 'Erro ao buscar usuarios'
+        error: 'Erro ao buscar usuários'
       });
     }
   },
 
   // =====================================================
-  // DETALHE USUÃRIO
+  // DETALHE USUÁRIO
   // =====================================================
   async show(req, res) {
     try {
@@ -285,18 +285,18 @@ module.exports = {
       });
 
       if (!usuario) {
-        return res.status(404).json({ error: 'Usuario nao encontrado' });
+        return res.status(404).json({ error: 'Usuário não encontrado' });
       }
 
       if (!podeGerenciarUsuarioAlvo(req, usuario)) {
-        return res.status(404).json({ error: 'Usuario nao encontrado' });
+        return res.status(404).json({ error: 'Usuário não encontrado' });
       }
 
       return res.json(usuario);
     } catch (error) {
       console.error(error);
       return res.status(500).json({
-        error: 'Erro ao buscar usuÃ¡rio'
+        error: 'Erro ao buscar usuário'
       });
     }
   },
@@ -328,7 +328,7 @@ module.exports = {
 
       if (!podeDefinirPerfilSuperadmin(req, perfil)) {
         return res.status(403).json({
-          error: 'Apenas SUPERADMIN pode criar usuario com perfil SUPERADMIN'
+          error: 'Apenas SUPERADMIN pode criar usuário com perfil SUPERADMIN'
         });
       }
       // Verifica email duplicado
@@ -381,7 +381,7 @@ module.exports = {
         recursoTipo: 'USER',
         recursoId: usuario.id,
         status: 'SUCCESS',
-        descricao: 'Usuario criado',
+        descricao: 'Usuário criado',
         metadata: {
           perfil,
           setor_id,
@@ -432,13 +432,13 @@ module.exports = {
 
       if (!usuario) {
         return res.status(404).json({
-          error: 'Usuario nao encontrado'
+          error: 'Usuário não encontrado'
         });
       }
 
       if (!podeGerenciarUsuarioAlvo(req, usuario)) {
         return res.status(404).json({
-          error: 'Usuario nao encontrado'
+          error: 'Usuário não encontrado'
         });
       }
 
@@ -475,7 +475,7 @@ module.exports = {
 
         if (existeOutro) {
           return res.status(400).json({
-            error: 'Email jÃ¡ cadastrado'
+            error: 'Email já cadastrado'
           });
         }
       }
@@ -872,6 +872,5 @@ module.exports = {
   }
 
 };
-
 
 

@@ -17,7 +17,7 @@ module.exports = {
     try {
       const { nome } = req.body;
       if (!nome) {
-        return res.status(400).json({ error: 'Nome Ã© obrigatÃ³rio' });
+        return res.status(400).json({ error: 'Nome é obrigatório' });
       }
       const tipo = await TipoMacroContrato.create({ nome });
       return res.status(201).json(tipo);
@@ -32,10 +32,10 @@ module.exports = {
       const { id } = req.params;
       const { nome } = req.body;
       if (!nome) {
-        return res.status(400).json({ error: 'Nome e obrigatorio' });
+        return res.status(400).json({ error: 'Nome é obrigatório' });
       }
       const tipo = await TipoMacroContrato.findByPk(id);
-      if (!tipo) return res.status(404).json({ error: 'Tipo nao encontrado' });
+      if (!tipo) return res.status(404).json({ error: 'Tipo não encontrado' });
       await tipo.update({ nome });
       return res.json(tipo);
     } catch (error) {
@@ -48,7 +48,7 @@ module.exports = {
     try {
       const { id } = req.params;
       const tipo = await TipoMacroContrato.findByPk(id);
-      if (!tipo) return res.status(404).json({ error: 'Tipo nÃ£o encontrado' });
+      if (!tipo) return res.status(404).json({ error: 'Tipo não encontrado' });
       await tipo.update({ ativo: true });
       return res.sendStatus(204);
     } catch (error) {
@@ -61,7 +61,7 @@ module.exports = {
     try {
       const { id } = req.params;
       const tipo = await TipoMacroContrato.findByPk(id);
-      if (!tipo) return res.status(404).json({ error: 'Tipo nÃ£o encontrado' });
+      if (!tipo) return res.status(404).json({ error: 'Tipo não encontrado' });
       await tipo.update({ ativo: false });
       return res.sendStatus(204);
     } catch (error) {

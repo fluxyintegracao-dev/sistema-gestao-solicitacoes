@@ -9,126 +9,126 @@ function normalizeModuleKey(value) {
 export const MODULE_GOVERNANCE = [
   {
     key: 'SOLICITACOES',
-    label: 'Solicitacoes',
+    label: 'Solicitações',
     packageLabel: 'Pacote Operacional',
-    role: 'Nucleo operacional',
-    dependency: 'Base fixa da instalacao. Deve permanecer ativo em todos os planos.',
-    usedIn: ['Nova Solicitacao', 'Lista de Solicitacoes', 'Detalhe da Solicitacao', 'Prioridades Diretoria'],
-    disabledEffect: 'Nao se aplica: este modulo faz parte do nucleo e permanece ativo.',
-    permissionsEffect: 'Permissoes de area controlam lista, criacao, aprovacao, prioridades e a aba financeira.'
+    role: 'Núcleo operacional',
+    dependency: 'Base fixa da instalação. Deve permanecer ativo em todos os planos.',
+    usedIn: ['Nova Solicitação', 'Lista de Solicitações', 'Detalhe da Solicitação', 'Prioridades Diretoria'],
+    disabledEffect: 'Não se aplica: este módulo faz parte do núcleo e permanece ativo.',
+    permissionsEffect: 'Permissões de área controlam lista, criação, aprovação, prioridades e a aba financeira.'
   },
   {
     key: 'COMUNICACAO_INTERNA',
-    label: 'Comunicacao Interna',
+    label: 'Comunicação Interna',
     packageLabel: 'Pacote Operacional',
     role: 'Add-on operacional simples',
-    dependency: 'Independente dos demais modulos. Pode ser vendido junto do pacote operacional.',
-    usedIn: ['Comunicacao Interna'],
-    disabledEffect: 'Oculta menu, caixa de entrada, saida e endpoints de conversas internas.',
-    permissionsEffect: 'Permissoes de comunicacao controlam leitura e marcacao de mensagens.'
+    dependency: 'Independente dos demais módulos. Pode ser vendido junto do pacote operacional.',
+    usedIn: ['Comunicação Interna'],
+    disabledEffect: 'Oculta menu, caixa de entrada, saída e endpoints de conversas internas.',
+    permissionsEffect: 'Permissões de comunicação controlam leitura e marcação de mensagens.'
   },
   {
     key: 'BIBLIOTECA_MODELOS',
     label: 'Arquivos Modelos',
     packageLabel: 'Pacote Operacional',
     role: 'Biblioteca operacional',
-    dependency: 'Independente dos demais modulos. Complementa treinamentos e padroes internos.',
+    dependency: 'Independente dos demais módulos. Complementa treinamentos e padrões internos.',
     usedIn: ['Arquivos Modelos', 'Arquivos Modelos Config'],
     disabledEffect: 'Oculta biblioteca de modelos e bloqueia endpoints de arquivos modelos.',
-    permissionsEffect: 'Permissoes definem upload e gestao por pagina; leitura segue a regra da pagina ativa.'
+    permissionsEffect: 'Permissões definem upload e gestão por página; leitura segue a regra da página ativa.'
   },
   {
     key: 'TREINAMENTO',
     label: 'Central de Treinamento',
     packageLabel: 'Pacote Institucional',
-    role: 'Institucionalizacao e onboarding',
-    dependency: 'Independente dos demais modulos. Usa S3 para videos e documentos privados.',
-    usedIn: ['Central de Treinamento', 'Perguntas e Respostas', 'Videos', 'Guias por modulo'],
-    disabledEffect: 'Oculta a central de treinamento e bloqueia endpoints de conteudo e arquivos.',
-    permissionsEffect: 'Permissoes de treinamento controlam visualizacao, gestao e publicacao.'
+    role: 'Institucionalização e onboarding',
+    dependency: 'Independente dos demais módulos. Usa S3 para vídeos e documentos privados.',
+    usedIn: ['Central de Treinamento', 'Perguntas e Respostas', 'Vídeos', 'Guias por módulo'],
+    disabledEffect: 'Oculta a central de treinamento e bloqueia endpoints de conteúdo e arquivos.',
+    permissionsEffect: 'Permissões de treinamento controlam visualização, gestão e publicação.'
   },
   {
     key: 'COMPRAS',
-    label: 'Solicitacoes de Compra',
+    label: 'Solicitações de Compra',
     packageLabel: 'Pacote Compras',
     role: 'Fluxo principal de compras',
-    dependency: 'Base para cotacoes, fornecedores e pedidos de compra.',
-    usedIn: ['Solicitacoes de Compra', 'Pedidos de Compra', 'Cadastros de Insumos', 'Unidades', 'Categorias'],
-    disabledEffect: 'Oculta o dominio de compras e desativa automaticamente Cotacoes e Pedidos.',
-    permissionsEffect: 'Permissoes de Compras atuam no fluxo de compras e nos submodulos vinculados.'
+    dependency: 'Base para cotações, fornecedores e pedidos de compra.',
+    usedIn: ['Solicitações de Compra', 'Pedidos de Compra', 'Cadastros de Insumos', 'Unidades', 'Categorias'],
+    disabledEffect: 'Oculta o domínio de compras e desativa automaticamente Cotações e Pedidos.',
+    permissionsEffect: 'Permissões de Compras atuam no fluxo de compras e nos submódulos vinculados.'
   },
   {
     key: 'COTACOES',
-    label: 'Cotacoes e Pedidos',
+    label: 'Cotações e Pedidos',
     packageLabel: 'Pacote Compras',
     role: 'Add-on do fluxo de compras',
-    dependency: 'Requer o modulo Compras ativo.',
+    dependency: 'Requer o módulo Compras ativo.',
     requiresAll: ['COMPRAS'],
-    usedIn: ['Cotacoes', 'Nova Cotacao Avulsa', 'Fornecedores', 'Pedidos de Compra'],
-    disabledEffect: 'Oculta cotacoes, fornecedores e rotas protegidas por COTACOES dentro do dominio de compras.',
-    permissionsEffect: 'Permissoes de cotacoes so produzem efeito com Compras e Cotacoes ativos.'
+    usedIn: ['Cotações', 'Nova Cotação Avulsa', 'Fornecedores', 'Pedidos de Compra'],
+    disabledEffect: 'Oculta cotações, fornecedores e rotas protegidas por COTACOES dentro do domínio de compras.',
+    permissionsEffect: 'Permissões de cotações só produzem efeito com Compras e Cotações ativos.'
   },
   {
     key: 'FINANCEIRO',
     label: 'Financeiro',
     packageLabel: 'Pacote Financeiro',
     role: 'Financeiro central',
-    dependency: 'Modulo financeiro deve funcionar sem Comercial. Integra opcionalmente com Obras, Boletos, Provisoes, RH/DP e SIENGE.',
-    usedIn: ['Titulos Financeiros', 'Comprovantes', 'Relatorios Financeiros', 'Conciliacao OFX', 'Cadastros Financeiros'],
-    disabledEffect: 'Oculta rotas financeiras e desativa automaticamente add-ons que dependem de Financeiro, como Boletos e Provisoes.',
-    permissionsEffect: 'Permissoes de Financeiro controlam visualizacao, criacao, baixa, estorno, conciliacao, comprovantes e cadastros.'
+    dependency: 'Módulo financeiro deve funcionar sem Comercial. Integra opcionalmente com Obras, Boletos, Provisões, RH/DP e SIENGE.',
+    usedIn: ['Títulos Financeiros', 'Comprovantes', 'Relatórios Financeiros', 'Conciliação OFX', 'Cadastros Financeiros'],
+    disabledEffect: 'Oculta rotas financeiras e desativa automaticamente add-ons que dependem de Financeiro, como Boletos e Provisões.',
+    permissionsEffect: 'Permissões de Financeiro controlam visualização, criação, baixa, estorno, conciliação, comprovantes e cadastros.'
   },
   {
     key: 'BOLETOS',
     label: 'Boletos',
     packageLabel: 'Add-on Boletos',
-    role: 'Add-on bancario do Financeiro',
-    dependency: 'Requer Financeiro ativo. Nao deve exigir Comercial.',
+    role: 'Add-on bancário do Financeiro',
+    dependency: 'Requer Financeiro ativo. Não deve exigir Comercial.',
     requiresAll: ['FINANCEIRO'],
-    usedIn: ['Geracao de Boletos', 'Titulos a Receber'],
-    disabledEffect: 'Oculta a tela de boletos e bloqueia endpoints de emissao, amostra e PDF.',
-    permissionsEffect: 'Permissoes de Boletos controlam visualizacao e geracao.'
+    usedIn: ['Geração de Boletos', 'Títulos a Receber'],
+    disabledEffect: 'Oculta a tela de boletos e bloqueia endpoints de emissão, amostra e PDF.',
+    permissionsEffect: 'Permissões de Boletos controlam visualização e geração.'
   },
   {
     key: 'OBRAS',
     label: 'Obras',
     packageLabel: 'Pacote Obras',
-    role: 'Cadastro mestre e apropriacoes',
-    dependency: 'Fornece obras e apropriacoes para Solicitacoes, Compras, Financeiro e Provisoes.',
-    usedIn: ['Gestao de Obras', 'Gestao de Apropriacoes', 'Nova Solicitacao', 'Novo Titulo Financeiro', 'Resultado de Obras'],
-    disabledEffect: 'Apropriacao e resultado de obras saem das telas consumidoras; Provisoes fica indisponivel.',
-    permissionsEffect: 'Permissoes de Obras controlam cadastro, gestao e apropriacoes.'
+    role: 'Cadastro mestre e apropriações',
+    dependency: 'Fornece obras e apropriações para Solicitações, Compras, Financeiro e Provisões.',
+    usedIn: ['Gestão de Obras', 'Gestão de Apropriações', 'Nova Solicitação', 'Novo Título Financeiro', 'Resultado de Obras'],
+    disabledEffect: 'Apropriação e resultado de obras saem das telas consumidoras; Provisões fica indisponível.',
+    permissionsEffect: 'Permissões de Obras controlam cadastro, gestão e apropriações.'
   },
   {
     key: 'PROVISOES',
     label: 'Provisionamento',
     packageLabel: 'Add-on Financeiro/Obras',
-    role: 'Previsao financeira por obra',
+    role: 'Previsão financeira por obra',
     dependency: 'Requer Financeiro e Obras ativos.',
     requiresAll: ['FINANCEIRO', 'OBRAS'],
-    usedIn: ['Dashboard de Previsao', 'Provisionamentos', 'Nova Provisao', 'Categorias Macro'],
-    disabledEffect: 'Oculta provisionamento e bloqueia rotas de previsao gerencial.',
-    permissionsEffect: 'Permissoes de Provisoes so produzem efeito com Financeiro, Obras e Provisoes ativos.'
+    usedIn: ['Dashboard de Previsão', 'Provisionamentos', 'Nova Provisão', 'Categorias Macro'],
+    disabledEffect: 'Oculta provisionamento e bloqueia rotas de previsão gerencial.',
+    permissionsEffect: 'Permissões de Provisões só produzem efeito com Financeiro, Obras e Provisões ativos.'
   },
   {
     key: 'CONTRATOS',
     label: 'Contratos',
     packageLabel: 'Complemento Operacional',
     role: 'Complemento opcional',
-    dependency: 'Acopla com Solicitacoes sem bloquear o fluxo principal.',
-    usedIn: ['Nova Solicitacao', 'Detalhe da Solicitacao', 'Gestao de Contratos'],
-    disabledEffect: 'Os campos de contrato somem da Nova Solicitacao e deixam de ser obrigatorios.',
-    permissionsEffect: 'Permissoes de Contratos so produzem efeito com o modulo ativo.'
+    dependency: 'Acopla com Solicitações sem bloquear o fluxo principal.',
+    usedIn: ['Nova Solicitação', 'Detalhe da Solicitação', 'Gestão de Contratos'],
+    disabledEffect: 'Os campos de contrato somem da Nova Solicitação e deixam de ser obrigatórios.',
+    permissionsEffect: 'Permissões de Contratos só produzem efeito com o módulo ativo.'
   },
   {
     key: 'COMERCIAL',
     label: 'Comercial',
     packageLabel: 'Pacote Comercial',
     role: 'Vendas e empreendimentos',
-    dependency: 'Modulo proprio de empreendimentos, unidades e contratos de venda. Pode integrar com Financeiro, mas nao deve ser exigido por ele.',
-    usedIn: ['Empreendimentos', 'Unidades', 'Mapa de Unidades', 'Tabelas de Preco', 'Contratos de Venda'],
-    disabledEffect: 'Oculta telas comerciais e endpoints protegidos por modulo. Telas financeiras devem esconder filtros de empreendimento comercial.',
-    permissionsEffect: 'Permissoes de Comercial controlam empreendimentos, vendas e contratos comerciais.'
+    dependency: 'Módulo próprio de empreendimentos, unidades e contratos de venda. Pode integrar com Financeiro, mas não deve ser exigido por ele.',
+    usedIn: ['Empreendimentos', 'Unidades', 'Mapa de Unidades', 'Tabelas de Preço', 'Contratos de Venda'],
+    disabledEffect: 'Oculta telas comerciais e endpoints protegidos por módulo. Telas financeiras devem esconder filtros de empreendimento comercial.',
+    permissionsEffect: 'Permissões de Comercial controlam empreendimentos, vendas e contratos comerciais.'
   },
   {
     key: 'CRM',
@@ -137,31 +137,31 @@ export const MODULE_GOVERNANCE = [
     role: 'Relacionamento e funil',
     dependency: 'Pode ser vendido separado, mas comercialmente combina com o Pacote Comercial.',
     recommendedWith: ['COMERCIAL'],
-    usedIn: ['Dashboards CRM', 'Leads', 'Inbox', 'Automacoes', 'Administracao CRM'],
+    usedIn: ['Dashboards CRM', 'Leads', 'Inbox', 'Automações', 'Administração CRM'],
     disabledEffect: 'Oculta o menu CRM e bloqueia endpoints do CRM.',
-    permissionsEffect: 'Permissoes de CRM controlam dashboards, leads, atendimento, automacoes e configuracoes.'
+    permissionsEffect: 'Permissões de CRM controlam dashboards, leads, atendimento, automações e configurações.'
   },
   {
     key: 'RH_DP',
     label: 'RH/DP',
     packageLabel: 'Pacote RH/DP',
     role: 'Rotinas trabalhistas',
-    dependency: 'Pode operar com cadastros, documentos, importacoes e apuracao. Fechamentos financeiros exigem Financeiro ativo.',
-    usedIn: ['Visao do Modulo RH/DP', 'Empresas do Grupo', 'Colaboradores', 'Documentos', 'Importacoes', 'Apuracao', 'Fechamentos'],
+    dependency: 'Pode operar com cadastros, documentos, importações e apuração. Fechamentos financeiros exigem Financeiro ativo.',
+    usedIn: ['Visão do Módulo RH/DP', 'Empresas do Grupo', 'Colaboradores', 'Documentos', 'Importações', 'Apuração', 'Fechamentos'],
     disabledEffect: 'Oculta o menu RH/DP e bloqueia endpoints do RH/DP.',
-    permissionsEffect: 'Permissoes de RH/DP controlam dashboard, colaboradores, documentos, importacoes, apuracao e fechamento.'
+    permissionsEffect: 'Permissões de RH/DP controlam dashboard, colaboradores, documentos, importações, apuração e fechamento.'
   },
   {
     key: 'INTEGRACAO_SIENGE',
-    label: 'Integracao SIENGE',
+    label: 'Integração SIENGE',
     packageLabel: 'Add-on SIENGE',
-    role: 'Gateway tecnico',
-    dependency: 'Requer pelo menos um modulo origem ativo: Financeiro, RH/DP ou Comercial. Por padrao, ativa junto do Financeiro.',
+    role: 'Gateway técnico',
+    dependency: 'Requer pelo menos um módulo origem ativo: Financeiro, RH/DP ou Comercial. Por padrão, ativa junto do Financeiro.',
     requiresAny: ['FINANCEIRO', 'RH_DP', 'COMERCIAL'],
     defaultRequiredModule: 'FINANCEIRO',
-    usedIn: ['Integracao SIENGE', 'Fila SIENGE', 'Logs SIENGE'],
-    disabledEffect: 'Oculta a tela de integracao e bloqueia endpoints do SIENGE.',
-    permissionsEffect: 'Permissoes de Integracao SIENGE controlam visualizar, reprocessar e configurar.'
+    usedIn: ['Integração SIENGE', 'Fila SIENGE', 'Logs SIENGE'],
+    disabledEffect: 'Oculta a tela de integração e bloqueia endpoints do SIENGE.',
+    permissionsEffect: 'Permissões de Integração SIENGE controlam visualizar, reprocessar e configurar.'
   }
 ];
 

@@ -892,7 +892,7 @@ module.exports = {
       const { id } = req.params;
       const contrato = await Contrato.findByPk(id);
       if (!contrato) {
-        return res.status(404).json({ error: 'Contrato nÃ£o encontrado' });
+        return res.status(404).json({ error: 'Contrato não encontrado' });
       }
 
       if (!(await usuarioPodeAcessarObraContrato(req, contrato.obra_id))) {
@@ -913,7 +913,7 @@ module.exports = {
       return res.json(solicitacoes);
     } catch (error) {
       console.error(error);
-      return res.status(500).json({ error: 'Erro ao buscar solicitaÃ§Ãµes do contrato' });
+      return res.status(500).json({ error: 'Erro ao buscar solicitações do contrato' });
     }
   },
 
@@ -942,13 +942,13 @@ module.exports = {
 
       const contrato = await Contrato.findByPk(id);
       if (!contrato) {
-        return res.status(404).json({ error: 'Contrato nÃ£o encontrado' });
+        return res.status(404).json({ error: 'Contrato não encontrado' });
       }
 
       if (obra_id !== undefined && obra_id !== null) {
         const obra = await Obra.findByPk(obra_id, { attributes: ['id'] });
         if (!obra) {
-          return res.status(400).json({ error: 'Obra nÃ£o encontrada' });
+          return res.status(400).json({ error: 'Obra não encontrada' });
         }
       }
 
@@ -983,7 +983,7 @@ module.exports = {
       const { id } = req.params;
       const contrato = await Contrato.findByPk(id);
       if (!contrato) {
-        return res.status(404).json({ error: 'Contrato nÃ£o encontrado' });
+        return res.status(404).json({ error: 'Contrato não encontrado' });
       }
       await contrato.update({ ativo: true });
       return res.sendStatus(204);
@@ -1003,7 +1003,7 @@ module.exports = {
       const { id } = req.params;
       const contrato = await Contrato.findByPk(id);
       if (!contrato) {
-        return res.status(404).json({ error: 'Contrato nÃ£o encontrado' });
+        return res.status(404).json({ error: 'Contrato não encontrado' });
       }
       await contrato.update({ ativo: false });
       return res.sendStatus(204);

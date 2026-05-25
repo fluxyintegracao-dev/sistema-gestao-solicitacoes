@@ -230,7 +230,7 @@ module.exports = {
 
     } catch (error) {
       console.error(error);
-      return res.status(500).json({ error: 'Erro ao buscar obras do usuÃ¡rio' });
+      return res.status(500).json({ error: 'Erro ao buscar obras do usuário' });
     }
   },
 
@@ -238,23 +238,23 @@ module.exports = {
     const { nome, codigo, cidade, classificacao, vgv, planilha_geral, margem_custo_esperada, tipo_centro_custo, empresa_grupo_id } = req.body;
 
     if (!nome || !codigo) {
-      return res.status(400).json({ error: 'Nome e codigo sao obrigatorios' });
+      return res.status(400).json({ error: 'Nome e código são obrigatórios' });
     }
 
     const classificacaoNorm = classificacao ? String(classificacao).trim().toUpperCase() : null;
     if (classificacaoNorm && !['PRIVADA', 'PUBLICA'].includes(classificacaoNorm)) {
-      return res.status(400).json({ error: 'Classificacao invalida. Use PRIVADA ou PUBLICA' });
+      return res.status(400).json({ error: 'Classificação inválida. Use PRIVADA ou PUBLICA' });
     }
     const tipoCentroCustoNorm = normalizeTipoCentroCusto(tipo_centro_custo);
     if (tipo_centro_custo && !TIPOS_CENTRO_CUSTO.includes(String(tipo_centro_custo).trim().toUpperCase())) {
-      return res.status(400).json({ error: 'Tipo de centro de custo invalido. Use OBRA ou CENTRO_CUSTO' });
+      return res.status(400).json({ error: 'Tipo de centro de custo inválido. Use OBRA ou CENTRO_CUSTO' });
     }
 
     const existente = await Obra.findOne({
       where: { codigo: String(codigo).toUpperCase() }
     });
     if (existente) {
-      return res.status(400).json({ error: 'Codigo de obra ja cadastrado' });
+      return res.status(400).json({ error: 'Código de obra já cadastrado' });
     }
 
     try {

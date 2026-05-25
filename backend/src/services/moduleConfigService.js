@@ -5,19 +5,19 @@ const CHAVE_MODULOS_HABILITADOS = 'MODULOS_HABILITADOS';
 const MODULE_CATALOG = [
   {
     key: 'SOLICITACOES',
-    label: 'Solicitacoes',
+    label: 'Solicitações',
     packageKey: 'OPERACIONAL',
     packageLabel: 'Pacote Operacional',
-    description: 'Modulo principal do fluxo operacional.',
+    description: 'Módulo principal do fluxo operacional.',
     enabled: true,
     locked: true
   },
   {
     key: 'COMUNICACAO_INTERNA',
-    label: 'Comunicacao Interna',
+    label: 'Comunicação Interna',
     packageKey: 'OPERACIONAL',
     packageLabel: 'Pacote Operacional',
-    description: 'Caixa de entrada, saida e conversas internas.',
+    description: 'Caixa de entrada, saída e conversas internas.',
     enabled: true,
     locked: false
   },
@@ -26,7 +26,7 @@ const MODULE_CATALOG = [
     label: 'Arquivos Modelos',
     packageKey: 'OPERACIONAL',
     packageLabel: 'Pacote Operacional',
-    description: 'Biblioteca de modelos e arquivos padrao operacionais.',
+    description: 'Biblioteca de modelos e arquivos padrão operacionais.',
     enabled: true,
     locked: false
   },
@@ -35,25 +35,25 @@ const MODULE_CATALOG = [
     label: 'Central de Treinamento',
     packageKey: 'INSTITUCIONAL',
     packageLabel: 'Pacote Institucional',
-    description: 'Perguntas, respostas, videos, guias e trilhas de treinamento com materiais em S3.',
+    description: 'Perguntas, respostas, vídeos, guias e trilhas de treinamento com materiais em S3.',
     enabled: true,
     locked: false
   },
   {
     key: 'COMPRAS',
-    label: 'Solicitacoes de Compra',
+    label: 'Solicitações de Compra',
     packageKey: 'COMPRAS',
     packageLabel: 'Pacote Compras',
-    description: 'Fluxo de solicitacao, aprovacao e liberacao de compras.',
+    description: 'Fluxo de solicitação, aprovação e liberação de compras.',
     enabled: true,
     locked: false
   },
   {
     key: 'COTACOES',
-    label: 'Cotacoes e Pedidos',
+    label: 'Cotações e Pedidos',
     packageKey: 'COMPRAS',
     packageLabel: 'Pacote Compras',
-    description: 'Cotacoes com fornecedores, comparativo de precos e pedidos de compra. Depende do modulo de compras.',
+    description: 'Cotações com fornecedores, comparativo de preços e pedidos de compra. Depende do módulo de compras.',
     enabled: true,
     locked: false,
     requiresAll: ['COMPRAS']
@@ -63,7 +63,7 @@ const MODULE_CATALOG = [
     label: 'Financeiro',
     packageKey: 'FINANCEIRO',
     packageLabel: 'Pacote Financeiro',
-    description: 'Titulos, baixas, comprovantes, conciliacao OFX e relatorios financeiros.',
+    description: 'Títulos, baixas, comprovantes, conciliação OFX e relatórios financeiros.',
     enabled: true,
     locked: false
   },
@@ -72,7 +72,7 @@ const MODULE_CATALOG = [
     label: 'Boletos',
     packageKey: 'FINANCEIRO',
     packageLabel: 'Add-on Boletos',
-    description: 'Emissao bancaria, homologacao, remessa e retorno de boletos. Disponivel apenas com Financeiro ativo.',
+    description: 'Emissão bancária, homologação, remessa e retorno de boletos. Disponível apenas com Financeiro ativo.',
     enabled: false,
     locked: false,
     requiresAll: ['FINANCEIRO']
@@ -82,16 +82,16 @@ const MODULE_CATALOG = [
     label: 'Fiscal',
     packageKey: 'FISCAL',
     packageLabel: 'Pacote Fiscal',
-    description: 'Entrada fiscal, documentos DFe, logs de sincronizacao e vinculos fiscais.',
+    description: 'Entrada fiscal, documentos DFe, logs de sincronização e vínculos fiscais.',
     enabled: false,
     locked: false
   },
   {
     key: 'OBRAS',
-    label: 'Gestao de Obras',
+    label: 'Gestão de Obras',
     packageKey: 'OBRAS',
     packageLabel: 'Pacote Obras',
-    description: 'Visao consolidada por obra com orcamento, custos, apropriacoes e relatorios.',
+    description: 'Visão consolidada por obra com orçamento, custos, apropriações e relatórios.',
     enabled: true,
     locked: false
   },
@@ -100,7 +100,7 @@ const MODULE_CATALOG = [
     label: 'Provisionamento',
     packageKey: 'OBRAS_FINANCEIRO',
     packageLabel: 'Add-on Financeiro/Obras',
-    description: 'Previsao gerencial de desembolso por obra com dashboard, detalhamento e historico.',
+    description: 'Previsão gerencial de desembolso por obra com dashboard, detalhamento e histórico.',
     enabled: false,
     locked: false,
     requiresAll: ['FINANCEIRO', 'OBRAS']
@@ -128,7 +128,7 @@ const MODULE_CATALOG = [
     label: 'CRM',
     packageKey: 'CRM',
     packageLabel: 'Pacote CRM',
-    description: 'Gestao de leads, funil comercial, distribuicao e acompanhamento de oportunidades.',
+    description: 'Gestão de leads, funil comercial, distribuição e acompanhamento de oportunidades.',
     enabled: false,
     locked: false,
     recommendedWith: ['COMERCIAL']
@@ -138,7 +138,7 @@ const MODULE_CATALOG = [
     label: 'RH/DP',
     packageKey: 'RH_DP',
     packageLabel: 'Pacote RH/DP',
-    description: 'Colaboradores, documentos, apuracao por competencia e fechamento operacional do RH/DP.',
+    description: 'Colaboradores, documentos, apuração por competência e fechamento operacional do RH/DP.',
     enabled: false,
     locked: false
   },
@@ -147,17 +147,17 @@ const MODULE_CATALOG = [
     label: 'SST',
     packageKey: 'SST',
     packageLabel: 'Pacote SST',
-    description: 'Saude e seguranca do trabalho com riscos, ASO, exames, EPI, treinamentos, acidentes e base futura eSocial.',
+    description: 'Saúde e segurança do trabalho com riscos, ASO, exames, EPI, treinamentos, acidentes e base futura eSocial.',
     enabled: false,
     locked: false,
     recommendedWith: ['RH_DP', 'OBRAS']
   },
   {
     key: 'INTEGRACAO_SIENGE',
-    label: 'Integracao SIENGE',
+    label: 'Integração SIENGE',
     packageKey: 'INTEGRACOES',
     packageLabel: 'Add-on SIENGE',
-    description: 'Gateway tecnico para envio de titulos, fila, logs e reprocessamento da integracao com SIENGE.',
+    description: 'Gateway técnico para envio de títulos, fila, logs e reprocessamento da integração com SIENGE.',
     enabled: false,
     locked: false,
     requiresAny: ['FINANCEIRO', 'RH_DP', 'COMERCIAL'],
