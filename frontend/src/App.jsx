@@ -75,6 +75,7 @@ const FinanceiroTituloEditar = lazy(() => import('./pages/FinanceiroTituloEditar
 const FinanceiroPagamentos = lazy(() => import('./pages/FinanceiroPagamentos'));
 const FinanceiroBoletos = lazy(() => import('./pages/FinanceiroBoletos'));
 const FinanceiroFaturasCartao = lazy(() => import('./pages/FinanceiroFaturasCartao'));
+const FinanceiroFaturaCartaoDetalhe = lazy(() => import('./pages/FinanceiroFaturaCartaoDetalhe'));
 const FinanceiroCadastros = lazy(() => import('./pages/FinanceiroCadastros'));
 const FinanceiroRelatorios = lazy(() => import('./pages/FinanceiroRelatorios'));
 const FinanceiroExecutivoGrupo = lazy(() => import('./pages/FinanceiroExecutivoGrupo'));
@@ -777,6 +778,7 @@ export default function App() {
         <Route path="financeiro/pagamentos" element={<FinanceiroPagamentosRoute><FinanceiroPagamentos /></FinanceiroPagamentosRoute>} />
         <Route path="financeiro/boletos" element={<BoletosRoute><FinanceiroBoletos /></BoletosRoute>} />
         <Route path="financeiro/faturas-cartao" element={<FinanceiroRoute><FinanceiroFaturasCartao /></FinanceiroRoute>} />
+        <Route path="financeiro/faturas-cartao/:id" element={<FinanceiroRoute><FinanceiroFaturaCartaoDetalhe /></FinanceiroRoute>} />
         <Route path="financeiro/relatorios" element={<FinanceiroRoute><FinanceiroRelatorios /></FinanceiroRoute>} />
         <Route path="financeiro/relatorios/grupo-consolidado" element={<FinanceiroRoute><FinanceiroExecutivoGrupo /></FinanceiroRoute>} />
         <Route path="financeiro/relatorios/fluxo-consolidado" element={<FinanceiroRoute><FinanceiroFluxoConsolidado /></FinanceiroRoute>} />
