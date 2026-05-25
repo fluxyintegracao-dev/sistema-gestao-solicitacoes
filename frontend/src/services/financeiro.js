@@ -746,6 +746,14 @@ export async function getFaturasCartaoFinanceiro(params = {}) {
   return parseJson(response, 'Erro ao buscar faturas de cartao');
 }
 
+export async function getFaturaCartaoFinanceiro(id) {
+  const response = await fetch(`${API_URL}/financeiro/faturas-cartao/${id}`, {
+    headers: authHeaders()
+  });
+
+  return parseJson(response, 'Erro ao buscar fatura de cartao');
+}
+
 export async function baixarFaturaCartaoFinanceiro(id, data) {
   const response = await fetch(`${API_URL}/financeiro/faturas-cartao/${id}/baixar`, {
     method: 'POST',

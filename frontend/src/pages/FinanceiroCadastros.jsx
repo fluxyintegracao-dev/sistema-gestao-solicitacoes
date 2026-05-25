@@ -595,6 +595,9 @@ export default function FinanceiroCadastros() {
       setSavingCartao(true);
       setError('');
       const { id, ...payload } = pickCartaoFormData(cartaoForm);
+      if (String(payload.tipo || '').toUpperCase() === 'DEBITO' && !payload.conta_bancaria_id) {
+        throw new Error('Cartao de debito precisa ter uma conta bancaria vinculada.');
+      }
       const cleanPayload = {
         ...payload,
         conta_bancaria_id: payload.conta_bancaria_id ? Number(payload.conta_bancaria_id) : null,
@@ -1318,8 +1321,12 @@ export default function FinanceiroCadastros() {
                 <input className="input w-full" maxLength={4} inputMode="numeric" placeholder="4 ultimos digitos" value={cartaoForm.ultimos_digitos} onChange={(e) => setCartaoForm((c) => ({ ...c, ultimos_digitos: e.target.value.replace(/\D/g, '').slice(0, 4) }))} required />
               </div>
               <div className="grid gap-3 md:grid-cols-3">
-                <select className="input w-full" value={cartaoForm.conta_bancaria_id} onChange={(e) => setCartaoForm((c) => ({ ...c, conta_bancaria_id: e.target.value }))}>
-                  <option value="">Conta de pagamento opcional</option>
+                <select className="input w-full" value={cartaoForm.conta_bancaria_id} onChange={(e) => setCartaoForm((c) => ({ ...c, conta_bancaria_id: e.target.value }))} required={String(cartaoForm.tipo || '').toUpperCase() === 'DEBITO'}>
+                  <option value="">
+                    {String(cartaoForm.tipo || '').toUpperCase() === 'DEBITO'
+                      ? 'Conta obrigatoria para debito'
+                      : 'Conta de pagamento opcional'}
+                  </option>
                   {contas.map((conta) => (
                     <option key={conta.id} value={conta.id}>{conta.nome}</option>
                   ))}

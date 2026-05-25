@@ -650,6 +650,94 @@ async function validarFormaPagamentoFinanceira(formaPagamentoId, payload = {}) {
   return forma;
 }
 
+async function baixarTituloCartaoDebitoNoAto({
+  req,
+  titulo,
+  formaPagamento,
+  pagamentoPayload = {},
+  dataMovimento,
+  transaction
+}) {
+  if (!formaPagamento?.exige_cartao || !pagamentoPayload.cartao_id) {
+    return null;
+  }
+
+  const cartao = await CartaoFinanceiro.findByPk(pagamentoPayload.cartao_id, {
+    include: [{ model: ContaBancaria, as: 'contaBancaria' }],
+    transaction
+  });
+
+  if (!cartao || cartao.ativo === false) {
+    throw createHttpError(400, 'Cartao financeiro invalido ou inativo.');
+  }
+
+  const tipoCartao = String(cartao.tipo || 'CREDITO').trim().toUpperCase();
+  if (tipoCartao !== 'DEBITO') {
+    return null;
+  }
+
+  const conta = cartao.contaBancaria;
+  if (!conta || conta.ativo === false) {
+    throw createHttpError(
+      400,
+      'Cartao de debito precisa ter uma conta bancaria ativa vinculada para baixar no ato do registro.'
+    );
+  }
+
+  if (!titulo.empresa_id) {
+    throw createHttpError(
+      400,
+      `Titulo ${titulo.codigo || titulo.id} sem empresa vinculada. Corrija a empresa antes de usar cartao de debito.`
+    );
+  }
+
+  const empresaBaixaId = await validarEmpresaBaixa({
+    empresaId: titulo.empresa_id,
+    conta
+  });
+  const dataBaixa = dataMovimento || titulo.data_compra || titulo.data_vencimento || getHoje();
+  const valorBaixa = roundCurrency(titulo.valor_saldo || titulo.valor_original);
+  if (valorBaixa <= 0) {
+    return null;
+  }
+
+  const caixaSessao = await obterSessaoAbertaParaConta(conta, dataBaixa, { transaction });
+  const movimento = await MovimentoFinanceiro.create({
+    titulo_financeiro_id: titulo.id,
+    conta_bancaria_id: conta.id,
+    empresa_id: empresaBaixaId,
+    intercompany_group_id: titulo.intercompany_group_id || null,
+    empresa_origem_id: titulo.empresa_origem_id || null,
+    empresa_destino_id: titulo.empresa_destino_id || null,
+    tipo_intercompany: titulo.tipo_intercompany || null,
+    motivo_intercompany: titulo.motivo_intercompany || null,
+    elimina_consolidado: Boolean(titulo.elimina_consolidado),
+    transferencia_interna: Boolean(titulo.transferencia_interna),
+    caixa_sessao_id: caixaSessao?.id || null,
+    forma_recebimento: 'CARTAO_DEBITO',
+    tipo_movimento: 'BAIXA',
+    status: 'ATIVO',
+    valor: valorBaixa,
+    juros: 0,
+    multa: 0,
+    desconto: 0,
+    valor_quitacao: valorBaixa,
+    data_movimento: dataBaixa,
+    observacoes: `Baixa automatica por cartao de debito ${cartao.nome || cartao.id}`,
+    criado_por: req.user?.id || null
+  }, { transaction });
+
+  await titulo.update({
+    valor_baixado: roundCurrency(Number(titulo.valor_baixado || 0) + valorBaixa),
+    valor_saldo: 0,
+    status: 'QUITADO',
+    data_quitacao: dataBaixa,
+    atualizado_por: req.user?.id || null
+  }, { transaction });
+
+  return { movimento, cartao, conta, valorBaixa, dataBaixa };
+}
+
 async function validarParceiro(parceiroId) {
   const parceiro = await Parceiro.findByPk(parceiroId);
   if (!parceiro || parceiro.ativo === false) {
@@ -1411,6 +1499,7 @@ async function criarTituloPorSolicitacao(req, solicitacaoId, payload = {}) {
 
   const transaction = await sequelize.transaction();
   const titulosCriados = [];
+  const baixasCartaoDebito = [];
   try {
     for (const [pagamentoIndex, pagamento] of pagamentos.entries()) {
       for (let index = 0; index < pagamento.quantidadeParcelas; index += 1) {
@@ -1476,6 +1565,18 @@ async function criarTituloPorSolicitacao(req, solicitacaoId, payload = {}) {
           await vincularTituloAFatura({ titulo, fatura, transaction });
         }
 
+        const baixaCartaoDebito = await baixarTituloCartaoDebitoNoAto({
+          req,
+          titulo,
+          formaPagamento: pagamento.formaPagamento,
+          pagamentoPayload: pagamento.payload,
+          dataMovimento: pagamento.dataCompra,
+          transaction
+        });
+        if (baixaCartaoDebito) {
+          baixasCartaoDebito.push(baixaCartaoDebito);
+        }
+
         titulosCriados.push(titulo);
       }
     }
@@ -1519,6 +1620,29 @@ async function criarTituloPorSolicitacao(req, solicitacaoId, payload = {}) {
         }))
       }
     });
+
+    if (baixasCartaoDebito.length > 0) {
+      await registrarEventoSeguranca({
+        req,
+        usuarioId: req.user?.id || null,
+        tipoEvento: 'FINANCIAL_DEBIT_CARD_SETTLED',
+        recursoTipo: 'TITULO_FINANCEIRO',
+        recursoId: titulosCriados[0]?.id || null,
+        status: 'SUCCESS',
+        descricao: 'Titulo financeiro baixado automaticamente por cartao de debito',
+        metadata: {
+          origem: 'SOLICITACAO',
+          quantidade_movimentos: baixasCartaoDebito.length,
+          movimentos: baixasCartaoDebito.map((baixa) => ({
+            movimento_id: baixa.movimento.id,
+            cartao_id: baixa.cartao.id,
+            conta_bancaria_id: baixa.conta.id,
+            valor: baixa.valorBaixa,
+            data_movimento: baixa.dataBaixa
+          }))
+        }
+      });
+    }
 
     return tituloCompleto;
   } catch (error) {
@@ -1627,6 +1751,7 @@ async function criarTituloManual(req, payload = {}) {
 
   const transaction = await sequelize.transaction();
   const titulosCriados = [];
+  const baixasCartaoDebito = [];
 
   try {
     for (const [pagamentoIndex, pagamento] of pagamentos.entries()) {
@@ -1692,6 +1817,18 @@ async function criarTituloManual(req, payload = {}) {
           await vincularTituloAFatura({ titulo, fatura, transaction });
         }
 
+        const baixaCartaoDebito = await baixarTituloCartaoDebitoNoAto({
+          req,
+          titulo,
+          formaPagamento: pagamento.formaPagamento,
+          pagamentoPayload: pagamento.payload,
+          dataMovimento: pagamento.dataCompra,
+          transaction
+        });
+        if (baixaCartaoDebito) {
+          baixasCartaoDebito.push(baixaCartaoDebito);
+        }
+
         titulosCriados.push(titulo);
       }
     }
@@ -1726,6 +1863,29 @@ async function criarTituloManual(req, payload = {}) {
       }))
     }
   });
+
+  if (baixasCartaoDebito.length > 0) {
+    await registrarEventoSeguranca({
+      req,
+      usuarioId: req.user?.id || null,
+      tipoEvento: 'FINANCIAL_DEBIT_CARD_SETTLED',
+      recursoTipo: 'TITULO_FINANCEIRO',
+      recursoId: titulosCriados[0]?.id || null,
+      status: 'SUCCESS',
+      descricao: 'Titulo financeiro baixado automaticamente por cartao de debito',
+      metadata: {
+        origem: 'MANUAL',
+        quantidade_movimentos: baixasCartaoDebito.length,
+        movimentos: baixasCartaoDebito.map((baixa) => ({
+          movimento_id: baixa.movimento.id,
+          cartao_id: baixa.cartao.id,
+          conta_bancaria_id: baixa.conta.id,
+          valor: baixa.valorBaixa,
+          data_movimento: baixa.dataBaixa
+        }))
+      }
+    });
+  }
 
   const tituloCompleto = await carregarTituloPorId(req, titulosCriados[0].id);
   if (titulosCriados.length > 1) {

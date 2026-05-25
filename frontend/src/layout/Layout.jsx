@@ -39,6 +39,7 @@ import {
   HiOutlinePaperAirplane,
   HiOutlineSparkles,
   HiOutlineKey,
+  HiOutlineCreditCard,
   HiOutlineLifebuoy,
   HiOutlineChatBubbleOvalLeft
 } from 'react-icons/hi2';
@@ -395,6 +396,7 @@ export default function Layout() {
         financeiroAccess ? item('/financeiro/titulos', 'Titulos Financeiros', HiOutlineWallet) : null,
         pagamentosAccess ? item('/financeiro/pagamentos', 'Pagamentos em Massa', HiOutlinePaperAirplane) : null,
         boletosAccess ? item('/financeiro/boletos', 'Boletos', HiOutlineDocumentText) : null,
+        financeiroAccess ? item('/financeiro/faturas-cartao', 'Faturas de Cartao', HiOutlineCreditCard) : null,
         financeiroAccess ? item('/financeiro/relatorios', 'Relatorios Financeiros', HiOutlineDocumentText) : null,
         financeiroAccess ? item('/financeiro/baixas', 'Baixas Realizadas', HiOutlineBanknotes) : null,
         financeiroAccess ? item('/financeiro/conciliacao', 'Conciliacao OFX', HiOutlineBanknotes) : null,

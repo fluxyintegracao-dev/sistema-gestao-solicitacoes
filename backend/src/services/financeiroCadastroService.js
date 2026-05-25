@@ -386,6 +386,31 @@ function sanitizeCartaoPayload(payload = {}, { partial = false } = {}) {
   return Object.fromEntries(Object.entries(data).filter(([, value]) => value !== undefined));
 }
 
+async function validarContaCartao(data = {}, cartaoAtual = null) {
+  const tipoFinal = String(data.tipo || cartaoAtual?.tipo || 'CREDITO').trim().toUpperCase();
+  const contaFinal = data.conta_bancaria_id !== undefined
+    ? data.conta_bancaria_id
+    : cartaoAtual?.conta_bancaria_id || null;
+
+  if (tipoFinal === 'DEBITO' && !contaFinal) {
+    throw createHttpError(
+      400,
+      'Cartao de debito precisa ter conta bancaria vinculada para baixar no ato do registro.'
+    );
+  }
+
+  if (!contaFinal) {
+    return null;
+  }
+
+  const conta = await ContaBancaria.findByPk(contaFinal);
+  if (!conta || conta.ativo === false) {
+    throw createHttpError(400, 'Conta bancaria do cartao invalida ou inativa.');
+  }
+
+  return conta;
+}
+
 async function listarContasBancarias(req) {
   await assertFinanceAccess(req);
 
@@ -541,6 +566,7 @@ async function listarCartoesFinanceiros(req) {
 async function criarCartaoFinanceiro(req, payload = {}) {
   await assertFinanceAccess(req);
   const data = sanitizeCartaoPayload(payload);
+  await validarContaCartao(data);
   data.criado_por = req.user?.id || null;
   data.atualizado_por = req.user?.id || null;
 
@@ -560,6 +586,7 @@ async function atualizarCartaoFinanceiro(req, cartaoId, payload = {}) {
   if (Object.keys(data).length === 0) {
     throw createHttpError(400, 'Nenhum campo valido informado para atualizar o cartao.');
   }
+  await validarContaCartao(data, cartao);
 
   data.atualizado_por = req.user?.id || null;
   await cartao.update(data);
