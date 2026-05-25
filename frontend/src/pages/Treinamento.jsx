@@ -134,6 +134,7 @@ export default function Treinamento() {
   const [uploading, setUploading] = useState(false);
   const [erro, setErro] = useState('');
   const [sucesso, setSucesso] = useState('');
+  const [pendingFile, setPendingFile] = useState(null);
   const [filtros, setFiltros] = useState({
     tipo: '',
     modulo: '',
@@ -190,15 +191,22 @@ export default function Treinamento() {
 
   function novoConteudo(tipo = 'FAQ') {
     setForm({ ...EMPTY_FORM, tipo });
+    setPendingFile(null);
     setSucesso('');
     setErro('');
   }
 
   function editarConteudo(item) {
     setForm(toForm(item));
+    setPendingFile(null);
     setSucesso('');
     setErro('');
     marcarTreinamentoLeitura(item.id, false).catch(() => {});
+  }
+
+  async function enviarArquivo(conteudoId, file, tipo = form.tipo) {
+    const tipoArquivo = tipo === 'VIDEO' ? 'VIDEO' : 'DOCUMENTO';
+    return uploadTreinamentoArquivo(conteudoId, file, tipoArquivo);
   }
 
   async function salvarConteudo(event) {
@@ -211,14 +219,21 @@ export default function Treinamento() {
       const saved = form.id
         ? await updateTreinamentoConteudo(form.id, payload)
         : await createTreinamentoConteudo(payload);
-      setForm(toForm(saved));
-      setSucesso('Conteudo salvo com sucesso.');
+      let next = saved;
+      if (pendingFile) {
+        setUploading(true);
+        next = await enviarArquivo(saved.id, pendingFile, saved.tipo);
+        setPendingFile(null);
+      }
+      setForm(toForm(next));
+      setSucesso(pendingFile ? 'Conteudo salvo e arquivo enviado para o S3.' : 'Conteudo salvo com sucesso.');
       await carregar();
     } catch (error) {
       console.error(error);
       setErro(error.message || 'Erro ao salvar conteudo.');
     } finally {
       setSaving(false);
+      setUploading(false);
     }
   }
 
@@ -259,14 +274,20 @@ export default function Treinamento() {
   async function uploadArquivo(event) {
     const file = event.target.files?.[0];
     event.target.value = '';
-    if (!file || !form.id) return;
-    const tipoArquivo = form.tipo === 'VIDEO' ? 'VIDEO' : 'DOCUMENTO';
+    if (!file) return;
+    setPendingFile(file);
+    if (!form.id) {
+      setSucesso('Arquivo selecionado. Ao salvar o conteudo, ele sera enviado para o S3.');
+      setErro('');
+      return;
+    }
     setUploading(true);
     setErro('');
     setSucesso('');
     try {
-      const saved = await uploadTreinamentoArquivo(form.id, file, tipoArquivo);
+      const saved = await enviarArquivo(form.id, file);
       setForm(toForm(saved));
+      setPendingFile(null);
       setSucesso('Arquivo enviado para o S3.');
       await carregar();
     } catch (error) {
@@ -276,6 +297,10 @@ export default function Treinamento() {
       setUploading(false);
     }
   }
+
+  const uploadAccept = form.tipo === 'VIDEO'
+    ? '.mp4,.webm,video/mp4,video/webm'
+    : '.pdf,.doc,.docx,.xls,.xlsx,.csv,.ppt,.pptx,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg';
 
   async function abrirArquivo(item, tipoArquivo) {
     try {
@@ -603,23 +628,45 @@ export default function Treinamento() {
                 </label>
               </div>
 
+              <div className="rounded-xl border border-[var(--c-border)] bg-[var(--c-surface-muted)] p-3">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-[var(--c-text)]">
+                      {form.tipo === 'VIDEO' ? 'Arquivo de video' : 'Arquivo do material'}
+                    </p>
+                    <p className="text-xs text-[var(--c-muted)]">
+                      {form.tipo === 'VIDEO'
+                        ? 'Selecione um MP4 ou WebM. Se ainda nao salvou, o envio acontece apos salvar.'
+                        : 'Selecione PDF, planilha, apresentacao, imagem ou documento.'}
+                    </p>
+                    {pendingFile && (
+                      <p className="mt-1 text-xs font-semibold text-blue-600">
+                        Selecionado: {pendingFile.name}
+                      </p>
+                    )}
+                  </div>
+                  <label className="btn btn-outline cursor-pointer">
+                    <HiOutlineCloudArrowUp className="h-4 w-4" />
+                    {uploading ? 'Enviando...' : 'Selecionar arquivo'}
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      className="hidden"
+                      accept={uploadAccept}
+                      onChange={uploadArquivo}
+                      disabled={uploading || saving}
+                    />
+                  </label>
+                </div>
+              </div>
+
               <div className="flex flex-wrap gap-2 pt-1">
                 <button type="submit" className="btn btn-primary" disabled={saving}>
                   <HiOutlinePencilSquare className="h-4 w-4" />
-                  {saving ? 'Salvando...' : 'Salvar'}
+                  {saving ? 'Salvando...' : pendingFile ? 'Salvar e enviar arquivo' : 'Salvar'}
                 </button>
                 {form.id && (
                   <>
-                    <button
-                      type="button"
-                      className="btn btn-outline"
-                      disabled={uploading}
-                      onClick={() => fileInputRef.current?.click()}
-                    >
-                      <HiOutlineCloudArrowUp className="h-4 w-4" />
-                      {uploading ? 'Enviando...' : 'Upload S3'}
-                    </button>
-                    <input ref={fileInputRef} type="file" className="hidden" onChange={uploadArquivo} />
                     {podePublicar && selected?.status !== 'PUBLICADO' && (
                       <button type="button" className="btn btn-outline" onClick={() => publicarConteudo(form.id)}>
                         Publicar
@@ -635,7 +682,7 @@ export default function Treinamento() {
 
               {form.id && (
                 <div className="rounded-xl border border-[var(--c-border)] bg-[var(--c-surface-muted)] p-3 text-xs text-[var(--c-muted)]">
-                  Salve o conteudo antes do upload. Depois disso, envie video MP4/WebM ou documentos permitidos para o S3 de desenvolvimento.
+                  Arquivos ja salvos ficam privados no S3 e sao abertos por URL assinada.
                 </div>
               )}
             </form>
