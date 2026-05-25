@@ -37,6 +37,7 @@ A visibilidade efetiva depende de combinacao entre:
 - quando a obra estiver classificada e houver configuracao de aprovacao por diretoria:
   - obra `PUBLICA` deve nascer em `DIR_OBRAS_PUBLICAS`
   - obra `PRIVADA` deve nascer em `DIR_OBRAS_PRIVADAS`
+  - essa regra vale para qualquer usuario ou setor criador; a classificacao da obra define a diretoria inicial
   - para usuarios do setor `OBRA`, essa escolha passa a seguir a classificacao da obra e a configuracao de `Areas Visiveis para OBRA`, sem depender de `Areas por Setor de Origem`
   - na criacao, o usuario seleciona a area destino operacional e o sistema grava a diretoria correspondente em campo separado
   - a solicitacao nasce na diretoria da classificacao da obra e, apos aprovacao, segue para a area operacional selecionada na criacao

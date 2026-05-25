@@ -25,7 +25,8 @@
 ## Fluxo de aprovacao por diretoria
 - obras podem ser classificadas como `PUBLICA` ou `PRIVADA`
 - o `SUPERADMIN` configura qual diretoria atende cada classificacao de obra
-- usuarios do setor `OBRA` continuam criando pela tela padrao, mas a `Area Responsavel` fica restrita a diretoria correspondente a classificacao da obra quando essa configuracao existir
+- toda solicitacao criada para obra classificada passa primeiro pela diretoria da classificacao, independentemente do usuario ou setor criador
+- usuarios do setor `OBRA` continuam criando pela tela padrao e a configuracao de `Areas Visiveis para OBRA` define as areas operacionais disponiveis
 - o `SUPERADMIN` tambem configura qual setor recebe a solicitacao apos a aprovacao da diretoria, por `tipo_solicitacao`
 - novas solicitacoes criadas nesse fluxo passam a persistir um marcador formal (`fluxo_aprovacao_diretoria`) e os codigos da diretoria/origem e do setor destino
 - no detalhe da solicitacao, quando ela estiver na diretoria correta e houver setor destino configurado, o botao `Enviar para outro setor` passa a ser `Aprovar`

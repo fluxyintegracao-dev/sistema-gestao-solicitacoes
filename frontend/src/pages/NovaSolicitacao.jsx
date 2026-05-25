@@ -566,10 +566,10 @@ export default function NovaSolicitacao() {
     return tiposAtivos.filter(tipo => idsPermitidos.has(Number(tipo.id)));
   }, [tipos, tiposPorSetorConfig, form.area_responsavel, setores]);
   const diretoriaAprovacaoLabel = useMemo(() => {
-    if (!isSetorObra || !form.obra_id || !diretoriaEsperadaObra) return '';
+    if (!form.obra_id || !diretoriaEsperadaObra) return '';
     const setorDiretoria = setores.find(setor => setorPossuiToken(setor, diretoriaEsperadaObra));
     return setorDiretoria?.nome || setorDiretoria?.codigo || diretoriaEsperadaObra;
-  }, [isSetorObra, form.obra_id, diretoriaEsperadaObra, setores]);
+  }, [form.obra_id, diretoriaEsperadaObra, setores]);
 
   useEffect(() => {
     if (!form.area_responsavel) return;
@@ -692,12 +692,12 @@ export default function NovaSolicitacao() {
             )}
           </label>
 
-          {isSetorObra && (
+          {diretoriaAprovacaoLabel && (
             <label className="grid gap-1 text-sm">
               Diretoria de aprovacao
               <input
                 className="input bg-gray-100"
-                value={diretoriaAprovacaoLabel || 'Selecione uma obra classificada'}
+                value={diretoriaAprovacaoLabel}
                 readOnly
               />
               <span className="text-xs text-gray-500">
@@ -997,5 +997,4 @@ export default function NovaSolicitacao() {
     </div>
   );
 }
-
 

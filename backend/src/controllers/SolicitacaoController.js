@@ -1890,7 +1890,6 @@ module.exports = {
       const areaDestinoSelecionada = String(area_responsavel || '').trim();
       const destinoSelecionado = areaDestinoSelecionada.toUpperCase();
       const fluxoAprovacaoDiretoriaAtivo = Boolean(
-        usuarioSetorObra &&
         contextoAprovacaoDiretoria.diretoriaEsperada &&
         destinoSelecionado
       );
