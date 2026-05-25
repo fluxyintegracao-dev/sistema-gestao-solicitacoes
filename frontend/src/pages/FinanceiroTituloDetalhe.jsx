@@ -1041,14 +1041,14 @@ export default function FinanceiroTituloDetalhe() {
       </div>
 
       {modalBaixaOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="card w-full max-w-2xl space-y-4">
-            <div className="flex items-start justify-between gap-3">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-4">
+          <div className="card flex max-h-[calc(100vh-2rem)] w-full max-w-2xl flex-col overflow-hidden p-0">
+            <div className="flex shrink-0 items-start justify-between gap-3 border-b border-[var(--c-border)] px-5 py-4">
               <div>
                 <h3 className="text-lg font-semibold" style={{ color: 'var(--c-text)' }}>
                   {corrigindoMovimentoId ? 'Corrigir baixa' : 'Registrar baixa'}
                 </h3>
-                <p className="text-sm text-slate-500">
+                <p className="text-sm text-[var(--c-muted)]">
                   {corrigindoMovimentoId
                     ? 'A baixa anterior ja foi estornada. Ajuste conta bancaria, data e demais campos antes de salvar.'
                     : 'Use baixa parcial ou total. O saldo do titulo sera atualizado no backend.'}
@@ -1067,7 +1067,8 @@ export default function FinanceiroTituloDetalhe() {
               </button>
             </div>
 
-            <form className="space-y-4" onSubmit={handleBaixaSubmit}>
+            <form className="flex min-h-0 flex-1 flex-col" onSubmit={handleBaixaSubmit}>
+              <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
               <div className="grid gap-3 md:grid-cols-2">
                 <label className="text-sm">
                   <span className="mb-1 block text-slate-500">Forma de recebimento</span>
@@ -1316,8 +1317,9 @@ export default function FinanceiroTituloDetalhe() {
                   onChange={(event) => setBaixaForm((current) => ({ ...current, observacoes: event.target.value }))}
                 />
               </label>
+              </div>
 
-              <div className="flex justify-end gap-2">
+              <div className="flex shrink-0 justify-end gap-2 border-t border-[var(--c-border)] bg-[var(--c-surface)] px-5 py-4">
                 <button
                   type="button"
                   className="btn btn-outline"
