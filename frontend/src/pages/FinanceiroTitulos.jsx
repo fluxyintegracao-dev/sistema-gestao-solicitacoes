@@ -1079,12 +1079,12 @@ export default function FinanceiroTitulos() {
       </div>
 
       {modalBaixaMassaOpen ? (
-        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-slate-950/45 px-4 py-6 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-slate-950/45 px-4 py-4 backdrop-blur-sm">
           <form
-            className="w-full max-w-2xl rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-5 shadow-2xl"
+            className="flex max-h-[calc(100vh-2rem)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] shadow-2xl"
             onSubmit={handleBaixaMassaSubmit}
           >
-            <div className="flex items-start justify-between gap-3 border-b border-[var(--c-border)] pb-3">
+            <div className="flex shrink-0 items-start justify-between gap-3 border-b border-[var(--c-border)] px-5 py-4">
               <div>
                 <h2 className="text-lg font-semibold text-[var(--c-text)]">Baixa em massa</h2>
                 <p className="text-xs text-[var(--c-muted)]">
@@ -1102,119 +1102,121 @@ export default function FinanceiroTitulos() {
               </button>
             </div>
 
-            <div className="mt-4 grid gap-3 md:grid-cols-2">
-              <label className="app-filter-field">
-                <span className="app-filter-label">Data da baixa</span>
-                <input
-                  className="input w-full input-sm"
-                  type="date"
-                  value={baixaMassaForm.data_movimento}
-                  onChange={(event) => setBaixaMassaForm((current) => ({ ...current, data_movimento: event.target.value }))}
-                  required
-                />
-              </label>
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
+              <div className="grid gap-3 md:grid-cols-2">
+                <label className="app-filter-field">
+                  <span className="app-filter-label">Data da baixa</span>
+                  <input
+                    className="input w-full input-sm"
+                    type="date"
+                    value={baixaMassaForm.data_movimento}
+                    onChange={(event) => setBaixaMassaForm((current) => ({ ...current, data_movimento: event.target.value }))}
+                    required
+                  />
+                </label>
 
-              <label className="app-filter-field">
-                <span className="app-filter-label">Forma</span>
-                <select
-                  className="input w-full input-sm"
-                  value={baixaMassaForm.forma_recebimento}
-                  onChange={(event) => setBaixaMassaForm((current) => ({ ...current, forma_recebimento: event.target.value }))}
-                  required
-                >
-                  <option value="">Selecione</option>
-                  {FORMAS_RECEBIMENTO.map((forma) => (
-                    <option key={forma} value={forma}>{forma}</option>
-                  ))}
-                </select>
-              </label>
+                <label className="app-filter-field">
+                  <span className="app-filter-label">Forma</span>
+                  <select
+                    className="input w-full input-sm"
+                    value={baixaMassaForm.forma_recebimento}
+                    onChange={(event) => setBaixaMassaForm((current) => ({ ...current, forma_recebimento: event.target.value }))}
+                    required
+                  >
+                    <option value="">Selecione</option>
+                    {FORMAS_RECEBIMENTO.map((forma) => (
+                      <option key={forma} value={forma}>{forma}</option>
+                    ))}
+                  </select>
+                </label>
 
-              <label className="app-filter-field md:col-span-2">
-                <span className="app-filter-label">Empresa pagadora</span>
-                <select
-                  className="input w-full input-sm"
-                  value={baixaMassaForm.empresa_id}
-                  onChange={(event) => setBaixaMassaForm((current) => ({
-                    ...current,
-                    empresa_id: event.target.value,
-                    conta_bancaria_id: ''
-                  }))}
-                  required
-                >
-                  <option value="">Selecione</option>
-                  {empresasGrupo.map((empresa) => (
-                    <option key={empresa.id} value={empresa.id}>
-                      {empresa.nome || empresa.razao_social || `Empresa #${empresa.id}`}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                <label className="app-filter-field md:col-span-2">
+                  <span className="app-filter-label">Empresa pagadora</span>
+                  <select
+                    className="input w-full input-sm"
+                    value={baixaMassaForm.empresa_id}
+                    onChange={(event) => setBaixaMassaForm((current) => ({
+                      ...current,
+                      empresa_id: event.target.value,
+                      conta_bancaria_id: ''
+                    }))}
+                    required
+                  >
+                    <option value="">Selecione</option>
+                    {empresasGrupo.map((empresa) => (
+                      <option key={empresa.id} value={empresa.id}>
+                        {empresa.nome || empresa.razao_social || `Empresa #${empresa.id}`}
+                      </option>
+                    ))}
+                  </select>
+                </label>
 
-              <label className="app-filter-field md:col-span-2">
-                <span className="app-filter-label">Conta bancaria</span>
-                <select
-                  className="input w-full input-sm"
-                  value={baixaMassaForm.conta_bancaria_id}
-                  onChange={(event) => setBaixaMassaForm((current) => ({ ...current, conta_bancaria_id: event.target.value }))}
-                  required={contaBancariaObrigatoria(baixaMassaForm.forma_recebimento)}
-                  disabled={!baixaMassaForm.empresa_id || !contaBancariaObrigatoria(baixaMassaForm.forma_recebimento)}
-                >
-                  <option value="">{baixaMassaForm.empresa_id ? 'Sem conta bancaria' : 'Selecione a empresa pagadora'}</option>
-                  {contasBancariasBaixaMassa.map((conta) => (
-                    <option key={conta.id} value={conta.id}>
-                      {conta.nome}
-                      {conta.banco ? ` - ${conta.banco}` : ''}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                <label className="app-filter-field md:col-span-2">
+                  <span className="app-filter-label">Conta bancaria</span>
+                  <select
+                    className="input w-full input-sm"
+                    value={baixaMassaForm.conta_bancaria_id}
+                    onChange={(event) => setBaixaMassaForm((current) => ({ ...current, conta_bancaria_id: event.target.value }))}
+                    required={contaBancariaObrigatoria(baixaMassaForm.forma_recebimento)}
+                    disabled={!baixaMassaForm.empresa_id || !contaBancariaObrigatoria(baixaMassaForm.forma_recebimento)}
+                  >
+                    <option value="">{baixaMassaForm.empresa_id ? 'Sem conta bancaria' : 'Selecione a empresa pagadora'}</option>
+                    {contasBancariasBaixaMassa.map((conta) => (
+                      <option key={conta.id} value={conta.id}>
+                        {conta.nome}
+                        {conta.banco ? ` - ${conta.banco}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </label>
 
-              <label className="app-filter-field">
-                <span className="app-filter-label">Juros por titulo</span>
-                <input
-                  className="input w-full input-sm"
-                  value={baixaMassaForm.juros}
-                  onChange={(event) => setBaixaMassaForm((current) => ({ ...current, juros: normalizeCurrencyTyping(event.target.value) }))}
-                  placeholder="0,00"
-                />
-              </label>
+                <label className="app-filter-field">
+                  <span className="app-filter-label">Juros por titulo</span>
+                  <input
+                    className="input w-full input-sm"
+                    value={baixaMassaForm.juros}
+                    onChange={(event) => setBaixaMassaForm((current) => ({ ...current, juros: normalizeCurrencyTyping(event.target.value) }))}
+                    placeholder="0,00"
+                  />
+                </label>
 
-              <label className="app-filter-field">
-                <span className="app-filter-label">Multa por titulo</span>
-                <input
-                  className="input w-full input-sm"
-                  value={baixaMassaForm.multa}
-                  onChange={(event) => setBaixaMassaForm((current) => ({ ...current, multa: normalizeCurrencyTyping(event.target.value) }))}
-                  placeholder="0,00"
-                />
-              </label>
+                <label className="app-filter-field">
+                  <span className="app-filter-label">Multa por titulo</span>
+                  <input
+                    className="input w-full input-sm"
+                    value={baixaMassaForm.multa}
+                    onChange={(event) => setBaixaMassaForm((current) => ({ ...current, multa: normalizeCurrencyTyping(event.target.value) }))}
+                    placeholder="0,00"
+                  />
+                </label>
 
-              <label className="app-filter-field md:col-span-2">
-                <span className="app-filter-label">Desconto por titulo</span>
-                <input
-                  className="input w-full input-sm"
-                  value={baixaMassaForm.desconto}
-                  onChange={(event) => setBaixaMassaForm((current) => ({ ...current, desconto: normalizeCurrencyTyping(event.target.value) }))}
-                  placeholder="0,00"
-                />
-              </label>
+                <label className="app-filter-field md:col-span-2">
+                  <span className="app-filter-label">Desconto por titulo</span>
+                  <input
+                    className="input w-full input-sm"
+                    value={baixaMassaForm.desconto}
+                    onChange={(event) => setBaixaMassaForm((current) => ({ ...current, desconto: normalizeCurrencyTyping(event.target.value) }))}
+                    placeholder="0,00"
+                  />
+                </label>
 
-              <label className="app-filter-field md:col-span-2">
-                <span className="app-filter-label">Observacoes</span>
-                <textarea
-                  className="input min-h-[92px] w-full"
-                  value={baixaMassaForm.observacoes}
-                  onChange={(event) => setBaixaMassaForm((current) => ({ ...current, observacoes: event.target.value }))}
-                  placeholder="Ex.: Baixa em massa conforme extrato bancario."
-                />
-              </label>
+                <label className="app-filter-field md:col-span-2">
+                  <span className="app-filter-label">Observacoes</span>
+                  <textarea
+                    className="input min-h-[92px] w-full"
+                    value={baixaMassaForm.observacoes}
+                    onChange={(event) => setBaixaMassaForm((current) => ({ ...current, observacoes: event.target.value }))}
+                    placeholder="Ex.: Baixa em massa conforme extrato bancario."
+                  />
+                </label>
+              </div>
+
+              <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                Cada titulo sera baixado pelo saldo atual. Juros, multa e desconto informados aqui serao aplicados individualmente em cada titulo.
+              </div>
             </div>
 
-            <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-              Cada titulo sera baixado pelo saldo atual. Juros, multa e desconto informados aqui serao aplicados individualmente em cada titulo.
-            </div>
-
-            <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
+            <div className="flex shrink-0 flex-col-reverse gap-2 border-t border-[var(--c-border)] bg-[var(--c-surface)] px-5 py-4 sm:flex-row sm:items-center sm:justify-end">
               <button
                 type="button"
                 className="btn btn-outline btn-sm"
