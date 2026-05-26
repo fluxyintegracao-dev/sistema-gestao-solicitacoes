@@ -27,6 +27,9 @@ function optionLabel(type, item) {
   if (type === 'obras') {
     return [item.nome, item.codigo ? `Codigo ${item.codigo}` : null].filter(Boolean).join(' - ');
   }
+  if (['ambientes', 'riscos', 'agentes', 'asos'].includes(type)) {
+    return item.nome || item.tipo_exame || item.nome_exame || item.titulo || `#${item.id}`;
+  }
   return item.razao_social || item.nome_fantasia || item.nome || `#${item.id}`;
 }
 
@@ -45,7 +48,7 @@ export default function SstCrudPage() {
   const [editing, setEditing] = useState(null);
   const [file, setFile] = useState(null);
   const [saving, setSaving] = useState(false);
-  const [refs, setRefs] = useState({ empresas: [], obras: [], colaboradores: [] });
+  const [refs, setRefs] = useState({ empresas: [], obras: [], colaboradores: [], ambientes: [], riscos: [], agentes: [], asos: [] });
   const [filters, setFilters] = useState({ empresa_id: '', obra_id: '', colaborador_id: '', status: '', search: '' });
   const [syncingEvents, setSyncingEvents] = useState(false);
   const [syncMessage, setSyncMessage] = useState('');
@@ -91,13 +94,21 @@ export default function SstCrudPage() {
     Promise.allSettled([
       getRhEmpresasGrupo({ ativo: true }),
       getObras({ ativo: true }),
-      getRhColaboradores({ status: 'ATIVO' })
-    ]).then(([empresasResult, obrasResult, colaboradoresResult]) => {
+      getRhColaboradores({ status: 'ATIVO' }),
+      listarSst('ambientes', { limit: 200 }),
+      listarSst('riscos', { limit: 200 }),
+      listarSst('agentes', { limit: 200 }),
+      listarSst('aso', { limit: 200 })
+    ]).then(([empresasResult, obrasResult, colaboradoresResult, ambientesResult, riscosResult, agentesResult, asosResult]) => {
       if (!active) return;
       setRefs({
         empresas: empresasResult.status === 'fulfilled' && Array.isArray(empresasResult.value) ? empresasResult.value : [],
         obras: obrasResult.status === 'fulfilled' && Array.isArray(obrasResult.value) ? obrasResult.value : [],
-        colaboradores: colaboradoresResult.status === 'fulfilled' && Array.isArray(colaboradoresResult.value) ? colaboradoresResult.value : []
+        colaboradores: colaboradoresResult.status === 'fulfilled' && Array.isArray(colaboradoresResult.value) ? colaboradoresResult.value : [],
+        ambientes: ambientesResult.status === 'fulfilled' ? (ambientesResult.value.rows || []) : [],
+        riscos: riscosResult.status === 'fulfilled' ? (riscosResult.value.rows || []) : [],
+        agentes: agentesResult.status === 'fulfilled' ? (agentesResult.value.rows || []) : [],
+        asos: asosResult.status === 'fulfilled' ? (asosResult.value.rows || []) : []
       });
     });
     return () => {
@@ -175,11 +186,11 @@ export default function SstCrudPage() {
 
   return (
     <div className="sst-page space-y-5">
-      <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+      <section className="rounded-lg border border-[var(--c-border)] bg-[var(--c-bg)] p-5 shadow-sm">
         <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">SST</p>
-            <h1 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">{config.title}</h1>
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--c-muted)]">SST</p>
+            <h1 className="mt-2 text-2xl font-semibold tracking-tight text-[var(--c-text)]">{config.title}</h1>
             <p className="mt-2 text-sm leading-6 text-slate-600">{config.subtitle}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -207,20 +218,20 @@ export default function SstCrudPage() {
       ) : null}
 
       {canManage ? (
-        <form onSubmit={submit} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <form onSubmit={submit} className="rounded-lg border border-[var(--c-border)] bg-[var(--c-bg)] p-5 shadow-sm">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-slate-950">{editing ? 'Editar registro' : 'Novo registro'}</h2>
-            {editing ? <button type="button" onClick={resetForm} className="text-sm font-semibold text-slate-500 hover:text-slate-900">Cancelar edicao</button> : null}
+            <h2 className="text-lg font-semibold text-[var(--c-text)]">{editing ? 'Editar registro' : 'Novo registro'}</h2>
+            {editing ? <button type="button" onClick={resetForm} className="text-sm font-semibold text-[var(--c-muted)] hover:text-slate-900">Cancelar edicao</button> : null}
           </div>
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {config.fields.map((field) => (
               <label key={field.key} className={field.type === 'textarea' ? 'md:col-span-2 xl:col-span-3' : ''}>
-                <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{field.label}</span>
+                <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--c-muted)]">{field.label}</span>
                 {field.type === 'textarea' ? (
                   <textarea
                     value={form[field.key] || ''}
                     onChange={(event) => setForm((current) => ({ ...current, [field.key]: event.target.value }))}
-                    className="mt-1 min-h-24 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100"
+                    className="mt-1 min-h-24 w-full rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] px-3 py-2 text-sm text-[var(--c-text)] outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100"
                   />
                 ) : field.type === 'checkbox' ? (
                   <input
@@ -234,7 +245,7 @@ export default function SstCrudPage() {
                     value={form[field.key] || ''}
                     required={field.required}
                     onChange={(event) => setForm((current) => ({ ...current, [field.key]: event.target.value }))}
-                    className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100"
+                    className="mt-1 w-full rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] px-3 py-2 text-sm text-[var(--c-text)] outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100"
                   >
                     <option value="">Selecionar</option>
                     {(refs[field.ref] || []).map((item) => (
@@ -246,7 +257,7 @@ export default function SstCrudPage() {
                     value={form[field.key] || ''}
                     required={field.required}
                     onChange={(event) => setForm((current) => ({ ...current, [field.key]: event.target.value }))}
-                    className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100"
+                    className="mt-1 w-full rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] px-3 py-2 text-sm text-[var(--c-text)] outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100"
                   >
                     <option value="">Selecionar</option>
                     {field.options.map((option) => <option key={option} value={option}>{option}</option>)}
@@ -257,18 +268,18 @@ export default function SstCrudPage() {
                     value={form[field.key] || ''}
                     required={field.required}
                     onChange={(event) => setForm((current) => ({ ...current, [field.key]: event.target.value }))}
-                    className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100"
+                    className="mt-1 w-full rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] px-3 py-2 text-sm text-[var(--c-text)] outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100"
                   />
                 )}
               </label>
             ))}
             {resource === 'documentos' && !editing ? (
               <label>
-                <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Arquivo</span>
+                <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--c-muted)]">Arquivo</span>
                 <input
                   type="file"
                   onChange={(event) => setFile(event.target.files?.[0] || null)}
-                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                  className="mt-1 w-full rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] px-3 py-2 text-sm text-[var(--c-text)]"
                 />
               </label>
             ) : null}
@@ -283,11 +294,11 @@ export default function SstCrudPage() {
         </form>
       ) : null}
 
-      <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+      <section className="rounded-lg border border-[var(--c-border)] bg-[var(--c-bg)] p-5 shadow-sm">
         <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-slate-950">Filtros</h2>
-            <p className="text-sm text-slate-500">Use filtros reais para auditar registros por empresa, obra, colaborador, status ou texto.</p>
+            <h2 className="text-lg font-semibold text-[var(--c-text)]">Filtros</h2>
+            <p className="text-sm text-[var(--c-muted)]">Use filtros reais para auditar registros por empresa, obra, colaborador, status ou texto.</p>
           </div>
           <div className="flex gap-2">
             <button
@@ -300,7 +311,7 @@ export default function SstCrudPage() {
             <button
               type="button"
               onClick={resetFilters}
-              className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              className="rounded-lg border border-[var(--c-border)] px-4 py-2 text-sm font-semibold text-[var(--c-text)] transition hover:bg-[var(--c-surface-muted)]"
             >
               Limpar
             </button>
@@ -308,92 +319,92 @@ export default function SstCrudPage() {
         </div>
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
           <label>
-            <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Empresa</span>
+            <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--c-muted)]">Empresa</span>
             <select
               value={filters.empresa_id}
               onChange={(event) => setFilters((current) => ({ ...current, empresa_id: event.target.value }))}
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100"
+              className="mt-1 w-full rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] px-3 py-2 text-sm text-[var(--c-text)] outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100"
             >
               <option value="">Todas</option>
               {refs.empresas.map((item) => <option key={item.id} value={item.id}>{optionLabel('empresas', item)}</option>)}
             </select>
           </label>
           <label>
-            <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Obra/Centro</span>
+            <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--c-muted)]">Obra/Centro</span>
             <select
               value={filters.obra_id}
               onChange={(event) => setFilters((current) => ({ ...current, obra_id: event.target.value }))}
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100"
+              className="mt-1 w-full rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] px-3 py-2 text-sm text-[var(--c-text)] outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100"
             >
               <option value="">Todos</option>
               {refs.obras.map((item) => <option key={item.id} value={item.id}>{optionLabel('obras', item)}</option>)}
             </select>
           </label>
           <label>
-            <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Colaborador</span>
+            <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--c-muted)]">Colaborador</span>
             <select
               value={filters.colaborador_id}
               onChange={(event) => setFilters((current) => ({ ...current, colaborador_id: event.target.value }))}
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100"
+              className="mt-1 w-full rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] px-3 py-2 text-sm text-[var(--c-text)] outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100"
             >
               <option value="">Todos</option>
               {refs.colaboradores.map((item) => <option key={item.id} value={item.id}>{optionLabel('colaboradores', item)}</option>)}
             </select>
           </label>
           <label>
-            <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Status</span>
+            <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--c-muted)]">Status</span>
             <input
               value={filters.status}
               onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value }))}
               placeholder="Ex.: ATIVO"
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100"
+              className="mt-1 w-full rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] px-3 py-2 text-sm text-[var(--c-text)] outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100"
             />
           </label>
           <label>
-            <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Busca</span>
+            <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--c-muted)]">Busca</span>
             <input
               value={filters.search}
               onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))}
               placeholder="Nome, titulo, mensagem..."
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100"
+              className="mt-1 w-full rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] px-3 py-2 text-sm text-[var(--c-text)] outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100"
             />
           </label>
         </div>
       </section>
 
       {tableVisible ? (
-        <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-          <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
-            <h2 className="text-lg font-semibold text-slate-950">Registros</h2>
-            <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">{loading ? 'Carregando' : `${rows.length} item(ns)`}</span>
+        <section className="overflow-hidden rounded-lg border border-[var(--c-border)] bg-[var(--c-bg)] shadow-sm">
+          <div className="flex items-center justify-between border-b border-[var(--c-border)] px-5 py-4">
+            <h2 className="text-lg font-semibold text-[var(--c-text)]">Registros</h2>
+            <span className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--c-muted)]">{loading ? 'Carregando' : `${rows.length} item(ns)`}</span>
           </div>
           <div className="overflow-x-auto">
             <table className="min-w-full text-left text-sm">
-              <thead className="bg-slate-50 text-xs uppercase tracking-[0.14em] text-slate-500">
+              <thead className="bg-[var(--c-surface-muted)] text-xs uppercase tracking-[0.14em] text-[var(--c-muted)]">
                 <tr>
                   {columns.map((column) => <th key={column} className="px-4 py-3">{column}</th>)}
                   <th className="px-4 py-3">Acoes</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-[var(--c-border)]">
                 {rows.map((row) => (
                   <tr key={row.id} className="align-top">
                     {columns.map((column) => (
-                      <td key={column} className="px-4 py-3 font-medium text-slate-800">{String(getValue(row, column) || '-')}</td>
+                      <td key={column} className="px-4 py-3 font-medium text-[var(--c-text)]">{String(getValue(row, column) || '-')}</td>
                     ))}
                     <td className="whitespace-nowrap px-4 py-3">
                       {resource === 'documentos' && row.arquivo_url ? (
                         <button type="button" onClick={() => openDocument(row)} className="mr-3 text-sm font-semibold text-sky-700">Abrir</button>
                       ) : null}
                       {canManage ? (
-                        <button type="button" onClick={() => startEdit(row)} className="text-sm font-semibold text-slate-700">Editar</button>
+                        <button type="button" onClick={() => startEdit(row)} className="text-sm font-semibold text-[var(--c-text)]">Editar</button>
                       ) : null}
                     </td>
                   </tr>
                 ))}
                 {!rows.length && !loading ? (
                   <tr>
-                    <td className="px-4 py-8 text-center text-sm text-slate-500" colSpan={columns.length + 1}>
+                    <td className="px-4 py-8 text-center text-sm text-[var(--c-muted)]" colSpan={columns.length + 1}>
                       Nenhum registro encontrado.
                     </td>
                   </tr>
@@ -406,3 +417,4 @@ export default function SstCrudPage() {
     </div>
   );
 }
+

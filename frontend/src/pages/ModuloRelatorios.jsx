@@ -225,13 +225,18 @@ const HUBS = {
           { titulo: 'ASO e exames', descricao: 'Aptidao, exames vencidos/vencendo e restricoes por colaborador.', to: '/sst/aso', status: 'Disponivel', permissaoKey: 'sst.aso.visualizar', componentKey: 'relatorios.sst.aso' },
           { titulo: 'EPI e treinamentos', descricao: 'Entregas, certificados, NRs e vencimentos criticos.', to: '/sst/epi', status: 'Disponivel', permissaoKey: 'sst.epi.visualizar', componentKey: 'relatorios.sst.epi' },
           { titulo: 'Acidentes e incidentes', descricao: 'Ocorrencias, gravidade, CAT, afastamento e obra impactada.', to: '/sst/acidentes', status: 'Disponivel', permissaoKey: 'sst.acidentes.visualizar', componentKey: 'relatorios.sst.acidentes' },
-          { titulo: 'Eventos operacionais', descricao: 'Alertas gerados pelo backend para rastreabilidade, automacoes futuras e auditoria SST.', to: '/sst/eventos', status: 'Disponivel', permissaoKey: 'sst.analytics.visualizar', componentKey: 'relatorios.sst.eventos' }
+          { titulo: 'Eventos operacionais', descricao: 'Alertas gerados pelo backend para rastreabilidade, automacoes futuras e auditoria SST.', to: '/sst/eventos', status: 'Disponivel', permissaoKey: 'sst.analytics.visualizar', componentKey: 'relatorios.sst.eventos' },
+          { titulo: 'Executivo SST', descricao: 'Compliance geral, bloqueios, pendencias, obras criticas e prontidao preditiva.', to: '/sst/relatorios/executivo', status: 'Disponivel', permissaoKey: 'sst.analytics.visualizar', componentKey: 'relatorios.sst.executivo' },
+          { titulo: 'Centro operacional SST', descricao: 'Visao corporativa multiempresa com score, sinais, automacoes e recomendacoes.', to: '/sst/relatorios/centro-operacional', status: 'Disponivel', permissaoKey: 'sst.analytics.visualizar', componentKey: 'relatorios.sst.centro_operacional' },
+          { titulo: 'Observabilidade SST', descricao: 'Logs, feature flags, checklist de homologacao e saude operacional do modulo.', to: '/sst/observabilidade', status: 'Disponivel', permissaoKey: 'sst.observabilidade.visualizar', componentKey: 'relatorios.sst.observabilidade' },
+          { titulo: 'Recomendacoes SST', descricao: 'Recomendacoes operacionais geradas por heatmap, score e pendencias criticas.', to: '/sst/recomendacoes', status: 'Disponivel', permissaoKey: 'sst.recomendacoes.visualizar', componentKey: 'relatorios.sst.recomendacoes' },
+          { titulo: 'Mapa de risco e heatmap', descricao: 'Mapa executivo por obra, pendencias, bloqueios, acidentes e riscos.', to: '/sst/relatorios/heatmap', status: 'Disponivel', permissaoKey: 'sst.analytics.visualizar', componentKey: 'relatorios.sst.mapa_risco' },
+          { titulo: 'Timeline do colaborador', descricao: 'Historico unificado de ASO, EPI, treinamentos, acidentes, bloqueios e pendencias.', to: '/sst/timeline', status: 'Disponivel', permissaoKey: 'sst.analytics.visualizar', componentKey: 'relatorios.sst.timeline' }
         ]
       },
       {
         titulo: 'Proximas visoes',
         itens: [
-          { titulo: 'Mapa de risco e heatmap', descricao: 'Mapa executivo por obra, severidade e probabilidade.', status: 'Planejado', componentKey: 'relatorios.sst.mapa_risco' },
           { titulo: 'Prontidao eSocial SST', descricao: 'Pendencias para S-2210, S-2220 e S-2240 antes da transmissao oficial.', status: 'Planejado', componentKey: 'relatorios.sst.esocial_prontidao' }
         ]
       }

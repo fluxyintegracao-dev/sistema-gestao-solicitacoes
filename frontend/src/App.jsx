@@ -212,7 +212,12 @@ const FiscalOperationalReport = lazy(() => import('./modules/fiscal/pages/Fiscal
 const SstDashboard = lazy(() => import('./modules/sst/pages/SstDashboard'));
 const SstCrudPage = lazy(() => import('./modules/sst/pages/SstCrudPage'));
 const SstConfiguracoes = lazy(() => import('./modules/sst/pages/SstConfiguracoes'));
+const SstExecutivo = lazy(() => import('./modules/sst/pages/SstExecutivo'));
+const SstCentroOperacional = lazy(() => import('./modules/sst/pages/SstCentroOperacional'));
+const SstHeatmap = lazy(() => import('./modules/sst/pages/SstHeatmap'));
 const SstRelatorioOperacional = lazy(() => import('./modules/sst/pages/SstRelatorioOperacional'));
+const SstTimeline = lazy(() => import('./modules/sst/pages/SstTimeline'));
+const SstObservabilidade = lazy(() => import('./modules/sst/pages/SstObservabilidade'));
 
 function PublicPage({ children }) {
   return (
@@ -777,6 +782,11 @@ export default function App() {
         <Route path="sst" element={<SstDashboardRoute><SstDashboard /></SstDashboardRoute>} />
         <Route path="sst/relatorios" element={<SstDashboardRoute><ModuloRelatorios modulo="sst" /></SstDashboardRoute>} />
         <Route path="sst/relatorios/operacional" element={<SstDashboardRoute><SstRelatorioOperacional /></SstDashboardRoute>} />
+        <Route path="sst/relatorios/executivo" element={<SstDashboardRoute><SstExecutivo /></SstDashboardRoute>} />
+        <Route path="sst/relatorios/centro-operacional" element={<SstDashboardRoute><SstCentroOperacional /></SstDashboardRoute>} />
+        <Route path="sst/relatorios/heatmap" element={<SstDashboardRoute><SstHeatmap /></SstDashboardRoute>} />
+        <Route path="sst/observabilidade" element={<SstDashboardRoute><SstObservabilidade /></SstDashboardRoute>} />
+        <Route path="sst/timeline" element={<SstDashboardRoute><SstTimeline /></SstDashboardRoute>} />
         <Route path="sst/configuracoes" element={<SstConfigRoute><SstConfiguracoes /></SstConfigRoute>} />
         <Route path="sst/:resource" element={<SstRoute><SstCrudPage /></SstRoute>} />
 

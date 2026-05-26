@@ -5,6 +5,7 @@ module.exports = (sequelize, DataTypes) => sequelize.define('SstExame', {
   empresa_id: { type: DataTypes.INTEGER, allowNull: false },
   obra_id: { type: DataTypes.INTEGER, allowNull: true },
   colaborador_id: { type: DataTypes.INTEGER, allowNull: false },
+  aso_id: { type: DataTypes.INTEGER, allowNull: true },
   tipo_exame: { type: DataTypes.STRING(40), allowNull: false },
   nome_exame: { type: DataTypes.STRING(160), allowNull: false },
   data_exame: { type: DataTypes.DATEONLY, allowNull: true },

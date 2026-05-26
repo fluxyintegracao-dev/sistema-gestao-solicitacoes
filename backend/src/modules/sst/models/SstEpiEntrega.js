@@ -12,6 +12,8 @@ module.exports = (sequelize, DataTypes) => sequelize.define('SstEpiEntrega', {
   validade: { type: DataTypes.DATEONLY, allowNull: true },
   assinatura_url: { type: DataTypes.TEXT, allowNull: true },
   comprovante_url: { type: DataTypes.TEXT, allowNull: true },
+  obrigatorio: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
+  funcao_alvo: { type: DataTypes.STRING(120), allowNull: true },
   status: { type: DataTypes.STRING(30), allowNull: false, defaultValue: 'ENTREGUE' },
   observacoes: { type: DataTypes.TEXT, allowNull: true },
   criado_por: { type: DataTypes.INTEGER, allowNull: true },

@@ -5,6 +5,8 @@
 > Produto: FLUXY Core (`sistema_gestao_solicitacoes`)
 > Arquitetura: modular, multiempresa, multiobra, configuravel, rastreavel e preparada para IA
 
+> Marco estrategico: o SST passa a ser tratado como o ultimo grande modulo estrutural da fase de expansao. Apos sua implantacao, o foco principal do FLUXY deve migrar para consolidacao operacional, testes, governanca, seguranca, documentacao, observabilidade e reducao de divida tecnica. Ver `docs/REPOSICIONAMENTO_ESTRATEGICO_FLUXY.md`.
+
 ---
 
 ## 1. Objetivo
@@ -970,3 +972,231 @@ Decisao implementada:
 - exibir no relatorio operacional se a transmissao esta bloqueada;
 - manter eventos eSocial apenas como registros internos preparados;
 - nao inferir leiaute, assinatura, regra de transmissao ou validacao sem documento oficial.
+
+---
+
+## 20. Atualizacao tecnica eSocial S-1.3 em 2026-05-26
+
+Nova pasta oficial analisada:
+
+```text
+SST ARQUIVOS/2026-04-27_esquemas_xsd_v_s_01_03_00
+```
+
+Esta pasta contem os XSDs especificos dos eventos SST prioritarios:
+
+- `evtCAT.xsd` - base do `S-2210`;
+- `evtMonit.xsd` - base do `S-2220`;
+- `evtExpRisco.xsd` - base do `S-2240`;
+- `tipos.xsd` - tipos compartilhados;
+- `xmldsig-core-schema.xsd` - assinatura XML futura;
+- `evtTabEstab.xsd`, `evtTabLotacao.xsd`, `evtAdmissao.xsd`, `evtTSVInicio.xsd` - dependencias auxiliares.
+
+Decisao arquitetural registrada:
+
+- o dominio SST do FLUXY nao replica XML do governo;
+- RH/DP segue como fonte unica de colaboradores;
+- `backend/src/modules/sst/` concentra a operacao real;
+- `backend/src/modules/esocial/` concentra a integracao tecnica;
+- mapeamentos sao versionados por layout em `mappings/s1_3`;
+- metadados de layout ficam em `layouts/s1_3` e `layouts/s1_4`;
+- transmissao real continua bloqueada nesta fase.
+
+Entregas desta fase:
+
+- ADR criada em `docs/adr/ADR-SST-ESOCIAL-DOMINIO-VS-XML.md`;
+- documentacao eSocial criada em `docs/esocial/`;
+- modelagem de dominio atualizada em `docs/sst/modelagem-dominio.md`;
+- mappers skeleton criados para `S-2210`, `S-2220` e `S-2240`;
+- modelos tecnicos eSocial criados para layout, lote, evento e retorno;
+- entidades complementares SST criadas para ambiente de trabalho e exposicao.
+
+Plano por fases executado:
+
+1. Inventariar XSDs oficiais e identificar eventos prioritarios.
+2. Registrar ADR e documentacao tecnica interna.
+3. Criar estrutura modular `modules/esocial` separada do dominio SST.
+4. Criar camada de mapeamento versionada `S-1.3`.
+5. Criar base de modelos/migration para eventos eSocial sem transmissao.
+6. Validar sintaxe dos novos arquivos e build do frontend.
+
+Regra de produto mantida:
+
+- sem SOAP;
+- sem assinatura digital;
+- sem certificado;
+- sem transmissao real;
+- sem producao restrita;
+- sem geracao XML oficial ate existir fase propria de homologacao eSocial.
+
+---
+
+## 21. Fase 2 - Consolidacao operacional SST em 2026-05-26
+
+Objetivo:
+
+- transformar o SST em camada operacional de conformidade da construtora;
+- manter RH/DP como fonte unica de colaboradores;
+- manter backend como fonte da verdade;
+- manter transmissao eSocial bloqueada;
+- preparar eventos, analytics, IA futura e automacoes.
+
+Implementado:
+
+- campos complementares para ASO, exames, treinamentos, EPI e acidentes;
+- entidade `SstRegraConformidade`;
+- motor de conformidade em `backend/src/modules/sst/compliance/`;
+- catalogo de eventos em `backend/src/modules/sst/events/`;
+- analytics base em `backend/src/modules/sst/analytics/`;
+- readiness de IA em `backend/src/modules/sst/ai/`;
+- dashboard SST com indicadores de pendencia e conformidade;
+- relatorio operacional com pendencias de conformidade;
+- frontend com fluxos de ambientes, exposicoes e regras.
+
+Documentos criados:
+
+- `docs/sst/fase-2-consolidacao-operacional.md`;
+- `docs/sst/RELATORIO_FASE_2_CONSOLIDACAO_OPERACIONAL.md`.
+
+Testes executados:
+
+- validacao de sintaxe dos novos arquivos backend;
+- validacao de sintaxe dos services/controllers/routes SST;
+- build do frontend via Vite.
+
+---
+
+## 22. Fase 3 - Inteligencia operacional e automacoes SST em 2026-05-26
+
+Objetivo:
+
+- transformar o SST em camada operacional inteligente;
+- criar workflows, bloqueios, notificacoes, timeline, heatmap e score;
+- manter RH/DP como fonte unica de colaboradores;
+- manter backend como fonte da verdade;
+- manter transmissao real ao eSocial bloqueada.
+
+Implementado:
+
+- modelos `SstPoliticaBloqueio`, `SstBloqueioOperacional`, `SstNotificacao`, `SstPendenciaOperacional`, `SstComplianceScore` e `SstCriticidade`;
+- migration `202605260003_sst_inteligencia_operacional_fase3.js`;
+- motor de bloqueios em `backend/src/modules/sst/blocking/`;
+- workflows em `backend/src/modules/sst/workflows/`;
+- central de notificacoes em `backend/src/modules/sst/notifications/`;
+- timeline SST em `backend/src/modules/sst/timeline/`;
+- analytics executivo e heatmap em `backend/src/modules/sst/analytics/`;
+- readiness preditivo em `backend/src/modules/sst/prediction/`;
+- pipeline IA documental em `backend/src/modules/sst/ai/`;
+- paginas frontend `SstExecutivo`, `SstHeatmap` e `SstTimeline`;
+- permissoes e visibilidade ampliadas para novas visoes SST.
+
+Documentos criados:
+
+- `docs/sst/fase-3-inteligencia-operacional.md`;
+- `docs/sst/RELATORIO_FASE_3_INTELIGENCIA_OPERACIONAL.md`.
+
+Testes executados:
+
+- validacao de sintaxe dos modelos, migration, services, controller e rotas;
+- require runtime de `sstService`;
+- build do frontend via Vite.
+
+Regra mantida:
+
+- sem SOAP;
+- sem certificado;
+- sem assinatura XML;
+- sem transmissao real ao governo;
+- sem duplicidade de colaboradores fora do RH/DP.
+
+---
+
+## 24. Fase 5 - Homologacao operacional e integracao controlada SST em 2026-05-26
+
+Objetivo:
+
+- estabilizar o dominio SST para uso operacional;
+- criar feature flags para integracoes e automacoes criticas;
+- controlar integracao com RH/DP e Obras;
+- criar logs operacionais;
+- criar observabilidade SST;
+- criar checklist de homologacao e go-live;
+- manter transmissao real ao eSocial bloqueada.
+
+Implementado:
+
+- modelos `SstWorkflowLog`, `SstAutomationLog`, `SstBlockingLog` e `SstIntegrationLog`;
+- migration `202605260005_sst_homologacao_operacional_fase5.js`;
+- feature flags em `backend/src/modules/sst/feature-flags/`;
+- logs em `backend/src/modules/sst/logs/`;
+- integracao controlada RH/DP em `backend/src/modules/sst/integrations/rhdp/`;
+- integracao controlada Obras em `backend/src/modules/sst/integrations/obras/`;
+- homologacao dry-run em `backend/src/modules/sst/homologation/`;
+- observabilidade em `backend/src/modules/sst/observability/`;
+- pagina frontend `SstObservabilidade`;
+- endpoints de checklist, simulacao, flags e logs;
+- permissoes e visibilidade de UI para observabilidade e logs.
+
+Documentos criados:
+
+- `docs/sst/fase-5-homologacao-operacional-integracao-controlada.md`;
+- `docs/sst/checklists/CHECKLIST_GO_LIVE_SST.md`;
+- `docs/sst/RELATORIO_FASE_5_HOMOLOGACAO_OPERACIONAL.md`.
+
+Testes executados:
+
+- validacao de sintaxe dos novos services, migration, controller e rotas;
+- require runtime de `backend/src/models`;
+- require runtime de `sstService`;
+- build completo do frontend via Vite.
+
+Regra mantida:
+
+- sem SOAP;
+- sem certificado;
+- sem assinatura XML;
+- sem transmissao real ao governo;
+- sem duplicidade de colaboradores fora do RH/DP;
+- integracoes criticas desativadas por padrao ate homologacao formal.
+
+---
+
+## 23. Fase 4 - Orquestracao operacional e IA aplicada SST em 2026-05-26
+
+Objetivo:
+
+- consolidar workflow engine SST;
+- estruturar automacoes orientadas a eventos;
+- criar recomendacoes operacionais;
+- evoluir score corporativo, por empresa, obra e colaborador;
+- preparar IA documental por provider;
+- criar centro operacional corporativo SST;
+- manter transmissao real ao eSocial bloqueada.
+
+Implementado:
+
+- modelos `SstWorkflow`, `SstWorkflowExecucao`, `SstWorkflowAcao`, `SstWorkflowEvento`, `SstRecomendacaoOperacional` e `SstDocumentoAnaliseIa`;
+- migration `202605260004_sst_orquestracao_operacional_fase4.js`;
+- workflow engine em `backend/src/modules/sst/workflow-engine/`;
+- engine de automacoes em `backend/src/modules/sst/automation/`;
+- integracoes preparadas com RH/DP e Obras;
+- IA documental por contrato/provider em `backend/src/modules/sst/ai/document-analysis/`;
+- inteligencia operacional em `backend/src/modules/sst/ai/operational-intelligence/`;
+- recomendacoes em `backend/src/modules/sst/recommendations/`;
+- score evoluido em `backend/src/modules/sst/scoring/`;
+- centro operacional corporativo em `backend/src/modules/sst/analytics/sstCorporateCenterService.js`;
+- pagina frontend `SstCentroOperacional`;
+- permissoes, menu e visibilidade ampliados.
+
+Documentos criados:
+
+- `docs/sst/fase-4-orquestracao-operacional-ia-aplicada.md`;
+- `docs/sst/RELATORIO_FASE_4_ORQUESTRACAO_OPERACIONAL_IA.md`.
+
+Regra mantida:
+
+- sem SOAP;
+- sem certificado;
+- sem assinatura XML;
+- sem transmissao real ao governo;
+- sem duplicidade de colaboradores fora do RH/DP.

@@ -12,6 +12,7 @@ module.exports = (sequelize, DataTypes) => sequelize.define('SstAso', {
   validade: { type: DataTypes.DATEONLY, allowNull: true },
   medico: { type: DataTypes.STRING(160), allowNull: true },
   crm: { type: DataTypes.STRING(40), allowNull: true },
+  uf_crm: { type: DataTypes.STRING(2), allowNull: true },
   documento_url: { type: DataTypes.TEXT, allowNull: true },
   status: { type: DataTypes.STRING(30), allowNull: false, defaultValue: 'VALIDO' },
   observacoes: { type: DataTypes.TEXT, allowNull: true },

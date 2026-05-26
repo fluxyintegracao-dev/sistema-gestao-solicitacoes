@@ -110,7 +110,13 @@ const UI_VISIBILITY_COMPONENTS = [
           { key: 'relatorios.sst.epi', label: 'EPI e treinamentos', type: 'card' },
           { key: 'relatorios.sst.acidentes', label: 'Acidentes e incidentes', type: 'card' },
           { key: 'relatorios.sst.eventos', label: 'Eventos operacionais', type: 'card' },
+          { key: 'relatorios.sst.executivo', label: 'Executivo SST', type: 'card' },
+          { key: 'relatorios.sst.centro_operacional', label: 'Centro operacional SST', type: 'card' },
+          { key: 'relatorios.sst.observabilidade', label: 'Observabilidade SST', type: 'card' },
+          { key: 'relatorios.sst.inteligencia', label: 'Inteligencia operacional SST', type: 'card' },
+          { key: 'relatorios.sst.recomendacoes', label: 'Recomendacoes SST', type: 'card' },
           { key: 'relatorios.sst.mapa_risco', label: 'Mapa de risco e heatmap', type: 'card' },
+          { key: 'relatorios.sst.timeline', label: 'Timeline do colaborador', type: 'card' },
           { key: 'relatorios.sst.esocial_prontidao', label: 'Prontidao eSocial SST', type: 'card' }
         ]
       },
@@ -217,6 +223,38 @@ const UI_VISIBILITY_COMPONENTS = [
         label: 'Eventos operacionais SST',
         components: [
           { key: 'sst.eventos.tabela', label: 'Tabela de eventos operacionais', type: 'table' }
+        ]
+      },
+      {
+        key: 'sst.inteligencia',
+        path: '/sst/relatorios/executivo, /sst/relatorios/heatmap e /sst/timeline',
+        label: 'Inteligencia operacional SST',
+        components: [
+          { key: 'sst.executivo.metricas', label: 'Cards executivos SST', type: 'dashboard' },
+          { key: 'sst.centro_operacional.resumo', label: 'Centro operacional corporativo', type: 'dashboard' },
+          { key: 'sst.inteligencia.sinais', label: 'Sinais de inteligencia SST', type: 'dashboard' },
+          { key: 'sst.recomendacoes.lista', label: 'Recomendacoes operacionais', type: 'table' },
+          { key: 'sst.observabilidade.logs', label: 'Observabilidade e logs SST', type: 'dashboard' },
+          { key: 'sst.heatmap.mapa', label: 'Heatmap operacional SST', type: 'dashboard' },
+          { key: 'sst.timeline.lista', label: 'Timeline do colaborador', type: 'table' }
+        ]
+      },
+      {
+        key: 'sst.operacional_fase3',
+        path: '/sst/pendencias, /sst/bloqueios, /sst/notificacoes e /sst/scores',
+        label: 'Pendencias, bloqueios, notificacoes e scores',
+        components: [
+          { key: 'sst.pendencias.tabela', label: 'Tabela de pendencias SST', type: 'table' },
+          { key: 'sst.bloqueios.tabela', label: 'Tabela de bloqueios SST', type: 'table' },
+          { key: 'sst.notificacoes.tabela', label: 'Tabela de notificacoes SST', type: 'table' },
+          { key: 'sst.scores.tabela', label: 'Tabela de scores SST', type: 'table' },
+          { key: 'sst.workflows.tabela', label: 'Tabela de workflows SST', type: 'table' },
+          { key: 'sst.workflow_execucoes.tabela', label: 'Tabela de execucoes de workflow SST', type: 'table' },
+          { key: 'sst.documentos_ia.tabela', label: 'Tabela de analises IA documental', type: 'table' },
+          { key: 'sst.workflow_logs.tabela', label: 'Tabela de logs de workflow SST', type: 'table' },
+          { key: 'sst.automation_logs.tabela', label: 'Tabela de logs de automacao SST', type: 'table' },
+          { key: 'sst.integration_logs.tabela', label: 'Tabela de logs de integracao SST', type: 'table' },
+          { key: 'sst.blocking_logs.tabela', label: 'Tabela de logs de bloqueio SST', type: 'table' }
         ]
       }
     ]

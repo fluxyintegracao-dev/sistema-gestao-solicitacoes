@@ -2,7 +2,7 @@
 
 Este diretorio organiza o conhecimento funcional, tecnico e operacional do produto para continuidade segura por pessoas e por IA.
 
-O produto esta evoluindo para um ERP simples, intuitivo, de facil registro e controle, sem perder o foco operacional e a implantacao enxuta.
+O FLUXY entrou oficialmente na fase de consolidacao operacional e institucionalizacao. A prioridade atual e tratar o sistema como infraestrutura operacional institucional da empresa, com foco em estabilidade, governanca, seguranca, testes, documentacao, deploy seguro e reducao de dependencia do fundador tecnico.
 
 ## Objetivo
 
@@ -18,21 +18,24 @@ Manter documentado:
 ## Ordem Recomendada de Leitura
 
 1. `docs/contexto/visao_geral.md`
-2. `docs/contexto/escopo_produto.md`
-3. `docs/arquitetura/visao_geral.md`
-4. `docs/arquitetura/stack_e_componentes.md`
-5. `docs/arquitetura/deploy_ambientes.md`
-6. `docs/arquitetura/fluxos_principais.md`
-7. `docs/arquitetura/modularidade_solicitacoes_contratos_apropriacoes.md`
-8. `docs/modulos/solicitacoes.md`
-9. `docs/modulos/compras.md`
-10. `docs/modulos/financeiro.md`
-11. `docs/modulos/comercial.md`
-12. `docs/modulos/provisionamento_financeiro.md`
-13. `docs/modulos/rh_dp.md`
-14. `docs/modulos/integracao_sienge.md`
-15. `docs/modulos/obras.md`
-16. `docs/seguranca/visao_geral.md`
+2. `docs/REPOSICIONAMENTO_ESTRATEGICO_FLUXY.md`
+3. `docs/PLANO_IMPLANTACAO_INSTITUCIONAL_5_DIAS_FLUXY.md`
+4. `docs/PLANO_TESTES_SMOKE_E_CENTRAL_TREINAMENTO_FLUXY.md`
+5. `docs/contexto/escopo_produto.md`
+6. `docs/arquitetura/visao_geral.md`
+7. `docs/arquitetura/stack_e_componentes.md`
+8. `docs/arquitetura/deploy_ambientes.md`
+9. `docs/arquitetura/fluxos_principais.md`
+10. `docs/arquitetura/modularidade_solicitacoes_contratos_apropriacoes.md`
+11. `docs/modulos/solicitacoes.md`
+12. `docs/modulos/compras.md`
+13. `docs/modulos/financeiro.md`
+14. `docs/modulos/comercial.md`
+15. `docs/modulos/provisionamento_financeiro.md`
+16. `docs/modulos/rh_dp.md`
+17. `docs/modulos/integracao_sienge.md`
+18. `docs/modulos/obras.md`
+19. `docs/seguranca/visao_geral.md`
 
 ## Estrutura
 
@@ -60,6 +63,12 @@ Manter documentado:
 ## Documentos Operacionais Importantes
 
 - `docs/arquitetura/deploy_ambientes.md`
+- `docs/REPOSICIONAMENTO_ESTRATEGICO_FLUXY.md`
+- `docs/RELATORIO_OBSIDIAN_REPOSICIONAMENTO_FLUXY.md`
+- `docs/PLANO_IMPLANTACAO_INSTITUCIONAL_5_DIAS_FLUXY.md`
+- `docs/RELATORIO_OBSIDIAN_IMPLANTACAO_5_DIAS_FLUXY.md`
+- `docs/PLANO_TESTES_SMOKE_E_CENTRAL_TREINAMENTO_FLUXY.md`
+- `docs/RELATORIO_OBSIDIAN_TESTES_TREINAMENTO_FLUXY.md`
 - `docs/arquitetura/promocao_dev_v2_para_main.md`
 - `docs/ROTEIRO_APRESENTACAO_TREINAMENTO_FLUXY.md`
 - `docs/CHECKLIST_IMPLANTACAO_CLIENTE_FLUXY.md`

@@ -2,6 +2,18 @@
 
 Este arquivo registra mudancas relevantes de produto, arquitetura e documentacao.
 
+## 2026-05-25 - Reposicionamento estrategico
+
+- registro oficial da mudanca de direcionamento do FLUXY para fase de consolidacao operacional e institucionalizacao;
+- FLUXY passa a ser tratado como infraestrutura operacional institucional da empresa, nao como SaaS em expansao acelerada;
+- SST definido como ultimo grande modulo estrutural da fase atual;
+- separacao conceitual entre Core Operacional e Camada Experimental/Lab;
+- decisao de manter o repositorio atual como single tenant por instalacao, com multiempresa dentro do tenant;
+- decisao de nao implementar multi-tenant com base compartilhada no repositorio atual;
+- criacao de `docs/REPOSICIONAMENTO_ESTRATEGICO_FLUXY.md`;
+- criacao de `docs/RELATORIO_OBSIDIAN_REPOSICIONAMENTO_FLUXY.md`;
+- atualizacao de `docs/README.md`, `docs/contexto/visao_geral.md`, `docs/contexto/escopo_produto.md`, `docs/arquitetura/visao_geral.md`, `docs/arquitetura/README.md` e `docs/PLANO_MODULO_SST.md`.
+
 ## 2026-04 (continuacao - sesao 12/04)
 
 - consolidacao da estrategia comercial de modularizacao em pacotes funcionais:

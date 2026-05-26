@@ -771,6 +771,9 @@ const SST_PERMISSION_KEYS = [
   'sst.dashboard.visualizar',
   'sst.analytics.visualizar',
   'sst.analytics.gerenciar',
+  'sst.observabilidade.visualizar',
+  'sst.logs.visualizar',
+  'sst.integracoes.gerenciar',
   'sst.riscos.visualizar',
   'sst.riscos.gerenciar',
   'sst.agentes.visualizar',
@@ -809,7 +812,7 @@ export function canViewSstDashboard(user) {
   if (!hasEnabledModule(user, 'SST')) return false;
   if (isBusinessAdmin(user)) return true;
   if (hasConfiguredAreaPermissions(user)) {
-    return hasAnyPermissao(user, ['sst.dashboard.visualizar', 'sst.analytics.visualizar']);
+    return hasAnyPermissao(user, ['sst.dashboard.visualizar', 'sst.analytics.visualizar', 'sst.observabilidade.visualizar']);
   }
   return false;
 }
@@ -822,7 +825,8 @@ export function canViewSstArea(user, area) {
     `sst.${normalizedArea}.visualizar`,
     `sst.${normalizedArea}.gerenciar`,
     normalizedArea === 'esocial' ? 'sst.esocial.preparar' : null,
-    normalizedArea === 'analytics' ? 'sst.analytics.visualizar' : null
+    normalizedArea === 'analytics' ? 'sst.analytics.visualizar' : null,
+    normalizedArea === 'analytics' ? 'sst.logs.visualizar' : null
   ].filter(Boolean);
   if (hasConfiguredAreaPermissions(user)) {
     return hasAnyPermissao(user, keys);

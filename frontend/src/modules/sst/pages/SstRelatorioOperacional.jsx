@@ -115,6 +115,8 @@ export default function SstRelatorioOperacional() {
 
   const cards = data?.cards || {};
   const prontidao = data?.prontidao_esocial || {};
+  const conformidade = data?.conformidade || {};
+  const analytics = data?.analytics || {};
 
   return (
     <div className="sst-page space-y-6">
@@ -178,8 +180,14 @@ export default function SstRelatorioOperacional() {
       <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <Metric label="Compliance score" value={`${moneyless(cards.compliance_score ?? 100)}%`} detail="Base operacional atual" tone="ok" />
         <Metric label="Riscos criticos" value={moneyless(cards.riscos_criticos)} detail="Severidade alta ou critica" tone={cards.riscos_criticos ? 'danger' : 'info'} />
-        <Metric label="Vencimentos SST" value={moneyless((cards.exames_vencendo || 0) + (cards.epi_vencendo || 0) + (cards.treinamentos_vencendo || 0) + (cards.documentos_vencendo || 0))} detail={`${data?.periodo_alerta_dias || 30} dias`} tone="warn" />
-        <Metric label="Inaptos" value={moneyless(cards.colaboradores_inaptos)} detail="ASOs marcados como inapto" tone={cards.colaboradores_inaptos ? 'danger' : 'ok'} />
+        <Metric label="Pendencias criticas" value={moneyless(conformidade.pendencias_criticas || cards.pendencias_criticas)} detail="Motor de conformidade" tone={(conformidade.pendencias_criticas || cards.pendencias_criticas) ? 'danger' : 'ok'} />
+        <Metric label="Pendencias totais" value={moneyless(conformidade.pendencias_total || cards.pendencias_total)} detail={`${data?.periodo_alerta_dias || 30} dias`} tone="warn" />
+      </section>
+
+      <section className="grid gap-3 md:grid-cols-3">
+        <Metric label="Acidentes por obra" value={analytics.acidentes_por_obra?.length || 0} detail="Agrupamentos com ocorrencias" />
+        <Metric label="Riscos por obra" value={analytics.riscos_por_obra?.length || 0} detail="Base para mapa operacional" />
+        <Metric label="Colaboradores ativos" value={conformidade.total_colaboradores_ativos || 0} detail="Analisados na conformidade" />
       </section>
 
       <section className="rounded-lg border border-[var(--c-border)] bg-[var(--c-bg)] p-5 shadow-sm">
@@ -206,6 +214,20 @@ export default function SstRelatorioOperacional() {
       </section>
 
       {loading ? <p className="text-sm text-[var(--c-muted)]">Carregando relatorio...</p> : null}
+
+      <SimpleTable
+        title="Pendencias de conformidade"
+        columns={['Tipo', 'Severidade', 'Mensagem', 'Origem']}
+        rows={conformidade.pendencias || []}
+        renderRow={(row, index) => (
+          <tr key={`pendencia-${index}-${row.origem_tipo}-${row.origem_id}`}>
+            <td className="px-4 py-3 font-semibold text-[var(--c-text)]">{row.tipo}</td>
+            <td className="px-4 py-3 text-[var(--c-muted)]">{row.severidade}</td>
+            <td className="px-4 py-3 text-[var(--c-text)]">{row.mensagem}</td>
+            <td className="px-4 py-3 text-[var(--c-muted)]">{row.origem_tipo || '-'} #{row.origem_id || '-'}</td>
+          </tr>
+        )}
+      />
 
       <SimpleTable
         title="Eventos operacionais abertos"

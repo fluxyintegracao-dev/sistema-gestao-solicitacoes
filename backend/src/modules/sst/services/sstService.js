@@ -14,6 +14,7 @@ const {
   SstEventoEsocial,
   SstEventoOperacional,
   SstExame,
+  SstExposicao,
   SstHistorico,
   SstRisco,
   SstTreinamento
@@ -23,6 +24,36 @@ const { ValidationError } = require('../../../middlewares/validation');
 const { SST_EVENT_TYPES, SST_RESOURCE_CONFIG, SST_VALIDITY_ALERT_DAYS } = require('../constants/sstConstants');
 const { getSstConfig } = require('./sstConfigService');
 const { registrarEventoSst } = require('./sstEventService');
+const { analisarConformidadeSst } = require('../compliance/sstComplianceEngine');
+const { gerarAnalyticsSst } = require('../analytics/sstAnalyticsService');
+const {
+  gerarDashboardExecutivoSst,
+  gerarHeatmapSst
+} = require('../analytics/sstExecutiveAnalyticsService');
+const { gerarCentroOperacionalCorporativoSst } = require('../analytics/sstCorporateCenterService');
+const { automatizarVencimentosProximos, processarEventosAbertosSst } = require('../automation/sstAutomationService');
+const { avaliarBloqueiosColaborador } = require('../blocking/sstBlockingService');
+const { SST_AI_READINESS } = require('../ai/sstAiReadiness');
+const { analisarDocumentoSstComIa, getDocumentAnalysisReadiness } = require('../ai/document-analysis/sstDocumentAnalysisService');
+const { gerarInteligenciaOperacionalSst } = require('../ai/operational-intelligence/sstOperationalIntelligenceService');
+const { getSstDocumentAiReadiness } = require('../ai/sstDocumentAiPipeline');
+const { gerarVisaoOperacionalObraSst } = require('../integrations/obras/sstObraIntegrationService');
+const { processarIntegracaoObraSst } = require('../integrations/obras/sstObrasControlledIntegrationService');
+const { processarEventoRhdpSst } = require('../integrations/rhdp/sstRhdpControlledIntegrationService');
+const { getSstFeatureFlags } = require('../feature-flags/sstFeatureFlagsService');
+const {
+  gerarChecklistHomologacaoSst,
+  homologarWorkflowsSst,
+  simularMassaHomologacaoSst
+} = require('../homologation/sstHomologationService');
+const { sincronizarNotificacoesSst, marcarNotificacaoLida } = require('../notifications/sstNotificationService');
+const { gerarObservabilidadeSst } = require('../observability/sstObservabilityService');
+const { getSstPredictionReadiness } = require('../prediction/sstPredictionService');
+const { gerarRecomendacoesSst } = require('../recommendations/sstRecommendationService');
+const { recalcularScoreSst } = require('../scoring/sstScoringService');
+const { gerarTimelineColaborador } = require('../timeline/sstTimelineService');
+const { processarFilaWorkflowSst, processarEventoWorkflow } = require('../workflow-engine/sstWorkflowEngineService');
+const { revisarConformidadeColaborador } = require('../workflows/sstWorkflowService');
 
 function getConfig(resource) {
   const config = SST_RESOURCE_CONFIG[String(resource || '').trim().toLowerCase()];
@@ -64,6 +95,32 @@ function buildInclude(model) {
   }
   if (model.rawAttributes?.colaborador_id) {
     include.push({ model: RhColaborador, as: 'colaborador', attributes: ['id', 'nome', 'cpf', 'matricula', 'cargo', 'status'] });
+  }
+  if (model.rawAttributes?.ambiente_id) {
+    const { SstAmbienteTrabalho } = require('../../../models');
+    include.push({ model: SstAmbienteTrabalho, as: 'ambiente', attributes: ['id', 'nome', 'tipo_ambiente'] });
+  }
+  if (model.rawAttributes?.agente_nocivo_id) {
+    const { SstAgenteNocivo } = require('../../../models');
+    include.push({ model: SstAgenteNocivo, as: 'agenteNocivo', attributes: ['id', 'nome', 'tipo_agente'] });
+  }
+  if (model.rawAttributes?.politica_id) {
+    const { SstPoliticaBloqueio } = require('../../../models');
+    include.push({ model: SstPoliticaBloqueio, as: 'politica', attributes: ['id', 'codigo', 'nome', 'tipo_bloqueio'] });
+  }
+  if (model.rawAttributes?.workflow_id) {
+    const { SstWorkflow } = require('../../../models');
+    include.push({ model: SstWorkflow, as: 'workflow', attributes: ['id', 'codigo', 'nome', 'gatilho_evento'] });
+  }
+  if (model.rawAttributes?.documento_id) {
+    const { SstDocumento } = require('../../../models');
+    include.push({ model: SstDocumento, as: 'documento', attributes: ['id', 'tipo_documento', 'titulo', 'status'] });
+  }
+  if (model.rawAttributes?.usuario_id) {
+    include.push({ model: User, as: 'usuario', attributes: ['id', 'nome', 'email'] });
+  }
+  if (model.rawAttributes?.responsavel_id) {
+    include.push({ model: User, as: 'responsavel', attributes: ['id', 'nome', 'email'] });
   }
   if (model.rawAttributes?.criado_por) {
     include.push({ model: User, as: 'criadoPor', attributes: ['id', 'nome', 'email'] });
@@ -201,6 +258,14 @@ async function dashboard(query = {}) {
     ...exameWhere,
     validade: { [Op.between]: [todayDate(), alertDate(alertDays)] }
   };
+  const validadeAsoWhere = {
+    ...asoWhere,
+    validade: { [Op.between]: [todayDate(), alertDate(alertDays)] }
+  };
+  const asoVencidosWhere = {
+    ...asoWhere,
+    validade: { [Op.lt]: todayDate() }
+  };
   const vencidosExameWhere = {
     ...exameWhere,
     validade: { [Op.lt]: todayDate() }
@@ -208,34 +273,42 @@ async function dashboard(query = {}) {
   const validadeEpiWhere = { ...epiWhere, validade: { [Op.between]: [todayDate(), alertDate(alertDays)] } };
   const validadeTreinamentoWhere = { ...treinamentoWhere, validade: { [Op.between]: [todayDate(), alertDate(alertDays)] } };
   const validadeDocumentoWhere = { ...documentoWhere, validade: { [Op.between]: [todayDate(), alertDate(alertDays)] } };
+  const epiVencidosWhere = { ...epiWhere, validade: { [Op.lt]: todayDate() } };
+  const treinamentoVencidosWhere = { ...treinamentoWhere, validade: { [Op.lt]: todayDate() } };
+  const conformidade = await analisarConformidadeSst(baseQuery);
+  const analytics = await gerarAnalyticsSst(baseQuery);
 
   const [
     riscosCriticos,
     riscosTotal,
     asoTotal,
+    asoVencendo,
+    asoVencidos,
     colaboradoresInaptos,
     examesVencendo,
     examesVencidos,
     epiVencendo,
+    epiVencidos,
     treinamentosVencendo,
+    treinamentosVencidos,
     documentosVencendo
   ] = await Promise.all([
     SstRisco.count({ where: { ...riscoWhere, severidade: { [Op.in]: ['ALTA', 'CRITICA'] }, ativo: true } }),
     SstRisco.count({ where: { ...riscoWhere, ativo: true } }),
     SstAso.count({ where: asoWhere }),
+    SstAso.count({ where: validadeAsoWhere }),
+    SstAso.count({ where: asoVencidosWhere }),
     SstAso.count({ where: { ...asoWhere, apto: false } }),
     SstExame.count({ where: validadeExameWhere }),
     SstExame.count({ where: vencidosExameWhere }),
     SstEpiEntrega.count({ where: validadeEpiWhere }),
+    SstEpiEntrega.count({ where: epiVencidosWhere }),
     SstTreinamento.count({ where: validadeTreinamentoWhere }),
+    SstTreinamento.count({ where: treinamentoVencidosWhere }),
     SstDocumento.count({ where: validadeDocumentoWhere })
   ]);
 
-  const totalConformidade = asoTotal + riscosTotal;
-  const pendencias = colaboradoresInaptos + examesVencidos + riscosCriticos;
-  const complianceScore = totalConformidade
-    ? Math.max(0, Math.round(((totalConformidade - pendencias) / totalConformidade) * 100))
-    : 100;
+  const complianceScore = conformidade.compliance_score;
 
   return {
     periodo_alerta_dias: alertDays,
@@ -243,14 +316,22 @@ async function dashboard(query = {}) {
       riscos_total: riscosTotal,
       riscos_criticos: riscosCriticos,
       asos_total: asoTotal,
+      aso_vencendo: asoVencendo,
+      aso_vencidos: asoVencidos,
       colaboradores_inaptos: colaboradoresInaptos,
       exames_vencendo: examesVencendo,
       exames_vencidos: examesVencidos,
       epi_vencendo: epiVencendo,
+      epi_vencidos: epiVencidos,
       treinamentos_vencendo: treinamentosVencendo,
+      treinamentos_vencidos: treinamentosVencidos,
       documentos_vencendo: documentosVencendo,
+      pendencias_total: conformidade.pendencias_total,
+      pendencias_criticas: conformidade.pendencias_criticas,
       compliance_score: complianceScore
-    }
+    },
+    conformidade,
+    analytics
   };
 }
 
@@ -269,8 +350,11 @@ async function relatorioOperacional(query = {}) {
     acidentesRecentes,
     eventosAbertos,
     documentosPendentes,
+    exposicoesRecentes,
     esocialEventos,
-    historicosRecentes
+    historicosRecentes,
+    conformidade,
+    analytics
   ] = await Promise.all([
     SstRisco.findAll({
       where: { ...buildWhere(baseQuery, SstRisco), severidade: { [Op.in]: ['ALTA', 'CRITICA'] }, ativo: true },
@@ -296,6 +380,12 @@ async function relatorioOperacional(query = {}) {
       order: [['validade', 'ASC'], ['updatedAt', 'DESC']],
       limit: 50
     }),
+    SstExposicao.findAll({
+      where: buildWhere(baseQuery, SstExposicao),
+      include: buildInclude(SstExposicao),
+      order: [['data_inicio', 'DESC'], ['id', 'DESC']],
+      limit: 50
+    }),
     SstEventoEsocial.findAll({
       where: buildWhere(baseQuery, SstEventoEsocial),
       include: buildInclude(SstEventoEsocial),
@@ -307,7 +397,9 @@ async function relatorioOperacional(query = {}) {
       include: buildInclude(SstHistorico),
       order: [['createdAt', 'DESC']],
       limit: 80
-    })
+    }),
+    analisarConformidadeSst(baseQuery),
+    gerarAnalyticsSst(baseQuery)
   ]);
 
   const statusEsocial = esocialEventos.reduce((acc, item) => {
@@ -331,11 +423,117 @@ async function relatorioOperacional(query = {}) {
     },
     riscos_criticos: riscosCriticos,
     acidentes_recentes: acidentesRecentes,
+    exposicoes_recentes: exposicoesRecentes,
+    conformidade,
+    analytics,
+    ia_prontidao: SST_AI_READINESS,
     eventos_abertos: eventosAbertos,
     documentos_pendentes: documentosPendentes,
     esocial_eventos: esocialEventos,
     historicos_recentes: historicosRecentes
   };
+}
+
+async function dashboardExecutivo(query = {}) {
+  const executivo = await gerarDashboardExecutivoSst(query);
+  return {
+    ...executivo,
+    predicao: getSstPredictionReadiness(),
+    ia_documental: {
+      ...getSstDocumentAiReadiness(),
+      fase4: getDocumentAnalysisReadiness()
+    }
+  };
+}
+
+async function heatmap(query = {}) {
+  return gerarHeatmapSst(query);
+}
+
+async function timelineColaborador(colaboradorId) {
+  return gerarTimelineColaborador(colaboradorId);
+}
+
+function predictionReadiness() {
+  return {
+    predicao: getSstPredictionReadiness(),
+    ia_documental: {
+      ...getSstDocumentAiReadiness(),
+      fase4: getDocumentAnalysisReadiness()
+    },
+    ia_prontidao: SST_AI_READINESS
+  };
+}
+
+async function centroOperacional(query = {}) {
+  return gerarCentroOperacionalCorporativoSst(query);
+}
+
+async function inteligenciaOperacional(query = {}) {
+  return gerarInteligenciaOperacionalSst(query);
+}
+
+async function recomendacoes(query = {}, user = null) {
+  return gerarRecomendacoesSst(query, user?.id || null);
+}
+
+async function recalcularScore(query = {}) {
+  return recalcularScoreSst(query);
+}
+
+async function processarAutomacoes({ limit = 50, usuario_id = null } = {}) {
+  const [eventos, vencimentos] = await Promise.all([
+    processarEventosAbertosSst({ limit, usuario_id }),
+    automatizarVencimentosProximos({ usuario_id })
+  ]);
+  return { eventos, vencimentos };
+}
+
+async function processarWorkflows({ evento_id = null, limit = 50, usuario_id = null } = {}) {
+  if (evento_id) return processarEventoWorkflow(evento_id, { usuario_id });
+  return processarFilaWorkflowSst({ limit, usuario_id });
+}
+
+async function analisarDocumentoIa(documento_id, { provider = null, usuario_id = null } = {}) {
+  return analisarDocumentoSstComIa({ documento_id, provider, usuario_id });
+}
+
+async function visaoObra(obra_id) {
+  return gerarVisaoOperacionalObraSst(obra_id);
+}
+
+async function featureFlags() {
+  return getSstFeatureFlags();
+}
+
+async function observabilidade(query = {}) {
+  return gerarObservabilidadeSst(query);
+}
+
+async function checklistHomologacao() {
+  return gerarChecklistHomologacaoSst();
+}
+
+async function homologarWorkflows(payload = {}) {
+  return homologarWorkflowsSst(payload);
+}
+
+async function simularHomologacao() {
+  return simularMassaHomologacaoSst();
+}
+
+async function processarIntegracaoRhdp(payload = {}, user = null) {
+  return processarEventoRhdpSst({
+    ...payload,
+    usuario_id: user?.id || payload.usuario_id || null
+  });
+}
+
+async function processarIntegracaoObra(obra_id, user = null) {
+  return processarIntegracaoObraSst({
+    obra_id,
+    usuario_id: user?.id || null
+  });
 }
 
 async function registrarHistoricoSst({
@@ -378,6 +576,20 @@ async function emitEventForResource(resource, item, user, transaction) {
       usuario_id: user?.id || null,
       transaction
     });
+    if (['GRAVE', 'FATAL'].includes(String(plain.gravidade || '').toUpperCase())) {
+      await registrarEventoSst({
+        empresa_id: plain.empresa_id,
+        obra_id: plain.obra_id,
+        colaborador_id: plain.colaborador_id,
+        tipo_evento: SST_EVENT_TYPES.ACIDENTE_GRAVE,
+        severidade: 'CRITICA',
+        origem_tipo: 'sst_acidentes',
+        origem_id: plain.id,
+        mensagem: `Acidente grave/fatal registrado: ${plain.tipo}`,
+        usuario_id: user?.id || null,
+        transaction
+      });
+    }
   }
 
   if (resource === 'riscos' && ['ALTA', 'CRITICA'].includes(String(plain.severidade || '').toUpperCase())) {
@@ -408,15 +620,69 @@ async function emitEventForResource(resource, item, user, transaction) {
       transaction
     });
   }
+
+  if (resource === 'aso') {
+    await registrarEventoSst({
+      empresa_id: plain.empresa_id,
+      obra_id: plain.obra_id,
+      colaborador_id: plain.colaborador_id,
+      tipo_evento: SST_EVENT_TYPES.ASO_CADASTRADO,
+      severidade: 'INFO',
+      origem_tipo: 'sst_aso',
+      origem_id: plain.id,
+      mensagem: `ASO registrado para tipo ${plain.tipo_exame}.`,
+      usuario_id: user?.id || null,
+      transaction
+    });
+  }
+
+  if (resource === 'epi') {
+    await registrarEventoSst({
+      empresa_id: plain.empresa_id,
+      obra_id: plain.obra_id,
+      colaborador_id: plain.colaborador_id,
+      tipo_evento: SST_EVENT_TYPES.EPI_ENTREGUE,
+      severidade: 'INFO',
+      origem_tipo: 'sst_epi_entregas',
+      origem_id: plain.id,
+      mensagem: `EPI entregue: ${plain.epi_nome || 'sem nome informado'}.`,
+      usuario_id: user?.id || null,
+      transaction
+    });
+  }
 }
 
 module.exports = {
   createResource,
+  analisarDocumentoIa,
+  checklistHomologacao,
   dashboard,
+  dashboardExecutivo,
+  centroOperacional,
+  featureFlags,
+  heatmap,
   getDocumentSignedUrl,
   getResource,
+  homologarWorkflows,
+  inteligenciaOperacional,
+  analisarConformidadeSst,
+  avaliarBloqueiosColaborador,
   listResource,
+  marcarNotificacaoLida,
+  observabilidade,
+  predictionReadiness,
+  processarAutomacoes,
+  processarIntegracaoObra,
+  processarIntegracaoRhdp,
+  processarWorkflows,
+  recomendacoes,
+  recalcularScore,
   relatorioOperacional,
+  revisarConformidadeColaborador,
+  simularHomologacao,
+  sincronizarNotificacoesSst,
+  timelineColaborador,
   updateResource,
+  visaoObra,
   uploadDocument
 };

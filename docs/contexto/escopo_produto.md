@@ -17,45 +17,56 @@ O produto hoje cobre:
 - conciliacao bancaria por OFX
 - gestao de obras com orcamento, custos, parcelas, pedidos e relatorio final
 
-O escopo atual sustenta a proposta de um ERP simples, intuitivo, de facil registro e controle, com prioridade em velocidade operacional e rastreabilidade.
+O escopo atual sustenta a proposta de uma infraestrutura operacional institucional, com prioridade em estabilidade, rastreabilidade, governanca, seguranca, documentacao e continuidade operacional.
 
-## Escopo da V1 Comercial
+## Escopo Institucional Atual
 
-- uma base por cliente
-- identidade visual parametrizada por instalacao
-- configuracoes essenciais centralizadas
-- implantacao rapida e fluxo operacional claro
+- operacao interna controlada;
+- core operacional protegido;
+- multiempresa dentro da mesma instalacao;
+- modulos habilitaveis e desabilitaveis;
+- permissoes granulares por usuario, area e visibilidade;
+- dados financeiros, fiscais, RH/DP e SST tratados como criticos;
+- documentacao operacional e tecnica como parte do produto.
 
-## Evolucao Planejada do Produto
+## Evolucao Planejada
 
-O proximo bloco estrutural do produto e um modulo comercial para construcao civil, separado dos demais modulos e integrado ao financeiro sem quebrar os fluxos ja existentes.
+Apos o modulo SST, o projeto deve reduzir abertura de grandes frentes funcionais e priorizar consolidacao operacional.
 
-Escopo futuro priorizado:
+Escopo tecnico priorizado:
 
-- empreendimentos
-- unidades
-- clientes
-- contratos de venda
-- carteira de recebimentos
-- titulos financeiros originados do contrato
-- multiplas formas de recebimento
-- submodulo independente de boletos para homologacao bancaria
+- testes automatizados;
+- homologacao formal;
+- CI/CD;
+- deploy e rollback;
+- revisao de seguranca;
+- revisao de permissoes;
+- observabilidade;
+- modularizacao de services, controllers e rotas;
+- reducao de arquivos gigantes;
+- documentacao de regras implicitas;
+- onboarding tecnico futuro.
 
 ## Fora de Escopo Atual
 
 - multi-tenant SaaS com base compartilhada
+- novo repositorio multi-tenant
+- expansao comercial massificada
+- novos grandes modulos estruturais depois de SST sem nova aprovacao estrategica
 - contabilizacao automatica completa
 - conciliacao bancaria 100% automatica
-- fiscal, folha e contabilidade profunda
 - workflow altamente customizavel por script do cliente
 
 ## Limite Deliberado do Produto
 
-O FLUXY nao busca competir com ERPs generalistas em amplitude. Ele busca ser melhor em:
+O FLUXY nao busca competir com ERPs generalistas em amplitude. Nesta fase, ele busca ser melhor em:
 
 - operacional do dia a dia
 - visibilidade por obra
 - rastreabilidade
-- velocidade de implantacao
+- estabilidade institucional
+- governanca
+- seguranca
+- confiabilidade
 - facilidade de uso
 - configuracao de produto sem hardcodes por cliente

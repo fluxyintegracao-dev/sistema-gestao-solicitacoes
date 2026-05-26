@@ -511,6 +511,11 @@ const MODULO_PERMISSION_GROUPS = [
         permissoes: [
           { key: 'sst.dashboard.visualizar', label: 'Visualizar dashboard', descricao: 'Acessar indicadores de conformidade, vencimentos, riscos e acidentes.' },
           { key: 'sst.analytics.visualizar', label: 'Visualizar analytics', descricao: 'Acessar leituras analiticas, eventos operacionais e futuras visoes inteligentes do SST.' },
+          { key: 'sst.centro_operacional.visualizar', label: 'Visualizar centro operacional', descricao: 'Acessar visao corporativa multiempresa, scores, riscos e tendencias SST.' },
+          { key: 'sst.inteligencia.visualizar', label: 'Visualizar inteligencia operacional', descricao: 'Acessar sinais, recomendacoes e leitura executiva do motor SST.' },
+          { key: 'sst.timeline.visualizar', label: 'Visualizar timeline SST', descricao: 'Acessar timeline operacional de colaboradores.' },
+          { key: 'sst.heatmap.visualizar', label: 'Visualizar heatmap SST', descricao: 'Acessar mapa de risco operacional por obra, empresa e funcao.' },
+          { key: 'sst.observabilidade.visualizar', label: 'Visualizar observabilidade', descricao: 'Acessar logs, checks de homologacao, flags e saude operacional SST.' },
           { key: 'sst.analytics.gerenciar', label: 'Gerenciar eventos analytics', descricao: 'Tratar eventos operacionais SST sem alterar a origem do fato registrado.' }
         ]
       },
@@ -521,7 +526,11 @@ const MODULO_PERMISSION_GROUPS = [
           { key: 'sst.riscos.visualizar', label: 'Visualizar riscos', descricao: 'Consultar riscos ocupacionais por empresa, obra, setor e funcao.' },
           { key: 'sst.riscos.gerenciar', label: 'Gerenciar riscos', descricao: 'Criar e editar riscos ocupacionais.' },
           { key: 'sst.agentes.visualizar', label: 'Visualizar agentes nocivos', descricao: 'Consultar agentes nocivos e limites de tolerancia.' },
-          { key: 'sst.agentes.gerenciar', label: 'Gerenciar agentes nocivos', descricao: 'Criar e editar agentes nocivos.' }
+          { key: 'sst.agentes.gerenciar', label: 'Gerenciar agentes nocivos', descricao: 'Criar e editar agentes nocivos.' },
+          { key: 'sst.ambientes.visualizar', label: 'Visualizar ambientes', descricao: 'Consultar ambientes de trabalho e locais de exposicao.' },
+          { key: 'sst.ambientes.gerenciar', label: 'Gerenciar ambientes', descricao: 'Criar e editar ambientes de trabalho.' },
+          { key: 'sst.exposicoes.visualizar', label: 'Visualizar exposicoes', descricao: 'Consultar exposicoes ocupacionais por colaborador.' },
+          { key: 'sst.exposicoes.gerenciar', label: 'Gerenciar exposicoes', descricao: 'Criar e editar exposicoes ocupacionais.' }
         ]
       },
       {
@@ -557,11 +566,33 @@ const MODULO_PERMISSION_GROUPS = [
         ]
       },
       {
+        key: 'sst.inteligencia_operacional',
+        label: 'Inteligencia Operacional SST',
+        permissoes: [
+          { key: 'sst.pendencias.visualizar', label: 'Visualizar pendencias', descricao: 'Consultar pendencias operacionais geradas pelo motor SST.' },
+          { key: 'sst.pendencias.gerenciar', label: 'Gerenciar pendencias', descricao: 'Tratar pendencias operacionais SST.' },
+          { key: 'sst.bloqueios.visualizar', label: 'Visualizar bloqueios', descricao: 'Consultar alertas, restricoes e bloqueios criticos.' },
+          { key: 'sst.bloqueios.gerenciar', label: 'Gerenciar bloqueios', descricao: 'Avaliar e resolver bloqueios operacionais SST.' },
+          { key: 'sst.notificacoes.visualizar', label: 'Visualizar notificacoes', descricao: 'Consultar central de notificacoes SST.' },
+          { key: 'sst.notificacoes.gerenciar', label: 'Gerenciar notificacoes', descricao: 'Sincronizar, ler e arquivar notificacoes SST.' },
+          { key: 'sst.recomendacoes.visualizar', label: 'Visualizar recomendacoes', descricao: 'Consultar recomendacoes operacionais geradas por analytics e eventos SST.' },
+          { key: 'sst.recomendacoes.gerenciar', label: 'Gerenciar recomendacoes', descricao: 'Gerar, tratar e encerrar recomendacoes operacionais SST.' },
+          { key: 'sst.scores.visualizar', label: 'Visualizar scores', descricao: 'Consultar score de conformidade SST.' },
+          { key: 'sst.scores.gerenciar', label: 'Gerenciar scores', descricao: 'Recalcular ou ajustar scores de conformidade SST.' },
+          { key: 'sst.workflows.visualizar', label: 'Visualizar workflows', descricao: 'Consultar workflows, execucoes e eventos de orquestracao SST.' },
+          { key: 'sst.workflows.gerenciar', label: 'Gerenciar workflows', descricao: 'Configurar e processar workflows e automacoes SST.' },
+          { key: 'sst.logs.visualizar', label: 'Visualizar logs SST', descricao: 'Consultar logs de workflows, automacoes, bloqueios e integracoes.' },
+          { key: 'sst.integracoes.gerenciar', label: 'Gerenciar integracoes SST', descricao: 'Executar integracoes controladas com RH/DP e Obras por feature flag.' }
+        ]
+      },
+      {
         key: 'sst.documentos',
         label: 'Documentos SST',
         permissoes: [
           { key: 'sst.documentos.visualizar', label: 'Visualizar documentos', descricao: 'Consultar documentos SST e URLs assinadas.' },
-          { key: 'sst.documentos.gerenciar', label: 'Gerenciar documentos', descricao: 'Enviar e editar documentos SST.' }
+          { key: 'sst.documentos.gerenciar', label: 'Gerenciar documentos', descricao: 'Enviar e editar documentos SST.' },
+          { key: 'sst.documentos_ia.visualizar', label: 'Visualizar analises IA', descricao: 'Consultar contratos e resultados de analise documental IA/OCR.' },
+          { key: 'sst.documentos_ia.gerenciar', label: 'Gerenciar analises IA', descricao: 'Solicitar analise IA documental quando houver provider habilitado.' }
         ]
       },
       {
@@ -576,7 +607,10 @@ const MODULO_PERMISSION_GROUPS = [
         key: 'sst.configuracoes',
         label: 'Configuracoes SST',
         permissoes: [
-          { key: 'sst.configuracoes.gerenciar', label: 'Gerenciar configuracoes SST', descricao: 'Configurar parametros, catalogos e regras futuras do modulo SST.' }
+          { key: 'sst.configuracoes.gerenciar', label: 'Gerenciar configuracoes SST', descricao: 'Configurar parametros, catalogos e regras futuras do modulo SST.' },
+          { key: 'sst.criticidades.gerenciar', label: 'Gerenciar criticidades', descricao: 'Configurar niveis e pesos de criticidade operacional SST.' },
+          { key: 'sst.politicas_bloqueio.gerenciar', label: 'Gerenciar politicas de bloqueio', descricao: 'Configurar alertas, restricoes e bloqueios criticos.' },
+          { key: 'sst.workflow_acoes.gerenciar', label: 'Gerenciar acoes de workflow', descricao: 'Configurar acoes permitidas pelo motor de workflow SST.' }
         ]
       }
     ]

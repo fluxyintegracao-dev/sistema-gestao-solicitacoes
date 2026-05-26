@@ -485,8 +485,15 @@ export default function Layout() {
     if (sstAccess) {
       addGroup('SST', [
         sstDashboardAccess ? item('/sst', 'Dashboard SST', HiOutlineShieldCheck) : null,
+        sstDashboardAccess ? item('/sst/relatorios/centro-operacional', 'Centro Operacional SST', HiOutlineSquares2X2) : null,
+        sstDashboardAccess ? item('/sst/relatorios/executivo', 'Executivo SST', HiOutlineSparkles) : null,
+        sstDashboardAccess ? item('/sst/relatorios/heatmap', 'Heatmap SST', HiOutlineSquares2X2) : null,
+        sstDashboardAccess ? item('/sst/observabilidade', 'Observabilidade SST', HiOutlineClipboardDocumentList) : null,
+        sstDashboardAccess ? item('/sst/timeline', 'Timeline SST', HiOutlineClipboardDocumentList) : null,
         sstDashboardAccess ? item('/sst/relatorios', 'Relatórios SST', HiOutlineDocumentText) : null,
         canViewSstArea(user, 'riscos') ? item('/sst/riscos', 'Riscos', HiOutlineExclamationTriangle) : null,
+        canViewSstArea(user, 'riscos') ? item('/sst/ambientes', 'Ambientes', HiOutlineBuildingOffice2) : null,
+        canViewSstArea(user, 'riscos') ? item('/sst/exposicoes', 'Exposicoes', HiOutlineAdjustmentsHorizontal) : null,
         canViewSstArea(user, 'aso') ? item('/sst/aso', 'ASO', HiOutlineClipboardDocumentCheck) : null,
         canViewSstArea(user, 'exames') ? item('/sst/exames', 'Exames', HiOutlineDocumentText) : null,
         canViewSstArea(user, 'epi') ? item('/sst/epi', 'EPI', HiOutlineShieldCheck) : null,
@@ -495,6 +502,16 @@ export default function Layout() {
         canViewSstArea(user, 'documentos') ? item('/sst/documentos', 'Documentos', HiOutlineFolderOpen) : null,
         canViewSstArea(user, 'esocial') ? item('/sst/esocial', 'eSocial', HiOutlineAdjustmentsHorizontal) : null,
         canViewSstArea(user, 'analytics') ? item('/sst/eventos', 'Eventos', HiOutlineClipboardDocumentList) : null,
+        canViewSstArea(user, 'analytics') ? item('/sst/pendencias', 'Pendencias SST', HiOutlineInboxStack) : null,
+        canViewSstArea(user, 'analytics') ? item('/sst/bloqueios', 'Bloqueios SST', HiOutlineKey) : null,
+        canViewSstArea(user, 'analytics') ? item('/sst/notificacoes', 'Notificacoes SST', HiOutlineChatBubbleOvalLeft) : null,
+        canViewSstArea(user, 'analytics') ? item('/sst/scores', 'Scores SST', HiOutlineRectangleGroup) : null,
+        canViewSstArea(user, 'analytics') ? item('/sst/recomendacoes', 'Recomendacoes SST', HiOutlineSparkles) : null,
+        canViewSstArea(user, 'analytics') ? item('/sst/workflow_execucoes', 'Execucoes Workflow', HiOutlineClipboardDocumentList) : null,
+        canManageSstArea(user, 'configuracoes') ? item('/sst/politicas_bloqueio', 'Politicas de bloqueio', HiOutlineCog6Tooth) : null,
+        canManageSstArea(user, 'configuracoes') ? item('/sst/workflows', 'Workflows SST', HiOutlineAdjustmentsHorizontal) : null,
+        canManageSstArea(user, 'configuracoes') ? item('/sst/workflow_acoes', 'Acoes Workflow', HiOutlineAdjustmentsHorizontal) : null,
+        canManageSstArea(user, 'configuracoes') ? item('/sst/criticidades', 'Criticidades SST', HiOutlineAdjustmentsHorizontal) : null,
         canManageSstArea(user, 'configuracoes') ? item('/sst/configuracoes', 'Configurações', HiOutlineCog6Tooth) : null
       ]);
     }

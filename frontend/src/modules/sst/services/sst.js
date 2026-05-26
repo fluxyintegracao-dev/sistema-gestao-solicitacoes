@@ -33,6 +33,144 @@ export async function getSstRelatorioOperacional(params = {}) {
   return parseResponse(res, 'Erro ao carregar relatorio operacional SST');
 }
 
+export async function getSstExecutivo(params = {}) {
+  const res = await fetch(`${API_URL}/sst/executivo${toQuery(params)}`, {
+    headers: authHeaders()
+  });
+  return parseResponse(res, 'Erro ao carregar dashboard executivo SST');
+}
+
+export async function getSstHeatmap(params = {}) {
+  const res = await fetch(`${API_URL}/sst/heatmap${toQuery(params)}`, {
+    headers: authHeaders()
+  });
+  return parseResponse(res, 'Erro ao carregar heatmap SST');
+}
+
+export async function getSstCentroOperacional(params = {}) {
+  const res = await fetch(`${API_URL}/sst/centro-operacional${toQuery(params)}`, {
+    headers: authHeaders()
+  });
+  return parseResponse(res, 'Erro ao carregar centro operacional SST');
+}
+
+export async function getSstFeatureFlags() {
+  const res = await fetch(`${API_URL}/sst/feature-flags`, {
+    headers: authHeaders()
+  });
+  return parseResponse(res, 'Erro ao carregar feature flags SST');
+}
+
+export async function getSstObservabilidade(params = {}) {
+  const res = await fetch(`${API_URL}/sst/observabilidade${toQuery(params)}`, {
+    headers: authHeaders()
+  });
+  return parseResponse(res, 'Erro ao carregar observabilidade SST');
+}
+
+export async function getSstChecklistHomologacao() {
+  const res = await fetch(`${API_URL}/sst/homologacao/checklist`, {
+    headers: authHeaders()
+  });
+  return parseResponse(res, 'Erro ao carregar checklist de homologacao SST');
+}
+
+export async function homologarWorkflowsSst(payload = {}) {
+  const res = await fetch(`${API_URL}/sst/homologacao/workflows`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload)
+  });
+  return parseResponse(res, 'Erro ao homologar workflows SST');
+}
+
+export async function simularHomologacaoSst() {
+  const res = await fetch(`${API_URL}/sst/homologacao/simular`, {
+    method: 'POST',
+    headers: authHeaders()
+  });
+  return parseResponse(res, 'Erro ao simular homologacao SST');
+}
+
+export async function getSstInteligenciaOperacional(params = {}) {
+  const res = await fetch(`${API_URL}/sst/inteligencia-operacional${toQuery(params)}`, {
+    headers: authHeaders()
+  });
+  return parseResponse(res, 'Erro ao carregar inteligencia operacional SST');
+}
+
+export async function gerarRecomendacoesSst(params = {}) {
+  const res = await fetch(`${API_URL}/sst/recomendacoes/gerar${toQuery(params)}`, {
+    headers: authHeaders()
+  });
+  return parseResponse(res, 'Erro ao gerar recomendacoes SST');
+}
+
+export async function recalcularScoreSst(params = {}) {
+  const res = await fetch(`${API_URL}/sst/scores/recalcular${toQuery(params)}`, {
+    method: 'POST',
+    headers: authHeaders()
+  });
+  return parseResponse(res, 'Erro ao recalcular score SST');
+}
+
+export async function getSstTimeline(colaboradorId) {
+  const res = await fetch(`${API_URL}/sst/timeline/${colaboradorId}`, {
+    headers: authHeaders()
+  });
+  return parseResponse(res, 'Erro ao carregar timeline SST');
+}
+
+export async function revisarConformidadeSst(colaboradorId, payload = {}) {
+  const res = await fetch(`${API_URL}/sst/workflows/revisar-colaborador/${colaboradorId}`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload)
+  });
+  return parseResponse(res, 'Erro ao revisar conformidade SST');
+}
+
+export async function avaliarBloqueiosSst(colaboradorId) {
+  const res = await fetch(`${API_URL}/sst/bloqueios/colaborador/${colaboradorId}/avaliar`, {
+    method: 'POST',
+    headers: authHeaders()
+  });
+  return parseResponse(res, 'Erro ao avaliar bloqueios SST');
+}
+
+export async function sincronizarNotificacoesSst() {
+  const res = await fetch(`${API_URL}/sst/notificacoes/sincronizar`, {
+    method: 'POST',
+    headers: authHeaders()
+  });
+  return parseResponse(res, 'Erro ao sincronizar notificacoes SST');
+}
+
+export async function getSstPredictionReadiness() {
+  const res = await fetch(`${API_URL}/sst/prediction/readiness`, {
+    headers: authHeaders()
+  });
+  return parseResponse(res, 'Erro ao carregar prontidao preditiva SST');
+}
+
+export async function processarAutomacoesSst(payload = {}) {
+  const res = await fetch(`${API_URL}/sst/automation/processar`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload)
+  });
+  return parseResponse(res, 'Erro ao processar automacoes SST');
+}
+
+export async function processarWorkflowsSst(payload = {}) {
+  const res = await fetch(`${API_URL}/sst/workflows/processar`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload)
+  });
+  return parseResponse(res, 'Erro ao processar workflows SST');
+}
+
 export async function getSstConfig() {
   const res = await fetch(`${API_URL}/sst/configuracoes`, {
     headers: authHeaders()
@@ -96,6 +234,15 @@ export async function getDocumentoSstUrl(id) {
     headers: authHeaders()
   });
   return parseResponse(res, 'Erro ao gerar link do documento SST');
+}
+
+export async function analisarDocumentoIaSst(id, payload = {}) {
+  const res = await fetch(`${API_URL}/sst/documentos/${id}/analisar-ia`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload)
+  });
+  return parseResponse(res, 'Erro ao analisar documento SST com IA');
 }
 
 export async function sincronizarEventosVencimentoSst() {

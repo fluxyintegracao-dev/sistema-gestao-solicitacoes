@@ -89,15 +89,16 @@ function normalizeSstPayload(payload = {}, req) {
   for (const field of allowed) {
     if (!Object.prototype.hasOwnProperty.call(payload, field)) continue;
     const value = payload[field];
-    if (field.endsWith('_id') || ['quantidade', 'carga_horaria', 'dias_afastamento'].includes(field)) {
-      normalized[field] = ['quantidade', 'carga_horaria'].includes(field)
+    if (field.endsWith('_id') || ['quantidade', 'carga_horaria', 'dias_afastamento', 'score', 'peso', 'pendencias_total', 'pendencias_criticas', 'ordem', 'confianca'].includes(field)) {
+      normalized[field] = ['quantidade', 'carga_horaria', 'score', 'confianca'].includes(field)
         ? normalizeDecimal(value, field)
         : normalizeInt(value, field);
-    } else if (['ativo', 'apto', 'afastamento', 'cat_emitida'].includes(field)) {
+    } else if (['ativo', 'apto', 'afastamento', 'cat_emitida', 'obrigatorio', 'utiliza_epc', 'epc_eficaz', 'utiliza_epi', 'epi_eficaz'].includes(field)) {
       normalized[field] = normalizeBoolean(value, null);
     } else if (
       field.includes('data_') ||
       field.includes('vigencia_') ||
+      field.endsWith('_em') ||
       ['validade', 'entrega_em'].includes(field)
     ) {
       normalized[field] = normalizeDate(value, field);

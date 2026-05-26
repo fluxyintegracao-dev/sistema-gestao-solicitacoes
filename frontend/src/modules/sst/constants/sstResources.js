@@ -32,6 +32,58 @@ export const SST_RESOURCES = {
     ],
     columns: ['nome', 'tipo_agente', 'intensidade', 'limite_tolerancia']
   },
+  ambientes: {
+    title: 'Ambientes de trabalho',
+    subtitle: 'Ambientes, setores e locais operacionais para controle de exposição.',
+    area: 'riscos',
+    fields: [
+      { key: 'empresa_id', label: 'Empresa', type: 'selectRef', ref: 'empresas', required: true },
+      { key: 'obra_id', label: 'Obra/Centro', type: 'selectRef', ref: 'obras' },
+      { key: 'nome', label: 'Ambiente', required: true },
+      { key: 'tipo_ambiente', label: 'Tipo de ambiente' },
+      { key: 'local_amb', label: 'Local eSocial' },
+      { key: 'esocial_tp_insc', label: 'Tipo inscrição eSocial' },
+      { key: 'esocial_nr_insc', label: 'Inscrição eSocial' },
+      { key: 'descricao', label: 'Descrição', type: 'textarea' },
+      { key: 'ativo', label: 'Ativo', type: 'checkbox' }
+    ],
+    columns: ['nome', 'tipo_ambiente', 'local_amb', 'obra.nome']
+  },
+  exposicoes: {
+    title: 'Exposição ocupacional',
+    subtitle: 'Atividade, ambiente, agente nocivo, EPC/EPI e responsável técnico.',
+    area: 'riscos',
+    fields: [
+      { key: 'empresa_id', label: 'Empresa', type: 'selectRef', ref: 'empresas', required: true },
+      { key: 'obra_id', label: 'Obra/Centro', type: 'selectRef', ref: 'obras' },
+      { key: 'colaborador_id', label: 'Colaborador', type: 'selectRef', ref: 'colaboradores', required: true },
+      { key: 'ambiente_id', label: 'Ambiente', type: 'selectRef', ref: 'ambientes' },
+      { key: 'risco_id', label: 'Risco', type: 'selectRef', ref: 'riscos' },
+      { key: 'agente_nocivo_id', label: 'Agente nocivo', type: 'selectRef', ref: 'agentes' },
+      { key: 'data_inicio', label: 'Início', type: 'date', required: true },
+      { key: 'data_fim', label: 'Fim', type: 'date' },
+      { key: 'atividade_desempenhada', label: 'Atividade', type: 'textarea' },
+      { key: 'codigo_agente_nocivo', label: 'Código agente' },
+      { key: 'descricao_agente_nocivo', label: 'Descrição agente' },
+      { key: 'intensidade', label: 'Intensidade' },
+      { key: 'unidade_medida', label: 'Unidade' },
+      { key: 'tecnica_medicao', label: 'Técnica medição' },
+      { key: 'limite_tolerancia', label: 'Limite tolerância' },
+      { key: 'utiliza_epc', label: 'Usa EPC', type: 'checkbox' },
+      { key: 'epc_eficaz', label: 'EPC eficaz', type: 'checkbox' },
+      { key: 'utiliza_epi', label: 'Usa EPI', type: 'checkbox' },
+      { key: 'epi_eficaz', label: 'EPI eficaz', type: 'checkbox' },
+      { key: 'epi_ca', label: 'CA do EPI' },
+      { key: 'responsavel_tecnico_nome', label: 'Responsável técnico' },
+      { key: 'responsavel_tecnico_cpf', label: 'CPF responsável' },
+      { key: 'responsavel_tecnico_registro', label: 'Registro profissional' },
+      { key: 'responsavel_tecnico_orgao', label: 'Órgão profissional' },
+      { key: 'responsavel_tecnico_uf', label: 'UF' },
+      { key: 'status', label: 'Status', options: ['ATIVA', 'ENCERRADA', 'EM_REVISAO'] },
+      { key: 'observacoes', label: 'Observações', type: 'textarea' }
+    ],
+    columns: ['colaborador.nome', 'ambiente.nome', 'agenteNocivo.nome', 'data_inicio', 'status']
+  },
   aso: {
     title: 'ASO',
     subtitle: 'Aptidao, restricoes, validade e medico responsavel.',
@@ -46,6 +98,7 @@ export const SST_RESOURCES = {
       { key: 'validade', label: 'Validade', type: 'date' },
       { key: 'medico', label: 'Medico' },
       { key: 'crm', label: 'CRM' },
+      { key: 'uf_crm', label: 'UF CRM' },
       { key: 'restricoes', label: 'Restricoes', type: 'textarea' }
     ],
     columns: ['colaborador.nome', 'tipo_exame', 'apto', 'data_exame', 'validade']
@@ -58,6 +111,7 @@ export const SST_RESOURCES = {
       { key: 'empresa_id', label: 'Empresa', type: 'selectRef', ref: 'empresas', required: true },
       { key: 'obra_id', label: 'Obra/Centro', type: 'selectRef', ref: 'obras' },
       { key: 'colaborador_id', label: 'Colaborador', type: 'selectRef', ref: 'colaboradores', required: true },
+      { key: 'aso_id', label: 'ASO vinculado', type: 'selectRef', ref: 'asos' },
       { key: 'tipo_exame', label: 'Tipo', options: ['ADMISSIONAL', 'PERIODICO', 'RETORNO', 'MUDANCA_FUNCAO', 'DEMISSIONAL'], required: true },
       { key: 'nome_exame', label: 'Exame', required: true },
       { key: 'data_exame', label: 'Data', type: 'date' },
@@ -80,6 +134,8 @@ export const SST_RESOURCES = {
       { key: 'quantidade', label: 'Quantidade', type: 'number' },
       { key: 'entrega_em', label: 'Entrega', type: 'date', required: true },
       { key: 'validade', label: 'Validade', type: 'date' },
+      { key: 'obrigatorio', label: 'Obrigatório', type: 'checkbox' },
+      { key: 'funcao_alvo', label: 'Função alvo' },
       { key: 'status', label: 'Status', options: ['ENTREGUE', 'SUBSTITUIDO', 'DEVOLVIDO'] }
     ],
     columns: ['colaborador.nome', 'epi_nome', 'ca', 'entrega_em', 'validade']
@@ -98,7 +154,9 @@ export const SST_RESOURCES = {
       { key: 'data_fim', label: 'Fim', type: 'date' },
       { key: 'validade', label: 'Validade', type: 'date' },
       { key: 'instrutor', label: 'Instrutor' },
-      { key: 'carga_horaria', label: 'Carga horaria', type: 'number' }
+      { key: 'carga_horaria', label: 'Carga horaria', type: 'number' },
+      { key: 'obrigatorio', label: 'Obrigatório', type: 'checkbox' },
+      { key: 'funcao_alvo', label: 'Função alvo' }
     ],
     columns: ['colaborador.nome', 'codigo', 'nome', 'validade', 'instrutor']
   },
@@ -114,11 +172,246 @@ export const SST_RESOURCES = {
       { key: 'gravidade', label: 'Gravidade', options: ['LEVE', 'MODERADA', 'GRAVE', 'FATAL'], required: true },
       { key: 'local', label: 'Local' },
       { key: 'data_ocorrencia', label: 'Data', type: 'date', required: true },
+      { key: 'agente_causador', label: 'Agente causador' },
+      { key: 'situacao_geradora', label: 'Situação geradora' },
+      { key: 'parte_corpo', label: 'Parte do corpo' },
+      { key: 'cid', label: 'CID' },
       { key: 'afastamento', label: 'Afastamento', type: 'checkbox' },
+      { key: 'dias_afastamento', label: 'Dias afastamento', type: 'number' },
       { key: 'cat_emitida', label: 'CAT emitida', type: 'checkbox' },
+      { key: 'fotos_url', label: 'Fotos/Anexos URL' },
+      { key: 'acoes_corretivas', label: 'Ações corretivas', type: 'textarea' },
       { key: 'descricao', label: 'Descricao', type: 'textarea', required: true }
     ],
     columns: ['data_ocorrencia', 'tipo', 'gravidade', 'colaborador.nome', 'cat_emitida']
+  },
+  regras: {
+    title: 'Regras de conformidade',
+    subtitle: 'Regras configuráveis para ASO, treinamentos, EPI e exposição.',
+    area: 'analytics',
+    fields: [
+      { key: 'empresa_id', label: 'Empresa', type: 'selectRef', ref: 'empresas', required: true },
+      { key: 'obra_id', label: 'Obra/Centro', type: 'selectRef', ref: 'obras' },
+      { key: 'codigo', label: 'Código', required: true },
+      { key: 'nome', label: 'Regra', required: true },
+      { key: 'tipo_regra', label: 'Tipo', options: ['ASO_VALIDO', 'TREINAMENTO_OBRIGATORIO', 'EPI_OBRIGATORIO', 'EXPOSICAO_COMPATIVEL'], required: true },
+      { key: 'funcao_alvo', label: 'Função alvo' },
+      { key: 'treinamento_codigo', label: 'Código treinamento/NR' },
+      { key: 'epi_nome', label: 'EPI obrigatório' },
+      { key: 'severidade', label: 'Severidade', options: ['INFO', 'ALERTA', 'CRITICA'] },
+      { key: 'ativo', label: 'Ativa', type: 'checkbox' },
+      { key: 'observacoes', label: 'Observações', type: 'textarea' }
+    ],
+    columns: ['codigo', 'nome', 'tipo_regra', 'funcao_alvo', 'severidade', 'ativo']
+  },
+  politicas_bloqueio: {
+    title: 'Politicas de bloqueio',
+    subtitle: 'Regras de alerta, restricao e bloqueio critico por empresa, obra e funcao.',
+    area: 'configuracoes',
+    fields: [
+      { key: 'empresa_id', label: 'Empresa', type: 'selectRef', ref: 'empresas', required: true },
+      { key: 'obra_id', label: 'Obra/Centro', type: 'selectRef', ref: 'obras' },
+      { key: 'codigo', label: 'Codigo', required: true },
+      { key: 'nome', label: 'Politica', required: true },
+      { key: 'tipo_regra', label: 'Tipo de regra', options: ['ASO_VALIDO', 'TREINAMENTO_OBRIGATORIO', 'EPI_OBRIGATORIO', 'DOCUMENTO_VALIDO', 'EXPOSICAO_COMPATIVEL', 'CONFORMIDADE_GERAL'], required: true },
+      { key: 'tipo_bloqueio', label: 'Tipo de bloqueio', options: ['ALERTA', 'RESTRICAO', 'BLOQUEIO_CRITICO'] },
+      { key: 'criticidade', label: 'Criticidade', options: ['BAIXA', 'MEDIA', 'ALTA', 'CRITICA'] },
+      { key: 'funcao_alvo', label: 'Funcao alvo' },
+      { key: 'tipo_risco', label: 'Tipo de risco' },
+      { key: 'ativo', label: 'Ativa', type: 'checkbox' },
+      { key: 'observacoes', label: 'Observacoes', type: 'textarea' }
+    ],
+    columns: ['codigo', 'nome', 'tipo_regra', 'tipo_bloqueio', 'criticidade', 'ativo']
+  },
+  bloqueios: {
+    title: 'Bloqueios operacionais',
+    subtitle: 'Alertas, restricoes e bloqueios criticos gerados pelo motor SST.',
+    area: 'analytics',
+    fields: [
+      { key: 'empresa_id', label: 'Empresa', type: 'selectRef', ref: 'empresas' },
+      { key: 'obra_id', label: 'Obra/Centro', type: 'selectRef', ref: 'obras' },
+      { key: 'colaborador_id', label: 'Colaborador', type: 'selectRef', ref: 'colaboradores' },
+      { key: 'tipo_bloqueio', label: 'Tipo', options: ['ALERTA', 'RESTRICAO', 'BLOQUEIO_CRITICO'] },
+      { key: 'criticidade', label: 'Criticidade', options: ['BAIXA', 'MEDIA', 'ALTA', 'CRITICA'] },
+      { key: 'status', label: 'Status', options: ['ABERTO', 'RESOLVIDO', 'IGNORADO'] },
+      { key: 'motivo', label: 'Motivo', type: 'textarea', required: true }
+    ],
+    columns: ['createdAt', 'tipo_bloqueio', 'criticidade', 'status', 'colaborador.nome', 'obra.nome', 'motivo']
+  },
+  notificacoes: {
+    title: 'Notificacoes SST',
+    subtitle: 'Central persistente de comunicacoes de pendencias, vencimentos e riscos.',
+    area: 'analytics',
+    fields: [
+      { key: 'empresa_id', label: 'Empresa', type: 'selectRef', ref: 'empresas' },
+      { key: 'obra_id', label: 'Obra/Centro', type: 'selectRef', ref: 'obras' },
+      { key: 'colaborador_id', label: 'Colaborador', type: 'selectRef', ref: 'colaboradores' },
+      { key: 'tipo_notificacao', label: 'Tipo', required: true },
+      { key: 'prioridade', label: 'Prioridade', options: ['NORMAL', 'ALTA', 'URGENTE'] },
+      { key: 'criticidade', label: 'Criticidade', options: ['BAIXA', 'MEDIA', 'ALTA', 'CRITICA'] },
+      { key: 'status', label: 'Status', options: ['NAO_LIDA', 'LIDA', 'ARQUIVADA'] },
+      { key: 'titulo', label: 'Titulo', required: true },
+      { key: 'mensagem', label: 'Mensagem', type: 'textarea', required: true }
+    ],
+    columns: ['createdAt', 'tipo_notificacao', 'prioridade', 'criticidade', 'status', 'titulo']
+  },
+  pendencias: {
+    title: 'Pendencias operacionais',
+    subtitle: 'Pendencias de ASO, treinamento, EPI, documentos, exposicao e conformidade.',
+    area: 'analytics',
+    fields: [
+      { key: 'empresa_id', label: 'Empresa', type: 'selectRef', ref: 'empresas' },
+      { key: 'obra_id', label: 'Obra/Centro', type: 'selectRef', ref: 'obras' },
+      { key: 'colaborador_id', label: 'Colaborador', type: 'selectRef', ref: 'colaboradores' },
+      { key: 'tipo_pendencia', label: 'Tipo', required: true },
+      { key: 'criticidade', label: 'Criticidade', options: ['BAIXA', 'MEDIA', 'ALTA', 'CRITICA'] },
+      { key: 'status', label: 'Status', options: ['ABERTA', 'EM_TRATAMENTO', 'RESOLVIDA', 'IGNORADA'] },
+      { key: 'titulo', label: 'Titulo', required: true },
+      { key: 'prazo_limite', label: 'Prazo', type: 'date' },
+      { key: 'descricao', label: 'Descricao', type: 'textarea' }
+    ],
+    columns: ['createdAt', 'tipo_pendencia', 'criticidade', 'status', 'colaborador.nome', 'obra.nome', 'titulo']
+  },
+  scores: {
+    title: 'Scores de conformidade',
+    subtitle: 'Score calculado por colaborador, obra, empresa ou setor.',
+    area: 'analytics',
+    fields: [
+      { key: 'empresa_id', label: 'Empresa', type: 'selectRef', ref: 'empresas' },
+      { key: 'obra_id', label: 'Obra/Centro', type: 'selectRef', ref: 'obras' },
+      { key: 'colaborador_id', label: 'Colaborador', type: 'selectRef', ref: 'colaboradores' },
+      { key: 'escopo_tipo', label: 'Escopo', options: ['COLABORADOR', 'OBRA', 'EMPRESA', 'SETOR'], required: true },
+      { key: 'score', label: 'Score', type: 'number', required: true },
+      { key: 'nivel', label: 'Nivel', options: ['EXCELENTE', 'CONTROLADO', 'ATENCAO', 'CRITICO'] }
+    ],
+    columns: ['calculado_em', 'escopo_tipo', 'score', 'nivel', 'colaborador.nome', 'obra.nome']
+  },
+  criticidades: {
+    title: 'Criticidades SST',
+    subtitle: 'Tabela gerencial de pesos e niveis de criticidade operacional.',
+    area: 'configuracoes',
+    fields: [
+      { key: 'empresa_id', label: 'Empresa', type: 'selectRef', ref: 'empresas' },
+      { key: 'codigo', label: 'Codigo', required: true },
+      { key: 'nome', label: 'Nome', required: true },
+      { key: 'nivel', label: 'Nivel', options: ['BAIXA', 'MEDIA', 'ALTA', 'CRITICA'], required: true },
+      { key: 'tipo_alvo', label: 'Alvo' },
+      { key: 'peso', label: 'Peso', type: 'number' },
+      { key: 'ativo', label: 'Ativa', type: 'checkbox' },
+      { key: 'observacoes', label: 'Observacoes', type: 'textarea' }
+    ],
+    columns: ['codigo', 'nome', 'nivel', 'tipo_alvo', 'peso', 'ativo']
+  },
+  workflows: {
+    title: 'Workflows SST',
+    subtitle: 'Motor de orquestracao orientado a eventos operacionais.',
+    area: 'configuracoes',
+    fields: [
+      { key: 'empresa_id', label: 'Empresa', type: 'selectRef', ref: 'empresas' },
+      { key: 'obra_id', label: 'Obra/Centro', type: 'selectRef', ref: 'obras' },
+      { key: 'codigo', label: 'Codigo', required: true },
+      { key: 'nome', label: 'Workflow', required: true },
+      { key: 'gatilho_evento', label: 'Evento gatilho', required: true },
+      { key: 'escopo', label: 'Escopo', options: ['CORPORATIVO', 'EMPRESA', 'OBRA', 'COLABORADOR'] },
+      { key: 'prioridade', label: 'Prioridade', options: ['BAIXA', 'NORMAL', 'ALTA', 'URGENTE'] },
+      { key: 'ativo', label: 'Ativo', type: 'checkbox' },
+      { key: 'descricao', label: 'Descricao', type: 'textarea' }
+    ],
+    columns: ['codigo', 'nome', 'gatilho_evento', 'escopo', 'prioridade', 'ativo']
+  },
+  workflow_acoes: {
+    title: 'Acoes de workflow',
+    subtitle: 'Acoes permitidas para o motor de automacoes SST.',
+    area: 'configuracoes',
+    fields: [
+      { key: 'workflow_id', label: 'Workflow ID', type: 'number', required: true },
+      { key: 'codigo', label: 'Codigo', required: true },
+      { key: 'nome', label: 'Acao', required: true },
+      { key: 'tipo_acao', label: 'Tipo', options: ['REVISAR_CONFORMIDADE', 'AVALIAR_BLOQUEIOS', 'RECALCULAR_SCORE', 'GERAR_RECOMENDACOES', 'GERAR_NOTIFICACOES'], required: true },
+      { key: 'ordem', label: 'Ordem', type: 'number' },
+      { key: 'ativo', label: 'Ativa', type: 'checkbox' }
+    ],
+    columns: ['workflow_id', 'codigo', 'nome', 'tipo_acao', 'ordem', 'ativo']
+  },
+  workflow_execucoes: {
+    title: 'Execucoes de workflow',
+    subtitle: 'Historico de orquestracoes executadas pelo backend.',
+    area: 'analytics',
+    fields: [
+      { key: 'status', label: 'Status', options: ['PENDENTE', 'EM_EXECUCAO', 'CONCLUIDO', 'ERRO'] },
+      { key: 'resultado', label: 'Resultado' },
+      { key: 'erro', label: 'Erro', type: 'textarea' }
+    ],
+    columns: ['createdAt', 'workflow.nome', 'status', 'resultado', 'colaborador.nome', 'obra.nome', 'erro']
+  },
+  workflow_eventos: {
+    title: 'Eventos de workflow',
+    subtitle: 'Rastreamento das acoes executadas por workflows SST.',
+    area: 'analytics',
+    fields: [
+      { key: 'status', label: 'Status', options: ['REGISTRADO', 'CONCLUIDO', 'ERRO'] },
+      { key: 'mensagem', label: 'Mensagem', type: 'textarea' }
+    ],
+    columns: ['createdAt', 'tipo_evento', 'status', 'workflow.nome', 'mensagem']
+  },
+  recomendacoes: {
+    title: 'Recomendacoes operacionais',
+    subtitle: 'Recomendacoes geradas por eventos, heatmap, scores e pendencias criticas.',
+    area: 'analytics',
+    fields: [
+      { key: 'empresa_id', label: 'Empresa', type: 'selectRef', ref: 'empresas' },
+      { key: 'obra_id', label: 'Obra/Centro', type: 'selectRef', ref: 'obras' },
+      { key: 'colaborador_id', label: 'Colaborador', type: 'selectRef', ref: 'colaboradores' },
+      { key: 'tipo_recomendacao', label: 'Tipo', required: true },
+      { key: 'criticidade', label: 'Criticidade', options: ['BAIXA', 'MEDIA', 'ALTA', 'CRITICA', 'EMERGENCIAL'] },
+      { key: 'status', label: 'Status', options: ['ABERTA', 'EM_ANALISE', 'APLICADA', 'IGNORADA'] },
+      { key: 'titulo', label: 'Titulo', required: true },
+      { key: 'descricao', label: 'Descricao', type: 'textarea', required: true },
+      { key: 'acao_sugerida', label: 'Acao sugerida', type: 'textarea' }
+    ],
+    columns: ['createdAt', 'tipo_recomendacao', 'criticidade', 'status', 'obra.nome', 'titulo']
+  },
+  documentos_ia: {
+    title: 'Analises IA documental',
+    subtitle: 'Contratos e resultados de leitura IA/OCR para documentos SST.',
+    area: 'documentos',
+    fields: [
+      { key: 'documento_id', label: 'Documento ID', type: 'number' },
+      { key: 'tipo_documento', label: 'Tipo', options: ['ASO', 'CERTIFICADO', 'TREINAMENTO', 'EPI', 'OUTRO'], required: true },
+      { key: 'provider', label: 'Provider', options: ['NAO_CONFIGURADO', 'OPENAI', 'CLAUDE', 'AWS_TEXTRACT', 'AZURE_OCR'] },
+      { key: 'status', label: 'Status', options: ['PENDENTE_PROVIDER', 'AGUARDANDO_PROCESSAMENTO', 'PROCESSADO', 'ERRO'] },
+      { key: 'confianca', label: 'Confianca', type: 'number' },
+      { key: 'observacoes', label: 'Observacoes', type: 'textarea' }
+    ],
+    columns: ['createdAt', 'tipo_documento', 'provider', 'status', 'confianca', 'documento.titulo']
+  },
+  workflow_logs: {
+    title: 'Logs de workflow',
+    subtitle: 'Observabilidade das execucoes e acoes de workflow SST.',
+    area: 'analytics',
+    fields: [],
+    columns: ['createdAt', 'acao', 'status', 'mensagem', 'erro']
+  },
+  automation_logs: {
+    title: 'Logs de automacao',
+    subtitle: 'Rastreamento das automacoes executadas pelo backend SST.',
+    area: 'analytics',
+    fields: [],
+    columns: ['createdAt', 'automacao', 'status', 'mensagem', 'erro']
+  },
+  blocking_logs: {
+    title: 'Logs de bloqueio',
+    subtitle: 'Auditoria das avaliacoes de bloqueio operacional SST.',
+    area: 'analytics',
+    fields: [],
+    columns: ['createdAt', 'tipo_bloqueio', 'criticidade', 'status', 'mensagem']
+  },
+  integration_logs: {
+    title: 'Logs de integracao',
+    subtitle: 'Rastreamento das integracoes controladas com RH/DP, Obras e futuras fontes.',
+    area: 'analytics',
+    fields: [],
+    columns: ['createdAt', 'integracao', 'tipo_evento', 'status', 'mensagem', 'erro']
   },
   documentos: {
     title: 'Documentos SST',
@@ -200,6 +493,8 @@ export const SST_RESOURCES = {
 export const SST_NAV = [
   ['riscos', 'Riscos'],
   ['agentes', 'Agentes'],
+  ['ambientes', 'Ambientes'],
+  ['exposicoes', 'Exposições'],
   ['pgr', 'PGR'],
   ['pcmso', 'PCMSO'],
   ['aso', 'ASO'],
@@ -208,6 +503,23 @@ export const SST_NAV = [
   ['treinamentos', 'Treinamentos'],
   ['acidentes', 'Acidentes'],
   ['documentos', 'Documentos'],
+  ['regras', 'Regras'],
+  ['politicas_bloqueio', 'Politicas de bloqueio'],
+  ['bloqueios', 'Bloqueios'],
+  ['notificacoes', 'Notificacoes'],
+  ['pendencias', 'Pendencias'],
+  ['scores', 'Scores'],
+  ['criticidades', 'Criticidades'],
+  ['workflows', 'Workflows'],
+  ['workflow_acoes', 'Acoes workflow'],
+  ['workflow_execucoes', 'Execucoes workflow'],
+  ['workflow_eventos', 'Eventos workflow'],
+  ['recomendacoes', 'Recomendacoes'],
+  ['documentos_ia', 'Analises IA'],
+  ['workflow_logs', 'Logs workflow'],
+  ['automation_logs', 'Logs automacao'],
+  ['integration_logs', 'Logs integracao'],
+  ['blocking_logs', 'Logs bloqueio'],
   ['esocial', 'eSocial'],
   ['eventos', 'Eventos']
 ];

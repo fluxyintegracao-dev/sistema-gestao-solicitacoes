@@ -13,6 +13,8 @@ module.exports = (sequelize, DataTypes) => sequelize.define('SstTreinamento', {
   instrutor: { type: DataTypes.STRING(160), allowNull: true },
   carga_horaria: { type: DataTypes.DECIMAL(8, 2), allowNull: true },
   certificado_url: { type: DataTypes.TEXT, allowNull: true },
+  obrigatorio: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
+  funcao_alvo: { type: DataTypes.STRING(120), allowNull: true },
   status: { type: DataTypes.STRING(30), allowNull: false, defaultValue: 'VALIDO' },
   observacoes: { type: DataTypes.TEXT, allowNull: true },
   criado_por: { type: DataTypes.INTEGER, allowNull: true },

@@ -7,6 +7,7 @@ const {
   SstEpiEntrega,
   SstEventoOperacional,
   SstExame,
+  SstRisco,
   SstTreinamento
 } = require('../../../models');
 const { SST_EVENT_TYPES, SST_VALIDITY_ALERT_DAYS } = require('../constants/sstConstants');
@@ -89,13 +90,18 @@ async function gerarEventosVencimentoSst({ usuario_id = null } = {}) {
   const fim = limiteIso(dias);
   const payloadBase = { inicio, fim, dias_alerta_validade: dias };
 
-  const [asos, exames, epis, treinamentos, documentosVencendo, documentosExpirados] = await Promise.all([
+  const [asos, asosVencidos, exames, examesVencidos, epis, episVencidos, treinamentos, treinamentosVencidos, documentosVencendo, documentosExpirados, riscosCriticos] = await Promise.all([
     SstAso.findAll({ where: { validade: { [Op.between]: [inicio, fim] } }, limit: 500 }),
+    SstAso.findAll({ where: { validade: { [Op.lt]: inicio } }, limit: 500 }),
     SstExame.findAll({ where: { validade: { [Op.between]: [inicio, fim] } }, limit: 500 }),
+    SstExame.findAll({ where: { validade: { [Op.lt]: inicio } }, limit: 500 }),
     SstEpiEntrega.findAll({ where: { validade: { [Op.between]: [inicio, fim] } }, limit: 500 }),
+    SstEpiEntrega.findAll({ where: { validade: { [Op.lt]: inicio } }, limit: 500 }),
     SstTreinamento.findAll({ where: { validade: { [Op.between]: [inicio, fim] } }, limit: 500 }),
+    SstTreinamento.findAll({ where: { validade: { [Op.lt]: inicio } }, limit: 500 }),
     SstDocumento.findAll({ where: { validade: { [Op.between]: [inicio, fim] } }, limit: 500 }),
-    SstDocumento.findAll({ where: { validade: { [Op.lt]: inicio } }, limit: 500 })
+    SstDocumento.findAll({ where: { validade: { [Op.lt]: inicio } }, limit: 500 }),
+    SstRisco.findAll({ where: { severidade: { [Op.in]: ['ALTA', 'CRITICA'] }, ativo: true }, limit: 500 })
   ]);
 
   const eventos = [
@@ -111,6 +117,18 @@ async function gerarEventosVencimentoSst({ usuario_id = null } = {}) {
       payload: { ...payloadBase, validade: item.validade },
       usuario_id
     })),
+    ...asosVencidos.map((item) => ({
+      empresa_id: item.empresa_id,
+      obra_id: item.obra_id,
+      colaborador_id: item.colaborador_id,
+      tipo_evento: SST_EVENT_TYPES.ASO_VENCIDO,
+      severidade: 'CRITICA',
+      origem_tipo: 'sst_aso',
+      origem_id: item.id,
+      mensagem: `ASO vencido em ${item.validade}.`,
+      payload: { ...payloadBase, validade: item.validade },
+      usuario_id
+    })),
     ...exames.map((item) => ({
       empresa_id: item.empresa_id,
       obra_id: item.obra_id,
@@ -120,6 +138,18 @@ async function gerarEventosVencimentoSst({ usuario_id = null } = {}) {
       origem_tipo: 'sst_exames',
       origem_id: item.id,
       mensagem: `Exame ocupacional vencendo em ${item.validade}.`,
+      payload: { ...payloadBase, validade: item.validade, tipo_exame: item.tipo_exame, nome_exame: item.nome_exame },
+      usuario_id
+    })),
+    ...examesVencidos.map((item) => ({
+      empresa_id: item.empresa_id,
+      obra_id: item.obra_id,
+      colaborador_id: item.colaborador_id,
+      tipo_evento: SST_EVENT_TYPES.EXAME_VENCIDO,
+      severidade: 'CRITICA',
+      origem_tipo: 'sst_exames',
+      origem_id: item.id,
+      mensagem: `Exame ocupacional vencido em ${item.validade}.`,
       payload: { ...payloadBase, validade: item.validade, tipo_exame: item.tipo_exame, nome_exame: item.nome_exame },
       usuario_id
     })),
@@ -135,6 +165,18 @@ async function gerarEventosVencimentoSst({ usuario_id = null } = {}) {
       payload: { ...payloadBase, validade: item.validade, epi_nome: item.epi_nome, ca: item.ca },
       usuario_id
     })),
+    ...episVencidos.map((item) => ({
+      empresa_id: item.empresa_id,
+      obra_id: item.obra_id,
+      colaborador_id: item.colaborador_id,
+      tipo_evento: SST_EVENT_TYPES.EPI_VENCIDO,
+      severidade: 'CRITICA',
+      origem_tipo: 'sst_epi_entregas',
+      origem_id: item.id,
+      mensagem: `EPI vencido em ${item.validade}: ${item.epi_nome || 'EPI sem nome informado'}.`,
+      payload: { ...payloadBase, validade: item.validade, epi_nome: item.epi_nome, ca: item.ca },
+      usuario_id
+    })),
     ...treinamentos.map((item) => ({
       empresa_id: item.empresa_id,
       obra_id: item.obra_id,
@@ -144,6 +186,18 @@ async function gerarEventosVencimentoSst({ usuario_id = null } = {}) {
       origem_tipo: 'sst_treinamentos',
       origem_id: item.id,
       mensagem: `Treinamento vencendo em ${item.validade}: ${item.nome || item.codigo || 'treinamento sem nome informado'}.`,
+      payload: { ...payloadBase, validade: item.validade, codigo: item.codigo, nome: item.nome },
+      usuario_id
+    })),
+    ...treinamentosVencidos.map((item) => ({
+      empresa_id: item.empresa_id,
+      obra_id: item.obra_id,
+      colaborador_id: item.colaborador_id,
+      tipo_evento: SST_EVENT_TYPES.TREINAMENTO_VENCIDO,
+      severidade: 'CRITICA',
+      origem_tipo: 'sst_treinamentos',
+      origem_id: item.id,
+      mensagem: `Treinamento vencido em ${item.validade}: ${item.nome || item.codigo || 'treinamento sem nome informado'}.`,
       payload: { ...payloadBase, validade: item.validade, codigo: item.codigo, nome: item.nome },
       usuario_id
     })),
@@ -170,6 +224,17 @@ async function gerarEventosVencimentoSst({ usuario_id = null } = {}) {
       mensagem: `Documento SST expirado em ${item.validade}: ${item.titulo}.`,
       payload: { ...payloadBase, validade: item.validade, tipo_documento: item.tipo_documento },
       usuario_id
+    })),
+    ...riscosCriticos.map((item) => ({
+      empresa_id: item.empresa_id,
+      obra_id: item.obra_id,
+      tipo_evento: SST_EVENT_TYPES.RISCO_CRITICO_IDENTIFICADO,
+      severidade: 'CRITICA',
+      origem_tipo: 'sst_riscos',
+      origem_id: item.id,
+      mensagem: `Risco critico identificado: ${item.nome}.`,
+      payload: { severidade: item.severidade, categoria: item.categoria },
+      usuario_id
     }))
   ];
 
@@ -183,11 +248,16 @@ async function gerarEventosVencimentoSst({ usuario_id = null } = {}) {
     dias_alerta_validade: dias,
     analisados: {
       aso: asos.length,
+      aso_vencidos: asosVencidos.length,
       exames: exames.length,
+      exames_vencidos: examesVencidos.length,
       epi: epis.length,
+      epi_vencidos: episVencidos.length,
       treinamentos: treinamentos.length,
+      treinamentos_vencidos: treinamentosVencidos.length,
       documentos_vencendo: documentosVencendo.length,
-      documentos_expirados: documentosExpirados.length
+      documentos_expirados: documentosExpirados.length,
+      riscos_criticos: riscosCriticos.length
     },
     eventos_criados: criados,
     eventos_existentes: Math.max(0, eventos.length - criados)

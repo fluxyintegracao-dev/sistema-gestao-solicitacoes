@@ -11,10 +11,24 @@
 
 - backend como fonte de verdade
 - single-tenant por instalacao
+- multiempresa dentro da instalacao
 - validacao critica no servidor
 - migrations controladas
 - configuracao por `.env` e por runtime config
 - modulos habilitaveis e desabilitaveis por configuracao central, sem acoplar um fluxo ao outro
+- core operacional separado de camada experimental/lab
+- dado operacional critico nao deve depender de fallback, inferencia ou simulacao
+- relatorios devem demonstrar inconsistencia de dados em vez de preencher lacunas por suposicao
+
+## Posicionamento Arquitetural Atual
+
+O FLUXY entrou na fase de consolidacao operacional e institucionalizacao.
+
+O repositorio atual deve ser tratado como sistema institucional single-tenant por instalacao, com suporte a multiempresa, holding, intercompany, obras e centros de custo dentro da mesma instalacao.
+
+O repositorio atual nao deve ser convertido em SaaS multi-tenant com base compartilhada. Caso o modelo multi-tenant seja retomado no futuro, ele deve nascer em nova geracao arquitetural, baseada nas regras estabilizadas e na experiencia operacional acumulada.
+
+O documento oficial desta mudanca e `docs/REPOSICIONAMENTO_ESTRATEGICO_FLUXY.md`.
 
 ## Camadas
 
@@ -77,3 +91,25 @@ Principios para novos modulos:
 - backend deve proteger rotas do modulo
 - frontend deve ocultar menu e telas quando o modulo estiver desabilitado
 - integracoes opcionais, como boleto bancario, devem ficar em modulo ou submodulo separado quando houver dependencia de homologacao externa
+
+## Core Operacional e Lab
+
+### Core Operacional
+
+Inclui solicitacoes, compras, financeiro, obras, contratos, apropriacoes, RH/DP, SST, fiscal operacional, integracoes criticas, seguranca, auditoria e permissoes.
+
+Mudancas no core exigem:
+
+- regra de negocio clara;
+- validacao no backend;
+- revisao de permissoes;
+- migration controlada quando houver banco;
+- teste/build aplicavel;
+- atualizacao documental;
+- orientacao de deploy e rollback quando houver risco.
+
+### Camada Experimental / Lab
+
+Inclui IA, Fluxy Experience, WebXR, 3D, automacoes avancadas e prototipos de integracoes.
+
+Essa camada deve ser desacoplada do core, preferencialmente por modulo, feature flag ou configuracao, sem comprometer rotinas operacionais criticas.

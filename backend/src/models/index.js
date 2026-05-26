@@ -179,9 +179,36 @@ db.SstEpiEntrega = require('../modules/sst/models/SstEpiEntrega')(sequelize, Seq
 db.SstTreinamento = require('../modules/sst/models/SstTreinamento')(sequelize, Sequelize);
 db.SstAcidente = require('../modules/sst/models/SstAcidente')(sequelize, Sequelize);
 db.SstDocumento = require('../modules/sst/models/SstDocumento')(sequelize, Sequelize);
+db.SstAmbienteTrabalho = require('../modules/sst/models/SstAmbienteTrabalho')(sequelize, Sequelize);
+db.SstExposicao = require('../modules/sst/models/SstExposicao')(sequelize, Sequelize);
+db.SstRegraConformidade = require('../modules/sst/models/SstRegraConformidade')(sequelize, Sequelize);
+db.SstPoliticaBloqueio = require('../modules/sst/models/SstPoliticaBloqueio')(sequelize, Sequelize);
+db.SstBloqueioOperacional = require('../modules/sst/models/SstBloqueioOperacional')(sequelize, Sequelize);
+db.SstNotificacao = require('../modules/sst/models/SstNotificacao')(sequelize, Sequelize);
+db.SstPendenciaOperacional = require('../modules/sst/models/SstPendenciaOperacional')(sequelize, Sequelize);
+db.SstComplianceScore = require('../modules/sst/models/SstComplianceScore')(sequelize, Sequelize);
+db.SstCriticidade = require('../modules/sst/models/SstCriticidade')(sequelize, Sequelize);
+db.SstWorkflow = require('../modules/sst/models/SstWorkflow')(sequelize, Sequelize);
+db.SstWorkflowExecucao = require('../modules/sst/models/SstWorkflowExecucao')(sequelize, Sequelize);
+db.SstWorkflowAcao = require('../modules/sst/models/SstWorkflowAcao')(sequelize, Sequelize);
+db.SstWorkflowEvento = require('../modules/sst/models/SstWorkflowEvento')(sequelize, Sequelize);
+db.SstRecomendacaoOperacional = require('../modules/sst/models/SstRecomendacaoOperacional')(sequelize, Sequelize);
+db.SstDocumentoAnaliseIa = require('../modules/sst/models/SstDocumentoAnaliseIa')(sequelize, Sequelize);
+db.SstWorkflowLog = require('../modules/sst/models/SstWorkflowLog')(sequelize, Sequelize);
+db.SstAutomationLog = require('../modules/sst/models/SstAutomationLog')(sequelize, Sequelize);
+db.SstBlockingLog = require('../modules/sst/models/SstBlockingLog')(sequelize, Sequelize);
+db.SstIntegrationLog = require('../modules/sst/models/SstIntegrationLog')(sequelize, Sequelize);
 db.SstEventoEsocial = require('../modules/sst/models/SstEventoEsocial')(sequelize, Sequelize);
 db.SstEventoOperacional = require('../modules/sst/models/SstEventoOperacional')(sequelize, Sequelize);
 db.SstHistorico = require('../modules/sst/models/SstHistorico')(sequelize, Sequelize);
+
+/* =====================
+   ESOCIAL
+===================== */
+db.EsocialLayoutVersion = require('../modules/esocial/models/EsocialLayoutVersion')(sequelize, Sequelize);
+db.EsocialLote = require('../modules/esocial/models/EsocialLote')(sequelize, Sequelize);
+db.EsocialEvento = require('../modules/esocial/models/EsocialEvento')(sequelize, Sequelize);
+db.EsocialRetorno = require('../modules/esocial/models/EsocialRetorno')(sequelize, Sequelize);
 
 const TITULO_FINANCEIRO_SEQUENCE_KEY = 'GLOBAL';
 
@@ -3171,6 +3198,25 @@ db.FiscalAccountingBatchItem.belongsTo(db.FiscalDfeDocument, { foreignKey: 'fisc
   db.SstTreinamento,
   db.SstAcidente,
   db.SstDocumento,
+  db.SstAmbienteTrabalho,
+  db.SstExposicao,
+  db.SstRegraConformidade,
+  db.SstPoliticaBloqueio,
+  db.SstBloqueioOperacional,
+  db.SstNotificacao,
+  db.SstPendenciaOperacional,
+  db.SstComplianceScore,
+  db.SstCriticidade,
+  db.SstWorkflow,
+  db.SstWorkflowExecucao,
+  db.SstWorkflowAcao,
+  db.SstWorkflowEvento,
+  db.SstRecomendacaoOperacional,
+  db.SstDocumentoAnaliseIa,
+  db.SstWorkflowLog,
+  db.SstAutomationLog,
+  db.SstBlockingLog,
+  db.SstIntegrationLog,
   db.SstEventoEsocial,
   db.SstEventoOperacional,
   db.SstHistorico
@@ -3195,6 +3241,62 @@ db.FiscalAccountingBatchItem.belongsTo(db.FiscalDfeDocument, { foreignKey: 'fisc
 
 db.SstRisco.hasMany(db.SstAgenteNocivo, { foreignKey: 'risco_id', as: 'agentes' });
 db.SstAgenteNocivo.belongsTo(db.SstRisco, { foreignKey: 'risco_id', as: 'risco' });
+db.SstAmbienteTrabalho.hasMany(db.SstExposicao, { foreignKey: 'ambiente_id', as: 'exposicoes' });
+db.SstExposicao.belongsTo(db.SstAmbienteTrabalho, { foreignKey: 'ambiente_id', as: 'ambiente' });
+db.SstRisco.hasMany(db.SstExposicao, { foreignKey: 'risco_id', as: 'exposicoes' });
+db.SstExposicao.belongsTo(db.SstRisco, { foreignKey: 'risco_id', as: 'risco' });
+db.SstAgenteNocivo.hasMany(db.SstExposicao, { foreignKey: 'agente_nocivo_id', as: 'exposicoes' });
+db.SstExposicao.belongsTo(db.SstAgenteNocivo, { foreignKey: 'agente_nocivo_id', as: 'agenteNocivo' });
+db.SstAso.hasMany(db.SstExame, { foreignKey: 'aso_id', as: 'examesComplementares' });
+db.SstExame.belongsTo(db.SstAso, { foreignKey: 'aso_id', as: 'aso' });
+db.User.hasMany(db.SstAcidente, { foreignKey: 'responsavel_id', as: 'acidentesSstResponsavel' });
+db.SstAcidente.belongsTo(db.User, { foreignKey: 'responsavel_id', as: 'responsavel' });
+db.SstPoliticaBloqueio.hasMany(db.SstBloqueioOperacional, { foreignKey: 'politica_id', as: 'bloqueios' });
+db.SstBloqueioOperacional.belongsTo(db.SstPoliticaBloqueio, { foreignKey: 'politica_id', as: 'politica' });
+db.User.hasMany(db.SstNotificacao, { foreignKey: 'usuario_id', as: 'notificacoesSst' });
+db.SstNotificacao.belongsTo(db.User, { foreignKey: 'usuario_id', as: 'usuario' });
+db.User.hasMany(db.SstPendenciaOperacional, { foreignKey: 'responsavel_id', as: 'pendenciasSstResponsavel' });
+db.SstPendenciaOperacional.belongsTo(db.User, { foreignKey: 'responsavel_id', as: 'responsavel' });
+db.SstWorkflow.hasMany(db.SstWorkflowAcao, { foreignKey: 'workflow_id', as: 'acoes' });
+db.SstWorkflowAcao.belongsTo(db.SstWorkflow, { foreignKey: 'workflow_id', as: 'workflow' });
+db.SstWorkflow.hasMany(db.SstWorkflowExecucao, { foreignKey: 'workflow_id', as: 'execucoes' });
+db.SstWorkflowExecucao.belongsTo(db.SstWorkflow, { foreignKey: 'workflow_id', as: 'workflow' });
+db.SstWorkflow.hasMany(db.SstWorkflowEvento, { foreignKey: 'workflow_id', as: 'eventosWorkflow' });
+db.SstWorkflowEvento.belongsTo(db.SstWorkflow, { foreignKey: 'workflow_id', as: 'workflow' });
+db.SstWorkflowExecucao.hasMany(db.SstWorkflowEvento, { foreignKey: 'execucao_id', as: 'eventos' });
+db.SstWorkflowEvento.belongsTo(db.SstWorkflowExecucao, { foreignKey: 'execucao_id', as: 'execucao' });
+db.SstEventoOperacional.hasMany(db.SstWorkflowExecucao, { foreignKey: 'evento_id', as: 'workflowExecucoes' });
+db.SstWorkflowExecucao.belongsTo(db.SstEventoOperacional, { foreignKey: 'evento_id', as: 'eventoOperacional' });
+db.SstEventoOperacional.hasMany(db.SstWorkflowEvento, { foreignKey: 'evento_operacional_id', as: 'workflowEventos' });
+db.SstWorkflowEvento.belongsTo(db.SstEventoOperacional, { foreignKey: 'evento_operacional_id', as: 'eventoOperacional' });
+db.SstDocumento.hasMany(db.SstDocumentoAnaliseIa, { foreignKey: 'documento_id', as: 'analisesIa' });
+db.SstDocumentoAnaliseIa.belongsTo(db.SstDocumento, { foreignKey: 'documento_id', as: 'documento' });
+db.SstWorkflow.hasMany(db.SstWorkflowLog, { foreignKey: 'workflow_id', as: 'logs' });
+db.SstWorkflowLog.belongsTo(db.SstWorkflow, { foreignKey: 'workflow_id', as: 'workflow' });
+db.SstWorkflowExecucao.hasMany(db.SstWorkflowLog, { foreignKey: 'execucao_id', as: 'logs' });
+db.SstWorkflowLog.belongsTo(db.SstWorkflowExecucao, { foreignKey: 'execucao_id', as: 'execucao' });
+db.SstBloqueioOperacional.hasMany(db.SstBlockingLog, { foreignKey: 'bloqueio_id', as: 'logs' });
+db.SstBlockingLog.belongsTo(db.SstBloqueioOperacional, { foreignKey: 'bloqueio_id', as: 'bloqueio' });
+
+/* ===== ESOCIAL ===== */
+db.EmpresaGrupo.hasMany(db.EsocialLote, { foreignKey: 'empresa_id', as: 'esocialLotes' });
+db.EsocialLote.belongsTo(db.EmpresaGrupo, { foreignKey: 'empresa_id', as: 'empresa' });
+db.EsocialLayoutVersion.hasMany(db.EsocialLote, { foreignKey: 'layout_version_id', as: 'lotes' });
+db.EsocialLote.belongsTo(db.EsocialLayoutVersion, { foreignKey: 'layout_version_id', as: 'layoutVersion' });
+db.EsocialLayoutVersion.hasMany(db.EsocialEvento, { foreignKey: 'layout_version_id', as: 'eventos' });
+db.EsocialEvento.belongsTo(db.EsocialLayoutVersion, { foreignKey: 'layout_version_id', as: 'layoutVersion' });
+db.EsocialLote.hasMany(db.EsocialEvento, { foreignKey: 'lote_id', as: 'eventos' });
+db.EsocialEvento.belongsTo(db.EsocialLote, { foreignKey: 'lote_id', as: 'lote' });
+db.EsocialEvento.hasMany(db.EsocialRetorno, { foreignKey: 'evento_id', as: 'retornos' });
+db.EsocialRetorno.belongsTo(db.EsocialEvento, { foreignKey: 'evento_id', as: 'evento' });
+db.EsocialLote.hasMany(db.EsocialRetorno, { foreignKey: 'lote_id', as: 'retornos' });
+db.EsocialRetorno.belongsTo(db.EsocialLote, { foreignKey: 'lote_id', as: 'lote' });
+db.EmpresaGrupo.hasMany(db.EsocialEvento, { foreignKey: 'empresa_id', as: 'esocialEventos' });
+db.EsocialEvento.belongsTo(db.EmpresaGrupo, { foreignKey: 'empresa_id', as: 'empresa' });
+db.Obra.hasMany(db.EsocialEvento, { foreignKey: 'obra_id', as: 'esocialEventos' });
+db.EsocialEvento.belongsTo(db.Obra, { foreignKey: 'obra_id', as: 'obra' });
+db.RhColaborador.hasMany(db.EsocialEvento, { foreignKey: 'colaborador_id', as: 'esocialEventos' });
+db.EsocialEvento.belongsTo(db.RhColaborador, { foreignKey: 'colaborador_id', as: 'colaborador' });
 
 /* ===== TREINAMENTO ===== */
 db.TreinamentoConteudo.belongsTo(db.User, { foreignKey: 'criado_por', as: 'criadoPor' });

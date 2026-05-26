@@ -1,8 +1,10 @@
 # Contexto - Visao Geral
 
-O FLUXY e um ERP operacional simples, orientado por solicitacoes, criado a partir de uma operacao real de construcao civil e evoluido para comercializacao.
+O FLUXY e uma plataforma operacional institucional, orientada por solicitacoes, criada a partir de uma operacao real de construcao civil e evoluida para sustentar rotinas criticas da empresa.
 
-A direcao atual do produto e consolidar o FLUXY como um ERP simples, intuitivo, de facil registro e controle para pequenas e medias operacoes, com modulos habilitaveis por instalacao e baixa friccao de implantacao.
+A direcao atual do produto nao e mais expansao funcional acelerada. O projeto entrou na fase de consolidacao operacional e institucionalizacao, com foco em estabilidade, governanca, seguranca, testes, documentacao, rastreabilidade e reducao de dependencia do fundador tecnico.
+
+O reposicionamento oficial esta documentado em `docs/REPOSICIONAMENTO_ESTRATEGICO_FLUXY.md`.
 
 ## Tese do Produto
 
@@ -25,18 +27,21 @@ O FLUXY resolve isso com um fluxo unico e rastreavel, centrado na solicitacao.
 
 ## Publico Alvo Atual
 
-- construtoras pequenas e medias
-- empresas com fluxo interno de solicitacoes entre setores
-- operacoes que precisam de financeiro simples e conciliacao bancaria
-- software houses que queiram operar o produto como implementacao por cliente
+- operacao interna da empresa
+- diretorias e liderancas setoriais
+- areas administrativas, obras, compras, financeiro, RH/DP, fiscal, contratos e SST
+- equipes futuras de suporte, implantacao, manutencao e governanca
 
 ## Principios do Produto
 
 - simplicidade operacional acima de sofisticacao desnecessaria
 - backend como autoridade para regras criticas
-- single-tenant por cliente na V1
+- single-tenant por instalacao
+- multiempresa dentro da instalacao
 - solicitacao como hub dos fluxos
 - rastreabilidade por historico, logs e auditoria
+- core operacional protegido contra experimentos de alto risco
+- camada experimental separada para IA, WebXR, 3D e automacoes avancadas
 
 ## Pilares Funcionais
 
@@ -49,3 +54,9 @@ O FLUXY resolve isso com um fluxo unico e rastreavel, centrado na solicitacao.
 - conciliacao OFX
 - gestao de obras
 - dashboards e relatorios
+
+## Posicionamento Comercial
+
+O FLUXY nao deve ser tratado neste momento como SaaS multi-tenant amplo ou produto massificado.
+
+A expansao comercial futura deve ser controlada, preferencialmente em modelo single tenant por cliente, somente depois de maturidade em estabilidade, testes, documentacao, suporte, deploy e governanca.
