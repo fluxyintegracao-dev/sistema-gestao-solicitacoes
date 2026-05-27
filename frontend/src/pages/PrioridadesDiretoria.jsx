@@ -171,6 +171,12 @@ export default function PrioridadesDiretoria() {
   const podeEditarSelecaoLote = Boolean(detalhe?.pode_editar_selecao || detalhe?.pode_finalizar);
   const statusDetalhe = String(detalhe?.status || '').toUpperCase();
   const statusPermiteSelecao = STATUS_LOTE_COM_SELECAO.has(statusDetalhe);
+  const isPedidoAguardandoAprovacao = Boolean(
+    isLoteSolicitacaoDiretoria &&
+    statusDetalhe === 'AGUARDANDO_APROVACAO'
+  );
+  const textoAcaoFinalizarLote = isPedidoAguardandoAprovacao ? 'Aprovar lote' : 'Finalizar lote';
+  const textoFinalizandoLote = isPedidoAguardandoAprovacao ? 'Aprovando...' : 'Finalizando...';
   const podeFinalizarPedidoDiretoria = Boolean(
     isLoteSolicitacaoDiretoria &&
     podeEditarSelecaoLote &&
@@ -659,7 +665,10 @@ export default function PrioridadesDiretoria() {
       alert('O total selecionado excede o valor disponivel do lote.');
       return;
     }
-    if (!window.confirm(`Finalizar lote com ${solicitacoesSelecionadas.length} solicitacao(oes)?`)) {
+    const mensagemConfirmacao = isPedidoAguardandoAprovacao
+      ? `Aprovar lote com ${solicitacoesSelecionadas.length} solicitacao(oes)?`
+      : `Finalizar lote com ${solicitacoesSelecionadas.length} solicitacao(oes)?`;
+    if (!window.confirm(mensagemConfirmacao)) {
       return;
     }
 
@@ -674,9 +683,12 @@ export default function PrioridadesDiretoria() {
       await carregarLotes();
       await carregarDetalheLote(detalhe.id);
       setSelecionadasIds([]);
+      const mensagemSucesso = isPedidoAguardandoAprovacao
+        ? 'Lote aprovado com sucesso.'
+        : 'Lote finalizado com sucesso.';
       alert(idsIgnorados.length > 0
-        ? `Lote finalizado com sucesso. ${idsIgnorados.length} solicitacao(oes) foram ignoradas por nao estarem mais elegiveis.${complemento}`
-        : 'Lote finalizado com sucesso.');
+        ? `${mensagemSucesso} ${idsIgnorados.length} solicitacao(oes) foram ignoradas por nao estarem mais elegiveis.${complemento}`
+        : mensagemSucesso);
     } catch (error) {
       console.error(error);
       await tratarErroElegibilidade(error, 'Erro ao finalizar lote');
@@ -1009,6 +1021,16 @@ export default function PrioridadesDiretoria() {
                       {cancelando ? 'Cancelando...' : 'Cancelar lote'}
                     </button>
                   )}
+                  {detalhe.pode_finalizar && (
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={finalizarLote}
+                      disabled={finalizando || solicitacoesSelecionadas.length === 0 || excedeuLimite}
+                    >
+                      {finalizando ? textoFinalizandoLote : textoAcaoFinalizarLote}
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -1188,7 +1210,7 @@ export default function PrioridadesDiretoria() {
                         onClick={finalizarLote}
                         disabled={finalizando || solicitacoesSelecionadas.length === 0 || excedeuLimite}
                       >
-                        {finalizando ? 'Finalizando...' : 'Finalizar lote'}
+                        {finalizando ? textoFinalizandoLote : textoAcaoFinalizarLote}
                       </button>
                     )}
                   </div>
