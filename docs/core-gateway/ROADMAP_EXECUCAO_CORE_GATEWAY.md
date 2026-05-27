@@ -66,6 +66,10 @@ Observacoes:
 
 ## Fase 3 - Portal Cliente
 
+Fundacao implementada:
+
+- `POST /api/gateway/portal/autorizacao`.
+
 Endpoints:
 
 - `GET /api/gateway/portal/dashboard`;

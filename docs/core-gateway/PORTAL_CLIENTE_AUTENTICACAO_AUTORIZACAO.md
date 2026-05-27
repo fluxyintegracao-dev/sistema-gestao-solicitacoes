@@ -50,7 +50,7 @@ X-Fluxy-Portal-Client-Document-Hash
 
 Observacoes:
 
-- `X-Fluxy-Portal-Client-Id` e o id interno do cliente no banco do Experience.
+- `X-Fluxy-Portal-Client-Id` e o `Parceiro.id` oficial do Core vinculado ao usuario autenticado no Experience.
 - `X-Fluxy-Portal-Client-Document-Hash` deve ser hash do CPF/CNPJ normalizado, nunca documento cru.
 - O Core pode usar o hash para conciliar com `Parceiro.cpf_cnpj` sem expor documento completo.
 
@@ -149,6 +149,33 @@ O Core nunca deve retornar dado sensivel apenas porque o Experience pediu.
 - CPF/CNPJ completo quando nao for indispensavel;
 - observacoes internas do contrato.
 
+## Endpoint De Fundacao Implementado
+
+```text
+POST /api/gateway/portal/autorizacao
+```
+
+Esse endpoint valida se o cliente autenticado no Experience pode ser reconhecido pelo Core como cliente oficial.
+
+Ele:
+
+- valida `X-Fluxy-Portal-Client-Id`;
+- valida `X-Fluxy-Portal-Client-Document-Hash`;
+- confirma `Parceiro.ativo = true`;
+- confirma `Parceiro.cliente = true`;
+- compara SHA-256 do CPF/CNPJ normalizado;
+- confirma contrato com status `ATIVO`, `INADIMPLENTE` ou `QUITADO`;
+- retorna apenas dados minimos para roteamento futuro do Portal.
+
+Ele nao libera:
+
+- financeiro;
+- parcelas;
+- boletos;
+- documentos;
+- chamados;
+- dashboard operacional.
+
 ## Endpoints Planejados
 
 ```text
@@ -166,7 +193,8 @@ POST /api/gateway/portal/chamados
 
 Em 2026-05-27:
 
-- rotas do Portal Cliente existem no Core Gateway como `501 PLANNED`;
+- rota `POST /api/gateway/portal/autorizacao` existe como fundacao de seguranca;
+- rotas operacionais do Portal Cliente existem no Core Gateway como `501 PLANNED`;
 - Experience deve manter mocks para `/portal/*`;
 - contrato de autenticacao/autorizacao foi definido;
 - implementacao real deve ser feita em fase separada com testes de acesso negado.

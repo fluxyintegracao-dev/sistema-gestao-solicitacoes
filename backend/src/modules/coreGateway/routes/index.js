@@ -33,6 +33,7 @@ router.get('/comercial/mapa-unidades', CoreGatewayController.listarMapaUnidades)
 router.post('/comercial/simulacao', CoreGatewayController.simularComercial);
 
 router.get('/portal/dashboard', CoreGatewayController.planned('GET /api/gateway/portal/dashboard'));
+router.post('/portal/autorizacao', CoreGatewayController.autorizarPortalCliente);
 router.get('/portal/financeiro', CoreGatewayController.planned('GET /api/gateway/portal/financeiro'));
 router.get('/portal/parcelas', CoreGatewayController.planned('GET /api/gateway/portal/parcelas'));
 router.get('/portal/boletos/:id', CoreGatewayController.planned('GET /api/gateway/portal/boletos/:id'));

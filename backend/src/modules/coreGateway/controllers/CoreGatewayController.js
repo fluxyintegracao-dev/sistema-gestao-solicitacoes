@@ -8,6 +8,7 @@ const {
 } = require('../services/coreGatewayService');
 const { auditCoreGateway } = require('../audit/coreGatewayAuditService');
 const commercialService = require('../services/coreGatewayCommercialService');
+const portalAuthService = require('../services/coreGatewayPortalAuthService');
 const { listarEventosCoreGateway } = require('../events/coreGatewayEvents');
 
 function health(req, res) {
@@ -200,6 +201,37 @@ async function simularComercial(req, res) {
   }
 }
 
+async function autorizarPortalCliente(req, res) {
+  try {
+    const data = await portalAuthService.autorizarClientePortal(req);
+    await auditCoreGateway(req, {
+      tipoEvento: 'CORE_GATEWAY_PORTAL_AUTORIZACAO',
+      status: data.autorizado ? 'ALLOWED' : 'DENIED',
+      descricao: data.autorizado
+        ? 'Cliente autorizado para futura camada Portal Cliente.'
+        : 'Cliente negado para futura camada Portal Cliente.',
+      metadata: {
+        motivo: data.motivo,
+        cliente_id: data.cliente?.id || null,
+        total_contratos: data.total_contratos || 0
+      }
+    });
+
+    return res.json(buildGatewayResponse({
+      ...data,
+      escopo: 'PORTAL_AUTH_ONLY',
+      dados_operacionais_liberados: false
+    }, req));
+  } catch (error) {
+    await auditCoreGateway(req, {
+      tipoEvento: 'CORE_GATEWAY_PORTAL_AUTORIZACAO_ERROR',
+      status: 'ERROR',
+      descricao: error.message
+    });
+    return handleControllerError(res, req, error, 'Erro ao validar autorizacao do Portal Cliente.');
+  }
+}
+
 module.exports = {
   health,
   eventos,
@@ -207,5 +239,6 @@ module.exports = {
   listarEmpreendimentos,
   listarUnidades,
   listarMapaUnidades,
-  simularComercial
+  simularComercial,
+  autorizarPortalCliente
 };

@@ -249,3 +249,111 @@ Registrar o estado mais recente do trabalho para que outra sessao ou outro chat 
   - `restricoes` ainda nao representa politica comercial oficial; Experience deve manter disclaimer e defaults proprios
 - proximo passo recomendado:
   - apos commit/deploy, Experience pode remover parte da normalizacao defensiva ou mante-la como fallback
+
+## Handoff
+- data: 2026-05-27
+- sessao: coordenacao multirrepositorio Core + Experience
+- escopo concluido:
+  - agente principal assumiu coordenacao dos dois projetos ate a borda de Portal/CRM
+  - criado plano `docs/workspace/PLANO_CORE_EXPERIENCE_PRE_PORTAL_CRM.md`
+  - criado plano espelho no Experience
+  - atualizado deploy Experience para `experience.jrfluxy.com.br` na Vercel e API em EC2
+  - criado contrato atual do Core Gateway no Experience
+  - validada sintaxe Core Gateway e TypeScript do Experience
+- repositorio: C:\Fluxy
+- arquivos alterados:
+  - docs/workspace/OWNERSHIP_ATIVO.md
+  - docs/workspace/HANDOFF_GLOBAL.md
+  - docs/workspace/PLANO_CORE_EXPERIENCE_PRE_PORTAL_CRM.md
+  - ../Fluxy_Experience/docs/workspace/OWNERSHIP_ATIVO.md
+  - ../Fluxy_Experience/docs/workspace/HANDOFF_GLOBAL.md
+  - ../Fluxy_Experience/docs/workspace/PLANO_CORE_EXPERIENCE_PRE_PORTAL_CRM.md
+  - ../Fluxy_Experience/docs/core-integration/CONTRATO_ATUAL_CORE_GATEWAY_20260527.md
+  - ../Fluxy_Experience/docs/deploy/DEPLOY_EXPERIENCE_SUBDOMINIO.md
+- validacao executada:
+  - `node -c backend/src/modules/coreGateway/controllers/CoreGatewayController.js`
+  - `node -c backend/src/modules/coreGateway/routes/index.js`
+  - `node -e "require('./backend/src/app'); console.log('core ok')"`
+  - `node --check api/src/services/coreGatewayClient.js`
+  - `node --check api/src/controllers/GatewayComercialController.js`
+  - `npx tsc --noEmit` em `C:\Fluxy_Experience`
+- riscos conhecidos:
+  - `C:\Fluxy_Experience` local ainda nao esta inicializado como repositorio Git nesta maquina
+  - Portal Cliente e CRM ainda nao devem ser construidos sem prompt especifico
+- proximo passo recomendado:
+  - se o comercial real estiver aprovado visualmente, preparar prompt para o agente auxiliar iniciar Portal Cliente ou CRM conforme prioridade do usuario
+
+## Handoff
+- data: 2026-05-27
+- sessao: coordenacao multirrepositorio Core + Experience
+- escopo concluido:
+  - registrada decisao de o agente principal assumir os dois projetos ate a borda de Portal Cliente e CRM
+  - atualizada fase preparatoria em `PLANO_CORE_EXPERIENCE_PRE_PORTAL_CRM.md`
+  - criado marco formal de handoff em `MARCO_HANDOFF_PORTAL_CRM.md`
+  - registrado que o agente auxiliar nao deve iniciar Portal/CRM sem prompt especifico
+- repositorio: C:\Fluxy
+- arquivos alterados:
+  - docs/workspace/PLANO_CORE_EXPERIENCE_PRE_PORTAL_CRM.md
+  - docs/workspace/MARCO_HANDOFF_PORTAL_CRM.md
+  - ../Fluxy_Experience/docs/workspace/PLANO_CORE_EXPERIENCE_PRE_PORTAL_CRM.md
+  - ../Fluxy_Experience/docs/workspace/MARCO_HANDOFF_PORTAL_CRM.md
+- validacao executada:
+  - revisao documental por leitura
+- riscos conhecidos:
+  - `C:\Fluxy_Experience` local ainda nao esta inicializado como repositorio Git nesta maquina
+  - Portal Cliente e CRM continuam bloqueados ate prompt especifico
+- proximo passo recomendado:
+  - validar visualmente a integracao comercial real e concluir checklist de ambiente Experience antes de entregar prompt ao agente auxiliar
+
+## Handoff
+- data: 2026-05-27
+- sessao: fundacao Core Gateway Portal Cliente
+- escopo concluido:
+  - implementada fundacao de autorizacao do Portal Cliente no Core Gateway
+  - criada rota `POST /api/gateway/portal/autorizacao`
+  - criada validacao por `Parceiro.ativo`, `Parceiro.cliente`, hash de CPF/CNPJ e contratos autorizados
+  - mantidas rotas operacionais do Portal Cliente como `501 PLANNED`
+  - documentado que nenhum dado financeiro/documental foi liberado nesta etapa
+- repositorio: C:\Fluxy
+- arquivos alterados:
+  - backend/src/modules/coreGateway/services/coreGatewayPortalAuthService.js
+  - backend/src/modules/coreGateway/controllers/CoreGatewayController.js
+  - backend/src/modules/coreGateway/routes/index.js
+  - docs/core-gateway/CONTRATOS_API_EXPERIENCE.md
+  - docs/core-gateway/PORTAL_CLIENTE_AUTENTICACAO_AUTORIZACAO.md
+  - docs/core-gateway/ROADMAP_EXECUCAO_CORE_GATEWAY.md
+  - docs/workspace/PLANO_CORE_EXPERIENCE_PRE_PORTAL_CRM.md
+  - docs/workspace/MARCO_HANDOFF_PORTAL_CRM.md
+  - docs/workspace/HANDOFF_GLOBAL.md
+- validacao executada:
+  - `node -c backend/src/modules/coreGateway/services/coreGatewayPortalAuthService.js`
+  - `node -c backend/src/modules/coreGateway/controllers/CoreGatewayController.js`
+  - `node -c backend/src/modules/coreGateway/routes/index.js`
+  - `node -e "const s=require('./backend/src/modules/coreGateway/services/coreGatewayPortalAuthService'); console.log(s.normalizeDocument('123.456.789-09'), s.documentHash('123.456.789-09').length)"`
+  - `node -e "require('./backend/src/app'); console.log('core gateway portal auth ok')"`
+- riscos conhecidos:
+  - Experience ainda precisa consumir esse endpoint no futuro, mas sem iniciar Portal real agora
+  - `X-Fluxy-Portal-Client-Id` deve corresponder ao `Parceiro.id` oficial do Core
+  - o Experience deve gerar o hash com CPF/CNPJ apenas digitos para bater com o Core
+- proximo passo recomendado:
+  - preparar checklist de ambiente Experience e, depois da validacao comercial, gerar prompt especifico para o agente auxiliar
+
+## Handoff
+- data: 2026-05-27
+- sessao: checklist ambiente Experience
+- escopo concluido:
+  - criado checklist de ambiente para publicar Experience sem iniciar Portal/CRM
+  - documentadas variaveis de Core, API Experience e Vercel
+  - documentado teste de health do Core Gateway e da API Experience
+  - documentado Go/No-Go antes de iniciar Portal Cliente e CRM
+- repositorio: C:\Fluxy
+- arquivos alterados:
+  - docs/workspace/CHECKLIST_AMBIENTE_EXPERIENCE.md
+  - docs/workspace/HANDOFF_GLOBAL.md
+- validacao executada:
+  - revisao documental por leitura
+- riscos conhecidos:
+  - Experience local ainda precisa de repositorio Git/projeto publicado para deploy real
+  - API Experience ainda precisa ser provisionada na EC2
+- proximo passo recomendado:
+  - validar o checklist em ambiente real e, quando aprovado, emitir prompt de Portal Cliente/CRM ao agente auxiliar

@@ -319,6 +319,112 @@ ContratoComercialComprador.parceiro_id
 
 Nao sera criada tabela paralela de clientes no Core para o portal.
 
+### POST `/api/gateway/portal/autorizacao`
+
+Status: implementado como fundacao de seguranca.
+
+Objetivo:
+
+- validar se o cliente autenticado no Experience existe no Core;
+- confirmar se `Parceiro.ativo = true`;
+- confirmar se `Parceiro.cliente = true`;
+- comparar hash SHA-256 do documento normalizado;
+- confirmar vinculo com contrato autorizado;
+- nao liberar dashboard, financeiro, documentos ou chamados.
+
+Headers obrigatorios:
+
+```text
+X-Fluxy-Experience-Client-Id
+X-Fluxy-Experience-Timestamp
+X-Fluxy-Experience-Signature
+X-Fluxy-Portal-Client-Id
+X-Fluxy-Portal-Client-Document-Hash
+```
+
+Formato do hash do documento:
+
+```text
+sha256(CPF_CNPJ_APENAS_DIGITOS)
+```
+
+Status de contrato aceitos para autorizacao inicial:
+
+```text
+ATIVO
+INADIMPLENTE
+QUITADO
+```
+
+Resposta autorizada:
+
+```json
+{
+  "success": true,
+  "data": {
+    "autorizado": true,
+    "motivo": "AUTORIZADO",
+    "cliente": {
+      "id": 1,
+      "nome": "Cliente Exemplo",
+      "email_cadastrado": true,
+      "telefone_cadastrado": true
+    },
+    "contratos": [
+      {
+        "id": 10,
+        "numero": "CT-001",
+        "status": "ATIVO",
+        "papel_cliente": "TITULAR",
+        "comprador_vinculado": false,
+        "empreendimento": {
+          "id": 1,
+          "nome": "Empreendimento",
+          "slug": "empreendimento"
+        },
+        "unidade": {
+          "id": 5,
+          "codigo": "101",
+          "tipologia": "Apartamento"
+        }
+      }
+    ],
+    "total_contratos": 1,
+    "escopo": "PORTAL_AUTH_ONLY",
+    "dados_operacionais_liberados": false
+  },
+  "meta": {
+    "version": "v1",
+    "request_id": "uuid"
+  }
+}
+```
+
+Resposta negada:
+
+```json
+{
+  "success": true,
+  "data": {
+    "autorizado": false,
+    "motivo": "DOCUMENTO_NAO_CONFERE",
+    "mensagem": "Documento autenticado no Experience nao confere com o cliente oficial do Core.",
+    "escopo": "PORTAL_AUTH_ONLY",
+    "dados_operacionais_liberados": false
+  },
+  "meta": {
+    "version": "v1",
+    "request_id": "uuid"
+  }
+}
+```
+
+Observacoes:
+
+- negativa de autorizacao e resposta de negocio com HTTP 200;
+- falhas de HMAC, feature flag, rate limit ou erro interno continuam usando HTTP apropriado;
+- nenhum dado financeiro/documental e liberado por este endpoint.
+
 ### GET `/api/gateway/portal/dashboard`
 
 Retorna:
