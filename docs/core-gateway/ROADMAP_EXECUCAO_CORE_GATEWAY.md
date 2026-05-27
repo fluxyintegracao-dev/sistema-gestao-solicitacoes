@@ -77,6 +77,22 @@ Endpoints:
 - `GET /api/gateway/portal/chamados`;
 - `POST /api/gateway/portal/chamados`.
 
+Status: contrato arquitetural preparado em 2026-05-27.
+
+Documento:
+
+```text
+docs/core-gateway/PORTAL_CLIENTE_AUTENTICACAO_AUTORIZACAO.md
+```
+
+Decisoes:
+
+- Experience autentica o cliente final;
+- Core autoriza por vinculo oficial com `Parceiro`/`ContratoComercial`;
+- Experience deve enviar id externo e hash de documento;
+- Core nao retorna dados sensiveis sem validar contrato/parcela/documento;
+- implementacao real permanece pendente.
+
 ## Fase 4 - Eventos
 
 Implementado parcialmente em 2026-05-27:

@@ -184,3 +184,68 @@ Registrar o estado mais recente do trabalho para que outra sessao ou outro chat 
   - Portal Cliente continua em mock no Experience porque o Core ainda retorna `501 PLANNED`
 - proximo passo recomendado:
   - configurar variaveis do Core Gateway na EC2 dev e executar teste `GET /api/admin/gateway/health` no Experience
+
+## Handoff
+- data: 2026-05-27
+- sessao: agente principal Core
+- escopo concluido:
+  - preparado contrato arquitetural do Portal Cliente
+  - definido que o Experience autentica o cliente e o Core autoriza dados oficiais
+  - definidos headers adicionais planejados `X-Fluxy-Portal-Client-Id` e `X-Fluxy-Portal-Client-Document-Hash`
+  - documentado que `/portal/*` permanece em mock no Experience ate implementacao Core
+- repositorio: C:\Fluxy
+- arquivos alterados:
+  - docs/core-gateway/PORTAL_CLIENTE_AUTENTICACAO_AUTORIZACAO.md
+  - docs/core-gateway/CONTRATOS_API_EXPERIENCE.md
+  - docs/core-gateway/ROADMAP_EXECUCAO_CORE_GATEWAY.md
+  - docs/workspace/HANDOFF_GLOBAL.md
+- validacao executada:
+  - revisao documental por leitura
+- riscos conhecidos:
+  - autorizacao do portal envolve dados sensiveis e deve ser implementada com testes negativos
+  - hash de documento precisa ser normalizado igualmente nos dois sistemas
+- proximo passo recomendado:
+  - apos o agente auxiliar concluir comercial real, implementar services do Portal Cliente no Core Gateway com autorizacao por contrato
+
+## Handoff
+- data: 2026-05-27
+- sessao: agente principal Core
+- escopo concluido:
+  - confirmado que a fonte oficial de cliente para Portal sera `Parceiro`
+  - documentado uso obrigatorio de `Parceiro.ativo = true` e `Parceiro.cliente = true`
+  - documentado vinculo por `ContratoComercial.parceiro_id` e `ContratoComercialComprador.parceiro_id`
+  - registrado retorno do agente auxiliar sobre integracao comercial real no Experience
+- repositorio: C:\Fluxy
+- arquivos alterados:
+  - docs/core-gateway/PORTAL_CLIENTE_AUTENTICACAO_AUTORIZACAO.md
+  - docs/core-gateway/CONTRATOS_API_EXPERIENCE.md
+  - docs/workspace/HANDOFF_GLOBAL.md
+- validacao executada:
+  - leitura dos models `Parceiro`, `ContratoComercial` e `ContratoComercialParcela`
+  - busca por regras existentes de cliente no Core
+- riscos conhecidos:
+  - hash de CPF/CNPJ precisa usar a mesma normalizacao no Core e Experience
+  - contratos com multiplos compradores exigem testes especificos
+- proximo passo recomendado:
+  - implementar helper de autorizacao do Portal Cliente no Core Gateway antes de qualquer endpoint financeiro/documental real
+
+## Handoff
+- data: 2026-05-27
+- sessao: agente principal Core
+- escopo concluido:
+  - alinhado contrato comercial do Core Gateway com a normalizacao feita pelo Experience
+  - `mapa-unidades` agora retorna `grupos`, `torres` e `unidades`
+  - `simulacao` agora retorna objeto `restricoes` com `disponiveis=false` quando nao ha politica oficial configurada
+  - documentado contrato atualizado em `docs/core-gateway/CONTRATOS_API_EXPERIENCE.md`
+- repositorio: C:\Fluxy
+- arquivos alterados:
+  - backend/src/modules/coreGateway/controllers/CoreGatewayController.js
+  - docs/core-gateway/CONTRATOS_API_EXPERIENCE.md
+  - docs/workspace/HANDOFF_GLOBAL.md
+- validacao executada:
+  - `node -c backend/src/modules/coreGateway/controllers/CoreGatewayController.js`
+  - `node -e "require('./backend/src/app'); console.log('app ok')"`
+- riscos conhecidos:
+  - `restricoes` ainda nao representa politica comercial oficial; Experience deve manter disclaimer e defaults proprios
+- proximo passo recomendado:
+  - apos commit/deploy, Experience pode remover parte da normalizacao defensiva ou mante-la como fallback

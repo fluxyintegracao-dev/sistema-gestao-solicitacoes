@@ -221,12 +221,38 @@ Dados permitidos:
 - status comercial publicavel;
 - metadados de exibicao.
 
+Resposta atual:
+
+```json
+{
+  "success": true,
+  "data": {
+    "grupos": [],
+    "torres": [],
+    "unidades": [],
+    "total": 0,
+    "total_unidades": 0
+  },
+  "meta": {
+    "version": "v1",
+    "request_id": "uuid"
+  }
+}
+```
+
+Observacao:
+
+- `grupos` e o formato original do Core por empreendimento/torre.
+- `torres` e formato de compatibilidade para visualizacao agrupada no Experience.
+- `unidades` e formato flat para telas que preferem lista simples.
+
 ### POST `/api/gateway/comercial/simulacao`
 
 Objetivo: validar parametros basicos de simulacao.
 
 Importante: simulacao nao e proposta oficial, nao aprova credito e nao gera contrato.
 O retorno atual e uma simulacao simples, sem juros, marcada como `nao_oficial`.
+Tambem retorna `restricoes`, mas enquanto nao houver politica comercial oficial configurada no Core os campos ficam `null` e `disponiveis=false`.
 
 Payload:
 
@@ -239,9 +265,59 @@ Payload:
 }
 ```
 
+Resposta parcial:
+
+```json
+{
+  "success": true,
+  "data": {
+    "nao_oficial": true,
+    "gera_proposta": false,
+    "aprova_credito": false,
+    "valor_referencia": 0,
+    "valor_entrada": 0,
+    "prazo_meses": 0,
+    "saldo_simulado": 0,
+    "parcela_base_sem_juros": 0,
+    "restricoes": {
+      "entrada_minima_percentual": null,
+      "prazo_maximo_meses": null,
+      "taxa_referencia_anual": null,
+      "disponiveis": false
+    }
+  }
+}
+```
+
 ## APIs portal cliente
 
-Todas exigem cliente autenticado e escopo do proprio cliente.
+Todas exigem cliente autenticado no Experience e autorizacao oficial no Core.
+
+Referencia arquitetural:
+
+```text
+docs/core-gateway/PORTAL_CLIENTE_AUTENTICACAO_AUTORIZACAO.md
+```
+
+Headers adicionais planejados para rotas do portal:
+
+```text
+X-Fluxy-Portal-Client-Id
+X-Fluxy-Portal-Client-Document-Hash
+```
+
+O Experience autentica o cliente. O Core valida se o cliente tem vinculo oficial com o contrato/parcela/documento solicitado.
+
+Fonte oficial de cliente no Core:
+
+```text
+Parceiro.ativo = true
+Parceiro.cliente = true
+ContratoComercial.parceiro_id
+ContratoComercialComprador.parceiro_id
+```
+
+Nao sera criada tabela paralela de clientes no Core para o portal.
 
 ### GET `/api/gateway/portal/dashboard`
 
@@ -253,23 +329,52 @@ Retorna:
 - andamento de obra resumido;
 - comunicados.
 
+Query planejada:
+
+```text
+contrato_id opcional
+```
+
 ### GET `/api/gateway/portal/financeiro`
 
 Retorna resumo financeiro do cliente autenticado.
 
 Nao retorna dados internos do Core.
 
+Dados permitidos:
+
+- valor contrato;
+- total pago;
+- saldo em aberto;
+- parcelas abertas;
+- parcelas vencidas;
+- proximo vencimento.
+
+Dados proibidos:
+
+- dados bancarios internos;
+- remessas;
+- conciliacoes;
+- movimentos de outros clientes;
+- observacoes internas.
+
 ### GET `/api/gateway/portal/parcelas`
 
 Retorna parcelas do cliente autenticado.
+
+Cada parcela deve pertencer ao contrato autorizado.
 
 ### GET `/api/gateway/portal/boletos/:id`
 
 Retorna URL temporaria ou instrucao de segunda via para parcela do cliente autenticado.
 
+O Core deve validar que o boleto pertence a parcela autorizada antes de gerar qualquer URL.
+
 ### GET `/api/gateway/portal/documentos`
 
 Retorna lista de documentos autorizados.
+
+Documentos devem ser entregues por URL temporaria e auditada.
 
 ### GET `/api/gateway/portal/obra`
 

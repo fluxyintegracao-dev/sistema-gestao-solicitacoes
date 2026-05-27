@@ -53,6 +53,52 @@ function handleControllerError(res, req, error, fallbackMessage = 'Erro interno 
   ));
 }
 
+function buildTorresFromMapaGroups(groups = []) {
+  return groups.map((group) => {
+    const pavimentos = new Map();
+
+    for (const unidade of group.unidades || []) {
+      const pavimentoKey = String(unidade.pavimento || 'Sem pavimento');
+      if (!pavimentos.has(pavimentoKey)) {
+        pavimentos.set(pavimentoKey, {
+          numero: unidade.pavimento || null,
+          unidades: []
+        });
+      }
+
+      pavimentos.get(pavimentoKey).unidades.push({
+        id_publico: unidade.id_publico,
+        codigo: unidade.codigo,
+        tipologia: unidade.tipologia,
+        status_comercial: unidade.status_comercial,
+        valor_a_partir_de: unidade.valor_a_partir_de,
+        area_privativa: unidade.area_privativa
+      });
+    }
+
+    return {
+      nome: group.torre || group.bloco || 'Geral',
+      empreendimento_id: group.empreendimento_id,
+      empreendimento_nome: group.empreendimento_nome,
+      bloco: group.bloco,
+      torre: group.torre,
+      pavimentos: Array.from(pavimentos.values())
+    };
+  });
+}
+
+function flattenMapaGroups(groups = []) {
+  return groups.flatMap((group) => (
+    (group.unidades || []).map((unidade) => ({
+      ...unidade,
+      empreendimento_id: group.empreendimento_id,
+      empreendimento_nome: group.empreendimento_nome,
+      bloco: group.bloco,
+      torre: group.torre
+    }))
+  ));
+}
+
 async function listarEmpreendimentos(req, res) {
   try {
     const data = await commercialService.listarEmpreendimentosPublicos(req.query || {});
@@ -96,13 +142,21 @@ async function listarUnidades(req, res) {
 async function listarMapaUnidades(req, res) {
   try {
     const data = await commercialService.listarMapaUnidadesPublico(req.query || {});
+    const unidades = flattenMapaGroups(data);
+    const torres = buildTorresFromMapaGroups(data);
     await auditCoreGateway(req, {
       tipoEvento: 'CORE_GATEWAY_COMERCIAL_MAPA_UNIDADES',
       status: 'ALLOWED',
       descricao: 'Mapa publico de unidades enviado ao Experience.',
       metadata: { total: data.length }
     });
-    return res.json(buildGatewayResponse({ grupos: data, total: data.length }, req));
+    return res.json(buildGatewayResponse({
+      grupos: data,
+      torres,
+      unidades,
+      total: data.length,
+      total_unidades: unidades.length
+    }, req));
   } catch (error) {
     await auditCoreGateway(req, {
       tipoEvento: 'CORE_GATEWAY_COMERCIAL_MAPA_UNIDADES_ERROR',
@@ -116,16 +170,26 @@ async function listarMapaUnidades(req, res) {
 async function simularComercial(req, res) {
   try {
     const data = await commercialService.simularComercialNaoOficial(req.body || {});
+    const payload = {
+      ...data,
+      restricoes: {
+        entrada_minima_percentual: null,
+        prazo_maximo_meses: null,
+        taxa_referencia_anual: null,
+        disponiveis: false,
+        observacao: 'Restricoes oficiais ainda nao configuradas no Core. Usar defaults do Experience sem tratar como proposta oficial.'
+      }
+    };
     await auditCoreGateway(req, {
       tipoEvento: 'CORE_GATEWAY_COMERCIAL_SIMULACAO',
       status: 'ALLOWED',
       descricao: 'Simulacao comercial nao oficial gerada para o Experience.',
       metadata: {
-        unidade_id: data.unidade?.core_id || null,
-        prazo_meses: data.prazo_meses
+        unidade_id: payload.unidade?.core_id || null,
+        prazo_meses: payload.prazo_meses
       }
     });
-    return res.json(buildGatewayResponse(data, req));
+    return res.json(buildGatewayResponse(payload, req));
   } catch (error) {
     await auditCoreGateway(req, {
       tipoEvento: 'CORE_GATEWAY_COMERCIAL_SIMULACAO_ERROR',
