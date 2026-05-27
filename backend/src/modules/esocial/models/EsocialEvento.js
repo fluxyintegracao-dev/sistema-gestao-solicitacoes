@@ -12,6 +12,10 @@ module.exports = (sequelize, DataTypes) => sequelize.define('EsocialEvento', {
   origem_id: { type: DataTypes.INTEGER, allowNull: true },
   tipo_evento: { type: DataTypes.STRING(20), allowNull: false },
   status: { type: DataTypes.STRING(30), allowNull: false, defaultValue: 'PREPARADO' },
+  idempotency_key: { type: DataTypes.STRING(180), allowNull: true },
+  data_referencia: { type: DataTypes.DATEONLY, allowNull: true },
+  xml_hash: { type: DataTypes.STRING(128), allowNull: true },
+  ambiente: { type: DataTypes.STRING(30), allowNull: false, defaultValue: 'restrita' },
   xml_original: { type: DataTypes.TEXT('long'), allowNull: true },
   xml_assinado: { type: DataTypes.TEXT('long'), allowNull: true },
   protocolo: { type: DataTypes.STRING(120), allowNull: true },
@@ -26,5 +30,12 @@ module.exports = (sequelize, DataTypes) => sequelize.define('EsocialEvento', {
   atualizado_por: { type: DataTypes.INTEGER, allowNull: true }
 }, {
   tableName: 'esocial_eventos',
-  timestamps: true
+  timestamps: true,
+  indexes: [
+    { fields: ['empresa_id'] },
+    { fields: ['colaborador_id'] },
+    { fields: ['tipo_evento'] },
+    { fields: ['status'] },
+    { fields: ['idempotency_key'] }
+  ]
 });

@@ -68,6 +68,104 @@ export async function getSstObservabilidade(params = {}) {
   return parseResponse(res, 'Erro ao carregar observabilidade SST');
 }
 
+export async function getSstMonitoramentoProducao(params = {}) {
+  const res = await fetch(`${API_URL}/sst/producao/monitoramento${toQuery(params)}`, {
+    headers: authHeaders()
+  });
+  return parseResponse(res, 'Erro ao carregar monitoramento de producao SST');
+}
+
+export async function getSstObservabilidadeAvancada(params = {}) {
+  const res = await fetch(`${API_URL}/sst/observabilidade-avancada${toQuery(params)}`, {
+    headers: authHeaders()
+  });
+  return parseResponse(res, 'Erro ao carregar observabilidade avancada SST');
+}
+
+export async function getSstFilasStatus(params = {}) {
+  const res = await fetch(`${API_URL}/sst/queues/status${toQuery(params)}`, {
+    headers: authHeaders()
+  });
+  return parseResponse(res, 'Erro ao carregar filas SST');
+}
+
+export async function enfileirarJobSst(payload = {}) {
+  const res = await fetch(`${API_URL}/sst/queues/enqueue`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload)
+  });
+  return parseResponse(res, 'Erro ao enfileirar job SST');
+}
+
+export async function processarWorkerSst(payload = {}) {
+  const res = await fetch(`${API_URL}/sst/workers/processar`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload)
+  });
+  return parseResponse(res, 'Erro ao processar worker SST');
+}
+
+export async function getSstCacheStatus() {
+  const res = await fetch(`${API_URL}/sst/cache/status`, {
+    headers: authHeaders()
+  });
+  return parseResponse(res, 'Erro ao carregar cache SST');
+}
+
+export async function limparCacheExpiradoSst() {
+  const res = await fetch(`${API_URL}/sst/cache/limpar-expirado`, {
+    method: 'POST',
+    headers: authHeaders()
+  });
+  return parseResponse(res, 'Erro ao limpar cache SST');
+}
+
+export async function executarQualityCheckSst() {
+  const res = await fetch(`${API_URL}/sst/quality/check`, {
+    method: 'POST',
+    headers: authHeaders()
+  });
+  return parseResponse(res, 'Erro ao executar quality check SST');
+}
+
+export async function getSstQualityResumo() {
+  const res = await fetch(`${API_URL}/sst/quality/resumo`, {
+    headers: authHeaders()
+  });
+  return parseResponse(res, 'Erro ao carregar qualidade SST');
+}
+
+export async function getSstRolloutStatus(params = {}) {
+  const res = await fetch(`${API_URL}/sst/rollout/status${toQuery(params)}`, {
+    headers: authHeaders()
+  });
+  return parseResponse(res, 'Erro ao carregar rollout SST');
+}
+
+export async function getSstTelemetriaResumo(params = {}) {
+  const res = await fetch(`${API_URL}/sst/telemetria/resumo${toQuery(params)}`, {
+    headers: authHeaders()
+  });
+  return parseResponse(res, 'Erro ao carregar telemetria SST');
+}
+
+export async function getSstHardeningStatus(params = {}) {
+  const res = await fetch(`${API_URL}/sst/hardening/status${toQuery(params)}`, {
+    headers: authHeaders()
+  });
+  return parseResponse(res, 'Erro ao carregar hardening SST');
+}
+
+export async function gerarAlertasOperacionaisSst(params = {}) {
+  const res = await fetch(`${API_URL}/sst/alertas/gerar${toQuery(params)}`, {
+    method: 'POST',
+    headers: authHeaders()
+  });
+  return parseResponse(res, 'Erro ao gerar alertas operacionais SST');
+}
+
 export async function getSstChecklistHomologacao() {
   const res = await fetch(`${API_URL}/sst/homologacao/checklist`, {
     headers: authHeaders()
@@ -243,6 +341,92 @@ export async function analisarDocumentoIaSst(id, payload = {}) {
     body: JSON.stringify(payload)
   });
   return parseResponse(res, 'Erro ao analisar documento SST com IA');
+}
+
+export async function aprovarAnaliseIaSst(id) {
+  const res = await fetch(`${API_URL}/sst/documentos/analises/${id}/aprovar`, {
+    method: 'POST',
+    headers: authHeaders()
+  });
+  return parseResponse(res, 'Erro ao aprovar sugestao IA documental');
+}
+
+export async function rejeitarAnaliseIaSst(id) {
+  const res = await fetch(`${API_URL}/sst/documentos/analises/${id}/rejeitar`, {
+    method: 'POST',
+    headers: authHeaders()
+  });
+  return parseResponse(res, 'Erro ao rejeitar sugestao IA documental');
+}
+
+export async function getEsocialEventosSst(params = {}) {
+  const res = await fetch(`${API_URL}/sst/esocial/eventos${toQuery(params)}`, {
+    headers: authHeaders()
+  });
+  return parseResponse(res, 'Erro ao carregar eventos eSocial SST');
+}
+
+export async function getEsocialLotesSst(params = {}) {
+  const res = await fetch(`${API_URL}/sst/esocial/lotes${toQuery(params)}`, {
+    headers: authHeaders()
+  });
+  return parseResponse(res, 'Erro ao carregar lotes eSocial SST');
+}
+
+export async function getEsocialCertificadoStatusSst(params = {}) {
+  const res = await fetch(`${API_URL}/sst/esocial/certificado/status${toQuery(params)}`, {
+    headers: authHeaders()
+  });
+  return parseResponse(res, 'Erro ao validar certificado eSocial SST');
+}
+
+export async function gerarXmlEsocialSst(id) {
+  const res = await fetch(`${API_URL}/sst/esocial/eventos/${id}/gerar-xml`, {
+    method: 'POST',
+    headers: authHeaders()
+  });
+  return parseResponse(res, 'Erro ao gerar XML eSocial SST');
+}
+
+export async function validarXmlEsocialSst(id) {
+  const res = await fetch(`${API_URL}/sst/esocial/eventos/${id}/validar-xml`, {
+    method: 'POST',
+    headers: authHeaders()
+  });
+  return parseResponse(res, 'Erro ao validar XML eSocial SST');
+}
+
+export async function assinarXmlEsocialSst(id) {
+  const res = await fetch(`${API_URL}/sst/esocial/eventos/${id}/assinar-xml`, {
+    method: 'POST',
+    headers: authHeaders()
+  });
+  return parseResponse(res, 'Erro ao assinar XML eSocial SST');
+}
+
+export async function criarLoteRestritaEsocialSst(eventoIds = []) {
+  const res = await fetch(`${API_URL}/sst/esocial/lotes/restrita`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ evento_ids: eventoIds })
+  });
+  return parseResponse(res, 'Erro ao criar lote eSocial restrito');
+}
+
+export async function enviarLoteRestritaEsocialSst(id) {
+  const res = await fetch(`${API_URL}/sst/esocial/lotes/${id}/enviar-restrita`, {
+    method: 'POST',
+    headers: authHeaders()
+  });
+  return parseResponse(res, 'Erro ao enviar lote eSocial restrito');
+}
+
+export async function consultarRetornoEsocialSst(id) {
+  const res = await fetch(`${API_URL}/sst/esocial/lotes/${id}/consultar-retorno`, {
+    method: 'POST',
+    headers: authHeaders()
+  });
+  return parseResponse(res, 'Erro ao consultar retorno eSocial restrito');
 }
 
 export async function sincronizarEventosVencimentoSst() {

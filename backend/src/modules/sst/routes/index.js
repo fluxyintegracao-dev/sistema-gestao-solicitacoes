@@ -59,6 +59,11 @@ function forceDocumentResource(req, res, next) {
   return next();
 }
 
+function forceEsocialResource(req, res, next) {
+  req.params.resource = 'esocial';
+  return next();
+}
+
 router.get('/health', allowSst, (req, res) => res.json({ ok: true, module: 'SST' }));
 router.get('/configuracoes', (req, res, next) => {
   req.params.resource = 'configuracoes';
@@ -82,6 +87,74 @@ router.get('/observabilidade', (req, res, next) => {
   req.params.resource = 'workflow_logs';
   return next();
 }, allowSstResource('VIEW'), validateRequest({ query: validateSstQuery }), SstController.observabilidade);
+router.get('/producao/monitoramento', (req, res, next) => {
+  req.params.resource = 'telemetria';
+  return next();
+}, allowSstResource('VIEW'), validateRequest({ query: validateSstQuery }), SstController.monitoramentoProducao);
+router.get('/observabilidade-avancada', (req, res, next) => {
+  req.params.resource = 'performance_metrics';
+  return next();
+}, allowSstResource('VIEW'), validateRequest({ query: validateSstQuery }), SstController.observabilidadeAvancada);
+router.get('/queues/status', (req, res, next) => {
+  req.params.resource = 'queue_metrics';
+  return next();
+}, allowSstResource('VIEW'), validateRequest({ query: validateSstQuery }), SstController.statusFilas);
+router.post('/queues/enqueue', (req, res, next) => {
+  req.params.resource = 'jobs';
+  return next();
+}, allowSstResource('MANAGE'), SstController.enqueueJob);
+router.post('/workers/processar', (req, res, next) => {
+  req.params.resource = 'jobs';
+  return next();
+}, allowSstResource('MANAGE'), SstController.processarWorker);
+router.get('/cache/status', (req, res, next) => {
+  req.params.resource = 'cache_entries';
+  return next();
+}, allowSstResource('VIEW'), SstController.cacheStatus);
+router.post('/cache/limpar-expirado', (req, res, next) => {
+  req.params.resource = 'cache_entries';
+  return next();
+}, allowSstResource('MANAGE'), SstController.limparCacheExpirado);
+router.post('/quality/check', (req, res, next) => {
+  req.params.resource = 'quality_issues';
+  return next();
+}, allowSstResource('MANAGE'), SstController.qualityCheck);
+router.get('/quality/resumo', (req, res, next) => {
+  req.params.resource = 'quality_issues';
+  return next();
+}, allowSstResource('VIEW'), SstController.qualidadeResumo);
+router.get('/governance/resumo', (req, res, next) => {
+  req.params.resource = 'governance_logs';
+  return next();
+}, allowSstResource('VIEW'), validateRequest({ query: validateSstQuery }), SstController.governancaResumo);
+router.post('/governance/logs', (req, res, next) => {
+  req.params.resource = 'governance_logs';
+  return next();
+}, allowSstResource('MANAGE'), SstController.registrarGovernanca);
+router.post('/performance/registrar', (req, res, next) => {
+  req.params.resource = 'performance_metrics';
+  return next();
+}, allowSstResource('MANAGE'), SstController.registrarPerformance);
+router.get('/rollout/status', (req, res, next) => {
+  req.params.resource = 'rollout_planos';
+  return next();
+}, allowSstResource('VIEW'), validateRequest({ query: validateSstQuery }), SstController.rolloutStatus);
+router.get('/telemetria/resumo', (req, res, next) => {
+  req.params.resource = 'telemetria';
+  return next();
+}, allowSstResource('VIEW'), validateRequest({ query: validateSstQuery }), SstController.telemetriaResumo);
+router.post('/telemetria/registrar', (req, res, next) => {
+  req.params.resource = 'telemetria';
+  return next();
+}, allowSstResource('MANAGE'), SstController.registrarTelemetria);
+router.get('/hardening/status', (req, res, next) => {
+  req.params.resource = 'hardening_policies';
+  return next();
+}, allowSstResource('VIEW'), validateRequest({ query: validateSstQuery }), SstController.hardeningStatus);
+router.post('/alertas/gerar', (req, res, next) => {
+  req.params.resource = 'alertas_operacionais';
+  return next();
+}, allowSstResource('MANAGE'), validateRequest({ query: validateSstQuery }), SstController.gerarAlertasOperacionais);
 router.get('/homologacao/checklist', (req, res, next) => {
   req.params.resource = 'workflow_logs';
   return next();
@@ -141,7 +214,19 @@ router.post('/eventos/sincronizar-vencimentos', (req, res, next) => {
 router.post('/documentos/upload', forceDocumentResource, allowSstResource('MANAGE'), uploadSstFile.single('file'), validateRequest({ body: normalizeSstPayload }), SstController.uploadDocument);
 router.get('/documentos/:id/url', forceDocumentResource, allowSstResource('VIEW'), validateRequest({ params: validateNumericIdParam('id', 'Documento SST') }), SstController.documentUrl);
 router.post('/documentos/:id/analisar-ia', forceDocumentResource, allowSstResource('MANAGE'), validateRequest({ params: validateNumericIdParam('id', 'Documento SST') }), SstController.analisarDocumentoIa);
+router.post('/documentos/analises/:id/aprovar', forceDocumentResource, allowSstResource('MANAGE'), validateRequest({ params: validateNumericIdParam('id', 'Analise IA documental SST') }), SstController.aprovarAnaliseIa);
+router.post('/documentos/analises/:id/rejeitar', forceDocumentResource, allowSstResource('MANAGE'), validateRequest({ params: validateNumericIdParam('id', 'Analise IA documental SST') }), SstController.rejeitarAnaliseIa);
 router.get('/obras/:obraId/visao-operacional', allowSstDashboard, validateRequest({ params: validateNumericIdParam('obraId', 'Obra SST') }), SstController.visaoObra);
+router.get('/esocial/eventos', forceEsocialResource, allowSstResource('VIEW'), validateRequest({ query: validateSstQuery }), SstController.esocialEventos);
+router.get('/esocial/lotes', forceEsocialResource, allowSstResource('VIEW'), validateRequest({ query: validateSstQuery }), SstController.esocialLotes);
+router.get('/esocial/retornos', forceEsocialResource, allowSstResource('VIEW'), validateRequest({ query: validateSstQuery }), SstController.esocialRetornos);
+router.get('/esocial/certificado/status', forceEsocialResource, allowSstResource('VIEW'), validateRequest({ query: validateSstQuery }), SstController.esocialCertificadoStatus);
+router.post('/esocial/eventos/:id/gerar-xml', forceEsocialResource, allowSstResource('MANAGE'), validateRequest({ params: validateNumericIdParam('id', 'Evento eSocial SST') }), SstController.esocialGerarXml);
+router.post('/esocial/eventos/:id/validar-xml', forceEsocialResource, allowSstResource('MANAGE'), validateRequest({ params: validateNumericIdParam('id', 'Evento eSocial SST') }), SstController.esocialValidarXml);
+router.post('/esocial/eventos/:id/assinar-xml', forceEsocialResource, allowSstResource('MANAGE'), validateRequest({ params: validateNumericIdParam('id', 'Evento eSocial SST') }), SstController.esocialAssinarXml);
+router.post('/esocial/lotes/restrita', forceEsocialResource, allowSstResource('MANAGE'), SstController.esocialCriarLoteRestrita);
+router.post('/esocial/lotes/:id/enviar-restrita', forceEsocialResource, allowSstResource('MANAGE'), validateRequest({ params: validateNumericIdParam('id', 'Lote eSocial SST') }), SstController.esocialEnviarRestrita);
+router.post('/esocial/lotes/:id/consultar-retorno', forceEsocialResource, allowSstResource('MANAGE'), validateRequest({ params: validateNumericIdParam('id', 'Lote eSocial SST') }), SstController.esocialConsultarRetorno);
 
 router.get('/:resource', allowSstResource('VIEW'), validateRequest({ params: validateSstResourceParam, query: validateSstQuery }), SstController.index);
 router.post('/:resource', allowSstResource('MANAGE'), validateRequest({ params: validateSstResourceParam, body: normalizeSstPayload }), SstController.create);

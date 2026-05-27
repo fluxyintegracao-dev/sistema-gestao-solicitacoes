@@ -10,10 +10,17 @@ module.exports = (sequelize, DataTypes) => sequelize.define('SstDocumentoAnalise
   provider: { type: DataTypes.STRING(80), allowNull: false, defaultValue: 'NAO_CONFIGURADO' },
   status: { type: DataTypes.STRING(40), allowNull: false, defaultValue: 'PENDENTE_PROVIDER' },
   confianca: { type: DataTypes.DECIMAL(5, 2), allowNull: true },
+  texto_extraido: { type: DataTypes.TEXT('long'), allowNull: true },
   dados_extraidos_json: { type: DataTypes.TEXT('long'), allowNull: true },
   inconsistencias_json: { type: DataTypes.TEXT('long'), allowNull: true },
+  divergencias_json: { type: DataTypes.TEXT('long'), allowNull: true },
+  sugestoes_json: { type: DataTypes.TEXT('long'), allowNull: true },
   observacoes: { type: DataTypes.TEXT, allowNull: true },
   processado_em: { type: DataTypes.DATE, allowNull: true },
+  aprovado_em: { type: DataTypes.DATE, allowNull: true },
+  aprovado_por: { type: DataTypes.INTEGER, allowNull: true },
+  rejeitado_em: { type: DataTypes.DATE, allowNull: true },
+  rejeitado_por: { type: DataTypes.INTEGER, allowNull: true },
   criado_por: { type: DataTypes.INTEGER, allowNull: true },
   atualizado_por: { type: DataTypes.INTEGER, allowNull: true }
 }, {

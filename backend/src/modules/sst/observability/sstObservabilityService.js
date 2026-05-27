@@ -9,7 +9,10 @@ const {
   SstEventoOperacional,
   SstIntegrationLog,
   SstNotificacao,
+  SstOperationalAlert,
   SstPendenciaOperacional,
+  SstRolloutPlano,
+  SstTelemetryMetric,
   SstWorkflowExecucao,
   SstWorkflowLog
 } = require('../../../models');
@@ -57,6 +60,9 @@ async function gerarObservabilidadeSst(query = {}) {
     pendenciasCriticas,
     bloqueiosAbertos,
     scoresRecentes,
+    planosRolloutAtivos,
+    alertasOperacionaisAbertos,
+    metricasTelemetria,
     errosWorkflows,
     errosAutomacoes,
     errosIntegracoes,
@@ -77,6 +83,9 @@ async function gerarObservabilidadeSst(query = {}) {
     SstPendenciaOperacional.count({ where: { ...baseWhere, status: 'ABERTA', criticidade: { [Op.in]: ['CRITICA', 'EMERGENCIAL'] } } }),
     SstBloqueioOperacional.count({ where: { ...baseWhere, status: 'ABERTO' } }),
     SstComplianceScore.count({ where: baseWhere }),
+    SstRolloutPlano.count({ where: { ...buildWhere(query, SstRolloutPlano), status: 'ATIVO' } }),
+    SstOperationalAlert.count({ where: { ...buildWhere(query, SstOperationalAlert), status: 'ABERTO' } }),
+    SstTelemetryMetric.count({ where: buildWhere(query, SstTelemetryMetric) }),
     SstWorkflowLog.count({ where: erroWhere }),
     SstAutomationLog.count({ where: erroWhere }),
     SstIntegrationLog.count({ where: erroWhere }),
@@ -103,6 +112,9 @@ async function gerarObservabilidadeSst(query = {}) {
       pendencias_criticas: pendenciasCriticas,
       bloqueios_abertos: bloqueiosAbertos,
       scores_registrados: scoresRecentes,
+      rollout_ativos: planosRolloutAtivos,
+      alertas_operacionais: alertasOperacionaisAbertos,
+      metricas_telemetria: metricasTelemetria,
       erros_operacionais: errosTotal
     },
     status: {

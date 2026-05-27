@@ -150,6 +150,9 @@ Preparar a implantacao antes do Dia 1, validando o sistema por smoke tests, capt
 9. Configurar permissoes amostrais por perfil.
 10. Definir quais screenshots entram no treinamento.
 11. Registrar pendencias P0/P1 antes do Dia 1.
+12. Incluir SST no mapa de testes como modulo operacional completo.
+13. Separar testes SST em: dominio operacional, documentos, compliance, automacoes, observabilidade, IA documental e eSocial controlado.
+14. Registrar evidencias de SST sem executar transmissao real ao governo.
 
 ### Entregaveis
 
@@ -165,9 +168,25 @@ Preparar a implantacao antes do Dia 1, validando o sistema por smoke tests, capt
 - Dashboard testado.
 - Menus principais testados.
 - Pelo menos um fluxo por modulo critico mapeado.
+- Fluxos SST mapeados com dados amostrais de colaborador, obra, empresa, ASO, treinamento, EPI e acidente.
 - Permissoes amostrais testadas.
 - Evidencias salvas.
 - Nenhum P0 conhecido antes do Dia 1.
+
+### Mapa Minimo de Testes SST no Dia 0
+
+- Acessar dashboard SST.
+- Acessar centro operacional SST.
+- Acessar paginas de ASO, exames, treinamentos, EPI, acidentes, documentos e exposicoes.
+- Validar que usuario sem permissao SST nao acessa rotas SST.
+- Validar que usuario com permissao restrita acessa apenas areas liberadas.
+- Validar que documentos SST usam S3/presigned URL.
+- Validar que IA documental nao executa se `SST_IA_DOCUMENTAL_ENABLED=false`.
+- Validar que IA documental usa provider apenas pelo `.env` do backend.
+- Validar que nenhuma chave de IA aparece no frontend.
+- Validar que eSocial producao oficial permanece bloqueado.
+- Validar que producao restrita exige flags especificas.
+- Capturar screenshots de dashboard, documentos, eSocial controlado e observabilidade.
 
 ## Plano Executivo de 5 Dias
 
@@ -191,7 +210,10 @@ Preparar a base institucional amostral antes de treinar usuarios e antes de gera
 10. Revisar usuarios-chave amostrais.
 11. Definir matriz de permissao inicial por perfil.
 12. Definir visibilidade de dashboards/tabelas por amostra.
-13. Registrar quais configuracoes deverao ser refeitas no ambiente oficial.
+13. Definir quais areas SST entram no go-live operacional.
+14. Revisar flags SST ativas/inativas no backend.
+15. Revisar provider IA documental configurado no `.env` do backend, se a IA for testada.
+16. Registrar quais configuracoes deverao ser refeitas no ambiente oficial.
 
 ### Entregaveis
 
@@ -210,6 +232,8 @@ Preparar a base institucional amostral antes de treinar usuarios e antes de gera
 - Empresa holding e empresas operacionais amostrais estao cadastradas.
 - Obras amostrais separadas de centros de custo administrativos.
 - Menu nao mostra modulos desabilitados.
+- Modulo SST aparece apenas para usuarios autorizados.
+- Flags criticas SST estao documentadas antes de qualquer teste operacional.
 
 ## Dia 2 - Solicitacoes, Obras, Compras e Fluxo Operacional
 
@@ -294,7 +318,7 @@ Validar o financeiro como fonte operacional e gerencial, sem inferencias indevid
 
 ### Objetivo
 
-Validar modulos sensiveis, acesso a documentos e controles de seguranca.
+Validar modulos sensiveis, acesso a documentos, controles de seguranca e o modulo SST como camada operacional de conformidade.
 
 ### Atividades
 
@@ -302,20 +326,30 @@ Validar modulos sensiveis, acesso a documentos e controles de seguranca.
 2. Revisar permissoes SST.
 3. Revisar documentos sensiveis.
 4. Validar acesso a anexos via S3/presigned URL.
-5. Validar modulo fiscal, se entrar no go-live.
-6. Validar contratos vinculados a solicitacoes.
-7. Validar dashboards/tabelas habilitados.
-8. Validar auditoria/logs principais.
-9. Revisar usuarios com acesso financeiro.
-10. Revisar usuarios com acesso RH/SST.
-11. Revisar usuarios com acesso fiscal.
-12. Criar checklist de suporte operacional.
+5. Validar ASO, exames, treinamentos, EPI, acidentes, documentos e exposicoes SST.
+6. Validar dashboard, centro operacional, heatmap, timeline, score e relatorio SST.
+7. Validar conformidade SST e pendencias operacionais.
+8. Validar notificacoes, bloqueios, workflows e logs SST quando flags estiverem ativas.
+9. Validar observabilidade, telemetria, jobs, filas e qualidade SST.
+10. Validar IA documental com provider definido no `.env` do backend, sem chave no frontend.
+11. Validar eSocial controlado apenas em modo preparado/restrito, sem transmissao oficial.
+12. Validar modulo fiscal, se entrar no go-live.
+13. Validar contratos vinculados a solicitacoes.
+14. Validar dashboards/tabelas habilitados.
+15. Validar auditoria/logs principais.
+16. Revisar usuarios com acesso financeiro.
+17. Revisar usuarios com acesso RH/SST.
+18. Revisar usuarios com acesso fiscal.
+19. Criar checklist de suporte operacional.
 
 ### Entregaveis
 
 - Modulos sensiveis revisados.
 - Permissoes criticas revisadas.
 - Acesso a documentos validado.
+- SST operacional homologado por amostra.
+- IA documental validada em modo controlado, se ativada.
+- eSocial validado sem transmissao oficial.
 - Checklist de suporte criado.
 
 ### Checklist de Aceite
@@ -325,6 +359,11 @@ Validar modulos sensiveis, acesso a documentos e controles de seguranca.
 - Documento/anexo abre com URL assinada.
 - Dashboard/tabela desabilitada nao aparece para usuario final.
 - Auditoria basica esta acessivel para investigacao.
+- ASO, treinamento, EPI e acidente podem ser registrados por usuario autorizado.
+- Conformidade SST gera resultado coerente com a massa amostral.
+- Observabilidade SST mostra logs e status de automacoes/jobs sem erro critico.
+- eSocial oficial de producao continua bloqueado.
+- Frontend nao possui chaves de IA ou certificado.
 
 ## Dia 5 - Homologacao Final, Go-Live e Suporte Assistido
 
@@ -475,6 +514,23 @@ Exemplos:
 - visibilidade de dashboards/tabelas;
 - MFA/politica de acesso quando aplicavel.
 
+### SST
+
+- modulo SST habilitado apenas se entrar no go-live;
+- permissoes SST por usuario revisadas;
+- usuarios RH/DP, SST, Engenharia, Obras e Diretoria separados por perfil;
+- colaboradores amostrais vindos do RH/DP, sem duplicidade;
+- empresas e obras vinculadas aos registros SST;
+- documentos SST armazenados em S3 com acesso privado;
+- ASO amostral cadastrado com validade e aptidao;
+- treinamento amostral cadastrado com validade;
+- EPI amostral cadastrado com entrega e validade;
+- acidente amostral registrado sem envio ao eSocial;
+- score/conformidade calculados com base nos dados amostrais;
+- flags SST revisadas no backend;
+- provider IA documental definido somente no `.env` do backend;
+- producao oficial eSocial bloqueada por padrao.
+
 ## Checklist de Homologacao por Modulo
 
 ### Solicitacoes
@@ -517,13 +573,39 @@ Exemplos:
 - consultar resultado;
 - validar apropriacoes.
 
-### RH/DP e SST
+### RH/DP
 
 - validar permissao;
 - cadastrar registro basico;
 - anexar documento;
 - consultar dashboard;
 - consultar relatorio.
+
+### SST
+
+- validar acesso ao dashboard SST;
+- validar acesso ao centro operacional SST;
+- validar menus SST por permissao;
+- cadastrar ASO amostral;
+- cadastrar exame ocupacional amostral;
+- cadastrar treinamento amostral;
+- cadastrar entrega de EPI amostral;
+- registrar acidente/incidente amostral;
+- cadastrar exposicao ocupacional amostral;
+- anexar documento SST e abrir via URL assinada;
+- executar analise de conformidade;
+- validar pendencias operacionais;
+- validar score de conformidade;
+- validar heatmap operacional;
+- validar timeline do colaborador;
+- validar observabilidade, telemetria, logs e jobs;
+- testar IA documental com flag desligada;
+- testar IA documental com flag ligada e provider configurado no backend, se houver chave real;
+- confirmar que o frontend nao possui chave nem escolhe provider;
+- validar area eSocial controlada sem transmissao oficial;
+- validar geracao/validacao XML apenas se houver massa e configuracao segura;
+- confirmar bloqueio de `ESOCIAL_AMBIENTE=producao`;
+- validar segregacao por empresa, obra e usuario.
 
 ### Fiscal
 
@@ -559,6 +641,14 @@ Mitigacao: separar P0/P1/P2/P3 e corrigir apenas bloqueios.
 
 Mitigacao: explicar que relatorio depende de dado operacional real, categoria correta, empresa correta e baixa correta.
 
+### Risco 7 - SST ser tratado apenas como cadastro documental
+
+Mitigacao: homologar ASO, treinamentos, EPI, acidentes, exposicoes, conformidade, score, pendencias e observabilidade como fluxo operacional integrado ao RH/DP e Obras.
+
+### Risco 8 - Ativar IA documental ou eSocial sem governanca
+
+Mitigacao: manter chaves apenas no `.env` do backend, provider definido no backend, producao oficial eSocial bloqueada e qualquer transmissao restrita controlada por flags.
+
 ## Regra de Ouro da Implantacao
 
 O sistema deve refletir a operacao real.
@@ -572,6 +662,9 @@ Nao preencher dado por chute, nao usar fallback para informacao critica e nao ma
 5. A baixa foi feita?
 6. O usuario tem permissao?
 7. O modulo esta habilitado?
+8. No SST, o colaborador vem do RH/DP ou foi duplicado indevidamente?
+9. No SST, a flag necessaria esta ativa?
+10. No SST, a acao e apenas operacional ou tenta transmitir ao governo?
 
 ## Plano de Suporte Pos-Go-Live
 

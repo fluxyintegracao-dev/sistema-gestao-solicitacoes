@@ -208,7 +208,10 @@ Os principais grupos do sistema sao:
 - Comercial;
 - Provisionamento;
 - RH/DP;
+- SST;
 - Contratos;
+- Comunicacao interna;
+- Treinamento;
 - Configuracoes.
 
 Cada grupo possui telas operacionais e, quando aplicavel, uma pagina unica de Relatorios.
@@ -2887,6 +2890,10 @@ Ele deve ser usado para controlar:
 - acidentes e incidentes;
 - documentos SST;
 - preparacao futura para eSocial.
+- IA documental controlada;
+- centro operacional SST;
+- observabilidade SST;
+- producao controlada SST.
 
 ### 29.2 Regra de governanca
 
@@ -2905,7 +2912,13 @@ Por isso:
 Caminhos previstos:
 
 - `SST > Dashboard SST`;
-- `SST > Relatorios SST`;
+- `SST > Centro Operacional SST`;
+- `SST > Executivo SST`;
+- `SST > Heatmap SST`;
+- `SST > Observabilidade SST`;
+- `SST > Producao SST`;
+- `SST > SST Enterprise`;
+- `SST > Timeline SST`;
 - `SST > Relatorios SST > Operacional SST`;
 - `SST > Riscos`;
 - `SST > Agentes nocivos`;
@@ -2917,6 +2930,17 @@ Caminhos previstos:
 - `SST > Treinamentos`;
 - `SST > Acidentes`;
 - `SST > Documentos`;
+- `SST > Pendencias SST`;
+- `SST > Bloqueios SST`;
+- `SST > Notificacoes SST`;
+- `SST > Scores SST`;
+- `SST > Recomendacoes SST`;
+- `SST > Telemetria SST`;
+- `SST > Alertas SST`;
+- `SST > Workflows SST`;
+- `SST > Rollout SST`;
+- `SST > Hardening SST`;
+- `SST > Criticidades SST`;
 - `SST > eSocial`;
 - `SST > Eventos`;
 - `SST > Configuracoes`.
@@ -3050,3 +3074,544 @@ Antes de liberar o modulo SST para usuarios:
 - politica de anexos e documentos definida;
 - rotina de conferencia de vencimentos definida;
 - orientacao sobre dados sensiveis realizada.
+
+---
+
+## 30. Matriz completa de treinamento por modulo
+
+Esta matriz deve ser usada como base para transformar este guia em plataforma de treinamento dentro do FLUXY.
+
+Para cada modulo, o treinamento deve ter:
+
+- explicacao do objetivo;
+- demonstracao das telas;
+- passo a passo operacional;
+- exemplos com dados amostrais;
+- erros comuns;
+- checklist de liberacao;
+- perguntas de validacao;
+- video curto por processo principal;
+- material de apoio com prints da tela.
+
+### 30.1 Painel
+
+Telas:
+
+- Painel inicial;
+- cards principais;
+- menus laterais;
+- atalhos por modulo.
+
+Processos para treinar:
+
+- entrar no sistema;
+- entender o menu;
+- localizar modulo;
+- ler indicadores sem confundir dado real com pendencia de cadastro;
+- alternar modo claro/escuro quando aplicavel.
+
+Aceite:
+
+- usuario consegue acessar o painel;
+- usuario entende que o painel depende dos dados registrados nos modulos;
+- usuario sabe onde encontrar solicitacoes, compras, financeiro, fiscal, RH/DP, SST e treinamento.
+
+### 30.2 Solicitacoes
+
+Telas:
+
+- Nova Solicitacao;
+- Solicitacoes abertas;
+- Detalhes da Solicitacao;
+- Solicitacoes arquivadas;
+- Relatorios de Solicitacoes;
+- SLA por setor.
+
+Processos para treinar:
+
+- criar solicitacao;
+- selecionar obra/centro de custo;
+- selecionar area responsavel;
+- anexar arquivo;
+- acompanhar historico;
+- assumir solicitacao;
+- enviar para outro setor quando permitido;
+- alterar status;
+- gerar conta quando aplicavel;
+- consultar relatorios operacionais.
+
+Aceite:
+
+- solicitante cria solicitacao completa;
+- setor responsavel assume e movimenta corretamente;
+- usuario sem permissao nao acessa area indevida;
+- relatorio reflete status, setor, obra e SLA reais.
+
+### 30.3 Compras
+
+Telas:
+
+- Solicitacoes de Compra;
+- Nova Solicitacao de Compra;
+- Detalhe da Solicitacao de Compra;
+- Cotacoes;
+- Revisao de cotacao;
+- Fornecedores;
+- Pedidos de Compra;
+- Relatorios de Compras;
+- Configuracoes de cotacao.
+
+Processos para treinar:
+
+- criar solicitacao de compra;
+- adicionar itens;
+- selecionar obra/centro de custo;
+- vincular fornecedores;
+- enviar cotacao;
+- compartilhar link publico com fornecedor;
+- receber resposta;
+- comparar propostas;
+- selecionar vencedor;
+- gerar pedido;
+- acompanhar status;
+- consultar relatorios de demanda, economia, fornecedores e ciclo.
+
+Aceite:
+
+- compras consegue transformar demanda em cotacao/pedido;
+- fornecedor consegue responder pelo link;
+- vencedor fica registrado com justificativa quando necessario;
+- relatorios usam pedidos e cotacoes reais.
+
+### 30.4 Financeiro
+
+Telas:
+
+- Titulos Financeiros;
+- Novo Titulo;
+- Detalhe do Titulo;
+- Baixas;
+- Conciliacao Bancaria;
+- Contas Bancarias;
+- Cartoes;
+- Faturas de Cartao;
+- Detalhe da Fatura de Cartao;
+- Boletos;
+- Pagamentos em Massa;
+- DRE;
+- Diagnostico da DRE;
+- Fluxo de Caixa;
+- Endividamento;
+- Intercompany;
+- Resultado de Obras;
+- Centros de Custo;
+- Relatorio Analitico.
+
+Processos para treinar:
+
+- criar titulo manual;
+- criar titulo a partir de solicitacao;
+- classificar categoria financeira;
+- definir competencia DRE;
+- informar empresa, obra e parceiro;
+- baixar titulo individual;
+- baixar titulos em massa;
+- estornar baixa;
+- operar cartao de debito com baixa imediata em conta vinculada;
+- operar cartao de credito com fatura;
+- abrir fatura e visualizar titulos da fatura;
+- gerar boleto quando aplicavel;
+- importar retorno bancario;
+- conciliar extrato;
+- tratar intercompany;
+- analisar DRE, caixa, endividamento e resultado de obras.
+
+Aceite:
+
+- financeiro cria e baixa titulo sem distorcer empresa/categoria;
+- cartao de debito movimenta conta no ato;
+- cartao de credito vincula titulo a fatura;
+- DRE e caixa mostram dados coerentes com categorias, competencias e baixas.
+
+### 30.5 Fiscal
+
+Telas:
+
+- Dashboard Fiscal;
+- Documentos Fiscais;
+- Detalhe do Documento Fiscal;
+- Importacao XML/ZIP;
+- Divergencias;
+- Lotes/Contabilizacao quando aplicavel;
+- Relatorio Fiscal Operacional;
+- Logs Fiscais;
+- Empresas Fiscais.
+
+Processos para treinar:
+
+- importar XML;
+- importar ZIP;
+- visualizar documento;
+- abrir/gerar DANFE;
+- vincular documento fiscal a solicitacao, compra, titulo ou contrato quando aplicavel;
+- revisar divergencias;
+- acompanhar logs;
+- gerar relatorio operacional.
+
+Aceite:
+
+- documento fiscal entra com empresa correta;
+- divergencia nao e ignorada sem analise;
+- fiscal sabe localizar XML, DANFE, vinculos e pendencias.
+
+### 30.6 Contratos
+
+Telas:
+
+- Gestao de Contratos;
+- Detalhe do Contrato;
+- Relatorio Operacional de Contratos.
+
+Processos para treinar:
+
+- cadastrar contrato;
+- informar parceiro;
+- informar empresa;
+- informar obra/centro de custo;
+- informar vigencia;
+- anexar documento;
+- acompanhar vencimento;
+- vincular solicitacoes ou titulos quando aplicavel;
+- consultar relatorio.
+
+Aceite:
+
+- contratos ativos possuem vigencia, parceiro, empresa e documento;
+- vencimentos aparecem para acompanhamento;
+- contrato nao substitui titulo financeiro quando houver obrigacao real.
+
+### 30.7 CRM
+
+Telas:
+
+- Dashboard CRM;
+- Leads;
+- Kanban;
+- Carteira;
+- Tarefas;
+- Inbox;
+- Automacoes;
+- Relatorio Executivo;
+- Configuracoes CRM.
+
+Processos para treinar:
+
+- cadastrar lead;
+- identificar canal de origem;
+- atribuir responsavel;
+- registrar contato;
+- criar tarefa;
+- mover etapa;
+- acompanhar SLA;
+- consultar dashboard e relatorio.
+
+Aceite:
+
+- nenhum lead fica sem responsavel;
+- canal de origem e etapa ficam atualizados;
+- tarefas vencidas sao tratadas.
+
+### 30.8 Comercial
+
+Telas:
+
+- Empreendimentos;
+- Unidades;
+- Mapa de Unidades;
+- Tabelas de Preco;
+- Contratos Comerciais;
+- Modelos de Contrato;
+- Relatorio Operacional Comercial.
+
+Processos para treinar:
+
+- cadastrar empreendimento;
+- cadastrar unidades;
+- atualizar status da unidade;
+- configurar tabela de preco;
+- gerar contrato comercial;
+- revisar parcelas;
+- conferir empresa/obra vinculada;
+- gerar titulos financeiros quando aplicavel;
+- acompanhar relatorios comerciais.
+
+Aceite:
+
+- contrato comercial gera parcelas com empresa, obra, categoria e competencia corretas;
+- mapa de unidades reflete status real;
+- relatorios comerciais nao dependem de ajuste manual posterior.
+
+### 30.9 Provisionamento
+
+Telas:
+
+- Dashboard de Provisionamento;
+- Nova Provisao;
+- Detalhe da Provisao;
+- Relatorio Operacional;
+- Configuracao do Fluxo de Provisionamento.
+
+Processos para treinar:
+
+- criar provisao;
+- informar empresa;
+- informar obra/centro;
+- informar categoria macro;
+- informar valor e data prevista;
+- atualizar status;
+- vincular com solicitacao/titulo quando fluxo integrado estiver ativo;
+- consultar relatorio de vencidas, proximos 7 dias e proximos 30 dias.
+
+Aceite:
+
+- provisao e entendida como previsao, nao como pagamento;
+- fluxo informativo/controlado/integrado esta claro;
+- diretoria consegue enxergar pressao futura de caixa.
+
+### 30.10 RH/DP
+
+Telas:
+
+- Dashboard RH/DP;
+- Empresas RH/DP;
+- Colaboradores;
+- Documentos;
+- Importacoes;
+- Apuracao;
+- Fechamentos;
+- Relatorio Operacional RH/DP;
+- Permissoes RH/DP.
+
+Processos para treinar:
+
+- cadastrar colaborador;
+- informar empresa, cargo, funcao e vinculo;
+- anexar documentos;
+- importar dados quando aplicavel;
+- revisar apuracao;
+- fechar competencia;
+- gerar titulos financeiros de folha;
+- consultar relatorio;
+- revisar permissoes sensiveis.
+
+Aceite:
+
+- colaborador e fonte da verdade para SST;
+- fechamento RH/DP gera titulos com empresa e categoria corretas;
+- documentos sensiveis ficam acessiveis apenas a usuarios autorizados.
+
+### 30.11 SST
+
+Telas:
+
+- Dashboard SST;
+- Centro Operacional SST;
+- Executivo SST;
+- Heatmap SST;
+- Observabilidade SST;
+- Producao SST;
+- SST Enterprise;
+- Timeline SST;
+- Relatorios SST;
+- Riscos;
+- Agentes Nocivos;
+- PGR;
+- PCMSO;
+- ASO;
+- Exames;
+- EPI;
+- Treinamentos;
+- Acidentes;
+- Documentos;
+- Pendencias;
+- Bloqueios;
+- Notificacoes;
+- Scores;
+- Recomendacoes;
+- Telemetria;
+- Alertas;
+- Workflows;
+- Rollout;
+- Hardening;
+- Criticidades;
+- eSocial;
+- Eventos;
+- Configuracoes.
+
+Processos para treinar:
+
+- validar permissao SST por perfil;
+- cadastrar risco;
+- cadastrar agente nocivo;
+- cadastrar PGR e PCMSO;
+- cadastrar ASO;
+- cadastrar exame ocupacional;
+- cadastrar treinamento;
+- cadastrar entrega de EPI;
+- registrar acidente/incidente;
+- cadastrar exposicao ocupacional;
+- anexar documento SST;
+- abrir documento via URL assinada;
+- executar analise de conformidade;
+- acompanhar pendencias;
+- avaliar bloqueios;
+- revisar notificacoes;
+- consultar score;
+- consultar timeline do colaborador;
+- consultar heatmap por obra/empresa;
+- consultar centro operacional;
+- revisar observabilidade, telemetria, jobs e filas;
+- validar IA documental com provider configurado apenas no backend;
+- gerar/validar XML eSocial somente em modo controlado;
+- manter transmissao oficial bloqueada ate autorizacao formal.
+
+Aceite:
+
+- SST opera com colaborador vindo do RH/DP, sem duplicidade;
+- ASO, treinamento, EPI e acidente aparecem nos dashboards;
+- conformidade e score refletem dados reais;
+- documentos ficam privados;
+- IA nao usa chave no frontend;
+- provider IA vem do `.env` do backend;
+- eSocial oficial permanece bloqueado por padrao.
+
+### 30.12 Comunicacao Interna
+
+Telas:
+
+- Comunicacao Interna;
+- conversas e registros vinculados quando aplicavel.
+
+Processos para treinar:
+
+- registrar comunicacao relevante;
+- manter historico claro;
+- anexar evidencia quando necessario;
+- evitar decisoes importantes apenas fora do sistema.
+
+Aceite:
+
+- comunicacoes criticas ficam rastreaveis;
+- usuarios entendem quando usar comunicacao interna e quando abrir solicitacao.
+
+### 30.13 Treinamento
+
+Telas:
+
+- Central de Treinamento;
+- perguntas e respostas;
+- videos de treinamento;
+- materiais por modulo.
+
+Processos para treinar:
+
+- acessar conteudo;
+- buscar pergunta frequente;
+- assistir video;
+- consultar material por modulo;
+- superadmin publicar ou atualizar videos;
+- anexar materiais usando S3;
+- revisar conteudo antes de liberar para equipe.
+
+Aceite:
+
+- usuarios conseguem estudar o fluxo antes do treinamento presencial;
+- superadmin consegue manter videos e materiais;
+- conteudo sensivel nao fica publico fora do FLUXY.
+
+### 30.14 Configuracoes e Governanca
+
+Telas:
+
+- Usuarios;
+- Setores;
+- Tipos de Solicitacao;
+- Status por Setor;
+- Modulos Ativos;
+- Areas por Setor;
+- Areas da Obra;
+- Permissoes de Areas por Usuario;
+- Visibilidade de Dashboards e Tabelas;
+- Configuracoes de Cotacao;
+- Configuracoes Financeiras;
+- Configuracoes RH/DP;
+- Configuracoes SST;
+- Configuracoes de Treinamento.
+
+Processos para treinar:
+
+- habilitar/desabilitar modulo;
+- criar usuario;
+- definir setor;
+- configurar permissoes por usuario;
+- configurar visibilidade de dashboard/tabela;
+- configurar SLA;
+- revisar modulos liberados;
+- revisar acessos financeiros, RH/DP, fiscal e SST;
+- testar usuario comum apos alterar permissao;
+- registrar motivo de mudanca critica.
+
+Aceite:
+
+- permissao e visibilidade sao entendidas como coisas diferentes;
+- usuarios acessam apenas o necessario;
+- mudanca de configuracao e testada antes de ir para equipe ampla.
+
+---
+
+## 31. Ordem sugerida para estudar antes de treinar as equipes
+
+Para o responsavel pelo treinamento, a ordem recomendada e:
+
+1. Ler este guia inteiro.
+2. Estudar o plano de implantacao de 5 dias.
+3. Acessar o sistema como SUPERADMIN em ambiente de desenvolvimento/homologacao.
+4. Validar menus e permissoes.
+5. Criar dados amostrais pequenos.
+6. Rodar smoke tests e capturar telas.
+7. Gravar videos curtos por modulo.
+8. Cadastrar os videos na Central de Treinamento.
+9. Criar perguntas frequentes por modulo.
+10. Aplicar treinamento por perfil.
+
+O treinamento nao deve tentar explicar tudo para todos.
+
+Cada equipe deve aprender primeiro o que precisa operar todos os dias, depois o que precisa consultar e, por ultimo, o que precisa entender como impacto gerencial.
+
+---
+
+## 32. Checklist final para o sistema rodar 100%
+
+O sistema so deve ser considerado operacionalmente pronto quando:
+
+- empresas do grupo estiverem cadastradas;
+- obras e centros de custo estiverem revisados;
+- usuarios estiverem ativos e com setor correto;
+- permissoes por usuario estiverem revisadas;
+- modulos ativos estiverem definidos pela diretoria;
+- visibilidade de dashboards/tabelas estiver revisada;
+- solicitacoes puderem ser abertas, assumidas, enviadas e concluidas;
+- compras puder gerar cotacao/pedido quando aplicavel;
+- financeiro puder criar, baixar, estornar e conciliar titulos;
+- faturas de cartao estiverem operacionais;
+- fiscal puder importar e revisar XML;
+- contratos puderem ser acompanhados;
+- CRM/comercial estiverem coerentes com o uso definido;
+- provisionamento estiver no modo aprovado pela diretoria;
+- RH/DP estiver com colaboradores e fechamentos revisados;
+- SST estiver com fluxos, documentos, conformidade e seguranca revisados;
+- central de treinamento tiver conteudo minimo por modulo;
+- relatorios principais tiverem dado real ou pendencia explicita;
+- backup, deploy e rollback estiverem documentados;
+- canal de suporte estiver definido;
+- nenhum P0 conhecido estiver aberto.

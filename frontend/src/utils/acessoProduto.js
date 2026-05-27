@@ -772,6 +772,11 @@ const SST_PERMISSION_KEYS = [
   'sst.analytics.visualizar',
   'sst.analytics.gerenciar',
   'sst.observabilidade.visualizar',
+  'sst.producao.visualizar',
+  'sst.rollout.gerenciar',
+  'sst.telemetria.visualizar',
+  'sst.alertas.gerenciar',
+  'sst.hardening.gerenciar',
   'sst.logs.visualizar',
   'sst.integracoes.gerenciar',
   'sst.riscos.visualizar',
@@ -794,8 +799,17 @@ const SST_PERMISSION_KEYS = [
   'sst.acidentes.gerenciar',
   'sst.documentos.visualizar',
   'sst.documentos.gerenciar',
+  'sst.documentos_ia.visualizar',
+  'sst.documentos_ia.gerenciar',
+  'sst.documentos_ia.analisar',
+  'sst.documentos_ia.aprovar_sugestao',
   'sst.esocial.visualizar',
   'sst.esocial.preparar',
+  'sst.esocial.gerar_xml',
+  'sst.esocial.validar_xml',
+  'sst.esocial.assinar_xml',
+  'sst.esocial.enviar_restrita',
+  'sst.esocial.consultar_retorno',
   'sst.configuracoes.gerenciar'
 ];
 
@@ -812,7 +826,7 @@ export function canViewSstDashboard(user) {
   if (!hasEnabledModule(user, 'SST')) return false;
   if (isBusinessAdmin(user)) return true;
   if (hasConfiguredAreaPermissions(user)) {
-    return hasAnyPermissao(user, ['sst.dashboard.visualizar', 'sst.analytics.visualizar', 'sst.observabilidade.visualizar']);
+    return hasAnyPermissao(user, ['sst.dashboard.visualizar', 'sst.analytics.visualizar', 'sst.observabilidade.visualizar', 'sst.producao.visualizar', 'sst.telemetria.visualizar']);
   }
   return false;
 }
@@ -825,8 +839,26 @@ export function canViewSstArea(user, area) {
     `sst.${normalizedArea}.visualizar`,
     `sst.${normalizedArea}.gerenciar`,
     normalizedArea === 'esocial' ? 'sst.esocial.preparar' : null,
+    normalizedArea === 'esocial' ? 'sst.esocial.gerar_xml' : null,
+    normalizedArea === 'esocial' ? 'sst.esocial.validar_xml' : null,
+    normalizedArea === 'esocial' ? 'sst.esocial.assinar_xml' : null,
+    normalizedArea === 'esocial' ? 'sst.esocial.enviar_restrita' : null,
+    normalizedArea === 'esocial' ? 'sst.esocial.consultar_retorno' : null,
+    normalizedArea === 'documentos' ? 'sst.documentos_ia.visualizar' : null,
+    normalizedArea === 'documentos' ? 'sst.documentos_ia.analisar' : null,
+    normalizedArea === 'documentos' ? 'sst.documentos_ia.aprovar_sugestao' : null,
     normalizedArea === 'analytics' ? 'sst.analytics.visualizar' : null,
-    normalizedArea === 'analytics' ? 'sst.logs.visualizar' : null
+    normalizedArea === 'analytics' ? 'sst.logs.visualizar' : null,
+    normalizedArea === 'analytics' ? 'sst.producao.visualizar' : null,
+    normalizedArea === 'analytics' ? 'sst.telemetria.visualizar' : null,
+    normalizedArea === 'analytics' ? 'sst.enterprise.visualizar' : null,
+    normalizedArea === 'analytics' ? 'sst.performance.visualizar' : null,
+    normalizedArea === 'analytics' ? 'sst.governanca.visualizar' : null,
+    normalizedArea === 'configuracoes' ? 'sst.rollout.gerenciar' : null,
+    normalizedArea === 'configuracoes' ? 'sst.hardening.gerenciar' : null,
+    normalizedArea === 'configuracoes' ? 'sst.jobs.gerenciar' : null,
+    normalizedArea === 'configuracoes' ? 'sst.cache.gerenciar' : null,
+    normalizedArea === 'configuracoes' ? 'sst.qualidade.gerenciar' : null
   ].filter(Boolean);
   if (hasConfiguredAreaPermissions(user)) {
     return hasAnyPermissao(user, keys);
@@ -841,8 +873,27 @@ export function canManageSstArea(user, area) {
   const key = normalizedArea === 'esocial'
     ? 'sst.esocial.preparar'
     : `sst.${normalizedArea}.gerenciar`;
+  const keys = [
+    key,
+    normalizedArea === 'esocial' ? 'sst.esocial.gerar_xml' : null,
+    normalizedArea === 'esocial' ? 'sst.esocial.validar_xml' : null,
+    normalizedArea === 'esocial' ? 'sst.esocial.assinar_xml' : null,
+    normalizedArea === 'esocial' ? 'sst.esocial.enviar_restrita' : null,
+    normalizedArea === 'esocial' ? 'sst.esocial.consultar_retorno' : null,
+    normalizedArea === 'documentos' ? 'sst.documentos_ia.gerenciar' : null,
+    normalizedArea === 'documentos' ? 'sst.documentos_ia.analisar' : null,
+    normalizedArea === 'documentos' ? 'sst.documentos_ia.aprovar_sugestao' : null,
+    normalizedArea === 'analytics' ? 'sst.alertas.gerenciar' : null,
+    normalizedArea === 'analytics' ? 'sst.jobs.gerenciar' : null,
+    normalizedArea === 'analytics' ? 'sst.qualidade.gerenciar' : null,
+    normalizedArea === 'configuracoes' ? 'sst.rollout.gerenciar' : null,
+    normalizedArea === 'configuracoes' ? 'sst.hardening.gerenciar' : null,
+    normalizedArea === 'configuracoes' ? 'sst.jobs.gerenciar' : null,
+    normalizedArea === 'configuracoes' ? 'sst.cache.gerenciar' : null,
+    normalizedArea === 'configuracoes' ? 'sst.qualidade.gerenciar' : null
+  ].filter(Boolean);
   if (hasConfiguredAreaPermissions(user)) {
-    return hasPermissao(user, key);
+    return hasAnyPermissao(user, keys);
   }
   return false;
 }

@@ -33,27 +33,44 @@ const {
 const { gerarCentroOperacionalCorporativoSst } = require('../analytics/sstCorporateCenterService');
 const { automatizarVencimentosProximos, processarEventosAbertosSst } = require('../automation/sstAutomationService');
 const { avaliarBloqueiosColaborador } = require('../blocking/sstBlockingService');
+const { getCacheStatusSst, limparCacheExpiradoSst } = require('../cache/sstCacheService');
 const { SST_AI_READINESS } = require('../ai/sstAiReadiness');
-const { analisarDocumentoSstComIa, getDocumentAnalysisReadiness } = require('../ai/document-analysis/sstDocumentAnalysisService');
+const {
+  analisarDocumentoSstComIa,
+  aprovarSugestaoAnaliseDocumento,
+  rejeitarSugestaoAnaliseDocumento,
+  getDocumentAnalysisReadiness
+} = require('../ai/document-analysis/sstDocumentAnalysisService');
 const { gerarInteligenciaOperacionalSst } = require('../ai/operational-intelligence/sstOperationalIntelligenceService');
 const { getSstDocumentAiReadiness } = require('../ai/sstDocumentAiPipeline');
 const { gerarVisaoOperacionalObraSst } = require('../integrations/obras/sstObraIntegrationService');
 const { processarIntegracaoObraSst } = require('../integrations/obras/sstObrasControlledIntegrationService');
 const { processarEventoRhdpSst } = require('../integrations/rhdp/sstRhdpControlledIntegrationService');
 const { getSstFeatureFlags } = require('../feature-flags/sstFeatureFlagsService');
+const { gerarResumoGovernancaSst, registrarGovernanceLogSst } = require('../governance/sstGovernanceService');
 const {
   gerarChecklistHomologacaoSst,
   homologarWorkflowsSst,
   simularMassaHomologacaoSst
 } = require('../homologation/sstHomologationService');
+const { gerarAlertasOperacionaisSst } = require('../alerts/sstAlertService');
+const { gerarStatusHardeningSst } = require('../hardening/sstHardeningService');
 const { sincronizarNotificacoesSst, marcarNotificacaoLida } = require('../notifications/sstNotificationService');
 const { gerarObservabilidadeSst } = require('../observability/sstObservabilityService');
+const { gerarObservabilidadeAvancadaSst, registrarPerformanceMetricSst } = require('../observability/sstAdvancedObservabilityService');
 const { getSstPredictionReadiness } = require('../prediction/sstPredictionService');
+const { gerarMonitoramentoProducaoSst } = require('../production/sstProductionReadinessService');
+const { executarQualityCheckSst, gerarResumoQualidadeSst } = require('../quality/sstQualityService');
+const { enqueueSstJob, gerarStatusFilasSst } = require('../queues/sstQueueService');
 const { gerarRecomendacoesSst } = require('../recommendations/sstRecommendationService');
+const { gerarStatusRolloutSst } = require('../rollout/sstRolloutService');
 const { recalcularScoreSst } = require('../scoring/sstScoringService');
+const { gerarResumoTelemetriaSst, registrarMetricaSst } = require('../telemetry/sstTelemetryService');
 const { gerarTimelineColaborador } = require('../timeline/sstTimelineService');
+const { processarWorkerSst } = require('../workers/sstWorkerService');
 const { processarFilaWorkflowSst, processarEventoWorkflow } = require('../workflow-engine/sstWorkflowEngineService');
 const { revisarConformidadeColaborador } = require('../workflows/sstWorkflowService');
+const esocialControlledService = require('../../esocial/services/EsocialSstControlledService');
 
 function getConfig(resource) {
   const config = SST_RESOURCE_CONFIG[String(resource || '').trim().toLowerCase()];
@@ -494,12 +511,60 @@ async function processarWorkflows({ evento_id = null, limit = 50, usuario_id = n
   return processarFilaWorkflowSst({ limit, usuario_id });
 }
 
-async function analisarDocumentoIa(documento_id, { provider = null, usuario_id = null } = {}) {
-  return analisarDocumentoSstComIa({ documento_id, provider, usuario_id });
+async function analisarDocumentoIa(documento_id, { texto_extraido = null, texto = null, usuario_id = null } = {}) {
+  return analisarDocumentoSstComIa({ documento_id, texto_extraido: texto_extraido || texto, usuario_id });
+}
+
+async function aprovarAnaliseIa(id, user = null) {
+  return aprovarSugestaoAnaliseDocumento(id, user);
+}
+
+async function rejeitarAnaliseIa(id, user = null) {
+  return rejeitarSugestaoAnaliseDocumento(id, user);
 }
 
 async function visaoObra(obra_id) {
   return gerarVisaoOperacionalObraSst(obra_id);
+}
+
+async function esocialEventos(query = {}) {
+  return esocialControlledService.listarEventosControlados(query);
+}
+
+async function esocialLotes(query = {}) {
+  return esocialControlledService.listarLotes(query);
+}
+
+async function esocialRetornos(query = {}) {
+  return esocialControlledService.listarRetornos(query);
+}
+
+async function esocialCertificadoStatus(query = {}, user = null) {
+  return esocialControlledService.validateCertificate({ empresa_id: query.empresa_id || null }, user);
+}
+
+async function esocialGerarXml(evento_id, user = null) {
+  return esocialControlledService.gerarXmlEvento(evento_id, user);
+}
+
+async function esocialValidarXml(evento_id, user = null) {
+  return esocialControlledService.validarXmlEvento(evento_id, user);
+}
+
+async function esocialAssinarXml(evento_id, user = null) {
+  return esocialControlledService.assinarXmlEvento(evento_id, user);
+}
+
+async function esocialCriarLoteRestrita(payload = {}, user = null) {
+  return esocialControlledService.criarLoteRestrita(payload, user);
+}
+
+async function esocialEnviarRestrita(lote_id, user = null) {
+  return esocialControlledService.enviarRestrita(lote_id, user);
+}
+
+async function esocialConsultarRetorno(lote_id, user = null) {
+  return esocialControlledService.consultarRetorno(lote_id, user);
 }
 
 async function featureFlags() {
@@ -508,6 +573,77 @@ async function featureFlags() {
 
 async function observabilidade(query = {}) {
   return gerarObservabilidadeSst(query);
+}
+
+async function observabilidadeAvancada(query = {}) {
+  return gerarObservabilidadeAvancadaSst(query);
+}
+
+async function monitoramentoProducao(query = {}) {
+  return gerarMonitoramentoProducaoSst(query);
+}
+
+async function rolloutStatus(query = {}) {
+  return gerarStatusRolloutSst(query);
+}
+
+async function telemetriaResumo(query = {}) {
+  return gerarResumoTelemetriaSst(query);
+}
+
+async function hardeningStatus(query = {}) {
+  return gerarStatusHardeningSst(query);
+}
+
+async function gerarAlertasOperacionais(query = {}, user = null) {
+  return gerarAlertasOperacionaisSst(query, user?.id || null);
+}
+
+async function registrarTelemetria(payload = {}, user = null) {
+  return registrarMetricaSst(payload, user?.id || payload.usuario_id || null);
+}
+
+async function enqueueJob(payload = {}, user = null) {
+  return enqueueSstJob({
+    ...payload,
+    usuario_id: user?.id || payload.usuario_id || null
+  });
+}
+
+async function processarWorker(payload = {}) {
+  return processarWorkerSst(payload);
+}
+
+async function statusFilas(query = {}) {
+  return gerarStatusFilasSst(query);
+}
+
+async function cacheStatus() {
+  return getCacheStatusSst();
+}
+
+async function limparCacheExpirado() {
+  return limparCacheExpiradoSst();
+}
+
+async function qualityCheck(user = null) {
+  return executarQualityCheckSst({ usuario_id: user?.id || null });
+}
+
+async function qualidadeResumo() {
+  return gerarResumoQualidadeSst();
+}
+
+async function governancaResumo() {
+  return gerarResumoGovernancaSst();
+}
+
+async function registrarGovernanca(payload = {}, user = null) {
+  return registrarGovernanceLogSst(payload, user?.id || payload.usuario_id || null);
+}
+
+async function registrarPerformance(payload = {}, user = null) {
+  return registrarPerformanceMetricSst(payload, user?.id || payload.usuario_id || null);
 }
 
 async function checklistHomologacao() {
@@ -655,12 +791,25 @@ async function emitEventForResource(resource, item, user, transaction) {
 module.exports = {
   createResource,
   analisarDocumentoIa,
+  aprovarAnaliseIa,
   checklistHomologacao,
   dashboard,
   dashboardExecutivo,
   centroOperacional,
+  esocialAssinarXml,
+  esocialCertificadoStatus,
+  esocialConsultarRetorno,
+  esocialCriarLoteRestrita,
+  esocialEnviarRestrita,
+  esocialEventos,
+  esocialGerarXml,
+  esocialLotes,
+  esocialRetornos,
+  esocialValidarXml,
   featureFlags,
+  cacheStatus,
   heatmap,
+  hardeningStatus,
   getDocumentSignedUrl,
   getResource,
   homologarWorkflows,
@@ -669,19 +818,35 @@ module.exports = {
   avaliarBloqueiosColaborador,
   listResource,
   marcarNotificacaoLida,
+  monitoramentoProducao,
   observabilidade,
+  observabilidadeAvancada,
   predictionReadiness,
   processarAutomacoes,
   processarIntegracaoObra,
   processarIntegracaoRhdp,
   processarWorkflows,
+  processarWorker,
   recomendacoes,
   recalcularScore,
+  enqueueJob,
+  statusFilas,
+  limparCacheExpirado,
+  qualityCheck,
+  qualidadeResumo,
+  governancaResumo,
+  registrarGovernanca,
+  registrarPerformance,
+  registrarTelemetria,
   relatorioOperacional,
+  rejeitarAnaliseIa,
   revisarConformidadeColaborador,
   simularHomologacao,
   sincronizarNotificacoesSst,
+  telemetriaResumo,
   timelineColaborador,
+  gerarAlertasOperacionais,
+  rolloutStatus,
   updateResource,
   visaoObra,
   uploadDocument

@@ -113,6 +113,8 @@ const UI_VISIBILITY_COMPONENTS = [
           { key: 'relatorios.sst.executivo', label: 'Executivo SST', type: 'card' },
           { key: 'relatorios.sst.centro_operacional', label: 'Centro operacional SST', type: 'card' },
           { key: 'relatorios.sst.observabilidade', label: 'Observabilidade SST', type: 'card' },
+          { key: 'relatorios.sst.producao_controlada', label: 'Producao controlada SST', type: 'card' },
+          { key: 'relatorios.sst.observabilidade_avancada', label: 'Observabilidade avancada SST', type: 'card' },
           { key: 'relatorios.sst.inteligencia', label: 'Inteligencia operacional SST', type: 'card' },
           { key: 'relatorios.sst.recomendacoes', label: 'Recomendacoes SST', type: 'card' },
           { key: 'relatorios.sst.mapa_risco', label: 'Mapa de risco e heatmap', type: 'card' },
@@ -206,7 +208,8 @@ const UI_VISIBILITY_COMPONENTS = [
         path: '/sst/documentos',
         label: 'Documentos SST',
         components: [
-          { key: 'sst.documentos.tabela', label: 'Tabela de documentos', type: 'table' }
+          { key: 'sst.documentos.tabela', label: 'Tabela de documentos', type: 'table' },
+          { key: 'sst.ia_document_logs.tabela', label: 'Tabela de logs IA documental', type: 'table' }
         ]
       },
       {
@@ -214,7 +217,10 @@ const UI_VISIBILITY_COMPONENTS = [
         path: '/sst/esocial',
         label: 'eSocial SST',
         components: [
-          { key: 'sst.esocial.tabela', label: 'Tabela de eventos eSocial', type: 'table' }
+          { key: 'sst.esocial.tabela', label: 'Tabela de eventos eSocial', type: 'table' },
+          { key: 'sst.esocial.lotes', label: 'Tabela de lotes restritos', type: 'table' },
+          { key: 'sst.esocial.certificado', label: 'Card de certificado digital', type: 'dashboard' },
+          { key: 'sst.esocial.acoes_xml', label: 'Acoes de XML restrito', type: 'button' }
         ]
       },
       {
@@ -235,6 +241,13 @@ const UI_VISIBILITY_COMPONENTS = [
           { key: 'sst.inteligencia.sinais', label: 'Sinais de inteligencia SST', type: 'dashboard' },
           { key: 'sst.recomendacoes.lista', label: 'Recomendacoes operacionais', type: 'table' },
           { key: 'sst.observabilidade.logs', label: 'Observabilidade e logs SST', type: 'dashboard' },
+          { key: 'sst.producao.readiness', label: 'Readiness de producao controlada SST', type: 'dashboard' },
+          { key: 'sst.producao.telemetria', label: 'Telemetria de producao SST', type: 'dashboard' },
+          { key: 'sst.enterprise.readiness', label: 'Readiness enterprise SST', type: 'dashboard' },
+          { key: 'sst.enterprise.filas', label: 'Filas e jobs SST', type: 'dashboard' },
+          { key: 'sst.enterprise.cache', label: 'Cache operacional SST', type: 'dashboard' },
+          { key: 'sst.enterprise.qualidade', label: 'Qualidade operacional SST', type: 'dashboard' },
+          { key: 'sst.enterprise.governanca', label: 'Governanca corporativa SST', type: 'dashboard' },
           { key: 'sst.heatmap.mapa', label: 'Heatmap operacional SST', type: 'dashboard' },
           { key: 'sst.timeline.lista', label: 'Timeline do colaborador', type: 'table' }
         ]
@@ -254,7 +267,17 @@ const UI_VISIBILITY_COMPONENTS = [
           { key: 'sst.workflow_logs.tabela', label: 'Tabela de logs de workflow SST', type: 'table' },
           { key: 'sst.automation_logs.tabela', label: 'Tabela de logs de automacao SST', type: 'table' },
           { key: 'sst.integration_logs.tabela', label: 'Tabela de logs de integracao SST', type: 'table' },
-          { key: 'sst.blocking_logs.tabela', label: 'Tabela de logs de bloqueio SST', type: 'table' }
+          { key: 'sst.blocking_logs.tabela', label: 'Tabela de logs de bloqueio SST', type: 'table' },
+          { key: 'sst.rollout_planos.tabela', label: 'Tabela de planos de rollout SST', type: 'table' },
+          { key: 'sst.telemetria.tabela', label: 'Tabela de telemetria SST', type: 'table' },
+          { key: 'sst.alertas_operacionais.tabela', label: 'Tabela de alertas operacionais SST', type: 'table' },
+          { key: 'sst.hardening_policies.tabela', label: 'Tabela de hardening SST', type: 'table' },
+          { key: 'sst.jobs.tabela', label: 'Tabela de jobs SST', type: 'table' },
+          { key: 'sst.queue_metrics.tabela', label: 'Tabela de metricas de fila SST', type: 'table' },
+          { key: 'sst.performance_metrics.tabela', label: 'Tabela de performance SST', type: 'table' },
+          { key: 'sst.cache_entries.tabela', label: 'Tabela de cache SST', type: 'table' },
+          { key: 'sst.quality_issues.tabela', label: 'Tabela de qualidade SST', type: 'table' },
+          { key: 'sst.governance_logs.tabela', label: 'Tabela de governanca SST', type: 'table' }
         ]
       }
     ]

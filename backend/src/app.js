@@ -161,6 +161,10 @@ const experienceLeadRouter = require('./routes/experienceLeadRouter');
 app.use('/api/experience', experienceLeadRouter);
 app.use('/experience', experienceLeadRouter);
 
+// Core Gateway - camada oficial e auditada para consumo do FLUXY Experience
+const coreGatewayRouter = require('./modules/coreGateway');
+app.use('/api/gateway', coreGatewayRouter);
+
 app.use('/api', routes);
 
 app.use((err, req, res, next) => {

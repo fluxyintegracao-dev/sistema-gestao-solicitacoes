@@ -75,3 +75,17 @@ Mesmo quando a IA documental extrair dados de ASO, certificados ou ficha EPI, o 
 A Fase 5 reforca a separacao entre dominio operacional e contrato externo ao criar feature flags, logs, observabilidade, homologacao e integracoes controladas.
 
 As integracoes com RH/DP e Obras nao sao acoplamento com XML. Elas apenas conectam eventos operacionais internos sob controle de flags e logs. A transmissao ao governo permanece fora do escopo e continua bloqueada ate existir fase tecnica especifica para certificado, assinatura, XSD, lote e retorno oficial.
+
+## Atualizacao 2026-05-26 - Fase 6 SST
+
+A Fase 6 reforca a institucionalizacao do modulo SST ao adicionar rollout assistido, telemetria, hardening, alertas e monitoramento de producao controlada.
+
+Essas estruturas sao controles de operacao real do dominio FLUXY. Elas nao mudam o contrato eSocial e nao autorizam transmissao externa. A decisao central permanece: primeiro estabilizar, observar e governar a operacao interna; depois, em fase propria, implementar integracao oficial com certificado, assinatura, schema e retorno governamental.
+
+## Atualizacao 2026-05-26 - Fase 7 SST
+
+A Fase 7 reforca esta ADR ao adicionar filas, jobs, workers, cache, quality checks, governanca e observabilidade avancada no dominio SST.
+
+Esses recursos operam antes da camada XML eSocial e nao alteram o contrato externo. O processamento assincrono foi iniciado com fila database-backed, preparada para migrar para BullMQ/Redis quando houver escala, preservando o principio de dominio interno desacoplado do XML oficial.
+
+Mesmo com jobs de IA documental e analytics, a transmissao ao governo permanece bloqueada ate existir etapa propria de certificado, assinatura, validacao XSD, lote oficial e homologacao governamental.

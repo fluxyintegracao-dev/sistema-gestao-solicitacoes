@@ -1111,6 +1111,156 @@ Regra mantida:
 
 ---
 
+## 24. Fase 8 - IA documental real e eSocial controlado em 2026-05-26
+
+Objetivo:
+
+- implementar provider real desacoplado para IA documental SST;
+- preparar parsing e conciliacao documental com aprovacao humana;
+- implementar base real controlada para certificado A1/PFX;
+- gerar XML eSocial S-2210, S-2220 e S-2240 via builders versionados;
+- validar XML contra estrutura e XSDs oficiais disponiveis;
+- preparar assinatura XMLDSig e SOAP para producao restrita;
+- manter producao oficial bloqueada.
+
+Implementado:
+
+- migration `202605260008_sst_ia_documental_esocial_controlado_fase8.js`;
+- modelos/logs `SstIaDocumentLog`, `EsocialTransmissionLog`, `EsocialCertificateLog`, `EsocialXmlValidationLog` e `EsocialSoapLog`;
+- providers `OpenAiDocumentProvider`, `AnthropicDocumentProvider`, `GeminiDocumentProvider`, `HttpDocumentProvider` e fallback `MockDisabledProvider`;
+- reconciliacao `SstDocumentReconciliationService`;
+- builders XML `S2210XmlBuilder`, `S2220XmlBuilder` e `S2240XmlBuilder`;
+- servicos eSocial para certificado, validacao XML, assinatura, SOAP, lote e transmissao restrita;
+- endpoints `/sst/esocial/*`;
+- pagina frontend `/sst/esocial`;
+- acoes de analisar IA, aprovar e rejeitar sugestoes nos documentos SST;
+- permissoes granulares para IA documental e eSocial.
+
+Documentos criados:
+
+- `docs/sst/fase-8-ia-documental-esocial-controlado.md`;
+- `docs/sst/RELATORIO_FASE_8_IA_DOCUMENTAL_ESOCIAL.md`;
+- `docs/esocial/integracao-real-controlada.md`;
+- `docs/esocial/certificado-digital.md`;
+- `docs/esocial/producao-restrita.md`;
+- `docs/esocial/assinatura-xml.md`;
+- `docs/esocial/soap-client.md`;
+- `docs/adr/ADR-ESOCIAL-PRODUCAO-RESTRITA-ANTES-PRODUCAO.md`;
+- `docs/adr/ADR-SST-IA-DOCUMENTAL-PROVIDER-DESACOPLADO.md`.
+
+Testes executados:
+
+- sintaxe dos arquivos backend SST/eSocial;
+- carga dos models e services;
+- bloqueio de producao oficial;
+- bloqueio de IA sem chave;
+- bloqueio de certificado ausente;
+- bloqueio de XML invalido;
+- build completo do frontend via Vite.
+
+Regra mantida:
+
+- producao oficial do eSocial bloqueada;
+- segredos somente via `.env`;
+- sem acoplamento do dominio SST ao XML;
+- sem atualizacao automatica de dado critico extraido por IA;
+- sem duplicidade de colaboradores fora do RH/DP.
+
+---
+
+## 25. Fase 7 - Consolidacao enterprise e go-live corporativo SST em 2026-05-26
+
+Objetivo:
+
+- consolidar SST para operacao corporativa em escala;
+- criar filas, jobs e workers reais;
+- estruturar cache operacional;
+- ampliar observabilidade e telemetria historica;
+- criar pipeline de qualidade;
+- criar governanca corporativa;
+- preparar readiness enterprise;
+- manter transmissao real ao eSocial bloqueada.
+
+Implementado:
+
+- migration `202605260007_sst_enterprise_go_live_fase7.js`;
+- modelos `SstJob`, `SstQueueMetric`, `SstPerformanceMetric`, `SstCacheEntry`, `SstQualityIssue` e `SstGovernanceLog`;
+- fila database-backed em `backend/src/modules/sst/queues/`;
+- handlers de jobs em `backend/src/modules/sst/jobs/`;
+- worker SST em `backend/src/modules/sst/workers/`;
+- cache operacional em `backend/src/modules/sst/cache/`;
+- pipeline de qualidade em `backend/src/modules/sst/quality/`;
+- governanca em `backend/src/modules/sst/governance/`;
+- observabilidade avancada em `backend/src/modules/sst/observability/sstAdvancedObservabilityService.js`;
+- pagina frontend `SstObservabilidadeAvancada`;
+- rota `/sst/observabilidade-avancada`;
+- recursos CRUD para jobs, filas, performance, cache, qualidade e governanca;
+- permissoes enterprise SST.
+
+Documentos criados:
+
+- `docs/sst/fase-7-consolidacao-enterprise-go-live-corporativo.md`;
+- `docs/sst/RELATORIO_FASE_7_CONSOLIDACAO_ENTERPRISE.md`;
+- `docs/sst/checklists/CHECKLIST_GO_LIVE_CORPORATIVO_SST.md`.
+
+Testes executados:
+
+- validacao de sintaxe dos novos services, migration, controller e rotas;
+- require runtime de `backend/src/models`;
+- require runtime de `sstService`;
+- build completo do frontend via Vite.
+
+Regra mantida:
+
+- sem SOAP;
+- sem certificado;
+- sem assinatura XML;
+- sem transmissao real ao governo;
+- sem duplicidade de colaboradores fora do RH/DP;
+- BullMQ/Redis preparado, mas nao obrigatorio nesta fase.
+
+---
+
+## 24. Fase 6 - Operacao real assistida e producao controlada SST em 2026-05-26
+
+Objetivo:
+
+- permitir entrada controlada em operacao real;
+- estruturar rollout assistido por empresa, obra, setor, usuario ou grupo piloto;
+- registrar telemetria operacional;
+- consolidar alertas operacionais;
+- criar politicas de hardening e resiliencia;
+- disponibilizar painel de monitoramento de producao;
+- manter transmissao real ao eSocial bloqueada.
+
+Implementado:
+
+- modelos `SstRolloutPlano`, `SstTelemetryMetric`, `SstOperationalAlert` e `SstHardeningPolicy`;
+- migration `202605260006_sst_operacao_real_assistida_fase6.js`;
+- services em `backend/src/modules/sst/rollout/`, `telemetry/`, `hardening/`, `alerts/` e `production/`;
+- endpoints `/sst/producao/monitoramento`, `/sst/rollout/status`, `/sst/telemetria/resumo`, `/sst/telemetria/registrar`, `/sst/hardening/status` e `/sst/alertas/gerar`;
+- pagina frontend `/sst/producao`;
+- recursos CRUD de rollout, telemetria, alertas operacionais e hardening;
+- novas permissoes e componentes de visibilidade.
+
+Documentos criados:
+
+- `docs/sst/fase-6-operacao-real-assistida-producao-controlada.md`;
+- `docs/sst/checklists/CHECKLIST_PRODUCAO_CONTROLADA_SST.md`;
+- `docs/sst/RELATORIO_FASE_6_OPERACAO_REAL_ASSISTIDA.md`.
+
+Regra mantida:
+
+- sem SOAP;
+- sem certificado;
+- sem assinatura XML;
+- sem lote real;
+- sem transmissao real ao governo;
+- sem duplicidade de colaboradores fora do RH/DP;
+- ativacoes criticas controladas por feature flags.
+
+---
+
 ## 24. Fase 5 - Homologacao operacional e integracao controlada SST em 2026-05-26
 
 Objetivo:

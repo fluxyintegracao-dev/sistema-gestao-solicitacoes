@@ -105,6 +105,176 @@ module.exports = {
     }
   },
 
+  async monitoramentoProducao(req, res) {
+    try {
+      const data = await sstService.monitoramentoProducao(req.query);
+      return res.json(data);
+    } catch (error) {
+      console.error(error);
+      return res.status(error.statusCode || 500).json({ error: error.message || 'Erro ao carregar monitoramento de producao SST' });
+    }
+  },
+
+  async observabilidadeAvancada(req, res) {
+    try {
+      const data = await sstService.observabilidadeAvancada(req.query);
+      return res.json(data);
+    } catch (error) {
+      console.error(error);
+      return res.status(error.statusCode || 500).json({ error: error.message || 'Erro ao carregar observabilidade avancada SST' });
+    }
+  },
+
+  async statusFilas(req, res) {
+    try {
+      const data = await sstService.statusFilas(req.query);
+      return res.json(data);
+    } catch (error) {
+      console.error(error);
+      return res.status(error.statusCode || 500).json({ error: error.message || 'Erro ao carregar filas SST' });
+    }
+  },
+
+  async enqueueJob(req, res) {
+    try {
+      const data = await sstService.enqueueJob(req.body || {}, req.user);
+      return res.status(data.ignored ? 200 : 201).json(data);
+    } catch (error) {
+      console.error(error);
+      return res.status(error.statusCode || 500).json({ error: error.message || 'Erro ao enfileirar job SST' });
+    }
+  },
+
+  async processarWorker(req, res) {
+    try {
+      const data = await sstService.processarWorker(req.body || {});
+      return res.json(data);
+    } catch (error) {
+      console.error(error);
+      return res.status(error.statusCode || 500).json({ error: error.message || 'Erro ao processar worker SST' });
+    }
+  },
+
+  async cacheStatus(req, res) {
+    try {
+      const data = await sstService.cacheStatus();
+      return res.json(data);
+    } catch (error) {
+      console.error(error);
+      return res.status(error.statusCode || 500).json({ error: error.message || 'Erro ao carregar cache SST' });
+    }
+  },
+
+  async limparCacheExpirado(req, res) {
+    try {
+      const data = await sstService.limparCacheExpirado();
+      return res.json(data);
+    } catch (error) {
+      console.error(error);
+      return res.status(error.statusCode || 500).json({ error: error.message || 'Erro ao limpar cache SST' });
+    }
+  },
+
+  async qualityCheck(req, res) {
+    try {
+      const data = await sstService.qualityCheck(req.user);
+      return res.json(data);
+    } catch (error) {
+      console.error(error);
+      return res.status(error.statusCode || 500).json({ error: error.message || 'Erro ao executar quality check SST' });
+    }
+  },
+
+  async qualidadeResumo(req, res) {
+    try {
+      const data = await sstService.qualidadeResumo();
+      return res.json(data);
+    } catch (error) {
+      console.error(error);
+      return res.status(error.statusCode || 500).json({ error: error.message || 'Erro ao carregar qualidade SST' });
+    }
+  },
+
+  async governancaResumo(req, res) {
+    try {
+      const data = await sstService.governancaResumo(req.query);
+      return res.json(data);
+    } catch (error) {
+      console.error(error);
+      return res.status(error.statusCode || 500).json({ error: error.message || 'Erro ao carregar governanca SST' });
+    }
+  },
+
+  async registrarGovernanca(req, res) {
+    try {
+      const data = await sstService.registrarGovernanca(req.body || {}, req.user);
+      return res.status(201).json(data);
+    } catch (error) {
+      console.error(error);
+      return res.status(error.statusCode || 500).json({ error: error.message || 'Erro ao registrar governanca SST' });
+    }
+  },
+
+  async registrarPerformance(req, res) {
+    try {
+      const data = await sstService.registrarPerformance(req.body || {}, req.user);
+      return res.status(201).json(data);
+    } catch (error) {
+      console.error(error);
+      return res.status(error.statusCode || 500).json({ error: error.message || 'Erro ao registrar performance SST' });
+    }
+  },
+
+  async rolloutStatus(req, res) {
+    try {
+      const data = await sstService.rolloutStatus(req.query);
+      return res.json(data);
+    } catch (error) {
+      console.error(error);
+      return res.status(error.statusCode || 500).json({ error: error.message || 'Erro ao carregar rollout SST' });
+    }
+  },
+
+  async telemetriaResumo(req, res) {
+    try {
+      const data = await sstService.telemetriaResumo(req.query);
+      return res.json(data);
+    } catch (error) {
+      console.error(error);
+      return res.status(error.statusCode || 500).json({ error: error.message || 'Erro ao carregar telemetria SST' });
+    }
+  },
+
+  async registrarTelemetria(req, res) {
+    try {
+      const data = await sstService.registrarTelemetria(req.body || {}, req.user);
+      return res.status(data.registrada ? 201 : 200).json(data);
+    } catch (error) {
+      console.error(error);
+      return res.status(error.statusCode || 500).json({ error: error.message || 'Erro ao registrar telemetria SST' });
+    }
+  },
+
+  async hardeningStatus(req, res) {
+    try {
+      const data = await sstService.hardeningStatus(req.query);
+      return res.json(data);
+    } catch (error) {
+      console.error(error);
+      return res.status(error.statusCode || 500).json({ error: error.message || 'Erro ao carregar hardening SST' });
+    }
+  },
+
+  async gerarAlertasOperacionais(req, res) {
+    try {
+      const data = await sstService.gerarAlertasOperacionais(req.query, req.user);
+      return res.json(data);
+    } catch (error) {
+      console.error(error);
+      return res.status(error.statusCode || 500).json({ error: error.message || 'Erro ao gerar alertas operacionais SST' });
+    }
+  },
+
   async checklistHomologacao(req, res) {
     try {
       const data = await sstService.checklistHomologacao();
@@ -286,13 +456,33 @@ module.exports = {
   async analisarDocumentoIa(req, res) {
     try {
       const data = await sstService.analisarDocumentoIa(req.params.id, {
-        provider: req.body?.provider || req.query?.provider || null,
+        texto_extraido: req.body?.texto_extraido || req.body?.texto || null,
         usuario_id: req.user?.id || null
       });
       return res.json(data);
     } catch (error) {
       console.error(error);
       return res.status(error.statusCode || 500).json({ error: error.message || 'Erro ao analisar documento SST com IA' });
+    }
+  },
+
+  async aprovarAnaliseIa(req, res) {
+    try {
+      const data = await sstService.aprovarAnaliseIa(req.params.id, req.user);
+      return res.json(data);
+    } catch (error) {
+      console.error(error);
+      return res.status(error.statusCode || 500).json({ error: error.message || 'Erro ao aprovar sugestao de IA documental SST' });
+    }
+  },
+
+  async rejeitarAnaliseIa(req, res) {
+    try {
+      const data = await sstService.rejeitarAnaliseIa(req.params.id, req.user);
+      return res.json(data);
+    } catch (error) {
+      console.error(error);
+      return res.status(error.statusCode || 500).json({ error: error.message || 'Erro ao rejeitar sugestao de IA documental SST' });
     }
   },
 
@@ -303,6 +493,106 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return res.status(error.statusCode || 500).json({ error: error.message || 'Erro ao carregar visao SST da obra' });
+    }
+  },
+
+  async esocialEventos(req, res) {
+    try {
+      const data = await sstService.esocialEventos(req.query);
+      return res.json(data);
+    } catch (error) {
+      console.error(error);
+      return res.status(error.statusCode || 500).json({ error: error.message || 'Erro ao listar eventos eSocial SST' });
+    }
+  },
+
+  async esocialLotes(req, res) {
+    try {
+      const data = await sstService.esocialLotes(req.query);
+      return res.json(data);
+    } catch (error) {
+      console.error(error);
+      return res.status(error.statusCode || 500).json({ error: error.message || 'Erro ao listar lotes eSocial SST' });
+    }
+  },
+
+  async esocialRetornos(req, res) {
+    try {
+      const data = await sstService.esocialRetornos(req.query);
+      return res.json(data);
+    } catch (error) {
+      console.error(error);
+      return res.status(error.statusCode || 500).json({ error: error.message || 'Erro ao listar retornos eSocial SST' });
+    }
+  },
+
+  async esocialCertificadoStatus(req, res) {
+    try {
+      const data = await sstService.esocialCertificadoStatus(req.query, req.user);
+      return res.json(data);
+    } catch (error) {
+      console.error(error);
+      return res.status(error.statusCode || 500).json({ error: error.message || 'Erro ao validar certificado eSocial SST' });
+    }
+  },
+
+  async esocialGerarXml(req, res) {
+    try {
+      const data = await sstService.esocialGerarXml(req.params.id, req.user);
+      return res.json(data);
+    } catch (error) {
+      console.error(error);
+      return res.status(error.statusCode || 500).json({ error: error.message || 'Erro ao gerar XML eSocial SST' });
+    }
+  },
+
+  async esocialValidarXml(req, res) {
+    try {
+      const data = await sstService.esocialValidarXml(req.params.id, req.user);
+      return res.json(data);
+    } catch (error) {
+      console.error(error);
+      return res.status(error.statusCode || 500).json({ error: error.message || 'Erro ao validar XML eSocial SST' });
+    }
+  },
+
+  async esocialAssinarXml(req, res) {
+    try {
+      const data = await sstService.esocialAssinarXml(req.params.id, req.user);
+      return res.json(data);
+    } catch (error) {
+      console.error(error);
+      return res.status(error.statusCode || 500).json({ error: error.message || 'Erro ao assinar XML eSocial SST' });
+    }
+  },
+
+  async esocialCriarLoteRestrita(req, res) {
+    try {
+      const data = await sstService.esocialCriarLoteRestrita(req.body || {}, req.user);
+      return res.status(201).json(data);
+    } catch (error) {
+      console.error(error);
+      return res.status(error.statusCode || 500).json({ error: error.message || 'Erro ao criar lote eSocial restrito' });
+    }
+  },
+
+  async esocialEnviarRestrita(req, res) {
+    try {
+      const data = await sstService.esocialEnviarRestrita(req.params.id, req.user);
+      return res.json(data);
+    } catch (error) {
+      console.error(error);
+      return res.status(error.statusCode || 500).json({ error: error.message || 'Erro ao enviar lote eSocial para producao restrita' });
+    }
+  },
+
+  async esocialConsultarRetorno(req, res) {
+    try {
+      const data = await sstService.esocialConsultarRetorno(req.params.id, req.user);
+      return res.json(data);
+    } catch (error) {
+      console.error(error);
+      return res.status(error.statusCode || 500).json({ error: error.message || 'Erro ao consultar retorno eSocial restrito' });
     }
   },
 

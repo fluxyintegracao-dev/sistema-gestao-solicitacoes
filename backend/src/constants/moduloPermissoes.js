@@ -516,6 +516,17 @@ const MODULO_PERMISSION_GROUPS = [
           { key: 'sst.timeline.visualizar', label: 'Visualizar timeline SST', descricao: 'Acessar timeline operacional de colaboradores.' },
           { key: 'sst.heatmap.visualizar', label: 'Visualizar heatmap SST', descricao: 'Acessar mapa de risco operacional por obra, empresa e funcao.' },
           { key: 'sst.observabilidade.visualizar', label: 'Visualizar observabilidade', descricao: 'Acessar logs, checks de homologacao, flags e saude operacional SST.' },
+          { key: 'sst.producao.visualizar', label: 'Visualizar producao controlada', descricao: 'Acessar rollout assistido, telemetria, hardening e readiness operacional SST.' },
+          { key: 'sst.enterprise.visualizar', label: 'Visualizar SST enterprise', descricao: 'Acessar readiness corporativo, filas, jobs, cache, qualidade e governanca SST.' },
+          { key: 'sst.rollout.gerenciar', label: 'Gerenciar rollout SST', descricao: 'Criar e ajustar planos de ativacao gradual do SST.' },
+          { key: 'sst.telemetria.visualizar', label: 'Visualizar telemetria SST', descricao: 'Acessar metricas operacionais de estabilidade e producao assistida.' },
+          { key: 'sst.performance.visualizar', label: 'Visualizar performance SST', descricao: 'Acessar metricas de performance, filas e saude de workers SST.' },
+          { key: 'sst.alertas.gerenciar', label: 'Gerenciar alertas SST', descricao: 'Gerar, tratar e resolver alertas operacionais do modulo SST.' },
+          { key: 'sst.hardening.gerenciar', label: 'Gerenciar hardening SST', descricao: 'Configurar politicas de timeout, retry, cooldown e controles de resiliencia SST.' },
+          { key: 'sst.jobs.gerenciar', label: 'Gerenciar jobs SST', descricao: 'Enfileirar, processar e auditar jobs internos do modulo SST.' },
+          { key: 'sst.cache.gerenciar', label: 'Gerenciar cache SST', descricao: 'Consultar e limpar cache operacional de dashboards, scores e analytics SST.' },
+          { key: 'sst.qualidade.gerenciar', label: 'Gerenciar qualidade SST', descricao: 'Executar quality checks e tratar inconsistencias operacionais SST.' },
+          { key: 'sst.governanca.visualizar', label: 'Visualizar governanca SST', descricao: 'Consultar logs de governanca, auditoria e trilha operacional enterprise SST.' },
           { key: 'sst.analytics.gerenciar', label: 'Gerenciar eventos analytics', descricao: 'Tratar eventos operacionais SST sem alterar a origem do fato registrado.' }
         ]
       },
@@ -592,7 +603,9 @@ const MODULO_PERMISSION_GROUPS = [
           { key: 'sst.documentos.visualizar', label: 'Visualizar documentos', descricao: 'Consultar documentos SST e URLs assinadas.' },
           { key: 'sst.documentos.gerenciar', label: 'Gerenciar documentos', descricao: 'Enviar e editar documentos SST.' },
           { key: 'sst.documentos_ia.visualizar', label: 'Visualizar analises IA', descricao: 'Consultar contratos e resultados de analise documental IA/OCR.' },
-          { key: 'sst.documentos_ia.gerenciar', label: 'Gerenciar analises IA', descricao: 'Solicitar analise IA documental quando houver provider habilitado.' }
+          { key: 'sst.documentos_ia.gerenciar', label: 'Gerenciar analises IA', descricao: 'Solicitar analise IA documental quando houver provider habilitado.' },
+          { key: 'sst.documentos_ia.analisar', label: 'Analisar documentos com IA', descricao: 'Executar pipeline de IA documental controlado por feature flag.' },
+          { key: 'sst.documentos_ia.aprovar_sugestao', label: 'Aprovar sugestoes IA', descricao: 'Aprovar ou rejeitar sugestoes extraidas pela IA documental SST.' }
         ]
       },
       {
@@ -600,7 +613,12 @@ const MODULO_PERMISSION_GROUPS = [
         label: 'eSocial SST',
         permissoes: [
           { key: 'sst.esocial.visualizar', label: 'Visualizar eventos eSocial', descricao: 'Consultar preparacao e retornos futuros dos eventos S-2210, S-2220 e S-2240.' },
-          { key: 'sst.esocial.preparar', label: 'Preparar eventos eSocial', descricao: 'Preparar registros para transmissao futura, sem envio ao governo nesta fase.' }
+          { key: 'sst.esocial.preparar', label: 'Preparar eventos eSocial', descricao: 'Preparar registros para transmissao futura, sem envio ao governo nesta fase.' },
+          { key: 'sst.esocial.gerar_xml', label: 'Gerar XML eSocial', descricao: 'Gerar XML tecnico a partir do dominio SST desacoplado.' },
+          { key: 'sst.esocial.validar_xml', label: 'Validar XML eSocial', descricao: 'Validar XML contra contrato estrutural e schemas disponiveis.' },
+          { key: 'sst.esocial.assinar_xml', label: 'Assinar XML eSocial', descricao: 'Assinar XML com certificado A1 quando flags e dependencias estiverem habilitadas.' },
+          { key: 'sst.esocial.enviar_restrita', label: 'Enviar producao restrita', descricao: 'Enviar lote ao ambiente de producao restrita, com producao oficial bloqueada.' },
+          { key: 'sst.esocial.consultar_retorno', label: 'Consultar retorno eSocial', descricao: 'Consultar protocolo, recibo e rejeicoes do ambiente restrito.' }
         ]
       },
       {

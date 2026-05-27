@@ -11,6 +11,26 @@ Registrar quais sessoes ou chats estao com ownership ativo de arquivos neste rep
 ## Ownership ativo
 
 - Sessao:
+  - escopo: governanca Core + Experience e planejamento Core Gateway
+  - repositorio: c:\Fluxy
+  - arquivos:
+    - docs/COLABORACAO_AGENTES.md
+    - docs/core-gateway/FRONTEIRAS_CORE_EXPERIENCE.md
+    - docs/core-gateway/CONTRATOS_API_EXPERIENCE.md
+    - docs/core-gateway/LGPD_DADOS_EXPERIENCE.md
+    - docs/core-gateway/EVENTOS_CORE_EXPERIENCE.md
+    - docs/core-gateway/ROADMAP_EXECUCAO_CORE_GATEWAY.md
+    - docs/workspace/OWNERSHIP_ATIVO.md
+    - docs/workspace/INTEGRACOES_ATIVAS.md
+    - docs/workspace/HANDOFF_GLOBAL.md
+    - backend/.env.example
+    - backend/src/app.js
+    - backend/src/config/env.js
+    - backend/src/modules/coreGateway/
+  - iniciado_em: 2026-05-27
+  - observacoes: agente principal no FLUXY CORE; agente auxiliar deve trabalhar apenas em C:\Fluxy_Experience e consultar os contratos publicados aqui
+
+- Sessao:
   - escopo: atualizacao em tempo real leve para solicitacoes via SSE + refresh pontual no frontend
   - repositorio: c:\Fluxy
   - arquivos:

@@ -194,10 +194,21 @@ db.SstWorkflowAcao = require('../modules/sst/models/SstWorkflowAcao')(sequelize,
 db.SstWorkflowEvento = require('../modules/sst/models/SstWorkflowEvento')(sequelize, Sequelize);
 db.SstRecomendacaoOperacional = require('../modules/sst/models/SstRecomendacaoOperacional')(sequelize, Sequelize);
 db.SstDocumentoAnaliseIa = require('../modules/sst/models/SstDocumentoAnaliseIa')(sequelize, Sequelize);
+db.SstIaDocumentLog = require('../modules/sst/models/SstIaDocumentLog')(sequelize, Sequelize);
 db.SstWorkflowLog = require('../modules/sst/models/SstWorkflowLog')(sequelize, Sequelize);
 db.SstAutomationLog = require('../modules/sst/models/SstAutomationLog')(sequelize, Sequelize);
 db.SstBlockingLog = require('../modules/sst/models/SstBlockingLog')(sequelize, Sequelize);
 db.SstIntegrationLog = require('../modules/sst/models/SstIntegrationLog')(sequelize, Sequelize);
+db.SstRolloutPlano = require('../modules/sst/models/SstRolloutPlano')(sequelize, Sequelize);
+db.SstTelemetryMetric = require('../modules/sst/models/SstTelemetryMetric')(sequelize, Sequelize);
+db.SstOperationalAlert = require('../modules/sst/models/SstOperationalAlert')(sequelize, Sequelize);
+db.SstHardeningPolicy = require('../modules/sst/models/SstHardeningPolicy')(sequelize, Sequelize);
+db.SstJob = require('../modules/sst/models/SstJob')(sequelize, Sequelize);
+db.SstQueueMetric = require('../modules/sst/models/SstQueueMetric')(sequelize, Sequelize);
+db.SstPerformanceMetric = require('../modules/sst/models/SstPerformanceMetric')(sequelize, Sequelize);
+db.SstCacheEntry = require('../modules/sst/models/SstCacheEntry')(sequelize, Sequelize);
+db.SstQualityIssue = require('../modules/sst/models/SstQualityIssue')(sequelize, Sequelize);
+db.SstGovernanceLog = require('../modules/sst/models/SstGovernanceLog')(sequelize, Sequelize);
 db.SstEventoEsocial = require('../modules/sst/models/SstEventoEsocial')(sequelize, Sequelize);
 db.SstEventoOperacional = require('../modules/sst/models/SstEventoOperacional')(sequelize, Sequelize);
 db.SstHistorico = require('../modules/sst/models/SstHistorico')(sequelize, Sequelize);
@@ -209,6 +220,10 @@ db.EsocialLayoutVersion = require('../modules/esocial/models/EsocialLayoutVersio
 db.EsocialLote = require('../modules/esocial/models/EsocialLote')(sequelize, Sequelize);
 db.EsocialEvento = require('../modules/esocial/models/EsocialEvento')(sequelize, Sequelize);
 db.EsocialRetorno = require('../modules/esocial/models/EsocialRetorno')(sequelize, Sequelize);
+db.EsocialTransmissionLog = require('../modules/esocial/models/EsocialTransmissionLog')(sequelize, Sequelize);
+db.EsocialCertificateLog = require('../modules/esocial/models/EsocialCertificateLog')(sequelize, Sequelize);
+db.EsocialXmlValidationLog = require('../modules/esocial/models/EsocialXmlValidationLog')(sequelize, Sequelize);
+db.EsocialSoapLog = require('../modules/esocial/models/EsocialSoapLog')(sequelize, Sequelize);
 
 const TITULO_FINANCEIRO_SEQUENCE_KEY = 'GLOBAL';
 
@@ -3213,10 +3228,21 @@ db.FiscalAccountingBatchItem.belongsTo(db.FiscalDfeDocument, { foreignKey: 'fisc
   db.SstWorkflowEvento,
   db.SstRecomendacaoOperacional,
   db.SstDocumentoAnaliseIa,
+  db.SstIaDocumentLog,
   db.SstWorkflowLog,
   db.SstAutomationLog,
   db.SstBlockingLog,
   db.SstIntegrationLog,
+  db.SstRolloutPlano,
+  db.SstTelemetryMetric,
+  db.SstOperationalAlert,
+  db.SstHardeningPolicy,
+  db.SstJob,
+  db.SstQueueMetric,
+  db.SstPerformanceMetric,
+  db.SstCacheEntry,
+  db.SstQualityIssue,
+  db.SstGovernanceLog,
   db.SstEventoEsocial,
   db.SstEventoOperacional,
   db.SstHistorico
@@ -3271,6 +3297,10 @@ db.SstEventoOperacional.hasMany(db.SstWorkflowEvento, { foreignKey: 'evento_oper
 db.SstWorkflowEvento.belongsTo(db.SstEventoOperacional, { foreignKey: 'evento_operacional_id', as: 'eventoOperacional' });
 db.SstDocumento.hasMany(db.SstDocumentoAnaliseIa, { foreignKey: 'documento_id', as: 'analisesIa' });
 db.SstDocumentoAnaliseIa.belongsTo(db.SstDocumento, { foreignKey: 'documento_id', as: 'documento' });
+db.SstDocumento.hasMany(db.SstIaDocumentLog, { foreignKey: 'documento_id', as: 'logsIa' });
+db.SstIaDocumentLog.belongsTo(db.SstDocumento, { foreignKey: 'documento_id', as: 'documento' });
+db.SstDocumentoAnaliseIa.hasMany(db.SstIaDocumentLog, { foreignKey: 'analise_id', as: 'logs' });
+db.SstIaDocumentLog.belongsTo(db.SstDocumentoAnaliseIa, { foreignKey: 'analise_id', as: 'analise' });
 db.SstWorkflow.hasMany(db.SstWorkflowLog, { foreignKey: 'workflow_id', as: 'logs' });
 db.SstWorkflowLog.belongsTo(db.SstWorkflow, { foreignKey: 'workflow_id', as: 'workflow' });
 db.SstWorkflowExecucao.hasMany(db.SstWorkflowLog, { foreignKey: 'execucao_id', as: 'logs' });
@@ -3297,6 +3327,32 @@ db.Obra.hasMany(db.EsocialEvento, { foreignKey: 'obra_id', as: 'esocialEventos' 
 db.EsocialEvento.belongsTo(db.Obra, { foreignKey: 'obra_id', as: 'obra' });
 db.RhColaborador.hasMany(db.EsocialEvento, { foreignKey: 'colaborador_id', as: 'esocialEventos' });
 db.EsocialEvento.belongsTo(db.RhColaborador, { foreignKey: 'colaborador_id', as: 'colaborador' });
+db.EsocialEvento.hasMany(db.EsocialTransmissionLog, { foreignKey: 'evento_id', as: 'transmissionLogs' });
+db.EsocialTransmissionLog.belongsTo(db.EsocialEvento, { foreignKey: 'evento_id', as: 'evento' });
+db.EsocialLote.hasMany(db.EsocialTransmissionLog, { foreignKey: 'lote_id', as: 'transmissionLogs' });
+db.EsocialTransmissionLog.belongsTo(db.EsocialLote, { foreignKey: 'lote_id', as: 'lote' });
+db.EsocialEvento.hasMany(db.EsocialXmlValidationLog, { foreignKey: 'evento_id', as: 'validationLogs' });
+db.EsocialXmlValidationLog.belongsTo(db.EsocialEvento, { foreignKey: 'evento_id', as: 'evento' });
+db.EsocialLote.hasMany(db.EsocialXmlValidationLog, { foreignKey: 'lote_id', as: 'validationLogs' });
+db.EsocialXmlValidationLog.belongsTo(db.EsocialLote, { foreignKey: 'lote_id', as: 'lote' });
+db.EsocialLote.hasMany(db.EsocialSoapLog, { foreignKey: 'lote_id', as: 'soapLogs' });
+db.EsocialSoapLog.belongsTo(db.EsocialLote, { foreignKey: 'lote_id', as: 'lote' });
+
+[
+  db.EsocialTransmissionLog,
+  db.EsocialCertificateLog,
+  db.EsocialXmlValidationLog,
+  db.EsocialSoapLog
+].forEach((model) => {
+  if (model?.rawAttributes?.empresa_id) {
+    db.EmpresaGrupo.hasMany(model, { foreignKey: 'empresa_id', as: `${model.name}Registros` });
+    model.belongsTo(db.EmpresaGrupo, { foreignKey: 'empresa_id', as: 'empresa' });
+  }
+  if (model?.rawAttributes?.criado_por) {
+    model.belongsTo(db.User, { foreignKey: 'criado_por', as: 'criadoPor' });
+    model.belongsTo(db.User, { foreignKey: 'atualizado_por', as: 'atualizadoPor' });
+  }
+});
 
 /* ===== TREINAMENTO ===== */
 db.TreinamentoConteudo.belongsTo(db.User, { foreignKey: 'criado_por', as: 'criadoPor' });

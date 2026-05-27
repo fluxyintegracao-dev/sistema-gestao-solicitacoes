@@ -100,3 +100,24 @@ Mesmo com IA aplicada, a integracao eSocial permanece bloqueada. A IA pode apoia
 A Fase 5 adicionou feature flags, logs operacionais, observabilidade e homologacao controlada para o modulo SST.
 
 Essa camada aumenta a confiabilidade operacional antes de qualquer integracao oficial. Integracoes com RH/DP e Obras passam a ter acionamento controlado, logs e rollback por configuracao. A transmissao eSocial continua bloqueada, e qualquer envio futuro deve nascer em etapa propria com validacao de schema, certificado, assinatura e ambiente oficial.
+
+## Atualizacao SST Fase 6
+
+A Fase 6 adicionou rollout assistido, telemetria, hardening, alertas operacionais e painel de producao controlada.
+
+Esses recursos servem para estabilizar o dominio SST em operacao real assistida. Eles nao alteram o contrato externo eSocial e nao liberam transmissao oficial. A camada de integracao governamental continua isolada e bloqueada ate existir decisao propria, documentacao tecnica completa, ambiente oficial preparado, certificado, assinatura e validacao de schema.
+
+## Atualizacao SST Fase 7
+
+A Fase 7 adicionou filas, jobs, workers, cache, telemetria historica, quality checks, governanca corporativa e observabilidade avancada.
+
+Essa camada consolida a maturidade enterprise do dominio SST antes de qualquer transmissao oficial ao governo. A fila inicial e database-backed, com arquitetura preparada para BullMQ/Redis em evolucao futura. O objetivo e desacoplar score, notificacoes, workflows, analytics, heatmaps e IA documental sem introduzir uma dependencia operacional obrigatoria antes do go-live corporativo.
+
+A transmissao eSocial continua bloqueada. O fluxo permanece:
+
+```text
+Dominio operacional SST
+  -> filas, jobs, observabilidade e governanca interna
+  -> mapeadores/versionamento eSocial
+  -> XML oficial futuro
+```

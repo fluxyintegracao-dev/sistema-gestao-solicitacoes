@@ -10,6 +10,13 @@ module.exports = {
     s1_3: require('./mappings/s1_3')
   },
   services: {
-    mapping: require('./services/esocialMappingService')
+    mapping: require('./services/esocialMappingService'),
+    controlled: require('./services/EsocialSstControlledService'),
+    loteBuilder: require('./services/EsocialLoteBuilderService'),
+    certificate: require('./certificates/EsocialCertificateService'),
+    signer: require('./signers/EsocialXmlSignerService'),
+    soap: require('./soap/EsocialSoapClient'),
+    validation: require('./validators/EsocialXmlValidationService'),
+    restritaTransmission: require('./transmitters/EsocialRestritaTransmissionService')
   }
 };

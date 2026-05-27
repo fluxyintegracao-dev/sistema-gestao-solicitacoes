@@ -395,14 +395,27 @@ const SST_RESOURCE_CONFIG = {
     listOrder: [['createdAt', 'DESC']],
     createFields: [
       'documento_id', 'empresa_id', 'obra_id', 'colaborador_id', 'tipo_documento',
-      'provider', 'status', 'confianca', 'dados_extraidos_json',
-      'inconsistencias_json', 'observacoes', 'processado_em'
+      'provider', 'status', 'confianca', 'texto_extraido',
+      'dados_extraidos_json', 'inconsistencias_json', 'divergencias_json',
+      'sugestoes_json', 'observacoes', 'processado_em'
     ],
     updateFields: [
-      'provider', 'status', 'confianca', 'dados_extraidos_json',
-      'inconsistencias_json', 'observacoes', 'processado_em'
+      'provider', 'status', 'confianca', 'texto_extraido',
+      'dados_extraidos_json', 'inconsistencias_json', 'divergencias_json',
+      'sugestoes_json', 'observacoes', 'processado_em', 'aprovado_em',
+      'aprovado_por', 'rejeitado_em', 'rejeitado_por'
     ],
     requiredFields: ['tipo_documento']
+  },
+  ia_document_logs: {
+    modelName: 'SstIaDocumentLog',
+    tableName: 'sst_ia_document_logs',
+    area: 'documentos',
+    label: 'Log de IA documental SST',
+    listOrder: [['createdAt', 'DESC']],
+    createFields: [],
+    updateFields: [],
+    requiredFields: []
   },
   workflow_logs: {
     modelName: 'SstWorkflowLog',
@@ -443,6 +456,156 @@ const SST_RESOURCE_CONFIG = {
     createFields: [],
     updateFields: [],
     requiredFields: []
+  },
+  rollout_planos: {
+    modelName: 'SstRolloutPlano',
+    tableName: 'sst_rollout_planos',
+    area: 'configuracoes',
+    label: 'Plano de rollout SST',
+    listOrder: [['updatedAt', 'DESC']],
+    createFields: [
+      'codigo', 'nome', 'descricao', 'escopo_tipo', 'empresa_id', 'obra_id',
+      'setor_id', 'usuario_id', 'grupo_piloto', 'status',
+      'percentual_ativacao', 'flags_json', 'criterios_json',
+      'iniciado_em', 'encerrado_em', 'rollback_em', 'rollback_motivo'
+    ],
+    updateFields: [
+      'codigo', 'nome', 'descricao', 'escopo_tipo', 'empresa_id', 'obra_id',
+      'setor_id', 'usuario_id', 'grupo_piloto', 'status',
+      'percentual_ativacao', 'flags_json', 'criterios_json',
+      'iniciado_em', 'encerrado_em', 'rollback_em', 'rollback_motivo'
+    ],
+    requiredFields: ['codigo', 'nome']
+  },
+  telemetria: {
+    modelName: 'SstTelemetryMetric',
+    tableName: 'sst_telemetry_metrics',
+    area: 'analytics',
+    label: 'Metrica de telemetria SST',
+    listOrder: [['createdAt', 'DESC']],
+    createFields: [
+      'tipo_metrica', 'escopo_tipo', 'empresa_id', 'obra_id', 'colaborador_id',
+      'referencia_tipo', 'referencia_id', 'valor', 'unidade', 'status',
+      'duracao_ms', 'payload_json'
+    ],
+    updateFields: ['status', 'payload_json'],
+    requiredFields: ['tipo_metrica']
+  },
+  alertas_operacionais: {
+    modelName: 'SstOperationalAlert',
+    tableName: 'sst_operational_alerts',
+    area: 'analytics',
+    label: 'Alerta operacional SST',
+    listOrder: [['createdAt', 'DESC']],
+    createFields: [
+      'tipo_alerta', 'criticidade', 'empresa_id', 'obra_id', 'colaborador_id',
+      'titulo', 'mensagem', 'status', 'origem_tipo', 'origem_id',
+      'payload_json'
+    ],
+    updateFields: [
+      'criticidade', 'titulo', 'mensagem', 'status', 'payload_json',
+      'resolvido_em', 'resolvido_por'
+    ],
+    requiredFields: ['tipo_alerta', 'titulo']
+  },
+  hardening_policies: {
+    modelName: 'SstHardeningPolicy',
+    tableName: 'sst_hardening_policies',
+    area: 'configuracoes',
+    label: 'Politica de hardening SST',
+    listOrder: [['updatedAt', 'DESC']],
+    createFields: [
+      'codigo', 'nome', 'tipo_alvo', 'timeout_ms', 'max_retries',
+      'cooldown_minutos', 'circuit_breaker_enabled', 'ativo',
+      'parametros_json', 'observacoes'
+    ],
+    updateFields: [
+      'codigo', 'nome', 'tipo_alvo', 'timeout_ms', 'max_retries',
+      'cooldown_minutos', 'circuit_breaker_enabled', 'ativo',
+      'parametros_json', 'observacoes'
+    ],
+    requiredFields: ['codigo', 'nome', 'tipo_alvo']
+  },
+  jobs: {
+    modelName: 'SstJob',
+    tableName: 'sst_jobs',
+    area: 'analytics',
+    label: 'Job SST',
+    listOrder: [['createdAt', 'DESC']],
+    createFields: [
+      'queue_name', 'job_type', 'status', 'prioridade', 'max_attempts',
+      'next_run_at', 'empresa_id', 'obra_id', 'colaborador_id',
+      'referencia_tipo', 'referencia_id', 'payload_json'
+    ],
+    updateFields: ['status', 'next_run_at', 'max_attempts', 'payload_json'],
+    requiredFields: ['job_type']
+  },
+  queue_metrics: {
+    modelName: 'SstQueueMetric',
+    tableName: 'sst_queue_metrics',
+    area: 'analytics',
+    label: 'Metrica de fila SST',
+    listOrder: [['sampled_at', 'DESC']],
+    createFields: [],
+    updateFields: [],
+    requiredFields: []
+  },
+  performance_metrics: {
+    modelName: 'SstPerformanceMetric',
+    tableName: 'sst_performance_metrics',
+    area: 'analytics',
+    label: 'Metrica de performance SST',
+    listOrder: [['sampled_at', 'DESC']],
+    createFields: [
+      'metric_name', 'scope_type', 'empresa_id', 'obra_id', 'colaborador_id',
+      'value', 'unit', 'sampled_at', 'payload_json'
+    ],
+    updateFields: ['value', 'unit', 'payload_json'],
+    requiredFields: ['metric_name']
+  },
+  cache_entries: {
+    modelName: 'SstCacheEntry',
+    tableName: 'sst_cache_entries',
+    area: 'analytics',
+    label: 'Cache SST',
+    listOrder: [['updatedAt', 'DESC']],
+    createFields: [
+      'namespace', 'cache_key', 'value_json', 'tags_json', 'expires_at'
+    ],
+    updateFields: [
+      'value_json', 'tags_json', 'expires_at'
+    ],
+    requiredFields: ['namespace', 'cache_key']
+  },
+  quality_issues: {
+    modelName: 'SstQualityIssue',
+    tableName: 'sst_quality_issues',
+    area: 'analytics',
+    label: 'Issue de qualidade SST',
+    listOrder: [['createdAt', 'DESC']],
+    createFields: [
+      'issue_type', 'severidade', 'status', 'empresa_id', 'obra_id',
+      'colaborador_id', 'titulo', 'descricao', 'origem_tipo',
+      'origem_id', 'payload_json'
+    ],
+    updateFields: [
+      'severidade', 'status', 'titulo', 'descricao', 'payload_json',
+      'resolvido_em', 'resolvido_por'
+    ],
+    requiredFields: ['issue_type', 'titulo']
+  },
+  governance_logs: {
+    modelName: 'SstGovernanceLog',
+    tableName: 'sst_governance_logs',
+    area: 'analytics',
+    label: 'Log de governanca SST',
+    listOrder: [['createdAt', 'DESC']],
+    createFields: [
+      'acao', 'entidade', 'entidade_id', 'criticidade', 'empresa_id',
+      'obra_id', 'usuario_id', 'mensagem', 'payload_json'
+    ],
+    updateFields: [],
+    requiredFields: ['acao']
   },
   documentos: {
     modelName: 'SstDocumento',
@@ -550,7 +713,23 @@ const SST_FEATURE_FLAGS = {
   IA_DOCUMENTAL: 'SST_IA_DOCUMENTAL',
   INTEGRACAO_RHDP: 'SST_INTEGRACAO_RHDP',
   INTEGRACAO_OBRAS: 'SST_INTEGRACAO_OBRAS',
-  WORKFLOW_ENGINE: 'SST_WORKFLOW_ENGINE'
+  WORKFLOW_ENGINE: 'SST_WORKFLOW_ENGINE',
+  ROLLOUT_ASSISTIDO: 'SST_ROLLOUT_ASSISTIDO',
+  TELEMETRIA_OPERACIONAL: 'SST_TELEMETRIA_OPERACIONAL',
+  ALERTAS_AVANCADOS: 'SST_ALERTAS_AVANCADOS',
+  HARDENING_OPERACIONAL: 'SST_HARDENING_OPERACIONAL',
+  MONITORAMENTO_PRODUCAO: 'SST_MONITORAMENTO_PRODUCAO',
+  ASYNC_JOBS: 'SST_ASYNC_JOBS',
+  CACHE_OPERACIONAL: 'SST_CACHE_OPERACIONAL',
+  OBSERVABILIDADE_AVANCADA: 'SST_OBSERVABILIDADE_AVANCADA',
+  QUALITY_PIPELINE: 'SST_QUALITY_PIPELINE',
+  GOVERNANCA_CORPORATIVA: 'SST_GOVERNANCA_CORPORATIVA',
+  IA_DOCUMENTAL_ENABLED: 'SST_IA_DOCUMENTAL_ENABLED',
+  ESOCIAL_INTEGRACAO_ENABLED: 'ESOCIAL_INTEGRACAO_ENABLED',
+  ESOCIAL_TRANSMISSAO_RESTRITA_ENABLED: 'ESOCIAL_TRANSMISSAO_RESTRITA_ENABLED',
+  ESOCIAL_TRANSMISSAO_PRODUCAO_ENABLED: 'ESOCIAL_TRANSMISSAO_PRODUCAO_ENABLED',
+  ESOCIAL_XML_SIGN_ENABLED: 'ESOCIAL_XML_SIGN_ENABLED',
+  ESOCIAL_SOAP_ENABLED: 'ESOCIAL_SOAP_ENABLED'
 };
 
 const DEFAULT_SST_CONFIG = {
@@ -575,7 +754,7 @@ const DEFAULT_SST_CONFIG = {
   status_recomendacao_operacional: ['ABERTA', 'EM_ANALISE', 'APLICADA', 'IGNORADA'],
   workflow_acoes_padrao: ['REVISAR_CONFORMIDADE', 'GERAR_PENDENCIAS', 'GERAR_NOTIFICACOES', 'AVALIAR_BLOQUEIOS', 'RECALCULAR_SCORE', 'GERAR_RECOMENDACOES'],
   workflow_status: ['PENDENTE', 'EM_EXECUCAO', 'CONCLUIDO', 'ERRO'],
-  ia_documental_providers: ['OPENAI', 'CLAUDE', 'AWS_TEXTRACT', 'AZURE_OCR'],
+  ia_documental_providers: ['openai', 'anthropic', 'claude', 'gemini', 'google', 'http', 'generic', 'aws_textract', 'azure_ocr'],
   ia_documental_provider_ativo: 'NAO_CONFIGURADO',
   SST_AUTO_REVISAO_FUNCAO: false,
   SST_BLOQUEIO_OPERACIONAL: false,
@@ -584,6 +763,29 @@ const DEFAULT_SST_CONFIG = {
   SST_INTEGRACAO_RHDP: false,
   SST_INTEGRACAO_OBRAS: false,
   SST_WORKFLOW_ENGINE: false,
+  SST_ROLLOUT_ASSISTIDO: false,
+  SST_TELEMETRIA_OPERACIONAL: false,
+  SST_ALERTAS_AVANCADOS: false,
+  SST_HARDENING_OPERACIONAL: false,
+  SST_MONITORAMENTO_PRODUCAO: false,
+  SST_ASYNC_JOBS: false,
+  SST_CACHE_OPERACIONAL: false,
+  SST_OBSERVABILIDADE_AVANCADA: false,
+  SST_QUALITY_PIPELINE: false,
+  SST_GOVERNANCA_CORPORATIVA: false,
+  SST_IA_DOCUMENTAL_ENABLED: false,
+  ESOCIAL_INTEGRACAO_ENABLED: false,
+  ESOCIAL_TRANSMISSAO_RESTRITA_ENABLED: false,
+  ESOCIAL_TRANSMISSAO_PRODUCAO_ENABLED: false,
+  ESOCIAL_XML_SIGN_ENABLED: false,
+  ESOCIAL_SOAP_ENABLED: false,
+  sst_jobs_padrao: ['SstScoreRecalculationJob', 'SstNotificationJob', 'SstWorkflowJob', 'SstAnalyticsRefreshJob', 'SstHeatmapRefreshJob', 'SstIaDocumentAnalysisJob'],
+  sst_queue_mode: 'DATABASE_BACKED',
+  sst_bullmq_ready: true,
+  rollout_escopos: ['PILOTO', 'EMPRESA', 'OBRA', 'SETOR', 'USUARIO'],
+  rollout_status: ['PLANEJADO', 'ATIVO', 'PAUSADO', 'ENCERRADO'],
+  telemetria_metricas_padrao: ['WORKFLOW_DURACAO', 'DASHBOARD_DURACAO', 'AUTOMACAO_FALHA', 'INTEGRACAO_FALHA', 'BLOQUEIO_GERADO', 'PENDENCIA_GERADA', 'NOTIFICACAO_GERADA'],
+  hardening_alvos_padrao: ['WORKFLOW', 'AUTOMACAO', 'INTEGRACAO', 'IA_DOCUMENTAL', 'NOTIFICACAO'],
   status_programa: ['ATIVO', 'VENCIDO', 'SUBSTITUIDO'],
   eventos_esocial: ['S-2210', 'S-2220', 'S-2240'],
   status_esocial: ['PREPARADO', 'PENDENTE_DOCUMENTACAO', 'REJEITADO', 'PROCESSADO'],

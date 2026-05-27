@@ -367,7 +367,12 @@ const TREINAMENTO_PUBLISH_KEYS = [
 
 const SST_DASHBOARD_KEYS = [
   'sst.dashboard.visualizar',
-  'sst.analytics.visualizar'
+  'sst.analytics.visualizar',
+  'sst.observabilidade.visualizar',
+  'sst.producao.visualizar',
+  'sst.telemetria.visualizar',
+  'sst.enterprise.visualizar',
+  'sst.performance.visualizar'
 ];
 
 const SST_AREA_PERMISSION_KEYS = [
@@ -393,8 +398,24 @@ const SST_AREA_PERMISSION_KEYS = [
   'sst.acidentes.gerenciar',
   'sst.documentos.visualizar',
   'sst.documentos.gerenciar',
+  'sst.documentos_ia.visualizar',
+  'sst.documentos_ia.gerenciar',
+  'sst.documentos_ia.analisar',
+  'sst.documentos_ia.aprovar_sugestao',
   'sst.esocial.visualizar',
   'sst.esocial.preparar',
+  'sst.esocial.gerar_xml',
+  'sst.esocial.validar_xml',
+  'sst.esocial.assinar_xml',
+  'sst.esocial.enviar_restrita',
+  'sst.esocial.consultar_retorno',
+  'sst.rollout.gerenciar',
+  'sst.alertas.gerenciar',
+  'sst.hardening.gerenciar',
+  'sst.jobs.gerenciar',
+  'sst.cache.gerenciar',
+  'sst.qualidade.gerenciar',
+  'sst.governanca.visualizar',
   'sst.configuracoes.gerenciar'
 ];
 
@@ -1634,7 +1655,25 @@ async function canViewSstArea(user, area) {
     `sst.${normalizedArea}.visualizar`,
     `sst.${normalizedArea}.gerenciar`,
     normalizedArea === 'esocial' ? 'sst.esocial.preparar' : null,
-    normalizedArea === 'analytics' ? 'sst.analytics.visualizar' : null
+    normalizedArea === 'esocial' ? 'sst.esocial.gerar_xml' : null,
+    normalizedArea === 'esocial' ? 'sst.esocial.validar_xml' : null,
+    normalizedArea === 'esocial' ? 'sst.esocial.assinar_xml' : null,
+    normalizedArea === 'esocial' ? 'sst.esocial.enviar_restrita' : null,
+    normalizedArea === 'esocial' ? 'sst.esocial.consultar_retorno' : null,
+    normalizedArea === 'documentos' ? 'sst.documentos_ia.visualizar' : null,
+    normalizedArea === 'documentos' ? 'sst.documentos_ia.analisar' : null,
+    normalizedArea === 'documentos' ? 'sst.documentos_ia.aprovar_sugestao' : null,
+    normalizedArea === 'analytics' ? 'sst.analytics.visualizar' : null,
+    normalizedArea === 'analytics' ? 'sst.producao.visualizar' : null,
+    normalizedArea === 'analytics' ? 'sst.telemetria.visualizar' : null,
+    normalizedArea === 'analytics' ? 'sst.enterprise.visualizar' : null,
+    normalizedArea === 'analytics' ? 'sst.performance.visualizar' : null,
+    normalizedArea === 'analytics' ? 'sst.governanca.visualizar' : null,
+    normalizedArea === 'configuracoes' ? 'sst.rollout.gerenciar' : null,
+    normalizedArea === 'configuracoes' ? 'sst.hardening.gerenciar' : null,
+    normalizedArea === 'configuracoes' ? 'sst.jobs.gerenciar' : null,
+    normalizedArea === 'configuracoes' ? 'sst.cache.gerenciar' : null,
+    normalizedArea === 'configuracoes' ? 'sst.qualidade.gerenciar' : null
   ].filter(Boolean);
 
   if (await userHasConfiguredAreaPermissions(user)) {
@@ -1653,9 +1692,28 @@ async function canManageSstArea(user, area) {
   const manageKey = normalizedArea === 'esocial'
     ? 'sst.esocial.preparar'
     : `sst.${normalizedArea}.gerenciar`;
+  const extraKeys = [
+    manageKey,
+    normalizedArea === 'esocial' ? 'sst.esocial.gerar_xml' : null,
+    normalizedArea === 'esocial' ? 'sst.esocial.validar_xml' : null,
+    normalizedArea === 'esocial' ? 'sst.esocial.assinar_xml' : null,
+    normalizedArea === 'esocial' ? 'sst.esocial.enviar_restrita' : null,
+    normalizedArea === 'esocial' ? 'sst.esocial.consultar_retorno' : null,
+    normalizedArea === 'documentos' ? 'sst.documentos_ia.gerenciar' : null,
+    normalizedArea === 'documentos' ? 'sst.documentos_ia.analisar' : null,
+    normalizedArea === 'documentos' ? 'sst.documentos_ia.aprovar_sugestao' : null,
+    normalizedArea === 'analytics' ? 'sst.alertas.gerenciar' : null,
+    normalizedArea === 'analytics' ? 'sst.jobs.gerenciar' : null,
+    normalizedArea === 'analytics' ? 'sst.qualidade.gerenciar' : null,
+    normalizedArea === 'configuracoes' ? 'sst.rollout.gerenciar' : null,
+    normalizedArea === 'configuracoes' ? 'sst.hardening.gerenciar' : null,
+    normalizedArea === 'configuracoes' ? 'sst.jobs.gerenciar' : null,
+    normalizedArea === 'configuracoes' ? 'sst.cache.gerenciar' : null,
+    normalizedArea === 'configuracoes' ? 'sst.qualidade.gerenciar' : null
+  ].filter(Boolean);
 
   if (await userHasConfiguredAreaPermissions(user)) {
-    return userHasAreaPermission(user, [manageKey]);
+    return userHasAreaPermission(user, extraKeys);
   }
 
   return false;

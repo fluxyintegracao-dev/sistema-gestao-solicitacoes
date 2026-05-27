@@ -378,12 +378,18 @@ export const SST_RESOURCES = {
     fields: [
       { key: 'documento_id', label: 'Documento ID', type: 'number' },
       { key: 'tipo_documento', label: 'Tipo', options: ['ASO', 'CERTIFICADO', 'TREINAMENTO', 'EPI', 'OUTRO'], required: true },
-      { key: 'provider', label: 'Provider', options: ['NAO_CONFIGURADO', 'OPENAI', 'CLAUDE', 'AWS_TEXTRACT', 'AZURE_OCR'] },
-      { key: 'status', label: 'Status', options: ['PENDENTE_PROVIDER', 'AGUARDANDO_PROCESSAMENTO', 'PROCESSADO', 'ERRO'] },
+      { key: 'status', label: 'Status', options: ['EM_ANALISE', 'PROCESSADO', 'PENDENTE_TEXTO_DOCUMENTO', 'BLOQUEADO_CONFIGURACAO', 'BLOQUEADO_CREDENCIAL', 'APROVADO_HUMANO', 'REJEITADO_HUMANO', 'ERRO_PROVIDER'] },
       { key: 'confianca', label: 'Confianca', type: 'number' },
       { key: 'observacoes', label: 'Observacoes', type: 'textarea' }
     ],
-    columns: ['createdAt', 'tipo_documento', 'provider', 'status', 'confianca', 'documento.titulo']
+    columns: ['createdAt', 'tipo_documento', 'provider', 'status', 'confianca', 'documento.titulo', 'observacoes']
+  },
+  ia_document_logs: {
+    title: 'Logs IA documental',
+    subtitle: 'Auditoria de execucoes, bloqueios e respostas da IA documental SST.',
+    area: 'documentos',
+    fields: [],
+    columns: ['createdAt', 'provider', 'status', 'etapa', 'documento.titulo', 'erro']
   },
   workflow_logs: {
     title: 'Logs de workflow',
@@ -412,6 +418,122 @@ export const SST_RESOURCES = {
     area: 'analytics',
     fields: [],
     columns: ['createdAt', 'integracao', 'tipo_evento', 'status', 'mensagem', 'erro']
+  },
+  rollout_planos: {
+    title: 'Planos de rollout',
+    subtitle: 'Ativacao gradual por empresa, obra, setor, grupo piloto ou usuario.',
+    area: 'configuracoes',
+    fields: [
+      { key: 'codigo', label: 'Codigo', required: true },
+      { key: 'nome', label: 'Plano', required: true },
+      { key: 'escopo_tipo', label: 'Escopo', options: ['PILOTO', 'EMPRESA', 'OBRA', 'SETOR', 'USUARIO'] },
+      { key: 'empresa_id', label: 'Empresa', type: 'selectRef', ref: 'empresas' },
+      { key: 'obra_id', label: 'Obra/Centro', type: 'selectRef', ref: 'obras' },
+      { key: 'grupo_piloto', label: 'Grupo piloto' },
+      { key: 'status', label: 'Status', options: ['PLANEJADO', 'ATIVO', 'PAUSADO', 'ENCERRADO'] },
+      { key: 'percentual_ativacao', label: 'Percentual ativacao', type: 'number' },
+      { key: 'descricao', label: 'Descricao', type: 'textarea' }
+    ],
+    columns: ['codigo', 'nome', 'escopo_tipo', 'status', 'percentual_ativacao', 'obra.nome']
+  },
+  telemetria: {
+    title: 'Telemetria SST',
+    subtitle: 'Metricas operacionais para producao controlada e estabilidade enterprise.',
+    area: 'analytics',
+    fields: [
+      { key: 'tipo_metrica', label: 'Tipo de metrica', required: true },
+      { key: 'escopo_tipo', label: 'Escopo', options: ['SISTEMA', 'EMPRESA', 'OBRA', 'COLABORADOR'] },
+      { key: 'empresa_id', label: 'Empresa', type: 'selectRef', ref: 'empresas' },
+      { key: 'obra_id', label: 'Obra/Centro', type: 'selectRef', ref: 'obras' },
+      { key: 'valor', label: 'Valor', type: 'number' },
+      { key: 'unidade', label: 'Unidade' },
+      { key: 'status', label: 'Status', options: ['REGISTRADO', 'ATENCAO', 'ERRO'] },
+      { key: 'duracao_ms', label: 'Duracao ms', type: 'number' }
+    ],
+    columns: ['createdAt', 'tipo_metrica', 'escopo_tipo', 'valor', 'unidade', 'status', 'duracao_ms']
+  },
+  alertas_operacionais: {
+    title: 'Alertas operacionais SST',
+    subtitle: 'Alertas de falhas, lentidao, scores criticos e riscos de operacao real.',
+    area: 'analytics',
+    fields: [
+      { key: 'tipo_alerta', label: 'Tipo', required: true },
+      { key: 'criticidade', label: 'Criticidade', options: ['BAIXA', 'MEDIA', 'ALTA', 'CRITICA', 'EMERGENCIAL'] },
+      { key: 'empresa_id', label: 'Empresa', type: 'selectRef', ref: 'empresas' },
+      { key: 'obra_id', label: 'Obra/Centro', type: 'selectRef', ref: 'obras' },
+      { key: 'status', label: 'Status', options: ['ABERTO', 'EM_TRATAMENTO', 'RESOLVIDO', 'IGNORADO'] },
+      { key: 'titulo', label: 'Titulo', required: true },
+      { key: 'mensagem', label: 'Mensagem', type: 'textarea' }
+    ],
+    columns: ['createdAt', 'tipo_alerta', 'criticidade', 'status', 'titulo', 'obra.nome']
+  },
+  hardening_policies: {
+    title: 'Politicas de hardening',
+    subtitle: 'Timeout, retry, cooldown e circuit breaker conceitual por camada SST.',
+    area: 'configuracoes',
+    fields: [
+      { key: 'codigo', label: 'Codigo', required: true },
+      { key: 'nome', label: 'Politica', required: true },
+      { key: 'tipo_alvo', label: 'Alvo', options: ['WORKFLOW', 'AUTOMACAO', 'INTEGRACAO', 'IA_DOCUMENTAL', 'NOTIFICACAO'], required: true },
+      { key: 'timeout_ms', label: 'Timeout ms', type: 'number' },
+      { key: 'max_retries', label: 'Max retries', type: 'number' },
+      { key: 'cooldown_minutos', label: 'Cooldown minutos', type: 'number' },
+      { key: 'circuit_breaker_enabled', label: 'Circuit breaker', type: 'checkbox' },
+      { key: 'ativo', label: 'Ativa', type: 'checkbox' },
+      { key: 'observacoes', label: 'Observacoes', type: 'textarea' }
+    ],
+    columns: ['codigo', 'nome', 'tipo_alvo', 'timeout_ms', 'max_retries', 'ativo']
+  },
+  jobs: {
+    title: 'Jobs SST',
+    subtitle: 'Processamento assincrono de score, workflows, analytics, heatmap, notificacoes e IA documental.',
+    area: 'configuracoes',
+    fields: [
+      { key: 'job_type', label: 'Tipo de job', required: true },
+      { key: 'queue_name', label: 'Fila' },
+      { key: 'status', label: 'Status', options: ['PENDENTE', 'PROCESSANDO', 'SUCESSO', 'ERRO', 'DEAD_LETTER', 'CANCELADO'] },
+      { key: 'priority', label: 'Prioridade', type: 'number' },
+      { key: 'max_attempts', label: 'Max tentativas', type: 'number' }
+    ],
+    columns: ['createdAt', 'job_type', 'queue_name', 'status', 'attempts', 'max_attempts', 'last_error']
+  },
+  queue_metrics: {
+    title: 'Metricas de fila',
+    subtitle: 'Historico de status das filas SST para readiness enterprise.',
+    area: 'analytics',
+    fields: [],
+    columns: ['sampled_at', 'queue_name', 'metric_type', 'total_jobs', 'pending_jobs', 'failed_jobs']
+  },
+  performance_metrics: {
+    title: 'Metricas de performance',
+    subtitle: 'Duracao, status e contexto tecnico de operacoes enterprise SST.',
+    area: 'analytics',
+    fields: [],
+    columns: ['sampled_at', 'metric_name', 'metric_group', 'duration_ms', 'status', 'contexto']
+  },
+  cache_entries: {
+    title: 'Cache operacional SST',
+    subtitle: 'Entradas de cache para dashboards, heatmaps, scores e centro operacional.',
+    area: 'configuracoes',
+    fields: [],
+    columns: ['namespace', 'cache_key', 'expires_at', 'hit_count', 'last_hit_at']
+  },
+  quality_issues: {
+    title: 'Qualidade operacional SST',
+    subtitle: 'Inconsistencias de scores, jobs, workflows e pendencias detectadas pelo pipeline de qualidade.',
+    area: 'configuracoes',
+    fields: [
+      { key: 'status', label: 'Status', options: ['ABERTA', 'EM_ANALISE', 'RESOLVIDA', 'IGNORADA'] },
+      { key: 'severidade', label: 'Severidade', options: ['BAIXA', 'MEDIA', 'ALTA', 'CRITICA'] }
+    ],
+    columns: ['createdAt', 'issue_type', 'severidade', 'status', 'titulo', 'origem_tipo']
+  },
+  governance_logs: {
+    title: 'Governanca SST',
+    subtitle: 'Trilha corporativa de auditoria, rollout, automacoes, jobs e decisoes operacionais.',
+    area: 'analytics',
+    fields: [],
+    columns: ['createdAt', 'acao', 'entidade_tipo', 'entidade_id', 'criticidade', 'usuario.nome']
   },
   documentos: {
     title: 'Documentos SST',
@@ -516,10 +638,21 @@ export const SST_NAV = [
   ['workflow_eventos', 'Eventos workflow'],
   ['recomendacoes', 'Recomendacoes'],
   ['documentos_ia', 'Analises IA'],
+  ['ia_document_logs', 'Logs IA documental'],
   ['workflow_logs', 'Logs workflow'],
   ['automation_logs', 'Logs automacao'],
   ['integration_logs', 'Logs integracao'],
   ['blocking_logs', 'Logs bloqueio'],
+  ['rollout_planos', 'Rollout'],
+  ['telemetria', 'Telemetria'],
+  ['alertas_operacionais', 'Alertas operacionais'],
+  ['hardening_policies', 'Hardening'],
+  ['jobs', 'Jobs'],
+  ['queue_metrics', 'Filas'],
+  ['performance_metrics', 'Performance'],
+  ['cache_entries', 'Cache'],
+  ['quality_issues', 'Qualidade'],
+  ['governance_logs', 'Governanca'],
   ['esocial', 'eSocial'],
   ['eventos', 'Eventos']
 ];

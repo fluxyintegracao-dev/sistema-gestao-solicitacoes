@@ -5,7 +5,17 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { useUiVisibility } from '../../../hooks/useUiVisibility';
 import { getObras } from '../../../services/obras';
 import { getRhColaboradores, getRhEmpresasGrupo } from '../../../services/rhDp';
-import { atualizarSst, criarSst, getDocumentoSstUrl, listarSst, sincronizarEventosVencimentoSst, uploadDocumentoSst } from '../services/sst';
+import {
+  analisarDocumentoIaSst,
+  aprovarAnaliseIaSst,
+  atualizarSst,
+  criarSst,
+  getDocumentoSstUrl,
+  listarSst,
+  rejeitarAnaliseIaSst,
+  sincronizarEventosVencimentoSst,
+  uploadDocumentoSst
+} from '../services/sst';
 import { SST_RESOURCES } from '../constants/sstResources';
 
 function getValue(row, path) {
@@ -52,6 +62,7 @@ export default function SstCrudPage() {
   const [filters, setFilters] = useState({ empresa_id: '', obra_id: '', colaborador_id: '', status: '', search: '' });
   const [syncingEvents, setSyncingEvents] = useState(false);
   const [syncMessage, setSyncMessage] = useState('');
+  const [rowActionId, setRowActionId] = useState('');
 
   useEffect(() => {
     setForm(emptyForm(config.fields));
@@ -168,6 +179,45 @@ export default function SstCrudPage() {
       if (payload?.url) window.open(payload.url, '_blank', 'noopener,noreferrer');
     } catch (err) {
       setError(err.message || 'Erro ao abrir documento');
+    }
+  };
+
+  const analyzeDocument = async (row) => {
+    setRowActionId(`ia-${row.id}`);
+    try {
+      const payload = await analisarDocumentoIaSst(row.id);
+      setSyncMessage(`Analise IA: ${payload.status || 'registrada'}.`);
+      load();
+    } catch (err) {
+      setError(err.message || 'Erro ao analisar documento com IA');
+    } finally {
+      setRowActionId('');
+    }
+  };
+
+  const approveIa = async (row) => {
+    setRowActionId(`aprovar-${row.id}`);
+    try {
+      const payload = await aprovarAnaliseIaSst(row.id);
+      setSyncMessage(`Sugestao IA: ${payload.status || 'aprovada'}.`);
+      load();
+    } catch (err) {
+      setError(err.message || 'Erro ao aprovar sugestao IA');
+    } finally {
+      setRowActionId('');
+    }
+  };
+
+  const rejectIa = async (row) => {
+    setRowActionId(`rejeitar-${row.id}`);
+    try {
+      const payload = await rejeitarAnaliseIaSst(row.id);
+      setSyncMessage(`Sugestao IA: ${payload.status || 'rejeitada'}.`);
+      load();
+    } catch (err) {
+      setError(err.message || 'Erro ao rejeitar sugestao IA');
+    } finally {
+      setRowActionId('');
     }
   };
 
@@ -395,6 +445,36 @@ export default function SstCrudPage() {
                     <td className="whitespace-nowrap px-4 py-3">
                       {resource === 'documentos' && row.arquivo_url ? (
                         <button type="button" onClick={() => openDocument(row)} className="mr-3 text-sm font-semibold text-sky-700">Abrir</button>
+                      ) : null}
+                      {resource === 'documentos' && canManage ? (
+                        <button
+                          type="button"
+                          onClick={() => analyzeDocument(row)}
+                          disabled={rowActionId === `ia-${row.id}`}
+                          className="mr-3 text-sm font-semibold text-indigo-700 disabled:opacity-60"
+                        >
+                          {rowActionId === `ia-${row.id}` ? 'Analisando...' : 'Analisar IA'}
+                        </button>
+                      ) : null}
+                      {resource === 'documentos_ia' && canManage ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => approveIa(row)}
+                            disabled={rowActionId === `aprovar-${row.id}`}
+                            className="mr-3 text-sm font-semibold text-emerald-700 disabled:opacity-60"
+                          >
+                            Aprovar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => rejectIa(row)}
+                            disabled={rowActionId === `rejeitar-${row.id}`}
+                            className="mr-3 text-sm font-semibold text-rose-700 disabled:opacity-60"
+                          >
+                            Rejeitar
+                          </button>
+                        </>
                       ) : null}
                       {canManage ? (
                         <button type="button" onClick={() => startEdit(row)} className="text-sm font-semibold text-[var(--c-text)]">Editar</button>

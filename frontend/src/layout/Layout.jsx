@@ -489,6 +489,8 @@ export default function Layout() {
         sstDashboardAccess ? item('/sst/relatorios/executivo', 'Executivo SST', HiOutlineSparkles) : null,
         sstDashboardAccess ? item('/sst/relatorios/heatmap', 'Heatmap SST', HiOutlineSquares2X2) : null,
         sstDashboardAccess ? item('/sst/observabilidade', 'Observabilidade SST', HiOutlineClipboardDocumentList) : null,
+        sstDashboardAccess ? item('/sst/producao', 'Produção SST', HiOutlineAdjustmentsHorizontal) : null,
+        sstDashboardAccess ? item('/sst/observabilidade-avancada', 'SST Enterprise', HiOutlineAdjustmentsHorizontal) : null,
         sstDashboardAccess ? item('/sst/timeline', 'Timeline SST', HiOutlineClipboardDocumentList) : null,
         sstDashboardAccess ? item('/sst/relatorios', 'Relatórios SST', HiOutlineDocumentText) : null,
         canViewSstArea(user, 'riscos') ? item('/sst/riscos', 'Riscos', HiOutlineExclamationTriangle) : null,
@@ -507,10 +509,14 @@ export default function Layout() {
         canViewSstArea(user, 'analytics') ? item('/sst/notificacoes', 'Notificacoes SST', HiOutlineChatBubbleOvalLeft) : null,
         canViewSstArea(user, 'analytics') ? item('/sst/scores', 'Scores SST', HiOutlineRectangleGroup) : null,
         canViewSstArea(user, 'analytics') ? item('/sst/recomendacoes', 'Recomendacoes SST', HiOutlineSparkles) : null,
+        canViewSstArea(user, 'analytics') ? item('/sst/telemetria', 'Telemetria SST', HiOutlineAdjustmentsHorizontal) : null,
+        canViewSstArea(user, 'analytics') ? item('/sst/alertas_operacionais', 'Alertas SST', HiOutlineExclamationTriangle) : null,
         canViewSstArea(user, 'analytics') ? item('/sst/workflow_execucoes', 'Execucoes Workflow', HiOutlineClipboardDocumentList) : null,
         canManageSstArea(user, 'configuracoes') ? item('/sst/politicas_bloqueio', 'Politicas de bloqueio', HiOutlineCog6Tooth) : null,
         canManageSstArea(user, 'configuracoes') ? item('/sst/workflows', 'Workflows SST', HiOutlineAdjustmentsHorizontal) : null,
         canManageSstArea(user, 'configuracoes') ? item('/sst/workflow_acoes', 'Acoes Workflow', HiOutlineAdjustmentsHorizontal) : null,
+        canManageSstArea(user, 'configuracoes') ? item('/sst/rollout_planos', 'Rollout SST', HiOutlineAdjustmentsHorizontal) : null,
+        canManageSstArea(user, 'configuracoes') ? item('/sst/hardening_policies', 'Hardening SST', HiOutlineCog6Tooth) : null,
         canManageSstArea(user, 'configuracoes') ? item('/sst/criticidades', 'Criticidades SST', HiOutlineAdjustmentsHorizontal) : null,
         canManageSstArea(user, 'configuracoes') ? item('/sst/configuracoes', 'Configurações', HiOutlineCog6Tooth) : null
       ]);
