@@ -276,7 +276,7 @@ function renderPedidoCompraPdfCss() {
       --pdf-radius-md: 10px;
       --pdf-radius-sm: 7px;
       --pdf-page-width: 794px;
-      --pdf-font-stack: "Inter", "Roboto", "Segoe UI", Arial, sans-serif;
+      --pdf-font-stack: "Calibri", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
     }
 
     * { box-sizing: border-box; }
@@ -306,9 +306,10 @@ function renderPedidoCompraPdfCss() {
 
     /* ── Cabeçalho compacto ── */
     .doc-header {
-      padding: 20px 28px 0;
-      background: linear-gradient(160deg, #f0f5fb 0%, var(--pdf-white) 55%);
+      padding: 20px 28px 0 24px;
+      background: linear-gradient(160deg, #e8f0fa 0%, var(--pdf-white) 65%);
       border-bottom: 2px solid var(--pdf-primary);
+      border-left: 5px solid var(--pdf-primary);
     }
 
     .doc-header__top {
@@ -376,6 +377,15 @@ function renderPedidoCompraPdfCss() {
       line-height: 1.1;
     }
 
+    .doc-header__generated {
+      display: block;
+      font-size: 9.5px;
+      font-weight: 500;
+      color: var(--pdf-muted);
+      margin-top: 3px;
+      letter-spacing: 0.02em;
+    }
+
     .doc-status-badge {
       flex-shrink: 0;
       display: inline-flex;
@@ -439,7 +449,7 @@ function renderPedidoCompraPdfCss() {
     /* ── Faixa de contato do fornecedor ── */
     .doc-supplier-strip {
       display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
+      grid-template-columns: repeat(5, minmax(0, 1fr));
       gap: 0;
       border-top: 1px solid var(--pdf-border);
       background: var(--pdf-surface);
@@ -591,24 +601,7 @@ function renderPedidoCompraPdfCss() {
       color: var(--pdf-danger);
     }
 
-    /* ── Rodapé do documento ── */
-    .document-footer {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      margin-top: 16px;
-      padding-top: 14px;
-      border-top: 1px solid var(--pdf-border);
-      color: var(--pdf-muted);
-      font-size: 10px;
-      line-height: 1.5;
-    }
-
-    .document-footer__right {
-      text-align: right;
-      white-space: nowrap;
-    }
+    /* rodapé removido — informações de geração movidas para o cabeçalho */
 
     /* ── Print ── */
     @page {
@@ -672,6 +665,7 @@ function renderPedidoCompraPdfHtml(pedido, options = {}) {
               <div class="doc-header__title-group">
                 <span class="doc-header__eyebrow">Pedido de Compra · ${escapeHtml(view.brand.brandName)}</span>
                 <span class="doc-header__number">${escapeHtml(h.numero)}</span>
+                <span class="doc-header__generated">Gerado em ${escapeHtml(view.generatedAtLabel)}</span>
               </div>
 
               <span
@@ -696,7 +690,7 @@ function renderPedidoCompraPdfHtml(pedido, options = {}) {
               </div>
             </div>
 
-            <!-- Linha 3: detalhes adicionais -->
+            <!-- Linha 3: detalhes adicionais (5 colunas) -->
             <div class="doc-supplier-strip">
               <div class="doc-data-cell">
                 <span class="doc-data-cell__label">Solicitacao vinculada</span>
@@ -705,6 +699,10 @@ function renderPedidoCompraPdfHtml(pedido, options = {}) {
               <div class="doc-data-cell">
                 <span class="doc-data-cell__label">Data de criacao</span>
                 <span class="doc-data-cell__value">${escapeHtml(h.criadoEm)}</span>
+              </div>
+              <div class="doc-data-cell">
+                <span class="doc-data-cell__label">Cond. pagamento</span>
+                <span class="doc-data-cell__value">${escapeHtml(h.condicaoPagamento)}</span>
               </div>
               <div class="doc-data-cell">
                 <span class="doc-data-cell__label">Contato</span>
@@ -754,11 +752,6 @@ function renderPedidoCompraPdfHtml(pedido, options = {}) {
                     ${h.atingiuPedidoMinimo ? 'Sim' : 'Nao'}
                   </span>
                 </div>
-                ${h.condicaoPagamento !== '-' ? `
-                <div class="doc-financial__item">
-                  <span class="doc-financial__label">Cond. pagamento</span>
-                  <span class="doc-financial__value">${escapeHtml(h.condicaoPagamento)}</span>
-                </div>` : ''}
                 <div class="doc-financial__item">
                   <span class="doc-financial__label">Encerrado em</span>
                   <span class="doc-financial__value">${escapeHtml(h.encerradoEm)}</span>
@@ -770,10 +763,6 @@ function renderPedidoCompraPdfHtml(pedido, options = {}) {
               </div>
             </div>
 
-            <footer class="document-footer">
-              <div>Documento gerado automaticamente pelo sistema ${escapeHtml(view.brand.productName)}.</div>
-              <div class="document-footer__right">Gerado em ${escapeHtml(view.generatedAtLabel)}</div>
-            </footer>
 
           </div>
         </main>

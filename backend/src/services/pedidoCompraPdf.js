@@ -376,7 +376,6 @@ function ensureSpace(doc, state, requiredHeight, columns) {
     return;
   }
 
-  drawPageFooter(doc, state.pageNumber, state.context.companyName);
   doc.addPage({ margin: 40, size: 'A4', layout: 'landscape' });
   state.pageNumber += 1;
   state.metrics = getPageMetrics(doc);
@@ -477,7 +476,6 @@ async function renderPedidoCompraPdf(doc, pedido) {
   ensureSpace(doc, state, 90, columns);
   state.y += 18;
   drawResumoFinal(doc, context, state.y);
-  drawPageFooter(doc, state.pageNumber, companyName);
 }
 
 module.exports = {
