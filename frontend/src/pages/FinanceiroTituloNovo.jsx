@@ -834,7 +834,7 @@ export default function FinanceiroTituloNovo() {
       return `Selecione o ${form.tipo === 'RECEBER' ? 'cliente' : 'credor'} na lista antes de salvar.`;
     }
 
-    if (form.considera_dre && !isCategoriaClassificadaParaDre(categoria)) {
+    if (form.considera_dre && !isCategoriaClassificadaParaDre(categoriaSelecionada)) {
       return 'Para considerar na DRE, selecione uma categoria financeira com grupo DRE classificado.';
     }
 
@@ -1105,7 +1105,7 @@ export default function FinanceiroTituloNovo() {
               <label className="sol-filter-field xl:col-span-3">
                 <span className="sol-filter-label">Categoria financeira</span>
                 <select
-                  className={`input w-full ${form.considera_dre && !isCategoriaClassificadaParaDre(categoria) ? 'border-amber-300 bg-amber-50' : ''}`}
+                  className={`input w-full ${form.considera_dre && !isCategoriaClassificadaParaDre(categoriaSelecionada) ? 'border-amber-300 bg-amber-50' : ''}`}
                   value={form.categoria_financeira_id}
                   onChange={(event) => updateField('categoria_financeira_id', event.target.value)}
                   required={Boolean(form.considera_dre)}
@@ -1118,7 +1118,7 @@ export default function FinanceiroTituloNovo() {
                   ))}
                 </select>
                 <span className="app-note mt-2">
-                  {form.considera_dre && !isCategoriaClassificadaParaDre(categoria)
+                  {form.considera_dre && !isCategoriaClassificadaParaDre(categoriaSelecionada)
                     ? `${categoriaResumo}. Para DRE, selecione categoria com grupo DRE classificado.`
                     : categoriaResumo}
                 </span>
