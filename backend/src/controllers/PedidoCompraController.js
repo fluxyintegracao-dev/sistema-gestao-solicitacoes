@@ -316,7 +316,7 @@ module.exports = {
       if (isPedidoCompraHtmlPdfAvailable()) {
         try {
           const pdfBuffer = await generatePedidoCompraPdfBufferFromHtml(pedido, {
-            generatedAt: new Date()
+            generatedAt: pedido.createdAt ? new Date(pedido.createdAt) : new Date()
           });
 
           res.setHeader('Content-Type', 'application/pdf');

@@ -420,7 +420,7 @@ function drawNFStyleHeader(doc, context, { continued = false } = {}) {
       .fontSize(7)
       .fillColor('rgba(255,255,255,0.65)')
       .text(
-        `${companyName}  ·  Gerado em ${formatDateTime(new Date())}`,
+        `${companyName}  ·  Gerado em ${formatDateTime(pedido?.createdAt)}`,
         contentX,
         y + 22,
         { lineBreak: false }
