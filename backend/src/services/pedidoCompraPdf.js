@@ -371,6 +371,152 @@ function drawItemRow(doc, item, index, y, columns) {
   return rowHeight;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Cabeçalho estilo Nota Fiscal — substitui cards de resumo e de fornecedor
+// ─────────────────────────────────────────────────────────────────────────────
+function drawNFStyleHeader(doc, context, { continued = false } = {}) {
+  const metrics = getPageMetrics(doc);
+  const { pedido, statusConfig, companyName, pdfLogoPath } = context;
+
+  const tableX = metrics.left;
+  const tableW = metrics.width;
+  let y       = metrics.top;
+
+  const titleH = 32;
+  const rowH   = 34;
+  const totalH = continued ? titleH : titleH + rowH * 3;
+
+  // Borda externa
+  doc.rect(tableX, y, tableW, totalH).lineWidth(1).strokeColor('#1f3a5f').stroke();
+
+  // Faixa de título (fundo azul)
+  doc.rect(tableX, y, tableW, titleH).fill('#1f3a5f');
+
+  let contentX = tableX + 10;
+  if (!continued && pdfLogoPath) {
+    try {
+      doc.image(pdfLogoPath, tableX + 6, y + 6, { fit: [42, 20], align: 'center', valign: 'center' });
+      contentX = tableX + 54;
+    } catch { /* sem logo */ }
+  }
+
+  // Título
+  doc
+    .font('Helvetica-Bold')
+    .fontSize(continued ? 9 : 13)
+    .fillColor('#ffffff')
+    .text(
+      continued
+        ? `PEDIDO DE COMPRA  ·  PC-${String(pedido?.id || '').padStart(5, '0')}  ·  Continuacao`
+        : 'PEDIDO DE COMPRA',
+      contentX,
+      y + (continued ? 11 : 7),
+      { lineBreak: false }
+    );
+
+  if (!continued) {
+    doc
+      .font('Helvetica')
+      .fontSize(7)
+      .fillColor('rgba(255,255,255,0.65)')
+      .text(
+        `${companyName}  ·  Gerado em ${formatDateTime(new Date())}`,
+        contentX,
+        y + 22,
+        { lineBreak: false }
+      );
+  }
+
+  // PC code + status (direita)
+  if (!continued) {
+    const pcCode    = `PC-${String(pedido?.id || '').padStart(5, '0')}`;
+    const statusTxt = (statusConfig?.nome || pedido?.status || '-').toUpperCase();
+    const rightW    = 130;
+    const rightX    = tableX + tableW - rightW - 8;
+
+    doc.font('Helvetica-Bold').fontSize(8).fillColor('rgba(255,255,255,0.6)')
+      .text(pcCode, rightX, y + 6, { width: rightW, align: 'right', lineBreak: false });
+    doc.font('Helvetica-Bold').fontSize(11).fillColor('#ffffff')
+      .text(statusTxt, rightX, y + 17, { width: rightW, align: 'right', lineBreak: false });
+  }
+
+  y += titleH;
+  if (continued) return y + 8;
+
+  // ─── Helpers ──────────────────────────────────────────────────
+  const BORDER_COLOR = '#b0c4d8';
+
+  function rowDivider(rowY) {
+    doc.moveTo(tableX, rowY).lineTo(tableX + tableW, rowY)
+      .lineWidth(0.5).strokeColor(BORDER_COLOR).stroke();
+  }
+
+  function cell(x, w, rowY, h, label, value, opts = {}) {
+    if (opts.drawRight !== false) {
+      doc.moveTo(x + w, rowY).lineTo(x + w, rowY + h)
+        .lineWidth(0.5).strokeColor(BORDER_COLOR).stroke();
+    }
+    doc.font('Helvetica-Bold').fontSize(6.5).fillColor('#5a7898')
+      .text(String(label).toUpperCase(), x + 5, rowY + 5, { width: w - 10, lineBreak: false });
+    doc
+      .font(opts.bold ? 'Helvetica-Bold' : 'Helvetica')
+      .fontSize(opts.fontSize || 9)
+      .fillColor(opts.color || '#1a2533')
+      .text(String(value || '-'), x + 5, rowY + 16, { width: w - 10, lineBreak: false });
+  }
+
+  // ─── Linha 1: Fornecedor | Obra | Valor Total ──────────────────
+  rowDivider(y);
+  const r1y  = y;
+  const wForn = Math.floor(tableW * 0.50);
+  const wObra = Math.floor(tableW * 0.25);
+  const wVlr  = tableW - wForn - wObra;
+
+  cell(tableX,                 wForn, r1y, rowH, 'Fornecedor', pedido?.fornecedor?.nome);
+  cell(tableX + wForn,         wObra, r1y, rowH, 'Obra',       pedido?.obra?.nome);
+  cell(tableX + wForn + wObra, wVlr,  r1y, rowH, 'Valor Total',
+    formatMoney(pedido?.valor_total),
+    { bold: true, fontSize: 11, color: '#1d4ed8', drawRight: false });
+  y += rowH;
+
+  // Linha 2: Solicitacao | Criado em | Criado por | Cond. pag.
+  rowDivider(y);
+  const r2y  = y;
+  const w4   = Math.floor(tableW / 4);
+  const w4r  = tableW - w4 * 3;
+  const scCode  = `SC-${String(pedido?.solicitacao_compra_id || '').padStart(5, '0')}` +
+    (pedido?.solicitacao?.numero_sienge ? ` - ${pedido.solicitacao.numero_sienge}` : '');
+  const condPag = pedido?.cotacaoFornecedor?.condicao_pagamento || pedido?.condicao_pagamento || '-';
+
+  cell(tableX,        w4,  r2y, rowH, 'Solicitacao',    scCode);
+  cell(tableX + w4,   w4,  r2y, rowH, 'Criado em',      formatDateTime(pedido?.createdAt));
+  cell(tableX + w4*2, w4,  r2y, rowH, 'Criado por',     pedido?.criador?.nome);
+  cell(tableX + w4*3, w4r, r2y, rowH, 'Cond. pagamento', condPag, { drawRight: false });
+  y += rowH;
+
+  // Linha 3: Contato | WhatsApp | E-mail | Ped. minimo | Atingiu
+  rowDivider(y);
+  const r3y  = y;
+  const wC1  = Math.floor(tableW * 0.17);
+  const wC2  = Math.floor(tableW * 0.17);
+  const wC3  = Math.floor(tableW * 0.27);
+  const wC4  = Math.floor(tableW * 0.19);
+  const wC5  = tableW - wC1 - wC2 - wC3 - wC4;
+  const atingiuColor = pedido?.atingiu_pedido_minimo ? '#15803d' : '#b45309';
+
+  cell(tableX,                      wC1, r3y, rowH, 'Contato',      pedido?.fornecedor?.contato);
+  cell(tableX + wC1,                wC2, r3y, rowH, 'WhatsApp',     pedido?.fornecedor?.whatsapp);
+  cell(tableX + wC1 + wC2,          wC3, r3y, rowH, 'E-mail',       pedido?.fornecedor?.email);
+  cell(tableX + wC1 + wC2 + wC3,    wC4, r3y, rowH, 'Ped. minimo',
+    pedido?.valor_minimo_pedido ? formatMoney(pedido.valor_minimo_pedido) : '-');
+  cell(tableX + wC1 + wC2 + wC3 + wC4, wC5, r3y, rowH, 'Atingiu minimo',
+    pedido?.atingiu_pedido_minimo ? 'Sim' : 'Nao',
+    { bold: true, color: atingiuColor, drawRight: false });
+  y += rowH;
+
+  return y + 12;
+}
+
 function ensureSpace(doc, state, requiredHeight, columns) {
   if (state.y + requiredHeight <= state.metrics.bottomLimit) {
     return;
@@ -379,34 +525,9 @@ function ensureSpace(doc, state, requiredHeight, columns) {
   doc.addPage({ margin: 40, size: 'A4', layout: 'landscape' });
   state.pageNumber += 1;
   state.metrics = getPageMetrics(doc);
-  state.y = drawPageHeader(doc, state.context, { continued: true });
+  state.y = drawNFStyleHeader(doc, state.context, { continued: true });
   state.y = drawSectionTitle(doc, 'Itens do pedido', 'Continuacao da listagem de itens do pedido.', state.y, state.metrics);
   state.y = drawTableHeader(doc, state.y, columns, state.metrics);
-}
-
-function drawResumoFinal(doc, context, y) {
-  const metrics = getPageMetrics(doc);
-  const { pedido } = context;
-  const gap = 12;
-  const cardWidth = (metrics.width - gap * 3) / 4;
-  const cards = [
-    { label: 'Itens ativos', value: String((pedido?.itens || []).filter((item) => !item.removido).length) },
-    { label: 'Valor minimo', value: pedido?.valor_minimo_pedido ? formatMoney(pedido.valor_minimo_pedido) : '-' },
-    { label: 'Encerrado em', value: formatDateTime(pedido?.encerrado_em) },
-    { label: 'Valor consolidado', value: formatMoney(pedido?.valor_total), accent: '#1d4ed8' }
-  ];
-
-  cards.forEach((item, index) => {
-    drawFieldCard(doc, {
-      x: metrics.left + (cardWidth + gap) * index,
-      y,
-      width: cardWidth,
-      height: 60,
-      label: item.label,
-      value: item.value,
-      accent: item.accent
-    });
-  });
 }
 
 async function renderPedidoCompraPdf(doc, pedido) {
@@ -433,10 +554,7 @@ async function renderPedidoCompraPdf(doc, pedido) {
     y: 0
   };
 
-  state.y = drawPageHeader(doc, context);
-  state.y = drawResumoGrid(doc, context, state.y);
-  state.y = drawSectionTitle(doc, 'Fornecedor e condicoes do pedido', 'Dados de contato e contexto comercial do fornecedor selecionado.', state.y, state.metrics);
-  state.y = drawFornecedorGrid(doc, context, state.y);
+  state.y = drawNFStyleHeader(doc, context);
   state.y = drawSectionTitle(doc, 'Itens do pedido', 'Listagem operacional consolidada para envio e conferencia.', state.y, state.metrics);
 
   const columns = getTableColumns(state.metrics);
@@ -472,10 +590,6 @@ async function renderPedidoCompraPdf(doc, pedido) {
       state.y += drawItemRow(doc, item, index, state.y, columns);
     });
   }
-
-  ensureSpace(doc, state, 90, columns);
-  state.y += 18;
-  drawResumoFinal(doc, context, state.y);
 }
 
 module.exports = {
