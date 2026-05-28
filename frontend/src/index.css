@@ -3580,6 +3580,20 @@ a:hover {
   padding-left: 0.72rem;
 }
 
+.sol-detail-timeline-text {
+  color: var(--c-text);
+  line-height: 1.55;
+  margin-top: 0.25rem;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.sol-detail-comment-textarea {
+  line-height: 1.5;
+  resize: vertical;
+  white-space: pre-wrap;
+}
+
 .sol-detail-timeline-meta {
   display: inline-block;
   margin-top: 0.2rem;

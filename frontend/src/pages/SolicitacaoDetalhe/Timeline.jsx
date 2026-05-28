@@ -123,10 +123,10 @@ export default function Timeline({ historicos, canRemoveAnexo = false, onAnexoRe
               )}
 
               {h.acao === 'ENVIADA_SETOR' && h.observacao && (
-                <p className="text-sm" style={{ color: 'var(--c-text)' }}>{h.observacao}</p>
+                <p className="sol-detail-timeline-text text-sm">{h.observacao}</p>
               )}
 
-              {h.descricao && <p className="text-sm" style={{ color: 'var(--c-text)' }}>{h.descricao}</p>}
+              {h.descricao && <p className="sol-detail-timeline-text text-sm">{h.descricao}</p>}
 
               {podeExibirArquivo && meta && caminhoArquivo && (
                 <div className="flex gap-3 mt-1">

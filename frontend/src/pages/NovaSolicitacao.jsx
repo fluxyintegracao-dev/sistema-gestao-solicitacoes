@@ -715,41 +715,11 @@ export default function NovaSolicitacao() {
         });
       }
 
-      alert('Solicitacao criada com sucesso');
-      setForm({
-        obra_id: '',
-        parceiro_id: '',
-        apropriacao_id: '',
-        tipo_solicitacao_id: '',
-        tipo_sub_id: '',
-        contrato_id: '',
-        codigo_contrato: '',
-        area_responsavel: '',
-        diretoria_fluxo_codigo: '',
-        descricao: '',
-        itens_apropriacao: '',
-        ref_contrato_abertura: '',
-        valor: '',
-        data_vencimento: '',
-        data_inicio_medicao: '',
-        data_fim_medicao: ''
-      });
-      setContratos([]);
-      setTiposSub([]);
-      setArquivos([]);
-      setObraBusca('');
-      setObraBuscaAtiva(false);
-      setValorTexto('');
-      setParceiroBusca('');
-      setParceiroResultados([]);
-      setParceiroSelecionado(null);
-      setParceiroBuscaExecutada(false);
-      setRefContratoBusca('');
-      setRefResultados([]);
-      setContratosRef([]);
-      if (anexosRef.current) {
-        anexosRef.current.value = '';
+      if (!solicitacao?.id) {
+        throw new Error('Solicitacao criada, mas a API nao retornou o identificador para abrir o detalhe.');
       }
+
+      navigate(`/solicitacoes/${solicitacao.id}`, { replace: true });
     } catch (error) {
       console.error(error);
       alert(error?.message || 'Erro ao criar solicitação');

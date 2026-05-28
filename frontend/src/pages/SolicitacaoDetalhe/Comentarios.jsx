@@ -105,10 +105,13 @@ export default function Comentarios({ solicitacaoId, onSucesso }) {
       <textarea
         value={texto}
         onChange={e => setTexto(e.target.value)}
-        rows={4}
-        className="input w-full mb-3"
-        placeholder="Escreva um comentario..."
+        rows={6}
+        className="input w-full mb-2 sol-detail-comment-textarea"
+        placeholder={'Escreva um comentario...\nUse Enter para quebrar linha e organizar o texto.'}
       />
+      <p className="app-note mb-3">
+        Enter cria uma nova linha. O historico vai manter a formatacao digitada.
+      </p>
 
       <div className="mb-3">
         <button
