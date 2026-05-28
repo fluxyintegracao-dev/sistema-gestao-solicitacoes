@@ -930,27 +930,6 @@ export default function NovaSolicitacao() {
                 Nenhuma obra/centro de custo encontrada com esse termo.
               </span>
             )}
-            {obraSelecionada && (
-              <div className="nova-solicitacao-selection-card nova-solicitacao-obra-selection border border-[var(--c-border)] bg-[var(--c-surface)]">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--c-muted)]">
-                      {getTipoCentroCustoLabel(obraSelecionada)} selecionada
-                    </div>
-                    <div className="mt-1 text-sm font-semibold text-[var(--c-text)] break-words">
-                      {obraSelecionada.nome || 'Obra sem nome'}
-                    </div>
-                    <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-[var(--c-muted)]">
-                      <span>Código: {obraSelecionada.codigo || '-'}</span>
-                      <span>{formatarLocalidadeObra(obraSelecionada)}</span>
-                    </div>
-                  </div>
-                  <span className="nova-solicitacao-obra-badge nova-solicitacao-obra-badge-selected">
-                    ID {obraSelecionada.id}
-                  </span>
-                </div>
-              </div>
-            )}
           </label>
           {false && (
           <>
