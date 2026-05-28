@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { getMinhasObras } from '../services/obras';
 import { getTiposSolicitacao } from '../services/tiposSolicitacao';
 import { getSetores } from '../services/setores';
@@ -79,6 +80,7 @@ function obterRegraTiposSetor(regrasConfig = {}, setorSelecionado = '', setores 
 
 export default function NovaSolicitacao() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [obras, setObras] = useState([]);
   const [obraCodigo, setObraCodigo] = useState('');
   const [obraDescricao, setObraDescricao] = useState('');
@@ -469,13 +471,14 @@ export default function NovaSolicitacao() {
         } catch (uploadError) {
           console.error(uploadError);
           limparFormulario();
-          alert('Solicitacao criada com sucesso, mas houve erro ao enviar anexos. Abra a solicitacao para anexar novamente.');
+          alert('Solicitacao criada com sucesso, mas houve erro ao enviar anexos. Voce sera direcionado para a solicitacao.');
+          navigate(`/solicitacoes/${solicitacao.id}`);
           return;
         }
       }
 
       limparFormulario();
-      alert('Solicitacao criada com sucesso');
+      navigate(`/solicitacoes/${solicitacao.id}`);
     } catch (error) {
       console.error(error);
       alert(error?.message || 'Erro ao criar solicitacao');
@@ -997,4 +1000,3 @@ export default function NovaSolicitacao() {
     </div>
   );
 }
-
