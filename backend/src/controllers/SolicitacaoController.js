@@ -3154,9 +3154,10 @@ module.exports = {
     try {
       const { id } = req.params;
       const { descricao, mencoes } = req.body;
+      const descricaoNormalizada = String(descricao || '').replace(/\r\n/g, '\n').trim();
       const usuario = await User.findByPk(req.user.id);
 
-      if (!descricao?.trim()) {
+      if (!descricaoNormalizada) {
         return res.status(400).json({ error: 'Comentario vazio' });
       }
 
@@ -3177,7 +3178,7 @@ module.exports = {
         usuario_responsavel_id: req.user.id,
         setor: usuario.setor_id,
         acao: 'COMENTARIO',
-        descricao
+        descricao: descricaoNormalizada
       });
 
       const mencoesRecebidas = Array.isArray(mencoes) ? mencoes : [];
@@ -3206,9 +3207,9 @@ module.exports = {
           await criarNotificacao({
             solicitacao_id: id,
             tipo: 'MENCAO_COMENTARIO',
-            mensagem: `${usuario?.nome || 'Usuario'} mencionou você: "${descricao}"`,
+            mensagem: `${usuario?.nome || 'Usuario'} mencionou você: "${descricaoNormalizada}"`,
             metadata: {
-              comentario: descricao,
+              comentario: descricaoNormalizada,
               mencionado_por: req.user.id
             },
             created_by: req.user.id,

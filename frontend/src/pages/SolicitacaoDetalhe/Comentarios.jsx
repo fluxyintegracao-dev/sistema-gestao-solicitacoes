@@ -105,8 +105,8 @@ export default function Comentarios({ solicitacaoId, onSucesso }) {
       <textarea
         value={texto}
         onChange={e => setTexto(e.target.value)}
-        rows={4}
-        className="input w-full mb-3"
+        rows={6}
+        className="input w-full mb-3 min-h-[140px] resize-y leading-relaxed whitespace-pre-wrap"
         placeholder="Escreva um comentario..."
       />
 
