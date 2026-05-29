@@ -283,7 +283,7 @@ export default function Pagamentos({ solicitacao, podeInformarPagamento = false,
 
       {modalBaixaAberto && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/40 px-4 py-6 backdrop-blur-sm">
-          <div className="w-full max-w-4xl overflow-hidden rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] shadow-2xl">
+          <div className="w-full max-w-2xl overflow-hidden rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] shadow-2xl">
             <div className="flex items-start justify-between gap-3 border-b border-[var(--c-border)] px-5 py-4">
               <div>
                 <h3 className="text-base font-semibold text-[var(--c-text)]">Baixa parcial por titulo</h3>
@@ -301,7 +301,7 @@ export default function Pagamentos({ solicitacao, podeInformarPagamento = false,
             </div>
 
             <div className="max-h-[72vh] overflow-y-auto p-5">
-              <div className="grid gap-3 md:grid-cols-3">
+              <div className="grid gap-3 md:grid-cols-2">
                 <label className="form-field md:col-span-2">
                   <span className="form-label">Conta bancaria da baixa</span>
                   <select className="input" value={contaBancariaId} onChange={(event) => setContaBancariaId(event.target.value)}>
