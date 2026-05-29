@@ -516,12 +516,6 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
   const valorSolicitacao = useMemo(() => roundCurrency(currencyToNumber(form.valor)), [form.valor]);
   const diferencaPagamentos = useMemo(() => roundCurrency(valorSolicitacao - totalPagamentos), [valorSolicitacao, totalPagamentos]);
   const totalBateComSolicitacao = Math.abs(diferencaPagamentos) <= 0.009;
-  const empresaDaObraId = getEmpresaObraId(solicitacao?.obra);
-  const empresaTituloDivergente = Boolean(
-    form.empresa_id &&
-    empresaDaObraId &&
-    String(form.empresa_id) !== String(empresaDaObraId)
-  );
 
   const categoriasAutocomplete = useMemo(() => {
     if (!categoriaSearch.trim() || selectedCategory) {
@@ -656,11 +650,7 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
 
   function validarGeracaoConta() {
     if (!form.empresa_id) {
-      return 'Informe a empresa real do titulo.';
-    }
-
-    if (empresaTituloDivergente) {
-      return 'A empresa do titulo deve ser a mesma vinculada a obra/centro de custo da solicitacao.';
+      return 'A obra/centro de custo da solicitacao nao possui empresa vinculada.';
     }
 
     if (!selectedPartner?.id && !form.parceiro_id) {
@@ -988,27 +978,6 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
                     {solicitacao.obra?.nome || '-'}
                   </div>
                 </div>
-                <label className="text-sm">
-                  <span className="mb-1 block text-slate-500">Empresa do titulo</span>
-                  <select
-                    className={`input w-full ${empresaTituloDivergente ? 'border-rose-300 bg-rose-50' : ''}`}
-                    value={form.empresa_id}
-                    onChange={(event) => setForm((current) => ({ ...current, empresa_id: event.target.value }))}
-                    required
-                  >
-                    <option value="">Selecione a empresa real</option>
-                    {empresasGrupo.map((empresa) => (
-                      <option key={empresa.id} value={empresa.id}>
-                        {empresa.nome}
-                      </option>
-                    ))}
-                  </select>
-                  <span className={`mt-1 block text-xs ${empresaTituloDivergente ? 'text-rose-600' : 'text-slate-500'}`}>
-                    {empresaTituloDivergente
-                      ? 'A empresa precisa coincidir com a obra/centro de custo da solicitacao.'
-                      : 'Responsabilidade economica que alimenta DRE e fluxo.'}
-                  </span>
-                </label>
                 <div className="text-sm">
                   <span className="mb-1 block text-slate-500">Total das formas</span>
                   <div className={`input flex items-center ${totalBateComSolicitacao ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>

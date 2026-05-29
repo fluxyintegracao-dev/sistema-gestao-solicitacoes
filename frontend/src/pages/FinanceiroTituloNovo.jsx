@@ -413,12 +413,6 @@ export default function FinanceiroTituloNovo() {
     [obras, form.obra_id]
   );
   const obraSelecionadaEhObra = isCadastroObra(obraSelecionada);
-  const empresaDaObraId = getEmpresaObraId(obraSelecionada);
-  const empresaTituloDivergente = Boolean(
-    form.empresa_id &&
-    empresaDaObraId &&
-    String(form.empresa_id) !== String(empresaDaObraId)
-  );
 
   useEffect(() => {
     if (!moduloApropriacoesHabilitado || !form.obra_id || !obraSelecionadaEhObra) {
@@ -826,10 +820,6 @@ export default function FinanceiroTituloNovo() {
 
     if (!form.empresa_id) {
       return 'Selecione uma obra/centro de custo com empresa vinculada.';
-    }
-
-    if (empresaTituloDivergente) {
-      return 'A empresa do titulo deve ser a mesma vinculada a obra/centro de custo selecionado.';
     }
 
     if (!form.parceiro_id) {

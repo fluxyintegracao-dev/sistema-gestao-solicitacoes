@@ -766,8 +766,20 @@ async function baixarTituloCartaoDebitoNoAto({
   }
 
   const empresaBaixaId = await validarEmpresaBaixa({
-    empresaId: titulo.empresa_id,
+    empresaId: conta.empresa_id,
     conta
+  });
+  const movimentoIntercompanyFields = await validarIntercompanyBaixa({
+    payload: {
+      intercompany: titulo.intercompany,
+      intercompany_group_id: titulo.intercompany_group_id,
+      tipo_intercompany: titulo.tipo_intercompany,
+      motivo_intercompany: titulo.motivo_intercompany,
+      elimina_consolidado: titulo.elimina_consolidado,
+      transferencia_interna: titulo.transferencia_interna
+    },
+    titulo,
+    empresaBaixaId
   });
   const dataBaixa = dataMovimento || titulo.data_compra || titulo.data_vencimento || getHoje();
   const valorBaixa = roundCurrency(titulo.valor_saldo || titulo.valor_original);
@@ -780,13 +792,7 @@ async function baixarTituloCartaoDebitoNoAto({
     titulo_financeiro_id: titulo.id,
     conta_bancaria_id: conta.id,
     empresa_id: empresaBaixaId,
-    intercompany_group_id: titulo.intercompany_group_id || null,
-    empresa_origem_id: titulo.empresa_origem_id || null,
-    empresa_destino_id: titulo.empresa_destino_id || null,
-    tipo_intercompany: titulo.tipo_intercompany || null,
-    motivo_intercompany: titulo.motivo_intercompany || null,
-    elimina_consolidado: Boolean(titulo.elimina_consolidado),
-    transferencia_interna: Boolean(titulo.transferencia_interna),
+    ...movimentoIntercompanyFields,
     caixa_sessao_id: caixaSessao?.id || null,
     forma_recebimento: 'CARTAO_DEBITO',
     tipo_movimento: 'BAIXA',
@@ -912,25 +918,17 @@ async function validarEmpresaBaixa({ empresaId, conta }) {
   return empresaBaixaId;
 }
 
-function resolverEmpresaTitulo({ empresaIdInformada, obra }) {
-  const empresaInformada = empresaIdInformada ? Number(empresaIdInformada) : null;
+function resolverEmpresaTitulo({ obra }) {
   const empresaDaObra = obra?.empresa_grupo_id ? Number(obra.empresa_grupo_id) : null;
 
-  if (!Number.isInteger(empresaInformada) || empresaInformada <= 0) {
+  if (!Number.isInteger(empresaDaObra) || empresaDaObra <= 0) {
     throw createHttpError(
       400,
-      'Empresa do titulo e obrigatoria. Informe a empresa real antes de salvar.'
+      'A obra/centro de custo selecionado nao possui empresa do grupo vinculada. Corrija o cadastro antes de gerar titulo.'
     );
   }
 
-  if (empresaInformada && empresaDaObra && empresaInformada !== empresaDaObra) {
-    throw createHttpError(
-      400,
-      'A empresa do titulo deve ser a mesma vinculada a obra/centro de custo selecionado.'
-    );
-  }
-
-  return empresaInformada;
+  return empresaDaObra;
 }
 
 function resolverCompetenciaTitulo(payload = {}) {
