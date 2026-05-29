@@ -2014,7 +2014,7 @@ module.exports = {
           {
             model: Obra,
             as: 'obra',
-            attributes: ['id', 'nome', 'codigo']
+            attributes: ['id', 'nome', 'codigo', 'empresa_grupo_id']
           },
           // TIPO DE SOLICITACAO
           {
