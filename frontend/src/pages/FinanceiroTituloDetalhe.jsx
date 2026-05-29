@@ -520,6 +520,16 @@ export default function FinanceiroTituloDetalhe() {
                 Editar titulo
               </Link>
             )}
+            {!podeEditarTitulo && (
+              <button
+                type="button"
+                className="btn btn-outline opacity-60"
+                disabled
+                title="Somente titulos em aberto, sem baixa e sem pagamento em massa vinculado podem ser editados"
+              >
+                Editar titulo
+              </button>
+            )}
             <button
               type="button"
               className="btn btn-primary"

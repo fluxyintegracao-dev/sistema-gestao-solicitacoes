@@ -6,6 +6,7 @@ import {
   HiOutlineDocumentText,
   HiOutlineEye,
   HiOutlineMagnifyingGlass,
+  HiOutlinePencilSquare,
   HiOutlinePlus,
   HiOutlineSparkles,
   HiOutlineXMark
@@ -176,6 +177,10 @@ function getCartaoLabel(cartao) {
 
 function isTituloBaixavel(titulo) {
   return ['ABERTO', 'PARCIAL'].includes(String(titulo?.status || '').trim().toUpperCase()) && Number(titulo?.valor_saldo || 0) > 0;
+}
+
+function isTituloEditavel(titulo) {
+  return String(titulo?.status || '').trim().toUpperCase() === 'ABERTO' && Number(titulo?.valor_baixado || 0) === 0;
 }
 
 function buildBaixaMassaForm(contasBancarias = []) {
@@ -1107,13 +1112,33 @@ export default function FinanceiroTitulos() {
                     {formatCurrency(titulo.valor_saldo)}
                   </td>
                   <td className="px-3 py-2 whitespace-nowrap">
-                    <Link
-                      className="btn btn-outline btn-sm"
-                      to={`/financeiro/titulos/${titulo.id}`}
-                      title="Abrir titulo"
-                    >
-                      <HiOutlineEye className="h-4 w-4" />
-                    </Link>
+                    <div className="flex items-center gap-2">
+                      <Link
+                        className="btn btn-outline btn-sm"
+                        to={`/financeiro/titulos/${titulo.id}`}
+                        title="Abrir titulo"
+                      >
+                        <HiOutlineEye className="h-4 w-4" />
+                      </Link>
+                      {isTituloEditavel(titulo) ? (
+                        <Link
+                          className="btn btn-outline btn-sm"
+                          to={`/financeiro/titulos/${titulo.id}/editar`}
+                          title="Editar informações do titulo"
+                        >
+                          <HiOutlinePencilSquare className="h-4 w-4" />
+                        </Link>
+                      ) : (
+                        <button
+                          type="button"
+                          className="btn btn-outline btn-sm opacity-50"
+                          disabled
+                          title="Somente titulos em aberto e sem baixa podem ser editados"
+                        >
+                          <HiOutlinePencilSquare className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
