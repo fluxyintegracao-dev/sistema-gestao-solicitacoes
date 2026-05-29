@@ -1420,12 +1420,12 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
       )}
 
       {modalOpen && categoriaModalOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 px-4">
-          <div className="card w-full max-w-3xl space-y-4">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 px-4 py-6">
+          <div className="card flex max-h-[72vh] w-full max-w-2xl flex-col gap-3 overflow-hidden">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h3 className="text-lg font-semibold text-[var(--c-text)]">Selecionar categoria financeira</h3>
-                <p className="text-sm text-slate-500">
+                <h3 className="text-base font-semibold text-[var(--c-text)]">Selecionar categoria financeira</h3>
+                <p className="text-xs text-slate-500">
                   Pesquise pelo nome e escolha uma categoria compativel com o tipo do titulo.
                 </p>
               </div>
@@ -1438,7 +1438,7 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
               </button>
             </div>
 
-            <div className="space-y-3">
+            <div className="flex min-h-0 flex-1 flex-col gap-3">
               <input
                 className="input w-full"
                 type="text"
@@ -1453,7 +1453,7 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
                   : `${categoriasFiltradas.length} categoria(s) disponivel(is) para ${String(form.tipo || '').toLowerCase()}.`}
               </div>
 
-              <div className="max-h-[420px] space-y-2 overflow-y-auto rounded-2xl border border-slate-200 p-2">
+              <div className="min-h-0 flex-1 space-y-2 overflow-y-auto rounded-2xl border border-slate-200 p-2">
                 {loadingCategorias ? (
                   <div className="px-3 py-4 text-sm text-slate-500">
                     Buscando categorias...
@@ -1466,7 +1466,7 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
                   <button
                     key={categoria.id}
                     type="button"
-                    className={`w-full rounded-2xl border px-3 py-3 text-left text-sm transition ${
+                    className={`w-full rounded-2xl border px-3 py-2 text-left text-sm transition ${
                       selectedCategory?.id === categoria.id
                         ? 'border-blue-300 bg-blue-50'
                         : 'border-slate-200 hover:bg-slate-50'
