@@ -98,7 +98,6 @@ export default function NovaSolicitacaoCompra() {
   const [obraId, setObraId] = useState('');
   const [necessarioPara, setNecessarioPara] = useState('');
   const [observacoes, setObservacoes] = useState('');
-  const [linkGeral, setLinkGeral] = useState('');
   const [buscaInsumo, setBuscaInsumo] = useState('');
   const [itens, setItens] = useState([]);
   const [uploadingArquivos, setUploadingArquivos] = useState({});
@@ -201,7 +200,6 @@ export default function NovaSolicitacaoCompra() {
       setObraId(String(payload.obra_id || ''));
       setNecessarioPara(payload.necessario_para || '');
       setObservacoes(payload.observacoes || '');
-      setLinkGeral(payload.link_geral || '');
       setItens(
         Array.isArray(payload.itens)
           ? payload.itens.map((item, index) => {
@@ -587,7 +585,6 @@ export default function NovaSolicitacaoCompra() {
         obra_id: obraId,
         necessario_para: necessarioPara || null,
         observacoes: observacoes || null,
-        link_geral: linkGeral || null,
         itens: itensNormalizados.map((item) => ({
           manual: Boolean(item.manual),
           insumo_id: item.manual ? null : item.insumo_id,
@@ -658,11 +655,6 @@ export default function NovaSolicitacaoCompra() {
           <div className="grid gap-2">
             <label className="text-sm font-medium">Necessário para</label>
             <input type="date" className="input" value={necessarioPara} onChange={(event) => setNecessarioPara(event.target.value)} />
-          </div>
-
-          <div className="grid gap-2 md:col-span-2">
-            <label className="text-sm font-medium">Link geral</label>
-            <input type="url" className="input" placeholder="https://" value={linkGeral} onChange={(event) => setLinkGeral(event.target.value)} />
           </div>
 
           <div className="grid gap-2 md:col-span-2">
