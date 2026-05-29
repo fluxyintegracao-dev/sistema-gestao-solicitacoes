@@ -41,6 +41,45 @@ function getEmpresaObraId(obra) {
   return obra?.empresa_grupo_id ? String(obra.empresa_grupo_id) : '';
 }
 
+function normalizarBusca(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+}
+
+function parceiroMatchesSearch(parceiro, termo) {
+  const search = normalizarBusca(termo);
+  if (!search) return true;
+
+  const haystack = normalizarBusca([
+    parceiro?.nome,
+    parceiro?.razao_social,
+    parceiro?.nome_fantasia,
+    parceiro?.cpf_cnpj
+  ].filter(Boolean).join(' '));
+
+  return haystack.includes(search);
+}
+
+function SearchIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      className="h-4 w-4"
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="2"
+      viewBox="0 0 24 24"
+    >
+      <circle cx="11" cy="11" r="8" />
+      <path d="m21 21-4.3-4.3" />
+    </svg>
+  );
+}
+
 function getTituloBloqueado(titulo) {
   const status = String(titulo?.status || '').toUpperCase();
   const valorBaixado = Number(titulo?.valor_baixado || 0);
@@ -88,7 +127,7 @@ function buildFormFromTitulo(titulo) {
     codigo_barras: titulo?.codigo_barras || '',
     identificador_externo: titulo?.identificador_externo || '',
     boleto_emitido_em: titulo?.boleto_emitido_em || '',
-    intercompany: Boolean(titulo?.intercompany),
+    intercompany: Boolean(titulo?.intercompany || titulo?.intercompany_group_id || titulo?.tipo_intercompany),
     empresa_contraparte_id: String(titulo?.empresa_contraparte_id || ''),
     intercompany_group_id: titulo?.intercompany_group_id || '',
     empresa_origem_id: String(titulo?.empresa_origem_id || ''),
@@ -114,6 +153,11 @@ export default function FinanceiroTituloEditar() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [parceiroBusca, setParceiroBusca] = useState('');
+  const [parceiroModalOpen, setParceiroModalOpen] = useState(false);
+  const [parceiroModalNomeBusca, setParceiroModalNomeBusca] = useState('');
+  const [parceiroModalDocumentoBusca, setParceiroModalDocumentoBusca] = useState('');
+  const [parceiroModalResultados, setParceiroModalResultados] = useState([]);
+  const [loadingParceiroModal, setLoadingParceiroModal] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -211,12 +255,16 @@ export default function FinanceiroTituloEditar() {
     () => categorias.filter((categoria) => categoriaCompativel(categoria, form?.tipo)),
     [categorias, form?.tipo]
   );
+  const parceirosAutocomplete = useMemo(
+    () => parceiros.filter((parceiro) => parceiroMatchesSearch(parceiro, parceiroBusca)).slice(0, 8),
+    [parceiros, parceiroBusca]
+  );
+  const mostrarListaParceiros = parceiroBusca.trim().length >= 2 && !form?.parceiro_id;
   const obraSelecionada = useMemo(
     () => obras.find((obra) => String(obra.id) === String(form?.obra_id)) || null,
     [obras, form?.obra_id]
   );
   const empresaDaObraId = getEmpresaObraId(obraSelecionada);
-  const empresaTravadaPelaObra = Boolean(empresaDaObraId);
   const categoriaSelecionada = useMemo(
     () => categorias.find((categoria) => String(categoria.id) === String(form?.categoria_financeira_id)) || null,
     [categorias, form?.categoria_financeira_id]
@@ -259,18 +307,52 @@ export default function FinanceiroTituloEditar() {
     });
   }
 
+  function selecionarParceiro(parceiro) {
+    setParceiroBusca(parceiro?.nome || '');
+    setForm((current) => ({
+      ...current,
+      parceiro_id: parceiro?.id ? String(parceiro.id) : ''
+    }));
+    setParceiroModalOpen(false);
+  }
+
+  async function pesquisarParceirosModal() {
+    const nome = parceiroModalNomeBusca.trim();
+    const documento = parceiroModalDocumentoBusca.trim();
+
+    try {
+      setLoadingParceiroModal(true);
+      const params = {
+        ativo: 1,
+        limit: 200,
+        q: documento || nome
+      };
+      if (form.tipo === 'RECEBER') {
+        params.cliente = 1;
+      }
+
+      const data = await buscarParceiros(params);
+      const lista = Array.isArray(data) ? data : [];
+      const tipoFiltrado = form.tipo === 'RECEBER'
+        ? lista.filter((item) => item.cliente !== false)
+        : lista.filter((item) => item.fornecedor !== false || item.corretor === true);
+      const termoFinal = documento || nome;
+      setParceiroModalResultados(tipoFiltrado.filter((item) => parceiroMatchesSearch(item, termoFinal)));
+    } catch (err) {
+      setParceiroModalResultados([]);
+    } finally {
+      setLoadingParceiroModal(false);
+    }
+  }
+
   function validar() {
-    if (!form.empresa_id) return 'Informe a empresa real do titulo.';
     if (!form.obra_id) return 'Selecione a obra/centro de custo.';
+    if (!empresaDaObraId) return 'A obra/centro de custo selecionado nao possui empresa vinculada.';
     if (!form.parceiro_id) return 'Selecione o parceiro.';
     if (!form.descricao.trim()) return 'Informe a descricao.';
     if (toCurrencyNumber(form.valor) <= 0) return 'Informe o valor do titulo.';
     if (!form.data_vencimento) return 'Informe o vencimento.';
-    if (form.considera_dre) {
-      if (!categoriaSelecionada) return 'Selecione uma categoria financeira para DRE.';
-      if (categoriaSelecionada.considera_dre === false || !String(categoriaSelecionada.dre_grupo || '').trim()) {
-        return 'A categoria selecionada precisa estar classificada para DRE.';
-      }
+    if (categoriaSelecionada && categoriaSelecionada.considera_dre !== false && String(categoriaSelecionada.dre_grupo || '').trim()) {
       if (!form.competencia_data) return 'Informe a competencia DRE.';
     }
     if (form.intercompany) {
@@ -296,13 +378,17 @@ export default function FinanceiroTituloEditar() {
       setError('');
       const payload = {
         ...form,
+        empresa_id: empresaDaObraId,
         valor: toCurrencyNumber(form.valor),
         apropriacao_id: form.apropriacao_id || null,
         categoria_financeira_id: form.categoria_financeira_id || null,
         numero_documento: form.numero_documento || null,
         observacoes: form.observacoes || null,
         data_emissao: form.data_emissao || null,
-        competencia_data: form.considera_dre ? form.competencia_data : null,
+        considera_dre: Boolean(categoriaSelecionada && categoriaSelecionada.considera_dre !== false && String(categoriaSelecionada.dre_grupo || '').trim()),
+        competencia_data: categoriaSelecionada && categoriaSelecionada.considera_dre !== false && String(categoriaSelecionada.dre_grupo || '').trim()
+          ? form.competencia_data
+          : null,
         forma_cobranca: form.tipo === 'RECEBER' ? form.forma_cobranca || null : null,
         status_cobranca: form.tipo === 'RECEBER' && form.forma_cobranca ? form.status_cobranca : null,
         banco_cobranca: form.banco_cobranca || null,
@@ -381,38 +467,59 @@ export default function FinanceiroTituloEditar() {
             </select>
           </label>
 
-          <label className="form-field">
-            <span>Empresa real</span>
-            <select
-              value={form.empresa_id}
-              onChange={(event) => updateField('empresa_id', event.target.value)}
-              disabled={Boolean(bloqueio) || empresaTravadaPelaObra}
-            >
-              <option value="">Selecione</option>
-              {empresasGrupo.map((empresa) => (
-                <option key={empresa.id} value={empresa.id}>{empresa.nome || empresa.razao_social}</option>
-              ))}
-            </select>
-            <small className="text-xs text-[var(--c-muted)]">
-              {empresaTravadaPelaObra
-                ? 'Preenchida pela empresa vinculada a obra/centro de custo.'
-                : 'Informe a empresa real para regularizar titulos antigos sem empresa vinculada.'}
-            </small>
-          </label>
-
-          <label className="form-field xl:col-span-2">
-            <span>Buscar parceiro</span>
-            <input value={parceiroBusca} onChange={(event) => setParceiroBusca(event.target.value)} placeholder="Nome ou documento" disabled={Boolean(bloqueio)} />
-          </label>
-
-          <label className="form-field xl:col-span-2">
-            <span>{form.tipo === 'RECEBER' ? 'Cliente' : 'Credor/Fornecedor'}</span>
-            <select value={form.parceiro_id} onChange={(event) => updateField('parceiro_id', event.target.value)} disabled={Boolean(bloqueio)}>
-              <option value="">Selecione</option>
-              {parceiros.map((parceiro) => (
-                <option key={parceiro.id} value={parceiro.id}>{parceiro.nome}</option>
-              ))}
-            </select>
+          <label className="form-field relative xl:col-span-2">
+            <span>Credor/Fornecedor</span>
+            <div className="flex gap-2">
+              <input
+                value={parceiroBusca}
+                onChange={(event) => {
+                  setParceiroBusca(event.target.value);
+                  updateField('parceiro_id', '');
+                }}
+                placeholder="Digite nome, razao social, CPF ou CNPJ"
+                disabled={Boolean(bloqueio)}
+              />
+              <button
+                type="button"
+                className="btn btn-outline shrink-0 px-3"
+                title="Pesquisar parceiro"
+                aria-label="Pesquisar parceiro"
+                disabled={Boolean(bloqueio)}
+                onClick={() => {
+                  setParceiroModalNomeBusca(parceiroBusca);
+                  setParceiroModalDocumentoBusca('');
+                  setParceiroModalResultados([]);
+                  setParceiroModalOpen(true);
+                }}
+              >
+                <SearchIcon />
+              </button>
+            </div>
+            <input type="hidden" value={form.parceiro_id} required />
+            {mostrarListaParceiros && (
+              <div className="absolute left-0 right-0 top-full z-20 mt-2 max-h-56 overflow-y-auto rounded-lg border border-[var(--c-border)] bg-[var(--c-bg)] shadow-lg">
+                {parceirosAutocomplete.length === 0 ? (
+                  <div className="px-3 py-2 text-sm text-[var(--c-muted)]">
+                    Nenhum parceiro encontrado.
+                  </div>
+                ) : parceirosAutocomplete.map((parceiro) => (
+                  <button
+                    key={parceiro.id}
+                    type="button"
+                    className="w-full border-b border-[var(--c-border)] px-3 py-2 text-left text-sm last:border-b-0 hover:bg-[var(--c-surface-muted)]"
+                    onClick={() => selecionarParceiro(parceiro)}
+                  >
+                    <span className="block font-medium text-[var(--c-text)]">{parceiro.nome}</span>
+                    <span className="block text-xs text-[var(--c-muted)]">{parceiro.cpf_cnpj || 'CPF/CNPJ nao informado'}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+            {form.parceiro_id && (
+              <small className="text-xs text-[var(--c-muted)]">
+                Selecionado: {parceiroBusca || `Parceiro #${form.parceiro_id}`}
+              </small>
+            )}
           </label>
 
           <label className="form-field xl:col-span-2">
@@ -464,12 +571,15 @@ export default function FinanceiroTituloEditar() {
 
           <label className="form-field">
             <span>Competencia DRE</span>
-            <input type="date" value={form.competencia_data} onChange={(event) => updateField('competencia_data', event.target.value)} disabled={Boolean(bloqueio) || !form.considera_dre} />
-          </label>
-
-          <label className="flex items-center gap-2 rounded-xl border border-[var(--c-border)] px-3 py-2 text-sm text-[var(--c-text)]">
-            <input type="checkbox" checked={form.considera_dre} onChange={(event) => updateField('considera_dre', event.target.checked)} disabled={Boolean(bloqueio)} />
-            Considerar na DRE
+            <input
+              type="date"
+              value={form.competencia_data}
+              onChange={(event) => updateField('competencia_data', event.target.value)}
+              disabled={Boolean(bloqueio) || !(categoriaSelecionada && categoriaSelecionada.considera_dre !== false && String(categoriaSelecionada.dre_grupo || '').trim())}
+            />
+            <small className="text-xs text-[var(--c-muted)]">
+              A categoria financeira define automaticamente se o titulo entra na DRE.
+            </small>
           </label>
         </div>
 
@@ -510,12 +620,9 @@ export default function FinanceiroTituloEditar() {
           </div>
         )}
 
-        <div className="rounded-xl border border-[var(--c-border)] p-4">
-          <label className="mb-3 flex items-center gap-2 text-sm font-semibold text-[var(--c-text)]">
-            <input type="checkbox" checked={form.intercompany} onChange={(event) => updateField('intercompany', event.target.checked)} disabled={Boolean(bloqueio)} />
-            Movimento Entre Empresas
-          </label>
-          {form.intercompany && (
+        {form.intercompany && (
+          <div className="rounded-xl border border-[var(--c-border)] p-4">
+            <h2 className="mb-3 text-base font-semibold text-[var(--c-text)]">Entre Empresas</h2>
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <label className="form-field">
                 <span>Origem</span>
@@ -550,8 +657,8 @@ export default function FinanceiroTituloEditar() {
                 <input value={form.motivo_intercompany} onChange={(event) => updateField('motivo_intercompany', event.target.value)} disabled={Boolean(bloqueio)} />
               </label>
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
         <label className="form-field">
           <span>Observacoes</span>
@@ -567,6 +674,73 @@ export default function FinanceiroTituloEditar() {
           </button>
         </div>
       </form>
+
+      {parceiroModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/40 px-4 py-6 backdrop-blur-sm">
+          <div className="w-full max-w-2xl overflow-hidden rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] shadow-2xl">
+            <div className="flex items-start justify-between gap-3 border-b border-[var(--c-border)] px-5 py-4">
+              <div>
+                <h3 className="text-base font-semibold text-[var(--c-text)]">Pesquisar credor/fornecedor</h3>
+                <p className="text-sm text-[var(--c-muted)]">
+                  Busque por CPF/CNPJ, nome ou razao social.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="rounded-lg px-3 py-1.5 text-sm font-semibold text-[var(--c-muted)] hover:bg-[var(--c-bg)] hover:text-[var(--c-text)]"
+                onClick={() => setParceiroModalOpen(false)}
+              >
+                Fechar
+              </button>
+            </div>
+
+            <div className="space-y-4 p-5">
+              <div className="grid gap-3 md:grid-cols-2">
+                <label className="form-field">
+                  <span>CPF/CNPJ</span>
+                  <input
+                    value={parceiroModalDocumentoBusca}
+                    onChange={(event) => setParceiroModalDocumentoBusca(event.target.value)}
+                    placeholder="Digite CPF ou CNPJ"
+                  />
+                </label>
+                <label className="form-field">
+                  <span>Nome/Razao social</span>
+                  <input
+                    value={parceiroModalNomeBusca}
+                    onChange={(event) => setParceiroModalNomeBusca(event.target.value)}
+                    placeholder="Digite parte do nome ou razao social"
+                  />
+                </label>
+              </div>
+
+              <div className="flex justify-end">
+                <button type="button" className="btn btn-primary" onClick={pesquisarParceirosModal} disabled={loadingParceiroModal}>
+                  {loadingParceiroModal ? 'Pesquisando...' : 'Pesquisar'}
+                </button>
+              </div>
+
+              <div className="max-h-72 overflow-y-auto rounded-xl border border-[var(--c-border)]">
+                {parceiroModalResultados.length === 0 ? (
+                  <div className="px-4 py-6 text-center text-sm text-[var(--c-muted)]">
+                    Nenhum resultado listado. Informe um termo e pesquise.
+                  </div>
+                ) : parceiroModalResultados.map((parceiro) => (
+                  <button
+                    key={parceiro.id}
+                    type="button"
+                    className="w-full border-b border-[var(--c-border)] px-4 py-3 text-left text-sm last:border-b-0 hover:bg-[var(--c-bg)]"
+                    onClick={() => selecionarParceiro(parceiro)}
+                  >
+                    <span className="block font-semibold text-[var(--c-text)]">{parceiro.nome}</span>
+                    <span className="block text-xs text-[var(--c-muted)]">{parceiro.cpf_cnpj || 'CPF/CNPJ nao informado'}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
