@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const { Op } = require('sequelize');
 const {
   CartaoFinanceiro,
+  ConciliacaoBancaria,
   ContaBancaria,
   EmpresaGrupo,
   Apropriacao,
@@ -2396,6 +2397,134 @@ async function baixarTitulo(req, tituloId, payload = {}) {
   }
 }
 
+async function baixarTituloPorConciliacoes(req, tituloId, payload = {}) {
+  const titulo = await carregarTituloPorId(req, tituloId, { includeMovimentos: false });
+  const statusAtual = String(titulo.status || '').trim().toUpperCase();
+
+  if (!['ABERTO', 'PARCIAL'].includes(statusAtual)) {
+    throw createHttpError(400, 'Somente titulos em aberto ou parcial podem receber baixa.');
+  }
+
+  const conciliacaoIds = Array.isArray(payload.conciliacao_ids)
+    ? [...new Set(payload.conciliacao_ids.map((id) => Number(id)).filter(Boolean))]
+    : [];
+  if (!conciliacaoIds.length) {
+    throw createHttpError(400, 'Selecione ao menos um lancamento bancario para conciliar.');
+  }
+
+  const conciliacoes = await ConciliacaoBancaria.findAll({
+    where: { id: { [Op.in]: conciliacaoIds } },
+    order: [['data_movimento', 'ASC'], ['id', 'ASC']]
+  });
+  if (conciliacoes.length !== conciliacaoIds.length) {
+    throw createHttpError(404, 'Um ou mais lancamentos bancarios nao foram encontrados.');
+  }
+
+  const tipoTitulo = String(titulo.tipo || '').trim().toUpperCase();
+  const saldoAtual = roundCurrency(titulo.valor_saldo);
+  const totalSelecionado = roundCurrency(conciliacoes.reduce((acc, conciliacao) => (
+    acc + Math.abs(Number(conciliacao.valor || 0))
+  ), 0));
+
+  if (totalSelecionado <= 0) {
+    throw createHttpError(400, 'Os lancamentos selecionados nao possuem valor para baixa.');
+  }
+  if (totalSelecionado > saldoAtual) {
+    throw createHttpError(400, 'A soma dos lancamentos bancarios nao pode ser maior que o saldo do titulo.');
+  }
+
+  const preparadas = [];
+  for (const conciliacao of conciliacoes) {
+    const statusConciliacao = String(conciliacao.status || '').trim().toUpperCase();
+    if (statusConciliacao !== 'PENDENTE') {
+      throw createHttpError(400, `Lancamento bancario #${conciliacao.id} nao esta pendente.`);
+    }
+    if (conciliacao.movimento_financeiro_id) {
+      throw createHttpError(400, `Lancamento bancario #${conciliacao.id} ja possui movimento vinculado.`);
+    }
+
+    const tipoEsperado = Number(conciliacao.valor || 0) >= 0 ? 'RECEBER' : 'PAGAR';
+    if (tipoEsperado !== tipoTitulo) {
+      throw createHttpError(400, 'Todos os lancamentos selecionados devem ter o mesmo sentido financeiro do titulo.');
+    }
+
+    const conta = await validarContaBancaria(conciliacao.conta_bancaria_id);
+    const empresaBaixaId = await validarEmpresaBaixa({
+      empresaId: conciliacao.empresa_id || conta.empresa_id,
+      conta
+    });
+    await validarIntercompanyBaixa({
+      payload,
+      titulo,
+      empresaBaixaId
+    });
+
+    preparadas.push({
+      conciliacao,
+      conta,
+      empresaBaixaId,
+      valor: roundCurrency(Math.abs(Number(conciliacao.valor || 0)))
+    });
+  }
+
+  const resultados = [];
+  for (const item of preparadas) {
+    const { conciliacao, conta, empresaBaixaId, valor } = item;
+    const baixa = await baixarTitulo(req, titulo.id, {
+      ...payload,
+      valor,
+      juros: 0,
+      multa: 0,
+      desconto: 0,
+      data_movimento: conciliacao.data_movimento,
+      conta_bancaria_id: conta.id,
+      empresa_id: empresaBaixaId,
+      documento_referencia: payload.documento_referencia || conciliacao.documento || null,
+      observacoes: payload.observacoes || `Baixa conciliada pelo lancamento bancario #${conciliacao.id}`
+    });
+
+    await conciliacao.update({
+      movimento_financeiro_id: baixa.movimento_financeiro_id,
+      titulo_financeiro_id: titulo.id,
+      status: 'CONCILIADO',
+      confirmado_por: req.user?.id || null,
+      confirmado_em: new Date()
+    });
+
+    resultados.push({
+      conciliacao_id: conciliacao.id,
+      movimento_financeiro_id: baixa.movimento_financeiro_id,
+      valor,
+      data_movimento: conciliacao.data_movimento
+    });
+  }
+
+  await registrarEventoSeguranca({
+    req,
+    usuarioId: req.user?.id || null,
+    tipoEvento: 'FINANCIAL_TITLE_SETTLED_FROM_BANK_RECONCILIATION',
+    recursoTipo: 'TITULO_FINANCEIRO',
+    recursoId: titulo.id,
+    status: 'SUCCESS',
+    descricao: 'Titulo financeiro baixado a partir de multiplos lancamentos bancarios',
+    metadata: {
+      conciliacao_ids: resultados.map((item) => item.conciliacao_id),
+      movimentos: resultados,
+      valor_total: totalSelecionado
+    }
+  });
+
+  const tituloAtualizado = await carregarTituloPorId(req, titulo.id, { includeMovimentos: true });
+  const tituloJson = typeof tituloAtualizado?.toJSON === 'function'
+    ? tituloAtualizado.toJSON()
+    : tituloAtualizado;
+
+  return {
+    ...tituloJson,
+    conciliacoes_processadas: resultados
+  };
+}
+
 async function estornarMovimentoTitulo(req, tituloId, movimentoId, payload = {}) {
   const titulo = await carregarTituloPorId(req, tituloId, { includeMovimentos: false });
   const movimento = await MovimentoFinanceiro.findOne({
@@ -2566,6 +2695,7 @@ module.exports = {
   atualizarCobrancaTitulo,
   atualizarTitulo,
   baixarTitulo,
+  baixarTituloPorConciliacoes,
   carregarTituloPorId,
   criarTituloManual,
   criarTituloManualComBaixaAtomica,

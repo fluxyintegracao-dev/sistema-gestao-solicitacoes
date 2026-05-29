@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
+  baixarTituloPorConciliacoes,
   conciliarSugestoesBancarias,
   confirmarConciliacaoBancaria,
   confirmarConciliacaoFaturaCartao,
@@ -14,6 +15,7 @@ import {
   getImportacoesConciliacao,
   getMovimentosAssociacaoConciliacao,
   getTarifasBancariasAtalhos,
+  getTitulosFinanceiros,
   ignorarConciliacaoBancaria,
   importarOfxConciliacao
 } from '../services/financeiro';
@@ -77,6 +79,10 @@ function statusClass(status) {
   if (s === 'CONCILIADO') return 'app-status-pill bg-emerald-100 text-emerald-700';
   if (s === 'IGNORADO') return 'app-status-pill bg-slate-100 text-slate-500';
   return 'app-status-pill bg-amber-100 text-amber-700';
+}
+
+function tipoTituloPorValorExtrato(value) {
+  return Number(value || 0) >= 0 ? 'RECEBER' : 'PAGAR';
 }
 
 function buildAssociacaoDefaults(item) {
@@ -511,7 +517,7 @@ function NovoTituloRapidoModal({ item, contas, onClose, onConciliar }) {
 
 // ─── ItemConciliacao — layout 2 colunas ──────────────────────────────────────
 
-function ItemConciliacao({ item, processingId, onConfirmar, onIgnorar, onAssociarManual, onAssociarFatura, onAssociarTransferencia, onAcoesRapidas }) {
+function ItemConciliacao({ item, processingId, selected = false, onToggleSelecao, onConfirmar, onIgnorar, onAssociarManual, onAssociarFatura, onAssociarTransferencia, onAcoesRapidas }) {
   const [expandirSugestoes, setExpandirSugestoes] = useState(false);
 
   const isPendente = item.status === 'PENDENTE';
@@ -535,6 +541,16 @@ function ItemConciliacao({ item, processingId, onConfirmar, onIgnorar, onAssocia
 
         {/* ── Coluna esquerda: lançamento OFX ── */}
         <div className="flex flex-col gap-1 p-2">
+          {isPendente && (
+            <label className="mb-1 flex items-center gap-2 text-[10px] font-semibold text-[var(--c-muted)]">
+              <input
+                type="checkbox"
+                checked={selected}
+                onChange={() => onToggleSelecao?.(item)}
+              />
+              Selecionar para baixa em titulo
+            </label>
+          )}
           {/* header */}
           <div className="flex items-center justify-between gap-1">
             <p className="text-[9px] uppercase tracking-wide font-semibold text-[var(--c-muted)]">Extrato bancário</p>
@@ -697,6 +713,235 @@ function ItemConciliacao({ item, processingId, onConfirmar, onIgnorar, onAssocia
 
 // ─── HistoricoImportacaoItem ──────────────────────────────────────────────────
 
+function BaixaExtratosTituloModal({ itens, onClose, onConfirmar }) {
+  const [titulos, setTitulos] = useState([]);
+  const [busca, setBusca] = useState('');
+  const [tituloId, setTituloId] = useState('');
+  const [formaRecebimento, setFormaRecebimento] = useState('TRANSFERENCIA');
+  const [observacoes, setObservacoes] = useState('');
+  const [entreEmpresas, setEntreEmpresas] = useState(false);
+  const [tipoIntercompany, setTipoIntercompany] = useState('');
+  const [motivoIntercompany, setMotivoIntercompany] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const tipoEsperado = useMemo(() => {
+    const tipos = [...new Set(itens.map((item) => tipoTituloPorValorExtrato(item.valor)))];
+    return tipos.length === 1 ? tipos[0] : null;
+  }, [itens]);
+  const totalSelecionado = useMemo(() => (
+    itens.reduce((acc, item) => acc + Math.abs(Number(item.valor || 0)), 0)
+  ), [itens]);
+
+  useEffect(() => {
+    let alive = true;
+    async function carregarTitulos() {
+      try {
+        setLoading(true);
+        setError('');
+        if (!tipoEsperado) {
+          setTitulos([]);
+          return;
+        }
+        const [abertos, parciais] = await Promise.all([
+          getTitulosFinanceiros({ tipo: tipoEsperado, status: 'ABERTO' }),
+          getTitulosFinanceiros({ tipo: tipoEsperado, status: 'PARCIAL' })
+        ]);
+        if (!alive) return;
+        const merged = [...(Array.isArray(abertos) ? abertos : []), ...(Array.isArray(parciais) ? parciais : [])];
+        const unique = Array.from(new Map(merged.map((titulo) => [Number(titulo.id), titulo])).values());
+        setTitulos(unique.filter((titulo) => Number(titulo.valor_saldo || 0) > 0));
+      } catch (err) {
+        if (alive) setError(err?.message || 'Erro ao buscar titulos financeiros.');
+      } finally {
+        if (alive) setLoading(false);
+      }
+    }
+    carregarTitulos();
+    return () => { alive = false; };
+  }, [tipoEsperado]);
+
+  const titulosFiltrados = useMemo(() => {
+    const term = busca.trim().toLowerCase();
+    return titulos.filter((titulo) => {
+      if (!term) return true;
+      return [
+        titulo.id,
+        titulo.codigo,
+        titulo.descricao,
+        titulo.numero_documento,
+        titulo.parceiro?.nome,
+        titulo.parceiro_nome
+      ].some((value) => String(value || '').toLowerCase().includes(term));
+    });
+  }, [busca, titulos]);
+
+  async function submit(event) {
+    event.preventDefault();
+    if (!tipoEsperado) {
+      setError('Selecione apenas lancamentos de entrada ou apenas de saida.');
+      return;
+    }
+    if (!tituloId) {
+      setError('Selecione o titulo financeiro que recebera as baixas.');
+      return;
+    }
+    if (entreEmpresas && !tipoIntercompany) {
+      setError('Marque a baixa como Entre Empresas e informe o tipo.');
+      return;
+    }
+    try {
+      setSaving(true);
+      setError('');
+      await onConfirmar(Number(tituloId), {
+        conciliacao_ids: itens.map((item) => item.id),
+        forma_recebimento: formaRecebimento,
+        observacoes: observacoes || 'Baixa parcial conciliada por extrato bancario',
+        intercompany: entreEmpresas,
+        tipo_intercompany: entreEmpresas ? tipoIntercompany : undefined,
+        motivo_intercompany: entreEmpresas ? motivoIntercompany : undefined
+      });
+    } catch (err) {
+      setError(err?.message || 'Erro ao baixar titulo por conciliacoes.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6">
+      <form onSubmit={submit} className="w-full max-w-4xl overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-[var(--c-surface)]">
+        <div className="flex items-start justify-between gap-3 border-b border-[var(--c-border)] px-5 py-4">
+          <div>
+            <h2 className="text-lg font-semibold text-[var(--c-text)]">Baixar titulo com extratos selecionados</h2>
+            <p className="mt-0.5 text-sm text-[var(--c-muted)]">
+              Cada lancamento selecionado vira uma baixa real no titulo, mantendo a data original do extrato.
+            </p>
+          </div>
+          <button type="button" className="btn btn-outline btn-sm" onClick={onClose}>Fechar</button>
+        </div>
+
+        <div className="max-h-[72vh] overflow-y-auto p-5">
+          {!tipoEsperado && (
+            <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              Selecione somente lancamentos de entrada ou somente de saida para vincular a um unico titulo.
+            </div>
+          )}
+
+          <div className="rounded-xl border border-[var(--c-border)] p-3">
+            <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+              <div>
+                <p className="text-sm font-semibold text-[var(--c-text)]">{itens.length} lancamento(s) selecionado(s)</p>
+                <p className="text-xs text-[var(--c-muted)]">
+                  Tipo esperado: {tipoEsperado || '-'} | Total: {formatCurrency(totalSelecionado)}
+                </p>
+              </div>
+              <select className="input max-w-[220px]" value={formaRecebimento} onChange={(event) => setFormaRecebimento(event.target.value)}>
+                <option value="TRANSFERENCIA">Transferencia</option>
+                <option value="PIX">PIX</option>
+                <option value="BOLETO">Boleto</option>
+                <option value="CHEQUE">Cheque</option>
+              </select>
+            </div>
+            <div className="mt-3 grid gap-2 md:grid-cols-2">
+              {itens.map((item) => (
+                <div key={item.id} className="rounded-lg bg-[var(--c-bg)] px-3 py-2 text-sm">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="truncate font-medium">{item.descricao_banco || 'Lancamento bancario'}</span>
+                    <ValorBanco value={item.valor} size="sm" />
+                  </div>
+                  <p className="text-xs text-[var(--c-muted)]">
+                    {formatDate(item.data_movimento)} | {item.conta_bancaria_nome || 'Conta bancaria'}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-4 grid gap-3 md:grid-cols-[1fr_260px]">
+            <label className="form-field">
+              <span className="form-label">Buscar titulo</span>
+              <input className="input" value={busca} onChange={(event) => setBusca(event.target.value)} placeholder="Digite descricao, documento, parceiro ou codigo" />
+            </label>
+            <label className="form-field">
+              <span className="form-label">Observacao</span>
+              <input className="input" value={observacoes} onChange={(event) => setObservacoes(event.target.value)} placeholder="Opcional" />
+            </label>
+          </div>
+
+          <div className="mt-4 rounded-xl border border-[var(--c-border)] p-3">
+            <label className="flex items-center gap-2 text-sm font-semibold text-[var(--c-text)]">
+              <input
+                type="checkbox"
+                checked={entreEmpresas}
+                onChange={(event) => setEntreEmpresas(event.target.checked)}
+              />
+              Baixa Entre Empresas
+            </label>
+            {entreEmpresas && (
+              <div className="mt-3 grid gap-3 md:grid-cols-2">
+                <label className="form-field">
+                  <span className="form-label">Tipo</span>
+                  <select className="input" value={tipoIntercompany} onChange={(event) => setTipoIntercompany(event.target.value)}>
+                    <option value="">Selecione</option>
+                    {TIPOS_INTERCOMPANY.map((tipo) => (
+                      <option key={tipo.value} value={tipo.value}>{tipo.label}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="form-field">
+                  <span className="form-label">Motivo</span>
+                  <input className="input" value={motivoIntercompany} onChange={(event) => setMotivoIntercompany(event.target.value)} placeholder="Opcional" />
+                </label>
+              </div>
+            )}
+          </div>
+
+          <div className="mt-4 max-h-[320px] space-y-2 overflow-y-auto rounded-xl border border-[var(--c-border)] p-2">
+            {loading ? (
+              <div className="app-empty-card">Carregando titulos...</div>
+            ) : titulosFiltrados.length === 0 ? (
+              <div className="app-empty-card">Nenhum titulo aberto ou parcial encontrado.</div>
+            ) : titulosFiltrados.map((titulo) => {
+              const selected = String(tituloId) === String(titulo.id);
+              return (
+                <button
+                  key={titulo.id}
+                  type="button"
+                  className={`w-full rounded-xl border px-3 py-3 text-left transition-colors ${
+                    selected
+                      ? 'border-[var(--c-primary)] bg-blue-50 text-[var(--c-text)]'
+                      : 'border-[var(--c-border)] hover:border-[var(--c-primary)] hover:bg-[var(--c-bg)]'
+                  }`}
+                  onClick={() => setTituloId(String(titulo.id))}
+                >
+                  <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
+                    <strong>#{titulo.id} {titulo.descricao || titulo.codigo || 'Titulo financeiro'}</strong>
+                    <span className="text-sm font-semibold">{formatCurrency(titulo.valor_saldo)}</span>
+                  </div>
+                  <p className="text-xs text-[var(--c-muted)]">
+                    {titulo.parceiro?.nome || titulo.parceiro_nome || 'Sem credor/cliente'} | Venc. {formatDate(titulo.data_vencimento)}
+                  </p>
+                </button>
+              );
+            })}
+          </div>
+
+          {error && <p className="mt-3 text-sm text-rose-600">{error}</p>}
+        </div>
+
+        <div className="flex justify-end gap-2 border-t border-[var(--c-border)] px-5 py-4">
+          <button type="button" className="btn btn-outline" onClick={onClose}>Cancelar</button>
+          <button type="submit" className="btn btn-primary" disabled={saving || !tipoEsperado}>
+            {saving ? 'Processando...' : 'Baixar e conciliar'}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
 function HistoricoImportacaoItem({ item }) {
   return (
     <div className="app-list-card">
@@ -840,6 +1085,8 @@ export default function FinanceiroConciliacao() {
     processing: false,
     error: ''
   });
+  const [conciliacoesSelecionadas, setConciliacoesSelecionadas] = useState([]);
+  const [baixaExtratosModalOpen, setBaixaExtratosModalOpen] = useState(false);
 
   const contaAtualTransferencia = useMemo(
     () => contas.find((conta) => String(conta.id) === String(transferenciaModal.item?.conta_bancaria_id)),
@@ -931,6 +1178,10 @@ export default function FinanceiroConciliacao() {
     (acc, item) => { if (item.conciliacao_em_lote_disponivel) acc.prontos += 1; if (item.associacao_manual_recomendada) acc.manuais += 1; return acc; },
     { prontos: 0, manuais: 0 }
   ), [dados.itens]);
+  const conciliacoesSelecionadasItens = useMemo(() => {
+    const ids = new Set(conciliacoesSelecionadas.map((id) => Number(id)));
+    return dados.itens.filter((item) => ids.has(Number(item.id)) && item.status === 'PENDENTE');
+  }, [conciliacoesSelecionadas, dados.itens]);
 
   async function handleImportar(event) {
     event.preventDefault();
@@ -947,6 +1198,24 @@ export default function FinanceiroConciliacao() {
       if (fi) fi.value = '';
       await carregarConciliacoes();
     } catch (err) { setError(err?.message || 'Erro ao importar OFX'); } finally { setImporting(false); }
+  }
+
+  function toggleConciliacaoSelecionada(item) {
+    if (!item || item.status !== 'PENDENTE') return;
+    setConciliacoesSelecionadas((current) => {
+      const id = Number(item.id);
+      return current.includes(id)
+        ? current.filter((value) => value !== id)
+        : [...current, id];
+    });
+  }
+
+  async function handleBaixarTituloPorExtratos(tituloId, payload) {
+    await baixarTituloPorConciliacoes(tituloId, payload);
+    setBaixaExtratosModalOpen(false);
+    setConciliacoesSelecionadas([]);
+    setFeedback('Titulo baixado e lancamentos bancarios conciliados com sucesso.');
+    await carregarConciliacoes();
   }
 
   async function handleConfirmar(conciliacaoId, movimentoId, { fecharModal = false } = {}) {
@@ -1330,11 +1599,34 @@ export default function FinanceiroConciliacao() {
               onConciliarSugeridos={handleConciliarSugeridos} appliedFilters={appliedFilters}
             />
 
+            {conciliacoesSelecionadasItens.length > 0 && (
+              <div className="sol-surface-card card flex flex-col gap-3 border border-[var(--c-primary)] bg-blue-50/60 p-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-[var(--c-text)]">
+                    {conciliacoesSelecionadasItens.length} lancamento(s) selecionado(s)
+                  </p>
+                  <p className="text-xs text-[var(--c-muted)]">
+                    Use para baixar um unico titulo com pagamentos parciais em uma ou mais datas do extrato.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" className="btn btn-outline btn-sm" onClick={() => setConciliacoesSelecionadas([])}>
+                    Limpar selecao
+                  </button>
+                  <button type="button" className="btn btn-primary btn-sm" onClick={() => setBaixaExtratosModalOpen(true)}>
+                    Baixar titulo com selecionados
+                  </button>
+                </div>
+              </div>
+            )}
+
             {dados.itens.length === 0
               ? <div className="app-empty-card sol-surface-card">Nenhum lançamento encontrado com os filtros atuais.</div>
               : dados.itens.map((item) => (
                   <ItemConciliacao
                     key={item.id} item={item} processingId={processingId}
+                    selected={conciliacoesSelecionadas.includes(Number(item.id))}
+                    onToggleSelecao={toggleConciliacaoSelecionada}
                     onConfirmar={handleConfirmar} onIgnorar={handleIgnorar}
                     onAssociarManual={abrirAssociacaoManual}
                     onAssociarFatura={abrirAssociacaoFatura}
@@ -1348,6 +1640,14 @@ export default function FinanceiroConciliacao() {
           </div>
         )
       }
+
+      {baixaExtratosModalOpen && (
+        <BaixaExtratosTituloModal
+          itens={conciliacoesSelecionadasItens}
+          onClose={() => setBaixaExtratosModalOpen(false)}
+          onConfirmar={handleBaixarTituloPorExtratos}
+        />
+      )}
 
       {acoesRapidasItem && (
         <AcoesRapidasConciliacaoModal

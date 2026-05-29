@@ -641,6 +641,16 @@ export async function baixarTituloFinanceiro(id, data) {
   return parseJson(response, 'Erro ao registrar baixa financeira');
 }
 
+export async function baixarTituloPorConciliacoes(id, data) {
+  const response = await fetch(`${API_URL}/financeiro/titulos/${id}/baixas/conciliacoes`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+
+  return parseJson(response, 'Erro ao baixar titulo por conciliacoes bancarias');
+}
+
 export async function estornarMovimentoFinanceiro(tituloId, movimentoId, data = {}) {
   const response = await fetch(`${API_URL}/financeiro/titulos/${tituloId}/movimentos/${movimentoId}/estornar`, {
     method: 'POST',

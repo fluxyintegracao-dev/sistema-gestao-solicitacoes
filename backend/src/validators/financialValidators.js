@@ -1132,6 +1132,51 @@ function validateFinanceTituloBaixaBody(body = {}) {
   };
 }
 
+function validateFinanceTituloBaixaConciliacoesBody(body = {}) {
+  ensureAllowedKeys(
+    body,
+    [
+      'conciliacao_ids',
+      'forma_recebimento',
+      'documento_referencia',
+      'observacoes',
+      'intercompany',
+      'tipo_intercompany',
+      'motivo_intercompany',
+      'elimina_consolidado',
+      'transferencia_interna'
+    ],
+    'Baixa por conciliacoes bancarias'
+  );
+
+  if (!Array.isArray(body.conciliacao_ids) || body.conciliacao_ids.length === 0) {
+    throw new ValidationError('Selecione ao menos um lancamento bancario para conciliar.');
+  }
+  if (body.conciliacao_ids.length > 50) {
+    throw new ValidationError('Selecione no maximo 50 lancamentos bancarios por baixa.');
+  }
+
+  const conciliacaoIds = [...new Set(body.conciliacao_ids.map((id, index) => (
+    parseInteger(id, `Lancamento bancario ${index + 1}`, { required: true })
+  )))];
+
+  return {
+    conciliacao_ids: conciliacaoIds,
+    forma_recebimento: parseEnum(
+      body.forma_recebimento || 'TRANSFERENCIA',
+      'Forma de recebimento',
+      COMERCIAL_FORMA_RECEBIMENTO
+    ),
+    documento_referencia: parseOptionalText(body.documento_referencia, 'Documento de referencia', 120),
+    observacoes: parseOptionalText(body.observacoes, 'Observacoes', 4000),
+    intercompany: parseBoolean(body.intercompany, 'Entre Empresas'),
+    tipo_intercompany: parseEnum(body.tipo_intercompany, 'Tipo', TIPOS_INTERCOMPANY),
+    motivo_intercompany: parseOptionalText(body.motivo_intercompany, 'Motivo', 255),
+    elimina_consolidado: parseBoolean(body.elimina_consolidado, 'Eliminar no consolidado'),
+    transferencia_interna: parseBoolean(body.transferencia_interna, 'Transferencia interna')
+  };
+}
+
 function validateFinanceTituloEstornoBody(body = {}) {
   ensureAllowedKeys(body, ['observacoes'], 'Estorno de baixa financeira');
 
@@ -1395,6 +1440,7 @@ module.exports = {
   validateFinanceIntercompanyQuery,
   validateFinanceRelatorioAnaliticoQuery,
   validateFinanceTituloBaixaBody,
+  validateFinanceTituloBaixaConciliacoesBody,
   validateFinanceTituloCobrancaBody,
   validateFinanceTituloCreateBody,
   validateFinanceTituloCreateFromSolicitacaoBody,

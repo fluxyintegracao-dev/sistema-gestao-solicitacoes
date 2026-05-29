@@ -2,6 +2,7 @@ const {
   atualizarCobrancaTitulo,
   atualizarTitulo,
   baixarTitulo,
+  baixarTituloPorConciliacoes,
   carregarTituloPorId,
   criarTituloManual,
   criarTituloPorSolicitacao,
@@ -117,6 +118,16 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return responderErro(res, error, 'Erro ao registrar baixa financeira');
+    }
+  },
+
+  async baixarPorConciliacoes(req, res) {
+    try {
+      const titulo = await baixarTituloPorConciliacoes(req, req.params.id, req.body || {});
+      return res.json(titulo);
+    } catch (error) {
+      console.error(error);
+      return responderErro(res, error, 'Erro ao registrar baixa por conciliacao bancaria');
     }
   },
 
