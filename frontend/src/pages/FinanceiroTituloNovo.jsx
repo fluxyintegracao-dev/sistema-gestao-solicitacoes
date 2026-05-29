@@ -186,10 +186,6 @@ function prioridadeCategoria(categoria, tipoTitulo) {
   return 2;
 }
 
-function labelTipoTitulo(tipoTitulo) {
-  return tipoTitulo === 'RECEBER' ? 'receber' : 'pagar';
-}
-
 function getTipoCartaoPorForma(forma) {
   const value = `${forma?.tipo || ''} ${forma?.codigo || ''}`.toUpperCase();
   if (value.includes('DEBITO')) return 'DEBITO';
@@ -250,10 +246,6 @@ function getParceiroPixPrincipal(parceiro) {
   return getParceiroPixOptions(parceiro)[0] || null;
 }
 
-function getEmpresaNome(empresas, empresaId) {
-  return empresas.find((empresa) => String(empresa.id) === String(empresaId))?.nome || '';
-}
-
 function getCategoriaDreResumo(categoria) {
   if (!categoria) return 'Sem categoria financeira';
   if (categoria.considera_dre === false) return 'Categoria fora da DRE';
@@ -264,73 +256,6 @@ function getCategoriaDreResumo(categoria) {
 
 function isCategoriaClassificadaParaDre(categoria) {
   return Boolean(categoria && categoria.considera_dre !== false && String(categoria.dre_grupo || '').trim());
-}
-
-function ImpactoGerencialPreview({ form, categoria, empresasGrupo, totalPagamentos }) {
-  const valorTitulo = roundCurrency(currencyToNumber(form.valor));
-  const valorCaixa = roundCurrency(totalPagamentos || valorTitulo);
-  const categoriaSelecionada = Boolean(categoria);
-  const categoriaEntraDre = isCategoriaClassificadaParaDre(categoria);
-  const dreAtiva = form.considera_dre !== false && categoriaEntraDre;
-  const origem = getEmpresaNome(empresasGrupo, form.empresa_origem_id);
-  const destino = getEmpresaNome(empresasGrupo, form.empresa_destino_id);
-
-  const dreTexto = !form.considera_dre
-    ? 'Nao entra na DRE'
-      : !categoriaSelecionada
-        ? 'Pendente de categoria'
-      : categoria?.considera_dre === false
-        ? 'Categoria fora da DRE'
-        : !String(categoria?.dre_grupo || '').trim()
-          ? 'Categoria sem grupo DRE'
-          : 'Entra na DRE gerencial';
-
-  const consolidadoTexto = form.intercompany
-    ? form.elimina_consolidado
-      ? 'Elimina no consolidado'
-      : 'Mantem no consolidado'
-    : 'Movimento externo';
-
-  const caixaTexto = valorCaixa > 0
-    ? `${form.tipo === 'RECEBER' ? 'Entrada' : 'Saida'} prevista de ${formatCurrency(valorCaixa)}`
-    : 'Valor ainda nao informado';
-
-  return (
-    <div className="md:col-span-2 xl:col-span-12 rounded-xl border border-[var(--c-border)] bg-[var(--c-bg)] p-4">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <div className="text-sm font-semibold text-[var(--c-text)]">Impacto gerencial antes de salvar</div>
-          <div className="text-xs text-[var(--c-muted)]">Conferencia operacional para DRE, caixa e consolidado.</div>
-        </div>
-        {form.intercompany && (
-          <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
-            Intercompany
-          </span>
-        )}
-      </div>
-      <div className="grid gap-3 md:grid-cols-3">
-        <div className={`rounded-lg border px-3 py-2 ${dreAtiva ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.16em]">DRE</div>
-          <div className="mt-1 text-sm font-semibold">{dreTexto}</div>
-          <div className="mt-1 text-xs opacity-80">{getCategoriaDreResumo(categoria)}</div>
-        </div>
-        <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-blue-800">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.16em]">Caixa</div>
-          <div className="mt-1 text-sm font-semibold">{caixaTexto}</div>
-          <div className="mt-1 text-xs opacity-80">Considerado no fluxo previsto ate a baixa.</div>
-        </div>
-        <div className={`rounded-lg border px-3 py-2 ${form.intercompany ? 'border-violet-200 bg-violet-50 text-violet-800' : 'border-slate-200 bg-slate-50 text-slate-700'}`}>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.16em]">Consolidado</div>
-          <div className="mt-1 text-sm font-semibold">{consolidadoTexto}</div>
-          <div className="mt-1 text-xs opacity-80">
-            {form.intercompany
-              ? `${origem || 'Origem nao informada'} -> ${destino || 'Destino nao informado'}`
-              : 'Nao ha eliminacao intercompany.'}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
 }
 
 export default function FinanceiroTituloNovo() {
@@ -560,16 +485,6 @@ export default function FinanceiroTituloNovo() {
       });
   }, [categorias, form.tipo]);
 
-  const categoriaResumo = useMemo(() => {
-    const especificas = categoriasFiltradas.filter((categoria) => String(categoria.tipo || '').trim().toUpperCase() === form.tipo).length;
-
-    if (!categoriasFiltradas.length) {
-      return `Nenhuma categoria compativel com titulos de ${labelTipoTitulo(form.tipo)}.`;
-    }
-
-    return `${especificas} categoria(s) de contas a ${labelTipoTitulo(form.tipo)} disponivel(is).`;
-  }, [categoriasFiltradas, form.tipo]);
-
   const categoriaSelecionada = useMemo(() => {
     return categorias.find((categoria) => String(categoria.id) === String(form.categoria_financeira_id)) || null;
   }, [categorias, form.categoria_financeira_id]);
@@ -583,10 +498,19 @@ export default function FinanceiroTituloNovo() {
   const parceiroResumo = useMemo(() => {
     const termo = parceiroDocumentoBusca.trim() || parceiroNomeBusca.trim();
     if (!termo) {
-      return `${parceiros.length} ${form.tipo === 'RECEBER' ? 'cliente(s)' : 'credor(es)'} carregado(s)`;
+      return `Digite parte do nome ou documento para buscar ${form.tipo === 'RECEBER' ? 'clientes' : 'credores'}.`;
+    }
+    if (form.parceiro_id) {
+      return `${form.tipo === 'RECEBER' ? 'Cliente' : 'Credor'} selecionado.`;
     }
     return `${parceiros.length} ${form.tipo === 'RECEBER' ? 'cliente(s)' : 'credor(es)'} encontrado(s) para "${termo}"`;
-  }, [form.tipo, parceiros, parceiroDocumentoBusca, parceiroNomeBusca]);
+  }, [form.tipo, form.parceiro_id, parceiros, parceiroDocumentoBusca, parceiroNomeBusca]);
+
+  const mostrarListaParceiros = useMemo(() => {
+    const temBuscaNome = parceiroNomeBusca.trim().length > 0;
+    const temBuscaDocumento = onlyDigits(parceiroDocumentoBusca).length >= 3;
+    return !form.parceiro_id && (temBuscaNome || temBuscaDocumento);
+  }, [form.parceiro_id, parceiroDocumentoBusca, parceiroNomeBusca]);
 
   function getFormaPagamento(formaPagamentoId) {
     return formasPagamento.find((item) => String(item.id) === String(formaPagamentoId)) || null;
@@ -822,8 +746,10 @@ export default function FinanceiroTituloNovo() {
   }
 
   function validarCadastroTitulo() {
+    const categoriaEntraDre = isCategoriaClassificadaParaDre(categoriaSelecionada);
+
     if (!form.empresa_id) {
-      return 'Informe a empresa real do titulo.';
+      return 'Selecione uma obra/centro de custo com empresa vinculada.';
     }
 
     if (empresaTituloDivergente) {
@@ -834,12 +760,12 @@ export default function FinanceiroTituloNovo() {
       return `Selecione o ${form.tipo === 'RECEBER' ? 'cliente' : 'credor'} na lista antes de salvar.`;
     }
 
-    if (form.considera_dre && !isCategoriaClassificadaParaDre(categoriaSelecionada)) {
-      return 'Para considerar na DRE, selecione uma categoria financeira com grupo DRE classificado.';
-    }
-
     if (valorTitulo <= 0) {
       return 'Informe o valor total do titulo.';
+    }
+
+    if (categoriaEntraDre && !form.competencia_data) {
+      return 'Informe a competencia DRE real do titulo.';
     }
 
     const pagamentos = Array.isArray(form.pagamentos) ? form.pagamentos : [];
@@ -897,12 +823,12 @@ export default function FinanceiroTituloNovo() {
     }
 
     if (form.intercompany) {
-      if (!form.empresa_origem_id) return 'Informe a empresa origem do intercompany.';
-      if (!form.empresa_destino_id) return 'Informe a empresa destino do intercompany.';
+      if (!form.empresa_origem_id) return 'Informe a empresa origem da movimentacao entre empresas.';
+      if (!form.empresa_destino_id) return 'Informe a empresa destino da movimentacao entre empresas.';
       if (String(form.empresa_origem_id) === String(form.empresa_destino_id)) {
-        return 'Empresa origem e destino nao podem ser iguais no intercompany.';
+        return 'Empresa origem e destino nao podem ser iguais na movimentacao entre empresas.';
       }
-      if (!form.tipo_intercompany) return 'Informe o tipo intercompany.';
+      if (!form.tipo_intercompany) return 'Informe o tipo.';
     }
 
     return '';
@@ -944,7 +870,7 @@ export default function FinanceiroTituloNovo() {
       payload.intercompany_group_id = form.intercompany ? form.intercompany_group_id || undefined : undefined;
       payload.elimina_consolidado = form.intercompany ? Boolean(form.elimina_consolidado) : false;
       payload.transferencia_interna = form.intercompany ? Boolean(form.transferencia_interna) : false;
-      payload.considera_dre = Boolean(form.considera_dre);
+      payload.considera_dre = isCategoriaClassificadaParaDre(categoriaSelecionada);
       payload.intercompany = Boolean(form.intercompany);
       payload.competencia_data = form.competencia_data || undefined;
       payload.pagamentos = (form.pagamentos || []).map((pagamento) => {
@@ -1081,34 +1007,11 @@ export default function FinanceiroTituloNovo() {
               </label>
 
               <label className="sol-filter-field xl:col-span-3">
-                <span className="sol-filter-label">Empresa do titulo</span>
-                <select
-                  className={`input w-full ${empresaTituloDivergente ? 'border-rose-300 bg-rose-50' : ''}`}
-                  value={form.empresa_id}
-                  onChange={(event) => updateField('empresa_id', event.target.value)}
-                  required
-                >
-                  <option value="">Selecione a empresa real</option>
-                  {empresasGrupo.map((empresa) => (
-                    <option key={empresa.id} value={empresa.id}>
-                      {empresa.nome}
-                    </option>
-                  ))}
-                </select>
-                <span className={`app-note mt-2 ${empresaTituloDivergente ? 'text-rose-600' : ''}`}>
-                  {empresaTituloDivergente
-                    ? 'A empresa deve coincidir com a empresa vinculada ao cadastro selecionado.'
-                    : 'Informe a empresa economica responsavel pelo titulo.'}
-                </span>
-              </label>
-
-              <label className="sol-filter-field xl:col-span-3">
                 <span className="sol-filter-label">Categoria financeira</span>
                 <select
-                  className={`input w-full ${form.considera_dre && !isCategoriaClassificadaParaDre(categoriaSelecionada) ? 'border-amber-300 bg-amber-50' : ''}`}
+                  className="input w-full"
                   value={form.categoria_financeira_id}
                   onChange={(event) => updateField('categoria_financeira_id', event.target.value)}
-                  required={Boolean(form.considera_dre)}
                 >
                   <option value="">Sem categoria</option>
                   {categoriasFiltradas.map((categoria) => (
@@ -1118,9 +1021,9 @@ export default function FinanceiroTituloNovo() {
                   ))}
                 </select>
                 <span className="app-note mt-2">
-                  {form.considera_dre && !isCategoriaClassificadaParaDre(categoriaSelecionada)
-                    ? `${categoriaResumo}. Para DRE, selecione categoria com grupo DRE classificado.`
-                    : categoriaResumo}
+                  {categoriaSelecionada
+                    ? getCategoriaDreResumo(categoriaSelecionada)
+                    : 'A categoria financeira define automaticamente se o titulo entra na DRE.'}
                 </span>
               </label>
 
@@ -1132,6 +1035,7 @@ export default function FinanceiroTituloNovo() {
                   value={parceiroDocumentoBusca}
                   onChange={(event) => {
                     setParceiroDocumentoBusca(maskCpfCnpj(event.target.value));
+                    setForm((current) => ({ ...current, parceiro_id: '' }));
                     if (onlyDigits(event.target.value).length >= 6) {
                       setParceiroNomeBusca('');
                     }
@@ -1155,12 +1059,13 @@ export default function FinanceiroTituloNovo() {
                   disabled={loadingParceiros}
                 />
                 <input type="hidden" value={form.parceiro_id} required />
-                <div className="mt-2 max-h-44 overflow-y-auto rounded-lg border border-[var(--c-border)] bg-[var(--c-bg)]">
-                  {parceiros.length === 0 ? (
+                {mostrarListaParceiros && (
+                  <div className="mt-2 max-h-44 overflow-y-auto rounded-lg border border-[var(--c-border)] bg-[var(--c-bg)]">
+                    {parceiros.length === 0 ? (
                     <div className="px-3 py-2 text-sm text-[var(--c-muted)]">
                       Nenhum {form.tipo === 'RECEBER' ? 'cliente' : 'credor'} encontrado.
                     </div>
-                  ) : parceiros.slice(0, 8).map((parceiro) => {
+                    ) : parceiros.slice(0, 8).map((parceiro) => {
                     const selected = String(parceiro.id) === String(form.parceiro_id);
                     return (
                       <button
@@ -1173,10 +1078,11 @@ export default function FinanceiroTituloNovo() {
                         <span className="block text-xs">{parceiro.cpf_cnpj || 'CPF/CNPJ nao informado'}</span>
                       </button>
                     );
-                  })}
-                </div>
+                    })}
+                  </div>
+                )}
                 <span className="app-note mt-2">
-                  Ao selecionar pelo nome, o CPF/CNPJ e preenchido automaticamente.
+                  Ao selecionar, o nome permanece no campo de busca e o CPF/CNPJ e preenchido automaticamente.
                 </span>
               </div>
 
@@ -1238,29 +1144,17 @@ export default function FinanceiroTituloNovo() {
                   className="input w-full"
                   value={form.competencia_data}
                   onChange={(event) => updateField('competencia_data', event.target.value)}
-                  required={Boolean(form.considera_dre)}
+                  required={isCategoriaClassificadaParaDre(categoriaSelecionada)}
                 />
                 <span className="app-note mt-2">
-                  {form.considera_dre
+                  {isCategoriaClassificadaParaDre(categoriaSelecionada)
                     ? 'Obrigatoria para DRE. Use o mes/periodo economico real do fato gerador.'
                     : 'Opcional quando o titulo nao entra na DRE.'}
                 </span>
               </label>
 
-              <label className="sol-filter-field xl:col-span-3">
-                <span className="sol-filter-label">DRE</span>
-                <span className="flex min-h-[42px] items-center gap-2 rounded-lg border border-[var(--c-border)] bg-[var(--c-bg)] px-3 text-sm text-[var(--c-text)]">
-                  <input
-                    type="checkbox"
-                    checked={Boolean(form.considera_dre)}
-                    onChange={(event) => updateField('considera_dre', event.target.checked)}
-                  />
-                  Considerar na DRE gerencial
-                </span>
-              </label>
-
               <div className="sol-filter-field md:col-span-2 xl:col-span-6">
-                <span className="sol-filter-label">Intercompany</span>
+                <span className="sol-filter-label">Entre Empresas</span>
                 <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                   <label className="flex min-h-[42px] items-center gap-2 rounded-lg border border-[var(--c-border)] bg-[var(--c-bg)] px-3 text-sm text-[var(--c-text)]">
                     <input
@@ -1306,7 +1200,7 @@ export default function FinanceiroTituloNovo() {
                     onChange={(event) => updateField('tipo_intercompany', event.target.value)}
                     disabled={!form.intercompany}
                   >
-                    <option value="">Tipo intercompany</option>
+                    <option value="">Tipo</option>
                     {TIPOS_INTERCOMPANY.map(([value, label]) => (
                       <option key={value} value={value}>{label}</option>
                     ))}
@@ -1316,7 +1210,7 @@ export default function FinanceiroTituloNovo() {
                     value={form.intercompany_group_id}
                     onChange={(event) => updateField('intercompany_group_id', event.target.value)}
                     disabled={!form.intercompany}
-                    placeholder="Grupo intercompany opcional"
+                    placeholder="Grupo da movimentacao opcional"
                   />
                   <input
                     className="input w-full"
@@ -1325,36 +1219,11 @@ export default function FinanceiroTituloNovo() {
                     disabled={!form.intercompany}
                     placeholder="Motivo"
                   />
-                  <label className="flex min-h-[42px] items-center gap-2 rounded-lg border border-[var(--c-border)] bg-[var(--c-bg)] px-3 text-sm text-[var(--c-text)]">
-                    <input
-                      type="checkbox"
-                      checked={Boolean(form.elimina_consolidado)}
-                      onChange={(event) => updateField('elimina_consolidado', event.target.checked)}
-                      disabled={!form.intercompany}
-                    />
-                    Eliminar no consolidado
-                  </label>
-                  <label className="flex min-h-[42px] items-center gap-2 rounded-lg border border-[var(--c-border)] bg-[var(--c-bg)] px-3 text-sm text-[var(--c-text)]">
-                    <input
-                      type="checkbox"
-                      checked={Boolean(form.transferencia_interna)}
-                      onChange={(event) => updateField('transferencia_interna', event.target.checked)}
-                      disabled={!form.intercompany}
-                    />
-                    Transferencia interna
-                  </label>
                 </div>
                 <span className="app-note mt-2">
-                  Informe origem, destino e tipo. A DRE consolidada elimina apenas o que estiver marcado para eliminacao.
+                  Informe origem, destino e tipo da movimentacao entre empresas do grupo.
                 </span>
               </div>
-
-              <ImpactoGerencialPreview
-                form={form}
-                categoria={categoriaSelecionada}
-                empresasGrupo={empresasGrupo}
-                totalPagamentos={totalPagamentos}
-              />
 
               <div className="financeiro-formas-pagamento md:col-span-2 xl:col-span-12 space-y-3 rounded-2xl border border-[var(--c-border)] bg-[var(--c-bg)] p-4">
                 <div className="flex items-center justify-between gap-3">
