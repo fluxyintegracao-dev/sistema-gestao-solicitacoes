@@ -667,11 +667,9 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
       return 'Selecione o credor antes de gerar a conta.';
     }
 
-    if (form.considera_dre !== false && !isCategoriaClassificadaParaDre(selectedCategory)) {
-      return 'Para considerar na DRE, selecione uma categoria financeira com grupo DRE classificado.';
-    }
+    const categoriaEntraDre = isCategoriaClassificadaParaDre(selectedCategory);
 
-    if (form.considera_dre !== false && !form.competencia_data) {
+    if (categoriaEntraDre && !form.competencia_data) {
       return 'Informe a competencia DRE real do titulo.';
     }
 
@@ -739,7 +737,7 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
       if (String(form.empresa_origem_id) === String(form.empresa_destino_id)) {
         return 'Empresa origem e destino nao podem ser iguais no intercompany.';
       }
-      if (!form.tipo_intercompany) return 'Informe o tipo intercompany.';
+      if (!form.tipo_intercompany) return 'Informe o tipo.';
     }
 
     return '';
@@ -764,7 +762,7 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
         categoria_financeira_id: form.categoria_financeira_id || undefined,
         competencia_data: form.competencia_data || undefined,
         valor: form.valor,
-        considera_dre: form.considera_dre !== false,
+        considera_dre: isCategoriaClassificadaParaDre(selectedCategory),
         intercompany: Boolean(form.intercompany),
         empresa_contraparte_id: form.intercompany && form.empresa_destino_id ? Number(form.empresa_destino_id) : undefined,
         empresa_origem_id: form.intercompany && form.empresa_origem_id ? Number(form.empresa_origem_id) : undefined,
@@ -1025,7 +1023,7 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
                 <div className="relative">
                   <div className="flex gap-2">
                     <input
-                      className={`input w-full ${form.considera_dre !== false && !isCategoriaClassificadaParaDre(selectedCategory) ? 'border-amber-300 bg-amber-50' : ''}`}
+                      className="input w-full"
                       type="text"
                       placeholder="Digite para buscar a categoria"
                       value={categoriaSearch}
@@ -1086,9 +1084,7 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
                     ? `${selectedCategory.tipo} - ${getCategoriaDreResumo(selectedCategory)}`
                     : loadingCategorias
                       ? 'Carregando categorias financeiras...'
-                      : form.considera_dre !== false
-                        ? 'Obrigatoria para DRE. Selecione categoria com grupo DRE classificado.'
-                        : 'Opcional. A lista considera o tipo da conta selecionado.'}
+                      : 'A categoria financeira define automaticamente se o titulo entra na DRE.'}
                 </div>
               </div>
 
@@ -1099,22 +1095,13 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
                   type="date"
                   value={form.competencia_data}
                   onChange={(event) => setForm((current) => ({ ...current, competencia_data: event.target.value }))}
-                  required={form.considera_dre !== false}
+                  required={isCategoriaClassificadaParaDre(selectedCategory)}
                 />
                 <span className="mt-1 block text-xs text-slate-500">
-                  {form.considera_dre !== false
+                  {isCategoriaClassificadaParaDre(selectedCategory)
                     ? 'Obrigatoria para DRE. Informe o periodo economico real.'
                     : 'Opcional quando o titulo nao entra na DRE.'}
                 </span>
-              </label>
-
-              <label className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm text-[var(--c-text)]">
-                <input
-                  type="checkbox"
-                  checked={form.considera_dre !== false}
-                  onChange={(event) => setForm((current) => ({ ...current, considera_dre: event.target.checked }))}
-                />
-                Considerar este titulo na DRE gerencial
               </label>
 
               <div className="financeiro-formas-pagamento space-y-3 rounded-2xl border border-[var(--c-border)] bg-[var(--c-bg)] p-3">
@@ -1165,7 +1152,7 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
                       value={form.tipo_intercompany}
                       onChange={(event) => setForm((current) => ({ ...current, tipo_intercompany: event.target.value }))}
                     >
-                      <option value="">Tipo intercompany</option>
+                      <option value="">Tipo</option>
                       {TIPOS_INTERCOMPANY.map(([value, label]) => (
                         <option key={value} value={value}>{label}</option>
                       ))}
@@ -1179,13 +1166,6 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
                   </div>
                 )}
               </div>
-
-              <ImpactoGerencialPreview
-                form={form}
-                categoria={selectedCategory}
-                empresasGrupo={empresasGrupo}
-                totalPagamentos={totalPagamentos}
-              />
 
               <div className="financeiro-formas-pagamento space-y-3 rounded-2xl border border-[var(--c-border)] bg-[var(--c-bg)] p-3">
                 <div className="flex items-center justify-between gap-3">
