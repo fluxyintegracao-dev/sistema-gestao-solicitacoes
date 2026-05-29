@@ -15,7 +15,7 @@ const CLASSIFICACOES_GERENCIAIS_LABELS = {
   ENDIVIDAMENTO: 'Endividamento',
   INVESTIMENTO: 'Investimento',
   PATRIMONIAL: 'Patrimonial',
-  INTERCOMPANY: 'Intercompany',
+  INTERCOMPANY: 'Entre Empresas',
   TRANSFERENCIA_INTERNA: 'Transferencia interna',
   IMPOSTO: 'Imposto',
   FOLHA: 'Folha',

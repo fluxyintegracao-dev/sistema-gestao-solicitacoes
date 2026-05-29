@@ -207,8 +207,8 @@ function formatAuditMetadata(metadata) {
     movimento_id: 'Movimento',
     conta_bancaria_id: 'Conta bancaria',
     empresa_baixa_id: 'Empresa da baixa',
-    intercompany_group_id: 'Grupo intercompany',
-    tipo_intercompany: 'Tipo intercompany',
+    intercompany_group_id: 'Grupo entre empresas',
+    tipo_intercompany: 'Tipo',
     forma_recebimento: 'Forma de recebimento',
     tipo_permuta: 'Tipo de permuta',
     categoria_bem: 'Categoria do bem',
@@ -384,11 +384,11 @@ export default function FinanceiroTituloDetalhe() {
       return;
     }
     if (baixaEmpresaDiferente && !baixaForm.intercompany) {
-      setError('A empresa da baixa e diferente da empresa do titulo. Marque como intercompany e informe o tipo.');
+      setError('A empresa da baixa e diferente da empresa do titulo. Marque a baixa como Entre Empresas e informe o tipo.');
       return;
     }
     if (baixaForm.intercompany && !baixaForm.tipo_intercompany) {
-      setError('Informe o tipo de intercompany da baixa.');
+      setError('Informe o tipo da baixa Entre Empresas.');
       return;
     }
     try {
@@ -598,7 +598,7 @@ export default function FinanceiroTituloDetalhe() {
                 <div className="font-medium text-[var(--c-text)]">{titulo.categoriaFinanceira?.nome || '-'}</div>
               </div>
               <div>
-                <div className="text-[var(--c-muted)]">Intercompany</div>
+                <div className="text-[var(--c-muted)]">Entre Empresas</div>
                 <div className="font-medium text-[var(--c-text)]">{titulo.intercompany ? 'Sim' : 'Nao'}</div>
               </div>
               {titulo.intercompany && (
@@ -612,7 +612,7 @@ export default function FinanceiroTituloDetalhe() {
                     <div className="font-medium text-[var(--c-text)]">{titulo.empresaDestino?.nome || '-'}</div>
                   </div>
                   <div>
-                    <div className="text-[var(--c-muted)]">Tipo intercompany</div>
+                    <div className="text-[var(--c-muted)]">Tipo</div>
                     <div className="font-medium text-[var(--c-text)]">{labelTipoIntercompany(titulo.tipo_intercompany)}</div>
                   </div>
                   <div>
@@ -978,7 +978,7 @@ export default function FinanceiroTituloDetalhe() {
                       </div>
                       {(movimento.intercompany_group_id || movimento.tipo_intercompany) && (
                         <div className="text-[var(--c-muted)]">
-                          Intercompany: {labelTipoIntercompany(movimento.tipo_intercompany)}
+                          Entre Empresas: {labelTipoIntercompany(movimento.tipo_intercompany)}
                           {movimento.empresaOrigem?.nome || movimento.empresaDestino?.nome
                             ? ` - ${movimento.empresaOrigem?.nome || 'Origem'} -> ${movimento.empresaDestino?.nome || 'Destino'}`
                             : ''}
@@ -1244,7 +1244,7 @@ export default function FinanceiroTituloDetalhe() {
                     }))}
                   />
                   <span>
-                    <span className="block font-semibold">Baixa intercompany</span>
+                    <span className="block font-semibold">Baixa Entre Empresas</span>
                     <span className="block text-xs text-[var(--c-muted)]">
                       Use quando uma empresa paga ou recebe um titulo que pertence a outra empresa do grupo.
                     </span>
@@ -1254,7 +1254,7 @@ export default function FinanceiroTituloDetalhe() {
                 {mostrarIntercompanyBaixa && (
                   <div className="mt-3 grid gap-3 md:grid-cols-2">
                     <label className="text-sm">
-                      <span className="mb-1 block text-slate-500">Tipo intercompany</span>
+                      <span className="mb-1 block text-slate-500">Tipo</span>
                       <select
                         className="input w-full"
                         value={baixaForm.tipo_intercompany}

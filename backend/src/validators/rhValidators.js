@@ -233,7 +233,7 @@ function validateRhEmpresaGrupoCreateBody(body = {}) {
     empresa_caixa: parseBoolean(body.empresa_caixa, 'Empresa caixa'),
     empresa_operacional: parseBoolean(body.empresa_operacional, 'Empresa operacional'),
     consolidar_no_grupo: parseBoolean(body.consolidar_no_grupo, 'Consolidar no grupo'),
-    elimina_intercompany: parseBoolean(body.elimina_intercompany, 'Eliminar intercompany'),
+    elimina_intercompany: parseBoolean(body.elimina_intercompany, 'Eliminar entre empresas'),
     holding_id: parseInteger(body.holding_id, 'Holding'),
     ativo: parseBoolean(body.ativo, 'Ativo')
   };
@@ -265,7 +265,7 @@ function validateRhEmpresaGrupoUpdateBody(body = {}) {
     empresa_caixa: parseBoolean(body.empresa_caixa, 'Empresa caixa'),
     empresa_operacional: parseBoolean(body.empresa_operacional, 'Empresa operacional'),
     consolidar_no_grupo: parseBoolean(body.consolidar_no_grupo, 'Consolidar no grupo'),
-    elimina_intercompany: parseBoolean(body.elimina_intercompany, 'Eliminar intercompany'),
+    elimina_intercompany: parseBoolean(body.elimina_intercompany, 'Eliminar entre empresas'),
     holding_id: parseInteger(body.holding_id, 'Holding'),
     ativo: parseBoolean(body.ativo, 'Ativo')
   };

@@ -113,7 +113,7 @@ module.exports = {
       return res.json(relatorio);
     } catch (error) {
       console.error(error);
-      return responderErro(res, error, 'Erro ao gerar relatorio intercompany');
+      return responderErro(res, error, 'Erro ao gerar relatorio Entre Empresas');
     }
   }
 };

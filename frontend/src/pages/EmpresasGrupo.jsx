@@ -368,7 +368,7 @@ export default function EmpresasGrupo() {
                   checked={form.elimina_intercompany}
                   onChange={(event) => setForm((prev) => ({ ...prev, elimina_intercompany: event.target.checked }))}
                 />
-                Eliminar intercompany no consolidado
+                Eliminar entre empresas no consolidado
               </label>
             </div>
           </div>

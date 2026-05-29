@@ -134,7 +134,7 @@ const MODULO_PERMISSION_GROUPS = [
           { key: 'financeiro.relatorios.fluxo_consolidado', label: 'Fluxo consolidado', descricao: 'Acessar fluxo de caixa consolidado por empresa e grupo.' },
           { key: 'financeiro.relatorios.dre', label: 'DRE gerencial', descricao: 'Acessar a DRE gerencial por grupo e empresa.' },
           { key: 'financeiro.relatorios.diagnostico_dre', label: 'Diagnóstico DRE', descricao: 'Ver inconsistências cadastrais que afetam a DRE.' },
-          { key: 'financeiro.relatorios.intercompany', label: 'Intercompany', descricao: 'Acessar movimentações e relações financeiras entre empresas.' },
+          { key: 'financeiro.relatorios.intercompany', label: 'Entre Empresas', descricao: 'Acessar movimentações e relações financeiras entre empresas.' },
           { key: 'financeiro.relatorios.endividamento', label: 'Endividamento', descricao: 'Acessar relatório de dívidas classificadas explicitamente.' },
           { key: 'financeiro.relatorios.analitico', label: 'Analítico financeiro', descricao: 'Acessar base analítica de títulos e movimentos financeiros.' },
           { key: 'financeiro.relatorios.resultado_obras', label: 'Resultado de obras', descricao: 'Ver dashboard financeiro por obra.' },

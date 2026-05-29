@@ -510,7 +510,7 @@ async function processarLinha(row, user) {
     const categoria = await resolverCategoria(row, tipo, transaction);
     const empresaContraparte = await resolverEmpresaContraparte(row, transaction);
     if (intercompany && !empresaContraparte) {
-      throw criarErro(`Empresa contraparte e obrigatoria para titulo intercompany na linha ${row._linha}.`);
+      throw criarErro(`Empresa contraparte e obrigatoria para titulo entre empresas na linha ${row._linha}.`);
     }
     validarClassificacaoDreImportacao({
       categoria,

@@ -11,6 +11,7 @@ const {
 const { canAccessFinanceiro, getFinanceiroObraScopeIds } = require('./authorizationService');
 const { obterSessaoAbertaParaConta } = require('./financeiroCaixaSessionHelper');
 const { registrarEventoSeguranca } = require('./securityLogService');
+const { normalizeTipoIntercompany } = require('../constants/intercompany');
 
 function createHttpError(statusCode, message) {
   const error = new Error(message);
@@ -180,6 +181,50 @@ async function carregarFaturaCartao(req, faturaId, { transaction = null } = {}) 
   return fatura;
 }
 
+function buildIntercompanyBaixaFatura({ payload = {}, titulo, empresaBaixaId }) {
+  const empresaTituloId = titulo?.empresa_id ? Number(titulo.empresa_id) : null;
+  const empresasDiferentes = Boolean(
+    empresaTituloId &&
+    empresaBaixaId &&
+    Number(empresaTituloId) !== Number(empresaBaixaId)
+  );
+
+  if (!empresasDiferentes) {
+    return {
+      intercompany_group_id: null,
+      empresa_origem_id: null,
+      empresa_destino_id: null,
+      tipo_intercompany: null,
+      motivo_intercompany: null,
+      elimina_consolidado: false,
+      transferencia_interna: false
+    };
+  }
+
+  if (!payload.intercompany) {
+    throw createHttpError(
+      400,
+      `Titulo ${titulo.codigo || titulo.id} pertence a empresa diferente da conta bancaria da baixa. Marque a baixa como Entre Empresas e informe o tipo.`
+    );
+  }
+
+  const tipoIntercompany = normalizeTipoIntercompany(payload.tipo_intercompany);
+  if (!tipoIntercompany) {
+    throw createHttpError(400, 'Tipo e obrigatorio quando outra empresa paga a fatura.');
+  }
+
+  const isPagar = String(titulo.tipo || '').toUpperCase() === 'PAGAR';
+  return {
+    intercompany_group_id: payload.intercompany_group_id || `IC-FATURA-${titulo.id}`,
+    empresa_origem_id: isPagar ? Number(empresaBaixaId) : Number(empresaTituloId),
+    empresa_destino_id: isPagar ? Number(empresaTituloId) : Number(empresaBaixaId),
+    tipo_intercompany: tipoIntercompany,
+    motivo_intercompany: payload.motivo_intercompany || null,
+    elimina_consolidado: payload.elimina_consolidado !== false,
+    transferencia_interna: payload.transferencia_interna !== false
+  };
+}
+
 async function baixarFaturaCartao(req, faturaId, payload = {}, { transaction: externalTransaction = null } = {}) {
   const transaction = externalTransaction || await sequelize.transaction();
   const ownTransaction = !externalTransaction;
@@ -216,15 +261,18 @@ async function baixarFaturaCartao(req, faturaId, payload = {}, { transaction: ex
       if (!titulo.empresa_id) {
         throw createHttpError(400, `Titulo ${titulo.codigo || titulo.id} da fatura nao possui empresa vinculada.`);
       }
-      if (Number(titulo.empresa_id) !== Number(conta.empresa_id)) {
-        throw createHttpError(400, `Titulo ${titulo.codigo || titulo.id} pertence a empresa diferente da conta bancaria da baixa.`);
-      }
+      const intercompanyFields = buildIntercompanyBaixaFatura({
+        payload,
+        titulo,
+        empresaBaixaId: conta.empresa_id
+      });
 
       const movimento = await MovimentoFinanceiro.create({
         titulo_financeiro_id: titulo.id,
         fatura_cartao_id: fatura.id,
         conta_bancaria_id: conta.id,
         empresa_id: conta.empresa_id,
+        ...intercompanyFields,
         caixa_sessao_id: caixaSessao?.id || null,
         forma_recebimento: 'CARTAO_CREDITO',
         tipo_movimento: 'BAIXA',

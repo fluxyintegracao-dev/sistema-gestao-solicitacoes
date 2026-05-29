@@ -548,7 +548,7 @@ export default function FinanceiroRelatorios() {
             ) : null}
             {isVisible('relatorios.financeiro.intercompany') ? (
               <Link to="/financeiro/relatorios/intercompany" className="btn btn-outline">
-                Intercompany
+                Entre Empresas
               </Link>
             ) : null}
             {isVisible('relatorios.financeiro.endividamento') ? (

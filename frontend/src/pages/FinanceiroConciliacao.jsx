@@ -124,7 +124,7 @@ function tarifaAtalhoAptaParaConciliacao(tarifa = {}) {
   }
   const classificacao = String(categoria.classificacao_gerencial || '').trim().toUpperCase();
   if (CLASSIFICACOES_INCOMPATIVEIS_COM_TARIFA.has(classificacao)) {
-    return { ok: false, motivo: 'A categoria da tarifa nao pode ser divida, patrimonio, intercompany ou transferencia interna.' };
+    return { ok: false, motivo: 'A categoria da tarifa nao pode ser divida, patrimonio, entre empresas ou transferencia interna.' };
   }
 
   return {
@@ -1137,11 +1137,11 @@ export default function FinanceiroConciliacao() {
       return;
     }
     if (transferenciaEntreEmpresas && !transferenciaModal.tipo_intercompany) {
-      setTransferenciaModal((current) => ({ ...current, error: 'Selecione o tipo intercompany da transferencia.' }));
+      setTransferenciaModal((current) => ({ ...current, error: 'Selecione o tipo da transferencia entre empresas.' }));
       return;
     }
     if (transferenciaEntreEmpresas && !String(transferenciaModal.motivo_intercompany || '').trim()) {
-      setTransferenciaModal((current) => ({ ...current, error: 'Informe o motivo intercompany da transferencia.' }));
+      setTransferenciaModal((current) => ({ ...current, error: 'Informe o motivo da transferencia entre empresas.' }));
       return;
     }
 
@@ -1423,7 +1423,7 @@ export default function FinanceiroConciliacao() {
               </label>
               {contaAtualTransferencia && contaContraparteTransferencia ? (
                 <div className={`rounded-xl border px-4 py-3 text-sm ${transferenciaEntreEmpresas ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-emerald-200 bg-emerald-50 text-emerald-800'}`}>
-                  <strong>{transferenciaEntreEmpresas ? 'Transferencia intercompany' : 'Transferencia interna da mesma empresa'}</strong>
+                  <strong>{transferenciaEntreEmpresas ? 'Transferencia Entre Empresas' : 'Transferencia interna da mesma empresa'}</strong>
                   <div className="mt-1">
                     {getContaEmpresaNome(contaAtualTransferencia)} para {getContaEmpresaNome(contaContraparteTransferencia)}.
                   </div>
@@ -1432,7 +1432,7 @@ export default function FinanceiroConciliacao() {
               {transferenciaEntreEmpresas ? (
                 <>
                   <label className="text-sm">
-                    <span className="mb-1 block text-[var(--c-muted)]">Tipo intercompany</span>
+                    <span className="mb-1 block text-[var(--c-muted)]">Tipo</span>
                     <select
                       className="input w-full"
                       value={transferenciaModal.tipo_intercompany}
@@ -1446,7 +1446,7 @@ export default function FinanceiroConciliacao() {
                     </select>
                   </label>
                   <label className="text-sm">
-                    <span className="mb-1 block text-[var(--c-muted)]">Motivo intercompany</span>
+                    <span className="mb-1 block text-[var(--c-muted)]">Motivo</span>
                     <input
                       className="input w-full"
                       value={transferenciaModal.motivo_intercompany}

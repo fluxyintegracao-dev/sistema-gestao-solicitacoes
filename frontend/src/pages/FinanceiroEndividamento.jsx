@@ -253,7 +253,7 @@ export default function FinanceiroEndividamento() {
         <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
           <label className="flex items-center gap-2 text-sm text-[var(--c-text)]">
             <input type="checkbox" checked={filters.excluir_intercompany} onChange={(event) => updateFilter('excluir_intercompany', event.target.checked)} />
-            Eliminar intercompany no consolidado
+            Eliminar entre empresas no consolidado
           </label>
           <div className="flex gap-2">
             <button type="button" className="btn btn-outline btn-sm" onClick={limparFiltros}>Limpar</button>

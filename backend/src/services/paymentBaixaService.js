@@ -13,6 +13,7 @@ const {
 } = require('../models');
 const { carregarContaBancaria, obterSessaoAbertaParaConta } = require('./financeiroCaixaSessionHelper');
 const { registrarEventoSeguranca } = require('./securityLogService');
+const { normalizeTipoIntercompany } = require('../constants/intercompany');
 
 function createHttpError(statusCode, message) {
   const error = new Error(message);
@@ -84,6 +85,50 @@ async function recalcularStatusLotePorIntent(intentId, { transaction = null } = 
       );
     }
   }
+}
+
+function buildIntercompanyBaixaPagamento({ payload = {}, titulo, empresaBaixaId }) {
+  const empresaTituloId = titulo?.empresa_id ? Number(titulo.empresa_id) : null;
+  const empresasDiferentes = Boolean(
+    empresaTituloId &&
+    empresaBaixaId &&
+    Number(empresaTituloId) !== Number(empresaBaixaId)
+  );
+
+  if (!empresasDiferentes) {
+    return {
+      intercompany_group_id: null,
+      empresa_origem_id: null,
+      empresa_destino_id: null,
+      tipo_intercompany: null,
+      motivo_intercompany: null,
+      elimina_consolidado: false,
+      transferencia_interna: false
+    };
+  }
+
+  if (!payload.intercompany) {
+    throw createHttpError(
+      400,
+      'Empresa do titulo diverge da empresa pagadora do lote. Marque a baixa como Entre Empresas e informe o tipo.'
+    );
+  }
+
+  const tipoIntercompany = normalizeTipoIntercompany(payload.tipo_intercompany);
+  if (!tipoIntercompany) {
+    throw createHttpError(400, 'Tipo e obrigatorio quando outra empresa paga o titulo.');
+  }
+
+  const isPagar = String(titulo.tipo || '').toUpperCase() === 'PAGAR';
+  return {
+    intercompany_group_id: payload.intercompany_group_id || `IC-PAGAMENTO-${titulo.id}`,
+    empresa_origem_id: isPagar ? Number(empresaBaixaId) : Number(empresaTituloId),
+    empresa_destino_id: isPagar ? Number(empresaTituloId) : Number(empresaBaixaId),
+    tipo_intercompany: tipoIntercompany,
+    motivo_intercompany: payload.motivo_intercompany || null,
+    elimina_consolidado: payload.elimina_consolidado !== false,
+    transferencia_interna: payload.transferencia_interna !== false
+  };
 }
 
 async function listPaymentsAwaitingBaixaConfirmation(req) {
@@ -169,9 +214,11 @@ async function confirmBaixaFromPaymentIntent(req, id, payload = {}) {
     if (Number(contaBancaria.empresa_id) !== Number(paymentAccount.empresa_id)) {
       throw createHttpError(400, 'Empresa da conta bancaria diverge da empresa pagadora do lote.');
     }
-    if (Number(titulo.empresa_id) !== Number(paymentAccount.empresa_id)) {
-      throw createHttpError(400, 'Empresa do titulo diverge da empresa pagadora do lote.');
-    }
+    const intercompanyFields = buildIntercompanyBaixaPagamento({
+      payload,
+      titulo,
+      empresaBaixaId: paymentAccount.empresa_id
+    });
     const caixaSessao = contaBancaria
       ? await obterSessaoAbertaParaConta(contaBancaria, dataMovimento, { transaction })
       : null;
@@ -185,6 +232,7 @@ async function confirmBaixaFromPaymentIntent(req, id, payload = {}) {
       titulo_financeiro_id: titulo.id,
       conta_bancaria_id: contaBancaria?.id || null,
       empresa_id: paymentAccount.empresa_id,
+      ...intercompanyFields,
       caixa_sessao_id: caixaSessao?.id || null,
       forma_recebimento: 'PIX',
       documento_referencia: intent.correlation_id,

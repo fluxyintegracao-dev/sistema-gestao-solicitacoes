@@ -962,7 +962,7 @@ async function validarIntercompanyTitulo(payload = {}) {
 
   const tipoIntercompany = normalizeTipoIntercompany(payload.tipo_intercompany);
   if (!tipoIntercompany) {
-    throw createHttpError(400, 'Tipo intercompany e obrigatorio para movimentos entre empresas.');
+    throw createHttpError(400, 'Tipo e obrigatorio para movimentos entre empresas.');
   }
 
   const [empresaOrigem, empresaDestino, empresaContraparte] = await Promise.all([
@@ -972,13 +972,13 @@ async function validarIntercompanyTitulo(payload = {}) {
   ]);
 
   if (!empresaOrigem || !empresaDestino) {
-    throw createHttpError(400, 'Empresa origem e empresa destino sao obrigatorias para intercompany.');
+    throw createHttpError(400, 'Empresa origem e empresa destino sao obrigatorias para movimentos entre empresas.');
   }
   if (Number(empresaOrigem.id) === Number(empresaDestino.id)) {
     throw createHttpError(400, 'Empresa origem e empresa destino nao podem ser iguais.');
   }
   if (!empresaContraparte) {
-    throw createHttpError(400, 'Empresa contraparte e obrigatoria para intercompany.');
+    throw createHttpError(400, 'Empresa contraparte e obrigatoria para movimentos entre empresas.');
   }
 
   return {
@@ -1025,7 +1025,7 @@ async function validarIntercompanyBaixa({ payload = {}, titulo = {}, empresaBaix
     if (payload.intercompany && !titulo.intercompany) {
       throw createHttpError(
         400,
-        'A baixa so deve ser marcada como intercompany quando a empresa da baixa for diferente da empresa do titulo.'
+        'A baixa so deve ser marcada como Entre Empresas quando a empresa da baixa for diferente da empresa do titulo.'
       );
     }
     return buildMovimentoIntercompanyFields(titulo);
@@ -1034,13 +1034,13 @@ async function validarIntercompanyBaixa({ payload = {}, titulo = {}, empresaBaix
   if (!payload.intercompany) {
     throw createHttpError(
       400,
-      'A empresa da baixa e diferente da empresa do titulo. Marque a baixa como intercompany e informe o tipo para manter rastreabilidade.'
+      'A empresa da baixa e diferente da empresa do titulo. Marque a baixa como Entre Empresas e informe o tipo.'
     );
   }
 
   const tipoIntercompany = normalizeTipoIntercompany(payload.tipo_intercompany);
   if (!tipoIntercompany) {
-    throw createHttpError(400, 'Tipo intercompany e obrigatorio quando outra empresa paga ou recebe a baixa.');
+    throw createHttpError(400, 'Tipo e obrigatorio quando outra empresa paga ou recebe a baixa.');
   }
 
   await validarEmpresaGrupo(empresaTituloId);
@@ -2019,14 +2019,32 @@ async function criarTituloManualComBaixaAtomica(req, payload = {}, { transaction
     empresaId: payload.empresa_id,
     conta
   });
-  if (obra.empresa_grupo_id && Number(obra.empresa_grupo_id) !== empresaBaixaId) {
-    throw createHttpError(400, 'A empresa pagadora deve ser a mesma vinculada a obra/centro de custo selecionado.');
-  }
+  const empresaTituloId = resolverEmpresaTitulo({ obra });
+  await validarEmpresaGrupo(empresaTituloId);
   const apropriacao = await validarApropriacaoTitulo(payload.apropriacao_id, obra.id);
 
   validarCompatibilidadeParceiroTitulo(parceiro, tipo);
   validarCategoriaDreTitulo(categoria, payload);
-  const intercompanyFields = await validarIntercompanyTitulo(payload);
+  const tituloIntercompanyFields = {
+    intercompany: false,
+    empresa_contraparte_id: null,
+    intercompany_group_id: null,
+    empresa_origem_id: null,
+    empresa_destino_id: null,
+    tipo_intercompany: null,
+    motivo_intercompany: null,
+    elimina_consolidado: false,
+    transferencia_interna: false
+  };
+  const movimentoIntercompanyFields = await validarIntercompanyBaixa({
+    payload,
+    titulo: {
+      tipo,
+      empresa_id: empresaTituloId,
+      ...tituloIntercompanyFields
+    },
+    empresaBaixaId
+  });
 
   const valorBaixa = roundCurrency(payload.valor);
   const juros = roundCurrency(payload.juros || 0);
@@ -2052,8 +2070,8 @@ async function criarTituloManualComBaixaAtomica(req, payload = {}, { transaction
       solicitacao_id: null,
       obra_id: obra.id,
       apropriacao_id: apropriacao?.id || null,
-      empresa_id: empresaBaixaId,
-      ...intercompanyFields,
+      empresa_id: empresaTituloId,
+      ...tituloIntercompanyFields,
       parceiro_id: parceiro.id,
       categoria_financeira_id: categoria?.id || null,
       tipo,
@@ -2085,7 +2103,7 @@ async function criarTituloManualComBaixaAtomica(req, payload = {}, { transaction
       titulo_financeiro_id: titulo.id,
       conta_bancaria_id: conta.id,
       empresa_id: empresaBaixaId,
-      ...intercompanyFields,
+      ...movimentoIntercompanyFields,
       caixa_sessao_id: caixaSessao?.id || null,
       forma_recebimento: formaRecebimento,
       tipo_permuta: payload.tipo_permuta || null,

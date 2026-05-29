@@ -1413,7 +1413,7 @@ async function confirmarConciliacaoTarifa(req, conciliacaoId, payload = {}) {
     }
     const classificacaoGerencial = String(categoria.classificacao_gerencial || '').trim().toUpperCase();
     if (['ENDIVIDAMENTO', 'INVESTIMENTO', 'PATRIMONIAL', 'INTERCOMPANY', 'TRANSFERENCIA_INTERNA'].includes(classificacaoGerencial)) {
-      throw createHttpError(400, 'Categoria financeira da tarifa bancaria nao pode ser endividamento, investimento, patrimonial, intercompany ou transferencia interna.');
+      throw createHttpError(400, 'Categoria financeira da tarifa bancaria nao pode ser endividamento, investimento, patrimonial, entre empresas ou transferencia interna.');
     }
 
     const sessao = await obterSessaoAbertaParaConta(conta, conciliacao.data_movimento, { transaction });

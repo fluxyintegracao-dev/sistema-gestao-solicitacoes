@@ -254,11 +254,11 @@ export default function FinanceiroCaixas() {
   async function handleTransferencia(event) {
     event.preventDefault();
     if (transferenciaEntreEmpresas && !transferenciaForm.tipo_intercompany) {
-      setError('Transferencia entre empresas exige tipo intercompany.');
+      setError('Transferencia entre empresas exige tipo.');
       return;
     }
     if (transferenciaEntreEmpresas && !String(transferenciaForm.motivo_intercompany || '').trim()) {
-      setError('Transferencia entre empresas exige motivo intercompany.');
+      setError('Transferencia entre empresas exige motivo.');
       return;
     }
 
@@ -493,7 +493,7 @@ export default function FinanceiroCaixas() {
             </div>
             {contaOrigemTransferencia && contaDestinoTransferencia ? (
               <div className={`rounded-xl border px-3 py-2 text-sm ${transferenciaEntreEmpresas ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-emerald-200 bg-emerald-50 text-emerald-800'}`}>
-                <strong>{transferenciaEntreEmpresas ? 'Transferencia intercompany' : 'Transferencia interna da mesma empresa'}</strong>
+                <strong>{transferenciaEntreEmpresas ? 'Transferencia Entre Empresas' : 'Transferencia interna da mesma empresa'}</strong>
                 <div className="mt-1">
                   {getContaEmpresaNome(contaOrigemTransferencia)} para {getContaEmpresaNome(contaDestinoTransferencia)}.
                 </div>
@@ -502,7 +502,7 @@ export default function FinanceiroCaixas() {
             {transferenciaEntreEmpresas ? (
               <>
                 <label className="sol-filter-field">
-                  <span className="sol-filter-label">Tipo intercompany</span>
+                  <span className="sol-filter-label">Tipo</span>
                   <select
                     className="input w-full"
                     value={transferenciaForm.tipo_intercompany}
@@ -516,7 +516,7 @@ export default function FinanceiroCaixas() {
                   </select>
                 </label>
                 <label className="sol-filter-field">
-                  <span className="sol-filter-label">Motivo intercompany</span>
+                  <span className="sol-filter-label">Motivo</span>
                   <input
                     className="input w-full"
                     value={transferenciaForm.motivo_intercompany}
@@ -656,7 +656,7 @@ export default function FinanceiroCaixas() {
                         </div>
                         {transferencia.tipo_intercompany ? (
                           <div className="mt-1 text-amber-700">
-                            Intercompany: {transferencia.tipo_intercompany}
+                            Entre Empresas: {transferencia.tipo_intercompany}
                             {transferencia.motivo_intercompany ? ` - ${transferencia.motivo_intercompany}` : ''}
                           </div>
                         ) : null}

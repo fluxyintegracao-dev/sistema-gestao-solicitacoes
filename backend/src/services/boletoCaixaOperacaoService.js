@@ -752,7 +752,7 @@ async function aplicarBaixaFinanceiraPorLiquidacao({ boleto, convenio, retorno, 
       return marcarOcorrenciaSemBaixa(
         ocorrenciaCriada,
         'PENDENTE_INTERCOMPANY',
-        'Retorno bancario recebido em conta de empresa diferente da empresa do titulo. Registre baixa intercompany manual para manter rastreabilidade.',
+        'Retorno bancario recebido em conta de empresa diferente da empresa do titulo. Registre baixa Entre Empresas manual para manter rastreabilidade.',
         transaction
       );
     }

@@ -103,7 +103,7 @@ function ExampleLine({ item }) {
         {item.competencia_data ? <span>Competencia {item.competencia_data}</span> : null}
         {item.data_movimento ? <span>Movimento {item.data_movimento}</span> : null}
         {item.data_transferencia ? <span>Transferencia {item.data_transferencia}</span> : null}
-        {item.tipo_intercompany ? <span>Intercompany {item.tipo_intercompany}</span> : null}
+        {item.tipo_intercompany ? <span>Entre Empresas {item.tipo_intercompany}</span> : null}
       </div>
     </li>
   );
@@ -240,7 +240,7 @@ export default function FinanceiroDiagnosticoDre() {
           A regra operacional recomendada e: toda obra/centro de custo pertence a uma empresa operacional,
             todo titulo financeiro herda ou informa essa empresa, toda categoria financeira tem grupo DRE,
           toda competencia representa o mes economico real do custo ou receita, e toda baixa ou transferencia
-          entre empresas possui classificacao intercompany completa quando representar relacao interna do grupo.
+          entre empresas possui classificacao completa quando representar relacao interna do grupo.
         </p>
       </section>
 

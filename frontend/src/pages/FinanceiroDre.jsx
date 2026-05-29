@@ -216,7 +216,7 @@ function DreComparativoEmpresasCard({ comparativo }) {
       <div className="border-b border-[var(--c-border)] px-4 py-3">
         <h2 className="text-lg font-semibold text-[var(--c-text)]">Comparativo por empresa</h2>
         <p className="text-sm text-[var(--c-muted)]">
-          Resultado operacional proprio sem intercompany, efeito intercompany e resultado final por empresa.
+          Resultado operacional proprio sem movimentos entre empresas, efeito entre empresas e resultado final por empresa.
         </p>
       </div>
 
@@ -228,7 +228,7 @@ function DreComparativoEmpresasCard({ comparativo }) {
           </strong>
         </div>
         <div className="rounded-lg border border-[var(--c-border)] px-3 py-2">
-          <span className="block text-xs uppercase text-[var(--c-muted)]">Intercompany liquido</span>
+          <span className="block text-xs uppercase text-[var(--c-muted)]">Entre Empresas liquido</span>
           <strong style={{ color: metricColor(comparativo?.resumo?.intercompany_liquido) }}>
             {formatCompactCurrency(comparativo?.resumo?.intercompany_liquido)}
           </strong>
@@ -259,7 +259,7 @@ function DreComparativoEmpresasCard({ comparativo }) {
                 <ResizableTh columnKey="empresa">Empresa</ResizableTh>
                 <ResizableTh columnKey="perfil">Perfil</ResizableTh>
                 <ResizableTh columnKey="resultado_proprio" className="text-right">Resultado proprio</ResizableTh>
-                <ResizableTh columnKey="intercompany_liquido" className="text-right">Intercompany liquido</ResizableTh>
+                <ResizableTh columnKey="intercompany_liquido" className="text-right">Entre Empresas liquido</ResizableTh>
                 <ResizableTh columnKey="resultado_final" className="text-right">Resultado final</ResizableTh>
                 <ResizableTh columnKey="dependencia" className="text-right">Dependencia</ResizableTh>
               </tr>
@@ -489,7 +489,7 @@ export default function FinanceiroDre() {
         <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
           <label className="flex items-center gap-2 text-sm text-[var(--c-text)]">
             <input type="checkbox" checked={filters.excluir_intercompany} onChange={(event) => updateFilter('excluir_intercompany', event.target.checked)} />
-            Excluir movimentacoes intercompany
+            Excluir movimentacoes entre empresas
           </label>
           <div className="flex gap-2">
             <button type="button" className="btn btn-outline btn-sm" onClick={limparFiltros}>Limpar</button>

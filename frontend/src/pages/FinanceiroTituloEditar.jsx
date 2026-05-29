@@ -278,7 +278,7 @@ export default function FinanceiroTituloEditar() {
       if (!form.empresa_destino_id) return 'Informe a empresa destino.';
       if (String(form.empresa_origem_id) === String(form.empresa_destino_id)) return 'Origem e destino nao podem ser iguais.';
       if (!form.empresa_contraparte_id) return 'Informe a empresa contraparte.';
-      if (!form.tipo_intercompany) return 'Informe o tipo intercompany.';
+      if (!form.tipo_intercompany) return 'Informe o tipo.';
     }
     return '';
   }
@@ -513,7 +513,7 @@ export default function FinanceiroTituloEditar() {
         <div className="rounded-xl border border-[var(--c-border)] p-4">
           <label className="mb-3 flex items-center gap-2 text-sm font-semibold text-[var(--c-text)]">
             <input type="checkbox" checked={form.intercompany} onChange={(event) => updateField('intercompany', event.target.checked)} disabled={Boolean(bloqueio)} />
-            Movimento intercompany
+            Movimento Entre Empresas
           </label>
           {form.intercompany && (
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">

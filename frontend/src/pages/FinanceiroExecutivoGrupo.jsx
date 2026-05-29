@@ -210,7 +210,7 @@ export default function FinanceiroExecutivoGrupo() {
           <div>
             <h1 className="text-xl font-semibold md:text-2xl">Grupo Consolidado</h1>
             <p className="page-subtitle">
-              Painel executivo com DRE, caixa, intercompany e obras em uma unica leitura.
+              Painel executivo com DRE, caixa, movimentos entre empresas e obras em uma unica leitura.
             </p>
           </div>
           <div className="app-page-actions">
@@ -221,7 +221,7 @@ export default function FinanceiroExecutivoGrupo() {
               DRE
             </Link>
             <Link to="/financeiro/relatorios/intercompany" className="btn btn-outline">
-              Intercompany
+              Entre Empresas
             </Link>
             <Link to="/financeiro/relatorios/endividamento" className="btn btn-outline">
               Endividamento
@@ -253,7 +253,7 @@ export default function FinanceiroExecutivoGrupo() {
           </label>
           <label className="flex items-center gap-2 rounded-lg border border-[var(--c-border)] px-3 py-2 text-sm text-[var(--c-text)]">
             <input type="checkbox" checked={filters.excluir_intercompany} onChange={(event) => updateFilter('excluir_intercompany', event.target.checked)} />
-            Eliminar intercompany no consolidado
+            Eliminar entre empresas no consolidado
           </label>
         </div>
         <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
@@ -300,7 +300,7 @@ export default function FinanceiroExecutivoGrupo() {
             color={necessidadeCaixa > 0 ? '#b91c1c' : '#15803d'}
           />
           <Metric
-            label="Intercompany eliminado"
+            label="Entre Empresas eliminado"
             value={formatCurrency(executivoResumo.intercompany_eliminado)}
             detail={`${intercompany?.resumo?.relacoes_empresas || 0} relacao(oes) entre empresas`}
           />
@@ -492,7 +492,7 @@ export default function FinanceiroExecutivoGrupo() {
             <div className="card sol-surface-card app-table-shell">
               <div className="border-b border-[var(--c-border)] px-4 py-3">
                 <h2 className="text-lg font-semibold text-[var(--c-text)]">Maiores relacoes internas</h2>
-                <p className="text-sm text-[var(--c-muted)]">Origem e destino de movimentos intercompany.</p>
+                <p className="text-sm text-[var(--c-muted)]">Origem e destino de movimentos entre empresas.</p>
               </div>
               <div className="table-wrapper">
                 <ResizableTable
@@ -508,7 +508,7 @@ export default function FinanceiroExecutivoGrupo() {
                   </thead>
                   <tbody>
                     {relacoesIntercompany.slice(0, 6).length === 0 ? (
-                      <EmptyRow colSpan={2} message="Nenhuma relacao intercompany no periodo." />
+                      <EmptyRow colSpan={2} message="Nenhuma relacao entre empresas no periodo." />
                     ) : (
                       relacoesIntercompany.slice(0, 6).map((relacao) => (
                         <tr key={`${relacao.empresa_origem_id || 'origem'}-${relacao.empresa_destino_id || 'destino'}`}>

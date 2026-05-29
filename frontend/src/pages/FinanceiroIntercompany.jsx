@@ -167,7 +167,7 @@ export default function FinanceiroIntercompany() {
       })
       .catch((err) => {
         if (!active) return;
-        setError(err?.message || 'Erro ao carregar intercompany');
+        setError(err?.message || 'Erro ao carregar movimentos entre empresas');
         setRelatorio(null);
       })
       .finally(() => {
@@ -221,7 +221,7 @@ export default function FinanceiroIntercompany() {
       <div className="app-page-header">
         <div className="app-page-header-row">
           <div>
-            <h1 className="text-xl font-semibold md:text-2xl">Relatorio Intercompany</h1>
+            <h1 className="text-xl font-semibold md:text-2xl">Relatorio Entre Empresas</h1>
             <p className="page-subtitle">
               Transferencias, aportes, reembolsos e rateios entre empresas do grupo.
             </p>
@@ -333,7 +333,7 @@ export default function FinanceiroIntercompany() {
       {error ? <div className="app-alert app-alert--error">{error}</div> : null}
       {!error && schemaPendencias.length ? (
         <div className="app-alert">
-          Existem migrations pendentes para o relatorio intercompany: {schemaPendencias.join(', ')}.
+          Existem migrations pendentes para o relatorio Entre Empresas: {schemaPendencias.join(', ')}.
           Atualize o banco para liberar todos os dados da visao.
         </div>
       ) : null}
@@ -345,11 +345,11 @@ export default function FinanceiroIntercompany() {
         <Metric label="Nao eliminado" value={formatCurrency(resumo.valor_nao_eliminado_consolidado)} detail="Permanece na visao consolidada" />
         <Metric label="Transferencias" value={String(resumo.transferencias || 0)} detail="Registros financeiros" />
         <Metric label="Relacoes" value={String(resumo.relacoes_empresas || 0)} detail="Origem x destino" />
-        <Metric label="Grupos" value={String(resumo.grupos_intercompany || 0)} detail="Identificadores intercompany" />
+        <Metric label="Grupos" value={String(resumo.grupos_intercompany || 0)} detail="Identificadores entre empresas" />
       </div>
 
       {loading ? (
-        <div className="app-empty-card">Carregando relatorio intercompany...</div>
+        <div className="app-empty-card">Carregando relatorio Entre Empresas...</div>
       ) : (
         <>
           <section className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
@@ -378,7 +378,7 @@ export default function FinanceiroIntercompany() {
                   </thead>
                   <tbody>
                     {relacoes.length === 0 ? (
-                      <EmptyRow colSpan={6} message="Nenhuma relacao intercompany encontrada no periodo." />
+                      <EmptyRow colSpan={6} message="Nenhuma relacao entre empresas encontrada no periodo." />
                     ) : (
                       relacoes.map((item) => (
                         <tr key={`${item.empresa_origem_id || 'o'}-${item.empresa_destino_id || 'd'}`}>
@@ -398,7 +398,7 @@ export default function FinanceiroIntercompany() {
 
             <div className="card sol-surface-card app-table-shell">
               <div className="border-b border-[var(--c-border)] px-4 py-3">
-                <h2 className="text-lg font-semibold text-[var(--c-text)]">Tipos de intercompany</h2>
+                <h2 className="text-lg font-semibold text-[var(--c-text)]">Tipos de movimento entre empresas</h2>
                 <p className="text-sm text-[var(--c-muted)]">
                   Ajuda a separar aporte, cobertura de caixa, reembolso e rateio.
                 </p>
@@ -438,7 +438,7 @@ export default function FinanceiroIntercompany() {
 
           <section className="card sol-surface-card app-table-shell">
             <div className="border-b border-[var(--c-border)] px-4 py-3">
-              <h2 className="text-lg font-semibold text-[var(--c-text)]">Transferencias financeiras intercompany</h2>
+              <h2 className="text-lg font-semibold text-[var(--c-text)]">Transferencias financeiras entre empresas</h2>
               <p className="text-sm text-[var(--c-muted)]">
                 Registros efetivos entre contas de empresas diferentes, vindos do caixa ou da conciliacao bancaria.
               </p>
@@ -462,7 +462,7 @@ export default function FinanceiroIntercompany() {
                 </thead>
                 <tbody>
                   {transferencias.length === 0 ? (
-                    <EmptyRow colSpan={7} message="Nenhuma transferencia intercompany encontrada para os filtros atuais." />
+                    <EmptyRow colSpan={7} message="Nenhuma transferencia entre empresas encontrada para os filtros atuais." />
                   ) : (
                     transferencias.map((transferencia) => (
                       <tr key={transferencia.id}>
@@ -492,7 +492,7 @@ export default function FinanceiroIntercompany() {
 
           <section className="card sol-surface-card app-table-shell">
             <div className="border-b border-[var(--c-border)] px-4 py-3">
-              <h2 className="text-lg font-semibold text-[var(--c-text)]">Titulos intercompany</h2>
+              <h2 className="text-lg font-semibold text-[var(--c-text)]">Titulos entre empresas</h2>
               <p className="text-sm text-[var(--c-muted)]">
                 Base analitica para auditoria, conciliacao e explicacao do consolidado.
               </p>
@@ -518,7 +518,7 @@ export default function FinanceiroIntercompany() {
                 </thead>
                 <tbody>
                   {titulos.length === 0 ? (
-                    <EmptyRow colSpan={9} message="Nenhum titulo intercompany encontrado para os filtros atuais." />
+                    <EmptyRow colSpan={9} message="Nenhum titulo entre empresas encontrado para os filtros atuais." />
                   ) : (
                     titulos.map((titulo) => (
                       <tr key={titulo.id}>

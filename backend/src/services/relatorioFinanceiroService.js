@@ -757,7 +757,7 @@ function summarizeFluxoConsolidadoInsights({ resumo, empresasResumo, obrasResumo
       titulo: 'Empresas com saldo previsto negativo',
       descricao: `${empresasNegativas.length} empresa(s) apresentam mais saidas previstas do que entradas previstas no periodo.`,
       valor: total,
-      acao: 'Abrir a tabela por empresa e confirmar se o descasamento sera coberto por caixa proprio ou intercompany formal.'
+      acao: 'Abrir a tabela por empresa e confirmar se o descasamento sera coberto por caixa proprio ou movimentacao entre empresas formal.'
     }));
   }
 
@@ -2577,8 +2577,8 @@ async function gerarDreComparativoEmpresas(req, filters = {}) {
     filtro: {
       ...dreOperacional.filtro,
       comparacao: 'EMPRESAS',
-      regra_operacional_propria: 'DRE com intercompany eliminado',
-      regra_resultado_final: 'DRE com intercompany mantido'
+      regra_operacional_propria: 'DRE com movimentos entre empresas eliminados',
+      regra_resultado_final: 'DRE com movimentos entre empresas mantidos'
     },
     resumo: {
       ...resumo,
@@ -2684,7 +2684,7 @@ function buildExecutiveRisks({ dre, fluxo, intercompany, endividamento, diagnost
   if (intercompanyNaoEliminado > 0) {
     riscos.push(buildExecutiveRisk({
       codigo: 'INTERCOMPANY_NAO_ELIMINADO',
-      titulo: 'Intercompany nao eliminado no consolidado',
+      titulo: 'Movimento entre empresas nao eliminado no consolidado',
       severidade: 'MEDIA',
       descricao: 'Existem movimentos entre empresas marcados para permanecer no consolidado.',
       valor: roundCurrency(intercompanyNaoEliminado),
@@ -2988,7 +2988,7 @@ async function gerarRelatorioIntercompany(req, filters = {}) {
 
   if (schema.tituloMissing.length) {
     return emptyReport({
-      mensagem: 'O relatorio intercompany depende de migrations financeiras pendentes no banco.'
+      mensagem: 'O relatorio Entre Empresas depende de migrations financeiras pendentes no banco.'
     });
   }
 
@@ -3810,11 +3810,11 @@ async function gerarDiagnosticoDre(req) {
     }),
     buildDiagnosticoItem({
       codigo: 'INTERCOMPANY_INCONSISTENTE',
-      titulo: 'Intercompany inconsistente',
+      titulo: 'Movimento entre empresas inconsistente',
       severidade: 'MEDIA',
       descricao: 'Transacoes entre empresas precisam de origem, destino, tipo, flag e contraparte consistentes para consolidacao.',
       total: titulosIntercompanyInconsistente,
-      acao: 'Marque intercompany apenas quando houver origem e destino reais, informe o tipo e a contraparte do grupo.',
+      acao: 'Marque Entre Empresas apenas quando houver origem e destino reais, informe o tipo e a contraparte do grupo.',
       exemplos: exemplosIntercompany
     }),
     buildDiagnosticoItem({
@@ -3828,29 +3828,29 @@ async function gerarDiagnosticoDre(req) {
     }),
     buildDiagnosticoItem({
       codigo: 'BAIXAS_EMPRESA_DIVERGENTE_SEM_INTERCOMPANY',
-      titulo: 'Baixas com empresa diferente sem intercompany completo',
+      titulo: 'Baixas com empresa diferente sem Entre Empresas completo',
       severidade: 'ALTA',
-      descricao: 'Quando a empresa da baixa e diferente da empresa do titulo, a operacao precisa ter origem, destino e tipo intercompany.',
+      descricao: 'Quando a empresa da baixa e diferente da empresa do titulo, a operacao precisa ter origem, destino e tipo Entre Empresas.',
       total: movimentosEmpresaDivergenteSemIntercompany,
-      acao: 'Revise a baixa e informe a classificacao intercompany real ou corrija a empresa pagadora/recebedora.',
+      acao: 'Revise a baixa e informe a classificacao Entre Empresas real ou corrija a empresa pagadora/recebedora.',
       exemplos: exemplosMovimentosEmpresaDivergente
     }),
     buildDiagnosticoItem({
       codigo: 'TRANSFERENCIAS_INTERCOMPANY_INCOMPLETAS',
-      titulo: 'Transferencias intercompany incompletas',
+      titulo: 'Transferencias entre empresas incompletas',
       severidade: 'ALTA',
       descricao: 'Transferencias entre empresas diferentes precisam de origem, destino, tipo e motivo para explicar quem financia quem.',
       total: transferenciasIntercompanyIncompletas,
-      acao: 'Complete tipo e motivo intercompany nas transferencias entre empresas do grupo.',
+      acao: 'Complete tipo e motivo nas transferencias entre empresas do grupo.',
       exemplos: exemplosTransferenciasIntercompanyIncompletas
     }),
     buildDiagnosticoItem({
       codigo: 'TRANSFERENCIAS_INTERNAS_INCONSISTENTES',
       titulo: 'Transferencias internas inconsistentes',
       severidade: 'MEDIA',
-      descricao: 'Transferencias entre contas da mesma empresa devem ser tratadas como transferencia interna de caixa, sem intercompany.',
+      descricao: 'Transferencias entre contas da mesma empresa devem ser tratadas como transferencia interna de caixa, sem Entre Empresas.',
       total: transferenciasInternasInconsistentes,
-      acao: 'Marque como transferencia interna e remova classificacao intercompany quando origem e destino forem a mesma empresa.',
+      acao: 'Marque como transferencia interna e remova classificacao Entre Empresas quando origem e destino forem a mesma empresa.',
       exemplos: exemplosTransferenciasInternasInconsistentes
     })
   ];

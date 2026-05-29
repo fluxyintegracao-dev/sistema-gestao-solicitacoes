@@ -274,7 +274,7 @@ function ImpactoGerencialPreview({ form, categoria, empresasGrupo, totalPagament
         </div>
         {form.intercompany && (
           <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
-            Intercompany
+            Entre Empresas
           </span>
         )}
       </div>
@@ -295,7 +295,7 @@ function ImpactoGerencialPreview({ form, categoria, empresasGrupo, totalPagament
           <div className="mt-1 text-xs opacity-80">
             {form.intercompany
               ? `${origem || 'Origem nao informada'} -> ${destino || 'Destino nao informado'}`
-              : 'Nao ha eliminacao intercompany.'}
+              : 'Nao ha eliminacao entre empresas.'}
           </div>
         </div>
       </div>
@@ -722,10 +722,10 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
     }
 
     if (form.intercompany) {
-      if (!form.empresa_origem_id) return 'Informe a empresa origem do intercompany.';
-      if (!form.empresa_destino_id) return 'Informe a empresa destino do intercompany.';
+      if (!form.empresa_origem_id) return 'Informe a empresa origem da movimentacao entre empresas.';
+      if (!form.empresa_destino_id) return 'Informe a empresa destino da movimentacao entre empresas.';
       if (String(form.empresa_origem_id) === String(form.empresa_destino_id)) {
-        return 'Empresa origem e destino nao podem ser iguais no intercompany.';
+        return 'Empresa origem e destino nao podem ser iguais na movimentacao entre empresas.';
       }
       if (!form.tipo_intercompany) return 'Informe o tipo.';
     }

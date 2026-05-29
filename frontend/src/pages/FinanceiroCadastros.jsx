@@ -256,7 +256,7 @@ const CATEGORIA_CLASSIFICACAO_GERENCIAL = [
   ['ENDIVIDAMENTO', 'Endividamento'],
   ['INVESTIMENTO', 'Investimento'],
   ['PATRIMONIAL', 'Patrimonial'],
-  ['INTERCOMPANY', 'Intercompany'],
+  ['INTERCOMPANY', 'Entre Empresas'],
   ['TRANSFERENCIA_INTERNA', 'Transferencia interna'],
   ['IMPOSTO', 'Imposto'],
   ['FOLHA', 'Folha'],
@@ -1269,7 +1269,7 @@ export default function FinanceiroCadastros() {
                     ))}
                   </select>
                   <div className="mt-2 text-xs text-[var(--c-muted)]">
-                    A lista mostra apenas categorias ativas de pagar/ambos, com grupo DRE e sem classificacao de endividamento, investimento, patrimonial, intercompany ou transferencia interna.
+                    A lista mostra apenas categorias ativas de pagar/ambos, com grupo DRE e sem classificacao de endividamento, investimento, patrimonial, entre empresas ou transferencia interna.
                   </div>
                   <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
                     <label className="flex items-center gap-2 text-sm text-[var(--c-text)]">

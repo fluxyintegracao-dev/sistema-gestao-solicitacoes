@@ -374,7 +374,7 @@ function validateFinanceFluxoConsolidadoQuery(query = {}) {
     ...base,
     holding_id: parseInteger(query.holding_id, 'Holding'),
     empresa_id: parseInteger(query.empresa_id, 'Empresa do grupo'),
-    excluir_intercompany: parseBoolean(query.excluir_intercompany, 'Excluir intercompany')
+    excluir_intercompany: parseBoolean(query.excluir_intercompany, 'Excluir entre empresas')
   };
 }
 
@@ -396,7 +396,7 @@ function validateFinanceDreQuery(query = {}) {
     ...base,
     empresa_id: parseInteger(query.empresa_id, 'Empresa do grupo'),
     holding_id: parseInteger(query.holding_id, 'Holding'),
-    excluir_intercompany: parseBoolean(query.excluir_intercompany, 'Excluir intercompany')
+    excluir_intercompany: parseBoolean(query.excluir_intercompany, 'Excluir entre empresas')
   };
 }
 
@@ -443,7 +443,7 @@ function validateFinanceEndividamentoQuery(query = {}) {
     ...base,
     empresa_id: parseInteger(query.empresa_id, 'Empresa do grupo'),
     holding_id: parseInteger(query.holding_id, 'Holding'),
-    excluir_intercompany: parseBoolean(query.excluir_intercompany, 'Excluir intercompany'),
+    excluir_intercompany: parseBoolean(query.excluir_intercompany, 'Excluir entre empresas'),
     limit: limit ? Math.min(limit, 500) : undefined
   };
 }
@@ -462,7 +462,7 @@ function validateFinanceIntercompanyQuery(query = {}) {
       'elimina_consolidado',
       'limit'
     ],
-    'Consulta de intercompany financeiro'
+    'Consulta de movimentos entre empresas'
   );
 
   const base = validateFinanceFluxoCaixaQuery({
@@ -476,7 +476,7 @@ function validateFinanceIntercompanyQuery(query = {}) {
     ...base,
     holding_id: parseInteger(query.holding_id, 'Holding'),
     empresa_id: parseInteger(query.empresa_id, 'Empresa do grupo'),
-    tipo_intercompany: parseEnum(query.tipo_intercompany, 'Tipo intercompany', TIPOS_INTERCOMPANY),
+    tipo_intercompany: parseEnum(query.tipo_intercompany, 'Tipo', TIPOS_INTERCOMPANY),
     status: parseEnum(query.status, 'Status', ['ABERTO', 'PARCIAL', 'QUITADO', 'CANCELADO', 'ESTORNADO', 'ATIVA', 'CANCELADA']),
     elimina_consolidado: parseBoolean(query.elimina_consolidado, 'Eliminar no consolidado'),
     limit: limit ? Math.min(limit, 1000) : undefined
@@ -657,8 +657,8 @@ function validateFinanceConciliacaoTransferenciaBody(body = {}) {
   return {
     conta_contraparte_id: parseInteger(body.conta_contraparte_id, 'Conta contraparte', { required: true }),
     descricao: parseOptionalText(body.descricao, 'Descricao', 255),
-    tipo_intercompany: parseEnum(body.tipo_intercompany, 'Tipo intercompany', TIPOS_INTERCOMPANY),
-    motivo_intercompany: parseOptionalText(body.motivo_intercompany, 'Motivo intercompany', 255),
+    tipo_intercompany: parseEnum(body.tipo_intercompany, 'Tipo', TIPOS_INTERCOMPANY),
+    motivo_intercompany: parseOptionalText(body.motivo_intercompany, 'Motivo', 255),
     elimina_consolidado: parseBoolean(body.elimina_consolidado, 'Eliminar no consolidado')
   };
 }
@@ -838,7 +838,7 @@ function validateFinanceTituloCreateFromSolicitacaoBody(body = {}) {
 
   return {
     tipo: parseEnum(body.tipo, 'Tipo', ['PAGAR', 'RECEBER']),
-    empresa_id: parseInteger(body.empresa_id, 'Empresa do grupo', { required: true }),
+    empresa_id: parseInteger(body.empresa_id, 'Empresa do grupo'),
     parceiro_id: parseInteger(body.parceiro_id, 'Parceiro'),
     valor: parseDecimal(body.valor, 'Valor', { min: 0.01 }),
     data_vencimento: parseDateOnly(body.data_vencimento, 'Data de vencimento'),
@@ -861,13 +861,13 @@ function validateFinanceTituloCreateFromSolicitacaoBody(body = {}) {
     data_compra: parseDateOnly(body.data_compra, 'Data da compra'),
     competencia_data: parseDateOnly(body.competencia_data, 'Data de competencia'),
     considera_dre: parseBoolean(body.considera_dre, 'Considera DRE'),
-    intercompany: parseBoolean(body.intercompany, 'Intercompany'),
+    intercompany: parseBoolean(body.intercompany, 'Entre Empresas'),
     empresa_contraparte_id: parseInteger(body.empresa_contraparte_id, 'Empresa contraparte'),
-    intercompany_group_id: parseOptionalText(body.intercompany_group_id, 'Grupo intercompany', 80),
+    intercompany_group_id: parseOptionalText(body.intercompany_group_id, 'Grupo entre empresas', 80),
     empresa_origem_id: parseInteger(body.empresa_origem_id, 'Empresa origem'),
     empresa_destino_id: parseInteger(body.empresa_destino_id, 'Empresa destino'),
-    tipo_intercompany: parseEnum(body.tipo_intercompany, 'Tipo intercompany', TIPOS_INTERCOMPANY),
-    motivo_intercompany: parseOptionalText(body.motivo_intercompany, 'Motivo intercompany', 255),
+    tipo_intercompany: parseEnum(body.tipo_intercompany, 'Tipo', TIPOS_INTERCOMPANY),
+    motivo_intercompany: parseOptionalText(body.motivo_intercompany, 'Motivo', 255),
     elimina_consolidado: parseBoolean(body.elimina_consolidado, 'Eliminar no consolidado'),
     transferencia_interna: parseBoolean(body.transferencia_interna, 'Transferencia interna'),
     parcelas: parseParcelasTitulo(body.parcelas),
@@ -916,7 +916,7 @@ function validateFinanceTituloCreateBody(body = {}) {
 
   return {
     tipo: parseEnum(body.tipo, 'Tipo', ['PAGAR', 'RECEBER'], { required: true }),
-    empresa_id: parseInteger(body.empresa_id, 'Empresa do grupo', { required: true }),
+    empresa_id: parseInteger(body.empresa_id, 'Empresa do grupo'),
     obra_id: parseInteger(body.obra_id, 'Obra/Centro de custo', { required: true }),
     apropriacao_id: parseInteger(body.apropriacao_id, 'Apropriacao'),
     parceiro_id: parseInteger(body.parceiro_id, 'Parceiro', { required: true }),
@@ -941,13 +941,13 @@ function validateFinanceTituloCreateBody(body = {}) {
     data_compra: parseDateOnly(body.data_compra, 'Data da compra'),
     competencia_data: parseDateOnly(body.competencia_data, 'Data de competencia'),
     considera_dre: parseBoolean(body.considera_dre, 'Considera DRE'),
-    intercompany: parseBoolean(body.intercompany, 'Intercompany'),
+    intercompany: parseBoolean(body.intercompany, 'Entre Empresas'),
     empresa_contraparte_id: parseInteger(body.empresa_contraparte_id, 'Empresa contraparte'),
-    intercompany_group_id: parseOptionalText(body.intercompany_group_id, 'Grupo intercompany', 80),
+    intercompany_group_id: parseOptionalText(body.intercompany_group_id, 'Grupo entre empresas', 80),
     empresa_origem_id: parseInteger(body.empresa_origem_id, 'Empresa origem'),
     empresa_destino_id: parseInteger(body.empresa_destino_id, 'Empresa destino'),
-    tipo_intercompany: parseEnum(body.tipo_intercompany, 'Tipo intercompany', TIPOS_INTERCOMPANY),
-    motivo_intercompany: parseOptionalText(body.motivo_intercompany, 'Motivo intercompany', 255),
+    tipo_intercompany: parseEnum(body.tipo_intercompany, 'Tipo', TIPOS_INTERCOMPANY),
+    motivo_intercompany: parseOptionalText(body.motivo_intercompany, 'Motivo', 255),
     elimina_consolidado: parseBoolean(body.elimina_consolidado, 'Eliminar no consolidado'),
     transferencia_interna: parseBoolean(body.transferencia_interna, 'Transferencia interna'),
     parcelas: parseParcelasTitulo(body.parcelas),
@@ -990,7 +990,7 @@ function validateFinanceTituloUpdateBody(body = {}) {
 
   return {
     tipo: parseEnum(body.tipo, 'Tipo', ['PAGAR', 'RECEBER'], { required: true }),
-    empresa_id: parseInteger(body.empresa_id, 'Empresa do grupo', { required: true }),
+    empresa_id: parseInteger(body.empresa_id, 'Empresa do grupo'),
     obra_id: parseInteger(body.obra_id, 'Obra/Centro de custo', { required: true }),
     apropriacao_id: parseInteger(body.apropriacao_id, 'Apropriacao'),
     parceiro_id: parseInteger(body.parceiro_id, 'Parceiro', { required: true }),
@@ -1011,13 +1011,13 @@ function validateFinanceTituloUpdateBody(body = {}) {
     boleto_emitido_em: parseDateOnly(body.boleto_emitido_em, 'Data de emissao do boleto'),
     competencia_data: parseDateOnly(body.competencia_data, 'Data de competencia'),
     considera_dre: parseBoolean(body.considera_dre, 'Considera DRE'),
-    intercompany: parseBoolean(body.intercompany, 'Intercompany'),
+    intercompany: parseBoolean(body.intercompany, 'Entre Empresas'),
     empresa_contraparte_id: parseInteger(body.empresa_contraparte_id, 'Empresa contraparte'),
-    intercompany_group_id: parseOptionalText(body.intercompany_group_id, 'Grupo intercompany', 80),
+    intercompany_group_id: parseOptionalText(body.intercompany_group_id, 'Grupo entre empresas', 80),
     empresa_origem_id: parseInteger(body.empresa_origem_id, 'Empresa origem'),
     empresa_destino_id: parseInteger(body.empresa_destino_id, 'Empresa destino'),
-    tipo_intercompany: parseEnum(body.tipo_intercompany, 'Tipo intercompany', TIPOS_INTERCOMPANY),
-    motivo_intercompany: parseOptionalText(body.motivo_intercompany, 'Motivo intercompany', 255),
+    tipo_intercompany: parseEnum(body.tipo_intercompany, 'Tipo', TIPOS_INTERCOMPANY),
+    motivo_intercompany: parseOptionalText(body.motivo_intercompany, 'Motivo', 255),
     elimina_consolidado: parseBoolean(body.elimina_consolidado, 'Eliminar no consolidado'),
     transferencia_interna: parseBoolean(body.transferencia_interna, 'Transferencia interna')
   };
@@ -1124,9 +1124,9 @@ function validateFinanceTituloBaixaBody(body = {}) {
     desconto: parseDecimal(body.desconto, 'Desconto', { min: 0 }),
     data_movimento: parseDateOnly(body.data_movimento, 'Data do movimento', { required: true }),
     observacoes: parseOptionalText(body.observacoes, 'Observacoes', 4000),
-    intercompany: parseBoolean(body.intercompany, 'Intercompany'),
-    tipo_intercompany: parseEnum(body.tipo_intercompany, 'Tipo intercompany', TIPOS_INTERCOMPANY),
-    motivo_intercompany: parseOptionalText(body.motivo_intercompany, 'Motivo intercompany', 255),
+    intercompany: parseBoolean(body.intercompany, 'Entre Empresas'),
+    tipo_intercompany: parseEnum(body.tipo_intercompany, 'Tipo', TIPOS_INTERCOMPANY),
+    motivo_intercompany: parseOptionalText(body.motivo_intercompany, 'Motivo', 255),
     elimina_consolidado: parseBoolean(body.elimina_consolidado, 'Eliminar no consolidado'),
     transferencia_interna: parseBoolean(body.transferencia_interna, 'Transferencia interna')
   };
@@ -1325,8 +1325,8 @@ function validateFinanceTransferenciaBody(body = {}) {
     data_transferencia: parseDateOnly(body.data_transferencia, 'Data da transferencia'),
     valor: parseDecimal(body.valor, 'Valor da transferencia', { required: true, min: 0.01 }),
     descricao: parseOptionalText(body.descricao, 'Descricao', 255),
-    tipo_intercompany: parseEnum(body.tipo_intercompany, 'Tipo intercompany', TIPOS_INTERCOMPANY),
-    motivo_intercompany: parseOptionalText(body.motivo_intercompany, 'Motivo intercompany', 255),
+    tipo_intercompany: parseEnum(body.tipo_intercompany, 'Tipo', TIPOS_INTERCOMPANY),
+    motivo_intercompany: parseOptionalText(body.motivo_intercompany, 'Motivo', 255),
     elimina_consolidado: parseBoolean(body.elimina_consolidado, 'Eliminar no consolidado')
   };
 }

@@ -200,7 +200,7 @@ export default function FinanceiroFluxoConsolidado() {
           <div>
             <h1 className="text-xl font-semibold md:text-2xl">Fluxo de Caixa Consolidado</h1>
             <p className="page-subtitle">
-              Visao prevista e realizada por empresa, com eliminacao explicita de intercompany.
+              Visao prevista e realizada por empresa, com eliminacao explicita de movimentos entre empresas.
             </p>
           </div>
           <div className="app-page-actions">
@@ -208,7 +208,7 @@ export default function FinanceiroFluxoConsolidado() {
               Voltar aos relatorios
             </Link>
             <Link to="/financeiro/relatorios/intercompany" className="btn btn-outline">
-              Intercompany
+              Entre Empresas
             </Link>
             <Link to="/financeiro/relatorios/dre" className="btn btn-outline">
               DRE
@@ -272,7 +272,7 @@ export default function FinanceiroFluxoConsolidado() {
         <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
           <label className="flex items-center gap-2 text-sm text-[var(--c-text)]">
             <input type="checkbox" checked={filters.excluir_intercompany} onChange={(event) => updateFilter('excluir_intercompany', event.target.checked)} />
-            Eliminar intercompany no consolidado
+            Eliminar entre empresas no consolidado
           </label>
           <div className="flex items-center gap-2">
             {periodoTexto ? <span className="hidden text-xs text-[var(--c-muted)] md:inline">{periodoTexto}</span> : null}
@@ -290,8 +290,8 @@ export default function FinanceiroFluxoConsolidado() {
         <Metric label="Saldo previsto" value={formatCurrency(resumo.saldo_previsto)} detail="Receber menos pagar" positive={Number(resumo.saldo_previsto || 0) >= 0} />
         <Metric label="Saldo realizado" value={formatCurrency(resumo.saldo_realizado)} detail={`${resumo.movimentos_realizados || 0} baixa(s)`} positive={Number(resumo.saldo_realizado || 0) >= 0} />
         <Metric label="Necessidade futura" value={formatCurrency(resumo.necessidade_futura_caixa)} detail={resumo.pior_periodo_previsto?.label ? `Pior periodo: ${resumo.pior_periodo_previsto.label}` : 'Menor saldo previsto acumulado'} positive={Number(resumo.necessidade_futura_caixa || 0) === 0} />
-        <Metric label="Intercompany previsto eliminado" value={formatCurrency(resumo.intercompany_previsto_eliminado)} detail={`${resumo.intercompany_titulos_eliminados || 0} titulo(s)`} />
-        <Metric label="Intercompany realizado eliminado" value={formatCurrency(resumo.intercompany_realizado_eliminado)} detail={`${resumo.intercompany_movimentos_eliminados || 0} baixa(s)`} />
+        <Metric label="Entre Empresas previsto eliminado" value={formatCurrency(resumo.intercompany_previsto_eliminado)} detail={`${resumo.intercompany_titulos_eliminados || 0} titulo(s)`} />
+        <Metric label="Entre Empresas realizado eliminado" value={formatCurrency(resumo.intercompany_realizado_eliminado)} detail={`${resumo.intercompany_movimentos_eliminados || 0} baixa(s)`} />
       </div>
 
       {loading ? (

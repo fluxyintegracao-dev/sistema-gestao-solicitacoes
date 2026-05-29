@@ -117,7 +117,7 @@ async function montarPayloadTransferencia(req, payload = {}, { transaction = nul
     : null;
 
   if (empresasDiferentes && !tipoIntercompany) {
-    throw createHttpError(400, 'Transferencia entre empresas exige tipo intercompany.');
+    throw createHttpError(400, 'Transferencia entre empresas exige tipo.');
   }
 
   const motivoIntercompany = empresasDiferentes
@@ -125,7 +125,7 @@ async function montarPayloadTransferencia(req, payload = {}, { transaction = nul
     : null;
 
   if (empresasDiferentes && !motivoIntercompany) {
-    throw createHttpError(400, 'Transferencia entre empresas exige motivo intercompany.');
+    throw createHttpError(400, 'Transferencia entre empresas exige motivo.');
   }
 
   return {
