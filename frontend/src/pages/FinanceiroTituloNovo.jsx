@@ -277,6 +277,7 @@ export default function FinanceiroTituloNovo() {
   const [error, setError] = useState('');
   const [parceiroDocumentoBusca, setParceiroDocumentoBusca] = useState('');
   const [parceiroNomeBusca, setParceiroNomeBusca] = useState('');
+  const [categoriaBusca, setCategoriaBusca] = useState('');
   const [paymentAccounts, setPaymentAccounts] = useState([]);
   const [formasPagamento, setFormasPagamento] = useState([]);
   const [cartoes, setCartoes] = useState([]);
@@ -489,6 +490,31 @@ export default function FinanceiroTituloNovo() {
     return categorias.find((categoria) => String(categoria.id) === String(form.categoria_financeira_id)) || null;
   }, [categorias, form.categoria_financeira_id]);
 
+  const categoriasAutocomplete = useMemo(() => {
+    const termos = normalizeSearchText(categoriaBusca)
+      .split(/\s+/)
+      .filter(Boolean);
+
+    if (!termos.length || form.categoria_financeira_id) {
+      return [];
+    }
+
+    return categoriasFiltradas
+      .filter((categoria) => {
+        const texto = normalizeSearchText([
+          categoria.nome,
+          categoria.tipo,
+          categoria.dre_grupo,
+          categoria.dre_subgrupo,
+          categoria.classificacao_gerencial
+        ].filter(Boolean).join(' '));
+        return termos.every((termo) => texto.includes(termo));
+      })
+      .slice(0, 8);
+  }, [categoriaBusca, categoriasFiltradas, form.categoria_financeira_id]);
+
+  const mostrarListaCategorias = categoriaBusca.trim().length > 0 && !form.categoria_financeira_id;
+
   const parceiroSelecionado = useMemo(() => {
     return parceiros.find((item) => String(item.id) === String(form.parceiro_id)) || null;
   }, [form.parceiro_id, parceiros]);
@@ -571,6 +597,12 @@ export default function FinanceiroTituloNovo() {
     });
   }
 
+  function selecionarCategoriaFinanceira(categoria) {
+    if (!categoria) return;
+    setForm((current) => ({ ...current, categoria_financeira_id: String(categoria.id) }));
+    setCategoriaBusca(categoria.nome || '');
+  }
+
   useEffect(() => {
     if (paymentDraft.usar_credor_como_favorecido && parceiroSelecionado) {
       preencherFavorecidoComParceiro(parceiroSelecionado);
@@ -598,6 +630,7 @@ export default function FinanceiroTituloNovo() {
       setSearchParams({ tipo: value });
       setParceiroDocumentoBusca('');
       setParceiroNomeBusca('');
+      setCategoriaBusca('');
       setBeneficiaries([]);
       setForm((current) => ({
         ...current,
@@ -968,6 +1001,7 @@ export default function FinanceiroTituloNovo() {
                   onChange={(event) => {
                     const tipo = resolveTipo(event.target.value);
                     setSearchParams({ tipo });
+                    setCategoriaBusca('');
                     setForm((current) => ({
                       ...current,
                       tipo,
@@ -1008,18 +1042,48 @@ export default function FinanceiroTituloNovo() {
 
               <label className="sol-filter-field xl:col-span-3">
                 <span className="sol-filter-label">Categoria financeira</span>
-                <select
-                  className="input w-full"
-                  value={form.categoria_financeira_id}
-                  onChange={(event) => updateField('categoria_financeira_id', event.target.value)}
-                >
-                  <option value="">Sem categoria</option>
-                  {categoriasFiltradas.map((categoria) => (
-                    <option key={categoria.id} value={categoria.id}>
-                      {categoria.nome}
-                    </option>
-                  ))}
-                </select>
+                <div className="relative">
+                  <input
+                    className="input w-full"
+                    placeholder="Digite para buscar a categoria"
+                    value={categoriaBusca}
+                    onChange={(event) => {
+                      setCategoriaBusca(event.target.value);
+                      setForm((current) => ({ ...current, categoria_financeira_id: '' }));
+                    }}
+                  />
+                  {categoriaSelecionada && (
+                    <button
+                      type="button"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg px-2 py-1 text-xs font-semibold text-[var(--c-muted)] hover:bg-[var(--c-bg)]"
+                      onClick={() => {
+                        setCategoriaBusca('');
+                        updateField('categoria_financeira_id', '');
+                      }}
+                    >
+                      Limpar
+                    </button>
+                  )}
+                  {mostrarListaCategorias && (
+                    <div className="absolute left-0 right-0 top-full z-20 mt-2 max-h-56 overflow-y-auto rounded-lg border border-[var(--c-border)] bg-[var(--c-bg)] shadow-lg">
+                      {categoriasAutocomplete.length === 0 ? (
+                        <div className="px-3 py-2 text-sm text-[var(--c-muted)]">
+                          Nenhuma categoria encontrada.
+                        </div>
+                      ) : categoriasAutocomplete.map((categoria) => (
+                        <button
+                          key={categoria.id}
+                          type="button"
+                          className="w-full border-b border-[var(--c-border)] px-3 py-2 text-left text-sm last:border-b-0 hover:bg-[var(--c-surface-muted)]"
+                          onClick={() => selecionarCategoriaFinanceira(categoria)}
+                        >
+                          <span className="block font-medium text-[var(--c-text)]">{categoria.nome}</span>
+                          <span className="block text-xs text-[var(--c-muted)]">{getCategoriaDreResumo(categoria)}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <span className="app-note mt-2">
                   {categoriaSelecionada
                     ? getCategoriaDreResumo(categoriaSelecionada)
@@ -1056,7 +1120,6 @@ export default function FinanceiroTituloNovo() {
                     setForm((current) => ({ ...current, parceiro_id: '' }));
                   }}
                   required={!form.parceiro_id}
-                  disabled={loadingParceiros}
                 />
                 <input type="hidden" value={form.parceiro_id} required />
                 {mostrarListaParceiros && (
