@@ -1861,11 +1861,11 @@ export default function FinanceiroTituloNovo() {
 
       {categoriaModalOpen && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 px-4 py-6">
-          <div className="card flex max-h-[88vh] w-full max-w-3xl flex-col gap-4 overflow-hidden">
+          <div className="card flex max-h-[72vh] w-full max-w-2xl flex-col gap-3 overflow-hidden">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h3 className="text-lg font-semibold text-[var(--c-text)]">Selecionar categoria financeira</h3>
-                <p className="text-sm text-[var(--c-muted)]">
+                <h3 className="text-base font-semibold text-[var(--c-text)]">Selecionar categoria financeira</h3>
+                <p className="text-xs text-[var(--c-muted)]">
                   Veja todas as categorias compativeis com o tipo do titulo ou filtre por nome, grupo ou descricao.
                 </p>
               </div>
@@ -1899,7 +1899,7 @@ export default function FinanceiroTituloNovo() {
                 <button
                   key={categoria.id}
                   type="button"
-                  className={`w-full rounded-xl border px-3 py-3 text-left text-sm transition ${
+                  className={`w-full rounded-xl border px-3 py-2 text-left text-sm transition ${
                     String(form.categoria_financeira_id) === String(categoria.id)
                       ? 'border-blue-300 bg-blue-50'
                       : 'border-transparent hover:border-[var(--c-border)] hover:bg-[var(--c-surface)]'
