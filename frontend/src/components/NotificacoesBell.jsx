@@ -6,31 +6,40 @@ import {
   marcarTodasNotificacoesLidas
 } from '../services/notificacoes';
 
-const TIPOS_VISIVEIS = new Set([
+const TIPOS_VISIVEIS_LISTA = [
   'MENCAO_COMENTARIO',
   'SOLICITACAO_CRIADA',
   'PRIORIDADE_DIRETORIA_LOTE_CRIADO',
   'PRIORIDADE_DIRETORIA_PEDIDO_ENVIADO'
-]);
+];
+
+const TIPOS_VISIVEIS = new Set(TIPOS_VISIVEIS_LISTA);
 
 export default function NotificacoesBell() {
   const [aberto, setAberto] = useState(false);
   const [itens, setItens] = useState([]);
   const [totalNaoLidas, setTotalNaoLidas] = useState(0);
+  const [meta, setMeta] = useState({ page: 1, total_pages: 0, has_more: false, total: 0 });
+  const [carregandoMais, setCarregandoMais] = useState(false);
   const navigate = useNavigate();
 
-  async function carregar() {
+  async function carregar({ page = 1, append = false } = {}) {
     if (typeof document !== 'undefined' && document.hidden) {
       return;
     }
     try {
-      const data = await getNotificacoes({ limit: 20 });
+      const data = await getNotificacoes({
+        limit: 20,
+        page,
+        tipos: TIPOS_VISIVEIS_LISTA
+      });
       const itensFiltrados = Array.isArray(data.itens)
         ? data.itens.filter(item => TIPOS_VISIVEIS.has(String(item.tipo || '').toUpperCase()))
         : [];
 
-      setItens(itensFiltrados);
-      setTotalNaoLidas(itensFiltrados.filter(item => !item.lida_em).length);
+      setItens(prev => append ? [...prev, ...itensFiltrados] : itensFiltrados);
+      setTotalNaoLidas(Number(data.total_nao_lidas || 0));
+      setMeta(data.meta || { page, total_pages: 0, has_more: false, total: itensFiltrados.length });
     } catch (e) {
       console.error(e);
     }
@@ -43,20 +52,30 @@ export default function NotificacoesBell() {
   }, []);
 
   async function abrirModal() {
-    await carregar();
+    await carregar({ page: 1 });
     setAberto(true);
   }
 
   async function marcarTudo() {
     await marcarTodasNotificacoesLidas();
-    await carregar();
+    await carregar({ page: 1 });
+  }
+
+  async function carregarMais() {
+    if (!meta?.has_more || carregandoMais) return;
+    try {
+      setCarregandoMais(true);
+      await carregar({ page: Number(meta.page || 1) + 1, append: true });
+    } finally {
+      setCarregandoMais(false);
+    }
   }
 
   async function abrirNotificacao(item) {
     if (item.destinatario_id && !item.lida_em) {
       await marcarNotificacaoLida(item.destinatario_id);
     }
-    await carregar();
+    await carregar({ page: 1 });
     if (item.metadata?.rota) {
       navigate(item.metadata.rota);
       if (item.metadata.rota === '/prioridades-diretoria') {
@@ -134,6 +153,19 @@ export default function NotificacoesBell() {
                   </div>
                 </button>
               ))}
+
+              {meta?.has_more && (
+                <div className="py-3 text-center">
+                  <button
+                    type="button"
+                    onClick={carregarMais}
+                    disabled={carregandoMais}
+                    className="text-sm text-blue-600 hover:underline disabled:text-gray-400 disabled:no-underline"
+                  >
+                    {carregandoMais ? 'Carregando...' : 'Carregar mais notificacoes'}
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
