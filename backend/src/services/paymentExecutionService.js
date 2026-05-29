@@ -32,6 +32,20 @@ function createHttpError(statusCode, message) {
   return error;
 }
 
+function isMockProviderBatchId(value) {
+  return String(value || '').toUpperCase().startsWith('MOCK-');
+}
+
+async function findLastRealProviderBatchTransaction(batchId) {
+  const transactions = await PaymentTransaction.findAll({
+    where: { payment_batch_id: batchId, provider_batch_id: { [Op.ne]: null } },
+    order: [['createdAt', 'DESC']],
+    limit: 20
+  });
+
+  return transactions.find((transaction) => !isMockProviderBatchId(transaction.provider_batch_id)) || null;
+}
+
 function timingSafeEqualText(left, right) {
   const leftBuffer = Buffer.from(String(left || ''), 'utf8');
   const rightBuffer = Buffer.from(String(right || ''), 'utf8');
@@ -595,10 +609,10 @@ async function processBbReleaseBatchJob(req, jobId) {
   }) + 1;
 
   try {
-    const lastSubmitTransaction = await PaymentTransaction.findOne({
-      where: { payment_batch_id: batch.id, provider_batch_id: { [Op.ne]: null } },
-      order: [['createdAt', 'DESC']]
-    });
+    const lastSubmitTransaction = await findLastRealProviderBatchTransaction(batch.id);
+    if (!lastSubmitTransaction) {
+      throw createHttpError(400, 'Lote ainda nao possui identificador BB real para liberacao. Envie o lote no sandbox real antes de liberar.');
+    }
     const providerResult = await bancoDoBrasilSandboxProvider.releasePayments(batch, {
       numeroRequisicao: lastSubmitTransaction?.provider_batch_id
     });
@@ -665,11 +679,11 @@ async function sincronizarStatusBb(req, id) {
   const batch = await getBatchWithPaymentGraph(id);
   if (!batch) throw createHttpError(404, 'Lote de pagamento nao encontrado.');
 
-  const lastTransaction = await PaymentTransaction.findOne({
-    where: { payment_batch_id: batch.id, provider_batch_id: { [Op.ne]: null } },
-    order: [['createdAt', 'DESC']]
-  });
-  const providerBatchId = lastTransaction?.provider_batch_id || batch.id;
+  const lastTransaction = await findLastRealProviderBatchTransaction(batch.id);
+  if (!lastTransaction) {
+    throw createHttpError(400, 'Este lote ainda nao possui identificador BB real. Envie ou reprocesse o lote no sandbox real antes de sincronizar.');
+  }
+  const providerBatchId = lastTransaction.provider_batch_id;
   const startedAt = new Date();
   const attemptNumber = await PaymentTransaction.count({ where: { payment_batch_id: batch.id } }) + 1;
   const providerResult = await bancoDoBrasilSandboxProvider.getBatchStatus(providerBatchId);

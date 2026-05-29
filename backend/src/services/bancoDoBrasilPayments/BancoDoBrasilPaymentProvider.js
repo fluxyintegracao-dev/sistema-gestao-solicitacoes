@@ -71,10 +71,13 @@ function normalizeInfoStatus(data) {
 }
 
 function extractBancoDoBrasilErrorMessage(details) {
-  const erros = details?.data?.erros || details?.response_snapshot?.body?.erros || [];
-  if (!Array.isArray(erros) || !erros.length) return null;
+  const body = details?.data || details?.response_snapshot?.body || {};
+  const erros = body?.erros || [];
+  if (!Array.isArray(erros) || !erros.length) {
+    return [body?.error, body?.message].filter(Boolean).join(' - ') || null;
+  }
 
-  return erros
+  const mensagemErros = erros
     .map((erro) => {
       const codigo = erro?.codigo || erro?.code || erro?.erro || erro?.mensagemCodigo;
       const mensagem = erro?.mensagem || erro?.message || erro?.descricao || erro?.texto;
@@ -82,6 +85,10 @@ function extractBancoDoBrasilErrorMessage(details) {
     })
     .filter(Boolean)
     .join('; ');
+
+  if (mensagemErros) return mensagemErros;
+
+  return [body?.error, body?.message].filter(Boolean).join(' - ') || null;
 }
 
 async function submitPixBatch(batch, options = {}) {
