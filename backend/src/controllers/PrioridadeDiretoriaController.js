@@ -8,6 +8,8 @@ const {
   Parceiro,
   TipoSolicitacao,
   TituloFinanceiro,
+  Notificacao,
+  NotificacaoDestinatario,
   User,
   Setor
 } = require('../models');
@@ -44,6 +46,127 @@ const TIPO_LOTE = {
 const DIRETORIA_ADMIN_CODIGO = 'DIR_ADMIN';
 const DIRETORIA_ADMIN_NOME = 'DIRETORIA ADMINISTRATIVA';
 const SETOR_FINANCEIRO_CODIGO = 'FINANCEIRO';
+const TIPO_NOTIFICACAO_LOTE_PRIORIDADE_CRIADO = 'PRIORIDADE_DIRETORIA_LOTE_CRIADO';
+const TIPO_NOTIFICACAO_LOTE_PRIORIDADE_FINALIZADO = 'PRIORIDADE_DIRETORIA_LOTE_FINALIZADO';
+const TIPO_NOTIFICACAO_DIR_ADMIN_LOTE_CRIADO = 'PRIORIDADE_DIR_ADMIN_LOTE_CRIADO';
+const TIPO_NOTIFICACAO_DIR_ADMIN_LOTE_APROVADO = 'PRIORIDADE_DIR_ADMIN_LOTE_APROVADO';
+
+function loteCriadoPorDiretoriaObras(lote) {
+  return String(lote?.tipo_lote || '').trim().toUpperCase() === TIPO_LOTE.SOLICITACAO_DIRETORIA;
+}
+
+async function obterDestinatariosPrioridadeDiretoria() {
+  const setores = await Setor.findAll({
+    where: {
+      [Op.or]: [
+        { codigo: { [Op.in]: [DIRETORIA_ADMIN_CODIGO, SETOR_FINANCEIRO_CODIGO] } },
+        { nome: { [Op.in]: [DIRETORIA_ADMIN_NOME, SETOR_FINANCEIRO_CODIGO] } }
+      ]
+    },
+    attributes: ['id']
+  });
+
+  const setorIds = setores.map((setor) => Number(setor.id)).filter(Boolean);
+  if (setorIds.length === 0) return [];
+
+  const usuarios = await User.findAll({
+    where: {
+      ativo: true,
+      setor_id: { [Op.in]: setorIds }
+    },
+    attributes: ['id']
+  });
+
+  return [...new Set(usuarios.map((usuario) => Number(usuario.id)).filter(Boolean))];
+}
+
+async function obterDestinatariosSetor(tokenSetor) {
+  const token = String(tokenSetor || '').trim();
+  if (!token) return [];
+
+  const setores = await Setor.findAll({
+    where: {
+      [Op.or]: [
+        { codigo: token },
+        { nome: token }
+      ]
+    },
+    attributes: ['id']
+  });
+
+  const setorIds = setores.map((setor) => Number(setor.id)).filter(Boolean);
+  if (setorIds.length === 0) return [];
+
+  const usuarios = await User.findAll({
+    where: {
+      ativo: true,
+      setor_id: { [Op.in]: setorIds }
+    },
+    attributes: ['id']
+  });
+
+  return [...new Set(usuarios.map((usuario) => Number(usuario.id)).filter(Boolean))];
+}
+
+function montarMetadataNotificacaoLote(lote) {
+  return {
+    prioridade_lote_id: lote.id,
+    tipo_lote: lote.tipo_lote,
+    classificacao_alvo: lote.classificacao_alvo,
+    diretoria_alvo_codigo: lote.diretoria_alvo_codigo,
+    setor_criador_codigo: lote.setor_criador_codigo,
+    valor_utilizado: lote.valor_utilizado,
+    valor_disponivel: lote.valor_disponivel
+  };
+}
+
+async function notificarLotePrioridadeDiretoria({ lote, tipo, mensagem, createdBy }) {
+  if (!loteCriadoPorDiretoriaObras(lote)) return null;
+
+  const destinatarios = await obterDestinatariosPrioridadeDiretoria();
+  const destinatariosFiltrados = destinatarios.filter((usuarioId) => Number(usuarioId) !== Number(createdBy));
+  if (destinatariosFiltrados.length === 0) return null;
+
+  const notificacao = await Notificacao.create({
+    solicitacao_id: null,
+    tipo,
+    mensagem,
+    metadata: JSON.stringify(montarMetadataNotificacaoLote(lote)),
+    created_by: createdBy || null
+  });
+
+  await NotificacaoDestinatario.bulkCreate(
+    destinatariosFiltrados.map((usuarioId) => ({
+      notificacao_id: notificacao.id,
+      usuario_id: usuarioId
+    }))
+  );
+
+  return notificacao;
+}
+
+async function notificarLotePrioridadeParaSetor({ lote, setorToken, tipo, mensagem, createdBy }) {
+  const destinatarios = await obterDestinatariosSetor(setorToken);
+  const destinatariosFiltrados = destinatarios.filter((usuarioId) => Number(usuarioId) !== Number(createdBy));
+  if (destinatariosFiltrados.length === 0) return null;
+
+  const notificacao = await Notificacao.create({
+    solicitacao_id: null,
+    tipo,
+    mensagem,
+    metadata: JSON.stringify(montarMetadataNotificacaoLote(lote)),
+    created_by: createdBy || null
+  });
+
+  await NotificacaoDestinatario.bulkCreate(
+    destinatariosFiltrados.map((usuarioId) => ({
+      notificacao_id: notificacao.id,
+      usuario_id: usuarioId
+    }))
+  );
+
+  return notificacao;
+}
 
 function normalizarStatusLote(valor) {
   const status = String(valor || '').trim().toUpperCase();
@@ -771,6 +894,15 @@ module.exports = {
         observacao: observacao || null,
         solicitado_por: req.user.id
       });
+      await Promise.allSettled([
+        notificarLotePrioridadeParaSetor({
+          lote,
+          setorToken: lote.diretoria_alvo_codigo,
+          tipo: TIPO_NOTIFICACAO_DIR_ADMIN_LOTE_CRIADO,
+          mensagem: `Novo lote de prioridade #${lote.id} criado pela DIR_ADMIN para ${lote.diretoria_alvo_codigo}. Valor disponivel: ${moedaBackend(lote.valor_disponivel)}.`,
+          createdBy: req.user.id
+        })
+      ]);
       const detalhe = await carregarLoteDetalhe(lote.id);
       return res.status(201).json({ item: serializarLote(detalhe) });
     } catch (error) {
@@ -885,6 +1017,17 @@ module.exports = {
 
       await transaction.commit();
       transactionFinalizada = true;
+
+      if (!adicionandoEmLoteAberto) {
+        await Promise.allSettled([
+          notificarLotePrioridadeDiretoria({
+            lote,
+            tipo: TIPO_NOTIFICACAO_LOTE_PRIORIDADE_CRIADO,
+            mensagem: `Novo lote de prioridade #${lote.id} criado por ${lote.setor_criador_nome || lote.setor_criador_codigo}. Valor: ${moedaBackend(lote.valor_utilizado)}.`,
+            createdBy: req.user.id
+          })
+        ]);
+      }
 
       const detalhe = await carregarLoteDetalhe(lote.id);
       return res.status(201).json({
@@ -1200,6 +1343,27 @@ module.exports = {
         finalizado_em: agora
       }, { transaction });
       await transaction.commit();
+
+      await Promise.allSettled([
+        notificarLotePrioridadeDiretoria({
+          lote,
+          tipo: TIPO_NOTIFICACAO_LOTE_PRIORIDADE_FINALIZADO,
+          mensagem: `Lote de prioridade #${lote.id} finalizado por ${lote.diretoria_alvo_codigo}. Valor aprovado: ${moedaBackend(valorUtilizado)}.`,
+          createdBy: req.user.id
+        })
+      ]);
+
+      if (isSolicitacaoDiretoria) {
+        await Promise.allSettled([
+          notificarLotePrioridadeParaSetor({
+            lote,
+            setorToken: lote.setor_criador_codigo,
+            tipo: TIPO_NOTIFICACAO_DIR_ADMIN_LOTE_APROVADO,
+            mensagem: `Lote de prioridade #${lote.id} aprovado pela DIR_ADMIN. Valor aprovado: ${moedaBackend(valorUtilizado)}.`,
+            createdBy: req.user.id
+          })
+        ]);
+      }
 
       await Promise.allSettled(solicitacoesSelecionadas.map((item) => criarNotificacao({
         solicitacao_id: item.id,
