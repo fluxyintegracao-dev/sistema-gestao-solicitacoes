@@ -245,8 +245,8 @@ export async function enviarSolicitacoesParaSetorEmMassa({ solicitacao_ids, seto
   });
 
   if (!res.ok) {
-    const text = await res.text();
-    throw new Error(text);
+    const json = await parseJsonSafe(res);
+    throw buildResponseError(res.status, 'Erro ao enviar solicitacoes em massa', json);
   }
 
   return res.json();

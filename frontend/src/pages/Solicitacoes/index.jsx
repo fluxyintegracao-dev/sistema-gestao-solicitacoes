@@ -1042,15 +1042,23 @@ export default function Solicitacoes({ arquivadas = false }) {
       });
       setModalEnvioMassa(false);
       setSetorEnvioMassa('');
-      await handleAtualizarLista({ type: 'remove_item', id: selecionadaUnica.id });
+      setSelecionadasIds([]);
+      await carregar({ silent: true });
       if (resultado?.erros?.length > 0) {
-        alert(`Envio em massa concluído. Enviadas: ${resultado.sucesso}. Falhas: ${resultado.erros.length}.`);
+        const detalhes = resultado.erros
+          .slice(0, 8)
+          .map(item => `#${item.id}: ${item.error || 'Erro ao enviar'}`)
+          .join('\n');
+        const complemento = resultado.erros.length > 8
+          ? `\n... e mais ${resultado.erros.length - 8} falha(s).`
+          : '';
+        alert(`Envio em massa concluído com pendências.\n\nEnviadas: ${resultado.sucesso}. Falhas: ${resultado.erros.length}.\n\n${detalhes}${complemento}`);
       } else {
         alert('Solicitações enviadas em massa com sucesso.');
       }
     } catch (error) {
       console.error(error);
-      alert('Erro ao enviar solicitações em massa.');
+      alert(error?.message || 'Erro ao enviar solicitações em massa.');
     } finally {
       setProcessandoMassa(false);
     }
