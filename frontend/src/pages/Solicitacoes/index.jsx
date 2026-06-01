@@ -33,7 +33,11 @@ import {
   getSolicitacaoResumoLista,
   getObrasVisiveisSolicitacoes
 } from '../../services/solicitacoes';
-import { solicitarUrgenciaPrioridadeDiretoria } from '../../services/prioridadesDiretoria';
+import {
+  getTitulosPrioridadePorSolicitacoes,
+  listarLotesPrioridadeDiretoria,
+  solicitarUrgenciaPrioridadeDiretoria
+} from '../../services/prioridadesDiretoria';
 
 function normalizarTextoComparacao(valor) {
   return String(valor || '')
@@ -52,6 +56,19 @@ function formatarDataParaFiltro(valor) {
   const mes = String(data.getMonth() + 1).padStart(2, '0');
   const dia = String(data.getDate()).padStart(2, '0');
   return `${ano}-${mes}-${dia}`;
+}
+
+function moeda(valor) {
+  const numero = Number(valor);
+  if (!Number.isFinite(numero)) return '-';
+  return numero.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+function dataCurta(valor) {
+  if (!valor) return '-';
+  const data = parseDateSmart(valor) || new Date(valor);
+  if (!data || Number.isNaN(data.getTime())) return '-';
+  return data.toLocaleDateString('pt-BR');
 }
 
 const PAGE_SIZE_ALL = 'all';
@@ -91,6 +108,12 @@ export default function Solicitacoes({ arquivadas = false }) {
   const [usuarioAtribuicaoMassa, setUsuarioAtribuicaoMassa] = useState('');
   const [setorEnvioMassa, setSetorEnvioMassa] = useState('');
   const [processandoMassa, setProcessandoMassa] = useState(false);
+  const [modalPrioridadeTitulos, setModalPrioridadeTitulos] = useState(false);
+  const [titulosPrioridade, setTitulosPrioridade] = useState([]);
+  const [solicitacoesPrioridadeSemTitulos, setSolicitacoesPrioridadeSemTitulos] = useState([]);
+  const [lotesPrioridadeAbertos, setLotesPrioridadeAbertos] = useState([]);
+  const [lotePrioridadeDestino, setLotePrioridadeDestino] = useState('');
+  const [titulosPrioridadeSelecionados, setTitulosPrioridadeSelecionados] = useState(new Set());
   const [mostrarSeletorColunas, setMostrarSeletorColunas] = useState(false);
   const [colunasVisiveis, setColunasVisiveis] = useState(DEFAULT_VISIBLE_COLUMNS);
   const [colunasStoragePronto, setColunasStoragePronto] = useState(false);
@@ -774,6 +797,7 @@ export default function Solicitacoes({ arquivadas = false }) {
       if (event.key !== 'Escape') return;
       setMostrarSeletorColunas(false);
       setModalEnvioMassa(false);
+      setModalPrioridadeTitulos(false);
     }
 
     document.addEventListener('keydown', handleEscape);
@@ -1050,17 +1074,78 @@ export default function Solicitacoes({ arquivadas = false }) {
       return;
     }
 
-    if (!window.confirm(`Enviar ${selecionadasIds.length} solicitacao(oes) para aprovacao de prioridade pela Diretoria Administrativa?`)) {
+    try {
+      setProcessandoMassa(true);
+      const [resposta, lotesAbertosData] = await Promise.all([
+        getTitulosPrioridadePorSolicitacoes({
+          solicitacao_ids: selecionadasIds,
+          classificacao_alvo: classificacaoPrioridadeDiretoria
+        }),
+        listarLotesPrioridadeDiretoria({ status: 'ABERTO' })
+      ]);
+      const titulos = Array.isArray(resposta?.items) ? resposta.items : [];
+      const semTitulos = Array.isArray(resposta?.solicitacoes_sem_titulos) ? resposta.solicitacoes_sem_titulos : [];
+      if (titulos.length === 0) {
+        const lista = semTitulos.map(item => item.codigo || `#${item.id}`).join(', ');
+        alert(`Nenhuma solicitacao selecionada possui titulo financeiro aberto elegivel.${lista ? `\n\nSolicitacoes sem titulo: ${lista}` : ''}\n\nCadastre os titulos financeiros e clique novamente em Prioridade financeiro para recarregar.`);
+        return;
+      }
+      const lotesAbertos = (Array.isArray(lotesAbertosData?.items) ? lotesAbertosData.items : [])
+        .filter(lote => (
+          String(lote.status || '').toUpperCase() === 'ABERTO' &&
+          String(lote.tipo_lote || '').toUpperCase() === 'SOLICITACAO_DIRETORIA' &&
+          String(lote.classificacao_alvo || '').toUpperCase() === String(classificacaoPrioridadeDiretoria || '').toUpperCase()
+        ));
+      setTitulosPrioridade(titulos);
+      setSolicitacoesPrioridadeSemTitulos(semTitulos);
+      setLotesPrioridadeAbertos(lotesAbertos);
+      setLotePrioridadeDestino('');
+      setTitulosPrioridadeSelecionados(new Set(titulos.map(item => String(item.id))));
+      setModalPrioridadeTitulos(true);
+    } catch (error) {
+      console.error(error);
+      alert(error?.message || 'Erro ao buscar titulos para prioridade.');
+    } finally {
+      setProcessandoMassa(false);
+    }
+  }
+
+  function alternarTituloPrioridade(id) {
+    const key = String(id);
+    setTitulosPrioridadeSelecionados(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
+  async function confirmarPrioridadeFinanceiroTitulos() {
+    const tituloIds = Array.from(titulosPrioridadeSelecionados).map(Number).filter(Boolean);
+    if (tituloIds.length === 0) {
+      alert('Selecione ao menos um titulo para enviar a prioridade.');
+      return;
+    }
+
+    if (!window.confirm(`Enviar ${tituloIds.length} titulo(s) para aprovacao de prioridade pela Diretoria Administrativa?`)) {
       return;
     }
 
     try {
       setProcessandoMassa(true);
       await solicitarUrgenciaPrioridadeDiretoria({
+        titulo_ids: tituloIds,
         solicitacao_ids: selecionadasIds,
-        classificacao_alvo: classificacaoPrioridadeDiretoria
+        classificacao_alvo: classificacaoPrioridadeDiretoria,
+        lote_id: lotePrioridadeDestino ? Number(lotePrioridadeDestino) : undefined
       });
       setSelecionadasIds([]);
+      setTitulosPrioridade([]);
+      setSolicitacoesPrioridadeSemTitulos([]);
+      setLotesPrioridadeAbertos([]);
+      setLotePrioridadeDestino('');
+      setTitulosPrioridadeSelecionados(new Set());
+      setModalPrioridadeTitulos(false);
       await carregar({ silent: true });
       alert('Lote de prioridade enviado para aprovacao da Diretoria Administrativa.');
     } catch (error) {
@@ -1284,6 +1369,121 @@ export default function Solicitacoes({ arquivadas = false }) {
           {arquivadas ? 'Solicitações Arquivadas' : 'Solicitações'}
         </h1>
       </div>
+
+      {modalPrioridadeTitulos && typeof document !== 'undefined' && createPortal((
+        <div className="fixed inset-0 z-[1200] flex items-center justify-center bg-slate-950/60 p-4">
+          <div className="w-full max-w-4xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-950">
+            <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4 dark:border-slate-800">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-50">Selecionar titulos para prioridade</h2>
+                <p className="text-sm text-slate-500 dark:text-slate-400">
+                  Confirme quais titulos abertos das solicitacoes selecionadas devem seguir para a Diretoria Administrativa.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="rounded-full p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
+                onClick={() => setModalPrioridadeTitulos(false)}
+                aria-label="Fechar"
+              >
+                <HiOutlineXMark className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="max-h-[60vh] overflow-y-auto px-5 py-4">
+              {solicitacoesPrioridadeSemTitulos.length > 0 && (
+                <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-100">
+                  <p className="font-semibold">Algumas solicitacoes ainda nao possuem titulo financeiro aberto.</p>
+                  <p className="mt-1">
+                    Elas nao serao enviadas agora. Clique em OK/Cancelar para voltar, desmarque se desejar, ou cadastre o titulo e clique novamente em Prioridade financeiro para recarregar.
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {solicitacoesPrioridadeSemTitulos.map((item) => (
+                      <span key={item.id} className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-950 dark:bg-amber-900/70 dark:text-amber-50">
+                        {item.codigo || `#${item.id}`}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <label className="mb-4 block text-sm">
+                <span className="mb-1 block font-medium text-slate-700 dark:text-slate-200">Destino dos titulos</span>
+                <select
+                  className="input"
+                  value={lotePrioridadeDestino}
+                  onChange={event => setLotePrioridadeDestino(event.target.value)}
+                >
+                  <option value="">Criar novo lote de prioridade</option>
+                  {lotesPrioridadeAbertos.map((lote) => (
+                    <option key={lote.id} value={lote.id}>
+                      Incluir no lote aberto #{lote.id} - {dataCurta(lote.createdAt)} - {moeda(lote.valor_utilizado)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600 dark:text-slate-300">
+                <span>
+                  Selecionados: <strong>{titulosPrioridadeSelecionados.size}</strong> de <strong>{titulosPrioridade.length}</strong>
+                </span>
+                <span>
+                  Total selecionado: <strong>{moeda(titulosPrioridade
+                    .filter(item => titulosPrioridadeSelecionados.has(String(item.id)))
+                    .reduce((total, item) => total + Number(item.valor_prioridade || item.valor_saldo || 0), 0))}</strong>
+                </span>
+              </div>
+              <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
+                <table className="min-w-full text-sm">
+                  <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-900 dark:text-slate-400">
+                    <tr>
+                      <th className="w-10 px-3 py-3"></th>
+                      <th className="px-3 py-3">Titulo</th>
+                      <th className="px-3 py-3">Solicitacao</th>
+                      <th className="px-3 py-3">Obra</th>
+                      <th className="px-3 py-3">Vencimento</th>
+                      <th className="px-3 py-3 text-right">Saldo</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                    {titulosPrioridade.map((titulo) => (
+                      <tr key={titulo.id} className="hover:bg-slate-50 dark:hover:bg-slate-900">
+                        <td className="px-3 py-3">
+                          <input
+                            type="checkbox"
+                            checked={titulosPrioridadeSelecionados.has(String(titulo.id))}
+                            onChange={() => alternarTituloPrioridade(titulo.id)}
+                          />
+                        </td>
+                        <td className="px-3 py-3">
+                          <p className="font-semibold text-slate-900 dark:text-slate-50">{titulo.codigo || `#${titulo.id}`}</p>
+                          <p className="text-xs text-slate-500">{titulo.parceiro?.nome || titulo.descricao || '-'}</p>
+                        </td>
+                        <td className="px-3 py-3">
+                          <p className="font-medium">{titulo.solicitacao?.codigo || '-'}</p>
+                          <p className="text-xs text-slate-500">{titulo.solicitacao?.descricao || ''}</p>
+                        </td>
+                        <td className="px-3 py-3">{titulo.obra?.nome || '-'}</td>
+                        <td className="px-3 py-3">{dataCurta(titulo.data_vencimento)}</td>
+                        <td className="px-3 py-3 text-right font-semibold">{moeda(titulo.valor_prioridade || titulo.valor_saldo)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="flex flex-col-reverse gap-2 border-t border-slate-200 px-5 py-4 dark:border-slate-800 sm:flex-row sm:justify-end">
+              <button type="button" className="btn btn-outline" onClick={() => setModalPrioridadeTitulos(false)} disabled={processandoMassa}>
+                Cancelar
+              </button>
+              <button type="button" className="btn btn-primary" onClick={confirmarPrioridadeFinanceiroTitulos} disabled={processandoMassa || titulosPrioridadeSelecionados.size === 0}>
+                Enviar titulos selecionados
+              </button>
+            </div>
+          </div>
+        </div>
+      ), document.body)}
 
       <Filtros
         filtros={filtros}

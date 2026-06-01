@@ -12,7 +12,11 @@ module.exports = (sequelize, DataTypes) => sequelize.define(
     },
     solicitacao_id: {
       type: DataTypes.INTEGER,
-      allowNull: false
+      allowNull: true
+    },
+    titulo_financeiro_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true
     },
     valor_considerado: {
       type: DataTypes.DECIMAL(14, 2),

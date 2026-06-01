@@ -75,7 +75,16 @@ export async function getSolicitacoesDisponiveisPrioridadeDiretoria(id, params =
   const res = await fetch(`${API_URL}/prioridades-diretoria/lotes/${id}/solicitacoes-disponiveis${query ? `?${query}` : ''}`, {
     headers: authHeaders()
   });
-  return tratarResposta(res, 'Erro ao buscar solicitacoes elegiveis para prioridade');
+  return tratarResposta(res, 'Erro ao buscar titulos elegiveis para prioridade');
+}
+
+export async function getTitulosPrioridadePorSolicitacoes(data) {
+  const res = await fetch(`${API_URL}/prioridades-diretoria/titulos-por-solicitacoes`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+  return tratarResposta(res, 'Erro ao buscar titulos vinculados as solicitacoes');
 }
 
 export async function finalizarLotePrioridadeDiretoria(id, data) {

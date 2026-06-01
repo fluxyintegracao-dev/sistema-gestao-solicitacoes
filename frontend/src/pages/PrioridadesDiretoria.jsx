@@ -33,13 +33,20 @@ function statusClass(status) {
   return 'badge badge-warning';
 }
 
-function solicitacoesDoLote(lote) {
+function tituloDoItem(item) {
+  if (!item) return null;
+  if (item.titulo) return item.titulo;
+  if (item.solicitacao) return item.solicitacao;
+  return item;
+}
+
+function titulosDoLote(lote) {
   return (Array.isArray(lote?.itens) ? lote.itens : [])
-    .map(item => item?.solicitacao)
+    .map(tituloDoItem)
     .filter(Boolean);
 }
 
-function mesclarSolicitacoes(base = [], extras = []) {
+function mesclarItens(base = [], extras = []) {
   const mapa = new Map();
   [...(Array.isArray(extras) ? extras : []), ...(Array.isArray(base) ? base : [])].forEach((item) => {
     if (item?.id) mapa.set(String(item.id), item);
@@ -143,8 +150,8 @@ export default function PrioridadesDiretoria() {
       const detalheData = await getLotePrioridadeDiretoria(id);
       const detalhe = detalheData?.item || null;
       setLoteDetalhe(detalhe);
-      const solicitacoesSalvas = solicitacoesDoLote(detalhe);
-      setSelecionados(new Set(solicitacoesSalvas.map(item => String(item.id))));
+      const titulosSalvos = titulosDoLote(detalhe);
+      setSelecionados(new Set(titulosSalvos.map(item => String(item.id))));
 
       if (detalhe?.status === 'ABERTO') {
         const params = {};
@@ -152,7 +159,7 @@ export default function PrioridadesDiretoria() {
         if (filtroObraId) params.obra_id = filtroObraId;
         const disponiveisData = await getSolicitacoesDisponiveisPrioridadeDiretoria(id, params);
         setObrasDisponiveis(Array.isArray(disponiveisData?.obras) ? disponiveisData.obras : []);
-        setDisponiveis(mesclarSolicitacoes(Array.isArray(disponiveisData?.items) ? disponiveisData.items : [], solicitacoesSalvas));
+        setDisponiveis(mesclarItens(Array.isArray(disponiveisData?.items) ? disponiveisData.items : [], titulosSalvos));
       } else {
         setDisponiveis([]);
         setObrasDisponiveis([]);
@@ -175,13 +182,13 @@ export default function PrioridadesDiretoria() {
       params
     );
     setObrasDisponiveis(Array.isArray(dataDisponiveis?.obras) ? dataDisponiveis.obras : []);
-    setDisponiveis(mesclarSolicitacoes(
+    setDisponiveis(mesclarItens(
       Array.isArray(dataDisponiveis?.items) ? dataDisponiveis.items : [],
-      solicitacoesDoLote(loteDetalhe)
+      titulosDoLote(loteDetalhe)
     ));
   }
 
-  function alternarSolicitacao(id) {
+  function alternarTitulo(id) {
     const key = String(id);
     setSelecionados(prev => {
       const next = new Set(prev);
@@ -198,47 +205,48 @@ export default function PrioridadesDiretoria() {
     }
   }
 
-  const solicitacoesExibidas = useMemo(() => (
+  const titulosExibidos = useMemo(() => (
     loteDetalhe?.status === 'ABERTO'
-      ? mesclarSolicitacoes(disponiveis, solicitacoesDoLote(loteDetalhe))
-      : solicitacoesDoLote(loteDetalhe)
+      ? mesclarItens(disponiveis, titulosDoLote(loteDetalhe))
+      : titulosDoLote(loteDetalhe)
   ), [disponiveis, loteDetalhe]);
 
-  const solicitacoesVisiveis = useMemo(() => {
+  const titulosVisiveis = useMemo(() => {
     const termo = normalizarBusca(filtroItensLote);
-    if (!termo) return solicitacoesExibidas;
-    return solicitacoesExibidas.filter((item) => {
+    if (!termo) return titulosExibidos;
+    return titulosExibidos.filter((item) => {
       const texto = [
         item.codigo,
-        item.numero_sienge,
         item.descricao,
         item.obra?.nome,
         item.obra?.codigo,
-        item.tipo?.nome,
-        item.status_global
+        item.solicitacao?.codigo,
+        item.solicitacao?.descricao,
+        item.parceiro?.nome,
+        item.status
       ].map(normalizarBusca).join(' ');
       return texto.includes(termo);
     });
-  }, [solicitacoesExibidas, filtroItensLote]);
+  }, [titulosExibidos, filtroItensLote]);
 
   const selecionadas = useMemo(() => (
-    solicitacoesExibidas.filter(item => selecionados.has(String(item.id)))
-  ), [solicitacoesExibidas, selecionados]);
+    titulosExibidos.filter(item => selecionados.has(String(item.id)))
+  ), [titulosExibidos, selecionados]);
 
   const valorSelecionado = selecionadas.reduce((total, item) => total + Number(item.valor_prioridade || 0), 0);
 
   async function salvarSelecaoLote() {
     if (!loteDetalhe?.id) return;
-    const solicitacaoIds = Array.from(selecionados).map(Number).filter(Boolean);
+    const tituloIds = Array.from(selecionados).map(Number).filter(Boolean);
 
     try {
       setOperando(true);
-      const dataLote = await salvarRascunhoLotePrioridadeDiretoria(loteDetalhe.id, { solicitacao_ids: solicitacaoIds });
+      const dataLote = await salvarRascunhoLotePrioridadeDiretoria(loteDetalhe.id, { titulo_ids: tituloIds });
       const detalhe = dataLote?.item || null;
       setLoteDetalhe(detalhe);
-      const solicitacoesSalvas = solicitacoesDoLote(detalhe);
-      setSelecionados(new Set(solicitacoesSalvas.map(item => String(item.id))));
-      setDisponiveis(mesclarSolicitacoes(disponiveis, solicitacoesSalvas));
+      const titulosSalvos = titulosDoLote(detalhe);
+      setSelecionados(new Set(titulosSalvos.map(item => String(item.id))));
+      setDisponiveis(mesclarItens(disponiveis, titulosSalvos));
       await recarregarLotes();
       alert('Selecao salva. Voce pode voltar depois para continuar este lote.');
     } catch (error) {
@@ -251,18 +259,18 @@ export default function PrioridadesDiretoria() {
 
   async function finalizarLote() {
     if (!loteDetalhe?.id) return;
-    const solicitacaoIds = Array.from(selecionados).map(Number).filter(Boolean);
-    if (solicitacaoIds.length === 0) {
-      alert('Selecione ao menos uma solicitacao.');
+    const tituloIds = Array.from(selecionados).map(Number).filter(Boolean);
+    if (tituloIds.length === 0) {
+      alert('Selecione ao menos um titulo.');
       return;
     }
-    if (!window.confirm(`Finalizar lote com ${solicitacaoIds.length} solicitacao(oes)?`)) {
+    if (!window.confirm(`Finalizar lote com ${tituloIds.length} titulo(s)?`)) {
       return;
     }
 
     try {
       setOperando(true);
-      const dataLote = await finalizarLotePrioridadeDiretoria(loteDetalhe.id, { solicitacao_ids: solicitacaoIds });
+      const dataLote = await finalizarLotePrioridadeDiretoria(loteDetalhe.id, { titulo_ids: tituloIds });
       setLoteDetalhe(dataLote?.item || null);
       setDisponiveis([]);
       setSelecionados(new Set());
@@ -283,14 +291,14 @@ export default function PrioridadesDiretoria() {
       const dataLote = await reabrirLotePrioridadeDiretoria(lote.id);
       const detalhe = dataLote?.item || null;
       setLoteDetalhe(detalhe);
-      const solicitacoesSalvas = solicitacoesDoLote(detalhe);
-      setSelecionados(new Set(solicitacoesSalvas.map(item => String(item.id))));
+      const titulosSalvos = titulosDoLote(detalhe);
+      setSelecionados(new Set(titulosSalvos.map(item => String(item.id))));
       const params = {};
       if (busca) params.busca = busca;
       if (filtroObraId) params.obra_id = filtroObraId;
       const disponiveisData = await getSolicitacoesDisponiveisPrioridadeDiretoria(lote.id, params);
       setObrasDisponiveis(Array.isArray(disponiveisData?.obras) ? disponiveisData.obras : []);
-      setDisponiveis(mesclarSolicitacoes(Array.isArray(disponiveisData?.items) ? disponiveisData.items : [], solicitacoesSalvas));
+      setDisponiveis(mesclarItens(Array.isArray(disponiveisData?.items) ? disponiveisData.items : [], titulosSalvos));
       await recarregarLotes();
       alert('Lote reaberto para edicao.');
     } catch (error) {
@@ -352,7 +360,7 @@ export default function PrioridadesDiretoria() {
         <div>
           <h1 className="page-title">Prioridades Diretoria</h1>
           <p className="page-subtitle">
-            Usuarios autorizados solicitam lotes de prioridade. A diretoria alvo autoriza quais solicitacoes entram no lote.
+            Usuarios autorizados solicitam lotes de prioridade. A diretoria alvo autoriza quais titulos financeiros entram no lote.
           </p>
         </div>
         <select className="input w-full md:w-56" value={statusFiltro} onChange={event => trocarStatusFiltro(event.target.value)}>
@@ -417,7 +425,7 @@ export default function PrioridadesDiretoria() {
 
         <div className="card space-y-4">
           {!loteDetalhe ? (
-            <p className="text-sm text-[var(--c-muted)]">Selecione um lote para visualizar as solicitacoes.</p>
+            <p className="text-sm text-[var(--c-muted)]">Selecione um lote para visualizar os titulos.</p>
           ) : (
             <>
               <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
@@ -438,8 +446,8 @@ export default function PrioridadesDiretoria() {
                 <div className="rounded-2xl border border-[var(--c-border)] p-4 space-y-3">
                   <div className="grid grid-cols-1 md:grid-cols-[1fr_220px_auto_auto_auto] gap-2 md:items-end">
                     <label className="form-field flex-1">
-                      <span className="form-label">Buscar solicitacao elegivel</span>
-                      <input className="input" value={busca} onChange={event => setBusca(event.target.value)} placeholder="Codigo, obra, descricao ou tipo" />
+                      <span className="form-label">Buscar titulo elegivel</span>
+                      <input className="input" value={busca} onChange={event => setBusca(event.target.value)} placeholder="Titulo, obra, credor ou solicitacao" />
                     </label>
                     <label className="form-field">
                       <span className="form-label">Obra</span>
@@ -472,12 +480,12 @@ export default function PrioridadesDiretoria() {
 
               <div className="rounded-2xl border border-[var(--c-border)] p-4">
                 <label className="form-field">
-                  <span className="form-label">Filtrar solicitacoes do lote</span>
+                  <span className="form-label">Filtrar titulos do lote</span>
                   <input
                     className="input"
                     value={filtroItensLote}
                     onChange={event => setFiltroItensLote(event.target.value)}
-                    placeholder="Codigo, obra, descricao, status ou tipo"
+                    placeholder="Titulo, obra, credor, solicitacao ou status"
                   />
                 </label>
               </div>
@@ -487,6 +495,7 @@ export default function PrioridadesDiretoria() {
                   <thead>
                     <tr>
                       {loteDetalhe.status === 'ABERTO' && <th className="w-10"></th>}
+                      <th>Titulo</th>
                       <th>Solicitacao</th>
                       <th>Obra</th>
                       <th>Vencimento</th>
@@ -495,11 +504,11 @@ export default function PrioridadesDiretoria() {
                     </tr>
                   </thead>
                   <tbody>
-                    {solicitacoesVisiveis.map(item => (
+                    {titulosVisiveis.map(item => (
                       <tr
                         key={item.id}
                         className="cursor-pointer hover:bg-[var(--c-primary-soft)]"
-                        onClick={() => abrirSolicitacao(item.id)}
+                        onClick={() => item.solicitacao?.id && abrirSolicitacao(item.solicitacao.id)}
                       >
                         {loteDetalhe.status === 'ABERTO' && (
                           <td>
@@ -507,7 +516,7 @@ export default function PrioridadesDiretoria() {
                               type="checkbox"
                               checked={selecionados.has(String(item.id))}
                               onClick={event => event.stopPropagation()}
-                              onChange={() => alternarSolicitacao(item.id)}
+                              onChange={() => alternarTitulo(item.id)}
                             />
                           </td>
                         )}
@@ -515,22 +524,32 @@ export default function PrioridadesDiretoria() {
                           <span className="font-semibold text-[var(--c-primary)]">
                             {item.codigo || `#${item.id}`}
                           </span>
-                          <p className="text-xs text-[var(--c-muted)]">{item.tipo?.nome || '-'}</p>
+                          <p className="text-xs text-[var(--c-muted)]">{item.parceiro?.nome || item.descricao || '-'}</p>
+                        </td>
+                        <td>
+                          {item.solicitacao ? (
+                            <>
+                              <span className="font-semibold">{item.solicitacao.codigo || `#${item.solicitacao.id}`}</span>
+                              <p className="text-xs text-[var(--c-muted)]">{item.solicitacao.tipo?.nome || item.solicitacao.descricao || '-'}</p>
+                            </>
+                          ) : (
+                            <span className="text-[var(--c-muted)]">Sem solicitacao</span>
+                          )}
                         </td>
                         <td>{item.obra?.nome || '-'}</td>
                         <td>{data(item.data_vencimento)}</td>
                         <td className="text-right font-semibold">{moeda(item.valor_prioridade)}</td>
                         <td>
                           <span className="badge badge-neutral">
-                            {item.status_global || '-'}
+                            {item.status || '-'}
                           </span>
                         </td>
                       </tr>
                     ))}
-                    {solicitacoesVisiveis.length === 0 && (
+                    {titulosVisiveis.length === 0 && (
                       <tr>
-                        <td colSpan={loteDetalhe.status === 'ABERTO' ? 6 : 5} className="text-center text-[var(--c-muted)] py-8">
-                          Nenhuma solicitacao encontrada para este lote.
+                        <td colSpan={loteDetalhe.status === 'ABERTO' ? 7 : 6} className="text-center text-[var(--c-muted)] py-8">
+                          Nenhum titulo encontrado para este lote.
                         </td>
                       </tr>
                     )}

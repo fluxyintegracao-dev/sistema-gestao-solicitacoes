@@ -471,6 +471,16 @@ db.PrioridadeLoteItem.belongsTo(db.Solicitacao, {
   as: 'solicitacao'
 });
 
+db.TituloFinanceiro.hasMany(db.PrioridadeLoteItem, {
+  foreignKey: 'titulo_financeiro_id',
+  as: 'itensPrioridadeDiretoria'
+});
+
+db.PrioridadeLoteItem.belongsTo(db.TituloFinanceiro, {
+  foreignKey: 'titulo_financeiro_id',
+  as: 'titulo'
+});
+
 db.User.hasMany(db.PrioridadeLote, {
   foreignKey: 'solicitado_por',
   as: 'prioridadeLotesSolicitados'
