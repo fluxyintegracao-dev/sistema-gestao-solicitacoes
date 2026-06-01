@@ -19,7 +19,12 @@ async function verifyMfaStepUp(req, codigo) {
     throw createHttpError(403, 'MFA obrigatorio para esta operacao.');
   }
 
-  if (!verifyTotpCode(user.mfa_totp_secret, codigo)) {
+  const normalizedCode = String(codigo || '').replace(/\s+/g, '').trim();
+  if (!/^\d{6}$/.test(normalizedCode)) {
+    throw createHttpError(400, 'Codigo MFA deve ter 6 digitos.');
+  }
+
+  if (!verifyTotpCode(user.mfa_totp_secret, normalizedCode)) {
     throw createHttpError(403, 'Codigo MFA invalido.');
   }
 
