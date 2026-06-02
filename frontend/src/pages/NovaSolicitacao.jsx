@@ -229,7 +229,9 @@ export default function NovaSolicitacao() {
   const solicitacaoCompra = nomeTipoNormalizado === 'SOLICITACAO DE COMPRA';
   const outrosAssuntos = nomeTipoNormalizado === 'OUTROS ASSUNTOS';
   const pedidoContratacao = nomeTipoNormalizado === 'PEDIDO DE CONTRATACAO';
-  const tipoSemValor = solicitacaoCompra || outrosAssuntos || pedidoContratacao;
+  const tipoSemValor = solicitacaoCompra || pedidoContratacao;
+  const valorOpcional = outrosAssuntos;
+  const valorObrigatorio = !tipoSemValor && !valorOpcional;
   const exibirCamposContrato = medicaoObrigatoria || subtipoObrigatorio || locacaoMaqEq;
   const camposContratoObrigatorios = exibirCamposContrato;
   const exibirCampoSubtipo = subtipoObrigatorio;
@@ -409,7 +411,7 @@ export default function NovaSolicitacao() {
       alert('Para continuar, selecione o subtipo.');
       return;
     }
-    if (!tipoSemValor && (form.valor === '' || form.valor === null || form.valor === undefined)) {
+    if (valorObrigatorio && (form.valor === '' || form.valor === null || form.valor === undefined)) {
       alert('Informe o valor da solicitacao.');
       return;
     }
@@ -830,14 +832,14 @@ export default function NovaSolicitacao() {
 
         {!tipoSemValor && (
           <label className="grid gap-1 text-sm">
-            Valor
+            Valor{valorOpcional ? ' (opcional)' : ''}
             <input
               type="text"
               className="input"
               value={valorTexto}
               onChange={e => atualizarValor(e.target.value)}
               placeholder="R$ 0,00"
-              required
+              required={valorObrigatorio}
             />
           </label>
         )}

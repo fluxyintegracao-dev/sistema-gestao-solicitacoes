@@ -1939,8 +1939,10 @@ module.exports = {
 
       const tiposSemValor = new Set([
         'SOLICITACAO DE COMPRA',
-        'OUTROS ASSUNTOS',
         'PEDIDO DE CONTRATACAO'
+      ]);
+      const tiposValorOpcional = new Set([
+        'OUTROS ASSUNTOS'
       ]);
       const exigeCamposContrato =
         nomeTipoNormalizado === 'MEDICAO' ||
@@ -1948,7 +1950,11 @@ module.exports = {
         nomeTipoToken === 'LOCACAO DE MAQ EQ';
       const exigeSubtipo = nomeTipo === 'ADM LOCAL DE OBRA';
 
-      if (!tiposSemValor.has(nomeTipoNormalizado) && (valor === '' || valor === null || valor === undefined)) {
+      if (
+        !tiposSemValor.has(nomeTipoNormalizado) &&
+        !tiposValorOpcional.has(nomeTipoNormalizado) &&
+        (valor === '' || valor === null || valor === undefined)
+      ) {
         return res.status(400).json({
           error: 'Para continuar, informe o valor da solicitacao.'
         });

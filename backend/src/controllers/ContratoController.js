@@ -159,6 +159,21 @@ async function obterTokensSetorUsuario(req) {
   return Array.from(tokens).filter(Boolean);
 }
 
+function whereSolicitacoesDoContrato(contrato) {
+  const codigoContrato = String(contrato?.codigo || '').trim();
+  const filtros = [{ contrato_id: contrato.id }];
+
+  if (codigoContrato && contrato?.obra_id) {
+    filtros.push({
+      contrato_id: null,
+      obra_id: contrato.obra_id,
+      codigo_contrato: codigoContrato
+    });
+  }
+
+  return { [Op.or]: filtros };
+}
+
 module.exports = {
   async index(req, res) {
     try {
@@ -639,12 +654,7 @@ module.exports = {
       }
 
       const totalSolicitacoesRelacionadas = await Solicitacao.count({
-        where: {
-          [Op.or]: [
-            { contrato_id: contrato.id },
-            { codigo_contrato: contrato.codigo }
-          ]
-        }
+        where: whereSolicitacoesDoContrato(contrato)
       });
 
       if (totalSolicitacoesRelacionadas > 0) {
