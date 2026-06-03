@@ -24,6 +24,7 @@ import {
   isGeoSetor,
   normalizarSetorToken,
   obterTokensSetorUsuario,
+  usuarioPodeEnviarObraParaGeo,
   usuarioPodeEnviarSolicitacaoParaOutroSetor
 } from '../../utils/setor';
 
@@ -245,8 +246,9 @@ export default function SolicitacaoDetalhe() {
           : setorUsuario);
   const podeEnviarSetor =
     !usaFluxoAprovacaoDiretoria &&
-    !isSetorObra &&
-    usuarioPodeEnviarSolicitacaoParaOutroSetor(solicitacao.area_responsavel, user);
+    (isSetorObra
+      ? usuarioPodeEnviarObraParaGeo(solicitacao.area_responsavel, user)
+      : usuarioPodeEnviarSolicitacaoParaOutroSetor(solicitacao.area_responsavel, user));
   const setorSolicitacaoToken = normalizarSetorToken(solicitacao.area_responsavel);
   const setorSemAlteracaoStatus = tokensSetoresSemAlteracaoStatus.some(token =>
     tokensSetorEquivalentes(token, setorSolicitacaoToken)
@@ -341,6 +343,7 @@ export default function SolicitacaoDetalhe() {
       {modalEnviarSetor && podeEnviarSetor && (
         <ModalEnviarSetor
           solicitacaoId={solicitacao.id}
+          apenasGeo={isSetorObra}
           onClose={() => setModalEnviarSetor(false)}
           onSucesso={carregar}
         />

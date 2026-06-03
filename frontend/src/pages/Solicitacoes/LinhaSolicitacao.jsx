@@ -4,8 +4,10 @@ import StatusBadge from '../../components/StatusBadge';
 import { useTheme } from '../../contexts/ThemeContext';
 import {
   isGeoSetor,
+  isObraSetor,
   obterTokensSetorUsuario,
   solicitacaoEstaNoSetorDoUsuario,
+  usuarioPodeEnviarObraParaGeo,
   usuarioPodeEnviarSolicitacaoParaOutroSetor
 } from '../../utils/setor';
 import ModalAtribuirResponsavel from './ModalAtribuirResponsavel';
@@ -54,10 +56,8 @@ export default function LinhaSolicitacao({
   });
   const { user } = useAuth();
   const { tema } = useTheme();
-  const isSetorObra =
-    user?.setor?.codigo === 'OBRA' ||
-    user?.area === 'OBRA';
   const setorTokens = obterTokensSetorUsuario(user);
+  const isSetorObra = setorTokens.some(isObraSetor);
   const isAdminGEO =
     String(user?.perfil || '').toUpperCase().startsWith('ADMIN') &&
     setorTokens.some(isGeoSetor);
@@ -84,8 +84,9 @@ export default function LinhaSolicitacao({
       ? (!!permissaoUsuario?.usuario_pode_atribuir || isFinanceiro)
       : true);
   const podeEnviar =
-    !isSetorObra &&
-    usuarioPodeEnviarSolicitacaoParaOutroSetor(solicitacao.area_responsavel, user);
+    isSetorObra
+      ? usuarioPodeEnviarObraParaGeo(solicitacao.area_responsavel, user)
+      : usuarioPodeEnviarSolicitacaoParaOutroSetor(solicitacao.area_responsavel, user);
 
   const navigate = useNavigate();
   const dataCriacaoRaw =
@@ -537,6 +538,7 @@ export default function LinhaSolicitacao({
       {modalEnviar && (
         <ModalEnviarSetor
           solicitacaoId={solicitacao.id}
+          apenasGeo={isSetorObra}
           onClose={() => setModalEnviar(false)}
           onSucesso={onAtualizar}
         />

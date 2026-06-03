@@ -23,7 +23,7 @@ A visibilidade efetiva depende de combinacao entre:
 - o `SUPERADMIN` pode configurar setores com alteracao livre de status; usuarios desses setores podem alterar status mesmo quando a solicitacao estiver em outro setor.
 - assumir e enviar solicitacoes dependem do setor atual da solicitacao.
 - `SUPERADMIN` pode marcar usuarios com permissao especial para enviar solicitacoes fora do setor atual da solicitacao.
-- a permissao especial de envio nao remove o bloqueio do setor `OBRA`.
+- a permissao especial de envio nao remove o bloqueio geral do setor `OBRA`; usuarios de `OBRA` podem enviar apenas solicitacoes que estejam em `OBRA` para `GEO`/`GERENCIA DE PROCESSOS`/`GERENCIAMENTO DE PROCESSOS`.
 - `SUPERADMIN` pode marcar usuarios com permissao especial para alterar o valor total da solicitacao em `Configuracoes > Alterar Valor da Solicitacao`.
 - `SUPERADMIN` e `ADMIN` do setor `GEO` continuam com permissao padrao para alterar o valor da solicitacao.
 - `SUPERADMIN` pode marcar usuarios com permissao para usar a opcao `Todas` no filtro `Por pagina` da listagem de solicitacoes e da gestao de contratos; o backend bloqueia `limit=ALL` para solicitacoes quando o usuario nao tem essa permissao.
@@ -63,6 +63,7 @@ A visibilidade efetiva depende de combinacao entre:
   - a automacao ocorre apos a alteracao manual de status
   - o historico registra `ENVIO_AUTOMATICO_SETOR`
   - as automacoes legadas ja existentes no fluxo atual continuam valendo
+  - ao alterar de `PENDENTE_DE_AJUSTE` ou `AGUARDANDO_AJUSTE` para `ATENDIDO`, `OBRA`, `DIR_OBRAS_PUBLICAS` e `DIR_OBRAS_PRIVADAS` retornam automaticamente a solicitacao para o setor que enviou o ajuste
 - prioridades da diretoria:
   - `DIR_ADMIN` nao ganha visibilidade global automatica de solicitacoes, mas pode abrir lotes de prioridade
   - para prioridades, usuarios vinculados ao setor `DIR_ADMIN` ou ao nome `DIRETORIA ADMINISTRATIVA` sao tratados como aprovadores administrativos

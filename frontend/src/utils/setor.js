@@ -9,7 +9,17 @@ export function normalizarSetorToken(valor) {
 
 export function isGeoSetor(valor) {
   const token = normalizarSetorToken(valor);
-  return token === 'GEO' || token === 'GERENCIA_DE_PROCESSOS' || token === 'GERENCIA_PROCESSOS';
+  return (
+    token === 'GEO' ||
+    token === 'GERENCIA_DE_PROCESSOS' ||
+    token === 'GERENCIA_PROCESSOS' ||
+    token === 'GERENCIAMENTO_DE_PROCESSOS' ||
+    token === 'GERENCIAMENTO_PROCESSOS'
+  );
+}
+
+export function isObraSetor(valor) {
+  return normalizarSetorToken(valor) === 'OBRA';
 }
 
 export function obterTokensSetorUsuario(user) {
@@ -89,6 +99,14 @@ export function solicitacaoEstaNoSetorDoUsuario(areaResponsavel, user) {
 export function usuarioPodeEnviarQualquerSetor(user) {
   const perfil = String(user?.perfil || '').trim().toUpperCase();
   return perfil === 'SUPERADMIN' || Boolean(user?.pode_enviar_qualquer_setor);
+}
+
+export function usuarioEhSetorObra(user) {
+  return obterTokensSetorUsuario(user).some(isObraSetor);
+}
+
+export function usuarioPodeEnviarObraParaGeo(areaResponsavel, user) {
+  return usuarioEhSetorObra(user) && isObraSetor(areaResponsavel);
 }
 
 export function usuarioPodeEnviarSolicitacaoParaOutroSetor(areaResponsavel, user) {

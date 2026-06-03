@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { API_URL, authHeaders } from '../../services/api';
+import { isGeoSetor } from '../../utils/setor';
 
 export default function ModalEnviarSetor({
   solicitacaoId,
+  apenasGeo = false,
   onClose,
   onSucesso
 }) {
@@ -22,6 +24,10 @@ export default function ModalEnviarSetor({
     const data = await res.json();
     setSetores(data);
   }
+
+  const setoresDisponiveis = apenasGeo
+    ? setores.filter(s => isGeoSetor(s.codigo) || isGeoSetor(s.nome))
+    : setores;
 
   async function enviar() {
     if (!setor) {
@@ -71,7 +77,7 @@ export default function ModalEnviarSetor({
         >
           <option value="">Selecione um setor</option>
 
-          {setores.map(s => (
+          {setoresDisponiveis.map(s => (
             <option key={s.id} value={s.nome}>
               {s.nome}
             </option>

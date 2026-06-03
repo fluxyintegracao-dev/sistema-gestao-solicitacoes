@@ -86,7 +86,9 @@ const TOKENS_GEO_EQUIVALENTES = new Set([
   'GERENCIA_DE_PROCESSOS',
   'GERENCIAS_DE_PROCESSOS',
   'GERENCIAS_PROCESSOS',
-  'GERENCIA_PROCESSOS'
+  'GERENCIA_PROCESSOS',
+  'GERENCIAMENTO_DE_PROCESSOS',
+  'GERENCIAMENTO_PROCESSOS'
 ]);
 const VALORES_AREA_GEO_EQUIVALENTES = [
   'GEO',
@@ -96,6 +98,9 @@ const VALORES_AREA_GEO_EQUIVALENTES = [
   'GERENCIAS DE PROCESSOS',
   'GERENCIAS_DE_PROCESSOS',
   'GERENCIAS_PROCESSOS',
+  'GERENCIAMENTO DE PROCESSOS',
+  'GERENCIAMENTO_DE_PROCESSOS',
+  'GERENCIAMENTO_PROCESSOS',
   'GERÊNCIA DE PROCESSOS',
   'GERÊNCIA_DE_PROCESSOS',
   'GERÊNCIA_PROCESSOS',
@@ -704,6 +709,33 @@ function setorPertenceAoUsuario(tokensSetor = [], setorSolicitacao = null) {
     if (tokenNormalizado === setorNormalizado) return true;
     return isGeoToken(tokenNormalizado) && isGeoToken(setorNormalizado);
   });
+}
+
+function setoresEquivalentesParaAutomacao(setorA = null, setorB = null) {
+  const tokenA = normalizarTokenComparacao(setorA);
+  const tokenB = normalizarTokenComparacao(setorB);
+  if (!tokenA || !tokenB) return false;
+  if (tokenA === tokenB) return true;
+  if (isGeoToken(tokenA) && isGeoToken(tokenB)) return true;
+
+  const diretoriaA = normalizarDiretoriaObrasToken(tokenA);
+  const diretoriaB = normalizarDiretoriaObrasToken(tokenB);
+  return Boolean(diretoriaA && diretoriaB && diretoriaA === diretoriaB);
+}
+
+function destinoHistoricoEhSetorAtualAjuste(destino, setorAtual, isSetorObraAtual) {
+  if (setoresEquivalentesParaAutomacao(destino, setorAtual)) {
+    return true;
+  }
+
+  return Boolean(isSetorObraAtual && normalizarTokenComparacao(destino) === 'OBRA');
+}
+
+function origemHistoricoPodeReceberRetornoAjuste(origem, setorAtual, isSetorObraAtual) {
+  const origemNorm = normalizarTokenComparacao(origem);
+  if (!origemNorm) return false;
+  if (setoresEquivalentesParaAutomacao(origem, setorAtual)) return false;
+  return !(isSetorObraAtual && origemNorm === 'OBRA');
 }
 
 function obterRegrasTipoPorTokensSetor(regrasConfig = {}, tokensSetor = []) {
@@ -2523,13 +2555,15 @@ module.exports = {
       });
 
       let enviouAutomaticamente = false;
+      const setorAtualEhDiretoriaObras = isDiretoriaObrasToken(setorAtual);
+      const aplicaRetornoAjusteAtendido = isSetorObra || setorAtualEhDiretoriaObras;
 
-      if (isSetorObra) {
+      if (aplicaRetornoAjusteAtendido) {
         const statusAnteriorNorm = normalizarTokenComparacao(statusAnterior);
         const statusNovoNorm = normalizarTokenComparacao(status);
 
-        // Quando OBRA atende um ajuste, retorna automaticamente para o setor
-        // que enviou a solicitacao para OBRA (ultimo envio para OBRA).
+        // Quando OBRA ou diretorias de obras atendem um ajuste, retorna para o
+        // setor que enviou a solicitacao para ajuste.
         const statusAjustePend = new Set(['PENDENTE_DE_AJUSTE', 'AGUARDANDO_AJUSTE']);
         if (statusAjustePend.has(statusAnteriorNorm) && statusNovoNorm === 'ATENDIDO') {
           const envios = await Historico.findAll({
@@ -2547,10 +2581,8 @@ module.exports = {
           for (const envio of envios) {
             const parsed = parseObservacaoEnvioSetor(envio.observacao);
             if (!parsed) continue;
-            const destinoNorm = normalizarTokenComparacao(parsed.destino);
-            if (destinoNorm !== setorAtualNorm && destinoNorm !== 'OBRA') continue;
-            const origemNorm = normalizarTokenComparacao(parsed.origem);
-            if (!origemNorm || origemNorm === setorAtualNorm || origemNorm === 'OBRA') continue;
+            if (!destinoHistoricoEhSetorAtualAjuste(parsed.destino, setorAtualNorm, isSetorObra)) continue;
+            if (!origemHistoricoPodeReceberRetornoAjuste(parsed.origem, setorAtualNorm, isSetorObra)) continue;
             setorRetorno = parsed.origem;
             break;
           }
@@ -2578,6 +2610,10 @@ module.exports = {
             enviouAutomaticamente = true;
           }
         }
+      }
+
+      if (isSetorObra) {
+        const statusNovoNorm = normalizarTokenComparacao(status);
 
         // Quando OBRA marca "Mercadoria Entregue", envia automaticamente para FINANCEIRO.
         if (!enviouAutomaticamente && statusNovoNorm === 'MERCADORIA_ENTREGUE') {
@@ -3347,13 +3383,13 @@ module.exports = {
       const perfil = String(req.user?.perfil || '').trim().toUpperCase();
       const isSetorObra = await isUsuarioSetorObra(req);
 
-      if (isSetorObra) {
-        return res.status(403).json({
-          error: 'Setor OBRA nao pode enviar solicitacoes para outro setor. Para seguir, solicite apoio ao responsavel do setor.'
-        });
-      }
       if (!setorDestino) {
         return res.status(400).json({ error: 'Selecione um setor de destino.' });
+      }
+      if (isSetorObra && !isGeoToken(setorDestino)) {
+        return res.status(403).json({
+          error: 'Setor OBRA pode enviar solicitacoes apenas para GEO/GERENCIA DE PROCESSOS.'
+        });
       }
       if (idsUnicos.length === 0) {
         return res.status(400).json({ error: 'Informe ao menos uma solicitacao.' });
@@ -3666,9 +3702,13 @@ module.exports = {
       const areaUsuario = await obterAreaUsuario(req);
       const isSetorObra = await isUsuarioSetorObra(req);
 
-      if (isSetorObra) {
+      if (!String(setor_destino || '').trim()) {
+        return res.status(400).json({ error: 'Selecione um setor de destino.' });
+      }
+
+      if (isSetorObra && !isGeoToken(setor_destino)) {
         return res.status(403).json({
-          error: 'Setor OBRA nao pode enviar solicitacoes para outro setor. Para seguir, solicite apoio ao responsavel do setor.'
+          error: 'Setor OBRA pode enviar solicitacoes apenas para GEO/GERENCIA DE PROCESSOS.'
         });
       }
 

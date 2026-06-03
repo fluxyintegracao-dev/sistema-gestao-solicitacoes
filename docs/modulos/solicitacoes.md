@@ -63,7 +63,7 @@
 - quando a combinacao configurada e atendida em uma alteracao de status, a solicitacao e enviada automaticamente para o setor destino
 - a automacao registra historico com a acao `ENVIO_AUTOMATICO_SETOR`
 - as automacoes legadas do fluxo atual continuam ativas:
-  - retorno automatico para setor anterior em ajustes atendidos pela `OBRA`
+  - retorno automatico para setor anterior em ajustes atendidos pela `OBRA`, `DIR_OBRAS_PUBLICAS` ou `DIR_OBRAS_PRIVADAS`
   - `MERCADORIA_ENTREGUE -> FINANCEIRO` no fluxo atual da `OBRA`
 
 ## Prioridades da diretoria

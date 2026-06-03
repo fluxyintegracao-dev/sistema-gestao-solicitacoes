@@ -34,6 +34,7 @@ import {
   obterIdsSetoresUsuario,
   obterTokensSetorUsuario,
   solicitacaoEstaNoSetorDoUsuario,
+  usuarioPodeEnviarObraParaGeo,
   usuarioPodeEnviarSolicitacaoParaOutroSetor
 } from '../../utils/setor';
 import {
@@ -491,7 +492,7 @@ export default function Solicitacoes({ arquivadas = false }) {
     String(user?.area || '').toUpperCase()
   ];
   const setorTokensNormalizados = obterTokensSetorUsuario(user).map(normalizarSetorToken);
-  const isSetorObra = setorTokens.includes('OBRA');
+  const isSetorObra = setorTokensNormalizados.includes('OBRA');
   const isSetorFinanceiro = setorTokens.includes('FINANCEIRO');
   const isDiretoriaObrasPublicas = setorTokensNormalizados.includes('DIR_OBRAS_PUBLICAS');
   const isDiretoriaObrasPrivadas = setorTokensNormalizados.includes('DIR_OBRAS_PRIVADAS');
@@ -503,6 +504,11 @@ export default function Solicitacoes({ arquivadas = false }) {
       : '';
   const isAdminGEO = perfilUpper.startsWith('ADMIN') && setorTokens.some(isGeoSetor);
   const isSuperadmin = perfilUpper === 'SUPERADMIN';
+  const setoresDestinoEnvio = useMemo(() => (
+    isSetorObra
+      ? setoresLista.filter(s => isGeoSetor(s.codigo) || isGeoSetor(s.nome))
+      : setoresLista
+  ), [isSetorObra, setoresLista]);
   const colunasStorageKey = useMemo(() => {
     const identificador = user?.id || user?.email || user?.nome || user?.perfil || 'anon';
     return `solicitacoes:colunas:${identificador}`;
@@ -770,16 +776,16 @@ export default function Solicitacoes({ arquivadas = false }) {
   }
 
   async function confirmarEnvioMassa() {
-    if (isSetorObra) {
-      alert('Setor OBRA não pode enviar solicitações para outro setor.');
-      return;
-    }
     if (selecionadasIds.length === 0) {
       alert('Selecione ao menos uma solicitação.');
       return;
     }
     if (!setorEnvioMassa) {
       alert('Selecione um setor de destino.');
+      return;
+    }
+    if (isSetorObra && !isGeoSetor(setorEnvioMassa)) {
+      alert('Setor OBRA pode enviar solicitacoes apenas para GEO/GERENCIA DE PROCESSOS.');
       return;
     }
 
@@ -935,14 +941,21 @@ export default function Solicitacoes({ arquivadas = false }) {
 
   const podeExcluirUnica = !!selecionadaUnica && (isSuperadmin || isAdminGEO);
   const podeEnviarUnica = useMemo(() => {
-    if (!selecionadaUnica || isSetorObra) return false;
+    if (!selecionadaUnica) return false;
+    if (isSetorObra) {
+      return usuarioPodeEnviarObraParaGeo(selecionadaUnica.area_responsavel, user);
+    }
     return usuarioPodeEnviarSolicitacaoParaOutroSetor(selecionadaUnica.area_responsavel, user);
   }, [selecionadaUnica, isSetorObra, user]);
   const podeEnviarMassa = useMemo(() => {
-    if (selecionadasIds.length <= 1 || isSetorObra) return false;
+    if (selecionadasIds.length <= 1) return false;
     return selecionadasIds.every(idSelecionado => {
       const solicitacao = solicitacoes.find(item => Number(item.id) === Number(idSelecionado));
-      return solicitacao && usuarioPodeEnviarSolicitacaoParaOutroSetor(solicitacao.area_responsavel, user);
+      if (!solicitacao) return false;
+      if (isSetorObra) {
+        return usuarioPodeEnviarObraParaGeo(solicitacao.area_responsavel, user);
+      }
+      return usuarioPodeEnviarSolicitacaoParaOutroSetor(solicitacao.area_responsavel, user);
     });
   }, [selecionadasIds, isSetorObra, solicitacoes, user]);
   const setorParaStatusMassa = useMemo(() => {
@@ -1436,6 +1449,7 @@ export default function Solicitacoes({ arquivadas = false }) {
       {!arquivadas && modalEnviarUnitario && selecionadaUnica && (
         <ModalEnviarSetor
           solicitacaoId={selecionadaUnica.id}
+          apenasGeo={isSetorObra}
           onClose={() => setModalEnviarUnitario(false)}
           onSucesso={carregar}
         />
@@ -1496,7 +1510,7 @@ export default function Solicitacoes({ arquivadas = false }) {
               onChange={e => setSetorEnvioMassa(e.target.value)}
             >
               <option value="">Selecione um setor</option>
-              {setoresLista.map(s => (
+              {setoresDestinoEnvio.map(s => (
                 <option key={s.id} value={s.nome}>
                   {s.nome}
                 </option>
