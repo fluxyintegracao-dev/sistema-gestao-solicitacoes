@@ -918,6 +918,49 @@ export async function getRelatorioEndividamentoFinanceiro(params = {}) {
   return parseJson(response, 'Erro ao buscar relatorio de endividamento');
 }
 
+export async function getFinanciamentosBancarios(params = {}) {
+  const query = new URLSearchParams(
+    Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== '')
+  ).toString();
+  const url = query
+    ? `${API_URL}/financeiro/financiamentos-bancarios?${query}`
+    : `${API_URL}/financeiro/financiamentos-bancarios`;
+
+  const response = await fetch(url, {
+    headers: authHeaders()
+  });
+
+  return parseJson(response, 'Erro ao buscar financiamentos bancarios');
+}
+
+export async function getFinanciamentoBancario(id) {
+  const response = await fetch(`${API_URL}/financeiro/financiamentos-bancarios/${id}`, {
+    headers: authHeaders()
+  });
+
+  return parseJson(response, 'Erro ao buscar financiamento bancario');
+}
+
+export async function criarFinanciamentoBancario(data) {
+  const response = await fetch(`${API_URL}/financeiro/financiamentos-bancarios`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+
+  return parseJson(response, 'Erro ao cadastrar financiamento bancario');
+}
+
+export async function gerarTitulosFinanciamentoBancario(id) {
+  const response = await fetch(`${API_URL}/financeiro/financiamentos-bancarios/${id}/gerar-titulos`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({})
+  });
+
+  return parseJson(response, 'Erro ao gerar titulos do financiamento bancario');
+}
+
 export async function getPaymentBeneficiaries(params = {}) {
   const query = new URLSearchParams(
     Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== '')

@@ -89,6 +89,8 @@ db.FaturaCartaoFinanceiro = require('./FaturaCartaoFinanceiro')(sequelize, Seque
 db.FaturaCartaoTitulo = require('./FaturaCartaoTitulo')(sequelize, Sequelize);
 db.TituloFinanceiro = require('./TituloFinanceiro')(sequelize, Sequelize);
 db.TituloFinanceiroSequencia = require('./TituloFinanceiroSequencia')(sequelize, Sequelize);
+db.FinanciamentoBancario = require('./FinanciamentoBancario')(sequelize, Sequelize);
+db.FinanciamentoBancarioParcela = require('./FinanciamentoBancarioParcela')(sequelize, Sequelize);
 db.BoletoCaixaConvenio = require('./BoletoCaixaConvenio')(sequelize, Sequelize);
 db.BoletoCaixa = require('./BoletoCaixa')(sequelize, Sequelize);
 db.BoletoCaixaRemessa = require('./BoletoCaixaRemessa')(sequelize, Sequelize);
@@ -2320,6 +2322,86 @@ db.User.hasMany(db.TituloFinanceiro, {
 db.TituloFinanceiro.belongsTo(db.User, {
   foreignKey: 'criado_por',
   as: 'criadoPor'
+});
+
+db.EmpresaGrupo.hasMany(db.FinanciamentoBancario, {
+  foreignKey: 'empresa_id',
+  as: 'financiamentosBancarios'
+});
+
+db.FinanciamentoBancario.belongsTo(db.EmpresaGrupo, {
+  foreignKey: 'empresa_id',
+  as: 'empresa'
+});
+
+db.ContaBancaria.hasMany(db.FinanciamentoBancario, {
+  foreignKey: 'conta_bancaria_id',
+  as: 'financiamentosBancarios'
+});
+
+db.FinanciamentoBancario.belongsTo(db.ContaBancaria, {
+  foreignKey: 'conta_bancaria_id',
+  as: 'contaBancaria'
+});
+
+db.Obra.hasMany(db.FinanciamentoBancario, {
+  foreignKey: 'obra_id',
+  as: 'financiamentosBancarios'
+});
+
+db.FinanciamentoBancario.belongsTo(db.Obra, {
+  foreignKey: 'obra_id',
+  as: 'obra'
+});
+
+db.Parceiro.hasMany(db.FinanciamentoBancario, {
+  foreignKey: 'parceiro_id',
+  as: 'financiamentosBancarios'
+});
+
+db.FinanciamentoBancario.belongsTo(db.Parceiro, {
+  foreignKey: 'parceiro_id',
+  as: 'instituicaoFinanceira'
+});
+
+db.CategoriaFinanceira.hasMany(db.FinanciamentoBancario, {
+  foreignKey: 'categoria_financeira_id',
+  as: 'financiamentosBancarios'
+});
+
+db.FinanciamentoBancario.belongsTo(db.CategoriaFinanceira, {
+  foreignKey: 'categoria_financeira_id',
+  as: 'categoriaFinanceira'
+});
+
+db.FinanciamentoBancario.hasMany(db.FinanciamentoBancarioParcela, {
+  foreignKey: 'financiamento_bancario_id',
+  as: 'parcelas'
+});
+
+db.FinanciamentoBancarioParcela.belongsTo(db.FinanciamentoBancario, {
+  foreignKey: 'financiamento_bancario_id',
+  as: 'financiamento'
+});
+
+db.TituloFinanceiro.hasOne(db.FinanciamentoBancarioParcela, {
+  foreignKey: 'titulo_financeiro_id',
+  as: 'financiamentoParcela'
+});
+
+db.FinanciamentoBancarioParcela.belongsTo(db.TituloFinanceiro, {
+  foreignKey: 'titulo_financeiro_id',
+  as: 'tituloFinanceiro'
+});
+
+db.FinanciamentoBancario.belongsTo(db.User, {
+  foreignKey: 'criado_por',
+  as: 'criadoPor'
+});
+
+db.FinanciamentoBancario.belongsTo(db.User, {
+  foreignKey: 'atualizado_por',
+  as: 'atualizadoPor'
 });
 
 db.EmpresaGrupo.hasMany(db.BoletoCaixaConvenio, {

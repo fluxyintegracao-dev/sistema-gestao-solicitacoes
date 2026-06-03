@@ -448,6 +448,91 @@ function validateFinanceEndividamentoQuery(query = {}) {
   };
 }
 
+function validateFinanceFinanciamentoBancarioQuery(query = {}) {
+  ensureAllowedKeys(
+    query,
+    [
+      'status',
+      'q',
+      'empresa_id',
+      'conta_bancaria_id',
+      'obra_id',
+      'parceiro_id',
+      'limit'
+    ],
+    'Consulta de financiamentos bancarios'
+  );
+
+  const limit = parseInteger(query.limit, 'Limite');
+
+  return {
+    status: parseEnum(query.status, 'Status', ['RASCUNHO', 'ATIVO', 'LIQUIDADO', 'CANCELADO']),
+    q: parseOptionalText(query.q, 'Busca', 120),
+    empresa_id: parseInteger(query.empresa_id, 'Empresa do grupo'),
+    conta_bancaria_id: parseInteger(query.conta_bancaria_id, 'Conta bancaria'),
+    obra_id: parseInteger(query.obra_id, 'Obra/Centro de custo'),
+    parceiro_id: parseInteger(query.parceiro_id, 'Instituicao financeira'),
+    limit: limit ? Math.min(limit, 500) : undefined
+  };
+}
+
+function validateFinanceFinanciamentoBancarioCreateBody(body = {}) {
+  ensureAllowedKeys(
+    body,
+    [
+      'conta_bancaria_id',
+      'obra_id',
+      'parceiro_id',
+      'categoria_financeira_id',
+      'numero_contrato',
+      'documento_referencia',
+      'tipo_contrato',
+      'sistema_amortizacao',
+      'taxa_juros_mensal',
+      'data_contrato',
+      'data_credito',
+      'primeiro_vencimento',
+      'quantidade_parcelas',
+      'valor_credito',
+      'valor_juros_total',
+      'valor_iof',
+      'valor_tarifas',
+      'observacoes'
+    ],
+    'Cadastro de financiamento bancario'
+  );
+
+  const dataContrato = parseDateOnly(body.data_contrato, 'Data do contrato', { required: true });
+  const dataCredito = parseDateOnly(body.data_credito, 'Data do credito', { required: true });
+  const primeiroVencimento = parseDateOnly(body.primeiro_vencimento, 'Primeiro vencimento', { required: true });
+  const quantidadeParcelas = parseInteger(body.quantidade_parcelas, 'Quantidade de parcelas', { required: true });
+
+  if (quantidadeParcelas > 240) {
+    throw new ValidationError('Quantidade de parcelas nao pode ser maior que 240.');
+  }
+
+  return {
+    conta_bancaria_id: parseInteger(body.conta_bancaria_id, 'Conta bancaria do credito', { required: true }),
+    obra_id: parseInteger(body.obra_id, 'Obra/Centro de custo', { required: true }),
+    parceiro_id: parseInteger(body.parceiro_id, 'Instituicao financeira', { required: true }),
+    categoria_financeira_id: parseInteger(body.categoria_financeira_id, 'Categoria financeira das parcelas', { required: true }),
+    numero_contrato: parseOptionalText(body.numero_contrato, 'Numero do contrato', 120, { required: true }),
+    documento_referencia: parseOptionalText(body.documento_referencia, 'Documento de referencia', 120),
+    tipo_contrato: parseOptionalText(body.tipo_contrato, 'Tipo de contrato', 80),
+    sistema_amortizacao: parseEnum(body.sistema_amortizacao || 'FIXO', 'Sistema de amortizacao', ['FIXO', 'PRICE', 'SAC']),
+    taxa_juros_mensal: parseDecimal(body.taxa_juros_mensal, 'Taxa de juros mensal', { min: 0 }),
+    data_contrato: dataContrato,
+    data_credito: dataCredito,
+    primeiro_vencimento: primeiroVencimento,
+    quantidade_parcelas: quantidadeParcelas,
+    valor_credito: parseDecimal(body.valor_credito, 'Valor do credito', { required: true, min: 0.01 }),
+    valor_juros_total: parseDecimal(body.valor_juros_total, 'Valor total de juros', { min: 0 }),
+    valor_iof: parseDecimal(body.valor_iof, 'Valor de IOF', { min: 0 }),
+    valor_tarifas: parseDecimal(body.valor_tarifas, 'Valor de tarifas', { min: 0 }),
+    observacoes: parseOptionalText(body.observacoes, 'Observacoes', 4000)
+  };
+}
+
 function validateFinanceIntercompanyQuery(query = {}) {
   ensureAllowedKeys(
     query,
@@ -1435,6 +1520,8 @@ module.exports = {
   validateFinanceDreQuery,
   validateFinanceDreComparativoQuery,
   validateFinanceEndividamentoQuery,
+  validateFinanceFinanciamentoBancarioCreateBody,
+  validateFinanceFinanciamentoBancarioQuery,
   validateFinanceFluxoCaixaQuery,
   validateFinanceFluxoConsolidadoQuery,
   validateFinanceIntercompanyQuery,

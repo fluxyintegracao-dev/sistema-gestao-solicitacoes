@@ -404,6 +404,7 @@ export default function Layout() {
     if (financeiroAccess || pagamentosAccess || boletosAccess) {
       addGroup('Financeiro', [
         financeiroAccess ? item('/financeiro/titulos', 'Titulos Financeiros', HiOutlineWallet) : null,
+        financeiroAccess ? item('/financeiro/financiamentos-bancarios', 'Financiamentos Bancarios', HiOutlineBanknotes) : null,
         pagamentosAccess ? item('/financeiro/pagamentos', 'Pagamentos em Massa', HiOutlinePaperAirplane) : null,
         boletosAccess ? item('/financeiro/boletos', 'Boletos', HiOutlineDocumentText) : null,
         financeiroAccess ? item('/financeiro/faturas-cartao', 'Faturas de Cartao', HiOutlineCreditCard) : null,

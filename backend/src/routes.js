@@ -157,6 +157,8 @@ const {
   validateFinanceDreComparativoQuery,
   validateFinanceDreQuery,
   validateFinanceEndividamentoQuery,
+  validateFinanceFinanciamentoBancarioCreateBody,
+  validateFinanceFinanciamentoBancarioQuery,
   validateFinanceFluxoCaixaQuery,
   validateFinanceFluxoConsolidadoQuery,
   validateFinanceIntercompanyQuery,
@@ -311,6 +313,7 @@ const FormaPagamentoFinanceiraController = require('./controllers/FormaPagamento
 const CartaoFinanceiroController = require('./controllers/CartaoFinanceiroController');
 const FaturaCartaoFinanceiroController = require('./controllers/FaturaCartaoFinanceiroController');
 const TituloFinanceiroController = require('./controllers/TituloFinanceiroController');
+const FinanciamentoBancarioController = require('./controllers/FinanciamentoBancarioController');
 const RelatorioFinanceiroController = require('./controllers/RelatorioFinanceiroController');
 const ConciliacaoBancariaController = require('./controllers/ConciliacaoBancariaController');
 const CaixaFinanceiroController = require('./controllers/CaixaFinanceiroController');
@@ -1269,6 +1272,11 @@ router.get('/financeiro/relatorios/endividamento', allowFinanceiro, validateRequ
 router.get('/financeiro/relatorios/resultado-obras', allowFinanceiro, ResultadoObrasController.index);
 router.get('/financeiro/relatorios/centros-custo', allowFinanceiro, ResultadoCentrosCustoController.index);
 router.get('/financeiro/baixas', allowFinanceiro, validateRequest({ query: validateFinanceBaixasQuery }), TituloFinanceiroController.baixas);
+router.get('/financeiro/financiamentos-bancarios', allowFinanceiro, validateRequest({ query: validateFinanceFinanciamentoBancarioQuery }), FinanciamentoBancarioController.index);
+router.post('/financeiro/financiamentos-bancarios', allowFinanceiro, criticalRateLimit, validateRequest({ body: validateFinanceFinanciamentoBancarioCreateBody }), FinanciamentoBancarioController.create);
+router.get('/financeiro/financiamentos-bancarios/:id', allowFinanceiro, validateRequest({ params: validateNumericIdParam('id', 'Financiamento bancario') }), FinanciamentoBancarioController.show);
+router.get('/financeiro/financiamentos-bancarios/:id/auditoria', allowFinanceiro, validateRequest({ params: validateNumericIdParam('id', 'Financiamento bancario') }), FinanciamentoBancarioController.auditoria);
+router.post('/financeiro/financiamentos-bancarios/:id/gerar-titulos', allowFinanceiro, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Financiamento bancario') }), FinanciamentoBancarioController.gerarTitulos);
 router.get('/financeiro/titulos', allowFinanceiro, validateRequest({ query: validateFinanceTituloQuery }), TituloFinanceiroController.index);
 router.post('/financeiro/titulos', allowFinanceiro, criticalRateLimit, validateRequest({ body: validateFinanceTituloCreateBody }), TituloFinanceiroController.create);
 router.get('/financeiro/titulos/:id', allowFinanceiro, validateRequest({ params: validateNumericIdParam('id', 'Titulo financeiro') }), TituloFinanceiroController.show);
