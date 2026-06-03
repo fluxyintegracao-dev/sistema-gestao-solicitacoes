@@ -26,7 +26,7 @@ module.exports = (sequelize, DataTypes) => sequelize.define(
     },
     obra_id: {
       type: DataTypes.INTEGER,
-      allowNull: false
+      allowNull: true
     },
     parceiro_id: {
       type: DataTypes.INTEGER,

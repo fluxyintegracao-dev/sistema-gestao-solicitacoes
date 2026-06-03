@@ -452,14 +452,13 @@ function validateFinanceFinanciamentoBancarioQuery(query = {}) {
   ensureAllowedKeys(
     query,
     [
-      'status',
-      'q',
-      'empresa_id',
-      'conta_bancaria_id',
-      'obra_id',
-      'parceiro_id',
-      'limit'
-    ],
+        'status',
+        'q',
+        'empresa_id',
+        'conta_bancaria_id',
+        'parceiro_id',
+        'limit'
+      ],
     'Consulta de financiamentos bancarios'
   );
 
@@ -467,24 +466,23 @@ function validateFinanceFinanciamentoBancarioQuery(query = {}) {
 
   return {
     status: parseEnum(query.status, 'Status', ['RASCUNHO', 'ATIVO', 'LIQUIDADO', 'CANCELADO']),
-    q: parseOptionalText(query.q, 'Busca', 120),
-    empresa_id: parseInteger(query.empresa_id, 'Empresa do grupo'),
-    conta_bancaria_id: parseInteger(query.conta_bancaria_id, 'Conta bancaria'),
-    obra_id: parseInteger(query.obra_id, 'Obra/Centro de custo'),
-    parceiro_id: parseInteger(query.parceiro_id, 'Instituicao financeira'),
-    limit: limit ? Math.min(limit, 500) : undefined
-  };
+      q: parseOptionalText(query.q, 'Busca', 120),
+      empresa_id: parseInteger(query.empresa_id, 'Empresa do grupo'),
+      conta_bancaria_id: parseInteger(query.conta_bancaria_id, 'Conta bancaria'),
+      parceiro_id: parseInteger(query.parceiro_id, 'Instituicao financeira'),
+      limit: limit ? Math.min(limit, 500) : undefined
+    };
 }
 
 function validateFinanceFinanciamentoBancarioCreateBody(body = {}) {
   ensureAllowedKeys(
-    body,
-    [
-      'conta_bancaria_id',
-      'obra_id',
-      'parceiro_id',
-      'categoria_financeira_id',
-      'numero_contrato',
+      body,
+      [
+        'conta_bancaria_id',
+        'empresa_id',
+        'parceiro_id',
+        'categoria_financeira_id',
+        'numero_contrato',
       'documento_referencia',
       'tipo_contrato',
       'sistema_amortizacao',
@@ -511,10 +509,10 @@ function validateFinanceFinanciamentoBancarioCreateBody(body = {}) {
     throw new ValidationError('Quantidade de parcelas nao pode ser maior que 240.');
   }
 
-  return {
-    conta_bancaria_id: parseInteger(body.conta_bancaria_id, 'Conta bancaria do credito', { required: true }),
-    obra_id: parseInteger(body.obra_id, 'Obra/Centro de custo', { required: true }),
-    parceiro_id: parseInteger(body.parceiro_id, 'Instituicao financeira', { required: true }),
+    return {
+      conta_bancaria_id: parseInteger(body.conta_bancaria_id, 'Conta bancaria do credito', { required: true }),
+      empresa_id: parseInteger(body.empresa_id, 'Empresa do grupo', { required: true }),
+      parceiro_id: parseInteger(body.parceiro_id, 'Instituicao financeira', { required: true }),
     categoria_financeira_id: parseInteger(body.categoria_financeira_id, 'Categoria financeira das parcelas', { required: true }),
     numero_contrato: parseOptionalText(body.numero_contrato, 'Numero do contrato', 120, { required: true }),
     documento_referencia: parseOptionalText(body.documento_referencia, 'Documento de referencia', 120),

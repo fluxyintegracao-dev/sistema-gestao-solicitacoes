@@ -69,26 +69,42 @@ async function assertFinanceAccess(req) {
   throw createHttpError(403, 'Acesso negado para o modulo financeiro');
 }
 
-async function assertObraScope(req, obraId) {
-  const obrasPermitidas = await getFinanceiroObraScopeIds(req.user);
-  if (obrasPermitidas === null) return;
+async function getFinanceiroEmpresaScopeIds(user) {
+  const obrasPermitidas = await getFinanceiroObraScopeIds(user);
+  if (obrasPermitidas === null) return null;
+  if (!obrasPermitidas.length) return [];
 
-  if (obrasPermitidas.length > 0 && obrasPermitidas.includes(Number(obraId))) {
-    return;
-  }
+  const obras = await Obra.findAll({
+    where: { id: { [Op.in]: obrasPermitidas } },
+    attributes: ['empresa_grupo_id'],
+    raw: true
+  });
+
+  return [...new Set(
+    obras
+      .map((obra) => Number(obra.empresa_grupo_id))
+      .filter((id) => Number.isInteger(id) && id > 0)
+  )];
+}
+
+async function assertEmpresaScope(req, empresaId) {
+  const empresasPermitidas = await getFinanceiroEmpresaScopeIds(req.user);
+  if (empresasPermitidas === null) return;
+
+  if (empresasPermitidas.includes(Number(empresaId))) return;
 
   await registrarEventoSeguranca({
     req,
     usuarioId: req.user?.id || null,
     tipoEvento: 'AUTHZ_DENIED',
     recursoTipo: 'FINANCIAMENTO_BANCARIO',
-    recursoId: String(obraId),
+    recursoId: String(empresaId),
     status: 'DENIED',
-    descricao: 'Usuario tentou acessar financiamento bancario fora do escopo de obra',
-    metadata: { obra_id: Number(obraId) || null }
+    descricao: 'Usuario tentou acessar financiamento bancario fora do escopo de empresa',
+    metadata: { empresa_id: Number(empresaId) || null }
   });
 
-  throw createHttpError(403, 'Acesso negado para esta obra');
+  throw createHttpError(403, 'Acesso negado para esta empresa');
 }
 
 function buildInclude({ includeParcelas = true } = {}) {
@@ -145,11 +161,9 @@ function buildInclude({ includeParcelas = true } = {}) {
 }
 
 async function carregarReferencias(req, payload) {
-  const [conta, obra, parceiro, categoria] = await Promise.all([
+  const [conta, empresa, parceiro, categoria] = await Promise.all([
     ContaBancaria.findByPk(payload.conta_bancaria_id),
-    Obra.findByPk(payload.obra_id, {
-      attributes: ['id', 'nome', 'codigo', 'empresa_grupo_id', 'tipo_centro_custo']
-    }),
+    EmpresaGrupo.findByPk(payload.empresa_id),
     Parceiro.findByPk(payload.parceiro_id),
     CategoriaFinanceira.findByPk(payload.categoria_financeira_id)
   ]);
@@ -161,15 +175,12 @@ async function carregarReferencias(req, payload) {
     throw createHttpError(400, 'A conta bancaria selecionada nao possui empresa vinculada.');
   }
 
-  if (!obra) {
-    throw createHttpError(400, 'Obra/Centro de custo invalido.');
+  if (!empresa || empresa.ativo === false) {
+    throw createHttpError(400, 'Empresa do grupo invalida ou inativa.');
   }
-  await assertObraScope(req, obra.id);
-  if (!obra.empresa_grupo_id) {
-    throw createHttpError(400, 'A obra/centro de custo selecionado nao possui empresa do grupo vinculada.');
-  }
-  if (Number(conta.empresa_id) !== Number(obra.empresa_grupo_id)) {
-    throw createHttpError(400, 'A conta do credito deve pertencer a mesma empresa vinculada a obra/centro de custo.');
+  await assertEmpresaScope(req, empresa.id);
+  if (Number(conta.empresa_id) !== Number(empresa.id)) {
+    throw createHttpError(400, 'A conta do credito deve pertencer a empresa do grupo selecionada.');
   }
 
   if (!parceiro || parceiro.ativo === false || parceiro.fornecedor === false) {
@@ -184,12 +195,7 @@ async function carregarReferencias(req, payload) {
     throw createHttpError(400, 'Categoria financeira incompativel com parcelas a pagar.');
   }
 
-  const empresa = await EmpresaGrupo.findByPk(conta.empresa_id);
-  if (!empresa || empresa.ativo === false) {
-    throw createHttpError(400, 'Empresa da conta bancaria invalida ou inativa.');
-  }
-
-  return { conta, obra, parceiro, categoria, empresa };
+  return { conta, parceiro, categoria, empresa };
 }
 
 function calcularParcelas(payload) {
@@ -271,7 +277,6 @@ async function listarFinanciamentosBancarios(req, filters = {}) {
   if (filters.status) where.status = filters.status;
   if (filters.empresa_id) where.empresa_id = filters.empresa_id;
   if (filters.conta_bancaria_id) where.conta_bancaria_id = filters.conta_bancaria_id;
-  if (filters.obra_id) where.obra_id = filters.obra_id;
   if (filters.parceiro_id) where.parceiro_id = filters.parceiro_id;
   if (filters.q) {
     where[Op.or] = [
@@ -281,13 +286,13 @@ async function listarFinanciamentosBancarios(req, filters = {}) {
     ];
   }
 
-  const obrasPermitidas = await getFinanceiroObraScopeIds(req.user);
-  if (obrasPermitidas !== null) {
-    if (obrasPermitidas.length === 0) return [];
-    if (where.obra_id) {
-      if (!obrasPermitidas.includes(Number(where.obra_id))) return [];
+  const empresasPermitidas = await getFinanceiroEmpresaScopeIds(req.user);
+  if (empresasPermitidas !== null) {
+    if (empresasPermitidas.length === 0) return [];
+    if (where.empresa_id) {
+      if (!empresasPermitidas.includes(Number(where.empresa_id))) return [];
     } else {
-      where.obra_id = { [Op.in]: obrasPermitidas };
+      where.empresa_id = { [Op.in]: empresasPermitidas };
     }
   }
 
@@ -309,7 +314,7 @@ async function carregarFinanciamentoBancario(req, id) {
   if (!financiamento) {
     throw createHttpError(404, 'Financiamento bancario nao encontrado.');
   }
-  await assertObraScope(req, financiamento.obra_id);
+  await assertEmpresaScope(req, financiamento.empresa_id);
   return financiamento;
 }
 
@@ -326,7 +331,7 @@ async function criarFinanciamentoBancario(req, payload = {}) {
       status: 'RASCUNHO',
       empresa_id: referencias.empresa.id,
       conta_bancaria_id: referencias.conta.id,
-      obra_id: referencias.obra.id,
+      obra_id: null,
       parceiro_id: referencias.parceiro.id,
       categoria_financeira_id: referencias.categoria.id,
       numero_contrato: payload.numero_contrato,
@@ -374,7 +379,6 @@ async function criarFinanciamentoBancario(req, payload = {}) {
       metadata: {
         codigo: financiamento.codigo,
         conta_bancaria_id: referencias.conta.id,
-        obra_id: referencias.obra.id,
         empresa_id: referencias.empresa.id,
         valor_total: resumo.total,
         quantidade_parcelas: parcelas.length
@@ -405,7 +409,7 @@ function buildTituloFromParcela({ financiamento, parcela, userId }) {
     total_parcelas: financiamento.quantidade_parcelas,
     data_compra: financiamento.data_credito,
     competencia_data: parcela.data_vencimento,
-    considera_dre: true,
+    considera_dre: financiamento.categoriaFinanceira?.considera_dre !== false,
     origem_titulo: 'FINANCIAMENTO_BANCARIO',
     tipo: 'PAGAR',
     status: 'ABERTO',

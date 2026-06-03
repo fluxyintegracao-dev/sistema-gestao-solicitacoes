@@ -7,6 +7,7 @@ import {
 } from 'react-icons/hi2';
 import { ResizableTable, ResizableTh } from '../components/ResizableTable';
 import { buscarParceiros } from '../services/parceiros';
+import { getEmpresasGrupo } from '../services/empresasGrupo';
 import {
   criarFinanciamentoBancario,
   gerarTitulosFinanciamentoBancario,
@@ -14,11 +15,10 @@ import {
   getContasBancarias,
   getFinanciamentosBancarios
 } from '../services/financeiro';
-import { getMinhasObras } from '../services/obras';
 
 const EMPTY_FORM = {
   conta_bancaria_id: '',
-  obra_id: '',
+  empresa_id: '',
   parceiro_id: '',
   categoria_financeira_id: '',
   numero_contrato: '',
@@ -67,6 +67,16 @@ function formatCurrency(value) {
     style: 'currency',
     currency: 'BRL'
   });
+}
+
+function parseCurrencyInput(value) {
+  const digits = String(value || '').replace(/\D/g, '');
+  return digits ? Number(digits) / 100 : '';
+}
+
+function formatCurrencyInput(value) {
+  if (value === '' || value === null || value === undefined) return '';
+  return formatCurrency(value);
 }
 
 function formatDate(value) {
@@ -187,7 +197,7 @@ export default function FinanceiroFinanciamentosBancarios() {
   const [financiamentos, setFinanciamentos] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [contas, setContas] = useState([]);
-  const [obras, setObras] = useState([]);
+  const [empresasGrupo, setEmpresasGrupo] = useState([]);
   const [parceiros, setParceiros] = useState([]);
   const [categorias, setCategorias] = useState([]);
   const [filters, setFilters] = useState({ status: '', q: '' });
@@ -221,14 +231,14 @@ export default function FinanceiroFinanciamentosBancarios() {
     let active = true;
     Promise.all([
       getContasBancarias(),
-      getMinhasObras({ modo: 'FINANCEIRO', escopo: 'TODOS' }),
+      getEmpresasGrupo({ ativo: true }),
       buscarParceiros({ fornecedor: '1', ativo: '1', limit: 200 }),
       getCategoriasFinanceiras()
     ])
-      .then(([contasData, obrasData, parceirosData, categoriasData]) => {
+      .then(([contasData, empresasData, parceirosData, categoriasData]) => {
         if (!active) return;
         setContas(Array.isArray(contasData) ? contasData : []);
-        setObras(Array.isArray(obrasData) ? obrasData : []);
+        setEmpresasGrupo(Array.isArray(empresasData) ? empresasData : []);
         setParceiros(Array.isArray(parceirosData) ? parceirosData : []);
         setCategorias(Array.isArray(categoriasData) ? categoriasData : []);
       })
@@ -266,6 +276,10 @@ export default function FinanceiroFinanciamentosBancarios() {
     }));
   }
 
+  function updateMoneyField(field, value) {
+    updateForm(field, parseCurrencyInput(value));
+  }
+
   function updateFilter(field, value) {
     setFilters((current) => ({
       ...current,
@@ -289,7 +303,7 @@ export default function FinanceiroFinanciamentosBancarios() {
         valor_tarifas: Number(form.valor_tarifas || 0),
         taxa_juros_mensal: form.taxa_juros_mensal === '' ? undefined : Number(form.taxa_juros_mensal)
       });
-      setSuccess('Financiamento cadastrado. Revise as parcelas e gere os titulos quando estiver conferido.');
+      setSuccess('Financiamento cadastrado. Revise as parcelas e gere os títulos quando estiver conferido.');
       setForm(EMPTY_FORM);
       await loadFinanciamentos();
       setSelectedId(created?.id || null);
@@ -306,11 +320,11 @@ export default function FinanceiroFinanciamentosBancarios() {
     setSuccess('');
     try {
       const updated = await gerarTitulosFinanciamentoBancario(id);
-      setSuccess('Titulos financeiros gerados para as parcelas do financiamento.');
+      setSuccess('Títulos financeiros gerados para as parcelas do financiamento.');
       await loadFinanciamentos();
       setSelectedId(updated?.id || id);
     } catch (err) {
-      setError(err?.message || 'Erro ao gerar titulos do financiamento');
+      setError(err?.message || 'Erro ao gerar títulos do financiamento');
     } finally {
       setSaving(false);
     }
@@ -331,14 +345,14 @@ export default function FinanceiroFinanciamentosBancarios() {
       <div className="app-page-header">
         <div className="app-page-header-row">
           <div>
-            <h1 className="text-xl font-semibold md:text-2xl">Financiamentos Bancarios</h1>
+            <h1 className="text-xl font-semibold md:text-2xl">Financiamentos Bancários</h1>
             <p className="page-subtitle">
-              Controle contratos de credito, acompanhe parcelas e gere os titulos de contas a pagar.
+              Controle contratos de crédito, acompanhe parcelas e gere os títulos de contas a pagar.
             </p>
           </div>
           <div className="app-page-actions">
-            <Link to="/financeiro/titulos" className="btn btn-outline">Titulos</Link>
-            <Link to="/financeiro/conciliacao" className="btn btn-outline">Conciliacao OFX</Link>
+            <Link to="/financeiro/titulos" className="btn btn-outline">Títulos</Link>
+            <Link to="/financeiro/conciliacao" className="btn btn-outline">Conciliação OFX</Link>
           </div>
         </div>
       </div>
@@ -348,7 +362,7 @@ export default function FinanceiroFinanciamentosBancarios() {
 
       <div className="app-summary-grid">
         <Metric label="Contratos" value={resumo.contratos} detail="cadastrados" icon={HiOutlineDocumentPlus} />
-        <Metric label="Ativos" value={resumo.ativos} detail="com titulos gerados" icon={HiOutlineBanknotes} />
+        <Metric label="Ativos" value={resumo.ativos} detail="com títulos gerados" icon={HiOutlineBanknotes} />
         <Metric label="Total contratado" value={formatCurrency(resumo.total)} detail="principal + encargos" icon={HiOutlineReceiptRefund} />
         <Metric label="Cronogramas enviados" value={resumo.titulosGerados} detail="para contas a pagar" />
       </div>
@@ -361,7 +375,7 @@ export default function FinanceiroFinanciamentosBancarios() {
               className="input w-full input-sm"
               value={filters.q}
               onChange={(event) => updateFilter('q', event.target.value)}
-              placeholder="Contrato, codigo ou documento"
+              placeholder="Contrato, código ou documento"
             />
           </label>
           <label className="app-filter-field">
@@ -387,7 +401,7 @@ export default function FinanceiroFinanciamentosBancarios() {
         <section className="card sol-surface-card app-table-shell">
           <div className="border-b border-[var(--c-border)] px-4 py-3">
             <h2 className="text-lg font-semibold text-[var(--c-text)]">Contratos cadastrados</h2>
-            <p className="text-sm text-[var(--c-muted)]">A conta bancaria representa onde o credito foi tomado.</p>
+            <p className="text-sm text-[var(--c-muted)]">A conta bancária representa onde o crédito foi tomado.</p>
           </div>
           <div className="table-wrapper">
             <ResizableTable
@@ -397,9 +411,9 @@ export default function FinanceiroFinanciamentosBancarios() {
             >
               <thead>
                 <tr>
-                  <ResizableTh columnKey="codigo">Codigo</ResizableTh>
+                  <ResizableTh columnKey="codigo">Código</ResizableTh>
                   <ResizableTh columnKey="contrato">Contrato</ResizableTh>
-                  <ResizableTh columnKey="conta">Conta credito</ResizableTh>
+                  <ResizableTh columnKey="conta">Conta do crédito</ResizableTh>
                   <ResizableTh columnKey="empresa">Empresa</ResizableTh>
                   <ResizableTh columnKey="parcelas" className="text-right">Parcelas</ResizableTh>
                   <ResizableTh columnKey="total" className="text-right">Total</ResizableTh>
@@ -435,7 +449,7 @@ export default function FinanceiroFinanciamentosBancarios() {
                           </button>
                           {!item.titulos_gerados_em ? (
                             <button type="button" className="btn btn-primary btn-xs" disabled={saving} onClick={() => handleGerarTitulos(item.id)}>
-                              Gerar titulos
+                              Gerar títulos
                             </button>
                           ) : null}
                         </div>
@@ -451,13 +465,13 @@ export default function FinanceiroFinanciamentosBancarios() {
         <section className="card sol-surface-card">
           <div className="border-b border-[var(--c-border)] px-4 py-3">
             <h2 className="text-lg font-semibold text-[var(--c-text)]">Novo financiamento</h2>
-            <p className="text-sm text-[var(--c-muted)]">A empresa do titulo sera a empresa vinculada a obra/centro de custo.</p>
+              <p className="text-sm text-[var(--c-muted)]">A empresa do título será a empresa do grupo selecionada para o contrato.</p>
           </div>
 
           <form className="space-y-4 p-4" onSubmit={submitForm}>
             <div className="grid gap-3 md:grid-cols-2">
               <label className="app-filter-field">
-                <span className="app-filter-label">Conta que recebeu o credito</span>
+                <span className="app-filter-label">Conta que recebeu o crédito</span>
                 <select className="input w-full" value={form.conta_bancaria_id} onChange={(event) => updateForm('conta_bancaria_id', event.target.value)} required>
                   <option value="">Selecione</option>
                   {contas.map((conta) => (
@@ -466,16 +480,18 @@ export default function FinanceiroFinanciamentosBancarios() {
                 </select>
               </label>
               <label className="app-filter-field">
-                <span className="app-filter-label">Obra/Centro de custo</span>
-                <select className="input w-full" value={form.obra_id} onChange={(event) => updateForm('obra_id', event.target.value)} required>
+                <span className="app-filter-label">Empresa do grupo</span>
+                <select className="input w-full" value={form.empresa_id} onChange={(event) => updateForm('empresa_id', event.target.value)} required>
                   <option value="">Selecione</option>
-                  {obras.map((obra) => (
-                    <option key={obra.id} value={obra.id}>{obra.codigo ? `${obra.codigo} - ` : ''}{obra.nome}</option>
+                  {empresasGrupo.map((empresa) => (
+                    <option key={empresa.id} value={empresa.id}>
+                      {empresa.codigo ? `${empresa.codigo} - ` : ''}{empresa.nome || empresa.razao_social}
+                    </option>
                   ))}
                 </select>
               </label>
               <label className="app-filter-field">
-                <span className="app-filter-label">Instituicao financeira</span>
+                <span className="app-filter-label">Instituição financeira</span>
                 <select className="input w-full" value={form.parceiro_id} onChange={(event) => updateForm('parceiro_id', event.target.value)} required>
                   <option value="">Banco/fornecedor</option>
                   {parceiros.map((parceiro) => (
@@ -493,11 +509,11 @@ export default function FinanceiroFinanciamentosBancarios() {
                 </select>
               </label>
               <label className="app-filter-field">
-                <span className="app-filter-label">Numero do contrato</span>
+                <span className="app-filter-label">Número do contrato</span>
                 <input className="input w-full" value={form.numero_contrato} onChange={(event) => updateForm('numero_contrato', event.target.value)} required />
               </label>
               <label className="app-filter-field">
-                <span className="app-filter-label">Documento referencia</span>
+                <span className="app-filter-label">Documento de referência</span>
                 <input className="input w-full" value={form.documento_referencia} onChange={(event) => updateForm('documento_referencia', event.target.value)} />
               </label>
               <label className="app-filter-field">
@@ -505,7 +521,7 @@ export default function FinanceiroFinanciamentosBancarios() {
                 <input className="input w-full" value={form.tipo_contrato} onChange={(event) => updateForm('tipo_contrato', event.target.value)} />
               </label>
               <label className="app-filter-field">
-                <span className="app-filter-label">Sistema de amortizacao</span>
+                <span className="app-filter-label">Sistema de amortização</span>
                 <select className="input w-full" value={form.sistema_amortizacao} onChange={(event) => updateForm('sistema_amortizacao', event.target.value)}>
                   <option value="FIXO">Parcelas fixas por valor informado</option>
                   <option value="PRICE">Tabela PRICE</option>
@@ -513,11 +529,11 @@ export default function FinanceiroFinanciamentosBancarios() {
                 </select>
               </label>
               <label className="app-filter-field">
-                <span className="app-filter-label">Data contrato</span>
+                <span className="app-filter-label">Data do contrato</span>
                 <input className="input w-full" type="date" value={form.data_contrato} onChange={(event) => updateForm('data_contrato', event.target.value)} required />
               </label>
               <label className="app-filter-field">
-                <span className="app-filter-label">Data credito</span>
+                <span className="app-filter-label">Data do crédito</span>
                 <input className="input w-full" type="date" value={form.data_credito} onChange={(event) => updateForm('data_credito', event.target.value)} required />
               </label>
               <label className="app-filter-field">
@@ -529,12 +545,12 @@ export default function FinanceiroFinanciamentosBancarios() {
                 <input className="input w-full" type="number" min="1" max="240" value={form.quantidade_parcelas} onChange={(event) => updateForm('quantidade_parcelas', event.target.value)} required />
               </label>
               <label className="app-filter-field">
-                <span className="app-filter-label">Valor credito</span>
-                <input className="input w-full" type="number" step="0.01" min="0.01" value={form.valor_credito} onChange={(event) => updateForm('valor_credito', event.target.value)} required />
+                <span className="app-filter-label">Valor do crédito</span>
+                <input className="input w-full" inputMode="decimal" value={formatCurrencyInput(form.valor_credito)} onChange={(event) => updateMoneyField('valor_credito', event.target.value)} required />
               </label>
               <label className="app-filter-field">
                 <span className="app-filter-label">Juros total</span>
-                <input className="input w-full" type="number" step="0.01" min="0" value={form.valor_juros_total} onChange={(event) => updateForm('valor_juros_total', event.target.value)} disabled={['PRICE', 'SAC'].includes(form.sistema_amortizacao) && Number(form.taxa_juros_mensal || 0) > 0} />
+                <input className="input w-full" inputMode="decimal" value={formatCurrencyInput(form.valor_juros_total)} onChange={(event) => updateMoneyField('valor_juros_total', event.target.value)} disabled={['PRICE', 'SAC'].includes(form.sistema_amortizacao) && Number(form.taxa_juros_mensal || 0) > 0} />
               </label>
               <label className="app-filter-field">
                 <span className="app-filter-label">Taxa mensal (%)</span>
@@ -542,20 +558,20 @@ export default function FinanceiroFinanciamentosBancarios() {
               </label>
               <label className="app-filter-field">
                 <span className="app-filter-label">IOF</span>
-                <input className="input w-full" type="number" step="0.01" min="0" value={form.valor_iof} onChange={(event) => updateForm('valor_iof', event.target.value)} />
+                <input className="input w-full" inputMode="decimal" value={formatCurrencyInput(form.valor_iof)} onChange={(event) => updateMoneyField('valor_iof', event.target.value)} />
               </label>
               <label className="app-filter-field">
                 <span className="app-filter-label">Tarifas</span>
-                <input className="input w-full" type="number" step="0.01" min="0" value={form.valor_tarifas} onChange={(event) => updateForm('valor_tarifas', event.target.value)} />
+                <input className="input w-full" inputMode="decimal" value={formatCurrencyInput(form.valor_tarifas)} onChange={(event) => updateMoneyField('valor_tarifas', event.target.value)} />
               </label>
               <label className="app-filter-field md:col-span-2">
-                <span className="app-filter-label">Observacoes</span>
+                <span className="app-filter-label">Observações</span>
                 <textarea className="input w-full" rows={3} value={form.observacoes} onChange={(event) => updateForm('observacoes', event.target.value)} />
               </label>
             </div>
 
             <div className="rounded-md border border-[var(--c-border)] bg-[var(--c-surface-muted)] p-3 text-sm text-[var(--c-muted)]">
-              Previa: {previewParcelas.length} parcela(s), principal {formatCurrency(previewTotais.principal)}, juros {formatCurrency(previewTotais.juros)}, encargos {formatCurrency(previewTotais.encargos)}, total {formatCurrency(previewTotais.total)}.
+              Prévia: {previewParcelas.length} parcela(s), principal {formatCurrency(previewTotais.principal)}, juros {formatCurrency(previewTotais.juros)}, encargos {formatCurrency(previewTotais.encargos)}, total {formatCurrency(previewTotais.total)}.
             </div>
 
             <div className="flex justify-end gap-2">
@@ -574,12 +590,12 @@ export default function FinanceiroFinanciamentosBancarios() {
                 Parcelas {selected ? `- ${selected.codigo || selected.numero_contrato}` : ''}
               </h2>
               <p className="text-sm text-[var(--c-muted)]">
-                Cada parcela gera um titulo a pagar e segue o fluxo normal de baixa e conciliacao.
+                Cada parcela gera um título a pagar e segue o fluxo normal de baixa e conciliação.
               </p>
             </div>
             {selected && !selected.titulos_gerados_em ? (
               <button type="button" className="btn btn-primary btn-sm" disabled={saving} onClick={() => handleGerarTitulos(selected.id)}>
-                Gerar titulos do contrato
+                Gerar títulos do contrato
               </button>
             ) : null}
           </div>
