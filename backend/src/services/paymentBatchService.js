@@ -42,6 +42,17 @@ function normalizeIdList(list) {
   )];
 }
 
+function todayIsoSaoPaulo() {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(new Date());
+  const byType = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${byType.year}-${byType.month}-${byType.day}`;
+}
+
 function todayCode() {
   const now = new Date();
   const pad = (value) => String(value).padStart(2, '0');
@@ -184,6 +195,9 @@ async function createBatchFromTitulos(req, payload = {}) {
   }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dataProgramada)) {
     throw createHttpError(400, 'Data programada invalida.');
+  }
+  if (dataProgramada < todayIsoSaoPaulo()) {
+    throw createHttpError(400, 'Data programada nao pode ser retroativa para pagamento Banco do Brasil.');
   }
 
   return sequelize.transaction(async (transaction) => {

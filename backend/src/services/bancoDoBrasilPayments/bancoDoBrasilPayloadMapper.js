@@ -14,13 +14,27 @@ function toPositiveInteger(value, fieldName) {
   return parsed;
 }
 
-function toDdMmYyyyNumber(value, fieldName) {
+function todayIsoSaoPaulo() {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(new Date());
+  const byType = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${byType.year}-${byType.month}-${byType.day}`;
+}
+
+function toDdMmYyyyString(value, fieldName, options = {}) {
   const normalized = String(value || '').slice(0, 10);
   const match = normalized.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!match) {
     throw createBancoDoBrasilError(400, `${fieldName} deve estar no formato YYYY-MM-DD.`, 'BB_PAYLOAD_INVALID');
   }
-  return Number(`${match[3]}${match[2]}${match[1]}`);
+  if (options.rejectRetroactive !== false && normalized < todayIsoSaoPaulo()) {
+    throw createBancoDoBrasilError(400, `${fieldName} nao pode ser retroativa para envio BB.`, 'BB_PAYMENT_DATE_RETROACTIVE');
+  }
+  return `${match[3]}${match[2]}${match[1]}`;
 }
 
 function truncate(value, max) {
@@ -107,7 +121,7 @@ function mapIntentToTransfer(item, batch) {
   }
 
   return {
-    data: toDdMmYyyyNumber(dataPagamento, 'Data de pagamento'),
+    data: toDdMmYyyyString(dataPagamento, 'Data de pagamento'),
     valor: Number(valor.toFixed(2)),
     documentoDebito: Number(intent.id || item.payment_intent_id || item.sequencia || 0),
     documentoCredito: Number(titulo.id || intent.titulo_financeiro_id || intent.id || 0),
@@ -143,5 +157,6 @@ function mapReleasePaymentsRequest(batch, options = {}) {
 module.exports = {
   mapBatchToPixTransferRequest,
   mapReleasePaymentsRequest,
-  toDdMmYyyyNumber
+  toDdMmYyyyString,
+  toDdMmYyyyNumber: toDdMmYyyyString
 };

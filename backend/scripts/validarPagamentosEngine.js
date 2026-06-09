@@ -12,7 +12,10 @@ const {
 } = require('../src/validators/paymentValidators');
 const bancoDoBrasilProvider = require('../src/services/paymentProviderBancoDoBrasil');
 const bancoDoBrasilSandboxProvider = require('../src/services/bancoDoBrasilPayments/BancoDoBrasilPaymentProvider');
-const { mapBatchToPixTransferRequest } = require('../src/services/bancoDoBrasilPayments/bancoDoBrasilPayloadMapper');
+const {
+  mapBatchToPixTransferRequest,
+  toDdMmYyyyString
+} = require('../src/services/bancoDoBrasilPayments/bancoDoBrasilPayloadMapper');
 const { mapPaymentStatus } = require('../src/services/bancoDoBrasilPayments/bancoDoBrasilStatusMapper');
 const { ValidationError } = require('../src/middlewares/validation');
 const { env } = require('../src/config/env');
@@ -21,6 +24,13 @@ const projectRoot = path.resolve(__dirname, '..');
 
 function read(relativePath) {
   return fs.readFileSync(path.join(projectRoot, relativePath), 'utf8');
+}
+
+function futureDateIso(daysAhead = 1) {
+  const date = new Date();
+  date.setDate(date.getDate() + daysAhead);
+  const pad = (value) => String(value).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
 function expectValidationError(fn, expectedMessage) {
@@ -304,13 +314,14 @@ async function validateBancoDoBrasilProvider() {
 
 function validateBancoDoBrasilSandboxProvider() {
   const onlyDigitsNumber = (value, fallback) => Number(String(value || fallback).replace(/\D/g, ''));
+  const dataPagamento = futureDateIso(1);
 
   const batch = {
     id: 123,
     codigo: 'PAY-20260508',
     correlation_id: 'corr-bb-1',
     idempotency_key: 'idem-bb-1',
-    data_programada: '2026-05-08',
+    data_programada: dataPagamento,
     paymentAccount: {
       convenio: '123456',
       agencia: '1234',
@@ -323,7 +334,7 @@ function validateBancoDoBrasilSandboxProvider() {
       valor: 25.5,
       intent: {
         id: 77,
-        data_pagamento: '2026-05-08',
+        data_pagamento: dataPagamento,
         correlation_id: 'intent-corr-77',
         beneficiary_snapshot: {
           nome: 'Fornecedor PIX',
@@ -347,7 +358,9 @@ function validateBancoDoBrasilSandboxProvider() {
   assert.strictEqual(payload.contaCorrenteDebito, onlyDigitsNumber(env.bbContaCorrenteDebito, 98765));
   assert.strictEqual(payload.digitoVerificadorContaCorrente, env.bbDigitoContaCorrenteDebito || 'X');
   assert.strictEqual(payload.tipoPagamento, 126);
-  assert.strictEqual(payload.listaTransferencias[0].data, 8052026);
+  assert.strictEqual(payload.listaTransferencias[0].data, toDdMmYyyyString(dataPagamento, 'Data de pagamento'));
+  assert.strictEqual(toDdMmYyyyString('2099-01-05', 'Data de pagamento'), '05012099');
+  assert.throws(() => toDdMmYyyyString('2020-01-01', 'Data de pagamento'), /retroativa/);
   assert.strictEqual(payload.listaTransferencias[0].formaIdentificacao, 2);
   assert.strictEqual(payload.listaTransferencias[0].email, 'financeiro@example.com');
   assert.strictEqual(mapPaymentStatus('Pago'), 'AGUARDANDO_CONFIRMACAO_BAIXA');

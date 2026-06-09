@@ -818,7 +818,7 @@ export default function FinanceiroPagamentos() {
                   </label>
                   <label className="sol-filter-field xl:col-span-2">
                     <span className="sol-filter-label">Data pagamento</span>
-                    <input className="input w-full" type="date" value={batchForm.data_programada} onChange={(e) => setBatchForm((c) => ({ ...c, data_programada: e.target.value }))} />
+                    <input className="input w-full" type="date" min={today()} value={batchForm.data_programada} onChange={(e) => setBatchForm((c) => ({ ...c, data_programada: e.target.value }))} />
                   </label>
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2">
