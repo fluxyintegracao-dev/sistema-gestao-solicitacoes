@@ -924,8 +924,8 @@ function SecaoComparativo({ comparativo, solicitacao, podeComprar, vencedoresSel
 
         <div className="app-list-stack gap-2">
           {comparativo.itens.map((item) => (
-            <div key={buildItemKey(item)} className="app-list-card px-3 py-3">
-              <div className="mb-2 flex flex-wrap items-start justify-between gap-3">
+            <div key={buildItemKey(item)} className="app-list-card px-3 py-2.5">
+              <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
                 <div>
                   <div className="text-sm font-semibold">{item.nome}</div>
                   <div className="text-xs text-[var(--c-muted)]">
@@ -941,7 +941,7 @@ function SecaoComparativo({ comparativo, solicitacao, podeComprar, vencedoresSel
               </div>
 
               <div className="app-table-shell overflow-x-auto">
-                <table className="table">
+                <table className="table text-xs">
                   <thead>
                     <tr>
                       <th>Fornecedor</th>
@@ -963,9 +963,9 @@ function SecaoComparativo({ comparativo, solicitacao, podeComprar, vencedoresSel
                           className={`${isVencedor ? 'bg-emerald-50' : ''} ${resp.resposta_item_id && podeComprar && solicitacao.status !== 'ENCERRADO' ? 'cursor-pointer hover:bg-emerald-50/60' : ''}`}
                           onClick={() => resp.resposta_item_id && podeComprar && solicitacao.status !== 'ENCERRADO' && onVencedorChange(buildItemKey(item), String(resp.resposta_item_id))}
                         >
-                          <td className="font-medium">{resp.fornecedor_nome}</td>
+                          <td className="text-xs font-medium">{resp.fornecedor_nome}</td>
                           <td>
-                            <span className={`app-status-pill text-xs ${resp.disponivel ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                            <span className={`app-status-pill text-[11px] ${resp.disponivel ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
                               {resp.disponivel ? 'Sim' : 'Nao'}
                             </span>
                           </td>
@@ -1394,7 +1394,7 @@ export default function GerenciarCotacaoSolicitacao() {
 
             {/* Lista de fornecedores vinculados */}
             {solicitacao.fornecedores?.length > 0 && (
-              <div className="app-list-stack mt-4">
+              <div className="app-list-stack mt-3 gap-2">
                 {solicitacao.fornecedores.map((cotacaoFornecedor) => {
                   const publicUrl = `${window.location.origin}/cotacao/${cotacaoFornecedor.token}`;
                   const pedidoFornecedor = pedidosPorFornecedor.get(Number(cotacaoFornecedor.fornecedor_compra_id));
@@ -1404,11 +1404,11 @@ export default function GerenciarCotacaoSolicitacao() {
                     : null;
 
                   return (
-                    <div key={cotacaoFornecedor.id} className="app-list-card">
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div className="grid gap-1">
-                          <div className="font-semibold">{cotacaoFornecedor.fornecedor?.nome || '-'}</div>
-                          <div className="text-sm text-[var(--c-muted)]">
+                    <div key={cotacaoFornecedor.id} className="app-list-card px-3 py-2.5">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div className="grid gap-0.5">
+                          <div className="text-sm font-semibold">{cotacaoFornecedor.fornecedor?.nome || '-'}</div>
+                          <div className="text-xs text-[var(--c-muted)]">
                             {cotacaoFornecedor.fornecedor?.whatsapp ? `WhatsApp: ${cotacaoFornecedor.fornecedor.whatsapp}` : ''}{' '}
                             {cotacaoFornecedor.fornecedor?.email || ''}
                           </div>
@@ -1426,7 +1426,7 @@ export default function GerenciarCotacaoSolicitacao() {
                             </div>
                           )}
                         </div>
-                        <div className="flex flex-wrap gap-2">
+                        <div className="flex flex-wrap gap-1.5">
                           <button type="button" className="btn btn-xs btn-outline" onClick={() => copiarTexto(publicUrl)}>Copiar link</button>
                           <button type="button" className="btn btn-xs btn-outline" onClick={() => window.open(publicUrl, '_blank', 'noopener,noreferrer')}>Abrir portal</button>
                           {possuiRespostaArquivo && (
@@ -1459,7 +1459,7 @@ export default function GerenciarCotacaoSolicitacao() {
                         </div>
                       </div>
                       {pedidoFornecedor?.id && (
-                        <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+                        <div className="mt-2 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs text-emerald-800">
                           Pedido vinculado:{' '}
                           <button type="button" className="font-semibold underline" onClick={() => navigate(`/pedidos-compra/${pedidoFornecedor.id}`)}>
                             PC-{String(pedidoFornecedor.id).padStart(5, '0')}
@@ -1467,7 +1467,7 @@ export default function GerenciarCotacaoSolicitacao() {
                           {' '} - Total {fmtMoeda(pedidoFornecedor.valor_total)}
                         </div>
                       )}
-                      <div className="mt-2 break-all rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">{publicUrl}</div>
+                      <div className="mt-1.5 break-all rounded-lg bg-slate-50 px-2.5 py-1.5 text-[11px] text-slate-500">{publicUrl}</div>
                     </div>
                   );
                 })}
