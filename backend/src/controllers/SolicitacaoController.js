@@ -551,6 +551,24 @@ function solicitacaoUsaFluxoAprovacaoDiretoria(solicitacao, contextoAprovacao) {
   );
 }
 
+async function solicitacaoJaFoiAprovadaDiretoria(solicitacaoId, historicos = null) {
+  if (!solicitacaoId) return false;
+
+  if (Array.isArray(historicos)) {
+    return historicos.some(item => String(item?.acao || '').toUpperCase() === 'APROVADA_DIRETORIA');
+  }
+
+  const aprovacao = await Historico.findOne({
+    where: {
+      solicitacao_id: solicitacaoId,
+      acao: 'APROVADA_DIRETORIA'
+    },
+    attributes: ['id']
+  });
+
+  return Boolean(aprovacao);
+}
+
 function calcularResumoFinanceiroSolicitacao(solicitacao) {
   const valorTotal = solicitacao?.valor === null || solicitacao?.valor === undefined
     ? null
@@ -2327,8 +2345,13 @@ module.exports = {
         solicitacao,
         contextoAprovacaoDiretoria
       );
+      const jaAprovadaDiretoria = await solicitacaoJaFoiAprovadaDiretoria(
+        solicitacao.id,
+        solicitacao.historicos
+      );
       const podeAprovarDiretoria =
         usaFluxoAprovacaoDiretoria &&
+        !jaAprovadaDiretoria &&
         (
           String(req.user?.perfil || '').trim().toUpperCase() === 'SUPERADMIN' ||
           setorPertenceAoUsuario(tokensSetorUsuario, solicitacao.area_responsavel)
@@ -2365,6 +2388,7 @@ module.exports = {
         });
       payload.usa_fluxo_aprovacao_diretoria = usaFluxoAprovacaoDiretoria;
       payload.acao_aprovar_diretoria_disponivel = podeAprovarDiretoria;
+      payload.ja_aprovada_diretoria = jaAprovadaDiretoria;
       payload.pode_alterar_status_diretoria = podeAlterarStatusDiretoria;
       payload.setor_destino_aprovacao = contextoAprovacaoDiretoria.setorDestinoAprovacao || null;
       payload.diretoria_responsavel = contextoAprovacaoDiretoria.diretoriaEsperada || null;
@@ -3627,6 +3651,13 @@ module.exports = {
       if (!solicitacaoUsaFluxoAprovacaoDiretoria(solicitacao, contextoAprovacaoDiretoria)) {
         return res.status(400).json({
           error: 'Esta solicitacao nao esta no fluxo de aprovacao por diretoria.'
+        });
+      }
+
+      const jaAprovadaDiretoria = await solicitacaoJaFoiAprovadaDiretoria(solicitacao.id);
+      if (jaAprovadaDiretoria) {
+        return res.status(400).json({
+          error: 'Esta solicitacao ja foi aprovada pela diretoria. Para ajustes, altere o status e aguarde o retorno automatico ao setor solicitante.'
         });
       }
 

@@ -41,6 +41,8 @@ A visibilidade efetiva depende de combinacao entre:
   - para usuarios do setor `OBRA`, essa escolha passa a seguir a classificacao da obra e a configuracao de `Areas Visiveis para OBRA`, sem depender de `Areas por Setor de Origem`
   - na criacao, o usuario seleciona a area destino operacional e o sistema grava a diretoria correspondente em campo separado
   - a solicitacao nasce na diretoria da classificacao da obra e, apos aprovacao, segue para a area operacional selecionada na criacao
+  - a aprovacao por diretoria e unica por solicitacao; uma solicitacao com historico `APROVADA_DIRETORIA` nao pode ser aprovada novamente
+  - quando uma solicitacao ja aprovada volta para `DIR_OBRAS_PUBLICAS` ou `DIR_OBRAS_PRIVADAS` por pendencia de ajuste, a diretoria deve responder o ajuste e alterar para `ATENDIDO`, usando a automacao de retorno ao setor solicitante
   - a configuracao de destino por tipo permanece como fallback para registros antigos ou sem destino persistido
   - o setor destino vira o dono da solicitacao para seguir o fluxo normal
   - `DIR_OBRAS_PUBLICAS` e `DIR_OBRAS_PRIVADAS` continuam vendo solicitacoes novas do fluxo que pertencem a sua diretoria, mesmo apos aprovacao e envio

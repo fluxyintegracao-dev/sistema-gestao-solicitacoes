@@ -35,6 +35,8 @@
   - o setor destino vira o dono do fluxo para alteracoes de status e demais regras normais
   - a diretoria que aprovou continua com visibilidade pela regra do fluxo novo, mesmo depois do envio ao setor destino
   - o criador da solicitacao continua com visibilidade
+- a aprovacao por diretoria e unica por solicitacao: se ja existir historico `APROVADA_DIRETORIA`, o botao `Aprovar` nao fica disponivel e a API bloqueia nova aprovacao
+- quando uma solicitacao ja aprovada volta para a diretoria por ajuste, a diretoria deve tratar o ajuste por status/comentario/anexo; ao marcar `ATENDIDO`, a automacao retorna para o setor que enviou o ajuste
 - `DIR_OBRAS_PUBLICAS` visualiza solicitacoes de obras `PUBLICA`, e `DIR_OBRAS_PRIVADAS` visualiza solicitacoes de obras `PRIVADA`, incluindo solicitacoes antigas que nao passaram pelo fluxo formal de aprovacao da diretoria
 
 ## Pagamentos parciais
