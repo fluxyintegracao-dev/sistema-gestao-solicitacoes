@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
-  criarPedidoCompraDaSolicitacao,
   baixarPdfSolicitacaoCompra,
   criarFornecedorCompra,
   encerrarSolicitacaoCompra,
@@ -9,8 +8,7 @@ import {
   listarFornecedoresCompra,
   obterComparativoSolicitacaoCompra,
   obterSolicitacaoCompra,
-  obterUrlAssinadaCompra,
-  responderCotacaoPublica
+  obterUrlAssinadaCompra
 } from '../../../services/compras';
 import { listarCategoriasParceiro } from '../../../services/parceiros';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -82,184 +80,6 @@ function gerarMensagemCotacao(fornecedorNome, url, itens = []) {
     .join('\n');
   const extra = itens.length > 10 ? `\n... e mais ${itens.length - 10} item(ns)` : '';
   return `${header}\n\nItens:\n${lista}${extra}\n\nAguardamos sua resposta. Obrigado!`;
-}
-
-// Modal de Pedido Final
-
-function ModalRevisarRespostaArquivo({ fornecedor, itens, onSalvar, onFechar }) {
-  const [linhas, setLinhas] = useState(() => itens.map((item) => ({
-    ...item,
-    preco: '',
-    prazo: '',
-    disponivel: true,
-    observacao: '',
-    quantidade_minima_item: ''
-  })));
-  const [valorMinimoPedido, setValorMinimoPedido] = useState(fornecedor?.valor_minimo_pedido ?? '');
-  const [condicaoPagamento, setCondicaoPagamento] = useState(fornecedor?.condicao_pagamento || '');
-  const [prazoEntrega, setPrazoEntrega] = useState(fornecedor?.prazo_entrega || '');
-  const [salvando, setSalvando] = useState(false);
-
-  function atualizarLinha(index, field, value) {
-    setLinhas((prev) => prev.map((linha, linhaIndex) => (
-      linhaIndex === index ? { ...linha, [field]: value } : linha
-    )));
-  }
-
-  async function handleSalvar() {
-    try {
-      if (valorMinimoPedido === '' || valorMinimoPedido === null || valorMinimoPedido === undefined) {
-        alert('Informe o VLR minimo pedido.');
-        return;
-      }
-      if (!String(condicaoPagamento || '').trim()) {
-        alert('Informe a condicao de pagamento.');
-        return;
-      }
-      if (!String(prazoEntrega || '').trim()) {
-        alert('Informe o prazo de entrega.');
-        return;
-      }
-
-      setSalvando(true);
-      await onSalvar({
-        valor_minimo_pedido: valorMinimoPedido,
-        condicao_pagamento: condicaoPagamento,
-        prazo_entrega: prazoEntrega,
-        itens: linhas.map((linha) => ({
-          item_tipo: linha.item_tipo,
-          item_referencia_id: linha.item_referencia_id,
-          status_disponibilidade: linha.disponivel ? 'DISPONIVEL' : 'NAO_TEM',
-          disponivel: linha.disponivel,
-          preco: linha.disponivel ? linha.preco : '',
-          prazo: linha.disponivel ? linha.prazo : '',
-          observacao: linha.observacao,
-          quantidade_minima_item: linha.quantidade_minima_item
-        }))
-      });
-    } catch (error) {
-      console.error(error);
-      alert(error.message || 'Erro ao registrar resposta do fornecedor');
-    } finally {
-      setSalvando(false);
-    }
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 px-3 py-6">
-      <div className="w-full max-w-5xl rounded-2xl bg-[var(--c-surface)] shadow-xl">
-        <div className="flex items-center justify-between gap-3 border-b border-[var(--c-border)] px-5 py-4">
-          <div>
-            <h2 className="font-semibold text-[var(--c-text)]">Revisar resposta anexada</h2>
-            <p className="text-sm text-[var(--c-muted)]">{fornecedor?.fornecedor?.nome || 'Fornecedor'}</p>
-          </div>
-          <button type="button" className="btn btn-outline" onClick={onFechar}>Fechar</button>
-        </div>
-
-        <div className="px-5 py-4">
-          <p className="mb-3 text-sm text-[var(--c-muted)]">
-            Transcreva os valores do arquivo anexado para que a resposta entre no comparativo da cotacao.
-          </p>
-          <div className="mb-4 grid gap-3 md:grid-cols-3">
-            <label className="grid gap-1 text-sm">
-              <span className="text-xs font-semibold text-[var(--c-muted)]">VLR minimo pedido *</span>
-              <input
-                className="input"
-                type="number"
-                min="0"
-                step="0.01"
-                value={valorMinimoPedido}
-                onChange={(event) => setValorMinimoPedido(event.target.value)}
-              />
-            </label>
-            <label className="grid gap-1 text-sm">
-              <span className="text-xs font-semibold text-[var(--c-muted)]">Condicao de pagamento *</span>
-              <input
-                className="input"
-                value={condicaoPagamento}
-                onChange={(event) => setCondicaoPagamento(event.target.value)}
-                placeholder="Ex.: PIX, 30/60 dias"
-              />
-            </label>
-            <label className="grid gap-1 text-sm">
-              <span className="text-xs font-semibold text-[var(--c-muted)]">Prazo de entrega *</span>
-              <input
-                className="input"
-                value={prazoEntrega}
-                onChange={(event) => setPrazoEntrega(event.target.value)}
-                placeholder="Ex.: 7 dias"
-              />
-            </label>
-          </div>
-          <div className="overflow-x-auto rounded-xl border border-[var(--c-border)]">
-            <table className="w-full min-w-[880px] text-sm">
-              <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
-                <tr>
-                  <th className="px-3 py-2">Item</th>
-                  <th className="px-3 py-2">Qtd.</th>
-                  <th className="px-3 py-2">Disponivel</th>
-                  <th className="px-3 py-2">Preco unit.</th>
-                  <th className="px-3 py-2">Prazo</th>
-                  <th className="px-3 py-2">Obs.</th>
-                </tr>
-              </thead>
-              <tbody>
-                {linhas.map((linha, index) => (
-                  <tr key={`${linha.item_tipo}-${linha.item_referencia_id}`} className="border-t border-[var(--c-border)]">
-                    <td className="px-3 py-2">
-                      <div className="font-medium text-[var(--c-text)]">{linha.nome}</div>
-                      <div className="text-xs text-[var(--c-muted)]">{linha.especificacao}</div>
-                    </td>
-                    <td className="px-3 py-2 text-[var(--c-muted)]">{linha.quantidade} {linha.unidade}</td>
-                    <td className="px-3 py-2">
-                      <input
-                        type="checkbox"
-                        checked={linha.disponivel}
-                        onChange={(event) => atualizarLinha(index, 'disponivel', event.target.checked)}
-                      />
-                    </td>
-                    <td className="px-3 py-2">
-                      <input
-                        className="input h-9 w-full"
-                        value={linha.preco}
-                        disabled={!linha.disponivel}
-                        onChange={(event) => atualizarLinha(index, 'preco', event.target.value)}
-                        placeholder="0,00"
-                      />
-                    </td>
-                    <td className="px-3 py-2">
-                      <input
-                        className="input h-9 w-full"
-                        value={linha.prazo}
-                        disabled={!linha.disponivel}
-                        onChange={(event) => atualizarLinha(index, 'prazo', event.target.value)}
-                        placeholder="Ex.: 7 dias"
-                      />
-                    </td>
-                    <td className="px-3 py-2">
-                      <input
-                        className="input h-9 w-full"
-                        value={linha.observacao}
-                        onChange={(event) => atualizarLinha(index, 'observacao', event.target.value)}
-                        placeholder="Opcional"
-                      />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <div className="flex justify-end gap-2 border-t border-[var(--c-border)] px-5 py-4">
-          <button type="button" className="btn btn-outline" onClick={onFechar}>Cancelar</button>
-          <button type="button" className="btn btn-primary" onClick={handleSalvar} disabled={salvando}>
-            {salvando ? 'Salvando...' : 'Salvar no comparativo'}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
 }
 
 function ModalPedidoFinal({ fornecedor, itensGanhos, solicitacaoId, onRemanejamento, onFechar }) {
@@ -1040,11 +860,9 @@ export default function GerenciarCotacaoSolicitacao() {
   const [previewArquivo, setPreviewArquivo] = useState(null);
   const [enviandoFornecedores, setEnviandoFornecedores] = useState(false);
   const [encerrando, setEncerrando] = useState(false);
-  const [criandoPedidoFornecedorId, setCriandoPedidoFornecedorId] = useState(null);
   const [fornecedoresSelecionados, setFornecedoresSelecionados] = useState([]);
   const [novoFornecedor, setNovoFornecedor] = useState({ nome: '', email: '', whatsapp: '', contato: '' });
   const [vencedoresSelecionados, setVencedoresSelecionados] = useState({});
-  const [cotacaoRevisaoArquivo, setCotacaoRevisaoArquivo] = useState(null);
 
   const perfilUpper = String(user?.perfil || '').toUpperCase();
   const tokens = [
@@ -1248,34 +1066,6 @@ export default function GerenciarCotacaoSolicitacao() {
     }
   }
 
-  async function handleSalvarRevisaoArquivo(payload) {
-    if (!cotacaoRevisaoArquivo?.token) {
-      throw new Error('Cotacao do fornecedor nao localizada.');
-    }
-
-    await responderCotacaoPublica(cotacaoRevisaoArquivo.token, payload);
-    setCotacaoRevisaoArquivo(null);
-    await carregarTudo();
-    alert('Resposta registrada no comparativo.');
-  }
-
-  async function handleCriarPedidoFornecedor(fornecedorCompraId) {
-    const pedidoExistente = pedidosPorFornecedor.get(Number(fornecedorCompraId));
-    if (pedidoExistente?.id) { navigate(`/pedidos-compra/${pedidoExistente.id}`); return; }
-
-    try {
-      setCriandoPedidoFornecedorId(fornecedorCompraId);
-      const pedido = await criarPedidoCompraDaSolicitacao(id, { fornecedor_compra_id: fornecedorCompraId });
-      await carregarTudo();
-      if (pedido?.id) navigate(`/pedidos-compra/${pedido.id}`);
-    } catch (error) {
-      console.error(error);
-      alert(error.message || 'Erro ao criar pedido para o fornecedor');
-    } finally {
-      setCriandoPedidoFornecedorId(null);
-    }
-  }
-
   if (loading) {
     return <div className="page solicitacoes-page"><div className="app-empty-card sol-surface-card">Carregando...</div></div>;
   }
@@ -1394,83 +1184,74 @@ export default function GerenciarCotacaoSolicitacao() {
 
             {/* Lista de fornecedores vinculados */}
             {solicitacao.fornecedores?.length > 0 && (
-              <div className="app-list-stack mt-3 gap-2">
-                {solicitacao.fornecedores.map((cotacaoFornecedor) => {
-                  const publicUrl = `${window.location.origin}/cotacao/${cotacaoFornecedor.token}`;
-                  const pedidoFornecedor = pedidosPorFornecedor.get(Number(cotacaoFornecedor.fornecedor_compra_id));
-                  const possuiRespostaArquivo = Boolean(cotacaoFornecedor.pdf_resposta_url);
-                  const linkWa = cotacaoFornecedor.fornecedor?.whatsapp
-                    ? whatsappLink(cotacaoFornecedor.fornecedor.whatsapp, gerarMensagemCotacao(cotacaoFornecedor.fornecedor.nome, publicUrl, itensCombinados))
-                    : null;
+              <div className="app-table-shell mt-3 overflow-x-auto">
+                <table className="table text-xs">
+                  <thead>
+                    <tr>
+                      <th>Nome</th>
+                      <th>Telefone</th>
+                      <th>E-mail</th>
+                      <th>Status</th>
+                      <th>Respondido em</th>
+                      <th className="w-[230px]">Acoes</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {solicitacao.fornecedores.map((cotacaoFornecedor) => {
+                      const publicUrl = `${window.location.origin}/cotacao/${cotacaoFornecedor.token}`;
+                      const pedidoFornecedor = pedidosPorFornecedor.get(Number(cotacaoFornecedor.fornecedor_compra_id));
+                      const possuiRespostaArquivo = Boolean(cotacaoFornecedor.pdf_resposta_url);
+                      const linkWa = cotacaoFornecedor.fornecedor?.whatsapp
+                        ? whatsappLink(cotacaoFornecedor.fornecedor.whatsapp, gerarMensagemCotacao(cotacaoFornecedor.fornecedor.nome, publicUrl, itensCombinados))
+                        : null;
 
-                  return (
-                    <div key={cotacaoFornecedor.id} className="app-list-card px-3 py-2.5">
-                      <div className="flex flex-wrap items-start justify-between gap-2">
-                        <div className="grid gap-0.5">
-                          <div className="text-sm font-semibold">{cotacaoFornecedor.fornecedor?.nome || '-'}</div>
-                          <div className="text-xs text-[var(--c-muted)]">
-                            {cotacaoFornecedor.fornecedor?.whatsapp ? `WhatsApp: ${cotacaoFornecedor.fornecedor.whatsapp}` : ''}{' '}
-                            {cotacaoFornecedor.fornecedor?.email || ''}
-                          </div>
-                          <div className="text-xs text-[var(--c-muted)]">
-                            Status: {fmtStatus(cotacaoFornecedor.status)} - Respondido em {fmt(cotacaoFornecedor.respondido_em)}
-                          </div>
-                          {cotacaoFornecedor.status === 'RESPONDIDO' && (
-                            <div className="text-xs text-[var(--c-muted)]">
-                              Pedido minimo: {cotacaoFornecedor.valor_minimo_pedido !== null && cotacaoFornecedor.valor_minimo_pedido !== undefined ? fmtMoeda(cotacaoFornecedor.valor_minimo_pedido) : '-'} - Condicao: {cotacaoFornecedor.condicao_pagamento || '-'} - Prazo entrega: {cotacaoFornecedor.prazo_entrega || '-'}
+                      return (
+                        <tr key={cotacaoFornecedor.id}>
+                          <td>
+                            <div className="font-semibold text-[var(--c-text)]">{cotacaoFornecedor.fornecedor?.nome || '-'}</div>
+                            {pedidoFornecedor?.id && (
+                              <button
+                                type="button"
+                                className="mt-0.5 text-[11px] font-semibold text-emerald-700 underline"
+                                onClick={() => navigate(`/pedidos-compra/${pedidoFornecedor.id}`)}
+                              >
+                                PC-{String(pedidoFornecedor.id).padStart(5, '0')} - {fmtMoeda(pedidoFornecedor.valor_total)}
+                              </button>
+                            )}
+                            {possuiRespostaArquivo && (
+                              <div className="text-[11px] font-semibold text-blue-700">Resposta por arquivo</div>
+                            )}
+                          </td>
+                          <td>{cotacaoFornecedor.fornecedor?.whatsapp || '-'}</td>
+                          <td>{cotacaoFornecedor.fornecedor?.email || '-'}</td>
+                          <td>
+                            <span className="app-status-pill text-[11px] bg-slate-100 text-slate-700">
+                              {fmtStatus(cotacaoFornecedor.status)}
+                            </span>
+                          </td>
+                          <td>{fmt(cotacaoFornecedor.respondido_em)}</td>
+                          <td>
+                            <div className="flex flex-wrap gap-1.5">
+                              <button type="button" className="btn btn-xs btn-outline px-2" onClick={() => copiarTexto(publicUrl)}>
+                                Copiar
+                              </button>
+                              <button type="button" className="btn btn-xs btn-outline px-2" onClick={() => window.open(publicUrl, '_blank', 'noopener,noreferrer')}>
+                                Portal
+                              </button>
+                              {linkWa ? (
+                                <a href={linkWa} target="_blank" rel="noopener noreferrer" className="btn btn-xs btn-outline px-2">
+                                  WhatsApp
+                                </a>
+                              ) : (
+                                <span className="btn btn-xs btn-outline px-2 opacity-50">WhatsApp</span>
+                              )}
                             </div>
-                          )}
-                          {possuiRespostaArquivo && (
-                            <div className="text-xs font-semibold text-blue-700">
-                              Resposta por arquivo anexado
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex flex-wrap gap-1.5">
-                          <button type="button" className="btn btn-xs btn-outline" onClick={() => copiarTexto(publicUrl)}>Copiar link</button>
-                          <button type="button" className="btn btn-xs btn-outline" onClick={() => window.open(publicUrl, '_blank', 'noopener,noreferrer')}>Abrir portal</button>
-                          {possuiRespostaArquivo && (
-                            <button type="button" className="btn btn-xs btn-outline" onClick={() => window.open(publicUrl, '_blank', 'noopener,noreferrer')}>
-                              Ver anexo
-                            </button>
-                          )}
-                          {podeComprar && possuiRespostaArquivo && solicitacao.status !== 'ENCERRADO' && (
-                            <button type="button" className="btn btn-xs btn-outline" onClick={() => setCotacaoRevisaoArquivo(cotacaoFornecedor)}>
-                              Revisar resposta
-                            </button>
-                          )}
-                          {linkWa && (
-                            <a href={linkWa} target="_blank" rel="noopener noreferrer" className="btn btn-xs btn-outline">
-                              WhatsApp
-                            </a>
-                          )}
-                          {podeComprar && solicitacao.status === 'ENCERRADO' && cotacaoFornecedor.status === 'RESPONDIDO' && (
-                            <button
-                              type="button"
-                              className="btn btn-xs btn-primary"
-                              onClick={() => handleCriarPedidoFornecedor(cotacaoFornecedor.fornecedor_compra_id)}
-                              disabled={criandoPedidoFornecedorId === cotacaoFornecedor.fornecedor_compra_id}
-                            >
-                              {criandoPedidoFornecedorId === cotacaoFornecedor.fornecedor_compra_id
-                                ? 'Gerando...'
-                                : pedidoFornecedor?.id ? 'Abrir pedido' : 'Gerar pedido'}
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                      {pedidoFornecedor?.id && (
-                        <div className="mt-2 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs text-emerald-800">
-                          Pedido vinculado:{' '}
-                          <button type="button" className="font-semibold underline" onClick={() => navigate(`/pedidos-compra/${pedidoFornecedor.id}`)}>
-                            PC-{String(pedidoFornecedor.id).padStart(5, '0')}
-                          </button>
-                          {' '} - Total {fmtMoeda(pedidoFornecedor.valor_total)}
-                        </div>
-                      )}
-                      <div className="mt-1.5 break-all rounded-lg bg-slate-50 px-2.5 py-1.5 text-[11px] text-slate-500">{publicUrl}</div>
-                    </div>
-                  );
-                })}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>
@@ -1489,14 +1270,6 @@ export default function GerenciarCotacaoSolicitacao() {
       </div>
 
       <CompraPreviewModal preview={previewArquivo} onClose={() => setPreviewArquivo(null)} />
-      {cotacaoRevisaoArquivo && (
-        <ModalRevisarRespostaArquivo
-          fornecedor={cotacaoRevisaoArquivo}
-          itens={itensCombinados}
-          onSalvar={handleSalvarRevisaoArquivo}
-          onFechar={() => setCotacaoRevisaoArquivo(null)}
-        />
-      )}
     </div>
   );
 }

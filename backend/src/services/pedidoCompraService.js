@@ -1,6 +1,7 @@
 const { Op } = require('sequelize');
 const {
   FornecedorCompra,
+  Historico,
   Obra,
   PedidoCompra,
   PedidoCompraItem,
@@ -52,6 +53,45 @@ function buildRespostaKey(itemTipo, itemReferenciaId) {
 
 function buildPedidoCodigo(id) {
   return `PC-${String(id).padStart(5, '0')}`;
+}
+
+async function registrarHistoricoPedidoNaSolicitacaoPrincipal({
+  solicitacao,
+  pedido,
+  usuarioId = null,
+  acao,
+  descricao,
+  statusAnterior = null,
+  statusNovo = null,
+  metadados = {},
+  transaction
+}) {
+  const solicitacaoPrincipalId = Number(solicitacao?.solicitacao_principal_id || 0);
+  if (!solicitacaoPrincipalId || !pedido?.id || !acao || !descricao) {
+    return null;
+  }
+
+  return Historico.create(
+    {
+      solicitacao_id: solicitacaoPrincipalId,
+      usuario_responsavel_id: usuarioId || null,
+      setor: 'COMPRAS',
+      acao,
+      status_anterior: statusAnterior || null,
+      status_novo: statusNovo || null,
+      observacao: descricao,
+      descricao,
+      metadata: JSON.stringify({
+        tipo: 'PEDIDO_COMPRA',
+        pedido_compra_id: pedido.id,
+        pedido_compra_codigo: buildPedidoCodigo(pedido.id),
+        solicitacao_compra_id: solicitacao.id,
+        fornecedor_compra_id: pedido.fornecedor_compra_id,
+        ...metadados
+      })
+    },
+    { transaction }
+  );
 }
 
 async function buscarUltimosPrecosPorInsumo(insumoIds, obraIdsEscopo = null, solicitacaoCompraIdIgnorar = null) {
@@ -342,6 +382,19 @@ async function obterOuCriarPedidoPorFornecedor({
     descricao: `Pedido preliminar gerado para ${vinculacaoFornecedor.fornecedor?.nome || vinculacaoFornecedor.fornecedor_compra_id}`,
     metadados: {
       pedido_compra_id: pedido.id
+    },
+    transaction
+  });
+
+  await registrarHistoricoPedidoNaSolicitacaoPrincipal({
+    solicitacao,
+    pedido,
+    usuarioId,
+    acao: 'PEDIDO_COMPRA_GERADO',
+    descricao: `${buildPedidoCodigo(pedido.id)} gerado para ${vinculacaoFornecedor.fornecedor?.nome || vinculacaoFornecedor.fornecedor_compra_id}`,
+    statusNovo: pedido.status,
+    metadados: {
+      fornecedor_nome: vinculacaoFornecedor.fornecedor?.nome || null
     },
     transaction
   });
@@ -916,6 +969,28 @@ async function atualizarStatusPedido({ pedidoId, status, usuarioId, transaction 
     descricao: `${buildPedidoCodigo(pedido.id)} alterado de ${statusAnterior || '-'} para ${statusConfig.codigo}`,
     metadados: {
       pedido_compra_id: pedido.id,
+      status_anterior: statusAnterior || null,
+      status_novo: statusConfig.codigo,
+      bloqueia_edicao: statusConfig.bloqueia_edicao
+    },
+    transaction
+  });
+
+  const solicitacao = await SolicitacaoCompra.findByPk(pedido.solicitacao_compra_id, {
+    transaction,
+    attributes: ['id', 'solicitacao_principal_id']
+  });
+  const isStatusFinal = Boolean(statusConfig.bloqueia_edicao) || ['ENCERRADO', 'CANCELADO'].includes(statusConfig.codigo);
+
+  await registrarHistoricoPedidoNaSolicitacaoPrincipal({
+    solicitacao,
+    pedido,
+    usuarioId,
+    acao: isStatusFinal ? 'PEDIDO_COMPRA_ENCERRADO' : 'PEDIDO_COMPRA_STATUS_ALTERADO',
+    descricao: `${buildPedidoCodigo(pedido.id)} ${isStatusFinal ? 'finalizado' : 'alterado'} de ${statusAnterior || '-'} para ${statusConfig.codigo}`,
+    statusAnterior: statusAnterior || null,
+    statusNovo: statusConfig.codigo,
+    metadados: {
       status_anterior: statusAnterior || null,
       status_novo: statusConfig.codigo,
       bloqueia_edicao: statusConfig.bloqueia_edicao

@@ -56,6 +56,28 @@ export default function Timeline({ historicos, canRemoveAnexo = false, onAnexoRe
     }
   }
 
+  async function baixarPedidoCompraPdf(pedidoCompraId, codigoPedido) {
+    try {
+      const response = await fetch(`${API_URL}/compras/pedidos/${pedidoCompraId}/pdf`, {
+        headers: authHeaders()
+      });
+      if (!response.ok) throw new Error('Falha ao baixar pedido de compra');
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${codigoPedido || `PC-${String(pedidoCompraId).padStart(5, '0')}`}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error(error);
+      alert(error?.message || 'Erro ao baixar pedido de compra');
+    }
+  }
+
   async function removerAnexo(historicoId) {
     const confirmar = window.confirm('Deseja remover este anexo do historico?');
     if (!confirmar) return;
@@ -93,11 +115,18 @@ export default function Timeline({ historicos, canRemoveAnexo = false, onAnexoRe
             meta = null;
           }
 
-          const acaoLabel = h.acao === 'NUMERO_PEDIDO_ATUALIZADO' ? 'No SIENGE atualizado' : h.acao;
+          const acaoLabel = {
+            NUMERO_PEDIDO_ATUALIZADO: 'No SIENGE atualizado',
+            PEDIDO_COMPRA_GERADO: 'Pedido de compra gerado',
+            PEDIDO_COMPRA_STATUS_ALTERADO: 'Status do pedido de compra alterado',
+            PEDIDO_COMPRA_ENCERRADO: 'Pedido de compra encerrado/cancelado'
+          }[h.acao] || h.acao;
           const atorNome = meta?.ator_nome || null;
           const responsavelNome = meta?.responsavel_nome || h.usuario?.nome || null;
           const caminhoArquivo = meta?.caminho || null;
           const podeExibirArquivo = ['ANEXO_ADICIONADO', 'COMPROVANTE_ADICIONADO'].includes(h.acao);
+          const pedidoCompraId = meta?.pedido_compra_id || null;
+          const pedidoCompraCodigo = meta?.pedido_compra_codigo || (pedidoCompraId ? `PC-${String(pedidoCompraId).padStart(5, '0')}` : null);
 
           return (
             <div key={h.id} className="sol-detail-timeline-item">
@@ -127,6 +156,29 @@ export default function Timeline({ historicos, canRemoveAnexo = false, onAnexoRe
               )}
 
               {h.descricao && <p className="sol-detail-timeline-text text-sm">{h.descricao}</p>}
+
+              {pedidoCompraId && (
+                <div className="flex flex-wrap gap-3 mt-1">
+                  <button
+                    type="button"
+                    className="text-sm"
+                    style={{ color: 'var(--c-primary)' }}
+                    onClick={() => {
+                      window.location.href = `/pedidos-compra/${pedidoCompraId}`;
+                    }}
+                  >
+                    Visualizar {pedidoCompraCodigo}
+                  </button>
+                  <button
+                    type="button"
+                    className="text-sm"
+                    style={{ color: 'var(--c-primary)' }}
+                    onClick={() => baixarPedidoCompraPdf(pedidoCompraId, pedidoCompraCodigo)}
+                  >
+                    Download
+                  </button>
+                </div>
+              )}
 
               {podeExibirArquivo && meta && caminhoArquivo && (
                 <div className="flex gap-3 mt-1">
