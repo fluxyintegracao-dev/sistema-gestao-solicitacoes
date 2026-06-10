@@ -5,14 +5,14 @@ const { URL } = require('url');
 const { env } = require('../../config/env');
 const { createBancoDoBrasilError, sanitizeHeaders, sanitizePayload } = require('./bancoDoBrasilErrors');
 
-function assertRealSandboxEnabled() {
+function assertRealProviderEnabled() {
   if (!env.bbSandboxRealEnabled) {
-    throw createBancoDoBrasilError(501, 'Integracao real BB esta desabilitada. Ative a chamada real ao Banco do Brasil nas variaveis de ambiente.', 'BB_SANDBOX_REAL_DISABLED');
+    throw createBancoDoBrasilError(501, 'Integracao real BB esta desabilitada. Ative BB_REAL_PROVIDER_ENABLED=true nas variaveis de ambiente.', 'BB_REAL_PROVIDER_DISABLED');
   }
 }
 
 function buildHttpsAgent() {
-  assertRealSandboxEnabled();
+  assertRealProviderEnabled();
   if (!env.bbCertPath) {
     throw createBancoDoBrasilError(400, 'Certificado mTLS BB nao configurado: informe BB_CERT_PATH.', 'BB_CERT_MISSING');
   }
@@ -51,7 +51,7 @@ function buildUrl(path, query = {}) {
 }
 
 function requestJson({ method = 'GET', path, query, body, accessToken }) {
-  assertRealSandboxEnabled();
+  assertRealProviderEnabled();
   if (!accessToken) {
     throw createBancoDoBrasilError(400, 'Token OAuth BB ausente para chamada ao provider.', 'BB_ACCESS_TOKEN_MISSING');
   }

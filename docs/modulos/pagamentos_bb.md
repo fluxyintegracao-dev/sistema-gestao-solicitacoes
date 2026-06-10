@@ -193,18 +193,18 @@ A coluna `active_titulo_key` e gerada pelo MySQL e impede mais de uma intent ati
 
 ## Proximas fases
 
-## Fase 2 - Provider Banco do Brasil sandbox
+## Provider Banco do Brasil
 
-Esta fase prepara o provider real do Banco do Brasil em sandbox/homologacao, mantendo o mock como caminho padrao e sem habilitar producao.
+O provider real do Banco do Brasil atende homologacao e producao por configuracao de ambiente, mantendo o mock como caminho seguro quando a integracao real estiver desabilitada.
 
 Variaveis de ambiente adicionadas:
 
 - `BB_PAYMENTS_ENABLED`
 - `BB_PAYMENTS_PROVIDER`
 - `BB_PAYMENTS_ENV`
-- `BB_PROVIDER_MODE`
-- `BB_PAYMENTS_BASE_URL`
-- `BB_OAUTH_TOKEN_URL`
+- `BB_PROVIDER_MODE`: usar `real` para chamada real ao BB e `mock` para simulacao interna.
+- `BB_PAYMENTS_BASE_URL`: producao `https://pagamentos-lote.mtls.api.bb.com.br/v1`; homologacao `https://pagamentos-lote.mtls.api.hm.bb.com.br/v1`.
+- `BB_OAUTH_TOKEN_URL`: producao `https://oauth.bb.com.br/oauth/token`; homologacao conforme ambiente liberado pelo BB.
 - `BB_CLIENT_ID`
 - `BB_CLIENT_SECRET`
 - `BB_APP_KEY`
@@ -221,16 +221,17 @@ Variaveis de ambiente adicionadas:
 - `BB_AUTO_LIBERAR_LOTE`
 - `BB_REQUEST_TIMEOUT_MS`
 - `BB_TOKEN_CACHE_TTL_SECONDS`
-- `BB_OAUTH_MAX_ATTEMPTS`: quantidade maxima de tentativas para obter token OAuth2 em caso de falha temporaria de conexao com o sandbox BB. Padrao recomendado: `3`.
-- `BB_SANDBOX_REAL_ENABLED`
+- `BB_OAUTH_MAX_ATTEMPTS`: quantidade maxima de tentativas para obter token OAuth2 em caso de falha temporaria de conexao com o BB. Padrao recomendado: `3`.
+- `BB_REAL_PROVIDER_ENABLED`
+- `BB_SANDBOX_REAL_ENABLED`: variavel legada para ambientes antigos; preferir `BB_REAL_PROVIDER_ENABLED`.
 - `BB_WEBHOOK_ENABLED`
 - `BB_WEBHOOK_PATH`
 - `BB_WEBHOOK_REQUIRE_MTLS`
 
 Regras de seguranca:
 
-- `BB_SANDBOX_REAL_ENABLED=false` mantem o fluxo mockado.
-- `BB_SANDBOX_REAL_ENABLED=true` exige `BB_CLIENT_ID`, `BB_CLIENT_SECRET`, `BB_APP_KEY` e certificado A1 configurado fora do repositorio.
+- `BB_REAL_PROVIDER_ENABLED=false` mantem o fluxo mockado.
+- `BB_REAL_PROVIDER_ENABLED=true` exige `BB_CLIENT_ID`, `BB_CLIENT_SECRET`, `BB_APP_KEY` e certificado A1 configurado fora do repositorio.
 - certificado, senha, app key, token e client secret nunca devem ser versionados nem expostos no frontend.
 - snapshots tecnicos sao mascarados antes de gravar em `payment_transactions`.
 
@@ -239,11 +240,11 @@ Certificado A1, CA e TLS:
 - o certificado A1 configurado em `BB_CERT_PATH` e a identidade da empresa usada no mTLS com o Banco do Brasil;
 - a cadeia CA/TLS e a cadeia de confianca que o Node usa para validar o certificado apresentado pelo servidor do Banco do Brasil;
 - erro `SELF_SIGNED_CERT_IN_CHAIN` normalmente indica problema de confianca na cadeia TLS do servidor ou ausencia de CA intermediaria/local, nao necessariamente erro no A1;
-- em sandbox, `BB_TLS_REJECT_UNAUTHORIZED=false` pode ser usado temporariamente para teste controlado quando a cadeia do endpoint de homologacao nao for aceita pelo Node;
+- em homologacao, `BB_TLS_REJECT_UNAUTHORIZED=false` pode ser usado temporariamente para teste controlado quando a cadeia do endpoint de homologacao nao for aceita pelo Node;
 - em producao, `BB_TLS_REJECT_UNAUTHORIZED` deve permanecer `true`;
 - se producao apresentar erro de cadeia TLS, a correcao deve ser configurar a cadeia CA correta em `BB_CA_CERT_PATH`, nao relaxar a validacao TLS.
 
-Endpoints BB usados no sandbox:
+Endpoints BB usados:
 
 - `POST /lotes-transferencias-pix`
 - `POST /liberar-pagamentos`
@@ -260,16 +261,17 @@ Escopos OAuth2:
 Rotas internas FLUXY adicionadas:
 
 - `GET /api/financeiro/pagamentos/bb/health`
-- `POST /api/financeiro/pagamentos/lotes/:id/enviar-bb-sandbox`
+- `POST /api/financeiro/pagamentos/lotes/:id/enviar-bb`
+- `POST /api/financeiro/pagamentos/lotes/:id/enviar-bb-sandbox` (compatibilidade legada)
 - `POST /api/financeiro/pagamentos/lotes/:id/sincronizar-status-bb`
 - `GET /api/financeiro/pagamentos/lotes/:id/transacoes-bb`
 - `GET /api/financeiro/pagamentos/eventos`
 - `POST /api/payments/bb/webhook`
 
-Fluxo sandbox real:
+Fluxo real BB:
 
 1. lote e criado e aprovado por duas pessoas;
-2. usuario financeiro informa MFA e envia pelo botao `Enviar BB Sandbox`;
+2. usuario financeiro informa MFA e envia pelo botao `Enviar ao BB`;
 3. backend cria job `BB_SUBMIT_PIX_BATCH`;
 4. provider monta payload `RequisicaoPOSTLotePagamentosTransferenciaPix`;
 5. OAuth2 gera token client credentials;
@@ -283,7 +285,7 @@ Numero da requisicao BB:
 
 - `numeroRequisicao` e controlado pelo FLUXY, mas o Banco do Brasil nao permite reutilizar um numero ja recebido;
 - o lote interno do FLUXY mantem seu `id` e `codigo`;
-- no envio real sandbox, o `numeroRequisicao` enviado ao BB e gerado na faixa de 6 digitos, evitando numeros ja usados no historico local do lote;
+- no envio real, o `numeroRequisicao` enviado ao BB e gerado na faixa de 6 digitos, evitando numeros ja usados no historico local do lote;
 - reprocessar um lote em `FALHA_INTEGRACAO` deve gerar novo `numeroRequisicao`, porque o numero anterior pode ter sido registrado pelo BB mesmo quando a resposta foi `400`;
 - se uma tentativa tiver status externo desconhecido, consultar/sincronizar antes de reenviar para reduzir risco de duplicidade.
 

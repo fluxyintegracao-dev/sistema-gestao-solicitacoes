@@ -20,12 +20,12 @@ const SCOPES = {
   INFO: 'pagamentos-lote.lotes-info'
 };
 
-function assertSandboxRealEnabled() {
+function assertRealProviderEnabled() {
   if (!env.bbSandboxRealEnabled) {
     throw createBancoDoBrasilError(
       400,
-      'Integracao real BB desabilitada. Ative a chamada real ao Banco do Brasil nas variaveis de ambiente.',
-      'BB_SANDBOX_DISABLED'
+      'Integracao real BB desabilitada. Ative BB_REAL_PROVIDER_ENABLED=true nas variaveis de ambiente.',
+      'BB_REAL_PROVIDER_DISABLED'
     );
   }
 }
@@ -105,7 +105,7 @@ function extractBancoDoBrasilErrorMessage(details) {
 }
 
 async function submitPixBatch(batch, options = {}) {
-  assertSandboxRealEnabled();
+  assertRealProviderEnabled();
   const body = mapBatchToPixTransferRequest(batch, {
     numeroRequisicao: options.numeroRequisicao
   });
@@ -130,7 +130,7 @@ async function submitPixBatch(batch, options = {}) {
 }
 
 async function releasePayments(batch, options = {}) {
-  assertSandboxRealEnabled();
+  assertRealProviderEnabled();
   const body = mapReleasePaymentsRequest(batch, {
     numeroRequisicao: options.numeroRequisicao
   });
@@ -154,7 +154,7 @@ async function releasePayments(batch, options = {}) {
 }
 
 async function getBatchStatus(providerBatchId) {
-  assertSandboxRealEnabled();
+  assertRealProviderEnabled();
   if (!providerBatchId) {
     throw createBancoDoBrasilError(400, 'Identificador do lote BB nao informado.', 'BB_BATCH_ID_REQUIRED');
   }
@@ -178,7 +178,7 @@ async function getBatchStatus(providerBatchId) {
 }
 
 async function getBatchRequestStatus(numeroSolicitacao) {
-  assertSandboxRealEnabled();
+  assertRealProviderEnabled();
   if (!numeroSolicitacao) {
     throw createBancoDoBrasilError(400, 'Numero da solicitacao BB nao informado.', 'BB_REQUEST_ID_REQUIRED');
   }
@@ -202,7 +202,7 @@ async function getBatchRequestStatus(numeroSolicitacao) {
 }
 
 async function searchPaymentsStatus(filters = {}) {
-  assertSandboxRealEnabled();
+  assertRealProviderEnabled();
   const token = await getAccessToken(SCOPES.INFO);
   const response = await requestJson({
     method: 'GET',

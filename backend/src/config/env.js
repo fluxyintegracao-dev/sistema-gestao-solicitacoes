@@ -31,6 +31,32 @@ function trimLeadingAndTrailingSlashes(value) {
   return String(value || '').trim().replace(/^\/+|\/+$/g, '');
 }
 
+function resolveBbPaymentsBaseUrl() {
+  if (process.env.BB_PAYMENTS_BASE_URL) {
+    return trimTrailingSlashes(process.env.BB_PAYMENTS_BASE_URL);
+  }
+
+  const ambiente = String(process.env.BB_PAYMENTS_ENV || 'sandbox').trim().toLowerCase();
+  if (ambiente === 'production' || ambiente === 'producao') {
+    return 'https://pagamentos-lote.mtls.api.bb.com.br/v1';
+  }
+
+  return 'https://pagamentos-lote.mtls.api.hm.bb.com.br/v1';
+}
+
+function resolveBbOauthTokenUrl() {
+  if (process.env.BB_OAUTH_TOKEN_URL) {
+    return String(process.env.BB_OAUTH_TOKEN_URL).trim();
+  }
+
+  const ambiente = String(process.env.BB_PAYMENTS_ENV || 'sandbox').trim().toLowerCase();
+  if (ambiente === 'production' || ambiente === 'producao') {
+    return 'https://oauth.bb.com.br/oauth/token';
+  }
+
+  return 'https://oauth.hm.bb.com.br/oauth/token';
+}
+
 function buildSiengeApiBaseUrl({ baseUrl, host, subdomain, basePath }) {
   const explicitBaseUrl = trimTrailingSlashes(baseUrl);
   if (explicitBaseUrl) {
@@ -148,8 +174,8 @@ const env = {
   bbPaymentsProvider: String(process.env.BB_PAYMENTS_PROVIDER || 'BB').trim().toUpperCase(),
   bbPaymentsEnv: String(process.env.BB_PAYMENTS_ENV || 'sandbox').trim().toLowerCase(),
   bbProviderMode: String(process.env.BB_PROVIDER_MODE || 'mock').trim().toLowerCase(),
-  bbPaymentsBaseUrl: trimTrailingSlashes(process.env.BB_PAYMENTS_BASE_URL || 'https://homologa-api-ip.bb.com.br:7144/pagamentos-lote/v1'),
-  bbOauthTokenUrl: String(process.env.BB_OAUTH_TOKEN_URL || 'https://oauth.sandbox.bb.com.br/oauth/token').trim(),
+  bbPaymentsBaseUrl: resolveBbPaymentsBaseUrl(),
+  bbOauthTokenUrl: resolveBbOauthTokenUrl(),
   bbClientId: String(process.env.BB_CLIENT_ID || '').trim(),
   bbClientSecret: String(process.env.BB_CLIENT_SECRET || ''),
   bbAppKey: String(process.env.BB_APP_KEY || '').trim(),
