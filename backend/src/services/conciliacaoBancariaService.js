@@ -1301,6 +1301,7 @@ async function confirmarConciliacaoTransferencia(req, conciliacaoId, payload = {
     const payloadTransferencia = {
       conta_origem_id: isSaidaDaContaAtual ? contaAtualId : contaContraparteId,
       conta_destino_id: isSaidaDaContaAtual ? contaContraparteId : contaAtualId,
+      tipo_transferencia: payload.tipo_transferencia,
       data_transferencia: conciliacao.data_movimento,
       valor,
       descricao: payload.descricao || `Transferencia conciliada pelo lancamento bancario #${conciliacao.id}`,

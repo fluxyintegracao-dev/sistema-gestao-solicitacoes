@@ -7,7 +7,7 @@ const { createBancoDoBrasilError, sanitizeHeaders, sanitizePayload } = require('
 
 function assertRealSandboxEnabled() {
   if (!env.bbSandboxRealEnabled) {
-    throw createBancoDoBrasilError(501, 'Sandbox real BB esta desabilitado. Use BB_SANDBOX_REAL_ENABLED=true para chamadas reais.', 'BB_SANDBOX_REAL_DISABLED');
+    throw createBancoDoBrasilError(501, 'Integracao real BB esta desabilitada. Ative a chamada real ao Banco do Brasil nas variaveis de ambiente.', 'BB_SANDBOX_REAL_DISABLED');
   }
 }
 
@@ -136,9 +136,10 @@ function getHealth() {
     enabled: env.bbPaymentsEnabled,
     provider: env.bbPaymentsProvider,
     env: env.bbPaymentsEnv,
-    mode: env.bbSandboxRealEnabled ? 'BB_SANDBOX' : 'MOCK',
+    mode: env.bbSandboxRealEnabled ? 'BB_REAL' : 'MOCK',
     baseURL: env.bbPaymentsBaseUrl,
     tokenURL: env.bbOauthTokenUrl,
+    realProviderEnabled: env.bbSandboxRealEnabled,
     sandboxRealEnabled: env.bbSandboxRealEnabled,
     certificateConfigured: Boolean(env.bbCertPath),
     caConfigured: Boolean(env.bbCaCertPath),

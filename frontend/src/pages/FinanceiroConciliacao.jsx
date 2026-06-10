@@ -1421,6 +1421,7 @@ export default function FinanceiroConciliacao() {
       setFeedback('');
       await confirmarConciliacaoTransferencia(transferenciaModal.item.id, {
         conta_contraparte_id: transferenciaModal.conta_contraparte_id,
+        tipo_transferencia: transferenciaEntreEmpresas ? 'ENTRE_EMPRESAS' : 'MESMA_TITULARIDADE',
         descricao: transferenciaModal.descricao,
         tipo_intercompany: transferenciaEntreEmpresas ? transferenciaModal.tipo_intercompany : undefined,
         motivo_intercompany: transferenciaEntreEmpresas ? transferenciaModal.motivo_intercompany : undefined,

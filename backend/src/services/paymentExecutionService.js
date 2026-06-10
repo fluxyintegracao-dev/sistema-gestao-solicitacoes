@@ -423,7 +423,7 @@ async function enqueueBbSandboxSendBatch(req, id, payload = {}) {
   });
   if (!batch) throw createHttpError(404, 'Lote de pagamento nao encontrado.');
   if (String(batch.status || '').toUpperCase() !== 'APROVADO') {
-    throw createHttpError(400, 'Lote precisa estar aprovado para envio BB sandbox.');
+    throw createHttpError(400, 'Lote precisa estar aprovado para envio ao Banco do Brasil.');
   }
   if ((await countValidApprovals(batch.id)) < 2) {
     throw createHttpError(400, 'Lote exige duas aprovacoes validas.');
@@ -431,7 +431,7 @@ async function enqueueBbSandboxSendBatch(req, id, payload = {}) {
   const integrityBatch = await validatePaymentBatchIntegrity(batch.id, {
     expectedBatchStatuses: ['APROVADO'],
     expectedIntentStatuses: ['APROVADO'],
-    phaseLabel: 'envio BB sandbox'
+    phaseLabel: 'envio ao Banco do Brasil'
   });
   await assertApprovalHashesMatchCurrentBatch(integrityBatch, { requireTwoApprovals: true });
 
@@ -458,7 +458,7 @@ async function processBbSubmitPixBatchJob(req, jobId) {
   const integrityBatch = await validatePaymentBatchIntegrity(batch.id, {
     expectedBatchStatuses: ['APROVADO'],
     expectedIntentStatuses: ['APROVADO'],
-    phaseLabel: 'processamento do envio BB sandbox'
+    phaseLabel: 'processamento do envio ao Banco do Brasil'
   });
   await assertApprovalHashesMatchCurrentBatch(integrityBatch, { requireTwoApprovals: true });
 
@@ -534,7 +534,7 @@ async function processBbSubmitPixBatchJob(req, jobId) {
       recursoTipo: 'PAYMENT_BATCH',
       recursoId: batch.id,
       status: 'SUCCESS',
-      descricao: 'Lote PIX enviado ao Banco do Brasil sandbox'
+      descricao: 'Lote PIX enviado ao Banco do Brasil'
     });
 
     if (env.bbAutoLiberarLote) {
@@ -611,7 +611,7 @@ async function processBbReleaseBatchJob(req, jobId) {
   try {
     const lastSubmitTransaction = await findLastRealProviderBatchTransaction(batch.id);
     if (!lastSubmitTransaction) {
-      throw createHttpError(400, 'Lote ainda nao possui identificador BB real para liberacao. Envie o lote no sandbox real antes de liberar.');
+      throw createHttpError(400, 'Lote ainda nao possui identificador BB real para liberacao. Envie o lote ao Banco do Brasil antes de liberar.');
     }
     const providerResult = await bancoDoBrasilSandboxProvider.releasePayments(batch, {
       numeroRequisicao: lastSubmitTransaction?.provider_batch_id
@@ -673,7 +673,7 @@ async function processBbReleaseBatchJob(req, jobId) {
 
 async function sincronizarStatusBb(req, id) {
   if (!env.bbSandboxRealEnabled) {
-    throw createHttpError(400, 'Sandbox real BB desabilitado. Use o fluxo mockado ou ative BB_SANDBOX_REAL_ENABLED.');
+    throw createHttpError(400, 'Integracao real BB desabilitada. Use o fluxo mockado ou ative a integracao Banco do Brasil.');
   }
 
   const batch = await getBatchWithPaymentGraph(id);
@@ -681,7 +681,7 @@ async function sincronizarStatusBb(req, id) {
 
   const lastTransaction = await findLastRealProviderBatchTransaction(batch.id);
   if (!lastTransaction) {
-    throw createHttpError(400, 'Este lote ainda nao possui identificador BB real. Envie ou reprocesse o lote no sandbox real antes de sincronizar.');
+    throw createHttpError(400, 'Este lote ainda nao possui identificador BB real. Envie ou reprocesse o lote no Banco do Brasil antes de sincronizar.');
   }
   const providerBatchId = lastTransaction.provider_batch_id;
   const startedAt = new Date();
@@ -743,7 +743,7 @@ async function sincronizarStatusBb(req, id) {
     recursoTipo: 'PAYMENT_BATCH',
     recursoId: batch.id,
     status: 'SUCCESS',
-    descricao: 'Status do lote sincronizado com o Banco do Brasil sandbox'
+    descricao: 'Status do lote sincronizado com o Banco do Brasil'
   });
 
   return getBatchWithPaymentGraph(batch.id);

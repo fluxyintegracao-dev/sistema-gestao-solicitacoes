@@ -70,6 +70,24 @@ Scripts existentes:
 - `npm run test:admin`
 - `npm run test:report`
 
+Comandos recomendados para uma sessao de testes assistida por IA:
+
+```bash
+cd e2e
+npm install
+npm run test:financeiro
+npm run test:solicitacoes
+npm run test:compras
+npm run test:report
+```
+
+Quando o objetivo for validar somente o motor financeiro, iniciar por:
+
+```bash
+cd e2e
+npm run test:financeiro
+```
+
 O Playwright ja esta configurado para:
 
 - executar testes por projeto;
@@ -79,6 +97,72 @@ O Playwright ja esta configurado para:
 - reter video em falha;
 - usar timezone `America/Sao_Paulo`;
 - reutilizar estado autenticado.
+
+## Documento recomendado para a extensao do Claude
+
+Para orientar a extensao do Claude ou outro agente de testes, adicionar como contexto principal:
+
+```text
+docs/PLANO_TESTES_SMOKE_E_CENTRAL_TREINAMENTO_FLUXY.md
+```
+
+Este e o documento correto para ela seguir porque contem:
+
+- comandos Playwright;
+- mapa de testes por modulo;
+- escopo de evidencias;
+- roteiro operacional de homologacao;
+- limites do que nao deve ser testado automaticamente.
+
+Documentos complementares, se a extensao permitir mais de um arquivo:
+
+```text
+docs/GUIA_TREINAMENTO_OPERACIONAL_FLUXY.md
+docs/CHECKLIST_IMPLANTACAO_CLIENTE_FLUXY.md
+docs/MANUAL_FLUXO_OPERACIONAL_FINANCEIRO.md
+```
+
+Regra para a extensao do Claude:
+
+- priorizar testes de fluxo real;
+- registrar prints e erros encontrados;
+- nao alterar dados produtivos sem confirmacao;
+- nao testar envio real de pagamento em massa enquanto faltar autorizacao do banco;
+- nao alterar configuracoes bancarias, certificados ou `.env`;
+- ao encontrar erro, informar rota, tela, acao executada, payload quando visivel e mensagem exibida.
+
+Prompt sugerido para colar na extensao:
+
+```text
+Use o documento docs/PLANO_TESTES_SMOKE_E_CENTRAL_TREINAMENTO_FLUXY.md como roteiro principal.
+
+Objetivo desta sessao: executar testes operacionais do FLUXY com prioridade no modulo Financeiro.
+
+Comece pelo fluxo:
+1. criar/abrir uma solicitacao apta a gerar titulo;
+2. gerar titulo financeiro pelo detalhe da solicitacao;
+3. validar vinculo do titulo com solicitacao, obra/centro de custo, empresa do grupo e categoria financeira;
+4. validar edicao de titulo aberto;
+5. validar baixa parcial;
+6. validar baixa total;
+7. validar conciliacao bancaria;
+8. validar DRE, fluxo consolidado, resultado por obras, intercompany e endividamento;
+9. validar financiamentos bancarios e geracao de parcelas como titulos a pagar.
+
+Nao execute pagamento em massa Banco do Brasil, envio BB sandbox, sincronizacao BB, alteracao de certificado, alteracao de convenio bancario ou alteracao de variaveis .env.
+
+Para cada falha, registrar:
+- tela;
+- rota/URL;
+- acao executada;
+- resultado esperado;
+- resultado obtido;
+- erro do console;
+- print quando possivel;
+- severidade sugerida.
+
+Depois dos testes, gerar um resumo com aprovados, falhas, riscos e proximos ajustes recomendados.
+```
 
 ## Ajuste Recomendado para Evidencias
 
@@ -194,33 +278,120 @@ Evidencias:
 
 ### Financeiro
 
-Objetivo: validar registro financeiro sem inferencia de dado critico.
+Objetivo: validar o motor financeiro institucional sem inferencia de dado critico.
+
+O foco inicial deve ser o fluxo:
+
+```text
+Solicitacao
+-> Gerar titulo financeiro
+-> Validar vinculos contabeis/gerenciais
+-> Baixa parcial ou total
+-> Movimento bancario
+-> Conciliacao
+-> Relatorios
+```
+
+Escopo prioritario:
+
+- titulo gerado a partir da solicitacao;
+- titulo manual;
+- titulo de financiamento bancario;
+- baixa parcial;
+- baixa total;
+- baixa com mais de um movimento bancario em datas diferentes;
+- conciliacao bancaria;
+- DRE por categoria financeira e empresa da obra;
+- fluxo consolidado;
+- endividamento;
+- faturas de cartao;
+- intercompany/Entre Empresas quando aplicavel.
+
+Fora do escopo automatico por enquanto:
+
+- envio real ou sandbox de pagamento em massa Banco do Brasil;
+- sincronizacao de lote BB que dependa de scopes/contrato bancario;
+- testes que alterem certificados, convenio bancario ou variaveis `.env`;
+- pagamentos reais.
+
+Observacao importante:
+
+Pagamento em massa deve continuar fora dos testes automatizados ate o banco liberar formalmente a autorizacao do contrato e dos scopes da aplicacao. A tela pode ser aberta apenas para validar carregamento visual e bloqueios, sem enviar lote.
 
 Testes:
 
-- listar titulos;
-- criar titulo manual;
+- listar titulos financeiros;
+- abrir detalhe de titulo;
+- criar solicitacao amostral;
+- gerar titulo financeiro dentro do detalhe da solicitacao;
+- confirmar que titulo gerado fica vinculado a solicitacao correta;
+- confirmar que titulo herda empresa pela obra/centro de custo vinculada a solicitacao;
+- bloquear geracao de titulo quando a obra/centro de custo nao possuir empresa vinculada;
+- confirmar que categoria financeira define se entra ou nao na DRE;
+- confirmar que a empresa do titulo impacta DRE;
+- confirmar que a empresa da baixa impacta movimento bancario, conciliacao e saldo;
+- criar titulo manual quando aplicavel;
 - editar titulo aberto;
-- bloquear edicao de titulo baixado;
-- baixar titulo individual;
-- baixar em massa;
-- selecionar empresa pagadora;
-- selecionar conta bancaria;
-- selecionar forma de pagamento;
-- validar cartao de credito/debito;
-- visualizar faturas;
+- impedir edicao indevida de campos bloqueados em titulo baixado;
+- registrar baixa parcial vinculada a um titulo;
+- registrar baixa parcial por mais de um movimento bancario, inclusive em datas diferentes;
+- confirmar que saldo do titulo permanece em aberto ate a baixa total;
+- confirmar que titulo fica quitado apenas quando a soma das baixas atingir o valor devido;
+- conciliar movimento bancario com titulo;
+- validar que baixa aparece na conta bancaria correta;
+- validar faturas de cartao de credito/debito;
 - abrir titulos de uma fatura;
-- validar DRE com categoria, empresa e competencia.
+- validar DRE com categoria, empresa e competencia;
+- validar fluxo de caixa consolidado;
+- validar relatorio de resultado por obras;
+- validar relatorio de endividamento e financiamentos bancarios;
+- validar modulo de financiamentos bancarios criando contrato e parcelas;
+- confirmar que parcelas de financiamento geram titulos a pagar;
+- validar que financiamento entra na conta bancaria escolhida como credito tomado;
+- validar que financiamento pode estar vinculado a empresa do grupo sem obrigar obra/centro de custo;
+- validar movimento Entre Empresas quando titulo tiver natureza intercompany;
+- validar mensagens amigaveis em erros de regra financeira.
 
 Evidencias:
 
+- solicitacao com titulo gerado;
 - titulo novo;
 - detalhe do titulo;
-- baixa;
+- edicao de titulo;
+- baixa parcial;
+- baixa total;
+- conciliacao bancaria;
+- movimento bancario;
 - fatura;
 - DRE;
+- fluxo consolidado;
+- resultado por obras;
 - relatorio intercompany;
 - relatorio de endividamento.
+
+Dados minimos para o teste financeiro:
+
+- uma empresa do grupo ativa;
+- uma obra/centro de custo vinculada a empresa do grupo;
+- uma categoria financeira de despesa marcada conforme regra de DRE;
+- uma categoria financeira fora da DRE para teste negativo;
+- um parceiro/credor ativo;
+- uma conta bancaria ativa;
+- uma solicitacao aprovada ou apta a gerar titulo;
+- um usuario com permissao de solicitacoes e financeiro;
+- um usuario sem permissao financeira para validar bloqueios.
+
+Checklist de aceite financeiro:
+
+- nenhum titulo deve ser criado sem empresa de titulo resolvida pelo backend;
+- nenhum titulo deve entrar na DRE apenas por escolha manual de tela;
+- DRE deve depender da categoria financeira e da empresa do titulo;
+- baixa deve movimentar conta bancaria e conciliacao;
+- baixa por empresa diferente da empresa do titulo nao deve alterar DRE, apenas movimento bancario/consolidacao;
+- pagamento parcial deve preservar saldo em aberto;
+- multiplos movimentos bancarios podem liquidar um unico titulo;
+- relatorios devem refletir os movimentos sem duplicidade;
+- erros devem ser amigaveis e apontar o dado faltante.
 
 ### Fiscal
 

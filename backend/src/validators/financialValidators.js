@@ -733,12 +733,13 @@ function validateFinanceConciliacaoConfirmBody(body = {}) {
 function validateFinanceConciliacaoTransferenciaBody(body = {}) {
   ensureAllowedKeys(
     body,
-    ['conta_contraparte_id', 'descricao', 'tipo_intercompany', 'motivo_intercompany', 'elimina_consolidado'],
+    ['conta_contraparte_id', 'tipo_transferencia', 'descricao', 'tipo_intercompany', 'motivo_intercompany', 'elimina_consolidado'],
     'Conciliacao bancaria por transferencia'
   );
 
   return {
     conta_contraparte_id: parseInteger(body.conta_contraparte_id, 'Conta contraparte', { required: true }),
+    tipo_transferencia: parseEnum(body.tipo_transferencia, 'Tipo de transferencia', ['ENTRE_EMPRESAS', 'MESMA_TITULARIDADE']),
     descricao: parseOptionalText(body.descricao, 'Descricao', 255),
     tipo_intercompany: parseEnum(body.tipo_intercompany, 'Tipo', TIPOS_INTERCOMPANY),
     motivo_intercompany: parseOptionalText(body.motivo_intercompany, 'Motivo', 255),
@@ -1434,6 +1435,7 @@ function validateFinanceTransferenciaBody(body = {}) {
     body,
     [
       'empresa_id',
+      'tipo_transferencia',
       'conta_origem_id',
       'conta_destino_id',
       'data_transferencia',
@@ -1448,6 +1450,7 @@ function validateFinanceTransferenciaBody(body = {}) {
 
   return {
     empresa_id: parseInteger(body.empresa_id, 'Empresa do grupo'),
+    tipo_transferencia: parseEnum(body.tipo_transferencia, 'Tipo de transferencia', ['ENTRE_EMPRESAS', 'MESMA_TITULARIDADE']),
     conta_origem_id: parseInteger(body.conta_origem_id, 'Conta de origem', { required: true }),
     conta_destino_id: parseInteger(body.conta_destino_id, 'Conta de destino', { required: true }),
     data_transferencia: parseDateOnly(body.data_transferencia, 'Data da transferencia'),

@@ -134,7 +134,7 @@ module.exports = {
       return res.json(data);
     } catch (error) {
       console.error(error);
-      return responderErro(res, error, 'Erro ao enviar lote ao Banco do Brasil sandbox');
+      return responderErro(res, error, 'Erro ao enviar lote ao Banco do Brasil');
     }
   },
 

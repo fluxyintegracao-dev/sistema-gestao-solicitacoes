@@ -112,25 +112,36 @@ async function montarPayloadTransferencia(req, payload = {}, { transaction = nul
   const empresaOrigemId = parsePositiveInteger(origem.empresa_id, 'Empresa da conta de origem');
   const empresaDestinoId = parsePositiveInteger(destino.empresa_id, 'Empresa da conta de destino');
   const empresasDiferentes = empresaOrigemId !== empresaDestinoId;
-  const tipoIntercompany = empresasDiferentes
+  const tipoTransferencia = String(payload.tipo_transferencia || '').trim().toUpperCase();
+  const transferenciaEntreEmpresas = tipoTransferencia === 'ENTRE_EMPRESAS' || empresasDiferentes;
+  const transferenciaMesmaTitularidade = tipoTransferencia === 'MESMA_TITULARIDADE' || !empresasDiferentes;
+
+  if (tipoTransferencia === 'ENTRE_EMPRESAS' && !empresasDiferentes) {
+    throw createHttpError(400, 'Transferencia entre empresas exige empresas diferentes nas contas de origem e destino.');
+  }
+  if (tipoTransferencia === 'MESMA_TITULARIDADE' && empresasDiferentes) {
+    throw createHttpError(400, 'Transferencia de mesma titularidade exige contas da mesma empresa.');
+  }
+
+  const tipoIntercompany = transferenciaEntreEmpresas
     ? normalizeTipoIntercompany(payload.tipo_intercompany)
     : null;
 
-  if (empresasDiferentes && !tipoIntercompany) {
+  if (transferenciaEntreEmpresas && !tipoIntercompany) {
     throw createHttpError(400, 'Transferencia entre empresas exige tipo.');
   }
 
-  const motivoIntercompany = empresasDiferentes
+  const motivoIntercompany = transferenciaEntreEmpresas
     ? String(payload.motivo_intercompany || payload.descricao || '').trim().slice(0, 255)
     : null;
 
-  if (empresasDiferentes && !motivoIntercompany) {
+  if (transferenciaEntreEmpresas && !motivoIntercompany) {
     throw createHttpError(400, 'Transferencia entre empresas exige motivo.');
   }
 
   return {
     empresa_id: empresaOrigemId,
-    intercompany_group_id: empresasDiferentes
+    intercompany_group_id: transferenciaEntreEmpresas
       ? (String(payload.intercompany_group_id || '').trim().slice(0, 80) || `IC-TRANSF-${crypto.randomUUID()}`)
       : null,
     empresa_origem_id: empresaOrigemId,
@@ -144,8 +155,8 @@ async function montarPayloadTransferencia(req, payload = {}, { transaction = nul
     descricao: String(payload.descricao || '').trim().slice(0, 255) || null,
     tipo_intercompany: tipoIntercompany,
     motivo_intercompany: motivoIntercompany || null,
-    elimina_consolidado: payload.elimina_consolidado === false ? false : true,
-    transferencia_interna: true,
+    elimina_consolidado: transferenciaEntreEmpresas && payload.elimina_consolidado !== false,
+    transferencia_interna: transferenciaMesmaTitularidade || transferenciaEntreEmpresas,
     criado_por: req.user?.id || null
   };
 }

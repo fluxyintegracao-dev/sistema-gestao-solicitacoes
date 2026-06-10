@@ -180,7 +180,7 @@ function getTituloPaymentAccountPendencies(titulo = {}, account = null) {
   return pendencies;
 }
 
-function buildBatchGuidance(batch, approvalsCount, isBbSandbox) {
+function buildBatchGuidance(batch, approvalsCount, isBbRealProvider) {
   const status = normalizeStatus(batch?.status);
   if (!batch) {
     return {
@@ -208,7 +208,7 @@ function buildBatchGuidance(batch, approvalsCount, isBbSandbox) {
   if (status === 'APROVADO') {
     return {
       eyebrow: 'Envio bancario',
-      title: isBbSandbox ? 'Enviar para BB Sandbox' : 'Enviar em modo mock',
+      title: isBbRealProvider ? 'Enviar para o Banco do Brasil' : 'Enviar em modo mock',
       body: 'Depois do envio, aguarde retorno bancario. A baixa financeira ainda nao deve ser feita nesta etapa.'
     };
   }
@@ -216,7 +216,7 @@ function buildBatchGuidance(batch, approvalsCount, isBbSandbox) {
     return {
       eyebrow: 'Retorno bancario',
       title: 'Acompanhar retorno do banco',
-      body: isBbSandbox ? 'Use a sincronizacao BB para atualizar as transacoes.' : 'Use o retorno mock para simular confirmacao ou falha.'
+      body: isBbRealProvider ? 'Use a sincronizacao BB para atualizar as transacoes.' : 'Use o retorno mock para simular confirmacao ou falha.'
     };
   }
   if (status === 'AGUARDANDO_CONFIRMACAO_BAIXA') {
@@ -306,7 +306,13 @@ export default function FinanceiroPagamentos() {
   const canCancel = useMemo(() => canCancelPagamentos(user), [user]);
   const canReprocess = useMemo(() => canReprocessPagamentos(user), [user]);
   const canConfirmBaixa = useMemo(() => canConfirmarBaixaPagamento(user), [user]);
-  const isBbSandbox = Boolean(bbHealth?.sandboxRealEnabled);
+  const isBbSandbox = Boolean(bbHealth?.realProviderEnabled ?? bbHealth?.sandboxRealEnabled);
+  const bbAmbienteLabel = String(bbHealth?.env || '').toLowerCase() === 'production'
+    ? 'BB PRODUCAO'
+    : 'BB HOMOLOGACAO';
+  const bbModoLabel = String(bbHealth?.env || '').toLowerCase() === 'production'
+    ? 'producao BB habilitada'
+    : 'homologacao BB habilitada';
   const visibleTabs = useMemo(() => TABS.filter((tab) => !tab.requiresAudit || canAudit), [canAudit]);
 
   async function loadBase() {
@@ -425,9 +431,9 @@ export default function FinanceiroPagamentos() {
       awaitingBaixaCount: awaitingBaixa.length,
       awaitingBaixaValue: sumBy(awaitingBaixa, 'valor'),
       certificateConfigured: Boolean(bbHealth?.certificateConfigured),
-      modeLabel: isBbSandbox ? 'BB Sandbox' : 'Mock interno'
+      modeLabel: isBbSandbox ? bbAmbienteLabel : 'Mock interno'
     };
-  }, [accounts, awaitingBaixa, batches, bbHealth, isBbSandbox]);
+  }, [accounts, awaitingBaixa, batches, bbAmbienteLabel, bbHealth, isBbSandbox]);
 
   const selectedPaymentAccount = useMemo(() => (
     accounts.find((account) => String(account.id) === String(batchForm.payment_account_id))
@@ -665,12 +671,12 @@ export default function FinanceiroPagamentos() {
           <div>
               <h1 className="text-xl font-semibold md:text-2xl">Pagamentos em Massa</h1>
               <p className="page-subtitle">
-                Motor interno para lotes PIX por chave, com dupla aprovacao, sandbox BB e baixa semiautomatica.
+                Motor interno para lotes PIX por chave, com dupla aprovacao, integracao Banco do Brasil e baixa semiautomatica.
               </p>
             </div>
             <div className="app-page-actions">
               <span className={isBbSandbox ? 'app-status-pill bg-emerald-100 text-emerald-700' : 'app-status-pill bg-slate-100 text-slate-700'}>
-                {isBbSandbox ? 'BB SANDBOX' : 'MOCK'}
+                {isBbSandbox ? bbAmbienteLabel : 'MOCK'}
               </span>
               <Link to="/financeiro/titulos" className="btn btn-outline">Titulos</Link>
               <Link to="/financeiro/cadastros" className="btn btn-outline">Cadastros</Link>
@@ -1023,7 +1029,7 @@ export default function FinanceiroPagamentos() {
                         {isBbSandbox && (
                           <button type="button" className="btn btn-primary" onClick={() => runBatchAction('enviar-bb', (id) => enviarPaymentBatchBbSandbox(id, { codigo_mfa: mfaCode }))} disabled={!canSend || selectedBatch.status !== 'APROVADO' || !mfaCode || actionLoading === 'enviar-bb'}>
                             <HiOutlinePaperAirplane className="h-4 w-4" />
-                            Enviar BB Sandbox
+                            Enviar ao BB
                           </button>
                         )}
                         <button type="button" className="btn btn-outline" onClick={() => runBatchAction('sync-bb', (id) => sincronizarPaymentBatchStatusBb(id))} disabled={!canAudit || !isBbSandbox || !['ENVIADO_AO_BANCO', 'PROCESSANDO_BANCO', 'FALHA_INTEGRACAO', 'AGUARDANDO_CONFIRMACAO_BAIXA'].includes(selectedBatch.status) || actionLoading === 'sync-bb'}>
@@ -1048,9 +1054,9 @@ export default function FinanceiroPagamentos() {
                     </div>
 
                     <div className="app-note">
-                      Modo BB: {isBbSandbox ? 'sandbox real habilitado' : 'mock ativo'}
+                      Modo BB: {isBbSandbox ? bbModoLabel : 'mock ativo'}
                       {isBbSandbox && (
-                        <> - {bbHealth?.baseURL || 'URL sandbox nao informada'} - certificado {bbHealth?.certificateConfigured ? 'configurado' : 'pendente'}</>
+                        <> - {bbHealth?.baseURL || 'URL BB nao informada'} - certificado {bbHealth?.certificateConfigured ? 'configurado' : 'pendente'}</>
                       )}
                     </div>
 

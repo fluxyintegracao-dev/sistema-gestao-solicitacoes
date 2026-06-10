@@ -1135,13 +1135,13 @@ export async function enviarPaymentBatchBanco(id, data) {
 }
 
 export async function enviarPaymentBatchBbSandbox(id, data) {
-  const response = await fetch(`${API_URL}/financeiro/pagamentos/lotes/${id}/enviar-bb-sandbox`, {
+  const response = await fetch(`${API_URL}/financeiro/pagamentos/lotes/${id}/enviar-bb`, {
     method: 'POST',
     headers: authHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(data)
   });
 
-  return parseJson(response, 'Erro ao enviar lote ao BB sandbox');
+  return parseJson(response, 'Erro ao enviar lote ao Banco do Brasil');
 }
 
 export async function sincronizarPaymentBatchStatusBb(id) {

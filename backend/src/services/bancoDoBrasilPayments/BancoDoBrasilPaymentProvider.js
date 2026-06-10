@@ -24,7 +24,7 @@ function assertSandboxRealEnabled() {
   if (!env.bbSandboxRealEnabled) {
     throw createBancoDoBrasilError(
       400,
-      'Sandbox real BB desabilitado. Ative BB_SANDBOX_REAL_ENABLED=true para chamar o Banco do Brasil.',
+      'Integracao real BB desabilitada. Ative a chamada real ao Banco do Brasil nas variaveis de ambiente.',
       'BB_SANDBOX_DISABLED'
     );
   }

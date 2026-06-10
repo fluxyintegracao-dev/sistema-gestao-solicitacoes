@@ -74,6 +74,10 @@ function getContaEmpresaNome(conta) {
   return conta?.empresa?.nome || conta?.empresa?.razao_social || (conta?.empresa_id ? `Empresa #${conta.empresa_id}` : 'Sem empresa vinculada');
 }
 
+function empresaLabel(empresa) {
+  return empresa?.nome || empresa?.razao_social || `Empresa ${empresa?.id}`;
+}
+
 export default function FinanceiroCaixas() {
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [appliedFilters, setAppliedFilters] = useState(DEFAULT_FILTERS);
@@ -89,6 +93,9 @@ export default function FinanceiroCaixas() {
   });
   const [fecharForm, setFecharForm] = useState({});
   const [transferenciaForm, setTransferenciaForm] = useState({
+    tipo_transferencia: 'MESMA_TITULARIDADE',
+    empresa_origem_id: '',
+    empresa_destino_id: '',
     conta_origem_id: '',
     conta_destino_id: '',
     data_transferencia: today(),
@@ -112,11 +119,22 @@ export default function FinanceiroCaixas() {
     () => contas.find((conta) => String(conta.id) === String(transferenciaForm.conta_destino_id)),
     [contas, transferenciaForm.conta_destino_id]
   );
-  const transferenciaEntreEmpresas = Boolean(
-    getContaEmpresaId(contaOrigemTransferencia) &&
-    getContaEmpresaId(contaDestinoTransferencia) &&
-    getContaEmpresaId(contaOrigemTransferencia) !== getContaEmpresaId(contaDestinoTransferencia)
+  const transferenciaEntreEmpresas = transferenciaForm.tipo_transferencia === 'ENTRE_EMPRESAS';
+  const transferenciaMesmaTitularidade = transferenciaForm.tipo_transferencia === 'MESMA_TITULARIDADE';
+  const contasOrigemDisponiveis = useMemo(
+    () => contas.filter((conta) => !transferenciaForm.empresa_origem_id || getContaEmpresaId(conta) === String(transferenciaForm.empresa_origem_id)),
+    [contas, transferenciaForm.empresa_origem_id]
   );
+  const contasDestinoDisponiveis = useMemo(() => contas.filter((conta) => {
+    if (String(conta.id) === String(transferenciaForm.conta_origem_id)) return false;
+    if (transferenciaMesmaTitularidade) {
+      return !transferenciaForm.empresa_origem_id || getContaEmpresaId(conta) === String(transferenciaForm.empresa_origem_id);
+    }
+    if (transferenciaEntreEmpresas) {
+      return !transferenciaForm.empresa_destino_id || getContaEmpresaId(conta) === String(transferenciaForm.empresa_destino_id);
+    }
+    return true;
+  }), [contas, transferenciaEntreEmpresas, transferenciaForm.conta_origem_id, transferenciaForm.empresa_destino_id, transferenciaForm.empresa_origem_id, transferenciaMesmaTitularidade]);
 
   useEffect(() => {
     let active = true;
@@ -253,6 +271,22 @@ export default function FinanceiroCaixas() {
 
   async function handleTransferencia(event) {
     event.preventDefault();
+    if (transferenciaMesmaTitularidade && !transferenciaForm.empresa_origem_id) {
+      setError('Selecione a empresa da transferencia de mesma titularidade.');
+      return;
+    }
+    if (transferenciaEntreEmpresas && (!transferenciaForm.empresa_origem_id || !transferenciaForm.empresa_destino_id)) {
+      setError('Selecione empresa origem e empresa destino.');
+      return;
+    }
+    if (transferenciaEntreEmpresas && String(transferenciaForm.empresa_origem_id) === String(transferenciaForm.empresa_destino_id)) {
+      setError('Empresa origem e destino devem ser diferentes.');
+      return;
+    }
+    if (transferenciaForm.conta_origem_id && String(transferenciaForm.conta_origem_id) === String(transferenciaForm.conta_destino_id)) {
+      setError('Conta origem e destino devem ser diferentes.');
+      return;
+    }
     if (transferenciaEntreEmpresas && !transferenciaForm.tipo_intercompany) {
       setError('Transferencia entre empresas exige tipo.');
       return;
@@ -268,12 +302,16 @@ export default function FinanceiroCaixas() {
       setMessage('');
       await criarTransferenciaFinanceira({
         ...transferenciaForm,
+        tipo_transferencia: transferenciaForm.tipo_transferencia,
         tipo_intercompany: transferenciaEntreEmpresas ? transferenciaForm.tipo_intercompany : undefined,
         motivo_intercompany: transferenciaEntreEmpresas ? transferenciaForm.motivo_intercompany : undefined,
         elimina_consolidado: transferenciaEntreEmpresas ? transferenciaForm.elimina_consolidado : true
       });
       setMessage('Transferencia registrada com sucesso.');
       setTransferenciaForm({
+        tipo_transferencia: 'MESMA_TITULARIDADE',
+        empresa_origem_id: '',
+        empresa_destino_id: '',
         conta_origem_id: '',
         conta_destino_id: '',
         data_transferencia: today(),
@@ -441,16 +479,107 @@ export default function FinanceiroCaixas() {
           <h2 className="text-lg font-semibold text-[var(--c-text)]">Transferir entre contas</h2>
           <form className="mt-4 space-y-3" onSubmit={handleTransferencia}>
             <label className="sol-filter-field">
+              <span className="sol-filter-label">Tipo de transferencia</span>
+              <select
+                className="input w-full"
+                value={transferenciaForm.tipo_transferencia}
+                onChange={(e) => setTransferenciaForm((current) => ({
+                  ...current,
+                  tipo_transferencia: e.target.value,
+                  empresa_origem_id: '',
+                  empresa_destino_id: '',
+                  conta_origem_id: '',
+                  conta_destino_id: '',
+                  tipo_intercompany: '',
+                  motivo_intercompany: ''
+                }))}
+              >
+                <option value="MESMA_TITULARIDADE">Mesma titularidade</option>
+                <option value="ENTRE_EMPRESAS">Entre empresas</option>
+              </select>
+            </label>
+            {transferenciaMesmaTitularidade ? (
+              <label className="sol-filter-field">
+                <span className="sol-filter-label">Empresa</span>
+                <select
+                  className="input w-full"
+                  value={transferenciaForm.empresa_origem_id}
+                  onChange={(e) => setTransferenciaForm((current) => ({
+                    ...current,
+                    empresa_origem_id: e.target.value,
+                    empresa_destino_id: e.target.value,
+                    conta_origem_id: '',
+                    conta_destino_id: ''
+                  }))}
+                  required
+                  disabled={loadingOptions}
+                >
+                  <option value="">Selecione</option>
+                  {empresas.map((empresa) => (
+                    <option key={empresa.id} value={empresa.id}>{empresaLabel(empresa)}</option>
+                  ))}
+                </select>
+              </label>
+            ) : (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="sol-filter-field">
+                  <span className="sol-filter-label">Empresa origem</span>
+                  <select
+                    className="input w-full"
+                    value={transferenciaForm.empresa_origem_id}
+                    onChange={(e) => setTransferenciaForm((current) => ({
+                      ...current,
+                      empresa_origem_id: e.target.value,
+                      conta_origem_id: '',
+                      empresa_destino_id: String(current.empresa_destino_id) === String(e.target.value) ? '' : current.empresa_destino_id
+                    }))}
+                    required
+                    disabled={loadingOptions}
+                  >
+                    <option value="">Selecione</option>
+                    {empresas.map((empresa) => (
+                      <option key={empresa.id} value={empresa.id}>{empresaLabel(empresa)}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="sol-filter-field">
+                  <span className="sol-filter-label">Empresa destino</span>
+                  <select
+                    className="input w-full"
+                    value={transferenciaForm.empresa_destino_id}
+                    onChange={(e) => setTransferenciaForm((current) => ({
+                      ...current,
+                      empresa_destino_id: e.target.value,
+                      conta_destino_id: ''
+                    }))}
+                    required
+                    disabled={loadingOptions}
+                  >
+                    <option value="">Selecione</option>
+                    {empresas
+                      .filter((empresa) => String(empresa.id) !== String(transferenciaForm.empresa_origem_id))
+                      .map((empresa) => (
+                        <option key={empresa.id} value={empresa.id}>{empresaLabel(empresa)}</option>
+                      ))}
+                  </select>
+                </label>
+              </div>
+            )}
+            <label className="sol-filter-field">
               <span className="sol-filter-label">Conta de origem</span>
               <select
                 className="input w-full"
                 value={transferenciaForm.conta_origem_id}
-                onChange={(e) => setTransferenciaForm((current) => ({ ...current, conta_origem_id: e.target.value, tipo_intercompany: '' }))}
+                onChange={(e) => setTransferenciaForm((current) => ({
+                  ...current,
+                  conta_origem_id: e.target.value,
+                  conta_destino_id: String(current.conta_destino_id) === String(e.target.value) ? '' : current.conta_destino_id
+                }))}
                 required
-                disabled={loadingOptions}
+                disabled={loadingOptions || !transferenciaForm.empresa_origem_id}
               >
                 <option value="">Selecione</option>
-                {contas.map((conta) => (
+                {contasOrigemDisponiveis.map((conta) => (
                   <option key={conta.id} value={conta.id}>{contaLabel(conta)}</option>
                 ))}
               </select>
@@ -460,12 +589,12 @@ export default function FinanceiroCaixas() {
               <select
                 className="input w-full"
                 value={transferenciaForm.conta_destino_id}
-                onChange={(e) => setTransferenciaForm((current) => ({ ...current, conta_destino_id: e.target.value, tipo_intercompany: '' }))}
+                onChange={(e) => setTransferenciaForm((current) => ({ ...current, conta_destino_id: e.target.value }))}
                 required
-                disabled={loadingOptions}
+                disabled={loadingOptions || !transferenciaForm.empresa_destino_id || !transferenciaForm.conta_origem_id}
               >
                 <option value="">Selecione</option>
-                {contas.map((conta) => (
+                {contasDestinoDisponiveis.map((conta) => (
                   <option key={conta.id} value={conta.id}>{contaLabel(conta)}</option>
                 ))}
               </select>
