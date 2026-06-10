@@ -527,8 +527,8 @@ function SecaoEnvioFornecedores({
     <div className="grid gap-4">
       {/* Envio para fornecedores vinculados via WhatsApp */}
       {linksVinculados.length > 0 && (
-        <div className="card sol-surface-card border border-emerald-200 bg-emerald-50">
-          <div className="card-header">
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+          <div className="mb-2">
             <h3 className="font-semibold text-emerald-800">Enviar cotacoes via WhatsApp</h3>
           </div>
           <p className="text-sm text-emerald-700 mb-3">
@@ -552,12 +552,15 @@ function SecaoEnvioFornecedores({
 
       {/* Adicionar novos fornecedores */}
       {solicitacao.status === 'LIBERADO_PARA_COMPRA' && (
-        <div className="solicitacoes-filtros app-filters-card">
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="rounded-2xl border border-[var(--c-border)] bg-slate-50/70 p-4">
+          <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
             <div className="grid gap-3">
               {/* Selecao por categoria */}
-              <div className="flex items-center gap-3">
-                <span className="text-sm font-medium">Selecionar fornecedores existentes</span>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-semibold text-[var(--c-text)]">Selecionar fornecedores existentes</div>
+                  <div className="text-xs text-[var(--c-muted)]">Busque por nome, documento, email ou categoria antes de gerar os links.</div>
+                </div>
                 <button
                   type="button"
                   className="btn btn-outline text-xs"
@@ -568,7 +571,7 @@ function SecaoEnvioFornecedores({
               </div>
 
               {selecionandoPorCategoria && (
-                <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 grid gap-2">
+                <div className="grid gap-2 rounded-xl border border-blue-200 bg-blue-50 p-3">
                   <p className="text-xs text-blue-700">
                     Selecione uma categoria para auto-selecionar os fornecedores cadastrados que a atendem:
                   </p>
@@ -624,7 +627,7 @@ function SecaoEnvioFornecedores({
                     {buscandoFornecedores ? 'Buscando...' : 'Buscar'}
                   </button>
                 </div>
-                <div className="app-list-stack max-h-[220px] overflow-y-auto rounded-xl border border-[var(--c-border)] bg-white/70 p-3">
+                <div className="app-list-stack max-h-[260px] overflow-y-auto rounded-xl border border-[var(--c-border)] bg-white/80 p-3">
                   {buscandoFornecedores ? (
                     <div className="text-sm text-[var(--c-muted)]">Buscando...</div>
                   ) : fornecedores.length === 0 ? (
@@ -660,16 +663,30 @@ function SecaoEnvioFornecedores({
               </div>
             </div>
 
-            {/* Cadastro rapido */}
-            <div className="grid gap-3 content-start">
-            {/* Cadastro rapido */}
-              <input className="input" placeholder="Nome do fornecedor" value={novoFornecedor.nome} onChange={(e) => onChangeNovoFornecedor('nome', e.target.value)} />
-              <input className="input" placeholder="WhatsApp" value={novoFornecedor.whatsapp} onChange={(e) => onChangeNovoFornecedor('whatsapp', e.target.value)} />
-              <input className="input" placeholder="Email" value={novoFornecedor.email} onChange={(e) => onChangeNovoFornecedor('email', e.target.value)} />
-              <input className="input" placeholder="Contato" value={novoFornecedor.contato} onChange={(e) => onChangeNovoFornecedor('contato', e.target.value)} />
-              <div className="flex flex-wrap gap-2">
-                <button type="button" className="btn btn-outline" onClick={onCriarFornecedorRapido}>Cadastrar e selecionar</button>
-                <button type="button" className="btn btn-primary" onClick={onEnviarFornecedores} disabled={enviandoFornecedores}>
+            <div className="grid content-start gap-3 rounded-xl border border-[var(--c-border)] bg-white/85 p-4">
+              <div>
+                <div className="text-sm font-semibold text-[var(--c-text)]">Cadastro rapido</div>
+                <div className="text-xs text-[var(--c-muted)]">Inclua um fornecedor novo sem sair da cotacao.</div>
+              </div>
+              <label className="grid gap-1 text-sm">
+                <span className="text-xs font-semibold text-[var(--c-muted)]">Nome do fornecedor</span>
+                <input className="input" placeholder="Ex.: Fornecedor ABC" value={novoFornecedor.nome} onChange={(e) => onChangeNovoFornecedor('nome', e.target.value)} />
+              </label>
+              <label className="grid gap-1 text-sm">
+                <span className="text-xs font-semibold text-[var(--c-muted)]">WhatsApp</span>
+                <input className="input" placeholder="(00) 00000-0000" value={novoFornecedor.whatsapp} onChange={(e) => onChangeNovoFornecedor('whatsapp', e.target.value)} />
+              </label>
+              <label className="grid gap-1 text-sm">
+                <span className="text-xs font-semibold text-[var(--c-muted)]">Email</span>
+                <input className="input" placeholder="email@fornecedor.com" value={novoFornecedor.email} onChange={(e) => onChangeNovoFornecedor('email', e.target.value)} />
+              </label>
+              <label className="grid gap-1 text-sm">
+                <span className="text-xs font-semibold text-[var(--c-muted)]">Contato</span>
+                <input className="input" placeholder="Nome do contato" value={novoFornecedor.contato} onChange={(e) => onChangeNovoFornecedor('contato', e.target.value)} />
+              </label>
+              <div className="grid gap-2">
+                <button type="button" className="btn btn-outline w-full" onClick={onCriarFornecedorRapido}>Cadastrar e selecionar</button>
+                <button type="button" className="btn btn-primary w-full" onClick={onEnviarFornecedores} disabled={enviandoFornecedores}>
                   {enviandoFornecedores ? 'Gerando links...' : 'Gerar links de cotacao'}
                 </button>
               </div>
@@ -762,17 +779,23 @@ function SecaoComparativo({ comparativo, solicitacao, podeComprar, vencedoresSel
 
   return (
     <>
-      {/* Top 3 fornecedores */}
-      {rankingFornecedores.length > 0 && (
-        <div className="card sol-surface-card">
-          <div className="card-header">
-            <h2 className="font-semibold">Top 3 Fornecedores - Menor preco total</h2>
+      <div className="card sol-surface-card">
+        <div className="card-header flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="font-semibold">Comparativo por item</h2>
+            <p className="mt-1 text-sm text-[var(--c-muted)]">Compare respostas, selecione vencedores e encerre a cotacao quando estiver pronta.</p>
           </div>
-          <div className="grid gap-3 sm:grid-cols-3">
+          <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-medium text-slate-700">
+            {comparativo.itens.length} item(ns)
+          </span>
+        </div>
+
+        {rankingFornecedores.length > 0 && (
+          <div className="mb-4 grid gap-3 sm:grid-cols-3">
             {rankingFornecedores.map((forn, idx) => (
               <div
                 key={forn.fornecedor_id}
-                className={`rounded-xl border p-4 grid gap-2 ${idx === 0 ? 'border-emerald-300 bg-emerald-50' : 'border-[var(--c-border)] bg-[var(--c-bg)]'}`}
+                className={`grid gap-2 rounded-xl border p-4 ${idx === 0 ? 'border-emerald-300 bg-emerald-50' : 'border-[var(--c-border)] bg-slate-50/80'}`}
               >
                 <div className="flex items-start justify-between gap-2">
                   <span className={`text-2xl font-bold ${idx === 0 ? 'text-emerald-600' : 'text-[var(--c-muted)]'}`}>
@@ -807,15 +830,7 @@ function SecaoComparativo({ comparativo, solicitacao, podeComprar, vencedoresSel
               </div>
             ))}
           </div>
-        </div>
-      )}
-
-      {/* Comparativo detalhado por item */}
-      <div className="card sol-surface-card">
-        <div className="card-header flex flex-wrap items-center justify-between gap-3">
-          <h2 className="font-semibold">Comparativo por Item</h2>
-          <span className="text-sm text-[var(--c-muted)]">{comparativo.itens.length} item(ns)</span>
-        </div>
+        )}
 
         <div className="app-list-stack">
           {comparativo.itens.map((item) => (
@@ -1240,67 +1255,35 @@ export default function GerenciarCotacaoSolicitacao() {
           </div>
         </div>
 
-        <div className="app-summary-grid app-summary-grid--compact">
-          <div className="app-summary-card">
-            <div className="app-summary-label">Status</div>
-            <div className="app-summary-value">
-              <span className={clsStatus(solicitacao.status)}>{fmtStatus(solicitacao.status)}</span>
-            </div>
-          </div>
-          <div className="app-summary-card">
-            <div className="app-summary-label">Obra</div>
-            <div className="app-summary-value">{solicitacao.obra?.nome || '-'}</div>
-          </div>
-          <div className="app-summary-card">
-            <div className="app-summary-label">Criado por</div>
-            <div className="app-summary-value">{solicitacao.solicitante?.nome || '-'}</div>
-            <div className="app-summary-subvalue">{fmt(solicitacao.createdAt)}</div>
-          </div>
-          <div className="app-summary-card">
-            <div className="app-summary-label">Necessario para</div>
-            <div className="app-summary-value">{fmt(solicitacao.necessario_para) || '-'}</div>
-          </div>
-          <div className="app-summary-card">
-            <div className="app-summary-label">Fornecedores</div>
-            <div className="app-summary-value">{solicitacao.fornecedores?.length || 0}</div>
-            <div className="app-summary-subvalue">vinculados a cotacao</div>
-          </div>
+        <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
+          <span className={clsStatus(solicitacao.status)}>{fmtStatus(solicitacao.status)}</span>
+          <span className="rounded-full bg-slate-100 px-3 py-1 font-medium text-slate-700">
+            {solicitacao.fornecedores?.length || 0} fornecedor(es)
+          </span>
+          <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-600">
+            {itensCombinados.length} item(ns)
+          </span>
+          {solicitacao.necessario_para && (
+            <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-600">
+              Necessario para {fmt(solicitacao.necessario_para)}
+            </span>
+          )}
         </div>
       </div>
 
-      <div className="mt-4 grid gap-4 xl:grid-cols-[340px_minmax(0,1fr)]">
-        {/* Coluna esquerda */}
-        <div className="grid gap-4">
-          {/* Resumo operacional */}
-          <div className="card sol-surface-card">
-            <div className="card-header"><h2 className="font-semibold">Resumo</h2></div>
-            <div className="app-summary-grid app-summary-grid--compact">
-              {!isAvulsa && (
-                <div className="app-summary-card">
-                  <div className="app-summary-label">Integrado Sienge</div>
-                  <div className="app-summary-value">{solicitacao.integrado_sienge ? 'Sim' : 'Nao'}</div>
-                </div>
-              )}
-              <div className="app-summary-card">
-                <div className="app-summary-label">Origem</div>
-                <div className="app-summary-value">{isAvulsa ? 'Cotacao Avulsa' : 'Solicitacao de Compra'}</div>
-              </div>
-              <div className="app-summary-card">
-                <div className="app-summary-label">Observacoes</div>
-                <div className="app-summary-subvalue whitespace-pre-wrap">{solicitacao.observacoes || '-'}</div>
-              </div>
-            </div>
-          </div>
-
-          {/* Integracao Sienge (somente fluxo normal) */}
+      <div className="mt-4 grid gap-4">
+        <div className="grid gap-3">
           {!isAvulsa && podeIntegrar && !solicitacao.integrado_sienge && (
-            <div className="card sol-surface-card solicitacoes-filtros app-filters-card">
-              <div className="card-header"><h2 className="font-semibold">Integracao Sienge</h2></div>
-              <div className="grid gap-3">
-                <div className="app-filter-field">
-                  <label className="app-filter-label">Numero Sienge</label>
-                  <input className="input" value={numeroSienge} onChange={(e) => setNumeroSienge(e.target.value)} placeholder="Ex.: PC-2026-001" />
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
+              <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_260px_auto] lg:items-end">
+                <div>
+                  <div className="text-sm font-semibold text-amber-900">Integracao Sienge pendente</div>
+                  <p className="mt-1 text-sm text-amber-800">Registre o numero Sienge para habilitar o envio aos fornecedores.</p>
                 </div>
+                <label className="app-filter-field">
+                  <span className="app-filter-label">Numero Sienge</span>
+                  <input className="input" value={numeroSienge} onChange={(e) => setNumeroSienge(e.target.value)} placeholder="Ex.: PC-2026-001" />
+                </label>
                 <button type="button" className="btn btn-primary" onClick={handleIntegrar} disabled={salvandoIntegracao}>
                   {salvandoIntegracao ? 'Integrando...' : 'Marcar como integrado'}
                 </button>
@@ -1309,10 +1292,12 @@ export default function GerenciarCotacaoSolicitacao() {
           )}
 
           {!isAvulsa && podeIntegrar && solicitacao.integrado_sienge && solicitacao.status !== 'LIBERADO_PARA_COMPRA' && solicitacao.status !== 'ENCERRADO' && (
-            <div className="card sol-surface-card solicitacoes-filtros app-filters-card">
-              <div className="card-header"><h2 className="font-semibold">Liberacao para compras</h2></div>
-              <div className="grid gap-3">
-                <p className="text-sm text-[var(--c-muted)]">Integracao registrada. Libere para envio aos fornecedores.</p>
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-semibold text-emerald-900">Pronto para liberar cotacao</div>
+                  <p className="mt-1 text-sm text-emerald-800">Integracao registrada. Libere a solicitacao para gerar links e enviar aos fornecedores.</p>
+                </div>
                 <button type="button" className="btn btn-primary" onClick={handleLiberar} disabled={salvandoLiberacao}>
                   {salvandoLiberacao ? 'Liberando...' : 'Liberar para compra'}
                 </button>
@@ -1320,45 +1305,16 @@ export default function GerenciarCotacaoSolicitacao() {
             </div>
           )}
 
-          {/* Itens da solicitacao */}
-          <div className="card sol-surface-card">
-            <div className="card-header flex items-center justify-between">
-              <h2 className="font-semibold">Itens</h2>
-              <span className="text-sm text-[var(--c-muted)]">{itensCombinados.length} item(ns)</span>
-            </div>
-            <div className="app-list-stack">
-              {itensCombinados.map((item, index) => (
-                <div key={`${item.item_tipo}-${index}`} className="app-list-card">
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div>
-                      <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold mr-2 ${item.item_tipo === 'MANUAL' ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-700'}`}>
-                        {item.item_tipo}
-                      </span>
-                      <span className={`font-medium ${item.item_tipo === 'MANUAL' ? 'text-red-700' : ''}`}>{item.nome}</span>
-                    </div>
-                    <span className="text-sm text-[var(--c-muted)]">{item.quantidade} {item.unidade}</span>
-                  </div>
-                  {item.especificacao && item.especificacao !== '-' && (
-                    <div className="mt-1 text-xs text-[var(--c-muted)]">{item.especificacao}</div>
-                  )}
-                  {item.arquivo_url && (
-                    <button type="button" className="mt-1 text-xs text-blue-600 hover:underline" onClick={() => handleAbrirArquivo(item)}>
-                      {item.arquivo_nome_original || 'Abrir arquivo'}
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Coluna direita */}
-        <div className="grid gap-4">
           {/* Fornecedores vinculados + envio */}
           <div className="card sol-surface-card">
             <div className="card-header flex flex-wrap items-center justify-between gap-3">
-              <h2 className="font-semibold">Fornecedores e links de cotacao</h2>
-              <span className="text-sm text-[var(--c-muted)]">{solicitacao.fornecedores?.length || 0} fornecedor(es)</span>
+              <div>
+                <h2 className="font-semibold">Fornecedores e links de cotacao</h2>
+                <p className="mt-1 text-sm text-[var(--c-muted)]">Pesquise fornecedores cadastrados, faca cadastro rapido e gere os links do portal.</p>
+              </div>
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-medium text-slate-700">
+                {solicitacao.fornecedores?.length || 0} vinculado(s)
+              </span>
             </div>
 
             {/* Aviso quando nao pode enviar ainda */}
@@ -1366,7 +1322,7 @@ export default function GerenciarCotacaoSolicitacao() {
               <div className="app-alert mb-5">
                 {!solicitacao.integrado_sienge
                   ? 'Preencha o numero Sienge e use Marcar como integrado antes de enviar aos fornecedores.'
-                  : 'Use Liberar para compra no card lateral para habilitar o envio de cotacoes.'}
+                  : 'Use Liberar para compra para habilitar o envio de cotacoes.'}
               </div>
             )}
 
@@ -1395,8 +1351,8 @@ export default function GerenciarCotacaoSolicitacao() {
             />
 
             {Array.isArray(solicitacao.logs) && solicitacao.logs.some((log) => log.tipo_acao === 'RESPOSTA_INTERNA_COMPRAS') && (
-              <div className="card sol-surface-card">
-                <div className="card-header">
+              <div className="mt-4 rounded-2xl border border-[var(--c-border)] bg-slate-50/70 p-4">
+                <div className="mb-3">
                   <h2 className="font-semibold">Auditoria de respostas internas</h2>
                 </div>
                 <div className="app-list-stack">
@@ -1451,27 +1407,27 @@ export default function GerenciarCotacaoSolicitacao() {
                           )}
                         </div>
                         <div className="flex flex-wrap gap-2">
-                          <button type="button" className="btn btn-outline" onClick={() => copiarTexto(publicUrl)}>Copiar link</button>
-                          <button type="button" className="btn btn-outline" onClick={() => window.open(publicUrl, '_blank', 'noopener,noreferrer')}>Abrir portal</button>
+                          <button type="button" className="btn btn-xs btn-outline" onClick={() => copiarTexto(publicUrl)}>Copiar link</button>
+                          <button type="button" className="btn btn-xs btn-outline" onClick={() => window.open(publicUrl, '_blank', 'noopener,noreferrer')}>Abrir portal</button>
                           {possuiRespostaArquivo && (
-                            <button type="button" className="btn btn-outline" onClick={() => window.open(publicUrl, '_blank', 'noopener,noreferrer')}>
+                            <button type="button" className="btn btn-xs btn-outline" onClick={() => window.open(publicUrl, '_blank', 'noopener,noreferrer')}>
                               Ver anexo
                             </button>
                           )}
                           {podeComprar && possuiRespostaArquivo && solicitacao.status !== 'ENCERRADO' && (
-                            <button type="button" className="btn btn-outline" onClick={() => setCotacaoRevisaoArquivo(cotacaoFornecedor)}>
+                            <button type="button" className="btn btn-xs btn-outline" onClick={() => setCotacaoRevisaoArquivo(cotacaoFornecedor)}>
                               Revisar resposta
                             </button>
                           )}
                           {linkWa && (
-                            <a href={linkWa} target="_blank" rel="noopener noreferrer" className="btn btn-outline">
+                            <a href={linkWa} target="_blank" rel="noopener noreferrer" className="btn btn-xs btn-outline">
                               WhatsApp
                             </a>
                           )}
                           {podeComprar && solicitacao.status === 'ENCERRADO' && cotacaoFornecedor.status === 'RESPONDIDO' && (
                             <button
                               type="button"
-                              className="btn btn-primary"
+                              className="btn btn-xs btn-primary"
                               onClick={() => handleCriarPedidoFornecedor(cotacaoFornecedor.fornecedor_compra_id)}
                               disabled={criandoPedidoFornecedorId === cotacaoFornecedor.fornecedor_compra_id}
                             >
@@ -1498,34 +1454,6 @@ export default function GerenciarCotacaoSolicitacao() {
               </div>
             )}
           </div>
-
-          {/* Pedidos gerados */}
-          {solicitacao.pedidos?.length > 0 && (
-            <div className="card sol-surface-card">
-              <div className="card-header flex flex-wrap items-center justify-between gap-3">
-                <h2 className="font-semibold">Pedidos Gerados</h2>
-                <span className="text-sm text-[var(--c-muted)]">{solicitacao.pedidos.length} pedido(s)</span>
-              </div>
-              <div className="app-list-stack">
-                {solicitacao.pedidos.map((pedido) => {
-                  const itensAtivos = (pedido.itens || []).filter((it) => !it.removido).length;
-                  return (
-                    <div key={pedido.id} className="app-list-card">
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div>
-                          <div className="font-semibold">PC-{String(pedido.id).padStart(5, '0')} - {pedido.fornecedor?.nome || '-'}</div>
-                          <div className="text-sm text-[var(--c-muted)]">{itensAtivos} item(ns) - Total {fmtMoeda(pedido.valor_total)}</div>
-                        </div>
-                        <button type="button" className="btn btn-outline" onClick={() => navigate(`/pedidos-compra/${pedido.id}`)}>
-                          Gerenciar pedido
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
 
           {/* Comparativo */}
           <SecaoComparativo
