@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
+  HiOutlineArrowTopRightOnSquare,
+  HiOutlineChatBubbleLeftRight,
+  HiOutlineClipboardDocument
+} from 'react-icons/hi2';
+import {
   baixarPdfSolicitacaoCompra,
   criarFornecedorCompra,
   encerrarSolicitacaoCompra,
@@ -15,6 +20,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import CompraPreviewModal from '../components/CompraPreviewModal';
 import { criarPreviewCompra } from '../utils/preview';
 import { montarLinhasResumoApropriacao } from '../utils/apropriacoes';
+import { ResizableTable, ResizableTh } from '../../../components/ResizableTable';
 
 // helpers
 
@@ -45,6 +51,26 @@ function clsStatus(status) {
 
 function buildItemKey(item) {
   return `${String(item?.item_tipo || '').toUpperCase()}:${Number(item?.item_referencia_id || 0)}`;
+}
+
+const FORNECEDOR_LINK_COLUMNS = [
+  { key: 'nome', width: 250, minWidth: 160 },
+  { key: 'telefone', width: 150, minWidth: 120 },
+  { key: 'email', width: 250, minWidth: 160 },
+  { key: 'status', width: 130, minWidth: 105 },
+  { key: 'respondido', width: 130, minWidth: 110 },
+  { key: 'acoes', width: 118, minWidth: 104 }
+];
+
+function CotacaoActionButton({ as: Component = 'button', children, className = '', ...props }) {
+  return (
+    <Component
+      className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-[var(--c-border)] bg-white text-slate-700 shadow-sm transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 disabled:cursor-not-allowed disabled:opacity-40 ${className}`.trim()}
+      {...props}
+    >
+      {children}
+    </Component>
+  );
 }
 
 function normalizeText(value) {
@@ -1185,15 +1211,19 @@ export default function GerenciarCotacaoSolicitacao() {
             {/* Lista de fornecedores vinculados */}
             {solicitacao.fornecedores?.length > 0 && (
               <div className="app-table-shell mt-3 overflow-x-auto">
-                <table className="table text-xs">
+                <ResizableTable
+                  className="table text-[11px]"
+                  columns={FORNECEDOR_LINK_COLUMNS}
+                  storageKey="fluxy.compras.cotacao.fornecedoresLinks.columns"
+                >
                   <thead>
                     <tr>
-                      <th>Nome</th>
-                      <th>Telefone</th>
-                      <th>E-mail</th>
-                      <th>Status</th>
-                      <th>Respondido em</th>
-                      <th className="w-[230px]">Acoes</th>
+                      <ResizableTh columnKey="nome">Nome</ResizableTh>
+                      <ResizableTh columnKey="telefone">Telefone</ResizableTh>
+                      <ResizableTh columnKey="email">E-mail</ResizableTh>
+                      <ResizableTh columnKey="status">Status</ResizableTh>
+                      <ResizableTh columnKey="respondido">Respondido em</ResizableTh>
+                      <ResizableTh columnKey="acoes">Acoes</ResizableTh>
                     </tr>
                   </thead>
                   <tbody>
@@ -1206,44 +1236,78 @@ export default function GerenciarCotacaoSolicitacao() {
                         : null;
 
                       return (
-                        <tr key={cotacaoFornecedor.id}>
-                          <td>
-                            <div className="font-semibold text-[var(--c-text)]">{cotacaoFornecedor.fornecedor?.nome || '-'}</div>
+                        <tr key={cotacaoFornecedor.id} className="h-11">
+                          <td className="whitespace-nowrap align-middle">
+                            <div className="flex min-w-0 items-center gap-2">
+                              <span className="truncate font-semibold text-[var(--c-text)]">
+                                {cotacaoFornecedor.fornecedor?.nome || '-'}
+                              </span>
+                              {possuiRespostaArquivo && (
+                                <span className="shrink-0 rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700">
+                                  Arquivo
+                                </span>
+                              )}
+                            </div>
                             {pedidoFornecedor?.id && (
                               <button
                                 type="button"
-                                className="mt-0.5 text-[11px] font-semibold text-emerald-700 underline"
+                                className="block max-w-full truncate text-left text-[10px] font-semibold text-emerald-700 underline"
                                 onClick={() => navigate(`/pedidos-compra/${pedidoFornecedor.id}`)}
+                                title={`PC-${String(pedidoFornecedor.id).padStart(5, '0')} - ${fmtMoeda(pedidoFornecedor.valor_total)}`}
                               >
                                 PC-{String(pedidoFornecedor.id).padStart(5, '0')} - {fmtMoeda(pedidoFornecedor.valor_total)}
                               </button>
                             )}
-                            {possuiRespostaArquivo && (
-                              <div className="text-[11px] font-semibold text-blue-700">Resposta por arquivo</div>
-                            )}
                           </td>
-                          <td>{cotacaoFornecedor.fornecedor?.whatsapp || '-'}</td>
-                          <td>{cotacaoFornecedor.fornecedor?.email || '-'}</td>
-                          <td>
-                            <span className="app-status-pill text-[11px] bg-slate-100 text-slate-700">
+                          <td className="whitespace-nowrap align-middle text-[11px]">
+                            <span className="block truncate" title={cotacaoFornecedor.fornecedor?.whatsapp || '-'}>
+                              {cotacaoFornecedor.fornecedor?.whatsapp || '-'}
+                            </span>
+                          </td>
+                          <td className="whitespace-nowrap align-middle text-[11px]">
+                            <span className="block truncate" title={cotacaoFornecedor.fornecedor?.email || '-'}>
+                              {cotacaoFornecedor.fornecedor?.email || '-'}
+                            </span>
+                          </td>
+                          <td className="whitespace-nowrap align-middle">
+                            <span className="app-status-pill bg-slate-100 px-2 py-1 text-[10px] text-slate-700">
                               {fmtStatus(cotacaoFornecedor.status)}
                             </span>
                           </td>
-                          <td>{fmt(cotacaoFornecedor.respondido_em)}</td>
-                          <td>
-                            <div className="flex flex-wrap gap-1.5">
-                              <button type="button" className="btn btn-xs btn-outline px-2" onClick={() => copiarTexto(publicUrl)}>
-                                Copiar
-                              </button>
-                              <button type="button" className="btn btn-xs btn-outline px-2" onClick={() => window.open(publicUrl, '_blank', 'noopener,noreferrer')}>
-                                Portal
-                              </button>
+                          <td className="whitespace-nowrap align-middle text-[11px]">{fmt(cotacaoFornecedor.respondido_em)}</td>
+                          <td className="whitespace-nowrap align-middle">
+                            <div className="flex flex-nowrap items-center gap-1">
+                              <CotacaoActionButton
+                                type="button"
+                                onClick={() => copiarTexto(publicUrl)}
+                                title="Copiar link"
+                                aria-label="Copiar link"
+                              >
+                                <HiOutlineClipboardDocument className="h-3.5 w-3.5" />
+                              </CotacaoActionButton>
+                              <CotacaoActionButton
+                                type="button"
+                                onClick={() => window.open(publicUrl, '_blank', 'noopener,noreferrer')}
+                                title="Abrir portal"
+                                aria-label="Abrir portal"
+                              >
+                                <HiOutlineArrowTopRightOnSquare className="h-3.5 w-3.5" />
+                              </CotacaoActionButton>
                               {linkWa ? (
-                                <a href={linkWa} target="_blank" rel="noopener noreferrer" className="btn btn-xs btn-outline px-2">
-                                  WhatsApp
-                                </a>
+                                <CotacaoActionButton
+                                  as="a"
+                                  href={linkWa}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  title="Enviar WhatsApp"
+                                  aria-label="Enviar WhatsApp"
+                                >
+                                  <HiOutlineChatBubbleLeftRight className="h-3.5 w-3.5" />
+                                </CotacaoActionButton>
                               ) : (
-                                <span className="btn btn-xs btn-outline px-2 opacity-50">WhatsApp</span>
+                                <CotacaoActionButton type="button" disabled title="WhatsApp indisponivel" aria-label="WhatsApp indisponivel">
+                                  <HiOutlineChatBubbleLeftRight className="h-3.5 w-3.5" />
+                                </CotacaoActionButton>
                               )}
                             </div>
                           </td>
@@ -1251,7 +1315,7 @@ export default function GerenciarCotacaoSolicitacao() {
                       );
                     })}
                   </tbody>
-                </table>
+                </ResizableTable>
               </div>
             )}
           </div>
