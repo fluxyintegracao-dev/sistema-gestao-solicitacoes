@@ -572,39 +572,41 @@ function SecaoEnvioFornecedores({
   if (!podeComprar) return null;
 
   return (
-    <div className="grid gap-4">
+    <div className="grid gap-3">
       {/* Envio para fornecedores vinculados via WhatsApp */}
       {linksVinculados.length > 0 && (
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3">
-          <div className="mb-2">
-            <h3 className="font-semibold text-emerald-800">Enviar cotacoes via WhatsApp</h3>
-          </div>
-          <p className="text-sm text-emerald-700 mb-3">
-            {linksVinculados.length} fornecedor(es) com WhatsApp cadastrado. Clique em cada um para abrir a conversa com a mensagem pronta.
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {linksVinculados.map(({ nome, link }) => (
-              <a
-                key={nome}
-                href={link}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn btn-primary text-sm"
-              >
-                WhatsApp: {nome}
-              </a>
-            ))}
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-semibold text-emerald-800">Enviar cotacoes via WhatsApp</h3>
+              <p className="mt-0.5 text-xs text-emerald-700">
+                {linksVinculados.length} fornecedor(es) com mensagem pronta.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {linksVinculados.map(({ nome, link }) => (
+                <a
+                  key={nome}
+                  href={link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn btn-xs btn-primary"
+                >
+                  WhatsApp: {nome}
+                </a>
+              ))}
+            </div>
           </div>
         </div>
       )}
 
       {/* Adicionar novos fornecedores */}
       {solicitacao.status !== 'ENCERRADO' && (
-        <div className="rounded-2xl border border-[var(--c-border)] bg-slate-50/70 p-4">
-          <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
-            <div className="grid gap-3">
+        <div className="rounded-xl border border-[var(--c-border)] bg-slate-50/70 p-3">
+          <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+            <div className="grid content-start gap-2.5">
               {/* Selecao por categoria */}
-              <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <div className="text-sm font-semibold text-[var(--c-text)]">Selecionar fornecedores existentes</div>
                   <div className="text-xs text-[var(--c-muted)]">Busque por nome, documento, email ou categoria antes de gerar os links.</div>
@@ -646,7 +648,7 @@ function SecaoEnvioFornecedores({
               )}
 
               <div>
-                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
                   <span className="text-sm font-medium">Fornecedores</span>
                   {fornecedoresSelecionados.length > 0 && (
                     <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
@@ -654,7 +656,7 @@ function SecaoEnvioFornecedores({
                     </span>
                   )}
                 </div>
-                <div className="mb-3 grid gap-2 md:grid-cols-[minmax(0,1fr)_200px_auto]">
+                <div className="mb-2 grid gap-2 md:grid-cols-[minmax(0,1fr)_190px_auto]">
                   <div className="relative">
                     <input
                       className="input"
@@ -709,12 +711,12 @@ function SecaoEnvioFornecedores({
                   </button>
                 </div>
                 {!deveMostrarAutocomplete && !deveMostrarListaCategoria && fornecedoresSelecionados.length === 0 && (
-                  <div className="rounded-xl border border-dashed border-[var(--c-border)] bg-white/70 px-3 py-4 text-sm text-[var(--c-muted)]">
+                  <div className="rounded-lg border border-dashed border-[var(--c-border)] bg-white/70 px-3 py-2.5 text-xs text-[var(--c-muted)]">
                     Digite no campo de busca para localizar fornecedores ou escolha uma categoria para listar os cadastrados.
                   </div>
                 )}
                 {deveMostrarListaCategoria && (
-                  <div className="app-list-stack max-h-[260px] overflow-y-auto rounded-xl border border-[var(--c-border)] bg-white/80 p-3">
+                  <div className="app-list-stack max-h-[220px] overflow-y-auto rounded-xl border border-[var(--c-border)] bg-white/80 p-2">
                     {buscandoFornecedores ? (
                       <div className="text-sm text-[var(--c-muted)]">Buscando...</div>
                     ) : fornecedoresListaCategoria.length === 0 ? (
@@ -751,7 +753,7 @@ function SecaoEnvioFornecedores({
               </div>
             </div>
 
-            <div className="grid content-start gap-3 rounded-xl border border-[var(--c-border)] bg-white/85 p-4">
+            <div className="grid content-start gap-2.5 rounded-xl border border-[var(--c-border)] bg-white/85 p-3">
               <div>
                 <div className="text-sm font-semibold text-[var(--c-text)]">Cadastro rapido</div>
                 <div className="text-xs text-[var(--c-muted)]">Inclua um fornecedor novo sem sair da cotacao.</div>
@@ -772,7 +774,7 @@ function SecaoEnvioFornecedores({
                 <span className="text-xs font-semibold text-[var(--c-muted)]">Contato</span>
                 <input className="input" placeholder="Nome do contato" value={novoFornecedor.contato} onChange={(e) => onChangeNovoFornecedor('contato', e.target.value)} />
               </label>
-              <div className="grid gap-2">
+              <div className="grid gap-1.5 pt-1">
                 <button type="button" className="btn btn-outline w-full" onClick={onCriarFornecedorRapido}>Cadastrar e selecionar</button>
                 <button type="button" className="btn btn-primary w-full" onClick={onEnviarFornecedores} disabled={enviandoFornecedores}>
                   {enviandoFornecedores ? 'Gerando links...' : 'Gerar links de cotacao'}
@@ -868,40 +870,40 @@ function SecaoComparativo({ comparativo, solicitacao, podeComprar, vencedoresSel
   return (
     <>
       <div className="card sol-surface-card">
-        <div className="card-header flex flex-wrap items-center justify-between gap-3">
+        <div className="card-header flex flex-wrap items-center justify-between gap-3 pb-3">
           <div>
             <h2 className="font-semibold">Comparativo por item</h2>
-            <p className="mt-1 text-sm text-[var(--c-muted)]">Compare respostas, selecione vencedores e encerre a cotacao quando estiver pronta.</p>
+            <p className="mt-0.5 text-xs text-[var(--c-muted)]">Compare respostas, selecione vencedores e encerre a cotacao quando estiver pronta.</p>
           </div>
-          <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-medium text-slate-700">
+          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
             {comparativo.itens.length} item(ns)
           </span>
         </div>
 
         {rankingFornecedores.length > 0 && (
-          <div className="mb-4 grid gap-3 sm:grid-cols-3">
+          <div className="mb-3 grid gap-2 sm:grid-cols-3">
             {rankingFornecedores.map((forn, idx) => (
               <div
                 key={forn.fornecedor_id}
-                className={`grid gap-2 rounded-xl border p-4 ${idx === 0 ? 'border-emerald-300 bg-emerald-50' : 'border-[var(--c-border)] bg-slate-50/80'}`}
+                className={`grid gap-1.5 rounded-xl border px-3 py-2.5 ${idx === 0 ? 'border-emerald-300 bg-emerald-50' : 'border-[var(--c-border)] bg-slate-50/80'}`}
               >
                 <div className="flex items-start justify-between gap-2">
-                  <span className={`text-2xl font-bold ${idx === 0 ? 'text-emerald-600' : 'text-[var(--c-muted)]'}`}>
+                  <span className={`text-lg font-bold leading-none ${idx === 0 ? 'text-emerald-600' : 'text-[var(--c-muted)]'}`}>
                     {idx + 1}
                   </span>
                   <span className={`app-status-pill text-xs ${idx === 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
                     {idx === 0 ? 'Menor preco' : `${idx + 1}o lugar`}
                   </span>
                 </div>
-                <div className="font-semibold text-sm">{forn.fornecedor_nome}</div>
-                <div className="text-xl font-bold text-[var(--c-text)]">{fmtMoeda(forn.total)}</div>
+                <div className="truncate text-sm font-semibold">{forn.fornecedor_nome}</div>
+                <div className="text-base font-bold text-[var(--c-text)]">{fmtMoeda(forn.total)}</div>
                 <div className="text-xs text-[var(--c-muted)]">
                   {forn.itensRespondidos} item(ns) respondido(s) - {forn.vencedor_itens} ganhador(es)
                 </div>
                 {forn.itensGanhos.length > 0 && (
                   <button
                     type="button"
-                    className="btn btn-outline text-xs mt-1"
+                    className="btn btn-xs btn-outline mt-1"
                     onClick={() => setModalFornecedor({
                       fornecedor: {
                         nome: forn.fornecedor_nome,
@@ -920,19 +922,19 @@ function SecaoComparativo({ comparativo, solicitacao, podeComprar, vencedoresSel
           </div>
         )}
 
-        <div className="app-list-stack">
+        <div className="app-list-stack gap-2">
           {comparativo.itens.map((item) => (
-            <div key={buildItemKey(item)} className="app-list-card">
-              <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
+            <div key={buildItemKey(item)} className="app-list-card px-3 py-3">
+              <div className="mb-2 flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <div className="font-semibold">{item.nome}</div>
-                  <div className="text-sm text-[var(--c-muted)]">
+                  <div className="text-sm font-semibold">{item.nome}</div>
+                  <div className="text-xs text-[var(--c-muted)]">
                     {item.quantidade} {item.unidade} - {item.item_tipo === 'MANUAL' ? 'Manual' : 'Cadastrado'}
                     {item.especificacao ? ` - ${item.especificacao}` : ''}
                   </div>
                 </div>
                 {item.melhor_preco && (
-                  <div className="rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-2 text-sm text-emerald-700">
+                  <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs text-emerald-700">
                     Menor: <strong>{item.melhor_preco.fornecedor_nome}</strong> - {fmtMoeda(item.melhor_preco.preco)}/un
                   </div>
                 )}
@@ -1313,7 +1315,9 @@ export default function GerenciarCotacaoSolicitacao() {
         </div>
 
         <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
-          <span className={clsStatus(solicitacao.status)}>{fmtStatus(solicitacao.status)}</span>
+          {String(solicitacao.status || '').toUpperCase() !== 'LIBERADO_PARA_COMPRA' && (
+            <span className={clsStatus(solicitacao.status)}>{fmtStatus(solicitacao.status)}</span>
+          )}
           <span className="rounded-full bg-slate-100 px-3 py-1 font-medium text-slate-700">
             {solicitacao.fornecedores?.length || 0} fornecedor(es)
           </span>
