@@ -173,6 +173,7 @@ const IntegracaoSiengeInicio = lazy(() => import('./pages/IntegracaoSiengeInicio
 const SolicitacoesCompra = lazy(() => import('./modules/solicitacao-compra/pages/SolicitacoesCompra'));
 const CotacaoFornecedorPublica = lazy(() => import('./modules/solicitacao-compra/pages/CotacaoFornecedorPublica'));
 const SolicitacaoCompraDetalhe = lazy(() => import('./modules/solicitacao-compra/pages/SolicitacaoCompraDetalheView'));
+const GerenciarCotacaoSolicitacao = lazy(() => import('./modules/solicitacao-compra/pages/GerenciarCotacaoSolicitacao'));
 const NovaSolicitacaoCompra = lazy(() => import('./modules/solicitacao-compra/pages/NovaSolicitacaoCompra'));
 const RevisarSolicitacaoCompra = lazy(() => import('./modules/solicitacao-compra/pages/RevisarSolicitacaoCompra'));
 const RevisarSolicitacaoCompraFinal = lazy(() => import('./modules/solicitacao-compra/pages/RevisarSolicitacaoCompraFinal'));
@@ -838,6 +839,7 @@ export default function App() {
         <Route path="contratos/relatorios" element={<ContratosRoute><ModuloRelatorios modulo="contratos" /></ContratosRoute>} />
         <Route path="contratos/relatorios/operacional" element={<ContratosRoute><ContratosRelatorioOperacional /></ContratosRoute>} />
         <Route path="solicitacoes-compra" element={<ModuloComprasRoute><SolicitacoesCompra /></ModuloComprasRoute>} />
+        <Route path="solicitacoes-compra/:id/cotacao" element={<ModuloComprasRoute><EnabledModuleRoute moduleKey="COTACOES"><ComprasCotacoesManageRoute><GerenciarCotacaoSolicitacao /></ComprasCotacoesManageRoute></EnabledModuleRoute></ModuloComprasRoute>} />
         <Route path="solicitacoes-compra/:id" element={<ModuloComprasRoute><SolicitacaoCompraDetalhe /></ModuloComprasRoute>} />
         <Route path="solicitacoes-compra/nova" element={<ComprasPedidosCreateRoute><NovaSolicitacaoCompra /></ComprasPedidosCreateRoute>} />
         <Route path="solicitacoes-compra/revisar" element={<ModuloComprasRoute><RevisarSolicitacaoCompra /></ModuloComprasRoute>} />

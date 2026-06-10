@@ -210,7 +210,7 @@ export default function ListaCotacoes() {
                     <td>{cotacao.solicitacao?.obra?.nome || '-'}</td>
                     <td className="text-[var(--c-muted)]">
                       {cotacao.solicitacao
-                        ? `SC-${String(cotacao.solicitacao.id).padStart(5, '0')}${cotacao.solicitacao.titulo ? ` · ${cotacao.solicitacao.titulo}` : ''}`
+                        ? `SC-${String(cotacao.solicitacao.id).padStart(5, '0')}${cotacao.solicitacao.titulo ? ` - ${cotacao.solicitacao.titulo}` : ''}`
                         : '-'}
                     </td>
                     <td>
@@ -222,14 +222,25 @@ export default function ListaCotacoes() {
                     <td className="tabular-nums">{formatMoney(cotacao.valor_minimo_pedido)}</td>
                     <td>{cotacao.condicao_pagamento || '-'}</td>
                     <td>
-                      <a
-                        href={`/cotacao/${cotacao.token}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="btn btn-xs btn-outline"
-                      >
-                        Ver cotacao
-                      </a>
+                      <div className="flex flex-wrap justify-end gap-2">
+                        {cotacao.solicitacao?.id && (
+                          <button
+                            type="button"
+                            className="btn btn-xs btn-primary"
+                            onClick={() => navigate(`/solicitacoes-compra/${cotacao.solicitacao.id}/cotacao`)}
+                          >
+                            Editar cotacao
+                          </button>
+                        )}
+                        <a
+                          href={`/cotacao/${cotacao.token}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="btn btn-xs btn-outline"
+                        >
+                          Portal fornecedor
+                        </a>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -241,3 +252,4 @@ export default function ListaCotacoes() {
     </div>
   );
 }
+
