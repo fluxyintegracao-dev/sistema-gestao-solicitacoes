@@ -72,9 +72,22 @@ function normalizeInfoStatus(data) {
 
 function extractBancoDoBrasilErrorMessage(details) {
   const body = details?.data || details?.response_snapshot?.body || {};
+  const httpStatus = Number(details?.http_status || details?.response_snapshot?.http_status || 0);
+  const rawMessage = body?.raw ? String(body.raw).trim() : '';
+  if (rawMessage) {
+    if ((httpStatus === 401 || httpStatus === 403) && /authentication failed/i.test(rawMessage)) {
+      return `Banco do Brasil recusou a autenticacao da chamada (HTTP ${httpStatus}): ${rawMessage}. Verifique APP_KEY, certificado mTLS, credenciais da aplicacao e vinculo do convenio.`;
+    }
+    return `Banco do Brasil retornou HTTP ${httpStatus || 'erro'}: ${rawMessage}`;
+  }
+
   const erros = body?.erros || [];
   if (!Array.isArray(erros) || !erros.length) {
-    return [body?.error, body?.message].filter(Boolean).join(' - ') || null;
+    const message = [body?.error, body?.message].filter(Boolean).join(' - ');
+    if ((httpStatus === 401 || httpStatus === 403) && message) {
+      return `Banco do Brasil recusou a autenticacao da chamada (HTTP ${httpStatus}): ${message}. Verifique APP_KEY, certificado mTLS, credenciais da aplicacao e vinculo do convenio.`;
+    }
+    return message || null;
   }
 
   const mensagemErros = erros
