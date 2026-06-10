@@ -14,6 +14,14 @@ function toPositiveInteger(value, fieldName) {
   return parsed;
 }
 
+function toBankAgencyInteger(value, fieldName) {
+  const normalized = String(value || '').trim();
+  const agencyWithoutDigit = normalized.includes('-')
+    ? normalized.split('-')[0]
+    : normalized;
+  return toPositiveInteger(agencyWithoutDigit, fieldName);
+}
+
 function todayIsoSaoPaulo() {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'America/Sao_Paulo',
@@ -97,7 +105,7 @@ function mapCpfCnpj(value, required) {
 function resolvePaymentAccount(account = {}) {
   return {
     numeroContrato: toPositiveInteger(env.bbNumeroContratoPagamento || account.convenio, 'Numero do contrato BB'),
-    agenciaDebito: toPositiveInteger(env.bbAgenciaDebito || account.agencia, 'Agencia de debito BB'),
+    agenciaDebito: toBankAgencyInteger(env.bbAgenciaDebito || account.agencia, 'Agencia de debito BB'),
     contaCorrenteDebito: toPositiveInteger(env.bbContaCorrenteDebito || account.conta, 'Conta corrente de debito BB'),
     digitoVerificadorContaCorrente: String(env.bbDigitoContaCorrenteDebito || account.conta_digito || '').trim().slice(0, 1)
   };
