@@ -1504,11 +1504,6 @@ module.exports = {
         return res.status(400).json({ error: 'Solicitacao encerrada nao aceita novo envio para fornecedores' });
       }
 
-      if (normalizeTextCompra(solicitacao.status) !== 'LIBERADO_PARA_COMPRA') {
-        await transaction.rollback();
-        return res.status(400).json({ error: 'A solicitacao precisa estar liberada para compra antes do envio' });
-      }
-
       const fornecedoresPayload = Array.isArray(req.body?.fornecedores) ? req.body.fornecedores : [];
       if (!fornecedoresPayload.length) {
         await transaction.rollback();

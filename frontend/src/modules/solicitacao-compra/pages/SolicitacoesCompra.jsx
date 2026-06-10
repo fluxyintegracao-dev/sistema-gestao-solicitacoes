@@ -35,14 +35,6 @@ function classNameStatus(status) {
     return 'app-status-pill compra-status-pill compra-status-blue bg-blue-100 text-blue-700';
   }
 
-  if (valor === 'INTEGRADO_SIENGE') {
-    return 'app-status-pill compra-status-pill compra-status-warning bg-amber-100 text-amber-700';
-  }
-
-  if (valor === 'LIBERADO_PARA_COMPRA') {
-    return 'app-status-pill compra-status-pill compra-status-success bg-emerald-100 text-emerald-700';
-  }
-
   if (valor === 'FINALIZADA' || valor === 'ENCERRADO') {
     return 'app-status-pill compra-status-pill compra-status-muted bg-slate-100 text-slate-700';
   }
@@ -195,8 +187,6 @@ export default function SolicitacoesCompra() {
             <select className="input" value={status} onChange={(event) => setStatus(event.target.value)}>
               <option value="">Todos</option>
               <option value="ENVIADO">Enviado</option>
-              <option value="INTEGRADO_SIENGE">Integrado Sienge</option>
-              <option value="LIBERADO_PARA_COMPRA">Liberado para compra</option>
               <option value="ENCERRADO">Encerrado</option>
             </select>
           </label>
@@ -229,7 +219,6 @@ export default function SolicitacoesCompra() {
                   <th>Obra</th>
                   <th>Solicitante</th>
                   <th>Itens</th>
-                  <th>Numero Sienge</th>
                   <th>Fornecedores</th>
                   <th>Necessario para</th>
                   <th>Criada em</th>
@@ -251,7 +240,6 @@ export default function SolicitacoesCompra() {
                     </td>
                     <td>{solicitacao.solicitante?.nome || '-'}</td>
                     <td>{(solicitacao.itens?.length || 0) + (solicitacao.itensManuais?.length || 0)}</td>
-                    <td>{solicitacao.numero_sienge || '-'}</td>
                     <td>{solicitacao.fornecedores?.length || 0}</td>
                     <td>{formatarData(solicitacao.necessario_para)}</td>
                     <td>{formatarData(solicitacao.createdAt)}</td>

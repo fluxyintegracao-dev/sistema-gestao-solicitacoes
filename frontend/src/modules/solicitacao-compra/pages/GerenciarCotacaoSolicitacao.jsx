@@ -6,8 +6,6 @@ import {
   criarFornecedorCompra,
   encerrarSolicitacaoCompra,
   enviarSolicitacaoCompraParaFornecedores,
-  integrarSolicitacaoCompra,
-  liberarSolicitacaoCompra,
   listarFornecedoresCompra,
   obterComparativoSolicitacaoCompra,
   obterSolicitacaoCompra,
@@ -49,6 +47,14 @@ function clsStatus(status) {
 
 function buildItemKey(item) {
   return `${String(item?.item_tipo || '').toUpperCase()}:${Number(item?.item_referencia_id || 0)}`;
+}
+
+function normalizeText(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
 }
 
 async function copiarTexto(texto) {
@@ -478,6 +484,48 @@ function SecaoEnvioFornecedores({
     });
   }, [fornecedores, categoriaSelecionada]);
 
+  const buscaFornecedorNormalizada = normalizeText(fornecedorBusca);
+  const deveMostrarAutocomplete = buscaFornecedorNormalizada.length > 0 && !categoriaFornecedorId;
+  const deveMostrarListaCategoria = Boolean(categoriaFornecedorId);
+  const fornecedoresAutocomplete = useMemo(() => {
+    if (!buscaFornecedorNormalizada) return [];
+    return fornecedores
+      .filter((f) => {
+        const texto = normalizeText([
+          f.nome,
+          f.documento,
+          f.cnpj,
+          f.cpf,
+          f.email,
+          f.telefone,
+          f.whatsapp,
+          f.contato,
+          ...(Array.isArray(f.categoria_insumos) ? f.categoria_insumos : [])
+        ].filter(Boolean).join(' '));
+        return texto.includes(buscaFornecedorNormalizada);
+      })
+      .slice(0, 8);
+  }, [fornecedores, buscaFornecedorNormalizada]);
+
+  const fornecedoresListaCategoria = useMemo(() => {
+    if (!categoriaFornecedorId) return [];
+    if (!buscaFornecedorNormalizada) return fornecedores;
+    return fornecedores.filter((f) => {
+      const texto = normalizeText([
+        f.nome,
+        f.documento,
+        f.cnpj,
+        f.cpf,
+        f.email,
+        f.telefone,
+        f.whatsapp,
+        f.contato,
+        ...(Array.isArray(f.categoria_insumos) ? f.categoria_insumos : [])
+      ].filter(Boolean).join(' '));
+      return texto.includes(buscaFornecedorNormalizada);
+    });
+  }, [fornecedores, categoriaFornecedorId, buscaFornecedorNormalizada]);
+
   function selecionarTodosComCategoria() {
     const ids = fornecedoresComCategoria.map((f) => String(f.id));
     const novos = ids.filter((id) => !fornecedoresSelecionados.includes(id));
@@ -551,7 +599,7 @@ function SecaoEnvioFornecedores({
       )}
 
       {/* Adicionar novos fornecedores */}
-      {solicitacao.status === 'LIBERADO_PARA_COMPRA' && (
+      {solicitacao.status !== 'ENCERRADO' && (
         <div className="rounded-2xl border border-[var(--c-border)] bg-slate-50/70 p-4">
           <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
             <div className="grid gap-3">
@@ -607,12 +655,45 @@ function SecaoEnvioFornecedores({
                   )}
                 </div>
                 <div className="mb-3 grid gap-2 md:grid-cols-[minmax(0,1fr)_200px_auto]">
-                  <input
-                    className="input"
-                    placeholder="Buscar por nome, CNPJ, email ou contato"
-                    value={fornecedorBusca}
-                    onChange={(e) => onChangeFornecedorBusca(e.target.value)}
-                  />
+                  <div className="relative">
+                    <input
+                      className="input"
+                      placeholder="Digite nome, CNPJ, email ou contato"
+                      value={fornecedorBusca}
+                      onChange={(e) => onChangeFornecedorBusca(e.target.value)}
+                    />
+                    {deveMostrarAutocomplete && (
+                      <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-20 rounded-xl border border-[var(--c-border)] bg-white shadow-lg">
+                        {buscandoFornecedores ? (
+                          <div className="px-3 py-3 text-sm text-[var(--c-muted)]">Buscando fornecedores...</div>
+                        ) : fornecedoresAutocomplete.length === 0 ? (
+                          <div className="px-3 py-3 text-sm text-[var(--c-muted)]">
+                            Nenhum fornecedor encontrado para essa busca.
+                          </div>
+                        ) : (
+                          fornecedoresAutocomplete.map((f) => {
+                            const checked = fornecedoresSelecionados.includes(String(f.id));
+                            return (
+                              <button
+                                key={f.id}
+                                type="button"
+                                className={`flex w-full items-start gap-3 border-b border-[var(--c-border)] px-3 py-2 text-left last:border-b-0 hover:bg-blue-50 ${checked ? 'bg-blue-50' : ''}`}
+                                onClick={() => onToggleFornecedor(String(f.id), !checked)}
+                              >
+                                <input type="checkbox" checked={checked} readOnly className="mt-1" />
+                                <span className="min-w-0">
+                                  <span className="block font-semibold text-[var(--c-text)]">{f.nome}</span>
+                                  <span className="block text-xs text-[var(--c-muted)]">
+                                    {f.whatsapp ? `WhatsApp: ${f.whatsapp}` : 'Sem WhatsApp'} {f.email ? ` - ${f.email}` : ''}
+                                  </span>
+                                </span>
+                              </button>
+                            );
+                          })
+                        )}
+                      </div>
+                    )}
+                  </div>
                   <select
                     className="input"
                     value={categoriaFornecedorId}
@@ -627,39 +708,46 @@ function SecaoEnvioFornecedores({
                     {buscandoFornecedores ? 'Buscando...' : 'Buscar'}
                   </button>
                 </div>
-                <div className="app-list-stack max-h-[260px] overflow-y-auto rounded-xl border border-[var(--c-border)] bg-white/80 p-3">
-                  {buscandoFornecedores ? (
-                    <div className="text-sm text-[var(--c-muted)]">Buscando...</div>
-                  ) : fornecedores.length === 0 ? (
-                    <div className="text-sm text-[var(--c-muted)]">Nenhum fornecedor encontrado.</div>
-                  ) : (
-                    fornecedores.map((f) => (
-                      <label key={f.id} className="app-list-card flex items-start gap-2 px-3 py-2">
-                        <input
-                          type="checkbox"
-                          checked={fornecedoresSelecionados.includes(String(f.id))}
-                          onChange={(e) => onToggleFornecedor(String(f.id), e.target.checked)}
-                        />
-                        <div>
-                          <div className="font-medium">{f.nome}</div>
-                          {f.whatsapp && (
-                            <div className="text-xs text-[var(--c-muted)]">WhatsApp: {f.whatsapp}</div>
-                          )}
-                          {Array.isArray(f.categoria_insumos) && f.categoria_insumos.length > 0 && (
-                            <div className="flex flex-wrap gap-1 mt-1">
-                              {f.categoria_insumos.map((c) => (
-                                <span key={c} className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] text-blue-700">{c}</span>
-                              ))}
+                {!deveMostrarAutocomplete && !deveMostrarListaCategoria && fornecedoresSelecionados.length === 0 && (
+                  <div className="rounded-xl border border-dashed border-[var(--c-border)] bg-white/70 px-3 py-4 text-sm text-[var(--c-muted)]">
+                    Digite no campo de busca para localizar fornecedores ou escolha uma categoria para listar os cadastrados.
+                  </div>
+                )}
+                {deveMostrarListaCategoria && (
+                  <div className="app-list-stack max-h-[260px] overflow-y-auto rounded-xl border border-[var(--c-border)] bg-white/80 p-3">
+                    {buscandoFornecedores ? (
+                      <div className="text-sm text-[var(--c-muted)]">Buscando...</div>
+                    ) : fornecedoresListaCategoria.length === 0 ? (
+                      <div className="text-sm text-[var(--c-muted)]">Nenhum fornecedor encontrado para a categoria selecionada.</div>
+                    ) : (
+                      fornecedoresListaCategoria.map((f) => (
+                        <label key={f.id} className="app-list-card flex items-start gap-2 px-3 py-2">
+                          <input
+                            type="checkbox"
+                            checked={fornecedoresSelecionados.includes(String(f.id))}
+                            onChange={(e) => onToggleFornecedor(String(f.id), e.target.checked)}
+                          />
+                          <div>
+                            <div className="font-medium">{f.nome}</div>
+                            {f.whatsapp && (
+                              <div className="text-xs text-[var(--c-muted)]">WhatsApp: {f.whatsapp}</div>
+                            )}
+                            {Array.isArray(f.categoria_insumos) && f.categoria_insumos.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                {f.categoria_insumos.map((c) => (
+                                  <span key={c} className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] text-blue-700">{c}</span>
+                                ))}
+                              </div>
+                            )}
+                            <div className="text-xs text-[var(--c-muted)]">
+                              {f.email || 'Sem email'} {f.telefone ? ` - ${f.telefone}` : ''}
                             </div>
-                          )}
-                          <div className="text-xs text-[var(--c-muted)]">
-                            {f.email || 'Sem email'} {f.telefone ? ` - ${f.telefone}` : ''}
                           </div>
-                        </div>
-                      </label>
-                    ))
-                  )}
-                </div>
+                        </label>
+                      ))
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -948,12 +1036,9 @@ export default function GerenciarCotacaoSolicitacao() {
   const [loading, setLoading] = useState(false);
   const [baixando, setBaixando] = useState(false);
   const [previewArquivo, setPreviewArquivo] = useState(null);
-  const [salvandoIntegracao, setSalvandoIntegracao] = useState(false);
-  const [salvandoLiberacao, setSalvandoLiberacao] = useState(false);
   const [enviandoFornecedores, setEnviandoFornecedores] = useState(false);
   const [encerrando, setEncerrando] = useState(false);
   const [criandoPedidoFornecedorId, setCriandoPedidoFornecedorId] = useState(null);
-  const [numeroSienge, setNumeroSienge] = useState('');
   const [fornecedoresSelecionados, setFornecedoresSelecionados] = useState([]);
   const [novoFornecedor, setNovoFornecedor] = useState({ nome: '', email: '', whatsapp: '', contato: '' });
   const [vencedoresSelecionados, setVencedoresSelecionados] = useState({});
@@ -965,11 +1050,6 @@ export default function GerenciarCotacaoSolicitacao() {
     String(user?.setor?.codigo || '').toUpperCase(),
     String(user?.setor?.nome || '').toUpperCase()
   ];
-  const podeIntegrar =
-    perfilUpper === 'SUPERADMIN' || perfilUpper === 'ADMIN' ||
-    tokens.includes('GEO') || tokens.includes('GERENCIA DE PROCESSOS') ||
-    tokens.includes('GESTAO DE PROCESSOS') || tokens.includes('GERENCIA_PROCESSOS') ||
-    tokens.includes('GESTAO_PROCESSOS');
   const podeComprar =
     perfilUpper === 'SUPERADMIN' || perfilUpper === 'ADMIN' || tokens.includes('COMPRAS');
 
@@ -1001,7 +1081,6 @@ export default function GerenciarCotacaoSolicitacao() {
       ]);
 
       setSolicitacao(dataSolicitacao || null);
-      setNumeroSienge(dataSolicitacao?.numero_sienge || '');
       setCategoriasFornecedor(Array.isArray(dataCategorias) ? dataCategorias : []);
       await carregarFornecedores();
 
@@ -1030,7 +1109,13 @@ export default function GerenciarCotacaoSolicitacao() {
   }
 
   useEffect(() => { carregarTudo(); }, [id]);
-  useEffect(() => { if (!loading) carregarFornecedores(); }, [categoriaFornecedorId]);
+  useEffect(() => {
+    if (loading) return undefined;
+    const timer = window.setTimeout(() => {
+      carregarFornecedores();
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [fornecedorBusca, categoriaFornecedorId]);
 
   const itensCombinados = useMemo(() => {
     const itens = (solicitacao?.itens || []).map((item) => ({
@@ -1100,34 +1185,6 @@ export default function GerenciarCotacaoSolicitacao() {
     } catch (error) {
       console.error(error);
       alert(error.message || 'Erro ao abrir arquivo do item');
-    }
-  }
-
-  async function handleIntegrar() {
-    try {
-      setSalvandoIntegracao(true);
-      await integrarSolicitacaoCompra(id, { numero_sienge: numeroSienge });
-      await carregarTudo();
-      alert('Solicitacao integrada ao Sienge.');
-    } catch (error) {
-      console.error(error);
-      alert(error.message || 'Erro ao integrar no Sienge');
-    } finally {
-      setSalvandoIntegracao(false);
-    }
-  }
-
-  async function handleLiberar() {
-    try {
-      setSalvandoLiberacao(true);
-      await liberarSolicitacaoCompra(id);
-      await carregarTudo();
-      alert('Solicitacao liberada para compra.');
-    } catch (error) {
-      console.error(error);
-      alert(error.message || 'Erro ao liberar para compra');
-    } finally {
-      setSalvandoLiberacao(false);
     }
   }
 
@@ -1273,38 +1330,6 @@ export default function GerenciarCotacaoSolicitacao() {
 
       <div className="mt-4 grid gap-4">
         <div className="grid gap-3">
-          {!isAvulsa && podeIntegrar && !solicitacao.integrado_sienge && (
-            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
-              <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_260px_auto] lg:items-end">
-                <div>
-                  <div className="text-sm font-semibold text-amber-900">Integracao Sienge pendente</div>
-                  <p className="mt-1 text-sm text-amber-800">Registre o numero Sienge para habilitar o envio aos fornecedores.</p>
-                </div>
-                <label className="app-filter-field">
-                  <span className="app-filter-label">Numero Sienge</span>
-                  <input className="input" value={numeroSienge} onChange={(e) => setNumeroSienge(e.target.value)} placeholder="Ex.: PC-2026-001" />
-                </label>
-                <button type="button" className="btn btn-primary" onClick={handleIntegrar} disabled={salvandoIntegracao}>
-                  {salvandoIntegracao ? 'Integrando...' : 'Marcar como integrado'}
-                </button>
-              </div>
-            </div>
-          )}
-
-          {!isAvulsa && podeIntegrar && solicitacao.integrado_sienge && solicitacao.status !== 'LIBERADO_PARA_COMPRA' && solicitacao.status !== 'ENCERRADO' && (
-            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <div className="text-sm font-semibold text-emerald-900">Pronto para liberar cotacao</div>
-                  <p className="mt-1 text-sm text-emerald-800">Integracao registrada. Libere a solicitacao para gerar links e enviar aos fornecedores.</p>
-                </div>
-                <button type="button" className="btn btn-primary" onClick={handleLiberar} disabled={salvandoLiberacao}>
-                  {salvandoLiberacao ? 'Liberando...' : 'Liberar para compra'}
-                </button>
-              </div>
-            </div>
-          )}
-
           {/* Fornecedores vinculados + envio */}
           <div className="card sol-surface-card">
             <div className="card-header flex flex-wrap items-center justify-between gap-3">
@@ -1316,15 +1341,6 @@ export default function GerenciarCotacaoSolicitacao() {
                 {solicitacao.fornecedores?.length || 0} vinculado(s)
               </span>
             </div>
-
-            {/* Aviso quando nao pode enviar ainda */}
-            {podeComprar && solicitacao.status !== 'LIBERADO_PARA_COMPRA' && solicitacao.status !== 'ENCERRADO' && !isAvulsa && (
-              <div className="app-alert mb-5">
-                {!solicitacao.integrado_sienge
-                  ? 'Preencha o numero Sienge e use Marcar como integrado antes de enviar aos fornecedores.'
-                  : 'Use Liberar para compra para habilitar o envio de cotacoes.'}
-              </div>
-            )}
 
             {/* Componente de envio para fornecedores */}
             <SecaoEnvioFornecedores
