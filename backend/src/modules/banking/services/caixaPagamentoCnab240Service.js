@@ -92,7 +92,11 @@ function resolveConvenio(convenio = {}) {
     banco_nome: convenio.banco_nome || NOME_CAIXA,
     tipo_inscricao: tipoInscricao(convenio.empresa_cpf_cnpj || empresa.cnpj),
     numero_inscricao: convenio.empresa_cpf_cnpj || empresa.cnpj,
-    codigo_convenio: convenio.convenio_codigo,
+    codigo_convenio: convenio.compromisso_codigo || convenio.convenio_codigo,
+    convenio_codigo: convenio.convenio_codigo,
+    convenio_nome: convenio.convenio_nome,
+    compromisso_codigo: convenio.compromisso_codigo,
+    compromisso_nome: convenio.compromisso_nome,
     agencia: convenio.agencia || conta.agencia,
     agencia_dv: convenio.agencia_dv || '',
     conta: convenio.conta || conta.conta,
@@ -116,7 +120,7 @@ function validarConvenio(convenio) {
   const pendencias = [];
   if (!onlyDigits(resolved.numero_inscricao)) pendencias.push('CNPJ/CPF da empresa');
   if (!resolved.nome_empresa) pendencias.push('nome da empresa');
-  if (!onlyDigits(resolved.codigo_convenio)) pendencias.push('codigo do convenio');
+  if (!onlyDigits(resolved.codigo_convenio)) pendencias.push('codigo do compromisso ou convenio');
   if (!onlyDigits(resolved.agencia)) pendencias.push('agencia');
   if (!onlyDigits(resolved.conta)) pendencias.push('conta');
 
@@ -336,6 +340,9 @@ async function salvarConvenioCaixaPagamento(data, userId, id = null) {
     conta: data.conta,
     conta_dv: data.conta_dv || null,
     convenio_codigo: data.convenio_codigo,
+    convenio_nome: data.convenio_nome || null,
+    compromisso_codigo: data.compromisso_codigo || null,
+    compromisso_nome: data.compromisso_nome || null,
     empresa_nome: data.empresa_nome,
     empresa_cpf_cnpj: data.empresa_cpf_cnpj,
     layout_arquivo_versao: data.layout_arquivo_versao || '080',

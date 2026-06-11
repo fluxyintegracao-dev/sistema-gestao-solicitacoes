@@ -30,7 +30,10 @@ const remessa = gerarArquivoCnab240CaixaPagamento({
     banco_nome: 'CAIXA ECONOMICA FEDERAL',
     empresa_id: 10,
     empresa_cpf_cnpj: '12.345.678/0001-90',
-    convenio_codigo: '1234567',
+    convenio_codigo: '335414',
+    convenio_nome: 'CONVENIO TESTE CAIXA',
+    compromisso_codigo: '0001',
+    compromisso_nome: 'PAG FORN 0557 003 000001581 8',
     agencia: '1234',
     agencia_dv: '0',
     conta: '123456',
@@ -62,5 +65,7 @@ assert.strictEqual(remessa.quantidade_titulos, 1);
 assert.strictEqual(remessa.quantidade_registros, 5);
 assert.ok(remessa.lines.every((line) => line.length === 240));
 assert.strictEqual(remessa.lines[2].slice(13, 14), 'J');
+assert.ok(remessa.lines[0].includes('0001'));
+assert.ok(!remessa.lines[0].includes('335414'));
 
 console.log('banking enterprise ok');

@@ -170,7 +170,7 @@ Implantacao concluida neste marco:
 Fluxo operacional:
 
 1. Cadastrar um convenio Caixa de pagamentos em `/financeiro/bancos`, vinculando empresa do grupo e conta bancaria de debito.
-2. Informar agencia, conta, codigo do convenio, CNPJ/CPF e nome da empresa conforme contrato Caixa.
+2. Informar agencia, conta, codigo/nome do convenio, codigo/nome do compromisso, CNPJ/CPF e nome da empresa conforme contrato Caixa.
 3. Marcar o convenio como homologado quando a Caixa liberar o uso em producao.
 4. Selecionar o convenio e carregar titulos elegiveis.
 5. Selecionar apenas titulos `PAGAR` em aberto com `codigo_barras` ou `linha_digitavel`.
@@ -185,6 +185,15 @@ Guardrails implantados:
 - o arquivo e validado para garantir linhas de 240 caracteres;
 - o conteudo gerado fica registrado com hash SHA-256;
 - a numeracao de remessa e controlada por convenio.
+- quando o codigo do compromisso estiver preenchido, ele e usado como identificador operacional no CNAB240; caso contrario, o sistema usa o codigo do convenio.
+
+Campos Caixa no cadastro:
+
+- `Codigo do convenio`: codigo geral do convenio Caixa, como `335414`;
+- `Nome do convenio`: nome exibido pela Caixa para o convenio;
+- `Codigo do compromisso`: codigo da modalidade/compromisso, como `0001` para pagamento a fornecedor/credito;
+- `Nome do compromisso`: descricao exibida pela Caixa, como `PAG FORN 0557 003 000001581 8`;
+- `Agencia`, `Conta` e digitos: devem ser os dados da conta de debito do compromisso.
 
 Pendencias futuras:
 

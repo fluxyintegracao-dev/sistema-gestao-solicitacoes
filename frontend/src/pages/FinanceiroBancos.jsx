@@ -127,6 +127,9 @@ const convenioInicial = {
   conta: '',
   conta_dv: '',
   convenio_codigo: '',
+  convenio_nome: '',
+  compromisso_codigo: '',
+  compromisso_nome: '',
   empresa_nome: '',
   empresa_cpf_cnpj: '',
   layout_arquivo_versao: '080',
@@ -326,6 +329,18 @@ function CaixaPagamentosPanel() {
                 <input className="app-input mt-1" value={form.convenio_codigo} onChange={(e) => setForm({ ...form, convenio_codigo: e.target.value })} required />
               </label>
               <label className="text-xs font-semibold text-slate-600">
+                Nome do convenio
+                <input className="app-input mt-1" value={form.convenio_nome} onChange={(e) => setForm({ ...form, convenio_nome: e.target.value })} placeholder="Ex.: CONSTRUTORA SUL CAPIXABA..." />
+              </label>
+              <label className="text-xs font-semibold text-slate-600">
+                Codigo do compromisso
+                <input className="app-input mt-1" value={form.compromisso_codigo} onChange={(e) => setForm({ ...form, compromisso_codigo: e.target.value })} placeholder="Ex.: 0001" />
+              </label>
+              <label className="text-xs font-semibold text-slate-600">
+                Nome do compromisso
+                <input className="app-input mt-1" value={form.compromisso_nome} onChange={(e) => setForm({ ...form, compromisso_nome: e.target.value })} placeholder="Ex.: PAG FORN 0557 003..." />
+              </label>
+              <label className="text-xs font-semibold text-slate-600">
                 Ambiente
                 <select className="app-input mt-1" value={form.ambiente} onChange={(e) => setForm({ ...form, ambiente: e.target.value })}>
                   <option value="HOMOLOGACAO">Homologacao</option>
@@ -361,6 +376,10 @@ function CaixaPagamentosPanel() {
                 Convenio homologado
               </label>
             </div>
+            <div className="mt-3 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-800">
+              Para a Caixa, o codigo do compromisso e usado como identificador operacional do CNAB quando informado.
+              Se ele ficar vazio, o sistema usa o codigo do convenio.
+            </div>
             <button type="submit" className="app-button mt-4 w-full" disabled={loading}>
               Salvar convenio
             </button>
@@ -382,7 +401,7 @@ function CaixaPagamentosPanel() {
                 <option value="">Selecione um convenio</option>
                 {convenios.map((convenio) => (
                   <option key={convenio.id} value={convenio.id}>
-                    {convenio.empresa?.razao_social || convenio.empresa_nome} - {convenio.convenio_codigo}
+                    {convenio.empresa?.razao_social || convenio.empresa_nome} - {convenio.compromisso_codigo || convenio.convenio_codigo}
                   </option>
                 ))}
               </select>
