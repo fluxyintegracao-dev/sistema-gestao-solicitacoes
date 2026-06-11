@@ -13,6 +13,7 @@
 ## Funcoes centrais
 - abertura de solicitacao
 - filtros e paginacao
+- filtro de vencimento por periodo inicial/final
 - detalhamento
 - historico
 - acoes em massa

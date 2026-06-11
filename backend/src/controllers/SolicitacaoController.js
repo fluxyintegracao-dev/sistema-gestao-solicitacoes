@@ -1004,6 +1004,8 @@ module.exports = {
         numero_sienge,
         responsavel,
         data_registro,
+        data_vencimento_inicio,
+        data_vencimento_fim,
         data_vencimento,
         data_inicio,
         data_fim,
@@ -1598,9 +1600,33 @@ module.exports = {
         }
       }
 
-      if (data_vencimento) {
-        const dataVencimentoStr = String(data_vencimento).trim();
-        if (/^\d{4}-\d{2}-\d{2}$/.test(dataVencimentoStr)) {
+      const dataRegex = /^\d{4}-\d{2}-\d{2}$/;
+      const dataVencimentoInicioStr = String(data_vencimento_inicio || '').trim();
+      const dataVencimentoFimStr = String(data_vencimento_fim || '').trim();
+      const dataVencimentoStr = String(data_vencimento || '').trim();
+
+      if (dataRegex.test(dataVencimentoInicioStr)) {
+        where[Op.and] = where[Op.and] || [];
+        where[Op.and].push(
+          Sequelize.where(
+            Sequelize.fn('DATE', Sequelize.col('Solicitacao.data_vencimento')),
+            { [Op.gte]: dataVencimentoInicioStr }
+          )
+        );
+      }
+
+      if (dataRegex.test(dataVencimentoFimStr)) {
+        where[Op.and] = where[Op.and] || [];
+        where[Op.and].push(
+          Sequelize.where(
+            Sequelize.fn('DATE', Sequelize.col('Solicitacao.data_vencimento')),
+            { [Op.lte]: dataVencimentoFimStr }
+          )
+        );
+      }
+
+      if (!dataVencimentoInicioStr && !dataVencimentoFimStr && data_vencimento) {
+        if (dataRegex.test(dataVencimentoStr)) {
           where[Op.and] = where[Op.and] || [];
           where[Op.and].push(
             Sequelize.where(

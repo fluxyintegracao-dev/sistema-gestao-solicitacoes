@@ -116,6 +116,8 @@ export default function Solicitacoes({ arquivadas = false }) {
     valor_min: '',
     valor_max: '',
     data_registro: '',
+    data_vencimento_inicio: '',
+    data_vencimento_fim: '',
     data_vencimento: '',
     responsavel: ''
   });
@@ -241,6 +243,15 @@ export default function Solicitacoes({ arquivadas = false }) {
           if (!normalizado.numero_sienge && normalizado.numero_solicitacao) {
             normalizado.numero_sienge = normalizado.numero_solicitacao;
           }
+          if (
+            normalizado.data_vencimento &&
+            !normalizado.data_vencimento_inicio &&
+            !normalizado.data_vencimento_fim
+          ) {
+            normalizado.data_vencimento_inicio = normalizado.data_vencimento;
+            normalizado.data_vencimento_fim = normalizado.data_vencimento;
+          }
+          delete normalizado.data_vencimento;
           delete normalizado.numero_solicitacao;
           setFiltros(prev => ({ ...prev, ...normalizado }));
         }

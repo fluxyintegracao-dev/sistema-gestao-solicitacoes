@@ -11,7 +11,7 @@ const FILTROS_DISPONIVEIS = [
   { id: 'valor_min', label: 'Valor minimo' },
   { id: 'valor_max', label: 'Valor maximo' },
   { id: 'data_registro', label: 'Data de registro' },
-  { id: 'data_vencimento', label: 'Data de vencimento' },
+  { id: 'data_vencimento', label: 'Periodo de vencimento' },
   { id: 'responsavel', label: 'Responsavel' }
 ];
 
@@ -119,6 +119,8 @@ export default function Filtros({
       valor_min: '',
       valor_max: '',
       data_registro: '',
+      data_vencimento_inicio: '',
+      data_vencimento_fim: '',
       data_vencimento: '',
       responsavel: ''
     });
@@ -316,6 +318,8 @@ export default function Filtros({
     filtros.valor_min,
     filtros.valor_max,
     filtros.data_registro,
+    filtros.data_vencimento_inicio,
+    filtros.data_vencimento_fim,
     filtros.data_vencimento,
     mostrarFiltroResponsavel ? filtros.responsavel : ''
   ].filter(v => String(v || '').trim() !== '').length;
@@ -690,14 +694,31 @@ export default function Filtros({
 
           {isFiltroVisivel('data_vencimento') && (
             <div className="sol-filter-field">
-              <label className="sol-filter-label">Data de vencimento</label>
-              <input
-                name="data_vencimento"
-                className="input"
-                value={filtros.data_vencimento || ''}
-                onChange={handleChange}
-                type="date"
-              />
+              <label className="sol-filter-label">Periodo de vencimento</label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <label className="block">
+                  <span className="text-xs font-medium text-gray-500 dark:text-slate-400">Inicial</span>
+                  <input
+                    name="data_vencimento_inicio"
+                    className="input mt-1"
+                    value={filtros.data_vencimento_inicio || ''}
+                    onChange={handleChange}
+                    type="date"
+                    aria-label="Data inicial de vencimento"
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-xs font-medium text-gray-500 dark:text-slate-400">Final</span>
+                  <input
+                    name="data_vencimento_fim"
+                    className="input mt-1"
+                    value={filtros.data_vencimento_fim || ''}
+                    onChange={handleChange}
+                    type="date"
+                    aria-label="Data final de vencimento"
+                  />
+                </label>
+              </div>
             </div>
           )}
 
