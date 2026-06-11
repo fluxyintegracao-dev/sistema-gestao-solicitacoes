@@ -115,6 +115,7 @@ router.patch('/solicitacoes/arquivar-massa', SolicitacaoController.arquivarEmMas
 router.post('/solicitacoes/enviar-setor-massa', SolicitacaoController.enviarParaSetorEmMassa);
 router.get('/solicitacoes/resumo', SolicitacaoController.resumo);
 router.post('/solicitacoes/:id/comentarios', SolicitacaoController.adicionarComentario);
+router.delete('/solicitacoes/:id/comentarios/:historicoId', SolicitacaoController.removerComentario);
 router.post('/solicitacoes/:id/enviar-setor', SolicitacaoController.enviarParaSetor);
 router.post('/solicitacoes/:id/aprovar-diretoria', SolicitacaoController.aprovarDiretoria);
 router.post('/solicitacoes/:id/assumir', SolicitacaoController.assumirSolicitacao);

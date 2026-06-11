@@ -16,6 +16,7 @@ A visibilidade efetiva depende de combinacao entre:
 
 ## Regras criticas
 - `SUPERADMIN` continua como excecao administrativa ampla.
+- `SUPERADMIN` pode excluir comentarios do historico de uma solicitacao; o comentario original e removido e a acao fica auditada como `COMENTARIO_REMOVIDO`.
 - numero do pedido permanece restrito ao escopo GEO.
 - lista de status no detalhe segue o setor do usuario logado.
 - para status de solicitacao, `GEO`, `GERENCIA DE PROCESSOS` e `GERENCIA_PROCESSOS` sao tratados como o mesmo setor.

@@ -301,8 +301,11 @@ export default function SolicitacaoDetalhe() {
       <div className="grid md:grid-cols-2 gap-6">
         <Timeline
           historicos={solicitacao.historicos || []}
+          solicitacaoId={id}
           canRemoveAnexo={isSetorCompras || isSuperadmin}
+          canRemoveComentario={isSuperadmin}
           onAnexoRemovido={carregar}
+          onComentarioRemovido={carregar}
         />
 
         <div className="space-y-6">

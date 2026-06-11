@@ -21,6 +21,7 @@
 - alteracao de status em massa reaproveitando a mesma regra do detalhe da solicitacao
 - solicitacoes arquivadas pelo usuario mantem selecao em massa e usam o painel flutuante para ver, exportar e desarquivar
 - permissao especial configuravel para envio fora do setor atual, sem liberar o setor OBRA
+- `SUPERADMIN` pode excluir comentarios do historico da solicitacao; a remocao registra um novo item `COMENTARIO_REMOVIDO`
 
 ## Fluxo de aprovacao por diretoria
 - obras podem ser classificadas como `PUBLICA` ou `PRIVADA`

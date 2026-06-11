@@ -2,7 +2,14 @@ import { useState } from 'react';
 import PreviewAnexoModal from './PreviewAnexoModal';
 import { API_URL, authHeaders, fileUrl } from '../../services/api';
 
-export default function Timeline({ historicos, canRemoveAnexo = false, onAnexoRemovido }) {
+export default function Timeline({
+  historicos,
+  solicitacaoId,
+  canRemoveAnexo = false,
+  canRemoveComentario = false,
+  onAnexoRemovido,
+  onComentarioRemovido
+}) {
   const [preview, setPreview] = useState(null);
 
   function normalizarUrlArquivo(url) {
@@ -80,6 +87,30 @@ export default function Timeline({ historicos, canRemoveAnexo = false, onAnexoRe
     }
   }
 
+  async function removerComentario(historicoId) {
+    const confirmar = window.confirm('Deseja excluir este comentario do historico?');
+    if (!confirmar) return;
+
+    try {
+      const res = await fetch(`${API_URL}/solicitacoes/${solicitacaoId}/comentarios/${historicoId}`, {
+        method: 'DELETE',
+        headers: authHeaders()
+      });
+
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(data?.error || 'Erro ao excluir comentario');
+      }
+
+      if (typeof onComentarioRemovido === 'function') {
+        onComentarioRemovido();
+      }
+    } catch (error) {
+      console.error(error);
+      alert(error?.message || 'Erro ao excluir comentario');
+    }
+  }
+
   return (
     <div className="sol-detail-card">
       <h2 className="sol-detail-card-title">Historico</h2>
@@ -130,6 +161,16 @@ export default function Timeline({ historicos, canRemoveAnexo = false, onAnexoRe
                 <p className="text-sm text-gray-700 whitespace-pre-wrap break-words leading-relaxed">
                   {h.descricao}
                 </p>
+              )}
+
+              {canRemoveComentario && h.acao === 'COMENTARIO' && (
+                <button
+                  type="button"
+                  className="text-red-600 text-sm mt-1"
+                  onClick={() => removerComentario(h.id)}
+                >
+                  Excluir comentario
+                </button>
               )}
 
               {podeExibirArquivo && meta && caminhoArquivo && (

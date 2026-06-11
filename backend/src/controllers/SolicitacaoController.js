@@ -3302,6 +3302,55 @@ module.exports = {
     }
   },
 
+  async removerComentario(req, res) {
+    try {
+      const { id, historicoId } = req.params;
+      const perfil = String(req.user?.perfil || '').trim().toUpperCase();
+
+      if (perfil !== 'SUPERADMIN') {
+        return res.status(403).json({ error: 'Apenas SUPERADMIN pode excluir comentarios do historico.' });
+      }
+
+      const historico = await Historico.findOne({
+        where: {
+          id: historicoId,
+          solicitacao_id: id
+        }
+      });
+
+      if (!historico) {
+        return res.status(404).json({ error: 'Comentario nao encontrado.' });
+      }
+
+      if (String(historico.acao || '').toUpperCase() !== 'COMENTARIO') {
+        return res.status(400).json({ error: 'Somente comentarios podem ser excluidos por este endpoint.' });
+      }
+
+      const usuario = await User.findByPk(req.user.id);
+      const descricaoRemovida = historico.descricao || null;
+      const solicitacaoId = historico.solicitacao_id;
+
+      await historico.destroy();
+
+      await Historico.create({
+        solicitacao_id: solicitacaoId,
+        usuario_responsavel_id: req.user.id,
+        setor: usuario?.setor_id || req.user?.setor_id || null,
+        acao: 'COMENTARIO_REMOVIDO',
+        descricao: 'Comentario removido por SUPERADMIN',
+        metadata: JSON.stringify({
+          historico_removido_id: Number(historicoId),
+          descricao_removida: descricaoRemovida
+        })
+      });
+
+      return res.json({ ok: true });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao excluir comentario' });
+    }
+  },
+
   // =====================================================
   // ARQUIVAR DA MINHA LISTA
   // =====================================================
