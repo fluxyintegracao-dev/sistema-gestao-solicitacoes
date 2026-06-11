@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import {
   obterCotacaoPublica,
@@ -59,6 +59,51 @@ const OPCOES_DISPONIBILIDADE = [
   { value: 'PARA_CHEGAR', label: 'Para chegar' }
 ];
 
+const FORMAS_PAGAMENTO = [
+  { value: 'PIX', label: 'PIX' },
+  { value: 'BOLETO', label: 'Boleto' },
+  { value: 'TRANSFERENCIA', label: 'Transferencia' },
+  { value: 'CARTAO', label: 'Cartao' },
+  { value: 'DINHEIRO', label: 'Dinheiro' },
+  { value: 'FATURADO', label: 'Faturado' },
+  { value: 'OUTROS', label: 'Outros' }
+];
+
+function criarCondicoesPagamentoVazias() {
+  return Object.fromEntries(
+    FORMAS_PAGAMENTO.map((opcao) => [opcao.value, { selecionado: false, prazo: '' }])
+  );
+}
+
+function parseCondicoesPagamento(valor) {
+  const condicoes = criarCondicoesPagamentoVazias();
+  const texto = String(valor || '').trim();
+  if (!texto) return condicoes;
+
+  let encontrouOpcao = false;
+  FORMAS_PAGAMENTO.forEach((opcao) => {
+    const escapedLabel = opcao.label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const match = texto.match(new RegExp(`${escapedLabel}\\s*[:\\-]\\s*([^;]+)`, 'i'));
+    if (match) {
+      condicoes[opcao.value] = { selecionado: true, prazo: match[1].trim() };
+      encontrouOpcao = true;
+    }
+  });
+
+  if (!encontrouOpcao) {
+    condicoes.OUTROS = { selecionado: true, prazo: texto };
+  }
+
+  return condicoes;
+}
+
+function montarCondicaoPagamento(condicoes) {
+  return FORMAS_PAGAMENTO
+    .filter((opcao) => condicoes?.[opcao.value]?.selecionado)
+    .map((opcao) => `${opcao.label}: ${String(condicoes[opcao.value]?.prazo || '').trim()}`)
+    .join('; ');
+}
+
 function AttachmentPreview({ item }) {
   if (!item?.arquivo_url) {
     return null;
@@ -108,7 +153,7 @@ export default function CotacaoFornecedorPublica() {
   const [salvando, setSalvando] = useState(false);
   const [enviandoPlanilha, setEnviandoPlanilha] = useState(false);
   const [valorMinimoPedido, setValorMinimoPedido] = useState('');
-  const [condicaoPagamento, setCondicaoPagamento] = useState('');
+  const [condicoesPagamento, setCondicoesPagamento] = useState(() => criarCondicoesPagamentoVazias());
   const [prazoEntrega, setPrazoEntrega] = useState('');
 
   async function carregar() {
@@ -126,7 +171,7 @@ export default function CotacaoFornecedorPublica() {
           : []
       );
       setValorMinimoPedido(data?.cotacao?.valor_minimo_pedido ?? '');
-      setCondicaoPagamento(data?.cotacao?.condicao_pagamento ?? '');
+      setCondicoesPagamento(parseCondicoesPagamento(data?.cotacao?.condicao_pagamento ?? ''));
       setPrazoEntrega(data?.cotacao?.prazo_entrega ?? '');
     } catch (error) {
       console.error(error);
@@ -144,14 +189,31 @@ export default function CotacaoFornecedorPublica() {
     );
   }
 
+  function atualizarCondicaoPagamento(tipo, campo, valor) {
+    setCondicoesPagamento((atual) => ({
+      ...atual,
+      [tipo]: {
+        ...(atual[tipo] || { selecionado: false, prazo: '' }),
+        [campo]: valor
+      }
+    }));
+  }
+
   function validarCabecalhoResposta() {
     if (valorMinimoPedido === '' || valorMinimoPedido === null || valorMinimoPedido === undefined) {
       alert('Informe o VLR minimo pedido antes de enviar a resposta.');
       return false;
     }
 
-    if (!String(condicaoPagamento || '').trim()) {
-      alert('Informe a condicao de pagamento antes de enviar a resposta.');
+    const selecionadas = FORMAS_PAGAMENTO.filter((opcao) => condicoesPagamento?.[opcao.value]?.selecionado);
+    if (selecionadas.length === 0) {
+      alert('Selecione ao menos uma condicao de pagamento antes de enviar a resposta.');
+      return false;
+    }
+
+    const semPrazo = selecionadas.find((opcao) => !String(condicoesPagamento?.[opcao.value]?.prazo || '').trim());
+    if (semPrazo) {
+      alert(`Informe o prazo/condicao para ${semPrazo.label}.`);
       return false;
     }
 
@@ -183,7 +245,7 @@ export default function CotacaoFornecedorPublica() {
           quantidade_minima_item: item.quantidade_minima_item
         })),
         valor_minimo_pedido: valorMinimoPedido,
-        condicao_pagamento: condicaoPagamento,
+        condicao_pagamento: montarCondicaoPagamento(condicoesPagamento),
         prazo_entrega: prazoEntrega
       });
       await carregar();
@@ -206,7 +268,7 @@ export default function CotacaoFornecedorPublica() {
       setEnviandoPlanilha(true);
       const resposta = await uploadPlanilhaCotacaoPublica(token, file, {
         valor_minimo_pedido: valorMinimoPedido,
-        condicao_pagamento: condicaoPagamento,
+        condicao_pagamento: montarCondicaoPagamento(condicoesPagamento),
         prazo_entrega: prazoEntrega
       });
       await carregar();
@@ -252,7 +314,7 @@ export default function CotacaoFornecedorPublica() {
     <div className="cotacao-publica-page solicitacoes-page min-h-screen px-3 py-4">
       <div className="cotacao-publica-shell mx-auto max-w-7xl">
 
-        {/* Cabeçalho */}
+        {/* CabeÃ§alho */}
         <div className="mb-3">
           <h1 className="text-base font-semibold">Resposta de Cotacao</h1>
           <p className="text-xs text-[var(--sol-text-soft)]">
@@ -272,7 +334,7 @@ export default function CotacaoFornecedorPublica() {
                 {statusCotacao}
               </span>
               <span className="text-[11px] text-[var(--sol-text-soft)]">
-                {itens.length} itens · {itensDisponiveis} disponiveis
+                {itens.length} itens Â· {itensDisponiveis} disponiveis
               </span>
             </div>
           </div>
@@ -323,17 +385,6 @@ export default function CotacaoFornecedorPublica() {
                 onChange={setValorMinimoPedido}
               />
             </div>
-            <div className="sm:col-span-2 lg:col-span-2">
-              <p className="text-[10px] uppercase tracking-wide text-[var(--sol-text-soft)] mb-0.5">Condicao de pagamento *</p>
-              <input
-                className="input h-7 text-xs px-2 w-full"
-                type="text"
-                value={condicaoPagamento}
-                disabled={formularioBloqueado}
-                onChange={(e) => setCondicaoPagamento(e.target.value)}
-                placeholder="Ex.: 30/60 dias, PIX a vista..."
-              />
-            </div>
             <div>
               <p className="text-[10px] uppercase tracking-wide text-[var(--sol-text-soft)] mb-0.5">Prazo entrega *</p>
               <input
@@ -349,9 +400,51 @@ export default function CotacaoFornecedorPublica() {
               <p className="text-[10px] uppercase tracking-wide text-[var(--sol-text-soft)]">Enviado em</p>
               <p className="text-xs font-semibold">{formatarData(dados.cotacao?.enviado_em)}</p>
             </div>
+            <div className="col-span-2 sm:col-span-3 lg:col-span-6">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[10px] uppercase tracking-wide text-[var(--sol-text-soft)]">Condicoes de pagamento aceitas *</p>
+                <span className="text-[10px] text-[var(--sol-text-soft)]">Selecione uma ou mais formas e informe o prazo.</span>
+              </div>
+              <div className="mt-1 grid gap-1.5 sm:grid-cols-2 lg:grid-cols-4">
+                {FORMAS_PAGAMENTO.map((opcao) => {
+                  const condicao = condicoesPagamento[opcao.value] || { selecionado: false, prazo: '' };
+                  return (
+                    <div
+                      key={opcao.value}
+                      className={`rounded-lg border px-2 py-1.5 transition ${
+                        condicao.selecionado
+                          ? 'border-blue-200 bg-blue-50/80'
+                          : 'border-[var(--c-border)] bg-white/70'
+                      }`}
+                    >
+                      <label className="flex items-center gap-2 text-[11px] font-semibold text-[var(--c-fg)]">
+                        <input
+                          type="checkbox"
+                          className="h-3.5 w-3.5 rounded border-slate-300"
+                          checked={Boolean(condicao.selecionado)}
+                          disabled={formularioBloqueado}
+                          onChange={(e) => atualizarCondicaoPagamento(opcao.value, 'selecionado', e.target.checked)}
+                        />
+                        <span>{opcao.label}</span>
+                      </label>
+                      {condicao.selecionado && (
+                        <input
+                          className="input mt-1 h-7 w-full px-2 text-[11px]"
+                          type="text"
+                          value={condicao.prazo}
+                          disabled={formularioBloqueado}
+                          onChange={(e) => atualizarCondicaoPagamento(opcao.value, 'prazo', e.target.value)}
+                          placeholder="Ex.: a vista, 7 dias, 30/60"
+                        />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
 
-          {/* Ações do card */}
+          {/* AÃ§Ãµes do card */}
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <label className={`btn btn-outline btn-sm text-xs h-7 px-3 cursor-pointer ${(enviandoPlanilha || formularioBloqueado) ? 'pointer-events-none opacity-60' : ''}`}>
               <input
@@ -381,7 +474,7 @@ export default function CotacaoFornecedorPublica() {
           </div>
         </div>
 
-        {/* Instrução resumida */}
+        {/* InstruÃ§Ã£o resumida */}
         <p className="mt-2 mb-2 text-[11px] text-[var(--sol-text-soft)]">
           {respondidaPorArquivo
             ? 'A resposta por formulario fica bloqueada quando a cotacao ja foi respondida por arquivo.'
@@ -534,20 +627,6 @@ export default function CotacaoFornecedorPublica() {
           </div>
         </div>
 
-        {/* Botão de envio no rodapé (conveniência) */}
-        {!dados.somente_leitura && (
-          <div className="mt-3 flex justify-end">
-            <button
-              type="button"
-              className="btn btn-primary btn-sm text-xs h-7 px-4"
-              onClick={handleSalvarOnline}
-              disabled={salvando || respondidaPorArquivo}
-              title={respondidaPorArquivo ? 'Cotacao ja respondida por arquivo.' : undefined}
-            >
-              {respondidaPorArquivo ? 'Respondida por arquivo' : salvando ? 'Enviando...' : 'Enviar resposta'}
-            </button>
-          </div>
-        )}
       </div>
     </div>
   );
