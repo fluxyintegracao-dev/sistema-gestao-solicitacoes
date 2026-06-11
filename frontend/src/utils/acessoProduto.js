@@ -226,6 +226,12 @@ export function canAccessFinanceiro(user) {
       'financeiro.conciliacao.visualizar',
       'financeiro.conciliacao.importar',
       'financeiro.conciliacao.conciliar',
+      'financeiro.bancos.visualizar',
+      'financeiro.bancos.auditar',
+      'financeiro.bancos.conciliar',
+      'financeiro.bancos.remessas',
+      'financeiro.bancos.retornos',
+      'financeiro.bancos.configurar',
       'financeiro.cadastros.visualizar',
       'financeiro.cadastros.gerenciar',
       'financeiro.pagamentos.visualizar',
@@ -248,6 +254,23 @@ export function canAccessFinanceiro(user) {
     normalizeToken(user?.perfil) === 'FINANCEIRO' ||
     userHasSetorCapability(user, 'eh_setor_financeiro')
   );
+}
+
+export function canAccessBancosEnterprise(user) {
+  if (!hasEnabledModule(user, 'FINANCEIRO')) return false;
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasAnyPermissao(user, [
+      'financeiro.bancos.visualizar',
+      'financeiro.bancos.auditar',
+      'financeiro.bancos.conciliar',
+      'financeiro.bancos.remessas',
+      'financeiro.bancos.retornos',
+      'financeiro.bancos.configurar'
+    ]);
+  }
+
+  return canAccessFinanceiro(user);
 }
 
 function userHasPaymentApprovalDirectorate(user) {

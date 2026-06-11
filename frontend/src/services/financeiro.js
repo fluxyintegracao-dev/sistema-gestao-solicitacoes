@@ -34,6 +34,94 @@ export async function getTitulosFinanceiros(params = {}) {
   return parseJson(response, 'Erro ao buscar titulos financeiros');
 }
 
+export async function getBankingDashboard() {
+  const response = await fetch(`${API_URL}/financeiro/bancos/dashboard`, {
+    headers: authHeaders()
+  });
+
+  return parseJson(response, 'Erro ao carregar painel bancario enterprise');
+}
+
+export async function getCnab240PagamentosSpec() {
+  const response = await fetch(`${API_URL}/financeiro/bancos/cnab240-pagamentos`, {
+    headers: authHeaders()
+  });
+
+  return parseJson(response, 'Erro ao carregar contrato CNAB240 de pagamentos');
+}
+
+export async function getCaixaPagamentoConvenios() {
+  const response = await fetch(`${API_URL}/financeiro/bancos/caixa-pagamentos/convenios`, {
+    headers: authHeaders()
+  });
+
+  return parseJson(response, 'Erro ao buscar convenios Caixa de pagamentos');
+}
+
+export async function salvarCaixaPagamentoConvenio(data, id = null) {
+  const response = await fetch(
+    id
+      ? `${API_URL}/financeiro/bancos/caixa-pagamentos/convenios/${id}`
+      : `${API_URL}/financeiro/bancos/caixa-pagamentos/convenios`,
+    {
+      method: id ? 'PATCH' : 'POST',
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(data)
+    }
+  );
+
+  return parseJson(response, 'Erro ao salvar convenio Caixa de pagamentos');
+}
+
+export async function getCaixaPagamentoTitulosElegiveis(convenioId) {
+  const response = await fetch(
+    `${API_URL}/financeiro/bancos/caixa-pagamentos/titulos-elegiveis?convenio_id=${encodeURIComponent(convenioId || '')}`,
+    { headers: authHeaders() }
+  );
+
+  return parseJson(response, 'Erro ao buscar titulos elegiveis para remessa Caixa');
+}
+
+export async function getCaixaPagamentoRemessas() {
+  const response = await fetch(`${API_URL}/financeiro/bancos/caixa-pagamentos/remessas`, {
+    headers: authHeaders()
+  });
+
+  return parseJson(response, 'Erro ao buscar remessas Caixa de pagamentos');
+}
+
+export async function gerarCaixaPagamentoRemessa(data) {
+  const response = await fetch(`${API_URL}/financeiro/bancos/caixa-pagamentos/remessas`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+
+  return parseJson(response, 'Erro ao gerar remessa Caixa de pagamentos');
+}
+
+export function getCaixaPagamentoRemessaDownloadUrl(id) {
+  return `${API_URL}/financeiro/bancos/caixa-pagamentos/remessas/${id}/download`;
+}
+
+export async function baixarCaixaPagamentoRemessa(id) {
+  const response = await fetch(getCaixaPagamentoRemessaDownloadUrl(id), {
+    headers: authHeaders()
+  });
+
+  if (!response.ok) {
+    await parseJson(response, 'Erro ao baixar remessa Caixa de pagamentos');
+  }
+
+  const blob = await response.blob();
+  const disposition = response.headers.get('Content-Disposition') || '';
+  const match = disposition.match(/filename="?([^"]+)"?/i);
+  return {
+    blob,
+    filename: match?.[1] || `CAIXA_PAGAMENTO_REMESSA_${id}.REM`
+  };
+}
+
 export async function getRelatorioFluxoCaixa(params = {}) {
   const query = new URLSearchParams(
     Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== '')

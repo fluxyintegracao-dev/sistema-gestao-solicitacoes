@@ -97,6 +97,9 @@ db.BoletoCaixaRemessa = require('./BoletoCaixaRemessa')(sequelize, Sequelize);
 db.BoletoCaixaRemessaItem = require('./BoletoCaixaRemessaItem')(sequelize, Sequelize);
 db.BoletoCaixaRetorno = require('./BoletoCaixaRetorno')(sequelize, Sequelize);
 db.BoletoCaixaOcorrencia = require('./BoletoCaixaOcorrencia')(sequelize, Sequelize);
+db.CaixaPagamentoConvenio = require('./CaixaPagamentoConvenio')(sequelize, Sequelize);
+db.CaixaPagamentoRemessa = require('./CaixaPagamentoRemessa')(sequelize, Sequelize);
+db.CaixaPagamentoRemessaItem = require('./CaixaPagamentoRemessaItem')(sequelize, Sequelize);
 db.MovimentoFinanceiro = require('./MovimentoFinanceiro')(sequelize, Sequelize);
 db.CaixaFinanceiroSessao = require('./CaixaFinanceiroSessao')(sequelize, Sequelize);
 db.TransferenciaFinanceira = require('./TransferenciaFinanceira')(sequelize, Sequelize);
@@ -2563,6 +2566,86 @@ db.MovimentoFinanceiro.hasMany(db.BoletoCaixaOcorrencia, {
 db.BoletoCaixaOcorrencia.belongsTo(db.MovimentoFinanceiro, {
   foreignKey: 'movimento_financeiro_id',
   as: 'movimentoFinanceiro'
+});
+
+db.EmpresaGrupo.hasMany(db.CaixaPagamentoConvenio, {
+  foreignKey: 'empresa_id',
+  as: 'conveniosCaixaPagamento'
+});
+
+db.CaixaPagamentoConvenio.belongsTo(db.EmpresaGrupo, {
+  foreignKey: 'empresa_id',
+  as: 'empresa'
+});
+
+db.ContaBancaria.hasMany(db.CaixaPagamentoConvenio, {
+  foreignKey: 'conta_bancaria_id',
+  as: 'conveniosCaixaPagamento'
+});
+
+db.CaixaPagamentoConvenio.belongsTo(db.ContaBancaria, {
+  foreignKey: 'conta_bancaria_id',
+  as: 'contaBancaria'
+});
+
+db.CaixaPagamentoConvenio.hasMany(db.CaixaPagamentoRemessa, {
+  foreignKey: 'convenio_id',
+  as: 'remessasPagamento'
+});
+
+db.CaixaPagamentoRemessa.belongsTo(db.CaixaPagamentoConvenio, {
+  foreignKey: 'convenio_id',
+  as: 'convenio'
+});
+
+db.EmpresaGrupo.hasMany(db.CaixaPagamentoRemessa, {
+  foreignKey: 'empresa_id',
+  as: 'remessasCaixaPagamento'
+});
+
+db.CaixaPagamentoRemessa.belongsTo(db.EmpresaGrupo, {
+  foreignKey: 'empresa_id',
+  as: 'empresa'
+});
+
+db.ContaBancaria.hasMany(db.CaixaPagamentoRemessa, {
+  foreignKey: 'conta_bancaria_id',
+  as: 'remessasCaixaPagamento'
+});
+
+db.CaixaPagamentoRemessa.belongsTo(db.ContaBancaria, {
+  foreignKey: 'conta_bancaria_id',
+  as: 'contaBancaria'
+});
+
+db.CaixaPagamentoRemessa.hasMany(db.CaixaPagamentoRemessaItem, {
+  foreignKey: 'remessa_id',
+  as: 'itens'
+});
+
+db.CaixaPagamentoRemessaItem.belongsTo(db.CaixaPagamentoRemessa, {
+  foreignKey: 'remessa_id',
+  as: 'remessa'
+});
+
+db.TituloFinanceiro.hasMany(db.CaixaPagamentoRemessaItem, {
+  foreignKey: 'titulo_financeiro_id',
+  as: 'itensRemessaCaixaPagamento'
+});
+
+db.CaixaPagamentoRemessaItem.belongsTo(db.TituloFinanceiro, {
+  foreignKey: 'titulo_financeiro_id',
+  as: 'titulo'
+});
+
+db.Parceiro.hasMany(db.CaixaPagamentoRemessaItem, {
+  foreignKey: 'parceiro_id',
+  as: 'itensRemessaCaixaPagamento'
+});
+
+db.CaixaPagamentoRemessaItem.belongsTo(db.Parceiro, {
+  foreignKey: 'parceiro_id',
+  as: 'parceiro'
 });
 
 db.ContaBancaria.hasMany(db.MovimentoFinanceiro, {

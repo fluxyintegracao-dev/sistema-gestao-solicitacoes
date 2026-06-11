@@ -151,6 +151,18 @@ const MODULO_PERMISSION_GROUPS = [
         ]
       },
       {
+        key: 'financeiro.bancos',
+        label: 'Bancos Enterprise',
+        permissoes: [
+          { key: 'financeiro.bancos.visualizar', label: 'Visualizar bancos', descricao: 'Acessar painel consolidado de contas, remessas, retornos, pagamentos e conciliacoes.' },
+          { key: 'financeiro.bancos.auditar', label: 'Auditar eventos bancarios', descricao: 'Consultar timeline, falhas tecnicas e eventos consolidados de integracoes bancarias.' },
+          { key: 'financeiro.bancos.conciliar', label: 'Operar conciliacao bancaria', descricao: 'Acessar acoes relacionadas a conciliacao dentro da visao bancaria consolidada.' },
+          { key: 'financeiro.bancos.remessas', label: 'Acompanhar remessas', descricao: 'Acompanhar remessas CNAB e integracoes de envio por banco.' },
+          { key: 'financeiro.bancos.retornos', label: 'Acompanhar retornos', descricao: 'Acompanhar retornos CNAB, rejeicoes e liquidacoes bancarias.' },
+          { key: 'financeiro.bancos.configurar', label: 'Configurar bancos', descricao: 'Preparar parametros e providers bancarios quando liberado.' }
+        ]
+      },
+      {
         key: 'financeiro.cadastros',
         label: 'Cadastros Financeiros',
         permissoes: [

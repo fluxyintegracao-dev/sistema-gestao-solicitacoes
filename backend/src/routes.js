@@ -1241,6 +1241,7 @@ router.get('/financeiro/pagamentos/providers', allowPagamentosRead, PaymentContr
 router.get('/financeiro/pagamentos/accounts', allowPagamentosRead, PaymentController.accounts);
 router.post('/financeiro/pagamentos/accounts', allowPagamentosConfig, criticalRateLimit, validateRequest({ body: validatePaymentAccountBody }), PaymentController.criarAccount);
 router.put('/financeiro/pagamentos/accounts/:id', allowPagamentosConfig, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Conta pagadora'), body: validatePaymentAccountBody }), PaymentController.atualizarAccount);
+router.use('/financeiro/bancos', allowFinanceiro, require('./modules/banking/routes'));
 router.get('/financeiro/conciliacoes', allowFinanceiro, validateRequest({ query: validateFinanceConciliacaoQuery }), ConciliacaoBancariaController.index);
 router.get('/financeiro/conciliacoes/importacoes', allowFinanceiro, validateRequest({ query: validateFinanceConciliacaoImportacoesQuery }), ConciliacaoBancariaController.importacoes);
 router.post('/financeiro/conciliacoes/importar-ofx', allowFinanceiro, criticalRateLimit, uploadOfx.single('file'), validateRequest({ body: validateFinanceConciliacaoImportBody }), ConciliacaoBancariaController.importarOfx);

@@ -53,6 +53,7 @@ import {
   canAccessCompras,
   canAccessContratos,
   canAccessFinanceiro,
+  canAccessBancosEnterprise,
   canAccessFiscal,
   canAccessPagamentos,
   canAccessProvisoes,
@@ -276,6 +277,7 @@ export default function Layout() {
   const prioridadesDiretoriaAccess = canAccessPrioridadesDiretoria(user);
   const solicitacoesRelatoriosAccess = canViewSolicitacoesRelatorios(user);
   const financeiroAccess = canAccessFinanceiro(user);
+  const bancosEnterpriseAccess = canAccessBancosEnterprise(user);
   const fiscalAccess = canAccessFiscal(user);
   const fiscalConfigAccess = canManageFiscalConfig(user);
   const fiscalDocumentsAccess = canViewFiscalDocuments(user);
@@ -401,9 +403,10 @@ export default function Layout() {
       ]);
     }
 
-    if (financeiroAccess || pagamentosAccess || boletosAccess) {
+    if (financeiroAccess || bancosEnterpriseAccess || pagamentosAccess || boletosAccess) {
       addGroup('Financeiro', [
         financeiroAccess ? item('/financeiro/titulos', 'Titulos Financeiros', HiOutlineWallet) : null,
+        bancosEnterpriseAccess ? item('/financeiro/bancos', 'Bancos Enterprise', HiOutlineBanknotes) : null,
         financeiroAccess ? item('/financeiro/financiamentos-bancarios', 'Financiamentos Bancarios', HiOutlineBanknotes) : null,
         pagamentosAccess ? item('/financeiro/pagamentos', 'Pagamentos em Massa', HiOutlinePaperAirplane) : null,
         boletosAccess ? item('/financeiro/boletos', 'Boletos', HiOutlineDocumentText) : null,
