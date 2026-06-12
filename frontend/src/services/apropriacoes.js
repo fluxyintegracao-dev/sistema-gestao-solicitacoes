@@ -22,6 +22,30 @@ export async function listarApropriacoes(params = {}) {
   return handleJsonResponse(response, 'Erro ao buscar apropriacoes');
 }
 
+export async function baixarModeloApropriacoes() {
+  const response = await fetch(`${API_URL}/apropriacoes/modelo-xlsx`, {
+    headers: authHeaders()
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || 'Erro ao baixar modelo de apropriacoes');
+  }
+
+  const blob = await response.blob();
+  const contentDisposition = response.headers.get('Content-Disposition') || '';
+  const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/i);
+  const filename = filenameMatch?.[1] || 'modelo-apropriacoes-obras.xlsx';
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
+}
+
 export async function criarApropriacao(data) {
   const response = await fetch(`${API_URL}/apropriacoes`, {
     method: 'POST',

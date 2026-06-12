@@ -1,3 +1,4 @@
+const XLSX = require('xlsx');
 const { Apropriacao, Obra } = require('../models');
 const { isObraCentroCusto } = require('../constants/centroCusto');
 
@@ -33,6 +34,41 @@ function parseValorOrcado(value, fallback = 0) {
 }
 
 module.exports = {
+  modeloXlsx(req, res) {
+    try {
+      const linhasModelo = [
+        ['codigo', 'descricao', 'valor_orcado'],
+        ['001', 'Fundacao', 0],
+        ['002', 'Estrutura', 0],
+        ['003', 'Instalacoes', 0]
+      ];
+
+      const instrucoes = [
+        ['Modelo de importacao de apropriacoes por obra'],
+        ['Selecione a obra no Fluxy antes de importar.'],
+        ['Preencha uma apropriacao por linha.'],
+        ['codigo e obrigatorio. descricao e valor_orcado sao opcionais.'],
+        ['Na importacao em massa atual, cole no formato Codigo|Descricao.']
+      ];
+
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(linhasModelo), 'Apropriacoes');
+      XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(instrucoes), 'Instrucoes');
+
+      const buffer = XLSX.write(workbook, {
+        bookType: 'xlsx',
+        type: 'buffer'
+      });
+
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', 'attachment; filename="modelo-apropriacoes-obras.xlsx"');
+      return res.send(buffer);
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao gerar modelo de apropriacoes' });
+    }
+  },
+
   async index(req, res) {
     try {
       const { obra_id } = req.query;

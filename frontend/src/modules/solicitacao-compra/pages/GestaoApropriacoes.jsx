@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { getObras } from '../../../services/obras';
+import { useAuth } from '../../../contexts/AuthContext';
 import {
   atualizarApropriacao,
+  baixarModeloApropriacoes,
   criarApropriacao,
   deletarApropriacao,
   listarApropriacoes
@@ -22,6 +24,7 @@ function parseLinhaApropriacao(linha) {
 }
 
 export default function GestaoApropriacoes() {
+  const { user } = useAuth();
   const [obras, setObras] = useState([]);
   const [obraSelecionada, setObraSelecionada] = useState('');
   const [apropriacoes, setApropriacoes] = useState([]);
@@ -32,6 +35,7 @@ export default function GestaoApropriacoes() {
   const [descricao, setDescricao] = useState('');
   const [textoMassa, setTextoMassa] = useState('');
   const [selecionados, setSelecionados] = useState([]);
+  const isSuperadmin = String(user?.perfil || '').trim().toUpperCase() === 'SUPERADMIN';
 
   useEffect(() => {
     (async () => {
@@ -192,6 +196,15 @@ export default function GestaoApropriacoes() {
     }
   }
 
+  async function handleBaixarModelo() {
+    try {
+      await baixarModeloApropriacoes();
+    } catch (error) {
+      console.error(error);
+      alert(error.message || 'Erro ao baixar modelo de apropriacoes');
+    }
+  }
+
   return (
     <div className="page solicitacoes-page">
       <div>
@@ -244,8 +257,16 @@ export default function GestaoApropriacoes() {
       </div>
 
       <div className="card">
-        <div className="card-header">
-          <h2 className="font-semibold">Importacao em massa</h2>
+        <div className="card-header flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="font-semibold">Importacao em massa</h2>
+            <p className="text-sm text-[var(--c-muted)]">Baixe o modelo Excel para orientar o preenchimento das apropriacoes da obra.</p>
+          </div>
+          {isSuperadmin && (
+            <button type="button" className="btn btn-outline" onClick={handleBaixarModelo}>
+              Baixar modelo Excel
+            </button>
+          )}
         </div>
         <textarea
           className="input min-h-[140px]"
