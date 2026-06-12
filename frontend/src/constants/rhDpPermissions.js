@@ -54,27 +54,6 @@ export const RH_DP_PERMISSION_GROUPS = [
         description: 'Permite acessar fechamentos e titulos gerados no financeiro.'
       }
     ]
-  },
-  {
-    key: 'integracao_sienge',
-    label: 'Integracao SIENGE',
-    permissions: [
-      {
-        key: 'integracao_sienge_view',
-        label: 'Ver fila e logs do SIENGE',
-        description: 'Permite consultar status, fila, prontidao e logs.'
-      },
-      {
-        key: 'integracao_sienge_retry',
-        label: 'Operar fila do SIENGE',
-        description: 'Permite enviar titulos e reprocessar falhas.'
-      },
-      {
-        key: 'integracao_sienge_config_manage',
-        label: 'Configurar integracao SIENGE',
-        description: 'Permite editar endpoint, defaults e parametros da integracao.'
-      }
-    ]
   }
 ];
 

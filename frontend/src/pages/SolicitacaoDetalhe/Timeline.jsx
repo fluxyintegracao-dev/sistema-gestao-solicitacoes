@@ -116,7 +116,7 @@ export default function Timeline({ historicos, canRemoveAnexo = false, onAnexoRe
           }
 
           const acaoLabel = {
-            NUMERO_PEDIDO_ATUALIZADO: 'No SIENGE atualizado',
+            NUMERO_PEDIDO_ATUALIZADO: 'Número do pedido atualizado',
             PEDIDO_COMPRA_GERADO: 'Pedido de compra gerado',
             PEDIDO_COMPRA_STATUS_ALTERADO: 'Status do pedido de compra alterado',
             PEDIDO_COMPRA_ENCERRADO: 'Pedido de compra encerrado/cancelado'

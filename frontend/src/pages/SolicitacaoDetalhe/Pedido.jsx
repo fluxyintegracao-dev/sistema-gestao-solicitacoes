@@ -6,7 +6,7 @@ export default function Pedido({ solicitacaoId, numeroPedido, onSucesso }) {
   const [loading, setLoading] = useState(false);
 
   async function salvar() {
-    if (!confirm('Confirmar envio do No SIENGE?')) return;
+    if (!confirm('Confirmar envio do número do pedido?')) return;
 
     try {
       setLoading(true);
@@ -17,14 +17,14 @@ export default function Pedido({ solicitacaoId, numeroPedido, onSucesso }) {
       });
 
       if (!res.ok) {
-        throw new Error('Erro ao atualizar No SIENGE da solicitacao');
+        throw new Error('Erro ao atualizar número do pedido da solicitacao');
       }
 
       onSucesso?.();
-      alert('No SIENGE registrado com sucesso.');
+      alert('Número do pedido registrado com sucesso.');
     } catch (error) {
       console.error(error);
-      alert('Erro ao salvar No SIENGE');
+      alert('Erro ao salvar número do pedido');
     } finally {
       setLoading(false);
     }
@@ -32,10 +32,10 @@ export default function Pedido({ solicitacaoId, numeroPedido, onSucesso }) {
 
   return (
     <div className="sol-detail-card space-y-3">
-      <h2 className="sol-detail-card-title">No no SIENGE</h2>
+      <h2 className="sol-detail-card-title">Número do pedido</h2>
       <input
         className="input"
-        placeholder="Informe o No no SIENGE"
+        placeholder="Informe o número do pedido"
         value={valor}
         onChange={e => setValor(e.target.value)}
       />

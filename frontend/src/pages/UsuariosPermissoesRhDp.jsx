@@ -132,10 +132,10 @@ export default function UsuariosPermissoesRhDp() {
   return (
     <div className="page solicitacoes-page rhdp-page space-y-6">
       <div>
-        <h1 className="page-title">Permissoes RH/DP e SIENGE por usuario</h1>
+        <h1 className="page-title">Permissoes RH/DP por usuario</h1>
         <p className="page-subtitle mt-1">
           Monte usuarios de RH e contabilidade sem criar perfil hardcoded novo. O `ADMINISTRADOR` define exatamente
-          quais areas do RH/DP e da Integracao SIENGE cada usuario pode operar.
+          quais areas do RH/DP cada usuario pode operar.
         </p>
       </div>
 

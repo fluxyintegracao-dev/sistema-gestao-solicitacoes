@@ -30,7 +30,6 @@ import {
   canViewComercialEmpreendimentos,
   canViewProvisionamentos,
   canViewProvisionamentosDashboard,
-  canViewIntegracaoSienge,
   canViewRhDpApuracao,
   canViewRhDpColaboradores,
   canViewRhDpDocumentos,
@@ -170,7 +169,6 @@ const RhDpImportacoes = lazy(() => import('./pages/RhDpImportacoes'));
 const RhDpApuracao = lazy(() => import('./pages/RhDpApuracao'));
 const RhDpFechamentos = lazy(() => import('./pages/RhDpFechamentos'));
 const RhDpRelatorioOperacional = lazy(() => import('./pages/RhDpRelatorioOperacional'));
-const IntegracaoSiengeInicio = lazy(() => import('./pages/IntegracaoSiengeInicio'));
 const SolicitacoesCompra = lazy(() => import('./modules/solicitacao-compra/pages/SolicitacoesCompra'));
 const CotacaoFornecedorPublica = lazy(() => import('./modules/solicitacao-compra/pages/CotacaoFornecedorPublica'));
 const SolicitacaoCompraDetalhe = lazy(() => import('./modules/solicitacao-compra/pages/SolicitacaoCompraDetalheView'));
@@ -635,13 +633,6 @@ function RhDpFinanceiroRoute({ children }) {
   return children;
 }
 
-function IntegracaoSiengeRoute({ children }) {
-  const { user } = useAuth();
-  if (!canViewIntegracaoSienge(user)) {
-    return <Navigate to="/" replace />;
-  }
-  return children;
-}
 
 export default function App() {
   return (
@@ -784,7 +775,6 @@ export default function App() {
         <Route path="rh-dp/importacoes" element={<RhDpImportacoesRoute><RhDpImportacoes /></RhDpImportacoesRoute>} />
         <Route path="rh-dp/apuracao" element={<RhDpApuracaoRoute><RhDpApuracao /></RhDpApuracaoRoute>} />
         <Route path="rh-dp/fechamentos" element={<RhDpFinanceiroRoute><RhDpFechamentos /></RhDpFinanceiroRoute>} />
-        <Route path="integracao-sienge" element={<IntegracaoSiengeRoute><IntegracaoSiengeInicio /></IntegracaoSiengeRoute>} />
         <Route path="sst" element={<SstDashboardRoute><SstDashboard /></SstDashboardRoute>} />
         <Route path="sst/relatorios" element={<SstDashboardRoute><ModuloRelatorios modulo="sst" /></SstDashboardRoute>} />
         <Route path="sst/relatorios/operacional" element={<SstDashboardRoute><SstRelatorioOperacional /></SstDashboardRoute>} />

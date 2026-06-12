@@ -87,7 +87,7 @@ export default function RhDpInicio() {
         ) : financeiroHabilitado ? null : (
           <EtapaCard
             titulo="Proximos blocos"
-            href="/integracao-sienge"
+            href="/rh-dp"
             descricao="Fechamento com geracao de titulos depende do modulo FINANCEIRO habilitado na instalacao."
           />
         )}

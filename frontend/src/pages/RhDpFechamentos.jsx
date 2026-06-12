@@ -1,10 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import {
-  criarIntegracaoSiengeFila,
-  reprocessarIntegracaoSiengeFila
-} from '../services/integracaoSienge';
 import { getObras } from '../services/obras';
 import {
   getRhEmpresasGrupo,
@@ -13,8 +9,6 @@ import {
   reabrirRhFechamento
 } from '../services/rhDp';
 import {
-  canRetryIntegracaoSienge,
-  canViewIntegracaoSienge,
   canReopenRhDpFechamento
 } from '../utils/acessoProduto';
 
@@ -45,26 +39,6 @@ function statusClass(status) {
   return 'app-status-pill bg-slate-100 text-slate-700';
 }
 
-function queueStatusClass(status) {
-  const normalized = String(status || '').trim().toUpperCase();
-  if (normalized === 'SUCESSO') {
-    return 'app-status-pill bg-emerald-100 text-emerald-700';
-  }
-  if (normalized === 'ERRO') {
-    return 'app-status-pill bg-rose-100 text-rose-700';
-  }
-  if (normalized === 'PROCESSANDO') {
-    return 'app-status-pill bg-amber-100 text-amber-700';
-  }
-  return 'app-status-pill bg-slate-100 text-slate-700';
-}
-
-function canQueueTituloSienge(titulo) {
-  const tipo = String(titulo?.tipo || '').trim().toUpperCase();
-  const status = String(titulo?.status || '').trim().toUpperCase();
-  return tipo === 'PAGAR' && ['ABERTO', 'PARCIAL'].includes(status);
-}
-
 export default function RhDpFechamentos() {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -75,7 +49,6 @@ export default function RhDpFechamentos() {
   const [carregandoBase, setCarregandoBase] = useState(false);
   const [carregandoLista, setCarregandoLista] = useState(false);
   const [carregandoDetalhe, setCarregandoDetalhe] = useState(false);
-  const [processandoSiengeKey, setProcessandoSiengeKey] = useState('');
   const [reabrindo, setReabrindo] = useState(false);
   const [filtros, setFiltros] = useState({
     competencia: searchParams.get('competencia') || '',
@@ -186,48 +159,7 @@ export default function RhDpFechamentos() {
     );
   }, [fechamentos]);
 
-  const podeVerIntegracaoSienge = canViewIntegracaoSienge(user);
-  const podeOperarIntegracaoSienge = canRetryIntegracaoSienge(user);
   const podeReabrirFechamento = canReopenRhDpFechamento(user);
-
-  async function enviarTituloParaSienge(tituloId) {
-    try {
-      setProcessandoSiengeKey(`titulo-${Number(tituloId)}`);
-      await criarIntegracaoSiengeFila({
-        titulo_financeiro_id: Number(tituloId),
-        origem_modulo: 'RH_DP',
-        processar_agora: true,
-        forcar_recriar_payload: false
-      });
-      if (detalhe?.id) {
-        await abrirFechamento(detalhe.id);
-      }
-      alert('Titulo do fechamento enviado para a fila SIENGE.');
-    } catch (error) {
-      console.error(error);
-      alert(error?.message || 'Erro ao enviar titulo do fechamento para o SIENGE');
-    } finally {
-      setProcessandoSiengeKey('');
-    }
-  }
-
-  async function reprocessarTituloNoSienge(filaId) {
-    try {
-      setProcessandoSiengeKey(`fila-${Number(filaId)}`);
-      await reprocessarIntegracaoSiengeFila(filaId, {
-        forcar_recriar_payload: true
-      });
-      if (detalhe?.id) {
-        await abrirFechamento(detalhe.id);
-      }
-      alert('Item da fila SIENGE reprocessado a partir do fechamento RH/DP.');
-    } catch (error) {
-      console.error(error);
-      alert(error?.message || 'Erro ao reprocessar item da fila SIENGE');
-    } finally {
-      setProcessandoSiengeKey('');
-    }
-  }
 
   async function reabrirFechamentoAtual() {
     if (!detalhe?.id || !podeReabrirFechamento) {
@@ -274,11 +206,6 @@ export default function RhDpFechamentos() {
             <Link to="/rh-dp/apuracao" className="btn btn-outline">
               Apuracao
             </Link>
-            {podeVerIntegracaoSienge ? (
-              <Link to="/integracao-sienge" className="btn btn-outline">
-                Gateway SIENGE
-              </Link>
-            ) : null}
           </div>
         </div>
       </div>
@@ -478,14 +405,8 @@ export default function RhDpFechamentos() {
                         <th className="px-3 py-2 font-medium">Titulo</th>
                         <th className="px-3 py-2 font-medium">Parceiro</th>
                         <th className="px-3 py-2 font-medium">Obra</th>
-                        {podeVerIntegracaoSienge ? (
-                          <th className="px-3 py-2 font-medium">SIENGE</th>
-                        ) : null}
                         <th className="px-3 py-2 font-medium">Valor</th>
                         <th className="px-3 py-2 font-medium">Vencimento</th>
-                        {podeVerIntegracaoSienge ? (
-                          <th className="px-3 py-2 font-medium">Enviar ao SIENGE</th>
-                        ) : null}
                       </tr>
                     </thead>
                     <tbody>
@@ -507,63 +428,8 @@ export default function RhDpFechamentos() {
                           </td>
                           <td className="px-3 py-3">{item.tituloFinanceiro?.parceiro?.nome || '-'}</td>
                           <td className="px-3 py-3">{item.tituloFinanceiro?.obra?.nome || '-'}</td>
-                          {podeVerIntegracaoSienge ? (
-                            <td className="px-3 py-3 whitespace-nowrap">
-                              {item.tituloFinanceiro?.integracaoSienge ? (
-                                <div>
-                                  <span className={queueStatusClass(item.tituloFinanceiro.integracaoSienge.status)}>
-                                    {item.tituloFinanceiro.integracaoSienge.status}
-                                  </span>
-                                  <div className="mt-1 text-[10px] text-slate-500">
-                                    {item.tituloFinanceiro.integracaoSienge.external_title_id
-                                      ? `Externo: ${item.tituloFinanceiro.integracaoSienge.external_title_id}`
-                                      : `Tentativas: ${item.tituloFinanceiro.integracaoSienge.tentativas || 0}`}
-                                  </div>
-                                </div>
-                              ) : canQueueTituloSienge(item.tituloFinanceiro) ? (
-                                <span className="app-status-pill bg-slate-100 text-slate-700">NAO ENVIADO</span>
-                              ) : (
-                                <span className="text-slate-400">-</span>
-                              )}
-                            </td>
-                          ) : null}
                           <td className="px-3 py-3">{formatCurrency(item.valor_gerado || item.itemApuracao?.valor_liquido)}</td>
                           <td className="px-3 py-3">{formatDate(item.tituloFinanceiro?.data_vencimento)}</td>
-                          {podeVerIntegracaoSienge ? (
-                            <td className="px-3 py-3 whitespace-nowrap">
-                              {canQueueTituloSienge(item.tituloFinanceiro) ? (
-                                item.tituloFinanceiro?.integracaoSienge ? (
-                                  <button
-                                    type="button"
-                                    className="btn btn-outline btn-sm"
-                                    disabled={
-                                      !podeOperarIntegracaoSienge ||
-                                      processandoSiengeKey === `fila-${item.tituloFinanceiro.integracaoSienge.id}` ||
-                                      String(item.tituloFinanceiro.integracaoSienge.status || '').toUpperCase() === 'PROCESSANDO'
-                                    }
-                                    onClick={() => reprocessarTituloNoSienge(item.tituloFinanceiro.integracaoSienge.id)}
-                                  >
-                                    {processandoSiengeKey === `fila-${item.tituloFinanceiro.integracaoSienge.id}`
-                                      ? 'Processando...'
-                                      : 'Reprocessar'}
-                                  </button>
-                                ) : (
-                                  <button
-                                    type="button"
-                                    className="btn btn-outline btn-sm"
-                                    disabled={!podeOperarIntegracaoSienge || processandoSiengeKey === `titulo-${item.tituloFinanceiro?.id}`}
-                                    onClick={() => enviarTituloParaSienge(item.tituloFinanceiro.id)}
-                                  >
-                                    {processandoSiengeKey === `titulo-${item.tituloFinanceiro?.id}`
-                                      ? 'Enviando...'
-                                      : 'Enviar'}
-                                  </button>
-                                )
-                              ) : (
-                                <span className="text-slate-400">Sem acao</span>
-                              )}
-                            </td>
-                          ) : null}
                         </tr>
                       ))}
                     </tbody>

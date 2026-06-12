@@ -4,7 +4,7 @@ import { HiAdjustmentsHorizontal, HiChevronDown, HiChevronUp, HiEye, HiEyeSlash 
 
 const FILTROS_DISPONIVEIS = [
   { id: 'codigo', label: 'Codigo da solicitacao' },
-  { id: 'numero_sienge', label: 'Numero SIENGE' },
+  { id: 'numero_sienge', label: 'Numero do pedido' },
   { id: 'obra_ids', label: 'Obra' },
   { id: 'area', label: 'Setor' },
   { id: 'tipo_solicitacao_id', label: 'Tipo de solicitacao' },
@@ -446,7 +446,7 @@ export default function Filtros({
 
           {isFiltroVisivel('numero_sienge') && (
             <div className="sol-filter-field">
-              <label className="sol-filter-label">Número SIENGE</label>
+              <label className="sol-filter-label">Número do pedido</label>
               <input
                 name="numero_sienge"
                 placeholder="Ex: 12345"

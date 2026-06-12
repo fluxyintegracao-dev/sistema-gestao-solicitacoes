@@ -653,7 +653,6 @@ export default function PedidoCompraDetalhe() {
                 <div className="text-[var(--c-muted)]">Solicitacao</div>
                 <div className="font-semibold">
                   SC-{String(pedido.solicitacao_compra_id).padStart(5, '0')}
-                  {pedido.solicitacao?.numero_sienge ? ` - ${pedido.solicitacao.numero_sienge}` : ''}
                 </div>
               </div>
               <div>

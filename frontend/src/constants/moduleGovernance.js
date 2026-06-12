@@ -73,7 +73,7 @@ export const MODULE_GOVERNANCE = [
     label: 'Financeiro',
     packageLabel: 'Pacote Financeiro',
     role: 'Financeiro central',
-    dependency: 'Módulo financeiro deve funcionar sem Comercial. Integra opcionalmente com Obras, Boletos, Provisões, RH/DP e SIENGE.',
+    dependency: 'Módulo financeiro deve funcionar sem Comercial. Integra opcionalmente com Obras, Boletos, Provisões e RH/DP.',
     usedIn: ['Títulos Financeiros', 'Comprovantes', 'Relatórios Financeiros', 'Conciliação OFX', 'Cadastros Financeiros'],
     disabledEffect: 'Oculta rotas financeiras e desativa automaticamente add-ons que dependem de Financeiro, como Boletos e Provisões.',
     permissionsEffect: 'Permissões de Financeiro controlam visualização, criação, baixa, estorno, conciliação, comprovantes e cadastros.'
@@ -150,18 +150,6 @@ export const MODULE_GOVERNANCE = [
     usedIn: ['Visão do Módulo RH/DP', 'Empresas do Grupo', 'Colaboradores', 'Documentos', 'Importações', 'Apuração', 'Fechamentos'],
     disabledEffect: 'Oculta o menu RH/DP e bloqueia endpoints do RH/DP.',
     permissionsEffect: 'Permissões de RH/DP controlam dashboard, colaboradores, documentos, importações, apuração e fechamento.'
-  },
-  {
-    key: 'INTEGRACAO_SIENGE',
-    label: 'Integração SIENGE',
-    packageLabel: 'Add-on SIENGE',
-    role: 'Gateway técnico',
-    dependency: 'Requer pelo menos um módulo origem ativo: Financeiro, RH/DP ou Comercial. Por padrão, ativa junto do Financeiro.',
-    requiresAny: ['FINANCEIRO', 'RH_DP', 'COMERCIAL'],
-    defaultRequiredModule: 'FINANCEIRO',
-    usedIn: ['Integração SIENGE', 'Fila SIENGE', 'Logs SIENGE'],
-    disabledEffect: 'Oculta a tela de integração e bloqueia endpoints do SIENGE.',
-    permissionsEffect: 'Permissões de Integração SIENGE controlam visualizar, reprocessar e configurar.'
   }
 ];
 

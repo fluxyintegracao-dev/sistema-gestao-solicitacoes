@@ -15,15 +15,6 @@ const RH_DP_PERMISSION_GROUPS = [
       'rh_dp_fechamento_reopen',
       'rh_dp_obrigacoes_view'
     ]
-  },
-  {
-    key: 'integracao_sienge',
-    label: 'Integracao SIENGE',
-    permissions: [
-      'integracao_sienge_view',
-      'integracao_sienge_retry',
-      'integracao_sienge_config_manage'
-    ]
   }
 ];
 

@@ -256,7 +256,7 @@ export default function LinhaSolicitacao({
 
         {mostrarColuna('numero_sienge') && (
           <td
-            {...tdBase('Nº SIENGE', 'p-2 whitespace-nowrap truncate')}
+            {...tdBase('Nº pedido', 'p-2 whitespace-nowrap truncate')}
             title={solicitacao.numero_sienge || solicitacao.numero_pedido || ''}
           >
             {limitarTexto(solicitacao.numero_sienge || solicitacao.numero_pedido, 15) || '-'}

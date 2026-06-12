@@ -193,6 +193,7 @@ const {
     canAccessPagamentos,
     canAccessProvisoes,
     canApprovePagamentos,
+    canRejectPagamentos,
     canAuditPaymentBeneficiaries,
     canAuditPagamentos,
     canConfigurePagamentos,
@@ -517,6 +518,11 @@ const allowPagamentosApprove = allowPaymentAction(
   'FINANCEIRO_PAGAMENTOS_APPROVE',
   canApprovePagamentos,
   'Acesso negado para aprovar pagamentos bancarios'
+);
+const allowPagamentosReject = allowPaymentAction(
+  'FINANCEIRO_PAGAMENTOS_REJECT',
+  canRejectPagamentos,
+  'Acesso negado para rejeitar pagamentos bancarios'
 );
 const allowPagamentosSend = allowPaymentAction(
   'FINANCEIRO_PAGAMENTOS_SEND',
@@ -1226,7 +1232,7 @@ router.get('/financeiro/pagamentos/lotes', allowPagamentosRead, PaymentControlle
 router.get('/financeiro/pagamentos/lotes/:id', allowPagamentosRead, validateRequest({ params: validateNumericIdParam('id', 'Lote de pagamento') }), PaymentController.loteDetalhe);
 router.post('/financeiro/pagamentos/lotes/:id/submeter-aprovacao', allowPagamentosPrepare, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Lote de pagamento') }), PaymentController.submeterAprovacao);
 router.post('/financeiro/pagamentos/lotes/:id/aprovar', allowPagamentosApprove, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Lote de pagamento'), body: validatePaymentMfaBody }), PaymentController.aprovarLote);
-router.post('/financeiro/pagamentos/lotes/:id/rejeitar', allowPagamentosApprove, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Lote de pagamento'), body: validatePaymentRejectBody }), PaymentController.rejeitarLote);
+router.post('/financeiro/pagamentos/lotes/:id/rejeitar', allowPagamentosReject, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Lote de pagamento'), body: validatePaymentRejectBody }), PaymentController.rejeitarLote);
 router.post('/financeiro/pagamentos/lotes/:id/cancelar', allowPagamentosCancel, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Lote de pagamento'), body: validatePaymentCancelBody }), PaymentController.cancelarLote);
 router.post('/financeiro/pagamentos/lotes/:id/enviar-banco', allowPagamentosSend, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Lote de pagamento'), body: validatePaymentMfaBody }), PaymentController.enviarBanco);
 router.post('/financeiro/pagamentos/lotes/:id/enviar-bb', allowPagamentosSend, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Lote de pagamento'), body: validatePaymentMfaBody }), PaymentController.enviarBbSandbox);

@@ -647,8 +647,7 @@ export default function ObraGestao() {
                         <div className="mt-1 text-sm font-semibold uppercase" style={{ color: 'var(--c-text)' }}>{item.status}</div>
                       </div>
                       <div className="text-right text-xs" style={{ color: 'var(--c-text)' }}>
-                        <div>Sienge: {item.numero_sienge ? <span className="font-semibold obra-accent-blue">{item.numero_sienge}</span> : '-'}</div>
-                        <div className="mt-1">Criado em: {formatDate(item.createdAt)}</div>
+                        <div>Criado em: {formatDate(item.createdAt)}</div>
                       </div>
                     </div>
                   </div>

@@ -22,7 +22,6 @@ import {
 import { getMinhasObras } from '../services/obras';
 import { buscarParceiros } from '../services/parceiros';
 import { getEmpresasGrupo } from '../services/empresasGrupo';
-import { canViewIntegracaoSienge } from '../utils/acessoProduto';
 import { normalizeCurrencyTyping } from '../utils/formatters';
 import ParceiroAutocomplete from '../components/ui/ParceiroAutocomplete';
 
@@ -122,14 +121,6 @@ function statusClass(status) {
   if (normalized === 'QUITADO') return 'app-status-pill bg-emerald-100 text-emerald-700';
   if (normalized === 'PARCIAL') return 'app-status-pill bg-amber-100 text-amber-700';
   if (normalized === 'CANCELADO' || normalized === 'ESTORNADO') return 'app-status-pill bg-rose-100 text-rose-700';
-  return 'app-status-pill bg-slate-100 text-slate-700';
-}
-
-function queueStatusClass(status) {
-  const normalized = String(status || '').trim().toUpperCase();
-  if (normalized === 'SUCESSO') return 'app-status-pill bg-emerald-100 text-emerald-700';
-  if (normalized === 'ERRO') return 'app-status-pill bg-rose-100 text-rose-700';
-  if (normalized === 'PROCESSANDO') return 'app-status-pill bg-amber-100 text-amber-700';
   return 'app-status-pill bg-slate-100 text-slate-700';
 }
 
@@ -333,8 +324,7 @@ export default function FinanceiroTitulos() {
     quantidadeVencida: 0
   }), [titulos]);
 
-  const mostraColunaSienge = canViewIntegracaoSienge(user);
-  const totalColunas = mostraColunaSienge ? 15 : 14;
+  const totalColunas = 14;
   const hasConsulted = Boolean(appliedFilters);
   const visibleFilterSet = useMemo(() => new Set(visibleFilterIds), [visibleFilterIds]);
   const basicVisibleFilters = useMemo(
@@ -975,7 +965,6 @@ export default function FinanceiroTitulos() {
                   'Obra',
                   'Categoria',
                   'Origem',
-                  ...(mostraColunaSienge ? ['SIENGE'] : []),
                   'Emissao',
                   'Vencimento',
                   'Valor total',
@@ -1081,26 +1070,6 @@ export default function FinanceiroTitulos() {
                       getOrigemTitulo(titulo)
                     )}
                   </td>
-                  {mostraColunaSienge ? (
-                    <td className="px-3 py-2 whitespace-nowrap">
-                      {String(titulo.tipo || '').trim().toUpperCase() !== 'PAGAR' ? (
-                        <span className="text-[var(--c-muted)]">-</span>
-                      ) : titulo.integracaoSienge ? (
-                        <div>
-                          <span className={queueStatusClass(titulo.integracaoSienge.status)}>
-                            {titulo.integracaoSienge.status}
-                          </span>
-                          <div className="mt-1 text-[10px] text-[var(--c-muted)]">
-                            {titulo.integracaoSienge.external_title_id
-                              ? `Externo: ${titulo.integracaoSienge.external_title_id}`
-                              : `Tentativas: ${titulo.integracaoSienge.tentativas || 0}`}
-                          </div>
-                        </div>
-                      ) : (
-                        <span className="app-status-pill bg-slate-100 text-slate-700">NAO ENVIADO</span>
-                      )}
-                    </td>
-                  ) : null}
                   <td className="px-3 py-2 whitespace-nowrap text-[var(--c-muted)]">{formatDate(titulo.data_emissao)}</td>
                   <td className={`px-3 py-2 whitespace-nowrap ${isOverdue(titulo) ? 'font-semibold text-rose-600' : 'text-[var(--c-text)]'}`}>
                     {formatDate(titulo.data_vencimento)}

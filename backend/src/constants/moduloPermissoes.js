@@ -176,7 +176,8 @@ const MODULO_PERMISSION_GROUPS = [
         permissoes: [
           { key: 'financeiro.pagamentos.visualizar', label: 'Visualizar pagamentos', descricao: 'Ver lotes, intents e status bancario.' },
           { key: 'financeiro.pagamentos.preparar', label: 'Preparar lotes', descricao: 'Selecionar titulos elegiveis e criar lotes de pagamento.' },
-          { key: 'financeiro.pagamentos.aprovar', label: 'Aprovar lotes', descricao: 'Aprovar ou rejeitar lotes conforme alcada.' },
+          { key: 'financeiro.pagamentos.aprovar', label: 'Aprovar lotes', descricao: 'Aprovar lotes conforme alcada.' },
+          { key: 'financeiro.pagamentos.rejeitar', label: 'Rejeitar lotes', descricao: 'Rejeitar lotes antes do envio bancario.' },
           { key: 'financeiro.pagamentos.enviar_banco', label: 'Enviar ao banco', descricao: 'Enviar lote aprovado para o provider bancario.' },
           { key: 'financeiro.pagamentos.cancelar', label: 'Cancelar pagamentos', descricao: 'Cancelar lotes ou itens antes do envio definitivo.' },
           { key: 'financeiro.pagamentos.reprocessar', label: 'Reprocessar falhas', descricao: 'Reprocessar jobs ou retornos elegiveis.' },
@@ -454,22 +455,6 @@ const MODULO_PERMISSION_GROUPS = [
         label: 'Relatórios RH/DP',
         permissoes: [
           { key: 'rh_dp.relatorios.visualizar', label: 'Visualizar relatórios', descricao: 'Acessar relatórios operacionais de colaboradores, documentos e apurações.' }
-        ]
-      }
-    ]
-  },
-  {
-    modulo: 'INTEGRACAO_SIENGE',
-    label: 'Integracao SIENGE',
-    descricao: 'Fila, logs, reprocessamentos, credores e configuracao da integracao SIENGE.',
-    areas: [
-      {
-        key: 'integracao_sienge.geral',
-        label: 'Operacao SIENGE',
-        permissoes: [
-          { key: 'integracao_sienge.geral.visualizar', label: 'Visualizar fila e logs', descricao: 'Consultar status, fila, saude, prontidao e logs.' },
-          { key: 'integracao_sienge.geral.reprocessar', label: 'Operar fila', descricao: 'Enviar titulos, buscar credores e reprocessar falhas.' },
-          { key: 'integracao_sienge.geral.configurar', label: 'Configurar integracao', descricao: 'Editar endpoint, defaults, credores e parametros da integracao.' }
         ]
       }
     ]

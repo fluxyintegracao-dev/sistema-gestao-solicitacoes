@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
 import {
   atualizarCobrancaTituloFinanceiro,
   baixarTituloFinanceiro,
@@ -10,14 +9,6 @@ import {
   getTituloFinanceiroAuditoria,
   getTituloFinanceiroById
 } from '../services/financeiro';
-import {
-  criarIntegracaoSiengeFila,
-  reprocessarIntegracaoSiengeFila
-} from '../services/integracaoSienge';
-import {
-  canRetryIntegracaoSienge,
-  canViewIntegracaoSienge
-} from '../utils/acessoProduto';
 import { getEmpresasGrupo } from '../services/empresasGrupo';
 import { formatCurrencyInput, normalizeCurrencyTyping } from '../utils/formatters';
 
@@ -171,26 +162,12 @@ function auditStatusClass(status) {
   return 'bg-slate-100 text-slate-700';
 }
 
-function queueStatusClass(status) {
-  const normalized = String(status || '').trim().toUpperCase();
-  if (normalized === 'SUCESSO') return 'bg-emerald-100 text-emerald-700';
-  if (normalized === 'ERRO') return 'bg-rose-100 text-rose-700';
-  if (normalized === 'PROCESSANDO') return 'bg-amber-100 text-amber-700';
-  return 'bg-slate-100 text-slate-700';
-}
-
 function paymentStatusClass(status) {
   const normalized = String(status || '').trim().toUpperCase();
   if (['APROVADO', 'CONFIRMADO_BANCO', 'BAIXADO'].includes(normalized)) return 'bg-emerald-100 text-emerald-700';
   if (['PENDENTE_APROVACAO', 'ENVIADO_AO_BANCO', 'AGUARDANDO_CONFIRMACAO_BAIXA'].includes(normalized)) return 'bg-amber-100 text-amber-700';
   if (['REJEITADO_BANCO', 'FALHA_INTEGRACAO', 'CANCELADO'].includes(normalized)) return 'bg-rose-100 text-rose-700';
   return 'bg-slate-100 text-slate-700';
-}
-
-function canQueueTituloSienge(titulo) {
-  const tipo = String(titulo?.tipo || '').trim().toUpperCase();
-  const status = String(titulo?.status || '').trim().toUpperCase();
-  return tipo === 'PAGAR' && ['ABERTO', 'PARCIAL'].includes(status);
 }
 
 function formatAuditMetadata(metadata) {
@@ -243,7 +220,6 @@ function formatAuditMetadata(metadata) {
 
 export default function FinanceiroTituloDetalhe() {
   const { id } = useParams();
-  const { user } = useAuth();
   const [titulo, setTitulo] = useState(null);
   const [contasBancarias, setContasBancarias] = useState([]);
   const [cartoes, setCartoes] = useState([]);
@@ -258,7 +234,6 @@ export default function FinanceiroTituloDetalhe() {
   const [savingBaixa, setSavingBaixa] = useState(false);
   const [estornandoId, setEstornandoId] = useState(null);
   const [corrigindoMovimentoId, setCorrigindoMovimentoId] = useState(null);
-  const [savingIntegracaoSienge, setSavingIntegracaoSienge] = useState(false);
 
   async function carregar() {
     try {
@@ -326,12 +301,6 @@ export default function FinanceiroTituloDetalhe() {
   const baixaUsaCartao = isCartaoForma(baixaForm.forma_recebimento);
   const baixaCartaoDebito = baixaUsaCartao && isCartaoDebito(selectedCartaoBaixa);
 
-  const podeOperarIntegracaoSienge = useMemo(() => {
-    return canRetryIntegracaoSienge(user) && canQueueTituloSienge(titulo);
-  }, [titulo, user]);
-  const podeVerIntegracaoSienge = useMemo(() => canViewIntegracaoSienge(user), [user]);
-
-  const filaSienge = titulo?.integracaoSienge || null;
   const empresaTituloId = String(titulo?.empresa_id || '');
   const baixaEmpresaDiferente = Boolean(
     empresaTituloId &&
@@ -447,45 +416,6 @@ export default function FinanceiroTituloDetalhe() {
       setError(err?.message || 'Erro ao preparar correcao da baixa');
     } finally {
       setEstornandoId(null);
-    }
-  }
-
-  async function handlePrepararOuEnviarSienge() {
-    if (!titulo?.id) return;
-
-    try {
-      setSavingIntegracaoSienge(true);
-      setError('');
-      await criarIntegracaoSiengeFila({
-        titulo_financeiro_id: Number(titulo.id),
-        origem_modulo: 'FINANCEIRO',
-        processar_agora: true,
-        forcar_recriar_payload: false
-      });
-      await carregar();
-      alert('Titulo enviado para a fila da Integracao SIENGE.');
-    } catch (err) {
-      setError(err?.message || 'Erro ao enviar titulo para a Integracao SIENGE');
-    } finally {
-      setSavingIntegracaoSienge(false);
-    }
-  }
-
-  async function handleReprocessarSienge() {
-    if (!filaSienge?.id) return;
-
-    try {
-      setSavingIntegracaoSienge(true);
-      setError('');
-      await reprocessarIntegracaoSiengeFila(filaSienge.id, {
-        forcar_recriar_payload: true
-      });
-      await carregar();
-      alert('Item da fila SIENGE reprocessado com sucesso.');
-    } catch (err) {
-      setError(err?.message || 'Erro ao reprocessar item da fila SIENGE');
-    } finally {
-      setSavingIntegracaoSienge(false);
     }
   }
 
@@ -664,88 +594,6 @@ export default function FinanceiroTituloDetalhe() {
             </div>
           </div>
         </div>
-
-        {podeVerIntegracaoSienge && (
-          <div className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4 space-y-4">
-            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-              <div>
-                <h2 className="text-lg font-semibold text-[var(--c-text)]">Integracao SIENGE</h2>
-                <p className="text-sm text-[var(--c-muted)]">
-                  O gateway tecnico trabalha sempre sobre este titulo central do financeiro.
-                </p>
-              </div>
-              <div className="app-page-actions">
-                <Link to="/integracao-sienge" className="btn btn-outline">
-                  Abrir gateway
-                </Link>
-                {podeOperarIntegracaoSienge && !filaSienge && (
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    onClick={handlePrepararOuEnviarSienge}
-                    disabled={savingIntegracaoSienge}
-                  >
-                    {savingIntegracaoSienge ? 'Enviando...' : 'Enviar ao SIENGE'}
-                  </button>
-                )}
-                {podeOperarIntegracaoSienge && filaSienge && (
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    onClick={handleReprocessarSienge}
-                    disabled={savingIntegracaoSienge || String(filaSienge.status || '').toUpperCase() === 'PROCESSANDO'}
-                  >
-                    {savingIntegracaoSienge ? 'Processando...' : 'Reprocessar envio'}
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {!canQueueTituloSienge(titulo) ? (
-              <div className="rounded-xl bg-[var(--c-bg)] px-3 py-4 text-sm text-[var(--c-muted)]">
-                Nesta fase, somente titulos <strong className="text-[var(--c-text)]">PAGAR</strong> com status aberto ou parcial
-                podem entrar na fila SIENGE.
-              </div>
-            ) : (
-              <div className="grid gap-3 text-sm md:grid-cols-4">
-                <div>
-                  <div className="text-[var(--c-muted)]">Status da fila</div>
-                  <div className="mt-2">
-                    {filaSienge ? (
-                      <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${queueStatusClass(filaSienge.status)}`}>
-                        {filaSienge.status}
-                      </span>
-                    ) : (
-                      <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
-                        NAO ENVIADO
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-[var(--c-muted)]">Origem</div>
-                  <div className="font-medium text-[var(--c-text)]">{filaSienge?.origem_modulo || 'FINANCEIRO'}</div>
-                </div>
-                <div>
-                  <div className="text-[var(--c-muted)]">Tentativas</div>
-                  <div className="font-medium text-[var(--c-text)]">{filaSienge?.tentativas ?? 0}</div>
-                </div>
-                <div>
-                  <div className="text-[var(--c-muted)]">Enviado em</div>
-                  <div className="font-medium text-[var(--c-text)]">{formatDateTime(filaSienge?.enviado_em)}</div>
-                </div>
-                <div className="md:col-span-2">
-                  <div className="text-[var(--c-muted)]">Titulo externo</div>
-                  <div className="font-medium break-all text-[var(--c-text)]">{filaSienge?.external_title_id || '-'}</div>
-                </div>
-                <div className="md:col-span-2">
-                  <div className="text-[var(--c-muted)]">Ultimo erro</div>
-                  <div className="font-medium whitespace-pre-wrap text-[var(--c-text)]">{filaSienge?.ultimo_erro || '-'}</div>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
 
         {titulo.tipo === 'RECEBER' && (
           <div className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4 space-y-4">

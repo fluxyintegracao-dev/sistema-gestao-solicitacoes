@@ -37,6 +37,7 @@ import {
   canCancelPagamentos,
   canConfirmarBaixaPagamento,
   canPreparePagamentos,
+  canRejectPagamentos,
   canReprocessPagamentos,
   canSendPagamentosBanco
 } from '../utils/acessoProduto';
@@ -44,7 +45,7 @@ import {
 const TABS = [
   { id: 'titulos', label: 'Titulos elegiveis' },
   { id: 'lotes', label: 'Lotes' },
-  { id: 'baixas', label: 'Confirmar baixa' },
+  { id: 'baixas', label: 'Confirmar baixa', requiresConfirmBaixa: true },
   { id: 'auditoria', label: 'Auditoria tecnica', requiresAudit: true }
 ];
 
@@ -302,6 +303,7 @@ export default function FinanceiroPagamentos() {
   const canPrepare = useMemo(() => canPreparePagamentos(user), [user]);
   const canApprove = useMemo(() => canApprovePagamentos(user), [user]);
   const canSend = useMemo(() => canSendPagamentosBanco(user), [user]);
+  const canReject = useMemo(() => canRejectPagamentos(user), [user]);
   const canAudit = useMemo(() => canAuditPagamentos(user), [user]);
   const canCancel = useMemo(() => canCancelPagamentos(user), [user]);
   const canReprocess = useMemo(() => canReprocessPagamentos(user), [user]);
@@ -313,7 +315,11 @@ export default function FinanceiroPagamentos() {
   const bbModoLabel = String(bbHealth?.env || '').toLowerCase() === 'production'
     ? 'producao BB habilitada'
     : 'homologacao BB habilitada';
-  const visibleTabs = useMemo(() => TABS.filter((tab) => !tab.requiresAudit || canAudit), [canAudit]);
+  const visibleTabs = useMemo(() => TABS.filter((tab) => {
+    if (tab.requiresAudit && !canAudit) return false;
+    if (tab.requiresConfirmBaixa && !canConfirmBaixa) return false;
+    return true;
+  }), [canAudit, canConfirmBaixa]);
 
   async function loadBase() {
     try {
@@ -404,6 +410,12 @@ export default function FinanceiroPagamentos() {
       loadPaymentEvents();
     }
   }, [activeTab, canAudit]);
+
+  useEffect(() => {
+    if (!visibleTabs.some((tab) => tab.id === activeTab)) {
+      setActiveTab(visibleTabs[0]?.id || 'lotes');
+    }
+  }, [activeTab, visibleTabs]);
 
   const selectedTotal = useMemo(() => {
     const selected = new Set(selectedIds.map(String));
@@ -827,17 +839,19 @@ export default function FinanceiroPagamentos() {
                     <input className="input w-full" type="date" min={today()} value={batchForm.data_programada} onChange={(e) => setBatchForm((c) => ({ ...c, data_programada: e.target.value }))} />
                   </label>
                 </div>
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <button type="button" className="btn btn-primary" onClick={loadTitulos} disabled={!canPrepare || actionLoading === 'titulos'}>
-                    <HiOutlineClock className="h-4 w-4" />
-                    {actionLoading === 'titulos' ? 'Buscando...' : 'Buscar elegiveis'}
-                  </button>
-                  <button type="button" className="btn btn-outline" onClick={handleCriarLote} disabled={!canPrepare || !selectedIds.length || !batchForm.payment_account_id || selectedPaymentAccountPendencies.length > 0 || selectedTitulosAccountPendencies.length > 0 || actionLoading === 'criar-lote'}>
-                    <HiOutlineBanknotes className="h-4 w-4" />
-                    {actionLoading === 'criar-lote' ? 'Gerando...' : `Gerar lote (${selectedIds.length})`}
-                  </button>
-                  <span className="app-status-pill bg-slate-100 text-slate-700">{formatCurrency(selectedTotal)}</span>
-                </div>
+                {canPrepare && (
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <button type="button" className="btn btn-primary" onClick={loadTitulos} disabled={actionLoading === 'titulos'}>
+                      <HiOutlineClock className="h-4 w-4" />
+                      {actionLoading === 'titulos' ? 'Buscando...' : 'Buscar elegiveis'}
+                    </button>
+                    <button type="button" className="btn btn-outline" onClick={handleCriarLote} disabled={!selectedIds.length || !batchForm.payment_account_id || selectedPaymentAccountPendencies.length > 0 || selectedTitulosAccountPendencies.length > 0 || actionLoading === 'criar-lote'}>
+                      <HiOutlineBanknotes className="h-4 w-4" />
+                      {actionLoading === 'criar-lote' ? 'Gerando...' : `Gerar lote (${selectedIds.length})`}
+                    </button>
+                    <span className="app-status-pill bg-slate-100 text-slate-700">{formatCurrency(selectedTotal)}</span>
+                  </div>
+                )}
                 {selectedTitulosAccountPendencies.length > 0 && (
                   <div className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
                     Remova da selecao os titulos de outra empresa antes de gerar o lote:
@@ -1004,48 +1018,60 @@ export default function FinanceiroPagamentos() {
                         onChange={(e) => setMfaCode(e.target.value)}
                       />
                       <div className="flex flex-wrap gap-2">
-                        <button type="button" className="btn btn-outline" onClick={() => runBatchAction('submeter', (id) => submeterPaymentBatch(id))} disabled={!canPrepare || selectedBatch.status !== 'RASCUNHO' || actionLoading === 'submeter'}>
-                          <HiOutlineShieldCheck className="h-4 w-4" />
-                          Submeter
-                        </button>
-                        <button type="button" className="btn btn-primary" onClick={() => runBatchAction('aprovar', (id) => aprovarPaymentBatch(id, { codigo_mfa: mfaCode }))} disabled={!canApprove || selectedBatch.status !== 'PENDENTE_APROVACAO' || !mfaCode || actionLoading === 'aprovar'}>
-                          <HiOutlineCheckCircle className="h-4 w-4" />
-                          Aprovar
-                        </button>
-                        <button type="button" className="btn btn-outline" onClick={handleRejectBatch} disabled={!canApprove || !['PENDENTE_APROVACAO', 'APROVADO'].includes(selectedBatch.status) || actionLoading === 'rejeitar'}>
-                          <HiOutlineXCircle className="h-4 w-4" />
-                          Rejeitar
-                        </button>
-                        <button type="button" className="btn btn-outline" onClick={handleCancelBatch} disabled={!canCancel || !['RASCUNHO', 'EM_REVISAO', 'PENDENTE_APROVACAO', 'APROVADO'].includes(selectedBatch.status) || actionLoading === 'cancelar'}>
-                          <HiOutlineXCircle className="h-4 w-4" />
-                          {cancelRequiresMfa ? 'Cancelar com MFA' : 'Cancelar'}
-                        </button>
-                        {!isBbSandbox && (
-                          <button type="button" className="btn btn-primary" onClick={() => runBatchAction('enviar', (id) => enviarPaymentBatchBanco(id, { codigo_mfa: mfaCode }))} disabled={!canSend || selectedBatch.status !== 'APROVADO' || !mfaCode || actionLoading === 'enviar'}>
+                        {canPrepare && (
+                          <button type="button" className="btn btn-outline" onClick={() => runBatchAction('submeter', (id) => submeterPaymentBatch(id))} disabled={selectedBatch.status !== 'RASCUNHO' || actionLoading === 'submeter'}>
+                            <HiOutlineShieldCheck className="h-4 w-4" />
+                            Submeter
+                          </button>
+                        )}
+                        {canApprove && (
+                          <button type="button" className="btn btn-primary" onClick={() => runBatchAction('aprovar', (id) => aprovarPaymentBatch(id, { codigo_mfa: mfaCode }))} disabled={selectedBatch.status !== 'PENDENTE_APROVACAO' || !mfaCode || actionLoading === 'aprovar'}>
+                            <HiOutlineCheckCircle className="h-4 w-4" />
+                            Aprovar
+                          </button>
+                        )}
+                        {canReject && (
+                          <button type="button" className="btn btn-outline" onClick={handleRejectBatch} disabled={!['PENDENTE_APROVACAO', 'APROVADO'].includes(selectedBatch.status) || actionLoading === 'rejeitar'}>
+                            <HiOutlineXCircle className="h-4 w-4" />
+                            Rejeitar
+                          </button>
+                        )}
+                        {canCancel && (
+                          <button type="button" className="btn btn-outline" onClick={handleCancelBatch} disabled={!['RASCUNHO', 'EM_REVISAO', 'PENDENTE_APROVACAO', 'APROVADO'].includes(selectedBatch.status) || actionLoading === 'cancelar'}>
+                            <HiOutlineXCircle className="h-4 w-4" />
+                            {cancelRequiresMfa ? 'Cancelar com MFA' : 'Cancelar'}
+                          </button>
+                        )}
+                        {!isBbSandbox && canSend && (
+                          <button type="button" className="btn btn-primary" onClick={() => runBatchAction('enviar', (id) => enviarPaymentBatchBanco(id, { codigo_mfa: mfaCode }))} disabled={selectedBatch.status !== 'APROVADO' || !mfaCode || actionLoading === 'enviar'}>
                             <HiOutlinePaperAirplane className="h-4 w-4" />
                             Enviar mock
                           </button>
                         )}
-                        {isBbSandbox && (
-                          <button type="button" className="btn btn-primary" onClick={() => runBatchAction('enviar-bb', (id) => enviarPaymentBatchBbSandbox(id, { codigo_mfa: mfaCode }))} disabled={!canSend || selectedBatch.status !== 'APROVADO' || !mfaCode || actionLoading === 'enviar-bb'}>
+                        {isBbSandbox && canSend && (
+                          <button type="button" className="btn btn-primary" onClick={() => runBatchAction('enviar-bb', (id) => enviarPaymentBatchBbSandbox(id, { codigo_mfa: mfaCode }))} disabled={selectedBatch.status !== 'APROVADO' || !mfaCode || actionLoading === 'enviar-bb'}>
                             <HiOutlinePaperAirplane className="h-4 w-4" />
                             Enviar ao BB
                           </button>
                         )}
-                        <button type="button" className="btn btn-outline" onClick={() => runBatchAction('sync-bb', (id) => sincronizarPaymentBatchStatusBb(id))} disabled={!canAudit || !isBbSandbox || !['ENVIADO_AO_BANCO', 'PROCESSANDO_BANCO', 'FALHA_INTEGRACAO', 'AGUARDANDO_CONFIRMACAO_BAIXA'].includes(selectedBatch.status) || actionLoading === 'sync-bb'}>
-                          <HiOutlineArrowPath className="h-4 w-4" />
-                          Sincronizar BB
-                        </button>
-                        <button type="button" className="btn btn-outline" onClick={handleReprocessBatch} disabled={!canReprocess || !['FALHA_INTEGRACAO', 'REJEITADO', 'PARCIALMENTE_REJEITADO'].includes(selectedBatch.status) || !mfaCode || actionLoading === 'reprocessar'}>
-                          <HiOutlineArrowPath className="h-4 w-4" />
-                          Reprocessar
-                        </button>
-                        {!isBbSandbox && (
+                        {canAudit && (
+                          <button type="button" className="btn btn-outline" onClick={() => runBatchAction('sync-bb', (id) => sincronizarPaymentBatchStatusBb(id))} disabled={!isBbSandbox || !['ENVIADO_AO_BANCO', 'PROCESSANDO_BANCO', 'FALHA_INTEGRACAO', 'AGUARDANDO_CONFIRMACAO_BAIXA'].includes(selectedBatch.status) || actionLoading === 'sync-bb'}>
+                            <HiOutlineArrowPath className="h-4 w-4" />
+                            Sincronizar BB
+                          </button>
+                        )}
+                        {canReprocess && (
+                          <button type="button" className="btn btn-outline" onClick={handleReprocessBatch} disabled={!['FALHA_INTEGRACAO', 'REJEITADO', 'PARCIALMENTE_REJEITADO'].includes(selectedBatch.status) || !mfaCode || actionLoading === 'reprocessar'}>
+                            <HiOutlineArrowPath className="h-4 w-4" />
+                            Reprocessar
+                          </button>
+                        )}
+                        {!isBbSandbox && canSend && (
                           <>
-                            <button type="button" className="btn btn-outline" onClick={() => handleMockBankReturn('CONFIRMADO')} disabled={!canSend || !['ENVIADO_AO_BANCO', 'PROCESSANDO_BANCO'].includes(selectedBatch.status) || !mfaCode || actionLoading === 'retorno'}>
+                            <button type="button" className="btn btn-outline" onClick={() => handleMockBankReturn('CONFIRMADO')} disabled={!['ENVIADO_AO_BANCO', 'PROCESSANDO_BANCO'].includes(selectedBatch.status) || !mfaCode || actionLoading === 'retorno'}>
                               Confirmar banco com MFA
                             </button>
-                            <button type="button" className="btn btn-outline" onClick={() => handleMockBankReturn('FALHA')} disabled={!canSend || !['ENVIADO_AO_BANCO', 'PROCESSANDO_BANCO'].includes(selectedBatch.status) || !mfaCode || actionLoading === 'falha-mock'}>
+                            <button type="button" className="btn btn-outline" onClick={() => handleMockBankReturn('FALHA')} disabled={!['ENVIADO_AO_BANCO', 'PROCESSANDO_BANCO'].includes(selectedBatch.status) || !mfaCode || actionLoading === 'falha-mock'}>
                               Falha mock com MFA
                             </button>
                           </>
@@ -1151,15 +1177,17 @@ export default function FinanceiroPagamentos() {
                             Favorecido: {intent.beneficiary?.nome || 'Favorecido pendente'} {intent.beneficiary?.pix_chave ? `- ${intent.beneficiary.pix_chave}` : ''}
                           </div>
                         </div>
-                        <button
-                          type="button"
-                          className="btn btn-primary"
-                          onClick={() => handleConfirmBaixa(intent.id)}
-                          disabled={!canConfirmBaixa || actionLoading === `baixa-${intent.id}`}
-                        >
-                          <HiOutlineCheckCircle className="h-4 w-4" />
-                          {actionLoading === `baixa-${intent.id}` ? 'Confirmando...' : 'Confirmar baixa'}
-                        </button>
+                        {canConfirmBaixa && (
+                          <button
+                            type="button"
+                            className="btn btn-primary"
+                            onClick={() => handleConfirmBaixa(intent.id)}
+                            disabled={actionLoading === `baixa-${intent.id}`}
+                          >
+                            <HiOutlineCheckCircle className="h-4 w-4" />
+                            {actionLoading === `baixa-${intent.id}` ? 'Confirmando...' : 'Confirmar baixa'}
+                          </button>
+                        )}
                       </div>
                     </div>
                   ))}

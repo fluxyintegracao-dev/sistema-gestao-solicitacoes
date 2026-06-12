@@ -231,7 +231,7 @@ const SECOES_CONFIG = [
       },
       {
         title: 'Permissoes de Areas por Usuario',
-        description: 'Configure quais areas, abas e acoes de cada modulo cada usuario pode acessar, incluindo CRM, RH/DP e Integracao SIENGE.',
+        description: 'Configure quais areas, abas e acoes de cada modulo cada usuario pode acessar, incluindo CRM, RH/DP, Financeiro e Compras.',
         to: '/permissoes-areas'
       },
       {

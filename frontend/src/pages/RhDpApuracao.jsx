@@ -441,11 +441,13 @@ export default function RhDpApuracao() {
           />
         </div>
 
-        <div className="app-page-actions">
-          <button type="submit" className="btn btn-primary" disabled={!podeEditar || gerando}>
-            {gerando ? 'Gerando apuracao...' : 'Gerar apuracao'}
-          </button>
-        </div>
+        {podeEditar ? (
+          <div className="app-page-actions">
+            <button type="submit" className="btn btn-primary" disabled={gerando}>
+              {gerando ? 'Gerando apuracao...' : 'Gerar apuracao'}
+            </button>
+          </div>
+        ) : null}
       </form>
 
       <div className="sol-surface-card solicitacoes-toolbar app-toolbar-card rounded-xl p-3 md:p-4">
@@ -875,14 +877,16 @@ export default function RhDpApuracao() {
                         />
                       </td>
                       <td className="px-3 py-3">
-                        <button
-                          type="button"
-                          className="btn btn-outline btn-sm"
-                          onClick={() => salvarItem(item.id)}
-                          disabled={!podeEditar || detalhe.status !== 'RASCUNHO' || salvandoItemId === item.id}
-                        >
-                          {salvandoItemId === item.id ? 'Salvando...' : 'Salvar ajuste'}
-                        </button>
+                        {podeEditar && detalhe.status === 'RASCUNHO' ? (
+                          <button
+                            type="button"
+                            className="btn btn-outline btn-sm"
+                            onClick={() => salvarItem(item.id)}
+                            disabled={salvandoItemId === item.id}
+                          >
+                            {salvandoItemId === item.id ? 'Salvando...' : 'Salvar ajuste'}
+                          </button>
+                        ) : null}
                       </td>
                     </tr>
                   ))}

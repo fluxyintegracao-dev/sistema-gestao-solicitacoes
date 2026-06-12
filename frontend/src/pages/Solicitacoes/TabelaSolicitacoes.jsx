@@ -54,7 +54,7 @@ export default function TabelaSolicitacoes({
       ...(selecaoHabilitada ? [{ id: 'selecionar', label: '', width: 42, min: 42, weight: 0, fixed: true }] : []),
       { id: 'data', label: 'Data', width: 110, min: 90, weight: 0.9 },
       { id: 'codigo', label: 'Código', width: 100, min: 80, weight: 0.9 },
-      { id: 'numero_sienge', label: 'Nº SIENGE', width: 120, min: 100, weight: 0.9 },
+      { id: 'numero_sienge', label: 'Nº pedido', width: 120, min: 100, weight: 0.9 },
       { id: 'obra', label: 'Obra', width: 170, min: 120, weight: 1.2 },
       ...(moduloContratosHabilitado ? [{ id: 'contrato', label: 'Contrato', width: 120, min: 95, weight: 1 }] : []),
       { id: 'descricao', label: 'Descrição', width: 110, min: 110, weight: 0, fixed: true },

@@ -42,6 +42,7 @@ const FINANCEIRO_PERMISSION_KEYS = [
   'financeiro.pagamentos.visualizar',
   'financeiro.pagamentos.preparar',
   'financeiro.pagamentos.aprovar',
+  'financeiro.pagamentos.rejeitar',
   'financeiro.pagamentos.enviar_banco',
   'financeiro.pagamentos.cancelar',
   'financeiro.pagamentos.reprocessar',
@@ -57,6 +58,7 @@ const FINANCEIRO_PAGAMENTOS_PERMISSION_KEYS = [
   'financeiro.pagamentos.visualizar',
   'financeiro.pagamentos.preparar',
   'financeiro.pagamentos.aprovar',
+  'financeiro.pagamentos.rejeitar',
   'financeiro.pagamentos.enviar_banco',
   'financeiro.pagamentos.cancelar',
   'financeiro.pagamentos.reprocessar',
@@ -938,6 +940,15 @@ async function canApprovePagamentos(user) {
   if (isBusinessAdmin(user)) return true;
   if (await userHasConfiguredAreaPermissions(user)) {
     return userHasAreaPermission(user, ['financeiro.pagamentos.aprovar']);
+  }
+
+  return userHasPaymentApprovalDirectorate(user);
+}
+
+async function canRejectPagamentos(user) {
+  if (isBusinessAdmin(user)) return true;
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, ['financeiro.pagamentos.rejeitar']);
   }
 
   return userHasPaymentApprovalDirectorate(user);
@@ -1999,6 +2010,7 @@ module.exports = {
   canCreateProvisoes,
   canCreateContratos,
   canCancelPagamentos,
+  canRejectPagamentos,
   canReprocessPagamentos,
   canExportCrmLeads,
   canGenerateBoletos,

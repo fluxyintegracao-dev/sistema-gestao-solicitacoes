@@ -108,7 +108,7 @@ export default function PedidosCompra() {
             <span className="app-filter-label">Busca geral</span>
             <input
               className="input"
-              placeholder="Fornecedor, obra, Sienge ou pedido"
+              placeholder="Fornecedor, obra ou pedido"
               value={filtros.q}
               onChange={(event) => setFiltros((atual) => ({ ...atual, q: event.target.value }))}
             />
@@ -211,7 +211,6 @@ export default function PedidosCompra() {
                       <td>{pedido.obra?.nome || '-'}</td>
                       <td>
                         SC-{String(pedido.solicitacao_compra_id || pedido.solicitacao?.id || '').padStart(5, '0')}
-                        {pedido.solicitacao?.numero_sienge ? ` - ${pedido.solicitacao.numero_sienge}` : ''}
                       </td>
                       <td>{itensAtivos}</td>
                       <td>{formatMoney(pedido.valor_total)}</td>

@@ -67,7 +67,6 @@ import {
   canExecuteRhDpImportacoes,
   canManageProvisionamentoCategorias,
   canManageSstArea,
-  canViewIntegracaoSienge,
   canViewProvisionamentos,
   canViewProvisionamentosDashboard,
   canViewRhDpApuracao,
@@ -303,7 +302,6 @@ export default function Layout() {
   const rhDpObrigacoesAccess = canViewRhDpObrigacoes(user) && financeiroModuleEnabled;
   const sstAccess = canAccessSst(user);
   const sstDashboardAccess = canViewSstDashboard(user);
-  const integracaoSiengeAccess = canViewIntegracaoSienge(user);
   const obrasAccess = canAccessCadastroObras(user);
   const contratosAccess = canAccessContratos(user);
   const bibliotecaAccess = canAccessBiblioteca(user);
@@ -526,12 +524,6 @@ export default function Layout() {
       ]);
     }
 
-    if (integracaoSiengeAccess) {
-      addGroup('Integrações', [
-        item('/integracao-sienge', 'SIENGE', HiOutlineAdjustmentsHorizontal)
-      ]);
-    }
-
     if (gestaoUsuarios || businessAdmin) {
       addGroup('Cadastros', [
         gestaoUsuarios ? item('/usuarios', 'Usuários', HiOutlineUsers) : null,
@@ -603,7 +595,6 @@ export default function Layout() {
     boletosAccess,
     financeiroModuleEnabled,
     gestaoUsuarios,
-    integracaoSiengeAccess,
     moduloBibliotecaHabilitado,
     moduloCotacoesHabilitado,
     obrasAccess,

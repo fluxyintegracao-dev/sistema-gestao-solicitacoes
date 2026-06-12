@@ -356,7 +356,7 @@ export default function Solicitacoes({ arquivadas = false }) {
     if (!item) return false;
 
     const codigo = String(item?.codigo || '');
-    const numeroSienge = String(item?.numero_sienge || item?.numero_pedido || '');
+    const numeroPedido = String(item?.numero_sienge || item?.numero_pedido || '');
     const obraId = String(item?.obra?.id ?? item?.obra_id ?? '');
     const tipoId = String(item?.tipo?.id ?? item?.tipo_solicitacao_id ?? '');
     const responsavel = String(item?.responsavel || '');
@@ -384,7 +384,7 @@ export default function Solicitacoes({ arquivadas = false }) {
       return false;
     }
 
-    if (filtros.numero_sienge && !numeroSienge.toLowerCase().includes(String(filtros.numero_sienge).trim().toLowerCase())) {
+    if (filtros.numero_sienge && !numeroPedido.toLowerCase().includes(String(filtros.numero_sienge).trim().toLowerCase())) {
       return false;
     }
 
@@ -727,7 +727,7 @@ export default function Solicitacoes({ arquivadas = false }) {
   const opcoesColunas = useMemo(() => [
     { id: 'data', label: 'Data' },
     { id: 'codigo', label: 'Código' },
-    { id: 'numero_sienge', label: 'Nº SIENGE' },
+    { id: 'numero_sienge', label: 'Nº pedido' },
     { id: 'obra', label: 'Obra' },
     ...(moduloContratosHabilitado ? [{ id: 'contrato', label: 'Contrato' }] : []),
     ...(moduloContratosHabilitado && isSetorObra ? [{ id: 'ref_contrato', label: 'Ref. do Contrato' }] : []),
@@ -933,7 +933,7 @@ export default function Solicitacoes({ arquivadas = false }) {
     const linhas = [
       [
         'Código',
-        'Nº SIENGE',
+        'Nº pedido',
         'Obra',
         ...(moduloContratosHabilitado ? ['Contrato', 'Ref. do Contrato'] : []),
         'Descrição',

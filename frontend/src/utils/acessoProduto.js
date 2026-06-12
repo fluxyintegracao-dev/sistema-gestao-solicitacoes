@@ -237,6 +237,7 @@ export function canAccessFinanceiro(user) {
       'financeiro.pagamentos.visualizar',
       'financeiro.pagamentos.preparar',
       'financeiro.pagamentos.aprovar',
+      'financeiro.pagamentos.rejeitar',
       'financeiro.pagamentos.enviar_banco',
       'financeiro.pagamentos.cancelar',
       'financeiro.pagamentos.reprocessar',
@@ -302,6 +303,7 @@ export function canAccessPagamentos(user) {
       'financeiro.pagamentos.visualizar',
       'financeiro.pagamentos.preparar',
       'financeiro.pagamentos.aprovar',
+      'financeiro.pagamentos.rejeitar',
       'financeiro.pagamentos.enviar_banco',
       'financeiro.pagamentos.cancelar',
       'financeiro.pagamentos.reprocessar',
@@ -323,6 +325,12 @@ export function canPreparePagamentos(user) {
 export function canApprovePagamentos(user) {
   if (isBusinessAdmin(user)) return true;
   if (hasConfiguredAreaPermissions(user)) return hasPermissao(user, 'financeiro.pagamentos.aprovar');
+  return userHasPaymentApprovalDirectorate(user);
+}
+
+export function canRejectPagamentos(user) {
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) return hasPermissao(user, 'financeiro.pagamentos.rejeitar');
   return userHasPaymentApprovalDirectorate(user);
 }
 
@@ -490,18 +498,6 @@ const RH_DP_LEGACY_TO_AREA = {
   rh_dp_obrigacoes_view: ['rh_dp.obrigacoes.visualizar']
 };
 
-const INTEGRACAO_SIENGE_AREA_PERMISSION_KEYS = [
-  'integracao_sienge.geral.visualizar',
-  'integracao_sienge.geral.reprocessar',
-  'integracao_sienge.geral.configurar'
-];
-
-const INTEGRACAO_SIENGE_LEGACY_TO_AREA = {
-  integracao_sienge_view: ['integracao_sienge.geral.visualizar'],
-  integracao_sienge_retry: ['integracao_sienge.geral.reprocessar'],
-  integracao_sienge_config_manage: ['integracao_sienge.geral.configurar']
-};
-
 export function canAccessRhDp(user) {
   if (!hasEnabledModule(user, 'RH_DP')) return false;
   if (isBusinessAdmin(user)) return true;
@@ -509,15 +505,6 @@ export function canAccessRhDp(user) {
     return hasAnyPermissao(user, RH_DP_AREA_PERMISSION_KEYS);
   }
   return getRhDpCapabilities(user).length > 0;
-}
-
-export function canAccessIntegracaoSienge(user) {
-  if (!hasEnabledModule(user, 'INTEGRACAO_SIENGE')) return false;
-  if (isBusinessAdmin(user)) return true;
-  if (hasConfiguredAreaPermissions(user)) {
-    return hasAnyPermissao(user, INTEGRACAO_SIENGE_AREA_PERMISSION_KEYS);
-  }
-  return getIntegracaoSiengeCapabilities(user).length > 0;
 }
 
 export function canAccessProvisoes(user) {
@@ -539,10 +526,6 @@ export function getRhDpCapabilities(user) {
   return normalizeRhDpPermissionList(user?.rh_dp_capacidades || []);
 }
 
-export function getIntegracaoSiengeCapabilities(user) {
-  return normalizeRhDpPermissionList(user?.integracao_sienge_capacidades || []);
-}
-
 export function hasRhDpCapability(user, capability) {
   if (isBusinessAdmin(user)) return true;
   if (hasConfiguredAreaPermissions(user)) {
@@ -550,15 +533,6 @@ export function hasRhDpCapability(user, capability) {
     return hasAnyPermissao(user, RH_DP_LEGACY_TO_AREA[key] || []);
   }
   return getRhDpCapabilities(user).includes(String(capability || '').trim().toLowerCase());
-}
-
-export function hasIntegracaoSiengeCapability(user, capability) {
-  if (isBusinessAdmin(user)) return true;
-  if (hasConfiguredAreaPermissions(user)) {
-    const key = String(capability || '').trim().toLowerCase();
-    return hasAnyPermissao(user, INTEGRACAO_SIENGE_LEGACY_TO_AREA[key] || []);
-  }
-  return getIntegracaoSiengeCapabilities(user).includes(String(capability || '').trim().toLowerCase());
 }
 
 export function canAccessRhDpDashboard(user) {
@@ -630,22 +604,6 @@ export function canExecuteRhDpFechamento(user) {
 
 export function canReopenRhDpFechamento(user) {
   return canAccessRhDp(user) && hasRhDpCapability(user, 'rh_dp_fechamento_reopen');
-}
-
-export function canViewIntegracaoSienge(user) {
-  return canAccessIntegracaoSienge(user) && (
-    hasIntegracaoSiengeCapability(user, 'integracao_sienge_view') ||
-    hasIntegracaoSiengeCapability(user, 'integracao_sienge_retry') ||
-    hasIntegracaoSiengeCapability(user, 'integracao_sienge_config_manage')
-  );
-}
-
-export function canRetryIntegracaoSienge(user) {
-  return canAccessIntegracaoSienge(user) && hasIntegracaoSiengeCapability(user, 'integracao_sienge_retry');
-}
-
-export function canManageIntegracaoSiengeConfig(user) {
-  return canAccessIntegracaoSienge(user) && hasIntegracaoSiengeCapability(user, 'integracao_sienge_config_manage');
 }
 
 export function canViewProvisionamentos(user) {
