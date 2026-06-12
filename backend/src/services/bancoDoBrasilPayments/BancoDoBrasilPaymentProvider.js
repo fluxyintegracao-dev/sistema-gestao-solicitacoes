@@ -186,7 +186,7 @@ async function getBatchRequestStatus(numeroSolicitacao) {
   const token = await getAccessToken(SCOPES.INFO);
   const response = await requestJson({
     method: 'GET',
-    path: `/${encodeURIComponent(String(numeroSolicitacao))}/solicitacao`,
+    path: `/lotes-transferencias-pix/${encodeURIComponent(String(numeroSolicitacao))}/solicitacao`,
     accessToken: token.access_token
   });
 

@@ -686,7 +686,28 @@ async function sincronizarStatusBb(req, id) {
   const providerBatchId = lastTransaction.provider_batch_id;
   const startedAt = new Date();
   const attemptNumber = await PaymentTransaction.count({ where: { payment_batch_id: batch.id } }) + 1;
-  const providerResult = await bancoDoBrasilSandboxProvider.getBatchStatus(providerBatchId);
+  let providerResult;
+  try {
+    providerResult = await bancoDoBrasilSandboxProvider.getBatchRequestStatus(providerBatchId);
+  } catch (error) {
+    const normalized = bancoDoBrasilSandboxProvider.normalizeError(error);
+    await PaymentTransaction.create({
+      payment_batch_id: batch.id,
+      provider_id: batch.provider_id,
+      attempt: attemptNumber,
+      status: 'FALHA_INTEGRACAO',
+      http_status: normalized.statusCode || null,
+      correlation_id: batch.correlation_id,
+      idempotency_key: batch.idempotency_key,
+      request_snapshot: sanitizePayload(error.details?.request_snapshot || null),
+      response_snapshot: sanitizePayload(error.details?.response_snapshot || error.details || null),
+      error_code: normalized.code,
+      error_message: normalized.message,
+      started_at: startedAt,
+      finished_at: new Date()
+    });
+    throw createHttpError(normalized.statusCode || 500, normalized.message);
+  }
   const now = new Date();
   const batchStatus = mapProviderResultToBatchStatus(providerResult.provider_status);
   const intentStatus = mapProviderResultToIntentStatus(providerResult.provider_status);
