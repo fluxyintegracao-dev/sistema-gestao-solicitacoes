@@ -1512,12 +1512,12 @@ export default function FinanceiroTituloNovo() {
 
                                 {!isFormaCheque(forma) && (
                                   <label className="text-sm md:col-span-2">
-                                    <span className="mb-1 block text-[var(--c-muted)]">Documento do boleto</span>
+                                    <span className="mb-1 block text-[var(--c-muted)]">Documento ou referencia do boleto</span>
                                     <input
                                       className="input w-full"
                                       value={parcela.numero_documento || ''}
                                       onChange={(event) => updateParcela(pagamentoIndex, parcelaIndex, 'numero_documento', event.target.value)}
-                                      placeholder="Nosso numero, linha ou referencia"
+                                      placeholder="Nosso numero ou referencia"
                                     />
                                   </label>
                                 )}
@@ -1559,6 +1559,45 @@ export default function FinanceiroTituloNovo() {
                               </div>
                             </div>
                           ))}
+                          {isFormaBoleto(forma) && form.tipo === 'PAGAR' && (
+                            <div className="rounded-2xl border border-blue-100 bg-blue-50 p-3 text-sm text-blue-900">
+                              <div className="mb-2">
+                                <div className="font-semibold">Dados bancarios do boleto</div>
+                                <div className="text-xs text-blue-700">
+                                  Informe a linha digitavel ou o codigo de barras para habilitar a remessa Caixa CNAB240.
+                                </div>
+                              </div>
+                              <div className="grid gap-3 md:grid-cols-3">
+                                <label>
+                                  <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.12em] text-blue-700">Banco</span>
+                                  <input
+                                    className="input w-full bg-white"
+                                    placeholder="Ex.: Caixa"
+                                    value={form.banco_cobranca}
+                                    onChange={(event) => updateField('banco_cobranca', event.target.value)}
+                                  />
+                                </label>
+                                <label>
+                                  <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.12em] text-blue-700">Linha digitavel</span>
+                                  <input
+                                    className="input w-full bg-white"
+                                    placeholder="47 digitos do boleto"
+                                    value={form.linha_digitavel}
+                                    onChange={(event) => updateField('linha_digitavel', event.target.value)}
+                                  />
+                                </label>
+                                <label>
+                                  <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.12em] text-blue-700">Codigo de barras</span>
+                                  <input
+                                    className="input w-full bg-white"
+                                    placeholder="44 digitos, se houver"
+                                    value={form.codigo_barras}
+                                    onChange={(event) => updateField('codigo_barras', event.target.value)}
+                                  />
+                                </label>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -1652,47 +1691,6 @@ export default function FinanceiroTituloNovo() {
                     <span className="sol-filter-label">Codigo de barras</span>
                     <input
                       className="input w-full"
-                      value={form.codigo_barras}
-                      onChange={(event) => updateField('codigo_barras', event.target.value)}
-                    />
-                  </label>
-                </>
-              )}
-
-              {form.tipo === 'PAGAR' && (
-                <>
-                  <div className="xl:col-span-12 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800">
-                    <div className="font-semibold">Dados do boleto para pagamento</div>
-                    <div className="mt-1 text-xs">
-                      Informe a linha digitavel ou o codigo de barras para o titulo aparecer em Bancos Enterprise e gerar remessa Caixa CNAB240.
-                    </div>
-                  </div>
-
-                  <label className="sol-filter-field xl:col-span-4">
-                    <span className="sol-filter-label">Banco do boleto</span>
-                    <input
-                      className="input w-full"
-                      placeholder="Ex.: Caixa, Banco do Brasil, Itau"
-                      value={form.banco_cobranca}
-                      onChange={(event) => updateField('banco_cobranca', event.target.value)}
-                    />
-                  </label>
-
-                  <label className="sol-filter-field xl:col-span-4">
-                    <span className="sol-filter-label">Linha digitavel</span>
-                    <input
-                      className="input w-full"
-                      placeholder="47 digitos do boleto"
-                      value={form.linha_digitavel}
-                      onChange={(event) => updateField('linha_digitavel', event.target.value)}
-                    />
-                  </label>
-
-                  <label className="sol-filter-field xl:col-span-4">
-                    <span className="sol-filter-label">Codigo de barras</span>
-                    <input
-                      className="input w-full"
-                      placeholder="44 digitos, se houver"
                       value={form.codigo_barras}
                       onChange={(event) => updateField('codigo_barras', event.target.value)}
                     />
