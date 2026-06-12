@@ -16,6 +16,7 @@ const {
 
 const SCOPES = {
   PIX_BATCH: 'pagamentos-lote.transferencias-pix-requisicao',
+  PIX_INFO: 'pagamentos-lote.transferencias-pix-info',
   RELEASE: 'pagamentos-lote.lotes-requisicao',
   INFO: 'pagamentos-lote.lotes-info'
 };
@@ -183,7 +184,7 @@ async function getBatchRequestStatus(numeroSolicitacao) {
     throw createBancoDoBrasilError(400, 'Numero da solicitacao BB nao informado.', 'BB_REQUEST_ID_REQUIRED');
   }
 
-  const token = await getAccessToken(SCOPES.INFO);
+  const token = await getAccessToken(SCOPES.PIX_INFO);
   const response = await requestJson({
     method: 'GET',
     path: `/lotes-transferencias-pix/${encodeURIComponent(String(numeroSolicitacao))}/solicitacao`,

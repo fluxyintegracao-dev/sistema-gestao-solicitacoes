@@ -3,10 +3,18 @@ const https = require('https');
 const { env } = require('../../config/env');
 const { createBancoDoBrasilError, maskToken } = require('./bancoDoBrasilErrors');
 
-let tokenCache = null;
+const tokenCache = new Map();
 
-function isTokenValid() {
-  return tokenCache?.access_token && tokenCache.expiresAt > Date.now() + 60 * 1000;
+function getScopeCacheKey(scope) {
+  return String(scope || '__default__');
+}
+
+function getCachedToken(scope) {
+  const cached = tokenCache.get(getScopeCacheKey(scope));
+  if (cached?.access_token && cached.expiresAt > Date.now() + 60 * 1000) {
+    return cached.publicToken;
+  }
+  return null;
 }
 
 function assertAuthConfig() {
@@ -139,7 +147,9 @@ async function getAccessToken(scope) {
     };
   }
 
-  if (isTokenValid()) return tokenCache.publicToken;
+  const cachedToken = getCachedToken(scope);
+  if (cachedToken) return cachedToken;
+
   assertAuthConfig();
 
   const body = new URLSearchParams({
@@ -174,17 +184,17 @@ async function getAccessToken(scope) {
     masked_token: maskToken(data.access_token)
   };
 
-  tokenCache = {
+  tokenCache.set(getScopeCacheKey(scope), {
     access_token: data.access_token,
     expiresAt: Date.now() + Math.max(60, expiresIn - 60) * 1000,
     publicToken
-  };
+  });
 
   return publicToken;
 }
 
 function clearTokenCache() {
-  tokenCache = null;
+  tokenCache.clear();
 }
 
 module.exports = {
