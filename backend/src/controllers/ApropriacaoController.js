@@ -37,18 +37,18 @@ module.exports = {
   modeloXlsx(req, res) {
     try {
       const linhasModelo = [
-        ['codigo', 'descricao', 'valor_orcado'],
-        ['001', 'Fundacao', 0],
-        ['002', 'Estrutura', 0],
-        ['003', 'Instalacoes', 0]
+        ['codigo_obra', 'codigo', 'descricao', 'valor_orcado'],
+        ['11111', '001', 'Fundacao', 0],
+        ['11111', '002', 'Estrutura', 0],
+        ['11111', '003', 'Instalacoes', 0]
       ];
 
       const instrucoes = [
         ['Modelo de importacao de apropriacoes por obra'],
-        ['Selecione a obra no Fluxy antes de importar.'],
+        ['codigo_obra deve corresponder ao codigo da obra cadastrada no Fluxy.'],
         ['Preencha uma apropriacao por linha.'],
-        ['codigo e obrigatorio. descricao e valor_orcado sao opcionais.'],
-        ['Na importacao em massa atual, cole no formato Codigo|Descricao.']
+        ['codigo_obra e codigo sao obrigatorios. descricao e valor_orcado sao opcionais.'],
+        ['Na importacao em massa atual pela tela, selecione a obra e cole no formato Codigo|Descricao.']
       ];
 
       const workbook = XLSX.utils.book_new();
