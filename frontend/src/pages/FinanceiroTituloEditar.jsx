@@ -620,6 +620,29 @@ export default function FinanceiroTituloEditar() {
           </div>
         )}
 
+        {form.tipo === 'PAGAR' && (
+          <div className="rounded-xl border border-[var(--c-border)] p-4">
+            <h2 className="mb-1 text-base font-semibold text-[var(--c-text)]">Dados do boleto para pagamento</h2>
+            <p className="mb-3 text-xs text-[var(--c-muted)]">
+              Informe a linha digitavel ou o codigo de barras para o titulo aparecer em Bancos Enterprise e gerar remessa Caixa CNAB240.
+            </p>
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <label className="form-field">
+                <span>Banco do boleto</span>
+                <input value={form.banco_cobranca} onChange={(event) => updateField('banco_cobranca', event.target.value)} disabled={Boolean(bloqueio)} />
+              </label>
+              <label className="form-field xl:col-span-2">
+                <span>Linha digitavel</span>
+                <input value={form.linha_digitavel} onChange={(event) => updateField('linha_digitavel', event.target.value)} disabled={Boolean(bloqueio)} />
+              </label>
+              <label className="form-field">
+                <span>Codigo de barras</span>
+                <input value={form.codigo_barras} onChange={(event) => updateField('codigo_barras', event.target.value)} disabled={Boolean(bloqueio)} />
+              </label>
+            </div>
+          </div>
+        )}
+
         {form.intercompany && (
           <div className="rounded-xl border border-[var(--c-border)] p-4">
             <h2 className="mb-3 text-base font-semibold text-[var(--c-text)]">Entre Empresas</h2>

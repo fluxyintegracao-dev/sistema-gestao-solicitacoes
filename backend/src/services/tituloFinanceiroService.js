@@ -284,7 +284,11 @@ function resolveVencimentoParcela({ formaPagamento, parcela, dataVencimentoBase,
 }
 
 function getStatusCobrancaInicial(tipo, formaCobranca, statusCobranca = null) {
-  if (String(tipo || '').toUpperCase() !== 'RECEBER') {
+  const tipoNormalizado = String(tipo || '').toUpperCase();
+  if (tipoNormalizado === 'PAGAR') {
+    return 'NAO_APLICAVEL';
+  }
+  if (tipoNormalizado !== 'RECEBER') {
     return 'NAO_APLICAVEL';
   }
 
@@ -296,7 +300,24 @@ function getStatusCobrancaInicial(tipo, formaCobranca, statusCobranca = null) {
 }
 
 function buildCobrancaFields(payload = {}, tipo) {
-  if (String(tipo || '').toUpperCase() !== 'RECEBER') {
+  const tipoNormalizado = String(tipo || '').toUpperCase();
+  const linhaDigitavel = payload.linha_digitavel || null;
+  const codigoBarras = payload.codigo_barras || null;
+
+  if (tipoNormalizado === 'PAGAR') {
+    return {
+      forma_cobranca: normalizarFormaCobranca(payload.forma_cobranca) || (linhaDigitavel || codigoBarras ? 'BOLETO' : null),
+      status_cobranca: 'NAO_APLICAVEL',
+      banco_cobranca: payload.banco_cobranca || null,
+      nosso_numero: null,
+      linha_digitavel: linhaDigitavel,
+      codigo_barras: codigoBarras,
+      identificador_externo: null,
+      boleto_emitido_em: null
+    };
+  }
+
+  if (tipoNormalizado !== 'RECEBER') {
     return {
       forma_cobranca: null,
       status_cobranca: 'NAO_APLICAVEL',
@@ -329,8 +350,27 @@ function buildCobrancaFields(payload = {}, tipo) {
 }
 
 function buildUpdatedCobrancaFields(titulo, payload = {}) {
-  if (String(titulo?.tipo || '').toUpperCase() !== 'RECEBER') {
-    throw createHttpError(400, 'Somente titulos a receber podem receber dados de cobranca.');
+  const tipoTitulo = String(titulo?.tipo || '').toUpperCase();
+  if (!['RECEBER', 'PAGAR'].includes(tipoTitulo)) {
+    throw createHttpError(400, 'Somente titulos financeiros podem receber dados bancarios.');
+  }
+
+  if (tipoTitulo === 'PAGAR') {
+    const linhaDigitavel = payload.linha_digitavel !== undefined ? payload.linha_digitavel : titulo.linha_digitavel;
+    const codigoBarras = payload.codigo_barras !== undefined ? payload.codigo_barras : titulo.codigo_barras;
+
+    return {
+      forma_cobranca: payload.forma_cobranca !== undefined
+        ? normalizarFormaCobranca(payload.forma_cobranca)
+        : normalizarFormaCobranca(titulo.forma_cobranca) || (linhaDigitavel || codigoBarras ? 'BOLETO' : null),
+      status_cobranca: 'NAO_APLICAVEL',
+      banco_cobranca: payload.banco_cobranca !== undefined ? payload.banco_cobranca : titulo.banco_cobranca,
+      nosso_numero: null,
+      linha_digitavel: linhaDigitavel || null,
+      codigo_barras: codigoBarras || null,
+      identificador_externo: null,
+      boleto_emitido_em: null
+    };
   }
 
   const formaCobranca = payload.forma_cobranca !== undefined

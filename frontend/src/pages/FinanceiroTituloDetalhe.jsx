@@ -899,6 +899,74 @@ export default function FinanceiroTituloDetalhe() {
           <div className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4 space-y-4">
             <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
               <div>
+                <h2 className="text-lg font-semibold text-[var(--c-text)]">Boleto para pagamento</h2>
+                <p className="text-sm text-[var(--c-muted)]">
+                  A linha digitavel ou codigo de barras habilita este titulo para remessa Caixa CNAB240 em Bancos Enterprise.
+                </p>
+              </div>
+              {(titulo.linha_digitavel || titulo.codigo_barras) && (
+                <span className="inline-flex rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                  Pronto para remessa
+                </span>
+              )}
+            </div>
+
+            <div className="grid gap-3 text-sm md:grid-cols-4">
+              <div>
+                <div className="text-[var(--c-muted)]">Banco do boleto</div>
+                <div className="font-medium text-[var(--c-text)]">{titulo.banco_cobranca || '-'}</div>
+              </div>
+              <div className="md:col-span-2">
+                <div className="text-[var(--c-muted)]">Linha digitavel</div>
+                <div className="font-medium break-all text-[var(--c-text)]">{titulo.linha_digitavel || '-'}</div>
+              </div>
+              <div>
+                <div className="text-[var(--c-muted)]">Codigo de barras</div>
+                <div className="font-medium break-all text-[var(--c-text)]">{titulo.codigo_barras || '-'}</div>
+              </div>
+            </div>
+
+            <form className="grid gap-3 md:grid-cols-4" onSubmit={handleSalvarCobranca}>
+              <label className="text-sm">
+                <span className="mb-1 block text-slate-500">Banco do boleto</span>
+                <input
+                  className="input w-full"
+                  value={cobrancaForm.banco_cobranca}
+                  onChange={(event) => setCobrancaForm((current) => ({ ...current, banco_cobranca: event.target.value }))}
+                />
+              </label>
+
+              <label className="text-sm md:col-span-2">
+                <span className="mb-1 block text-slate-500">Linha digitavel</span>
+                <input
+                  className="input w-full"
+                  value={cobrancaForm.linha_digitavel}
+                  onChange={(event) => setCobrancaForm((current) => ({ ...current, linha_digitavel: event.target.value }))}
+                />
+              </label>
+
+              <label className="text-sm">
+                <span className="mb-1 block text-slate-500">Codigo de barras</span>
+                <input
+                  className="input w-full"
+                  value={cobrancaForm.codigo_barras}
+                  onChange={(event) => setCobrancaForm((current) => ({ ...current, codigo_barras: event.target.value }))}
+                />
+              </label>
+
+              <div className="md:col-span-4 flex justify-end">
+                <button type="submit" className="btn btn-primary" disabled={savingCobranca}>
+                  {savingCobranca ? 'Salvando...' : 'Salvar dados do boleto'}
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {String(titulo.tipo || '').toUpperCase() === 'PAGAR' && (
+          <div className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4 space-y-4">
+            <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
+              <div>
                 <h2 className="text-lg font-semibold text-[var(--c-text)]">Pagamentos bancarios</h2>
                 <p className="text-sm text-[var(--c-muted)]">
                   Status bancario separado do status financeiro do titulo.

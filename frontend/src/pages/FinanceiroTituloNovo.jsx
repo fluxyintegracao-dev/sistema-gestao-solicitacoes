@@ -674,12 +674,12 @@ export default function FinanceiroTituloNovo() {
         tipo: value,
         parceiro_id: '',
         categoria_financeira_id: '',
-        forma_cobranca: value === 'RECEBER' ? current.forma_cobranca : '',
+        forma_cobranca: ['RECEBER', 'PAGAR'].includes(value) ? current.forma_cobranca : '',
         status_cobranca: value === 'RECEBER' ? current.status_cobranca : 'PENDENTE_EMISSAO',
-        banco_cobranca: value === 'RECEBER' ? current.banco_cobranca : '',
+        banco_cobranca: ['RECEBER', 'PAGAR'].includes(value) ? current.banco_cobranca : '',
         nosso_numero: value === 'RECEBER' ? current.nosso_numero : '',
-        linha_digitavel: value === 'RECEBER' ? current.linha_digitavel : '',
-        codigo_barras: value === 'RECEBER' ? current.codigo_barras : '',
+        linha_digitavel: ['RECEBER', 'PAGAR'].includes(value) ? current.linha_digitavel : '',
+        codigo_barras: ['RECEBER', 'PAGAR'].includes(value) ? current.codigo_barras : '',
         identificador_externo: value === 'RECEBER' ? current.identificador_externo : '',
         boleto_emitido_em: value === 'RECEBER' ? current.boleto_emitido_em : ''
       }));
@@ -1040,12 +1040,12 @@ export default function FinanceiroTituloNovo() {
                       tipo,
                       parceiro_id: '',
                       categoria_financeira_id: '',
-                      forma_cobranca: tipo === 'RECEBER' ? current.forma_cobranca : '',
+                      forma_cobranca: ['RECEBER', 'PAGAR'].includes(tipo) ? current.forma_cobranca : '',
                       status_cobranca: tipo === 'RECEBER' ? current.status_cobranca : 'PENDENTE_EMISSAO',
-                      banco_cobranca: tipo === 'RECEBER' ? current.banco_cobranca : '',
+                      banco_cobranca: ['RECEBER', 'PAGAR'].includes(tipo) ? current.banco_cobranca : '',
                       nosso_numero: tipo === 'RECEBER' ? current.nosso_numero : '',
-                      linha_digitavel: tipo === 'RECEBER' ? current.linha_digitavel : '',
-                      codigo_barras: tipo === 'RECEBER' ? current.codigo_barras : '',
+                      linha_digitavel: ['RECEBER', 'PAGAR'].includes(tipo) ? current.linha_digitavel : '',
+                      codigo_barras: ['RECEBER', 'PAGAR'].includes(tipo) ? current.codigo_barras : '',
                       identificador_externo: tipo === 'RECEBER' ? current.identificador_externo : '',
                       boleto_emitido_em: tipo === 'RECEBER' ? current.boleto_emitido_em : ''
                     }));
@@ -1652,6 +1652,47 @@ export default function FinanceiroTituloNovo() {
                     <span className="sol-filter-label">Codigo de barras</span>
                     <input
                       className="input w-full"
+                      value={form.codigo_barras}
+                      onChange={(event) => updateField('codigo_barras', event.target.value)}
+                    />
+                  </label>
+                </>
+              )}
+
+              {form.tipo === 'PAGAR' && (
+                <>
+                  <div className="xl:col-span-12 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+                    <div className="font-semibold">Dados do boleto para pagamento</div>
+                    <div className="mt-1 text-xs">
+                      Informe a linha digitavel ou o codigo de barras para o titulo aparecer em Bancos Enterprise e gerar remessa Caixa CNAB240.
+                    </div>
+                  </div>
+
+                  <label className="sol-filter-field xl:col-span-4">
+                    <span className="sol-filter-label">Banco do boleto</span>
+                    <input
+                      className="input w-full"
+                      placeholder="Ex.: Caixa, Banco do Brasil, Itau"
+                      value={form.banco_cobranca}
+                      onChange={(event) => updateField('banco_cobranca', event.target.value)}
+                    />
+                  </label>
+
+                  <label className="sol-filter-field xl:col-span-4">
+                    <span className="sol-filter-label">Linha digitavel</span>
+                    <input
+                      className="input w-full"
+                      placeholder="47 digitos do boleto"
+                      value={form.linha_digitavel}
+                      onChange={(event) => updateField('linha_digitavel', event.target.value)}
+                    />
+                  </label>
+
+                  <label className="sol-filter-field xl:col-span-4">
+                    <span className="sol-filter-label">Codigo de barras</span>
+                    <input
+                      className="input w-full"
+                      placeholder="44 digitos, se houver"
                       value={form.codigo_barras}
                       onChange={(event) => updateField('codigo_barras', event.target.value)}
                     />
