@@ -682,6 +682,43 @@ const MODULO_PERMISSION_GROUPS = [
         ]
       }
     ]
+
+  },
+  {
+    modulo: 'GOVERNANCA',
+    label: 'Governanca do Sistema',
+    descricao: 'Painel institucional de governanca, auditoria, saude tecnica e evolucao do produto.',
+    areas: [
+      {
+        key: 'governanca.sistema',
+        label: 'Governanca Executiva',
+        permissoes: [
+          { key: 'governanca.sistema.visualizar', label: 'Visualizar governanca', descricao: 'Equivale a SYSTEM_GOVERNANCE_VIEW. Acessar a visao executiva institucional do sistema.' },
+          { key: 'governanca.sistema.gerenciar', label: 'Gerenciar governanca', descricao: 'Equivale a SYSTEM_GOVERNANCE_MANAGE. Gerar snapshots e operar controles administrativos do modulo.' }
+        ]
+      },
+      {
+        key: 'governanca.tecnico',
+        label: 'Saude Tecnica',
+        permissoes: [
+          { key: 'governanca.tecnico.visualizar', label: 'Visualizar saude tecnica', descricao: 'Equivale a SYSTEM_TECH_MONITOR_VIEW. Consultar API, banco, storage e integracoes.' }
+        ]
+      },
+      {
+        key: 'governanca.auditoria',
+        label: 'Auditoria',
+        permissoes: [
+          { key: 'governanca.auditoria.visualizar', label: 'Visualizar auditoria', descricao: 'Equivale a SYSTEM_AUDIT_VIEW. Consultar logs de acesso e eventos agregados de governanca.' }
+        ]
+      },
+      {
+        key: 'governanca.produto',
+        label: 'Evolucao do Produto',
+        permissoes: [
+          { key: 'governanca.produto.visualizar', label: 'Visualizar evolucao do produto', descricao: 'Equivale a SYSTEM_PRODUCT_EVOLUTION_VIEW. Acompanhar modulos ativos, snapshots e proximas frentes.' }
+        ]
+      }
+    ]
   }
 ];
 

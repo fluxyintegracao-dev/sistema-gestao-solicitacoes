@@ -7,6 +7,7 @@ const { ensureRateLimitStoreReady } = require('./src/services/rateLimitStore');
 const { iniciarRetencaoEventosSeguranca } = require('./src/services/securityLogService');
 const { ensureClamavReady } = require('./src/services/clamavService');
 const { iniciarCrmAutomationRuntime } = require('./src/services/crmAutomationRuntimeService');
+const { startGovernancaSnapshotJob } = require('./src/modules/governanca/jobs/governancaSnapshotJob');
 
 async function start() {
   validateRequiredEnv();
@@ -21,6 +22,7 @@ async function start() {
     iniciarRetencaoEventosSeguranca();
     iniciarOpsSync(sequelize);
     iniciarCrmAutomationRuntime();
+    startGovernancaSnapshotJob();
   });
 
   server.on('error', (error) => {

@@ -87,6 +87,7 @@ import {
   canViewCrmLeads,
   canViewFiscalDocuments,
   canViewFiscalLogs,
+  canViewSystemGovernance,
   canCreateComprasPedidos,
   canManageComprasCotacoes,
   canViewComprasCotacoes,
@@ -302,6 +303,7 @@ export default function Layout() {
   const rhDpObrigacoesAccess = canViewRhDpObrigacoes(user) && financeiroModuleEnabled;
   const sstAccess = canAccessSst(user);
   const sstDashboardAccess = canViewSstDashboard(user);
+  const governancaSistemaAccess = canViewSystemGovernance(user);
   const obrasAccess = canAccessCadastroObras(user);
   const contratosAccess = canAccessContratos(user);
   const bibliotecaAccess = canAccessBiblioteca(user);
@@ -328,6 +330,7 @@ export default function Layout() {
       Relatórios: HiOutlineDocumentText,
       Cadastros: HiOutlineRectangleGroup,
       Contratos: HiOutlineBanknotes,
+      'Administração': HiOutlineShieldCheck,
       Configurações: HiOutlineCog6Tooth,
       Biblioteca: HiOutlineFolderOpen,
       Treinamento: HiOutlineAcademicCap,
@@ -544,6 +547,12 @@ export default function Layout() {
       ]);
     }
 
+    if (governancaSistemaAccess) {
+      addGroup('Administração', [
+        item('/governanca', 'Governança do Sistema', HiOutlineShieldCheck)
+      ]);
+    }
+
     if (businessAdmin) {
       addGroup('Configurações', [
         item('/configuracoes', 'Configurações', HiOutlineCog6Tooth),
@@ -595,6 +604,7 @@ export default function Layout() {
     boletosAccess,
     financeiroModuleEnabled,
     gestaoUsuarios,
+    governancaSistemaAccess,
     moduloBibliotecaHabilitado,
     moduloCotacoesHabilitado,
     obrasAccess,

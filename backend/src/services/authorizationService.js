@@ -275,6 +275,30 @@ const CRM_CONFIG_MANAGE_KEYS = [
   'crm.configuracoes.gerenciar'
 ];
 
+const SYSTEM_GOVERNANCE_VIEW_KEYS = [
+  'governanca.sistema.visualizar',
+  'governanca.sistema.gerenciar'
+];
+
+const SYSTEM_GOVERNANCE_MANAGE_KEYS = [
+  'governanca.sistema.gerenciar'
+];
+
+const SYSTEM_TECH_MONITOR_VIEW_KEYS = [
+  'governanca.tecnico.visualizar',
+  'governanca.sistema.gerenciar'
+];
+
+const SYSTEM_AUDIT_VIEW_KEYS = [
+  'governanca.auditoria.visualizar',
+  'governanca.sistema.gerenciar'
+];
+
+const SYSTEM_PRODUCT_EVOLUTION_VIEW_KEYS = [
+  'governanca.produto.visualizar',
+  'governanca.sistema.gerenciar'
+];
+
 const CRM_PERMISSION_KEYS = [
   ...CRM_DASHBOARD_KEYS,
   ...CRM_LEADS_VIEW_KEYS,
@@ -1950,6 +1974,46 @@ async function canManageCrmConfiguracoes(user) {
   return canAccessCrm(user);
 }
 
+async function canViewSystemGovernance(user) {
+  if (isBusinessAdmin(user)) return true;
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, SYSTEM_GOVERNANCE_VIEW_KEYS);
+  }
+  return false;
+}
+
+async function canManageSystemGovernance(user) {
+  if (isBusinessAdmin(user)) return true;
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, SYSTEM_GOVERNANCE_MANAGE_KEYS);
+  }
+  return false;
+}
+
+async function canViewSystemTechMonitor(user) {
+  if (isBusinessAdmin(user)) return true;
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, SYSTEM_TECH_MONITOR_VIEW_KEYS);
+  }
+  return false;
+}
+
+async function canViewSystemAudit(user) {
+  if (isBusinessAdmin(user)) return true;
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, SYSTEM_AUDIT_VIEW_KEYS);
+  }
+  return false;
+}
+
+async function canViewSystemProductEvolution(user) {
+  if (isBusinessAdmin(user)) return true;
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, SYSTEM_PRODUCT_EVOLUTION_VIEW_KEYS);
+  }
+  return false;
+}
+
 async function getFinanceiroObraScopeIds(user) {
   if (await canAccessFinanceiro(user)) {
     return null;
@@ -2067,6 +2131,7 @@ module.exports = {
   canViewCrmConfiguracoes,
   canViewCrmDashboard,
   canViewCrmLeads,
+  canManageSystemGovernance,
   canViewProvisoes,
   canViewProvisoesDashboard,
   canViewRhDpApuracao,
@@ -2074,6 +2139,10 @@ module.exports = {
   canViewRhDpDashboard,
   canViewRhDpDocumentos,
   canViewRhDpObrigacoes,
+  canViewSystemAudit,
+  canViewSystemGovernance,
+  canViewSystemProductEvolution,
+  canViewSystemTechMonitor,
   getRhDpCapabilitiesForUser,
   isAdministrador,
   isBusinessAdmin,

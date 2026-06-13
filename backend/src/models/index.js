@@ -230,6 +230,12 @@ db.EsocialCertificateLog = require('../modules/esocial/models/EsocialCertificate
 db.EsocialXmlValidationLog = require('../modules/esocial/models/EsocialXmlValidationLog')(sequelize, Sequelize);
 db.EsocialSoapLog = require('../modules/esocial/models/EsocialSoapLog')(sequelize, Sequelize);
 
+/* =====================
+   GOVERNANCA
+===================== */
+db.GovernancaSnapshot = require('../modules/governanca/models/GovernancaSnapshot')(sequelize, Sequelize);
+db.GovernancaAccessLog = require('../modules/governanca/models/GovernancaAccessLog')(sequelize, Sequelize);
+
 const TITULO_FINANCEIRO_SEQUENCE_KEY = 'GLOBAL';
 
 function formatTituloFinanceiroCodigo(numero) {
@@ -3528,6 +3534,9 @@ db.EsocialSoapLog.belongsTo(db.EsocialLote, { foreignKey: 'lote_id', as: 'lote' 
     model.belongsTo(db.User, { foreignKey: 'atualizado_por', as: 'atualizadoPor' });
   }
 });
+
+db.GovernancaAccessLog.belongsTo(db.User, { foreignKey: 'usuario_id', as: 'usuario' });
+db.User.hasMany(db.GovernancaAccessLog, { foreignKey: 'usuario_id', as: 'governancaAccessLogs' });
 
 /* ===== TREINAMENTO ===== */
 db.TreinamentoConteudo.belongsTo(db.User, { foreignKey: 'criado_por', as: 'criadoPor' });

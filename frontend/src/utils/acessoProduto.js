@@ -879,6 +879,52 @@ export function canManageSstArea(user, area) {
   return false;
 }
 
+const SYSTEM_GOVERNANCE_VIEW_KEYS = ['governanca.sistema.visualizar', 'governanca.sistema.gerenciar'];
+const SYSTEM_GOVERNANCE_MANAGE_KEYS = ['governanca.sistema.gerenciar'];
+const SYSTEM_TECH_MONITOR_VIEW_KEYS = ['governanca.tecnico.visualizar', 'governanca.sistema.gerenciar'];
+const SYSTEM_AUDIT_VIEW_KEYS = ['governanca.auditoria.visualizar', 'governanca.sistema.gerenciar'];
+const SYSTEM_PRODUCT_EVOLUTION_VIEW_KEYS = ['governanca.produto.visualizar', 'governanca.sistema.gerenciar'];
+
+export function canViewSystemGovernance(user) {
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasAnyPermissao(user, SYSTEM_GOVERNANCE_VIEW_KEYS);
+  }
+  return false;
+}
+
+export function canManageSystemGovernance(user) {
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasAnyPermissao(user, SYSTEM_GOVERNANCE_MANAGE_KEYS);
+  }
+  return false;
+}
+
+export function canViewSystemTechMonitor(user) {
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasAnyPermissao(user, SYSTEM_TECH_MONITOR_VIEW_KEYS);
+  }
+  return false;
+}
+
+export function canViewSystemAudit(user) {
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasAnyPermissao(user, SYSTEM_AUDIT_VIEW_KEYS);
+  }
+  return false;
+}
+
+export function canViewSystemProductEvolution(user) {
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasAnyPermissao(user, SYSTEM_PRODUCT_EVOLUTION_VIEW_KEYS);
+  }
+  return false;
+}
+
 const CRM_PERFIS = ['SUPERADMIN', 'ADMIN', 'ADMINISTRADOR', 'ADMIN_CRM', 'GESTOR_COMERCIAL', 'COORDENADOR_CRM', 'DIRETORIA'];
 const CRM_PERFIS_EXPORT = ['SUPERADMIN', 'ADMIN', 'ADMINISTRADOR', 'ADMIN_CRM', 'GESTOR_COMERCIAL', 'COORDENADOR_CRM'];
 const CRM_PERFIS_REDISTRIBUTE = ['SUPERADMIN', 'ADMIN', 'ADMINISTRADOR', 'ADMIN_CRM', 'GESTOR_COMERCIAL', 'COORDENADOR_CRM'];

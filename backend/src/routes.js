@@ -339,6 +339,7 @@ const CrmAutomationController = require('./controllers/CrmAutomationController')
 const { requireCrmModule } = require('./middlewares/crmAccess');
 const fiscalRoutes = require('./modules/fiscal/routes');
 const sstRoutes = require('./modules/sst/routes');
+const governancaRoutes = require('./modules/governanca/routes');
 //console.log('AnexoController =>', AnexoController);
 
 const loginRateLimit = createRateLimit({
@@ -438,6 +439,7 @@ router.use('/fiscal', requireEnabledModule('FISCAL'));
 router.use('/fiscal', fiscalRoutes);
 router.use('/sst', requireEnabledModule('SST'));
 router.use('/sst', sstRoutes);
+router.use('/governanca', governancaRoutes);
 router.use('/treinamento', requireEnabledModule('TREINAMENTO'));
 router.use('/arquivos-modelos', requireEnabledModule('BIBLIOTECA_MODELOS'));
 router.use('/conversas-internas', requireEnabledModule('COMUNICACAO_INTERNA'));
