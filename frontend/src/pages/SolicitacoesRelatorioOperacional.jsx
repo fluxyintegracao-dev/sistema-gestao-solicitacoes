@@ -153,6 +153,54 @@ function EmptyRow({ colSpan, children }) {
   );
 }
 
+function SortableResizableTh({
+  columnKey,
+  sortKey = columnKey,
+  sortState,
+  onSort,
+  className = '',
+  children,
+  align = 'left',
+  title
+}) {
+  const active = sortState?.key === sortKey;
+  const direction = active ? sortState.direction : null;
+  const justifyClass = align === 'right' ? 'justify-end text-right' : 'justify-start text-left';
+
+  return (
+    <ResizableTh columnKey={columnKey} className={className} title={title}>
+      <button
+        type="button"
+        className={`inline-flex w-full items-center gap-1.5 rounded-md text-xs font-bold uppercase tracking-[0.08em] text-[var(--c-text)] transition hover:text-[var(--c-primary)] ${justifyClass}`}
+        onClick={() => onSort(sortKey)}
+        title={title || 'Ordenar coluna'}
+      >
+        <span>{children}</span>
+        <span className={`text-[10px] ${active ? 'text-[var(--c-primary)]' : 'text-[var(--c-muted)]'}`}>
+          {direction === 'asc' ? 'ASC' : direction === 'desc' ? 'DESC' : '--'}
+        </span>
+      </button>
+    </ResizableTh>
+  );
+}
+
+function getAcertividadeSortValue(item, key) {
+  switch (key) {
+    case 'usuario':
+      return String(item.usuario_nome || 'Sem criador').toLowerCase();
+    case 'criadas':
+      return Number(item.total_criadas || 0);
+    case 'ajustes':
+      return Number(item.solicitacoes_com_ajuste || 0);
+    case 'ocorrencias':
+      return Number(item.ocorrencias_setor_ajuste || 0);
+    case 'acertividade':
+      return Number(item.taxa_acertividade || 0);
+    default:
+      return 0;
+  }
+}
+
 export default function SolicitacoesRelatorioOperacional() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [filtros, setFiltros] = useState(() => readFilters(searchParams));
@@ -160,6 +208,7 @@ export default function SolicitacoesRelatorioOperacional() {
   const [relatorio, setRelatorio] = useState(null);
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState('');
+  const [acertividadeSort, setAcertividadeSort] = useState({ key: 'ajustes', direction: 'desc' });
 
   useEffect(() => {
     let ativo = true;
@@ -219,6 +268,21 @@ export default function SolicitacoesRelatorioOperacional() {
     () => (Array.isArray(relatorio?.acertividade_criacao) ? relatorio.acertividade_criacao : []),
     [relatorio]
   );
+  const acertividadeCriacaoOrdenada = useMemo(() => {
+    return [...acertividadeCriacao].sort((a, b) => {
+      const aValue = getAcertividadeSortValue(a, acertividadeSort.key);
+      const bValue = getAcertividadeSortValue(b, acertividadeSort.key);
+      let comparison = 0;
+
+      if (typeof aValue === 'string' || typeof bValue === 'string') {
+        comparison = String(aValue).localeCompare(String(bValue), 'pt-BR', { sensitivity: 'base' });
+      } else {
+        comparison = Number(aValue || 0) - Number(bValue || 0);
+      }
+
+      return acertividadeSort.direction === 'asc' ? comparison : comparison * -1;
+    });
+  }, [acertividadeCriacao, acertividadeSort]);
   const porResponsavel = useMemo(() => (Array.isArray(relatorio?.por_responsavel) ? relatorio.por_responsavel : []), [relatorio]);
   const temposEtapas = useMemo(() => (Array.isArray(relatorio?.tempos_etapas) ? relatorio.tempos_etapas : []), [relatorio]);
   const evolucaoMensal = useMemo(() => (Array.isArray(relatorio?.evolucao_mensal) ? relatorio.evolucao_mensal : []), [relatorio]);
@@ -289,6 +353,15 @@ export default function SolicitacoesRelatorioOperacional() {
     () => Math.max(...setorStatus.map((item) => Number(item.total || 0)), 0),
     [setorStatus]
   );
+
+  function ordenarAcertividade(key) {
+    setAcertividadeSort((current) => {
+      if (current.key === key) {
+        return { key, direction: current.direction === 'asc' ? 'desc' : 'asc' };
+      }
+      return { key, direction: key === 'usuario' ? 'asc' : 'desc' };
+    });
+  }
 
   function aplicarFiltros(event) {
     event.preventDefault();
@@ -910,11 +983,54 @@ export default function SolicitacoesRelatorioOperacional() {
           >
             <thead>
               <tr>
-                <ResizableTh columnKey="usuario">Usuario criador</ResizableTh>
-                <ResizableTh columnKey="criadas" className="text-right">Criadas</ResizableTh>
-                <ResizableTh columnKey="ajustes" className="text-right">Com ajuste</ResizableTh>
-                <ResizableTh columnKey="ocorrencias" className="text-right">Ocorr. setor</ResizableTh>
-                <ResizableTh columnKey="acertividade" className="text-right">Acertividade</ResizableTh>
+                <SortableResizableTh
+                  columnKey="usuario"
+                  sortState={acertividadeSort}
+                  onSort={ordenarAcertividade}
+                  title="Ordenar usuario de A-Z ou Z-A"
+                >
+                  Usuario criador
+                </SortableResizableTh>
+                <SortableResizableTh
+                  columnKey="criadas"
+                  sortState={acertividadeSort}
+                  onSort={ordenarAcertividade}
+                  align="right"
+                  className="text-right"
+                  title="Ordenar pela quantidade de solicitacoes criadas"
+                >
+                  Criadas
+                </SortableResizableTh>
+                <SortableResizableTh
+                  columnKey="ajustes"
+                  sortState={acertividadeSort}
+                  onSort={ordenarAcertividade}
+                  align="right"
+                  className="text-right"
+                  title="Ordenar pela quantidade de solicitacoes com ajuste"
+                >
+                  Com ajuste
+                </SortableResizableTh>
+                <SortableResizableTh
+                  columnKey="ocorrencias"
+                  sortState={acertividadeSort}
+                  onSort={ordenarAcertividade}
+                  align="right"
+                  className="text-right"
+                  title="Ordenar pelo total de ocorrencias por setor"
+                >
+                  Ocorr. setor
+                </SortableResizableTh>
+                <SortableResizableTh
+                  columnKey="acertividade"
+                  sortState={acertividadeSort}
+                  onSort={ordenarAcertividade}
+                  align="right"
+                  className="text-right"
+                  title="Ordenar pela taxa de acertividade"
+                >
+                  Acertividade
+                </SortableResizableTh>
                 <ResizableTh columnKey="setores">Setores que pediram ajuste</ResizableTh>
               </tr>
             </thead>
@@ -924,7 +1040,7 @@ export default function SolicitacoesRelatorioOperacional() {
               ) : acertividadeCriacao.length === 0 ? (
                 <EmptyRow colSpan={6}>Sem solicitacoes criadas no periodo.</EmptyRow>
               ) : (
-                acertividadeCriacao.map((item) => (
+                acertividadeCriacaoOrdenada.map((item) => (
                   <tr key={item.key}>
                     <td>{item.usuario_nome || 'Sem criador'}</td>
                     <td className="text-right">{formatNumber(item.total_criadas)}</td>
