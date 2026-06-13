@@ -46,10 +46,11 @@ const USUARIO_COLUMNS = [
 
 const ACERTIVIDADE_COLUMNS = [
   { key: 'usuario', width: 240, minWidth: 160 },
-  { key: 'criadas', width: 110, minWidth: 90 },
-  { key: 'ajustes', width: 150, minWidth: 120 },
-  { key: 'acertividade', width: 150, minWidth: 120 },
-  { key: 'setores', width: 320, minWidth: 220 }
+  { key: 'criadas', width: 96, minWidth: 80 },
+  { key: 'ajustes', width: 145, minWidth: 115 },
+  { key: 'ocorrencias', width: 150, minWidth: 120 },
+  { key: 'acertividade', width: 135, minWidth: 110 },
+  { key: 'setores', width: 340, minWidth: 240 }
 ];
 
 const TEMPO_COLUMNS = [
@@ -894,9 +895,12 @@ export default function SolicitacoesRelatorioOperacional() {
           <div>
             <h2 className="text-lg font-bold text-[var(--c-text)]">Acertividade na criacao por usuario</h2>
             <p className="page-subtitle">
-              Mede quantas solicitacoes criadas por cada usuario voltaram para ajuste e quais setores marcaram essa pendencia.
+              Mede solicitacoes criadas, quantas voltaram para ajuste e quais setores registraram essas ocorrencias.
             </p>
           </div>
+        </div>
+        <div className="mb-3 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <strong>Leitura:</strong> "Com ajuste" conta cada solicitacao uma unica vez. "Ocorrencias por setor" pode ser maior quando a mesma solicitacao recebeu ajuste de mais de um setor.
         </div>
         <div className="sol-table-wrapper">
           <ResizableTable
@@ -909,15 +913,16 @@ export default function SolicitacoesRelatorioOperacional() {
                 <ResizableTh columnKey="usuario">Usuario criador</ResizableTh>
                 <ResizableTh columnKey="criadas" className="text-right">Criadas</ResizableTh>
                 <ResizableTh columnKey="ajustes" className="text-right">Com ajuste</ResizableTh>
+                <ResizableTh columnKey="ocorrencias" className="text-right">Ocorr. setor</ResizableTh>
                 <ResizableTh columnKey="acertividade" className="text-right">Acertividade</ResizableTh>
-                <ResizableTh columnKey="setores">Ajustes por setor</ResizableTh>
+                <ResizableTh columnKey="setores">Setores que pediram ajuste</ResizableTh>
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <EmptyRow colSpan={5}>Carregando acertividade...</EmptyRow>
+                <EmptyRow colSpan={6}>Carregando acertividade...</EmptyRow>
               ) : acertividadeCriacao.length === 0 ? (
-                <EmptyRow colSpan={5}>Sem solicitacoes criadas no periodo.</EmptyRow>
+                <EmptyRow colSpan={6}>Sem solicitacoes criadas no periodo.</EmptyRow>
               ) : (
                 acertividadeCriacao.map((item) => (
                   <tr key={item.key}>
@@ -925,7 +930,19 @@ export default function SolicitacoesRelatorioOperacional() {
                     <td className="text-right">{formatNumber(item.total_criadas)}</td>
                     <td className="text-right">
                       <strong>{formatNumber(item.solicitacoes_com_ajuste)}</strong>
-                      <div className="text-xs text-[var(--c-muted)]">{formatPercent(item.taxa_ajuste)} do total</div>
+                      <div className="text-xs text-[var(--c-muted)]">
+                        {formatPercent(item.taxa_ajuste)} das criadas
+                      </div>
+                    </td>
+                    <td className="text-right">
+                      <strong>{formatNumber(item.ocorrencias_setor_ajuste)}</strong>
+                      {Number(item.solicitacoes_com_ajuste_multissetor || 0) > 0 ? (
+                        <div className="text-xs text-amber-700">
+                          {formatNumber(item.solicitacoes_com_ajuste_multissetor)} multi-setor
+                        </div>
+                      ) : (
+                        <div className="text-xs text-[var(--c-muted)]">sem multi-setor</div>
+                      )}
                     </td>
                     <td className="text-right">
                       <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">
@@ -938,7 +955,7 @@ export default function SolicitacoesRelatorioOperacional() {
                           {item.ajustes_por_setor.map((setor) => (
                             <span
                               key={`${item.key}-${setor.setor}`}
-                              className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-700"
+                              className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700"
                             >
                               {formatLabel(setor.setor)}: {formatNumber(setor.total)}
                             </span>

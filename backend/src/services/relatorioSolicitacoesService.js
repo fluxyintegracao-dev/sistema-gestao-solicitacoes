@@ -521,6 +521,7 @@ async function relatorioSolicitacoesOperacional({ user, periodo, dataInicio, dat
         usuario_nome: plain.criador?.nome || 'Sem criador',
         total_criadas: 0,
         solicitacoes_com_ajuste: 0,
+        solicitacoes_com_ajuste_multissetor: 0,
         ajustes_por_setor_map: new Map()
       });
     }
@@ -531,6 +532,9 @@ async function relatorioSolicitacoesOperacional({ user, periodo, dataInicio, dat
       const setoresAjusteSolicitacao = new Set(
         ajustesCriacao.map((item) => normalizeToken(item.setor || 'NAO_INFORMADO')).filter(Boolean)
       );
+      if (setoresAjusteSolicitacao.size > 1) {
+        acertividade.solicitacoes_com_ajuste_multissetor += 1;
+      }
       setoresAjusteSolicitacao.forEach((setorToken) => {
         const atual = acertividade.ajustes_por_setor_map.get(setorToken) || {
           setor: setorToken,
@@ -599,16 +603,23 @@ async function relatorioSolicitacoesOperacional({ user, periodo, dataInicio, dat
       .map((item) => {
         const totalCriadas = Number(item.total_criadas || 0);
         const totalAjuste = Number(item.solicitacoes_com_ajuste || 0);
+        const ajustesPorSetor = Array.from(item.ajustes_por_setor_map.values())
+          .sort((a, b) => Number(b.total || 0) - Number(a.total || 0));
+        const totalOcorrenciasSetor = ajustesPorSetor.reduce(
+          (sum, setor) => sum + Number(setor.total || 0),
+          0
+        );
         return {
           key: item.key,
           usuario_id: item.usuario_id,
           usuario_nome: item.usuario_nome,
           total_criadas: totalCriadas,
           solicitacoes_com_ajuste: totalAjuste,
+          ocorrencias_setor_ajuste: totalOcorrenciasSetor,
+          solicitacoes_com_ajuste_multissetor: Number(item.solicitacoes_com_ajuste_multissetor || 0),
           taxa_ajuste: totalCriadas > 0 ? Number(((totalAjuste / totalCriadas) * 100).toFixed(1)) : 0,
           taxa_acertividade: totalCriadas > 0 ? Number((((totalCriadas - totalAjuste) / totalCriadas) * 100).toFixed(1)) : 0,
-          ajustes_por_setor: Array.from(item.ajustes_por_setor_map.values())
-            .sort((a, b) => Number(b.total || 0) - Number(a.total || 0))
+          ajustes_por_setor: ajustesPorSetor
         };
       })
       .sort((a, b) => {
