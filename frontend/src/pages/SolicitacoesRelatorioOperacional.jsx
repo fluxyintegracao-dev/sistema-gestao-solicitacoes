@@ -44,6 +44,14 @@ const USUARIO_COLUMNS = [
   { key: 'valor', width: 140, minWidth: 110 }
 ];
 
+const ACERTIVIDADE_COLUMNS = [
+  { key: 'usuario', width: 240, minWidth: 160 },
+  { key: 'criadas', width: 110, minWidth: 90 },
+  { key: 'ajustes', width: 150, minWidth: 120 },
+  { key: 'acertividade', width: 150, minWidth: 120 },
+  { key: 'setores', width: 320, minWidth: 220 }
+];
+
 const TEMPO_COLUMNS = [
   { key: 'etapa', width: 260, minWidth: 180 },
   { key: 'amostras', width: 110, minWidth: 90 },
@@ -206,6 +214,10 @@ export default function SolicitacoesRelatorioOperacional() {
   const porObra = useMemo(() => (Array.isArray(relatorio?.por_obra) ? relatorio.por_obra : []), [relatorio]);
   const porTipo = useMemo(() => (Array.isArray(relatorio?.por_tipo) ? relatorio.por_tipo : []), [relatorio]);
   const porCriador = useMemo(() => (Array.isArray(relatorio?.por_criador) ? relatorio.por_criador : []), [relatorio]);
+  const acertividadeCriacao = useMemo(
+    () => (Array.isArray(relatorio?.acertividade_criacao) ? relatorio.acertividade_criacao : []),
+    [relatorio]
+  );
   const porResponsavel = useMemo(() => (Array.isArray(relatorio?.por_responsavel) ? relatorio.por_responsavel : []), [relatorio]);
   const temposEtapas = useMemo(() => (Array.isArray(relatorio?.tempos_etapas) ? relatorio.tempos_etapas : []), [relatorio]);
   const evolucaoMensal = useMemo(() => (Array.isArray(relatorio?.evolucao_mensal) ? relatorio.evolucao_mensal : []), [relatorio]);
@@ -874,6 +886,73 @@ export default function SolicitacoesRelatorioOperacional() {
               </tbody>
             </ResizableTable>
           </div>
+        </div>
+      </div>
+
+      <div className="mt-4 card sol-surface-card overflow-hidden">
+        <div className="app-page-header-row mb-3">
+          <div>
+            <h2 className="text-lg font-bold text-[var(--c-text)]">Acertividade na criacao por usuario</h2>
+            <p className="page-subtitle">
+              Mede quantas solicitacoes criadas por cada usuario voltaram para ajuste e quais setores marcaram essa pendencia.
+            </p>
+          </div>
+        </div>
+        <div className="sol-table-wrapper">
+          <ResizableTable
+            className="sol-table"
+            columns={ACERTIVIDADE_COLUMNS}
+            storageKey="fluxy.solicitacoes.relatorio.acertividadeCriacao.columns"
+          >
+            <thead>
+              <tr>
+                <ResizableTh columnKey="usuario">Usuario criador</ResizableTh>
+                <ResizableTh columnKey="criadas" className="text-right">Criadas</ResizableTh>
+                <ResizableTh columnKey="ajustes" className="text-right">Com ajuste</ResizableTh>
+                <ResizableTh columnKey="acertividade" className="text-right">Acertividade</ResizableTh>
+                <ResizableTh columnKey="setores">Ajustes por setor</ResizableTh>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <EmptyRow colSpan={5}>Carregando acertividade...</EmptyRow>
+              ) : acertividadeCriacao.length === 0 ? (
+                <EmptyRow colSpan={5}>Sem solicitacoes criadas no periodo.</EmptyRow>
+              ) : (
+                acertividadeCriacao.map((item) => (
+                  <tr key={item.key}>
+                    <td>{item.usuario_nome || 'Sem criador'}</td>
+                    <td className="text-right">{formatNumber(item.total_criadas)}</td>
+                    <td className="text-right">
+                      <strong>{formatNumber(item.solicitacoes_com_ajuste)}</strong>
+                      <div className="text-xs text-[var(--c-muted)]">{formatPercent(item.taxa_ajuste)} do total</div>
+                    </td>
+                    <td className="text-right">
+                      <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">
+                        {formatPercent(item.taxa_acertividade)}
+                      </span>
+                    </td>
+                    <td>
+                      {Array.isArray(item.ajustes_por_setor) && item.ajustes_por_setor.length > 0 ? (
+                        <div className="flex flex-wrap gap-2">
+                          {item.ajustes_por_setor.map((setor) => (
+                            <span
+                              key={`${item.key}-${setor.setor}`}
+                              className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-700"
+                            >
+                              {formatLabel(setor.setor)}: {formatNumber(setor.total)}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-[var(--c-muted)]">Sem ajustes</span>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </ResizableTable>
         </div>
       </div>
 

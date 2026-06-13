@@ -30,6 +30,11 @@ const STATUS_CONCLUIDOS = new Set([
   'ENCERRADO'
 ]);
 
+const STATUS_AJUSTE_CRIACAO = new Set([
+  'PENDENTE_DE_AJUSTE',
+  'AGUARDANDO_AJUSTE'
+]);
+
 function normalizeToken(value) {
   return String(value || '')
     .trim()
@@ -184,6 +189,10 @@ function getLatestResponsavel(historicosItem = []) {
 
 function isConcluida(status) {
   return STATUS_CONCLUIDOS.has(normalizeToken(status));
+}
+
+function isStatusAjusteCriacao(status) {
+  return STATUS_AJUSTE_CRIACAO.has(normalizeToken(status));
 }
 
 function addDuration(map, key, label, start, end) {
@@ -342,6 +351,7 @@ async function relatorioSolicitacoesOperacional({ user, periodo, dataInicio, dat
   const obraMap = new Map();
   const tipoMap = new Map();
   const criadorMap = new Map();
+  const acertividadeCriacaoMap = new Map();
   const responsavelMap = new Map();
   const tempoEtapasMap = new Map();
   const agingSetorMap = new Map();
@@ -378,6 +388,9 @@ async function relatorioSolicitacoesOperacional({ user, periodo, dataInicio, dat
     );
     const primeiroEnvio = getFirstHistorico(historicosItem, (item) =>
       String(item.acao || '').toUpperCase() === 'ENVIADA_SETOR'
+    );
+    const ajustesCriacao = historicosItem.filter((item) =>
+      String(item.acao || '').toUpperCase() === 'STATUS_ALTERADO' && isStatusAjusteCriacao(item.status_novo)
     );
     const historicoConclusao = getFirstHistorico(historicosItem, (item) =>
       String(item.acao || '').toUpperCase() === 'STATUS_ALTERADO' && isConcluida(item.status_novo)
@@ -499,6 +512,35 @@ async function relatorioSolicitacoesOperacional({ user, periodo, dataInicio, dat
       usuario_id: plain.criado_por || null,
       usuario_nome: plain.criador?.nome || 'Sem criador'
     }).valor_total += valor;
+
+    const criadorKey = plain.criado_por || 'SEM_CRIADOR';
+    if (!acertividadeCriacaoMap.has(criadorKey)) {
+      acertividadeCriacaoMap.set(criadorKey, {
+        key: criadorKey,
+        usuario_id: plain.criado_por || null,
+        usuario_nome: plain.criador?.nome || 'Sem criador',
+        total_criadas: 0,
+        solicitacoes_com_ajuste: 0,
+        ajustes_por_setor_map: new Map()
+      });
+    }
+    const acertividade = acertividadeCriacaoMap.get(criadorKey);
+    acertividade.total_criadas += 1;
+    if (ajustesCriacao.length > 0) {
+      acertividade.solicitacoes_com_ajuste += 1;
+      const setoresAjusteSolicitacao = new Set(
+        ajustesCriacao.map((item) => normalizeToken(item.setor || 'NAO_INFORMADO')).filter(Boolean)
+      );
+      setoresAjusteSolicitacao.forEach((setorToken) => {
+        const atual = acertividade.ajustes_por_setor_map.get(setorToken) || {
+          setor: setorToken,
+          total: 0
+        };
+        atual.total += 1;
+        acertividade.ajustes_por_setor_map.set(setorToken, atual);
+      });
+    }
+
     incrementMap(responsavelMap, responsavelAtual?.usuario_responsavel_id || 'SEM_RESPONSAVEL', {
       usuario_id: responsavelAtual?.usuario_responsavel_id || null,
       usuario_nome: responsavelAtual?.usuario?.nome || 'Sem responsavel'
@@ -553,6 +595,27 @@ async function relatorioSolicitacoesOperacional({ user, periodo, dataInicio, dat
     por_obra: sortByTotalDesc(obraMap).slice(0, 20),
     por_tipo: sortByTotalDesc(tipoMap).slice(0, 20),
     por_criador: sortByTotalDesc(criadorMap).slice(0, 20),
+    acertividade_criacao: Array.from(acertividadeCriacaoMap.values())
+      .map((item) => {
+        const totalCriadas = Number(item.total_criadas || 0);
+        const totalAjuste = Number(item.solicitacoes_com_ajuste || 0);
+        return {
+          key: item.key,
+          usuario_id: item.usuario_id,
+          usuario_nome: item.usuario_nome,
+          total_criadas: totalCriadas,
+          solicitacoes_com_ajuste: totalAjuste,
+          taxa_ajuste: totalCriadas > 0 ? Number(((totalAjuste / totalCriadas) * 100).toFixed(1)) : 0,
+          taxa_acertividade: totalCriadas > 0 ? Number((((totalCriadas - totalAjuste) / totalCriadas) * 100).toFixed(1)) : 0,
+          ajustes_por_setor: Array.from(item.ajustes_por_setor_map.values())
+            .sort((a, b) => Number(b.total || 0) - Number(a.total || 0))
+        };
+      })
+      .sort((a, b) => {
+        const ajusteDiff = Number(b.solicitacoes_com_ajuste || 0) - Number(a.solicitacoes_com_ajuste || 0);
+        if (ajusteDiff !== 0) return ajusteDiff;
+        return Number(b.total_criadas || 0) - Number(a.total_criadas || 0);
+      }),
     por_responsavel: sortByTotalDesc(responsavelMap).slice(0, 20),
     tempos_etapas: finalizeDurations(tempoEtapasMap),
     sla_configurado: slaConfigurado,
