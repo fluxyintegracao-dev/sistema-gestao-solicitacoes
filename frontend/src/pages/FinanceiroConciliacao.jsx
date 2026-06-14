@@ -81,6 +81,22 @@ function statusClass(status) {
   return 'app-status-pill bg-amber-100 text-amber-700';
 }
 
+function getContaNome(conta) {
+  return conta?.nome || conta?.descricao || conta?.conta_corrente || conta?.conta || `Conta #${conta?.id || '-'}`;
+}
+
+function getContaBanco(conta) {
+  return conta?.banco || conta?.banco_nome || conta?.instituicao || conta?.instituicao_nome || 'Banco nao informado';
+}
+
+function getContaAgencia(conta) {
+  return conta?.agencia || conta?.agencia_numero || conta?.numero_agencia || '-';
+}
+
+function getContaNumero(conta) {
+  return conta?.conta || conta?.numero_conta || conta?.conta_corrente || conta?.codigo || '-';
+}
+
 function tipoTituloPorValorExtrato(value) {
   return Number(value || 0) >= 0 ? 'RECEBER' : 'PAGAR';
 }
@@ -1042,6 +1058,11 @@ function FooterPaginacao({ meta, onAlterarPagina }) {
 
 export default function FinanceiroConciliacao() {
   const [contas, setContas] = useState([]);
+  const [viewMode, setViewMode] = useState('CONTAS');
+  const [dashboardFilters, setDashboardFilters] = useState({ busca: '', banco: '', data_inicial: '', data_final: '' });
+  const [appliedDashboardFilters, setAppliedDashboardFilters] = useState({ busca: '', banco: '', data_inicial: '', data_final: '' });
+  const [contasResumo, setContasResumo] = useState([]);
+  const [loadingContasResumo, setLoadingContasResumo] = useState(false);
   const [tarifasBancarias, setTarifasBancarias] = useState([]);
   const [filters, setFilters] = useState({ status: 'PENDENTE', conta_bancaria_id: '', data_inicial: '', data_final: '', page: 1, page_size: 100 });
   const [appliedFilters, setAppliedFilters] = useState({ status: 'PENDENTE', conta_bancaria_id: '', data_inicial: '', data_final: '', page: 1, page_size: 100 });
@@ -1121,6 +1142,64 @@ export default function FinanceiroConciliacao() {
     }
   }
 
+  async function carregarResumoContas() {
+    const contasFiltradas = contas.filter((conta) => {
+      const busca = String(appliedDashboardFilters.busca || '').trim().toLowerCase();
+      const banco = String(appliedDashboardFilters.banco || '').trim().toLowerCase();
+      const textoConta = [
+        getContaNome(conta),
+        getContaBanco(conta),
+        getContaAgencia(conta),
+        getContaNumero(conta),
+        getContaEmpresaNome(conta)
+      ].join(' ').toLowerCase();
+      const bancoConta = getContaBanco(conta).toLowerCase();
+      return (!busca || textoConta.includes(busca)) && (!banco || bancoConta === banco);
+    });
+
+    if (contasFiltradas.length === 0) {
+      setContasResumo([]);
+      return;
+    }
+
+    try {
+      setLoadingContasResumo(true);
+      const resultados = await Promise.all(contasFiltradas.map(async (conta) => {
+        try {
+          const response = await getConciliacoesBancarias({
+            status: 'TODOS',
+            conta_bancaria_id: String(conta.id),
+            data_inicial: appliedDashboardFilters.data_inicial,
+            data_final: appliedDashboardFilters.data_final,
+            page: 1,
+            page_size: 1
+          });
+          return {
+            conta,
+            erro: false,
+            resumo: {
+              total: Number(response?.resumo?.total || 0),
+              pendentes: Number(response?.resumo?.pendentes || 0),
+              conciliados: Number(response?.resumo?.conciliados || 0),
+              ignorados: Number(response?.resumo?.ignorados || 0),
+              valor_total: Number(response?.resumo?.valor_total || 0),
+              valor_absoluto_total: Number(response?.resumo?.valor_absoluto_total || 0)
+            }
+          };
+        } catch {
+          return {
+            conta,
+            erro: true,
+            resumo: { total: 0, pendentes: 0, conciliados: 0, ignorados: 0, valor_total: 0, valor_absoluto_total: 0 }
+          };
+        }
+      }));
+      setContasResumo(resultados);
+    } finally {
+      setLoadingContasResumo(false);
+    }
+  }
+
   async function carregarConciliacoes() {
     try {
       setLoading(true);
@@ -1164,7 +1243,8 @@ export default function FinanceiroConciliacao() {
   }
 
   useEffect(() => { carregarContas(); carregarTarifasBancarias(); }, []);
-  useEffect(() => { carregarConciliacoes(); }, [appliedFilters]);
+  useEffect(() => { if (contas.length > 0) carregarResumoContas(); }, [contas, appliedDashboardFilters]);
+  useEffect(() => { if (viewMode === 'DETALHE') carregarConciliacoes(); }, [appliedFilters, viewMode]);
 
   const resumoFinanceiro = useMemo(() => ([
     { label: 'Pendentes', value: String(dados.resumo.pendentes), detail: 'Aguardando conferência' },
@@ -1178,6 +1258,18 @@ export default function FinanceiroConciliacao() {
     (acc, item) => { if (item.conciliacao_em_lote_disponivel) acc.prontos += 1; if (item.associacao_manual_recomendada) acc.manuais += 1; return acc; },
     { prontos: 0, manuais: 0 }
   ), [dados.itens]);
+  const bancosDashboard = useMemo(() => {
+    const bancos = new Set(contas.map((conta) => getContaBanco(conta)).filter(Boolean));
+    return Array.from(bancos).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  }, [contas]);
+  const resumoDashboard = useMemo(() => contasResumo.reduce((acc, item) => {
+    acc.contas += 1;
+    acc.pendentes += item.resumo.pendentes;
+    acc.conciliados += item.resumo.conciliados;
+    acc.ignorados += item.resumo.ignorados;
+    acc.valor_absoluto_total += item.resumo.valor_absoluto_total;
+    return acc;
+  }, { contas: 0, pendentes: 0, conciliados: 0, ignorados: 0, valor_absoluto_total: 0 }), [contasResumo]);
   const conciliacoesSelecionadasItens = useMemo(() => {
     const ids = new Set(conciliacoesSelecionadas.map((id) => Number(id)));
     return dados.itens.filter((item) => ids.has(Number(item.id)) && item.status === 'PENDENTE');
@@ -1196,7 +1288,8 @@ export default function FinanceiroConciliacao() {
       setUploadForm((c) => ({ ...c, file: null }));
       const fi = document.getElementById('ofx-file-input');
       if (fi) fi.value = '';
-      await carregarConciliacoes();
+      await carregarResumoContas();
+      if (viewMode === 'DETALHE') await carregarConciliacoes();
     } catch (err) { setError(err?.message || 'Erro ao importar OFX'); } finally { setImporting(false); }
   }
 
@@ -1467,6 +1560,31 @@ export default function FinanceiroConciliacao() {
     setAppliedFilters({ ...filters, page: 1 });
   }
 
+  function aplicarFiltrosDashboard(event) {
+    event.preventDefault();
+    setAppliedDashboardFilters({ ...dashboardFilters });
+  }
+
+  function limparFiltrosDashboard() {
+    const next = { busca: '', banco: '', data_inicial: '', data_final: '' };
+    setDashboardFilters(next);
+    setAppliedDashboardFilters(next);
+  }
+
+  function abrirConferenciaManual(conta) {
+    const next = {
+      status: 'PENDENTE',
+      conta_bancaria_id: String(conta?.id || ''),
+      data_inicial: appliedDashboardFilters.data_inicial,
+      data_final: appliedDashboardFilters.data_final,
+      page: 1,
+      page_size: filters.page_size || 100
+    };
+    setFilters(next);
+    setAppliedFilters(next);
+    setViewMode('DETALHE');
+  }
+
   function alterarPagina(nextPage) {
     setAppliedFilters((c) => ({ ...c, page: nextPage }));
   }
@@ -1517,6 +1635,150 @@ export default function FinanceiroConciliacao() {
       </form>
 
       {/* Filtros — linha horizontal */}
+      {error && <div className="app-alert app-alert--error">{error}</div>}
+      {feedback && <div className="app-alert border-emerald-200 bg-emerald-50 text-emerald-700">{feedback}</div>}
+
+      {viewMode === 'CONTAS' ? (
+        <>
+          <form className="card sol-surface-card" onSubmit={aplicarFiltrosDashboard}>
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[1.4fr_1fr_0.8fr_0.8fr_auto] xl:items-end">
+              <label className="app-filter-field">
+                <span className="app-filter-label">Buscar conta</span>
+                <input
+                  className="input w-full input-sm"
+                  value={dashboardFilters.busca}
+                  onChange={(e) => setDashboardFilters((current) => ({ ...current, busca: e.target.value }))}
+                  placeholder="Banco, conta, agencia ou empresa"
+                />
+              </label>
+              <label className="app-filter-field">
+                <span className="app-filter-label">Banco</span>
+                <select
+                  className="input w-full input-sm"
+                  value={dashboardFilters.banco}
+                  onChange={(e) => setDashboardFilters((current) => ({ ...current, banco: e.target.value }))}
+                >
+                  <option value="">Todos</option>
+                  {bancosDashboard.map((banco) => <option key={banco} value={banco}>{banco}</option>)}
+                </select>
+              </label>
+              <label className="app-filter-field">
+                <span className="app-filter-label">Data inicial</span>
+                <input
+                  className="input w-full input-sm"
+                  type="date"
+                  value={dashboardFilters.data_inicial}
+                  onChange={(e) => setDashboardFilters((current) => ({ ...current, data_inicial: e.target.value }))}
+                />
+              </label>
+              <label className="app-filter-field">
+                <span className="app-filter-label">Data final</span>
+                <input
+                  className="input w-full input-sm"
+                  type="date"
+                  value={dashboardFilters.data_final}
+                  onChange={(e) => setDashboardFilters((current) => ({ ...current, data_final: e.target.value }))}
+                />
+              </label>
+              <div className="flex gap-2">
+                <button type="submit" className="btn btn-primary btn-sm">Filtrar</button>
+                <button type="button" className="btn btn-outline btn-sm" onClick={limparFiltrosDashboard}>Limpar</button>
+              </div>
+            </div>
+          </form>
+
+          <div className="card sol-surface-card">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex min-w-[120px] flex-1 flex-col">
+                <span className="text-[10px] uppercase tracking-wide text-[var(--c-muted)]">Contas exibidas</span>
+                <span className="text-sm font-bold text-[var(--c-text)]">{resumoDashboard.contas}</span>
+                <span className="text-[10px] text-[var(--c-muted)]">com conciliacao no filtro</span>
+              </div>
+              <div className="flex min-w-[120px] flex-1 flex-col">
+                <span className="text-[10px] uppercase tracking-wide text-amber-600">Pendentes</span>
+                <span className="text-sm font-bold text-amber-700">{resumoDashboard.pendentes}</span>
+                <span className="text-[10px] text-[var(--c-muted)]">aguardando conferencia</span>
+              </div>
+              <div className="flex min-w-[120px] flex-1 flex-col">
+                <span className="text-[10px] uppercase tracking-wide text-emerald-600">Conciliados</span>
+                <span className="text-sm font-bold text-emerald-700">{resumoDashboard.conciliados}</span>
+                <span className="text-[10px] text-[var(--c-muted)]">matches confirmados</span>
+              </div>
+              <div className="flex min-w-[120px] flex-1 flex-col">
+                <span className="text-[10px] uppercase tracking-wide text-slate-500">Ignorados</span>
+                <span className="text-sm font-bold text-slate-600">{resumoDashboard.ignorados}</span>
+                <span className="text-[10px] text-[var(--c-muted)]">descartados</span>
+              </div>
+              <div className="flex min-w-[150px] flex-1 flex-col">
+                <span className="text-[10px] uppercase tracking-wide text-[var(--c-muted)]">Movimentacao bruta</span>
+                <span className="text-sm font-bold text-[var(--c-text)]">{formatCurrency(resumoDashboard.valor_absoluto_total)}</span>
+                <span className="text-[10px] text-[var(--c-muted)]">soma absoluta do filtro</span>
+              </div>
+            </div>
+          </div>
+
+          {loadingContas || loadingContasResumo ? (
+            <div className="app-empty-card sol-surface-card">Carregando contas bancarias...</div>
+          ) : contasResumo.length === 0 ? (
+            <div className="app-empty-card sol-surface-card">Nenhuma conta encontrada com os filtros atuais.</div>
+          ) : (
+            <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
+              {contasResumo.map(({ conta, resumo, erro }) => {
+                const hasPending = resumo.pendentes > 0;
+                return (
+                  <div key={conta.id} className="card sol-surface-card border border-[var(--c-border)] p-5">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-xs uppercase tracking-[0.18em] text-[var(--c-muted)]">{getContaBanco(conta)}</p>
+                        <h2 className="mt-1 truncate text-lg font-semibold text-[var(--c-text)]">{getContaNome(conta)}</h2>
+                        <p className="mt-1 text-sm text-[var(--c-muted)]">
+                          Agencia {getContaAgencia(conta)} - Conta {getContaNumero(conta)}
+                        </p>
+                        <p className="mt-0.5 truncate text-xs text-[var(--c-muted)]">{getContaEmpresaNome(conta)}</p>
+                      </div>
+                      <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${erro ? 'bg-rose-50 text-rose-700' : hasPending ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'}`}>
+                        {erro ? 'Erro' : hasPending ? 'Conferir' : 'Em dia'}
+                      </span>
+                    </div>
+
+                    <div className="mt-5 grid grid-cols-3 gap-2">
+                      <div className="rounded-xl bg-amber-50 px-3 py-2">
+                        <span className="block text-[10px] uppercase tracking-wide text-amber-700">Pendentes</span>
+                        <strong className="text-lg text-amber-800">{resumo.pendentes}</strong>
+                      </div>
+                      <div className="rounded-xl bg-emerald-50 px-3 py-2">
+                        <span className="block text-[10px] uppercase tracking-wide text-emerald-700">Conciliados</span>
+                        <strong className="text-lg text-emerald-800">{resumo.conciliados}</strong>
+                      </div>
+                      <div className="rounded-xl bg-slate-100 px-3 py-2">
+                        <span className="block text-[10px] uppercase tracking-wide text-slate-600">Ignorados</span>
+                        <strong className="text-lg text-slate-700">{resumo.ignorados}</strong>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 flex items-end justify-between gap-3">
+                      <div>
+                        <span className="block text-[10px] uppercase tracking-wide text-[var(--c-muted)]">Movimentacao bruta</span>
+                        <strong className="text-base text-[var(--c-text)]">{formatCurrency(resumo.valor_absoluto_total)}</strong>
+                      </div>
+                      <button type="button" className="btn btn-primary btn-sm" onClick={() => abrirConferenciaManual(conta)}>
+                        Conferir manualmente
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </>
+      ) : (
+        <>
+          <div className="flex justify-start">
+            <button type="button" className="btn btn-outline btn-sm" onClick={() => setViewMode('CONTAS')}>
+              Voltar para contas
+            </button>
+          </div>
+
       <form className="card sol-surface-card" onSubmit={aplicarFiltros}>
         <div className="flex flex-wrap items-end gap-3">
           <label className="app-filter-field min-w-[130px]">
@@ -1556,10 +1818,6 @@ export default function FinanceiroConciliacao() {
           </div>
         </div>
       </form>
-
-      {/* Alertas */}
-      {error && <div className="app-alert app-alert--error">{error}</div>}
-      {feedback && <div className="app-alert border-emerald-200 bg-emerald-50 text-emerald-700">{feedback}</div>}
 
       {/* Indicadores + Resumo consolidado — linha horizontal */}
       <div className="card sol-surface-card">
@@ -1641,6 +1899,8 @@ export default function FinanceiroConciliacao() {
           </div>
         )
       }
+        </>
+      )}
 
       {baixaExtratosModalOpen && (
         <BaixaExtratosTituloModal
