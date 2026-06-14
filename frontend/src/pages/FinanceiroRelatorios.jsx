@@ -1,9 +1,20 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { ResizableTable, ResizableTh } from '../components/ResizableTable';
 import { useUiVisibility } from '../hooks/useUiVisibility';
 import { getRelatorioFluxoCaixa } from '../services/financeiro';
 import { getMinhasObras } from '../services/obras';
+
+const FinanceiroExecutivoGrupo = lazy(() => import('./FinanceiroExecutivoGrupo'));
+const FinanceiroFluxoConsolidado = lazy(() => import('./FinanceiroFluxoConsolidado'));
+const FinanceiroDre = lazy(() => import('./FinanceiroDre'));
+const FinanceiroDiagnosticoDre = lazy(() => import('./FinanceiroDiagnosticoDre'));
+const FinanceiroIntercompany = lazy(() => import('./FinanceiroIntercompany'));
+const FinanceiroEndividamento = lazy(() => import('./FinanceiroEndividamento'));
+const FinanceiroRelatorioAnalitico = lazy(() => import('./FinanceiroRelatorioAnalitico'));
+const FinanceiroObras = lazy(() => import('./FinanceiroObras'));
+const FinanceiroResultadoObras = lazy(() => import('./FinanceiroResultadoObras'));
+const FinanceiroResultadoCentrosCusto = lazy(() => import('./FinanceiroResultadoCentrosCusto'));
 
 const DEFAULT_FILTERS = {
   periodo: '30_DIAS',
@@ -427,8 +438,7 @@ function FluxoComparativoCard({ serie }) {
   );
 }
 
-export default function FinanceiroRelatorios() {
-  const { isVisible } = useUiVisibility();
+function FluxoCaixaRelatorioConteudo({ isVisible }) {
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [appliedFilters, setAppliedFilters] = useState(DEFAULT_FILTERS);
   const [obras, setObras] = useState([]);
@@ -520,71 +530,10 @@ export default function FinanceiroRelatorios() {
       <div className="app-page-header">
         <div className="app-page-header-row">
           <div>
-            <h1 className="text-xl font-semibold md:text-2xl">Relatorios Financeiros</h1>
+            <h1 className="text-xl font-semibold md:text-2xl">Fluxo de caixa</h1>
             <p className="page-subtitle">
               Fluxo de caixa previsto e realizado com filtro por periodo e obra.
             </p>
-          </div>
-          <div className="app-page-actions">
-            {isVisible('relatorios.financeiro.grupo_consolidado') ? (
-              <Link to="/financeiro/relatorios/grupo-consolidado" className="btn btn-primary">
-                Grupo Consolidado
-              </Link>
-            ) : null}
-            {isVisible('relatorios.financeiro.fluxo_consolidado') ? (
-              <Link to="/financeiro/relatorios/fluxo-consolidado" className="btn btn-outline">
-                Fluxo Consolidado
-              </Link>
-            ) : null}
-            {isVisible('relatorios.financeiro.dre') ? (
-              <Link to="/financeiro/relatorios/dre" className="btn btn-outline">
-                DRE
-              </Link>
-            ) : null}
-            {isVisible('relatorios.financeiro.diagnostico_dre') ? (
-              <Link to="/financeiro/relatorios/dre/diagnostico" className="btn btn-outline">
-                Diagnostico DRE
-              </Link>
-            ) : null}
-            {isVisible('relatorios.financeiro.intercompany') ? (
-              <Link to="/financeiro/relatorios/intercompany" className="btn btn-outline">
-                Entre Empresas
-              </Link>
-            ) : null}
-            {isVisible('relatorios.financeiro.endividamento') ? (
-              <Link to="/financeiro/relatorios/endividamento" className="btn btn-outline">
-                Endividamento
-              </Link>
-            ) : null}
-            {isVisible('relatorios.financeiro.analitico') ? (
-              <Link to="/financeiro/relatorios/analitico" className="btn btn-outline">
-                Analitico
-              </Link>
-            ) : null}
-            {isVisible('relatorios.financeiro.financeiro_obras') ? (
-              <Link to="/financeiro/relatorios/financeiro-obras" className="btn btn-outline">
-                Financeiro de Obras
-              </Link>
-            ) : null}
-            <Link to="/financeiro/baixas" className="btn btn-outline">
-              Baixas
-            </Link>
-            {isVisible('relatorios.financeiro.resultado_obras') ? (
-              <Link to="/financeiro/relatorios/resultado-obras" className="btn btn-outline">
-                Resultado de Obras
-              </Link>
-            ) : null}
-            {isVisible('relatorios.financeiro.centros_custo') ? (
-              <Link to="/financeiro/relatorios/centros-custo" className="btn btn-outline">
-                Centros de Custo
-              </Link>
-            ) : null}
-            <Link to="/financeiro/titulos" className="btn btn-outline">
-              Titulos
-            </Link>
-            <Link to="/financeiro/cadastros" className="btn btn-outline">
-              Cadastros
-            </Link>
           </div>
         </div>
       </div>
@@ -777,6 +726,239 @@ export default function FinanceiroRelatorios() {
           ) : null}
         </>
       )}
+    </div>
+  );
+}
+
+const REPORT_CATALOG = [
+  {
+    id: 'fluxo-caixa',
+    title: 'Fluxo de caixa',
+    group: 'Caixa',
+    description: 'Previsto e realizado por periodo e obra.',
+    route: '/financeiro/relatorios',
+    component: FluxoCaixaRelatorioConteudo
+  },
+  {
+    id: 'grupo-consolidado',
+    title: 'Grupo Consolidado',
+    group: 'Executivo',
+    description: 'Visao consolidada do grupo e indicadores executivos.',
+    route: '/financeiro/relatorios/grupo-consolidado',
+    visibilityKey: 'relatorios.financeiro.grupo_consolidado',
+    component: FinanceiroExecutivoGrupo
+  },
+  {
+    id: 'fluxo-consolidado',
+    title: 'Fluxo Consolidado',
+    group: 'Caixa',
+    description: 'Fluxo consolidado entre empresas do grupo.',
+    route: '/financeiro/relatorios/fluxo-consolidado',
+    visibilityKey: 'relatorios.financeiro.fluxo_consolidado',
+    component: FinanceiroFluxoConsolidado
+  },
+  {
+    id: 'dre',
+    title: 'DRE',
+    group: 'Resultado',
+    description: 'Resultado gerencial por categorias financeiras.',
+    route: '/financeiro/relatorios/dre',
+    visibilityKey: 'relatorios.financeiro.dre',
+    component: FinanceiroDre
+  },
+  {
+    id: 'diagnostico-dre',
+    title: 'Diagnostico DRE',
+    group: 'Resultado',
+    description: 'Consistencias e pendencias que impactam a DRE.',
+    route: '/financeiro/relatorios/dre/diagnostico',
+    visibilityKey: 'relatorios.financeiro.diagnostico_dre',
+    component: FinanceiroDiagnosticoDre
+  },
+  {
+    id: 'entre-empresas',
+    title: 'Entre Empresas',
+    group: 'Governanca',
+    description: 'Movimentos entre empresas e eliminacoes no consolidado.',
+    route: '/financeiro/relatorios/intercompany',
+    visibilityKey: 'relatorios.financeiro.intercompany',
+    component: FinanceiroIntercompany
+  },
+  {
+    id: 'endividamento',
+    title: 'Endividamento',
+    group: 'Bancos',
+    description: 'Acompanhamento de dividas e compromissos bancarios.',
+    route: '/financeiro/relatorios/endividamento',
+    visibilityKey: 'relatorios.financeiro.endividamento',
+    component: FinanceiroEndividamento
+  },
+  {
+    id: 'analitico',
+    title: 'Analitico',
+    group: 'Titulos',
+    description: 'Extrato analitico dos titulos financeiros.',
+    route: '/financeiro/relatorios/analitico',
+    visibilityKey: 'relatorios.financeiro.analitico',
+    component: FinanceiroRelatorioAnalitico
+  },
+  {
+    id: 'financeiro-obras',
+    title: 'Financeiro de Obras',
+    group: 'Obras',
+    description: 'Realizado, comprometido e a realizar por obra.',
+    route: '/financeiro/relatorios/financeiro-obras',
+    visibilityKey: 'relatorios.financeiro.financeiro_obras',
+    component: FinanceiroObras
+  },
+  {
+    id: 'resultado-obras',
+    title: 'Resultado de Obras',
+    group: 'Obras',
+    description: 'Resultado financeiro agregado por obra.',
+    route: '/financeiro/relatorios/resultado-obras',
+    visibilityKey: 'relatorios.financeiro.resultado_obras',
+    component: FinanceiroResultadoObras
+  },
+  {
+    id: 'centros-custo',
+    title: 'Centros de Custo',
+    group: 'Obras',
+    description: 'Resultado agrupado por centro de custo.',
+    route: '/financeiro/relatorios/centros-custo',
+    visibilityKey: 'relatorios.financeiro.centros_custo',
+    component: FinanceiroResultadoCentrosCusto
+  }
+];
+
+function ReportListItem({ report, active, onClick }) {
+  return (
+    <button
+      type="button"
+      className={`w-full rounded-2xl border px-4 py-3 text-left transition ${
+        active
+          ? 'border-blue-300 bg-blue-50 shadow-sm'
+          : 'border-slate-200 bg-white hover:border-blue-200 hover:bg-slate-50'
+      }`}
+      onClick={onClick}
+    >
+      <span className="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
+        {report.group}
+      </span>
+      <span className="block text-sm font-semibold text-slate-950">{report.title}</span>
+      <span className="mt-1 block text-xs leading-relaxed text-slate-500">{report.description}</span>
+    </button>
+  );
+}
+
+export default function FinanceiroRelatorios() {
+  const { isVisible } = useUiVisibility();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [search, setSearch] = useState('');
+
+  const availableReports = useMemo(
+    () => REPORT_CATALOG.filter((report) => !report.visibilityKey || isVisible(report.visibilityKey)),
+    [isVisible]
+  );
+
+  const filteredReports = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (!term) return availableReports;
+
+    return availableReports.filter((report) =>
+      [report.title, report.group, report.description].some((value) =>
+        String(value || '').toLowerCase().includes(term)
+      )
+    );
+  }, [availableReports, search]);
+
+  const selectedId = searchParams.get('relatorio') || availableReports[0]?.id || 'fluxo-caixa';
+  const selectedReport =
+    availableReports.find((report) => report.id === selectedId) || availableReports[0] || REPORT_CATALOG[0];
+  const SelectedReportComponent = selectedReport.component;
+
+  function selectReport(report) {
+    setSearchParams(report.id === 'fluxo-caixa' ? {} : { relatorio: report.id });
+  }
+
+  return (
+    <div className="page solicitacoes-page">
+      <div className="app-page-header">
+        <div className="app-page-header-row">
+          <div>
+            <span className="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-500">
+              Financeiro
+            </span>
+            <h1 className="text-xl font-semibold md:text-2xl">Relatorios Financeiros</h1>
+            <p className="page-subtitle">
+              Escolha um relatorio na coluna lateral e trabalhe no painel principal sem perder contexto.
+            </p>
+          </div>
+          <div className="app-page-actions">
+            <Link to="/financeiro/titulos" className="btn btn-outline">
+              Titulos
+            </Link>
+            <Link to="/financeiro/cadastros" className="btn btn-outline">
+              Cadastros
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
+        <aside className="card sol-surface-card h-fit xl:sticky xl:top-4">
+          <div className="border-b border-[var(--c-border)] px-4 py-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-base font-semibold text-slate-950">Relatorios</h2>
+                <p className="text-xs text-slate-500">{availableReports.length} disponivel(is)</p>
+              </div>
+            </div>
+            <input
+              type="search"
+              className="input mt-3 w-full input-sm"
+              placeholder="Buscar relatorio..."
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+          </div>
+
+          <div className="max-h-[calc(100vh-270px)] space-y-2 overflow-y-auto p-3">
+            {filteredReports.length ? (
+              filteredReports.map((report) => (
+                <ReportListItem
+                  key={report.id}
+                  report={report}
+                  active={selectedReport.id === report.id}
+                  onClick={() => selectReport(report)}
+                />
+              ))
+            ) : (
+              <div className="rounded-2xl border border-dashed border-slate-300 px-4 py-6 text-sm text-slate-500">
+                Nenhum relatorio encontrado para essa busca.
+              </div>
+            )}
+          </div>
+        </aside>
+
+        <section className="min-w-0">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
+            <div>
+              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">
+                {selectedReport.group}
+              </span>
+              <h2 className="text-lg font-semibold text-slate-950">{selectedReport.title}</h2>
+            </div>
+            <Link to={selectedReport.route} className="btn btn-outline btn-sm">
+              Abrir tela inteira
+            </Link>
+          </div>
+
+          <Suspense fallback={<div className="app-empty-card">Carregando relatorio...</div>}>
+            <SelectedReportComponent isVisible={isVisible} />
+          </Suspense>
+        </section>
+      </div>
     </div>
   );
 }

@@ -1334,9 +1334,7 @@ function getTituloParcelaLabel(titulo = {}) {
 function getPlanoFinanceiroLabel(titulo = {}) {
   const categoria = titulo.categoriaFinanceira;
   if (!categoria) return 'Sem categoria';
-  const grupo = categoria.dre_grupo ? `${categoria.dre_grupo} - ` : '';
-  const subgrupo = categoria.dre_subgrupo ? `${categoria.dre_subgrupo} - ` : '';
-  return `${grupo}${subgrupo}${categoria.nome}`;
+  return categoria.nome;
 }
 
 function getCreditoDebitoFromTitulo(titulo, valor) {
