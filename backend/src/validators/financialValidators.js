@@ -660,6 +660,49 @@ function validateFinanceRelatorioAnaliticoQuery(query = {}) {
   };
 }
 
+function validateFinanceiroObrasQuery(query = {}) {
+  ensureAllowedKeys(
+    query,
+    [
+      'analise',
+      'periodo',
+      'data_inicial',
+      'data_final',
+      'obra_id',
+      'empresa_id',
+      'tipo',
+      'parceiro_id',
+      'categoria_financeira_id',
+      'q',
+      'limit'
+    ],
+    'Consulta de financeiro de obras'
+  );
+
+  const dataInicial = parseDateOnly(query.data_inicial, 'Data inicial');
+  const dataFinal = parseDateOnly(query.data_final, 'Data final');
+
+  if (dataInicial && dataFinal && dataInicial > dataFinal) {
+    throw new ValidationError('Data inicial nao pode ser maior que data final.');
+  }
+
+  const limit = parseInteger(query.limit, 'Limite');
+
+  return {
+    analise: parseEnum(query.analise, 'Analise', ['REALIZADO', 'COMPROMETIDO', 'A_REALIZAR']),
+    periodo: parseEnum(query.periodo, 'Periodo', ['HOJE', '7_DIAS', '30_DIAS', '90_DIAS', 'MES_ATUAL', 'PROXIMO_MES', 'PERSONALIZADO']),
+    data_inicial: dataInicial,
+    data_final: dataFinal,
+    obra_id: parseInteger(query.obra_id, 'Obra'),
+    empresa_id: parseInteger(query.empresa_id, 'Empresa'),
+    tipo: parseEnum(query.tipo, 'Tipo', ['PAGAR', 'RECEBER']),
+    parceiro_id: parseInteger(query.parceiro_id, 'Parceiro'),
+    categoria_financeira_id: parseInteger(query.categoria_financeira_id, 'Categoria financeira'),
+    q: parseOptionalText(query.q, 'Busca', 120),
+    limit: limit ? Math.min(limit, 3000) : undefined
+  };
+}
+
 function validateFinanceConciliacaoQuery(query = {}) {
   ensureAllowedKeys(
     query,
@@ -1531,6 +1574,7 @@ module.exports = {
   validateFinanceFinanciamentoBancarioQuery,
   validateFinanceFluxoCaixaQuery,
   validateFinanceFluxoConsolidadoQuery,
+  validateFinanceiroObrasQuery,
   validateFinanceIntercompanyQuery,
   validateFinanceRelatorioAnaliticoQuery,
   validateFinanceTituloBaixaBody,

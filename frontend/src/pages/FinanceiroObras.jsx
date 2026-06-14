@@ -1,0 +1,426 @@
+import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { HiOutlineArrowDownTray, HiOutlineBuildingOffice2 } from 'react-icons/hi2';
+import {
+  getCategoriasFinanceiras,
+  getRelatorioFinanceiroObras
+} from '../services/financeiro';
+import { getEmpresasGrupo } from '../services/empresasGrupo';
+import { getMinhasObras } from '../services/obras';
+import { buscarParceiros } from '../services/parceiros';
+import { ResizableTable, ResizableTh } from '../components/ResizableTable';
+
+const STORAGE_KEY = 'fluxy.financeiro.financeiroObras.columnWidths';
+
+function getTodayIso() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function getMonthStartIso() {
+  const today = new Date();
+  return new Date(today.getFullYear(), today.getMonth(), 1).toISOString().slice(0, 10);
+}
+
+const DEFAULT_FILTERS = {
+  analise: 'REALIZADO',
+  periodo: 'PERSONALIZADO',
+  data_inicial: getMonthStartIso(),
+  data_final: getTodayIso(),
+  obra_id: '',
+  empresa_id: '',
+  tipo: '',
+  parceiro_id: '',
+  categoria_financeira_id: '',
+  q: '',
+  limit: '1000'
+};
+
+const ANALISE_OPTIONS = [
+  {
+    value: 'REALIZADO',
+    label: 'Realizado',
+    description: 'Baixas efetivas no periodo, pela data de baixa.'
+  },
+  {
+    value: 'COMPROMETIDO',
+    label: 'Comprometido',
+    description: 'Titulos existentes no periodo, pela data de vencimento.'
+  },
+  {
+    value: 'A_REALIZAR',
+    label: 'A realizar',
+    description: 'Saldo em aberto dos titulos, pela data de vencimento.'
+  }
+];
+
+const TABLE_COLUMNS = [
+  { key: 'data_baixa', width: 112, minWidth: 96 },
+  { key: 'data_vencimento', width: 112, minWidth: 96 },
+  { key: 'parceiro_nome', width: 230, minWidth: 150 },
+  { key: 'titulo_parcela', width: 150, minWidth: 116 },
+  { key: 'documento', width: 220, minWidth: 140 },
+  { key: 'plano_financeiro', width: 280, minWidth: 160 },
+  { key: 'credito', width: 130, minWidth: 110 },
+  { key: 'debito', width: 130, minWidth: 110 },
+  { key: 'saldo', width: 130, minWidth: 110 },
+  { key: 'obra_nome', width: 210, minWidth: 140 },
+  { key: 'empresa_nome', width: 200, minWidth: 140 },
+  { key: 'status_titulo', width: 130, minWidth: 110 }
+];
+
+function compact(params = {}) {
+  return Object.fromEntries(
+    Object.entries(params).filter(([, value]) => value !== undefined && value !== null && String(value).trim() !== '')
+  );
+}
+
+function formatCurrency(value) {
+  return Number(value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+function formatDate(value) {
+  if (!value) return '-';
+  const [year, month, day] = String(value).split('-');
+  if (!year || !month || !day) return '-';
+  return `${day}/${month}/${year}`;
+}
+
+function statusClass(value) {
+  const normalized = String(value || '').toUpperCase();
+  if (normalized === 'QUITADO') return 'app-status-pill bg-emerald-100 text-emerald-700';
+  if (normalized === 'PARCIAL') return 'app-status-pill bg-amber-100 text-amber-700';
+  if (normalized === 'ABERTO') return 'app-status-pill bg-slate-100 text-slate-700';
+  return 'app-status-pill bg-slate-100 text-slate-600';
+}
+
+function csvValue(value) {
+  const text = String(value ?? '');
+  if (/[",;\n]/.test(text)) {
+    return `"${text.replace(/"/g, '""')}"`;
+  }
+  return text;
+}
+
+function Metric({ label, value, detail, tone = 'default' }) {
+  const color = tone === 'positive' ? '#047857' : tone === 'negative' ? '#b91c1c' : 'var(--c-text)';
+  return (
+    <div className="app-metric-card">
+      <span className="app-filter-label">{label}</span>
+      <strong className="text-xl" style={{ color }}>{value}</strong>
+      <small className="text-[var(--c-muted)]">{detail}</small>
+    </div>
+  );
+}
+
+export default function FinanceiroObras() {
+  const [filters, setFilters] = useState(DEFAULT_FILTERS);
+  const [appliedFilters, setAppliedFilters] = useState(DEFAULT_FILTERS);
+  const [relatorio, setRelatorio] = useState({ filtros: {}, resumo: {}, linhas: [] });
+  const [obras, setObras] = useState([]);
+  const [empresas, setEmpresas] = useState([]);
+  const [parceiros, setParceiros] = useState([]);
+  const [categorias, setCategorias] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadingOptions, setLoadingOptions] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    setLoadingOptions(true);
+
+    Promise.all([
+      getMinhasObras({ modo: 'FINANCEIRO' }).catch(() => []),
+      getEmpresasGrupo({ ativo: true }).catch(() => []),
+      buscarParceiros({ ativo: true, limit: 300 }).catch(() => []),
+      getCategoriasFinanceiras().catch(() => [])
+    ])
+      .then(([obrasData, empresasData, parceirosData, categoriasData]) => {
+        if (!active) return;
+        setObras(Array.isArray(obrasData) ? obrasData : []);
+        setEmpresas(Array.isArray(empresasData) ? empresasData : []);
+        setParceiros(Array.isArray(parceirosData) ? parceirosData : []);
+        setCategorias(Array.isArray(categoriasData) ? categoriasData : []);
+      })
+      .finally(() => {
+        if (active) setLoadingOptions(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    setError('');
+
+    getRelatorioFinanceiroObras(compact(appliedFilters))
+      .then((data) => {
+        if (!active) return;
+        setRelatorio({
+          filtros: data?.filtros || {},
+          resumo: data?.resumo || {},
+          linhas: Array.isArray(data?.linhas) ? data.linhas : []
+        });
+      })
+      .catch((err) => {
+        if (!active) return;
+        setError(err?.message || 'Erro ao carregar financeiro de obras');
+        setRelatorio({ filtros: {}, resumo: {}, linhas: [] });
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [appliedFilters]);
+
+  const analiseAtual = useMemo(
+    () => ANALISE_OPTIONS.find((item) => item.value === filters.analise) || ANALISE_OPTIONS[0],
+    [filters.analise]
+  );
+
+  function setFilter(name, value) {
+    setFilters((current) => ({ ...current, [name]: value }));
+  }
+
+  function aplicarFiltros(event) {
+    event.preventDefault();
+    setAppliedFilters({ ...filters });
+  }
+
+  function limparFiltros() {
+    setFilters(DEFAULT_FILTERS);
+    setAppliedFilters(DEFAULT_FILTERS);
+  }
+
+  function exportarCsv() {
+    const header = [
+      'Baixa',
+      'Vencto',
+      'Cliente/Fornecedor/Complemento',
+      'Titulo/Parcela',
+      'Documento',
+      'Plano financeiro',
+      'Credito',
+      'Debito',
+      'Saldo',
+      'Obra',
+      'Empresa',
+      'Status'
+    ];
+    const rows = relatorio.linhas.map((linha) => [
+      formatDate(linha.data_baixa),
+      formatDate(linha.data_vencimento),
+      linha.parceiro_nome || '',
+      linha.titulo_parcela || '',
+      linha.documento || '',
+      linha.plano_financeiro || '',
+      Number(linha.credito || 0).toFixed(2).replace('.', ','),
+      Number(linha.debito || 0).toFixed(2).replace('.', ','),
+      Number(linha.saldo || 0).toFixed(2).replace('.', ','),
+      linha.obra_nome || '',
+      linha.empresa_nome || '',
+      linha.status_titulo || ''
+    ]);
+    const csv = ['\uFEFF' + header.map(csvValue).join(';'), ...rows.map((row) => row.map(csvValue).join(';'))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `financeiro-obras-${filters.analise.toLowerCase()}-${filters.data_inicial || 'inicio'}-${filters.data_final || 'fim'}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }
+
+  return (
+    <div className="page solicitacoes-page">
+      <div className="app-page-header">
+        <div className="app-page-header-row">
+          <div>
+            <h1 className="text-xl font-semibold md:text-2xl">Financeiro de Obras</h1>
+            <p className="page-subtitle">
+              Relatorio de custo por obra baseado nos titulos financeiros, com visao realizada, comprometida e a realizar.
+            </p>
+          </div>
+          <div className="app-page-actions">
+            <button type="button" className="btn btn-outline" onClick={exportarCsv} disabled={!relatorio.linhas.length}>
+              <HiOutlineArrowDownTray /> Exportar CSV
+            </button>
+            <Link to="/financeiro/relatorios" className="btn btn-outline">Relatorios</Link>
+            <Link to="/financeiro/titulos" className="btn btn-outline">Titulos</Link>
+          </div>
+        </div>
+      </div>
+
+      <form className="card sol-surface-card" onSubmit={aplicarFiltros}>
+        <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
+          <label className="app-filter-field">
+            <span className="app-filter-label">Analise</span>
+            <select className="input w-full input-sm" value={filters.analise} onChange={(e) => setFilter('analise', e.target.value)}>
+              {ANALISE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </label>
+          <label className="app-filter-field">
+            <span className="app-filter-label">Data inicial</span>
+            <input className="input w-full input-sm" type="date" value={filters.data_inicial} onChange={(e) => setFilter('data_inicial', e.target.value)} />
+          </label>
+          <label className="app-filter-field">
+            <span className="app-filter-label">Data final</span>
+            <input className="input w-full input-sm" type="date" value={filters.data_final} onChange={(e) => setFilter('data_final', e.target.value)} />
+          </label>
+          <label className="app-filter-field">
+            <span className="app-filter-label">Tipo</span>
+            <select className="input w-full input-sm" value={filters.tipo} onChange={(e) => setFilter('tipo', e.target.value)}>
+              <option value="">Pagar e receber</option>
+              <option value="PAGAR">Pagar</option>
+              <option value="RECEBER">Receber</option>
+            </select>
+          </label>
+          <label className="app-filter-field">
+            <span className="app-filter-label">Limite</span>
+            <input className="input w-full input-sm" type="number" min="1" max="3000" value={filters.limit} onChange={(e) => setFilter('limit', e.target.value)} />
+          </label>
+          <label className="app-filter-field">
+            <span className="app-filter-label">Busca</span>
+            <input className="input w-full input-sm" value={filters.q} onChange={(e) => setFilter('q', e.target.value)} placeholder="Titulo, documento, parceiro..." />
+          </label>
+        </div>
+
+        <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <label className="app-filter-field">
+            <span className="app-filter-label">Obra/Centro de custo</span>
+            <select className="input w-full input-sm" value={filters.obra_id} onChange={(e) => setFilter('obra_id', e.target.value)} disabled={loadingOptions}>
+              <option value="">Todas</option>
+              {obras.map((obra) => (
+                <option key={obra.id} value={obra.id}>{obra.codigo ? `${obra.codigo} - ${obra.nome}` : obra.nome}</option>
+              ))}
+            </select>
+          </label>
+          <label className="app-filter-field">
+            <span className="app-filter-label">Empresa</span>
+            <select className="input w-full input-sm" value={filters.empresa_id} onChange={(e) => setFilter('empresa_id', e.target.value)} disabled={loadingOptions}>
+              <option value="">Todas</option>
+              {empresas.map((empresa) => (
+                <option key={empresa.id} value={empresa.id}>{empresa.nome}</option>
+              ))}
+            </select>
+          </label>
+          <label className="app-filter-field">
+            <span className="app-filter-label">Parceiro</span>
+            <select className="input w-full input-sm" value={filters.parceiro_id} onChange={(e) => setFilter('parceiro_id', e.target.value)} disabled={loadingOptions}>
+              <option value="">Todos</option>
+              {parceiros.map((parceiro) => (
+                <option key={parceiro.id} value={parceiro.id}>{parceiro.nome}</option>
+              ))}
+            </select>
+          </label>
+          <label className="app-filter-field">
+            <span className="app-filter-label">Plano financeiro</span>
+            <select className="input w-full input-sm" value={filters.categoria_financeira_id} onChange={(e) => setFilter('categoria_financeira_id', e.target.value)} disabled={loadingOptions}>
+              <option value="">Todos</option>
+              {categorias.map((categoria) => (
+                <option key={categoria.id} value={categoria.id}>{categoria.nome}</option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-start gap-2 text-sm text-[var(--c-muted)]">
+            <HiOutlineBuildingOffice2 className="mt-0.5" />
+            <span>{analiseAtual.description}</span>
+          </div>
+          <div className="flex gap-2">
+            <button type="button" className="btn btn-outline btn-sm" onClick={limparFiltros}>Limpar</button>
+            <button type="submit" className="btn btn-primary btn-sm">Gerar relatorio</button>
+          </div>
+        </div>
+      </form>
+
+      {error ? <div className="app-alert app-alert--error">{error}</div> : null}
+
+      <div className="app-summary-grid">
+        <Metric label="Credito" value={formatCurrency(relatorio.resumo.credito_total)} detail="Entradas no recorte" tone="positive" />
+        <Metric label="Debito" value={formatCurrency(relatorio.resumo.debito_total)} detail="Saidas no recorte" tone="negative" />
+        <Metric
+          label="Saldo"
+          value={formatCurrency(relatorio.resumo.saldo_total)}
+          detail={`${relatorio.resumo.quantidade_linhas || 0} linha(s)`}
+          tone={Number(relatorio.resumo.saldo_total || 0) >= 0 ? 'positive' : 'negative'}
+        />
+        <Metric label="Titulos" value={String(relatorio.resumo.titulos || 0)} detail={`${relatorio.resumo.movimentos || 0} baixa(s) vinculada(s)`} />
+      </div>
+
+      <section className="card sol-surface-card app-table-shell">
+        <div className="border-b border-[var(--c-border)] px-4 py-3">
+          <h2 className="text-lg font-semibold text-[var(--c-text)]">Detalhamento financeiro</h2>
+          <p className="text-sm text-[var(--c-muted)]">
+            Periodo: {formatDate(relatorio.filtros.data_inicial)} ate {formatDate(relatorio.filtros.data_final)}.
+          </p>
+        </div>
+
+        <div className="table-wrapper">
+          <ResizableTable columns={TABLE_COLUMNS} storageKey={STORAGE_KEY} className="table table-sm">
+            <thead>
+              <tr>
+                <ResizableTh columnKey="data_baixa">Baixa</ResizableTh>
+                <ResizableTh columnKey="data_vencimento">Vencto</ResizableTh>
+                <ResizableTh columnKey="parceiro_nome">Cliente/Fornecedor</ResizableTh>
+                <ResizableTh columnKey="titulo_parcela">Titulo/Parcela</ResizableTh>
+                <ResizableTh columnKey="documento">Documento</ResizableTh>
+                <ResizableTh columnKey="plano_financeiro">Plano financeiro</ResizableTh>
+                <ResizableTh columnKey="credito" className="text-right">Credito</ResizableTh>
+                <ResizableTh columnKey="debito" className="text-right">Debito</ResizableTh>
+                <ResizableTh columnKey="saldo" className="text-right">Saldo</ResizableTh>
+                <ResizableTh columnKey="obra_nome">Obra</ResizableTh>
+                <ResizableTh columnKey="empresa_nome">Empresa</ResizableTh>
+                <ResizableTh columnKey="status_titulo">Status</ResizableTh>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={12} className="text-center text-[var(--c-muted)]">Carregando financeiro de obras...</td>
+                </tr>
+              ) : relatorio.linhas.length === 0 ? (
+                <tr>
+                  <td colSpan={12} className="text-center text-[var(--c-muted)]">Nenhum titulo encontrado para os filtros selecionados.</td>
+                </tr>
+              ) : (
+                relatorio.linhas.map((linha) => (
+                  <tr key={linha.id}>
+                    <td>{formatDate(linha.data_baixa)}</td>
+                    <td>{formatDate(linha.data_vencimento)}</td>
+                    <td>
+                      <strong className="block text-[var(--c-text)]">{linha.parceiro_nome || '-'}</strong>
+                      <small className="text-[var(--c-muted)]">{linha.parceiro_cpf_cnpj || ''}</small>
+                    </td>
+                    <td>{linha.titulo_parcela || '-'}</td>
+                    <td className="text-xs">{linha.documento || '-'}</td>
+                    <td>
+                      <span className="line-clamp-2">{linha.plano_financeiro || '-'}</span>
+                    </td>
+                    <td className="text-right text-emerald-700 font-semibold">{linha.credito ? formatCurrency(linha.credito) : '-'}</td>
+                    <td className="text-right text-rose-700 font-semibold">{linha.debito ? formatCurrency(linha.debito) : '-'}</td>
+                    <td className="text-right font-semibold">{formatCurrency(linha.saldo)}</td>
+                    <td>{linha.obra_codigo ? `${linha.obra_codigo} - ${linha.obra_nome || ''}` : (linha.obra_nome || '-')}</td>
+                    <td>{linha.empresa_nome || '-'}</td>
+                    <td><span className={statusClass(linha.status_titulo)}>{linha.status_titulo || '-'}</span></td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </ResizableTable>
+        </div>
+      </section>
+    </div>
+  );
+}

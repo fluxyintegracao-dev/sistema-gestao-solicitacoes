@@ -1244,6 +1244,296 @@ async function gerarRelatorioAnalitico(req, filters = {}) {
   };
 }
 
+function normalizeFinanceiroObrasAnalise(value) {
+  const analise = String(value || 'REALIZADO').toUpperCase();
+  if (['REALIZADO', 'COMPROMETIDO', 'A_REALIZAR'].includes(analise)) {
+    return analise;
+  }
+  return 'REALIZADO';
+}
+
+function buildFinanceiroObrasTituloWhere(filters, obraWhere, periodo, analise) {
+  const where = {
+    ...obraWhere,
+    status: { [Op.notIn]: ['CANCELADO', 'ESTORNADO'] }
+  };
+
+  if (filters.tipo) {
+    where.tipo = filters.tipo;
+  }
+  if (filters.empresa_id) {
+    where.empresa_id = Number(filters.empresa_id);
+  }
+  if (filters.parceiro_id) {
+    where.parceiro_id = Number(filters.parceiro_id);
+  }
+  if (filters.categoria_financeira_id) {
+    where.categoria_financeira_id = Number(filters.categoria_financeira_id);
+  }
+
+  if (analise === 'A_REALIZAR') {
+    where.status = { [Op.in]: ['ABERTO', 'PARCIAL'] };
+    where.valor_saldo = { [Op.gt]: 0 };
+  }
+
+  if (analise !== 'REALIZADO') {
+    where.data_vencimento = {
+      [Op.between]: [periodo.data_inicial, periodo.data_final]
+    };
+  }
+
+  if (filters.q) {
+    const term = String(filters.q).trim();
+    where[Op.or] = [
+      { codigo: { [Op.like]: `%${term}%` } },
+      { descricao: { [Op.like]: `%${term}%` } },
+      { numero_documento: { [Op.like]: `%${term}%` } },
+      { linha_digitavel: { [Op.like]: `%${term}%` } },
+      { codigo_barras: { [Op.like]: `%${term}%` } }
+    ];
+  }
+
+  return where;
+}
+
+function getFinanceiroObrasTituloIncludes() {
+  return [
+    {
+      model: Obra,
+      as: 'obra',
+      attributes: ['id', 'nome', 'codigo', 'tipo_centro_custo', 'empresa_grupo_id']
+    },
+    {
+      model: EmpresaGrupo,
+      as: 'empresa',
+      attributes: ['id', 'codigo', 'nome', 'razao_social', 'cnpj']
+    },
+    {
+      model: Parceiro,
+      as: 'parceiro',
+      attributes: ['id', 'nome', 'cpf_cnpj']
+    },
+    {
+      model: CategoriaFinanceira,
+      as: 'categoriaFinanceira',
+      attributes: ['id', 'nome', 'tipo', 'dre_grupo', 'dre_subgrupo']
+    }
+  ];
+}
+
+function getTituloParcelaLabel(titulo = {}) {
+  const codigo = titulo.codigo || `TIT-${titulo.id}`;
+  const numeroParcela = Number(titulo.numero_parcela || 0);
+  const totalParcelas = Number(titulo.total_parcelas || 0);
+  if (numeroParcela > 0 && totalParcelas > 0) {
+    return `${codigo}/${numeroParcela}-${totalParcelas}`;
+  }
+  return codigo;
+}
+
+function getPlanoFinanceiroLabel(titulo = {}) {
+  const categoria = titulo.categoriaFinanceira;
+  if (!categoria) return 'Sem categoria';
+  const grupo = categoria.dre_grupo ? `${categoria.dre_grupo} - ` : '';
+  const subgrupo = categoria.dre_subgrupo ? `${categoria.dre_subgrupo} - ` : '';
+  return `${grupo}${subgrupo}${categoria.nome}`;
+}
+
+function getCreditoDebitoFromTitulo(titulo, valor) {
+  const amount = roundCurrency(valor);
+  if (String(titulo.tipo || '').toUpperCase() === 'RECEBER') {
+    return { credito: amount, debito: 0 };
+  }
+  return { credito: 0, debito: amount };
+}
+
+function buildFinanceiroObrasLinhaBase(titulo, analise) {
+  return {
+    titulo_id: titulo.id,
+    titulo_codigo: titulo.codigo,
+    titulo_parcela: getTituloParcelaLabel(titulo),
+    tipo: titulo.tipo,
+    status_titulo: titulo.status,
+    documento: titulo.numero_documento || titulo.linha_digitavel || titulo.codigo_barras || null,
+    descricao: titulo.descricao,
+    parceiro_nome: titulo.parceiro?.nome || null,
+    parceiro_cpf_cnpj: titulo.parceiro?.cpf_cnpj || null,
+    obra_id: titulo.obra_id,
+    obra_nome: titulo.obra?.nome || null,
+    obra_codigo: titulo.obra?.codigo || null,
+    empresa_id: titulo.empresa_id,
+    empresa_nome: titulo.empresa?.nome || titulo.empresa?.razao_social || null,
+    empresa_cnpj: titulo.empresa?.cnpj || null,
+    categoria_nome: titulo.categoriaFinanceira?.nome || null,
+    plano_financeiro: getPlanoFinanceiroLabel(titulo),
+    data_emissao: titulo.data_emissao,
+    data_vencimento: titulo.data_vencimento,
+    valor_original: Number(titulo.valor_original || 0),
+    valor_baixado: Number(titulo.valor_baixado || 0),
+    valor_saldo: Number(titulo.valor_saldo || 0),
+    analise
+  };
+}
+
+function buildFinanceiroObrasLinhaTitulo(titulo, analise) {
+  const valorBase = analise === 'A_REALIZAR'
+    ? Number(titulo.valor_saldo || 0)
+    : Number(titulo.valor_original || 0);
+  const { credito, debito } = getCreditoDebitoFromTitulo(titulo, valorBase);
+
+  return {
+    id: `titulo-${titulo.id}-${analise}`,
+    ...buildFinanceiroObrasLinhaBase(titulo, analise),
+    data_baixa: null,
+    movimento_id: null,
+    status_movimento: null,
+    conta_bancaria_nome: null,
+    credito,
+    debito,
+    saldo: 0
+  };
+}
+
+function buildFinanceiroObrasLinhaMovimento(movimento) {
+  const titulo = movimento.titulo || {};
+  const valorBase = Number(movimento.valor_quitacao || movimento.valor || 0);
+  const { credito, debito } = getCreditoDebitoFromTitulo(titulo, valorBase);
+
+  return {
+    id: `movimento-${movimento.id}`,
+    ...buildFinanceiroObrasLinhaBase(titulo, 'REALIZADO'),
+    data_baixa: movimento.data_movimento,
+    movimento_id: movimento.id,
+    status_movimento: movimento.status,
+    conta_bancaria_nome: movimento.contaBancaria?.nome || null,
+    credito,
+    debito,
+    saldo: 0
+  };
+}
+
+function applyFinanceiroObrasSaldo(linhas = []) {
+  let saldo = 0;
+  return linhas.map((linha) => {
+    saldo = roundCurrency(saldo + Number(linha.credito || 0) - Number(linha.debito || 0));
+    return { ...linha, saldo };
+  });
+}
+
+function summarizeFinanceiroObras(linhas = []) {
+  const credito = linhas.reduce((sum, linha) => roundCurrency(sum + Number(linha.credito || 0)), 0);
+  const debito = linhas.reduce((sum, linha) => roundCurrency(sum + Number(linha.debito || 0)), 0);
+  const titulosMap = new Map();
+  linhas.forEach((linha) => {
+    if (!linha.titulo_id || titulosMap.has(linha.titulo_id)) return;
+    titulosMap.set(linha.titulo_id, linha);
+  });
+  const movimentoIds = new Set(linhas.map((linha) => linha.movimento_id).filter(Boolean));
+  const titulosUnicos = Array.from(titulosMap.values());
+
+  return {
+    quantidade_linhas: linhas.length,
+    titulos: titulosMap.size,
+    movimentos: movimentoIds.size,
+    credito_total: credito,
+    debito_total: debito,
+    saldo_total: roundCurrency(credito - debito),
+    valor_original_total: titulosUnicos.reduce((sum, linha) => roundCurrency(sum + Number(linha.valor_original || 0)), 0),
+    valor_baixado_total: titulosUnicos.reduce((sum, linha) => roundCurrency(sum + Number(linha.valor_baixado || 0)), 0),
+    valor_saldo_total: titulosUnicos.reduce((sum, linha) => roundCurrency(sum + Number(linha.valor_saldo || 0)), 0)
+  };
+}
+
+async function gerarRelatorioFinanceiroObras(req, filters = {}) {
+  const analise = normalizeFinanceiroObrasAnalise(filters.analise);
+  const periodo = resolvePeriodo({
+    data_inicial: filters.data_inicial,
+    data_final: filters.data_final,
+    periodo: filters.periodo || 'MES_ATUAL'
+  });
+  const obraWhere = await resolveObraScope(req, filters.obra_id);
+
+  if (obraWhere === null) {
+    return {
+      filtros: { ...filters, analise, ...periodo },
+      resumo: summarizeFinanceiroObras([]),
+      linhas: []
+    };
+  }
+
+  const tituloWhere = buildFinanceiroObrasTituloWhere(filters, obraWhere, periodo, analise);
+  const limit = Math.min(Number(filters.limit || 1000), 3000);
+  let linhas = [];
+
+  if (analise === 'REALIZADO') {
+    const movimentos = await MovimentoFinanceiro.findAll({
+      where: {
+        status: 'ATIVO',
+        data_movimento: {
+          [Op.between]: [periodo.data_inicial, periodo.data_final]
+        }
+      },
+      include: [
+        {
+          model: TituloFinanceiro,
+          as: 'titulo',
+          required: true,
+          where: tituloWhere,
+          include: getFinanceiroObrasTituloIncludes()
+        },
+        {
+          model: ContaBancaria,
+          as: 'contaBancaria',
+          attributes: ['id', 'nome', 'banco', 'agencia', 'conta']
+        }
+      ],
+      order: [
+        ['data_movimento', 'ASC'],
+        [{ model: TituloFinanceiro, as: 'titulo' }, 'data_vencimento', 'ASC'],
+        ['id', 'ASC']
+      ],
+      limit,
+      subQuery: false
+    });
+
+    linhas = movimentos.map((movimentoInstance) => {
+      const movimento = typeof movimentoInstance.toJSON === 'function' ? movimentoInstance.toJSON() : movimentoInstance;
+      return buildFinanceiroObrasLinhaMovimento(movimento);
+    });
+  } else {
+    const titulos = await TituloFinanceiro.findAll({
+      where: tituloWhere,
+      include: getFinanceiroObrasTituloIncludes(),
+      order: [
+        ['data_vencimento', 'ASC'],
+        ['id', 'ASC']
+      ],
+      limit,
+      subQuery: false
+    });
+
+    linhas = titulos.map((tituloInstance) => {
+      const titulo = typeof tituloInstance.toJSON === 'function' ? tituloInstance.toJSON() : tituloInstance;
+      return buildFinanceiroObrasLinhaTitulo(titulo, analise);
+    });
+  }
+
+  const linhasComSaldo = applyFinanceiroObrasSaldo(linhas);
+
+  return {
+    filtros: {
+      ...filters,
+      analise,
+      periodo: periodo.periodo,
+      descricao: periodo.descricao,
+      data_inicial: periodo.data_inicial,
+      data_final: periodo.data_final
+    },
+    resumo: summarizeFinanceiroObras(linhasComSaldo),
+    linhas: linhasComSaldo
+  };
+}
+
 function getCompetenciaWhere(periodo) {
   return {
     competencia_data: {
@@ -3885,6 +4175,7 @@ async function gerarDiagnosticoDre(req) {
 
 module.exports = {
   gerarRelatorioAnalitico,
+  gerarRelatorioFinanceiroObras,
   gerarRelatorioFluxoCaixa,
   gerarRelatorioFluxoConsolidado,
   gerarPainelExecutivoGrupo,

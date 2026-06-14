@@ -561,6 +561,11 @@ export default function FinanceiroRelatorios() {
                 Analitico
               </Link>
             ) : null}
+            {isVisible('relatorios.financeiro.financeiro_obras') ? (
+              <Link to="/financeiro/relatorios/financeiro-obras" className="btn btn-outline">
+                Financeiro de Obras
+              </Link>
+            ) : null}
             <Link to="/financeiro/baixas" className="btn btn-outline">
               Baixas
             </Link>

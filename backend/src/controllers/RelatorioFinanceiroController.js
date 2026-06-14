@@ -8,6 +8,7 @@ const {
   gerarRelatorioFluxoConsolidado,
   gerarRelatorioIntercompany,
   gerarRelatorioAnalitico,
+  gerarRelatorioFinanceiroObras,
   gerarRelatorioFluxoCaixa
 } = require('../services/relatorioFinanceiroService');
 const { responderErroController } = require('../utils/controllerError');
@@ -54,6 +55,16 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return responderErro(res, error, 'Erro ao gerar relatorio analitico financeiro');
+    }
+  },
+
+  async financeiroObras(req, res) {
+    try {
+      const relatorio = await gerarRelatorioFinanceiroObras(req, req.query || {});
+      return res.json(relatorio);
+    } catch (error) {
+      console.error(error);
+      return responderErro(res, error, 'Erro ao gerar relatorio financeiro de obras');
     }
   },
 

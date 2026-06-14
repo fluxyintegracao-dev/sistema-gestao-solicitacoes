@@ -50,6 +50,7 @@ const UI_VISIBILITY_COMPONENTS = [
           { key: 'relatorios.financeiro.intercompany', label: 'Entre Empresas', type: 'card' },
           { key: 'relatorios.financeiro.endividamento', label: 'Endividamento', type: 'card' },
           { key: 'relatorios.financeiro.analitico', label: 'Analitico financeiro', type: 'card' },
+          { key: 'relatorios.financeiro.financeiro_obras', label: 'Financeiro de obras', type: 'card' },
           { key: 'relatorios.financeiro.resultado_obras', label: 'Resultado de obras', type: 'card' },
           { key: 'relatorios.financeiro.centros_custo', label: 'Centros de custo', type: 'card' }
         ]

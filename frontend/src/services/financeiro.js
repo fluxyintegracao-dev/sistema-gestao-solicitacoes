@@ -182,6 +182,21 @@ export async function getRelatorioAnaliticoFinanceiro(params = {}) {
   return parseJson(response, 'Erro ao buscar relatorio analitico financeiro');
 }
 
+export async function getRelatorioFinanceiroObras(params = {}) {
+  const query = new URLSearchParams(
+    Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== '')
+  ).toString();
+  const url = query
+    ? `${API_URL}/financeiro/relatorios/financeiro-obras?${query}`
+    : `${API_URL}/financeiro/relatorios/financeiro-obras`;
+
+  const response = await fetch(url, {
+    headers: authHeaders()
+  });
+
+  return parseJson(response, 'Erro ao buscar financeiro de obras');
+}
+
 export async function getBaixasFinanceiras(params = {}) {
   const query = new URLSearchParams(
     Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== '')
