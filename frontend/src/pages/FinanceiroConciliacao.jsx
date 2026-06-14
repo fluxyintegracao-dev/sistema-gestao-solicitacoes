@@ -1608,6 +1608,11 @@ export default function FinanceiroConciliacao() {
             <Link to="/financeiro/titulos" className="btn btn-outline btn-sm">Títulos</Link>
             <Link to="/financeiro/relatorios" className="btn btn-outline btn-sm">Relatórios</Link>
             <Link to="/financeiro/cadastros" className="btn btn-outline btn-sm">Cadastros</Link>
+            {viewMode === 'DETALHE' && (
+              <button type="button" className="btn btn-outline btn-sm" onClick={() => setViewMode('CONTAS')}>
+                Voltar para contas
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -1773,12 +1778,6 @@ export default function FinanceiroConciliacao() {
         </>
       ) : (
         <>
-          <div className="flex justify-start">
-            <button type="button" className="btn btn-outline btn-sm" onClick={() => setViewMode('CONTAS')}>
-              Voltar para contas
-            </button>
-          </div>
-
       <form className="card sol-surface-card" onSubmit={aplicarFiltros}>
         <div className="flex flex-wrap items-end gap-3">
           <label className="app-filter-field min-w-[130px]">
