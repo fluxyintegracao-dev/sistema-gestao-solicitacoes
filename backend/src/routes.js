@@ -1253,7 +1253,7 @@ router.put('/financeiro/pagamentos/accounts/:id', allowPagamentosConfig, critica
 router.use('/financeiro/bancos', allowFinanceiro, require('./modules/banking/routes'));
 router.get('/financeiro/conciliacoes', allowFinanceiro, validateRequest({ query: validateFinanceConciliacaoQuery }), ConciliacaoBancariaController.index);
 router.get('/financeiro/conciliacoes/importacoes', allowFinanceiro, validateRequest({ query: validateFinanceConciliacaoImportacoesQuery }), ConciliacaoBancariaController.importacoes);
-router.post('/financeiro/conciliacoes/importar-ofx', allowFinanceiro, criticalRateLimit, uploadOfx.single('file'), validateRequest({ body: validateFinanceConciliacaoImportBody }), ConciliacaoBancariaController.importarOfx);
+router.post('/financeiro/conciliacoes/importar-ofx', allowFinanceiro, criticalRateLimit, uploadOfx.fields([{ name: 'file', maxCount: 1 }, { name: 'files', maxCount: 20 }]), validateRequest({ body: validateFinanceConciliacaoImportBody }), ConciliacaoBancariaController.importarOfx);
 router.post('/financeiro/conciliacoes/conciliar-sugeridos', allowFinanceiro, criticalRateLimit, validateRequest({ body: validateFinanceConciliacaoConciliarSugeridosBody }), ConciliacaoBancariaController.conciliarSugeridos);
 router.get('/financeiro/conciliacoes/:id/movimentos', allowFinanceiro, validateRequest({ params: validateNumericIdParam('id', 'Conciliacao bancaria'), query: validateFinanceConciliacaoMovimentosQuery }), ConciliacaoBancariaController.movimentos);
 router.post('/financeiro/conciliacoes/:id/criar-titulo', allowFinanceiro, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Conciliacao bancaria'), body: validateFinanceConciliacaoCriarTituloBody }), ConciliacaoBancariaController.criarTitulo);

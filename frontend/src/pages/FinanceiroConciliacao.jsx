@@ -1066,7 +1066,8 @@ export default function FinanceiroConciliacao() {
   const [tarifasBancarias, setTarifasBancarias] = useState([]);
   const [filters, setFilters] = useState({ status: 'PENDENTE', conta_bancaria_id: '', data_inicial: '', data_final: '', page: 1, page_size: 100 });
   const [appliedFilters, setAppliedFilters] = useState({ status: 'PENDENTE', conta_bancaria_id: '', data_inicial: '', data_final: '', page: 1, page_size: 100 });
-  const [uploadForm, setUploadForm] = useState({ conta_bancaria_id: '', file: null });
+  const [uploadForm, setUploadForm] = useState({ conta_bancaria_id: '', files: [] });
+  const [importResults, setImportResults] = useState([]);
   const [dados, setDados] = useState({
     resumo: { total: 0, pendentes: 0, conciliados: 0, ignorados: 0, valor_total: 0, valor_absoluto_total: 0 },
     meta: { total_disponivel: 0, total_listado: 0, current_page: 1, page_size: 100, total_pages: 1 },
@@ -1129,7 +1130,7 @@ export default function FinanceiroConciliacao() {
       const contasData = await getContasBancarias();
       const normalized = Array.isArray(contasData) ? contasData : [];
       setContas(normalized);
-      setUploadForm((c) => ({ ...c, conta_bancaria_id: c.conta_bancaria_id || String(normalized[0]?.id || '') }));
+      setUploadForm((c) => ({ ...c, conta_bancaria_id: c.conta_bancaria_id || '' }));
     } catch { setContas([]); } finally { setLoadingContas(false); }
   }
 
@@ -1277,15 +1278,26 @@ export default function FinanceiroConciliacao() {
 
   async function handleImportar(event) {
     event.preventDefault();
-    if (!uploadForm.conta_bancaria_id || !uploadForm.file) { setError('Selecione a conta bancaria e o arquivo OFX.'); return; }
+    if (!uploadForm.files.length) { setError('Selecione ao menos um arquivo OFX.'); return; }
     try {
       setImporting(true); setError(''); setFeedback('');
+      setImportResults([]);
       const formData = new FormData();
-      formData.append('conta_bancaria_id', uploadForm.conta_bancaria_id);
-      formData.append('file', uploadForm.file);
+      if (uploadForm.conta_bancaria_id) {
+        formData.append('conta_bancaria_id', uploadForm.conta_bancaria_id);
+      }
+      uploadForm.files.forEach((file) => formData.append('files', file));
       const response = await importarOfxConciliacao(formData);
-      setFeedback(`${response.importados || 0} lançamento(s) importado(s) e ${response.ignorados || 0} ignorado(s) do arquivo ${response.arquivo || ''}.`);
-      setUploadForm((c) => ({ ...c, file: null }));
+      const resultados = Array.isArray(response?.resultados) ? response.resultados : [];
+      setImportResults(resultados);
+      const arquivosImportados = Number(response.arquivos_importados || 0);
+      const arquivosNaoImportados = Number(response.arquivos_nao_importados || 0);
+      const importados = Number(response.importados || 0);
+      setFeedback(`${arquivosImportados} arquivo(s) importado(s), ${arquivosNaoImportados} nao importado(s) e ${importados} lancamento(s) novo(s) gravado(s).`);
+      if (arquivosNaoImportados > 0 && arquivosImportados === 0) {
+        setError('Nenhum arquivo foi importado. Confira o resumo abaixo e ajuste as contas bancarias antes de tentar novamente.');
+      }
+      setUploadForm((c) => ({ ...c, files: [] }));
       const fi = document.getElementById('ofx-file-input');
       if (fi) fi.value = '';
       await carregarResumoContas();
@@ -1624,22 +1636,58 @@ export default function FinanceiroConciliacao() {
             <span className="app-filter-label">Importar OFX <span className="font-normal text-[var(--c-muted)]">— Remessas duplicadas são bloqueadas.</span></span>
             <select className="input w-full input-sm" value={uploadForm.conta_bancaria_id} disabled={loadingContas}
               onChange={(e) => setUploadForm((c) => ({ ...c, conta_bancaria_id: e.target.value }))}>
-              <option value="">Conta bancária</option>
+              <option value="">Detectar conta pelo OFX</option>
               {contas.map((ct) => <option key={ct.id} value={ct.id}>{ct.nome}</option>)}
             </select>
           </label>
           <label className="app-filter-field flex-[2] min-w-[200px]">
             <span className="app-filter-label">Arquivo OFX</span>
-            <input id="ofx-file-input" className="input w-full input-sm" type="file" accept=".ofx"
-              onChange={(e) => setUploadForm((c) => ({ ...c, file: e.target.files?.[0] || null }))} />
+            <input id="ofx-file-input" className="input w-full input-sm" type="file" accept=".ofx" multiple
+              onChange={(e) => setUploadForm((c) => ({ ...c, files: Array.from(e.target.files || []) }))} />
           </label>
-          <button type="submit" className="btn btn-primary btn-sm shrink-0" disabled={importing || !uploadForm.conta_bancaria_id || !uploadForm.file}>
+          <button type="submit" className="btn btn-primary btn-sm shrink-0" disabled={importing || !uploadForm.files.length}>
             {importing ? 'Importando...' : 'Importar OFX'}
           </button>
         </div>
+        <p className="mt-2 text-xs text-[var(--c-muted)]">
+          Deixe a conta em branco para o sistema identificar cada OFX pela Identificacao OFX cadastrada na conta bancaria. Se selecionar uma conta, todos os arquivos serao importados nela.
+        </p>
       </form>
 
       {/* Filtros — linha horizontal */}
+      {importResults.length > 0 && (
+        <div className="card sol-surface-card">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 className="text-sm font-semibold text-[var(--c-text)]">Resultado da importacao</h2>
+              <p className="text-xs text-[var(--c-muted)]">Confira quais OFX foram importados e quais precisam de ajuste cadastral.</p>
+            </div>
+            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+              {importResults.filter((item) => item.sucesso).length}/{importResults.length} importado(s)
+            </span>
+          </div>
+          <div className="grid gap-2">
+            {importResults.map((item, index) => (
+              <div
+                key={`${item.arquivo || 'ofx'}-${index}`}
+                className={`rounded-xl border px-3 py-2 text-sm ${item.sucesso ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-amber-200 bg-amber-50 text-amber-900'}`}
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <strong className="truncate">{item.arquivo || `Arquivo ${index + 1}`}</strong>
+                  <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${item.sucesso ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-800'}`}>
+                    {item.sucesso ? 'Importado' : 'Nao importado'}
+                  </span>
+                </div>
+                <p className="mt-1 text-xs">
+                  {item.sucesso
+                    ? `${item.importados || 0} lancamento(s) novo(s), ${item.ignorados || 0} ignorado(s) - ${item.conta_bancaria_nome || `Conta #${item.conta_bancaria_id || '-'}`}`
+                    : item.mensagem || 'Conta nao encontrada para este OFX.'}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       {error && <div className="app-alert app-alert--error">{error}</div>}
       {feedback && <div className="app-alert border-emerald-200 bg-emerald-50 text-emerald-700">{feedback}</div>}
 

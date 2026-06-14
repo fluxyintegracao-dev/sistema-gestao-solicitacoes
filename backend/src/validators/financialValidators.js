@@ -714,7 +714,7 @@ function validateFinanceConciliacaoImportBody(body = {}) {
   );
 
   return {
-    conta_bancaria_id: parseInteger(body.conta_bancaria_id, 'Conta bancaria', { required: true })
+    conta_bancaria_id: parseInteger(body.conta_bancaria_id, 'Conta bancaria')
   };
 }
 
@@ -1318,6 +1318,9 @@ function validateFinanceCadastroContaBody(body = {}) {
       'banco',
       'agencia',
       'conta',
+      'ofx_bank_id',
+      'ofx_branch_id',
+      'ofx_account_id',
       'tipo_conta',
       'empresa_id',
       'tipo_operacional',
@@ -1333,6 +1336,9 @@ function validateFinanceCadastroContaBody(body = {}) {
     banco: parseOptionalText(body.banco, 'Banco', 120),
     agencia: parseOptionalText(body.agencia, 'Agencia', 40),
     conta: parseOptionalText(body.conta, 'Conta', 60),
+    ofx_bank_id: parseOptionalText(body.ofx_bank_id, 'Banco OFX', 20),
+    ofx_branch_id: parseOptionalText(body.ofx_branch_id, 'Agencia OFX', 40),
+    ofx_account_id: parseOptionalText(body.ofx_account_id, 'Identificador OFX da conta', 80),
     tipo_conta: parseOptionalText(body.tipo_conta, 'Tipo de conta', 40),
     empresa_id: parseInteger(body.empresa_id, 'Empresa do grupo'),
     tipo_operacional: parseEnum(body.tipo_operacional, 'Tipo operacional', ['BANCARIA', 'CAIXA_INTERNO']),

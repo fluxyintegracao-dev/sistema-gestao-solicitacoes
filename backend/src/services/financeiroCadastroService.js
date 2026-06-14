@@ -71,6 +71,9 @@ function sanitizeContaPayload(payload = {}, { partial = false } = {}) {
     banco: sanitizeTextField(payload.banco, { emptyAsNull: true }),
     agencia: sanitizeTextField(payload.agencia, { emptyAsNull: true }),
     conta: sanitizeTextField(payload.conta, { emptyAsNull: true }),
+    ofx_bank_id: sanitizeTextField(payload.ofx_bank_id, { emptyAsNull: true }),
+    ofx_branch_id: sanitizeTextField(payload.ofx_branch_id, { emptyAsNull: true }),
+    ofx_account_id: sanitizeTextField(payload.ofx_account_id, { emptyAsNull: true }),
     tipo_conta: sanitizeTextField(payload.tipo_conta, { emptyAsNull: true }),
     exige_abertura_fechamento: payload.exige_abertura_fechamento === undefined
       ? undefined

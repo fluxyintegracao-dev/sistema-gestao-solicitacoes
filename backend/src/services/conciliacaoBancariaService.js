@@ -195,6 +195,105 @@ function normalizeOfxIdentifier(value) {
   return normalized;
 }
 
+function onlyDigits(value) {
+  return String(value || '').replace(/\D/g, '');
+}
+
+function stripLeadingZeros(value) {
+  return onlyDigits(value).replace(/^0+/, '') || '0';
+}
+
+function normalizeBankIdentifier(value) {
+  const text = normalizeText(value);
+  const digits = onlyDigits(value);
+  if (digits) {
+    return stripLeadingZeros(digits).padStart(3, '0');
+  }
+  if (text.includes('BANCO DO BRASIL') || text === 'BB') return '001';
+  if (text.includes('CAIXA') || text.includes('CEF')) return '104';
+  if (text.includes('BRADESCO')) return '237';
+  if (text.includes('ITAU')) return '341';
+  if (text.includes('SANTANDER')) return '033';
+  if (text.includes('SICREDI')) return '748';
+  if (text.includes('BANESTES') || text.includes('BANCO DO ESTADO DO ESPIRITO SANTO')) return '021';
+  return text;
+}
+
+function bankAccountIdentifierMatches(left, right) {
+  const a = stripLeadingZeros(left);
+  const b = stripLeadingZeros(right);
+  if (!a || !b || a === '0' || b === '0') {
+    return false;
+  }
+  if (a === b) {
+    return true;
+  }
+  if (a.length > 2 && b.length > 2 && a.slice(0, -1) === b) {
+    return true;
+  }
+  if (a.length > 2 && b.length > 2 && b.slice(0, -1) === a) {
+    return true;
+  }
+  return false;
+}
+
+function extractOfxAccountInfo(fileBuffer) {
+  const rawText = decodeOfxBuffer(fileBuffer).replace(/\r/g, '\n');
+  const normalizedText = rawText.replace(/>\s+</g, '><');
+  return {
+    bankId: extractTagValue(normalizedText, 'BANKID'),
+    branchId: extractTagValue(normalizedText, 'BRANCHID'),
+    accountId: extractTagValue(normalizedText, 'ACCTID'),
+    accountType: extractTagValue(normalizedText, 'ACCTTYPE')
+  };
+}
+
+function accountMatchesOfx(conta, ofxInfo) {
+  if (!conta.ofx_account_id || !bankAccountIdentifierMatches(ofxInfo.accountId, conta.ofx_account_id)) {
+    return false;
+  }
+
+  if (ofxInfo.branchId && conta.ofx_branch_id && !bankAccountIdentifierMatches(ofxInfo.branchId, conta.ofx_branch_id)) {
+    return false;
+  }
+
+  const ofxBank = normalizeBankIdentifier(ofxInfo.bankId);
+  if (ofxInfo.bankId && conta.ofx_bank_id && normalizeBankIdentifier(conta.ofx_bank_id) !== ofxBank) {
+    return false;
+  }
+
+  return true;
+}
+
+async function resolveContaBancariaFromOfx(fileBuffer, { contaBancariaId = null } = {}) {
+  if (contaBancariaId) {
+    return validarContaBancaria(contaBancariaId);
+  }
+
+  const ofxInfo = extractOfxAccountInfo(fileBuffer);
+  const contas = await ContaBancaria.findAll({
+    where: { ativo: true },
+    attributes: ['id', 'nome', 'banco', 'agencia', 'conta', 'ofx_bank_id', 'ofx_branch_id', 'ofx_account_id', 'empresa_id']
+  });
+  const matches = contas.filter((conta) => accountMatchesOfx(conta, ofxInfo));
+
+  if (matches.length === 1) {
+    return matches[0];
+  }
+
+  const identificacao = [
+    ofxInfo.bankId ? `banco ${ofxInfo.bankId}` : null,
+    ofxInfo.branchId ? `agencia ${ofxInfo.branchId}` : null,
+    ofxInfo.accountId ? `conta ${ofxInfo.accountId}` : null
+  ].filter(Boolean).join(', ') || 'sem identificacao bancaria no arquivo';
+
+  if (matches.length > 1) {
+    throw createHttpError(400, `Mais de uma conta cadastrada combina com este OFX (${identificacao}). Revise a Identificacao OFX das contas ou selecione a conta manualmente e importe novamente.`);
+  }
+
+  throw createHttpError(400, `Conta bancaria nao encontrada para este OFX (${identificacao}). Cadastre a Identificacao OFX na conta bancaria antes de importar automaticamente.`);
+}
+
 function parseOfxTransactions(fileBuffer) {
   const rawText = decodeOfxBuffer(fileBuffer).replace(/\r/g, '\n');
   const normalizedText = rawText.replace(/>\s+</g, '><');
@@ -400,28 +499,29 @@ function buildConciliacaoWhere(filters = {}, { forcePending = false } = {}) {
   return where;
 }
 
-async function importOfx(req, payload = {}) {
-  await assertFinanceAccess(req);
-
-  if (!req.file?.buffer || !req.file?.originalname) {
+async function importSingleOfxFile(req, file, payload = {}) {
+  if (!file?.buffer || !file?.originalname) {
     throw createHttpError(400, 'Arquivo OFX e obrigatorio.');
   }
 
-  const contaBancariaId = parseInteger(payload.conta_bancaria_id, 'Conta bancaria');
-  const contaBancaria = await validarContaBancaria(contaBancariaId);
+  const contaBancariaId = payload.conta_bancaria_id
+    ? parseInteger(payload.conta_bancaria_id, 'Conta bancaria')
+    : null;
+  const contaBancaria = await resolveContaBancariaFromOfx(file.buffer, { contaBancariaId });
+  const contaFinalId = Number(contaBancaria.id);
   const empresaContaId = contaBancaria.empresa_id ? Number(contaBancaria.empresa_id) : null;
   if (!empresaContaId) {
     throw createHttpError(
       400,
-      'A conta bancaria selecionada precisa estar vinculada a uma empresa antes de importar OFX.'
+      `A conta bancaria ${contaBancaria.nome || `#${contaFinalId}`} precisa estar vinculada a uma empresa antes de importar OFX.`
     );
   }
 
-  const transacoes = parseOfxTransactions(req.file.buffer);
+  const transacoes = parseOfxTransactions(file.buffer);
   const arquivoHash = buildImportFingerprint(transacoes);
   const importacaoExistente = await ConciliacaoBancariaImportacao.findOne({
     where: {
-      conta_bancaria_id: contaBancariaId,
+      conta_bancaria_id: contaFinalId,
       arquivo_hash: arquivoHash
     },
     attributes: ['id', 'arquivo_nome', 'createdAt', 'importados', 'ignorados']
@@ -439,7 +539,7 @@ async function importOfx(req, payload = {}) {
   const skipped = [];
 
   for (const transacao of transacoes) {
-    const uniqueKey = `${contaBancariaId}:${transacao.ofx_uid}`;
+    const uniqueKey = `${contaFinalId}:${transacao.ofx_uid}`;
     if (batchSeen.has(uniqueKey)) {
       skipped.push({
         ofx_uid: transacao.ofx_uid,
@@ -451,7 +551,7 @@ async function importOfx(req, payload = {}) {
 
     const existing = await ConciliacaoBancaria.findOne({
       where: {
-        conta_bancaria_id: contaBancariaId,
+        conta_bancaria_id: contaFinalId,
         ofx_uid: transacao.ofx_uid
       },
       attributes: ['id', 'status']
@@ -467,7 +567,7 @@ async function importOfx(req, payload = {}) {
     }
 
     const created = await ConciliacaoBancaria.create({
-      conta_bancaria_id: contaBancariaId,
+      conta_bancaria_id: contaFinalId,
       empresa_id: empresaContaId,
       titulo_financeiro_id: null,
       movimento_financeiro_id: null,
@@ -490,10 +590,10 @@ async function importOfx(req, payload = {}) {
   }
 
   const importacao = await ConciliacaoBancariaImportacao.create({
-    conta_bancaria_id: contaBancariaId,
+    conta_bancaria_id: contaFinalId,
     empresa_id: empresaContaId,
     arquivo_hash: arquivoHash,
-    arquivo_nome: req.file.originalname,
+    arquivo_nome: file.originalname,
     total_lidos: transacoes.length,
     importados: imported.length,
     ignorados: skipped.length,
@@ -509,10 +609,10 @@ async function importOfx(req, payload = {}) {
     status: 'SUCCESS',
     descricao: 'Arquivo OFX importado para conciliacao bancaria',
     metadata: {
-      conta_bancaria_id: contaBancariaId,
+      conta_bancaria_id: contaFinalId,
       importacao_id: importacao.id,
       arquivo_hash: arquivoHash,
-      arquivo: req.file.originalname,
+      arquivo: file.originalname,
       importados: imported.length,
       ignorados: skipped.length
     }
@@ -520,8 +620,9 @@ async function importOfx(req, payload = {}) {
 
   return {
     importacao_id: importacao.id,
-    conta_bancaria_id: contaBancariaId,
-    arquivo: req.file.originalname,
+    conta_bancaria_id: contaFinalId,
+    conta_bancaria_nome: contaBancaria.nome || null,
+    arquivo: file.originalname,
     arquivo_hash: arquivoHash,
     importados: imported.length,
     ignorados: skipped.length,
@@ -533,6 +634,68 @@ async function importOfx(req, payload = {}) {
       descricao_banco: item.descricao_banco
     })),
     itens_ignorados: skipped
+  };
+}
+
+async function importOfx(req, payload = {}) {
+  await assertFinanceAccess(req);
+
+  const files = [
+    ...(Array.isArray(req.files?.file) ? req.files.file : []),
+    ...(Array.isArray(req.files?.files) ? req.files.files : [])
+  ].filter((file) => file?.buffer && file?.originalname);
+
+  if (!files.length && req.file?.buffer) {
+    files.push(req.file);
+  }
+
+  if (!files.length) {
+    throw createHttpError(400, 'Selecione ao menos um arquivo OFX.');
+  }
+
+  const resultados = [];
+  for (const file of files) {
+    try {
+      const resultado = await importSingleOfxFile(req, file, payload);
+      resultados.push({
+        status: 'IMPORTADO',
+        sucesso: true,
+        ...resultado
+      });
+    } catch (error) {
+      resultados.push({
+        status: 'NAO_IMPORTADO',
+        sucesso: false,
+        arquivo: file.originalname,
+        mensagem: error?.message || 'Nao foi possivel importar este OFX.'
+      });
+    }
+  }
+
+  const resumo = resultados.reduce((acc, item) => {
+    acc.arquivos_total += 1;
+    if (item.sucesso) {
+      acc.arquivos_importados += 1;
+      acc.importados += Number(item.importados || 0);
+      acc.ignorados += Number(item.ignorados || 0);
+      acc.total_lidos += Number(item.total_lidos || 0);
+    } else {
+      acc.arquivos_nao_importados += 1;
+    }
+    return acc;
+  }, {
+    arquivos_total: 0,
+    arquivos_importados: 0,
+    arquivos_nao_importados: 0,
+    total_lidos: 0,
+    importados: 0,
+    ignorados: 0
+  });
+
+  return {
+    ...resumo,
+    arquivo: resultados.length === 1 ? resultados[0].arquivo : null,
+    resultados
   };
 }
 

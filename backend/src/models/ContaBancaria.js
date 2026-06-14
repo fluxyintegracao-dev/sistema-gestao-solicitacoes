@@ -31,6 +31,18 @@ module.exports = (sequelize, DataTypes) => sequelize.define(
       type: DataTypes.STRING(60),
       allowNull: true
     },
+    ofx_bank_id: {
+      type: DataTypes.STRING(20),
+      allowNull: true
+    },
+    ofx_branch_id: {
+      type: DataTypes.STRING(40),
+      allowNull: true
+    },
+    ofx_account_id: {
+      type: DataTypes.STRING(80),
+      allowNull: true
+    },
     tipo_conta: {
       type: DataTypes.STRING(40),
       allowNull: true

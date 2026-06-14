@@ -31,6 +31,9 @@ function defaultContaForm() {
     banco: '',
     agencia: '',
     conta: '',
+    ofx_bank_id: '',
+    ofx_branch_id: '',
+    ofx_account_id: '',
     tipo_conta: '',
     empresa_id: '',
     tipo_operacional: 'BANCARIA',
@@ -127,6 +130,9 @@ function pickContaFormData(conta = {}) {
     banco: conta.banco || '',
     agencia: conta.agencia || '',
     conta: conta.conta || '',
+    ofx_bank_id: conta.ofx_bank_id || '',
+    ofx_branch_id: conta.ofx_branch_id || '',
+    ofx_account_id: conta.ofx_account_id || '',
     tipo_conta: conta.tipo_conta || '',
     empresa_id: conta.empresa_id ? String(conta.empresa_id) : '',
     tipo_operacional: conta.tipo_operacional || 'BANCARIA',
@@ -735,6 +741,28 @@ export default function FinanceiroCadastros() {
                 <div className="grid gap-3 md:grid-cols-2">
                   <input className="input w-full" placeholder="Agencia" value={contaForm.agencia} onChange={(e) => setContaForm((c) => ({ ...c, agencia: e.target.value }))} />
                   <input className="input w-full" placeholder="Conta" value={contaForm.conta} onChange={(e) => setContaForm((c) => ({ ...c, conta: e.target.value }))} />
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3">
+                  <div className="mb-2">
+                    <h3 className="text-sm font-semibold text-[var(--c-text)]">Identificacao OFX para conciliacao</h3>
+                    <p className="text-xs text-[var(--c-muted)]">
+                      Obrigatoria para deteccao automatica em lote. Informe o ACCTID do OFX em Conta OFX e, quando existir no arquivo, tambem Banco OFX e Agencia OFX.
+                    </p>
+                  </div>
+                  <div className="grid gap-3 md:grid-cols-3">
+                    <label className="sol-filter-field">
+                      <span className="sol-filter-label">Banco OFX</span>
+                      <input className="input w-full" placeholder="Ex.: 0104, 001, 748" value={contaForm.ofx_bank_id} onChange={(e) => setContaForm((c) => ({ ...c, ofx_bank_id: e.target.value }))} />
+                    </label>
+                    <label className="sol-filter-field">
+                      <span className="sol-filter-label">Agencia OFX</span>
+                      <input className="input w-full" placeholder="Se houver BRANCHID" value={contaForm.ofx_branch_id} onChange={(e) => setContaForm((c) => ({ ...c, ofx_branch_id: e.target.value }))} />
+                    </label>
+                    <label className="sol-filter-field">
+                      <span className="sol-filter-label">Conta OFX</span>
+                      <input className="input w-full" placeholder="Ex.: ACCTID do arquivo OFX" value={contaForm.ofx_account_id} onChange={(e) => setContaForm((c) => ({ ...c, ofx_account_id: e.target.value }))} />
+                    </label>
+                  </div>
                 </div>
                 <label className="sol-filter-field">
                   <span className="sol-filter-label">Saldo inicial</span>
