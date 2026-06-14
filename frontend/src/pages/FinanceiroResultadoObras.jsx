@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { getResultadoObras } from '../services/financeiro';
 
 function formatCurrency(value) {
@@ -192,6 +193,9 @@ export default function FinanceiroResultadoObras() {
             <h1 className="page-title">Resultado de Obras</h1>
             <p className="page-subtitle">Visão financeira consolidada por obra — orçado, executado e recebimento.</p>
           </div>
+          <Link to="/financeiro/relatorios" className="btn btn-outline btn-sm">
+            Voltar para relatorios
+          </Link>
         </div>
       </div>
 

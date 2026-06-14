@@ -186,13 +186,7 @@ export default function FinanceiroEndividamento() {
           </div>
           <div className="app-page-actions">
             <Link to="/financeiro/relatorios" className="btn btn-outline">
-              Voltar aos relatorios
-            </Link>
-            <Link to="/financeiro/cadastros" className="btn btn-outline">
-              Classificar categorias
-            </Link>
-            <Link to="/financeiro/relatorios/grupo-consolidado" className="btn btn-outline">
-              Grupo Consolidado
+              Voltar para relatorios
             </Link>
           </div>
         </div>

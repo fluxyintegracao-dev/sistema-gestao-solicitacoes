@@ -228,13 +228,7 @@ export default function FinanceiroIntercompany() {
           </div>
           <div className="app-page-actions">
             <Link to="/financeiro/relatorios" className="btn btn-outline">
-              Voltar aos relatorios
-            </Link>
-            <Link to="/financeiro/relatorios/dre" className="btn btn-outline">
-              DRE
-            </Link>
-            <Link to="/financeiro/relatorios/dre/diagnostico" className="btn btn-outline">
-              Diagnostico
+              Voltar para relatorios
             </Link>
           </div>
         </div>

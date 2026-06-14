@@ -205,13 +205,7 @@ export default function FinanceiroFluxoConsolidado() {
           </div>
           <div className="app-page-actions">
             <Link to="/financeiro/relatorios" className="btn btn-outline">
-              Voltar aos relatorios
-            </Link>
-            <Link to="/financeiro/relatorios/intercompany" className="btn btn-outline">
-              Entre Empresas
-            </Link>
-            <Link to="/financeiro/relatorios/dre" className="btn btn-outline">
-              DRE
+              Voltar para relatorios
             </Link>
           </div>
         </div>

@@ -280,8 +280,7 @@ export default function FinanceiroRelatorioAnalitico() {
           <p className="page-subtitle">Monte a visao por titulo, baixa, conta e parceiro. Arraste as colunas para reorganizar.</p>
         </div>
         <div className="app-page-actions">
-          <Link to="/financeiro/relatorios" className="btn btn-outline btn-sm">Fluxo de caixa</Link>
-          <Link to="/financeiro/baixas" className="btn btn-outline btn-sm">Baixas</Link>
+          <Link to="/financeiro/relatorios" className="btn btn-outline btn-sm">Voltar para relatorios</Link>
           <button type="button" className="btn btn-outline btn-sm" onClick={exportarCsv} disabled={!relatorio.linhas.length}>
             <HiOutlineArrowDownTray className="h-4 w-4" />
             CSV

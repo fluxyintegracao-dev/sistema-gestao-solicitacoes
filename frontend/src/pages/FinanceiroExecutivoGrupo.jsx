@@ -214,17 +214,8 @@ export default function FinanceiroExecutivoGrupo() {
             </p>
           </div>
           <div className="app-page-actions">
-            <Link to="/financeiro/relatorios/fluxo-consolidado" className="btn btn-outline">
-              Fluxo Consolidado
-            </Link>
-            <Link to="/financeiro/relatorios/dre" className="btn btn-outline">
-              DRE
-            </Link>
-            <Link to="/financeiro/relatorios/intercompany" className="btn btn-outline">
-              Entre Empresas
-            </Link>
-            <Link to="/financeiro/relatorios/endividamento" className="btn btn-outline">
-              Endividamento
+            <Link to="/financeiro/relatorios" className="btn btn-outline">
+              Voltar para relatorios
             </Link>
           </div>
         </div>

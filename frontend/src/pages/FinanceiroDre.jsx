@@ -423,13 +423,7 @@ export default function FinanceiroDre() {
           </div>
           <div className="app-page-actions">
             <Link to="/financeiro/relatorios" className="btn btn-outline">
-              Voltar aos relatorios
-            </Link>
-            <Link to="/financeiro/cadastros" className="btn btn-outline">
-              Categorias DRE
-            </Link>
-            <Link to="/financeiro/relatorios/dre/diagnostico" className="btn btn-outline">
-              Diagnostico
+              Voltar para relatorios
             </Link>
           </div>
         </div>
