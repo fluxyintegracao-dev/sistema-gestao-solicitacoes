@@ -992,7 +992,7 @@ async function listarConciliacoes(req, filters = {}) {
   const itens = await ConciliacaoBancaria.findAll({
     where,
     include: buildConciliacaoInclude(),
-    order: [['data_movimento', 'DESC'], ['createdAt', 'DESC']],
+    order: [['data_movimento', 'ASC'], ['createdAt', 'ASC']],
     limit: pageSize,
     offset
   });

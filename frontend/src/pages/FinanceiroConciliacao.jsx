@@ -1654,40 +1654,52 @@ export default function FinanceiroConciliacao() {
         </p>
       </form>
 
-      {/* Filtros — linha horizontal */}
       {importResults.length > 0 && (
-        <div className="card sol-surface-card">
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <h2 className="text-sm font-semibold text-[var(--c-text)]">Resultado da importacao</h2>
-              <p className="text-xs text-[var(--c-muted)]">Confira quais OFX foram importados e quais precisam de ajuste cadastral.</p>
-            </div>
-            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
-              {importResults.filter((item) => item.sucesso).length}/{importResults.length} importado(s)
-            </span>
-          </div>
-          <div className="grid gap-2">
-            {importResults.map((item, index) => (
-              <div
-                key={`${item.arquivo || 'ofx'}-${index}`}
-                className={`rounded-xl border px-3 py-2 text-sm ${item.sucesso ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-amber-200 bg-amber-50 text-amber-900'}`}
-              >
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <strong className="truncate">{item.arquivo || `Arquivo ${index + 1}`}</strong>
-                  <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${item.sucesso ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-800'}`}>
-                    {item.sucesso ? 'Importado' : 'Nao importado'}
-                  </span>
-                </div>
-                <p className="mt-1 text-xs">
-                  {item.sucesso
-                    ? `${item.importados || 0} lancamento(s) novo(s), ${item.ignorados || 0} ignorado(s) - ${item.conta_bancaria_nome || `Conta #${item.conta_bancaria_id || '-'}`}`
-                    : item.mensagem || 'Conta nao encontrada para este OFX.'}
-                </p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 p-4">
+          <div className="w-full max-w-3xl rounded-3xl border border-slate-200 bg-white p-5 shadow-2xl">
+            <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 className="text-base font-semibold text-[var(--c-text)]">Resultado da importacao</h2>
+                <p className="mt-1 text-xs text-[var(--c-muted)]">Confira quais OFX foram importados e quais precisam de ajuste cadastral.</p>
               </div>
-            ))}
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+                {importResults.filter((item) => item.sucesso).length}/{importResults.length} importado(s)
+              </span>
+            </div>
+
+            <div className="max-h-[58vh] overflow-y-auto pr-1">
+              <div className="grid gap-2">
+                {importResults.map((item, index) => (
+                  <div
+                    key={`${item.arquivo || 'ofx'}-${index}`}
+                    className={`rounded-xl border px-3 py-2 text-sm ${item.sucesso ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-amber-200 bg-amber-50 text-amber-900'}`}
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <strong className="truncate">{item.arquivo || `Arquivo ${index + 1}`}</strong>
+                      <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${item.sucesso ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-800'}`}>
+                        {item.sucesso ? 'Importado' : 'Nao importado'}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-xs">
+                      {item.sucesso
+                        ? `${item.importados || 0} lancamento(s) novo(s), ${item.ignorados || 0} ignorado(s) - ${item.conta_bancaria_nome || `Conta #${item.conta_bancaria_id || '-'}`}`
+                        : item.mensagem || 'Conta nao encontrada para este OFX.'}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="mt-4 flex justify-end">
+              <button type="button" className="btn btn-primary btn-sm" onClick={() => setImportResults([])}>
+                OK
+              </button>
+            </div>
           </div>
         </div>
       )}
+
+      {/* Filtros — linha horizontal */}
       {error && <div className="app-alert app-alert--error">{error}</div>}
       {feedback && <div className="app-alert border-emerald-200 bg-emerald-50 text-emerald-700">{feedback}</div>}
 
