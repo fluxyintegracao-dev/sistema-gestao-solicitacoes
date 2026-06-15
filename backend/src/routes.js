@@ -1503,6 +1503,7 @@ router.patch('/configuracoes/modulos', permit(['SUPERADMIN']), ConfiguracaoSiste
 router.get('/contratos', validateRequest({ query: validateContratoQuery }), ContratoController.index);
 router.get('/contratos/resumo', validateRequest({ query: validateContratoQuery }), ContratoController.resumo);
 router.get('/contratos/relatorios/operacional', validateRequest({ query: validateContratoRelatorioOperacionalQuery }), ContratoController.relatorioOperacional);
+router.get('/contratos/exportar-csv', validateRequest({ query: validateContratoQuery }), ContratoController.exportarCsv);
 router.get('/contratos/:id/solicitacoes', validateRequest({ params: validateNumericIdParam('id', 'Contrato') }), requireContratoAccess, ContratoController.solicitacoes);
 router.get('/contratos/:id/anexos', validateRequest({ params: validateNumericIdParam('id', 'Contrato') }), requireContratoAccess, ContratoController.listarAnexos);
 router.post('/contratos', validateRequest({ body: validateContratoCreateBody }), requireContratoBodyObraAccess, ContratoController.create);

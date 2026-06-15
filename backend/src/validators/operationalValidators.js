@@ -223,7 +223,8 @@ function validateContratoCreateBody(body = {}) {
       'tipo_macro_id',
       'tipo_sub_id',
       'ajuste_solicitado',
-      'ajuste_pago'
+      'ajuste_pago',
+      'apropriacoes'
     ],
     'Contrato'
   );
@@ -246,7 +247,8 @@ function validateContratoCreateBody(body = {}) {
     tipo_macro_id: parseInteger(body.tipo_macro_id, 'Tipo macro'),
     tipo_sub_id: parseInteger(body.tipo_sub_id, 'Tipo sub'),
     ajuste_solicitado: parseDecimal(body.ajuste_solicitado, 'Ajuste solicitado', { min: 0 }),
-    ajuste_pago: parseDecimal(body.ajuste_pago, 'Ajuste pago', { min: 0 })
+    ajuste_pago: parseDecimal(body.ajuste_pago, 'Ajuste pago', { min: 0 }),
+    apropriacoes: Array.isArray(body.apropriacoes) ? body.apropriacoes : undefined
   };
 }
 
@@ -265,7 +267,8 @@ function validateContratoUpdateBody(body = {}) {
       'tipo_sub_id',
       'ativo',
       'ajuste_solicitado',
-      'ajuste_pago'
+      'ajuste_pago',
+      'apropriacoes'
     ],
     'Atualizacao de contrato'
   );
@@ -282,7 +285,8 @@ function validateContratoUpdateBody(body = {}) {
     tipo_sub_id: parseInteger(body.tipo_sub_id, 'Tipo sub'),
     ativo: parseBoolean(body.ativo, 'Ativo'),
     ajuste_solicitado: parseDecimal(body.ajuste_solicitado, 'Ajuste solicitado', { min: 0 }),
-    ajuste_pago: parseDecimal(body.ajuste_pago, 'Ajuste pago', { min: 0 })
+    ajuste_pago: parseDecimal(body.ajuste_pago, 'Ajuste pago', { min: 0 }),
+    apropriacoes: Array.isArray(body.apropriacoes) ? body.apropriacoes : undefined
   };
 }
 
@@ -711,7 +715,8 @@ function validateSolicitacaoCreateBody(body = {}) {
       'data_inicio_medicao',
       'data_fim_medicao',
       'itens_apropriacao',
-      'ref_contrato_abertura'
+      'ref_contrato_abertura',
+      'apropriacoes_rateio'
     ],
     'Solicitacao'
   );
@@ -733,7 +738,8 @@ function validateSolicitacaoCreateBody(body = {}) {
     data_inicio_medicao: parseDateOnly(body.data_inicio_medicao, 'Data inicial da medicao'),
     data_fim_medicao: parseDateOnly(body.data_fim_medicao, 'Data final da medicao'),
     itens_apropriacao: parseOptionalText(body.itens_apropriacao, 'Itens de apropriacao', 5000),
-    ref_contrato_abertura: parseOptionalText(body.ref_contrato_abertura, 'Ref. do contrato', 255)
+    ref_contrato_abertura: parseOptionalText(body.ref_contrato_abertura, 'Ref. do contrato', 255),
+    apropriacoes_rateio: Array.isArray(body.apropriacoes_rateio) ? body.apropriacoes_rateio : undefined
   };
 }
 

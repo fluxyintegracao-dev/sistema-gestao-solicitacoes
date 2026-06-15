@@ -8,6 +8,8 @@ const {
   TipoSolicitacao,
   EtapaSetor,
   Contrato,
+  ContratoApropriacao,
+  SolicitacaoApropriacao,
   TipoSubContrato,
   Anexo,
   MensagemSetor,
@@ -78,6 +80,52 @@ const CHAVE_SETORES_VISIVEIS_POR_USUARIO = 'SETORES_VISIVEIS_POR_USUARIO';
 const CHAVE_TIPOS_SOLICITACAO_POR_SETOR = 'TIPOS_SOLICITACAO_POR_SETOR';
 const CHAVE_SETORES_CRIACAO_TODAS_OBRAS = 'SETORES_CRIACAO_TODAS_OBRAS';
 const DEFAULT_SOLICITACOES_PAGE_SIZE = 25;
+
+function parseDecimalOpcionalSolicitacao(valor) {
+  if (valor === null || valor === undefined) return null;
+  const texto = String(valor).trim();
+  if (!texto) return null;
+  const numero = Number(texto.replace(/[^\d,.-]/g, '').replace(/\./g, '').replace(',', '.'));
+  return Number.isFinite(numero) ? numero : null;
+}
+
+function normalizarApropriacoesRateio(lista = []) {
+  if (!Array.isArray(lista)) return [];
+  const vistos = new Set();
+  const normalizadas = [];
+
+  lista.forEach((item) => {
+    const apropriacaoId = Number(item?.apropriacao_id);
+    if (!Number.isInteger(apropriacaoId) || apropriacaoId <= 0 || vistos.has(apropriacaoId)) {
+      return;
+    }
+    vistos.add(apropriacaoId);
+    normalizadas.push({
+      apropriacao_id: apropriacaoId,
+      percentual: parseDecimalOpcionalSolicitacao(item?.percentual),
+      quantidade: parseDecimalOpcionalSolicitacao(item?.quantidade),
+      observacao: String(item?.observacao || '').trim() || null
+    });
+  });
+
+  return normalizadas;
+}
+
+function formatarRateioApropriacoesHistorico(rateios = []) {
+  if (!Array.isArray(rateios) || rateios.length === 0) return null;
+  return rateios.map((item) => {
+    const apropriacao = item.apropriacao || {};
+    const codigo = apropriacao.codigo || item.apropriacao_id;
+    const descricao = apropriacao.descricao ? ` - ${apropriacao.descricao}` : '';
+    const percentual = item.percentual !== null && item.percentual !== undefined
+      ? ` ${Number(item.percentual).toLocaleString('pt-BR', { maximumFractionDigits: 4 })}%`
+      : '';
+    const quantidade = item.quantidade !== null && item.quantidade !== undefined
+      ? ` qtd ${Number(item.quantidade).toLocaleString('pt-BR', { maximumFractionDigits: 4 })}`
+      : '';
+    return `${codigo}${descricao}${percentual}${quantidade}`.trim();
+  }).join('; ');
+}
 const MAX_SOLICITACOES_PAGE_SIZE = 500;
 /* =====================================================
    FUNCAO AUXILIAR - VISIBILIDADE
@@ -1607,6 +1655,7 @@ module.exports = {
         data_inicio_medicao,
         data_fim_medicao,
         itens_apropriacao,
+        apropriacoes_rateio,
         ref_contrato_abertura
       } = req.body;
 
@@ -1728,6 +1777,9 @@ module.exports = {
       );
       const campoVisivel = (campo) => camposNovaSolicitacao?.[campo]?.visivel !== false;
       const campoObrigatorio = (campo) => Boolean(camposNovaSolicitacao?.[campo]?.obrigatorio);
+      const rateioApropriacoes = campoVisivel('contrato')
+        ? normalizarApropriacoesRateio(apropriacoes_rateio)
+        : [];
 
       if (campoObrigatorio('valor') && (valor === '' || valor === null || valor === undefined)) {
         return res.status(400).json({
@@ -1778,9 +1830,9 @@ module.exports = {
           error: 'Selecione um contrato.'
         });
       }
-      if (campoObrigatorio('itens_apropriacao') && !itens_apropriacao) {
+      if (campoObrigatorio('itens_apropriacao') && !itens_apropriacao && rateioApropriacoes.length === 0) {
         return res.status(400).json({
-          error: 'Para Abertura de Contrato, informe os itens de apropriacao.'
+          error: 'Para Abertura de Contrato, informe os itens de apropriacao ou selecione as apropriacoes do contrato.'
         });
       }
       if (campoObrigatorio('ref_contrato_abertura') && !ref_contrato_abertura) {
@@ -1819,10 +1871,92 @@ module.exports = {
         }
       }
 
-      if (registroSelecionadoEhObra && campoObrigatorio('apropriacao_principal') && !apropriacao) {
+      if (
+        registroSelecionadoEhObra &&
+        campoObrigatorio('apropriacao_principal') &&
+        !apropriacao &&
+        rateioApropriacoes.length === 0
+      ) {
         return res.status(400).json({
           error: 'Selecione a apropriacao principal da solicitacao.'
         });
+      }
+
+      let rateioApropriacoesDetalhado = [];
+      if (rateioApropriacoes.length > 0) {
+        if (!registroSelecionadoEhObra) {
+          return res.status(400).json({
+            error: 'Rateio de apropriacoes so pode ser usado em registros classificados como obra.'
+          });
+        }
+        if (!contrato_id) {
+          return res.status(400).json({
+            error: 'Selecione o contrato antes de vincular apropriacoes.'
+          });
+        }
+
+        const contratoSelecionado = await Contrato.findOne({
+          where: {
+            id: Number(contrato_id),
+            obra_id: Number(obra_id)
+          },
+          attributes: ['id', 'obra_id']
+        });
+        if (!contratoSelecionado) {
+          return res.status(400).json({
+            error: 'Contrato selecionado nao pertence a obra informada.'
+          });
+        }
+
+        const apropriacoesContrato = await ContratoApropriacao.findAll({
+          where: { contrato_id: Number(contrato_id) },
+          include: [
+            {
+              model: Apropriacao,
+              as: 'apropriacao',
+              attributes: ['id', 'obra_id', 'codigo', 'descricao', 'ativo']
+            }
+          ]
+        });
+        const mapaContrato = new Map(
+          apropriacoesContrato
+            .filter(item => item.apropriacao)
+            .map(item => [Number(item.apropriacao_id), item])
+        );
+
+        if (mapaContrato.size === 0) {
+          return res.status(400).json({
+            error: 'O contrato selecionado nao possui apropriacoes estruturadas cadastradas.'
+          });
+        }
+
+        for (const item of rateioApropriacoes) {
+          const vinculoContrato = mapaContrato.get(Number(item.apropriacao_id));
+          if (!vinculoContrato) {
+            return res.status(400).json({
+              error: 'Uma ou mais apropriacoes selecionadas nao pertencem ao contrato.'
+            });
+          }
+          if (Number(vinculoContrato.apropriacao.obra_id) !== Number(obra_id)) {
+            return res.status(400).json({
+              error: 'Uma ou mais apropriacoes selecionadas nao pertencem a obra informada.'
+            });
+          }
+          if (vinculoContrato.apropriacao.ativo === false) {
+            return res.status(400).json({
+              error: 'Uma ou mais apropriacoes selecionadas estao inativas.'
+            });
+          }
+          rateioApropriacoesDetalhado.push({
+            ...item,
+            contrato_id: Number(contrato_id),
+            apropriacao: vinculoContrato.apropriacao
+          });
+        }
+
+        if (!apropriacao && rateioApropriacoesDetalhado.length > 0) {
+          apropriacao = rateioApropriacoesDetalhado[0].apropriacao;
+        }
       }
 
       const usuarioId = req.user.id;
@@ -1876,6 +2010,19 @@ module.exports = {
         status_global: 'PENDENTE'
       });
 
+      if (rateioApropriacoesDetalhado.length > 0) {
+        await SolicitacaoApropriacao.bulkCreate(
+          rateioApropriacoesDetalhado.map(item => ({
+            solicitacao_id: solicitacao.id,
+            contrato_id: Number(contrato_id),
+            apropriacao_id: item.apropriacao_id,
+            percentual: item.percentual,
+            quantidade: item.quantidade,
+            observacao: item.observacao
+          }))
+        );
+      }
+
       await registrarEventoSeguranca({
         req,
         usuarioId,
@@ -1898,17 +2045,29 @@ module.exports = {
       const itensTexto = campoVisivel('itens_apropriacao') && itens_apropriacao
         ? `Itens de apropriacao: ${String(itens_apropriacao).trim()}`
         : null;
+      const rateioTexto = rateioApropriacoesDetalhado.length > 0
+        ? `Rateio de apropriacoes: ${formatarRateioApropriacoesHistorico(rateioApropriacoesDetalhado)}`
+        : null;
       const apropriacaoTexto = apropriacao
         ? `Apropriacao principal: ${String(apropriacao.codigo || apropriacao.descricao || apropriacao.id).trim()}`
         : null;
       const refTexto = campoVisivel('ref_contrato_abertura') && ref_contrato_abertura
         ? `Ref. do contrato: ${String(ref_contrato_abertura).trim()}`
         : null;
-      const descricaoHistorico = [apropriacaoTexto, itensTexto, refTexto].filter(Boolean).join(' | ') || null;
+      const descricaoHistorico = [apropriacaoTexto, rateioTexto, itensTexto, refTexto].filter(Boolean).join(' | ') || null;
       const metadata = {};
       if (apropriacao) {
         metadata.apropriacao_id = apropriacao.id;
         metadata.apropriacao_codigo = apropriacao.codigo;
+      }
+      if (rateioApropriacoesDetalhado.length > 0) {
+        metadata.apropriacoes_rateio = rateioApropriacoesDetalhado.map(item => ({
+          contrato_id: Number(contrato_id),
+          apropriacao_id: item.apropriacao_id,
+          apropriacao_codigo: item.apropriacao?.codigo || null,
+          percentual: item.percentual,
+          quantidade: item.quantidade
+        }));
       }
       if (campoVisivel('itens_apropriacao') && itens_apropriacao) {
         metadata.itens_apropriacao = String(itens_apropriacao).trim();

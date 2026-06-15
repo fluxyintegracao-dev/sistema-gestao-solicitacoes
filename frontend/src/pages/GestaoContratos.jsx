@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { HiArrowDownTray, HiArrowUpTray, HiPaperClip } from 'react-icons/hi2';
 import { useAuth } from '../contexts/AuthContext';
 import PendingAttachmentsList from '../components/attachments/PendingAttachmentsList';
@@ -16,12 +16,14 @@ import {
   atualizarContrato,
   criarContrato,
   excluirContrato,
+  exportarContratosCsv,
   getContratoAnexos,
   getContratos,
   getContratosResumo,
   importarContratosEmMassa,
   uploadContratoAnexos
 } from '../services/contratos';
+import { listarApropriacoes } from '../services/apropriacoes';
 
 export default function GestaoContratos() {
   const { user } = useAuth();
@@ -59,6 +61,10 @@ export default function GestaoContratos() {
   const [anexos, setAnexos] = useState([]);
   const [uploadAnexos, setUploadAnexos] = useState([]);
   const [importandoContratos, setImportandoContratos] = useState(false);
+  const [apropriacoesDisponiveis, setApropriacoesDisponiveis] = useState([]);
+  const [apropriacoesContrato, setApropriacoesContrato] = useState([]);
+  const [apropriacoesEdicaoDisponiveis, setApropriacoesEdicaoDisponiveis] = useState([]);
+  const [apropriacoesEdicao, setApropriacoesEdicao] = useState([]);
 
   const setorTokens = [
     String(user?.setor?.nome || '').toUpperCase(),
@@ -121,10 +127,165 @@ export default function GestaoContratos() {
     }
   }
 
+  async function carregarApropriacoesObra(obraId, setter) {
+    if (!obraId) {
+      setter([]);
+      return;
+    }
+    try {
+      const data = await listarApropriacoes({ obra_id: obraId });
+      setter(Array.isArray(data) ? data.filter(item => item?.ativo !== false) : []);
+    } catch (error) {
+      console.error(error);
+      setter([]);
+    }
+  }
+
+  function criarLinhaApropriacao() {
+    return {
+      apropriacao_id: '',
+      percentual: '',
+      quantidade: '',
+      observacao: ''
+    };
+  }
+
+  function alterarLinhaApropriacao(index, campo, valor, setter) {
+    setter(prev => prev.map((item, itemIndex) => (
+      itemIndex === index ? { ...item, [campo]: valor } : item
+    )));
+  }
+
+  function adicionarLinhaApropriacao(setter) {
+    setter(prev => [...prev, criarLinhaApropriacao()]);
+  }
+
+  function removerLinhaApropriacao(index, setter) {
+    setter(prev => prev.filter((_, itemIndex) => itemIndex !== index));
+  }
+
+  function montarApropriacoesPayload(lista) {
+    const vistos = new Set();
+    return (Array.isArray(lista) ? lista : [])
+      .map(item => ({
+        apropriacao_id: Number(item.apropriacao_id),
+        percentual: String(item.percentual || '').trim() || null,
+        quantidade: String(item.quantidade || '').trim() || null,
+        observacao: String(item.observacao || '').trim() || null
+      }))
+      .filter((item) => {
+        if (!item.apropriacao_id || vistos.has(item.apropriacao_id)) return false;
+        vistos.add(item.apropriacao_id);
+        return true;
+      });
+  }
+
+  function normalizarApropriacoesContrato(contrato) {
+    return (Array.isArray(contrato?.apropriacoes) ? contrato.apropriacoes : []).map(item => ({
+      apropriacao_id: String(item.apropriacao_id || item.apropriacao?.id || ''),
+      percentual: item.percentual !== null && item.percentual !== undefined ? String(item.percentual) : '',
+      quantidade: item.quantidade !== null && item.quantidade !== undefined ? String(item.quantidade) : '',
+      observacao: item.observacao || ''
+    }));
+  }
+
+  function resumoApropriacoesContrato(contrato) {
+    const lista = Array.isArray(contrato?.apropriacoes) ? contrato.apropriacoes : [];
+    if (lista.length === 0) return contrato?.itens_apropriacao || '-';
+    return lista.map((item) => {
+      const codigo = item.apropriacao?.codigo || item.apropriacao_id;
+      const descricao = item.apropriacao?.descricao ? ` - ${item.apropriacao.descricao}` : '';
+      const percentual = item.percentual !== null && item.percentual !== undefined
+        ? ` (${Number(item.percentual).toLocaleString('pt-BR', { maximumFractionDigits: 4 })}%)`
+        : '';
+      const quantidade = item.quantidade !== null && item.quantidade !== undefined
+        ? ` qtd ${Number(item.quantidade).toLocaleString('pt-BR', { maximumFractionDigits: 4 })}`
+        : '';
+      return `${codigo}${descricao}${percentual}${quantidade}`;
+    }).join('; ');
+  }
+
+  function renderApropriacoesEditor({ lista, disponiveis, setter }) {
+    return (
+      <div className="rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-3 space-y-2">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-[var(--c-text)]">Apropriacoes do contrato</p>
+            <p className="text-xs text-[var(--c-muted)]">Use uma linha por item que podera ser rateado na solicitacao.</p>
+          </div>
+          <button
+            type="button"
+            className="btn btn-outline btn-sm"
+            onClick={() => adicionarLinhaApropriacao(setter)}
+          >
+            Adicionar
+          </button>
+        </div>
+
+        {disponiveis.length === 0 && (
+          <p className="text-xs text-[var(--c-muted)]">
+            Selecione uma obra com apropriacoes cadastradas para habilitar a lista.
+          </p>
+        )}
+
+        {lista.map((item, index) => (
+          <div key={`${index}-${item.apropriacao_id || 'nova'}`} className="grid gap-2 lg:grid-cols-[minmax(220px,1.5fr)_100px_100px_minmax(160px,1fr)_auto]">
+            <select
+              className="input input-sm"
+              value={item.apropriacao_id}
+              onChange={e => alterarLinhaApropriacao(index, 'apropriacao_id', e.target.value, setter)}
+            >
+              <option value="">Apropriacao</option>
+              {disponiveis.map(ap => (
+                <option key={ap.id} value={ap.id}>
+                  {ap.codigo} - {ap.descricao}
+                </option>
+              ))}
+            </select>
+            <input
+              className="input input-sm"
+              value={item.percentual}
+              onChange={e => alterarLinhaApropriacao(index, 'percentual', e.target.value, setter)}
+              placeholder="%"
+            />
+            <input
+              className="input input-sm"
+              value={item.quantidade}
+              onChange={e => alterarLinhaApropriacao(index, 'quantidade', e.target.value, setter)}
+              placeholder="Qtd."
+            />
+            <input
+              className="input input-sm"
+              value={item.observacao}
+              onChange={e => alterarLinhaApropriacao(index, 'observacao', e.target.value, setter)}
+              placeholder="Observacao"
+            />
+            <button
+              type="button"
+              className="btn btn-outline btn-sm"
+              onClick={() => removerLinhaApropriacao(index, setter)}
+            >
+              Remover
+            </button>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   function onChangeForm(e) {
     const { name, value } = e.target;
     setForm(prev => ({ ...prev, [name]: value }));
   }
+
+  useEffect(() => {
+    carregarApropriacoesObra(form.obra_id, setApropriacoesDisponiveis);
+    setApropriacoesContrato([]);
+  }, [form.obra_id]);
+
+  useEffect(() => {
+    carregarApropriacoesObra(formEdicao.obra_id, setApropriacoesEdicaoDisponiveis);
+  }, [formEdicao.obra_id]);
 
   function onChangeFiltro(e) {
     const { name, value } = e.target;
@@ -175,7 +336,8 @@ export default function GestaoContratos() {
         descricao: String(form.descricao || '').trim() || null,
         valor_total: valorDisplay ? parseMoeda(valorDisplay) : null,
         tipo_macro_id: null,
-        tipo_sub_id: null
+        tipo_sub_id: null,
+        apropriacoes: montarApropriacoesPayload(apropriacoesContrato)
       };
 
       if (!payload.obra_id || !payload.codigo) {
@@ -199,6 +361,7 @@ export default function GestaoContratos() {
       });
       setValorDisplay('');
       setFiles([]);
+      setApropriacoesContrato([]);
       await carregar();
       alert('Contrato criado com sucesso.');
     } catch (error) {
@@ -231,6 +394,7 @@ export default function GestaoContratos() {
         ? String(contrato.valor_total)
         : ''
     });
+    setApropriacoesEdicao(normalizarApropriacoesContrato(contrato));
   }
 
   function cancelarEdicao() {
@@ -244,6 +408,7 @@ export default function GestaoContratos() {
       itens_apropriacao: '',
       valor_total: ''
     });
+    setApropriacoesEdicao([]);
   }
 
   function onChangeEdicao(e) {
@@ -270,7 +435,8 @@ export default function GestaoContratos() {
       ref_contrato: String(formEdicao.ref_contrato || '').trim(),
       descricao: String(formEdicao.descricao || '').trim() || null,
       itens_apropriacao: String(formEdicao.itens_apropriacao || '').trim() || null,
-      valor_total: valorTotalNumerico
+      valor_total: valorTotalNumerico,
+      apropriacoes: montarApropriacoesPayload(apropriacoesEdicao)
     };
 
     if (!payload.obra_id || !payload.codigo || !payload.ref_contrato) {
@@ -346,8 +512,20 @@ export default function GestaoContratos() {
 
   function baixarModeloImportacaoContratos() {
     const linhas = [
-      ['Contrato', 'Codigo', 'Ref. do Contrato', 'Descrição', 'Itens de Apropriação', 'Solicitado'],
-      ['CT/PE001-7', '7', 'EXEMPLO REF CONTRATO', '', '', '15000,00']
+      [
+        'Contrato',
+        'Codigo',
+        'Ref. do Contrato',
+        'Descricao',
+        'Itens de Apropriacao',
+        'Solicitado',
+        'Apropriacao Codigo',
+        'Apropriacao Percentual',
+        'Apropriacao Quantidade',
+        'Apropriacao Observacao'
+      ],
+      ['CT/PE001-7', '7', 'EXEMPLO REF CONTRATO', 'Contrato exemplo', '', '15000,00', '001', '60', '', 'Linha 1'],
+      ['CT/PE001-7', '7', 'EXEMPLO REF CONTRATO', 'Contrato exemplo', '', '15000,00', '002', '40', '', 'Linha 2']
     ];
 
     const csv = linhas
@@ -385,6 +563,8 @@ export default function GestaoContratos() {
       await carregar();
 
       const importados = Number(resultado?.importados || 0);
+      const atualizados = Number(resultado?.atualizados || 0);
+      const apropriacoesVinculadas = Number(resultado?.apropriacoes_vinculadas || 0);
       const ignorados = Number(resultado?.ignorados || 0);
       const erros = Array.isArray(resultado?.erros) ? resultado.erros : [];
 
@@ -393,15 +573,24 @@ export default function GestaoContratos() {
           .slice(0, 5)
           .map(item => `Linha ${item.linha}: ${item.error}`)
           .join('\n');
-        alert(`Importados: ${importados}. Ignorados: ${ignorados}. Erros: ${erros.length}.\n${resumoErros}${erros.length > 5 ? '\n...' : ''}`);
+        alert(`Importados: ${importados}. Atualizados: ${atualizados}. Apropriacoes vinculadas: ${apropriacoesVinculadas}. Ignorados: ${ignorados}. Erros: ${erros.length}.\n${resumoErros}${erros.length > 5 ? '\n...' : ''}`);
       } else {
-        alert(`Importação concluída. Importados: ${importados}. Ignorados: ${ignorados}.`);
+        alert(`Importacao concluida. Importados: ${importados}. Atualizados: ${atualizados}. Apropriacoes vinculadas: ${apropriacoesVinculadas}. Ignorados: ${ignorados}.`);
       }
     } catch (error) {
       console.error(error);
       alert(error?.message || 'Erro ao importar contratos em massa.');
     } finally {
       setImportandoContratos(false);
+    }
+  }
+
+  async function handleExportarContratos() {
+    try {
+      await exportarContratosCsv(filtros);
+    } catch (error) {
+      console.error(error);
+      alert(error?.message || 'Erro ao exportar contratos.');
     }
   }
 
@@ -610,7 +799,7 @@ export default function GestaoContratos() {
                   <td className="p-3">{c.obra?.nome || '-'}</td>
                   <td className="p-3">{c.ref_contrato || '-'}</td>
                   <td className="p-3">{c.descricao || '-'}</td>
-                  <td className="p-3">{c.itens_apropriacao || '-'}</td>
+                  <td className="p-3">{resumoApropriacoesContrato(c)}</td>
                   <td className="p-3 text-right">
                     {Number(c.total_solicitado || 0).toLocaleString('pt-BR', {
                       style: 'currency',
@@ -656,6 +845,16 @@ export default function GestaoContratos() {
             <HiArrowDownTray className="w-4 h-4" />
           </button>
 
+          <button
+            type="button"
+            className="btn btn-outline px-3"
+            onClick={handleExportarContratos}
+            title="Exportar contratos e apropriacoes (.csv)"
+            aria-label="Exportar contratos e apropriacoes"
+          >
+            Exportar CSV
+          </button>
+
           <label
             className={`btn btn-outline px-3 cursor-pointer ${importandoContratos ? 'opacity-60 pointer-events-none' : ''}`}
             title="Importar contratos em massa (.csv)"
@@ -672,8 +871,7 @@ export default function GestaoContratos() {
           </label>
 
           <span className="app-note">
-            Modelo CSV (abre no Excel): Contrato, Código da obra, Ref. do Contrato, Descrição, Itens de Apropriação e Solicitado.
-            Descrição e Itens de Apropriação podem ficar em branco.
+            Modelo CSV (abre no Excel): repita o contrato em varias linhas para vincular varias apropriacoes.
           </span>
         </div>
       )}
@@ -772,6 +970,12 @@ export default function GestaoContratos() {
 
         </div>
 
+        {renderApropriacoesEditor({
+          lista: apropriacoesContrato,
+          disponiveis: apropriacoesDisponiveis,
+          setter: setApropriacoesContrato
+        })}
+
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-end">
           <div>
           <label className="grid gap-1 text-sm">Anexos do contrato</label>
@@ -847,7 +1051,8 @@ export default function GestaoContratos() {
               </tr>
             )}
             {contratos.map(c => (
-              <tr key={c.id} className="border-t">
+              <Fragment key={c.id}>
+              <tr className="border-t">
                 <td className="p-3 font-medium">
                   {editandoId === c.id ? (
                     <input
@@ -912,7 +1117,7 @@ export default function GestaoContratos() {
                       className="w-64 border rounded p-1"
                     />
                   ) : (
-                    c.itens_apropriacao || '-'
+                    resumoApropriacoesContrato(c)
                   )}
                 </td>
                 <td className="p-3 text-right">
@@ -1015,6 +1220,18 @@ export default function GestaoContratos() {
                   </div>
                 </td>
               </tr>
+              {editandoId === c.id && (
+                <tr className="border-t bg-[var(--c-surface)]">
+                  <td colSpan="13" className="p-3">
+                    {renderApropriacoesEditor({
+                      lista: apropriacoesEdicao,
+                      disponiveis: apropriacoesEdicaoDisponiveis,
+                      setter: setApropriacoesEdicao
+                    })}
+                  </td>
+                </tr>
+              )}
+              </Fragment>
             ))}
           </tbody>
         </table>

@@ -119,3 +119,29 @@ export async function importarContratosEmMassa(file) {
 
   return data;
 }
+
+export async function exportarContratosCsv({ obra_id, ref, codigo } = {}) {
+  const search = new URLSearchParams();
+  if (obra_id) search.set('obra_id', obra_id);
+  if (ref) search.set('ref', ref);
+  if (codigo) search.set('codigo', codigo);
+  const params = search.toString() ? `?${search.toString()}` : '';
+  const res = await fetch(`${API_URL}/contratos/exportar-csv${params}`, {
+    headers: authHeaders()
+  });
+
+  if (!res.ok) {
+    const data = await res.json().catch(() => null);
+    throw new Error(data?.error || 'Erro ao exportar contratos');
+  }
+
+  const blob = await res.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'contratos-apropriacoes.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  window.URL.revokeObjectURL(url);
+}

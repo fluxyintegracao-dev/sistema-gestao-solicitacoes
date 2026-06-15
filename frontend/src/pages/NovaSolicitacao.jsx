@@ -112,6 +112,7 @@ export default function NovaSolicitacao() {
   const [contratos, setContratos] = useState([]);
   const [contratosRef, setContratosRef] = useState([]);
   const [apropriacoes, setApropriacoes] = useState([]);
+  const [apropriacoesContratoRateio, setApropriacoesContratoRateio] = useState([]);
   const [refContratoBusca, setRefContratoBusca] = useState('');
   const [refResultados, setRefResultados] = useState([]);
   const [parceiroBusca, setParceiroBusca] = useState('');
@@ -239,6 +240,7 @@ export default function NovaSolicitacao() {
       setForm(prev => ({ ...prev, contrato_id: '', ref_contrato_abertura: '' }));
       setContratosRef([]);
       setApropriacoes([]);
+      setApropriacoesContratoRateio([]);
       setForm(prev => ({ ...prev, apropriacao_id: '', itens_apropriacao: '' }));
       return;
     }
@@ -249,6 +251,7 @@ export default function NovaSolicitacao() {
       setApropriacoes([]);
       setRefContratoBusca('');
       setRefResultados([]);
+      setApropriacoesContratoRateio([]);
       setForm(prev => ({
         ...prev,
         contrato_id: '',
@@ -372,6 +375,7 @@ export default function NovaSolicitacao() {
     setContratosRef([]);
     setRefContratoBusca('');
     setRefResultados([]);
+    setApropriacoesContratoRateio([]);
   }
 
   function limparBuscaObra() {
@@ -436,6 +440,7 @@ export default function NovaSolicitacao() {
       }));
       setRefContratoBusca('');
       setRefResultados([]);
+      setApropriacoesContratoRateio([]);
       setContratosRef([]);
     }
     if (tipoSemValor) {
@@ -490,6 +495,56 @@ export default function NovaSolicitacao() {
     setForm(prev => ({ ...prev, valor: valor || '' }));
   }
 
+  function normalizarApropriacoesContratoParaRateio(contrato) {
+    return (Array.isArray(contrato?.apropriacoes) ? contrato.apropriacoes : []).map((item) => ({
+      apropriacao_id: String(item.apropriacao_id || item.apropriacao?.id || ''),
+      codigo: item.apropriacao?.codigo || '',
+      descricao: item.apropriacao?.descricao || '',
+      percentual: item.percentual !== null && item.percentual !== undefined ? String(item.percentual) : '',
+      quantidade: item.quantidade !== null && item.quantidade !== undefined ? String(item.quantidade) : '',
+      observacao: item.observacao || '',
+      selecionado: false
+    })).filter(item => item.apropriacao_id);
+  }
+
+  function aplicarContratoSelecionado(contrato) {
+    if (!contrato) {
+      setForm(prev => ({
+        ...prev,
+        contrato_id: '',
+        codigo_contrato: ''
+      }));
+      setRefContratoBusca('');
+      setApropriacoesContratoRateio([]);
+      return;
+    }
+
+    setForm(prev => ({
+      ...prev,
+      contrato_id: String(contrato.id),
+      codigo_contrato: contrato.codigo || ''
+    }));
+    setRefContratoBusca(contrato.ref_contrato || '');
+    setRefResultados([]);
+    setApropriacoesContratoRateio(normalizarApropriacoesContratoParaRateio(contrato));
+  }
+
+  function alternarApropriacaoContratoRateio(index, checked) {
+    setApropriacoesContratoRateio(prev => prev.map((item, itemIndex) => (
+      itemIndex === index ? { ...item, selecionado: checked } : item
+    )));
+  }
+
+  function alterarApropriacaoContratoRateio(index, campo, valor) {
+    setApropriacoesContratoRateio(prev => prev.map((item, itemIndex) => (
+      itemIndex === index ? { ...item, [campo]: valor } : item
+    )));
+  }
+
+  const apropriacoesRateioSelecionadas = useMemo(() => (
+    apropriacoesContratoRateio.filter(item => item.selecionado && item.apropriacao_id)
+  ), [apropriacoesContratoRateio]);
+
   async function buscarRefContrato() {
     try {
       if (!form.obra_id) {
@@ -533,13 +588,7 @@ export default function NovaSolicitacao() {
   }
 
   function selecionarContratoRef(contrato) {
-    setForm(prev => ({
-      ...prev,
-      contrato_id: String(contrato.id),
-      codigo_contrato: contrato.codigo || ''
-    }));
-    setRefContratoBusca(contrato.ref_contrato || '');
-    setRefResultados([]);
+    aplicarContratoSelecionado(contrato);
   }
 
   function limparRefContrato() {
@@ -547,6 +596,7 @@ export default function NovaSolicitacao() {
     setRefResultados([]);
     setContratosRef([]);
     setForm(prev => ({ ...prev, contrato_id: '', codigo_contrato: '' }));
+    setApropriacoesContratoRateio([]);
   }
 
   function removerArquivo(index) {
@@ -666,8 +716,8 @@ export default function NovaSolicitacao() {
       alert('Informe a ref. do contrato.');
       return;
     }
-    if (itensApropriacaoObrigatorio && !form.itens_apropriacao) {
-      alert('Para Abertura de Contrato, informe os itens de apropriacao.');
+    if (itensApropriacaoObrigatorio && !form.itens_apropriacao && apropriacoesRateioSelecionadas.length === 0) {
+      alert('Para Abertura de Contrato, informe os itens de apropriacao ou selecione as apropriacoes do contrato.');
       return;
     }
     if (refContratoAberturaObrigatoria && !form.ref_contrato_abertura) {
@@ -701,7 +751,15 @@ export default function NovaSolicitacao() {
       data_fim_medicao: exibirPeriodoMedicao ? (form.data_fim_medicao || null) : null,
       itens_apropriacao: exibirItensApropriacao ? (form.itens_apropriacao || null) : null,
       ref_contrato_abertura: exibirRefContratoAbertura ? (form.ref_contrato_abertura || null) : null,
-      descricao: exibirDescricao ? form.descricao : ''
+      descricao: exibirDescricao ? form.descricao : '',
+      apropriacoes_rateio: exibirCamposContrato
+        ? apropriacoesRateioSelecionadas.map(item => ({
+            apropriacao_id: item.apropriacao_id,
+            percentual: String(item.percentual || '').trim() || null,
+            quantidade: String(item.quantidade || '').trim() || null,
+            observacao: String(item.observacao || '').trim() || null
+          }))
+        : []
     };
 
     try {
@@ -1233,13 +1291,7 @@ export default function NovaSolicitacao() {
                 onChange={e => {
                   const contratoId = e.target.value;
                   const contrato = contratosDisponiveis.find(c => String(c.id) === String(contratoId));
-                  setForm(prev => ({
-                    ...prev,
-                    contrato_id: contratoId,
-                    codigo_contrato: contrato?.codigo || ''
-                  }));
-                  setRefContratoBusca(contrato?.ref_contrato || '');
-                  setRefResultados([]);
+                  aplicarContratoSelecionado(contrato || null);
                   if (!contratoId) {
                     setContratosRef([]);
                   }
@@ -1257,6 +1309,68 @@ export default function NovaSolicitacao() {
                 ))}
               </select>
             </label>
+
+            {form.contrato_id && (
+              <div className="md:col-span-2 rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-3 space-y-2">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-semibold text-[var(--c-text)]">Apropriacoes do contrato</p>
+                    <p className="text-xs text-[var(--c-muted)]">
+                      Marque os itens que receberao esta solicitacao e informe percentual ou quantidade quando aplicavel.
+                    </p>
+                  </div>
+                  <span className="rounded-full bg-[var(--c-surface-alt)] px-2 py-1 text-xs font-semibold text-[var(--c-muted)]">
+                    {apropriacoesRateioSelecionadas.length}/{apropriacoesContratoRateio.length} selecionada(s)
+                  </span>
+                </div>
+
+                {apropriacoesContratoRateio.length === 0 ? (
+                  <p className="rounded-lg border border-dashed border-[var(--c-border)] px-3 py-2 text-xs text-[var(--c-muted)]">
+                    Este contrato ainda nao possui apropriacoes estruturadas cadastradas.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {apropriacoesContratoRateio.map((item, index) => (
+                      <div
+                        key={`${item.apropriacao_id}-${index}`}
+                        className="grid gap-2 rounded-lg border border-[var(--c-border)] bg-[var(--c-bg)] p-2 md:grid-cols-[minmax(240px,1fr)_96px_96px]"
+                      >
+                        <label className="flex items-start gap-2 text-sm">
+                          <input
+                            type="checkbox"
+                            className="mt-1"
+                            checked={Boolean(item.selecionado)}
+                            onChange={e => alternarApropriacaoContratoRateio(index, e.target.checked)}
+                          />
+                          <span>
+                            <span className="font-semibold text-[var(--c-text)]">
+                              {item.codigo || item.apropriacao_id}
+                            </span>
+                            {item.descricao && (
+                              <span className="text-[var(--c-muted)]"> - {item.descricao}</span>
+                            )}
+                          </span>
+                        </label>
+                        <input
+                          className="input input-sm"
+                          value={item.percentual}
+                          onChange={e => alterarApropriacaoContratoRateio(index, 'percentual', e.target.value)}
+                          placeholder="%"
+                          disabled={!item.selecionado}
+                        />
+                        <input
+                          className="input input-sm"
+                          value={item.quantidade}
+                          onChange={e => alterarApropriacaoContratoRateio(index, 'quantidade', e.target.value)}
+                          placeholder="Qtd."
+                          disabled={!item.selecionado}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 

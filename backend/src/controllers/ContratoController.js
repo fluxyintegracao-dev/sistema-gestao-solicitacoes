@@ -2,14 +2,17 @@ const { Op } = require('sequelize');
 const {
   Contrato,
   ContratoAnexo,
+  ContratoApropriacao,
   EmpresaGrupo,
   Obra,
+  Apropriacao,
   TipoSolicitacao,
   TipoSubContrato,
   Solicitacao,
   Comprovante,
   Setor,
-  ConfiguracaoSistema
+  ConfiguracaoSistema,
+  sequelize
 } = require('../models');
 const { env } = require('../config/env');
 const { uploadToS3 } = require('../services/s3');
@@ -99,6 +102,118 @@ function parseValorMonetario(valor) {
       .replace(',', '.')
   );
   return Number.isNaN(numero) ? null : numero;
+}
+
+function parseDecimalOpcional(valor) {
+  if (valor === null || valor === undefined) return null;
+  const texto = String(valor).trim();
+  if (!texto) return null;
+  const numero = Number(texto.replace(/[^\d,.-]/g, '').replace(/\./g, '').replace(',', '.'));
+  return Number.isFinite(numero) ? numero : null;
+}
+
+function normalizarApropriacoesPayload(lista = []) {
+  if (!Array.isArray(lista)) return [];
+  const normalizadas = [];
+  const vistos = new Set();
+
+  lista.forEach((item) => {
+    const apropriacaoId = Number(item?.apropriacao_id);
+    if (!Number.isInteger(apropriacaoId) || apropriacaoId <= 0 || vistos.has(apropriacaoId)) {
+      return;
+    }
+    vistos.add(apropriacaoId);
+    normalizadas.push({
+      apropriacao_id: apropriacaoId,
+      percentual: parseDecimalOpcional(item?.percentual),
+      quantidade: parseDecimalOpcional(item?.quantidade),
+      observacao: String(item?.observacao || '').trim() || null
+    });
+  });
+
+  return normalizadas;
+}
+
+function contratoApropriacoesInclude() {
+  return {
+    model: ContratoApropriacao,
+    as: 'apropriacoes',
+    include: [
+      {
+        model: Apropriacao,
+        as: 'apropriacao',
+        attributes: ['id', 'obra_id', 'codigo', 'descricao', 'ativo']
+      }
+    ]
+  };
+}
+
+function formatarApropriacaoContrato(item) {
+  const apropriacao = item.apropriacao || {};
+  const codigo = apropriacao.codigo || apropriacao.id || item.apropriacao_id;
+  const descricao = apropriacao.descricao ? ` - ${apropriacao.descricao}` : '';
+  const percentual = item.percentual !== null && item.percentual !== undefined
+    ? ` (${Number(item.percentual).toLocaleString('pt-BR', { maximumFractionDigits: 4 })}%)`
+    : '';
+  const quantidade = item.quantidade !== null && item.quantidade !== undefined
+    ? ` qtd ${Number(item.quantidade).toLocaleString('pt-BR', { maximumFractionDigits: 4 })}`
+    : '';
+  return `${codigo}${descricao}${percentual}${quantidade}`;
+}
+
+async function validarApropriacoesContrato(obraId, lista = []) {
+  const apropriacoes = normalizarApropriacoesPayload(lista);
+  if (apropriacoes.length === 0) return apropriacoes;
+
+  const ids = apropriacoes.map(item => item.apropriacao_id);
+  const registros = await Apropriacao.findAll({
+    where: {
+      id: { [Op.in]: ids },
+      obra_id: Number(obraId)
+    },
+    attributes: ['id', 'obra_id', 'ativo']
+  });
+  const registrosMap = new Map(registros.map(item => [Number(item.id), item]));
+
+  for (const item of apropriacoes) {
+    const registro = registrosMap.get(Number(item.apropriacao_id));
+    if (!registro) {
+      const error = new Error('Uma ou mais apropriacoes nao pertencem a obra do contrato.');
+      error.statusCode = 400;
+      throw error;
+    }
+    if (registro.ativo === false) {
+      const error = new Error('Uma ou mais apropriacoes do contrato estao inativas.');
+      error.statusCode = 400;
+      throw error;
+    }
+  }
+
+  return apropriacoes;
+}
+
+async function salvarApropriacoesContrato(contratoId, apropriacoes = [], transaction = null) {
+  await ContratoApropriacao.destroy({
+    where: { contrato_id: contratoId },
+    transaction
+  });
+
+  if (apropriacoes.length === 0) return;
+
+  await ContratoApropriacao.bulkCreate(
+    apropriacoes.map(item => ({
+      contrato_id: contratoId,
+      apropriacao_id: item.apropriacao_id,
+      percentual: item.percentual,
+      quantidade: item.quantidade,
+      observacao: item.observacao
+    })),
+    { transaction }
+  );
+}
+
+function contratoToCsvValue(valor) {
+  return `"${String(valor ?? '').replace(/"/g, '""')}"`;
 }
 
 async function isAdminGEO(req) {
@@ -374,7 +489,8 @@ module.exports = {
         include: [
           { model: Obra, as: 'obra', attributes: ['id', 'nome', 'codigo'] },
           { model: TipoSolicitacao, as: 'tipoMacro', attributes: ['id', 'nome'] },
-          { model: TipoSubContrato, as: 'tipoSub', attributes: ['id', 'nome'] }
+          { model: TipoSubContrato, as: 'tipoSub', attributes: ['id', 'nome'] },
+          contratoApropriacoesInclude()
         ],
         order: [['createdAt', 'DESC']]
       });
@@ -404,7 +520,8 @@ module.exports = {
         tipo_macro_id,
         tipo_sub_id,
         ajuste_solicitado,
-        ajuste_pago
+        ajuste_pago,
+        apropriacoes
       } = req.body;
 
       const refContratoFinal = ref_contrato ?? fornecedor;
@@ -433,17 +550,24 @@ module.exports = {
         }
       }
 
-      const contrato = await Contrato.create({
-        obra_id,
-        codigo,
-        ref_contrato: refContratoFinal,
-        descricao: descricao || null,
-        itens_apropriacao: itens_apropriacao || null,
-        valor_total,
-        ajuste_solicitado: ajuste_solicitado ?? 0,
-        ajuste_pago: ajuste_pago ?? 0,
-        tipo_macro_id: tipo_macro_id || null,
-        tipo_sub_id: tipo_sub_id || null
+      const apropriacoesNormalizadas = await validarApropriacoesContrato(obra_id, apropriacoes);
+
+      const contrato = await sequelize.transaction(async (transaction) => {
+        const novoContrato = await Contrato.create({
+          obra_id,
+          codigo,
+          ref_contrato: refContratoFinal,
+          descricao: descricao || null,
+          itens_apropriacao: itens_apropriacao || null,
+          valor_total,
+          ajuste_solicitado: ajuste_solicitado ?? 0,
+          ajuste_pago: ajuste_pago ?? 0,
+          tipo_macro_id: tipo_macro_id || null,
+          tipo_sub_id: tipo_sub_id || null
+        }, { transaction });
+
+        await salvarApropriacoesContrato(novoContrato.id, apropriacoesNormalizadas, transaction);
+        return novoContrato;
       });
 
       await registrarEventoSeguranca({
@@ -460,10 +584,17 @@ module.exports = {
         }
       });
 
-      return res.status(201).json(contrato);
+      const contratoCriado = await Contrato.findByPk(contrato.id, {
+        include: [
+          { model: Obra, as: 'obra', attributes: ['id', 'nome', 'codigo'] },
+          contratoApropriacoesInclude()
+        ]
+      });
+
+      return res.status(201).json(contratoCriado || contrato);
     } catch (error) {
       console.error(error);
-      return res.status(500).json({ error: 'Erro ao criar contrato' });
+      return res.status(error.statusCode || 500).json({ error: error.statusCode ? error.message : 'Erro ao criar contrato' });
     }
   },
 
@@ -482,7 +613,7 @@ module.exports = {
 
       const nomeArquivo = normalizeOriginalName(file.originalname).toLowerCase();
       if (!nomeArquivo.endsWith('.csv')) {
-        return res.status(400).json({ error: 'Formato inválido. Utilize a planilha modelo em CSV.' });
+        return res.status(400).json({ error: 'Formato invalido. Utilize a planilha modelo em CSV.' });
       }
 
       const conteudo = file.buffer.toString('utf8');
@@ -493,7 +624,7 @@ module.exports = {
         });
       }
       if (!headers.length) {
-        return res.status(400).json({ error: 'Arquivo CSV vazio ou sem cabeçalho.' });
+        return res.status(400).json({ error: 'Arquivo CSV vazio ou sem cabecalho.' });
       }
 
       const headerMap = headers.map(normalizarCabecalho);
@@ -503,6 +634,10 @@ module.exports = {
       const idxDescricao = headerMap.findIndex(h => ['descricao'].includes(h));
       const idxItens = headerMap.findIndex(h => ['itens_de_apropriacao', 'itens_apropriacao'].includes(h));
       const idxSolicitado = headerMap.findIndex(h => ['solicitado', 'valor_total'].includes(h));
+      const idxApropriacaoCodigo = headerMap.findIndex(h => ['apropriacao_codigo', 'codigo_apropriacao', 'apropriacao'].includes(h));
+      const idxApropriacaoPercentual = headerMap.findIndex(h => ['apropriacao_percentual', 'percentual', 'percentual_apropriacao'].includes(h));
+      const idxApropriacaoQuantidade = headerMap.findIndex(h => ['apropriacao_quantidade', 'quantidade', 'quantidade_apropriacao'].includes(h));
+      const idxApropriacaoObservacao = headerMap.findIndex(h => ['apropriacao_observacao', 'observacao_apropriacao'].includes(h));
 
       const camposObrigatorios = [
         ['Contrato', idxContrato],
@@ -513,7 +648,7 @@ module.exports = {
       const faltando = camposObrigatorios.filter(([, idx]) => idx < 0).map(([nome]) => nome);
       if (faltando.length > 0) {
         return res.status(400).json({
-          error: `Cabeçalhos obrigatórios ausentes: ${faltando.join(', ')}. (Descrição e Itens de Apropriação são opcionais)`
+          error: `Cabecalhos obrigatorios ausentes: ${faltando.join(', ')}. (Descricao e Itens de Apropriacao sao opcionais)`
         });
       }
 
@@ -526,9 +661,20 @@ module.exports = {
         if (codigo) obraMap.set(codigo, obra);
       });
 
+      const apropriacoes = await Apropriacao.findAll({
+        attributes: ['id', 'obra_id', 'codigo', 'descricao', 'ativo']
+      });
+      const apropriacaoMap = new Map();
+      apropriacoes.forEach((apropriacao) => {
+        const codigo = String(apropriacao.codigo || '').trim().toUpperCase();
+        if (codigo) apropriacaoMap.set(`${Number(apropriacao.obra_id)}:${codigo}`, apropriacao);
+      });
+
       const resultado = {
         total_linhas: rows.length,
         importados: 0,
+        atualizados: 0,
+        apropriacoes_vinculadas: 0,
         ignorados: 0,
         erros: []
       };
@@ -552,7 +698,7 @@ module.exports = {
         if (!codigoContrato || !codigoObra || !refContrato || valorTotal === null) {
           resultado.erros.push({
             linha: linhaPlanilha,
-            error: 'Campos obrigatórios inválidos (Contrato, Codigo, Ref. do Contrato, Solicitado).'
+            error: 'Campos obrigatorios invalidos (Contrato, Codigo, Ref. do Contrato, Solicitado).'
           });
           continue;
         }
@@ -561,7 +707,29 @@ module.exports = {
         if (!obra) {
           resultado.erros.push({
             linha: linhaPlanilha,
-            error: `Obra não encontrada para o código "${codigoObra}".`
+            error: `Obra nao encontrada para o codigo "${codigoObra}".`
+          });
+          continue;
+        }
+
+        const apropriacaoCodigo = idxApropriacaoCodigo >= 0
+          ? String(row[idxApropriacaoCodigo] ?? '').trim()
+          : '';
+        const apropriacaoRegistro = apropriacaoCodigo
+          ? apropriacaoMap.get(`${Number(obra.id)}:${apropriacaoCodigo.toUpperCase()}`)
+          : null;
+
+        if (apropriacaoCodigo && !apropriacaoRegistro) {
+          resultado.erros.push({
+            linha: linhaPlanilha,
+            error: `Apropriacao "${apropriacaoCodigo}" nao encontrada para a obra "${obra.nome}".`
+          });
+          continue;
+        }
+        if (apropriacaoRegistro?.ativo === false) {
+          resultado.erros.push({
+            linha: linhaPlanilha,
+            error: `Apropriacao "${apropriacaoCodigo}" esta inativa.`
           });
           continue;
         }
@@ -571,18 +739,36 @@ module.exports = {
             obra_id: obra.id,
             codigo: codigoContrato
           },
-          attributes: ['id']
+          attributes: ['id', 'descricao', 'itens_apropriacao']
         });
 
         if (existente) {
-          resultado.erros.push({
-            linha: linhaPlanilha,
-            error: `Contrato "${codigoContrato}" já existe para a obra "${obra.nome}".`
+          await sequelize.transaction(async (transaction) => {
+            await existente.update({
+              ref_contrato: refContrato,
+              descricao: descricao || existente.descricao || null,
+              itens_apropriacao: itensApropriacao || existente.itens_apropriacao || null,
+              valor_total: valorTotal
+            }, { transaction });
+
+            if (apropriacaoRegistro) {
+              await ContratoApropriacao.upsert({
+                contrato_id: existente.id,
+                apropriacao_id: apropriacaoRegistro.id,
+                percentual: idxApropriacaoPercentual >= 0 ? parseDecimalOpcional(row[idxApropriacaoPercentual]) : null,
+                quantidade: idxApropriacaoQuantidade >= 0 ? parseDecimalOpcional(row[idxApropriacaoQuantidade]) : null,
+                observacao: idxApropriacaoObservacao >= 0
+                  ? (String(row[idxApropriacaoObservacao] ?? '').trim() || null)
+                  : null
+              }, { transaction });
+              resultado.apropriacoes_vinculadas += 1;
+            }
           });
+          resultado.atualizados += 1;
           continue;
         }
 
-        await Contrato.create({
+        const contratoCriado = await Contrato.create({
           obra_id: obra.id,
           codigo: codigoContrato,
           ref_contrato: refContrato,
@@ -593,6 +779,19 @@ module.exports = {
           ajuste_pago: 0
         });
 
+        if (apropriacaoRegistro) {
+          await ContratoApropriacao.create({
+            contrato_id: contratoCriado.id,
+            apropriacao_id: apropriacaoRegistro.id,
+            percentual: idxApropriacaoPercentual >= 0 ? parseDecimalOpcional(row[idxApropriacaoPercentual]) : null,
+            quantidade: idxApropriacaoQuantidade >= 0 ? parseDecimalOpcional(row[idxApropriacaoQuantidade]) : null,
+            observacao: idxApropriacaoObservacao >= 0
+              ? (String(row[idxApropriacaoObservacao] ?? '').trim() || null)
+              : null
+          });
+          resultado.apropriacoes_vinculadas += 1;
+        }
+
         resultado.importados += 1;
       }
 
@@ -600,6 +799,108 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return res.status(500).json({ error: 'Erro ao importar contratos em massa' });
+    }
+  },
+
+  async exportarCsv(req, res) {
+    try {
+      const podeVisualizarContratos = await canAccessContratos(req.user);
+      const restringirPorObra = await shouldRestrictContratosToObras(req.user);
+      const acessoGlobalContratos = !restringirPorObra && await canAccessContratosGlobal(req.user);
+      const obrasPermitidas = isSuperadmin(req.user) ? null : await getUserObraScopeIds(req.user);
+
+      if (!podeVisualizarContratos) {
+        return res.status(403).json({ error: 'Acesso negado' });
+      }
+
+      const where = {};
+      const { obra_id, ref, codigo } = req.query;
+
+      if (!acessoGlobalContratos && obrasPermitidas && obrasPermitidas.length > 0) {
+        if (obra_id && !obrasPermitidas.includes(Number(obra_id))) {
+          return res.status(403).json({ error: 'Acesso negado para esta obra' });
+        }
+        where.obra_id = obra_id ? Number(obra_id) : { [Op.in]: obrasPermitidas };
+      } else if (!acessoGlobalContratos && obrasPermitidas !== null) {
+        return res.status(403).json({ error: 'Acesso negado' });
+      }
+
+      if (obra_id) where.obra_id = obra_id;
+      if (ref) where.ref_contrato = { [Op.like]: `%${String(ref).trim()}%` };
+      if (codigo) where.codigo = { [Op.like]: `%${String(codigo).trim()}%` };
+
+      const contratos = await Contrato.findAll({
+        where,
+        include: [
+          { model: Obra, as: 'obra', attributes: ['id', 'nome', 'codigo'] },
+          contratoApropriacoesInclude()
+        ],
+        order: [
+          [{ model: Obra, as: 'obra' }, 'codigo', 'ASC'],
+          ['codigo', 'ASC']
+        ]
+      });
+
+      const linhas = [[
+        'Contrato',
+        'Codigo',
+        'Ref. do Contrato',
+        'Descricao',
+        'Itens de Apropriacao',
+        'Solicitado',
+        'Apropriacao Codigo',
+        'Apropriacao Descricao',
+        'Apropriacao Percentual',
+        'Apropriacao Quantidade',
+        'Apropriacao Observacao'
+      ]];
+
+      contratos.forEach((contrato) => {
+        const apropriacoesContrato = Array.isArray(contrato.apropriacoes) ? contrato.apropriacoes : [];
+        if (apropriacoesContrato.length === 0) {
+          linhas.push([
+            contrato.codigo,
+            contrato.obra?.codigo || '',
+            contrato.ref_contrato || '',
+            contrato.descricao || '',
+            contrato.itens_apropriacao || '',
+            contrato.valor_total || '',
+            '',
+            '',
+            '',
+            '',
+            ''
+          ]);
+          return;
+        }
+
+        apropriacoesContrato.forEach((item) => {
+          linhas.push([
+            contrato.codigo,
+            contrato.obra?.codigo || '',
+            contrato.ref_contrato || '',
+            contrato.descricao || '',
+            contrato.itens_apropriacao || '',
+            contrato.valor_total || '',
+            item.apropriacao?.codigo || '',
+            item.apropriacao?.descricao || '',
+            item.percentual ?? '',
+            item.quantidade ?? '',
+            item.observacao || ''
+          ]);
+        });
+      });
+
+      const csv = linhas
+        .map(linha => linha.map(contratoToCsvValue).join(';'))
+        .join('\r\n');
+
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', 'attachment; filename="contratos-apropriacoes.csv"');
+      return res.send(`\uFEFF${csv}`);
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao exportar contratos' });
     }
   },
 
@@ -652,6 +953,7 @@ module.exports = {
           { model: Obra, as: 'obra', attributes: ['id', 'nome', 'codigo'] },
           { model: TipoSolicitacao, as: 'tipoMacro', attributes: ['id', 'nome'] },
           { model: TipoSubContrato, as: 'tipoSub', attributes: ['id', 'nome'] },
+          contratoApropriacoesInclude(),
           {
             model: Solicitacao,
             as: 'solicitacoes',
@@ -892,7 +1194,7 @@ module.exports = {
       const { id } = req.params;
       const contrato = await Contrato.findByPk(id);
       if (!contrato) {
-        return res.status(404).json({ error: 'Contrato não encontrado' });
+        return res.status(404).json({ error: 'Contrato nao encontrado' });
       }
 
       if (!(await usuarioPodeAcessarObraContrato(req, contrato.obra_id))) {
@@ -913,7 +1215,7 @@ module.exports = {
       return res.json(solicitacoes);
     } catch (error) {
       console.error(error);
-      return res.status(500).json({ error: 'Erro ao buscar solicitações do contrato' });
+      return res.status(500).json({ error: 'Erro ao buscar solicitacoes do contrato' });
     }
   },
 
@@ -937,39 +1239,58 @@ module.exports = {
         tipo_sub_id,
         ativo,
         ajuste_solicitado,
-        ajuste_pago
+        ajuste_pago,
+        apropriacoes
       } = req.body;
 
       const contrato = await Contrato.findByPk(id);
       if (!contrato) {
-        return res.status(404).json({ error: 'Contrato não encontrado' });
+        return res.status(404).json({ error: 'Contrato nao encontrado' });
       }
 
       if (obra_id !== undefined && obra_id !== null) {
         const obra = await Obra.findByPk(obra_id, { attributes: ['id'] });
         if (!obra) {
-          return res.status(400).json({ error: 'Obra não encontrada' });
+          return res.status(400).json({ error: 'Obra nao encontrada' });
         }
       }
 
-      await contrato.update({
-        obra_id: obra_id !== undefined && obra_id !== null ? obra_id : contrato.obra_id,
-        codigo: codigo ?? contrato.codigo,
-        ref_contrato: (ref_contrato ?? fornecedor) ?? contrato.ref_contrato,
-        descricao: descricao ?? contrato.descricao,
-        itens_apropriacao: itens_apropriacao ?? contrato.itens_apropriacao,
-        valor_total: valor_total ?? contrato.valor_total,
-        tipo_macro_id: tipo_macro_id ?? contrato.tipo_macro_id,
-        tipo_sub_id: tipo_sub_id ?? contrato.tipo_sub_id,
-        ativo: ativo ?? contrato.ativo,
-        ajuste_solicitado: ajuste_solicitado ?? contrato.ajuste_solicitado,
-        ajuste_pago: ajuste_pago ?? contrato.ajuste_pago
+      const obraFinalId = obra_id !== undefined && obra_id !== null ? obra_id : contrato.obra_id;
+      const apropriacoesNormalizadas = apropriacoes !== undefined
+        ? await validarApropriacoesContrato(obraFinalId, apropriacoes)
+        : null;
+
+      await sequelize.transaction(async (transaction) => {
+        await contrato.update({
+          obra_id: obraFinalId,
+          codigo: codigo ?? contrato.codigo,
+          ref_contrato: (ref_contrato ?? fornecedor) ?? contrato.ref_contrato,
+          descricao: descricao ?? contrato.descricao,
+          itens_apropriacao: itens_apropriacao ?? contrato.itens_apropriacao,
+          valor_total: valor_total ?? contrato.valor_total,
+          tipo_macro_id: tipo_macro_id ?? contrato.tipo_macro_id,
+          tipo_sub_id: tipo_sub_id ?? contrato.tipo_sub_id,
+          ativo: ativo ?? contrato.ativo,
+          ajuste_solicitado: ajuste_solicitado ?? contrato.ajuste_solicitado,
+          ajuste_pago: ajuste_pago ?? contrato.ajuste_pago
+        }, { transaction });
+
+        if (apropriacoesNormalizadas !== null) {
+          await salvarApropriacoesContrato(contrato.id, apropriacoesNormalizadas, transaction);
+        }
       });
 
-      return res.json(contrato);
+      const contratoAtualizado = await Contrato.findByPk(contrato.id, {
+        include: [
+          { model: Obra, as: 'obra', attributes: ['id', 'nome', 'codigo'] },
+          contratoApropriacoesInclude()
+        ]
+      });
+
+      return res.json(contratoAtualizado || contrato);
     } catch (error) {
       console.error(error);
-      return res.status(500).json({ error: 'Erro ao atualizar contrato' });
+      return res.status(error.statusCode || 500).json({ error: error.statusCode ? error.message : 'Erro ao atualizar contrato' });
     }
   },
 
@@ -983,7 +1304,7 @@ module.exports = {
       const { id } = req.params;
       const contrato = await Contrato.findByPk(id);
       if (!contrato) {
-        return res.status(404).json({ error: 'Contrato não encontrado' });
+        return res.status(404).json({ error: 'Contrato nao encontrado' });
       }
       await contrato.update({ ativo: true });
       return res.sendStatus(204);
@@ -1003,7 +1324,7 @@ module.exports = {
       const { id } = req.params;
       const contrato = await Contrato.findByPk(id);
       if (!contrato) {
-        return res.status(404).json({ error: 'Contrato não encontrado' });
+        return res.status(404).json({ error: 'Contrato nao encontrado' });
       }
       await contrato.update({ ativo: false });
       return res.sendStatus(204);
@@ -1023,7 +1344,7 @@ module.exports = {
       const { id } = req.params;
       const contrato = await Contrato.findByPk(id);
       if (!contrato) {
-        return res.status(404).json({ error: 'Contrato não encontrado' });
+        return res.status(404).json({ error: 'Contrato nao encontrado' });
       }
 
       const totalSolicitacoesRelacionadas = await Solicitacao.count({
@@ -1037,7 +1358,7 @@ module.exports = {
 
       if (totalSolicitacoesRelacionadas > 0) {
         return res.status(409).json({
-          error: 'Não é possível excluir contrato com solicitações vinculadas.'
+          error: 'Nao e possivel excluir contrato com solicitacoes vinculadas.'
         });
       }
 

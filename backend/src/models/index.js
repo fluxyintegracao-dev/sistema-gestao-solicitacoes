@@ -18,6 +18,7 @@ db.Parceiro = require('./Parceiro')(sequelize, Sequelize);
 db.ParceiroCategoria = require('./ParceiroCategoria')(sequelize, Sequelize);
 db.ParceiroCategoriaItem = require('./ParceiroCategoriaItem')(sequelize, Sequelize);
 db.Solicitacao = require('./Solicitacao')(sequelize, Sequelize);
+db.SolicitacaoApropriacao = require('./SolicitacaoApropriacao')(sequelize, Sequelize);
 db.SolicitacaoPagamento = require('./SolicitacaoPagamento')(sequelize, Sequelize);
 db.PrioridadeLote = require('./PrioridadeLote')(sequelize, Sequelize);
 db.PrioridadeLoteItem = require('./PrioridadeLoteItem')(sequelize, Sequelize);
@@ -31,6 +32,7 @@ db.Cargo = require('./Cargo')(sequelize, Sequelize);
 db.Comprovante = require('./Comprovante')(sequelize, Sequelize);
 db.Contrato = require('./Contrato')(sequelize, Sequelize);
 db.ContratoAnexo = require('./ContratoAnexo')(sequelize, Sequelize);
+db.ContratoApropriacao = require('./ContratoApropriacao')(sequelize, Sequelize);
 db.Empreendimento = require('./Empreendimento')(sequelize, Sequelize);
 db.UnidadeComercial = require('./UnidadeComercial')(sequelize, Sequelize);
 db.TabelaPrecoComercial = require('./TabelaPrecoComercial')(sequelize, Sequelize);
@@ -668,6 +670,48 @@ db.Contrato.hasMany(db.ContratoAnexo, {
 db.ContratoAnexo.belongsTo(db.Contrato, {
   foreignKey: 'contrato_id',
   as: 'contrato'
+});
+
+db.Contrato.hasMany(db.ContratoApropriacao, {
+  foreignKey: 'contrato_id',
+  as: 'apropriacoes',
+  onDelete: 'CASCADE'
+});
+
+db.ContratoApropriacao.belongsTo(db.Contrato, {
+  foreignKey: 'contrato_id',
+  as: 'contrato'
+});
+
+db.ContratoApropriacao.belongsTo(db.Apropriacao, {
+  foreignKey: 'apropriacao_id',
+  as: 'apropriacao'
+});
+
+db.Apropriacao.hasMany(db.ContratoApropriacao, {
+  foreignKey: 'apropriacao_id',
+  as: 'contratosVinculados'
+});
+
+db.Solicitacao.hasMany(db.SolicitacaoApropriacao, {
+  foreignKey: 'solicitacao_id',
+  as: 'apropriacoes',
+  onDelete: 'CASCADE'
+});
+
+db.SolicitacaoApropriacao.belongsTo(db.Solicitacao, {
+  foreignKey: 'solicitacao_id',
+  as: 'solicitacao'
+});
+
+db.SolicitacaoApropriacao.belongsTo(db.Contrato, {
+  foreignKey: 'contrato_id',
+  as: 'contrato'
+});
+
+db.SolicitacaoApropriacao.belongsTo(db.Apropriacao, {
+  foreignKey: 'apropriacao_id',
+  as: 'apropriacao'
 });
 
 db.Obra.hasMany(db.Empreendimento, {
