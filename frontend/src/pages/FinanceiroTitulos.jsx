@@ -275,6 +275,25 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
   }, [user?.id, user?.email, visibilityStoragePrefix]);
 
   useEffect(() => {
+    const defaults = getDefaultFilters(fixedTipo || 'RECEBER');
+    let nextFilters = defaults;
+
+    try {
+      const stored = localStorage.getItem(filterStorageKey);
+      nextFilters = normalizeFilters(stored ? JSON.parse(stored) : defaults, fixedTipo);
+    } catch (error) {
+      nextFilters = defaults;
+    }
+
+    setDraftFilters(nextFilters);
+    setAppliedFilters(null);
+    setTitulos([]);
+    setLoading(false);
+    setError('');
+    setSelectedTituloIds([]);
+  }, [filterStorageKey, fixedTipo]);
+
+  useEffect(() => {
     if (!appliedFilters) {
       setTitulos([]);
       setLoading(false);
@@ -352,11 +371,12 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
     () => FILTER_DEFINITIONS.filter((item) => item.group === 'advanced' && visibleFilterSet.has(item.id)),
     [visibleFilterSet]
   );
-  const tipoReferencia = appliedFilters?.tipo || draftFilters.tipo;
+  const tipoAtual = fixedTipo || draftFilters.tipo;
+  const tipoReferencia = fixedTipo || appliedFilters?.tipo || draftFilters.tipo;
   const tipoLabel = tipoReferencia === 'PAGAR' ? 'a pagar' : 'a receber';
-  const parceiroLabel = draftFilters.tipo === 'PAGAR' ? 'Credor' : 'Cliente';
+  const parceiroLabel = tipoAtual === 'PAGAR' ? 'Credor' : 'Cliente';
   const parceiroResultadoLabel = tipoReferencia === 'PAGAR' ? 'Credor' : 'Cliente';
-  const categoriasLabel = draftFilters.tipo === 'PAGAR' ? 'contas a pagar' : 'contas a receber';
+  const categoriasLabel = tipoAtual === 'PAGAR' ? 'contas a pagar' : 'contas a receber';
   const showTipoColumn = !fixedTipo;
   const tableHeaders = [
     'Titulo',
