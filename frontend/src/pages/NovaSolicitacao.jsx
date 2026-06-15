@@ -447,8 +447,8 @@ export default function NovaSolicitacao() {
       setForm(prev => ({ ...prev, valor: '' }));
       setValorTexto('');
     }
-    if (!exigeApropriacaoPrincipal) {
-      setForm(prev => ({ ...prev, apropriacao_id: '', itens_apropriacao: '' }));
+    if (!exibirCampoApropriacao) {
+      setForm(prev => ({ ...prev, apropriacao_id: '' }));
     }
     if (!exibirCampoCredor) {
       limparParceiroSelecionado();
@@ -474,6 +474,7 @@ export default function NovaSolicitacao() {
   }, [
     exibirCamposContrato,
     tipoSemValor,
+    exibirCampoApropriacao,
     exigeApropriacaoPrincipal,
     exibirCampoCredor,
     exibirDataVencimento,
@@ -495,13 +496,36 @@ export default function NovaSolicitacao() {
     setForm(prev => ({ ...prev, valor: valor || '' }));
   }
 
+  function parseDecimalRateio(valor) {
+    if (valor === null || valor === undefined) return null;
+    if (typeof valor === 'number') return Number.isFinite(valor) ? valor : null;
+    const texto = String(valor).trim();
+    if (!texto) return null;
+    const limpo = texto.replace(/[^\d,.-]/g, '');
+    const normalizado = limpo.includes(',')
+      ? limpo.replace(/\./g, '').replace(',', '.')
+      : limpo;
+    const numero = Number(normalizado);
+    return Number.isFinite(numero) ? numero : null;
+  }
+
+  function arredondarCentavos(valor) {
+    return Math.round((Number(valor) || 0) * 100) / 100;
+  }
+
+  function atualizarValorRateioContrato(index, raw) {
+    const numeros = String(raw || '').replace(/\D/g, '');
+    const valor = numeros ? Number(numeros) / 100 : 0;
+    alterarApropriacaoContratoRateio(index, 'valor_rateio', numeros ? formatarMoeda(valor) : '');
+  }
+
   function normalizarApropriacoesContratoParaRateio(contrato) {
     return (Array.isArray(contrato?.apropriacoes) ? contrato.apropriacoes : []).map((item) => ({
       apropriacao_id: String(item.apropriacao_id || item.apropriacao?.id || ''),
       codigo: item.apropriacao?.codigo || '',
       descricao: item.apropriacao?.descricao || '',
       percentual: item.percentual !== null && item.percentual !== undefined ? String(item.percentual) : '',
-      quantidade: item.quantidade !== null && item.quantidade !== undefined ? String(item.quantidade) : '',
+      valor_rateio: '',
       observacao: item.observacao || '',
       selecionado: false
     })).filter(item => item.apropriacao_id);
@@ -739,6 +763,43 @@ export default function NovaSolicitacao() {
       return;
     }
 
+    if (apropriacoesRateioSelecionadas.length > 0) {
+      const valorTotalSolicitacao = arredondarCentavos(parseDecimalRateio(form.valor));
+      if (!valorTotalSolicitacao || valorTotalSolicitacao <= 0) {
+        alert('Informe o valor total da solicitacao para validar o rateio das apropriacoes.');
+        return;
+      }
+
+      const comPercentual = apropriacoesRateioSelecionadas.filter(item => parseDecimalRateio(item.percentual) !== null);
+      const comValor = apropriacoesRateioSelecionadas.filter(item => parseDecimalRateio(item.valor_rateio) !== null);
+      const possuiDoisCriterios = apropriacoesRateioSelecionadas.some(item => (
+        parseDecimalRateio(item.percentual) !== null &&
+        parseDecimalRateio(item.valor_rateio) !== null
+      ));
+
+      if (possuiDoisCriterios) {
+        alert('Informe o rateio usando apenas percentual ou apenas valor em R$ por apropriacao.');
+        return;
+      }
+
+      if (comPercentual.length === apropriacoesRateioSelecionadas.length) {
+        const totalPercentual = comPercentual.reduce((acc, item) => acc + Number(parseDecimalRateio(item.percentual) || 0), 0);
+        if (comPercentual.some(item => Number(parseDecimalRateio(item.percentual) || 0) <= 0) || Math.abs(totalPercentual - 100) > 0.0001) {
+          alert('A soma dos percentuais do rateio deve ser exatamente 100%.');
+          return;
+        }
+      } else if (comValor.length === apropriacoesRateioSelecionadas.length) {
+        const totalValorRateio = arredondarCentavos(comValor.reduce((acc, item) => acc + Number(parseDecimalRateio(item.valor_rateio) || 0), 0));
+        if (comValor.some(item => Number(parseDecimalRateio(item.valor_rateio) || 0) <= 0) || totalValorRateio !== valorTotalSolicitacao) {
+          alert('A soma dos valores em R$ do rateio deve ser igual ao valor total da solicitacao.');
+          return;
+        }
+      } else {
+        alert('Todas as apropriacoes selecionadas devem usar o mesmo criterio de rateio: percentual ou valor em R$.');
+        return;
+      }
+    }
+
     const payload = {
       ...form,
       parceiro_id: exibirCampoCredor ? (form.parceiro_id || null) : null,
@@ -756,7 +817,7 @@ export default function NovaSolicitacao() {
         ? apropriacoesRateioSelecionadas.map(item => ({
             apropriacao_id: item.apropriacao_id,
             percentual: String(item.percentual || '').trim() || null,
-            quantidade: String(item.quantidade || '').trim() || null,
+            valor_rateio: String(item.valor_rateio || '').trim() || null,
             observacao: String(item.observacao || '').trim() || null
           }))
         : []
@@ -1190,25 +1251,21 @@ export default function NovaSolicitacao() {
                 value={form.apropriacao_id}
                 options={apropriacoes}
                 onChange={(id) => setForm({ ...form, apropriacao_id: id })}
-                disabled={!form.obra_id || solicitacaoCompra}
+                disabled={!form.obra_id}
                 required={exigeApropriacaoPrincipal}
                 inputClassName="input input-sm w-full"
-                disabledPlaceholder={
-                  !form.obra_id
-                    ? 'Selecione a obra primeiro'
-                    : 'Não se aplica para solicitação de compra'
-                }
+                disabledPlaceholder="Selecione a obra primeiro"
               />
-              {solicitacaoCompra ? (
+              {exigeApropriacaoPrincipal ? (
                 <span className="text-xs text-gray-500">
-                  Para solicitação de compra, a apropriação é feita por item no módulo de compras.
+                  Campo obrigatorio conforme configuracao da nova solicitacao.
                 </span>
-              ) : exigeApropriacaoPrincipal ? (
+              ) : (
                 <span className="text-xs text-gray-500">
-                  Campo obrigatório para solicitações gerais vinculadas a esta obra.
+                  Campo opcional. Use quando a solicitacao precisar nascer vinculada a uma apropriacao da obra.
                 </span>
-              ) : null}
-              {form.obra_id && apropriacoes.length === 0 && !solicitacaoCompra && (
+              )}
+              {form.obra_id && apropriacoes.length === 0 && (
                 <span className="text-xs text-gray-500">
                   Nenhuma apropriacao ativa encontrada para esta obra.
                 </span>
@@ -1316,7 +1373,7 @@ export default function NovaSolicitacao() {
                   <div>
                     <p className="text-sm font-semibold text-[var(--c-text)]">Apropriacoes do contrato</p>
                     <p className="text-xs text-[var(--c-muted)]">
-                      Marque os itens que receberao esta solicitacao e informe percentual ou quantidade quando aplicavel.
+                      Marque os itens que receberao esta solicitacao e informe o rateio por percentual ou valor em R$.
                     </p>
                   </div>
                   <span className="rounded-full bg-[var(--c-surface-alt)] px-2 py-1 text-xs font-semibold text-[var(--c-muted)]">
@@ -1333,7 +1390,7 @@ export default function NovaSolicitacao() {
                     {apropriacoesContratoRateio.map((item, index) => (
                       <div
                         key={`${item.apropriacao_id}-${index}`}
-                        className="grid gap-2 rounded-lg border border-[var(--c-border)] bg-[var(--c-bg)] p-2 md:grid-cols-[minmax(240px,1fr)_96px_96px]"
+                        className="grid gap-2 rounded-lg border border-[var(--c-border)] bg-[var(--c-bg)] p-2 md:grid-cols-[minmax(240px,1fr)_96px_132px]"
                       >
                         <label className="flex items-start gap-2 text-sm">
                           <input
@@ -1360,9 +1417,9 @@ export default function NovaSolicitacao() {
                         />
                         <input
                           className="input input-sm"
-                          value={item.quantidade}
-                          onChange={e => alterarApropriacaoContratoRateio(index, 'quantidade', e.target.value)}
-                          placeholder="Qtd."
+                          value={item.valor_rateio}
+                          onChange={e => atualizarValorRateioContrato(index, e.target.value)}
+                          placeholder="Valor R$"
                           disabled={!item.selecionado}
                         />
                       </div>

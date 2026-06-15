@@ -83,10 +83,19 @@ const DEFAULT_SOLICITACOES_PAGE_SIZE = 25;
 
 function parseDecimalOpcionalSolicitacao(valor) {
   if (valor === null || valor === undefined) return null;
+  if (typeof valor === 'number') return Number.isFinite(valor) ? valor : null;
   const texto = String(valor).trim();
   if (!texto) return null;
-  const numero = Number(texto.replace(/[^\d,.-]/g, '').replace(/\./g, '').replace(',', '.'));
+  const limpo = texto.replace(/[^\d,.-]/g, '');
+  const normalizado = limpo.includes(',')
+    ? limpo.replace(/\./g, '').replace(',', '.')
+    : limpo;
+  const numero = Number(normalizado);
   return Number.isFinite(numero) ? numero : null;
+}
+
+function arredondarCentavos(valor) {
+  return Math.round((Number(valor) || 0) * 100) / 100;
 }
 
 function normalizarApropriacoesRateio(lista = []) {
@@ -104,6 +113,7 @@ function normalizarApropriacoesRateio(lista = []) {
       apropriacao_id: apropriacaoId,
       percentual: parseDecimalOpcionalSolicitacao(item?.percentual),
       quantidade: parseDecimalOpcionalSolicitacao(item?.quantidade),
+      valor_rateio: parseDecimalOpcionalSolicitacao(item?.valor_rateio ?? item?.valor),
       observacao: String(item?.observacao || '').trim() || null
     });
   });
@@ -120,10 +130,13 @@ function formatarRateioApropriacoesHistorico(rateios = []) {
     const percentual = item.percentual !== null && item.percentual !== undefined
       ? ` ${Number(item.percentual).toLocaleString('pt-BR', { maximumFractionDigits: 4 })}%`
       : '';
-    const quantidade = item.quantidade !== null && item.quantidade !== undefined
+    const valorRateio = item.valor_rateio !== null && item.valor_rateio !== undefined
+      ? ` R$ ${Number(item.valor_rateio).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+      : '';
+    const quantidade = !valorRateio && item.quantidade !== null && item.quantidade !== undefined
       ? ` qtd ${Number(item.quantidade).toLocaleString('pt-BR', { maximumFractionDigits: 4 })}`
       : '';
-    return `${codigo}${descricao}${percentual}${quantidade}`.trim();
+    return `${codigo}${descricao}${percentual}${valorRateio}${quantidade}`.trim();
   }).join('; ');
 }
 const MAX_SOLICITACOES_PAGE_SIZE = 500;
@@ -1985,6 +1998,50 @@ module.exports = {
         ? null
         : (valor === '' || valor === undefined ? null : valor);
 
+      if (rateioApropriacoesDetalhado.length > 0) {
+        const valorTotalSolicitacao = arredondarCentavos(parseDecimalOpcionalSolicitacao(valorPersistido));
+        if (!valorTotalSolicitacao || valorTotalSolicitacao <= 0) {
+          return res.status(400).json({
+            error: 'Informe o valor total da solicitacao para validar o rateio das apropriacoes.'
+          });
+        }
+
+        const rateiosComPercentual = rateioApropriacoesDetalhado.filter(item => item.percentual !== null && item.percentual !== undefined);
+        const rateiosComValor = rateioApropriacoesDetalhado.filter(item => item.valor_rateio !== null && item.valor_rateio !== undefined);
+        const possuiLinhaComDoisCriterios = rateioApropriacoesDetalhado.some(item => (
+          item.percentual !== null &&
+          item.percentual !== undefined &&
+          item.valor_rateio !== null &&
+          item.valor_rateio !== undefined
+        ));
+
+        if (possuiLinhaComDoisCriterios) {
+          return res.status(400).json({
+            error: 'Informe o rateio usando apenas percentual ou apenas valor em R$ por apropriacao.'
+          });
+        }
+
+        if (rateiosComPercentual.length === rateioApropriacoesDetalhado.length) {
+          const totalPercentual = rateiosComPercentual.reduce((acc, item) => acc + Number(item.percentual || 0), 0);
+          if (rateiosComPercentual.some(item => Number(item.percentual || 0) <= 0) || Math.abs(totalPercentual - 100) > 0.0001) {
+            return res.status(400).json({
+              error: 'A soma dos percentuais do rateio deve ser exatamente 100%.'
+            });
+          }
+        } else if (rateiosComValor.length === rateioApropriacoesDetalhado.length) {
+          const totalValorRateio = arredondarCentavos(rateiosComValor.reduce((acc, item) => acc + Number(item.valor_rateio || 0), 0));
+          if (rateiosComValor.some(item => Number(item.valor_rateio || 0) <= 0) || totalValorRateio !== valorTotalSolicitacao) {
+            return res.status(400).json({
+              error: 'A soma dos valores em R$ do rateio deve ser igual ao valor total da solicitacao.'
+            });
+          }
+        } else {
+          return res.status(400).json({
+            error: 'Todas as apropriacoes selecionadas devem usar o mesmo criterio de rateio: percentual ou valor em R$.'
+          });
+        }
+      }
+
       const codigo = await gerarCodigoSolicitacao();
 
       const solicitacao = await Solicitacao.create({
@@ -2018,6 +2075,7 @@ module.exports = {
             apropriacao_id: item.apropriacao_id,
             percentual: item.percentual,
             quantidade: item.quantidade,
+            valor_rateio: item.valor_rateio,
             observacao: item.observacao
           }))
         );
@@ -2066,7 +2124,8 @@ module.exports = {
           apropriacao_id: item.apropriacao_id,
           apropriacao_codigo: item.apropriacao?.codigo || null,
           percentual: item.percentual,
-          quantidade: item.quantidade
+          quantidade: item.quantidade,
+          valor_rateio: item.valor_rateio
         }));
       }
       if (campoVisivel('itens_apropriacao') && itens_apropriacao) {

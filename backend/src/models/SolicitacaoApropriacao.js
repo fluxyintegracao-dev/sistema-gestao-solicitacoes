@@ -27,6 +27,10 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.DECIMAL(14, 4),
         allowNull: true
       },
+      valor_rateio: {
+        type: DataTypes.DECIMAL(15, 2),
+        allowNull: true
+      },
       observacao: {
         type: DataTypes.STRING,
         allowNull: true

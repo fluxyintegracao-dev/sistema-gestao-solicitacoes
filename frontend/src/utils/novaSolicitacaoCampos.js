@@ -57,7 +57,7 @@ function padraoCampo(id, behavior = {}, contexto = {}) {
       return { visivel: true, obrigatorio: false };
     case 'apropriacao_principal':
       return {
-        visivel: Boolean(apropriacoesDisponiveis && (behavior.mostrar_apropriacao_principal || solicitacaoCompra)),
+        visivel: Boolean(apropriacoesDisponiveis && behavior.mostrar_apropriacao_principal),
         obrigatorio: Boolean(behavior.exige_apropriacao_principal)
       };
     case 'subtipo':

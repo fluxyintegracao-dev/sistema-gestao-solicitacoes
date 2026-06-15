@@ -15,7 +15,7 @@ function getDefaultTipoSolicitacaoBehavior() {
     mostrar_descricao: true,
     exige_descricao: true,
     mostrar_apropriacao_principal: true,
-    exige_apropriacao_principal: true,
+    exige_apropriacao_principal: false,
     mostrar_contrato: false,
     exige_contrato: false,
     mostrar_subtipo: false,

@@ -30,7 +30,7 @@ const CAMPOS_NOVA_SOLICITACAO = [
     id: 'apropriacao_principal',
     label: 'Apropriacao principal',
     descricao: 'Apropriacao da solicitacao na obra.',
-    visivelPadrao: (behavior, contexto) => Boolean(contexto?.apropriacoesDisponiveis && (behavior.mostrar_apropriacao_principal || contexto?.solicitacaoCompra)),
+    visivelPadrao: (behavior, contexto) => Boolean(contexto?.apropriacoesDisponiveis && behavior.mostrar_apropriacao_principal),
     obrigatorioPadrao: (behavior) => Boolean(behavior.exige_apropriacao_principal)
   },
   {
