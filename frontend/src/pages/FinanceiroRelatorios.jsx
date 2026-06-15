@@ -895,8 +895,11 @@ export default function FinanceiroRelatorios() {
             </p>
           </div>
           <div className="app-page-actions">
-            <Link to="/financeiro/titulos" className="btn btn-outline">
-              Titulos
+            <Link to="/financeiro/contas-a-receber" className="btn btn-outline">
+              Contas a Receber
+            </Link>
+            <Link to="/financeiro/contas-a-pagar" className="btn btn-outline">
+              Contas a Pagar
             </Link>
             <Link to="/financeiro/cadastros" className="btn btn-outline">
               Cadastros

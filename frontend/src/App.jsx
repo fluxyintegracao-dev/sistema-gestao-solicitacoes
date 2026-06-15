@@ -803,6 +803,8 @@ export default function App() {
 
         <Route path="comprovantes/upload" element={<FinanceiroRoute><UploadComprovantes /></FinanceiroRoute>} />
         <Route path="comprovantes/pendentes" element={<FinanceiroRoute><ComprovantesPendentes /></FinanceiroRoute>} />
+        <Route path="financeiro/contas-a-receber" element={<FinanceiroRoute><FinanceiroTitulos tipoFixo="RECEBER" /></FinanceiroRoute>} />
+        <Route path="financeiro/contas-a-pagar" element={<FinanceiroRoute><FinanceiroTitulos tipoFixo="PAGAR" /></FinanceiroRoute>} />
         <Route path="financeiro/titulos" element={<FinanceiroRoute><FinanceiroTitulos /></FinanceiroRoute>} />
         <Route path="financeiro/titulos/novo" element={<FinanceiroRoute><FinanceiroTituloNovo /></FinanceiroRoute>} />
         <Route path="financeiro/titulos/:id/editar" element={<FinanceiroRoute><FinanceiroTituloEditar /></FinanceiroRoute>} />

@@ -987,6 +987,9 @@ export default function FinanceiroTituloNovo() {
     }
   }
 
+  const tituloListPath = form.tipo === 'PAGAR' ? '/financeiro/contas-a-pagar' : '/financeiro/contas-a-receber';
+  const tituloListLabel = form.tipo === 'PAGAR' ? 'contas a pagar' : 'contas a receber';
+
   return (
     <div className="page solicitacoes-page max-w-5xl mx-auto">
       <div className="app-page-header">
@@ -1000,7 +1003,7 @@ export default function FinanceiroTituloNovo() {
             </p>
           </div>
           <div className="app-page-actions">
-            <Link to="/financeiro/titulos" className="btn btn-outline">Voltar para titulos</Link>
+            <Link to={tituloListPath} className="btn btn-outline">Voltar para {tituloListLabel}</Link>
           </div>
         </div>
       </div>
@@ -1879,7 +1882,7 @@ export default function FinanceiroTituloNovo() {
             </div>
 
             <div className="app-page-actions justify-end">
-              <Link to="/financeiro/titulos" className="btn btn-outline">Cancelar</Link>
+              <Link to={tituloListPath} className="btn btn-outline">Cancelar</Link>
               <button type="submit" className="btn btn-primary" disabled={saving}>
                 {saving ? 'Salvando...' : (form.tipo === 'RECEBER' ? 'Criar conta a receber' : 'Criar conta a pagar')}
               </button>

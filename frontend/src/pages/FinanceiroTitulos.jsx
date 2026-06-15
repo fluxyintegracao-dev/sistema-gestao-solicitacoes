@@ -45,9 +45,9 @@ const FILTER_DEFINITIONS = [
 
 const DEFAULT_VISIBLE_FILTER_IDS = FILTER_DEFINITIONS.map((item) => item.id);
 
-function getDefaultFilters() {
+function getDefaultFilters(tipo = 'RECEBER') {
   return {
-    tipo: 'RECEBER',
+    tipo,
     status: 'ABERTO',
     q: '',
     codigo: '',
@@ -62,13 +62,14 @@ function getDefaultFilters() {
   };
 }
 
-function normalizeFilters(filters = {}) {
-  return {
-    ...getDefaultFilters(),
+function normalizeFilters(filters = {}, forcedTipo = null) {
+  const normalized = {
+    ...getDefaultFilters(forcedTipo || 'RECEBER'),
     ...Object.fromEntries(
       Object.entries(filters || {}).map(([key, value]) => [key, value == null ? '' : String(value)])
     )
   };
+  return forcedTipo ? { ...normalized, tipo: forcedTipo } : normalized;
 }
 
 function compactFilters(filters = {}) {
@@ -77,14 +78,14 @@ function compactFilters(filters = {}) {
   );
 }
 
-function getVisibilityStorageKey(user) {
+function getVisibilityStorageKey(user, storagePrefix = FILTER_VISIBILITY_STORAGE_PREFIX) {
   const userToken = user?.id || user?.email || 'anonimo';
-  return `${FILTER_VISIBILITY_STORAGE_PREFIX}.${userToken}`;
+  return `${storagePrefix}.${userToken}`;
 }
 
-function loadVisibleFilterIds(user) {
+function loadVisibleFilterIds(user, storagePrefix = FILTER_VISIBILITY_STORAGE_PREFIX) {
   try {
-    const stored = localStorage.getItem(getVisibilityStorageKey(user));
+    const stored = localStorage.getItem(getVisibilityStorageKey(user, storagePrefix));
     const parsed = stored ? JSON.parse(stored) : null;
     if (!Array.isArray(parsed)) {
       return DEFAULT_VISIBLE_FILTER_IDS;
@@ -188,18 +189,35 @@ function buildBaixaMassaForm(contasBancarias = []) {
   };
 }
 
-export default function FinanceiroTitulos() {
+export default function FinanceiroTitulos({ tipoFixo = null }) {
   const { user } = useAuth();
+  const fixedTipo = ['PAGAR', 'RECEBER'].includes(String(tipoFixo || '').toUpperCase())
+    ? String(tipoFixo).toUpperCase()
+    : null;
+  const filterStorageKey = fixedTipo ? `${FILTER_STORAGE_KEY}.${fixedTipo.toLowerCase()}` : FILTER_STORAGE_KEY;
+  const visibilityStoragePrefix = fixedTipo
+    ? `${FILTER_VISIBILITY_STORAGE_PREFIX}.${fixedTipo.toLowerCase()}`
+    : FILTER_VISIBILITY_STORAGE_PREFIX;
+  const pageTitle = fixedTipo === 'PAGAR'
+    ? 'Contas a Pagar'
+    : fixedTipo === 'RECEBER'
+      ? 'Contas a Receber'
+      : 'Consulta de Titulos Financeiros';
+  const pageSubtitle = fixedTipo === 'PAGAR'
+    ? 'Consulte, baixe e acompanhe os compromissos financeiros em aberto ou quitados.'
+    : fixedTipo === 'RECEBER'
+      ? 'Consulte, baixe e acompanhe os recebimentos em aberto ou quitados.'
+      : 'Filtre a carteira antes de operar baixas, boletos e integracoes.';
   const [saveFilterCache, setSaveFilterCache] = useState(true);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [filterChooserOpen, setFilterChooserOpen] = useState(false);
-  const [visibleFilterIds, setVisibleFilterIds] = useState(() => loadVisibleFilterIds(user));
+  const [visibleFilterIds, setVisibleFilterIds] = useState(() => loadVisibleFilterIds(user, visibilityStoragePrefix));
   const [draftFilters, setDraftFilters] = useState(() => {
     try {
-      const stored = localStorage.getItem(FILTER_STORAGE_KEY);
-      return normalizeFilters(stored ? JSON.parse(stored) : getDefaultFilters());
+      const stored = localStorage.getItem(filterStorageKey);
+      return normalizeFilters(stored ? JSON.parse(stored) : getDefaultFilters(fixedTipo || 'RECEBER'), fixedTipo);
     } catch (error) {
-      return getDefaultFilters();
+      return getDefaultFilters(fixedTipo || 'RECEBER');
     }
   });
   const [appliedFilters, setAppliedFilters] = useState(null);
@@ -252,9 +270,9 @@ export default function FinanceiroTitulos() {
   }, []);
 
   useEffect(() => {
-    setVisibleFilterIds(loadVisibleFilterIds(user));
+    setVisibleFilterIds(loadVisibleFilterIds(user, visibilityStoragePrefix));
     setFilterChooserOpen(false);
-  }, [user?.id, user?.email]);
+  }, [user?.id, user?.email, visibilityStoragePrefix]);
 
   useEffect(() => {
     if (!appliedFilters) {
@@ -324,7 +342,6 @@ export default function FinanceiroTitulos() {
     quantidadeVencida: 0
   }), [titulos]);
 
-  const totalColunas = 14;
   const hasConsulted = Boolean(appliedFilters);
   const visibleFilterSet = useMemo(() => new Set(visibleFilterIds), [visibleFilterIds]);
   const basicVisibleFilters = useMemo(
@@ -340,6 +357,23 @@ export default function FinanceiroTitulos() {
   const parceiroLabel = draftFilters.tipo === 'PAGAR' ? 'Credor' : 'Cliente';
   const parceiroResultadoLabel = tipoReferencia === 'PAGAR' ? 'Credor' : 'Cliente';
   const categoriasLabel = draftFilters.tipo === 'PAGAR' ? 'contas a pagar' : 'contas a receber';
+  const showTipoColumn = !fixedTipo;
+  const tableHeaders = [
+    'Titulo',
+    'Status',
+    ...(showTipoColumn ? ['Tipo'] : []),
+    'Documento',
+    parceiroResultadoLabel,
+    'Obra',
+    'Categoria',
+    'Origem',
+    'Emissao',
+    'Vencimento',
+    'Valor total',
+    'Saldo',
+    'Acoes'
+  ];
+  const totalColunas = 1 + tableHeaders.length;
   const titulosBaixaveis = useMemo(() => titulos.filter(isTituloBaixavel), [titulos]);
   const selectedTituloSet = useMemo(() => new Set(selectedTituloIds.map((id) => Number(id))), [selectedTituloIds]);
   const selectedTitulos = useMemo(
@@ -378,6 +412,7 @@ export default function FinanceiroTitulos() {
   }
 
   function setTipoFiltro(tipo) {
+    if (fixedTipo) return;
     setDraftFilters({
       ...getDefaultFilters(),
       tipo
@@ -391,7 +426,7 @@ export default function FinanceiroTitulos() {
 
   function submitFilters(event) {
     event.preventDefault();
-    const normalized = normalizeFilters(draftFilters);
+    const normalized = normalizeFilters(draftFilters, fixedTipo);
     const visibleFilters = pickVisibleFilters(normalized, visibleFilterIds);
     if (Object.keys(compactFilters(visibleFilters)).length === 0) {
       setError('Selecione ao menos um filtro visivel antes de consultar.');
@@ -402,21 +437,21 @@ export default function FinanceiroTitulos() {
 
     setAppliedFilters(normalized);
     if (saveFilterCache) {
-      localStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify(normalized));
+      localStorage.setItem(filterStorageKey, JSON.stringify(normalized));
     } else {
-      localStorage.removeItem(FILTER_STORAGE_KEY);
+      localStorage.removeItem(filterStorageKey);
     }
   }
 
   function clearFilters() {
-    const defaults = getDefaultFilters();
+    const defaults = getDefaultFilters(fixedTipo || 'RECEBER');
     setDraftFilters(defaults);
     setAppliedFilters(null);
     setTitulos([]);
     setLoading(false);
     setError('');
     setSelectedTituloIds([]);
-    localStorage.removeItem(FILTER_STORAGE_KEY);
+    localStorage.removeItem(filterStorageKey);
   }
 
   function toggleTituloSelecionado(titulo, checked) {
@@ -525,7 +560,7 @@ export default function FinanceiroTitulos() {
   function persistVisibleFilters(nextIds) {
     const normalized = nextIds.length > 0 ? nextIds : DEFAULT_VISIBLE_FILTER_IDS;
     setVisibleFilterIds(normalized);
-    localStorage.setItem(getVisibilityStorageKey(user), JSON.stringify(normalized));
+    localStorage.setItem(getVisibilityStorageKey(user, visibilityStoragePrefix), JSON.stringify(normalized));
   }
 
   function toggleVisibleFilter(filterId) {
@@ -709,8 +744,8 @@ export default function FinanceiroTitulos() {
     <div className="page solicitacoes-page">
       <div className="app-page-header-row">
         <div>
-          <h1 className="page-title">Consulta de Titulos Financeiros</h1>
-          <p className="page-subtitle">Filtre a carteira antes de operar baixas, boletos e integracoes.</p>
+          <h1 className="page-title">{pageTitle}</h1>
+          <p className="page-subtitle">{pageSubtitle}</p>
         </div>
         <div className="app-page-actions">
           <Link to="/financeiro/relatorios" className="btn btn-outline btn-sm">
@@ -723,7 +758,7 @@ export default function FinanceiroTitulos() {
           <Link to="/financeiro/conciliacao" className="btn btn-outline btn-sm">
             Conciliacao OFX
           </Link>
-          <Link to={`/financeiro/titulos/novo?tipo=${draftFilters.tipo || 'RECEBER'}`} className="btn btn-primary btn-sm">
+          <Link to={`/financeiro/titulos/novo?tipo=${fixedTipo || draftFilters.tipo || 'RECEBER'}`} className="btn btn-primary btn-sm">
             <HiOutlinePlus className="h-4 w-4" />
             Novo titulo
           </Link>
@@ -748,31 +783,37 @@ export default function FinanceiroTitulos() {
             </label>
           </div>
 
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <span className="app-filter-label">Tipo</span>
-            <div className="inline-grid w-full max-w-[220px] grid-cols-2 rounded-lg border border-[var(--c-border)] bg-[var(--c-bg)] p-1">
-              {[
-                { value: 'RECEBER', label: 'Receber' },
-                { value: 'PAGAR', label: 'Pagar' }
-              ].map((option) => {
-                const active = draftFilters.tipo === option.value;
-                return (
-                  <button
-                    key={option.value}
-                    type="button"
-                    className={`rounded-md px-3 py-1.5 text-sm font-semibold transition-colors ${
-                      active
-                        ? 'bg-[var(--c-primary)] text-white shadow-sm'
-                        : 'text-[var(--c-muted)] hover:bg-[var(--c-surface)] hover:text-[var(--c-text)]'
-                    }`}
-                    onClick={() => setTipoFiltro(option.value)}
-                  >
-                    {option.label}
-                  </button>
-                );
-              })}
+          {fixedTipo ? (
+            <div className="inline-flex w-fit items-center gap-2 rounded-full border border-[var(--c-border)] bg-[var(--c-bg)] px-3 py-1 text-xs font-semibold text-[var(--c-muted)]">
+              Carteira fixa: {fixedTipo === 'PAGAR' ? 'Contas a pagar' : 'Contas a receber'}
             </div>
-          </div>
+          ) : (
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <span className="app-filter-label">Tipo</span>
+              <div className="inline-grid w-full max-w-[220px] grid-cols-2 rounded-lg border border-[var(--c-border)] bg-[var(--c-bg)] p-1">
+                {[
+                  { value: 'RECEBER', label: 'Receber' },
+                  { value: 'PAGAR', label: 'Pagar' }
+                ].map((option) => {
+                  const active = draftFilters.tipo === option.value;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      className={`rounded-md px-3 py-1.5 text-sm font-semibold transition-colors ${
+                        active
+                          ? 'bg-[var(--c-primary)] text-white shadow-sm'
+                          : 'text-[var(--c-muted)] hover:bg-[var(--c-surface)] hover:text-[var(--c-text)]'
+                      }`}
+                      onClick={() => setTipoFiltro(option.value)}
+                    >
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-12">
             {basicVisibleFilters.map((filter) => renderFilterField(filter))}
@@ -956,21 +997,7 @@ export default function FinanceiroTitulos() {
                     title="Selecionar todos os titulos filtrados baixaveis"
                   />
                 </th>
-                {[
-                  'Titulo',
-                  'Status',
-                  'Tipo',
-                  'Documento',
-                  parceiroResultadoLabel,
-                  'Obra',
-                  'Categoria',
-                  'Origem',
-                  'Emissao',
-                  'Vencimento',
-                  'Valor total',
-                  'Saldo',
-                  'Acoes'
-                ].map((header) => (
+                {tableHeaders.map((header) => (
                   <th
                     key={header}
                     className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wide text-[var(--c-muted)] whitespace-nowrap"
@@ -1046,7 +1073,9 @@ export default function FinanceiroTitulos() {
                   <td className="px-3 py-2 whitespace-nowrap">
                     <span className={statusClass(titulo.status)}>{titulo.status}</span>
                   </td>
-                  <td className="px-3 py-2 font-medium text-[var(--c-muted)] whitespace-nowrap">{titulo.tipo}</td>
+                  {showTipoColumn ? (
+                    <td className="px-3 py-2 font-medium text-[var(--c-muted)] whitespace-nowrap">{titulo.tipo}</td>
+                  ) : null}
                   <td className="px-3 py-2 whitespace-nowrap">{titulo.numero_documento || '-'}</td>
                   <td className="px-3 py-2">
                     <div className="max-w-[180px] truncate font-medium text-[var(--c-text)]">{titulo.parceiro?.nome || '-'}</div>

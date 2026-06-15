@@ -427,13 +427,16 @@ export default function FinanceiroTituloDetalhe() {
     return <p className="text-sm text-[var(--c-muted)]">Titulo financeiro nao encontrado.</p>;
   }
 
+  const tituloListPath = titulo.tipo === 'PAGAR' ? '/financeiro/contas-a-pagar' : '/financeiro/contas-a-receber';
+  const tituloListLabel = titulo.tipo === 'PAGAR' ? 'contas a pagar' : 'contas a receber';
+
   return (
     <>
       <div className="page solicitacoes-page">
         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div>
-            <Link className="btn btn-outline mb-3" to="/financeiro/titulos">
-              Voltar
+            <Link className="btn btn-outline mb-3" to={tituloListPath}>
+              Voltar para {tituloListLabel}
             </Link>
             <h1 className="page-title">Titulo {titulo.codigo || `#${titulo.id}`}</h1>
             <p className="text-sm text-[var(--c-muted)]">{titulo.descricao || 'Sem descricao'}</p>
