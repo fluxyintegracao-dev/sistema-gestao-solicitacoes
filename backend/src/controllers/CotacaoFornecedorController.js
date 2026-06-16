@@ -431,46 +431,285 @@ async function registrarRespostaArquivoCotacao(cotacaoFornecedor, req, tipoArqui
   return url;
 }
 
+function pdfText(value, fallback = '-') {
+  const normalized = String(value ?? '').trim();
+  return normalized || fallback;
+}
+
+function pdfMoneyPlaceholder() {
+  return 'R$';
+}
+
+function drawPdfCell(doc, text, x, y, width, height, options = {}) {
+  const {
+    align = 'left',
+    valign = 'middle',
+    font = 'Helvetica',
+    fontSize = 7,
+    color = '#111827',
+    paddingX = 4,
+    paddingY = 3
+  } = options;
+
+  const availableWidth = Math.max(4, width - paddingX * 2);
+  const value = pdfText(text);
+  doc.font(font).fontSize(fontSize).fillColor(color);
+  const textHeight = doc.heightOfString(value, { width: availableWidth, align });
+  const top =
+    valign === 'top'
+      ? y + paddingY
+      : y + Math.max(paddingY, (height - textHeight) / 2);
+
+  doc.text(value, x + paddingX, top, {
+    width: availableWidth,
+    align,
+    lineGap: 0.5
+  });
+}
+
+function drawPdfInfoBox(doc, x, y, width, label, value) {
+  const height = 30;
+  doc.roundedRect(x, y, width, height, 4).stroke('#cbd5e1');
+  doc
+    .font('Helvetica-Bold')
+    .fontSize(6.5)
+    .fillColor('#64748b')
+    .text(label, x + 6, y + 5, { width: width - 12 });
+  doc
+    .font('Helvetica')
+    .fontSize(8)
+    .fillColor('#111827')
+    .text(pdfText(value), x + 6, y + 16, { width: width - 12 });
+}
+
+function drawPdfCotacaoHeader(doc, cotacaoFornecedor, solicitacao, metrics) {
+  const { left, top, width } = metrics;
+  const titleHeight = 48;
+
+  doc.rect(left, top, width, titleHeight).fillAndStroke('#eaf2ff', '#c7d7ee');
+  doc
+    .font('Helvetica-Bold')
+    .fontSize(16)
+    .fillColor('#0f172a')
+    .text('COTACAO DE COMPRA', left + 14, top + 10, { width: width - 28 });
+  doc
+    .font('Helvetica')
+    .fontSize(8)
+    .fillColor('#475569')
+    .text(
+      'Use este PDF para conferir os itens solicitados. O formulario online e opcional: voce tambem pode enviar uma proposta em PDF ou imagem pelo portal.',
+      left + 14,
+      top + 30,
+      { width: width - 28 }
+    );
+
+  const gap = 8;
+  const yInfo = top + titleHeight + 8;
+  const colWidth = (width - gap * 3) / 4;
+  drawPdfInfoBox(doc, left, yInfo, colWidth, 'FORNECEDOR', cotacaoFornecedor?.fornecedor?.nome || '-');
+  drawPdfInfoBox(doc, left + (colWidth + gap), yInfo, colWidth, 'OBRA', solicitacao?.obra?.nome || '-');
+  drawPdfInfoBox(
+    doc,
+    left + (colWidth + gap) * 2,
+    yInfo,
+    colWidth,
+    'SOLICITACAO',
+    `SC-${String(solicitacao?.id || '').padStart(5, '0')}`
+  );
+  drawPdfInfoBox(
+    doc,
+    left + (colWidth + gap) * 3,
+    yInfo,
+    colWidth,
+    'ENVIADO EM',
+    formatarDataPublica(cotacaoFornecedor?.enviado_em)
+  );
+
+  const observacao = pdfText(solicitacao?.observacoes, '');
+  if (!observacao) {
+    return yInfo + 38;
+  }
+
+  const yObs = yInfo + 38;
+  const obsHeight = Math.max(
+    28,
+    doc.font('Helvetica').fontSize(7.2).heightOfString(observacao, { width: width - 96 }) + 14
+  );
+  doc.roundedRect(left, yObs, width, obsHeight, 4).fillAndStroke('#fff7ed', '#fed7aa');
+  doc
+    .font('Helvetica-Bold')
+    .fontSize(7)
+    .fillColor('#9a3412')
+    .text('OBSERVACAO', left + 8, yObs + 7, { width: 76 });
+  doc
+    .font('Helvetica')
+    .fontSize(7.2)
+    .fillColor('#431407')
+    .text(observacao, left + 88, yObs + 7, { width: width - 96 });
+
+  return yObs + obsHeight + 8;
+}
+
+function drawPdfCotacaoTableHeader(doc, y, columns, metrics) {
+  const { left, width } = metrics;
+  const headerHeight = 18;
+  doc.rect(left, y, width, headerHeight).fillAndStroke('#dbe7f7', '#94a3b8');
+
+  let x = left;
+  columns.forEach((column) => {
+    doc.rect(x, y, column.width, headerHeight).stroke('#94a3b8');
+    drawPdfCell(doc, column.label, x, y, column.width, headerHeight, {
+      align: column.align || 'center',
+      font: 'Helvetica-Bold',
+      fontSize: 6.4,
+      color: '#0f172a'
+    });
+    x += column.width;
+  });
+
+  return y + headerHeight;
+}
+
+function measureCotacaoRowHeight(doc, item, columns) {
+  const values = [
+    item.nome || '-',
+    formatarQuantidadePublica(item.quantidade, item.unidade),
+    formatarDataPublica(item.necessario_para),
+    item.especificacao || '-',
+    item.link_produto || item.arquivo_nome_original || '-',
+    pdfMoneyPlaceholder(),
+    '',
+    '',
+    '',
+    ''
+  ];
+
+  doc.font('Helvetica').fontSize(6.8);
+  const maxTextHeight = values.reduce((max, value, index) => {
+    const cellHeight = doc.heightOfString(pdfText(value), {
+      width: Math.max(4, columns[index].width - 8),
+      align: columns[index].align || 'left'
+    });
+    return Math.max(max, cellHeight);
+  }, 0);
+
+  return Math.max(24, Math.ceil(maxTextHeight + 10));
+}
+
+function drawPdfCotacaoFooter(doc, metrics, pageNumber) {
+  const { left, bottom, width } = metrics;
+  doc
+    .font('Helvetica')
+    .fontSize(6.5)
+    .fillColor('#64748b')
+    .text(`Cotacao gerada pelo Fluxy - Pagina ${pageNumber}`, left, bottom - 10, {
+      width,
+      align: 'right'
+    });
+}
+
 async function renderPdfCotacaoPublica(doc, cotacaoFornecedor) {
   const solicitacao = cotacaoFornecedor?.solicitacao || {};
   const itensCotaveis = obterItensCotaveis(solicitacao);
+  const metrics = {
+    left: 28,
+    top: 28,
+    width: doc.page.width - 56,
+    bottom: doc.page.height - 34
+  };
+  const columns = [
+    { label: 'ITEM', width: 124 },
+    { label: 'QTD./UN.', width: 52, align: 'center' },
+    { label: 'NECESSARIO', width: 58, align: 'center' },
+    { label: 'ESPECIFICACAO', width: 150 },
+    { label: 'REFERENCIA', width: 104 },
+    { label: 'PRECO UNIT.', width: 56, align: 'center' },
+    { label: 'PRAZO', width: 48, align: 'center' },
+    { label: 'QTD. MIN.', width: 46, align: 'center' },
+    { label: 'DISP.', width: 40, align: 'center' },
+    { label: 'OBS.', width: 102 }
+  ];
 
-  doc
-    .font('Helvetica-Bold')
-    .fontSize(18)
-    .text('Cotacao de compra', { align: 'left' });
+  let pageNumber = 1;
+  let y = drawPdfCotacaoHeader(doc, cotacaoFornecedor, solicitacao, metrics);
+  y = drawPdfCotacaoTableHeader(doc, y, columns, metrics);
 
-  doc.moveDown(0.5);
-  doc.font('Helvetica').fontSize(10);
-  doc.text(`Fornecedor: ${cotacaoFornecedor?.fornecedor?.nome || '-'}`);
-  doc.text(`Obra: ${solicitacao?.obra?.nome || '-'}`);
-  doc.text(`Solicitacao: SC-${String(solicitacao?.id || '').padStart(5, '0')}`);
-  doc.text(`Enviado em: ${formatarDataPublica(cotacaoFornecedor?.enviado_em)}`);
-  doc.moveDown();
+  itensCotaveis.forEach((item) => {
+    const rowHeight = measureCotacaoRowHeight(doc, item, columns);
+    if (y + rowHeight + 28 > metrics.bottom) {
+      drawPdfCotacaoFooter(doc, metrics, pageNumber);
+      doc.addPage({ margin: 28, size: 'A4', layout: 'landscape' });
+      pageNumber += 1;
+      y = drawPdfCotacaoTableHeader(doc, metrics.top, columns, metrics);
+    }
 
-  doc
-    .font('Helvetica-Bold')
-    .fontSize(11)
-    .text('Itens solicitados');
-  doc.moveDown(0.4);
+    let x = metrics.left;
+    const values = [
+      item.nome || '-',
+      formatarQuantidadePublica(item.quantidade, item.unidade),
+      formatarDataPublica(item.necessario_para),
+      item.especificacao || '-',
+      item.link_produto || item.arquivo_nome_original || '-',
+      pdfMoneyPlaceholder(),
+      '',
+      '',
+      '',
+      ''
+    ];
 
-  itensCotaveis.forEach((item, index) => {
-    const titulo = `${index + 1}. ${item.nome || '-'}`;
-    doc.font('Helvetica-Bold').fontSize(10).text(titulo);
-    doc.font('Helvetica').fontSize(9);
-    doc.text(`Quantidade: ${formatarQuantidadePublica(item.quantidade, item.unidade)}`);
-    doc.text(`Necessario para: ${formatarDataPublica(item.necessario_para)}`);
-    if (item.especificacao) doc.text(`Especificacao: ${item.especificacao}`);
-    if (item.link_produto) doc.text(`Link: ${item.link_produto}`);
-    doc.moveDown(0.5);
+    columns.forEach((column, index) => {
+      doc.rect(x, y, column.width, rowHeight).stroke('#cbd5e1');
+      drawPdfCell(doc, values[index], x, y, column.width, rowHeight, {
+        align: column.align || 'left',
+        valign: index >= 5 ? 'top' : 'middle',
+        font: index === 0 ? 'Helvetica-Bold' : 'Helvetica',
+        fontSize: index === 0 ? 7 : 6.8,
+        color: '#111827'
+      });
+      x += column.width;
+    });
+
+    y += rowHeight;
   });
 
-  doc.moveDown();
+  if (!itensCotaveis.length) {
+    doc.rect(metrics.left, y, metrics.width, 34).stroke('#cbd5e1');
+    drawPdfCell(doc, 'Nenhum item cotavel encontrado para esta solicitacao.', metrics.left, y, metrics.width, 34, {
+      align: 'center',
+      fontSize: 8,
+      color: '#64748b'
+    });
+    y += 34;
+  }
+
+  const instructionsHeight = 44;
+  if (y + instructionsHeight + 28 > metrics.bottom) {
+    drawPdfCotacaoFooter(doc, metrics, pageNumber);
+    doc.addPage({ margin: 28, size: 'A4', layout: 'landscape' });
+    pageNumber += 1;
+    y = metrics.top;
+  } else {
+    y += 10;
+  }
+
+  doc.roundedRect(metrics.left, y, metrics.width, instructionsHeight, 4).fillAndStroke('#f8fafc', '#cbd5e1');
+  doc
+    .font('Helvetica-Bold')
+    .fontSize(8)
+    .fillColor('#0f172a')
+    .text('Como responder', metrics.left + 10, y + 8, { width: metrics.width - 20 });
   doc
     .font('Helvetica')
-    .fontSize(9)
-    .fillColor('#64748b')
-    .text('O fornecedor pode responder pelo formulario online ou anexar PDF/imagem da cotacao no portal.');
+    .fontSize(7.2)
+    .fillColor('#475569')
+    .text(
+      'Preencha os valores no formulario online pelo link recebido ou envie sua proposta em PDF/imagem pelo portal. Os campos de preco, prazo, quantidade minima, disponibilidade e observacao podem ser usados como guia para montar a resposta.',
+      metrics.left + 10,
+      y + 21,
+      { width: metrics.width - 20 }
+    );
+
+  drawPdfCotacaoFooter(doc, metrics, pageNumber);
 }
 
 module.exports = {
@@ -689,7 +928,7 @@ module.exports = {
         return res.status(500).json({ error: 'Dependencia pdfkit nao instalada no backend' });
       }
 
-      const doc = new PDFDocument({ margin: 42, size: 'A4' });
+      const doc = new PDFDocument({ margin: 28, size: 'A4', layout: 'landscape' });
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `inline; filename="cotacao-${cotacaoFornecedor.id}.pdf"`);
       doc.pipe(res);
