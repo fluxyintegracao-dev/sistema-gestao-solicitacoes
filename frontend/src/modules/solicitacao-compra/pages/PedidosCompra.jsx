@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { HiOutlineEye } from 'react-icons/hi2';
 import { useNavigate } from 'react-router-dom';
 import { listarPedidosCompra } from '../../../services/compras';
 import { getStatusPedidosCompra } from '../../../services/configuracoesSistema';
@@ -174,7 +175,7 @@ export default function PedidosCompra() {
         </div>
       </div>
 
-      <div className="mt-4 card sol-surface-card">
+      <div className="mt-4 card sol-surface-card compras-table-card">
         <div className="card-header flex flex-wrap items-center justify-between gap-3">
           <h2 className="font-semibold">Lista de pedidos</h2>
           <span className="text-sm text-[var(--c-muted)]">{pedidos.length} registro(s)</span>
@@ -185,8 +186,19 @@ export default function PedidosCompra() {
         ) : pedidos.length === 0 ? (
           <div className="app-empty-card">Nenhum pedido de compra encontrado para os filtros informados.</div>
         ) : (
-          <div className="app-table-shell overflow-x-auto">
-            <table className="table">
+          <div className="compras-table-wrapper">
+            <table className="compras-data-table compras-data-table-pedidos">
+              <colgroup>
+                <col className="compras-col-codigo" />
+                <col className="compras-col-fornecedor" />
+                <col className="compras-col-obra" />
+                <col className="compras-col-codigo" />
+                <col className="compras-col-numero" />
+                <col className="compras-col-valor" />
+                <col className="compras-col-valor" />
+                <col className="compras-col-status" />
+                <col className="compras-col-acoes" />
+              </colgroup>
               <thead>
                 <tr>
                   <th>Pedido</th>
@@ -228,10 +240,12 @@ export default function PedidosCompra() {
                       <td>
                         <button
                           type="button"
-                          className="btn btn-outline"
+                          className="compras-icon-action"
                           onClick={() => navigate(`/pedidos-compra/${pedido.id}`)}
+                          title={podeGerenciarPedidos ? 'Gerenciar pedido' : 'Abrir pedido'}
+                          aria-label={`${podeGerenciarPedidos ? 'Gerenciar' : 'Abrir'} pedido PC-${String(pedido.id).padStart(5, '0')}`}
                         >
-                          {podeGerenciarPedidos ? 'Gerenciar' : 'Abrir'}
+                          <HiOutlineEye />
                         </button>
                       </td>
                     </tr>

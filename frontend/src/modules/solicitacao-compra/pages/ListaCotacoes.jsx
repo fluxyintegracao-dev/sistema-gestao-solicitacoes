@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { HiOutlineArrowTopRightOnSquare, HiOutlinePencilSquare } from 'react-icons/hi2';
 import { useNavigate } from 'react-router-dom';
 import { listarCotacoes } from '../../../services/compras';
 import { getObras } from '../../../services/obras';
@@ -170,7 +171,7 @@ export default function ListaCotacoes() {
         </div>
       </div>
 
-      <div className="mt-4 card sol-surface-card">
+      <div className="mt-4 card sol-surface-card compras-table-card">
         <div className="card-header flex flex-wrap items-center justify-between gap-3">
           <h2 className="font-semibold">Lista de cotacoes</h2>
           <span className="text-sm text-[var(--c-muted)]">{cotacoes.length} registro(s)</span>
@@ -183,8 +184,21 @@ export default function ListaCotacoes() {
             Nenhuma cotacao encontrada. Crie uma nova cotacao avulsa ou envie uma solicitacao de compra para fornecedores.
           </div>
         ) : (
-          <div className="app-table-shell overflow-x-auto">
-            <table className="table">
+          <div className="compras-table-wrapper">
+            <table className="compras-data-table compras-data-table-cotacoes">
+              <colgroup>
+                <col className="compras-col-codigo-curto" />
+                <col className="compras-col-fornecedor" />
+                <col className="compras-col-obra" />
+                <col className="compras-col-solicitacao" />
+                <col className="compras-col-status" />
+                <col className="compras-col-data" />
+                <col className="compras-col-data" />
+                <col className="compras-col-data" />
+                <col className="compras-col-valor" />
+                <col className="compras-col-condicao" />
+                <col className="compras-col-acoes" />
+              </colgroup>
               <thead>
                 <tr>
                   <th>#</th>
@@ -222,23 +236,27 @@ export default function ListaCotacoes() {
                     <td className="tabular-nums">{formatMoney(cotacao.valor_minimo_pedido)}</td>
                     <td>{cotacao.condicao_pagamento || '-'}</td>
                     <td>
-                      <div className="flex flex-wrap justify-end gap-2">
+                      <div className="compras-table-actions">
                         {cotacao.solicitacao?.id && (
                           <button
                             type="button"
-                            className="btn btn-xs btn-primary"
+                            className="compras-icon-action compras-icon-action-primary"
                             onClick={() => navigate(`/solicitacoes-compra/${cotacao.solicitacao.id}/cotacao`)}
+                            title="Editar cotacao"
+                            aria-label={`Editar cotacao ${String(cotacao.id).padStart(5, '0')}`}
                           >
-                            Editar cotacao
+                            <HiOutlinePencilSquare />
                           </button>
                         )}
                         <a
                           href={`/cotacao/${cotacao.token}`}
                           target="_blank"
                           rel="noreferrer"
-                          className="btn btn-xs btn-outline"
+                          className="compras-icon-action"
+                          title="Abrir portal do fornecedor"
+                          aria-label={`Abrir portal do fornecedor da cotacao ${String(cotacao.id).padStart(5, '0')}`}
                         >
-                          Portal fornecedor
+                          <HiOutlineArrowTopRightOnSquare />
                         </a>
                       </div>
                     </td>

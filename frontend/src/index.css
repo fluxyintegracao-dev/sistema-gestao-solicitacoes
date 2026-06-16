@@ -8871,6 +8871,179 @@ body {
   }
 }
 
+/* Compras: listas operacionais em tabela unica, sem linhas em formato de card */
+.layout-shell .compras-table-card {
+  padding: 0.9rem;
+}
+
+.layout-shell .compras-table-wrapper {
+  overflow-x: auto;
+  border: 1px solid var(--shell-border, var(--ui-border));
+  border-radius: 1rem;
+  background: color-mix(in srgb, var(--shell-panel, #fff) 96%, var(--shell-primary, #2563eb) 4%);
+}
+
+.layout-shell .compras-data-table {
+  width: 100%;
+  min-width: 58rem;
+  border-collapse: collapse;
+  border-spacing: 0;
+  table-layout: fixed;
+}
+
+.layout-shell .compras-data-table-cotacoes {
+  min-width: 76rem;
+}
+
+.layout-shell .compras-data-table th {
+  padding: 0.55rem 0.65rem;
+  border-bottom: 1px solid var(--shell-border, var(--ui-border));
+  background: color-mix(in srgb, var(--shell-panel-strong, #fff) 88%, var(--shell-primary, #2563eb) 12%);
+  color: var(--shell-muted, var(--c-muted));
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  line-height: 1rem;
+  text-align: left;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.layout-shell .compras-data-table td {
+  padding: 0.52rem 0.65rem;
+  border-bottom: 1px solid var(--shell-border, var(--ui-border));
+  color: var(--shell-text, var(--c-text));
+  font-size: 0.78rem;
+  line-height: 1.15rem;
+  vertical-align: middle;
+  background: transparent;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.layout-shell .compras-data-table tbody tr:nth-child(even) {
+  background: rgba(148, 163, 184, 0.07);
+}
+
+.layout-shell .compras-data-table tbody tr:hover {
+  background: color-mix(in srgb, var(--shell-primary, #2563eb) 8%, transparent);
+}
+
+.layout-shell .compras-data-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.layout-shell .compras-data-table .app-status-pill {
+  min-height: 1.45rem;
+  padding: 0 0.48rem;
+  font-size: 0.66rem;
+  white-space: nowrap;
+}
+
+.layout-shell .compras-table-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.35rem;
+  width: 100%;
+}
+
+.layout-shell .compras-icon-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  flex: 0 0 2rem;
+  border: 1px solid var(--shell-border, var(--ui-border));
+  border-radius: 0.7rem;
+  background: rgba(255, 255, 255, 0.66);
+  color: var(--shell-text, var(--c-text));
+  box-shadow: none;
+  transition: background-color 0.16s ease, border-color 0.16s ease, color 0.16s ease, transform 0.16s ease;
+}
+
+.layout-shell .compras-icon-action svg {
+  width: 1.05rem;
+  height: 1.05rem;
+}
+
+.layout-shell .compras-icon-action:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--shell-primary, #2563eb) 42%, var(--shell-border, #cbd5e1));
+  background: color-mix(in srgb, var(--shell-primary, #2563eb) 11%, #fff);
+  color: var(--shell-primary, #2563eb);
+}
+
+.layout-shell .compras-icon-action-primary {
+  border-color: transparent;
+  background: var(--shell-primary, #2563eb);
+  color: var(--shell-primary-contrast, #fff);
+}
+
+.layout-shell .compras-icon-action-primary:hover {
+  background: color-mix(in srgb, var(--shell-primary, #2563eb) 88%, #0f172a);
+  color: var(--shell-primary-contrast, #fff);
+}
+
+.layout-shell .compras-col-codigo {
+  width: 7.1rem;
+}
+
+.layout-shell .compras-col-codigo-curto {
+  width: 5.2rem;
+}
+
+.layout-shell .compras-col-obra,
+.layout-shell .compras-col-fornecedor,
+.layout-shell .compras-col-solicitante {
+  width: 12.5rem;
+}
+
+.layout-shell .compras-col-solicitacao {
+  width: 16rem;
+}
+
+.layout-shell .compras-col-numero {
+  width: 5.6rem;
+}
+
+.layout-shell .compras-col-data {
+  width: 7.3rem;
+}
+
+.layout-shell .compras-col-valor {
+  width: 8.4rem;
+}
+
+.layout-shell .compras-col-status {
+  width: 9.2rem;
+}
+
+.layout-shell .compras-col-condicao {
+  width: 11.5rem;
+}
+
+.layout-shell .compras-col-acoes {
+  width: 5.6rem;
+}
+
+.dark .layout-shell .compras-table-wrapper {
+  background: rgba(15, 23, 42, 0.52);
+}
+
+.dark .layout-shell .compras-data-table tbody tr:nth-child(even) {
+  background: rgba(30, 41, 59, 0.56);
+}
+
+.dark .layout-shell .compras-data-table tbody tr:hover {
+  background: color-mix(in srgb, var(--shell-primary, #60a5fa) 16%, rgba(15, 23, 42, 0.7));
+}
+
+.dark .layout-shell .compras-icon-action {
+  background: rgba(15, 23, 42, 0.86);
+}
+
 /* ============================
    ObraGestao — acento financeiro
 ============================ */

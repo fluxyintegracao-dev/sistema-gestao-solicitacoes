@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { HiOutlineArrowDownTray, HiOutlineEye } from 'react-icons/hi2';
 import { useNavigate } from 'react-router-dom';
 import { baixarPdfSolicitacaoCompra, listarSolicitacoesCompra } from '../../../services/compras';
 import { getMinhasObras } from '../../../services/obras';
@@ -203,7 +204,7 @@ export default function SolicitacoesCompra() {
         </div>
       </div>
 
-      <div className="card sol-surface-card app-table-shell compras-solicitacoes-table-shell">
+      <div className="card sol-surface-card compras-table-card">
         {loading ? (
           <div className="py-8 text-center text-sm text-[var(--c-muted)]">Carregando...</div>
         ) : solicitacoesFiltradas.length === 0 ? (
@@ -211,8 +212,19 @@ export default function SolicitacoesCompra() {
             Nenhuma solicitacao de compra encontrada.
           </div>
         ) : (
-          <div className="table-wrapper">
-            <table className="table">
+          <div className="compras-table-wrapper">
+            <table className="compras-data-table compras-data-table-solicitacoes">
+              <colgroup>
+                <col className="compras-col-codigo" />
+                <col className="compras-col-obra" />
+                <col className="compras-col-solicitante" />
+                <col className="compras-col-numero" />
+                <col className="compras-col-numero" />
+                <col className="compras-col-data" />
+                <col className="compras-col-data" />
+                <col className="compras-col-status" />
+                <col className="compras-col-acoes" />
+              </colgroup>
               <thead>
                 <tr>
                   <th>Codigo</th>
@@ -249,20 +261,24 @@ export default function SolicitacoesCompra() {
                       </span>
                     </td>
                     <td>
-                      <div className="flex flex-wrap gap-2">
+                      <div className="compras-table-actions">
                         <button
                           type="button"
-                          className="btn btn-outline"
+                          className="compras-icon-action"
                           onClick={() => navigate(`/solicitacoes-compra/${solicitacao.id}`)}
+                          title="Abrir detalhes"
+                          aria-label={`Abrir detalhes da solicitacao SC-${String(solicitacao.id).padStart(5, '0')}`}
                         >
-                          Detalhes
+                          <HiOutlineEye />
                         </button>
                         <button
                           type="button"
-                          className="btn btn-outline"
+                          className="compras-icon-action"
                           onClick={() => handleBaixarPdf(solicitacao.id)}
+                          title="Baixar PDF"
+                          aria-label={`Baixar PDF da solicitacao SC-${String(solicitacao.id).padStart(5, '0')}`}
                         >
-                          PDF
+                          <HiOutlineArrowDownTray />
                         </button>
                       </div>
                     </td>
