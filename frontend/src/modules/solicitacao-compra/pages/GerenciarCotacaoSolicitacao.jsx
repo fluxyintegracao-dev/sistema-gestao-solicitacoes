@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   HiOutlineArrowTopRightOnSquare,
+  HiOutlineArrowDownTray,
   HiOutlineChatBubbleLeftRight,
   HiOutlineClipboardDocument
 } from 'react-icons/hi2';
@@ -61,7 +62,7 @@ const FORNECEDOR_LINK_COLUMNS = [
   { key: 'email', width: 250, minWidth: 160 },
   { key: 'status', width: 130, minWidth: 105 },
   { key: 'respondido', width: 130, minWidth: 110 },
-  { key: 'acoes', width: 118, minWidth: 104 }
+  { key: 'acoes', width: 150, minWidth: 136 }
 ];
 
 function CotacaoActionButton({ as: Component = 'button', children, className = '', ...props }) {
@@ -1272,12 +1273,13 @@ export default function GerenciarCotacaoSolicitacao() {
                   <tbody>
                     {solicitacao.fornecedores.map((cotacaoFornecedor) => {
                       const publicUrl = `${window.location.origin}/cotacao/${cotacaoFornecedor.token}`;
+                      const pdfUrl = obterUrlPdfCotacaoPublica(cotacaoFornecedor.token);
                       const pedidoFornecedor = pedidosPorFornecedor.get(Number(cotacaoFornecedor.fornecedor_compra_id));
                       const possuiRespostaArquivo = Boolean(cotacaoFornecedor.pdf_resposta_url);
                       const linkWa = cotacaoFornecedor.fornecedor?.whatsapp
                         ? whatsappLink(
                             cotacaoFornecedor.fornecedor.whatsapp,
-                            gerarMensagemCotacao(cotacaoFornecedor.fornecedor.nome, publicUrl, itensCombinados, obterUrlPdfCotacaoPublica(cotacaoFornecedor.token))
+                            gerarMensagemCotacao(cotacaoFornecedor.fornecedor.nome, publicUrl, itensCombinados, pdfUrl)
                           )
                         : null;
 
@@ -1338,6 +1340,17 @@ export default function GerenciarCotacaoSolicitacao() {
                                 aria-label="Abrir portal"
                               >
                                 <HiOutlineArrowTopRightOnSquare className="h-3.5 w-3.5" />
+                              </CotacaoActionButton>
+                              <CotacaoActionButton
+                                as="a"
+                                href={pdfUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                download
+                                title="Baixar PDF"
+                                aria-label="Baixar PDF"
+                              >
+                                <HiOutlineArrowDownTray className="h-3.5 w-3.5" />
                               </CotacaoActionButton>
                               {linkWa ? (
                                 <CotacaoActionButton
