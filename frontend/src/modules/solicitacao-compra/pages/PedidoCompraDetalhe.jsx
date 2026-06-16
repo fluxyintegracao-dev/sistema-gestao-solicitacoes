@@ -149,6 +149,20 @@ function formatQuantityLabel(value, unidade) {
   return `${formatted || '-'}${suffix ? ` ${suffix}` : ''}`;
 }
 
+function normalizeItemType(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toUpperCase();
+}
+
+function buildPedidoItemKey(item) {
+  const referenciaId = Number(item?.solicitacao_compra_item_id || 0) ||
+    Number(item?.solicitacao_compra_item_manual_id || 0);
+  return `${normalizeItemType(item?.item_tipo)}:${referenciaId}`;
+}
+
 function formatStatusLabel(value, statusMap) {
   return statusMap[String(value || '').toUpperCase()]?.nome || String(value || '-').replace(/_/g, ' ').toUpperCase();
 }
@@ -648,11 +662,26 @@ export default function PedidoCompraDetalhe() {
       return;
     }
 
+    const quantidadeMaxima = Number(itemEditando.quantidade_pedido || 0);
+    const quantidadeInformada = remanejoQuantidade
+      ? parseBrazilianQuantity(remanejoQuantidade)
+      : quantidadeMaxima;
+
+    if (quantidadeInformada <= 0) {
+      alert('Informe uma quantidade maior que zero para remanejar.');
+      return;
+    }
+
+    if (quantidadeInformada > quantidadeMaxima) {
+      alert(`A quantidade remanejada nao pode ser maior que ${formatQuantityLabel(itemEditando.quantidade_pedido, itemEditando.unidade)}.`);
+      return;
+    }
+
     try {
       setRemanejandoItem(true);
       const data = await remanejarItemPedidoCompra(id, itemEditando.id, {
         resposta_item_id_destino: remanejoSelecionado,
-        quantidade: remanejoQuantidade || itemEditando.quantidade_pedido,
+        quantidade: formatBrazilianQuantity(quantidadeInformada),
         motivo: 'Remanejamento operacional pela tela do pedido'
       });
       setPedido(data || null);
@@ -695,10 +724,16 @@ export default function PedidoCompraDetalhe() {
     : 0;
   const modalProcessando = itemEditando ? savingItemId === itemEditando.id || removingItemId === itemEditando.id : false;
   const candidatosRemanejamentoItem = itemEditando
-    ? (pedido.candidatos_remanejamento || []).filter((candidato) => (
-        String(candidato.descricao || '').trim().toLowerCase() === String(itemEditando.descricao || '').trim().toLowerCase() &&
-        Number(candidato.resposta_item_id) !== Number(itemEditando.resposta_item_id)
-      ))
+    ? (pedido.candidatos_remanejamento || []).filter((candidato) => {
+        const candidatoKey = candidato.item_key || `${normalizeItemType(candidato.item_tipo)}:${
+          Number(candidato.solicitacao_compra_item_id || 0) ||
+          Number(candidato.solicitacao_compra_item_manual_id || 0)
+        }`;
+
+        return candidatoKey === buildPedidoItemKey(itemEditando) &&
+          Number(candidato.resposta_item_id) !== Number(itemEditando.resposta_item_id) &&
+          Number(candidato.fornecedor_id) !== Number(pedido.fornecedor_compra_id);
+      })
     : [];
 
   return (

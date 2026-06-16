@@ -146,6 +146,18 @@ function buildItemKeyFromResposta(resposta) {
   return buildRespostaKey(itemTipo, itemReferenciaId);
 }
 
+function buildItemKeyFromPedidoItem(item) {
+  const itemReferenciaId =
+    Number(item?.solicitacao_compra_item_id || 0) ||
+    Number(item?.solicitacao_compra_item_manual_id || 0);
+  return buildRespostaKey(item?.item_tipo, itemReferenciaId);
+}
+
+function fornecedorRespondeuCotacao(vinculacaoFornecedor) {
+  return Boolean(vinculacaoFornecedor?.respondido_em) ||
+    normalizeText(vinculacaoFornecedor?.status) === 'RESPONDIDO';
+}
+
 function getQuantidadeBaseItem(solicitacao, resposta) {
   const baseItem = obterBaseItemPorResposta(solicitacao, resposta);
   return baseItem ? roundQty(baseItem.quantidade_solicitada) : 0;
@@ -1128,13 +1140,22 @@ async function obterPedidoDetalhe(id, { obraIdsHistoricoPreco = null } = {}) {
 
   const candidatosRemanejamento = (solicitacao?.fornecedores || [])
     .flatMap((fornecedor) => (fornecedor.respostas || []).map((resposta) => ({ fornecedor, resposta })))
-    .filter(({ resposta }) => Boolean(resposta.disponivel) && asNumber(resposta.preco) > 0)
+    .filter(({ fornecedor, resposta }) => (
+      fornecedorRespondeuCotacao(fornecedor) &&
+      Number(fornecedor.fornecedor_compra_id) !== Number(pedido.fornecedor_compra_id) &&
+      Boolean(resposta.disponivel) &&
+      asNumber(resposta.preco) > 0
+    ))
     .map(({ fornecedor, resposta }) => {
       const baseItem = obterBaseItemPorResposta(solicitacao, resposta);
       return {
         resposta_item_id: resposta.id,
         fornecedor_id: fornecedor.fornecedor_compra_id,
         fornecedor_nome: fornecedor.fornecedor?.nome || fornecedor.nome || 'Fornecedor',
+        item_tipo: baseItem?.item_tipo || normalizeText(resposta.item_tipo),
+        solicitacao_compra_item_id: baseItem?.solicitacao_compra_item_id || null,
+        solicitacao_compra_item_manual_id: baseItem?.solicitacao_compra_item_manual_id || null,
+        item_key: buildItemKeyFromResposta(resposta),
         descricao: baseItem?.descricao || 'Item',
         unidade: baseItem?.unidade || null,
         quantidade_solicitada: baseItem?.quantidade_solicitada || 0,
@@ -1772,6 +1793,22 @@ async function remanejarPedidoItem({ pedidoId, itemId, respostaItemIdDestino, qu
 
   if (!respostaDestino) {
     throw new Error('Resposta de destino nao encontrada na cotacao.');
+  }
+
+  if (!fornecedorRespondeuCotacao(respostaDestino.fornecedor)) {
+    throw new Error('Fornecedor de destino ainda nao respondeu esta cotacao.');
+  }
+
+  if (Number(respostaDestino.fornecedor.fornecedor_compra_id) === Number(pedidoOrigem.fornecedor_compra_id)) {
+    throw new Error('Selecione um fornecedor de destino diferente do fornecedor atual.');
+  }
+
+  if (buildItemKeyFromResposta(respostaDestino.resposta) !== buildItemKeyFromPedidoItem(itemOrigem)) {
+    throw new Error('Resposta de destino nao pertence ao mesmo item do pedido.');
+  }
+
+  if (!respostaDestino.resposta.disponivel || asNumber(respostaDestino.resposta.preco) <= 0) {
+    throw new Error('Resposta de destino precisa estar disponivel e possuir preco.');
   }
 
   const fornecedorDestino = respostaDestino.fornecedor;

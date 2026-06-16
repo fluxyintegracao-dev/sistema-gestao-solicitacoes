@@ -9,7 +9,16 @@ import {
 function handleJsonResponse(response, fallbackMessage) {
   return response.text().then((text) => {
     if (!response.ok) {
-      throw new Error(text || fallbackMessage);
+      let message = text;
+
+      try {
+        const parsed = text ? JSON.parse(text) : null;
+        message = parsed?.error || parsed?.message || text;
+      } catch {
+        // Mantem o texto original quando a resposta nao for JSON.
+      }
+
+      throw new Error(message || fallbackMessage);
     }
 
     return text ? JSON.parse(text) : null;

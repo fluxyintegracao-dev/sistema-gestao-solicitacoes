@@ -1247,9 +1247,15 @@ module.exports = {
         await Historico.create(
           {
             solicitacao_id: solicitacao.solicitacao_principal_id,
-            usuario_id: usuario.id,
+            usuario_responsavel_id: usuario.id,
+            setor: 'COMPRAS',
             acao: 'COTACAO_COMPRA_COMENTARIO',
-            observacao: `Comentario na cotacao SC-${String(solicitacao.id).padStart(5, '0')}:\n${comentario}`
+            observacao: `Comentario na cotacao SC-${String(solicitacao.id).padStart(5, '0')}:\n${comentario}`,
+            descricao: comentario,
+            metadata: JSON.stringify({
+              tipo: 'SOLICITACAO_COMPRA',
+              solicitacao_compra_id: solicitacao.id
+            })
           },
           { transaction }
         );
