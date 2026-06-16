@@ -9,6 +9,7 @@ const {
   EtapaSetor,
   Contrato,
   ContratoApropriacao,
+  ContratoCredor,
   SolicitacaoApropriacao,
   TipoSubContrato,
   Anexo,
@@ -1991,6 +1992,23 @@ module.exports = {
           return res.status(400).json({
             error: 'Selecione uma pessoa cadastrada como credor ativo.'
           });
+        }
+
+        if (contrato_id) {
+          const credorVinculado = await ContratoCredor.findOne({
+            where: {
+              contrato_id: Number(contrato_id),
+              parceiro_id: Number(parceiro_id),
+              ativo: true
+            },
+            attributes: ['id']
+          });
+
+          if (!credorVinculado) {
+            return res.status(400).json({
+              error: 'O credor selecionado nao esta vinculado ao contrato informado. Solicite ao setor de Gerencia de Processo o cadastro ou vinculo correto.'
+            });
+          }
         }
       }
 

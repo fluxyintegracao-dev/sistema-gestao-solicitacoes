@@ -24,6 +24,7 @@ import {
   uploadContratoAnexos
 } from '../services/contratos';
 import { listarApropriacoes } from '../services/apropriacoes';
+import { buscarParceiros } from '../services/parceiros';
 
 export default function GestaoContratos() {
   const { user } = useAuth();
@@ -65,6 +66,12 @@ export default function GestaoContratos() {
   const [apropriacoesContrato, setApropriacoesContrato] = useState([]);
   const [apropriacoesEdicaoDisponiveis, setApropriacoesEdicaoDisponiveis] = useState([]);
   const [apropriacoesEdicao, setApropriacoesEdicao] = useState([]);
+  const [credoresContrato, setCredoresContrato] = useState([]);
+  const [credoresEdicao, setCredoresEdicao] = useState([]);
+  const [buscaCredor, setBuscaCredor] = useState('');
+  const [resultadosCredor, setResultadosCredor] = useState([]);
+  const [buscaCredorEdicao, setBuscaCredorEdicao] = useState('');
+  const [resultadosCredorEdicao, setResultadosCredorEdicao] = useState([]);
 
   const setorTokens = [
     String(user?.setor?.nome || '').toUpperCase(),
@@ -205,6 +212,166 @@ export default function GestaoContratos() {
     }).join('; ');
   }
 
+  function normalizarCredoresContrato(contrato) {
+    return (Array.isArray(contrato?.credores) ? contrato.credores : []).map(item => ({
+      parceiro_id: String(item.id || ''),
+      nome: item.nome || '',
+      cpf_cnpj: item.cpf_cnpj || '',
+      observacao: item.ContratoCredor?.observacao || item.contrato_credor?.observacao || ''
+    }));
+  }
+
+  function montarCredoresPayload(lista) {
+    const vistos = new Set();
+    return (Array.isArray(lista) ? lista : [])
+      .map(item => ({
+        parceiro_id: Number(item.parceiro_id || item.id),
+        observacao: String(item.observacao || '').trim() || null
+      }))
+      .filter((item) => {
+        if (!item.parceiro_id || vistos.has(item.parceiro_id)) return false;
+        vistos.add(item.parceiro_id);
+        return true;
+      });
+  }
+
+  function resumoCredoresContrato(contrato) {
+    const lista = Array.isArray(contrato?.credores) ? contrato.credores : [];
+    if (lista.length === 0) return '-';
+    return lista.map(item => item.nome || item.cpf_cnpj || `Credor ${item.id}`).join('; ');
+  }
+
+  async function pesquisarCredoresContrato(termo, setter) {
+    const busca = String(termo || '').trim();
+    if (busca.length < 2) {
+      setter([]);
+      return;
+    }
+    try {
+      const data = await buscarParceiros({ q: busca, fornecedor: 1, ativo: 1, limit: 8 });
+      setter(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error(error);
+      setter([]);
+    }
+  }
+
+  function adicionarCredorContrato(credor, listaSetter, resultadosSetter, buscaSetter) {
+    if (!credor?.id) return;
+    listaSetter(prev => {
+      if (prev.some(item => String(item.parceiro_id) === String(credor.id))) return prev;
+      return [
+        ...prev,
+        {
+          parceiro_id: String(credor.id),
+          nome: credor.nome || '',
+          cpf_cnpj: credor.cpf_cnpj || '',
+          observacao: ''
+        }
+      ];
+    });
+    resultadosSetter([]);
+    buscaSetter('');
+  }
+
+  function removerCredorContrato(parceiroId, listaSetter) {
+    listaSetter(prev => prev.filter(item => String(item.parceiro_id) !== String(parceiroId)));
+  }
+
+  function alterarObservacaoCredor(parceiroId, valor, listaSetter) {
+    listaSetter(prev => prev.map(item => (
+      String(item.parceiro_id) === String(parceiroId)
+        ? { ...item, observacao: valor }
+        : item
+    )));
+  }
+
+  function renderCredoresEditor({
+    lista,
+    setter,
+    busca,
+    setBusca,
+    resultados,
+    setResultados
+  }) {
+    return (
+      <div className="rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-3 space-y-3">
+        <div>
+          <p className="text-sm font-semibold text-[var(--c-text)]">Credores vinculados ao contrato</p>
+          <p className="text-xs text-[var(--c-muted)]">
+            A Nova Solicitacao listara somente estes credores quando o contrato for selecionado.
+          </p>
+        </div>
+
+        <div className="grid gap-2 md:grid-cols-[minmax(220px,1fr)_auto]">
+          <input
+            className="input input-sm"
+            value={busca}
+            onChange={(e) => {
+              const valor = e.target.value;
+              setBusca(valor);
+              pesquisarCredoresContrato(valor, setResultados);
+            }}
+            placeholder="Buscar credor por nome ou CPF/CNPJ"
+          />
+          <button
+            type="button"
+            className="btn btn-outline btn-sm"
+            onClick={() => pesquisarCredoresContrato(busca, setResultados)}
+          >
+            Buscar
+          </button>
+        </div>
+
+        {resultados.length > 0 && (
+          <div className="rounded-lg border border-[var(--c-border)] bg-[var(--c-bg)] p-2 max-h-44 overflow-auto">
+            {resultados.map(credor => (
+              <button
+                type="button"
+                key={credor.id}
+                className="block w-full rounded px-2 py-2 text-left text-sm hover:bg-[var(--c-surface-alt)]"
+                onClick={() => adicionarCredorContrato(credor, setter, setResultados, setBusca)}
+              >
+                <span className="font-semibold">{credor.nome}</span>
+                {credor.cpf_cnpj && <span className="text-[var(--c-muted)]"> - {credor.cpf_cnpj}</span>}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {lista.length === 0 ? (
+          <p className="rounded-lg border border-dashed border-[var(--c-border)] px-3 py-2 text-xs text-[var(--c-muted)]">
+            Nenhum credor vinculado ainda.
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {lista.map(credor => (
+              <div key={credor.parceiro_id} className="grid gap-2 rounded-lg border border-[var(--c-border)] bg-[var(--c-bg)] p-2 md:grid-cols-[minmax(220px,1fr)_minmax(180px,1fr)_auto]">
+                <div className="text-sm">
+                  <p className="font-semibold text-[var(--c-text)]">{credor.nome || `Credor ${credor.parceiro_id}`}</p>
+                  <p className="text-xs text-[var(--c-muted)]">{credor.cpf_cnpj || 'Documento nao informado'}</p>
+                </div>
+                <input
+                  className="input input-sm"
+                  value={credor.observacao || ''}
+                  onChange={e => alterarObservacaoCredor(credor.parceiro_id, e.target.value, setter)}
+                  placeholder="Observacao interna"
+                />
+                <button
+                  type="button"
+                  className="btn btn-outline btn-sm"
+                  onClick={() => removerCredorContrato(credor.parceiro_id, setter)}
+                >
+                  Remover
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   function renderApropriacoesEditor({ lista, disponiveis, setter }) {
     return (
       <div className="rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-3 space-y-2">
@@ -337,7 +504,8 @@ export default function GestaoContratos() {
         valor_total: valorDisplay ? parseMoeda(valorDisplay) : null,
         tipo_macro_id: null,
         tipo_sub_id: null,
-        apropriacoes: montarApropriacoesPayload(apropriacoesContrato)
+        apropriacoes: montarApropriacoesPayload(apropriacoesContrato),
+        credores: montarCredoresPayload(credoresContrato)
       };
 
       if (!payload.obra_id || !payload.codigo) {
@@ -362,6 +530,9 @@ export default function GestaoContratos() {
       setValorDisplay('');
       setFiles([]);
       setApropriacoesContrato([]);
+      setCredoresContrato([]);
+      setBuscaCredor('');
+      setResultadosCredor([]);
       await carregar();
       alert('Contrato criado com sucesso.');
     } catch (error) {
@@ -395,6 +566,9 @@ export default function GestaoContratos() {
         : ''
     });
     setApropriacoesEdicao(normalizarApropriacoesContrato(contrato));
+    setCredoresEdicao(normalizarCredoresContrato(contrato));
+    setBuscaCredorEdicao('');
+    setResultadosCredorEdicao([]);
   }
 
   function cancelarEdicao() {
@@ -409,6 +583,9 @@ export default function GestaoContratos() {
       valor_total: ''
     });
     setApropriacoesEdicao([]);
+    setCredoresEdicao([]);
+    setBuscaCredorEdicao('');
+    setResultadosCredorEdicao([]);
   }
 
   function onChangeEdicao(e) {
@@ -436,7 +613,8 @@ export default function GestaoContratos() {
       descricao: String(formEdicao.descricao || '').trim() || null,
       itens_apropriacao: String(formEdicao.itens_apropriacao || '').trim() || null,
       valor_total: valorTotalNumerico,
-      apropriacoes: montarApropriacoesPayload(apropriacoesEdicao)
+      apropriacoes: montarApropriacoesPayload(apropriacoesEdicao),
+      credores: montarCredoresPayload(credoresEdicao)
     };
 
     if (!payload.obra_id || !payload.codigo || !payload.ref_contrato) {
@@ -976,6 +1154,15 @@ export default function GestaoContratos() {
           setter: setApropriacoesContrato
         })}
 
+        {renderCredoresEditor({
+          lista: credoresContrato,
+          setter: setCredoresContrato,
+          busca: buscaCredor,
+          setBusca: setBuscaCredor,
+          resultados: resultadosCredor,
+          setResultados: setResultadosCredor
+        })}
+
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-end">
           <div>
           <label className="grid gap-1 text-sm">Anexos do contrato</label>
@@ -1031,6 +1218,7 @@ export default function GestaoContratos() {
               <th className="text-left p-3">Obra</th>
               <th className="text-left p-3">Ref. do Contrato</th>
               <th className="text-left p-3">Descrição</th>
+              <th className="text-left p-3">Credores</th>
               <th className="text-left p-3">Itens de Apropriação</th>
               <th className="text-right p-3">Solicitado</th>
               <th className="text-right p-3">Pago</th>
@@ -1108,6 +1296,7 @@ export default function GestaoContratos() {
                     c.descricao || '-'
                   )}
                 </td>
+                <td className="p-3">{resumoCredoresContrato(c)}</td>
                 <td className="p-3">
                   {editandoId === c.id ? (
                     <input
@@ -1222,11 +1411,19 @@ export default function GestaoContratos() {
               </tr>
               {editandoId === c.id && (
                 <tr className="border-t bg-[var(--c-surface)]">
-                  <td colSpan="13" className="p-3">
+                  <td colSpan="14" className="p-3 space-y-3">
                     {renderApropriacoesEditor({
                       lista: apropriacoesEdicao,
                       disponiveis: apropriacoesEdicaoDisponiveis,
                       setter: setApropriacoesEdicao
+                    })}
+                    {renderCredoresEditor({
+                      lista: credoresEdicao,
+                      setter: setCredoresEdicao,
+                      busca: buscaCredorEdicao,
+                      setBusca: setBuscaCredorEdicao,
+                      resultados: resultadosCredorEdicao,
+                      setResultados: setResultadosCredorEdicao
                     })}
                   </td>
                 </tr>

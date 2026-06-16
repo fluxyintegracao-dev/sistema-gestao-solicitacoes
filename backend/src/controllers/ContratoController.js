@@ -3,9 +3,11 @@ const {
   Contrato,
   ContratoAnexo,
   ContratoApropriacao,
+  ContratoCredor,
   EmpresaGrupo,
   Obra,
   Apropriacao,
+  Parceiro,
   TipoSolicitacao,
   TipoSubContrato,
   Solicitacao,
@@ -148,6 +150,17 @@ function contratoApropriacoesInclude() {
   };
 }
 
+function contratoCredoresInclude() {
+  return {
+    model: Parceiro,
+    as: 'credores',
+    attributes: ['id', 'nome', 'cpf_cnpj', 'telefone', 'email', 'fornecedor', 'corretor', 'ativo'],
+    through: {
+      attributes: ['id', 'observacao', 'ativo']
+    }
+  };
+}
+
 function formatarApropriacaoContrato(item) {
   const apropriacao = item.apropriacao || {};
   const codigo = apropriacao.codigo || apropriacao.id || item.apropriacao_id;
@@ -159,6 +172,70 @@ function formatarApropriacaoContrato(item) {
     ? ` qtd ${Number(item.quantidade).toLocaleString('pt-BR', { maximumFractionDigits: 4 })}`
     : '';
   return `${codigo}${descricao}${percentual}${quantidade}`;
+}
+
+function resumoCredoresContrato(contrato) {
+  const credores = Array.isArray(contrato?.credores) ? contrato.credores : [];
+  return credores
+    .map((credor) => {
+      const documento = credor.cpf_cnpj ? ` (${credor.cpf_cnpj})` : '';
+      return `${credor.nome || credor.id}${documento}`;
+    })
+    .filter(Boolean)
+    .join(' | ');
+}
+
+function normalizarCredoresPayload(lista = []) {
+  if (!Array.isArray(lista)) return [];
+  const normalizados = [];
+  const vistos = new Set();
+
+  lista.forEach((item) => {
+    const parceiroId = Number(item?.parceiro_id ?? item?.id);
+    if (!Number.isInteger(parceiroId) || parceiroId <= 0 || vistos.has(parceiroId)) {
+      return;
+    }
+    vistos.add(parceiroId);
+    normalizados.push({
+      parceiro_id: parceiroId,
+      observacao: String(item?.observacao || '').trim() || null
+    });
+  });
+
+  return normalizados;
+}
+
+async function validarCredoresContrato(lista = []) {
+  const credores = normalizarCredoresPayload(lista);
+  if (credores.length === 0) return credores;
+
+  const ids = credores.map(item => item.parceiro_id);
+  const parceiros = await Parceiro.findAll({
+    where: { id: { [Op.in]: ids } },
+    attributes: ['id', 'nome', 'fornecedor', 'corretor', 'ativo']
+  });
+  const parceirosMap = new Map(parceiros.map(item => [Number(item.id), item]));
+
+  for (const item of credores) {
+    const parceiro = parceirosMap.get(Number(item.parceiro_id));
+    if (!parceiro) {
+      const error = new Error('Um ou mais credores vinculados ao contrato nao foram encontrados.');
+      error.statusCode = 400;
+      throw error;
+    }
+    if (parceiro.ativo === false) {
+      const error = new Error(`O credor ${parceiro.nome || parceiro.id} esta inativo.`);
+      error.statusCode = 400;
+      throw error;
+    }
+    if (parceiro.fornecedor === false && parceiro.corretor === false) {
+      const error = new Error(`O parceiro ${parceiro.nome || parceiro.id} nao esta marcado como fornecedor/corretor.`);
+      error.statusCode = 400;
+      throw error;
+    }
+  }
+
+  return credores;
 }
 
 async function validarApropriacoesContrato(obraId, lista = []) {
@@ -207,6 +284,25 @@ async function salvarApropriacoesContrato(contratoId, apropriacoes = [], transac
       percentual: item.percentual,
       quantidade: item.quantidade,
       observacao: item.observacao
+    })),
+    { transaction }
+  );
+}
+
+async function salvarCredoresContrato(contratoId, credores = [], transaction = null) {
+  await ContratoCredor.destroy({
+    where: { contrato_id: contratoId },
+    transaction
+  });
+
+  if (credores.length === 0) return;
+
+  await ContratoCredor.bulkCreate(
+    credores.map(item => ({
+      contrato_id: contratoId,
+      parceiro_id: item.parceiro_id,
+      observacao: item.observacao,
+      ativo: true
     })),
     { transaction }
   );
@@ -490,7 +586,8 @@ module.exports = {
           { model: Obra, as: 'obra', attributes: ['id', 'nome', 'codigo'] },
           { model: TipoSolicitacao, as: 'tipoMacro', attributes: ['id', 'nome'] },
           { model: TipoSubContrato, as: 'tipoSub', attributes: ['id', 'nome'] },
-          contratoApropriacoesInclude()
+          contratoApropriacoesInclude(),
+          contratoCredoresInclude()
         ],
         order: [['createdAt', 'DESC']]
       });
@@ -521,7 +618,8 @@ module.exports = {
         tipo_sub_id,
         ajuste_solicitado,
         ajuste_pago,
-        apropriacoes
+        apropriacoes,
+        credores
       } = req.body;
 
       const refContratoFinal = ref_contrato ?? fornecedor;
@@ -551,6 +649,7 @@ module.exports = {
       }
 
       const apropriacoesNormalizadas = await validarApropriacoesContrato(obra_id, apropriacoes);
+      const credoresNormalizados = await validarCredoresContrato(credores);
 
       const contrato = await sequelize.transaction(async (transaction) => {
         const novoContrato = await Contrato.create({
@@ -567,6 +666,7 @@ module.exports = {
         }, { transaction });
 
         await salvarApropriacoesContrato(novoContrato.id, apropriacoesNormalizadas, transaction);
+        await salvarCredoresContrato(novoContrato.id, credoresNormalizados, transaction);
         return novoContrato;
       });
 
@@ -587,7 +687,8 @@ module.exports = {
       const contratoCriado = await Contrato.findByPk(contrato.id, {
         include: [
           { model: Obra, as: 'obra', attributes: ['id', 'nome', 'codigo'] },
-          contratoApropriacoesInclude()
+          contratoApropriacoesInclude(),
+          contratoCredoresInclude()
         ]
       });
 
@@ -833,7 +934,8 @@ module.exports = {
         where,
         include: [
           { model: Obra, as: 'obra', attributes: ['id', 'nome', 'codigo'] },
-          contratoApropriacoesInclude()
+          contratoApropriacoesInclude(),
+          contratoCredoresInclude()
         ],
         order: [
           [{ model: Obra, as: 'obra' }, 'codigo', 'ASC'],
@@ -846,6 +948,7 @@ module.exports = {
         'Codigo',
         'Ref. do Contrato',
         'Descricao',
+        'Credores',
         'Itens de Apropriacao',
         'Solicitado',
         'Apropriacao Codigo',
@@ -863,6 +966,7 @@ module.exports = {
             contrato.obra?.codigo || '',
             contrato.ref_contrato || '',
             contrato.descricao || '',
+            resumoCredoresContrato(contrato),
             contrato.itens_apropriacao || '',
             contrato.valor_total || '',
             '',
@@ -880,6 +984,7 @@ module.exports = {
             contrato.obra?.codigo || '',
             contrato.ref_contrato || '',
             contrato.descricao || '',
+            resumoCredoresContrato(contrato),
             contrato.itens_apropriacao || '',
             contrato.valor_total || '',
             item.apropriacao?.codigo || '',
@@ -954,6 +1059,7 @@ module.exports = {
           { model: TipoSolicitacao, as: 'tipoMacro', attributes: ['id', 'nome'] },
           { model: TipoSubContrato, as: 'tipoSub', attributes: ['id', 'nome'] },
           contratoApropriacoesInclude(),
+          contratoCredoresInclude(),
           {
             model: Solicitacao,
             as: 'solicitacoes',
@@ -1240,7 +1346,8 @@ module.exports = {
         ativo,
         ajuste_solicitado,
         ajuste_pago,
-        apropriacoes
+        apropriacoes,
+        credores
       } = req.body;
 
       const contrato = await Contrato.findByPk(id);
@@ -1258,6 +1365,9 @@ module.exports = {
       const obraFinalId = obra_id !== undefined && obra_id !== null ? obra_id : contrato.obra_id;
       const apropriacoesNormalizadas = apropriacoes !== undefined
         ? await validarApropriacoesContrato(obraFinalId, apropriacoes)
+        : null;
+      const credoresNormalizados = credores !== undefined
+        ? await validarCredoresContrato(credores)
         : null;
 
       await sequelize.transaction(async (transaction) => {
@@ -1278,12 +1388,16 @@ module.exports = {
         if (apropriacoesNormalizadas !== null) {
           await salvarApropriacoesContrato(contrato.id, apropriacoesNormalizadas, transaction);
         }
+        if (credoresNormalizados !== null) {
+          await salvarCredoresContrato(contrato.id, credoresNormalizados, transaction);
+        }
       });
 
       const contratoAtualizado = await Contrato.findByPk(contrato.id, {
         include: [
           { model: Obra, as: 'obra', attributes: ['id', 'nome', 'codigo'] },
-          contratoApropriacoesInclude()
+          contratoApropriacoesInclude(),
+          contratoCredoresInclude()
         ]
       });
 

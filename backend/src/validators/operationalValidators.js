@@ -224,7 +224,8 @@ function validateContratoCreateBody(body = {}) {
       'tipo_sub_id',
       'ajuste_solicitado',
       'ajuste_pago',
-      'apropriacoes'
+      'apropriacoes',
+      'credores'
     ],
     'Contrato'
   );
@@ -248,7 +249,8 @@ function validateContratoCreateBody(body = {}) {
     tipo_sub_id: parseInteger(body.tipo_sub_id, 'Tipo sub'),
     ajuste_solicitado: parseDecimal(body.ajuste_solicitado, 'Ajuste solicitado', { min: 0 }),
     ajuste_pago: parseDecimal(body.ajuste_pago, 'Ajuste pago', { min: 0 }),
-    apropriacoes: Array.isArray(body.apropriacoes) ? body.apropriacoes : undefined
+    apropriacoes: Array.isArray(body.apropriacoes) ? body.apropriacoes : undefined,
+    credores: Array.isArray(body.credores) ? body.credores : undefined
   };
 }
 
@@ -268,7 +270,8 @@ function validateContratoUpdateBody(body = {}) {
       'ativo',
       'ajuste_solicitado',
       'ajuste_pago',
-      'apropriacoes'
+      'apropriacoes',
+      'credores'
     ],
     'Atualizacao de contrato'
   );
@@ -286,7 +289,8 @@ function validateContratoUpdateBody(body = {}) {
     ativo: parseBoolean(body.ativo, 'Ativo'),
     ajuste_solicitado: parseDecimal(body.ajuste_solicitado, 'Ajuste solicitado', { min: 0 }),
     ajuste_pago: parseDecimal(body.ajuste_pago, 'Ajuste pago', { min: 0 }),
-    apropriacoes: Array.isArray(body.apropriacoes) ? body.apropriacoes : undefined
+    apropriacoes: Array.isArray(body.apropriacoes) ? body.apropriacoes : undefined,
+    credores: Array.isArray(body.credores) ? body.credores : undefined
   };
 }
 

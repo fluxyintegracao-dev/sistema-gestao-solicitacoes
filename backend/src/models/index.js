@@ -33,6 +33,7 @@ db.Comprovante = require('./Comprovante')(sequelize, Sequelize);
 db.Contrato = require('./Contrato')(sequelize, Sequelize);
 db.ContratoAnexo = require('./ContratoAnexo')(sequelize, Sequelize);
 db.ContratoApropriacao = require('./ContratoApropriacao')(sequelize, Sequelize);
+db.ContratoCredor = require('./ContratoCredor')(sequelize, Sequelize);
 db.Empreendimento = require('./Empreendimento')(sequelize, Sequelize);
 db.UnidadeComercial = require('./UnidadeComercial')(sequelize, Sequelize);
 db.TabelaPrecoComercial = require('./TabelaPrecoComercial')(sequelize, Sequelize);
@@ -691,6 +692,41 @@ db.ContratoApropriacao.belongsTo(db.Apropriacao, {
 db.Apropriacao.hasMany(db.ContratoApropriacao, {
   foreignKey: 'apropriacao_id',
   as: 'contratosVinculados'
+});
+
+db.Contrato.hasMany(db.ContratoCredor, {
+  foreignKey: 'contrato_id',
+  as: 'credoresVinculos',
+  onDelete: 'CASCADE'
+});
+
+db.ContratoCredor.belongsTo(db.Contrato, {
+  foreignKey: 'contrato_id',
+  as: 'contrato'
+});
+
+db.ContratoCredor.belongsTo(db.Parceiro, {
+  foreignKey: 'parceiro_id',
+  as: 'credor'
+});
+
+db.Parceiro.hasMany(db.ContratoCredor, {
+  foreignKey: 'parceiro_id',
+  as: 'contratosCredorVinculos'
+});
+
+db.Contrato.belongsToMany(db.Parceiro, {
+  through: db.ContratoCredor,
+  foreignKey: 'contrato_id',
+  otherKey: 'parceiro_id',
+  as: 'credores'
+});
+
+db.Parceiro.belongsToMany(db.Contrato, {
+  through: db.ContratoCredor,
+  foreignKey: 'parceiro_id',
+  otherKey: 'contrato_id',
+  as: 'contratosComoCredor'
 });
 
 db.Solicitacao.hasMany(db.SolicitacaoApropriacao, {

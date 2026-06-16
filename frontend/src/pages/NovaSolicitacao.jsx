@@ -7,7 +7,7 @@ import { createSolicitacao } from '../services/solicitacoes';
 import { uploadArquivos } from '../services/uploads';
 import { getTiposSubContrato } from '../services/tiposSubContrato';
 import { getContratos } from '../services/contratos';
-import { buscarParceiros, criarParceiro, listarCategoriasParceiro } from '../services/parceiros';
+import { buscarParceiros, criarParceiro } from '../services/parceiros';
 import { listarApropriacoes } from '../services/apropriacoes';
 import { getAprovacaoDiretoria, getAreasObra, getAreasPorSetorOrigem, getAutomacaoDestinoNovaSolicitacao, getCamposNovaSolicitacao, getTiposSolicitacaoPorSetor } from '../services/configuracoesSistema';
 import { useAuth } from '../contexts/AuthContext';
@@ -159,13 +159,6 @@ export default function NovaSolicitacao() {
       setObras(await getMinhasObras({ modo: 'CRIACAO', escopo: 'TODOS' }));
       setTipos(await getTiposSolicitacao());
       setSetores(await getSetores());
-      try {
-        const categoriasData = await listarCategoriasParceiro();
-        setCategoriasParceiro(Array.isArray(categoriasData) ? categoriasData : []);
-      } catch (error) {
-        console.error(error);
-        setCategoriasParceiro([]);
-      }
       try {
         const [cfg, cfgSetorOrigem, cfgTiposPorSetor, cfgAprovacaoDiretoria, cfgCamposNovaSolicitacao, cfgAutomacaoDestino] = await Promise.all([
           getAreasObra(),
@@ -368,7 +361,8 @@ export default function NovaSolicitacao() {
       tipo_solicitacao_id: '',
       tipo_sub_id: '',
       contrato_id: '',
-      codigo_contrato: ''
+      codigo_contrato: '',
+      parceiro_id: ''
     }));
     setContratos([]);
     setApropriacoes([]);
@@ -376,6 +370,7 @@ export default function NovaSolicitacao() {
     setRefContratoBusca('');
     setRefResultados([]);
     setApropriacoesContratoRateio([]);
+    limparParceiroSelecionado();
   }
 
   function limparBuscaObra() {
@@ -531,26 +526,44 @@ export default function NovaSolicitacao() {
     })).filter(item => item.apropriacao_id);
   }
 
+  function getCredoresContrato(contrato) {
+    return (Array.isArray(contrato?.credores) ? contrato.credores : [])
+      .filter(credor => credor?.ativo !== false && (credor?.fornecedor !== false || credor?.corretor === true));
+  }
+
   function aplicarContratoSelecionado(contrato) {
     if (!contrato) {
       setForm(prev => ({
         ...prev,
         contrato_id: '',
-        codigo_contrato: ''
+        codigo_contrato: '',
+        parceiro_id: ''
       }));
       setRefContratoBusca('');
       setApropriacoesContratoRateio([]);
+      limparParceiroSelecionado();
       return;
     }
 
+    const credores = getCredoresContrato(contrato);
     setForm(prev => ({
       ...prev,
       contrato_id: String(contrato.id),
-      codigo_contrato: contrato.codigo || ''
+      codigo_contrato: contrato.codigo || '',
+      parceiro_id: credores.length === 1 ? String(credores[0].id) : ''
     }));
     setRefContratoBusca(contrato.ref_contrato || '');
     setRefResultados([]);
     setApropriacoesContratoRateio(normalizarApropriacoesContratoParaRateio(contrato));
+    if (credores.length === 1) {
+      setParceiroSelecionado(credores[0]);
+      setParceiroBusca(credores[0].nome || credores[0].cpf_cnpj || '');
+    } else {
+      setParceiroSelecionado(null);
+      setParceiroBusca('');
+    }
+    setParceiroResultados([]);
+    setParceiroBuscaExecutada(false);
   }
 
   function alternarApropriacaoContratoRateio(index, checked) {
@@ -619,8 +632,9 @@ export default function NovaSolicitacao() {
     setRefContratoBusca('');
     setRefResultados([]);
     setContratosRef([]);
-    setForm(prev => ({ ...prev, contrato_id: '', codigo_contrato: '' }));
+    setForm(prev => ({ ...prev, contrato_id: '', codigo_contrato: '', parceiro_id: '' }));
     setApropriacoesContratoRateio([]);
+    limparParceiroSelecionado();
   }
 
   function removerArquivo(index) {
@@ -643,11 +657,13 @@ export default function NovaSolicitacao() {
       obra_id: String(obra.id),
       contrato_id: '',
       codigo_contrato: '',
+      parceiro_id: '',
       apropriacao_id: '',
       itens_apropriacao: ''
     }));
     setObraBusca(formatarRotuloBuscaObra(obra));
     setObraBuscaAtiva(false);
+    limparParceiroSelecionado();
   }
 
   const obrasFiltradas = useMemo(() => {
@@ -879,6 +895,116 @@ export default function NovaSolicitacao() {
     return lista;
   }, [setores, isSetorObra, areasObra, destinosPermitidosPorSetorOrigem]);
   const contratosDisponiveis = contratosRef.length > 0 ? contratosRef : contratos;
+  const contratoSelecionado = useMemo(() => {
+    if (!form.contrato_id) return null;
+    return [...contratosDisponiveis, ...contratos, ...contratosRef]
+      .find(item => String(item.id) === String(form.contrato_id)) || null;
+  }, [form.contrato_id, contratosDisponiveis, contratos, contratosRef]);
+  const credoresContratoSelecionado = useMemo(
+    () => getCredoresContrato(contratoSelecionado),
+    [contratoSelecionado]
+  );
+
+  function renderCampoCredor(className = 'grid gap-1 text-sm lg:col-span-6') {
+    if (!exibirCampoCredor) return null;
+
+    return (
+      <label className={className}>
+        Credor
+        {exibirCamposContrato ? (
+          <>
+            <select
+              className="input input-sm"
+              value={form.parceiro_id}
+              disabled={!form.contrato_id || credoresContratoSelecionado.length === 0}
+              required={campoObrigatorio('credor')}
+              onChange={(e) => {
+                const credor = credoresContratoSelecionado.find(item => String(item.id) === String(e.target.value));
+                if (credor) {
+                  selecionarParceiro(credor);
+                } else {
+                  limparParceiroSelecionado();
+                }
+              }}
+            >
+              <option value="">
+                {!form.contrato_id
+                  ? 'Selecione o contrato primeiro'
+                  : credoresContratoSelecionado.length === 0
+                    ? 'Contrato sem credor vinculado'
+                    : 'Selecione o credor'}
+              </option>
+              {credoresContratoSelecionado.map(credor => (
+                <option key={credor.id} value={credor.id}>
+                  {credor.nome || credor.cpf_cnpj || `Credor ${credor.id}`}
+                </option>
+              ))}
+            </select>
+            <span className="text-xs text-gray-500">
+              O credor e carregado a partir do contrato. Para pagar um credor diferente, solicite ao setor de Gerencia de Processo o cadastro ou vinculo no contrato.
+            </span>
+          </>
+        ) : (
+          <>
+            <div className="flex gap-2 nova-solicitacao-inline-actions">
+              <input
+                className="input input-sm"
+                placeholder="Buscar credor por nome ou CPF/CNPJ"
+                value={parceiroBusca}
+                onChange={e => {
+                  setParceiroBusca(e.target.value);
+                  setParceiroBuscaExecutada(false);
+                  setParceiroResultados([]);
+                  if (parceiroSelecionado) {
+                    setParceiroSelecionado(null);
+                    setForm(prev => ({ ...prev, parceiro_id: '' }));
+                  }
+                }}
+              />
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                onClick={buscarParceirosRelacionados}
+                disabled={parceiroBuscando}
+              >
+                {parceiroBuscando ? 'Buscando...' : 'Buscar'}
+              </button>
+              {form.parceiro_id && (
+                <button
+                  type="button"
+                  className="btn btn-outline btn-sm"
+                  onClick={limparParceiroSelecionado}
+                >
+                  Limpar
+                </button>
+              )}
+            </div>
+
+            {parceiroResultados.length > 1 && !parceiroSelecionado && (
+              <div className="nova-solicitacao-results-list mt-2 border rounded p-2 max-h-40 overflow-auto">
+                {parceiroResultados.map(item => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => selecionarParceiro(item)}
+                    className="block w-full text-left text-sm p-2 hover:bg-gray-50 rounded nova-solicitacao-result-item"
+                  >
+                    {item.nome} - {item.cpf_cnpj}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {parceiroBuscaExecutada && parceiroBusca.trim() && parceiroResultados.length === 0 && !parceiroBuscando && !parceiroSelecionado && (
+              <span className="text-xs text-gray-500">
+                Nenhum credor encontrado. Solicite ao setor de Gerencia de Processo o cadastro do credor.
+              </span>
+            )}
+          </>
+        )}
+      </label>
+    );
+  }
   const hoje = new Date();
   const hojeInput = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-${String(hoje.getDate()).padStart(2, '0')}`;
   const classificacaoObraSelecionada = String(
@@ -1177,69 +1303,99 @@ export default function NovaSolicitacao() {
             </select>
           </label>
 
-          {exibirCampoCredor && (
+          {false && exibirCampoCredor && (
             <label className="grid gap-1 text-sm lg:col-span-6">
               Credor
-              <div className="flex gap-2 nova-solicitacao-inline-actions">
-                <input
-                  className="input input-sm"
-                  placeholder="Buscar credor por nome ou CPF/CNPJ"
-                  value={parceiroBusca}
-                  onChange={e => {
-                    setParceiroBusca(e.target.value);
-                    setParceiroBuscaExecutada(false);
-                    setParceiroResultados([]);
-                    if (parceiroSelecionado) {
-                      setParceiroSelecionado(null);
-                      setForm(prev => ({ ...prev, parceiro_id: '' }));
-                    }
-                  }}
-                />
-                <button
-                  type="button"
-                  className="btn btn-outline btn-sm"
-                  onClick={buscarParceirosRelacionados}
-                  disabled={parceiroBuscando}
-                >
-                  {parceiroBuscando ? 'Buscando...' : 'Buscar'}
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-outline btn-sm"
-                  onClick={() => setModalParceiroAberto(true)}
-                >
-                  Cadastrar
-                </button>
-                {form.parceiro_id && (
-                  <button
-                    type="button"
-                    className="btn btn-outline btn-sm"
-                    onClick={limparParceiroSelecionado}
+              {exibirCamposContrato ? (
+                <>
+                  <select
+                    className="input input-sm"
+                    value={form.parceiro_id}
+                    disabled={!form.contrato_id || credoresContratoSelecionado.length === 0}
+                    required={campoObrigatorio('credor')}
+                    onChange={(e) => {
+                      const credor = credoresContratoSelecionado.find(item => String(item.id) === String(e.target.value));
+                      if (credor) {
+                        selecionarParceiro(credor);
+                      } else {
+                        limparParceiroSelecionado();
+                      }
+                    }}
                   >
-                    Limpar
-                  </button>
-                )}
-              </div>
-
-              {parceiroResultados.length > 1 && !parceiroSelecionado && (
-                <div className="nova-solicitacao-results-list mt-2 border rounded p-2 max-h-40 overflow-auto">
-                  {parceiroResultados.map(item => (
+                    <option value="">
+                      {!form.contrato_id
+                        ? 'Selecione o contrato primeiro'
+                        : credoresContratoSelecionado.length === 0
+                          ? 'Contrato sem credor vinculado'
+                          : 'Selecione o credor'}
+                    </option>
+                    {credoresContratoSelecionado.map(credor => (
+                      <option key={credor.id} value={credor.id}>
+                        {credor.nome || credor.cpf_cnpj || `Credor ${credor.id}`}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="text-xs text-gray-500">
+                    O credor e carregado a partir do contrato. Para pagar um credor diferente, solicite ao setor de Gerencia de Processo o cadastro ou vinculo no contrato.
+                  </span>
+                </>
+              ) : (
+                <>
+                  <div className="flex gap-2 nova-solicitacao-inline-actions">
+                    <input
+                      className="input input-sm"
+                      placeholder="Buscar credor por nome ou CPF/CNPJ"
+                      value={parceiroBusca}
+                      onChange={e => {
+                        setParceiroBusca(e.target.value);
+                        setParceiroBuscaExecutada(false);
+                        setParceiroResultados([]);
+                        if (parceiroSelecionado) {
+                          setParceiroSelecionado(null);
+                          setForm(prev => ({ ...prev, parceiro_id: '' }));
+                        }
+                      }}
+                    />
                     <button
-                      key={item.id}
                       type="button"
-                      onClick={() => selecionarParceiro(item)}
-                      className="block w-full text-left text-sm p-2 hover:bg-gray-50 rounded nova-solicitacao-result-item"
+                      className="btn btn-outline btn-sm"
+                      onClick={buscarParceirosRelacionados}
+                      disabled={parceiroBuscando}
                     >
-                      {item.nome} - {item.cpf_cnpj}
+                      {parceiroBuscando ? 'Buscando...' : 'Buscar'}
                     </button>
-                  ))}
-                </div>
-              )}
+                    {form.parceiro_id && (
+                      <button
+                        type="button"
+                        className="btn btn-outline btn-sm"
+                        onClick={limparParceiroSelecionado}
+                      >
+                        Limpar
+                      </button>
+                    )}
+                  </div>
 
-              {parceiroBuscaExecutada && parceiroBusca.trim() && parceiroResultados.length === 0 && !parceiroBuscando && !parceiroSelecionado && (
-                <span className="text-xs text-gray-500">
-                  Nenhum credor encontrado. Use o botao Cadastrar para criar uma nova pessoa como credor.
-                </span>
+                  {parceiroResultados.length > 1 && !parceiroSelecionado && (
+                    <div className="nova-solicitacao-results-list mt-2 border rounded p-2 max-h-40 overflow-auto">
+                      {parceiroResultados.map(item => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => selecionarParceiro(item)}
+                          className="block w-full text-left text-sm p-2 hover:bg-gray-50 rounded nova-solicitacao-result-item"
+                        >
+                          {item.nome} - {item.cpf_cnpj}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {parceiroBuscaExecutada && parceiroBusca.trim() && parceiroResultados.length === 0 && !parceiroBuscando && !parceiroSelecionado && (
+                    <span className="text-xs text-gray-500">
+                      Nenhum credor encontrado. Solicite ao setor de Gerencia de Processo o cadastro do credor.
+                    </span>
+                  )}
+                </>
               )}
             </label>
           )}
@@ -1431,6 +1587,12 @@ export default function NovaSolicitacao() {
           </div>
         )}
 
+        {exibirCampoCredor && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 nova-solicitacao-grid-curta">
+            {renderCampoCredor('grid gap-1 text-sm md:col-span-2')}
+          </div>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 nova-solicitacao-grid-curta">
           {!tipoSemValor && (
             <label className="grid gap-1 text-sm">
@@ -1583,7 +1745,7 @@ export default function NovaSolicitacao() {
         </div>
       </form>
 
-      {modalParceiroAberto && (
+      {false && modalParceiroAberto && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
           <div className="card w-full max-w-2xl space-y-4">
             <div className="flex items-start justify-between gap-4">
