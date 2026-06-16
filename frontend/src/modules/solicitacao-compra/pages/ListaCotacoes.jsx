@@ -69,7 +69,7 @@ export default function ListaCotacoes() {
   ).length;
 
   return (
-    <div className="page solicitacoes-page">
+    <div className="page solicitacoes-page compras-cotacoes-page">
       <div className="card sol-surface-card app-toolbar-card">
         <div className="app-page-header-row">
           <div>

@@ -9044,6 +9044,95 @@ body {
   background: rgba(15, 23, 42, 0.86);
 }
 
+/* Cotacoes: evita que filtros, cards e tabela empurrem a pagina para fora do viewport */
+.layout-shell .compras-cotacoes-page {
+  width: 100%;
+  max-width: min(100%, 88rem);
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+.layout-shell .compras-cotacoes-page > *,
+.layout-shell .compras-cotacoes-page .card,
+.layout-shell .compras-cotacoes-page .sol-surface-card,
+.layout-shell .compras-cotacoes-page .app-filters-card,
+.layout-shell .compras-cotacoes-page .compras-table-card {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.layout-shell .compras-cotacoes-page .app-filters-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+}
+
+.layout-shell .compras-cotacoes-page .app-summary-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
+}
+
+.layout-shell .compras-cotacoes-page .compras-table-card {
+  overflow: hidden;
+}
+
+.layout-shell .compras-cotacoes-page .compras-table-wrapper {
+  width: 100%;
+  max-width: 100%;
+}
+
+.layout-shell .compras-cotacoes-page .compras-data-table-cotacoes {
+  min-width: 82rem;
+}
+
+.layout-shell .compras-cotacoes-page .compras-col-codigo-curto {
+  width: 4.4rem;
+}
+
+.layout-shell .compras-cotacoes-page .compras-col-fornecedor,
+.layout-shell .compras-cotacoes-page .compras-col-obra {
+  width: 9.6rem;
+}
+
+.layout-shell .compras-cotacoes-page .compras-col-solicitacao {
+  width: 12.8rem;
+}
+
+.layout-shell .compras-cotacoes-page .compras-col-status {
+  width: 7.8rem;
+}
+
+.layout-shell .compras-cotacoes-page .compras-col-data {
+  width: 6.7rem;
+}
+
+.layout-shell .compras-cotacoes-page .compras-col-valor {
+  width: 7.4rem;
+}
+
+.layout-shell .compras-cotacoes-page .compras-col-condicao {
+  width: 8.4rem;
+}
+
+.layout-shell .compras-cotacoes-page .compras-col-acoes {
+  width: 4.8rem;
+}
+
+@media (max-width: 900px) {
+  .layout-shell .compras-cotacoes-page .app-page-header-row {
+    align-items: flex-start;
+  }
+
+  .layout-shell .compras-cotacoes-page .app-page-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .layout-shell .compras-cotacoes-page .compras-table-card,
+  .layout-shell .compras-cotacoes-page .app-filters-card {
+    padding: 0.85rem;
+    border-radius: 1.2rem;
+  }
+}
+
 /* ============================
    ObraGestao — acento financeiro
 ============================ */
