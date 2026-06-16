@@ -191,7 +191,6 @@ export default function SolicitacoesCompra() {
             <span className="sol-filter-label">Status</span>
             <select className="input" value={status} onChange={(event) => setStatus(event.target.value)}>
               <option value="">Todos</option>
-              <option value="AGUARDANDO_DIRETORIA">Aguardando diretoria</option>
               <option value="ENVIADO">Enviado</option>
               <option value="ENCERRADO">Encerrado</option>
             </select>

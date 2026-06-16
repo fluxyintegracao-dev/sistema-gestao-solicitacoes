@@ -48,8 +48,7 @@ const {
 const { getRuntimeInstallationConfig } = require('../services/runtimeConfig');
 const {
   obterConfiguracaoAprovacaoDiretoria,
-  obterDiretoriaParaObra,
-  obterSetorDestinoAprovacao
+  obterDiretoriaParaObra
 } = require('../services/aprovacaoDiretoriaConfig');
 const {
   canAccessCompras,
@@ -350,22 +349,27 @@ async function buscarSetorCompras(transaction) {
   return resolveSetorPersistenciaValue(setor, 'COMPRAS');
 }
 
-async function montarFluxoAprovacaoCompra({ obra, tipoSolicitacaoId, transaction }) {
+async function montarFluxoAprovacaoCompra({ obra, transaction }) {
   const setorCompras = await buscarSetorCompras(transaction);
   const configuracao = await obterConfiguracaoAprovacaoDiretoria();
   const diretoria = obterDiretoriaParaObra(obra, configuracao.diretoriasPorClassificacao);
-  const destinoConfigurado = obterSetorDestinoAprovacao(
-    tipoSolicitacaoId,
-    configuracao.setoresDestinoPorTipo
-  );
-  const setorDestinoAprovacao = destinoConfigurado || setorCompras;
 
   return {
     usaFluxoDiretoria: Boolean(diretoria),
     areaResponsavel: diretoria || setorCompras,
     diretoriaFluxoCodigo: diretoria || null,
-    setorDestinoPosAprovacao: diretoria ? setorDestinoAprovacao : null
+    setorDestinoPosAprovacao: diretoria ? setorCompras : null
   };
+}
+
+function isCompraAguardandoDiretoria(solicitacao) {
+  return normalizeTextCompra(solicitacao?.status) === 'AGUARDANDO_DIRETORIA';
+}
+
+function responderCompraAguardandoDiretoria(res) {
+  return res.status(403).json({
+    error: 'A solicitacao de compra ainda aguarda aprovacao da diretoria antes de seguir para compras.'
+  });
 }
 
 async function carregarSolicitacaoCompra(id) {
@@ -1113,7 +1117,11 @@ module.exports = {
       if (!usuario) return;
 
       const { obra_id } = req.query;
-      const where = {};
+      const where = {
+        status: {
+          [Op.ne]: 'AGUARDANDO_DIRETORIA'
+        }
+      };
       const obraIdsEscopo = Array.isArray(req.compraScopeObraIds)
         ? req.compraScopeObraIds
         : null;
@@ -1184,6 +1192,10 @@ module.exports = {
         return res.status(404).json({ error: 'Solicitacao nao encontrada' });
       }
 
+      if (isCompraAguardandoDiretoria(solicitacao)) {
+        return responderCompraAguardandoDiretoria(res);
+      }
+
       return res.json(solicitacao);
     } catch (error) {
       console.error(error);
@@ -1216,6 +1228,11 @@ module.exports = {
       if (!solicitacao) {
         await transaction.rollback();
         return res.status(404).json({ error: 'Solicitacao de compra nao encontrada' });
+      }
+
+      if (isCompraAguardandoDiretoria(solicitacao)) {
+        await transaction.rollback();
+        return responderCompraAguardandoDiretoria(res);
       }
 
       await registrarLogSolicitacaoCompra({
@@ -1303,7 +1320,6 @@ module.exports = {
       const tipoSolicitacao = await buscarTipoSolicitacaoCompra(transaction);
       const fluxoCompra = await montarFluxoAprovacaoCompra({
         obra,
-        tipoSolicitacaoId: tipoSolicitacao.id,
         transaction
       });
 
@@ -1633,6 +1649,11 @@ module.exports = {
         return res.status(400).json({ error: 'Solicitacao encerrada nao aceita novo envio para fornecedores' });
       }
 
+      if (isCompraAguardandoDiretoria(solicitacao)) {
+        await transaction.rollback();
+        return responderCompraAguardandoDiretoria(res);
+      }
+
       if (Number(solicitacao.solicitacao_principal_id || 0) > 0) {
         const solicitacaoPrincipal = await Solicitacao.findByPk(solicitacao.solicitacao_principal_id, {
           attributes: [
@@ -1805,6 +1826,11 @@ module.exports = {
         return res.status(400).json({ error: 'Esta solicitacao nao pode ser recusada novamente' });
       }
 
+      if (isCompraAguardandoDiretoria(solicitacao)) {
+        await transaction.rollback();
+        return responderCompraAguardandoDiretoria(res);
+      }
+
       const motivo = String(req.body?.motivo || '').trim();
       await solicitacao.update(
         {
@@ -1845,6 +1871,10 @@ module.exports = {
         return res.status(404).json({ error: 'Solicitacao nao encontrada' });
       }
 
+      if (isCompraAguardandoDiretoria(solicitacao)) {
+        return responderCompraAguardandoDiretoria(res);
+      }
+
       return res.json(montarComparativoSolicitacao(solicitacao));
     } catch (error) {
       console.error(error);
@@ -1871,6 +1901,11 @@ module.exports = {
       if (!solicitacao) {
         await transaction.rollback();
         return res.status(404).json({ error: 'Solicitacao nao encontrada' });
+      }
+
+      if (isCompraAguardandoDiretoria(solicitacao)) {
+        await transaction.rollback();
+        return responderCompraAguardandoDiretoria(res);
       }
 
       const vencedores = Array.isArray(req.body?.alocacoes)
@@ -1966,6 +2001,10 @@ module.exports = {
       const solicitacao = await carregarSolicitacaoCompra(req.params.id);
       if (!solicitacao) {
         return res.status(404).json({ error: 'Solicitacao nao encontrada' });
+      }
+
+      if (isCompraAguardandoDiretoria(solicitacao)) {
+        return responderCompraAguardandoDiretoria(res);
       }
 
       const doc = new PDFDocument({ margin: 40, size: 'A4', layout: 'landscape' });
