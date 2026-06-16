@@ -100,22 +100,17 @@ function whatsappLink(numero, mensagem) {
 }
 
 function gerarMensagemCotacao(fornecedorNome, url, itens = [], pdfUrl = '') {
-  const header = [
+  return [
     `Ola${fornecedorNome ? `, ${fornecedorNome}` : ''}!`,
     '',
     'Temos uma cotacao disponivel para voce.',
     'O preenchimento direto no formulario e opcional: se preferir, voce pode apenas anexar/enviar o PDF ou imagem da sua cotacao.',
     '',
     `Link da cotacao: ${url}`,
-    pdfUrl ? `PDF da cotacao: ${pdfUrl}` : ''
+    pdfUrl ? `PDF da cotacao: ${pdfUrl}` : '',
+    '',
+    'Aguardamos sua resposta. Obrigado!'
   ].filter(Boolean).join('\n');
-  if (!itens.length) return header;
-  const lista = itens
-    .slice(0, 10)
-    .map((it) => `- ${it.nome || it.nome_manual || '-'}: ${it.quantidade} ${it.unidade || it.unidade_sigla_manual || ''}`.trim())
-    .join('\n');
-  const extra = itens.length > 10 ? `\n... e mais ${itens.length - 10} item(ns)` : '';
-  return `${header}\n\nItens:\n${lista}${extra}\n\nAguardamos sua resposta. Obrigado!`;
 }
 
 function ModalPedidoFinal({ fornecedor, itensGanhos, solicitacaoId, onRemanejamento, onFechar }) {
