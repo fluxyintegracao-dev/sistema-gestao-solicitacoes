@@ -253,8 +253,17 @@ export default function FinanceiroFaturasCartao() {
             </button>
           </div>
 
-          <div className="app-table-shell overflow-x-auto">
-            <table className="table min-w-full">
+          <div className="app-dense-table-wrapper">
+            <table className="app-dense-data-table faturas-cartao-table">
+              <colgroup>
+                <col className="app-dense-col-title" />
+                <col className="app-dense-col-title" />
+                <col className="app-dense-col-date" />
+                <col className="app-dense-col-status" />
+                <col className="app-dense-col-money" />
+                <col className="app-dense-col-number" />
+                <col className="app-dense-col-actions" />
+              </colgroup>
               <thead>
                 <tr>
                   <th>Fatura</th>
@@ -288,8 +297,13 @@ export default function FinanceiroFaturasCartao() {
                     <td className="font-semibold">{formatCurrency(fatura.valor_total)}</td>
                     <td>{(fatura.titulos || []).length}</td>
                     <td>
-                      <Link className="btn btn-outline btn-sm" to={`/financeiro/faturas-cartao/${fatura.id}`}>
-                        <HiOutlineEye className="h-4 w-4" /> Detalhes
+                      <Link
+                        className="app-dense-icon-action"
+                        to={`/financeiro/faturas-cartao/${fatura.id}`}
+                        title="Abrir detalhes"
+                        aria-label={`Abrir detalhes da fatura ${fatura.competencia || fatura.id}`}
+                      >
+                        <HiOutlineEye />
                       </Link>
                     </td>
                   </tr>

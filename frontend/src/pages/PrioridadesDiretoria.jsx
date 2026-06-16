@@ -490,8 +490,17 @@ export default function PrioridadesDiretoria() {
                 </label>
               </div>
 
-              <div className="overflow-x-auto rounded-2xl border border-[var(--c-border)]">
-                <table className="table table-sm min-w-full">
+              <div className="app-dense-table-wrapper">
+                <table className="app-dense-data-table prioridade-titulos-table">
+                  <colgroup>
+                    {loteDetalhe.status === 'ABERTO' && <col className="app-dense-col-check" />}
+                    <col className="app-dense-col-title" />
+                    <col className="app-dense-col-title" />
+                    <col className="app-dense-col-medium" />
+                    <col className="app-dense-col-date" />
+                    <col className="app-dense-col-money" />
+                    <col className="app-dense-col-status" />
+                  </colgroup>
                   <thead>
                     <tr>
                       {loteDetalhe.status === 'ABERTO' && <th className="w-10"></th>}
@@ -507,7 +516,7 @@ export default function PrioridadesDiretoria() {
                     {titulosVisiveis.map(item => (
                       <tr
                         key={item.id}
-                        className="cursor-pointer hover:bg-[var(--c-primary-soft)]"
+                        className="cursor-pointer"
                         onClick={() => item.solicitacao?.id && abrirSolicitacao(item.solicitacao.id)}
                       >
                         {loteDetalhe.status === 'ABERTO' && (

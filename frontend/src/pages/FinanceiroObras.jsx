@@ -358,16 +358,16 @@ export default function FinanceiroObras() {
         <Metric label="Titulos" value={String(relatorio.resumo.titulos || 0)} detail={`${relatorio.resumo.movimentos || 0} baixa(s) vinculada(s)`} />
       </div>
 
-      <section className="card sol-surface-card app-table-shell">
-        <div className="border-b border-[var(--c-border)] px-4 py-3">
+      <section className="card sol-surface-card app-dense-table-card financeiro-obras-detalhamento-card">
+        <div className="app-dense-table-header">
           <h2 className="text-lg font-semibold text-[var(--c-text)]">Detalhamento financeiro</h2>
           <p className="text-sm text-[var(--c-muted)]">
             Periodo: {formatDate(relatorio.filtros.data_inicial)} ate {formatDate(relatorio.filtros.data_final)}.
           </p>
         </div>
 
-        <div className="table-wrapper">
-          <ResizableTable columns={TABLE_COLUMNS} storageKey={STORAGE_KEY} className="table table-sm">
+        <div className="app-dense-table-wrapper financeiro-obras-table-wrapper">
+          <ResizableTable columns={TABLE_COLUMNS} storageKey={STORAGE_KEY} className="app-dense-data-table financeiro-obras-table">
             <thead>
               <tr>
                 <ResizableTh columnKey="data_baixa">Baixa</ResizableTh>

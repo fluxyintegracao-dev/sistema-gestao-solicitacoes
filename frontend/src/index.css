@@ -9044,6 +9044,172 @@ body {
   background: rgba(15, 23, 42, 0.86);
 }
 
+/* Tabelas densas compartilhadas para telas financeiras e diretoria */
+.layout-shell .app-dense-table-card {
+  padding: 0.9rem;
+  overflow: hidden;
+}
+
+.layout-shell .app-dense-table-header {
+  padding: 0 0 0.8rem;
+  margin-bottom: 0.8rem;
+  border-bottom: 1px solid var(--shell-border, var(--ui-border));
+}
+
+.layout-shell .app-dense-table-wrapper {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--shell-border, var(--ui-border));
+  border-radius: 1rem;
+  background: color-mix(in srgb, var(--shell-panel, #fff) 96%, var(--shell-primary, #2563eb) 4%);
+}
+
+.layout-shell .app-dense-data-table {
+  width: 100%;
+  min-width: 54rem;
+  border-collapse: collapse;
+  border-spacing: 0;
+  table-layout: fixed;
+}
+
+.layout-shell .app-dense-data-table th {
+  padding: 0.55rem 0.65rem;
+  border-bottom: 1px solid var(--shell-border, var(--ui-border));
+  background: color-mix(in srgb, var(--shell-panel-strong, #fff) 88%, var(--shell-primary, #2563eb) 12%);
+  color: var(--shell-muted, var(--c-muted));
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  line-height: 1rem;
+  text-align: left;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.layout-shell .app-dense-data-table td {
+  padding: 0.52rem 0.65rem;
+  border-bottom: 1px solid var(--shell-border, var(--ui-border));
+  color: var(--shell-text, var(--c-text));
+  font-size: 0.78rem;
+  line-height: 1.15rem;
+  vertical-align: middle;
+  background: transparent;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.layout-shell .app-dense-data-table tbody tr:nth-child(even) {
+  background: rgba(148, 163, 184, 0.07);
+}
+
+.layout-shell .app-dense-data-table tbody tr:hover {
+  background: color-mix(in srgb, var(--shell-primary, #2563eb) 8%, transparent);
+}
+
+.layout-shell .app-dense-data-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.layout-shell .app-dense-data-table .app-status-pill,
+.layout-shell .app-dense-data-table .badge {
+  min-height: 1.45rem;
+  padding: 0 0.5rem;
+  font-size: 0.66rem;
+  white-space: nowrap;
+}
+
+.layout-shell .app-dense-icon-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  flex: 0 0 2rem;
+  border: 1px solid var(--shell-border, var(--ui-border));
+  border-radius: 0.7rem;
+  background: rgba(255, 255, 255, 0.66);
+  color: var(--shell-text, var(--c-text));
+  box-shadow: none;
+  transition: background-color 0.16s ease, border-color 0.16s ease, color 0.16s ease, transform 0.16s ease;
+}
+
+.layout-shell .app-dense-icon-action svg {
+  width: 1.05rem;
+  height: 1.05rem;
+}
+
+.layout-shell .app-dense-icon-action:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--shell-primary, #2563eb) 42%, var(--shell-border, #cbd5e1));
+  background: color-mix(in srgb, var(--shell-primary, #2563eb) 11%, #fff);
+  color: var(--shell-primary, #2563eb);
+}
+
+.layout-shell .app-dense-col-check {
+  width: 3.2rem;
+}
+
+.layout-shell .app-dense-col-title {
+  width: 13.5rem;
+}
+
+.layout-shell .app-dense-col-medium {
+  width: 10.5rem;
+}
+
+.layout-shell .app-dense-col-date {
+  width: 7.6rem;
+}
+
+.layout-shell .app-dense-col-money {
+  width: 8.5rem;
+}
+
+.layout-shell .app-dense-col-status {
+  width: 8.4rem;
+}
+
+.layout-shell .app-dense-col-number {
+  width: 5.5rem;
+}
+
+.layout-shell .app-dense-col-actions {
+  width: 5.4rem;
+}
+
+.layout-shell .prioridade-titulos-table {
+  min-width: 55rem;
+}
+
+.layout-shell .faturas-cartao-table {
+  min-width: 58rem;
+}
+
+.layout-shell .financeiro-obras-detalhamento-card {
+  padding-bottom: 0.9rem;
+}
+
+.layout-shell .financeiro-obras-table {
+  min-width: 96rem;
+}
+
+.dark .layout-shell .app-dense-table-wrapper {
+  background: rgba(15, 23, 42, 0.52);
+}
+
+.dark .layout-shell .app-dense-data-table tbody tr:nth-child(even) {
+  background: rgba(30, 41, 59, 0.56);
+}
+
+.dark .layout-shell .app-dense-data-table tbody tr:hover {
+  background: color-mix(in srgb, var(--shell-primary, #60a5fa) 16%, rgba(15, 23, 42, 0.7));
+}
+
+.dark .layout-shell .app-dense-icon-action {
+  background: rgba(15, 23, 42, 0.86);
+}
+
 /* Cotacoes: evita que filtros, cards e tabela empurrem a pagina para fora do viewport */
 .layout-shell .compras-cotacoes-page {
   width: 100%;
