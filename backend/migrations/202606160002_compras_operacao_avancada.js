@@ -1,6 +1,7 @@
 const {
   columnExists,
   indexExists,
+  resolveTableName,
   tableExists
 } = require('../src/database/schemaUtils');
 
@@ -18,6 +19,8 @@ async function addIndexIfMissing(queryInterface, sequelize, tableName, fields, i
 
 module.exports = {
   async up({ DataTypes, queryInterface, sequelize }) {
+    const obrasTableName = await resolveTableName(sequelize, ['obras', 'Obras'], 'Obras');
+
     if (!(await tableExists(sequelize, 'solicitacao_compra_alocacoes'))) {
       await queryInterface.createTable('solicitacao_compra_alocacoes', {
         id: {
@@ -265,31 +268,31 @@ module.exports = {
       defaultValue: 0
     });
 
-    await addColumnIfMissing(queryInterface, sequelize, 'obras', 'cno', {
+    await addColumnIfMissing(queryInterface, sequelize, obrasTableName, 'cno', {
       type: DataTypes.STRING(40),
       allowNull: true
     });
-    await addColumnIfMissing(queryInterface, sequelize, 'obras', 'endereco_logradouro', {
+    await addColumnIfMissing(queryInterface, sequelize, obrasTableName, 'endereco_logradouro', {
       type: DataTypes.STRING(255),
       allowNull: true
     });
-    await addColumnIfMissing(queryInterface, sequelize, 'obras', 'endereco_numero', {
+    await addColumnIfMissing(queryInterface, sequelize, obrasTableName, 'endereco_numero', {
       type: DataTypes.STRING(50),
       allowNull: true
     });
-    await addColumnIfMissing(queryInterface, sequelize, 'obras', 'endereco_complemento', {
+    await addColumnIfMissing(queryInterface, sequelize, obrasTableName, 'endereco_complemento', {
       type: DataTypes.STRING(120),
       allowNull: true
     });
-    await addColumnIfMissing(queryInterface, sequelize, 'obras', 'endereco_bairro', {
+    await addColumnIfMissing(queryInterface, sequelize, obrasTableName, 'endereco_bairro', {
       type: DataTypes.STRING(120),
       allowNull: true
     });
-    await addColumnIfMissing(queryInterface, sequelize, 'obras', 'endereco_cep', {
+    await addColumnIfMissing(queryInterface, sequelize, obrasTableName, 'endereco_cep', {
       type: DataTypes.STRING(20),
       allowNull: true
     });
-    await addColumnIfMissing(queryInterface, sequelize, 'obras', 'endereco_uf', {
+    await addColumnIfMissing(queryInterface, sequelize, obrasTableName, 'endereco_uf', {
       type: DataTypes.STRING(2),
       allowNull: true
     });
