@@ -65,6 +65,35 @@ module.exports = (sequelize, DataTypes) => {
       link_geral: {
         type: DataTypes.STRING,
         allowNull: true
+      },
+      comprador_responsavel_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true
+      },
+      prazo_compra: {
+        type: DataTypes.DATEONLY,
+        allowNull: true
+      },
+      delegado_por: {
+        type: DataTypes.INTEGER,
+        allowNull: true
+      },
+      delegado_em: {
+        type: DataTypes.DATE,
+        allowNull: true
+      },
+      motivo_atraso: {
+        type: DataTypes.TEXT,
+        allowNull: true
+      },
+      motivo_atraso_em: {
+        type: DataTypes.DATE,
+        allowNull: true
+      },
+      valor_fechado: {
+        type: DataTypes.DECIMAL(14, 2),
+        allowNull: false,
+        defaultValue: 0
       }
     },
     {

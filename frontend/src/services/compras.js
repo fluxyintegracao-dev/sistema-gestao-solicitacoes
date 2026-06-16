@@ -215,22 +215,22 @@ export async function criarSolicitacaoCompra(data) {
   return handleJsonResponse(response, 'Erro ao criar solicitacao de compra');
 }
 
-export async function integrarSolicitacaoCompra(id, data) {
-  const response = await fetch(`${API_URL}/compras/solicitacoes/${id}/integrar`, {
+export async function delegarSolicitacaoCompra(id, data = {}) {
+  const response = await fetch(`${API_URL}/compras/solicitacoes/${id}/delegar`, {
     method: 'PATCH',
     headers: authHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(data)
   });
-  return handleJsonResponse(response, 'Erro ao integrar solicitacao');
+  return handleJsonResponse(response, 'Erro ao delegar solicitacao de compra');
 }
 
-export async function liberarSolicitacaoCompra(id) {
-  const response = await fetch(`${API_URL}/compras/solicitacoes/${id}/liberar`, {
-    method: 'PATCH',
+export async function comentarSolicitacaoCompra(id, data = {}) {
+  const response = await fetch(`${API_URL}/compras/solicitacoes/${id}/comentarios`, {
+    method: 'POST',
     headers: authHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify({})
+    body: JSON.stringify(data)
   });
-  return handleJsonResponse(response, 'Erro ao liberar solicitacao para compra');
+  return handleJsonResponse(response, 'Erro ao registrar comentario na cotacao');
 }
 
 export async function recusarSolicitacaoCompra(id, data = {}) {
@@ -415,6 +415,60 @@ export async function atualizarStatusPedidoCompra(id, data) {
   return handleJsonResponse(response, 'Erro ao atualizar status do pedido');
 }
 
+export async function atualizarStatusPedidosCompraEmLote(data) {
+  const response = await fetch(`${API_URL}/compras/pedidos/status-lote`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+  return handleJsonResponse(response, 'Erro ao atualizar pedidos em lote');
+}
+
+export async function cancelarPedidoCompra(id, data = {}) {
+  const response = await fetch(`${API_URL}/compras/pedidos/${id}/cancelar`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+  return handleJsonResponse(response, 'Erro ao cancelar pedido de compra');
+}
+
+export async function cancelarItensPedidoCompra(id, data = {}) {
+  const response = await fetch(`${API_URL}/compras/pedidos/${id}/itens-cancelar`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+  return handleJsonResponse(response, 'Erro ao cancelar itens do pedido');
+}
+
+export async function remanejarItemPedidoCompra(id, itemId, data = {}) {
+  const response = await fetch(`${API_URL}/compras/pedidos/${id}/itens/${itemId}/remanejar`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+  return handleJsonResponse(response, 'Erro ao remanejar item do pedido');
+}
+
+export async function comentarPedidoCompra(id, data = {}) {
+  const response = await fetch(`${API_URL}/compras/pedidos/${id}/comentarios`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+  return handleJsonResponse(response, 'Erro ao registrar comentario no pedido');
+}
+
+export async function anexarEspelhoPedidoCompra(id, data = {}) {
+  const response = await fetch(`${API_URL}/compras/pedidos/${id}/espelho`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+  return handleJsonResponse(response, 'Erro ao anexar espelho do fornecedor');
+}
+
 export async function criarPedidoCompraDaSolicitacao(id, data) {
   const response = await fetch(`${API_URL}/compras/solicitacoes/${id}/pedidos`, {
     method: 'POST',
@@ -595,13 +649,4 @@ export async function desativarFornecedorCompra(id) {
     headers: authHeaders()
   });
   return handleJsonResponse(response, 'Erro ao desativar fornecedor');
-}
-
-export async function criarCotacaoAvulsa(data) {
-  const response = await fetch(`${API_URL}/compras/cotacoes/avulsa`, {
-    method: 'POST',
-    headers: authHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify(data)
-  });
-  return handleJsonResponse(response, 'Erro ao criar cotacao avulsa');
 }

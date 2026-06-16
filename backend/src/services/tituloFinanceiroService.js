@@ -21,6 +21,8 @@ const {
   PaymentIntent,
   SecurityEventLog,
   Solicitacao,
+  SolicitacaoCompra,
+  SolicitacaoCompraAlocacao,
   TipoSolicitacao,
   TituloFinanceiro,
   User
@@ -855,6 +857,12 @@ async function baixarTituloCartaoDebitoNoAto({
     data_quitacao: dataBaixa,
     atualizado_por: req.user?.id || null
   }, { transaction });
+
+  await sincronizarRealizacaoCompraPorTitulo({
+    titulo,
+    statusTitulo: 'QUITADO',
+    transaction
+  });
 
   return { movimento, cartao, conta, valorBaixa, dataBaixa };
 }
@@ -2173,6 +2181,12 @@ async function criarTituloManualComBaixaAtomica(req, payload = {}, { transaction
       atualizado_por: req.user?.id || null
     }, { transaction });
 
+    await sincronizarRealizacaoCompraPorTitulo({
+      titulo,
+      statusTitulo: novoEstado.status,
+      transaction
+    });
+
     const afterCommit = async () => {
       await registrarEventoSeguranca({
         req,
@@ -2252,6 +2266,46 @@ function calcularStatusTitulo({ valorOriginal, valorBaixado }) {
     status: 'ABERTO',
     valor_saldo: saldo
   };
+}
+
+async function sincronizarRealizacaoCompraPorTitulo({
+  titulo,
+  statusTitulo,
+  transaction
+}) {
+  const solicitacaoPrincipalId = Number(titulo?.solicitacao_id || 0);
+  if (!solicitacaoPrincipalId) return;
+
+  const solicitacaoCompra = await SolicitacaoCompra.findOne({
+    where: { solicitacao_principal_id: solicitacaoPrincipalId },
+    attributes: ['id'],
+    transaction
+  });
+
+  if (!solicitacaoCompra) return;
+
+  const isQuitado = String(statusTitulo || '').toUpperCase() === 'QUITADO';
+  const update = isQuitado
+    ? {
+        status_financeiro: 'REALIZADO',
+        titulo_financeiro_id: titulo.id,
+        valor_realizado: sequelize.literal('valor_total'),
+        realizado_em: new Date()
+      }
+    : {
+        status_financeiro: 'PREVISTO',
+        titulo_financeiro_id: null,
+        valor_realizado: 0,
+        realizado_em: null
+      };
+
+  await SolicitacaoCompraAlocacao.update(update, {
+    where: {
+      solicitacao_compra_id: solicitacaoCompra.id,
+      status: 'ATIVA'
+    },
+    transaction
+  });
 }
 
 async function baixarTitulo(req, tituloId, payload = {}) {
@@ -2360,6 +2414,12 @@ async function baixarTitulo(req, tituloId, payload = {}) {
       status_cobranca: titulo.forma_cobranca ? 'CONCILIADO' : titulo.status_cobranca,
       atualizado_por: req.user?.id || null
     }, { transaction });
+
+    await sincronizarRealizacaoCompraPorTitulo({
+      titulo,
+      statusTitulo: novoEstado.status,
+      transaction
+    });
 
     if (cartaoBaixa.fatura) {
       await vincularTituloAFatura({
@@ -2612,6 +2672,12 @@ async function estornarMovimentoTitulo(req, tituloId, movimentoId, payload = {})
       status_cobranca: titulo.forma_cobranca ? 'EMITIDO' : titulo.status_cobranca,
       atualizado_por: req.user?.id || null
     }, { transaction });
+
+    await sincronizarRealizacaoCompraPorTitulo({
+      titulo,
+      statusTitulo: novoEstado.status,
+      transaction
+    });
 
     if (titulo.solicitacao_id) {
       await Historico.create({

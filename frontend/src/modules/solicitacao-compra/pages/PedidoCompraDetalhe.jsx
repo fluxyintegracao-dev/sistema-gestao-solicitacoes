@@ -4,9 +4,15 @@ import {
   adicionarItemPedidoCompra,
   atualizarStatusPedidoCompra,
   atualizarItemPedidoCompra,
+  anexarEspelhoPedidoCompra,
   baixarPdfPedidoCompra,
+  cancelarItensPedidoCompra,
+  cancelarPedidoCompra,
+  comentarPedidoCompra,
   obterPedidoCompra,
-  removerItemPedidoCompra
+  removerItemPedidoCompra,
+  remanejarItemPedidoCompra,
+  uploadAnexoTemporarioCompra
 } from '../../../services/compras';
 import { getStatusPedidosCompra } from '../../../services/configuracoesSistema';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -243,6 +249,15 @@ export default function PedidoCompraDetalhe() {
   const [filtroItens, setFiltroItens] = useState('ATIVOS');
   const [modalEdicaoAberto, setModalEdicaoAberto] = useState(false);
   const [itemEditandoId, setItemEditandoId] = useState(null);
+  const [comentarioPedido, setComentarioPedido] = useState('');
+  const [salvandoComentario, setSalvandoComentario] = useState(false);
+  const [anexandoEspelho, setAnexandoEspelho] = useState(false);
+  const [cancelandoPedido, setCancelandoPedido] = useState(false);
+  const [itensSelecionadosCancelamento, setItensSelecionadosCancelamento] = useState([]);
+  const [cancelandoItens, setCancelandoItens] = useState(false);
+  const [remanejoSelecionado, setRemanejoSelecionado] = useState('');
+  const [remanejoQuantidade, setRemanejoQuantidade] = useState('');
+  const [remanejandoItem, setRemanejandoItem] = useState(false);
   const itemSelecionadoId = itemEditandoId;
   const buscaItensDeferred = useDeferredValue(buscaItens);
 
@@ -371,6 +386,8 @@ export default function PedidoCompraDetalhe() {
 
   function abrirModalEdicao(itemId) {
     setItemEditandoId(itemId);
+    setRemanejoSelecionado('');
+    setRemanejoQuantidade('');
     setModalEdicaoAberto(true);
   }
 
@@ -532,6 +549,125 @@ export default function PedidoCompraDetalhe() {
     }
   }
 
+  function toggleItemCancelamento(itemId) {
+    setItensSelecionadosCancelamento((atuais) => (
+      atuais.includes(itemId)
+        ? atuais.filter((idAtual) => idAtual !== itemId)
+        : [...atuais, itemId]
+    ));
+  }
+
+  async function handleCancelarPedido() {
+    const motivo = window.prompt('Informe o motivo do cancelamento do pedido.');
+    if (motivo === null) return;
+
+    try {
+      setCancelandoPedido(true);
+      const data = await cancelarPedidoCompra(id, { motivo });
+      setPedido(data || null);
+      alert('Pedido cancelado e historico da solicitacao atualizado.');
+    } catch (error) {
+      console.error(error);
+      alert(error.message || 'Erro ao cancelar pedido');
+    } finally {
+      setCancelandoPedido(false);
+    }
+  }
+
+  async function handleCancelarItensSelecionados() {
+    if (!itensSelecionadosCancelamento.length) {
+      alert('Selecione ao menos um item ativo para cancelar.');
+      return;
+    }
+
+    const motivo = window.prompt('Informe o motivo do cancelamento dos itens selecionados.');
+    if (motivo === null) return;
+
+    try {
+      setCancelandoItens(true);
+      const data = await cancelarItensPedidoCompra(id, {
+        item_ids: itensSelecionadosCancelamento,
+        motivo
+      });
+      setPedido(data || null);
+      setItensSelecionadosCancelamento([]);
+      alert('Itens cancelados. As quantidades ficam disponiveis para remanejamento na cotacao.');
+    } catch (error) {
+      console.error(error);
+      alert(error.message || 'Erro ao cancelar itens');
+    } finally {
+      setCancelandoItens(false);
+    }
+  }
+
+  async function handleSalvarComentarioPedido() {
+    if (!comentarioPedido.trim()) {
+      alert('Digite o comentario do pedido.');
+      return;
+    }
+
+    try {
+      setSalvandoComentario(true);
+      await comentarPedidoCompra(id, { comentario: comentarioPedido });
+      setComentarioPedido('');
+      alert('Comentario registrado no pedido e no historico da solicitacao.');
+    } catch (error) {
+      console.error(error);
+      alert(error.message || 'Erro ao registrar comentario');
+    } finally {
+      setSalvandoComentario(false);
+    }
+  }
+
+  async function handleAnexarEspelho(event) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+
+    try {
+      setAnexandoEspelho(true);
+      const upload = await uploadAnexoTemporarioCompra(file);
+      const data = await anexarEspelhoPedidoCompra(id, {
+        arquivo_url: upload?.arquivo_url,
+        arquivo_nome_original: upload?.arquivo_nome_original || file.name
+      });
+      setPedido(data || null);
+      alert('Espelho anexado ao pedido e ao historico da solicitacao.');
+    } catch (error) {
+      console.error(error);
+      alert(error.message || 'Erro ao anexar espelho do fornecedor');
+    } finally {
+      setAnexandoEspelho(false);
+    }
+  }
+
+  async function handleRemanejarItemAtual() {
+    if (!itemEditando) return;
+    if (!remanejoSelecionado) {
+      alert('Selecione o fornecedor/resposta de destino.');
+      return;
+    }
+
+    try {
+      setRemanejandoItem(true);
+      const data = await remanejarItemPedidoCompra(id, itemEditando.id, {
+        resposta_item_id_destino: remanejoSelecionado,
+        quantidade: remanejoQuantidade || itemEditando.quantidade_pedido,
+        motivo: 'Remanejamento operacional pela tela do pedido'
+      });
+      setPedido(data || null);
+      setRemanejoSelecionado('');
+      setRemanejoQuantidade('');
+      fecharModalEdicao();
+      alert('Item remanejado para o fornecedor selecionado.');
+    } catch (error) {
+      console.error(error);
+      alert(error.message || 'Erro ao remanejar item');
+    } finally {
+      setRemanejandoItem(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="page solicitacoes-page">
@@ -558,6 +694,12 @@ export default function PedidoCompraDetalhe() {
     ? parseBrazilianQuantity(edicaoItemAtual.quantidade_pedido ?? itemEditando.quantidade_pedido) * (itemEditandoPrecoContext?.precoAtual ?? 0)
     : 0;
   const modalProcessando = itemEditando ? savingItemId === itemEditando.id || removingItemId === itemEditando.id : false;
+  const candidatosRemanejamentoItem = itemEditando
+    ? (pedido.candidatos_remanejamento || []).filter((candidato) => (
+        String(candidato.descricao || '').trim().toLowerCase() === String(itemEditando.descricao || '').trim().toLowerCase() &&
+        Number(candidato.resposta_item_id) !== Number(itemEditando.resposta_item_id)
+      ))
+    : [];
 
   return (
     <div className="page solicitacoes-page">
@@ -602,6 +744,16 @@ export default function PedidoCompraDetalhe() {
             <button type="button" className="btn btn-primary" onClick={handleEnviarPedido} disabled={enviandoPedido}>
               {enviandoPedido ? 'Preparando envio...' : 'Enviar pedido'}
             </button>
+            {podeGerenciarPedido ? (
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={handleCancelarPedido}
+                disabled={pedidoBloqueado || cancelandoPedido}
+              >
+                {cancelandoPedido ? 'Cancelando...' : 'Cancelar pedido'}
+              </button>
+            ) : null}
             <button type="button" className="btn btn-outline" onClick={() => navigate('/pedidos-compra')}>
               Voltar
             </button>
@@ -680,6 +832,49 @@ export default function PedidoCompraDetalhe() {
               </div>
             </div>
           </div>
+
+          {podeGerenciarPedido ? (
+            <div className="card sol-surface-card">
+              <div className="card-header">
+                <h2 className="font-semibold">Historico operacional</h2>
+              </div>
+              <div className="grid gap-4">
+                <label className="grid gap-2 text-sm font-medium">
+                  Comentario do pedido
+                  <textarea
+                    className="input min-h-[110px]"
+                    value={comentarioPedido}
+                    onChange={(event) => setComentarioPedido(event.target.value)}
+                    placeholder="Registre alinhamentos, pendencias ou informacoes para a obra."
+                  />
+                </label>
+                <button
+                  type="button"
+                  className="btn btn-outline justify-center"
+                  onClick={handleSalvarComentarioPedido}
+                  disabled={salvandoComentario || !comentarioPedido.trim()}
+                >
+                  {salvandoComentario ? 'Registrando...' : 'Registrar comentario'}
+                </button>
+
+                <div className="rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-3 text-sm">
+                  <div className="font-semibold">Espelho do pedido do fornecedor</div>
+                  <p className="mt-1 text-xs text-[var(--c-muted)]">
+                    Anexe aqui o comprovante/espelho enviado pelo fornecedor. Ele tambem aparece no historico da solicitacao.
+                  </p>
+                  {pedido.espelho_fornecedor_url ? (
+                    <div className="mt-2 text-xs text-[var(--c-muted)]">
+                      Anexado: <span className="font-semibold text-[var(--c-text)]">{pedido.espelho_fornecedor_nome || 'arquivo'}</span>
+                    </div>
+                  ) : null}
+                  <label className="btn btn-outline mt-3 w-full cursor-pointer justify-center">
+                    {anexandoEspelho ? 'Anexando...' : 'Anexar espelho'}
+                    <input type="file" className="hidden" onChange={handleAnexarEspelho} disabled={anexandoEspelho} />
+                  </label>
+                </div>
+              </div>
+            </div>
+          ) : null}
 
           {podeGerenciarPedido ? (
             <div className="card sol-surface-card">
@@ -774,6 +969,16 @@ export default function PedidoCompraDetalhe() {
                     Auditoria do pedido
                   </button>
                 ) : null}
+                {podeGerenciarPedido ? (
+                  <button
+                    type="button"
+                    className="btn btn-outline"
+                    onClick={handleCancelarItensSelecionados}
+                    disabled={pedidoBloqueado || cancelandoItens || itensSelecionadosCancelamento.length === 0}
+                  >
+                    {cancelandoItens ? 'Cancelando...' : `Cancelar itens (${itensSelecionadosCancelamento.length})`}
+                  </button>
+                ) : null}
               </div>
             </div>
 
@@ -805,6 +1010,7 @@ export default function PedidoCompraDetalhe() {
                 <table className="table">
                   <thead>
                     <tr>
+                      {podeGerenciarPedido ? <th className="w-10">Sel.</th> : null}
                       <th>Item</th>
                       <th>Origem</th>
                       <th>Solicitado</th>
@@ -821,6 +1027,16 @@ export default function PedidoCompraDetalhe() {
 
                       return (
                         <tr key={item.id} className={item.removido ? 'opacity-80' : ''}>
+                          {podeGerenciarPedido ? (
+                            <td>
+                              <input
+                                type="checkbox"
+                                checked={itensSelecionadosCancelamento.includes(item.id)}
+                                disabled={item.removido || pedidoBloqueado}
+                                onChange={() => toggleItemCancelamento(item.id)}
+                              />
+                            </td>
+                          ) : null}
                           <td>
                             <div className="font-medium">{item.descricao}</div>
                             <div className="text-xs text-[var(--c-muted)]">
@@ -1056,6 +1272,57 @@ export default function PedidoCompraDetalhe() {
                 ) : null}
               </div>
             </div>
+
+            {podeGerenciarPedido && !itemEditando.removido ? (
+              <div className="mt-6 rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <h3 className="font-semibold">Remanejar quantidade para outro fornecedor</h3>
+                    <p className="mt-1 text-sm text-[var(--c-muted)]">
+                      Use quando parte ou todo o item precisar voltar para a cotacao e seguir em outro pedido.
+                    </p>
+                  </div>
+                  <span className="app-status-pill bg-blue-50 text-blue-700">
+                    Max. {formatQuantityLabel(itemEditando.quantidade_pedido, itemEditando.unidade)}
+                  </span>
+                </div>
+                <div className="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_180px_auto]">
+                  <select
+                    className="input"
+                    value={remanejoSelecionado}
+                    onChange={(event) => setRemanejoSelecionado(event.target.value)}
+                    disabled={pedidoBloqueado || remanejandoItem || candidatosRemanejamentoItem.length === 0}
+                  >
+                    <option value="">
+                      {candidatosRemanejamentoItem.length ? 'Selecione a resposta de destino' : 'Sem fornecedor alternativo respondido'}
+                    </option>
+                    {candidatosRemanejamentoItem.map((candidato) => (
+                      <option key={`${candidato.resposta_item_id}-${candidato.fornecedor_id}`} value={candidato.resposta_item_id}>
+                        {candidato.fornecedor_nome} - {formatUnitPrice(candidato.preco_unitario, candidato.unidade)} - prazo {candidato.prazo || '-'}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    className="input"
+                    type="text"
+                    inputMode="decimal"
+                    value={remanejoQuantidade}
+                    onChange={(event) => setRemanejoQuantidade(maskBrazilianQuantityInput(event.target.value))}
+                    onBlur={(event) => setRemanejoQuantidade(normalizeBrazilianQuantityOnBlur(event.target.value))}
+                    placeholder={formatBrazilianQuantity(itemEditando.quantidade_pedido)}
+                    disabled={pedidoBloqueado || remanejandoItem}
+                  />
+                  <button
+                    type="button"
+                    className="btn btn-outline"
+                    onClick={handleRemanejarItemAtual}
+                    disabled={pedidoBloqueado || remanejandoItem || !remanejoSelecionado}
+                  >
+                    {remanejandoItem ? 'Remanejando...' : 'Remanejar'}
+                  </button>
+                </div>
+              </div>
+            ) : null}
 
             <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
               <div className="text-xs text-[var(--c-muted)]">

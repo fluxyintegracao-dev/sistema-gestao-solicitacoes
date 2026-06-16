@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { HiOutlineEye } from 'react-icons/hi2';
 import { useNavigate } from 'react-router-dom';
-import { listarPedidosCompra } from '../../../services/compras';
+import { atualizarStatusPedidosCompraEmLote, listarPedidosCompra } from '../../../services/compras';
 import { getStatusPedidosCompra } from '../../../services/configuracoesSistema';
 import { getObras } from '../../../services/obras';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -40,6 +40,9 @@ export default function PedidosCompra() {
   const [obras, setObras] = useState([]);
   const [statusOptions, setStatusOptions] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [selecionados, setSelecionados] = useState([]);
+  const [statusLote, setStatusLote] = useState('');
+  const [salvandoLote, setSalvandoLote] = useState(false);
   const [filtros, setFiltros] = useState({
     q: '',
     status: '',
@@ -60,6 +63,7 @@ export default function PedidosCompra() {
       ]);
 
       setPedidos(Array.isArray(dataPedidos) ? dataPedidos : []);
+      setSelecionados([]);
       setObras(Array.isArray(dataObras) ? dataObras : []);
       setStatusOptions(Array.isArray(dataStatus?.statuses) ? dataStatus.statuses : []);
     } catch (error) {
@@ -80,6 +84,38 @@ export default function PedidosCompra() {
   );
   const totalPedidos = pedidos.length;
   const totalValor = pedidos.reduce((acc, pedido) => acc + Number(pedido.valor_total || 0), 0);
+
+  function toggleSelecionado(id) {
+    setSelecionados((atuais) => (
+      atuais.includes(id) ? atuais.filter((item) => item !== id) : [...atuais, id]
+    ));
+  }
+
+  function toggleTodosVisiveis() {
+    const ids = pedidos.map((pedido) => pedido.id);
+    const todosMarcados = ids.length > 0 && ids.every((id) => selecionados.includes(id));
+    setSelecionados(todosMarcados ? [] : ids);
+  }
+
+  async function handleStatusLote() {
+    if (!selecionados.length || !statusLote) {
+      alert('Selecione pedidos e um status para atualizar em lote.');
+      return;
+    }
+
+    try {
+      setSalvandoLote(true);
+      await atualizarStatusPedidosCompraEmLote({ pedido_ids: selecionados, status: statusLote });
+      await carregar();
+      setStatusLote('');
+      alert('Status dos pedidos atualizados.');
+    } catch (error) {
+      console.error(error);
+      alert(error.message || 'Erro ao atualizar status em lote');
+    } finally {
+      setSalvandoLote(false);
+    }
+  }
 
   return (
     <div className="page solicitacoes-page">
@@ -178,7 +214,35 @@ export default function PedidosCompra() {
       <div className="mt-4 card sol-surface-card compras-table-card">
         <div className="card-header flex flex-wrap items-center justify-between gap-3">
           <h2 className="font-semibold">Lista de pedidos</h2>
-          <span className="text-sm text-[var(--c-muted)]">{pedidos.length} registro(s)</span>
+          <div className="flex flex-wrap items-center gap-2">
+            {podeGerenciarPedidos ? (
+              <>
+                <select
+                  className="input min-w-[220px]"
+                  value={statusLote}
+                  onChange={(event) => setStatusLote(event.target.value)}
+                >
+                  <option value="">Alterar status em lote</option>
+                  {statusOptions
+                    .filter((item) => item?.ativo !== false)
+                    .map((status) => (
+                      <option key={status.codigo} value={status.codigo}>
+                        {status.nome}
+                      </option>
+                    ))}
+                </select>
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={handleStatusLote}
+                  disabled={salvandoLote || selecionados.length === 0 || !statusLote}
+                >
+                  {salvandoLote ? 'Atualizando...' : `Aplicar (${selecionados.length})`}
+                </button>
+              </>
+            ) : null}
+            <span className="text-sm text-[var(--c-muted)]">{pedidos.length} registro(s)</span>
+          </div>
         </div>
 
         {loading ? (
@@ -189,6 +253,7 @@ export default function PedidosCompra() {
           <div className="compras-table-wrapper">
             <table className="compras-data-table compras-data-table-pedidos">
               <colgroup>
+                {podeGerenciarPedidos ? <col className="compras-col-select" /> : null}
                 <col className="compras-col-codigo" />
                 <col className="compras-col-fornecedor" />
                 <col className="compras-col-obra" />
@@ -201,6 +266,16 @@ export default function PedidosCompra() {
               </colgroup>
               <thead>
                 <tr>
+                  {podeGerenciarPedidos ? (
+                    <th>
+                      <input
+                        type="checkbox"
+                        checked={pedidos.length > 0 && pedidos.every((pedido) => selecionados.includes(pedido.id))}
+                        onChange={toggleTodosVisiveis}
+                        aria-label="Selecionar todos os pedidos visiveis"
+                      />
+                    </th>
+                  ) : null}
                   <th>Pedido</th>
                   <th>Fornecedor</th>
                   <th>Obra</th>
@@ -218,6 +293,16 @@ export default function PedidosCompra() {
 
                   return (
                     <tr key={pedido.id}>
+                      {podeGerenciarPedidos ? (
+                        <td>
+                          <input
+                            type="checkbox"
+                            checked={selecionados.includes(pedido.id)}
+                            onChange={() => toggleSelecionado(pedido.id)}
+                            aria-label={`Selecionar pedido PC-${String(pedido.id).padStart(5, '0')}`}
+                          />
+                        </td>
+                      ) : null}
                       <td>PC-{String(pedido.id).padStart(5, '0')}</td>
                       <td>{pedido.fornecedor?.nome || '-'}</td>
                       <td>{pedido.obra?.nome || '-'}</td>

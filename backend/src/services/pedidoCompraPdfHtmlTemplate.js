@@ -144,6 +144,21 @@ function buildSolicitacaoCodigo(pedido) {
   return numeroSienge ? `${base} - ${numeroSienge}` : base;
 }
 
+function buildObraEndereco(obra) {
+  const partes = [
+    obra?.endereco_logradouro,
+    obra?.endereco_numero,
+    obra?.endereco_complemento,
+    obra?.endereco_bairro,
+    obra?.endereco_cep,
+    obra?.endereco_uf
+  ]
+    .map((parte) => String(parte || '').trim())
+    .filter(Boolean);
+
+  return withFallback(partes.join(' - '));
+}
+
 function getStatusPresentation(statusLabel, statusColor) {
   const label = withFallback(statusLabel).toUpperCase();
   const normalized = label.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
@@ -217,6 +232,8 @@ function buildViewModel(pedido, options = {}) {
       fornecedorWhatsapp: formatPhoneBr(pedido?.fornecedor?.whatsapp),
       fornecedorEmail: withFallback(pedido?.fornecedor?.email),
       obraNome: withFallback(pedido?.obra?.nome),
+      obraCno: withFallback(pedido?.obra?.cno),
+      obraEndereco: buildObraEndereco(pedido?.obra),
       condicaoPagamento: withFallback(pedido?.cotacaoFornecedor?.condicao_pagamento || pedido?.condicao_pagamento),
       prazoEntrega: withFallback(pedido?.cotacaoFornecedor?.prazo_entrega || pedido?.prazo_entrega),
       valorTotal: formatMoneyBr(pedido?.valor_total),
@@ -716,6 +733,22 @@ function renderPedidoCompraPdfHtml(pedido, options = {}) {
               <div class="doc-data-cell">
                 <span class="doc-data-cell__label">WhatsApp / E-mail</span>
                 <span class="doc-data-cell__value">${escapeHtml(h.fornecedorWhatsapp)}${h.fornecedorEmail !== '-' ? ` · ${escapeHtml(h.fornecedorEmail)}` : ''}</span>
+              </div>
+            </div>
+
+            <!-- Linha 4: dados da obra para entrega/faturamento -->
+            <div class="doc-data-strip">
+              <div class="doc-data-cell">
+                <span class="doc-data-cell__label">CNO da obra</span>
+                <span class="doc-data-cell__value">${escapeHtml(h.obraCno)}</span>
+              </div>
+              <div class="doc-data-cell doc-data-cell--wide">
+                <span class="doc-data-cell__label">Endereco da obra</span>
+                <span class="doc-data-cell__value">${escapeHtml(h.obraEndereco)}</span>
+              </div>
+              <div class="doc-data-cell">
+                <span class="doc-data-cell__label">Numero do pedido</span>
+                <span class="doc-data-cell__value">${escapeHtml(h.numero)}</span>
               </div>
             </div>
 

@@ -51,6 +51,54 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.TEXT,
         allowNull: true
       },
+      atribuido_a: {
+        type: DataTypes.INTEGER,
+        allowNull: true
+      },
+      prazo_finalizacao: {
+        type: DataTypes.DATEONLY,
+        allowNull: true
+      },
+      delegado_por: {
+        type: DataTypes.INTEGER,
+        allowNull: true
+      },
+      delegado_em: {
+        type: DataTypes.DATE,
+        allowNull: true
+      },
+      motivo_atraso: {
+        type: DataTypes.TEXT,
+        allowNull: true
+      },
+      motivo_atraso_em: {
+        type: DataTypes.DATE,
+        allowNull: true
+      },
+      cancelado_por: {
+        type: DataTypes.INTEGER,
+        allowNull: true
+      },
+      cancelado_em: {
+        type: DataTypes.DATE,
+        allowNull: true
+      },
+      motivo_cancelamento: {
+        type: DataTypes.TEXT,
+        allowNull: true
+      },
+      espelho_fornecedor_url: {
+        type: DataTypes.STRING(1000),
+        allowNull: true
+      },
+      espelho_fornecedor_nome: {
+        type: DataTypes.STRING(255),
+        allowNull: true
+      },
+      espelho_fornecedor_em: {
+        type: DataTypes.DATE,
+        allowNull: true
+      },
       encerrado_em: {
         type: DataTypes.DATE,
         allowNull: true

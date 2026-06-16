@@ -1,19 +1,23 @@
 module.exports = (sequelize, DataTypes) => {
-  const PedidoCompraItem = sequelize.define(
-    'PedidoCompraItem',
+  const SolicitacaoCompraAlocacao = sequelize.define(
+    'SolicitacaoCompraAlocacao',
     {
       id: {
         type: DataTypes.INTEGER,
         primaryKey: true,
         autoIncrement: true
       },
-      pedido_compra_id: {
+      solicitacao_compra_id: {
         type: DataTypes.INTEGER,
         allowNull: false
       },
       resposta_item_id: {
         type: DataTypes.INTEGER,
-        allowNull: true
+        allowNull: false
+      },
+      fornecedor_compra_id: {
+        type: DataTypes.INTEGER,
+        allowNull: false
       },
       item_tipo: {
         type: DataTypes.STRING(40),
@@ -27,24 +31,7 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.INTEGER,
         allowNull: true
       },
-      descricao: {
-        type: DataTypes.STRING(255),
-        allowNull: false
-      },
-      unidade: {
-        type: DataTypes.STRING(50),
-        allowNull: true
-      },
-      quantidade_solicitada: {
-        type: DataTypes.DECIMAL(14, 3),
-        allowNull: false,
-        defaultValue: 0
-      },
-      quantidade_minima_item: {
-        type: DataTypes.DECIMAL(14, 3),
-        allowNull: true
-      },
-      quantidade_pedido: {
+      quantidade_alocada: {
         type: DataTypes.DECIMAL(14, 3),
         allowNull: false,
         defaultValue: 0
@@ -59,15 +46,40 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
         defaultValue: 0
       },
-      removido: {
-        type: DataTypes.BOOLEAN,
+      status: {
+        type: DataTypes.STRING(40),
         allowNull: false,
-        defaultValue: false
+        defaultValue: 'ATIVA'
       },
-      quantidade_cancelada: {
-        type: DataTypes.DECIMAL(14, 3),
+      status_financeiro: {
+        type: DataTypes.STRING(40),
+        allowNull: false,
+        defaultValue: 'PREVISTO'
+      },
+      titulo_financeiro_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true
+      },
+      valor_realizado: {
+        type: DataTypes.DECIMAL(14, 2),
         allowNull: false,
         defaultValue: 0
+      },
+      realizado_em: {
+        type: DataTypes.DATE,
+        allowNull: true
+      },
+      pedido_compra_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true
+      },
+      pedido_compra_item_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true
+      },
+      criado_por: {
+        type: DataTypes.INTEGER,
+        allowNull: true
       },
       cancelado_por: {
         type: DataTypes.INTEGER,
@@ -80,22 +92,13 @@ module.exports = (sequelize, DataTypes) => {
       motivo_cancelamento: {
         type: DataTypes.TEXT,
         allowNull: true
-      },
-      origem: {
-        type: DataTypes.STRING(40),
-        allowNull: false,
-        defaultValue: 'COTACAO'
-      },
-      observacoes: {
-        type: DataTypes.TEXT,
-        allowNull: true
       }
     },
     {
-      tableName: 'pedido_compra_itens',
+      tableName: 'solicitacao_compra_alocacoes',
       timestamps: true
     }
   );
 
-  return PedidoCompraItem;
+  return SolicitacaoCompraAlocacao;
 };

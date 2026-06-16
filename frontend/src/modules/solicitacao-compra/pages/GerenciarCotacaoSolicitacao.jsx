@@ -8,6 +8,7 @@ import {
 } from 'react-icons/hi2';
 import {
   baixarPdfSolicitacaoCompra,
+  comentarSolicitacaoCompra,
   criarFornecedorCompra,
   encerrarSolicitacaoCompra,
   enviarSolicitacaoCompraParaFornecedores,
@@ -44,11 +45,27 @@ function fmtMoeda(valor) {
   return Number(valor || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
+function parseNumeroCompra(value) {
+  if (value === null || value === undefined || value === '') return 0;
+  const normalized = String(value).trim().replace(/\./g, '').replace(',', '.').replace(/[^\d.-]/g, '');
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function formatNumeroCompra(value) {
+  const parsed = Number(value || 0);
+  if (!Number.isFinite(parsed)) return '';
+  return parsed.toLocaleString('pt-BR', {
+    minimumFractionDigits: Number.isInteger(parsed) ? 0 : 2,
+    maximumFractionDigits: 2
+  });
+}
+
 function clsStatus(status) {
   const v = String(status || '').toUpperCase();
   if (v === 'ENCERRADO') return 'app-status-pill bg-slate-100 text-slate-700';
   if (v === 'RECUSADO') return 'app-status-pill bg-red-100 text-red-700';
-  if (v === 'LIBERADO_PARA_COMPRA') return 'app-status-pill bg-emerald-100 text-emerald-700';
+  if (v === 'AGUARDANDO_DIRETORIA') return 'app-status-pill bg-amber-100 text-amber-700';
   return 'app-status-pill bg-blue-100 text-blue-700';
 }
 
@@ -143,11 +160,18 @@ function ModalPedidoFinal({ fornecedor, itensGanhos, solicitacaoId, onRemanejame
   }
 
   const mensagemWhatsApp = useMemo(() => {
-    const linhas = itensGanhos.map((it) =>
-      `${it.nome || '-'}: ${it.quantidade} ${it.unidade || ''} x ${fmtMoeda(it.preco)} = ${fmtMoeda(Number(it.quantidade) * Number(it.preco || 0))}`
-    ).join('\n');
-    return `Ola ${fornecedor.nome}!\n\nSegue o pedido referente a cotacao ${solicitacaoId ? `SC-${String(solicitacaoId).padStart(5, '0')}` : ''}:\n\n${linhas}\n\nTOTAL: ${fmtMoeda(totalGanho)}\n\nAguardamos a confirmacao. Obrigado!`;
-  }, [fornecedor, itensGanhos, totalGanho, solicitacaoId]);
+    return [
+      `Ola ${fornecedor.nome}!`,
+      '',
+      `Segue o pedido referente a cotacao ${solicitacaoId ? `SC-${String(solicitacaoId).padStart(5, '0')}` : ''}.`,
+      `Valor total previsto: ${fmtMoeda(totalGanho)}.`,
+      '',
+      'O PDF do pedido deve ser enviado junto desta mensagem.',
+      'Aguardamos a confirmacao de recebimento, prazo de entrega e condicao final combinada.',
+      '',
+      'Obrigado!'
+    ].join('\n');
+  }, [fornecedor, totalGanho, solicitacaoId]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 py-8 overflow-y-auto">
@@ -649,6 +673,15 @@ function SecaoEnvioFornecedores({
 function SecaoComparativo({ comparativo, solicitacao, podeComprar, vencedoresSelecionados, onVencedorChange, onEncerrar, encerrando }) {
   const [modalFornecedor, setModalFornecedor] = useState(null); // { fornecedor, itensGanhos }
 
+  function getQuantidadeAlocada(respostaItemId) {
+    const registro = vencedoresSelecionados[String(respostaItemId)];
+    return parseNumeroCompra(registro?.quantidade_alocada);
+  }
+
+  function getTotalAlocadoItem(item) {
+    return (item.respostas || []).reduce((acc, resp) => acc + getQuantidadeAlocada(resp.resposta_item_id), 0);
+  }
+
   // Agrega totais por fornecedor para o ranking top 3
   const rankingFornecedores = useMemo(() => {
     if (!comparativo?.itens?.length) return [];
@@ -657,13 +690,11 @@ function SecaoComparativo({ comparativo, solicitacao, podeComprar, vencedoresSel
     const itensFornecedor = {};
 
     comparativo.itens.forEach((item) => {
-      const keyItem = buildItemKey(item);
-      const vencedorId = vencedoresSelecionados[keyItem];
-
       item.respostas.forEach((resp) => {
         if (!resp.fornecedor_id || !resp.disponivel || !resp.preco) return;
         const fId = resp.fornecedor_id;
-        const totalItem = Number(resp.preco || 0) * Number(item.quantidade || 0);
+        const quantidadeGanha = getQuantidadeAlocada(resp.resposta_item_id);
+        const totalItem = Number(resp.preco || 0) * (quantidadeGanha || Number(item.quantidade || 0));
 
         if (!totaisFornecedor[fId]) {
           totaisFornecedor[fId] = {
@@ -686,14 +717,14 @@ function SecaoComparativo({ comparativo, solicitacao, podeComprar, vencedoresSel
           resposta_item_id: resp.resposta_item_id,
           nome: item.nome,
           unidade: item.unidade,
-          quantidade: item.quantidade,
+          quantidade: quantidadeGanha || item.quantidade,
           preco: resp.preco,
           prazo: resp.prazo,
           especificacao: item.especificacao,
-          ganhou: String(vencedorId) === String(resp.resposta_item_id)
+          ganhou: quantidadeGanha > 0
         });
 
-        if (String(vencedorId) === String(resp.resposta_item_id)) {
+        if (quantidadeGanha > 0) {
           totaisFornecedor[fId].vencedor_itens += 1;
         }
       });
@@ -788,6 +819,11 @@ function SecaoComparativo({ comparativo, solicitacao, podeComprar, vencedoresSel
                     {item.quantidade} {item.unidade} - {item.item_tipo === 'MANUAL' ? 'Manual' : 'Cadastrado'}
                     {item.especificacao ? ` - ${item.especificacao}` : ''}
                   </div>
+                  {podeComprar ? (
+                    <div className="mt-1 text-xs text-[var(--c-muted)]">
+                      Selecionado: <strong>{formatNumeroCompra(getTotalAlocadoItem(item))}</strong> de {formatNumeroCompra(item.quantidade)} {item.unidade || ''}
+                    </div>
+                  ) : null}
                 </div>
                 {item.melhor_preco && (
                   <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs text-emerald-700">
@@ -808,17 +844,20 @@ function SecaoComparativo({ comparativo, solicitacao, podeComprar, vencedoresSel
                       <th>Cond. pag.</th>
                       <th>Qtd. min.</th>
                       <th>Observacao</th>
-                      <th>Vencedor</th>
+                      <th className="min-w-[150px]">Comprar</th>
                     </tr>
                   </thead>
                   <tbody>
                     {item.respostas.map((resp) => {
-                      const isVencedor = String(vencedoresSelecionados[buildItemKey(item)] || '') === String(resp.resposta_item_id);
+                      const quantidadeAlocada = getQuantidadeAlocada(resp.resposta_item_id);
+                      const isVencedor = quantidadeAlocada > 0;
+                      const totalAlocadoItem = getTotalAlocadoItem(item);
+                      const quantidadeItem = parseNumeroCompra(item.quantidade);
+                      const excedeu = totalAlocadoItem > quantidadeItem + 0.0001;
                       return (
                         <tr
                           key={`${item.id}-${resp.fornecedor_id}`}
-                          className={`${isVencedor ? 'bg-emerald-50' : ''} ${resp.resposta_item_id && podeComprar ? 'cursor-pointer hover:bg-emerald-50/60' : ''}`}
-                          onClick={() => resp.resposta_item_id && podeComprar && onVencedorChange(buildItemKey(item), String(resp.resposta_item_id))}
+                          className={`${isVencedor ? 'bg-emerald-50' : ''} ${excedeu ? 'bg-red-50' : ''}`}
                         >
                           <td className="text-xs font-medium">{resp.fornecedor_nome}</td>
                           <td>
@@ -836,12 +875,32 @@ function SecaoComparativo({ comparativo, solicitacao, podeComprar, vencedoresSel
                           <td className="max-w-[160px] text-xs">{resp.observacao || '-'}</td>
                           <td>
                             {resp.resposta_item_id ? (
-                              <input
-                                type="radio"
-                                name={`vencedor-${buildItemKey(item)}`}
-                                checked={isVencedor}
-                                onChange={() => onVencedorChange(buildItemKey(item), String(resp.resposta_item_id))}
-                              />
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="checkbox"
+                                  checked={isVencedor}
+                                  disabled={!podeComprar || !resp.disponivel || !resp.preco}
+                                  onChange={(event) => {
+                                    const checked = event.target.checked;
+                                    onVencedorChange({
+                                      item,
+                                      resposta: resp,
+                                      quantidade: checked ? item.quantidade : 0
+                                    });
+                                  }}
+                                />
+                                <input
+                                  className="input h-8 w-20 px-2 text-xs"
+                                  value={isVencedor ? formatNumeroCompra(quantidadeAlocada) : ''}
+                                  placeholder="Qtd."
+                                  disabled={!podeComprar || !isVencedor}
+                                  onChange={(event) => onVencedorChange({
+                                    item,
+                                    resposta: resp,
+                                    quantidade: event.target.value
+                                  })}
+                                />
+                              </div>
                             ) : '-'}
                           </td>
                         </tr>
@@ -902,6 +961,8 @@ export default function GerenciarCotacaoSolicitacao() {
   const [previewArquivo, setPreviewArquivo] = useState(null);
   const [enviandoFornecedores, setEnviandoFornecedores] = useState(false);
   const [encerrando, setEncerrando] = useState(false);
+  const [comentarioCotacao, setComentarioCotacao] = useState('');
+  const [registrandoComentario, setRegistrandoComentario] = useState(false);
   const [fornecedoresSelecionados, setFornecedoresSelecionados] = useState([]);
   const [novoFornecedor, setNovoFornecedor] = useState({ nome: '', cnpj: '', email: '', whatsapp: '', contato: '' });
   const [vencedoresSelecionados, setVencedoresSelecionados] = useState({});
@@ -952,10 +1013,14 @@ export default function GerenciarCotacaoSolicitacao() {
 
         const vencedoresAtuais = {};
         (dataComparativo?.itens || []).forEach((item) => {
-          const respostaVencedora = (item.respostas || []).find((r) => r.vencedor);
-          if (respostaVencedora?.resposta_item_id) {
-            vencedoresAtuais[buildItemKey(item)] = String(respostaVencedora.resposta_item_id);
-          }
+          (item.respostas || [])
+            .filter((r) => r.vencedor && r.resposta_item_id)
+            .forEach((respostaVencedora) => {
+              vencedoresAtuais[String(respostaVencedora.resposta_item_id)] = {
+                resposta_item_id: Number(respostaVencedora.resposta_item_id),
+                quantidade_alocada: parseNumeroCompra(respostaVencedora.quantidade_alocada || item.quantidade)
+              };
+            });
         });
         setVencedoresSelecionados(vencedoresAtuais);
       } else {
@@ -1093,17 +1158,57 @@ export default function GerenciarCotacaoSolicitacao() {
     }
   }
 
+  function handleVencedorChange({ resposta, quantidade }) {
+    if (!resposta?.resposta_item_id) return;
+
+    const respostaId = String(resposta.resposta_item_id);
+    const quantidadeNumero = parseNumeroCompra(quantidade);
+
+    setVencedoresSelecionados((prev) => {
+      const next = { ...prev };
+      if (!quantidadeNumero || quantidadeNumero <= 0) {
+        delete next[respostaId];
+        return next;
+      }
+
+      next[respostaId] = {
+        resposta_item_id: Number(resposta.resposta_item_id),
+        quantidade_alocada: quantidadeNumero
+      };
+      return next;
+    });
+  }
+
   async function handleEncerrar() {
     try {
       const itens = comparativo?.itens || [];
-      const vencedores = itens
-        .map((item) => vencedoresSelecionados[buildItemKey(item)])
-        .filter(Boolean)
-        .map((respostaItemId) => ({ resposta_item_id: Number(respostaItemId) }));
-      if (!vencedores.length) { alert('Selecione ao menos um vencedor para encerrar.'); return; }
+      const alocacoes = Object.values(vencedoresSelecionados)
+        .filter((entry) => Number(entry?.resposta_item_id) > 0 && parseNumeroCompra(entry?.quantidade_alocada) > 0)
+        .map((entry) => ({
+          resposta_item_id: Number(entry.resposta_item_id),
+          quantidade_alocada: parseNumeroCompra(entry.quantidade_alocada)
+        }));
+      if (!alocacoes.length) { alert('Selecione ao menos um vencedor para encerrar.'); return; }
+
+      const errosQuantidade = [];
+      itens.forEach((item) => {
+        const totalItem = (item.respostas || []).reduce((acc, resp) => {
+          const selecionado = vencedoresSelecionados[String(resp.resposta_item_id)];
+          return acc + parseNumeroCompra(selecionado?.quantidade_alocada);
+        }, 0);
+        const quantidadeItem = parseNumeroCompra(item.quantidade);
+        if (totalItem > quantidadeItem + 0.0001) {
+          errosQuantidade.push(`${item.nome}: selecionado ${formatNumeroCompra(totalItem)} de ${formatNumeroCompra(quantidadeItem)} ${item.unidade || ''}`);
+        }
+      });
+
+      if (errosQuantidade.length) {
+        alert(`A quantidade selecionada ultrapassa o total cotado:\n\n${errosQuantidade.join('\n')}`);
+        return;
+      }
 
       setEncerrando(true);
-      await encerrarSolicitacaoCompra(id, { vencedores });
+      await encerrarSolicitacaoCompra(id, { alocacoes });
       await carregarTudo();
       alert('Cotacao encerrada. Agora voce pode gerar os pedidos para cada fornecedor vencedor.');
     } catch (error) {
@@ -1128,6 +1233,26 @@ export default function GerenciarCotacaoSolicitacao() {
     } catch (error) {
       console.error(error);
       alert(error.message || 'Erro ao recusar solicitacao de compra');
+    }
+  }
+
+  async function handleRegistrarComentarioCotacao() {
+    const comentario = comentarioCotacao.trim();
+    if (!comentario) {
+      alert('Digite o comentario da cotacao.');
+      return;
+    }
+
+    try {
+      setRegistrandoComentario(true);
+      await comentarSolicitacaoCompra(id, { comentario });
+      setComentarioCotacao('');
+      await carregarTudo();
+    } catch (error) {
+      console.error(error);
+      alert(error.message || 'Erro ao registrar comentario da cotacao');
+    } finally {
+      setRegistrandoComentario(false);
     }
   }
 
@@ -1175,9 +1300,7 @@ export default function GerenciarCotacaoSolicitacao() {
         </div>
 
         <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
-          {String(solicitacao.status || '').toUpperCase() !== 'LIBERADO_PARA_COMPRA' && (
-            <span className={clsStatus(solicitacao.status)}>{fmtStatus(solicitacao.status)}</span>
-          )}
+          <span className={clsStatus(solicitacao.status)}>{fmtStatus(solicitacao.status)}</span>
           <span className="rounded-full bg-slate-100 px-3 py-1 font-medium text-slate-700">
             {solicitacao.fornecedores?.length || 0} fornecedor(es)
           </span>
@@ -1194,6 +1317,46 @@ export default function GerenciarCotacaoSolicitacao() {
 
       <div className="mt-4 grid gap-4">
         <div className="grid gap-3">
+          {podeComprar && (
+            <div className="card sol-surface-card">
+              <div className="card-header">
+                <h2 className="font-semibold">Comentario da cotacao</h2>
+                <p className="mt-1 text-sm text-[var(--c-muted)]">
+                  Registre alinhamentos com compras; o texto tambem alimenta o historico da solicitacao da obra.
+                </p>
+              </div>
+              <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
+                <textarea
+                  className="input min-h-[92px]"
+                  value={comentarioCotacao}
+                  onChange={(event) => setComentarioCotacao(event.target.value)}
+                  placeholder="Ex.: fornecedor pediu prazo adicional, compra dividida por quantidade, ajuste combinado..."
+                />
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={handleRegistrarComentarioCotacao}
+                  disabled={registrandoComentario || !comentarioCotacao.trim()}
+                >
+                  {registrandoComentario ? 'Registrando...' : 'Registrar comentario'}
+                </button>
+              </div>
+              {Array.isArray(solicitacao.logs) && solicitacao.logs.some((log) => log.tipo_acao === 'COMENTARIO_COTACAO') && (
+                <div className="mt-3 grid gap-2">
+                  {solicitacao.logs
+                    .filter((log) => log.tipo_acao === 'COMENTARIO_COTACAO')
+                    .slice(0, 3)
+                    .map((log) => (
+                      <div key={log.id} className="rounded-xl border border-[var(--c-border)] bg-slate-50 px-3 py-2 text-sm">
+                        <div className="font-medium text-[var(--c-text)]">{log.usuario?.nome || 'Compras'}</div>
+                        <div className="whitespace-pre-wrap text-[var(--c-muted)]">{log.descricao}</div>
+                      </div>
+                    ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Fornecedores vinculados + envio */}
           <div className="card sol-surface-card">
             <div className="card-header flex flex-wrap items-center justify-between gap-3">
@@ -1385,7 +1548,7 @@ export default function GerenciarCotacaoSolicitacao() {
             solicitacao={solicitacao}
             podeComprar={podeComprar}
             vencedoresSelecionados={vencedoresSelecionados}
-            onVencedorChange={(key, value) => setVencedoresSelecionados((prev) => ({ ...prev, [key]: value }))}
+            onVencedorChange={handleVencedorChange}
             onEncerrar={handleEncerrar}
             encerrando={encerrando}
           />

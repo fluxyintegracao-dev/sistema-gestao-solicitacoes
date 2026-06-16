@@ -132,6 +132,7 @@ db.SolicitacaoCompraItemManualApropriacao = require('./SolicitacaoCompraItemManu
 db.FornecedorCompra = require('./FornecedorCompra')(sequelize, Sequelize);
 db.SolicitacaoCompraFornecedor = require('./SolicitacaoCompraFornecedor')(sequelize, Sequelize);
 db.SolicitacaoCompraRespostaItem = require('./SolicitacaoCompraRespostaItem')(sequelize, Sequelize);
+db.SolicitacaoCompraAlocacao = require('./SolicitacaoCompraAlocacao')(sequelize, Sequelize);
 db.SolicitacaoCompraLog = require('./SolicitacaoCompraLog')(sequelize, Sequelize);
 db.PedidoCompra = require('./PedidoCompra')(sequelize, Sequelize);
 db.PedidoCompraItem = require('./PedidoCompraItem')(sequelize, Sequelize);
@@ -1910,6 +1911,11 @@ db.SolicitacaoCompra.belongsTo(db.User, {
   as: 'solicitante'
 });
 
+db.SolicitacaoCompra.belongsTo(db.User, {
+  foreignKey: 'comprador_responsavel_id',
+  as: 'compradorResponsavel'
+});
+
 db.SolicitacaoCompra.belongsTo(db.Solicitacao, {
   foreignKey: 'solicitacao_principal_id',
   as: 'solicitacaoPrincipal'
@@ -2062,6 +2068,47 @@ db.SolicitacaoCompraLog.belongsTo(db.FornecedorCompra, {
   as: 'fornecedor'
 });
 
+db.SolicitacaoCompra.hasMany(db.SolicitacaoCompraAlocacao, {
+  foreignKey: 'solicitacao_compra_id',
+  as: 'alocacoes',
+  onDelete: 'CASCADE'
+});
+
+db.SolicitacaoCompraAlocacao.belongsTo(db.SolicitacaoCompra, {
+  foreignKey: 'solicitacao_compra_id',
+  as: 'solicitacao'
+});
+
+db.SolicitacaoCompraRespostaItem.hasMany(db.SolicitacaoCompraAlocacao, {
+  foreignKey: 'resposta_item_id',
+  as: 'alocacoes'
+});
+
+db.SolicitacaoCompraAlocacao.belongsTo(db.SolicitacaoCompraRespostaItem, {
+  foreignKey: 'resposta_item_id',
+  as: 'respostaItem'
+});
+
+db.FornecedorCompra.hasMany(db.SolicitacaoCompraAlocacao, {
+  foreignKey: 'fornecedor_compra_id',
+  as: 'alocacoesCompra'
+});
+
+db.SolicitacaoCompraAlocacao.belongsTo(db.FornecedorCompra, {
+  foreignKey: 'fornecedor_compra_id',
+  as: 'fornecedor'
+});
+
+db.SolicitacaoCompraAlocacao.belongsTo(db.SolicitacaoCompraItem, {
+  foreignKey: 'solicitacao_compra_item_id',
+  as: 'itemCadastrado'
+});
+
+db.SolicitacaoCompraAlocacao.belongsTo(db.SolicitacaoCompraItemManual, {
+  foreignKey: 'solicitacao_compra_item_manual_id',
+  as: 'itemManual'
+});
+
 db.SolicitacaoCompra.hasMany(db.PedidoCompra, {
   foreignKey: 'solicitacao_compra_id',
   as: 'pedidos'
@@ -2102,6 +2149,16 @@ db.PedidoCompra.belongsTo(db.User, {
   as: 'criador'
 });
 
+db.User.hasMany(db.PedidoCompra, {
+  foreignKey: 'atribuido_a',
+  as: 'pedidosCompraAtribuidos'
+});
+
+db.PedidoCompra.belongsTo(db.User, {
+  foreignKey: 'atribuido_a',
+  as: 'responsavel'
+});
+
 db.PedidoCompra.hasMany(db.PedidoCompraItem, {
   foreignKey: 'pedido_compra_id',
   as: 'itens',
@@ -2126,6 +2183,36 @@ db.PedidoCompraItem.belongsTo(db.SolicitacaoCompraItem, {
 db.PedidoCompraItem.belongsTo(db.SolicitacaoCompraItemManual, {
   foreignKey: 'solicitacao_compra_item_manual_id',
   as: 'itemManual'
+});
+
+db.PedidoCompra.hasMany(db.SolicitacaoCompraAlocacao, {
+  foreignKey: 'pedido_compra_id',
+  as: 'alocacoes'
+});
+
+db.SolicitacaoCompraAlocacao.belongsTo(db.PedidoCompra, {
+  foreignKey: 'pedido_compra_id',
+  as: 'pedido'
+});
+
+db.PedidoCompraItem.hasMany(db.SolicitacaoCompraAlocacao, {
+  foreignKey: 'pedido_compra_item_id',
+  as: 'alocacoes'
+});
+
+db.SolicitacaoCompraAlocacao.belongsTo(db.PedidoCompraItem, {
+  foreignKey: 'pedido_compra_item_id',
+  as: 'pedidoItem'
+});
+
+db.TituloFinanceiro.hasMany(db.SolicitacaoCompraAlocacao, {
+  foreignKey: 'titulo_financeiro_id',
+  as: 'alocacoesCompraRealizadas'
+});
+
+db.SolicitacaoCompraAlocacao.belongsTo(db.TituloFinanceiro, {
+  foreignKey: 'titulo_financeiro_id',
+  as: 'tituloFinanceiro'
 });
 
 db.PedidoCompra.hasMany(db.PedidoCompraItemLog, {

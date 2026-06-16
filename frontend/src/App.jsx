@@ -184,8 +184,8 @@ const GestaoCategorias = lazy(() => import('./modules/solicitacao-compra/pages/G
 const GestaoUnidades = lazy(() => import('./modules/solicitacao-compra/pages/GestaoUnidades'));
 const PedidosCompra = lazy(() => import('./modules/solicitacao-compra/pages/PedidosCompra'));
 const PedidoCompraDetalhe = lazy(() => import('./modules/solicitacao-compra/pages/PedidoCompraDetalhe'));
+const ComprasDelegacao = lazy(() => import('./modules/solicitacao-compra/pages/ComprasDelegacao'));
 const GestaoFornecedores = lazy(() => import('./modules/solicitacao-compra/pages/GestaoFornecedores'));
-const NovaCotacaoAvulsa = lazy(() => import('./modules/solicitacao-compra/pages/NovaCotacaoAvulsa'));
 const ListaCotacoes = lazy(() => import('./modules/solicitacao-compra/pages/ListaCotacoes'));
 const CrmLeads = lazy(() => import('./modules/crm/pages/CrmLeads'));
 const CrmKanban = lazy(() => import('./modules/crm/pages/CrmKanban'));
@@ -853,13 +853,13 @@ export default function App() {
         <Route path="solicitacoes-compra/finalizada/:id" element={<ModuloComprasRoute><RevisarSolicitacaoCompraFinal /></ModuloComprasRoute>} />
         <Route path="pedidos-compra" element={<ComprasPedidosRoute><PedidosCompra /></ComprasPedidosRoute>} />
         <Route path="pedidos-compra/:id" element={<ComprasPedidosRoute><PedidoCompraDetalhe /></ComprasPedidosRoute>} />
+        <Route path="compras/delegacao" element={<ComprasPedidosRoute><ComprasDelegacao /></ComprasPedidosRoute>} />
         <Route path="gestao-apropriacoes" element={<GestaoObrasRoute><BusinessAdminRoute><GestaoApropriacoes /></BusinessAdminRoute></GestaoObrasRoute>} />
         <Route path="gestao-insumos" element={<ModuloComprasRoute><BusinessAdminRoute><GestaoInsumos /></BusinessAdminRoute></ModuloComprasRoute>} />
         <Route path="gestao-unidades" element={<ModuloComprasRoute><BusinessAdminRoute><GestaoUnidades /></BusinessAdminRoute></ModuloComprasRoute>} />
         <Route path="gestao-categorias" element={<ModuloComprasRoute><BusinessAdminRoute><GestaoCategorias /></BusinessAdminRoute></ModuloComprasRoute>} />
         <Route path="gestao-fornecedores" element={<EnabledModuleRoute moduleKey="COTACOES"><ComprasCotacoesManageRoute><GestaoFornecedores /></ComprasCotacoesManageRoute></EnabledModuleRoute>} />
         <Route path="cotacoes" element={<EnabledModuleRoute moduleKey="COTACOES"><ComprasCotacoesRoute><ListaCotacoes /></ComprasCotacoesRoute></EnabledModuleRoute>} />
-        <Route path="cotacoes/nova" element={<EnabledModuleRoute moduleKey="COTACOES"><ComprasCotacoesManageRoute><NovaCotacaoAvulsa /></ComprasCotacoesManageRoute></EnabledModuleRoute>} />
       </Route>
     </Routes>
   );

@@ -393,28 +393,41 @@ function validateCompraEnviarBody(body = {}) {
 }
 
 function validateCompraEncerrarBody(body = {}) {
-  ensureAllowedKeys(body, ['vencedores'], 'Encerramento da cotacao');
+  ensureAllowedKeys(body, ['vencedores', 'alocacoes'], 'Encerramento da cotacao');
 
-  if (!Array.isArray(body.vencedores) || body.vencedores.length === 0) {
+  const entradas = Array.isArray(body.alocacoes) && body.alocacoes.length
+    ? body.alocacoes
+    : body.vencedores;
+
+  if (!Array.isArray(entradas) || entradas.length === 0) {
     throw new ValidationError('Selecione ao menos um vencedor.');
   }
 
-  if (body.vencedores.length > 500) {
+  if (entradas.length > 500) {
     throw new ValidationError('Quantidade de vencedores excede o limite permitido.');
   }
 
   return {
-    vencedores: body.vencedores.map((entry, index) => {
+    vencedores: entradas.map((entry, index) => {
       if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
         throw new ValidationError(`Vencedor ${index + 1} invalido.`);
       }
 
-      ensureAllowedKeys(entry, ['resposta_item_id'], `Vencedor ${index + 1}`);
+      ensureAllowedKeys(
+        entry,
+        ['resposta_item_id', 'quantidade', 'quantidade_alocada', 'quantidade_pedido'],
+        `Vencedor ${index + 1}`
+      );
 
       return {
         resposta_item_id: parseInteger(entry.resposta_item_id, 'Resposta vencedora', {
           required: true
-        })
+        }),
+        quantidade_alocada: parseDecimal(
+          entry.quantidade_alocada ?? entry.quantidade ?? entry.quantidade_pedido,
+          'Quantidade alocada',
+          { min: 0, scale: 3, brazilianFormat: true }
+        )
       };
     })
   };
@@ -664,6 +677,98 @@ function validateCompraPedidoStatusBody(body = {}) {
   };
 }
 
+function validateCompraPedidoStatusBatchBody(body = {}) {
+  ensureAllowedKeys(body, ['pedido_ids', 'status'], 'Atualizacao em lote de pedidos');
+
+  if (!Array.isArray(body.pedido_ids) || body.pedido_ids.length === 0) {
+    throw new ValidationError('Selecione ao menos um pedido.');
+  }
+
+  if (body.pedido_ids.length > 100) {
+    throw new ValidationError('Quantidade de pedidos excede o limite permitido.');
+  }
+
+  return {
+    pedido_ids: body.pedido_ids.map((id) => parseInteger(id, 'Pedido', { required: true })),
+    status: parseOptionalText(body.status, 'Status do pedido', 40, { required: true })
+  };
+}
+
+function validateCompraPedidoCancelBody(body = {}) {
+  ensureAllowedKeys(body, ['motivo', 'itens', 'item_ids'], 'Cancelamento do pedido');
+
+  return {
+    motivo: parseOptionalText(body.motivo, 'Motivo', 5000),
+    itens: Array.isArray(body.itens) ? body.itens : undefined,
+    item_ids: Array.isArray(body.item_ids) ? body.item_ids : undefined
+  };
+}
+
+function validateCompraPedidoRemanejarBody(body = {}) {
+  ensureAllowedKeys(
+    body,
+    ['resposta_item_id_destino', 'quantidade', 'motivo'],
+    'Remanejamento de item do pedido'
+  );
+
+  return {
+    resposta_item_id_destino: parseInteger(body.resposta_item_id_destino, 'Resposta de destino', {
+      required: true
+    }),
+    quantidade: parseDecimal(body.quantidade, 'Quantidade remanejada', {
+      min: 0,
+      scale: 3,
+      brazilianFormat: true,
+      required: true
+    }),
+    motivo: parseOptionalText(body.motivo, 'Motivo', 5000)
+  };
+}
+
+function validateCompraPedidoComentarioBody(body = {}) {
+  ensureAllowedKeys(body, ['comentario'], 'Comentario do pedido');
+
+  return {
+    comentario: parseOptionalText(body.comentario, 'Comentario', 5000, { required: true })
+  };
+}
+
+function validateCompraCotacaoComentarioBody(body = {}) {
+  ensureAllowedKeys(body, ['comentario'], 'Comentario da cotacao');
+
+  return {
+    comentario: parseOptionalText(body.comentario, 'Comentario', 5000, { required: true })
+  };
+}
+
+function validateCompraPedidoEspelhoBody(body = {}) {
+  ensureAllowedKeys(
+    body,
+    ['arquivo_url', 'arquivo_nome', 'arquivo_nome_original'],
+    'Espelho do pedido'
+  );
+
+  return {
+    arquivo_url: parseOptionalText(body.arquivo_url, 'Arquivo', 1000, { required: true }),
+    arquivo_nome: parseOptionalText(body.arquivo_nome, 'Nome do arquivo', 255),
+    arquivo_nome_original: parseOptionalText(body.arquivo_nome_original, 'Nome do arquivo', 255)
+  };
+}
+
+function validateCompraDelegacaoBody(body = {}) {
+  ensureAllowedKeys(
+    body,
+    ['responsavel_id', 'prazo_compra', 'motivo_atraso'],
+    'Delegacao da solicitacao de compra'
+  );
+
+  return {
+    responsavel_id: parseInteger(body.responsavel_id, 'Responsavel'),
+    prazo_compra: parseDateOnly(body.prazo_compra, 'Prazo de compra'),
+    motivo_atraso: parseOptionalText(body.motivo_atraso, 'Motivo do atraso', 5000)
+  };
+}
+
 function validateCompraPedidoItemUpdateBody(body = {}) {
   ensureAllowedKeys(
     body,
@@ -843,8 +948,15 @@ module.exports = {
   validateCompraPedidoCreateBody,
   validateCompraPedidoItemAddBody,
   validateCompraPedidoItemParams,
+  validateCompraPedidoCancelBody,
+  validateCompraPedidoComentarioBody,
+  validateCompraCotacaoComentarioBody,
+  validateCompraPedidoEspelhoBody,
+  validateCompraPedidoRemanejarBody,
   validateCompraPedidoStatusBody,
+  validateCompraPedidoStatusBatchBody,
   validateCompraPedidoItemUpdateBody,
+  validateCompraDelegacaoBody,
   validateCompraPedidoAuditoriaQuery,
   validateCompraPedidoQuery,
   validateCompraQuery,

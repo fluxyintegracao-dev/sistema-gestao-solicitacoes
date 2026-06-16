@@ -18,7 +18,7 @@ function formatarStatus(status) {
 function statusClass(status) {
   const value = String(status || '').toUpperCase();
   if (value === 'ENCERRADO') return 'app-status-pill bg-slate-100 text-slate-700';
-  if (value === 'LIBERADO_PARA_COMPRA') return 'app-status-pill bg-emerald-100 text-emerald-700';
+  if (value === 'AGUARDANDO_DIRETORIA') return 'app-status-pill bg-amber-100 text-amber-700';
   return 'app-status-pill bg-blue-100 text-blue-700';
 }
 

@@ -36,6 +36,10 @@ function classNameStatus(status) {
     return 'app-status-pill compra-status-pill compra-status-blue bg-blue-100 text-blue-700';
   }
 
+  if (valor === 'AGUARDANDO_DIRETORIA') {
+    return 'app-status-pill compra-status-pill bg-amber-100 text-amber-700';
+  }
+
   if (valor === 'FINALIZADA' || valor === 'ENCERRADO') {
     return 'app-status-pill compra-status-pill compra-status-muted bg-slate-100 text-slate-700';
   }
@@ -187,6 +191,7 @@ export default function SolicitacoesCompra() {
             <span className="sol-filter-label">Status</span>
             <select className="input" value={status} onChange={(event) => setStatus(event.target.value)}>
               <option value="">Todos</option>
+              <option value="AGUARDANDO_DIRETORIA">Aguardando diretoria</option>
               <option value="ENVIADO">Enviado</option>
               <option value="ENCERRADO">Encerrado</option>
             </select>

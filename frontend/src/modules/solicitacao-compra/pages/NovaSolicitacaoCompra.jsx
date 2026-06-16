@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   listarInsumos,
+  listarUnidades,
   obterUrlAssinadaCompra,
   uploadAnexoTemporarioCompra
 } from '../../../services/compras';
@@ -94,6 +95,7 @@ export default function NovaSolicitacaoCompra() {
   const draftCarregadoRef = useRef(false);
   const [obras, setObras] = useState([]);
   const [insumos, setInsumos] = useState([]);
+  const [unidades, setUnidades] = useState([]);
   const [apropriacoes, setApropriacoes] = useState([]);
   const [obraId, setObraId] = useState('');
   const [necessarioPara, setNecessarioPara] = useState('');
@@ -133,6 +135,16 @@ export default function NovaSolicitacaoCompra() {
     }
   }
 
+  async function carregarUnidades() {
+    try {
+      const data = await listarUnidades();
+      setUnidades(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error(error);
+      setUnidades([]);
+    }
+  }
+
   async function carregarApropriacoes(obraSelecionada) {
     try {
       if (!obraSelecionada) {
@@ -151,6 +163,7 @@ export default function NovaSolicitacaoCompra() {
   useEffect(() => {
     carregarObras();
     carregarInsumos();
+    carregarUnidades();
   }, []);
 
   const itemModalAtual = modalApropriacaoIndex !== null ? itens[modalApropriacaoIndex] || null : null;
@@ -865,7 +878,21 @@ export default function NovaSolicitacaoCompra() {
               </div>
               <div className="grid gap-2">
                 <label className="text-sm font-medium">Unidade *</label>
-                <input className="input" value={itemManual.unidade_sigla_manual} onChange={(event) => setItemManual((atual) => ({ ...atual, unidade_sigla_manual: event.target.value }))} />
+                <select
+                  className="input"
+                  value={itemManual.unidade_sigla_manual}
+                  onChange={(event) => setItemManual((atual) => ({ ...atual, unidade_sigla_manual: event.target.value }))}
+                >
+                  <option value="">Selecione</option>
+                  {unidades.map((unidade) => (
+                    <option key={unidade.id || unidade.sigla} value={unidade.sigla || unidade.nome}>
+                      {unidade.sigla || unidade.nome} {unidade.nome && unidade.sigla ? `- ${unidade.nome}` : ''}
+                    </option>
+                  ))}
+                </select>
+                {!unidades.length ? (
+                  <span className="text-xs text-[var(--c-muted)]">Nenhuma unidade cadastrada encontrada.</span>
+                ) : null}
               </div>
               <div className="grid gap-2">
                 <label className="text-sm font-medium">Quantidade *</label>

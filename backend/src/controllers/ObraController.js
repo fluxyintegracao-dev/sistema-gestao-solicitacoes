@@ -235,7 +235,24 @@ module.exports = {
   },
 
   async create(req, res) {
-    const { nome, codigo, cidade, classificacao, vgv, planilha_geral, margem_custo_esperada, tipo_centro_custo, empresa_grupo_id } = req.body;
+    const {
+      nome,
+      codigo,
+      cidade,
+      classificacao,
+      vgv,
+      planilha_geral,
+      margem_custo_esperada,
+      tipo_centro_custo,
+      empresa_grupo_id,
+      cno,
+      endereco_logradouro,
+      endereco_numero,
+      endereco_complemento,
+      endereco_bairro,
+      endereco_cep,
+      endereco_uf
+    } = req.body;
 
     if (!nome || !codigo) {
       return res.status(400).json({ error: 'Nome e código são obrigatórios' });
@@ -267,6 +284,13 @@ module.exports = {
       codigo: String(codigo).toUpperCase(),
       cidade: cidade || null,
       nome,
+      cno: cno ? String(cno).trim() : null,
+      endereco_logradouro: endereco_logradouro ? String(endereco_logradouro).trim() : null,
+      endereco_numero: endereco_numero ? String(endereco_numero).trim() : null,
+      endereco_complemento: endereco_complemento ? String(endereco_complemento).trim() : null,
+      endereco_bairro: endereco_bairro ? String(endereco_bairro).trim() : null,
+      endereco_cep: endereco_cep ? String(endereco_cep).trim() : null,
+      endereco_uf: endereco_uf ? String(endereco_uf).trim().toUpperCase().slice(0, 2) : null,
       empresa_grupo_id: empresa_grupo_id ? Number(empresa_grupo_id) : null,
       ativo: true,
       tipo_centro_custo: tipoCentroCustoNorm,
@@ -281,11 +305,35 @@ module.exports = {
 
   async update(req, res) {
     const { id } = req.params;
-    const { nome, codigo, cidade, classificacao, vgv, planilha_geral, margem_custo_esperada, tipo_centro_custo, empresa_grupo_id } = req.body;
+    const {
+      nome,
+      codigo,
+      cidade,
+      classificacao,
+      vgv,
+      planilha_geral,
+      margem_custo_esperada,
+      tipo_centro_custo,
+      empresa_grupo_id,
+      cno,
+      endereco_logradouro,
+      endereco_numero,
+      endereco_complemento,
+      endereco_bairro,
+      endereco_cep,
+      endereco_uf
+    } = req.body;
 
     const dados = {};
     if (nome) dados.nome = nome;
     if (cidade !== undefined) dados.cidade = cidade || null;
+    if (cno !== undefined) dados.cno = cno ? String(cno).trim() : null;
+    if (endereco_logradouro !== undefined) dados.endereco_logradouro = endereco_logradouro ? String(endereco_logradouro).trim() : null;
+    if (endereco_numero !== undefined) dados.endereco_numero = endereco_numero ? String(endereco_numero).trim() : null;
+    if (endereco_complemento !== undefined) dados.endereco_complemento = endereco_complemento ? String(endereco_complemento).trim() : null;
+    if (endereco_bairro !== undefined) dados.endereco_bairro = endereco_bairro ? String(endereco_bairro).trim() : null;
+    if (endereco_cep !== undefined) dados.endereco_cep = endereco_cep ? String(endereco_cep).trim() : null;
+    if (endereco_uf !== undefined) dados.endereco_uf = endereco_uf ? String(endereco_uf).trim().toUpperCase().slice(0, 2) : null;
     if (codigo !== undefined) {
       if (!codigo) {
         return res.status(400).json({ error: 'Codigo invalido' });

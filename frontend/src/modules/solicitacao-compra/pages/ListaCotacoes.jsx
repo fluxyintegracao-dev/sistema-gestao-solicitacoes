@@ -78,15 +78,6 @@ export default function ListaCotacoes() {
               Acompanhe todas as cotacoes enviadas a fornecedores, seus status de resposta e dados registrados.
             </p>
           </div>
-          <div className="app-page-actions">
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={() => navigate('/cotacoes/nova')}
-            >
-              + Nova cotacao avulsa
-            </button>
-          </div>
         </div>
       </div>
 
@@ -181,7 +172,7 @@ export default function ListaCotacoes() {
           <div className="app-empty-card">Carregando...</div>
         ) : cotacoes.length === 0 ? (
           <div className="app-empty-card">
-            Nenhuma cotacao encontrada. Crie uma nova cotacao avulsa ou envie uma solicitacao de compra para fornecedores.
+            Nenhuma cotacao encontrada. Envie uma solicitacao de compra para fornecedores.
           </div>
         ) : (
           <div className="compras-table-wrapper">

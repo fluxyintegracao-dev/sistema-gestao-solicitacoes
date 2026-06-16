@@ -46,8 +46,15 @@ const {
   validateCompraPedidoCreateBody,
   validateCompraPedidoItemAddBody,
   validateCompraPedidoItemParams,
+  validateCompraPedidoCancelBody,
+  validateCompraCotacaoComentarioBody,
+  validateCompraPedidoComentarioBody,
+  validateCompraPedidoEspelhoBody,
+  validateCompraPedidoRemanejarBody,
   validateCompraPedidoStatusBody,
+  validateCompraPedidoStatusBatchBody,
   validateCompraPedidoItemUpdateBody,
+  validateCompraDelegacaoBody,
   validateCompraPedidoAuditoriaQuery,
   validateCompraPedidoQuery,
   validateCompraQuery,
@@ -1377,8 +1384,11 @@ router.patch('/compras/solicitacoes/:id/liberar', validateRequest({ params: vali
 router.post('/compras/solicitacoes/:id/enviar', validateRequest({ params: validateNumericIdParam('id', 'Solicitacao de compra'), body: validateCompraEnviarBody }), requireCompraAccess, SolicitacaoCompraController.enviarParaFornecedores);
 router.patch('/compras/solicitacoes/:id/recusar', validateRequest({ params: validateNumericIdParam('id', 'Solicitacao de compra') }), requireCompraAccess, SolicitacaoCompraController.recusar);
 router.patch('/compras/solicitacoes/:id/encerrar', validateRequest({ params: validateNumericIdParam('id', 'Solicitacao de compra'), body: validateCompraEncerrarBody }), requireCompraAccess, SolicitacaoCompraController.encerrar);
+router.post('/compras/solicitacoes/:id/comentarios', criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Solicitacao de compra'), body: validateCompraCotacaoComentarioBody }), requireCompraAccess, SolicitacaoCompraController.comentar);
+router.patch('/compras/solicitacoes/:id/delegar', criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Solicitacao de compra'), body: validateCompraDelegacaoBody }), requireCompraAccess, PedidoCompraController.delegarSolicitacao);
 router.post('/compras/solicitacoes/:id/pedidos', criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Solicitacao de compra'), body: validateCompraPedidoCreateBody }), requireCompraAccess, PedidoCompraController.createFromSolicitacao);
 router.get('/compras/pedidos', validateRequest({ query: validateCompraPedidoQuery }), scopeCompraListAccess, PedidoCompraController.index);
+router.patch('/compras/pedidos/status-lote', criticalRateLimit, validateRequest({ body: validateCompraPedidoStatusBatchBody }), scopeCompraListAccess, PedidoCompraController.updateStatusBatch);
 router.get('/compras/relatorios/auditoria-itens-pedido', validateRequest({ query: validateCompraPedidoAuditoriaQuery }), scopeCompraListAccess, PedidoCompraController.auditoria);
 router.get('/compras/relatorios/categorias-insumos', validateRequest({ query: validateCompraRelatorioCategoriasInsumosQuery }), scopeCompraListAccess, RelatorioComprasController.categoriasInsumos);
 router.get('/compras/relatorios/compras-fornecedor', validateRequest({ query: validateCompraRelatorioComprasFornecedorQuery }), scopeCompraListAccess, RelatorioComprasController.comprasPorFornecedor);
@@ -1392,7 +1402,12 @@ router.get('/compras/relatorios/fornecedores', validateRequest({ query: validate
 router.get('/compras/pedidos/:id', validateRequest({ params: validateNumericIdParam('id', 'Pedido de compra') }), requirePedidoCompraAccess, PedidoCompraController.show);
 router.post('/compras/pedidos/:id/itens', criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Pedido de compra'), body: validateCompraPedidoItemAddBody }), requirePedidoCompraAccess, PedidoCompraController.addItem);
 router.patch('/compras/pedidos/:id/status', criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Pedido de compra'), body: validateCompraPedidoStatusBody }), requirePedidoCompraAccess, PedidoCompraController.updateStatus);
+router.patch('/compras/pedidos/:id/cancelar', criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Pedido de compra'), body: validateCompraPedidoCancelBody }), requirePedidoCompraAccess, PedidoCompraController.cancel);
+router.patch('/compras/pedidos/:id/itens-cancelar', criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Pedido de compra'), body: validateCompraPedidoCancelBody }), requirePedidoCompraAccess, PedidoCompraController.cancelItems);
+router.post('/compras/pedidos/:id/comentarios', criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Pedido de compra'), body: validateCompraPedidoComentarioBody }), requirePedidoCompraAccess, PedidoCompraController.comentar);
+router.patch('/compras/pedidos/:id/espelho', criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Pedido de compra'), body: validateCompraPedidoEspelhoBody }), requirePedidoCompraAccess, PedidoCompraController.anexarEspelho);
 router.patch('/compras/pedidos/:id/itens/:itemId', criticalRateLimit, validateRequest({ params: validateCompraPedidoItemParams, body: validateCompraPedidoItemUpdateBody }), requirePedidoCompraAccess, PedidoCompraController.updateItem);
+router.patch('/compras/pedidos/:id/itens/:itemId/remanejar', criticalRateLimit, validateRequest({ params: validateCompraPedidoItemParams, body: validateCompraPedidoRemanejarBody }), requirePedidoCompraAccess, PedidoCompraController.remanejarItem);
 router.delete('/compras/pedidos/:id/itens/:itemId', criticalRateLimit, validateRequest({ params: validateCompraPedidoItemParams }), requirePedidoCompraAccess, PedidoCompraController.removeItem);
 router.get('/compras/pedidos/:id/pdf', validateRequest({ params: validateNumericIdParam('id', 'Pedido de compra') }), requirePedidoCompraAccess, PedidoCompraController.pdf);
 

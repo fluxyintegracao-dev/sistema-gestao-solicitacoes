@@ -19,6 +19,7 @@ const {
   SolicitacaoCompraItemManual,
   SolicitacaoCompraItemManualApropriacao,
   SolicitacaoCompraLog,
+  SolicitacaoCompraAlocacao,
   SolicitacaoCompraRespostaItem,
   StatusArea,
   TipoSolicitacao,
@@ -45,6 +46,11 @@ const {
   validarRateiosPayload
 } = require('../services/compraApropriacao');
 const { getRuntimeInstallationConfig } = require('../services/runtimeConfig');
+const {
+  obterConfiguracaoAprovacaoDiretoria,
+  obterDiretoriaParaObra,
+  obterSetorDestinoAprovacao
+} = require('../services/aprovacaoDiretoriaConfig');
 const {
   canAccessCompras,
   canManageComprasCotacoes,
@@ -334,14 +340,32 @@ async function buscarTipoSolicitacaoCompra(transaction) {
   );
 }
 
-async function buscarSetorDestino(transaction) {
-  const setor = await findSetorByCapability('eh_setor_geo', {
+async function buscarSetorCompras(transaction) {
+  const setor = await findSetorByCapability('eh_setor_compras', {
     attributes: ['id', 'codigo', 'nome'],
     onlyActive: false,
     transaction
   });
 
-  return resolveSetorPersistenciaValue(setor, 'GEO');
+  return resolveSetorPersistenciaValue(setor, 'COMPRAS');
+}
+
+async function montarFluxoAprovacaoCompra({ obra, tipoSolicitacaoId, transaction }) {
+  const setorCompras = await buscarSetorCompras(transaction);
+  const configuracao = await obterConfiguracaoAprovacaoDiretoria();
+  const diretoria = obterDiretoriaParaObra(obra, configuracao.diretoriasPorClassificacao);
+  const destinoConfigurado = obterSetorDestinoAprovacao(
+    tipoSolicitacaoId,
+    configuracao.setoresDestinoPorTipo
+  );
+  const setorDestinoAprovacao = destinoConfigurado || setorCompras;
+
+  return {
+    usaFluxoDiretoria: Boolean(diretoria),
+    areaResponsavel: diretoria || setorCompras,
+    diretoriaFluxoCodigo: diretoria || null,
+    setorDestinoPosAprovacao: diretoria ? setorDestinoAprovacao : null
+  };
 }
 
 async function carregarSolicitacaoCompra(id) {
@@ -349,6 +373,7 @@ async function carregarSolicitacaoCompra(id) {
     include: [
       { model: Obra, as: 'obra', attributes: ['id', 'nome', 'codigo'] },
       { model: User, as: 'solicitante', attributes: ['id', 'nome', 'email'] },
+      { model: User, as: 'compradorResponsavel', attributes: ['id', 'nome', 'email'] },
       { model: Solicitacao, as: 'solicitacaoPrincipal', attributes: ['id', 'codigo', 'area_responsavel', 'status_global'] },
       {
         model: SolicitacaoCompraItem,
@@ -391,6 +416,13 @@ async function carregarSolicitacaoCompra(id) {
               'observacao',
               'quantidade_minima_item',
               'vencedor'
+            ],
+            include: [
+              {
+                model: SolicitacaoCompraAlocacao,
+                as: 'alocacoes',
+                attributes: ['id', 'quantidade_alocada', 'status']
+              }
             ]
           }
         ]
@@ -639,6 +671,9 @@ function montarComparativoSolicitacao(solicitacao) {
         prazo: resposta?.prazo || '',
         observacao: resposta?.observacao || '',
         quantidade_minima_item: resposta?.quantidade_minima_item ?? null,
+        quantidade_alocada: (resposta?.alocacoes || [])
+          .filter((alocacao) => String(alocacao.status || '').toUpperCase() === 'ATIVA')
+          .reduce((acc, alocacao) => acc + Number(alocacao.quantidade_alocada || 0), 0),
         vencedor: Boolean(resposta?.vencedor)
       };
     });
@@ -1103,6 +1138,7 @@ module.exports = {
         include: [
           { model: Obra, as: 'obra', attributes: ['id', 'nome', 'codigo'] },
           { model: User, as: 'solicitante', attributes: ['id', 'nome', 'email'] },
+          { model: User, as: 'compradorResponsavel', attributes: ['id', 'nome', 'email'] },
           { model: Solicitacao, as: 'solicitacaoPrincipal', attributes: ['id', 'codigo', 'area_responsavel', 'status_global'] },
           {
             model: SolicitacaoCompraItem,
@@ -1152,6 +1188,63 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return res.status(500).json({ error: 'Erro ao buscar solicitacao de compra' });
+    }
+  },
+
+  async comentar(req, res) {
+    const transaction = await SolicitacaoCompra.sequelize.transaction();
+
+    try {
+      const usuario = await validarAcesso(req, res);
+      if (!usuario) {
+        await transaction.rollback();
+        return;
+      }
+
+      if (!(await validarAcessoCompras(usuario))) {
+        await transaction.rollback();
+        return res.status(403).json({ error: 'Apenas compras pode comentar na cotacao' });
+      }
+
+      const comentario = String(req.body?.comentario || '').trim();
+      if (!comentario) {
+        await transaction.rollback();
+        return res.status(400).json({ error: 'Informe o comentario da cotacao' });
+      }
+
+      const solicitacao = await SolicitacaoCompra.findByPk(req.params.id, { transaction });
+      if (!solicitacao) {
+        await transaction.rollback();
+        return res.status(404).json({ error: 'Solicitacao de compra nao encontrada' });
+      }
+
+      await registrarLogSolicitacaoCompra({
+        solicitacaoCompraId: solicitacao.id,
+        usuarioId: usuario.id,
+        tipoAcao: 'COMENTARIO_COTACAO',
+        descricao: comentario,
+        transaction
+      });
+
+      if (solicitacao.solicitacao_principal_id) {
+        await Historico.create(
+          {
+            solicitacao_id: solicitacao.solicitacao_principal_id,
+            usuario_id: usuario.id,
+            acao: 'COTACAO_COMPRA_COMENTARIO',
+            observacao: `Comentario na cotacao SC-${String(solicitacao.id).padStart(5, '0')}:\n${comentario}`
+          },
+          { transaction }
+        );
+      }
+
+      await transaction.commit();
+      const atualizada = await carregarSolicitacaoCompra(req.params.id);
+      return res.json(atualizada);
+    } catch (error) {
+      await transaction.rollback();
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao registrar comentario da cotacao' });
     }
   },
 
@@ -1207,11 +1300,18 @@ module.exports = {
         }
       }
 
+      const tipoSolicitacao = await buscarTipoSolicitacaoCompra(transaction);
+      const fluxoCompra = await montarFluxoAprovacaoCompra({
+        obra,
+        tipoSolicitacaoId: tipoSolicitacao.id,
+        transaction
+      });
+
       const solicitacaoCompra = await SolicitacaoCompra.create(
         {
           obra_id,
           solicitante_id: usuario.id,
-          status: 'ENVIADO',
+          status: fluxoCompra.usaFluxoDiretoria ? 'AGUARDANDO_DIRETORIA' : 'ENVIADO',
           integrado_sienge: false,
           observacoes: observacoes || null,
           necessario_para: necessario_para || null,
@@ -1258,8 +1358,6 @@ module.exports = {
         );
       }
 
-      const tipoSolicitacao = await buscarTipoSolicitacaoCompra(transaction);
-      const setorDestino = await buscarSetorDestino(transaction);
       const codigo = await gerarCodigoSolicitacao();
 
       const insumos = itensPreparados.length
@@ -1297,7 +1395,10 @@ module.exports = {
           tipo_solicitacao_id: tipoSolicitacao.id,
           descricao,
           status_global: 'PENDENTE',
-          area_responsavel: setorDestino,
+          area_responsavel: fluxoCompra.areaResponsavel,
+          fluxo_aprovacao_diretoria: fluxoCompra.usaFluxoDiretoria,
+          diretoria_fluxo_codigo: fluxoCompra.diretoriaFluxoCodigo,
+          setor_destino_pos_aprovacao: fluxoCompra.setorDestinoPosAprovacao,
           criado_por: usuario.id,
           data_vencimento: necessario_para || null,
           cancelada: false
@@ -1316,10 +1417,18 @@ module.exports = {
         {
           solicitacao_id: solicitacaoPrincipal.id,
           usuario_responsavel_id: usuario.id,
-          setor: setorDestino,
+          setor: fluxoCompra.areaResponsavel,
           acao: 'CRIADA',
           status_novo: 'PENDENTE',
-          observacao: `Solicita??o de compra criada com ${itensPreparados.length + itensManuaisPreparados.length} item(ns)`
+          observacao: fluxoCompra.usaFluxoDiretoria
+            ? `Solicitacao de compra criada e enviada para aprovacao da diretoria com ${itensPreparados.length + itensManuaisPreparados.length} item(ns)`
+            : `Solicitacao de compra criada com ${itensPreparados.length + itensManuaisPreparados.length} item(ns)`,
+          metadata: JSON.stringify({
+            origem: 'MODULO_COMPRAS',
+            fluxo_aprovacao_diretoria: fluxoCompra.usaFluxoDiretoria,
+            diretoria_fluxo_codigo: fluxoCompra.diretoriaFluxoCodigo,
+            setor_destino_pos_aprovacao: fluxoCompra.setorDestinoPosAprovacao
+          })
         },
         { transaction }
       );
@@ -1327,9 +1436,11 @@ module.exports = {
       await StatusArea.create(
         {
           solicitacao_id: solicitacaoPrincipal.id,
-          setor: setorDestino,
+          setor: fluxoCompra.areaResponsavel,
           status: 'PENDENTE',
-          observacao: 'Solicita??o de compra criada'
+          observacao: fluxoCompra.usaFluxoDiretoria
+            ? 'Solicitacao de compra aguardando aprovacao da diretoria'
+            : 'Solicitacao de compra criada'
         },
         { transaction }
       );
@@ -1371,6 +1482,10 @@ module.exports = {
   },
 
   async integrar(req, res) {
+    return res.status(410).json({
+      error: 'Integracao SIENGE desativada no fluxo de compras. A solicitacao aprovada segue diretamente para cotacao.'
+    });
+
     const transaction = await SolicitacaoCompra.sequelize.transaction();
 
     try {
@@ -1432,6 +1547,10 @@ module.exports = {
   },
 
   async liberar(req, res) {
+    return res.status(410).json({
+      error: 'Liberacao manual para compra foi desativada. Toda solicitacao aprovada pela diretoria fica liberada para cotacao.'
+    });
+
     const transaction = await SolicitacaoCompra.sequelize.transaction();
 
     try {
@@ -1512,6 +1631,29 @@ module.exports = {
       if (normalizeTextCompra(solicitacao.status) === 'ENCERRADO') {
         await transaction.rollback();
         return res.status(400).json({ error: 'Solicitacao encerrada nao aceita novo envio para fornecedores' });
+      }
+
+      if (Number(solicitacao.solicitacao_principal_id || 0) > 0) {
+        const solicitacaoPrincipal = await Solicitacao.findByPk(solicitacao.solicitacao_principal_id, {
+          attributes: [
+            'id',
+            'fluxo_aprovacao_diretoria',
+            'aprovada_diretoria_em',
+            'diretoria_fluxo_codigo',
+            'setor_destino_pos_aprovacao'
+          ],
+          transaction
+        });
+
+        if (
+          solicitacaoPrincipal?.fluxo_aprovacao_diretoria &&
+          !solicitacaoPrincipal.aprovada_diretoria_em
+        ) {
+          await transaction.rollback();
+          return res.status(400).json({
+            error: 'A solicitacao de compra ainda aguarda aprovacao da diretoria antes de seguir para cotacao.'
+          });
+        }
       }
 
       const fornecedoresPayload = Array.isArray(req.body?.fornecedores) ? req.body.fornecedores : [];
@@ -1731,7 +1873,9 @@ module.exports = {
         return res.status(404).json({ error: 'Solicitacao nao encontrada' });
       }
 
-      const vencedores = Array.isArray(req.body?.vencedores) ? req.body.vencedores : [];
+      const vencedores = Array.isArray(req.body?.alocacoes)
+        ? req.body.alocacoes
+        : (Array.isArray(req.body?.vencedores) ? req.body.vencedores : []);
       if (!vencedores.length) {
         await transaction.rollback();
         return res.status(400).json({ error: 'Selecione ao menos um vencedor para encerrar a cotacao' });
@@ -1782,7 +1926,10 @@ module.exports = {
           ? 'Cotacao reencerrada com vencedores atualizados'
           : 'Cotacao encerrada com vencedores definidos',
         metadados: {
-          vencedores: vencedores.map((item) => item.resposta_item_id)
+          vencedores: vencedores.map((item) => ({
+            resposta_item_id: item.resposta_item_id,
+            quantidade_alocada: item.quantidade_alocada ?? null
+          }))
         },
         transaction
       });
@@ -1790,6 +1937,7 @@ module.exports = {
       await gerarPedidosDosVencedores({
         solicitacaoId: solicitacaoDb.id,
         usuarioId: usuario.id,
+        vencedores,
         transaction
       });
 
@@ -1837,6 +1985,10 @@ module.exports = {
   // Cria uma cotação diretamente sem passar pelo fluxo de aprovação.
   // Permite cotações manuais sem uma solicitação de compra formal.
   async createAvulsa(req, res) {
+    return res.status(410).json({
+      error: 'Cotacao avulsa desabilitada. Toda cotacao deve estar vinculada a uma solicitacao de compra.'
+    });
+
     const transaction = await SolicitacaoCompra.sequelize.transaction();
 
     try {

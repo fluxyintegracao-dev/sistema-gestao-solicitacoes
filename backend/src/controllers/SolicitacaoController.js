@@ -22,6 +22,7 @@ const {
   Comprovante,
   TituloFinanceiro,
   SolicitacaoPagamento,
+  SolicitacaoCompra,
   Notificacao,
   NotificacaoDestinatario,
   LogExclusao,
@@ -2919,6 +2920,16 @@ module.exports = {
         aprovada_diretoria_por: usuarioId,
         aprovada_diretoria_em: new Date()
       });
+
+      await SolicitacaoCompra.update(
+        { status: 'ENVIADO' },
+        {
+          where: {
+            solicitacao_principal_id: solicitacao.id,
+            status: 'AGUARDANDO_DIRETORIA'
+          }
+        }
+      );
 
       await Historico.create({
         solicitacao_id: solicitacao.id,

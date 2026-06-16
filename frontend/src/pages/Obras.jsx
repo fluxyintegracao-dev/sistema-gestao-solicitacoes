@@ -137,6 +137,13 @@ function initialFormState() {
     codigo: '',
     nome: '',
     cidade: '',
+    cno: '',
+    endereco_logradouro: '',
+    endereco_numero: '',
+    endereco_complemento: '',
+    endereco_bairro: '',
+    endereco_cep: '',
+    endereco_uf: '',
     classificacao: '',
     vgv: '',
     planilha_geral: '',
@@ -210,6 +217,13 @@ export default function Obras() {
       codigo: obra.codigo || '',
       nome: obra.nome || '',
       cidade: obra.cidade || '',
+      cno: obra.cno || '',
+      endereco_logradouro: obra.endereco_logradouro || '',
+      endereco_numero: obra.endereco_numero || '',
+      endereco_complemento: obra.endereco_complemento || '',
+      endereco_bairro: obra.endereco_bairro || '',
+      endereco_cep: obra.endereco_cep || '',
+      endereco_uf: obra.endereco_uf || '',
       classificacao: obra.classificacao || '',
       vgv: obra.vgv != null ? String(obra.vgv) : '',
       planilha_geral: obra.planilha_geral != null ? String(obra.planilha_geral) : '',
@@ -236,6 +250,13 @@ export default function Obras() {
         codigo: String(form.codigo || '').trim().toUpperCase(),
         nome: String(form.nome || '').trim(),
         cidade: String(form.cidade || '').trim(),
+        cno: String(form.cno || '').trim() || null,
+        endereco_logradouro: String(form.endereco_logradouro || '').trim() || null,
+        endereco_numero: String(form.endereco_numero || '').trim() || null,
+        endereco_complemento: String(form.endereco_complemento || '').trim() || null,
+        endereco_bairro: String(form.endereco_bairro || '').trim() || null,
+        endereco_cep: String(form.endereco_cep || '').trim() || null,
+        endereco_uf: String(form.endereco_uf || '').trim().toUpperCase() || null,
         classificacao: cadastroEhObra ? (form.classificacao || null) : null,
         vgv: cadastroEhObra && form.classificacao === 'PRIVADA' && form.vgv !== '' ? Number(form.vgv) : null,
         planilha_geral: cadastroEhObra && form.classificacao === 'PUBLICA' && form.planilha_geral !== '' ? Number(form.planilha_geral) : null,
@@ -667,6 +688,77 @@ export default function Obras() {
                   value={form.cidade}
                   onChange={(event) => setForm((current) => ({ ...current, cidade: event.target.value }))}
                   placeholder="Ex: São Domingos"
+                />
+              </label>
+
+              <label className="grid gap-1 text-sm font-medium" style={{ color: 'var(--c-text)' }}>
+                CNO
+                <input
+                  className="input"
+                  value={form.cno}
+                  onChange={(event) => setForm((current) => ({ ...current, cno: event.target.value }))}
+                  placeholder="Cadastro Nacional de Obras"
+                />
+              </label>
+
+              <label className="grid gap-1 text-sm font-medium md:col-span-2" style={{ color: 'var(--c-text)' }}>
+                Logradouro
+                <input
+                  className="input"
+                  value={form.endereco_logradouro}
+                  onChange={(event) => setForm((current) => ({ ...current, endereco_logradouro: event.target.value }))}
+                  placeholder="Rua, avenida ou localidade"
+                />
+              </label>
+
+              <label className="grid gap-1 text-sm font-medium" style={{ color: 'var(--c-text)' }}>
+                Número
+                <input
+                  className="input"
+                  value={form.endereco_numero}
+                  onChange={(event) => setForm((current) => ({ ...current, endereco_numero: event.target.value }))}
+                  placeholder="Ex: 120"
+                />
+              </label>
+
+              <label className="grid gap-1 text-sm font-medium" style={{ color: 'var(--c-text)' }}>
+                Bairro
+                <input
+                  className="input"
+                  value={form.endereco_bairro}
+                  onChange={(event) => setForm((current) => ({ ...current, endereco_bairro: event.target.value }))}
+                  placeholder="Bairro"
+                />
+              </label>
+
+              <label className="grid gap-1 text-sm font-medium" style={{ color: 'var(--c-text)' }}>
+                CEP
+                <input
+                  className="input"
+                  value={form.endereco_cep}
+                  onChange={(event) => setForm((current) => ({ ...current, endereco_cep: event.target.value }))}
+                  placeholder="00000-000"
+                />
+              </label>
+
+              <label className="grid gap-1 text-sm font-medium" style={{ color: 'var(--c-text)' }}>
+                UF
+                <input
+                  className="input"
+                  maxLength={2}
+                  value={form.endereco_uf}
+                  onChange={(event) => setForm((current) => ({ ...current, endereco_uf: event.target.value.toUpperCase() }))}
+                  placeholder="ES"
+                />
+              </label>
+
+              <label className="grid gap-1 text-sm font-medium md:col-span-2" style={{ color: 'var(--c-text)' }}>
+                Complemento
+                <input
+                  className="input"
+                  value={form.endereco_complemento}
+                  onChange={(event) => setForm((current) => ({ ...current, endereco_complemento: event.target.value }))}
+                  placeholder="Complemento ou referência"
                 />
               </label>
 

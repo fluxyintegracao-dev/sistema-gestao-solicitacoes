@@ -3,10 +3,17 @@ const {
   adicionarRespostaAoPedido,
   atualizarPedidoItem,
   atualizarStatusPedido,
+  atualizarStatusPedidosEmLote,
+  anexarEspelhoFornecedorPedido,
+  cancelarPedidoCompra,
+  cancelarPedidoItens,
   criarPedidoParaFornecedor,
+  delegarSolicitacaoCompra,
   listarAuditoriaItensPedido,
   listarPedidos,
   obterPedidoDetalhe,
+  registrarComentarioPedido,
+  remanejarPedidoItem,
   removerPedidoItem
 } = require('../services/pedidoCompraService');
 const {
@@ -238,6 +245,33 @@ module.exports = {
     }
   },
 
+  async updateStatusBatch(req, res) {
+    const transaction = await PedidoCompra.sequelize.transaction();
+
+    try {
+      const usuario = await validarAcessoPedidos(req, res, { gerenciar: true });
+      if (!usuario) {
+        await transaction.rollback();
+        return;
+      }
+
+      const ids = Array.isArray(req.body?.pedido_ids) ? req.body.pedido_ids : [];
+      await atualizarStatusPedidosEmLote({
+        pedidoIds: ids,
+        status: req.body?.status,
+        usuarioId: usuario.id,
+        transaction
+      });
+
+      await transaction.commit();
+      return res.json({ ok: true, atualizados: ids.length });
+    } catch (error) {
+      await transaction.rollback();
+      console.error(error);
+      return responderErroController(res, error, 'Erro ao atualizar pedidos em lote', { status: 400 });
+    }
+  },
+
   async updateItem(req, res) {
     const transaction = await PedidoCompra.sequelize.transaction();
 
@@ -294,6 +328,181 @@ module.exports = {
       await transaction.rollback();
       console.error(error);
       return responderErroController(res, error, 'Erro ao remover item do pedido', { status: 400 });
+    }
+  },
+
+  async cancel(req, res) {
+    const transaction = await PedidoCompra.sequelize.transaction();
+
+    try {
+      const usuario = await validarAcessoPedidos(req, res, { gerenciar: true });
+      if (!usuario) {
+        await transaction.rollback();
+        return;
+      }
+
+      await cancelarPedidoCompra({
+        pedidoId: req.params.id,
+        motivo: req.body?.motivo,
+        usuarioId: usuario.id,
+        transaction
+      });
+
+      await transaction.commit();
+      const pedido = await obterPedidoDetalhe(req.params.id, {
+        obraIdsHistoricoPreco: await buildHistoricoPrecoScope(req)
+      });
+      return res.json(pedido);
+    } catch (error) {
+      await transaction.rollback();
+      console.error(error);
+      return responderErroController(res, error, 'Erro ao cancelar pedido de compra', { status: 400 });
+    }
+  },
+
+  async cancelItems(req, res) {
+    const transaction = await PedidoCompra.sequelize.transaction();
+
+    try {
+      const usuario = await validarAcessoPedidos(req, res, { gerenciar: true });
+      if (!usuario) {
+        await transaction.rollback();
+        return;
+      }
+
+      await cancelarPedidoItens({
+        pedidoId: req.params.id,
+        itens: req.body?.itens || req.body?.item_ids,
+        motivo: req.body?.motivo,
+        usuarioId: usuario.id,
+        transaction
+      });
+
+      await transaction.commit();
+      const pedido = await obterPedidoDetalhe(req.params.id, {
+        obraIdsHistoricoPreco: await buildHistoricoPrecoScope(req)
+      });
+      return res.json(pedido);
+    } catch (error) {
+      await transaction.rollback();
+      console.error(error);
+      return responderErroController(res, error, 'Erro ao cancelar itens do pedido', { status: 400 });
+    }
+  },
+
+  async remanejarItem(req, res) {
+    const transaction = await PedidoCompra.sequelize.transaction();
+
+    try {
+      const usuario = await validarAcessoPedidos(req, res, { gerenciar: true });
+      if (!usuario) {
+        await transaction.rollback();
+        return;
+      }
+
+      await remanejarPedidoItem({
+        pedidoId: req.params.id,
+        itemId: req.params.itemId,
+        respostaItemIdDestino: req.body?.resposta_item_id_destino,
+        quantidade: req.body?.quantidade,
+        motivo: req.body?.motivo,
+        usuarioId: usuario.id,
+        transaction
+      });
+
+      await transaction.commit();
+      const pedido = await obterPedidoDetalhe(req.params.id, {
+        obraIdsHistoricoPreco: await buildHistoricoPrecoScope(req)
+      });
+      return res.json(pedido);
+    } catch (error) {
+      await transaction.rollback();
+      console.error(error);
+      return responderErroController(res, error, 'Erro ao remanejar item do pedido', { status: 400 });
+    }
+  },
+
+  async comentar(req, res) {
+    const transaction = await PedidoCompra.sequelize.transaction();
+
+    try {
+      const usuario = await validarAcessoPedidos(req, res, { gerenciar: true });
+      if (!usuario) {
+        await transaction.rollback();
+        return;
+      }
+
+      await registrarComentarioPedido({
+        pedidoId: req.params.id,
+        comentario: req.body?.comentario,
+        usuarioId: usuario.id,
+        transaction
+      });
+
+      await transaction.commit();
+      return res.json({ ok: true });
+    } catch (error) {
+      await transaction.rollback();
+      console.error(error);
+      return responderErroController(res, error, 'Erro ao comentar pedido', { status: 400 });
+    }
+  },
+
+  async anexarEspelho(req, res) {
+    const transaction = await PedidoCompra.sequelize.transaction();
+
+    try {
+      const usuario = await validarAcessoPedidos(req, res, { gerenciar: true });
+      if (!usuario) {
+        await transaction.rollback();
+        return;
+      }
+
+      await anexarEspelhoFornecedorPedido({
+        pedidoId: req.params.id,
+        arquivoUrl: req.body?.arquivo_url,
+        arquivoNome: req.body?.arquivo_nome_original || req.body?.arquivo_nome,
+        usuarioId: usuario.id,
+        transaction
+      });
+
+      await transaction.commit();
+      const pedido = await obterPedidoDetalhe(req.params.id, {
+        obraIdsHistoricoPreco: await buildHistoricoPrecoScope(req)
+      });
+      return res.json(pedido);
+    } catch (error) {
+      await transaction.rollback();
+      console.error(error);
+      return responderErroController(res, error, 'Erro ao anexar espelho do fornecedor', { status: 400 });
+    }
+  },
+
+  async delegarSolicitacao(req, res) {
+    const transaction = await PedidoCompra.sequelize.transaction();
+
+    try {
+      const usuario = await validarAcessoPedidos(req, res, { gerenciar: true });
+      if (!usuario) {
+        await transaction.rollback();
+        return;
+      }
+
+      await delegarSolicitacaoCompra({
+        solicitacaoId: req.params.id,
+        responsavelId: req.body?.responsavel_id,
+        prazoCompra: req.body?.prazo_compra,
+        motivoAtraso: req.body?.motivo_atraso,
+        usuarioId: usuario.id,
+        transaction
+      });
+
+      await transaction.commit();
+      return res.json({ ok: true });
+    } catch (error) {
+      await transaction.rollback();
+      console.error(error);
+      return responderErroController(res, error, 'Erro ao delegar solicitacao de compra', { status: 400 });
     }
   },
 

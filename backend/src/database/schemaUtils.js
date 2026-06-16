@@ -3,7 +3,8 @@ async function tableExists(sequelize, tableName) {
     `SELECT COUNT(*) AS total
        FROM information_schema.TABLES
       WHERE TABLE_SCHEMA = DATABASE()
-        AND TABLE_NAME = ${sequelize.escape(tableName)}`
+        AND TABLE_NAME = ?`,
+    { replacements: [tableName] }
   );
 
   return Number(rows?.[0]?.total || 0) > 0;
@@ -20,12 +21,13 @@ async function resolveTableName(sequelize, candidates = [], fallback = null) {
     return fallback;
   }
 
-  const escapedNames = names.map((name) => sequelize.escape(name)).join(', ');
+  const placeholders = names.map(() => '?').join(', ');
   const [rows] = await sequelize.query(
     `SELECT TABLE_NAME
        FROM information_schema.TABLES
       WHERE TABLE_SCHEMA = DATABASE()
-        AND TABLE_NAME IN (${escapedNames})`
+        AND TABLE_NAME IN (${placeholders})`,
+    { replacements: names }
   );
 
   const existing = new Set((rows || []).map((row) => row.TABLE_NAME));
@@ -41,8 +43,9 @@ async function columnExists(sequelize, tableName, columnName) {
     `SELECT COUNT(*) AS total
        FROM information_schema.COLUMNS
       WHERE TABLE_SCHEMA = DATABASE()
-        AND TABLE_NAME = ${sequelize.escape(tableName)}
-        AND COLUMN_NAME = ${sequelize.escape(columnName)}`
+        AND TABLE_NAME = ?
+        AND COLUMN_NAME = ?`,
+    { replacements: [tableName, columnName] }
   );
 
   return Number(rows?.[0]?.total || 0) > 0;
@@ -53,9 +56,11 @@ async function foreignKeyExists(sequelize, tableName, constraintName) {
     `SELECT COUNT(*) AS total
        FROM information_schema.TABLE_CONSTRAINTS
       WHERE TABLE_SCHEMA = DATABASE()
-        AND TABLE_NAME = ${sequelize.escape(tableName)}
-        AND CONSTRAINT_NAME = ${sequelize.escape(constraintName)}
+        AND TABLE_NAME = ?
+        AND CONSTRAINT_NAME = ?
         AND CONSTRAINT_TYPE = 'FOREIGN KEY'`
+    ,
+    { replacements: [tableName, constraintName] }
   );
 
   return Number(rows?.[0]?.total || 0) > 0;
@@ -66,8 +71,9 @@ async function indexExists(sequelize, tableName, indexName) {
     `SELECT COUNT(*) AS total
        FROM information_schema.STATISTICS
       WHERE TABLE_SCHEMA = DATABASE()
-        AND TABLE_NAME = ${sequelize.escape(tableName)}
-        AND INDEX_NAME = ${sequelize.escape(indexName)}`
+        AND TABLE_NAME = ?
+        AND INDEX_NAME = ?`,
+    { replacements: [tableName, indexName] }
   );
 
   return Number(rows?.[0]?.total || 0) > 0;

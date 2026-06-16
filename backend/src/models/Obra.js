@@ -46,6 +46,34 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.DECIMAL(5, 2),
       allowNull: true,
       defaultValue: null
+    },
+    cno: {
+      type: DataTypes.STRING(40),
+      allowNull: true
+    },
+    endereco_logradouro: {
+      type: DataTypes.STRING(255),
+      allowNull: true
+    },
+    endereco_numero: {
+      type: DataTypes.STRING(50),
+      allowNull: true
+    },
+    endereco_complemento: {
+      type: DataTypes.STRING(120),
+      allowNull: true
+    },
+    endereco_bairro: {
+      type: DataTypes.STRING(120),
+      allowNull: true
+    },
+    endereco_cep: {
+      type: DataTypes.STRING(20),
+      allowNull: true
+    },
+    endereco_uf: {
+      type: DataTypes.STRING(2),
+      allowNull: true
     }
   });
 
