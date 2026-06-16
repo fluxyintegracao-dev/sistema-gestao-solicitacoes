@@ -494,22 +494,25 @@ function drawNFStyleHeader(doc, context, { continued = false } = {}) {
   cell(tableX + w4*3, w4r, r2y, rowH, 'Cond. pagamento', condPag, { drawRight: false });
   y += rowH;
 
-  // Linha 3: Contato | WhatsApp | E-mail | Ped. minimo | Atingiu
+  // Linha 3: Contato | WhatsApp | E-mail | Prazo entrega | Ped. minimo | Atingiu
   rowDivider(y);
   const r3y  = y;
-  const wC1  = Math.floor(tableW * 0.17);
-  const wC2  = Math.floor(tableW * 0.17);
-  const wC3  = Math.floor(tableW * 0.27);
-  const wC4  = Math.floor(tableW * 0.19);
-  const wC5  = tableW - wC1 - wC2 - wC3 - wC4;
+  const wC1  = Math.floor(tableW * 0.15);
+  const wC2  = Math.floor(tableW * 0.15);
+  const wC3  = Math.floor(tableW * 0.24);
+  const wC4  = Math.floor(tableW * 0.17);
+  const wC5  = Math.floor(tableW * 0.16);
+  const wC6  = tableW - wC1 - wC2 - wC3 - wC4 - wC5;
   const atingiuColor = pedido?.atingiu_pedido_minimo ? '#15803d' : '#b45309';
+  const prazoEntrega = pedido?.cotacaoFornecedor?.prazo_entrega || pedido?.prazo_entrega || '-';
 
   cell(tableX,                      wC1, r3y, rowH, 'Contato',      pedido?.fornecedor?.contato);
   cell(tableX + wC1,                wC2, r3y, rowH, 'WhatsApp',     pedido?.fornecedor?.whatsapp);
   cell(tableX + wC1 + wC2,          wC3, r3y, rowH, 'E-mail',       pedido?.fornecedor?.email);
-  cell(tableX + wC1 + wC2 + wC3,    wC4, r3y, rowH, 'Ped. minimo',
+  cell(tableX + wC1 + wC2 + wC3,    wC4, r3y, rowH, 'Prazo entrega', prazoEntrega);
+  cell(tableX + wC1 + wC2 + wC3 + wC4, wC5, r3y, rowH, 'Ped. minimo',
     pedido?.valor_minimo_pedido ? formatMoney(pedido.valor_minimo_pedido) : '-');
-  cell(tableX + wC1 + wC2 + wC3 + wC4, wC5, r3y, rowH, 'Atingiu minimo',
+  cell(tableX + wC1 + wC2 + wC3 + wC4 + wC5, wC6, r3y, rowH, 'Atingiu minimo',
     pedido?.atingiu_pedido_minimo ? 'Sim' : 'Nao',
     { bold: true, color: atingiuColor, drawRight: false });
   y += rowH;

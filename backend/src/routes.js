@@ -405,6 +405,7 @@ router.get('/configuracoes/tema', ConfiguracaoSistemaController.getTema);
 router.post('/cotacoes/upload', requireEnabledModule('COTACOES', { allowSuperadminBypass: false }), uploadRateLimit, uploadComprovantes.single('file'), CotacaoFornecedorController.upload);
 router.get('/cotacoes/:token/modelo', requireEnabledModule('COTACOES', { allowSuperadminBypass: false }), CotacaoFornecedorController.modelo);
 router.get('/cotacoes/:token/modelo-xlsx', requireEnabledModule('COTACOES', { allowSuperadminBypass: false }), CotacaoFornecedorController.modeloXlsx);
+router.get('/cotacoes/:token/pdf', requireEnabledModule('COTACOES', { allowSuperadminBypass: false }), CotacaoFornecedorController.pdf);
 router.get('/cotacoes/:token', requireEnabledModule('COTACOES', { allowSuperadminBypass: false }), CotacaoFornecedorController.show);
 router.post('/cotacoes/:token', requireEnabledModule('COTACOES', { allowSuperadminBypass: false }), CotacaoFornecedorController.responder);
 router.get('/crm/webhooks/meta', requireEnabledModule('CRM', { allowSuperadminBypass: false }), CrmWebhookMetaController.verify);
@@ -1374,6 +1375,7 @@ router.post('/compras/cotacoes/avulsa', requireEnabledModule('COTACOES'), Solici
 router.patch('/compras/solicitacoes/:id/integrar', validateRequest({ params: validateNumericIdParam('id', 'Solicitacao de compra'), body: validateCompraIntegrarBody }), requireCompraAccess, SolicitacaoCompraController.integrar);
 router.patch('/compras/solicitacoes/:id/liberar', validateRequest({ params: validateNumericIdParam('id', 'Solicitacao de compra') }), requireCompraAccess, SolicitacaoCompraController.liberar);
 router.post('/compras/solicitacoes/:id/enviar', validateRequest({ params: validateNumericIdParam('id', 'Solicitacao de compra'), body: validateCompraEnviarBody }), requireCompraAccess, SolicitacaoCompraController.enviarParaFornecedores);
+router.patch('/compras/solicitacoes/:id/recusar', validateRequest({ params: validateNumericIdParam('id', 'Solicitacao de compra') }), requireCompraAccess, SolicitacaoCompraController.recusar);
 router.patch('/compras/solicitacoes/:id/encerrar', validateRequest({ params: validateNumericIdParam('id', 'Solicitacao de compra'), body: validateCompraEncerrarBody }), requireCompraAccess, SolicitacaoCompraController.encerrar);
 router.post('/compras/solicitacoes/:id/pedidos', criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Solicitacao de compra'), body: validateCompraPedidoCreateBody }), requireCompraAccess, PedidoCompraController.createFromSolicitacao);
 router.get('/compras/pedidos', validateRequest({ query: validateCompraPedidoQuery }), scopeCompraListAccess, PedidoCompraController.index);

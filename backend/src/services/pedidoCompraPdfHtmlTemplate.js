@@ -218,6 +218,7 @@ function buildViewModel(pedido, options = {}) {
       fornecedorEmail: withFallback(pedido?.fornecedor?.email),
       obraNome: withFallback(pedido?.obra?.nome),
       condicaoPagamento: withFallback(pedido?.cotacaoFornecedor?.condicao_pagamento || pedido?.condicao_pagamento),
+      prazoEntrega: withFallback(pedido?.cotacaoFornecedor?.prazo_entrega || pedido?.prazo_entrega),
       valorTotal: formatMoneyBr(pedido?.valor_total),
       pedidoMinimo: pedido?.valor_minimo_pedido ? formatMoneyBr(pedido.valor_minimo_pedido) : '-',
       atingiuPedidoMinimo: Boolean(pedido?.atingiu_pedido_minimo),
@@ -703,6 +704,10 @@ function renderPedidoCompraPdfHtml(pedido, options = {}) {
               <div class="doc-data-cell">
                 <span class="doc-data-cell__label">Cond. pagamento</span>
                 <span class="doc-data-cell__value">${escapeHtml(h.condicaoPagamento)}</span>
+              </div>
+              <div class="doc-data-cell">
+                <span class="doc-data-cell__label">Prazo entrega</span>
+                <span class="doc-data-cell__value">${escapeHtml(h.prazoEntrega)}</span>
               </div>
               <div class="doc-data-cell">
                 <span class="doc-data-cell__label">Contato</span>

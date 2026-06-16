@@ -52,6 +52,10 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.TEXT,
         allowNull: true
       },
+      observacao_resposta: {
+        type: DataTypes.TEXT,
+        allowNull: true
+      },
       pdf_resposta_url: {
         type: DataTypes.TEXT,
         allowNull: true

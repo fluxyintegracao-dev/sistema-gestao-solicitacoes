@@ -155,6 +155,7 @@ export default function CotacaoFornecedorPublica() {
   const [valorMinimoPedido, setValorMinimoPedido] = useState('');
   const [condicoesPagamento, setCondicoesPagamento] = useState(() => criarCondicoesPagamentoVazias());
   const [prazoEntrega, setPrazoEntrega] = useState('');
+  const [observacaoResposta, setObservacaoResposta] = useState('');
 
   async function carregar() {
     try {
@@ -173,6 +174,7 @@ export default function CotacaoFornecedorPublica() {
       setValorMinimoPedido(data?.cotacao?.valor_minimo_pedido ?? '');
       setCondicoesPagamento(parseCondicoesPagamento(data?.cotacao?.condicao_pagamento ?? ''));
       setPrazoEntrega(data?.cotacao?.prazo_entrega ?? '');
+      setObservacaoResposta(data?.cotacao?.observacao_resposta ?? '');
     } catch (error) {
       console.error(error);
       alert(error.message || 'Erro ao carregar cotacao');
@@ -230,6 +232,22 @@ export default function CotacaoFornecedorPublica() {
       return;
     }
 
+    const itensSemPreco = itens.filter((item) => {
+      const statusDisp = item.status_disponibilidade || 'DISPONIVEL';
+      if (statusDisp === 'NAO_TEM') return false;
+      const preco = Number(String(item.preco ?? '').replace(',', '.'));
+      return !Number.isFinite(preco) || preco <= 0;
+    });
+
+    if (itensSemPreco.length > 0) {
+      const confirmar = window.confirm(
+        `${itensSemPreco.length} item(ns) estao sem preco preenchido. Deseja enviar mesmo assim?`
+      );
+      if (!confirmar) {
+        return;
+      }
+    }
+
     try {
       setSalvando(true);
       await responderCotacaoPublica(token, {
@@ -246,7 +264,8 @@ export default function CotacaoFornecedorPublica() {
         })),
         valor_minimo_pedido: valorMinimoPedido,
         condicao_pagamento: montarCondicaoPagamento(condicoesPagamento),
-        prazo_entrega: prazoEntrega
+        prazo_entrega: prazoEntrega,
+        observacao_resposta: observacaoResposta
       });
       await carregar();
       alert('Resposta enviada com sucesso.');
@@ -261,20 +280,13 @@ export default function CotacaoFornecedorPublica() {
   async function handleUploadArquivo(file) {
     try {
       if (!file) return;
-      if (!validarCabecalhoResposta()) {
-        return;
-      }
 
       setEnviandoPlanilha(true);
-      const resposta = await uploadPlanilhaCotacaoPublica(token, file, {
-        valor_minimo_pedido: valorMinimoPedido,
-        condicao_pagamento: montarCondicaoPagamento(condicoesPagamento),
-        prazo_entrega: prazoEntrega
-      });
+      const resposta = await uploadPlanilhaCotacaoPublica(token, file);
       await carregar();
       const tipoArquivoResposta = resposta?.cotacao?.arquivo_resposta_tipo;
       alert(tipoArquivoResposta
-        ? 'Arquivo recebido. Nossa equipe ira revisar e registrar os precos quando necessario.'
+        ? 'Arquivo anexado. Para finalizar, confira os dados do cabecalho e clique em Enviar resposta.'
         : 'Planilha importada com sucesso.');
     } catch (error) {
       console.error(error);
@@ -304,8 +316,8 @@ export default function CotacaoFornecedorPublica() {
   const arquivoRespostaUrl = dados.cotacao?.arquivo_resposta_url || dados.cotacao?.pdf_resposta_url || null;
   const arquivoRespostaTipo = dados.cotacao?.arquivo_resposta_tipo || 'ARQUIVO';
   const arquivoRespostaIsImage = Boolean(dados.cotacao?.arquivo_resposta_is_image);
-  const respondidaPorArquivo = Boolean(arquivoRespostaUrl);
-  const formularioBloqueado = dados.somente_leitura || respondidaPorArquivo;
+  const respostaFinalizada = String(statusCotacao).toUpperCase() === 'RESPONDIDO';
+  const formularioBloqueado = dados.somente_leitura || respostaFinalizada;
   const itensDisponiveis = itens.filter(
     (item) => (item.status_disponibilidade || 'DISPONIVEL') !== 'NAO_TEM'
   ).length;
@@ -357,7 +369,9 @@ export default function CotacaoFornecedorPublica() {
                 </a>
               )}
               <span>
-                Esta cotacao ja foi respondida por arquivo ({arquivoRespostaTipo}). Para alterar a resposta, fale com a equipe de compras.
+                {respostaFinalizada
+                  ? `Resposta finalizada com arquivo anexado (${arquivoRespostaTipo}).`
+                  : `Arquivo anexado (${arquivoRespostaTipo}). O envio so sera concluido ao clicar em Enviar resposta.`}
               </span>
               <a href={arquivoRespostaUrl} target="_blank" rel="noopener noreferrer"
                 className="ml-auto shrink-0 rounded border border-blue-300 px-2 py-0.5 text-[11px] hover:bg-blue-100">
@@ -442,11 +456,21 @@ export default function CotacaoFornecedorPublica() {
                 })}
               </div>
             </div>
+            <div className="col-span-2 sm:col-span-3 lg:col-span-6">
+              <p className="text-[10px] uppercase tracking-wide text-[var(--sol-text-soft)] mb-0.5">Observacao da cotacao</p>
+              <textarea
+                className="input min-h-[58px] w-full px-2 py-2 text-xs"
+                value={observacaoResposta}
+                disabled={formularioBloqueado}
+                onChange={(e) => setObservacaoResposta(e.target.value)}
+                placeholder="Informe condicoes comerciais, marcas principais, restricoes ou observacoes gerais da proposta."
+              />
+            </div>
           </div>
 
           {/* AÃ§Ãµes do card */}
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <label className={`btn btn-outline btn-sm text-xs h-7 px-3 cursor-pointer ${(enviandoPlanilha || formularioBloqueado) ? 'pointer-events-none opacity-60' : ''}`}>
+            <label className={`btn btn-primary btn-sm text-xs h-7 px-3 cursor-pointer ${(enviandoPlanilha || formularioBloqueado) ? 'pointer-events-none opacity-60' : ''}`}>
               <input
                 type="file"
                 className="hidden"
@@ -465,10 +489,10 @@ export default function CotacaoFornecedorPublica() {
                 type="button"
                 className="btn btn-primary btn-sm text-xs h-7 px-3 ml-auto"
                 onClick={handleSalvarOnline}
-                disabled={salvando || respondidaPorArquivo}
-                title={respondidaPorArquivo ? 'Cotacao ja respondida por arquivo.' : undefined}
+                disabled={salvando || respostaFinalizada}
+                title={respostaFinalizada ? 'Cotacao ja respondida.' : undefined}
               >
-                {respondidaPorArquivo ? 'Respondida por arquivo' : salvando ? 'Enviando...' : 'Enviar resposta'}
+                {respostaFinalizada ? 'Resposta enviada' : salvando ? 'Enviando...' : 'Enviar resposta'}
               </button>
             )}
           </div>
@@ -476,9 +500,7 @@ export default function CotacaoFornecedorPublica() {
 
         {/* InstruÃ§Ã£o resumida */}
         <p className="mt-2 mb-2 text-[11px] text-[var(--sol-text-soft)]">
-          {respondidaPorArquivo
-            ? 'A resposta por formulario fica bloqueada quando a cotacao ja foi respondida por arquivo.'
-            : 'Escolha apenas uma forma de resposta: preencha o formulario online ou envie um PDF/imagem.'}
+          O formulario e opcional: voce pode preencher os itens online ou apenas anexar um PDF/imagem da proposta e confirmar em Enviar resposta.
         </p>
 
         {/* Tabela */}

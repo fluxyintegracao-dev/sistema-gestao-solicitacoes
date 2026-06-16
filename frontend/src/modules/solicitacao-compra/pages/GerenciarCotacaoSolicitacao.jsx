@@ -13,7 +13,9 @@ import {
   listarFornecedoresCompra,
   obterComparativoSolicitacaoCompra,
   obterSolicitacaoCompra,
-  obterUrlAssinadaCompra
+  obterUrlAssinadaCompra,
+  obterUrlPdfCotacaoPublica,
+  recusarSolicitacaoCompra
 } from '../../../services/compras';
 import { listarCategoriasParceiro } from '../../../services/parceiros';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -44,6 +46,7 @@ function fmtMoeda(valor) {
 function clsStatus(status) {
   const v = String(status || '').toUpperCase();
   if (v === 'ENCERRADO') return 'app-status-pill bg-slate-100 text-slate-700';
+  if (v === 'RECUSADO') return 'app-status-pill bg-red-100 text-red-700';
   if (v === 'LIBERADO_PARA_COMPRA') return 'app-status-pill bg-emerald-100 text-emerald-700';
   return 'app-status-pill bg-blue-100 text-blue-700';
 }
@@ -96,8 +99,16 @@ function whatsappLink(numero, mensagem) {
   return `https://wa.me/${numero55}${mensagem ? `?text=${encodeURIComponent(mensagem)}` : ''}`;
 }
 
-function gerarMensagemCotacao(fornecedorNome, url, itens = []) {
-  const header = `Ola${fornecedorNome ? `, ${fornecedorNome}` : ''}!\n\nTemos uma cotacao disponivel para voce responder.\n\nLink da cotacao:\n${url}`;
+function gerarMensagemCotacao(fornecedorNome, url, itens = [], pdfUrl = '') {
+  const header = [
+    `Ola${fornecedorNome ? `, ${fornecedorNome}` : ''}!`,
+    '',
+    'Temos uma cotacao disponivel para voce.',
+    'O preenchimento direto no formulario e opcional: se preferir, voce pode apenas anexar/enviar o PDF ou imagem da sua cotacao.',
+    '',
+    `Link da cotacao: ${url}`,
+    pdfUrl ? `PDF da cotacao: ${pdfUrl}` : ''
+  ].filter(Boolean).join('\n');
   if (!itens.length) return header;
   const lista = itens
     .slice(0, 10)
@@ -396,7 +407,7 @@ function SecaoEnvioFornecedores({
       if (!vinculo?.token) return;
 
       const url = `${publicBase}/cotacao/${vinculo.token}`;
-      const msg = gerarMensagemCotacao(f.nome, url, itensCombinados);
+      const msg = gerarMensagemCotacao(f.nome, url, itensCombinados, obterUrlPdfCotacaoPublica(vinculo.token));
       links.push({ nome: f.nome, link: whatsappLink(f.whatsapp, msg) });
     });
 
@@ -409,7 +420,7 @@ function SecaoEnvioFornecedores({
       .filter((v) => v.fornecedor?.whatsapp)
       .map((v) => {
         const url = `${window.location.origin}/cotacao/${v.token}`;
-        const msg = gerarMensagemCotacao(v.fornecedor.nome, url, itensCombinados);
+        const msg = gerarMensagemCotacao(v.fornecedor.nome, url, itensCombinados, obterUrlPdfCotacaoPublica(v.token));
         return { nome: v.fornecedor.nome, link: whatsappLink(v.fornecedor.whatsapp, msg) };
       });
   }, [solicitacao, itensCombinados]);
@@ -608,6 +619,10 @@ function SecaoEnvioFornecedores({
                 <input className="input" placeholder="Ex.: Fornecedor ABC" value={novoFornecedor.nome} onChange={(e) => onChangeNovoFornecedor('nome', e.target.value)} />
               </label>
               <label className="grid gap-1 text-sm">
+                <span className="text-xs font-semibold text-[var(--c-muted)]">CNPJ</span>
+                <input className="input" placeholder="00.000.000/0000-00" value={novoFornecedor.cnpj} onChange={(e) => onChangeNovoFornecedor('cnpj', e.target.value)} />
+              </label>
+              <label className="grid gap-1 text-sm">
                 <span className="text-xs font-semibold text-[var(--c-muted)]">WhatsApp</span>
                 <input className="input" placeholder="(00) 00000-0000" value={novoFornecedor.whatsapp} onChange={(e) => onChangeNovoFornecedor('whatsapp', e.target.value)} />
               </label>
@@ -794,6 +809,7 @@ function SecaoComparativo({ comparativo, solicitacao, podeComprar, vencedoresSel
                       <th>Preco unit.</th>
                       <th>Total item</th>
                       <th>Prazo</th>
+                      <th>Cond. pag.</th>
                       <th>Qtd. min.</th>
                       <th>Observacao</th>
                       <th>Vencedor</th>
@@ -805,8 +821,8 @@ function SecaoComparativo({ comparativo, solicitacao, podeComprar, vencedoresSel
                       return (
                         <tr
                           key={`${item.id}-${resp.fornecedor_id}`}
-                          className={`${isVencedor ? 'bg-emerald-50' : ''} ${resp.resposta_item_id && podeComprar && solicitacao.status !== 'ENCERRADO' ? 'cursor-pointer hover:bg-emerald-50/60' : ''}`}
-                          onClick={() => resp.resposta_item_id && podeComprar && solicitacao.status !== 'ENCERRADO' && onVencedorChange(buildItemKey(item), String(resp.resposta_item_id))}
+                          className={`${isVencedor ? 'bg-emerald-50' : ''} ${resp.resposta_item_id && podeComprar ? 'cursor-pointer hover:bg-emerald-50/60' : ''}`}
+                          onClick={() => resp.resposta_item_id && podeComprar && onVencedorChange(buildItemKey(item), String(resp.resposta_item_id))}
                         >
                           <td className="text-xs font-medium">{resp.fornecedor_nome}</td>
                           <td>
@@ -819,6 +835,7 @@ function SecaoComparativo({ comparativo, solicitacao, podeComprar, vencedoresSel
                             {resp.preco ? fmtMoeda(Number(resp.preco) * Number(item.quantidade || 0)) : '-'}
                           </td>
                           <td>{resp.prazo || '-'}</td>
+                          <td className="max-w-[150px] text-xs">{resp.condicao_pagamento || '-'}</td>
                           <td>{resp.quantidade_minima_item || '-'}</td>
                           <td className="max-w-[160px] text-xs">{resp.observacao || '-'}</td>
                           <td>
@@ -840,10 +857,14 @@ function SecaoComparativo({ comparativo, solicitacao, podeComprar, vencedoresSel
             </div>
           ))}
 
-          {podeComprar && solicitacao.status !== 'ENCERRADO' && (
+          {podeComprar && String(solicitacao.status || '').toUpperCase() !== 'RECUSADO' && (
             <div className="app-page-actions justify-end">
               <button type="button" className="btn btn-primary" onClick={onEncerrar} disabled={encerrando}>
-                {encerrando ? 'Encerrando...' : 'Encerrar Cotacao e Definir Vencedores'}
+                {encerrando
+                  ? 'Atualizando...'
+                  : String(solicitacao.status || '').toUpperCase() === 'ENCERRADO'
+                    ? 'Atualizar vencedores e pedidos'
+                    : 'Encerrar Cotacao e Definir Vencedores'}
               </button>
             </div>
           )}
@@ -886,7 +907,7 @@ export default function GerenciarCotacaoSolicitacao() {
   const [enviandoFornecedores, setEnviandoFornecedores] = useState(false);
   const [encerrando, setEncerrando] = useState(false);
   const [fornecedoresSelecionados, setFornecedoresSelecionados] = useState([]);
-  const [novoFornecedor, setNovoFornecedor] = useState({ nome: '', email: '', whatsapp: '', contato: '' });
+  const [novoFornecedor, setNovoFornecedor] = useState({ nome: '', cnpj: '', email: '', whatsapp: '', contato: '' });
   const [vencedoresSelecionados, setVencedoresSelecionados] = useState({});
 
   const perfilUpper = String(user?.perfil || '').toUpperCase();
@@ -1038,14 +1059,20 @@ export default function GerenciarCotacaoSolicitacao() {
       const payload = [];
       fornecedoresSelecionados.forEach((fornecedorId) => payload.push({ fornecedor_id: Number(fornecedorId) }));
       if (String(novoFornecedor.nome || '').trim()) {
-        payload.push({ nome: novoFornecedor.nome, email: novoFornecedor.email, whatsapp: novoFornecedor.whatsapp, contato: novoFornecedor.contato });
+        payload.push({
+          nome: novoFornecedor.nome,
+          cnpj: novoFornecedor.cnpj,
+          email: novoFornecedor.email,
+          whatsapp: novoFornecedor.whatsapp,
+          contato: novoFornecedor.contato
+        });
       }
       if (!payload.length) { alert('Selecione ou cadastre ao menos um fornecedor.'); return; }
 
       setEnviandoFornecedores(true);
       await enviarSolicitacaoCompraParaFornecedores(id, { fornecedores: payload });
       setFornecedoresSelecionados([]);
-      setNovoFornecedor({ nome: '', email: '', whatsapp: '', contato: '' });
+      setNovoFornecedor({ nome: '', cnpj: '', email: '', whatsapp: '', contato: '' });
       await carregarTudo();
       alert('Links de cotacao gerados. Use os botoes de WhatsApp para enviar a mensagem a cada fornecedor.');
     } catch (error) {
@@ -1062,7 +1089,7 @@ export default function GerenciarCotacaoSolicitacao() {
       const fornecedor = await criarFornecedorCompra(novoFornecedor);
       setFornecedores((atual) => [...atual, fornecedor].sort((a, b) => String(a.nome).localeCompare(String(b.nome))));
       setFornecedoresSelecionados((atual) => [...atual, String(fornecedor.id)]);
-      setNovoFornecedor({ nome: '', email: '', whatsapp: '', contato: '' });
+      setNovoFornecedor({ nome: '', cnpj: '', email: '', whatsapp: '', contato: '' });
       alert('Fornecedor criado e selecionado.');
     } catch (error) {
       console.error(error);
@@ -1088,6 +1115,23 @@ export default function GerenciarCotacaoSolicitacao() {
       alert(error.message || 'Erro ao encerrar cotacao');
     } finally {
       setEncerrando(false);
+    }
+  }
+
+  async function handleRecusarSolicitacao() {
+    const motivo = window.prompt('Informe o motivo da recusa da solicitacao de compra:');
+    if (motivo === null) return;
+
+    const confirmado = window.confirm('Confirmar recusa desta solicitacao de compra?');
+    if (!confirmado) return;
+
+    try {
+      await recusarSolicitacaoCompra(id, { motivo });
+      await carregarTudo();
+      alert('Solicitacao de compra recusada.');
+    } catch (error) {
+      console.error(error);
+      alert(error.message || 'Erro ao recusar solicitacao de compra');
     }
   }
 
@@ -1123,6 +1167,11 @@ export default function GerenciarCotacaoSolicitacao() {
             <button type="button" className="btn btn-outline" onClick={() => navigate('/cotacoes')}>
               Lista de cotacoes
             </button>
+            {podeComprar && !['ENCERRADO', 'RECUSADO'].includes(String(solicitacao.status || '').toUpperCase()) && (
+              <button type="button" className="btn btn-outline text-red-700 hover:border-red-200 hover:bg-red-50" onClick={handleRecusarSolicitacao}>
+                Recusar
+              </button>
+            )}
             <button type="button" className="btn btn-primary" onClick={handleAbrirPdf} disabled={baixando}>
               {baixando ? 'Abrindo...' : 'Abrir PDF'}
             </button>
@@ -1231,7 +1280,10 @@ export default function GerenciarCotacaoSolicitacao() {
                       const pedidoFornecedor = pedidosPorFornecedor.get(Number(cotacaoFornecedor.fornecedor_compra_id));
                       const possuiRespostaArquivo = Boolean(cotacaoFornecedor.pdf_resposta_url);
                       const linkWa = cotacaoFornecedor.fornecedor?.whatsapp
-                        ? whatsappLink(cotacaoFornecedor.fornecedor.whatsapp, gerarMensagemCotacao(cotacaoFornecedor.fornecedor.nome, publicUrl, itensCombinados))
+                        ? whatsappLink(
+                            cotacaoFornecedor.fornecedor.whatsapp,
+                            gerarMensagemCotacao(cotacaoFornecedor.fornecedor.nome, publicUrl, itensCombinados, obterUrlPdfCotacaoPublica(cotacaoFornecedor.token))
+                          )
                         : null;
 
                       return (

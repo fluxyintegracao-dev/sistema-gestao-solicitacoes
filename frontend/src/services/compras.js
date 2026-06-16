@@ -233,6 +233,15 @@ export async function liberarSolicitacaoCompra(id) {
   return handleJsonResponse(response, 'Erro ao liberar solicitacao para compra');
 }
 
+export async function recusarSolicitacaoCompra(id, data = {}) {
+  const response = await fetch(`${API_URL}/compras/solicitacoes/${id}/recusar`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+  return handleJsonResponse(response, 'Erro ao recusar solicitacao de compra');
+}
+
 export async function enviarSolicitacaoCompraParaFornecedores(id, data) {
   const response = await fetch(`${API_URL}/compras/solicitacoes/${id}/enviar`, {
     method: 'POST',
@@ -520,15 +529,16 @@ export async function uploadPlanilhaCotacaoPublica(token, file, data = {}) {
   const formData = new FormData();
   formData.append('token', token);
   formData.append('file', file);
-  formData.append('valor_minimo_pedido', data.valor_minimo_pedido ?? '');
-  formData.append('condicao_pagamento', data.condicao_pagamento ?? '');
-  formData.append('prazo_entrega', data.prazo_entrega ?? '');
 
   const response = await fetch(`${API_URL}/cotacoes/upload`, {
     method: 'POST',
     body: formData
   });
   return handleJsonResponse(response, 'Erro ao enviar arquivo da cotacao');
+}
+
+export function obterUrlPdfCotacaoPublica(token) {
+  return `${API_URL}/cotacoes/${encodeURIComponent(token)}/pdf`;
 }
 
 export async function baixarModeloCotacaoPublica(token) {

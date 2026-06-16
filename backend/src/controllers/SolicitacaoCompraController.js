@@ -602,6 +602,9 @@ function montarComparativoSolicitacao(solicitacao) {
     whatsapp: cotacaoFornecedor.fornecedor?.whatsapp || '',
     valor_minimo_pedido: cotacaoFornecedor.valor_minimo_pedido ?? null,
     prazo_entrega: cotacaoFornecedor.prazo_entrega || '',
+    condicao_pagamento: cotacaoFornecedor.condicao_pagamento || '',
+    observacao_resposta: cotacaoFornecedor.observacao_resposta || '',
+    arquivo_resposta_url: cotacaoFornecedor.pdf_resposta_url || null,
     status: cotacaoFornecedor.status,
     token: cotacaoFornecedor.token,
     enviado_em: cotacaoFornecedor.enviado_em,
@@ -622,7 +625,14 @@ function montarComparativoSolicitacao(solicitacao) {
         cotacao_fornecedor_id: cotacaoFornecedor.id,
         fornecedor_id: cotacaoFornecedor.fornecedor?.id || cotacaoFornecedor.fornecedor_compra_id,
         fornecedor_nome: cotacaoFornecedor.fornecedor?.nome || '-',
+        fornecedor_whatsapp: cotacaoFornecedor.fornecedor?.whatsapp || '',
+        fornecedor_email: cotacaoFornecedor.fornecedor?.email || '',
+        fornecedor_compra_id: cotacaoFornecedor.fornecedor_compra_id || null,
         status_fornecedor: cotacaoFornecedor.status,
+        condicao_pagamento: cotacaoFornecedor.condicao_pagamento || '',
+        prazo_entrega_fornecedor: cotacaoFornecedor.prazo_entrega || '',
+        observacao_resposta: cotacaoFornecedor.observacao_resposta || '',
+        arquivo_resposta_url: cotacaoFornecedor.pdf_resposta_url || null,
         resposta_item_id: resposta?.id || null,
         disponivel: Boolean(resposta?.disponivel),
         preco: resposta?.preco ?? null,
@@ -1549,6 +1559,7 @@ module.exports = {
           fornecedor = await FornecedorCompra.create(
             {
               nome: String(entry.nome).trim(),
+              cnpj: entry.cnpj ? String(entry.cnpj).trim() : null,
               email: entry.email ? String(entry.email).trim() : null,
               whatsapp: entry.whatsapp ? String(entry.whatsapp).trim() : null,
               contato: entry.contato ? String(entry.contato).trim() : null,
@@ -1626,6 +1637,62 @@ module.exports = {
     }
   },
 
+  async recusar(req, res) {
+    const transaction = await SolicitacaoCompra.sequelize.transaction();
+
+    try {
+      const usuario = await validarAcesso(req, res);
+      if (!usuario) {
+        await transaction.rollback();
+        return;
+      }
+
+      if (!(await validarAcessoCompras(usuario))) {
+        await transaction.rollback();
+        return res.status(403).json({ error: 'Apenas compras pode recusar solicitacoes de compra' });
+      }
+
+      const solicitacao = await SolicitacaoCompra.findByPk(req.params.id, { transaction });
+      if (!solicitacao) {
+        await transaction.rollback();
+        return res.status(404).json({ error: 'Solicitacao nao encontrada' });
+      }
+
+      if (['ENCERRADO', 'RECUSADO'].includes(normalizeTextCompra(solicitacao.status))) {
+        await transaction.rollback();
+        return res.status(400).json({ error: 'Esta solicitacao nao pode ser recusada novamente' });
+      }
+
+      const motivo = String(req.body?.motivo || '').trim();
+      await solicitacao.update(
+        {
+          status: 'RECUSADO',
+          observacoes: motivo
+            ? [solicitacao.observacoes, `Recusa compras: ${motivo}`].filter(Boolean).join('\n')
+            : solicitacao.observacoes
+        },
+        { transaction }
+      );
+
+      await registrarLogSolicitacaoCompra({
+        solicitacaoCompraId: solicitacao.id,
+        usuarioId: usuario.id,
+        tipoAcao: 'RECUSA_COMPRA',
+        descricao: motivo ? `Solicitacao recusada: ${motivo}` : 'Solicitacao recusada pelo setor de compras',
+        metadados: { motivo: motivo || null },
+        transaction
+      });
+
+      await transaction.commit();
+      const atualizada = await carregarSolicitacaoCompra(req.params.id);
+      return res.json(atualizada);
+    } catch (error) {
+      await transaction.rollback();
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao recusar solicitacao de compra' });
+    }
+  },
+
   async comparativo(req, res) {
     try {
       const usuario = await validarAcesso(req, res);
@@ -1662,11 +1729,6 @@ module.exports = {
       if (!solicitacao) {
         await transaction.rollback();
         return res.status(404).json({ error: 'Solicitacao nao encontrada' });
-      }
-
-      if (normalizeTextCompra(solicitacao.status) === 'ENCERRADO') {
-        await transaction.rollback();
-        return res.status(400).json({ error: 'Cotacao ja encerrada' });
       }
 
       const vencedores = Array.isArray(req.body?.vencedores) ? req.body.vencedores : [];
@@ -1716,7 +1778,9 @@ module.exports = {
         solicitacaoCompraId: solicitacaoDb.id,
         usuarioId: usuario.id,
         tipoAcao: 'ENCERRAMENTO',
-        descricao: 'Cotacao encerrada com vencedores definidos',
+        descricao: normalizeTextCompra(solicitacao.status) === 'ENCERRADO'
+          ? 'Cotacao reencerrada com vencedores atualizados'
+          : 'Cotacao encerrada com vencedores definidos',
         metadados: {
           vencedores: vencedores.map((item) => item.resposta_item_id)
         },
