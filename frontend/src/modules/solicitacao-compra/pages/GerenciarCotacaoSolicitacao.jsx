@@ -1341,19 +1341,6 @@ export default function GerenciarCotacaoSolicitacao() {
                   {registrandoComentario ? 'Registrando...' : 'Registrar comentario'}
                 </button>
               </div>
-              {Array.isArray(solicitacao.logs) && solicitacao.logs.some((log) => log.tipo_acao === 'COMENTARIO_COTACAO') && (
-                <div className="mt-3 grid gap-2">
-                  {solicitacao.logs
-                    .filter((log) => log.tipo_acao === 'COMENTARIO_COTACAO')
-                    .slice(0, 3)
-                    .map((log) => (
-                      <div key={log.id} className="rounded-xl border border-[var(--c-border)] bg-slate-50 px-3 py-2 text-sm">
-                        <div className="font-medium text-[var(--c-text)]">{log.usuario?.nome || 'Compras'}</div>
-                        <div className="whitespace-pre-wrap text-[var(--c-muted)]">{log.descricao}</div>
-                      </div>
-                    ))}
-                </div>
-              )}
             </div>
           )}
 

@@ -1235,14 +1235,6 @@ module.exports = {
         return responderCompraAguardandoDiretoria(res);
       }
 
-      await registrarLogSolicitacaoCompra({
-        solicitacaoCompraId: solicitacao.id,
-        usuarioId: usuario.id,
-        tipoAcao: 'COMENTARIO_COTACAO',
-        descricao: comentario,
-        transaction
-      });
-
       if (solicitacao.solicitacao_principal_id) {
         await Historico.create(
           {
