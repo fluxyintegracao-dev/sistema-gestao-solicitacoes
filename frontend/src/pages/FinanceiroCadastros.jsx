@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  HiOutlineMagnifyingGlass,
+  HiOutlinePencilSquare,
+  HiXMark
+} from 'react-icons/hi2';
+import {
   atualizarCartaoFinanceiro,
   atualizarCategoriaFinanceira,
   atualizarContaBancaria,
@@ -334,12 +339,16 @@ export default function FinanceiroCadastros() {
   const [error, setError] = useState('');
   const [categoriaFiltro, setCategoriaFiltro] = useState('');
   const [categoriaTipoFiltro, setCategoriaTipoFiltro] = useState('TODAS');
+  const [categoriasModalAberto, setCategoriasModalAberto] = useState(false);
+  const [categoriasModalAba, setCategoriasModalAba] = useState('PAGAR');
+  const [categoriasModalBusca, setCategoriasModalBusca] = useState('');
   const [favorecidoForm, setFavorecidoForm] = useState(defaultFavorecidoForm());
   const [favorecidos, setFavorecidos] = useState([]);
   const [savingFavorecido, setSavingFavorecido] = useState(false);
   const [loadingFavorecidos, setLoadingFavorecidos] = useState(false);
   const categoriaFormRef = useRef(null);
   const categoriaNomeInputRef = useRef(null);
+  const categoriaFiltroNormalizado = useMemo(() => normalizeSearchText(categoriaFiltro).trim(), [categoriaFiltro]);
 
   async function carregar() {
     try {
@@ -373,7 +382,11 @@ export default function FinanceiroCadastros() {
   }, []);
 
   const categoriasFiltradas = useMemo(() => {
-    const search = normalizeSearchText(categoriaFiltro);
+    const search = categoriaFiltroNormalizado;
+    if (!search) {
+      return [];
+    }
+
     return [...categorias]
       .filter((categoria) => {
         const tipoCategoria = String(categoria.tipo || 'AMBOS').trim().toUpperCase();
@@ -393,7 +406,33 @@ export default function FinanceiroCadastros() {
         return nome.includes(search) || descricao.includes(search) || tipo.includes(search) || classificacao.includes(search);
       })
       .sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR', { sensitivity: 'base' }));
-  }, [categoriaFiltro, categoriaTipoFiltro, categorias]);
+  }, [categoriaFiltroNormalizado, categoriaTipoFiltro, categorias]);
+
+  const categoriasModalFiltradas = useMemo(() => {
+    const search = normalizeSearchText(categoriasModalBusca).trim();
+    const tiposPermitidos = categoriasModalAba === 'PAGAR' ? ['PAGAR', 'AMBOS'] : ['RECEBER', 'AMBOS'];
+
+    return [...categorias]
+      .filter((categoria) => {
+        const tipoCategoria = String(categoria.tipo || 'AMBOS').trim().toUpperCase();
+        if (!tiposPermitidos.includes(tipoCategoria)) {
+          return false;
+        }
+        if (!search) {
+          return true;
+        }
+        const texto = normalizeSearchText([
+          categoria.nome,
+          categoria.descricao,
+          categoria.classificacao_gerencial,
+          categoria.dre_grupo,
+          categoria.dre_subgrupo,
+          tipoCategoria
+        ].filter(Boolean).join(' '));
+        return texto.includes(search);
+      })
+      .sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR', { sensitivity: 'base' }));
+  }, [categorias, categoriasModalAba, categoriasModalBusca]);
 
   const secoesCategorias = useMemo(() => {
     const grupos = [
@@ -533,6 +572,7 @@ export default function FinanceiroCadastros() {
 
   function handleEditarCategoria(categoria) {
     setCategoriaForm(pickCategoriaFormData(categoria));
+    setCategoriasModalAberto(false);
     window.setTimeout(() => {
       categoriaFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       categoriaNomeInputRef.current?.focus({ preventScroll: true });
@@ -1068,12 +1108,26 @@ export default function FinanceiroCadastros() {
                     </p>
                   </div>
                   <div className="finance-category-toolbar-actions">
-                    <input
-                      className="input w-full md:max-w-sm"
-                      placeholder="Buscar categoria por nome, tipo ou descricao"
-                      value={categoriaFiltro}
-                      onChange={(e) => setCategoriaFiltro(e.target.value)}
-                    />
+                    <div className="finance-category-search-line">
+                      <input
+                        className="input w-full"
+                        placeholder="Digite para listar categorias"
+                        value={categoriaFiltro}
+                        onChange={(e) => setCategoriaFiltro(e.target.value)}
+                      />
+                      <button
+                        type="button"
+                        className="btn btn-outline finance-category-search-button"
+                        onClick={() => {
+                          setCategoriasModalBusca('');
+                          setCategoriasModalAberto(true);
+                        }}
+                        aria-label="Abrir catalogo de categorias financeiras"
+                        title="Abrir catalogo de categorias"
+                      >
+                        <HiOutlineMagnifyingGlass className="h-5 w-5" />
+                      </button>
+                    </div>
                     <div className="finance-category-toggle-group" role="tablist" aria-label="Filtro de categorias financeiras">
                       {Object.entries(CATEGORIA_TIPO_META).map(([key, meta]) => (
                         <button
@@ -1090,10 +1144,14 @@ export default function FinanceiroCadastros() {
                 </div>
               </div>
               <div className="app-note">
-                Na criacao do titulo, o sistema mostra apenas categorias compatíveis com o tipo escolhido e mantem as compartilhadas disponiveis nos dois fluxos.
+                Digite parte do nome, descricao ou classificacao para localizar rapidamente. Use a lupa para consultar o catalogo completo por tipo de titulo.
               </div>
               {categorias.length === 0 ? (
                 <p className="text-sm text-[var(--c-muted)]">Nenhuma categoria financeira cadastrada.</p>
+              ) : !categoriaFiltroNormalizado ? (
+                <div className="app-empty-card">
+                  Comece digitando para listar categorias financeiras ou abra a lupa para consultar todas.
+                </div>
               ) : categoriasFiltradas.length === 0 ? (
                 <p className="text-sm text-[var(--c-muted)]">Nenhuma categoria encontrada para esse filtro.</p>
               ) : (
@@ -1499,6 +1557,112 @@ export default function FinanceiroCadastros() {
           </div>
         </div>
         </>
+      )}
+      {categoriasModalAberto && (
+        <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="categorias-financeiras-modal-title">
+          <div className="modal-dialog modal-dialog--xl finance-category-modal">
+            <div className="modal-header">
+              <div>
+                <h2 id="categorias-financeiras-modal-title" className="text-lg font-semibold text-[var(--c-text)]">
+                  Catalogo de categorias financeiras
+                </h2>
+                <p className="text-sm text-[var(--c-muted)]">
+                  Consulte todas as categorias por fluxo e edite sem sair dos cadastros financeiros.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="btn btn-outline btn-icon"
+                onClick={() => setCategoriasModalAberto(false)}
+                aria-label="Fechar catalogo de categorias"
+              >
+                <HiXMark className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="modal-body finance-category-modal-body">
+              <div className="finance-category-modal-controls">
+                <div className="finance-category-toggle-group" role="tablist" aria-label="Tipo de categoria no catalogo">
+                  {[
+                    ['PAGAR', 'Contas a pagar'],
+                    ['RECEBER', 'Contas a receber']
+                  ].map(([key, label]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      className={`finance-category-toggle ${categoriasModalAba === key ? 'finance-category-toggle--active' : ''}`}
+                      onClick={() => setCategoriasModalAba(key)}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <div className="finance-category-search-line">
+                  <input
+                    className="input w-full"
+                    placeholder="Filtrar por nome, descricao, DRE ou classificacao"
+                    value={categoriasModalBusca}
+                    onChange={(event) => setCategoriasModalBusca(event.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="finance-category-modal-summary">
+                <span className="app-status-pill bg-slate-100 text-slate-700">
+                  {categoriasModalFiltradas.length} categoria(s)
+                </span>
+                <span>
+                  Categorias compartilhadas aparecem nas duas abas porque podem ser usadas nos dois fluxos.
+                </span>
+              </div>
+
+              {categoriasModalFiltradas.length === 0 ? (
+                <div className="app-empty-card">
+                  Nenhuma categoria encontrada nesta aba.
+                </div>
+              ) : (
+                <div className="finance-category-modal-table" role="table" aria-label="Categorias financeiras cadastradas">
+                  <div className="finance-category-modal-row finance-category-modal-row--head" role="row">
+                    <span>Acoes</span>
+                    <span>Categoria</span>
+                    <span>Tipo</span>
+                    <span>DRE</span>
+                    <span>Status</span>
+                  </div>
+                  {categoriasModalFiltradas.map((categoria) => (
+                    <div key={categoria.id} className="finance-category-modal-row" role="row">
+                      <div className="finance-category-modal-actions">
+                        <button
+                          type="button"
+                          className="btn btn-outline btn-icon"
+                          onClick={() => handleEditarCategoria(categoria)}
+                          aria-label={`Editar categoria ${categoria.nome}`}
+                          title="Editar categoria"
+                        >
+                          <HiOutlinePencilSquare className="h-4 w-4" />
+                        </button>
+                      </div>
+                      <div>
+                        <strong>{categoria.nome}</strong>
+                        <small>{categoria.descricao || 'Sem descricao complementar.'}</small>
+                      </div>
+                      <span className={categoriaTipoBadgeClass(String(categoria.tipo || 'AMBOS').trim().toUpperCase())}>
+                        {categoriaTipoLabel(String(categoria.tipo || 'AMBOS').trim().toUpperCase())}
+                      </span>
+                      <div>
+                        <strong>{categoria.considera_dre === false ? 'Nao considera' : (categoria.dre_grupo || 'Nao classificada')}</strong>
+                        {categoria.dre_subgrupo && <small>{categoria.dre_subgrupo}</small>}
+                      </div>
+                      <span className={statusClass(categoria.ativo)}>
+                        {categoria.ativo ? 'ATIVA' : 'INATIVA'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
