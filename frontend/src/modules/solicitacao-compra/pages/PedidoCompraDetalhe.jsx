@@ -26,16 +26,49 @@ function formatMoney(value) {
   });
 }
 
+function parseBrazilianMoney(value) {
+  if (value === '' || value === null || value === undefined) {
+    return null;
+  }
+
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : null;
+  }
+
+  const raw = String(value).trim().replace(/[^\d,.-]/g, '');
+  if (!raw) {
+    return null;
+  }
+
+  const normalized = raw.includes(',')
+    ? raw.replace(/\./g, '').replace(',', '.')
+    : raw;
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function formatMoneyInput(value) {
+  const parsed = parseBrazilianMoney(value);
+  if (parsed === null) {
+    return '';
+  }
+
+  return parsed.toLocaleString('pt-BR', {
+    style: 'currency',
+    currency: 'BRL'
+  });
+}
+
+function sanitizeMoneyInput(value) {
+  return String(value ?? '').replace(/[^\d,.\sR$-]/g, '');
+}
+
 function toNullableNumber(value) {
   if (value === '' || value === null || value === undefined) {
     return null;
   }
 
-  const normalized = typeof value === 'string'
-    ? value.trim().replace(',', '.')
-    : value;
-  const parsed = Number(normalized);
-  return Number.isFinite(parsed) ? parsed : null;
+  return parseBrazilianMoney(value);
 }
 
 function formatUnitPrice(value, unidade, fallback = '-') {
@@ -289,7 +322,7 @@ export default function PedidoCompraDetalhe() {
       (data?.itens || []).forEach((item) => {
         proximasEdicoes[item.id] = {
           quantidade_pedido: formatBrazilianQuantity(item.quantidade_pedido),
-          preco_unitario: item.preco_unitario ?? '',
+          preco_unitario: formatMoneyInput(item.preco_unitario),
           observacoes: item.observacoes || ''
         };
       });
@@ -423,8 +456,14 @@ export default function PedidoCompraDetalhe() {
 
   async function handleSalvarItem(itemId) {
     try {
+      const edicao = edicoes[itemId] || {};
+      const payload = {
+        ...edicao,
+        preco_unitario: parseBrazilianMoney(edicao.preco_unitario)
+      };
+
       setSavingItemId(itemId);
-      await atualizarItemPedidoCompra(id, itemId, edicoes[itemId] || {});
+      await atualizarItemPedidoCompra(id, itemId, payload);
       await carregar();
       fecharModalEdicao();
       alert('Item atualizado com auditoria registrada.');
@@ -1135,21 +1174,24 @@ export default function PedidoCompraDetalhe() {
       </div>
 
       {modalEdicaoAberto && itemEditando ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0, 0, 0, 0.45)' }}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4" style={{ background: 'rgba(0, 0, 0, 0.45)' }}>
           <div
-            className="w-full max-w-4xl rounded-2xl border p-6"
+            className="flex w-full flex-col rounded-2xl border"
             style={{
               background: 'var(--ui-surface)',
               borderColor: 'var(--ui-border)',
-              boxShadow: '0 30px 60px rgba(0,0,0,0.2)'
+              boxShadow: '0 30px 60px rgba(0,0,0,0.2)',
+              maxHeight: 'calc(100vh - 32px)',
+              maxWidth: '1080px',
+              overflow: 'hidden'
             }}
           >
-            <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--c-border)] px-4 py-3 sm:px-5">
               <div>
-                <h2 className="text-xl font-bold" style={{ color: 'var(--c-text)' }}>
+                <h2 className="text-lg font-bold" style={{ color: 'var(--c-text)' }}>
                   {podeGerenciarPedido && !itemEditando.removido ? 'Editar item do pedido' : 'Detalhes do item'}
                 </h2>
-                <p className="mt-1 text-sm" style={{ color: 'var(--c-muted)' }}>
+                <p className="mt-0.5 text-xs" style={{ color: 'var(--c-muted)' }}>
                   PC-{String(pedido.id).padStart(5, '0')} - {itemEditando.descricao}
                 </p>
               </div>
@@ -1158,28 +1200,29 @@ export default function PedidoCompraDetalhe() {
               </button>
             </div>
 
-            {itemEditando.removido ? (
-              <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-[var(--c-muted)]">
-                Este item foi removido do pedido. Ele permanece visivel para consulta, mas a trilha detalhada agora fica no
-                painel administrativo de relatorios.
-              </div>
-            ) : null}
+            <div className="overflow-y-auto px-4 py-3 sm:px-5 sm:py-4">
+              {itemEditando.removido ? (
+                <div className="mb-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-[var(--c-muted)]">
+                  Este item foi removido do pedido. Ele permanece visivel para consulta, mas a trilha detalhada agora fica no
+                  painel administrativo de relatorios.
+                </div>
+              ) : null}
 
-            {itemEditandoAbaixoMinimo ? (
-              <div className="mt-4 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-700">
-                A quantidade atual do pedido ainda esta abaixo do minimo definido para este item.
-              </div>
-            ) : null}
+              {itemEditandoAbaixoMinimo ? (
+                <div className="mb-3 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                  A quantidade atual do pedido ainda esta abaixo do minimo definido para este item.
+                </div>
+              ) : null}
 
-            <div className="mt-6 grid gap-4 lg:grid-cols-[minmax(0,1.5fr)_320px]">
-              <div className="grid gap-4">
-                {!itemEditando.removido ? (
-                  <>
-                    <div className="grid gap-4 md:grid-cols-3">
+              <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_240px]">
+                <div className="grid gap-3">
+                  {!itemEditando.removido ? (
+                    <>
+                      <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_180px]">
                       <label className="grid gap-2 text-sm font-medium">
                         Quantidade do pedido
                         <input
-                          className="input"
+                          className="input h-11"
                           type="text"
                           inputMode="decimal"
                           value={edicaoItemAtual.quantidade_pedido ?? ''}
@@ -1204,15 +1247,19 @@ export default function PedidoCompraDetalhe() {
                       <label className="grid gap-2 text-sm font-medium">
                         Preco unitario
                         <input
-                          className="input"
-                          type="number"
-                          min="0"
-                          step="0.01"
+                          className="input h-11"
+                          type="text"
+                          inputMode="decimal"
                           value={edicaoItemAtual.preco_unitario ?? ''}
                           disabled={pedidoBloqueado}
                           onChange={(event) =>
                             atualizarEdicaoItem(itemEditando.id, {
-                              preco_unitario: event.target.value
+                              preco_unitario: sanitizeMoneyInput(event.target.value)
+                            })
+                          }
+                          onBlur={(event) =>
+                            atualizarEdicaoItem(itemEditando.id, {
+                              preco_unitario: formatMoneyInput(event.target.value)
                             })
                           }
                         />
@@ -1220,9 +1267,9 @@ export default function PedidoCompraDetalhe() {
 
                       <div className="grid gap-2 text-sm font-medium">
                         <span>Valor recalculado</span>
-                        <div className="input flex items-center bg-slate-50">
+                        <div className="input flex h-11 items-center bg-slate-50">
                           {formatMoney(
-                            parseBrazilianQuantity(edicaoItemAtual.quantidade_pedido) * Number(edicaoItemAtual.preco_unitario || 0)
+                            parseBrazilianQuantity(edicaoItemAtual.quantidade_pedido) * (parseBrazilianMoney(edicaoItemAtual.preco_unitario) || 0)
                           )}
                         </div>
                       </div>
@@ -1231,7 +1278,7 @@ export default function PedidoCompraDetalhe() {
                     <label className="grid gap-2 text-sm font-medium">
                       Observacoes do item
                       <textarea
-                        className="input min-h-[120px]"
+                        className="input min-h-[84px]"
                         value={edicaoItemAtual.observacoes ?? ''}
                         disabled={pedidoBloqueado}
                         onChange={(event) =>
@@ -1243,17 +1290,17 @@ export default function PedidoCompraDetalhe() {
                     </label>
                   </>
                 ) : (
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-[var(--c-muted)]">
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-[var(--c-muted)]">
                     Item removido do fluxo ativo. Use o atalho de auditoria para consultar toda a trilha historica.
                   </div>
                 )}
               </div>
 
-              <div className="rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4">
+              <div className="rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-3">
                 <div className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--c-muted)]">
                   Resumo do item
                 </div>
-                <div className="mt-4 grid gap-3 text-sm">
+                <div className="mt-3 grid gap-2 text-xs">
                   <div>
                     <div className="text-[var(--c-muted)]">Situacao</div>
                     <div className="mt-1">
@@ -1301,7 +1348,7 @@ export default function PedidoCompraDetalhe() {
                 </div>
 
                 {businessAdmin ? (
-                  <button type="button" className="btn btn-outline mt-4 w-full justify-center" onClick={() => abrirAuditoria(itemEditando.id)}>
+                  <button type="button" className="btn btn-outline mt-3 w-full justify-center" onClick={() => abrirAuditoria(itemEditando.id)}>
                     Abrir auditoria do item
                   </button>
                 ) : null}
@@ -1309,11 +1356,11 @@ export default function PedidoCompraDetalhe() {
             </div>
 
             {podeGerenciarPedido && !itemEditando.removido ? (
-              <div className="mt-6 rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4">
+              <div className="mt-4 rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-3">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <h3 className="font-semibold">Remanejar quantidade para outro fornecedor</h3>
-                    <p className="mt-1 text-sm text-[var(--c-muted)]">
+                    <p className="mt-0.5 text-xs text-[var(--c-muted)]">
                       Use quando parte ou todo o item precisar voltar para a cotacao e seguir em outro pedido.
                     </p>
                   </div>
@@ -1321,9 +1368,9 @@ export default function PedidoCompraDetalhe() {
                     Max. {formatQuantityLabel(itemEditando.quantidade_pedido, itemEditando.unidade)}
                   </span>
                 </div>
-                <div className="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_180px_auto]">
+                <div className="mt-3 grid gap-2 md:grid-cols-[minmax(0,1fr)_150px_auto]">
                   <select
-                    className="input"
+                    className="input h-11"
                     value={remanejoSelecionado}
                     onChange={(event) => setRemanejoSelecionado(event.target.value)}
                     disabled={pedidoBloqueado || remanejandoItem || candidatosRemanejamentoItem.length === 0}
@@ -1338,7 +1385,7 @@ export default function PedidoCompraDetalhe() {
                     ))}
                   </select>
                   <input
-                    className="input"
+                    className="input h-11"
                     type="text"
                     inputMode="decimal"
                     value={remanejoQuantidade}
@@ -1359,11 +1406,11 @@ export default function PedidoCompraDetalhe() {
               </div>
             ) : null}
 
-            <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
-              <div className="text-xs text-[var(--c-muted)]">
-                A trilha de auditoria saiu desta tela para evitar sobrecarga visual em pedidos grandes.
-              </div>
-              <div className="flex flex-wrap gap-2">
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                <div className="text-xs text-[var(--c-muted)]">
+                  A trilha de auditoria saiu desta tela para evitar sobrecarga visual em pedidos grandes.
+                </div>
+                <div className="flex flex-wrap gap-2">
                 {podeGerenciarPedido && !itemEditando.removido ? (
                   <button
                     type="button"
@@ -1387,6 +1434,7 @@ export default function PedidoCompraDetalhe() {
                     {savingItemId === itemEditando.id ? 'Salvando...' : 'Salvar ajustes'}
                   </button>
                 ) : null}
+                </div>
               </div>
             </div>
           </div>

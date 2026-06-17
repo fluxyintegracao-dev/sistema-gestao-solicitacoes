@@ -131,10 +131,9 @@ function gerarMensagemCotacao(fornecedorNome, url, itens = [], pdfUrl = '') {
   ].filter(Boolean).join('\n');
 }
 
-function ModalPedidoFinal({ fornecedor, itensGanhos, solicitacaoId, onRemanejamento, onFechar }) {
+function ModalPedidoFinal({ fornecedor, itensGanhos, solicitacaoId, fornecedoresCotacao = [], onRemanejamento, onFechar }) {
   const [itensSelecionados, setItensSelecionados] = useState([]);
   const [destinoFornecedorId, setDestinoFornecedorId] = useState('');
-  const [fornecedoresDisponiveis, setFornecedoresDisponiveis] = useState([]);
   const [modoRemanejar, setModoRemanejar] = useState(false);
 
   const totalGanho = useMemo(() => {
@@ -145,13 +144,17 @@ function ModalPedidoFinal({ fornecedor, itensGanhos, solicitacaoId, onRemanejame
     }, 0);
   }, [itensGanhos]);
 
-  useEffect(() => {
-    if (modoRemanejar) {
-      listarFornecedoresCompra({}).then((data) => {
-        setFornecedoresDisponiveis(Array.isArray(data) ? data : []);
-      }).catch(() => {});
-    }
-  }, [modoRemanejar]);
+  const fornecedoresDestinoCotacao = useMemo(() => {
+    const fornecedores = Array.isArray(fornecedoresCotacao) ? fornecedoresCotacao : [];
+    return fornecedores
+      .filter((vinculo) => Number(vinculo.fornecedor_compra_id) !== Number(fornecedor.fornecedor_compra_id))
+      .map((vinculo) => ({
+        id: vinculo.fornecedor_compra_id,
+        nome: vinculo.fornecedor?.nome || vinculo.nome || 'Fornecedor'
+      }))
+      .filter((vinculo, index, lista) => vinculo.id && lista.findIndex((item) => Number(item.id) === Number(vinculo.id)) === index)
+      .sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'pt-BR'));
+  }, [fornecedor.fornecedor_compra_id, fornecedoresCotacao]);
 
   function toggleItem(respItemId) {
     setItensSelecionados((prev) =>
@@ -256,8 +259,7 @@ function ModalPedidoFinal({ fornecedor, itensGanhos, solicitacaoId, onRemanejame
                 onChange={(e) => setDestinoFornecedorId(e.target.value)}
               >
                 <option value="">Selecionar fornecedor destino...</option>
-                {fornecedoresDisponiveis
-                  .filter((f) => f.id !== fornecedor.fornecedor_compra_id)
+                {fornecedoresDestinoCotacao
                   .map((f) => (
                     <option key={f.id} value={f.id}>{f.nome}</option>
                   ))
@@ -932,6 +934,7 @@ function SecaoComparativo({ comparativo, solicitacao, podeComprar, vencedoresSel
           fornecedor={modalFornecedor.fornecedor}
           itensGanhos={modalFornecedor.itensGanhos}
           solicitacaoId={solicitacao?.id}
+          fornecedoresCotacao={solicitacao?.fornecedores || []}
           onRemanejamento={({ itensIds, destinoFornecedorId }) => {
             alert(`Remanejamento registrado: ${itensIds.length} item(ns) para fornecedor ID ${destinoFornecedorId}.\n\nPara concluir, ajuste manualmente os vencedores no comparativo abaixo e encerre a cotacao novamente.`);
             setModalFornecedor(null);
