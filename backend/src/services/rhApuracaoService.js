@@ -11,6 +11,7 @@ const {
   User,
   sequelize
 } = require('../models');
+const { Op } = require('sequelize');
 const { ValidationError } = require('../middlewares/validation');
 
 const APURACAO_ITEM_INCLUDE = [
@@ -219,6 +220,20 @@ async function resolveExistingDraft(data, transaction) {
 }
 
 async function buildAgrupamentoImportacoes(data, transaction) {
+  const importacaoWhere = {
+    status: 'CONFIRMADA',
+    competencia: data.competencia,
+    empresa_grupo_id: data.empresa_grupo_id,
+    ...(data.tipo_vinculo ? { tipo_vinculo: data.tipo_vinculo } : {})
+  };
+
+  if (data.obra_id) {
+    importacaoWhere[Op.or] = [
+      { obra_id: data.obra_id },
+      { obra_id: null }
+    ];
+  }
+
   const linhas = await RhImportacaoLinha.findAll({
     where: {
       status: 'CONFIRMADA'
@@ -229,13 +244,7 @@ async function buildAgrupamentoImportacoes(data, transaction) {
         as: 'importacao',
         required: true,
         attributes: ['id', 'tipo', 'competencia', 'empresa_grupo_id', 'obra_id', 'tipo_vinculo'],
-        where: {
-          status: 'CONFIRMADA',
-          competencia: data.competencia,
-          empresa_grupo_id: data.empresa_grupo_id,
-          ...(data.obra_id ? { obra_id: data.obra_id } : {}),
-          ...(data.tipo_vinculo ? { tipo_vinculo: data.tipo_vinculo } : {})
-        }
+        where: importacaoWhere
       },
       {
         model: RhColaborador,

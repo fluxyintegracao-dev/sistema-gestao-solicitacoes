@@ -4,8 +4,11 @@ import { getMinhasObras } from '../services/obras';
 import { buscarParceiros } from '../services/parceiros';
 import { getEmpresasGrupo } from '../services/empresasGrupo';
 import {
+  atualizarPaymentBeneficiary,
   atualizarTituloFinanceiro,
+  criarPaymentBeneficiary,
   getCategoriasFinanceiras,
+  getPaymentBeneficiaries,
   getTituloFinanceiroById
 } from '../services/financeiro';
 import { listarApropriacoes } from '../services/apropriacoes';
@@ -13,6 +16,7 @@ import { formatCurrencyInput, normalizeCurrencyTyping } from '../utils/formatter
 
 const FORMAS_COBRANCA = ['BOLETO', 'PIX', 'OUTROS'];
 const STATUS_COBRANCA = ['PENDENTE_EMISSAO', 'EMITIDO', 'PAGO_BANCO', 'CONCILIADO', 'CANCELADO'];
+const PIX_TIPOS_CHAVE = ['CPF', 'CNPJ', 'EMAIL', 'TELEFONE', 'ALEATORIA'];
 const TIPOS_INTERCOMPANY = [
   ['APORTE', 'Aporte'],
   ['EMPRESTIMO', 'Emprestimo'],
@@ -78,6 +82,34 @@ function SearchIcon() {
       <path d="m21 21-4.3-4.3" />
     </svg>
   );
+}
+
+function getParceiroPixOptions(parceiro) {
+  if (!parceiro) return [];
+  return [
+    {
+      id: 'pix_chave_fixa_1',
+      label: 'Chave fixa 1',
+      tipo: parceiro.pix_chave_fixa_1_tipo,
+      chave: parceiro.pix_chave_fixa_1
+    },
+    {
+      id: 'pix_chave_fixa_2',
+      label: 'Chave fixa 2',
+      tipo: parceiro.pix_chave_fixa_2_tipo,
+      chave: parceiro.pix_chave_fixa_2
+    },
+    {
+      id: 'pix_chave_variavel',
+      label: 'Chave variavel',
+      tipo: parceiro.pix_chave_variavel_tipo,
+      chave: parceiro.pix_chave_variavel
+    }
+  ].filter((item) => item.tipo && item.chave);
+}
+
+function getParceiroPixPrincipal(parceiro) {
+  return getParceiroPixOptions(parceiro)[0] || null;
 }
 
 function getTituloBloqueado(titulo) {
@@ -158,6 +190,16 @@ export default function FinanceiroTituloEditar() {
   const [parceiroModalDocumentoBusca, setParceiroModalDocumentoBusca] = useState('');
   const [parceiroModalResultados, setParceiroModalResultados] = useState([]);
   const [loadingParceiroModal, setLoadingParceiroModal] = useState(false);
+  const [beneficiaries, setBeneficiaries] = useState([]);
+  const [paymentDraft, setPaymentDraft] = useState({
+    preparar_pagamento_pix: false,
+    usar_credor_como_favorecido: false,
+    payment_beneficiary_id: '',
+    nome: '',
+    cpf_cnpj: '',
+    pix_tipo_chave: 'CNPJ',
+    pix_chave: ''
+  });
 
   useEffect(() => {
     let active = true;
@@ -270,6 +312,53 @@ export default function FinanceiroTituloEditar() {
     [categorias, form?.categoria_financeira_id]
   );
   const bloqueio = useMemo(() => getTituloBloqueado(titulo), [titulo]);
+  const parceiroSelecionado = useMemo(
+    () => parceiros.find((item) => String(item.id) === String(form?.parceiro_id)) || null,
+    [form?.parceiro_id, parceiros]
+  );
+  const parceiroPixOptions = useMemo(() => getParceiroPixOptions(parceiroSelecionado), [parceiroSelecionado]);
+
+  useEffect(() => {
+    if (!form || form.tipo !== 'PAGAR' || !form.parceiro_id) {
+      setBeneficiaries([]);
+      setPaymentDraft((current) => ({
+        ...current,
+        usar_credor_como_favorecido: false,
+        payment_beneficiary_id: '',
+        nome: '',
+        cpf_cnpj: '',
+        pix_chave: ''
+      }));
+      return undefined;
+    }
+
+    let active = true;
+    getPaymentBeneficiaries({ parceiro_id: form.parceiro_id })
+      .then((data) => {
+        if (!active) return;
+        const lista = Array.isArray(data) ? data : [];
+        setBeneficiaries(lista);
+        const beneficiary = lista.find((item) => item.ativo !== false) || lista[0];
+        if (beneficiary) {
+          setPaymentDraft((current) => ({
+            ...current,
+            preparar_pagamento_pix: true,
+            payment_beneficiary_id: current.usar_credor_como_favorecido ? '' : String(beneficiary.id),
+            nome: current.usar_credor_como_favorecido ? current.nome : (beneficiary.nome || current.nome),
+            cpf_cnpj: current.usar_credor_como_favorecido ? current.cpf_cnpj : (beneficiary.cpf_cnpj || current.cpf_cnpj),
+            pix_tipo_chave: current.usar_credor_como_favorecido ? current.pix_tipo_chave : (beneficiary.pix_tipo_chave || current.pix_tipo_chave),
+            pix_chave: current.usar_credor_como_favorecido ? current.pix_chave : (beneficiary.pix_chave || current.pix_chave)
+          }));
+        }
+      })
+      .catch(() => {
+        if (active) setBeneficiaries([]);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [form?.tipo, form?.parceiro_id]);
 
   useEffect(() => {
     if (!form || !empresaDaObraId || String(form.empresa_id || '') === String(empresaDaObraId)) {
@@ -281,6 +370,19 @@ export default function FinanceiroTituloEditar() {
       empresa_id: empresaDaObraId
     }));
   }, [empresaDaObraId, form]);
+
+  function resetPaymentDraft() {
+    setBeneficiaries([]);
+    setPaymentDraft((current) => ({
+      ...current,
+      preparar_pagamento_pix: false,
+      usar_credor_como_favorecido: false,
+      payment_beneficiary_id: '',
+      nome: '',
+      cpf_cnpj: '',
+      pix_chave: ''
+    }));
+  }
 
   function updateField(field, value) {
     setForm((current) => {
@@ -307,13 +409,44 @@ export default function FinanceiroTituloEditar() {
     });
   }
 
+  function handleTipoChange(value) {
+    updateField('tipo', value);
+    if (value !== 'PAGAR') {
+      resetPaymentDraft();
+    }
+  }
+
   function selecionarParceiro(parceiro) {
     setParceiroBusca(parceiro?.nome || '');
     setForm((current) => ({
       ...current,
       parceiro_id: parceiro?.id ? String(parceiro.id) : ''
     }));
+    setPaymentDraft((current) => {
+      if (!current.usar_credor_como_favorecido) return current;
+      const pix = getParceiroPixPrincipal(parceiro);
+      return {
+        ...current,
+        payment_beneficiary_id: '',
+        nome: parceiro?.nome || '',
+        cpf_cnpj: parceiro?.cpf_cnpj || '',
+        pix_tipo_chave: pix?.tipo || current.pix_tipo_chave || 'CNPJ',
+        pix_chave: pix?.chave || ''
+      };
+    });
     setParceiroModalOpen(false);
+  }
+
+  function preencherFavorecidoComParceiro(parceiro) {
+    const pix = getParceiroPixPrincipal(parceiro);
+    setPaymentDraft((current) => ({
+      ...current,
+      payment_beneficiary_id: '',
+      nome: parceiro?.nome || '',
+      cpf_cnpj: parceiro?.cpf_cnpj || '',
+      pix_tipo_chave: pix?.tipo || current.pix_tipo_chave || 'CNPJ',
+      pix_chave: pix?.chave || ''
+    }));
   }
 
   async function pesquisarParceirosModal() {
@@ -404,6 +537,28 @@ export default function FinanceiroTituloEditar() {
         tipo_intercompany: form.intercompany ? form.tipo_intercompany || null : null,
         motivo_intercompany: form.intercompany ? form.motivo_intercompany || null : null
       };
+      if (form.tipo === 'PAGAR' && paymentDraft.preparar_pagamento_pix) {
+        if (!form.parceiro_id || !paymentDraft.nome || !paymentDraft.cpf_cnpj || !paymentDraft.pix_tipo_chave || !paymentDraft.pix_chave) {
+          throw new Error('Preencha os dados PIX do favorecido para pagamento em massa.');
+        }
+
+        const beneficiaryPayload = {
+          parceiro_id: Number(form.parceiro_id),
+          nome: paymentDraft.nome,
+          cpf_cnpj: paymentDraft.cpf_cnpj,
+          metodo_preferencial: 'PIX_CHAVE',
+          pix_tipo_chave: paymentDraft.pix_tipo_chave,
+          pix_chave: paymentDraft.pix_chave,
+          ativo: true
+        };
+
+        if (paymentDraft.payment_beneficiary_id) {
+          await atualizarPaymentBeneficiary(paymentDraft.payment_beneficiary_id, beneficiaryPayload);
+        } else {
+          await criarPaymentBeneficiary(beneficiaryPayload);
+        }
+      }
+
       const atualizado = await atualizarTituloFinanceiro(id, payload);
       navigate(`/financeiro/titulos/${atualizado.id}`);
     } catch (err) {
@@ -451,7 +606,7 @@ export default function FinanceiroTituloEditar() {
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <label className="form-field">
             <span>Tipo</span>
-            <select value={form.tipo} onChange={(event) => updateField('tipo', event.target.value)} disabled={Boolean(bloqueio)}>
+            <select value={form.tipo} onChange={(event) => handleTipoChange(event.target.value)} disabled={Boolean(bloqueio)}>
               <option value="PAGAR">Conta a pagar</option>
               <option value="RECEBER">Conta a receber</option>
             </select>
@@ -640,6 +795,147 @@ export default function FinanceiroTituloEditar() {
                 <input value={form.codigo_barras} onChange={(event) => updateField('codigo_barras', event.target.value)} disabled={Boolean(bloqueio)} />
               </label>
             </div>
+          </div>
+        )}
+
+        {form.tipo === 'PAGAR' && (
+          <div className="rounded-xl border border-[var(--c-border)] p-4">
+            <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+              <div>
+                <h2 className="text-base font-semibold text-[var(--c-text)]">Favorecido PIX para pagamento em massa</h2>
+                <p className="text-xs text-[var(--c-muted)]">
+                  Cadastre ou atualize o favorecido usado quando este credor entrar em lotes PIX por chave.
+                </p>
+              </div>
+              <label className="flex items-center gap-2 text-sm text-[var(--c-text)]">
+                <input
+                  type="checkbox"
+                  checked={paymentDraft.preparar_pagamento_pix}
+                  onChange={(event) => setPaymentDraft((current) => ({ ...current, preparar_pagamento_pix: event.target.checked }))}
+                  disabled={Boolean(bloqueio)}
+                />
+                Preparar PIX
+              </label>
+            </div>
+
+            {paymentDraft.preparar_pagamento_pix && (
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-12">
+                <label className="flex items-start gap-2 text-sm text-[var(--c-text)] xl:col-span-4">
+                  <input
+                    type="checkbox"
+                    checked={paymentDraft.usar_credor_como_favorecido}
+                    onChange={(event) => {
+                      const checked = event.target.checked;
+                      setPaymentDraft((current) => ({ ...current, usar_credor_como_favorecido: checked }));
+                      if (checked && parceiroSelecionado) preencherFavorecidoComParceiro(parceiroSelecionado);
+                    }}
+                    disabled={Boolean(bloqueio) || !parceiroSelecionado}
+                  />
+                  <span>
+                    Usar o mesmo credor como favorecido
+                    <span className="mt-1 block text-xs text-[var(--c-muted)]">
+                      Preenche nome, CPF/CNPJ e a primeira chave PIX cadastrada no credor.
+                    </span>
+                  </span>
+                </label>
+
+                <label className="form-field xl:col-span-4">
+                  <span>Favorecido bancario vinculado</span>
+                  <select
+                    value={paymentDraft.payment_beneficiary_id}
+                    onChange={(event) => {
+                      const selected = beneficiaries.find((item) => String(item.id) === String(event.target.value));
+                      setPaymentDraft((current) => ({
+                        ...current,
+                        usar_credor_como_favorecido: false,
+                        payment_beneficiary_id: event.target.value,
+                        nome: selected?.nome || current.nome,
+                        cpf_cnpj: selected?.cpf_cnpj || current.cpf_cnpj,
+                        pix_tipo_chave: selected?.pix_tipo_chave || current.pix_tipo_chave,
+                        pix_chave: selected?.pix_chave || current.pix_chave
+                      }));
+                    }}
+                    disabled={Boolean(bloqueio)}
+                  >
+                    <option value="">Novo favorecido</option>
+                    {beneficiaries.map((beneficiary) => (
+                      <option key={beneficiary.id} value={beneficiary.id}>
+                        {beneficiary.nome} - {beneficiary.pix_chave || 'sem PIX'}
+                      </option>
+                    ))}
+                  </select>
+                  <small className="text-xs text-[var(--c-muted)]">
+                    Se nao houver favorecido salvo, informe os dados abaixo.
+                  </small>
+                </label>
+
+                {paymentDraft.usar_credor_como_favorecido && parceiroPixOptions.length > 1 && (
+                  <label className="form-field xl:col-span-4">
+                    <span>Chave PIX do credor</span>
+                    <select
+                      value={`${paymentDraft.pix_tipo_chave}:${paymentDraft.pix_chave}`}
+                      onChange={(event) => {
+                        const selected = parceiroPixOptions.find((item) => `${item.tipo}:${item.chave}` === event.target.value);
+                        if (!selected) return;
+                        setPaymentDraft((current) => ({
+                          ...current,
+                          pix_tipo_chave: selected.tipo,
+                          pix_chave: selected.chave
+                        }));
+                      }}
+                      disabled={Boolean(bloqueio)}
+                    >
+                      {parceiroPixOptions.map((item) => (
+                        <option key={item.id} value={`${item.tipo}:${item.chave}`}>
+                          {item.label} - {item.tipo} {item.chave}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+
+                <label className="form-field xl:col-span-3">
+                  <span>Nome favorecido</span>
+                  <input
+                    value={paymentDraft.nome}
+                    onChange={(event) => setPaymentDraft((current) => ({ ...current, nome: event.target.value }))}
+                    disabled={Boolean(bloqueio)}
+                    required={paymentDraft.preparar_pagamento_pix}
+                  />
+                </label>
+                <label className="form-field xl:col-span-2">
+                  <span>CPF/CNPJ</span>
+                  <input
+                    value={paymentDraft.cpf_cnpj}
+                    onChange={(event) => setPaymentDraft((current) => ({ ...current, cpf_cnpj: event.target.value }))}
+                    disabled={Boolean(bloqueio)}
+                    required={paymentDraft.preparar_pagamento_pix}
+                  />
+                </label>
+                <label className="form-field xl:col-span-2">
+                  <span>Tipo chave PIX</span>
+                  <select
+                    value={paymentDraft.pix_tipo_chave}
+                    onChange={(event) => setPaymentDraft((current) => ({ ...current, pix_tipo_chave: event.target.value }))}
+                    disabled={Boolean(bloqueio)}
+                  >
+                    {PIX_TIPOS_CHAVE.map((tipo) => <option key={tipo} value={tipo}>{tipo}</option>)}
+                  </select>
+                </label>
+                <label className="form-field xl:col-span-5">
+                  <span>Chave PIX</span>
+                  <input
+                    value={paymentDraft.pix_chave}
+                    onChange={(event) => setPaymentDraft((current) => ({ ...current, pix_chave: event.target.value }))}
+                    disabled={Boolean(bloqueio)}
+                    required={paymentDraft.preparar_pagamento_pix}
+                  />
+                </label>
+                <div className="rounded-lg border border-[var(--c-border)] bg-[var(--c-surface-muted)] px-3 py-2 text-xs text-[var(--c-muted)] xl:col-span-12">
+                  O lote de pagamento cria um snapshot do favorecido no momento da montagem. Ajustes feitos aqui valem para os proximos lotes.
+                </div>
+              </div>
+            )}
           </div>
         )}
 

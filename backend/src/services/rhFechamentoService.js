@@ -289,11 +289,6 @@ function validarEmpresaApuracaoParaTitulo(apuracao) {
     throw new ValidationError('A apuracao RH/DP precisa estar vinculada a uma empresa do grupo antes de gerar titulos financeiros.');
   }
 
-  const empresaObraId = apuracao?.obra?.empresa_grupo_id ? Number(apuracao.obra.empresa_grupo_id) : null;
-  if (empresaObraId && empresaObraId !== empresaApuracaoId) {
-    throw new ValidationError('A empresa da apuracao RH/DP deve ser a mesma vinculada a obra/centro de custo informado.');
-  }
-
   return empresaApuracaoId;
 }
 
