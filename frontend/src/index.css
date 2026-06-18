@@ -9357,7 +9357,52 @@ body {
 }
 
 .layout-shell .rhdp-apuracao-items-table {
-  min-width: 122rem;
+  min-width: 136rem;
+  table-layout: fixed;
+}
+
+.layout-shell .rhdp-apuracao-items-table .rhdp-apuracao-colaborador-col {
+  width: 13.5rem;
+}
+
+.layout-shell .rhdp-apuracao-items-table .rhdp-apuracao-vinculo-col {
+  width: 8.5rem;
+}
+
+.layout-shell .rhdp-apuracao-items-table .rhdp-apuracao-numero-col {
+  width: 5.5rem;
+}
+
+.layout-shell .rhdp-apuracao-items-table .rhdp-apuracao-horas-col {
+  width: 8.5rem;
+}
+
+.layout-shell .rhdp-apuracao-items-table .rhdp-apuracao-moeda-col {
+  width: 9rem;
+}
+
+.layout-shell .rhdp-apuracao-items-table .rhdp-apuracao-liquido-col {
+  width: 11rem;
+}
+
+.layout-shell .rhdp-apuracao-items-table .rhdp-apuracao-pix-col {
+  width: 15rem;
+}
+
+.layout-shell .rhdp-apuracao-items-table .rhdp-apuracao-ajuste-col {
+  width: 9rem;
+}
+
+.layout-shell .rhdp-apuracao-items-table .rhdp-apuracao-status-col {
+  width: 10rem;
+}
+
+.layout-shell .rhdp-apuracao-items-table .rhdp-apuracao-observacoes-col {
+  width: 15rem;
+}
+
+.layout-shell .rhdp-apuracao-items-table .rhdp-apuracao-acoes-col {
+  width: 10rem;
 }
 
 .layout-shell .rhdp-apuracao-table th,
@@ -9365,12 +9410,21 @@ body {
   padding-block: 0.48rem;
 }
 
+.layout-shell .rhdp-apuracao-items-table th {
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+  line-height: 0.95rem;
+  white-space: normal;
+}
+
 .layout-shell .rhdp-apuracao-table td,
 .layout-shell .rhdp-apuracao-items-table td {
   padding-block: 0.5rem;
+  vertical-align: middle;
 }
 
 .layout-shell .rhdp-apuracao-items-table .form-control {
+  width: 100%;
   min-height: 2.35rem;
   padding: 0.5rem 0.65rem;
   font-size: 0.78rem;

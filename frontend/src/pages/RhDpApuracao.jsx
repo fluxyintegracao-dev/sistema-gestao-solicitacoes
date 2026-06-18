@@ -843,6 +843,21 @@ export default function RhDpApuracao() {
           ) : (
             <div className="app-dense-table-wrapper rhdp-apuracao-items-wrapper">
               <table className="app-dense-data-table rhdp-apuracao-items-table">
+                <colgroup>
+                  <col className="rhdp-apuracao-colaborador-col" />
+                  <col className="rhdp-apuracao-vinculo-col" />
+                  <col className="rhdp-apuracao-numero-col" />
+                  <col className="rhdp-apuracao-horas-col" />
+                  <col className="rhdp-apuracao-moeda-col" />
+                  <col className="rhdp-apuracao-moeda-col" />
+                  <col className="rhdp-apuracao-liquido-col" />
+                  <col className="rhdp-apuracao-pix-col" />
+                  <col className="rhdp-apuracao-ajuste-col" />
+                  <col className="rhdp-apuracao-ajuste-col" />
+                  <col className="rhdp-apuracao-status-col" />
+                  <col className="rhdp-apuracao-observacoes-col" />
+                  <col className="rhdp-apuracao-acoes-col" />
+                </colgroup>
                 <thead>
                   <tr className="border-b border-slate-200 text-left text-slate-500">
                     <th className="px-3 py-2 font-medium">Colaborador</th>
