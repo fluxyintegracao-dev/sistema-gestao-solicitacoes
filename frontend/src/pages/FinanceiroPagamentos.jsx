@@ -30,6 +30,7 @@ import {
   simularRetornoPaymentBatch,
   submeterPaymentBatch
 } from '../services/financeiro';
+import { getObras } from '../services/obras';
 import { useAuth } from '../contexts/AuthContext';
 import {
   canApprovePagamentos,
@@ -106,6 +107,25 @@ function compactFilters(filters = {}) {
   return Object.fromEntries(
     Object.entries(filters).filter(([, value]) => value !== undefined && value !== null && String(value).trim() !== '')
   );
+}
+
+function normalizeListResponse(data) {
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.data)) return data.data;
+  if (Array.isArray(data?.items)) return data.items;
+  return [];
+}
+
+function normalizeSearchText(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
+function getObraLabel(obra = {}) {
+  return [obra.codigo, obra.nome].filter(Boolean).join(' - ') || `Obra #${obra.id}`;
 }
 
 function sumBy(list, fieldName) {
@@ -263,6 +283,7 @@ export default function FinanceiroPagamentos() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('titulos');
   const [accounts, setAccounts] = useState([]);
+  const [obras, setObras] = useState([]);
   const [titulos, setTitulos] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
   const [batches, setBatches] = useState([]);
@@ -276,8 +297,11 @@ export default function FinanceiroPagamentos() {
     vencimento_final: '',
     parceiro_id: '',
     obra_id: '',
-    categoria_financeira_id: ''
+    categoria_financeira_id: '',
+    somente_rh_dp: false
   });
+  const [obraSearch, setObraSearch] = useState('');
+  const [obraSuggestionsOpen, setObraSuggestionsOpen] = useState(false);
   const [batchForm, setBatchForm] = useState({
     payment_account_id: '',
     data_programada: today()
@@ -318,19 +342,29 @@ export default function FinanceiroPagamentos() {
     return true;
   }), [canAudit, canConfirmBaixa]);
 
+  const obrasFiltradas = useMemo(() => {
+    const term = normalizeSearchText(obraSearch);
+    if (!term) return [];
+    return obras
+      .filter((obra) => normalizeSearchText(`${obra.codigo || ''} ${obra.nome || ''}`).includes(term))
+      .slice(0, 8);
+  }, [obraSearch, obras]);
+
   async function loadBase() {
     try {
       setLoading(true);
       setError('');
-      const [accountsData, batchesData, baixaData, bbHealthData] = await Promise.all([
+      const [accountsData, batchesData, baixaData, bbHealthData, obrasData] = await Promise.all([
         getPaymentAccounts().catch(() => []),
         getPaymentBatches().catch(() => []),
         getPaymentsAwaitingBaixa().catch(() => []),
-        getBbPaymentsHealth().catch(() => null)
+        getBbPaymentsHealth().catch(() => null),
+        getObras().catch(() => [])
       ]);
       const accountList = Array.isArray(accountsData) ? accountsData : [];
       const firstOperationalAccount = accountList.find((account) => getPaymentAccountPendencies(account).length === 0);
       setAccounts(accountList);
+      setObras(normalizeListResponse(obrasData));
       setBatches(Array.isArray(batchesData) ? batchesData : []);
       setAwaitingBaixa(Array.isArray(baixaData) ? baixaData : []);
       setBbHealth(bbHealthData);
@@ -343,6 +377,24 @@ export default function FinanceiroPagamentos() {
     } finally {
       setLoading(false);
     }
+  }
+
+  function handleObraSearchChange(value) {
+    setObraSearch(value);
+    setObraSuggestionsOpen(Boolean(value.trim()));
+    setFilters((current) => ({ ...current, obra_id: '' }));
+  }
+
+  function handleSelectObra(obra) {
+    setObraSearch(getObraLabel(obra));
+    setObraSuggestionsOpen(false);
+    setFilters((current) => ({ ...current, obra_id: String(obra.id || '') }));
+  }
+
+  function handleClearObra() {
+    setObraSearch('');
+    setObraSuggestionsOpen(false);
+    setFilters((current) => ({ ...current, obra_id: '' }));
   }
 
   async function loadTitulos() {
@@ -802,9 +854,56 @@ export default function FinanceiroPagamentos() {
                     <span className="sol-filter-label">Parceiro ID</span>
                     <input className="input w-full" inputMode="numeric" value={filters.parceiro_id} onChange={(e) => setFilters((c) => ({ ...c, parceiro_id: e.target.value }))} />
                   </label>
-                  <label className="sol-filter-field xl:col-span-2">
-                    <span className="sol-filter-label">Obra ID</span>
-                    <input className="input w-full" inputMode="numeric" value={filters.obra_id} onChange={(e) => setFilters((c) => ({ ...c, obra_id: e.target.value }))} />
+                  <div className="sol-filter-field relative xl:col-span-3">
+                    <span className="sol-filter-label">Obra</span>
+                    <div className="flex gap-2">
+                      <input
+                        className="input w-full"
+                        value={obraSearch}
+                        placeholder="Digite o nome da obra"
+                        onChange={(e) => handleObraSearchChange(e.target.value)}
+                        onFocus={() => setObraSuggestionsOpen(Boolean(obraSearch.trim()))}
+                      />
+                      {(obraSearch || filters.obra_id) && (
+                        <button type="button" className="btn btn-outline px-3" onClick={handleClearObra}>
+                          Limpar
+                        </button>
+                      )}
+                    </div>
+                    {obraSuggestionsOpen && (
+                      <div className="absolute left-3 right-3 top-[calc(100%-0.5rem)] z-20 max-h-64 overflow-y-auto rounded-lg border border-slate-200 bg-white p-2 shadow-xl">
+                        {obrasFiltradas.length > 0 ? (
+                          obrasFiltradas.map((obra) => (
+                            <button
+                              key={obra.id}
+                              type="button"
+                              className="block w-full rounded-md px-3 py-2 text-left text-sm hover:bg-slate-50"
+                              onMouseDown={(event) => event.preventDefault()}
+                              onClick={() => handleSelectObra(obra)}
+                            >
+                              <span className="font-semibold text-[var(--c-text)]">{obra.nome || `Obra #${obra.id}`}</span>
+                              {obra.codigo && <span className="ml-2 text-xs text-[var(--c-muted)]">Codigo {obra.codigo}</span>}
+                            </button>
+                          ))
+                        ) : (
+                          <div className="px-3 py-2 text-sm text-[var(--c-muted)]">Nenhuma obra encontrada com esse texto.</div>
+                        )}
+                      </div>
+                    )}
+                    <span className="app-note mt-2">
+                      Selecione uma obra da lista para aplicar o filtro.
+                    </span>
+                  </div>
+                  <label className="sol-filter-field xl:col-span-1">
+                    <span className="sol-filter-label">Origem</span>
+                    <span className="flex min-h-[42px] items-center gap-2 text-sm font-semibold text-[var(--c-text)]">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(filters.somente_rh_dp)}
+                        onChange={(e) => setFilters((current) => ({ ...current, somente_rh_dp: e.target.checked }))}
+                      />
+                      RH/DP
+                    </span>
                   </label>
                   <label className="sol-filter-field xl:col-span-2">
                     <span className="sol-filter-label">Conta pagadora</span>

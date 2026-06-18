@@ -42,6 +42,10 @@ function normalizeIdList(list) {
   )];
 }
 
+function isTruthyFilter(value) {
+  return ['1', 'true', 'sim', 'yes', 'on'].includes(String(value || '').trim().toLowerCase());
+}
+
 function todayIsoSaoPaulo() {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'America/Sao_Paulo',
@@ -122,6 +126,13 @@ async function listarTitulosElegiveis(req, filters = {}) {
   if (filters.parceiro_id) where.parceiro_id = Number(filters.parceiro_id);
   if (filters.categoria_financeira_id) where.categoria_financeira_id = Number(filters.categoria_financeira_id);
   if (filters.empresa_id) where.empresa_id = Number(filters.empresa_id);
+  if (
+    isTruthyFilter(filters.somente_rh_dp)
+    || isTruthyFilter(filters.apenas_rh_dp)
+    || isTruthyFilter(filters.origem_rh_dp)
+  ) {
+    where.origem_titulo = 'RH_DP';
+  }
   if (filters.vencimento_inicial || filters.vencimento_final) {
     where.data_vencimento = {};
     if (filters.vencimento_inicial) where.data_vencimento[Op.gte] = filters.vencimento_inicial;
