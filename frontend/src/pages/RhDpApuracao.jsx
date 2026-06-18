@@ -359,7 +359,7 @@ export default function RhDpApuracao() {
   }, [apuracoes]);
 
   return (
-    <div className="page solicitacoes-page rhdp-page space-y-6">
+    <div className="page solicitacoes-page rhdp-page rhdp-apuracao-page space-y-6">
       <div className="app-page-header">
         <div className="app-page-header-row">
           <div>
@@ -379,8 +379,8 @@ export default function RhDpApuracao() {
         </div>
       </div>
 
-      <form className="sol-surface-card rounded-xl p-4 space-y-4" onSubmit={onGerarApuracao}>
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+      <form className="sol-surface-card rhdp-apuracao-create-card rounded-xl p-4 space-y-4" onSubmit={onGerarApuracao}>
+        <div className="rhdp-apuracao-form-grid">
           <input
             type="month"
             className="form-control"
@@ -412,7 +412,7 @@ export default function RhDpApuracao() {
           </select>
         </div>
 
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <div className="rhdp-apuracao-form-grid rhdp-apuracao-form-grid-secondary">
           <select
             className="form-control"
             value={form.tipo_vinculo}
@@ -450,7 +450,7 @@ export default function RhDpApuracao() {
         ) : null}
       </form>
 
-      <div className="sol-surface-card solicitacoes-toolbar app-toolbar-card rounded-xl p-3 md:p-4">
+      <div className="sol-surface-card solicitacoes-toolbar app-toolbar-card rhdp-apuracao-summary rounded-xl p-3 md:p-4">
         <div className="app-summary-grid">
           <div className="app-summary-card">
             <span className="app-summary-label">Apuracoes</span>
@@ -472,7 +472,7 @@ export default function RhDpApuracao() {
         </div>
       </div>
 
-      <div className="sol-surface-card solicitacoes-filtros app-filters-card rounded-xl p-4 md:p-5">
+      <div className="sol-surface-card solicitacoes-filtros app-filters-card rhdp-apuracao-filters rounded-xl p-4 md:p-5">
         <div className="sol-filtros-head">
           <div>
             <p className="sol-filtros-title">Filtros</p>
@@ -482,7 +482,7 @@ export default function RhDpApuracao() {
           </div>
         </div>
 
-        <div className="sol-filtros-grid">
+        <div className="sol-filtros-grid rhdp-apuracao-filter-grid">
           <label className="sol-filter-field">
             <span className="sol-filter-label">Competencia</span>
             <input
@@ -555,14 +555,14 @@ export default function RhDpApuracao() {
         </div>
       </div>
 
-      <div className="sol-surface-card rounded-xl p-4">
+      <div className="sol-surface-card rhdp-apuracao-list-card rounded-xl p-4">
         {carregandoBase || carregandoLista ? (
           <p className="text-sm text-slate-500">Carregando apuracoes...</p>
         ) : !apuracoes.length ? (
           <p className="text-sm text-slate-500">Nenhuma apuracao encontrada para os filtros atuais.</p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
+          <div className="app-dense-table-wrapper rhdp-apuracao-table-wrapper">
+            <table className="app-dense-data-table rhdp-apuracao-table">
               <thead>
                 <tr className="border-b border-slate-200 text-left text-slate-500">
                   <th className="px-3 py-2 font-medium">Competencia</th>
@@ -605,7 +605,7 @@ export default function RhDpApuracao() {
       </div>
 
       {detalhe ? (
-        <div className="sol-surface-card rounded-xl p-4 space-y-4">
+        <div className="sol-surface-card rhdp-apuracao-detail-card rounded-xl p-4 space-y-4">
           <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
             <div className="space-y-1">
               <h2 className="text-lg font-semibold text-slate-900">
@@ -619,7 +619,7 @@ export default function RhDpApuracao() {
               </p>
             </div>
 
-            <div className="app-page-actions">
+            <div className="app-page-actions rhdp-apuracao-detail-actions">
               <span className={statusClass(detalhe.status)}>
                 {detalhe.status === 'CONFERIDA' ? 'Conferida' : 'Rascunho'}
               </span>
@@ -703,7 +703,7 @@ export default function RhDpApuracao() {
                 </p>
               </div>
 
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <div className="rhdp-apuracao-close-grid">
                 <label className="text-sm">
                   <span className="mb-1 block text-slate-500">Data de fechamento</span>
                   <input
@@ -771,8 +771,8 @@ export default function RhDpApuracao() {
           {!detalhe.itens?.length ? (
             <p className="text-sm text-slate-500">A apuracao nao possui itens.</p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-sm">
+            <div className="app-dense-table-wrapper rhdp-apuracao-items-wrapper">
+              <table className="app-dense-data-table rhdp-apuracao-items-table">
                 <thead>
                   <tr className="border-b border-slate-200 text-left text-slate-500">
                     <th className="px-3 py-2 font-medium">Colaborador</th>
