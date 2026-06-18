@@ -292,7 +292,18 @@ function normalizePagamentoPayload(value) {
 
   ensureAllowedKeys(
     value,
-    ['favorecido_nome', 'favorecido_documento', 'banco', 'agencia', 'conta', 'tipo_conta', 'chave_pix', 'observacoes'],
+    [
+      'favorecido_nome',
+      'favorecido_documento',
+      'banco',
+      'agencia',
+      'conta',
+      'tipo_conta',
+      'chave_pix',
+      'chave_pix_secundaria',
+      'chave_pix_variavel',
+      'observacoes'
+    ],
     'Pagamento do colaborador'
   );
 
@@ -303,7 +314,9 @@ function normalizePagamentoPayload(value) {
     agencia: parseOptionalText(value.agencia, 'Agencia', 30),
     conta: parseOptionalText(value.conta, 'Conta', 40),
     tipo_conta: parseOptionalText(value.tipo_conta, 'Tipo de conta', 30),
-    chave_pix: parseOptionalText(value.chave_pix, 'Chave PIX', 120),
+    chave_pix: parseOptionalText(value.chave_pix, 'Chave PIX principal', 120),
+    chave_pix_secundaria: parseOptionalText(value.chave_pix_secundaria, 'Chave PIX fixa 2', 120),
+    chave_pix_variavel: parseOptionalText(value.chave_pix_variavel, 'Chave PIX variavel', 120),
     observacoes: parseOptionalText(value.observacoes, 'Observacoes do pagamento', 2000)
   };
 }
@@ -638,7 +651,7 @@ function validateRhApuracaoItemParams(params = {}) {
 function validateRhApuracaoItemUpdateBody(body = {}) {
   ensureAllowedKeys(
     body,
-    ['ajuste_credito_manual', 'ajuste_debito_manual', 'observacoes', 'status'],
+    ['ajuste_credito_manual', 'ajuste_debito_manual', 'observacoes', 'status', 'chave_pix_titulo'],
     'Item da apuracao RH/DP'
   );
 
@@ -646,7 +659,8 @@ function validateRhApuracaoItemUpdateBody(body = {}) {
     ajuste_credito_manual: parseDecimal(body.ajuste_credito_manual, 'Ajuste de credito manual', { min: 0 }),
     ajuste_debito_manual: parseDecimal(body.ajuste_debito_manual, 'Ajuste de debito manual', { min: 0 }),
     observacoes: parseOptionalText(body.observacoes, 'Observacoes', 4000),
-    status: parseEnum(body.status, 'Status do item da apuracao', RH_STATUS_APURACAO_ITEM)
+    status: parseEnum(body.status, 'Status do item da apuracao', RH_STATUS_APURACAO_ITEM),
+    chave_pix_titulo: parseOptionalText(body.chave_pix_titulo, 'Chave PIX do titulo', 120)
   };
 
   const normalized = Object.fromEntries(

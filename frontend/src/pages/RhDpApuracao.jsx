@@ -71,12 +71,28 @@ function initialForm() {
   };
 }
 
+function getPixOptions(item) {
+  const pagamento = item?.colaborador?.pagamento || {};
+  return [
+    { key: 'principal', label: 'Principal', value: pagamento.chave_pix },
+    { key: 'secundaria', label: 'Fixa 2', value: pagamento.chave_pix_secundaria },
+    { key: 'variavel', label: 'Variavel', value: pagamento.chave_pix_variavel }
+  ]
+    .map((option) => ({ ...option, value: String(option.value || '').trim() }))
+    .filter((option) => option.value);
+}
+
+function getDefaultPixValue(item) {
+  return getPixOptions(item)[0]?.value || '';
+}
+
 function toEditState(item) {
   return {
     ajuste_credito_manual: item?.ajuste_credito_manual ?? '0',
     ajuste_debito_manual: item?.ajuste_debito_manual ?? '0',
     observacoes: item?.observacoes || '',
-    status: item?.status || 'PENDENTE'
+    status: item?.status || 'PENDENTE',
+    chave_pix_titulo: item?.detalhes_json?.pagamento?.chave_pix_titulo || getDefaultPixValue(item)
   };
 }
 
@@ -245,7 +261,8 @@ export default function RhDpApuracao() {
         ajuste_credito_manual: edicoes[itemId].ajuste_credito_manual || '0',
         ajuste_debito_manual: edicoes[itemId].ajuste_debito_manual || '0',
         observacoes: edicoes[itemId].observacoes || undefined,
-        status: edicoes[itemId].status
+        status: edicoes[itemId].status,
+        chave_pix_titulo: edicoes[itemId].chave_pix_titulo || undefined
       });
       setDetalhe(atualizado);
       await carregarApuracoes();
@@ -782,6 +799,7 @@ export default function RhDpApuracao() {
                     <th className="px-3 py-2 font-medium">Bruto</th>
                     <th className="px-3 py-2 font-medium">Descontos</th>
                     <th className="px-3 py-2 font-medium">Liquido</th>
+                    <th className="px-3 py-2 font-medium">PIX do titulo</th>
                     <th className="px-3 py-2 font-medium">Ajuste credito</th>
                     <th className="px-3 py-2 font-medium">Ajuste debito</th>
                     <th className="px-3 py-2 font-medium">Status</th>
@@ -790,7 +808,9 @@ export default function RhDpApuracao() {
                   </tr>
                 </thead>
                 <tbody>
-                  {detalhe.itens.map((item) => (
+                  {detalhe.itens.map((item) => {
+                    const pixOptions = getPixOptions(item);
+                    return (
                     <tr key={item.id} className="border-b border-slate-100 align-top">
                       <td className="px-3 py-3">
                         <div className="font-medium text-slate-800">{item.colaborador?.nome || '-'}</div>
@@ -806,6 +826,33 @@ export default function RhDpApuracao() {
                       <td className="px-3 py-3">
                         <div className="font-medium text-slate-800">{formatCurrency(item.valor_liquido)}</div>
                         <div className="text-xs text-slate-500">{item.regra_aplicada || '-'}</div>
+                      </td>
+                      <td className="px-3 py-3">
+                        <select
+                          className="form-control min-w-[190px]"
+                          value={edicoes[item.id]?.chave_pix_titulo ?? getDefaultPixValue(item)}
+                          onChange={(event) =>
+                            setEdicoes((current) => ({
+                              ...current,
+                              [item.id]: {
+                                ...current[item.id],
+                                chave_pix_titulo: event.target.value
+                              }
+                            }))
+                          }
+                          disabled={!podeEditar || detalhe.status !== 'RASCUNHO' || !pixOptions.length}
+                        >
+                          {!pixOptions.length ? (
+                            <option value="">Sem chave PIX</option>
+                          ) : (
+                            pixOptions.map((option) => (
+                              <option key={option.key} value={option.value}>
+                                {option.label}: {option.value}
+                              </option>
+                            ))
+                          )}
+                        </select>
+                        <div className="mt-1 text-xs text-slate-500">Principal usada por padrao.</div>
                       </td>
                       <td className="px-3 py-3">
                         <input
@@ -889,7 +936,8 @@ export default function RhDpApuracao() {
                         ) : null}
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

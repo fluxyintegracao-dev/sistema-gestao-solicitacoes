@@ -394,6 +394,8 @@ async function upsertPagamentoColaborador(colaboradorId, pagamento, transaction)
       conta: pagamento.conta,
       tipo_conta: pagamento.tipo_conta,
       chave_pix: pagamento.chave_pix,
+      chave_pix_secundaria: pagamento.chave_pix_secundaria,
+      chave_pix_variavel: pagamento.chave_pix_variavel,
       observacoes: pagamento.observacoes
     }).filter(([, value]) => value !== undefined)
   );
@@ -1217,6 +1219,12 @@ async function importarColaboradoresRh(file, user) {
           conta: String(pickImportValue(row, ['conta']) || '').trim() || undefined,
           tipo_conta: String(pickImportValue(row, ['tipo_conta']) || '').trim() || undefined,
           chave_pix: String(pickImportValue(row, ['chave_pix', 'pix']) || '').trim() || undefined,
+          chave_pix_secundaria: String(
+            pickImportValue(row, ['chave_pix_secundaria', 'pix_secundaria', 'chave_pix_fixa_2', 'pix_fixa_2']) || ''
+          ).trim() || undefined,
+          chave_pix_variavel: String(
+            pickImportValue(row, ['chave_pix_variavel', 'pix_variavel']) || ''
+          ).trim() || undefined,
           observacoes: String(
             pickImportValue(row, ['pagamento_observacoes', 'observacoes_pagamento']) || ''
           ).trim() || undefined

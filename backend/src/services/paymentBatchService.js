@@ -139,7 +139,7 @@ async function listarTitulosElegiveis(req, filters = {}) {
           model: PaymentBeneficiary,
           as: 'paymentBeneficiaries',
           required: false,
-          attributes: ['id', 'nome', 'cpf_cnpj', 'pix_tipo_chave', 'pix_chave', 'ativo', 'validado_em']
+          attributes: ['id', 'nome', 'cpf_cnpj', 'pix_tipo_chave', 'pix_chave', 'ativo', 'validado_em', 'createdAt', 'updatedAt']
         }]
       },
       { model: Obra, as: 'obra', attributes: ['id', 'codigo', 'nome'] },
@@ -159,8 +159,14 @@ async function listarTitulosElegiveis(req, filters = {}) {
   return titulos.map((titulo) => {
     const plain = titulo.get({ plain: true });
     const activeIntent = (plain.paymentIntents || [])[0] || null;
-    const beneficiaries = (plain.parceiro?.paymentBeneficiaries || []);
-    const beneficiary = beneficiaries.find((item) => item.ativo) || beneficiaries[0] || null;
+    const beneficiaries = (plain.parceiro?.paymentBeneficiaries || [])
+      .slice()
+      .sort((a, b) => {
+        const activeDelta = Number(b.ativo === true) - Number(a.ativo === true);
+        if (activeDelta) return activeDelta;
+        return new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0);
+      });
+    const beneficiary = beneficiaries[0] || null;
     const pendencias = [];
 
     if (activeIntent) pendencias.push('Titulo ja possui pagamento ativo.');
@@ -237,14 +243,14 @@ async function createBatchFromTitulos(req, payload = {}) {
     for (const titulo of titulos) {
       const beneficiary = await PaymentBeneficiary.findOne({
         where: { parceiro_id: titulo.parceiro_id, ativo: true },
-        order: [['validado_em', 'DESC'], ['id', 'ASC']],
+        order: [['updatedAt', 'DESC'], ['id', 'DESC']],
         transaction
       });
 
       await validateBeneficiaryComplete(beneficiary);
       await validateTituloEligibleForPayment(titulo, { beneficiary, transaction });
       if (!titulo.empresa_id) {
-        throw createHttpError(400, `Titulo ${titulo.codigo || `#${titulo.id}`} nao possui empresa pagadora vinculada.`);
+        throw createHttpError(400, `Titulo ${titulo.codigo || `#${titulo.id}`} nao possui empresa do titulo vinculada.`);
       }
 
       const valor = Number(titulo.valor_saldo || 0);

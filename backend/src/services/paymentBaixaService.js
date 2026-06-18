@@ -187,7 +187,7 @@ async function confirmBaixaFromPaymentIntent(req, id, payload = {}) {
       throw createHttpError(400, 'Titulo nao permite baixa neste status.');
     }
     if (!titulo.empresa_id) {
-      throw createHttpError(400, 'Titulo financeiro nao possui empresa pagadora vinculada.');
+      throw createHttpError(400, 'Titulo financeiro nao possui empresa do titulo vinculada.');
     }
 
     const valorBaixa = roundCurrency(intent.valor);

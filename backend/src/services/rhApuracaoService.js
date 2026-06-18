@@ -3,6 +3,7 @@ const {
   RhApuracao,
   RhApuracaoEvento,
   RhColaborador,
+  RhColaboradorPagamento,
   RhEmpresaGrupo,
   RhFechamento,
   RhImportacao,
@@ -37,6 +38,10 @@ const APURACAO_ITEM_INCLUDE = [
         model: Obra,
         as: 'obra',
         attributes: ['id', 'codigo', 'nome']
+      },
+      {
+        model: RhColaboradorPagamento,
+        as: 'pagamento'
       }
     ]
   },
@@ -564,6 +569,17 @@ async function atualizarItemApuracaoRh(apuracaoId, itemId, data, user) {
       throw new ValidationError('Item da apuracao RH/DP nao encontrado.', 404);
     }
 
+    const detalhesJson = item.detalhes_json && typeof item.detalhes_json === 'object'
+      ? { ...item.detalhes_json }
+      : {};
+
+    if (data.chave_pix_titulo !== undefined) {
+      detalhesJson.pagamento = {
+        ...(detalhesJson.pagamento || {}),
+        chave_pix_titulo: data.chave_pix_titulo || null
+      };
+    }
+
     const payload = {
       ...(data.ajuste_credito_manual !== undefined
         ? { ajuste_credito_manual: formatCurrencyValue(data.ajuste_credito_manual) }
@@ -573,6 +589,7 @@ async function atualizarItemApuracaoRh(apuracaoId, itemId, data, user) {
         : {}),
       ...(data.observacoes !== undefined ? { observacoes: data.observacoes || null } : {}),
       ...(data.status !== undefined ? { status: data.status } : {}),
+      ...(data.chave_pix_titulo !== undefined ? { detalhes_json: detalhesJson } : {}),
       ajustado_por: user?.id || null,
       ajustado_em: new Date()
     };

@@ -38,6 +38,14 @@ module.exports = (sequelize, DataTypes) => sequelize.define(
       type: DataTypes.STRING(120),
       allowNull: true
     },
+    chave_pix_secundaria: {
+      type: DataTypes.STRING(120),
+      allowNull: true
+    },
+    chave_pix_variavel: {
+      type: DataTypes.STRING(120),
+      allowNull: true
+    },
     observacoes: {
       type: DataTypes.TEXT,
       allowNull: true

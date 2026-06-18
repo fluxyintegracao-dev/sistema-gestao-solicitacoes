@@ -5,6 +5,7 @@ const {
   NotificacaoDestinatario,
   Obra,
   Parceiro,
+  PaymentBeneficiary,
   RhApuracao,
   RhApuracaoEvento,
   RhColaborador,
@@ -97,6 +98,51 @@ function inferTipoPessoa(documento) {
   if (digits.length === 11) return 'F';
   if (digits.length === 14) return 'J';
   return '';
+}
+
+function inferPixTipoChave(chavePix, documentoFallback) {
+  const raw = String(chavePix || '').trim();
+  if (!raw) return '';
+  if (raw.includes('@')) return 'EMAIL';
+
+  const digits = normalizeDigits(raw);
+  const documento = normalizeDigits(documentoFallback);
+  if (digits.length === 14) return 'CNPJ';
+  if (digits.length === 11) {
+    return documento && digits === documento ? 'CPF' : 'TELEFONE';
+  }
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(raw)) {
+    return 'ALEATORIA';
+  }
+  return 'ALEATORIA';
+}
+
+function normalizePixChaveForType(tipoChave, chavePix) {
+  const raw = String(chavePix || '').trim();
+  if (['CPF', 'CNPJ', 'TELEFONE'].includes(String(tipoChave || '').toUpperCase())) {
+    return normalizeDigits(raw);
+  }
+  if (String(tipoChave || '').toUpperCase() === 'EMAIL') {
+    return raw.toLowerCase();
+  }
+  return raw;
+}
+
+function getPixKeyOptions(pagamento = {}) {
+  return [
+    pagamento.chave_pix,
+    pagamento.chave_pix_secundaria,
+    pagamento.chave_pix_variavel
+  ].map((value) => String(value || '').trim()).filter(Boolean);
+}
+
+function resolvePixKeyForItem(item, pagamento = {}) {
+  const selected = String(item?.detalhes_json?.pagamento?.chave_pix_titulo || '').trim();
+  const options = getPixKeyOptions(pagamento);
+  if (selected && options.includes(selected)) {
+    return selected;
+  }
+  return options[0] || '';
 }
 
 async function ensureCategoriaFinanceiraPagar(categoriaFinanceiraId, transaction) {
@@ -208,6 +254,7 @@ function validarItemElegivelParaFechamento(item, apuracao) {
   const pagamento = colaborador.pagamento || {};
   const favorecidoNome = String(pagamento.favorecido_nome || colaborador.nome || '').trim();
   const favorecidoDocumento = normalizeDigits(pagamento.favorecido_documento || colaborador.cpf);
+  const chavePix = resolvePixKeyForItem(item, pagamento);
   const obraId = Number(apuracao.obra_id || colaborador.obra_id || 0);
 
   if (!favorecidoNome) {
@@ -222,9 +269,14 @@ function validarItemElegivelParaFechamento(item, apuracao) {
     throw new ValidationError(`O colaborador ${colaborador.nome} nao possui obra valida para gerar o titulo financeiro.`);
   }
 
+  if (!chavePix) {
+    throw new ValidationError(`O colaborador ${colaborador.nome} nao possui chave PIX definida para gerar favorecido bancario.`);
+  }
+
   return {
     favorecidoNome,
     favorecidoDocumento,
+    chavePix,
     obraId,
     email: pagamento.email || colaborador.email || null,
     telefone: colaborador.telefone || null
@@ -294,6 +346,54 @@ async function syncParceiroFavorecido({ colaborador, favorecidoNome, favorecidoD
   }
 
   return parceiro;
+}
+
+async function syncFavorecidoBancarioRh({
+  parceiro,
+  favorecidoNome,
+  favorecidoDocumento,
+  chavePix,
+  usuarioId
+}, transaction) {
+  const pixTipoChave = inferPixTipoChave(chavePix, favorecidoDocumento);
+  const pixChave = normalizePixChaveForType(pixTipoChave, chavePix);
+
+  if (!pixTipoChave || !pixChave) {
+    throw new ValidationError('Chave PIX invalida para gerar favorecido bancario RH/DP.');
+  }
+
+  const existing = await PaymentBeneficiary.findOne({
+    where: {
+      parceiro_id: parceiro.id,
+      pix_tipo_chave: pixTipoChave,
+      pix_chave: pixChave
+    },
+    transaction
+  });
+
+  const payload = {
+    parceiro_id: parceiro.id,
+    nome: favorecidoNome,
+    cpf_cnpj: normalizeDigits(favorecidoDocumento),
+    metodo_preferencial: 'PIX_CHAVE',
+    pix_tipo_chave: pixTipoChave,
+    pix_chave: pixChave,
+    ativo: true,
+    updated_by: usuarioId || null
+  };
+
+  if (existing) {
+    await existing.update(payload, { transaction });
+    return existing;
+  }
+
+  return PaymentBeneficiary.create(
+    {
+      ...payload,
+      created_by: usuarioId || null
+    },
+    { transaction }
+  );
 }
 
 function buildTituloRhPayload({ apuracao, item, parceiro, dataVencimento, categoriaFinanceiraId, empresaId, usuarioId }) {
@@ -566,6 +666,17 @@ async function fecharApuracaoRh(apuracaoId, data, user) {
           favorecidoDocumento: dadosFechamento.favorecidoDocumento,
           email: dadosFechamento.email,
           telefone: dadosFechamento.telefone
+        },
+        transaction
+      );
+
+      await syncFavorecidoBancarioRh(
+        {
+          parceiro,
+          favorecidoNome: dadosFechamento.favorecidoNome,
+          favorecidoDocumento: dadosFechamento.favorecidoDocumento,
+          chavePix: dadosFechamento.chavePix,
+          usuarioId: user?.id || null
         },
         transaction
       );

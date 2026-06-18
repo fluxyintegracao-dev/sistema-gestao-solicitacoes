@@ -54,6 +54,8 @@ function emptyForm() {
       conta: '',
       tipo_conta: '',
       chave_pix: '',
+      chave_pix_secundaria: '',
+      chave_pix_variavel: '',
       observacoes: ''
     }
   };
@@ -128,6 +130,8 @@ function toFormData(data) {
       conta: data?.pagamento?.conta || '',
       tipo_conta: data?.pagamento?.tipo_conta || '',
       chave_pix: data?.pagamento?.chave_pix || '',
+      chave_pix_secundaria: data?.pagamento?.chave_pix_secundaria || '',
+      chave_pix_variavel: data?.pagamento?.chave_pix_variavel || '',
       observacoes: data?.pagamento?.observacoes || ''
     }
   };
@@ -162,6 +166,8 @@ function buildPayload(form) {
       conta: form.pagamento.conta || undefined,
       tipo_conta: form.pagamento.tipo_conta || undefined,
       chave_pix: form.pagamento.chave_pix || undefined,
+      chave_pix_secundaria: form.pagamento.chave_pix_secundaria || undefined,
+      chave_pix_variavel: form.pagamento.chave_pix_variavel || undefined,
       observacoes: form.pagamento.observacoes || undefined
     }
   };
@@ -190,6 +196,8 @@ function downloadModeloColaboradores() {
       'Favorecido_Nome',
       'Favorecido_Documento',
       'Chave_PIX',
+      'Chave_PIX_Secundaria',
+      'Chave_PIX_Variavel',
       'Telefone',
       'Email',
       'Observacoes'
@@ -215,6 +223,8 @@ function downloadModeloColaboradores() {
       'Colaborador Exemplo',
       '12345678909',
       'colaborador@pix',
+      '27999999999',
+      '',
       '27999999999',
       'colaborador@empresa.com',
       'Importacao inicial RH/DP'
@@ -997,15 +1007,44 @@ export default function RhDpColaboradores() {
               </label>
             </div>
 
-            <label className="space-y-1 text-sm block">
-              <span>Chave PIX</span>
-              <input
-                className="form-control"
-                value={form.pagamento.chave_pix}
-                onChange={(e) => setForm((prev) => ({ ...prev, pagamento: { ...prev.pagamento, chave_pix: e.target.value } }))}
-                disabled={!podeEditar}
-              />
-            </label>
+            <div>
+              <div className="grid gap-3 md:grid-cols-3">
+                <label className="space-y-1 text-sm block">
+                  <span>Chave PIX principal</span>
+                  <input
+                    className="form-control"
+                    value={form.pagamento.chave_pix}
+                    onChange={(e) => setForm((prev) => ({ ...prev, pagamento: { ...prev.pagamento, chave_pix: e.target.value } }))}
+                    disabled={!podeEditar}
+                  />
+                </label>
+                <label className="space-y-1 text-sm block">
+                  <span>Chave PIX fixa 2</span>
+                  <input
+                    className="form-control"
+                    value={form.pagamento.chave_pix_secundaria}
+                    onChange={(e) =>
+                      setForm((prev) => ({ ...prev, pagamento: { ...prev.pagamento, chave_pix_secundaria: e.target.value } }))
+                    }
+                    disabled={!podeEditar}
+                  />
+                </label>
+                <label className="space-y-1 text-sm block">
+                  <span>Chave PIX variavel</span>
+                  <input
+                    className="form-control"
+                    value={form.pagamento.chave_pix_variavel}
+                    onChange={(e) =>
+                      setForm((prev) => ({ ...prev, pagamento: { ...prev.pagamento, chave_pix_variavel: e.target.value } }))
+                    }
+                    disabled={!podeEditar}
+                  />
+                </label>
+              </div>
+              <p className="mt-2 text-xs text-slate-500">
+                A chave principal e usada por padrao nos titulos RH/DP. Na conferencia da apuracao e possivel trocar para uma das chaves cadastradas.
+              </p>
+            </div>
           </div>
 
           <label className="space-y-1 text-sm block">

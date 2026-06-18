@@ -169,7 +169,7 @@ function getTituloPaymentAccountPendencies(titulo = {}, account = null) {
   const accountEmpresaId = getPaymentAccountEmpresaId(account);
 
   if (!tituloEmpresaId) {
-    pendencies.push('Titulo sem empresa pagadora.');
+    pendencies.push('Titulo sem empresa do titulo.');
   }
   if (!accountEmpresaId) {
     pendencies.push('Selecione uma conta pagadora completa.');
