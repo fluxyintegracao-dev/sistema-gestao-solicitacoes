@@ -68,9 +68,10 @@ function formatCpf(value) {
 }
 
 const RH_COLABORADORES_COLUMNS = [
-  { key: 'nome', width: 240, minWidth: 180 },
-  { key: 'cpf', width: 160, minWidth: 130 },
-  { key: 'empresa', width: 260, minWidth: 180 },
+  { key: 'nome', width: 220, minWidth: 170 },
+  { key: 'matricula', width: 130, minWidth: 110 },
+  { key: 'cpf', width: 150, minWidth: 130 },
+  { key: 'empresa', width: 240, minWidth: 180 },
   { key: 'obra', width: 210, minWidth: 150 },
   { key: 'vinculo', width: 140, minWidth: 110 },
   { key: 'status', width: 130, minWidth: 100 },
@@ -664,6 +665,7 @@ export default function RhDpColaboradores() {
               <thead>
                 <tr>
                   <ResizableTh columnKey="nome">Nome</ResizableTh>
+                  <ResizableTh columnKey="matricula">Matricula</ResizableTh>
                   <ResizableTh columnKey="cpf">CPF</ResizableTh>
                   <ResizableTh columnKey="empresa">Empresa</ResizableTh>
                   <ResizableTh columnKey="obra">Obra</ResizableTh>
@@ -679,6 +681,7 @@ export default function RhDpColaboradores() {
                       <div className="font-medium text-slate-900">{item.nome}</div>
                       <div className="text-xs text-slate-500">{item.cargo || item.matricula || '-'}</div>
                     </td>
+                    <td>{item.matricula || '-'}</td>
                     <td>{formatCpf(item.cpf)}</td>
                     <td>{item.empresaGrupo?.nome || '-'}</td>
                     <td>{item.obra?.nome || '-'}</td>
@@ -699,7 +702,7 @@ export default function RhDpColaboradores() {
                 ))}
                 {!colaboradores.length && (
                   <tr>
-                    <td colSpan="7" align="center">
+                    <td colSpan="8" align="center">
                       {carregando ? 'Carregando...' : 'Nenhum colaborador cadastrado'}
                     </td>
                   </tr>

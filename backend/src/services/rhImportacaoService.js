@@ -46,6 +46,15 @@ function normalizeDigits(value) {
   return String(value || '').replace(/\D+/g, '');
 }
 
+function normalizeMatricula(value) {
+  const raw = String(value || '').trim().toUpperCase();
+  if (!raw) return '';
+
+  return /^\d+$/.test(raw)
+    ? raw.replace(/^0+/, '') || '0'
+    : raw;
+}
+
 function normalizeToken(value) {
   return String(value || '')
     .trim()
@@ -174,15 +183,8 @@ async function ensureObraExists(obraId, transaction) {
   return obra;
 }
 
-async function buildColaboradorLookup({ empresa_grupo_id, obra_id, tipo_vinculo }) {
-  const where = {
-    empresa_grupo_id
-  };
-
-  if (obra_id) {
-    where.obra_id = obra_id;
-  }
-
+async function buildColaboradorLookup({ tipo_vinculo }) {
+  const where = {};
   if (tipo_vinculo) {
     where.tipo_vinculo = tipo_vinculo;
   }
@@ -194,31 +196,44 @@ async function buildColaboradorLookup({ empresa_grupo_id, obra_id, tipo_vinculo 
 
   const byCpf = new Map();
   const byMatricula = new Map();
+  const matriculasDuplicadas = new Set();
 
   colaboradores.forEach((colaborador) => {
     if (colaborador.cpf) {
       byCpf.set(String(colaborador.cpf), colaborador);
     }
     if (colaborador.matricula) {
-      byMatricula.set(String(colaborador.matricula).trim().toUpperCase(), colaborador);
+      const matriculaNormalizada = normalizeMatricula(colaborador.matricula);
+      const colaboradorExistente = byMatricula.get(matriculaNormalizada);
+
+      if (colaboradorExistente && colaboradorExistente.id !== colaborador.id) {
+        matriculasDuplicadas.add(matriculaNormalizada);
+      } else {
+        byMatricula.set(matriculaNormalizada, colaborador);
+      }
     }
   });
 
   return {
     byCpf,
-    byMatricula
+    byMatricula,
+    matriculasDuplicadas
   };
 }
 
 function resolveColaborador(row, lookup) {
   const cpf = normalizeDigits(pickImportValue(row, ['cpf']));
-  const matricula = String(pickImportValue(row, ['matricula']) || '').trim().toUpperCase();
+  const matricula = normalizeMatricula(pickImportValue(row, ['matricula']));
 
   if (!cpf && !matricula) {
     throw new ValidationError('CPF ou matricula do colaborador e obrigatorio.');
   }
 
   const colaboradorByCpf = cpf ? lookup.byCpf.get(cpf) : null;
+  if (!colaboradorByCpf && matricula && lookup.matriculasDuplicadas.has(matricula)) {
+    throw new ValidationError('Matricula encontrada em mais de um colaborador. Informe o CPF para identificar a linha.');
+  }
+
   const colaboradorByMatricula = matricula ? lookup.byMatricula.get(matricula) : null;
 
   if (colaboradorByCpf && colaboradorByMatricula && colaboradorByCpf.id !== colaboradorByMatricula.id) {
