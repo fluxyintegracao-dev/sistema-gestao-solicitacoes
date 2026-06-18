@@ -108,14 +108,15 @@ module.exports = {
         Contrato.count({ where: { tipo_sub_id: id } })
       ]);
 
-      if (totalSolicitacoes > 0 || totalContratos > 0) {
-        return res.status(409).json({
-          error: 'Nao e possivel excluir subtipo com solicitacoes ou contratos vinculados.'
-        });
-      }
-
-      await tipo.destroy();
-      return res.sendStatus(204);
+      await tipo.update({ ativo: false });
+      return res.json({
+        message: 'Subtipo excluido da visualizacao operacional.',
+        softDelete: true,
+        vinculos: {
+          solicitacoes: totalSolicitacoes,
+          contratos: totalContratos
+        }
+      });
     } catch (error) {
       console.error(error);
       return res.status(500).json({ error: 'Erro ao excluir subtipo' });

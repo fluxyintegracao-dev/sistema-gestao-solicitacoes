@@ -35,7 +35,8 @@ const {
 const STATUS_LOTE = {
   ABERTO: 'ABERTO',
   FINALIZADO: 'FINALIZADO',
-  CANCELADO: 'CANCELADO'
+  CANCELADO: 'CANCELADO',
+  EXCLUIDO: 'EXCLUIDO'
 };
 
 const TIPO_LOTE = {
@@ -470,7 +471,7 @@ async function carregarResumoItensPorLote(loteIds = []) {
   const ids = Array.from(new Set((Array.isArray(loteIds) ? loteIds : []).map(Number).filter((id) => Number.isInteger(id) && id > 0)));
   if (ids.length === 0) return new Map();
   const itens = await PrioridadeLoteItem.findAll({
-    where: { lote_id: { [Op.in]: ids } },
+    where: { lote_id: { [Op.in]: ids }, deleted_at: null },
     attributes: ['lote_id', 'valor_considerado']
   });
   const mapa = new Map();
@@ -493,6 +494,7 @@ async function carregarLoteDetalhe(loteId) {
         model: PrioridadeLoteItem,
         as: 'itens',
         required: false,
+        where: { deleted_at: null },
         include: [
           {
             model: Solicitacao,
@@ -623,10 +625,11 @@ async function listarTitulosElegiveisParaLote(lote, busca = '', tituloIds = null
       { [Op.gt]: 0 }
     ),
     Sequelize.literal(`NOT EXISTS (
-      SELECT 1
+         SELECT 1
         FROM prioridade_lote_itens pli
         JOIN prioridade_lotes pl ON pl.id = pli.lote_id
        WHERE pli.titulo_financeiro_id = TituloFinanceiro.id
+         AND pli.deleted_at IS NULL
          AND pl.status <> 'CANCELADO'
          AND pl.id <> ${Number(lote.id) || 0}
     )`)
@@ -689,10 +692,13 @@ async function substituirItensLote({ lote, titulosSelecionados = null, solicitac
     : solicitacoesSelecionadas;
   const valorUtilizado = (itensSelecionados || []).reduce((total, item) => total + formatarNumero(item.valor_prioridade), 0);
 
-  await PrioridadeLoteItem.destroy({
-    where: { lote_id: lote.id },
-    transaction
-  });
+  await PrioridadeLoteItem.update(
+    { deleted_at: agora },
+    {
+      where: { lote_id: lote.id, deleted_at: null },
+      transaction
+    }
+  );
 
   if ((itensSelecionados || []).length > 0) {
     await PrioridadeLoteItem.bulkCreate(
@@ -720,7 +726,7 @@ async function adicionarTitulosAoLote({ lote, titulosSelecionados, usuarioId, tr
   if (itens.length === 0) return { valorAdicionado: 0, agora, adicionados: [] };
 
   const existentes = await PrioridadeLoteItem.findAll({
-    where: { lote_id: lote.id },
+    where: { lote_id: lote.id, deleted_at: null },
     attributes: ['titulo_financeiro_id'],
     transaction
   });
@@ -831,7 +837,7 @@ module.exports = {
       if (!permissoes.podeAcessarModulo) {
         return res.status(403).json({ error: 'Acesso negado ao modulo de prioridades.' });
       }
-      const where = {};
+      const where = { status: { [Op.ne]: STATUS_LOTE.EXCLUIDO } };
       const status = normalizarStatusLote(req.query?.status);
       if (status) where.status = status;
       if (!permissoes.podeVisualizarTodasClassificacoes) {
@@ -1189,7 +1195,7 @@ module.exports = {
         }
 
         const itens = await PrioridadeLoteItem.findAll({
-          where: { lote_id: lote.id },
+          where: { lote_id: lote.id, deleted_at: null },
           attributes: ['solicitacao_id'],
           transaction
         });
@@ -1433,9 +1439,9 @@ module.exports = {
         await transaction.rollback();
         return res.status(400).json({ error: 'Nao e possivel excluir um lote que ja possui solicitacoes autorizadas.' });
       }
-      await lote.destroy({ transaction });
+      await lote.update({ status: STATUS_LOTE.EXCLUIDO }, { transaction });
       await transaction.commit();
-      return res.sendStatus(204);
+      return res.json({ message: 'Lote excluido com seguranca.', softDelete: true });
     } catch (error) {
       await transaction.rollback();
       console.error(error);

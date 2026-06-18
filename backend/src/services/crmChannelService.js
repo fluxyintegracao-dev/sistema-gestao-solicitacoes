@@ -5,7 +5,7 @@ const { CrmChannel, CrmPhoneAsset } = require('../models');
 // -------------------------------------------------------
 async function listarCanais(query = {}) {
   const { status, type } = query;
-  const where = {};
+  const where = { deleted_at: null };
   if (status) where.status = String(status).toUpperCase();
   if (type) where.type = String(type).toUpperCase();
   return CrmChannel.findAll({ where, order: [['nome', 'ASC']] });
@@ -13,7 +13,7 @@ async function listarCanais(query = {}) {
 
 async function obterCanal(id) {
   const canal = await CrmChannel.findByPk(id);
-  if (!canal) throw Object.assign(new Error('Canal nao encontrado'), { status: 404 });
+  if (!canal || canal.deleted_at) throw Object.assign(new Error('Canal nao encontrado'), { status: 404 });
   return canal;
 }
 
@@ -33,7 +33,7 @@ async function criarCanal(dados) {
 
 async function atualizarCanal(id, dados) {
   const canal = await CrmChannel.findByPk(id);
-  if (!canal) throw Object.assign(new Error('Canal nao encontrado'), { status: 404 });
+  if (!canal || canal.deleted_at) throw Object.assign(new Error('Canal nao encontrado'), { status: 404 });
   const campos = [
     'nome', 'type', 'status', 'provider', 'public_label',
     'business_main_phone', 'operational_phone', 'tracking_phone', 'destination_phone',
@@ -49,8 +49,9 @@ async function atualizarCanal(id, dados) {
 
 async function excluirCanal(id) {
   const canal = await CrmChannel.findByPk(id);
-  if (!canal) throw Object.assign(new Error('Canal nao encontrado'), { status: 404 });
-  await canal.destroy();
+  if (!canal || canal.deleted_at) throw Object.assign(new Error('Canal nao encontrado'), { status: 404 });
+  await canal.update({ deleted_at: new Date() });
+  return { ok: true, softDelete: true };
 }
 
 // -------------------------------------------------------
@@ -58,7 +59,7 @@ async function excluirCanal(id) {
 // -------------------------------------------------------
 async function listarPhoneAssets(query = {}) {
   const { status, role_type } = query;
-  const where = {};
+  const where = { deleted_at: null };
   if (status) where.status = String(status).toUpperCase();
   if (role_type) where.role_type = String(role_type).toUpperCase();
   return CrmPhoneAsset.findAll({ where, order: [['role_type', 'ASC'], ['label', 'ASC']] });
@@ -66,7 +67,7 @@ async function listarPhoneAssets(query = {}) {
 
 async function obterPhoneAsset(id) {
   const asset = await CrmPhoneAsset.findByPk(id);
-  if (!asset) throw Object.assign(new Error('Numero nao encontrado'), { status: 404 });
+  if (!asset || asset.deleted_at) throw Object.assign(new Error('Numero nao encontrado'), { status: 404 });
   return asset;
 }
 
@@ -89,7 +90,7 @@ async function criarPhoneAsset(dados) {
 
 async function atualizarPhoneAsset(id, dados) {
   const asset = await CrmPhoneAsset.findByPk(id);
-  if (!asset) throw Object.assign(new Error('Numero nao encontrado'), { status: 404 });
+  if (!asset || asset.deleted_at) throw Object.assign(new Error('Numero nao encontrado'), { status: 404 });
   const campos = [
     'label', 'phone_number', 'country_code', 'role_type', 'provider',
     'is_whatsapp_enabled', 'is_google_ads_enabled', 'is_meta_ads_enabled',
@@ -106,8 +107,9 @@ async function atualizarPhoneAsset(id, dados) {
 
 async function excluirPhoneAsset(id) {
   const asset = await CrmPhoneAsset.findByPk(id);
-  if (!asset) throw Object.assign(new Error('Numero nao encontrado'), { status: 404 });
-  await asset.destroy();
+  if (!asset || asset.deleted_at) throw Object.assign(new Error('Numero nao encontrado'), { status: 404 });
+  await asset.update({ deleted_at: new Date() });
+  return { ok: true, softDelete: true };
 }
 
 module.exports = {

@@ -21,7 +21,8 @@ module.exports = (sequelize, DataTypes) => {
     meta_waba_id: { type: DataTypes.STRING(120), allowNull: true },
     meta_phone_number_id: { type: DataTypes.STRING(120), allowNull: true },
     google_customer_id: { type: DataTypes.STRING(120), allowNull: true },
-    config_json: { type: DataTypes.JSON, allowNull: true }
+    config_json: { type: DataTypes.JSON, allowNull: true },
+    deleted_at: { type: DataTypes.DATE, allowNull: true }
   }, {
     tableName: 'crm_channels',
     timestamps: true

@@ -220,7 +220,9 @@ async function carregarCotacaoPorToken(token) {
       },
       {
         model: SolicitacaoCompraRespostaItem,
-        as: 'respostas'
+        as: 'respostas',
+        where: { deleted_at: null },
+        required: false
       }
     ]
   });
@@ -367,9 +369,10 @@ async function salvarRespostasCotacao(cotacaoFornecedor, itensResposta, options 
     });
   }
 
-  await SolicitacaoCompraRespostaItem.destroy({
-    where: { solicitacao_compra_fornecedor_id: cotacaoFornecedor.id }
-  });
+  await SolicitacaoCompraRespostaItem.update(
+    { deleted_at: new Date() },
+    { where: { solicitacao_compra_fornecedor_id: cotacaoFornecedor.id, deleted_at: null } }
+  );
 
   if (respostasPreparadas.length) {
     await SolicitacaoCompraRespostaItem.bulkCreate(respostasPreparadas);

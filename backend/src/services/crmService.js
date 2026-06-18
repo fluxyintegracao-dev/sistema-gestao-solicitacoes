@@ -885,7 +885,7 @@ async function removerEtapaPipeline(stageId, userId, req) {
     await etapasRestantes[0].update({ is_initial: true });
   }
 
-  await etapa.destroy();
+  await etapa.update({ ativo: false });
 
   await registrarAuditCrm({
     userId,

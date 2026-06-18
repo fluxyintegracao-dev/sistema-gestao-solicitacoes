@@ -2,6 +2,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { spawn } = require('child_process');
+const { Op } = require('sequelize');
 const PizZip = require('pizzip');
 const Docxtemplater = require('docxtemplater');
 const { PDFDocument } = require('pdf-lib');
@@ -1773,7 +1774,10 @@ async function criarModeloContratoComercial(req, payload = {}, file) {
 
 async function listarDocumentosContratoComercial(contratoId) {
   return ContratoComercialDocumento.findAll({
-    where: { contrato_comercial_id: Number(contratoId) },
+    where: {
+      contrato_comercial_id: Number(contratoId),
+      status: { [Op.ne]: 'EXCLUIDO' }
+    },
     include: [
       { model: ContratoComercialModelo, as: 'modelo', attributes: ['id', 'nome', 'tipo_documento'] },
       { model: User, as: 'criadoPor', attributes: ['id', 'nome', 'email'] }
@@ -1986,7 +1990,10 @@ async function excluirDocumentoContratoComercial(req, documentoId) {
     d4sign_status: documento.d4sign_status
   };
 
-  await documento.destroy();
+  await documento.update({
+    status: 'EXCLUIDO',
+    atualizado_por: req.user?.id || null
+  });
 
   await registrarEventoSeguranca({
     req,
@@ -1999,7 +2006,7 @@ async function excluirDocumentoContratoComercial(req, documentoId) {
     metadata
   });
 
-  return { ok: true, contrato_comercial_id: contratoId };
+  return { ok: true, contrato_comercial_id: contratoId, softDelete: true };
 }
 
 function defaultSignersFromContrato(contrato) {

@@ -3566,37 +3566,8 @@ module.exports = {
         }
       });
 
-      if (titulosVinculados > 0) {
-        return res.status(409).json({
-          error: 'Nao e possivel excluir solicitacao com titulos financeiros vinculados.'
-        });
-      }
-
       const transaction = await Solicitacao.sequelize.transaction();
       try {
-        const notificacoes = await Notificacao.findAll({
-          where: { solicitacao_id: id },
-          attributes: ['id'],
-          transaction
-        });
-        const notificacaoIds = notificacoes.map(n => n.id);
-        if (notificacaoIds.length > 0) {
-          await NotificacaoDestinatario.destroy({
-            where: { notificacao_id: { [Op.in]: notificacaoIds } },
-            transaction
-          });
-        }
-
-        await Promise.all([
-          Notificacao.destroy({ where: { solicitacao_id: id }, transaction }),
-          Historico.destroy({ where: { solicitacao_id: id }, transaction }),
-          Anexo.destroy({ where: { solicitacao_id: id }, transaction }),
-          MensagemSetor.destroy({ where: { solicitacao_id: id }, transaction }),
-          StatusArea.destroy({ where: { solicitacao_id: id }, transaction }),
-          Comprovante.destroy({ where: { solicitacao_id: id }, transaction }),
-          SolicitacaoVisibilidadeUsuario.destroy({ where: { solicitacao_id: id }, transaction })
-        ]);
-
         await LogExclusao.create({
           entidade: 'SOLICITACAO',
           entidade_id: Number(id),
@@ -3610,11 +3581,13 @@ module.exports = {
             obra_id: solicitacao.obra_id,
             area_responsavel: solicitacao.area_responsavel,
             valor: solicitacao.valor,
-            status_global: solicitacao.status_global
+            status_global: solicitacao.status_global,
+            titulos_vinculados: titulosVinculados,
+            exclusao_logica: true
           })
         }, { transaction });
 
-        await Solicitacao.destroy({ where: { id }, transaction });
+        await solicitacao.update({ cancelada: true }, { transaction });
         await transaction.commit();
       } catch (error) {
         await transaction.rollback();
@@ -3629,7 +3602,8 @@ module.exports = {
           nome: req.user?.nome || null
         },
         metadata: {
-          deleted: true
+          deleted: true,
+          softDelete: true
         }
       });
 

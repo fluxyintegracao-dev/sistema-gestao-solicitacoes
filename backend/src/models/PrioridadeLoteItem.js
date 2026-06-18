@@ -29,6 +29,10 @@ module.exports = (sequelize, DataTypes) => sequelize.define(
     autorizado_em: {
       type: DataTypes.DATE,
       allowNull: false
+    },
+    deleted_at: {
+      type: DataTypes.DATE,
+      allowNull: true
     }
   },
   {

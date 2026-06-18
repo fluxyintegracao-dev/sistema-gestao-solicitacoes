@@ -34,6 +34,11 @@ module.exports = (sequelize, DataTypes) => {
     uploaded_by: {
       type: DataTypes.INTEGER,
       allowNull: false
+    },
+
+    deleted_at: {
+      type: DataTypes.DATE,
+      allowNull: true
     }
 
   }, {

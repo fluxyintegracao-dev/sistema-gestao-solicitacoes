@@ -256,7 +256,7 @@ async function canAccessCompraFile(req, solicitacaoCompraId) {
 async function resolveRegisteredFileResource(alvo) {
   const buscas = await Promise.all([
     Anexo.findOne({
-      where: { caminho_arquivo: alvo },
+      where: { caminho_arquivo: alvo, deleted_at: null },
       attributes: ['id', 'solicitacao_id', 'caminho_arquivo']
     }),
     ContratoAnexo.findOne({
@@ -264,7 +264,7 @@ async function resolveRegisteredFileResource(alvo) {
       attributes: ['id', 'contrato_id', 'caminho_arquivo']
     }),
     Comprovante.findOne({
-      where: { caminho_arquivo: alvo },
+      where: { caminho_arquivo: alvo, deleted_at: null },
       attributes: ['id', 'solicitacao_id', 'obra_id', 'caminho_arquivo']
     }),
     ArquivoModelo.findOne({

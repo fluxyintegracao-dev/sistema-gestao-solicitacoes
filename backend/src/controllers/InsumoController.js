@@ -121,8 +121,11 @@ module.exports = {
         return res.status(404).json({ error: 'Insumo nao encontrado' });
       }
 
-      await insumo.destroy();
-      return res.sendStatus(204);
+      await insumo.update({ ativo: false });
+      return res.json({
+        message: 'Insumo excluido da visualizacao operacional.',
+        softDelete: true
+      });
     } catch (error) {
       console.error(error);
       return res.status(500).json({ error: 'Erro ao remover insumo' });
@@ -145,7 +148,7 @@ module.exports = {
       }
 
       const respostaItem = await SolicitacaoCompraRespostaItem.findOne({
-        where: { vencedor: true, preco: { [Op.not]: null } },
+        where: { vencedor: true, preco: { [Op.not]: null }, deleted_at: null },
         include: [{
           model: SolicitacaoCompraItem,
           as: 'itemCadastrado',

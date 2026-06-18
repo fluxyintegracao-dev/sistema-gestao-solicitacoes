@@ -409,6 +409,8 @@ async function carregarSolicitacaoCompra(id) {
           {
             model: SolicitacaoCompraRespostaItem,
             as: 'respostas',
+            where: { deleted_at: null },
+            required: false,
             attributes: [
               'id',
               'item_tipo',
@@ -1921,14 +1923,18 @@ module.exports = {
           where: {
             solicitacao_compra_fornecedor_id: {
               [Op.in]: cotacaoFornecedorIds.length ? cotacaoFornecedorIds : [0]
-            }
+            },
+            deleted_at: null
           },
           transaction
         }
       );
 
       for (const entry of vencedores) {
-        const resposta = await SolicitacaoCompraRespostaItem.findByPk(entry?.resposta_item_id, { transaction });
+        const resposta = await SolicitacaoCompraRespostaItem.findOne({
+          where: { id: entry?.resposta_item_id, deleted_at: null },
+          transaction
+        });
         if (!resposta) {
           await transaction.rollback();
           return res.status(400).json({ error: 'Resposta vencedora invalida informada' });

@@ -1470,18 +1470,14 @@ module.exports = {
         }
       });
 
-      if (totalSolicitacoesRelacionadas > 0) {
-        return res.status(409).json({
-          error: 'Nao e possivel excluir contrato com solicitacoes vinculadas.'
-        });
-      }
-
-      await ContratoAnexo.destroy({
-        where: { contrato_id: contrato.id }
+      await contrato.update({ ativo: false });
+      return res.json({
+        message: 'Contrato excluido da visualizacao operacional.',
+        softDelete: true,
+        vinculos: {
+          solicitacoes: totalSolicitacoesRelacionadas
+        }
       });
-
-      await contrato.destroy();
-      return res.sendStatus(204);
     } catch (error) {
       console.error(error);
       return res.status(500).json({ error: 'Erro ao excluir contrato' });

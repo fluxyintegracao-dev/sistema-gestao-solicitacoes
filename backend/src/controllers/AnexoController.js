@@ -177,7 +177,7 @@ class AnexoController {
         return res.status(acessoSolicitacao.status).json({ error: acessoSolicitacao.error });
       }
 
-      const where = { solicitacao_id: id };
+      const where = { solicitacao_id: id, deleted_at: null };
 
       if (tipo) where.tipo = tipo;
 
@@ -282,10 +282,8 @@ class AnexoController {
       }
 
       if (anexo) {
-        await anexo.destroy();
+        await anexo.update({ deleted_at: new Date() });
       }
-
-      await historico.destroy();
 
       await Historico.create({
         solicitacao_id: historico.solicitacao_id,
@@ -293,7 +291,7 @@ class AnexoController {
         setor: usuario.setor_id,
         acao: 'ANEXO_REMOVIDO',
         descricao: anexo?.nome_original || historico.descricao || 'Anexo removido',
-        metadata: JSON.stringify({ caminho: caminho || null })
+        metadata: JSON.stringify({ anexo_id: anexo?.id || anexoId || null, caminho: caminho || null })
       });
 
       await publishSolicitacaoRealtimeEvent({

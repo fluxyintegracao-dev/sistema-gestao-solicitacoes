@@ -28,6 +28,11 @@ module.exports = (sequelize, DataTypes) => {
     status: {
       type: DataTypes.STRING,
       defaultValue: 'PENDENTE'
+    },
+
+    deleted_at: {
+      type: DataTypes.DATE,
+      allowNull: true
     }
   });
 

@@ -89,7 +89,7 @@ module.exports = {
   async pendentes(req, res) {
     try {
       const pendentes = await Comprovante.findAll({
-        where: { status: 'PENDENTE' },
+        where: { status: 'PENDENTE', deleted_at: null },
         include: [
           { model: Solicitacao, as: 'solicitacao' },
           { model: Obra, as: 'obra' }
@@ -163,35 +163,27 @@ module.exports = {
         return res.status(404).json({ error: 'Comprovante nao encontrado' });
       }
 
+      await comprovante.update({
+        deleted_at: new Date(),
+        status: comprovante.status === 'PENDENTE' ? 'EXCLUIDO' : comprovante.status
+      });
+
       if (comprovante.solicitacao_id) {
-        const historicos = await Historico.findAll({
-          where: {
-            solicitacao_id: comprovante.solicitacao_id,
-            acao: 'COMPROVANTE_ADICIONADO'
-          },
-          attributes: ['id', 'metadata']
-        });
-
-        const historicosParaExcluir = historicos
-          .filter(item => {
-            try {
-              const metadata = item?.metadata ? JSON.parse(item.metadata) : {};
-              return Number(metadata?.comprovante_id) === Number(comprovante.id);
-            } catch {
-              return false;
-            }
+        await Historico.create({
+          solicitacao_id: comprovante.solicitacao_id,
+          usuario_responsavel_id: req.user?.id || null,
+          setor: req.user?.setor_id || req.user?.setor || 'FINANCEIRO',
+          acao: 'COMPROVANTE_REMOVIDO',
+          descricao: comprovante.nome_original || 'Comprovante removido',
+          metadata: JSON.stringify({
+            comprovante_id: comprovante.id,
+            caminho: comprovante.caminho_arquivo || null,
+            exclusao_logica: true
           })
-          .map(item => item.id);
-
-        if (historicosParaExcluir.length > 0) {
-          await Historico.destroy({
-            where: { id: { [Op.in]: historicosParaExcluir } }
-          });
-        }
+        });
       }
 
-      await comprovante.destroy();
-      return res.sendStatus(204);
+      return res.json({ message: 'Comprovante excluido com seguranca.', softDelete: true });
     } catch (error) {
       console.error(error);
       return res.status(500).json({ error: 'Erro ao excluir comprovante' });

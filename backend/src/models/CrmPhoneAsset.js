@@ -26,7 +26,8 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: false,
       defaultValue: 'ACTIVE'
     },
-    notes: { type: DataTypes.TEXT, allowNull: true }
+    notes: { type: DataTypes.TEXT, allowNull: true },
+    deleted_at: { type: DataTypes.DATE, allowNull: true }
   }, {
     tableName: 'crm_phone_assets',
     timestamps: true

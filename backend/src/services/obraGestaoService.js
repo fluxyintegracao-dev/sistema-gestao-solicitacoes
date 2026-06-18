@@ -335,6 +335,7 @@ async function carregarDadosObra(obraId) {
   const solicitacaoIds = solicitacoes.map((item) => item.id);
   const [anexos, comprovantes] = await Promise.all([
     Anexo.findAll({
+      where: { deleted_at: null },
       include: [
         {
           model: Solicitacao,
@@ -349,6 +350,7 @@ async function carregarDadosObra(obraId) {
     }),
     Comprovante.findAll({
       where: {
+        deleted_at: null,
         [Op.or]: [
           { obra_id: obraId },
           solicitacaoIds.length

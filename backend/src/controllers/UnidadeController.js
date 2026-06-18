@@ -85,16 +85,13 @@ module.exports = {
         where: { unidade_id: id }
       });
 
-      if (insumosVinculados > 0) {
-        await unidade.update({ ativo: false });
-        return res.json({
-          message: `Unidade desativada (${insumosVinculados} insumo(s) vinculado(s))`,
-          softDelete: true
-        });
-      }
-
-      await unidade.destroy();
-      return res.sendStatus(204);
+      await unidade.update({ ativo: false });
+      return res.json({
+        message: insumosVinculados > 0
+          ? `Unidade desativada (${insumosVinculados} insumo(s) vinculado(s))`
+          : 'Unidade excluida da visualizacao operacional.',
+        softDelete: true
+      });
     } catch (error) {
       console.error(error);
       return res.status(500).json({ error: 'Erro ao remover unidade' });

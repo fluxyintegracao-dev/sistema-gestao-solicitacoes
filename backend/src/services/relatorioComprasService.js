@@ -362,6 +362,8 @@ async function relatorioFornecedoresCompras({ obraId, dataInicio, dataFim, obraI
       {
         model: SolicitacaoCompraRespostaItem,
         as: 'respostas',
+        where: { deleted_at: null },
+        required: false,
         attributes: ['id', 'disponivel', 'preco', 'vencedor'],
         include: [
           {
@@ -1682,6 +1684,8 @@ async function relatorioEconomiaCotacoes({ obraId, dataInicio, dataFim, obraIds 
           {
             model: SolicitacaoCompraRespostaItem,
             as: 'respostas',
+            where: { deleted_at: null },
+            required: false,
             attributes: [
               'id',
               'item_tipo',

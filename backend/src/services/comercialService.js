@@ -1238,7 +1238,9 @@ async function anexarIndicadoresContratos(contratos = [], { manterParcelas = fal
 }
 
 async function listarContratosComerciais(filters = {}) {
-  const where = {};
+  const where = {
+    status: { [Op.ne]: 'EXCLUIDO' }
+  };
   const term = normalizeSearch(filters.q);
 
   if (filters.status) {
@@ -2145,30 +2147,16 @@ async function excluirContratoComercial(req, id) {
       );
     }
 
-    await ContratoComercialDocumento.destroy({
-      where: { contrato_comercial_id: contrato.id },
-      transaction
-    });
-
-    await ContratoComercialEvento.destroy({
-      where: { contrato_comercial_id: contrato.id },
-      transaction
-    });
-
-    await ContratoComercialParcela.destroy({
-      where: { contrato_comercial_id: contrato.id },
-      transaction
-    });
-
-    await ContratoComercialComprador.destroy({
-      where: { contrato_comercial_id: contrato.id },
-      transaction
-    });
-
-    await ContratoComercial.destroy({
-      where: { id: contrato.id },
-      transaction
-    });
+    await ContratoComercial.update(
+      {
+        status: 'EXCLUIDO',
+        atualizado_por: req.user?.id || null
+      },
+      {
+        where: { id: contrato.id },
+        transaction
+      }
+    );
 
     const contratoAtivoUnidade = await ContratoComercial.findOne({
       where: {
@@ -2211,7 +2199,7 @@ async function excluirContratoComercial(req, id) {
       }
     });
 
-    return { ok: true };
+    return { ok: true, softDelete: true };
   } catch (error) {
     await transaction.rollback();
     throw error;

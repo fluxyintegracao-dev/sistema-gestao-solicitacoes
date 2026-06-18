@@ -573,7 +573,7 @@ module.exports = {
       const beforeId = Number(req.query?.before_id || 0);
       const afterId = Number(req.query?.after_id || 0);
 
-      const where = { conversa_id: id };
+      const where = { conversa_id: id, deleted_at: null };
       if (afterId > 0) {
         where.id = { [Op.gt]: afterId };
       } else if (beforeId > 0) {
@@ -599,7 +599,7 @@ module.exports = {
 
       const anexos = ids.length > 0
         ? await ConversaInternaAnexo.findAll({
-            where: { mensagem_id: { [Op.in]: ids } },
+            where: { mensagem_id: { [Op.in]: ids }, deleted_at: null },
             attributes: ['id', 'mensagem_id', 'nome_arquivo', 'caminho', 'mime_type', 'tamanho_bytes', 'createdAt']
           })
         : [];
@@ -625,7 +625,7 @@ module.exports = {
       const citacoesMap = {};
       if (citacaoIds.length > 0) {
         const citadas = await ConversaInternaMensagem.findAll({
-          where: { id: { [Op.in]: citacaoIds } },
+          where: { id: { [Op.in]: citacaoIds }, deleted_at: null },
           include: [{ model: User, as: 'autor' }]
         });
         for (const c of citadas) {
@@ -751,7 +751,8 @@ module.exports = {
 
       let citacaoData = null;
       if (citacaoId) {
-        const citada = await ConversaInternaMensagem.findByPk(citacaoId, {
+        const citada = await ConversaInternaMensagem.findOne({
+          where: { id: citacaoId, deleted_at: null },
           include: [{ model: User, as: 'autor' }]
         });
         if (citada) {
@@ -784,7 +785,9 @@ module.exports = {
 
       if (!novoTexto) return res.status(400).json({ error: 'Mensagem obrigatoria' });
 
-      const mensagem = await ConversaInternaMensagem.findByPk(mensagemId);
+      const mensagem = await ConversaInternaMensagem.findOne({
+        where: { id: mensagemId, deleted_at: null }
+      });
       if (!mensagem) return res.status(404).json({ error: 'Mensagem nao encontrada' });
 
       const { conversa, permitido } = await podeVisualizarConversa(req, mensagem.conversa_id);
@@ -814,7 +817,9 @@ module.exports = {
       const mensagemId = Number(req.params?.mensagemId || 0);
       const usuarioId = Number(req.user.id);
 
-      const mensagem = await ConversaInternaMensagem.findByPk(mensagemId);
+      const mensagem = await ConversaInternaMensagem.findOne({
+        where: { id: mensagemId, deleted_at: null }
+      });
       if (!mensagem) return res.status(404).json({ error: 'Mensagem nao encontrada' });
 
       const { conversa, permitido } = await podeVisualizarConversa(req, mensagem.conversa_id);
@@ -839,12 +844,16 @@ module.exports = {
         return res.status(400).json({ error: 'Mensagem ja visualizada e nao pode ser excluida.' });
       }
 
-      await ConversaInternaAnexo.destroy({ where: { mensagem_id: mensagemId } });
-      await mensagem.destroy();
+      const agora = new Date();
+      await ConversaInternaAnexo.update(
+        { deleted_at: agora },
+        { where: { mensagem_id: mensagemId, deleted_at: null } }
+      );
+      await mensagem.update({ deleted_at: agora });
 
       // Atualiza preview da conversa se era a ultima mensagem
       const ultima = await ConversaInternaMensagem.findOne({
-        where: { conversa_id: conversa.id },
+        where: { conversa_id: conversa.id, deleted_at: null },
         order: [['id', 'DESC']],
         include: [{ model: User, as: 'autor', attributes: ['nome'] }]
       });

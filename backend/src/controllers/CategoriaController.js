@@ -82,16 +82,13 @@ module.exports = {
         where: { categoria_id: id }
       });
 
-      if (insumosVinculados > 0) {
-        await categoria.update({ ativo: false });
-        return res.json({
-          message: `Categoria desativada (${insumosVinculados} insumo(s) vinculado(s))`,
-          softDelete: true
-        });
-      }
-
-      await categoria.destroy();
-      return res.sendStatus(204);
+      await categoria.update({ ativo: false });
+      return res.json({
+        message: insumosVinculados > 0
+          ? `Categoria desativada (${insumosVinculados} insumo(s) vinculado(s))`
+          : 'Categoria excluida da visualizacao operacional.',
+        softDelete: true
+      });
     } catch (error) {
       console.error(error);
       return res.status(500).json({ error: 'Erro ao remover categoria' });

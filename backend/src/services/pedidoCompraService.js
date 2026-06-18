@@ -234,7 +234,8 @@ async function buscarUltimosPrecosPorInsumo(insumoIds, obraIdsEscopo = null, sol
   const respostas = await SolicitacaoCompraRespostaItem.findAll({
     where: {
       vencedor: true,
-      preco: { [Op.not]: null }
+      preco: { [Op.not]: null },
+      deleted_at: null
     },
     include: [{
       model: SolicitacaoCompraItem,
@@ -325,6 +326,8 @@ async function carregarSolicitacaoPedidos(id, transaction) {
           {
             model: SolicitacaoCompraRespostaItem,
             as: 'respostas',
+            where: { deleted_at: null },
+            required: false,
             attributes: [
               'id',
               'item_tipo',

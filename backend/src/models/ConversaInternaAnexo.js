@@ -34,6 +34,11 @@ module.exports = (sequelize, DataTypes) => {
     tamanho_bytes: {
       type: DataTypes.INTEGER,
       allowNull: true
+    },
+
+    deleted_at: {
+      type: DataTypes.DATE,
+      allowNull: true
     }
   }, {
     tableName: 'conversas_internas_anexos',
