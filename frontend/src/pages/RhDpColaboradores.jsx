@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { HiOutlineEye, HiOutlinePencilSquare } from 'react-icons/hi2';
 import { useAuth } from '../contexts/AuthContext';
 import { getObras } from '../services/obras';
 import {
@@ -643,17 +644,17 @@ export default function RhDpColaboradores() {
 
       <div className="grid gap-6 xl:grid-cols-[1.45fr,1fr]">
         <div className="card sol-surface-card app-table-shell">
-          <div className="table-wrapper">
-            <table className="table">
+          <div className="app-dense-table-wrapper">
+            <table className="app-dense-data-table rh-colaboradores-table">
               <thead>
                 <tr>
-                  <th>Nome</th>
-                  <th>CPF</th>
-                  <th>Empresa</th>
-                  <th>Obra</th>
-                  <th>Vinculo</th>
-                  <th>Status</th>
-                  <th>Acoes</th>
+                  <th className="app-dense-col-title">Nome</th>
+                  <th className="app-dense-col-medium">CPF</th>
+                  <th className="app-dense-col-title">Empresa</th>
+                  <th className="app-dense-col-medium">Obra</th>
+                  <th className="app-dense-col-medium">Vinculo</th>
+                  <th className="app-dense-col-status">Status</th>
+                  <th className="app-dense-col-actions text-center">Acoes</th>
                 </tr>
               </thead>
               <tbody>
@@ -668,9 +669,15 @@ export default function RhDpColaboradores() {
                     <td>{item.obra?.nome || '-'}</td>
                     <td>{item.tipo_vinculo === 'NAO_CLT' ? 'Nao CLT' : item.tipo_vinculo}</td>
                     <td>{item.status}</td>
-                    <td>
-                      <button type="button" className="btn btn-outline" onClick={() => abrirColaborador(item.id)}>
-                        {podeEditar ? 'Editar' : 'Ver'}
+                    <td className="text-center">
+                      <button
+                        type="button"
+                        className="app-dense-icon-action"
+                        onClick={() => abrirColaborador(item.id)}
+                        title={podeEditar ? 'Editar colaborador' : 'Ver colaborador'}
+                        aria-label={podeEditar ? `Editar colaborador ${item.nome}` : `Ver colaborador ${item.nome}`}
+                      >
+                        {podeEditar ? <HiOutlinePencilSquare aria-hidden="true" /> : <HiOutlineEye aria-hidden="true" />}
                       </button>
                     </td>
                   </tr>
