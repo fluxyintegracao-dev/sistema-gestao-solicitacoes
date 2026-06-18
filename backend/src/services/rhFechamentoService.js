@@ -208,6 +208,7 @@ async function carregarApuracaoParaFechamento(apuracaoId, transaction) {
               'matricula',
               'tipo_vinculo',
               'status',
+              'empresa_grupo_id',
               'obra_id',
               'telefone',
               'email'

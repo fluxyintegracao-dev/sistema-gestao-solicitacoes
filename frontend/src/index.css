@@ -9357,7 +9357,7 @@ body {
 }
 
 .layout-shell .rhdp-apuracao-items-table {
-  min-width: 86rem;
+  min-width: 122rem;
 }
 
 .layout-shell .rhdp-apuracao-table th,
@@ -9374,6 +9374,18 @@ body {
   min-height: 2.35rem;
   padding: 0.5rem 0.65rem;
   font-size: 0.78rem;
+}
+
+.layout-shell .rhdp-apuracao-items-table th,
+.layout-shell .rhdp-apuracao-items-table td {
+  white-space: nowrap;
+}
+
+.layout-shell .rhdp-apuracao-items-table td:first-child,
+.layout-shell .rhdp-apuracao-items-table td:nth-child(7),
+.layout-shell .rhdp-apuracao-items-table td:nth-child(8),
+.layout-shell .rhdp-apuracao-items-table td:nth-child(12) {
+  white-space: normal;
 }
 
 .layout-shell .app-dense-data-table {
