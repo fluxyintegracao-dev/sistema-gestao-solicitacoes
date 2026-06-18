@@ -6,6 +6,7 @@ const {
   Obra,
   Parceiro,
   PaymentBeneficiary,
+  MovimentoFinanceiro,
   RhApuracao,
   RhApuracaoEvento,
   RhColaborador,
@@ -544,7 +545,8 @@ async function obterDestinatariosFinanceiro(transaction) {
     where: {
       [Op.or]: [
         { codigo: 'FINANCEIRO' },
-        { nome: 'Financeiro' }
+        { nome: 'Financeiro' },
+        { eh_setor_financeiro: true }
       ]
     },
     attributes: ['id'],
@@ -575,11 +577,6 @@ async function obterDestinatariosFinanceiro(transaction) {
 
 async function notificarFinanceiroReabertura({ fechamento, apuracao, justificativa, user, transaction }) {
   const destinatarios = await obterDestinatariosFinanceiro(transaction);
-  if (user?.id) {
-    const actorId = Number(user.id);
-    const index = destinatarios.indexOf(actorId);
-    if (index >= 0) destinatarios.splice(index, 1);
-  }
   if (!destinatarios.length) {
     return;
   }
@@ -588,7 +585,7 @@ async function notificarFinanceiroReabertura({ fechamento, apuracao, justificati
     {
       solicitacao_id: null,
       tipo: 'RH_DP_FECHAMENTO_REABERTO',
-      mensagem: `Fechamento RH/DP #${fechamento.id} da competencia ${apuracao.competencia} foi reaberto por ${user?.nome || 'Usuario'}.`,
+      mensagem: `Apuracao RH/DP ${apuracao.competencia} foi estornada por ${user?.nome || 'Usuario'} e os titulos em aberto foram cancelados.`,
       metadata: JSON.stringify({
         fechamento_id: fechamento.id,
         apuracao_id: apuracao.id,
@@ -780,15 +777,42 @@ async function reabrirFechamentoRh(fechamentoId, data, user) {
     }
 
     const titulos = Array.isArray(fechamento.titulos) ? fechamento.titulos : [];
+    const tituloIds = titulos
+      .map((item) => Number(item?.tituloFinanceiro?.id || 0))
+      .filter((id) => Number.isInteger(id) && id > 0);
+
+    const baixasAtivas = tituloIds.length
+      ? await MovimentoFinanceiro.findAll({
+          where: {
+            titulo_financeiro_id: { [Op.in]: tituloIds },
+            tipo_movimento: 'BAIXA',
+            status: 'ATIVO'
+          },
+          attributes: ['id', 'titulo_financeiro_id', 'valor'],
+          transaction
+        })
+      : [];
+    const tituloIdsComBaixaAtiva = new Set(
+      baixasAtivas.map((movimento) => Number(movimento.titulo_financeiro_id)).filter(Boolean)
+    );
+
     const tituloBaixado = titulos.find((item) => {
       const titulo = item.tituloFinanceiro;
       const status = String(titulo?.status || '').trim().toUpperCase();
-      return Number(titulo?.valor_baixado || 0) > 0 || status === 'QUITADO';
+      const valorBaixado = Number(titulo?.valor_baixado || 0);
+      const valorOriginal = Number(titulo?.valor_original || 0);
+      const valorSaldo = Number(titulo?.valor_saldo || 0);
+      return (
+        tituloIdsComBaixaAtiva.has(Number(titulo?.id)) ||
+        valorBaixado > 0 ||
+        (valorOriginal > 0 && valorSaldo < valorOriginal) ||
+        ['PARCIAL', 'QUITADO', 'BAIXADO', 'PAGO', 'CONCILIADO'].includes(status)
+      );
     });
 
     if (tituloBaixado) {
       throw new ValidationError(
-        `Nao e possivel reabrir este fechamento porque o titulo financeiro #${tituloBaixado.tituloFinanceiro.id} possui baixa registrada.`
+        `Nao e possivel estornar esta apuracao porque o titulo financeiro #${tituloBaixado.tituloFinanceiro.id} ja possui baixa registrada. Estorne a baixa no financeiro antes de reabrir a apuracao.`
       );
     }
 
