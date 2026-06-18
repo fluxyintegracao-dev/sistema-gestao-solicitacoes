@@ -174,9 +174,6 @@ function getTituloPaymentAccountPendencies(titulo = {}, account = null) {
   if (!accountEmpresaId) {
     pendencies.push('Selecione uma conta pagadora completa.');
   }
-  if (tituloEmpresaId && accountEmpresaId && tituloEmpresaId !== accountEmpresaId) {
-    pendencies.push('Empresa do titulo diferente da conta pagadora.');
-  }
 
   return pendencies;
 }
@@ -352,11 +349,7 @@ export default function FinanceiroPagamentos() {
     try {
       setActionLoading('titulos');
       setError('');
-      const accountEmpresaId = getPaymentAccountEmpresaId(selectedPaymentAccount);
-      const data = await getPaymentEligibleTitulos(compactFilters({
-        ...filters,
-        empresa_id: accountEmpresaId || ''
-      }));
+      const data = await getPaymentEligibleTitulos(compactFilters(filters));
       setTitulos(Array.isArray(data) ? data : []);
       setSelectedIds([]);
     } catch (err) {
@@ -470,15 +463,16 @@ export default function FinanceiroPagamentos() {
   const titulosOverview = useMemo(() => {
     const eligible = titulos.filter((titulo) => titulo.elegivel_pagamento);
     const compatible = eligible.filter((titulo) => getTituloPaymentAccountPendencies(titulo, selectedPaymentAccount).length === 0);
+    const operationalBlocked = eligible.length - compatible.length;
     return {
       total: titulos.length,
       eligibleCount: eligible.length,
       compatibleCount: compatible.length,
       blockedCount: Math.max(titulos.length - eligible.length, 0),
-      companyBlockedCount: Math.max(eligible.length - compatible.length, 0),
+      operationalBlockedCount: Math.max(operationalBlocked, 0),
       selectedCount: selectedIds.length,
       selectedTotal,
-      selectedCompanyBlockedCount: selectedTitulosAccountPendencies.length
+      selectedOperationalBlockedCount: selectedTitulosAccountPendencies.length
     };
   }, [selectedIds.length, selectedPaymentAccount, selectedTitulosAccountPendencies.length, selectedTotal, titulos]);
 
@@ -504,16 +498,16 @@ export default function FinanceiroPagamentos() {
         return {
           eyebrow: 'Lote em montagem',
           title: `${titulosOverview.selectedCount} titulo(s) selecionado(s)`,
-          body: titulosOverview.selectedCompanyBlockedCount
-            ? `${titulosOverview.selectedCompanyBlockedCount} titulo(s) selecionado(s) nao pertencem a empresa da conta pagadora.`
+          body: titulosOverview.selectedOperationalBlockedCount
+            ? `${titulosOverview.selectedOperationalBlockedCount} titulo(s) selecionado(s) ainda tem pendencia operacional.`
             : `${formatCurrency(titulosOverview.selectedTotal)} pronto para gerar lote, desde que conta pagadora e data estejam corretas.`
         };
       }
       return {
         eyebrow: 'Conferencia',
-        title: `${titulosOverview.compatibleCount} titulo(s) pronto(s) para a conta selecionada`,
-        body: titulosOverview.blockedCount || titulosOverview.companyBlockedCount
-          ? `${titulosOverview.blockedCount} com pendencias cadastrais e ${titulosOverview.companyBlockedCount} de outra empresa para esta conta.`
+        title: `${titulosOverview.compatibleCount} titulo(s) pronto(s) para lote`,
+        body: titulosOverview.blockedCount || titulosOverview.operationalBlockedCount
+          ? `${titulosOverview.blockedCount} com pendencias cadastrais e ${titulosOverview.operationalBlockedCount} com pendencia operacional.`
           : 'Selecione os titulos que realmente devem ser pagos neste lote.'
       };
     }
@@ -568,7 +562,7 @@ export default function FinanceiroPagamentos() {
         return;
       }
       if (selectedTitulosAccountPendencies.length > 0) {
-        setError('Remova da selecao os titulos cuja empresa diverge da conta pagadora.');
+        setError('Remova da selecao os titulos com pendencia operacional antes de gerar o lote.');
         return;
       }
       setActionLoading('criar-lote');
@@ -792,7 +786,7 @@ export default function FinanceiroPagamentos() {
                 <div className="sol-filtros-head">
                   <div>
                     <p className="sol-filtros-title">Selecao para lote</p>
-                    <p className="sol-filtros-subtitle">Somente contas a pagar abertas/parciais e com favorecido PIX completo entram no lote.</p>
+                    <p className="sol-filtros-subtitle">Contas a pagar abertas/parciais aparecem para conferencia. Somente titulos com favorecido PIX completo e conta pagadora valida entram no lote.</p>
                   </div>
                 </div>
                 <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-12">
@@ -854,7 +848,7 @@ export default function FinanceiroPagamentos() {
                 )}
                 {selectedTitulosAccountPendencies.length > 0 && (
                   <div className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
-                    Remova da selecao os titulos de outra empresa antes de gerar o lote:
+                    Remova da selecao os titulos com pendencia operacional antes de gerar o lote:
                     {' '}
                     {selectedTitulosAccountPendencies.map(({ titulo }) => getTituloCodigo(titulo)).join(', ')}.
                   </div>
@@ -870,8 +864,8 @@ export default function FinanceiroPagamentos() {
                       <strong className="text-emerald-700">{titulosOverview.eligibleCount}</strong>
                     </div>
                     <div>
-                      <span className="block text-xs uppercase tracking-[0.14em] text-[var(--c-muted)]">Para esta conta</span>
-                      <strong className={titulosOverview.companyBlockedCount ? 'text-amber-700' : 'text-emerald-700'}>{titulosOverview.compatibleCount}</strong>
+                      <span className="block text-xs uppercase tracking-[0.14em] text-[var(--c-muted)]">Prontos para lote</span>
+                      <strong className={titulosOverview.operationalBlockedCount ? 'text-amber-700' : 'text-emerald-700'}>{titulosOverview.compatibleCount}</strong>
                     </div>
                     <div>
                       <span className="block text-xs uppercase tracking-[0.14em] text-[var(--c-muted)]">Com pendencia</span>

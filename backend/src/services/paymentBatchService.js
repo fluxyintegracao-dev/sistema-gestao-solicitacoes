@@ -246,9 +246,6 @@ async function createBatchFromTitulos(req, payload = {}) {
       if (!titulo.empresa_id) {
         throw createHttpError(400, `Titulo ${titulo.codigo || `#${titulo.id}`} nao possui empresa pagadora vinculada.`);
       }
-      if (Number(titulo.empresa_id) !== Number(paymentAccount.empresa_id)) {
-        throw createHttpError(400, `Titulo ${titulo.codigo || `#${titulo.id}`} pertence a outra empresa. Selecione a conta pagadora da mesma empresa do titulo ou registre a operacao Entre Empresas correta antes de gerar o lote.`);
-      }
 
       const valor = Number(titulo.valor_saldo || 0);
       const intent = await PaymentIntent.create({

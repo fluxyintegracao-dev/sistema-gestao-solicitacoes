@@ -156,9 +156,6 @@ async function validatePaymentBatchIntegrity(batchId, options = {}) {
     if (Number(intent.provider_id) !== Number(batch.provider_id)) {
       throw createHttpError(409, `Provider da intencao do titulo ${tituloLabel} diverge do provider do lote.`);
     }
-    if (Number(titulo.empresa_id || 0) !== Number(batch.paymentAccount.empresa_id)) {
-      throw createHttpError(400, `Titulo ${tituloLabel} pertence a empresa diferente da conta pagadora.`);
-    }
     if (!['ABERTO', 'PARCIAL'].includes(normalizeStatus(titulo.status))) {
       throw createHttpError(409, `Titulo ${tituloLabel} nao esta mais aberto para pagamento.`);
     }
