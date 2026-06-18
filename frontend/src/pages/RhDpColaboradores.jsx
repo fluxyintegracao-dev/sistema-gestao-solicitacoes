@@ -557,7 +557,7 @@ export default function RhDpColaboradores() {
   }
 
   return (
-    <div className="page solicitacoes-page rhdp-page space-y-6">
+    <div className="page solicitacoes-page rhdp-page rh-colaboradores-page space-y-6">
       <div className="app-page-header">
         <div className="app-page-header-row">
           <div>
@@ -577,8 +577,8 @@ export default function RhDpColaboradores() {
         </div>
       </div>
 
-      <div className="sol-surface-card solicitacoes-toolbar app-toolbar-card rounded-xl p-3 md:p-4 space-y-3">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+      <div className="sol-surface-card solicitacoes-toolbar app-toolbar-card rh-colaboradores-filter-card rounded-xl p-3 md:p-4 space-y-3">
+        <div className="rh-colaboradores-filter-grid">
           <input
             className="form-control"
             placeholder="Buscar por nome, CPF ou matricula"
@@ -626,7 +626,7 @@ export default function RhDpColaboradores() {
           </select>
         </div>
 
-        <div className="app-page-actions">
+        <div className="app-page-actions rh-colaboradores-actions">
           <button type="button" className="btn btn-outline" onClick={aplicarFiltros} disabled={carregando}>
             Aplicar filtros
           </button>
@@ -709,7 +709,7 @@ export default function RhDpColaboradores() {
           </div>
         </div>
 
-        <form className="sol-surface-card rounded-xl p-4 space-y-4" onSubmit={salvar}>
+        <form className="sol-surface-card rh-colaborador-form-card rounded-xl p-4 space-y-4" onSubmit={salvar}>
           <div>
             <h2 className="text-lg font-semibold text-slate-900">
               {form.id ? 'Detalhe do colaborador' : 'Novo colaborador'}
