@@ -9176,6 +9176,12 @@ body {
   background: color-mix(in srgb, var(--shell-panel, #fff) 96%, var(--shell-primary, #2563eb) 4%);
 }
 
+.layout-shell .rh-colaboradores-table-wrapper {
+  max-height: 34.5rem;
+  overflow: auto;
+  scrollbar-gutter: stable;
+}
+
 .layout-shell .app-dense-data-table {
   width: 100%;
   min-width: 54rem;
@@ -9196,6 +9202,12 @@ body {
   text-align: left;
   text-transform: uppercase;
   white-space: nowrap;
+}
+
+.layout-shell .rh-colaboradores-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
 }
 
 .layout-shell .app-dense-data-table td {

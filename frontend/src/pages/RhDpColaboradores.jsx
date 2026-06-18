@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { HiOutlineEye, HiOutlinePencilSquare } from 'react-icons/hi2';
+import { ResizableTable, ResizableTh } from '../components/ResizableTable';
 import { useAuth } from '../contexts/AuthContext';
 import { getObras } from '../services/obras';
 import {
@@ -65,6 +66,16 @@ function formatCpf(value) {
   }
   return value || '-';
 }
+
+const RH_COLABORADORES_COLUMNS = [
+  { key: 'nome', width: 240, minWidth: 180 },
+  { key: 'cpf', width: 160, minWidth: 130 },
+  { key: 'empresa', width: 260, minWidth: 180 },
+  { key: 'obra', width: 210, minWidth: 150 },
+  { key: 'vinculo', width: 140, minWidth: 110 },
+  { key: 'status', width: 130, minWidth: 100 },
+  { key: 'acoes', width: 92, minWidth: 76 }
+];
 
 function formatDate(value) {
   if (!value) return '-';
@@ -642,19 +653,23 @@ export default function RhDpColaboradores() {
         </div>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[1.45fr,1fr]">
+      <div className="space-y-6">
         <div className="card sol-surface-card app-table-shell">
-          <div className="app-dense-table-wrapper">
-            <table className="app-dense-data-table rh-colaboradores-table">
+          <div className="app-dense-table-wrapper rh-colaboradores-table-wrapper">
+            <ResizableTable
+              columns={RH_COLABORADORES_COLUMNS}
+              storageKey="rh-colaboradores-table-columns"
+              className="app-dense-data-table rh-colaboradores-table"
+            >
               <thead>
                 <tr>
-                  <th className="app-dense-col-title">Nome</th>
-                  <th className="app-dense-col-medium">CPF</th>
-                  <th className="app-dense-col-title">Empresa</th>
-                  <th className="app-dense-col-medium">Obra</th>
-                  <th className="app-dense-col-medium">Vinculo</th>
-                  <th className="app-dense-col-status">Status</th>
-                  <th className="app-dense-col-actions text-center">Acoes</th>
+                  <ResizableTh columnKey="nome">Nome</ResizableTh>
+                  <ResizableTh columnKey="cpf">CPF</ResizableTh>
+                  <ResizableTh columnKey="empresa">Empresa</ResizableTh>
+                  <ResizableTh columnKey="obra">Obra</ResizableTh>
+                  <ResizableTh columnKey="vinculo">Vinculo</ResizableTh>
+                  <ResizableTh columnKey="status">Status</ResizableTh>
+                  <ResizableTh columnKey="acoes" className="text-center">Acoes</ResizableTh>
                 </tr>
               </thead>
               <tbody>
@@ -690,7 +705,7 @@ export default function RhDpColaboradores() {
                   </tr>
                 )}
               </tbody>
-            </table>
+            </ResizableTable>
           </div>
         </div>
 
