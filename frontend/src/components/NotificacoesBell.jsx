@@ -28,6 +28,7 @@ export default function NotificacoesBell() {
 
     try {
       if (showLoading) setCarregando(true);
+      const data = await getNotificacoes({ limit: 20 });
       const itensRecebidos = Array.isArray(data.itens) ? data.itens : [];
 
       setItens(itensRecebidos);

@@ -606,34 +606,42 @@ async function obterDestinatariosFinanceiro(transaction) {
 }
 
 async function notificarFinanceiroReabertura({ fechamento, apuracao, justificativa, user, transaction }) {
-  const destinatarios = await obterDestinatariosFinanceiro(transaction);
-  if (!destinatarios.length) {
-    return;
-  }
-
-  const notificacao = await Notificacao.create(
-    {
-      solicitacao_id: null,
-      tipo: 'RH_DP_FECHAMENTO_REABERTO',
-      mensagem: `Apuracao RH/DP ${apuracao.competencia} foi estornada por ${user?.nome || 'Usuario'} e os titulos em aberto foram cancelados.`,
-      metadata: JSON.stringify({
+  try {
+    const destinatarios = await obterDestinatariosFinanceiro(transaction);
+    if (!destinatarios.length) {
+      console.warn('[rh-dp] Estorno de fechamento sem destinatarios financeiros para notificacao.', {
         fechamento_id: fechamento.id,
-        apuracao_id: apuracao.id,
-        competencia: apuracao.competencia,
-        justificativa
-      }),
-      created_by: user?.id || null
-    },
-    { transaction }
-  );
+        apuracao_id: apuracao.id
+      });
+      return;
+    }
 
-  await NotificacaoDestinatario.bulkCreate(
-    destinatarios.map((usuarioId) => ({
-      notificacao_id: notificacao.id,
-      usuario_id: usuarioId
-    })),
-    { transaction }
-  );
+    const notificacao = await Notificacao.create(
+      {
+        solicitacao_id: null,
+        tipo: 'RH_DP_FECHAMENTO_REABERTO',
+        mensagem: `Apuracao RH/DP ${apuracao.competencia} foi estornada por ${user?.nome || 'Usuario'} e os titulos em aberto foram cancelados.`,
+        metadata: JSON.stringify({
+          fechamento_id: fechamento.id,
+          apuracao_id: apuracao.id,
+          competencia: apuracao.competencia,
+          justificativa
+        }),
+        created_by: user?.id || null
+      },
+      { transaction }
+    );
+
+    await NotificacaoDestinatario.bulkCreate(
+      destinatarios.map((usuarioId) => ({
+        notificacao_id: notificacao.id,
+        usuario_id: usuarioId
+      })),
+      { transaction }
+    );
+  } catch (error) {
+    console.error('[rh-dp] Erro ao notificar financeiro sobre estorno de fechamento.', error);
+  }
 }
 
 async function fecharApuracaoRh(apuracaoId, data, user) {
