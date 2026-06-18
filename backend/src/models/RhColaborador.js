@@ -58,6 +58,10 @@ module.exports = (sequelize, DataTypes) => sequelize.define(
       type: DataTypes.DATEONLY,
       allowNull: true
     },
+    data_demissao: {
+      type: DataTypes.DATEONLY,
+      allowNull: true
+    },
     data_nascimento: {
       type: DataTypes.DATEONLY,
       allowNull: true

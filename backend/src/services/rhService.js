@@ -842,6 +842,7 @@ async function criarColaboradorRh(data, user) {
     const created = await RhColaborador.create(
       {
         ...data,
+        data_inicio: data.data_inicio || data.data_admissao,
         pagamento: undefined,
         criado_por: user?.id || null,
         atualizado_por: user?.id || null
@@ -890,8 +891,9 @@ async function atualizarColaboradorRh(id, data, user) {
         email: data.email,
         cargo: data.cargo,
         tipo_vinculo: data.tipo_vinculo,
-        data_inicio: data.data_inicio,
+        data_inicio: data.data_inicio || data.data_admissao,
         data_admissao: data.data_admissao,
+        data_demissao: data.data_demissao,
         data_nascimento: data.data_nascimento,
         status: data.status,
         salario_base: data.salario_base,
@@ -1178,6 +1180,10 @@ async function importarColaboradoresRh(file, user) {
         setorByCodigo.get(setorCodigo) ||
         setorByNome.get(setorNome) ||
         null;
+      const dataAdmissaoImportada =
+        parseImportDate(pickImportValue(row, ['data_admissao', 'admissao'])) ||
+        parseImportDate(pickImportValue(row, ['data_inicio', 'inicio'])) ||
+        undefined;
 
       const payload = {
         empresa_grupo_id: empresa.id,
@@ -1191,8 +1197,9 @@ async function importarColaboradoresRh(file, user) {
         email: String(pickImportValue(row, ['email']) || '').trim() || undefined,
         cargo: String(pickImportValue(row, ['cargo', 'funcao']) || '').trim() || undefined,
         tipo_vinculo: normalizeToken(pickImportValue(row, ['tipo_vinculo', 'vinculo'])) || undefined,
-        data_inicio: parseImportDate(pickImportValue(row, ['data_inicio', 'inicio'])) || undefined,
-        data_admissao: parseImportDate(pickImportValue(row, ['data_admissao', 'admissao'])) || undefined,
+        data_inicio: dataAdmissaoImportada,
+        data_admissao: dataAdmissaoImportada,
+        data_demissao: parseImportDate(pickImportValue(row, ['data_demissao', 'demissao', 'desligamento'])) || undefined,
         data_nascimento: parseImportDate(pickImportValue(row, ['data_nascimento', 'nascimento'])) || undefined,
         status: normalizeToken(pickImportValue(row, ['status'])) || 'ATIVO',
         salario_base: parseImportDecimal(pickImportValue(row, ['salario_base', 'salario'])) || undefined,

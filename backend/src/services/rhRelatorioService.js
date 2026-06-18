@@ -105,6 +105,7 @@ function formatColaborador(colaborador) {
     salario_base: toNumber(colaborador.salario_base),
     valor_contratual: toNumber(colaborador.valor_contratual),
     data_admissao: colaborador.data_admissao,
+    data_demissao: colaborador.data_demissao,
     data_inicio: colaborador.data_inicio
   };
 }

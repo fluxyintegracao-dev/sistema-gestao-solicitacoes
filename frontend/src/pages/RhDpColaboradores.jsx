@@ -38,6 +38,7 @@ function emptyForm() {
     tipo_vinculo: 'CLT',
     data_inicio: '',
     data_admissao: '',
+    data_demissao: '',
     data_nascimento: '',
     status: 'ATIVO',
     salario_base: '',
@@ -98,8 +99,9 @@ function toFormData(data) {
     email: data?.email || '',
     cargo: data?.cargo || '',
     tipo_vinculo: data?.tipo_vinculo || 'CLT',
-    data_inicio: data?.data_inicio || '',
-    data_admissao: data?.data_admissao || '',
+    data_inicio: data?.data_inicio || data?.data_admissao || '',
+    data_admissao: data?.data_admissao || data?.data_inicio || '',
+    data_demissao: data?.data_demissao || '',
     data_nascimento: data?.data_nascimento || '',
     status: data?.status || 'ATIVO',
     salario_base: formatCurrencyInput(data?.salario_base),
@@ -131,8 +133,9 @@ function buildPayload(form) {
     email: form.email || undefined,
     cargo: form.cargo || undefined,
     tipo_vinculo: form.tipo_vinculo,
-    data_inicio: form.data_inicio || undefined,
+    data_inicio: form.data_admissao || undefined,
     data_admissao: form.data_admissao || undefined,
+    data_demissao: form.data_demissao || undefined,
     data_nascimento: form.data_nascimento || undefined,
     status: form.status,
     salario_base: form.salario_base === '' ? undefined : form.salario_base,
@@ -162,8 +165,8 @@ function downloadModeloColaboradores() {
       'Setor_Codigo',
       'Cargo',
       'Tipo_Vinculo',
-      'Data_Inicio',
       'Data_Admissao',
+      'Data_Demissao',
       'Status',
       'Salario_Base',
       'Valor_Contratual',
@@ -188,7 +191,7 @@ function downloadModeloColaboradores() {
       'Analista',
       'CLT',
       '2026-04-01',
-      '2026-04-01',
+      '',
       'ATIVO',
       '3500,00',
       '',
@@ -826,22 +829,22 @@ export default function RhDpColaboradores() {
 
           <div className="grid gap-3 md:grid-cols-3">
             <label className="space-y-1 text-sm">
-              <span>Data de inicio</span>
-              <input
-                type="date"
-                className="form-control"
-                value={form.data_inicio}
-                onChange={(e) => setForm((prev) => ({ ...prev, data_inicio: e.target.value }))}
-                disabled={!podeEditar}
-              />
-            </label>
-            <label className="space-y-1 text-sm">
-              <span>Data de admissao</span>
+              <span>Data de admissão</span>
               <input
                 type="date"
                 className="form-control"
                 value={form.data_admissao}
-                onChange={(e) => setForm((prev) => ({ ...prev, data_admissao: e.target.value }))}
+                onChange={(e) => setForm((prev) => ({ ...prev, data_admissao: e.target.value, data_inicio: e.target.value }))}
+                disabled={!podeEditar}
+              />
+            </label>
+            <label className="space-y-1 text-sm">
+              <span>Data de demissão</span>
+              <input
+                type="date"
+                className="form-control"
+                value={form.data_demissao}
+                onChange={(e) => setForm((prev) => ({ ...prev, data_demissao: e.target.value }))}
                 disabled={!podeEditar}
               />
             </label>
