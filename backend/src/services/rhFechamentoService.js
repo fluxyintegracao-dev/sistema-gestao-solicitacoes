@@ -21,7 +21,12 @@ const {
 } = require('../models');
 const { Op } = require('sequelize');
 const { ValidationError } = require('../middlewares/validation');
-const { getUsuariosAcessoFinanceiro } = require('./authorizationService');
+const { canAccessFinanceiro, getUsuariosAcessoFinanceiro } = require('./authorizationService');
+const {
+  buildSetorComparisonTokens,
+  hasSetorCapability,
+  normalizeSetorCode
+} = require('./setorCapabilityService');
 
 const FECHAMENTO_INCLUDE = [
   {
@@ -544,35 +549,60 @@ async function obterDestinatariosFinanceiro(transaction) {
   const setoresFinanceiro = await Setor.findAll({
     where: {
       [Op.or]: [
-        { codigo: 'FINANCEIRO' },
-        { nome: 'Financeiro' },
+        { codigo: { [Op.in]: ['FINANCEIRO', 'FINANCEIRO_CSC', 'SETOR_FINANCEIRO'] } },
+        { nome: { [Op.like]: '%Financeiro%' } },
         { eh_setor_financeiro: true }
       ]
     },
-    attributes: ['id'],
+    attributes: ['id', 'codigo', 'nome', 'eh_setor_financeiro'],
     transaction
   });
-  const setorIds = setoresFinanceiro.map((setor) => Number(setor.id)).filter(Boolean);
+  const setorIds = new Set(setoresFinanceiro.map((setor) => Number(setor.id)).filter(Boolean));
   const usuarios = await User.findAll({
     where: {
-      ativo: true,
-      [Op.or]: [
-        { perfil: 'FINANCEIRO' },
-        ...(setorIds.length ? [{ setor_id: { [Op.in]: setorIds } }] : []),
-        ...(usuariosConfigurados.length ? [{ id: { [Op.in]: usuariosConfigurados } }] : [])
-      ]
+      ativo: true
     },
-    attributes: ['id'],
+    attributes: ['id', 'perfil', 'area', 'setor_id'],
+    include: [
+      {
+        model: Setor,
+        as: 'setor',
+        attributes: ['id', 'codigo', 'nome', 'eh_setor_financeiro'],
+        required: false
+      }
+    ],
     transaction
   });
 
-  return [
-    ...new Set(
-      usuarios
-        .map((usuario) => Number(usuario.id))
-        .filter((usuarioId) => Number.isInteger(usuarioId) && usuarioId > 0)
-    )
-  ];
+  const destinatarios = [];
+  for (const usuario of usuarios) {
+    const usuarioId = Number(usuario.id);
+    if (!Number.isInteger(usuarioId) || usuarioId <= 0) continue;
+
+    const setorTokens = buildSetorComparisonTokens(usuario.setor || {});
+    const perfilFinanceiro = normalizeSetorCode(usuario.perfil) === 'FINANCEIRO';
+    const areaFinanceira = normalizeSetorCode(usuario.area).includes('FINANCEIRO');
+    const setorFinanceiro = (
+      setorIds.has(Number(usuario.setor_id)) ||
+      hasSetorCapability(usuario.setor, 'eh_setor_financeiro') ||
+      setorTokens.includes('FINANCEIRO') ||
+      setorTokens.some((token) => token.includes('FINANCEIRO'))
+    );
+    const configuradoFinanceiro = usuariosConfigurados.includes(usuarioId);
+    const possuiPermissaoFinanceira = await canAccessFinanceiro(usuario);
+
+    if (
+      perfilFinanceiro ||
+      areaFinanceira ||
+      setorFinanceiro ||
+      configuradoFinanceiro ||
+      possuiPermissaoFinanceira
+    ) {
+      destinatarios.push(usuarioId);
+    }
+  }
+
+  return [...new Set(destinatarios)];
 }
 
 async function notificarFinanceiroReabertura({ fechamento, apuracao, justificativa, user, transaction }) {

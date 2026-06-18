@@ -12,8 +12,6 @@ import {
   marcarTodasNotificacoesLidas
 } from '../services/notificacoes';
 
-const TIPOS_VISIVEIS = new Set(['MENCAO_COMENTARIO']);
-
 export default function NotificacoesBell() {
   const [aberto, setAberto] = useState(false);
   const [itens, setItens] = useState([]);
@@ -30,13 +28,10 @@ export default function NotificacoesBell() {
 
     try {
       if (showLoading) setCarregando(true);
-      const data = await getNotificacoes({ limit: 20, tipos: ['MENCAO_COMENTARIO'] });
-      const itensFiltrados = Array.isArray(data.itens)
-        ? data.itens.filter((item) => TIPOS_VISIVEIS.has(String(item.tipo || '').toUpperCase()))
-        : [];
+      const itensRecebidos = Array.isArray(data.itens) ? data.itens : [];
 
-      setItens(itensFiltrados);
-      setTotalNaoLidas(itensFiltrados.filter((item) => !item.lida_em).length);
+      setItens(itensRecebidos);
+      setTotalNaoLidas(Number(data.total_nao_lidas) || itensRecebidos.filter((item) => !item.lida_em).length);
     } catch (error) {
       console.error(error);
     } finally {
