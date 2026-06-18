@@ -1237,7 +1237,7 @@ export default function RhDpColaboradores() {
                 {form.id ? 'Salvar alteracoes' : 'Criar colaborador'}
               </button>
               <button type="button" className="btn btn-outline" onClick={limparFormulario} disabled={salvando}>
-                Limpar
+                {form.id ? 'Cancelar edicao' : 'Limpar'}
               </button>
             </div>
           )}
