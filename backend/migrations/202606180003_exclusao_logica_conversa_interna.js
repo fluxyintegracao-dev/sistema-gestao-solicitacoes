@@ -1,11 +1,13 @@
-const { columnExists, indexExists } = require('../src/database/schemaUtils');
+const { columnExists, indexExists, tableExists } = require('../src/database/schemaUtils');
 
 async function addColumnIfMissing(queryInterface, sequelize, tableName, columnName, definition) {
+  if (!(await tableExists(sequelize, tableName))) return;
   if (await columnExists(sequelize, tableName, columnName)) return;
   await queryInterface.addColumn(tableName, columnName, definition);
 }
 
 async function addIndexIfMissing(queryInterface, sequelize, tableName, fields, name) {
+  if (!(await tableExists(sequelize, tableName))) return;
   if (await indexExists(sequelize, tableName, name)) return;
   await queryInterface.addIndex(tableName, fields, { name });
 }
