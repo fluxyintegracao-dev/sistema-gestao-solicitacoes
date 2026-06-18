@@ -9273,6 +9273,54 @@ body {
   max-width: 100%;
 }
 
+.layout-shell .rhdp-autocomplete-field {
+  position: relative;
+  display: block;
+  min-width: 0;
+}
+
+.layout-shell .rhdp-autocomplete-list {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 0.35rem);
+  right: 0;
+  left: 0;
+  max-height: 15rem;
+  padding: 0.35rem;
+  overflow-y: auto;
+  border: 1px solid var(--shell-border, var(--ui-border));
+  border-radius: 1rem;
+  background: var(--shell-panel, #fff);
+  box-shadow: 0 18px 38px rgba(15, 23, 42, 0.16);
+}
+
+.layout-shell .rhdp-autocomplete-option {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: 0.15rem;
+  border: 0;
+  border-radius: 0.75rem;
+  background: transparent;
+  padding: 0.7rem 0.8rem;
+  color: var(--shell-text, var(--c-text));
+  text-align: left;
+  cursor: pointer;
+}
+
+.layout-shell .rhdp-autocomplete-option:hover {
+  background: color-mix(in srgb, var(--shell-primary, #2563eb) 10%, transparent);
+}
+
+.layout-shell .rhdp-autocomplete-option strong {
+  font-size: 0.85rem;
+}
+
+.layout-shell .rhdp-autocomplete-option span {
+  color: var(--shell-muted, var(--c-muted));
+  font-size: 0.72rem;
+}
+
 .layout-shell .rhdp-apuracao-page .app-page-actions {
   min-width: 0;
   flex-wrap: wrap;

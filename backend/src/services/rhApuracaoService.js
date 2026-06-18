@@ -11,7 +11,6 @@ const {
   User,
   sequelize
 } = require('../models');
-const { Op } = require('sequelize');
 const { ValidationError } = require('../middlewares/validation');
 
 const APURACAO_ITEM_INCLUDE = [
@@ -190,7 +189,7 @@ async function resolveExistingDraft(data, transaction) {
   const draft = await RhApuracao.findOne({
     where: {
       competencia: data.competencia,
-      empresa_grupo_id: data.empresa_grupo_id,
+      empresa_grupo_id: data.empresa_grupo_id || null,
       obra_id: data.obra_id || null,
       tipo_vinculo: data.tipo_vinculo || null,
       status: 'RASCUNHO'
@@ -201,7 +200,7 @@ async function resolveExistingDraft(data, transaction) {
   const conferida = await RhApuracao.findOne({
     where: {
       competencia: data.competencia,
-      empresa_grupo_id: data.empresa_grupo_id,
+      empresa_grupo_id: data.empresa_grupo_id || null,
       obra_id: data.obra_id || null,
       tipo_vinculo: data.tipo_vinculo || null,
       status: 'CONFERIDA'
@@ -223,16 +222,8 @@ async function buildAgrupamentoImportacoes(data, transaction) {
   const importacaoWhere = {
     status: 'CONFIRMADA',
     competencia: data.competencia,
-    empresa_grupo_id: data.empresa_grupo_id,
     ...(data.tipo_vinculo ? { tipo_vinculo: data.tipo_vinculo } : {})
   };
-
-  if (data.obra_id) {
-    importacaoWhere[Op.or] = [
-      { obra_id: data.obra_id },
-      { obra_id: null }
-    ];
-  }
 
   const linhas = await RhImportacaoLinha.findAll({
     where: {
@@ -498,7 +489,9 @@ async function detalharApuracaoRh(id) {
 
 async function gerarApuracaoRh(data, user) {
   return sequelize.transaction(async (transaction) => {
-    await ensureEmpresaGrupoExists(data.empresa_grupo_id, transaction);
+    if (data.empresa_grupo_id) {
+      await ensureEmpresaGrupoExists(data.empresa_grupo_id, transaction);
+    }
     await ensureObraExists(data.obra_id, transaction);
 
     const agrupados = await buildAgrupamentoImportacoes(data, transaction);
@@ -526,7 +519,7 @@ async function gerarApuracaoRh(data, user) {
       apuracao = await RhApuracao.create(
         {
           competencia: data.competencia,
-          empresa_grupo_id: data.empresa_grupo_id,
+          empresa_grupo_id: data.empresa_grupo_id || null,
           obra_id: data.obra_id || null,
           tipo_vinculo: data.tipo_vinculo || null,
           status: 'RASCUNHO',

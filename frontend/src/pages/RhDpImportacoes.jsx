@@ -84,8 +84,6 @@ export default function RhDpImportacoes() {
   const [form, setForm] = useState({
     tipo: 'JORNADA',
     competencia: '',
-    empresa_grupo_id: '',
-    obra_id: '',
     tipo_vinculo: '',
     observacoes: ''
   });
@@ -155,8 +153,8 @@ export default function RhDpImportacoes() {
     event.target.value = '';
 
     if (!file) return;
-    if (!form.empresa_grupo_id || !form.competencia || !form.tipo) {
-      alert('Preencha tipo, competencia e empresa do grupo antes de subir a planilha.');
+    if (!form.competencia || !form.tipo) {
+      alert('Preencha tipo e competencia antes de subir a planilha.');
       return;
     }
 
@@ -165,8 +163,6 @@ export default function RhDpImportacoes() {
       const data = await criarPreviewRhImportacao({
         tipo: form.tipo,
         competencia: form.competencia,
-        empresa_grupo_id: form.empresa_grupo_id,
-        obra_id: form.obra_id || undefined,
         tipo_vinculo: form.tipo_vinculo || undefined,
         observacoes: form.observacoes || undefined,
         file
@@ -244,31 +240,6 @@ export default function RhDpImportacoes() {
             onChange={(e) => setForm((prev) => ({ ...prev, competencia: e.target.value }))}
             disabled={!podeEditar}
           />
-          <select
-            className="form-control"
-            value={form.empresa_grupo_id}
-            onChange={(e) => setForm((prev) => ({ ...prev, empresa_grupo_id: e.target.value }))}
-            disabled={!podeEditar}
-          >
-            <option value="">Empresa do grupo</option>
-            {empresas.map((item) => (
-              <option key={item.id} value={item.id}>{item.nome}</option>
-            ))}
-          </select>
-        </div>
-
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          <select
-            className="form-control"
-            value={form.obra_id}
-            onChange={(e) => setForm((prev) => ({ ...prev, obra_id: e.target.value }))}
-            disabled={!podeEditar}
-          >
-            <option value="">Todas as obras da importacao</option>
-            {obras.map((item) => (
-              <option key={item.id} value={item.id}>{item.codigo ? `${item.codigo} - ${item.nome}` : item.nome}</option>
-            ))}
-          </select>
           <select
             className="form-control"
             value={form.tipo_vinculo}
@@ -383,7 +354,7 @@ export default function RhDpImportacoes() {
                 <tr>
                   <th>Lote</th>
                   <th>Competencia</th>
-                  <th>Empresa</th>
+                  <th>Recorte</th>
                   <th>Status</th>
                   <th>Acoes</th>
                 </tr>
@@ -396,7 +367,7 @@ export default function RhDpImportacoes() {
                       <div className="text-xs text-slate-500">{item.nome_arquivo}</div>
                     </td>
                     <td>{item.competencia}</td>
-                    <td>{item.empresaGrupo?.nome || '-'}</td>
+                    <td>{item.empresaGrupo?.nome || 'Sem recorte operacional'}</td>
                     <td>
                       <div>{item.status}</div>
                       <div className="text-xs text-slate-500">
@@ -435,7 +406,7 @@ export default function RhDpImportacoes() {
                     Importacao #{detalhe.id} - {detalhe.tipo}
                   </h2>
                   <p className="mt-1 text-sm text-slate-600">
-                    Competencia {detalhe.competencia} · {detalhe.empresaGrupo?.nome || '-'} · {detalhe.status}
+                    Competencia {detalhe.competencia} · sem recorte operacional · {detalhe.status}
                   </p>
                 </div>
                 {podeEditar && detalhe.status === 'PREVIEW' && (

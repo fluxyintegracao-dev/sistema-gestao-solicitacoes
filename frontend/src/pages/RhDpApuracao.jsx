@@ -63,7 +63,6 @@ function statusClass(status) {
 function initialForm() {
   return {
     competencia: '',
-    empresa_grupo_id: '',
     obra_id: '',
     tipo_vinculo: '',
     dias_base: '30',
@@ -84,6 +83,19 @@ function getPixOptions(item) {
 
 function getDefaultPixValue(item) {
   return getPixOptions(item)[0]?.value || '';
+}
+
+function normalizeSearchText(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
+function getObraLabel(obra) {
+  if (!obra) return '';
+  return obra.codigo ? `${obra.codigo} - ${obra.nome}` : obra.nome;
 }
 
 function toEditState(item) {
@@ -124,6 +136,8 @@ export default function RhDpApuracao() {
     status: ''
   });
   const [form, setForm] = useState(initialForm());
+  const [formObraSearch, setFormObraSearch] = useState('');
+  const [formObraSuggestionsOpen, setFormObraSuggestionsOpen] = useState(false);
   const [fechamentoForm, setFechamentoForm] = useState({
     data_fechamento: new Date().toISOString().slice(0, 10),
     data_vencimento: '',
@@ -223,9 +237,9 @@ export default function RhDpApuracao() {
     event.preventDefault();
     if (!podeEditar) return;
 
-    const empresaGrupoId = Number(form.empresa_grupo_id);
-    if (!form.competencia || !Number.isInteger(empresaGrupoId) || empresaGrupoId <= 0) {
-      alert('Informe a competencia e a empresa do grupo antes de gerar a apuracao.');
+    const obraId = Number(form.obra_id);
+    if (!form.competencia || !Number.isInteger(obraId) || obraId <= 0) {
+      alert('Informe a competencia e selecione a obra antes de gerar a apuracao.');
       return;
     }
 
@@ -233,8 +247,7 @@ export default function RhDpApuracao() {
       setGerando(true);
       const data = await gerarRhApuracao({
         competencia: form.competencia,
-        empresa_grupo_id: empresaGrupoId,
-        obra_id: form.obra_id ? Number(form.obra_id) : undefined,
+        obra_id: obraId,
         tipo_vinculo: form.tipo_vinculo || undefined,
         dias_base: form.dias_base || undefined,
         observacoes: form.observacoes || undefined
@@ -375,6 +388,15 @@ export default function RhDpApuracao() {
     );
   }, [apuracoes]);
 
+  const formObraSuggestions = useMemo(() => {
+    const search = normalizeSearchText(formObraSearch);
+    if (!search) return [];
+
+    return obras
+      .filter((obra) => normalizeSearchText(`${obra.codigo || ''} ${obra.nome || ''}`).includes(search))
+      .slice(0, 12);
+  }, [formObraSearch, obras]);
+
   return (
     <div className="page solicitacoes-page rhdp-page rhdp-apuracao-page space-y-6">
       <div className="app-page-header">
@@ -405,28 +427,46 @@ export default function RhDpApuracao() {
             onChange={(event) => setForm((current) => ({ ...current, competencia: event.target.value }))}
             disabled={!podeEditar}
           />
-          <select
-            className="form-control"
-            value={form.empresa_grupo_id}
-            onChange={(event) => setForm((current) => ({ ...current, empresa_grupo_id: event.target.value }))}
-            disabled={!podeEditar}
-          >
-            <option value="">Empresa do grupo</option>
-            {empresas.map((item) => (
-              <option key={item.id} value={item.id}>{item.nome}</option>
-            ))}
-          </select>
-          <select
-            className="form-control"
-            value={form.obra_id}
-            onChange={(event) => setForm((current) => ({ ...current, obra_id: event.target.value }))}
-            disabled={!podeEditar}
-          >
-            <option value="">Todas as obras</option>
-            {obras.map((item) => (
-              <option key={item.id} value={item.id}>{item.codigo ? `${item.codigo} - ${item.nome}` : item.nome}</option>
-            ))}
-          </select>
+          <label className="rhdp-autocomplete-field">
+            <span className="sr-only">Obra de prestacao do servico</span>
+            <input
+              type="text"
+              className="form-control"
+              value={formObraSearch}
+              placeholder="Digite para buscar a obra obrigatoria"
+              autoComplete="off"
+              onFocus={() => setFormObraSuggestionsOpen(true)}
+              onChange={(event) => {
+                setFormObraSearch(event.target.value);
+                setForm((current) => ({ ...current, obra_id: '' }));
+                setFormObraSuggestionsOpen(true);
+              }}
+              onBlur={() => window.setTimeout(() => setFormObraSuggestionsOpen(false), 120)}
+              disabled={!podeEditar}
+            />
+            {formObraSuggestionsOpen && formObraSuggestions.length > 0 ? (
+              <div className="rhdp-autocomplete-list">
+                {formObraSuggestions.map((obra) => (
+                  <button
+                    key={obra.id}
+                    type="button"
+                    className="rhdp-autocomplete-option"
+                    onMouseDown={(event) => {
+                      event.preventDefault();
+                      setForm((current) => ({ ...current, obra_id: String(obra.id) }));
+                      setFormObraSearch(getObraLabel(obra));
+                      setFormObraSuggestionsOpen(false);
+                    }}
+                  >
+                    <strong>{getObraLabel(obra)}</strong>
+                    {obra.cidade || obra.uf ? (
+                      <span>{[obra.cidade, obra.uf].filter(Boolean).join(' - ')}</span>
+                    ) : null}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </label>
         </div>
 
         <div className="rhdp-apuracao-form-grid rhdp-apuracao-form-grid-secondary">
@@ -597,8 +637,8 @@ export default function RhDpApuracao() {
                 {apuracoes.map((item) => (
                   <tr key={item.id} className="border-b border-slate-100 align-top">
                     <td className="px-3 py-3">{item.competencia}</td>
-                    <td className="px-3 py-3">{item.empresaGrupo?.nome || '-'}</td>
-                    <td className="px-3 py-3">{item.obra?.nome || 'Todas as obras'}</td>
+                    <td className="px-3 py-3">{item.empresaGrupo?.nome || 'Por colaborador'}</td>
+                    <td className="px-3 py-3">{item.obra?.nome || '-'}</td>
                     <td className="px-3 py-3">{item.tipo_vinculo || 'Misto'}</td>
                     <td className="px-3 py-3">{item.total_colaboradores || 0}</td>
                     <td className="px-3 py-3">{formatCurrency(item.total_liquido)}</td>
@@ -626,10 +666,10 @@ export default function RhDpApuracao() {
           <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
             <div className="space-y-1">
               <h2 className="text-lg font-semibold text-slate-900">
-                Apuracao {detalhe.competencia} - {detalhe.empresaGrupo?.nome || '-'}
+                Apuracao {detalhe.competencia} - {detalhe.obra?.nome || 'obra nao informada'}
               </h2>
               <p className="text-sm text-slate-500">
-                Recorte: {detalhe.obra?.nome || 'todas as obras'} | {detalhe.tipo_vinculo || 'todos os vinculos'} | {detalhe.total_colaboradores || 0} colaborador(es)
+                Recorte: empresa do cadastro do colaborador | {detalhe.tipo_vinculo || 'todos os vinculos'} | {detalhe.total_colaboradores || 0} colaborador(es)
               </p>
               <p className="text-xs text-slate-400">
                 Criada em {formatDateTime(detalhe.createdAt)} por {detalhe.criadoPor?.nome || 'sistema'}

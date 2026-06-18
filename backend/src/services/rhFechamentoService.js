@@ -255,7 +255,8 @@ function validarItemElegivelParaFechamento(item, apuracao) {
   const favorecidoNome = String(pagamento.favorecido_nome || colaborador.nome || '').trim();
   const favorecidoDocumento = normalizeDigits(pagamento.favorecido_documento || colaborador.cpf);
   const chavePix = resolvePixKeyForItem(item, pagamento);
-  const obraId = Number(apuracao.obra_id || colaborador.obra_id || 0);
+  const obraId = Number(apuracao.obra_id || 0);
+  const empresaId = Number(colaborador.empresa_grupo_id || 0);
 
   if (!favorecidoNome) {
     throw new ValidationError(`O colaborador ${colaborador.nome} nao possui favorecido definido para pagamento.`);
@@ -266,7 +267,11 @@ function validarItemElegivelParaFechamento(item, apuracao) {
   }
 
   if (!Number.isInteger(obraId) || obraId <= 0) {
-    throw new ValidationError(`O colaborador ${colaborador.nome} nao possui obra valida para gerar o titulo financeiro.`);
+    throw new ValidationError('A apuracao RH/DP precisa estar vinculada a uma obra antes de gerar titulos financeiros.');
+  }
+
+  if (!Number.isInteger(empresaId) || empresaId <= 0) {
+    throw new ValidationError(`O colaborador ${colaborador.nome} nao possui empresa do grupo vinculada para gerar titulo financeiro.`);
   }
 
   if (!chavePix) {
@@ -278,18 +283,10 @@ function validarItemElegivelParaFechamento(item, apuracao) {
     favorecidoDocumento,
     chavePix,
     obraId,
+    empresaId,
     email: pagamento.email || colaborador.email || null,
     telefone: colaborador.telefone || null
   };
-}
-
-function validarEmpresaApuracaoParaTitulo(apuracao) {
-  const empresaApuracaoId = apuracao?.empresa_grupo_id ? Number(apuracao.empresa_grupo_id) : null;
-  if (!Number.isInteger(empresaApuracaoId) || empresaApuracaoId <= 0) {
-    throw new ValidationError('A apuracao RH/DP precisa estar vinculada a uma empresa do grupo antes de gerar titulos financeiros.');
-  }
-
-  return empresaApuracaoId;
 }
 
 async function syncParceiroFavorecido({ colaborador, favorecidoNome, favorecidoDocumento, email, telefone }, transaction) {
@@ -393,7 +390,7 @@ async function syncFavorecidoBancarioRh({
 
 function buildTituloRhPayload({ apuracao, item, parceiro, dataVencimento, categoriaFinanceiraId, empresaId, usuarioId }) {
   if (!Number.isInteger(Number(empresaId)) || Number(empresaId) <= 0) {
-    throw new ValidationError('Empresa da apuracao RH/DP e obrigatoria para gerar titulo financeiro.');
+    throw new ValidationError('Empresa do colaborador RH/DP e obrigatoria para gerar titulo financeiro.');
   }
 
   const colaborador = item.colaborador;
@@ -402,7 +399,7 @@ function buildTituloRhPayload({ apuracao, item, parceiro, dataVencimento, catego
 
   return {
     solicitacao_id: null,
-    obra_id: Number(apuracao.obra_id || colaborador.obra_id),
+    obra_id: Number(apuracao.obra_id),
     empresa_id: Number(empresaId),
     parceiro_id: parceiro.id,
     categoria_financeira_id: categoriaFinanceiraId,
@@ -631,8 +628,6 @@ async function fecharApuracaoRh(apuracaoId, data, user) {
     const categoria = await ensureCategoriaFinanceiraPagar(data.categoria_financeira_id, transaction);
     const dataFechamento = data.data_fechamento || getToday();
     const dataVencimento = data.data_vencimento || getLastDayOfCompetencia(apuracao.competencia);
-    const empresaTituloId = validarEmpresaApuracaoParaTitulo(apuracao);
-
     const fechamento = await RhFechamento.create(
       {
         apuracao_id: apuracao.id,
@@ -683,7 +678,7 @@ async function fecharApuracaoRh(apuracaoId, data, user) {
           parceiro,
           dataVencimento,
           categoriaFinanceiraId: categoria?.id || null,
-          empresaId: empresaTituloId,
+          empresaId: dadosFechamento.empresaId,
           usuarioId: user?.id || null
         }),
         { transaction }

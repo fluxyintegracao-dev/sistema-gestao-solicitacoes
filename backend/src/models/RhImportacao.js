@@ -16,7 +16,7 @@ module.exports = (sequelize, DataTypes) => sequelize.define(
     },
     empresa_grupo_id: {
       type: DataTypes.INTEGER,
-      allowNull: false
+      allowNull: true
     },
     obra_id: {
       type: DataTypes.INTEGER,

@@ -1,5 +1,4 @@
 const XLSX = require('xlsx');
-const { Op } = require('sequelize');
 const {
   Obra,
   RhColaborador,
@@ -447,7 +446,9 @@ async function criarPreviewImportacaoRh(data, file, user) {
     throw new ValidationError('A planilha nao contem registros para importar.');
   }
 
-  await ensureEmpresaGrupoExists(data.empresa_grupo_id);
+  if (data.empresa_grupo_id) {
+    await ensureEmpresaGrupoExists(data.empresa_grupo_id);
+  }
   await ensureObraExists(data.obra_id);
 
   const lookup = await buildColaboradorLookup(data);
@@ -490,8 +491,8 @@ async function criarPreviewImportacaoRh(data, file, user) {
       {
         tipo: data.tipo,
         competencia: data.competencia,
-        empresa_grupo_id: data.empresa_grupo_id,
-        obra_id: data.obra_id,
+        empresa_grupo_id: data.empresa_grupo_id || null,
+        obra_id: data.obra_id || null,
         tipo_vinculo: data.tipo_vinculo,
         status: 'PREVIEW',
         nome_arquivo: String(file.originalname || 'importacao-rh'),

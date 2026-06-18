@@ -599,7 +599,7 @@ function validateRhImportacaoCreateBody(body = {}) {
   return {
     tipo: parseEnum(body.tipo, 'Tipo de importacao', RH_TIPOS_IMPORTACAO, { required: true }),
     competencia: parseCompetencia(body.competencia, 'Competencia', { required: true }),
-    empresa_grupo_id: parseInteger(body.empresa_grupo_id, 'Empresa do grupo', { required: true }),
+    empresa_grupo_id: parseInteger(body.empresa_grupo_id, 'Empresa do grupo'),
     obra_id: parseInteger(body.obra_id, 'Obra'),
     tipo_vinculo: parseEnum(body.tipo_vinculo, 'Tipo de vinculo', RH_TIPOS_VINCULO),
     observacoes: parseOptionalText(body.observacoes, 'Observacoes', 4000)
@@ -631,8 +631,8 @@ function validateRhApuracaoCreateBody(body = {}) {
 
   return {
     competencia: parseCompetencia(body.competencia, 'Competencia', { required: true }),
-    empresa_grupo_id: parseInteger(body.empresa_grupo_id, 'Empresa do grupo', { required: true }),
-    obra_id: parseInteger(body.obra_id, 'Obra'),
+    empresa_grupo_id: parseInteger(body.empresa_grupo_id, 'Empresa do grupo'),
+    obra_id: parseInteger(body.obra_id, 'Obra', { required: true }),
     tipo_vinculo: parseEnum(body.tipo_vinculo, 'Tipo de vinculo', RH_TIPOS_VINCULO),
     dias_base: parseInteger(body.dias_base, 'Dias base') || 30,
     observacoes: parseOptionalText(body.observacoes, 'Observacoes', 4000)
