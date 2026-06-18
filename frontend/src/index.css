@@ -9257,6 +9257,23 @@ body {
   min-width: 0;
 }
 
+.layout-shell .rhdp-apuracao-field {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.35rem;
+  color: var(--shell-muted, var(--c-muted));
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.layout-shell .rhdp-apuracao-field small {
+  color: var(--shell-muted, var(--c-muted));
+  font-size: 0.74rem;
+  font-weight: 500;
+  line-height: 1.25;
+}
+
 .layout-shell .rhdp-apuracao-filter-grid {
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
 }

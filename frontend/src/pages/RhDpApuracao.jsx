@@ -420,15 +420,18 @@ export default function RhDpApuracao() {
 
       <form className="sol-surface-card rhdp-apuracao-create-card rounded-xl p-4 space-y-4" onSubmit={onGerarApuracao}>
         <div className="rhdp-apuracao-form-grid">
-          <input
-            type="month"
-            className="form-control"
-            value={form.competencia}
-            onChange={(event) => setForm((current) => ({ ...current, competencia: event.target.value }))}
-            disabled={!podeEditar}
-          />
-          <label className="rhdp-autocomplete-field">
-            <span className="sr-only">Obra de prestacao do servico</span>
+          <label className="rhdp-apuracao-field">
+            <span>Competencia</span>
+            <input
+              type="month"
+              className="form-control"
+              value={form.competencia}
+              onChange={(event) => setForm((current) => ({ ...current, competencia: event.target.value }))}
+              disabled={!podeEditar}
+            />
+          </label>
+          <label className="rhdp-apuracao-field rhdp-autocomplete-field">
+            <span>Obra de prestacao do servico</span>
             <input
               type="text"
               className="form-control"
@@ -470,32 +473,42 @@ export default function RhDpApuracao() {
         </div>
 
         <div className="rhdp-apuracao-form-grid rhdp-apuracao-form-grid-secondary">
-          <select
-            className="form-control"
-            value={form.tipo_vinculo}
-            onChange={(event) => setForm((current) => ({ ...current, tipo_vinculo: event.target.value }))}
-            disabled={!podeEditar}
-          >
-            <option value="">Todos os vinculos</option>
-            <option value="CLT">CLT</option>
-            <option value="NAO_CLT">Nao CLT</option>
-          </select>
-          <input
-            type="number"
-            min="1"
-            className="form-control"
-            placeholder="Dias base"
-            value={form.dias_base}
-            onChange={(event) => setForm((current) => ({ ...current, dias_base: event.target.value }))}
-            disabled={!podeEditar}
-          />
-          <textarea
-            className="form-control min-h-[84px]"
-            placeholder="Observacoes do recorte"
-            value={form.observacoes}
-            onChange={(event) => setForm((current) => ({ ...current, observacoes: event.target.value }))}
-            disabled={!podeEditar}
-          />
+          <label className="rhdp-apuracao-field">
+            <span>Tipo de vinculo</span>
+            <select
+              className="form-control"
+              value={form.tipo_vinculo}
+              onChange={(event) => setForm((current) => ({ ...current, tipo_vinculo: event.target.value }))}
+              disabled={!podeEditar}
+            >
+              <option value="">Todos os vinculos</option>
+              <option value="CLT">CLT</option>
+              <option value="NAO_CLT">Nao CLT</option>
+            </select>
+          </label>
+          <label className="rhdp-apuracao-field">
+            <span>Dias base</span>
+            <input
+              type="number"
+              min="1"
+              className="form-control"
+              placeholder="Ex.: 30"
+              value={form.dias_base}
+              onChange={(event) => setForm((current) => ({ ...current, dias_base: event.target.value }))}
+              disabled={!podeEditar}
+            />
+            <small>Usado quando a jornada importada nao informa dias trabalhados.</small>
+          </label>
+          <label className="rhdp-apuracao-field">
+            <span>Observacoes do recorte</span>
+            <textarea
+              className="form-control min-h-[84px]"
+              placeholder="Observacoes do recorte"
+              value={form.observacoes}
+              onChange={(event) => setForm((current) => ({ ...current, observacoes: event.target.value }))}
+              disabled={!podeEditar}
+            />
+          </label>
         </div>
 
         {podeEditar ? (
