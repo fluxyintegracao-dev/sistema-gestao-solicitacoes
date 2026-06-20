@@ -62,6 +62,31 @@ function normalizeSearchText(value) {
     .toLowerCase();
 }
 
+function getParceiroRoleLabel(tipo) {
+  return String(tipo || '').trim().toUpperCase() === 'RECEBER' ? 'cliente' : 'credor';
+}
+
+function getParceiroRoleTitle(tipo) {
+  const label = getParceiroRoleLabel(tipo);
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
+
+function parceiroCompativelComTipo(parceiro, tipo) {
+  if (!parceiro) return false;
+  if (String(tipo || '').trim().toUpperCase() === 'RECEBER') {
+    return parceiro.cliente !== false;
+  }
+  return parceiro.fornecedor !== false || parceiro.corretor === true;
+}
+
+function buildParceiroSearchParams(search, tipo, limit = 8) {
+  const params = { ativo: 1, q: search, limit };
+  if (String(tipo || '').trim().toUpperCase() === 'RECEBER') {
+    params.cliente = 1;
+  }
+  return params;
+}
+
 function currencyToNumber(value) {
   if (value == null || value === '') return 0;
   const raw = String(value).trim().replace(/[R$\s]/gi, '');
@@ -269,10 +294,12 @@ function SearchIcon() {
   );
 }
 
-function ParceiroPagamentoField({ pagamento, pagamentoIndex, onSelect }) {
+function ParceiroPagamentoField({ pagamento, pagamentoIndex, tipo, onSelect }) {
   const [search, setSearch] = useState('');
   const [options, setOptions] = useState([]);
   const [loading, setLoading] = useState(false);
+  const roleLabel = getParceiroRoleLabel(tipo);
+  const roleTitle = getParceiroRoleTitle(tipo);
 
   useEffect(() => {
     if (!search || search.trim().length < 2) {
@@ -284,10 +311,11 @@ function ParceiroPagamentoField({ pagamento, pagamentoIndex, onSelect }) {
     let active = true;
     setLoading(true);
     const timer = setTimeout(() => {
-      buscarParceiros({ q: search, limit: 6 })
+      buscarParceiros(buildParceiroSearchParams(search, tipo, 6))
         .then((data) => {
           if (!active) return;
-          setOptions(Array.isArray(data) ? data : []);
+          const lista = Array.isArray(data) ? data : [];
+          setOptions(lista.filter((partner) => parceiroCompativelComTipo(partner, tipo)));
         })
         .catch(() => {
           if (!active) return;
@@ -302,15 +330,15 @@ function ParceiroPagamentoField({ pagamento, pagamentoIndex, onSelect }) {
       active = false;
       clearTimeout(timer);
     };
-  }, [search]);
+  }, [search, tipo]);
 
   return (
     <div className="relative text-sm">
-      <span className="mb-1 block text-slate-500">Credor deste titulo</span>
+      <span className="mb-1 block text-slate-500">{roleTitle} deste titulo</span>
       <input
         className="input w-full"
         type="text"
-        placeholder={pagamento?.parceiro_nome || 'Buscar credor por nome ou CPF/CNPJ'}
+        placeholder={pagamento?.parceiro_nome || `Buscar ${roleLabel} por nome ou CPF/CNPJ`}
         value={search}
         onChange={(event) => setSearch(event.target.value)}
       />
@@ -502,10 +530,11 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
     setSearchingPartners(true);
 
     const timer = setTimeout(() => {
-      buscarParceiros({ q: partnerSearch, limit: 8 })
+      buscarParceiros(buildParceiroSearchParams(partnerSearch, form.tipo, 8))
         .then((data) => {
           if (!active) return;
-          setPartnerOptions(Array.isArray(data) ? data : []);
+          const lista = Array.isArray(data) ? data : [];
+          setPartnerOptions(lista.filter((partner) => parceiroCompativelComTipo(partner, form.tipo)));
         })
         .catch(() => {
           if (!active) return;
@@ -520,7 +549,25 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
       active = false;
       clearTimeout(timer);
     };
-  }, [modalOpen, partnerSearch]);
+  }, [modalOpen, partnerSearch, form.tipo]);
+
+  useEffect(() => {
+    if (!modalOpen || !selectedPartner || parceiroCompativelComTipo(selectedPartner, form.tipo)) {
+      return;
+    }
+
+    setSelectedPartner(null);
+    setForm((current) => ({
+      ...current,
+      parceiro_id: '',
+      pagamentos: (current.pagamentos || []).map((pagamento) => ({
+        ...pagamento,
+        parceiro_id: '',
+        parceiro_nome: '',
+        parceiro_busca: ''
+      }))
+    }));
+  }, [modalOpen, selectedPartner, form.tipo]);
 
   useEffect(() => {
     if (!modalOpen) return undefined;
@@ -686,6 +733,8 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
   }, [form.rateios, valorSolicitacao]);
   const totalRateioValido = (form.rateios || []).length === 0
     || (Math.abs(totalRateioValor - valorSolicitacao) <= 0.02 && Math.abs(totalRateioPercentual - 100) <= 0.02);
+  const parceiroRoleLabel = getParceiroRoleLabel(form.tipo);
+  const parceiroRoleTitle = getParceiroRoleTitle(form.tipo);
 
   const categoriasAutocomplete = useMemo(() => {
     if (!categoriaSearch.trim() || selectedCategory) {
@@ -891,7 +940,7 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
     }
 
     if (!geracaoMultiplaTitulos && !selectedPartner?.id && !form.parceiro_id) {
-      return 'Selecione o credor antes de gerar a conta.';
+      return `Selecione o ${parceiroRoleLabel} antes de gerar a conta.`;
     }
 
     const categoriaEntraDre = isCategoriaClassificadaParaDre(selectedCategory);
@@ -917,7 +966,7 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
       const labelForma = `forma de pagamento ${pagamentoIndex + 1}`;
 
       if (geracaoMultiplaTitulos && !pagamento.parceiro_id) {
-        return `Selecione o credor do titulo ${pagamentoIndex + 1}.`;
+        return `Selecione o ${parceiroRoleLabel} do titulo ${pagamentoIndex + 1}.`;
       }
 
       if (valorPagamento <= 0) {
@@ -1201,11 +1250,11 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
                 </label>
 
                 <div className="space-y-2 text-sm">
-                  <span className="block text-slate-500">Credor</span>
+                  <span className="block text-slate-500">{parceiroRoleTitle}</span>
                   <input
                     className="input w-full"
                     type="text"
-                    placeholder={selectedPartner?.nome || 'Buscar credor por nome ou CPF/CNPJ'}
+                    placeholder={selectedPartner?.nome || `Buscar ${parceiroRoleLabel} por nome ou CPF/CNPJ`}
                     value={partnerSearch}
                     onChange={(event) => setPartnerSearch(event.target.value)}
                   />
@@ -1552,6 +1601,7 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
                         <ParceiroPagamentoField
                           pagamento={pagamento}
                           pagamentoIndex={pagamentoIndex}
+                          tipo={form.tipo}
                           onSelect={selecionarParceiroPagamento}
                         />
                       )}

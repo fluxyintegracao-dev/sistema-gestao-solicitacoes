@@ -41,6 +41,14 @@ function resolveTipo(value) {
   return String(value || '').trim().toUpperCase() === 'RECEBER' ? 'RECEBER' : 'PAGAR';
 }
 
+function parceiroCompativelComTipo(parceiro, tipo) {
+  if (!parceiro) return false;
+  if (resolveTipo(tipo) === 'RECEBER') {
+    return parceiro.cliente !== false;
+  }
+  return parceiro.fornecedor !== false || parceiro.corretor === true;
+}
+
 function isCadastroObra(obra) {
   return String(obra?.tipo_centro_custo || 'OBRA').trim().toUpperCase() === 'OBRA';
 }
@@ -443,9 +451,7 @@ export default function FinanceiroTituloNovo() {
         const data = await buscarParceiros(params);
         if (!active) return;
         const listaBase = Array.isArray(data) ? data : [];
-        const lista = form.tipo === 'RECEBER'
-          ? listaBase.filter((item) => item.cliente !== false)
-          : listaBase.filter((item) => item.fornecedor !== false || item.corretor === true);
+        const lista = listaBase.filter((item) => parceiroCompativelComTipo(item, form.tipo));
         setParceiros(lista);
       } catch (err) {
         if (!active) return;
@@ -727,6 +733,7 @@ export default function FinanceiroTituloNovo() {
     const termo = normalizeSearchText(busca);
     if (!termo) return [];
     return parceiros
+      .filter((parceiro) => parceiroCompativelComTipo(parceiro, form.tipo))
       .filter((parceiro) => {
         const texto = normalizeSearchText(`${parceiro.nome || ''} ${parceiro.cpf_cnpj || ''}`);
         return texto.includes(termo);
@@ -1637,7 +1644,7 @@ export default function FinanceiroTituloNovo() {
                             </div>
                           )}
                           <span className="mt-2 block text-xs text-blue-700">
-                            Use quando cada titulo precisar sair para um credor diferente.
+                            Use quando cada titulo precisar sair para um {form.tipo === 'RECEBER' ? 'cliente' : 'credor'} diferente.
                           </span>
                         </div>
                       )}
