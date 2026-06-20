@@ -49,6 +49,22 @@ function normalizarTexto(valor) {
     .replace(/[\u0300-\u036f]/g, '');
 }
 
+function limparDescricaoCompra(valor) {
+  const texto = String(valor || '').trim();
+  if (!texto) return texto;
+  if (normalizarTexto(texto).includes('SOLICITACAO DE COMPRA')) {
+    return texto
+      .replace(/\s+(Itens|Items):[\s\S]*$/i, '')
+      .replace(/\s+-\s*$/g, '')
+      .trim() || 'Solicitacao de compra';
+  }
+  if (!texto || !/solicita[cç][aã]o de compra/i.test(texto)) return texto;
+  return texto
+    .replace(/\s+(Itens|Items):[\s\S]*$/i, '')
+    .replace(/\s+-\s*$/g, '')
+    .trim() || 'Solicitacao de compra';
+}
+
 export default function Header({
   solicitacao,
   onAlterarStatus,
@@ -100,7 +116,7 @@ export default function Header({
     .filter(item => item?.acao === 'STATUS_ALTERADO')
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
   const setorStatusAtual = ultimoHistoricoStatus?.setor || solicitacao?.area_responsavel || null;
-  const descricaoCorrigida = corrigirTextoCorrompido(solicitacao?.descricao || '');
+  const descricaoCorrigida = limparDescricaoCompra(corrigirTextoCorrompido(solicitacao?.descricao || ''));
 
   return (
     <div className="sol-detail-header">

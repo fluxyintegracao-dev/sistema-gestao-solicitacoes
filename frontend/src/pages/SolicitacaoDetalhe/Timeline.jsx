@@ -4,6 +4,9 @@ import { API_URL, authHeaders, fileUrl } from '../../services/api';
 
 export default function Timeline({ historicos, canRemoveAnexo = false, onAnexoRemovido }) {
   const [preview, setPreview] = useState(null);
+  const historicosVisiveis = Array.isArray(historicos)
+    ? historicos.filter((h) => !['PENDENCIA_FINANCEIRA_MARCADA', 'PENDENCIA_FINANCEIRA_REGULARIZADA'].includes(h?.acao))
+    : [];
 
   function normalizarUrlArquivo(url) {
     const valor = String(url || '');
@@ -107,7 +110,7 @@ export default function Timeline({ historicos, canRemoveAnexo = false, onAnexoRe
       <h2 className="sol-detail-card-title">Historico</h2>
 
       <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
-        {historicos.map(h => {
+        {historicosVisiveis.map(h => {
           let meta = null;
           try {
             meta = h.metadata ? JSON.parse(h.metadata) : null;

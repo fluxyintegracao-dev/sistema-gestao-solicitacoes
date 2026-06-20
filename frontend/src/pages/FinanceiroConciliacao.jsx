@@ -246,7 +246,7 @@ function AcoesRapidasConciliacaoModal({ item, tarifas, processingId, onClose, on
                     key={tarifa.codigo}
                     type="button"
                     className="btn btn-outline btn-sm"
-                    disabled={!isSaida || !elegibilidade.ok || processingId === key}
+                    disabled={!isSaida || processingId === key}
                     onClick={() => onConfirmarTarifa(item, tarifa)}
                     title={!isSaida ? 'Tarifas bancarias devem ser lancamentos de saida.' : elegibilidade.motivo}
                   >
@@ -259,6 +259,113 @@ function AcoesRapidasConciliacaoModal({ item, tarifas, processingId, onClose, on
         </div>
       </div>
     </div>
+  );
+}
+
+function AssociacaoManualTabela({ loading, itens, modal, processingId, onAssociar }) {
+  if (loading) {
+    return <div className="px-4 py-8 text-center text-sm text-[var(--c-muted)]">Carregando movimentos...</div>;
+  }
+
+  if (!itens.length) {
+    return <div className="px-4 py-8 text-center text-sm text-[var(--c-muted)]">Nenhum movimento encontrado com os filtros atuais.</div>;
+  }
+
+  return (
+    <table className="min-w-full divide-y divide-[var(--c-border)] text-sm">
+      <thead className="bg-[var(--c-surface-muted)] text-xs uppercase tracking-[0.12em] text-[var(--c-muted)]">
+        <tr>
+          <th className="px-4 py-3 text-left">Titulo</th>
+          <th className="px-4 py-3 text-left">Parceiro</th>
+          <th className="px-4 py-3 text-left">Tipo</th>
+          <th className="px-4 py-3 text-left">Data</th>
+          <th className="px-4 py-3 text-right">Valor</th>
+          <th className="px-4 py-3 text-left">Documento</th>
+          <th className="px-4 py-3 text-center">Score</th>
+          <th className="px-4 py-3 text-right">Acao</th>
+        </tr>
+      </thead>
+      <tbody className="divide-y divide-[var(--c-border)] bg-white dark:bg-[var(--c-surface)]">
+        {itens.map((it) => {
+          const processingKey = `confirmar-${modal.item?.id}-${it.movimento_financeiro_id}`;
+          const processing = modal.processing || processingId === processingKey;
+          return (
+            <tr key={it.movimento_financeiro_id} className="align-top">
+              <td className="px-4 py-3 font-medium text-[var(--c-text)]">
+                <div>{it.titulo_descricao || '-'}</div>
+                {it.motivos?.length > 0 && (
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {it.motivos.map((m) => (
+                      <span key={`${it.movimento_financeiro_id}-${m}`} className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-normal text-slate-600">{m}</span>
+                    ))}
+                  </div>
+                )}
+              </td>
+              <td className="px-4 py-3 text-[var(--c-muted)]">{it.parceiro_nome || '-'}</td>
+              <td className="px-4 py-3 text-[var(--c-muted)]">{it.tipo || '-'}</td>
+              <td className="px-4 py-3 text-[var(--c-muted)]">{formatDate(it.data_movimento)}</td>
+              <td className="px-4 py-3 text-right font-semibold text-[var(--c-text)]">{formatCurrency(it.valor_quitacao)}</td>
+              <td className="px-4 py-3 text-[var(--c-muted)]">{it.documento || `mov. #${it.movimento_financeiro_id}`}</td>
+              <td className="px-4 py-3 text-center text-xs uppercase tracking-wide text-[var(--c-muted)]">{it.score || 0}</td>
+              <td className="px-4 py-3 text-right">
+                <button type="button" className="btn btn-primary btn-sm" disabled={processing} onClick={() => onAssociar(modal.item?.id, it.movimento_financeiro_id, { fecharModal: true })}>
+                  {processing ? 'Associando...' : 'Associar'}
+                </button>
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+}
+
+function FaturasAssociacaoTabela({ loading, itens, modal, processingId, onAssociar }) {
+  if (loading) {
+    return <div className="px-4 py-8 text-center text-sm text-[var(--c-muted)]">Carregando faturas...</div>;
+  }
+
+  if (!itens.length) {
+    return <div className="px-4 py-8 text-center text-sm text-[var(--c-muted)]">Nenhuma fatura encontrada com os filtros atuais.</div>;
+  }
+
+  return (
+    <table className="min-w-full divide-y divide-[var(--c-border)] text-sm">
+      <thead className="bg-[var(--c-surface-muted)] text-xs uppercase tracking-[0.12em] text-[var(--c-muted)]">
+        <tr>
+          <th className="px-4 py-3 text-left">Cartao</th>
+          <th className="px-4 py-3 text-left">Competencia</th>
+          <th className="px-4 py-3 text-left">Fechamento</th>
+          <th className="px-4 py-3 text-left">Vencimento</th>
+          <th className="px-4 py-3 text-center">Titulos</th>
+          <th className="px-4 py-3 text-right">Valor</th>
+          <th className="px-4 py-3 text-center">Status</th>
+          <th className="px-4 py-3 text-right">Acao</th>
+        </tr>
+      </thead>
+      <tbody className="divide-y divide-[var(--c-border)] bg-white dark:bg-[var(--c-surface)]">
+        {itens.map((fatura) => {
+          const processingKey = `fatura-${modal.item?.id}-${fatura.id}`;
+          const processing = modal.processing || processingId === processingKey;
+          return (
+            <tr key={fatura.id} className="align-middle">
+              <td className="px-4 py-3 font-medium text-[var(--c-text)]">{fatura.cartao?.nome || 'Cartao'}</td>
+              <td className="px-4 py-3 text-[var(--c-muted)]">{fatura.competencia || '-'}</td>
+              <td className="px-4 py-3 text-[var(--c-muted)]">{formatDate(fatura.data_fechamento)}</td>
+              <td className="px-4 py-3 text-[var(--c-muted)]">{formatDate(fatura.data_vencimento)}</td>
+              <td className="px-4 py-3 text-center text-[var(--c-muted)]">{fatura.total_titulos || 0}</td>
+              <td className="px-4 py-3 text-right font-semibold text-[var(--c-text)]">{formatCurrency(fatura.valor_total)}</td>
+              <td className="px-4 py-3 text-center"><span className={statusClass(fatura.status)}>{fatura.status}</span></td>
+              <td className="px-4 py-3 text-right">
+                <button type="button" className="btn btn-primary btn-sm" disabled={processing} onClick={() => onAssociar(modal.item?.id, fatura.id)}>
+                  {processing ? 'Associando...' : 'Associar'}
+                </button>
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
   );
 }
 
@@ -2194,7 +2301,16 @@ export default function FinanceiroConciliacao() {
             <div className="mt-3 rounded-xl border border-[var(--c-border)] bg-[var(--c-bg)] px-4 py-2 text-sm text-[var(--c-muted)]">
               {associacaoModal.dados.meta.total} movimento(s) encontrado(s)
             </div>
-            <div className="mt-3 space-y-2">
+            <div className="mt-3 overflow-x-auto rounded-xl border border-[var(--c-border)]">
+              <AssociacaoManualTabela
+                loading={associacaoModal.loading}
+                itens={associacaoModal.dados.itens}
+                modal={associacaoModal}
+                processingId={processingId}
+                onAssociar={handleConfirmar}
+              />
+            </div>
+            <div className="hidden">
               {associacaoModal.loading
                 ? <div className="rounded-xl border border-[var(--c-border)] px-4 py-8 text-center text-sm text-[var(--c-muted)]">Carregando movimentos...</div>
                 : associacaoModal.dados.itens.length === 0
@@ -2302,7 +2418,16 @@ export default function FinanceiroConciliacao() {
             <div className="mt-3 rounded-xl border border-[var(--c-border)] bg-[var(--c-bg)] px-4 py-2 text-sm text-[var(--c-muted)]">
               {faturaModal.dados.meta.total} fatura(s) encontrada(s)
             </div>
-            <div className="mt-3 space-y-2">
+            <div className="mt-3 overflow-x-auto rounded-xl border border-[var(--c-border)]">
+              <FaturasAssociacaoTabela
+                loading={faturaModal.loading}
+                itens={faturaModal.dados.itens}
+                modal={faturaModal}
+                processingId={processingId}
+                onAssociar={handleConfirmarFatura}
+              />
+            </div>
+            <div className="hidden">
               {faturaModal.loading
                 ? <div className="rounded-xl border border-[var(--c-border)] px-4 py-8 text-center text-sm text-[var(--c-muted)]">Carregando faturas...</div>
                 : faturaModal.dados.itens.length === 0

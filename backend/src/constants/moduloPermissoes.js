@@ -22,7 +22,7 @@ const MODULO_PERMISSION_GROUPS = [
         key: 'solicitacoes.lista',
         label: 'Lista de Solicitações',
         permissoes: [
-          { key: 'solicitacoes.lista.visualizar_minhas', label: 'Ver suas próprias solicitações', descricao: 'Exibe somente solicitações criadas pelo próprio usuário.' },
+          { key: 'solicitacoes.lista.visualizar_minhas', label: 'Ver suas próprias solicitações', descricao: 'Exibe solicitações criadas pelo próprio usuário e, para o setor OBRA, também as obras vinculadas ao usuário.' },
           { key: 'solicitacoes.lista.visualizar_setor', label: 'Ver solicitações do setor', descricao: 'Exibe solicitações de todos os usuários do setor.' },
           { key: 'solicitacoes.lista.visualizar_todas', label: 'Ver todas as solicitações', descricao: 'Acesso irrestrito à lista completa.' }
         ]
@@ -115,7 +115,10 @@ const MODULO_PERMISSION_GROUPS = [
           { key: 'financeiro.titulos.visualizar', label: 'Visualizar títulos', descricao: 'Ver lista e detalhes dos títulos a pagar e a receber.' },
           { key: 'financeiro.titulos.criar', label: 'Criar conta manual', descricao: 'Abrir novo título financeiro manualmente.' },
           { key: 'financeiro.titulos.baixar', label: 'Registrar baixa / pagamento', descricao: 'Quitar ou baixar parcialmente um título.' },
-          { key: 'financeiro.titulos.estornar', label: 'Estornar movimento', descricao: 'Reverter uma baixa ou pagamento registrado.' }
+          { key: 'financeiro.titulos.estornar', label: 'Estornar movimento', descricao: 'Reverter uma baixa ou pagamento registrado.' },
+          { key: 'financeiro.titulos.pagamentos_bancarios.visualizar', label: 'Ver pagamentos bancarios do titulo', descricao: 'Exibe intencoes e lotes de pagamentos bancarios no detalhe do titulo.' },
+          { key: 'financeiro.titulos.movimentos.visualizar', label: 'Ver movimentos financeiros do titulo', descricao: 'Exibe baixas, estornos e movimentos financeiros vinculados ao titulo.' },
+          { key: 'financeiro.titulos.auditoria.visualizar', label: 'Ver auditoria financeira do titulo', descricao: 'Exibe eventos de criacao, baixas, estornos e rastreabilidade financeira do titulo.' }
         ]
       },
       {

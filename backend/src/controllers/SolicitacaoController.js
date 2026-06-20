@@ -76,6 +76,10 @@ const {
   resolverCamposNovaSolicitacao
 } = require('../services/novaSolicitacaoCamposConfig');
 const { isObraCentroCusto } = require('../constants/centroCusto');
+const {
+  userHasAreaPermission,
+  userHasConfiguredAreaPermissions
+} = require('../services/authorizationService');
 
 const CHAVE_AREAS_POR_SETOR_ORIGEM = 'AREAS_POR_SETOR_ORIGEM';
 const CHAVE_SETORES_VISIVEIS_POR_USUARIO = 'SETORES_VISIVEIS_POR_USUARIO';
@@ -1048,6 +1052,13 @@ module.exports = {
 
       const isSetorObra = await isSetorObraGeral(req);
       const isUsuarioGeo = await isUsuarioSetorGeo(req);
+      const temPermissoesAreasConfiguradas = await userHasConfiguredAreaPermissions(req.user);
+      const podeVerSolicitacoesProprias = await userHasAreaPermission(req.user, [
+        'solicitacoes.lista.visualizar_minhas'
+      ]);
+      const podeVerTodasSolicitacoes = temPermissoesAreasConfiguradas && await userHasAreaPermission(req.user, [
+        'solicitacoes.lista.visualizar_todas'
+      ]);
 
       const setorTokensBase = [
         setorAtual?.codigo,
@@ -1120,15 +1131,19 @@ module.exports = {
         });
       }
 
-      // Setor OBRA (ADMIN e USUARIO): ve apenas solicitacoes criadas por ele
-      // e/ou das obras vinculadas ao usuario. Superadmin continua com visao global.
-      if (!isSetorAdministrativo && isSetorObra && perfil !== 'SUPERADMIN') {
-        const condicoesObra = [{ criado_por: usuarioId }];
-        if (obrasVinculadas.length > 0) {
-          condicoesObra.push({ obra_id: { [Op.in]: obrasVinculadas } });
+      // Setor OBRA: "Ver proprias" equivale a criadas pelo usuario + obras vinculadas.
+      // Isso evita liberar todas as obras via permissao de setor.
+      if (!isSetorAdministrativo && isSetorObra && perfil !== 'SUPERADMIN' && !podeVerTodasSolicitacoes) {
+        if (temPermissoesAreasConfiguradas && !podeVerSolicitacoesProprias) {
+          where.id = -1;
+        } else {
+          const condicoesObra = [{ criado_por: usuarioId }];
+          if (obrasVinculadas.length > 0) {
+            condicoesObra.push({ obra_id: { [Op.in]: obrasVinculadas } });
+          }
+          where[Op.and] = where[Op.and] || [];
+          where[Op.and].push({ [Op.or]: condicoesObra });
         }
-        where[Op.and] = where[Op.and] || [];
-        where[Op.and].push({ [Op.or]: condicoesObra });
       }
 
       // SUPERADMIN ve tudo; demais passam por regra de visibilidade
@@ -1316,21 +1331,6 @@ module.exports = {
         }
       }
 
-      if (isSetorObra) {
-        const filtroAtual = where.obra_id;
-        if (filtroAtual) {
-          if (typeof filtroAtual === 'number') {
-            if (!obrasVinculadas.includes(filtroAtual)) {
-              where.obra_id = -1;
-            }
-          } else if (filtroAtual[Op.in]) {
-            const idsFiltrados = filtroAtual[Op.in].filter(id => obrasVinculadas.includes(id));
-            where.obra_id = idsFiltrados.length > 0 ? { [Op.in]: idsFiltrados } : -1;
-          }
-        } else {
-          where.obra_id = { [Op.in]: obrasVinculadas };
-        }
-      }
       if (tipo_macro_id) {
         const tipoMacroNum = Number(tipo_macro_id);
         if (!Number.isNaN(tipoMacroNum) && tipoMacroNum > 0) {
@@ -1523,10 +1523,6 @@ module.exports = {
         });
         let resultadoFiltro = solicitacoesFiltro.map(item => item.toJSON());
 
-        if (isSetorObra) {
-          resultadoFiltro = resultadoFiltro.filter(item => obrasVinculadas.includes(item.obra_id));
-        }
-
         const idsResultado = resultadoFiltro.map(item => item.id);
         const historicosUsuario = idsResultado.length > 0
           ? await Historico.findAll({
@@ -1597,10 +1593,7 @@ module.exports = {
             attributes: ['obra_id']
           });
 
-          let obraIdsVisiveis = solicitacoesComObra.map(item => Number(item.obra_id));
-          if (isSetorObra) {
-            obraIdsVisiveis = obraIdsVisiveis.filter(id => obrasVinculadas.includes(id));
-          }
+          const obraIdsVisiveis = solicitacoesComObra.map(item => Number(item.obra_id));
 
           return res.json(await listarObrasDistinct(obraIdsVisiveis));
         }
@@ -1616,12 +1609,6 @@ module.exports = {
         });
         resultado = await montarResumoSolicitacoesLista(solicitacoes);
 
-        if (isSetorObra) {
-          resultado = resultado.filter(item => obrasVinculadas.includes(item.obra_id));
-          if (!paginacaoSolicitada) {
-            totalRegistros = resultado.length;
-          }
-        }
       }
 
       if (!paginacaoSolicitada) {
@@ -3402,16 +3389,6 @@ module.exports = {
           };
 
       await solicitacao.update(updatePayload);
-
-      await Historico.create({
-        solicitacao_id: solicitacao.id,
-        usuario_responsavel_id: req.user.id,
-        setor: usuario?.setor_id || req.user.area || null,
-        acao: marcar ? 'PENDENCIA_FINANCEIRA_MARCADA' : 'PENDENCIA_FINANCEIRA_REGULARIZADA',
-        descricao: marcar
-          ? `Marcada pendencia financeira: ${tipo}${observacao ? ` - ${observacao}` : ''}`
-          : `Pendencia financeira regularizada${observacao ? ` - ${observacao}` : ''}`
-      });
 
       await publishSolicitacaoRealtimeEvent({
         action: 'FINANCIAL_DEADLINE_FLAG_UPDATED',

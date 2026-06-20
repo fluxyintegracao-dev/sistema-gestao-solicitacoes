@@ -38,6 +38,11 @@ function sortUsuarios(lista = []) {
   );
 }
 
+function isBypassAdmin(usuario) {
+  const perfil = String(usuario?.perfil || '').trim().toUpperCase();
+  return perfil === 'SUPERADMIN' || perfil === 'ADMINISTRADOR';
+}
+
 function BadgePerfil({ perfil }) {
   const token = String(perfil || '').toUpperCase();
   const colorClass =
@@ -322,8 +327,7 @@ export default function PermissoesAreas() {
   );
 
   const selectedUserIsBypassAdmin = useMemo(() => {
-    const perfil = String(usuarioSelecionado?.perfil || '').trim().toUpperCase();
-    return perfil === 'SUPERADMIN' || perfil === 'ADMINISTRADOR';
+    return isBypassAdmin(usuarioSelecionado);
   }, [usuarioSelecionado]);
 
   const permissoesUsuarioAtual = useMemo(() => {
@@ -414,13 +418,16 @@ export default function PermissoesAreas() {
       <div className="card sol-surface-card app-toolbar-card">
         <div className="app-page-header-row">
           <div>
-            <h1 className="page-title">Permissoes de Areas por Usuario</h1>
+            <h1 className="page-title">Permissoes adicionais por Usuario</h1>
             <p className="page-subtitle">
-              Configure quais areas, abas e acoes cada usuario pode acessar dentro dos recursos disponiveis.
-              SUPERADMIN e ADMINISTRADOR seguem com bypass total e nao sao afetados por esta configuracao.
+              Adicione excecoes individuais acima do padrao por setor e perfil. SUPERADMIN e ADMINISTRADOR seguem
+              com bypass total e nao sao afetados por esta configuracao.
             </p>
           </div>
           <div className="app-page-actions">
+            <a href="/permissoes-areas-padroes" className="btn btn-outline btn-sm">
+              Padroes por setor/perfil
+            </a>
             <button
               type="button"
               className="btn btn-primary btn-sm"
@@ -434,9 +441,8 @@ export default function PermissoesAreas() {
       </div>
 
       <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-800">
-        <strong>Como funciona:</strong> se um usuario nao tiver nenhuma permissao configurada aqui, ele continua com o
-        acesso padrao do seu perfil. Ao marcar ao menos uma permissao, somente as marcadas passam a valer para aquele
-        usuario dentro de cada modulo.
+        <strong>Como funciona:</strong> esta tela soma permissoes extras ao padrao definido por setor e perfil. Use
+        aqui somente quando um usuario precisar de acesso adicional ao grupo dele.
       </div>
 
       {sessionIsSuperadmin ? (

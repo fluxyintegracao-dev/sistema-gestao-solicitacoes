@@ -1825,10 +1825,7 @@ async function criarTituloPorSolicitacao(req, solicitacaoId, payload = {}) {
     throw createHttpError(400, 'Tipo de titulo invalido.');
   }
 
-  const parceiroId = Number(payload.parceiro_id || solicitacao.parceiro_id);
-  if (!Number.isInteger(parceiroId) || parceiroId <= 0) {
-    throw createHttpError(400, 'Parceiro e obrigatorio para gerar o titulo.');
-  }
+  const parceiroPadraoId = Number(payload.parceiro_id || solicitacao.parceiro_id);
 
   const valorSolicitacao = Number(solicitacao.valor != null ? solicitacao.valor : payload.valor);
   if (!Number.isFinite(valorSolicitacao) || valorSolicitacao <= 0) {
@@ -1840,12 +1837,10 @@ async function criarTituloPorSolicitacao(req, solicitacaoId, payload = {}) {
     obra: solicitacao.obra
   });
 
-  const [parceiro,, categoria] = await Promise.all([
-    validarParceiro(parceiroId),
+  const [, categoria] = await Promise.all([
     validarEmpresaGrupo(empresaTituloId),
     validarCategoriaFinanceira(payload.categoria_financeira_id, tipo)
   ]);
-  validarCompatibilidadeParceiroTitulo(parceiro, tipo);
   validarCategoriaDreTitulo(categoria, payload);
   const intercompanyFields = await validarIntercompanyTitulo(payload);
 
@@ -1855,6 +1850,12 @@ async function criarTituloPorSolicitacao(req, solicitacaoId, payload = {}) {
 
   const pagamentos = [];
   for (const [pagamentoIndex, pagamentoPayload] of pagamentosPayload.entries()) {
+    const parceiroIdPagamento = Number(pagamentoPayload.parceiro_id || parceiroPadraoId);
+    if (!Number.isInteger(parceiroIdPagamento) || parceiroIdPagamento <= 0) {
+      throw createHttpError(400, `Parceiro e obrigatorio para o titulo ${pagamentoIndex + 1}.`);
+    }
+    const parceiroPagamento = await validarParceiro(parceiroIdPagamento);
+    validarCompatibilidadeParceiroTitulo(parceiroPagamento, tipo);
     const formaPagamento = await validarFormaPagamentoFinanceira(pagamentoPayload.forma_pagamento_id, pagamentoPayload);
     const quantidadeParcelas = Math.max(
       Number(pagamentoPayload.quantidade_parcelas || pagamentoPayload.parcelas?.length || 1),
@@ -1885,6 +1886,7 @@ async function criarTituloPorSolicitacao(req, solicitacaoId, payload = {}) {
     }
 
     pagamentos.push({
+      parceiro: parceiroPagamento,
       formaPagamento,
       payload: pagamentoPayload,
       quantidadeParcelas,
@@ -1942,7 +1944,7 @@ async function criarTituloPorSolicitacao(req, solicitacaoId, payload = {}) {
           apropriacao_id: solicitacao.apropriacao_id || null,
           empresa_id: empresaTituloId,
           ...intercompanyFields,
-          parceiro_id: parceiroId,
+          parceiro_id: pagamento.parceiro.id,
           categoria_financeira_id: categoria?.id || null,
           forma_pagamento_id: pagamento.formaPagamento?.id || null,
           cartao_id: pagamento.payload.cartao_id || null,
@@ -2044,12 +2046,13 @@ async function criarTituloPorSolicitacao(req, solicitacaoId, payload = {}) {
       metadata: {
         solicitacao_id: solicitacao.id,
         obra_id: solicitacao.obra_id,
-        parceiro_id: parceiroId,
+        parceiro_id: titulosCriados[0]?.parceiro_id || parceiroPadraoId || null,
         tipo,
         valor_original: valorOriginal,
         quantidade_titulos: titulosCriados.length,
         pagamentos: pagamentos.map((pagamento) => ({
           valor: pagamento.totalPagamento,
+          parceiro_id: pagamento.parceiro.id,
           quantidade_parcelas: pagamento.quantidadeParcelas,
           grupo_parcelamento_id: pagamento.grupoParcelamentoId,
           forma_pagamento_id: pagamento.formaPagamento?.id || null,
@@ -2138,6 +2141,14 @@ async function criarTituloManual(req, payload = {}) {
 
   const pagamentos = [];
   for (const [pagamentoIndex, pagamentoPayload] of pagamentosPayload.entries()) {
+    const parceiroPagamentoId = Number(pagamentoPayload.parceiro_id || parceiroId);
+    if (!Number.isInteger(parceiroPagamentoId) || parceiroPagamentoId <= 0) {
+      throw createHttpError(400, `Parceiro obrigatorio no pagamento ${pagamentoIndex + 1}.`);
+    }
+    const parceiroPagamento = parceiroPagamentoId === parceiro.id
+      ? parceiro
+      : await validarParceiro(parceiroPagamentoId);
+    validarCompatibilidadeParceiroTitulo(parceiroPagamento, tipo);
     const formaPagamento = await validarFormaPagamentoFinanceira(pagamentoPayload.forma_pagamento_id, pagamentoPayload);
     const quantidadeParcelas = Math.max(
       Number(pagamentoPayload.quantidade_parcelas || pagamentoPayload.parcelas?.length || 1),
@@ -2168,6 +2179,7 @@ async function criarTituloManual(req, payload = {}) {
     }
 
     pagamentos.push({
+      parceiro: parceiroPagamento,
       formaPagamento,
       payload: pagamentoPayload,
       quantidadeParcelas,
@@ -2217,7 +2229,7 @@ async function criarTituloManual(req, payload = {}) {
           apropriacao_id: apropriacao?.id || null,
           empresa_id: empresaTituloId,
           ...intercompanyFields,
-          parceiro_id: parceiro.id,
+          parceiro_id: pagamento.parceiro.id,
           categoria_financeira_id: categoria?.id || null,
           forma_pagamento_id: pagamento.formaPagamento?.id || null,
           cartao_id: pagamento.payload.cartao_id || null,
@@ -2303,12 +2315,13 @@ async function criarTituloManual(req, payload = {}) {
     metadata: {
       origem: 'MANUAL',
       obra_id: obra.id,
-      parceiro_id: parceiro.id,
+      parceiro_id: titulosCriados[0]?.parceiro_id || parceiro.id,
       tipo,
       valor_original: roundCurrency(valorOriginal),
       quantidade_titulos: titulosCriados.length,
       pagamentos: pagamentos.map((pagamento) => ({
         valor: pagamento.totalPagamento,
+        parceiro_id: pagamento.parceiro.id,
         quantidade_parcelas: pagamento.quantidadeParcelas,
         grupo_parcelamento_id: pagamento.grupoParcelamentoId,
         forma_pagamento_id: pagamento.formaPagamento?.id || null,

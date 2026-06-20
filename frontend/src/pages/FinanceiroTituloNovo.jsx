@@ -71,6 +71,13 @@ function roundCurrency(value) {
   return Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;
 }
 
+function calcularValorImposto(imposto) {
+  const base = currencyToNumber(imposto?.base_calculo);
+  const aliquota = currencyToNumber(imposto?.aliquota);
+  if (base <= 0 || aliquota <= 0) return '';
+  return formatCurrencyInput(roundCurrency((base * aliquota) / 100));
+}
+
 function addMonths(dateString, amount) {
   const date = new Date(`${dateString || today()}T00:00:00`);
   if (Number.isNaN(date.getTime())) return today();
@@ -114,10 +121,13 @@ function buildParcelasDetalhadas(
   }));
 }
 
-function createPagamento(valor = '') {
+function createPagamento(valor = '', parceiro = null) {
   return {
     id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
     valor,
+    parceiro_id: parceiro?.id ? String(parceiro.id) : '',
+    parceiro_nome: parceiro?.nome || '',
+    parceiro_busca: '',
     data_vencimento: today(),
     forma_pagamento_id: '',
     cartao_id: '',
@@ -618,6 +628,7 @@ export default function FinanceiroTituloNovo() {
     const temBuscaDocumento = onlyDigits(parceiroDocumentoBusca).length >= 3;
     return !form.parceiro_id && (temBuscaNome || temBuscaDocumento);
   }, [form.parceiro_id, parceiroDocumentoBusca, parceiroNomeBusca]);
+  const quantidadePagamentos = (form.pagamentos || []).length;
 
   function getFormaPagamento(formaPagamentoId) {
     return formasPagamento.find((item) => String(item.id) === String(formaPagamentoId)) || null;
@@ -686,7 +697,16 @@ export default function FinanceiroTituloNovo() {
 
   function selecionarParceiro(parceiro) {
     if (!parceiro) return;
-    setForm((current) => ({ ...current, parceiro_id: String(parceiro.id) }));
+    setForm((current) => ({
+      ...current,
+      parceiro_id: String(parceiro.id),
+      pagamentos: (current.pagamentos || []).map((pagamento) => ({
+        ...pagamento,
+        parceiro_id: String(parceiro.id),
+        parceiro_nome: parceiro.nome || '',
+        parceiro_busca: ''
+      }))
+    }));
     setParceiroNomeBusca(parceiro.nome || '');
     setParceiroDocumentoBusca(maskCpfCnpj(parceiro.cpf_cnpj || ''));
     setPaymentDraft((current) => {
@@ -700,6 +720,32 @@ export default function FinanceiroTituloNovo() {
         pix_tipo_chave: pix?.tipo || current.pix_tipo_chave || 'CNPJ',
         pix_chave: pix?.chave || ''
       };
+    });
+  }
+
+  function filtrarParceirosPagamento(busca) {
+    const termo = normalizeSearchText(busca);
+    if (!termo) return [];
+    return parceiros
+      .filter((parceiro) => {
+        const texto = normalizeSearchText(`${parceiro.nome || ''} ${parceiro.cpf_cnpj || ''}`);
+        return texto.includes(termo);
+      })
+      .slice(0, 8);
+  }
+
+  function selecionarParceiroPagamento(index, parceiro) {
+    if (!parceiro) return;
+    setForm((current) => {
+      const pagamentos = [...(current.pagamentos || [])];
+      const pagamento = pagamentos[index] || createPagamento();
+      pagamentos[index] = {
+        ...pagamento,
+        parceiro_id: String(parceiro.id),
+        parceiro_nome: parceiro.nome || '',
+        parceiro_busca: ''
+      };
+      return { ...current, pagamentos };
     });
   }
 
@@ -874,7 +920,7 @@ export default function FinanceiroTituloNovo() {
   function adicionarPagamento() {
     setForm((current) => ({
       ...current,
-      pagamentos: [...(current.pagamentos || []), createPagamento()]
+      pagamentos: [...(current.pagamentos || []), createPagamento('', parceiroSelecionado)]
     }));
   }
 
@@ -922,10 +968,15 @@ export default function FinanceiroTituloNovo() {
     setForm((current) => {
       const impostos = [...(current.impostos || [])];
       const imposto = impostos[index] || createImposto();
-      impostos[index] = {
+      const next = {
         ...imposto,
         [field]: value
       };
+      if (['base_calculo', 'aliquota'].includes(field)) {
+        const valorCalculado = calcularValorImposto(next);
+        if (valorCalculado) next.valor = valorCalculado;
+      }
+      impostos[index] = next;
       return { ...current, impostos };
     });
   }
@@ -967,6 +1018,10 @@ export default function FinanceiroTituloNovo() {
       const usaCartao = isFormaCartao(forma);
       const valorPagamento = getValorPagamento(pagamento);
       const labelForma = `forma de pagamento ${pagamentoIndex + 1}`;
+
+      if (pagamentos.length > 1 && !pagamento.parceiro_id) {
+        return `Selecione o ${form.tipo === 'RECEBER' ? 'cliente' : 'credor'} da ${labelForma}.`;
+      }
 
       if (valorPagamento <= 0) {
         return `Informe o valor da ${labelForma}.`;
@@ -1111,6 +1166,7 @@ export default function FinanceiroTituloNovo() {
         const forma = getFormaPagamento(pagamento.forma_pagamento_id);
         const usaDetalhe = formaUsaParcelasDetalhadas(forma);
         return {
+          parceiro_id: pagamento.parceiro_id ? Number(pagamento.parceiro_id) : undefined,
           valor: usaDetalhe ? undefined : pagamento.valor,
           forma_pagamento_id: pagamento.forma_pagamento_id || undefined,
           cartao_id: pagamento.cartao_id || undefined,
@@ -1543,6 +1599,48 @@ export default function FinanceiroTituloNovo() {
                           </button>
                         )}
                       </div>
+
+                      {quantidadePagamentos > 1 && (
+                        <div className="rounded-2xl border border-blue-100 bg-blue-50 p-3">
+                          <label className="text-sm">
+                            <span className="mb-1 block font-semibold text-blue-950">
+                              {form.tipo === 'RECEBER' ? 'Cliente deste titulo' : 'Credor deste titulo'}
+                            </span>
+                            <input
+                              className="input w-full bg-white"
+                              placeholder={form.tipo === 'RECEBER' ? 'Digite para buscar o cliente' : 'Digite para buscar o credor'}
+                              value={pagamento.parceiro_id ? (pagamento.parceiro_nome || 'Selecionado') : (pagamento.parceiro_busca || '')}
+                              onChange={(event) => updatePagamento(pagamentoIndex, {
+                                parceiro_id: '',
+                                parceiro_nome: '',
+                                parceiro_busca: event.target.value
+                              })}
+                            />
+                          </label>
+                          {!pagamento.parceiro_id && String(pagamento.parceiro_busca || '').trim() && (
+                            <div className="mt-2 max-h-44 overflow-y-auto rounded-xl border border-blue-100 bg-white">
+                              {filtrarParceirosPagamento(pagamento.parceiro_busca).length === 0 ? (
+                                <div className="px-3 py-2 text-sm text-[var(--c-muted)]">
+                                  Nenhum {form.tipo === 'RECEBER' ? 'cliente' : 'credor'} encontrado.
+                                </div>
+                              ) : filtrarParceirosPagamento(pagamento.parceiro_busca).map((parceiro) => (
+                                <button
+                                  key={parceiro.id}
+                                  type="button"
+                                  className="w-full border-b border-blue-50 px-3 py-2 text-left text-sm last:border-b-0 hover:bg-blue-50"
+                                  onClick={() => selecionarParceiroPagamento(pagamentoIndex, parceiro)}
+                                >
+                                  <span className="block font-semibold text-[var(--c-text)]">{parceiro.nome}</span>
+                                  <span className="block text-xs text-[var(--c-muted)]">{parceiro.cpf_cnpj || 'CPF/CNPJ nao informado'}</span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                          <span className="mt-2 block text-xs text-blue-700">
+                            Use quando cada titulo precisar sair para um credor diferente.
+                          </span>
+                        </div>
+                      )}
 
                       <div className="grid gap-3 md:grid-cols-2">
                         <label className="text-sm">

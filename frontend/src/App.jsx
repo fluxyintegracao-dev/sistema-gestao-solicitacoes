@@ -138,6 +138,7 @@ const UsuariosAcessoFinanceiro = lazy(() => import('./pages/UsuariosAcessoFinanc
 const UsuariosAcessoPrioridadeDiretoria = lazy(() => import('./pages/UsuariosAcessoPrioridadeDiretoria'));
 const UsuariosPermissoesRhDp = lazy(() => import('./pages/UsuariosPermissoesRhDp'));
 const PermissoesAreas = lazy(() => import('./pages/PermissoesAreas'));
+const PermissoesAreasPadroes = lazy(() => import('./pages/PermissoesAreasPadroes'));
 const ComunicacaoInterna = lazy(() => import('./pages/ComunicacaoInterna'));
 const PrioridadesDiretoria = lazy(() => import('./pages/PrioridadesDiretoria'));
 const ArquivosModelos = lazy(() => import('./pages/ArquivosModelos'));
@@ -728,6 +729,7 @@ export default function App() {
         <Route path="usuarios-acesso-prioridade-diretoria" element={<BusinessAdminRoute><UsuariosAcessoPrioridadeDiretoria /></BusinessAdminRoute>} />
         <Route path="usuarios-permissoes-rh-dp" element={<BusinessAdminRoute><UsuariosPermissoesRhDp /></BusinessAdminRoute>} />
         <Route path="permissoes-areas" element={<BusinessAdminRoute><PermissoesAreas /></BusinessAdminRoute>} />
+        <Route path="permissoes-areas-padroes" element={<BusinessAdminRoute><PermissoesAreasPadroes /></BusinessAdminRoute>} />
         <Route path="governanca" element={<GovernancaSistemaRoute><GovernancaSistema /></GovernancaSistemaRoute>} />
         <Route path="arquivos-modelos-config" element={<SuperadminRoute><ArquivosModelosConfig /></SuperadminRoute>} />
         <Route path="configuracoes-cotacao" element={<EnabledModuleRoute moduleKey="COMPRAS"><EnabledModuleRoute moduleKey="COTACOES"><BusinessAdminRoute><ConfiguracoesCotacao /></BusinessAdminRoute></EnabledModuleRoute></EnabledModuleRoute>} />

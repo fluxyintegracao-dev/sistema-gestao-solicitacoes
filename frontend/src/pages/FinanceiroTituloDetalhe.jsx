@@ -10,6 +10,8 @@ import {
   getTituloFinanceiroById
 } from '../services/financeiro';
 import { getEmpresasGrupo } from '../services/empresasGrupo';
+import { useAuth } from '../contexts/AuthContext';
+import { hasPermissao } from '../utils/acessoProduto';
 import { formatCurrencyInput, normalizeCurrencyTyping } from '../utils/formatters';
 
 const FORMAS_RECEBIMENTO = ['DINHEIRO', 'PIX', 'CARTAO', 'TRANSFERENCIA', 'BOLETO', 'CHEQUE', 'PERMUTA', 'BENS', 'OUTROS'];
@@ -220,6 +222,7 @@ function formatAuditMetadata(metadata) {
 
 export default function FinanceiroTituloDetalhe() {
   const { id } = useParams();
+  const { user } = useAuth();
   const [titulo, setTitulo] = useState(null);
   const [contasBancarias, setContasBancarias] = useState([]);
   const [cartoes, setCartoes] = useState([]);
@@ -234,6 +237,9 @@ export default function FinanceiroTituloDetalhe() {
   const [savingBaixa, setSavingBaixa] = useState(false);
   const [estornandoId, setEstornandoId] = useState(null);
   const [corrigindoMovimentoId, setCorrigindoMovimentoId] = useState(null);
+  const podeVerPagamentosBancarios = hasPermissao(user, 'financeiro.titulos.pagamentos_bancarios.visualizar');
+  const podeVerMovimentosFinanceiros = hasPermissao(user, 'financeiro.titulos.movimentos.visualizar');
+  const podeVerAuditoriaFinanceira = hasPermissao(user, 'financeiro.titulos.auditoria.visualizar');
 
   async function carregar() {
     try {
@@ -244,7 +250,7 @@ export default function FinanceiroTituloDetalhe() {
         getContasBancarias(),
         getCartoesFinanceiros(),
         getEmpresasGrupo({ ativo: true }),
-        getTituloFinanceiroAuditoria(id)
+        podeVerAuditoriaFinanceira ? getTituloFinanceiroAuditoria(id) : Promise.resolve([])
       ]);
       setTitulo(tituloData);
       setContasBancarias(Array.isArray(contasData) ? contasData : []);
@@ -266,7 +272,7 @@ export default function FinanceiroTituloDetalhe() {
 
   useEffect(() => {
     carregar();
-  }, [id]);
+  }, [id, podeVerAuditoriaFinanceira]);
 
   const movimentosAtivos = useMemo(() => {
     return Array.isArray(titulo?.movimentos)
@@ -278,10 +284,16 @@ export default function FinanceiroTituloDetalhe() {
       ? titulo.paymentIntents.filter((item) => !['CANCELADO', 'REJEITADO', 'REJEITADO_BANCO'].includes(String(item.status || '').toUpperCase()))
       : [];
   }, [titulo]);
+  const movimentosAtivosCount = Array.isArray(titulo?.movimentos)
+    ? movimentosAtivos.length
+    : Number(titulo?.movimentos_ativos_count || 0);
+  const pagamentosAtivosCount = Array.isArray(titulo?.paymentIntents)
+    ? pagamentosAtivos.length
+    : Number(titulo?.payment_intents_ativos_count || 0);
   const podeEditarTitulo = String(titulo?.status || '').toUpperCase() === 'ABERTO'
     && Number(titulo?.valor_baixado || 0) === 0
-    && movimentosAtivos.length === 0
-    && pagamentosAtivos.length === 0;
+    && movimentosAtivosCount === 0
+    && pagamentosAtivosCount === 0;
 
   const contasBancariasBaixa = useMemo(() => {
     if (!baixaForm.empresa_id) return [];
@@ -588,7 +600,7 @@ export default function FinanceiroTituloDetalhe() {
               </div>
               <div>
                 <div className="text-[var(--c-muted)]">Baixas ativas</div>
-                <div className="font-medium text-[var(--c-text)]">{movimentosAtivos.length}</div>
+                <div className="font-medium text-[var(--c-text)]">{movimentosAtivosCount}</div>
               </div>
               <div>
                 <div className="text-[var(--c-muted)]">Quitacao</div>
@@ -814,7 +826,7 @@ export default function FinanceiroTituloDetalhe() {
           </div>
         )}
 
-        {String(titulo.tipo || '').toUpperCase() === 'PAGAR' && (
+        {String(titulo.tipo || '').toUpperCase() === 'PAGAR' && podeVerPagamentosBancarios && (
           <div className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4 space-y-4">
             <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
               <div>
@@ -874,6 +886,7 @@ export default function FinanceiroTituloDetalhe() {
           </div>
         )}
 
+        {podeVerMovimentosFinanceiros && (
         <div className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4 space-y-4">
           <h2 className="text-lg font-semibold text-[var(--c-text)]">Movimentos financeiros</h2>
 
@@ -961,7 +974,9 @@ export default function FinanceiroTituloDetalhe() {
             </div>
           )}
         </div>
+        )}
 
+        {podeVerAuditoriaFinanceira && (
         <div className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4 space-y-4">
           <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
             <h2 className="text-lg font-semibold text-[var(--c-text)]">Auditoria financeira</h2>
@@ -1015,6 +1030,7 @@ export default function FinanceiroTituloDetalhe() {
             </div>
           )}
         </div>
+        )}
       </div>
 
       {modalBaixaOpen && (

@@ -53,6 +53,13 @@ function formatCurrency(value) {
   });
 }
 
+function calcularValorImposto(imposto) {
+  const base = toCurrencyNumber(imposto?.base_calculo);
+  const aliquota = toCurrencyNumber(imposto?.aliquota);
+  if (base <= 0 || aliquota <= 0) return '';
+  return formatCurrencyInput(roundCurrency((base * aliquota) / 100));
+}
+
 function createRateio(valor = '') {
   return {
     id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
@@ -530,7 +537,12 @@ export default function FinanceiroTituloEditar() {
   function updateImposto(index, field, value) {
     setForm((current) => {
       const impostos = [...(current.impostos || [])];
-      impostos[index] = { ...(impostos[index] || createImposto()), [field]: value };
+      const next = { ...(impostos[index] || createImposto()), [field]: value };
+      if (['base_calculo', 'aliquota'].includes(field)) {
+        const valorCalculado = calcularValorImposto(next);
+        if (valorCalculado) next.valor = valorCalculado;
+      }
+      impostos[index] = next;
       return { ...current, impostos };
     });
   }

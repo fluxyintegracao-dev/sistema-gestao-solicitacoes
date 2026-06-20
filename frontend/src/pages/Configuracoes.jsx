@@ -235,8 +235,13 @@ const SECOES_CONFIG = [
         requireModule: 'FINANCEIRO'
       },
       {
+        title: 'Permissoes por Setor e Perfil',
+        description: 'Configure permissões padrão por setor e perfil para aplicar a todos os usuários daquele grupo.',
+        to: '/permissoes-areas-padroes'
+      },
+      {
         title: 'Permissoes de Areas por Usuario',
-        description: 'Configure quais areas, abas e acoes de cada modulo cada usuario pode acessar, incluindo CRM, RH/DP, Financeiro e Compras.',
+        description: 'Adicione exceções individuais quando um usuário precisar de permissões além do padrão do setor e perfil.',
         to: '/permissoes-areas'
       },
       {

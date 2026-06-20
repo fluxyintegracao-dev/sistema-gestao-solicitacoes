@@ -17,6 +17,9 @@ const FINANCEIRO_PERMISSION_KEYS = [
   'financeiro.titulos.criar',
   'financeiro.titulos.baixar',
   'financeiro.titulos.estornar',
+  'financeiro.titulos.pagamentos_bancarios.visualizar',
+  'financeiro.titulos.movimentos.visualizar',
+  'financeiro.titulos.auditoria.visualizar',
   'financeiro.comprovantes.excluir',
   'financeiro.relatorios.visualizar',
   'financeiro.relatorios.grupo_consolidado',
@@ -466,8 +469,13 @@ let usuariosPermissoesRhDpCache = {
 
 let permissoesAreasUsuariosCache = {
   expiresAt: 0,
-  usuarios: {}
+  config: {
+    usuarios: {},
+    padroes_setor_perfil: {}
+  }
 };
+
+const PERMISSAO_SOLICITACOES_MINHAS = 'solicitacoes.lista.visualizar_minhas';
 
 function normalizeToken(value) {
   return String(value || '')
@@ -610,10 +618,42 @@ async function getUsuariosPermissoesRhDp() {
   return usuarios;
 }
 
-async function getPermissoesAreasUsuarios() {
+function normalizePermissoesAreasPadroes(input) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return {};
+
+  return Object.entries(input).reduce((acc, [setorKey, perfis]) => {
+    const setor = String(setorKey || '').trim();
+    if (!setor || !perfis || typeof perfis !== 'object' || Array.isArray(perfis)) return acc;
+
+    const normalizedPerfis = Object.entries(perfis).reduce((perfilAcc, [perfilKey, permissions]) => {
+      const perfil = normalizeToken(perfilKey);
+      if (!perfil) return perfilAcc;
+      const normalized = normalizeModuloPermissaoList(permissions);
+      if (normalized.length) perfilAcc[perfil] = normalized;
+      return perfilAcc;
+    }, {});
+
+    if (Object.keys(normalizedPerfis).length) acc[setor] = normalizedPerfis;
+    return acc;
+  }, {});
+}
+
+function normalizePermissoesAreasUsuarios(input) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return {};
+
+  return Object.entries(input).reduce((acc, [userId, permissions]) => {
+    const id = Number(userId);
+    if (!Number.isInteger(id) || id <= 0) return acc;
+    const normalized = normalizeModuloPermissaoList(permissions);
+    if (normalized.length) acc[id] = normalized;
+    return acc;
+  }, {});
+}
+
+async function getPermissoesAreasConfig() {
   const now = Date.now();
   if (permissoesAreasUsuariosCache.expiresAt > now) {
-    return permissoesAreasUsuariosCache.usuarios;
+    return permissoesAreasUsuariosCache.config;
   }
 
   const item = await ConfiguracaoSistema.findOne({
@@ -622,29 +662,78 @@ async function getPermissoesAreasUsuarios() {
     attributes: ['valor']
   });
 
-  let usuarios = {};
+  let config = {
+    usuarios: {},
+    padroes_setor_perfil: {}
+  };
   if (item?.valor) {
     try {
       const data = JSON.parse(item.valor);
-      const input = data?.usuarios && typeof data.usuarios === 'object' ? data.usuarios : {};
-      usuarios = Object.entries(input).reduce((acc, [userId, permissions]) => {
-        const id = Number(userId);
-        if (!Number.isInteger(id) || id <= 0) return acc;
-        const normalized = normalizeModuloPermissaoList(permissions);
-        if (normalized.length) acc[id] = normalized;
-        return acc;
-      }, {});
+      config = {
+        usuarios: normalizePermissoesAreasUsuarios(data?.usuarios),
+        padroes_setor_perfil: normalizePermissoesAreasPadroes(data?.padroes_setor_perfil)
+      };
     } catch {
-      usuarios = {};
+      config = {
+        usuarios: {},
+        padroes_setor_perfil: {}
+      };
     }
   }
 
   permissoesAreasUsuariosCache = {
     expiresAt: now + CACHE_TTL_MS,
-    usuarios
+    config
   };
 
-  return usuarios;
+  return config;
+}
+
+async function getPermissoesAreasUsuarios() {
+  const config = await getPermissoesAreasConfig();
+  return config.usuarios || {};
+}
+
+async function resolveSetorPermissionKeys(user) {
+  const keys = new Set();
+  [user?.setor_id, user?.setor?.id, user?.setor?.codigo, user?.setor?.nome]
+    .map((value) => String(value || '').trim())
+    .filter(Boolean)
+    .forEach((value) => keys.add(value));
+
+  if ((!user?.setor?.id && !user?.setor?.codigo && !user?.setor?.nome) && user?.setor_id) {
+    const setor = await Setor.findByPk(user.setor_id, {
+      attributes: ['id', 'codigo', 'nome', 'eh_setor_obra']
+    });
+    [setor?.id, setor?.codigo, setor?.nome]
+      .map((value) => String(value || '').trim())
+      .filter(Boolean)
+      .forEach((value) => keys.add(value));
+  }
+
+  return Array.from(keys);
+}
+
+async function getPermissoesPadraoSetorPerfil(user, config) {
+  const padroes = config?.padroes_setor_perfil || {};
+  const perfil = normalizeToken(user?.perfil);
+  if (!perfil) return [];
+
+  const setorKeys = await resolveSetorPermissionKeys(user);
+  const lista = [];
+
+  setorKeys.forEach((key) => {
+    const perfis = padroes[String(key)] || padroes[normalizeToken(key)];
+    if (perfis?.[perfil]) {
+      lista.push(...perfis[perfil]);
+    }
+  });
+
+  if (await userHasSetorCapability(user, 'eh_setor_obra')) {
+    lista.push(PERMISSAO_SOLICITACOES_MINHAS);
+  }
+
+  return normalizeModuloPermissaoList(lista);
 }
 
 async function getAreasPermissoesForUser(user) {
@@ -652,11 +741,14 @@ async function getAreasPermissoesForUser(user) {
   // BusinessAdmin: sem restrições, retorna array vazio (frontend interpreta como acesso total)
   if (isBusinessAdmin(user)) return [];
   const sessionPermissions = normalizeModuloPermissaoList(user.areas_permissoes);
-  if (sessionPermissions.length > 0) {
-    return sessionPermissions;
-  }
-  const permissionMap = await getPermissoesAreasUsuarios();
-  return permissionMap[Number(user.id)] || [];
+  const config = await getPermissoesAreasConfig();
+  const permissionMap = config.usuarios || {};
+  const padroes = await getPermissoesPadraoSetorPerfil(user, config);
+  return normalizeModuloPermissaoList([
+    ...padroes,
+    ...sessionPermissions,
+    ...(permissionMap[Number(user.id)] || [])
+  ]);
 }
 
 async function userHasAreaPermission(user, permissionKeys = []) {
@@ -703,7 +795,10 @@ async function userHasAreaOrRhDpLegacyPermission(user, areaPermissionKeys = [], 
 function invalidatePermissoesAreasCache() {
   permissoesAreasUsuariosCache = {
     expiresAt: 0,
-    usuarios: {}
+    config: {
+      usuarios: {},
+      padroes_setor_perfil: {}
+    }
   };
 }
 
@@ -2156,7 +2251,9 @@ module.exports = {
   hasAnyScopeToken,
   hasObraAccess,
   getAreasPermissoesForUser,
+  getPermissoesAreasConfig,
   getPermissoesAreasUsuarios,
+  userHasConfiguredAreaPermissions,
   invalidateFinanceiroAccessConfigCache,
   invalidateObraAccessConfigCache,
   invalidatePermissoesAreasCache,

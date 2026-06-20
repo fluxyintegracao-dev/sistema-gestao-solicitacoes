@@ -14,10 +14,72 @@ const {
   listarTitulos,
   listarTitulosPorSolicitacao
 } = require('../services/tituloFinanceiroService');
+const { userHasAreaPermission } = require('../services/authorizationService');
 const { responderErroController } = require('../utils/controllerError');
+
+const PERMISSAO_PAGAMENTOS_BANCARIOS = 'financeiro.titulos.pagamentos_bancarios.visualizar';
+const PERMISSAO_MOVIMENTOS_FINANCEIROS = 'financeiro.titulos.movimentos.visualizar';
+const PERMISSAO_AUDITORIA_FINANCEIRA = 'financeiro.titulos.auditoria.visualizar';
+const PAYMENT_INTENT_INACTIVE_STATUSES = ['CANCELADO', 'REJEITADO', 'REJEITADO_BANCO'];
 
 function responderErro(res, error, fallbackMessage) {
   return responderErroController(res, error, fallbackMessage);
+}
+
+function toPlainObject(instance) {
+  if (!instance) return instance;
+  if (typeof instance.toJSON === 'function') {
+    return instance.toJSON();
+  }
+  return { ...instance };
+}
+
+function countMovimentosAtivos(movimentos) {
+  return Array.isArray(movimentos)
+    ? movimentos.filter((item) => String(item?.status || '').trim().toUpperCase() === 'ATIVO').length
+    : 0;
+}
+
+function countPagamentosAtivos(paymentIntents) {
+  return Array.isArray(paymentIntents)
+    ? paymentIntents.filter((intent) => {
+        const status = String(intent?.status || '').trim().toUpperCase();
+        return !PAYMENT_INTENT_INACTIVE_STATUSES.includes(status);
+      }).length
+    : 0;
+}
+
+async function filtrarDetalheTituloPorPermissoes(req, titulo) {
+  const payload = toPlainObject(titulo);
+  const movimentos = Array.isArray(payload?.movimentos) ? payload.movimentos : [];
+  const paymentIntents = Array.isArray(payload?.paymentIntents) ? payload.paymentIntents : [];
+
+  const [
+    podeVerPagamentosBancarios,
+    podeVerMovimentosFinanceiros,
+    podeVerAuditoriaFinanceira
+  ] = await Promise.all([
+    userHasAreaPermission(req.user, [PERMISSAO_PAGAMENTOS_BANCARIOS]),
+    userHasAreaPermission(req.user, [PERMISSAO_MOVIMENTOS_FINANCEIROS]),
+    userHasAreaPermission(req.user, [PERMISSAO_AUDITORIA_FINANCEIRA])
+  ]);
+
+  payload.movimentos_ativos_count = countMovimentosAtivos(movimentos);
+  payload.payment_intents_ativos_count = countPagamentosAtivos(paymentIntents);
+  payload.permissoes_detalhe = {
+    pagamentos_bancarios: podeVerPagamentosBancarios,
+    movimentos_financeiros: podeVerMovimentosFinanceiros,
+    auditoria_financeira: podeVerAuditoriaFinanceira
+  };
+
+  if (!podeVerPagamentosBancarios) {
+    delete payload.paymentIntents;
+  }
+  if (!podeVerMovimentosFinanceiros) {
+    delete payload.movimentos;
+  }
+
+  return payload;
 }
 
 module.exports = {
@@ -34,7 +96,8 @@ module.exports = {
   async show(req, res) {
     try {
       const titulo = await carregarTituloPorId(req, req.params.id, { includeMovimentos: true });
-      return res.json(titulo);
+      const payload = await filtrarDetalheTituloPorPermissoes(req, titulo);
+      return res.json(payload);
     } catch (error) {
       console.error(error);
       return responderErro(res, error, 'Erro ao buscar titulo financeiro');
@@ -43,6 +106,10 @@ module.exports = {
 
   async auditoria(req, res) {
     try {
+      const podeVerAuditoriaFinanceira = await userHasAreaPermission(req.user, [PERMISSAO_AUDITORIA_FINANCEIRA]);
+      if (!podeVerAuditoriaFinanceira) {
+        return res.status(403).json({ error: 'Acesso negado a auditoria financeira do titulo' });
+      }
       const auditoria = await listarAuditoriaTitulo(req, req.params.id);
       return res.json(auditoria);
     } catch (error) {

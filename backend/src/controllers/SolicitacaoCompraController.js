@@ -1394,7 +1394,7 @@ module.exports = {
         return `${entry.item.quantidade}x ${nome}`;
       });
       const resumoItensManuais = itensManuaisPreparados.map((entry) => `${entry.item.quantidade}x ${entry.item.nome_manual} [manual]`);
-      const resumoItens = [...resumoItensNormais, ...resumoItensManuais].join(', ');
+      const resumoItens = '';
 
       const descricao = [
         'Solicitação de Compra',

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { buscarParceiros } from '../../services/parceiros';
 import { getEmpresasGrupo } from '../../services/empresasGrupo';
+import { getObras } from '../../services/obras';
 import { formatCurrencyInput, normalizeCurrencyTyping } from '../../utils/formatters';
 import {
   gerarContaPorSolicitacao,
@@ -36,6 +37,22 @@ function formatDate(value) {
   const date = new Date(`${value}T00:00:00`);
   if (Number.isNaN(date.getTime())) return '-';
   return date.toLocaleDateString('pt-BR');
+}
+
+function limparDescricaoTituloCompra(value) {
+  const texto = String(value || '').trim();
+  if (!texto) return texto;
+  if (normalizeSearchText(texto).includes('solicitacao de compra')) {
+    return texto
+      .replace(/\s+(Itens|Items):[\s\S]*$/i, '')
+      .replace(/\s+-\s*$/g, '')
+      .trim() || 'Solicitacao de compra';
+  }
+  if (!/solicita[cç][aã]o de compra/i.test(texto)) return texto;
+  return texto
+    .replace(/\s+(Itens|Items):[\s\S]*$/i, '')
+    .replace(/\s+-\s*$/g, '')
+    .trim() || 'Solicitacao de compra';
 }
 
 function normalizeSearchText(value) {
@@ -171,6 +188,8 @@ function buildParcelasDetalhadas(
 function createPagamento(solicitacao, valor = '') {
   return {
     id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    parceiro_id: solicitacao?.parceiro?.id ? String(solicitacao.parceiro.id) : '',
+    parceiro_nome: solicitacao?.parceiro?.nome || '',
     valor,
     data_vencimento: solicitacao?.data_vencimento || today(),
     competencia_data: '',
@@ -179,6 +198,17 @@ function createPagamento(solicitacao, valor = '') {
     quantidade_parcelas: '1',
     data_compra: today(),
     parcelas: []
+  };
+}
+
+function createRateio(valor = '') {
+  return {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    obra_id: '',
+    tipo_rateio: 'PERCENTUAL',
+    percentual: '',
+    valor_rateio: valor,
+    observacoes: ''
   };
 }
 
@@ -208,6 +238,7 @@ function buildDefaultForm(solicitacao) {
     elimina_consolidado: true,
     transferencia_interna: true,
     parcelas: [],
+    rateios: [],
     pagamentos: [createPagamento(solicitacao, valorSolicitacao)]
   };
 }
@@ -235,6 +266,84 @@ function SearchIcon() {
       <circle cx="11" cy="11" r="8" />
       <path d="m21 21-4.3-4.3" />
     </svg>
+  );
+}
+
+function ParceiroPagamentoField({ pagamento, pagamentoIndex, onSelect }) {
+  const [search, setSearch] = useState('');
+  const [options, setOptions] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!search || search.trim().length < 2) {
+      setOptions([]);
+      setLoading(false);
+      return undefined;
+    }
+
+    let active = true;
+    setLoading(true);
+    const timer = setTimeout(() => {
+      buscarParceiros({ q: search, limit: 6 })
+        .then((data) => {
+          if (!active) return;
+          setOptions(Array.isArray(data) ? data : []);
+        })
+        .catch(() => {
+          if (!active) return;
+          setOptions([]);
+        })
+        .finally(() => {
+          if (active) setLoading(false);
+        });
+    }, 250);
+
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [search]);
+
+  return (
+    <div className="relative text-sm">
+      <span className="mb-1 block text-slate-500">Credor deste titulo</span>
+      <input
+        className="input w-full"
+        type="text"
+        placeholder={pagamento?.parceiro_nome || 'Buscar credor por nome ou CPF/CNPJ'}
+        value={search}
+        onChange={(event) => setSearch(event.target.value)}
+      />
+      {pagamento?.parceiro_nome && (
+        <div className="mt-1 text-xs text-slate-500">
+          Selecionado: {pagamento.parceiro_nome}
+        </div>
+      )}
+      {loading && (
+        <div className="mt-1 text-xs text-slate-500">Buscando parceiros...</div>
+      )}
+      {options.length > 0 && (
+        <div className="absolute left-0 right-0 top-full z-20 mt-2 max-h-52 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-lg">
+          {options.map((partner) => (
+            <button
+              key={partner.id}
+              type="button"
+              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-left text-sm hover:bg-slate-50"
+              onClick={() => {
+                onSelect(pagamentoIndex, partner);
+                setSearch('');
+                setOptions([]);
+              }}
+            >
+              <div className="font-medium text-[var(--c-text)]">{partner.nome}</div>
+              <div className="text-xs text-slate-500">
+                {partner.cpf_cnpj || '-'} {partner.telefone ? `- ${partner.telefone}` : ''}
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -344,6 +453,8 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
   const [formasPagamento, setFormasPagamento] = useState([]);
   const [cartoes, setCartoes] = useState([]);
   const [empresasGrupo, setEmpresasGrupo] = useState([]);
+  const [obras, setObras] = useState([]);
+  const [loadingObras, setLoadingObras] = useState(false);
   const [loadingPagamento, setLoadingPagamento] = useState(false);
   const [geracaoMultiplaTitulos, setGeracaoMultiplaTitulos] = useState(false);
 
@@ -429,6 +540,27 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
       })
       .finally(() => {
         if (active) setLoadingCategorias(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [modalOpen]);
+
+  useEffect(() => {
+    if (!modalOpen) return undefined;
+
+    let active = true;
+    setLoadingObras(true);
+    getObras()
+      .then((data) => {
+        if (active) setObras(Array.isArray(data) ? data : []);
+      })
+      .catch(() => {
+        if (active) setObras([]);
+      })
+      .finally(() => {
+        if (active) setLoadingObras(false);
       });
 
     return () => {
@@ -540,6 +672,20 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
   const valorSolicitacao = useMemo(() => roundCurrency(currencyToNumber(form.valor)), [form.valor]);
   const diferencaPagamentos = useMemo(() => roundCurrency(valorSolicitacao - totalPagamentos), [valorSolicitacao, totalPagamentos]);
   const totalBateComSolicitacao = Math.abs(diferencaPagamentos) <= 0.009;
+  const totalRateioValor = useMemo(() => {
+    return roundCurrency((form.rateios || []).reduce((acc, rateio) => {
+      if (rateio.tipo_rateio === 'VALOR') return acc + currencyToNumber(rateio.valor_rateio);
+      return acc + (valorSolicitacao * currencyToNumber(rateio.percentual) / 100);
+    }, 0));
+  }, [form.rateios, valorSolicitacao]);
+  const totalRateioPercentual = useMemo(() => {
+    return roundCurrency((form.rateios || []).reduce((acc, rateio) => {
+      if (rateio.tipo_rateio === 'PERCENTUAL') return acc + currencyToNumber(rateio.percentual);
+      return acc + (valorSolicitacao > 0 ? (currencyToNumber(rateio.valor_rateio) / valorSolicitacao) * 100 : 0);
+    }, 0));
+  }, [form.rateios, valorSolicitacao]);
+  const totalRateioValido = (form.rateios || []).length === 0
+    || (Math.abs(totalRateioValor - valorSolicitacao) <= 0.02 && Math.abs(totalRateioPercentual - 100) <= 0.02);
 
   const categoriasAutocomplete = useMemo(() => {
     if (!categoriaSearch.trim() || selectedCategory) {
@@ -574,6 +720,25 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
       };
       return { ...current, pagamentos };
     });
+  }
+
+  function selecionarParceiroPagamento(index, partner) {
+    updatePagamento(index, {
+      parceiro_id: partner?.id ? String(partner.id) : '',
+      parceiro_nome: partner?.nome || ''
+    });
+  }
+
+  function aplicarCredorPadraoNosPagamentos(partner) {
+    setForm((current) => ({
+      ...current,
+      parceiro_id: partner?.id ? String(partner.id) : '',
+      pagamentos: (current.pagamentos || []).map((pagamento) => ({
+        ...pagamento,
+        parceiro_id: partner?.id ? String(partner.id) : pagamento.parceiro_id,
+        parceiro_nome: partner?.nome || pagamento.parceiro_nome
+      }))
+    }));
   }
 
   function updateFormaPagamento(index, formaPagamentoId) {
@@ -661,7 +826,10 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
   function adicionarPagamento() {
     setForm((current) => ({
       ...current,
-      pagamentos: [...(current.pagamentos || []), createPagamento(solicitacao)]
+      pagamentos: [
+        ...(current.pagamentos || []),
+        createPagamento({ ...solicitacao, parceiro: selectedPartner || solicitacao?.parceiro })
+      ]
     }));
   }
 
@@ -691,12 +859,38 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
     });
   }
 
+  function adicionarRateio() {
+    setForm((current) => ({
+      ...current,
+      rateios: [...(current.rateios || []), createRateio()]
+    }));
+  }
+
+  function updateRateio(index, field, value) {
+    setForm((current) => {
+      const rateios = [...(current.rateios || [])];
+      const rateio = rateios[index] || createRateio();
+      rateios[index] = {
+        ...rateio,
+        [field]: value
+      };
+      return { ...current, rateios };
+    });
+  }
+
+  function removerRateio(index) {
+    setForm((current) => ({
+      ...current,
+      rateios: (current.rateios || []).filter((_, itemIndex) => itemIndex !== index)
+    }));
+  }
+
   function validarGeracaoConta() {
     if (!form.empresa_id) {
       return 'A obra/centro de custo da solicitacao nao possui empresa vinculada.';
     }
 
-    if (!selectedPartner?.id && !form.parceiro_id) {
+    if (!geracaoMultiplaTitulos && !selectedPartner?.id && !form.parceiro_id) {
       return 'Selecione o credor antes de gerar a conta.';
     }
 
@@ -721,6 +915,10 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
       const usaCartao = isFormaCartao(forma);
       const valorPagamento = getValorPagamento(pagamento);
       const labelForma = `forma de pagamento ${pagamentoIndex + 1}`;
+
+      if (geracaoMultiplaTitulos && !pagamento.parceiro_id) {
+        return `Selecione o credor do titulo ${pagamentoIndex + 1}.`;
+      }
 
       if (valorPagamento <= 0) {
         return `Informe o valor da ${labelForma}.`;
@@ -762,6 +960,25 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
     if (!totalBateComSolicitacao) {
       const direcao = diferencaPagamentos > 0 ? 'faltam' : 'sobram';
       return `A soma das formas de pagamento precisa ser igual ao valor da solicitacao. Valor da solicitacao: ${formatCurrency(valorSolicitacao)}. Total informado: ${formatCurrency(totalPagamentos)}. Ainda ${direcao} ${formatCurrency(Math.abs(diferencaPagamentos))}.`;
+    }
+
+    const rateios = Array.isArray(form.rateios) ? form.rateios : [];
+    if (rateios.length > 0) {
+      for (const [rateioIndex, rateio] of rateios.entries()) {
+        if (!rateio.obra_id) {
+          return `Selecione a obra/centro de custo do rateio ${rateioIndex + 1}.`;
+        }
+        if (rateio.tipo_rateio === 'VALOR' && currencyToNumber(rateio.valor_rateio) <= 0) {
+          return `Informe o valor do rateio ${rateioIndex + 1}.`;
+        }
+        if (rateio.tipo_rateio === 'PERCENTUAL' && currencyToNumber(rateio.percentual) <= 0) {
+          return `Informe o percentual do rateio ${rateioIndex + 1}.`;
+        }
+      }
+
+      if (!totalRateioValido) {
+        return `O rateio precisa fechar 100% ou ${formatCurrency(valorSolicitacao)}. Total atual: ${formatCurrency(totalRateioValor)} (${totalRateioPercentual.toFixed(2)}%).`;
+      }
     }
 
     if (form.intercompany) {
@@ -808,10 +1025,19 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
         intercompany_group_id: form.intercompany ? form.intercompany_group_id || undefined : undefined,
         elimina_consolidado: form.intercompany ? Boolean(form.elimina_consolidado) : false,
         transferencia_interna: form.intercompany ? Boolean(form.transferencia_interna) : false,
+        tipo_rateio: form.rateios?.[0]?.tipo_rateio || undefined,
+        rateios: (form.rateios || []).map((rateio) => ({
+          obra_id: rateio.obra_id ? Number(rateio.obra_id) : undefined,
+          tipo_rateio: rateio.tipo_rateio || 'PERCENTUAL',
+          percentual: rateio.tipo_rateio === 'PERCENTUAL' ? rateio.percentual : undefined,
+          valor_rateio: rateio.tipo_rateio === 'VALOR' ? rateio.valor_rateio : undefined,
+          observacoes: rateio.observacoes || undefined
+        })),
         pagamentos: (form.pagamentos || []).map((pagamento) => {
           const forma = getFormaPagamento(pagamento.forma_pagamento_id);
           const usaDetalhe = formaUsaParcelasDetalhadas(forma);
           return {
+            parceiro_id: geracaoMultiplaTitulos ? pagamento.parceiro_id || undefined : undefined,
             valor: usaDetalhe ? undefined : pagamento.valor,
             forma_pagamento_id: pagamento.forma_pagamento_id || undefined,
             cartao_id: pagamento.cartao_id || undefined,
@@ -910,7 +1136,7 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
                 <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
                   <div>
                     <Link className="font-medium text-blue-600 hover:underline" to={`/financeiro/titulos/${titulo.id}`}>
-                      {titulo.descricao || `${titulo.tipo} #${titulo.id}`}
+                      {limparDescricaoTituloCompra(titulo.descricao) || `${titulo.tipo} #${titulo.id}`}
                     </Link>
                     <div className="text-[var(--c-muted)]">
                       {titulo.parceiro?.nome || '-'} - vencimento {formatDate(titulo.data_vencimento)}
@@ -997,7 +1223,7 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
                           className="w-full rounded-xl border border-slate-200 px-3 py-2 text-left text-sm hover:bg-slate-50"
                           onClick={() => {
                             setSelectedPartner(partner);
-                            setForm((current) => ({ ...current, parceiro_id: String(partner.id) }));
+                            aplicarCredorPadraoNosPagamentos(partner);
                             setPartnerSearch('');
                             setPartnerOptions([]);
                           }}
@@ -1119,6 +1345,101 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
                 </span>
               </label>
 
+              <div className="space-y-3 rounded-2xl border border-[var(--c-border)] bg-[var(--c-bg)] p-3">
+                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                  <div>
+                    <div className="text-sm font-semibold text-[var(--c-text)]">Rateio por obra/centro de custo</div>
+                    <div className="text-xs text-[var(--c-muted)]">
+                      Opcional. Use quando o titulo precisa compor mais de uma obra nos relatorios financeiros.
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                      totalRateioValido ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
+                    }`}>
+                      {(form.rateios || []).length === 0
+                        ? 'Sem rateio'
+                        : `${formatCurrency(totalRateioValor)} - ${totalRateioPercentual.toFixed(2)}%`}
+                    </span>
+                    <button type="button" className="btn btn-outline" onClick={adicionarRateio}>
+                      Adicionar rateio
+                    </button>
+                  </div>
+                </div>
+
+                {(form.rateios || []).length > 0 && (
+                  <div className="space-y-3">
+                    {(form.rateios || []).map((rateio, rateioIndex) => (
+                      <div key={rateio.id || rateioIndex} className="grid gap-3 rounded-xl border border-slate-200 bg-white p-3 md:grid-cols-2 xl:grid-cols-12">
+                        <label className="text-sm xl:col-span-4">
+                          <span className="mb-1 block text-slate-500">Obra/centro de custo</span>
+                          <select
+                            className="input w-full"
+                            value={rateio.obra_id}
+                            onChange={(event) => updateRateio(rateioIndex, 'obra_id', event.target.value)}
+                          >
+                            <option value="">{loadingObras ? 'Carregando...' : 'Selecione'}</option>
+                            {obras.map((obra) => (
+                              <option key={obra.id} value={obra.id}>
+                                {obra.codigo ? `${obra.codigo} - ${obra.nome}` : obra.nome}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className="text-sm xl:col-span-2">
+                          <span className="mb-1 block text-slate-500">Tipo</span>
+                          <select
+                            className="input w-full"
+                            value={rateio.tipo_rateio}
+                            onChange={(event) => updateRateio(rateioIndex, 'tipo_rateio', event.target.value)}
+                          >
+                            <option value="PERCENTUAL">Percentual</option>
+                            <option value="VALOR">Valor</option>
+                          </select>
+                        </label>
+                        {rateio.tipo_rateio === 'VALOR' ? (
+                          <label className="text-sm xl:col-span-2">
+                            <span className="mb-1 block text-slate-500">Valor</span>
+                            <input
+                              className="input w-full"
+                              placeholder="R$ 0,00"
+                              value={rateio.valor_rateio}
+                              onChange={(event) => updateRateio(rateioIndex, 'valor_rateio', normalizeCurrencyTyping(event.target.value))}
+                              onBlur={(event) => updateRateio(rateioIndex, 'valor_rateio', formatCurrencyInput(event.target.value))}
+                            />
+                          </label>
+                        ) : (
+                          <label className="text-sm xl:col-span-2">
+                            <span className="mb-1 block text-slate-500">Percentual</span>
+                            <input
+                              className="input w-full"
+                              inputMode="decimal"
+                              placeholder="0,00"
+                              value={rateio.percentual}
+                              onChange={(event) => updateRateio(rateioIndex, 'percentual', event.target.value)}
+                            />
+                          </label>
+                        )}
+                        <label className="text-sm xl:col-span-3">
+                          <span className="mb-1 block text-slate-500">Observacoes</span>
+                          <input
+                            className="input w-full"
+                            placeholder="Opcional"
+                            value={rateio.observacoes}
+                            onChange={(event) => updateRateio(rateioIndex, 'observacoes', event.target.value)}
+                          />
+                        </label>
+                        <div className="flex items-end xl:col-span-1">
+                          <button type="button" className="btn btn-outline w-full" onClick={() => removerRateio(rateioIndex)}>
+                            Remover
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               <div className="financeiro-formas-pagamento space-y-3 rounded-2xl border border-[var(--c-border)] bg-[var(--c-bg)] p-3">
                 <label className="flex items-center gap-2 text-sm text-[var(--c-text)]">
                   <input
@@ -1226,6 +1547,14 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
                           </button>
                         )}
                       </div>
+
+                      {geracaoMultiplaTitulos && (
+                        <ParceiroPagamentoField
+                          pagamento={pagamento}
+                          pagamentoIndex={pagamentoIndex}
+                          onSelect={selecionarParceiroPagamento}
+                        />
+                      )}
 
                       <div className="grid gap-3 md:grid-cols-2">
                         <label className="text-sm">
