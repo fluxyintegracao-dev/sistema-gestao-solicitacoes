@@ -1079,6 +1079,7 @@ const REPORT_CATALOG = [
     group: 'Caixa',
     description: 'Previsto e realizado por periodo e obra.',
     route: '/financeiro/relatorios',
+    embedded: true,
     component: FluxoCaixaRelatorioConteudo
   },
   {
@@ -1142,6 +1143,7 @@ const REPORT_CATALOG = [
     description: 'Sintetico e analitico de entradas, saidas e permutas por conta.',
     route: '/financeiro/relatorios?relatorio=movimentacao-contas',
     visibilityKey: 'relatorios.financeiro.movimentacao_contas',
+    embedded: true,
     component: MovimentacaoContasRelatorioConteudo
   },
   {
@@ -1151,6 +1153,7 @@ const REPORT_CATALOG = [
     description: 'Sintetico e analitico dos OFX conciliados, pendentes e ignorados.',
     route: '/financeiro/relatorios?relatorio=conciliacao-contas',
     visibilityKey: 'relatorios.financeiro.conciliacao_contas',
+    embedded: true,
     component: ConciliacaoContasRelatorioConteudo
   },
   {
@@ -1211,10 +1214,24 @@ function ReportListItem({ report, active, onClick }) {
   );
 }
 
+function getReportFullScreenRoute(report) {
+  if (!report.embedded) {
+    return report.route;
+  }
+
+  const params = new URLSearchParams({
+    relatorio: report.id,
+    tela: 'inteira'
+  });
+
+  return `/financeiro/relatorios?${params.toString()}`;
+}
+
 export default function FinanceiroRelatorios() {
   const { isVisible } = useUiVisibility();
   const [searchParams, setSearchParams] = useSearchParams();
   const [search, setSearch] = useState('');
+  const isFullScreenMode = searchParams.get('tela') === 'inteira';
 
   const availableReports = useMemo(
     () => REPORT_CATALOG.filter((report) => !report.visibilityKey || isVisible(report.visibilityKey)),
@@ -1239,6 +1256,33 @@ export default function FinanceiroRelatorios() {
 
   function selectReport(report) {
     setSearchParams(report.id === 'fluxo-caixa' ? {} : { relatorio: report.id });
+  }
+
+  if (isFullScreenMode && selectedReport.embedded) {
+    return (
+      <div className="page solicitacoes-page">
+        <div className="app-page-header">
+          <div className="app-page-header-row">
+            <div>
+              <span className="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-500">
+                {selectedReport.group}
+              </span>
+              <h1 className="text-xl font-semibold md:text-2xl">{selectedReport.title}</h1>
+              <p className="page-subtitle">{selectedReport.description}</p>
+            </div>
+            <div className="app-page-actions">
+              <Link to="/financeiro/relatorios" className="btn btn-outline">
+                Voltar para relatorios
+              </Link>
+            </div>
+          </div>
+        </div>
+
+        <Suspense fallback={<div className="app-empty-card">Carregando relatorio...</div>}>
+          <SelectedReportComponent isVisible={isVisible} />
+        </Suspense>
+      </div>
+    );
   }
 
   return (
@@ -1312,7 +1356,7 @@ export default function FinanceiroRelatorios() {
               </span>
               <h2 className="text-lg font-semibold text-slate-950">{selectedReport.title}</h2>
             </div>
-            <Link to={selectedReport.route} className="btn btn-outline btn-sm">
+            <Link to={getReportFullScreenRoute(selectedReport)} className="btn btn-outline btn-sm">
               Abrir tela inteira
             </Link>
           </div>
