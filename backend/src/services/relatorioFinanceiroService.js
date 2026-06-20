@@ -4311,6 +4311,7 @@ async function gerarRelatorioMovimentacaoContas(req, filters = {}) {
 
   const maps = await hydrateFinanceiroMaps({ movimentos });
   const sinteticoMap = new Map();
+  const saldosPorConta = new Map();
   const analitico = movimentos.map((movimento) => {
     const conta = maps.contas.get(Number(movimento.conta_bancaria_id));
     const titulo = maps.titulos.get(Number(movimento.titulo_financeiro_id));
@@ -4320,17 +4321,24 @@ async function gerarRelatorioMovimentacaoContas(req, filters = {}) {
     const valor = Math.abs(toNumber(movimento.valor_quitacao || movimento.valor));
     const classe = classifyMovimentoBancario(movimento, titulo);
     const contaResumo = ensureSinteticoConta(sinteticoMap, conta);
+    const contaKey = Number(movimento.conta_bancaria_id) || `sem-conta-${movimento.id}`;
+    const saldoAnterior = toNumber(saldosPorConta.get(contaKey));
+    let valorMovimento = 0;
 
     contaResumo.movimentos += 1;
     if (classe === 'ENTRADA') {
       contaResumo.entradas += valor;
       contaResumo.saldo_liquido += valor;
+      valorMovimento = valor;
     } else if (classe === 'SAIDA') {
       contaResumo.saidas += valor;
       contaResumo.saldo_liquido -= valor;
+      valorMovimento = -valor;
     } else {
       contaResumo.permutas += valor;
     }
+    const saldoMovimento = roundCurrency(saldoAnterior + valorMovimento);
+    saldosPorConta.set(contaKey, saldoMovimento);
 
     return {
       id: movimento.id,
@@ -4341,6 +4349,8 @@ async function gerarRelatorioMovimentacaoContas(req, filters = {}) {
       tipo_movimento: movimento.tipo_movimento,
       status: movimento.status,
       valor,
+      valor_movimento: roundCurrency(valorMovimento),
+      saldo_movimento: saldoMovimento,
       valor_quitacao: toNumber(movimento.valor_quitacao || movimento.valor),
       juros: toNumber(movimento.juros),
       multa: toNumber(movimento.multa),

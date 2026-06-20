@@ -64,6 +64,10 @@ module.exports = (sequelize, DataTypes) => sequelize.define(
       type: DataTypes.INTEGER,
       allowNull: true
     },
+    conciliacao_bancaria_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true
+    },
     forma_recebimento: {
       type: DataTypes.STRING(30),
       allowNull: true

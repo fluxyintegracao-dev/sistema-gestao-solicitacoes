@@ -855,12 +855,21 @@ function validateFinanceConciliacaoImportBody(body = {}) {
 function validateFinanceConciliacaoConfirmBody(body = {}) {
   ensureAllowedKeys(
     body,
-    ['movimento_financeiro_id'],
+    ['movimento_financeiro_id', 'movimento_financeiro_ids'],
     'Confirmacao de conciliacao bancaria'
   );
 
+  const movimentoIds = Array.isArray(body.movimento_financeiro_ids)
+    ? [...new Set(body.movimento_financeiro_ids
+      .map((id) => parseInteger(id, 'Movimento financeiro'))
+      .filter(Boolean))]
+    : [];
+
   return {
-    movimento_financeiro_id: parseInteger(body.movimento_financeiro_id, 'Movimento financeiro', { required: true })
+    movimento_financeiro_id: movimentoIds.length
+      ? undefined
+      : parseInteger(body.movimento_financeiro_id, 'Movimento financeiro', { required: true }),
+    movimento_financeiro_ids: movimentoIds
   };
 }
 

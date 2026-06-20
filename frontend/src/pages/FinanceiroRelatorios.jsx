@@ -101,6 +101,13 @@ function formatDate(value) {
   return `${day}/${month}/${year}`;
 }
 
+function getCurrencyTone(value) {
+  const numeric = Number(value || 0);
+  if (numeric > 0) return 'text-emerald-700';
+  if (numeric < 0) return 'text-rose-700';
+  return 'text-slate-700';
+}
+
 function normalizeRelatorio(data) {
   if (!data || typeof data !== 'object') {
     return EMPTY_RELATORIO;
@@ -753,8 +760,8 @@ function buildContaReportParams(filters) {
 
 function ContaReportFilters({ filters, setFilters, contas, loading, onSubmit }) {
   return (
-    <form className="card sol-surface-card p-4" onSubmit={onSubmit}>
-      <div className="grid gap-3 md:grid-cols-4">
+    <form className="card sol-surface-card p-4 financeiro-conta-report-filters" onSubmit={onSubmit}>
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <label className="field">
           <span>Periodo</span>
           <select
@@ -885,7 +892,7 @@ function ContaReportShell({ title, subtitle, type }) {
 
       {relatorio ? (
         <>
-          <div className="app-summary-grid">
+          <div className="app-summary-grid app-summary-grid--compact financeiro-report-summary-grid">
             <RelatorioMetric label="Contas" value={resumo.contas || 0} />
             <RelatorioMetric label="Movimentos" value={resumo.movimentos || 0} />
             {type === 'conciliacao' ? (
@@ -904,7 +911,7 @@ function ContaReportShell({ title, subtitle, type }) {
             )}
           </div>
 
-          <section className="card sol-surface-card p-4">
+          <section className="card sol-surface-card p-4 financeiro-report-card">
             <div className="mb-3">
               <h3 className="text-base font-semibold text-slate-950">Sintetico por conta</h3>
               <p className="text-xs text-slate-500">{relatorio.filtro?.descricao || 'Periodo selecionado'}</p>
@@ -920,7 +927,7 @@ function ContaReportShell({ title, subtitle, type }) {
                   { key: 'saldo', width: 150, minWidth: 120 },
                   { key: 'status', width: 220, minWidth: 160 }
                 ]}
-                className="table"
+                className="table financeiro-report-table"
               >
                 <thead>
                   <tr>
@@ -964,23 +971,24 @@ function ContaReportShell({ title, subtitle, type }) {
             </div>
           </section>
 
-          <section className="card sol-surface-card p-4">
+          <section className="card sol-surface-card p-4 financeiro-report-card">
             <h3 className="mb-3 text-base font-semibold text-slate-950">Analitico</h3>
             <div className="table-responsive">
               <ResizableTable
                 storageKey={`financeiro-relatorio-${type}-analitico`}
                 columns={[
                   { key: 'data', width: 120, minWidth: 105 },
-                  { key: 'conta', width: 260, minWidth: 180 },
+                  { key: 'conta', width: 240, minWidth: 170 },
                   { key: 'status', width: 130, minWidth: 110 },
                   { key: 'titulo', width: 150, minWidth: 120 },
-                  { key: 'parceiro', width: 220, minWidth: 160 },
-                  { key: 'obra', width: 180, minWidth: 140 },
-                  { key: 'documento', width: 200, minWidth: 150 },
+                  { key: 'parceiro', width: 200, minWidth: 150 },
+                  { key: 'obra', width: 170, minWidth: 130 },
+                  { key: 'documento', width: 190, minWidth: 145 },
                   { key: 'valor', width: 140, minWidth: 120 },
-                  { key: 'descricao', width: 300, minWidth: 220 }
+                  ...(type === 'movimentacao' ? [{ key: 'saldo', width: 140, minWidth: 120 }] : []),
+                  { key: 'descricao', width: 280, minWidth: 210 }
                 ]}
-                className="table"
+                className="table financeiro-report-table"
               >
                 <thead>
                   <tr>
@@ -991,31 +999,48 @@ function ContaReportShell({ title, subtitle, type }) {
                     <ResizableTh columnKey="parceiro">Cliente/Fornecedor</ResizableTh>
                     <ResizableTh columnKey="obra">Obra</ResizableTh>
                     <ResizableTh columnKey="documento">Documento</ResizableTh>
-                    <ResizableTh columnKey="valor" className="text-right">Valor</ResizableTh>
+                    <ResizableTh columnKey="valor" className="text-right">
+                      {type === 'movimentacao' ? 'Movimento' : 'Valor'}
+                    </ResizableTh>
+                    {type === 'movimentacao' ? (
+                      <ResizableTh columnKey="saldo" className="text-right">Saldo</ResizableTh>
+                    ) : null}
                     <ResizableTh columnKey="descricao">Descricao</ResizableTh>
                   </tr>
                 </thead>
                 <tbody>
                   {analitico.length === 0 ? (
                     <tr>
-                      <td colSpan={9} className="text-center text-slate-500">Nenhum registro encontrado.</td>
+                      <td colSpan={type === 'movimentacao' ? 10 : 9} className="text-center text-slate-500">Nenhum registro encontrado.</td>
                     </tr>
                   ) : (
-                    analitico.map((item) => (
-                      <tr key={item.id}>
-                        <td>{formatDate(item.data_movimento)}</td>
-                        <td>{item.conta}</td>
-                        <td>
-                          <span className="badge badge-soft">{type === 'conciliacao' ? item.status : item.classe}</span>
-                        </td>
-                        <td>{item.titulo_codigo || '-'}</td>
-                        <td>{item.parceiro || '-'}</td>
-                        <td>{item.obra || '-'}</td>
-                        <td>{item.documento || item.ofx_uid || '-'}</td>
-                        <td className="text-right font-semibold">{formatCurrency(item.valor_quitacao ?? item.valor)}</td>
-                        <td>{item.descricao_banco || item.categoria || item.observacoes || '-'}</td>
-                      </tr>
-                    ))
+                    analitico.map((item) => {
+                      const valorMovimento = type === 'movimentacao'
+                        ? Number(item.valor_movimento ?? item.valor_quitacao ?? item.valor)
+                        : Number(item.valor_quitacao ?? item.valor);
+                      return (
+                        <tr key={item.id}>
+                          <td>{formatDate(item.data_movimento)}</td>
+                          <td>{item.conta}</td>
+                          <td>
+                            <span className="badge badge-soft">{type === 'conciliacao' ? item.status : item.classe}</span>
+                          </td>
+                          <td>{item.titulo_codigo || '-'}</td>
+                          <td>{item.parceiro || '-'}</td>
+                          <td>{item.obra || '-'}</td>
+                          <td>{item.documento || item.ofx_uid || '-'}</td>
+                          <td className={`text-right font-semibold ${getCurrencyTone(valorMovimento)}`}>
+                            {formatCurrency(valorMovimento)}
+                          </td>
+                          {type === 'movimentacao' ? (
+                            <td className={`text-right font-semibold ${getCurrencyTone(item.saldo_movimento)}`}>
+                              {formatCurrency(item.saldo_movimento)}
+                            </td>
+                          ) : null}
+                          <td>{item.descricao_banco || item.categoria || item.observacoes || '-'}</td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </ResizableTable>

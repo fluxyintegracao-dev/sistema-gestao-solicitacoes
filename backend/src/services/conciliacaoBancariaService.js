@@ -837,7 +837,28 @@ async function loadUnavailableMovementIds(movimentoIds = [], exceptConciliacaoId
     raw: true
   });
 
-  return new Set(rows.map((item) => Number(item.movimento_financeiro_id || 0)).filter(Boolean));
+  const whereVinculados = {
+    id: { [Op.in]: ids },
+    conciliacao_bancaria_id: { [Op.ne]: null }
+  };
+  if (exceptConciliacaoId) {
+    whereVinculados[Op.and] = [
+      { conciliacao_bancaria_id: { [Op.ne]: null } },
+      { conciliacao_bancaria_id: { [Op.ne]: Number(exceptConciliacaoId) } }
+    ];
+    delete whereVinculados.conciliacao_bancaria_id;
+  }
+
+  const vinculados = await MovimentoFinanceiro.findAll({
+    where: whereVinculados,
+    attributes: ['id'],
+    raw: true
+  });
+
+  return new Set([
+    ...rows.map((item) => Number(item.movimento_financeiro_id || 0)).filter(Boolean),
+    ...vinculados.map((item) => Number(item.id || 0)).filter(Boolean)
+  ]);
 }
 
 async function queryMovimentoCandidates(req, conciliacao, searchFilters = {}) {
@@ -1287,7 +1308,8 @@ async function loadConciliacaoById(req, conciliacaoId) {
   return conciliacao;
 }
 
-async function resolveMovimentoForConciliacao(req, conciliacao, movimentoId) {
+async function resolveMovimentoForConciliacao(req, conciliacao, movimentoId, options = {}) {
+  const validarValor = options.validarValor !== false;
   const parsedMovimentoId = parseInteger(movimentoId, 'Movimento financeiro');
   const movimento = await MovimentoFinanceiro.findByPk(parsedMovimentoId, {
     include: [
@@ -1346,10 +1368,12 @@ async function resolveMovimentoForConciliacao(req, conciliacao, movimentoId) {
     throw createHttpError(400, 'O tipo do titulo nao e compativel com o sinal do lancamento bancario.');
   }
 
-  const valorConciliacao = Math.abs(Number(conciliacao.valor || 0));
-  const valorMovimento = Math.abs(Number(movimento.valor_quitacao || 0));
-  if (Math.abs(valorConciliacao - valorMovimento) > 0.1) {
-    throw createHttpError(400, 'O valor do movimento nao confere com o lancamento bancario importado.');
+  if (validarValor) {
+    const valorConciliacao = Math.abs(Number(conciliacao.valor || 0));
+    const valorMovimento = Math.abs(Number(movimento.valor_quitacao || 0));
+    if (Math.abs(valorConciliacao - valorMovimento) > 0.1) {
+      throw createHttpError(400, 'O valor do movimento nao confere com o lancamento bancario importado.');
+    }
   }
 
   const jaConciliado = await ConciliacaoBancaria.findOne({
@@ -1365,6 +1389,10 @@ async function resolveMovimentoForConciliacao(req, conciliacao, movimentoId) {
 
   if (jaConciliado) {
     throw createHttpError(400, 'Este movimento financeiro ja foi usado em outra conciliacao.');
+  }
+
+  if (movimento.conciliacao_bancaria_id && Number(movimento.conciliacao_bancaria_id) !== Number(conciliacao.id)) {
+    throw createHttpError(400, 'Este movimento financeiro ja esta vinculado a outra conciliacao.');
   }
 
   return movimento;
@@ -1722,6 +1750,10 @@ async function confirmarConciliacaoTarifa(req, conciliacaoId, payload = {}) {
 }
 
 async function finalizarConciliacao(req, conciliacao, movimento, { batch = false } = {}) {
+  await movimento.update({
+    conciliacao_bancaria_id: conciliacao.id
+  });
+
   await conciliacao.update({
     movimento_financeiro_id: movimento.id,
     titulo_financeiro_id: movimento.titulo?.id || null,
@@ -1753,8 +1785,71 @@ async function confirmarConciliacao(req, conciliacaoId, payload = {}) {
     throw createHttpError(400, 'Somente conciliacoes pendentes podem ser confirmadas.');
   }
 
-  const movimento = await resolveMovimentoForConciliacao(req, conciliacao, payload.movimento_financeiro_id);
-  await finalizarConciliacao(req, conciliacao, movimento);
+  const movimentoIds = Array.isArray(payload.movimento_financeiro_ids)
+    ? [...new Set(payload.movimento_financeiro_ids.map((id) => Number(id)).filter(Boolean))]
+    : [];
+
+  if (!movimentoIds.length && payload.movimento_financeiro_id) {
+    movimentoIds.push(Number(payload.movimento_financeiro_id));
+  }
+
+  if (!movimentoIds.length) {
+    throw createHttpError(400, 'Selecione ao menos um movimento financeiro para confirmar a conciliacao.');
+  }
+
+  const isAssociacaoMultipla = movimentoIds.length > 1;
+  const movimentos = [];
+  for (const movimentoId of movimentoIds) {
+    movimentos.push(await resolveMovimentoForConciliacao(req, conciliacao, movimentoId, {
+      validarValor: !isAssociacaoMultipla
+    }));
+  }
+
+  if (isAssociacaoMultipla) {
+    const valorConciliacao = roundCurrency(Math.abs(Number(conciliacao.valor || 0)));
+    const valorMovimentos = roundCurrency(movimentos.reduce((total, movimento) => (
+      total + Math.abs(Number(movimento.valor_quitacao || 0))
+    ), 0));
+
+    if (valorMovimentos > valorConciliacao + 0.01) {
+      throw createHttpError(400, 'A soma dos movimentos selecionados e maior que o valor do lancamento bancario.');
+    }
+
+    if (Math.abs(valorConciliacao - valorMovimentos) > 0.01) {
+      throw createHttpError(400, 'A soma dos movimentos selecionados precisa fechar com o valor do lancamento bancario.');
+    }
+  }
+
+  const movimentoPrincipal = movimentos[0];
+  await Promise.all(movimentos.map((movimento) => movimento.update({
+    conciliacao_bancaria_id: conciliacao.id
+  })));
+
+  await conciliacao.update({
+    movimento_financeiro_id: movimentoPrincipal.id,
+    titulo_financeiro_id: movimentoPrincipal.titulo?.id || null,
+    status: 'CONCILIADO',
+    confirmado_por: req.user?.id || null,
+    confirmado_em: new Date()
+  });
+
+  await registrarEventoSeguranca({
+    req,
+    usuarioId: req.user?.id || null,
+    tipoEvento: isAssociacaoMultipla ? 'FINANCIAL_BANK_RECONCILED_MULTIPLE' : 'FINANCIAL_BANK_RECONCILED',
+    recursoTipo: 'CONCILIACAO_BANCARIA',
+    recursoId: conciliacao.id,
+    status: 'SUCCESS',
+    descricao: isAssociacaoMultipla
+      ? 'Lancamento bancario conciliado manualmente com multiplos movimentos'
+      : 'Lancamento bancario conciliado manualmente',
+    metadata: {
+      movimento_financeiro_id: movimentoPrincipal.id,
+      movimento_financeiro_ids: movimentos.map((movimento) => movimento.id),
+      titulo_financeiro_id: movimentoPrincipal.titulo?.id || null,
+      titulo_financeiro_ids: movimentos.map((movimento) => movimento.titulo?.id || null).filter(Boolean)
+    }
+  });
 
   return loadConciliacaoById(req, conciliacao.id);
 }

@@ -114,6 +114,31 @@ function buildAssociacaoDefaults(item) {
   };
 }
 
+function valorAbsolutoMovimentoAssociacao(item) {
+  return Math.abs(Number(item?.valor_quitacao || item?.valor || 0));
+}
+
+function buildAssociacaoResumo(modal) {
+  const selecionados = Array.isArray(modal?.selecionados)
+    ? modal.selecionados.map(Number).filter(Boolean)
+    : [];
+  const itens = Array.isArray(modal?.dados?.itens) ? modal.dados.itens : [];
+  const totalSelecionado = itens
+    .filter((item) => selecionados.includes(Number(item.movimento_financeiro_id || 0)))
+    .reduce((total, item) => total + valorAbsolutoMovimentoAssociacao(item), 0);
+  const valorEsperado = Math.abs(Number(modal?.item?.valor || 0));
+  const diferenca = valorEsperado - totalSelecionado;
+
+  return {
+    selecionados,
+    totalSelecionado,
+    valorEsperado,
+    diferenca,
+    ultrapassou: totalSelecionado > valorEsperado + 0.01,
+    fechou: selecionados.length > 0 && Math.abs(diferenca) <= 0.01
+  };
+}
+
 // ─── ícones ───────────────────────────────────────────────────────────────────
 
 function getContaEmpresaId(conta) {
@@ -181,6 +206,15 @@ function PlusIcon({ className = 'h-4 w-4' }) {
   );
 }
 
+function LinkIcon({ className = 'h-4 w-4' }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className} aria-hidden="true">
+      <path d="M10 13a5 5 0 0 0 7.1.1l2-2a5 5 0 0 0-7.1-7.1l-1.1 1.1" />
+      <path d="M14 11a5 5 0 0 0-7.1-.1l-2 2A5 5 0 0 0 12 20l1.1-1.1" />
+    </svg>
+  );
+}
+
 // ─── ValorBanco ───────────────────────────────────────────────────────────────
 
 function ValorBanco({ value, size = 'lg' }) {
@@ -195,7 +229,7 @@ function ValorBanco({ value, size = 'lg' }) {
 
 // ─── NovoTituloRapidoModal ────────────────────────────────────────────────────
 
-function AcoesRapidasConciliacaoModal({ item, tarifas, processingId, onClose, onNovoTitulo, onConfirmarTarifa }) {
+function AcoesRapidasConciliacaoModal({ item, tarifas, processingId, error, onClose, onNovoTitulo, onConfirmarTarifa }) {
   const tarifasAtivas = Array.isArray(tarifas) ? tarifas.filter((tarifa) => tarifa.ativo !== false) : [];
   const isSaida = Number(item?.valor || 0) < 0;
 
@@ -246,7 +280,7 @@ function AcoesRapidasConciliacaoModal({ item, tarifas, processingId, onClose, on
                     key={tarifa.codigo}
                     type="button"
                     className="btn btn-outline btn-sm"
-                    disabled={!isSaida || processingId === key}
+                    disabled={!isSaida || !elegibilidade.ok || processingId === key}
                     onClick={() => onConfirmarTarifa(item, tarifa)}
                     title={!isSaida ? 'Tarifas bancarias devem ser lancamentos de saida.' : elegibilidade.motivo}
                   >
@@ -255,6 +289,11 @@ function AcoesRapidasConciliacaoModal({ item, tarifas, processingId, onClose, on
                 );
               })}
             </div>
+            {error ? (
+              <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-medium text-rose-700">
+                {error}
+              </div>
+            ) : null}
           </div>
         </div>
       </div>
@@ -262,7 +301,16 @@ function AcoesRapidasConciliacaoModal({ item, tarifas, processingId, onClose, on
   );
 }
 
-function AssociacaoManualTabela({ loading, itens, modal, processingId, onAssociar }) {
+function AssociacaoManualTabela({
+  loading,
+  itens,
+  modal,
+  processingId,
+  selecionados = [],
+  totalSelecionado = 0,
+  valorEsperado = 0,
+  onToggleSelecionado
+}) {
   if (loading) {
     return <div className="px-4 py-8 text-center text-sm text-[var(--c-muted)]">Carregando movimentos...</div>;
   }
@@ -275,6 +323,7 @@ function AssociacaoManualTabela({ loading, itens, modal, processingId, onAssocia
     <table className="min-w-full divide-y divide-[var(--c-border)] text-sm">
       <thead className="bg-[var(--c-surface-muted)] text-xs uppercase tracking-[0.12em] text-[var(--c-muted)]">
         <tr>
+          <th className="px-4 py-3 text-left">Sel.</th>
           <th className="px-4 py-3 text-left">Titulo</th>
           <th className="px-4 py-3 text-left">Parceiro</th>
           <th className="px-4 py-3 text-left">Tipo</th>
@@ -282,15 +331,29 @@ function AssociacaoManualTabela({ loading, itens, modal, processingId, onAssocia
           <th className="px-4 py-3 text-right">Valor</th>
           <th className="px-4 py-3 text-left">Documento</th>
           <th className="px-4 py-3 text-center">Score</th>
-          <th className="px-4 py-3 text-right">Acao</th>
+          <th className="px-4 py-3 text-center">Acao</th>
         </tr>
       </thead>
       <tbody className="divide-y divide-[var(--c-border)] bg-white dark:bg-[var(--c-surface)]">
         {itens.map((it) => {
-          const processingKey = `confirmar-${modal.item?.id}-${it.movimento_financeiro_id}`;
+          const id = Number(it.movimento_financeiro_id || 0);
+          const selected = selecionados.includes(id);
+          const valor = Math.abs(Number(it.valor_quitacao || 0));
+          const ultrapassa = !selected && totalSelecionado + valor > valorEsperado + 0.01;
+          const processingKey = `confirmar-${modal.item?.id}-${selecionados.join('-') || id}`;
           const processing = modal.processing || processingId === processingKey;
           return (
-            <tr key={it.movimento_financeiro_id} className="align-top">
+            <tr key={it.movimento_financeiro_id} className={`align-top ${selected ? 'bg-blue-50/60 dark:bg-blue-900/10' : ''}`}>
+              <td className="px-4 py-3">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 rounded border-[var(--c-border)] text-blue-600"
+                  checked={selected}
+                  disabled={processing || ultrapassa}
+                  title={ultrapassa ? 'Selecionar este movimento ultrapassa o valor do extrato.' : 'Selecionar movimento'}
+                  onChange={() => onToggleSelecionado(id)}
+                />
+              </td>
               <td className="px-4 py-3 font-medium text-[var(--c-text)]">
                 <div>{it.titulo_descricao || '-'}</div>
                 {it.motivos?.length > 0 && (
@@ -307,9 +370,20 @@ function AssociacaoManualTabela({ loading, itens, modal, processingId, onAssocia
               <td className="px-4 py-3 text-right font-semibold text-[var(--c-text)]">{formatCurrency(it.valor_quitacao)}</td>
               <td className="px-4 py-3 text-[var(--c-muted)]">{it.documento || `mov. #${it.movimento_financeiro_id}`}</td>
               <td className="px-4 py-3 text-center text-xs uppercase tracking-wide text-[var(--c-muted)]">{it.score || 0}</td>
-              <td className="px-4 py-3 text-right">
-                <button type="button" className="btn btn-primary btn-sm" disabled={processing} onClick={() => onAssociar(modal.item?.id, it.movimento_financeiro_id, { fecharModal: true })}>
-                  {processing ? 'Associando...' : 'Associar'}
+              <td className="px-4 py-3 text-center">
+                <button
+                  type="button"
+                  className={`inline-flex h-9 w-9 items-center justify-center rounded-xl border transition ${
+                    selected
+                      ? 'border-blue-500 bg-blue-600 text-white'
+                      : 'border-[var(--c-border)] bg-white text-[var(--c-text)] hover:border-blue-400 hover:text-blue-700'
+                  } disabled:cursor-not-allowed disabled:opacity-40`}
+                  disabled={processing || ultrapassa}
+                  title={selected ? 'Remover da associacao' : ultrapassa ? 'Ultrapassa o valor do extrato' : 'Selecionar para associar'}
+                  aria-label={selected ? 'Remover da associacao' : 'Selecionar para associar'}
+                  onClick={() => onToggleSelecionado(id)}
+                >
+                  <LinkIcon className="h-4 w-4" />
                 </button>
               </td>
             </tr>
@@ -1203,10 +1277,12 @@ export default function FinanceiroConciliacao() {
   const [feedback, setFeedback] = useState('');
   const [processingId, setProcessingId] = useState(null);
   const [acoesRapidasItem, setAcoesRapidasItem] = useState(null);
+  const [acoesRapidasError, setAcoesRapidasError] = useState('');
   const [novoTituloItem, setNovoTituloItem] = useState(null); // item OFX para o modal de novo título
   const [associacaoModal, setAssociacaoModal] = useState({
     open: false, item: null, filters: buildAssociacaoDefaults(null),
     loading: false, processing: false, error: '',
+    selecionados: [],
     dados: { conciliacao: null, meta: { total: 0, limit: 30 }, itens: [] }
   });
   const [faturaModal, setFaturaModal] = useState({
@@ -1441,22 +1517,31 @@ export default function FinanceiroConciliacao() {
     await carregarConciliacoes();
   }
 
-  async function handleConfirmar(conciliacaoId, movimentoId, { fecharModal = false } = {}) {
+  async function handleConfirmar(conciliacaoId, movimentoIdOrIds, { fecharModal = false } = {}) {
     // Se conciliacaoId for null, apenas recarrega (fluxo do novo título sem movimento_id)
     if (!conciliacaoId) { await carregarConciliacoes(); return; }
-    if (!Number.isInteger(Number(movimentoId)) || Number(movimentoId) <= 0) {
+    const movimentoIds = Array.isArray(movimentoIdOrIds)
+      ? [...new Set(movimentoIdOrIds.map((id) => Number(id)).filter(Boolean))]
+      : [Number(movimentoIdOrIds)].filter(Boolean);
+    if (!movimentoIds.length) {
       const message = 'Selecione um movimento financeiro valido para confirmar a conciliacao.';
       if (fecharModal) setAssociacaoModal((c) => ({ ...c, processing: false, error: message }));
       else setError(message);
       return;
     }
     try {
-      setProcessingId(`confirmar-${conciliacaoId}-${movimentoId}`);
+      const processingKey = `confirmar-${conciliacaoId}-${movimentoIds.join('-')}`;
+      setProcessingId(processingKey);
       setError(''); setFeedback('');
       if (fecharModal) setAssociacaoModal((c) => ({ ...c, processing: true, error: '' }));
-      await confirmarConciliacaoBancaria(conciliacaoId, { movimento_financeiro_id: movimentoId });
+      await confirmarConciliacaoBancaria(
+        conciliacaoId,
+        movimentoIds.length > 1
+          ? { movimento_financeiro_ids: movimentoIds }
+          : { movimento_financeiro_id: movimentoIds[0] }
+      );
       setFeedback('Conciliacao confirmada com sucesso.');
-      if (fecharModal) setAssociacaoModal((c) => ({ ...c, open: false, processing: false, error: '', dados: { conciliacao: null, meta: { total: 0, limit: 30 }, itens: [] } }));
+      if (fecharModal) setAssociacaoModal((c) => ({ ...c, open: false, processing: false, error: '', selecionados: [], dados: { conciliacao: null, meta: { total: 0, limit: 30 }, itens: [] } }));
       await carregarConciliacoes();
     } catch (err) {
       const message = err?.message || 'Erro ao confirmar conciliacao';
@@ -1501,26 +1586,71 @@ export default function FinanceiroConciliacao() {
 
   async function carregarMovimentosAssociacao(conciliacaoId, filtersPayload, { manterAberto = true } = {}) {
     try {
-      setAssociacaoModal((c) => ({ ...c, open: manterAberto, loading: true, error: '', filters: filtersPayload || c.filters }));
+      setAssociacaoModal((c) => ({ ...c, open: manterAberto, loading: true, error: '', selecionados: [], filters: filtersPayload || c.filters }));
       const response = await getMovimentosAssociacaoConciliacao(conciliacaoId, filtersPayload);
-      setAssociacaoModal((c) => ({ ...c, open: true, loading: false, error: '', dados: { conciliacao: response?.conciliacao || null, meta: { total: Number(response?.meta?.total || 0), limit: Number(response?.meta?.limit || filtersPayload?.limit || c.filters.limit || 30) }, itens: Array.isArray(response?.itens) ? response.itens : [] } }));
+      setAssociacaoModal((c) => ({ ...c, open: true, loading: false, error: '', selecionados: [], dados: { conciliacao: response?.conciliacao || null, meta: { total: Number(response?.meta?.total || 0), limit: Number(response?.meta?.limit || filtersPayload?.limit || c.filters.limit || 30) }, itens: Array.isArray(response?.itens) ? response.itens : [] } }));
     } catch (err) { setAssociacaoModal((c) => ({ ...c, open: true, loading: false, error: err?.message || 'Erro ao buscar movimentos' })); }
   }
 
   async function abrirAssociacaoManual(item) {
     const defaults = buildAssociacaoDefaults(item);
-    setAssociacaoModal({ open: true, item, filters: defaults, loading: true, processing: false, error: '', dados: { conciliacao: null, meta: { total: 0, limit: defaults.limit }, itens: [] } });
+    setAssociacaoModal({ open: true, item, filters: defaults, loading: true, processing: false, error: '', selecionados: [], dados: { conciliacao: null, meta: { total: 0, limit: defaults.limit }, itens: [] } });
     await carregarMovimentosAssociacao(item.id, defaults);
   }
 
   function fecharAssociacaoManual() {
-    setAssociacaoModal({ open: false, item: null, filters: buildAssociacaoDefaults(null), loading: false, processing: false, error: '', dados: { conciliacao: null, meta: { total: 0, limit: 30 }, itens: [] } });
+    setAssociacaoModal({ open: false, item: null, filters: buildAssociacaoDefaults(null), loading: false, processing: false, error: '', selecionados: [], dados: { conciliacao: null, meta: { total: 0, limit: 30 }, itens: [] } });
   }
 
   async function consultarAssociacaoManual(event) {
     event.preventDefault();
     if (!associacaoModal.item?.id) return;
     await carregarMovimentosAssociacao(associacaoModal.item.id, associacaoModal.filters);
+  }
+
+  function toggleMovimentoAssociacaoManual(movimentoId) {
+    const id = Number(movimentoId || 0);
+    if (!id) return;
+    setAssociacaoModal((current) => {
+      const selecionadosAtuais = Array.isArray(current.selecionados)
+        ? current.selecionados.map(Number).filter(Boolean)
+        : [];
+      if (selecionadosAtuais.includes(id)) {
+        return { ...current, error: '', selecionados: selecionadosAtuais.filter((item) => item !== id) };
+      }
+
+      const movimento = current.dados.itens.find((item) => Number(item.movimento_financeiro_id || 0) === id);
+      const resumoAtual = buildAssociacaoResumo({ ...current, selecionados: selecionadosAtuais });
+      const novoTotal = resumoAtual.totalSelecionado + valorAbsolutoMovimentoAssociacao(movimento);
+      if (novoTotal > resumoAtual.valorEsperado + 0.01) {
+        return {
+          ...current,
+          error: 'A soma selecionada ultrapassa o valor do lancamento bancario.',
+          selecionados: selecionadosAtuais
+        };
+      }
+
+      return { ...current, error: '', selecionados: [...selecionadosAtuais, id] };
+    });
+  }
+
+  async function handleConfirmarAssociacaoSelecionada() {
+    const resumo = buildAssociacaoResumo(associacaoModal);
+    if (!associacaoModal.item?.id) return;
+    if (!resumo.selecionados.length) {
+      setAssociacaoModal((current) => ({ ...current, error: 'Selecione ao menos um movimento financeiro.' }));
+      return;
+    }
+    if (resumo.ultrapassou) {
+      setAssociacaoModal((current) => ({ ...current, error: 'A soma selecionada ultrapassa o valor do lancamento bancario.' }));
+      return;
+    }
+    if (!resumo.fechou) {
+      setAssociacaoModal((current) => ({ ...current, error: 'A soma selecionada precisa fechar com o valor do lancamento bancario.' }));
+      return;
+    }
+
+    await handleConfirmar(associacaoModal.item.id, resumo.selecionados, { fecharModal: true });
   }
 
   async function carregarFaturasAssociacao(conciliacaoId, filtersPayload, { manterAberto = true } = {}) {
@@ -1676,6 +1806,7 @@ export default function FinanceiroConciliacao() {
     try {
       setProcessingId(`tarifa-${item.id}-${tarifa.codigo}`);
       setError('');
+      setAcoesRapidasError('');
       setFeedback('');
       await confirmarConciliacaoTarifaBancaria(item.id, {
         codigo: tarifa.codigo,
@@ -1685,7 +1816,9 @@ export default function FinanceiroConciliacao() {
       setAcoesRapidasItem(null);
       await carregarConciliacoes();
     } catch (err) {
-      setError(err?.message || 'Erro ao conciliar tarifa bancaria');
+      const message = err?.message || 'Erro ao conciliar tarifa bancaria';
+      setAcoesRapidasError(message);
+      setError(message);
     } finally {
       setProcessingId(null);
     }
@@ -1726,6 +1859,8 @@ export default function FinanceiroConciliacao() {
   }
 
   // ─── render ──────────────────────────────────────────────────────────────────
+
+  const associacaoResumo = buildAssociacaoResumo(associacaoModal);
 
   return (
     <div className="page solicitacoes-page">
@@ -2074,7 +2209,10 @@ export default function FinanceiroConciliacao() {
                     onAssociarManual={abrirAssociacaoManual}
                     onAssociarFatura={abrirAssociacaoFatura}
                     onAssociarTransferencia={abrirAssociacaoTransferencia}
-                    onAcoesRapidas={(it) => setAcoesRapidasItem(it)}
+                    onAcoesRapidas={(it) => {
+                      setAcoesRapidasError('');
+                      setAcoesRapidasItem(it);
+                    }}
                   />
                 ))
             }
@@ -2099,8 +2237,13 @@ export default function FinanceiroConciliacao() {
           item={acoesRapidasItem}
           tarifas={tarifasBancarias}
           processingId={processingId}
-          onClose={() => setAcoesRapidasItem(null)}
+          error={acoesRapidasError}
+          onClose={() => {
+            setAcoesRapidasError('');
+            setAcoesRapidasItem(null);
+          }}
           onNovoTitulo={(item) => {
+            setAcoesRapidasError('');
             setAcoesRapidasItem(null);
             setNovoTituloItem(item);
           }}
@@ -2307,8 +2450,31 @@ export default function FinanceiroConciliacao() {
                 itens={associacaoModal.dados.itens}
                 modal={associacaoModal}
                 processingId={processingId}
-                onAssociar={handleConfirmar}
+                selecionados={associacaoResumo.selecionados}
+                totalSelecionado={associacaoResumo.totalSelecionado}
+                valorEsperado={associacaoResumo.valorEsperado}
+                onToggleSelecionado={toggleMovimentoAssociacaoManual}
               />
+            </div>
+            <div className="mt-3 flex flex-col gap-3 rounded-xl border border-[var(--c-border)] bg-[var(--c-bg)] px-4 py-3 md:flex-row md:items-center md:justify-between">
+              <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm">
+                <span className="text-[var(--c-muted)]">Selecionado: <strong className="text-[var(--c-text)]">{formatCurrency(associacaoResumo.totalSelecionado)}</strong></span>
+                <span className="text-[var(--c-muted)]">Extrato: <strong className="text-[var(--c-text)]">{formatCurrency(associacaoResumo.valorEsperado)}</strong></span>
+                {associacaoResumo.selecionados.length > 0 && !associacaoResumo.fechou && !associacaoResumo.ultrapassou ? (
+                  <span className="text-amber-700">Falta {formatCurrency(Math.max(associacaoResumo.diferenca, 0))}</span>
+                ) : null}
+                {associacaoResumo.ultrapassou ? (
+                  <span className="text-rose-700">Selecao acima do valor pago.</span>
+                ) : null}
+              </div>
+              <button
+                type="button"
+                className="btn btn-primary shrink-0"
+                disabled={associacaoModal.processing || !associacaoResumo.fechou}
+                onClick={handleConfirmarAssociacaoSelecionada}
+              >
+                {associacaoModal.processing ? 'Associando...' : 'Associar selecionados'}
+              </button>
             </div>
             <div className="hidden">
               {associacaoModal.loading

@@ -3529,6 +3529,16 @@ db.PaymentReconciliation.belongsTo(db.ConciliacaoBancaria, {
   as: 'conciliacao'
 });
 
+db.ConciliacaoBancaria.hasMany(db.MovimentoFinanceiro, {
+  foreignKey: 'conciliacao_bancaria_id',
+  as: 'movimentosAssociados'
+});
+
+db.MovimentoFinanceiro.belongsTo(db.ConciliacaoBancaria, {
+  foreignKey: 'conciliacao_bancaria_id',
+  as: 'conciliacaoBancaria'
+});
+
 /* ===== CRM ===== */
 db.CrmPipeline.hasMany(db.CrmPipelineStage, { foreignKey: 'pipeline_id', as: 'etapas' });
 db.CrmPipelineStage.belongsTo(db.CrmPipeline, { foreignKey: 'pipeline_id', as: 'pipeline' });

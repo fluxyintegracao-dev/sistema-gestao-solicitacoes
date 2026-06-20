@@ -5028,6 +5028,54 @@ input[type="file"]:disabled {
   border-color: var(--app-summary-border, rgba(145, 176, 218, 0.42));
 }
 
+.financeiro-report-summary-grid {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+.financeiro-report-card {
+  overflow: hidden;
+}
+
+.financeiro-report-card .table-responsive {
+  overflow-x: auto;
+  border: 1px solid var(--ui-border);
+  border-radius: 14px;
+}
+
+.financeiro-report-table {
+  border-collapse: collapse;
+}
+
+.financeiro-report-table th {
+  white-space: nowrap;
+}
+
+.financeiro-report-table td {
+  padding: 0.62rem 0.75rem;
+  border-bottom: 1px solid var(--ui-border);
+  background: transparent;
+  font-size: 0.8rem;
+  vertical-align: middle;
+}
+
+.financeiro-report-table tbody tr:nth-child(even) td {
+  background: rgba(226, 232, 240, 0.34);
+}
+
+.financeiro-report-table tbody tr:hover td {
+  background: rgba(219, 234, 254, 0.42);
+}
+
+@media (max-width: 900px) {
+  .financeiro-conta-report-filters .btn {
+    width: 100%;
+  }
+
+  .financeiro-report-card {
+    padding: 0.85rem;
+  }
+}
+
 .app-summary-label {
   font-size: 0.71rem;
   font-weight: 700;
