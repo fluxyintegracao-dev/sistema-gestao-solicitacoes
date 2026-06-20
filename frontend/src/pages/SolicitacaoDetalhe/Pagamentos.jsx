@@ -32,6 +32,23 @@ function tituloBaixavel(titulo) {
   return ['ABERTO', 'PARCIAL'].includes(status) && numeroSeguro(titulo?.valor_saldo) > 0;
 }
 
+function normalizeSearchText(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+}
+
+function limparDescricaoTituloCompra(value) {
+  const texto = String(value || '').trim();
+  if (!texto) return texto;
+  if (!normalizeSearchText(texto).includes('solicitacao de compra')) return texto;
+  return texto
+    .replace(/\s+(Itens|Items):[\s\S]*$/i, '')
+    .replace(/\s+-\s*$/g, '')
+    .trim() || 'Solicitacao de compra';
+}
+
 export default function Pagamentos({ solicitacao, podeInformarPagamento = false, onSucesso }) {
   const [modalPagamentosAberto, setModalPagamentosAberto] = useState(false);
   const [modalBaixaAberto, setModalBaixaAberto] = useState(false);
@@ -247,7 +264,7 @@ export default function Pagamentos({ solicitacao, podeInformarPagamento = false,
           {titulos.slice(0, 4).map((titulo) => (
             <div key={titulo.id} className="rounded-xl border border-[var(--c-border)] px-3 py-3 text-sm">
               <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
-                <strong>#{titulo.id} {titulo.descricao || 'Titulo financeiro'}</strong>
+                <strong>#{titulo.id} {limparDescricaoTituloCompra(titulo.descricao) || 'Titulo financeiro'}</strong>
                 <span className="rounded-full bg-[var(--c-bg)] px-2 py-1 text-xs font-semibold text-[var(--c-muted)]">
                   {titulo.status}
                 </span>
@@ -350,7 +367,7 @@ export default function Pagamentos({ solicitacao, podeInformarPagamento = false,
                         #{titulo.id}
                       </label>
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-[var(--c-text)]">{titulo.descricao || 'Titulo financeiro'}</p>
+                        <p className="truncate text-sm font-semibold text-[var(--c-text)]">{limparDescricaoTituloCompra(titulo.descricao) || 'Titulo financeiro'}</p>
                         <p className="text-xs text-[var(--c-muted)]">
                           Vencimento: {formatarData(titulo.data_vencimento)} | Saldo: {formatarMoeda(titulo.valor_saldo)}
                         </p>
