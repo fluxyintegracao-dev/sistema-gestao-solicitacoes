@@ -13,8 +13,25 @@ import {
 } from '../constants/moduleGovernance';
 import { isSuperadmin } from '../utils/acessoProduto';
 
+const PERMISSAO_SOLICITACOES_MINHAS = 'solicitacoes.lista.visualizar_minhas';
+
 function normalizeKey(value) {
   return String(value || '').trim().toLowerCase();
+}
+
+function normalizePerfil(value) {
+  return String(value || '')
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, '_');
+}
+
+function normalizeToken(value) {
+  return String(value || '')
+    .trim()
+    .toUpperCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
 }
 
 function normalizeMapa(input) {
@@ -32,10 +49,77 @@ function normalizeMapa(input) {
   }, {});
 }
 
+function normalizePadroes(input) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return {};
+
+  return Object.entries(input).reduce((acc, [setorKey, perfis]) => {
+    const key = String(setorKey || '').trim();
+    if (!key || !perfis || typeof perfis !== 'object' || Array.isArray(perfis)) return acc;
+
+    const normalizedPerfis = Object.entries(perfis).reduce((perfilAcc, [perfil, permissoes]) => {
+      const perfilKey = normalizePerfil(perfil);
+      if (!perfilKey) return perfilAcc;
+
+      perfilAcc[perfilKey] = Array.isArray(permissoes)
+        ? [...new Set(permissoes.map(normalizeKey).filter(Boolean))]
+        : [];
+      return perfilAcc;
+    }, {});
+
+    acc[key] = normalizedPerfis;
+    return acc;
+  }, {});
+}
+
 function sortUsuarios(lista = []) {
   return [...lista].sort((a, b) =>
     String(a?.nome || '').localeCompare(String(b?.nome || ''), 'pt-BR', { sensitivity: 'base' })
   );
+}
+
+function isSetorObra(setor) {
+  const tokens = [setor?.codigo, setor?.nome, setor?.slug]
+    .map(normalizeToken)
+    .filter(Boolean);
+
+  return Boolean(setor?.eh_setor_obra) || tokens.some((token) => token === 'OBRA' || token.includes('OBRA'));
+}
+
+function getSetorPermissionKeys(usuario) {
+  const values = [
+    usuario?.setor_id,
+    usuario?.setor?.id,
+    usuario?.setor?.codigo,
+    usuario?.setor?.nome
+  ];
+
+  return [...new Set(
+    values
+      .map((value) => String(value || '').trim())
+      .filter(Boolean)
+      .flatMap((value) => [value, normalizeToken(value)])
+      .filter(Boolean)
+  )];
+}
+
+function getPermissoesPadraoUsuario(usuario, padroesSetorPerfil) {
+  if (!usuario || !padroesSetorPerfil || typeof padroesSetorPerfil !== 'object') return [];
+
+  const perfil = normalizePerfil(usuario?.perfil);
+  const permissoes = [];
+
+  getSetorPermissionKeys(usuario).forEach((setorKey) => {
+    const perfis = padroesSetorPerfil[setorKey] || padroesSetorPerfil[normalizeToken(setorKey)];
+    if (perfis?.[perfil]) {
+      permissoes.push(...perfis[perfil]);
+    }
+  });
+
+  if (isSetorObra(usuario?.setor)) {
+    permissoes.push(PERMISSAO_SOLICITACOES_MINHAS);
+  }
+
+  return [...new Set(permissoes.map(normalizeKey).filter(Boolean))];
 }
 
 function isBypassAdmin(usuario) {
@@ -58,7 +142,7 @@ function BadgePerfil({ perfil }) {
   );
 }
 
-function CheckboxItem({ permissao, checked, onChange, disabled }) {
+function CheckboxItem({ permissao, checked, onChange, disabled, origem }) {
   return (
     <label
       className={`flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-2.5 text-sm transition-colors ${
@@ -80,6 +164,23 @@ function CheckboxItem({ permissao, checked, onChange, disabled }) {
         <span className="font-medium text-[var(--c-text)]">{permissao.label}</span>
         {permissao.descricao && (
           <span className="text-[11px] text-[var(--c-muted)]">{permissao.descricao}</span>
+        )}
+        {origem && (
+          <span
+            className={`w-fit rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+              origem === 'bloqueada'
+                ? 'bg-rose-100 text-rose-700'
+                : origem === 'individual'
+                  ? 'bg-blue-100 text-blue-700'
+                  : 'bg-emerald-100 text-emerald-700'
+            }`}
+          >
+            {origem === 'bloqueada'
+              ? 'Bloqueada neste usuario'
+              : origem === 'individual'
+                ? 'Permissao individual'
+                : 'Padrao do setor/perfil'}
+          </span>
         )}
         <span className="font-mono text-[10px] text-[var(--c-muted)] opacity-60">{permissao.key}</span>
       </span>
@@ -149,6 +250,9 @@ function ModuleCard({
   sessionIsSuperadmin,
   selectedUserIsBypassAdmin,
   permissoesUsuarioAtual,
+  permissoesPadraoUsuarioAtual,
+  permissoesIndividuaisUsuarioAtual,
+  permissoesBloqueadasUsuarioAtual,
   areaExpandida,
   onToggleArea,
   onTogglePermissao,
@@ -245,15 +349,22 @@ function ModuleCard({
 
                 {aberta && (
                   <div className="grid gap-2 px-4 pb-3 sm:grid-cols-2">
-                    {area.permissoes.map((perm) => (
-                      <CheckboxItem
-                        key={perm.key}
-                        permissao={perm}
-                        checked={permissoesUsuarioAtual.includes(normalizeKey(perm.key))}
-                        onChange={() => onTogglePermissao(perm.key)}
-                        disabled={false}
-                      />
-                    ))}
+                    {area.permissoes.map((perm) => {
+                      const key = normalizeKey(perm.key);
+                      const vemDoPadrao = permissoesPadraoUsuarioAtual.includes(key);
+                      const individual = permissoesIndividuaisUsuarioAtual.includes(key);
+                      const bloqueada = permissoesBloqueadasUsuarioAtual.includes(key);
+                      return (
+                        <CheckboxItem
+                          key={perm.key}
+                          permissao={perm}
+                          checked={permissoesUsuarioAtual.includes(key)}
+                          onChange={() => onTogglePermissao(perm.key)}
+                          disabled={false}
+                          origem={bloqueada ? 'bloqueada' : individual ? 'individual' : vemDoPadrao ? 'padrao' : ''}
+                        />
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -270,6 +381,8 @@ export default function PermissoesAreas() {
   const [usuarios, setUsuarios] = useState([]);
   const [registry, setRegistry] = useState([]);
   const [mapa, setMapa] = useState({});
+  const [bloqueiosMapa, setBloqueiosMapa] = useState({});
+  const [padroesSetorPerfil, setPadroesSetorPerfil] = useState({});
   const [usuarioSelecionadoId, setUsuarioSelecionadoId] = useState(null);
   const [filtroUsuario, setFiltroUsuario] = useState('');
   const [areaExpandida, setAreaExpandida] = useState(null);
@@ -298,6 +411,8 @@ export default function PermissoesAreas() {
 
         setUsuarios(sortUsuarios(ativos));
         setMapa(normalizeMapa(configAtual?.usuarios));
+        setBloqueiosMapa(normalizeMapa(configAtual?.usuarios_bloqueios));
+        setPadroesSetorPerfil(normalizePadroes(configAtual?.padroes_setor_perfil));
         setRegistry(Array.isArray(registroPerms) ? registroPerms : []);
       } catch (err) {
         alert(err?.message || 'Erro ao carregar configuracoes de permissoes');
@@ -330,32 +445,65 @@ export default function PermissoesAreas() {
     return isBypassAdmin(usuarioSelecionado);
   }, [usuarioSelecionado]);
 
-  const permissoesUsuarioAtual = useMemo(() => {
+  const permissoesIndividuaisUsuarioAtual = useMemo(() => {
     if (!usuarioSelecionadoId) return [];
     return mapa[usuarioSelecionadoId] || [];
   }, [mapa, usuarioSelecionadoId]);
+
+  const permissoesBloqueadasUsuarioAtual = useMemo(() => {
+    if (!usuarioSelecionadoId) return [];
+    return bloqueiosMapa[usuarioSelecionadoId] || [];
+  }, [bloqueiosMapa, usuarioSelecionadoId]);
+
+  const permissoesPadraoUsuarioAtual = useMemo(() => {
+    if (!usuarioSelecionado) return [];
+    return getPermissoesPadraoUsuario(usuarioSelecionado, padroesSetorPerfil);
+  }, [padroesSetorPerfil, usuarioSelecionado]);
+
+  const permissoesUsuarioAtual = useMemo(() => {
+    const bloqueadas = new Set(permissoesBloqueadasUsuarioAtual);
+    return [...new Set([...permissoesPadraoUsuarioAtual, ...permissoesIndividuaisUsuarioAtual])]
+      .filter((key) => !bloqueadas.has(key));
+  }, [permissoesBloqueadasUsuarioAtual, permissoesIndividuaisUsuarioAtual, permissoesPadraoUsuarioAtual]);
+
+  function setUserList(setter, userId, updater) {
+    setter((current) => {
+      const listaAtual = current[userId] || [];
+      const proximaLista = [...new Set(updater(listaAtual).map(normalizeKey).filter(Boolean))];
+      const next = { ...current };
+
+      if (proximaLista.length) {
+        next[userId] = proximaLista;
+      } else {
+        delete next[userId];
+      }
+
+      return next;
+    });
+  }
 
   function togglePermissao(permKey) {
     const id = usuarioSelecionadoId;
     if (!id) return;
 
     const normalizedKey = normalizeKey(permKey);
+    const vemDoPadrao = permissoesPadraoUsuarioAtual.includes(normalizedKey);
+    const estaBloqueada = permissoesBloqueadasUsuarioAtual.includes(normalizedKey);
 
-    setMapa((current) => {
-      const listaAtual = [...(current[id] || [])];
-      const idx = listaAtual.indexOf(normalizedKey);
-      const proximaLista = idx >= 0
-        ? listaAtual.filter((item) => item !== normalizedKey)
-        : [...listaAtual, normalizedKey];
+    if (vemDoPadrao) {
+      setUserList(setBloqueiosMapa, id, (lista) =>
+        estaBloqueada ? lista.filter((item) => item !== normalizedKey) : [...lista, normalizedKey]
+      );
+      setUserList(setMapa, id, (lista) => lista.filter((item) => item !== normalizedKey));
+      return;
+    }
 
-      const next = { ...current };
-      if (proximaLista.length) {
-        next[id] = proximaLista;
-      } else {
-        delete next[id];
-      }
-      return next;
-    });
+    setUserList(setMapa, id, (lista) =>
+      lista.includes(normalizedKey)
+        ? lista.filter((item) => item !== normalizedKey)
+        : [...lista, normalizedKey]
+    );
+    setUserList(setBloqueiosMapa, id, (lista) => lista.filter((item) => item !== normalizedKey));
   }
 
   function toggleArea(areaKey) {
@@ -366,13 +514,14 @@ export default function PermissoesAreas() {
     if (!usuarioSelecionadoId || selectedUserIsBypassAdmin) return;
 
     const chaves = grupo.areas.flatMap((area) => area.permissoes.map((perm) => normalizeKey(perm.key)));
-    setMapa((current) => {
-      const nextList = [...new Set([...(current[usuarioSelecionadoId] || []), ...chaves])];
-      return {
-        ...current,
-        [usuarioSelecionadoId]: nextList
-      };
-    });
+    const padrao = new Set(permissoesPadraoUsuarioAtual);
+    setUserList(setMapa, usuarioSelecionadoId, (lista) => [
+      ...lista,
+      ...chaves.filter((key) => !padrao.has(key))
+    ]);
+    setUserList(setBloqueiosMapa, usuarioSelecionadoId, (lista) =>
+      lista.filter((item) => !chaves.includes(item))
+    );
   }
 
   function desmarcarTudoModulo(grupo) {
@@ -382,28 +531,32 @@ export default function PermissoesAreas() {
       grupo.areas.flatMap((area) => area.permissoes.map((perm) => normalizeKey(perm.key)))
     );
 
-    setMapa((current) => {
-      const nextList = (current[usuarioSelecionadoId] || []).filter((item) => !removidas.has(item));
-      const next = { ...current };
-
-      if (nextList.length) {
-        next[usuarioSelecionadoId] = nextList;
-      } else {
-        delete next[usuarioSelecionadoId];
-      }
-
-      return next;
-    });
+    const padrao = new Set(permissoesPadraoUsuarioAtual);
+    setUserList(setMapa, usuarioSelecionadoId, (lista) => lista.filter((item) => !removidas.has(item)));
+    setUserList(setBloqueiosMapa, usuarioSelecionadoId, (lista) => [
+      ...lista.filter((item) => !removidas.has(item)),
+      ...Array.from(removidas).filter((key) => padrao.has(key))
+    ]);
   }
 
   async function salvar() {
     try {
       setSalvando(true);
-      const resultado = await salvarPermissoesAreas({ usuarios: mapa });
+      const resultado = await salvarPermissoesAreas({
+        usuarios: mapa,
+        usuarios_bloqueios: bloqueiosMapa
+      });
       const persistedMap = normalizeMapa(resultado?.usuarios);
+      const persistedBlocks = normalizeMapa(resultado?.usuarios_bloqueios);
       setMapa(persistedMap);
+      setBloqueiosMapa(persistedBlocks);
       if (Number(usuarioSelecionadoId) === Number(user?.id)) {
-        updateUser({ areas_permissoes: persistedMap[usuarioSelecionadoId] || [] });
+        const padroesUsuario = getPermissoesPadraoUsuario(usuarioSelecionado, normalizePadroes(resultado?.padroes_setor_perfil));
+        const bloqueadas = new Set(persistedBlocks[usuarioSelecionadoId] || []);
+        updateUser({
+          areas_permissoes: [...new Set([...padroesUsuario, ...(persistedMap[usuarioSelecionadoId] || [])])]
+            .filter((key) => !bloqueadas.has(key))
+        });
       }
       alert('Permissoes salvas com sucesso.');
     } catch (err) {
@@ -441,8 +594,9 @@ export default function PermissoesAreas() {
       </div>
 
       <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-800">
-        <strong>Como funciona:</strong> esta tela soma permissoes extras ao padrao definido por setor e perfil. Use
-        aqui somente quando um usuario precisar de acesso adicional ao grupo dele.
+        <strong>Como funciona:</strong> esta tela mostra o acesso efetivo do usuario: padrao do setor/perfil,
+        permissoes individuais extras e bloqueios individuais. Se uma permissao herdada for desmarcada aqui,
+        ela fica bloqueada apenas para este usuario.
       </div>
 
       {sessionIsSuperadmin ? (
@@ -473,7 +627,10 @@ export default function PermissoesAreas() {
 
             <div className="max-h-[60vh] space-y-1 overflow-y-auto pr-1">
               {usuariosFiltrados.map((item) => {
-                const qPerms = (mapa[item.id] || []).length;
+                const extras = mapa[item.id] || [];
+                const bloqueios = bloqueiosMapa[item.id] || [];
+                const padroes = getPermissoesPadraoUsuario(item, padroesSetorPerfil);
+                const qPerms = [...new Set([...padroes, ...extras])].filter((key) => !bloqueios.includes(key)).length;
                 const perfil = String(item.perfil || '').toUpperCase();
                 const ehBypass = perfil === 'SUPERADMIN' || perfil === 'ADMINISTRADOR';
                 const ativo = item.id === usuarioSelecionadoId;
@@ -545,9 +702,9 @@ export default function PermissoesAreas() {
                         <div className="tabular-nums text-2xl font-black leading-tight text-[var(--c-primary)]">
                           {permissoesUsuarioAtual.length}
                         </div>
-                        {permissoesUsuarioAtual.length === 0 && (
-                          <div className="text-[10px] text-[var(--c-muted)]">Acesso padrao do perfil</div>
-                        )}
+                        <div className="text-[10px] text-[var(--c-muted)]">
+                          {permissoesPadraoUsuarioAtual.length} padrao | {permissoesIndividuaisUsuarioAtual.length} individual | {permissoesBloqueadasUsuarioAtual.length} bloqueada(s)
+                        </div>
                       </div>
                     )}
                   </div>
@@ -567,6 +724,9 @@ export default function PermissoesAreas() {
                       sessionIsSuperadmin={sessionIsSuperadmin}
                       selectedUserIsBypassAdmin={selectedUserIsBypassAdmin}
                       permissoesUsuarioAtual={permissoesUsuarioAtual}
+                      permissoesPadraoUsuarioAtual={permissoesPadraoUsuarioAtual}
+                      permissoesIndividuaisUsuarioAtual={permissoesIndividuaisUsuarioAtual}
+                      permissoesBloqueadasUsuarioAtual={permissoesBloqueadasUsuarioAtual}
                       areaExpandida={areaExpandida}
                       onToggleArea={toggleArea}
                       onTogglePermissao={togglePermissao}

@@ -77,12 +77,17 @@ module.exports = {
         ? normalizeUsuarios(req.body?.usuarios)
         : currentConfig.usuarios || {};
 
+      const normalizedBloqueios = Object.prototype.hasOwnProperty.call(req.body || {}, 'usuarios_bloqueios')
+        ? normalizeUsuarios(req.body?.usuarios_bloqueios)
+        : currentConfig.usuarios_bloqueios || {};
+
       const normalizedPadroes = Object.prototype.hasOwnProperty.call(req.body || {}, 'padroes_setor_perfil')
         ? normalizePadroesSetorPerfil(req.body?.padroes_setor_perfil)
         : currentConfig.padroes_setor_perfil || {};
 
       const valor = JSON.stringify({
         usuarios: normalizedUsuarios,
+        usuarios_bloqueios: normalizedBloqueios,
         padroes_setor_perfil: normalizedPadroes
       });
 

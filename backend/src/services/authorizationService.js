@@ -471,6 +471,7 @@ let permissoesAreasUsuariosCache = {
   expiresAt: 0,
   config: {
     usuarios: {},
+    usuarios_bloqueios: {},
     padroes_setor_perfil: {}
   }
 };
@@ -664,6 +665,7 @@ async function getPermissoesAreasConfig() {
 
   let config = {
     usuarios: {},
+    usuarios_bloqueios: {},
     padroes_setor_perfil: {}
   };
   if (item?.valor) {
@@ -671,11 +673,13 @@ async function getPermissoesAreasConfig() {
       const data = JSON.parse(item.valor);
       config = {
         usuarios: normalizePermissoesAreasUsuarios(data?.usuarios),
+        usuarios_bloqueios: normalizePermissoesAreasUsuarios(data?.usuarios_bloqueios),
         padroes_setor_perfil: normalizePermissoesAreasPadroes(data?.padroes_setor_perfil)
       };
     } catch {
       config = {
         usuarios: {},
+        usuarios_bloqueios: {},
         padroes_setor_perfil: {}
       };
     }
@@ -743,12 +747,14 @@ async function getAreasPermissoesForUser(user) {
   const sessionPermissions = normalizeModuloPermissaoList(user.areas_permissoes);
   const config = await getPermissoesAreasConfig();
   const permissionMap = config.usuarios || {};
+  const blockMap = config.usuarios_bloqueios || {};
   const padroes = await getPermissoesPadraoSetorPerfil(user, config);
+  const bloqueios = new Set(normalizeModuloPermissaoList(blockMap[Number(user.id)] || []));
   return normalizeModuloPermissaoList([
     ...padroes,
     ...sessionPermissions,
     ...(permissionMap[Number(user.id)] || [])
-  ]);
+  ]).filter((permission) => !bloqueios.has(permission));
 }
 
 async function userHasAreaPermission(user, permissionKeys = []) {
@@ -797,6 +803,7 @@ function invalidatePermissoesAreasCache() {
     expiresAt: 0,
     config: {
       usuarios: {},
+      usuarios_bloqueios: {},
       padroes_setor_perfil: {}
     }
   };
