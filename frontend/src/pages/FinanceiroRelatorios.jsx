@@ -2,7 +2,12 @@ import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { ResizableTable, ResizableTh } from '../components/ResizableTable';
 import { useUiVisibility } from '../hooks/useUiVisibility';
-import { getRelatorioFluxoCaixa } from '../services/financeiro';
+import {
+  getContasBancarias,
+  getRelatorioConciliacaoContas,
+  getRelatorioFluxoCaixa,
+  getRelatorioMovimentacaoContas
+} from '../services/financeiro';
 import { getMinhasObras } from '../services/obras';
 
 const FinanceiroExecutivoGrupo = lazy(() => import('./FinanceiroExecutivoGrupo'));
@@ -730,6 +735,318 @@ function FluxoCaixaRelatorioConteudo({ isVisible }) {
   );
 }
 
+const CONTAS_REPORT_DEFAULT_FILTERS = {
+  periodo: 'MES_ATUAL',
+  data_inicial: '',
+  data_final: '',
+  conta_bancaria_id: ''
+};
+
+function buildContaReportParams(filters) {
+  const params = { periodo: filters.periodo, conta_bancaria_id: filters.conta_bancaria_id };
+  if (filters.periodo === 'PERSONALIZADO') {
+    params.data_inicial = filters.data_inicial;
+    params.data_final = filters.data_final;
+  }
+  return params;
+}
+
+function ContaReportFilters({ filters, setFilters, contas, loading, onSubmit }) {
+  return (
+    <form className="card sol-surface-card p-4" onSubmit={onSubmit}>
+      <div className="grid gap-3 md:grid-cols-4">
+        <label className="field">
+          <span>Periodo</span>
+          <select
+            value={filters.periodo}
+            onChange={(event) => setFilters((current) => ({ ...current, periodo: event.target.value }))}
+          >
+            <option value="MES_ATUAL">Mes atual</option>
+            <option value="HOJE">Hoje</option>
+            <option value="30_DIAS">Proximos 30 dias</option>
+            <option value="90_DIAS">Proximos 90 dias</option>
+            <option value="PERSONALIZADO">Personalizado</option>
+          </select>
+        </label>
+        <label className="field">
+          <span>Data inicial</span>
+          <input
+            type="date"
+            value={filters.data_inicial}
+            disabled={filters.periodo !== 'PERSONALIZADO'}
+            onChange={(event) => setFilters((current) => ({ ...current, data_inicial: event.target.value }))}
+          />
+        </label>
+        <label className="field">
+          <span>Data final</span>
+          <input
+            type="date"
+            value={filters.data_final}
+            disabled={filters.periodo !== 'PERSONALIZADO'}
+            onChange={(event) => setFilters((current) => ({ ...current, data_final: event.target.value }))}
+          />
+        </label>
+        <label className="field">
+          <span>Conta bancaria</span>
+          <select
+            value={filters.conta_bancaria_id}
+            onChange={(event) => setFilters((current) => ({ ...current, conta_bancaria_id: event.target.value }))}
+          >
+            <option value="">Todas as contas</option>
+            {contas.map((conta) => (
+              <option key={conta.id} value={conta.id}>
+                {conta.nome || `${conta.banco || ''} ${conta.conta || ''}`}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <div className="mt-4 flex justify-end">
+        <button type="submit" className="btn btn-primary" disabled={loading}>
+          {loading ? 'Gerando...' : 'Gerar relatorio'}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function ContaReportShell({ title, subtitle, type }) {
+  const [filters, setFilters] = useState(CONTAS_REPORT_DEFAULT_FILTERS);
+  const [appliedFilters, setAppliedFilters] = useState(CONTAS_REPORT_DEFAULT_FILTERS);
+  const [contas, setContas] = useState([]);
+  const [relatorio, setRelatorio] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    getContasBancarias()
+      .then((data) => {
+        if (active) setContas(Array.isArray(data) ? data : []);
+      })
+      .catch(() => {
+        if (active) setContas([]);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    setError('');
+
+    const loader = type === 'conciliacao' ? getRelatorioConciliacaoContas : getRelatorioMovimentacaoContas;
+    loader(buildContaReportParams(appliedFilters))
+      .then((data) => {
+        if (active) setRelatorio(data);
+      })
+      .catch((err) => {
+        if (!active) return;
+        setRelatorio(null);
+        setError(err?.message || 'Erro ao gerar relatorio');
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [appliedFilters, type]);
+
+  function handleSubmit(event) {
+    event.preventDefault();
+    setAppliedFilters(filters);
+  }
+
+  const resumo = relatorio?.resumo || {};
+  const sintetico = Array.isArray(relatorio?.sintetico) ? relatorio.sintetico : [];
+  const analitico = Array.isArray(relatorio?.analitico) ? relatorio.analitico : [];
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h2 className="text-lg font-semibold text-slate-950">{title}</h2>
+        <p className="text-sm text-slate-500">{subtitle}</p>
+      </div>
+
+      <ContaReportFilters
+        filters={filters}
+        setFilters={setFilters}
+        contas={contas}
+        loading={loading}
+        onSubmit={handleSubmit}
+      />
+
+      {error ? <div className="alert alert-danger">{error}</div> : null}
+
+      {relatorio ? (
+        <>
+          <div className="app-summary-grid">
+            <RelatorioMetric label="Contas" value={resumo.contas || 0} />
+            <RelatorioMetric label="Movimentos" value={resumo.movimentos || 0} />
+            {type === 'conciliacao' ? (
+              <>
+                <RelatorioMetric label="Conciliados" value={resumo.conciliados || 0} positive />
+                <RelatorioMetric label="Pendentes" value={resumo.pendentes || 0} positive={Number(resumo.pendentes || 0) === 0} />
+                <RelatorioMetric label="Ignorados/removidos" value={`${resumo.ignorados || 0}/${resumo.removidos || 0}`} />
+              </>
+            ) : (
+              <>
+                <RelatorioMetric label="Entradas" value={formatCurrency(resumo.entradas)} positive />
+                <RelatorioMetric label="Saidas" value={formatCurrency(resumo.saidas)} positive={false} />
+                <RelatorioMetric label="Saldo liquido" value={formatCurrency(resumo.saldo_liquido)} positive={Number(resumo.saldo_liquido || 0) >= 0} />
+                <RelatorioMetric label="Permutas" value={formatCurrency(resumo.permutas)} detail="Separadas do caixa bancario" />
+              </>
+            )}
+          </div>
+
+          <section className="card sol-surface-card p-4">
+            <div className="mb-3">
+              <h3 className="text-base font-semibold text-slate-950">Sintetico por conta</h3>
+              <p className="text-xs text-slate-500">{relatorio.filtro?.descricao || 'Periodo selecionado'}</p>
+            </div>
+            <div className="table-responsive">
+              <ResizableTable
+                storageKey={`financeiro-relatorio-${type}-sintetico`}
+                columns={[
+                  { key: 'conta', width: 320, minWidth: 220 },
+                  { key: 'movimentos', width: 120, minWidth: 100 },
+                  { key: 'entradas', width: 150, minWidth: 120 },
+                  { key: 'saidas', width: 150, minWidth: 120 },
+                  { key: 'saldo', width: 150, minWidth: 120 },
+                  { key: 'status', width: 220, minWidth: 160 }
+                ]}
+                className="table"
+              >
+                <thead>
+                  <tr>
+                    <ResizableTh columnKey="conta">Conta</ResizableTh>
+                    <ResizableTh columnKey="movimentos" className="text-right">Movimentos</ResizableTh>
+                    <ResizableTh columnKey="entradas" className="text-right">{type === 'conciliacao' ? 'Conciliados' : 'Entradas'}</ResizableTh>
+                    <ResizableTh columnKey="saidas" className="text-right">{type === 'conciliacao' ? 'Pendentes' : 'Saidas'}</ResizableTh>
+                    <ResizableTh columnKey="saldo" className="text-right">{type === 'conciliacao' ? 'Ignor./remov.' : 'Saldo'}</ResizableTh>
+                    <ResizableTh columnKey="status">Observacao</ResizableTh>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sintetico.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="text-center text-slate-500">Nenhum registro encontrado.</td>
+                    </tr>
+                  ) : (
+                    sintetico.map((item) => (
+                      <tr key={item.conta_bancaria_id || item.conta}>
+                        <td className="font-medium text-slate-950">{item.conta}</td>
+                        <td className="text-right">{item.movimentos}</td>
+                        <td className="text-right">{type === 'conciliacao' ? item.conciliados : formatCurrency(item.entradas)}</td>
+                        <td className="text-right">{type === 'conciliacao' ? item.pendentes : formatCurrency(item.saidas)}</td>
+                        <td className="text-right">
+                          {type === 'conciliacao'
+                            ? `${item.ignorados || 0}/${item.removidos || 0}`
+                            : formatCurrency(item.saldo_liquido)}
+                        </td>
+                        <td className="text-slate-500">
+                          {type === 'conciliacao'
+                            ? `${item.conciliados || 0} conciliado(s), ${item.pendentes || 0} pendente(s)`
+                            : Number(item.permutas || 0) > 0
+                              ? `${formatCurrency(item.permutas)} em permutas`
+                              : '-'}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </ResizableTable>
+            </div>
+          </section>
+
+          <section className="card sol-surface-card p-4">
+            <h3 className="mb-3 text-base font-semibold text-slate-950">Analitico</h3>
+            <div className="table-responsive">
+              <ResizableTable
+                storageKey={`financeiro-relatorio-${type}-analitico`}
+                columns={[
+                  { key: 'data', width: 120, minWidth: 105 },
+                  { key: 'conta', width: 260, minWidth: 180 },
+                  { key: 'status', width: 130, minWidth: 110 },
+                  { key: 'titulo', width: 150, minWidth: 120 },
+                  { key: 'parceiro', width: 220, minWidth: 160 },
+                  { key: 'obra', width: 180, minWidth: 140 },
+                  { key: 'documento', width: 200, minWidth: 150 },
+                  { key: 'valor', width: 140, minWidth: 120 },
+                  { key: 'descricao', width: 300, minWidth: 220 }
+                ]}
+                className="table"
+              >
+                <thead>
+                  <tr>
+                    <ResizableTh columnKey="data">Data</ResizableTh>
+                    <ResizableTh columnKey="conta">Conta</ResizableTh>
+                    <ResizableTh columnKey="status">{type === 'conciliacao' ? 'Status' : 'Classe'}</ResizableTh>
+                    <ResizableTh columnKey="titulo">Titulo</ResizableTh>
+                    <ResizableTh columnKey="parceiro">Cliente/Fornecedor</ResizableTh>
+                    <ResizableTh columnKey="obra">Obra</ResizableTh>
+                    <ResizableTh columnKey="documento">Documento</ResizableTh>
+                    <ResizableTh columnKey="valor" className="text-right">Valor</ResizableTh>
+                    <ResizableTh columnKey="descricao">Descricao</ResizableTh>
+                  </tr>
+                </thead>
+                <tbody>
+                  {analitico.length === 0 ? (
+                    <tr>
+                      <td colSpan={9} className="text-center text-slate-500">Nenhum registro encontrado.</td>
+                    </tr>
+                  ) : (
+                    analitico.map((item) => (
+                      <tr key={item.id}>
+                        <td>{formatDate(item.data_movimento)}</td>
+                        <td>{item.conta}</td>
+                        <td>
+                          <span className="badge badge-soft">{type === 'conciliacao' ? item.status : item.classe}</span>
+                        </td>
+                        <td>{item.titulo_codigo || '-'}</td>
+                        <td>{item.parceiro || '-'}</td>
+                        <td>{item.obra || '-'}</td>
+                        <td>{item.documento || item.ofx_uid || '-'}</td>
+                        <td className="text-right font-semibold">{formatCurrency(item.valor_quitacao ?? item.valor)}</td>
+                        <td>{item.descricao_banco || item.categoria || item.observacoes || '-'}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </ResizableTable>
+            </div>
+          </section>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
+function MovimentacaoContasRelatorioConteudo() {
+  return (
+    <ContaReportShell
+      type="movimentacao"
+      title="Movimentacao de contas"
+      subtitle="Relatorio sintetico e analitico das movimentacoes por conta bancaria, separando permutas do caixa."
+    />
+  );
+}
+
+function ConciliacaoContasRelatorioConteudo() {
+  return (
+    <ContaReportShell
+      type="conciliacao"
+      title="Conciliacao bancaria"
+      subtitle="Relatorio sintetico e analitico dos movimentos importados, conciliados, pendentes, ignorados e removidos."
+    />
+  );
+}
+
 const REPORT_CATALOG = [
   {
     id: 'fluxo-caixa',
@@ -792,6 +1109,24 @@ const REPORT_CATALOG = [
     route: '/financeiro/relatorios/endividamento',
     visibilityKey: 'relatorios.financeiro.endividamento',
     component: FinanceiroEndividamento
+  },
+  {
+    id: 'movimentacao-contas',
+    title: 'Movimentacao de Contas',
+    group: 'Bancos',
+    description: 'Sintetico e analitico de entradas, saidas e permutas por conta.',
+    route: '/financeiro/relatorios?relatorio=movimentacao-contas',
+    visibilityKey: 'relatorios.financeiro.movimentacao_contas',
+    component: MovimentacaoContasRelatorioConteudo
+  },
+  {
+    id: 'conciliacao-contas',
+    title: 'Conciliacao Bancaria',
+    group: 'Bancos',
+    description: 'Sintetico e analitico dos OFX conciliados, pendentes e ignorados.',
+    route: '/financeiro/relatorios?relatorio=conciliacao-contas',
+    visibilityKey: 'relatorios.financeiro.conciliacao_contas',
+    component: ConciliacaoContasRelatorioConteudo
   },
   {
     id: 'analitico',

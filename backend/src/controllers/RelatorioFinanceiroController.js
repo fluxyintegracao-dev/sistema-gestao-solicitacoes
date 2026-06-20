@@ -5,11 +5,13 @@ const {
   gerarDreGerencial,
   gerarPainelExecutivoGrupo,
   gerarRelatorioEndividamento,
+  gerarRelatorioConciliacaoContas,
   gerarRelatorioFluxoConsolidado,
   gerarRelatorioIntercompany,
   gerarRelatorioAnalitico,
   gerarRelatorioFinanceiroObras,
-  gerarRelatorioFluxoCaixa
+  gerarRelatorioFluxoCaixa,
+  gerarRelatorioMovimentacaoContas
 } = require('../services/relatorioFinanceiroService');
 const { responderErroController } = require('../utils/controllerError');
 
@@ -125,6 +127,26 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return responderErro(res, error, 'Erro ao gerar relatorio Entre Empresas');
+    }
+  },
+
+  async movimentacaoContas(req, res) {
+    try {
+      const relatorio = await gerarRelatorioMovimentacaoContas(req, req.query || {});
+      return res.json(relatorio);
+    } catch (error) {
+      console.error(error);
+      return responderErro(res, error, 'Erro ao gerar relatorio de movimentacao de contas');
+    }
+  },
+
+  async conciliacaoContas(req, res) {
+    try {
+      const relatorio = await gerarRelatorioConciliacaoContas(req, req.query || {});
+      return res.json(relatorio);
+    } catch (error) {
+      console.error(error);
+      return responderErro(res, error, 'Erro ao gerar relatorio de conciliacao bancaria');
     }
   }
 };

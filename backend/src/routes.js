@@ -1293,6 +1293,8 @@ router.get('/financeiro/relatorios/dre', allowFinanceiro, validateRequest({ quer
 router.get('/financeiro/relatorios/dre/diagnostico', allowFinanceiro, RelatorioFinanceiroController.diagnosticoDre);
 router.get('/financeiro/relatorios/intercompany', allowFinanceiro, validateRequest({ query: validateFinanceIntercompanyQuery }), RelatorioFinanceiroController.intercompany);
 router.get('/financeiro/relatorios/endividamento', allowFinanceiro, validateRequest({ query: validateFinanceEndividamentoQuery }), RelatorioFinanceiroController.endividamento);
+router.get('/financeiro/relatorios/movimentacao-contas', allowFinanceiro, RelatorioFinanceiroController.movimentacaoContas);
+router.get('/financeiro/relatorios/conciliacao-contas', allowFinanceiro, RelatorioFinanceiroController.conciliacaoContas);
 router.get('/financeiro/relatorios/resultado-obras', allowFinanceiro, ResultadoObrasController.index);
 router.get('/financeiro/relatorios/centros-custo', allowFinanceiro, ResultadoCentrosCustoController.index);
 router.get('/financeiro/baixas', allowFinanceiro, validateRequest({ query: validateFinanceBaixasQuery }), TituloFinanceiroController.baixas);

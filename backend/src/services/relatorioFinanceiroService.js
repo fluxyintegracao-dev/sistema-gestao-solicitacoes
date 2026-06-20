@@ -1,6 +1,7 @@
 const { Op, col, where: sequelizeWhere } = require('sequelize');
 const {
   CategoriaFinanceira,
+  ConciliacaoBancaria,
   ContaBancaria,
   EmpresaGrupo,
   MovimentoFinanceiro,
@@ -4171,11 +4172,302 @@ async function gerarDiagnosticoDre(req) {
   };
 }
 
+function toNumber(value) {
+  const parsed = Number(value || 0);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function mapById(rows) {
+  return new Map((rows || []).map((row) => [Number(row.id), row]));
+}
+
+function classifyMovimentoBancario(movimento, titulo) {
+  const formaRecebimento = String(movimento.forma_recebimento || '').toUpperCase();
+  const tipoPermuta = String(movimento.tipo_permuta || '').toUpperCase();
+  if (formaRecebimento === 'PERMUTA' || tipoPermuta) {
+    return 'PERMUTA';
+  }
+
+  const tipoMovimento = String(movimento.tipo_movimento || '').toUpperCase();
+  if (tipoMovimento.includes('ENTRADA') || tipoMovimento.includes('RECEB')) {
+    return 'ENTRADA';
+  }
+
+  if (tipoMovimento.includes('SAIDA') || tipoMovimento.includes('SAÍDA') || tipoMovimento.includes('PAG')) {
+    return 'SAIDA';
+  }
+
+  const tipoTitulo = String(titulo?.tipo || '').toUpperCase();
+  if (tipoTitulo === 'RECEBER') {
+    return 'ENTRADA';
+  }
+  if (tipoTitulo === 'PAGAR') {
+    return 'SAIDA';
+  }
+
+  return toNumber(movimento.valor_quitacao || movimento.valor) >= 0 ? 'ENTRADA' : 'SAIDA';
+}
+
+function buildContaLabel(conta) {
+  if (!conta) return 'Conta nao informada';
+  return [conta.nome, conta.banco, conta.agencia, conta.conta]
+    .filter(Boolean)
+    .join(' - ');
+}
+
+async function hydrateFinanceiroMaps({ movimentos = [], conciliacoes = [] }) {
+  const contaIds = new Set();
+  const tituloIds = new Set();
+  const categoriaIds = new Set();
+
+  movimentos.forEach((movimento) => {
+    if (movimento.conta_bancaria_id) contaIds.add(Number(movimento.conta_bancaria_id));
+    if (movimento.titulo_financeiro_id) tituloIds.add(Number(movimento.titulo_financeiro_id));
+    if (movimento.categoria_financeira_id) categoriaIds.add(Number(movimento.categoria_financeira_id));
+  });
+
+  conciliacoes.forEach((conciliacao) => {
+    if (conciliacao.conta_bancaria_id) contaIds.add(Number(conciliacao.conta_bancaria_id));
+    if (conciliacao.titulo_financeiro_id) tituloIds.add(Number(conciliacao.titulo_financeiro_id));
+  });
+
+  const contas = contaIds.size
+    ? await ContaBancaria.findAll({ where: { id: { [Op.in]: Array.from(contaIds) } }, raw: true })
+    : [];
+
+  const titulos = tituloIds.size
+    ? await TituloFinanceiro.findAll({ where: { id: { [Op.in]: Array.from(tituloIds) } }, raw: true })
+    : [];
+
+  titulos.forEach((titulo) => {
+    if (titulo.categoria_financeira_id) categoriaIds.add(Number(titulo.categoria_financeira_id));
+  });
+
+  const parceiroIds = new Set(titulos.map((titulo) => Number(titulo.parceiro_id)).filter(Boolean));
+  const obraIds = new Set(titulos.map((titulo) => Number(titulo.obra_id)).filter(Boolean));
+
+  const parceiros = parceiroIds.size
+    ? await Parceiro.findAll({ where: { id: { [Op.in]: Array.from(parceiroIds) } }, raw: true })
+    : [];
+
+  const obras = obraIds.size
+    ? await Obra.findAll({ where: { id: { [Op.in]: Array.from(obraIds) } }, raw: true })
+    : [];
+
+  const categorias = categoriaIds.size
+    ? await CategoriaFinanceira.findAll({ where: { id: { [Op.in]: Array.from(categoriaIds) } }, raw: true })
+    : [];
+
+  return {
+    contas: mapById(contas),
+    titulos: mapById(titulos),
+    parceiros: mapById(parceiros),
+    obras: mapById(obras),
+    categorias: mapById(categorias)
+  };
+}
+
+function ensureSinteticoConta(sinteticoMap, conta) {
+  const key = conta?.id ? Number(conta.id) : 0;
+  if (!sinteticoMap.has(key)) {
+    sinteticoMap.set(key, {
+      conta_bancaria_id: conta?.id || null,
+      conta: buildContaLabel(conta),
+      entradas: 0,
+      saidas: 0,
+      permutas: 0,
+      saldo_liquido: 0,
+      movimentos: 0,
+      conciliados: 0,
+      pendentes: 0,
+      ignorados: 0,
+      removidos: 0
+    });
+  }
+  return sinteticoMap.get(key);
+}
+
+async function gerarRelatorioMovimentacaoContas(req, filters = {}) {
+  await assertFinanceAccess(req);
+  const filtroPeriodo = resolvePeriodo(filters);
+  const where = {
+    data_movimento: {
+      [Op.between]: [filtroPeriodo.data_inicial, filtroPeriodo.data_final]
+    }
+  };
+
+  if (filters.conta_bancaria_id) {
+    where.conta_bancaria_id = Number(filters.conta_bancaria_id);
+  }
+
+  const movimentos = await MovimentoFinanceiro.findAll({
+    where,
+    raw: true,
+    order: [
+      ['data_movimento', 'ASC'],
+      ['id', 'ASC']
+    ]
+  });
+
+  const maps = await hydrateFinanceiroMaps({ movimentos });
+  const sinteticoMap = new Map();
+  const analitico = movimentos.map((movimento) => {
+    const conta = maps.contas.get(Number(movimento.conta_bancaria_id));
+    const titulo = maps.titulos.get(Number(movimento.titulo_financeiro_id));
+    const parceiro = maps.parceiros.get(Number(titulo?.parceiro_id));
+    const obra = maps.obras.get(Number(titulo?.obra_id));
+    const categoria = maps.categorias.get(Number(movimento.categoria_financeira_id || titulo?.categoria_financeira_id));
+    const valor = Math.abs(toNumber(movimento.valor_quitacao || movimento.valor));
+    const classe = classifyMovimentoBancario(movimento, titulo);
+    const contaResumo = ensureSinteticoConta(sinteticoMap, conta);
+
+    contaResumo.movimentos += 1;
+    if (classe === 'ENTRADA') {
+      contaResumo.entradas += valor;
+      contaResumo.saldo_liquido += valor;
+    } else if (classe === 'SAIDA') {
+      contaResumo.saidas += valor;
+      contaResumo.saldo_liquido -= valor;
+    } else {
+      contaResumo.permutas += valor;
+    }
+
+    return {
+      id: movimento.id,
+      data_movimento: movimento.data_movimento,
+      conta_bancaria_id: movimento.conta_bancaria_id,
+      conta: buildContaLabel(conta),
+      classe,
+      tipo_movimento: movimento.tipo_movimento,
+      status: movimento.status,
+      valor,
+      valor_quitacao: toNumber(movimento.valor_quitacao || movimento.valor),
+      juros: toNumber(movimento.juros),
+      multa: toNumber(movimento.multa),
+      desconto: toNumber(movimento.desconto),
+      titulo_id: titulo?.id || null,
+      titulo_codigo: titulo?.codigo || null,
+      titulo_tipo: titulo?.tipo || null,
+      documento: titulo?.numero_documento || movimento.documento_referencia || null,
+      parceiro: parceiro?.nome || null,
+      obra: obra?.nome || null,
+      categoria: categoria ? `${categoria.codigo ? `${categoria.codigo} - ` : ''}${categoria.nome}` : null,
+      observacoes: movimento.observacoes || null,
+      permuta: classe === 'PERMUTA'
+    };
+  });
+
+  const sintetico = Array.from(sinteticoMap.values()).map((item) => ({
+    ...item,
+    entradas: roundCurrency(item.entradas),
+    saidas: roundCurrency(item.saidas),
+    permutas: roundCurrency(item.permutas),
+    saldo_liquido: roundCurrency(item.saldo_liquido)
+  }));
+
+  return {
+    gerado_em: new Date().toISOString(),
+    filtro: filtroPeriodo,
+    resumo: {
+      contas: sintetico.length,
+      movimentos: analitico.length,
+      entradas: roundCurrency(sintetico.reduce((sum, item) => sum + item.entradas, 0)),
+      saidas: roundCurrency(sintetico.reduce((sum, item) => sum + item.saidas, 0)),
+      permutas: roundCurrency(sintetico.reduce((sum, item) => sum + item.permutas, 0)),
+      saldo_liquido: roundCurrency(sintetico.reduce((sum, item) => sum + item.saldo_liquido, 0))
+    },
+    sintetico,
+    analitico
+  };
+}
+
+async function gerarRelatorioConciliacaoContas(req, filters = {}) {
+  await assertFinanceAccess(req);
+  const filtroPeriodo = resolvePeriodo(filters);
+  const where = {
+    data_movimento: {
+      [Op.between]: [filtroPeriodo.data_inicial, filtroPeriodo.data_final]
+    }
+  };
+
+  if (filters.conta_bancaria_id) {
+    where.conta_bancaria_id = Number(filters.conta_bancaria_id);
+  }
+
+  const conciliacoes = await ConciliacaoBancaria.findAll({
+    where,
+    raw: true,
+    paranoid: false,
+    order: [
+      ['data_movimento', 'ASC'],
+      ['id', 'ASC']
+    ]
+  });
+
+  const maps = await hydrateFinanceiroMaps({ conciliacoes });
+  const sinteticoMap = new Map();
+  const analitico = conciliacoes.map((conciliacao) => {
+    const conta = maps.contas.get(Number(conciliacao.conta_bancaria_id));
+    const titulo = maps.titulos.get(Number(conciliacao.titulo_financeiro_id));
+    const parceiro = maps.parceiros.get(Number(titulo?.parceiro_id));
+    const obra = maps.obras.get(Number(titulo?.obra_id));
+    const status = conciliacao.deleted_at ? 'REMOVIDO' : String(conciliacao.status || 'PENDENTE').toUpperCase();
+    const valor = toNumber(conciliacao.valor);
+    const contaResumo = ensureSinteticoConta(sinteticoMap, conta);
+
+    contaResumo.movimentos += 1;
+    if (status === 'CONCILIADO') contaResumo.conciliados += 1;
+    else if (status === 'IGNORADO') contaResumo.ignorados += 1;
+    else if (status === 'REMOVIDO') contaResumo.removidos += 1;
+    else contaResumo.pendentes += 1;
+
+    return {
+      id: conciliacao.id,
+      data_movimento: conciliacao.data_movimento,
+      conta_bancaria_id: conciliacao.conta_bancaria_id,
+      conta: buildContaLabel(conta),
+      status,
+      valor,
+      ofx_uid: conciliacao.ofx_uid || null,
+      documento: conciliacao.documento || titulo?.numero_documento || null,
+      descricao_banco: conciliacao.descricao_banco || null,
+      titulo_id: titulo?.id || null,
+      titulo_codigo: titulo?.codigo || null,
+      movimento_financeiro_id: conciliacao.movimento_financeiro_id || null,
+      fatura_cartao_id: conciliacao.fatura_cartao_id || null,
+      parceiro: parceiro?.nome || null,
+      obra: obra?.nome || null,
+      confirmado_em: conciliacao.confirmado_em || null,
+      removido_em: conciliacao.deleted_at || null
+    };
+  });
+
+  const sintetico = Array.from(sinteticoMap.values());
+
+  return {
+    gerado_em: new Date().toISOString(),
+    filtro: filtroPeriodo,
+    resumo: {
+      contas: sintetico.length,
+      movimentos: analitico.length,
+      conciliados: sintetico.reduce((sum, item) => sum + item.conciliados, 0),
+      pendentes: sintetico.reduce((sum, item) => sum + item.pendentes, 0),
+      ignorados: sintetico.reduce((sum, item) => sum + item.ignorados, 0),
+      removidos: sintetico.reduce((sum, item) => sum + item.removidos, 0),
+      valor_total: roundCurrency(analitico.reduce((sum, item) => sum + Math.abs(item.valor), 0))
+    },
+    sintetico,
+    analitico
+  };
+}
+
 module.exports = {
   gerarRelatorioAnalitico,
+  gerarRelatorioConciliacaoContas,
   gerarRelatorioFinanceiroObras,
   gerarRelatorioFluxoCaixa,
   gerarRelatorioFluxoConsolidado,
+  gerarRelatorioMovimentacaoContas,
   gerarPainelExecutivoGrupo,
   gerarDreComparativoMensal,
   gerarDreComparativoEmpresas,

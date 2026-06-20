@@ -326,9 +326,11 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
   const [cartoes, setCartoes] = useState([]);
   const [empresasGrupo, setEmpresasGrupo] = useState([]);
   const [loadingPagamento, setLoadingPagamento] = useState(false);
+  const [geracaoMultiplaTitulos, setGeracaoMultiplaTitulos] = useState(false);
 
   function resetModalState(baseSolicitacao = solicitacao) {
     setForm(buildDefaultForm(baseSolicitacao));
+    setGeracaoMultiplaTitulos(false);
     setSelectedPartner(baseSolicitacao?.parceiro || null);
     setSelectedCategory(null);
     setPartnerSearch('');
@@ -642,6 +644,25 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
       ...current,
       pagamentos: [...(current.pagamentos || []), createPagamento(solicitacao)]
     }));
+  }
+
+  function toggleGeracaoMultiplaTitulos(checked) {
+    setGeracaoMultiplaTitulos(checked);
+    if (!checked) {
+      setForm((current) => {
+        const primeiroPagamento = current.pagamentos?.[0] || createPagamento(solicitacao, current.valor);
+        return {
+          ...current,
+          pagamentos: [
+            {
+              ...primeiroPagamento,
+              valor: primeiroPagamento.valor || current.valor,
+              parcelas: Array.isArray(primeiroPagamento.parcelas) ? primeiroPagamento.parcelas : []
+            }
+          ]
+        };
+      });
+    }
   }
 
   function removerPagamento(index) {
@@ -1143,16 +1164,28 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
               </div>
 
               <div className="financeiro-formas-pagamento space-y-3 rounded-2xl border border-[var(--c-border)] bg-[var(--c-bg)] p-3">
-                <div className="flex items-center justify-between gap-3">
+                <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <div className="text-sm font-semibold text-[var(--c-text)]">Formas de pagamento</div>
+                    <div className="text-sm font-semibold text-[var(--c-text)]">Titulos e formas de pagamento</div>
                     <div className="text-xs text-[var(--c-muted)]">
-                      Combine pix, cartao, boleto ou cheque ate fechar o valor da solicitacao.
+                      {geracaoMultiplaTitulos
+                        ? 'Crie titulos separados com vencimento, forma e valor proprios ate fechar o valor da solicitacao.'
+                        : 'Informe o titulo unico desta solicitacao. Marque a opcao abaixo para gerar multiplos titulos.'}
                     </div>
+                    <label className="mt-3 flex items-center gap-2 text-sm font-medium text-slate-700">
+                      <input
+                        type="checkbox"
+                        checked={geracaoMultiplaTitulos}
+                        onChange={(event) => toggleGeracaoMultiplaTitulos(event.target.checked)}
+                      />
+                      Gerar multiplos titulos
+                    </label>
                   </div>
-                  <button type="button" className="btn btn-outline shrink-0" onClick={adicionarPagamento}>
-                    Adicionar
-                  </button>
+                  {geracaoMultiplaTitulos ? (
+                    <button type="button" className="btn btn-outline shrink-0" onClick={adicionarPagamento}>
+                      Adicionar titulo
+                    </button>
+                  ) : null}
                 </div>
 
                 {(form.pagamentos || []).map((pagamento, pagamentoIndex) => {
@@ -1166,9 +1199,9 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
                     <div key={pagamento.id || pagamentoIndex} className="financeiro-forma-pagamento-item space-y-3 rounded-2xl border border-slate-200 bg-white p-3">
                       <div className="flex items-center justify-between gap-2">
                         <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-                          Forma {pagamentoIndex + 1}
+                          {geracaoMultiplaTitulos ? `Titulo ${pagamentoIndex + 1}` : 'Titulo unico'}
                         </div>
-                        {(form.pagamentos || []).length > 1 && (
+                        {geracaoMultiplaTitulos && (form.pagamentos || []).length > 1 && (
                           <button type="button" className="text-sm font-semibold text-rose-600" onClick={() => removerPagamento(pagamentoIndex)}>
                             Remover
                           </button>

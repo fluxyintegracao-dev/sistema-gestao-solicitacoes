@@ -42,6 +42,36 @@ export async function getBankingDashboard() {
   return parseJson(response, 'Erro ao carregar painel bancario enterprise');
 }
 
+export async function getRelatorioMovimentacaoContas(params = {}) {
+  const query = new URLSearchParams(
+    Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== '')
+  ).toString();
+  const url = query
+    ? `${API_URL}/financeiro/relatorios/movimentacao-contas?${query}`
+    : `${API_URL}/financeiro/relatorios/movimentacao-contas`;
+
+  const response = await fetch(url, {
+    headers: authHeaders()
+  });
+
+  return parseJson(response, 'Erro ao gerar relatorio de movimentacao de contas');
+}
+
+export async function getRelatorioConciliacaoContas(params = {}) {
+  const query = new URLSearchParams(
+    Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== '')
+  ).toString();
+  const url = query
+    ? `${API_URL}/financeiro/relatorios/conciliacao-contas?${query}`
+    : `${API_URL}/financeiro/relatorios/conciliacao-contas`;
+
+  const response = await fetch(url, {
+    headers: authHeaders()
+  });
+
+  return parseJson(response, 'Erro ao gerar relatorio de conciliacao bancaria');
+}
+
 export async function getCnab240PagamentosSpec() {
   const response = await fetch(`${API_URL}/financeiro/bancos/cnab240-pagamentos`, {
     headers: authHeaders()
