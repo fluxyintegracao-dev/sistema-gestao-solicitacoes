@@ -244,6 +244,25 @@ function isFormaCheque(forma) {
   return value.includes('CHEQUE');
 }
 
+function isFormaPix(forma) {
+  const value = `${forma?.tipo || ''} ${forma?.codigo || ''} ${forma?.nome || ''}`.toUpperCase();
+  return value.includes('PIX');
+}
+
+function formaPermiteParcelamentoOperacional(forma) {
+  return Boolean(forma?.permite_parcelamento) || isFormaPix(forma);
+}
+
+function formaUsaParcelasDetalhadas(forma) {
+  return Boolean(forma) && (isFormaBoleto(forma) || isFormaCheque(forma) || isFormaPix(forma));
+}
+
+function getLabelParcelaForma(forma) {
+  if (isFormaCheque(forma)) return 'cheque';
+  if (isFormaPix(forma)) return 'PIX';
+  return 'boleto';
+}
+
 function getParceiroPixOptions(parceiro) {
   if (!parceiro) return [];
   return [
@@ -610,7 +629,7 @@ export default function FinanceiroTituloNovo() {
 
   function pagamentoUsaParcelasDetalhadas(pagamento) {
     const forma = getFormaPagamento(pagamento?.forma_pagamento_id);
-    return Boolean(forma) && (isFormaBoleto(forma) || isFormaCheque(forma));
+    return formaUsaParcelasDetalhadas(forma);
   }
 
   function getValorPagamento(pagamento) {
@@ -777,8 +796,8 @@ export default function FinanceiroTituloNovo() {
       const forma = formasPagamento.find((item) => String(item.id) === String(formaPagamentoId));
       const cartaoAtual = cartoes.find((item) => String(item.id) === String(pagamento.cartao_id));
       const manterCartao = forma?.exige_cartao && cartaoAtual && cartaoCompativelComForma(cartaoAtual, forma);
-      const quantidade = forma?.permite_parcelamento ? getQuantidadeParcelas(pagamento) : 1;
-      const usaParcelas = forma && (isFormaBoleto(forma) || isFormaCheque(forma));
+      const quantidade = formaPermiteParcelamentoOperacional(forma) ? getQuantidadeParcelas(pagamento) : 1;
+      const usaParcelas = formaUsaParcelasDetalhadas(forma);
       pagamentos[index] = {
         ...pagamento,
         forma_pagamento_id: formaPagamentoId,
@@ -944,7 +963,7 @@ export default function FinanceiroTituloNovo() {
 
     for (const [pagamentoIndex, pagamento] of pagamentos.entries()) {
       const forma = getFormaPagamento(pagamento.forma_pagamento_id);
-      const usaDetalhe = forma && (isFormaBoleto(forma) || isFormaCheque(forma));
+      const usaDetalhe = formaUsaParcelasDetalhadas(forma);
       const usaCartao = isFormaCartao(forma);
       const valorPagamento = getValorPagamento(pagamento);
       const labelForma = `forma de pagamento ${pagamentoIndex + 1}`;
@@ -1090,7 +1109,7 @@ export default function FinanceiroTituloNovo() {
       }));
       payload.pagamentos = (form.pagamentos || []).map((pagamento) => {
         const forma = getFormaPagamento(pagamento.forma_pagamento_id);
-        const usaDetalhe = forma && (isFormaBoleto(forma) || isFormaCheque(forma));
+        const usaDetalhe = formaUsaParcelasDetalhadas(forma);
         return {
           valor: usaDetalhe ? undefined : pagamento.valor,
           forma_pagamento_id: pagamento.forma_pagamento_id || undefined,
@@ -1508,7 +1527,7 @@ export default function FinanceiroTituloNovo() {
                 {(form.pagamentos || []).map((pagamento, pagamentoIndex) => {
                   const forma = getFormaPagamento(pagamento.forma_pagamento_id);
                   const quantidade = getQuantidadeParcelas(pagamento);
-                  const usaDetalhe = forma && (isFormaBoleto(forma) || isFormaCheque(forma));
+                  const usaDetalhe = formaUsaParcelasDetalhadas(forma);
                   const usaCartao = isFormaCartao(forma);
                   const cartoesFiltrados = cartoes.filter((item) => item.ativo !== false && cartaoCompativelComForma(item, forma));
 
@@ -1561,7 +1580,7 @@ export default function FinanceiroTituloNovo() {
                       </div>
 
                       <div className="grid gap-3 md:grid-cols-2">
-                        {forma?.permite_parcelamento ? (
+                        {formaPermiteParcelamentoOperacional(forma) ? (
                           <label className="text-sm">
                             <span className="mb-1 block text-[var(--c-muted)]">Parcelas</span>
                             <input
@@ -1631,7 +1650,7 @@ export default function FinanceiroTituloNovo() {
                       {usaDetalhe && (
                         <div className="space-y-3">
                           <div className="text-xs text-[var(--c-muted)]">
-                            Informe vencimento e valor de cada {isFormaCheque(forma) ? 'cheque' : 'boleto'}.
+                            Informe vencimento e valor de cada {getLabelParcelaForma(forma)}.
                           </div>
                           {(pagamento.parcelas || []).map((parcela, parcelaIndex) => (
                             <div key={parcelaIndex} className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface-muted)] p-3">
@@ -1662,7 +1681,7 @@ export default function FinanceiroTituloNovo() {
                                   />
                                 </label>
 
-                                {!isFormaCheque(forma) && (
+                                {isFormaBoleto(forma) && (
                                   <label className="text-sm md:col-span-2">
                                     <span className="mb-1 block text-[var(--c-muted)]">Documento ou referencia do boleto</span>
                                     <input
