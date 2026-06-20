@@ -149,6 +149,16 @@ function csvEscape(value) {
   return text;
 }
 
+function formatCodigoBarrasExport(value) {
+  const text = String(value ?? '').trim();
+  if (!text) return '';
+  const normalized = text.replace(/\s+/g, '').replace(/[^\d.,]/g, '');
+  if (/^\d+[.,]0+$/.test(normalized)) {
+    return normalized.replace(/[.,]0+$/, '');
+  }
+  return normalized.replace(/\D/g, '');
+}
+
 function parseCsvLine(line = '') {
   const values = [];
   let current = '';
@@ -1000,7 +1010,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
         titulo.data_vencimento || '',
         Number(titulo.valor_saldo || titulo.valor_original || 0).toFixed(2).replace('.', ','),
         titulo.linha_digitavel || '',
-        titulo.codigo_barras || '',
+        formatCodigoBarrasExport(titulo.codigo_barras),
         titulo.banco_boleto || ''
       ]);
     });

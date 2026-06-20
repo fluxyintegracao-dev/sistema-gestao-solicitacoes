@@ -67,12 +67,102 @@ function normalizePositiveNumber(value, fallback = undefined) {
     return fallback;
   }
 
-  const normalized = Number(value);
+  const normalized = typeof value === 'number'
+    ? value
+    : Number(String(value)
+      .trim()
+      .replace(/\s+/g, '')
+      .replace(/^R\$/i, '')
+      .replace(/\./g, '')
+      .replace(',', '.'));
   if (!Number.isFinite(normalized) || normalized < 0) {
     return fallback;
   }
 
   return normalized;
+}
+
+function hasExplicitFilterValue(value) {
+  return value !== undefined && value !== null && String(value).trim() !== '';
+}
+
+function resolveValueBounds(filters = {}) {
+  const hasInitial = hasExplicitFilterValue(filters.valor_inicial);
+  const hasFinal = hasExplicitFilterValue(filters.valor_final);
+  if (!hasInitial && !hasFinal) {
+    return { shouldFilter: false, lower: null, upper: null };
+  }
+
+  const initial = normalizePositiveNumber(filters.valor_inicial, undefined);
+  const final = normalizePositiveNumber(filters.valor_final, undefined);
+  const lower = Number(initial ?? final ?? 0);
+  const upper = Number(final ?? initial ?? lower);
+
+  return {
+    shouldFilter: Number.isFinite(lower) || Number.isFinite(upper),
+    lower: Math.min(lower, upper),
+    upper: Math.max(lower, upper)
+  };
+}
+
+const CLASSIFICACOES_INCOMPATIVEIS_COM_TARIFA = new Set([
+  'ENDIVIDAMENTO',
+  'INVESTIMENTO',
+  'PATRIMONIAL',
+  'INTERCOMPANY',
+  'TRANSFERENCIA_INTERNA'
+]);
+
+function categoriaFinanceiraAptaParaTarifa(categoria) {
+  if (!categoria || categoria.ativo === false) return false;
+  const tipo = String(categoria.tipo || '').trim().toUpperCase();
+  if (!['PAGAR', 'AMBOS'].includes(tipo)) return false;
+  if (categoria.considera_dre === false || !String(categoria.dre_grupo || '').trim()) return false;
+  const classificacao = String(categoria.classificacao_gerencial || '').trim().toUpperCase();
+  return !CLASSIFICACOES_INCOMPATIVEIS_COM_TARIFA.has(classificacao);
+}
+
+function categoriaFinanceiraPareceTarifa(categoria) {
+  const text = normalizeText([
+    categoria?.nome,
+    categoria?.descricao,
+    categoria?.dre_grupo,
+    categoria?.dre_subgrupo
+  ].filter(Boolean).join(' '));
+  return ['TARIFA', 'TAXA BANCARIA', 'DESPESA BANCARIA', 'DESPESAS BANCARIAS', 'RESULTADO FINANCEIRO'].some((term) => text.includes(term));
+}
+
+async function resolveCategoriaTarifaBancaria(tarifa, { transaction = null } = {}) {
+  const categoriaId = Number(tarifa?.categoria_financeira_id || 0);
+  if (Number.isInteger(categoriaId) && categoriaId > 0) {
+    const categoria = await CategoriaFinanceira.findByPk(categoriaId, { transaction });
+    if (!categoria) {
+      throw createHttpError(400, 'Categoria financeira configurada para a tarifa bancaria nao foi encontrada.');
+    }
+    if (!categoriaFinanceiraAptaParaTarifa(categoria)) {
+      throw createHttpError(400, 'Categoria financeira da tarifa bancaria deve estar ativa, ser PAGAR ou AMBOS e estar classificada para DRE.');
+    }
+    return categoria;
+  }
+
+  const categorias = await CategoriaFinanceira.findAll({
+    where: {
+      ativo: true,
+      tipo: {
+        [Op.in]: ['PAGAR', 'AMBOS']
+      }
+    },
+    transaction,
+    order: [['nome', 'ASC']]
+  });
+
+  const aptas = categorias.filter(categoriaFinanceiraAptaParaTarifa);
+  const categoria = aptas.find(categoriaFinanceiraPareceTarifa) || aptas[0];
+  if (!categoria) {
+    throw createHttpError(400, 'Configure uma categoria financeira de tarifa bancaria em Financeiro > Cadastros para conciliar este atalho.');
+  }
+
+  return categoria;
 }
 
 async function assertFinanceAccess(req) {
@@ -758,12 +848,10 @@ async function queryMovimentoCandidates(req, conciliacao, searchFilters = {}) {
 
   const defaultDateInitial = subtractDays(conciliacao.data_movimento, 5);
   const defaultDateFinal = addDays(conciliacao.data_movimento, 5);
-  const valorBancoAbsoluto = Math.abs(Number(conciliacao.valor || 0));
 
   const dataInicial = searchFilters.data_inicial || defaultDateInitial;
   const dataFinal = searchFilters.data_final || defaultDateFinal;
-  const valorInicial = normalizePositiveNumber(searchFilters.valor_inicial, valorBancoAbsoluto);
-  const valorFinal = normalizePositiveNumber(searchFilters.valor_final, valorBancoAbsoluto);
+  const valueBounds = resolveValueBounds(searchFilters);
   const documentoPesquisa = normalizeText(searchFilters.documento);
   const numeroDocumentoPesquisa = normalizeText(searchFilters.numero_documento);
   const limit = normalizeSearchLimit(searchFilters.limit, 40);
@@ -812,16 +900,17 @@ async function queryMovimentoCandidates(req, conciliacao, searchFilters = {}) {
       return false;
     }
 
-    const movementValue = Math.abs(Number(item.valor_quitacao || 0));
-    const lowerBound = Number(valorInicial || 0);
-    const upperBound = Number(valorFinal || lowerBound);
+    if (valueBounds.shouldFilter) {
+      const movementValue = Math.abs(Number(item.valor_quitacao || 0));
+      const lowerBound = Number(valueBounds.lower || 0);
+      const upperBound = Number(valueBounds.upper || lowerBound);
 
-    if (lowerBound === upperBound) {
-      if (Math.abs(movementValue - lowerBound) > 0.1) {
+      if (lowerBound === upperBound && Math.abs(movementValue - lowerBound) > 0.1) {
         return false;
       }
-    } else if (movementValue < lowerBound || movementValue > upperBound) {
-      return false;
+      if (lowerBound !== upperBound && (movementValue < lowerBound || movementValue > upperBound)) {
+        return false;
+      }
     }
 
     if (numeroDocumentoPesquisa) {
@@ -1284,20 +1373,24 @@ async function resolveMovimentoForConciliacao(req, conciliacao, movimentoId) {
 async function listarFaturasAssociacao(req, conciliacaoId, filters = {}) {
   const conciliacao = await loadConciliacaoById(req, conciliacaoId);
   const valorBancoAbsoluto = Math.abs(Number(conciliacao.valor || 0));
-  const valorInicial = normalizePositiveNumber(filters.valor_inicial, valorBancoAbsoluto);
-  const valorFinal = normalizePositiveNumber(filters.valor_final, valorBancoAbsoluto);
+  const valueBounds = resolveValueBounds(filters);
   const dataInicial = filters.data_inicial || subtractDays(conciliacao.data_movimento, 7);
   const dataFinal = filters.data_final || addDays(conciliacao.data_movimento, 7);
   const limit = normalizeSearchLimit(filters.limit, 30);
+  const dataRange = {
+    [Op.between]: [dataInicial, dataFinal]
+  };
 
   const faturas = await FaturaCartaoFinanceiro.findAll({
     where: {
       status: {
-        [Op.in]: ['ABERTA', 'FECHADA', 'PARCIAL', 'PAGA']
+        [Op.in]: ['ABERTA', 'FECHADA', 'PARCIAL', 'PAGA', 'PAGO', 'QUITADA', 'BAIXADA']
       },
-      data_vencimento: {
-        [Op.between]: [dataInicial, dataFinal]
-      }
+      [Op.or]: [
+        { data_vencimento: dataRange },
+        { data_pagamento: dataRange },
+        { data_fechamento: dataRange }
+      ]
     },
     include: [
       {
@@ -1315,14 +1408,13 @@ async function listarFaturasAssociacao(req, conciliacaoId, filters = {}) {
     order: [['data_vencimento', 'DESC'], ['id', 'DESC']]
   });
 
-  const lower = Number(valorInicial || 0);
-  const upper = Number(valorFinal || lower);
   const search = normalizeText(filters.documento || filters.busca || '');
   const itens = faturas
     .filter((fatura) => {
+      if (!valueBounds.shouldFilter) return true;
       const valor = Math.abs(Number(fatura.valor_total || 0));
-      if (lower === upper) return Math.abs(valor - lower) <= 0.1;
-      return valor >= lower && valor <= upper;
+      if (valueBounds.lower === valueBounds.upper) return Math.abs(valor - valueBounds.lower) <= 0.1;
+      return valor >= valueBounds.lower && valor <= valueBounds.upper;
     })
     .filter((fatura) => {
       if (!search) return true;
@@ -1336,29 +1428,32 @@ async function listarFaturasAssociacao(req, conciliacaoId, filters = {}) {
       return haystack.includes(search);
     })
     .slice(0, limit)
-    .map((fatura) => ({
-      id: fatura.id,
-      fatura_cartao_id: fatura.id,
-      cartao: fatura.cartao
-        ? {
-            id: fatura.cartao.id,
-            nome: fatura.cartao.nome,
-            titular: fatura.cartao.titular,
-            bandeira: fatura.cartao.bandeira,
-            ultimos_digitos: fatura.cartao.ultimos_digitos
-          }
-        : null,
-      cartao_nome: fatura.cartao?.nome || '-',
-      cartao_final: fatura.cartao?.ultimos_digitos || null,
-      competencia: fatura.competencia,
-      status: fatura.status,
-      data_fechamento: fatura.data_fechamento,
-      data_vencimento: fatura.data_vencimento,
-      valor_total: Number(fatura.valor_total || 0),
-      total_titulos: Array.isArray(fatura.titulos) ? fatura.titulos.length : 0,
-      diff_valor: roundCurrency(Math.abs(Math.abs(Number(fatura.valor_total || 0)) - valorBancoAbsoluto)),
-      diff_dias: calculateDiffDays(conciliacao.data_movimento, fatura.data_vencimento)
-    }));
+    .map((fatura) => {
+      const dataReferencia = fatura.data_pagamento || fatura.data_vencimento || fatura.data_fechamento;
+      return {
+        id: fatura.id,
+        fatura_cartao_id: fatura.id,
+        cartao: fatura.cartao
+          ? {
+              id: fatura.cartao.id,
+              nome: fatura.cartao.nome,
+              titular: fatura.cartao.titular,
+              bandeira: fatura.cartao.bandeira,
+              ultimos_digitos: fatura.cartao.ultimos_digitos
+            }
+          : null,
+        cartao_nome: fatura.cartao?.nome || '-',
+        cartao_final: fatura.cartao?.ultimos_digitos || null,
+        competencia: fatura.competencia,
+        status: fatura.status,
+        data_fechamento: fatura.data_fechamento,
+        data_vencimento: fatura.data_vencimento,
+        valor_total: Number(fatura.valor_total || 0),
+        total_titulos: Array.isArray(fatura.titulos) ? fatura.titulos.length : 0,
+        diff_valor: roundCurrency(Math.abs(Math.abs(Number(fatura.valor_total || 0)) - valorBancoAbsoluto)),
+        diff_dias: calculateDiffDays(conciliacao.data_movimento, dataReferencia)
+      };
+    });
 
   return {
     conciliacao: {
@@ -1399,7 +1494,7 @@ async function confirmarConciliacaoFatura(req, conciliacaoId, payload = {}) {
       throw createHttpError(400, 'O valor da fatura nao confere com o lancamento bancario.');
     }
 
-    if (statusFatura !== 'PAGA') {
+    if (!['PAGA', 'PAGO', 'QUITADA', 'BAIXADA'].includes(statusFatura)) {
       await baixarFaturaCartao(req, fatura.id, {
         conta_bancaria_id: conciliacao.conta_bancaria_id,
         data_movimento: conciliacao.data_movimento,
@@ -1566,28 +1661,7 @@ async function confirmarConciliacaoTarifa(req, conciliacaoId, payload = {}) {
     if (valor <= 0) {
       throw createHttpError(400, 'Valor do lancamento bancario invalido para tarifa.');
     }
-    const categoriaId = Number(tarifa.categoria_financeira_id || 0);
-    if (!Number.isInteger(categoriaId) || categoriaId <= 0) {
-      throw createHttpError(400, 'Configure uma categoria financeira para este atalho de tarifa bancaria antes de conciliar.');
-    }
-    const categoria = await CategoriaFinanceira.findByPk(categoriaId, { transaction });
-    if (!categoria) {
-      throw createHttpError(400, 'Categoria financeira configurada para a tarifa bancaria nao foi encontrada.');
-    }
-    const tipoCategoria = String(categoria.tipo || '').trim().toUpperCase();
-    if (!['PAGAR', 'AMBOS'].includes(tipoCategoria)) {
-      throw createHttpError(400, 'Categoria financeira da tarifa bancaria deve ser do tipo PAGAR ou AMBOS.');
-    }
-    if (categoria.ativo === false) {
-      throw createHttpError(400, 'Categoria financeira da tarifa bancaria esta inativa.');
-    }
-    if (categoria.considera_dre === false || !String(categoria.dre_grupo || '').trim()) {
-      throw createHttpError(400, 'Categoria financeira da tarifa bancaria precisa estar classificada para DRE.');
-    }
-    const classificacaoGerencial = String(categoria.classificacao_gerencial || '').trim().toUpperCase();
-    if (['ENDIVIDAMENTO', 'INVESTIMENTO', 'PATRIMONIAL', 'INTERCOMPANY', 'TRANSFERENCIA_INTERNA'].includes(classificacaoGerencial)) {
-      throw createHttpError(400, 'Categoria financeira da tarifa bancaria nao pode ser endividamento, investimento, patrimonial, entre empresas ou transferencia interna.');
-    }
+    const categoria = await resolveCategoriaTarifaBancaria(tarifa, { transaction });
 
     const sessao = await obterSessaoAbertaParaConta(conta, conciliacao.data_movimento, { transaction });
     const descricao = String(payload.descricao || conciliacao.descricao_banco || tarifa.nome || '').trim().slice(0, 255);

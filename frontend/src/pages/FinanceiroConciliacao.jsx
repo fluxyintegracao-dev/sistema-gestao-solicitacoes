@@ -103,14 +103,13 @@ function tipoTituloPorValorExtrato(value) {
 }
 
 function buildAssociacaoDefaults(item) {
-  const valor = Math.abs(Number(item?.valor || 0));
   return {
     data_inicial: item?.data_movimento || '',
     data_final: item?.data_movimento || '',
     documento: '',
-    numero_documento: item?.documento || '',
-    valor_inicial: valor ? formatCurrencyInput(valor) : '',
-    valor_final: valor ? formatCurrencyInput(valor) : '',
+    numero_documento: '',
+    valor_inicial: '',
+    valor_final: '',
     limit: 30
   };
 }
@@ -127,7 +126,7 @@ function getContaEmpresaNome(conta) {
 
 function tarifaAtalhoAptaParaConciliacao(tarifa = {}) {
   if (!tarifa.categoria_financeira_id) {
-    return { ok: false, motivo: 'Configure uma categoria financeira para este atalho.' };
+    return { ok: true, motivo: 'Sem categoria fixa: o sistema tentara usar uma categoria padrao de tarifa bancaria.' };
   }
 
   const categoria = tarifa.categoria_financeira;
@@ -1566,10 +1565,6 @@ export default function FinanceiroConciliacao() {
 
   async function handleConfirmarTarifa(item, tarifa) {
     if (!item?.id || !tarifa?.codigo) return;
-    if (!tarifa.categoria_financeira_id) {
-      setError('Configure a categoria financeira deste atalho de tarifa em Financeiro > Cadastros antes de conciliar.');
-      return;
-    }
 
     try {
       setProcessingId(`tarifa-${item.id}-${tarifa.codigo}`);
