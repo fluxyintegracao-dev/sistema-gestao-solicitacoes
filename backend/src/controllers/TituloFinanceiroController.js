@@ -2,6 +2,7 @@ const {
   atualizarCobrancaTitulo,
   atualizarTitulo,
   baixarTitulo,
+  baixarTitulosParceladosEmMassa,
   baixarTituloPorConciliacoes,
   carregarTituloPorId,
   criarTituloManual,
@@ -129,6 +130,16 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return responderErro(res, error, 'Erro ao registrar baixa financeira');
+    }
+  },
+
+  async baixarParcelado(req, res) {
+    try {
+      const resultado = await baixarTitulosParceladosEmMassa(req, req.body || {});
+      return res.json(resultado);
+    } catch (error) {
+      console.error(error);
+      return responderErro(res, error, 'Erro ao registrar baixa parcelada em massa');
     }
   },
 

@@ -172,6 +172,7 @@ const {
   validateFinanceIntercompanyQuery,
   validateFinanceRelatorioAnaliticoQuery,
   validateFinanceTituloBaixaBody,
+  validateFinanceTituloBaixaParceladaBody,
   validateFinanceTituloBaixaConciliacoesBody,
   validateFinanceTituloCobrancaBody,
   validateFinanceTituloCreateBody,
@@ -1307,6 +1308,7 @@ router.patch('/financeiro/financiamentos-bancarios/parcelas/:id', allowFinanceir
 router.get('/financeiro/titulos', allowFinanceiro, validateRequest({ query: validateFinanceTituloQuery }), TituloFinanceiroController.index);
 router.post('/financeiro/titulos', allowFinanceiro, criticalRateLimit, validateRequest({ body: validateFinanceTituloCreateBody }), TituloFinanceiroController.create);
 router.post('/financeiro/titulos/importar-codigos-barras', allowFinanceiro, criticalRateLimit, TituloFinanceiroController.importarCodigosBarras);
+router.post('/financeiro/titulos/baixas/parceladas', allowFinanceiro, criticalRateLimit, validateRequest({ body: validateFinanceTituloBaixaParceladaBody }), TituloFinanceiroController.baixarParcelado);
 router.get('/financeiro/titulos/:id', allowFinanceiro, validateRequest({ params: validateNumericIdParam('id', 'Titulo financeiro') }), TituloFinanceiroController.show);
 router.get('/financeiro/titulos/:id/auditoria', allowFinanceiro, validateRequest({ params: validateNumericIdParam('id', 'Titulo financeiro') }), TituloFinanceiroController.auditoria);
 router.patch('/financeiro/titulos/:id', allowFinanceiro, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Titulo financeiro'), body: validateFinanceTituloUpdateBody }), TituloFinanceiroController.update);

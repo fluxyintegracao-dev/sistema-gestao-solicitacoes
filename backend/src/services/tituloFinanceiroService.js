@@ -2829,6 +2829,302 @@ async function baixarTitulo(req, tituloId, payload = {}) {
   }
 }
 
+async function validarCartaoBaixaParcelada({ formaRecebimento, cartaoId, empresaBaixaId, transaction }) {
+  if (String(formaRecebimento || '').toUpperCase() !== 'CARTAO') {
+    if (cartaoId) {
+      throw createHttpError(400, 'Cartao deve ser informado apenas quando a forma de recebimento for CARTAO.');
+    }
+    return null;
+  }
+
+  if (!cartaoId) {
+    throw createHttpError(400, 'Informe o cartao utilizado na baixa parcelada.');
+  }
+
+  const cartao = await CartaoFinanceiro.findByPk(cartaoId, {
+    include: [{ model: ContaBancaria, as: 'contaBancaria' }],
+    transaction
+  });
+
+  if (!cartao || cartao.ativo === false) {
+    throw createHttpError(400, 'Cartao financeiro invalido ou inativo.');
+  }
+
+  const contaCartao = cartao.contaBancaria;
+  if (contaCartao?.empresa_id && Number(contaCartao.empresa_id) !== Number(empresaBaixaId)) {
+    throw createHttpError(400, 'O cartao informado deve pertencer a empresa pagadora.');
+  }
+
+  return cartao;
+}
+
+function appendObservacaoBaixaAgrupada(observacoes, grupoParcelamentoId) {
+  const atual = String(observacoes || '').trim();
+  const complemento = `Quitado por baixa agrupada parcelada ${grupoParcelamentoId}.`;
+  return atual ? `${atual}\n${complemento}` : complemento;
+}
+
+async function baixarTitulosParceladosEmMassa(req, payload = {}) {
+  await assertFinanceAccess(req);
+
+  const tituloIds = Array.isArray(payload.titulo_ids)
+    ? Array.from(new Set(payload.titulo_ids.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0)))
+    : [];
+  if (tituloIds.length === 0) {
+    throw createHttpError(400, 'Selecione ao menos um titulo para a baixa parcelada.');
+  }
+
+  const formaRecebimento = normalizarFormaRecebimento(payload.forma_recebimento);
+  if (!['CHEQUE', 'CARTAO'].includes(formaRecebimento)) {
+    throw createHttpError(400, 'Baixa parcelada em massa esta disponivel apenas para CHEQUE ou CARTAO.');
+  }
+
+  const conta = await validarContaBancaria(payload.conta_bancaria_id);
+  if (!conta) {
+    throw createHttpError(400, 'Conta bancaria e obrigatoria para gerar parcelas conciliaveis.');
+  }
+  const empresaBaixaId = await validarEmpresaBaixa({
+    empresaId: payload.empresa_id,
+    conta
+  });
+
+  const titulos = [];
+  for (const tituloId of tituloIds) {
+    const titulo = await carregarTituloPorId(req, tituloId, { includeMovimentos: false });
+    const statusAtual = String(titulo.status || '').trim().toUpperCase();
+    if (!['ABERTO', 'PARCIAL'].includes(statusAtual)) {
+      throw createHttpError(400, `Titulo ${titulo.codigo || titulo.id} nao esta aberto ou parcial.`);
+    }
+    const saldo = roundCurrency(titulo.valor_saldo);
+    if (saldo <= 0) {
+      throw createHttpError(400, `Titulo ${titulo.codigo || titulo.id} nao possui saldo em aberto.`);
+    }
+    if (!titulo.empresa_id) {
+      throw createHttpError(400, `Titulo ${titulo.codigo || titulo.id} nao possui empresa vinculada.`);
+    }
+    titulos.push(titulo);
+  }
+
+  const tipoTitulo = String(titulos[0]?.tipo || '').toUpperCase();
+  if (!['PAGAR', 'RECEBER'].includes(tipoTitulo)) {
+    throw createHttpError(400, 'Tipo dos titulos selecionados invalido para baixa parcelada.');
+  }
+  const tituloTipoDiferente = titulos.find((titulo) => String(titulo.tipo || '').toUpperCase() !== tipoTitulo);
+  if (tituloTipoDiferente) {
+    throw createHttpError(400, 'Selecione apenas titulos do mesmo tipo para baixa agrupada.');
+  }
+
+  const parcelas = Array.isArray(payload.parcelas) ? payload.parcelas : [];
+  if (parcelas.length === 0) {
+    throw createHttpError(400, 'Informe as parcelas da baixa agrupada.');
+  }
+
+  const totalTitulos = somarValores(titulos.map((titulo) => Number(titulo.valor_saldo || 0)));
+  const totalParcelas = somarValores(parcelas.map((parcela) => Number(parcela.valor || 0)));
+  assertValoresIguais({
+    atual: totalParcelas,
+    esperado: totalTitulos,
+    mensagem: 'A soma das parcelas precisa ser igual ao saldo total dos titulos selecionados.'
+  });
+
+  const grupoParcelamentoId = `BAIXA-${crypto.randomUUID()}`;
+  const referenciaTitulo = titulos[0];
+  const codigosOriginais = titulos.map((titulo) => titulo.codigo || `#${titulo.id}`).join(', ');
+  const transaction = await sequelize.transaction();
+  let transactionCommitted = false;
+
+  try {
+    const cartao = await validarCartaoBaixaParcelada({
+      formaRecebimento,
+      cartaoId: payload.cartao_id,
+      empresaBaixaId,
+      transaction
+    });
+
+    const movimentosOriginais = [];
+    for (const titulo of titulos) {
+      const saldo = roundCurrency(titulo.valor_saldo);
+      const movimentoIntercompanyFields = await validarIntercompanyBaixa({
+        payload: Number(titulo.empresa_id) === Number(empresaBaixaId)
+          ? { ...payload, intercompany: false }
+          : payload,
+        titulo,
+        empresaBaixaId
+      });
+      const caixaSessao = await obterSessaoAbertaParaConta(conta, payload.data_movimento, { transaction });
+      const movimentoOriginal = await MovimentoFinanceiro.create({
+        titulo_financeiro_id: titulo.id,
+        conta_bancaria_id: conta.id,
+        cartao_id: cartao?.id || null,
+        empresa_id: empresaBaixaId,
+        ...movimentoIntercompanyFields,
+        caixa_sessao_id: caixaSessao?.id || null,
+        forma_recebimento: formaRecebimento,
+        documento_referencia: grupoParcelamentoId,
+        tipo_movimento: 'BAIXA',
+        status: 'AGRUPADO',
+        valor: saldo,
+        juros: 0,
+        multa: 0,
+        desconto: 0,
+        valor_quitacao: saldo,
+        data_movimento: payload.data_movimento,
+        observacoes: payload.observacoes || 'Baixa agrupada parcelada.',
+        criado_por: req.user?.id || null
+      }, { transaction });
+      movimentosOriginais.push(movimentoOriginal);
+
+      await titulo.update({
+        valor_baixado: roundCurrency(Number(titulo.valor_baixado || 0) + saldo),
+        valor_saldo: 0,
+        status: 'QUITADO',
+        data_quitacao: payload.data_movimento,
+        observacoes: appendObservacaoBaixaAgrupada(titulo.observacoes, grupoParcelamentoId),
+        atualizado_por: req.user?.id || null
+      }, { transaction });
+
+      await sincronizarRealizacaoCompraPorTitulo({
+        titulo,
+        statusTitulo: 'QUITADO',
+        transaction
+      });
+
+      if (titulo.solicitacao_id) {
+        await Historico.create({
+          solicitacao_id: titulo.solicitacao_id,
+          usuario_responsavel_id: req.user?.id || null,
+          setor: getSetorUsuario(req),
+          acao: 'TITULO_FINANCEIRO_BAIXADO_AGRUPADO',
+          observacao: `Titulo financeiro ${titulo.codigo || `#${titulo.id}`} quitado por baixa agrupada ${grupoParcelamentoId}.`
+        }, { transaction });
+      }
+    }
+
+    const parcelasCriadas = [];
+    for (const [index, parcela] of parcelas.entries()) {
+      const numeroParcela = index + 1;
+      const valorParcela = roundCurrency(parcela.valor);
+      const documentoReferencia = parcela.documento_referencia
+        || parcela.cheque_numero
+        || `${grupoParcelamentoId}-${numeroParcela}`;
+      const tituloParcela = await TituloFinanceiro.create({
+        solicitacao_id: referenciaTitulo.solicitacao_id || null,
+        obra_id: referenciaTitulo.obra_id || null,
+        apropriacao_id: referenciaTitulo.apropriacao_id || null,
+        empresa_id: empresaBaixaId,
+        parceiro_id: referenciaTitulo.parceiro_id,
+        categoria_financeira_id: referenciaTitulo.categoria_financeira_id || null,
+        forma_pagamento_id: null,
+        cartao_id: cartao?.id || null,
+        grupo_parcelamento_id: grupoParcelamentoId,
+        numero_parcela: numeroParcela,
+        total_parcelas: parcelas.length,
+        competencia_data: referenciaTitulo.competencia_data || parcela.data_movimento,
+        considera_dre: false,
+        possui_rateio: false,
+        origem_titulo: 'BAIXA_MASSA_PARCELADA',
+        tipo: tipoTitulo,
+        status: 'QUITADO',
+        descricao: `Baixa agrupada ${grupoParcelamentoId} - parcela ${numeroParcela}/${parcelas.length}`,
+        numero_documento: documentoReferencia,
+        cheque_numero: parcela.cheque_numero || null,
+        cheque_banco: parcela.cheque_banco || null,
+        cheque_agencia: parcela.cheque_agencia || null,
+        cheque_conta: parcela.cheque_conta || null,
+        cheque_emitente: parcela.cheque_emitente || null,
+        valor_original: valorParcela,
+        valor_bruto: valorParcela,
+        valor_impostos: 0,
+        valor_liquido: valorParcela,
+        valor_saldo: 0,
+        valor_baixado: valorParcela,
+        data_emissao: payload.data_movimento,
+        data_vencimento: parcela.data_movimento,
+        data_quitacao: parcela.data_movimento,
+        observacoes: [
+          payload.observacoes || 'Parcela gerada por baixa agrupada.',
+          `Titulos originais: ${codigosOriginais}.`
+        ].filter(Boolean).join('\n'),
+        criado_por: req.user?.id || null,
+        atualizado_por: req.user?.id || null
+      }, { transaction });
+
+      const caixaSessao = await obterSessaoAbertaParaConta(conta, parcela.data_movimento, { transaction });
+      const movimentoParcela = await MovimentoFinanceiro.create({
+        titulo_financeiro_id: tituloParcela.id,
+        conta_bancaria_id: conta.id,
+        cartao_id: cartao?.id || null,
+        empresa_id: empresaBaixaId,
+        caixa_sessao_id: caixaSessao?.id || null,
+        forma_recebimento: formaRecebimento === 'CARTAO' ? 'CARTAO_PARCELADO' : 'CHEQUE_PARCELADO',
+        documento_referencia: documentoReferencia,
+        tipo_movimento: 'BAIXA',
+        status: 'ATIVO',
+        valor: valorParcela,
+        juros: 0,
+        multa: 0,
+        desconto: 0,
+        valor_quitacao: valorParcela,
+        data_movimento: parcela.data_movimento,
+        observacoes: [
+          parcela.observacoes || null,
+          `Parcela ${numeroParcela}/${parcelas.length} da baixa agrupada ${grupoParcelamentoId}.`,
+          `Titulos originais: ${codigosOriginais}.`
+        ].filter(Boolean).join('\n'),
+        criado_por: req.user?.id || null
+      }, { transaction });
+
+      parcelasCriadas.push({
+        titulo_id: tituloParcela.id,
+        codigo: tituloParcela.codigo,
+        movimento_id: movimentoParcela.id,
+        numero_parcela: numeroParcela,
+        data_movimento: parcela.data_movimento,
+        valor: valorParcela
+      });
+    }
+
+    await transaction.commit();
+    transactionCommitted = true;
+
+    await registrarEventoSeguranca({
+      req,
+      usuarioId: req.user?.id || null,
+      tipoEvento: 'FINANCIAL_MASS_SETTLEMENT_INSTALLMENTS',
+      recursoTipo: 'TITULO_FINANCEIRO',
+      recursoId: null,
+      status: 'SUCCESS',
+      descricao: 'Baixa em massa agrupada e parcelada registrada',
+      metadata: {
+        grupo_parcelamento_id: grupoParcelamentoId,
+        titulo_ids: tituloIds,
+        movimento_ids_agrupados: movimentosOriginais.map((movimento) => movimento.id),
+        parcelas: parcelasCriadas,
+        forma_recebimento: formaRecebimento,
+        conta_bancaria_id: conta.id,
+        cartao_id: cartao?.id || null,
+        empresa_baixa_id: empresaBaixaId,
+        total: totalTitulos
+      }
+    });
+
+    return {
+      grupo_parcelamento_id: grupoParcelamentoId,
+      total: totalTitulos,
+      titulos_originais: titulos.map((titulo) => ({
+        id: titulo.id,
+        codigo: titulo.codigo
+      })),
+      parcelas: parcelasCriadas
+    };
+  } catch (error) {
+    if (!transactionCommitted) {
+      await transaction.rollback();
+    }
+    throw error;
+  }
+}
+
 async function baixarTituloPorConciliacoes(req, tituloId, payload = {}) {
   const titulo = await carregarTituloPorId(req, tituloId, { includeMovimentos: false });
   const statusAtual = String(titulo.status || '').trim().toUpperCase();
@@ -3215,6 +3511,7 @@ module.exports = {
   atualizarCobrancaTitulo,
   atualizarTitulo,
   baixarTitulo,
+  baixarTitulosParceladosEmMassa,
   baixarTituloPorConciliacoes,
   carregarTituloPorId,
   criarTituloManual,

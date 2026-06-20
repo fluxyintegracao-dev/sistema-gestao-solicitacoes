@@ -1380,6 +1380,116 @@ function validateFinanceTituloBaixaBody(body = {}) {
   };
 }
 
+function validateFinanceTituloBaixaParceladaBody(body = {}) {
+  ensureAllowedKeys(
+    body,
+    [
+      'titulo_ids',
+      'empresa_id',
+      'conta_bancaria_id',
+      'cartao_id',
+      'forma_recebimento',
+      'data_movimento',
+      'observacoes',
+      'parcelas',
+      'intercompany',
+      'tipo_intercompany',
+      'motivo_intercompany',
+      'elimina_consolidado',
+      'transferencia_interna'
+    ],
+    'Baixa parcelada em massa'
+  );
+
+  if (!Array.isArray(body.titulo_ids) || body.titulo_ids.length === 0) {
+    throw new ValidationError('Selecione ao menos um titulo para a baixa parcelada.');
+  }
+
+  if (body.titulo_ids.length > 100) {
+    throw new ValidationError('A baixa parcelada permite ate 100 titulos por operacao.');
+  }
+
+  const tituloIds = Array.from(new Set(body.titulo_ids.map((id) => (
+    parseInteger(id, 'Titulo financeiro', { required: true })
+  ))));
+
+  const formaRecebimento = parseEnum(
+    body.forma_recebimento,
+    'Forma de recebimento',
+    COMERCIAL_FORMA_RECEBIMENTO
+  );
+
+  if (!['CHEQUE', 'CARTAO'].includes(formaRecebimento)) {
+    throw new ValidationError('Baixa parcelada em massa esta disponivel apenas para CHEQUE ou CARTAO.');
+  }
+
+  const contaBancariaId = parseInteger(body.conta_bancaria_id, 'Conta bancaria', { required: true });
+  const cartaoId = parseInteger(body.cartao_id, 'Cartao');
+  if (formaRecebimento === 'CARTAO' && !cartaoId) {
+    throw new ValidationError('Informe o cartao utilizado na baixa parcelada.');
+  }
+
+  if (!Array.isArray(body.parcelas) || body.parcelas.length === 0) {
+    throw new ValidationError('Informe as parcelas da baixa agrupada.');
+  }
+
+  if (body.parcelas.length > 60) {
+    throw new ValidationError('A baixa parcelada permite ate 60 parcelas.');
+  }
+
+  const parcelas = body.parcelas.map((item, index) => {
+    ensureAllowedKeys(
+      item || {},
+      [
+        'data_movimento',
+        'valor',
+        'documento_referencia',
+        'observacoes',
+        'cheque_numero',
+        'cheque_emitente',
+        'cheque_banco',
+        'cheque_agencia',
+        'cheque_conta'
+      ],
+      `Parcela ${index + 1} da baixa agrupada`
+    );
+
+    const parcela = {
+      data_movimento: parseDateOnly(item?.data_movimento, `Data da parcela ${index + 1}`, { required: true }),
+      valor: parseDecimal(item?.valor, `Valor da parcela ${index + 1}`, { required: true, min: 0.01 }),
+      documento_referencia: parseOptionalText(item?.documento_referencia, `Documento da parcela ${index + 1}`, 120),
+      observacoes: parseOptionalText(item?.observacoes, `Observacoes da parcela ${index + 1}`, 1000),
+      cheque_numero: parseOptionalText(item?.cheque_numero, `Numero do cheque da parcela ${index + 1}`, 60),
+      cheque_emitente: parseOptionalText(item?.cheque_emitente, `Emitente do cheque da parcela ${index + 1}`, 160),
+      cheque_banco: parseOptionalText(item?.cheque_banco, `Banco do cheque da parcela ${index + 1}`, 120),
+      cheque_agencia: parseOptionalText(item?.cheque_agencia, `Agencia do cheque da parcela ${index + 1}`, 40),
+      cheque_conta: parseOptionalText(item?.cheque_conta, `Conta do cheque da parcela ${index + 1}`, 60)
+    };
+
+    if (formaRecebimento === 'CHEQUE' && (!parcela.cheque_numero || !parcela.cheque_emitente)) {
+      throw new ValidationError(`Informe numero e emitente do cheque na parcela ${index + 1}.`);
+    }
+
+    return parcela;
+  });
+
+  return {
+    titulo_ids: tituloIds,
+    empresa_id: parseInteger(body.empresa_id, 'Empresa pagadora', { required: true }),
+    conta_bancaria_id: contaBancariaId,
+    cartao_id: cartaoId,
+    forma_recebimento: formaRecebimento,
+    data_movimento: parseDateOnly(body.data_movimento, 'Data do movimento', { required: true }),
+    observacoes: parseOptionalText(body.observacoes, 'Observacoes', 4000),
+    parcelas,
+    intercompany: parseBoolean(body.intercompany, 'Entre Empresas'),
+    tipo_intercompany: parseEnum(body.tipo_intercompany, 'Tipo', TIPOS_INTERCOMPANY),
+    motivo_intercompany: parseOptionalText(body.motivo_intercompany, 'Motivo', 255),
+    elimina_consolidado: parseBoolean(body.elimina_consolidado, 'Eliminar no consolidado'),
+    transferencia_interna: parseBoolean(body.transferencia_interna, 'Transferencia interna')
+  };
+}
+
 function validateFinanceTituloBaixaConciliacoesBody(body = {}) {
   ensureAllowedKeys(
     body,
@@ -1699,6 +1809,7 @@ module.exports = {
   validateFinanceIntercompanyQuery,
   validateFinanceRelatorioAnaliticoQuery,
   validateFinanceTituloBaixaBody,
+  validateFinanceTituloBaixaParceladaBody,
   validateFinanceTituloBaixaConciliacoesBody,
   validateFinanceTituloCobrancaBody,
   validateFinanceTituloCreateBody,

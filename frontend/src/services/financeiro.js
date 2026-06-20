@@ -803,6 +803,16 @@ export async function baixarTituloFinanceiro(id, data) {
   return parseJson(response, 'Erro ao registrar baixa financeira');
 }
 
+export async function baixarTitulosFinanceirosEmMassaParcelado(data) {
+  const response = await fetch(`${API_URL}/financeiro/titulos/baixas/parceladas`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+
+  return parseJson(response, 'Erro ao registrar baixa parcelada em massa');
+}
+
 export async function baixarTituloPorConciliacoes(id, data) {
   const response = await fetch(`${API_URL}/financeiro/titulos/${id}/baixas/conciliacoes`, {
     method: 'POST',

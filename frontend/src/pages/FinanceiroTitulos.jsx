@@ -14,6 +14,7 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 import {
   baixarTituloFinanceiro,
+  baixarTitulosFinanceirosEmMassaParcelado,
   getCategoriasFinanceiras,
   getCartoesFinanceiros,
   getContasBancarias,
@@ -235,6 +236,10 @@ function isCartaoForma(formaRecebimento) {
   return String(formaRecebimento || '').toUpperCase() === 'CARTAO';
 }
 
+function isChequeForma(formaRecebimento) {
+  return String(formaRecebimento || '').toUpperCase() === 'CHEQUE';
+}
+
 function isCartaoDebito(cartao) {
   return String(cartao?.tipo || '').toUpperCase() === 'DEBITO';
 }
@@ -254,7 +259,61 @@ function isTituloEditavel(titulo) {
   return String(titulo?.status || '').trim().toUpperCase() === 'ABERTO' && Number(titulo?.valor_baixado || 0) === 0;
 }
 
-function buildBaixaMassaForm(contasBancarias = []) {
+function parseCurrencyInput(value) {
+  if (value == null || value === '') return 0;
+  const raw = String(value).trim().replace(/[R$\s]/gi, '');
+  const normalized = raw.includes(',')
+    ? raw.replace(/\./g, '').replace(',', '.')
+    : raw;
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function roundValue(value) {
+  return Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;
+}
+
+function formatCurrencyInput(value) {
+  const number = Number(value || 0);
+  return number.toLocaleString('pt-BR', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+}
+
+function addMonthsToDate(dateString, amount) {
+  const date = new Date(`${dateString || today()}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return dateString || today();
+  const day = date.getDate();
+  date.setMonth(date.getMonth() + Number(amount || 0), 1);
+  const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+  date.setDate(Math.min(day, lastDay));
+  return date.toISOString().slice(0, 10);
+}
+
+function buildBaixaMassaParcelas(total = 0, quantidade = 2, dataInicial = today()) {
+  const qtd = Math.max(1, Math.min(Number(quantidade || 1), 60));
+  const totalCentavos = Math.round(Number(total || 0) * 100);
+  const base = Math.floor(totalCentavos / qtd);
+  let resto = totalCentavos - (base * qtd);
+  return Array.from({ length: qtd }, (_, index) => {
+    const centavos = base + (resto > 0 ? 1 : 0);
+    if (resto > 0) resto -= 1;
+    return {
+      data_movimento: addMonthsToDate(dataInicial, index),
+      valor: formatCurrencyInput(centavos / 100),
+      documento_referencia: '',
+      cheque_numero: '',
+      cheque_emitente: '',
+      cheque_banco: '',
+      cheque_agencia: '',
+      cheque_conta: '',
+      observacoes: ''
+    };
+  });
+}
+
+function buildBaixaMassaForm(contasBancarias = [], total = 0) {
   return {
     empresa_id: '',
     conta_bancaria_id: '',
@@ -262,7 +321,10 @@ function buildBaixaMassaForm(contasBancarias = []) {
     forma_recebimento: '',
     desconto: '',
     data_movimento: today(),
-    observacoes: ''
+    observacoes: '',
+    parcelado: false,
+    quantidade_parcelas: 2,
+    parcelas: buildBaixaMassaParcelas(total, 2, today())
   };
 }
 
@@ -529,6 +591,12 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
   }), [baixaMassaForm.empresa_id, cartoes, contasBancarias]);
   const baixaMassaUsaCartao = isCartaoForma(baixaMassaForm.forma_recebimento);
   const baixaMassaCartaoDebito = baixaMassaUsaCartao && isCartaoDebito(selectedCartaoBaixaMassa);
+  const baixaMassaFormaParcelavel = baixaMassaUsaCartao || isChequeForma(baixaMassaForm.forma_recebimento);
+  const baixaMassaParcelada = baixaMassaFormaParcelavel && Boolean(baixaMassaForm.parcelado);
+  const baixaMassaTotalParcelas = useMemo(() => (
+    (baixaMassaForm.parcelas || []).reduce((total, parcela) => total + parseCurrencyInput(parcela.valor), 0)
+  ), [baixaMassaForm.parcelas]);
+  const baixaMassaDiferencaParcelas = roundValue(selectedSaldo - baixaMassaTotalParcelas);
   const allBaixaveisSelected = titulosBaixaveis.length > 0 && titulosBaixaveis.every((titulo) => selectedTituloSet.has(Number(titulo.id)));
 
   useEffect(() => {
@@ -753,8 +821,38 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
     }
 
     setError('');
-    setBaixaMassaForm(buildBaixaMassaForm(contasBancarias));
+    setBaixaMassaForm(buildBaixaMassaForm(contasBancarias, selectedSaldo));
     setModalBaixaMassaOpen(true);
+  }
+
+  function setBaixaMassaParcelamentoAtivo(checked) {
+    setBaixaMassaForm((current) => ({
+      ...current,
+      parcelado: checked,
+      desconto: checked ? '' : current.desconto,
+      quantidade_parcelas: current.quantidade_parcelas || 2,
+      parcelas: checked
+        ? buildBaixaMassaParcelas(selectedSaldo, current.quantidade_parcelas || 2, current.data_movimento)
+        : current.parcelas
+    }));
+  }
+
+  function setQuantidadeParcelasBaixaMassa(value) {
+    const quantidade = Math.max(1, Math.min(Number(value || 1), 60));
+    setBaixaMassaForm((current) => ({
+      ...current,
+      quantidade_parcelas: quantidade,
+      parcelas: buildBaixaMassaParcelas(selectedSaldo, quantidade, current.data_movimento)
+    }));
+  }
+
+  function updateBaixaMassaParcela(index, field, value) {
+    setBaixaMassaForm((current) => ({
+      ...current,
+      parcelas: (current.parcelas || []).map((parcela, itemIndex) => (
+        itemIndex === index ? { ...parcela, [field]: value } : parcela
+      ))
+    }));
   }
 
   async function handleBaixaMassaSubmit(event) {
@@ -779,14 +877,43 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
       return;
     }
 
-    if (baixaMassaCartaoDebito && !baixaMassaForm.conta_bancaria_id) {
+    if (baixaMassaParcelada && !baixaMassaForm.conta_bancaria_id) {
+      setError('Informe a conta bancaria para conciliar as parcelas geradas.');
+      return;
+    }
+
+    if (!baixaMassaParcelada && baixaMassaCartaoDebito && !baixaMassaForm.conta_bancaria_id) {
       setError('Cartao de debito precisa ter conta bancaria vinculada.');
       return;
     }
 
-    if (contaBancariaObrigatoria(baixaMassaForm.forma_recebimento) && !baixaMassaForm.conta_bancaria_id) {
+    if (!baixaMassaParcelada && contaBancariaObrigatoria(baixaMassaForm.forma_recebimento) && !baixaMassaForm.conta_bancaria_id) {
       setError('Conta bancaria e obrigatoria para esta forma de baixa.');
       return;
+    }
+
+    if (baixaMassaParcelada) {
+      const parcelas = Array.isArray(baixaMassaForm.parcelas) ? baixaMassaForm.parcelas : [];
+      if (parcelas.length === 0) {
+        setError('Informe ao menos uma parcela para a baixa agrupada.');
+        return;
+      }
+      const parcelaInvalida = parcelas.find((parcela) => !parcela.data_movimento || parseCurrencyInput(parcela.valor) <= 0);
+      if (parcelaInvalida) {
+        setError('Todas as parcelas precisam ter data e valor maior que zero.');
+        return;
+      }
+      if (Math.abs(baixaMassaDiferencaParcelas) >= 0.01) {
+        setError('A soma das parcelas precisa ser igual ao saldo total selecionado.');
+        return;
+      }
+      if (isChequeForma(baixaMassaForm.forma_recebimento)) {
+        const chequeInvalido = parcelas.find((parcela) => !String(parcela.cheque_numero || '').trim() || !String(parcela.cheque_emitente || '').trim());
+        if (chequeInvalido) {
+          setError('Para cheque, informe numero e emitente em todas as parcelas.');
+          return;
+        }
+      }
     }
 
     try {
@@ -794,20 +921,36 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
       setError('');
 
       const falhas = [];
-      for (const titulo of selectedTitulosBaixaveis) {
-        try {
-          await baixarTituloFinanceiro(titulo.id, {
-            empresa_id: baixaMassaForm.empresa_id,
-            conta_bancaria_id: baixaMassaForm.conta_bancaria_id || null,
-            cartao_id: baixaMassaForm.cartao_id || null,
-            forma_recebimento: baixaMassaForm.forma_recebimento,
-            valor: Number(titulo.valor_saldo || 0),
-            desconto: baixaMassaForm.desconto || 0,
-            data_movimento: baixaMassaForm.data_movimento,
-            observacoes: baixaMassaForm.observacoes || `Baixa em massa registrada pela tela de titulos.`
-          });
-        } catch (err) {
-          falhas.push(`${getTituloCodigo(titulo)}: ${err?.message || 'erro ao baixar'}`);
+      if (baixaMassaParcelada) {
+        await baixarTitulosFinanceirosEmMassaParcelado({
+          titulo_ids: selectedTitulosBaixaveis.map((titulo) => Number(titulo.id)),
+          empresa_id: baixaMassaForm.empresa_id,
+          conta_bancaria_id: baixaMassaForm.conta_bancaria_id,
+          cartao_id: baixaMassaForm.cartao_id || null,
+          forma_recebimento: baixaMassaForm.forma_recebimento,
+          data_movimento: baixaMassaForm.data_movimento,
+          observacoes: baixaMassaForm.observacoes || 'Baixa em massa agrupada e parcelada.',
+          parcelas: baixaMassaForm.parcelas.map((parcela) => ({
+            ...parcela,
+            valor: parseCurrencyInput(parcela.valor)
+          }))
+        });
+      } else {
+        for (const titulo of selectedTitulosBaixaveis) {
+          try {
+            await baixarTituloFinanceiro(titulo.id, {
+              empresa_id: baixaMassaForm.empresa_id,
+              conta_bancaria_id: baixaMassaForm.conta_bancaria_id || null,
+              cartao_id: baixaMassaForm.cartao_id || null,
+              forma_recebimento: baixaMassaForm.forma_recebimento,
+              valor: Number(titulo.valor_saldo || 0),
+              desconto: baixaMassaForm.desconto || 0,
+              data_movimento: baixaMassaForm.data_movimento,
+              observacoes: baixaMassaForm.observacoes || `Baixa em massa registrada pela tela de titulos.`
+            });
+          } catch (err) {
+            falhas.push(`${getTituloCodigo(titulo)}: ${err?.message || 'erro ao baixar'}`);
+          }
         }
       }
 
@@ -1555,7 +1698,13 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                     className="input w-full input-sm"
                     type="date"
                     value={baixaMassaForm.data_movimento}
-                    onChange={(event) => setBaixaMassaForm((current) => ({ ...current, data_movimento: event.target.value }))}
+                    onChange={(event) => setBaixaMassaForm((current) => ({
+                      ...current,
+                      data_movimento: event.target.value,
+                      parcelas: current.parcelado
+                        ? buildBaixaMassaParcelas(selectedSaldo, current.quantidade_parcelas || 2, event.target.value)
+                        : current.parcelas
+                    }))}
                     required
                   />
                 </label>
@@ -1569,7 +1718,10 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                       ...current,
                       forma_recebimento: event.target.value,
                       cartao_id: '',
-                      conta_bancaria_id: isCartaoForma(event.target.value) ? '' : current.conta_bancaria_id
+                      conta_bancaria_id: isCartaoForma(event.target.value) ? '' : current.conta_bancaria_id,
+                      parcelado: false,
+                      desconto: '',
+                      parcelas: buildBaixaMassaParcelas(selectedSaldo, current.quantidade_parcelas || 2, current.data_movimento)
                     }))}
                     required
                   >
@@ -1614,7 +1766,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                         setBaixaMassaForm((current) => ({
                           ...current,
                           cartao_id: event.target.value,
-                          conta_bancaria_id: contaCartao
+                          conta_bancaria_id: current.parcelado ? current.conta_bancaria_id : contaCartao
                         }));
                       }}
                       required
@@ -1640,11 +1792,16 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                     className="input w-full input-sm"
                     value={baixaMassaForm.conta_bancaria_id}
                     onChange={(event) => setBaixaMassaForm((current) => ({ ...current, conta_bancaria_id: event.target.value }))}
-                    required={contaBancariaObrigatoria(baixaMassaForm.forma_recebimento) || baixaMassaCartaoDebito}
-                    disabled={!baixaMassaForm.empresa_id || baixaMassaUsaCartao || !contaBancariaObrigatoria(baixaMassaForm.forma_recebimento)}
+                    required={baixaMassaParcelada || contaBancariaObrigatoria(baixaMassaForm.forma_recebimento) || baixaMassaCartaoDebito}
+                    disabled={
+                      !baixaMassaForm.empresa_id ||
+                      (!baixaMassaParcelada && (baixaMassaUsaCartao || !contaBancariaObrigatoria(baixaMassaForm.forma_recebimento)))
+                    }
                   >
                     <option value="">
-                      {baixaMassaUsaCartao
+                      {baixaMassaParcelada
+                        ? 'Selecione a conta para conciliacao das parcelas'
+                        : baixaMassaUsaCartao
                         ? (baixaMassaCartaoDebito ? 'Conta vinculada ao cartao' : 'Cartao de credito sem baixa bancaria imediata')
                         : (baixaMassaForm.empresa_id ? 'Sem conta bancaria' : 'Selecione a empresa pagadora')}
                     </option>
@@ -1657,15 +1814,162 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                   </select>
                 </label>
 
-                <label className="app-filter-field md:col-span-2">
-                  <span className="app-filter-label">Desconto por titulo</span>
-                  <input
-                    className="input w-full input-sm"
-                    value={baixaMassaForm.desconto}
-                    onChange={(event) => setBaixaMassaForm((current) => ({ ...current, desconto: normalizeCurrencyTyping(event.target.value) }))}
-                    placeholder="0,00"
-                  />
-                </label>
+                {baixaMassaFormaParcelavel ? (
+                  <div className="md:col-span-2 rounded-xl border border-[var(--c-border)] bg-[var(--c-bg)] p-3">
+                    <label className="flex items-start gap-3 text-sm font-semibold text-[var(--c-text)]">
+                      <input
+                        type="checkbox"
+                        className="mt-1"
+                        checked={Boolean(baixaMassaForm.parcelado)}
+                        onChange={(event) => setBaixaMassaParcelamentoAtivo(event.target.checked)}
+                      />
+                      <span>
+                        Agrupar titulos e gerar parcelas para conciliacao
+                        <span className="mt-1 block text-xs font-normal text-[var(--c-muted)]">
+                          Use para cheque ou cartao quando varios titulos forem pagos em parcelas. Os titulos originais serao quitados e cada parcela ficara disponivel para conciliacao pela data e valor.
+                        </span>
+                      </span>
+                    </label>
+                  </div>
+                ) : null}
+
+                {!baixaMassaParcelada ? (
+                  <label className="app-filter-field md:col-span-2">
+                    <span className="app-filter-label">Desconto por titulo</span>
+                    <input
+                      className="input w-full input-sm"
+                      value={baixaMassaForm.desconto}
+                      onChange={(event) => setBaixaMassaForm((current) => ({ ...current, desconto: normalizeCurrencyTyping(event.target.value) }))}
+                      placeholder="0,00"
+                    />
+                  </label>
+                ) : null}
+
+                {baixaMassaParcelada ? (
+                  <div className="md:col-span-2 space-y-3 rounded-2xl border border-[var(--c-border)] bg-[var(--c-bg)] p-3">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                      <label className="app-filter-field w-full sm:max-w-[220px]">
+                        <span className="app-filter-label">Quantidade de parcelas</span>
+                        <input
+                          className="input w-full input-sm"
+                          type="number"
+                          min="1"
+                          max="60"
+                          value={baixaMassaForm.quantidade_parcelas}
+                          onChange={(event) => setQuantidadeParcelasBaixaMassa(event.target.value)}
+                        />
+                      </label>
+                      <div className="text-xs text-[var(--c-muted)] sm:text-right">
+                        <strong className="block text-sm text-[var(--c-text)]">
+                          Total das parcelas: {formatCurrency(baixaMassaTotalParcelas)}
+                        </strong>
+                        {Math.abs(baixaMassaDiferencaParcelas) >= 0.01 ? (
+                          <span className="text-amber-700">
+                            Diferenca: {formatCurrency(baixaMassaDiferencaParcelas)}
+                          </span>
+                        ) : (
+                          <span className="text-emerald-700">Parcelas batem com o saldo selecionado.</span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      {(baixaMassaForm.parcelas || []).map((parcela, index) => (
+                        <div key={`baixa-parcela-${index}`} className="rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-3">
+                          <div className="mb-2 flex items-center justify-between gap-2">
+                            <strong className="text-xs uppercase tracking-[0.18em] text-[var(--c-muted)]">
+                              Parcela {index + 1}/{baixaMassaForm.parcelas.length}
+                            </strong>
+                            <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">
+                              {formatCurrency(parseCurrencyInput(parcela.valor))}
+                            </span>
+                          </div>
+                          <div className="grid gap-2 md:grid-cols-3">
+                            <label className="app-filter-field">
+                              <span className="app-filter-label">Data da parcela</span>
+                              <input
+                                className="input w-full input-sm"
+                                type="date"
+                                value={parcela.data_movimento}
+                                onChange={(event) => updateBaixaMassaParcela(index, 'data_movimento', event.target.value)}
+                                required
+                              />
+                            </label>
+                            <label className="app-filter-field">
+                              <span className="app-filter-label">Valor</span>
+                              <input
+                                className="input w-full input-sm"
+                                value={parcela.valor}
+                                onChange={(event) => updateBaixaMassaParcela(index, 'valor', normalizeCurrencyTyping(event.target.value))}
+                                onBlur={(event) => updateBaixaMassaParcela(index, 'valor', formatCurrencyInput(parseCurrencyInput(event.target.value)))}
+                                placeholder="0,00"
+                                required
+                              />
+                            </label>
+                            <label className="app-filter-field">
+                              <span className="app-filter-label">Documento</span>
+                              <input
+                                className="input w-full input-sm"
+                                value={parcela.documento_referencia}
+                                onChange={(event) => updateBaixaMassaParcela(index, 'documento_referencia', event.target.value)}
+                                placeholder="Referencia da parcela"
+                              />
+                            </label>
+                          </div>
+
+                          {isChequeForma(baixaMassaForm.forma_recebimento) ? (
+                            <div className="mt-2 grid gap-2 md:grid-cols-2">
+                              <label className="app-filter-field">
+                                <span className="app-filter-label">Numero do cheque</span>
+                                <input
+                                  className="input w-full input-sm"
+                                  value={parcela.cheque_numero}
+                                  onChange={(event) => updateBaixaMassaParcela(index, 'cheque_numero', event.target.value)}
+                                  required
+                                />
+                              </label>
+                              <label className="app-filter-field">
+                                <span className="app-filter-label">Emitente do cheque</span>
+                                <input
+                                  className="input w-full input-sm"
+                                  value={parcela.cheque_emitente}
+                                  onChange={(event) => updateBaixaMassaParcela(index, 'cheque_emitente', event.target.value)}
+                                  required
+                                />
+                              </label>
+                              <label className="app-filter-field">
+                                <span className="app-filter-label">Banco</span>
+                                <input
+                                  className="input w-full input-sm"
+                                  value={parcela.cheque_banco}
+                                  onChange={(event) => updateBaixaMassaParcela(index, 'cheque_banco', event.target.value)}
+                                />
+                              </label>
+                              <div className="grid gap-2 sm:grid-cols-2">
+                                <label className="app-filter-field">
+                                  <span className="app-filter-label">Agencia</span>
+                                  <input
+                                    className="input w-full input-sm"
+                                    value={parcela.cheque_agencia}
+                                    onChange={(event) => updateBaixaMassaParcela(index, 'cheque_agencia', event.target.value)}
+                                  />
+                                </label>
+                                <label className="app-filter-field">
+                                  <span className="app-filter-label">Conta</span>
+                                  <input
+                                    className="input w-full input-sm"
+                                    value={parcela.cheque_conta}
+                                    onChange={(event) => updateBaixaMassaParcela(index, 'cheque_conta', event.target.value)}
+                                  />
+                                </label>
+                              </div>
+                            </div>
+                          ) : null}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
 
                 <label className="app-filter-field md:col-span-2">
                   <span className="app-filter-label">Observacoes</span>
@@ -1679,7 +1983,9 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
               </div>
 
               <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                Cada titulo sera baixado pelo saldo atual. Desconto informado aqui sera aplicado individualmente em cada titulo.
+                {baixaMassaParcelada
+                  ? 'Os titulos selecionados serao quitados em grupo, e cada parcela gerada ficara disponivel para conciliacao bancaria pela data, conta e valor.'
+                  : 'Cada titulo sera baixado pelo saldo atual. Desconto informado aqui sera aplicado individualmente em cada titulo.'}
               </div>
             </div>
 
@@ -1699,8 +2005,10 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                   savingBaixaMassa ||
                   !baixaMassaForm.empresa_id ||
                   (baixaMassaUsaCartao && !baixaMassaForm.cartao_id) ||
-                  (baixaMassaCartaoDebito && !baixaMassaForm.conta_bancaria_id) ||
-                  (contaBancariaObrigatoria(baixaMassaForm.forma_recebimento) && !baixaMassaForm.conta_bancaria_id)
+                  (baixaMassaParcelada && !baixaMassaForm.conta_bancaria_id) ||
+                  (!baixaMassaParcelada && baixaMassaCartaoDebito && !baixaMassaForm.conta_bancaria_id) ||
+                  (!baixaMassaParcelada && contaBancariaObrigatoria(baixaMassaForm.forma_recebimento) && !baixaMassaForm.conta_bancaria_id) ||
+                  (baixaMassaParcelada && Math.abs(baixaMassaDiferencaParcelas) >= 0.01)
                 }
               >
                 {savingBaixaMassa ? 'Baixando...' : `Confirmar ${selectedTitulosBaixaveis.length} baixa(s)`}
