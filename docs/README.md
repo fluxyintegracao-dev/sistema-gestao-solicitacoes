@@ -18,24 +18,25 @@ Manter documentado:
 ## Ordem Recomendada de Leitura
 
 1. `docs/contexto/visao_geral.md`
-2. `docs/REPOSICIONAMENTO_ESTRATEGICO_FLUXY.md`
-3. `docs/PLANO_IMPLANTACAO_INSTITUCIONAL_5_DIAS_FLUXY.md`
-4. `docs/PLANO_TESTES_SMOKE_E_CENTRAL_TREINAMENTO_FLUXY.md`
-5. `docs/contexto/escopo_produto.md`
-6. `docs/arquitetura/visao_geral.md`
-7. `docs/arquitetura/stack_e_componentes.md`
-8. `docs/arquitetura/deploy_ambientes.md`
-9. `docs/arquitetura/fluxos_principais.md`
-10. `docs/arquitetura/modularidade_solicitacoes_contratos_apropriacoes.md`
-11. `docs/modulos/solicitacoes.md`
-12. `docs/modulos/compras.md`
-13. `docs/modulos/financeiro.md`
-14. `docs/modulos/comercial.md`
-15. `docs/modulos/provisionamento_financeiro.md`
-16. `docs/modulos/rh_dp.md`
-17. `docs/modulos/integracao_sienge.md`
-18. `docs/modulos/obras.md`
-19. `docs/seguranca/visao_geral.md`
+2. `docs/ROADMAP_ESTRATEGICO_LONGO_PRAZO.md`
+3. `docs/REPOSICIONAMENTO_ESTRATEGICO_FLUXY.md`
+4. `docs/PLANO_IMPLANTACAO_INSTITUCIONAL_5_DIAS_FLUXY.md`
+5. `docs/PLANO_TESTES_SMOKE_E_CENTRAL_TREINAMENTO_FLUXY.md`
+6. `docs/contexto/escopo_produto.md`
+7. `docs/arquitetura/visao_geral.md`
+8. `docs/arquitetura/stack_e_componentes.md`
+9. `docs/arquitetura/deploy_ambientes.md`
+10. `docs/arquitetura/fluxos_principais.md`
+11. `docs/arquitetura/modularidade_solicitacoes_contratos_apropriacoes.md`
+12. `docs/modulos/solicitacoes.md`
+13. `docs/modulos/compras.md`
+14. `docs/modulos/financeiro.md`
+15. `docs/modulos/comercial.md`
+16. `docs/modulos/provisionamento_financeiro.md`
+17. `docs/modulos/rh_dp.md`
+18. `docs/modulos/integracao_sienge.md`
+19. `docs/modulos/obras.md`
+20. `docs/seguranca/visao_geral.md`
 
 ## Estrutura
 
@@ -62,6 +63,7 @@ Manter documentado:
 
 ## Documentos Operacionais Importantes
 
+- `docs/ROADMAP_ESTRATEGICO_LONGO_PRAZO.md`
 - `docs/arquitetura/deploy_ambientes.md`
 - `docs/REPOSICIONAMENTO_ESTRATEGICO_FLUXY.md`
 - `docs/RELATORIO_OBSIDIAN_REPOSICIONAMENTO_FLUXY.md`

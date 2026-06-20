@@ -908,6 +908,19 @@ function parseObservacaoEnvioSetor(observacao) {
   };
 }
 
+const TIPOS_PENDENCIA_FINANCEIRA = new Set([
+  'FORA_DO_PRAZO',
+  'SEM_NOTA',
+  'SEM_BOLETO',
+  'SEM_NOTA_E_BOLETO',
+  'OUTRO'
+]);
+
+function normalizarTipoPendenciaFinanceira(valor) {
+  const tipo = String(valor || '').trim().toUpperCase();
+  return TIPOS_PENDENCIA_FINANCEIRA.has(tipo) ? tipo : 'FORA_DO_PRAZO';
+}
+
 module.exports = {
 
   // =====================================================
@@ -3337,6 +3350,96 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return res.status(500).json({ error: 'Erro ao adicionar comentario' });
+    }
+  },
+
+  async atualizarPendenciaFinanceira(req, res) {
+    try {
+      const { id } = req.params;
+      const usuario = await User.findByPk(req.user.id);
+      const perfil = String(req.user?.perfil || '').trim().toUpperCase();
+      const isSuperadmin = perfil === 'SUPERADMIN';
+      const [isFinanceiro, isGeo] = await Promise.all([
+        userHasSetorCapability(req.user, 'eh_setor_financeiro'),
+        userHasSetorCapability(req.user, 'eh_setor_geo')
+      ]);
+
+      if (!isSuperadmin && !isFinanceiro && !isGeo) {
+        return res.status(403).json({
+          error: 'Apenas GEO/Gerencia de Processos ou Financeiro podem marcar pendencias de prazo/documento.'
+        });
+      }
+
+      const solicitacao = await Solicitacao.findByPk(id);
+      if (!solicitacao) {
+        return res.status(404).json({ error: 'Solicitacao nao encontrada' });
+      }
+
+      const acesso = await verificarAcessoDetalheSolicitacao(req, solicitacao);
+      if (!acesso.allowed) {
+        return res.status(acesso.status || 403).json({ error: acesso.error || 'Acesso negado' });
+      }
+
+      const marcar = Boolean(req.body?.marcar);
+      const observacao = String(req.body?.observacao || '').trim() || null;
+      const tipo = normalizarTipoPendenciaFinanceira(req.body?.tipo);
+      const agora = new Date();
+      const updatePayload = marcar
+        ? {
+            financeiro_pendencia_prazo: true,
+            financeiro_pendencia_tipo: tipo,
+            financeiro_pendencia_observacao: observacao,
+            financeiro_pendencia_marcado_por: req.user.id,
+            financeiro_pendencia_marcado_em: agora,
+            financeiro_pendencia_regularizado_por: null,
+            financeiro_pendencia_regularizado_em: null
+          }
+        : {
+            financeiro_pendencia_prazo: false,
+            financeiro_pendencia_observacao: observacao,
+            financeiro_pendencia_regularizado_por: req.user.id,
+            financeiro_pendencia_regularizado_em: agora
+          };
+
+      await solicitacao.update(updatePayload);
+
+      await Historico.create({
+        solicitacao_id: solicitacao.id,
+        usuario_responsavel_id: req.user.id,
+        setor: usuario?.setor_id || req.user.area || null,
+        acao: marcar ? 'PENDENCIA_FINANCEIRA_MARCADA' : 'PENDENCIA_FINANCEIRA_REGULARIZADA',
+        descricao: marcar
+          ? `Marcada pendencia financeira: ${tipo}${observacao ? ` - ${observacao}` : ''}`
+          : `Pendencia financeira regularizada${observacao ? ` - ${observacao}` : ''}`
+      });
+
+      await publishSolicitacaoRealtimeEvent({
+        action: 'FINANCIAL_DEADLINE_FLAG_UPDATED',
+        solicitacao,
+        actor: {
+          id: req.user.id,
+          nome: usuario?.nome || req.user?.nome || null
+        },
+        metadata: {
+          financeiro_pendencia_prazo: marcar,
+          financeiro_pendencia_tipo: marcar ? tipo : solicitacao.financeiro_pendencia_tipo,
+          observacao
+        }
+      });
+
+      return res.json({
+        id: solicitacao.id,
+        financeiro_pendencia_prazo: solicitacao.financeiro_pendencia_prazo,
+        financeiro_pendencia_tipo: solicitacao.financeiro_pendencia_tipo,
+        financeiro_pendencia_observacao: solicitacao.financeiro_pendencia_observacao,
+        financeiro_pendencia_marcado_por: solicitacao.financeiro_pendencia_marcado_por,
+        financeiro_pendencia_marcado_em: solicitacao.financeiro_pendencia_marcado_em,
+        financeiro_pendencia_regularizado_por: solicitacao.financeiro_pendencia_regularizado_por,
+        financeiro_pendencia_regularizado_em: solicitacao.financeiro_pendencia_regularizado_em
+      });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao atualizar pendencia financeira da solicitacao' });
     }
   },
 

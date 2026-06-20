@@ -55,6 +55,10 @@ const {
   obterProvisionamentoFluxoConfig,
   salvarProvisionamentoFluxoConfig
 } = require('../services/provisionamentoFluxoConfigService');
+const {
+  obterConfiguracaoNotificacoesSistema,
+  salvarConfiguracaoNotificacoesSistema
+} = require('../services/notificacaoConfigService');
 
 const CHAVE_TEMA = 'TEMA_SISTEMA';
 const CHAVE_AREAS_OBRA = 'AREAS_OBRA_VISIVEIS';
@@ -1500,6 +1504,26 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return res.status(500).json({ error: 'Erro ao salvar configuracao do fluxo de provisionamento' });
+    }
+  },
+
+  async getNotificacoesSistema(req, res) {
+    try {
+      const config = await obterConfiguracaoNotificacoesSistema();
+      return res.json(config);
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao buscar configuracao de notificacoes do sistema' });
+    }
+  },
+
+  async setNotificacoesSistema(req, res) {
+    try {
+      const config = await salvarConfiguracaoNotificacoesSistema(req.body || {});
+      return res.json(config);
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao salvar configuracao de notificacoes do sistema' });
     }
   },
 

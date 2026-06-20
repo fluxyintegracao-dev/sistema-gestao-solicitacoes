@@ -67,6 +67,18 @@ module.exports = (sequelize, DataTypes) => sequelize.define(
       type: DataTypes.DATE,
       allowNull: true
     },
+    deleted_at: {
+      type: DataTypes.DATE,
+      allowNull: true
+    },
+    deleted_by: {
+      type: DataTypes.INTEGER,
+      allowNull: true
+    },
+    deleted_reason: {
+      type: DataTypes.STRING(255),
+      allowNull: true
+    },
     criado_por: {
       type: DataTypes.INTEGER,
       allowNull: true

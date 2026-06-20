@@ -24,6 +24,8 @@ const {
   SolicitacaoCompra,
   SolicitacaoCompraAlocacao,
   TipoSolicitacao,
+  TituloFinanceiroImposto,
+  TituloFinanceiroRateio,
   TituloFinanceiro,
   User
 } = require('../models');
@@ -121,6 +123,160 @@ function getValoresParcelas({ valorTotal, quantidade, parcelas = [], contexto = 
 function assertValoresIguais({ atual, esperado, mensagem }) {
   if (Math.abs(roundCurrency(atual) - roundCurrency(esperado)) > 0.009) {
     throw createHttpError(400, mensagem);
+  }
+}
+
+function normalizarImpostosTitulo(payload = {}, valorTitulo = 0) {
+  const impostos = Array.isArray(payload.impostos) ? payload.impostos : [];
+  const normalizados = impostos
+    .map((item) => {
+      const valor = roundCurrency(item?.valor);
+      if (!Number.isFinite(valor) || valor <= 0) return null;
+      return {
+        tipo_imposto: String(item.tipo_imposto || item.tipo || 'IMPOSTO').trim().slice(0, 60),
+        descricao: item.descricao ? String(item.descricao).trim().slice(0, 180) : null,
+        natureza: String(item.natureza || 'RETENCAO').trim().toUpperCase() === 'ACRESCIMO' ? 'ACRESCIMO' : 'RETENCAO',
+        base_calculo: item.base_calculo != null ? roundCurrency(item.base_calculo) : roundCurrency(valorTitulo),
+        aliquota: item.aliquota != null ? Number(item.aliquota) : null,
+        valor,
+        observacoes: item.observacoes || null
+      };
+    })
+    .filter(Boolean);
+
+  const totalRetencoes = somarValores(normalizados
+    .filter((item) => item.natureza === 'RETENCAO')
+    .map((item) => item.valor));
+  const totalAcrescimos = somarValores(normalizados
+    .filter((item) => item.natureza === 'ACRESCIMO')
+    .map((item) => item.valor));
+  const valorBruto = roundCurrency(payload.valor_bruto != null ? payload.valor_bruto : valorTitulo);
+  const valorLiquido = roundCurrency(payload.valor_liquido != null
+    ? payload.valor_liquido
+    : valorTitulo);
+
+  return {
+    impostos: normalizados,
+    valorBruto,
+    valorImpostos: roundCurrency(totalRetencoes - totalAcrescimos),
+    valorLiquido
+  };
+}
+
+function escalarImpostosParaTitulo(impostos = [], valorParcela = 0, valorBase = 0) {
+  if (!Array.isArray(impostos) || impostos.length === 0) return [];
+  const base = Number(valorBase || 0);
+  const fator = base > 0 ? Number(valorParcela || 0) / base : 1;
+  return impostos.map((item) => ({
+    ...item,
+    base_calculo: item.base_calculo != null ? roundCurrency(Number(item.base_calculo) * fator) : null,
+    valor: roundCurrency(Number(item.valor || 0) * fator)
+  })).filter((item) => item.valor > 0);
+}
+
+async function normalizarRateiosTitulo(req, payload = {}, defaultObra, defaultApropriacao, valorTitulo = 0) {
+  const rateiosPayload = Array.isArray(payload.rateios) ? payload.rateios.filter(Boolean) : [];
+  if (rateiosPayload.length === 0) {
+    return [];
+  }
+
+  const valorBase = roundCurrency(valorTitulo);
+  const tipoRateio = String(payload.tipo_rateio || rateiosPayload[0]?.tipo_rateio || '').trim().toUpperCase() === 'VALOR'
+    ? 'VALOR'
+    : 'PERCENTUAL';
+
+  const normalizados = [];
+  for (const [index, item] of rateiosPayload.entries()) {
+    const obraId = Number(item.obra_id || item.centro_custo_id || defaultObra?.id);
+    if (!Number.isInteger(obraId) || obraId <= 0) {
+      throw createHttpError(400, `Informe a obra/centro de custo do rateio ${index + 1}.`);
+    }
+
+    const obra = obraId === Number(defaultObra?.id)
+      ? defaultObra
+      : await validarObraTitulo(req, obraId);
+    const apropriacaoId = item.apropriacao_id ? Number(item.apropriacao_id) : null;
+    const apropriacao = apropriacaoId
+      ? await validarApropriacaoTitulo(apropriacaoId, obra.id)
+      : obraId === Number(defaultObra?.id)
+        ? defaultApropriacao
+        : null;
+
+    const percentualInformado = item.percentual != null ? Number(item.percentual) : null;
+    const valorInformado = item.valor_rateio != null ? Number(item.valor_rateio) : item.valor != null ? Number(item.valor) : null;
+    const valorRateio = tipoRateio === 'VALOR'
+      ? roundCurrency(valorInformado)
+      : roundCurrency(valorBase * (percentualInformado || 0) / 100);
+    const percentual = tipoRateio === 'VALOR'
+      ? (valorBase > 0 ? roundCurrency((valorRateio / valorBase) * 100) : 0)
+      : roundCurrency(percentualInformado);
+
+    if (!Number.isFinite(valorRateio) || valorRateio <= 0 || !Number.isFinite(percentual) || percentual <= 0) {
+      throw createHttpError(400, `Informe percentual ou valor valido para o rateio ${index + 1}.`);
+    }
+
+    normalizados.push({
+      obra_id: obra.id,
+      apropriacao_id: apropriacao?.id || null,
+      tipo_rateio: tipoRateio,
+      percentual,
+      valor_rateio: valorRateio,
+      observacoes: item.observacoes || null
+    });
+  }
+
+  if (tipoRateio === 'VALOR') {
+    assertValoresIguais({
+      atual: somarValores(normalizados.map((item) => item.valor_rateio)),
+      esperado: valorBase,
+      mensagem: 'A soma do rateio por valor precisa bater com o valor total do titulo.'
+    });
+  } else {
+    assertValoresIguais({
+      atual: somarValores(normalizados.map((item) => item.percentual)),
+      esperado: 100,
+      mensagem: 'A soma do rateio percentual precisa ser igual a 100%.'
+    });
+  }
+
+  return normalizados;
+}
+
+function escalarRateiosParaTitulo(rateios = [], valorParcela = 0, valorBase = 0) {
+  if (!Array.isArray(rateios) || rateios.length === 0) return [];
+  const base = Number(valorBase || 0);
+  const fator = base > 0 ? Number(valorParcela || 0) / base : 1;
+  return rateios.map((item) => ({
+    ...item,
+    valor_rateio: roundCurrency(Number(item.valor_rateio || 0) * fator)
+  }));
+}
+
+async function gravarComplementosTitulo({ titulo, rateios = [], impostos = [], valorBase, valorParcela, usuarioId, transaction }) {
+  const rateiosTitulo = escalarRateiosParaTitulo(rateios, valorParcela, valorBase);
+  if (rateiosTitulo.length > 0) {
+    await TituloFinanceiroRateio.bulkCreate(
+      rateiosTitulo.map((item) => ({
+        ...item,
+        titulo_financeiro_id: titulo.id,
+        criado_por: usuarioId || null,
+        atualizado_por: usuarioId || null
+      })),
+      { transaction }
+    );
+  }
+
+  const impostosTitulo = escalarImpostosParaTitulo(impostos, valorParcela, valorBase);
+  if (impostosTitulo.length > 0) {
+    await TituloFinanceiroImposto.bulkCreate(
+      impostosTitulo.map((item) => ({
+        ...item,
+        titulo_financeiro_id: titulo.id,
+        criado_por: usuarioId || null,
+        atualizado_por: usuarioId || null
+      })),
+      { transaction }
+    );
   }
 }
 
@@ -545,6 +701,26 @@ function buildTituloInclude({ includeMovimentos = false } = {}) {
       attributes: ['id', 'competencia', 'data_fechamento', 'data_vencimento', 'valor_total', 'status']
     },
     {
+      model: TituloFinanceiroRateio,
+      as: 'rateios',
+      include: [
+        {
+          model: Obra,
+          as: 'obra',
+          attributes: ['id', 'nome', 'codigo', 'empresa_grupo_id']
+        },
+        {
+          model: Apropriacao,
+          as: 'apropriacao',
+          attributes: ['id', 'codigo', 'descricao']
+        }
+      ]
+    },
+    {
+      model: TituloFinanceiroImposto,
+      as: 'impostos'
+    },
+    {
       model: User,
       as: 'criadoPor',
       attributes: ['id', 'nome', 'email']
@@ -886,6 +1062,35 @@ function validarCompatibilidadeParceiroTitulo(parceiro, tipoTitulo) {
   }
 }
 
+async function marcarSolicitacaoComTituloCadastrado({ solicitacao, usuarioId, setor, transaction }) {
+  if (!solicitacao?.id) return;
+
+  const statusAnterior = solicitacao.status_global || null;
+  const statusNovo = 'TITULO_CADASTRADO';
+
+  if (String(statusAnterior || '').trim().toUpperCase() === statusNovo) {
+    return;
+  }
+
+  await solicitacao.update(
+    { status_global: statusNovo },
+    { transaction }
+  );
+
+  await Historico.create(
+    {
+      solicitacao_id: solicitacao.id,
+      usuario_responsavel_id: usuarioId || null,
+      setor: setor || solicitacao.area_responsavel || 'FINANCEIRO',
+      acao: 'STATUS_ALTERADO',
+      status_anterior: statusAnterior,
+      status_novo: statusNovo,
+      observacao: 'Status atualizado automaticamente apos criacao de titulo financeiro.'
+    },
+    { transaction }
+  );
+}
+
 async function validarObraTitulo(req, obraId) {
   const obra = await Obra.findByPk(obraId, {
     attributes: ['id', 'nome', 'codigo', 'tipo_centro_custo', 'empresa_grupo_id']
@@ -1208,6 +1413,19 @@ async function atualizarTitulo(req, tituloId, payload = {}) {
   validarCategoriaDreTitulo(categoria, payload);
   const intercompanyFields = await validarIntercompanyTitulo(payload);
   const competenciaData = resolverCompetenciaTitulo(payload);
+  const atualizarImpostos = Array.isArray(payload.impostos);
+  const atualizarRateios = Array.isArray(payload.rateios);
+  const impostosResumo = atualizarImpostos
+    ? normalizarImpostosTitulo(payload, valorOriginal)
+    : {
+        valorBruto: roundCurrency(payload.valor_bruto || titulo.valor_bruto || valorOriginal),
+        valorImpostos: roundCurrency(payload.valor_impostos || titulo.valor_impostos || 0),
+        valorLiquido: roundCurrency(payload.valor_liquido || titulo.valor_liquido || valorOriginal),
+        impostos: []
+      };
+  const rateiosTitulo = atualizarRateios
+    ? await normalizarRateiosTitulo(req, payload, obra, apropriacao, valorOriginal)
+    : [];
 
   const antes = {
     tipo: titulo.tipo,
@@ -1234,8 +1452,12 @@ async function atualizarTitulo(req, tituloId, payload = {}) {
     descricao,
     numero_documento: payload.numero_documento || null,
     valor_original: roundCurrency(valorOriginal),
+    valor_bruto: impostosResumo.valorBruto,
+    valor_impostos: impostosResumo.valorImpostos,
+    valor_liquido: impostosResumo.valorLiquido,
     valor_saldo: roundCurrency(valorOriginal),
     valor_baixado: 0,
+    possui_rateio: atualizarRateios ? rateiosTitulo.length > 0 : Boolean(titulo.possui_rateio),
     data_emissao: payload.data_emissao || null,
     data_vencimento: payload.data_vencimento,
     data_quitacao: null,
@@ -1245,6 +1467,29 @@ async function atualizarTitulo(req, tituloId, payload = {}) {
     ...buildCobrancaFields(payload, tipo),
     atualizado_por: req.user?.id || null
   });
+
+  if (atualizarRateios) {
+    await TituloFinanceiroRateio.destroy({
+      where: { titulo_financeiro_id: titulo.id }
+    });
+  }
+
+  if (atualizarImpostos) {
+    await TituloFinanceiroImposto.destroy({
+      where: { titulo_financeiro_id: titulo.id }
+    });
+  }
+
+  if (atualizarRateios || atualizarImpostos) {
+    await gravarComplementosTitulo({
+      titulo,
+      rateios: rateiosTitulo,
+      impostos: impostosResumo.impostos,
+      valorBase: valorOriginal,
+      valorParcela: valorOriginal,
+      usuarioId: req.user?.id || null
+    });
+  }
 
   await registrarEventoSeguranca({
     req,
@@ -1264,6 +1509,10 @@ async function atualizarTitulo(req, tituloId, payload = {}) {
         parceiro_id: parceiro.id,
         categoria_financeira_id: categoria?.id || null,
         valor_original: roundCurrency(valorOriginal),
+        valor_bruto: impostosResumo.valorBruto,
+        valor_impostos: impostosResumo.valorImpostos,
+        valor_liquido: impostosResumo.valorLiquido,
+        possui_rateio: atualizarRateios ? rateiosTitulo.length > 0 : Boolean(titulo.possui_rateio),
         data_vencimento: payload.data_vencimento,
         competencia_data: competenciaData,
         considera_dre: payload.considera_dre !== false,
@@ -1281,6 +1530,16 @@ async function listarTitulos(req, filters = {}) {
   const where = {};
   const obraFiltro = Number(filters.obra_id);
   const obrasPermitidas = await getFinanceiroObraScopeIds(req.user);
+  const paginated = ['1', 'true', 'sim'].includes(String(filters.paginated || '').trim().toLowerCase());
+  const emptyPaginatedResult = () => ({
+    data: [],
+    pagination: {
+      page: 1,
+      limit: 0,
+      total: 0,
+      total_pages: 0
+    }
+  });
 
   if (obrasPermitidas === null) {
     if (obraFiltro) {
@@ -1308,7 +1567,7 @@ async function listarTitulos(req, filters = {}) {
         'Usuario tentou listar titulos financeiros sem vinculo de obra'
       );
     }
-    return [];
+    return paginated ? emptyPaginatedResult() : [];
   }
 
   if (filters.tipo) {
@@ -1370,14 +1629,42 @@ async function listarTitulos(req, filters = {}) {
     ];
   }
 
-  return TituloFinanceiro.findAll({
+  const queryOptions = {
     where,
     include: buildTituloInclude(),
     order: [
       ['data_vencimento', 'ASC'],
       ['createdAt', 'DESC']
-    ]
-  });
+    ],
+    distinct: true,
+    subQuery: false
+  };
+
+  if (paginated) {
+    const rawLimit = String(filters.limit || '25').trim().toLowerCase();
+    const listAll = rawLimit === 'all' || rawLimit === 'todos';
+    const pageSize = listAll ? null : Math.min(Math.max(Number(rawLimit) || 25, 1), 500);
+    const page = Math.max(Number(filters.page) || 1, 1);
+    const result = await TituloFinanceiro.findAndCountAll({
+      ...queryOptions,
+      ...(listAll ? {} : {
+        limit: pageSize,
+        offset: (page - 1) * pageSize
+      })
+    });
+
+    return {
+      data: result.rows,
+      pagination: {
+        page,
+        limit: listAll ? 'all' : pageSize,
+        total: result.count,
+        total_pages: listAll ? 1 : Math.max(Math.ceil(result.count / pageSize), 1)
+      }
+    };
+  }
+
+  return TituloFinanceiro.findAll(queryOptions);
 }
 
 async function listarBaixasRealizadas(req, filters = {}) {
@@ -1616,6 +1903,14 @@ async function criarTituloPorSolicitacao(req, solicitacaoId, payload = {}) {
     mensagem: 'A soma dos titulos gerados precisa bater com o valor da solicitacao.'
   });
 
+  const impostosResumo = normalizarImpostosTitulo(payload, valorOriginal);
+  const rateiosTitulo = await normalizarRateiosTitulo(
+    req,
+    payload,
+    solicitacao.obra,
+    null,
+    valorOriginal
+  );
   const descricaoBase = String(payload.descricao || descricaoPadraoTitulo(solicitacao)).trim();
 
   const transaction = await sequelize.transaction();
@@ -1664,6 +1959,10 @@ async function criarTituloPorSolicitacao(req, solicitacaoId, payload = {}) {
           numero_documento: parcelaPayload.numero_documento || pagamento.payload.numero_documento || payload.numero_documento || chequeFields.cheque_numero || null,
           ...chequeFields,
           valor_original: valorParcela,
+          valor_bruto: roundCurrency(impostosResumo.valorBruto * (valorParcela / valorOriginal)),
+          valor_impostos: roundCurrency(impostosResumo.valorImpostos * (valorParcela / valorOriginal)),
+          valor_liquido: valorParcela,
+          possui_rateio: rateiosTitulo.length > 0,
           valor_saldo: valorParcela,
           valor_baixado: 0,
           data_emissao: payload.data_emissao || getHoje(),
@@ -1674,6 +1973,16 @@ async function criarTituloPorSolicitacao(req, solicitacaoId, payload = {}) {
           criado_por: req.user?.id || null,
           atualizado_por: req.user?.id || null
         }, { transaction });
+
+        await gravarComplementosTitulo({
+          titulo,
+          rateios: rateiosTitulo,
+          impostos: impostosResumo.impostos,
+          valorBase: valorOriginal,
+          valorParcela,
+          usuarioId: req.user?.id || null,
+          transaction
+        });
 
         if (pagamento.formaPagamento?.gera_fatura && pagamento.payload.cartao_id) {
           const { fatura } = await obterOuCriarFaturaCartao({
@@ -1709,6 +2018,13 @@ async function criarTituloPorSolicitacao(req, solicitacaoId, payload = {}) {
       acao: 'TITULO_FINANCEIRO_CRIADO',
       observacao: `${titulosCriados.length} titulo(s) ${tipo} gerado(s) no valor de ${formatCurrency(valorOriginal)}`
     }, { transaction });
+
+    await marcarSolicitacaoComTituloCadastrado({
+      solicitacao,
+      usuarioId: req.user?.id || null,
+      setor: getSetorUsuario(req),
+      transaction
+    });
 
     await transaction.commit();
 
@@ -1870,6 +2186,8 @@ async function criarTituloManual(req, payload = {}) {
     mensagem: 'A soma das formas de pagamento precisa bater com o valor do titulo.'
   });
 
+  const impostosResumo = normalizarImpostosTitulo(payload, valorOriginal);
+  const rateiosTitulo = await normalizarRateiosTitulo(req, payload, obra, apropriacao, valorOriginal);
   const transaction = await sequelize.transaction();
   const titulosCriados = [];
   const baixasCartaoDebito = [];
@@ -1916,6 +2234,10 @@ async function criarTituloManual(req, payload = {}) {
           numero_documento: parcelaPayload.numero_documento || pagamento.payload.numero_documento || payload.numero_documento || chequeFields.cheque_numero || null,
           ...chequeFields,
           valor_original: valorParcela,
+          valor_bruto: roundCurrency(impostosResumo.valorBruto * (valorParcela / valorOriginal)),
+          valor_impostos: roundCurrency(impostosResumo.valorImpostos * (valorParcela / valorOriginal)),
+          valor_liquido: valorParcela,
+          possui_rateio: rateiosTitulo.length > 0,
           valor_saldo: valorParcela,
           valor_baixado: 0,
           data_emissao: payload.data_emissao || getHoje(),
@@ -1926,6 +2248,16 @@ async function criarTituloManual(req, payload = {}) {
           criado_por: req.user?.id || null,
           atualizado_por: req.user?.id || null
         }, { transaction });
+
+        await gravarComplementosTitulo({
+          titulo,
+          rateios: rateiosTitulo,
+          impostos: impostosResumo.impostos,
+          valorBase: valorOriginal,
+          valorParcela,
+          usuarioId: req.user?.id || null,
+          transaction
+        });
 
         if (pagamento.formaPagamento?.gera_fatura && pagamento.payload.cartao_id) {
           const { fatura } = await obterOuCriarFaturaCartao({
@@ -2797,6 +3129,88 @@ async function listarAuditoriaTitulo(req, tituloId) {
   }));
 }
 
+async function importarCodigosBarrasTitulos(req, payload = {}) {
+  await assertFinanceAccess(req);
+
+  const itens = Array.isArray(payload.itens) ? payload.itens : [];
+  if (itens.length === 0) {
+    throw createHttpError(400, 'Informe ao menos um titulo para importar codigo de barras.');
+  }
+
+  const resultado = {
+    importados: 0,
+    ignorados: 0,
+    erros: []
+  };
+
+  for (const [index, item] of itens.entries()) {
+    const linha = index + 1;
+    const tituloId = Number(item?.id || item?.titulo_id || 0);
+    const codigo = String(item?.codigo || item?.codigo_titulo || item?.titulo || '').trim();
+    const linhaDigitavel = String(item?.linha_digitavel || item?.linha || '').trim();
+    const codigoBarras = String(item?.codigo_barras || item?.barras || '').trim();
+    const bancoBoleto = String(item?.banco_boleto || item?.banco || '').trim();
+
+    if (!tituloId && !codigo) {
+      resultado.ignorados += 1;
+      resultado.erros.push({ linha, erro: 'Informe id ou codigo do titulo.' });
+      continue;
+    }
+
+    if (!linhaDigitavel && !codigoBarras) {
+      resultado.ignorados += 1;
+      resultado.erros.push({ linha, titulo: codigo || tituloId, erro: 'Informe linha digitavel ou codigo de barras.' });
+      continue;
+    }
+
+    const where = tituloId
+      ? { id: tituloId }
+      : { codigo };
+    const titulo = await TituloFinanceiro.findOne({ where });
+
+    if (!titulo) {
+      resultado.ignorados += 1;
+      resultado.erros.push({ linha, titulo: codigo || tituloId, erro: 'Titulo nao encontrado.' });
+      continue;
+    }
+
+    if (titulo.obra_id) {
+      await assertObraScope(
+        req,
+        titulo.obra_id,
+        'TITULO_FINANCEIRO',
+        titulo.id,
+        'Usuario sem permissao para importar codigo de barras deste titulo'
+      );
+    }
+
+    await titulo.update({
+      linha_digitavel: linhaDigitavel || titulo.linha_digitavel || null,
+      codigo_barras: codigoBarras || titulo.codigo_barras || null,
+      banco_boleto: bancoBoleto || titulo.banco_boleto || null
+    });
+
+    await registrarEventoSeguranca({
+      req,
+      usuarioId: req.user?.id || null,
+      tipoEvento: 'FINANCIAL_TITLE_BARCODE_IMPORTED',
+      recursoTipo: 'TITULO_FINANCEIRO',
+      recursoId: String(titulo.id),
+      status: 'SUCCESS',
+      descricao: 'Codigo de barras/linha digitavel importado em massa',
+      metadata: {
+        codigo: titulo.codigo,
+        linha_digitavel_informada: Boolean(linhaDigitavel),
+        codigo_barras_informado: Boolean(codigoBarras)
+      }
+    });
+
+    resultado.importados += 1;
+  }
+
+  return resultado;
+}
+
 module.exports = {
   atualizarCobrancaTitulo,
   atualizarTitulo,
@@ -2807,6 +3221,7 @@ module.exports = {
   criarTituloManualComBaixaAtomica,
   criarTituloPorSolicitacao,
   estornarMovimentoTitulo,
+  importarCodigosBarrasTitulos,
   listarAuditoriaTitulo,
   listarBaixasRealizadas,
   listarTitulos,

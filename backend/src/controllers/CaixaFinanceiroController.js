@@ -1,5 +1,6 @@
 const {
   abrirSessaoCaixa,
+  confirmarConciliacaoDiaCaixa,
   fecharSessaoCaixa,
   listarSessoesCaixa,
   obterResumoSessaoCaixa
@@ -32,6 +33,15 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return responderErroController(res, error, 'Erro ao abrir caixa financeiro');
+    }
+  },
+
+  async confirmarConciliacaoDia(req, res) {
+    try {
+      return res.json(await confirmarConciliacaoDiaCaixa(req, req.body || {}));
+    } catch (error) {
+      console.error(error);
+      return responderErroController(res, error, 'Erro ao confirmar conciliacao do dia');
     }
   },
 

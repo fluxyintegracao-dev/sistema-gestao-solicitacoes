@@ -139,6 +139,35 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
         defaultValue: 0
       },
+      financeiro_pendencia_prazo: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false
+      },
+      financeiro_pendencia_tipo: {
+        type: DataTypes.STRING(80),
+        allowNull: true
+      },
+      financeiro_pendencia_observacao: {
+        type: DataTypes.TEXT,
+        allowNull: true
+      },
+      financeiro_pendencia_marcado_por: {
+        type: DataTypes.INTEGER,
+        allowNull: true
+      },
+      financeiro_pendencia_marcado_em: {
+        type: DataTypes.DATE,
+        allowNull: true
+      },
+      financeiro_pendencia_regularizado_por: {
+        type: DataTypes.INTEGER,
+        allowNull: true
+      },
+      financeiro_pendencia_regularizado_em: {
+        type: DataTypes.DATE,
+        allowNull: true
+      },
       cancelada: {
         type: DataTypes.BOOLEAN,
         defaultValue: false

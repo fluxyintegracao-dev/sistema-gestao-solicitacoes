@@ -77,6 +77,11 @@ const SECOES_CONFIG = [
         title: 'Visibilidade de Dashboards e Tabelas',
         description: 'Defina quais cards, dashboards e tabelas ficam visiveis nas telas do sistema.',
         to: '/configuracoes-visibilidade-ui'
+      },
+      {
+        title: 'Notificacoes do Sistema',
+        description: 'Defina quais eventos podem gerar avisos no sino por modulo.',
+        to: '/configuracoes-notificacoes-sistema'
       }
     ]
   },

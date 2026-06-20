@@ -15,6 +15,7 @@ import ModalAlterarStatus from './ModalAlterarStatus';
 import ModalEnviarSetor from '../Solicitacoes/ModalEnviarSetor';
 import {
   aprovarDiretoriaSolicitacao,
+  atualizarPendenciaFinanceiraSolicitacao,
   getSolicitacaoById,
   updateStatusSolicitacao
 } from '../../services/solicitacoes';
@@ -44,6 +45,12 @@ export default function SolicitacaoDetalhe() {
   const [loading, setLoading] = useState(true);
   const [modalStatus, setModalStatus] = useState(false);
   const [modalEnviarSetor, setModalEnviarSetor] = useState(false);
+  const [pendenciaFinanceira, setPendenciaFinanceira] = useState({
+    marcar: false,
+    tipo: 'FORA_DO_PRAZO',
+    observacao: ''
+  });
+  const [salvandoPendenciaFinanceira, setSalvandoPendenciaFinanceira] = useState(false);
   const localMutationsRef = useRef(new Map());
 
   const perfil = String(user?.perfil || '').trim().toUpperCase();
@@ -58,6 +65,20 @@ export default function SolicitacaoDetalhe() {
   useEffect(() => {
     carregar();
   }, [id]);
+
+  useEffect(() => {
+    if (!solicitacao) return;
+    setPendenciaFinanceira({
+      marcar: Boolean(solicitacao.financeiro_pendencia_prazo),
+      tipo: solicitacao.financeiro_pendencia_tipo || 'FORA_DO_PRAZO',
+      observacao: solicitacao.financeiro_pendencia_observacao || ''
+    });
+  }, [
+    solicitacao?.id,
+    solicitacao?.financeiro_pendencia_prazo,
+    solicitacao?.financeiro_pendencia_tipo,
+    solicitacao?.financeiro_pendencia_observacao
+  ]);
 
   function registrarMutacaoLocal(solicitacaoId) {
     const idNumerico = Number(solicitacaoId);
@@ -141,6 +162,23 @@ export default function SolicitacaoDetalhe() {
     }
   }
 
+  async function salvarPendenciaFinanceira() {
+    try {
+      setSalvandoPendenciaFinanceira(true);
+      await atualizarPendenciaFinanceiraSolicitacao(solicitacao.id, pendenciaFinanceira);
+      registrarMutacaoLocal(solicitacao.id);
+      await carregar({ silent: true });
+      alert(pendenciaFinanceira.marcar
+        ? 'Pendencia registrada para auditoria.'
+        : 'Pendencia marcada como regularizada.');
+    } catch (error) {
+      console.error(error);
+      alert(error?.message || 'Erro ao registrar pendencia financeira');
+    } finally {
+      setSalvandoPendenciaFinanceira(false);
+    }
+  }
+
   useLiveUpdateSubscription({
     enabled: !!id,
     filter: (payload) => (
@@ -188,6 +226,7 @@ export default function SolicitacaoDetalhe() {
     !usaFluxoAprovacaoDiretoria &&
     !isSetorObra &&
     (isSuperadmin || solicitacaoEstaNoSetorDoUsuario(solicitacao.area_responsavel, user));
+  const podeMarcarPendenciaFinanceira = isSuperadmin || isSetorGeo || isSetorFinanceiro;
 
   const atualizadoEm = new Date(solicitacao.updatedAt || solicitacao.createdAt).toLocaleString('pt-BR');
 
@@ -248,6 +287,74 @@ export default function SolicitacaoDetalhe() {
         />
 
         <div className="space-y-6">
+          {podeMarcarPendenciaFinanceira && (
+            <div className="card space-y-4">
+              <div>
+                <h2 className="text-base font-semibold text-[var(--c-text)]">Auditoria de prazo e documentos</h2>
+                <p className="text-sm text-[var(--c-muted)]">
+                  Registre solicitacoes enviadas fora do prazo ou sem nota/boleto para medir regularizacao por usuario.
+                </p>
+              </div>
+
+              <label className="flex items-center gap-2 text-sm font-semibold text-[var(--c-text)]">
+                <input
+                  type="checkbox"
+                  checked={pendenciaFinanceira.marcar}
+                  onChange={(event) => setPendenciaFinanceira((prev) => ({
+                    ...prev,
+                    marcar: event.target.checked
+                  }))}
+                />
+                Marcar pendencia para auditoria
+              </label>
+
+              <div className="grid md:grid-cols-2 gap-3">
+                <label className="block text-sm text-[var(--c-muted)]">
+                  Tipo
+                  <select
+                    className="input mt-1"
+                    value={pendenciaFinanceira.tipo}
+                    onChange={(event) => setPendenciaFinanceira((prev) => ({
+                      ...prev,
+                      tipo: event.target.value
+                    }))}
+                    disabled={!pendenciaFinanceira.marcar}
+                  >
+                    <option value="FORA_DO_PRAZO">Enviada fora do prazo</option>
+                    <option value="SEM_NOTA">Sem nota ate o vencimento</option>
+                    <option value="SEM_BOLETO">Sem boleto ate o vencimento</option>
+                    <option value="SEM_NOTA_E_BOLETO">Sem nota e boleto</option>
+                    <option value="OUTRO">Outro</option>
+                  </select>
+                </label>
+
+                <label className="block text-sm text-[var(--c-muted)]">
+                  Observacao
+                  <textarea
+                    className="input mt-1 min-h-[88px]"
+                    value={pendenciaFinanceira.observacao}
+                    onChange={(event) => setPendenciaFinanceira((prev) => ({
+                      ...prev,
+                      observacao: event.target.value
+                    }))}
+                    placeholder="Ex.: nota enviada apos vencimento, boleto ausente, prazo regularizado..."
+                  />
+                </label>
+              </div>
+
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  onClick={salvarPendenciaFinanceira}
+                  disabled={salvandoPendenciaFinanceira}
+                >
+                  {salvandoPendenciaFinanceira ? 'Salvando...' : 'Salvar auditoria'}
+                </button>
+              </div>
+            </div>
+          )}
+
           {isFinanceiro && (
             <FinanceiroCard
               solicitacao={solicitacao}

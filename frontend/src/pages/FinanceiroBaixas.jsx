@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
+  HiOutlineArrowDownTray,
   HiOutlineArrowPath,
   HiOutlineBanknotes,
   HiOutlineEye,
@@ -51,6 +52,27 @@ function statusClass(status) {
   if (normalized === 'ATIVO') return 'app-status-pill bg-emerald-100 text-emerald-700';
   if (normalized === 'ESTORNADO') return 'app-status-pill bg-rose-100 text-rose-700';
   return 'app-status-pill bg-slate-100 text-slate-700';
+}
+
+function csvEscape(value) {
+  const text = value == null ? '' : String(value);
+  if (/[",\n;]/.test(text)) {
+    return `"${text.replace(/"/g, '""')}"`;
+  }
+  return text;
+}
+
+function downloadCsv(filename, rows) {
+  const content = rows.map((row) => row.map(csvEscape).join(';')).join('\n');
+  const blob = new Blob([`\uFEFF${content}`], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 }
 
 export default function FinanceiroBaixas() {
@@ -180,6 +202,46 @@ export default function FinanceiroBaixas() {
     }
   }
 
+  function exportarBaixas() {
+    const headers = [
+      'Data baixa',
+      'Titulo',
+      'Tipo',
+      'Documento',
+      'Parceiro',
+      'Documento parceiro',
+      'Obra',
+      'Conta bancaria',
+      'Valor base',
+      'Juros',
+      'Multa',
+      'Desconto',
+      'Valor quitacao',
+      'Status',
+      'Observacoes'
+    ];
+
+    const rows = baixas.map((baixa) => [
+      formatDate(baixa.data_movimento),
+      baixa.titulo?.codigo || `#${baixa.titulo_financeiro_id}`,
+      baixa.titulo?.tipo || '',
+      baixa.titulo?.numero_documento || '',
+      baixa.titulo?.parceiro?.nome || '',
+      baixa.titulo?.parceiro?.cpf_cnpj || '',
+      baixa.titulo?.obra?.nome || '',
+      baixa.contaBancaria?.nome || '',
+      Number(baixa.valor || 0).toFixed(2).replace('.', ','),
+      Number(baixa.juros || 0).toFixed(2).replace('.', ','),
+      Number(baixa.multa || 0).toFixed(2).replace('.', ','),
+      Number(baixa.desconto || 0).toFixed(2).replace('.', ','),
+      Number(baixa.valor_quitacao || 0).toFixed(2).replace('.', ','),
+      baixa.status || '',
+      baixa.observacoes || ''
+    ]);
+
+    downloadCsv(`baixas-financeiras-${new Date().toISOString().slice(0, 10)}.csv`, [headers, ...rows]);
+  }
+
   return (
     <div className="page solicitacoes-page">
       <div className="app-page-header-row">
@@ -188,6 +250,10 @@ export default function FinanceiroBaixas() {
           <p className="page-subtitle">Consulte movimentos baixados e estorne uma baixa para corrigir conta, juros, multa ou valor.</p>
         </div>
         <div className="app-page-actions">
+          <button type="button" className="btn btn-outline btn-sm" onClick={exportarBaixas} disabled={loading || baixas.length === 0}>
+            <HiOutlineArrowDownTray className="h-4 w-4" />
+            Exportar
+          </button>
           <Link to="/financeiro/titulos" className="btn btn-outline btn-sm">Titulos</Link>
           <Link to="/financeiro/relatorios" className="btn btn-outline btn-sm">Relatorios</Link>
         </div>

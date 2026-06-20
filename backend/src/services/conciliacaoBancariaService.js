@@ -475,7 +475,9 @@ function buildConciliacaoInclude() {
 }
 
 function buildConciliacaoWhere(filters = {}, { forcePending = false } = {}) {
-  const where = {};
+  const where = {
+    deleted_at: null
+  };
   const status = forcePending ? 'PENDENTE' : normalizeStatusFilter(filters.status);
 
   if (status !== 'TODOS') {
@@ -1181,7 +1183,11 @@ async function listarImportacoes(req, filters = {}) {
 
 async function loadConciliacaoById(req, conciliacaoId) {
   await assertFinanceAccess(req);
-  const conciliacao = await ConciliacaoBancaria.findByPk(conciliacaoId, {
+  const conciliacao = await ConciliacaoBancaria.findOne({
+    where: {
+      id: parseInteger(conciliacaoId, 'Conciliacao bancaria'),
+      deleted_at: null
+    },
     include: buildConciliacaoInclude()
   });
 
@@ -1287,7 +1293,7 @@ async function listarFaturasAssociacao(req, conciliacaoId, filters = {}) {
   const faturas = await FaturaCartaoFinanceiro.findAll({
     where: {
       status: {
-        [Op.in]: ['ABERTA', 'FECHADA', 'PARCIAL']
+        [Op.in]: ['ABERTA', 'FECHADA', 'PARCIAL', 'PAGA']
       },
       data_vencimento: {
         [Op.between]: [dataInicial, dataFinal]
@@ -1385,6 +1391,7 @@ async function confirmarConciliacaoFatura(req, conciliacaoId, payload = {}) {
     const faturaId = parseInteger(payload.fatura_cartao_id, 'Fatura de cartao');
     const fatura = await FaturaCartaoFinanceiro.findByPk(faturaId, { transaction });
     if (!fatura) throw createHttpError(400, 'Fatura de cartao invalida.');
+    const statusFatura = String(fatura.status || '').toUpperCase();
 
     const valorConciliacao = Math.abs(Number(conciliacao.valor || 0));
     const valorFatura = Math.abs(Number(fatura.valor_total || 0));
@@ -1392,11 +1399,13 @@ async function confirmarConciliacaoFatura(req, conciliacaoId, payload = {}) {
       throw createHttpError(400, 'O valor da fatura nao confere com o lancamento bancario.');
     }
 
-    await baixarFaturaCartao(req, fatura.id, {
-      conta_bancaria_id: conciliacao.conta_bancaria_id,
-      data_movimento: conciliacao.data_movimento,
-      observacoes: `Baixa conciliada pelo lancamento bancario #${conciliacao.id}`
-    }, { transaction });
+    if (statusFatura !== 'PAGA') {
+      await baixarFaturaCartao(req, fatura.id, {
+        conta_bancaria_id: conciliacao.conta_bancaria_id,
+        data_movimento: conciliacao.data_movimento,
+        observacoes: `Baixa conciliada pelo lancamento bancario #${conciliacao.id}`
+      }, { transaction });
+    }
 
     await conciliacao.update({
       fatura_cartao_id: fatura.id,
@@ -1899,6 +1908,45 @@ async function ignorarConciliacao(req, conciliacaoId) {
   return loadConciliacaoById(req, conciliacao.id);
 }
 
+async function removerConciliacao(req, conciliacaoId, payload = {}) {
+  const conciliacao = await loadConciliacaoById(req, conciliacaoId);
+  const status = String(conciliacao.status || '').toUpperCase();
+  if (status !== 'PENDENTE' && status !== 'IGNORADO') {
+    throw createHttpError(400, 'Somente lancamentos pendentes ou ignorados podem ser removidos do extrato.');
+  }
+
+  const motivo = String(payload.motivo || payload.observacao || '').trim() || 'Remocao manual na conciliacao bancaria';
+  await conciliacao.update({
+    deleted_at: new Date(),
+    deleted_by: req.user?.id || null,
+    deleted_reason: motivo
+  });
+
+  await registrarEventoSeguranca({
+    req,
+    usuarioId: req.user?.id || null,
+    tipoEvento: 'FINANCIAL_BANK_RECONCILIATION_REMOVED',
+    recursoTipo: 'CONCILIACAO_BANCARIA',
+    recursoId: conciliacao.id,
+    status: 'SUCCESS',
+    descricao: 'Lancamento bancario removido logicamente do extrato',
+    metadata: {
+      motivo,
+      status_anterior: conciliacao.status,
+      conta_bancaria_id: conciliacao.conta_bancaria_id,
+      valor: Number(conciliacao.valor || 0),
+      data_movimento: conciliacao.data_movimento
+    }
+  });
+
+  return {
+    id: conciliacao.id,
+    removed: true,
+    deleted_at: conciliacao.deleted_at,
+    deleted_reason: motivo
+  };
+}
+
 module.exports = {
   conciliarSugeridos,
   confirmarConciliacao,
@@ -1912,5 +1960,6 @@ module.exports = {
   listarConciliacoes,
   listarFaturasAssociacao,
   listarMovimentosAssociacao,
+  removerConciliacao,
   parseOfxTransactions
 };

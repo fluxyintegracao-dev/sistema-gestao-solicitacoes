@@ -13,6 +13,7 @@ const {
 } = require('../models');
 const { dispararEventoAutomacaoCrm } = require('./crmAutomationRuntimeService');
 const { canReceiveCrmLeadAssignment } = require('./authorizationService');
+const { notificacaoEventoAtivo } = require('./notificacaoConfigService');
 
 const LEAD_EXPORT_MAX_ROWS = 5000;
 const CSV_FORMULA_REGEX = /^[=+\-@]/;
@@ -72,6 +73,11 @@ function sanitizeMotivoRedistribuicao(value) {
 }
 
 async function criarNotificacaoCrm({ tipo, mensagem, metadata, destinatarios, createdBy }) {
+  const tipoNormalizado = String(tipo || '').trim().toUpperCase();
+  if (!(await notificacaoEventoAtivo(tipoNormalizado))) {
+    return null;
+  }
+
   const usuarios = [
     ...new Set(
       (Array.isArray(destinatarios) ? destinatarios : [])
@@ -86,7 +92,7 @@ async function criarNotificacaoCrm({ tipo, mensagem, metadata, destinatarios, cr
 
   const notificacao = await Notificacao.create({
     solicitacao_id: null,
-    tipo,
+    tipo: tipoNormalizado,
     mensagem,
     metadata: metadata ? JSON.stringify(metadata) : null,
     created_by: createdBy || null

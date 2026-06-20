@@ -53,6 +53,16 @@ const ACERTIVIDADE_COLUMNS = [
   { key: 'setores', width: 340, minWidth: 240 }
 ];
 
+const PENDENCIAS_FINANCEIRAS_COLUMNS = [
+  { key: 'usuario', width: 240, minWidth: 160 },
+  { key: 'marcadas', width: 125, minWidth: 100 },
+  { key: 'abertas', width: 115, minWidth: 92 },
+  { key: 'regularizadas', width: 140, minWidth: 112 },
+  { key: 'media', width: 145, minWidth: 115 },
+  { key: 'maior', width: 145, minWidth: 115 },
+  { key: 'tipos', width: 340, minWidth: 240 }
+];
+
 const TEMPO_COLUMNS = [
   { key: 'etapa', width: 260, minWidth: 180 },
   { key: 'amostras', width: 110, minWidth: 90 },
@@ -266,6 +276,10 @@ export default function SolicitacoesRelatorioOperacional() {
   const porCriador = useMemo(() => (Array.isArray(relatorio?.por_criador) ? relatorio.por_criador : []), [relatorio]);
   const acertividadeCriacao = useMemo(
     () => (Array.isArray(relatorio?.acertividade_criacao) ? relatorio.acertividade_criacao : []),
+    [relatorio]
+  );
+  const pendenciasFinanceirasCriador = useMemo(
+    () => (Array.isArray(relatorio?.pendencias_financeiras_criador) ? relatorio.pendencias_financeiras_criador : []),
     [relatorio]
   );
   const acertividadeCriacaoOrdenada = useMemo(() => {
@@ -863,6 +877,77 @@ export default function SolicitacoesRelatorioOperacional() {
               </tbody>
             </ResizableTable>
           </div>
+        </div>
+      </div>
+
+      <div className="mt-4 card sol-surface-card overflow-hidden">
+        <div className="app-page-header-row mb-3">
+          <div>
+            <h2 className="text-lg font-bold text-[var(--c-text)]">Pendencias financeiras por usuario</h2>
+            <p className="page-subtitle">
+              Mede solicitacoes marcadas por GEO ou Financeiro como fora do prazo, sem nota ou sem boleto ate o vencimento.
+            </p>
+          </div>
+        </div>
+        <div className="mb-3 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <strong>Leitura:</strong> a pendencia fica aberta ate ser regularizada no detalhe da solicitacao. O tempo medio mede o prazo entre a marcacao e a regularizacao.
+        </div>
+        <div className="sol-table-wrapper">
+          <ResizableTable
+            className="sol-table"
+            columns={PENDENCIAS_FINANCEIRAS_COLUMNS}
+            storageKey="fluxy.solicitacoes.relatorio.pendenciasFinanceiras.columns"
+          >
+            <thead>
+              <tr>
+                <ResizableTh columnKey="usuario">Usuario criador</ResizableTh>
+                <ResizableTh columnKey="marcadas" className="text-right">Marcadas</ResizableTh>
+                <ResizableTh columnKey="abertas" className="text-right">Abertas</ResizableTh>
+                <ResizableTh columnKey="regularizadas" className="text-right">Regularizadas</ResizableTh>
+                <ResizableTh columnKey="media" className="text-right">Prazo medio</ResizableTh>
+                <ResizableTh columnKey="maior" className="text-right">Maior prazo</ResizableTh>
+                <ResizableTh columnKey="tipos">Tipos de pendencia</ResizableTh>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <EmptyRow colSpan={7}>Carregando pendencias...</EmptyRow>
+              ) : pendenciasFinanceirasCriador.length === 0 ? (
+                <EmptyRow colSpan={7}>Sem pendencias financeiras marcadas no periodo.</EmptyRow>
+              ) : (
+                pendenciasFinanceirasCriador.map((item) => (
+                  <tr key={item.key}>
+                    <td>{item.usuario_nome || 'Sem criador'}</td>
+                    <td className="text-right font-bold">{formatNumber(item.total_marcadas)}</td>
+                    <td className="text-right">
+                      <span className={Number(item.abertas || 0) > 0 ? 'text-amber-700 font-bold' : 'text-[var(--c-muted)]'}>
+                        {formatNumber(item.abertas)}
+                      </span>
+                    </td>
+                    <td className="text-right text-emerald-700 font-bold">{formatNumber(item.regularizadas)}</td>
+                    <td className="text-right">{formatDays(item.media_dias_regularizacao)}</td>
+                    <td className="text-right">{formatDays(item.maior_dias_regularizacao)}</td>
+                    <td>
+                      {Array.isArray(item.tipos) && item.tipos.length > 0 ? (
+                        <div className="flex flex-wrap gap-2">
+                          {item.tipos.map((tipo) => (
+                            <span
+                              key={`${item.key}-${tipo.tipo}`}
+                              className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700"
+                            >
+                              {formatLabel(tipo.tipo)}: {formatNumber(tipo.total)}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-[var(--c-muted)]">Sem tipo informado</span>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </ResizableTable>
         </div>
       </div>
 

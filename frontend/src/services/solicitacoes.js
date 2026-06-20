@@ -150,6 +150,20 @@ export async function adicionarPagamentoSolicitacao(id, data) {
   return res.json();
 }
 
+export async function atualizarPendenciaFinanceiraSolicitacao(id, data) {
+  const res = await fetch(`${API_URL}/solicitacoes/${id}/pendencia-financeira`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+
+  if (!res.ok) {
+    throw buildResponseError(res.status, 'Erro ao atualizar pendencia financeira da solicitacao', await parseJsonSafe(res));
+  }
+
+  return res.json();
+}
+
 export async function updateValorSolicitacao(id, valor) {
   const res = await fetch(`${API_URL}/solicitacoes/${id}/valor`, {
     method: 'PATCH',

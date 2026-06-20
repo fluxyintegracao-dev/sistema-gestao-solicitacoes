@@ -304,6 +304,11 @@ async function relatorioSolicitacoesOperacional({ user, periodo, dataInicio, dat
       'obra_id',
       'tipo_solicitacao_id',
       'criado_por',
+      'financeiro_pendencia_prazo',
+      'financeiro_pendencia_tipo',
+      'financeiro_pendencia_observacao',
+      'financeiro_pendencia_marcado_em',
+      'financeiro_pendencia_regularizado_em',
       'aprovada_diretoria_em',
       'createdAt',
       'updatedAt'
@@ -352,6 +357,7 @@ async function relatorioSolicitacoesOperacional({ user, periodo, dataInicio, dat
   const tipoMap = new Map();
   const criadorMap = new Map();
   const acertividadeCriacaoMap = new Map();
+  const pendenciasFinanceirasMap = new Map();
   const responsavelMap = new Map();
   const tempoEtapasMap = new Map();
   const agingSetorMap = new Map();
@@ -399,6 +405,7 @@ async function relatorioSolicitacoesOperacional({ user, periodo, dataInicio, dat
     const diasParada = concluida ? 0 : diffDays(ultimaMovimentacao, now);
     const diasAberta = concluida ? 0 : diffDays(plain.createdAt, now);
     const mesCriacao = formatMonthKey(plain.createdAt) || 'SEM_MES';
+    const possuiPendenciaFinanceira = Boolean(plain.financeiro_pendencia_marcado_em || plain.financeiro_pendencia_prazo);
 
     resumo.valor_total += valor;
     const evolucao = incrementMap(evolucaoMensalMap, mesCriacao, {
@@ -545,6 +552,38 @@ async function relatorioSolicitacoesOperacional({ user, periodo, dataInicio, dat
       });
     }
 
+    if (possuiPendenciaFinanceira) {
+      if (!pendenciasFinanceirasMap.has(criadorKey)) {
+        pendenciasFinanceirasMap.set(criadorKey, {
+          key: criadorKey,
+          usuario_id: plain.criado_por || null,
+          usuario_nome: plain.criador?.nome || 'Sem criador',
+          total_marcadas: 0,
+          abertas: 0,
+          regularizadas: 0,
+          soma_dias_regularizacao: 0,
+          maior_dias_regularizacao: 0,
+          tipos_map: new Map()
+        });
+      }
+      const pendencia = pendenciasFinanceirasMap.get(criadorKey);
+      pendencia.total_marcadas += 1;
+      if (plain.financeiro_pendencia_regularizado_em) {
+        pendencia.regularizadas += 1;
+        const diasRegularizacao = diffDays(plain.financeiro_pendencia_marcado_em, plain.financeiro_pendencia_regularizado_em);
+        if (diasRegularizacao != null) {
+          pendencia.soma_dias_regularizacao += diasRegularizacao;
+          pendencia.maior_dias_regularizacao = Math.max(pendencia.maior_dias_regularizacao, diasRegularizacao);
+        }
+      } else {
+        pendencia.abertas += 1;
+      }
+      const tipoToken = normalizeToken(plain.financeiro_pendencia_tipo || 'NAO_INFORMADO');
+      const tipoAtual = pendencia.tipos_map.get(tipoToken) || { tipo: tipoToken, total: 0 };
+      tipoAtual.total += 1;
+      pendencia.tipos_map.set(tipoToken, tipoAtual);
+    }
+
     incrementMap(responsavelMap, responsavelAtual?.usuario_responsavel_id || 'SEM_RESPONSAVEL', {
       usuario_id: responsavelAtual?.usuario_responsavel_id || null,
       usuario_nome: responsavelAtual?.usuario?.nome || 'Sem responsavel'
@@ -626,6 +665,27 @@ async function relatorioSolicitacoesOperacional({ user, periodo, dataInicio, dat
         const ajusteDiff = Number(b.solicitacoes_com_ajuste || 0) - Number(a.solicitacoes_com_ajuste || 0);
         if (ajusteDiff !== 0) return ajusteDiff;
         return Number(b.total_criadas || 0) - Number(a.total_criadas || 0);
+      }),
+    pendencias_financeiras_criador: Array.from(pendenciasFinanceirasMap.values())
+      .map((item) => {
+        const regularizadas = Number(item.regularizadas || 0);
+        const tipos = Array.from(item.tipos_map.values()).sort((a, b) => Number(b.total || 0) - Number(a.total || 0));
+        return {
+          key: item.key,
+          usuario_id: item.usuario_id,
+          usuario_nome: item.usuario_nome,
+          total_marcadas: Number(item.total_marcadas || 0),
+          abertas: Number(item.abertas || 0),
+          regularizadas,
+          media_dias_regularizacao: regularizadas > 0 ? Number((item.soma_dias_regularizacao / regularizadas).toFixed(1)) : 0,
+          maior_dias_regularizacao: Number(item.maior_dias_regularizacao.toFixed(1)),
+          tipos
+        };
+      })
+      .sort((a, b) => {
+        const abertasDiff = Number(b.abertas || 0) - Number(a.abertas || 0);
+        if (abertasDiff !== 0) return abertasDiff;
+        return Number(b.total_marcadas || 0) - Number(a.total_marcadas || 0);
       }),
     por_responsavel: sortByTotalDesc(responsavelMap).slice(0, 20),
     tempos_etapas: finalizeDurations(tempoEtapasMap),

@@ -149,7 +149,7 @@ function buildInclude({ includeParcelas = true } = {}) {
         {
           model: TituloFinanceiro,
           as: 'tituloFinanceiro',
-          attributes: ['id', 'codigo', 'status', 'valor_original', 'valor_saldo', 'data_vencimento']
+          attributes: ['id', 'codigo', 'status', 'valor_original', 'valor_saldo', 'valor_baixado', 'data_vencimento']
         }
       ],
       separate: true,
@@ -424,7 +424,7 @@ function buildTituloFromParcela({ financiamento, parcela, userId }) {
     observacoes: [
       financiamento.observacoes,
       `Contrato: ${financiamento.numero_contrato}`,
-      `Principal: ${parcela.valor_principal}`,
+      `Amortizacao: ${parcela.valor_principal}`,
       `Juros: ${parcela.valor_juros}`,
       `IOF: ${parcela.valor_iof}`,
       `Tarifa: ${parcela.valor_tarifa}`
@@ -432,6 +432,127 @@ function buildTituloFromParcela({ financiamento, parcela, userId }) {
     criado_por: userId || null,
     atualizado_por: userId || null
   };
+}
+
+async function atualizarParcelaFinanciamentoBancario(req, parcelaId, payload = {}) {
+  await assertFinanceAccess(req);
+
+  const parcela = await FinanciamentoBancarioParcela.findByPk(parcelaId, {
+    include: [
+      {
+        model: FinanciamentoBancario,
+        as: 'financiamento'
+      },
+      {
+        model: TituloFinanceiro,
+        as: 'tituloFinanceiro'
+      }
+    ]
+  });
+
+  if (!parcela || !parcela.financiamento) {
+    throw createHttpError(404, 'Parcela do financiamento nao encontrada.');
+  }
+
+  await assertEmpresaScope(req, parcela.financiamento.empresa_id);
+
+  const titulo = parcela.tituloFinanceiro || null;
+  const tituloBaixado = titulo && (
+    Number(titulo.valor_baixado || 0) > 0 ||
+    ['BAIXADO', 'PAGO', 'QUITADO'].includes(String(titulo.status || '').toUpperCase())
+  );
+
+  if (tituloBaixado) {
+    throw createHttpError(400, 'Nao e possivel editar parcela de financiamento com titulo ja baixado.');
+  }
+
+  const valorPrincipal = roundCurrency(
+    payload.valor_principal !== undefined ? payload.valor_principal : parcela.valor_principal
+  );
+  const valorJuros = roundCurrency(
+    payload.valor_juros !== undefined ? payload.valor_juros : parcela.valor_juros
+  );
+  const valorIof = roundCurrency(parcela.valor_iof);
+  const valorTarifa = roundCurrency(parcela.valor_tarifa);
+  const valorParcela = roundCurrency(valorPrincipal + valorJuros + valorIof + valorTarifa);
+
+  if (valorPrincipal < 0 || valorJuros < 0 || valorParcela <= 0) {
+    throw createHttpError(400, 'Informe valores validos para amortizacao e juros da parcela.');
+  }
+
+  const anterior = {
+    valor_principal: Number(parcela.valor_principal || 0),
+    valor_juros: Number(parcela.valor_juros || 0),
+    valor_parcela: Number(parcela.valor_parcela || 0)
+  };
+
+  const transaction = await sequelize.transaction();
+  try {
+    await parcela.update({
+      valor_principal: valorPrincipal,
+      valor_juros: valorJuros,
+      valor_parcela: valorParcela,
+      observacoes: payload.observacoes !== undefined ? String(payload.observacoes || '').trim() || null : parcela.observacoes
+    }, { transaction });
+
+    if (titulo) {
+      await titulo.update({
+        valor_original: valorParcela,
+        valor_saldo: valorParcela,
+        observacoes: [
+          parcela.financiamento.observacoes,
+          `Contrato: ${parcela.financiamento.numero_contrato}`,
+          `Amortizacao: ${valorPrincipal}`,
+          `Juros: ${valorJuros}`,
+          `IOF: ${valorIof}`,
+          `Tarifa: ${valorTarifa}`
+        ].filter(Boolean).join('\n'),
+        atualizado_por: req.user?.id || null
+      }, { transaction });
+    }
+
+    const parcelasAtualizadas = await FinanciamentoBancarioParcela.findAll({
+      where: { financiamento_bancario_id: parcela.financiamento_bancario_id },
+      transaction
+    });
+
+    const resumo = resumoParcelas(parcelasAtualizadas);
+    await parcela.financiamento.update({
+      valor_credito: resumo.principal,
+      valor_juros_total: resumo.juros,
+      valor_iof: resumo.iof,
+      valor_tarifas: resumo.tarifas,
+      valor_total: resumo.total,
+      atualizado_por: req.user?.id || null
+    }, { transaction });
+
+    await transaction.commit();
+
+    await registrarEventoSeguranca({
+      req,
+      usuarioId: req.user?.id || null,
+      tipoEvento: 'BANK_LOAN_INSTALLMENT_UPDATED',
+      recursoTipo: 'FINANCIAMENTO_BANCARIO',
+      recursoId: parcela.financiamento_bancario_id,
+      status: 'SUCCESS',
+      descricao: 'Parcela de financiamento bancario atualizada',
+      metadata: {
+        parcela_id: parcela.id,
+        numero_parcela: parcela.numero_parcela,
+        anterior,
+        novo: {
+          valor_principal: valorPrincipal,
+          valor_juros: valorJuros,
+          valor_parcela: valorParcela
+        }
+      }
+    });
+
+    return carregarFinanciamentoBancario(req, parcela.financiamento_bancario_id);
+  } catch (error) {
+    await transaction.rollback();
+    throw error;
+  }
 }
 
 async function gerarTitulosFinanciamentoBancario(req, id) {
@@ -516,6 +637,7 @@ module.exports = {
   SISTEMAS_AMORTIZACAO,
   STATUS_FINANCIAMENTO,
   carregarFinanciamentoBancario,
+  atualizarParcelaFinanciamentoBancario,
   criarFinanciamentoBancario,
   gerarTitulosFinanciamentoBancario,
   listarAuditoriaFinanciamentoBancario,

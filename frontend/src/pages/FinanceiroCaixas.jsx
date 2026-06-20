@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   abrirCaixaFinanceiro,
   cancelarTransferenciaFinanceira,
+  confirmarConciliacaoDiaCaixa,
   fecharCaixaFinanceiro,
   getCaixasFinanceiros,
   getContasBancarias,
@@ -31,6 +32,13 @@ const DEFAULT_FILTERS = {
 
 function today() {
   return new Date().toISOString().slice(0, 10);
+}
+
+function addDays(dateString, days) {
+  const date = new Date(`${dateString || today()}T12:00:00.000`);
+  if (Number.isNaN(date.getTime())) return today();
+  date.setDate(date.getDate() + days);
+  return date.toISOString().slice(0, 10);
 }
 
 function formatCurrency(value) {
@@ -253,6 +261,29 @@ export default function FinanceiroCaixas() {
     }
   }
 
+  async function handleConfirmarConciliacaoDia() {
+    if (!abrirForm.conta_bancaria_id) {
+      setError('Selecione a conta antes de confirmar a conciliacao do dia anterior.');
+      return;
+    }
+    const dataReferencia = addDays(abrirForm.data_abertura || today(), -1);
+    try {
+      setSaving(true);
+      setError('');
+      setMessage('');
+      await confirmarConciliacaoDiaCaixa({
+        conta_bancaria_id: abrirForm.conta_bancaria_id,
+        data_referencia: dataReferencia,
+        observacoes: abrirForm.observacoes
+      });
+      setMessage(`Conciliacao OFX de ${formatDate(dataReferencia)} confirmada para esta conta.`);
+    } catch (err) {
+      setError(err?.message || 'Erro ao confirmar conciliacao OFX do dia anterior');
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function handleFechar(sessaoId) {
     const payload = fecharForm[sessaoId] || {};
     try {
@@ -456,7 +487,7 @@ export default function FinanceiroCaixas() {
               <input
                 className="input w-full"
                 inputMode="decimal"
-                placeholder="Usar saldo do ultimo fechamento"
+                placeholder="Saldo calculado pelo fechamento anterior"
                 value={abrirForm.saldo_abertura}
                 onChange={(e) => setAbrirForm((current) => ({ ...current, saldo_abertura: e.target.value }))}
               />
@@ -469,13 +500,27 @@ export default function FinanceiroCaixas() {
                 onChange={(e) => setAbrirForm((current) => ({ ...current, observacoes: e.target.value }))}
               />
             </label>
+            <div className="rounded-2xl border border-amber-100 bg-amber-50 p-3 text-sm text-amber-800">
+              <strong className="block text-amber-900">Conferencia OFX obrigatoria</strong>
+              <span>
+                Antes de abrir, confirme que os OFX de {formatDate(addDays(abrirForm.data_abertura || today(), -1))} desta conta foram conciliados ou ignorados.
+              </span>
+              <button
+                type="button"
+                className="btn btn-outline mt-3 w-full"
+                onClick={handleConfirmarConciliacaoDia}
+                disabled={saving || !abrirForm.conta_bancaria_id}
+              >
+                Confirmar OFX do dia anterior
+              </button>
+            </div>
             <button type="submit" className="btn btn-primary w-full" disabled={saving}>
               {saving ? 'Salvando...' : 'Abrir caixa'}
             </button>
           </form>
         </div>
 
-        <div className="card sol-surface-card">
+        <div className="hidden">
           <h2 className="text-lg font-semibold text-[var(--c-text)]">Transferir entre contas</h2>
           <form className="mt-4 space-y-3" onSubmit={handleTransferencia}>
             <label className="sol-filter-field">
@@ -767,7 +812,7 @@ export default function FinanceiroCaixas() {
             </div>
           )}
 
-          <div className="mt-8 border-t border-[var(--c-border)] pt-5">
+          <div className="hidden">
             <h3 className="text-base font-semibold text-[var(--c-text)]">Transferencias recentes</h3>
             {transferencias.length === 0 ? (
               <div className="app-empty-card mt-3">Nenhuma transferencia encontrada nos filtros atuais.</div>

@@ -17,7 +17,8 @@ import {
   getTarifasBancariasAtalhos,
   getTitulosFinanceiros,
   ignorarConciliacaoBancaria,
-  importarOfxConciliacao
+  importarOfxConciliacao,
+  removerConciliacaoBancaria
 } from '../services/financeiro';
 import { buscarParceiros } from '../services/parceiros';
 import { getMinhasObras } from '../services/obras';
@@ -533,7 +534,7 @@ function NovoTituloRapidoModal({ item, contas, onClose, onConciliar }) {
 
 // ─── ItemConciliacao — layout 2 colunas ──────────────────────────────────────
 
-function ItemConciliacao({ item, processingId, selected = false, onToggleSelecao, onConfirmar, onIgnorar, onAssociarManual, onAssociarFatura, onAssociarTransferencia, onAcoesRapidas }) {
+function ItemConciliacao({ item, processingId, selected = false, onToggleSelecao, onConfirmar, onIgnorar, onRemover, onAssociarManual, onAssociarFatura, onAssociarTransferencia, onAcoesRapidas }) {
   const [expandirSugestoes, setExpandirSugestoes] = useState(false);
 
   const isPendente = item.status === 'PENDENTE';
@@ -549,6 +550,7 @@ function ItemConciliacao({ item, processingId, selected = false, onToggleSelecao
   const pidConfirmar = topSugestao ? `confirmar-${item.id}-${topSugestao.movimento_financeiro_id}` : null;
   const isConfirmando = processingId === pidConfirmar;
   const isIgnorando = processingId === `ignorar-${item.id}`;
+  const isRemovendo = processingId === `remover-${item.id}`;
   const podeConfirmar = isPendente && Boolean(topSugestao) && !isConfirmando;
 
   return (
@@ -595,14 +597,24 @@ function ItemConciliacao({ item, processingId, selected = false, onToggleSelecao
           )}
           {/* ignorar */}
           {isPendente && (
-            <button
-              type="button"
-              className="self-start text-[10px] text-slate-400 hover:text-rose-600 underline underline-offset-2 leading-tight"
-              disabled={isIgnorando}
-              onClick={() => onIgnorar(item.id)}
-            >
-              {isIgnorando ? 'Ignorando...' : 'Ignorar'}
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                className="text-[10px] text-slate-400 hover:text-amber-600 underline underline-offset-2 leading-tight"
+                disabled={isIgnorando || isRemovendo}
+                onClick={() => onIgnorar(item.id)}
+              >
+                {isIgnorando ? 'Ignorando...' : 'Ignorar'}
+              </button>
+              <button
+                type="button"
+                className="text-[10px] text-slate-400 hover:text-rose-600 underline underline-offset-2 leading-tight"
+                disabled={isIgnorando || isRemovendo}
+                onClick={() => onRemover(item.id)}
+              >
+                {isRemovendo ? 'Removendo...' : 'Remover do extrato'}
+              </button>
+            </div>
           )}
         </div>
 
@@ -1360,6 +1372,16 @@ export default function FinanceiroConciliacao() {
     } catch (err) { setError(err?.message || 'Erro ao ignorar conciliacao'); } finally { setProcessingId(null); }
   }
 
+  async function handleRemover(conciliacaoId) {
+    if (!window.confirm('Remover este lancamento do extrato? O registro ficara auditado e nao sera apagado fisicamente do banco.')) return;
+    try {
+      setProcessingId(`remover-${conciliacaoId}`); setError(''); setFeedback('');
+      await removerConciliacaoBancaria(conciliacaoId, { motivo: 'Removido manualmente na tela de conciliacao' });
+      setFeedback('Lancamento removido do extrato.');
+      await carregarConciliacoes();
+    } catch (err) { setError(err?.message || 'Erro ao remover lancamento do extrato'); } finally { setProcessingId(null); }
+  }
+
   async function handleConciliarSugeridos() {
     if (!window.confirm('Conciliar em lote todos os lançamentos pendentes do filtro atual que tenham sugestão segura?')) return;
     try {
@@ -1946,6 +1968,7 @@ export default function FinanceiroConciliacao() {
                     selected={conciliacoesSelecionadas.includes(Number(item.id))}
                     onToggleSelecao={toggleConciliacaoSelecionada}
                     onConfirmar={handleConfirmar} onIgnorar={handleIgnorar}
+                    onRemover={handleRemover}
                     onAssociarManual={abrirAssociacaoManual}
                     onAssociarFatura={abrirAssociacaoFatura}
                     onAssociarTransferencia={abrirAssociacaoTransferencia}

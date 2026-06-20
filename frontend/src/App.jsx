@@ -148,6 +148,7 @@ const ConfiguracoesStatusPedidoCompra = lazy(() => import('./pages/Configuracoes
 const ConfiguracoesComercialCategorias = lazy(() => import('./pages/ConfiguracoesComercialCategorias'));
 const ConfiguracoesProvisionamentoFluxo = lazy(() => import('./pages/ConfiguracoesProvisionamentoFluxo'));
 const ConfiguracoesModulos = lazy(() => import('./pages/ConfiguracoesModulos'));
+const ConfiguracoesNotificacoesSistema = lazy(() => import('./pages/ConfiguracoesNotificacoesSistema'));
 const Parceiros = lazy(() => import('./pages/Parceiros'));
 const ParceiroCategorias = lazy(() => import('./pages/ParceiroCategorias'));
 const ComercialEmpreendimentos = lazy(() => import('./pages/ComercialEmpreendimentos'));
@@ -734,6 +735,7 @@ export default function App() {
         <Route path="configuracoes-comercial-categorias" element={<EnabledModuleRoute moduleKey="COMERCIAL"><SuperadminRoute><ConfiguracoesComercialCategorias /></SuperadminRoute></EnabledModuleRoute>} />
         <Route path="configuracoes-provisionamento-fluxo" element={<EnabledModuleRoute moduleKey="PROVISOES"><SuperadminRoute><ConfiguracoesProvisionamentoFluxo /></SuperadminRoute></EnabledModuleRoute>} />
         <Route path="configuracoes-modulos" element={<SuperadminRoute><ConfiguracoesModulos /></SuperadminRoute>} />
+        <Route path="configuracoes-notificacoes-sistema" element={<SuperadminRoute><ConfiguracoesNotificacoesSistema /></SuperadminRoute>} />
         <Route path="parceiros" element={<BusinessAdminRoute><Parceiros /></BusinessAdminRoute>} />
         <Route path="parceiros-categorias" element={<BusinessAdminRoute><ParceiroCategorias /></BusinessAdminRoute>} />
         <Route path="crm/dashboard" element={<CrmDashboardRoute><CrmDashboard /></CrmDashboardRoute>} />

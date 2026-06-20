@@ -1,4 +1,5 @@
 const {
+  atualizarParcelaFinanciamentoBancario,
   carregarFinanciamentoBancario,
   criarFinanciamentoBancario,
   gerarTitulosFinanciamentoBancario,
@@ -49,6 +50,16 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return responderErro(res, error, 'Erro ao gerar titulos do financiamento bancario');
+    }
+  },
+
+  async atualizarParcela(req, res) {
+    try {
+      const financiamento = await atualizarParcelaFinanciamentoBancario(req, req.params.id, req.body || {});
+      return res.json(financiamento);
+    } catch (error) {
+      console.error(error);
+      return responderErro(res, error, 'Erro ao atualizar parcela do financiamento bancario');
     }
   },
 

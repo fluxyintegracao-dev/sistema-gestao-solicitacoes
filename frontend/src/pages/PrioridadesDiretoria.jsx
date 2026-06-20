@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   cancelarLotePrioridadeDiretoria,
@@ -76,6 +76,7 @@ export default function PrioridadesDiretoria() {
   const [statusFiltro, setStatusFiltro] = useState('');
   const [loading, setLoading] = useState(true);
   const [operando, setOperando] = useState(false);
+  const autosavePrioridadeRef = useRef(0);
   const [form, setForm] = useState({
     classificacao_alvo: '',
     valor_disponivel: '',
@@ -188,12 +189,31 @@ export default function PrioridadesDiretoria() {
     ));
   }
 
+  async function salvarSelecaoLoteSilenciosa(tituloIds) {
+    if (!loteDetalhe?.id || loteDetalhe.status !== 'ABERTO' || !loteDetalhe.pode_salvar) return;
+    const versao = autosavePrioridadeRef.current + 1;
+    autosavePrioridadeRef.current = versao;
+
+    try {
+      const dataLote = await salvarRascunhoLotePrioridadeDiretoria(loteDetalhe.id, { titulo_ids: tituloIds });
+      if (autosavePrioridadeRef.current !== versao) return;
+      const detalhe = dataLote?.item || null;
+      const titulosSalvos = titulosDoLote(detalhe);
+      setLoteDetalhe(detalhe);
+      setDisponiveis((current) => mesclarItens(current, titulosSalvos));
+    } catch (error) {
+      console.error(error);
+    }
+  }
+
   function alternarTitulo(id) {
     const key = String(id);
     setSelecionados(prev => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key);
       else next.add(key);
+      const tituloIds = Array.from(next).map(Number).filter(Boolean);
+      void salvarSelecaoLoteSilenciosa(tituloIds);
       return next;
     });
   }

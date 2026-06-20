@@ -41,6 +41,42 @@ function toCurrencyNumber(value) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function roundCurrency(value) {
+  const parsed = Number(value || 0);
+  return Math.round((Number.isFinite(parsed) ? parsed : 0) * 100) / 100;
+}
+
+function formatCurrency(value) {
+  return Number(value || 0).toLocaleString('pt-BR', {
+    style: 'currency',
+    currency: 'BRL'
+  });
+}
+
+function createRateio(valor = '') {
+  return {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    obra_id: '',
+    tipo_rateio: 'PERCENTUAL',
+    percentual: '',
+    valor_rateio: valor,
+    observacoes: ''
+  };
+}
+
+function createImposto() {
+  return {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    tipo_imposto: '',
+    descricao: '',
+    natureza: 'RETENCAO',
+    base_calculo: '',
+    aliquota: '',
+    valor: '',
+    observacoes: ''
+  };
+}
+
 function getEmpresaObraId(obra) {
   return obra?.empresa_grupo_id ? String(obra.empresa_grupo_id) : '';
 }
@@ -167,7 +203,29 @@ function buildFormFromTitulo(titulo) {
     tipo_intercompany: titulo?.tipo_intercompany || '',
     motivo_intercompany: titulo?.motivo_intercompany || '',
     elimina_consolidado: titulo?.elimina_consolidado !== false,
-    transferencia_interna: titulo?.transferencia_interna !== false
+    transferencia_interna: titulo?.transferencia_interna !== false,
+    rateios: Array.isArray(titulo?.rateios)
+      ? titulo.rateios.map((rateio) => ({
+        id: rateio.id || `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        obra_id: String(rateio.obra_id || ''),
+        tipo_rateio: rateio.tipo_rateio || 'PERCENTUAL',
+        percentual: rateio.percentual != null ? String(rateio.percentual).replace('.', ',') : '',
+        valor_rateio: rateio.valor_rateio != null ? formatCurrencyInput(rateio.valor_rateio) : '',
+        observacoes: rateio.observacoes || ''
+      }))
+      : [],
+    impostos: Array.isArray(titulo?.impostos)
+      ? titulo.impostos.map((imposto) => ({
+        id: imposto.id || `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        tipo_imposto: imposto.tipo_imposto || '',
+        descricao: imposto.descricao || '',
+        natureza: imposto.natureza || 'RETENCAO',
+        base_calculo: imposto.base_calculo != null ? formatCurrencyInput(imposto.base_calculo) : '',
+        aliquota: imposto.aliquota != null ? String(imposto.aliquota).replace('.', ',') : '',
+        valor: imposto.valor != null ? formatCurrencyInput(imposto.valor) : '',
+        observacoes: imposto.observacoes || ''
+      }))
+      : []
   };
 }
 
@@ -317,6 +375,32 @@ export default function FinanceiroTituloEditar() {
     [form?.parceiro_id, parceiros]
   );
   const parceiroPixOptions = useMemo(() => getParceiroPixOptions(parceiroSelecionado), [parceiroSelecionado]);
+  const valorTitulo = useMemo(() => roundCurrency(toCurrencyNumber(form?.valor)), [form?.valor]);
+  const totalRateioValor = useMemo(() => {
+    return roundCurrency((form?.rateios || []).reduce((acc, rateio) => {
+      if (rateio.tipo_rateio === 'VALOR') return acc + toCurrencyNumber(rateio.valor_rateio);
+      return acc + (valorTitulo * toCurrencyNumber(rateio.percentual) / 100);
+    }, 0));
+  }, [form?.rateios, valorTitulo]);
+  const totalRateioPercentual = useMemo(() => {
+    return roundCurrency((form?.rateios || []).reduce((acc, rateio) => {
+      if (rateio.tipo_rateio === 'PERCENTUAL') return acc + toCurrencyNumber(rateio.percentual);
+      return acc + (valorTitulo > 0 ? (toCurrencyNumber(rateio.valor_rateio) / valorTitulo) * 100 : 0);
+    }, 0));
+  }, [form?.rateios, valorTitulo]);
+  const totalImpostosRetencao = useMemo(() => {
+    return roundCurrency((form?.impostos || [])
+      .filter((imposto) => imposto.natureza !== 'ACRESCIMO')
+      .reduce((acc, imposto) => acc + toCurrencyNumber(imposto.valor), 0));
+  }, [form?.impostos]);
+  const totalImpostosAcrescimo = useMemo(() => {
+    return roundCurrency((form?.impostos || [])
+      .filter((imposto) => imposto.natureza === 'ACRESCIMO')
+      .reduce((acc, imposto) => acc + toCurrencyNumber(imposto.valor), 0));
+  }, [form?.impostos]);
+  const valorLiquidoPrevisto = useMemo(() => {
+    return roundCurrency(valorTitulo - totalImpostosRetencao + totalImpostosAcrescimo);
+  }, [valorTitulo, totalImpostosRetencao, totalImpostosAcrescimo]);
 
   useEffect(() => {
     if (!form || form.tipo !== 'PAGAR' || !form.parceiro_id) {
@@ -409,6 +493,55 @@ export default function FinanceiroTituloEditar() {
     });
   }
 
+  function adicionarRateio() {
+    setForm((current) => ({
+      ...current,
+      rateios: [...(current.rateios || []), createRateio()]
+    }));
+  }
+
+  function updateRateio(index, field, value) {
+    setForm((current) => {
+      const rateios = [...(current.rateios || [])];
+      const rateio = rateios[index] || createRateio();
+      rateios[index] = { ...rateio, [field]: value };
+      if (field === 'tipo_rateio') {
+        rateios[index].percentual = '';
+        rateios[index].valor_rateio = '';
+      }
+      return { ...current, rateios };
+    });
+  }
+
+  function removerRateio(index) {
+    setForm((current) => ({
+      ...current,
+      rateios: (current.rateios || []).filter((_, itemIndex) => itemIndex !== index)
+    }));
+  }
+
+  function adicionarImposto() {
+    setForm((current) => ({
+      ...current,
+      impostos: [...(current.impostos || []), createImposto()]
+    }));
+  }
+
+  function updateImposto(index, field, value) {
+    setForm((current) => {
+      const impostos = [...(current.impostos || [])];
+      impostos[index] = { ...(impostos[index] || createImposto()), [field]: value };
+      return { ...current, impostos };
+    });
+  }
+
+  function removerImposto(index) {
+    setForm((current) => ({
+      ...current,
+      impostos: (current.impostos || []).filter((_, itemIndex) => itemIndex !== index)
+    }));
+  }
+
   function handleTipoChange(value) {
     updateField('tipo', value);
     if (value !== 'PAGAR') {
@@ -485,6 +618,26 @@ export default function FinanceiroTituloEditar() {
     if (!form.descricao.trim()) return 'Informe a descricao.';
     if (toCurrencyNumber(form.valor) <= 0) return 'Informe o valor do titulo.';
     if (!form.data_vencimento) return 'Informe o vencimento.';
+    if ((form.rateios || []).length > 0) {
+      for (const rateio of form.rateios) {
+        if (!rateio.obra_id) return 'Informe a obra/centro de custo em todos os rateios.';
+        if (rateio.tipo_rateio === 'PERCENTUAL' && toCurrencyNumber(rateio.percentual) <= 0) {
+          return 'Informe o percentual de todos os rateios percentuais.';
+        }
+        if (rateio.tipo_rateio === 'VALOR' && toCurrencyNumber(rateio.valor_rateio) <= 0) {
+          return 'Informe o valor de todos os rateios por valor.';
+        }
+      }
+      if (Math.abs(totalRateioValor - valorTitulo) > 0.02 || Math.abs(totalRateioPercentual - 100) > 0.02) {
+        return `O rateio precisa fechar 100% ou ${formatCurrency(valorTitulo)}. Total atual: ${formatCurrency(totalRateioValor)} (${totalRateioPercentual.toFixed(2)}%).`;
+      }
+    }
+    if ((form.impostos || []).length > 0) {
+      for (const imposto of form.impostos) {
+        if (!String(imposto.tipo_imposto || imposto.descricao || '').trim()) return 'Informe o tipo dos impostos/descontos.';
+        if (toCurrencyNumber(imposto.valor) <= 0) return 'Informe o valor dos impostos/descontos.';
+      }
+    }
     if (categoriaSelecionada && categoriaSelecionada.considera_dre !== false && String(categoriaSelecionada.dre_grupo || '').trim()) {
       if (!form.competencia_data) return 'Informe a competencia DRE.';
     }
@@ -535,7 +688,25 @@ export default function FinanceiroTituloEditar() {
         empresa_origem_id: form.intercompany ? form.empresa_origem_id || null : null,
         empresa_destino_id: form.intercompany ? form.empresa_destino_id || null : null,
         tipo_intercompany: form.intercompany ? form.tipo_intercompany || null : null,
-        motivo_intercompany: form.intercompany ? form.motivo_intercompany || null : null
+        motivo_intercompany: form.intercompany ? form.motivo_intercompany || null : null,
+        valor_bruto: form.valor,
+        valor_liquido: formatCurrencyInput(valorLiquidoPrevisto),
+        rateios: (form.rateios || []).map((rateio) => ({
+          obra_id: rateio.obra_id ? Number(rateio.obra_id) : undefined,
+          tipo_rateio: rateio.tipo_rateio || 'PERCENTUAL',
+          percentual: rateio.tipo_rateio === 'PERCENTUAL' ? rateio.percentual : undefined,
+          valor_rateio: rateio.tipo_rateio === 'VALOR' ? rateio.valor_rateio : undefined,
+          observacoes: rateio.observacoes || undefined
+        })),
+        impostos: (form.impostos || []).map((imposto) => ({
+          tipo_imposto: imposto.tipo_imposto || imposto.descricao,
+          descricao: imposto.descricao || imposto.tipo_imposto,
+          natureza: imposto.natureza || 'RETENCAO',
+          base_calculo: imposto.base_calculo || undefined,
+          aliquota: imposto.aliquota || undefined,
+          valor: imposto.valor,
+          observacoes: imposto.observacoes || undefined
+        }))
       };
       if (form.tipo === 'PAGAR' && paymentDraft.preparar_pagamento_pix) {
         if (!form.parceiro_id || !paymentDraft.nome || !paymentDraft.cpf_cnpj || !paymentDraft.pix_tipo_chave || !paymentDraft.pix_chave) {
@@ -736,6 +907,139 @@ export default function FinanceiroTituloEditar() {
               A categoria financeira define automaticamente se o titulo entra na DRE.
             </small>
           </label>
+        </div>
+
+        <div className="rounded-xl border border-[var(--c-border)] p-4">
+          <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+            <div>
+              <h2 className="text-base font-semibold text-[var(--c-text)]">Rateio por obra/centro de custo</h2>
+              <p className="text-xs text-[var(--c-muted)]">
+                Use quando o mesmo titulo precisar compor mais de uma obra. Sem rateio, o titulo segue na obra principal selecionada.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                (form.rateios || []).length === 0 || (Math.abs(totalRateioValor - valorTitulo) <= 0.02 && Math.abs(totalRateioPercentual - 100) <= 0.02)
+                  ? 'bg-emerald-100 text-emerald-700'
+                  : 'bg-amber-100 text-amber-700'
+              }`}>
+                {(form.rateios || []).length === 0
+                  ? 'Sem rateio'
+                  : `${formatCurrency(totalRateioValor)} - ${totalRateioPercentual.toFixed(2)}%`}
+              </span>
+              <button type="button" className="btn btn-outline" onClick={adicionarRateio} disabled={Boolean(bloqueio)}>
+                Adicionar rateio
+              </button>
+            </div>
+          </div>
+
+          {(form.rateios || []).length > 0 && (
+            <div className="space-y-3">
+              {(form.rateios || []).map((rateio, index) => (
+                <div key={rateio.id || index} className="rounded-lg border border-[var(--c-border)] bg-[var(--c-bg)] p-3">
+                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-12">
+                    <label className="form-field xl:col-span-4">
+                      <span>Obra/Centro de custo</span>
+                      <select value={rateio.obra_id} onChange={(event) => updateRateio(index, 'obra_id', event.target.value)} disabled={Boolean(bloqueio)}>
+                        <option value="">Selecione</option>
+                        {obras.map((obra) => (
+                          <option key={obra.id} value={obra.id}>{obra.codigo ? `${obra.codigo} - ${obra.nome}` : obra.nome}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="form-field xl:col-span-2">
+                      <span>Tipo</span>
+                      <select value={rateio.tipo_rateio} onChange={(event) => updateRateio(index, 'tipo_rateio', event.target.value)} disabled={Boolean(bloqueio)}>
+                        <option value="PERCENTUAL">Percentual</option>
+                        <option value="VALOR">Valor R$</option>
+                      </select>
+                    </label>
+                    {rateio.tipo_rateio === 'PERCENTUAL' ? (
+                      <label className="form-field xl:col-span-2">
+                        <span>Percentual</span>
+                        <input value={rateio.percentual} onChange={(event) => updateRateio(index, 'percentual', event.target.value)} disabled={Boolean(bloqueio)} placeholder="Ex.: 50" />
+                      </label>
+                    ) : (
+                      <label className="form-field xl:col-span-2">
+                        <span>Valor</span>
+                        <input value={rateio.valor_rateio} onChange={(event) => updateRateio(index, 'valor_rateio', normalizeCurrencyTyping(event.target.value))} disabled={Boolean(bloqueio)} placeholder="R$ 0,00" />
+                      </label>
+                    )}
+                    <label className="form-field xl:col-span-3">
+                      <span>Observacoes</span>
+                      <input value={rateio.observacoes} onChange={(event) => updateRateio(index, 'observacoes', event.target.value)} disabled={Boolean(bloqueio)} />
+                    </label>
+                    <div className="flex items-end xl:col-span-1">
+                      <button type="button" className="btn btn-outline w-full" onClick={() => removerRateio(index)} disabled={Boolean(bloqueio)}>
+                        Remover
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="rounded-xl border border-[var(--c-border)] p-4">
+          <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+            <div>
+              <h2 className="text-base font-semibold text-[var(--c-text)]">Impostos, retencoes e descontos</h2>
+              <p className="text-xs text-[var(--c-muted)]">
+                Registre retencoes, descontos ou acrescimos para acompanhar o valor liquido do titulo.
+              </p>
+            </div>
+            <button type="button" className="btn btn-outline" onClick={adicionarImposto} disabled={Boolean(bloqueio)}>
+              Adicionar imposto/desconto
+            </button>
+          </div>
+
+          {(form.impostos || []).length > 0 && (
+            <div className="space-y-3">
+              {(form.impostos || []).map((imposto, index) => (
+                <div key={imposto.id || index} className="rounded-lg border border-[var(--c-border)] bg-[var(--c-bg)] p-3">
+                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-12">
+                    <label className="form-field xl:col-span-2">
+                      <span>Natureza</span>
+                      <select value={imposto.natureza} onChange={(event) => updateImposto(index, 'natureza', event.target.value)} disabled={Boolean(bloqueio)}>
+                        <option value="RETENCAO">Retencao/desconto</option>
+                        <option value="ACRESCIMO">Acrescimo</option>
+                      </select>
+                    </label>
+                    <label className="form-field xl:col-span-2">
+                      <span>Tipo</span>
+                      <input value={imposto.tipo_imposto} onChange={(event) => updateImposto(index, 'tipo_imposto', event.target.value)} disabled={Boolean(bloqueio)} placeholder="IRRF, INSS..." />
+                    </label>
+                    <label className="form-field xl:col-span-2">
+                      <span>Base</span>
+                      <input value={imposto.base_calculo} onChange={(event) => updateImposto(index, 'base_calculo', normalizeCurrencyTyping(event.target.value))} disabled={Boolean(bloqueio)} placeholder="R$ 0,00" />
+                    </label>
+                    <label className="form-field xl:col-span-1">
+                      <span>Aliq. %</span>
+                      <input value={imposto.aliquota} onChange={(event) => updateImposto(index, 'aliquota', event.target.value)} disabled={Boolean(bloqueio)} />
+                    </label>
+                    <label className="form-field xl:col-span-2">
+                      <span>Valor</span>
+                      <input value={imposto.valor} onChange={(event) => updateImposto(index, 'valor', normalizeCurrencyTyping(event.target.value))} disabled={Boolean(bloqueio)} placeholder="R$ 0,00" />
+                    </label>
+                    <label className="form-field xl:col-span-2">
+                      <span>Descricao</span>
+                      <input value={imposto.descricao} onChange={(event) => updateImposto(index, 'descricao', event.target.value)} disabled={Boolean(bloqueio)} />
+                    </label>
+                    <div className="flex items-end xl:col-span-1">
+                      <button type="button" className="btn btn-outline w-full" onClick={() => removerImposto(index)} disabled={Boolean(bloqueio)}>
+                        Remover
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="mt-3 rounded-lg border border-[var(--c-border)] bg-[var(--c-surface-muted)] px-3 py-2 text-sm text-[var(--c-text)]">
+            Valor bruto: <strong>{formatCurrency(valorTitulo)}</strong>. Retencoes/descontos: <strong>{formatCurrency(totalImpostosRetencao)}</strong>. Acrescimos: <strong>{formatCurrency(totalImpostosAcrescimo)}</strong>. Valor liquido previsto: <strong>{formatCurrency(valorLiquidoPrevisto)}</strong>.
+          </div>
         </div>
 
         {form.tipo === 'RECEBER' && (

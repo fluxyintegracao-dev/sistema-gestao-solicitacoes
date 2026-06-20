@@ -22,6 +22,7 @@ const {
 const { Op } = require('sequelize');
 const { ValidationError } = require('../middlewares/validation');
 const { canAccessFinanceiro, getUsuariosAcessoFinanceiro } = require('./authorizationService');
+const { notificacaoEventoAtivo } = require('./notificacaoConfigService');
 const {
   buildSetorComparisonTokens,
   hasSetorCapability,
@@ -607,6 +608,10 @@ async function obterDestinatariosFinanceiro(transaction) {
 
 async function notificarFinanceiroReabertura({ fechamento, apuracao, justificativa, user, transaction }) {
   try {
+    if (!(await notificacaoEventoAtivo('RH_DP_FECHAMENTO_REABERTO'))) {
+      return;
+    }
+
     const destinatarios = await obterDestinatariosFinanceiro(transaction);
     if (!destinatarios.length) {
       console.warn('[rh-dp] Estorno de fechamento sem destinatarios financeiros para notificacao.', {

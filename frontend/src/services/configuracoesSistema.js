@@ -491,6 +491,30 @@ export async function salvarProvisionamentoFluxoConfig(data) {
   return res.json();
 }
 
+export async function getNotificacoesSistema() {
+  const res = await fetch(`${API_URL}/configuracoes/notificacoes-sistema`, {
+    headers: authHeaders()
+  });
+  if (!res.ok) {
+    const txt = await res.text();
+    throw new Error(txt || 'Erro ao buscar configuracao de notificacoes do sistema');
+  }
+  return res.json();
+}
+
+export async function salvarNotificacoesSistema(data) {
+  const res = await fetch(`${API_URL}/configuracoes/notificacoes-sistema`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+  if (!res.ok) {
+    const payload = await res.json().catch(() => null);
+    throw new Error(payload?.error || 'Erro ao salvar configuracao de notificacoes do sistema');
+  }
+  return res.json();
+}
+
 export async function getModulosSistema() {
   const res = await fetch(`${API_URL}/configuracoes/modulos`, {
     headers: authHeaders()

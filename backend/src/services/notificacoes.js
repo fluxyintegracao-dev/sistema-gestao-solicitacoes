@@ -9,9 +9,9 @@ const {
   SetorPermissao,
   ConfiguracaoSistema
 } = require('../models');
+const { notificacaoEventoAtivo } = require('./notificacaoConfigService');
 
 const CHAVE_TIPOS_SOLICITACAO_POR_SETOR = 'TIPOS_SOLICITACAO_POR_SETOR';
-const TIPOS_NOTIFICACAO_ATIVOS = new Set(['MENCAO_COMENTARIO']);
 
 function parseJsonOrDefault(value, fallback) {
   if (!value) return fallback;
@@ -198,7 +198,7 @@ async function criarNotificacao({
   usarDestinatariosInformados = false
 }) {
   const tipoNormalizado = String(tipo || '').trim().toUpperCase();
-  if (!TIPOS_NOTIFICACAO_ATIVOS.has(tipoNormalizado)) {
+  if (!(await notificacaoEventoAtivo(tipoNormalizado))) {
     return null;
   }
 

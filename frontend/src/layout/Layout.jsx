@@ -42,6 +42,7 @@ import {
   HiOutlineCreditCard,
   HiOutlineLifebuoy,
   HiOutlineChatBubbleOvalLeft,
+  HiOutlineBell,
   HiOutlineAcademicCap
 } from 'react-icons/hi2';
 import {
@@ -566,6 +567,7 @@ export default function Layout() {
         comprasAccess ? item('/configuracoes-status-pedidos-compra', 'Status dos Pedidos', HiOutlineClipboardDocumentList) : null,
         superadmin && comercialAccess ? item('/configuracoes-comercial-categorias', 'Categorias Comerciais', HiOutlineArchiveBox) : null,
         superadmin ? item('/configuracoes-modulos', 'Modulos e Planos', HiOutlineCog6Tooth) : null,
+        superadmin ? item('/configuracoes-notificacoes-sistema', 'Notificacoes Sistema', HiOutlineBell) : null,
         superadmin && moduloBibliotecaHabilitado ? item('/arquivos-modelos-config', 'Arquivos Modelos', HiOutlineFolderOpen) : null
       ]);
     }

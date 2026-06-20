@@ -9,6 +9,7 @@ import { ResizableTable, ResizableTh } from '../components/ResizableTable';
 import { buscarParceiros } from '../services/parceiros';
 import { getEmpresasGrupo } from '../services/empresasGrupo';
 import {
+  atualizarParcelaFinanciamentoBancario,
   criarFinanciamentoBancario,
   gerarTitulosFinanciamentoBancario,
   getCategoriasFinanceiras,
@@ -55,7 +56,8 @@ const PARCELAS_COLUMNS = [
   { key: 'juros', width: 116, minWidth: 100 },
   { key: 'encargos', width: 116, minWidth: 100 },
   { key: 'total', width: 132, minWidth: 108 },
-  { key: 'titulo', width: 132, minWidth: 108 }
+  { key: 'titulo', width: 132, minWidth: 108 },
+  { key: 'acoes', width: 110, minWidth: 96 }
 ];
 
 function roundCurrency(value) {
@@ -206,6 +208,12 @@ export default function FinanceiroFinanciamentosBancarios() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [editingParcela, setEditingParcela] = useState(null);
+  const [parcelaForm, setParcelaForm] = useState({
+    valor_principal: '',
+    valor_juros: '',
+    observacoes: ''
+  });
 
   const selected = useMemo(
     () => financiamentos.find((item) => Number(item.id) === Number(selectedId)) || financiamentos[0] || null,
@@ -280,6 +288,13 @@ export default function FinanceiroFinanciamentosBancarios() {
     updateForm(field, parseCurrencyInput(value));
   }
 
+  function updateParcelaMoneyField(field, value) {
+    setParcelaForm((current) => ({
+      ...current,
+      [field]: parseCurrencyInput(value)
+    }));
+  }
+
   function updateFilter(field, value) {
     setFilters((current) => ({
       ...current,
@@ -330,6 +345,49 @@ export default function FinanceiroFinanciamentosBancarios() {
     }
   }
 
+  function parcelaPodeSerEditada(parcela) {
+    const titulo = parcela?.tituloFinanceiro;
+    if (!titulo) return true;
+    const status = String(titulo.status || '').toUpperCase();
+    return Number(titulo.valor_baixado || 0) <= 0 && !['BAIXADO', 'PAGO', 'QUITADO'].includes(status);
+  }
+
+  function abrirEdicaoParcela(parcela) {
+    setEditingParcela(parcela);
+    setParcelaForm({
+      valor_principal: Number(parcela?.valor_principal || 0),
+      valor_juros: Number(parcela?.valor_juros || 0),
+      observacoes: parcela?.observacoes || ''
+    });
+  }
+
+  async function salvarParcela(event) {
+    event.preventDefault();
+    if (!editingParcela) return;
+    setSaving(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const updated = await atualizarParcelaFinanciamentoBancario(editingParcela.id, {
+        valor_principal: Number(parcelaForm.valor_principal || 0),
+        valor_juros: Number(parcelaForm.valor_juros || 0),
+        observacoes: parcelaForm.observacoes || null
+      });
+
+      setFinanciamentos((current) => current.map((item) => (
+        Number(item.id) === Number(updated?.id) ? updated : item
+      )));
+      setSelectedId(updated?.id || selectedId);
+      setEditingParcela(null);
+      setSuccess('Parcela do financiamento atualizada.');
+    } catch (err) {
+      setError(err?.message || 'Erro ao atualizar parcela do financiamento');
+    } finally {
+      setSaving(false);
+    }
+  }
+
   function handleFilterSubmit(event) {
     event.preventDefault();
     loadFinanciamentos(filters);
@@ -363,7 +421,7 @@ export default function FinanceiroFinanciamentosBancarios() {
       <div className="app-summary-grid">
         <Metric label="Contratos" value={resumo.contratos} detail="cadastrados" icon={HiOutlineDocumentPlus} />
         <Metric label="Ativos" value={resumo.ativos} detail="com títulos gerados" icon={HiOutlineBanknotes} />
-        <Metric label="Total contratado" value={formatCurrency(resumo.total)} detail="principal + encargos" icon={HiOutlineReceiptRefund} />
+        <Metric label="Total contratado" value={formatCurrency(resumo.total)} detail="amortização + encargos" icon={HiOutlineReceiptRefund} />
         <Metric label="Cronogramas enviados" value={resumo.titulosGerados} detail="para contas a pagar" />
       </div>
 
@@ -571,7 +629,7 @@ export default function FinanceiroFinanciamentosBancarios() {
             </div>
 
             <div className="rounded-md border border-[var(--c-border)] bg-[var(--c-surface-muted)] p-3 text-sm text-[var(--c-muted)]">
-              Prévia: {previewParcelas.length} parcela(s), principal {formatCurrency(previewTotais.principal)}, juros {formatCurrency(previewTotais.juros)}, encargos {formatCurrency(previewTotais.encargos)}, total {formatCurrency(previewTotais.total)}.
+              Prévia: {previewParcelas.length} parcela(s), amortização {formatCurrency(previewTotais.principal)}, juros {formatCurrency(previewTotais.juros)}, encargos {formatCurrency(previewTotais.encargos)}, total {formatCurrency(previewTotais.total)}.
             </div>
 
             <div className="flex justify-end gap-2">
@@ -610,18 +668,19 @@ export default function FinanceiroFinanciamentosBancarios() {
               <tr>
                 <ResizableTh columnKey="numero">#</ResizableTh>
                 <ResizableTh columnKey="vencimento">Vencimento</ResizableTh>
-                <ResizableTh columnKey="principal" className="text-right">Principal</ResizableTh>
+                <ResizableTh columnKey="principal" className="text-right">Amortização</ResizableTh>
                 <ResizableTh columnKey="juros" className="text-right">Juros</ResizableTh>
                 <ResizableTh columnKey="encargos" className="text-right">Encargos</ResizableTh>
                 <ResizableTh columnKey="total" className="text-right">Parcela</ResizableTh>
                 <ResizableTh columnKey="titulo">Titulo</ResizableTh>
+                <ResizableTh columnKey="acoes">Ações</ResizableTh>
               </tr>
             </thead>
             <tbody>
               {!selected ? (
-                <tr><td colSpan={7} className="text-center text-[var(--c-muted)]">Selecione um financiamento para ver as parcelas.</td></tr>
+                <tr><td colSpan={8} className="text-center text-[var(--c-muted)]">Selecione um financiamento para ver as parcelas.</td></tr>
               ) : selectedParcelas.length === 0 ? (
-                <tr><td colSpan={7} className="text-center text-[var(--c-muted)]">Nenhuma parcela encontrada.</td></tr>
+                <tr><td colSpan={8} className="text-center text-[var(--c-muted)]">Nenhuma parcela encontrada.</td></tr>
               ) : (
                 selectedParcelas.map((parcela) => (
                   <tr key={parcela.id}>
@@ -640,6 +699,17 @@ export default function FinanceiroFinanciamentosBancarios() {
                         <span className="text-[var(--c-muted)]">Pendente</span>
                       )}
                     </td>
+                    <td>
+                      <button
+                        type="button"
+                        className="btn btn-outline btn-xs"
+                        onClick={() => abrirEdicaoParcela(parcela)}
+                        disabled={!parcelaPodeSerEditada(parcela) || saving}
+                        title={parcelaPodeSerEditada(parcela) ? 'Editar amortização e juros' : 'Parcela com título baixado'}
+                      >
+                        Editar
+                      </button>
+                    </td>
                   </tr>
                 ))
               )}
@@ -647,6 +717,70 @@ export default function FinanceiroFinanciamentosBancarios() {
           </ResizableTable>
         </div>
       </section>
+
+      {editingParcela ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <form className="card w-full max-w-xl space-y-4" onSubmit={salvarParcela}>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-semibold text-[var(--c-text)]">
+                  Editar parcela #{editingParcela.numero_parcela}
+                </h3>
+                <p className="text-sm text-[var(--c-muted)]">
+                  Ajuste amortização e juros. Parcelas já baixadas ficam bloqueadas.
+                </p>
+              </div>
+              <button type="button" className="btn btn-outline btn-sm" onClick={() => setEditingParcela(null)}>
+                Fechar
+              </button>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-2">
+              <label className="app-filter-field">
+                <span className="app-filter-label">Amortização</span>
+                <input
+                  className="input w-full"
+                  inputMode="decimal"
+                  value={formatCurrencyInput(parcelaForm.valor_principal)}
+                  onChange={(event) => updateParcelaMoneyField('valor_principal', event.target.value)}
+                  required
+                />
+              </label>
+              <label className="app-filter-field">
+                <span className="app-filter-label">Juros</span>
+                <input
+                  className="input w-full"
+                  inputMode="decimal"
+                  value={formatCurrencyInput(parcelaForm.valor_juros)}
+                  onChange={(event) => updateParcelaMoneyField('valor_juros', event.target.value)}
+                />
+              </label>
+              <label className="app-filter-field md:col-span-2">
+                <span className="app-filter-label">Observações</span>
+                <textarea
+                  className="input w-full"
+                  rows={3}
+                  value={parcelaForm.observacoes}
+                  onChange={(event) => setParcelaForm((current) => ({ ...current, observacoes: event.target.value }))}
+                />
+              </label>
+            </div>
+
+            <div className="rounded-lg border border-[var(--c-border)] bg-[var(--c-surface-muted)] p-3 text-sm text-[var(--c-muted)]">
+              Total recalculado: <strong className="text-[var(--c-text)]">{formatCurrency(Number(parcelaForm.valor_principal || 0) + Number(parcelaForm.valor_juros || 0) + Number(editingParcela.valor_iof || 0) + Number(editingParcela.valor_tarifa || 0))}</strong>
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <button type="button" className="btn btn-outline" onClick={() => setEditingParcela(null)} disabled={saving}>
+                Cancelar
+              </button>
+              <button type="submit" className="btn btn-primary" disabled={saving}>
+                {saving ? 'Salvando...' : 'Salvar parcela'}
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : null}
     </div>
   );
 }

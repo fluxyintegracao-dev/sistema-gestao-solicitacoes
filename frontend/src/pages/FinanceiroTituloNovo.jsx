@@ -127,6 +127,30 @@ function createPagamento(valor = '') {
   };
 }
 
+function createRateio(valor = '') {
+  return {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    obra_id: '',
+    tipo_rateio: 'PERCENTUAL',
+    percentual: '',
+    valor_rateio: valor,
+    observacoes: ''
+  };
+}
+
+function createImposto() {
+  return {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    tipo_imposto: '',
+    descricao: '',
+    natureza: 'RETENCAO',
+    base_calculo: '',
+    aliquota: '',
+    valor: '',
+    observacoes: ''
+  };
+}
+
 function buildDefaultForm(tipo = 'PAGAR') {
   return {
     tipo: resolveTipo(tipo),
@@ -164,6 +188,8 @@ function buildDefaultForm(tipo = 'PAGAR') {
     cartao_id: '',
     quantidade_parcelas: 1,
     data_compra: today(),
+    rateios: [],
+    impostos: [],
     pagamentos: [createPagamento('')]
   };
 }
@@ -601,6 +627,31 @@ export default function FinanceiroTituloNovo() {
   const valorTitulo = useMemo(() => roundCurrency(currencyToNumber(form.valor)), [form.valor]);
   const diferencaPagamentos = useMemo(() => roundCurrency(valorTitulo - totalPagamentos), [valorTitulo, totalPagamentos]);
   const totalBateComTitulo = Math.abs(diferencaPagamentos) <= 0.009;
+  const totalRateioValor = useMemo(() => {
+    return roundCurrency((form.rateios || []).reduce((acc, rateio) => {
+      if (rateio.tipo_rateio === 'VALOR') return acc + currencyToNumber(rateio.valor_rateio);
+      return acc + (valorTitulo * currencyToNumber(rateio.percentual) / 100);
+    }, 0));
+  }, [form.rateios, valorTitulo]);
+  const totalRateioPercentual = useMemo(() => {
+    return roundCurrency((form.rateios || []).reduce((acc, rateio) => {
+      if (rateio.tipo_rateio === 'PERCENTUAL') return acc + currencyToNumber(rateio.percentual);
+      return acc + (valorTitulo > 0 ? (currencyToNumber(rateio.valor_rateio) / valorTitulo) * 100 : 0);
+    }, 0));
+  }, [form.rateios, valorTitulo]);
+  const totalImpostosRetencao = useMemo(() => {
+    return roundCurrency((form.impostos || [])
+      .filter((item) => item.natureza !== 'ACRESCIMO')
+      .reduce((acc, item) => acc + currencyToNumber(item.valor), 0));
+  }, [form.impostos]);
+  const totalImpostosAcrescimo = useMemo(() => {
+    return roundCurrency((form.impostos || [])
+      .filter((item) => item.natureza === 'ACRESCIMO')
+      .reduce((acc, item) => acc + currencyToNumber(item.valor), 0));
+  }, [form.impostos]);
+  const valorLiquidoPrevisto = useMemo(() => {
+    return roundCurrency(valorTitulo - totalImpostosRetencao + totalImpostosAcrescimo);
+  }, [valorTitulo, totalImpostosRetencao, totalImpostosAcrescimo]);
 
   function preencherFavorecidoComParceiro(parceiro) {
     const pix = getParceiroPixPrincipal(parceiro);
@@ -815,6 +866,58 @@ export default function FinanceiroTituloNovo() {
     });
   }
 
+  function adicionarRateio() {
+    setForm((current) => ({
+      ...current,
+      rateios: [...(current.rateios || []), createRateio()]
+    }));
+  }
+
+  function updateRateio(index, field, value) {
+    setForm((current) => {
+      const rateios = [...(current.rateios || [])];
+      const rateio = rateios[index] || createRateio();
+      rateios[index] = {
+        ...rateio,
+        [field]: value
+      };
+      return { ...current, rateios };
+    });
+  }
+
+  function removerRateio(index) {
+    setForm((current) => ({
+      ...current,
+      rateios: (current.rateios || []).filter((_, itemIndex) => itemIndex !== index)
+    }));
+  }
+
+  function adicionarImposto() {
+    setForm((current) => ({
+      ...current,
+      impostos: [...(current.impostos || []), createImposto()]
+    }));
+  }
+
+  function updateImposto(index, field, value) {
+    setForm((current) => {
+      const impostos = [...(current.impostos || [])];
+      const imposto = impostos[index] || createImposto();
+      impostos[index] = {
+        ...imposto,
+        [field]: value
+      };
+      return { ...current, impostos };
+    });
+  }
+
+  function removerImposto(index) {
+    setForm((current) => ({
+      ...current,
+      impostos: (current.impostos || []).filter((_, itemIndex) => itemIndex !== index)
+    }));
+  }
+
   function validarCadastroTitulo() {
     const categoriaEntraDre = isCategoriaClassificadaParaDre(categoriaSelecionada);
 
@@ -888,6 +991,34 @@ export default function FinanceiroTituloNovo() {
       return `A soma das formas de pagamento precisa ser igual ao valor do titulo. Valor do titulo: ${formatCurrency(valorTitulo)}. Total informado: ${formatCurrency(totalPagamentos)}. Ainda ${direcao} ${formatCurrency(Math.abs(diferencaPagamentos))}.`;
     }
 
+    const rateios = Array.isArray(form.rateios) ? form.rateios : [];
+    if (rateios.length > 0) {
+      for (const [rateioIndex, rateio] of rateios.entries()) {
+        if (!rateio.obra_id) {
+          return `Selecione a obra/centro de custo do rateio ${rateioIndex + 1}.`;
+        }
+        if (rateio.tipo_rateio === 'VALOR' && currencyToNumber(rateio.valor_rateio) <= 0) {
+          return `Informe o valor do rateio ${rateioIndex + 1}.`;
+        }
+        if (rateio.tipo_rateio === 'PERCENTUAL' && currencyToNumber(rateio.percentual) <= 0) {
+          return `Informe o percentual do rateio ${rateioIndex + 1}.`;
+        }
+      }
+      if (Math.abs(totalRateioValor - valorTitulo) > 0.02 || Math.abs(totalRateioPercentual - 100) > 0.02) {
+        return `O rateio precisa fechar 100% ou ${formatCurrency(valorTitulo)}. Total atual: ${formatCurrency(totalRateioValor)} (${totalRateioPercentual.toFixed(2)}%).`;
+      }
+    }
+
+    const impostos = Array.isArray(form.impostos) ? form.impostos : [];
+    for (const [impostoIndex, imposto] of impostos.entries()) {
+      if (!String(imposto.tipo_imposto || imposto.descricao || '').trim()) {
+        return `Informe o tipo ou descricao do imposto/desconto ${impostoIndex + 1}.`;
+      }
+      if (currencyToNumber(imposto.valor) <= 0) {
+        return `Informe o valor do imposto/desconto ${impostoIndex + 1}.`;
+      }
+    }
+
     if (form.intercompany) {
       if (!form.empresa_origem_id) return 'Informe a empresa origem da movimentacao entre empresas.';
       if (!form.empresa_destino_id) return 'Informe a empresa destino da movimentacao entre empresas.';
@@ -939,6 +1070,24 @@ export default function FinanceiroTituloNovo() {
       payload.considera_dre = isCategoriaClassificadaParaDre(categoriaSelecionada);
       payload.intercompany = Boolean(form.intercompany);
       payload.competencia_data = form.competencia_data || undefined;
+      payload.valor_bruto = form.valor;
+      payload.valor_liquido = formatCurrencyInput(valorLiquidoPrevisto);
+      payload.rateios = (form.rateios || []).map((rateio) => ({
+        obra_id: rateio.obra_id ? Number(rateio.obra_id) : undefined,
+        tipo_rateio: rateio.tipo_rateio || 'PERCENTUAL',
+        percentual: rateio.tipo_rateio === 'PERCENTUAL' ? rateio.percentual : undefined,
+        valor_rateio: rateio.tipo_rateio === 'VALOR' ? rateio.valor_rateio : undefined,
+        observacoes: rateio.observacoes || undefined
+      }));
+      payload.impostos = (form.impostos || []).map((imposto) => ({
+        tipo_imposto: imposto.tipo_imposto || imposto.descricao,
+        descricao: imposto.descricao || imposto.tipo_imposto,
+        natureza: imposto.natureza || 'RETENCAO',
+        base_calculo: imposto.base_calculo || undefined,
+        aliquota: imposto.aliquota || undefined,
+        valor: imposto.valor,
+        observacoes: imposto.observacoes || undefined
+      }));
       payload.pagamentos = (form.pagamentos || []).map((pagamento) => {
         const forma = getFormaPagamento(pagamento.forma_pagamento_id);
         const usaDetalhe = forma && (isFormaBoleto(forma) || isFormaCheque(forma));
@@ -1728,6 +1877,189 @@ export default function FinanceiroTituloNovo() {
                 </span>
               </label>
               )}
+
+              <div className="md:col-span-2 xl:col-span-12 rounded-2xl border border-[var(--c-border)] bg-[var(--c-bg)] p-4">
+                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                  <div>
+                    <h2 className="text-base font-semibold text-[var(--c-text)]">Rateio por obra/centro de custo</h2>
+                    <p className="text-sm text-[var(--c-muted)]">
+                      Opcional. Use quando o mesmo titulo precisa compor mais de uma obra no financeiro de obras.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                      (form.rateios || []).length === 0 || (Math.abs(totalRateioValor - valorTitulo) <= 0.02 && Math.abs(totalRateioPercentual - 100) <= 0.02)
+                        ? 'bg-emerald-50 text-emerald-700'
+                        : 'bg-amber-50 text-amber-700'
+                    }`}>
+                      {(form.rateios || []).length === 0
+                        ? 'Sem rateio'
+                        : `${formatCurrency(totalRateioValor)} - ${totalRateioPercentual.toFixed(2)}%`}
+                    </span>
+                    <button type="button" className="btn btn-outline" onClick={adicionarRateio}>
+                      Adicionar rateio
+                    </button>
+                  </div>
+                </div>
+
+                {(form.rateios || []).length > 0 && (
+                  <div className="mt-4 space-y-3">
+                    {(form.rateios || []).map((rateio, rateioIndex) => (
+                      <div key={rateio.id || rateioIndex} className="grid gap-3 rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-3 md:grid-cols-2 xl:grid-cols-12">
+                        <label className="sol-filter-field xl:col-span-4">
+                          <span className="sol-filter-label">Obra/centro de custo</span>
+                          <select
+                            className="input w-full"
+                            value={rateio.obra_id}
+                            onChange={(event) => updateRateio(rateioIndex, 'obra_id', event.target.value)}
+                          >
+                            <option value="">Selecione</option>
+                            {obras.map((obra) => (
+                              <option key={obra.id} value={obra.id}>
+                                {obra.codigo ? `${obra.codigo} - ${obra.nome}` : obra.nome}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className="sol-filter-field xl:col-span-2">
+                          <span className="sol-filter-label">Tipo</span>
+                          <select
+                            className="input w-full"
+                            value={rateio.tipo_rateio}
+                            onChange={(event) => updateRateio(rateioIndex, 'tipo_rateio', event.target.value)}
+                          >
+                            <option value="PERCENTUAL">Percentual</option>
+                            <option value="VALOR">Valor</option>
+                          </select>
+                        </label>
+                        {rateio.tipo_rateio === 'VALOR' ? (
+                          <label className="sol-filter-field xl:col-span-2">
+                            <span className="sol-filter-label">Valor</span>
+                            <input
+                              className="input w-full"
+                              placeholder="R$ 0,00"
+                              value={rateio.valor_rateio}
+                              onChange={(event) => updateRateio(rateioIndex, 'valor_rateio', normalizeCurrencyTyping(event.target.value))}
+                              onBlur={(event) => updateRateio(rateioIndex, 'valor_rateio', formatCurrencyInput(event.target.value))}
+                            />
+                          </label>
+                        ) : (
+                          <label className="sol-filter-field xl:col-span-2">
+                            <span className="sol-filter-label">Percentual</span>
+                            <input
+                              className="input w-full"
+                              inputMode="decimal"
+                              placeholder="0,00"
+                              value={rateio.percentual}
+                              onChange={(event) => updateRateio(rateioIndex, 'percentual', event.target.value)}
+                            />
+                          </label>
+                        )}
+                        <label className="sol-filter-field xl:col-span-3">
+                          <span className="sol-filter-label">Observacoes</span>
+                          <input
+                            className="input w-full"
+                            placeholder="Opcional"
+                            value={rateio.observacoes}
+                            onChange={(event) => updateRateio(rateioIndex, 'observacoes', event.target.value)}
+                          />
+                        </label>
+                        <div className="flex items-end xl:col-span-1">
+                          <button type="button" className="btn btn-outline w-full" onClick={() => removerRateio(rateioIndex)}>
+                            Remover
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="md:col-span-2 xl:col-span-12 rounded-2xl border border-[var(--c-border)] bg-[var(--c-bg)] p-4">
+                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                  <div>
+                    <h2 className="text-base font-semibold text-[var(--c-text)]">Impostos, retencoes e descontos</h2>
+                    <p className="text-sm text-[var(--c-muted)]">
+                      Opcional. Registre os valores que explicam a diferenca entre bruto e liquido do titulo.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-full bg-[var(--c-surface-muted)] px-3 py-1 text-xs font-semibold text-[var(--c-muted)]">
+                      Liquido previsto: {formatCurrency(valorLiquidoPrevisto)}
+                    </span>
+                    <button type="button" className="btn btn-outline" onClick={adicionarImposto}>
+                      Adicionar imposto
+                    </button>
+                  </div>
+                </div>
+
+                {(form.impostos || []).length > 0 && (
+                  <div className="mt-4 space-y-3">
+                    {(form.impostos || []).map((imposto, impostoIndex) => (
+                      <div key={imposto.id || impostoIndex} className="grid gap-3 rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-3 md:grid-cols-2 xl:grid-cols-12">
+                        <label className="sol-filter-field xl:col-span-2">
+                          <span className="sol-filter-label">Natureza</span>
+                          <select
+                            className="input w-full"
+                            value={imposto.natureza}
+                            onChange={(event) => updateImposto(impostoIndex, 'natureza', event.target.value)}
+                          >
+                            <option value="RETENCAO">Retencao/desconto</option>
+                            <option value="ACRESCIMO">Acrescimo</option>
+                          </select>
+                        </label>
+                        <label className="sol-filter-field xl:col-span-3">
+                          <span className="sol-filter-label">Tipo</span>
+                          <input
+                            className="input w-full"
+                            placeholder="ISS, INSS, IRRF, desconto..."
+                            value={imposto.tipo_imposto}
+                            onChange={(event) => updateImposto(impostoIndex, 'tipo_imposto', event.target.value)}
+                          />
+                        </label>
+                        <label className="sol-filter-field xl:col-span-2">
+                          <span className="sol-filter-label">Base</span>
+                          <input
+                            className="input w-full"
+                            placeholder="R$ 0,00"
+                            value={imposto.base_calculo}
+                            onChange={(event) => updateImposto(impostoIndex, 'base_calculo', normalizeCurrencyTyping(event.target.value))}
+                            onBlur={(event) => updateImposto(impostoIndex, 'base_calculo', formatCurrencyInput(event.target.value))}
+                          />
+                        </label>
+                        <label className="sol-filter-field xl:col-span-2">
+                          <span className="sol-filter-label">Aliquota %</span>
+                          <input
+                            className="input w-full"
+                            inputMode="decimal"
+                            placeholder="0,00"
+                            value={imposto.aliquota}
+                            onChange={(event) => updateImposto(impostoIndex, 'aliquota', event.target.value)}
+                          />
+                        </label>
+                        <label className="sol-filter-field xl:col-span-2">
+                          <span className="sol-filter-label">Valor</span>
+                          <input
+                            className="input w-full"
+                            placeholder="R$ 0,00"
+                            value={imposto.valor}
+                            onChange={(event) => updateImposto(impostoIndex, 'valor', normalizeCurrencyTyping(event.target.value))}
+                            onBlur={(event) => updateImposto(impostoIndex, 'valor', formatCurrencyInput(event.target.value))}
+                          />
+                        </label>
+                        <div className="flex items-end xl:col-span-1">
+                          <button type="button" className="btn btn-outline w-full" onClick={() => removerImposto(impostoIndex)}>
+                            Remover
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                    <div className="text-xs text-[var(--c-muted)]">
+                      Retencoes/descontos: {formatCurrency(totalImpostosRetencao)}. Acrescimos: {formatCurrency(totalImpostosAcrescimo)}.
+                    </div>
+                  </div>
+                )}
+              </div>
 
               {form.tipo === 'PAGAR' && (
                 <div className="md:col-span-2 xl:col-span-12 rounded-2xl border border-[var(--c-border)] bg-[var(--c-bg)] p-4">

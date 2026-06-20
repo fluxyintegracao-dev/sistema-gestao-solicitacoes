@@ -204,6 +204,91 @@ function parsePagamentosTitulo(value) {
   });
 }
 
+function parseRateiosTitulo(value) {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (!Array.isArray(value)) {
+    throw new ValidationError('Rateios devem ser enviados em lista.');
+  }
+
+  return value.map((item, index) => {
+    ensureAllowedKeys(
+      item || {},
+      [
+        'obra_id',
+        'centro_custo_id',
+        'apropriacao_id',
+        'tipo_rateio',
+        'percentual',
+        'valor_rateio',
+        'valor',
+        'observacoes'
+      ],
+      `Rateio ${index + 1}`
+    );
+
+    const tipoRateio = parseEnum(item?.tipo_rateio, `Tipo de rateio ${index + 1}`, ['PERCENTUAL', 'VALOR']);
+
+    return {
+      obra_id: parseInteger(item?.obra_id || item?.centro_custo_id, `Obra do rateio ${index + 1}`),
+      apropriacao_id: parseInteger(item?.apropriacao_id, `Apropriacao do rateio ${index + 1}`),
+      tipo_rateio: tipoRateio,
+      percentual: tipoRateio === 'PERCENTUAL'
+        ? parseDecimal(item?.percentual, `Percentual do rateio ${index + 1}`, { min: 0.000001 })
+        : parseDecimal(item?.percentual, `Percentual do rateio ${index + 1}`, { min: 0 }),
+      valor_rateio: tipoRateio === 'VALOR'
+        ? parseDecimal(
+          item?.valor_rateio != null ? item.valor_rateio : item?.valor,
+          `Valor do rateio ${index + 1}`,
+          { min: 0.01 }
+        )
+        : parseDecimal(
+          item?.valor_rateio != null ? item.valor_rateio : item?.valor,
+          `Valor do rateio ${index + 1}`,
+          { min: 0 }
+        ),
+      observacoes: parseOptionalText(item?.observacoes, `Observacoes do rateio ${index + 1}`, 1000)
+    };
+  });
+}
+
+function parseImpostosTitulo(value) {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (!Array.isArray(value)) {
+    throw new ValidationError('Impostos devem ser enviados em lista.');
+  }
+
+  return value.map((item, index) => {
+    ensureAllowedKeys(
+      item || {},
+      [
+        'tipo_imposto',
+        'tipo',
+        'descricao',
+        'natureza',
+        'base_calculo',
+        'aliquota',
+        'valor',
+        'observacoes'
+      ],
+      `Imposto ${index + 1}`
+    );
+
+    return {
+      tipo_imposto: parseOptionalText(item?.tipo_imposto || item?.tipo, `Tipo do imposto ${index + 1}`, 60),
+      descricao: parseOptionalText(item?.descricao, `Descricao do imposto ${index + 1}`, 180),
+      natureza: parseEnum(item?.natureza, `Natureza do imposto ${index + 1}`, ['RETENCAO', 'ACRESCIMO']),
+      base_calculo: parseDecimal(item?.base_calculo, `Base do imposto ${index + 1}`, { min: 0 }),
+      aliquota: parseDecimal(item?.aliquota, `Aliquota do imposto ${index + 1}`, { min: 0 }),
+      valor: parseDecimal(item?.valor, `Valor do imposto ${index + 1}`, { min: 0.01 }),
+      observacoes: parseOptionalText(item?.observacoes, `Observacoes do imposto ${index + 1}`, 1000)
+    };
+  });
+}
+
 function parseEnum(value, fieldName, allowedValues = [], { required = false } = {}) {
   if (isBlank(value)) {
     if (required) {
@@ -281,7 +366,10 @@ function validateFinanceTituloQuery(query = {}) {
       'data_emissao_inicial',
       'data_emissao_final',
       'vencimento_inicial',
-      'vencimento_final'
+      'vencimento_final',
+      'paginated',
+      'page',
+      'limit'
     ],
     'Consulta de titulos financeiros'
   );
@@ -314,7 +402,10 @@ function validateFinanceTituloQuery(query = {}) {
     data_emissao_inicial: dataEmissaoInicial,
     data_emissao_final: dataEmissaoFinal,
     vencimento_inicial: vencimentoInicial,
-    vencimento_final: vencimentoFinal
+    vencimento_final: vencimentoFinal,
+    paginated: parseBoolean(query.paginated, 'Paginado'),
+    page: parseInteger(query.page, 'Pagina'),
+    limit: parseOptionalText(query.limit, 'Limite', 20)
   };
 }
 
@@ -958,7 +1049,12 @@ function validateFinanceTituloCreateFromSolicitacaoBody(body = {}) {
       'empresa_contraparte_id',
       ...CAMPOS_INTERCOMPANY_TITULO,
       'parcelas',
-      'pagamentos'
+      'pagamentos',
+      'tipo_rateio',
+      'rateios',
+      'impostos',
+      'valor_bruto',
+      'valor_liquido'
     ],
     'Geracao de titulo financeiro'
   );
@@ -998,7 +1094,12 @@ function validateFinanceTituloCreateFromSolicitacaoBody(body = {}) {
     elimina_consolidado: parseBoolean(body.elimina_consolidado, 'Eliminar no consolidado'),
     transferencia_interna: parseBoolean(body.transferencia_interna, 'Transferencia interna'),
     parcelas: parseParcelasTitulo(body.parcelas),
-    pagamentos: parsePagamentosTitulo(body.pagamentos)
+    pagamentos: parsePagamentosTitulo(body.pagamentos),
+    tipo_rateio: parseEnum(body.tipo_rateio, 'Tipo de rateio', ['PERCENTUAL', 'VALOR']),
+    rateios: parseRateiosTitulo(body.rateios),
+    impostos: parseImpostosTitulo(body.impostos),
+    valor_bruto: parseDecimal(body.valor_bruto, 'Valor bruto', { min: 0.01 }),
+    valor_liquido: parseDecimal(body.valor_liquido, 'Valor liquido', { min: 0.01 })
   };
 }
 
@@ -1036,7 +1137,12 @@ function validateFinanceTituloCreateBody(body = {}) {
       'empresa_contraparte_id',
       ...CAMPOS_INTERCOMPANY_TITULO,
       'parcelas',
-      'pagamentos'
+      'pagamentos',
+      'tipo_rateio',
+      'rateios',
+      'impostos',
+      'valor_bruto',
+      'valor_liquido'
     ],
     'Criacao manual de titulo financeiro'
   );
@@ -1078,7 +1184,12 @@ function validateFinanceTituloCreateBody(body = {}) {
     elimina_consolidado: parseBoolean(body.elimina_consolidado, 'Eliminar no consolidado'),
     transferencia_interna: parseBoolean(body.transferencia_interna, 'Transferencia interna'),
     parcelas: parseParcelasTitulo(body.parcelas),
-    pagamentos: parsePagamentosTitulo(body.pagamentos)
+    pagamentos: parsePagamentosTitulo(body.pagamentos),
+    tipo_rateio: parseEnum(body.tipo_rateio, 'Tipo de rateio', ['PERCENTUAL', 'VALOR']),
+    rateios: parseRateiosTitulo(body.rateios),
+    impostos: parseImpostosTitulo(body.impostos),
+    valor_bruto: parseDecimal(body.valor_bruto, 'Valor bruto', { min: 0.01 }),
+    valor_liquido: parseDecimal(body.valor_liquido, 'Valor liquido', { min: 0.01 })
   };
 }
 
@@ -1110,7 +1221,12 @@ function validateFinanceTituloUpdateBody(body = {}) {
       'considera_dre',
       'intercompany',
       'empresa_contraparte_id',
-      ...CAMPOS_INTERCOMPANY_TITULO
+      ...CAMPOS_INTERCOMPANY_TITULO,
+      'tipo_rateio',
+      'rateios',
+      'impostos',
+      'valor_bruto',
+      'valor_liquido'
     ],
     'Edicao de titulo financeiro'
   );
@@ -1146,7 +1262,12 @@ function validateFinanceTituloUpdateBody(body = {}) {
     tipo_intercompany: parseEnum(body.tipo_intercompany, 'Tipo', TIPOS_INTERCOMPANY),
     motivo_intercompany: parseOptionalText(body.motivo_intercompany, 'Motivo', 255),
     elimina_consolidado: parseBoolean(body.elimina_consolidado, 'Eliminar no consolidado'),
-    transferencia_interna: parseBoolean(body.transferencia_interna, 'Transferencia interna')
+    transferencia_interna: parseBoolean(body.transferencia_interna, 'Transferencia interna'),
+    tipo_rateio: parseEnum(body.tipo_rateio, 'Tipo de rateio', ['PERCENTUAL', 'VALOR']),
+    rateios: parseRateiosTitulo(body.rateios),
+    impostos: parseImpostosTitulo(body.impostos),
+    valor_bruto: parseDecimal(body.valor_bruto, 'Valor bruto', { min: 0.01 }),
+    valor_liquido: parseDecimal(body.valor_liquido, 'Valor liquido', { min: 0.01 })
   };
 }
 

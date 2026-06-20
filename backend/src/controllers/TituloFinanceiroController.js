@@ -7,6 +7,7 @@ const {
   criarTituloManual,
   criarTituloPorSolicitacao,
   estornarMovimentoTitulo,
+  importarCodigosBarrasTitulos,
   listarAuditoriaTitulo,
   listarBaixasRealizadas,
   listarTitulos,
@@ -88,6 +89,16 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return responderErro(res, error, 'Erro ao criar titulo financeiro manual');
+    }
+  },
+
+  async importarCodigosBarras(req, res) {
+    try {
+      const resultado = await importarCodigosBarrasTitulos(req, req.body || {});
+      return res.json(resultado);
+    } catch (error) {
+      console.error(error);
+      return responderErro(res, error, 'Erro ao importar codigos de barras dos titulos');
     }
   },
 

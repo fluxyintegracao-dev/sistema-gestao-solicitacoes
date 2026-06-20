@@ -178,15 +178,16 @@ No frontend, o deploy ocorre pela Vercel a partir do diretorio `frontend/`.
 
 Leitura recomendada:
 
-1. [docs/README.md](C:/Projetos/sistema_gestao_solicitacoes/docs/README.md)
-2. [docs/contexto/visao_geral.md](C:/Projetos/sistema_gestao_solicitacoes/docs/contexto/visao_geral.md)
-3. [docs/arquitetura/visao_geral.md](C:/Projetos/sistema_gestao_solicitacoes/docs/arquitetura/visao_geral.md)
-4. [docs/modulos/solicitacoes.md](C:/Projetos/sistema_gestao_solicitacoes/docs/modulos/solicitacoes.md)
-5. [docs/modulos/compras.md](C:/Projetos/sistema_gestao_solicitacoes/docs/modulos/compras.md)
-6. [docs/modulos/financeiro.md](C:/Projetos/sistema_gestao_solicitacoes/docs/modulos/financeiro.md)
-7. [docs/modulos/comercial.md](C:/Projetos/sistema_gestao_solicitacoes/docs/modulos/comercial.md)
-8. [docs/MANUAL_FLUXO_OPERACIONAL_FINANCEIRO.md](C:/Projetos/sistema_gestao_solicitacoes/docs/MANUAL_FLUXO_OPERACIONAL_FINANCEIRO.md)
-9. [docs/PLANO_MODULO_COMERCIAL_CONSTRUCAO_CIVIL.md](C:/Projetos/sistema_gestao_solicitacoes/docs/PLANO_MODULO_COMERCIAL_CONSTRUCAO_CIVIL.md)
+1. [docs/README.md](C:/Fluxy/docs/README.md)
+2. [docs/ROADMAP_ESTRATEGICO_LONGO_PRAZO.md](C:/Fluxy/docs/ROADMAP_ESTRATEGICO_LONGO_PRAZO.md)
+3. [docs/contexto/visao_geral.md](C:/Fluxy/docs/contexto/visao_geral.md)
+4. [docs/arquitetura/visao_geral.md](C:/Fluxy/docs/arquitetura/visao_geral.md)
+5. [docs/modulos/solicitacoes.md](C:/Fluxy/docs/modulos/solicitacoes.md)
+6. [docs/modulos/compras.md](C:/Fluxy/docs/modulos/compras.md)
+7. [docs/modulos/financeiro.md](C:/Fluxy/docs/modulos/financeiro.md)
+8. [docs/modulos/comercial.md](C:/Fluxy/docs/modulos/comercial.md)
+9. [docs/MANUAL_FLUXO_OPERACIONAL_FINANCEIRO.md](C:/Fluxy/docs/MANUAL_FLUXO_OPERACIONAL_FINANCEIRO.md)
+10. [docs/PLANO_MODULO_COMERCIAL_CONSTRUCAO_CIVIL.md](C:/Fluxy/docs/PLANO_MODULO_COMERCIAL_CONSTRUCAO_CIVIL.md)
 
 ## Observacoes Importantes
 

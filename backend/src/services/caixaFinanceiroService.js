@@ -1,6 +1,8 @@
 const { Op } = require('sequelize');
 const {
   CaixaFinanceiroSessao,
+  CaixaConciliacaoConfirmacao,
+  ConciliacaoBancaria,
   ContaBancaria,
   EmpresaGrupo,
   MovimentoFinanceiro,
@@ -23,6 +25,13 @@ function roundCurrency(value) {
 
 function today() {
   return new Date().toISOString().slice(0, 10);
+}
+
+function addDays(dateString, days) {
+  const date = new Date(`${dateString}T12:00:00.000`);
+  if (Number.isNaN(date.getTime())) return null;
+  date.setDate(date.getDate() + days);
+  return date.toISOString().slice(0, 10);
 }
 
 async function assertFinanceAccess(req) {
@@ -114,6 +123,92 @@ async function carregarConta(contaBancariaId) {
     throw createHttpError(400, 'A conta financeira precisa estar vinculada a uma empresa do grupo antes de abrir caixa.');
   }
   return conta;
+}
+
+async function obterResumoConciliacaoDia(contaBancariaId, dataReferencia) {
+  const movimentos = await ConciliacaoBancaria.findAll({
+    where: {
+      conta_bancaria_id: contaBancariaId,
+      data_movimento: dataReferencia,
+      deleted_at: null
+    },
+    attributes: ['id', 'status']
+  });
+
+  return movimentos.reduce((acc, item) => {
+    const status = String(item.status || '').toUpperCase();
+    acc.total_movimentos += 1;
+    if (status === 'CONCILIADO') {
+      acc.total_conciliados += 1;
+    } else if (status === 'IGNORADO') {
+      acc.total_ignorados += 1;
+    } else {
+      acc.total_pendentes += 1;
+    }
+    return acc;
+  }, {
+    total_movimentos: 0,
+    total_conciliados: 0,
+    total_ignorados: 0,
+    total_pendentes: 0
+  });
+}
+
+async function confirmarConciliacaoDiaCaixa(req, payload = {}) {
+  await assertFinanceAccess(req);
+  const conta = await carregarConta(payload.conta_bancaria_id);
+  const dataReferencia = parseDate(payload.data_referencia, 'Data de referencia', addDays(today(), -1));
+  const resumo = await obterResumoConciliacaoDia(conta.id, dataReferencia);
+
+  if (resumo.total_pendentes > 0) {
+    throw createHttpError(
+      400,
+      `Ainda existem ${resumo.total_pendentes} movimento(s) OFX pendente(s) para esta conta em ${dataReferencia}. Concilie ou ignore antes de confirmar.`
+    );
+  }
+
+  const existente = await CaixaConciliacaoConfirmacao.findOne({
+    where: {
+      conta_bancaria_id: conta.id,
+      data_referencia: dataReferencia
+    }
+  });
+
+  const values = {
+    empresa_id: Number(conta.empresa_id) || null,
+    total_movimentos: resumo.total_movimentos,
+    total_conciliados: resumo.total_conciliados,
+    total_ignorados: resumo.total_ignorados,
+    observacoes: payload.observacoes || null,
+    confirmado_por: req.user?.id || null,
+    confirmado_em: new Date()
+  };
+
+  const confirmacao = existente
+    ? await existente.update(values)
+    : await CaixaConciliacaoConfirmacao.create({
+        conta_bancaria_id: conta.id,
+        data_referencia: dataReferencia,
+        ...values
+      });
+
+  await registrarEventoSeguranca({
+    req,
+    usuarioId: req.user?.id || null,
+    tipoEvento: 'FINANCIAL_CASH_PREVIOUS_OFX_CONFIRMED',
+    recursoTipo: 'CAIXA_FINANCEIRO',
+    recursoId: `${conta.id}:${dataReferencia}`,
+    status: 'SUCCESS',
+    descricao: 'Conciliacao OFX do dia anterior confirmada para abertura de caixa',
+    metadata: {
+      conta_bancaria_id: conta.id,
+      empresa_id: Number(conta.empresa_id) || null,
+      data_referencia: dataReferencia,
+      ...resumo
+    }
+  });
+
+  return confirmacao;
 }
 
 async function calcularResumoSessao(sessao) {
@@ -220,6 +315,8 @@ async function listarSessoesCaixa(req, filters = {}) {
 async function abrirSessaoCaixa(req, payload = {}) {
   await assertFinanceAccess(req);
   const conta = await carregarConta(payload.conta_bancaria_id);
+  const dataAbertura = parseDate(payload.data_abertura, 'Data de abertura', today());
+  const dataConciliacaoObrigatoria = addDays(dataAbertura, -1);
 
   const aberto = await CaixaFinanceiroSessao.findOne({
     where: {
@@ -244,7 +341,20 @@ async function abrirSessaoCaixa(req, payload = {}) {
     ? roundCurrency(ultimaFechada.saldo_informado ?? ultimaFechada.saldo_sistema)
     : roundCurrency(conta.saldo_inicial || 0);
   const saldoAbertura = parseMoney(payload.saldo_abertura, 'Saldo de abertura') ?? saldoPadrao;
-  const dataAbertura = parseDate(payload.data_abertura, 'Data de abertura', today());
+
+  const confirmacaoConciliacao = await CaixaConciliacaoConfirmacao.findOne({
+    where: {
+      conta_bancaria_id: conta.id,
+      data_referencia: dataConciliacaoObrigatoria
+    }
+  });
+
+  if (!confirmacaoConciliacao) {
+    throw createHttpError(
+      400,
+      `Confirme que todos os OFX de ${dataConciliacaoObrigatoria} desta conta foram conciliados antes de abrir o caixa.`
+    );
+  }
 
   const sessao = await CaixaFinanceiroSessao.create({
     empresa_id: Number(conta.empresa_id),
@@ -297,6 +407,12 @@ async function fecharSessaoCaixa(req, sessaoId, payload = {}) {
   const resumo = await calcularResumoSessao(sessao);
   const saldoInformado = parseMoney(payload.saldo_informado, 'Saldo informado', { required: true });
   const diferenca = roundCurrency(saldoInformado - resumo.saldo_sistema);
+  if (Math.abs(diferenca) > 0.009) {
+    throw createHttpError(
+      400,
+      `O caixa nao pode ser fechado com saldo divergente. Saldo do sistema: R$ ${resumo.saldo_sistema.toFixed(2)}; saldo informado: R$ ${saldoInformado.toFixed(2)}.`
+    );
+  }
 
   await sessao.update({
     data_fechamento: dataFechamento,
@@ -346,6 +462,7 @@ async function obterResumoSessaoCaixa(req, sessaoId) {
 
 module.exports = {
   abrirSessaoCaixa,
+  confirmarConciliacaoDiaCaixa,
   fecharSessaoCaixa,
   listarSessoesCaixa,
   obterResumoSessaoCaixa

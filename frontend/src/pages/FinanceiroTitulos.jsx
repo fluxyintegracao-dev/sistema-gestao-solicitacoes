@@ -17,7 +17,8 @@ import {
   getCategoriasFinanceiras,
   getCartoesFinanceiros,
   getContasBancarias,
-  getTitulosFinanceiros
+  getTitulosFinanceiros,
+  importarCodigosBarrasTitulos
 } from '../services/financeiro';
 import { getMinhasObras } from '../services/obras';
 import { buscarParceiros } from '../services/parceiros';
@@ -27,7 +28,9 @@ import ParceiroAutocomplete from '../components/ui/ParceiroAutocomplete';
 
 const FILTER_STORAGE_KEY = 'fluxy.financeiro.titulos.filters';
 const FILTER_VISIBILITY_STORAGE_PREFIX = 'fluxy.financeiro.titulos.visibleFilters';
+const COLUMN_ORDER_STORAGE_PREFIX = 'fluxy.financeiro.titulos.columnOrder';
 const FORMAS_RECEBIMENTO = ['DINHEIRO', 'PIX', 'CARTAO', 'TRANSFERENCIA', 'BOLETO', 'CHEQUE', 'PERMUTA', 'BENS', 'OUTROS'];
+const PAGE_SIZE_OPTIONS = ['25', '50', '100', '150', '200', 'all'];
 
 const FILTER_DEFINITIONS = [
   { id: 'codigo', label: 'Titulo', group: 'basic', span: 'xl:col-span-2' },
@@ -99,6 +102,26 @@ function loadVisibleFilterIds(user, storagePrefix = FILTER_VISIBILITY_STORAGE_PR
   }
 }
 
+function getColumnOrderStorageKey(user, fixedTipo = null) {
+  const userToken = user?.id || user?.email || 'anonimo';
+  const scope = fixedTipo ? fixedTipo.toLowerCase() : 'geral';
+  return `${COLUMN_ORDER_STORAGE_PREFIX}.${scope}.${userToken}`;
+}
+
+function loadColumnOrder(user, fixedTipo, headers) {
+  try {
+    const stored = localStorage.getItem(getColumnOrderStorageKey(user, fixedTipo));
+    const parsed = stored ? JSON.parse(stored) : null;
+    if (!Array.isArray(parsed)) return headers;
+    const allowed = new Set(headers);
+    const ordered = parsed.filter((header) => allowed.has(header));
+    const missing = headers.filter((header) => !ordered.includes(header));
+    return [...ordered, ...missing];
+  } catch (error) {
+    return headers;
+  }
+}
+
 function pickVisibleFilters(filters, visibleFilterIds) {
   const visible = new Set(visibleFilterIds);
   return Object.fromEntries(
@@ -115,6 +138,62 @@ function formatDate(value) {
   const date = new Date(`${value}T00:00:00`);
   if (Number.isNaN(date.getTime())) return '-';
   return date.toLocaleDateString('pt-BR');
+}
+
+function csvEscape(value) {
+  const text = String(value ?? '');
+  if (/[;"\n\r]/.test(text)) {
+    return `"${text.replace(/"/g, '""')}"`;
+  }
+  return text;
+}
+
+function parseCsvLine(line = '') {
+  const values = [];
+  let current = '';
+  let quoted = false;
+
+  for (let index = 0; index < line.length; index += 1) {
+    const char = line[index];
+    const next = line[index + 1];
+    if (char === '"' && quoted && next === '"') {
+      current += '"';
+      index += 1;
+    } else if (char === '"') {
+      quoted = !quoted;
+    } else if ((char === ';' || char === ',') && !quoted) {
+      values.push(current.trim());
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+  values.push(current.trim());
+  return values;
+}
+
+function parseCsvText(text = '') {
+  const lines = String(text || '').split(/\r?\n/).filter((line) => line.trim());
+  if (lines.length < 2) return [];
+  const headers = parseCsvLine(lines[0]).map((header) => header.trim().toLowerCase());
+  return lines.slice(1).map((line) => {
+    const values = parseCsvLine(line);
+    return headers.reduce((row, header, index) => ({
+      ...row,
+      [header]: values[index] || ''
+    }), {});
+  });
+}
+
+function downloadCsv(filename, rows) {
+  const content = rows.map((row) => row.map(csvEscape).join(';')).join('\n');
+  const blob = new Blob([`\uFEFF${content}`], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
 }
 
 function statusClass(status) {
@@ -181,8 +260,6 @@ function buildBaixaMassaForm(contasBancarias = []) {
     conta_bancaria_id: '',
     cartao_id: '',
     forma_recebimento: '',
-    juros: '',
-    multa: '',
     desconto: '',
     data_movimento: today(),
     observacoes: ''
@@ -228,6 +305,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
   const [cartoes, setCartoes] = useState([]);
   const [empresasGrupo, setEmpresasGrupo] = useState([]);
   const [titulos, setTitulos] = useState([]);
+  const [pagination, setPagination] = useState({ page: 1, limit: '25', total: 0, total_pages: 0 });
   const [loading, setLoading] = useState(false);
   const [loadingOptions, setLoadingOptions] = useState(true);
   const [error, setError] = useState('');
@@ -235,6 +313,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
   const [modalBaixaMassaOpen, setModalBaixaMassaOpen] = useState(false);
   const [baixaMassaForm, setBaixaMassaForm] = useState(() => buildBaixaMassaForm([]));
   const [savingBaixaMassa, setSavingBaixaMassa] = useState(false);
+  const [importandoCodigos, setImportandoCodigos] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -288,6 +367,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
     setDraftFilters(nextFilters);
     setAppliedFilters(null);
     setTitulos([]);
+    setPagination((current) => ({ ...current, page: 1, total: 0, total_pages: 0 }));
     setLoading(false);
     setError('');
     setSelectedTituloIds([]);
@@ -304,10 +384,30 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
     setLoading(true);
     setError('');
 
-    getTitulosFinanceiros(compactFilters(pickVisibleFilters(appliedFilters, visibleFilterIds)))
+    getTitulosFinanceiros({
+      ...compactFilters(pickVisibleFilters(appliedFilters, visibleFilterIds)),
+      paginated: 1,
+      page: pagination.page,
+      limit: pagination.limit
+    })
       .then((data) => {
         if (active) {
-          setTitulos(Array.isArray(data) ? data : []);
+          if (Array.isArray(data)) {
+            setTitulos(data);
+            setPagination((current) => ({
+              ...current,
+              total: data.length,
+              total_pages: data.length > 0 ? 1 : 0
+            }));
+          } else {
+            setTitulos(Array.isArray(data?.data) ? data.data : []);
+            setPagination((current) => ({
+              ...current,
+              ...(data?.pagination || {}),
+              page: Number(data?.pagination?.page || current.page || 1),
+              limit: data?.pagination?.limit || current.limit
+            }));
+          }
           setSelectedTituloIds([]);
         }
       })
@@ -325,7 +425,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
     return () => {
       active = false;
     };
-  }, [appliedFilters]);
+  }, [appliedFilters, pagination.page, pagination.limit, visibleFilterIds]);
 
   const categoriasFiltradas = useMemo(() => {
     const tipo = String(draftFilters.tipo || '').toUpperCase();
@@ -378,7 +478,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
   const parceiroResultadoLabel = tipoReferencia === 'PAGAR' ? 'Credor' : 'Cliente';
   const categoriasLabel = tipoAtual === 'PAGAR' ? 'contas a pagar' : 'contas a receber';
   const showTipoColumn = !fixedTipo;
-  const tableHeaders = [
+  const baseTableHeaders = useMemo(() => [
     'Titulo',
     'Status',
     ...(showTipoColumn ? ['Tipo'] : []),
@@ -392,7 +492,14 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
     'Valor total',
     'Saldo',
     'Acoes'
-  ];
+  ], [showTipoColumn, parceiroResultadoLabel]);
+  const [columnOrder, setColumnOrder] = useState(() => loadColumnOrder(user, fixedTipo, baseTableHeaders));
+  const tableHeaders = useMemo(() => {
+    const allowed = new Set(baseTableHeaders);
+    const ordered = columnOrder.filter((header) => allowed.has(header));
+    const missing = baseTableHeaders.filter((header) => !ordered.includes(header));
+    return [...ordered, ...missing];
+  }, [baseTableHeaders, columnOrder]);
   const totalColunas = 1 + tableHeaders.length;
   const titulosBaixaveis = useMemo(() => titulos.filter(isTituloBaixavel), [titulos]);
   const selectedTituloSet = useMemo(() => new Set(selectedTituloIds.map((id) => Number(id))), [selectedTituloIds]);
@@ -423,6 +530,151 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
   const baixaMassaUsaCartao = isCartaoForma(baixaMassaForm.forma_recebimento);
   const baixaMassaCartaoDebito = baixaMassaUsaCartao && isCartaoDebito(selectedCartaoBaixaMassa);
   const allBaixaveisSelected = titulosBaixaveis.length > 0 && titulosBaixaveis.every((titulo) => selectedTituloSet.has(Number(titulo.id)));
+
+  useEffect(() => {
+    setColumnOrder((current) => {
+      const allowed = new Set(baseTableHeaders);
+      const ordered = current.filter((header) => allowed.has(header));
+      const missing = baseTableHeaders.filter((header) => !ordered.includes(header));
+      return [...ordered, ...missing];
+    });
+  }, [baseTableHeaders]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(getColumnOrderStorageKey(user, fixedTipo), JSON.stringify(tableHeaders));
+    } catch (error) {
+      // Mantem a tabela funcional mesmo quando o navegador bloqueia storage.
+    }
+  }, [fixedTipo, tableHeaders, user]);
+
+  function moverColuna(header, direction) {
+    setColumnOrder(() => {
+      const ordered = tableHeaders.slice();
+      const index = ordered.indexOf(header);
+      const nextIndex = direction === 'left' ? index - 1 : index + 1;
+      if (index < 0 || nextIndex < 0 || nextIndex >= ordered.length) return ordered;
+      [ordered[index], ordered[nextIndex]] = [ordered[nextIndex], ordered[index]];
+      return ordered;
+    });
+  }
+
+  function renderTituloCell(titulo, header) {
+    switch (header) {
+      case 'Titulo':
+        return (
+          <td className="px-3 py-2 whitespace-nowrap">
+            <Link
+              className="font-semibold text-[var(--c-primary)] hover:underline"
+              to={`/financeiro/titulos/${titulo.id}`}
+            >
+              {getTituloCodigo(titulo)}
+            </Link>
+            <div className="max-w-[220px] truncate text-[10px] text-[var(--c-muted)]">
+              {titulo.descricao || '-'}
+            </div>
+          </td>
+        );
+      case 'Status':
+        return (
+          <td className="px-3 py-2 whitespace-nowrap">
+            <span className={statusClass(titulo.status)}>{titulo.status}</span>
+          </td>
+        );
+      case 'Tipo':
+        return <td className="px-3 py-2 font-medium text-[var(--c-muted)] whitespace-nowrap">{titulo.tipo}</td>;
+      case 'Documento':
+        return <td className="px-3 py-2 whitespace-nowrap">{titulo.numero_documento || '-'}</td>;
+      case parceiroResultadoLabel:
+        return (
+          <td className="px-3 py-2">
+            <div className="max-w-[180px] truncate font-medium text-[var(--c-text)]">{titulo.parceiro?.nome || '-'}</div>
+            <div className="text-[10px] text-[var(--c-muted)]">{titulo.parceiro?.cpf_cnpj || ''}</div>
+          </td>
+        );
+      case 'Obra':
+        return (
+          <td className="px-3 py-2">
+            <div className="max-w-[150px] truncate text-[var(--c-muted)]">{titulo.obra?.nome || '-'}</div>
+          </td>
+        );
+      case 'Categoria':
+        return (
+          <td className="px-3 py-2">
+            <div className="max-w-[150px] truncate text-[var(--c-muted)]">{titulo.categoriaFinanceira?.nome || '-'}</div>
+          </td>
+        );
+      case 'Origem':
+        return (
+          <td className="px-3 py-2 whitespace-nowrap">
+            {titulo.solicitacao?.id ? (
+              <Link
+                className="text-[var(--c-primary)] hover:underline"
+                to={`/solicitacoes/${titulo.solicitacao.id}`}
+              >
+                {titulo.solicitacao.codigo || `#${titulo.solicitacao.id}`}
+              </Link>
+            ) : (
+              getOrigemTitulo(titulo)
+            )}
+          </td>
+        );
+      case 'Emissao':
+        return <td className="px-3 py-2 whitespace-nowrap text-[var(--c-muted)]">{formatDate(titulo.data_emissao)}</td>;
+      case 'Vencimento':
+        return (
+          <td className={`px-3 py-2 whitespace-nowrap ${isOverdue(titulo) ? 'font-semibold text-rose-600' : 'text-[var(--c-text)]'}`}>
+            {formatDate(titulo.data_vencimento)}
+          </td>
+        );
+      case 'Valor total':
+        return (
+          <td className="px-3 py-2 whitespace-nowrap text-[var(--c-text)] tabular-nums">
+            {formatCurrency(titulo.valor_original)}
+          </td>
+        );
+      case 'Saldo':
+        return (
+          <td className="px-3 py-2 whitespace-nowrap font-semibold text-[var(--c-text)] tabular-nums">
+            {formatCurrency(titulo.valor_saldo)}
+          </td>
+        );
+      case 'Acoes':
+        return (
+          <td className="px-3 py-2 whitespace-nowrap">
+            <div className="flex items-center gap-2">
+              <Link
+                className="btn btn-outline btn-sm"
+                to={`/financeiro/titulos/${titulo.id}`}
+                title="Abrir titulo"
+              >
+                <HiOutlineEye className="h-4 w-4" />
+              </Link>
+              {isTituloEditavel(titulo) ? (
+                <Link
+                  className="btn btn-outline btn-sm"
+                  to={`/financeiro/titulos/${titulo.id}/editar`}
+                  title="Editar informacoes do titulo"
+                >
+                  <HiOutlinePencilSquare className="h-4 w-4" />
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  className="btn btn-outline btn-sm opacity-50"
+                  disabled
+                  title="Somente titulos em aberto e sem baixa podem ser editados"
+                >
+                  <HiOutlinePencilSquare className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+          </td>
+        );
+      default:
+        return <td className="px-3 py-2">-</td>;
+    }
+  }
 
   function setFilter(name, value) {
     setDraftFilters((current) => ({
@@ -456,6 +708,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
     }
 
     setAppliedFilters(normalized);
+    setPagination((current) => ({ ...current, page: 1, total: 0, total_pages: 0 }));
     if (saveFilterCache) {
       localStorage.setItem(filterStorageKey, JSON.stringify(normalized));
     } else {
@@ -468,6 +721,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
     setDraftFilters(defaults);
     setAppliedFilters(null);
     setTitulos([]);
+    setPagination((current) => ({ ...current, page: 1, total: 0, total_pages: 0 }));
     setLoading(false);
     setError('');
     setSelectedTituloIds([]);
@@ -548,8 +802,6 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
             cartao_id: baixaMassaForm.cartao_id || null,
             forma_recebimento: baixaMassaForm.forma_recebimento,
             valor: Number(titulo.valor_saldo || 0),
-            juros: baixaMassaForm.juros || 0,
-            multa: baixaMassaForm.multa || 0,
             desconto: baixaMassaForm.desconto || 0,
             data_movimento: baixaMassaForm.data_movimento,
             observacoes: baixaMassaForm.observacoes || `Baixa em massa registrada pela tela de titulos.`
@@ -559,8 +811,21 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
         }
       }
 
-      const data = await getTitulosFinanceiros(compactFilters(pickVisibleFilters(appliedFilters, visibleFilterIds)));
-      setTitulos(Array.isArray(data) ? data : []);
+      const data = await getTitulosFinanceiros({
+        ...compactFilters(pickVisibleFilters(appliedFilters, visibleFilterIds)),
+        paginated: 1,
+        page: pagination.page,
+        limit: pagination.limit
+      });
+      setTitulos(Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : []);
+      if (data?.pagination) {
+        setPagination((current) => ({
+          ...current,
+          ...data.pagination,
+          page: Number(data.pagination.page || current.page || 1),
+          limit: data.pagination.limit || current.limit
+        }));
+      }
       setSelectedTituloIds([]);
       setModalBaixaMassaOpen(false);
 
@@ -574,6 +839,80 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
       setError(err?.message || 'Erro ao registrar baixas em massa.');
     } finally {
       setSavingBaixaMassa(false);
+    }
+  }
+
+  function exportarModeloCodigosBarras() {
+    const linhas = [
+      ['id', 'codigo', 'tipo', 'credor_cliente', 'vencimento', 'valor_saldo', 'linha_digitavel', 'codigo_barras', 'banco_boleto']
+    ];
+
+    const base = titulos.length > 0 ? titulos : [];
+    base.forEach((titulo) => {
+      linhas.push([
+        titulo.id,
+        titulo.codigo || '',
+        titulo.tipo || '',
+        titulo.parceiro?.nome || '',
+        titulo.data_vencimento || '',
+        Number(titulo.valor_saldo || titulo.valor_original || 0).toFixed(2).replace('.', ','),
+        titulo.linha_digitavel || '',
+        titulo.codigo_barras || '',
+        titulo.banco_boleto || ''
+      ]);
+    });
+
+    if (linhas.length === 1) {
+      linhas.push(['', '', fixedTipo || draftFilters.tipo || 'PAGAR', '', '', '', '', '', '']);
+    }
+
+    downloadCsv(`modelo-codigos-barras-${fixedTipo || draftFilters.tipo || 'titulos'}.csv`, linhas);
+  }
+
+  async function importarCodigosBarras(event) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+
+    try {
+      setImportandoCodigos(true);
+      setError('');
+      const text = await file.text();
+      const itens = parseCsvText(text).map((row) => ({
+        id: row.id || row.titulo_id,
+        codigo: row.codigo || row.codigo_titulo || row.titulo,
+        linha_digitavel: row.linha_digitavel || row.linha,
+        codigo_barras: row.codigo_barras || row.barras,
+        banco_boleto: row.banco_boleto || row.banco
+      }));
+
+      const resultado = await importarCodigosBarrasTitulos({ itens });
+      if (appliedFilters) {
+        const data = await getTitulosFinanceiros({
+          ...compactFilters(pickVisibleFilters(appliedFilters, visibleFilterIds)),
+          paginated: 1,
+          page: pagination.page,
+          limit: pagination.limit
+        });
+        setTitulos(Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : []);
+        if (data?.pagination) {
+          setPagination((current) => ({
+            ...current,
+            ...data.pagination,
+            page: Number(data.pagination.page || current.page || 1),
+            limit: data.pagination.limit || current.limit
+          }));
+        }
+      }
+
+      const erros = Array.isArray(resultado?.erros) && resultado.erros.length > 0
+        ? `\n\nPendencias:\n${resultado.erros.slice(0, 10).map((item) => `Linha ${item.linha}: ${item.erro}`).join('\n')}`
+        : '';
+      alert(`Importacao concluida. Importados: ${resultado?.importados || 0}. Ignorados: ${resultado?.ignorados || 0}.${erros}`);
+    } catch (err) {
+      setError(err?.message || 'Erro ao importar codigos de barras.');
+    } finally {
+      setImportandoCodigos(false);
     }
   }
 
@@ -969,10 +1308,66 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                 ? 'Aplique um filtro para carregar os titulos.'
                 : loading
                   ? 'Carregando titulos...'
-                  : `${titulos.length} titulo(s) encontrados.`}
+                  : `${titulos.length} de ${pagination.total || titulos.length} titulo(s) exibido(s).`}
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="flex items-center gap-2 text-xs text-[var(--c-muted)]">
+              <span>Por pagina</span>
+              <select
+                className="input input-sm w-[96px]"
+                value={String(pagination.limit || '25')}
+                onChange={(event) => {
+                  const nextLimit = event.target.value;
+                  setPagination((current) => ({
+                    ...current,
+                    limit: nextLimit,
+                    page: 1
+                  }));
+                }}
+                disabled={!hasConsulted || loading}
+              >
+                {PAGE_SIZE_OPTIONS.map((option) => (
+                  <option key={option} value={option}>
+                    {option === 'all' ? 'Todos' : option}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="flex items-center gap-1 text-xs text-[var(--c-muted)]">
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                disabled={!hasConsulted || loading || Number(pagination.page || 1) <= 1}
+                onClick={() => setPagination((current) => ({
+                  ...current,
+                  page: Math.max(Number(current.page || 1) - 1, 1)
+                }))}
+              >
+                Anterior
+              </button>
+              <span className="px-1">
+                {pagination.limit === 'all'
+                  ? 'Todos'
+                  : `${pagination.page || 1}/${pagination.total_pages || 1}`}
+              </span>
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                disabled={
+                  !hasConsulted ||
+                  loading ||
+                  pagination.limit === 'all' ||
+                  Number(pagination.page || 1) >= Number(pagination.total_pages || 1)
+                }
+                onClick={() => setPagination((current) => ({
+                  ...current,
+                  page: Number(current.page || 1) + 1
+                }))}
+              >
+                Proxima
+              </button>
+            </div>
             <button
               type="button"
               className="btn btn-primary btn-sm"
@@ -985,6 +1380,25 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
             </button>
             <Link to="/financeiro/cadastros" className="btn btn-outline btn-sm">Cadastros</Link>
             <Link to="/financeiro/baixas" className="btn btn-outline btn-sm">Baixas</Link>
+            <button
+              type="button"
+              className="btn btn-outline btn-sm"
+              onClick={exportarModeloCodigosBarras}
+              disabled={loading}
+              title="Exporta os titulos listados para preencher linha digitavel ou codigo de barras"
+            >
+              Exportar codigos
+            </button>
+            <label className={`btn btn-outline btn-sm ${importandoCodigos ? 'opacity-60 pointer-events-none' : ''}`}>
+              {importandoCodigos ? 'Importando...' : 'Importar codigos'}
+              <input
+                type="file"
+                accept=".csv,text/csv"
+                className="hidden"
+                onChange={importarCodigosBarras}
+                disabled={importandoCodigos}
+              />
+            </label>
             <Link to="/financeiro/relatorios" className="btn btn-outline btn-sm">Gerar relatorio</Link>
           </div>
         </div>
@@ -1022,7 +1436,29 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                     key={header}
                     className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wide text-[var(--c-muted)] whitespace-nowrap"
                   >
-                    {header}
+                    <span className="inline-flex items-center gap-1">
+                      <span>{header}</span>
+                      <span className="inline-flex rounded-md border border-[var(--c-border)] bg-[var(--c-surface)] normal-case shadow-sm">
+                        <button
+                          type="button"
+                          className="px-1 text-[10px] leading-4 text-[var(--c-muted)] hover:text-[var(--c-primary)] disabled:opacity-30"
+                          onClick={() => moverColuna(header, 'left')}
+                          disabled={tableHeaders.indexOf(header) === 0}
+                          title="Mover coluna para esquerda"
+                        >
+                          {'<'}
+                        </button>
+                        <button
+                          type="button"
+                          className="border-l border-[var(--c-border)] px-1 text-[10px] leading-4 text-[var(--c-muted)] hover:text-[var(--c-primary)] disabled:opacity-30"
+                          onClick={() => moverColuna(header, 'right')}
+                          disabled={tableHeaders.indexOf(header) === tableHeaders.length - 1}
+                          title="Mover coluna para direita"
+                        >
+                          {'>'}
+                        </button>
+                      </span>
+                    </span>
                   </th>
                 ))}
               </tr>
@@ -1079,85 +1515,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                       title={isTituloBaixavel(titulo) ? 'Selecionar titulo para baixa' : 'Somente titulos abertos ou parciais podem ser baixados'}
                     />
                   </td>
-                  <td className="px-3 py-2 whitespace-nowrap">
-                    <Link
-                      className="font-semibold text-[var(--c-primary)] hover:underline"
-                      to={`/financeiro/titulos/${titulo.id}`}
-                    >
-                      {getTituloCodigo(titulo)}
-                    </Link>
-                    <div className="max-w-[220px] truncate text-[10px] text-[var(--c-muted)]">
-                      {titulo.descricao || '-'}
-                    </div>
-                  </td>
-                  <td className="px-3 py-2 whitespace-nowrap">
-                    <span className={statusClass(titulo.status)}>{titulo.status}</span>
-                  </td>
-                  {showTipoColumn ? (
-                    <td className="px-3 py-2 font-medium text-[var(--c-muted)] whitespace-nowrap">{titulo.tipo}</td>
-                  ) : null}
-                  <td className="px-3 py-2 whitespace-nowrap">{titulo.numero_documento || '-'}</td>
-                  <td className="px-3 py-2">
-                    <div className="max-w-[180px] truncate font-medium text-[var(--c-text)]">{titulo.parceiro?.nome || '-'}</div>
-                    <div className="text-[10px] text-[var(--c-muted)]">{titulo.parceiro?.cpf_cnpj || ''}</div>
-                  </td>
-                  <td className="px-3 py-2">
-                    <div className="max-w-[150px] truncate text-[var(--c-muted)]">{titulo.obra?.nome || '-'}</div>
-                  </td>
-                  <td className="px-3 py-2">
-                    <div className="max-w-[150px] truncate text-[var(--c-muted)]">{titulo.categoriaFinanceira?.nome || '-'}</div>
-                  </td>
-                  <td className="px-3 py-2 whitespace-nowrap">
-                    {titulo.solicitacao?.id ? (
-                      <Link
-                        className="text-[var(--c-primary)] hover:underline"
-                        to={`/solicitacoes/${titulo.solicitacao.id}`}
-                      >
-                        {titulo.solicitacao.codigo || `#${titulo.solicitacao.id}`}
-                      </Link>
-                    ) : (
-                      getOrigemTitulo(titulo)
-                    )}
-                  </td>
-                  <td className="px-3 py-2 whitespace-nowrap text-[var(--c-muted)]">{formatDate(titulo.data_emissao)}</td>
-                  <td className={`px-3 py-2 whitespace-nowrap ${isOverdue(titulo) ? 'font-semibold text-rose-600' : 'text-[var(--c-text)]'}`}>
-                    {formatDate(titulo.data_vencimento)}
-                  </td>
-                  <td className="px-3 py-2 whitespace-nowrap text-[var(--c-text)] tabular-nums">
-                    {formatCurrency(titulo.valor_original)}
-                  </td>
-                  <td className="px-3 py-2 whitespace-nowrap font-semibold text-[var(--c-text)] tabular-nums">
-                    {formatCurrency(titulo.valor_saldo)}
-                  </td>
-                  <td className="px-3 py-2 whitespace-nowrap">
-                    <div className="flex items-center gap-2">
-                      <Link
-                        className="btn btn-outline btn-sm"
-                        to={`/financeiro/titulos/${titulo.id}`}
-                        title="Abrir titulo"
-                      >
-                        <HiOutlineEye className="h-4 w-4" />
-                      </Link>
-                      {isTituloEditavel(titulo) ? (
-                        <Link
-                          className="btn btn-outline btn-sm"
-                          to={`/financeiro/titulos/${titulo.id}/editar`}
-                          title="Editar informações do titulo"
-                        >
-                          <HiOutlinePencilSquare className="h-4 w-4" />
-                        </Link>
-                      ) : (
-                        <button
-                          type="button"
-                          className="btn btn-outline btn-sm opacity-50"
-                          disabled
-                          title="Somente titulos em aberto e sem baixa podem ser editados"
-                        >
-                          <HiOutlinePencilSquare className="h-4 w-4" />
-                        </button>
-                      )}
-                    </div>
-                  </td>
+                  {tableHeaders.map((header) => renderTituloCell(titulo, header))}
                 </tr>
               ))}
             </tbody>
@@ -1299,26 +1657,6 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                   </select>
                 </label>
 
-                <label className="app-filter-field">
-                  <span className="app-filter-label">Juros por titulo</span>
-                  <input
-                    className="input w-full input-sm"
-                    value={baixaMassaForm.juros}
-                    onChange={(event) => setBaixaMassaForm((current) => ({ ...current, juros: normalizeCurrencyTyping(event.target.value) }))}
-                    placeholder="0,00"
-                  />
-                </label>
-
-                <label className="app-filter-field">
-                  <span className="app-filter-label">Multa por titulo</span>
-                  <input
-                    className="input w-full input-sm"
-                    value={baixaMassaForm.multa}
-                    onChange={(event) => setBaixaMassaForm((current) => ({ ...current, multa: normalizeCurrencyTyping(event.target.value) }))}
-                    placeholder="0,00"
-                  />
-                </label>
-
                 <label className="app-filter-field md:col-span-2">
                   <span className="app-filter-label">Desconto por titulo</span>
                   <input
@@ -1341,7 +1679,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
               </div>
 
               <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                Cada titulo sera baixado pelo saldo atual. Juros, multa e desconto informados aqui serao aplicados individualmente em cada titulo.
+                Cada titulo sera baixado pelo saldo atual. Desconto informado aqui sera aplicado individualmente em cada titulo.
               </div>
             </div>
 

@@ -106,6 +106,11 @@ module.exports = (sequelize, DataTypes) => sequelize.define(
       allowNull: false,
       defaultValue: true
     },
+    possui_rateio: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false
+    },
     intercompany: {
       type: DataTypes.BOOLEAN,
       allowNull: false,
@@ -189,6 +194,19 @@ module.exports = (sequelize, DataTypes) => sequelize.define(
     valor_original: {
       type: DataTypes.DECIMAL(14, 2),
       allowNull: false
+    },
+    valor_bruto: {
+      type: DataTypes.DECIMAL(14, 2),
+      allowNull: true
+    },
+    valor_impostos: {
+      type: DataTypes.DECIMAL(14, 2),
+      allowNull: false,
+      defaultValue: 0
+    },
+    valor_liquido: {
+      type: DataTypes.DECIMAL(14, 2),
+      allowNull: true
     },
     valor_saldo: {
       type: DataTypes.DECIMAL(14, 2),

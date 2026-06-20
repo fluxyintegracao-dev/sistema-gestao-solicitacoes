@@ -10,7 +10,8 @@ const {
   listarFaturasAssociacao,
   listarImportacoes,
   listarConciliacoes,
-  listarMovimentosAssociacao
+  listarMovimentosAssociacao,
+  removerConciliacao
 } = require('../services/conciliacaoBancariaService');
 const { responderErroController } = require('../utils/controllerError');
 
@@ -136,6 +137,16 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return responderErro(res, error, 'Erro ao ignorar conciliacao bancaria');
+    }
+  },
+
+  async remover(req, res) {
+    try {
+      const data = await removerConciliacao(req, req.params.id, req.body || {});
+      return res.json(data);
+    } catch (error) {
+      console.error(error);
+      return responderErro(res, error, 'Erro ao remover lancamento do extrato bancario');
     }
   }
 };

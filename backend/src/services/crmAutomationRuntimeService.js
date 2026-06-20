@@ -18,6 +18,7 @@ const {
   canReceiveCrmAutomationManagerNotification,
   canReceiveCrmLeadAssignment
 } = require('./authorizationService');
+const { notificacaoEventoAtivo } = require('./notificacaoConfigService');
 
 const SCHEDULED_TRIGGER_TYPES = ['NO_FIRST_CONTACT', 'NO_ACTIVITY'];
 
@@ -154,6 +155,11 @@ async function registrarAuditCrmInterno({
 }
 
 async function criarNotificacaoCrm({ tipo, mensagem, metadata, destinatarios, createdBy }) {
+  const tipoNormalizado = String(tipo || '').trim().toUpperCase();
+  if (!(await notificacaoEventoAtivo(tipoNormalizado))) {
+    return null;
+  }
+
   const usuarios = [...new Set(
     toArray(destinatarios)
       .map((item) => Number(item))
@@ -166,7 +172,7 @@ async function criarNotificacaoCrm({ tipo, mensagem, metadata, destinatarios, cr
 
   const notificacao = await Notificacao.create({
     solicitacao_id: null,
-    tipo,
+    tipo: tipoNormalizado,
     mensagem,
     metadata: metadata ? JSON.stringify(metadata) : null,
     created_by: createdBy || null

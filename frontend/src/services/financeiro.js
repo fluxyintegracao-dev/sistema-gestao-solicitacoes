@@ -335,6 +335,16 @@ export async function ignorarConciliacaoBancaria(id) {
   return parseJson(response, 'Erro ao ignorar conciliacao bancaria');
 }
 
+export async function removerConciliacaoBancaria(id, data = {}) {
+  const response = await fetch(`${API_URL}/financeiro/conciliacoes/${id}/remover`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+
+  return parseJson(response, 'Erro ao remover lancamento do extrato bancario');
+}
+
 export async function getCaixasFinanceiros(params = {}) {
   const query = new URLSearchParams(
     Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== '')
@@ -364,6 +374,15 @@ export async function abrirCaixaFinanceiro(data) {
   });
 
   return parseJson(response, 'Erro ao abrir caixa financeiro');
+}
+
+export async function confirmarConciliacaoDiaCaixa(data) {
+  const response = await fetch(`${API_URL}/financeiro/caixas/confirmar-conciliacao-dia`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify(data)
+  });
+  return parseJson(response, 'Erro ao confirmar conciliacao do dia');
 }
 
 export async function fecharCaixaFinanceiro(id, data) {
@@ -450,6 +469,16 @@ export async function atualizarTituloFinanceiro(id, data) {
   });
 
   return parseJson(response, 'Erro ao editar titulo financeiro');
+}
+
+export async function importarCodigosBarrasTitulos(data) {
+  const response = await fetch(`${API_URL}/financeiro/titulos/importar-codigos-barras`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+
+  return parseJson(response, 'Erro ao importar codigos de barras dos titulos');
 }
 
 export async function atualizarCobrancaTituloFinanceiro(id, data) {
@@ -1062,6 +1091,16 @@ export async function gerarTitulosFinanciamentoBancario(id) {
   });
 
   return parseJson(response, 'Erro ao gerar titulos do financiamento bancario');
+}
+
+export async function atualizarParcelaFinanciamentoBancario(id, data) {
+  const response = await fetch(`${API_URL}/financeiro/financiamentos-bancarios/parcelas/${id}`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+
+  return parseJson(response, 'Erro ao atualizar parcela do financiamento bancario');
 }
 
 export async function getPaymentBeneficiaries(params = {}) {
