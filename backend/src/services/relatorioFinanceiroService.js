@@ -4189,6 +4189,10 @@ function classifyMovimentoBancario(movimento, titulo) {
   }
 
   const tipoMovimento = String(movimento.tipo_movimento || '').toUpperCase();
+  if (tipoMovimento === 'TARIFA_BANCARIA') {
+    return 'SAIDA';
+  }
+
   if (tipoMovimento.includes('ENTRADA') || tipoMovimento.includes('RECEB')) {
     return 'ENTRADA';
   }

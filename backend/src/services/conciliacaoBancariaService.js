@@ -1717,6 +1717,7 @@ async function confirmarConciliacaoTarifa(req, conciliacaoId, payload = {}) {
       movimento_financeiro_id: movimento.id,
       titulo_financeiro_id: null,
       fatura_cartao_id: null,
+      empresa_id: empresaConciliacaoId,
       caixa_sessao_id: sessao?.id || null,
       status: 'CONCILIADO',
       confirmado_por: req.user?.id || null,
