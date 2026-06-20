@@ -761,7 +761,7 @@ function buildContaReportParams(filters) {
 function ContaReportFilters({ filters, setFilters, contas, loading, onSubmit }) {
   return (
     <form className="card sol-surface-card p-4 financeiro-conta-report-filters" onSubmit={onSubmit}>
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="financeiro-conta-report-filter-grid">
         <label className="field">
           <span>Periodo</span>
           <select
@@ -808,7 +808,7 @@ function ContaReportFilters({ filters, setFilters, contas, loading, onSubmit }) 
           </select>
         </label>
       </div>
-      <div className="mt-4 flex justify-end">
+      <div className="financeiro-conta-report-actions">
         <button type="submit" className="btn btn-primary" disabled={loading}>
           {loading ? 'Gerando...' : 'Gerar relatorio'}
         </button>
@@ -874,7 +874,7 @@ function ContaReportShell({ title, subtitle, type }) {
   const analitico = Array.isArray(relatorio?.analitico) ? relatorio.analitico : [];
 
   return (
-    <div className="space-y-4">
+    <div className="financeiro-conta-report-shell space-y-4">
       <div>
         <h2 className="text-lg font-semibold text-slate-950">{title}</h2>
         <p className="text-sm text-slate-500">{subtitle}</p>
@@ -1260,7 +1260,7 @@ export default function FinanceiroRelatorios() {
 
   if (isFullScreenMode && selectedReport.embedded) {
     return (
-      <div className="page solicitacoes-page">
+      <div className="page solicitacoes-page financeiro-relatorios-page financeiro-relatorios-page--full">
         <div className="app-page-header">
           <div className="app-page-header-row">
             <div>
@@ -1278,15 +1278,17 @@ export default function FinanceiroRelatorios() {
           </div>
         </div>
 
-        <Suspense fallback={<div className="app-empty-card">Carregando relatorio...</div>}>
-          <SelectedReportComponent isVisible={isVisible} />
-        </Suspense>
+        <div className="financeiro-relatorios-content">
+          <Suspense fallback={<div className="app-empty-card">Carregando relatorio...</div>}>
+            <SelectedReportComponent isVisible={isVisible} />
+          </Suspense>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="page solicitacoes-page">
+    <div className="page solicitacoes-page financeiro-relatorios-page">
       <div className="app-page-header">
         <div className="app-page-header-row">
           <div>
@@ -1312,8 +1314,8 @@ export default function FinanceiroRelatorios() {
         </div>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
-        <aside className="card sol-surface-card h-fit xl:sticky xl:top-4">
+      <div className="financeiro-relatorios-layout grid gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
+        <aside className="card sol-surface-card financeiro-relatorios-sidebar h-fit xl:sticky xl:top-4">
           <div className="border-b border-[var(--c-border)] px-4 py-4">
             <div className="flex items-center justify-between gap-3">
               <div>
@@ -1348,7 +1350,7 @@ export default function FinanceiroRelatorios() {
           </div>
         </aside>
 
-        <section className="min-w-0">
+        <section className="financeiro-relatorios-content min-w-0">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
             <div>
               <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">

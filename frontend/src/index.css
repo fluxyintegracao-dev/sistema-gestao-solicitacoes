@@ -5029,20 +5029,72 @@ input[type="file"]:disabled {
 }
 
 .financeiro-report-summary-grid {
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 140px), 1fr));
+  min-width: 0;
+}
+
+.financeiro-relatorios-page {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.financeiro-relatorios-layout,
+.financeiro-relatorios-content,
+.financeiro-conta-report-shell {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.financeiro-relatorios-content {
+  overflow: hidden;
+}
+
+.financeiro-relatorios-page--full .financeiro-relatorios-content {
+  width: 100%;
+}
+
+.financeiro-conta-report-filters {
+  width: 100% !important;
+  max-width: 100% !important;
+  margin-inline: 0 !important;
+  overflow: hidden;
+}
+
+.financeiro-conta-report-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  gap: 0.75rem;
+}
+
+.financeiro-conta-report-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 1rem;
+}
+
+.financeiro-conta-report-actions .btn {
+  min-width: 150px;
 }
 
 .financeiro-report-card {
+  max-width: 100%;
+  min-width: 0;
   overflow: hidden;
 }
 
 .financeiro-report-card .table-responsive {
+  width: 100%;
+  max-width: 100%;
   overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
   border: 1px solid var(--ui-border);
   border-radius: 14px;
 }
 
 .financeiro-report-table {
+  width: max-content;
+  min-width: 100%;
   border-collapse: collapse;
 }
 
@@ -5066,13 +5118,53 @@ input[type="file"]:disabled {
   background: rgba(219, 234, 254, 0.42);
 }
 
+@media (max-width: 1100px) {
+  .financeiro-relatorios-layout {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .financeiro-relatorios-sidebar {
+    position: static !important;
+  }
+}
+
 @media (max-width: 900px) {
+  .financeiro-conta-report-actions {
+    justify-content: stretch;
+  }
+
+  .financeiro-conta-report-actions .btn,
   .financeiro-conta-report-filters .btn {
     width: 100%;
+    min-width: 0;
   }
 
   .financeiro-report-card {
     padding: 0.85rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .financeiro-relatorios-page .app-page-header-row {
+    gap: 1rem;
+  }
+
+  .financeiro-relatorios-page .app-page-actions,
+  .financeiro-relatorios-page .app-page-actions .btn {
+    width: 100%;
+  }
+
+  .financeiro-conta-report-filters {
+    padding: 0.85rem !important;
+  }
+
+  .financeiro-report-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .financeiro-report-card .table-responsive {
+    margin-inline: -0.25rem;
+    width: calc(100% + 0.5rem);
   }
 }
 
