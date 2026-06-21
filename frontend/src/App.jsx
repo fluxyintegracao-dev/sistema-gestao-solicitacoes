@@ -324,6 +324,14 @@ function CompraSolicitacaoCreateRoute({ children }) {
   return children;
 }
 
+function CompraSolicitacaoCreateFlowRoute({ children }) {
+  const { user } = useAuth();
+  if (!canCreateCompraSolicitacao(user) && !canViewCompraSolicitacoes(user)) {
+    return <Navigate to="/solicitacoes" replace />;
+  }
+  return children;
+}
+
 function CompraSolicitacoesManageRoute({ children }) {
   const { user } = useAuth();
   if (!canManageCompraSolicitacoes(user)) {
@@ -916,8 +924,8 @@ export default function App() {
         <Route path="solicitacoes-compra/:id/cotacao" element={<ModuloComprasRoute><EnabledModuleRoute moduleKey="COTACOES"><CompraSolicitacoesManageRoute><GerenciarCotacaoSolicitacao /></CompraSolicitacoesManageRoute></EnabledModuleRoute></ModuloComprasRoute>} />
         <Route path="solicitacoes-compra/:id" element={<ModuloComprasRoute><CompraSolicitacoesRoute><SolicitacaoCompraDetalhe /></CompraSolicitacoesRoute></ModuloComprasRoute>} />
         <Route path="solicitacoes-compra/nova" element={<CompraSolicitacaoCreateRoute><NovaSolicitacaoCompra /></CompraSolicitacaoCreateRoute>} />
-        <Route path="solicitacoes-compra/revisar" element={<ModuloComprasRoute><CompraSolicitacoesRoute><RevisarSolicitacaoCompra /></CompraSolicitacoesRoute></ModuloComprasRoute>} />
-        <Route path="solicitacoes-compra/finalizada/:id" element={<ModuloComprasRoute><CompraSolicitacoesRoute><RevisarSolicitacaoCompraFinal /></CompraSolicitacoesRoute></ModuloComprasRoute>} />
+        <Route path="solicitacoes-compra/revisar" element={<CompraSolicitacaoCreateFlowRoute><RevisarSolicitacaoCompra /></CompraSolicitacaoCreateFlowRoute>} />
+        <Route path="solicitacoes-compra/finalizada/:id" element={<CompraSolicitacaoCreateFlowRoute><RevisarSolicitacaoCompraFinal /></CompraSolicitacaoCreateFlowRoute>} />
         <Route path="pedidos-compra" element={<ComprasPedidosRoute><PedidosCompra /></ComprasPedidosRoute>} />
         <Route path="pedidos-compra/:id" element={<ComprasPedidosRoute><PedidoCompraDetalhe /></ComprasPedidosRoute>} />
         <Route path="compras/delegacao" element={<ComprasDelegacaoRoute><ComprasDelegacao /></ComprasDelegacaoRoute>} />

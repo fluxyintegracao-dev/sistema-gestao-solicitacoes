@@ -600,6 +600,14 @@ const allowCompraSolicitacoesRead = allowPaymentAction(
   canViewCompraSolicitacoes,
   'Acesso negado para solicitacoes de compra'
 );
+const allowCompraSolicitacoesCreateFlowRead = allowPaymentAction(
+  'COMPRAS_SOLICITACOES_CREATE_FLOW_READ',
+  async (user) => (
+    await canViewCompraSolicitacoes(user)
+    || await canCreateCompraSolicitacao(user)
+  ),
+  'Acesso negado para revisar solicitacao de compra'
+);
 const allowCompraSolicitacoesCreate = allowPaymentAction(
   'COMPRAS_SOLICITACOES_CREATE',
   canCreateCompraSolicitacao,
@@ -1471,9 +1479,9 @@ router.put('/compras/fornecedores/:id', requireEnabledModule('COTACOES'), allowC
 router.delete('/compras/fornecedores/:id', requireEnabledModule('COTACOES'), allowComprasFornecedoresManage, FornecedorCompraController.destroy);
 router.post('/compras/anexos-temporarios', allowCompraSolicitacoesUpload, uploadRateLimit, uploadComprovantes.single('file'), SolicitacaoCompraController.uploadTemporario);
 router.get('/compras/solicitacoes', allowCompraSolicitacoesRead, validateRequest({ query: validateCompraQuery }), scopeCompraListAccess, SolicitacaoCompraController.index);
-router.get('/compras/solicitacoes/:id', allowCompraSolicitacoesRead, validateRequest({ params: validateNumericIdParam('id', 'Solicitacao de compra') }), requireCompraAccess, SolicitacaoCompraController.show);
+router.get('/compras/solicitacoes/:id', allowCompraSolicitacoesCreateFlowRead, validateRequest({ params: validateNumericIdParam('id', 'Solicitacao de compra') }), requireCompraAccess, SolicitacaoCompraController.show);
 router.get('/compras/solicitacoes/:id/comparativo', allowCompraSolicitacoesRead, validateRequest({ params: validateNumericIdParam('id', 'Solicitacao de compra') }), requireCompraAccess, SolicitacaoCompraController.comparativo);
-router.get('/compras/solicitacoes/:id/pdf', allowCompraSolicitacoesRead, validateRequest({ params: validateNumericIdParam('id', 'Solicitacao de compra') }), requireCompraAccess, SolicitacaoCompraController.pdf);
+router.get('/compras/solicitacoes/:id/pdf', allowCompraSolicitacoesCreateFlowRead, validateRequest({ params: validateNumericIdParam('id', 'Solicitacao de compra') }), requireCompraAccess, SolicitacaoCompraController.pdf);
 router.post('/compras/solicitacoes', allowCompraSolicitacoesCreate, validateRequest({ body: validateCompraCreateBody }), requireCompraBodyObraAccess, SolicitacaoCompraController.create);
 router.get('/compras/cotacoes', requireEnabledModule('COTACOES'), allowComprasCotacoesRead, scopeCompraListAccess, CotacaoFornecedorController.index);
 router.post('/compras/cotacoes/avulsa', requireEnabledModule('COTACOES'), allowComprasCotacoesManage, SolicitacaoCompraController.createAvulsa);
