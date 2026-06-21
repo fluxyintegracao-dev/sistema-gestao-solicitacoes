@@ -154,13 +154,15 @@ module.exports = {
   // =====================================================
   async index(req, res) {
     try {
+      const whereUsuarios = {};
+      if (!isPerfilSuperadmin(req.user?.perfil)) {
+        whereUsuarios.perfil = {
+          [Op.ne]: 'SUPERADMIN'
+        };
+      }
 
       const usuarios = await User.findAll({
-        where: {
-          perfil: {
-            [Op.ne]: 'SUPERADMIN'
-          }
-        },
+        where: whereUsuarios,
         attributes: { exclude: ['senha'] }, // nunca retornar senha
         include: [
           {
@@ -872,5 +874,4 @@ module.exports = {
   }
 
 };
-
 

@@ -16,7 +16,7 @@ import {
 import { listarApropriacoes } from '../services/apropriacoes';
 import { useAuth } from '../contexts/AuthContext';
 import { hasEnabledModule } from '../utils/acessoProduto';
-import { formatCurrencyInput, maskCpfCnpj, normalizeCurrencyTyping, onlyDigits } from '../utils/formatters';
+import { formatCurrencyInput, normalizeCurrencyTyping } from '../utils/formatters';
 
 const FORMAS_COBRANCA = ['BOLETO', 'PIX', 'OUTROS'];
 const STATUS_COBRANCA = ['PENDENTE_EMISSAO', 'EMITIDO', 'PAGO_BANCO', 'CONCILIADO', 'CANCELADO'];
@@ -353,11 +353,10 @@ export default function FinanceiroTituloNovo() {
   const [apropriacoes, setApropriacoes] = useState([]);
   const [loadingApropriacoes, setLoadingApropriacoes] = useState(false);
   const [loadingBase, setLoadingBase] = useState(true);
-  const [loadingParceiros, setLoadingParceiros] = useState(true);
+  const [loadingParceiros, setLoadingParceiros] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [parceiroDocumentoBusca, setParceiroDocumentoBusca] = useState('');
-  const [parceiroNomeBusca, setParceiroNomeBusca] = useState('');
+  const [parceiroBusca, setParceiroBusca] = useState('');
   const [categoriaBusca, setCategoriaBusca] = useState('');
   const [categoriaModalOpen, setCategoriaModalOpen] = useState(false);
   const [categoriaModalBusca, setCategoriaModalBusca] = useState('');
@@ -434,14 +433,19 @@ export default function FinanceiroTituloNovo() {
     let active = true;
 
     async function carregarParceiros() {
+      const termoBusca = parceiroBusca.trim();
+      if (!termoBusca) {
+        setParceiros([]);
+        setLoadingParceiros(false);
+        return;
+      }
+
       try {
         setLoadingParceiros(true);
-        const termoDocumento = parceiroDocumentoBusca.trim();
-        const termoNome = parceiroNomeBusca.trim();
         const params = {
           ativo: 1,
           limit: 200,
-          q: termoDocumento || termoNome
+          q: termoBusca
         };
 
         if (form.tipo === 'RECEBER') {
@@ -467,7 +471,7 @@ export default function FinanceiroTituloNovo() {
     return () => {
       active = false;
     };
-  }, [form.tipo, parceiroDocumentoBusca, parceiroNomeBusca]);
+  }, [form.tipo, parceiroBusca]);
 
   const obraSelecionada = useMemo(
     () => obras.find((obra) => String(obra.id) === String(form.obra_id)) || null,
@@ -619,7 +623,7 @@ export default function FinanceiroTituloNovo() {
   const parceiroPixOptions = useMemo(() => getParceiroPixOptions(parceiroSelecionado), [parceiroSelecionado]);
 
   const parceiroResumo = useMemo(() => {
-    const termo = parceiroDocumentoBusca.trim() || parceiroNomeBusca.trim();
+    const termo = parceiroBusca.trim();
     if (!termo) {
       return `Digite parte do nome ou documento para buscar ${form.tipo === 'RECEBER' ? 'clientes' : 'credores'}.`;
     }
@@ -627,13 +631,11 @@ export default function FinanceiroTituloNovo() {
       return `${form.tipo === 'RECEBER' ? 'Cliente' : 'Credor'} selecionado.`;
     }
     return `${parceiros.length} ${form.tipo === 'RECEBER' ? 'cliente(s)' : 'credor(es)'} encontrado(s) para "${termo}"`;
-  }, [form.tipo, form.parceiro_id, parceiros, parceiroDocumentoBusca, parceiroNomeBusca]);
+  }, [form.tipo, form.parceiro_id, parceiros, parceiroBusca]);
 
   const mostrarListaParceiros = useMemo(() => {
-    const temBuscaNome = parceiroNomeBusca.trim().length > 0;
-    const temBuscaDocumento = onlyDigits(parceiroDocumentoBusca).length >= 3;
-    return !form.parceiro_id && (temBuscaNome || temBuscaDocumento);
-  }, [form.parceiro_id, parceiroDocumentoBusca, parceiroNomeBusca]);
+    return !form.parceiro_id && parceiroBusca.trim().length > 0;
+  }, [form.parceiro_id, parceiroBusca]);
   const quantidadePagamentos = (form.pagamentos || []).length;
 
   function getFormaPagamento(formaPagamentoId) {
@@ -713,8 +715,7 @@ export default function FinanceiroTituloNovo() {
         parceiro_busca: ''
       }))
     }));
-    setParceiroNomeBusca(parceiro.nome || '');
-    setParceiroDocumentoBusca(maskCpfCnpj(parceiro.cpf_cnpj || ''));
+    setParceiroBusca(parceiro.nome || parceiro.cpf_cnpj || '');
     setPaymentDraft((current) => {
       if (!current.usar_credor_como_favorecido) return current;
       const pix = getParceiroPixPrincipal(parceiro);
@@ -1365,32 +1366,16 @@ export default function FinanceiroTituloNovo() {
                 </span>
               </label>
 
-              <label className="sol-filter-field md:col-span-2 xl:col-span-3">
-                <span className="sol-filter-label">Consulta por CPF/CNPJ</span>
-                <input
-                  className="input w-full"
-                  placeholder="Digite CPF/CNPJ"
-                  value={parceiroDocumentoBusca}
-                  onChange={(event) => {
-                    setParceiroDocumentoBusca(maskCpfCnpj(event.target.value));
-                    setForm((current) => ({ ...current, parceiro_id: '' }));
-                    if (onlyDigits(event.target.value).length >= 6) {
-                      setParceiroNomeBusca('');
-                    }
-                  }}
-                />
-                <span className="app-note mt-2">{loadingParceiros ? 'Carregando parceiros...' : parceiroResumo}</span>
-              </label>
-
-              <div className="sol-filter-field md:col-span-2 xl:col-span-6">
+              <div className="sol-filter-field md:col-span-2 xl:col-span-9">
                 <span className="sol-filter-label">{form.tipo === 'RECEBER' ? 'Cliente' : 'Credor'}</span>
                 <input
                   className="input w-full"
-                  placeholder={form.tipo === 'RECEBER' ? 'Digite o nome do cliente' : 'Digite o nome do credor'}
-                  value={parceiroNomeBusca}
+                  placeholder={form.tipo === 'RECEBER'
+                    ? 'Buscar cliente por nome ou CPF/CNPJ'
+                    : 'Buscar credor por nome ou CPF/CNPJ'}
+                  value={parceiroBusca}
                   onChange={(event) => {
-                    setParceiroNomeBusca(event.target.value);
-                    if (event.target.value.trim()) setParceiroDocumentoBusca('');
+                    setParceiroBusca(event.target.value);
                     setForm((current) => ({ ...current, parceiro_id: '' }));
                   }}
                   required={!form.parceiro_id}
@@ -1399,28 +1384,26 @@ export default function FinanceiroTituloNovo() {
                 {mostrarListaParceiros && (
                   <div className="mt-2 max-h-44 overflow-y-auto rounded-lg border border-[var(--c-border)] bg-[var(--c-bg)]">
                     {parceiros.length === 0 ? (
-                    <div className="px-3 py-2 text-sm text-[var(--c-muted)]">
-                      Nenhum {form.tipo === 'RECEBER' ? 'cliente' : 'credor'} encontrado.
-                    </div>
+                      <div className="px-3 py-2 text-sm text-[var(--c-muted)]">
+                        Nenhum {form.tipo === 'RECEBER' ? 'cliente' : 'credor'} encontrado.
+                      </div>
                     ) : parceiros.slice(0, 8).map((parceiro) => {
-                    const selected = String(parceiro.id) === String(form.parceiro_id);
-                    return (
-                      <button
-                        key={parceiro.id}
-                        type="button"
-                        className={`w-full border-b border-[var(--c-border)] px-3 py-2 text-left text-sm last:border-b-0 hover:bg-[var(--c-surface-muted)] ${selected ? 'bg-[var(--c-surface-muted)] font-medium text-[var(--c-text)]' : 'text-[var(--c-muted)]'}`}
-                        onClick={() => selecionarParceiro(parceiro)}
-                      >
-                        <span className="block text-[var(--c-text)]">{parceiro.nome}</span>
-                        <span className="block text-xs">{parceiro.cpf_cnpj || 'CPF/CNPJ nao informado'}</span>
-                      </button>
-                    );
+                      const selected = String(parceiro.id) === String(form.parceiro_id);
+                      return (
+                        <button
+                          key={parceiro.id}
+                          type="button"
+                          className={`w-full border-b border-[var(--c-border)] px-3 py-2 text-left text-sm last:border-b-0 hover:bg-[var(--c-surface-muted)] ${selected ? 'bg-[var(--c-surface-muted)] font-medium text-[var(--c-text)]' : 'text-[var(--c-muted)]'}`}
+                          onClick={() => selecionarParceiro(parceiro)}
+                        >
+                          <span className="block text-[var(--c-text)]">{parceiro.nome}</span>
+                          <span className="block text-xs">{parceiro.cpf_cnpj || 'CPF/CNPJ nao informado'}</span>
+                        </button>
+                      );
                     })}
                   </div>
                 )}
-                <span className="app-note mt-2">
-                  Ao selecionar, o nome permanece no campo de busca e o CPF/CNPJ e preenchido automaticamente.
-                </span>
+                <span className="app-note mt-2">{loadingParceiros ? 'Carregando parceiros...' : parceiroResumo}</span>
               </div>
 
               <label className="sol-filter-field md:col-span-2 xl:col-span-4">
