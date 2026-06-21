@@ -344,6 +344,41 @@ function addCandidate(candidates, value) {
   if (normalized) candidates.add(normalized);
 }
 
+function decodePathPart(value) {
+  const rawValue = String(value || '').trim();
+  if (!rawValue) return '';
+
+  try {
+    return decodeURIComponent(rawValue);
+  } catch {
+    const sanitizedValue = rawValue.replace(/%(?![0-9A-Fa-f]{2})/g, '%25');
+    try {
+      return decodeURIComponent(sanitizedValue);
+    } catch {
+      return rawValue;
+    }
+  }
+}
+
+function encodeStorageKey(value) {
+  return String(value || '')
+    .split('/')
+    .map((part) => encodeURIComponent(part))
+    .join('/');
+}
+
+function extractStorageKey(value) {
+  const target = String(value || '').trim();
+  if (!target) return '';
+
+  try {
+    const parsed = new URL(target);
+    return decodePathPart(parsed.pathname.replace(/^\//, ''));
+  } catch {
+    return decodePathPart(target.replace(/^\/+/, ''));
+  }
+}
+
 function buildFileTargetCandidates(alvo) {
   const candidates = new Set();
   const target = String(alvo || '').trim();
@@ -351,29 +386,30 @@ function buildFileTargetCandidates(alvo) {
 
   const bucket = process.env.AWS_S3_BUCKET;
   const region = process.env.AWS_REGION;
+  const storageKey = extractStorageKey(target);
 
   try {
     const parsed = new URL(target);
     if (bucket && parsed.hostname.startsWith(`${bucket}.s3`)) {
       const rawKey = parsed.pathname.replace(/^\//, '');
       addCandidate(candidates, rawKey);
-
-      try {
-        addCandidate(candidates, decodeURIComponent(rawKey));
-      } catch {
-        const sanitizedKey = rawKey.replace(/%(?![0-9A-Fa-f]{2})/g, '%25');
-        addCandidate(candidates, decodeURIComponent(sanitizedKey));
-      }
+      addCandidate(candidates, decodePathPart(rawKey));
 
       if (region) {
         addCandidate(candidates, `https://${bucket}.s3.${region}.amazonaws.com/${rawKey}`);
+        addCandidate(candidates, `https://${bucket}.s3.${region}.amazonaws.com/${encodeStorageKey(storageKey)}`);
+        addCandidate(candidates, `https://${bucket}.s3.${region}.amazonaws.com/${storageKey}`);
       }
     }
   } catch {
     if (bucket && region && target && !target.startsWith('http')) {
       addCandidate(candidates, `https://${bucket}.s3.${region}.amazonaws.com/${target}`);
+      addCandidate(candidates, `https://${bucket}.s3.${region}.amazonaws.com/${encodeStorageKey(storageKey)}`);
     }
   }
+
+  addCandidate(candidates, storageKey);
+  addCandidate(candidates, encodeStorageKey(storageKey));
 
   return Array.from(candidates);
 }
@@ -404,10 +440,77 @@ function parseMetadata(metadata) {
   }
 }
 
+function getMetadataFilePaths(metadata) {
+  const parsed = parseMetadata(metadata);
+  if (!parsed) return [];
+
+  return [
+    parsed.caminho,
+    parsed.caminho_arquivo,
+    parsed.arquivo_url,
+    parsed.url,
+    parsed.file_url,
+    parsed.download_url
+  ].filter(Boolean);
+}
+
 function metadataPathMatches(metadata, candidates) {
-  const caminho = parseMetadata(metadata)?.caminho;
-  if (!caminho) return false;
-  return candidates.includes(String(caminho).trim());
+  const candidateKeys = candidates.map(extractStorageKey).filter(Boolean);
+  return getMetadataFilePaths(metadata).some((path) => {
+    const pathCandidates = buildFileTargetCandidates(path);
+    if (pathCandidates.some((candidate) => candidates.includes(candidate))) {
+      return true;
+    }
+
+    const pathKey = extractStorageKey(path);
+    return pathKey && candidateKeys.includes(pathKey);
+  });
+}
+
+function isMissingColumnError(error, columnName) {
+  const message = [
+    error?.message,
+    error?.parent?.message,
+    error?.parent?.sqlMessage,
+    error?.original?.message,
+    error?.original?.sqlMessage
+  ]
+    .filter(Boolean)
+    .join(' ');
+
+  return (
+    (error?.parent?.code === 'ER_BAD_FIELD_ERROR' || error?.original?.code === 'ER_BAD_FIELD_ERROR') &&
+    message.includes(columnName)
+  );
+}
+
+function isMissingTableError(error) {
+  return (
+    error?.parent?.code === 'ER_NO_SUCH_TABLE' ||
+    error?.original?.code === 'ER_NO_SUCH_TABLE'
+  );
+}
+
+async function findOneFileRecord(model, query) {
+  try {
+    return await model.findOne(query);
+  } catch (error) {
+    if (isMissingTableError(error)) {
+      return null;
+    }
+
+    const hasDeletedAtFilter = Object.prototype.hasOwnProperty.call(query?.where || {}, 'deleted_at');
+    if (!hasDeletedAtFilter || !isMissingColumnError(error, 'deleted_at')) {
+      throw error;
+    }
+
+    const retryWhere = { ...query.where };
+    delete retryWhere.deleted_at;
+    return model.findOne({
+      ...query,
+      where: retryWhere
+    });
+  }
 }
 
 async function findHistoricoFileResource(fileCandidates) {
@@ -452,44 +555,49 @@ async function resolveRegisteredFileResource(alvo) {
   const fileCandidates = buildFileTargetCandidates(alvo);
   const whereIn = { [Op.in]: fileCandidates };
 
-  const buscas = await Promise.all([
-    Anexo.findOne({
-      where: { caminho_arquivo: whereIn, deleted_at: null },
-      attributes: ['id', 'solicitacao_id', 'caminho_arquivo']
-    }),
-    ContratoAnexo.findOne({
-      where: { caminho_arquivo: whereIn },
-      attributes: ['id', 'contrato_id', 'caminho_arquivo']
-    }),
-    Comprovante.findOne({
-      where: { caminho_arquivo: whereIn, deleted_at: null },
-      attributes: ['id', 'solicitacao_id', 'obra_id', 'caminho_arquivo']
-    }),
-    ArquivoModelo.findOne({
-      where: { arquivo_url: whereIn },
-      attributes: ['id', 'pagina_codigo', 'arquivo_url', 'ativo']
-    }),
-    ConversaInternaAnexo.findOne({
-      where: { caminho: whereIn },
-      attributes: ['id', 'conversa_id', 'caminho']
-    }),
-    SolicitacaoCompraItem.findOne({
-      where: { arquivo_url: whereIn },
-      attributes: ['id', 'solicitacao_compra_id', 'arquivo_url']
-    }),
-    SolicitacaoCompraItemManual.findOne({
-      where: { arquivo_url: whereIn },
-      attributes: ['id', 'solicitacao_compra_id', 'arquivo_url']
-    })
-  ]);
+  const anexo = await findOneFileRecord(Anexo, {
+    where: { caminho_arquivo: whereIn, deleted_at: null },
+    attributes: ['id', 'solicitacao_id', 'caminho_arquivo']
+  });
+  if (anexo) return { kind: 'SOLICITACAO_ANEXO', record: anexo };
 
-  if (buscas[0]) return { kind: 'SOLICITACAO_ANEXO', record: buscas[0] };
-  if (buscas[1]) return { kind: 'CONTRATO_ANEXO', record: buscas[1] };
-  if (buscas[2]) return { kind: 'COMPROVANTE', record: buscas[2] };
-  if (buscas[3]) return { kind: 'ARQUIVO_MODELO', record: buscas[3] };
-  if (buscas[4]) return { kind: 'CONVERSA_ANEXO', record: buscas[4] };
-  if (buscas[5]) return { kind: 'COMPRA_ITEM_ARQUIVO', record: buscas[5] };
-  if (buscas[6]) return { kind: 'COMPRA_ITEM_MANUAL_ARQUIVO', record: buscas[6] };
+  const contratoAnexo = await findOneFileRecord(ContratoAnexo, {
+    where: { caminho_arquivo: whereIn },
+    attributes: ['id', 'contrato_id', 'caminho_arquivo']
+  });
+  if (contratoAnexo) return { kind: 'CONTRATO_ANEXO', record: contratoAnexo };
+
+  const comprovante = await findOneFileRecord(Comprovante, {
+    where: { caminho_arquivo: whereIn, deleted_at: null },
+    attributes: ['id', 'solicitacao_id', 'obra_id', 'caminho_arquivo']
+  });
+  if (comprovante) return { kind: 'COMPROVANTE', record: comprovante };
+
+  const arquivoModelo = await findOneFileRecord(ArquivoModelo, {
+    where: { arquivo_url: whereIn },
+    attributes: ['id', 'pagina_codigo', 'arquivo_url', 'ativo']
+  });
+  if (arquivoModelo) return { kind: 'ARQUIVO_MODELO', record: arquivoModelo };
+
+  const conversaAnexo = await findOneFileRecord(ConversaInternaAnexo, {
+    where: { caminho: whereIn },
+    attributes: ['id', 'conversa_id', 'caminho']
+  });
+  if (conversaAnexo) return { kind: 'CONVERSA_ANEXO', record: conversaAnexo };
+
+  const compraItemArquivo = await findOneFileRecord(SolicitacaoCompraItem, {
+    where: { arquivo_url: whereIn },
+    attributes: ['id', 'solicitacao_compra_id', 'arquivo_url']
+  });
+  if (compraItemArquivo) return { kind: 'COMPRA_ITEM_ARQUIVO', record: compraItemArquivo };
+
+  const compraItemManualArquivo = await findOneFileRecord(SolicitacaoCompraItemManual, {
+    where: { arquivo_url: whereIn },
+    attributes: ['id', 'solicitacao_compra_id', 'arquivo_url']
+  });
+  if (compraItemManualArquivo) {
+    return { kind: 'COMPRA_ITEM_MANUAL_ARQUIVO', record: compraItemManualArquivo };
+  }
 
   const historicoArquivo = await findHistoricoFileResource(fileCandidates);
   if (historicoArquivo) {
