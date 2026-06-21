@@ -4,7 +4,9 @@ export default function PreviewAnexoModal({ anexo, onClose }) {
   const temUrlExplicita = Object.prototype.hasOwnProperty.call(anexo, 'url');
   const url = temUrlExplicita ? anexo.url : fileUrl(anexo.caminho);
   const downloadUrl = anexo.downloadUrl || url;
-  const isPdf = /\.pdf$/i.test(anexo?.nome || '');
+  const referenciaArquivo = String(anexo?.nome || anexo?.caminho || url || '');
+  const isImage = /\.(jpg|jpeg|png|gif|webp)(\?|$)/i.test(referenciaArquivo);
+  const isPdf = /\.pdf(\?|$)/i.test(referenciaArquivo);
 
   function renderPreview() {
     if (!url) {
@@ -18,11 +20,11 @@ export default function PreviewAnexoModal({ anexo, onClose }) {
       );
     }
 
-    if (anexo.nome.match(/\.(jpg|jpeg|png|gif|webp)$/i)) {
+    if (isImage) {
       return (
         <img
           src={url}
-          alt={anexo.nome}
+          alt={anexo.nome || 'Anexo'}
           className="max-h-[80vh] mx-auto"
         />
       );

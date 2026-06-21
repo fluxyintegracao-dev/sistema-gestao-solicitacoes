@@ -38,33 +38,13 @@ export default function Timeline({ historicos, canRemoveAnexo = false, onAnexoRe
     }
   }
 
-  function isPdfArquivo(nomeArquivo, caminhoArquivo) {
-    return /\.pdf(\?|$)/i.test(String(nomeArquivo || caminhoArquivo || ''));
-  }
-
-  async function prepararPreviewArquivo(caminhoArquivo, nomeArquivo) {
+  async function prepararPreviewArquivo(caminhoArquivo) {
     const urlAssinada = await obterUrlAssinada(caminhoArquivo);
     if (!urlAssinada) {
       return { url: null, downloadUrl: null, isObjectUrl: false };
     }
 
-    if (!isPdfArquivo(nomeArquivo, caminhoArquivo)) {
-      return { url: urlAssinada, downloadUrl: urlAssinada, isObjectUrl: false };
-    }
-
-    try {
-      const response = await fetch(urlAssinada);
-      if (!response.ok) throw new Error('Falha ao preparar preview do PDF');
-
-      const blob = await response.blob();
-      const previewUrl = window.URL.createObjectURL(new Blob([blob], {
-        type: blob.type || 'application/pdf'
-      }));
-      return { url: previewUrl, downloadUrl: urlAssinada, isObjectUrl: true };
-    } catch (error) {
-      console.error(error);
-      return { url: null, downloadUrl: null, isObjectUrl: false, erro: 'Nao foi possivel preparar o preview deste PDF.' };
-    }
+    return { url: urlAssinada, downloadUrl: urlAssinada, isObjectUrl: false };
   }
 
   function fecharPreview() {
@@ -77,18 +57,16 @@ export default function Timeline({ historicos, canRemoveAnexo = false, onAnexoRe
   async function baixarArquivo(caminhoArquivo, nomeArquivo) {
     try {
       const urlArquivo = await obterUrlAssinada(caminhoArquivo);
-      const response = await fetch(urlArquivo);
-      if (!response.ok) throw new Error('Falha ao baixar arquivo');
+      if (!urlArquivo) throw new Error('Falha ao gerar link seguro para download');
 
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
-      link.href = url;
+      link.href = urlArquivo;
       link.download = nomeArquivo || 'arquivo';
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error(error);
       alert('Erro ao baixar arquivo');
@@ -224,7 +202,7 @@ export default function Timeline({ historicos, canRemoveAnexo = false, onAnexoRe
                   <button
                     className="text-sm" style={{ color: 'var(--c-primary)' }}
                     onClick={async () => {
-                      const previewArquivo = await prepararPreviewArquivo(caminhoArquivo, h.descricao);
+                      const previewArquivo = await prepararPreviewArquivo(caminhoArquivo);
                       setPreview({
                         nome: h.descricao,
                         caminho: caminhoArquivo,
