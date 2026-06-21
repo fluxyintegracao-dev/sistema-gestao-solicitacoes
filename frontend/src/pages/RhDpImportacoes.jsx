@@ -57,6 +57,43 @@ function formatPayloadValue(value) {
   return String(value);
 }
 
+function firstFilled(...values) {
+  return values.find((value) => value !== null && value !== undefined && String(value).trim() !== '') || '-';
+}
+
+function getLinhaColaboradorCodigo(linha) {
+  const payload = linha?.payload_json || {};
+
+  return firstFilled(
+    linha?.matricula_ref,
+    linha?.codigo_ref,
+    payload.matricula,
+    payload.Matricula,
+    payload.codigo_colaborador,
+    payload.Codigo_Colaborador,
+    payload.codigo,
+    payload.Codigo,
+    linha?.colaborador?.matricula,
+    linha?.colaborador?.codigo,
+    linha?.cpf_ref,
+    payload.cpf,
+    payload.CPF
+  );
+}
+
+function getLinhaColaboradorNome(linha) {
+  const payload = linha?.payload_json || {};
+
+  return firstFilled(
+    linha?.colaborador?.nome,
+    linha?.nome_ref,
+    payload.nome_colaborador,
+    payload.Nome_Colaborador,
+    payload.nome,
+    payload.Nome
+  );
+}
+
 function buildTemplateRows(tipo) {
   if (tipo === 'JORNADA') {
     return [
@@ -442,11 +479,16 @@ export default function RhDpImportacoes() {
                     Competencia {detalhe.competencia} · sem recorte operacional · {detalhe.status}
                   </p>
                 </div>
-                {podeEditar && detalhe.status === 'PREVIEW' && (
-                  <button type="button" className="btn btn-primary" onClick={confirmarImportacao} disabled={confirmando}>
-                    {confirmando ? 'Confirmando...' : 'Confirmar importacao'}
+                <div className="app-page-actions">
+                  <button type="button" className="btn btn-outline" onClick={() => setDetalhe(null)}>
+                    Voltar para lista
                   </button>
-                )}
+                  {podeEditar && detalhe.status === 'PREVIEW' && (
+                    <button type="button" className="btn btn-primary" onClick={confirmarImportacao} disabled={confirmando}>
+                      {confirmando ? 'Confirmando...' : 'Confirmar importacao'}
+                    </button>
+                  )}
+                </div>
               </div>
 
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -474,11 +516,12 @@ export default function RhDpImportacoes() {
                 </div>
               )}
 
-              <div className="max-h-[520px] overflow-auto rounded-2xl border border-slate-200">
-                <table className="table">
+              <div className="app-dense-table-wrapper max-h-[520px]">
+                <table className="app-dense-data-table rhdp-importacao-preview-table">
                   <thead>
                     <tr>
                       <th>Linha</th>
+                      <th>Codigo/matricula</th>
                       <th>Colaborador</th>
                       <th>Status</th>
                       {(IMPORTACAO_PAYLOAD_COLUMNS[detalhe.tipo] || []).map((column) => (
@@ -491,10 +534,8 @@ export default function RhDpImportacoes() {
                     {(detalhe.linhas || []).map((linha) => (
                       <tr key={linha.id}>
                         <td>{linha.numero_linha}</td>
-                        <td>
-                          <div className="font-medium text-slate-900">{linha.colaborador?.nome || linha.nome_ref || '-'}</div>
-                          <div className="text-xs text-slate-500">{linha.matricula_ref || linha.cpf_ref || '-'}</div>
-                        </td>
+                        <td>{getLinhaColaboradorCodigo(linha)}</td>
+                        <td className="font-semibold text-slate-900">{getLinhaColaboradorNome(linha)}</td>
                         <td>{linha.status}</td>
                         {(IMPORTACAO_PAYLOAD_COLUMNS[detalhe.tipo] || []).map((column) => (
                           <td key={column.key} className="text-sm text-slate-700">
@@ -508,7 +549,7 @@ export default function RhDpImportacoes() {
                     ))}
                     {!detalhe.linhas?.length && (
                       <tr>
-                        <td colSpan={4 + (IMPORTACAO_PAYLOAD_COLUMNS[detalhe.tipo] || []).length} align="center">Sem linhas registradas</td>
+                        <td colSpan={5 + (IMPORTACAO_PAYLOAD_COLUMNS[detalhe.tipo] || []).length} align="center">Sem linhas registradas</td>
                       </tr>
                     )}
                   </tbody>

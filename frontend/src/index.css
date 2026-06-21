@@ -9703,6 +9703,24 @@ body {
   border-bottom: 0;
 }
 
+.layout-shell .rhdp-importacao-preview-table {
+  min-width: 78rem;
+  table-layout: auto;
+}
+
+.layout-shell .rhdp-importacao-preview-table th,
+.layout-shell .rhdp-importacao-preview-table td {
+  white-space: nowrap;
+}
+
+.layout-shell .rhdp-importacao-preview-table td:nth-child(3),
+.layout-shell .rhdp-importacao-preview-table td:last-child {
+  min-width: 12rem;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+}
+
 .layout-shell .app-dense-data-table .app-status-pill,
 .layout-shell .app-dense-data-table .badge {
   min-height: 1.45rem;
