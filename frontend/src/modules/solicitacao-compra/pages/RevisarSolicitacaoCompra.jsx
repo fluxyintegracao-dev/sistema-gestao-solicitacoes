@@ -263,6 +263,15 @@ export default function RevisarSolicitacaoCompra() {
     }
   }
 
+  function handleVoltarEditar() {
+    if (draft) {
+      window.localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+    }
+    navigate('/solicitacoes-compra/nova', {
+      state: { preservarRascunhoCompra: true }
+    });
+  }
+
   if (!draft) {
     return null;
   }
@@ -366,7 +375,7 @@ export default function RevisarSolicitacaoCompra() {
               <button
                 type="button"
                 className="btn btn-outline w-full justify-center"
-                onClick={() => navigate('/solicitacoes-compra/nova')}
+                onClick={handleVoltarEditar}
               >
                 Voltar e editar
               </button>
@@ -408,7 +417,7 @@ export default function RevisarSolicitacaoCompra() {
             <div>
               <h2 className="font-semibold">Itens revisados</h2>
               <p className="mt-1 text-sm text-[var(--c-muted)]">
-                Cada card resume quantidade, rateio de apropriacao, prazo e acessos de compra.
+                Confira quantidade, rateio de apropriacao, prazo e acessos de compra em uma lista unica.
               </p>
             </div>
             <div className="inline-flex rounded-full border border-[var(--c-border)] px-3 py-1 text-xs font-semibold text-[var(--c-muted)]">
@@ -416,81 +425,87 @@ export default function RevisarSolicitacaoCompra() {
             </div>
           </div>
 
-          <div className="grid gap-3">
-            {itensResumo.map((item, index) => (
-              <div key={`${item.manual ? 'manual' : item.insumo_id}-${index}`} className="rounded-2xl border border-[var(--c-border)] p-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="inline-flex rounded-full border border-[var(--c-border)] px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--c-muted)]">
-                        Item {String(index + 1).padStart(2, '0')}
-                      </span>
-                      {item.manual && (
-                        <span className="inline-flex rounded-full border border-amber-300 bg-amber-50 px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-700">
-                          Manual
-                        </span>
-                      )}
-                    </div>
-                    <h3 className="mt-3 text-lg font-semibold text-[var(--c-text)]">{item.insumo_nome}</h3>
-                    <p className="mt-1 text-sm text-[var(--c-muted)]">
-                      Quantidade {item.quantidade} {item.unidade_sigla || '-'} - Apropriacao {montarTextoResumoApropriacao(item)}
-                    </p>
-                  </div>
-
-                  <div className="rounded-xl border border-[var(--c-border)] px-4 py-3 text-right">
-                    <div className="text-xs uppercase tracking-[0.16em] text-[var(--c-muted)]">Necessario para</div>
-                    <div className="mt-1 text-sm font-semibold text-[var(--c-text)]">
-                      {formatarData(item.necessario_para)}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_260px]">
-                  <div className="rounded-xl border border-[var(--c-border)] px-4 py-4">
-                    <div className="text-xs uppercase tracking-[0.14em] text-[var(--c-muted)]">Especificacao</div>
-                    <div className="mt-2 whitespace-pre-wrap text-sm text-[var(--c-text)]">
-                      {textoOuPadrao(item.especificacao)}
-                    </div>
-                  </div>
-
-                  <div className="rounded-xl border border-[var(--c-border)] px-4 py-4">
-                    <div className="text-xs uppercase tracking-[0.14em] text-[var(--c-muted)]">Acessos do item</div>
-                    <div className="mt-3 grid gap-2">
-                      {item.link_produto ? (
-                        <a
-                          href={item.link_produto}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center justify-between rounded-lg border border-[var(--c-border)] px-3 py-2 text-sm text-[var(--c-text)] transition hover:border-[var(--c-primary)] hover:text-[var(--c-primary)]"
-                        >
-                          <span>Link do produto</span>
-                          <span className="text-xs text-[var(--c-muted)]">Abrir</span>
-                        </a>
-                      ) : (
-                        <div className="rounded-lg border border-dashed border-[var(--c-border)] px-3 py-2 text-sm text-[var(--c-muted)]">
-                          Sem link informado
+          <div className="overflow-hidden rounded-2xl border border-[var(--c-border)]">
+            <div className="overflow-x-auto">
+              <table className="min-w-[980px] w-full text-left text-sm">
+                <thead className="bg-slate-100 text-[11px] uppercase tracking-[0.16em] text-[var(--c-muted)]">
+                  <tr>
+                    <th className="px-4 py-3 font-semibold">Item</th>
+                    <th className="px-4 py-3 font-semibold">Quantidade</th>
+                    <th className="px-4 py-3 font-semibold">Apropriacao</th>
+                    <th className="px-4 py-3 font-semibold">Necessario para</th>
+                    <th className="px-4 py-3 font-semibold">Especificacao</th>
+                    <th className="px-4 py-3 font-semibold">Acessos</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--c-border)]">
+                  {itensResumo.map((item, index) => (
+                    <tr key={`${item.manual ? 'manual' : item.insumo_id}-${index}`} className="align-top">
+                      <td className="px-4 py-4">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="inline-flex rounded-full border border-[var(--c-border)] px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--c-muted)]">
+                            {String(index + 1).padStart(2, '0')}
+                          </span>
+                          {item.manual && (
+                            <span className="inline-flex rounded-full border border-amber-300 bg-amber-50 px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-amber-700">
+                              Manual
+                            </span>
+                          )}
                         </div>
-                      )}
-
-                      {item.arquivo_url ? (
-                        <button
-                          type="button"
-                          className="inline-flex items-center justify-between rounded-lg border border-[var(--c-border)] px-3 py-2 text-left text-sm text-[var(--c-text)] transition hover:border-[var(--c-primary)] hover:text-[var(--c-primary)]"
-                          onClick={() => handleAbrirArquivo(item)}
-                        >
-                          <span className="truncate pr-3">{item.arquivo_nome_original || 'Abrir arquivo'}</span>
-                          <span className="shrink-0 text-xs text-[var(--c-muted)]">Abrir</span>
-                        </button>
-                      ) : (
-                        <div className="rounded-lg border border-dashed border-[var(--c-border)] px-3 py-2 text-sm text-[var(--c-muted)]">
-                          Sem arquivo anexado
+                        <div className="mt-2 max-w-[240px] font-semibold text-[var(--c-text)]">{item.insumo_nome}</div>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-[var(--c-text)]">
+                        {item.quantidade} {item.unidade_sigla || '-'}
+                      </td>
+                      <td className="px-4 py-4 max-w-[220px] text-[var(--c-muted)]">
+                        {montarTextoResumoApropriacao(item)}
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap font-semibold text-[var(--c-text)]">
+                        {formatarData(item.necessario_para)}
+                      </td>
+                      <td className="px-4 py-4">
+                        <div className="max-w-[320px] whitespace-pre-wrap text-[var(--c-text)]">
+                          {textoOuPadrao(item.especificacao)}
                         </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
+                      </td>
+                      <td className="px-4 py-4">
+                        <div className="flex min-w-[180px] flex-wrap gap-2">
+                          {item.link_produto ? (
+                            <a
+                              href={item.link_produto}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex rounded-lg border border-[var(--c-border)] px-3 py-2 text-xs font-semibold text-[var(--c-text)] transition hover:border-[var(--c-primary)] hover:text-[var(--c-primary)]"
+                            >
+                              Abrir link
+                            </a>
+                          ) : (
+                            <span className="inline-flex rounded-lg border border-dashed border-[var(--c-border)] px-3 py-2 text-xs text-[var(--c-muted)]">
+                              Sem link
+                            </span>
+                          )}
+
+                          {item.arquivo_url ? (
+                            <button
+                              type="button"
+                              className="inline-flex max-w-[180px] rounded-lg border border-[var(--c-border)] px-3 py-2 text-left text-xs font-semibold text-[var(--c-text)] transition hover:border-[var(--c-primary)] hover:text-[var(--c-primary)]"
+                              onClick={() => handleAbrirArquivo(item)}
+                              title={item.arquivo_nome_original || 'Abrir arquivo'}
+                            >
+                              <span className="truncate">{item.arquivo_nome_original || 'Abrir arquivo'}</span>
+                            </button>
+                          ) : (
+                            <span className="inline-flex rounded-lg border border-dashed border-[var(--c-border)] px-3 py-2 text-xs text-[var(--c-muted)]">
+                              Sem arquivo
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>

@@ -41,6 +41,11 @@ async function logResourceDenied(req, resourceType, resourceId, obraId, descript
   });
 }
 
+function isOwnCompraResource(resource, user) {
+  return Number(resource?.solicitante_id || 0) > 0
+    && Number(resource.solicitante_id) === Number(user?.id);
+}
+
 function createBodyObraAccessMiddleware({
   bodyField,
   resourceType,
@@ -134,6 +139,11 @@ function createResourceAccessMiddleware({
     }
 
     const obraId = Number(resource.obra_id);
+    if (resourceType === 'SOLICITACAO_COMPRA' && isOwnCompraResource(resource, req.user)) {
+      req[attachAs] = resource;
+      return next();
+    }
+
     const obrasPermitidas = await getUserObraScopeIds(req.user);
     if (obrasPermitidas === null) {
       req[attachAs] = resource;
