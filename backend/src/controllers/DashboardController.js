@@ -12,7 +12,9 @@ const {
 const {
   canAccessFinanceiro,
   getFinanceiroObraScopeIds,
-  isAdministrador
+  isAdministrador,
+  userHasAreaPermission,
+  userHasConfiguredAreaPermissions
 } = require('../services/authorizationService');
 
 const { Op } = Sequelize;
@@ -503,8 +505,14 @@ module.exports = {
       const isAdministradorPerfil = isAdministrador(req.user);
       const isSuperadmin = perfil === 'SUPERADMIN';
       const hasFinanceAccess = await canAccessFinanceiro(req.user);
+      const hasDashboardPermission = await userHasAreaPermission(req.user, ['painel.dashboard.visualizar']);
+      const hasConfiguredDashboardPermission = await userHasConfiguredAreaPermissions(req.user);
 
-      if (!isSuperadmin && !isAdmin && !isAdministradorPerfil && !hasFinanceAccess) {
+      if (hasConfiguredDashboardPermission && !hasDashboardPermission) {
+        return res.status(403).json({ error: 'Acesso negado para o dashboard do painel' });
+      }
+
+      if (!hasConfiguredDashboardPermission && !isSuperadmin && !isAdmin && !isAdministradorPerfil && !hasFinanceAccess) {
         return res.status(403).json({ error: 'Acesso negado' });
       }
 

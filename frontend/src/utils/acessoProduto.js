@@ -308,6 +308,9 @@ export function canManageComprasConfiguracoes(user) {
 }
 
 export function canAccessDashboard(user) {
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasPermissao(user, 'painel.dashboard.visualizar');
+  }
   const perfil = String(user?.perfil || '').toUpperCase();
   return isBusinessAdmin(user) || canAccessFinanceiro(user) || perfil === 'ADMIN';
 }

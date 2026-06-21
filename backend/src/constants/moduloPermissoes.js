@@ -14,6 +14,20 @@
 
 const MODULO_PERMISSION_GROUPS = [
   {
+    modulo: 'PAINEL',
+    label: 'Painel',
+    descricao: 'Controle de acesso ao dashboard inicial e indicadores do painel.',
+    areas: [
+      {
+        key: 'painel.dashboard',
+        label: 'Dashboard',
+        permissoes: [
+          { key: 'painel.dashboard.visualizar', label: 'Visualizar Dashboard', descricao: 'Permite acessar o dashboard inicial do painel.' }
+        ]
+      }
+    ]
+  },
+  {
     modulo: 'SOLICITACOES',
     label: 'Solicitações',
     descricao: 'Controle de criação, visualização e aprovação de solicitações operacionais.',
