@@ -49,7 +49,7 @@ function criarItemManualBase(dados, necessarioParaPadrao) {
   return {
     insumo_id: null,
     insumo_nome: dados.nome_manual,
-    unidade_id: null,
+    unidade_id: dados.unidade_id || null,
     unidade_sigla: dados.unidade_sigla_manual,
     quantidade: String(dados.quantidade || '1'),
     especificacao: dados.especificacao || '',
@@ -110,6 +110,7 @@ export default function NovaSolicitacaoCompra() {
   const [previewArquivo, setPreviewArquivo] = useState(null);
   const [itemManual, setItemManual] = useState({
     nome_manual: '',
+    unidade_id: '',
     unidade_sigla_manual: '',
     quantidade: '1',
     especificacao: ''
@@ -341,7 +342,7 @@ export default function NovaSolicitacaoCompra() {
         necessarioPara
       )
     ]);
-    setItemManual({ nome_manual: '', unidade_sigla_manual: '', quantidade: '1', especificacao: '' });
+    setItemManual({ nome_manual: '', unidade_id: '', unidade_sigla_manual: '', quantidade: '1', especificacao: '' });
     setModalManualAberto(false);
   }
 
@@ -373,6 +374,15 @@ export default function NovaSolicitacaoCompra() {
         return sincronizarItemComRateios(atualizado);
       })
     );
+  }
+
+  function atualizarUnidadeItem(index, unidadeIdSelecionada) {
+    const unidade = unidades.find((item) => String(item.id) === String(unidadeIdSelecionada));
+    atualizarCamposItem(index, {
+      unidade_id: unidade?.id || null,
+      unidade_sigla: unidade?.sigla || unidade?.nome || '',
+      unidade_sigla_manual: unidade?.sigla || unidade?.nome || ''
+    });
   }
 
   function atualizarCamposItem(index, campos) {
@@ -759,12 +769,21 @@ export default function NovaSolicitacaoCompra() {
                         )}
                       </td>
                       <td>
-                        <input
+                        <select
                           className="input min-w-[110px]"
-                          placeholder="Ex: kg, m, un"
-                          value={item.unidade_sigla || ''}
-                          onChange={(event) => atualizarItem(index, 'unidade_sigla', event.target.value)}
-                        />
+                          value={item.unidade_id ? String(item.unidade_id) : ''}
+                          onChange={(event) => atualizarUnidadeItem(index, event.target.value)}
+                        >
+                          <option value="">Selecione</option>
+                          {unidades.map((unidade) => (
+                            <option key={unidade.id || unidade.sigla} value={unidade.id}>
+                              {unidade.sigla || unidade.nome}{unidade.nome && unidade.sigla ? ` - ${unidade.nome}` : ''}
+                            </option>
+                          ))}
+                        </select>
+                        {!item.unidade_id && item.unidade_sigla ? (
+                          <p className="mt-1 text-[11px] text-[var(--c-muted)]">Atual: {item.unidade_sigla}</p>
+                        ) : null}
                       </td>
                       <td><input type="number" min="0.01" step="0.01" className="input min-w-[110px]" value={item.quantidade} onChange={(event) => atualizarItem(index, 'quantidade', event.target.value)} /></td>
                       <td><input className="input min-w-[260px]" value={item.especificacao} onChange={(event) => atualizarItem(index, 'especificacao', event.target.value)} /></td>
@@ -880,12 +899,19 @@ export default function NovaSolicitacaoCompra() {
                 <label className="text-sm font-medium">Unidade *</label>
                 <select
                   className="input"
-                  value={itemManual.unidade_sigla_manual}
-                  onChange={(event) => setItemManual((atual) => ({ ...atual, unidade_sigla_manual: event.target.value }))}
+                  value={itemManual.unidade_id}
+                  onChange={(event) => {
+                    const unidade = unidades.find((item) => String(item.id) === String(event.target.value));
+                    setItemManual((atual) => ({
+                      ...atual,
+                      unidade_id: unidade?.id ? String(unidade.id) : '',
+                      unidade_sigla_manual: unidade?.sigla || unidade?.nome || ''
+                    }));
+                  }}
                 >
                   <option value="">Selecione</option>
                   {unidades.map((unidade) => (
-                    <option key={unidade.id || unidade.sigla} value={unidade.sigla || unidade.nome}>
+                    <option key={unidade.id || unidade.sigla} value={unidade.id}>
                       {unidade.sigla || unidade.nome} {unidade.nome && unidade.sigla ? `- ${unidade.nome}` : ''}
                     </option>
                   ))}
