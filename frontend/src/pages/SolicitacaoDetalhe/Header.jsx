@@ -103,6 +103,7 @@ export default function Header({
   const tipoNomeNormalizado = normalizarTexto(solicitacao?.tipo?.nome);
   const exibirSubtipoAdmLocal = tipoNomeNormalizado === 'ADM LOCAL DE OBRA';
   const subtipoSolicitacao = solicitacao?.tipoSubSolicitacao?.nome || '-';
+  const exibirSubtipo = exibirSubtipoAdmLocal || subtipoSolicitacao !== '-';
   const ultimoHistoricoStatus = [...historicos]
     .filter(item => item?.acao === 'STATUS_ALTERADO')
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
@@ -164,7 +165,7 @@ export default function Header({
       <div className="sol-detail-stats-grid sol-detail-contract-grid">
         <InfoItem label="Ref. do contrato" value={refContratoAtual} />
         <InfoItem label="Contrato" value={codigoContratoAtual} />
-        {exibirSubtipoAdmLocal && (
+        {exibirSubtipo && (
           <InfoItem label="Subtipo" value={subtipoSolicitacao} />
         )}
       </div>

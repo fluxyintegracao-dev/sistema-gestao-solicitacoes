@@ -1,11 +1,25 @@
-﻿const { TipoSubContrato, TipoSolicitacao, Solicitacao, Contrato } = require('../models');
+const { Op } = require('sequelize');
+const { TipoSubContrato, TipoSolicitacao, Solicitacao, Contrato } = require('../models');
+
+function normalizarSetor(valor) {
+  return String(valor || '').trim().toUpperCase();
+}
 
 module.exports = {
   async index(req, res) {
     try {
-      const { tipo_macro_id } = req.query;
+      const { tipo_macro_id, setor } = req.query;
       const where = {};
       if (tipo_macro_id) where.tipo_macro_id = tipo_macro_id;
+
+      const setorNormalizado = normalizarSetor(setor);
+      if (setorNormalizado) {
+        where[Op.or] = [
+          { setor: setorNormalizado },
+          { setor: null },
+          { setor: '' }
+        ];
+      }
 
       const tipos = await TipoSubContrato.findAll({
         where,
@@ -24,10 +38,11 @@ module.exports = {
 
   async create(req, res) {
     try {
-      const { nome, tipo_macro_id } = req.body;
-      if (!nome || !tipo_macro_id) {
+      const { nome, tipo_macro_id, setor } = req.body;
+      const setorNormalizado = normalizarSetor(setor);
+      if (!nome || !tipo_macro_id || !setorNormalizado) {
         return res.status(400).json({
-          error: 'Nome e tipo macro sao obrigatorios'
+          error: 'Setor, nome e tipo macro sao obrigatorios'
         });
       }
 
@@ -36,7 +51,11 @@ module.exports = {
         return res.status(400).json({ error: 'Tipo macro nao encontrado' });
       }
 
-      const tipo = await TipoSubContrato.create({ nome, tipo_macro_id });
+      const tipo = await TipoSubContrato.create({
+        nome: String(nome).trim(),
+        tipo_macro_id,
+        setor: setorNormalizado
+      });
       return res.status(201).json(tipo);
     } catch (error) {
       console.error(error);
@@ -47,10 +66,11 @@ module.exports = {
   async update(req, res) {
     try {
       const { id } = req.params;
-      const { nome, tipo_macro_id } = req.body;
+      const { nome, tipo_macro_id, setor } = req.body;
+      const setorNormalizado = normalizarSetor(setor);
 
-      if (!nome || !tipo_macro_id) {
-        return res.status(400).json({ error: 'Nome e tipo macro sao obrigatorios' });
+      if (!nome || !tipo_macro_id || !setorNormalizado) {
+        return res.status(400).json({ error: 'Setor, nome e tipo macro sao obrigatorios' });
       }
 
       const macro = await TipoSolicitacao.findByPk(tipo_macro_id);
@@ -61,7 +81,11 @@ module.exports = {
       const tipo = await TipoSubContrato.findByPk(id);
       if (!tipo) return res.status(404).json({ error: 'Tipo nao encontrado' });
 
-      await tipo.update({ nome, tipo_macro_id });
+      await tipo.update({
+        nome: String(nome).trim(),
+        tipo_macro_id,
+        setor: setorNormalizado
+      });
       return res.json(tipo);
     } catch (error) {
       console.error(error);

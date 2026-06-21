@@ -1,10 +1,15 @@
 import { API_URL, authHeaders } from './api';
 
+async function getErrorMessage(res, fallback) {
+  const data = await res.json().catch(() => null);
+  return data?.error || fallback;
+}
+
 export async function getTiposSolicitacao() {
   const res = await fetch(`${API_URL}/tipos-solicitacao`, {
     headers: authHeaders()
   });
-  if (!res.ok) throw new Error('Erro ao buscar tipos');
+  if (!res.ok) throw new Error(await getErrorMessage(res, 'Erro ao buscar tipos'));
   return res.json();
 }
 
@@ -15,7 +20,7 @@ export async function criarTipoSolicitacao(data) {
     body: JSON.stringify(data)
   });
 
-  if (!res.ok) throw new Error('Erro ao criar tipo');
+  if (!res.ok) throw new Error(await getErrorMessage(res, 'Erro ao criar tipo'));
   return res.json();
 }
 
@@ -26,7 +31,7 @@ export async function atualizarTipoSolicitacao(id, data) {
     body: JSON.stringify(data)
   });
 
-  if (!res.ok) throw new Error('Erro ao atualizar tipo');
+  if (!res.ok) throw new Error(await getErrorMessage(res, 'Erro ao atualizar tipo'));
   return res.json();
 }
 
@@ -37,8 +42,7 @@ export async function ativarTipoSolicitacao(id) {
   });
 
   if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data?.error || 'Erro ao ativar tipo');
+    throw new Error(await getErrorMessage(res, 'Erro ao ativar tipo'));
   }
 }
 
@@ -49,8 +53,7 @@ export async function desativarTipoSolicitacao(id) {
   });
 
   if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data?.error || 'Erro ao desativar tipo');
+    throw new Error(await getErrorMessage(res, 'Erro ao desativar tipo'));
   }
 }
 
@@ -61,7 +64,6 @@ export async function excluirTipoSolicitacao(id) {
   });
 
   if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data?.error || 'Erro ao excluir tipo');
+    throw new Error(await getErrorMessage(res, 'Erro ao excluir tipo'));
   }
 }

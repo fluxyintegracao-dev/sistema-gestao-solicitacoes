@@ -11,6 +11,10 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.INTEGER,
         allowNull: false
       },
+      setor: {
+        type: DataTypes.STRING,
+        allowNull: true
+      },
       nome: {
         type: DataTypes.STRING,
         allowNull: false

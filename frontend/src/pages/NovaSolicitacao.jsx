@@ -43,6 +43,29 @@ function obterValorAreaResponsavel(setor) {
   return String(setor?.codigo || setor?.nome || setor?.id || '').trim().toUpperCase();
 }
 
+const TOKENS_GEO_EQUIVALENTES = new Set([
+  'GEO',
+  'GERENCIA_DE_PROCESSOS',
+  'GERENCIAS_DE_PROCESSOS',
+  'GERENCIAS_PROCESSOS',
+  'GERENCIA_PROCESSOS',
+  'GERENCIAMENTO_DE_PROCESSOS',
+  'GERENCIAMENTO_PROCESSOS'
+]);
+
+function normalizarTokenComparacao(valor) {
+  return String(valor || '')
+    .trim()
+    .toUpperCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[\s-]+/g, '_');
+}
+
+function isGeoToken(valor) {
+  return TOKENS_GEO_EQUIVALENTES.has(normalizarTokenComparacao(valor));
+}
+
 const FORM_INICIAL = {
   obra_id: '',
   tipo_solicitacao_id: '',
@@ -150,7 +173,7 @@ export default function NovaSolicitacao() {
   }, []);
 
   useEffect(() => {
-    if (!form.tipo_solicitacao_id) {
+    if (!form.tipo_solicitacao_id || !form.area_responsavel) {
       setTiposSub([]);
       setForm(prev => ({ ...prev, tipo_sub_id: '' }));
       return;
@@ -158,13 +181,14 @@ export default function NovaSolicitacao() {
 
     async function loadSub() {
       const data = await getTiposSubContrato({
-        tipo_macro_id: form.tipo_solicitacao_id
+        tipo_macro_id: form.tipo_solicitacao_id,
+        setor: form.area_responsavel
       });
-      setTiposSub(Array.isArray(data) ? data : []);
+      setTiposSub(Array.isArray(data) ? data.filter(item => item?.ativo !== false) : []);
     }
 
     loadSub();
-  }, [form.tipo_solicitacao_id]);
+  }, [form.tipo_solicitacao_id, form.area_responsavel]);
 
   useEffect(() => {
     if (!form.obra_id) {
@@ -190,7 +214,13 @@ export default function NovaSolicitacao() {
   }, [form.obra_id]);
 
   function handleChange(e) {
-    setForm({ ...form, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    if (name === 'area_responsavel' || name === 'tipo_solicitacao_id') {
+      setTiposSub([]);
+      setForm(prev => ({ ...prev, [name]: value, tipo_sub_id: '' }));
+      return;
+    }
+    setForm({ ...form, [name]: value });
   }
 
   function limparSelecaoObraERegras() {
@@ -222,7 +252,16 @@ export default function NovaSolicitacao() {
       .replace(/[^A-Z0-9]+/g, ' ')
       .trim();
   }, [nomeTipoNormalizado]);
-  const subtipoObrigatorio = nomeTipoSelecionado === 'ADM LOCAL DE OBRA';
+  const areaResponsavelGeo = useMemo(() => {
+    if (isGeoToken(form.area_responsavel)) return true;
+    const setor = setores.find(item => setorPossuiToken(item, form.area_responsavel));
+    return [
+      setor?.codigo,
+      setor?.nome,
+      setor?.id
+    ].some(isGeoToken);
+  }, [form.area_responsavel, setores]);
+  const subtipoObrigatorio = nomeTipoSelecionado === 'ADM LOCAL DE OBRA' && areaResponsavelGeo;
   const medicaoObrigatoria = nomeTipoNormalizado === 'MEDICAO';
   const locacaoMaqEq = nomeTipoToken === 'LOCACAO DE MAQ EQ';
   const aberturaContratoObrigatoria = nomeTipoNormalizado === 'ABERTURA DE CONTRATO';
@@ -234,13 +273,12 @@ export default function NovaSolicitacao() {
   const valorObrigatorio = !tipoSemValor && !valorOpcional;
   const exibirCamposContrato = medicaoObrigatoria || subtipoObrigatorio || locacaoMaqEq;
   const camposContratoObrigatorios = exibirCamposContrato;
-  const exibirCampoSubtipo = subtipoObrigatorio;
+  const exibirCampoSubtipo = subtipoObrigatorio || tiposSub.length > 0;
 
   useEffect(() => {
     if (!exibirCamposContrato) {
       setForm(prev => ({
         ...prev,
-        tipo_sub_id: '',
         contrato_id: '',
         codigo_contrato: ''
       }));
@@ -253,6 +291,12 @@ export default function NovaSolicitacao() {
       setValorTexto('');
     }
   }, [exibirCamposContrato, tipoSemValor]);
+
+  useEffect(() => {
+    if (!exibirCampoSubtipo && form.tipo_sub_id) {
+      setForm(prev => ({ ...prev, tipo_sub_id: '' }));
+    }
+  }, [exibirCampoSubtipo, form.tipo_sub_id]);
 
   function formatarMoeda(valor) {
     if (Number.isNaN(valor)) return '';
@@ -728,6 +772,30 @@ export default function NovaSolicitacao() {
             </select>
           </label>
 
+          {exibirCampoSubtipo && (
+            <label className="grid gap-1 text-sm">
+              Subtipo{subtipoObrigatorio ? '' : ' (opcional)'}
+              <select
+                name="tipo_sub_id"
+                onChange={handleChange}
+                className="input"
+                required={subtipoObrigatorio}
+                disabled={!form.tipo_solicitacao_id}
+                value={form.tipo_sub_id}
+              >
+                <option value="">Selecione</option>
+                {tiposSub.map(t => (
+                  <option key={t.id} value={t.id}>{t.nome}</option>
+                ))}
+              </select>
+              {subtipoObrigatorio && (
+                <span className="text-xs text-gray-500">
+                  Obrigatorio para Adm Local de Obra no setor GEO/GERENCIA DE PROCESSOS.
+                </span>
+              )}
+            </label>
+          )}
+
           {exibirCamposContrato && (
             <label className="grid gap-1 text-sm md:col-span-2">
               Ref. do Contrato
@@ -772,7 +840,7 @@ export default function NovaSolicitacao() {
 
         {exibirCamposContrato && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {exibirCampoSubtipo && (
+            {false && exibirCampoSubtipo && (
               <label className="grid gap-1 text-sm">
                 Subtipo
                 <select

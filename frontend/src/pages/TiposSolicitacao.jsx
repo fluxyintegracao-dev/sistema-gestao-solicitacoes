@@ -54,35 +54,43 @@ export default function TiposSolicitacao() {
   async function handleSubmit(e) {
     e.preventDefault();
 
-    if (!setorSelecionado) {
-      alert('Selecione o setor para vincular o tipo.');
-      return;
-    }
-
-    const novoTipo = await criarTipoSolicitacao({ nome });
-
-    const regraAtual = regrasTiposPorSetor?.[setorSelecionado] || { tipos: [], modos: {} };
-    const tiposAtualizados = Array.from(new Set([
-      ...(Array.isArray(regraAtual.tipos) ? regraAtual.tipos.map(Number) : []),
-      Number(novoTipo.id)
-    ])).filter(Number.isFinite);
-    const modosAtualizados = {
-      ...(regraAtual.modos && typeof regraAtual.modos === 'object' ? regraAtual.modos : {}),
-      [String(novoTipo.id)]: regraAtual?.modos?.[String(novoTipo.id)] || 'TODOS_VISIVEIS'
-    };
-    const novasRegras = {
-      ...regrasTiposPorSetor,
-      [setorSelecionado]: {
-        tipos: tiposAtualizados,
-        modos: modosAtualizados
+    try {
+      if (!setorSelecionado) {
+        alert('Selecione o setor para vincular o tipo.');
+        return;
       }
-    };
 
-    await salvarTiposSolicitacaoPorSetor({ regras: novasRegras });
-    setRegrasTiposPorSetor(novasRegras);
+      setSaving(true);
+      const novoTipo = await criarTipoSolicitacao({ nome });
 
-    setNome('');
-    carregar();
+      const regraAtual = regrasTiposPorSetor?.[setorSelecionado] || { tipos: [], modos: {} };
+      const tiposAtualizados = Array.from(new Set([
+        ...(Array.isArray(regraAtual.tipos) ? regraAtual.tipos.map(Number) : []),
+        Number(novoTipo.id)
+      ])).filter(Number.isFinite);
+      const modosAtualizados = {
+        ...(regraAtual.modos && typeof regraAtual.modos === 'object' ? regraAtual.modos : {}),
+        [String(novoTipo.id)]: regraAtual?.modos?.[String(novoTipo.id)] || 'TODOS_VISIVEIS'
+      };
+      const novasRegras = {
+        ...regrasTiposPorSetor,
+        [setorSelecionado]: {
+          tipos: tiposAtualizados,
+          modos: modosAtualizados
+        }
+      };
+
+      await salvarTiposSolicitacaoPorSetor({ regras: novasRegras });
+      setRegrasTiposPorSetor(novasRegras);
+
+      setNome('');
+      carregar();
+    } catch (error) {
+      console.error(error);
+      alert(error.message || 'Erro ao criar tipo');
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function toggle(tipo) {
@@ -182,8 +190,8 @@ export default function TiposSolicitacao() {
               required
             />
           </label>
-          <button type="submit" className="btn btn-primary md:self-end">
-            Adicionar
+          <button type="submit" className="btn btn-primary md:self-end" disabled={saving}>
+            {saving ? 'Salvando...' : 'Adicionar'}
           </button>
         </form>
         <p className="text-xs text-gray-500 mt-2">

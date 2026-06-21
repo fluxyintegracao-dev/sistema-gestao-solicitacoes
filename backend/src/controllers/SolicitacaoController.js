@@ -2022,9 +2022,9 @@ module.exports = {
       ]);
       const exigeCamposContrato =
         nomeTipoNormalizado === 'MEDICAO' ||
-        nomeTipo === 'ADM LOCAL DE OBRA' ||
+        (nomeTipo === 'ADM LOCAL DE OBRA' && isGeoToken(area_responsavel)) ||
         nomeTipoToken === 'LOCACAO DE MAQ EQ';
-      const exigeSubtipo = nomeTipo === 'ADM LOCAL DE OBRA';
+      const exigeSubtipo = nomeTipo === 'ADM LOCAL DE OBRA' && isGeoToken(area_responsavel);
 
       if (
         !tiposSemValor.has(nomeTipoNormalizado) &&
@@ -2046,6 +2046,28 @@ module.exports = {
         return res.status(400).json({
           error: 'Para continuar, selecione o subtipo.'
         });
+      }
+      if (tipo_sub_id) {
+        const subtipoSelecionado = await TipoSubContrato.findByPk(tipo_sub_id);
+        if (
+          !subtipoSelecionado ||
+          Number(subtipoSelecionado.tipo_macro_id) !== Number(tipo_solicitacao_id) ||
+          subtipoSelecionado.ativo === false
+        ) {
+          return res.status(400).json({
+            error: 'Subtipo invalido para o tipo de solicitacao selecionado.'
+          });
+        }
+
+        const setorSubtipo = String(subtipoSelecionado.setor || '').trim();
+        if (
+          setorSubtipo &&
+          normalizarTokenComparacao(setorSubtipo) !== normalizarTokenComparacao(area_responsavel)
+        ) {
+          return res.status(400).json({
+            error: 'Subtipo invalido para o setor selecionado.'
+          });
+        }
       }
       if (nomeTipoNormalizado === 'MEDICAO' && (!data_inicio_medicao || !data_fim_medicao)) {
         return res.status(400).json({
