@@ -126,8 +126,19 @@ const COTACOES_DEFAULTS = {
   criterio_vencedor: 'menor_total',
   prazo_resposta_padrao_dias: 5,
   permitir_aprovar_sem_minimo: true,
-  exigir_justificativa_se_nao_menor_preco: true
+  exigir_justificativa_se_nao_menor_preco: true,
+  condicoes_pagamento_exigem_prazo: ['BOLETO', 'CARTAO', 'CHEQUE', 'FATURADO', 'OUTROS']
 };
+
+function normalizarCondicoesPagamentoExigemPrazo(value) {
+  const permitidas = new Set(['PIX', 'BOLETO', 'TRANSFERENCIA', 'CARTAO', 'CHEQUE', 'DINHEIRO', 'FATURADO', 'OUTROS']);
+  const parsed = Array.isArray(value) ? value : parseJsonOrDefault(value, COTACOES_DEFAULTS.condicoes_pagamento_exigem_prazo);
+  return [...new Set(
+    parsed
+      .map((item) => String(item || '').trim().toUpperCase())
+      .filter((item) => permitidas.has(item))
+  )];
+}
 
 function parseJsonOrDefault(value, fallback) {
   if (!value) return fallback;
@@ -1352,7 +1363,10 @@ module.exports = {
         criterio_vencedor: porChave['COTACOES_CRITERIO_VENCEDOR'] ?? COTACOES_DEFAULTS.criterio_vencedor,
         prazo_resposta_padrao_dias: Number(porChave['COTACOES_PRAZO_RESPOSTA_PADRAO_DIAS'] ?? COTACOES_DEFAULTS.prazo_resposta_padrao_dias),
         permitir_aprovar_sem_minimo: (porChave['COTACOES_PERMITIR_APROVAR_SEM_MINIMO'] ?? String(COTACOES_DEFAULTS.permitir_aprovar_sem_minimo)) === 'true',
-        exigir_justificativa_se_nao_menor_preco: (porChave['COTACOES_EXIGIR_JUSTIFICATIVA_SE_NAO_MENOR_PRECO'] ?? String(COTACOES_DEFAULTS.exigir_justificativa_se_nao_menor_preco)) === 'true'
+        exigir_justificativa_se_nao_menor_preco: (porChave['COTACOES_EXIGIR_JUSTIFICATIVA_SE_NAO_MENOR_PRECO'] ?? String(COTACOES_DEFAULTS.exigir_justificativa_se_nao_menor_preco)) === 'true',
+        condicoes_pagamento_exigem_prazo: normalizarCondicoesPagamentoExigemPrazo(
+          porChave['COTACOES_CONDICOES_PAGAMENTO_EXIGEM_PRAZO']
+        )
       };
 
       return res.json(config);
@@ -1369,15 +1383,19 @@ module.exports = {
         criterio_vencedor,
         prazo_resposta_padrao_dias,
         permitir_aprovar_sem_minimo,
-        exigir_justificativa_se_nao_menor_preco
+        exigir_justificativa_se_nao_menor_preco,
+        condicoes_pagamento_exigem_prazo
       } = req.body || {};
+
+      const condicoesPagamentoExigemPrazo = normalizarCondicoesPagamentoExigemPrazo(condicoes_pagamento_exigem_prazo);
 
       const entries = [
         { chave: 'COTACOES_MIN_COTACOES', valor: String(Number(min_cotacoes) || COTACOES_DEFAULTS.min_cotacoes) },
         { chave: 'COTACOES_CRITERIO_VENCEDOR', valor: String(criterio_vencedor || COTACOES_DEFAULTS.criterio_vencedor) },
         { chave: 'COTACOES_PRAZO_RESPOSTA_PADRAO_DIAS', valor: String(Number(prazo_resposta_padrao_dias) || COTACOES_DEFAULTS.prazo_resposta_padrao_dias) },
         { chave: 'COTACOES_PERMITIR_APROVAR_SEM_MINIMO', valor: String(Boolean(permitir_aprovar_sem_minimo)) },
-        { chave: 'COTACOES_EXIGIR_JUSTIFICATIVA_SE_NAO_MENOR_PRECO', valor: String(Boolean(exigir_justificativa_se_nao_menor_preco)) }
+        { chave: 'COTACOES_EXIGIR_JUSTIFICATIVA_SE_NAO_MENOR_PRECO', valor: String(Boolean(exigir_justificativa_se_nao_menor_preco)) },
+        { chave: 'COTACOES_CONDICOES_PAGAMENTO_EXIGEM_PRAZO', valor: JSON.stringify(condicoesPagamentoExigemPrazo) }
       ];
 
       for (const entry of entries) {
@@ -1394,7 +1412,8 @@ module.exports = {
         criterio_vencedor: entries[1].valor,
         prazo_resposta_padrao_dias: Number(entries[2].valor),
         permitir_aprovar_sem_minimo: entries[3].valor === 'true',
-        exigir_justificativa_se_nao_menor_preco: entries[4].valor === 'true'
+        exigir_justificativa_se_nao_menor_preco: entries[4].valor === 'true',
+        condicoes_pagamento_exigem_prazo: condicoesPagamentoExigemPrazo
       });
     } catch (error) {
       console.error(error);

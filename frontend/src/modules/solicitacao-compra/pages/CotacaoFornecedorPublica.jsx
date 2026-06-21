@@ -64,10 +64,23 @@ const FORMAS_PAGAMENTO = [
   { value: 'BOLETO', label: 'Boleto' },
   { value: 'TRANSFERENCIA', label: 'Transferencia' },
   { value: 'CARTAO', label: 'Cartao' },
+  { value: 'CHEQUE', label: 'Cheque' },
   { value: 'DINHEIRO', label: 'Dinheiro' },
   { value: 'FATURADO', label: 'Faturado' },
   { value: 'OUTROS', label: 'Outros' }
 ];
+
+const FORMAS_PAGAMENTO_EXIGEM_PRAZO_DEFAULT = ['BOLETO', 'CARTAO', 'CHEQUE', 'FATURADO', 'OUTROS'];
+
+function obterFormasPagamentoExigemPrazo(configuracoes) {
+  return Array.isArray(configuracoes?.condicoes_pagamento_exigem_prazo)
+    ? configuracoes.condicoes_pagamento_exigem_prazo
+    : FORMAS_PAGAMENTO_EXIGEM_PRAZO_DEFAULT;
+}
+
+function formaPagamentoExigePrazo(tipo, configuracoes) {
+  return obterFormasPagamentoExigemPrazo(configuracoes).includes(tipo);
+}
 
 function criarCondicoesPagamentoVazias() {
   return Object.fromEntries(
@@ -87,6 +100,14 @@ function parseCondicoesPagamento(valor) {
     if (match) {
       condicoes[opcao.value] = { selecionado: true, prazo: match[1].trim() };
       encontrouOpcao = true;
+    } else {
+      const hasLabel = texto
+        .split(';')
+        .some((parte) => parte.trim().toLowerCase() === opcao.label.toLowerCase());
+      if (hasLabel) {
+        condicoes[opcao.value] = { selecionado: true, prazo: '' };
+        encontrouOpcao = true;
+      }
     }
   });
 
@@ -100,7 +121,10 @@ function parseCondicoesPagamento(valor) {
 function montarCondicaoPagamento(condicoes) {
   return FORMAS_PAGAMENTO
     .filter((opcao) => condicoes?.[opcao.value]?.selecionado)
-    .map((opcao) => `${opcao.label}: ${String(condicoes[opcao.value]?.prazo || '').trim()}`)
+    .map((opcao) => {
+      const prazo = String(condicoes[opcao.value]?.prazo || '').trim();
+      return prazo ? `${opcao.label}: ${prazo}` : opcao.label;
+    })
     .join('; ');
 }
 
@@ -208,7 +232,9 @@ export default function CotacaoFornecedorPublica() {
       return false;
     }
 
-    const semPrazo = selecionadas.find((opcao) => !String(condicoesPagamento?.[opcao.value]?.prazo || '').trim());
+    const semPrazo = selecionadas.find((opcao) =>
+      formaPagamentoExigePrazo(opcao.value, dados?.configuracoes) && !String(condicoesPagamento?.[opcao.value]?.prazo || '').trim()
+    );
     if (semPrazo) {
       alert(`Informe o prazo/condicao para ${semPrazo.label}.`);
       return false;
@@ -412,11 +438,12 @@ export default function CotacaoFornecedorPublica() {
             <div className="col-span-2 sm:col-span-3 lg:col-span-6">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-[10px] uppercase tracking-wide text-[var(--sol-text-soft)]">Condicoes de pagamento aceitas *</p>
-                <span className="text-[10px] text-[var(--sol-text-soft)]">Selecione uma ou mais formas e informe o prazo.</span>
+                <span className="text-[10px] text-[var(--sol-text-soft)]">O prazo aparece apenas nas formas marcadas como obrigatorias pela configuracao.</span>
               </div>
               <div className="mt-1 grid gap-1.5 sm:grid-cols-2 lg:grid-cols-4">
                 {FORMAS_PAGAMENTO.map((opcao) => {
                   const condicao = condicoesPagamento[opcao.value] || { selecionado: false, prazo: '' };
+                  const exigePrazo = formaPagamentoExigePrazo(opcao.value, dados?.configuracoes);
                   return (
                     <div
                       key={opcao.value}
@@ -436,7 +463,7 @@ export default function CotacaoFornecedorPublica() {
                         />
                         <span>{opcao.label}</span>
                       </label>
-                      {condicao.selecionado && (
+                      {condicao.selecionado && exigePrazo && (
                         <input
                           className="input mt-1 h-7 w-full px-2 text-[11px]"
                           type="text"

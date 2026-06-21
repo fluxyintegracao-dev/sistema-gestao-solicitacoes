@@ -7,6 +7,19 @@ const CRITERIOS = [
   { value: 'fornecedor_preferencial', label: 'Fornecedor preferencial' }
 ];
 
+const CONDICOES_PAGAMENTO = [
+  { value: 'PIX', label: 'PIX' },
+  { value: 'BOLETO', label: 'Boleto' },
+  { value: 'TRANSFERENCIA', label: 'Transferencia' },
+  { value: 'CARTAO', label: 'Cartao' },
+  { value: 'CHEQUE', label: 'Cheque' },
+  { value: 'DINHEIRO', label: 'Dinheiro' },
+  { value: 'FATURADO', label: 'Faturado' },
+  { value: 'OUTROS', label: 'Outros' }
+];
+
+const CONDICOES_PRAZO_DEFAULT = ['BOLETO', 'CARTAO', 'CHEQUE', 'FATURADO', 'OUTROS'];
+
 export default function ConfiguracoesCotacao() {
   const [config, setConfig] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -31,6 +44,18 @@ export default function ConfiguracoesCotacao() {
 
   function atualizar(campo, valor) {
     setConfig((atual) => ({ ...atual, [campo]: valor }));
+  }
+
+  function alternarCondicaoPrazo(value, checked) {
+    setConfig((atual) => {
+      const atuais = Array.isArray(atual?.condicoes_pagamento_exigem_prazo)
+        ? atual.condicoes_pagamento_exigem_prazo
+        : CONDICOES_PRAZO_DEFAULT;
+      const proximas = checked
+        ? [...new Set([...atuais, value])]
+        : atuais.filter((item) => item !== value);
+      return { ...atual, condicoes_pagamento_exigem_prazo: proximas };
+    });
   }
 
   async function handleSalvar(event) {
@@ -142,6 +167,32 @@ export default function ConfiguracoesCotacao() {
                 </div>
               </div>
             </label>
+          </div>
+
+          <div className="grid gap-3">
+            <div>
+              <label className="text-sm font-medium">Condicoes de pagamento que exigem prazo</label>
+              <p className="text-xs text-[var(--c-muted)]">
+                Controla quais formas obrigam o fornecedor a informar prazo na resposta da cotacao.
+              </p>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+              {CONDICOES_PAGAMENTO.map((opcao) => {
+                const selecionadas = Array.isArray(config.condicoes_pagamento_exigem_prazo)
+                  ? config.condicoes_pagamento_exigem_prazo
+                  : CONDICOES_PRAZO_DEFAULT;
+                return (
+                  <label key={opcao.value} className="flex items-center gap-2 rounded-xl border border-[var(--c-border)] bg-white px-3 py-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={selecionadas.includes(opcao.value)}
+                      onChange={(event) => alternarCondicaoPrazo(opcao.value, event.target.checked)}
+                    />
+                    <span>{opcao.label}</span>
+                  </label>
+                );
+              })}
+            </div>
           </div>
 
           <div className="flex justify-end">

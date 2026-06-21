@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const { Op } = require('sequelize');
 const {
   Apropriacao,
+  ConfiguracaoSistema,
   FornecedorCompra,
   Insumo,
   Obra,
@@ -27,6 +28,38 @@ const {
 const { getPresignedUrl, uploadToS3 } = require('../services/s3');
 const { canViewAllComprasScope } = require('../services/authorizationService');
 const { responderErroController } = require('../utils/controllerError');
+
+const CONDICOES_PAGAMENTO_EXIGEM_PRAZO_PADRAO = ['BOLETO', 'CARTAO', 'CHEQUE', 'FATURADO', 'OUTROS'];
+
+function parseJsonArrayOrDefault(value, fallback) {
+  if (!value) return fallback;
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function normalizarCondicoesPagamentoExigemPrazo(value) {
+  const permitidas = new Set(['PIX', 'BOLETO', 'TRANSFERENCIA', 'CARTAO', 'CHEQUE', 'DINHEIRO', 'FATURADO', 'OUTROS']);
+  return [...new Set(
+    parseJsonArrayOrDefault(value, CONDICOES_PAGAMENTO_EXIGEM_PRAZO_PADRAO)
+      .map((item) => String(item || '').trim().toUpperCase())
+      .filter((item) => permitidas.has(item))
+  )];
+}
+
+async function obterConfiguracaoPublicaCotacao() {
+  const registro = await ConfiguracaoSistema.findOne({
+    where: { chave: 'COTACOES_CONDICOES_PAGAMENTO_EXIGEM_PRAZO' },
+    order: [['id', 'DESC']]
+  });
+
+  return {
+    condicoes_pagamento_exigem_prazo: normalizarCondicoesPagamentoExigemPrazo(registro?.valor)
+  };
+}
 
 function buildItemKey(itemTipo, itemReferenciaId) {
   return `${normalizeText(itemTipo)}:${Number(itemReferenciaId)}`;
@@ -231,6 +264,7 @@ async function carregarCotacaoPorToken(token) {
 
 async function serializarCotacaoPublica(cotacaoFornecedor, req) {
   const itensCotaveis = obterItensCotaveis(cotacaoFornecedor?.solicitacao || {});
+  const configuracoes = await obterConfiguracaoPublicaCotacao();
   const arquivoRespostaUrl = await resolvePublicAttachmentUrl(req, cotacaoFornecedor?.pdf_resposta_url);
   const arquivoRespostaExtension = path.extname(String(cotacaoFornecedor?.pdf_resposta_url || '').split('?')[0]).toLowerCase();
   const arquivoRespostaTipo = arquivoRespostaUrl ? getTipoArquivoResposta(arquivoRespostaExtension) : null;
@@ -264,6 +298,7 @@ async function serializarCotacaoPublica(cotacaoFornecedor, req) {
       arquivo_resposta_tipo: arquivoRespostaTipo,
       arquivo_resposta_is_image: Boolean(arquivoRespostaUrl && arquivoRespostaTipo === 'IMAGEM')
     },
+    configuracoes,
     somente_leitura: normalizeText(cotacaoFornecedor?.solicitacao?.status) === 'ENCERRADO',
     itens: await Promise.all(itensCotaveis.map(async (item) => {
       const resposta = respostasPorItem.get(buildItemKey(item.item_tipo, item.item_referencia_id));
