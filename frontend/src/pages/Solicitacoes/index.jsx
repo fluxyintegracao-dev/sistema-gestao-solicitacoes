@@ -1219,6 +1219,24 @@ export default function Solicitacoes({ arquivadas = false }) {
       String(setorSolicitacao?.nome || selecionadaUnica.area_responsavel || '').trim().toUpperCase() === 'OBRA';
   }, [selecionadaUnica, setoresMap]);
 
+  const exigePrazoCompraDelegacaoUnica = useMemo(() => {
+    if (!selecionadaUnica) return false;
+    const texto = [
+      selecionadaUnica?.tipo_solicitacao?.nome,
+      selecionadaUnica?.tipo_solicitacao?.codigo,
+      selecionadaUnica?.tipoSolicitacao?.nome,
+      selecionadaUnica?.tipoSolicitacao?.codigo,
+      selecionadaUnica?.tipo?.nome,
+      selecionadaUnica?.tipo?.codigo,
+      selecionadaUnica?.tipo_solicitacao_nome,
+      selecionadaUnica?.tipo_solicitacao_codigo,
+      selecionadaUnica?.titulo,
+      selecionadaUnica?.descricao
+    ].filter(Boolean).join(' ');
+    const normalizado = normalizarTextoComparacao(texto);
+    return normalizado.includes('SOLICITACAO DE COMPRA') || normalizado.includes('COMPRA DIRETA');
+  }, [selecionadaUnica]);
+
   async function assumirSelecionada() {
     if (!selecionadaUnica) return;
     try {
@@ -1840,6 +1858,7 @@ export default function Solicitacoes({ arquivadas = false }) {
           obraId={selecionadaUnica.obra_id}
           isSetorObraSolicitacao={isSetorObraSolicitacaoUnica}
           isUsuarioSetorObra={isSetorObra}
+          exigirPrazoCompra={exigePrazoCompraDelegacaoUnica}
           onClose={() => setModalAtribuir(false)}
           onSucesso={() => {
             void handleAtualizarLista({ type: 'refresh_item', id: selecionadaUnica.id });

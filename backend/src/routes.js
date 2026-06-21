@@ -600,6 +600,13 @@ const allowCompraSolicitacoesRead = allowPaymentAction(
   canViewCompraSolicitacoes,
   'Acesso negado para solicitacoes de compra'
 );
+function allowCompraSolicitacoesOrDelegacaoRead(req, res, next) {
+  const contexto = String(req.query?.contexto || '').trim().toLowerCase();
+  if (contexto === 'delegacao') {
+    return allowComprasDelegacaoRead(req, res, next);
+  }
+  return allowCompraSolicitacoesRead(req, res, next);
+}
 const allowCompraSolicitacoesCreateFlowRead = allowPaymentAction(
   'COMPRAS_SOLICITACOES_CREATE_FLOW_READ',
   async (user) => (
@@ -1478,7 +1485,7 @@ router.get('/compras/fornecedores/:id', requireEnabledModule('COTACOES'), allowC
 router.put('/compras/fornecedores/:id', requireEnabledModule('COTACOES'), allowComprasFornecedoresManage, FornecedorCompraController.update);
 router.delete('/compras/fornecedores/:id', requireEnabledModule('COTACOES'), allowComprasFornecedoresManage, FornecedorCompraController.destroy);
 router.post('/compras/anexos-temporarios', allowCompraSolicitacoesUpload, uploadRateLimit, uploadComprovantes.single('file'), SolicitacaoCompraController.uploadTemporario);
-router.get('/compras/solicitacoes', allowCompraSolicitacoesRead, validateRequest({ query: validateCompraQuery }), scopeCompraListAccess, SolicitacaoCompraController.index);
+router.get('/compras/solicitacoes', allowCompraSolicitacoesOrDelegacaoRead, validateRequest({ query: validateCompraQuery }), scopeCompraListAccess, SolicitacaoCompraController.index);
 router.get('/compras/solicitacoes/:id', allowCompraSolicitacoesCreateFlowRead, validateRequest({ params: validateNumericIdParam('id', 'Solicitacao de compra') }), requireCompraAccess, SolicitacaoCompraController.show);
 router.get('/compras/solicitacoes/:id/comparativo', allowCompraSolicitacoesRead, validateRequest({ params: validateNumericIdParam('id', 'Solicitacao de compra') }), requireCompraAccess, SolicitacaoCompraController.comparativo);
 router.get('/compras/solicitacoes/:id/pdf', allowCompraSolicitacoesCreateFlowRead, validateRequest({ params: validateNumericIdParam('id', 'Solicitacao de compra') }), requireCompraAccess, SolicitacaoCompraController.pdf);
@@ -1491,7 +1498,7 @@ router.post('/compras/solicitacoes/:id/enviar', allowCompraSolicitacoesManage, v
 router.patch('/compras/solicitacoes/:id/recusar', allowCompraSolicitacoesManage, validateRequest({ params: validateNumericIdParam('id', 'Solicitacao de compra') }), requireCompraAccess, SolicitacaoCompraController.recusar);
 router.patch('/compras/solicitacoes/:id/encerrar', allowCompraSolicitacoesManage, validateRequest({ params: validateNumericIdParam('id', 'Solicitacao de compra'), body: validateCompraEncerrarBody }), requireCompraAccess, SolicitacaoCompraController.encerrar);
 router.post('/compras/solicitacoes/:id/comentarios', allowCompraSolicitacoesManage, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Solicitacao de compra'), body: validateCompraCotacaoComentarioBody }), requireCompraAccess, SolicitacaoCompraController.comentar);
-router.patch('/compras/solicitacoes/:id/delegar', allowComprasDelegacaoManage, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Solicitacao de compra'), body: validateCompraDelegacaoBody }), requireCompraAccess, PedidoCompraController.delegarSolicitacao);
+router.patch('/compras/solicitacoes/:id/delegar', allowComprasDelegacaoRead, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Solicitacao de compra'), body: validateCompraDelegacaoBody }), requireCompraAccess, PedidoCompraController.delegarSolicitacao);
 router.post('/compras/solicitacoes/:id/pedidos', allowCompraSolicitacoesManage, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Solicitacao de compra'), body: validateCompraPedidoCreateBody }), requireCompraAccess, PedidoCompraController.createFromSolicitacao);
 router.get('/compras/pedidos', allowComprasPedidosRead, validateRequest({ query: validateCompraPedidoQuery }), scopeCompraListAccess, PedidoCompraController.index);
 router.patch('/compras/pedidos/status-lote', allowComprasPedidosManage, criticalRateLimit, validateRequest({ body: validateCompraPedidoStatusBatchBody }), scopeCompraListAccess, PedidoCompraController.updateStatusBatch);

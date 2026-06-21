@@ -7,12 +7,13 @@ export default function ModalAtribuirResponsavel({
   obraId,
   isSetorObraSolicitacao,
   isUsuarioSetorObra,
+  exigirPrazoCompra = false,
   onClose,
   onSucesso
 }) {
-
   const [usuarios, setUsuarios] = useState([]);
   const [usuarioSelecionado, setUsuarioSelecionado] = useState('');
+  const [prazoCompra, setPrazoCompra] = useState('');
   const { user } = useAuth();
   const isUsuario = user?.perfil === 'USUARIO';
   const setorUsuario = user?.setor_id ? String(user.setor_id) : '';
@@ -51,7 +52,11 @@ export default function ModalAtribuirResponsavel({
 
   async function salvar() {
     if (!usuarioSelecionado) {
-      alert('Selecione um usuário');
+      alert('Selecione um usuario');
+      return;
+    }
+    if (exigirPrazoCompra && !prazoCompra) {
+      alert('Informe o prazo para realizar o pedido.');
       return;
     }
 
@@ -61,13 +66,14 @@ export default function ModalAtribuirResponsavel({
         method: 'POST',
         headers: authHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({
-          usuario_responsavel_id: usuarioSelecionado
+          usuario_responsavel_id: usuarioSelecionado,
+          ...(exigirPrazoCompra ? { prazo_compra: prazoCompra } : {})
         })
       }
     );
 
     if (!res.ok) {
-      let mensagem = 'Erro ao atribuir responsável';
+      let mensagem = 'Erro ao atribuir responsavel';
       try {
         const data = await res.json();
         mensagem = data?.error || mensagem;
@@ -76,7 +82,7 @@ export default function ModalAtribuirResponsavel({
       return;
     }
 
-    alert('Responsável atribuído com sucesso.');
+    alert('Responsavel atribuido com sucesso.');
     onSucesso();
     onClose();
   }
@@ -84,9 +90,8 @@ export default function ModalAtribuirResponsavel({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm">
       <div className="card w-full max-w-md">
-
         <h2 className="text-lg font-semibold mb-4">
-          Atribuir responsável
+          Atribuir responsavel
         </h2>
 
         <select
@@ -94,7 +99,7 @@ export default function ModalAtribuirResponsavel({
           value={usuarioSelecionado}
           onChange={e => setUsuarioSelecionado(e.target.value)}
         >
-          <option value="">Selecione um usuário</option>
+          <option value="">Selecione um usuario</option>
 
           {usuarios.map(u => (
             <option key={u.id} value={u.id}>
@@ -102,6 +107,21 @@ export default function ModalAtribuirResponsavel({
             </option>
           ))}
         </select>
+
+        {exigirPrazoCompra && (
+          <label className="block mb-4 text-sm text-[var(--c-text)]">
+            Prazo para realizar pedido
+            <input
+              className="input w-full mt-1"
+              type="date"
+              value={prazoCompra}
+              onChange={e => setPrazoCompra(e.target.value)}
+            />
+            <span className="mt-1 block text-xs text-[var(--c-muted)]">
+              Este prazo alimenta a Delegacao de Compras.
+            </span>
+          </label>
+        )}
 
         {(isUsuario || isSetorObraSolicitacao || isUsuarioSetorObra) && (
           <p className="mb-3 text-xs text-[var(--c-muted)]">
@@ -111,7 +131,6 @@ export default function ModalAtribuirResponsavel({
         )}
 
         <div className="flex justify-end gap-3">
-
           <button
             onClick={onClose}
             className="btn btn-outline"
@@ -125,11 +144,8 @@ export default function ModalAtribuirResponsavel({
           >
             Salvar
           </button>
-
         </div>
-
       </div>
-
     </div>
   );
 }

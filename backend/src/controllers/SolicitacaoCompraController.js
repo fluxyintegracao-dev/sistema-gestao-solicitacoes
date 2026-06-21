@@ -53,6 +53,7 @@ const {
 const {
   canAccessCompras,
   canManageComprasCotacoes,
+  canManageComprasDelegacao,
   isSuperadmin,
   isBusinessAdmin
 } = require('../services/authorizationService');
@@ -1126,12 +1127,19 @@ module.exports = {
       const usuario = await validarAcesso(req, res);
       if (!usuario) return;
 
-      const { obra_id } = req.query;
+      const { obra_id, contexto } = req.query;
       const where = {};
       if (!isSuperadmin(usuario)) {
         where.status = {
           [Op.ne]: 'AGUARDANDO_DIRETORIA'
         };
+      }
+      const contextoDelegacao = String(contexto || '').trim().toLowerCase() === 'delegacao';
+      const podeGerenciarDelegacao = contextoDelegacao
+        ? await canManageComprasDelegacao(usuario)
+        : false;
+      if (contextoDelegacao && !podeGerenciarDelegacao) {
+        where.comprador_responsavel_id = usuario.id;
       }
       const obraIdsEscopo = Array.isArray(req.compraScopeObraIds)
         ? req.compraScopeObraIds

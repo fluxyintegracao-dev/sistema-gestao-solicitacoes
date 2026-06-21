@@ -295,10 +295,16 @@ function validateContratoUpdateBody(body = {}) {
 }
 
 function validateCompraQuery(query = {}) {
-  ensureAllowedKeys(query, ['obra_id'], 'Consulta de compras');
+  ensureAllowedKeys(query, ['obra_id', 'contexto'], 'Consulta de compras');
+  const contexto = parseOptionalText(query.contexto, 'Contexto', 40);
+  const contextoNormalizado = contexto ? String(contexto).trim().toLowerCase() : undefined;
+  if (contextoNormalizado && !['delegacao'].includes(contextoNormalizado)) {
+    throw new ValidationError('Contexto de consulta invalido.');
+  }
 
   return {
-    obra_id: parseInteger(query.obra_id, 'Obra')
+    obra_id: parseInteger(query.obra_id, 'Obra'),
+    contexto: contextoNormalizado
   };
 }
 
@@ -885,10 +891,11 @@ function validateSolicitacaoValorBody(body = {}) {
 }
 
 function validateSolicitacaoResponsavelBody(body = {}) {
-  ensureAllowedKeys(body, ['usuario_responsavel_id'], 'Atribuicao de responsavel');
+  ensureAllowedKeys(body, ['usuario_responsavel_id', 'prazo_compra'], 'Atribuicao de responsavel');
 
   return {
-    usuario_responsavel_id: parseInteger(body.usuario_responsavel_id, 'Responsavel', { required: true })
+    usuario_responsavel_id: parseInteger(body.usuario_responsavel_id, 'Responsavel', { required: true }),
+    prazo_compra: parseDateOnly(body.prazo_compra, 'Prazo de compra')
   };
 }
 

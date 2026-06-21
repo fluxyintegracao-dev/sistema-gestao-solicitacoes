@@ -1653,10 +1653,55 @@ async function anexarEspelhoFornecedorPedido({ pedidoId, arquivoUrl, arquivoNome
   return pedido;
 }
 
-async function delegarSolicitacaoCompra({ solicitacaoId, responsavelId, prazoCompra, motivoAtraso, usuarioId, transaction }) {
+async function delegarSolicitacaoCompra({
+  solicitacaoId,
+  responsavelId,
+  prazoCompra,
+  motivoAtraso,
+  usuarioId,
+  somenteMotivo = false,
+  transaction
+}) {
   const solicitacao = await SolicitacaoCompra.findByPk(Number(solicitacaoId), { transaction });
   if (!solicitacao) {
     throw new Error('Solicitacao de compra nao encontrada.');
+  }
+
+  const motivoNormalizado = motivoAtraso ? String(motivoAtraso).trim() : '';
+
+  if (somenteMotivo) {
+    if (!motivoNormalizado) {
+      throw new Error('Informe o motivo do atraso.');
+    }
+
+    await solicitacao.update(
+      {
+        motivo_atraso: motivoNormalizado,
+        motivo_atraso_em: new Date()
+      },
+      { transaction }
+    );
+
+    await PedidoCompra.update(
+      {
+        motivo_atraso: motivoNormalizado,
+        motivo_atraso_em: new Date()
+      },
+      { where: { solicitacao_compra_id: solicitacao.id }, transaction }
+    );
+
+    await registrarLogSolicitacaoCompra({
+      solicitacaoCompraId: solicitacao.id,
+      usuarioId,
+      tipoAcao: 'MOTIVO_ATRASO_COMPRA',
+      descricao: 'Motivo de atraso informado pelo responsavel da compra',
+      metadados: {
+        motivo_atraso: motivoNormalizado
+      },
+      transaction
+    });
+
+    return solicitacao;
   }
 
   await solicitacao.update(
@@ -1665,23 +1710,24 @@ async function delegarSolicitacaoCompra({ solicitacaoId, responsavelId, prazoCom
       prazo_compra: prazoCompra || null,
       delegado_por: usuarioId || null,
       delegado_em: new Date(),
-      motivo_atraso: motivoAtraso ? String(motivoAtraso).trim() : solicitacao.motivo_atraso,
-      motivo_atraso_em: motivoAtraso ? new Date() : solicitacao.motivo_atraso_em
+      motivo_atraso: motivoNormalizado || solicitacao.motivo_atraso,
+      motivo_atraso_em: motivoNormalizado ? new Date() : solicitacao.motivo_atraso_em
     },
     { transaction }
   );
 
-  await PedidoCompra.update(
-    {
-      atribuido_a: responsavelId ? Number(responsavelId) : null,
-      prazo_finalizacao: prazoCompra || null,
-      delegado_por: usuarioId || null,
-      delegado_em: new Date(),
-      motivo_atraso: motivoAtraso ? String(motivoAtraso).trim() : null,
-      motivo_atraso_em: motivoAtraso ? new Date() : null
-    },
-    { where: { solicitacao_compra_id: solicitacao.id }, transaction }
-  );
+  const pedidoUpdate = {
+    atribuido_a: responsavelId ? Number(responsavelId) : null,
+    prazo_finalizacao: prazoCompra || null,
+    delegado_por: usuarioId || null,
+    delegado_em: new Date()
+  };
+  if (motivoNormalizado) {
+    pedidoUpdate.motivo_atraso = motivoNormalizado;
+    pedidoUpdate.motivo_atraso_em = new Date();
+  }
+
+  await PedidoCompra.update(pedidoUpdate, { where: { solicitacao_compra_id: solicitacao.id }, transaction });
 
   await registrarLogSolicitacaoCompra({
     solicitacaoCompraId: solicitacao.id,
@@ -1693,7 +1739,7 @@ async function delegarSolicitacaoCompra({ solicitacaoId, responsavelId, prazoCom
     metadados: {
       responsavel_id: responsavelId || null,
       prazo_compra: prazoCompra || null,
-      motivo_atraso: motivoAtraso || null
+      motivo_atraso: motivoNormalizado || null
     },
     transaction
   });
@@ -1708,7 +1754,7 @@ async function delegarSolicitacaoCompra({ solicitacaoId, responsavelId, prazoCom
     metadados: {
       responsavel_id: responsavelId || null,
       prazo_compra: prazoCompra || null,
-      motivo_atraso: motivoAtraso || null
+      motivo_atraso: motivoNormalizado || null
     },
     transaction
   });

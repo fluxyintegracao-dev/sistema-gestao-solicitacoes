@@ -16,6 +16,31 @@ import { useAuth } from '../../contexts/AuthContext';
 import { parseDateSmart } from '../../utils/dateLocal';
 import { corrigirTextoCorrompido } from '../../utils/texto';
 
+function normalizarTextoSolicitacaoCompra(valor) {
+  return String(valor || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toUpperCase();
+}
+
+function isSolicitacaoCompraNormal(solicitacao) {
+  const texto = [
+    solicitacao?.tipo_solicitacao?.nome,
+    solicitacao?.tipo_solicitacao?.codigo,
+    solicitacao?.tipoSolicitacao?.nome,
+    solicitacao?.tipoSolicitacao?.codigo,
+    solicitacao?.tipo?.nome,
+    solicitacao?.tipo?.codigo,
+    solicitacao?.tipo_solicitacao_nome,
+    solicitacao?.tipo_solicitacao_codigo,
+    solicitacao?.titulo,
+    solicitacao?.descricao
+  ].filter(Boolean).join(' ');
+  const normalizado = normalizarTextoSolicitacaoCompra(texto);
+  return normalizado.includes('SOLICITACAO DE COMPRA') || normalizado.includes('COMPRA DIRETA');
+}
+
 export default function LinhaSolicitacao({
   solicitacao,
   onAtualizar,
@@ -65,6 +90,7 @@ export default function LinhaSolicitacao({
   const isSetorObraSolicitacao =
     Boolean(setorSolicitacao?.eh_setor_obra) ||
     String(setorNomeSolicitacao).trim().toUpperCase() === 'OBRA';
+  const exigePrazoCompraDelegacao = isSolicitacaoCompraNormal(solicitacao);
   const isFinanceiro = userHasSetorCapability(user, 'eh_setor_financeiro');
   const isUsuario = user?.perfil === 'USUARIO';
   const podeAssumir =
@@ -529,6 +555,7 @@ export default function LinhaSolicitacao({
           obraId={solicitacao.obra_id}
           isSetorObraSolicitacao={isSetorObraSolicitacao}
           isUsuarioSetorObra={isSetorObra}
+          exigirPrazoCompra={exigePrazoCompraDelegacao}
           onClose={() => setModalAtribuir(false)}
           onSucesso={() => {
             void notificarAtualizacao({ type: 'refresh_item', id: solicitacao.id });

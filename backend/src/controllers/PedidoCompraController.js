@@ -1,4 +1,4 @@
-const { PedidoCompra, User } = require('../models');
+const { PedidoCompra, SolicitacaoCompra, User } = require('../models');
 const {
   adicionarRespostaAoPedido,
   atualizarPedidoItem,
@@ -19,7 +19,9 @@ const {
 const {
   getUserObraScopeIds,
   canAuditComprasPedidos,
+  canManageComprasDelegacao,
   canManageComprasPedidos,
+  canViewComprasDelegacao,
   canViewComprasPedidos
 } = require('../services/authorizationService');
 const { renderPedidoCompraPdf } = require('../services/pedidoCompraPdf');
@@ -71,6 +73,21 @@ async function validarAcessoPedidos(req, res, options = {}) {
           ? 'Apenas compras pode gerenciar pedidos de compra'
           : 'Acesso negado aos pedidos de compra')
     });
+    return null;
+  }
+
+  return usuario;
+}
+
+async function validarAcessoDelegacao(req, res) {
+  const usuario = await carregarUsuarioCompras(req.user?.id);
+  if (!usuario) {
+    res.status(401).json({ error: 'Usuario nao autenticado' });
+    return null;
+  }
+
+  if (!(await canViewComprasDelegacao(usuario))) {
+    res.status(403).json({ error: 'Acesso negado para delegacao de compras' });
     return null;
   }
 
@@ -482,10 +499,31 @@ module.exports = {
     const transaction = await PedidoCompra.sequelize.transaction();
 
     try {
-      const usuario = await validarAcessoPedidos(req, res, { gerenciar: true });
+      const usuario = await validarAcessoDelegacao(req, res);
       if (!usuario) {
         await transaction.rollback();
         return;
+      }
+
+      const podeGerenciar = await canManageComprasDelegacao(usuario);
+      const solicitacao = await SolicitacaoCompra.findByPk(req.params.id, { transaction });
+      if (!solicitacao) {
+        await transaction.rollback();
+        return res.status(404).json({ error: 'Solicitacao de compra nao encontrada' });
+      }
+
+      if (!podeGerenciar) {
+        const responsavelAtual = solicitacao.comprador_responsavel_id
+          ? Number(solicitacao.comprador_responsavel_id)
+          : null;
+        if (responsavelAtual !== Number(usuario.id)) {
+          await transaction.rollback();
+          return res.status(403).json({ error: 'Voce so pode informar motivo em solicitacoes atribuidas a voce.' });
+        }
+        if (req.body?.responsavel_id !== undefined || req.body?.prazo_compra !== undefined) {
+          await transaction.rollback();
+          return res.status(403).json({ error: 'Sem permissao para alterar responsavel ou prazo da delegacao.' });
+        }
       }
 
       await delegarSolicitacaoCompra({
@@ -494,6 +532,7 @@ module.exports = {
         prazoCompra: req.body?.prazo_compra,
         motivoAtraso: req.body?.motivo_atraso,
         usuarioId: usuario.id,
+        somenteMotivo: !podeGerenciar,
         transaction
       });
 

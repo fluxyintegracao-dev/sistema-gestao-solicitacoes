@@ -23,6 +23,7 @@ const {
   TituloFinanceiro,
   SolicitacaoPagamento,
   SolicitacaoCompra,
+  PedidoCompra,
   Notificacao,
   NotificacaoDestinatario,
   LogExclusao,
@@ -3103,7 +3104,7 @@ module.exports = {
   async atribuirResponsavel(req, res) {
     try {
       const { id } = req.params;
-      const { usuario_responsavel_id } = req.body;
+      const { usuario_responsavel_id, prazo_compra } = req.body;
 
       const perfil = req.user.perfil;
       const areaUsuario = await obterAreaUsuario(req);
@@ -3207,6 +3208,35 @@ module.exports = {
         }
       }
 
+      const solicitacaoCompraVinculada = await SolicitacaoCompra.findOne({
+        where: { solicitacao_principal_id: id }
+      });
+
+      if (solicitacaoCompraVinculada && !prazo_compra) {
+        return res.status(400).json({
+          error: 'Informe o prazo para realizar o pedido da solicitacao de compra.'
+        });
+      }
+
+      if (solicitacaoCompraVinculada) {
+        const agora = new Date();
+        await solicitacaoCompraVinculada.update({
+          comprador_responsavel_id: usuario_responsavel_id,
+          prazo_compra,
+          delegado_por: req.user.id,
+          delegado_em: agora
+        });
+        await PedidoCompra.update(
+          {
+            atribuido_a: usuario_responsavel_id,
+            prazo_finalizacao: prazo_compra,
+            delegado_por: req.user.id,
+            delegado_em: agora
+          },
+          { where: { solicitacao_compra_id: solicitacaoCompraVinculada.id } }
+        );
+      }
+
       await Historico.create({
         solicitacao_id: id,
         usuario_responsavel_id,
@@ -3216,7 +3246,9 @@ module.exports = {
           ator_id: req.user.id,
           ator_nome: usuarioAcao ? usuarioAcao.nome : null,
           responsavel_id: usuario_responsavel_id,
-          responsavel_nome: usuarioResponsavel ? usuarioResponsavel.nome : null
+          responsavel_nome: usuarioResponsavel ? usuarioResponsavel.nome : null,
+          prazo_compra: solicitacaoCompraVinculada ? prazo_compra : null,
+          solicitacao_compra_id: solicitacaoCompraVinculada ? solicitacaoCompraVinculada.id : null
         })
       });
 
@@ -3227,7 +3259,9 @@ module.exports = {
         created_by: req.user.id,
         metadata: {
           responsavel_id: usuario_responsavel_id,
-          responsavel_nome: usuarioResponsavel ? usuarioResponsavel.nome : null
+          responsavel_nome: usuarioResponsavel ? usuarioResponsavel.nome : null,
+          prazo_compra: solicitacaoCompraVinculada ? prazo_compra : null,
+          solicitacao_compra_id: solicitacaoCompraVinculada ? solicitacaoCompraVinculada.id : null
         }
       });
 
@@ -3240,7 +3274,9 @@ module.exports = {
         },
         metadata: {
           responsavel_id: usuario_responsavel_id,
-          responsavel_nome: usuarioResponsavel ? usuarioResponsavel.nome : null
+          responsavel_nome: usuarioResponsavel ? usuarioResponsavel.nome : null,
+          prazo_compra: solicitacaoCompraVinculada ? prazo_compra : null,
+          solicitacao_compra_id: solicitacaoCompraVinculada ? solicitacaoCompraVinculada.id : null
         }
       });
 

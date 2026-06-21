@@ -237,6 +237,15 @@ export function canViewComprasDelegacao(user) {
   return userHasSetorCapability(user, 'eh_setor_compras');
 }
 
+export function canManageComprasDelegacao(user) {
+  if (!hasEnabledModule(user, 'COMPRAS')) return false;
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasAnyPermissao(user, ['compras.delegacao.gerenciar']);
+  }
+  return userHasSetorCapability(user, 'eh_setor_compras');
+}
+
 export function canViewComprasCotacoes(user) {
   if (!hasEnabledModule(user, 'COMPRAS')) return false;
   if (!hasEnabledModule(user, 'COTACOES')) return false;

@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { delegarSolicitacaoCompra, listarSolicitacoesCompra } from '../../../services/compras';
 import { API_URL, authHeaders } from '../../../services/api';
+import { useAuth } from '../../../contexts/AuthContext';
+import { canManageComprasDelegacao } from '../../../utils/acessoProduto';
 
 function formatDate(value) {
   if (!value) return '-';
@@ -43,6 +45,8 @@ async function listarUsuariosParaDelegacao() {
 
 export default function ComprasDelegacao() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const podeGerenciarDelegacao = canManageComprasDelegacao(user);
   const [solicitacoes, setSolicitacoes] = useState([]);
   const [usuarios, setUsuarios] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -54,10 +58,17 @@ export default function ComprasDelegacao() {
     try {
       setLoading(true);
       const [dataSolicitacoes, dataUsuarios] = await Promise.all([
-        listarSolicitacoesCompra(),
+        listarSolicitacoesCompra({ contexto: 'delegacao' }),
         listarUsuariosParaDelegacao()
       ]);
-      setSolicitacoes(Array.isArray(dataSolicitacoes) ? dataSolicitacoes : []);
+      const listaSolicitacoes = Array.isArray(dataSolicitacoes) ? dataSolicitacoes : [];
+      setSolicitacoes(
+        podeGerenciarDelegacao
+          ? listaSolicitacoes
+          : listaSolicitacoes.filter((solicitacao) => (
+            Number(solicitacao.comprador_responsavel_id) === Number(user?.id)
+          ))
+      );
       setUsuarios((Array.isArray(dataUsuarios) ? dataUsuarios : []).filter((usuario) => usuario.ativo !== false));
     } catch (error) {
       console.error(error);
@@ -69,7 +80,7 @@ export default function ComprasDelegacao() {
 
   useEffect(() => {
     carregar();
-  }, []);
+  }, [podeGerenciarDelegacao, user?.id]);
 
   const solicitacoesFiltradas = useMemo(() => {
     const termo = filtro.trim().toLowerCase();
@@ -128,9 +139,14 @@ export default function ComprasDelegacao() {
 
     try {
       setSalvandoId(solicitacao.id);
-      await delegarSolicitacaoCompra(solicitacao.id, payload);
+      await delegarSolicitacaoCompra(
+        solicitacao.id,
+        podeGerenciarDelegacao
+          ? payload
+          : { motivo_atraso: payload.motivo_atraso }
+      );
       await carregar();
-      alert('Delegacao atualizada.');
+      alert(podeGerenciarDelegacao ? 'Delegacao atualizada.' : 'Motivo do atraso registrado.');
     } catch (error) {
       console.error(error);
       alert(error.message || 'Erro ao salvar delegacao');
@@ -208,6 +224,7 @@ export default function ComprasDelegacao() {
                     className="input"
                     value={edicao.responsavel_id}
                     onChange={(event) => updateEdicao(solicitacao.id, { responsavel_id: event.target.value })}
+                    disabled={!podeGerenciarDelegacao}
                   >
                     <option value="">Sem responsavel</option>
                     {usuarios.map((usuario) => (
@@ -225,6 +242,7 @@ export default function ComprasDelegacao() {
                     type="date"
                     value={edicao.prazo_compra || ''}
                     onChange={(event) => updateEdicao(solicitacao.id, { prazo_compra: event.target.value })}
+                    disabled={!podeGerenciarDelegacao}
                   />
                 </label>
               </div>
@@ -245,14 +263,18 @@ export default function ComprasDelegacao() {
                 <button type="button" className="btn btn-outline" onClick={() => navigate(`/solicitacoes-compra/${solicitacao.id}`)}>
                   Abrir
                 </button>
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  onClick={() => salvarDelegacao(solicitacao)}
-                  disabled={salvandoId === solicitacao.id}
-                >
-                  {salvandoId === solicitacao.id ? 'Salvando...' : 'Salvar delegacao'}
-                </button>
+                {podeGerenciarDelegacao || prazoInfo.atrasado ? (
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={() => salvarDelegacao(solicitacao)}
+                    disabled={salvandoId === solicitacao.id}
+                  >
+                    {salvandoId === solicitacao.id
+                      ? 'Salvando...'
+                      : (podeGerenciarDelegacao ? 'Salvar delegacao' : 'Salvar motivo')}
+                  </button>
+                ) : null}
               </div>
             </div>
           );
