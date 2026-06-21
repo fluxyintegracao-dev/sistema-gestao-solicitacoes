@@ -973,10 +973,6 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
         return `Informe o valor da ${labelForma}.`;
       }
 
-      if (forma?.exige_cartao && !pagamento.cartao_id) {
-        return `Selecione o cartao da ${labelForma}.`;
-      }
-
       if (usaDetalhe) {
         const quantidade = getQuantidadeParcelas(pagamento);
         const parcelas = Array.isArray(pagamento.parcelas) ? pagamento.parcelas : [];
@@ -991,14 +987,6 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
           }
           if (!parcela.data_vencimento) {
             return `Informe o vencimento da ${labelParcela}.`;
-          }
-          if (isFormaCheque(forma)) {
-            if (!String(parcela.cheque_numero || '').trim()) {
-              return `Informe o numero do cheque da ${labelParcela}.`;
-            }
-            if (!String(parcela.cheque_emitente || '').trim()) {
-              return `Informe o emitente do cheque da ${labelParcela}.`;
-            }
           }
         }
       } else if (!usaCartao && !pagamento.data_vencimento) {
@@ -1692,22 +1680,9 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
                       </div>
 
                       {forma?.exige_cartao && (
-                        <label className="text-sm">
-                          <span className="mb-1 block text-slate-500">Cartao</span>
-                          <select
-                            className="input w-full"
-                            value={pagamento.cartao_id}
-                            onChange={(event) => updatePagamento(pagamentoIndex, { cartao_id: event.target.value })}
-                            required
-                          >
-                            <option value="">Selecione o cartao</option>
-                            {cartoesFiltrados.map((cartao) => (
-                              <option key={cartao.id} value={cartao.id}>
-                                {cartao.nome} final {cartao.ultimos_digitos} ({labelTipoCartao(cartao.tipo)})
-                              </option>
-                            ))}
-                          </select>
-                        </label>
+                        <div className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-800">
+                          O cartao usado sera definido na baixa ou na fatura. Na geracao da conta fica registrada apenas a forma prevista.
+                        </div>
                       )}
 
                       {usaDetalhe && (
@@ -1757,38 +1732,9 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
                                 )}
 
                                 {isFormaCheque(forma) && (
-                                  <>
-                                    <label className="text-sm">
-                                      <span className="mb-1 block text-slate-500">Numero do cheque</span>
-                                      <input
-                                        className="input w-full"
-                                        value={parcela.cheque_numero || ''}
-                                        onChange={(event) => updateParcela(pagamentoIndex, parcelaIndex, 'cheque_numero', event.target.value)}
-                                        required
-                                      />
-                                    </label>
-                                    <label className="text-sm">
-                                      <span className="mb-1 block text-slate-500">Emitente</span>
-                                      <input
-                                        className="input w-full"
-                                        value={parcela.cheque_emitente || ''}
-                                        onChange={(event) => updateParcela(pagamentoIndex, parcelaIndex, 'cheque_emitente', event.target.value)}
-                                        required
-                                      />
-                                    </label>
-                                    <label className="text-sm">
-                                      <span className="mb-1 block text-slate-500">Banco</span>
-                                      <input className="input w-full" value={parcela.cheque_banco || ''} onChange={(event) => updateParcela(pagamentoIndex, parcelaIndex, 'cheque_banco', event.target.value)} />
-                                    </label>
-                                    <label className="text-sm">
-                                      <span className="mb-1 block text-slate-500">Agencia</span>
-                                      <input className="input w-full" value={parcela.cheque_agencia || ''} onChange={(event) => updateParcela(pagamentoIndex, parcelaIndex, 'cheque_agencia', event.target.value)} />
-                                    </label>
-                                    <label className="text-sm">
-                                      <span className="mb-1 block text-slate-500">Conta</span>
-                                      <input className="input w-full" value={parcela.cheque_conta || ''} onChange={(event) => updateParcela(pagamentoIndex, parcelaIndex, 'cheque_conta', event.target.value)} />
-                                    </label>
-                                  </>
+                                  <div className="rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-xs text-amber-800 md:col-span-2">
+                                    Os dados do cheque serao informados na baixa, quando o instrumento real for definido.
+                                  </div>
                                 )}
                               </div>
                             </div>

@@ -813,6 +813,23 @@ export async function baixarTitulosFinanceirosEmMassaParcelado(data) {
   return parseJson(response, 'Erro ao registrar baixa parcelada em massa');
 }
 
+export async function getChequesTerceirosDisponiveis(params = {}) {
+  const query = new URLSearchParams();
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      query.append(key, value);
+    }
+  });
+
+  const suffix = query.toString();
+  const response = await fetch(
+    `${API_URL}/financeiro/cheques-terceiros/disponiveis${suffix ? `?${suffix}` : ''}`,
+    { headers: authHeaders() }
+  );
+
+  return parseJson(response, 'Erro ao buscar cheques de terceiros disponiveis');
+}
+
 export async function baixarTituloPorConciliacoes(id, data) {
   const response = await fetch(`${API_URL}/financeiro/titulos/${id}/baixas/conciliacoes`, {
     method: 'POST',

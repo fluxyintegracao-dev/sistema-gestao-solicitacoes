@@ -11,6 +11,7 @@ const {
   importarCodigosBarrasTitulos,
   listarAuditoriaTitulo,
   listarBaixasRealizadas,
+  listarChequesTerceirosDisponiveis,
   listarTitulos,
   listarTitulosPorSolicitacao
 } = require('../services/tituloFinanceiroService');
@@ -125,6 +126,16 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return responderErro(res, error, 'Erro ao listar baixas financeiras');
+    }
+  },
+
+  async chequesTerceirosDisponiveis(req, res) {
+    try {
+      const cheques = await listarChequesTerceirosDisponiveis(req, req.query || {});
+      return res.json(cheques);
+    } catch (error) {
+      console.error(error);
+      return responderErro(res, error, 'Erro ao listar cheques de terceiros disponiveis');
     }
   },
 

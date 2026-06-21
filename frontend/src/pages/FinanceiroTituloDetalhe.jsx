@@ -5,6 +5,7 @@ import {
   baixarTituloFinanceiro,
   estornarMovimentoFinanceiro,
   getCartoesFinanceiros,
+  getChequesTerceirosDisponiveis,
   getContasBancarias,
   getTituloFinanceiroAuditoria,
   getTituloFinanceiroById
@@ -87,6 +88,17 @@ function getCartaoLabel(cartao) {
   return `${cartao?.nome || 'Cartao'} - ${tipo} - ${bandeira}${final}`.trim();
 }
 
+function isChequeForma(formaRecebimento) {
+  return String(formaRecebimento || '').toUpperCase() === 'CHEQUE';
+}
+
+function formatChequeTerceiroLabel(cheque) {
+  const numero = cheque?.numero_cheque || cheque?.codigo || 'Sem numero';
+  const titular = cheque?.titular_nome || cheque?.cliente_nome || cheque?.parceiroEntregou?.nome || 'Titular nao informado';
+  const vencimento = cheque?.data_vencimento ? ` - venc. ${formatDate(cheque.data_vencimento)}` : '';
+  return `${numero} - ${titular} - ${formatCurrency(cheque?.valor)}${vencimento}`;
+}
+
 function normalizeFormaBaixaForm(formaRecebimento) {
   const normalized = String(formaRecebimento || '').toUpperCase();
   return normalized.startsWith('CARTAO_') ? 'CARTAO' : normalized;
@@ -98,6 +110,16 @@ function buildBaixaForm(titulo, contasBancarias, movimento = null) {
       empresa_id: String(movimento.empresa_id || movimento.empresa?.id || ''),
       conta_bancaria_id: String(movimento.conta_bancaria_id || movimento.contaBancaria?.id || ''),
       cartao_id: String(movimento.cartao_id || movimento.cartao?.id || ''),
+      usar_cheque_terceiro: Boolean(movimento.cheque_terceiro_id),
+      cheque_terceiro_id: String(movimento.cheque_terceiro_id || ''),
+      cheque_numero: movimento?.cheque_numero || '',
+      cheque_emitente: movimento?.cheque_emitente || '',
+      cheque_banco: movimento?.cheque_banco || '',
+      cheque_agencia: movimento?.cheque_agencia || '',
+      cheque_conta: movimento?.cheque_conta || '',
+      titular_documento: movimento?.titular_documento || '',
+      data_emissao: movimento?.data_emissao || '',
+      data_vencimento: movimento?.data_vencimento || '',
       forma_recebimento: normalizeFormaBaixaForm(movimento?.forma_recebimento),
       tipo_permuta: movimento?.tipo_permuta || '',
       categoria_bem: movimento?.categoria_bem || '',
@@ -122,6 +144,16 @@ function buildBaixaForm(titulo, contasBancarias, movimento = null) {
     empresa_id: String(titulo?.empresa_id || ''),
     conta_bancaria_id: '',
     cartao_id: '',
+    usar_cheque_terceiro: false,
+    cheque_terceiro_id: '',
+    cheque_numero: '',
+    cheque_emitente: '',
+    cheque_banco: '',
+    cheque_agencia: '',
+    cheque_conta: '',
+    titular_documento: '',
+    data_emissao: '',
+    data_vencimento: '',
     forma_recebimento: '',
     tipo_permuta: '',
     categoria_bem: '',
@@ -226,6 +258,7 @@ export default function FinanceiroTituloDetalhe() {
   const [titulo, setTitulo] = useState(null);
   const [contasBancarias, setContasBancarias] = useState([]);
   const [cartoes, setCartoes] = useState([]);
+  const [chequesTerceiros, setChequesTerceiros] = useState([]);
   const [empresasGrupo, setEmpresasGrupo] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -245,23 +278,26 @@ export default function FinanceiroTituloDetalhe() {
     try {
       setLoading(true);
       setError('');
-      const [tituloData, contasData, cartoesData, empresasData, auditoriaData] = await Promise.all([
+      const [tituloData, contasData, cartoesData, chequesData, empresasData, auditoriaData] = await Promise.all([
         getTituloFinanceiroById(id),
         getContasBancarias(),
         getCartoesFinanceiros(),
+        getChequesTerceirosDisponiveis().catch(() => []),
         getEmpresasGrupo({ ativo: true }),
         podeVerAuditoriaFinanceira ? getTituloFinanceiroAuditoria(id) : Promise.resolve([])
       ]);
       setTitulo(tituloData);
       setContasBancarias(Array.isArray(contasData) ? contasData : []);
       setCartoes(Array.isArray(cartoesData) ? cartoesData : []);
+      setChequesTerceiros(Array.isArray(chequesData) ? chequesData : []);
       setEmpresasGrupo(Array.isArray(empresasData) ? empresasData : []);
       setAuditoria(Array.isArray(auditoriaData) ? auditoriaData : []);
       setCobrancaForm(buildCobrancaForm(tituloData));
       setBaixaForm((current) => ({
         ...buildBaixaForm(tituloData, Array.isArray(contasData) ? contasData : []),
         conta_bancaria_id: current.conta_bancaria_id || '',
-        cartao_id: current.cartao_id || ''
+        cartao_id: current.cartao_id || '',
+        cheque_terceiro_id: current.cheque_terceiro_id || ''
       }));
     } catch (err) {
       setError(err?.message || 'Erro ao carregar titulo financeiro');
@@ -312,6 +348,14 @@ export default function FinanceiroTituloDetalhe() {
   }), [baixaForm.empresa_id, cartoes, contasBancarias]);
   const baixaUsaCartao = isCartaoForma(baixaForm.forma_recebimento);
   const baixaCartaoDebito = baixaUsaCartao && isCartaoDebito(selectedCartaoBaixa);
+  const baixaUsaCheque = isChequeForma(baixaForm.forma_recebimento);
+  const tituloTipo = String(titulo?.tipo || '').toUpperCase();
+  const baixaRecebeChequeTerceiro = baixaUsaCheque && tituloTipo === 'RECEBER';
+  const baixaPagaComChequeTerceiro = baixaUsaCheque && tituloTipo === 'PAGAR' && Boolean(baixaForm.usar_cheque_terceiro);
+  const chequesTerceirosDisponiveis = useMemo(
+    () => chequesTerceiros.filter((cheque) => String(cheque?.status || '').toUpperCase() === 'EM_CARTEIRA'),
+    [chequesTerceiros]
+  );
 
   const empresaTituloId = String(titulo?.empresa_id || '');
   const baixaEmpresaDiferente = Boolean(
@@ -370,6 +414,14 @@ export default function FinanceiroTituloDetalhe() {
     }
     if (baixaForm.intercompany && !baixaForm.tipo_intercompany) {
       setError('Informe o tipo da baixa Entre Empresas.');
+      return;
+    }
+    if (baixaPagaComChequeTerceiro && !baixaForm.cheque_terceiro_id) {
+      setError('Selecione o cheque de terceiro que sera usado no pagamento.');
+      return;
+    }
+    if (baixaRecebeChequeTerceiro && (!String(baixaForm.cheque_numero || '').trim() || !String(baixaForm.cheque_emitente || '').trim())) {
+      setError('Informe numero e emitente do cheque recebido.');
       return;
     }
     try {
@@ -1072,6 +1124,16 @@ export default function FinanceiroTituloDetalhe() {
                       ...current,
                       forma_recebimento: event.target.value,
                       cartao_id: '',
+                      usar_cheque_terceiro: false,
+                      cheque_terceiro_id: '',
+                      cheque_numero: '',
+                      cheque_emitente: '',
+                      cheque_banco: '',
+                      cheque_agencia: '',
+                      cheque_conta: '',
+                      titular_documento: '',
+                      data_emissao: '',
+                      data_vencimento: '',
                       conta_bancaria_id: isCartaoForma(event.target.value) ? '' : current.conta_bancaria_id
                     }))}
                   >
@@ -1138,6 +1200,135 @@ export default function FinanceiroTituloDetalhe() {
                       </span>
                     ) : null}
                   </label>
+                ) : null}
+
+                {baixaUsaCheque && tituloTipo === 'PAGAR' ? (
+                  <div className="rounded-xl border border-amber-100 bg-amber-50 p-3 text-sm text-amber-900 md:col-span-2">
+                    <label className="flex items-start gap-2">
+                      <input
+                        type="checkbox"
+                        className="mt-1"
+                        checked={Boolean(baixaForm.usar_cheque_terceiro)}
+                        onChange={(event) => {
+                          const checked = event.target.checked;
+                          setBaixaForm((current) => ({
+                            ...current,
+                            usar_cheque_terceiro: checked,
+                            cheque_terceiro_id: checked ? current.cheque_terceiro_id : '',
+                            cheque_numero: checked ? '' : current.cheque_numero,
+                            cheque_emitente: checked ? '' : current.cheque_emitente
+                          }));
+                        }}
+                      />
+                      <span>
+                        <span className="block font-semibold">Usar cheque de terceiro em carteira</span>
+                        <span className="block text-xs text-amber-700">
+                          Use quando o pagamento for feito com um cheque recebido anteriormente de cliente ou parceiro.
+                        </span>
+                      </span>
+                    </label>
+                    {baixaPagaComChequeTerceiro ? (
+                      <label className="mt-3 block text-sm">
+                        <span className="mb-1 block text-amber-800">Cheque disponivel</span>
+                        <select
+                          className="input w-full bg-white"
+                          value={baixaForm.cheque_terceiro_id || ''}
+                          onChange={(event) => setBaixaForm((current) => ({ ...current, cheque_terceiro_id: event.target.value }))}
+                          required
+                        >
+                          <option value="">Selecione o cheque</option>
+                          {chequesTerceirosDisponiveis.map((cheque) => (
+                            <option key={cheque.id} value={cheque.id}>
+                              {formatChequeTerceiroLabel(cheque)}
+                            </option>
+                          ))}
+                        </select>
+                        {!chequesTerceirosDisponiveis.length ? (
+                          <span className="mt-1 block text-xs text-amber-700">
+                            Nenhum cheque de terceiro em carteira foi encontrado.
+                          </span>
+                        ) : null}
+                      </label>
+                    ) : null}
+                  </div>
+                ) : null}
+
+                {baixaRecebeChequeTerceiro ? (
+                  <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3 text-sm text-emerald-900 md:col-span-2">
+                    <div className="mb-3 text-xs text-emerald-700">
+                      Ao confirmar uma baixa de recebimento por cheque, o sistema registra automaticamente o cheque em carteira como cheque de terceiro.
+                    </div>
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <label>
+                        <span className="mb-1 block text-emerald-800">Numero do cheque</span>
+                        <input
+                          className="input w-full bg-white"
+                          value={baixaForm.cheque_numero}
+                          onChange={(event) => setBaixaForm((current) => ({ ...current, cheque_numero: event.target.value }))}
+                          required
+                        />
+                      </label>
+                      <label>
+                        <span className="mb-1 block text-emerald-800">Emitente / titular</span>
+                        <input
+                          className="input w-full bg-white"
+                          value={baixaForm.cheque_emitente}
+                          onChange={(event) => setBaixaForm((current) => ({ ...current, cheque_emitente: event.target.value }))}
+                          required
+                        />
+                      </label>
+                      <label>
+                        <span className="mb-1 block text-emerald-800">CPF/CNPJ do titular</span>
+                        <input
+                          className="input w-full bg-white"
+                          value={baixaForm.titular_documento}
+                          onChange={(event) => setBaixaForm((current) => ({ ...current, titular_documento: event.target.value }))}
+                        />
+                      </label>
+                      <label>
+                        <span className="mb-1 block text-emerald-800">Banco</span>
+                        <input
+                          className="input w-full bg-white"
+                          value={baixaForm.cheque_banco}
+                          onChange={(event) => setBaixaForm((current) => ({ ...current, cheque_banco: event.target.value }))}
+                        />
+                      </label>
+                      <label>
+                        <span className="mb-1 block text-emerald-800">Agencia</span>
+                        <input
+                          className="input w-full bg-white"
+                          value={baixaForm.cheque_agencia}
+                          onChange={(event) => setBaixaForm((current) => ({ ...current, cheque_agencia: event.target.value }))}
+                        />
+                      </label>
+                      <label>
+                        <span className="mb-1 block text-emerald-800">Conta</span>
+                        <input
+                          className="input w-full bg-white"
+                          value={baixaForm.cheque_conta}
+                          onChange={(event) => setBaixaForm((current) => ({ ...current, cheque_conta: event.target.value }))}
+                        />
+                      </label>
+                      <label>
+                        <span className="mb-1 block text-emerald-800">Emissao</span>
+                        <input
+                          className="input w-full bg-white"
+                          type="date"
+                          value={baixaForm.data_emissao}
+                          onChange={(event) => setBaixaForm((current) => ({ ...current, data_emissao: event.target.value }))}
+                        />
+                      </label>
+                      <label>
+                        <span className="mb-1 block text-emerald-800">Vencimento</span>
+                        <input
+                          className="input w-full bg-white"
+                          type="date"
+                          value={baixaForm.data_vencimento}
+                          onChange={(event) => setBaixaForm((current) => ({ ...current, data_vencimento: event.target.value }))}
+                        />
+                      </label>
+                    </div>
+                  </div>
                 ) : null}
 
                 <label className="text-sm">
@@ -1375,6 +1566,8 @@ export default function FinanceiroTituloDetalhe() {
                     (baixaUsaCartao && !baixaForm.cartao_id) ||
                     (baixaCartaoDebito && !baixaForm.conta_bancaria_id) ||
                     (contaBancariaObrigatoria(baixaForm.forma_recebimento) && !baixaForm.conta_bancaria_id) ||
+                    (baixaPagaComChequeTerceiro && !baixaForm.cheque_terceiro_id) ||
+                    (baixaRecebeChequeTerceiro && (!baixaForm.cheque_numero || !baixaForm.cheque_emitente)) ||
                     !baixaForm.valor ||
                     (Boolean(baixaForm.intercompany) && !baixaForm.tipo_intercompany)
                   }

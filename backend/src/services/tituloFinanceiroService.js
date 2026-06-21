@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const { Op } = require('sequelize');
 const {
   CartaoFinanceiro,
+  ChequeTerceiro,
   ConciliacaoBancaria,
   ContaBancaria,
   EmpresaGrupo,
@@ -405,20 +406,136 @@ function buildChequeFields(formaPagamento, parcela, index) {
     };
   }
 
-  if (!String(parcela?.cheque_numero || '').trim()) {
-    throw createHttpError(400, `Informe o numero do cheque da parcela ${index + 1}.`);
-  }
-  if (!String(parcela?.cheque_emitente || '').trim()) {
-    throw createHttpError(400, `Informe o emitente do cheque da parcela ${index + 1}.`);
-  }
+  const chequeNumero = String(parcela?.cheque_numero || '').trim();
+  const chequeEmitente = String(parcela?.cheque_emitente || '').trim();
 
   return {
-    cheque_numero: String(parcela.cheque_numero || '').trim(),
+    cheque_numero: chequeNumero || null,
     cheque_banco: parcela.cheque_banco || null,
     cheque_agencia: parcela.cheque_agencia || null,
     cheque_conta: parcela.cheque_conta || null,
-    cheque_emitente: String(parcela.cheque_emitente || '').trim()
+    cheque_emitente: chequeEmitente || null
   };
+}
+
+function isChequeFormaRecebimento(formaRecebimento) {
+  return String(formaRecebimento || '').trim().toUpperCase().includes('CHEQUE');
+}
+
+function getTituloTipo(titulo) {
+  return String(titulo?.tipo || '').trim().toUpperCase();
+}
+
+function getTituloParceiroNome(titulo) {
+  return (
+    titulo?.parceiro?.nome
+    || titulo?.parceiro?.razao_social
+    || titulo?.parceiro?.nome_fantasia
+    || titulo?.parceiro_nome
+    || null
+  );
+}
+
+function getTituloParceiroDocumento(titulo) {
+  return titulo?.parceiro?.cpf_cnpj || titulo?.parceiro_documento || null;
+}
+
+function gerarCodigoChequeTerceiro() {
+  return `CHQ-${crypto.randomUUID().slice(0, 10).toUpperCase()}`;
+}
+
+function normalizarChequePayload(payload = {}) {
+  return {
+    numero_cheque: String(payload.cheque_numero || payload.numero_cheque || '').trim() || null,
+    titular_nome: String(payload.cheque_emitente || payload.titular_nome || '').trim() || null,
+    titular_documento: String(payload.titular_documento || '').trim() || null,
+    banco: String(payload.cheque_banco || payload.banco || '').trim() || null,
+    agencia: String(payload.cheque_agencia || payload.agencia || '').trim() || null,
+    conta: String(payload.cheque_conta || payload.conta || '').trim() || null
+  };
+}
+
+async function obterChequeTerceiroDisponivel(chequeTerceiroId, transaction) {
+  const id = Number(chequeTerceiroId);
+  if (!Number.isInteger(id) || id <= 0) {
+    throw createHttpError(400, 'Selecione o cheque de terceiro que sera usado na baixa.');
+  }
+
+  const cheque = await ChequeTerceiro.findOne({
+    where: { id, status: 'EM_CARTEIRA' },
+    transaction,
+    lock: transaction?.LOCK?.UPDATE
+  });
+
+  if (!cheque) {
+    throw createHttpError(400, 'Cheque de terceiro indisponivel ou ja utilizado.');
+  }
+
+  return cheque;
+}
+
+async function registrarChequeTerceiroRecebido({
+  req,
+  titulo,
+  movimento,
+  payload = {},
+  valor,
+  dataMovimento,
+  transaction
+}) {
+  if (!ChequeTerceiro || !movimento) return null;
+
+  const chequePayload = normalizarChequePayload(payload);
+  const titularNome = chequePayload.titular_nome || getTituloParceiroNome(titulo) || 'Titular nao informado';
+  const numeroCheque = chequePayload.numero_cheque || payload.documento_referencia || `MOV-${movimento.id}`;
+
+  return ChequeTerceiro.create({
+    codigo: gerarCodigoChequeTerceiro(),
+    titulo_financeiro_id: titulo.id,
+    movimento_financeiro_id: movimento.id,
+    parceiro_entregou_id: titulo.parceiro_id || null,
+    cliente_nome: getTituloParceiroNome(titulo),
+    titular_nome: titularNome,
+    titular_documento: chequePayload.titular_documento || getTituloParceiroDocumento(titulo),
+    banco: chequePayload.banco,
+    agencia: chequePayload.agencia,
+    conta: chequePayload.conta,
+    numero_cheque: numeroCheque,
+    valor: roundCurrency(valor),
+    data_emissao: payload.data_emissao || dataMovimento || null,
+    data_vencimento: payload.data_vencimento || dataMovimento || null,
+    status: 'EM_CARTEIRA',
+    observacoes: payload.observacoes || 'Cheque de terceiro registrado automaticamente pela baixa de recebimento.',
+    criado_por: req.user?.id || null,
+    atualizado_por: req.user?.id || null
+  }, { transaction });
+}
+
+async function consumirChequeTerceiroPagamento({
+  req,
+  chequeTerceiroId,
+  movimento,
+  valor,
+  transaction
+}) {
+  if (!ChequeTerceiro || !movimento) return null;
+
+  const cheque = await obterChequeTerceiroDisponivel(chequeTerceiroId, transaction);
+  const diferenca = Math.abs(roundCurrency(cheque.valor) - roundCurrency(valor));
+  if (diferenca >= 0.01) {
+    throw createHttpError(
+      400,
+      'O valor do cheque de terceiro precisa ser igual ao valor da baixa ou parcela selecionada.'
+    );
+  }
+
+  await cheque.update({
+    status: 'UTILIZADO',
+    movimento_financeiro_id: movimento.id,
+    atualizado_por: req.user?.id || null
+  }, { transaction });
+
+  return cheque;
 }
 
 function resolveVencimentoParcela({ formaPagamento, parcela, dataVencimentoBase, dataCompra, index }) {
@@ -906,10 +1023,6 @@ async function validarFormaPagamentoFinanceira(formaPagamentoId, payload = {}) {
   const quantidadeParcelas = Math.max(Number(payload.quantidade_parcelas || 1), 1);
   if (quantidadeParcelas > 1 && forma.permite_parcelamento === false) {
     throw createHttpError(400, 'A forma de pagamento selecionada nao permite parcelamento.');
-  }
-
-  if (forma.exige_cartao && !payload.cartao_id) {
-    throw createHttpError(400, 'Selecione o cartao para esta forma de pagamento.');
   }
 
   if (forma.exige_cartao && payload.cartao_id) {
@@ -2517,6 +2630,29 @@ async function criarTituloManualComBaixaAtomica(req, payload = {}, { transaction
       criado_por: req.user?.id || null
     }, { transaction });
 
+    if (isChequeFormaRecebimento(formaRecebimento)) {
+      const tipoTitulo = getTituloTipo(titulo);
+      if (tipoTitulo === 'RECEBER') {
+        await registrarChequeTerceiroRecebido({
+          req,
+          titulo,
+          movimento,
+          payload,
+          valor: valorBaixa,
+          dataMovimento: payload.data_movimento,
+          transaction
+        });
+      } else if (tipoTitulo === 'PAGAR' && payload.usar_cheque_terceiro) {
+        await consumirChequeTerceiroPagamento({
+          req,
+          chequeTerceiroId: payload.cheque_terceiro_id,
+          movimento,
+          valor: valorBaixa,
+          transaction
+        });
+      }
+    }
+
     await titulo.update({
       valor_baixado: novoValorBaixado,
       valor_saldo: novoEstado.valor_saldo,
@@ -2747,6 +2883,29 @@ async function baixarTitulo(req, tituloId, payload = {}) {
       observacoes: payload.observacoes || null,
       criado_por: req.user?.id || null
     }, { transaction });
+
+    if (isChequeFormaRecebimento(formaMovimento)) {
+      const tipoTitulo = getTituloTipo(titulo);
+      if (tipoTitulo === 'RECEBER') {
+        await registrarChequeTerceiroRecebido({
+          req,
+          titulo,
+          movimento,
+          payload,
+          valor: valorBaixa,
+          dataMovimento: payload.data_movimento,
+          transaction
+        });
+      } else if (tipoTitulo === 'PAGAR' && payload.usar_cheque_terceiro) {
+        await consumirChequeTerceiroPagamento({
+          req,
+          chequeTerceiroId: payload.cheque_terceiro_id,
+          movimento,
+          valor: valorBaixa,
+          transaction
+        });
+      }
+    }
 
     await titulo.update({
       empresa_id: empresaTituloId,
@@ -3086,6 +3245,28 @@ async function baixarTitulosParceladosEmMassa(req, payload = {}) {
         ].filter(Boolean).join('\n'),
         criado_por: req.user?.id || null
       }, { transaction });
+
+      if (formaRecebimento === 'CHEQUE') {
+        if (tipoTitulo === 'RECEBER') {
+          await registrarChequeTerceiroRecebido({
+            req,
+            titulo: tituloParcela,
+            movimento: movimentoParcela,
+            payload: parcela,
+            valor: valorParcela,
+            dataMovimento: parcela.data_movimento,
+            transaction
+          });
+        } else if (tipoTitulo === 'PAGAR' && parcela.usar_cheque_terceiro) {
+          await consumirChequeTerceiroPagamento({
+            req,
+            chequeTerceiroId: parcela.cheque_terceiro_id,
+            movimento: movimentoParcela,
+            valor: valorParcela,
+            transaction
+          });
+        }
+      }
 
       parcelasCriadas.push({
         titulo_id: tituloParcela.id,
@@ -3520,6 +3701,42 @@ async function importarCodigosBarrasTitulos(req, payload = {}) {
   return resultado;
 }
 
+async function listarChequesTerceirosDisponiveis(req, filters = {}) {
+  await assertFinanceAccess(req);
+
+  const where = { status: 'EM_CARTEIRA' };
+  const termo = String(filters.q || filters.busca || '').trim();
+  if (termo) {
+    where[Op.or] = [
+      { codigo: { [Op.like]: `%${termo}%` } },
+      { numero_cheque: { [Op.like]: `%${termo}%` } },
+      { titular_nome: { [Op.like]: `%${termo}%` } },
+      { cliente_nome: { [Op.like]: `%${termo}%` } },
+      { titular_documento: { [Op.like]: `%${termo}%` } }
+    ];
+  }
+
+  const limite = Math.min(Math.max(Number(filters.limit || 100), 1), 300);
+  const cheques = await ChequeTerceiro.findAll({
+    where,
+    include: [
+      {
+        model: Parceiro,
+        as: 'parceiroEntregou',
+        attributes: ['id', 'nome', 'cpf_cnpj'],
+        required: false
+      }
+    ],
+    order: [
+      ['data_vencimento', 'ASC'],
+      ['id', 'ASC']
+    ],
+    limit: limite
+  });
+
+  return cheques.map((cheque) => (typeof cheque.toJSON === 'function' ? cheque.toJSON() : cheque));
+}
+
 module.exports = {
   atualizarCobrancaTitulo,
   atualizarTitulo,
@@ -3532,6 +3749,7 @@ module.exports = {
   criarTituloPorSolicitacao,
   estornarMovimentoTitulo,
   importarCodigosBarrasTitulos,
+  listarChequesTerceirosDisponiveis,
   listarAuditoriaTitulo,
   listarBaixasRealizadas,
   listarTitulos,

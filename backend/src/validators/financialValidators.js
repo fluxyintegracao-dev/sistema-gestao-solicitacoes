@@ -1337,6 +1337,16 @@ function validateFinanceTituloBaixaBody(body = {}) {
       'desconto',
       'data_movimento',
       'observacoes',
+      'usar_cheque_terceiro',
+      'cheque_terceiro_id',
+      'cheque_numero',
+      'cheque_emitente',
+      'cheque_banco',
+      'cheque_agencia',
+      'cheque_conta',
+      'titular_documento',
+      'data_emissao',
+      'data_vencimento',
       'intercompany',
       'tipo_intercompany',
       'motivo_intercompany',
@@ -1354,6 +1364,8 @@ function validateFinanceTituloBaixaBody(body = {}) {
 
   const contaBancariaId = parseInteger(body.conta_bancaria_id, 'Conta bancaria');
   const cartaoId = parseInteger(body.cartao_id, 'Cartao');
+  const usarChequeTerceiro = parseBoolean(body.usar_cheque_terceiro, 'Usar cheque de terceiro');
+  const chequeTerceiroId = parseInteger(body.cheque_terceiro_id, 'Cheque de terceiro');
   const empresaId = parseInteger(body.empresa_id, 'Empresa pagadora', { required: true });
   const exigeContaBancaria = !formaRecebimento || !['DINHEIRO', 'CARTAO', 'PERMUTA', 'BENS', 'OUTROS'].includes(formaRecebimento);
 
@@ -1363,6 +1375,10 @@ function validateFinanceTituloBaixaBody(body = {}) {
 
   if (formaRecebimento === 'CARTAO' && !cartaoId) {
     throw new ValidationError('Informe o cartao utilizado na baixa.');
+  }
+
+  if (usarChequeTerceiro && !chequeTerceiroId) {
+    throw new ValidationError('Selecione o cheque de terceiro que sera usado na baixa.');
   }
 
   return {
@@ -1381,6 +1397,16 @@ function validateFinanceTituloBaixaBody(body = {}) {
     desconto: parseDecimal(body.desconto, 'Desconto', { min: 0 }),
     data_movimento: parseDateOnly(body.data_movimento, 'Data do movimento', { required: true }),
     observacoes: parseOptionalText(body.observacoes, 'Observacoes', 4000),
+    usar_cheque_terceiro: usarChequeTerceiro,
+    cheque_terceiro_id: chequeTerceiroId,
+    cheque_numero: parseOptionalText(body.cheque_numero, 'Numero do cheque', 60),
+    cheque_emitente: parseOptionalText(body.cheque_emitente, 'Emitente do cheque', 160),
+    cheque_banco: parseOptionalText(body.cheque_banco, 'Banco do cheque', 120),
+    cheque_agencia: parseOptionalText(body.cheque_agencia, 'Agencia do cheque', 40),
+    cheque_conta: parseOptionalText(body.cheque_conta, 'Conta do cheque', 60),
+    titular_documento: parseOptionalText(body.titular_documento, 'Documento do titular do cheque', 40),
+    data_emissao: parseDateOnly(body.data_emissao, 'Data de emissao do cheque'),
+    data_vencimento: parseDateOnly(body.data_vencimento, 'Data de vencimento do cheque'),
     intercompany: parseBoolean(body.intercompany, 'Entre Empresas'),
     tipo_intercompany: parseEnum(body.tipo_intercompany, 'Tipo', TIPOS_INTERCOMPANY),
     motivo_intercompany: parseOptionalText(body.motivo_intercompany, 'Motivo', 255),
@@ -1458,11 +1484,16 @@ function validateFinanceTituloBaixaParceladaBody(body = {}) {
         'cheque_emitente',
         'cheque_banco',
         'cheque_agencia',
-        'cheque_conta'
+        'cheque_conta',
+        'usar_cheque_terceiro',
+        'cheque_terceiro_id',
+        'titular_documento'
       ],
       `Parcela ${index + 1} da baixa agrupada`
     );
 
+    const usarChequeTerceiro = parseBoolean(item?.usar_cheque_terceiro, `Usar cheque de terceiro na parcela ${index + 1}`);
+    const chequeTerceiroId = parseInteger(item?.cheque_terceiro_id, `Cheque de terceiro da parcela ${index + 1}`);
     const parcela = {
       data_movimento: parseDateOnly(item?.data_movimento, `Data da parcela ${index + 1}`, { required: true }),
       valor: parseDecimal(item?.valor, `Valor da parcela ${index + 1}`, { required: true, min: 0.01 }),
@@ -1472,10 +1503,17 @@ function validateFinanceTituloBaixaParceladaBody(body = {}) {
       cheque_emitente: parseOptionalText(item?.cheque_emitente, `Emitente do cheque da parcela ${index + 1}`, 160),
       cheque_banco: parseOptionalText(item?.cheque_banco, `Banco do cheque da parcela ${index + 1}`, 120),
       cheque_agencia: parseOptionalText(item?.cheque_agencia, `Agencia do cheque da parcela ${index + 1}`, 40),
-      cheque_conta: parseOptionalText(item?.cheque_conta, `Conta do cheque da parcela ${index + 1}`, 60)
+      cheque_conta: parseOptionalText(item?.cheque_conta, `Conta do cheque da parcela ${index + 1}`, 60),
+      titular_documento: parseOptionalText(item?.titular_documento, `Documento do titular do cheque da parcela ${index + 1}`, 40),
+      usar_cheque_terceiro: usarChequeTerceiro,
+      cheque_terceiro_id: chequeTerceiroId
     };
 
-    if (formaRecebimento === 'CHEQUE' && (!parcela.cheque_numero || !parcela.cheque_emitente)) {
+    if (formaRecebimento === 'CHEQUE' && usarChequeTerceiro && !chequeTerceiroId) {
+      throw new ValidationError(`Selecione o cheque de terceiro da parcela ${index + 1}.`);
+    }
+
+    if (formaRecebimento === 'CHEQUE' && !usarChequeTerceiro && (!parcela.cheque_numero || !parcela.cheque_emitente)) {
       throw new ValidationError(`Informe numero e emitente do cheque na parcela ${index + 1}.`);
     }
 
