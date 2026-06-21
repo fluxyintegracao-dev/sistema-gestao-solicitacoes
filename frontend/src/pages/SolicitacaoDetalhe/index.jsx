@@ -280,6 +280,7 @@ export default function SolicitacaoDetalhe() {
         <Timeline
           historicos={solicitacao.historicos || []}
           canRemoveAnexo={canDeleteSolicitacaoAnexo(user)}
+          canRemoveComentario={String(user?.perfil || '').trim().toUpperCase() === 'SUPERADMIN'}
           onAnexoRemovido={() => {
             registrarMutacaoLocal(id);
             void carregar({ silent: true });

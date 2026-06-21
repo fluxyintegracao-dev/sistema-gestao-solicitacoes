@@ -2,10 +2,20 @@ import { useState } from 'react';
 import PreviewAnexoModal from './PreviewAnexoModal';
 import { API_URL, authHeaders, fileUrl } from '../../services/api';
 
-export default function Timeline({ historicos, canRemoveAnexo = false, onAnexoRemovido }) {
+export default function Timeline({
+  historicos,
+  canRemoveAnexo = false,
+  canRemoveComentario = false,
+  onAnexoRemovido
+}) {
   const [preview, setPreview] = useState(null);
+  const acoesOcultas = new Set([
+    'PENDENCIA_FINANCEIRA_MARCADA',
+    'PENDENCIA_FINANCEIRA_REGULARIZADA',
+    'COMENTARIO_REMOVIDO'
+  ]);
   const historicosVisiveis = Array.isArray(historicos)
-    ? historicos.filter((h) => !['PENDENCIA_FINANCEIRA_MARCADA', 'PENDENCIA_FINANCEIRA_REGULARIZADA'].includes(h?.acao))
+    ? historicos.filter((h) => !acoesOcultas.has(String(h?.acao || '').trim().toUpperCase()))
     : [];
 
   function normalizarUrlArquivo(url) {
@@ -154,6 +164,34 @@ export default function Timeline({ historicos, canRemoveAnexo = false, onAnexoRe
     }
   }
 
+  async function removerComentario(historico) {
+    const historicoId = historico?.id;
+    const solicitacaoId = historico?.solicitacao_id;
+    if (!historicoId || !solicitacaoId) return;
+
+    const confirmar = window.confirm('Deseja remover este comentario do historico?');
+    if (!confirmar) return;
+
+    try {
+      const res = await fetch(`${API_URL}/solicitacoes/${solicitacaoId}/comentarios/${historicoId}`, {
+        method: 'DELETE',
+        headers: authHeaders()
+      });
+
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(data?.error || 'Erro ao remover comentario');
+      }
+
+      if (typeof onAnexoRemovido === 'function') {
+        onAnexoRemovido();
+      }
+    } catch (error) {
+      console.error(error);
+      alert(error?.message || 'Erro ao remover comentario');
+    }
+  }
+
   return (
     <div className="sol-detail-card">
       <h2 className="sol-detail-card-title">Historico</h2>
@@ -209,6 +247,17 @@ export default function Timeline({ historicos, canRemoveAnexo = false, onAnexoRe
               )}
 
               {h.descricao && <p className="sol-detail-timeline-text text-sm">{h.descricao}</p>}
+
+              {canRemoveComentario && String(h.acao || '').trim().toUpperCase() === 'COMENTARIO' && (
+                <button
+                  type="button"
+                  className="text-xs font-semibold mt-1"
+                  style={{ color: 'var(--c-danger, #dc2626)' }}
+                  onClick={() => removerComentario(h)}
+                >
+                  Remover comentario
+                </button>
+              )}
 
               {pedidoCompraId && solicitacaoHistoricoId && (
                 <div className="flex flex-wrap gap-3 mt-1">

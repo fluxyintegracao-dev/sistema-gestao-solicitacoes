@@ -12,7 +12,7 @@ const FILTROS_DISPONIVEIS = [
   { id: 'valor_min', label: 'Valor minimo' },
   { id: 'valor_max', label: 'Valor maximo' },
   { id: 'data_registro', label: 'Data de registro' },
-  { id: 'data_vencimento', label: 'Data de vencimento' },
+  { id: 'data_vencimento', label: 'Periodo de vencimento' },
   { id: 'responsavel', label: 'Responsavel' }
 ];
 
@@ -149,6 +149,8 @@ export default function Filtros({
       valor_max: '',
       data_registro: '',
       data_vencimento: '',
+      data_vencimento_inicio: '',
+      data_vencimento_fim: '',
       responsavel: ''
     });
     setObraDropdownOpen(false);
@@ -372,12 +374,16 @@ export default function Filtros({
     filtros.valor_max,
     filtros.data_registro,
     filtros.data_vencimento,
+    filtros.data_vencimento_inicio,
+    filtros.data_vencimento_fim,
     mostrarFiltroResponsavel ? filtros.responsavel : ''
   ].filter(v => String(v || '').trim() !== '').length;
 
   function isFiltroVisivel(filtroId) {
     return filtrosVisiveis.includes(filtroId);
   }
+
+  const mostrarPeriodoVencimento = isFiltroVisivel('periodo_vencimento') || isFiltroVisivel('data_vencimento');
 
   return (
     <div className="solicitacoes-filtros sol-surface-card p-3 sm:p-4 rounded-xl mb-4 md:mb-6">
@@ -743,13 +749,26 @@ export default function Filtros({
             </div>
           )}
 
-          {isFiltroVisivel('data_vencimento') && (
+          {mostrarPeriodoVencimento && (
             <div className="sol-filter-field">
-              <label className="sol-filter-label">Data de vencimento</label>
+              <label className="sol-filter-label">Vencimento de</label>
               <input
-                name="data_vencimento"
+                name="data_vencimento_inicio"
                 className="input"
-                value={filtros.data_vencimento || ''}
+                value={filtros.data_vencimento_inicio || ''}
+                onChange={handleChange}
+                type="date"
+              />
+            </div>
+          )}
+
+          {mostrarPeriodoVencimento && (
+            <div className="sol-filter-field">
+              <label className="sol-filter-label">Vencimento ate</label>
+              <input
+                name="data_vencimento_fim"
+                className="input"
+                value={filtros.data_vencimento_fim || ''}
                 onChange={handleChange}
                 type="date"
               />

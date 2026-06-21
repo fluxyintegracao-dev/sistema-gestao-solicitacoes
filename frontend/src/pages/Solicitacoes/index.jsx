@@ -145,6 +145,8 @@ export default function Solicitacoes({ arquivadas = false }) {
     valor_max: '',
     data_registro: '',
     data_vencimento: '',
+    data_vencimento_inicio: '',
+    data_vencimento_fim: '',
     responsavel: ''
   });
 
@@ -419,6 +421,14 @@ export default function Solicitacoes({ arquivadas = false }) {
     }
 
     if (filtros.data_registro && dataRegistro !== filtros.data_registro) {
+      return false;
+    }
+
+    if (filtros.data_vencimento_inicio && (!dataVencimento || dataVencimento < filtros.data_vencimento_inicio)) {
+      return false;
+    }
+
+    if (filtros.data_vencimento_fim && (!dataVencimento || dataVencimento > filtros.data_vencimento_fim)) {
       return false;
     }
 

@@ -949,6 +949,8 @@ module.exports = {
         responsavel,
         data_registro,
         data_vencimento,
+        data_vencimento_inicio,
+        data_vencimento_fim,
         data_inicio,
         data_fim,
         valor_min,
@@ -1415,9 +1417,32 @@ module.exports = {
         }
       }
 
-      if (data_vencimento) {
+      const isDataIsoValida = (valor) => /^\d{4}-\d{2}-\d{2}$/.test(String(valor || '').trim());
+      const dataVencimentoInicioStr = String(data_vencimento_inicio || '').trim();
+      const dataVencimentoFimStr = String(data_vencimento_fim || '').trim();
+      const temPeriodoVencimento = isDataIsoValida(dataVencimentoInicioStr) || isDataIsoValida(dataVencimentoFimStr);
+
+      if (temPeriodoVencimento) {
+        where[Op.and] = where[Op.and] || [];
+        if (isDataIsoValida(dataVencimentoInicioStr)) {
+          where[Op.and].push(
+            Sequelize.where(
+              Sequelize.fn('DATE', Sequelize.col('Solicitacao.data_vencimento')),
+              { [Op.gte]: dataVencimentoInicioStr }
+            )
+          );
+        }
+        if (isDataIsoValida(dataVencimentoFimStr)) {
+          where[Op.and].push(
+            Sequelize.where(
+              Sequelize.fn('DATE', Sequelize.col('Solicitacao.data_vencimento')),
+              { [Op.lte]: dataVencimentoFimStr }
+            )
+          );
+        }
+      } else if (data_vencimento) {
         const dataVencimentoStr = String(data_vencimento).trim();
-        if (/^\d{4}-\d{2}-\d{2}$/.test(dataVencimentoStr)) {
+        if (isDataIsoValida(dataVencimentoStr)) {
           where[Op.and] = where[Op.and] || [];
           where[Op.and].push(
             Sequelize.where(
@@ -2797,9 +2822,14 @@ module.exports = {
       const { valor } = req.body;
       const perfil = String(req.user?.perfil || '').trim().toUpperCase();
       const isGeo = await isSetorGeo(req);
+      const permissoesArea = Array.isArray(req.user?.areas_permissoes)
+        ? req.user.areas_permissoes.map((item) => String(item || '').trim().toLowerCase())
+        : [];
+      const podeEditarPorPermissao = permissoesArea.includes('solicitacoes.acoes.alterar_valor');
       const podeEditar =
         perfil === 'SUPERADMIN' ||
-        (perfil.startsWith('ADMIN') && isGeo);
+        (perfil.startsWith('ADMIN') && isGeo) ||
+        podeEditarPorPermissao;
 
       if (!podeEditar) {
         return res.status(403).json({
@@ -3409,6 +3439,61 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return res.status(500).json({ error: 'Erro ao adicionar comentario' });
+    }
+  },
+
+  async removerComentario(req, res) {
+    try {
+      const perfil = String(req.user?.perfil || '').trim().toUpperCase();
+      if (perfil !== 'SUPERADMIN') {
+        return res.status(403).json({ error: 'Acesso negado para remover comentario.' });
+      }
+
+      const solicitacaoId = Number(req.params.id);
+      const historicoId = Number(req.params.historicoId);
+      if (!Number.isInteger(solicitacaoId) || !Number.isInteger(historicoId)) {
+        return res.status(400).json({ error: 'Parametros invalidos.' });
+      }
+
+      const historico = await Historico.findOne({
+        where: {
+          id: historicoId,
+          solicitacao_id: solicitacaoId
+        }
+      });
+
+      if (!historico) {
+        return res.status(404).json({ error: 'Comentario nao encontrado.' });
+      }
+
+      if (String(historico.acao || '').trim().toUpperCase() !== 'COMENTARIO') {
+        return res.status(400).json({ error: 'Apenas comentarios podem ser removidos por este endpoint.' });
+      }
+
+      let metadata = {};
+      try {
+        metadata = historico.metadata ? JSON.parse(historico.metadata) : {};
+      } catch {
+        metadata = {};
+      }
+
+      await historico.update({
+        acao: 'COMENTARIO_REMOVIDO',
+        descricao: 'Comentario removido por SUPERADMIN.',
+        metadata: JSON.stringify({
+          ...metadata,
+          comentario_removido: true,
+          removido_por: req.user.id,
+          removido_em: new Date().toISOString(),
+          acao_original: historico.acao,
+          descricao_original: historico.descricao
+        })
+      });
+
+      return res.json({ message: 'Comentario removido do historico.' });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao remover comentario' });
     }
   },
 

@@ -17,21 +17,30 @@ export default function NotificacoesBell() {
   const [itens, setItens] = useState([]);
   const [totalNaoLidas, setTotalNaoLidas] = useState(0);
   const [carregando, setCarregando] = useState(false);
+  const [meta, setMeta] = useState({ page: 1, has_more: false });
   const navigate = useNavigate();
   const painelRef = useRef(null);
   const botaoRef = useRef(null);
 
-  async function carregar({ showLoading = false } = {}) {
+  async function carregar({ showLoading = false, page = 1, append = false } = {}) {
     if (typeof document !== 'undefined' && document.hidden) {
       return;
     }
 
     try {
       if (showLoading) setCarregando(true);
-      const data = await getNotificacoes({ limit: 20 });
+      const data = await getNotificacoes({ limit: 20, page });
       const itensRecebidos = Array.isArray(data.itens) ? data.itens : [];
 
-      setItens(itensRecebidos);
+      setItens((atuais) => {
+        if (!append) return itensRecebidos;
+        const mapa = new Map();
+        [...atuais, ...itensRecebidos].forEach((item) => {
+          mapa.set(item.destinatario_id ?? item.id ?? `${item.tipo}-${item.created_at}`, item);
+        });
+        return Array.from(mapa.values());
+      });
+      setMeta(data.meta || { page, has_more: false });
       setTotalNaoLidas(Number(data.total_nao_lidas) || itensRecebidos.filter((item) => !item.lida_em).length);
     } catch (error) {
       console.error(error);
@@ -77,14 +86,14 @@ export default function NotificacoesBell() {
   async function alternarPainel() {
     const nextState = !aberto;
     if (nextState) {
-      await carregar({ showLoading: true });
+      await carregar({ showLoading: true, page: 1 });
     }
     setAberto(nextState);
   }
 
   async function marcarTudo() {
     await marcarTodasNotificacoesLidas();
-    await carregar({ showLoading: true });
+    await carregar({ showLoading: true, page: 1 });
   }
 
   async function abrirSolicitacao(item) {
@@ -92,11 +101,16 @@ export default function NotificacoesBell() {
       await marcarNotificacaoLida(item.destinatario_id);
     }
 
-    await carregar();
+    await carregar({ page: 1 });
     if (item.solicitacao_id) {
       navigate(`/solicitacoes/${item.solicitacao_id}`);
     }
     setAberto(false);
+  }
+
+  async function carregarMais() {
+    if (!meta?.has_more || carregando) return;
+    await carregar({ showLoading: true, page: Number(meta.page || 1) + 1, append: true });
   }
 
   return (
@@ -212,6 +226,18 @@ export default function NotificacoesBell() {
                   </div>
                 </button>
               ))}
+
+              {!carregando && meta?.has_more && (
+                <div className="p-3">
+                  <button
+                    type="button"
+                    onClick={carregarMais}
+                    className="btn btn-ghost btn-sm w-full"
+                  >
+                    Carregar mais
+                  </button>
+                </div>
+              )}
             </div>
           </section>
         </>

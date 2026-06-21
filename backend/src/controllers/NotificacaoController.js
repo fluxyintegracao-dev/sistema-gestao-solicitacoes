@@ -17,12 +17,14 @@ function normalizarTiposFiltro(value) {
 module.exports = {
   async index(req, res) {
     try {
-      const { nao_lidas, limit, tipos } = req.query;
+      const { nao_lidas, limit, page, tipos } = req.query;
       const where = { usuario_id: req.user.id };
       const limite = Math.min(
         Number(limit) > 0 ? Number(limit) : DEFAULT_NOTIFICACOES_LIMIT,
         MAX_NOTIFICACOES_LIMIT
       );
+      const pagina = Math.max(Number(page) > 0 ? Number(page) : 1, 1);
+      const offset = (pagina - 1) * limite;
       const tiposFiltro = normalizarTiposFiltro(tipos);
       const includeNotificacao = {
         model: Notificacao,
@@ -39,9 +41,15 @@ module.exports = {
         where.lida_em = null;
       }
 
-      const [totalNaoLidas, itens] = await Promise.all([
+      const [totalNaoLidas, totalItens, itens] = await Promise.all([
         NotificacaoDestinatario.count({
           where: { usuario_id: req.user.id, lida_em: null },
+          include: [includeNotificacao],
+          distinct: true,
+          col: 'id'
+        }),
+        NotificacaoDestinatario.count({
+          where,
           include: [includeNotificacao],
           distinct: true,
           col: 'id'
@@ -50,7 +58,8 @@ module.exports = {
           where,
           include: [includeNotificacao],
           order: [['createdAt', 'DESC']],
-          limit: limite
+          limit: limite,
+          offset
         })
       ]);
 
@@ -68,7 +77,13 @@ module.exports = {
 
       return res.json({
         total_nao_lidas: totalNaoLidas,
-        itens: resultado
+        itens: resultado,
+        meta: {
+          page: pagina,
+          limit: limite,
+          total: totalItens,
+          has_more: offset + resultado.length < totalItens
+        }
       });
     } catch (error) {
       console.error(error);
