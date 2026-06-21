@@ -31,10 +31,10 @@ export default function Timeline({ historicos, canRemoveAnexo = false, onAnexoRe
       );
       if (!res.ok) throw new Error('Falha ao assinar URL');
       const data = await res.json();
-      return data?.url || caminhoNormalizado;
+      return data?.url || null;
     } catch (error) {
       console.error(error);
-      return caminhoNormalizado;
+      return null;
     }
   }
 
@@ -63,7 +63,7 @@ export default function Timeline({ historicos, canRemoveAnexo = false, onAnexoRe
       return { url: previewUrl, downloadUrl: urlAssinada, isObjectUrl: true };
     } catch (error) {
       console.error(error);
-      return { url: urlAssinada, downloadUrl: urlAssinada, isObjectUrl: false };
+      return { url: null, downloadUrl: null, isObjectUrl: false, erro: 'Nao foi possivel preparar o preview deste PDF.' };
     }
   }
 

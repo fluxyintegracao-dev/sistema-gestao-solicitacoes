@@ -8,6 +8,7 @@ const { criarNotificacao } = require('../services/notificacoes');
 const { uploadToS3, getPresignedUrl } = require('../services/s3');
 const {
   assertRegisteredFileAccess,
+  getRegisteredFilePath,
   resolveRegisteredFileResource
 } = require('../services/fileAccessService');
 const { normalizeOriginalName } = require('../utils/fileName');
@@ -222,7 +223,8 @@ class AnexoController {
         return res.status(acesso.status || 403).json({ error: acesso.error || 'Acesso negado ao arquivo' });
       }
 
-      const signedUrl = await getPresignedUrl(alvo);
+      const caminhoRegistrado = getRegisteredFilePath(arquivoRegistrado) || alvo;
+      const signedUrl = await getPresignedUrl(caminhoRegistrado);
       return res.json({ url: signedUrl });
     } catch (error) {
       console.error('Erro ao gerar URL assinada:', error);

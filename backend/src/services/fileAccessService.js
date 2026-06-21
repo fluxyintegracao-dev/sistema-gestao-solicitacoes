@@ -12,6 +12,7 @@ const {
   SolicitacaoCompraItem,
   SolicitacaoCompraItemManual
 } = require('../models');
+const { Op } = require('sequelize');
 const {
   buildUserScopeTokens,
   canAccessComprovantes,
@@ -253,34 +254,87 @@ async function canAccessCompraFile(req, solicitacaoCompraId) {
   };
 }
 
+function addCandidate(candidates, value) {
+  const normalized = String(value || '').trim();
+  if (normalized) candidates.add(normalized);
+}
+
+function buildFileTargetCandidates(alvo) {
+  const candidates = new Set();
+  const target = String(alvo || '').trim();
+  addCandidate(candidates, target);
+
+  const bucket = process.env.AWS_S3_BUCKET;
+  const region = process.env.AWS_REGION;
+
+  try {
+    const parsed = new URL(target);
+    if (bucket && parsed.hostname.startsWith(`${bucket}.s3`)) {
+      const rawKey = parsed.pathname.replace(/^\//, '');
+      addCandidate(candidates, rawKey);
+
+      try {
+        addCandidate(candidates, decodeURIComponent(rawKey));
+      } catch {
+        const sanitizedKey = rawKey.replace(/%(?![0-9A-Fa-f]{2})/g, '%25');
+        addCandidate(candidates, decodeURIComponent(sanitizedKey));
+      }
+
+      if (region) {
+        addCandidate(candidates, `https://${bucket}.s3.${region}.amazonaws.com/${rawKey}`);
+      }
+    }
+  } catch {
+    if (bucket && region && target && !target.startsWith('http')) {
+      addCandidate(candidates, `https://${bucket}.s3.${region}.amazonaws.com/${target}`);
+    }
+  }
+
+  return Array.from(candidates);
+}
+
+function getRegisteredFilePath(target) {
+  if (!target?.record) return null;
+
+  return (
+    target.record.caminho_arquivo ||
+    target.record.arquivo_url ||
+    target.record.caminho ||
+    null
+  );
+}
+
 async function resolveRegisteredFileResource(alvo) {
+  const fileCandidates = buildFileTargetCandidates(alvo);
+  const whereIn = { [Op.in]: fileCandidates };
+
   const buscas = await Promise.all([
     Anexo.findOne({
-      where: { caminho_arquivo: alvo, deleted_at: null },
+      where: { caminho_arquivo: whereIn, deleted_at: null },
       attributes: ['id', 'solicitacao_id', 'caminho_arquivo']
     }),
     ContratoAnexo.findOne({
-      where: { caminho_arquivo: alvo },
+      where: { caminho_arquivo: whereIn },
       attributes: ['id', 'contrato_id', 'caminho_arquivo']
     }),
     Comprovante.findOne({
-      where: { caminho_arquivo: alvo, deleted_at: null },
+      where: { caminho_arquivo: whereIn, deleted_at: null },
       attributes: ['id', 'solicitacao_id', 'obra_id', 'caminho_arquivo']
     }),
     ArquivoModelo.findOne({
-      where: { arquivo_url: alvo },
+      where: { arquivo_url: whereIn },
       attributes: ['id', 'pagina_codigo', 'arquivo_url', 'ativo']
     }),
     ConversaInternaAnexo.findOne({
-      where: { caminho: alvo },
+      where: { caminho: whereIn },
       attributes: ['id', 'conversa_id', 'caminho']
     }),
     SolicitacaoCompraItem.findOne({
-      where: { arquivo_url: alvo },
+      where: { arquivo_url: whereIn },
       attributes: ['id', 'solicitacao_compra_id', 'arquivo_url']
     }),
     SolicitacaoCompraItemManual.findOne({
-      where: { arquivo_url: alvo },
+      where: { arquivo_url: whereIn },
       attributes: ['id', 'solicitacao_compra_id', 'arquivo_url']
     })
   ]);
@@ -363,5 +417,6 @@ async function assertRegisteredFileAccess(req, target) {
 
 module.exports = {
   assertRegisteredFileAccess,
+  getRegisteredFilePath,
   resolveRegisteredFileResource
 };

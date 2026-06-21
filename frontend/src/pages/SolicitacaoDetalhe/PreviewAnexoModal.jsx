@@ -1,11 +1,23 @@
 import { fileUrl } from '../../services/api';
 
 export default function PreviewAnexoModal({ anexo, onClose }) {
-  const url = anexo.url || fileUrl(anexo.caminho);
+  const temUrlExplicita = Object.prototype.hasOwnProperty.call(anexo, 'url');
+  const url = temUrlExplicita ? anexo.url : fileUrl(anexo.caminho);
   const downloadUrl = anexo.downloadUrl || url;
   const isPdf = /\.pdf$/i.test(anexo?.nome || '');
 
   function renderPreview() {
+    if (!url) {
+      return (
+        <div className="text-center py-12" style={{ color: 'var(--c-text-muted)' }}>
+          <p className="mb-2 font-semibold" style={{ color: 'var(--c-text)' }}>
+            Pre-visualizacao indisponivel
+          </p>
+          <p>{anexo.erro || 'Nao foi possivel gerar um link seguro para este arquivo.'}</p>
+        </div>
+      );
+    }
+
     if (anexo.nome.match(/\.(jpg|jpeg|png|gif|webp)$/i)) {
       return (
         <img
