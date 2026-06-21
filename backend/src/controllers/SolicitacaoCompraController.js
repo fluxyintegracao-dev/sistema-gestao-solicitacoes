@@ -52,8 +52,10 @@ const {
 } = require('../services/aprovacaoDiretoriaConfig');
 const {
   canAccessCompras,
+  canAccessSolicitacaoCompraByScope,
   canManageComprasCotacoes,
   canManageComprasDelegacao,
+  canViewAllComprasScope,
   isSuperadmin,
   isBusinessAdmin
 } = require('../services/authorizationService');
@@ -1093,6 +1095,22 @@ async function anexarPdfNaSolicitacaoPrincipal({ solicitacaoCompraId, solicitaca
   }
 }
 
+async function validarEscopoSolicitacaoCompra(usuario, solicitacao, res, transaction = null) {
+  if (await canAccessSolicitacaoCompraByScope(usuario, solicitacao)) {
+    return true;
+  }
+
+  if (transaction && Number(solicitacao?.id || 0) > 0) {
+    const solicitacaoDb = await SolicitacaoCompra.findByPk(solicitacao.id, { transaction });
+    if (await canAccessSolicitacaoCompraByScope(usuario, solicitacaoDb)) {
+      return true;
+    }
+  }
+
+  res.status(403).json({ error: 'Acesso negado a esta solicitacao de compra' });
+  return false;
+}
+
 module.exports = {
   async uploadTemporario(req, res) {
     try {
@@ -1140,6 +1158,11 @@ module.exports = {
         : false;
       if (contextoDelegacao && !podeGerenciarDelegacao) {
         where.comprador_responsavel_id = usuario.id;
+      } else if (!contextoDelegacao && !(await canViewAllComprasScope(usuario))) {
+        where[Op.or] = [
+          { comprador_responsavel_id: usuario.id },
+          { solicitante_id: usuario.id }
+        ];
       }
       const obraIdsEscopo = Array.isArray(req.compraScopeObraIds)
         ? req.compraScopeObraIds
@@ -1215,6 +1238,10 @@ module.exports = {
         return responderCompraAguardandoDiretoria(res);
       }
 
+      if (!(await validarEscopoSolicitacaoCompra(usuario, solicitacao, res))) {
+        return;
+      }
+
       return res.json(solicitacao);
     } catch (error) {
       console.error(error);
@@ -1252,6 +1279,11 @@ module.exports = {
       if (isCompraAguardandoDiretoria(solicitacao)) {
         await transaction.rollback();
         return responderCompraAguardandoDiretoria(res);
+      }
+
+      if (!(await validarEscopoSolicitacaoCompra(usuario, solicitacao, res, transaction))) {
+        await transaction.rollback();
+        return;
       }
 
       if (solicitacao.solicitacao_principal_id) {
@@ -1671,6 +1703,11 @@ module.exports = {
         return responderCompraAguardandoDiretoria(res);
       }
 
+      if (!(await validarEscopoSolicitacaoCompra(usuario, solicitacao, res, transaction))) {
+        await transaction.rollback();
+        return;
+      }
+
       if (Number(solicitacao.solicitacao_principal_id || 0) > 0) {
         const solicitacaoPrincipal = await Solicitacao.findByPk(solicitacao.solicitacao_principal_id, {
           attributes: [
@@ -1848,6 +1885,11 @@ module.exports = {
         return responderCompraAguardandoDiretoria(res);
       }
 
+      if (!(await validarEscopoSolicitacaoCompra(usuario, solicitacao, res, transaction))) {
+        await transaction.rollback();
+        return;
+      }
+
       const motivo = String(req.body?.motivo || '').trim();
       await solicitacao.update(
         {
@@ -1892,6 +1934,10 @@ module.exports = {
         return responderCompraAguardandoDiretoria(res);
       }
 
+      if (!(await validarEscopoSolicitacaoCompra(usuario, solicitacao, res))) {
+        return;
+      }
+
       return res.json(montarComparativoSolicitacao(solicitacao));
     } catch (error) {
       console.error(error);
@@ -1923,6 +1969,11 @@ module.exports = {
       if (isCompraAguardandoDiretoria(solicitacao)) {
         await transaction.rollback();
         return responderCompraAguardandoDiretoria(res);
+      }
+
+      if (!(await validarEscopoSolicitacaoCompra(usuario, solicitacao, res))) {
+        await transaction.rollback();
+        return;
       }
 
       const vencedores = Array.isArray(req.body?.alocacoes)
@@ -2026,6 +2077,10 @@ module.exports = {
 
       if (!podeAcompanharCompraAguardandoDiretoria(usuario, solicitacao)) {
         return responderCompraAguardandoDiretoria(res);
+      }
+
+      if (!(await validarEscopoSolicitacaoCompra(usuario, solicitacao, res))) {
+        return;
       }
 
       const doc = new PDFDocument({ margin: 40, size: 'A4', layout: 'landscape' });

@@ -904,7 +904,15 @@ async function criarPedidoParaFornecedor({ solicitacaoId, fornecedorCompraId, us
   });
 }
 
-async function listarPedidos({ solicitacaoId, obraId, status, q, obraIds = null } = {}) {
+async function listarPedidos({
+  solicitacaoId,
+  obraId,
+  status,
+  q,
+  obraIds = null,
+  compradorResponsavelId = null,
+  solicitanteId = null
+} = {}) {
   const where = {};
 
   if (solicitacaoId) {
@@ -923,11 +931,32 @@ async function listarPedidos({ solicitacaoId, obraId, status, q, obraIds = null 
     where.status = String(status).trim().toUpperCase();
   }
 
+  const solicitacaoScope = [];
+  if (Number(compradorResponsavelId || 0) > 0) {
+    solicitacaoScope.push({ comprador_responsavel_id: Number(compradorResponsavelId) });
+  }
+  if (Number(solicitanteId || 0) > 0) {
+    solicitacaoScope.push({ solicitante_id: Number(solicitanteId) });
+  }
+
+  const solicitacaoWhere = {};
+  if (solicitacaoScope.length === 1) {
+    Object.assign(solicitacaoWhere, solicitacaoScope[0]);
+  } else if (solicitacaoScope.length > 1) {
+    solicitacaoWhere[Op.or] = solicitacaoScope;
+  }
+
   const pedidos = await PedidoCompra.findAll({
     where,
     include: [
       { model: FornecedorCompra, as: 'fornecedor', attributes: ['id', 'nome', 'email', 'whatsapp'] },
-      { model: SolicitacaoCompra, as: 'solicitacao', attributes: ['id', 'status', 'numero_sienge'] },
+      {
+        model: SolicitacaoCompra,
+        as: 'solicitacao',
+        attributes: ['id', 'status', 'numero_sienge', 'comprador_responsavel_id', 'solicitante_id'],
+        where: solicitacaoWhere,
+        required: solicitacaoScope.length > 0
+      },
       { model: Obra, as: 'obra', attributes: ['id', 'nome', 'codigo'] },
       { model: PedidoCompraItem, as: 'itens', attributes: ['id', 'descricao', 'valor_total', 'removido'] }
     ],
@@ -1072,11 +1101,18 @@ async function obterPedidoDetalhe(id, { obraIdsHistoricoPreco = null } = {}) {
       },
       { model: User, as: 'criador', attributes: ['id', 'nome', 'email'] },
       { model: User, as: 'responsavel', attributes: ['id', 'nome', 'email'] },
-      {
-        model: SolicitacaoCompra,
-        as: 'solicitacao',
-        attributes: ['id', 'status', 'numero_sienge', 'necessario_para']
-      },
+        {
+          model: SolicitacaoCompra,
+          as: 'solicitacao',
+          attributes: [
+            'id',
+            'status',
+            'numero_sienge',
+            'necessario_para',
+            'comprador_responsavel_id',
+            'solicitante_id'
+          ]
+        },
       {
         model: PedidoCompraItem,
         as: 'itens',

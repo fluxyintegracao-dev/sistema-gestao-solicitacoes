@@ -25,6 +25,7 @@ const {
   registrarLogSolicitacaoCompra
 } = require('../services/comprasCotacao');
 const { getPresignedUrl, uploadToS3 } = require('../services/s3');
+const { canViewAllComprasScope } = require('../services/authorizationService');
 const { responderErroController } = require('../utils/controllerError');
 
 function buildItemKey(itemTipo, itemReferenciaId) {
@@ -720,9 +721,25 @@ module.exports = {
     try {
       const { q, status, obra_id } = req.query;
       const where = {};
+      const solicitacaoWhere = {};
 
       if (status) {
         where.status = String(status).toUpperCase();
+      }
+
+      if (obra_id) {
+        solicitacaoWhere.obra_id = obra_id;
+      } else if (Array.isArray(req.compraScopeObraIds)) {
+        solicitacaoWhere.obra_id = req.compraScopeObraIds.length
+          ? { [Op.in]: req.compraScopeObraIds }
+          : -1;
+      }
+
+      if (!(await canViewAllComprasScope(req.user))) {
+        solicitacaoWhere[Op.or] = [
+          { comprador_responsavel_id: req.user.id },
+          { solicitante_id: req.user.id }
+        ];
       }
 
       const cotacoes = await SolicitacaoCompraFornecedor.findAll({
@@ -738,11 +755,12 @@ module.exports = {
           {
             model: SolicitacaoCompra,
             as: 'solicitacao',
-            attributes: ['id', 'titulo', 'status'],
+            attributes: ['id', 'titulo', 'status', 'comprador_responsavel_id', 'solicitante_id'],
             include: [
               { model: Obra, as: 'obra', attributes: ['id', 'nome', 'codigo'] }
             ],
-            ...(obra_id ? { where: { obra_id }, required: true } : {})
+            where: solicitacaoWhere,
+            required: true
           }
         ]
       });

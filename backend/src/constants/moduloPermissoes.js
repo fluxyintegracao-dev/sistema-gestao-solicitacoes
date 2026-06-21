@@ -85,6 +85,15 @@ const MODULO_PERMISSION_GROUPS = [
         ]
       },
       {
+        key: 'compras.escopo',
+        label: 'Escopo operacional',
+        permissoes: [
+          { key: 'compras.escopo.minhas_atribuidas', label: 'Ver apenas atribuidas', descricao: 'Operar somente solicitacoes, cotacoes, pedidos e delegacoes vinculados ao usuario.' },
+          { key: 'compras.escopo.setor', label: 'Ver setor de compras', descricao: 'Acompanhar todos os registros operacionais do setor de compras.' },
+          { key: 'compras.escopo.todas', label: 'Ver todos os registros', descricao: 'Visao administrativa completa dos registros de compras.' }
+        ]
+      },
+      {
         key: 'compras.pedidos',
         label: 'Pedidos de Compra',
         permissoes: [

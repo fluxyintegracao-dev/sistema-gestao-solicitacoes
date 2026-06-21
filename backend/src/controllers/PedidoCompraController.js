@@ -18,11 +18,14 @@ const {
 } = require('../services/pedidoCompraService');
 const {
   getUserObraScopeIds,
+  canAccessSolicitacaoCompraByScope,
   canAuditComprasPedidos,
   canManageComprasDelegacao,
   canManageComprasPedidos,
+  canViewAllComprasScope,
   canViewComprasDelegacao,
-  canViewComprasPedidos
+  canViewComprasPedidos,
+  normalizeToken
 } = require('../services/authorizationService');
 const { renderPedidoCompraPdf } = require('../services/pedidoCompraPdf');
 const { responderErroController } = require('../utils/controllerError');
@@ -104,6 +107,32 @@ async function buildHistoricoPrecoScope(req) {
   return obraIds;
 }
 
+async function validarEscopoPedidoCompra(usuario, pedido, res) {
+  if (await canAccessSolicitacaoCompraByScope(usuario, pedido?.solicitacao)) {
+    return true;
+  }
+
+  res.status(403).json({ error: 'Acesso negado a este pedido de compra' });
+  return false;
+}
+
+async function carregarPedidoCompraNoEscopo(req, res, usuario, pedidoId) {
+  const pedido = await obterPedidoDetalhe(pedidoId, {
+    obraIdsHistoricoPreco: await buildHistoricoPrecoScope(req)
+  });
+
+  if (!pedido) {
+    res.status(404).json({ error: 'Pedido de compra nao encontrado' });
+    return null;
+  }
+
+  if (!(await validarEscopoPedidoCompra(usuario, pedido, res))) {
+    return null;
+  }
+
+  return pedido;
+}
+
 module.exports = {
   async index(req, res) {
     try {
@@ -112,12 +141,15 @@ module.exports = {
         return;
       }
 
+      const podeVerEscopoCompleto = await canViewAllComprasScope(usuario);
       const pedidos = await listarPedidos({
         solicitacaoId: req.query?.solicitacao_id,
         obraId: req.query?.obra_id,
         status: req.query?.status,
         q: req.query?.q,
-        obraIds: req.compraScopeObraIds
+        obraIds: req.compraScopeObraIds,
+        compradorResponsavelId: podeVerEscopoCompleto ? null : usuario.id,
+        solicitanteId: podeVerEscopoCompleto ? null : usuario.id
       });
 
       return res.json(pedidos);
@@ -164,6 +196,10 @@ module.exports = {
         return res.status(404).json({ error: 'Pedido de compra nao encontrado' });
       }
 
+      if (!(await validarEscopoPedidoCompra(usuario, pedido, res))) {
+        return;
+      }
+
       return res.json(pedido);
     } catch (error) {
       console.error(error);
@@ -181,7 +217,16 @@ module.exports = {
         return;
       }
 
-      if (normalizeToken(req.solicitacaoCompraResource?.status) !== 'ENCERRADO') {
+      const solicitacaoCompra = req.solicitacaoCompraResource || await SolicitacaoCompra.findByPk(req.params.id, {
+        transaction
+      });
+
+      if (!(await canAccessSolicitacaoCompraByScope(usuario, solicitacaoCompra))) {
+        await transaction.rollback();
+        return res.status(403).json({ error: 'Acesso negado a esta solicitacao de compra' });
+      }
+
+      if (normalizeToken(solicitacaoCompra?.status) !== 'ENCERRADO') {
         await transaction.rollback();
         return res.status(400).json({
           error: 'A solicitacao precisa estar encerrada para gerar pedido adicional.'
@@ -214,6 +259,11 @@ module.exports = {
         return;
       }
 
+      if (!(await carregarPedidoCompraNoEscopo(req, res, usuario, req.params.id))) {
+        await transaction.rollback();
+        return;
+      }
+
       await adicionarRespostaAoPedido({
         pedidoId: req.params.id,
         respostaItemId: req.body?.resposta_item_id,
@@ -239,6 +289,11 @@ module.exports = {
     try {
       const usuario = await validarAcessoPedidos(req, res, { gerenciar: true });
       if (!usuario) {
+        await transaction.rollback();
+        return;
+      }
+
+      if (!(await carregarPedidoCompraNoEscopo(req, res, usuario, req.params.id))) {
         await transaction.rollback();
         return;
       }
@@ -273,6 +328,19 @@ module.exports = {
       }
 
       const ids = Array.isArray(req.body?.pedido_ids) ? req.body.pedido_ids : [];
+      if (!(await canViewAllComprasScope(usuario))) {
+        const pedidosPermitidos = await listarPedidos({
+          compradorResponsavelId: usuario.id,
+          solicitanteId: usuario.id
+        });
+        const idsPermitidos = new Set(pedidosPermitidos.map((pedido) => Number(pedido.id)));
+        const foraDoEscopo = ids.some((id) => !idsPermitidos.has(Number(id)));
+        if (foraDoEscopo) {
+          await transaction.rollback();
+          return res.status(403).json({ error: 'Acesso negado a um ou mais pedidos selecionados' });
+        }
+      }
+
       await atualizarStatusPedidosEmLote({
         pedidoIds: ids,
         status: req.body?.status,
@@ -295,6 +363,11 @@ module.exports = {
     try {
       const usuario = await validarAcessoPedidos(req, res, { gerenciar: true });
       if (!usuario) {
+        await transaction.rollback();
+        return;
+      }
+
+      if (!(await carregarPedidoCompraNoEscopo(req, res, usuario, req.params.id))) {
         await transaction.rollback();
         return;
       }
@@ -329,6 +402,11 @@ module.exports = {
         return;
       }
 
+      if (!(await carregarPedidoCompraNoEscopo(req, res, usuario, req.params.id))) {
+        await transaction.rollback();
+        return;
+      }
+
       await removerPedidoItem({
         pedidoId: req.params.id,
         itemId: req.params.itemId,
@@ -354,6 +432,11 @@ module.exports = {
     try {
       const usuario = await validarAcessoPedidos(req, res, { gerenciar: true });
       if (!usuario) {
+        await transaction.rollback();
+        return;
+      }
+
+      if (!(await carregarPedidoCompraNoEscopo(req, res, usuario, req.params.id))) {
         await transaction.rollback();
         return;
       }
@@ -387,6 +470,11 @@ module.exports = {
         return;
       }
 
+      if (!(await carregarPedidoCompraNoEscopo(req, res, usuario, req.params.id))) {
+        await transaction.rollback();
+        return;
+      }
+
       await cancelarPedidoItens({
         pedidoId: req.params.id,
         itens: req.body?.itens || req.body?.item_ids,
@@ -413,6 +501,11 @@ module.exports = {
     try {
       const usuario = await validarAcessoPedidos(req, res, { gerenciar: true });
       if (!usuario) {
+        await transaction.rollback();
+        return;
+      }
+
+      if (!(await carregarPedidoCompraNoEscopo(req, res, usuario, req.params.id))) {
         await transaction.rollback();
         return;
       }
@@ -449,6 +542,11 @@ module.exports = {
         return;
       }
 
+      if (!(await carregarPedidoCompraNoEscopo(req, res, usuario, req.params.id))) {
+        await transaction.rollback();
+        return;
+      }
+
       await registrarComentarioPedido({
         pedidoId: req.params.id,
         comentario: req.body?.comentario,
@@ -471,6 +569,11 @@ module.exports = {
     try {
       const usuario = await validarAcessoPedidos(req, res, { gerenciar: true });
       if (!usuario) {
+        await transaction.rollback();
+        return;
+      }
+
+      if (!(await carregarPedidoCompraNoEscopo(req, res, usuario, req.params.id))) {
         await transaction.rollback();
         return;
       }
@@ -557,6 +660,10 @@ module.exports = {
       });
       if (!pedido) {
         return res.status(404).json({ error: 'Pedido de compra nao encontrado' });
+      }
+
+      if (!(await validarEscopoPedidoCompra(usuario, pedido, res))) {
+        return;
       }
 
       const filename = `pedido-compra-PC-${String(pedido.id).padStart(5, '0')}.pdf`;

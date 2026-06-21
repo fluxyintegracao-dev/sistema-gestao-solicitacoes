@@ -197,6 +197,15 @@ const COMPRAS_CONFIGURACOES_MANAGE_KEYS = [
   'compras.configuracoes.cadastros'
 ];
 
+const COMPRAS_ESCOPO_SETOR_KEYS = [
+  'compras.escopo.setor',
+  'compras.delegacao.gerenciar'
+];
+
+const COMPRAS_ESCOPO_TODAS_KEYS = [
+  'compras.escopo.todas'
+];
+
 const COMPRAS_PERMISSION_KEYS = [
   ...COMPRAS_SOLICITACOES_VIEW_KEYS,
   ...COMPRAS_SOLICITACOES_CREATE_KEYS,
@@ -1520,6 +1529,51 @@ async function canManageComprasCotacoes(user) {
   );
 }
 
+async function getComprasVisibilityScope(user) {
+  if (isBusinessAdmin(user)) {
+    return 'TODAS';
+  }
+
+  if (await userHasAreaPermissionWhenConfigured(user, COMPRAS_ESCOPO_TODAS_KEYS)) {
+    return 'TODAS';
+  }
+
+  if (await userHasAreaPermissionWhenConfigured(user, COMPRAS_ESCOPO_SETOR_KEYS)) {
+    return 'SETOR';
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return 'ATRIBUIDAS';
+  }
+
+  if (await userHasSetorCapability(user, 'eh_setor_compras')) {
+    return 'SETOR';
+  }
+
+  return 'ATRIBUIDAS';
+}
+
+async function canViewAllComprasScope(user) {
+  const scope = await getComprasVisibilityScope(user);
+  return scope === 'TODAS' || scope === 'SETOR';
+}
+
+async function canAccessSolicitacaoCompraByScope(user, solicitacaoCompra) {
+  if (!solicitacaoCompra) {
+    return false;
+  }
+
+  if (await canViewAllComprasScope(user)) {
+    return true;
+  }
+
+  const userId = Number(user?.id || 0);
+  const responsavelId = Number(solicitacaoCompra.comprador_responsavel_id || 0);
+  const solicitanteId = Number(solicitacaoCompra.solicitante_id || 0);
+
+  return userId > 0 && (responsavelId === userId || solicitanteId === userId);
+}
+
 async function canAccessRhDp(user) {
   if (isBusinessAdmin(user)) {
     return true;
@@ -2322,6 +2376,7 @@ module.exports = {
   canAuditComprasPedidos,
   canAuditPagamentos,
   buildUserScopeTokens,
+  canAccessSolicitacaoCompraByScope,
   canCreateCompraSolicitacao,
   canAccessComprovantes,
   canCancelPrioridadeDiretoriaLote,
@@ -2375,6 +2430,7 @@ module.exports = {
   canManageRhDpColaboradores,
   canManageRhDpDocumentos,
   getFinanceiroObraScopeIds,
+  getComprasVisibilityScope,
   canManageTreinamento,
   canPublishTreinamento,
   canRetryIntegracaoSienge,
@@ -2396,6 +2452,7 @@ module.exports = {
   canManageComprasConfiguracoes,
   canManageCompraSolicitacoes,
   canViewComprasCotacoes,
+  canViewAllComprasScope,
   canViewCompraSolicitacoes,
   canViewComprasDelegacao,
   canManageComprasDelegacao,
