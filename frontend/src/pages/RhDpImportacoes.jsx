@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { HiOutlineEye } from 'react-icons/hi2';
 import { useAuth } from '../contexts/AuthContext';
 import { getObras } from '../services/obras';
 import {
@@ -418,8 +419,8 @@ export default function RhDpImportacoes() {
 
       <div className="rhdp-importacoes-workspace">
         <div className="card sol-surface-card app-table-shell rhdp-importacoes-list-card">
-          <div className="table-wrapper">
-            <table className="table">
+          <div className="app-dense-table-wrapper rhdp-importacoes-lotes-wrapper">
+            <table className="app-dense-data-table rhdp-importacoes-lotes-table">
               <thead>
                 <tr>
                   <th>Lote</th>
@@ -433,20 +434,29 @@ export default function RhDpImportacoes() {
                 {importacoes.map((item) => (
                   <tr key={item.id}>
                     <td>
-                      <div className="font-medium text-slate-900">#{item.id} - {item.tipo}</div>
-                      <div className="text-xs text-slate-500">{item.nome_arquivo}</div>
+                      <div className="font-semibold text-slate-900">#{item.id}</div>
+                      <div className="text-xs uppercase tracking-wide text-slate-500">{item.tipo}</div>
+                      <div className="rhdp-importacoes-lote-file" title={item.nome_arquivo || ''}>
+                        {item.nome_arquivo || '-'}
+                      </div>
                     </td>
                     <td>{item.competencia}</td>
                     <td>{item.empresaGrupo?.nome || 'Sem recorte operacional'}</td>
                     <td>
-                      <div>{item.status}</div>
+                      <div className="font-semibold text-slate-900">{item.status}</div>
                       <div className="text-xs text-slate-500">
-                        Validas: {item.total_validas || 0} · Erros: {item.total_erros || 0}
+                        {item.total_validas || 0} valida(s) · {item.total_erros || 0} erro(s)
                       </div>
                     </td>
-                    <td>
-                      <button type="button" className="btn btn-outline" onClick={() => selecionarImportacao(item.id)}>
-                        Ver preview
+                    <td className="text-right">
+                      <button
+                        type="button"
+                        className="app-dense-icon-action"
+                        onClick={() => selecionarImportacao(item.id)}
+                        title="Ver preview"
+                        aria-label={`Ver preview da importacao ${item.id}`}
+                      >
+                        <HiOutlineEye aria-hidden="true" />
                       </button>
                     </td>
                   </tr>

@@ -9718,16 +9718,80 @@ body {
 .layout-shell .rhdp-importacoes-list-card,
 .layout-shell .rhdp-importacoes-detail-card {
   min-width: 0;
+  padding: 1.1rem;
 }
 
-.layout-shell .rhdp-importacoes-list-card .table-wrapper {
+.layout-shell .rhdp-importacoes-list-card .table-wrapper,
+.layout-shell .rhdp-importacoes-lotes-wrapper {
   max-width: 100%;
+}
+
+.layout-shell .rhdp-importacoes-lotes-wrapper {
+  max-height: 31rem;
+  overflow: auto;
+}
+
+.layout-shell .rhdp-importacoes-lotes-table {
+  min-width: 30rem;
+  table-layout: fixed;
+}
+
+.layout-shell .rhdp-importacoes-lotes-table th,
+.layout-shell .rhdp-importacoes-lotes-table td {
+  padding: 0.48rem 0.55rem;
+  font-size: 0.74rem;
+}
+
+.layout-shell .rhdp-importacoes-lotes-table th:nth-child(1),
+.layout-shell .rhdp-importacoes-lotes-table td:nth-child(1) {
+  width: 6.5rem;
+}
+
+.layout-shell .rhdp-importacoes-lotes-table th:nth-child(2),
+.layout-shell .rhdp-importacoes-lotes-table td:nth-child(2) {
+  width: 5rem;
+}
+
+.layout-shell .rhdp-importacoes-lotes-table th:nth-child(3),
+.layout-shell .rhdp-importacoes-lotes-table td:nth-child(3) {
+  width: 8.5rem;
+}
+
+.layout-shell .rhdp-importacoes-lotes-table th:nth-child(4),
+.layout-shell .rhdp-importacoes-lotes-table td:nth-child(4) {
+  width: 7.25rem;
+}
+
+.layout-shell .rhdp-importacoes-lotes-table th:nth-child(5),
+.layout-shell .rhdp-importacoes-lotes-table td:nth-child(5) {
+  width: 3.2rem;
+}
+
+.layout-shell .rhdp-importacoes-lote-file {
+  margin-top: 0.1rem;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--shell-muted, var(--c-muted));
+  font-size: 0.7rem;
+  line-height: 0.95rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .layout-shell .rhdp-importacao-summary-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 8.5rem), 1fr));
   gap: 0.75rem;
+}
+
+.layout-shell .rhdp-importacao-summary-grid > div {
+  border-radius: 0.85rem;
+  padding: 0.7rem 0.85rem;
+}
+
+.layout-shell .rhdp-importacao-summary-grid > div > div:last-child {
+  font-size: 1.25rem;
+  line-height: 1.6rem;
 }
 
 .layout-shell .rhdp-importacao-preview-table {
@@ -9750,7 +9814,7 @@ body {
 
 @media (min-width: 1536px) {
   .layout-shell .rhdp-importacoes-workspace {
-    grid-template-columns: minmax(21rem, 0.82fr) minmax(0, 1.18fr);
+    grid-template-columns: minmax(31rem, 0.78fr) minmax(0, 1.22fr);
     align-items: start;
   }
 }
