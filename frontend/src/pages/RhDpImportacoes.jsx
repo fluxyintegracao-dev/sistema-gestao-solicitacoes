@@ -416,8 +416,8 @@ export default function RhDpImportacoes() {
         </div>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[1.15fr,1fr]">
-        <div className="card sol-surface-card app-table-shell">
+      <div className="rhdp-importacoes-workspace">
+        <div className="card sol-surface-card app-table-shell rhdp-importacoes-list-card">
           <div className="table-wrapper">
             <table className="table">
               <thead>
@@ -463,7 +463,7 @@ export default function RhDpImportacoes() {
           </div>
         </div>
 
-        <div className="sol-surface-card rounded-xl p-4 space-y-4">
+        <div className="sol-surface-card rounded-xl p-4 space-y-4 rhdp-importacoes-detail-card">
           {!detalhe ? (
             <div className="text-sm text-slate-500">
               Selecione uma importacao para ver o preview persistido, os erros de linha e a confirmacao.
@@ -491,7 +491,7 @@ export default function RhDpImportacoes() {
                 </div>
               </div>
 
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <div className="rhdp-importacao-summary-grid">
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
                   <div className="text-xs uppercase tracking-wide text-slate-500">Linhas</div>
                   <div className="mt-1 text-2xl font-semibold text-slate-900">{detalhe.total_linhas || 0}</div>
