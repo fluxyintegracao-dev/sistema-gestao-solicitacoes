@@ -2,6 +2,7 @@ import { fileUrl } from '../../services/api';
 
 export default function PreviewAnexoModal({ anexo, onClose }) {
   const url = anexo.url || fileUrl(anexo.caminho);
+  const downloadUrl = anexo.downloadUrl || url;
   const isPdf = /\.pdf$/i.test(anexo?.nome || '');
 
   function renderPreview() {
@@ -25,7 +26,7 @@ export default function PreviewAnexoModal({ anexo, onClose }) {
           />
           <div className="text-center text-sm">
             <a
-              href={url}
+              href={downloadUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="underline"
@@ -43,7 +44,7 @@ export default function PreviewAnexoModal({ anexo, onClose }) {
         <p className="mb-4">Pre-visualizacao nao disponivel</p>
 
         <a
-          href={url}
+          href={downloadUrl}
           download
           className="underline" style={{ color: 'var(--c-primary)' }}
         >

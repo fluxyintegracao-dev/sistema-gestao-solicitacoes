@@ -38,6 +38,42 @@ export default function Timeline({ historicos, canRemoveAnexo = false, onAnexoRe
     }
   }
 
+  function isPdfArquivo(nomeArquivo, caminhoArquivo) {
+    return /\.pdf(\?|$)/i.test(String(nomeArquivo || caminhoArquivo || ''));
+  }
+
+  async function prepararPreviewArquivo(caminhoArquivo, nomeArquivo) {
+    const urlAssinada = await obterUrlAssinada(caminhoArquivo);
+    if (!urlAssinada) {
+      return { url: null, downloadUrl: null, isObjectUrl: false };
+    }
+
+    if (!isPdfArquivo(nomeArquivo, caminhoArquivo)) {
+      return { url: urlAssinada, downloadUrl: urlAssinada, isObjectUrl: false };
+    }
+
+    try {
+      const response = await fetch(urlAssinada);
+      if (!response.ok) throw new Error('Falha ao preparar preview do PDF');
+
+      const blob = await response.blob();
+      const previewUrl = window.URL.createObjectURL(new Blob([blob], {
+        type: blob.type || 'application/pdf'
+      }));
+      return { url: previewUrl, downloadUrl: urlAssinada, isObjectUrl: true };
+    } catch (error) {
+      console.error(error);
+      return { url: urlAssinada, downloadUrl: urlAssinada, isObjectUrl: false };
+    }
+  }
+
+  function fecharPreview() {
+    if (preview?.isObjectUrl && String(preview.url || '').startsWith('blob:')) {
+      window.URL.revokeObjectURL(preview.url);
+    }
+    setPreview(null);
+  }
+
   async function baixarArquivo(caminhoArquivo, nomeArquivo) {
     try {
       const urlArquivo = await obterUrlAssinada(caminhoArquivo);
@@ -188,11 +224,11 @@ export default function Timeline({ historicos, canRemoveAnexo = false, onAnexoRe
                   <button
                     className="text-sm" style={{ color: 'var(--c-primary)' }}
                     onClick={async () => {
-                      const urlArquivo = await obterUrlAssinada(caminhoArquivo);
+                      const previewArquivo = await prepararPreviewArquivo(caminhoArquivo, h.descricao);
                       setPreview({
                         nome: h.descricao,
                         caminho: caminhoArquivo,
-                        url: urlArquivo
+                        ...previewArquivo
                       });
                     }}
                     type="button"
@@ -235,7 +271,7 @@ export default function Timeline({ historicos, canRemoveAnexo = false, onAnexoRe
       {preview && (
         <PreviewAnexoModal
           anexo={preview}
-          onClose={() => setPreview(null)}
+          onClose={fecharPreview}
         />
       )}
     </div>

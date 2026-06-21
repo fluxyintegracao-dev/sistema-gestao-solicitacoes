@@ -53,6 +53,7 @@ const {
 const {
   canAccessCompras,
   canManageComprasCotacoes,
+  isSuperadmin,
   isBusinessAdmin
 } = require('../services/authorizationService');
 const PDF_PAGE = {
@@ -370,6 +371,13 @@ function responderCompraAguardandoDiretoria(res) {
   return res.status(403).json({
     error: 'A solicitacao de compra ainda aguarda aprovacao da diretoria antes de seguir para compras.'
   });
+}
+
+function podeAcompanharCompraAguardandoDiretoria(usuario, solicitacao) {
+  if (!isCompraAguardandoDiretoria(solicitacao)) return true;
+  if (isSuperadmin(usuario)) return true;
+  return Number(solicitacao?.solicitante_id || 0) > 0
+    && Number(solicitacao.solicitante_id) === Number(usuario?.id);
 }
 
 async function carregarSolicitacaoCompra(id) {
@@ -1119,11 +1127,12 @@ module.exports = {
       if (!usuario) return;
 
       const { obra_id } = req.query;
-      const where = {
-        status: {
+      const where = {};
+      if (!isSuperadmin(usuario)) {
+        where.status = {
           [Op.ne]: 'AGUARDANDO_DIRETORIA'
-        }
-      };
+        };
+      }
       const obraIdsEscopo = Array.isArray(req.compraScopeObraIds)
         ? req.compraScopeObraIds
         : null;
@@ -1194,7 +1203,7 @@ module.exports = {
         return res.status(404).json({ error: 'Solicitacao nao encontrada' });
       }
 
-      if (isCompraAguardandoDiretoria(solicitacao)) {
+      if (!podeAcompanharCompraAguardandoDiretoria(usuario, solicitacao)) {
         return responderCompraAguardandoDiretoria(res);
       }
 
@@ -2007,7 +2016,7 @@ module.exports = {
         return res.status(404).json({ error: 'Solicitacao nao encontrada' });
       }
 
-      if (isCompraAguardandoDiretoria(solicitacao)) {
+      if (!podeAcompanharCompraAguardandoDiretoria(usuario, solicitacao)) {
         return responderCompraAguardandoDiretoria(res);
       }
 
