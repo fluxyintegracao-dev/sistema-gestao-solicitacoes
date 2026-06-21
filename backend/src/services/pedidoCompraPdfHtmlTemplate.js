@@ -159,6 +159,11 @@ function buildObraEndereco(obra) {
   return withFallback(partes.join(' - '));
 }
 
+function buildNotaFiscalInfo(pedido) {
+  const obra = pedido?.obra || {};
+  return `CNO: ${withFallback(obra.cno)} | Endereco: ${buildObraEndereco(obra)}`;
+}
+
 function getStatusPresentation(statusLabel, statusColor) {
   const label = withFallback(statusLabel).toUpperCase();
   const normalized = label.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
@@ -234,6 +239,7 @@ function buildViewModel(pedido, options = {}) {
       obraNome: withFallback(pedido?.obra?.nome),
       obraCno: withFallback(pedido?.obra?.cno),
       obraEndereco: buildObraEndereco(pedido?.obra),
+      notaFiscalInfo: buildNotaFiscalInfo(pedido),
       condicaoPagamento: withFallback(pedido?.cotacaoFornecedor?.condicao_pagamento || pedido?.condicao_pagamento),
       prazoEntrega: withFallback(pedido?.cotacaoFornecedor?.prazo_entrega || pedido?.prazo_entrega),
       valorTotal: formatMoneyBr(pedido?.valor_total),
@@ -437,6 +443,10 @@ function renderPedidoCompraPdfCss() {
 
     .doc-data-cell--wide {
       grid-column: span 2;
+    }
+
+    .doc-data-cell--full {
+      grid-column: 1 / -1;
     }
 
     .doc-data-cell__label {
@@ -686,10 +696,6 @@ function renderPedidoCompraPdfHtml(pedido, options = {}) {
                 <span class="doc-header__generated">Gerado em ${escapeHtml(view.generatedAtLabel)}</span>
               </div>
 
-              <span
-                class="doc-status-badge"
-                style="background:${escapeHtml(h.status.background)};border-color:${escapeHtml(h.status.border)};color:${escapeHtml(h.status.color)};"
-              >${escapeHtml(h.status.label)}</span>
             </div>
 
             <!-- Linha 2: dados do pedido -->
@@ -736,19 +742,11 @@ function renderPedidoCompraPdfHtml(pedido, options = {}) {
               </div>
             </div>
 
-            <!-- Linha 4: dados da obra para entrega/faturamento -->
+            <!-- Linha 4: dados da obra para nota fiscal -->
             <div class="doc-data-strip">
-              <div class="doc-data-cell">
-                <span class="doc-data-cell__label">CNO da obra</span>
-                <span class="doc-data-cell__value">${escapeHtml(h.obraCno)}</span>
-              </div>
-              <div class="doc-data-cell doc-data-cell--wide">
-                <span class="doc-data-cell__label">Endereco da obra</span>
-                <span class="doc-data-cell__value">${escapeHtml(h.obraEndereco)}</span>
-              </div>
-              <div class="doc-data-cell">
-                <span class="doc-data-cell__label">Numero do pedido</span>
-                <span class="doc-data-cell__value">${escapeHtml(h.numero)}</span>
+              <div class="doc-data-cell doc-data-cell--full">
+                <span class="doc-data-cell__label">Informacoes para adicionar na Nota Fiscal</span>
+                <span class="doc-data-cell__value">${escapeHtml(h.notaFiscalInfo)}</span>
               </div>
             </div>
 

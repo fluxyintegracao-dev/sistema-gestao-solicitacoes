@@ -38,6 +38,25 @@ function formatQuantity(value, unidade) {
   return `${formatted}${unidade ? ` ${unidade}` : ''}`;
 }
 
+function buildObraEndereco(obra) {
+  const partes = [
+    obra?.endereco_logradouro,
+    obra?.endereco_numero,
+    obra?.endereco_complemento,
+    obra?.endereco_bairro,
+    obra?.endereco_cep,
+    obra?.endereco_uf
+  ]
+    .map((parte) => String(parte || '').trim())
+    .filter(Boolean);
+
+  return partes.length ? partes.join(' - ') : '-';
+}
+
+function buildNotaFiscalInfo(pedido) {
+  return `CNO: ${pedido?.obra?.cno || '-'} | Endereco: ${buildObraEndereco(pedido?.obra)}`;
+}
+
 function getPdfLogoPath() {
   const config = getRuntimeInstallationConfig();
   const logoUrl = String(config?.pdf_logo_url || config?.logo_url || '').trim();
@@ -376,7 +395,7 @@ function drawItemRow(doc, item, index, y, columns) {
 // ─────────────────────────────────────────────────────────────────────────────
 function drawNFStyleHeader(doc, context, { continued = false } = {}) {
   const metrics = getPageMetrics(doc);
-  const { pedido, statusConfig, companyName, pdfLogoPath } = context;
+  const { pedido, companyName, pdfLogoPath } = context;
 
   const tableX = metrics.left;
   const tableW = metrics.width;
@@ -384,7 +403,7 @@ function drawNFStyleHeader(doc, context, { continued = false } = {}) {
 
   const titleH = 32;
   const rowH   = 34;
-  const totalH = continued ? titleH : titleH + rowH * 3;
+  const totalH = continued ? titleH : titleH + rowH * 4;
 
   // Borda externa
   doc.rect(tableX, y, tableW, totalH).lineWidth(1).strokeColor('#1f3a5f').stroke();
@@ -427,17 +446,14 @@ function drawNFStyleHeader(doc, context, { continued = false } = {}) {
       );
   }
 
-  // PC code + status (direita)
+  // Numero do pedido (direita)
   if (!continued) {
     const pcCode    = `PC-${String(pedido?.id || '').padStart(5, '0')}`;
-    const statusTxt = (statusConfig?.nome || pedido?.status || '-').toUpperCase();
     const rightW    = 130;
     const rightX    = tableX + tableW - rightW - 8;
 
     doc.font('Helvetica-Bold').fontSize(8).fillColor('rgba(255,255,255,0.6)')
-      .text(pcCode, rightX, y + 6, { width: rightW, align: 'right', lineBreak: false });
-    doc.font('Helvetica-Bold').fontSize(11).fillColor('#ffffff')
-      .text(statusTxt, rightX, y + 17, { width: rightW, align: 'right', lineBreak: false });
+      .text(pcCode, rightX, y + 12, { width: rightW, align: 'right', lineBreak: false });
   }
 
   y += titleH;
@@ -515,6 +531,20 @@ function drawNFStyleHeader(doc, context, { continued = false } = {}) {
   cell(tableX + wC1 + wC2 + wC3 + wC4 + wC5, wC6, r3y, rowH, 'Atingiu minimo',
     pedido?.atingiu_pedido_minimo ? 'Sim' : 'Nao',
     { bold: true, color: atingiuColor, drawRight: false });
+  y += rowH;
+
+  // Linha 4: informacoes fiscais da obra
+  rowDivider(y);
+  const r4y = y;
+  cell(
+    tableX,
+    tableW,
+    r4y,
+    rowH,
+    'Informacoes para adicionar na Nota Fiscal',
+    buildNotaFiscalInfo(pedido),
+    { drawRight: false }
+  );
   y += rowH;
 
   return y + 12;

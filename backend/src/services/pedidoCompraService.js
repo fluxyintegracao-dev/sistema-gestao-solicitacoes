@@ -452,6 +452,31 @@ async function recalcularPedidoPorId(pedidoId, transaction) {
   const itensAtivos = (pedido.itens || []).filter((item) => !item.removido);
   let valorTotal = 0;
 
+  if (!itensAtivos.length) {
+    await pedido.update(
+      {
+        status: 'CANCELADO',
+        valor_total: 0,
+        atingiu_pedido_minimo: true,
+        cancelado_em: pedido.cancelado_em || new Date(),
+        motivo_cancelamento: pedido.motivo_cancelamento || 'Pedido sem itens ativos apos atualizacao da cotacao',
+        encerrado_em: pedido.encerrado_em || new Date()
+      },
+      { transaction }
+    );
+
+    await sincronizarValoresSolicitacaoCompra(pedido.solicitacao_compra_id, transaction);
+
+    return PedidoCompra.findByPk(pedidoId, {
+      transaction,
+      include: [
+        { model: PedidoCompraItem, as: 'itens' },
+        { model: FornecedorCompra, as: 'fornecedor', attributes: ['id', 'nome', 'email', 'whatsapp'] },
+        { model: SolicitacaoCompra, as: 'solicitacao', attributes: ['id', 'status'] }
+      ]
+    });
+  }
+
   for (const item of itensAtivos) {
     const valorItem = roundMoney(asNumber(item.quantidade_pedido) * asNumber(item.preco_unitario));
     if (roundMoney(item.valor_total) !== valorItem) {
@@ -484,6 +509,76 @@ async function recalcularPedidoPorId(pedidoId, transaction) {
   });
 }
 
+async function inativarPedidoSemItensPorAtualizacao({ pedido, usuarioId, transaction, motivo }) {
+  const pedidoCompleto = pedido.itens
+    ? pedido
+    : await PedidoCompra.findByPk(pedido.id, {
+      transaction,
+      include: [{ model: PedidoCompraItem, as: 'itens' }]
+    });
+
+  const agora = new Date();
+  const itensAtivos = (pedidoCompleto.itens || []).filter((item) => !item.removido);
+  for (const item of itensAtivos) {
+    const anterior = item.toJSON();
+    await item.update(
+      {
+        removido: true,
+        quantidade_cancelada: item.quantidade_pedido,
+        cancelado_por: usuarioId || null,
+        cancelado_em: agora,
+        motivo_cancelamento: motivo
+      },
+      { transaction }
+    );
+
+    await registrarLogPedidoItem({
+      pedidoCompraId: pedidoCompleto.id,
+      pedidoCompraItemId: item.id,
+      usuarioId,
+      acao: 'ITEM_REMOVIDO_DA_SELECAO',
+      descricao: `Item ${item.descricao} removido porque deixou de ser vencedor da cotacao`,
+      dadosAnteriores: {
+        removido: anterior.removido,
+        quantidade_pedido: anterior.quantidade_pedido,
+        valor_total: anterior.valor_total
+      },
+      dadosNovos: {
+        removido: true,
+        quantidade_cancelada: item.quantidade_cancelada
+      },
+      transaction
+    });
+  }
+
+  await pedidoCompleto.update(
+    {
+      status: 'CANCELADO',
+      valor_total: 0,
+      atingiu_pedido_minimo: true,
+      cancelado_por: usuarioId || null,
+      cancelado_em: pedidoCompleto.cancelado_em || agora,
+      encerrado_em: pedidoCompleto.encerrado_em || agora,
+      motivo_cancelamento: motivo
+    },
+    { transaction }
+  );
+
+  await registrarLogSolicitacaoCompra({
+    solicitacaoCompraId: pedidoCompleto.solicitacao_compra_id,
+    usuarioId,
+    fornecedorCompraId: pedidoCompleto.fornecedor_compra_id,
+    tipoAcao: 'PEDIDO_CANCELADO_AUTOMATICAMENTE',
+    descricao: motivo,
+    metadados: {
+      pedido_compra_id: pedidoCompleto.id
+    },
+    transaction
+  });
+
+  return pedidoCompleto;
+}
+
 async function obterOuCriarPedidoPorFornecedor({
   solicitacao,
   vinculacaoFornecedor,
@@ -499,6 +594,18 @@ async function obterOuCriarPedidoPorFornecedor({
   });
 
   if (pedido) {
+    if (normalizeText(pedido.status) === 'CANCELADO') {
+      await pedido.update(
+        {
+          status: 'ABERTO',
+          cancelado_por: null,
+          cancelado_em: null,
+          motivo_cancelamento: null,
+          encerrado_em: null
+        },
+        { transaction }
+      );
+    }
     return pedido;
   }
 
@@ -552,6 +659,7 @@ async function adicionarRespostasAoPedido({
   respostaItemIds = [],
   quantidadesPorResposta = new Map(),
   somarQuantidadeExistente = false,
+  sincronizarItensSelecionados = false,
   usuarioId,
   acaoLog = 'ITEM_ADICIONADO',
   descricaoLog = 'Item adicionado ao pedido',
@@ -578,6 +686,47 @@ async function adicionarRespostasAoPedido({
       .map((item) => [Number(item.resposta_item_id || 0), item])
       .filter(([id]) => id > 0)
   );
+
+  if (sincronizarItensSelecionados && respostaItemIds.length) {
+    const respostasSelecionadasIds = new Set(respostasSelecionadas.map((resposta) => Number(resposta.id)));
+    const itensRemover = itensAtuais.filter((item) =>
+      !item.removido &&
+      Number(item.resposta_item_id || 0) > 0 &&
+      !respostasSelecionadasIds.has(Number(item.resposta_item_id || 0))
+    );
+
+    for (const itemAtual of itensRemover) {
+      const anterior = itemAtual.toJSON();
+      await itemAtual.update(
+        {
+          removido: true,
+          quantidade_cancelada: itemAtual.quantidade_pedido,
+          cancelado_por: usuarioId || null,
+          cancelado_em: new Date(),
+          motivo_cancelamento: 'Item removido da selecao de vencedores da cotacao'
+        },
+        { transaction }
+      );
+
+      await registrarLogPedidoItem({
+        pedidoCompraId: pedido.id,
+        pedidoCompraItemId: itemAtual.id,
+        usuarioId,
+        acao: 'ITEM_REMOVIDO_DA_SELECAO',
+        descricao: `Item ${itemAtual.descricao} removido da selecao de vencedores`,
+        dadosAnteriores: {
+          removido: anterior.removido,
+          quantidade_pedido: anterior.quantidade_pedido,
+          valor_total: anterior.valor_total
+        },
+        dadosNovos: {
+          removido: true,
+          quantidade_cancelada: itemAtual.quantidade_cancelada
+        },
+        transaction
+      });
+    }
+  }
 
   for (const resposta of respostasSelecionadas) {
     const baseItem = obterBaseItemPorResposta(solicitacao, resposta);
@@ -732,7 +881,7 @@ function montarAlocacoesNormalizadas(solicitacao, vencedores = []) {
     const totalAtual = roundQty((totaisPorItem.get(itemKey) || 0) + quantidadeAlocada);
     if (totalAtual > quantidadeBase) {
       throw new Error(
-        `Quantidade alocada para ${baseItem.descricao} excede a quantidade solicitada (${quantidadeBase}).`
+        `A quantidade definida para comprar do item "${baseItem.descricao}" ultrapassa a quantidade solicitada na cotacao. Solicitado: ${quantidadeBase}. Marcado: ${totalAtual}. Ajuste a quantidade antes de atualizar os vencedores.`
       );
     }
 
@@ -822,6 +971,27 @@ async function gerarPedidosDosVencedores({ solicitacaoId, usuarioId, vencedores 
     grupo.registrosAlocacao.push(alocacao.registro);
   }
 
+  const fornecedoresSelecionados = new Set([...porFornecedor.keys()].map((id) => Number(id)));
+  const pedidosExistentes = await PedidoCompra.findAll({
+    where: { solicitacao_compra_id: solicitacao.id },
+    include: [{ model: PedidoCompraItem, as: 'itens' }],
+    transaction
+  });
+
+  for (const pedidoExistente of pedidosExistentes) {
+    const fornecedorId = Number(pedidoExistente.fornecedor_compra_id || 0);
+    if (fornecedoresSelecionados.has(fornecedorId) || normalizeText(pedidoExistente.status) === 'CANCELADO') {
+      continue;
+    }
+
+    await inativarPedidoSemItensPorAtualizacao({
+      pedido: pedidoExistente,
+      usuarioId,
+      transaction,
+      motivo: 'Fornecedor sem itens vencedores apos atualizacao da cotacao'
+    });
+  }
+
   for (const grupo of porFornecedor.values()) {
     if (!grupo.respostaItemIds.length) continue;
 
@@ -841,6 +1011,7 @@ async function gerarPedidosDosVencedores({ solicitacaoId, usuarioId, vencedores 
       usuarioId,
       acaoLog: 'GERADO_DA_COTACAO',
       descricaoLog: 'Item gerado a partir da cotacao encerrada',
+      sincronizarItensSelecionados: true,
       transaction
     });
 
@@ -929,6 +1100,8 @@ async function listarPedidos({
 
   if (status) {
     where.status = String(status).trim().toUpperCase();
+  } else {
+    where.status = { [Op.ne]: 'CANCELADO' };
   }
 
   const solicitacaoScope = [];

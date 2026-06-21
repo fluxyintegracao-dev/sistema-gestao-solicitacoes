@@ -131,8 +131,9 @@ function gerarMensagemCotacao(fornecedorNome, url, itens = [], pdfUrl = '') {
   ].filter(Boolean).join('\n');
 }
 
-function ModalPedidoFinal({ fornecedor, itensGanhos, solicitacaoId, fornecedoresCotacao = [], onRemanejamento, onFechar }) {
+function ModalPedidoFinal({ fornecedor, itensGanhos, solicitacaoId, onRemanejamento, onFechar }) {
   const [itensSelecionados, setItensSelecionados] = useState([]);
+  const [quantidadesRemanejar, setQuantidadesRemanejar] = useState({});
   const [destinoFornecedorId, setDestinoFornecedorId] = useState('');
   const [modoRemanejar, setModoRemanejar] = useState(false);
 
@@ -145,21 +146,100 @@ function ModalPedidoFinal({ fornecedor, itensGanhos, solicitacaoId, fornecedores
   }, [itensGanhos]);
 
   const fornecedoresDestinoCotacao = useMemo(() => {
-    const fornecedores = Array.isArray(fornecedoresCotacao) ? fornecedoresCotacao : [];
-    return fornecedores
-      .filter((vinculo) => Number(vinculo.fornecedor_compra_id) !== Number(fornecedor.fornecedor_compra_id))
-      .map((vinculo) => ({
-        id: vinculo.fornecedor_compra_id,
-        nome: vinculo.fornecedor?.nome || vinculo.nome || 'Fornecedor'
-      }))
-      .filter((vinculo, index, lista) => vinculo.id && lista.findIndex((item) => Number(item.id) === Number(vinculo.id)) === index)
-      .sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'pt-BR'));
-  }, [fornecedor.fornecedor_compra_id, fornecedoresCotacao]);
+    const selecionados = itensGanhos.filter((item) => itensSelecionados.includes(item.resposta_item_id));
+    if (!selecionados.length) return [];
 
-  function toggleItem(respItemId) {
-    setItensSelecionados((prev) =>
-      prev.includes(respItemId) ? prev.filter((id) => id !== respItemId) : [...prev, respItemId]
-    );
+    const candidatos = new Map();
+    selecionados.forEach((item) => {
+      (item.respostasDestino || [])
+        .filter((resp) =>
+          Number(resp.fornecedor_compra_id) !== Number(fornecedor.fornecedor_compra_id) &&
+          Number(resp.resposta_item_id) > 0 &&
+          Boolean(resp.disponivel) &&
+          parseNumeroCompra(resp.preco) > 0
+        )
+        .forEach((resp) => {
+          const fornecedorId = Number(resp.fornecedor_compra_id);
+          const atual = candidatos.get(fornecedorId) || {
+            id: fornecedorId,
+            nome: resp.fornecedor_nome || 'Fornecedor',
+            itensAtendidos: new Set()
+          };
+          atual.itensAtendidos.add(item.item_key);
+          candidatos.set(fornecedorId, atual);
+        });
+    });
+
+    return [...candidatos.values()]
+      .filter((candidato) => selecionados.every((item) => candidato.itensAtendidos.has(item.item_key)))
+      .sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'pt-BR'));
+  }, [fornecedor.fornecedor_compra_id, itensGanhos, itensSelecionados]);
+
+  function toggleItem(item) {
+    const respItemId = item.resposta_item_id;
+    setItensSelecionados((prev) => {
+      if (prev.includes(respItemId)) {
+        setQuantidadesRemanejar((current) => {
+          const next = { ...current };
+          delete next[String(respItemId)];
+          return next;
+        });
+        return prev.filter((id) => id !== respItemId);
+      }
+
+      setQuantidadesRemanejar((current) => ({
+        ...current,
+        [String(respItemId)]: formatNumeroCompra(item.quantidade)
+      }));
+      return [...prev, respItemId];
+    });
+    setDestinoFornecedorId('');
+  }
+
+  function confirmarRemanejamento() {
+    if (!itensSelecionados.length || !destinoFornecedorId) return;
+
+    const itens = itensGanhos
+      .filter((item) => itensSelecionados.includes(item.resposta_item_id))
+      .map((item) => {
+        const quantidade = parseNumeroCompra(quantidadesRemanejar[String(item.resposta_item_id)] ?? item.quantidade);
+        const quantidadeVencedora = parseNumeroCompra(item.quantidade);
+        const quantidadeSolicitada = parseNumeroCompra(item.quantidade_solicitada || item.quantidade);
+
+        if (quantidade <= 0) {
+          throw new Error(`Informe uma quantidade maior que zero para ${item.nome}.`);
+        }
+        if (quantidade > quantidadeVencedora + 0.0001) {
+          throw new Error(`A quantidade remanejada de ${item.nome} nao pode ser maior que a quantidade vencida por este fornecedor (${formatNumeroCompra(quantidadeVencedora)} ${item.unidade || ''}).`);
+        }
+        if (quantidade > quantidadeSolicitada + 0.0001) {
+          throw new Error(`A quantidade remanejada de ${item.nome} nao pode ser maior que a quantidade solicitada (${formatNumeroCompra(quantidadeSolicitada)} ${item.unidade || ''}).`);
+        }
+
+        const respostaDestino = (item.respostasDestino || []).find((resp) =>
+          Number(resp.fornecedor_compra_id) === Number(destinoFornecedorId) &&
+          Number(resp.resposta_item_id) > 0 &&
+          Boolean(resp.disponivel) &&
+          parseNumeroCompra(resp.preco) > 0
+        );
+
+        if (!respostaDestino) {
+          throw new Error(`O fornecedor destino nao possui resposta valida para ${item.nome}.`);
+        }
+
+        return {
+          itemKey: item.item_key,
+          itemNome: item.nome,
+          unidade: item.unidade,
+          respostaOrigemId: Number(item.resposta_item_id),
+          respostaDestinoId: Number(respostaDestino.resposta_item_id),
+          destinoFornecedorId: Number(destinoFornecedorId),
+          destinoFornecedorNome: respostaDestino.fornecedor_nome || 'Fornecedor',
+          quantidade
+        };
+      });
+
+    onRemanejamento({ itens, destinoFornecedorId: Number(destinoFornecedorId) });
   }
 
   const mensagemWhatsApp = useMemo(() => {
@@ -221,7 +301,7 @@ function ModalPedidoFinal({ fornecedor, itensGanhos, solicitacaoId, fornecedores
                           <input
                             type="checkbox"
                             checked={itensSelecionados.includes(it.resposta_item_id)}
-                            onChange={() => toggleItem(it.resposta_item_id)}
+                            onChange={() => toggleItem(it)}
                           />
                         </td>
                       )}
@@ -229,7 +309,20 @@ function ModalPedidoFinal({ fornecedor, itensGanhos, solicitacaoId, fornecedores
                         <div className="font-medium">{it.nome || '-'}</div>
                         {it.especificacao && <div className="text-xs text-[var(--c-muted)]">{it.especificacao}</div>}
                       </td>
-                      <td>{it.quantidade} {it.unidade || ''}</td>
+                      <td>
+                        {it.quantidade} {it.unidade || ''}
+                        {modoRemanejar && itensSelecionados.includes(it.resposta_item_id) && (
+                          <input
+                            className="input mt-2 h-8 w-24 px-2 text-xs"
+                            value={quantidadesRemanejar[String(it.resposta_item_id)] ?? ''}
+                            onChange={(event) => setQuantidadesRemanejar((current) => ({
+                              ...current,
+                              [String(it.resposta_item_id)]: event.target.value
+                            }))}
+                            placeholder="Qtd."
+                          />
+                        )}
+                      </td>
                       <td>{fmtMoeda(it.preco)}</td>
                       <td className="font-semibold">{fmtMoeda(Number(it.quantidade) * Number(it.preco || 0))}</td>
                       {!modoRemanejar && <td>{it.prazo || '-'}</td>}
@@ -257,8 +350,11 @@ function ModalPedidoFinal({ fornecedor, itensGanhos, solicitacaoId, fornecedores
                 className="input"
                 value={destinoFornecedorId}
                 onChange={(e) => setDestinoFornecedorId(e.target.value)}
+                disabled={!itensSelecionados.length}
               >
-                <option value="">Selecionar fornecedor destino...</option>
+                <option value="">
+                  {itensSelecionados.length ? 'Selecionar fornecedor destino...' : 'Selecione um item para listar destinos validos'}
+                </option>
                 {fornecedoresDestinoCotacao
                   .map((f) => (
                     <option key={f.id} value={f.id}>{f.nome}</option>
@@ -269,7 +365,12 @@ function ModalPedidoFinal({ fornecedor, itensGanhos, solicitacaoId, fornecedores
                 <button
                   type="button"
                   className="btn btn-outline"
-                  onClick={() => { setModoRemanejar(false); setItensSelecionados([]); }}
+                  onClick={() => {
+                    setModoRemanejar(false);
+                    setItensSelecionados([]);
+                    setQuantidadesRemanejar({});
+                    setDestinoFornecedorId('');
+                  }}
                 >
                   Cancelar
                 </button>
@@ -277,7 +378,13 @@ function ModalPedidoFinal({ fornecedor, itensGanhos, solicitacaoId, fornecedores
                   type="button"
                   className="btn btn-primary"
                   disabled={!itensSelecionados.length || !destinoFornecedorId}
-                  onClick={() => onRemanejamento({ itensIds: itensSelecionados, destinoFornecedorId: Number(destinoFornecedorId) })}
+                  onClick={() => {
+                    try {
+                      confirmarRemanejamento();
+                    } catch (error) {
+                      alert(error.message || 'Nao foi possivel remanejar os itens.');
+                    }
+                  }}
                 >
                   Confirmar Remanejamento ({itensSelecionados.length} item{itensSelecionados.length !== 1 ? 's' : ''})
                 </button>
@@ -672,7 +779,7 @@ function SecaoEnvioFornecedores({
 
 // SecaoComparativo
 
-function SecaoComparativo({ comparativo, solicitacao, podeComprar, vencedoresSelecionados, onVencedorChange, onEncerrar, encerrando }) {
+function SecaoComparativo({ comparativo, solicitacao, podeComprar, vencedoresSelecionados, onVencedorChange, onRemanejamentoAplicado, onEncerrar, encerrando }) {
   const [modalFornecedor, setModalFornecedor] = useState(null); // { fornecedor, itensGanhos }
 
   function getQuantidadeAlocada(respostaItemId) {
@@ -716,13 +823,16 @@ function SecaoComparativo({ comparativo, solicitacao, podeComprar, vencedoresSel
 
         if (!itensFornecedor[fId]) itensFornecedor[fId] = [];
         itensFornecedor[fId].push({
+          item_key: buildItemKey(item),
           resposta_item_id: resp.resposta_item_id,
           nome: item.nome,
           unidade: item.unidade,
           quantidade: quantidadeGanha || item.quantidade,
+          quantidade_solicitada: item.quantidade,
           preco: resp.preco,
           prazo: resp.prazo,
           especificacao: item.especificacao,
+          respostasDestino: item.respostas || [],
           ganhou: quantidadeGanha > 0
         });
 
@@ -934,9 +1044,11 @@ function SecaoComparativo({ comparativo, solicitacao, podeComprar, vencedoresSel
           fornecedor={modalFornecedor.fornecedor}
           itensGanhos={modalFornecedor.itensGanhos}
           solicitacaoId={solicitacao?.id}
-          fornecedoresCotacao={solicitacao?.fornecedores || []}
-          onRemanejamento={({ itensIds, destinoFornecedorId }) => {
-            alert(`Remanejamento registrado: ${itensIds.length} item(ns) para fornecedor ID ${destinoFornecedorId}.\n\nPara concluir, ajuste manualmente os vencedores no comparativo abaixo e encerre a cotacao novamente.`);
+          onRemanejamento={(payload) => {
+            onRemanejamentoAplicado?.(payload);
+            const totalItens = payload?.itens?.length || 0;
+            const fornecedorDestino = payload?.itens?.[0]?.destinoFornecedorNome || 'fornecedor destino';
+            alert(`${totalItens} item(ns) remanejado(s) para ${fornecedorDestino}. Confira as quantidades e clique em "Atualizar vencedores e pedidos" para gravar.`);
             setModalFornecedor(null);
           }}
           onFechar={() => setModalFornecedor(null)}
@@ -1182,6 +1294,43 @@ export default function GerenciarCotacaoSolicitacao() {
     });
   }
 
+  function handleAplicarRemanejamentoCotacao({ itens = [] }) {
+    if (!Array.isArray(itens) || !itens.length) return;
+
+    setVencedoresSelecionados((prev) => {
+      const next = { ...prev };
+
+      itens.forEach((item) => {
+        const quantidade = parseNumeroCompra(item.quantidade);
+        const origemId = Number(item.respostaOrigemId || 0);
+        const destinoId = Number(item.respostaDestinoId || 0);
+        if (!origemId || !destinoId || quantidade <= 0) return;
+
+        const origemKey = String(origemId);
+        const destinoKey = String(destinoId);
+        const origemAtual = parseNumeroCompra(next[origemKey]?.quantidade_alocada);
+        const origemNova = Number(Math.max(0, origemAtual - quantidade).toFixed(3));
+
+        if (origemNova > 0) {
+          next[origemKey] = {
+            resposta_item_id: origemId,
+            quantidade_alocada: origemNova
+          };
+        } else {
+          delete next[origemKey];
+        }
+
+        const destinoAtual = parseNumeroCompra(next[destinoKey]?.quantidade_alocada);
+        next[destinoKey] = {
+          resposta_item_id: destinoId,
+          quantidade_alocada: Number((destinoAtual + quantidade).toFixed(3))
+        };
+      });
+
+      return next;
+    });
+  }
+
   async function handleEncerrar() {
     try {
       const itens = comparativo?.itens || [];
@@ -1201,19 +1350,27 @@ export default function GerenciarCotacaoSolicitacao() {
         }, 0);
         const quantidadeItem = parseNumeroCompra(item.quantidade);
         if (totalItem > quantidadeItem + 0.0001) {
-          errosQuantidade.push(`${item.nome}: selecionado ${formatNumeroCompra(totalItem)} de ${formatNumeroCompra(quantidadeItem)} ${item.unidade || ''}`);
+          errosQuantidade.push(`- ${item.nome}: marcado ${formatNumeroCompra(totalItem)} ${item.unidade || ''}, mas a cotacao solicitou ${formatNumeroCompra(quantidadeItem)} ${item.unidade || ''}.`);
         }
       });
 
       if (errosQuantidade.length) {
-        alert(`A quantidade selecionada ultrapassa o total cotado:\n\n${errosQuantidade.join('\n')}`);
+        alert([
+          'A quantidade marcada para compra ultrapassa a quantidade solicitada na cotacao.',
+          '',
+          'Ajuste os itens abaixo antes de atualizar os vencedores:',
+          ...errosQuantidade
+        ].join('\n'));
         return;
       }
 
       setEncerrando(true);
       await encerrarSolicitacaoCompra(id, { alocacoes });
       await carregarTudo();
-      alert('Cotacao encerrada. Agora voce pode gerar os pedidos para cada fornecedor vencedor.');
+      alert(String(solicitacao?.status || '').toUpperCase() === 'ENCERRADO'
+        ? 'Vencedores e pedidos atualizados. Abrindo a tela de pedidos.'
+        : 'Cotacao encerrada e pedidos gerados. Abrindo a tela de pedidos.');
+      navigate('/pedidos-compra');
     } catch (error) {
       console.error(error);
       alert(error.message || 'Erro ao encerrar cotacao');
@@ -1542,6 +1699,7 @@ export default function GerenciarCotacaoSolicitacao() {
             podeComprar={podeComprar}
             vencedoresSelecionados={vencedoresSelecionados}
             onVencedorChange={handleVencedorChange}
+            onRemanejamentoAplicado={handleAplicarRemanejamentoCotacao}
             onEncerrar={handleEncerrar}
             encerrando={encerrando}
           />
