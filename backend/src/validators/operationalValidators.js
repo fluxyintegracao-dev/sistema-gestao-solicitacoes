@@ -810,6 +810,15 @@ function validateCompraPedidoItemParams(params = {}) {
   };
 }
 
+function validateSolicitacaoPedidoCompraPdfParams(params = {}) {
+  ensureAllowedKeys(params, ['id', 'pedidoId'], 'Parametros do PDF do pedido');
+
+  return {
+    id: parseInteger(params.id, 'Solicitacao', { required: true }),
+    pedidoId: parseInteger(params.pedidoId, 'Pedido de compra', { required: true })
+  };
+}
+
 function validateSolicitacaoCreateBody(body = {}) {
   ensureAllowedKeys(
     body,
@@ -955,6 +964,7 @@ module.exports = {
   validateCompraPedidoCreateBody,
   validateCompraPedidoItemAddBody,
   validateCompraPedidoItemParams,
+  validateSolicitacaoPedidoCompraPdfParams,
   validateCompraPedidoCancelBody,
   validateCompraPedidoComentarioBody,
   validateCompraCotacaoComentarioBody,

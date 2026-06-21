@@ -46,6 +46,7 @@ const {
   validateCompraPedidoCreateBody,
   validateCompraPedidoItemAddBody,
   validateCompraPedidoItemParams,
+  validateSolicitacaoPedidoCompraPdfParams,
   validateCompraPedidoCancelBody,
   validateCompraCotacaoComentarioBody,
   validateCompraPedidoComentarioBody,
@@ -1118,6 +1119,13 @@ router.delete(
 router.get(
   '/solicitacoes/:id/anexos',
   AnexoController.listarPorSolicitacao
+);
+
+router.get(
+  '/solicitacoes/:id/pedidos-compra/:pedidoId/pdf',
+  requireEnabledModule('SOLICITACOES'),
+  validateRequest({ params: validateSolicitacaoPedidoCompraPdfParams }),
+  PedidoCompraController.pdfPorSolicitacao
 );
 // -------------------------------------------------------------------
 // COMPROVANTES

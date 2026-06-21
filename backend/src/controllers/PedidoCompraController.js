@@ -33,6 +33,7 @@ const {
   generatePedidoCompraPdfBufferFromHtml,
   isPedidoCompraHtmlPdfAvailable
 } = require('../services/pedidoCompraPdfPuppeteer');
+const { canAccessSolicitacaoFile } = require('../services/fileAccessService');
 
 async function carregarUsuarioCompras(userId) {
   if (!userId) {
@@ -131,6 +132,41 @@ async function carregarPedidoCompraNoEscopo(req, res, usuario, pedidoId) {
   }
 
   return pedido;
+}
+
+async function enviarPdfPedidoCompra(res, pedido) {
+  const filename = `pedido-compra-PC-${String(pedido.id).padStart(5, '0')}.pdf`;
+
+  if (isPedidoCompraHtmlPdfAvailable()) {
+    try {
+      const pdfBuffer = await generatePedidoCompraPdfBufferFromHtml(pedido, {
+        generatedAt: pedido.createdAt ? new Date(pedido.createdAt) : new Date()
+      });
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      return res.end(pdfBuffer);
+    } catch (error) {
+      console.warn('[PedidoCompraController.pdf] Falha ao gerar PDF HTML. Aplicando fallback para pdfkit.');
+      console.warn(error);
+    }
+  }
+
+  let PDFDocument;
+  try {
+    PDFDocument = require('pdfkit');
+  } catch (error) {
+    return res.status(500).json({ error: 'Dependencias de PDF indisponiveis no backend' });
+  }
+
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+  const doc = new PDFDocument({ margin: 40, size: 'A4', layout: 'landscape' });
+  doc.pipe(res);
+  await renderPedidoCompraPdf(doc, pedido);
+  doc.end();
+  return null;
 }
 
 module.exports = {
@@ -666,37 +702,41 @@ module.exports = {
         return;
       }
 
-      const filename = `pedido-compra-PC-${String(pedido.id).padStart(5, '0')}.pdf`;
+      return enviarPdfPedidoCompra(res, pedido);
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao gerar PDF do pedido' });
+    }
+  },
 
-      if (isPedidoCompraHtmlPdfAvailable()) {
-        try {
-          const pdfBuffer = await generatePedidoCompraPdfBufferFromHtml(pedido, {
-            generatedAt: pedido.createdAt ? new Date(pedido.createdAt) : new Date()
-          });
+  async pdfPorSolicitacao(req, res) {
+    try {
+      const solicitacaoId = Number(req.params.id);
+      const pedidoId = Number(req.params.pedidoId);
+      const acesso = await canAccessSolicitacaoFile(req, solicitacaoId);
 
-          res.setHeader('Content-Type', 'application/pdf');
-          res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-          return res.end(pdfBuffer);
-        } catch (error) {
-          console.warn('[PedidoCompraController.pdf] Falha ao gerar PDF HTML. Aplicando fallback para pdfkit.');
-          console.warn(error);
-        }
+      if (!acesso?.allowed) {
+        return res.status(acesso?.status || 403).json({
+          error: acesso?.error || 'Acesso negado ao arquivo da solicitacao'
+        });
       }
 
-      let PDFDocument;
-      try {
-        PDFDocument = require('pdfkit');
-      } catch (error) {
-        return res.status(500).json({ error: 'Dependencias de PDF indisponiveis no backend' });
+      const pedido = await obterPedidoDetalhe(pedidoId, {
+        obraIdsHistoricoPreco: await buildHistoricoPrecoScope(req)
+      });
+      if (!pedido) {
+        return res.status(404).json({ error: 'Pedido de compra nao encontrado' });
       }
 
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      const solicitacaoCompra = await SolicitacaoCompra.findByPk(pedido.solicitacao_compra_id, {
+        attributes: ['id', 'solicitacao_principal_id']
+      });
 
-      const doc = new PDFDocument({ margin: 40, size: 'A4', layout: 'landscape' });
-      doc.pipe(res);
-      await renderPedidoCompraPdf(doc, pedido);
-      doc.end();
+      if (Number(solicitacaoCompra?.solicitacao_principal_id || 0) !== solicitacaoId) {
+        return res.status(403).json({ error: 'Pedido de compra nao pertence a solicitacao informada' });
+      }
+
+      return enviarPdfPedidoCompra(res, pedido);
     } catch (error) {
       console.error(error);
       return res.status(500).json({ error: 'Erro ao gerar PDF do pedido' });

@@ -678,6 +678,7 @@ async function assertRegisteredFileAccess(req, target) {
 
 module.exports = {
   assertRegisteredFileAccess,
+  canAccessSolicitacaoFile,
   getRegisteredFilePath,
   resolveRegisteredFileResource
 };

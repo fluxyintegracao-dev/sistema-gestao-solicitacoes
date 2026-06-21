@@ -73,9 +73,44 @@ export default function Timeline({ historicos, canRemoveAnexo = false, onAnexoRe
     }
   }
 
-  async function baixarPedidoCompraPdf(pedidoCompraId, codigoPedido) {
+  function nomePedidoCompraPdf(pedidoCompraId, codigoPedido) {
+    return `${codigoPedido || `PC-${String(pedidoCompraId).padStart(5, '0')}`}.pdf`;
+  }
+
+  function pedidoCompraPdfUrl(solicitacaoId, pedidoCompraId) {
+    return `${API_URL}/solicitacoes/${solicitacaoId}/pedidos-compra/${pedidoCompraId}/pdf`;
+  }
+
+  async function obterPedidoCompraPdfBlobUrl(solicitacaoId, pedidoCompraId) {
+    const response = await fetch(pedidoCompraPdfUrl(solicitacaoId, pedidoCompraId), {
+      headers: authHeaders()
+    });
+    if (!response.ok) throw new Error('Falha ao carregar pedido de compra');
+
+    const blob = await response.blob();
+    return window.URL.createObjectURL(blob);
+  }
+
+  async function visualizarPedidoCompraPdf(solicitacaoId, pedidoCompraId, codigoPedido) {
     try {
-      const response = await fetch(`${API_URL}/compras/pedidos/${pedidoCompraId}/pdf`, {
+      const url = await obterPedidoCompraPdfBlobUrl(solicitacaoId, pedidoCompraId);
+      const nome = nomePedidoCompraPdf(pedidoCompraId, codigoPedido);
+      setPreview({
+        nome,
+        caminho: nome,
+        url,
+        downloadUrl: url,
+        isObjectUrl: true
+      });
+    } catch (error) {
+      console.error(error);
+      alert(error?.message || 'Erro ao abrir pedido de compra');
+    }
+  }
+
+  async function baixarPedidoCompraPdf(solicitacaoId, pedidoCompraId, codigoPedido) {
+    try {
+      const response = await fetch(pedidoCompraPdfUrl(solicitacaoId, pedidoCompraId), {
         headers: authHeaders()
       });
       if (!response.ok) throw new Error('Falha ao baixar pedido de compra');
@@ -84,7 +119,7 @@ export default function Timeline({ historicos, canRemoveAnexo = false, onAnexoRe
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `${codigoPedido || `PC-${String(pedidoCompraId).padStart(5, '0')}`}.pdf`;
+      link.download = nomePedidoCompraPdf(pedidoCompraId, codigoPedido);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -144,6 +179,7 @@ export default function Timeline({ historicos, canRemoveAnexo = false, onAnexoRe
           const podeExibirArquivo = ['ANEXO_ADICIONADO', 'COMPROVANTE_ADICIONADO'].includes(h.acao);
           const pedidoCompraId = meta?.pedido_compra_id || null;
           const pedidoCompraCodigo = meta?.pedido_compra_codigo || (pedidoCompraId ? `PC-${String(pedidoCompraId).padStart(5, '0')}` : null);
+          const solicitacaoHistoricoId = h?.solicitacao_id || meta?.solicitacao_id || null;
 
           return (
             <div key={h.id} className="sol-detail-timeline-item">
@@ -174,15 +210,13 @@ export default function Timeline({ historicos, canRemoveAnexo = false, onAnexoRe
 
               {h.descricao && <p className="sol-detail-timeline-text text-sm">{h.descricao}</p>}
 
-              {pedidoCompraId && (
+              {pedidoCompraId && solicitacaoHistoricoId && (
                 <div className="flex flex-wrap gap-3 mt-1">
                   <button
                     type="button"
                     className="text-sm"
                     style={{ color: 'var(--c-primary)' }}
-                    onClick={() => {
-                      window.location.href = `/pedidos-compra/${pedidoCompraId}`;
-                    }}
+                    onClick={() => visualizarPedidoCompraPdf(solicitacaoHistoricoId, pedidoCompraId, pedidoCompraCodigo)}
                   >
                     Visualizar {pedidoCompraCodigo}
                   </button>
@@ -190,7 +224,7 @@ export default function Timeline({ historicos, canRemoveAnexo = false, onAnexoRe
                     type="button"
                     className="text-sm"
                     style={{ color: 'var(--c-primary)' }}
-                    onClick={() => baixarPedidoCompraPdf(pedidoCompraId, pedidoCompraCodigo)}
+                    onClick={() => baixarPedidoCompraPdf(solicitacaoHistoricoId, pedidoCompraId, pedidoCompraCodigo)}
                   >
                     Download
                   </button>
