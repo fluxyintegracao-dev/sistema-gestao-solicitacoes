@@ -11,21 +11,28 @@ import {
   canAccessComercial,
   canAccessComunicacao,
   canAccessCompras,
+  canAccessDashboard,
   canAccessContratos,
   canAccessFinanceiro,
   canAccessFiscal,
   canAccessPagamentos,
   canAccessGestaoObras,
   canAccessPrioridadesDiretoria,
-  canCreateComprasPedidos,
+  canCreateCompraSolicitacao,
   canCreateProvisionamentos,
   canAccessRhDpDashboard,
   canAccessRhDpEmpresas,
   canExecuteRhDpImportacoes,
+  canManageComprasConfiguracoes,
   canManageComprasCotacoes,
+  canManageCompraSolicitacoes,
   canManageProvisionamentoCategorias,
+  canViewCompraSolicitacoes,
   canViewComprasCotacoes,
+  canViewComprasDelegacao,
+  canViewComprasFornecedores,
   canViewComprasPedidos,
+  canViewComprasRelatorios,
   canViewComercialContratos,
   canViewComercialEmpreendimentos,
   canViewProvisionamentos,
@@ -269,6 +276,14 @@ function EnabledModuleRoute({ moduleKey, children }) {
   return children;
 }
 
+function DashboardRoute() {
+  const { user } = useAuth();
+  if (!canAccessDashboard(user)) {
+    return <Navigate to="/solicitacoes" replace />;
+  }
+  return <Dashboard />;
+}
+
 function SolicitacoesRelatoriosRoute({ children }) {
   const { user } = useAuth();
   if (!canViewSolicitacoesRelatorios(user)) {
@@ -293,6 +308,30 @@ function ModuloComprasRoute({ children }) {
   return children;
 }
 
+function CompraSolicitacoesRoute({ children }) {
+  const { user } = useAuth();
+  if (!canViewCompraSolicitacoes(user)) {
+    return <Navigate to="/solicitacoes" replace />;
+  }
+  return children;
+}
+
+function CompraSolicitacaoCreateRoute({ children }) {
+  const { user } = useAuth();
+  if (!canCreateCompraSolicitacao(user)) {
+    return <Navigate to="/solicitacoes" replace />;
+  }
+  return children;
+}
+
+function CompraSolicitacoesManageRoute({ children }) {
+  const { user } = useAuth();
+  if (!canManageCompraSolicitacoes(user)) {
+    return <Navigate to="/solicitacoes-compra" replace />;
+  }
+  return children;
+}
+
 function ComprasPedidosRoute({ children }) {
   const { user } = useAuth();
   if (!canViewComprasPedidos(user)) {
@@ -301,10 +340,34 @@ function ComprasPedidosRoute({ children }) {
   return children;
 }
 
-function ComprasPedidosCreateRoute({ children }) {
+function ComprasDelegacaoRoute({ children }) {
   const { user } = useAuth();
-  if (!canCreateComprasPedidos(user)) {
-    return <Navigate to="/" replace />;
+  if (!canViewComprasDelegacao(user)) {
+    return <Navigate to="/solicitacoes" replace />;
+  }
+  return children;
+}
+
+function ComprasFornecedoresRoute({ children }) {
+  const { user } = useAuth();
+  if (!canViewComprasFornecedores(user)) {
+    return <Navigate to="/solicitacoes" replace />;
+  }
+  return children;
+}
+
+function ComprasRelatoriosRoute({ children }) {
+  const { user } = useAuth();
+  if (!canViewComprasRelatorios(user)) {
+    return <Navigate to="/solicitacoes" replace />;
+  }
+  return children;
+}
+
+function ComprasConfiguracoesRoute({ children }) {
+  const { user } = useAuth();
+  if (!canManageComprasConfiguracoes(user)) {
+    return <Navigate to="/solicitacoes" replace />;
   }
   return children;
 }
@@ -675,7 +738,7 @@ export default function App() {
           </PrivateRoute>
         )}
       >
-        <Route index element={<Dashboard />} />
+        <Route index element={<DashboardRoute />} />
 
         <Route path="solicitacoes" element={<Solicitacoes />} />
         <Route path="solicitacoes/relatorios" element={<SolicitacoesRelatoriosRoute><ModuloRelatorios modulo="solicitacoes" /></SolicitacoesRelatoriosRoute>} />
@@ -732,8 +795,8 @@ export default function App() {
         <Route path="permissoes-areas-padroes" element={<BusinessAdminRoute><PermissoesAreasPadroes /></BusinessAdminRoute>} />
         <Route path="governanca" element={<GovernancaSistemaRoute><GovernancaSistema /></GovernancaSistemaRoute>} />
         <Route path="arquivos-modelos-config" element={<SuperadminRoute><ArquivosModelosConfig /></SuperadminRoute>} />
-        <Route path="configuracoes-cotacao" element={<EnabledModuleRoute moduleKey="COMPRAS"><EnabledModuleRoute moduleKey="COTACOES"><BusinessAdminRoute><ConfiguracoesCotacao /></BusinessAdminRoute></EnabledModuleRoute></EnabledModuleRoute>} />
-        <Route path="configuracoes-status-pedidos-compra" element={<EnabledModuleRoute moduleKey="COMPRAS"><BusinessAdminRoute><ConfiguracoesStatusPedidoCompra /></BusinessAdminRoute></EnabledModuleRoute>} />
+        <Route path="configuracoes-cotacao" element={<EnabledModuleRoute moduleKey="COMPRAS"><EnabledModuleRoute moduleKey="COTACOES"><ComprasConfiguracoesRoute><ConfiguracoesCotacao /></ComprasConfiguracoesRoute></EnabledModuleRoute></EnabledModuleRoute>} />
+        <Route path="configuracoes-status-pedidos-compra" element={<EnabledModuleRoute moduleKey="COMPRAS"><ComprasConfiguracoesRoute><ConfiguracoesStatusPedidoCompra /></ComprasConfiguracoesRoute></EnabledModuleRoute>} />
         <Route path="configuracoes-comercial-categorias" element={<EnabledModuleRoute moduleKey="COMERCIAL"><SuperadminRoute><ConfiguracoesComercialCategorias /></SuperadminRoute></EnabledModuleRoute>} />
         <Route path="configuracoes-provisionamento-fluxo" element={<EnabledModuleRoute moduleKey="PROVISOES"><SuperadminRoute><ConfiguracoesProvisionamentoFluxo /></SuperadminRoute></EnabledModuleRoute>} />
         <Route path="configuracoes-modulos" element={<SuperadminRoute><ConfiguracoesModulos /></SuperadminRoute>} />
@@ -834,35 +897,35 @@ export default function App() {
         <Route path="financeiro/conciliacao" element={<FinanceiroRoute><FinanceiroConciliacao /></FinanceiroRoute>} />
         <Route path="financeiro/caixas" element={<FinanceiroRoute><FinanceiroCaixas /></FinanceiroRoute>} />
         <Route path="financeiro/cadastros" element={<FinanceiroRoute><FinanceiroCadastros /></FinanceiroRoute>} />
-        <Route path="compras/relatorios" element={<ModuloComprasRoute><ModuloRelatorios modulo="compras" /></ModuloComprasRoute>} />
-        <Route path="compras/relatorios/auditoria" element={<ModuloComprasRoute><BusinessAdminRoute><RelatoriosAdministrativos /></BusinessAdminRoute></ModuloComprasRoute>} />
-        <Route path="compras/relatorios/categorias-insumos" element={<ModuloComprasRoute><ComprasCotacoesRoute><ComprasRelatorioCategoriasInsumos /></ComprasCotacoesRoute></ModuloComprasRoute>} />
-        <Route path="compras/relatorios/compras-fornecedor" element={<ModuloComprasRoute><ComprasCotacoesRoute><ComprasRelatorioComprasFornecedor /></ComprasCotacoesRoute></ModuloComprasRoute>} />
-        <Route path="compras/relatorios/demanda-pedidos" element={<ModuloComprasRoute><ComprasCotacoesRoute><ComprasRelatorioDemandaPedidos /></ComprasCotacoesRoute></ModuloComprasRoute>} />
-        <Route path="compras/relatorios/evolucao" element={<ModuloComprasRoute><ComprasCotacoesRoute><ComprasRelatorioEvolucao /></ComprasCotacoesRoute></ModuloComprasRoute>} />
-        <Route path="compras/relatorios/pendencias-cotacoes" element={<ModuloComprasRoute><ComprasCotacoesRoute><ComprasRelatorioPendenciasCotacoes /></ComprasCotacoesRoute></ModuloComprasRoute>} />
-        <Route path="compras/relatorios/precos-insumos" element={<ModuloComprasRoute><ComprasCotacoesRoute><ComprasRelatorioPrecosInsumos /></ComprasCotacoesRoute></ModuloComprasRoute>} />
-        <Route path="compras/relatorios/ciclo" element={<ModuloComprasRoute><ComprasCotacoesRoute><ComprasRelatorioCiclo /></ComprasCotacoesRoute></ModuloComprasRoute>} />
-        <Route path="compras/relatorios/economia-cotacoes" element={<ModuloComprasRoute><ComprasCotacoesRoute><ComprasRelatorioEconomiaCotacoes /></ComprasCotacoesRoute></ModuloComprasRoute>} />
-        <Route path="compras/relatorios/fornecedores" element={<ModuloComprasRoute><ComprasCotacoesRoute><ComprasRelatorioFornecedores /></ComprasCotacoesRoute></ModuloComprasRoute>} />
-        <Route path="relatorios/administrativos" element={<ModuloComprasRoute><BusinessAdminRoute><RelatoriosAdministrativos /></BusinessAdminRoute></ModuloComprasRoute>} />
+        <Route path="compras/relatorios" element={<ModuloComprasRoute><ComprasRelatoriosRoute><ModuloRelatorios modulo="compras" /></ComprasRelatoriosRoute></ModuloComprasRoute>} />
+        <Route path="compras/relatorios/auditoria" element={<ModuloComprasRoute><ComprasRelatoriosRoute><RelatoriosAdministrativos /></ComprasRelatoriosRoute></ModuloComprasRoute>} />
+        <Route path="compras/relatorios/categorias-insumos" element={<ModuloComprasRoute><ComprasRelatoriosRoute><ComprasRelatorioCategoriasInsumos /></ComprasRelatoriosRoute></ModuloComprasRoute>} />
+        <Route path="compras/relatorios/compras-fornecedor" element={<ModuloComprasRoute><ComprasRelatoriosRoute><ComprasRelatorioComprasFornecedor /></ComprasRelatoriosRoute></ModuloComprasRoute>} />
+        <Route path="compras/relatorios/demanda-pedidos" element={<ModuloComprasRoute><ComprasRelatoriosRoute><ComprasRelatorioDemandaPedidos /></ComprasRelatoriosRoute></ModuloComprasRoute>} />
+        <Route path="compras/relatorios/evolucao" element={<ModuloComprasRoute><ComprasRelatoriosRoute><ComprasRelatorioEvolucao /></ComprasRelatoriosRoute></ModuloComprasRoute>} />
+        <Route path="compras/relatorios/pendencias-cotacoes" element={<ModuloComprasRoute><ComprasRelatoriosRoute><ComprasRelatorioPendenciasCotacoes /></ComprasRelatoriosRoute></ModuloComprasRoute>} />
+        <Route path="compras/relatorios/precos-insumos" element={<ModuloComprasRoute><ComprasRelatoriosRoute><ComprasRelatorioPrecosInsumos /></ComprasRelatoriosRoute></ModuloComprasRoute>} />
+        <Route path="compras/relatorios/ciclo" element={<ModuloComprasRoute><ComprasRelatoriosRoute><ComprasRelatorioCiclo /></ComprasRelatoriosRoute></ModuloComprasRoute>} />
+        <Route path="compras/relatorios/economia-cotacoes" element={<ModuloComprasRoute><ComprasRelatoriosRoute><ComprasRelatorioEconomiaCotacoes /></ComprasRelatoriosRoute></ModuloComprasRoute>} />
+        <Route path="compras/relatorios/fornecedores" element={<ModuloComprasRoute><ComprasRelatoriosRoute><ComprasRelatorioFornecedores /></ComprasRelatoriosRoute></ModuloComprasRoute>} />
+        <Route path="relatorios/administrativos" element={<ModuloComprasRoute><ComprasRelatoriosRoute><RelatoriosAdministrativos /></ComprasRelatoriosRoute></ModuloComprasRoute>} />
         <Route path="perfil" element={<Perfil />} />
         <Route path="contratos/relatorios" element={<ContratosRoute><ModuloRelatorios modulo="contratos" /></ContratosRoute>} />
         <Route path="contratos/relatorios/operacional" element={<ContratosRoute><ContratosRelatorioOperacional /></ContratosRoute>} />
-        <Route path="solicitacoes-compra" element={<ModuloComprasRoute><SolicitacoesCompra /></ModuloComprasRoute>} />
-        <Route path="solicitacoes-compra/:id/cotacao" element={<ModuloComprasRoute><EnabledModuleRoute moduleKey="COTACOES"><ComprasCotacoesManageRoute><GerenciarCotacaoSolicitacao /></ComprasCotacoesManageRoute></EnabledModuleRoute></ModuloComprasRoute>} />
-        <Route path="solicitacoes-compra/:id" element={<ModuloComprasRoute><SolicitacaoCompraDetalhe /></ModuloComprasRoute>} />
-        <Route path="solicitacoes-compra/nova" element={<ComprasPedidosCreateRoute><NovaSolicitacaoCompra /></ComprasPedidosCreateRoute>} />
-        <Route path="solicitacoes-compra/revisar" element={<ModuloComprasRoute><RevisarSolicitacaoCompra /></ModuloComprasRoute>} />
-        <Route path="solicitacoes-compra/finalizada/:id" element={<ModuloComprasRoute><RevisarSolicitacaoCompraFinal /></ModuloComprasRoute>} />
+        <Route path="solicitacoes-compra" element={<ModuloComprasRoute><CompraSolicitacoesRoute><SolicitacoesCompra /></CompraSolicitacoesRoute></ModuloComprasRoute>} />
+        <Route path="solicitacoes-compra/:id/cotacao" element={<ModuloComprasRoute><EnabledModuleRoute moduleKey="COTACOES"><CompraSolicitacoesManageRoute><GerenciarCotacaoSolicitacao /></CompraSolicitacoesManageRoute></EnabledModuleRoute></ModuloComprasRoute>} />
+        <Route path="solicitacoes-compra/:id" element={<ModuloComprasRoute><CompraSolicitacoesRoute><SolicitacaoCompraDetalhe /></CompraSolicitacoesRoute></ModuloComprasRoute>} />
+        <Route path="solicitacoes-compra/nova" element={<CompraSolicitacaoCreateRoute><NovaSolicitacaoCompra /></CompraSolicitacaoCreateRoute>} />
+        <Route path="solicitacoes-compra/revisar" element={<ModuloComprasRoute><CompraSolicitacoesRoute><RevisarSolicitacaoCompra /></CompraSolicitacoesRoute></ModuloComprasRoute>} />
+        <Route path="solicitacoes-compra/finalizada/:id" element={<ModuloComprasRoute><CompraSolicitacoesRoute><RevisarSolicitacaoCompraFinal /></CompraSolicitacoesRoute></ModuloComprasRoute>} />
         <Route path="pedidos-compra" element={<ComprasPedidosRoute><PedidosCompra /></ComprasPedidosRoute>} />
         <Route path="pedidos-compra/:id" element={<ComprasPedidosRoute><PedidoCompraDetalhe /></ComprasPedidosRoute>} />
-        <Route path="compras/delegacao" element={<ComprasPedidosRoute><ComprasDelegacao /></ComprasPedidosRoute>} />
+        <Route path="compras/delegacao" element={<ComprasDelegacaoRoute><ComprasDelegacao /></ComprasDelegacaoRoute>} />
         <Route path="gestao-apropriacoes" element={<GestaoObrasRoute><BusinessAdminRoute><GestaoApropriacoes /></BusinessAdminRoute></GestaoObrasRoute>} />
-        <Route path="gestao-insumos" element={<ModuloComprasRoute><BusinessAdminRoute><GestaoInsumos /></BusinessAdminRoute></ModuloComprasRoute>} />
-        <Route path="gestao-unidades" element={<ModuloComprasRoute><BusinessAdminRoute><GestaoUnidades /></BusinessAdminRoute></ModuloComprasRoute>} />
-        <Route path="gestao-categorias" element={<ModuloComprasRoute><BusinessAdminRoute><GestaoCategorias /></BusinessAdminRoute></ModuloComprasRoute>} />
-        <Route path="gestao-fornecedores" element={<EnabledModuleRoute moduleKey="COTACOES"><ComprasCotacoesManageRoute><GestaoFornecedores /></ComprasCotacoesManageRoute></EnabledModuleRoute>} />
+        <Route path="gestao-insumos" element={<ModuloComprasRoute><ComprasConfiguracoesRoute><GestaoInsumos /></ComprasConfiguracoesRoute></ModuloComprasRoute>} />
+        <Route path="gestao-unidades" element={<ModuloComprasRoute><ComprasConfiguracoesRoute><GestaoUnidades /></ComprasConfiguracoesRoute></ModuloComprasRoute>} />
+        <Route path="gestao-categorias" element={<ModuloComprasRoute><ComprasConfiguracoesRoute><GestaoCategorias /></ComprasConfiguracoesRoute></ModuloComprasRoute>} />
+        <Route path="gestao-fornecedores" element={<EnabledModuleRoute moduleKey="COTACOES"><ComprasFornecedoresRoute><GestaoFornecedores /></ComprasFornecedoresRoute></EnabledModuleRoute>} />
         <Route path="cotacoes" element={<EnabledModuleRoute moduleKey="COTACOES"><ComprasCotacoesRoute><ListaCotacoes /></ComprasCotacoesRoute></EnabledModuleRoute>} />
       </Route>
     </Routes>

@@ -75,6 +75,16 @@ const MODULO_PERMISSION_GROUPS = [
     descricao: 'Pedidos de compra, cotações e aprovações.',
     areas: [
       {
+        key: 'compras.solicitacoes',
+        label: 'Solicitacoes de Compra',
+        permissoes: [
+          { key: 'compras.solicitacoes.visualizar', label: 'Visualizar solicitacoes', descricao: 'Ver lista, detalhes e PDF das solicitacoes de compra.' },
+          { key: 'compras.solicitacoes.criar', label: 'Criar solicitacao de compra', descricao: 'Acessar a pagina Nova Solicitacao de Compra e criar solicitacoes vinculadas a obra.' },
+          { key: 'compras.solicitacoes.gerenciar', label: 'Gerenciar solicitacoes', descricao: 'Liberar, recusar, enviar para fornecedores, encerrar e comentar solicitacoes de compra.' },
+          { key: 'compras.solicitacoes.gerar_pedidos', label: 'Gerar pedidos pela cotacao', descricao: 'Gerar pedidos de compra a partir da cotacao encerrada.' }
+        ]
+      },
+      {
         key: 'compras.pedidos',
         label: 'Pedidos de Compra',
         permissoes: [
@@ -85,11 +95,47 @@ const MODULO_PERMISSION_GROUPS = [
         ]
       },
       {
+        key: 'compras.pedidos.acoes',
+        label: 'Acoes de Pedidos',
+        permissoes: [
+          { key: 'compras.pedidos.editar_itens', label: 'Editar itens do pedido', descricao: 'Alterar quantidade, valor, observacoes e itens do pedido.' },
+          { key: 'compras.pedidos.remanejar', label: 'Remanejar itens', descricao: 'Remanejar itens de um pedido para outro fornecedor da mesma cotacao.' },
+          { key: 'compras.pedidos.cancelar', label: 'Cancelar pedido ou item', descricao: 'Cancelar pedidos ou itens mantendo rastreabilidade.' },
+          { key: 'compras.pedidos.anexar_espelho', label: 'Anexar espelho', descricao: 'Anexar espelho do pedido enviado pelo fornecedor.' },
+          { key: 'compras.pedidos.alterar_status', label: 'Alterar status do pedido', descricao: 'Alterar status de pedidos individualmente ou em lote.' }
+        ]
+      },
+      {
+        key: 'compras.delegacao',
+        label: 'Delegacao de Compras',
+        permissoes: [
+          { key: 'compras.delegacao.visualizar', label: 'Visualizar delegacao', descricao: 'Acompanhar responsaveis, prazos e atrasos das solicitacoes de compra.' },
+          { key: 'compras.delegacao.gerenciar', label: 'Gerenciar delegacao', descricao: 'Atribuir responsavel, prazo e motivo de atraso.' }
+        ]
+      },
+      {
         key: 'compras.cotacoes',
         label: 'Cotações',
         permissoes: [
           { key: 'compras.cotacoes.visualizar', label: 'Visualizar cotações', descricao: 'Ver cotações e comparativo de fornecedores.' },
           { key: 'compras.cotacoes.gerenciar', label: 'Gerenciar cotações', descricao: 'Criar, editar e encerrar cotações.' }
+        ]
+      },
+      {
+        key: 'compras.fornecedores',
+        label: 'Fornecedores',
+        permissoes: [
+          { key: 'compras.fornecedores.visualizar', label: 'Visualizar fornecedores', descricao: 'Ver fornecedores cadastrados para cotacao.' },
+          { key: 'compras.fornecedores.gerenciar', label: 'Gerenciar fornecedores', descricao: 'Cadastrar, editar e inativar fornecedores.' }
+        ]
+      },
+      {
+        key: 'compras.configuracoes',
+        label: 'Configuracoes de Compras',
+        permissoes: [
+          { key: 'compras.configuracoes.cotacoes', label: 'Configurar cotacoes', descricao: 'Alterar parametros operacionais de cotacao.' },
+          { key: 'compras.configuracoes.status_pedidos', label: 'Configurar status de pedidos', descricao: 'Gerenciar status do fluxo de pedidos de compra.' },
+          { key: 'compras.configuracoes.cadastros', label: 'Cadastros de compras', descricao: 'Gerenciar insumos, unidades e categorias de compras.' }
         ]
       },
       {

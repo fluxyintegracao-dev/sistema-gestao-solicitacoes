@@ -123,6 +123,21 @@ const SOLICITACOES_RELATORIO_OPERACIONAL_KEYS = [
   'solicitacoes.relatorios.operacional'
 ];
 
+const COMPRAS_SOLICITACOES_VIEW_KEYS = [
+  'compras.solicitacoes.visualizar',
+  'compras.solicitacoes.gerenciar',
+  'compras.solicitacoes.gerar_pedidos'
+];
+
+const COMPRAS_SOLICITACOES_CREATE_KEYS = [
+  'compras.solicitacoes.criar'
+];
+
+const COMPRAS_SOLICITACOES_MANAGE_KEYS = [
+  'compras.solicitacoes.gerenciar',
+  'compras.solicitacoes.gerar_pedidos'
+];
+
 const COMPRAS_PEDIDOS_VIEW_KEYS = [
   'compras.pedidos.visualizar',
   'compras.pedidos.criar',
@@ -152,9 +167,51 @@ const COMPRAS_COTACOES_MANAGE_KEYS = [
   'compras.cotacoes.gerenciar'
 ];
 
+const COMPRAS_DELEGACAO_VIEW_KEYS = [
+  'compras.delegacao.visualizar',
+  'compras.delegacao.gerenciar'
+];
+
+const COMPRAS_DELEGACAO_MANAGE_KEYS = [
+  'compras.delegacao.gerenciar'
+];
+
+const COMPRAS_FORNECEDORES_VIEW_KEYS = [
+  'compras.fornecedores.visualizar',
+  'compras.fornecedores.gerenciar'
+];
+
+const COMPRAS_FORNECEDORES_MANAGE_KEYS = [
+  'compras.fornecedores.gerenciar'
+];
+
+const COMPRAS_RELATORIOS_VIEW_KEYS = [
+  'compras.relatorios.visualizar',
+  'compras.relatorios.cotacoes',
+  'compras.relatorios.pedidos'
+];
+
+const COMPRAS_CONFIGURACOES_MANAGE_KEYS = [
+  'compras.configuracoes.cotacoes',
+  'compras.configuracoes.status_pedidos',
+  'compras.configuracoes.cadastros'
+];
+
 const COMPRAS_PERMISSION_KEYS = [
+  ...COMPRAS_SOLICITACOES_VIEW_KEYS,
+  ...COMPRAS_SOLICITACOES_CREATE_KEYS,
+  ...COMPRAS_SOLICITACOES_MANAGE_KEYS,
   ...COMPRAS_PEDIDOS_VIEW_KEYS,
-  ...COMPRAS_COTACOES_VIEW_KEYS
+  ...COMPRAS_PEDIDOS_MANAGE_KEYS,
+  ...COMPRAS_PEDIDOS_AUDIT_KEYS,
+  ...COMPRAS_COTACOES_VIEW_KEYS,
+  ...COMPRAS_COTACOES_MANAGE_KEYS,
+  ...COMPRAS_DELEGACAO_VIEW_KEYS,
+  ...COMPRAS_DELEGACAO_MANAGE_KEYS,
+  ...COMPRAS_FORNECEDORES_VIEW_KEYS,
+  ...COMPRAS_FORNECEDORES_MANAGE_KEYS,
+  ...COMPRAS_RELATORIOS_VIEW_KEYS,
+  ...COMPRAS_CONFIGURACOES_MANAGE_KEYS
 ];
 
 const COMERCIAL_EMPREENDIMENTOS_VIEW_KEYS = [
@@ -1288,6 +1345,42 @@ async function canAccessCompras(user) {
   );
 }
 
+async function canViewCompraSolicitacoes(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, COMPRAS_SOLICITACOES_VIEW_KEYS);
+  }
+
+  return canAccessCompras(user);
+}
+
+async function canCreateCompraSolicitacao(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, COMPRAS_SOLICITACOES_CREATE_KEYS);
+  }
+
+  return Boolean(user?.pode_criar_solicitacao_compra) || userHasSetorCapability(user, 'eh_setor_compras');
+}
+
+async function canManageCompraSolicitacoes(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, COMPRAS_SOLICITACOES_MANAGE_KEYS);
+  }
+
+  return userHasSetorCapability(user, 'eh_setor_compras');
+}
+
 async function canViewComprasPedidos(user) {
   if (isBusinessAdmin(user)) {
     return true;
@@ -1325,6 +1418,78 @@ async function canAuditComprasPedidos(user) {
   }
 
   return userHasSetorCapability(user, 'eh_setor_compras');
+}
+
+async function canViewComprasDelegacao(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, COMPRAS_DELEGACAO_VIEW_KEYS);
+  }
+
+  return canAccessCompras(user);
+}
+
+async function canManageComprasDelegacao(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, COMPRAS_DELEGACAO_MANAGE_KEYS);
+  }
+
+  return userHasSetorCapability(user, 'eh_setor_compras');
+}
+
+async function canViewComprasFornecedores(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, COMPRAS_FORNECEDORES_VIEW_KEYS);
+  }
+
+  return canManageComprasCotacoes(user);
+}
+
+async function canManageComprasFornecedores(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, COMPRAS_FORNECEDORES_MANAGE_KEYS);
+  }
+
+  return canManageComprasCotacoes(user);
+}
+
+async function canViewComprasRelatorios(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, COMPRAS_RELATORIOS_VIEW_KEYS);
+  }
+
+  return canAccessCompras(user);
+}
+
+async function canManageComprasConfiguracoes(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, COMPRAS_CONFIGURACOES_MANAGE_KEYS);
+  }
+
+  return false;
 }
 
 async function canViewComprasCotacoes(user) {
@@ -2157,6 +2322,7 @@ module.exports = {
   canAuditComprasPedidos,
   canAuditPagamentos,
   buildUserScopeTokens,
+  canCreateCompraSolicitacao,
   canAccessComprovantes,
   canCancelPrioridadeDiretoriaLote,
   canAccessPagamentos,
@@ -2186,6 +2352,7 @@ module.exports = {
   canManageContratos,
   canManageComercialEmpreendimentos,
   canManageComprasCotacoes,
+  canManageComprasFornecedores,
   canManageComprasPedidos,
   canManageCrmAutomacoes,
   canManageCrmConfiguracoes,
@@ -2226,8 +2393,15 @@ module.exports = {
   canSendCrmAtendimento,
   canViewComercialContratos,
   canViewComercialEmpreendimentos,
+  canManageComprasConfiguracoes,
+  canManageCompraSolicitacoes,
   canViewComprasCotacoes,
+  canViewCompraSolicitacoes,
+  canViewComprasDelegacao,
+  canManageComprasDelegacao,
+  canViewComprasFornecedores,
   canViewComprasPedidos,
+  canViewComprasRelatorios,
   canViewCrmAtendimento,
   canViewCrmAutomacoes,
   canViewCrmConfiguracoes,

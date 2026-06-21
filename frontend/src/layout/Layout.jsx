@@ -52,6 +52,7 @@ import {
   canAccessCadastroObras,
   canAccessComunicacao,
   canAccessCompras,
+  canAccessDashboard,
   canAccessContratos,
   canAccessFinanceiro,
   canAccessBancosEnterprise,
@@ -89,10 +90,15 @@ import {
   canViewFiscalDocuments,
   canViewFiscalLogs,
   canViewSystemGovernance,
-  canCreateComprasPedidos,
+  canCreateCompraSolicitacao,
+  canManageComprasConfiguracoes,
   canManageComprasCotacoes,
+  canViewCompraSolicitacoes,
   canViewComprasCotacoes,
+  canViewComprasDelegacao,
+  canViewComprasFornecedores,
   canViewComprasPedidos,
+  canViewComprasRelatorios,
   canViewComercialContratos,
   canViewComercialEmpreendimentos,
   hasEnabledModule,
@@ -271,10 +277,15 @@ export default function Layout() {
   const crmAutomacoesAccess = canViewCrmAutomacoes(user);
   const crmConfiguracoesAccess = canViewCrmConfiguracoes(user);
   const comprasAccess = canAccessCompras(user);
+  const comprasSolicitacoesAccess = canViewCompraSolicitacoes(user);
+  const comprasSolicitacoesCreateAccess = canCreateCompraSolicitacao(user);
   const comprasPedidosAccess = canViewComprasPedidos(user);
-  const comprasPedidosCreateAccess = canCreateComprasPedidos(user);
+  const comprasDelegacaoAccess = canViewComprasDelegacao(user);
   const comprasCotacoesAccess = canViewComprasCotacoes(user);
   const comprasCotacoesManageAccess = canManageComprasCotacoes(user);
+  const comprasFornecedoresAccess = canViewComprasFornecedores(user);
+  const comprasRelatoriosAccess = canViewComprasRelatorios(user);
+  const comprasConfiguracoesAccess = canManageComprasConfiguracoes(user);
   const prioridadesDiretoriaAccess = canAccessPrioridadesDiretoria(user);
   const solicitacoesRelatoriosAccess = canViewSolicitacoesRelatorios(user);
   const financeiroAccess = canAccessFinanceiro(user);
@@ -347,7 +358,7 @@ export default function Layout() {
     };
 
     const perfil = String(user?.perfil || '').toUpperCase();
-    const canSeeDashboard = businessAdmin || financeiroAccess || perfil === 'ADMIN';
+    const canSeeDashboard = canAccessDashboard(user);
     const solicitacoesLabel =
       perfil === 'USUARIO'
         ? 'Minhas Solicitações'
@@ -391,17 +402,17 @@ export default function Layout() {
 
     if (comprasAccess) {
       addGroup('Compras', [
-        item('/solicitacoes-compra', 'Solicitações de Compra', HiOutlineClipboardDocumentList),
-        comprasPedidosCreateAccess ? item('/solicitacoes-compra/nova', 'Nova Solicitacao de Compra', HiOutlinePlusCircle) : null,
+        comprasSolicitacoesAccess ? item('/solicitacoes-compra', 'Solicitações de Compra', HiOutlineClipboardDocumentList) : null,
+        comprasSolicitacoesCreateAccess ? item('/solicitacoes-compra/nova', 'Nova Solicitacao de Compra', HiOutlinePlusCircle) : null,
         comprasPedidosAccess ? item('/pedidos-compra', 'Pedidos de Compra', HiOutlineDocumentText) : null,
-        comprasPedidosAccess ? item('/compras/delegacao', 'Delegacao de Compras', HiOutlineUsers) : null,
-        item('/compras/relatorios', 'Relatórios de Compras', HiOutlineDocumentText),
+        comprasDelegacaoAccess ? item('/compras/delegacao', 'Delegacao de Compras', HiOutlineUsers) : null,
+        comprasRelatoriosAccess ? item('/compras/relatorios', 'Relatórios de Compras', HiOutlineDocumentText) : null,
         moduloCotacoesHabilitado && comprasCotacoesAccess ? item('/cotacoes', 'Cotações', HiOutlineInboxStack) : null,
-        moduloCotacoesHabilitado && comprasCotacoesManageAccess ? item('/gestao-fornecedores', 'Fornecedores', HiOutlineUsers) : null,
-        moduloCotacoesHabilitado && businessAdmin && comprasCotacoesAccess ? item('/configuracoes-cotacao', 'Config. Cotações', HiOutlineAdjustmentsHorizontal) : null,
-        businessAdmin ? item('/gestao-insumos', 'Gestão de Insumos', HiOutlineRectangleGroup) : null,
-        businessAdmin ? item('/gestao-unidades', 'Gestão de Unidades', HiOutlineBuildingOffice2) : null,
-        businessAdmin ? item('/gestao-categorias', 'Gestão de Categorias', HiOutlineFolderOpen) : null
+        moduloCotacoesHabilitado && comprasFornecedoresAccess ? item('/gestao-fornecedores', 'Fornecedores', HiOutlineUsers) : null,
+        moduloCotacoesHabilitado && comprasConfiguracoesAccess ? item('/configuracoes-cotacao', 'Config. Cotações', HiOutlineAdjustmentsHorizontal) : null,
+        comprasConfiguracoesAccess ? item('/gestao-insumos', 'Gestão de Insumos', HiOutlineRectangleGroup) : null,
+        comprasConfiguracoesAccess ? item('/gestao-unidades', 'Gestão de Unidades', HiOutlineBuildingOffice2) : null,
+        comprasConfiguracoesAccess ? item('/gestao-categorias', 'Gestão de Categorias', HiOutlineFolderOpen) : null
       ]);
     }
 
@@ -563,8 +574,8 @@ export default function Layout() {
         item('/usuarios-envio-qualquer-setor', 'Envio Livre por Usuario', HiOutlineUsers),
         item('/tipos-compartilhados-setor', 'Tipos Compartilhados', HiOutlineClipboardDocumentList),
         item('/automacao-status-setor', 'Automacao por Status', HiOutlinePaperAirplane),
-        moduloCotacoesHabilitado && comprasCotacoesAccess ? item('/configuracoes-cotacao', 'Config. Cotações', HiOutlineAdjustmentsHorizontal) : null,
-        comprasAccess ? item('/configuracoes-status-pedidos-compra', 'Status dos Pedidos', HiOutlineClipboardDocumentList) : null,
+        moduloCotacoesHabilitado && comprasConfiguracoesAccess ? item('/configuracoes-cotacao', 'Config. Cotações', HiOutlineAdjustmentsHorizontal) : null,
+        comprasConfiguracoesAccess ? item('/configuracoes-status-pedidos-compra', 'Status dos Pedidos', HiOutlineClipboardDocumentList) : null,
         superadmin && comercialAccess ? item('/configuracoes-comercial-categorias', 'Categorias Comerciais', HiOutlineArchiveBox) : null,
         superadmin ? item('/configuracoes-modulos', 'Modulos e Planos', HiOutlineCog6Tooth) : null,
         superadmin ? item('/configuracoes-notificacoes-sistema', 'Notificacoes Sistema', HiOutlineBell) : null,
@@ -586,10 +597,15 @@ export default function Layout() {
     comercialEmpreendimentosAccess,
     comunicacaoAccess,
     comprasAccess,
+    comprasConfiguracoesAccess,
     comprasCotacoesAccess,
     comprasCotacoesManageAccess,
+    comprasDelegacaoAccess,
+    comprasFornecedoresAccess,
     comprasPedidosAccess,
-    comprasPedidosCreateAccess,
+    comprasRelatoriosAccess,
+    comprasSolicitacoesAccess,
+    comprasSolicitacoesCreateAccess,
     contratosAccess,
     crmAccess,
     crmAtendimentoAccess,
