@@ -7,6 +7,7 @@ export const CAMPOS_NOVA_SOLICITACAO = [
   { id: 'contrato', label: 'Contrato', descricao: 'Referencia e contrato vinculado.' },
   { id: 'valor', label: 'Valor', descricao: 'Valor da solicitacao.' },
   { id: 'data_vencimento', label: 'Data de vencimento', descricao: 'Prazo ou vencimento esperado.' },
+  { id: 'data_demissao', label: 'Data de demissao', descricao: 'Data efetiva de desligamento do colaborador.' },
   { id: 'periodo_medicao', label: 'Periodo de medicao', descricao: 'Data inicial e final da medicao.' },
   { id: 'ref_contrato_abertura', label: 'Ref. contrato abertura', descricao: 'Referencia usada para abertura de contrato.' },
   { id: 'itens_apropriacao', label: 'Itens de apropriacao', descricao: 'Itens de apropriacao usados na abertura de contrato.' },
@@ -68,6 +69,8 @@ function padraoCampo(id, behavior = {}, contexto = {}) {
       return { visivel: Boolean(behavior.mostrar_valor), obrigatorio: Boolean(behavior.exige_valor) };
     case 'data_vencimento':
       return { visivel: true, obrigatorio: true };
+    case 'data_demissao':
+      return { visivel: false, obrigatorio: false };
     case 'periodo_medicao':
       return {
         visivel: Boolean(behavior.mostrar_periodo_medicao || behavior.exige_periodo_medicao),

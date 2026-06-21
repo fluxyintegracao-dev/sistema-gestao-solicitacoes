@@ -511,6 +511,16 @@ export async function importarCodigosBarrasTitulos(data) {
   return parseJson(response, 'Erro ao importar codigos de barras dos titulos');
 }
 
+export async function excluirTitulosFinanceirosEmMassa(data) {
+  const response = await fetch(`${API_URL}/financeiro/titulos/excluir-em-massa`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+
+  return parseJson(response, 'Erro ao excluir titulos financeiros');
+}
+
 export async function atualizarCobrancaTituloFinanceiro(id, data) {
   const response = await fetch(`${API_URL}/financeiro/titulos/${id}/cobranca`, {
     method: 'PATCH',

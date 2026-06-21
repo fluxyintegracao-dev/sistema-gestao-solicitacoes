@@ -1668,6 +1668,7 @@ module.exports = {
         codigo_contrato,
         contrato_id,
         data_vencimento,
+        data_demissao,
         data_inicio_medicao,
         data_fim_medicao,
         itens_apropriacao,
@@ -1824,6 +1825,11 @@ module.exports = {
           error: 'Informe a data de vencimento.'
         });
       }
+      if (campoObrigatorio('data_demissao') && !data_demissao) {
+        return res.status(400).json({
+          error: 'Informe a data de demissao.'
+        });
+      }
       if (campoVisivel('data_vencimento') && data_vencimento) {
         const vencimentoStr = String(data_vencimento).trim();
         if (!/^\d{4}-\d{2}-\d{2}$/.test(vencimentoStr)) {
@@ -1838,6 +1844,14 @@ module.exports = {
         if (vencimentoStr < hojeStr) {
           return res.status(400).json({
             error: 'A data de vencimento nao pode ser menor que a data atual.'
+          });
+        }
+      }
+      if (campoVisivel('data_demissao') && data_demissao) {
+        const demissaoStr = String(data_demissao).trim();
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(demissaoStr)) {
+          return res.status(400).json({
+            error: 'Data de demissao invalida. Use o formato YYYY-MM-DD.'
           });
         }
       }
@@ -2081,6 +2095,7 @@ module.exports = {
         codigo_contrato: campoVisivel('contrato') ? codigo_contrato : null,
         contrato_id: campoVisivel('contrato') ? (contrato_id || null) : null,
         data_vencimento: campoVisivel('data_vencimento') ? (data_vencimento || null) : null,
+        data_demissao: campoVisivel('data_demissao') ? (data_demissao || null) : null,
         data_inicio_medicao: campoVisivel('periodo_medicao') ? (data_inicio_medicao || null) : null,
         data_fim_medicao: campoVisivel('periodo_medicao') ? (data_fim_medicao || null) : null,
         criado_por: usuarioId,
@@ -3313,14 +3328,6 @@ module.exports = {
         });
       }
 
-      await Historico.create({
-        solicitacao_id: id,
-        usuario_responsavel_id: req.user.id,
-        setor: usuario.setor_id,
-        acao: 'COMENTARIO',
-        descricao
-      });
-
       const mencoesRecebidas = Array.isArray(mencoes) ? mencoes : [];
       const idsMencionados = [
         ...new Set(
@@ -3330,15 +3337,44 @@ module.exports = {
         )
       ];
 
+      let usuariosMencionados = [];
       if (idsMencionados.length > 0) {
-        const usuariosMencionados = await User.findAll({
+        usuariosMencionados = await User.findAll({
           where: {
             id: { [Op.in]: idsMencionados },
             ativo: true
           },
-          attributes: ['id', 'nome']
+          attributes: ['id', 'nome', 'email']
         });
+      }
 
+      const mencoesHistorico = usuariosMencionados.map((item) => ({
+        id: item.id,
+        nome: item.nome,
+        email: item.email
+      }));
+      const descricaoHistorico = mencoesHistorico.length > 0
+        ? `${descricao}\n\nMencoes: ${usuario?.nome || 'Usuario'} mencionou ${mencoesHistorico.map((item) => item.nome || item.email || `usuario #${item.id}`).join(', ')}.`
+        : descricao;
+
+      await Historico.create({
+        solicitacao_id: id,
+        usuario_responsavel_id: req.user.id,
+        setor: usuario.setor_id,
+        acao: 'COMENTARIO',
+        descricao: descricaoHistorico,
+        metadata: JSON.stringify({
+          comentario: descricao,
+          mencoes: mencoesHistorico,
+          mencionado_por: {
+            id: req.user.id,
+            nome: usuario?.nome || null,
+            email: usuario?.email || null
+          }
+        })
+      });
+
+      if (usuariosMencionados.length > 0) {
         for (const usuarioMencionado of usuariosMencionados) {
           await criarNotificacao({
             solicitacao_id: id,

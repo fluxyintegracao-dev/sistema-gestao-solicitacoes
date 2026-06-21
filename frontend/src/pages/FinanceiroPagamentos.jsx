@@ -501,16 +501,27 @@ export default function FinanceiroPagamentos() {
     [selectedPaymentAccount]
   );
 
+  const selectedIdsSet = useMemo(() => new Set(selectedIds.map(String)), [selectedIds]);
+
+  const selectableTitulosIds = useMemo(() => (
+    titulos
+      .filter((titulo) => titulo.elegivel_pagamento && getTituloPaymentAccountPendencies(titulo, selectedPaymentAccount).length === 0)
+      .map((titulo) => titulo.id)
+  ), [selectedPaymentAccount, titulos]);
+
+  const allSelectableTitulosSelected = useMemo(() => (
+    selectableTitulosIds.length > 0 && selectableTitulosIds.every((id) => selectedIdsSet.has(String(id)))
+  ), [selectableTitulosIds, selectedIdsSet]);
+
   const selectedTitulosAccountPendencies = useMemo(() => {
-    const selected = new Set(selectedIds.map(String));
     return titulos
-      .filter((titulo) => selected.has(String(titulo.id)))
+      .filter((titulo) => selectedIdsSet.has(String(titulo.id)))
       .map((titulo) => ({
         titulo,
         pendencias: getTituloPaymentAccountPendencies(titulo, selectedPaymentAccount)
       }))
       .filter((item) => item.pendencias.length > 0);
-  }, [selectedIds, selectedPaymentAccount, titulos]);
+  }, [selectedIdsSet, selectedPaymentAccount, titulos]);
 
   const titulosOverview = useMemo(() => {
     const eligible = titulos.filter((titulo) => titulo.elegivel_pagamento);
@@ -600,6 +611,20 @@ export default function FinanceiroPagamentos() {
         ? current.filter((item) => String(item) !== String(id))
         : [...current, id]
     ));
+  }
+
+  function toggleTodosTitulosElegiveis() {
+    setSelectedIds((current) => {
+      const selectable = selectableTitulosIds.map(String);
+      const currentSet = new Set(current.map(String));
+      const alreadyAllSelected = selectable.length > 0 && selectable.every((id) => currentSet.has(id));
+
+      if (alreadyAllSelected) {
+        return current.filter((id) => !selectable.includes(String(id)));
+      }
+
+      return Array.from(new Set([...current, ...selectableTitulosIds]));
+    });
   }
 
   function handlePaymentAccountChange(value) {
@@ -938,6 +963,9 @@ export default function FinanceiroPagamentos() {
                       <HiOutlineClock className="h-4 w-4" />
                       {actionLoading === 'titulos' ? 'Buscando...' : 'Buscar elegiveis'}
                     </button>
+                    <button type="button" className="btn btn-outline" onClick={toggleTodosTitulosElegiveis} disabled={!selectableTitulosIds.length}>
+                      {allSelectableTitulosSelected ? 'Desmarcar todos' : 'Selecionar todos'}
+                    </button>
                     <button type="button" className="btn btn-outline" onClick={handleCriarLote} disabled={!selectedIds.length || !batchForm.payment_account_id || selectedPaymentAccountPendencies.length > 0 || selectedTitulosAccountPendencies.length > 0 || actionLoading === 'criar-lote'}>
                       <HiOutlineBanknotes className="h-4 w-4" />
                       {actionLoading === 'criar-lote' ? 'Gerando...' : `Gerar lote (${selectedIds.length})`}
@@ -986,7 +1014,15 @@ export default function FinanceiroPagamentos() {
                     <table className="min-w-full text-left text-sm">
                       <thead className="text-xs uppercase text-[var(--c-muted)]">
                         <tr>
-                          <th className="px-3 py-2">Selecionar</th>
+                          <th className="px-3 py-2">
+                            <input
+                              type="checkbox"
+                              aria-label="Selecionar todos os titulos elegiveis"
+                              checked={allSelectableTitulosSelected}
+                              disabled={!selectableTitulosIds.length}
+                              onChange={toggleTodosTitulosElegiveis}
+                            />
+                          </th>
                           <th className="px-3 py-2">Titulo</th>
                           <th className="px-3 py-2">Credor</th>
                           <th className="px-3 py-2">Favorecido PIX</th>

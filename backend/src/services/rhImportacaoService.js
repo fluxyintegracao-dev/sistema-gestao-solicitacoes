@@ -257,7 +257,7 @@ function parseLinhaJornada(row) {
     dias_trabalhados: parseImportDecimal(
       pickImportValue(row, ['dias_trabalhados', 'dias_trabalhados_no_mes', 'dias']),
       'Dias trabalhados',
-      { required: true, min: 0 }
+      { required: true, min: 0.01 }
     ),
     faltas: parseImportDecimal(pickImportValue(row, ['faltas']), 'Faltas', { min: 0 }) || 0,
     horas_extras: parseImportDecimal(

@@ -80,6 +80,14 @@ const RH_COLABORADORES_COLUMNS = [
   { key: 'acoes', width: 92, minWidth: 76 }
 ];
 
+const RH_COLABORADORES_FILTROS_INICIAIS = {
+  q: '',
+  empresa_grupo_id: '',
+  obra_id: '',
+  tipo_vinculo: '',
+  status: ''
+};
+
 function formatDate(value) {
   if (!value) return '-';
   const date = new Date(`${String(value).slice(0, 10)}T00:00:00`);
@@ -265,13 +273,7 @@ export default function RhDpColaboradores() {
   const [tiposDocumento, setTiposDocumento] = useState([]);
   const [documentos, setDocumentos] = useState([]);
   const [resumoDocumentos, setResumoDocumentos] = useState(null);
-  const [filtros, setFiltros] = useState({
-    q: '',
-    empresa_grupo_id: '',
-    obra_id: '',
-    tipo_vinculo: '',
-    status: ''
-  });
+  const [filtros, setFiltros] = useState(RH_COLABORADORES_FILTROS_INICIAIS);
   const [filtrosDocumentos, setFiltrosDocumentos] = useState({
     q: '',
     tipo_documento_id: '',
@@ -365,6 +367,20 @@ export default function RhDpColaboradores() {
     } catch (error) {
       console.error(error);
       alert(error?.message || 'Erro ao filtrar colaboradores');
+    } finally {
+      setCarregando(false);
+    }
+  }
+
+  async function limparFiltros() {
+    try {
+      setCarregando(true);
+      setFiltros(RH_COLABORADORES_FILTROS_INICIAIS);
+      const data = await getRhColaboradores({});
+      setColaboradores(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error(error);
+      alert(error?.message || 'Erro ao limpar filtros de colaboradores');
     } finally {
       setCarregando(false);
     }
@@ -640,6 +656,9 @@ export default function RhDpColaboradores() {
         <div className="app-page-actions rh-colaboradores-actions">
           <button type="button" className="btn btn-outline" onClick={aplicarFiltros} disabled={carregando}>
             Aplicar filtros
+          </button>
+          <button type="button" className="btn btn-outline" onClick={limparFiltros} disabled={carregando}>
+            Limpar filtros
           </button>
           {podeEditar && (
             <>

@@ -148,6 +148,7 @@ export default function Header({
         <InfoItem label="Valor" value={formatarValor(solicitacao.valor)} />
         <InfoItem label="Criado em" value={formatarDataHora(solicitacao.createdAt)} />
         <InfoItem label="Vencimento" value={formatarData(solicitacao.data_vencimento)} />
+        {solicitacao.data_demissao && <InfoItem label="Data de demissao" value={formatarData(solicitacao.data_demissao)} />}
         <InfoItem label="Inicio da medicao" value={formatarData(solicitacao.data_inicio_medicao)} />
         <InfoItem label="Fim da medicao" value={formatarData(solicitacao.data_fim_medicao)} />
         <InfoItem label="Status" value={solicitacao.status_global || '-'} />

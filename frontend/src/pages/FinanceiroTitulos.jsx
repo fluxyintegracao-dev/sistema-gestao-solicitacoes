@@ -20,6 +20,7 @@ import {
   getChequesTerceirosDisponiveis,
   getContasBancarias,
   getTitulosFinanceiros,
+  excluirTitulosFinanceirosEmMassa,
   importarCodigosBarrasTitulos
 } from '../services/financeiro';
 import { getMinhasObras } from '../services/obras';
@@ -863,6 +864,48 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
     setModalBaixaMassaOpen(true);
   }
 
+  async function excluirTitulosSelecionados() {
+    if (selectedTitulosBaixaveis.length === 0) {
+      setError('Selecione ao menos um titulo aberto ou parcial para excluir.');
+      return;
+    }
+
+    const confirmado = window.confirm(
+      `Excluir ${selectedTitulosBaixaveis.length} titulo(s) selecionado(s)? Eles sairao das telas e relatorios, mas ficarao preservados para auditoria.`
+    );
+    if (!confirmado) return;
+
+    try {
+      setLoading(true);
+      setError('');
+      await excluirTitulosFinanceirosEmMassa({
+        titulo_ids: selectedTitulosBaixaveis.map((titulo) => Number(titulo.id)),
+        motivo: 'Exclusao em massa pela tela de contas a pagar/receber'
+      });
+
+      const data = await getTitulosFinanceiros({
+        ...compactFilters(pickVisibleFilters(appliedFilters, visibleFilterIds)),
+        paginated: 1,
+        page: pagination.page,
+        limit: pagination.limit
+      });
+      setTitulos(Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : []);
+      if (data?.pagination) {
+        setPagination((current) => ({
+          ...current,
+          ...data.pagination,
+          page: Number(data.pagination.page || current.page || 1),
+          limit: data.pagination.limit || current.limit
+        }));
+      }
+      setSelectedTituloIds([]);
+    } catch (err) {
+      setError(err?.message || 'Erro ao excluir titulos selecionados.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
   function setBaixaMassaParcelamentoAtivo(checked) {
     setBaixaMassaForm((current) => ({
       ...current,
@@ -1588,6 +1631,16 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
               title="Baixar titulos selecionados"
             >
               Baixar selecionados
+              {selectedTitulosBaixaveis.length > 0 ? ` (${selectedTitulosBaixaveis.length})` : ''}
+            </button>
+            <button
+              type="button"
+              className="btn btn-outline btn-sm text-rose-700 hover:border-rose-300 hover:bg-rose-50"
+              onClick={excluirTitulosSelecionados}
+              disabled={selectedTitulosBaixaveis.length === 0 || loading || savingBaixaMassa}
+              title="Excluir titulos selecionados sem apagar o registro do banco"
+            >
+              Excluir selecionados
               {selectedTitulosBaixaveis.length > 0 ? ` (${selectedTitulosBaixaveis.length})` : ''}
             </button>
             <Link to="/financeiro/cadastros" className="btn btn-outline btn-sm">Cadastros</Link>

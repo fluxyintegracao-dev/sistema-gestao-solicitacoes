@@ -17,11 +17,44 @@ const TIPOS_IMPORTACAO = [
   { value: 'DESCONTO', label: 'Desconto' }
 ];
 
+const IMPORTACAO_PAYLOAD_COLUMNS = {
+  JORNADA: [
+    { key: 'dias_trabalhados', label: 'Dias trabalhados' },
+    { key: 'faltas', label: 'Faltas' },
+    { key: 'horas_extras', label: 'Horas extras' },
+    { key: 'adicionais', label: 'Adicionais' },
+    { key: 'descontos_informados', label: 'Descontos' },
+    { key: 'valor_informado', label: 'Valor informado' },
+    { key: 'observacoes', label: 'Observacoes' }
+  ],
+  EVENTO_VARIAVEL: [
+    { key: 'codigo_evento', label: 'Codigo' },
+    { key: 'descricao_evento', label: 'Descricao' },
+    { key: 'natureza', label: 'Natureza' },
+    { key: 'valor', label: 'Valor' },
+    { key: 'referencia', label: 'Referencia' },
+    { key: 'observacoes', label: 'Observacoes' }
+  ],
+  DESCONTO: [
+    { key: 'codigo_evento', label: 'Codigo' },
+    { key: 'descricao_evento', label: 'Descricao' },
+    { key: 'valor', label: 'Valor' },
+    { key: 'referencia', label: 'Referencia' },
+    { key: 'observacoes', label: 'Observacoes' }
+  ]
+};
+
 function formatDateTime(value) {
   if (!value) return '-';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '-';
   return date.toLocaleString('pt-BR');
+}
+
+function formatPayloadValue(value) {
+  if (value === null || value === undefined || value === '') return '-';
+  if (typeof value === 'number') return value.toLocaleString('pt-BR');
+  return String(value);
 }
 
 function buildTemplateRows(tipo) {
@@ -448,7 +481,9 @@ export default function RhDpImportacoes() {
                       <th>Linha</th>
                       <th>Colaborador</th>
                       <th>Status</th>
-                      <th>Payload</th>
+                      {(IMPORTACAO_PAYLOAD_COLUMNS[detalhe.tipo] || []).map((column) => (
+                        <th key={column.key}>{column.label}</th>
+                      ))}
                       <th>Erro</th>
                     </tr>
                   </thead>
@@ -461,17 +496,19 @@ export default function RhDpImportacoes() {
                           <div className="text-xs text-slate-500">{linha.matricula_ref || linha.cpf_ref || '-'}</div>
                         </td>
                         <td>{linha.status}</td>
-                        <td>
-                          <pre className="max-w-[260px] whitespace-pre-wrap break-all text-xs text-slate-600">
-                            {linha.payload_json ? JSON.stringify(linha.payload_json, null, 2) : '-'}
-                          </pre>
+                        {(IMPORTACAO_PAYLOAD_COLUMNS[detalhe.tipo] || []).map((column) => (
+                          <td key={column.key} className="text-sm text-slate-700">
+                            {formatPayloadValue(linha.payload_json?.[column.key])}
+                          </td>
+                        ))}
+                        <td className="text-sm text-rose-700">
+                          {linha.erro_mensagem ? `Linha ${linha.numero_linha}: ${linha.erro_mensagem}` : '-'}
                         </td>
-                        <td className="text-sm text-rose-700">{linha.erro_mensagem || '-'}</td>
                       </tr>
                     ))}
                     {!detalhe.linhas?.length && (
                       <tr>
-                        <td colSpan="5" align="center">Sem linhas registradas</td>
+                        <td colSpan={4 + (IMPORTACAO_PAYLOAD_COLUMNS[detalhe.tipo] || []).length} align="center">Sem linhas registradas</td>
                       </tr>
                     )}
                   </tbody>

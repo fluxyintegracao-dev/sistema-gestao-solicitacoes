@@ -1419,6 +1419,7 @@ router.patch('/financeiro/financiamentos-bancarios/parcelas/:id', allowFinanceir
 router.get('/financeiro/titulos', allowFinanceiro, validateRequest({ query: validateFinanceTituloQuery }), TituloFinanceiroController.index);
 router.post('/financeiro/titulos', allowFinanceiro, criticalRateLimit, validateRequest({ body: validateFinanceTituloCreateBody }), TituloFinanceiroController.create);
 router.post('/financeiro/titulos/importar-codigos-barras', allowFinanceiro, criticalRateLimit, TituloFinanceiroController.importarCodigosBarras);
+router.post('/financeiro/titulos/excluir-em-massa', allowFinanceiro, criticalRateLimit, TituloFinanceiroController.excluirEmMassa);
 router.post('/financeiro/titulos/baixas/parceladas', allowFinanceiro, criticalRateLimit, validateRequest({ body: validateFinanceTituloBaixaParceladaBody }), TituloFinanceiroController.baixarParcelado);
 router.get('/financeiro/cheques-terceiros/disponiveis', allowFinanceiro, TituloFinanceiroController.chequesTerceirosDisponiveis);
 router.get('/financeiro/titulos/:id', allowFinanceiro, validateRequest({ params: validateNumericIdParam('id', 'Titulo financeiro') }), TituloFinanceiroController.show);

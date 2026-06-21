@@ -65,7 +65,6 @@ function initialForm() {
     competencia: '',
     obra_id: '',
     tipo_vinculo: '',
-    dias_base: '30',
     observacoes: ''
   };
 }
@@ -249,7 +248,6 @@ export default function RhDpApuracao() {
         competencia: form.competencia,
         obra_id: obraId,
         tipo_vinculo: form.tipo_vinculo || undefined,
-        dias_base: form.dias_base || undefined,
         observacoes: form.observacoes || undefined
       });
 
@@ -485,19 +483,6 @@ export default function RhDpApuracao() {
               <option value="CLT">CLT</option>
               <option value="NAO_CLT">Nao CLT</option>
             </select>
-          </label>
-          <label className="rhdp-apuracao-field">
-            <span>Dias base</span>
-            <input
-              type="number"
-              min="1"
-              className="form-control"
-              placeholder="Ex.: 30"
-              value={form.dias_base}
-              onChange={(event) => setForm((current) => ({ ...current, dias_base: event.target.value }))}
-              disabled={!podeEditar}
-            />
-            <small>Usado quando a jornada importada nao informa dias trabalhados.</small>
           </label>
           <label className="rhdp-apuracao-field">
             <span>Observacoes do recorte</span>

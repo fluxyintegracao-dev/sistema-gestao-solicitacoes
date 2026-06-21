@@ -62,6 +62,13 @@ const CAMPOS_NOVA_SOLICITACAO = [
     obrigatorioPadrao: true
   },
   {
+    id: 'data_demissao',
+    label: 'Data de demissao',
+    descricao: 'Data efetiva de desligamento do colaborador.',
+    visivelPadrao: false,
+    obrigatorioPadrao: false
+  },
+  {
     id: 'periodo_medicao',
     label: 'Periodo de medicao',
     descricao: 'Data inicial e final da medicao.',

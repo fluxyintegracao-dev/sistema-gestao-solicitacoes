@@ -8,6 +8,7 @@ const {
   criarTituloManual,
   criarTituloPorSolicitacao,
   estornarMovimentoTitulo,
+  excluirTitulosEmMassa,
   importarCodigosBarrasTitulos,
   listarAuditoriaTitulo,
   listarBaixasRealizadas,
@@ -178,6 +179,16 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return responderErro(res, error, 'Erro ao importar codigos de barras dos titulos');
+    }
+  },
+
+  async excluirEmMassa(req, res) {
+    try {
+      const resultado = await excluirTitulosEmMassa(req, req.body || {});
+      return res.json(resultado);
+    } catch (error) {
+      console.error(error);
+      return responderErro(res, error, 'Erro ao excluir titulos financeiros');
     }
   },
 

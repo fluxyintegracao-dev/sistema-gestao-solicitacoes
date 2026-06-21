@@ -3701,6 +3701,115 @@ async function importarCodigosBarrasTitulos(req, payload = {}) {
   return resultado;
 }
 
+async function excluirTitulosEmMassa(req, payload = {}) {
+  await assertFinanceAccess(req);
+
+  const ids = Array.isArray(payload.titulo_ids)
+    ? payload.titulo_ids.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0)
+    : [];
+
+  const idsUnicos = [...new Set(ids)];
+  if (idsUnicos.length === 0) {
+    throw createHttpError(400, 'Selecione ao menos um titulo para excluir.');
+  }
+
+  const titulos = await TituloFinanceiro.unscoped().findAll({
+    where: {
+      id: { [Op.in]: idsUnicos },
+      deleted_at: null
+    },
+    attributes: ['id', 'codigo', 'status', 'obra_id']
+  });
+
+  if (titulos.length !== idsUnicos.length) {
+    throw createHttpError(404, 'Um ou mais titulos selecionados nao foram encontrados ou ja foram excluidos.');
+  }
+
+  const statusInvalidos = titulos.filter((titulo) => (
+    !['ABERTO', 'PARCIAL'].includes(String(titulo.status || '').trim().toUpperCase())
+  ));
+  if (statusInvalidos.length > 0) {
+    throw createHttpError(
+      400,
+      `Somente titulos abertos ou parciais podem ser excluidos. Revise: ${statusInvalidos.map((titulo) => titulo.codigo || titulo.id).join(', ')}.`
+    );
+  }
+
+  for (const titulo of titulos) {
+    if (titulo.obra_id) {
+      await assertObraScope(
+        req,
+        titulo.obra_id,
+        'TITULO_FINANCEIRO',
+        titulo.id,
+        'Usuario sem permissao para excluir este titulo financeiro'
+      );
+    }
+  }
+
+  const movimentosAtivos = await MovimentoFinanceiro.count({
+    where: {
+      titulo_id: { [Op.in]: idsUnicos },
+      status: 'ATIVO'
+    }
+  });
+  if (movimentosAtivos > 0) {
+    throw createHttpError(400, 'Nao e possivel excluir titulos com movimentos financeiros ativos. Estorne as baixas antes.');
+  }
+
+  const pagamentosAtivos = await PaymentIntent.count({
+    where: {
+      titulo_id: { [Op.in]: idsUnicos },
+      status: { [Op.notIn]: ['CANCELADO', 'REJEITADO', 'REJEITADO_BANCO'] }
+    }
+  });
+  if (pagamentosAtivos > 0) {
+    throw createHttpError(400, 'Nao e possivel excluir titulos com pagamento bancario ativo.');
+  }
+
+  const agora = new Date();
+  const motivo = String(payload.motivo || 'Exclusao em massa pela tela de titulos financeiros').trim().slice(0, 255);
+
+  await TituloFinanceiro.unscoped().update(
+    {
+      status: 'EXCLUIDO',
+      deleted_at: agora,
+      deleted_by: req.user?.id || null,
+      deleted_reason: motivo,
+      atualizado_por: req.user?.id || null
+    },
+    {
+      where: {
+        id: { [Op.in]: idsUnicos },
+        deleted_at: null
+      }
+    }
+  );
+
+  await registrarEventoSeguranca({
+    req,
+    usuarioId: req.user?.id || null,
+    tipoEvento: 'FINANCIAL_TITLES_SOFT_DELETED',
+    recursoTipo: 'TITULO_FINANCEIRO',
+    recursoId: idsUnicos.join(','),
+    status: 'SUCCESS',
+    descricao: 'Titulos financeiros excluidos logicamente em massa',
+    metadata: {
+      total: idsUnicos.length,
+      motivo,
+      titulos: titulos.map((titulo) => ({
+        id: titulo.id,
+        codigo: titulo.codigo
+      }))
+    }
+  });
+
+  return {
+    excluidos: idsUnicos.length,
+    ids: idsUnicos
+  };
+}
+
 async function listarChequesTerceirosDisponiveis(req, filters = {}) {
   await assertFinanceAccess(req);
 
@@ -3748,6 +3857,7 @@ module.exports = {
   criarTituloManualComBaixaAtomica,
   criarTituloPorSolicitacao,
   estornarMovimentoTitulo,
+  excluirTitulosEmMassa,
   importarCodigosBarrasTitulos,
   listarChequesTerceirosDisponiveis,
   listarAuditoriaTitulo,

@@ -92,6 +92,10 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.DATEONLY,
         allowNull: true
       },
+      data_demissao: {
+        type: DataTypes.DATEONLY,
+        allowNull: true
+      },
       data_inicio_medicao: {
         type: DataTypes.DATEONLY,
         allowNull: true

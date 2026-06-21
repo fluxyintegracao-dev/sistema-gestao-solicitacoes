@@ -144,6 +144,7 @@ export default function NovaSolicitacao() {
     ref_contrato_abertura: '',
     valor: '',
     data_vencimento: '',
+    data_demissao: '',
     data_inicio_medicao: '',
     data_fim_medicao: ''
   });
@@ -415,6 +416,8 @@ export default function NovaSolicitacao() {
   const exibirCampoCredor = campoVisivel('credor');
   const exibirDataVencimento = campoVisivel('data_vencimento');
   const dataVencimentoObrigatoria = campoObrigatorio('data_vencimento');
+  const exibirDataDemissao = campoVisivel('data_demissao');
+  const dataDemissaoObrigatoria = campoObrigatorio('data_demissao');
   const exibirPeriodoMedicao = campoVisivel('periodo_medicao');
   const exibirRefContratoAbertura = campoVisivel('ref_contrato_abertura');
   const exibirItensApropriacao = obraSelecionadaEhObra && campoVisivel('itens_apropriacao');
@@ -451,6 +454,9 @@ export default function NovaSolicitacao() {
     if (!exibirDataVencimento) {
       setForm(prev => ({ ...prev, data_vencimento: '' }));
     }
+    if (!exibirDataDemissao) {
+      setForm(prev => ({ ...prev, data_demissao: '' }));
+    }
     if (!exibirPeriodoMedicao) {
       setForm(prev => ({ ...prev, data_inicio_medicao: '', data_fim_medicao: '' }));
     }
@@ -473,6 +479,7 @@ export default function NovaSolicitacao() {
     exigeApropriacaoPrincipal,
     exibirCampoCredor,
     exibirDataVencimento,
+    exibirDataDemissao,
     exibirPeriodoMedicao,
     exibirRefContratoAbertura,
     exibirItensApropriacao,
@@ -748,6 +755,10 @@ export default function NovaSolicitacao() {
       alert('Informe a data de vencimento.');
       return;
     }
+    if (dataDemissaoObrigatoria && !form.data_demissao) {
+      alert('Informe a data de demissao.');
+      return;
+    }
     if (camposContratoObrigatorios && !form.contrato_id) {
       alert('Selecione um contrato.');
       return;
@@ -824,6 +835,7 @@ export default function NovaSolicitacao() {
       tipo_sub_id: exibirCampoSubtipo ? (form.tipo_sub_id || null) : null,
       tipo_macro_id: form.tipo_solicitacao_id || null,
       data_vencimento: exibirDataVencimento ? (form.data_vencimento || null) : null,
+      data_demissao: exibirDataDemissao ? (form.data_demissao || null) : null,
       data_inicio_medicao: exibirPeriodoMedicao ? (form.data_inicio_medicao || null) : null,
       data_fim_medicao: exibirPeriodoMedicao ? (form.data_fim_medicao || null) : null,
       itens_apropriacao: exibirItensApropriacao ? (form.itens_apropriacao || null) : null,
@@ -1621,6 +1633,20 @@ export default function NovaSolicitacao() {
               required={dataVencimentoObrigatoria}
             />
           </label>
+          )}
+
+          {exibirDataDemissao && (
+            <label className="grid gap-1 text-sm">
+              Data de demissao
+              <input
+                name="data_demissao"
+                type="date"
+                onChange={handleChange}
+                className="input input-sm"
+                value={form.data_demissao}
+                required={dataDemissaoObrigatoria}
+              />
+            </label>
           )}
         </div>
 
