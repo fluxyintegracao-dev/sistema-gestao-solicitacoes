@@ -202,11 +202,6 @@ export default function CotacaoFornecedorPublica() {
   }
 
   function validarCabecalhoResposta() {
-    if (valorMinimoPedido === '' || valorMinimoPedido === null || valorMinimoPedido === undefined) {
-      alert('Informe o VLR minimo pedido antes de enviar a resposta.');
-      return false;
-    }
-
     const selecionadas = FORMAS_PAGAMENTO.filter((opcao) => condicoesPagamento?.[opcao.value]?.selecionado);
     if (selecionadas.length === 0) {
       alert('Selecione ao menos uma condicao de pagamento antes de enviar a resposta.');
@@ -391,7 +386,7 @@ export default function CotacaoFornecedorPublica() {
               <p className="text-xs font-semibold truncate">{dados.solicitacao?.obra?.nome || '-'}</p>
             </div>
             <div>
-              <p className="text-[10px] uppercase tracking-wide text-[var(--sol-text-soft)] mb-0.5">Vlr. minimo pedido *</p>
+              <p className="text-[10px] uppercase tracking-wide text-[var(--sol-text-soft)] mb-0.5">Vlr. minimo pedido</p>
               <CurrencyInput
                 className="input h-7 text-xs px-2 w-full"
                 value={valorMinimoPedido}

@@ -95,7 +95,7 @@ async function identificarUsuarioInternoOpcional(req) {
 
 function normalizarValorMinimoPedido(value) {
   if (value === '' || value === null || value === undefined) {
-    throw new Error('Informe o VLR minimo pedido.');
+    return null;
   }
 
   const raw = String(value).trim();

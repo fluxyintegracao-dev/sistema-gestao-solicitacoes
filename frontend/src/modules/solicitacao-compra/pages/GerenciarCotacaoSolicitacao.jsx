@@ -1407,37 +1407,39 @@ export default function GerenciarCotacaoSolicitacao() {
 
             {/* Lista de fornecedores vinculados */}
             {solicitacao.fornecedores?.length > 0 && (
-              <div className="app-table-shell mt-3 overflow-x-auto">
-                <ResizableTable
-                  className="table text-[11px]"
-                  columns={FORNECEDOR_LINK_COLUMNS}
-                  storageKey="fluxy.compras.cotacao.fornecedoresLinks.columns"
-                >
-                  <thead>
-                    <tr>
-                      <ResizableTh columnKey="nome">Nome</ResizableTh>
-                      <ResizableTh columnKey="telefone">Telefone</ResizableTh>
-                      <ResizableTh columnKey="email">E-mail</ResizableTh>
-                      <ResizableTh columnKey="status">Status</ResizableTh>
-                      <ResizableTh columnKey="respondido">Respondido em</ResizableTh>
-                      <ResizableTh columnKey="acoes">Acoes</ResizableTh>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {solicitacao.fornecedores.map((cotacaoFornecedor) => {
-                      const publicUrl = `${window.location.origin}/cotacao/${cotacaoFornecedor.token}`;
-                      const pdfUrl = obterUrlPdfCotacaoPublica(cotacaoFornecedor.token);
-                      const pedidoFornecedor = pedidosPorFornecedor.get(Number(cotacaoFornecedor.fornecedor_compra_id));
-                      const possuiRespostaArquivo = Boolean(cotacaoFornecedor.pdf_resposta_url);
-                      const linkWa = cotacaoFornecedor.fornecedor?.whatsapp
-                        ? whatsappLink(
-                            cotacaoFornecedor.fornecedor.whatsapp,
-                            gerarMensagemCotacao(cotacaoFornecedor.fornecedor.nome, publicUrl, itensCombinados, pdfUrl)
-                          )
-                        : null;
+              <div className="mt-4">
+                <h3 className="mb-2 text-sm font-semibold text-[var(--c-text)]">Cotações enviadas</h3>
+                <div className="app-table-shell overflow-x-auto">
+                  <ResizableTable
+                    className="table text-[11px]"
+                    columns={FORNECEDOR_LINK_COLUMNS}
+                    storageKey="fluxy.compras.cotacao.fornecedoresLinks.columns"
+                  >
+                    <thead>
+                      <tr>
+                        <ResizableTh columnKey="nome">Nome</ResizableTh>
+                        <ResizableTh columnKey="telefone">Telefone</ResizableTh>
+                        <ResizableTh columnKey="email">E-mail</ResizableTh>
+                        <ResizableTh columnKey="status">Status</ResizableTh>
+                        <ResizableTh columnKey="respondido">Respondido em</ResizableTh>
+                        <ResizableTh columnKey="acoes">Acoes</ResizableTh>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {solicitacao.fornecedores.map((cotacaoFornecedor) => {
+                        const publicUrl = `${window.location.origin}/cotacao/${cotacaoFornecedor.token}`;
+                        const pdfUrl = obterUrlPdfCotacaoPublica(cotacaoFornecedor.token);
+                        const pedidoFornecedor = pedidosPorFornecedor.get(Number(cotacaoFornecedor.fornecedor_compra_id));
+                        const possuiRespostaArquivo = Boolean(cotacaoFornecedor.pdf_resposta_url);
+                        const linkWa = cotacaoFornecedor.fornecedor?.whatsapp
+                          ? whatsappLink(
+                              cotacaoFornecedor.fornecedor.whatsapp,
+                              gerarMensagemCotacao(cotacaoFornecedor.fornecedor.nome, publicUrl, itensCombinados, pdfUrl)
+                            )
+                          : null;
 
-                      return (
-                        <tr key={cotacaoFornecedor.id} className="h-11">
+                        return (
+                          <tr key={cotacaoFornecedor.id} className="h-11">
                           <td className="whitespace-nowrap align-middle">
                             <div className="flex min-w-0 items-center gap-2">
                               <span className="truncate font-semibold text-[var(--c-text)]">
@@ -1523,11 +1525,12 @@ export default function GerenciarCotacaoSolicitacao() {
                               )}
                             </div>
                           </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </ResizableTable>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </ResizableTable>
+                </div>
               </div>
             )}
           </div>
