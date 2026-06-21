@@ -7,12 +7,15 @@ const {
   ConversaInterna,
   ConversaInternaAnexo,
   ConversaInternaParticipante,
+  Historico,
+  Notificacao,
+  NotificacaoDestinatario,
   Solicitacao,
   SolicitacaoCompra,
   SolicitacaoCompraItem,
   SolicitacaoCompraItemManual
 } = require('../models');
-const { Op } = require('sequelize');
+const { Op, col, fn, where: sequelizeWhere } = require('sequelize');
 const {
   buildUserScopeTokens,
   canAccessComprovantes,
@@ -52,6 +55,63 @@ async function logFileDenied(req, resourceType, resourceId, descricao, metadata 
     descricao,
     metadata
   });
+}
+
+function normalizeAccessToken(value) {
+  return String(value || '')
+    .trim()
+    .toUpperCase();
+}
+
+function tokensContainValue(tokens, value) {
+  const normalized = normalizeAccessToken(value);
+  if (!normalized) return false;
+
+  return (Array.isArray(tokens) ? tokens : [])
+    .map(normalizeAccessToken)
+    .filter(Boolean)
+    .includes(normalized);
+}
+
+async function userParticipatedInSolicitacao(user, solicitacaoId) {
+  const usuarioId = Number(user?.id);
+  if (!usuarioId || !solicitacaoId) return false;
+
+  const historico = await Historico.findOne({
+    where: {
+      solicitacao_id: solicitacaoId,
+      usuario_responsavel_id: usuarioId
+    },
+    attributes: ['id']
+  });
+
+  return Boolean(historico);
+}
+
+async function userMentionedInSolicitacao(user, solicitacaoId) {
+  const usuarioId = Number(user?.id);
+  if (!usuarioId || !solicitacaoId) return false;
+
+  const mencao = await NotificacaoDestinatario.findOne({
+    include: [
+      {
+        model: Notificacao,
+        as: 'notificacao',
+        required: true,
+        where: {
+          solicitacao_id: solicitacaoId,
+          tipo: 'MENCAO_COMENTARIO'
+        },
+        attributes: ['id']
+      }
+    ],
+    where: {
+      usuario_id: usuarioId
+    },
+    attributes: ['id']
+  });
+
+  return Boolean(mencao);
 }
 
 async function canAccessContractResource(user, obraId) {
@@ -132,7 +192,7 @@ async function canAccessConversa(req, conversaId) {
 
 async function canAccessSolicitacaoFile(req, solicitacaoId) {
   const solicitacao = await Solicitacao.findByPk(solicitacaoId, {
-    attributes: ['id', 'obra_id']
+    attributes: ['id', 'obra_id', 'criado_por', 'area_responsavel']
   });
 
   if (!solicitacao) {
@@ -143,8 +203,29 @@ async function canAccessSolicitacaoFile(req, solicitacaoId) {
     };
   }
 
-  const allowed = await hasObraAccess(req.user, solicitacao.obra_id);
-  if (allowed) {
+  if (isBusinessAdmin(req.user)) {
+    return { allowed: true };
+  }
+
+  const usuarioId = Number(req.user?.id);
+  if (usuarioId && Number(solicitacao.criado_por) === usuarioId) {
+    return { allowed: true };
+  }
+
+  const hasObraScope = await hasObraAccess(req.user, solicitacao.obra_id);
+  if (hasObraScope) {
+    return { allowed: true };
+  }
+
+  const userScopeTokens = await buildUserScopeTokens(req.user);
+  if (tokensContainValue(userScopeTokens, solicitacao.area_responsavel)) {
+    return { allowed: true };
+  }
+
+  if (
+    await userParticipatedInSolicitacao(req.user, solicitacao.id) ||
+    await userMentionedInSolicitacao(req.user, solicitacao.id)
+  ) {
     return { allowed: true };
   }
 
@@ -152,14 +233,18 @@ async function canAccessSolicitacaoFile(req, solicitacaoId) {
     req,
     'SOLICITACAO',
     solicitacao.id,
-    'Usuario sem acesso a obra do anexo da solicitacao',
-    { obra_id: solicitacao.obra_id }
+    'Usuario sem acesso ao anexo da solicitacao',
+    {
+      obra_id: solicitacao.obra_id,
+      criado_por: solicitacao.criado_por,
+      area_responsavel: solicitacao.area_responsavel
+    }
   );
 
   return {
     allowed: false,
     status: 403,
-    error: 'Acesso negado para a obra da solicitacao'
+    error: 'Acesso negado ao anexo da solicitacao'
   };
 }
 
@@ -296,12 +381,71 @@ function buildFileTargetCandidates(alvo) {
 function getRegisteredFilePath(target) {
   if (!target?.record) return null;
 
+  if (target.kind === 'HISTORICO_SOLICITACAO_ARQUIVO') {
+    return parseMetadata(target.record.metadata)?.caminho || null;
+  }
+
   return (
     target.record.caminho_arquivo ||
     target.record.arquivo_url ||
     target.record.caminho ||
     null
   );
+}
+
+function parseMetadata(metadata) {
+  if (!metadata) return null;
+  if (typeof metadata === 'object') return metadata;
+
+  try {
+    return JSON.parse(metadata);
+  } catch {
+    return null;
+  }
+}
+
+function metadataPathMatches(metadata, candidates) {
+  const caminho = parseMetadata(metadata)?.caminho;
+  if (!caminho) return false;
+  return candidates.includes(String(caminho).trim());
+}
+
+async function findHistoricoFileResource(fileCandidates) {
+  const acoesComArquivo = ['ANEXO_ADICIONADO', 'COMPROVANTE_ADICIONADO'];
+
+  try {
+    const historico = await Historico.findOne({
+      where: {
+        acao: { [Op.in]: acoesComArquivo },
+        [Op.or]: fileCandidates.map((candidate) =>
+          sequelizeWhere(
+            fn('JSON_UNQUOTE', fn('JSON_EXTRACT', col('metadata'), '$.caminho')),
+            candidate
+          )
+        )
+      },
+      attributes: ['id', 'solicitacao_id', 'metadata'],
+      order: [['id', 'DESC']]
+    });
+
+    if (historico) {
+      return historico;
+    }
+  } catch {
+    // Alguns ambientes antigos mantem metadata como texto simples; se o banco
+    // nao aceitar JSON_EXTRACT, fazemos uma varredura limitada nos historicos recentes.
+  }
+
+  const historicosRecentes = await Historico.findAll({
+    where: { acao: { [Op.in]: acoesComArquivo } },
+    attributes: ['id', 'solicitacao_id', 'metadata'],
+    order: [['id', 'DESC']],
+    limit: 1500
+  });
+
+  return historicosRecentes.find((historico) =>
+    metadataPathMatches(historico.metadata, fileCandidates)
+  ) || null;
 }
 
 async function resolveRegisteredFileResource(alvo) {
@@ -347,6 +491,11 @@ async function resolveRegisteredFileResource(alvo) {
   if (buscas[5]) return { kind: 'COMPRA_ITEM_ARQUIVO', record: buscas[5] };
   if (buscas[6]) return { kind: 'COMPRA_ITEM_MANUAL_ARQUIVO', record: buscas[6] };
 
+  const historicoArquivo = await findHistoricoFileResource(fileCandidates);
+  if (historicoArquivo) {
+    return { kind: 'HISTORICO_SOLICITACAO_ARQUIVO', record: historicoArquivo };
+  }
+
   return null;
 }
 
@@ -360,6 +509,10 @@ async function assertRegisteredFileAccess(req, target) {
   }
 
   if (target.kind === 'SOLICITACAO_ANEXO') {
+    return canAccessSolicitacaoFile(req, target.record.solicitacao_id);
+  }
+
+  if (target.kind === 'HISTORICO_SOLICITACAO_ARQUIVO') {
     return canAccessSolicitacaoFile(req, target.record.solicitacao_id);
   }
 
