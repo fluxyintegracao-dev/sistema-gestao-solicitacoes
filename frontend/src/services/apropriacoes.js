@@ -46,6 +46,21 @@ export async function baixarModeloApropriacoes() {
   window.URL.revokeObjectURL(url);
 }
 
+export async function importarApropriacoesXlsx(file, obraId) {
+  const formData = new FormData();
+  formData.append('file', file);
+  if (obraId) {
+    formData.append('obra_id', obraId);
+  }
+
+  const response = await fetch(`${API_URL}/apropriacoes/importar-xlsx`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: formData
+  });
+  return handleJsonResponse(response, 'Erro ao importar apropriacoes');
+}
+
 export async function criarApropriacao(data) {
   const response = await fetch(`${API_URL}/apropriacoes`, {
     method: 'POST',

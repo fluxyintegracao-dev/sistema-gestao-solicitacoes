@@ -786,6 +786,7 @@ router.get('/treinamento/:id/arquivo', allowTreinamentoRead, validateRequest({ p
 
 router.get('/apropriacoes', requireAnyEnabledModule(['OBRAS', 'SOLICITACOES', 'COMPRAS', 'FINANCEIRO']), ApropriacaoController.index);
 router.get('/apropriacoes/modelo-xlsx', requireEnabledModule('OBRAS'), permit(['SUPERADMIN']), ApropriacaoController.modeloXlsx);
+router.post('/apropriacoes/importar-xlsx', requireEnabledModule('OBRAS'), allowBusinessAdmin, uploadRateLimit, uploadComprovantes.single('file'), ApropriacaoController.importarXlsx);
 router.post('/apropriacoes', requireEnabledModule('OBRAS'), allowBusinessAdmin, ApropriacaoController.create);
 router.put('/apropriacoes/:id', requireEnabledModule('OBRAS'), allowBusinessAdmin, ApropriacaoController.update);
 router.delete('/apropriacoes/:id', requireEnabledModule('OBRAS'), allowBusinessAdmin, ApropriacaoController.destroy);

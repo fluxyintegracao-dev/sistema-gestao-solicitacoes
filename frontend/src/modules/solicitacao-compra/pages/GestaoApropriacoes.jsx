@@ -6,20 +6,22 @@ import {
   baixarModeloApropriacoes,
   criarApropriacao,
   deletarApropriacao,
+  importarApropriacoesXlsx,
   listarApropriacoes
 } from '../../../services/apropriacoes';
 
 function parseLinhaApropriacao(linha) {
   const partes = String(linha || '')
     .split('|')
-    .map((valor) => String(valor || '').trim())
-    .filter(Boolean);
+    .map((valor) => String(valor || '').trim());
 
-  if (!partes.length) return null;
+  if (!partes[0]) return null;
 
   return {
     codigo: partes[0],
-    descricao: partes[1] || ''
+    descricao: partes[1] || '',
+    somadora: partes[2] || '',
+    codigo_apropriacao_pai: partes[3] || ''
   };
 }
 
@@ -33,7 +35,11 @@ export default function GestaoApropriacoes() {
   const [editandoId, setEditandoId] = useState(null);
   const [codigo, setCodigo] = useState('');
   const [descricao, setDescricao] = useState('');
+  const [somadora, setSomadora] = useState(false);
+  const [apropriacaoPaiId, setApropriacaoPaiId] = useState('');
   const [textoMassa, setTextoMassa] = useState('');
+  const [arquivoXlsx, setArquivoXlsx] = useState(null);
+  const [importandoXlsx, setImportandoXlsx] = useState(false);
   const [selecionados, setSelecionados] = useState([]);
   const isSuperadmin = String(user?.perfil || '').trim().toUpperCase() === 'SUPERADMIN';
 
@@ -77,11 +83,17 @@ export default function GestaoApropriacoes() {
     () => apropriacoes.length > 0 && selecionados.length === apropriacoes.length,
     [apropriacoes.length, selecionados.length]
   );
+  const apropriacoesPaisDisponiveis = useMemo(
+    () => apropriacoes.filter((item) => item.somadora && item.id !== editandoId),
+    [apropriacoes, editandoId]
+  );
 
   function limparFormulario() {
     setEditandoId(null);
     setCodigo('');
     setDescricao('');
+    setSomadora(false);
+    setApropriacaoPaiId('');
   }
 
   async function handleSalvar(event) {
@@ -102,7 +114,9 @@ export default function GestaoApropriacoes() {
       const payload = {
         obra_id: Number(obraSelecionada),
         codigo,
-        descricao
+        descricao,
+        somadora,
+        apropriacao_pai_id: apropriacaoPaiId || null
       };
 
       if (editandoId) {
@@ -125,6 +139,8 @@ export default function GestaoApropriacoes() {
     setEditandoId(item.id);
     setCodigo(item.codigo || '');
     setDescricao(item.descricao || '');
+    setSomadora(Boolean(item.somadora));
+    setApropriacaoPaiId(item.apropriacao_pai_id ? String(item.apropriacao_pai_id) : '');
   }
 
   function toggleSelecionado(id) {
@@ -182,7 +198,9 @@ export default function GestaoApropriacoes() {
         await criarApropriacao({
           obra_id: Number(obraSelecionada),
           codigo: item.codigo,
-          descricao: item.descricao
+          descricao: item.descricao,
+          somadora: item.somadora,
+          codigo_apropriacao_pai: item.codigo_apropriacao_pai
         });
       }
       setTextoMassa('');
@@ -202,6 +220,37 @@ export default function GestaoApropriacoes() {
     } catch (error) {
       console.error(error);
       alert(error.message || 'Erro ao baixar modelo de apropriacoes');
+    }
+  }
+
+  async function importarExcel() {
+    if (!arquivoXlsx) {
+      alert('Selecione um arquivo Excel para importar.');
+      return;
+    }
+
+    try {
+      setImportandoXlsx(true);
+      const resultado = await importarApropriacoesXlsx(arquivoXlsx, obraSelecionada || null);
+      setArquivoXlsx(null);
+      await carregarApropriacoes();
+      const erros = Array.isArray(resultado?.erros) ? resultado.erros : [];
+      const resumo = [
+        `Importadas: ${resultado?.importados || 0}`,
+        `Criadas: ${resultado?.criados || 0}`,
+        `Atualizadas: ${resultado?.atualizados || 0}`,
+        `Somadoras identificadas: ${resultado?.somadoras_identificadas || 0}`
+      ];
+      if (erros.length) {
+        resumo.push(`Erros: ${erros.length}`);
+        resumo.push(erros.slice(0, 8).map((erro) => `Linha ${erro.linha || '-'}: ${erro.erro}`).join('\n'));
+      }
+      alert(resumo.join('\n'));
+    } catch (error) {
+      console.error(error);
+      alert(error.message || 'Erro ao importar arquivo Excel');
+    } finally {
+      setImportandoXlsx(false);
     }
   }
 
@@ -232,27 +281,58 @@ export default function GestaoApropriacoes() {
         <div className="card-header">
           <h2 className="font-semibold">{editandoId ? 'Editar apropriacao' : 'Nova apropriacao'}</h2>
         </div>
-        <form onSubmit={handleSalvar} className="grid gap-3 md:grid-cols-[220px_1fr_auto_auto]">
-          <input
-            className="input"
-            placeholder="Codigo"
-            value={codigo}
-            onChange={(event) => setCodigo(event.target.value)}
-          />
-          <input
-            className="input"
-            placeholder="Descricao"
-            value={descricao}
-            onChange={(event) => setDescricao(event.target.value)}
-          />
-          <button type="submit" className="btn btn-primary" disabled={salvando}>
-            {salvando ? 'Salvando...' : editandoId ? 'Salvar' : 'Adicionar'}
-          </button>
-          {editandoId && (
-            <button type="button" className="btn btn-outline" onClick={limparFormulario} disabled={salvando}>
-              Cancelar
+        <form onSubmit={handleSalvar} className="grid gap-3 md:grid-cols-[180px_1fr_180px_240px]">
+          <label className="grid gap-1 text-sm">
+            Codigo
+            <input
+              className="input"
+              placeholder="Ex.: 00.001.001"
+              value={codigo}
+              onChange={(event) => setCodigo(event.target.value)}
+            />
+          </label>
+          <label className="grid gap-1 text-sm">
+            Descricao
+            <input
+              className="input"
+              placeholder="Descricao da apropriacao"
+              value={descricao}
+              onChange={(event) => setDescricao(event.target.value)}
+            />
+          </label>
+          <label className="flex items-center gap-2 rounded-2xl border border-[var(--c-border)] px-4 py-3 text-sm">
+            <input
+              type="checkbox"
+              checked={somadora}
+              onChange={(event) => setSomadora(event.target.checked)}
+            />
+            Conta somadora
+          </label>
+          <label className="grid gap-1 text-sm">
+            Apropriacao pai
+            <select
+              className="input"
+              value={apropriacaoPaiId}
+              onChange={(event) => setApropriacaoPaiId(event.target.value)}
+            >
+              <option value="">Identificar pelo codigo</option>
+              {apropriacoesPaisDisponiveis.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.codigo} - {item.descricao || 'Sem descricao'}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="flex flex-wrap gap-2 md:col-span-4">
+            <button type="submit" className="btn btn-primary" disabled={salvando}>
+              {salvando ? 'Salvando...' : editandoId ? 'Salvar' : 'Adicionar'}
             </button>
-          )}
+            {editandoId && (
+              <button type="button" className="btn btn-outline" onClick={limparFormulario} disabled={salvando}>
+                Cancelar
+              </button>
+            )}
+          </div>
         </form>
       </div>
 
@@ -268,9 +348,28 @@ export default function GestaoApropriacoes() {
             </button>
           )}
         </div>
+        <div className="mb-4 grid gap-3 rounded-2xl border border-[var(--c-border)] p-3 md:grid-cols-[1fr_auto]">
+          <label className="grid gap-1 text-sm">
+            Arquivo Excel
+            <input
+              className="input"
+              type="file"
+              accept=".xlsx,.xls"
+              onChange={(event) => setArquivoXlsx(event.target.files?.[0] || null)}
+            />
+          </label>
+          <div className="flex items-end">
+            <button type="button" className="btn btn-primary" onClick={importarExcel} disabled={importandoXlsx}>
+              {importandoXlsx ? 'Importando...' : 'Importar Excel'}
+            </button>
+          </div>
+          <p className="text-xs text-[var(--c-muted)] md:col-span-2">
+            Se uma obra estiver selecionada, ela sera usada para todas as linhas. Sem obra selecionada, preencha a coluna codigo_obra no arquivo.
+          </p>
+        </div>
         <textarea
           className="input min-h-[140px]"
-          placeholder={'Formato: Codigo|Descricao\nExemplo:\n001|Fundacao\n002|Estrutura'}
+          placeholder={'Formato: Codigo|Descricao|Somadora|CodigoPai\nExemplo:\n00.001|Servicos preliminares|sim|\n00.001.001|Tapume|nao|00.001'}
           value={textoMassa}
           onChange={(event) => setTextoMassa(event.target.value)}
         />
@@ -307,6 +406,8 @@ export default function GestaoApropriacoes() {
                 </th>
                 <th>Codigo</th>
                 <th>Descricao</th>
+                <th>Tipo</th>
+                <th>Pai</th>
                 <th>Acoes</th>
               </tr>
             </thead>
@@ -323,6 +424,16 @@ export default function GestaoApropriacoes() {
                   <td>{item.codigo}</td>
                   <td>{item.descricao || '-'}</td>
                   <td>
+                    <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                      item.somadora
+                        ? 'bg-amber-100 text-amber-700'
+                        : 'bg-slate-100 text-slate-600'
+                    }`}>
+                      {item.somadora ? 'Somadora' : 'Analitica'}
+                    </span>
+                  </td>
+                  <td>{item.apropriacao_pai?.codigo || '-'}</td>
+                  <td>
                     <div className="flex gap-2">
                       <button type="button" className="btn btn-outline" onClick={() => iniciarEdicao(item)}>
                         Editar
@@ -336,7 +447,7 @@ export default function GestaoApropriacoes() {
               ))}
               {apropriacoes.length === 0 && (
                 <tr>
-                  <td colSpan="4" align="center">Nenhuma apropriacao cadastrada.</td>
+                  <td colSpan="6" align="center">Nenhuma apropriacao cadastrada.</td>
                 </tr>
               )}
             </tbody>

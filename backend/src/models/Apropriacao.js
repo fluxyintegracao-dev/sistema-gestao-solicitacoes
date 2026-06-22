@@ -24,6 +24,15 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
         defaultValue: 0
       },
+      somadora: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false
+      },
+      apropriacao_pai_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true
+      },
       ativo: {
         type: DataTypes.BOOLEAN,
         defaultValue: true

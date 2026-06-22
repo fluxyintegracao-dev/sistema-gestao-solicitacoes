@@ -1905,6 +1905,16 @@ db.Obra.hasMany(db.Apropriacao, {
   as: 'apropriacoes'
 });
 
+db.Apropriacao.belongsTo(db.Apropriacao, {
+  foreignKey: 'apropriacao_pai_id',
+  as: 'apropriacao_pai'
+});
+
+db.Apropriacao.hasMany(db.Apropriacao, {
+  foreignKey: 'apropriacao_pai_id',
+  as: 'apropriacoes_filhas'
+});
+
 db.SolicitacaoCompra.belongsTo(db.Obra, {
   foreignKey: 'obra_id',
   as: 'obra'
