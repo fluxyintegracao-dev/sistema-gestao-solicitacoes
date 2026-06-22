@@ -359,13 +359,19 @@ async function buscarParceiros({
     });
   }
 
-  return Parceiro.findAll({
+  const shouldReturnAll = String(limit || '').trim().toLowerCase() === 'all';
+  const options = {
     where,
     include,
     order: [['nome', 'ASC']],
-    limit: Math.min(Math.max(Number(limit) || 10, 1), 200),
     distinct: true
-  });
+  };
+
+  if (!shouldReturnAll) {
+    options.limit = Math.min(Math.max(Number(limit) || 10, 1), 200);
+  }
+
+  return Parceiro.findAll(options);
 }
 
 async function criarParceiro(payload) {

@@ -11,6 +11,7 @@ import {
 import { isValidCpfCnpj, maskCep, maskCpfCnpj, maskCreci, maskPhone, maskRg, onlyDigits } from '../utils/formatters';
 
 const PIX_TIPOS_CHAVE = ['CPF', 'CNPJ', 'EMAIL', 'TELEFONE', 'ALEATORIA'];
+const PAGE_SIZE_OPTIONS = ['25', '50', '100', '200', 'all'];
 
 function defaultParceiroForm() {
   return {
@@ -113,13 +114,15 @@ export default function Parceiros() {
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState(null);
   const [error, setError] = useState('');
+  const [pageSize, setPageSize] = useState('25');
+  const [currentPage, setCurrentPage] = useState(1);
 
   async function carregar() {
     try {
       setLoading(true);
       setError('');
       const [parceirosData, categoriasData] = await Promise.all([
-        buscarParceiros({ ativo: 0, limit: 200, incluir_categorias: 1 }),
+        buscarParceiros({ ativo: 0, limit: 'all', incluir_categorias: 1 }),
         listarCategoriasParceiro()
       ]);
 
@@ -166,6 +169,69 @@ export default function Parceiros() {
       );
     });
   }, [filtro, parceiros]);
+
+  const totalPages = useMemo(() => {
+    if (pageSize === 'all') return 1;
+    return Math.max(1, Math.ceil(parceirosFiltrados.length / Number(pageSize)));
+  }, [pageSize, parceirosFiltrados.length]);
+
+  const parceirosPaginados = useMemo(() => {
+    if (pageSize === 'all') return parceirosFiltrados;
+    const size = Number(pageSize);
+    const start = (currentPage - 1) * size;
+    return parceirosFiltrados.slice(start, start + size);
+  }, [currentPage, pageSize, parceirosFiltrados]);
+
+  const paginationInfo = useMemo(() => {
+    if (parceirosFiltrados.length === 0) {
+      return { start: 0, end: 0 };
+    }
+    if (pageSize === 'all') {
+      return { start: 1, end: parceirosFiltrados.length };
+    }
+    const size = Number(pageSize);
+    const start = (currentPage - 1) * size + 1;
+    const end = Math.min(start + size - 1, parceirosFiltrados.length);
+    return { start, end };
+  }, [currentPage, pageSize, parceirosFiltrados.length]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filtro, pageSize]);
+
+  useEffect(() => {
+    setCurrentPage((page) => Math.min(page, totalPages));
+  }, [totalPages]);
+
+  function renderPerfilBadges(parceiro) {
+    return (
+      <div className="flex flex-wrap gap-1.5">
+        {parceiro.cliente && (
+          <span className="inline-flex rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-semibold text-sky-700 dark:bg-sky-900/30 dark:text-sky-300">
+            CLIENTE
+          </span>
+        )}
+        {parceiro.fornecedor && (
+          <span className="inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+            CREDOR
+          </span>
+        )}
+        {parceiro.corretor && (
+          <span className="inline-flex rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-semibold text-violet-700 dark:bg-violet-900/30 dark:text-violet-300">
+            CORRETOR
+          </span>
+        )}
+      </div>
+    );
+  }
+
+  function formatPixKeys(parceiro) {
+    return [
+      parceiro.pix_chave_fixa_1 ? `${parceiro.pix_chave_fixa_1_tipo || 'PIX'} ${parceiro.pix_chave_fixa_1}` : '',
+      parceiro.pix_chave_fixa_2 ? `${parceiro.pix_chave_fixa_2_tipo || 'PIX'} ${parceiro.pix_chave_fixa_2}` : '',
+      parceiro.pix_chave_variavel ? `${parceiro.pix_chave_variavel_tipo || 'PIX'} ${parceiro.pix_chave_variavel}` : ''
+    ].filter(Boolean).join(' | ');
+  }
 
   async function handleSalvar(event) {
     event.preventDefault();
@@ -616,6 +682,122 @@ export default function Parceiros() {
                 Nenhuma pessoa encontrada.
               </div>
             ) : (
+              <>
+                <div className="sol-surface-card rounded-xl p-0">
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--sol-border-color)] p-3">
+                    <div className="text-sm text-[var(--c-muted)]">
+                      Exibindo <strong className="text-[var(--c-text)]">{paginationInfo.start}</strong>-
+                      <strong className="text-[var(--c-text)]">{paginationInfo.end}</strong> de{' '}
+                      <strong className="text-[var(--c-text)]">{parceirosFiltrados.length}</strong>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <label className="text-sm font-medium text-[var(--c-muted)]" htmlFor="pessoas-page-size">
+                        Listar
+                      </label>
+                      <select
+                        id="pessoas-page-size"
+                        className="input h-10 w-[120px]"
+                        value={pageSize}
+                        onChange={(event) => setPageSize(event.target.value)}
+                      >
+                        {PAGE_SIZE_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option === 'all' ? 'Todos' : option}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        className="btn btn-outline px-3 py-1.5 text-xs"
+                        disabled={pageSize === 'all' || currentPage <= 1}
+                        onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                      >
+                        Anterior
+                      </button>
+                      <span className="text-sm text-[var(--c-muted)]">
+                        {pageSize === 'all' ? 'Pagina unica' : `${currentPage}/${totalPages}`}
+                      </span>
+                      <button
+                        type="button"
+                        className="btn btn-outline px-3 py-1.5 text-xs"
+                        disabled={pageSize === 'all' || currentPage >= totalPages}
+                        onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                      >
+                        Proxima
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="app-table-shell rounded-b-xl">
+                    <div className="table-wrapper overflow-x-auto">
+                      <table className="table min-w-[1040px]">
+                        <thead>
+                          <tr>
+                            <th>Pessoa</th>
+                            <th>Documento</th>
+                            <th>Contato</th>
+                            <th>Perfil</th>
+                            <th>PIX</th>
+                            <th>Categorias</th>
+                            <th>Status</th>
+                            <th>Acoes</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {parceirosPaginados.map((parceiro) => {
+                            const pixKeys = formatPixKeys(parceiro);
+                            const categoriasParceiro = Array.isArray(parceiro.categorias) && parceiro.categorias.length > 0
+                              ? parceiro.categorias.map((categoria) => categoria.nome).join(', ')
+                              : 'Sem categoria';
+
+                            return (
+                              <tr key={parceiro.id}>
+                                <td>
+                                  <div className="font-semibold text-[var(--c-text)]">{parceiro.nome}</div>
+                                  {parceiro.municipio && (
+                                    <div className="text-xs text-[var(--c-muted)]">{parceiro.municipio}</div>
+                                  )}
+                                </td>
+                                <td>{parceiro.cpf_cnpj || '-'}</td>
+                                <td>
+                                  <div>{parceiro.telefone || '-'}</div>
+                                  <div className="text-xs text-[var(--c-muted)]">{parceiro.email || 'Sem email'}</div>
+                                </td>
+                                <td>{renderPerfilBadges(parceiro)}</td>
+                                <td className="max-w-[240px]">
+                                  <div className="truncate" title={pixKeys || '-'}>
+                                    {pixKeys || '-'}
+                                  </div>
+                                </td>
+                                <td className="max-w-[220px]">
+                                  <div className="truncate" title={categoriasParceiro}>
+                                    {categoriasParceiro}
+                                  </div>
+                                </td>
+                                <td>
+                                  <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${statusClass(parceiro.ativo)}`}>
+                                    {parceiro.ativo ? 'ATIVO' : 'INATIVO'}
+                                  </span>
+                                </td>
+                                <td>
+                                  <button
+                                    type="button"
+                                    className="btn btn-outline px-3 py-1.5 text-xs"
+                                    onClick={() => setParceiroForm(pickParceiroFormData(parceiro))}
+                                  >
+                                    Editar
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+
+                {false && (
               <div className="app-list-stack">
                 {parceirosFiltrados.map((parceiro) => (
                   <div key={parceiro.id} className="app-list-card">
@@ -677,6 +859,8 @@ export default function Parceiros() {
                   </div>
                 ))}
               </div>
+                )}
+              </>
             )}
           </div>
         </div>
