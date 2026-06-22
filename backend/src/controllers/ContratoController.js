@@ -185,6 +185,123 @@ function resumoCredoresContrato(contrato) {
     .join(' | ');
 }
 
+function onlyDigits(value) {
+  return String(value || '').replace(/\D/g, '');
+}
+
+function normalizarNomeParceiro(value) {
+  return String(value || '')
+    .trim()
+    .toUpperCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ');
+}
+
+function extrairCredorImportado(raw) {
+  const texto = String(raw || '').trim();
+  if (!texto) return null;
+
+  const parentesesMatch = texto.match(/\(([^)]*\d[^)]*)\)\s*$/);
+  const colchetesMatch = texto.match(/\[([^\]]*\d[^\]]*)\]\s*$/);
+  const documentoTexto = parentesesMatch?.[1] || colchetesMatch?.[1] || '';
+  const documento = onlyDigits(documentoTexto || texto);
+  const nome = documentoTexto
+    ? texto.replace(/\s*[\[(][^\])]+[\])]\s*$/, '').trim()
+    : texto;
+
+  return {
+    texto,
+    nome,
+    nome_normalizado: normalizarNomeParceiro(nome),
+    documento
+  };
+}
+
+function montarIndicesParceiros(parceiros = []) {
+  const porDocumento = new Map();
+  const porNome = new Map();
+
+  parceiros.forEach((parceiro) => {
+    const documento = onlyDigits(parceiro.cpf_cnpj);
+    if (documento) porDocumento.set(documento, parceiro);
+
+    const nome = normalizarNomeParceiro(parceiro.nome);
+    if (!nome) return;
+    const lista = porNome.get(nome) || [];
+    lista.push(parceiro);
+    porNome.set(nome, lista);
+  });
+
+  return { porDocumento, porNome };
+}
+
+function validarParceiroCredorImportado(parceiro, label) {
+  if (!parceiro) {
+    return `Credor "${label}" nao encontrado no cadastro de pessoas.`;
+  }
+  if (parceiro.ativo === false) {
+    return `Credor "${parceiro.nome || label}" esta inativo.`;
+  }
+  if (parceiro.fornecedor === false && parceiro.corretor === false) {
+    return `Parceiro "${parceiro.nome || label}" nao esta marcado como fornecedor/corretor.`;
+  }
+  return null;
+}
+
+function resolverCredoresImportacao(valor, indicesParceiros) {
+  const texto = String(valor || '').trim();
+  if (!texto) return null;
+
+  const partes = texto
+    .split('|')
+    .map(extrairCredorImportado)
+    .filter(Boolean);
+
+  if (partes.length === 0) return null;
+
+  const credores = [];
+  const vistos = new Set();
+
+  for (const parte of partes) {
+    let parceiro = null;
+
+    if (parte.documento) {
+      if (![11, 14].includes(parte.documento.length)) {
+        return {
+          error: `Documento do credor "${parte.texto}" invalido. Informe CPF com 11 digitos ou CNPJ com 14 digitos.`
+        };
+      }
+      parceiro = indicesParceiros.porDocumento.get(parte.documento);
+      const erro = validarParceiroCredorImportado(parceiro, parte.texto);
+      if (erro) return { error: erro };
+    } else {
+      const candidatos = indicesParceiros.porNome.get(parte.nome_normalizado) || [];
+      if (candidatos.length === 0) {
+        return {
+          error: `Credor "${parte.texto}" sem CPF/CNPJ nao foi encontrado pelo nome exato. Prefira preencher como Nome (CPF/CNPJ).`
+        };
+      }
+      if (candidatos.length > 1) {
+        return {
+          error: `Credor "${parte.texto}" sem CPF/CNPJ e ambiguo. Informe o documento para identificar corretamente.`
+        };
+      }
+      parceiro = candidatos[0];
+      const erro = validarParceiroCredorImportado(parceiro, parte.texto);
+      if (erro) return { error: erro };
+    }
+
+    const parceiroId = Number(parceiro.id);
+    if (!vistos.has(parceiroId)) {
+      vistos.add(parceiroId);
+      credores.push({ parceiro_id: parceiroId, observacao: null });
+    }
+  }
+
+  return { credores };
+}
+
 function normalizarCredoresPayload(lista = []) {
   if (!Array.isArray(lista)) return [];
   const normalizados = [];
@@ -738,6 +855,7 @@ module.exports = {
       const idxCodigoObra = headerMap.findIndex(h => ['codigo', 'codigo_obra'].includes(h));
       const idxRef = headerMap.findIndex(h => ['ref_do_contrato', 'ref_contrato'].includes(h));
       const idxDescricao = headerMap.findIndex(h => ['descricao'].includes(h));
+      const idxCredores = headerMap.findIndex(h => ['credores', 'credor', 'fornecedores'].includes(h));
       const idxItens = headerMap.findIndex(h => ['itens_de_apropriacao', 'itens_apropriacao'].includes(h));
       const idxSolicitado = headerMap.findIndex(h => ['solicitado', 'valor_total'].includes(h));
       const idxApropriacaoCodigo = headerMap.findIndex(h => ['apropriacao_codigo', 'codigo_apropriacao', 'apropriacao'].includes(h));
@@ -776,11 +894,17 @@ module.exports = {
         if (codigo) apropriacaoMap.set(`${Number(apropriacao.obra_id)}:${codigo}`, apropriacao);
       });
 
+      const parceiros = await Parceiro.findAll({
+        attributes: ['id', 'nome', 'cpf_cnpj', 'fornecedor', 'corretor', 'ativo']
+      });
+      const indicesParceiros = montarIndicesParceiros(parceiros);
+
       const resultado = {
         total_linhas: rows.length,
         importados: 0,
         atualizados: 0,
         apropriacoes_vinculadas: 0,
+        credores_vinculados: 0,
         ignorados: 0,
         erros: []
       };
@@ -793,6 +917,7 @@ module.exports = {
         const codigoObra = String(row[idxCodigoObra] ?? '').trim();
         const refContrato = String(row[idxRef] ?? '').trim();
         const descricao = idxDescricao >= 0 ? String(row[idxDescricao] ?? '').trim() : '';
+        const credoresTexto = idxCredores >= 0 ? String(row[idxCredores] ?? '').trim() : '';
         const itensApropriacao = idxItens >= 0 ? String(row[idxItens] ?? '').trim() : '';
         const valorTotal = parseValorMonetario(row[idxSolicitado]);
 
@@ -814,6 +939,17 @@ module.exports = {
           resultado.erros.push({
             linha: linhaPlanilha,
             error: `Obra nao encontrada para o codigo "${codigoObra}".`
+          });
+          continue;
+        }
+
+        const credoresImportados = credoresTexto
+          ? resolverCredoresImportacao(credoresTexto, indicesParceiros)
+          : null;
+        if (credoresImportados?.error) {
+          resultado.erros.push({
+            linha: linhaPlanilha,
+            error: credoresImportados.error
           });
           continue;
         }
@@ -876,6 +1012,11 @@ module.exports = {
               }, { transaction });
               resultado.apropriacoes_vinculadas += 1;
             }
+
+            if (credoresImportados?.credores) {
+              await salvarCredoresContrato(existente.id, credoresImportados.credores, transaction);
+              resultado.credores_vinculados += credoresImportados.credores.length;
+            }
           });
           resultado.atualizados += 1;
           continue;
@@ -903,6 +1044,11 @@ module.exports = {
               : null
           });
           resultado.apropriacoes_vinculadas += 1;
+        }
+
+        if (credoresImportados?.credores) {
+          await salvarCredoresContrato(contratoCriado.id, credoresImportados.credores);
+          resultado.credores_vinculados += credoresImportados.credores.length;
         }
 
         resultado.importados += 1;
