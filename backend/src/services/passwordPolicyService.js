@@ -3,15 +3,20 @@ const crypto = require('crypto');
 const PASSWORD_POLICY_MESSAGE =
   'A senha deve ter no minimo 8 caracteres, uma letra maiuscula, uma letra minuscula, um numero e um caractere especial.';
 
+const PASSWORD_UPPERCASE_REGEX = /\p{Lu}/u;
+const PASSWORD_LOWERCASE_REGEX = /\p{Ll}/u;
+const PASSWORD_NUMBER_REGEX = /\p{N}/u;
+const PASSWORD_SPECIAL_REGEX = /[^\p{L}\p{N}\s]/u;
+
 function validateStrongPassword(password) {
   const value = String(password || '');
   const errors = [];
 
   if (value.length < 8) errors.push('minimo 8 caracteres');
-  if (!/[A-Z]/.test(value)) errors.push('uma letra maiuscula');
-  if (!/[a-z]/.test(value)) errors.push('uma letra minuscula');
-  if (!/\d/.test(value)) errors.push('um numero');
-  if (!/[^A-Za-z0-9]/.test(value)) errors.push('um caractere especial');
+  if (!PASSWORD_UPPERCASE_REGEX.test(value)) errors.push('uma letra maiuscula');
+  if (!PASSWORD_LOWERCASE_REGEX.test(value)) errors.push('uma letra minuscula');
+  if (!PASSWORD_NUMBER_REGEX.test(value)) errors.push('um numero');
+  if (!PASSWORD_SPECIAL_REGEX.test(value)) errors.push('um caractere especial');
 
   return {
     ok: errors.length === 0,

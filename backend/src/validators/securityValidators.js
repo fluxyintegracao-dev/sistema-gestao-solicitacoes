@@ -74,7 +74,7 @@ function validatePasswordChangeBody(body = {}) {
   }
 
   const policy = validateStrongPassword(senhaNova);
-  if (!policy.valid) {
+  if (!policy.ok) {
     throw new ValidationError(PASSWORD_POLICY_MESSAGE);
   }
 
@@ -110,7 +110,7 @@ function validateResetPasswordBody(body = {}) {
   });
 
   const policy = validateStrongPassword(senha);
-  if (!policy.valid) {
+  if (!policy.ok) {
     throw new ValidationError(PASSWORD_POLICY_MESSAGE);
   }
 
