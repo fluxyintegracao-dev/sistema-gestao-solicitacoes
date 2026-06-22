@@ -1,8 +1,7 @@
 const { columnExists, foreignKeyExists, indexExists, tableExists } = require('../src/database/schemaUtils');
 
 module.exports = {
-  async up(queryInterface, Sequelize) {
-    const sequelize = queryInterface.sequelize;
+  async up({ queryInterface, sequelize, DataTypes }) {
     const tabelaExiste = await tableExists(sequelize, 'apropriacoes');
 
     if (!tabelaExiste) {
@@ -11,7 +10,7 @@ module.exports = {
 
     if (!(await columnExists(sequelize, 'apropriacoes', 'somadora'))) {
       await queryInterface.addColumn('apropriacoes', 'somadora', {
-        type: Sequelize.BOOLEAN,
+        type: DataTypes.BOOLEAN,
         allowNull: false,
         defaultValue: false
       });
@@ -19,7 +18,7 @@ module.exports = {
 
     if (!(await columnExists(sequelize, 'apropriacoes', 'apropriacao_pai_id'))) {
       await queryInterface.addColumn('apropriacoes', 'apropriacao_pai_id', {
-        type: Sequelize.INTEGER,
+        type: DataTypes.INTEGER,
         allowNull: true
       });
     }
@@ -45,8 +44,7 @@ module.exports = {
     }
   },
 
-  async down(queryInterface) {
-    const sequelize = queryInterface.sequelize;
+  async down({ queryInterface, sequelize }) {
     const tabelaExiste = await tableExists(sequelize, 'apropriacoes');
 
     if (!tabelaExiste) {
