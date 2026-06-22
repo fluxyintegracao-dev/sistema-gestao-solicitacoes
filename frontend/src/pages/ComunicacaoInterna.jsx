@@ -11,6 +11,7 @@ import {
   HiPaperClip
 } from 'react-icons/hi2';
 import { useAuth } from '../contexts/AuthContext';
+import { API_URL, authHeaders, fileUrl } from '../services/api';
 import { getSetores } from '../services/setores';
 import {
   arquivarConversasEmMassa,
@@ -55,6 +56,12 @@ function formatDataHora(valor) {
   const d = new Date(valor);
   if (Number.isNaN(d.getTime())) return '';
   return d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+function normalizarUrlArquivo(url) {
+  const valor = String(url || '');
+  if (!valor.startsWith('http')) return valor;
+  return valor.replace(/%(?![0-9A-Fa-f]{2})/g, '%25');
 }
 
 function nomeConversa(conv, userId) {
@@ -170,6 +177,38 @@ export default function ComunicacaoInterna() {
   const inputRef = useRef(null);
   const mensagensRef = useRef([]);
   const msgElemsRef = useRef({});
+
+  const obterUrlAssinadaAnexo = useCallback(async (caminhoArquivo) => {
+    if (!caminhoArquivo) return null;
+    if (!String(caminhoArquivo).startsWith('http')) {
+      return fileUrl(caminhoArquivo);
+    }
+
+    const caminhoNormalizado = normalizarUrlArquivo(caminhoArquivo);
+    const response = await fetch(`${API_URL}/anexos/presign?url=${encodeURIComponent(caminhoNormalizado)}`, {
+      headers: authHeaders()
+    });
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      throw new Error(data?.error || 'Erro ao gerar link seguro para o arquivo');
+    }
+
+    return data?.url || null;
+  }, []);
+
+  const abrirAnexoConversa = useCallback(async (anexo) => {
+    try {
+      const urlArquivo = await obterUrlAssinadaAnexo(anexo?.caminho);
+      if (!urlArquivo) {
+        throw new Error('Link seguro indisponivel');
+      }
+      window.open(urlArquivo, '_blank', 'noopener,noreferrer');
+    } catch (error) {
+      console.error(error);
+      alert('Erro ao abrir arquivo');
+    }
+  }, [obterUrlAssinadaAnexo]);
 
   const adicionarArquivosConversa = useCallback((files) => {
     const { arquivos: proximoEstado, rejeitados } = concatenarAnexosPendentes(arquivos, files, {
@@ -826,10 +865,23 @@ export default function ComunicacaoInterna() {
                             {msg.anexos?.length > 0 && (
                               <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 2 }}>
                                 {msg.anexos.map((a) => (
-                                  <a key={a.id} href={a.caminho} target="_blank" rel="noopener noreferrer"
-                                    style={{ fontSize: 11, color: euSou ? 'rgba(255,255,255,0.8)' : 'var(--c-primary)', textDecoration: 'underline' }}>
-                                    📎 {a.nome_arquivo}
-                                  </a>
+                                  <button
+                                    key={a.id}
+                                    type="button"
+                                    onClick={() => abrirAnexoConversa(a)}
+                                    style={{
+                                      fontSize: 11,
+                                      color: euSou ? 'rgba(255,255,255,0.8)' : 'var(--c-primary)',
+                                      textDecoration: 'underline',
+                                      background: 'none',
+                                      border: 'none',
+                                      padding: 0,
+                                      textAlign: 'left',
+                                      cursor: 'pointer'
+                                    }}
+                                  >
+                                    Anexo: {a.nome_arquivo}
+                                  </button>
                                 ))}
                               </div>
                             )}
