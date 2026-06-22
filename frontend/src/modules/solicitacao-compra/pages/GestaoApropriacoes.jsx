@@ -64,7 +64,7 @@ export default function GestaoApropriacoes() {
 
     try {
       setLoading(true);
-      const data = await listarApropriacoes({ obra_id: obraIdAtual });
+      const data = await listarApropriacoes({ obra_id: obraIdAtual, include_somadoras: true });
       setApropriacoes(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error(error);

@@ -248,7 +248,7 @@ async function validarApropriacoesContrato(obraId, lista = []) {
       id: { [Op.in]: ids },
       obra_id: Number(obraId)
     },
-    attributes: ['id', 'obra_id', 'ativo']
+    attributes: ['id', 'obra_id', 'ativo', 'somadora']
   });
   const registrosMap = new Map(registros.map(item => [Number(item.id), item]));
 
@@ -261,6 +261,11 @@ async function validarApropriacoesContrato(obraId, lista = []) {
     }
     if (registro.ativo === false) {
       const error = new Error('Uma ou mais apropriacoes do contrato estao inativas.');
+      error.statusCode = 400;
+      throw error;
+    }
+    if (registro.somadora === true) {
+      const error = new Error('Uma ou mais apropriacoes do contrato sao somadoras. Selecione apenas apropriacoes analiticas.');
       error.statusCode = 400;
       throw error;
     }
@@ -763,7 +768,7 @@ module.exports = {
       });
 
       const apropriacoes = await Apropriacao.findAll({
-        attributes: ['id', 'obra_id', 'codigo', 'descricao', 'ativo']
+        attributes: ['id', 'obra_id', 'codigo', 'descricao', 'ativo', 'somadora']
       });
       const apropriacaoMap = new Map();
       apropriacoes.forEach((apropriacao) => {
@@ -831,6 +836,13 @@ module.exports = {
           resultado.erros.push({
             linha: linhaPlanilha,
             error: `Apropriacao "${apropriacaoCodigo}" esta inativa.`
+          });
+          continue;
+        }
+        if (apropriacaoRegistro?.somadora === true) {
+          resultado.erros.push({
+            linha: linhaPlanilha,
+            error: `Apropriacao "${apropriacaoCodigo}" e somadora. Use uma apropriacao analitica.`
           });
           continue;
         }

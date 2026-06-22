@@ -1910,7 +1910,7 @@ module.exports = {
 
       if (registroSelecionadoEhObra && campoVisivel('apropriacao_principal') && apropriacao_id !== undefined && apropriacao_id !== null && apropriacao_id !== '') {
         apropriacao = await Apropriacao.findByPk(Number(apropriacao_id), {
-          attributes: ['id', 'obra_id', 'codigo', 'descricao']
+          attributes: ['id', 'obra_id', 'codigo', 'descricao', 'somadora']
         });
 
         if (!apropriacao) {
@@ -1922,6 +1922,11 @@ module.exports = {
         if (Number(apropriacao.obra_id) !== Number(obra_id)) {
           return res.status(400).json({
             error: 'A apropriacao selecionada nao pertence a obra informada.'
+          });
+        }
+        if (apropriacao.somadora === true) {
+          return res.status(400).json({
+            error: 'Selecione uma apropriacao analitica. Apropriacoes somadoras nao podem receber lancamentos.'
           });
         }
       }
@@ -1969,7 +1974,7 @@ module.exports = {
             {
               model: Apropriacao,
               as: 'apropriacao',
-              attributes: ['id', 'obra_id', 'codigo', 'descricao', 'ativo']
+              attributes: ['id', 'obra_id', 'codigo', 'descricao', 'ativo', 'somadora']
             }
           ]
         });
@@ -2000,6 +2005,11 @@ module.exports = {
           if (vinculoContrato.apropriacao.ativo === false) {
             return res.status(400).json({
               error: 'Uma ou mais apropriacoes selecionadas estao inativas.'
+            });
+          }
+          if (vinculoContrato.apropriacao.somadora === true) {
+            return res.status(400).json({
+              error: 'Uma ou mais apropriacoes selecionadas sao somadoras. Selecione apenas apropriacoes analiticas.'
             });
           }
           rateioApropriacoesDetalhado.push({

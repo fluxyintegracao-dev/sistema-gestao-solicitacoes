@@ -67,7 +67,7 @@ const PDF_PAGE = {
 };
 const PDF_OBSERVACOES_FIXAS =
   'Solicitacoes de insumos com informacoes incompletas, incorretas ou sem a devida clareza para viabilizar a compra nao serao processadas. Leia atentamente as orientacoes destacadas em vermelho nas celulas de preenchimento. Em caso de duvida, solicite apoio antes de enviar e nao encaminhe solicitacoes com erros ou omissoes, pois isso compromete o fluxo de trabalho dos demais setores da empresa. Lembre-se: os outros setores nao estao presentes na obra e dependem exclusivamente da precisao das informacoes fornecidas. Seja claro, objetivo e tecnicamente preciso no preenchimento.';
-const APROPRIACAO_ATTRIBUTES = ['id', 'codigo', 'descricao', 'obra_id'];
+const APROPRIACAO_ATTRIBUTES = ['id', 'codigo', 'descricao', 'obra_id', 'somadora'];
 
 function buildIncludeRateiosItem() {
   return {
@@ -537,6 +537,11 @@ function prepararItemCompraPayload({
     if (!apropriacao || Number(apropriacao.obra_id) !== Number(obraId)) {
       return {
         erro: `Item ${index + 1}: apropriacao invalida para a obra selecionada.`
+      };
+    }
+    if (apropriacao.somadora === true) {
+      return {
+        erro: `Item ${index + 1}: selecione uma apropriacao analitica. Apropriacoes somadoras nao podem receber lancamentos.`
       };
     }
   }

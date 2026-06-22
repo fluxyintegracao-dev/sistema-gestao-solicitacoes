@@ -1233,6 +1233,9 @@ async function validarApropriacaoTitulo(apropriacaoId, obraId) {
   if (!apropriacao || apropriacao.ativo === false) {
     throw createHttpError(400, 'Apropriacao informada nao foi encontrada.');
   }
+  if (apropriacao.somadora === true) {
+    throw createHttpError(400, 'Selecione uma apropriacao analitica. Apropriacoes somadoras nao podem receber lancamentos.');
+  }
 
   if (Number(apropriacao.obra_id) !== Number(obraId)) {
     throw createHttpError(400, 'A apropriacao informada nao pertence a obra/centro de custo selecionado.');

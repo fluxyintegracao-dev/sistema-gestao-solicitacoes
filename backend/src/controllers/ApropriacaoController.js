@@ -334,11 +334,15 @@ module.exports = {
 
   async index(req, res) {
     try {
-      const { obra_id } = req.query;
+      const { obra_id, include_somadoras, incluir_somadoras } = req.query;
       const where = { ativo: true };
+      const incluirSomadoras = parseBoolean(include_somadoras ?? incluir_somadoras, false);
 
       if (obra_id) {
         where.obra_id = obra_id;
+      }
+      if (!incluirSomadoras) {
+        where.somadora = false;
       }
 
       const apropriacoes = await Apropriacao.findAll({
