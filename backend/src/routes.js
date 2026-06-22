@@ -1,5 +1,6 @@
 // src/routes.js
 
+const crypto = require('crypto');
 const express = require('express');
 const router = express.Router();
 
@@ -9,6 +10,7 @@ const csrfProtection = require('./middlewares/csrf');
 const requireMfaCompletion = require('./middlewares/requireMfaCompletion');
 const { auditSuccess } = require('./middlewares/audit');
 const { createRateLimit } = require('./middlewares/rateLimit');
+const { getRequestIp } = require('./services/securityLogService');
 const {
   requireCompraAccess,
   requireCompraBodyObraAccess,
@@ -367,14 +369,42 @@ const sstRoutes = require('./modules/sst/routes');
 const governancaRoutes = require('./modules/governanca/routes');
 //console.log('AnexoController =>', AnexoController);
 
+function hashRateLimitValue(value, fallback = 'anon') {
+  const normalized = String(value || fallback).trim().toLowerCase() || fallback;
+  return crypto
+    .createHash('sha256')
+    .update(normalized)
+    .digest('hex')
+    .slice(0, 24);
+}
+
+function rateLimitRouteKey(req) {
+  return `${req.method}:${req.baseUrl || ''}${req.path || ''}`;
+}
+
+function authIdentifierFromRequest(req) {
+  return (
+    req.body?.email ||
+    req.body?.login ||
+    req.body?.usuario ||
+    req.body?.username ||
+    req.body?.cpf ||
+    'sem-identificador'
+  );
+}
+
+function authRateLimitKey(scope, req, identifier) {
+  const ip = getRequestIp(req) || 'unknown';
+  return `${scope}:${rateLimitRouteKey(req)}:${hashRateLimitValue(identifier)}:${ip}`;
+}
+
 const loginRateLimit = createRateLimit({
   windowMs: Math.max(1, env.loginRateLimitWindowMinutes) * 60 * 1000,
   max: Math.max(1, env.loginRateLimitMaxAttempts),
   message: 'Muitas tentativas de login. Aguarde alguns minutos e tente novamente.',
   eventType: 'AUTH_RATE_LIMIT',
   resource: 'AUTH',
-  keyGenerator: (req) =>
-    `login:${String(req.body?.email || '').trim().toLowerCase()}:${req.ip || 'unknown'}`
+  keyGenerator: (req) => authRateLimitKey('login', req, authIdentifierFromRequest(req))
 });
 
 const uploadRateLimit = createRateLimit({
@@ -415,7 +445,17 @@ const passwordChangeRateLimit = createRateLimit({
   message: 'Muitas tentativas de troca de senha. Aguarde antes de tentar novamente.',
   eventType: 'PASSWORD_CHANGE_RATE_LIMIT',
   resource: 'USER_PASSWORD',
-  keyGenerator: (req) => `password-change:${req.user?.id || 'anon'}:${req.ip || 'unknown'}`
+  keyGenerator: (req) => {
+    if (req.user?.id) {
+      return authRateLimitKey('password-change', req, `user:${req.user.id}`);
+    }
+
+    if (req.body?.token) {
+      return authRateLimitKey('password-change', req, `token:${req.body.token}`);
+    }
+
+    return authRateLimitKey('password-change', req, authIdentifierFromRequest(req));
+  }
 });
 
 

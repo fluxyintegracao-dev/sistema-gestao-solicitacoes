@@ -63,6 +63,48 @@ function normalizeAccessToken(value) {
     .toUpperCase();
 }
 
+function normalizeComparableToken(value) {
+  return normalizeAccessToken(value)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+const AREA_ACCESS_ALIASES = {
+  COMPRAS: ['COMPRAS', 'SETOR DE COMPRAS', 'DEPARTAMENTO DE COMPRAS'],
+  GEO: ['GEO', 'GERENCIA DE PROCESSOS', 'GERÊNCIA DE PROCESSOS', 'GERENCIA_PROCESSOS'],
+  FINANCEIRO: ['FINANCEIRO', 'SETOR FINANCEIRO'],
+  OBRA: ['OBRA', 'OBRAS', 'SETOR OBRA', 'SETOR DE OBRA'],
+  ADMINISTRATIVO: ['ADMINISTRATIVO', 'ADMIN'],
+  MARKETING: ['MARKETING'],
+  RH: ['RH', 'DP', 'RH/DP', 'RECURSOS HUMANOS'],
+  FISCAL: ['FISCAL']
+};
+
+function buildAreaAccessCandidates(value) {
+  const base = normalizeComparableToken(value);
+  if (!base) return [];
+
+  const candidates = new Set([base]);
+  const compact = base.replace(/\s+/g, '_');
+  candidates.add(compact);
+
+  Object.entries(AREA_ACCESS_ALIASES).forEach(([key, aliases]) => {
+    const comparableKey = normalizeComparableToken(key);
+    const comparableAliases = aliases.map(normalizeComparableToken);
+    if (comparableKey === base || comparableAliases.includes(base) || comparableAliases.includes(compact)) {
+      comparableAliases.forEach((alias) => {
+        candidates.add(alias);
+        candidates.add(alias.replace(/\s+/g, '_'));
+      });
+    }
+  });
+
+  return Array.from(candidates).filter(Boolean);
+}
+
 function tokensContainValue(tokens, value) {
   const normalized = normalizeAccessToken(value);
   if (!normalized) return false;
@@ -71,6 +113,20 @@ function tokensContainValue(tokens, value) {
     .map(normalizeAccessToken)
     .filter(Boolean)
     .includes(normalized);
+}
+
+function tokensContainAreaValue(tokens, value) {
+  const candidates = buildAreaAccessCandidates(value);
+  if (!candidates.length) return false;
+
+  const normalizedTokens = (Array.isArray(tokens) ? tokens : [])
+    .flatMap((token) => {
+      const comparable = normalizeComparableToken(token);
+      if (!comparable) return [];
+      return [comparable, comparable.replace(/\s+/g, '_')];
+    });
+
+  return candidates.some((candidate) => normalizedTokens.includes(candidate));
 }
 
 async function userParticipatedInSolicitacao(user, solicitacaoId) {
@@ -218,7 +274,7 @@ async function canAccessSolicitacaoFile(req, solicitacaoId) {
   }
 
   const userScopeTokens = await buildUserScopeTokens(req.user);
-  if (tokensContainValue(userScopeTokens, solicitacao.area_responsavel)) {
+  if (tokensContainAreaValue(userScopeTokens, solicitacao.area_responsavel)) {
     return { allowed: true };
   }
 
@@ -237,7 +293,9 @@ async function canAccessSolicitacaoFile(req, solicitacaoId) {
     {
       obra_id: solicitacao.obra_id,
       criado_por: solicitacao.criado_por,
-      area_responsavel: solicitacao.area_responsavel
+      area_responsavel: solicitacao.area_responsavel,
+      usuario_area: req.user?.area || null,
+      usuario_setor_id: req.user?.setor_id || null
     }
   );
 
