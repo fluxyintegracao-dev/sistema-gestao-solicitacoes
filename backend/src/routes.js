@@ -22,10 +22,12 @@ const { requireAnyEnabledModule, requireEnabledModule } = require('./middlewares
 const { validateRequest } = require('./middlewares/validation');
 const {
   validateLoginBody,
+  validateForgotPasswordBody,
   validateMfaCodeBody,
   validateMfaLoginBody,
   validateNumericIdParam,
   validatePasswordChangeBody,
+  validateResetPasswordBody,
   validatePresignQuery
 } = require('./validators/securityValidators');
 const {
@@ -422,6 +424,8 @@ const passwordChangeRateLimit = createRateLimit({
 // -------------------------------------------------------------------
 router.post('/login', loginRateLimit, validateRequest({ body: validateLoginBody }), AuthController.login);
 router.post('/login/mfa', loginRateLimit, validateRequest({ body: validateMfaLoginBody }), AuthController.loginMfa);
+router.post('/auth/forgot-password', passwordChangeRateLimit, validateRequest({ body: validateForgotPasswordBody }), AuthController.forgotPassword);
+router.post('/auth/reset-password', passwordChangeRateLimit, validateRequest({ body: validateResetPasswordBody }), AuthController.resetPassword);
 router.get('/instalacao/publica', InstalacaoController.publica);
 router.get('/configuracoes/tema', ConfiguracaoSistemaController.getTema);
 router.post('/cotacoes/upload', requireEnabledModule('COTACOES', { allowSuperadminBypass: false }), uploadRateLimit, uploadComprovantes.single('file'), CotacaoFornecedorController.upload);
@@ -1182,6 +1186,8 @@ router.get('/usuarios/opcoes-atribuicao', UsuarioController.opcoesAtribuicao);
 router.get('/usuarios/:id', allowGestaoUsuarios, validateRequest({ params: validateNumericIdParam('id', 'Usuario') }), UsuarioController.show);
 router.post('/usuarios', allowGestaoUsuarios, UsuarioController.create);
 router.post('/usuarios/importar-massa', allowGestaoUsuarios, uploadRateLimit, uploadComprovantes.single('file'), UsuarioController.importarMassa);
+router.post('/usuarios/forcar-reset-senhas', allowGestaoUsuarios, UsuarioController.forcarResetSenhas);
+router.post('/usuarios/:id/enviar-convite', allowGestaoUsuarios, validateRequest({ params: validateNumericIdParam('id', 'Usuario') }), UsuarioController.enviarConvite);
 router.put('/usuarios/:id', allowGestaoUsuarios, validateRequest({ params: validateNumericIdParam('id', 'Usuario') }), UsuarioController.update);
 router.patch('/usuarios/me/senha', passwordChangeRateLimit, validateRequest({ body: validatePasswordChangeBody }), UsuarioController.alterarSenha);
 router.patch('/usuarios/:id/ativar', allowGestaoUsuarios, validateRequest({ params: validateNumericIdParam('id', 'Usuario') }), UsuarioController.ativar);

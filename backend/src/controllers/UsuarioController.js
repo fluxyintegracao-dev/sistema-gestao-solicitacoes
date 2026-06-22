@@ -10,6 +10,11 @@ const {
 } = require('../models');
 const { env } = require('../config/env');
 const { registrarEventoSeguranca } = require('../services/securityLogService');
+const { assertStrongPassword } = require('../services/passwordPolicyService');
+const {
+  createUserPasswordPayload,
+  sendPasswordResetEmail
+} = require('../services/passwordResetService');
 
 function podeDefinirPerfilSuperadmin(req, perfilDestino) {
   const perfilSolicitante = String(req.user?.perfil || '').trim().toUpperCase();
@@ -191,6 +196,13 @@ module.exports = {
 
     } catch (error) {
       console.error(error);
+      if (error.statusCode) {
+        return res.status(error.statusCode).json({
+          error: error.message || 'Erro ao criar usuario',
+          code: error.code,
+          details: error.details
+        });
+      }
       return res.status(500).json({
         error: 'Erro ao listar usuários'
       });
@@ -227,6 +239,13 @@ module.exports = {
       return res.json(usuarios);
     } catch (error) {
       console.error(error);
+      if (error.statusCode) {
+        return res.status(error.statusCode).json({
+          error: error.message || 'Erro ao criar usuario',
+          code: error.code,
+          details: error.details
+        });
+      }
       return res.status(500).json({
         error: 'Erro ao listar usuarios para atribuicao'
       });
@@ -249,6 +268,13 @@ module.exports = {
       return res.json(usuarios);
     } catch (error) {
       console.error(error);
+      if (error.statusCode) {
+        return res.status(error.statusCode).json({
+          error: error.message || 'Erro ao alterar senha',
+          code: error.code,
+          details: error.details
+        });
+      }
       return res.status(500).json({
         error: 'Erro ao buscar usuários'
       });
@@ -317,12 +343,13 @@ module.exports = {
         setor_id,
         perfil,
         obras = [],
-        pode_criar_solicitacao_compra
+        pode_criar_solicitacao_compra,
+        enviar_convite = true
       } = req.body;
 
       const emailNormalizado = normalizarEmail(email);
 
-      if (!nome || !emailNormalizado || !senha || !perfil) {
+      if (!nome || !emailNormalizado || !perfil) {
         return res.status(400).json({
           error: 'Nome, email, senha e perfil são obrigatórios'
         });
@@ -350,16 +377,22 @@ module.exports = {
       }
 
       // 🔐 Criptografa senha
-      const senhaHash = await bcrypt.hash(senha, 10);
+      const deveEnviarConvite = !senha || enviar_convite !== false;
+      const passwordPayload = await createUserPasswordPayload({
+        senha,
+        forceInvite: deveEnviarConvite
+      });
 
       const usuario = await User.create({
         nome,
         email: emailNormalizado,
-        senha: senhaHash,
+        senha: passwordPayload.senhaHash,
         cargo_id,
         setor_id,
         perfil,
         ativo: true,
+        force_password_reset: passwordPayload.forcePasswordReset,
+        password_changed_at: passwordPayload.passwordChangedAt,
         pode_criar_solicitacao_compra: definirPermissaoSolicitacaoCompra(
           perfil,
           pode_criar_solicitacao_compra,
@@ -391,17 +424,39 @@ module.exports = {
         }
       });
 
+      let conviteEnviado = false;
+      let conviteErro = null;
+      if (deveEnviarConvite) {
+        try {
+          await sendPasswordResetEmail(usuario, { req, isInvite: true });
+          conviteEnviado = true;
+        } catch (emailError) {
+          console.error(emailError);
+          conviteErro = emailError.message || 'Erro ao enviar convite.';
+        }
+      }
+
       return res.status(201).json({
         id: usuario.id,
         nome: usuario.nome,
         email: usuario.email,
         perfil: usuario.perfil,
         ativo: usuario.ativo,
-        pode_criar_solicitacao_compra: usuario.pode_criar_solicitacao_compra
+        force_password_reset: usuario.force_password_reset,
+        pode_criar_solicitacao_compra: usuario.pode_criar_solicitacao_compra,
+        convite_enviado: conviteEnviado,
+        convite_erro: conviteErro
       });
 
     } catch (error) {
       console.error(error);
+      if (error.statusCode) {
+        return res.status(error.statusCode).json({
+          error: error.message || 'Erro ao criar usuario',
+          code: error.code,
+          details: error.details
+        });
+      }
       return res.status(500).json({
         error: 'Erro ao criar usuário'
       });
@@ -484,7 +539,12 @@ module.exports = {
 
       // 🔐 Troca senha se enviada
       if (senha && senha.trim()) {
+        assertStrongPassword(senha);
         dadosUpdate.senha = await bcrypt.hash(senha, 10);
+        dadosUpdate.force_password_reset = false;
+        dadosUpdate.password_reset_token_hash = null;
+        dadosUpdate.password_reset_expires_at = null;
+        dadosUpdate.password_changed_at = new Date();
       }
 
       await usuario.update(dadosUpdate);
@@ -529,6 +589,13 @@ module.exports = {
 
     } catch (error) {
       console.error(error);
+      if (error.statusCode) {
+        return res.status(error.statusCode).json({
+          error: error.message || 'Erro ao atualizar usuario',
+          code: error.code,
+          details: error.details
+        });
+      }
       return res.status(500).json({
         error: 'Erro ao atualizar usuário'
       });
@@ -643,8 +710,7 @@ module.exports = {
       const obrigatorios = [
         ['Nome', idxNome],
         ['Email', idxEmail],
-        ['Setor', idxSetor],
-        ['Senha', idxSenha]
+        ['Setor', idxSetor]
       ];
       const faltando = obrigatorios.filter(([, idx]) => idx < 0).map(([nome]) => nome);
       if (faltando.length > 0) {
@@ -679,6 +745,8 @@ module.exports = {
         total_linhas: rows.length,
         importados: 0,
         ignorados: 0,
+        convites_enviados: 0,
+        convites_erros: [],
         erros: []
       };
 
@@ -690,7 +758,7 @@ module.exports = {
         const email = String(row[idxEmail] ?? '').trim().toLowerCase();
         const setorRaw = String(row[idxSetor] ?? '').trim();
         const obrasRaw = String(idxObras >= 0 ? (row[idxObras] ?? '') : '').trim();
-        const senhaRaw = String(row[idxSenha] ?? '').trim();
+        const senhaRaw = String(idxSenha >= 0 ? (row[idxSenha] ?? '') : '').trim();
         const perfilRaw = idxPerfil >= 0 ? String(row[idxPerfil] ?? '').trim() : '';
         const permissaoComprasRaw =
           idxPermissaoCompras >= 0 ? String(row[idxPermissaoCompras] ?? '').trim() : '';
@@ -702,10 +770,10 @@ module.exports = {
           continue;
         }
 
-        if (!nome || !email || !setorRaw || !senhaRaw) {
+        if (!nome || !email || !setorRaw) {
           resultado.erros.push({
             linha,
-            error: 'Campos obrigatorios invalidos (Nome, Email, Setor, Senha).'
+            error: 'Campos obrigatorios invalidos (Nome, Email, Setor).'
           });
           continue;
           resultado.erros.push({
@@ -775,15 +843,30 @@ module.exports = {
           continue;
         }
 
-        const senhaHash = await bcrypt.hash(senhaRaw, 10);
+        let passwordPayload;
+        try {
+          passwordPayload = await createUserPasswordPayload({
+            senha: senhaRaw,
+            forceInvite: true
+          });
+        } catch (error) {
+          resultado.erros.push({
+            linha,
+            error: error.message || 'Senha invalida.'
+          });
+          continue;
+        }
+
         const usuario = await User.create({
           nome,
           email,
-          senha: senhaHash,
+          senha: passwordPayload.senhaHash,
           cargo_id: null,
           setor_id: setor.id,
           perfil,
           ativo: true,
+          force_password_reset: passwordPayload.forcePasswordReset,
+          password_changed_at: passwordPayload.passwordChangedAt,
           pode_criar_solicitacao_compra: definirPermissaoSolicitacaoCompra(
             perfil,
             permissaoComprasRaw,
@@ -796,6 +879,19 @@ module.exports = {
             user_id: usuario.id,
             obra_id,
             perfil
+          });
+        }
+
+        try {
+          await sendPasswordResetEmail(usuario, { req, isInvite: true });
+          resultado.convites_enviados += 1;
+        } catch (emailError) {
+          console.error(emailError);
+          resultado.convites_erros.push({
+            linha,
+            id: usuario.id,
+            email: usuario.email,
+            error: emailError.message || 'Erro ao enviar convite.'
           });
         }
 
@@ -851,8 +947,16 @@ module.exports = {
         });
       }
 
+      assertStrongPassword(senha_nova);
+
       const senhaHash = await bcrypt.hash(senha_nova, 10);
-      await usuario.update({ senha: senhaHash });
+      await usuario.update({
+        senha: senhaHash,
+        force_password_reset: false,
+        password_reset_token_hash: null,
+        password_reset_expires_at: null,
+        password_changed_at: new Date()
+      });
 
       await registrarEventoSeguranca({
         req,
@@ -867,11 +971,81 @@ module.exports = {
       return res.sendStatus(204);
     } catch (error) {
       console.error(error);
+      if (error.statusCode) {
+        return res.status(error.statusCode).json({
+          error: error.message || 'Erro ao alterar senha',
+          code: error.code,
+          details: error.details
+        });
+      }
       return res.status(500).json({
         error: 'Erro ao alterar senha'
+      });
+    }
+  },
+
+  async enviarConvite(req, res) {
+    try {
+      const usuario = await User.findByPk(req.params.id);
+      if (!usuario || !podeGerenciarUsuarioAlvo(req, usuario)) {
+        return res.status(404).json({ error: 'Usuario nao encontrado' });
+      }
+
+      if (usuario.ativo === false) {
+        return res.status(400).json({ error: 'Usuario inativo nao pode receber link de senha.' });
+      }
+
+      const result = await sendPasswordResetEmail(usuario, { req, isInvite: true });
+      return res.json({
+        ok: true,
+        ...result,
+        message: 'Link enviado para o email do usuario.'
+      });
+    } catch (error) {
+      console.error(error);
+      return res.status(error.statusCode || 500).json({
+        error: error.message || 'Erro ao enviar link de senha'
+      });
+    }
+  },
+
+  async forcarResetSenhas(req, res) {
+    try {
+      if (String(req.user?.perfil || '').trim().toUpperCase() !== 'SUPERADMIN') {
+        return res.status(403).json({ error: 'Apenas SUPERADMIN pode forcar redefinicao em massa.' });
+      }
+
+      const usuarios = await User.findAll({
+        where: { ativo: true },
+        order: [['nome', 'ASC']]
+      });
+      const resultado = {
+        total: usuarios.length,
+        enviados: 0,
+        erros: []
+      };
+
+      for (const usuario of usuarios) {
+        try {
+          await sendPasswordResetEmail(usuario, { req, isInvite: false });
+          resultado.enviados += 1;
+        } catch (emailError) {
+          console.error(emailError);
+          resultado.erros.push({
+            id: usuario.id,
+            email: usuario.email,
+            error: emailError.message || 'Erro ao enviar email.'
+          });
+        }
+      }
+
+      return res.json({ ok: true, ...resultado });
+    } catch (error) {
+      console.error(error);
+      return res.status(error.statusCode || 500).json({
+        error: error.message || 'Erro ao forcar redefinicao de senhas'
       });
     }
   }
 
 };
-

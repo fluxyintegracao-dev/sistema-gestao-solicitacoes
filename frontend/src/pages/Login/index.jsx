@@ -57,6 +57,10 @@ export default function Login() {
     const rawMessage = String(err?.message || '').trim();
     const normalizedMessage = rawMessage.toLowerCase();
 
+    if (err?.data?.code === 'PASSWORD_RESET_REQUIRED') {
+      return 'Sua senha precisa ser definida ou redefinida. Use "Esqueci minha senha" para receber um link seguro.';
+    }
+
     if (!rawMessage) {
       return 'Nao foi possivel entrar agora. Tente novamente em alguns instantes.';
     }
@@ -307,7 +311,13 @@ export default function Login() {
                   <span className="login-security-dot" aria-hidden="true" />
                   <span>Acesso corporativo protegido.</span>
                 </div>
-                <button type="button" className="login-forgot">Esqueci minha senha</button>
+                <button
+                  type="button"
+                  className="login-forgot"
+                  onClick={() => navigate('/recuperar-senha', { state: { email: email.trim() } })}
+                >
+                  Esqueci minha senha
+                </button>
               </div>
 
               <button

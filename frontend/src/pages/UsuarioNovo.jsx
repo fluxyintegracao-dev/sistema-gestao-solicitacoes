@@ -14,6 +14,7 @@ export default function UsuarioNovo() {
   const [nome, setNome] = useState('');
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
+  const [enviarConvite, setEnviarConvite] = useState(true);
   const [perfil, setPerfil] = useState('');
   const [setorId, setSetorId] = useState('');
   const [obras, setObras] = useState([]);
@@ -78,6 +79,7 @@ export default function UsuarioNovo() {
       nome,
       email,
       senha,
+      enviar_convite: enviarConvite,
       perfil,
       setor_id: setorId || null,
       obras,
@@ -88,13 +90,28 @@ export default function UsuarioNovo() {
       delete payload.senha;
     }
 
-    if (editando) {
-      await atualizarUsuario(id, payload);
-    } else {
-      await criarUsuario(payload);
+    if (!editando && enviarConvite && !senha.trim()) {
+      delete payload.senha;
     }
 
-    navigate('/usuarios');
+    if (!editando && !enviarConvite && !senha.trim()) {
+      alert('Informe uma senha inicial forte ou mantenha o envio de link por e-mail habilitado.');
+      return;
+    }
+
+    try {
+      const resultado = editando
+        ? await atualizarUsuario(id, payload)
+        : await criarUsuario(payload);
+
+      if (!editando && resultado?.convite_erro) {
+        alert(`Usuario criado, mas o link de definicao de senha nao foi enviado: ${resultado.convite_erro}`);
+      }
+      navigate('/usuarios');
+    } catch (error) {
+      console.error(error);
+      alert(error?.message || 'Erro ao salvar usuario');
+    }
   }
 
   if (loading) {
@@ -139,10 +156,16 @@ export default function UsuarioNovo() {
             <input
               type="password"
               className="input"
-              placeholder={editando ? 'Deixe em branco para manter a senha' : 'Senha'}
+              placeholder={
+                editando
+                  ? 'Deixe em branco para manter a senha'
+                  : enviarConvite
+                    ? 'Opcional; usuario recebera link seguro'
+                    : 'Senha inicial forte'
+              }
               value={senha}
               onChange={e => setSenha(e.target.value)}
-              required={!editando}
+              required={!editando && !enviarConvite}
             />
           </label>
 
@@ -178,6 +201,25 @@ export default function UsuarioNovo() {
             </select>
           </label>
         </div>
+
+        {!editando && (
+          <div className="rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4">
+            <label className="flex items-start gap-3 text-sm">
+              <input
+                type="checkbox"
+                className="mt-1"
+                checked={enviarConvite}
+                onChange={e => setEnviarConvite(e.target.checked)}
+              />
+              <span className="grid gap-1">
+                <span className="font-medium">Enviar link para definir senha por e-mail</span>
+                <span className="text-[var(--c-muted)]">
+                  O usuario recebe um link seguro para criar a propria senha. Se desmarcar, informe uma senha inicial forte.
+                </span>
+              </span>
+            </label>
+          </div>
+        )}
 
         {isBusinessAdminLogado && (
           <div className="rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4">
@@ -266,4 +308,3 @@ export default function UsuarioNovo() {
     </div>
   );
 }
-

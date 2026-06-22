@@ -1,10 +1,21 @@
 import { API_URL, authHeaders } from './api';
 
+async function parseResponse(res, fallbackMessage) {
+  const data = await res.json().catch(() => null);
+  if (!res.ok) {
+    const error = new Error(data?.error || fallbackMessage);
+    error.status = res.status;
+    error.data = data;
+    throw error;
+  }
+  return data;
+}
+
 export async function getUsuarios() {
   const res = await fetch(`${API_URL}/usuarios`, {
     headers: authHeaders()
   });
-  return res.json();
+  return parseResponse(res, 'Erro ao buscar usuarios');
 }
 
 export async function getUsuario(id) {
@@ -23,7 +34,7 @@ export async function criarUsuario(data) {
     headers: authHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(data)
   });
-  return res.json();
+  return parseResponse(res, 'Erro ao criar usuario');
 }
 
 export async function atualizarUsuario(id, data) {
@@ -32,7 +43,7 @@ export async function atualizarUsuario(id, data) {
     headers: authHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(data)
   });
-  return res.json();
+  return parseResponse(res, 'Erro ao atualizar usuario');
 }
 
 export async function ativarUsuario(id) {
@@ -47,6 +58,22 @@ export async function desativarUsuario(id) {
     method: 'PATCH',
     headers: authHeaders()
   });
+}
+
+export async function enviarConviteUsuario(id) {
+  const res = await fetch(`${API_URL}/usuarios/${id}/enviar-convite`, {
+    method: 'POST',
+    headers: authHeaders()
+  });
+  return parseResponse(res, 'Erro ao enviar link de definicao de senha');
+}
+
+export async function forcarResetSenhaUsuarios() {
+  const res = await fetch(`${API_URL}/usuarios/forcar-reset-senhas`, {
+    method: 'POST',
+    headers: authHeaders()
+  });
+  return parseResponse(res, 'Erro ao forcar redefinicao de senhas');
 }
 
 export async function alterarSenhaAtual({ senha_atual, senha_nova }) {

@@ -78,6 +78,39 @@ export async function logoutRequest() {
   return data;
 }
 
+export async function forgotPasswordRequest(email) {
+  const response = await fetch(`${API_URL}/auth/forgot-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: String(email || '').trim() })
+  });
+
+  const data = await parseJsonSafe(response);
+  if (!response.ok) {
+    throw buildError(data, 'Erro ao solicitar recuperacao de senha.');
+  }
+
+  return data;
+}
+
+export async function resetPasswordRequest({ token, senha }) {
+  const response = await fetch(`${API_URL}/auth/reset-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      token: String(token || '').trim(),
+      senha: String(senha || '')
+    })
+  });
+
+  const data = await parseJsonSafe(response);
+  if (!response.ok) {
+    throw buildError(data, 'Erro ao definir nova senha.');
+  }
+
+  return data;
+}
+
 export async function startMfaSetupRequest() {
   const response = await fetch(`${API_URL}/auth/mfa/setup`, {
     method: 'POST'

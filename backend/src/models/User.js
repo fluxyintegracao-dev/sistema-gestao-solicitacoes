@@ -58,6 +58,32 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: false
     },
 
+    force_password_reset: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+      allowNull: false
+    },
+
+    password_reset_token_hash: {
+      type: DataTypes.STRING,
+      allowNull: true
+    },
+
+    password_reset_expires_at: {
+      type: DataTypes.DATE,
+      allowNull: true
+    },
+
+    password_changed_at: {
+      type: DataTypes.DATE,
+      allowNull: true
+    },
+
+    password_setup_sent_at: {
+      type: DataTypes.DATE,
+      allowNull: true
+    },
+
     mfa_totp_enabled: {
       type: DataTypes.BOOLEAN,
       defaultValue: false,

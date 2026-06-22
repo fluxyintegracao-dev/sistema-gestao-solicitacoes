@@ -65,6 +65,8 @@ import {
 } from './utils/acessoProduto';
 
 const Login = lazy(() => import('./pages/Login'));
+const RecuperarSenha = lazy(() => import('./pages/RecuperarSenha'));
+const DefinirSenha = lazy(() => import('./pages/DefinirSenha'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Solicitacoes = lazy(() => import('./pages/Solicitacoes'));
 const SolicitacaoDetalhe = lazy(() => import('./pages/SolicitacaoDetalhe'));
@@ -726,6 +728,22 @@ export default function App() {
         element={(
           <PublicPage>
             <Login />
+          </PublicPage>
+        )}
+      />
+      <Route
+        path="/recuperar-senha"
+        element={(
+          <PublicPage>
+            <RecuperarSenha />
+          </PublicPage>
+        )}
+      />
+      <Route
+        path="/definir-senha"
+        element={(
+          <PublicPage>
+            <DefinirSenha />
           </PublicPage>
         )}
       />

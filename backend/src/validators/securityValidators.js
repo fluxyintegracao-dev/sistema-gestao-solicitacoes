@@ -3,6 +3,10 @@ const {
   ValidationError,
   sanitizeString
 } = require('../middlewares/validation');
+const {
+  PASSWORD_POLICY_MESSAGE,
+  validateStrongPassword
+} = require('../services/passwordPolicyService');
 
 function validateLoginBody(body = {}) {
   ensureAllowedKeys(body, ['email', 'senha'], 'Login');
@@ -69,10 +73,48 @@ function validatePasswordChangeBody(body = {}) {
     throw new ValidationError('Senha nova deve ter pelo menos 8 caracteres.');
   }
 
+  const policy = validateStrongPassword(senhaNova);
+  if (!policy.valid) {
+    throw new ValidationError(PASSWORD_POLICY_MESSAGE);
+  }
+
   return {
     senha_atual: senhaAtual,
     senha_nova: senhaNova
   };
+}
+
+function validateForgotPasswordBody(body = {}) {
+  ensureAllowedKeys(body, ['email'], 'Recuperacao de senha');
+
+  const email = sanitizeString(body.email, 'Email', {
+    required: true,
+    max: 160,
+    pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/i
+  }).toLowerCase();
+
+  return { email };
+}
+
+function validateResetPasswordBody(body = {}) {
+  ensureAllowedKeys(body, ['token', 'senha'], 'Definicao de senha');
+
+  const token = sanitizeString(body.token, 'Token', {
+    required: true,
+    max: 256
+  });
+
+  const senha = sanitizeString(body.senha, 'Senha', {
+    required: true,
+    max: 120
+  });
+
+  const policy = validateStrongPassword(senha);
+  if (!policy.valid) {
+    throw new ValidationError(PASSWORD_POLICY_MESSAGE);
+  }
+
+  return { token, senha };
 }
 
 function validatePresignQuery(query = {}) {
@@ -113,9 +155,11 @@ function validateNumericIdParam(paramName, label) {
 
 module.exports = {
   validateLoginBody,
+  validateForgotPasswordBody,
   validateMfaCodeBody,
   validateMfaLoginBody,
   validateNumericIdParam,
   validatePasswordChangeBody,
+  validateResetPasswordBody,
   validatePresignQuery
 };

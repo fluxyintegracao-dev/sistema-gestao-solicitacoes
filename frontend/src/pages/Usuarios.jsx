@@ -1,15 +1,26 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { HiArrowDownTray, HiArrowUpTray } from 'react-icons/hi2';
-import { getUsuarios, ativarUsuario, desativarUsuario, importarUsuariosEmMassa } from '../services/usuarios';
+import { HiArrowDownTray, HiArrowUpTray, HiEnvelope, HiKey } from 'react-icons/hi2';
+import {
+  getUsuarios,
+  ativarUsuario,
+  desativarUsuario,
+  importarUsuariosEmMassa,
+  enviarConviteUsuario,
+  forcarResetSenhaUsuarios
+} from '../services/usuarios';
 import EmptyState from '../components/ui/EmptyState';
 import LoadingSkeleton from '../components/ui/LoadingSkeleton';
+import { useAuth } from '../contexts/AuthContext';
+import { isSuperadmin } from '../utils/acessoProduto';
 
 export default function Usuarios() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [usuarios, setUsuarios] = useState([]);
   const [importando, setImportando] = useState(false);
   const [loading, setLoading] = useState(true);
+  const isSuperadminLogado = isSuperadmin(user);
 
   useEffect(() => {
     carregar();
@@ -36,8 +47,8 @@ export default function Usuarios() {
 
   function baixarModeloImportacaoUsuarios() {
     const linhas = [
-      ['Nome', 'Email', 'Setor', 'Perfil', 'Obras', 'Senha'],
-      ['Usuario Exemplo', 'usuario.exemplo@empresa.com', 'FINANCEIRO', 'USUARIO', '7|8', '123456']
+      ['Nome', 'Email', 'Setor', 'Perfil', 'Obras', 'Senha', 'Enviar convite'],
+      ['Usuario Exemplo', 'usuario.exemplo@empresa.com', 'FINANCEIRO', 'USUARIO', '7|8', '', 'Sim']
     ];
 
     const csv = linhas
@@ -76,18 +87,52 @@ export default function Usuarios() {
 
       const importados = Number(resultado?.importados || 0);
       const ignorados = Number(resultado?.ignorados || 0);
+      const convitesEnviados = Number(resultado?.convites_enviados || 0);
+      const convitesErros = Number(resultado?.convites_erros || 0);
       const erros = Array.isArray(resultado?.erros) ? resultado.erros : [];
       if (erros.length > 0) {
         const resumo = erros.slice(0, 5).map((item) => `Linha ${item.linha}: ${item.error}`).join('\n');
-        alert(`Importados: ${importados}. Ignorados: ${ignorados}. Erros: ${erros.length}.\n${resumo}${erros.length > 5 ? '\n...' : ''}`);
+        alert(`Importados: ${importados}. Ignorados: ${ignorados}. Convites enviados: ${convitesEnviados}. Falhas de convite: ${convitesErros}. Erros: ${erros.length}.\n${resumo}${erros.length > 5 ? '\n...' : ''}`);
       } else {
-        alert(`Importacao concluida. Importados: ${importados}. Ignorados: ${ignorados}.`);
+        alert(`Importacao concluida. Importados: ${importados}. Ignorados: ${ignorados}. Convites enviados: ${convitesEnviados}. Falhas de convite: ${convitesErros}.`);
       }
     } catch (error) {
       console.error(error);
       alert(error?.message || 'Erro ao importar usuarios em massa');
     } finally {
       setImportando(false);
+    }
+  }
+
+  async function enviarConvite(usuario) {
+    if (!confirm(`Enviar link para definicao de senha para ${usuario.nome || usuario.email}?`)) {
+      return;
+    }
+
+    try {
+      const resultado = await enviarConviteUsuario(usuario.id);
+      alert(resultado?.email_configurado === false
+        ? 'Link gerado, mas o SMTP nao esta configurado. Configure o e-mail antes de usar em producao.'
+        : 'Link enviado com sucesso.');
+      await carregar();
+    } catch (error) {
+      console.error(error);
+      alert(error?.message || 'Erro ao enviar link de senha');
+    }
+  }
+
+  async function forcarResetSenhas() {
+    if (!confirm('Isso vai exigir que todos os usuarios ativos redefinam a senha no proximo acesso e enviara links por e-mail. Deseja continuar?')) {
+      return;
+    }
+
+    try {
+      const resultado = await forcarResetSenhaUsuarios();
+      alert(`Reset aplicado. Usuarios processados: ${resultado?.total || 0}. Links enviados: ${resultado?.enviados || 0}. Falhas: ${resultado?.falhas || 0}.`);
+      await carregar();
+    } catch (error) {
+      console.error(error);
+      alert(error?.message || 'Erro ao forcar redefinicao de senhas');
     }
   }
 
@@ -113,6 +158,18 @@ export default function Usuarios() {
         </div>
 
         <div className="app-page-actions">
+          {isSuperadminLogado && (
+            <button
+              type="button"
+              className="btn btn-outline px-3"
+              onClick={forcarResetSenhas}
+              title="Forcar redefinicao de senha para todos os usuarios ativos"
+            >
+              <HiKey className="w-4 h-4" />
+              Resetar senhas
+            </button>
+          )}
+
           <button
             type="button"
             className="btn btn-outline px-3"
@@ -144,7 +201,7 @@ export default function Usuarios() {
 
       <div className="sol-surface-card rounded-xl p-4">
         <p className="app-note">
-          Modelo CSV: Nome, Email, Setor, Perfil, Obras (separar por <code>|</code> ou <code>,</code>) e Senha. Perfis aceitos: <code>USUARIO</code>, <code>ADMIN</code>, <code>ADMINISTRADOR</code> e <code>SUPERADMIN</code>. A senha informada (ex.: <code>123456</code>) e convertida em hash automaticamente no import.
+          Modelo CSV: Nome, Email, Setor, Perfil, Obras (separar por <code>|</code> ou <code>,</code>), Senha e Enviar convite. Perfis aceitos: <code>USUARIO</code>, <code>ADMIN</code>, <code>ADMINISTRADOR</code> e <code>SUPERADMIN</code>. Com convite marcado, a senha pode ficar vazia e o usuario define a propria senha pelo link seguro.
         </p>
       </div>
 
@@ -195,6 +252,13 @@ export default function Usuarios() {
                     </td>
                     <td>
                       <div className="flex flex-wrap gap-2">
+                        <button
+                          className="btn btn-outline px-3"
+                          onClick={() => enviarConvite(u)}
+                          title="Enviar link para definir ou redefinir senha"
+                        >
+                          <HiEnvelope className="w-4 h-4" />
+                        </button>
                         <button className="btn btn-outline" onClick={() => navigate(`/usuarios/${u.id}`)}>
                           Editar
                         </button>

@@ -29,6 +29,10 @@ const {
 const { isMfaRequiredProfile } = require('../services/mfaPolicyService');
 const { listarSetoresDoUsuario } = require('../services/usuariosSetores');
 const { obterAcessoPrioridadeDiretoriaPorUsuario } = require('../services/prioridadeDiretoriaAcesso');
+const {
+  requestPasswordResetByEmail,
+  resetPasswordByToken
+} = require('../services/passwordResetService');
 
 const SETOR_ATTRIBUTES = [
   'id',
@@ -160,6 +164,24 @@ module.exports = {
         return res.status(401).json({ error: 'Credenciais invalidas' });
       }
 
+      if (user.force_password_reset) {
+        await registrarEventoSeguranca({
+          req,
+          usuarioId: user.id,
+          tipoEvento: 'AUTH_PASSWORD_RESET_REQUIRED',
+          recursoTipo: 'AUTH',
+          recursoId: user.id,
+          status: 'DENIED',
+          descricao: 'Login bloqueado ate definicao ou redefinicao de senha'
+        });
+
+        return res.status(403).json({
+          error: 'Sua senha precisa ser definida ou redefinida antes do acesso.',
+          code: 'PASSWORD_RESET_REQUIRED',
+          password_reset_required: true
+        });
+      }
+
       const mfaRequiredByPolicy = isMfaRequiredProfile(user);
       const mfaEnabled = Boolean(user.mfa_totp_enabled && user.mfa_totp_secret);
 
@@ -264,6 +286,31 @@ module.exports = {
     } catch (err) {
       console.error(err);
       return res.status(500).json({ error: 'Erro ao validar autenticacao em duas etapas.' });
+    }
+  },
+
+  async forgotPassword(req, res) {
+    try {
+      return res.json(await requestPasswordResetByEmail(req.body?.email, req));
+    } catch (err) {
+      console.error(err);
+      return res.status(err.statusCode || 500).json({
+        error: err.statusCode ? err.message : 'Erro ao solicitar recuperacao de senha.',
+        code: err.code
+      });
+    }
+  },
+
+  async resetPassword(req, res) {
+    try {
+      return res.json(await resetPasswordByToken(req.body?.token, req.body?.senha, req));
+    } catch (err) {
+      console.error(err);
+      return res.status(err.statusCode || 500).json({
+        error: err.statusCode ? err.message : 'Erro ao redefinir senha.',
+        code: err.code,
+        details: err.details
+      });
     }
   },
 
