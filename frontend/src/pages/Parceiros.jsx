@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   atualizarParceiro,
+  baixarModeloParceiros,
   buscarParceiros,
   criarParceiro,
+  exportarParceiros,
+  importarParceiros,
   listarCategoriasParceiro
 } from '../services/parceiros';
 import { isValidCpfCnpj, maskCep, maskCpfCnpj, maskCreci, maskPhone, maskRg, onlyDigits } from '../utils/formatters';
@@ -107,6 +110,8 @@ export default function Parceiros() {
   const [filtro, setFiltro] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState(null);
   const [error, setError] = useState('');
 
   async function carregar() {
@@ -191,6 +196,43 @@ export default function Parceiros() {
       setError(err?.message || 'Erro ao salvar parceiro');
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleBaixarModelo() {
+    try {
+      setError('');
+      await baixarModeloParceiros();
+    } catch (err) {
+      setError(err?.message || 'Erro ao baixar modelo de pessoas');
+    }
+  }
+
+  async function handleExportar() {
+    try {
+      setError('');
+      await exportarParceiros();
+    } catch (err) {
+      setError(err?.message || 'Erro ao exportar pessoas');
+    }
+  }
+
+  async function handleImportarParceiros(event) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+
+    try {
+      setImporting(true);
+      setError('');
+      setImportResult(null);
+      const result = await importarParceiros(file);
+      setImportResult(result);
+      await carregar();
+    } catch (err) {
+      setError(err?.message || 'Erro ao importar pessoas');
+    } finally {
+      setImporting(false);
     }
   }
 
@@ -514,14 +556,60 @@ export default function Parceiros() {
             <div className="sol-surface-card solicitacoes-toolbar rounded-xl p-3 md:p-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <h2 className="text-lg font-semibold text-[var(--c-text)]">Pessoas cadastradas</h2>
-                <input
-                  className="input w-[240px]"
-                  placeholder="Buscar pessoa"
-                  value={filtro}
-                  onChange={(e) => setFiltro(e.target.value)}
-                />
+                <div className="flex flex-wrap items-center gap-2">
+                  <button type="button" className="btn btn-outline" onClick={handleBaixarModelo}>
+                    Baixar modelo
+                  </button>
+                  <button type="button" className="btn btn-outline" onClick={handleExportar}>
+                    Exportar
+                  </button>
+                  <label className={`btn btn-primary cursor-pointer ${importing ? 'opacity-70' : ''}`}>
+                    {importing ? 'Importando...' : 'Importar'}
+                    <input
+                      type="file"
+                      className="hidden"
+                      accept=".xlsx,.xls,.csv"
+                      disabled={importing}
+                      onChange={handleImportarParceiros}
+                    />
+                  </label>
+                  <input
+                    className="input w-[240px]"
+                    placeholder="Buscar pessoa"
+                    value={filtro}
+                    onChange={(e) => setFiltro(e.target.value)}
+                  />
+                </div>
               </div>
             </div>
+
+            {importResult && (
+              <div className="rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-900 dark:border-sky-900/50 dark:bg-sky-950/30 dark:text-sky-100">
+                <div className="font-semibold">
+                  Importacao concluida: {importResult.importados || 0} novo(s), {importResult.atualizados || 0} atualizado(s), {importResult.ignorados || 0} ignorado(s).
+                </div>
+                {Array.isArray(importResult.categorias_criadas) && importResult.categorias_criadas.length > 0 && (
+                  <div className="mt-1">
+                    Categorias criadas: {importResult.categorias_criadas.join(', ')}
+                  </div>
+                )}
+                {Array.isArray(importResult.erros) && importResult.erros.length > 0 && (
+                  <div className="mt-2 rounded-lg bg-white/70 p-3 text-red-700 dark:bg-slate-950/40 dark:text-red-300">
+                    <div className="font-semibold">Linhas com erro:</div>
+                    <ul className="mt-1 list-disc space-y-1 pl-5">
+                      {importResult.erros.slice(0, 8).map((erro) => (
+                        <li key={`${erro.linha}-${erro.erro}`}>
+                          Linha {erro.linha}: {erro.erro}
+                        </li>
+                      ))}
+                    </ul>
+                    {importResult.erros.length > 8 && (
+                      <div className="mt-1">Mais {importResult.erros.length - 8} erro(s) oculto(s).</div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
 
             {parceirosFiltrados.length === 0 ? (
               <div className="app-empty-card">

@@ -9,6 +9,29 @@ async function parseJson(response, fallbackMessage) {
   return text ? JSON.parse(text) : null;
 }
 
+function getFilenameFromDisposition(disposition, fallback) {
+  const match = String(disposition || '').match(/filename="?([^"]+)"?/i);
+  return match?.[1] || fallback;
+}
+
+async function downloadResponse(response, fallbackName, fallbackMessage) {
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || fallbackMessage);
+  }
+
+  const blob = await response.blob();
+  const filename = getFilenameFromDisposition(response.headers.get('Content-Disposition'), fallbackName);
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
 export async function buscarParceiros(params = {}) {
   const query = new URLSearchParams(params).toString();
   const url = query ? `${API_URL}/parceiros?${query}` : `${API_URL}/parceiros`;
@@ -17,6 +40,35 @@ export async function buscarParceiros(params = {}) {
   });
 
   return parseJson(response, 'Erro ao buscar parceiros');
+}
+
+export async function baixarModeloParceiros() {
+  const response = await fetch(`${API_URL}/parceiros/modelo-xlsx`, {
+    headers: authHeaders()
+  });
+
+  return downloadResponse(response, 'modelo-importacao-pessoas.xlsx', 'Erro ao baixar modelo de pessoas');
+}
+
+export async function exportarParceiros() {
+  const response = await fetch(`${API_URL}/parceiros/exportar-xlsx`, {
+    headers: authHeaders()
+  });
+
+  return downloadResponse(response, 'pessoas-cadastradas.xlsx', 'Erro ao exportar pessoas');
+}
+
+export async function importarParceiros(file) {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const response = await fetch(`${API_URL}/parceiros/importar-xlsx`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: formData
+  });
+
+  return parseJson(response, 'Erro ao importar pessoas');
 }
 
 export async function criarParceiro(data) {
