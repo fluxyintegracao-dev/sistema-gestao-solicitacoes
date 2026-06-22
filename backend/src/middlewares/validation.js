@@ -34,7 +34,7 @@ function ensureAllowedKeys(payload, allowedKeys = [], label = 'Requisicao') {
 
   const unknownKeys = Object.keys(payload).filter((key) => !allowedKeys.includes(key));
   if (unknownKeys.length > 0) {
-    throw new ValidationError(`${label} contem campos nao permitidos.`);
+    throw new ValidationError(`${label} contem campos nao permitidos: ${unknownKeys.join(', ')}.`);
   }
 }
 
