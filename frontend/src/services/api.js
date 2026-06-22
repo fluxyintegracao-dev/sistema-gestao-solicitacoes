@@ -39,6 +39,10 @@ function rememberCsrfTokenFromResponse(response) {
   }
 }
 
+function getKnownCsrfToken() {
+  return currentCsrfToken || getCookieValue(CSRF_COOKIE_NAME);
+}
+
 export function installFetchSecurityDefaults() {
   if (typeof window === 'undefined' || window.__fluxyFetchSecurityInstalled) {
     return;
@@ -56,7 +60,7 @@ export function installFetchSecurityDefaults() {
     }
 
     if (isUnsafeMethod(method) && !headers.has(CSRF_HEADER_NAME)) {
-      const csrfToken = currentCsrfToken || getCookieValue(CSRF_COOKIE_NAME);
+      const csrfToken = getKnownCsrfToken();
       if (csrfToken) {
         headers.set(CSRF_HEADER_NAME, csrfToken);
       }
@@ -97,6 +101,10 @@ export function clearAuthToken() {
 
 export function authHeaders(extra = {}) {
   const token = getAuthToken();
-  if (!token) return extra;
-  return { ...extra, Authorization: `Bearer ${token}` };
+  const csrfToken = getKnownCsrfToken();
+  return {
+    ...extra,
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(csrfToken ? { [CSRF_HEADER_NAME]: csrfToken } : {})
+  };
 }

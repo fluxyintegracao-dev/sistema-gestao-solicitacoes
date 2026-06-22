@@ -5,6 +5,12 @@ const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
 module.exports = async function csrfProtection(req, res, next) {
   if (SAFE_METHODS.has(String(req.method || '').toUpperCase())) {
+    if (req.auth_mode === 'cookie') {
+      const cookieToken = String(req.cookies?.[env.csrfCookieName] || '').trim();
+      if (cookieToken) {
+        res.set(env.csrfHeaderName, cookieToken);
+      }
+    }
     return next();
   }
 
