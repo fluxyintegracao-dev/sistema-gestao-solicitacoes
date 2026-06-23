@@ -371,7 +371,7 @@ function normalizarStatusCobranca(value) {
 }
 
 function getTipoFormaPagamento(formaPagamento) {
-  return `${formaPagamento?.tipo || ''} ${formaPagamento?.codigo || ''}`.toUpperCase();
+  return `${formaPagamento?.tipo || ''} ${formaPagamento?.codigo || ''} ${formaPagamento?.nome || ''}`.toUpperCase();
 }
 
 function isFormaCartao(formaPagamento) {
@@ -384,6 +384,11 @@ function isFormaCartaoComFatura(formaPagamento) {
 
 function isFormaBoleto(formaPagamento) {
   return getTipoFormaPagamento(formaPagamento).includes('BOLETO');
+}
+
+function isFormaOutros(formaPagamento) {
+  const value = getTipoFormaPagamento(formaPagamento);
+  return value.includes('OUTROS') || value.includes('OUTRO');
 }
 
 function isFormaCheque(formaPagamento) {
@@ -543,9 +548,9 @@ function resolveVencimentoParcela({ formaPagamento, parcela, dataVencimentoBase,
     return dataCompra;
   }
 
-  if (isFormaBoleto(formaPagamento) || isFormaCheque(formaPagamento)) {
+  if (isFormaBoleto(formaPagamento) || isFormaCheque(formaPagamento) || isFormaOutros(formaPagamento)) {
     if (!parcela?.data_vencimento) {
-      const label = isFormaCheque(formaPagamento) ? 'cheque' : 'boleto';
+      const label = isFormaCheque(formaPagamento) ? 'cheque' : isFormaOutros(formaPagamento) ? 'guia de pagamento' : 'boleto';
       throw createHttpError(400, `Informe o vencimento do ${label} da parcela ${index + 1}.`);
     }
     return parcela.data_vencimento;
@@ -1021,7 +1026,7 @@ async function validarFormaPagamentoFinanceira(formaPagamentoId, payload = {}) {
   }
 
   const quantidadeParcelas = Math.max(Number(payload.quantidade_parcelas || 1), 1);
-  if (quantidadeParcelas > 1 && forma.permite_parcelamento === false) {
+  if (quantidadeParcelas > 1 && forma.permite_parcelamento === false && !isFormaOutros(forma)) {
     throw createHttpError(400, 'A forma de pagamento selecionada nao permite parcelamento.');
   }
 
@@ -1301,6 +1306,37 @@ function resolverEmpresaTitulo({ obra }) {
   return empresaDaObra;
 }
 
+async function resolverEmpresaTituloParaBaixa(titulo = {}) {
+  const empresaAtualId = titulo?.empresa_id ? Number(titulo.empresa_id) : null;
+  if (Number.isInteger(empresaAtualId) && empresaAtualId > 0) {
+    await validarEmpresaGrupo(empresaAtualId);
+    return empresaAtualId;
+  }
+
+  let obra = titulo?.obra || null;
+  if (!obra && titulo?.obra_id) {
+    obra = await Obra.findByPk(titulo.obra_id, {
+      attributes: ['id', 'nome', 'codigo', 'empresa_grupo_id']
+    });
+  }
+
+  const empresaDaObra = obra?.empresa_grupo_id ? Number(obra.empresa_grupo_id) : null;
+  if (!Number.isInteger(empresaDaObra) || empresaDaObra <= 0) {
+    throw createHttpError(
+      400,
+      'Titulo sem empresa vinculada e a obra/centro de custo do titulo nao possui empresa do grupo vinculada. Corrija o cadastro antes de registrar baixa.'
+    );
+  }
+
+  await validarEmpresaGrupo(empresaDaObra);
+  if (typeof titulo.setDataValue === 'function') {
+    titulo.setDataValue('empresa_id', empresaDaObra);
+  } else {
+    titulo.empresa_id = empresaDaObra;
+  }
+  return empresaDaObra;
+}
+
 function resolverCompetenciaTitulo(payload = {}) {
   const competenciaData = payload.competencia_data || null;
   if (payload.considera_dre !== false && !competenciaData) {
@@ -1377,13 +1413,7 @@ function buildMovimentoIntercompanyFields(titulo = {}) {
 }
 
 async function validarIntercompanyBaixa({ payload = {}, titulo = {}, empresaBaixaId }) {
-  const empresaTituloId = titulo?.empresa_id ? Number(titulo.empresa_id) : null;
-  if (!empresaTituloId) {
-    throw createHttpError(
-      400,
-      'Titulo sem empresa vinculada. Corrija a empresa do titulo antes de registrar baixa.'
-    );
-  }
+  const empresaTituloId = await resolverEmpresaTituloParaBaixa(titulo);
 
   const empresasDiferentes = Boolean(
     empresaTituloId &&
@@ -1412,8 +1442,6 @@ async function validarIntercompanyBaixa({ payload = {}, titulo = {}, empresaBaix
   if (!tipoIntercompany) {
     throw createHttpError(400, 'Tipo e obrigatorio quando outra empresa paga ou recebe a baixa.');
   }
-
-  await validarEmpresaGrupo(empresaTituloId);
 
   const isPagar = String(titulo.tipo || '').toUpperCase() === 'PAGAR';
   return {
@@ -2053,6 +2081,13 @@ async function criarTituloPorSolicitacao(req, solicitacaoId, payload = {}) {
           ? `${prefixoForma}${descricaoBase}`.slice(0, 205) + ` - Parcela ${numeroParcela}/${totalParcelasDoGrupo}`
           : `${prefixoForma}${descricaoBase}`.slice(0, 255);
         const chequeFields = buildChequeFields(pagamento.formaPagamento, parcelaPayload, index);
+        const cobrancaPayload = {
+          ...payload,
+          forma_cobranca: parcelaPayload.forma_cobranca || pagamento.payload.forma_cobranca || payload.forma_cobranca,
+          banco_cobranca: parcelaPayload.banco_cobranca || pagamento.payload.banco_cobranca || payload.banco_cobranca,
+          linha_digitavel: parcelaPayload.linha_digitavel || pagamento.payload.linha_digitavel || payload.linha_digitavel,
+          codigo_barras: parcelaPayload.codigo_barras || pagamento.payload.codigo_barras || payload.codigo_barras
+        };
 
         const titulo = await TituloFinanceiro.create({
           solicitacao_id: solicitacao.id,
@@ -2087,7 +2122,7 @@ async function criarTituloPorSolicitacao(req, solicitacaoId, payload = {}) {
           data_vencimento: vencimentoParcela,
           data_quitacao: null,
           observacoes: parcelaPayload.observacoes || pagamento.payload.observacoes || payload.observacoes || null,
-          ...buildCobrancaFields(payload, tipo),
+          ...buildCobrancaFields(cobrancaPayload, tipo),
           criado_por: req.user?.id || null,
           atualizado_por: req.user?.id || null
         }, { transaction });
@@ -2338,6 +2373,13 @@ async function criarTituloManual(req, payload = {}) {
           ? `${prefixoForma}${descricao}`.slice(0, 205) + ` - Parcela ${numeroParcela}/${pagamento.quantidadeParcelas}`
           : `${prefixoForma}${descricao}`.slice(0, 255);
         const chequeFields = buildChequeFields(pagamento.formaPagamento, parcelaPayload, index);
+        const cobrancaPayload = {
+          ...payload,
+          forma_cobranca: parcelaPayload.forma_cobranca || pagamento.payload.forma_cobranca || payload.forma_cobranca,
+          banco_cobranca: parcelaPayload.banco_cobranca || pagamento.payload.banco_cobranca || payload.banco_cobranca,
+          linha_digitavel: parcelaPayload.linha_digitavel || pagamento.payload.linha_digitavel || payload.linha_digitavel,
+          codigo_barras: parcelaPayload.codigo_barras || pagamento.payload.codigo_barras || payload.codigo_barras
+        };
 
         const titulo = await TituloFinanceiro.create({
           solicitacao_id: null,
@@ -2372,7 +2414,7 @@ async function criarTituloManual(req, payload = {}) {
           data_vencimento: vencimentoParcela,
           data_quitacao: null,
           observacoes: parcelaPayload.observacoes || pagamento.payload.observacoes || payload.observacoes || null,
-          ...buildCobrancaFields(payload, tipo),
+          ...buildCobrancaFields(cobrancaPayload, tipo),
           criado_por: req.user?.id || null,
           atualizado_por: req.user?.id || null
         }, { transaction });
@@ -2825,18 +2867,12 @@ async function baixarTitulo(req, tituloId, payload = {}) {
     empresaId: payload.empresa_id,
     conta
   });
+  const empresaTituloId = await resolverEmpresaTituloParaBaixa(titulo);
   const movimentoIntercompanyFields = await validarIntercompanyBaixa({
     payload,
     titulo,
     empresaBaixaId
   });
-  const empresaTituloId = titulo.empresa_id ? Number(titulo.empresa_id) : null;
-  if (!empresaTituloId) {
-    throw createHttpError(
-      400,
-      'Titulo sem empresa vinculada. Corrija a empresa do titulo antes de registrar baixa.'
-    );
-  }
 
   const novoValorBaixado = roundCurrency(Number(titulo.valor_baixado || 0) + valorBaixa);
   const novoEstado = calcularStatusTitulo({
@@ -3074,9 +3110,7 @@ async function baixarTitulosParceladosEmMassa(req, payload = {}) {
     if (saldo <= 0) {
       throw createHttpError(400, `Titulo ${titulo.codigo || titulo.id} nao possui saldo em aberto.`);
     }
-    if (!titulo.empresa_id) {
-      throw createHttpError(400, `Titulo ${titulo.codigo || titulo.id} nao possui empresa vinculada.`);
-    }
+    await resolverEmpresaTituloParaBaixa(titulo);
     titulos.push(titulo);
   }
 
@@ -3150,6 +3184,7 @@ async function baixarTitulosParceladosEmMassa(req, payload = {}) {
       movimentosOriginais.push(movimentoOriginal);
 
       await titulo.update({
+        empresa_id: Number(titulo.empresa_id),
         valor_baixado: roundCurrency(Number(titulo.valor_baixado || 0) + saldo),
         valor_saldo: 0,
         status: 'QUITADO',

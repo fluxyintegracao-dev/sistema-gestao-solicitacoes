@@ -625,6 +625,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
   const baixaMassaFormaParcelavel = baixaMassaUsaCartao || isChequeForma(baixaMassaForm.forma_recebimento);
   const baixaMassaParcelada = baixaMassaFormaParcelavel && Boolean(baixaMassaForm.parcelado);
   const baixaMassaTipoSelecionado = String(selectedTitulosBaixaveis[0]?.tipo || fixedTipo || draftFilters.tipo || '').toUpperCase();
+  const baixaMassaFormaLabel = baixaMassaTipoSelecionado === 'PAGAR' ? 'Forma de pagamento' : 'Forma de recebimento';
   const chequesTerceirosDisponiveis = useMemo(
     () => chequesTerceiros.filter((cheque) => String(cheque?.status || '').toUpperCase() === 'EM_CARTEIRA'),
     [chequesTerceiros]
@@ -944,7 +945,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
     }
 
     if (!baixaMassaForm.forma_recebimento) {
-      setError('Informe a forma de recebimento/pagamento da baixa em massa.');
+      setError(`Informe a ${baixaMassaFormaLabel.toLowerCase()} da baixa em massa.`);
       return;
     }
 
@@ -1832,7 +1833,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                 </label>
 
                 <label className="app-filter-field">
-                  <span className="app-filter-label">Forma</span>
+                  <span className="app-filter-label">{baixaMassaFormaLabel}</span>
                   <select
                     className="input w-full input-sm"
                     value={baixaMassaForm.forma_recebimento}

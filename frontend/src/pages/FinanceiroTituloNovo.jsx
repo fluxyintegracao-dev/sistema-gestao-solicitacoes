@@ -120,6 +120,9 @@ function buildParcelasDetalhadas(
     valor: redistribuirValores ? (valoresSugeridos[index] || '') : (parcelasAtuais[index]?.valor || valoresSugeridos[index] || ''),
     data_vencimento: parcelasAtuais[index]?.data_vencimento || addMonths(dataBase || today(), index),
     numero_documento: parcelasAtuais[index]?.numero_documento || '',
+    banco_cobranca: parcelasAtuais[index]?.banco_cobranca || '',
+    linha_digitavel: parcelasAtuais[index]?.linha_digitavel || '',
+    codigo_barras: parcelasAtuais[index]?.codigo_barras || '',
     observacoes: parcelasAtuais[index]?.observacoes || '',
     cheque_numero: parcelasAtuais[index]?.cheque_numero || '',
     cheque_banco: parcelasAtuais[index]?.cheque_banco || '',
@@ -253,12 +256,17 @@ function isFormaCartao(forma) {
 }
 
 function isFormaBoleto(forma) {
-  const value = `${forma?.tipo || ''} ${forma?.codigo || ''}`.toUpperCase();
+  const value = `${forma?.tipo || ''} ${forma?.codigo || ''} ${forma?.nome || ''}`.toUpperCase();
   return value.includes('BOLETO');
 }
 
+function isFormaOutros(forma) {
+  const value = `${forma?.tipo || ''} ${forma?.codigo || ''} ${forma?.nome || ''}`.toUpperCase();
+  return value.includes('OUTROS') || value.includes('OUTRO');
+}
+
 function isFormaCheque(forma) {
-  const value = `${forma?.tipo || ''} ${forma?.codigo || ''}`.toUpperCase();
+  const value = `${forma?.tipo || ''} ${forma?.codigo || ''} ${forma?.nome || ''}`.toUpperCase();
   return value.includes('CHEQUE');
 }
 
@@ -268,17 +276,35 @@ function isFormaPix(forma) {
 }
 
 function formaPermiteParcelamentoOperacional(forma) {
-  return Boolean(forma?.permite_parcelamento) || isFormaPix(forma);
+  return Boolean(forma?.permite_parcelamento) || isFormaPix(forma) || isFormaOutros(forma);
 }
 
 function formaUsaParcelasDetalhadas(forma) {
-  return Boolean(forma) && (isFormaBoleto(forma) || isFormaCheque(forma) || isFormaPix(forma));
+  return Boolean(forma) && (isFormaBoleto(forma) || isFormaCheque(forma) || isFormaPix(forma) || isFormaOutros(forma));
 }
 
 function getLabelParcelaForma(forma) {
   if (isFormaCheque(forma)) return 'cheque';
   if (isFormaPix(forma)) return 'PIX';
+  if (isFormaOutros(forma)) return 'guia de pagamento';
   return 'boleto';
+}
+
+function formaAceitaDadosBoletoOuGuia(forma) {
+  return isFormaBoleto(forma) || isFormaOutros(forma);
+}
+
+function resolveFormaCobrancaPagamento(forma) {
+  if (isFormaOutros(forma)) return 'OUTROS';
+  if (isFormaBoleto(forma)) return 'BOLETO';
+  return undefined;
+}
+
+function resolveFormaCobrancaPagamentos(pagamentos = [], getFormaPagamento) {
+  const formaComCobranca = pagamentos
+    .map((pagamento) => getFormaPagamento(pagamento?.forma_pagamento_id))
+    .find((forma) => formaAceitaDadosBoletoOuGuia(forma));
+  return resolveFormaCobrancaPagamento(formaComCobranca);
 }
 
 function getParceiroPixOptions(parceiro) {
@@ -1140,6 +1166,9 @@ export default function FinanceiroTituloNovo() {
       payload.considera_dre = isCategoriaClassificadaParaDre(categoriaSelecionada);
       payload.intercompany = Boolean(form.intercompany);
       payload.competencia_data = form.competencia_data || undefined;
+      payload.forma_cobranca = form.tipo === 'PAGAR'
+        ? (form.forma_cobranca || resolveFormaCobrancaPagamentos(form.pagamentos, getFormaPagamento))
+        : form.forma_cobranca || undefined;
       payload.valor_bruto = form.valor;
       payload.valor_liquido = formatCurrencyInput(valorLiquidoPrevisto);
       payload.rateios = (form.rateios || []).map((rateio) => ({
@@ -1744,16 +1773,45 @@ export default function FinanceiroTituloNovo() {
                                   />
                                 </label>
 
-                                {isFormaBoleto(forma) && (
-                                  <label className="text-sm md:col-span-2">
-                                    <span className="mb-1 block text-[var(--c-muted)]">Documento ou referencia do boleto</span>
-                                    <input
-                                      className="input w-full"
-                                      value={parcela.numero_documento || ''}
-                                      onChange={(event) => updateParcela(pagamentoIndex, parcelaIndex, 'numero_documento', event.target.value)}
-                                      placeholder="Nosso numero ou referencia"
-                                    />
-                                  </label>
+                                {formaAceitaDadosBoletoOuGuia(forma) && (
+                                  <>
+                                    <label className="text-sm md:col-span-2">
+                                      <span className="mb-1 block text-[var(--c-muted)]">Documento ou referencia</span>
+                                      <input
+                                        className="input w-full"
+                                        value={parcela.numero_documento || ''}
+                                        onChange={(event) => updateParcela(pagamentoIndex, parcelaIndex, 'numero_documento', event.target.value)}
+                                        placeholder={isFormaOutros(forma) ? 'Referencia da guia ou pagamento' : 'Nosso numero ou referencia'}
+                                      />
+                                    </label>
+                                    <label className="text-sm">
+                                      <span className="mb-1 block text-[var(--c-muted)]">Banco</span>
+                                      <input
+                                        className="input w-full"
+                                        value={parcela.banco_cobranca || ''}
+                                        onChange={(event) => updateParcela(pagamentoIndex, parcelaIndex, 'banco_cobranca', event.target.value)}
+                                        placeholder="Ex.: Caixa"
+                                      />
+                                    </label>
+                                    <label className="text-sm">
+                                      <span className="mb-1 block text-[var(--c-muted)]">Linha digitavel</span>
+                                      <input
+                                        className="input w-full"
+                                        value={parcela.linha_digitavel || ''}
+                                        onChange={(event) => updateParcela(pagamentoIndex, parcelaIndex, 'linha_digitavel', event.target.value)}
+                                        placeholder="Linha digitavel, se houver"
+                                      />
+                                    </label>
+                                    <label className="text-sm md:col-span-2">
+                                      <span className="mb-1 block text-[var(--c-muted)]">Codigo de barras</span>
+                                      <input
+                                        className="input w-full"
+                                        value={parcela.codigo_barras || ''}
+                                        onChange={(event) => updateParcela(pagamentoIndex, parcelaIndex, 'codigo_barras', event.target.value)}
+                                        placeholder="Codigo de barras, se houver"
+                                      />
+                                    </label>
+                                  </>
                                 )}
 
                                 {isFormaCheque(forma) && (
@@ -1764,45 +1822,6 @@ export default function FinanceiroTituloNovo() {
                               </div>
                             </div>
                           ))}
-                          {isFormaBoleto(forma) && form.tipo === 'PAGAR' && (
-                            <div className="rounded-2xl border border-blue-100 bg-blue-50 p-3 text-sm text-blue-900">
-                              <div className="mb-2">
-                                <div className="font-semibold">Dados bancarios do boleto</div>
-                                <div className="text-xs text-blue-700">
-                                  Informe a linha digitavel ou o codigo de barras para habilitar a remessa Caixa CNAB240.
-                                </div>
-                              </div>
-                              <div className="grid gap-3 md:grid-cols-3">
-                                <label>
-                                  <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.12em] text-blue-700">Banco</span>
-                                  <input
-                                    className="input w-full bg-white"
-                                    placeholder="Ex.: Caixa"
-                                    value={form.banco_cobranca}
-                                    onChange={(event) => updateField('banco_cobranca', event.target.value)}
-                                  />
-                                </label>
-                                <label>
-                                  <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.12em] text-blue-700">Linha digitavel</span>
-                                  <input
-                                    className="input w-full bg-white"
-                                    placeholder="47 digitos do boleto"
-                                    value={form.linha_digitavel}
-                                    onChange={(event) => updateField('linha_digitavel', event.target.value)}
-                                  />
-                                </label>
-                                <label>
-                                  <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.12em] text-blue-700">Codigo de barras</span>
-                                  <input
-                                    className="input w-full bg-white"
-                                    placeholder="44 digitos, se houver"
-                                    value={form.codigo_barras}
-                                    onChange={(event) => updateField('codigo_barras', event.target.value)}
-                                  />
-                                </label>
-                              </div>
-                            </div>
-                          )}
                         </div>
                       )}
                     </div>

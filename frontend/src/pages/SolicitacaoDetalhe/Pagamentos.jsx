@@ -117,6 +117,8 @@ export default function Pagamentos({ solicitacao, podeInformarPagamento = false,
   const pagamentosResumo = pagamentos.slice(0, 2);
   const temPagamentosOcultos = pagamentos.length > pagamentosResumo.length;
   const titulosBaixaveis = titulos.filter(tituloBaixavel);
+  const tipoTituloBaixa = String(titulosBaixaveis[0]?.tipo || '').toUpperCase();
+  const formaBaixaLabel = tipoTituloBaixa === 'RECEBER' ? 'Forma de recebimento' : 'Forma de pagamento';
 
   if (!exibirCard) return null;
 
@@ -336,7 +338,7 @@ export default function Pagamentos({ solicitacao, podeInformarPagamento = false,
                   <input type="date" className="input" value={dataPagamento} onChange={(event) => setDataPagamento(event.target.value)} />
                 </label>
                 <label className="form-field">
-                  <span className="form-label">Forma</span>
+                  <span className="form-label">{formaBaixaLabel}</span>
                   <select className="input" value={formaRecebimento} onChange={(event) => setFormaRecebimento(event.target.value)}>
                     <option value="PIX">PIX</option>
                     <option value="TRANSFERENCIA">Transferencia</option>

@@ -220,7 +220,7 @@ function formatAuditMetadata(metadata) {
     empresa_baixa_id: 'Empresa da baixa',
     intercompany_group_id: 'Grupo entre empresas',
     tipo_intercompany: 'Tipo',
-    forma_recebimento: 'Forma de recebimento',
+    forma_recebimento: 'Forma de pagamento/recebimento',
     tipo_permuta: 'Tipo de permuta',
     categoria_bem: 'Categoria do bem',
     descricao_bem: 'Descricao do bem',
@@ -350,6 +350,7 @@ export default function FinanceiroTituloDetalhe() {
   const baixaCartaoDebito = baixaUsaCartao && isCartaoDebito(selectedCartaoBaixa);
   const baixaUsaCheque = isChequeForma(baixaForm.forma_recebimento);
   const tituloTipo = String(titulo?.tipo || '').toUpperCase();
+  const baixaFormaLabel = tituloTipo === 'PAGAR' ? 'Forma de pagamento' : 'Forma de recebimento';
   const baixaRecebeChequeTerceiro = baixaUsaCheque && tituloTipo === 'RECEBER';
   const baixaPagaComChequeTerceiro = baixaUsaCheque && tituloTipo === 'PAGAR' && Boolean(baixaForm.usar_cheque_terceiro);
   const chequesTerceirosDisponiveis = useMemo(
@@ -962,7 +963,7 @@ export default function FinanceiroTituloDetalhe() {
                         Empresa pagadora: {movimento.empresa?.nome || movimento.empresa?.razao_social || 'Nao informada'}
                       </div>
                       <div className="text-[var(--c-muted)]">
-                        Forma de recebimento: {movimento.forma_recebimento || 'Nao informada'}
+                        {baixaFormaLabel}: {movimento.forma_recebimento || 'Nao informada'}
                       </div>
                       <div className="text-[var(--c-muted)]">
                         Valor base {formatCurrency(movimento.valor)} - Juros {formatCurrency(movimento.juros)} - Multa {formatCurrency(movimento.multa)} - Desconto {formatCurrency(movimento.desconto)}
@@ -1116,7 +1117,7 @@ export default function FinanceiroTituloDetalhe() {
               <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
               <div className="grid gap-3 md:grid-cols-2">
                 <label className="text-sm">
-                  <span className="mb-1 block text-slate-500">Forma de recebimento</span>
+                  <span className="mb-1 block text-slate-500">{baixaFormaLabel}</span>
                   <select
                     className="input w-full"
                     value={baixaForm.forma_recebimento}
