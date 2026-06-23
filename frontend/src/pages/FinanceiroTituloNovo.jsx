@@ -79,6 +79,10 @@ function roundCurrency(value) {
   return Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;
 }
 
+function normalizeCodigoBancoInput(value) {
+  return String(value || '').replace(/\D/g, '').slice(0, 8);
+}
+
 function calcularValorImposto(imposto) {
   const base = currencyToNumber(imposto?.base_calculo);
   const aliquota = currencyToNumber(imposto?.aliquota);
@@ -1785,12 +1789,15 @@ export default function FinanceiroTituloNovo() {
                                       />
                                     </label>
                                     <label className="text-sm">
-                                      <span className="mb-1 block text-[var(--c-muted)]">Banco</span>
+                                      <span className="mb-1 block text-[var(--c-muted)]">Codigo do banco</span>
                                       <input
                                         className="input w-full"
+                                        inputMode="numeric"
+                                        maxLength={8}
+                                        pattern="[0-9]*"
                                         value={parcela.banco_cobranca || ''}
-                                        onChange={(event) => updateParcela(pagamentoIndex, parcelaIndex, 'banco_cobranca', event.target.value)}
-                                        placeholder="Ex.: Caixa"
+                                        onChange={(event) => updateParcela(pagamentoIndex, parcelaIndex, 'banco_cobranca', normalizeCodigoBancoInput(event.target.value))}
+                                        placeholder="Ex.: 001, 104, 237"
                                       />
                                     </label>
                                     <label className="text-sm">
@@ -1864,12 +1871,15 @@ export default function FinanceiroTituloNovo() {
                   </label>
 
                   <label className="sol-filter-field xl:col-span-3">
-                    <span className="sol-filter-label">Banco da cobranca</span>
+                    <span className="sol-filter-label">Codigo do banco da cobranca</span>
                     <input
                       className="input w-full"
-                      placeholder="Ex.: Caixa, Banco do Brasil, Sicredi"
+                      inputMode="numeric"
+                      maxLength={8}
+                      pattern="[0-9]*"
+                      placeholder="Ex.: 001, 104, 237"
                       value={form.banco_cobranca}
-                      onChange={(event) => updateField('banco_cobranca', event.target.value)}
+                      onChange={(event) => updateField('banco_cobranca', normalizeCodigoBancoInput(event.target.value))}
                     />
                   </label>
 

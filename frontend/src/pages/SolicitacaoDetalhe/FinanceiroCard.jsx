@@ -39,6 +39,10 @@ function formatDate(value) {
   return date.toLocaleDateString('pt-BR');
 }
 
+function normalizeCodigoBancoInput(value) {
+  return String(value || '').replace(/\D/g, '').slice(0, 8);
+}
+
 function limparDescricaoTituloCompra(value) {
   const texto = String(value || '').trim();
   if (!texto) return texto;
@@ -1760,12 +1764,15 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
                                       />
                                     </label>
                                     <label className="text-sm">
-                                      <span className="mb-1 block text-slate-500">Banco</span>
+                                      <span className="mb-1 block text-slate-500">Codigo do banco</span>
                                       <input
                                         className="input w-full"
+                                        inputMode="numeric"
+                                        maxLength={8}
+                                        pattern="[0-9]*"
                                         value={parcela.banco_cobranca || ''}
-                                        onChange={(event) => updateParcela(pagamentoIndex, parcelaIndex, 'banco_cobranca', event.target.value)}
-                                        placeholder="Ex.: Caixa"
+                                        onChange={(event) => updateParcela(pagamentoIndex, parcelaIndex, 'banco_cobranca', normalizeCodigoBancoInput(event.target.value))}
+                                        placeholder="Ex.: 001, 104, 237"
                                       />
                                     </label>
                                     <label className="text-sm">

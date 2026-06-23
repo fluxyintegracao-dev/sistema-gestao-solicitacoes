@@ -69,6 +69,10 @@ function today() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function normalizeCodigoBancoInput(value) {
+  return String(value || '').replace(/\D/g, '').slice(0, 8);
+}
+
 function contaBancariaObrigatoria(formaRecebimento) {
   return !['DINHEIRO', 'CARTAO', 'PERMUTA', 'BENS', 'OUTROS'].includes(String(formaRecebimento || '').toUpperCase());
 }
@@ -228,7 +232,7 @@ function formatAuditMetadata(metadata) {
     documento_referencia: 'Documento',
     forma_cobranca: 'Forma de cobranca',
     status_cobranca: 'Status da cobranca',
-    banco_cobranca: 'Banco da cobranca',
+    banco_cobranca: 'Codigo do banco da cobranca',
     nosso_numero: 'Nosso numero',
     identificador_externo: 'Identificador externo',
     boleto_emitido_em: 'Boleto emitido em',
@@ -689,7 +693,7 @@ export default function FinanceiroTituloDetalhe() {
                 <div className="font-medium text-[var(--c-text)]">{titulo.status_cobranca || 'NAO_APLICAVEL'}</div>
               </div>
               <div>
-                <div className="text-[var(--c-muted)]">Banco</div>
+                <div className="text-[var(--c-muted)]">Codigo do banco</div>
                 <div className="font-medium text-[var(--c-text)]">{titulo.banco_cobranca || '-'}</div>
               </div>
               <div>
@@ -748,11 +752,15 @@ export default function FinanceiroTituloDetalhe() {
               </label>
 
               <label className="text-sm">
-                <span className="mb-1 block text-slate-500">Banco</span>
+                <span className="mb-1 block text-slate-500">Codigo do banco</span>
                 <input
                   className="input w-full"
+                  inputMode="numeric"
+                  maxLength={8}
+                  pattern="[0-9]*"
                   value={cobrancaForm.banco_cobranca}
-                  onChange={(event) => setCobrancaForm((current) => ({ ...current, banco_cobranca: event.target.value }))}
+                  onChange={(event) => setCobrancaForm((current) => ({ ...current, banco_cobranca: normalizeCodigoBancoInput(event.target.value) }))}
+                  placeholder="Ex.: 001, 104, 237"
                 />
               </label>
 
@@ -829,7 +837,7 @@ export default function FinanceiroTituloDetalhe() {
 
             <div className="grid gap-3 text-sm md:grid-cols-4">
               <div>
-                <div className="text-[var(--c-muted)]">Banco do boleto</div>
+                <div className="text-[var(--c-muted)]">Codigo do banco</div>
                 <div className="font-medium text-[var(--c-text)]">{titulo.banco_cobranca || '-'}</div>
               </div>
               <div className="md:col-span-2">
@@ -844,11 +852,15 @@ export default function FinanceiroTituloDetalhe() {
 
             <form className="grid gap-3 md:grid-cols-4" onSubmit={handleSalvarCobranca}>
               <label className="text-sm">
-                <span className="mb-1 block text-slate-500">Banco do boleto</span>
+                <span className="mb-1 block text-slate-500">Codigo do banco</span>
                 <input
                   className="input w-full"
+                  inputMode="numeric"
+                  maxLength={8}
+                  pattern="[0-9]*"
                   value={cobrancaForm.banco_cobranca}
-                  onChange={(event) => setCobrancaForm((current) => ({ ...current, banco_cobranca: event.target.value }))}
+                  onChange={(event) => setCobrancaForm((current) => ({ ...current, banco_cobranca: normalizeCodigoBancoInput(event.target.value) }))}
+                  placeholder="Ex.: 001, 104, 237"
                 />
               </label>
 

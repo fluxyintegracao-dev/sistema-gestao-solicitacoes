@@ -126,6 +126,34 @@ function parseNullableText(value, fieldName, max) {
   });
 }
 
+function normalizeCodigoBanco(value, fieldName) {
+  const codigo = String(value || '').replace(/\D/g, '');
+  if (!codigo) {
+    throw new ValidationError(`${fieldName} deve conter o codigo numerico do banco.`);
+  }
+  if (codigo.length > 8) {
+    throw new ValidationError(`${fieldName} deve ter no maximo 8 digitos.`);
+  }
+  return codigo;
+}
+
+function parseOptionalCodigoBanco(value, fieldName) {
+  if (isBlank(value)) {
+    return undefined;
+  }
+  return normalizeCodigoBanco(value, fieldName);
+}
+
+function parseNullableCodigoBanco(value, fieldName) {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (isBlank(value)) {
+    return null;
+  }
+  return normalizeCodigoBanco(value, fieldName);
+}
+
 function parseParcelasTitulo(value) {
   if (value === undefined) {
     return undefined;
@@ -158,7 +186,7 @@ function parseParcelasTitulo(value) {
       valor: parseDecimal(item?.valor, `Valor da parcela ${index + 1}`, { min: 0.01 }),
       data_vencimento: parseDateOnly(item?.data_vencimento, `Vencimento da parcela ${index + 1}`),
       numero_documento: parseOptionalText(item?.numero_documento, `Documento da parcela ${index + 1}`, 120),
-      banco_cobranca: parseOptionalText(item?.banco_cobranca, `Banco da parcela ${index + 1}`, 120),
+      banco_cobranca: parseOptionalCodigoBanco(item?.banco_cobranca, `Codigo do banco da parcela ${index + 1}`),
       linha_digitavel: parseOptionalText(item?.linha_digitavel, `Linha digitavel da parcela ${index + 1}`, 255),
       codigo_barras: parseOptionalText(item?.codigo_barras, `Codigo de barras da parcela ${index + 1}`, 255),
       observacoes: parseOptionalText(item?.observacoes, `Observacoes da parcela ${index + 1}`, 1000),
@@ -203,7 +231,7 @@ function parsePagamentosTitulo(value) {
       valor: parseDecimal(item?.valor, `Valor do pagamento ${index + 1}`, { min: 0.01 }),
       data_vencimento: parseDateOnly(item?.data_vencimento, `Vencimento do pagamento ${index + 1}`),
       numero_documento: parseOptionalText(item?.numero_documento, `Documento do pagamento ${index + 1}`, 120),
-      banco_cobranca: parseOptionalText(item?.banco_cobranca, `Banco do pagamento ${index + 1}`, 120),
+      banco_cobranca: parseOptionalCodigoBanco(item?.banco_cobranca, `Codigo do banco do pagamento ${index + 1}`),
       linha_digitavel: parseOptionalText(item?.linha_digitavel, `Linha digitavel do pagamento ${index + 1}`, 255),
       codigo_barras: parseOptionalText(item?.codigo_barras, `Codigo de barras do pagamento ${index + 1}`, 255),
       observacoes: parseOptionalText(item?.observacoes, `Observacoes do pagamento ${index + 1}`, 1000),
@@ -1093,7 +1121,7 @@ function validateFinanceTituloCreateFromSolicitacaoBody(body = {}) {
     numero_documento: parseOptionalText(body.numero_documento, 'Numero do documento', 120),
     forma_cobranca: parseEnum(body.forma_cobranca, 'Forma de cobranca', FORMAS_COBRANCA),
     status_cobranca: parseEnum(body.status_cobranca, 'Status da cobranca', STATUS_COBRANCA),
-    banco_cobranca: parseOptionalText(body.banco_cobranca, 'Banco da cobranca', 120),
+    banco_cobranca: parseOptionalCodigoBanco(body.banco_cobranca, 'Codigo do banco da cobranca'),
     nosso_numero: parseOptionalText(body.nosso_numero, 'Nosso numero', 120),
     linha_digitavel: parseOptionalText(body.linha_digitavel, 'Linha digitavel', 255),
     codigo_barras: parseOptionalText(body.codigo_barras, 'Codigo de barras', 255),
@@ -1183,7 +1211,7 @@ function validateFinanceTituloCreateBody(body = {}) {
     numero_documento: parseOptionalText(body.numero_documento, 'Numero do documento', 120),
     forma_cobranca: parseEnum(body.forma_cobranca, 'Forma de cobranca', FORMAS_COBRANCA),
     status_cobranca: parseEnum(body.status_cobranca, 'Status da cobranca', STATUS_COBRANCA),
-    banco_cobranca: parseOptionalText(body.banco_cobranca, 'Banco da cobranca', 120),
+    banco_cobranca: parseOptionalCodigoBanco(body.banco_cobranca, 'Codigo do banco da cobranca'),
     nosso_numero: parseOptionalText(body.nosso_numero, 'Nosso numero', 120),
     linha_digitavel: parseOptionalText(body.linha_digitavel, 'Linha digitavel', 255),
     codigo_barras: parseOptionalText(body.codigo_barras, 'Codigo de barras', 255),
@@ -1267,7 +1295,7 @@ function validateFinanceTituloUpdateBody(body = {}) {
     numero_documento: parseOptionalText(body.numero_documento, 'Numero do documento', 120),
     forma_cobranca: parseEnum(body.forma_cobranca, 'Forma de cobranca', FORMAS_COBRANCA),
     status_cobranca: parseEnum(body.status_cobranca, 'Status da cobranca', STATUS_COBRANCA),
-    banco_cobranca: parseOptionalText(body.banco_cobranca, 'Banco da cobranca', 120),
+    banco_cobranca: parseOptionalCodigoBanco(body.banco_cobranca, 'Codigo do banco da cobranca'),
     nosso_numero: parseOptionalText(body.nosso_numero, 'Nosso numero', 120),
     linha_digitavel: parseOptionalText(body.linha_digitavel, 'Linha digitavel', 255),
     codigo_barras: parseOptionalText(body.codigo_barras, 'Codigo de barras', 255),
@@ -1311,7 +1339,7 @@ function validateFinanceTituloCobrancaBody(body = {}) {
   return {
     forma_cobranca: parseNullableEnum(body.forma_cobranca, 'Forma de cobranca', FORMAS_COBRANCA),
     status_cobranca: parseNullableEnum(body.status_cobranca, 'Status da cobranca', STATUS_COBRANCA),
-    banco_cobranca: parseNullableText(body.banco_cobranca, 'Banco da cobranca', 120),
+    banco_cobranca: parseNullableCodigoBanco(body.banco_cobranca, 'Codigo do banco da cobranca'),
     nosso_numero: parseNullableText(body.nosso_numero, 'Nosso numero', 120),
     linha_digitavel: parseNullableText(body.linha_digitavel, 'Linha digitavel', 255),
     codigo_barras: parseNullableText(body.codigo_barras, 'Codigo de barras', 255),
