@@ -92,6 +92,13 @@ function criarNovoParceiroPadrao() {
   };
 }
 
+function criarChaveIdempotenciaSolicitacao() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `sol-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
+}
+
 export default function NovaSolicitacao() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -124,10 +131,12 @@ export default function NovaSolicitacao() {
   const [categoriasParceiro, setCategoriasParceiro] = useState([]);
   const [novoParceiro, setNovoParceiro] = useState(criarNovoParceiroPadrao);
   const [arquivos, setArquivos] = useState([]);
+  const [criandoSolicitacao, setCriandoSolicitacao] = useState(false);
   const [valorTexto, setValorTexto] = useState('');
   const anexosRef = useRef(null);
   const obraBuscaBlurTimeoutRef = useRef(null);
   const automacaoDestinoExecutadaRef = useRef('');
+  const criandoSolicitacaoRef = useRef(false);
 
   const [form, setForm] = useState({
     obra_id: '',
@@ -827,6 +836,13 @@ export default function NovaSolicitacao() {
       }
     }
 
+    if (criandoSolicitacaoRef.current) {
+      return;
+    }
+    criandoSolicitacaoRef.current = true;
+    setCriandoSolicitacao(true);
+    const idempotencyKey = criarChaveIdempotenciaSolicitacao();
+
     const payload = {
       ...form,
       parceiro_id: exibirCampoCredor ? (form.parceiro_id || null) : null,
@@ -852,24 +868,34 @@ export default function NovaSolicitacao() {
     };
 
     try {
-      const solicitacao = await createSolicitacao(payload);
-
-      if (exibirAnexos && arquivos.length > 0) {
-        await uploadArquivos({
-          files: extrairFilesAnexosPendentes(arquivos),
-          solicitacao_id: solicitacao.id,
-          tipo: 'SOLICITACAO'
-        });
-      }
+      const solicitacao = await createSolicitacao(payload, { idempotencyKey });
 
       if (!solicitacao?.id) {
         throw new Error('Solicitacao criada, mas a API nao retornou o identificador para abrir o detalhe.');
+      }
+
+      if (exibirAnexos && arquivos.length > 0) {
+        try {
+          await uploadArquivos({
+            files: extrairFilesAnexosPendentes(arquivos),
+            solicitacao_id: solicitacao.id,
+            tipo: 'SOLICITACAO'
+          });
+        } catch (uploadError) {
+          console.error(uploadError);
+          alert(`A solicitacao ${solicitacao.codigo || solicitacao.id} foi criada, mas os anexos nao foram enviados. Abra a solicitacao e envie os anexos novamente.`);
+          navigate(`/solicitacoes/${solicitacao.id}`, { replace: true });
+          return;
+        }
       }
 
       navigate(`/solicitacoes/${solicitacao.id}`, { replace: true });
     } catch (error) {
       console.error(error);
       alert(error?.message || 'Erro ao criar solicitação');
+    } finally {
+      criandoSolicitacaoRef.current = false;
+      setCriandoSolicitacao(false);
     }
   }
 
@@ -1763,8 +1789,12 @@ export default function NovaSolicitacao() {
           )}
 
           <div className="flex justify-end nova-solicitacao-footer">
-          <button className="btn btn-primary btn-sm">
-            Criar Solicitação
+          <button
+            type="submit"
+            className="btn btn-primary btn-sm"
+            disabled={criandoSolicitacao}
+          >
+            {criandoSolicitacao ? 'Criando...' : 'Criar Solicitação'}
           </button>
           </div>
         </div>

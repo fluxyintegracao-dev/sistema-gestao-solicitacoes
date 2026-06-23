@@ -1,7 +1,11 @@
 import { API_URL, authHeaders } from './api';
 
 function buildResponseError(status, fallbackMessage, data = null) {
-  const error = new Error(data?.error || fallbackMessage);
+  const details = Array.isArray(data?.errors)
+    ? data.errors.map((item) => item?.message || item?.error || item).filter(Boolean).join('\n')
+    : '';
+  const message = data?.error || data?.message || data?.erro || data?.details || details || fallbackMessage;
+  const error = new Error(message);
   error.status = Number(status || 0) || 0;
   error.data = data;
   return error;
@@ -67,10 +71,15 @@ export async function obterRelatorioSolicitacoesOperacional(params = {}) {
   return res.json();
 }
 
-export async function createSolicitacao(data) {
+export async function createSolicitacao(data, options = {}) {
+  const headers = authHeaders({ 'Content-Type': 'application/json' });
+  if (options.idempotencyKey) {
+    headers['Idempotency-Key'] = options.idempotencyKey;
+  }
+
   const res = await fetch(`${API_URL}/solicitacoes`, {
     method: 'POST',
-    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    headers,
     body: JSON.stringify(data)
   });
 

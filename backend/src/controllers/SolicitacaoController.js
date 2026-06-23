@@ -87,6 +87,10 @@ const CHAVE_SETORES_VISIVEIS_POR_USUARIO = 'SETORES_VISIVEIS_POR_USUARIO';
 const CHAVE_TIPOS_SOLICITACAO_POR_SETOR = 'TIPOS_SOLICITACAO_POR_SETOR';
 const CHAVE_SETORES_CRIACAO_TODAS_OBRAS = 'SETORES_CRIACAO_TODAS_OBRAS';
 const DEFAULT_SOLICITACOES_PAGE_SIZE = 25;
+const SOLICITACOES_PAGE_SIZE_OPTIONS = [25, 50, 100, 200];
+const CREATE_SOLICITACAO_IDEMPOTENCY_TTL_MS = 10 * 60 * 1000;
+const solicitacaoCreatePendingKeys = new Map();
+const solicitacaoCreateCompletedKeys = new Map();
 
 function parseDecimalOpcionalSolicitacao(valor) {
   if (valor === null || valor === undefined) return null;
@@ -146,7 +150,67 @@ function formatarRateioApropriacoesHistorico(rateios = []) {
     return `${codigo}${descricao}${percentual}${valorRateio}${quantidade}`.trim();
   }).join('; ');
 }
-const MAX_SOLICITACOES_PAGE_SIZE = 500;
+function limparIdempotenciaCriacaoExpirada() {
+  const agora = Date.now();
+  for (const [key, value] of solicitacaoCreatePendingKeys.entries()) {
+    if (!value || value.expiresAt <= agora) {
+      solicitacaoCreatePendingKeys.delete(key);
+    }
+  }
+  for (const [key, value] of solicitacaoCreateCompletedKeys.entries()) {
+    if (!value || value.expiresAt <= agora) {
+      solicitacaoCreateCompletedKeys.delete(key);
+    }
+  }
+}
+
+function prepararIdempotenciaCriacao(req, res) {
+  limparIdempotenciaCriacaoExpirada();
+
+  const rawKey = String(req.headers?.['idempotency-key'] || '').trim();
+  if (!rawKey) {
+    return { handled: false, scopeKey: null };
+  }
+
+  if (!/^[A-Za-z0-9:_-]{8,160}$/.test(rawKey)) {
+    res.status(400).json({ error: 'Chave de idempotencia invalida.' });
+    return { handled: true, scopeKey: null };
+  }
+
+  const scopeKey = `${req.user?.id || 'anon'}:${rawKey}`;
+  const cached = solicitacaoCreateCompletedKeys.get(scopeKey);
+  if (cached?.body) {
+    res.set('X-Idempotent-Replay', 'true');
+    res.status(200).json(cached.body);
+    return { handled: true, scopeKey: null };
+  }
+
+  if (solicitacaoCreatePendingKeys.has(scopeKey)) {
+    res.status(409).json({
+      error: 'Esta solicitacao ja esta sendo criada. Aguarde a conclusao antes de tentar novamente.'
+    });
+    return { handled: true, scopeKey: null };
+  }
+
+  solicitacaoCreatePendingKeys.set(scopeKey, {
+    expiresAt: Date.now() + CREATE_SOLICITACAO_IDEMPOTENCY_TTL_MS
+  });
+
+  res.on('finish', () => {
+    solicitacaoCreatePendingKeys.delete(scopeKey);
+  });
+
+  return { handled: false, scopeKey };
+}
+
+function armazenarIdempotenciaCriacao(scopeKey, body) {
+  if (!scopeKey || !body) return;
+  solicitacaoCreatePendingKeys.delete(scopeKey);
+  solicitacaoCreateCompletedKeys.set(scopeKey, {
+    expiresAt: Date.now() + CREATE_SOLICITACAO_IDEMPOTENCY_TTL_MS,
+    body
+  });
+}
 /* =====================================================
    FUNCAO AUXILIAR - VISIBILIDADE
 ===================================================== */
@@ -168,8 +232,11 @@ function parsePositiveInt(value, fallback) {
   return parsed;
 }
 
-function isAllLimit(value) {
-  return ['all', 'todos', 'todas'].includes(String(value || '').trim().toLowerCase());
+function parseSolicitacoesPageSize(value) {
+  const parsed = parsePositiveInt(value, DEFAULT_SOLICITACOES_PAGE_SIZE);
+  return SOLICITACOES_PAGE_SIZE_OPTIONS.includes(parsed)
+    ? parsed
+    : DEFAULT_SOLICITACOES_PAGE_SIZE;
 }
 
 async function montarResumoSolicitacoesLista(solicitacoes) {
@@ -961,20 +1028,13 @@ module.exports = {
         limit,
         apenas_obras
       } = req.query;
-      const paginacaoSolicitada =
-        req.query.page !== undefined || req.query.limit !== undefined;
-      const listarTodasSolicitacoes = isAllLimit(limit);
+      const paginacaoSolicitada = true;
       const apenasObrasSolicitadas = ['1', 'true', 'sim'].includes(
         String(apenas_obras || '').trim().toLowerCase()
       );
       const paginaAtual = parsePositiveInt(page, 1);
-      const limitePorPagina = listarTodasSolicitacoes
-        ? null
-        : Math.min(
-            parsePositiveInt(limit, DEFAULT_SOLICITACOES_PAGE_SIZE),
-            MAX_SOLICITACOES_PAGE_SIZE
-          );
-      const offset = listarTodasSolicitacoes ? 0 : (paginaAtual - 1) * limitePorPagina;
+      const limitePorPagina = parseSolicitacoesPageSize(limit);
+      const offset = (paginaAtual - 1) * limitePorPagina;
 
       /* ===============================
         1) BUSCAR SOLICITACOES OCULTADAS
@@ -1009,7 +1069,7 @@ module.exports = {
             items: [],
             meta: {
               page: paginaAtual,
-              limit: listarTodasSolicitacoes ? 'all' : limitePorPagina,
+              limit: limitePorPagina,
               total: 0,
               total_pages: 0
             }
@@ -1594,7 +1654,7 @@ module.exports = {
           return res.json(await listarObrasDistinct(obraIdsVisiveis));
         }
 
-        const idsPagina = (paginacaoSolicitada && !listarTodasSolicitacoes
+        const idsPagina = (paginacaoSolicitada
           ? resultadoFiltro.slice(offset, offset + limitePorPagina)
           : resultadoFiltro
         ).map(item => Number(item.id));
@@ -1629,7 +1689,7 @@ module.exports = {
           where,
           include: includeBase,
           order: [['createdAt', 'DESC']],
-          ...(paginacaoSolicitada && !listarTodasSolicitacoes
+          ...(paginacaoSolicitada
             ? { limit: limitePorPagina, offset }
             : {})
         });
@@ -1645,13 +1705,11 @@ module.exports = {
         items: resultado,
         meta: {
           page: paginaAtual,
-          limit: listarTodasSolicitacoes ? 'all' : limitePorPagina,
+          limit: limitePorPagina,
           total: totalRegistros,
-          total_pages: listarTodasSolicitacoes
-            ? (totalRegistros > 0 ? 1 : 0)
-            : (totalRegistros > 0
-                ? Math.ceil(totalRegistros / limitePorPagina)
-                : 0)
+          total_pages: totalRegistros > 0
+            ? Math.ceil(totalRegistros / limitePorPagina)
+            : 0
         }
       });
 
@@ -1679,6 +1737,11 @@ module.exports = {
   // =====================================================
   async create(req, res) {
     try {
+      const idempotenciaCriacao = prepararIdempotenciaCriacao(req, res);
+      if (idempotenciaCriacao.handled) {
+        return;
+      }
+
       const {
         obra_id,
         tipo_solicitacao_id,
@@ -2243,7 +2306,10 @@ module.exports = {
         }
       });
 
-      return res.status(201).json(solicitacao);
+      const respostaSolicitacao = solicitacao?.toJSON ? solicitacao.toJSON() : solicitacao;
+      armazenarIdempotenciaCriacao(idempotenciaCriacao.scopeKey, respostaSolicitacao);
+
+      return res.status(201).json(respostaSolicitacao);
 
     } catch (error) {
       console.error(error);

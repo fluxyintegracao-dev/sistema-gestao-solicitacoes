@@ -71,8 +71,7 @@ function dataCurta(valor) {
   return data.toLocaleDateString('pt-BR');
 }
 
-const PAGE_SIZE_ALL = 'all';
-const PAGE_SIZE_OPTIONS = [10, 25, 50, 100, 200, 300, 500];
+const PAGE_SIZE_OPTIONS = [25, 50, 100, 200];
 
 export default function Solicitacoes({ arquivadas = false }) {
   const DEFAULT_VISIBLE_COLUMNS = [
@@ -479,9 +478,7 @@ export default function Solicitacoes({ arquivadas = false }) {
 
     setMetaPaginacao((prev) => {
       const nextTotal = Math.max(0, Number(prev?.total || 0) + Number(totalDelta || 0));
-      const nextLimit = limitePorPagina === PAGE_SIZE_ALL
-        ? Math.max(nextTotal, solicitacoesRef.current.length, 1)
-        : Math.max(1, Number(prev?.limit || limitePorPagina || 25));
+      const nextLimit = Math.max(1, Number(prev?.limit || limitePorPagina || 25));
       return {
         ...prev,
         total: nextTotal,
@@ -549,9 +546,7 @@ export default function Solicitacoes({ arquivadas = false }) {
           array.findIndex((outro) => Number(outro.id) === Number(item.id)) === index
         ));
 
-      const listaLimitada = limitePorPagina === PAGE_SIZE_ALL
-        ? proximaLista
-        : proximaLista.slice(0, Number(limitePorPagina || 25));
+      const listaLimitada = proximaLista.slice(0, Number(limitePorPagina || 25));
 
       aplicarListaLocal(listaLimitada, { totalDelta: 1 });
     } catch (error) {
@@ -609,7 +604,7 @@ export default function Solicitacoes({ arquivadas = false }) {
         paramsObj.arquivadas = '1';
       }
       paramsObj.page = String(paginaAtual);
-      paramsObj.limit = limitePorPagina === PAGE_SIZE_ALL ? PAGE_SIZE_ALL : String(limitePorPagina);
+      paramsObj.limit = String(limitePorPagina);
 
       const params = new URLSearchParams(paramsObj).toString();
 
@@ -634,7 +629,7 @@ export default function Solicitacoes({ arquivadas = false }) {
       });
       setMetaPaginacao({
         page: Number(data?.meta?.page || paginaAtual),
-        limit: data?.meta?.limit === PAGE_SIZE_ALL ? PAGE_SIZE_ALL : Number(data?.meta?.limit || limitePorPagina),
+        limit: Number(data?.meta?.limit || limitePorPagina),
         total: Number(data?.meta?.total || lista.length),
         total_pages: Number(data?.meta?.total_pages || (lista.length > 0 ? 1 : 0))
       });
@@ -662,7 +657,7 @@ export default function Solicitacoes({ arquivadas = false }) {
         paramsObj.arquivadas = '1';
       }
       paramsObj.page = String(paginaAtual);
-      paramsObj.limit = limitePorPagina === PAGE_SIZE_ALL ? PAGE_SIZE_ALL : String(limitePorPagina);
+      paramsObj.limit = String(limitePorPagina);
 
       const params = new URLSearchParams(paramsObj).toString();
       const res = await fetch(`${API_URL}/solicitacoes?${params}`, {
@@ -687,7 +682,7 @@ export default function Solicitacoes({ arquivadas = false }) {
       });
       setMetaPaginacao({
         page: Number(data?.meta?.page || paginaAtual),
-        limit: data?.meta?.limit === PAGE_SIZE_ALL ? PAGE_SIZE_ALL : Number(data?.meta?.limit || limitePorPagina),
+        limit: Number(data?.meta?.limit || limitePorPagina),
         total: Number(data?.meta?.total || lista.length),
         total_pages: Number(data?.meta?.total_pages || (lista.length > 0 ? 1 : 0))
       });
@@ -707,10 +702,7 @@ export default function Solicitacoes({ arquivadas = false }) {
   }, 0);
   const totalSolicitacoes = Number(metaPaginacao?.total || 0);
   const totalPaginas = Number(metaPaginacao?.total_pages || 0);
-  const exibindoTodas = limitePorPagina === PAGE_SIZE_ALL;
-  const limiteNumericoAtual = exibindoTodas
-    ? Math.max(totalSolicitacoes, solicitacoes.length, 1)
-    : Number(limitePorPagina || 25);
+  const limiteNumericoAtual = Number(limitePorPagina || 25);
   const paginaInicial = totalSolicitacoes === 0 ? 0 : ((paginaAtual - 1) * limiteNumericoAtual) + 1;
   const paginaFinal = totalSolicitacoes === 0
     ? 0
@@ -1670,13 +1662,12 @@ export default function Solicitacoes({ arquivadas = false }) {
                   value={limitePorPagina}
                   onChange={(event) => {
                     const valor = event.target.value;
-                    setLimitePorPagina(valor === PAGE_SIZE_ALL ? PAGE_SIZE_ALL : Number(valor) || 25);
+                    setLimitePorPagina(Number(valor) || 25);
                   }}
                 >
                   {PAGE_SIZE_OPTIONS.map((opcao) => (
                     <option key={opcao} value={opcao}>{opcao}</option>
                   ))}
-                  <option value={PAGE_SIZE_ALL}>Todas</option>
                 </select>
               </label>
 
@@ -1685,18 +1676,18 @@ export default function Solicitacoes({ arquivadas = false }) {
                   type="button"
                   className="btn btn-outline"
                   onClick={() => setPaginaAtual((prev) => Math.max(1, prev - 1))}
-                  disabled={exibindoTodas || paginaAtual <= 1}
+                  disabled={paginaAtual <= 1}
                 >
                   Anterior
                 </button>
                 <span className="text-sm text-gray-700 dark:text-slate-200 min-w-[96px] text-center">
-                  {exibindoTodas ? 'Todas' : `Página ${paginaAtual} de ${Math.max(totalPaginas, 1)}`}
+                  {`Página ${paginaAtual} de ${Math.max(totalPaginas, 1)}`}
                 </span>
                 <button
                   type="button"
                   className="btn btn-outline"
                   onClick={() => setPaginaAtual((prev) => Math.min(Math.max(totalPaginas, 1), prev + 1))}
-                  disabled={exibindoTodas || totalPaginas === 0 || paginaAtual >= totalPaginas}
+                  disabled={totalPaginas === 0 || paginaAtual >= totalPaginas}
                 >
                   Próxima
                 </button>
