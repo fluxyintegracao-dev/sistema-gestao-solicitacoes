@@ -428,6 +428,7 @@ export default function NovaSolicitacao() {
   const exibirCampoSubtipo = campoVisivel('subtipo');
   const exibirCampoCredor = campoVisivel('credor');
   const exibirCadastroCredor = campoVisivel('cadastro_credor');
+  const permitirVinculoCredor = exibirCampoCredor || exibirCadastroCredor;
   const exibirDataVencimento = campoVisivel('data_vencimento');
   const dataVencimentoObrigatoria = campoObrigatorio('data_vencimento');
   const exibirDataDemissao = campoVisivel('data_demissao');
@@ -462,7 +463,7 @@ export default function NovaSolicitacao() {
     if (!exibirCampoApropriacao) {
       setForm(prev => ({ ...prev, apropriacao_id: '' }));
     }
-    if (!exibirCampoCredor) {
+    if (!permitirVinculoCredor) {
       limparParceiroSelecionado();
     }
     if (!exibirDataVencimento) {
@@ -491,7 +492,7 @@ export default function NovaSolicitacao() {
     tipoSemValor,
     exibirCampoApropriacao,
     exigeApropriacaoPrincipal,
-    exibirCampoCredor,
+    permitirVinculoCredor,
     exibirDataVencimento,
     exibirDataDemissao,
     exibirPeriodoMedicao,
@@ -850,7 +851,7 @@ export default function NovaSolicitacao() {
 
     const payload = {
       ...form,
-      parceiro_id: exibirCampoCredor ? (form.parceiro_id || null) : null,
+      parceiro_id: permitirVinculoCredor ? (form.parceiro_id || null) : null,
       apropriacao_id: exibirCampoApropriacao ? (form.apropriacao_id || null) : null,
       contrato_id: exibirCamposContrato ? (form.contrato_id || null) : null,
       tipo_sub_id: exibirCampoSubtipo ? (form.tipo_sub_id || null) : null,
@@ -949,7 +950,42 @@ export default function NovaSolicitacao() {
   );
 
   function renderCampoCredor(className = 'grid gap-1 text-sm lg:col-span-6') {
-    if (!exibirCampoCredor) return null;
+    if (!permitirVinculoCredor) return null;
+
+    if (!exibirCampoCredor && exibirCadastroCredor) {
+      return (
+        <div className={className}>
+          <span className="font-medium text-[var(--c-text)]">Credor</span>
+          {parceiroSelecionado ? (
+            <div className="flex flex-wrap items-center gap-2 rounded border border-[var(--c-border)] bg-[var(--c-surface)] p-3 text-sm">
+              <span className="min-w-0 flex-1">
+                {parceiroSelecionado.nome}
+                {parceiroSelecionado.cpf_cnpj ? ` - ${parceiroSelecionado.cpf_cnpj}` : ''}
+              </span>
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                onClick={limparParceiroSelecionado}
+              >
+                Limpar
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="btn btn-outline btn-sm w-fit"
+              onClick={() => setModalParceiroAberto(true)}
+            >
+              Cadastrar novo credor
+            </button>
+          )}
+        </div>
+      );
+    }
+
+    const credoresContratoCampo = parceiroSelecionado && !credoresContratoSelecionado.some(credor => String(credor.id) === String(parceiroSelecionado.id))
+      ? [...credoresContratoSelecionado, parceiroSelecionado]
+      : credoresContratoSelecionado;
 
     return (
       <label className={className}>
@@ -959,10 +995,10 @@ export default function NovaSolicitacao() {
             <select
               className="input input-sm"
               value={form.parceiro_id}
-              disabled={!form.contrato_id || credoresContratoSelecionado.length === 0}
+              disabled={!form.contrato_id && credoresContratoCampo.length === 0}
               required={campoObrigatorio('credor')}
               onChange={(e) => {
-                const credor = credoresContratoSelecionado.find(item => String(item.id) === String(e.target.value));
+                const credor = credoresContratoCampo.find(item => String(item.id) === String(e.target.value));
                 if (credor) {
                   selecionarParceiro(credor);
                 } else {
@@ -973,19 +1009,30 @@ export default function NovaSolicitacao() {
               <option value="">
                 {!form.contrato_id
                   ? 'Selecione o contrato primeiro'
-                  : credoresContratoSelecionado.length === 0
+                  : credoresContratoCampo.length === 0
                     ? 'Contrato sem credor vinculado'
                     : 'Selecione o credor'}
               </option>
-              {credoresContratoSelecionado.map(credor => (
+              {credoresContratoCampo.map(credor => (
                 <option key={credor.id} value={credor.id}>
                   {credor.nome || credor.cpf_cnpj || `Credor ${credor.id}`}
                 </option>
               ))}
             </select>
             <span className="text-xs text-gray-500">
-              O credor e carregado a partir do contrato. Para pagar um credor diferente, solicite ao setor de Gerencia de Processo o cadastro ou vinculo no contrato.
+              {exibirCadastroCredor
+                ? 'O credor e carregado a partir do contrato. Se necessario, cadastre um novo credor para vincular nesta solicitacao.'
+                : 'O credor e carregado a partir do contrato. Para pagar um credor diferente, solicite ao setor de Gerencia de Processo o cadastro ou vinculo no contrato.'}
             </span>
+            {exibirCadastroCredor && (
+              <button
+                type="button"
+                className="btn btn-outline btn-sm mt-2 w-fit"
+                onClick={() => setModalParceiroAberto(true)}
+              >
+                Cadastrar novo credor
+              </button>
+            )}
           </>
         ) : (
           <>
