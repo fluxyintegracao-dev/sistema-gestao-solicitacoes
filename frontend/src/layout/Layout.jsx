@@ -51,6 +51,7 @@ import {
   canAccessComercial,
   canAccessCadastroObras,
   canAccessComunicacao,
+  canAccessConfiguracoes,
   canAccessCompras,
   canAccessDashboard,
   canAccessContratos,
@@ -93,6 +94,7 @@ import {
   canCreateCompraSolicitacao,
   canManageComprasConfiguracoes,
   canManageComprasCotacoes,
+  canManageConfiguracoesArea,
   canViewCompraSolicitacoes,
   canViewComprasCotacoes,
   canViewComprasDelegacao,
@@ -286,6 +288,12 @@ export default function Layout() {
   const comprasFornecedoresAccess = canViewComprasFornecedores(user);
   const comprasRelatoriosAccess = canViewComprasRelatorios(user);
   const comprasConfiguracoesAccess = canManageComprasConfiguracoes(user);
+  const configuracoesAccess = canAccessConfiguracoes(user);
+  const configuracoesGeralAccess = canManageConfiguracoesArea(user, 'geral');
+  const configuracoesCadastrosAccess = canManageConfiguracoesArea(user, 'cadastros');
+  const configuracoesStatusVinculosAccess = canManageConfiguracoesArea(user, 'status_vinculos');
+  const configuracoesAparenciaAccess = canManageConfiguracoesArea(user, 'aparencia');
+  const configuracoesModulosAccess = canManageConfiguracoesArea(user, 'modulos');
   const prioridadesDiretoriaAccess = canAccessPrioridadesDiretoria(user);
   const solicitacoesRelatoriosAccess = canViewSolicitacoesRelatorios(user);
   const financeiroAccess = canAccessFinanceiro(user);
@@ -540,16 +548,16 @@ export default function Layout() {
       ]);
     }
 
-    if (gestaoUsuarios || businessAdmin) {
+    if (gestaoUsuarios || businessAdmin || configuracoesCadastrosAccess) {
       addGroup('Cadastros', [
         gestaoUsuarios ? item('/usuarios', 'Usuários', HiOutlineUsers) : null,
-        superadmin ? item('/empresas-grupo', 'Empresas do Grupo', HiOutlineBuildingOffice2) : null,
-        businessAdmin && obrasAccess ? item('/obras', 'Obras', HiOutlineBuildingOffice2) : null,
+        (superadmin || configuracoesCadastrosAccess) ? item('/empresas-grupo', 'Empresas do Grupo', HiOutlineBuildingOffice2) : null,
+        (businessAdmin || configuracoesCadastrosAccess) && obrasAccess ? item('/obras', 'Obras', HiOutlineBuildingOffice2) : null,
         businessAdmin && obrasAccess ? item('/gestao-apropriacoes', 'Gestão de Apropriações', HiOutlineAdjustmentsHorizontal) : null,
-        businessAdmin ? item('/setores', 'Setores', HiOutlineAdjustmentsHorizontal) : null,
-        businessAdmin ? item('/tipos-solicitacao', 'Tipos de Solicitacao', HiOutlineClipboardDocumentList) : null,
-        businessAdmin ? item('/parceiros', 'Cadastro de Pessoas', HiOutlineUsers) : null,
-        businessAdmin ? item('/parceiros-categorias', 'Categorias de Parceiro', HiOutlineArchiveBox) : null
+        (businessAdmin || configuracoesCadastrosAccess) ? item('/setores', 'Setores', HiOutlineAdjustmentsHorizontal) : null,
+        (businessAdmin || configuracoesCadastrosAccess) ? item('/tipos-solicitacao', 'Tipos de Solicitacao', HiOutlineClipboardDocumentList) : null,
+        (businessAdmin || configuracoesCadastrosAccess) ? item('/parceiros', 'Cadastro de Pessoas', HiOutlineUsers) : null,
+        (businessAdmin || configuracoesCadastrosAccess) ? item('/parceiros-categorias', 'Categorias de Parceiro', HiOutlineArchiveBox) : null
       ]);
     }
 
@@ -566,19 +574,19 @@ export default function Layout() {
       ]);
     }
 
-    if (businessAdmin) {
+    if (configuracoesAccess) {
       addGroup('Configurações', [
         item('/configuracoes', 'Configurações', HiOutlineCog6Tooth),
-        item('/aprovacao-diretoria', 'Aprovacao Diretoria', HiOutlineAdjustmentsHorizontal),
-        item('/usuarios-acesso-prioridade-diretoria', 'Acesso Prioridades', HiOutlineUsers),
-        item('/usuarios-envio-qualquer-setor', 'Envio Livre por Usuario', HiOutlineUsers),
-        item('/tipos-compartilhados-setor', 'Tipos Compartilhados', HiOutlineClipboardDocumentList),
-        item('/automacao-status-setor', 'Automacao por Status', HiOutlinePaperAirplane),
+        configuracoesStatusVinculosAccess ? item('/aprovacao-diretoria', 'Aprovacao Diretoria', HiOutlineAdjustmentsHorizontal) : null,
+        configuracoesStatusVinculosAccess ? item('/usuarios-acesso-prioridade-diretoria', 'Acesso Prioridades', HiOutlineUsers) : null,
+        configuracoesStatusVinculosAccess ? item('/usuarios-envio-qualquer-setor', 'Envio Livre por Usuario', HiOutlineUsers) : null,
+        configuracoesStatusVinculosAccess ? item('/tipos-compartilhados-setor', 'Tipos Compartilhados', HiOutlineClipboardDocumentList) : null,
+        configuracoesStatusVinculosAccess ? item('/automacao-status-setor', 'Automacao por Status', HiOutlinePaperAirplane) : null,
         moduloCotacoesHabilitado && comprasConfiguracoesAccess ? item('/configuracoes-cotacao', 'Config. Cotações', HiOutlineAdjustmentsHorizontal) : null,
         comprasConfiguracoesAccess ? item('/configuracoes-status-pedidos-compra', 'Status dos Pedidos', HiOutlineClipboardDocumentList) : null,
-        superadmin && comercialAccess ? item('/configuracoes-comercial-categorias', 'Categorias Comerciais', HiOutlineArchiveBox) : null,
-        superadmin ? item('/configuracoes-modulos', 'Modulos e Planos', HiOutlineCog6Tooth) : null,
-        superadmin ? item('/configuracoes-notificacoes-sistema', 'Notificacoes Sistema', HiOutlineBell) : null,
+        configuracoesGeralAccess && comercialAccess ? item('/configuracoes-comercial-categorias', 'Categorias Comerciais', HiOutlineArchiveBox) : null,
+        configuracoesModulosAccess ? item('/configuracoes-modulos', 'Modulos e Planos', HiOutlineCog6Tooth) : null,
+        configuracoesAparenciaAccess ? item('/configuracoes-notificacoes-sistema', 'Notificacoes Sistema', HiOutlineBell) : null,
         superadmin && moduloBibliotecaHabilitado ? item('/arquivos-modelos-config', 'Arquivos Modelos', HiOutlineFolderOpen) : null
       ]);
     }
@@ -598,6 +606,12 @@ export default function Layout() {
     comunicacaoAccess,
     comprasAccess,
     comprasConfiguracoesAccess,
+    configuracoesAccess,
+    configuracoesAparenciaAccess,
+    configuracoesCadastrosAccess,
+    configuracoesGeralAccess,
+    configuracoesModulosAccess,
+    configuracoesStatusVinculosAccess,
     comprasCotacoesAccess,
     comprasCotacoesManageAccess,
     comprasDelegacaoAccess,
