@@ -8,13 +8,13 @@ const { criarNotificacao } = require('../services/notificacoes');
 const { uploadToS3, getPresignedUrl } = require('../services/s3');
 const {
   assertRegisteredFileAccess,
+  canAccessSolicitacaoFile,
   getRegisteredFilePath,
   resolveRegisteredFileResource
 } = require('../services/fileAccessService');
 const { normalizeOriginalName } = require('../utils/fileName');
 const {
-  canDeleteSolicitacaoAnexo,
-  hasObraAccess
+  canDeleteSolicitacaoAnexo
 } = require('../services/authorizationService');
 const { registrarEventoSeguranca } = require('../services/securityLogService');
 const { publishSolicitacaoRealtimeEvent } = require('../services/solicitacaoRealtimeService');
@@ -28,22 +28,12 @@ async function validarAcessoSolicitacao(req, solicitacao) {
     };
   }
 
-  const permitido = await hasObraAccess(req.user, solicitacao.obra_id);
-  if (!permitido) {
-    await registrarEventoSeguranca({
-      req,
-      usuarioId: req.user?.id || null,
-      tipoEvento: 'FILE_ACCESS_DENIED',
-      recursoTipo: 'SOLICITACAO',
-      recursoId: solicitacao.id,
-      status: 'DENIED',
-      descricao: 'Usuário sem acesso à obra da solicitação'
-    });
-
+  const acesso = await canAccessSolicitacaoFile(req, solicitacao.id);
+  if (!acesso.allowed) {
     return {
       permitido: false,
-      status: 403,
-      error: 'Acesso negado para a obra da solicitação'
+      status: acesso.status || 403,
+      error: acesso.error || 'Voce nao tem permissao para acessar anexos desta solicitacao.'
     };
   }
 
