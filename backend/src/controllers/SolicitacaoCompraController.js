@@ -952,9 +952,7 @@ function desenharCabecalhoTabela(doc, y, colWidths, colX, compraDireta = false) 
         'QTD',
         'VALOR UNIT.',
         'VALOR TOTAL',
-        'ESPECIFICACAO',
-        'APROPRIACAO',
-        'ANEXO'
+        'APROPRIACAO'
       ]
     : [
         'ITEM',
@@ -1031,7 +1029,7 @@ function desenharBlocoObservacoes(doc, y, solicitacao) {
 async function renderPdfSolicitacaoCompra(doc, solicitacao) {
   const compraDireta = isSolicitacaoCompraDireta(solicitacao);
   const colWidths = compraDireta
-    ? [34, 145, 52, 46, 72, 76, 116, 94, 167]
+    ? [38, 230, 70, 62, 92, 100, 210]
     : [38, 160, 56, 62, 132, 84, 90, 180];
   const colX = [PDF_PAGE.left];
   for (let index = 1; index < colWidths.length; index += 1) {
@@ -1043,23 +1041,25 @@ async function renderPdfSolicitacaoCompra(doc, solicitacao) {
   let y = desenharCabecalhoTabela(doc, desenharCabecalhoFicha(doc, solicitacao), colWidths, colX, compraDireta);
 
   linhas.forEach((item, index) => {
-    const anexoVisualNaCelula = !item.link_produto ? anexosVisuaisMap.get(index) : null;
-    const textoMidia = anexoVisualNaCelula ? '' : construirTextoMidiaPdf(item);
+    const anexoVisualNaCelula = !compraDireta && !item.link_produto ? anexosVisuaisMap.get(index) : null;
+    const textoMidia = !compraDireta && !anexoVisualNaCelula ? construirTextoMidiaPdf(item) : '';
     const nomeItem = item.nome || '-';
 
     doc.fontSize(8).font('Helvetica');
-    const especificacaoIndex = compraDireta ? 6 : 4;
-    const apropriacaoIndex = compraDireta ? 7 : 5;
-    const anexoIndex = compraDireta ? 8 : 7;
+    const especificacaoIndex = compraDireta ? null : 4;
+    const apropriacaoIndex = compraDireta ? 6 : 5;
+    const anexoIndex = compraDireta ? null : 7;
     const alturaNome = doc.heightOfString(nomeItem, { width: colWidths[1] - 10 });
-    const alturaEspecificacao = doc.heightOfString(item.especificacao || '-', {
-      width: colWidths[especificacaoIndex] - 10
-    });
+    const alturaEspecificacao = compraDireta
+      ? 0
+      : doc.heightOfString(item.especificacao || '-', {
+          width: colWidths[especificacaoIndex] - 10
+        });
     const alturaApropriacao = doc.heightOfString(item.apropriacao || '-', {
       width: colWidths[apropriacaoIndex] - 10
     });
     doc.fontSize(6).font('Helvetica');
-    const alturaMidia = textoMidia
+    const alturaMidia = textoMidia && anexoIndex !== null
       ? doc.heightOfString(textoMidia, { width: colWidths[anexoIndex] - 10 })
       : 0;
     const alturaImagem = anexoVisualNaCelula ? 98 : 0;
@@ -1107,9 +1107,11 @@ async function renderPdfSolicitacaoCompra(doc, solicitacao) {
       });
     }
 
-    desenharTextoNaCelula(doc, item.especificacao || '-', colX[especificacaoIndex], y, colWidths[especificacaoIndex], rowHeight, {
-      paddingX: 4
-    });
+    if (!compraDireta) {
+      desenharTextoNaCelula(doc, item.especificacao || '-', colX[especificacaoIndex], y, colWidths[especificacaoIndex], rowHeight, {
+        paddingX: 4
+      });
+    }
     desenharTextoNaCelula(doc, item.apropriacao || '-', colX[apropriacaoIndex], y, colWidths[apropriacaoIndex], rowHeight, {
       align: 'center',
       paddingX: 3
@@ -1121,7 +1123,7 @@ async function renderPdfSolicitacaoCompra(doc, solicitacao) {
       });
     }
 
-    if (anexoVisualNaCelula) {
+    if (!compraDireta && anexoVisualNaCelula) {
       try {
         const image = doc.openImage(anexoVisualNaCelula.buffer);
         doc.image(image, colX[anexoIndex] + 6, y + 6, {
@@ -1135,7 +1137,7 @@ async function renderPdfSolicitacaoCompra(doc, solicitacao) {
           fontSize: 7
         });
       }
-    } else if (item.link_produto) {
+    } else if (!compraDireta && item.link_produto) {
       doc.fontSize(5.5).fillColor('#1d4ed8');
       const alturaLink = doc.heightOfString(item.link_produto, { width: colWidths[anexoIndex] - 8 });
       const yLink = y + Math.max(4, (rowHeight - Math.max(alturaLink, 12)) / 2);
@@ -1150,7 +1152,7 @@ async function renderPdfSolicitacaoCompra(doc, solicitacao) {
           width: colWidths[anexoIndex] - 8
         });
       }
-    } else {
+    } else if (!compraDireta) {
       desenharTextoNaCelula(doc, textoMidia || '-', colX[anexoIndex], y, colWidths[anexoIndex], rowHeight, {
         fontSize: 6,
         paddingX: 4
@@ -1526,6 +1528,7 @@ module.exports = {
         itens,
         origem,
         tipo_solicitacao_id,
+        parceiro_id,
         anexos_cabecalho
       } = req.body;
       const compraDireta = normalizeTextCompra(origem) === 'COMPRA_DIRETA';
@@ -1580,6 +1583,19 @@ module.exports = {
       if (compraDireta && valorTotalCompraDireta <= 0) {
         await transaction.rollback();
         return res.status(400).json({ error: 'Informe o valor dos itens da compra direta.' });
+      }
+
+      let parceiroCompraDireta = null;
+      if (compraDireta && parceiro_id) {
+        parceiroCompraDireta = await Parceiro.findByPk(parceiro_id, {
+          attributes: ['id', 'nome', 'cpf_cnpj', 'ativo', 'fornecedor'],
+          transaction
+        });
+
+        if (!parceiroCompraDireta || parceiroCompraDireta.ativo === false || parceiroCompraDireta.fornecedor !== true) {
+          await transaction.rollback();
+          return res.status(400).json({ error: 'Selecione um credor ativo para a compra direta.' });
+        }
       }
 
       const tipoSolicitacao = compraDireta
@@ -1674,6 +1690,7 @@ module.exports = {
       const descricao = [
         compraDireta ? 'Compra Direta' : 'Solicitação de Compra',
         resumoItens ? `Itens: ${resumoItens}` : null,
+        compraDireta && parceiroCompraDireta ? `Credor: ${parceiroCompraDireta.nome || parceiroCompraDireta.cpf_cnpj || parceiroCompraDireta.id}` : null,
         compraDireta ? `Valor total: R$ ${formatCurrencyPdf(valorTotalCompraDireta)}` : null,
         observacoes ? `Observações: ${observacoes}` : null
       ]
@@ -1684,6 +1701,7 @@ module.exports = {
         {
           codigo,
           obra_id,
+          parceiro_id: compraDireta ? parceiroCompraDireta?.id || null : null,
           tipo_solicitacao_id: tipoSolicitacao.id,
           descricao,
           valor: compraDireta ? valorTotalCompraDireta : null,
@@ -1719,6 +1737,7 @@ module.exports = {
           metadata: JSON.stringify({
             origem: compraDireta ? 'COMPRA_DIRETA' : 'MODULO_COMPRAS',
             solicitacao_compra_origem: compraDireta ? 'COMPRA_DIRETA' : 'NORMAL',
+            parceiro_id: compraDireta ? parceiroCompraDireta?.id || null : null,
             valor_total: compraDireta ? valorTotalCompraDireta : null,
             fluxo_aprovacao_diretoria: fluxoCompra.usaFluxoDiretoria,
             diretoria_fluxo_codigo: fluxoCompra.diretoriaFluxoCodigo,

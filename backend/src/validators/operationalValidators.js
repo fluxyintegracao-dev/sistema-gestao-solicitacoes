@@ -344,6 +344,7 @@ function validateCompraQuery(query = {}) {
       [
         'obra_id',
         'tipo_solicitacao_id',
+        'parceiro_id',
         'necessario_para',
         'observacoes',
         'link_geral',
@@ -375,6 +376,7 @@ function validateCompraQuery(query = {}) {
     return {
       obra_id: parseInteger(body.obra_id, 'Obra', { required: true }),
       tipo_solicitacao_id: parseInteger(body.tipo_solicitacao_id, 'Tipo de solicitacao', { positiveOnly: true }),
+      parceiro_id: parseInteger(body.parceiro_id, 'Credor', { positiveOnly: true }),
       necessario_para: parseDateOnly(body.necessario_para, 'Necessario para'),
       observacoes: parseOptionalText(body.observacoes, 'Observacoes', 5000),
       link_geral: parseOptionalUrl(body.link_geral, 'Link geral'),

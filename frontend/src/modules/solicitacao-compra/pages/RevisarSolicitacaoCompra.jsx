@@ -157,11 +157,11 @@ export default function RevisarSolicitacaoCompra({ modoCompraDireta = false }) {
           <td>${escapeHtml(item.quantidade || '-')}</td>
           ${modoCompraDireta ? `<td>${escapeHtml(formatarMoeda(item.valor_unitario))}</td>` : ''}
           ${modoCompraDireta ? `<td>${escapeHtml(formatarMoeda(item.valor_total))}</td>` : ''}
-          <td>${escapeHtml(item.especificacao || '-')}</td>
+          ${modoCompraDireta ? '' : `<td>${escapeHtml(item.especificacao || '-')}</td>`}
           <td>${montarLinhasResumoApropriacao(item).map((linha) => escapeHtml(linha)).join('<br />') || '-'}</td>
-          <td>${escapeHtml(formatarData(item.necessario_para))}</td>
-          <td>${escapeHtml(item.link_produto || '-')}</td>
-          <td>${escapeHtml(item.arquivo_nome_original || '-')}</td>
+          ${modoCompraDireta ? '' : `<td>${escapeHtml(formatarData(item.necessario_para))}</td>`}
+          ${modoCompraDireta ? '' : `<td>${escapeHtml(item.link_produto || '-')}</td>`}
+          ${modoCompraDireta ? '' : `<td>${escapeHtml(item.arquivo_nome_original || '-')}</td>`}
         </tr>
       `
       )
@@ -187,7 +187,8 @@ export default function RevisarSolicitacaoCompra({ modoCompraDireta = false }) {
           <div class="meta"><strong>Obra:</strong> ${escapeHtml(draft.resumo?.obra_nome || '-')}</div>
           <div class="meta"><strong>Solicitante:</strong> ${escapeHtml(draft.resumo?.solicitante_nome || '-')}</div>
           ${modoCompraDireta ? `<div class="meta"><strong>Valor total:</strong> ${escapeHtml(formatarMoeda(draft.resumo?.valor_total))}</div>` : ''}
-          <div class="meta"><strong>Necessario para:</strong> ${escapeHtml(
+          ${modoCompraDireta ? `<div class="meta"><strong>Credor:</strong> ${escapeHtml(draft.resumo?.credor_nome || '-')}</div>` : ''}
+          <div class="meta"><strong>${modoCompraDireta ? 'Data de vencimento' : 'Necessario para'}:</strong> ${escapeHtml(
             formatarData(draft.payload?.necessario_para)
           )}</div>
           <div class="meta"><strong>Observacoes:</strong> ${escapeHtml(draft.payload?.observacoes || '-')}</div>
@@ -200,11 +201,9 @@ export default function RevisarSolicitacaoCompra({ modoCompraDireta = false }) {
                 <th>Unidade</th>
                 <th>Quantidade</th>
                 ${modoCompraDireta ? '<th>Valor unit.</th><th>Valor total</th>' : ''}
-                <th>Especificacao</th>
+                ${modoCompraDireta ? '' : '<th>Especificacao</th>'}
                 <th>Apropriacao</th>
-                <th>Necessario para</th>
-                <th>Link</th>
-                <th>Arquivo</th>
+                ${modoCompraDireta ? '' : '<th>Necessario para</th><th>Link</th><th>Arquivo</th>'}
               </tr>
             </thead>
             <tbody>${itensHtml}</tbody>
@@ -419,8 +418,9 @@ export default function RevisarSolicitacaoCompra({ modoCompraDireta = false }) {
           <div className="grid gap-4 text-sm">
             <LinhaResumo titulo="Obra" valor={textoOuPadrao(draft.resumo?.obra_nome)} />
             <LinhaResumo titulo="Solicitante" valor={textoOuPadrao(draft.resumo?.solicitante_nome)} />
+            {modoCompraDireta && <LinhaResumo titulo="Credor" valor={textoOuPadrao(draft.resumo?.credor_nome)} />}
             <LinhaResumo
-              titulo="Necessario para"
+              titulo={modoCompraDireta ? 'Data de vencimento' : 'Necessario para'}
               valor={textoOuPadrao(formatarData(draft.payload?.necessario_para))}
             />
             <LinhaResumo titulo="Link geral" valor={textoOuPadrao(draft.payload?.link_geral)} className="break-all" />
@@ -465,9 +465,9 @@ export default function RevisarSolicitacaoCompra({ modoCompraDireta = false }) {
                     <th className="px-4 py-3 font-semibold">Quantidade</th>
                     {modoCompraDireta && <th className="px-4 py-3 font-semibold">Valor</th>}
                     <th className="px-4 py-3 font-semibold">Apropriacao</th>
-                    <th className="px-4 py-3 font-semibold">Necessario para</th>
-                    <th className="px-4 py-3 font-semibold">Especificacao</th>
-                    <th className="px-4 py-3 font-semibold">Acessos</th>
+                    {!modoCompraDireta && <th className="px-4 py-3 font-semibold">Necessario para</th>}
+                    {!modoCompraDireta && <th className="px-4 py-3 font-semibold">Especificacao</th>}
+                    {!modoCompraDireta && <th className="px-4 py-3 font-semibold">Acessos</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--c-border)]">
@@ -498,16 +498,21 @@ export default function RevisarSolicitacaoCompra({ modoCompraDireta = false }) {
                       <td className="px-4 py-4 max-w-[220px] text-[var(--c-muted)]">
                         {montarTextoResumoApropriacao(item)}
                       </td>
-                      <td className="px-4 py-4 whitespace-nowrap font-semibold text-[var(--c-text)]">
-                        {formatarData(item.necessario_para)}
-                      </td>
-                      <td className="px-4 py-4">
-                        <div className="max-w-[320px] whitespace-pre-wrap text-[var(--c-text)]">
-                          {textoOuPadrao(item.especificacao)}
-                        </div>
-                      </td>
-                      <td className="px-4 py-4">
-                        <div className="flex min-w-[180px] flex-wrap gap-2">
+                      {!modoCompraDireta && (
+                        <td className="px-4 py-4 whitespace-nowrap font-semibold text-[var(--c-text)]">
+                          {formatarData(item.necessario_para)}
+                        </td>
+                      )}
+                      {!modoCompraDireta && (
+                        <td className="px-4 py-4">
+                          <div className="max-w-[320px] whitespace-pre-wrap text-[var(--c-text)]">
+                            {textoOuPadrao(item.especificacao)}
+                          </div>
+                        </td>
+                      )}
+                      {!modoCompraDireta && (
+                        <td className="px-4 py-4">
+                          <div className="flex min-w-[180px] flex-wrap gap-2">
                           {item.link_produto ? (
                             <a
                               href={item.link_produto}
@@ -537,8 +542,9 @@ export default function RevisarSolicitacaoCompra({ modoCompraDireta = false }) {
                               Sem arquivo
                             </span>
                           )}
-                        </div>
-                      </td>
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>

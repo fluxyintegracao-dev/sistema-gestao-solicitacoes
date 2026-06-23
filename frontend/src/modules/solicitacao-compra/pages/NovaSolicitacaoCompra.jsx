@@ -6,6 +6,7 @@ import {
   obterUrlAssinadaCompra,
   uploadAnexoTemporarioCompra
 } from '../../../services/compras';
+import { buscarParceiros, criarCredorNovaSolicitacao } from '../../../services/parceiros';
 import { listarApropriacoes } from '../../../services/apropriacoes';
 import { getMinhasObras } from '../../../services/obras';
 import ApropriacaoAutocomplete from '../../../components/ui/ApropriacaoAutocomplete';
@@ -55,6 +56,22 @@ function formatarMoeda(value) {
     style: 'currency',
     currency: 'BRL'
   });
+}
+
+function formatarCredor(credor) {
+  if (!credor) return '';
+  const nome = String(credor.nome || credor.razao_social || '').trim();
+  const documento = String(credor.cpf_cnpj || '').trim();
+  return [nome, documento].filter(Boolean).join(' - ') || `Credor ${credor.id}`;
+}
+
+function criarNovoCredorPadrao() {
+  return {
+    cpf_cnpj: '',
+    nome: '',
+    telefone: '',
+    email: ''
+  };
 }
 
 function calcularValorTotalItem(item) {
@@ -141,6 +158,13 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
   const [necessarioPara, setNecessarioPara] = useState('');
   const [observacoes, setObservacoes] = useState('');
   const [anexosCabecalho, setAnexosCabecalho] = useState([]);
+  const [parceiroId, setParceiroId] = useState('');
+  const [parceiroBusca, setParceiroBusca] = useState('');
+  const [parceiros, setParceiros] = useState([]);
+  const [buscandoParceiros, setBuscandoParceiros] = useState(false);
+  const [modalCredorAberto, setModalCredorAberto] = useState(false);
+  const [novoCredor, setNovoCredor] = useState(criarNovoCredorPadrao);
+  const [salvandoCredor, setSalvandoCredor] = useState(false);
   const [buscaInsumo, setBuscaInsumo] = useState('');
   const [itens, setItens] = useState([]);
   const [uploadingArquivos, setUploadingArquivos] = useState({});
@@ -257,6 +281,10 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
       setNecessarioPara(payload.necessario_para || '');
       setObservacoes(payload.observacoes || '');
       setAnexosCabecalho(Array.isArray(payload.anexos_cabecalho) ? payload.anexos_cabecalho : []);
+      setParceiroId(payload.parceiro_id ? String(payload.parceiro_id) : '');
+      if (dados?.resumo?.credor_nome) {
+        setParceiroBusca(dados.resumo.credor_nome);
+      }
       setItens(
         Array.isArray(payload.itens)
           ? payload.itens.map((item, index) => {
@@ -340,6 +368,56 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
     () => itens.reduce((acc, item) => acc + calcularValorTotalItem(item), 0),
     [itens]
   );
+
+  const parceiroSelecionado = useMemo(
+    () => parceiros.find((parceiro) => String(parceiro.id) === String(parceiroId)) || null,
+    [parceiroId, parceiros]
+  );
+
+  async function buscarCredoresCompraDireta() {
+    const termo = String(parceiroBusca || '').trim();
+    if (!termo) {
+      alert('Digite parte do nome ou CPF/CNPJ do credor.');
+      return;
+    }
+
+    setBuscandoParceiros(true);
+    try {
+      const data = await buscarParceiros({ q: termo, fornecedor: 1, ativo: 1, limit: 10 });
+      setParceiros(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error(error);
+      alert(error.message || 'Erro ao buscar credores');
+    } finally {
+      setBuscandoParceiros(false);
+    }
+  }
+
+  async function cadastrarCredorCompraDireta() {
+    if (!novoCredor.nome.trim()) {
+      alert('Informe o nome do credor.');
+      return;
+    }
+
+    setSalvandoCredor(true);
+    try {
+      const parceiro = await criarCredorNovaSolicitacao({
+        ...novoCredor,
+        cpf_cnpj: novoCredor.cpf_cnpj.replace(/\D/g, ''),
+        telefone: novoCredor.telefone.replace(/\D/g, '')
+      });
+      setParceiros((atual) => [parceiro, ...atual.filter((item) => Number(item.id) !== Number(parceiro.id))]);
+      setParceiroId(String(parceiro.id));
+      setParceiroBusca(formatarCredor(parceiro));
+      setNovoCredor(criarNovoCredorPadrao());
+      setModalCredorAberto(false);
+    } catch (error) {
+      console.error(error);
+      alert(error.message || 'Erro ao cadastrar credor');
+    } finally {
+      setSalvandoCredor(false);
+    }
+  }
 
   async function adicionarInsumo(insumo) {
     if (!obraId) {
@@ -656,7 +734,7 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
         alert(`Item ${index + 1}: informe o valor unitario.`);
         return;
       }
-      if (!item.necessario_para) {
+      if (!modoCompraDireta && !item.necessario_para) {
         alert(`Item ${index + 1}: o prazo de entrega é obrigatório.`);
         return;
       }
@@ -699,6 +777,7 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
         obra_id: obraId,
         tipo_solicitacao_id: modoCompraDireta ? tipoSolicitacaoIdInicial || null : undefined,
         origem: modoCompraDireta ? 'COMPRA_DIRETA' : undefined,
+        parceiro_id: modoCompraDireta ? parceiroId || null : undefined,
         necessario_para: necessarioPara || null,
         observacoes: observacoes || null,
         anexos_cabecalho: modoCompraDireta ? anexosCabecalho : undefined,
@@ -725,6 +804,7 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
         obra_nome: obraSelecionada?.nome || '',
         obra_codigo: obraSelecionada?.codigo || '',
         solicitante_nome: user?.nome || '',
+        credor_nome: parceiroSelecionado ? formatarCredor(parceiroSelecionado) : parceiroBusca || '',
         valor_total: modoCompraDireta ? valorTotalCompraDireta : null,
         anexos_cabecalho: modoCompraDireta ? anexosCabecalho : [],
         itens: itensNormalizados.map((item) => ({
@@ -778,9 +858,54 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
           </div>
 
           <div className="grid gap-2">
-            <label className="text-sm font-medium">Necessário para</label>
+            <label className="text-sm font-medium">{modoCompraDireta ? 'Data de vencimento' : 'Necessário para'}</label>
             <input type="date" className="input" value={necessarioPara} onChange={(event) => setNecessarioPara(event.target.value)} />
           </div>
+
+          {modoCompraDireta && (
+            <div className="grid gap-2 md:col-span-2">
+              <label className="text-sm font-medium">Credor</label>
+              <div className="flex flex-wrap gap-2">
+                <input
+                  className="input min-w-[260px] flex-1"
+                  value={parceiroBusca}
+                  onChange={(event) => {
+                    setParceiroBusca(event.target.value);
+                    setParceiroId('');
+                  }}
+                  placeholder="Buscar credor por nome ou CPF/CNPJ"
+                />
+                <button type="button" className="btn btn-outline" onClick={buscarCredoresCompraDireta} disabled={buscandoParceiros}>
+                  {buscandoParceiros ? 'Buscando...' : 'Buscar'}
+                </button>
+                <button type="button" className="btn btn-outline" onClick={() => setModalCredorAberto(true)}>
+                  Cadastrar novo credor
+                </button>
+              </div>
+              {parceiros.length > 0 && !parceiroId && (
+                <div className="grid gap-2 rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] p-2">
+                  {parceiros.slice(0, 6).map((parceiro) => (
+                    <button
+                      key={parceiro.id}
+                      type="button"
+                      className="rounded-md px-3 py-2 text-left text-sm hover:bg-[var(--c-surface-hover)]"
+                      onClick={() => {
+                        setParceiroId(String(parceiro.id));
+                        setParceiroBusca(formatarCredor(parceiro));
+                      }}
+                    >
+                      {formatarCredor(parceiro)}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {parceiroId && (
+                <div className="text-sm text-emerald-700">
+                  Credor selecionado: <strong>{parceiroBusca || formatarCredor(parceiroSelecionado)}</strong>
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="grid gap-2 md:col-span-2">
             <label className="text-sm font-medium">Observações</label>
@@ -899,11 +1024,11 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
                     <th>Quantidade *</th>
                     {modoCompraDireta && <th>Valor unitário *</th>}
                     {modoCompraDireta && <th>Total</th>}
-                    <th>Especificação</th>
+                    {!modoCompraDireta && <th>Especificação</th>}
                     <th>Apropriação *</th>
-                    <th>Necessário para</th>
-                    <th>Link do produto</th>
-                    <th>Arquivo do item</th>
+                    {!modoCompraDireta && <th>Necessário para</th>}
+                    {!modoCompraDireta && <th>Link do produto</th>}
+                    {!modoCompraDireta && <th>Arquivo do item</th>}
                     <th>Ações</th>
                   </tr>
                 </thead>
@@ -960,7 +1085,9 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
                           </div>
                         </td>
                       )}
-                      <td><input className="input min-w-[260px]" value={item.especificacao} onChange={(event) => atualizarItem(index, 'especificacao', event.target.value)} /></td>
+                      {!modoCompraDireta && (
+                        <td><input className="input min-w-[260px]" value={item.especificacao} onChange={(event) => atualizarItem(index, 'especificacao', event.target.value)} /></td>
+                      )}
                       <td>
                         {(() => {
                           const linhasApropriacao = montarLinhasResumoApropriacao(item, apropriacoes);
@@ -994,50 +1121,54 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
                           );
                         })()}
                       </td>
-                      <td><input type="date" className={`input min-w-[170px] ${!item.necessario_para ? 'border-red-400' : ''}`} value={item.necessario_para} onChange={(event) => atualizarItem(index, 'necessario_para', event.target.value)} required /></td>
-                      <td>
-                        <input
-                          type="url"
-                          className="input min-w-[260px]"
-                          placeholder="https://"
-                          value={item.link_produto}
-                          onChange={(event) => atualizarItem(index, 'link_produto', event.target.value)}
-                        />
-                      </td>
-                      <td>
-                        <div className="flex min-w-[260px] flex-col gap-2">
-                          <label className={`btn btn-outline cursor-pointer justify-center ${uploadingArquivos[index] ? 'pointer-events-none opacity-60' : ''}`}>
-                            <input
-                              type="file"
-                              className="hidden"
-                              accept={ITEM_ATTACHMENT_ACCEPT}
-                              onChange={(event) => {
-                                const [file] = Array.from(event.target.files || []);
-                                void handleSelecionarArquivo(index, file);
-                                event.target.value = '';
-                              }}
-                            />
-                            {uploadingArquivos[index]
-                              ? 'Enviando...'
-                              : item.arquivo_nome_original
-                                ? 'Trocar arquivo'
-                                : 'Anexar arquivo'}
-                          </label>
-                          <div className="text-xs text-[var(--c-muted)]">
-                            {item.arquivo_nome_original || 'Sem arquivo anexado'}
-                          </div>
-                          {item.arquivo_url && (
-                            <div className="flex flex-wrap gap-2 text-xs">
-                              <button type="button" className="text-blue-600 hover:underline" onClick={() => abrirArquivoItem(item)}>
-                                Abrir
-                              </button>
-                              <button type="button" className="text-red-600 hover:underline" onClick={() => removerArquivoItem(index)}>
-                                Remover arquivo
-                              </button>
+                      {!modoCompraDireta && <td><input type="date" className={`input min-w-[170px] ${!item.necessario_para ? 'border-red-400' : ''}`} value={item.necessario_para} onChange={(event) => atualizarItem(index, 'necessario_para', event.target.value)} required /></td>}
+                      {!modoCompraDireta && (
+                        <td>
+                          <input
+                            type="url"
+                            className="input min-w-[260px]"
+                            placeholder="https://"
+                            value={item.link_produto}
+                            onChange={(event) => atualizarItem(index, 'link_produto', event.target.value)}
+                          />
+                        </td>
+                      )}
+                      {!modoCompraDireta && (
+                        <td>
+                          <div className="flex min-w-[260px] flex-col gap-2">
+                            <label className={`btn btn-outline cursor-pointer justify-center ${uploadingArquivos[index] ? 'pointer-events-none opacity-60' : ''}`}>
+                              <input
+                                type="file"
+                                className="hidden"
+                                accept={ITEM_ATTACHMENT_ACCEPT}
+                                onChange={(event) => {
+                                  const [file] = Array.from(event.target.files || []);
+                                  void handleSelecionarArquivo(index, file);
+                                  event.target.value = '';
+                                }}
+                              />
+                              {uploadingArquivos[index]
+                                ? 'Enviando...'
+                                : item.arquivo_nome_original
+                                  ? 'Trocar arquivo'
+                                  : 'Anexar arquivo'}
+                            </label>
+                            <div className="text-xs text-[var(--c-muted)]">
+                              {item.arquivo_nome_original || 'Sem arquivo anexado'}
                             </div>
-                          )}
-                        </div>
-                      </td>
+                            {item.arquivo_url && (
+                              <div className="flex flex-wrap gap-2 text-xs">
+                                <button type="button" className="text-blue-600 hover:underline" onClick={() => abrirArquivoItem(item)}>
+                                  Abrir
+                                </button>
+                                <button type="button" className="text-red-600 hover:underline" onClick={() => removerArquivoItem(index)}>
+                                  Remover arquivo
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                      )}
                       <td><button type="button" className="btn btn-danger min-w-[110px] justify-center" onClick={() => removerItem(index)}>Remover</button></td>
                     </tr>
                   ))}
@@ -1098,14 +1229,74 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
                 <label className="text-sm font-medium">Quantidade *</label>
                 <input type="number" min="0.01" step="0.01" className="input" value={itemManual.quantidade} onChange={(event) => setItemManual((atual) => ({ ...atual, quantidade: event.target.value }))} />
               </div>
-              <div className="grid gap-2 md:col-span-2">
-                <label className="text-sm font-medium">Especificação</label>
-                <textarea className="input min-h-[96px]" value={itemManual.especificacao} onChange={(event) => setItemManual((atual) => ({ ...atual, especificacao: event.target.value }))} />
-              </div>
+              {!modoCompraDireta && (
+                <div className="grid gap-2 md:col-span-2">
+                  <label className="text-sm font-medium">Especificação</label>
+                  <textarea className="input min-h-[96px]" value={itemManual.especificacao} onChange={(event) => setItemManual((atual) => ({ ...atual, especificacao: event.target.value }))} />
+                </div>
+              )}
             </div>
             <div className="mt-6 flex justify-end gap-2">
               <button type="button" className="btn btn-outline" onClick={() => setModalManualAberto(false)}>Cancelar</button>
               <button type="button" className="btn btn-primary" onClick={adicionarItemManual}>Adicionar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {modoCompraDireta && modalCredorAberto && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
+          <div className="card w-full max-w-xl">
+            <div className="card-header flex items-center justify-between gap-3">
+              <h2 className="font-semibold">Cadastrar Credor</h2>
+              <button type="button" className="btn btn-outline" onClick={() => setModalCredorAberto(false)}>
+                Fechar
+              </button>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-2">
+              <label className="grid gap-2 text-sm">
+                CPF/CNPJ
+                <input
+                  className="input"
+                  value={novoCredor.cpf_cnpj}
+                  onChange={(event) => setNovoCredor((atual) => ({ ...atual, cpf_cnpj: event.target.value }))}
+                />
+              </label>
+              <label className="grid gap-2 text-sm">
+                Nome *
+                <input
+                  className="input"
+                  value={novoCredor.nome}
+                  onChange={(event) => setNovoCredor((atual) => ({ ...atual, nome: event.target.value }))}
+                />
+              </label>
+              <label className="grid gap-2 text-sm">
+                Telefone
+                <input
+                  className="input"
+                  value={novoCredor.telefone}
+                  onChange={(event) => setNovoCredor((atual) => ({ ...atual, telefone: event.target.value }))}
+                />
+              </label>
+              <label className="grid gap-2 text-sm">
+                E-mail
+                <input
+                  type="email"
+                  className="input"
+                  value={novoCredor.email}
+                  onChange={(event) => setNovoCredor((atual) => ({ ...atual, email: event.target.value }))}
+                />
+              </label>
+            </div>
+
+            <div className="mt-6 flex justify-end gap-2">
+              <button type="button" className="btn btn-outline" onClick={() => setModalCredorAberto(false)}>
+                Cancelar
+              </button>
+              <button type="button" className="btn btn-primary" onClick={cadastrarCredorCompraDireta} disabled={salvandoCredor}>
+                {salvandoCredor ? 'Salvando...' : 'Salvar credor'}
+              </button>
             </div>
           </div>
         </div>
