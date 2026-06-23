@@ -88,6 +88,11 @@ const CHAVE_TIPOS_SOLICITACAO_POR_SETOR = 'TIPOS_SOLICITACAO_POR_SETOR';
 const CHAVE_SETORES_CRIACAO_TODAS_OBRAS = 'SETORES_CRIACAO_TODAS_OBRAS';
 const DEFAULT_SOLICITACOES_PAGE_SIZE = 25;
 const SOLICITACOES_PAGE_SIZE_OPTIONS = [25, 50, 100, 200];
+const SOLICITACAO_RESPONSAVEL_ACTIONS = [
+  'RESPONSAVEL_ATRIBUIDO',
+  'RESPONSAVEL_ASSUMIU',
+  'RESPONSAVEL_REMOVIDO'
+];
 const CREATE_SOLICITACAO_IDEMPOTENCY_TTL_MS = 10 * 60 * 1000;
 const solicitacaoCreatePendingKeys = new Map();
 const solicitacaoCreateCompletedKeys = new Map();
@@ -251,17 +256,17 @@ async function montarResumoSolicitacoesLista(solicitacoes) {
     Historico.findAll({
       where: {
         solicitacao_id: { [Op.in]: idsSolicitacoes },
-        usuario_responsavel_id: { [Op.ne]: null },
         acao: {
-          [Op.in]: ['RESPONSAVEL_ATRIBUIDO', 'RESPONSAVEL_ASSUMIU']
+          [Op.in]: SOLICITACAO_RESPONSAVEL_ACTIONS
         }
       },
-      attributes: ['solicitacao_id', 'createdAt'],
+      attributes: ['solicitacao_id', 'acao', 'createdAt'],
       include: [
         {
           model: User,
           as: 'usuario',
-          attributes: ['id', 'nome']
+          attributes: ['id', 'nome'],
+          required: false
         }
       ],
       order: [
@@ -286,7 +291,11 @@ async function montarResumoSolicitacoesLista(solicitacoes) {
   historicosResponsavel.forEach((item) => {
     const solicitacaoId = Number(item.solicitacao_id);
     if (!responsavelPorSolicitacao.has(solicitacaoId)) {
-      responsavelPorSolicitacao.set(solicitacaoId, item.usuario?.nome || null);
+      const acao = String(item.acao || '').toUpperCase();
+      responsavelPorSolicitacao.set(
+        solicitacaoId,
+        acao === 'RESPONSAVEL_REMOVIDO' ? null : (item.usuario?.nome || null)
+      );
     }
   });
 
@@ -558,10 +567,37 @@ async function enviarSolicitacaoParaSetorInterno({
 
   const nomeOrigem = setorOrigemRow?.nome || setorOrigem;
   const nomeDestino = setorDestinoRow?.nome || setorDestinoPersistido;
+  const ultimoResponsavel = await Historico.findOne({
+    where: {
+      solicitacao_id: solicitacao.id,
+      acao: { [Op.in]: SOLICITACAO_RESPONSAVEL_ACTIONS }
+    },
+    order: [['createdAt', 'DESC']]
+  });
+  const deveRemoverResponsavel =
+    ultimoResponsavel &&
+    ['RESPONSAVEL_ATRIBUIDO', 'RESPONSAVEL_ASSUMIU'].includes(String(ultimoResponsavel.acao || '').toUpperCase());
 
   await solicitacao.update({
     area_responsavel: setorDestinoPersistido
   });
+
+  if (deveRemoverResponsavel) {
+    await Historico.create({
+      solicitacao_id: solicitacao.id,
+      usuario_responsavel_id: null,
+      setor: setorDestinoPersistido,
+      acao: 'RESPONSAVEL_REMOVIDO',
+      descricao: `Responsavel removido por envio do setor ${nomeOrigem || '-'} para ${nomeDestino || '-'}`,
+      metadata: JSON.stringify({
+        ator_id: usuarioId,
+        ator_nome: req.user?.nome || null,
+        setor_origem: setorOrigem,
+        setor_destino: setorDestinoPersistido,
+        responsavel_anterior_id: ultimoResponsavel.usuario_responsavel_id || null
+      })
+    });
+  }
 
   await Historico.create({
     solicitacao_id: solicitacao.id,
@@ -1539,7 +1575,7 @@ module.exports = {
                     SELECT MAX(h2.createdAt)
                     FROM historicos h2
                     WHERE h2.solicitacao_id = Solicitacao.id
-                      AND h2.acao IN ('RESPONSAVEL_ATRIBUIDO', 'RESPONSAVEL_ASSUMIU')
+                      AND h2.acao IN ('RESPONSAVEL_ATRIBUIDO', 'RESPONSAVEL_ASSUMIU', 'RESPONSAVEL_REMOVIDO')
                   )
                   AND UPPER(u.nome) IN (${valoresIn})
               )`)
@@ -1557,7 +1593,7 @@ module.exports = {
                     SELECT MAX(h2.createdAt)
                     FROM historicos h2
                     WHERE h2.solicitacao_id = Solicitacao.id
-                      AND h2.acao IN ('RESPONSAVEL_ATRIBUIDO', 'RESPONSAVEL_ASSUMIU')
+                      AND h2.acao IN ('RESPONSAVEL_ATRIBUIDO', 'RESPONSAVEL_ASSUMIU', 'RESPONSAVEL_REMOVIDO')
                   )
                   AND UPPER(u.nome) LIKE UPPER('%${filtroEscapado}%')
               )`)
@@ -2984,6 +3020,94 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return res.status(500).json({ error: 'Erro ao atualizar valor' });
+    }
+  },
+
+  // =====================================================
+  // ATUALIZAR DATA DE VENCIMENTO DA SOLICITACAO
+  // =====================================================
+  async atualizarDataVencimento(req, res) {
+    try {
+      const { id } = req.params;
+      const { data_vencimento } = req.body;
+      const perfil = String(req.user?.perfil || '').trim().toUpperCase();
+      const isGeo = await isSetorGeo(req);
+      const permissoesArea = Array.isArray(req.user?.areas_permissoes)
+        ? req.user.areas_permissoes.map((item) => String(item || '').trim().toLowerCase())
+        : [];
+      const podeEditarPorPermissao = permissoesArea.includes('solicitacoes.acoes.alterar_data_vencimento');
+      const podeEditar =
+        perfil === 'SUPERADMIN' ||
+        (perfil.startsWith('ADMIN') && isGeo) ||
+        podeEditarPorPermissao;
+
+      if (!podeEditar) {
+        return res.status(403).json({
+          error: 'Acesso negado para alterar data de vencimento.'
+        });
+      }
+
+      const solicitacao = await Solicitacao.findByPk(id);
+      if (!solicitacao) {
+        return res.status(404).json({ error: 'Solicitacao nao encontrada' });
+      }
+
+      const acessoObra = await validarAcessoObra(req, solicitacao);
+      if (!acessoObra) {
+        return res.status(403).json({
+          error: 'Acesso negado. Vincule o usuario a obra para continuar.'
+        });
+      }
+
+      const novoVencimento = data_vencimento || null;
+      const vencimentoAnterior = solicitacao.data_vencimento || null;
+
+      await solicitacao.update({
+        data_vencimento: novoVencimento
+      });
+
+      const usuario = await User.findByPk(req.user.id);
+
+      await Historico.create({
+        solicitacao_id: id,
+        usuario_responsavel_id: req.user.id,
+        setor: req.user.area,
+        acao: 'DATA_VENCIMENTO_ATUALIZADA',
+        descricao: `De ${vencimentoAnterior || '-'} para ${novoVencimento || '-'}`,
+        metadata: JSON.stringify({
+          data_vencimento_anterior: vencimentoAnterior,
+          data_vencimento_nova: novoVencimento
+        })
+      });
+
+      await criarNotificacao({
+        solicitacao_id: id,
+        tipo: 'DATA_VENCIMENTO_ATUALIZADA',
+        mensagem: `${usuario?.nome || 'Usuario'} atualizou a data de vencimento da solicitacao ${solicitacao.codigo}`,
+        created_by: req.user.id,
+        metadata: {
+          data_vencimento_anterior: vencimentoAnterior,
+          data_vencimento_nova: novoVencimento
+        }
+      });
+
+      await publishSolicitacaoRealtimeEvent({
+        action: 'DUE_DATE_UPDATED',
+        solicitacao,
+        actor: {
+          id: req.user.id,
+          nome: usuario?.nome || req.user?.nome || null
+        },
+        metadata: {
+          data_vencimento_anterior: vencimentoAnterior,
+          data_vencimento_nova: novoVencimento
+        }
+      });
+
+      return res.sendStatus(204);
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao atualizar data de vencimento' });
     }
   },
 

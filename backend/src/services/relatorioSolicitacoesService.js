@@ -181,10 +181,13 @@ function getFirstHistorico(historicosItem = [], predicate) {
 }
 
 function getLatestResponsavel(historicosItem = []) {
-  return historicosItem.find((item) =>
-    ['RESPONSAVEL_ATRIBUIDO', 'RESPONSAVEL_ASSUMIU'].includes(String(item.acao || '').toUpperCase()) &&
-    item.usuario
+  const latest = historicosItem.find((item) =>
+    ['RESPONSAVEL_ATRIBUIDO', 'RESPONSAVEL_ASSUMIU', 'RESPONSAVEL_REMOVIDO'].includes(String(item.acao || '').toUpperCase())
   );
+  if (!latest || String(latest.acao || '').toUpperCase() === 'RESPONSAVEL_REMOVIDO') {
+    return null;
+  }
+  return latest.usuario ? latest : null;
 }
 
 function isConcluida(status) {

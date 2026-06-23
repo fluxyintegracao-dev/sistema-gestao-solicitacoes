@@ -10,6 +10,7 @@ import {
   arquivarSolicitacao,
   deleteSolicitacao,
   desarquivarSolicitacao,
+  updateDataVencimentoSolicitacao,
   updateValorSolicitacao
 } from '../../services/solicitacoes';
 import { useAuth } from '../../contexts/AuthContext';
@@ -83,7 +84,17 @@ export default function LinhaSolicitacao({
     String(user?.perfil || '').toUpperCase().startsWith('ADMIN') &&
     setorTokens.some(isGeoSetor);
   const isSuperadmin = String(user?.perfil || '').toUpperCase() === 'SUPERADMIN';
-  const podeEditarValor = isAdminGEO || isSuperadmin;
+  const permissoesArea = Array.isArray(user?.areas_permissoes)
+    ? user.areas_permissoes.map(item => String(item || '').trim().toLowerCase())
+    : [];
+  const podeEditarValor =
+    isAdminGEO ||
+    isSuperadmin ||
+    permissoesArea.includes('solicitacoes.acoes.alterar_valor');
+  const podeEditarDataVencimento =
+    isAdminGEO ||
+    isSuperadmin ||
+    permissoesArea.includes('solicitacoes.acoes.alterar_data_vencimento');
   const setorSolicitacao = setoresMap?.[solicitacao.area_responsavel] || null;
   const setorNomeSolicitacao =
     (setorSolicitacao?.nome || setorSolicitacao || solicitacao.area_responsavel || '');
@@ -140,6 +151,8 @@ export default function LinhaSolicitacao({
       ? String(solicitacao.valor)
       : ''
   );
+  const [editandoDataVencimento, setEditandoDataVencimento] = useState(false);
+  const [dataVencimentoEditada, setDataVencimentoEditada] = useState(solicitacao.data_vencimento || '');
   const valorTotalSolicitacao = Number(solicitacao.valor_total ?? solicitacao.valor);
   const valorPagoAcumulado = Number(solicitacao.valor_pago_acumulado || 0);
   const statusGlobalNormalizado = String(solicitacao.status_global || '').trim().toUpperCase();
@@ -173,6 +186,12 @@ export default function LinhaSolicitacao({
     }
   }, [solicitacao.valor, editandoValor]);
 
+  useEffect(() => {
+    if (!editandoDataVencimento) {
+      setDataVencimentoEditada(solicitacao.data_vencimento || '');
+    }
+  }, [solicitacao.data_vencimento, editandoDataVencimento]);
+
   async function notificarAtualizacao(payload) {
     if (typeof onAtualizar === 'function') {
       await onAtualizar(payload);
@@ -192,6 +211,17 @@ export default function LinhaSolicitacao({
     } catch (err) {
       console.error(err);
       alert('Erro ao atualizar valor');
+    }
+  }
+
+  async function salvarDataVencimento() {
+    try {
+      await updateDataVencimentoSolicitacao(solicitacao.id, dataVencimentoEditada || null);
+      setEditandoDataVencimento(false);
+      await notificarAtualizacao({ type: 'refresh_item', id: solicitacao.id });
+    } catch (err) {
+      console.error(err);
+      alert(err?.message || 'Erro ao atualizar data de vencimento');
     }
   }
 
@@ -445,7 +475,43 @@ export default function LinhaSolicitacao({
             {...tdBase('Vencimento', 'p-2 whitespace-nowrap')}
             title={dataVencimentoTitle}
           >
-            {dataVencimentoLabel}
+            {editandoDataVencimento ? (
+              <div className="flex items-center gap-2">
+                <input
+                  type="date"
+                  className="w-36 rounded px-2 py-1 bg-[var(--c-surface)] text-[var(--c-text)] border border-[var(--c-border)] focus:outline-none focus:ring-2 focus:ring-blue-500/35"
+                  value={dataVencimentoEditada || ''}
+                  onChange={e => setDataVencimentoEditada(e.target.value)}
+                />
+                <button
+                  className="text-xs text-blue-700 hover:underline"
+                  onClick={salvarDataVencimento}
+                >
+                  Salvar
+                </button>
+                <button
+                  className="text-xs text-gray-500 hover:underline"
+                  onClick={() => {
+                    setDataVencimentoEditada(solicitacao.data_vencimento || '');
+                    setEditandoDataVencimento(false);
+                  }}
+                >
+                  Cancelar
+                </button>
+              </div>
+            ) : (
+              <div className="flex flex-col items-start gap-1">
+                <span>{dataVencimentoLabel}</span>
+                {podeEditarDataVencimento && (
+                  <button
+                    className="text-[11px] leading-none text-blue-600 hover:underline"
+                    onClick={() => setEditandoDataVencimento(true)}
+                  >
+                    Editar
+                  </button>
+                )}
+              </div>
+            )}
           </td>
         )}
 

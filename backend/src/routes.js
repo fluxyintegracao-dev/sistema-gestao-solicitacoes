@@ -79,6 +79,7 @@ const {
   validateSolicitacaoArquivarMassaBody,
   validateSolicitacaoComentarioBody,
   validateSolicitacaoCreateBody,
+  validateSolicitacaoDataVencimentoBody,
   validateSolicitacaoEnviarSetorBody,
   validateSolicitacaoEnviarSetorMassaBody,
   validateSolicitacaoPedidoBody,
@@ -1097,6 +1098,7 @@ router.post('/solicitacoes/:id/pagamentos', requireEnabledModule('FINANCEIRO'), 
 router.patch('/solicitacoes/:id/pedido', validateRequest({ params: validateNumericIdParam('id', 'Solicitacao'), body: validateSolicitacaoPedidoBody }), auditSuccess({ eventType: 'SOLICITACAO_PEDIDO_UPDATED', resourceType: 'SOLICITACAO', description: 'Numero do pedido atualizado', resourceIdResolver: (req) => req.params.id }), SolicitacaoController.atualizarNumeroPedido);
 router.patch('/solicitacoes/:id/ref-contrato', requireEnabledModule('CONTRATOS'), validateRequest({ params: validateNumericIdParam('id', 'Solicitacao'), body: validateSolicitacaoRefContratoBody }), auditSuccess({ eventType: 'SOLICITACAO_CONTRATO_UPDATED', resourceType: 'SOLICITACAO', description: 'Referencia de contrato atualizada', resourceIdResolver: (req) => req.params.id }), SolicitacaoController.atualizarRefContrato);
 router.patch('/solicitacoes/:id/valor', validateRequest({ params: validateNumericIdParam('id', 'Solicitacao'), body: validateSolicitacaoValorBody }), auditSuccess({ eventType: 'SOLICITACAO_VALOR_UPDATED', resourceType: 'SOLICITACAO', description: 'Valor da solicitacao atualizado', resourceIdResolver: (req) => req.params.id }), SolicitacaoController.atualizarValor);
+router.patch('/solicitacoes/:id/data-vencimento', validateRequest({ params: validateNumericIdParam('id', 'Solicitacao'), body: validateSolicitacaoDataVencimentoBody }), auditSuccess({ eventType: 'SOLICITACAO_DUE_DATE_UPDATED', resourceType: 'SOLICITACAO', description: 'Data de vencimento da solicitacao atualizada', resourceIdResolver: (req) => req.params.id }), SolicitacaoController.atualizarDataVencimento);
 router.patch('/solicitacoes/arquivar-massa', validateRequest({ body: validateSolicitacaoArquivarMassaBody }), auditSuccess({ eventType: 'SOLICITACAO_ARCHIVED_BATCH', resourceType: 'SOLICITACAO', description: 'Solicitacoes arquivadas em massa', metadataResolver: (req) => ({ solicitacao_ids: req.body?.solicitacao_ids || [] }) }), SolicitacaoController.arquivarEmMassa);
 router.post('/solicitacoes/enviar-setor-massa', validateRequest({ body: validateSolicitacaoEnviarSetorMassaBody }), auditSuccess({ eventType: 'SOLICITACAO_SENT_BATCH', resourceType: 'SOLICITACAO', description: 'Solicitacoes enviadas em massa para outro setor', metadataResolver: (req) => ({ solicitacao_ids: req.body?.solicitacao_ids || [], setor_destino: req.body?.setor_destino || null }) }), SolicitacaoController.enviarParaSetorEmMassa);
 router.post('/solicitacoes/:id/comentarios', validateRequest({ params: validateNumericIdParam('id', 'Solicitacao'), body: validateSolicitacaoComentarioBody }), auditSuccess({ eventType: 'SOLICITACAO_COMMENTED', resourceType: 'SOLICITACAO', description: 'Comentario adicionado na solicitacao', resourceIdResolver: (req) => req.params.id }), SolicitacaoController.adicionarComentario);

@@ -188,6 +188,20 @@ export async function updateValorSolicitacao(id, valor) {
   return true;
 }
 
+export async function updateDataVencimentoSolicitacao(id, data_vencimento) {
+  const res = await fetch(`${API_URL}/solicitacoes/${id}/data-vencimento`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ data_vencimento: data_vencimento || null })
+  });
+
+  if (!res.ok) {
+    throw buildResponseError(res.status, 'Erro ao atualizar data de vencimento', await parseJsonSafe(res));
+  }
+
+  return true;
+}
+
 export async function updateRefContratoSolicitacao(id, contrato_id) {
   const res = await fetch(`${API_URL}/solicitacoes/${id}/ref-contrato`, {
     method: 'PATCH',

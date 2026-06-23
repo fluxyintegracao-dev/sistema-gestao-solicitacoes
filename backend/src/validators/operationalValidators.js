@@ -901,6 +901,14 @@ function validateSolicitacaoValorBody(body = {}) {
   };
 }
 
+function validateSolicitacaoDataVencimentoBody(body = {}) {
+  ensureAllowedKeys(body, ['data_vencimento'], 'Atualizacao de data de vencimento');
+
+  return {
+    data_vencimento: parseDateOnly(body.data_vencimento, 'Data de vencimento')
+  };
+}
+
 function validateSolicitacaoResponsavelBody(body = {}) {
   ensureAllowedKeys(body, ['usuario_responsavel_id', 'prazo_compra'], 'Atribuicao de responsavel');
 
@@ -995,6 +1003,7 @@ module.exports = {
   validateSolicitacaoArquivarMassaBody,
   validateSolicitacaoComentarioBody,
   validateSolicitacaoCreateBody,
+  validateSolicitacaoDataVencimentoBody,
   validateSolicitacaoEnviarSetorBody,
   validateSolicitacaoEnviarSetorMassaBody,
   validateSolicitacaoPedidoBody,

@@ -13,6 +13,7 @@ const NOTIFICACAO_EVENTOS = [
       ['APROVADA_DIRETORIA', 'Aprovada pela diretoria', 'Diretoria aprovou a solicitacao no fluxo de aprovacao.'],
       ['NUMERO_PEDIDO_ATUALIZADO', 'Numero do pedido atualizado', 'Numero do pedido foi ajustado na solicitacao.'],
       ['VALOR_ATUALIZADO', 'Valor atualizado', 'Valor da solicitacao foi alterado.'],
+      ['DATA_VENCIMENTO_ATUALIZADA', 'Data de vencimento atualizada', 'Data de vencimento da solicitacao foi alterada.'],
       ['ANEXO_ADICIONADO', 'Anexo adicionado', 'Arquivo anexado na solicitacao.'],
       ['MENCAO_COMENTARIO', 'Mencao em comentario', 'Usuario foi mencionado em comentario.']
     ]

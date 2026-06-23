@@ -209,7 +209,9 @@ export default function Timeline({
             NUMERO_PEDIDO_ATUALIZADO: 'Número do pedido atualizado',
             PEDIDO_COMPRA_GERADO: 'Pedido de compra gerado',
             PEDIDO_COMPRA_STATUS_ALTERADO: 'Status do pedido de compra alterado',
-            PEDIDO_COMPRA_ENCERRADO: 'Pedido de compra encerrado/cancelado'
+            PEDIDO_COMPRA_ENCERRADO: 'Pedido de compra encerrado/cancelado',
+            RESPONSAVEL_REMOVIDO: 'Responsavel removido',
+            DATA_VENCIMENTO_ATUALIZADA: 'Data de vencimento atualizada'
           }[h.acao] || h.acao;
           const atorNome = meta?.ator_nome || null;
           const responsavelNome = meta?.responsavel_nome || h.usuario?.nome || null;
