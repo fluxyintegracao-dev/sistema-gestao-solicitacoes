@@ -1,5 +1,5 @@
 const XLSX = require('xlsx');
-const { Parceiro, ParceiroCategoria } = require('../models');
+const { Contrato, ContratoCredor, Parceiro, ParceiroCategoria } = require('../models');
 const {
   atualizarParceiro,
   buscarParceiros,
@@ -307,9 +307,27 @@ module.exports = {
     try {
       const tipoSolicitacaoId = Number(req.body?.tipo_solicitacao_id);
       const areaResponsavel = String(req.body?.area_responsavel || '').trim();
+      const contratoId = req.body?.contrato_id !== undefined && req.body?.contrato_id !== null && req.body?.contrato_id !== ''
+        ? Number(req.body.contrato_id)
+        : null;
 
       if (!Number.isInteger(tipoSolicitacaoId) || tipoSolicitacaoId <= 0 || !areaResponsavel) {
         return res.status(400).json({ error: 'Informe area responsavel e tipo da solicitacao para cadastrar o credor.' });
+      }
+
+      let contrato = null;
+      if (contratoId !== null) {
+        if (!Number.isInteger(contratoId) || contratoId <= 0) {
+          return res.status(400).json({ error: 'Contrato informado para vinculo do credor e invalido.' });
+        }
+
+        contrato = await Contrato.findByPk(contratoId, {
+          attributes: ['id']
+        });
+
+        if (!contrato) {
+          return res.status(404).json({ error: 'Contrato informado para vinculo do credor nao foi encontrado.' });
+        }
       }
 
       const configCampos = await obterConfigCamposNovaSolicitacao();
@@ -335,8 +353,31 @@ module.exports = {
 
       delete payload.tipo_solicitacao_id;
       delete payload.area_responsavel;
+      delete payload.contrato_id;
 
       const parceiro = await criarParceiro(payload);
+      if (contrato) {
+        const [vinculo, criado] = await ContratoCredor.findOrCreate({
+          where: {
+            contrato_id: contrato.id,
+            parceiro_id: parceiro.id
+          },
+          defaults: {
+            contrato_id: contrato.id,
+            parceiro_id: parceiro.id,
+            observacao: 'Vinculado automaticamente pelo cadastro rapido da nova solicitacao.',
+            ativo: true
+          }
+        });
+
+        if (!criado && vinculo.ativo !== true) {
+          await vinculo.update({
+            ativo: true,
+            observacao: vinculo.observacao || 'Reativado automaticamente pelo cadastro rapido da nova solicitacao.'
+          });
+        }
+      }
+
       return res.status(201).json(parceiro);
     } catch (error) {
       return responderErroController(res, error, 'Erro ao cadastrar credor', { status: 400 });

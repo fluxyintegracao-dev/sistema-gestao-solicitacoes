@@ -354,7 +354,8 @@ export default function NovaSolicitacao() {
       const parceiro = await criarCredorNovaSolicitacao({
         ...payload,
         tipo_solicitacao_id: form.tipo_solicitacao_id,
-        area_responsavel: form.area_responsavel
+        area_responsavel: form.area_responsavel,
+        contrato_id: form.contrato_id || null
       });
       selecionarParceiro(parceiro);
       setNovoParceiro(criarNovoParceiroPadrao());
