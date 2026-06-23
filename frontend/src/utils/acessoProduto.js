@@ -30,7 +30,11 @@ export function isAdminGeo(user) {
 }
 
 export function canManageUsers(user) {
-  return isBusinessAdmin(user) || isAdminGeo(user);
+  if (isBusinessAdmin(user) || isAdminGeo(user)) return true;
+  return hasAnyExplicitPermissao(user, [
+    'configuracoes.geral.gerenciar',
+    'configuracoes.usuarios.gerenciar'
+  ]);
 }
 
 export function getEnabledModules(user) {
@@ -515,6 +519,7 @@ export function canAccessBoletos(user) {
 export function canAccessCadastroObras(user) {
   if (!hasEnabledModule(user, 'OBRAS')) return false;
   if (isBusinessAdmin(user)) return true;
+  if (canManageConfiguracoesArea(user, 'cadastros')) return true;
   return hasAnyExplicitPermissao(user, [
     'obras.cadastro.visualizar',
     'obras.cadastro.gerenciar'
@@ -1033,6 +1038,63 @@ export function canViewSystemProductEvolution(user) {
   if (isBusinessAdmin(user)) return true;
   if (hasConfiguredAreaPermissions(user)) {
     return hasAnyPermissao(user, SYSTEM_PRODUCT_EVOLUTION_VIEW_KEYS);
+  }
+  return false;
+}
+
+const CONFIGURACOES_AREA_PERMISSION_KEYS = {
+  geral: [
+    'configuracoes.geral.visualizar',
+    'configuracoes.geral.gerenciar'
+  ],
+  cadastros: [
+    'configuracoes.geral.gerenciar',
+    'configuracoes.cadastros.gerenciar'
+  ],
+  usuarios: [
+    'configuracoes.geral.gerenciar',
+    'configuracoes.usuarios.gerenciar'
+  ],
+  status_vinculos: [
+    'configuracoes.geral.gerenciar',
+    'configuracoes.status_vinculos.gerenciar'
+  ],
+  solicitacoes: [
+    'configuracoes.geral.gerenciar',
+    'configuracoes.solicitacoes.gerenciar'
+  ],
+  aparencia: [
+    'configuracoes.geral.gerenciar',
+    'configuracoes.aparencia.gerenciar'
+  ],
+  permissoes: [
+    'configuracoes.geral.gerenciar',
+    'configuracoes.permissoes.gerenciar'
+  ],
+  modulos: [
+    'configuracoes.geral.gerenciar',
+    'configuracoes.modulos.gerenciar'
+  ]
+};
+
+const CONFIGURACOES_VIEW_KEYS = [
+  ...new Set(Object.values(CONFIGURACOES_AREA_PERMISSION_KEYS).flat())
+];
+
+export function canAccessConfiguracoes(user) {
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasAnyPermissao(user, CONFIGURACOES_VIEW_KEYS);
+  }
+  return false;
+}
+
+export function canManageConfiguracoesArea(user, area = 'geral') {
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    const normalizedArea = String(area || 'geral').trim().toLowerCase();
+    const permissionKeys = CONFIGURACOES_AREA_PERMISSION_KEYS[normalizedArea] || CONFIGURACOES_AREA_PERMISSION_KEYS.geral;
+    return hasAnyPermissao(user, permissionKeys);
   }
   return false;
 }

@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import {
+  canManageConfiguracoesArea,
   hasEnabledModule,
   isBusinessAdmin,
   isSuperadmin
@@ -9,6 +10,7 @@ import {
 const SECOES_CONFIG = [
   {
     title: 'Cadastros',
+    permissionArea: 'cadastros',
     itens: [
       {
         title: 'Obras',
@@ -56,6 +58,7 @@ const SECOES_CONFIG = [
   },
   {
     title: 'Usuarios',
+    permissionArea: 'usuarios',
     itens: [
       {
         title: 'Cadastro de Usuarios',
@@ -66,7 +69,7 @@ const SECOES_CONFIG = [
   },
   {
     title: 'Suporte',
-    requireSuperadmin: true,
+    permissionArea: 'aparencia',
     itens: [
       {
         title: 'WhatsApp do Suporte',
@@ -87,6 +90,7 @@ const SECOES_CONFIG = [
   },
   {
     title: 'Compras',
+    permissionArea: 'geral',
     itens: [
       {
         title: 'Configuracoes de Cotacao',
@@ -105,12 +109,14 @@ const SECOES_CONFIG = [
         description: 'Crie paginas e defina admins com permissao de upload.',
         to: '/arquivos-modelos-config',
         requireSuperadmin: true,
+        strictSuperadmin: true,
         requireModule: 'BIBLIOTECA_MODELOS'
       }
     ]
   },
   {
     title: 'Comercial',
+    permissionArea: 'geral',
     itens: [
       {
         title: 'Categorias do Contrato de Venda',
@@ -123,7 +129,7 @@ const SECOES_CONFIG = [
   },
   {
     title: 'Provisionamento',
-    requireSuperadmin: true,
+    permissionArea: 'geral',
     itens: [
       {
         title: 'Fluxo do Provisionamento',
@@ -135,6 +141,7 @@ const SECOES_CONFIG = [
   },
   {
     title: 'Status e Vinculos',
+    permissionArea: 'status_vinculos',
     itens: [
       {
         title: 'Status por Setor',
@@ -149,7 +156,8 @@ const SECOES_CONFIG = [
       {
         title: 'Cores do Sistema',
         description: 'Defina cores de botoes e status.',
-        to: '/cores-sistema'
+        to: '/cores-sistema',
+        permissionArea: 'aparencia'
       },
       {
         title: 'Areas Visiveis para OBRA',
@@ -185,13 +193,13 @@ const SECOES_CONFIG = [
         title: 'Campos da Nova Solicitacao',
         description: 'Defina campos visiveis e obrigatorios por tipo de solicitacao.',
         to: '/nova-solicitacao-campos',
-        requireSuperadmin: true
+        permissionArea: 'solicitacoes'
       },
       {
         title: 'Automacao da Nova Solicitacao',
         description: 'Redirecione tipos de solicitacao para telas especificas mantendo a obra selecionada.',
         to: '/nova-solicitacao-automacao-destino',
-        requireSuperadmin: true
+        permissionArea: 'solicitacoes'
       },
       {
         title: 'Aprovacao por Diretoria',
@@ -237,12 +245,14 @@ const SECOES_CONFIG = [
       {
         title: 'Permissoes por Setor e Perfil',
         description: 'Configure permissões padrão por setor e perfil para aplicar a todos os usuários daquele grupo.',
-        to: '/permissoes-areas-padroes'
+        to: '/permissoes-areas-padroes',
+        permissionArea: 'permissoes'
       },
       {
         title: 'Permissoes de Areas por Usuario',
         description: 'Adicione exceções individuais quando um usuário precisar de permissões além do padrão do setor e perfil.',
-        to: '/permissoes-areas'
+        to: '/permissoes-areas',
+        permissionArea: 'permissoes'
       },
       {
         title: 'Tempo de Inatividade',
@@ -253,7 +263,7 @@ const SECOES_CONFIG = [
   },
   {
     title: 'Instalacao',
-    requireSuperadmin: true,
+    permissionArea: 'modulos',
     itens: [
       {
         title: 'Modulos e Planos',
@@ -270,11 +280,16 @@ export default function Configuracoes() {
   const businessAdmin = isBusinessAdmin(user);
 
   const secoesVisiveis = SECOES_CONFIG
-    .filter((secao) => !secao.requireSuperadmin || superadmin)
     .map((secao) => ({
       ...secao,
       itens: secao.itens.filter((item) => {
-        if (item.requireSuperadmin && !superadmin) return false;
+        const areaPermissao = item.permissionArea || secao.permissionArea || 'geral';
+        const podeGerenciarArea = canManageConfiguracoesArea(user, areaPermissao);
+        if (item.strictSuperadmin && !superadmin) return false;
+        if (secao.requireSuperadmin && !superadmin && !podeGerenciarArea) return false;
+        if (secao.permissionArea && !podeGerenciarArea) return false;
+        if (item.requireSuperadmin && !superadmin && !podeGerenciarArea) return false;
+        if (item.permissionArea && !podeGerenciarArea) return false;
         if (item.requireBusinessAdmin && !businessAdmin) return false;
         if (item.requireModule && !hasEnabledModule(user, item.requireModule, { allowSuperadminBypass: false })) {
           return false;

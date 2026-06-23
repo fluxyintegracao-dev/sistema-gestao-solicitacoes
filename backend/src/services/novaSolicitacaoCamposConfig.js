@@ -27,6 +27,14 @@ const CAMPOS_NOVA_SOLICITACAO = [
     obrigatorioPadrao: false
   },
   {
+    id: 'cadastro_credor',
+    label: 'Cadastro de credor',
+    descricao: 'Permite cadastrar um novo credor durante a abertura da solicitacao.',
+    visivelPadrao: false,
+    obrigatorioPadrao: false,
+    permiteObrigatorio: false
+  },
+  {
     id: 'apropriacao_principal',
     label: 'Apropriacao principal',
     descricao: 'Apropriacao da solicitacao na obra.',

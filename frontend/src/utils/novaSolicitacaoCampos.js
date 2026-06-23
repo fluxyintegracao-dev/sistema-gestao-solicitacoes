@@ -2,6 +2,7 @@ export const CAMPOS_NOVA_SOLICITACAO = [
   { id: 'obra', label: 'Obra', descricao: 'Vincula a solicitacao a uma obra.', fixo: true },
   { id: 'area_responsavel', label: 'Area responsavel', descricao: 'Define o setor que recebe a solicitacao.', fixo: true },
   { id: 'credor', label: 'Credor', descricao: 'Pessoa ou empresa vinculada como credor.' },
+  { id: 'cadastro_credor', label: 'Cadastro de credor', descricao: 'Permite cadastrar um novo credor durante a abertura da solicitacao.', permiteObrigatorio: false },
   { id: 'apropriacao_principal', label: 'Apropriacao principal', descricao: 'Apropriacao da solicitacao na obra.' },
   { id: 'subtipo', label: 'Subtipo', descricao: 'Subtipo de contrato ou classificacao complementar.' },
   { id: 'contrato', label: 'Contrato', descricao: 'Referencia e contrato vinculado.' },
@@ -56,6 +57,8 @@ function padraoCampo(id, behavior = {}, contexto = {}) {
       return { visivel: true, obrigatorio: true };
     case 'credor':
       return { visivel: true, obrigatorio: false };
+    case 'cadastro_credor':
+      return { visivel: false, obrigatorio: false };
     case 'apropriacao_principal':
       return {
         visivel: Boolean(apropriacoesDisponiveis && behavior.mostrar_apropriacao_principal),
@@ -137,7 +140,7 @@ export function normalizarConfigCamposNovaSolicitacao(config) {
       const visivel = boolOrDefault(regraCampo?.visivel, true);
       campos[campoId] = {
         visivel,
-        obrigatorio: campoId === 'anexos' ? false : (visivel ? boolOrDefault(regraCampo?.obrigatorio, false) : false)
+      obrigatorio: ['anexos', 'cadastro_credor'].includes(campoId) ? false : (visivel ? boolOrDefault(regraCampo?.obrigatorio, false) : false)
       };
     });
     return campos;

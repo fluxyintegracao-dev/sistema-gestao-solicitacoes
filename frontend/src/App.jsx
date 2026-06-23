@@ -15,6 +15,7 @@ import {
   canAccessContratos,
   canAccessFinanceiro,
   canAccessFiscal,
+  canAccessConfiguracoes,
   canAccessPagamentos,
   canAccessGestaoObras,
   canAccessPrioridadesDiretoria,
@@ -26,6 +27,7 @@ import {
   canManageComprasConfiguracoes,
   canManageComprasCotacoes,
   canManageCompraSolicitacoes,
+  canManageConfiguracoesArea,
   canManageProvisionamentoCategorias,
   canViewCompraSolicitacoes,
   canViewComprasCotacoes,
@@ -266,6 +268,22 @@ function BusinessAdminRoute({ children }) {
   const { user } = useAuth();
   if (!isBusinessAdmin(user)) {
     return <Navigate to="/" replace />;
+  }
+  return children;
+}
+
+function ConfiguracoesRoute({ children }) {
+  const { user } = useAuth();
+  if (!canAccessConfiguracoes(user)) {
+    return <Navigate to="/" replace />;
+  }
+  return children;
+}
+
+function ConfiguracoesAreaRoute({ area, children }) {
+  const { user } = useAuth();
+  if (!canManageConfiguracoesArea(user, area)) {
+    return <Navigate to="/configuracoes" replace />;
   }
   return children;
 }
@@ -789,46 +807,46 @@ export default function App() {
 
         <Route path="obras" element={<CadastroObrasRoute><Obras /></CadastroObrasRoute>} />
         <Route path="obras/:id" element={<GestaoObrasRoute><ObraGestao /></GestaoObrasRoute>} />
-        <Route path="setores" element={<BusinessAdminRoute><Setores /></BusinessAdminRoute>} />
-        <Route path="tipos-solicitacao" element={<BusinessAdminRoute><TiposSolicitacao /></BusinessAdminRoute>} />
+        <Route path="setores" element={<ConfiguracoesAreaRoute area="cadastros"><Setores /></ConfiguracoesAreaRoute>} />
+        <Route path="tipos-solicitacao" element={<ConfiguracoesAreaRoute area="cadastros"><TiposSolicitacao /></ConfiguracoesAreaRoute>} />
         <Route path="gestao-contratos" element={<ContratosRoute><GestaoContratos /></ContratosRoute>} />
-        <Route path="configuracoes" element={<BusinessAdminRoute><Configuracoes /></BusinessAdminRoute>} />
-        <Route path="configuracoes-suporte" element={<SuperadminRoute><ConfiguracoesSuporte /></SuperadminRoute>} />
-        <Route path="configuracoes-visibilidade-ui" element={<SuperadminRoute><ConfiguracoesVisibilidadeUi /></SuperadminRoute>} />
-        <Route path="empresas-grupo" element={<SuperadminRoute><EmpresasGrupo /></SuperadminRoute>} />
-        <Route path="aprovacao-diretoria" element={<BusinessAdminRoute><AprovacaoDiretoria /></BusinessAdminRoute>} />
-        <Route path="tipos-sub-contrato" element={<BusinessAdminRoute><TiposSubContrato /></BusinessAdminRoute>} />
-        <Route path="status-setor" element={<BusinessAdminRoute><StatusSetor /></BusinessAdminRoute>} />
-        <Route path="permissoes-setor" element={<BusinessAdminRoute><PermissoesSetor /></BusinessAdminRoute>} />
-        <Route path="cores-sistema" element={<BusinessAdminRoute><CoresSistema /></BusinessAdminRoute>} />
-        <Route path="areas-obra" element={<BusinessAdminRoute><AreasObra /></BusinessAdminRoute>} />
-        <Route path="areas-por-setor-origem" element={<BusinessAdminRoute><AreasPorSetorOrigem /></BusinessAdminRoute>} />
-        <Route path="setores-visiveis-usuario" element={<BusinessAdminRoute><SetoresVisiveisUsuario /></BusinessAdminRoute>} />
-        <Route path="comportamento-recebimento-setor" element={<BusinessAdminRoute><ComportamentoRecebimentoSetor /></BusinessAdminRoute>} />
-        <Route path="timeout-inatividade" element={<BusinessAdminRoute><TimeoutInatividade /></BusinessAdminRoute>} />
-        <Route path="tipos-solicitacao-por-setor" element={<BusinessAdminRoute><TiposSolicitacaoPorSetor /></BusinessAdminRoute>} />
-        <Route path="nova-solicitacao-campos" element={<SuperadminRoute><NovaSolicitacaoCamposConfig /></SuperadminRoute>} />
-        <Route path="nova-solicitacao-automacao-destino" element={<SuperadminRoute><NovaSolicitacaoAutomacaoDestinoConfig /></SuperadminRoute>} />
-        <Route path="tipos-compartilhados-setor" element={<BusinessAdminRoute><TiposCompartilhadosSetor /></BusinessAdminRoute>} />
-        <Route path="automacao-status-setor" element={<BusinessAdminRoute><AutomacaoStatusSetor /></BusinessAdminRoute>} />
-        <Route path="setores-criacao-todas-obras" element={<BusinessAdminRoute><SetoresCriacaoTodasObras /></BusinessAdminRoute>} />
-        <Route path="setores-acesso-todas-obras" element={<BusinessAdminRoute><SetoresAcessoTodasObras /></BusinessAdminRoute>} />
-        <Route path="usuarios-envio-qualquer-setor" element={<BusinessAdminRoute><UsuariosEnvioQualquerSetor /></BusinessAdminRoute>} />
-        <Route path="usuarios-acesso-financeiro" element={<BusinessAdminRoute><UsuariosAcessoFinanceiro /></BusinessAdminRoute>} />
-        <Route path="usuarios-acesso-prioridade-diretoria" element={<BusinessAdminRoute><UsuariosAcessoPrioridadeDiretoria /></BusinessAdminRoute>} />
-        <Route path="usuarios-permissoes-rh-dp" element={<BusinessAdminRoute><UsuariosPermissoesRhDp /></BusinessAdminRoute>} />
-        <Route path="permissoes-areas" element={<BusinessAdminRoute><PermissoesAreas /></BusinessAdminRoute>} />
-        <Route path="permissoes-areas-padroes" element={<BusinessAdminRoute><PermissoesAreasPadroes /></BusinessAdminRoute>} />
+        <Route path="configuracoes" element={<ConfiguracoesRoute><Configuracoes /></ConfiguracoesRoute>} />
+        <Route path="configuracoes-suporte" element={<ConfiguracoesAreaRoute area="aparencia"><ConfiguracoesSuporte /></ConfiguracoesAreaRoute>} />
+        <Route path="configuracoes-visibilidade-ui" element={<ConfiguracoesAreaRoute area="aparencia"><ConfiguracoesVisibilidadeUi /></ConfiguracoesAreaRoute>} />
+        <Route path="empresas-grupo" element={<ConfiguracoesAreaRoute area="cadastros"><EmpresasGrupo /></ConfiguracoesAreaRoute>} />
+        <Route path="aprovacao-diretoria" element={<ConfiguracoesAreaRoute area="status_vinculos"><AprovacaoDiretoria /></ConfiguracoesAreaRoute>} />
+        <Route path="tipos-sub-contrato" element={<ConfiguracoesAreaRoute area="cadastros"><TiposSubContrato /></ConfiguracoesAreaRoute>} />
+        <Route path="status-setor" element={<ConfiguracoesAreaRoute area="status_vinculos"><StatusSetor /></ConfiguracoesAreaRoute>} />
+        <Route path="permissoes-setor" element={<ConfiguracoesAreaRoute area="status_vinculos"><PermissoesSetor /></ConfiguracoesAreaRoute>} />
+        <Route path="cores-sistema" element={<ConfiguracoesAreaRoute area="aparencia"><CoresSistema /></ConfiguracoesAreaRoute>} />
+        <Route path="areas-obra" element={<ConfiguracoesAreaRoute area="status_vinculos"><AreasObra /></ConfiguracoesAreaRoute>} />
+        <Route path="areas-por-setor-origem" element={<ConfiguracoesAreaRoute area="status_vinculos"><AreasPorSetorOrigem /></ConfiguracoesAreaRoute>} />
+        <Route path="setores-visiveis-usuario" element={<ConfiguracoesAreaRoute area="status_vinculos"><SetoresVisiveisUsuario /></ConfiguracoesAreaRoute>} />
+        <Route path="comportamento-recebimento-setor" element={<ConfiguracoesAreaRoute area="status_vinculos"><ComportamentoRecebimentoSetor /></ConfiguracoesAreaRoute>} />
+        <Route path="timeout-inatividade" element={<ConfiguracoesAreaRoute area="status_vinculos"><TimeoutInatividade /></ConfiguracoesAreaRoute>} />
+        <Route path="tipos-solicitacao-por-setor" element={<ConfiguracoesAreaRoute area="status_vinculos"><TiposSolicitacaoPorSetor /></ConfiguracoesAreaRoute>} />
+        <Route path="nova-solicitacao-campos" element={<ConfiguracoesAreaRoute area="solicitacoes"><NovaSolicitacaoCamposConfig /></ConfiguracoesAreaRoute>} />
+        <Route path="nova-solicitacao-automacao-destino" element={<ConfiguracoesAreaRoute area="solicitacoes"><NovaSolicitacaoAutomacaoDestinoConfig /></ConfiguracoesAreaRoute>} />
+        <Route path="tipos-compartilhados-setor" element={<ConfiguracoesAreaRoute area="status_vinculos"><TiposCompartilhadosSetor /></ConfiguracoesAreaRoute>} />
+        <Route path="automacao-status-setor" element={<ConfiguracoesAreaRoute area="status_vinculos"><AutomacaoStatusSetor /></ConfiguracoesAreaRoute>} />
+        <Route path="setores-criacao-todas-obras" element={<ConfiguracoesAreaRoute area="status_vinculos"><SetoresCriacaoTodasObras /></ConfiguracoesAreaRoute>} />
+        <Route path="setores-acesso-todas-obras" element={<ConfiguracoesAreaRoute area="status_vinculos"><SetoresAcessoTodasObras /></ConfiguracoesAreaRoute>} />
+        <Route path="usuarios-envio-qualquer-setor" element={<ConfiguracoesAreaRoute area="status_vinculos"><UsuariosEnvioQualquerSetor /></ConfiguracoesAreaRoute>} />
+        <Route path="usuarios-acesso-financeiro" element={<ConfiguracoesAreaRoute area="status_vinculos"><UsuariosAcessoFinanceiro /></ConfiguracoesAreaRoute>} />
+        <Route path="usuarios-acesso-prioridade-diretoria" element={<ConfiguracoesAreaRoute area="status_vinculos"><UsuariosAcessoPrioridadeDiretoria /></ConfiguracoesAreaRoute>} />
+        <Route path="usuarios-permissoes-rh-dp" element={<ConfiguracoesAreaRoute area="status_vinculos"><UsuariosPermissoesRhDp /></ConfiguracoesAreaRoute>} />
+        <Route path="permissoes-areas" element={<ConfiguracoesAreaRoute area="permissoes"><PermissoesAreas /></ConfiguracoesAreaRoute>} />
+        <Route path="permissoes-areas-padroes" element={<ConfiguracoesAreaRoute area="permissoes"><PermissoesAreasPadroes /></ConfiguracoesAreaRoute>} />
         <Route path="governanca" element={<GovernancaSistemaRoute><GovernancaSistema /></GovernancaSistemaRoute>} />
         <Route path="arquivos-modelos-config" element={<SuperadminRoute><ArquivosModelosConfig /></SuperadminRoute>} />
         <Route path="configuracoes-cotacao" element={<EnabledModuleRoute moduleKey="COMPRAS"><EnabledModuleRoute moduleKey="COTACOES"><ComprasConfiguracoesRoute><ConfiguracoesCotacao /></ComprasConfiguracoesRoute></EnabledModuleRoute></EnabledModuleRoute>} />
         <Route path="configuracoes-status-pedidos-compra" element={<EnabledModuleRoute moduleKey="COMPRAS"><ComprasConfiguracoesRoute><ConfiguracoesStatusPedidoCompra /></ComprasConfiguracoesRoute></EnabledModuleRoute>} />
-        <Route path="configuracoes-comercial-categorias" element={<EnabledModuleRoute moduleKey="COMERCIAL"><SuperadminRoute><ConfiguracoesComercialCategorias /></SuperadminRoute></EnabledModuleRoute>} />
-        <Route path="configuracoes-provisionamento-fluxo" element={<EnabledModuleRoute moduleKey="PROVISOES"><SuperadminRoute><ConfiguracoesProvisionamentoFluxo /></SuperadminRoute></EnabledModuleRoute>} />
-        <Route path="configuracoes-modulos" element={<SuperadminRoute><ConfiguracoesModulos /></SuperadminRoute>} />
-        <Route path="configuracoes-notificacoes-sistema" element={<SuperadminRoute><ConfiguracoesNotificacoesSistema /></SuperadminRoute>} />
-        <Route path="parceiros" element={<BusinessAdminRoute><Parceiros /></BusinessAdminRoute>} />
-        <Route path="parceiros-categorias" element={<BusinessAdminRoute><ParceiroCategorias /></BusinessAdminRoute>} />
+        <Route path="configuracoes-comercial-categorias" element={<EnabledModuleRoute moduleKey="COMERCIAL"><ConfiguracoesAreaRoute area="geral"><ConfiguracoesComercialCategorias /></ConfiguracoesAreaRoute></EnabledModuleRoute>} />
+        <Route path="configuracoes-provisionamento-fluxo" element={<EnabledModuleRoute moduleKey="PROVISOES"><ConfiguracoesAreaRoute area="geral"><ConfiguracoesProvisionamentoFluxo /></ConfiguracoesAreaRoute></EnabledModuleRoute>} />
+        <Route path="configuracoes-modulos" element={<ConfiguracoesAreaRoute area="modulos"><ConfiguracoesModulos /></ConfiguracoesAreaRoute>} />
+        <Route path="configuracoes-notificacoes-sistema" element={<ConfiguracoesAreaRoute area="aparencia"><ConfiguracoesNotificacoesSistema /></ConfiguracoesAreaRoute>} />
+        <Route path="parceiros" element={<ConfiguracoesAreaRoute area="cadastros"><Parceiros /></ConfiguracoesAreaRoute>} />
+        <Route path="parceiros-categorias" element={<ConfiguracoesAreaRoute area="cadastros"><ParceiroCategorias /></ConfiguracoesAreaRoute>} />
         <Route path="crm/dashboard" element={<CrmDashboardRoute><CrmDashboard /></CrmDashboardRoute>} />
         <Route path="crm/relatorios" element={<CrmDashboardRoute><ModuloRelatorios modulo="crm" /></CrmDashboardRoute>} />
         <Route path="crm/relatorios/executivo" element={<CrmDashboardRoute><CrmRelatorioExecutivo /></CrmDashboardRoute>} />

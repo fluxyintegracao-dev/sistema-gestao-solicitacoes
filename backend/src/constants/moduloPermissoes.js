@@ -28,6 +28,70 @@ const MODULO_PERMISSION_GROUPS = [
     ]
   },
   {
+    modulo: 'CONFIGURACOES',
+    label: 'Configuracoes',
+    descricao: 'Console administrativo, cadastros, liberacoes, bloqueios e parametros do sistema.',
+    areas: [
+      {
+        key: 'configuracoes.geral',
+        label: 'Console de Configuracoes',
+        permissoes: [
+          { key: 'configuracoes.geral.visualizar', label: 'Visualizar configuracoes', descricao: 'Permite acessar a pagina central de configuracoes.' },
+          { key: 'configuracoes.geral.gerenciar', label: 'Gerenciar configuracoes gerais', descricao: 'Permite operar configuracoes administrativas gerais.' }
+        ]
+      },
+      {
+        key: 'configuracoes.cadastros',
+        label: 'Cadastros administrativos',
+        permissoes: [
+          { key: 'configuracoes.cadastros.gerenciar', label: 'Gerenciar cadastros', descricao: 'Permite criar, editar, ativar e bloquear cadastros estruturais.' }
+        ]
+      },
+      {
+        key: 'configuracoes.usuarios',
+        label: 'Usuarios',
+        permissoes: [
+          { key: 'configuracoes.usuarios.gerenciar', label: 'Gerenciar usuarios', descricao: 'Permite cadastrar, alterar e bloquear usuarios.' }
+        ]
+      },
+      {
+        key: 'configuracoes.status_vinculos',
+        label: 'Status, vinculos e acessos',
+        permissoes: [
+          { key: 'configuracoes.status_vinculos.gerenciar', label: 'Gerenciar status e vinculos', descricao: 'Permite alterar status por setor, permissoes de setor, acessos por obra e bloqueios operacionais.' }
+        ]
+      },
+      {
+        key: 'configuracoes.solicitacoes',
+        label: 'Parametros de solicitacoes',
+        permissoes: [
+          { key: 'configuracoes.solicitacoes.gerenciar', label: 'Gerenciar regras de solicitacoes', descricao: 'Permite configurar campos, automacoes e regras da nova solicitacao.' }
+        ]
+      },
+      {
+        key: 'configuracoes.aparencia',
+        label: 'Aparencia e suporte',
+        permissoes: [
+          { key: 'configuracoes.aparencia.gerenciar', label: 'Gerenciar aparencia e suporte', descricao: 'Permite alterar cores, visibilidade da UI, suporte e notificacoes do sistema.' }
+        ]
+      },
+      {
+        key: 'configuracoes.permissoes',
+        label: 'Permissoes granulares',
+        permissoes: [
+          { key: 'configuracoes.permissoes.gerenciar', label: 'Gerenciar permissoes granulares', descricao: 'Permite alterar permissoes por usuario, setor e perfil.' }
+        ]
+      },
+      {
+        key: 'configuracoes.modulos',
+        label: 'Modulos e instalacao',
+        permissoes: [
+          { key: 'configuracoes.modulos.gerenciar', label: 'Gerenciar modulos', descricao: 'Permite habilitar e bloquear modulos do produto.' }
+        ]
+      }
+    ]
+  },
+  {
     modulo: 'SOLICITACOES',
     label: 'Solicitações',
     descricao: 'Controle de criação, visualização e aprovação de solicitações operacionais.',

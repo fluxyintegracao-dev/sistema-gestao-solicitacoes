@@ -6,6 +6,10 @@ const {
   criarParceiro,
   normalizarCpfCnpj
 } = require('../services/parceiroService');
+const {
+  obterConfigCamposNovaSolicitacao,
+  resolverCamposNovaSolicitacao
+} = require('../services/novaSolicitacaoCamposConfig');
 const { responderErroController } = require('../utils/controllerError');
 
 const PLANILHA_COLUNAS = [
@@ -296,6 +300,46 @@ module.exports = {
       return res.status(201).json(parceiro);
     } catch (error) {
       return responderErroController(res, error, 'Erro ao criar parceiro', { status: 400 });
+    }
+  },
+
+  async createCredorNovaSolicitacao(req, res) {
+    try {
+      const tipoSolicitacaoId = Number(req.body?.tipo_solicitacao_id);
+      const areaResponsavel = String(req.body?.area_responsavel || '').trim();
+
+      if (!Number.isInteger(tipoSolicitacaoId) || tipoSolicitacaoId <= 0 || !areaResponsavel) {
+        return res.status(400).json({ error: 'Informe area responsavel e tipo da solicitacao para cadastrar o credor.' });
+      }
+
+      const configCampos = await obterConfigCamposNovaSolicitacao();
+      const campos = resolverCamposNovaSolicitacao(
+        {},
+        configCampos,
+        tipoSolicitacaoId,
+        { areaResponsavel }
+      );
+
+      if (campos?.cadastro_credor?.visivel !== true) {
+        return res.status(403).json({ error: 'Cadastro de credor nao habilitado para este tipo de solicitacao.' });
+      }
+
+      const payload = {
+        ...req.body,
+        fornecedor: true,
+        cliente: Boolean(req.body?.cliente),
+        corretor: Boolean(req.body?.corretor),
+        testemunha: false,
+        ativo: true
+      };
+
+      delete payload.tipo_solicitacao_id;
+      delete payload.area_responsavel;
+
+      const parceiro = await criarParceiro(payload);
+      return res.status(201).json(parceiro);
+    } catch (error) {
+      return responderErroController(res, error, 'Erro ao cadastrar credor', { status: 400 });
     }
   },
 

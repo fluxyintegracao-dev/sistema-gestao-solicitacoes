@@ -7,7 +7,7 @@ import { createSolicitacao } from '../services/solicitacoes';
 import { uploadArquivos } from '../services/uploads';
 import { getTiposSubContrato } from '../services/tiposSubContrato';
 import { getContratos } from '../services/contratos';
-import { buscarParceiros, criarParceiro } from '../services/parceiros';
+import { buscarParceiros, criarCredorNovaSolicitacao } from '../services/parceiros';
 import { listarApropriacoes } from '../services/apropriacoes';
 import { getAprovacaoDiretoria, getAreasObra, getAreasPorSetorOrigem, getAutomacaoDestinoNovaSolicitacao, getCamposNovaSolicitacao, getTiposSolicitacaoPorSetor } from '../services/configuracoesSistema';
 import { useAuth } from '../contexts/AuthContext';
@@ -351,7 +351,11 @@ export default function NovaSolicitacao() {
         cep: onlyDigits(novoParceiro.cep)
       };
 
-      const parceiro = await criarParceiro(payload);
+      const parceiro = await criarCredorNovaSolicitacao({
+        ...payload,
+        tipo_solicitacao_id: form.tipo_solicitacao_id,
+        area_responsavel: form.area_responsavel
+      });
       selecionarParceiro(parceiro);
       setNovoParceiro(criarNovoParceiroPadrao());
       setModalParceiroAberto(false);
@@ -423,6 +427,7 @@ export default function NovaSolicitacao() {
   const camposContratoObrigatorios = campoObrigatorio('contrato');
   const exibirCampoSubtipo = campoVisivel('subtipo');
   const exibirCampoCredor = campoVisivel('credor');
+  const exibirCadastroCredor = campoVisivel('cadastro_credor');
   const exibirDataVencimento = campoVisivel('data_vencimento');
   const dataVencimentoObrigatoria = campoObrigatorio('data_vencimento');
   const exibirDataDemissao = campoVisivel('data_demissao');
@@ -1034,9 +1039,32 @@ export default function NovaSolicitacao() {
             )}
 
             {parceiroBuscaExecutada && parceiroBusca.trim() && parceiroResultados.length === 0 && !parceiroBuscando && !parceiroSelecionado && (
-              <span className="text-xs text-gray-500">
-                Nenhum credor encontrado. Solicite ao setor de Gerencia de Processo o cadastro do credor.
-              </span>
+              <div className="mt-2 flex flex-col gap-2 rounded border border-[var(--c-border)] bg-[var(--c-surface)] p-3 text-xs text-gray-500">
+                <span>
+                  Nenhum credor encontrado.
+                </span>
+                {exibirCadastroCredor ? (
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-sm w-fit"
+                    onClick={() => setModalParceiroAberto(true)}
+                  >
+                    Cadastrar credor
+                  </button>
+                ) : (
+                  <span>Solicite ao setor de Gerencia de Processo o cadastro do credor.</span>
+                )}
+              </div>
+            )}
+
+            {exibirCadastroCredor && !parceiroSelecionado && !parceiroBuscaExecutada && (
+              <button
+                type="button"
+                className="btn btn-outline btn-sm mt-2 w-fit"
+                onClick={() => setModalParceiroAberto(true)}
+              >
+                Cadastrar novo credor
+              </button>
             )}
           </>
         )}
@@ -1801,7 +1829,7 @@ export default function NovaSolicitacao() {
         </div>
       </form>
 
-      {false && modalParceiroAberto && (
+      {exibirCadastroCredor && modalParceiroAberto && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
           <div className="card w-full max-w-2xl space-y-4">
             <div className="flex items-start justify-between gap-4">

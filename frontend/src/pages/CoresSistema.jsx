@@ -200,8 +200,9 @@ function montarPreviewVars(draft) {
   };
 }
 
-function ColorField({ label, value, fallback, onChange }) {
+function ColorField({ label, path, value, fallback, onChange }) {
   const safeValue = corValida(value, fallback);
+  const fieldLabel = path ? `${label} (${path})` : label;
   return (
     <label className="flex items-center gap-3 rounded-xl border border-[var(--c-border)] bg-[var(--c-bg)] px-3 py-2 text-sm">
       <span
@@ -211,11 +212,18 @@ function ColorField({ label, value, fallback, onChange }) {
       />
       <span className="min-w-0 flex-1">
         <span className="block truncate font-medium text-[var(--c-text)]">{label}</span>
+        {path && (
+          <span className="mt-0.5 block truncate font-mono text-[10px] text-[var(--c-muted)]">
+            {path}
+          </span>
+        )}
         <input
           className="mt-1 w-28 rounded-md border border-[var(--c-border)] bg-[var(--c-surface)] px-2 py-1 text-xs font-mono"
           value={String(value || '')}
           onChange={(event) => onChange(event.target.value)}
           maxLength={7}
+          aria-label={fieldLabel}
+          title={fieldLabel}
         />
       </span>
       <input
@@ -223,6 +231,8 @@ function ColorField({ label, value, fallback, onChange }) {
         value={safeValue}
         onChange={(event) => onChange(event.target.value)}
         className="h-9 w-10 cursor-pointer rounded-lg border border-[var(--c-border)] bg-transparent p-1"
+        aria-label={`Selecionar cor de ${fieldLabel}`}
+        title={`Selecionar cor de ${fieldLabel}`}
       />
     </label>
   );
@@ -240,6 +250,7 @@ function ColorSection({ title, description, fields, draft, onChange, columns = '
           <ColorField
             key={path}
             label={label}
+            path={path}
             value={getByPath(draft, path)}
             fallback={getByPath(TEMA_PADRAO, path) || '#ffffff'}
             onChange={(value) => onChange(path, value)}
@@ -439,6 +450,7 @@ export default function CoresSistema() {
             <ColorField
               key={status}
               label={status}
+              path={`status.global.${status}`}
               value={draft.status?.global?.[status]}
               fallback={TEMA_PADRAO.status.global[status] || '#9ca3af'}
               onChange={(value) => atualizarCorStatusGlobal(status, value)}
@@ -478,6 +490,7 @@ export default function CoresSistema() {
             <ColorField
               key={status}
               label={status}
+              path={`status.setores.${String(setorSelecionado || '').toUpperCase()}.${status}`}
               value={
                 draft.status?.setores?.[String(setorSelecionado || '').toUpperCase()]?.[status] ||
                 draft.status?.global?.[status]

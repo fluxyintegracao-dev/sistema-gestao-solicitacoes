@@ -226,6 +226,7 @@ const {
   canManagePaymentBeneficiaries,
   canManageComercialContratos,
   canManageComercialEmpreendimentos,
+  canManageConfiguracoesArea,
   canManageComprasConfiguracoes,
   canManageComprasDelegacao,
   canManageComprasFornecedores,
@@ -794,7 +795,26 @@ const allowComercialContratosManage = permit({
   )
 });
 
+function allowConfiguracoesArea(area, errorMessage = 'Acesso negado para configuracoes') {
+  return permit({
+    resource: 'CONFIGURACOES',
+    custom: async (req) => (
+      (await canManageConfiguracoesArea(req.user, area))
+        ? true
+        : errorMessage
+    )
+  });
+}
+
 const allowBusinessAdmin = permit(['SUPERADMIN', 'ADMINISTRADOR']);
+const allowConfiguracoesGeral = allowConfiguracoesArea('geral', 'Acesso negado para configuracoes administrativas');
+const allowConfiguracoesCadastros = allowConfiguracoesArea('cadastros', 'Acesso negado para cadastros administrativos');
+const allowConfiguracoesUsuarios = allowConfiguracoesArea('usuarios', 'Acesso negado para gerenciar usuarios');
+const allowConfiguracoesStatusVinculos = allowConfiguracoesArea('status_vinculos', 'Acesso negado para status, vinculos e acessos');
+const allowConfiguracoesSolicitacoes = allowConfiguracoesArea('solicitacoes', 'Acesso negado para configurar solicitacoes');
+const allowConfiguracoesAparencia = allowConfiguracoesArea('aparencia', 'Acesso negado para configurar aparencia e suporte');
+const allowConfiguracoesPermissoes = allowConfiguracoesArea('permissoes', 'Acesso negado para permissoes granulares');
+const allowConfiguracoesModulos = allowConfiguracoesArea('modulos', 'Acesso negado para configurar modulos');
 const allowSolicitacoesRelatorioOperacional = permit({
   resource: 'SOLICITACOES_RELATORIOS',
   custom: async (req) => (
@@ -1099,6 +1119,7 @@ router.patch('/solicitacoes/:id/pedido', validateRequest({ params: validateNumer
 router.patch('/solicitacoes/:id/ref-contrato', requireEnabledModule('CONTRATOS'), validateRequest({ params: validateNumericIdParam('id', 'Solicitacao'), body: validateSolicitacaoRefContratoBody }), auditSuccess({ eventType: 'SOLICITACAO_CONTRATO_UPDATED', resourceType: 'SOLICITACAO', description: 'Referencia de contrato atualizada', resourceIdResolver: (req) => req.params.id }), SolicitacaoController.atualizarRefContrato);
 router.patch('/solicitacoes/:id/valor', validateRequest({ params: validateNumericIdParam('id', 'Solicitacao'), body: validateSolicitacaoValorBody }), auditSuccess({ eventType: 'SOLICITACAO_VALOR_UPDATED', resourceType: 'SOLICITACAO', description: 'Valor da solicitacao atualizado', resourceIdResolver: (req) => req.params.id }), SolicitacaoController.atualizarValor);
 router.patch('/solicitacoes/:id/data-vencimento', validateRequest({ params: validateNumericIdParam('id', 'Solicitacao'), body: validateSolicitacaoDataVencimentoBody }), auditSuccess({ eventType: 'SOLICITACAO_DUE_DATE_UPDATED', resourceType: 'SOLICITACAO', description: 'Data de vencimento da solicitacao atualizada', resourceIdResolver: (req) => req.params.id }), SolicitacaoController.atualizarDataVencimento);
+router.post('/solicitacoes/credores', auditSuccess({ eventType: 'SOLICITACAO_CREDOR_CREATED', resourceType: 'PARCEIRO', description: 'Credor criado durante abertura de solicitacao' }), ParceiroController.createCredorNovaSolicitacao);
 router.patch('/solicitacoes/arquivar-massa', validateRequest({ body: validateSolicitacaoArquivarMassaBody }), auditSuccess({ eventType: 'SOLICITACAO_ARCHIVED_BATCH', resourceType: 'SOLICITACAO', description: 'Solicitacoes arquivadas em massa', metadataResolver: (req) => ({ solicitacao_ids: req.body?.solicitacao_ids || [] }) }), SolicitacaoController.arquivarEmMassa);
 router.post('/solicitacoes/enviar-setor-massa', validateRequest({ body: validateSolicitacaoEnviarSetorMassaBody }), auditSuccess({ eventType: 'SOLICITACAO_SENT_BATCH', resourceType: 'SOLICITACAO', description: 'Solicitacoes enviadas em massa para outro setor', metadataResolver: (req) => ({ solicitacao_ids: req.body?.solicitacao_ids || [], setor_destino: req.body?.setor_destino || null }) }), SolicitacaoController.enviarParaSetorEmMassa);
 router.post('/solicitacoes/:id/comentarios', validateRequest({ params: validateNumericIdParam('id', 'Solicitacao'), body: validateSolicitacaoComentarioBody }), auditSuccess({ eventType: 'SOLICITACAO_COMMENTED', resourceType: 'SOLICITACAO', description: 'Comentario adicionado na solicitacao', resourceIdResolver: (req) => req.params.id }), SolicitacaoController.adicionarComentario);
@@ -1245,20 +1266,20 @@ router.post('/solicitacoes/:id/atribuir', validateRequest({ params: validateNume
 // -------------------------------------------------------------------
 
 router.get('/cargos', CargoController.index);
-router.post('/cargos', allowBusinessAdmin, validateRequest({ body: validateCargoCreateBody }), CargoController.create);
-router.patch('/cargos/:id', allowBusinessAdmin, validateRequest({ params: validateNumericIdParam('id', 'Cargo'), body: validateCargoUpdateBody }), CargoController.update);
-router.patch('/cargos/:id/ativar', allowBusinessAdmin, validateRequest({ params: validateNumericIdParam('id', 'Cargo') }), CargoController.ativar);
-router.patch('/cargos/:id/desativar', allowBusinessAdmin, validateRequest({ params: validateNumericIdParam('id', 'Cargo') }), CargoController.desativar);
+router.post('/cargos', allowConfiguracoesCadastros, validateRequest({ body: validateCargoCreateBody }), CargoController.create);
+router.patch('/cargos/:id', allowConfiguracoesCadastros, validateRequest({ params: validateNumericIdParam('id', 'Cargo'), body: validateCargoUpdateBody }), CargoController.update);
+router.patch('/cargos/:id/ativar', allowConfiguracoesCadastros, validateRequest({ params: validateNumericIdParam('id', 'Cargo') }), CargoController.ativar);
+router.patch('/cargos/:id/desativar', allowConfiguracoesCadastros, validateRequest({ params: validateNumericIdParam('id', 'Cargo') }), CargoController.desativar);
 
 // -------------------------------------------------------------------
 // SETORES
 // -------------------------------------------------------------------
 
 router.get('/setores', SetorController.index);
-router.post('/setores', allowBusinessAdmin, validateRequest({ body: validateSetorCreateBody }), SetorController.create);
-router.patch('/setores/:id', allowBusinessAdmin, validateRequest({ params: validateNumericIdParam('id', 'Setor'), body: validateSetorUpdateBody }), SetorController.update);
-router.patch('/setores/:id/ativar', allowBusinessAdmin, validateRequest({ params: validateNumericIdParam('id', 'Setor') }), SetorController.ativar);
-router.patch('/setores/:id/desativar', allowBusinessAdmin, validateRequest({ params: validateNumericIdParam('id', 'Setor') }), SetorController.desativar);
+router.post('/setores', allowConfiguracoesCadastros, validateRequest({ body: validateSetorCreateBody }), SetorController.create);
+router.patch('/setores/:id', allowConfiguracoesCadastros, validateRequest({ params: validateNumericIdParam('id', 'Setor'), body: validateSetorUpdateBody }), SetorController.update);
+router.patch('/setores/:id/ativar', allowConfiguracoesCadastros, validateRequest({ params: validateNumericIdParam('id', 'Setor') }), SetorController.ativar);
+router.patch('/setores/:id/desativar', allowConfiguracoesCadastros, validateRequest({ params: validateNumericIdParam('id', 'Setor') }), SetorController.desativar);
 
 // -------------------------------------------------------------------
 // OBRAS
@@ -1268,26 +1289,26 @@ router.get('/obras', ObraController.index);
 router.get('/obras/minhas', ObraController.minhas);
 router.get('/obras/gestao', requireEnabledModule('OBRAS'), ObraController.gestaoIndex);
 router.get('/obras/:id/gestao', requireEnabledModule('OBRAS'), validateRequest({ params: validateNumericIdParam('id', 'Obra') }), ObraController.gestaoShow);
-router.post('/obras', allowBusinessAdmin, ObraController.create);
-router.patch('/obras/:id', allowBusinessAdmin, ObraController.update);
-router.patch('/obras/:id/ativar', allowBusinessAdmin, ObraController.ativar);
-router.patch('/obras/:id/desativar', allowBusinessAdmin, ObraController.desativar);
+router.post('/obras', allowConfiguracoesCadastros, ObraController.create);
+router.patch('/obras/:id', allowConfiguracoesCadastros, ObraController.update);
+router.patch('/obras/:id/ativar', allowConfiguracoesCadastros, ObraController.ativar);
+router.patch('/obras/:id/desativar', allowConfiguracoesCadastros, ObraController.desativar);
 
 // -------------------------------------------------------------------
 // PARCEIROS
 // -------------------------------------------------------------------
 
 router.get('/parceiros/categorias', ParceiroCategoriaController.index);
-router.post('/parceiros/categorias', allowBusinessAdmin, ParceiroCategoriaController.create);
-router.patch('/parceiros/categorias/:id', allowBusinessAdmin, validateRequest({ params: validateNumericIdParam('id', 'Categoria de parceiro') }), ParceiroCategoriaController.update);
-router.delete('/parceiros/categorias/:id', allowBusinessAdmin, validateRequest({ params: validateNumericIdParam('id', 'Categoria de parceiro') }), ParceiroCategoriaController.destroy);
-router.get('/parceiros/modelo-xlsx', allowBusinessAdmin, ParceiroController.modeloXlsx);
-router.get('/parceiros/exportar-xlsx', allowBusinessAdmin, ParceiroController.exportarXlsx);
-router.post('/parceiros/importar-xlsx', allowBusinessAdmin, uploadRateLimit, uploadComprovantes.single('file'), ParceiroController.importarXlsx);
+router.post('/parceiros/categorias', allowConfiguracoesCadastros, ParceiroCategoriaController.create);
+router.patch('/parceiros/categorias/:id', allowConfiguracoesCadastros, validateRequest({ params: validateNumericIdParam('id', 'Categoria de parceiro') }), ParceiroCategoriaController.update);
+router.delete('/parceiros/categorias/:id', allowConfiguracoesCadastros, validateRequest({ params: validateNumericIdParam('id', 'Categoria de parceiro') }), ParceiroCategoriaController.destroy);
+router.get('/parceiros/modelo-xlsx', allowConfiguracoesCadastros, ParceiroController.modeloXlsx);
+router.get('/parceiros/exportar-xlsx', allowConfiguracoesCadastros, ParceiroController.exportarXlsx);
+router.post('/parceiros/importar-xlsx', allowConfiguracoesCadastros, uploadRateLimit, uploadComprovantes.single('file'), ParceiroController.importarXlsx);
 router.get('/parceiros', ParceiroController.index);
 router.get('/parceiros/:id', validateRequest({ params: validateNumericIdParam('id', 'Parceiro') }), ParceiroController.show);
-router.post('/parceiros', allowBusinessAdmin, ParceiroController.create);
-router.patch('/parceiros/:id', allowBusinessAdmin, validateRequest({ params: validateNumericIdParam('id', 'Parceiro') }), ParceiroController.update);
+router.post('/parceiros', allowConfiguracoesCadastros, ParceiroController.create);
+router.patch('/parceiros/:id', allowConfiguracoesCadastros, validateRequest({ params: validateNumericIdParam('id', 'Parceiro') }), ParceiroController.update);
 
 // -------------------------------------------------------------------
 // COMERCIAL
@@ -1343,8 +1364,8 @@ router.post('/provisoes-financeiras/:id/comentarios', allowProvisoesEdit, critic
 // RH/DP - BLOCO 2
 // -------------------------------------------------------------------
 router.get('/empresas-grupo', allowEmpresasGrupoRead, validateRequest({ query: validateRhEmpresaGrupoQuery }), RhEmpresaGrupoController.index);
-router.post('/empresas-grupo', allowBusinessAdmin, criticalRateLimit, validateRequest({ body: validateRhEmpresaGrupoCreateBody }), RhEmpresaGrupoController.create);
-router.patch('/empresas-grupo/:id', allowBusinessAdmin, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Empresa do grupo'), body: validateRhEmpresaGrupoUpdateBody }), RhEmpresaGrupoController.update);
+router.post('/empresas-grupo', allowConfiguracoesCadastros, criticalRateLimit, validateRequest({ body: validateRhEmpresaGrupoCreateBody }), RhEmpresaGrupoController.create);
+router.patch('/empresas-grupo/:id', allowConfiguracoesCadastros, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Empresa do grupo'), body: validateRhEmpresaGrupoUpdateBody }), RhEmpresaGrupoController.update);
 router.get('/rh/empresas-grupo', allowRhDpEmpresasManage, validateRequest({ query: validateRhEmpresaGrupoQuery }), RhEmpresaGrupoController.index);
 router.post('/rh/empresas-grupo', allowRhDpEmpresasManage, criticalRateLimit, validateRequest({ body: validateRhEmpresaGrupoCreateBody }), RhEmpresaGrupoController.create);
 router.patch('/rh/empresas-grupo/:id', allowRhDpEmpresasManage, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Empresa do grupo RH/DP'), body: validateRhEmpresaGrupoUpdateBody }), RhEmpresaGrupoController.update);
@@ -1591,104 +1612,104 @@ router.get('/compras/pedidos/:id/pdf', allowComprasPedidosRead, validateRequest(
 // -------------------------------------------------------------------
 
 router.get('/tipos-solicitacao', TipoSolicitacaoController.index);
-router.post('/tipos-solicitacao', allowBusinessAdmin, TipoSolicitacaoController.create);
-router.patch('/tipos-solicitacao/:id', allowBusinessAdmin, TipoSolicitacaoController.update);
-router.patch('/tipos-solicitacao/:id/ativar', allowBusinessAdmin, TipoSolicitacaoController.ativar);
-router.patch('/tipos-solicitacao/:id/desativar', allowBusinessAdmin, TipoSolicitacaoController.desativar);
-router.delete('/tipos-solicitacao/:id', allowBusinessAdmin, TipoSolicitacaoController.excluir);
+router.post('/tipos-solicitacao', allowConfiguracoesCadastros, TipoSolicitacaoController.create);
+router.patch('/tipos-solicitacao/:id', allowConfiguracoesCadastros, TipoSolicitacaoController.update);
+router.patch('/tipos-solicitacao/:id/ativar', allowConfiguracoesCadastros, TipoSolicitacaoController.ativar);
+router.patch('/tipos-solicitacao/:id/desativar', allowConfiguracoesCadastros, TipoSolicitacaoController.desativar);
+router.delete('/tipos-solicitacao/:id', allowConfiguracoesCadastros, TipoSolicitacaoController.excluir);
 
 // -------------------------------------------------------------------
 // TIPOS MACRO E SUB DE CONTRATO
 // -------------------------------------------------------------------
 
 router.get('/tipos-macro-contrato', TipoMacroContratoController.index);
-router.post('/tipos-macro-contrato', allowBusinessAdmin, TipoMacroContratoController.create);
-router.patch('/tipos-macro-contrato/:id', allowBusinessAdmin, TipoMacroContratoController.update);
-router.patch('/tipos-macro-contrato/:id/ativar', allowBusinessAdmin, TipoMacroContratoController.ativar);
-router.patch('/tipos-macro-contrato/:id/desativar', allowBusinessAdmin, TipoMacroContratoController.desativar);
+router.post('/tipos-macro-contrato', allowConfiguracoesCadastros, TipoMacroContratoController.create);
+router.patch('/tipos-macro-contrato/:id', allowConfiguracoesCadastros, TipoMacroContratoController.update);
+router.patch('/tipos-macro-contrato/:id/ativar', allowConfiguracoesCadastros, TipoMacroContratoController.ativar);
+router.patch('/tipos-macro-contrato/:id/desativar', allowConfiguracoesCadastros, TipoMacroContratoController.desativar);
 
 router.get('/tipos-sub-contrato', TipoSubContratoController.index);
-router.post('/tipos-sub-contrato', allowBusinessAdmin, TipoSubContratoController.create);
-router.patch('/tipos-sub-contrato/:id', allowBusinessAdmin, TipoSubContratoController.update);
-router.patch('/tipos-sub-contrato/:id/ativar', allowBusinessAdmin, TipoSubContratoController.ativar);
-router.patch('/tipos-sub-contrato/:id/desativar', allowBusinessAdmin, TipoSubContratoController.desativar);
-router.delete('/tipos-sub-contrato/:id', allowBusinessAdmin, TipoSubContratoController.excluir);
+router.post('/tipos-sub-contrato', allowConfiguracoesCadastros, TipoSubContratoController.create);
+router.patch('/tipos-sub-contrato/:id', allowConfiguracoesCadastros, TipoSubContratoController.update);
+router.patch('/tipos-sub-contrato/:id/ativar', allowConfiguracoesCadastros, TipoSubContratoController.ativar);
+router.patch('/tipos-sub-contrato/:id/desativar', allowConfiguracoesCadastros, TipoSubContratoController.desativar);
+router.delete('/tipos-sub-contrato/:id', allowConfiguracoesCadastros, TipoSubContratoController.excluir);
 
 // -------------------------------------------------------------------
 // STATUS POR SETOR (SUPERADMIN)
 // -------------------------------------------------------------------
 
 router.get('/status-setor', validateRequest({ query: validateStatusSetorQuery }), StatusSetorController.index);
-router.post('/status-setor', allowBusinessAdmin, validateRequest({ body: validateStatusSetorCreateBody }), StatusSetorController.create);
-router.patch('/status-setor/:id', allowBusinessAdmin, validateRequest({ params: validateNumericIdParam('id', 'Status do setor'), body: validateStatusSetorUpdateBody }), StatusSetorController.update);
-router.patch('/status-setor/:id/ativar', allowBusinessAdmin, validateRequest({ params: validateNumericIdParam('id', 'Status do setor') }), StatusSetorController.ativar);
-router.patch('/status-setor/:id/desativar', allowBusinessAdmin, validateRequest({ params: validateNumericIdParam('id', 'Status do setor') }), StatusSetorController.desativar);
+router.post('/status-setor', allowConfiguracoesStatusVinculos, validateRequest({ body: validateStatusSetorCreateBody }), StatusSetorController.create);
+router.patch('/status-setor/:id', allowConfiguracoesStatusVinculos, validateRequest({ params: validateNumericIdParam('id', 'Status do setor'), body: validateStatusSetorUpdateBody }), StatusSetorController.update);
+router.patch('/status-setor/:id/ativar', allowConfiguracoesStatusVinculos, validateRequest({ params: validateNumericIdParam('id', 'Status do setor') }), StatusSetorController.ativar);
+router.patch('/status-setor/:id/desativar', allowConfiguracoesStatusVinculos, validateRequest({ params: validateNumericIdParam('id', 'Status do setor') }), StatusSetorController.desativar);
 
 // -------------------------------------------------------------------
 // PERMISSOES POR SETOR (SUPERADMIN)
 // -------------------------------------------------------------------
 
 router.get('/setor-permissoes', SetorPermissaoController.index);
-router.patch('/setor-permissoes', allowBusinessAdmin, validateRequest({ body: validateSetorPermissaoBody }), SetorPermissaoController.upsert);
+router.patch('/setor-permissoes', allowConfiguracoesStatusVinculos, validateRequest({ body: validateSetorPermissaoBody }), SetorPermissaoController.upsert);
 
 // -------------------------------------------------------------------
 // CONFIGURACOES DO SISTEMA (SUPERADMIN)
 // -------------------------------------------------------------------
 
-router.patch('/configuracoes/tema', allowBusinessAdmin, ConfiguracaoSistemaController.updateTema);
+router.patch('/configuracoes/tema', allowConfiguracoesAparencia, ConfiguracaoSistemaController.updateTema);
 router.get('/configuracoes/suporte-whatsapp', ConfiguracaoSistemaController.getSuporteWhatsapp);
-router.patch('/configuracoes/suporte-whatsapp', permit(['SUPERADMIN']), ConfiguracaoSistemaController.updateSuporteWhatsapp);
+router.patch('/configuracoes/suporte-whatsapp', allowConfiguracoesAparencia, ConfiguracaoSistemaController.updateSuporteWhatsapp);
 router.get('/configuracoes/timeout-inatividade', ConfiguracaoSistemaController.getTimeoutInatividade);
-router.patch('/configuracoes/timeout-inatividade', allowBusinessAdmin, ConfiguracaoSistemaController.updateTimeoutInatividade);
+router.patch('/configuracoes/timeout-inatividade', allowConfiguracoesStatusVinculos, ConfiguracaoSistemaController.updateTimeoutInatividade);
 router.get('/configuracoes/areas-obra', ConfiguracaoSistemaController.getAreasObra);
-router.patch('/configuracoes/areas-obra', allowBusinessAdmin, ConfiguracaoSistemaController.updateAreasObra);
+router.patch('/configuracoes/areas-obra', allowConfiguracoesStatusVinculos, ConfiguracaoSistemaController.updateAreasObra);
 router.get('/configuracoes/areas-por-setor-origem', ConfiguracaoSistemaController.getAreasPorSetorOrigem);
-router.patch('/configuracoes/areas-por-setor-origem', allowBusinessAdmin, ConfiguracaoSistemaController.updateAreasPorSetorOrigem);
-router.get('/configuracoes/solicitacoes-sla-setor', allowBusinessAdmin, ConfiguracaoSistemaController.getSlaSolicitacoesSetor);
-router.patch('/configuracoes/solicitacoes-sla-setor', allowBusinessAdmin, ConfiguracaoSistemaController.updateSlaSolicitacoesSetor);
-router.get('/configuracoes/setores-visiveis-usuario', allowBusinessAdmin, ConfiguracaoSistemaController.getSetoresVisiveisPorUsuario);
-router.patch('/configuracoes/setores-visiveis-usuario', allowBusinessAdmin, ConfiguracaoSistemaController.updateSetoresVisiveisPorUsuario);
+router.patch('/configuracoes/areas-por-setor-origem', allowConfiguracoesStatusVinculos, ConfiguracaoSistemaController.updateAreasPorSetorOrigem);
+router.get('/configuracoes/solicitacoes-sla-setor', allowConfiguracoesStatusVinculos, ConfiguracaoSistemaController.getSlaSolicitacoesSetor);
+router.patch('/configuracoes/solicitacoes-sla-setor', allowConfiguracoesStatusVinculos, ConfiguracaoSistemaController.updateSlaSolicitacoesSetor);
+router.get('/configuracoes/setores-visiveis-usuario', allowConfiguracoesStatusVinculos, ConfiguracaoSistemaController.getSetoresVisiveisPorUsuario);
+router.patch('/configuracoes/setores-visiveis-usuario', allowConfiguracoesStatusVinculos, ConfiguracaoSistemaController.updateSetoresVisiveisPorUsuario);
 router.get('/configuracoes/tipos-solicitacao-por-setor', ConfiguracaoSistemaController.getTiposSolicitacaoPorSetor);
-router.patch('/configuracoes/tipos-solicitacao-por-setor', allowBusinessAdmin, ConfiguracaoSistemaController.updateTiposSolicitacaoPorSetor);
+router.patch('/configuracoes/tipos-solicitacao-por-setor', allowConfiguracoesStatusVinculos, ConfiguracaoSistemaController.updateTiposSolicitacaoPorSetor);
 router.get('/configuracoes/nova-solicitacao-campos', ConfiguracaoSistemaController.getCamposNovaSolicitacao);
-router.patch('/configuracoes/nova-solicitacao-campos', permit(['SUPERADMIN']), ConfiguracaoSistemaController.updateCamposNovaSolicitacao);
+router.patch('/configuracoes/nova-solicitacao-campos', allowConfiguracoesSolicitacoes, ConfiguracaoSistemaController.updateCamposNovaSolicitacao);
 router.get('/configuracoes/nova-solicitacao-automacao-destino', ConfiguracaoSistemaController.getAutomacaoDestinoNovaSolicitacao);
-router.patch('/configuracoes/nova-solicitacao-automacao-destino', permit(['SUPERADMIN']), ConfiguracaoSistemaController.updateAutomacaoDestinoNovaSolicitacao);
+router.patch('/configuracoes/nova-solicitacao-automacao-destino', allowConfiguracoesSolicitacoes, ConfiguracaoSistemaController.updateAutomacaoDestinoNovaSolicitacao);
 router.get('/configuracoes/aprovacao-diretoria', ConfiguracaoSistemaController.getAprovacaoDiretoria);
-router.patch('/configuracoes/aprovacao-diretoria', allowBusinessAdmin, ConfiguracaoSistemaController.updateAprovacaoDiretoria);
-router.get('/configuracoes/usuarios-acesso-prioridade-diretoria', allowBusinessAdmin, ConfiguracaoSistemaController.getUsuariosAcessoPrioridadeDiretoria);
-router.patch('/configuracoes/usuarios-acesso-prioridade-diretoria', allowBusinessAdmin, ConfiguracaoSistemaController.updateUsuariosAcessoPrioridadeDiretoria);
+router.patch('/configuracoes/aprovacao-diretoria', allowConfiguracoesStatusVinculos, ConfiguracaoSistemaController.updateAprovacaoDiretoria);
+router.get('/configuracoes/usuarios-acesso-prioridade-diretoria', allowConfiguracoesStatusVinculos, ConfiguracaoSistemaController.getUsuariosAcessoPrioridadeDiretoria);
+router.patch('/configuracoes/usuarios-acesso-prioridade-diretoria', allowConfiguracoesStatusVinculos, ConfiguracaoSistemaController.updateUsuariosAcessoPrioridadeDiretoria);
 router.get('/configuracoes/tipos-compartilhados-setor', ConfiguracaoSistemaController.getTiposCompartilhadosSetor);
-router.patch('/configuracoes/tipos-compartilhados-setor', allowBusinessAdmin, ConfiguracaoSistemaController.updateTiposCompartilhadosSetor);
+router.patch('/configuracoes/tipos-compartilhados-setor', allowConfiguracoesStatusVinculos, ConfiguracaoSistemaController.updateTiposCompartilhadosSetor);
 router.get('/configuracoes/automacao-status-setor', ConfiguracaoSistemaController.getAutomacaoStatusSetor);
-router.patch('/configuracoes/automacao-status-setor', allowBusinessAdmin, ConfiguracaoSistemaController.updateAutomacaoStatusSetor);
+router.patch('/configuracoes/automacao-status-setor', allowConfiguracoesStatusVinculos, ConfiguracaoSistemaController.updateAutomacaoStatusSetor);
 router.get('/configuracoes/setores-criacao-todas-obras', ConfiguracaoSistemaController.getSetoresCriacaoTodasObras);
-router.patch('/configuracoes/setores-criacao-todas-obras', allowBusinessAdmin, ConfiguracaoSistemaController.updateSetoresCriacaoTodasObras);
+router.patch('/configuracoes/setores-criacao-todas-obras', allowConfiguracoesStatusVinculos, ConfiguracaoSistemaController.updateSetoresCriacaoTodasObras);
 router.get('/configuracoes/setores-acesso-todas-obras', ConfiguracaoSistemaController.getSetoresAcessoTodasObras);
-router.patch('/configuracoes/setores-acesso-todas-obras', allowBusinessAdmin, ConfiguracaoSistemaController.updateSetoresAcessoTodasObras);
-router.get('/configuracoes/usuarios-acesso-financeiro', allowBusinessAdmin, ConfiguracaoSistemaController.getUsuariosAcessoFinanceiro);
-router.patch('/configuracoes/usuarios-acesso-financeiro', allowBusinessAdmin, ConfiguracaoSistemaController.updateUsuariosAcessoFinanceiro);
-router.get('/configuracoes/usuarios-envio-qualquer-setor', allowBusinessAdmin, ConfiguracaoSistemaController.getUsuariosEnvioQualquerSetor);
-router.patch('/configuracoes/usuarios-envio-qualquer-setor', allowBusinessAdmin, ConfiguracaoSistemaController.updateUsuariosEnvioQualquerSetor);
-router.get('/configuracoes/usuarios-permissoes-rh-dp', allowBusinessAdmin, ConfiguracaoSistemaController.getUsuariosPermissoesRhDp);
-router.patch('/configuracoes/usuarios-permissoes-rh-dp', allowBusinessAdmin, ConfiguracaoSistemaController.updateUsuariosPermissoesRhDp);
-router.get('/configuracoes/permissoes-areas/registry', allowBusinessAdmin, PermissoesAreasController.registry);
-router.get('/configuracoes/permissoes-areas', allowBusinessAdmin, PermissoesAreasController.get);
-router.put('/configuracoes/permissoes-areas', allowBusinessAdmin, PermissoesAreasController.save);
+router.patch('/configuracoes/setores-acesso-todas-obras', allowConfiguracoesStatusVinculos, ConfiguracaoSistemaController.updateSetoresAcessoTodasObras);
+router.get('/configuracoes/usuarios-acesso-financeiro', allowConfiguracoesStatusVinculos, ConfiguracaoSistemaController.getUsuariosAcessoFinanceiro);
+router.patch('/configuracoes/usuarios-acesso-financeiro', allowConfiguracoesStatusVinculos, ConfiguracaoSistemaController.updateUsuariosAcessoFinanceiro);
+router.get('/configuracoes/usuarios-envio-qualquer-setor', allowConfiguracoesStatusVinculos, ConfiguracaoSistemaController.getUsuariosEnvioQualquerSetor);
+router.patch('/configuracoes/usuarios-envio-qualquer-setor', allowConfiguracoesStatusVinculos, ConfiguracaoSistemaController.updateUsuariosEnvioQualquerSetor);
+router.get('/configuracoes/usuarios-permissoes-rh-dp', allowConfiguracoesStatusVinculos, ConfiguracaoSistemaController.getUsuariosPermissoesRhDp);
+router.patch('/configuracoes/usuarios-permissoes-rh-dp', allowConfiguracoesStatusVinculos, ConfiguracaoSistemaController.updateUsuariosPermissoesRhDp);
+router.get('/configuracoes/permissoes-areas/registry', allowConfiguracoesPermissoes, PermissoesAreasController.registry);
+router.get('/configuracoes/permissoes-areas', allowConfiguracoesPermissoes, PermissoesAreasController.get);
+router.put('/configuracoes/permissoes-areas', allowConfiguracoesPermissoes, PermissoesAreasController.save);
 router.get('/configuracoes/visibilidade-ui', UiVisibilityConfigController.show);
-router.patch('/configuracoes/visibilidade-ui', permit(['SUPERADMIN']), UiVisibilityConfigController.update);
+router.patch('/configuracoes/visibilidade-ui', allowConfiguracoesAparencia, UiVisibilityConfigController.update);
 router.get('/configuracoes/cotacoes', requireEnabledModule('COTACOES'), allowComprasConfiguracoesManage, ConfiguracaoSistemaController.getCotacoesConfig);
 router.patch('/configuracoes/cotacoes', requireEnabledModule('COTACOES'), allowComprasConfiguracoesManage, ConfiguracaoSistemaController.setCotacoesConfig);
 router.get('/configuracoes/status-pedidos-compra', allowComprasConfiguracoesManage, ConfiguracaoSistemaController.getStatusPedidosCompra);
 router.patch('/configuracoes/status-pedidos-compra', allowComprasConfiguracoesManage, ConfiguracaoSistemaController.setStatusPedidosCompra);
-router.get('/configuracoes/comercial-categorias-contrato', allowBusinessAdmin, ConfiguracaoSistemaController.getComercialCategoriasContrato);
-router.patch('/configuracoes/comercial-categorias-contrato', permit(['SUPERADMIN']), ConfiguracaoSistemaController.setComercialCategoriasContrato);
-router.get('/configuracoes/provisionamento-fluxo', requireEnabledModule('PROVISOES'), permit(['SUPERADMIN']), ConfiguracaoSistemaController.getProvisionamentoFluxo);
-router.patch('/configuracoes/provisionamento-fluxo', requireEnabledModule('PROVISOES'), permit(['SUPERADMIN']), validateRequest({ body: validateProvisionamentoFluxoConfigBody }), ConfiguracaoSistemaController.setProvisionamentoFluxo);
-router.get('/configuracoes/notificacoes-sistema', permit(['SUPERADMIN']), ConfiguracaoSistemaController.getNotificacoesSistema);
-router.patch('/configuracoes/notificacoes-sistema', permit(['SUPERADMIN']), ConfiguracaoSistemaController.setNotificacoesSistema);
+router.get('/configuracoes/comercial-categorias-contrato', allowConfiguracoesGeral, ConfiguracaoSistemaController.getComercialCategoriasContrato);
+router.patch('/configuracoes/comercial-categorias-contrato', allowConfiguracoesGeral, ConfiguracaoSistemaController.setComercialCategoriasContrato);
+router.get('/configuracoes/provisionamento-fluxo', requireEnabledModule('PROVISOES'), allowConfiguracoesGeral, ConfiguracaoSistemaController.getProvisionamentoFluxo);
+router.patch('/configuracoes/provisionamento-fluxo', requireEnabledModule('PROVISOES'), allowConfiguracoesGeral, validateRequest({ body: validateProvisionamentoFluxoConfigBody }), ConfiguracaoSistemaController.setProvisionamentoFluxo);
+router.get('/configuracoes/notificacoes-sistema', allowConfiguracoesAparencia, ConfiguracaoSistemaController.getNotificacoesSistema);
+router.patch('/configuracoes/notificacoes-sistema', allowConfiguracoesAparencia, ConfiguracaoSistemaController.setNotificacoesSistema);
 router.get('/configuracoes/modulos', ConfiguracaoSistemaController.getModulos);
-router.patch('/configuracoes/modulos', permit(['SUPERADMIN']), ConfiguracaoSistemaController.setModulos);
+router.patch('/configuracoes/modulos', allowConfiguracoesModulos, ConfiguracaoSistemaController.setModulos);
 
 // -------------------------------------------------------------------
 // CONTRATOS

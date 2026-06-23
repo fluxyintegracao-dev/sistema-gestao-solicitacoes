@@ -197,6 +197,45 @@ const COMPRAS_CONFIGURACOES_MANAGE_KEYS = [
   'compras.configuracoes.cadastros'
 ];
 
+const CONFIGURACOES_AREA_PERMISSION_KEYS = {
+  geral: [
+    'configuracoes.geral.visualizar',
+    'configuracoes.geral.gerenciar'
+  ],
+  cadastros: [
+    'configuracoes.geral.gerenciar',
+    'configuracoes.cadastros.gerenciar'
+  ],
+  usuarios: [
+    'configuracoes.geral.gerenciar',
+    'configuracoes.usuarios.gerenciar'
+  ],
+  status_vinculos: [
+    'configuracoes.geral.gerenciar',
+    'configuracoes.status_vinculos.gerenciar'
+  ],
+  solicitacoes: [
+    'configuracoes.geral.gerenciar',
+    'configuracoes.solicitacoes.gerenciar'
+  ],
+  aparencia: [
+    'configuracoes.geral.gerenciar',
+    'configuracoes.aparencia.gerenciar'
+  ],
+  permissoes: [
+    'configuracoes.geral.gerenciar',
+    'configuracoes.permissoes.gerenciar'
+  ],
+  modulos: [
+    'configuracoes.geral.gerenciar',
+    'configuracoes.modulos.gerenciar'
+  ]
+};
+
+const CONFIGURACOES_VIEW_KEYS = [
+  ...new Set(Object.values(CONFIGURACOES_AREA_PERMISSION_KEYS).flat())
+];
+
 const COMPRAS_ESCOPO_SETOR_KEYS = [
   'compras.escopo.setor',
   'compras.delegacao.gerenciar'
@@ -1042,6 +1081,10 @@ async function canManageUsers(user) {
     return true;
   }
 
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, CONFIGURACOES_AREA_PERMISSION_KEYS.usuarios);
+  }
+
   return hasAnyProfile(user, ['ADMIN']) && userHasSetorCapability(user, 'eh_setor_geo');
 }
 
@@ -1496,6 +1539,32 @@ async function canManageComprasConfiguracoes(user) {
 
   if (await userHasConfiguredAreaPermissions(user)) {
     return userHasAreaPermission(user, COMPRAS_CONFIGURACOES_MANAGE_KEYS);
+  }
+
+  return false;
+}
+
+async function canAccessConfiguracoes(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, CONFIGURACOES_VIEW_KEYS);
+  }
+
+  return false;
+}
+
+async function canManageConfiguracoesArea(user, area = 'geral') {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    const normalizedArea = String(area || 'geral').trim().toLowerCase();
+    const permissionKeys = CONFIGURACOES_AREA_PERMISSION_KEYS[normalizedArea] || CONFIGURACOES_AREA_PERMISSION_KEYS.geral;
+    return userHasAreaPermission(user, permissionKeys);
   }
 
   return false;
@@ -2379,6 +2448,7 @@ module.exports = {
   canAccessSolicitacaoCompraByScope,
   canCreateCompraSolicitacao,
   canAccessComprovantes,
+  canAccessConfiguracoes,
   canCancelPrioridadeDiretoriaLote,
   canAccessPagamentos,
   canApprovePagamentos,
@@ -2409,6 +2479,7 @@ module.exports = {
   canManageComprasCotacoes,
   canManageComprasFornecedores,
   canManageComprasPedidos,
+  canManageConfiguracoesArea,
   canManageCrmAutomacoes,
   canManageCrmConfiguracoes,
   canManageFiscalConfig,
