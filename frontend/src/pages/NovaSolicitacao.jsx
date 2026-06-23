@@ -11,7 +11,7 @@ import { buscarParceiros, criarCredorNovaSolicitacao } from '../services/parceir
 import { listarApropriacoes } from '../services/apropriacoes';
 import { getAprovacaoDiretoria, getAreasObra, getAreasPorSetorOrigem, getAutomacaoDestinoNovaSolicitacao, getCamposNovaSolicitacao, getTiposSolicitacaoPorSetor } from '../services/configuracoesSistema';
 import { useAuth } from '../contexts/AuthContext';
-import { HiPaperClip } from 'react-icons/hi2';
+import { HiOutlineMagnifyingGlass, HiPaperClip } from 'react-icons/hi2';
 import ApropriacaoAutocomplete from '../components/ui/ApropriacaoAutocomplete';
 import PendingAttachmentsList from '../components/attachments/PendingAttachmentsList';
 import { userHasSetorCapability } from '../utils/setor';
@@ -38,6 +38,11 @@ function normalizarBusca(valor) {
     .toUpperCase();
 }
 
+function isTipoCompraDireta(tipo) {
+  const token = normalizarBusca(tipo?.codigo_interno || tipo?.nome).replace(/[^A-Z0-9]+/g, '_');
+  return token === 'COMPRA_DIRETA';
+}
+
 function formatarLocalidadeObra(obra) {
   if (!obra) return 'Localidade nao informada';
   return [obra.cidade, obra.estado].filter(Boolean).join(' / ') || 'Localidade nao informada';
@@ -49,6 +54,14 @@ function formatarRotuloBuscaObra(obra) {
   const nome = String(obra.nome || '').trim();
   if (codigo && nome) return `${codigo} - ${nome}`;
   return codigo || nome;
+}
+
+function formatarCredor(credor) {
+  if (!credor) return '';
+  const nome = String(credor.nome || '').trim();
+  const documento = String(credor.cpf_cnpj || '').trim();
+  if (nome && documento) return `${nome} - ${documento}`;
+  return nome || documento || `Credor ${credor.id}`;
 }
 
 function isCadastroObra(obra) {
@@ -128,6 +141,9 @@ export default function NovaSolicitacao() {
   const [parceiroBuscando, setParceiroBuscando] = useState(false);
   const [parceiroBuscaExecutada, setParceiroBuscaExecutada] = useState(false);
   const [modalParceiroAberto, setModalParceiroAberto] = useState(false);
+  const [modalCredoresContratoAberto, setModalCredoresContratoAberto] = useState(false);
+  const [credorContratoSugestoesAbertas, setCredorContratoSugestoesAbertas] = useState(false);
+  const [credorContratoModalBusca, setCredorContratoModalBusca] = useState('');
   const [categoriasParceiro, setCategoriasParceiro] = useState([]);
   const [novoParceiro, setNovoParceiro] = useState(criarNovoParceiroPadrao);
   const [arquivos, setArquivos] = useState([]);
@@ -311,6 +327,8 @@ export default function NovaSolicitacao() {
     setParceiroBusca(parceiro.nome || parceiro.cpf_cnpj || '');
     setParceiroResultados([]);
     setParceiroBuscaExecutada(false);
+    setCredorContratoSugestoesAbertas(false);
+    setModalCredoresContratoAberto(false);
   }
 
   function limparParceiroSelecionado() {
@@ -318,6 +336,7 @@ export default function NovaSolicitacao() {
     setParceiroBusca('');
     setParceiroResultados([]);
     setParceiroBuscaExecutada(false);
+    setCredorContratoSugestoesAbertas(false);
     setForm(prev => ({ ...prev, parceiro_id: '' }));
   }
 
@@ -949,6 +968,18 @@ export default function NovaSolicitacao() {
     () => getCredoresContrato(contratoSelecionado),
     [contratoSelecionado]
   );
+  const credoresContratoDisponiveis = useMemo(() => (
+    parceiroSelecionado && !credoresContratoSelecionado.some(credor => String(credor.id) === String(parceiroSelecionado.id))
+      ? [...credoresContratoSelecionado, parceiroSelecionado]
+      : credoresContratoSelecionado
+  ), [credoresContratoSelecionado, parceiroSelecionado]);
+  const credoresContratoModalFiltrados = useMemo(() => {
+    const termo = normalizarBusca(credorContratoModalBusca);
+    return credoresContratoDisponiveis.filter((credor) => {
+      if (!termo) return true;
+      return normalizarBusca(`${credor.nome || ''} ${credor.cpf_cnpj || ''}`).includes(termo);
+    });
+  }, [credoresContratoDisponiveis, credorContratoModalBusca]);
 
   function renderCampoCredor(className = 'grid gap-1 text-sm lg:col-span-6') {
     if (!permitirVinculoCredor) return null;
@@ -984,42 +1015,101 @@ export default function NovaSolicitacao() {
       );
     }
 
-    const credoresContratoCampo = parceiroSelecionado && !credoresContratoSelecionado.some(credor => String(credor.id) === String(parceiroSelecionado.id))
-      ? [...credoresContratoSelecionado, parceiroSelecionado]
-      : credoresContratoSelecionado;
+    const credoresContratoCampo = credoresContratoDisponiveis;
+    const termoCredorContrato = normalizarBusca(parceiroBusca);
+    const credoresContratoFiltrados = credoresContratoCampo.filter((credor) => {
+      if (!termoCredorContrato) return true;
+      return normalizarBusca(`${credor.nome || ''} ${credor.cpf_cnpj || ''}`).includes(termoCredorContrato);
+    });
+    const credoresContratoSugestoes = credoresContratoFiltrados.slice(0, 8);
+    const inputCredorContratoDesabilitado = !form.contrato_id && credoresContratoCampo.length === 0;
 
     return (
       <label className={className}>
         Credor
         {exibirCamposContrato ? (
           <>
-            <select
-              className="input input-sm"
-              value={form.parceiro_id}
-              disabled={!form.contrato_id && credoresContratoCampo.length === 0}
-              required={campoObrigatorio('credor')}
-              onChange={(e) => {
-                const credor = credoresContratoCampo.find(item => String(item.id) === String(e.target.value));
-                if (credor) {
-                  selecionarParceiro(credor);
-                } else {
-                  limparParceiroSelecionado();
-                }
-              }}
-            >
-              <option value="">
-                {!form.contrato_id
-                  ? 'Selecione o contrato primeiro'
-                  : credoresContratoCampo.length === 0
-                    ? 'Contrato sem credor vinculado'
-                    : 'Selecione o credor'}
-              </option>
-              {credoresContratoCampo.map(credor => (
-                <option key={credor.id} value={credor.id}>
-                  {credor.nome || credor.cpf_cnpj || `Credor ${credor.id}`}
-                </option>
-              ))}
-            </select>
+            <div className="relative">
+              <div className="flex gap-2 nova-solicitacao-inline-actions">
+                <input
+                  className="input input-sm min-w-0 flex-1"
+                  placeholder={!form.contrato_id
+                    ? 'Selecione o contrato primeiro'
+                    : credoresContratoCampo.length === 0
+                      ? 'Contrato sem credor vinculado'
+                      : 'Pesquisar credor vinculado ao contrato'}
+                  value={parceiroBusca}
+                  disabled={inputCredorContratoDesabilitado}
+                  aria-label="Pesquisar credor"
+                  onFocus={() => setCredorContratoSugestoesAbertas(true)}
+                  onBlur={() => {
+                    window.setTimeout(() => setCredorContratoSugestoesAbertas(false), 120);
+                  }}
+                  onChange={(e) => {
+                    setParceiroBusca(e.target.value);
+                    setParceiroBuscaExecutada(false);
+                    if (parceiroSelecionado) {
+                      setParceiroSelecionado(null);
+                      setForm(prev => ({ ...prev, parceiro_id: '' }));
+                    }
+                    setCredorContratoSugestoesAbertas(true);
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' && credoresContratoSugestoes.length === 1) {
+                      event.preventDefault();
+                      selecionarParceiro(credoresContratoSugestoes[0]);
+                    }
+                    if (event.key === 'Escape') {
+                      setCredorContratoSugestoesAbertas(false);
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  className="btn btn-outline btn-sm shrink-0 px-3"
+                  title="Listar credores do contrato"
+                  aria-label="Listar credores do contrato"
+                  onClick={() => {
+                    setCredorContratoModalBusca(parceiroBusca);
+                    setModalCredoresContratoAberto(true);
+                  }}
+                  disabled={credoresContratoCampo.length === 0}
+                >
+                  <HiOutlineMagnifyingGlass className="h-4 w-4" />
+                </button>
+                {form.parceiro_id && (
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-sm shrink-0"
+                    onClick={limparParceiroSelecionado}
+                  >
+                    Limpar
+                  </button>
+                )}
+              </div>
+
+              {credorContratoSugestoesAbertas && !parceiroSelecionado && !inputCredorContratoDesabilitado && (
+                <div className="absolute left-0 right-0 z-20 mt-1 max-h-52 overflow-auto rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] p-1 shadow-lg">
+                  {credoresContratoSugestoes.length > 0 ? (
+                    credoresContratoSugestoes.map((credor) => (
+                      <button
+                        key={credor.id}
+                        type="button"
+                        className="block w-full rounded px-3 py-2 text-left text-sm hover:bg-slate-50"
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => selecionarParceiro(credor)}
+                      >
+                        <span className="block font-medium text-[var(--c-text)]">{formatarCredor(credor)}</span>
+                      </button>
+                    ))
+                  ) : (
+                    <div className="px-3 py-2 text-xs text-[var(--c-muted)]">
+                      Nenhum credor vinculado ao contrato corresponde a busca.
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
             <span className="text-xs text-gray-500">
               {exibirCadastroCredor
                 ? 'O credor e carregado a partir do contrato. Se necessario, cadastre um novo credor para vincular nesta solicitacao.'
@@ -1192,6 +1282,18 @@ export default function NovaSolicitacao() {
   useEffect(() => {
     if (!form.obra_id || !form.area_responsavel || !form.tipo_solicitacao_id) return;
 
+    const tipoSelecionadoRedirecionamento = tipos.find(
+      tipo => String(tipo.id) === String(form.tipo_solicitacao_id)
+    );
+    if (isTipoCompraDireta(tipoSelecionadoRedirecionamento)) {
+      const params = new URLSearchParams();
+      params.set('obra_id', String(form.obra_id));
+      params.set('tipo_solicitacao_id', String(form.tipo_solicitacao_id));
+      params.set('origem', 'nova-solicitacao');
+      navigate(`/solicitacoes-compra-direta/nova?${params.toString()}`);
+      return;
+    }
+
     const regra = obterRegraAutomacaoDestinoNovaSolicitacao(
       automacaoDestinoConfig,
       form.area_responsavel,
@@ -1215,7 +1317,8 @@ export default function NovaSolicitacao() {
     form.area_responsavel,
     form.obra_id,
     form.tipo_solicitacao_id,
-    navigate
+    navigate,
+    tipos
   ]);
 
   return (
@@ -1876,6 +1979,61 @@ export default function NovaSolicitacao() {
         </div>
         </div>
       </form>
+
+      {modalCredoresContratoAberto && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="card w-full max-w-2xl space-y-4">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-semibold" style={{ color: 'var(--c-text)' }}>Credores do contrato</h2>
+                <p className="text-sm" style={{ color: 'var(--c-muted)' }}>
+                  Selecione um dos credores vinculados ao contrato informado.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                onClick={() => setModalCredoresContratoAberto(false)}
+              >
+                Fechar
+              </button>
+            </div>
+
+            <div className="relative">
+              <HiOutlineMagnifyingGlass className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--c-muted)]" />
+              <input
+                className="input input-sm w-full pl-9"
+                placeholder="Pesquisar por nome ou CPF/CNPJ"
+                value={credorContratoModalBusca}
+                onChange={(event) => setCredorContratoModalBusca(event.target.value)}
+                autoFocus
+              />
+            </div>
+
+            <div className="max-h-[360px] overflow-auto rounded-lg border border-[var(--c-border)]">
+              {credoresContratoModalFiltrados.length === 0 ? (
+                <div className="p-4 text-sm text-[var(--c-muted)]">
+                  Nenhum credor disponivel para a busca informada.
+                </div>
+              ) : (
+                credoresContratoModalFiltrados.map((credor) => {
+                  const selecionado = String(form.parceiro_id) === String(credor.id);
+                  return (
+                    <button
+                      key={credor.id}
+                      type="button"
+                      className={`block w-full border-b border-[var(--c-border)] px-4 py-3 text-left text-sm last:border-b-0 hover:bg-slate-50 ${selecionado ? 'bg-blue-50' : 'bg-[var(--c-surface)]'}`}
+                      onClick={() => selecionarParceiro(credor)}
+                    >
+                      <span className="block font-semibold text-[var(--c-text)]">{formatarCredor(credor)}</span>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {exibirCadastroCredor && modalParceiroAberto && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">

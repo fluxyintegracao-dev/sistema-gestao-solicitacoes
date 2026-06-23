@@ -27,6 +27,16 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.DECIMAL(12, 2),
         allowNull: false
       },
+      valor_unitario: {
+        type: DataTypes.DECIMAL(14, 2),
+        allowNull: false,
+        defaultValue: 0
+      },
+      valor_total: {
+        type: DataTypes.DECIMAL(14, 2),
+        allowNull: false,
+        defaultValue: 0
+      },
       especificacao: {
         type: DataTypes.TEXT,
         allowNull: true

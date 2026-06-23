@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { criarSolicitacaoCompra, obterUrlAssinadaCompra } from '../../../services/compras';
+import { criarSolicitacaoCompra, criarSolicitacaoCompraDireta, obterUrlAssinadaCompra } from '../../../services/compras';
 import CompraPreviewModal from '../components/CompraPreviewModal';
 import { criarPreviewCompra } from '../utils/preview';
 import { montarLinhasResumoApropriacao, montarTextoResumoApropriacao } from '../utils/apropriacoes';
 
 const DRAFT_KEY = 'fluxy_solicitacao_compra_draft';
+const DRAFT_COMPRA_DIRETA_KEY = 'fluxy_compra_direta_draft';
 
 function formatarData(data) {
   if (!data) {
@@ -37,6 +38,13 @@ function escapeHtml(valor) {
 
 function textoOuPadrao(valor, padrao = '-') {
   return valor ? valor : padrao;
+}
+
+function formatarMoeda(valor) {
+  return Number(valor || 0).toLocaleString('pt-BR', {
+    style: 'currency',
+    currency: 'BRL'
+  });
 }
 
 function StatusChecklist({ ativo, titulo, descricao }) {
@@ -74,8 +82,9 @@ function LinhaResumo({ titulo, valor, className = '' }) {
   );
 }
 
-export default function RevisarSolicitacaoCompra() {
+export default function RevisarSolicitacaoCompra({ modoCompraDireta = false }) {
   const navigate = useNavigate();
+  const draftKey = modoCompraDireta ? DRAFT_COMPRA_DIRETA_KEY : DRAFT_KEY;
   const [draft, setDraft] = useState(null);
   const [confirmado, setConfirmado] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -85,26 +94,26 @@ export default function RevisarSolicitacaoCompra() {
 
   useEffect(() => {
     try {
-      const salvo = window.localStorage.getItem(DRAFT_KEY);
+      const salvo = window.localStorage.getItem(draftKey);
       if (!salvo) {
-        navigate('/solicitacoes-compra/nova', { replace: true });
+        navigate(modoCompraDireta ? '/solicitacoes-compra-direta/nova' : '/solicitacoes-compra/nova', { replace: true });
         return;
       }
 
       const dados = JSON.parse(salvo);
       if (!dados?.payload?.obra_id || !Array.isArray(dados?.payload?.itens) || !dados.payload.itens.length) {
-        window.localStorage.removeItem(DRAFT_KEY);
-        navigate('/solicitacoes-compra/nova', { replace: true });
+        window.localStorage.removeItem(draftKey);
+        navigate(modoCompraDireta ? '/solicitacoes-compra-direta/nova' : '/solicitacoes-compra/nova', { replace: true });
         return;
       }
 
       setDraft(dados);
     } catch (error) {
       console.error(error);
-      window.localStorage.removeItem(DRAFT_KEY);
-      navigate('/solicitacoes-compra/nova', { replace: true });
+      window.localStorage.removeItem(draftKey);
+      navigate(modoCompraDireta ? '/solicitacoes-compra-direta/nova' : '/solicitacoes-compra/nova', { replace: true });
     }
-  }, [navigate]);
+  }, [draftKey, modoCompraDireta, navigate]);
 
   const itensResumo = useMemo(() => draft?.resumo?.itens || [], [draft]);
   const totalItens = itensResumo.length;
@@ -146,6 +155,8 @@ export default function RevisarSolicitacaoCompra() {
           <td>${escapeHtml(item.insumo_nome || '-')}</td>
           <td>${escapeHtml(item.unidade_sigla || '-')}</td>
           <td>${escapeHtml(item.quantidade || '-')}</td>
+          ${modoCompraDireta ? `<td>${escapeHtml(formatarMoeda(item.valor_unitario))}</td>` : ''}
+          ${modoCompraDireta ? `<td>${escapeHtml(formatarMoeda(item.valor_total))}</td>` : ''}
           <td>${escapeHtml(item.especificacao || '-')}</td>
           <td>${montarLinhasResumoApropriacao(item).map((linha) => escapeHtml(linha)).join('<br />') || '-'}</td>
           <td>${escapeHtml(formatarData(item.necessario_para))}</td>
@@ -172,9 +183,10 @@ export default function RevisarSolicitacaoCompra() {
           </style>
         </head>
         <body>
-          <h1>Solicitacao de Compra</h1>
+          <h1>${modoCompraDireta ? 'Compra Direta' : 'Solicitacao de Compra'}</h1>
           <div class="meta"><strong>Obra:</strong> ${escapeHtml(draft.resumo?.obra_nome || '-')}</div>
           <div class="meta"><strong>Solicitante:</strong> ${escapeHtml(draft.resumo?.solicitante_nome || '-')}</div>
+          ${modoCompraDireta ? `<div class="meta"><strong>Valor total:</strong> ${escapeHtml(formatarMoeda(draft.resumo?.valor_total))}</div>` : ''}
           <div class="meta"><strong>Necessario para:</strong> ${escapeHtml(
             formatarData(draft.payload?.necessario_para)
           )}</div>
@@ -187,6 +199,7 @@ export default function RevisarSolicitacaoCompra() {
                 <th>Insumo</th>
                 <th>Unidade</th>
                 <th>Quantidade</th>
+                ${modoCompraDireta ? '<th>Valor unit.</th><th>Valor total</th>' : ''}
                 <th>Especificacao</th>
                 <th>Apropriacao</th>
                 <th>Necessario para</th>
@@ -199,7 +212,7 @@ export default function RevisarSolicitacaoCompra() {
         </body>
       </html>
     `;
-  }, [draft, itensResumo]);
+  }, [draft, itensResumo, modoCompraDireta]);
 
   function abrirPreviaPdf() {
     if (!draft) {
@@ -246,8 +259,10 @@ export default function RevisarSolicitacaoCompra() {
 
     try {
       setLoading(true);
-      const resposta = await criarSolicitacaoCompra(draft.payload);
-      window.localStorage.removeItem(DRAFT_KEY);
+      const resposta = modoCompraDireta
+        ? await criarSolicitacaoCompraDireta(draft.payload)
+        : await criarSolicitacaoCompra(draft.payload);
+      window.localStorage.removeItem(draftKey);
       navigate(`/solicitacoes-compra/finalizada/${resposta.id}`, {
         replace: true,
         state: {
@@ -265,9 +280,9 @@ export default function RevisarSolicitacaoCompra() {
 
   function handleVoltarEditar() {
     if (draft) {
-      window.localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+      window.localStorage.setItem(draftKey, JSON.stringify(draft));
     }
-    navigate('/solicitacoes-compra/nova', {
+    navigate(modoCompraDireta ? '/solicitacoes-compra-direta/nova' : '/solicitacoes-compra/nova', {
       state: { preservarRascunhoCompra: true }
     });
   }
@@ -279,7 +294,7 @@ export default function RevisarSolicitacaoCompra() {
   return (
     <div className="page solicitacoes-page">
       <div>
-        <h1 className="page-title">Revisar Solicitacao de Compra</h1>
+        <h1 className="page-title">{modoCompraDireta ? 'Revisar Compra Direta' : 'Revisar Solicitacao de Compra'}</h1>
         <p className="page-subtitle">
           Esta etapa agora mostra o que realmente importa: contexto da compra, checklist do envio e
           leitura clara dos itens antes da criacao.
@@ -298,7 +313,7 @@ export default function RevisarSolicitacaoCompra() {
                   {prontoParaCriar ? 'Solicitacao pronta para criar' : 'Ainda existem pendencias de revisao'}
                 </h2>
                 <p className="mt-2 max-w-2xl text-sm text-[var(--c-muted)]">
-                  Revise o PDF, confira os acessos dos itens e confirme a autorizacao. Quando os dois
+                  Revise o PDF, confira os itens e confirme a autorizacao. Quando os dois
                   checkpoints estiverem ok, o envio fica objetivo.
                 </p>
               </div>
@@ -315,6 +330,13 @@ export default function RevisarSolicitacaoCompra() {
 
             <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <CardMetrica titulo="Itens" valor={totalItens} detalhe="Total revisado nesta compra" />
+              {modoCompraDireta && (
+                <CardMetrica
+                  titulo="Total"
+                  valor={formatarMoeda(draft.resumo?.valor_total)}
+                  detalhe="Valor que sera levado para a solicitacao"
+                />
+              )}
               <CardMetrica
                 titulo="Com arquivo"
                 valor={estatisticas.comArquivo}
@@ -339,7 +361,7 @@ export default function RevisarSolicitacaoCompra() {
               <StatusChecklist
                 ativo={previewVisualizado}
                 titulo="PDF revisado"
-                descricao="Abra a pre-visualizacao para validar o documento que sera enviado."
+                descricao="Abra a pre-visualizacao para validar o documento que sera anexado ao historico."
               />
               <StatusChecklist
                 ativo={confirmado}
@@ -359,7 +381,7 @@ export default function RevisarSolicitacaoCompra() {
                 onChange={(event) => setConfirmado(event.target.checked)}
               />
               <span className="text-sm text-[var(--c-text)]">
-                Confirmo que revisei os dados e autorizo a criacao da solicitacao de compra.
+                Confirmo que revisei os dados e autorizo a criacao da {modoCompraDireta ? 'compra direta' : 'solicitacao de compra'}.
               </span>
             </label>
 
@@ -391,7 +413,7 @@ export default function RevisarSolicitacaoCompra() {
       <div className="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
         <div className="card xl:sticky xl:top-4">
           <div className="card-header">
-            <h2 className="font-semibold">Dados da compra</h2>
+            <h2 className="font-semibold">{modoCompraDireta ? 'Dados da compra direta' : 'Dados da compra'}</h2>
           </div>
 
           <div className="grid gap-4 text-sm">
@@ -402,6 +424,15 @@ export default function RevisarSolicitacaoCompra() {
               valor={textoOuPadrao(formatarData(draft.payload?.necessario_para))}
             />
             <LinhaResumo titulo="Link geral" valor={textoOuPadrao(draft.payload?.link_geral)} className="break-all" />
+            {modoCompraDireta && (
+              <>
+                <LinhaResumo titulo="Valor total" valor={formatarMoeda(draft.resumo?.valor_total)} />
+                <LinhaResumo
+                  titulo="Notas/Guias anexadas"
+                  valor={`${draft.resumo?.anexos_cabecalho?.length || 0} arquivo(s)`}
+                />
+              </>
+            )}
 
             <div className="rounded-xl border border-[var(--c-border)] px-4 py-4">
               <div className="text-xs uppercase tracking-[0.14em] text-[var(--c-muted)]">Observacoes</div>
@@ -432,6 +463,7 @@ export default function RevisarSolicitacaoCompra() {
                   <tr>
                     <th className="px-4 py-3 font-semibold">Item</th>
                     <th className="px-4 py-3 font-semibold">Quantidade</th>
+                    {modoCompraDireta && <th className="px-4 py-3 font-semibold">Valor</th>}
                     <th className="px-4 py-3 font-semibold">Apropriacao</th>
                     <th className="px-4 py-3 font-semibold">Necessario para</th>
                     <th className="px-4 py-3 font-semibold">Especificacao</th>
@@ -457,6 +489,12 @@ export default function RevisarSolicitacaoCompra() {
                       <td className="px-4 py-4 whitespace-nowrap text-[var(--c-text)]">
                         {item.quantidade} {item.unidade_sigla || '-'}
                       </td>
+                      {modoCompraDireta && (
+                        <td className="px-4 py-4 whitespace-nowrap text-[var(--c-text)]">
+                          <div>{formatarMoeda(item.valor_unitario)} un.</div>
+                          <div className="mt-1 font-semibold">{formatarMoeda(item.valor_total)}</div>
+                        </td>
+                      )}
                       <td className="px-4 py-4 max-w-[220px] text-[var(--c-muted)]">
                         {montarTextoResumoApropriacao(item)}
                       </td>

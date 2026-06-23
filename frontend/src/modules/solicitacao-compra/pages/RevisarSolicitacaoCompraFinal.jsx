@@ -13,6 +13,7 @@ export default function RevisarSolicitacaoCompraFinal() {
   const [previewArquivo, setPreviewArquivo] = useState(null);
   const resultado = location.state?.resultado || null;
   const resumo = location.state?.resumo || null;
+  const compraDireta = String(resultado?.origem || '').toUpperCase() === 'COMPRA_DIRETA';
 
   const codigo = useMemo(
     () => resultado?.codigo || `SC-${String(id || '').padStart(5, '0')}`,
@@ -59,9 +60,11 @@ export default function RevisarSolicitacaoCompraFinal() {
   return (
     <div className="page solicitacoes-page">
       <div>
-        <h1 className="page-title">Solicitacao de Compra Criada</h1>
+        <h1 className="page-title">{compraDireta ? 'Compra Direta Criada' : 'Solicitacao de Compra Criada'}</h1>
         <p className="page-subtitle">
-          O registro foi criado no modulo compras e ja gerou uma solicitacao no fluxo principal.
+          {compraDireta
+            ? 'A compra direta gerou uma solicitacao no fluxo principal com PDF e anexos para pagamento.'
+            : 'O registro foi criado no modulo compras e ja gerou uma solicitacao no fluxo principal.'}
         </p>
       </div>
 
@@ -102,9 +105,9 @@ export default function RevisarSolicitacaoCompraFinal() {
             <button
               type="button"
               className="btn btn-outline"
-              onClick={() => navigate('/solicitacoes-compra/nova')}
+              onClick={() => navigate(compraDireta ? '/solicitacoes-compra-direta/nova' : '/solicitacoes-compra/nova')}
             >
-              Nova solicitacao
+              {compraDireta ? 'Nova compra direta' : 'Nova solicitacao'}
             </button>
           </div>
         </div>

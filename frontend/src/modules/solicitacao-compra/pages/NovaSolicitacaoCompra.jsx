@@ -25,7 +25,41 @@ import {
 } from '../utils/apropriacoes';
 
 const DRAFT_KEY = 'fluxy_solicitacao_compra_draft';
+const DRAFT_COMPRA_DIRETA_KEY = 'fluxy_compra_direta_draft';
 const ITEM_ATTACHMENT_ACCEPT = '.pdf,.doc,.docx,.xls,.xlsx,.csv,.ppt,.pptx,.png,.jpg,.jpeg,.html,.rar';
+const HEADER_ATTACHMENT_ACCEPT = '.pdf,.png,.jpg,.jpeg,.xml';
+
+function parseValorMonetario(value) {
+  if (value === null || value === undefined || value === '') {
+    return 0;
+  }
+
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : 0;
+  }
+
+  const cleaned = String(value).replace(/[^\d,.-]/g, '');
+  const normalized = cleaned.includes(',')
+    ? cleaned.replace(/\./g, '').replace(',', '.')
+    : cleaned;
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function arredondarMoeda(value) {
+  return Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;
+}
+
+function formatarMoeda(value) {
+  return parseValorMonetario(value).toLocaleString('pt-BR', {
+    style: 'currency',
+    currency: 'BRL'
+  });
+}
+
+function calcularValorTotalItem(item) {
+  return arredondarMoeda(parseQuantidade(item?.quantidade) * parseValorMonetario(item?.valor_unitario));
+}
 
 function criarItemBase(insumo) {
   return {
@@ -34,6 +68,8 @@ function criarItemBase(insumo) {
     unidade_id: insumo.unidade_id,
     unidade_sigla: insumo.unidade_manual || insumo.unidade?.sigla || '',
     quantidade: '1',
+    valor_unitario: '',
+    valor_total: '',
     especificacao: '',
     apropriacao_id: '',
     apropriacoes: [],
@@ -52,6 +88,8 @@ function criarItemManualBase(dados, necessarioParaPadrao) {
     unidade_id: dados.unidade_id || null,
     unidade_sigla: dados.unidade_sigla_manual,
     quantidade: String(dados.quantidade || '1'),
+    valor_unitario: dados.valor_unitario || '',
+    valor_total: dados.valor_total || '',
     especificacao: dados.especificacao || '',
     apropriacao_id: '',
     apropriacoes: [],
@@ -86,11 +124,13 @@ function sincronizarQuantidadeRateioUnico(item, quantidade) {
   });
 }
 
-export default function NovaSolicitacaoCompra() {
+export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const obraIdInicial = String(searchParams.get('obra_id') || '').trim();
+  const tipoSolicitacaoIdInicial = String(searchParams.get('tipo_solicitacao_id') || '').trim();
+  const draftKey = modoCompraDireta ? DRAFT_COMPRA_DIRETA_KEY : DRAFT_KEY;
   const hidratandoDraftRef = useRef(false);
   const draftCarregadoRef = useRef(false);
   const [obras, setObras] = useState([]);
@@ -100,9 +140,11 @@ export default function NovaSolicitacaoCompra() {
   const [obraId, setObraId] = useState('');
   const [necessarioPara, setNecessarioPara] = useState('');
   const [observacoes, setObservacoes] = useState('');
+  const [anexosCabecalho, setAnexosCabecalho] = useState([]);
   const [buscaInsumo, setBuscaInsumo] = useState('');
   const [itens, setItens] = useState([]);
   const [uploadingArquivos, setUploadingArquivos] = useState({});
+  const [uploadingAnexoCabecalho, setUploadingAnexoCabecalho] = useState(false);
   const [loading, setLoading] = useState(false);
   const [modalManualAberto, setModalManualAberto] = useState(false);
   const [modalApropriacaoIndex, setModalApropriacaoIndex] = useState(null);
@@ -197,7 +239,7 @@ export default function NovaSolicitacaoCompra() {
         return;
       }
 
-      const salvo = window.localStorage.getItem(DRAFT_KEY);
+      const salvo = window.localStorage.getItem(draftKey);
       if (!salvo) {
         draftCarregadoRef.current = true;
         return;
@@ -214,6 +256,7 @@ export default function NovaSolicitacaoCompra() {
       setObraId(String(payload.obra_id || ''));
       setNecessarioPara(payload.necessario_para || '');
       setObservacoes(payload.observacoes || '');
+      setAnexosCabecalho(Array.isArray(payload.anexos_cabecalho) ? payload.anexos_cabecalho : []);
       setItens(
         Array.isArray(payload.itens)
           ? payload.itens.map((item, index) => {
@@ -229,6 +272,8 @@ export default function NovaSolicitacaoCompra() {
                   ? item.unidade_sigla_manual || item.unidade_sigla || ''
                   : resumoItem?.unidade_sigla || '',
                 quantidade: String(item.quantidade ?? '1'),
+                valor_unitario: item.valor_unitario ? String(item.valor_unitario) : '',
+                valor_total: item.valor_total ? String(item.valor_total) : '',
                 especificacao: item.especificacao || '',
                 apropriacao_id: item.apropriacao_id ? String(item.apropriacao_id) : '',
                 apropriacoes: Array.isArray(item.apropriacoes) ? item.apropriacoes : [],
@@ -250,7 +295,7 @@ export default function NovaSolicitacaoCompra() {
     } finally {
       draftCarregadoRef.current = true;
     }
-  }, []);
+  }, [draftKey]);
 
   useEffect(() => {
     carregarApropriacoes(obraId);
@@ -288,6 +333,11 @@ export default function NovaSolicitacaoCompra() {
 
   const itensPendentesApropriacao = useMemo(
     () => itens.filter((item) => !validarRateiosItem(item).ok).length,
+    [itens]
+  );
+
+  const valorTotalCompraDireta = useMemo(
+    () => itens.reduce((acc, item) => acc + calcularValorTotalItem(item), 0),
     [itens]
   );
 
@@ -368,7 +418,17 @@ export default function NovaSolicitacaoCompra() {
         }
 
         if (campo === 'quantidade') {
-          return sincronizarQuantidadeRateioUnico(atualizado, valor);
+          return sincronizarQuantidadeRateioUnico({
+            ...atualizado,
+            valor_total: modoCompraDireta ? String(calcularValorTotalItem(atualizado)) : atualizado.valor_total
+          }, valor);
+        }
+
+        if (campo === 'valor_unitario') {
+          return sincronizarItemComRateios({
+            ...atualizado,
+            valor_total: modoCompraDireta ? String(calcularValorTotalItem(atualizado)) : atualizado.valor_total
+          });
         }
 
         return sincronizarItemComRateios(atualizado);
@@ -522,6 +582,33 @@ export default function NovaSolicitacaoCompra() {
     }
   }
 
+  async function handleSelecionarAnexoCabecalho(file) {
+    if (!file) {
+      return;
+    }
+
+    setUploadingAnexoCabecalho(true);
+    try {
+      const data = await uploadAnexoTemporarioCompra(file);
+      setAnexosCabecalho((atual) => [
+        ...atual,
+        {
+          arquivo_url: data?.arquivo_url || '',
+          arquivo_nome_original: data?.arquivo_nome_original || file.name || ''
+        }
+      ]);
+    } catch (error) {
+      console.error(error);
+      alert(error.message || 'Erro ao enviar anexo da compra direta');
+    } finally {
+      setUploadingAnexoCabecalho(false);
+    }
+  }
+
+  function removerAnexoCabecalho(index) {
+    setAnexosCabecalho((atual) => atual.filter((_, itemIndex) => itemIndex !== index));
+  }
+
   function removerArquivoItem(index) {
     atualizarCamposItem(index, {
       arquivo_url: '',
@@ -565,6 +652,10 @@ export default function NovaSolicitacaoCompra() {
         alert(`Item ${index + 1}: informe a quantidade.`);
         return;
       }
+      if (modoCompraDireta && parseValorMonetario(item.valor_unitario) <= 0) {
+        alert(`Item ${index + 1}: informe o valor unitario.`);
+        return;
+      }
       if (!item.necessario_para) {
         alert(`Item ${index + 1}: o prazo de entrega é obrigatório.`);
         return;
@@ -606,8 +697,11 @@ export default function NovaSolicitacaoCompra() {
 
       const payload = {
         obra_id: obraId,
+        tipo_solicitacao_id: modoCompraDireta ? tipoSolicitacaoIdInicial || null : undefined,
+        origem: modoCompraDireta ? 'COMPRA_DIRETA' : undefined,
         necessario_para: necessarioPara || null,
         observacoes: observacoes || null,
+        anexos_cabecalho: modoCompraDireta ? anexosCabecalho : undefined,
         itens: itensNormalizados.map((item) => ({
           manual: Boolean(item.manual),
           insumo_id: item.manual ? null : item.insumo_id,
@@ -615,6 +709,8 @@ export default function NovaSolicitacaoCompra() {
           apropriacao_id: item.apropriacao_id,
           apropriacoes: item.apropriacoes,
           quantidade: Number(item.quantidade),
+          valor_unitario: modoCompraDireta ? parseValorMonetario(item.valor_unitario) : undefined,
+          valor_total: modoCompraDireta ? calcularValorTotalItem(item) : undefined,
           especificacao: item.especificacao || '',
           necessario_para: item.necessario_para || necessarioPara || null,
           link_produto: item.link_produto || null,
@@ -629,14 +725,18 @@ export default function NovaSolicitacaoCompra() {
         obra_nome: obraSelecionada?.nome || '',
         obra_codigo: obraSelecionada?.codigo || '',
         solicitante_nome: user?.nome || '',
+        valor_total: modoCompraDireta ? valorTotalCompraDireta : null,
+        anexos_cabecalho: modoCompraDireta ? anexosCabecalho : [],
         itens: itensNormalizados.map((item) => ({
           ...item,
+          valor_unitario: modoCompraDireta ? parseValorMonetario(item.valor_unitario) : undefined,
+          valor_total: modoCompraDireta ? calcularValorTotalItem(item) : undefined,
           apropriacao_linhas: montarLinhasResumoApropriacao(item, apropriacoes)
         }))
       };
 
-      window.localStorage.setItem(DRAFT_KEY, JSON.stringify({ payload, resumo }));
-      navigate('/solicitacoes-compra/revisar');
+      window.localStorage.setItem(draftKey, JSON.stringify({ payload, resumo }));
+      navigate(modoCompraDireta ? '/solicitacoes-compra-direta/revisar' : '/solicitacoes-compra/revisar');
     } catch (error) {
       console.error(error);
       alert(error.message || 'Erro ao preparar revisão da solicitação');
@@ -648,9 +748,11 @@ export default function NovaSolicitacaoCompra() {
   return (
     <div className="page solicitacoes-page page-compra-nova">
       <div>
-        <h1 className="page-title">Nova Solicitação de Compra</h1>
+        <h1 className="page-title">{modoCompraDireta ? 'Compra Direta' : 'Nova Solicitação de Compra'}</h1>
         <p className="page-subtitle">
-          Monte os itens da compra e distribua a apropriação por item antes de enviar.
+          {modoCompraDireta
+            ? 'Informe os itens ja comprados, valores, notas fiscais e apropriacoes para abrir a solicitacao de pagamento.'
+            : 'Monte os itens da compra e distribua a apropriacao por item antes de enviar.'}
         </p>
       </div>
 
@@ -686,6 +788,57 @@ export default function NovaSolicitacaoCompra() {
           </div>
         </div>
       </div>
+
+      {modoCompraDireta && (
+        <div className="card">
+          <div className="card-header flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="font-semibold">Dados da compra direta</h2>
+              <p className="mt-1 text-sm text-[var(--c-muted)]">
+                Anexe as notas fiscais ou guias que comprovam a compra ja realizada.
+              </p>
+            </div>
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-right text-emerald-800">
+              <div className="text-xs uppercase tracking-[0.14em]">Total da solicitação</div>
+              <div className="mt-1 text-2xl font-semibold">{formatarMoeda(valorTotalCompraDireta)}</div>
+            </div>
+          </div>
+
+          <div className="grid gap-3">
+            <label className={`btn btn-outline w-fit cursor-pointer ${uploadingAnexoCabecalho ? 'pointer-events-none opacity-60' : ''}`}>
+              <input
+                type="file"
+                className="hidden"
+                accept={HEADER_ATTACHMENT_ACCEPT}
+                onChange={(event) => {
+                  const [file] = Array.from(event.target.files || []);
+                  void handleSelecionarAnexoCabecalho(file);
+                  event.target.value = '';
+                }}
+              />
+              {uploadingAnexoCabecalho ? 'Enviando...' : 'Anexar nota fiscal ou guia'}
+            </label>
+
+            {anexosCabecalho.length > 0 ? (
+              <div className="grid gap-2">
+                {anexosCabecalho.map((anexo, index) => (
+                  <div
+                    key={`${anexo.arquivo_url}-${index}`}
+                    className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] px-3 py-2 text-sm"
+                  >
+                    <span className="truncate">{anexo.arquivo_nome_original || 'Anexo da compra direta'}</span>
+                    <button type="button" className="text-red-600 hover:underline" onClick={() => removerAnexoCabecalho(index)}>
+                      Remover
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-sm text-[var(--c-muted)]">Nenhuma nota fiscal ou guia anexada.</div>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="compra-nova-layout">
         <div className="card compra-insumos-card">
@@ -744,6 +897,8 @@ export default function NovaSolicitacaoCompra() {
                     <th>Insumo</th>
                     <th>Unidade</th>
                     <th>Quantidade *</th>
+                    {modoCompraDireta && <th>Valor unitário *</th>}
+                    {modoCompraDireta && <th>Total</th>}
                     <th>Especificação</th>
                     <th>Apropriação *</th>
                     <th>Necessário para</th>
@@ -786,6 +941,25 @@ export default function NovaSolicitacaoCompra() {
                         ) : null}
                       </td>
                       <td><input type="number" min="0.01" step="0.01" className="input min-w-[110px]" value={item.quantidade} onChange={(event) => atualizarItem(index, 'quantidade', event.target.value)} /></td>
+                      {modoCompraDireta && (
+                        <td>
+                          <input
+                            type="number"
+                            min="0.01"
+                            step="0.01"
+                            className="input min-w-[140px]"
+                            value={item.valor_unitario}
+                            onChange={(event) => atualizarItem(index, 'valor_unitario', event.target.value)}
+                          />
+                        </td>
+                      )}
+                      {modoCompraDireta && (
+                        <td>
+                          <div className="min-w-[130px] rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] px-3 py-2 text-sm font-semibold">
+                            {formatarMoeda(calcularValorTotalItem(item))}
+                          </div>
+                        </td>
+                      )}
                       <td><input className="input min-w-[260px]" value={item.especificacao} onChange={(event) => atualizarItem(index, 'especificacao', event.target.value)} /></td>
                       <td>
                         {(() => {

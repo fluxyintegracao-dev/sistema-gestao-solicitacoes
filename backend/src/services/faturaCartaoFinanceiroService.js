@@ -12,6 +12,7 @@ const { canAccessFinanceiro, getFinanceiroObraScopeIds } = require('./authorizat
 const { obterSessaoAbertaParaConta } = require('./financeiroCaixaSessionHelper');
 const { registrarEventoSeguranca } = require('./securityLogService');
 const { normalizeTipoIntercompany } = require('../constants/intercompany');
+const { sincronizarStatusSolicitacaoPorBaixaTitulos } = require('./solicitacaoFinanceiroStatusService');
 
 function createHttpError(statusCode, message) {
   const error = new Error(message);
@@ -252,6 +253,7 @@ async function baixarFaturaCartao(req, faturaId, payload = {}, { transaction: ex
     const caixaSessao = await obterSessaoAbertaParaConta(conta, dataMovimento, { transaction });
 
     const movimentos = [];
+    const solicitacaoIdsSincronizar = new Set();
     for (const titulo of fatura.titulos || []) {
       const status = String(titulo.status || '').toUpperCase();
       if (!['ABERTO', 'PARCIAL'].includes(status)) continue;
@@ -295,7 +297,21 @@ async function baixarFaturaCartao(req, faturaId, payload = {}, { transaction: ex
         atualizado_por: req.user?.id || null
       }, { transaction });
 
+      if (titulo.solicitacao_id) {
+        solicitacaoIdsSincronizar.add(Number(titulo.solicitacao_id));
+      }
+
       movimentos.push(movimento);
+    }
+
+    for (const solicitacaoId of solicitacaoIdsSincronizar) {
+      await sincronizarStatusSolicitacaoPorBaixaTitulos({
+        solicitacaoId,
+        usuarioId: req.user?.id || null,
+        setor: 'FINANCEIRO',
+        transaction,
+        observacao: 'Status atualizado automaticamente apos baixa de fatura de cartao.'
+      });
     }
 
     await fatura.update({

@@ -224,6 +224,15 @@ export async function criarSolicitacaoCompra(data) {
   return handleJsonResponse(response, 'Erro ao criar solicitacao de compra');
 }
 
+export async function criarSolicitacaoCompraDireta(data) {
+  const response = await fetch(`${API_URL}/compras/solicitacoes-diretas`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+  return handleJsonResponse(response, 'Erro ao criar compra direta');
+}
+
 export async function delegarSolicitacaoCompra(id, data = {}) {
   const response = await fetch(`${API_URL}/compras/solicitacoes/${id}/delegar`, {
     method: 'PATCH',

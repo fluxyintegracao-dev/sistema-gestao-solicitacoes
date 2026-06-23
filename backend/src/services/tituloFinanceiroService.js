@@ -41,6 +41,7 @@ const {
 const { obterSessaoAbertaParaConta } = require('./financeiroCaixaSessionHelper');
 const { registrarEventoSeguranca } = require('./securityLogService');
 const { normalizeTipoIntercompany } = require('../constants/intercompany');
+const { sincronizarStatusSolicitacaoPorBaixaTitulos } = require('./solicitacaoFinanceiroStatusService');
 
 const FORMAS_COBRANCA = ['BOLETO', 'PIX', 'OUTROS'];
 const STATUS_COBRANCA = ['NAO_APLICAVEL', 'PENDENTE_EMISSAO', 'EMITIDO', 'PAGO_BANCO', 'CONCILIADO', 'CANCELADO'];
@@ -1156,6 +1157,14 @@ async function baixarTituloCartaoDebitoNoAto({
     titulo,
     statusTitulo: 'QUITADO',
     transaction
+  });
+
+  await sincronizarStatusSolicitacaoPorBaixaTitulos({
+    solicitacaoId: titulo.solicitacao_id,
+    usuarioId: req.user?.id || null,
+    setor: getSetorUsuario(req),
+    transaction,
+    observacao: 'Status atualizado automaticamente apos baixa por cartao de debito.'
   });
 
   return { movimento, cartao, conta, valorBaixa, dataBaixa };
@@ -2964,6 +2973,13 @@ async function baixarTitulo(req, tituloId, payload = {}) {
       transaction
     });
 
+    await sincronizarStatusSolicitacaoPorBaixaTitulos({
+      solicitacaoId: titulo.solicitacao_id,
+      usuarioId: req.user?.id || null,
+      setor: getSetorUsuario(req),
+      transaction
+    });
+
     if (cartaoBaixa.fatura) {
       await vincularTituloAFatura({
         titulo,
@@ -3316,6 +3332,20 @@ async function baixarTitulosParceladosEmMassa(req, payload = {}) {
       });
     }
 
+    const solicitacaoIdsSincronizar = Array.from(new Set(titulos
+      .map((titulo) => Number(titulo.solicitacao_id || 0))
+      .filter((id) => Number.isInteger(id) && id > 0)));
+
+    for (const solicitacaoId of solicitacaoIdsSincronizar) {
+      await sincronizarStatusSolicitacaoPorBaixaTitulos({
+        solicitacaoId,
+        usuarioId: req.user?.id || null,
+        setor: getSetorUsuario(req),
+        transaction,
+        observacao: 'Status atualizado automaticamente apos baixa agrupada de titulos financeiros.'
+      });
+    }
+
     await transaction.commit();
     transactionCommitted = true;
 
@@ -3537,6 +3567,14 @@ async function estornarMovimentoTitulo(req, tituloId, movimentoId, payload = {})
       titulo,
       statusTitulo: novoEstado.status,
       transaction
+    });
+
+    await sincronizarStatusSolicitacaoPorBaixaTitulos({
+      solicitacaoId: titulo.solicitacao_id,
+      usuarioId: req.user?.id || null,
+      setor: getSetorUsuario(req),
+      transaction,
+      observacao: 'Status atualizado automaticamente apos estorno de baixa financeira.'
     });
 
     if (titulo.solicitacao_id) {

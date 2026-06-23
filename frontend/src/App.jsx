@@ -191,6 +191,8 @@ const GerenciarCotacaoSolicitacao = lazy(() => import('./modules/solicitacao-com
 const NovaSolicitacaoCompra = lazy(() => import('./modules/solicitacao-compra/pages/NovaSolicitacaoCompra'));
 const RevisarSolicitacaoCompra = lazy(() => import('./modules/solicitacao-compra/pages/RevisarSolicitacaoCompra'));
 const RevisarSolicitacaoCompraFinal = lazy(() => import('./modules/solicitacao-compra/pages/RevisarSolicitacaoCompraFinal'));
+const NovaCompraDireta = lazy(() => import('./modules/solicitacao-compra/pages/NovaCompraDireta'));
+const RevisarCompraDireta = lazy(() => import('./modules/solicitacao-compra/pages/RevisarCompraDireta'));
 const GestaoApropriacoes = lazy(() => import('./modules/solicitacao-compra/pages/GestaoApropriacoes'));
 const GestaoInsumos = lazy(() => import('./modules/solicitacao-compra/pages/GestaoInsumos'));
 const GestaoCategorias = lazy(() => import('./modules/solicitacao-compra/pages/GestaoCategorias'));
@@ -962,6 +964,8 @@ export default function App() {
         <Route path="solicitacoes-compra/nova" element={<CompraSolicitacaoCreateRoute><NovaSolicitacaoCompra /></CompraSolicitacaoCreateRoute>} />
         <Route path="solicitacoes-compra/revisar" element={<CompraSolicitacaoCreateFlowRoute><RevisarSolicitacaoCompra /></CompraSolicitacaoCreateFlowRoute>} />
         <Route path="solicitacoes-compra/finalizada/:id" element={<CompraSolicitacaoCreateFlowRoute><RevisarSolicitacaoCompraFinal /></CompraSolicitacaoCreateFlowRoute>} />
+        <Route path="solicitacoes-compra-direta/nova" element={<CompraSolicitacaoCreateRoute><NovaCompraDireta /></CompraSolicitacaoCreateRoute>} />
+        <Route path="solicitacoes-compra-direta/revisar" element={<CompraSolicitacaoCreateFlowRoute><RevisarCompraDireta /></CompraSolicitacaoCreateFlowRoute>} />
         <Route path="pedidos-compra" element={<ComprasPedidosRoute><PedidosCompra /></ComprasPedidosRoute>} />
         <Route path="pedidos-compra/:id" element={<ComprasPedidosRoute><PedidoCompraDetalhe /></ComprasPedidosRoute>} />
         <Route path="compras/delegacao" element={<ComprasDelegacaoRoute><ComprasDelegacao /></ComprasDelegacaoRoute>} />

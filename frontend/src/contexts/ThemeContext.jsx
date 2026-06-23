@@ -91,7 +91,10 @@ export const TEMA_PADRAO = {
       PENDENTE: '#64748b',
       EM_ANALISE: '#0ea5e9',
       AGUARDANDO_AJUSTE: '#f59e0b',
+      TITULO_CADASTRADO: '#2563eb',
+      'PAGAMENTO PARCIAL': '#f97316',
       APROVADA: '#16a34a',
+      PAGA: '#16a34a',
       REJEITADA: '#dc2626',
       CONCLUIDA: '#059669'
     },

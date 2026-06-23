@@ -7,7 +7,10 @@ const STATUS_PADRAO = [
   'PENDENTE',
   'EM_ANALISE',
   'AGUARDANDO_AJUSTE',
+  'TITULO_CADASTRADO',
+  'PAGAMENTO PARCIAL',
   'APROVADA',
+  'PAGA',
   'REJEITADA',
   'CONCLUIDA'
 ];
@@ -204,36 +207,38 @@ function ColorField({ label, path, value, fallback, onChange }) {
   const safeValue = corValida(value, fallback);
   const fieldLabel = path ? `${label} (${path})` : label;
   return (
-    <label className="flex items-center gap-3 rounded-xl border border-[var(--c-border)] bg-[var(--c-bg)] px-3 py-2 text-sm">
-      <span
-        className="h-8 w-8 shrink-0 rounded-lg border border-[var(--c-border)]"
-        style={{ background: safeValue }}
-        aria-hidden="true"
-      />
-      <span className="min-w-0 flex-1">
-        <span className="block truncate font-medium text-[var(--c-text)]">{label}</span>
+    <label className="block rounded-xl border border-[var(--c-border)] bg-[var(--c-bg)] px-3 py-3 text-sm">
+      <span className="block min-w-0">
+        <span className="block text-sm font-semibold leading-5 text-[var(--c-text)]">{label}</span>
         {path && (
-          <span className="mt-0.5 block truncate font-mono text-[10px] text-[var(--c-muted)]">
+          <span className="mt-0.5 block break-all font-mono text-[10px] leading-4 text-[var(--c-muted)]">
             {path}
           </span>
         )}
+      </span>
+      <span className="mt-3 flex items-center gap-3">
+        <span
+          className="h-9 w-9 shrink-0 rounded-lg border border-[var(--c-border)] shadow-sm"
+          style={{ background: safeValue }}
+          aria-hidden="true"
+        />
         <input
-          className="mt-1 w-28 rounded-md border border-[var(--c-border)] bg-[var(--c-surface)] px-2 py-1 text-xs font-mono"
+          className="min-w-0 flex-1 rounded-md border border-[var(--c-border)] bg-[var(--c-surface)] px-2 py-1.5 text-xs font-mono text-[var(--c-text)]"
           value={String(value || '')}
           onChange={(event) => onChange(event.target.value)}
           maxLength={7}
           aria-label={fieldLabel}
           title={fieldLabel}
         />
+        <input
+          type="color"
+          value={safeValue}
+          onChange={(event) => onChange(event.target.value)}
+          className="h-9 w-10 shrink-0 cursor-pointer rounded-lg border border-[var(--c-border)] bg-transparent p-1"
+          aria-label={`Selecionar cor de ${fieldLabel}`}
+          title={`Selecionar cor de ${fieldLabel}`}
+        />
       </span>
-      <input
-        type="color"
-        value={safeValue}
-        onChange={(event) => onChange(event.target.value)}
-        className="h-9 w-10 cursor-pointer rounded-lg border border-[var(--c-border)] bg-transparent p-1"
-        aria-label={`Selecionar cor de ${fieldLabel}`}
-        title={`Selecionar cor de ${fieldLabel}`}
-      />
     </label>
   );
 }

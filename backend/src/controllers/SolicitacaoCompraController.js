@@ -353,6 +353,16 @@ async function buscarSetorCompras(transaction) {
   return resolveSetorPersistenciaValue(setor, 'COMPRAS');
 }
 
+async function buscarSetorGerenciaProcessos(transaction) {
+  const setor = await findSetorByCapability('eh_setor_geo', {
+    attributes: ['id', 'codigo', 'nome'],
+    onlyActive: false,
+    transaction
+  });
+
+  return resolveSetorPersistenciaValue(setor, 'GERENCIA DE PROCESSOS');
+}
+
 async function montarFluxoAprovacaoCompra({ obra, transaction }) {
   const setorCompras = await buscarSetorCompras(transaction);
   const configuracao = await obterConfiguracaoAprovacaoDiretoria();
@@ -364,6 +374,59 @@ async function montarFluxoAprovacaoCompra({ obra, transaction }) {
     diretoriaFluxoCodigo: diretoria || null,
     setorDestinoPosAprovacao: diretoria ? setorCompras : null
   };
+}
+
+async function montarFluxoAprovacaoCompraDireta({ obra, transaction }) {
+  const setorGerenciaProcessos = await buscarSetorGerenciaProcessos(transaction);
+  const configuracao = await obterConfiguracaoAprovacaoDiretoria();
+  const diretoria = obterDiretoriaParaObra(obra, configuracao.diretoriasPorClassificacao);
+
+  return {
+    usaFluxoDiretoria: Boolean(diretoria),
+    areaResponsavel: diretoria || setorGerenciaProcessos,
+    diretoriaFluxoCodigo: diretoria || null,
+    setorDestinoPosAprovacao: diretoria ? setorGerenciaProcessos : null
+  };
+}
+
+async function buscarTipoSolicitacaoCompraDireta(tipoSolicitacaoId, transaction) {
+  if (tipoSolicitacaoId) {
+    const tipoInformado = await TipoSolicitacao.findByPk(tipoSolicitacaoId, {
+      attributes: ['id', 'nome', 'ativo', 'codigo_interno', 'comportamento'],
+      transaction
+    });
+
+    if (tipoInformado) {
+      return tipoInformado;
+    }
+  }
+
+  const tipos = await TipoSolicitacao.findAll({
+    attributes: ['id', 'nome', 'ativo', 'codigo_interno', 'comportamento'],
+    transaction
+  });
+
+  const tipoExistente = tipos.find((tipo) => {
+    const codigoInterno = normalizeTipoSolicitacaoCodigo(tipo.codigo_interno, tipo.nome);
+    return codigoInterno === 'COMPRA_DIRETA';
+  });
+
+  if (tipoExistente) {
+    if (!tipoExistente.ativo) {
+      await tipoExistente.update({ ativo: true }, { transaction });
+    }
+    return tipoExistente;
+  }
+
+  return TipoSolicitacao.create(
+    {
+      nome: 'Compra Direta',
+      codigo_interno: 'COMPRA_DIRETA',
+      comportamento: JSON.stringify(normalizeTipoSolicitacaoBehavior({ codigo_interno: 'COMPRA_DIRETA' })),
+      ativo: true
+    },
+    { transaction }
+  );
 }
 
 function isCompraAguardandoDiretoria(solicitacao) {
@@ -508,6 +571,32 @@ async function carregarMapaApropriacoes({ obraId, itens, transaction }) {
   return mapa;
 }
 
+function parseValorMonetario(value) {
+  if (value === null || value === undefined || value === '') {
+    return 0;
+  }
+
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : 0;
+  }
+
+  const raw = String(value).trim();
+  if (!raw) {
+    return 0;
+  }
+
+  const cleaned = raw.replace(/[^\d,.-]/g, '');
+  const normalized = cleaned.includes(',')
+    ? cleaned.replace(/\./g, '').replace(',', '.')
+    : cleaned;
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function arredondarMoeda(value) {
+  return Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;
+}
+
 function prepararItemCompraPayload({
   item,
   index,
@@ -549,6 +638,10 @@ function prepararItemCompraPayload({
   const baseItem = {
     apropriacao_id: Number(rateios[0].apropriacao_id),
     quantidade,
+    valor_unitario: arredondarMoeda(parseValorMonetario(item?.valor_unitario)),
+    valor_total: arredondarMoeda(
+      parseValorMonetario(item?.valor_total) || quantidade * parseValorMonetario(item?.valor_unitario)
+    ),
     especificacao: item?.especificacao || '',
     necessario_para: item?.necessario_para || necessarioParaPadrao || null,
     link_produto: item?.link_produto || null,
@@ -599,6 +692,8 @@ function obterLinhasPdf(solicitacao) {
     nome: item.insumo?.nome || '-',
     unidade: item.unidade_sigla_manual || item.unidade?.sigla || '-',
     quantidade: item.quantidade,
+    valor_unitario: item.valor_unitario,
+    valor_total: item.valor_total,
     especificacao: item.especificacao || '-',
     apropriacao: construirResumoApropriacoes(item).linhas.join('\n') || '-',
     necessario_para: item.necessario_para,
@@ -613,6 +708,8 @@ function obterLinhasPdf(solicitacao) {
     nome: item.nome_manual || '-',
     unidade: item.unidade_sigla_manual || '-',
     quantidade: item.quantidade,
+    valor_unitario: item.valor_unitario,
+    valor_total: item.valor_total,
     especificacao: item.especificacao || '-',
     apropriacao: construirResumoApropriacoes(item).linhas.join('\n') || '-',
     necessario_para: item.necessario_para,
@@ -640,6 +737,17 @@ function construirTextoMidiaPdf(item) {
   }
 
   return linhas.join('\n');
+}
+
+function isSolicitacaoCompraDireta(solicitacao) {
+  return normalizeTextCompra(solicitacao?.origem) === 'COMPRA_DIRETA';
+}
+
+function formatCurrencyPdf(value) {
+  return Number(value || 0).toLocaleString('pt-BR', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
 }
 
 function buildRespostaItemKey(itemTipo, itemReferenciaId) {
@@ -768,7 +876,7 @@ function desenharCabecalhoFicha(doc, solicitacao) {
     .font('Helvetica-Bold')
     .fontSize(13)
     .fillColor('#000000')
-    .text('FICHA PARA PEDIDO DE COMPRA', x + logoWidth, y + 5, {
+      .text(isSolicitacaoCompraDireta(solicitacao) ? 'FICHA DE COMPRA DIRETA' : 'FICHA PARA PEDIDO DE COMPRA', x + logoWidth, y + 5, {
       width: PDF_PAGE.width - logoWidth,
       align: 'center'
     });
@@ -826,7 +934,7 @@ function desenharCabecalhoFicha(doc, solicitacao) {
   return y + totalHeaderHeight + 8;
 }
 
-function desenharCabecalhoTabela(doc, y, colWidths, colX) {
+function desenharCabecalhoTabela(doc, y, colWidths, colX, compraDireta = false) {
   const headerHeight = 18;
   doc.save();
   doc.rect(PDF_PAGE.left, y, PDF_PAGE.width, headerHeight).fillAndStroke('#d6deec', '#000000');
@@ -836,16 +944,28 @@ function desenharCabecalhoTabela(doc, y, colWidths, colX) {
     doc.moveTo(colX[index], y).lineTo(colX[index], y + headerHeight).stroke('#000000');
   }
 
-  const labels = [
-    'ITEM',
-    'INSUMO',
-    'UNIDADE',
-    'QUANTIDADE',
-    'ESPECIFICACAO',
-    'APROPRIACAO',
-    'NECESSARIO',
-    'LINK DO PRODUTO'
-  ];
+  const labels = compraDireta
+    ? [
+        'ITEM',
+        'INSUMO',
+        'UNIDADE',
+        'QTD',
+        'VALOR UNIT.',
+        'VALOR TOTAL',
+        'ESPECIFICACAO',
+        'APROPRIACAO',
+        'ANEXO'
+      ]
+    : [
+        'ITEM',
+        'INSUMO',
+        'UNIDADE',
+        'QUANTIDADE',
+        'ESPECIFICACAO',
+        'APROPRIACAO',
+        'NECESSARIO',
+        'LINK DO PRODUTO'
+      ];
 
   doc.font('Helvetica-Bold').fontSize(7).fillColor('#000000');
   labels.forEach((label, index) => {
@@ -909,7 +1029,10 @@ function desenharBlocoObservacoes(doc, y, solicitacao) {
 }
 
 async function renderPdfSolicitacaoCompra(doc, solicitacao) {
-  const colWidths = [38, 160, 56, 62, 132, 84, 90, 180];
+  const compraDireta = isSolicitacaoCompraDireta(solicitacao);
+  const colWidths = compraDireta
+    ? [34, 145, 52, 46, 72, 76, 116, 94, 167]
+    : [38, 160, 56, 62, 132, 84, 90, 180];
   const colX = [PDF_PAGE.left];
   for (let index = 1; index < colWidths.length; index += 1) {
     colX.push(colX[index - 1] + colWidths[index - 1]);
@@ -917,7 +1040,7 @@ async function renderPdfSolicitacaoCompra(doc, solicitacao) {
   const linhas = obterLinhasPdf(solicitacao);
   const anexosVisuais = await obterAnexosVisuaisPdf(linhas);
   const anexosVisuaisMap = new Map(anexosVisuais.map((anexo) => [anexo.index, anexo]));
-  let y = desenharCabecalhoTabela(doc, desenharCabecalhoFicha(doc, solicitacao), colWidths, colX);
+  let y = desenharCabecalhoTabela(doc, desenharCabecalhoFicha(doc, solicitacao), colWidths, colX, compraDireta);
 
   linhas.forEach((item, index) => {
     const anexoVisualNaCelula = !item.link_produto ? anexosVisuaisMap.get(index) : null;
@@ -925,16 +1048,19 @@ async function renderPdfSolicitacaoCompra(doc, solicitacao) {
     const nomeItem = item.nome || '-';
 
     doc.fontSize(8).font('Helvetica');
+    const especificacaoIndex = compraDireta ? 6 : 4;
+    const apropriacaoIndex = compraDireta ? 7 : 5;
+    const anexoIndex = compraDireta ? 8 : 7;
     const alturaNome = doc.heightOfString(nomeItem, { width: colWidths[1] - 10 });
     const alturaEspecificacao = doc.heightOfString(item.especificacao || '-', {
-      width: colWidths[4] - 10
+      width: colWidths[especificacaoIndex] - 10
     });
     const alturaApropriacao = doc.heightOfString(item.apropriacao || '-', {
-      width: colWidths[5] - 10
+      width: colWidths[apropriacaoIndex] - 10
     });
     doc.fontSize(6).font('Helvetica');
     const alturaMidia = textoMidia
-      ? doc.heightOfString(textoMidia, { width: colWidths[7] - 10 })
+      ? doc.heightOfString(textoMidia, { width: colWidths[anexoIndex] - 10 })
       : 0;
     const alturaImagem = anexoVisualNaCelula ? 98 : 0;
     const rowHeight = Math.max(
@@ -944,7 +1070,7 @@ async function renderPdfSolicitacaoCompra(doc, solicitacao) {
 
     if (y + rowHeight + 72 > PDF_PAGE.bottomLimit) {
       doc.addPage({ margin: 40, size: 'A4', layout: 'landscape' });
-      y = desenharCabecalhoTabela(doc, desenharCabecalhoFicha(doc, solicitacao), colWidths, colX);
+      y = desenharCabecalhoTabela(doc, desenharCabecalhoFicha(doc, solicitacao), colWidths, colX, compraDireta);
     }
 
     doc.rect(PDF_PAGE.left, y, PDF_PAGE.width, rowHeight).stroke('#000000');
@@ -969,49 +1095,63 @@ async function renderPdfSolicitacaoCompra(doc, solicitacao) {
       align: 'center',
       paddingX: 3
     });
-    desenharTextoNaCelula(doc, item.especificacao || '-', colX[4], y, colWidths[4], rowHeight, {
+
+    if (compraDireta) {
+      desenharTextoNaCelula(doc, `R$ ${formatCurrencyPdf(item.valor_unitario)}`, colX[4], y, colWidths[4], rowHeight, {
+        align: 'center',
+        paddingX: 3
+      });
+      desenharTextoNaCelula(doc, `R$ ${formatCurrencyPdf(item.valor_total)}`, colX[5], y, colWidths[5], rowHeight, {
+        align: 'center',
+        paddingX: 3
+      });
+    }
+
+    desenharTextoNaCelula(doc, item.especificacao || '-', colX[especificacaoIndex], y, colWidths[especificacaoIndex], rowHeight, {
       paddingX: 4
     });
-    desenharTextoNaCelula(doc, item.apropriacao || '-', colX[5], y, colWidths[5], rowHeight, {
+    desenharTextoNaCelula(doc, item.apropriacao || '-', colX[apropriacaoIndex], y, colWidths[apropriacaoIndex], rowHeight, {
       align: 'center',
       paddingX: 3
     });
-    desenharTextoNaCelula(doc, formatDate(item.necessario_para) || '-', colX[6], y, colWidths[6], rowHeight, {
-      align: 'center',
-      paddingX: 3
-    });
+    if (!compraDireta) {
+      desenharTextoNaCelula(doc, formatDate(item.necessario_para) || '-', colX[6], y, colWidths[6], rowHeight, {
+        align: 'center',
+        paddingX: 3
+      });
+    }
 
     if (anexoVisualNaCelula) {
       try {
         const image = doc.openImage(anexoVisualNaCelula.buffer);
-        doc.image(image, colX[7] + 6, y + 6, {
-          fit: [colWidths[7] - 12, rowHeight - 12],
+        doc.image(image, colX[anexoIndex] + 6, y + 6, {
+          fit: [colWidths[anexoIndex] - 12, rowHeight - 12],
           align: 'center',
           valign: 'center'
         });
       } catch (error) {
-        desenharTextoNaCelula(doc, 'Foto anexada', colX[7], y, colWidths[7], rowHeight, {
+        desenharTextoNaCelula(doc, 'Foto anexada', colX[anexoIndex], y, colWidths[anexoIndex], rowHeight, {
           align: 'center',
           fontSize: 7
         });
       }
     } else if (item.link_produto) {
       doc.fontSize(5.5).fillColor('#1d4ed8');
-      const alturaLink = doc.heightOfString(item.link_produto, { width: colWidths[7] - 8 });
+      const alturaLink = doc.heightOfString(item.link_produto, { width: colWidths[anexoIndex] - 8 });
       const yLink = y + Math.max(4, (rowHeight - Math.max(alturaLink, 12)) / 2);
-      doc.text(item.link_produto, colX[7] + 4, yLink, {
-        width: colWidths[7] - 8,
+      doc.text(item.link_produto, colX[anexoIndex] + 4, yLink, {
+        width: colWidths[anexoIndex] - 8,
         link: item.link_produto,
         underline: false
       });
       if (item.arquivo_nome_original) {
-        const offset = doc.heightOfString(item.link_produto, { width: colWidths[7] - 8 }) + 2;
-        doc.fontSize(6).fillColor('#000000').text(construirTextoMidiaPdf({ ...item, link_produto: null }), colX[7] + 4, yLink + offset, {
-          width: colWidths[7] - 8
+        const offset = doc.heightOfString(item.link_produto, { width: colWidths[anexoIndex] - 8 }) + 2;
+        doc.fontSize(6).fillColor('#000000').text(construirTextoMidiaPdf({ ...item, link_produto: null }), colX[anexoIndex] + 4, yLink + offset, {
+          width: colWidths[anexoIndex] - 8
         });
       }
     } else {
-      desenharTextoNaCelula(doc, textoMidia || '-', colX[7], y, colWidths[7], rowHeight, {
+      desenharTextoNaCelula(doc, textoMidia || '-', colX[anexoIndex], y, colWidths[anexoIndex], rowHeight, {
         fontSize: 6,
         paddingX: 4
       });
@@ -1098,6 +1238,55 @@ async function anexarPdfNaSolicitacaoPrincipal({ solicitacaoCompraId, solicitaca
     console.error('Erro ao anexar PDF automaticamente na solicitacao principal:', error);
     return false;
   }
+}
+
+async function anexarArquivosCabecalhoSolicitacao({ anexos = [], solicitacaoPrincipalId, codigoSolicitacao, usuario }) {
+  const anexosValidos = Array.isArray(anexos)
+    ? anexos
+        .map((anexo) => ({
+          arquivo_url: String(anexo?.arquivo_url || '').trim(),
+          arquivo_nome_original: normalizeOriginalName(anexo?.arquivo_nome_original || anexo?.nome_original || 'anexo-compra-direta')
+        }))
+        .filter((anexo) => anexo.arquivo_url)
+        .slice(0, 20)
+    : [];
+
+  if (!anexosValidos.length) {
+    return 0;
+  }
+
+  let total = 0;
+  for (const anexoPayload of anexosValidos) {
+    try {
+      const anexo = await Anexo.create({
+        solicitacao_id: solicitacaoPrincipalId,
+        tipo: 'ANEXO',
+        nome_original: anexoPayload.arquivo_nome_original,
+        caminho_arquivo: anexoPayload.arquivo_url,
+        uploaded_by: usuario.id,
+        area_origem: usuario.setor_id
+      });
+
+      await Historico.create({
+        solicitacao_id: solicitacaoPrincipalId,
+        usuario_responsavel_id: usuario.id,
+        setor: usuario.setor_id,
+        acao: 'ANEXO_ADICIONADO',
+        descricao: anexoPayload.arquivo_nome_original,
+        metadata: JSON.stringify({
+          anexo_id: anexo.id,
+          caminho: anexoPayload.arquivo_url,
+          origem: 'COMPRA_DIRETA_NOTA_FISCAL'
+        })
+      });
+
+      total += 1;
+    } catch (error) {
+      console.error('Erro ao anexar nota fiscal da compra direta:', error);
+    }
+  }
+
+  return total;
 }
 
 async function validarEscopoSolicitacaoCompra(usuario, solicitacao, res, transaction = null) {
@@ -1329,7 +1518,17 @@ module.exports = {
         return;
       }
 
-      const { obra_id, necessario_para, observacoes, link_geral, itens } = req.body;
+      const {
+        obra_id,
+        necessario_para,
+        observacoes,
+        link_geral,
+        itens,
+        origem,
+        tipo_solicitacao_id,
+        anexos_cabecalho
+      } = req.body;
+      const compraDireta = normalizeTextCompra(origem) === 'COMPRA_DIRETA';
 
       if (!obra_id || !Array.isArray(itens) || itens.length === 0) {
         await transaction.rollback();
@@ -1371,21 +1570,43 @@ module.exports = {
         }
       }
 
-      const tipoSolicitacao = await buscarTipoSolicitacaoCompra(transaction);
-      const fluxoCompra = await montarFluxoAprovacaoCompra({
-        obra,
-        transaction
-      });
+      const valorTotalCompraDireta = compraDireta
+        ? arredondarMoeda([...itensPreparados, ...itensManuaisPreparados].reduce(
+            (acc, entry) => acc + Number(entry.item.valor_total || 0),
+            0
+          ))
+        : 0;
+
+      if (compraDireta && valorTotalCompraDireta <= 0) {
+        await transaction.rollback();
+        return res.status(400).json({ error: 'Informe o valor dos itens da compra direta.' });
+      }
+
+      const tipoSolicitacao = compraDireta
+        ? await buscarTipoSolicitacaoCompraDireta(tipo_solicitacao_id, transaction)
+        : await buscarTipoSolicitacaoCompra(transaction);
+      const fluxoCompra = compraDireta
+        ? await montarFluxoAprovacaoCompraDireta({
+            obra,
+            transaction
+          })
+        : await montarFluxoAprovacaoCompra({
+            obra,
+            transaction
+          });
 
       const solicitacaoCompra = await SolicitacaoCompra.create(
         {
+          origem: compraDireta ? 'COMPRA_DIRETA' : 'NORMAL',
+          titulo: compraDireta ? 'Compra Direta' : null,
           obra_id,
           solicitante_id: usuario.id,
           status: fluxoCompra.usaFluxoDiretoria ? 'AGUARDANDO_DIRETORIA' : 'ENVIADO',
           integrado_sienge: false,
           observacoes: observacoes || null,
           necessario_para: necessario_para || null,
-          link_geral: link_geral || null
+          link_geral: link_geral || null,
+          valor_fechado: compraDireta ? valorTotalCompraDireta : 0
         },
         { transaction }
       );
@@ -1451,8 +1672,9 @@ module.exports = {
       const resumoItens = '';
 
       const descricao = [
-        'Solicitação de Compra',
+        compraDireta ? 'Compra Direta' : 'Solicitação de Compra',
         resumoItens ? `Itens: ${resumoItens}` : null,
+        compraDireta ? `Valor total: R$ ${formatCurrencyPdf(valorTotalCompraDireta)}` : null,
         observacoes ? `Observações: ${observacoes}` : null
       ]
         .filter(Boolean)
@@ -1464,6 +1686,7 @@ module.exports = {
           obra_id,
           tipo_solicitacao_id: tipoSolicitacao.id,
           descricao,
+          valor: compraDireta ? valorTotalCompraDireta : null,
           status_global: 'PENDENTE',
           area_responsavel: fluxoCompra.areaResponsavel,
           fluxo_aprovacao_diretoria: fluxoCompra.usaFluxoDiretoria,
@@ -1491,10 +1714,12 @@ module.exports = {
           acao: 'CRIADA',
           status_novo: 'PENDENTE',
           observacao: fluxoCompra.usaFluxoDiretoria
-            ? `Solicitacao de compra criada e enviada para aprovacao da diretoria com ${itensPreparados.length + itensManuaisPreparados.length} item(ns)`
-            : `Solicitacao de compra criada com ${itensPreparados.length + itensManuaisPreparados.length} item(ns)`,
+            ? `${compraDireta ? 'Compra direta' : 'Solicitacao de compra'} criada e enviada para aprovacao da diretoria com ${itensPreparados.length + itensManuaisPreparados.length} item(ns)`
+            : `${compraDireta ? 'Compra direta' : 'Solicitacao de compra'} criada com ${itensPreparados.length + itensManuaisPreparados.length} item(ns)`,
           metadata: JSON.stringify({
-            origem: 'MODULO_COMPRAS',
+            origem: compraDireta ? 'COMPRA_DIRETA' : 'MODULO_COMPRAS',
+            solicitacao_compra_origem: compraDireta ? 'COMPRA_DIRETA' : 'NORMAL',
+            valor_total: compraDireta ? valorTotalCompraDireta : null,
             fluxo_aprovacao_diretoria: fluxoCompra.usaFluxoDiretoria,
             diretoria_fluxo_codigo: fluxoCompra.diretoriaFluxoCodigo,
             setor_destino_pos_aprovacao: fluxoCompra.setorDestinoPosAprovacao
@@ -1509,8 +1734,8 @@ module.exports = {
           setor: fluxoCompra.areaResponsavel,
           status: 'PENDENTE',
           observacao: fluxoCompra.usaFluxoDiretoria
-            ? 'Solicitacao de compra aguardando aprovacao da diretoria'
-            : 'Solicitacao de compra criada'
+            ? `${compraDireta ? 'Compra direta' : 'Solicitacao de compra'} aguardando aprovacao da diretoria`
+            : `${compraDireta ? 'Compra direta' : 'Solicitacao de compra'} criada`
         },
         { transaction }
       );
@@ -1519,11 +1744,13 @@ module.exports = {
         solicitacaoCompraId: solicitacaoCompra.id,
         usuarioId: usuario.id,
         tipoAcao: 'CRIACAO',
-        descricao: `Solicitacao de compra criada com ${itensPreparados.length + itensManuaisPreparados.length} item(ns)`,
+        descricao: `${compraDireta ? 'Compra direta' : 'Solicitacao de compra'} criada com ${itensPreparados.length + itensManuaisPreparados.length} item(ns)`,
         metadados: {
           obra_id,
           solicitacao_principal_id: solicitacaoPrincipal.id,
-          quantidade_itens: itensPreparados.length + itensManuaisPreparados.length
+          quantidade_itens: itensPreparados.length + itensManuaisPreparados.length,
+          origem: compraDireta ? 'COMPRA_DIRETA' : 'NORMAL',
+          valor_total: compraDireta ? valorTotalCompraDireta : null
         },
         transaction
       });
@@ -1536,13 +1763,24 @@ module.exports = {
         codigoSolicitacao: codigo,
         usuario
       });
+      const anexosCabecalhoAnexados = compraDireta
+        ? await anexarArquivosCabecalhoSolicitacao({
+            anexos: anexos_cabecalho,
+            solicitacaoPrincipalId: solicitacaoPrincipal.id,
+            codigoSolicitacao: codigo,
+            usuario
+          })
+        : 0;
 
       return res.status(201).json({
         id: solicitacaoCompra.id,
         solicitacao_principal_id: solicitacaoPrincipal.id,
         codigo,
         quantidade_itens: itensPreparados.length + itensManuaisPreparados.length,
-        pdf_anexado: pdfAnexado
+        pdf_anexado: pdfAnexado,
+        anexos_cabecalho_anexados: anexosCabecalhoAnexados,
+        origem: compraDireta ? 'COMPRA_DIRETA' : 'NORMAL',
+        valor_total: compraDireta ? valorTotalCompraDireta : null
       });
     } catch (error) {
       await transaction.rollback();

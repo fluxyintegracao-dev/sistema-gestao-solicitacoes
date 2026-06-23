@@ -308,10 +308,10 @@ function validateCompraQuery(query = {}) {
   };
 }
 
-function validateCompraCreateBody(body = {}) {
-  ensureAllowedKeys(
-    body,
-    ['obra_id', 'necessario_para', 'observacoes', 'link_geral', 'itens'],
+  function validateCompraCreateBody(body = {}) {
+    ensureAllowedKeys(
+      body,
+      ['obra_id', 'necessario_para', 'observacoes', 'link_geral', 'itens'],
     'Solicitacao de compra'
   );
 
@@ -334,9 +334,55 @@ function validateCompraCreateBody(body = {}) {
     necessario_para: parseDateOnly(body.necessario_para, 'Necessario para'),
     observacoes: parseOptionalText(body.observacoes, 'Observacoes', 5000),
     link_geral: parseOptionalUrl(body.link_geral, 'Link geral'),
-    itens: body.itens
-  };
-}
+      itens: body.itens
+    };
+  }
+
+  function validateCompraDiretaCreateBody(body = {}) {
+    ensureAllowedKeys(
+      body,
+      [
+        'obra_id',
+        'tipo_solicitacao_id',
+        'necessario_para',
+        'observacoes',
+        'link_geral',
+        'itens',
+        'origem',
+        'anexos_cabecalho'
+      ],
+      'Compra direta'
+    );
+
+    if (!Array.isArray(body.itens) || body.itens.length === 0) {
+      throw new ValidationError('Informe ao menos um item.');
+    }
+
+    if (body.itens.length > 300) {
+      throw new ValidationError('Quantidade de itens excede o limite permitido.');
+    }
+
+    body.itens.forEach((item, index) => {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) {
+        throw new ValidationError(`Item ${index + 1} invalido.`);
+      }
+    });
+
+    if (body.anexos_cabecalho !== undefined && !Array.isArray(body.anexos_cabecalho)) {
+      throw new ValidationError('Anexos da compra direta invalidos.');
+    }
+
+    return {
+      obra_id: parseInteger(body.obra_id, 'Obra', { required: true }),
+      tipo_solicitacao_id: parseInteger(body.tipo_solicitacao_id, 'Tipo de solicitacao', { positiveOnly: true }),
+      necessario_para: parseDateOnly(body.necessario_para, 'Necessario para'),
+      observacoes: parseOptionalText(body.observacoes, 'Observacoes', 5000),
+      link_geral: parseOptionalUrl(body.link_geral, 'Link geral'),
+      origem: 'COMPRA_DIRETA',
+      anexos_cabecalho: body.anexos_cabecalho || [],
+      itens: body.itens
+    };
+  }
 
 function validateCompraIntegrarBody(body = {}) {
   ensureAllowedKeys(body, ['numero_sienge'], 'Integracao da solicitacao de compra');
@@ -967,7 +1013,8 @@ function validateSolicitacaoEnviarSetorMassaBody(body = {}) {
 }
 
 module.exports = {
-  validateCompraCreateBody,
+    validateCompraCreateBody,
+    validateCompraDiretaCreateBody,
   validateCompraEncerrarBody,
   validateCompraEnviarBody,
   validateCompraIntegrarBody,

@@ -44,6 +44,7 @@ const {
 } = require('./validators/adminValidators');
 const {
   validateCompraCreateBody,
+  validateCompraDiretaCreateBody,
   validateCompraEncerrarBody,
   validateCompraEnviarBody,
   validateCompraIntegrarBody,
@@ -1573,6 +1574,7 @@ router.get('/compras/solicitacoes/:id', allowCompraSolicitacoesCreateFlowRead, v
 router.get('/compras/solicitacoes/:id/comparativo', allowCompraSolicitacoesRead, validateRequest({ params: validateNumericIdParam('id', 'Solicitacao de compra') }), requireCompraAccess, SolicitacaoCompraController.comparativo);
 router.get('/compras/solicitacoes/:id/pdf', allowCompraSolicitacoesCreateFlowRead, validateRequest({ params: validateNumericIdParam('id', 'Solicitacao de compra') }), requireCompraAccess, SolicitacaoCompraController.pdf);
 router.post('/compras/solicitacoes', allowCompraSolicitacoesCreate, validateRequest({ body: validateCompraCreateBody }), requireCompraBodyObraAccess, SolicitacaoCompraController.create);
+router.post('/compras/solicitacoes-diretas', allowCompraSolicitacoesCreate, validateRequest({ body: validateCompraDiretaCreateBody }), requireCompraBodyObraAccess, SolicitacaoCompraController.create);
 router.get('/compras/cotacoes', requireEnabledModule('COTACOES'), allowComprasCotacoesRead, scopeCompraListAccess, CotacaoFornecedorController.index);
 router.post('/compras/cotacoes/avulsa', requireEnabledModule('COTACOES'), allowComprasCotacoesManage, SolicitacaoCompraController.createAvulsa);
 router.patch('/compras/solicitacoes/:id/integrar', allowCompraSolicitacoesManage, validateRequest({ params: validateNumericIdParam('id', 'Solicitacao de compra'), body: validateCompraIntegrarBody }), requireCompraAccess, SolicitacaoCompraController.integrar);
