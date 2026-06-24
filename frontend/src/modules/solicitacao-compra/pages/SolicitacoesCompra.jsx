@@ -12,6 +12,7 @@ import {
 } from '../../../services/compras';
 import { getMinhasObras } from '../../../services/obras';
 import { canDeleteCompraSolicitacoes, canEncaminharCompraSolicitacoes } from '../../../utils/acessoProduto';
+import { ResizableTable, ResizableTh } from '../../../components/ResizableTable';
 
 function formatarData(data) {
   if (!data) {
@@ -56,6 +57,24 @@ function classNameStatus(status) {
   return 'app-status-pill compra-status-pill compra-status-default bg-indigo-100 text-indigo-700';
 }
 
+function buildSolicitacoesCompraColumns({ podeSelecionar, podeEncaminharCompras, podeInativar }) {
+  const actionWidth = 96
+    + (podeEncaminharCompras ? 40 : 0)
+    + (podeInativar ? 40 : 0);
+  return [
+    podeSelecionar ? { key: 'selecao', width: 48, minWidth: 44 } : null,
+    { key: 'codigo', width: 112, minWidth: 96 },
+    { key: 'obra', width: 240, minWidth: 180 },
+    { key: 'solicitante', width: 180, minWidth: 140 },
+    { key: 'itens', width: 82, minWidth: 72 },
+    { key: 'fornecedores', width: 112, minWidth: 96 },
+    { key: 'necessario_para', width: 132, minWidth: 116 },
+    { key: 'criada_em', width: 120, minWidth: 104 },
+    { key: 'status', width: 190, minWidth: 160 },
+    { key: 'acoes', width: Math.max(actionWidth, 136), minWidth: Math.max(actionWidth, 128) }
+  ].filter(Boolean);
+}
+
 export default function SolicitacoesCompra() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -71,6 +90,10 @@ export default function SolicitacoesCompra() {
   const podeInativar = canDeleteCompraSolicitacoes(user);
   const podeEncaminharCompras = canEncaminharCompraSolicitacoes(user);
   const podeSelecionar = podeInativar || podeEncaminharCompras;
+  const tableColumns = useMemo(
+    () => buildSolicitacoesCompraColumns({ podeSelecionar, podeEncaminharCompras, podeInativar }),
+    [podeEncaminharCompras, podeInativar, podeSelecionar]
+  );
 
   async function carregarObras() {
     try {
@@ -348,41 +371,33 @@ export default function SolicitacoesCompra() {
             Nenhuma solicitacao de compra encontrada.
           </div>
         ) : (
-          <div className="compras-table-wrapper">
-            <table className="compras-data-table compras-data-table-solicitacoes">
-              <colgroup>
-                {podeSelecionar ? <col className="w-12" /> : null}
-                <col className="compras-col-codigo" />
-                <col className="compras-col-obra" />
-                <col className="compras-col-solicitante" />
-                <col className="compras-col-numero" />
-                <col className="compras-col-numero" />
-                <col className="compras-col-data" />
-                <col className="compras-col-data" />
-                <col className="compras-col-status" />
-                <col className="compras-col-acoes" />
-              </colgroup>
+          <div className="compras-table-wrapper compras-table-wrapper-scroll">
+            <ResizableTable
+              columns={tableColumns}
+              storageKey="fluxy.solicitacoes-compra.columns.v1"
+              className="compras-data-table compras-data-table-solicitacoes compras-data-table-resizable"
+            >
               <thead>
                 <tr>
                   {podeSelecionar ? (
-                    <th className="text-center">
+                    <ResizableTh columnKey="selecao" className="text-center compras-th-selecao">
                       <input
                         type="checkbox"
                         checked={todasSelecionadas}
                         onChange={toggleTodasSelecionadas}
                         aria-label="Selecionar solicitacoes listadas"
                       />
-                    </th>
+                    </ResizableTh>
                   ) : null}
-                  <th>Codigo</th>
-                  <th>Obra</th>
-                  <th>Solicitante</th>
-                  <th>Itens</th>
-                  <th>Fornecedores</th>
-                  <th>Necessario para</th>
-                  <th>Criada em</th>
-                  <th>Status</th>
-                  <th>Acoes</th>
+                  <ResizableTh columnKey="codigo">Codigo</ResizableTh>
+                  <ResizableTh columnKey="obra">Obra</ResizableTh>
+                  <ResizableTh columnKey="solicitante">Solicitante</ResizableTh>
+                  <ResizableTh columnKey="itens">Itens</ResizableTh>
+                  <ResizableTh columnKey="fornecedores">Fornecedores</ResizableTh>
+                  <ResizableTh columnKey="necessario_para">Necessario para</ResizableTh>
+                  <ResizableTh columnKey="criada_em">Criada em</ResizableTh>
+                  <ResizableTh columnKey="status">Status</ResizableTh>
+                  <ResizableTh columnKey="acoes" className="compras-th-acoes">Acoes</ResizableTh>
                 </tr>
               </thead>
               <tbody>
@@ -466,7 +481,7 @@ export default function SolicitacoesCompra() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </ResizableTable>
           </div>
         )}
       </div>

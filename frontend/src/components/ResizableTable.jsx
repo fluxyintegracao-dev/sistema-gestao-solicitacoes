@@ -75,7 +75,7 @@ export function ResizableTable({
   }, [storageKey, widths]);
 
   useEffect(() => {
-    function handleMouseMove(event) {
+    function handlePointerMove(event) {
       if (!resizingRef.current) {
         return;
       }
@@ -84,16 +84,18 @@ export function ResizableTable({
       setWidths((current) => ({ ...current, [key]: nextWidth }));
     }
 
-    function handleMouseUp() {
+    function handlePointerUp() {
       resizingRef.current = null;
       document.body.classList.remove('is-column-resizing');
     }
 
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+    window.addEventListener('pointercancel', handlePointerUp);
     return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+      window.removeEventListener('pointercancel', handlePointerUp);
       document.body.classList.remove('is-column-resizing');
     };
   }, []);
@@ -105,6 +107,7 @@ export function ResizableTable({
     }
     event.preventDefault();
     event.stopPropagation();
+    event.currentTarget?.setPointerCapture?.(event.pointerId);
     resizingRef.current = {
       key: columnKey,
       startX: event.clientX,
@@ -137,7 +140,10 @@ export function ResizableTable({
     <ResizableTableContext.Provider value={contextValue}>
       <table
         className={`resizable-table ${className}`.trim()}
-        style={{ minWidth: `${Math.max(tableMinWidth, 320)}px` }}
+        style={{
+          minWidth: `${Math.max(tableMinWidth, 320)}px`,
+          width: `${Math.max(tableMinWidth, 320)}px`
+        }}
         {...props}
       >
         <colgroup>
@@ -185,7 +191,7 @@ export function ResizableTh({ columnKey, children, className = '', title, ...pro
           role="separator"
           tabIndex={0}
           onKeyDown={handleKeyDown}
-          onMouseDown={(event) => context.startResize(columnKey, event)}
+          onPointerDown={(event) => context.startResize(columnKey, event)}
           onClick={(event) => event.stopPropagation()}
         />
       ) : null}

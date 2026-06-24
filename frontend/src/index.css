@@ -462,10 +462,10 @@ h1, h2, h3, h4, h5, h6 {
 .resizable-th-handle {
   position: absolute;
   top: 0;
-  right: -4px;
+  right: -6px;
   bottom: 0;
-  z-index: 2;
-  width: 9px;
+  z-index: 8;
+  width: 14px;
   cursor: col-resize;
   touch-action: none;
 }
@@ -473,20 +473,24 @@ h1, h2, h3, h4, h5, h6 {
 .resizable-th-handle::after {
   content: '';
   position: absolute;
-  top: 22%;
-  right: 4px;
-  bottom: 22%;
-  width: 1px;
+  top: 24%;
+  right: 5px;
+  bottom: 24%;
+  width: 4px;
+  border-right: 1px solid color-mix(in srgb, var(--ui-focus-ring, #2563eb) 72%, transparent);
+  border-left: 1px solid color-mix(in srgb, var(--ui-focus-ring, #2563eb) 42%, transparent);
   border-radius: 999px;
-  background: color-mix(in srgb, var(--c-border) 84%, var(--c-primary));
-  opacity: 0;
-  transition: opacity 0.14s ease, background 0.14s ease;
+  background: transparent;
+  opacity: 0.5;
+  transition: opacity 0.14s ease, border-color 0.14s ease, box-shadow 0.14s ease;
 }
 
 .resizable-th:hover .resizable-th-handle::after,
 .resizable-th-handle:focus-visible::after,
 .is-column-resizing .resizable-th-handle::after {
   opacity: 1;
+  border-color: var(--ui-focus-ring, #2563eb);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ui-focus-ring, #2563eb) 16%, transparent);
 }
 
 .resizable-th-handle:focus-visible {
@@ -9129,9 +9133,32 @@ body {
 
 .layout-shell .compras-table-wrapper {
   overflow-x: auto;
+  overflow-y: hidden;
   border: 1px solid var(--shell-border, var(--ui-border));
   border-radius: 1rem;
   background: color-mix(in srgb, var(--shell-panel, #fff) 96%, var(--shell-primary, #2563eb) 4%);
+  scrollbar-gutter: stable;
+}
+
+.layout-shell .compras-table-wrapper-scroll {
+  max-width: 100%;
+  padding-bottom: 0.35rem;
+}
+
+.layout-shell .compras-table-wrapper-scroll::-webkit-scrollbar {
+  height: 0.72rem;
+}
+
+.layout-shell .compras-table-wrapper-scroll::-webkit-scrollbar-track {
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--shell-panel-strong, #fff) 82%, var(--shell-primary, #2563eb) 8%);
+}
+
+.layout-shell .compras-table-wrapper-scroll::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--shell-primary, #2563eb) 42%, var(--shell-border, #cbd5e1));
+  background-clip: padding-box;
 }
 
 .layout-shell .compras-data-table {
@@ -9142,11 +9169,16 @@ body {
   table-layout: fixed;
 }
 
+.layout-shell .compras-data-table-resizable {
+  width: max-content;
+}
+
 .layout-shell .compras-data-table-cotacoes {
   min-width: 76rem;
 }
 
 .layout-shell .compras-data-table th {
+  position: relative;
   padding: 0.55rem 0.65rem;
   border-bottom: 1px solid var(--shell-border, var(--ui-border));
   background: color-mix(in srgb, var(--shell-panel-strong, #fff) 88%, var(--shell-primary, #2563eb) 12%);
@@ -9160,6 +9192,56 @@ body {
   white-space: nowrap;
 }
 
+.layout-shell .compras-data-table .resizable-th {
+  cursor: default;
+  padding-right: 1.2rem;
+}
+
+.layout-shell .compras-data-table .resizable-th-label {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.layout-shell .compras-data-table .resizable-th-handle {
+  position: absolute;
+  top: 0.24rem;
+  right: -0.38rem;
+  bottom: 0.24rem;
+  z-index: 10;
+  width: 0.9rem;
+  cursor: col-resize;
+  border-radius: 999px;
+}
+
+.layout-shell .compras-data-table .resizable-th-handle::after {
+  content: '';
+  position: absolute;
+  top: 18%;
+  right: 0.32rem;
+  bottom: 18%;
+  width: 4px;
+  border-right: 1px solid color-mix(in srgb, var(--shell-primary, #2563eb) 78%, transparent);
+  border-left: 1px solid color-mix(in srgb, var(--shell-primary, #2563eb) 42%, transparent);
+  border-radius: 999px;
+  background: transparent;
+  opacity: 0.62;
+}
+
+.layout-shell .compras-data-table .resizable-th-handle:hover::after,
+.layout-shell .compras-data-table .resizable-th-handle:focus-visible::after,
+.is-column-resizing .layout-shell .compras-data-table .resizable-th-handle::after {
+  opacity: 1;
+  border-color: var(--shell-primary, #2563eb);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--shell-primary, #2563eb) 16%, transparent);
+}
+
+.layout-shell .compras-data-table .compras-th-acoes,
+.layout-shell .compras-data-table th:last-child {
+  text-align: right;
+}
+
 .layout-shell .compras-data-table td {
   padding: 0.52rem 0.65rem;
   border-bottom: 1px solid var(--shell-border, var(--ui-border));
@@ -9170,6 +9252,21 @@ body {
   background: transparent;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.layout-shell .compras-data-table-solicitacoes th:last-child,
+.layout-shell .compras-data-table-solicitacoes td:last-child {
+  position: sticky;
+  right: 0;
+  z-index: 2;
+  overflow: visible;
+  background: color-mix(in srgb, var(--shell-panel, #fff) 96%, var(--shell-primary, #2563eb) 4%);
+  box-shadow: -10px 0 18px -18px rgba(15, 23, 42, 0.55);
+}
+
+.layout-shell .compras-data-table-solicitacoes th:last-child {
+  z-index: 4;
+  background: color-mix(in srgb, var(--shell-panel-strong, #fff) 88%, var(--shell-primary, #2563eb) 12%);
 }
 
 .layout-shell .compras-data-table tbody tr:nth-child(even) {
@@ -9196,7 +9293,8 @@ body {
   align-items: center;
   justify-content: flex-end;
   gap: 0.35rem;
-  width: 100%;
+  width: max-content;
+  min-width: 100%;
 }
 
 .layout-shell .compras-icon-action {
@@ -9279,6 +9377,28 @@ body {
   width: 5.6rem;
 }
 
+@media (max-width: 900px) {
+  .layout-shell .compras-table-card {
+    padding: 0.6rem;
+  }
+
+  .layout-shell .compras-data-table th {
+    padding: 0.5rem 0.55rem;
+    font-size: 0.64rem;
+  }
+
+  .layout-shell .compras-data-table td {
+    padding: 0.48rem 0.55rem;
+    font-size: 0.76rem;
+  }
+
+  .layout-shell .compras-icon-action {
+    width: 1.86rem;
+    height: 1.86rem;
+    flex-basis: 1.86rem;
+  }
+}
+
 .dark .layout-shell .compras-table-wrapper {
   background: rgba(15, 23, 42, 0.52);
 }
@@ -9293,6 +9413,14 @@ body {
 
 .dark .layout-shell .compras-icon-action {
   background: rgba(15, 23, 42, 0.86);
+}
+
+.dark .layout-shell .compras-data-table-solicitacoes th:last-child {
+  background: color-mix(in srgb, var(--shell-panel-strong, #0f172a) 82%, var(--shell-primary, #2563eb) 18%);
+}
+
+.dark .layout-shell .compras-data-table-solicitacoes td:last-child {
+  background: rgba(15, 23, 42, 0.9);
 }
 
 /* Tabelas densas compartilhadas para telas financeiras e diretoria */
