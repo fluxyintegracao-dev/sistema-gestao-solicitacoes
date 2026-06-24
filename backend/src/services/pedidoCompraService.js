@@ -1875,6 +1875,9 @@ async function delegarSolicitacaoCompra({
   if (!solicitacao) {
     throw new Error('Solicitacao de compra nao encontrada.');
   }
+  if (normalizeText(solicitacao.origem) === 'COMPRA_DIRETA') {
+    throw new Error('Compra Direta segue pelo fluxo da solicitacao principal e nao deve ser delegada no modulo de Compras.');
+  }
 
   const motivoNormalizado = motivoAtraso ? String(motivoAtraso).trim() : '';
 

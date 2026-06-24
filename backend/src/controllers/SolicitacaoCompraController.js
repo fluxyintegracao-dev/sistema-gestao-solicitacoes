@@ -799,6 +799,12 @@ function isSolicitacaoCompraDireta(solicitacao) {
   return normalizeTextCompra(solicitacao?.origem) === 'COMPRA_DIRETA';
 }
 
+function responderCompraDiretaForaDoFluxoCompras(res) {
+  return res.status(400).json({
+    error: 'Compra Direta segue pelo fluxo da solicitacao principal e nao deve entrar na fila operacional de Compras.'
+  });
+}
+
 function formatCurrencyPdf(value) {
   return Number(value || 0).toLocaleString('pt-BR', {
     minimumFractionDigits: 2,
@@ -1389,6 +1395,13 @@ async function validarEscopoEncaminhamentoCompra(usuario, solicitacao, res, opti
 }
 
 async function encaminharSolicitacaoCompraParaFilaCompras({ solicitacao, usuario, transaction }) {
+  if (isSolicitacaoCompraDireta(solicitacao)) {
+    const codigo = `SC-${String(solicitacao.id).padStart(5, '0')}`;
+    const error = new Error(`${codigo} e uma Compra Direta e nao deve ser encaminhada para Compras.`);
+    error.statusCode = 400;
+    throw error;
+  }
+
   const statusAtual = normalizeTextCompra(solicitacao.status);
   if (['INATIVA', 'ENCERRADO', 'FINALIZADA'].includes(statusAtual) || statusAtual.startsWith('PEDIDO_')) {
     const codigo = `SC-${String(solicitacao.id).padStart(5, '0')}`;
@@ -1539,6 +1552,7 @@ module.exports = {
       const { obra_id, contexto } = req.query;
       const statusOcultos = ['INATIVA'];
       const where = {
+        origem: { [Op.ne]: 'COMPRA_DIRETA' },
         status: {
           [Op.notIn]: statusOcultos
         }
@@ -1838,6 +1852,11 @@ module.exports = {
       if (!solicitacao) {
         await transaction.rollback();
         return res.status(404).json({ error: 'Solicitacao de compra nao encontrada' });
+      }
+
+      if (isSolicitacaoCompraDireta(solicitacao)) {
+        await transaction.rollback();
+        return responderCompraDiretaForaDoFluxoCompras(res);
       }
 
       if (isCompraAguardandoDiretoria(solicitacao)) {
@@ -2328,6 +2347,11 @@ module.exports = {
         return res.status(404).json({ error: 'Solicitacao nao encontrada' });
       }
 
+      if (isSolicitacaoCompraDireta(solicitacao)) {
+        await transaction.rollback();
+        return responderCompraDiretaForaDoFluxoCompras(res);
+      }
+
       if (normalizeTextCompra(solicitacao.status) === 'ENCERRADO') {
         await transaction.rollback();
         return res.status(400).json({ error: 'Solicitacao encerrada nao aceita novo envio para fornecedores' });
@@ -2515,6 +2539,11 @@ module.exports = {
         return res.status(404).json({ error: 'Solicitacao nao encontrada' });
       }
 
+      if (isSolicitacaoCompraDireta(solicitacao)) {
+        await transaction.rollback();
+        return responderCompraDiretaForaDoFluxoCompras(res);
+      }
+
       if (['ENCERRADO', 'RECUSADO'].includes(normalizeTextCompra(solicitacao.status))) {
         await transaction.rollback();
         return res.status(400).json({ error: 'Esta solicitacao nao pode ser recusada novamente' });
@@ -2575,6 +2604,10 @@ module.exports = {
         return res.status(404).json({ error: 'Solicitacao nao encontrada' });
       }
 
+      if (isSolicitacaoCompraDireta(solicitacao)) {
+        return responderCompraDiretaForaDoFluxoCompras(res);
+      }
+
       if (isCompraAguardandoDiretoria(solicitacao)) {
         return responderCompraAguardandoDiretoria(res);
       }
@@ -2613,6 +2646,11 @@ module.exports = {
       if (!solicitacao) {
         await transaction.rollback();
         return res.status(404).json({ error: 'Solicitacao nao encontrada' });
+      }
+
+      if (isSolicitacaoCompraDireta(solicitacao)) {
+        await transaction.rollback();
+        return responderCompraDiretaForaDoFluxoCompras(res);
       }
 
       if (isCompraAguardandoDiretoria(solicitacao)) {
