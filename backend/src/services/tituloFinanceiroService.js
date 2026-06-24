@@ -3851,7 +3851,7 @@ async function excluirTitulosEmMassa(req, payload = {}) {
 
   const pagamentosAtivos = await PaymentIntent.count({
     where: {
-      titulo_id: { [Op.in]: idsUnicos },
+      titulo_financeiro_id: { [Op.in]: idsUnicos },
       status: { [Op.notIn]: PAYMENT_INTENT_INACTIVE_STATUSES }
     }
   });
