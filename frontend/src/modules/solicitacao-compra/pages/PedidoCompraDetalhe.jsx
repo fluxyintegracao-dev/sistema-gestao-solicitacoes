@@ -17,6 +17,7 @@ import {
 import { getStatusPedidosCompra } from '../../../services/configuracoesSistema';
 import { useAuth } from '../../../contexts/AuthContext';
 import { canManageComprasPedidos, isBusinessAdmin } from '../../../utils/acessoProduto';
+import { useSafeNavigateBack } from '../../../utils/navigation';
 import CompraPreviewModal from '../components/CompraPreviewModal';
 
 function formatMoney(value) {
@@ -277,6 +278,7 @@ function getItemSituacao(item) {
 export default function PedidoCompraDetalhe() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const navigateBack = useSafeNavigateBack('/pedidos-compra');
   const { user } = useAuth();
   const businessAdmin = isBusinessAdmin(user);
   const podeGerenciarPedido = canManageComprasPedidos(user);
@@ -828,7 +830,7 @@ export default function PedidoCompraDetalhe() {
                 {cancelandoPedido ? 'Cancelando...' : 'Cancelar pedido'}
               </button>
             ) : null}
-            <button type="button" className="btn btn-outline" onClick={() => navigate('/pedidos-compra')}>
+            <button type="button" className="btn btn-outline" onClick={() => navigateBack('/pedidos-compra')}>
               Voltar
             </button>
             <button

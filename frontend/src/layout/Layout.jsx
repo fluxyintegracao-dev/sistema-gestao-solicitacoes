@@ -108,6 +108,7 @@ import {
   isSuperadmin
 } from '../utils/acessoProduto';
 import { isNativeApp, registerNativeBackButtonHandler } from '../mobile/runtime';
+import { getFallbackRoute, hasSafeBrowserHistory } from '../utils/navigation';
 
 export default function Layout() {
   const { user, logout } = useContext(AuthContext);
@@ -190,7 +191,13 @@ export default function Layout() {
       canCloseMenu: () => menuAberto,
       onCloseMenu: () => setMenuAberto(false),
       canNavigateBack: () => location.pathname !== '/',
-      onNavigateBack: () => navigate(-1)
+      onNavigateBack: () => {
+        if (hasSafeBrowserHistory()) {
+          navigate(-1);
+          return;
+        }
+        navigate(getFallbackRoute(location.pathname), { replace: true });
+      }
     });
   }, [location.pathname, menuAberto, navigate]);
 

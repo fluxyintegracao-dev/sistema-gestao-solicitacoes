@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { baixarPdfSolicitacaoCompra, obterSolicitacaoCompra } from '../../../services/compras';
+import { useSafeNavigateBack } from '../../../utils/navigation';
 
 function formatarData(data) {
   if (!data) return '-';
@@ -33,6 +34,7 @@ function statusCotacaoClass(status) {
 export default function SolicitacaoCompraDetalheView() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const navigateBack = useSafeNavigateBack('/solicitacoes-compra');
   const [solicitacao, setSolicitacao] = useState(null);
   const [loading, setLoading] = useState(false);
   const [baixando, setBaixando] = useState(false);
@@ -132,7 +134,7 @@ export default function SolicitacaoCompraDetalheView() {
             </p>
           </div>
           <div className="app-page-actions">
-            <button type="button" className="btn btn-outline" onClick={() => navigate('/solicitacoes-compra')}>
+            <button type="button" className="btn btn-outline" onClick={() => navigateBack('/solicitacoes-compra')}>
               Voltar
             </button>
             <button type="button" className="btn btn-outline" onClick={() => navigate(`/solicitacoes-compra/${id}/cotacao`)}>

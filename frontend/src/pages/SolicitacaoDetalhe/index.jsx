@@ -21,10 +21,12 @@ import {
 } from '../../services/solicitacoes';
 import { isGeoSetor, solicitacaoEstaNoSetorDoUsuario, userHasSetorCapability } from '../../utils/setor';
 import { canAccessFinanceiro, canDeleteSolicitacaoAnexo, hasEnabledModule } from '../../utils/acessoProduto';
+import { useSafeNavigateBack } from '../../utils/navigation';
 
 export default function SolicitacaoDetalhe() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const navigateBack = useSafeNavigateBack('/solicitacoes');
   const { user } = useAuth();
 
   const setorTokens = [
@@ -234,7 +236,7 @@ export default function SolicitacaoDetalhe() {
     <div className="sol-detail-page max-w-6xl mx-auto space-y-6">
       <div className="sol-detail-nav">
         <button
-          onClick={() => navigate(-1)}
+          onClick={() => navigateBack('/solicitacoes')}
           className="sol-detail-back-btn"
           type="button"
         >

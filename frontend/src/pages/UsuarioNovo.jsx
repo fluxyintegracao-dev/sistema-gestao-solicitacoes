@@ -4,10 +4,12 @@ import { API_URL, authHeaders } from '../services/api';
 import { getUsuario, criarUsuario, atualizarUsuario } from '../services/usuarios';
 import { useAuth } from '../contexts/AuthContext';
 import { isBusinessAdmin, isSuperadmin } from '../utils/acessoProduto';
+import { useSafeNavigateBack } from '../utils/navigation';
 
 export default function UsuarioNovo() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const navigateBack = useSafeNavigateBack('/usuarios');
   const { id } = useParams();
   const editando = Boolean(id);
 
@@ -292,7 +294,7 @@ export default function UsuarioNovo() {
           <button
             type="button"
             className="btn-secondary"
-            onClick={() => navigate(-1)}
+            onClick={() => navigateBack('/usuarios')}
           >
             Cancelar
           </button>

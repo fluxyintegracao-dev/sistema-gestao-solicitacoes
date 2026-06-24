@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useNavigate } from 'react-router-dom';
 import {
   HiDocumentArrowDown,
   HiViewColumns,
@@ -74,6 +75,7 @@ function dataCurta(valor) {
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 200];
 
 export default function Solicitacoes({ arquivadas = false }) {
+  const navigate = useNavigate();
   const DEFAULT_VISIBLE_COLUMNS = [
     'data',
     'codigo',
@@ -1707,7 +1709,7 @@ export default function Solicitacoes({ arquivadas = false }) {
             <button
               type="button"
               className="btn btn-outline !min-h-0 h-9 px-3 inline-flex items-center gap-2"
-              onClick={() => window.location.assign(`/solicitacoes/${selecionadaUnica.id}`)}
+              onClick={() => navigate(`/solicitacoes/${selecionadaUnica.id}`)}
               title="Ver solicitação"
             >
               <HiOutlineEye className="w-4 h-4" />
