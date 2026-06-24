@@ -38,6 +38,9 @@ const {
   obterItensCotaveis,
   registrarLogSolicitacaoCompra
 } = require('../services/comprasCotacao');
+const {
+  criarOuAtualizarFornecedorCentralizado
+} = require('../services/comprasFornecedorService');
 const { gerarPedidosDosVencedores } = require('../services/pedidoCompraService');
 const {
   construirResumoApropriacoes,
@@ -2437,18 +2440,12 @@ module.exports = {
             );
           }
         } else if (String(entry?.nome || '').trim()) {
-          fornecedor = await FornecedorCompra.create(
-            {
-              nome: String(entry.nome).trim(),
-              cnpj: entry.cnpj ? String(entry.cnpj).trim() : null,
-              email: entry.email ? String(entry.email).trim() : null,
-              whatsapp: entry.whatsapp ? String(entry.whatsapp).trim() : null,
-              contato: entry.contato ? String(entry.contato).trim() : null,
-              observacoes: null,
-              ativo: true
-            },
-            { transaction }
-          );
+          try {
+            fornecedor = await criarOuAtualizarFornecedorCentralizado(entry, { transaction });
+          } catch (error) {
+            await transaction.rollback();
+            return res.status(400).json({ error: error.message || 'Fornecedor invalido informado para envio' });
+          }
         }
 
         if (!fornecedor) {

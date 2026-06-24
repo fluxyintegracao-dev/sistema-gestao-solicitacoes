@@ -246,13 +246,14 @@ function parseCategoriaIds(value) {
   return Array.from(new Set(ids));
 }
 
-async function validarCategorias(categoriaIds = []) {
+async function validarCategorias(categoriaIds = [], options = {}) {
   if (!categoriaIds.length) return;
   const categorias = await ParceiroCategoria.findAll({
     where: {
       id: categoriaIds,
       ativo: true
-    }
+    },
+    transaction: options.transaction
   });
 
   if (categorias.length !== categoriaIds.length) {
@@ -260,12 +261,13 @@ async function validarCategorias(categoriaIds = []) {
   }
 }
 
-async function ensureParceiroUnico(cpfCnpj, parceiroId = null) {
+async function ensureParceiroUnico(cpfCnpj, parceiroId = null, options = {}) {
   const existente = await Parceiro.findOne({
     where: {
       cpf_cnpj: cpfCnpj,
       ...(parceiroId ? { id: { [Op.ne]: parceiroId } } : {})
-    }
+    },
+    transaction: options.transaction
   });
 
   if (existente) {
@@ -374,22 +376,22 @@ async function buscarParceiros({
   return Parceiro.findAll(options);
 }
 
-async function criarParceiro(payload) {
+async function criarParceiro(payload, options = {}) {
   const categoriaIds = parseCategoriaIds(payload?.categoria_ids);
   const data = normalizeParceiroPayload(payload);
-  await ensureParceiroUnico(data.cpf_cnpj);
-  await validarCategorias(categoriaIds);
-  const parceiro = await Parceiro.create(data);
+  await ensureParceiroUnico(data.cpf_cnpj, null, options);
+  await validarCategorias(categoriaIds, options);
+  const parceiro = await Parceiro.create(data, { transaction: options.transaction });
 
   if (categoriaIds.length) {
-    await parceiro.setCategorias(categoriaIds);
+    await parceiro.setCategorias(categoriaIds, { transaction: options.transaction });
   }
 
   return parceiro;
 }
 
-async function atualizarParceiro(id, payload) {
-  const parceiro = await Parceiro.findByPk(id);
+async function atualizarParceiro(id, payload, options = {}) {
+  const parceiro = await Parceiro.findByPk(id, { transaction: options.transaction });
   if (!parceiro) {
     throw new Error('Parceiro nao encontrado.');
   }
@@ -402,7 +404,7 @@ async function atualizarParceiro(id, payload) {
     if (!isValidCpfCnpj(data.cpf_cnpj)) {
       throw new Error('Informe um CPF/CNPJ valido.');
     }
-    await ensureParceiroUnico(data.cpf_cnpj, parceiro.id);
+    await ensureParceiroUnico(data.cpf_cnpj, parceiro.id, options);
     data.tipo_pessoa = inferirTipoPessoa(data.cpf_cnpj, payload.tipo_pessoa);
   }
 
@@ -415,11 +417,11 @@ async function atualizarParceiro(id, payload) {
     data.fornecedor = true;
   }
 
-  await parceiro.update(data);
+  await parceiro.update(data, { transaction: options.transaction });
 
   if (hasCategorias) {
-    await validarCategorias(categoriaIds);
-    await parceiro.setCategorias(categoriaIds);
+    await validarCategorias(categoriaIds, options);
+    await parceiro.setCategorias(categoriaIds, { transaction: options.transaction });
   }
 
   return parceiro;

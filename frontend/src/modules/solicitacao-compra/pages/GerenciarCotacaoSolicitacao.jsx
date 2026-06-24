@@ -19,7 +19,7 @@ import {
   obterUrlPdfCotacaoPublica,
   recusarSolicitacaoCompra
 } from '../../../services/compras';
-import { listarCategoriasParceiro } from '../../../services/parceiros';
+import { buscarParceiros, listarCategoriasParceiro } from '../../../services/parceiros';
 import { useAuth } from '../../../contexts/AuthContext';
 import CompraPreviewModal from '../components/CompraPreviewModal';
 import { criarPreviewCompra } from '../utils/preview';
@@ -99,6 +99,21 @@ function normalizeText(value) {
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .trim();
+}
+
+function fornecedorSelectionKey(fornecedor) {
+  if (fornecedor?.selection_key) return String(fornecedor.selection_key);
+  if (fornecedor?.origem_cadastro === 'PARCEIRO' && fornecedor?.parceiro_id) {
+    return `parceiro:${fornecedor.parceiro_id}`;
+  }
+  return `fornecedor:${fornecedor?.fornecedor_compra_id || fornecedor?.id}`;
+}
+
+function fornecedorToCotacaoPayload(fornecedor) {
+  if (fornecedor?.origem_cadastro === 'PARCEIRO' && fornecedor?.parceiro_id) {
+    return { parceiro_id: Number(fornecedor.parceiro_id) };
+  }
+  return { fornecedor_id: Number(fornecedor?.fornecedor_compra_id || fornecedor?.id) };
 }
 
 async function copiarTexto(texto) {
@@ -512,7 +527,7 @@ function SecaoEnvioFornecedores({
   }, [fornecedores, categoriaFornecedorId, buscaFornecedorNormalizada]);
 
   function selecionarTodosComCategoria() {
-    const ids = fornecedoresComCategoria.map((f) => String(f.id));
+    const ids = fornecedoresComCategoria.map((f) => fornecedorSelectionKey(f));
     const novos = ids.filter((id) => !fornecedoresSelecionados.includes(id));
     novos.forEach((id) => onToggleFornecedor(id, true));
     setSelecionandoPorCategoria(false);
@@ -526,12 +541,12 @@ function SecaoEnvioFornecedores({
 
     // Fornecedores selecionados
     fornecedoresSelecionados.forEach((id) => {
-      const f = fornecedores.find((x) => String(x.id) === id);
+      const f = fornecedores.find((x) => fornecedorSelectionKey(x) === id);
       if (!f?.whatsapp) return;
 
       // Encontra o token da cotacao para este fornecedor, quando ja gerado.
       const vinculo = (solicitacao?.fornecedores || []).find(
-        (v) => String(v.fornecedor_compra_id) === String(f.id)
+        (v) => String(v.fornecedor_compra_id) === String(f.fornecedor_compra_id || f.id)
       );
       if (!vinculo?.token) return;
 
@@ -659,13 +674,14 @@ function SecaoEnvioFornecedores({
                           </div>
                         ) : (
                           fornecedoresAutocomplete.map((f) => {
-                            const checked = fornecedoresSelecionados.includes(String(f.id));
+                            const selectionKey = fornecedorSelectionKey(f);
+                            const checked = fornecedoresSelecionados.includes(selectionKey);
                             return (
                               <button
-                                key={f.id}
+                                key={selectionKey}
                                 type="button"
                                 className={`flex w-full items-start gap-3 border-b border-[var(--c-border)] px-3 py-2 text-left last:border-b-0 hover:bg-blue-50 ${checked ? 'bg-blue-50' : ''}`}
-                                onClick={() => onToggleFornecedor(String(f.id), !checked)}
+                                onClick={() => onToggleFornecedor(selectionKey, !checked)}
                               >
                                 <input type="checkbox" checked={checked} readOnly className="mt-1" />
                                 <span className="min-w-0">
@@ -708,11 +724,11 @@ function SecaoEnvioFornecedores({
                       <div className="text-sm text-[var(--c-muted)]">Nenhum fornecedor encontrado para a categoria selecionada.</div>
                     ) : (
                       fornecedoresListaCategoria.map((f) => (
-                        <label key={f.id} className="app-list-card flex items-start gap-2 px-3 py-2">
+                        <label key={fornecedorSelectionKey(f)} className="app-list-card flex items-start gap-2 px-3 py-2">
                           <input
                             type="checkbox"
-                            checked={fornecedoresSelecionados.includes(String(f.id))}
-                            onChange={(e) => onToggleFornecedor(String(f.id), e.target.checked)}
+                            checked={fornecedoresSelecionados.includes(fornecedorSelectionKey(f))}
+                            onChange={(e) => onToggleFornecedor(fornecedorSelectionKey(f), e.target.checked)}
                           />
                           <div>
                             <div className="font-medium">{f.nome}</div>
@@ -748,8 +764,8 @@ function SecaoEnvioFornecedores({
                 <input className="input" placeholder="Ex.: Fornecedor ABC" value={novoFornecedor.nome} onChange={(e) => onChangeNovoFornecedor('nome', e.target.value)} />
               </label>
               <label className="grid gap-1 text-sm">
-                <span className="text-xs font-semibold text-[var(--c-muted)]">CNPJ</span>
-                <input className="input" placeholder="00.000.000/0000-00" value={novoFornecedor.cnpj} onChange={(e) => onChangeNovoFornecedor('cnpj', e.target.value)} />
+                <span className="text-xs font-semibold text-[var(--c-muted)]">CPF/CNPJ</span>
+                <input className="input" placeholder="CPF ou CNPJ do fornecedor" value={novoFornecedor.cnpj} onChange={(e) => onChangeNovoFornecedor('cnpj', e.target.value)} />
               </label>
               <label className="grid gap-1 text-sm">
                 <span className="text-xs font-semibold text-[var(--c-muted)]">WhatsApp</span>
@@ -1095,13 +1111,55 @@ export default function GerenciarCotacaoSolicitacao() {
     try {
       setBuscandoFornecedores(true);
       const params = { limit: 200 };
+      const parceiroParams = { fornecedor: 1, ativo: 1, incluir_categorias: 1, limit: 200 };
       if (categoriaFornecedorId) {
         const categoria = categoriasFornecedor.find((item) => String(item.id) === String(categoriaFornecedorId));
         if (categoria?.nome) params.categoria = categoria.nome;
+        parceiroParams.categoria_id = categoriaFornecedorId;
       }
-      if (fornecedorBusca.trim()) params.q = fornecedorBusca.trim();
-      const data = await listarFornecedoresCompra(params);
-      setFornecedores(Array.isArray(data) ? data : []);
+      if (fornecedorBusca.trim()) {
+        params.q = fornecedorBusca.trim();
+        parceiroParams.q = fornecedorBusca.trim();
+      }
+      const [fornecedoresData, parceirosData] = await Promise.all([
+        listarFornecedoresCompra(params),
+        buscarParceiros(parceiroParams)
+      ]);
+
+      const fornecedoresCompra = (Array.isArray(fornecedoresData) ? fornecedoresData : []).map((fornecedor) => ({
+        ...fornecedor,
+        fornecedor_compra_id: fornecedor.id,
+        selection_key: `fornecedor:${fornecedor.id}`,
+        origem_cadastro: fornecedor.parceiro_id ? 'FORNECEDOR_COMPRA_PARCEIRO' : 'FORNECEDOR_COMPRA'
+      }));
+      const parceiroIdsJaSincronizados = new Set(
+        fornecedoresCompra
+          .map((fornecedor) => Number(fornecedor.parceiro_id || 0))
+          .filter((parceiroId) => parceiroId > 0)
+      );
+      const parceirosFornecedores = (Array.isArray(parceirosData) ? parceirosData : [])
+        .filter((parceiro) => !parceiroIdsJaSincronizados.has(Number(parceiro.id)))
+        .map((parceiro) => ({
+          id: `parceiro:${parceiro.id}`,
+          parceiro_id: parceiro.id,
+          selection_key: `parceiro:${parceiro.id}`,
+          origem_cadastro: 'PARCEIRO',
+          nome: parceiro.nome,
+          cnpj: parceiro.cpf_cnpj,
+          documento: parceiro.cpf_cnpj,
+          email: parceiro.email || '',
+          whatsapp: parceiro.telefone || '',
+          telefone: parceiro.telefone || '',
+          contato: '',
+          categoria_insumos: Array.isArray(parceiro.categorias)
+            ? parceiro.categorias.map((categoria) => categoria.nome).filter(Boolean)
+            : []
+        }));
+
+      setFornecedores(
+        [...fornecedoresCompra, ...parceirosFornecedores]
+          .sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR'))
+      );
     } catch (error) {
       console.error(error);
       alert(error.message || 'Erro ao buscar fornecedores');
@@ -1233,7 +1291,10 @@ export default function GerenciarCotacaoSolicitacao() {
   async function handleEnviarFornecedores() {
     try {
       const payload = [];
-      fornecedoresSelecionados.forEach((fornecedorId) => payload.push({ fornecedor_id: Number(fornecedorId) }));
+      fornecedoresSelecionados.forEach((selectionKey) => {
+        const fornecedor = fornecedores.find((item) => fornecedorSelectionKey(item) === selectionKey);
+        if (fornecedor) payload.push(fornecedorToCotacaoPayload(fornecedor));
+      });
       if (String(novoFornecedor.nome || '').trim()) {
         payload.push({
           nome: novoFornecedor.nome,
@@ -1262,9 +1323,17 @@ export default function GerenciarCotacaoSolicitacao() {
   async function handleCriarFornecedorRapido() {
     try {
       if (!String(novoFornecedor.nome || '').trim()) { alert('Informe o nome do fornecedor.'); return; }
+      if (!String(novoFornecedor.cnpj || '').trim()) { alert('Informe o CPF/CNPJ do fornecedor.'); return; }
+      if (!String(novoFornecedor.whatsapp || '').trim()) { alert('Informe o WhatsApp/telefone do fornecedor.'); return; }
       const fornecedor = await criarFornecedorCompra(novoFornecedor);
-      setFornecedores((atual) => [...atual, fornecedor].sort((a, b) => String(a.nome).localeCompare(String(b.nome))));
-      setFornecedoresSelecionados((atual) => [...atual, String(fornecedor.id)]);
+      const fornecedorFormatado = {
+        ...fornecedor,
+        fornecedor_compra_id: fornecedor.id,
+        selection_key: `fornecedor:${fornecedor.id}`,
+        origem_cadastro: fornecedor.parceiro_id ? 'FORNECEDOR_COMPRA_PARCEIRO' : 'FORNECEDOR_COMPRA'
+      };
+      setFornecedores((atual) => [...atual, fornecedorFormatado].sort((a, b) => String(a.nome).localeCompare(String(b.nome))));
+      setFornecedoresSelecionados((atual) => [...atual, fornecedorSelectionKey(fornecedorFormatado)]);
       setNovoFornecedor({ nome: '', cnpj: '', email: '', whatsapp: '', contato: '' });
       alert('Fornecedor criado e selecionado.');
     } catch (error) {
@@ -1710,4 +1779,3 @@ export default function GerenciarCotacaoSolicitacao() {
     </div>
   );
 }
-

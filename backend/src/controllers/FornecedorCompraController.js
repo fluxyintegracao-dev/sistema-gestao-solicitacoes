@@ -1,9 +1,14 @@
 const { Op } = require('sequelize');
 const { FornecedorCompra } = require('../models');
 const {
+  criarOuAtualizarFornecedorCentralizado,
+  criarOuAtualizarFornecedorCentralizadoEmTransacao,
+} = require('../services/comprasFornecedorService');
+const {
   canManageComprasCotacoes,
   canViewComprasCotacoes
 } = require('../services/authorizationService');
+const { sequelize } = require('../models');
 
 async function canReadFornecedores(req) {
   return canViewComprasCotacoes(req.user);
@@ -114,24 +119,23 @@ module.exports = {
         return res.status(400).json({ error: 'Informe o nome do fornecedor' });
       }
 
-      const fornecedor = await FornecedorCompra.create({
-        nome: String(nome).trim(),
-        cnpj: cnpj ? String(cnpj).trim() : null,
-        email: email ? String(email).trim() : null,
-        whatsapp: whatsapp ? String(whatsapp).trim() : null,
-        contato: contato ? String(contato).trim() : null,
-        observacoes: observacoes ? String(observacoes).trim() : null,
-        categoria_insumos: parseCategorias(categoria_insumos),
-        cidade: cidade ? String(cidade).trim() : null,
-        estado: estado ? String(estado).trim().toUpperCase().slice(0, 2) : null,
-        cep: cep ? String(cep).trim() : null,
-        ativo: true
+      const fornecedor = await criarOuAtualizarFornecedorCentralizadoEmTransacao({
+        nome,
+        cnpj,
+        email,
+        whatsapp,
+        contato,
+        observacoes,
+        categoria_insumos,
+        cidade,
+        estado,
+        cep
       });
 
       return res.status(201).json(fornecedor);
     } catch (error) {
       console.error(error);
-      return res.status(500).json({ error: 'Erro ao criar fornecedor' });
+      return res.status(400).json({ error: error.message || 'Erro ao criar fornecedor' });
     }
   },
 
@@ -152,24 +156,54 @@ module.exports = {
         return res.status(400).json({ error: 'Informe o nome do fornecedor' });
       }
 
-      await fornecedor.update({
-        nome: nome !== undefined ? String(nome).trim() : fornecedor.nome,
-        cnpj: cnpj !== undefined ? (cnpj ? String(cnpj).trim() : null) : fornecedor.cnpj,
-        email: email !== undefined ? (email ? String(email).trim() : null) : fornecedor.email,
-        whatsapp: whatsapp !== undefined ? (whatsapp ? String(whatsapp).trim() : null) : fornecedor.whatsapp,
-        contato: contato !== undefined ? (contato ? String(contato).trim() : null) : fornecedor.contato,
-        observacoes: observacoes !== undefined ? (observacoes ? String(observacoes).trim() : null) : fornecedor.observacoes,
-        categoria_insumos: categoria_insumos !== undefined ? parseCategorias(categoria_insumos) : fornecedor.categoria_insumos,
-        cidade: cidade !== undefined ? (cidade ? String(cidade).trim() : null) : fornecedor.cidade,
-        estado: estado !== undefined ? (estado ? String(estado).trim().toUpperCase().slice(0, 2) : null) : fornecedor.estado,
-        cep: cep !== undefined ? (cep ? String(cep).trim() : null) : fornecedor.cep,
-        ativo: ativo !== undefined ? Boolean(ativo) : fornecedor.ativo
-      });
+      if (fornecedor.parceiro_id) {
+        let fornecedorAtualizado = null;
+        await sequelize.transaction(async (transaction) => {
+          if (ativo !== undefined && Boolean(ativo) === false) {
+            await fornecedor.update({ ativo: false }, { transaction });
+            return;
+          }
+
+          fornecedorAtualizado = await criarOuAtualizarFornecedorCentralizado(
+            {
+              nome: nome !== undefined ? nome : fornecedor.nome,
+              cnpj: cnpj !== undefined ? cnpj : fornecedor.cnpj,
+              email: email !== undefined ? email : fornecedor.email,
+              whatsapp: whatsapp !== undefined ? whatsapp : fornecedor.whatsapp,
+              contato: contato !== undefined ? contato : fornecedor.contato,
+              observacoes: observacoes !== undefined ? observacoes : fornecedor.observacoes,
+              categoria_insumos: categoria_insumos !== undefined ? categoria_insumos : fornecedor.categoria_insumos,
+              cidade: cidade !== undefined ? cidade : fornecedor.cidade,
+              estado: estado !== undefined ? estado : fornecedor.estado,
+              cep: cep !== undefined ? cep : fornecedor.cep
+            },
+            { transaction }
+          );
+        });
+        if (fornecedorAtualizado) {
+          return res.json(fornecedorAtualizado);
+        }
+        await fornecedor.reload();
+      } else {
+        await fornecedor.update({
+          nome: nome !== undefined ? String(nome).trim() : fornecedor.nome,
+          cnpj: cnpj !== undefined ? (cnpj ? String(cnpj).trim() : null) : fornecedor.cnpj,
+          email: email !== undefined ? (email ? String(email).trim() : null) : fornecedor.email,
+          whatsapp: whatsapp !== undefined ? (whatsapp ? String(whatsapp).trim() : null) : fornecedor.whatsapp,
+          contato: contato !== undefined ? (contato ? String(contato).trim() : null) : fornecedor.contato,
+          observacoes: observacoes !== undefined ? (observacoes ? String(observacoes).trim() : null) : fornecedor.observacoes,
+          categoria_insumos: categoria_insumos !== undefined ? parseCategorias(categoria_insumos) : fornecedor.categoria_insumos,
+          cidade: cidade !== undefined ? (cidade ? String(cidade).trim() : null) : fornecedor.cidade,
+          estado: estado !== undefined ? (estado ? String(estado).trim().toUpperCase().slice(0, 2) : null) : fornecedor.estado,
+          cep: cep !== undefined ? (cep ? String(cep).trim() : null) : fornecedor.cep,
+          ativo: ativo !== undefined ? Boolean(ativo) : fornecedor.ativo
+        });
+      }
 
       return res.json(fornecedor);
     } catch (error) {
       console.error(error);
-      return res.status(500).json({ error: 'Erro ao atualizar fornecedor' });
+      return res.status(400).json({ error: error.message || 'Erro ao atualizar fornecedor' });
     }
   },
 
