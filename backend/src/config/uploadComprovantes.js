@@ -3,7 +3,7 @@ const path = require('path');
 const createSecureUpload = require('./createSecureUpload');
 
 const storage = multer.memoryStorage();
-const uploadMaxMb = Number(process.env.UPLOAD_MAX_FILE_SIZE_MB || 10);
+const uploadMaxMb = Number(process.env.UPLOAD_MAX_FILE_SIZE_MB || 50);
 const uploadMaxBytes = Math.max(1, uploadMaxMb) * 1024 * 1024;
 
 const tiposPermitidos = new Set([

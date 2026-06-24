@@ -1,8 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
-import { HiOutlineArrowDownTray, HiOutlineEye } from 'react-icons/hi2';
+import { HiOutlineArrowDownTray, HiOutlineEye, HiOutlineTrash } from 'react-icons/hi2';
 import { useNavigate } from 'react-router-dom';
-import { baixarPdfSolicitacaoCompra, listarSolicitacoesCompra } from '../../../services/compras';
+import { useAuth } from '../../../contexts/AuthContext';
+import {
+  baixarPdfSolicitacaoCompra,
+  inativarSolicitacaoCompra,
+  inativarSolicitacoesCompra,
+  listarSolicitacoesCompra
+} from '../../../services/compras';
 import { getMinhasObras } from '../../../services/obras';
+import { canDeleteCompraSolicitacoes } from '../../../utils/acessoProduto';
 
 function formatarData(data) {
   if (!data) {
@@ -49,12 +56,16 @@ function classNameStatus(status) {
 
 export default function SolicitacoesCompra() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [solicitacoes, setSolicitacoes] = useState([]);
   const [obras, setObras] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [inativando, setInativando] = useState(false);
   const [obraId, setObraId] = useState('');
   const [status, setStatus] = useState('');
   const [busca, setBusca] = useState('');
+  const [selecionadas, setSelecionadas] = useState([]);
+  const podeInativar = canDeleteCompraSolicitacoes(user);
 
   async function carregarObras() {
     try {
@@ -115,6 +126,31 @@ export default function SolicitacoesCompra() {
     });
   }, [busca, solicitacoes, status]);
 
+  const idsFiltrados = useMemo(
+    () => solicitacoesFiltradas.map((solicitacao) => Number(solicitacao.id)).filter(Boolean),
+    [solicitacoesFiltradas]
+  );
+
+  const todasSelecionadas = useMemo(
+    () => idsFiltrados.length > 0 && idsFiltrados.every((id) => selecionadas.includes(id)),
+    [idsFiltrados, selecionadas]
+  );
+
+  useEffect(() => {
+    setSelecionadas((atuais) => atuais.filter((id) => idsFiltrados.includes(id)));
+  }, [idsFiltrados]);
+
+  function toggleSelecionada(id) {
+    const key = Number(id);
+    setSelecionadas((atuais) =>
+      atuais.includes(key) ? atuais.filter((item) => item !== key) : [...atuais, key]
+    );
+  }
+
+  function toggleTodasSelecionadas() {
+    setSelecionadas(todasSelecionadas ? [] : idsFiltrados);
+  }
+
   async function handleBaixarPdf(id) {
     try {
       const blob = await baixarPdfSolicitacaoCompra(id);
@@ -126,6 +162,40 @@ export default function SolicitacoesCompra() {
     } catch (error) {
       console.error(error);
       alert(error.message || 'Erro ao gerar PDF');
+    }
+  }
+
+  async function handleInativar(ids) {
+    const idsValidos = [...new Set(
+      (Array.isArray(ids) ? ids : [ids])
+        .map((id) => Number(id))
+        .filter(Boolean)
+    )];
+
+    if (!idsValidos.length) {
+      alert('Selecione ao menos uma solicitacao de compra.');
+      return;
+    }
+
+    if (!window.confirm(`Inativar ${idsValidos.length} solicitacao(oes) de compra selecionada(s)?`)) {
+      return;
+    }
+
+    try {
+      setInativando(true);
+      if (idsValidos.length === 1) {
+        await inativarSolicitacaoCompra(idsValidos[0]);
+      } else {
+        await inativarSolicitacoesCompra(idsValidos);
+      }
+      setSelecionadas([]);
+      await carregarSolicitacoes();
+      alert('Solicitacao(oes) de compra inativada(s) com sucesso.');
+    } catch (error) {
+      console.error(error);
+      alert(error.message || 'Erro ao inativar solicitacao de compra');
+    } finally {
+      setInativando(false);
     }
   }
 
@@ -145,8 +215,21 @@ export default function SolicitacoesCompra() {
       <div className="sol-surface-card solicitacoes-toolbar app-toolbar-card rounded-xl p-3 md:p-4">
         <div className="text-sm text-gray-600 dark:text-slate-300">
           Registros disponiveis: <strong>{solicitacoesFiltradas.length}</strong>
+          {podeInativar && selecionadas.length > 0 ? (
+            <span className="ml-2 text-[var(--c-muted)]">Selecionadas: {selecionadas.length}</span>
+          ) : null}
         </div>
         <div className="app-page-actions">
+          {podeInativar && selecionadas.length > 0 ? (
+            <button
+              type="button"
+              className="btn btn-danger"
+              onClick={() => handleInativar(selecionadas)}
+              disabled={inativando}
+            >
+              {inativando ? 'Inativando...' : 'Inativar selecionadas'}
+            </button>
+          ) : null}
           <button type="button" className="btn btn-outline" onClick={carregarSolicitacoes} disabled={loading}>
             {loading ? 'Atualizando...' : 'Atualizar'}
           </button>
@@ -219,6 +302,7 @@ export default function SolicitacoesCompra() {
           <div className="compras-table-wrapper">
             <table className="compras-data-table compras-data-table-solicitacoes">
               <colgroup>
+                {podeInativar ? <col className="w-12" /> : null}
                 <col className="compras-col-codigo" />
                 <col className="compras-col-obra" />
                 <col className="compras-col-solicitante" />
@@ -231,6 +315,16 @@ export default function SolicitacoesCompra() {
               </colgroup>
               <thead>
                 <tr>
+                  {podeInativar ? (
+                    <th className="text-center">
+                      <input
+                        type="checkbox"
+                        checked={todasSelecionadas}
+                        onChange={toggleTodasSelecionadas}
+                        aria-label="Selecionar solicitacoes listadas"
+                      />
+                    </th>
+                  ) : null}
                   <th>Codigo</th>
                   <th>Obra</th>
                   <th>Solicitante</th>
@@ -245,6 +339,16 @@ export default function SolicitacoesCompra() {
               <tbody>
                 {solicitacoesFiltradas.map((solicitacao) => (
                   <tr key={solicitacao.id}>
+                    {podeInativar ? (
+                      <td className="text-center">
+                        <input
+                          type="checkbox"
+                          checked={selecionadas.includes(Number(solicitacao.id))}
+                          onChange={() => toggleSelecionada(solicitacao.id)}
+                          aria-label={`Selecionar solicitacao SC-${String(solicitacao.id).padStart(5, '0')}`}
+                        />
+                      </td>
+                    ) : null}
                     <td className="font-mono text-sm font-semibold">
                       SC-{String(solicitacao.id).padStart(5, '0')}
                     </td>
@@ -284,6 +388,18 @@ export default function SolicitacoesCompra() {
                         >
                           <HiOutlineArrowDownTray />
                         </button>
+                        {podeInativar ? (
+                          <button
+                            type="button"
+                            className="compras-icon-action text-red-600 hover:text-red-700"
+                            onClick={() => handleInativar([solicitacao.id])}
+                            title="Inativar solicitacao"
+                            aria-label={`Inativar solicitacao SC-${String(solicitacao.id).padStart(5, '0')}`}
+                            disabled={inativando}
+                          >
+                            <HiOutlineTrash />
+                          </button>
+                        ) : null}
                       </div>
                     </td>
                   </tr>

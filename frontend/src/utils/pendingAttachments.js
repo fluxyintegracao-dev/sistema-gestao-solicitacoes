@@ -1,4 +1,4 @@
-export const UPLOAD_MAX_FILE_SIZE_MB_PADRAO = 10;
+export const UPLOAD_MAX_FILE_SIZE_MB_PADRAO = 50;
 
 function gerarIdArquivo(file) {
   const nome = String(file?.name || 'arquivo').replace(/\s+/g, '-').toLowerCase();

@@ -215,6 +215,23 @@ export async function obterSolicitacaoCompra(id) {
   return handleJsonResponse(response, 'Erro ao buscar solicitacao de compra');
 }
 
+export async function inativarSolicitacaoCompra(id) {
+  const response = await fetch(`${API_URL}/compras/solicitacoes/${id}`, {
+    method: 'DELETE',
+    headers: authHeaders()
+  });
+  return handleJsonResponse(response, 'Erro ao inativar solicitacao de compra');
+}
+
+export async function inativarSolicitacoesCompra(ids = []) {
+  const response = await fetch(`${API_URL}/compras/solicitacoes/inativar-massa`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ solicitacao_ids: ids })
+  });
+  return handleJsonResponse(response, 'Erro ao inativar solicitacoes de compra');
+}
+
 export async function criarSolicitacaoCompra(data) {
   const response = await fetch(`${API_URL}/compras/solicitacoes`, {
     method: 'POST',

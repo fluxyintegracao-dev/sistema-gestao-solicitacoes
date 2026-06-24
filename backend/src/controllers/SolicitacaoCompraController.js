@@ -1342,11 +1342,14 @@ module.exports = {
       if (!usuario) return;
 
       const { obra_id, contexto } = req.query;
-      const where = {};
+      const statusOcultos = ['INATIVA'];
+      const where = {
+        status: {
+          [Op.notIn]: statusOcultos
+        }
+      };
       if (!isSuperadmin(usuario)) {
-        where.status = {
-          [Op.ne]: 'AGUARDANDO_DIRETORIA'
-        };
+        statusOcultos.push('AGUARDANDO_DIRETORIA');
       }
       const contextoDelegacao = String(contexto || '').trim().toLowerCase() === 'delegacao';
       const podeGerenciarDelegacao = contextoDelegacao
@@ -1416,6 +1419,95 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return res.status(500).json({ error: 'Erro ao listar solicitacoes de compra' });
+    }
+  },
+
+  async inativar(req, res) {
+    const transaction = await SolicitacaoCompra.sequelize.transaction();
+
+    try {
+      const usuario = await validarAcesso(req, res);
+      if (!usuario) {
+        await transaction.rollback();
+        return;
+      }
+
+      const ids = req.body?.solicitacao_ids || [req.params.id];
+      const solicitacaoIds = [...new Set(
+        (Array.isArray(ids) ? ids : [ids])
+          .map((id) => Number(id))
+          .filter((id) => Number.isInteger(id) && id > 0)
+      )];
+
+      if (solicitacaoIds.length === 0) {
+        await transaction.rollback();
+        return res.status(400).json({ error: 'Selecione ao menos uma solicitacao de compra.' });
+      }
+
+      const solicitacoes = await SolicitacaoCompra.findAll({
+        where: { id: { [Op.in]: solicitacaoIds } },
+        transaction
+      });
+
+      if (solicitacoes.length !== solicitacaoIds.length) {
+        await transaction.rollback();
+        return res.status(404).json({ error: 'Uma ou mais solicitacoes de compra nao foram encontradas.' });
+      }
+
+      const pedidoCounts = await PedidoCompra.count({
+        where: { solicitacao_compra_id: { [Op.in]: solicitacaoIds } },
+        transaction
+      });
+
+      if (pedidoCounts > 0) {
+        await transaction.rollback();
+        return res.status(400).json({
+          error: 'Nao e possivel inativar solicitacoes de compra que ja possuem pedido gerado.'
+        });
+      }
+
+      for (const solicitacao of solicitacoes) {
+        if (!(await validarEscopoSolicitacaoCompra(usuario, solicitacao, res, transaction))) {
+          await transaction.rollback();
+          return;
+        }
+
+        const statusAtual = normalizeTextCompra(solicitacao.status);
+        if (['INATIVA', 'ENCERRADO'].includes(statusAtual) || statusAtual.startsWith('PEDIDO_')) {
+          await transaction.rollback();
+          return res.status(400).json({
+            error: `A solicitacao SC-${String(solicitacao.id).padStart(5, '0')} nao pode ser inativada no status atual.`
+          });
+        }
+      }
+
+      for (const solicitacao of solicitacoes) {
+        await solicitacao.update(
+          {
+            status: 'INATIVA',
+            observacoes: [
+              solicitacao.observacoes,
+              `Inativada em ${new Date().toISOString()} pelo usuario #${usuario.id}`
+            ].filter(Boolean).join('\n')
+          },
+          { transaction }
+        );
+
+        await registrarLogSolicitacaoCompra({
+          solicitacaoCompraId: solicitacao.id,
+          usuarioId: usuario.id,
+          tipoAcao: 'INATIVACAO_COMPRA',
+          descricao: 'Solicitacao de compra inativada',
+          transaction
+        });
+      }
+
+      await transaction.commit();
+      return res.json({ ok: true, inativadas: solicitacoes.length, ids: solicitacaoIds });
+    } catch (error) {
+      await transaction.rollback();
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao inativar solicitacao de compra' });
     }
   },
 

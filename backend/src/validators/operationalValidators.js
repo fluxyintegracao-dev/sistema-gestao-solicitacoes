@@ -748,6 +748,17 @@ function validateCompraPedidoStatusBatchBody(body = {}) {
   };
 }
 
+function validateCompraSolicitacaoInativarMassaBody(body = {}) {
+  ensureAllowedKeys(body, ['solicitacao_ids'], 'Inativacao em massa de solicitacoes de compra');
+
+  return {
+    solicitacao_ids: parseIdArray(body.solicitacao_ids, 'Solicitacoes de compra', {
+      required: true,
+      maxItems: 100
+    })
+  };
+}
+
 function validateCompraPedidoCancelBody(body = {}) {
   ensureAllowedKeys(body, ['motivo', 'itens', 'item_ids'], 'Cancelamento do pedido');
 
@@ -1031,6 +1042,7 @@ module.exports = {
   validateCompraPedidoRemanejarBody,
   validateCompraPedidoStatusBody,
   validateCompraPedidoStatusBatchBody,
+  validateCompraSolicitacaoInativarMassaBody,
   validateCompraPedidoItemUpdateBody,
   validateCompraDelegacaoBody,
   validateCompraPedidoAuditoriaQuery,

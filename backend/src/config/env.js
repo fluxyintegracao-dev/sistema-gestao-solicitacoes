@@ -90,7 +90,7 @@ const env = {
   dbName: String(process.env.DB_NAME || '').trim(),
   jwtSecret: String(process.env.JWT_SECRET || '').trim(),
   jwtExpiresIn: String(process.env.JWT_EXPIRES_IN || '8h').trim(),
-  uploadMaxFileSizeMb: Number(process.env.UPLOAD_MAX_FILE_SIZE_MB || 10),
+  uploadMaxFileSizeMb: Number(process.env.UPLOAD_MAX_FILE_SIZE_MB || 50),
   requestBodyLimitMb: Number(process.env.REQUEST_BODY_LIMIT_MB || 2),
   corsAllowedOrigins: parseCsv(process.env.CORS_ALLOWED_ORIGINS),
   authCookieName: String(process.env.AUTH_COOKIE_NAME || 'fluxy_auth').trim(),
