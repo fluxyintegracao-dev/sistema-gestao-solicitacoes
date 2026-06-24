@@ -109,7 +109,7 @@ export default function ParceiroAutocomplete({
 
   return (
     <div className={`relative ${className}`}>
-      <span className="sol-filter-label app-filter-label">{label}</span>
+      {label ? <span className="sol-filter-label app-filter-label">{label}</span> : null}
       <input
         className={inputClassName}
         value={query}

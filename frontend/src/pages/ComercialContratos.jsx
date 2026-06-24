@@ -6,12 +6,12 @@ import { getMinhasObras } from '../services/obras';
 import { buscarParceiros, criarParceiro } from '../services/parceiros';
 import { getCategoriasFinanceiras } from '../services/financeiro';
 import { getComercialCategoriasContrato } from '../services/configuracoesSistema';
+import ParceiroAutocomplete from '../components/ui/ParceiroAutocomplete';
 import { isValidCpfCnpj, maskCep, maskCpfCnpj, maskCreci, maskPhone, normalizeCurrencyTyping, onlyDigits } from '../utils/formatters';
 import {
   atualizarContratoComercial,
   criarContratoComercial,
   distratarContratoComercial,
-  enviarDocumentoContratoD4Sign,
   excluirDocumentoContratoComercial,
   excluirContratoComercial,
   gerarDocumentoContratoComercial,
@@ -106,7 +106,6 @@ function defaultForm() {
     valor_total: '',
     valor_entrada: '',
     desconto_concedido: '',
-    indice_reajuste: '',
     corretor_nome: '',
     comissao_percentual: '',
     competencia_comissao_data: '',
@@ -461,7 +460,6 @@ function pickEditForm(contrato = {}) {
     valor_total: formatCurrencyInput(contrato.valor_total),
     valor_entrada: formatCurrencyInput(contrato.valor_entrada),
     desconto_concedido: formatCurrencyInput(contrato.desconto_concedido),
-    indice_reajuste: contrato.indice_reajuste || '',
     corretor_nome: contrato.corretor_nome || '',
     comissao_percentual: contrato.comissao_percentual || '',
     competencia_comissao_data: contrato.competencia_comissao_data || '',
@@ -1263,19 +1261,6 @@ export default function ComercialContratos() {
     }
   }
 
-  async function handleEnviarDocumentoD4Sign(documentoId) {
-    try {
-      setProcessingAction(`d4sign-${documentoId}`);
-      setError('');
-      await enviarDocumentoContratoD4Sign(documentoId);
-      await carregarDocumentosContrato(contratoSelecionado?.id);
-    } catch (err) {
-      setError(err?.message || 'Erro ao enviar documento para D4Sign');
-    } finally {
-      setProcessingAction('');
-    }
-  }
-
   async function handleExcluirDocumentoContrato(documento) {
     if (!documento?.id || !contratoSelecionado?.id) return;
 
@@ -1461,7 +1446,6 @@ export default function ComercialContratos() {
     if (!hasText(form.data_contrato)) camposFaltando.push('Data');
     if (!hasText(form.status)) camposFaltando.push('Status');
     if (!hasText(form.categoria_financeira_id)) camposFaltando.push('Categoria financeira');
-    if (!hasText(form.indice_reajuste)) camposFaltando.push('Indice reajuste');
     if (!hasText(form.corretor_parceiro_id)) camposFaltando.push('Corretor parceiro');
     if (!hasText(form.corretor_nome)) camposFaltando.push('Corretor no contrato');
     if (!hasText(form.categoria_financeira_comissao_id)) camposFaltando.push('Categoria comissao');
@@ -1528,7 +1512,6 @@ export default function ComercialContratos() {
           corretor_parceiro_id: form.corretor_parceiro_id ? Number(form.corretor_parceiro_id) : null,
           categoria_financeira_comissao_id: form.categoria_financeira_comissao_id ? Number(form.categoria_financeira_comissao_id) : null,
           desconto_concedido: form.desconto_concedido || undefined,
-          indice_reajuste: form.indice_reajuste || undefined,
           corretor_nome: form.corretor_nome || undefined,
           comissao_percentual: form.comissao_percentual || undefined,
           competencia_comissao_data: form.competencia_comissao_data || undefined,
@@ -1563,7 +1546,6 @@ export default function ComercialContratos() {
           valor_total: form.valor_total || undefined,
           valor_entrada: valorEntradaComposicao || undefined,
           desconto_concedido: form.desconto_concedido || undefined,
-          indice_reajuste: form.indice_reajuste || undefined,
           corretor_nome: form.corretor_nome || undefined,
           comissao_percentual: form.comissao_percentual || undefined,
           competencia_comissao_data: form.competencia_comissao_data || undefined,
@@ -1683,10 +1665,15 @@ export default function ComercialContratos() {
                   </button>
                 )}
               </div>
-              <select className="input w-full" value={form.parceiro_id} onChange={(e) => selecionarClientePrincipal(e.target.value)} required disabled={Boolean(form.id)}>
-                <option value="">Selecione</option>
-                {clientes.map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}
-              </select>
+              <ParceiroAutocomplete
+                label=""
+                value={form.parceiro_id}
+                options={clientes}
+                onChange={selecionarClientePrincipal}
+                disabled={Boolean(form.id)}
+                placeholder="Digite nome, CPF/CNPJ ou e-mail"
+                emptyLabel="Nenhum cliente encontrado"
+              />
               {!form.id && (
                 <button type="button" className="btn btn-outline btn-sm mt-2" onClick={() => abrirCadastroRapidoPessoa('cliente')}>
                   Cadastro rapido
@@ -1714,10 +1701,14 @@ export default function ComercialContratos() {
                     <HiXMark className="h-4 w-4" />
                   </button>
                 </div>
-                <select className="input w-full" value={compradorSelecionarId} onChange={(e) => setCompradorSelecionarId(e.target.value)}>
-                  <option value="">Selecionar cliente cadastrado</option>
-                  {clientesDisponiveisComprador.map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}
-                </select>
+                <ParceiroAutocomplete
+                  label=""
+                  value={compradorSelecionarId}
+                  options={clientesDisponiveisComprador}
+                  onChange={setCompradorSelecionarId}
+                  placeholder="Digite nome, CPF/CNPJ ou e-mail"
+                  emptyLabel="Nenhum cliente disponível"
+                />
                 <div className="mt-2 flex flex-wrap gap-2">
                   <button type="button" className="btn btn-primary btn-sm" onClick={() => adicionarComprador()} disabled={!compradorSelecionarId}>
                     Adicionar
@@ -1779,7 +1770,6 @@ export default function ComercialContratos() {
           </div>
           <div className="grid gap-3 md:grid-cols-4">
             <label className="sol-filter-field"><span className="sol-filter-label">Desconto</span><input className="input w-full" inputMode="decimal" value={form.desconto_concedido} onChange={(e) => setForm((c) => ({ ...c, desconto_concedido: normalizeCurrencyTyping(e.target.value) }))} onBlur={(e) => setForm((c) => ({ ...c, desconto_concedido: formatCurrencyInput(e.target.value) }))} placeholder="R$ 0,00" /></label>
-            <label className="sol-filter-field"><span className="sol-filter-label">Indice reajuste</span><input className="input w-full" value={form.indice_reajuste} onChange={(e) => setForm((c) => ({ ...c, indice_reajuste: e.target.value }))} /></label>
             <label className="sol-filter-field"><span className="sol-filter-label">Comissao %</span><input className="input w-full" type="number" step="0.01" value={form.comissao_percentual} onChange={(e) => setForm((c) => ({ ...c, comissao_percentual: e.target.value }))} /></label>
             <label className="sol-filter-field"><span className="sol-filter-label">Valor total</span><input className="input w-full" inputMode="decimal" value={form.valor_total} onChange={(e) => setForm((c) => ({ ...c, valor_total: normalizeCurrencyTyping(e.target.value) }))} onBlur={(e) => setForm((c) => ({ ...c, valor_total: formatCurrencyInput(e.target.value) }))} placeholder="R$ 0,00" /></label>
           </div>
@@ -1834,22 +1824,21 @@ export default function ComercialContratos() {
           <div className="grid gap-3 md:grid-cols-4">
             <label className="sol-filter-field">
               <span className="sol-filter-label">Corretor parceiro</span>
-              <select
-                className="input w-full"
+              <ParceiroAutocomplete
+                label=""
                 value={form.corretor_parceiro_id}
-                onChange={(e) => {
-                  const corretorId = e.target.value;
+                options={corretores}
+                onChange={(corretorId) => {
                   const corretor = corretores.find((item) => String(item.id) === String(corretorId));
                   setForm((c) => ({
                     ...c,
                     corretor_parceiro_id: corretorId,
-                    corretor_nome: corretor?.nome || ''
+                    corretor_nome: corretor?.nome || (corretorId ? c.corretor_nome : '')
                   }));
                 }}
-              >
-                <option value="">Nao vincular</option>
-                {corretores.map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}
-              </select>
+                placeholder="Digite nome, CPF/CNPJ ou e-mail"
+                emptyLabel="Nenhum corretor encontrado"
+              />
               <button type="button" className="btn btn-outline btn-sm mt-2" onClick={() => abrirCadastroRapidoPessoa('corretor')}>
                 Cadastro rapido
               </button>
@@ -1885,42 +1874,42 @@ export default function ComercialContratos() {
             <div className="grid gap-3 md:grid-cols-2">
               <label className="sol-filter-field">
                 <span className="sol-filter-label">Testemunha 1</span>
-                <select
-                  className="input w-full"
+                <ParceiroAutocomplete
+                  label=""
                   value={getTestemunhaSelecionadaId(1)}
-                  onChange={(e) => {
-                    const testemunha = testemunhas.find((item) => String(item.id) === String(e.target.value));
+                  options={testemunhas}
+                  onChange={(testemunhaId) => {
+                    const testemunha = testemunhas.find((item) => String(item.id) === String(testemunhaId));
                     if (testemunha) {
                       aplicarTestemunha(1, testemunha);
                     } else {
                       setForm((c) => ({ ...c, testemunha_1_nome: '', testemunha_1_cpf: '' }));
                     }
                   }}
-                >
-                  <option value="">Selecionar testemunha cadastrada</option>
-                  {testemunhas.map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}
-                </select>
+                  placeholder="Digite nome, CPF/CNPJ ou e-mail"
+                  emptyLabel="Nenhuma testemunha encontrada"
+                />
                 <button type="button" className="btn btn-outline btn-sm mt-2" onClick={() => abrirCadastroRapidoPessoa('testemunha', { slot: 1 })}>
                   Cadastro rapido
                 </button>
               </label>
               <label className="sol-filter-field">
                 <span className="sol-filter-label">Testemunha 2</span>
-                <select
-                  className="input w-full"
+                <ParceiroAutocomplete
+                  label=""
                   value={getTestemunhaSelecionadaId(2)}
-                  onChange={(e) => {
-                    const testemunha = testemunhas.find((item) => String(item.id) === String(e.target.value));
+                  options={testemunhas}
+                  onChange={(testemunhaId) => {
+                    const testemunha = testemunhas.find((item) => String(item.id) === String(testemunhaId));
                     if (testemunha) {
                       aplicarTestemunha(2, testemunha);
                     } else {
                       setForm((c) => ({ ...c, testemunha_2_nome: '', testemunha_2_cpf: '' }));
                     }
                   }}
-                >
-                  <option value="">Selecionar testemunha cadastrada</option>
-                  {testemunhas.map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}
-                </select>
+                  placeholder="Digite nome, CPF/CNPJ ou e-mail"
+                  emptyLabel="Nenhuma testemunha encontrada"
+                />
                 <button type="button" className="btn btn-outline btn-sm mt-2" onClick={() => abrirCadastroRapidoPessoa('testemunha', { slot: 2 })}>
                   Cadastro rapido
                 </button>
@@ -2636,14 +2625,6 @@ export default function ComercialContratos() {
                     <div className="mt-4 flex flex-wrap gap-2">
                       <button type="button" className="btn btn-outline" onClick={() => abrirDocumentoContrato(documento.id, 'pdf')}>
                         Abrir PDF
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-primary"
-                        onClick={() => handleEnviarDocumentoD4Sign(documento.id)}
-                        disabled={processingAction === `d4sign-${documento.id}` || documentoAssinado}
-                      >
-                        {processingAction === `d4sign-${documento.id}` ? 'Enviando...' : 'Enviar D4Sign'}
                       </button>
                       {isSuperadmin && (
                         <button

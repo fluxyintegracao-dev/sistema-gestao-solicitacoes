@@ -1,5 +1,15 @@
 import { Fragment, useEffect, useState } from 'react';
-import { HiArrowDownTray, HiArrowUpTray, HiPaperClip } from 'react-icons/hi2';
+import {
+  HiArrowDownTray,
+  HiArrowPath,
+  HiArrowUpTray,
+  HiCheck,
+  HiEye,
+  HiPaperClip,
+  HiPencilSquare,
+  HiTrash,
+  HiXMark
+} from 'react-icons/hi2';
 import { useAuth } from '../contexts/AuthContext';
 import PendingAttachmentsList from '../components/attachments/PendingAttachmentsList';
 import { canAccessContratos } from '../utils/acessoProduto';
@@ -25,6 +35,20 @@ import {
 } from '../services/contratos';
 import { listarApropriacoes } from '../services/apropriacoes';
 import { buscarParceiros } from '../services/parceiros';
+
+function IconAction({ children, label, tone = 'default', className = '', ...props }) {
+  return (
+    <button
+      type="button"
+      className={`contratos-icon-action contratos-icon-action--${tone} ${className}`}
+      title={label}
+      aria-label={label}
+      {...props}
+    >
+      {children}
+    </button>
+  );
+}
 
 export default function GestaoContratos() {
   const { user } = useAuth();
@@ -942,7 +966,7 @@ export default function GestaoContratos() {
 
   if (isSetorObra) {
     return (
-      <div className="page solicitacoes-page">
+      <div className="page solicitacoes-page contratos-page">
         <h1 className="text-2xl font-semibold">Gestão de Contratos</h1>
         <p className="page-subtitle">Acompanhamento dos contratos vinculados as suas obras.</p>
 
@@ -1007,7 +1031,7 @@ export default function GestaoContratos() {
   }
 
   return (
-    <div className="page solicitacoes-page">
+    <div className="page solicitacoes-page contratos-page">
       <h1 className="page-title">Gestão de Contratos</h1>
       <p className="page-subtitle">Cadastro, importacao e acompanhamento dos contratos por obra.</p>
 
@@ -1209,9 +1233,9 @@ export default function GestaoContratos() {
 
       {renderFiltros()}
 
-      <div className="card sol-surface-card app-table-shell">
-        <div className="table-wrapper">
-        <table className="table min-w-[1400px]">
+      <div className="card sol-surface-card app-table-shell contratos-table-card">
+        <div className="table-wrapper contratos-table-wrapper">
+        <table className="table contratos-data-table">
           <thead>
             <tr>
               <th className="text-left p-3">Contrato</th>
@@ -1240,26 +1264,26 @@ export default function GestaoContratos() {
             )}
             {contratos.map(c => (
               <Fragment key={c.id}>
-              <tr className="border-t">
-                <td className="p-3 font-medium">
+              <tr className="border-t contratos-row">
+                <td className="p-3 font-medium contratos-primary-cell" data-label="Contrato">
                   {editandoId === c.id ? (
                     <input
                       name="codigo"
                       value={formEdicao.codigo}
                       onChange={onChangeEdicao}
-                      className="w-40 border rounded p-1"
+                      className="input contratos-table-input"
                     />
                   ) : (
                     c.codigo
                   )}
                 </td>
-                <td className="p-3">
+                <td className="p-3" data-label="Obra">
                   {editandoId === c.id ? (
                     <select
                       name="obra_id"
                       value={formEdicao.obra_id}
                       onChange={onChangeEdicao}
-                      className="w-56 border rounded p-1"
+                      className="input contratos-table-select"
                     >
                       <option value="">Selecione</option>
                       {obras.map(obra => (
@@ -1272,49 +1296,49 @@ export default function GestaoContratos() {
                     c.obra?.nome || '-'
                   )}
                 </td>
-                <td className="p-3">
+                <td className="p-3" data-label="Ref. do Contrato">
                   {editandoId === c.id ? (
                     <input
                       name="ref_contrato"
                       value={formEdicao.ref_contrato}
                       onChange={onChangeEdicao}
-                      className="w-56 border rounded p-1"
+                      className="input contratos-table-input"
                     />
                   ) : (
                     c.ref_contrato || '-'
                   )}
                 </td>
-                <td className="p-3">
+                <td className="p-3 contratos-description-cell" data-label="Descrição">
                   {editandoId === c.id ? (
                     <input
                       name="descricao"
                       value={formEdicao.descricao}
                       onChange={onChangeEdicao}
-                      className="w-64 border rounded p-1"
+                      className="input contratos-table-input contratos-table-input-wide"
                     />
                   ) : (
                     c.descricao || '-'
                   )}
                 </td>
-                <td className="p-3">{resumoCredoresContrato(c)}</td>
-                <td className="p-3">
+                <td className="p-3 contratos-text-cell" data-label="Credores">{resumoCredoresContrato(c)}</td>
+                <td className="p-3 contratos-text-cell" data-label="Itens de Apropriação">
                   {editandoId === c.id ? (
                     <input
                       name="itens_apropriacao"
                       value={formEdicao.itens_apropriacao}
                       onChange={onChangeEdicao}
-                      className="w-64 border rounded p-1"
+                      className="input contratos-table-input contratos-table-input-wide"
                     />
                   ) : (
                     resumoApropriacoesContrato(c)
                   )}
                 </td>
-                <td className="p-3 text-right">
+                <td className="p-3 text-right" data-label="Solicitado">
                   {editandoId === c.id ? (
                     <input
                       type="number"
                       step="0.01"
-                      className="w-32 border rounded p-1 text-right"
+                      className="input contratos-table-number"
                       name="valor_total"
                       value={formEdicao.valor_total}
                       onChange={onChangeEdicao}
@@ -1326,91 +1350,81 @@ export default function GestaoContratos() {
                     })
                   )}
                 </td>
-                <td className="p-3 text-right">
+                <td className="p-3 text-right" data-label="Pago">
                   {Number(c.total_pago || 0).toLocaleString('pt-BR', {
                     style: 'currency',
                     currency: 'BRL'
                   })}
                 </td>
-                <td className="p-3 text-right">
+                <td className="p-3 text-right" data-label="A pagar">
                   {Number(c.total_a_pagar || 0).toLocaleString('pt-BR', {
                     style: 'currency',
                     currency: 'BRL'
                   })}
                 </td>
-                <td className="p-3 text-right">
+                <td className="p-3 text-right" data-label="Ajuste Solicitado">
                   <input
                     type="number"
                     step="0.01"
-                    className="w-28 border rounded p-1 text-right"
+                    className="input contratos-table-number"
                     value={ajustes[c.id]?.ajuste_solicitado ?? c.ajuste_solicitado ?? 0}
                     onChange={e => onChangeAjuste(c.id, 'ajuste_solicitado', e.target.value)}
                   />
                 </td>
-                <td className="p-3 text-right">
+                <td className="p-3 text-right" data-label="Ajuste Pago">
                   <input
                     type="number"
                     step="0.01"
-                    className="w-28 border rounded p-1 text-right"
+                    className="input contratos-table-number"
                     value={ajustes[c.id]?.ajuste_pago ?? c.ajuste_pago ?? 0}
                     onChange={e => onChangeAjuste(c.id, 'ajuste_pago', e.target.value)}
                   />
                 </td>
-                <td className="p-3 text-right">{c.total_solicitacoes || 0}</td>
-                <td className="p-3">
-                  <button
-                    className="text-blue-600"
-                    onClick={() => abrirAnexos(c)}
-                  >
-                    Ver anexos
-                  </button>
+                <td className="p-3 text-right" data-label="Qtd. Solicitações">{c.total_solicitacoes || 0}</td>
+                <td className="p-3" data-label="Anexos">
+                  <IconAction label="Ver anexos" tone="default" onClick={() => abrirAnexos(c)}>
+                    <HiEye />
+                  </IconAction>
                 </td>
-                <td className="p-3">
-                  <div className="flex items-center gap-3">
+                <td className="p-3 contratos-actions-cell" data-label="Ações">
+                  <div className="contratos-actions">
                     {editandoId === c.id ? (
                       <>
-                        <button
-                          className="text-blue-600"
+                        <IconAction
+                          label={salvandoEdicaoId === c.id ? 'Salvando edição' : 'Salvar edição'}
+                          tone="success"
                           onClick={() => salvarEdicao(c)}
                           disabled={salvandoEdicaoId === c.id}
                         >
-                          {salvandoEdicaoId === c.id ? 'Salvando...' : 'Salvar edição'}
-                        </button>
-                        <button
-                          className="text-gray-600"
+                          <HiCheck />
+                        </IconAction>
+                        <IconAction
+                          label="Cancelar edição"
+                          tone="muted"
                           onClick={cancelarEdicao}
                           disabled={salvandoEdicaoId === c.id}
                         >
-                          Cancelar
-                        </button>
+                          <HiXMark />
+                        </IconAction>
                       </>
                     ) : (
                       <>
-                        <button
-                          className="text-blue-600"
-                          onClick={() => iniciarEdicao(c)}
-                        >
-                          Editar
-                        </button>
-                        <button
-                          className="text-blue-600"
-                          onClick={() => salvarAjustes(c)}
-                        >
-                          Salvar ajustes
-                        </button>
+                        <IconAction label="Editar contrato" tone="primary" onClick={() => iniciarEdicao(c)}>
+                          <HiPencilSquare />
+                        </IconAction>
+                        <IconAction label="Salvar ajustes" tone="success" onClick={() => salvarAjustes(c)}>
+                          <HiArrowPath />
+                        </IconAction>
                       </>
                     )}
-                    <button
-                      className="text-blue-700"
-                      onClick={() => excluirContratoItem(c)}
-                    >
-                      Excluir
-                    </button>
+                    <IconAction label="Excluir contrato" tone="danger" onClick={() => excluirContratoItem(c)}>
+                      <HiTrash />
+                    </IconAction>
                   </div>
                 </td>
               </tr>
               {editandoId === c.id && (
-                <tr className="border-t bg-[var(--c-surface)]">
+                <tr className="border-t bg-[var(--c-surface)] contratos-edit-row">
                   <td colSpan="14" className="p-3 space-y-3">
                     {renderApropriacoesEditor({
                       lista: apropriacoesEdicao,
