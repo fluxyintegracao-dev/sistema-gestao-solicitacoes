@@ -4,12 +4,10 @@ import { delegarSolicitacaoCompra, listarSolicitacoesCompra } from '../../../ser
 import { API_URL, authHeaders } from '../../../services/api';
 import { useAuth } from '../../../contexts/AuthContext';
 import { canManageComprasDelegacao } from '../../../utils/acessoProduto';
+import { formatarDataLocalPtBr, parseDateSmart } from '../../../utils/dateLocal';
 
 function formatDate(value) {
-  if (!value) return '-';
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return '-';
-  return parsed.toLocaleDateString('pt-BR');
+  return formatarDataLocalPtBr(value);
 }
 
 function getPrazoInfo(solicitacao) {
@@ -19,7 +17,11 @@ function getPrazoInfo(solicitacao) {
 
   const hoje = new Date();
   hoje.setHours(0, 0, 0, 0);
-  const prazo = new Date(`${solicitacao.prazo_compra}T00:00:00`);
+  const prazo = parseDateSmart(solicitacao.prazo_compra);
+  if (!prazo) {
+    return { label: 'Sem prazo', className: 'app-status-pill bg-slate-100 text-slate-700', atrasado: false };
+  }
+  prazo.setHours(0, 0, 0, 0);
   const atrasado = prazo.getTime() < hoje.getTime();
 
   return atrasado
