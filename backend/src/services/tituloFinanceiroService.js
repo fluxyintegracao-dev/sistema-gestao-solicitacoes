@@ -1749,6 +1749,9 @@ async function listarTitulos(req, filters = {}) {
   if (filters.categoria_financeira_id) {
     where.categoria_financeira_id = Number(filters.categoria_financeira_id);
   }
+  if (filters.forma_pagamento_id) {
+    where.forma_pagamento_id = Number(filters.forma_pagamento_id);
+  }
   if (filters.solicitacao_id) {
     where.solicitacao_id = Number(filters.solicitacao_id);
   }
@@ -3841,7 +3844,7 @@ async function excluirTitulosEmMassa(req, payload = {}) {
 
   const movimentosAtivos = await MovimentoFinanceiro.count({
     where: {
-      titulo_id: { [Op.in]: idsUnicos },
+      titulo_financeiro_id: { [Op.in]: idsUnicos },
       status: 'ATIVO'
     }
   });

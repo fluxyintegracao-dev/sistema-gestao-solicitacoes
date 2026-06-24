@@ -19,6 +19,7 @@ import {
   getCartoesFinanceiros,
   getChequesTerceirosDisponiveis,
   getContasBancarias,
+  getFormasPagamentoFinanceiras,
   getTitulosFinanceiros,
   excluirTitulosFinanceirosEmMassa,
   importarCodigosBarrasTitulos
@@ -46,6 +47,7 @@ const FILTER_DEFINITIONS = [
   { id: 'data_emissao_inicial', label: 'Emissao inicio', group: 'basic', span: 'xl:col-span-2' },
   { id: 'data_emissao_final', label: 'Emissao fim', group: 'basic', span: 'xl:col-span-2' },
   { id: 'categoria_financeira_id', label: 'Categoria financeira', group: 'advanced', span: 'xl:col-span-3' },
+  { id: 'forma_pagamento_id', label: 'Forma de pagamento', group: 'advanced', span: 'xl:col-span-3', defaultVisibleWhenMissing: true },
   { id: 'vencimento_inicial', label: 'Vencimento inicio', group: 'advanced', span: 'xl:col-span-2' },
   { id: 'vencimento_final', label: 'Vencimento fim', group: 'advanced', span: 'xl:col-span-2' }
 ];
@@ -61,6 +63,7 @@ function getDefaultFilters(tipo = 'RECEBER') {
     obra_id: '',
     parceiro_id: '',
     categoria_financeira_id: '',
+    forma_pagamento_id: '',
     numero_documento: '',
     data_emissao_inicial: '',
     data_emissao_final: '',
@@ -100,6 +103,9 @@ function loadVisibleFilterIds(user, storagePrefix = FILTER_VISIBILITY_STORAGE_PR
 
     const allowed = new Set(FILTER_DEFINITIONS.map((item) => item.id));
     const normalized = parsed.filter((id) => allowed.has(id));
+    FILTER_DEFINITIONS
+      .filter((item) => item.defaultVisibleWhenMissing && !normalized.includes(item.id))
+      .forEach((item) => normalized.push(item.id));
     return normalized.length > 0 ? normalized : DEFAULT_VISIBLE_FILTER_IDS;
   } catch (error) {
     return DEFAULT_VISIBLE_FILTER_IDS;
@@ -397,6 +403,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
   const [obras, setObras] = useState([]);
   const [parceiros, setParceiros] = useState([]);
   const [categorias, setCategorias] = useState([]);
+  const [formasPagamento, setFormasPagamento] = useState([]);
   const [contasBancarias, setContasBancarias] = useState([]);
   const [cartoes, setCartoes] = useState([]);
   const [chequesTerceiros, setChequesTerceiros] = useState([]);
@@ -420,16 +427,18 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
       getMinhasObras({ modo: 'FINANCEIRO' }).catch(() => []),
       buscarParceiros({ ativo: true, limit: 200 }).catch(() => []),
       getCategoriasFinanceiras().catch(() => []),
+      getFormasPagamentoFinanceiras().catch(() => []),
       getContasBancarias().catch(() => []),
       getCartoesFinanceiros().catch(() => []),
       getChequesTerceirosDisponiveis().catch(() => []),
       getEmpresasGrupo({ ativo: true }).catch(() => [])
     ])
-      .then(([obrasData, parceirosData, categoriasData, contasData, cartoesData, chequesData, empresasData]) => {
+      .then(([obrasData, parceirosData, categoriasData, formasData, contasData, cartoesData, chequesData, empresasData]) => {
         if (!active) return;
         setObras(Array.isArray(obrasData) ? obrasData : []);
         setParceiros(Array.isArray(parceirosData) ? parceirosData : []);
         setCategorias(Array.isArray(categoriasData) ? categoriasData : []);
+        setFormasPagamento(Array.isArray(formasData) ? formasData : []);
         const contasNormalizadas = Array.isArray(contasData) ? contasData : [];
         setContasBancarias(contasNormalizadas);
         setCartoes(Array.isArray(cartoesData) ? cartoesData : []);
@@ -534,6 +543,15 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
     });
   }, [categorias, draftFilters.tipo]);
 
+  const formasPagamentoFiltradas = useMemo(() => {
+    const tipo = String(draftFilters.tipo || '').toUpperCase();
+    return formasPagamento.filter((forma) => {
+      if (forma?.ativo === false) return false;
+      const formaTipo = String(forma?.tipo || '').toUpperCase();
+      return !formaTipo || formaTipo === tipo || formaTipo === 'AMBOS';
+    });
+  }, [formasPagamento, draftFilters.tipo]);
+
   const parceirosFiltrados = useMemo(() => {
     const tipo = String(draftFilters.tipo || '').toUpperCase();
     return parceiros.filter((parceiro) => (
@@ -585,6 +603,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
     parceiroResultadoLabel,
     'Obra',
     'Categoria',
+    'Forma pagamento',
     'Origem',
     'Emissao',
     'Vencimento',
@@ -717,6 +736,17 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
         return (
           <td className="px-3 py-2">
             <div className="max-w-[150px] truncate text-[var(--c-muted)]">{titulo.categoriaFinanceira?.nome || '-'}</div>
+          </td>
+        );
+      case 'Forma pagamento':
+        return (
+          <td className="px-3 py-2">
+            <div className="max-w-[160px] truncate text-[var(--c-muted)]">
+              {titulo.formaPagamento?.nome || '-'}
+            </div>
+            {titulo.formaPagamento?.codigo ? (
+              <div className="text-[10px] text-[var(--c-muted)]">{titulo.formaPagamento.codigo}</div>
+            ) : null}
           </td>
         );
       case 'Origem':
@@ -1334,6 +1364,25 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
               <option value="">Todas as categorias de {categoriasLabel}</option>
               {categoriasFiltradas.map((categoria) => (
                 <option key={categoria.id} value={categoria.id}>{categoria.nome}</option>
+              ))}
+            </select>
+          </label>
+        );
+      case 'forma_pagamento_id':
+        return (
+          <label key={filter.id} className={commonClass}>
+            <span className="app-filter-label">Forma de pagamento</span>
+            <select
+              className="input w-full input-sm"
+              value={draftFilters.forma_pagamento_id}
+              onChange={(event) => setFilter('forma_pagamento_id', event.target.value)}
+              disabled={loadingOptions}
+            >
+              <option value="">Todas as formas</option>
+              {formasPagamentoFiltradas.map((forma) => (
+                <option key={forma.id} value={forma.id}>
+                  {forma.codigo ? `${forma.codigo} - ${forma.nome}` : forma.nome}
+                </option>
               ))}
             </select>
           </label>
