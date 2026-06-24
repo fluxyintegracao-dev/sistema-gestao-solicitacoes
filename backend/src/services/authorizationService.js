@@ -1122,6 +1122,16 @@ async function canAccessFinanceiro(user) {
   return userHasSetorCapability(user, 'eh_setor_financeiro');
 }
 
+async function canViewSolicitacaoFinanceiro(user) {
+  if (await canAccessFinanceiro(user)) return true;
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, ['solicitacoes.acoes.ver_aba_financeiro']);
+  }
+
+  return false;
+}
+
 async function canDeleteTitulosFinanceiros(user) {
   if (isBusinessAdmin(user)) return true;
 
@@ -2485,6 +2495,7 @@ module.exports = {
   canAccessCrm,
   canAccessProvisoes,
   canAccessFinanceiro,
+  canViewSolicitacaoFinanceiro,
   canDeleteTitulosFinanceiros,
   canAccessFiscal,
   canAccessSst,

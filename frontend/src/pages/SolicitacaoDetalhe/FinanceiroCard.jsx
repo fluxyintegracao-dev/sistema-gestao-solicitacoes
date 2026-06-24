@@ -492,7 +492,11 @@ function ImpactoGerencialPreview({ form, categoria, empresasGrupo, totalPagament
   );
 }
 
-export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
+export default function FinanceiroCard({
+  solicitacao,
+  onTituloCriado,
+  podeAcessarModuloFinanceiro = false
+}) {
   const [titulos, setTitulos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -1144,9 +1148,11 @@ export default function FinanceiroCard({ solicitacao, onTituloCriado }) {
             </p>
           </div>
           <div className="flex gap-2">
-            <Link to="/financeiro/titulos" className="btn btn-outline">
-              Ver titulos
-            </Link>
+            {podeAcessarModuloFinanceiro && (
+              <Link to="/financeiro/titulos" className="btn btn-outline">
+                Ver titulos
+              </Link>
+            )}
             <button
               type="button"
               className="btn btn-primary"

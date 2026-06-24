@@ -20,7 +20,12 @@ import {
   updateStatusSolicitacao
 } from '../../services/solicitacoes';
 import { isGeoSetor, solicitacaoEstaNoSetorDoUsuario, userHasSetorCapability } from '../../utils/setor';
-import { canAccessFinanceiro, canDeleteSolicitacaoAnexo, hasEnabledModule } from '../../utils/acessoProduto';
+import {
+  canAccessFinanceiro,
+  canDeleteSolicitacaoAnexo,
+  canViewSolicitacaoFinanceiro,
+  hasEnabledModule
+} from '../../utils/acessoProduto';
 import { useSafeNavigateBack } from '../../utils/navigation';
 
 export default function SolicitacaoDetalhe() {
@@ -38,7 +43,9 @@ export default function SolicitacaoDetalhe() {
   const isSetorGeo = setorTokens.some(isGeoSetor);
   const isSetorFinanceiro = setorTokens.includes('FINANCEIRO') || userHasSetorCapability(user, 'eh_setor_financeiro');
   const isSuperadmin = String(user?.perfil || '').trim().toUpperCase() === 'SUPERADMIN';
-  const isFinanceiro = canAccessFinanceiro(user);
+  const podeAcessarModuloFinanceiro = canAccessFinanceiro(user);
+  const isFinanceiro = canViewSolicitacaoFinanceiro(user);
+  const podeEnviarQualquerSetor = Boolean(user?.pode_enviar_qualquer_setor);
   const podeInformarPagamento = isSuperadmin || isSetorFinanceiro;
   const moduloContratosHabilitado = hasEnabledModule(user, 'CONTRATOS');
   const moduloComprasHabilitado = hasEnabledModule(user, 'COMPRAS');
@@ -227,7 +234,11 @@ export default function SolicitacaoDetalhe() {
   const podeEnviarSetor =
     !usaFluxoAprovacaoDiretoria &&
     !isSetorObra &&
-    (isSuperadmin || solicitacaoEstaNoSetorDoUsuario(solicitacao.area_responsavel, user));
+    (
+      isSuperadmin ||
+      podeEnviarQualquerSetor ||
+      solicitacaoEstaNoSetorDoUsuario(solicitacao.area_responsavel, user)
+    );
   const podeMarcarPendenciaFinanceira = isSuperadmin || isSetorGeo || isSetorFinanceiro;
 
   const atualizadoEm = new Date(solicitacao.updatedAt || solicitacao.createdAt).toLocaleString('pt-BR');
@@ -361,6 +372,7 @@ export default function SolicitacaoDetalhe() {
           {isFinanceiro && (
             <FinanceiroCard
               solicitacao={solicitacao}
+              podeAcessarModuloFinanceiro={podeAcessarModuloFinanceiro}
               onTituloCriado={() => {
                 registrarMutacaoLocal(id);
                 void carregar({ silent: true });

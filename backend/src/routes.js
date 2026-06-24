@@ -219,6 +219,7 @@ const {
   canCreateCompraSolicitacao,
   canCreateProvisoes,
   canAccessFinanceiro,
+  canViewSolicitacaoFinanceiro,
   canAccessTreinamento,
   canAccessComprovantes,
   canCancelPagamentos,
@@ -549,6 +550,15 @@ const allowFinanceiro = permit({
     (await canAccessFinanceiro(req.user))
       ? true
       : 'Acesso negado para o modulo financeiro'
+  )
+});
+
+const allowSolicitacaoFinanceiro = permit({
+  resource: 'SOLICITACAO_FINANCEIRO',
+  custom: async (req) => (
+    (await canViewSolicitacaoFinanceiro(req.user))
+      ? true
+      : 'Acesso negado para a aba financeira da solicitacao'
   )
 });
 
@@ -1165,8 +1175,8 @@ router.post('/prioridades-diretoria/lotes/:id/reabrir', requireEnabledModule('SO
 router.post('/prioridades-diretoria/lotes/:id/finalizar', requireEnabledModule('SOLICITACOES'), validateRequest({ params: validateNumericIdParam('id', 'Lote de prioridade') }), auditSuccess({ eventType: 'DIRETORIA_PRIORITY_BATCH_CLOSED', resourceType: 'PRIORIDADE_DIRETORIA', description: 'Lote de prioridade da diretoria finalizado', resourceIdResolver: (req) => req.params.id }), PrioridadeDiretoriaController.finalizar);
 router.post('/prioridades-diretoria/lotes/:id/cancelar', requireEnabledModule('SOLICITACOES'), validateRequest({ params: validateNumericIdParam('id', 'Lote de prioridade') }), PrioridadeDiretoriaController.cancelar);
 router.delete('/prioridades-diretoria/lotes/:id', requireEnabledModule('SOLICITACOES'), validateRequest({ params: validateNumericIdParam('id', 'Lote de prioridade') }), PrioridadeDiretoriaController.excluir);
-router.get('/solicitacoes/:id/titulos-financeiros', allowFinanceiro, validateRequest({ params: validateNumericIdParam('id', 'Solicitacao') }), TituloFinanceiroController.listarPorSolicitacao);
-router.post('/solicitacoes/:id/gerar-conta', requireEnabledModule('FINANCEIRO'), allowFinanceiro, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Solicitacao'), body: validateFinanceTituloCreateFromSolicitacaoBody }), TituloFinanceiroController.criarPorSolicitacao);
+router.get('/solicitacoes/:id/titulos-financeiros', allowSolicitacaoFinanceiro, validateRequest({ params: validateNumericIdParam('id', 'Solicitacao') }), TituloFinanceiroController.listarPorSolicitacao);
+router.post('/solicitacoes/:id/gerar-conta', requireEnabledModule('FINANCEIRO'), allowSolicitacaoFinanceiro, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Solicitacao'), body: validateFinanceTituloCreateFromSolicitacaoBody }), TituloFinanceiroController.criarPorSolicitacao);
 
 // -------------------------------------------------------------------
 // NOTIFICACOES

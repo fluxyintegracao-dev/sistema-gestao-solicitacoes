@@ -724,6 +724,7 @@ export default function Solicitacoes({ arquivadas = false }) {
   const classificacaoPrioridadeDiretoria = isDiretoriaObrasPublicas ? 'PUBLICA' : 'PRIVADA';
   const isAdminGEO = perfilUpper.startsWith('ADMIN') && userHasSetorCapability(user, 'eh_setor_geo');
   const isSuperadmin = perfilUpper === 'SUPERADMIN';
+  const podeEnviarQualquerSetor = Boolean(user?.pode_enviar_qualquer_setor);
   const colunasStorageKey = useMemo(() => {
     const identificador = user?.id || user?.email || user?.nome || user?.perfil || 'anon';
     return `solicitacoes:colunas:${identificador}`;
@@ -1204,16 +1205,20 @@ export default function Solicitacoes({ arquivadas = false }) {
   const podeExcluirUnica = !!selecionadaUnica && (isSuperadmin || isAdminGEO);
   const podeEnviarUnica = useMemo(() => {
     if (!selecionadaUnica || isSetorObra) return false;
-    return isSuperadmin || solicitacaoEstaNoSetorDoUsuario(selecionadaUnica.area_responsavel, user);
-  }, [selecionadaUnica, isSetorObra, isSuperadmin, user]);
+    return (
+      isSuperadmin ||
+      podeEnviarQualquerSetor ||
+      solicitacaoEstaNoSetorDoUsuario(selecionadaUnica.area_responsavel, user)
+    );
+  }, [selecionadaUnica, isSetorObra, isSuperadmin, podeEnviarQualquerSetor, user]);
   const podeEnviarMassa = useMemo(() => {
     if (selecionadasIds.length <= 1 || isSetorObra) return false;
-    if (isSuperadmin) return true;
+    if (isSuperadmin || podeEnviarQualquerSetor) return true;
     return selecionadasIds.every(idSelecionado => {
       const solicitacao = solicitacoes.find(item => Number(item.id) === Number(idSelecionado));
       return solicitacao && solicitacaoEstaNoSetorDoUsuario(solicitacao.area_responsavel, user);
     });
-  }, [selecionadasIds, isSetorObra, isSuperadmin, solicitacoes, user]);
+  }, [selecionadasIds, isSetorObra, isSuperadmin, podeEnviarQualquerSetor, solicitacoes, user]);
 
   const isSetorObraSolicitacaoUnica = useMemo(() => {
     if (!selecionadaUnica) return false;

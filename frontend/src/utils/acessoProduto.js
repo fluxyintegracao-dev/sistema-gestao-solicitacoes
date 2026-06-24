@@ -400,6 +400,15 @@ export function canAccessFinanceiro(user) {
   );
 }
 
+export function canViewSolicitacaoFinanceiro(user) {
+  if (!hasEnabledModule(user, 'FINANCEIRO')) return false;
+  if (canAccessFinanceiro(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasPermissao(user, 'solicitacoes.acoes.ver_aba_financeiro');
+  }
+  return false;
+}
+
 export function canAccessBancosEnterprise(user) {
   if (!hasEnabledModule(user, 'FINANCEIRO')) return false;
   if (isBusinessAdmin(user)) return true;
