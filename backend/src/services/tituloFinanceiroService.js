@@ -546,7 +546,7 @@ async function consumirChequeTerceiroPagamento({
 
 function resolveVencimentoParcela({ formaPagamento, parcela, dataVencimentoBase, dataCompra, index }) {
   if (isFormaCartao(formaPagamento)) {
-    return dataCompra;
+    return addMonths(dataVencimentoBase || dataCompra, index);
   }
 
   if (isFormaBoleto(formaPagamento) || isFormaCheque(formaPagamento) || isFormaOutros(formaPagamento)) {
@@ -2146,17 +2146,6 @@ async function criarTituloPorSolicitacao(req, solicitacaoId, payload = {}) {
           transaction
         });
 
-        if (pagamento.formaPagamento?.gera_fatura && pagamento.payload.cartao_id) {
-          const { fatura } = await obterOuCriarFaturaCartao({
-            cartaoId: pagamento.payload.cartao_id,
-            dataCompra: pagamento.dataCompra,
-            parcelaOffset: index,
-            usuarioId: req.user?.id || null,
-            transaction
-          });
-          await vincularTituloAFatura({ titulo, fatura, transaction });
-        }
-
         const baixaCartaoDebito = await baixarTituloCartaoDebitoNoAto({
           req,
           titulo,
@@ -2437,17 +2426,6 @@ async function criarTituloManual(req, payload = {}) {
           usuarioId: req.user?.id || null,
           transaction
         });
-
-        if (pagamento.formaPagamento?.gera_fatura && pagamento.payload.cartao_id) {
-          const { fatura } = await obterOuCriarFaturaCartao({
-            cartaoId: pagamento.payload.cartao_id,
-            dataCompra: pagamento.dataCompra,
-            parcelaOffset: index,
-            usuarioId: req.user?.id || null,
-            transaction
-          });
-          await vincularTituloAFatura({ titulo, fatura, transaction });
-        }
 
         const baixaCartaoDebito = await baixarTituloCartaoDebitoNoAto({
           req,

@@ -1738,9 +1738,24 @@ export default function FinanceiroTituloNovo() {
                       </div>
 
                       {forma?.exige_cartao && (
-                        <div className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-800">
-                          O cartao usado sera definido na baixa ou na fatura. Na criacao do titulo fica registrada apenas a forma prevista.
-                        </div>
+                        <label className="text-sm">
+                          <span className="mb-1 block text-[var(--c-muted)]">Cartao previsto</span>
+                          <select
+                            className="input w-full"
+                            value={pagamento.cartao_id || ''}
+                            onChange={(event) => updatePagamento(pagamentoIndex, { cartao_id: event.target.value })}
+                          >
+                            <option value="">Informar na baixa</option>
+                            {cartoesFiltrados.map((cartao) => (
+                              <option key={cartao.id} value={cartao.id}>
+                                {cartao.nome} {cartao.ultimos_digitos ? `- final ${cartao.ultimos_digitos}` : ''} ({labelTipoCartao(cartao.tipo)})
+                              </option>
+                            ))}
+                          </select>
+                          <span className="mt-1 block text-xs text-[var(--c-muted)]">
+                            Opcional; a fatura sera vinculada na baixa do titulo.
+                          </span>
+                        </label>
                       )}
 
                       {usaDetalhe && (
