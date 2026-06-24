@@ -27,6 +27,7 @@ import { getMinhasObras } from '../services/obras';
 import { buscarParceiros } from '../services/parceiros';
 import { getEmpresasGrupo } from '../services/empresasGrupo';
 import { normalizeCurrencyTyping } from '../utils/formatters';
+import { canDeleteTitulosFinanceiros } from '../utils/acessoProduto';
 import ParceiroAutocomplete from '../components/ui/ParceiroAutocomplete';
 
 const FILTER_STORAGE_KEY = 'fluxy.financeiro.titulos.filters';
@@ -274,6 +275,10 @@ function isTituloBaixavel(titulo) {
   return ['ABERTO', 'PARCIAL'].includes(String(titulo?.status || '').trim().toUpperCase()) && Number(titulo?.valor_saldo || 0) > 0;
 }
 
+function isTituloExcluivel(titulo) {
+  return ['ABERTO', 'PARCIAL'].includes(String(titulo?.status || '').trim().toUpperCase());
+}
+
 function isTituloEditavel(titulo) {
   return String(titulo?.status || '').trim().toUpperCase() === 'ABERTO' && Number(titulo?.valor_baixado || 0) === 0;
 }
@@ -358,6 +363,7 @@ function buildBaixaMassaForm(contasBancarias = [], total = 0) {
 
 export default function FinanceiroTitulos({ tipoFixo = null }) {
   const { user } = useAuth();
+  const canDeleteTitulos = canDeleteTitulosFinanceiros(user);
   const fixedTipo = ['PAGAR', 'RECEBER'].includes(String(tipoFixo || '').toUpperCase())
     ? String(tipoFixo).toUpperCase()
     : null;
@@ -601,6 +607,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
     [titulos, selectedTituloSet]
   );
   const selectedTitulosBaixaveis = useMemo(() => selectedTitulos.filter(isTituloBaixavel), [selectedTitulos]);
+  const selectedTitulosExcluiveis = useMemo(() => selectedTitulos.filter(isTituloExcluivel), [selectedTitulos]);
   const selectedSaldo = useMemo(() => selectedTitulosBaixaveis.reduce(
     (total, titulo) => total + Number(titulo.valor_saldo || 0),
     0
@@ -866,13 +873,18 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
   }
 
   async function excluirTitulosSelecionados() {
-    if (selectedTitulosBaixaveis.length === 0) {
+    if (!canDeleteTitulos) {
+      setError('Usuario sem permissao para excluir titulos financeiros.');
+      return;
+    }
+
+    if (selectedTitulosExcluiveis.length === 0) {
       setError('Selecione ao menos um titulo aberto ou parcial para excluir.');
       return;
     }
 
     const confirmado = window.confirm(
-      `Excluir ${selectedTitulosBaixaveis.length} titulo(s) selecionado(s)? Eles sairao das telas e relatorios, mas ficarao preservados para auditoria.`
+      `Excluir ${selectedTitulosExcluiveis.length} titulo(s) selecionado(s)? Eles sairao das telas e relatorios, mas ficarao preservados para auditoria.`
     );
     if (!confirmado) return;
 
@@ -880,7 +892,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
       setLoading(true);
       setError('');
       await excluirTitulosFinanceirosEmMassa({
-        titulo_ids: selectedTitulosBaixaveis.map((titulo) => Number(titulo.id)),
+        titulo_ids: selectedTitulosExcluiveis.map((titulo) => Number(titulo.id)),
         motivo: 'Exclusao em massa pela tela de contas a pagar/receber'
       });
 
@@ -1638,11 +1650,11 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
               type="button"
               className="btn btn-outline btn-sm text-rose-700 hover:border-rose-300 hover:bg-rose-50"
               onClick={excluirTitulosSelecionados}
-              disabled={selectedTitulosBaixaveis.length === 0 || loading || savingBaixaMassa}
+              disabled={!canDeleteTitulos || selectedTitulosExcluiveis.length === 0 || loading || savingBaixaMassa}
               title="Excluir titulos selecionados sem apagar o registro do banco"
             >
               Excluir selecionados
-              {selectedTitulosBaixaveis.length > 0 ? ` (${selectedTitulosBaixaveis.length})` : ''}
+              {selectedTitulosExcluiveis.length > 0 ? ` (${selectedTitulosExcluiveis.length})` : ''}
             </button>
             <Link to="/financeiro/cadastros" className="btn btn-outline btn-sm">Cadastros</Link>
             <Link to="/financeiro/baixas" className="btn btn-outline btn-sm">Baixas</Link>
@@ -1672,7 +1684,8 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
         {selectedTitulosBaixaveis.length > 0 ? (
           <div className="flex flex-col gap-2 border-b border-[var(--c-border)] bg-[var(--c-bg)]/70 px-3 py-2 text-xs md:flex-row md:items-center md:justify-between">
             <div className="font-medium text-[var(--c-text)]">
-              {selectedTitulosBaixaveis.length} titulo(s) selecionado(s) para baixa em massa
+              {selectedTitulosBaixaveis.length} titulo(s) selecionado(s) para baixa
+              {canDeleteTitulos && selectedTitulosExcluiveis.length > 0 ? ` / ${selectedTitulosExcluiveis.length} para exclusao` : ''}
             </div>
             <div className="flex flex-wrap items-center gap-2 text-[var(--c-muted)]">
               <span>Saldo selecionado: <strong className="text-[var(--c-text)]">{formatCurrency(selectedSaldo)}</strong></span>

@@ -22,7 +22,7 @@ const { responderErroController } = require('../utils/controllerError');
 const PERMISSAO_PAGAMENTOS_BANCARIOS = 'financeiro.titulos.pagamentos_bancarios.visualizar';
 const PERMISSAO_MOVIMENTOS_FINANCEIROS = 'financeiro.titulos.movimentos.visualizar';
 const PERMISSAO_AUDITORIA_FINANCEIRA = 'financeiro.titulos.auditoria.visualizar';
-const PAYMENT_INTENT_INACTIVE_STATUSES = ['CANCELADO', 'REJEITADO', 'REJEITADO_BANCO'];
+const PAYMENT_INTENT_INACTIVE_STATUSES = ['CANCELADO', 'REJEITADO', 'REJEITADO_BANCO', 'FALHA_INTEGRACAO'];
 
 function responderErro(res, error, fallbackMessage) {
   return responderErroController(res, error, fallbackMessage);

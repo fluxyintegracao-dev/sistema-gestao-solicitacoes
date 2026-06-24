@@ -16,6 +16,7 @@ const FINANCEIRO_PERMISSION_KEYS = [
   'financeiro.titulos.visualizar',
   'financeiro.titulos.criar',
   'financeiro.titulos.baixar',
+  'financeiro.titulos.excluir',
   'financeiro.titulos.estornar',
   'financeiro.titulos.pagamentos_bancarios.visualizar',
   'financeiro.titulos.movimentos.visualizar',
@@ -1119,6 +1120,16 @@ async function canAccessFinanceiro(user) {
   }
 
   return userHasSetorCapability(user, 'eh_setor_financeiro');
+}
+
+async function canDeleteTitulosFinanceiros(user) {
+  if (isBusinessAdmin(user)) return true;
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, ['financeiro.titulos.excluir']);
+  }
+
+  return userHasFinanceiroSector(user);
 }
 
 async function canAccessBoletos(user) {
@@ -2474,6 +2485,7 @@ module.exports = {
   canAccessCrm,
   canAccessProvisoes,
   canAccessFinanceiro,
+  canDeleteTitulosFinanceiros,
   canAccessFiscal,
   canAccessSst,
   canAccessTreinamento,

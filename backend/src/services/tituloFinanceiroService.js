@@ -32,6 +32,7 @@ const {
 } = require('../models');
 const {
   canAccessFinanceiro,
+  canDeleteTitulosFinanceiros,
   getFinanceiroObraScopeIds
 } = require('./authorizationService');
 const {
@@ -45,6 +46,7 @@ const { sincronizarStatusSolicitacaoPorBaixaTitulos } = require('./solicitacaoFi
 
 const FORMAS_COBRANCA = ['BOLETO', 'PIX', 'OUTROS'];
 const STATUS_COBRANCA = ['NAO_APLICAVEL', 'PENDENTE_EMISSAO', 'EMITIDO', 'PAGO_BANCO', 'CONCILIADO', 'CANCELADO'];
+const PAYMENT_INTENT_INACTIVE_STATUSES = ['CANCELADO', 'REJEITADO', 'REJEITADO_BANCO', 'FALHA_INTEGRACAO'];
 
 function createHttpError(statusCode, message) {
   const error = new Error(message);
@@ -1495,7 +1497,7 @@ function assertTituloEditavel(titulo) {
   const paymentIntentsAtivos = Array.isArray(titulo?.paymentIntents)
     ? titulo.paymentIntents.filter((intent) => {
         const intentStatus = String(intent?.status || '').trim().toUpperCase();
-        return !['CANCELADO', 'REJEITADO', 'REJEITADO_BANCO'].includes(intentStatus);
+        return !PAYMENT_INTENT_INACTIVE_STATUSES.includes(intentStatus);
       })
     : [];
 
@@ -3779,6 +3781,20 @@ async function importarCodigosBarrasTitulos(req, payload = {}) {
 
 async function excluirTitulosEmMassa(req, payload = {}) {
   await assertFinanceAccess(req);
+  const canDelete = await canDeleteTitulosFinanceiros(req.user);
+  if (!canDelete) {
+    await registrarEventoSeguranca({
+      req,
+      usuarioId: req.user?.id || null,
+      tipoEvento: 'AUTHZ_DENIED',
+      recursoTipo: 'TITULO_FINANCEIRO',
+      recursoId: 'excluir-em-massa',
+      status: 'DENIED',
+      descricao: 'Usuario sem permissao para excluir titulos financeiros'
+    });
+
+    throw createHttpError(403, 'Usuario sem permissao para excluir titulos financeiros.');
+  }
 
   const ids = Array.isArray(payload.titulo_ids)
     ? payload.titulo_ids.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0)
@@ -3836,7 +3852,7 @@ async function excluirTitulosEmMassa(req, payload = {}) {
   const pagamentosAtivos = await PaymentIntent.count({
     where: {
       titulo_id: { [Op.in]: idsUnicos },
-      status: { [Op.notIn]: ['CANCELADO', 'REJEITADO', 'REJEITADO_BANCO'] }
+      status: { [Op.notIn]: PAYMENT_INTENT_INACTIVE_STATUSES }
     }
   });
   if (pagamentosAtivos > 0) {

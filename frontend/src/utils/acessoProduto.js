@@ -353,6 +353,7 @@ export function canAccessFinanceiro(user) {
       'financeiro.titulos.visualizar',
       'financeiro.titulos.criar',
       'financeiro.titulos.baixar',
+      'financeiro.titulos.excluir',
       'financeiro.titulos.estornar',
       'financeiro.comprovantes.excluir',
       'financeiro.relatorios.visualizar',
@@ -526,6 +527,15 @@ export function canDeleteComprovante(user) {
     return hasPermissao(user, 'financeiro.comprovantes.excluir');
   }
   return false;
+}
+
+export function canDeleteTitulosFinanceiros(user) {
+  if (!hasEnabledModule(user, 'FINANCEIRO')) return false;
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasPermissao(user, 'financeiro.titulos.excluir');
+  }
+  return userHasSetorCapability(user, 'eh_setor_financeiro') || normalizeToken(user?.perfil) === 'FINANCEIRO';
 }
 
 export function canAccessBoletos(user) {

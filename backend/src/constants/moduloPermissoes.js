@@ -252,6 +252,7 @@ const MODULO_PERMISSION_GROUPS = [
           { key: 'financeiro.titulos.visualizar', label: 'Visualizar títulos', descricao: 'Ver lista e detalhes dos títulos a pagar e a receber.' },
           { key: 'financeiro.titulos.criar', label: 'Criar conta manual', descricao: 'Abrir novo título financeiro manualmente.' },
           { key: 'financeiro.titulos.baixar', label: 'Registrar baixa / pagamento', descricao: 'Quitar ou baixar parcialmente um título.' },
+          { key: 'financeiro.titulos.excluir', label: 'Excluir títulos', descricao: 'Excluir logicamente títulos abertos sem movimentos financeiros ativos.' },
           { key: 'financeiro.titulos.estornar', label: 'Estornar movimento', descricao: 'Reverter uma baixa ou pagamento registrado.' },
           { key: 'financeiro.titulos.pagamentos_bancarios.visualizar', label: 'Ver pagamentos bancarios do titulo', descricao: 'Exibe intencoes e lotes de pagamentos bancarios no detalhe do titulo.' },
           { key: 'financeiro.titulos.movimentos.visualizar', label: 'Ver movimentos financeiros do titulo', descricao: 'Exibe baixas, estornos e movimentos financeiros vinculados ao titulo.' },
