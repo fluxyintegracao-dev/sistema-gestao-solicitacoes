@@ -364,15 +364,15 @@ async function buscarSetorGerenciaProcessos(transaction) {
 }
 
 async function montarFluxoAprovacaoCompra({ obra, transaction }) {
-  const setorCompras = await buscarSetorCompras(transaction);
+  const setorGerenciaProcessos = await buscarSetorGerenciaProcessos(transaction);
   const configuracao = await obterConfiguracaoAprovacaoDiretoria();
   const diretoria = obterDiretoriaParaObra(obra, configuracao.diretoriasPorClassificacao);
 
   return {
     usaFluxoDiretoria: Boolean(diretoria),
-    areaResponsavel: diretoria || setorCompras,
+    areaResponsavel: diretoria || setorGerenciaProcessos,
     diretoriaFluxoCodigo: diretoria || null,
-    setorDestinoPosAprovacao: diretoria ? setorCompras : null
+    setorDestinoPosAprovacao: diretoria ? setorGerenciaProcessos : null
   };
 }
 
@@ -433,9 +433,54 @@ function isCompraAguardandoDiretoria(solicitacao) {
   return normalizeTextCompra(solicitacao?.status) === 'AGUARDANDO_DIRETORIA';
 }
 
+function normalizeFluxoTokenCompra(value) {
+  return normalizeTextCompra(value)
+    .replace(/[\s-]+/g, '_')
+    .replace(/_+/g, '_');
+}
+
+function isSetorComprasValue(value) {
+  return normalizeFluxoTokenCompra(value) === 'COMPRAS';
+}
+
+async function isSolicitacaoPrincipalLiberadaParaCompras(solicitacao, transaction = null) {
+  if (!Number(solicitacao?.solicitacao_principal_id || 0)) {
+    return true;
+  }
+
+  const principal = solicitacao?.solicitacaoPrincipal || await Solicitacao.findByPk(
+    solicitacao.solicitacao_principal_id,
+    {
+      attributes: ['id', 'area_responsavel', 'status_global'],
+      transaction
+    }
+  );
+  if (!principal) {
+    return false;
+  }
+
+  const status = normalizeFluxoTokenCompra(principal.status_global);
+  const area = normalizeFluxoTokenCompra(principal.area_responsavel);
+
+  if (['LIBERADO', 'LIBERADO_PARA_COMPRA'].includes(status)) {
+    return true;
+  }
+
+  return isSetorComprasValue(area) && (
+    status.startsWith('PEDIDO_') ||
+    ['COTACAO', 'COTACAO_ENVIADA', 'EM_COTACAO', 'ENCERRADO', 'FINALIZADA'].includes(status)
+  );
+}
+
 function responderCompraAguardandoDiretoria(res) {
   return res.status(403).json({
     error: 'A solicitacao de compra ainda aguarda aprovacao da diretoria antes de seguir para compras.'
+  });
+}
+
+function responderCompraAguardandoLiberacao(res) {
+  return res.status(403).json({
+    error: 'A solicitacao de compra ainda aguarda liberacao da Gerencia de Processos.'
   });
 }
 
@@ -444,6 +489,16 @@ function podeAcompanharCompraAguardandoDiretoria(usuario, solicitacao) {
   if (isSuperadmin(usuario)) return true;
   return Number(solicitacao?.solicitante_id || 0) > 0
     && Number(solicitacao.solicitante_id) === Number(usuario?.id);
+}
+
+async function podeAcompanharCompraAntesLiberacao(usuario, solicitacao, transaction = null) {
+  if (await isSolicitacaoPrincipalLiberadaParaCompras(solicitacao, transaction)) return true;
+  if (isSuperadmin(usuario)) return true;
+  if (Number(solicitacao?.solicitante_id || 0) > 0 && Number(solicitacao.solicitante_id) === Number(usuario?.id)) {
+    return true;
+  }
+  if (await userHasSetorCapability(usuario, 'eh_setor_geo')) return true;
+  return !(await userHasSetorCapability(usuario, 'eh_setor_compras'));
 }
 
 async function carregarSolicitacaoCompra(id) {
@@ -1415,7 +1470,14 @@ module.exports = {
         ]
       });
 
-      return res.json(solicitacoes);
+      const solicitacoesVisiveis = [];
+      for (const solicitacao of solicitacoes) {
+        if (await podeAcompanharCompraAntesLiberacao(usuario, solicitacao)) {
+          solicitacoesVisiveis.push(solicitacao);
+        }
+      }
+
+      return res.json(solicitacoesVisiveis);
     } catch (error) {
       console.error(error);
       return res.status(500).json({ error: 'Erro ao listar solicitacoes de compra' });
@@ -1526,6 +1588,10 @@ module.exports = {
         return responderCompraAguardandoDiretoria(res);
       }
 
+      if (!(await podeAcompanharCompraAntesLiberacao(usuario, solicitacao))) {
+        return responderCompraAguardandoLiberacao(res);
+      }
+
       if (!(await validarEscopoSolicitacaoCompra(usuario, solicitacao, res))) {
         return;
       }
@@ -1567,6 +1633,11 @@ module.exports = {
       if (isCompraAguardandoDiretoria(solicitacao)) {
         await transaction.rollback();
         return responderCompraAguardandoDiretoria(res);
+      }
+
+      if (!(await podeAcompanharCompraAntesLiberacao(usuario, solicitacao, transaction))) {
+        await transaction.rollback();
+        return responderCompraAguardandoLiberacao(res);
       }
 
       if (!(await validarEscopoSolicitacaoCompra(usuario, solicitacao, res, transaction))) {
@@ -2057,6 +2128,11 @@ module.exports = {
         return responderCompraAguardandoDiretoria(res);
       }
 
+      if (!(await podeAcompanharCompraAntesLiberacao(usuario, solicitacao, transaction))) {
+        await transaction.rollback();
+        return responderCompraAguardandoLiberacao(res);
+      }
+
       if (!(await validarEscopoSolicitacaoCompra(usuario, solicitacao, res, transaction))) {
         await transaction.rollback();
         return;
@@ -2239,6 +2315,11 @@ module.exports = {
         return responderCompraAguardandoDiretoria(res);
       }
 
+      if (!(await podeAcompanharCompraAntesLiberacao(usuario, solicitacao, transaction))) {
+        await transaction.rollback();
+        return responderCompraAguardandoLiberacao(res);
+      }
+
       if (!(await validarEscopoSolicitacaoCompra(usuario, solicitacao, res, transaction))) {
         await transaction.rollback();
         return;
@@ -2288,6 +2369,10 @@ module.exports = {
         return responderCompraAguardandoDiretoria(res);
       }
 
+      if (!(await podeAcompanharCompraAntesLiberacao(usuario, solicitacao))) {
+        return responderCompraAguardandoLiberacao(res);
+      }
+
       if (!(await validarEscopoSolicitacaoCompra(usuario, solicitacao, res))) {
         return;
       }
@@ -2323,6 +2408,11 @@ module.exports = {
       if (isCompraAguardandoDiretoria(solicitacao)) {
         await transaction.rollback();
         return responderCompraAguardandoDiretoria(res);
+      }
+
+      if (!(await podeAcompanharCompraAntesLiberacao(usuario, solicitacao, transaction))) {
+        await transaction.rollback();
+        return responderCompraAguardandoLiberacao(res);
       }
 
       if (!(await validarEscopoSolicitacaoCompra(usuario, solicitacao, res))) {
@@ -2431,6 +2521,10 @@ module.exports = {
 
       if (!podeAcompanharCompraAguardandoDiretoria(usuario, solicitacao)) {
         return responderCompraAguardandoDiretoria(res);
+      }
+
+      if (!(await podeAcompanharCompraAntesLiberacao(usuario, solicitacao))) {
+        return responderCompraAguardandoLiberacao(res);
       }
 
       if (!(await validarEscopoSolicitacaoCompra(usuario, solicitacao, res))) {
