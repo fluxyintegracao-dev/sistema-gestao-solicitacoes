@@ -60,6 +60,7 @@ const {
   validateCompraPedidoStatusBody,
   validateCompraPedidoStatusBatchBody,
   validateCompraSolicitacaoInativarMassaBody,
+  validateCompraSolicitacaoEncaminharComprasMassaBody,
   validateCompraPedidoItemUpdateBody,
   validateCompraDelegacaoBody,
   validateCompraPedidoAuditoriaQuery,
@@ -232,6 +233,7 @@ const {
   canManageComprasConfiguracoes,
   canManageComprasDelegacao,
   canManageComprasFornecedores,
+  canEncaminharCompraSolicitacoes,
   canDeleteCompraSolicitacoes,
   canManageCrmAutomacoes,
   canManageCrmConfiguracoes,
@@ -674,6 +676,11 @@ const allowCompraSolicitacoesManage = allowPaymentAction(
   'COMPRAS_SOLICITACOES_MANAGE',
   canManageCompraSolicitacoes,
   'Acesso negado para gerenciar solicitacoes de compra'
+);
+const allowCompraSolicitacoesEncaminhar = allowPaymentAction(
+  'COMPRAS_SOLICITACOES_ENCAMINHAR',
+  canEncaminharCompraSolicitacoes,
+  'Acesso negado para enviar solicitacoes ao setor de compras'
 );
 const allowCompraSolicitacoesDelete = allowPaymentAction(
   'COMPRAS_SOLICITACOES_DELETE',
@@ -1578,6 +1585,7 @@ router.delete('/compras/fornecedores/:id', requireEnabledModule('COTACOES'), all
 router.post('/compras/anexos-temporarios', allowCompraSolicitacoesUpload, uploadRateLimit, uploadComprovantes.single('file'), SolicitacaoCompraController.uploadTemporario);
 router.get('/compras/solicitacoes', allowCompraSolicitacoesOrDelegacaoRead, validateRequest({ query: validateCompraQuery }), scopeCompraListAccess, SolicitacaoCompraController.index);
 router.post('/compras/solicitacoes/inativar-massa', allowCompraSolicitacoesDelete, criticalRateLimit, validateRequest({ body: validateCompraSolicitacaoInativarMassaBody }), scopeCompraListAccess, SolicitacaoCompraController.inativar);
+router.post('/compras/solicitacoes/encaminhar-compras-massa', allowCompraSolicitacoesEncaminhar, criticalRateLimit, validateRequest({ body: validateCompraSolicitacaoEncaminharComprasMassaBody }), scopeCompraListAccess, SolicitacaoCompraController.encaminharParaCompras);
 router.get('/compras/solicitacoes/:id', allowCompraSolicitacoesCreateFlowRead, validateRequest({ params: validateNumericIdParam('id', 'Solicitacao de compra') }), requireCompraAccess, SolicitacaoCompraController.show);
 router.get('/compras/solicitacoes/:id/comparativo', allowCompraSolicitacoesRead, validateRequest({ params: validateNumericIdParam('id', 'Solicitacao de compra') }), requireCompraAccess, SolicitacaoCompraController.comparativo);
 router.get('/compras/solicitacoes/:id/pdf', allowCompraSolicitacoesCreateFlowRead, validateRequest({ params: validateNumericIdParam('id', 'Solicitacao de compra') }), requireCompraAccess, SolicitacaoCompraController.pdf);
@@ -1586,6 +1594,7 @@ router.post('/compras/solicitacoes-diretas', allowCompraSolicitacoesCreate, vali
 router.delete('/compras/solicitacoes/:id', allowCompraSolicitacoesDelete, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Solicitacao de compra') }), requireCompraAccess, SolicitacaoCompraController.inativar);
 router.get('/compras/cotacoes', requireEnabledModule('COTACOES'), allowComprasCotacoesRead, scopeCompraListAccess, CotacaoFornecedorController.index);
 router.post('/compras/cotacoes/avulsa', requireEnabledModule('COTACOES'), allowComprasCotacoesManage, SolicitacaoCompraController.createAvulsa);
+router.patch('/compras/solicitacoes/:id/encaminhar-compras', allowCompraSolicitacoesEncaminhar, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Solicitacao de compra') }), requireCompraAccess, SolicitacaoCompraController.encaminharParaCompras);
 router.patch('/compras/solicitacoes/:id/integrar', allowCompraSolicitacoesManage, validateRequest({ params: validateNumericIdParam('id', 'Solicitacao de compra'), body: validateCompraIntegrarBody }), requireCompraAccess, SolicitacaoCompraController.integrar);
 router.patch('/compras/solicitacoes/:id/liberar', allowCompraSolicitacoesManage, validateRequest({ params: validateNumericIdParam('id', 'Solicitacao de compra') }), requireCompraAccess, SolicitacaoCompraController.liberar);
 router.post('/compras/solicitacoes/:id/enviar', allowCompraSolicitacoesManage, validateRequest({ params: validateNumericIdParam('id', 'Solicitacao de compra'), body: validateCompraEnviarBody }), requireCompraAccess, SolicitacaoCompraController.enviarParaFornecedores);

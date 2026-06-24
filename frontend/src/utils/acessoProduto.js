@@ -136,6 +136,7 @@ export function canAccessCompras(user) {
       'compras.solicitacoes.criar',
       'compras.solicitacoes.gerenciar',
       'compras.solicitacoes.excluir',
+      'compras.solicitacoes.encaminhar_compras',
       'compras.solicitacoes.gerar_pedidos',
       'compras.pedidos.visualizar',
       'compras.pedidos.criar',
@@ -175,6 +176,7 @@ export function canViewCompraSolicitacoes(user) {
     return hasAnyPermissao(user, [
       'compras.solicitacoes.visualizar',
       'compras.solicitacoes.gerenciar',
+      'compras.solicitacoes.encaminhar_compras',
       'compras.solicitacoes.gerar_pedidos',
       'compras.delegacao.visualizar',
       'compras.delegacao.gerenciar'
@@ -202,6 +204,18 @@ export function canManageCompraSolicitacoes(user) {
     ]);
   }
   return userHasSetorCapability(user, 'eh_setor_compras');
+}
+
+export function canEncaminharCompraSolicitacoes(user) {
+  if (!hasEnabledModule(user, 'COMPRAS')) return false;
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasAnyPermissao(user, [
+      'compras.solicitacoes.encaminhar_compras',
+      'compras.solicitacoes.gerenciar'
+    ]);
+  }
+  return userHasSetorCapability(user, 'eh_setor_geo');
 }
 
 export function canDeleteCompraSolicitacoes(user) {

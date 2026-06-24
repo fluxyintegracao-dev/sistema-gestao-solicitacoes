@@ -126,6 +126,7 @@ const SOLICITACOES_RELATORIO_OPERACIONAL_KEYS = [
 const COMPRAS_SOLICITACOES_VIEW_KEYS = [
   'compras.solicitacoes.visualizar',
   'compras.solicitacoes.gerenciar',
+  'compras.solicitacoes.encaminhar_compras',
   'compras.solicitacoes.gerar_pedidos',
   'compras.delegacao.visualizar',
   'compras.delegacao.gerenciar'
@@ -138,6 +139,11 @@ const COMPRAS_SOLICITACOES_CREATE_KEYS = [
 const COMPRAS_SOLICITACOES_MANAGE_KEYS = [
   'compras.solicitacoes.gerenciar',
   'compras.solicitacoes.gerar_pedidos'
+];
+
+const COMPRAS_SOLICITACOES_ENCAMINHAR_KEYS = [
+  'compras.solicitacoes.encaminhar_compras',
+  'compras.solicitacoes.gerenciar'
 ];
 
 const COMPRAS_SOLICITACOES_DELETE_KEYS = [
@@ -1440,6 +1446,18 @@ async function canManageCompraSolicitacoes(user) {
   return userHasSetorCapability(user, 'eh_setor_compras');
 }
 
+async function canEncaminharCompraSolicitacoes(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, COMPRAS_SOLICITACOES_ENCAMINHAR_KEYS);
+  }
+
+  return userHasSetorCapability(user, 'eh_setor_geo');
+}
+
 async function canDeleteCompraSolicitacoes(user) {
   if (isBusinessAdmin(user)) {
     return true;
@@ -2541,6 +2559,7 @@ module.exports = {
   canViewComercialEmpreendimentos,
   canManageComprasConfiguracoes,
   canManageCompraSolicitacoes,
+  canEncaminharCompraSolicitacoes,
   canDeleteCompraSolicitacoes,
   canViewComprasCotacoes,
   canViewAllComprasScope,

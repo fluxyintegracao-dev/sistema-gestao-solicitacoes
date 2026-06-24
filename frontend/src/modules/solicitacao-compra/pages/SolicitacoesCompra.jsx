@@ -1,15 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
-import { HiOutlineArrowDownTray, HiOutlineEye, HiOutlineTrash } from 'react-icons/hi2';
+import { HiOutlineArrowDownTray, HiOutlineEye, HiOutlinePaperAirplane, HiOutlineTrash } from 'react-icons/hi2';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../contexts/AuthContext';
 import {
   baixarPdfSolicitacaoCompra,
+  encaminharSolicitacaoCompraParaCompras,
+  encaminharSolicitacoesCompraParaCompras,
   inativarSolicitacaoCompra,
   inativarSolicitacoesCompra,
   listarSolicitacoesCompra
 } from '../../../services/compras';
 import { getMinhasObras } from '../../../services/obras';
-import { canDeleteCompraSolicitacoes } from '../../../utils/acessoProduto';
+import { canDeleteCompraSolicitacoes, canEncaminharCompraSolicitacoes } from '../../../utils/acessoProduto';
 
 function formatarData(data) {
   if (!data) {
@@ -61,11 +63,14 @@ export default function SolicitacoesCompra() {
   const [obras, setObras] = useState([]);
   const [loading, setLoading] = useState(false);
   const [inativando, setInativando] = useState(false);
+  const [encaminhando, setEncaminhando] = useState(false);
   const [obraId, setObraId] = useState('');
   const [status, setStatus] = useState('');
   const [busca, setBusca] = useState('');
   const [selecionadas, setSelecionadas] = useState([]);
   const podeInativar = canDeleteCompraSolicitacoes(user);
+  const podeEncaminharCompras = canEncaminharCompraSolicitacoes(user);
+  const podeSelecionar = podeInativar || podeEncaminharCompras;
 
   async function carregarObras() {
     try {
@@ -199,6 +204,40 @@ export default function SolicitacoesCompra() {
     }
   }
 
+  async function handleEncaminharCompras(ids) {
+    const idsValidos = [...new Set(
+      (Array.isArray(ids) ? ids : [ids])
+        .map((id) => Number(id))
+        .filter(Boolean)
+    )];
+
+    if (!idsValidos.length) {
+      alert('Selecione ao menos uma solicitacao de compra.');
+      return;
+    }
+
+    if (!window.confirm(`Enviar ${idsValidos.length} solicitacao(oes) para a fila do setor de Compras?`)) {
+      return;
+    }
+
+    try {
+      setEncaminhando(true);
+      if (idsValidos.length === 1) {
+        await encaminharSolicitacaoCompraParaCompras(idsValidos[0]);
+      } else {
+        await encaminharSolicitacoesCompraParaCompras(idsValidos);
+      }
+      setSelecionadas([]);
+      await carregarSolicitacoes();
+      alert('Solicitacao(oes) enviada(s) para a fila do setor de Compras.');
+    } catch (error) {
+      console.error(error);
+      alert(error.message || 'Erro ao enviar solicitacao para Compras');
+    } finally {
+      setEncaminhando(false);
+    }
+  }
+
   return (
     <div className="page solicitacoes-page">
       <div className="app-page-header">
@@ -215,11 +254,21 @@ export default function SolicitacoesCompra() {
       <div className="sol-surface-card solicitacoes-toolbar app-toolbar-card rounded-xl p-3 md:p-4">
         <div className="text-sm text-gray-600 dark:text-slate-300">
           Registros disponiveis: <strong>{solicitacoesFiltradas.length}</strong>
-          {podeInativar && selecionadas.length > 0 ? (
+          {podeSelecionar && selecionadas.length > 0 ? (
             <span className="ml-2 text-[var(--c-muted)]">Selecionadas: {selecionadas.length}</span>
           ) : null}
         </div>
         <div className="app-page-actions">
+          {podeEncaminharCompras && selecionadas.length > 0 ? (
+            <button
+              type="button"
+              className="btn btn-outline"
+              onClick={() => handleEncaminharCompras(selecionadas)}
+              disabled={encaminhando}
+            >
+              {encaminhando ? 'Enviando...' : 'Enviar para Compras'}
+            </button>
+          ) : null}
           {podeInativar && selecionadas.length > 0 ? (
             <button
               type="button"
@@ -302,7 +351,7 @@ export default function SolicitacoesCompra() {
           <div className="compras-table-wrapper">
             <table className="compras-data-table compras-data-table-solicitacoes">
               <colgroup>
-                {podeInativar ? <col className="w-12" /> : null}
+                {podeSelecionar ? <col className="w-12" /> : null}
                 <col className="compras-col-codigo" />
                 <col className="compras-col-obra" />
                 <col className="compras-col-solicitante" />
@@ -315,7 +364,7 @@ export default function SolicitacoesCompra() {
               </colgroup>
               <thead>
                 <tr>
-                  {podeInativar ? (
+                  {podeSelecionar ? (
                     <th className="text-center">
                       <input
                         type="checkbox"
@@ -339,7 +388,7 @@ export default function SolicitacoesCompra() {
               <tbody>
                 {solicitacoesFiltradas.map((solicitacao) => (
                   <tr key={solicitacao.id}>
-                    {podeInativar ? (
+                    {podeSelecionar ? (
                       <td className="text-center">
                         <input
                           type="checkbox"
@@ -388,6 +437,18 @@ export default function SolicitacoesCompra() {
                         >
                           <HiOutlineArrowDownTray />
                         </button>
+                        {podeEncaminharCompras ? (
+                          <button
+                            type="button"
+                            className="compras-icon-action"
+                            onClick={() => handleEncaminharCompras([solicitacao.id])}
+                            title="Enviar para fila de Compras"
+                            aria-label={`Enviar solicitacao SC-${String(solicitacao.id).padStart(5, '0')} para Compras`}
+                            disabled={encaminhando}
+                          >
+                            <HiOutlinePaperAirplane />
+                          </button>
+                        ) : null}
                         {podeInativar ? (
                           <button
                             type="button"

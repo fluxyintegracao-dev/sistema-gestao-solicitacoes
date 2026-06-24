@@ -232,6 +232,23 @@ export async function inativarSolicitacoesCompra(ids = []) {
   return handleJsonResponse(response, 'Erro ao inativar solicitacoes de compra');
 }
 
+export async function encaminharSolicitacaoCompraParaCompras(id) {
+  const response = await fetch(`${API_URL}/compras/solicitacoes/${id}/encaminhar-compras`, {
+    method: 'PATCH',
+    headers: authHeaders()
+  });
+  return handleJsonResponse(response, 'Erro ao enviar solicitacao de compra para Compras');
+}
+
+export async function encaminharSolicitacoesCompraParaCompras(ids = []) {
+  const response = await fetch(`${API_URL}/compras/solicitacoes/encaminhar-compras-massa`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ solicitacao_ids: ids })
+  });
+  return handleJsonResponse(response, 'Erro ao enviar solicitacoes de compra para Compras');
+}
+
 export async function criarSolicitacaoCompra(data) {
   const response = await fetch(`${API_URL}/compras/solicitacoes`, {
     method: 'POST',

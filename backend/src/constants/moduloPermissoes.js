@@ -162,6 +162,7 @@ const MODULO_PERMISSION_GROUPS = [
           { key: 'compras.solicitacoes.criar', label: 'Criar solicitacao de compra', descricao: 'Acessar a pagina Nova Solicitacao de Compra e criar solicitacoes vinculadas a obra.' },
           { key: 'compras.solicitacoes.gerenciar', label: 'Gerenciar solicitacoes', descricao: 'Liberar, recusar, enviar para fornecedores, encerrar e comentar solicitacoes de compra.' },
           { key: 'compras.solicitacoes.excluir', label: 'Inativar solicitacoes', descricao: 'Inativar uma ou mais solicitacoes de compra na fila operacional.' },
+          { key: 'compras.solicitacoes.encaminhar_compras', label: 'Enviar para Compras', descricao: 'Encaminhar solicitacoes de compra antigas ou fora do fluxo para a fila do setor de Compras.' },
           { key: 'compras.solicitacoes.gerar_pedidos', label: 'Gerar pedidos pela cotacao', descricao: 'Gerar pedidos de compra a partir da cotacao encerrada.' }
         ]
       },

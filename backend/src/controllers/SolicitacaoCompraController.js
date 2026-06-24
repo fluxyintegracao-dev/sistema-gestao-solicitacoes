@@ -53,6 +53,7 @@ const {
 const {
   canAccessCompras,
   canAccessSolicitacaoCompraByScope,
+  canEncaminharCompraSolicitacoes,
   canManageComprasCotacoes,
   canManageComprasDelegacao,
   canViewAllComprasScope,
@@ -1362,6 +1363,145 @@ async function validarEscopoSolicitacaoCompra(usuario, solicitacao, res, transac
   return false;
 }
 
+async function validarEscopoEncaminhamentoCompra(usuario, solicitacao, res, options = {}) {
+  if (await canAccessSolicitacaoCompraByScope(usuario, solicitacao)) {
+    return true;
+  }
+
+  if (options.recursoPreValidado || options.obraIdsEscopo === null) {
+    return true;
+  }
+
+  if (Array.isArray(options.obraIdsEscopo)) {
+    const obraId = Number(solicitacao?.obra_id || 0);
+    if (obraId > 0 && options.obraIdsEscopo.includes(obraId)) {
+      return true;
+    }
+  }
+
+  if (await canEncaminharCompraSolicitacoes(usuario)) {
+    res.status(403).json({ error: 'Acesso negado para a obra desta solicitacao de compra' });
+    return false;
+  }
+
+  res.status(403).json({ error: 'Acesso negado a esta solicitacao de compra' });
+  return false;
+}
+
+async function encaminharSolicitacaoCompraParaFilaCompras({ solicitacao, usuario, transaction }) {
+  const statusAtual = normalizeTextCompra(solicitacao.status);
+  if (['INATIVA', 'ENCERRADO', 'FINALIZADA'].includes(statusAtual) || statusAtual.startsWith('PEDIDO_')) {
+    const codigo = `SC-${String(solicitacao.id).padStart(5, '0')}`;
+    const error = new Error(`${codigo} nao pode ser encaminhada para Compras no status atual.`);
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (isCompraAguardandoDiretoria(solicitacao)) {
+    const error = new Error('A solicitacao de compra ainda aguarda aprovacao da diretoria.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const setorCompras = await buscarSetorCompras(transaction);
+  const liberadoEm = solicitacao.liberado_para_compra_em || new Date();
+  const statusAnteriorCompra = solicitacao.status;
+
+  await solicitacao.update(
+    {
+      status: 'LIBERADO_PARA_COMPRA',
+      liberado_para_compra_em: liberadoEm,
+      comprador_responsavel_id: null,
+      prazo_compra: null,
+      delegado_por: null,
+      delegado_em: null,
+      motivo_atraso: null,
+      motivo_atraso_em: null
+    },
+    { transaction }
+  );
+
+  let historicoPrincipal = null;
+  if (Number(solicitacao.solicitacao_principal_id || 0) > 0) {
+    const principal = await Solicitacao.findByPk(solicitacao.solicitacao_principal_id, {
+      attributes: [
+        'id',
+        'codigo',
+        'area_responsavel',
+        'status_global',
+        'fluxo_aprovacao_diretoria',
+        'aprovada_diretoria_em'
+      ],
+      transaction
+    });
+
+    if (principal?.fluxo_aprovacao_diretoria && !principal.aprovada_diretoria_em) {
+      const error = new Error('A solicitacao principal ainda aguarda aprovacao da diretoria.');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    if (principal) {
+      const statusAnteriorPrincipal = principal.status_global;
+      const areaAnteriorPrincipal = principal.area_responsavel;
+      await principal.update(
+        {
+          area_responsavel: setorCompras,
+          status_global: 'LIBERADO'
+        },
+        { transaction }
+      );
+
+      historicoPrincipal = await Historico.create(
+        {
+          solicitacao_id: principal.id,
+          usuario_responsavel_id: usuario.id,
+          setor: usuario.setor_id || setorCompras,
+          acao: 'SOLICITACAO_COMPRA_ENCAMINHADA_COMPRAS',
+          status_anterior: statusAnteriorPrincipal,
+          status_novo: 'LIBERADO',
+          descricao: `Solicitacao de compra SC-${String(solicitacao.id).padStart(5, '0')} encaminhada para o setor de Compras`,
+          metadata: JSON.stringify({
+            solicitacao_compra_id: solicitacao.id,
+            area_anterior: areaAnteriorPrincipal,
+            area_nova: setorCompras,
+            origem: 'AJUSTE_MANUAL_FILA_COMPRAS'
+          })
+        },
+        { transaction }
+      );
+    }
+  }
+
+  await PedidoCompra.update(
+    {
+      atribuido_a: null,
+      prazo_finalizacao: null
+    },
+    {
+      where: { solicitacao_compra_id: solicitacao.id },
+      transaction
+    }
+  );
+
+  await registrarLogSolicitacaoCompra({
+    solicitacaoCompraId: solicitacao.id,
+    usuarioId: usuario.id,
+    tipoAcao: 'ENCAMINHAMENTO_COMPRAS',
+    descricao: 'Solicitacao encaminhada para a fila do setor de Compras',
+    metadados: {
+      status_anterior: statusAnteriorCompra,
+      status_novo: 'LIBERADO_PARA_COMPRA',
+      setor_destino: setorCompras,
+      responsavel_removido: true,
+      historico_id: historicoPrincipal?.id || null
+    },
+    transaction
+  });
+
+  return solicitacao;
+}
+
 module.exports = {
   async uploadTemporario(req, res) {
     try {
@@ -1528,8 +1668,18 @@ module.exports = {
         });
       }
 
+      const obraIdsEscopo = Object.prototype.hasOwnProperty.call(req, 'compraScopeObraIds')
+        ? req.compraScopeObraIds
+        : undefined;
+      const recursoPreValidadoId = Number(req.solicitacaoCompraResource?.id || 0);
+
       for (const solicitacao of solicitacoes) {
-        if (!(await validarEscopoSolicitacaoCompra(usuario, solicitacao, res, transaction))) {
+        const recursoPreValidado = recursoPreValidadoId > 0
+          && recursoPreValidadoId === Number(solicitacao.id);
+        if (!(await validarEscopoEncaminhamentoCompra(usuario, solicitacao, res, {
+          obraIdsEscopo,
+          recursoPreValidado
+        }))) {
           await transaction.rollback();
           return;
         }
@@ -1570,6 +1720,66 @@ module.exports = {
       await transaction.rollback();
       console.error(error);
       return res.status(500).json({ error: 'Erro ao inativar solicitacao de compra' });
+    }
+  },
+
+  async encaminharParaCompras(req, res) {
+    const transaction = await SolicitacaoCompra.sequelize.transaction();
+
+    try {
+      const usuario = await validarAcesso(req, res);
+      if (!usuario) {
+        await transaction.rollback();
+        return;
+      }
+
+      const ids = req.body?.solicitacao_ids || [req.params.id];
+      const solicitacaoIds = [...new Set(
+        (Array.isArray(ids) ? ids : [ids])
+          .map((id) => Number(id))
+          .filter((id) => Number.isInteger(id) && id > 0)
+      )];
+
+      if (solicitacaoIds.length === 0) {
+        await transaction.rollback();
+        return res.status(400).json({ error: 'Selecione ao menos uma solicitacao de compra.' });
+      }
+
+      const solicitacoes = await SolicitacaoCompra.findAll({
+        where: { id: { [Op.in]: solicitacaoIds } },
+        transaction
+      });
+
+      if (solicitacoes.length !== solicitacaoIds.length) {
+        await transaction.rollback();
+        return res.status(404).json({ error: 'Uma ou mais solicitacoes de compra nao foram encontradas.' });
+      }
+
+      for (const solicitacao of solicitacoes) {
+        if (!(await validarEscopoSolicitacaoCompra(usuario, solicitacao, res, transaction))) {
+          await transaction.rollback();
+          return;
+        }
+      }
+
+      for (const solicitacao of solicitacoes) {
+        await encaminharSolicitacaoCompraParaFilaCompras({ solicitacao, usuario, transaction });
+      }
+
+      await transaction.commit();
+
+      if (solicitacaoIds.length === 1) {
+        const atualizada = await carregarSolicitacaoCompra(solicitacaoIds[0]);
+        return res.json(atualizada);
+      }
+
+      return res.json({ ok: true, encaminhadas: solicitacoes.length, ids: solicitacaoIds });
+    } catch (error) {
+      await transaction.rollback();
+      console.error(error);
+      return res.status(error.statusCode || 500).json({
+        error: error.statusCode ? error.message : 'Erro ao encaminhar solicitacao de compra para Compras'
+      });
     }
   },
 

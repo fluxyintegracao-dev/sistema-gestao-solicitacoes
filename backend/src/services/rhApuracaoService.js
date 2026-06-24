@@ -11,6 +11,7 @@ const {
   User,
   sequelize
 } = require('../models');
+const { Op } = require('sequelize');
 const { ValidationError } = require('../middlewares/validation');
 
 const APURACAO_ITEM_INCLUDE = [
@@ -145,6 +146,18 @@ function buildApuracaoWhere(filters = {}) {
   return where;
 }
 
+function addNullableRecorteFilter(where, field, value) {
+  if (!value) return;
+  if (!where[Op.and]) where[Op.and] = [];
+
+  where[Op.and].push({
+    [Op.or]: [
+      { [field]: value },
+      { [field]: null }
+    ]
+  });
+}
+
 function enrichApuracao(apuracao) {
   const plain = typeof apuracao?.toJSON === 'function' ? apuracao.toJSON() : apuracao;
   const itensOrdenados = Array.isArray(plain?.itens)
@@ -221,9 +234,16 @@ async function resolveExistingDraft(data, transaction) {
 async function buildAgrupamentoImportacoes(data, transaction) {
   const importacaoWhere = {
     status: 'CONFIRMADA',
-    competencia: data.competencia,
-    ...(data.tipo_vinculo ? { tipo_vinculo: data.tipo_vinculo } : {})
+    competencia: data.competencia
   };
+  addNullableRecorteFilter(importacaoWhere, 'empresa_grupo_id', data.empresa_grupo_id);
+  addNullableRecorteFilter(importacaoWhere, 'obra_id', data.obra_id);
+  addNullableRecorteFilter(importacaoWhere, 'tipo_vinculo', data.tipo_vinculo);
+
+  const colaboradorWhere = {};
+  if (data.empresa_grupo_id) colaboradorWhere.empresa_grupo_id = data.empresa_grupo_id;
+  if (data.obra_id) colaboradorWhere.obra_id = data.obra_id;
+  if (data.tipo_vinculo) colaboradorWhere.tipo_vinculo = data.tipo_vinculo;
 
   const linhas = await RhImportacaoLinha.findAll({
     where: {
@@ -241,6 +261,7 @@ async function buildAgrupamentoImportacoes(data, transaction) {
         model: RhColaborador,
         as: 'colaborador',
         required: true,
+        where: colaboradorWhere,
         attributes: [
           'id',
           'nome',
