@@ -5537,6 +5537,64 @@ input[type="file"]:disabled {
   align-items: center;
 }
 
+.finance-cadastros-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.finance-cadastros-column {
+  min-width: 0;
+}
+
+.finance-cadastros-card {
+  border-radius: 18px;
+}
+
+.finance-cadastros-card :is(.btn, .btn-primary, .btn-outline) {
+  min-height: 38px;
+}
+
+.finance-cadastros-card .btn:not(.btn-icon) {
+  padding-inline: 0.95rem;
+}
+
+.finance-cadastros-card .app-list-card {
+  border-radius: 14px;
+  padding: 0.85rem 0.95rem;
+}
+
+.finance-cadastros-card .input {
+  min-height: 40px;
+}
+
+.finance-cadastros-card textarea.input {
+  min-height: 58px;
+}
+
+.finance-cadastros-card--favorecidos {
+  max-width: 1100px;
+  margin-inline: auto;
+}
+
+@media (min-width: 1280px) {
+  .finance-cadastros-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .finance-cadastros-card--forma-pagamento {
+    order: 1;
+  }
+
+  .finance-cadastros-card--tarifas {
+    order: 2;
+  }
+
+  .finance-cadastros-card--cartao {
+    order: 3;
+  }
+}
+
 .finance-chart-card {
   --finance-chart-previsto: #356dff;
   --finance-chart-realizado: #0fbf8f;

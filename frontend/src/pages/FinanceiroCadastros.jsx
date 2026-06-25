@@ -732,9 +732,9 @@ export default function FinanceiroCadastros() {
         </div>
       ) : (
         <>
-        <div className="grid gap-6 xl:grid-cols-2">
-          <div className="space-y-4">
-            <div className="card sol-surface-card">
+        <div className="finance-cadastros-grid">
+          <div className="space-y-4 finance-cadastros-column finance-cadastros-column--bancos">
+            <div className="card sol-surface-card finance-cadastros-card finance-cadastros-card--conta">
               <h2 className="text-lg font-semibold text-[var(--c-text)]">
                 {contaForm.id ? 'Editar conta bancaria' : 'Nova conta bancaria'}
               </h2>
@@ -831,7 +831,7 @@ export default function FinanceiroCadastros() {
               </form>
             </div>
 
-            <div className="card sol-surface-card space-y-3">
+            <div className="card sol-surface-card space-y-3 finance-cadastros-card finance-cadastros-card--contas-lista">
               <h2 className="text-lg font-semibold text-[var(--c-text)]">Contas bancarias</h2>
               {contas.length === 0 ? (
                 <p className="text-sm text-[var(--c-muted)]">Nenhuma conta bancaria cadastrada.</p>
@@ -864,7 +864,7 @@ export default function FinanceiroCadastros() {
               )}
             </div>
 
-            <div className="card sol-surface-card">
+            <div className="card sol-surface-card finance-cadastros-card finance-cadastros-card--conta-pagadora">
               <div className="flex flex-col gap-1 md:flex-row md:items-start md:justify-between">
                 <div>
                   <h2 className="text-lg font-semibold text-[var(--c-text)]">
@@ -990,7 +990,7 @@ export default function FinanceiroCadastros() {
               </form>
             </div>
 
-            <div className="card sol-surface-card space-y-3">
+            <div className="card sol-surface-card space-y-3 finance-cadastros-card finance-cadastros-card--contas-pagadoras-lista">
               <h2 className="text-lg font-semibold text-[var(--c-text)]">Contas pagadoras</h2>
               {paymentAccounts.length === 0 ? (
                 <p className="text-sm text-[var(--c-muted)]">Nenhuma conta pagadora cadastrada.</p>
@@ -1026,8 +1026,8 @@ export default function FinanceiroCadastros() {
             </div>
           </div>
 
-          <div className="space-y-4">
-            <div className="card sol-surface-card" ref={categoriaFormRef}>
+          <div className="space-y-4 finance-cadastros-column finance-cadastros-column--categorias">
+            <div className="card sol-surface-card finance-cadastros-card finance-cadastros-card--categoria" ref={categoriaFormRef}>
               <h2 className="text-lg font-semibold text-[var(--c-text)]">
                 {categoriaForm.id ? 'Editar categoria financeira' : 'Nova categoria financeira'}
               </h2>
@@ -1098,7 +1098,7 @@ export default function FinanceiroCadastros() {
               </form>
             </div>
 
-            <div className="card sol-surface-card space-y-3">
+            <div className="card sol-surface-card space-y-3 finance-cadastros-card finance-cadastros-card--categorias-lista">
               <div className="solicitacoes-toolbar rounded-xl p-0">
                 <div className="finance-category-filter-row">
                   <div>
@@ -1215,8 +1215,8 @@ export default function FinanceiroCadastros() {
           </div>
         </div>
 
-        <div className="mt-6 grid gap-6 xl:grid-cols-2">
-          <div className="card sol-surface-card">
+        <div className="mt-6 finance-cadastros-grid">
+          <div className="card sol-surface-card finance-cadastros-card finance-cadastros-card--forma-pagamento">
             <div className="flex flex-col gap-1 md:flex-row md:items-start md:justify-between">
               <div>
                 <h2 className="text-lg font-semibold text-[var(--c-text)]">
@@ -1303,7 +1303,7 @@ export default function FinanceiroCadastros() {
             </div>
           </div>
 
-          <div className="card sol-surface-card">
+          <div className="card sol-surface-card finance-cadastros-card finance-cadastros-card--tarifas">
             <div className="flex flex-col gap-1 md:flex-row md:items-start md:justify-between">
               <div>
                 <h2 className="text-lg font-semibold text-[var(--c-text)]">Atalhos de tarifas bancarias</h2>
@@ -1381,7 +1381,7 @@ export default function FinanceiroCadastros() {
             </div>
           </div>
 
-          <div className="card sol-surface-card">
+          <div className="card sol-surface-card finance-cadastros-card finance-cadastros-card--cartao">
             <div className="flex flex-col gap-1 md:flex-row md:items-start md:justify-between">
               <div>
                 <h2 className="text-lg font-semibold text-[var(--c-text)]">
@@ -1470,7 +1470,7 @@ export default function FinanceiroCadastros() {
           </div>
         </div>
 
-        <div className="mt-6 card sol-surface-card">
+        <div className="mt-6 card sol-surface-card finance-cadastros-card finance-cadastros-card--favorecidos">
           <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
             <div>
               <h2 className="text-lg font-semibold text-[var(--c-text)]">Favorecidos bancarios PIX</h2>
