@@ -8605,6 +8605,118 @@ body {
   color: #a7f3d0 !important;
 }
 
+.layout-shell .compra-detalhe-page .app-toolbar-card {
+  display: grid;
+  gap: 1rem;
+}
+
+.layout-shell .compra-detalhe-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 0.75rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--shell-border);
+}
+
+.layout-shell .compra-detalhe-summary-item {
+  min-width: 0;
+  border: 1px solid var(--shell-border);
+  border-radius: 1rem;
+  padding: 0.75rem 0.85rem;
+  background: rgba(148, 163, 184, 0.08);
+}
+
+.layout-shell .compra-detalhe-summary-wide {
+  grid-column: span 2;
+}
+
+.layout-shell .compra-detalhe-summary-label {
+  display: block;
+  margin-bottom: 0.25rem;
+  color: var(--shell-muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.layout-shell .compra-detalhe-summary-item strong {
+  display: block;
+  min-width: 0;
+  color: var(--shell-text);
+  font-size: 0.9rem;
+  font-weight: 750;
+}
+
+.layout-shell .compra-detalhe-summary-item small {
+  display: block;
+  margin-top: 0.15rem;
+  color: var(--shell-muted);
+  font-size: 0.78rem;
+}
+
+.layout-shell .compra-detalhe-link-button {
+  color: var(--shell-primary);
+  font-weight: 800;
+  text-align: left;
+}
+
+.layout-shell .compra-detalhe-link-button:hover {
+  text-decoration: underline;
+}
+
+.layout-shell .compra-detalhe-itens-card {
+  min-width: 0;
+}
+
+.layout-shell .compra-detalhe-itens-shell {
+  padding: 0.75rem;
+  border-radius: 1.25rem;
+}
+
+.layout-shell .compra-detalhe-itens-table {
+  table-layout: fixed;
+}
+
+.layout-shell .compra-detalhe-itens-table th,
+.layout-shell .compra-detalhe-itens-table td {
+  overflow: hidden;
+}
+
+.layout-shell .compra-detalhe-link-cell {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--shell-primary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 0.75rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.layout-shell .compra-detalhe-link-cell:hover {
+  text-decoration: underline;
+}
+
+.layout-shell .compra-detalhe-support-card {
+  min-height: 100%;
+}
+
+.dark .layout-shell .compra-detalhe-page .compra-detalhe-summary-item {
+  background: rgba(15, 23, 42, 0.62);
+}
+
+.dark .layout-shell .compra-detalhe-page .compra-detalhe-link-cell,
+.dark .layout-shell .compra-detalhe-page .compra-detalhe-link-button {
+  color: #93c5fd;
+}
+
+@media (max-width: 760px) {
+  .layout-shell .compra-detalhe-summary-wide {
+    grid-column: span 1;
+  }
+}
+
 .layout-shell .app-status-pill,
 .layout-shell .badge {
   display: inline-flex;

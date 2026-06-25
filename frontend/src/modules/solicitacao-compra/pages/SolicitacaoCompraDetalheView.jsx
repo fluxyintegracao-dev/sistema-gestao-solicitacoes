@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { ResizableTable, ResizableTh } from '../../../components/ResizableTable';
 import { baixarPdfSolicitacaoCompra, obterSolicitacaoCompra } from '../../../services/compras';
 import { useSafeNavigateBack } from '../../../utils/navigation';
 
@@ -30,6 +31,18 @@ function statusCotacaoClass(status) {
   if (value === 'CANCELADO') return 'app-status-pill bg-slate-100 text-slate-700';
   return 'app-status-pill bg-blue-100 text-blue-700';
 }
+
+const itemTableColumns = [
+  { key: 'indice', width: 64, minWidth: 56 },
+  { key: 'tipo', width: 112, minWidth: 92 },
+  { key: 'insumo', width: 220, minWidth: 160 },
+  { key: 'unidade', width: 96, minWidth: 78 },
+  { key: 'quantidade', width: 118, minWidth: 98 },
+  { key: 'especificacao', width: 260, minWidth: 180 },
+  { key: 'apropriacao', width: 140, minWidth: 110 },
+  { key: 'necessario_para', width: 132, minWidth: 112 },
+  { key: 'link', width: 280, minWidth: 140 }
+];
 
 export default function SolicitacaoCompraDetalheView() {
   const { id } = useParams();
@@ -124,7 +137,7 @@ export default function SolicitacaoCompraDetalheView() {
   }
 
   return (
-    <div className="page solicitacoes-page">
+    <div className="page solicitacoes-page compra-detalhe-page">
       <div className="card sol-surface-card app-toolbar-card">
         <div className="app-page-header-row">
           <div>
@@ -145,59 +158,115 @@ export default function SolicitacaoCompraDetalheView() {
             </button>
           </div>
         </div>
+
+        <div className="compra-detalhe-summary-grid">
+          <div className="compra-detalhe-summary-item">
+            <span className="compra-detalhe-summary-label">Status</span>
+            <strong>
+              <span className={statusClass(solicitacao.status)}>{formatarStatus(solicitacao.status)}</span>
+            </strong>
+          </div>
+          <div className="compra-detalhe-summary-item">
+            <span className="compra-detalhe-summary-label">Obra</span>
+            <strong>{solicitacao.obra?.nome || '-'}</strong>
+            <small>{solicitacao.obra?.codigo || '-'}</small>
+          </div>
+          <div className="compra-detalhe-summary-item">
+            <span className="compra-detalhe-summary-label">Solicitante</span>
+            <strong>{solicitacao.solicitante?.nome || '-'}</strong>
+          </div>
+          <div className="compra-detalhe-summary-item">
+            <span className="compra-detalhe-summary-label">Necessario para</span>
+            <strong>{formatarData(solicitacao.necessario_para)}</strong>
+          </div>
+          <div className="compra-detalhe-summary-item">
+            <span className="compra-detalhe-summary-label">Criada em</span>
+            <strong>{formatarData(solicitacao.createdAt)}</strong>
+          </div>
+          <div className="compra-detalhe-summary-item">
+            <span className="compra-detalhe-summary-label">Solicitacao principal</span>
+            {solicitacao.solicitacaoPrincipal ? (
+              <button
+                type="button"
+                className="compra-detalhe-link-button"
+                onClick={() => navigate(`/solicitacoes/${solicitacao.solicitacaoPrincipal.id}`)}
+              >
+                {solicitacao.solicitacaoPrincipal.codigo || `ID ${solicitacao.solicitacaoPrincipal.id}`}
+              </button>
+            ) : (
+              <strong>-</strong>
+            )}
+          </div>
+          <div className="compra-detalhe-summary-item compra-detalhe-summary-wide">
+            <span className="compra-detalhe-summary-label">Observacoes</span>
+            <strong>{solicitacao.observacoes || '-'}</strong>
+          </div>
+        </div>
       </div>
 
-      <div className="mt-4 grid gap-4 xl:grid-cols-[380px_minmax(0,1fr)]">
-        <div className="grid gap-4">
-          <div className="card sol-surface-card">
-            <div className="card-header">
-              <h2 className="font-semibold">Dados gerais</h2>
-            </div>
-            <div className="grid gap-4 text-sm">
-              <div>
-                <div className="text-[var(--c-muted)]">Status</div>
-                <div className="font-semibold">
-                  <span className={statusClass(solicitacao.status)}>{formatarStatus(solicitacao.status)}</span>
-                </div>
-              </div>
-              <div>
-                <div className="text-[var(--c-muted)]">Obra</div>
-                <div className="font-semibold">{solicitacao.obra?.nome || '-'}</div>
-                <div className="text-[var(--c-muted)]">{solicitacao.obra?.codigo || '-'}</div>
-              </div>
-              <div>
-                <div className="text-[var(--c-muted)]">Solicitante</div>
-                <div className="font-semibold">{solicitacao.solicitante?.nome || '-'}</div>
-              </div>
-              <div>
-                <div className="text-[var(--c-muted)]">Necessario para</div>
-                <div className="font-semibold">{formatarData(solicitacao.necessario_para)}</div>
-              </div>
-              <div>
-                <div className="text-[var(--c-muted)]">Criada em</div>
-                <div className="font-semibold">{formatarData(solicitacao.createdAt)}</div>
-              </div>
-              <div>
-                <div className="text-[var(--c-muted)]">Solicitacao principal</div>
-                {solicitacao.solicitacaoPrincipal ? (
-                  <button
-                    type="button"
-                    className="text-left font-semibold text-blue-600 hover:underline"
-                    onClick={() => navigate(`/solicitacoes/${solicitacao.solicitacaoPrincipal.id}`)}
-                  >
-                    {solicitacao.solicitacaoPrincipal.codigo || `ID ${solicitacao.solicitacaoPrincipal.id}`}
-                  </button>
-                ) : (
-                  <div className="font-semibold">-</div>
-                )}
-              </div>
-              <div>
-                <div className="text-[var(--c-muted)]">Observacoes</div>
-                <div className="whitespace-pre-wrap">{solicitacao.observacoes || '-'}</div>
-              </div>
-            </div>
+      <div className="mt-4 grid gap-4">
+        <div className="card sol-surface-card compra-detalhe-itens-card">
+          <div className="card-header flex flex-wrap items-center justify-between gap-3">
+            <h2 className="font-semibold">Itens</h2>
+            <span className="text-sm text-[var(--c-muted)]">{itensCombinados.length} item(ns)</span>
           </div>
+          <div className="app-table-shell compra-detalhe-itens-shell overflow-x-auto">
+            <ResizableTable
+              columns={itemTableColumns}
+              storageKey="fluxy.solicitacao-compra-detalhe.itens.columns.v1"
+              className="table compra-detalhe-itens-table"
+            >
+              <thead>
+                <tr>
+                  <ResizableTh columnKey="indice">#</ResizableTh>
+                  <ResizableTh columnKey="tipo">Tipo</ResizableTh>
+                  <ResizableTh columnKey="insumo">Insumo</ResizableTh>
+                  <ResizableTh columnKey="unidade">Unidade</ResizableTh>
+                  <ResizableTh columnKey="quantidade">Quantidade</ResizableTh>
+                  <ResizableTh columnKey="especificacao">Especificacao</ResizableTh>
+                  <ResizableTh columnKey="apropriacao">Apropriacao</ResizableTh>
+                  <ResizableTh columnKey="necessario_para">Necessario para</ResizableTh>
+                  <ResizableTh columnKey="link">Link</ResizableTh>
+                </tr>
+              </thead>
+              <tbody>
+                {itensCombinados.map((item, index) => (
+                  <tr key={`${item.tipo}-${index}`}>
+                    <td>{index + 1}</td>
+                    <td>
+                      <span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${item.tipo === 'MANUAL' ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-700'}`}>
+                        {item.tipo}
+                      </span>
+                    </td>
+                    <td className={item.tipo === 'MANUAL' ? 'font-semibold text-red-700' : ''}>{item.nome}</td>
+                    <td>{item.unidade}</td>
+                    <td>{item.quantidade}</td>
+                    <td>{item.especificacao}</td>
+                    <td>{item.apropriacao}</td>
+                    <td>{formatarData(item.necessario_para)}</td>
+                    <td>
+                      {item.link_produto ? (
+                        <a
+                          className="compra-detalhe-link-cell"
+                          href={item.link_produto}
+                          target="_blank"
+                          rel="noreferrer"
+                          title={item.link_produto}
+                        >
+                          {item.link_produto}
+                        </a>
+                      ) : (
+                        '-'
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </ResizableTable>
+          </div>
+        </div>
 
+        <div className="grid gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
           <div className="card sol-surface-card">
             <div className="card-header">
               <h2 className="font-semibold">Cotacao</h2>
@@ -221,48 +290,23 @@ export default function SolicitacaoCompraDetalheView() {
               </button>
             </div>
           </div>
-        </div>
 
-        <div className="card sol-surface-card">
-          <div className="card-header flex flex-wrap items-center justify-between gap-3">
-            <h2 className="font-semibold">Itens</h2>
-            <span className="text-sm text-[var(--c-muted)]">{itensCombinados.length} item(ns)</span>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Tipo</th>
-                  <th>Insumo</th>
-                  <th>Unidade</th>
-                  <th>Quantidade</th>
-                  <th>Especificacao</th>
-                  <th>Apropriacao</th>
-                  <th>Necessario para</th>
-                  <th>Link</th>
-                </tr>
-              </thead>
-              <tbody>
-                {itensCombinados.map((item, index) => (
-                  <tr key={`${item.tipo}-${index}`}>
-                    <td>{index + 1}</td>
-                    <td>
-                      <span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${item.tipo === 'MANUAL' ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-700'}`}>
-                        {item.tipo}
-                      </span>
-                    </td>
-                    <td className={item.tipo === 'MANUAL' ? 'font-semibold text-red-700' : ''}>{item.nome}</td>
-                    <td>{item.unidade}</td>
-                    <td>{item.quantidade}</td>
-                    <td>{item.especificacao}</td>
-                    <td>{item.apropriacao}</td>
-                    <td>{formatarData(item.necessario_para)}</td>
-                    <td className="max-w-[220px] break-all">{item.link_produto || '-'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="card sol-surface-card compra-detalhe-support-card">
+            <div className="card-header">
+              <h2 className="font-semibold">Vinculos operacionais</h2>
+            </div>
+            <div className="grid gap-3 text-sm text-[var(--c-muted)]">
+              <div className="rounded-xl border border-[var(--c-border)] px-3 py-3">
+                <div className="text-xs font-semibold uppercase tracking-[0.12em]">Solicitacao principal</div>
+                <div className="mt-1 text-base font-semibold text-[var(--c-text)]">
+                  {solicitacao.solicitacaoPrincipal?.codigo || '-'}
+                </div>
+              </div>
+              <div className="rounded-xl border border-[var(--c-border)] px-3 py-3">
+                <div className="text-xs font-semibold uppercase tracking-[0.12em]">PDF e cotacao</div>
+                <div className="mt-1">Use os botoes do cabecalho para abrir o PDF ou gerenciar a cotacao desta compra.</div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
