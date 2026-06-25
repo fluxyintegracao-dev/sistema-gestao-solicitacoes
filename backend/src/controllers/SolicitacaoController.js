@@ -3138,6 +3138,116 @@ module.exports = {
     }
   },
 
+  // =====================================================
+  // ATUALIZAR CREDOR DA SOLICITACAO
+  // =====================================================
+  async atualizarCredor(req, res) {
+    try {
+      const { id } = req.params;
+      const { parceiro_id } = req.body;
+
+      const solicitacao = await Solicitacao.findByPk(id, {
+        include: [{
+          model: Parceiro,
+          as: 'parceiro',
+          attributes: ['id', 'nome', 'cpf_cnpj']
+        }]
+      });
+
+      if (!solicitacao) {
+        return res.status(404).json({ error: 'Solicitacao nao encontrada' });
+      }
+
+      const acesso = await verificarAcessoDetalheSolicitacao(req, solicitacao);
+      if (!acesso.allowed) {
+        return res.status(acesso.status || 403).json({ error: acesso.error || 'Acesso negado' });
+      }
+
+      let novoParceiro = null;
+      if (parceiro_id) {
+        novoParceiro = await Parceiro.findByPk(parceiro_id, {
+          attributes: ['id', 'nome', 'cpf_cnpj', 'fornecedor', 'ativo']
+        });
+
+        if (!novoParceiro) {
+          return res.status(404).json({ error: 'Credor nao encontrado.' });
+        }
+
+        if (novoParceiro.ativo === false || novoParceiro.fornecedor !== true) {
+          return res.status(400).json({ error: 'Selecione uma pessoa cadastrada como credor ativo.' });
+        }
+      }
+
+      const credorAnterior = solicitacao.parceiro
+        ? {
+            id: solicitacao.parceiro.id,
+            nome: solicitacao.parceiro.nome || null,
+            cpf_cnpj: solicitacao.parceiro.cpf_cnpj || null
+          }
+        : null;
+
+      const novoCredorResumo = novoParceiro
+        ? {
+            id: novoParceiro.id,
+            nome: novoParceiro.nome || null,
+            cpf_cnpj: novoParceiro.cpf_cnpj || null
+          }
+        : null;
+
+      if (String(credorAnterior?.id || '') === String(novoCredorResumo?.id || '')) {
+        return res.json({
+          id: solicitacao.id,
+          parceiro_id: solicitacao.parceiro_id || null,
+          parceiro: credorAnterior
+        });
+      }
+
+      await solicitacao.update({
+        parceiro_id: novoCredorResumo?.id || null
+      });
+
+      const usuario = await User.findByPk(req.user.id, {
+        attributes: ['id', 'nome']
+      });
+
+      await Historico.create({
+        solicitacao_id: id,
+        usuario_responsavel_id: req.user.id,
+        setor: req.user.area,
+        acao: 'CREDOR_ATUALIZADO',
+        descricao: `De ${credorAnterior?.nome || '-'} para ${novoCredorResumo?.nome || '-'}`,
+        metadata: JSON.stringify({
+          parceiro_anterior_id: credorAnterior?.id || null,
+          parceiro_anterior_nome: credorAnterior?.nome || null,
+          parceiro_novo_id: novoCredorResumo?.id || null,
+          parceiro_novo_nome: novoCredorResumo?.nome || null
+        })
+      });
+
+      await publishSolicitacaoRealtimeEvent({
+        action: 'CREDOR_UPDATED',
+        solicitacao,
+        actor: {
+          id: req.user.id,
+          nome: usuario?.nome || req.user?.nome || null
+        },
+        metadata: {
+          parceiro_anterior_id: credorAnterior?.id || null,
+          parceiro_novo_id: novoCredorResumo?.id || null
+        }
+      });
+
+      return res.json({
+        id: solicitacao.id,
+        parceiro_id: novoCredorResumo?.id || null,
+        parceiro: novoCredorResumo
+      });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao atualizar credor da solicitacao' });
+    }
+  },
+
   async aprovarDiretoria(req, res) {
     try {
       const { id } = req.params;

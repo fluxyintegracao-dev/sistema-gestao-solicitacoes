@@ -979,6 +979,16 @@ function validateSolicitacaoDataVencimentoBody(body = {}) {
   };
 }
 
+function validateSolicitacaoCredorBody(body = {}) {
+  ensureAllowedKeys(body, ['parceiro_id'], 'Atualizacao de credor');
+
+  return {
+    parceiro_id: isBlank(body.parceiro_id)
+      ? null
+      : parseInteger(body.parceiro_id, 'Credor', { positiveOnly: true })
+  };
+}
+
 function validateSolicitacaoResponsavelBody(body = {}) {
   ensureAllowedKeys(body, ['usuario_responsavel_id', 'prazo_compra'], 'Atribuicao de responsavel');
 
@@ -1076,6 +1086,7 @@ module.exports = {
   validateSolicitacaoArquivarMassaBody,
   validateSolicitacaoComentarioBody,
   validateSolicitacaoCreateBody,
+  validateSolicitacaoCredorBody,
   validateSolicitacaoDataVencimentoBody,
   validateSolicitacaoEnviarSetorBody,
   validateSolicitacaoEnviarSetorMassaBody,

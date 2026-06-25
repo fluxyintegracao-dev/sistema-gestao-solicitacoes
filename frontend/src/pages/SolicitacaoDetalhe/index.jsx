@@ -373,6 +373,10 @@ export default function SolicitacaoDetalhe() {
             <FinanceiroCard
               solicitacao={solicitacao}
               podeAcessarModuloFinanceiro={podeAcessarModuloFinanceiro}
+              onSolicitacaoAtualizada={() => {
+                registrarMutacaoLocal(id);
+                return carregar({ silent: true });
+              }}
               onTituloCriado={() => {
                 registrarMutacaoLocal(id);
                 void carregar({ silent: true });

@@ -202,6 +202,20 @@ export async function updateDataVencimentoSolicitacao(id, data_vencimento) {
   return true;
 }
 
+export async function updateCredorSolicitacao(id, parceiro_id) {
+  const res = await fetch(`${API_URL}/solicitacoes/${id}/credor`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ parceiro_id: parceiro_id || null })
+  });
+
+  if (!res.ok) {
+    throw buildResponseError(res.status, 'Erro ao atualizar credor', await parseJsonSafe(res));
+  }
+
+  return res.json();
+}
+
 export async function updateRefContratoSolicitacao(id, contrato_id) {
   const res = await fetch(`${API_URL}/solicitacoes/${id}/ref-contrato`, {
     method: 'PATCH',

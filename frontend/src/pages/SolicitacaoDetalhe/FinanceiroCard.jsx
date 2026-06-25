@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { buscarParceiros } from '../../services/parceiros';
+import { updateCredorSolicitacao } from '../../services/solicitacoes';
 import { getEmpresasGrupo } from '../../services/empresasGrupo';
 import { getObras } from '../../services/obras';
 import { formatCurrencyInput, normalizeCurrencyTyping } from '../../utils/formatters';
@@ -497,6 +498,7 @@ function ImpactoGerencialPreview({ form, categoria, empresasGrupo, totalPagament
 export default function FinanceiroCard({
   solicitacao,
   onTituloCriado,
+  onSolicitacaoAtualizada,
   podeAcessarModuloFinanceiro = false
 }) {
   const [titulos, setTitulos] = useState([]);
@@ -504,6 +506,12 @@ export default function FinanceiroCard({
   const [saving, setSaving] = useState(false);
   const [erro, setErro] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
+  const [credorModalOpen, setCredorModalOpen] = useState(false);
+  const [credorSaving, setCredorSaving] = useState(false);
+  const [credorSearch, setCredorSearch] = useState('');
+  const [credorOptions, setCredorOptions] = useState([]);
+  const [credorSearching, setCredorSearching] = useState(false);
+  const [credorSelecionado, setCredorSelecionado] = useState(solicitacao?.parceiro || null);
   const [form, setForm] = useState(() => buildDefaultForm(solicitacao));
   const [selectedPartner, setSelectedPartner] = useState(solicitacao?.parceiro || null);
   const [partnerSearch, setPartnerSearch] = useState('');
@@ -535,6 +543,9 @@ export default function FinanceiroCard({
 
   useEffect(() => {
     resetModalState(solicitacao);
+    setCredorSelecionado(solicitacao?.parceiro || null);
+    setCredorSearch('');
+    setCredorOptions([]);
   }, [solicitacao]);
 
   async function carregarTitulos() {
@@ -586,6 +597,38 @@ export default function FinanceiroCard({
       clearTimeout(timer);
     };
   }, [modalOpen, partnerSearch, form.tipo]);
+
+  useEffect(() => {
+    if (!credorModalOpen) return undefined;
+    if (!credorSearch || credorSearch.trim().length < 2) {
+      setCredorSearching(false);
+      setCredorOptions([]);
+      return undefined;
+    }
+
+    let active = true;
+    setCredorSearching(true);
+
+    const timer = setTimeout(() => {
+      buscarParceiros({ q: credorSearch, fornecedor: 1, ativo: 1, limit: 8 })
+        .then((data) => {
+          if (!active) return;
+          setCredorOptions(Array.isArray(data) ? data : []);
+        })
+        .catch(() => {
+          if (!active) return;
+          setCredorOptions([]);
+        })
+        .finally(() => {
+          if (active) setCredorSearching(false);
+        });
+    }, 250);
+
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [credorModalOpen, credorSearch]);
 
   useEffect(() => {
     if (!modalOpen || !selectedPartner || parceiroCompativelComTipo(selectedPartner, form.tipo)) {
@@ -1140,6 +1183,25 @@ export default function FinanceiroCard({
     }
   }
 
+  async function handleSalvarCredor() {
+    try {
+      setCredorSaving(true);
+      setErro('');
+      await updateCredorSolicitacao(solicitacao.id, credorSelecionado?.id || null);
+      setCredorModalOpen(false);
+      setCredorSearch('');
+      setCredorOptions([]);
+      if (typeof onSolicitacaoAtualizada === 'function') {
+        await onSolicitacaoAtualizada();
+      }
+      alert('Credor atualizado com sucesso.');
+    } catch (error) {
+      setErro(error?.message || 'Erro ao atualizar credor');
+    } finally {
+      setCredorSaving(false);
+    }
+  }
+
   return (
     <>
       <div className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4 shadow-sm space-y-4">
@@ -1155,6 +1217,21 @@ export default function FinanceiroCard({
               <Link to="/financeiro/titulos" className="btn btn-outline">
                 Ver titulos
               </Link>
+            )}
+            {podeAcessarModuloFinanceiro && (
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={() => {
+                  setErro('');
+                  setCredorSelecionado(solicitacao?.parceiro || null);
+                  setCredorSearch('');
+                  setCredorOptions([]);
+                  setCredorModalOpen(true);
+                }}
+              >
+                Editar credor
+              </button>
             )}
             <button
               type="button"
@@ -1235,6 +1312,109 @@ export default function FinanceiroCard({
           </div>
         )}
       </div>
+
+      {credorModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="card w-full max-w-xl space-y-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-lg font-semibold text-[var(--c-text)]">Editar credor da solicitacao</h3>
+                <p className="text-sm text-[var(--c-muted)]">
+                  Atualize o credor vinculado ao pagamento desta solicitacao.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={() => {
+                  setCredorModalOpen(false);
+                  setCredorSearch('');
+                  setCredorOptions([]);
+                  setCredorSelecionado(solicitacao?.parceiro || null);
+                }}
+                disabled={credorSaving}
+              >
+                Fechar
+              </button>
+            </div>
+
+            {erro && (
+              <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+                {erro}
+              </div>
+            )}
+
+            <div className="rounded-xl bg-[var(--c-bg)] px-3 py-2 text-sm">
+              <span className="block text-xs uppercase tracking-[0.18em] text-[var(--c-muted)]">Credor atual</span>
+              <strong className="mt-1 block text-[var(--c-text)]">
+                {credorSelecionado?.nome || 'Nenhum credor vinculado'}
+              </strong>
+              {credorSelecionado?.cpf_cnpj && (
+                <span className="text-xs text-[var(--c-muted)]">{credorSelecionado.cpf_cnpj}</span>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm text-[var(--c-muted)]" htmlFor="solicitacao-credor-busca">
+                Buscar credor
+              </label>
+              <input
+                id="solicitacao-credor-busca"
+                className="input w-full"
+                type="text"
+                value={credorSearch}
+                onChange={(event) => setCredorSearch(event.target.value)}
+                placeholder="Digite nome ou CPF/CNPJ do credor"
+                disabled={credorSaving}
+              />
+
+              {credorSearching && (
+                <div className="text-xs text-[var(--c-muted)]">Buscando credores...</div>
+              )}
+
+              {credorOptions.length > 0 && (
+                <div className="max-h-56 space-y-2 overflow-y-auto rounded-2xl border border-[var(--c-border)] p-2">
+                  {credorOptions.map((credor) => (
+                    <button
+                      key={credor.id}
+                      type="button"
+                      className="w-full rounded-xl border border-[var(--c-border)] px-3 py-2 text-left text-sm hover:bg-[var(--c-bg)]"
+                      onClick={() => {
+                        setCredorSelecionado(credor);
+                        setCredorSearch('');
+                        setCredorOptions([]);
+                      }}
+                      disabled={credorSaving}
+                    >
+                      <div className="font-medium text-[var(--c-text)]">{credor.nome}</div>
+                      <div className="text-xs text-[var(--c-muted)]">{credor.cpf_cnpj || 'Documento nao informado'}</div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={() => setCredorSelecionado(null)}
+                disabled={credorSaving || !credorSelecionado}
+              >
+                Remover vinculo
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={handleSalvarCredor}
+                disabled={credorSaving}
+              >
+                {credorSaving ? 'Salvando...' : 'Salvar credor'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
