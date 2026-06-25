@@ -10525,6 +10525,84 @@ body {
   background: rgba(7, 17, 30, 0.62) !important;
 }
 
+.dark .layout-shell .cotacao-gestao-page .cotacao-comparativo-count,
+.dark .layout-shell .cotacao-gestao-page .cotacao-ranking-pill {
+  border-color: rgba(71, 101, 142, 0.72) !important;
+  background: rgba(18, 36, 61, 0.92) !important;
+  color: #d9e7ff !important;
+}
+
+.dark .layout-shell .cotacao-gestao-page .cotacao-ranking-card,
+.dark .layout-shell .cotacao-gestao-page .cotacao-comparativo-item {
+  border-color: rgba(71, 101, 142, 0.72) !important;
+  background: rgba(13, 29, 50, 0.92) !important;
+  color: #e7edf7 !important;
+}
+
+.dark .layout-shell .cotacao-gestao-page .cotacao-ranking-card-best {
+  border-color: rgba(52, 211, 153, 0.72) !important;
+  background: rgba(6, 55, 47, 0.86) !important;
+}
+
+.dark .layout-shell .cotacao-gestao-page .cotacao-ranking-card-best .cotacao-ranking-pill,
+.dark .layout-shell .cotacao-gestao-page .cotacao-menor-preco,
+.dark .layout-shell .cotacao-gestao-page .cotacao-comparativo-resposta .bg-emerald-100,
+.dark .layout-shell .cotacao-gestao-page .cotacao-comparativo-resposta .text-emerald-700 {
+  border-color: rgba(52, 211, 153, 0.62) !important;
+  background: rgba(16, 185, 129, 0.20) !important;
+  color: #a7f3d0 !important;
+}
+
+.dark .layout-shell .cotacao-gestao-page .cotacao-comparativo-panel .app-list-stack,
+.dark .layout-shell .cotacao-gestao-page .cotacao-comparativo-panel .app-table-shell {
+  border-color: rgba(71, 101, 142, 0.72) !important;
+  background: rgba(7, 17, 30, 0.72) !important;
+}
+
+.dark .layout-shell .cotacao-gestao-page .cotacao-comparativo-panel .table {
+  background: transparent !important;
+  color: #e7edf7 !important;
+}
+
+.dark .layout-shell .cotacao-gestao-page .cotacao-comparativo-panel .table thead,
+.dark .layout-shell .cotacao-gestao-page .cotacao-comparativo-panel .table th {
+  border-color: rgba(71, 101, 142, 0.72) !important;
+  background: rgba(29, 48, 78, 0.92) !important;
+  color: #b9c7dc !important;
+}
+
+.dark .layout-shell .cotacao-gestao-page .cotacao-comparativo-panel .table td {
+  border-color: rgba(71, 101, 142, 0.50) !important;
+  color: #e7edf7 !important;
+}
+
+.dark .layout-shell .cotacao-gestao-page .cotacao-comparativo-resposta {
+  background: rgba(15, 23, 42, 0.74) !important;
+}
+
+.dark .layout-shell .cotacao-gestao-page .cotacao-comparativo-resposta-vencedora {
+  background: rgba(16, 185, 129, 0.12) !important;
+}
+
+.dark .layout-shell .cotacao-gestao-page .cotacao-comparativo-resposta-excedida {
+  background: rgba(239, 68, 68, 0.13) !important;
+}
+
+.dark .layout-shell .cotacao-gestao-page .cotacao-comparativo-panel :is(.text-\[var\(--c-text\)\], .font-semibold, .font-bold, .font-medium, h2, h3) {
+  color: #eef5ff !important;
+}
+
+.dark .layout-shell .cotacao-gestao-page .cotacao-comparativo-panel :is(.text-\[var\(--c-muted\)\], p) {
+  color: #9fb3cf !important;
+}
+
+.dark .layout-shell .cotacao-gestao-page .cotacao-comparativo-panel .input {
+  border-color: rgba(71, 101, 142, 0.84) !important;
+  background: rgba(19, 35, 58, 0.96) !important;
+  color: #eef5ff !important;
+  -webkit-text-fill-color: #eef5ff !important;
+}
+
 .layout-shell .compras-cotacoes-page .compras-col-codigo-curto {
   width: 4.4rem;
 }

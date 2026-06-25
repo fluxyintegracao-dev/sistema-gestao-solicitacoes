@@ -871,7 +871,7 @@ function SecaoComparativo({ comparativo, solicitacao, podeComprar, vencedoresSel
 
   if (!comparativo?.itens?.length) {
     return (
-      <div className="card sol-surface-card">
+      <div className="card sol-surface-card cotacao-comparativo-panel">
         <div className="card-header">
           <h2 className="font-semibold">Comparativo de Cotacoes</h2>
         </div>
@@ -890,7 +890,7 @@ function SecaoComparativo({ comparativo, solicitacao, podeComprar, vencedoresSel
             <h2 className="font-semibold">Comparativo por item</h2>
             <p className="mt-0.5 text-xs text-[var(--c-muted)]">Compare respostas, selecione vencedores e encerre a cotacao quando estiver pronta.</p>
           </div>
-          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
+          <span className="cotacao-comparativo-count rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
             {comparativo.itens.length} item(ns)
           </span>
         </div>
@@ -900,13 +900,13 @@ function SecaoComparativo({ comparativo, solicitacao, podeComprar, vencedoresSel
             {rankingFornecedores.map((forn, idx) => (
               <div
                 key={forn.fornecedor_id}
-                className={`grid gap-1.5 rounded-xl border px-3 py-2.5 ${idx === 0 ? 'border-emerald-300 bg-emerald-50' : 'border-[var(--c-border)] bg-slate-50/80'}`}
+                className={`cotacao-ranking-card grid gap-1.5 rounded-xl border px-3 py-2.5 ${idx === 0 ? 'cotacao-ranking-card-best border-emerald-300 bg-emerald-50' : 'border-[var(--c-border)] bg-slate-50/80'}`}
               >
                 <div className="flex items-start justify-between gap-2">
                   <span className={`text-lg font-bold leading-none ${idx === 0 ? 'text-emerald-600' : 'text-[var(--c-muted)]'}`}>
                     {idx + 1}
                   </span>
-                  <span className={`app-status-pill text-xs ${idx === 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
+                   <span className={`cotacao-ranking-pill app-status-pill text-xs ${idx === 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
                     {idx === 0 ? 'Menor preco' : `${idx + 1}o lugar`}
                   </span>
                 </div>
@@ -939,7 +939,7 @@ function SecaoComparativo({ comparativo, solicitacao, podeComprar, vencedoresSel
 
         <div className="app-list-stack gap-2">
           {comparativo.itens.map((item) => (
-            <div key={buildItemKey(item)} className="app-list-card px-3 py-2.5">
+            <div key={buildItemKey(item)} className="cotacao-comparativo-item app-list-card px-3 py-2.5">
               <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
                 <div>
                   <div className="text-sm font-semibold">{item.nome}</div>
@@ -954,7 +954,7 @@ function SecaoComparativo({ comparativo, solicitacao, podeComprar, vencedoresSel
                   ) : null}
                 </div>
                 {item.melhor_preco && (
-                  <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs text-emerald-700">
+                  <div className="cotacao-menor-preco rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs text-emerald-700">
                     Menor: <strong>{item.melhor_preco.fornecedor_nome}</strong> - {fmtMoeda(item.melhor_preco.preco)}/un
                   </div>
                 )}
@@ -985,7 +985,7 @@ function SecaoComparativo({ comparativo, solicitacao, podeComprar, vencedoresSel
                       return (
                         <tr
                           key={`${item.id}-${resp.fornecedor_id}`}
-                          className={`${isVencedor ? 'bg-emerald-50' : ''} ${excedeu ? 'bg-red-50' : ''}`}
+                          className={`cotacao-comparativo-resposta ${isVencedor ? 'cotacao-comparativo-resposta-vencedora bg-emerald-50' : ''} ${excedeu ? 'cotacao-comparativo-resposta-excedida bg-red-50' : ''}`}
                         >
                           <td className="text-xs font-medium">{resp.fornecedor_nome}</td>
                           <td>
