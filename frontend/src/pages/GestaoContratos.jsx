@@ -1364,7 +1364,7 @@ export default function GestaoContratos() {
 
       {contratoEmEdicao && (
         <div className="contratos-edit-modal fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4 py-6">
-          <div className="contratos-edit-modal__panel card w-full max-w-6xl overflow-hidden">
+          <div className="contratos-edit-modal__panel card w-full overflow-hidden">
             <div className="contratos-edit-modal__header">
               <div>
                 <p className="sol-filtros-title">Editar contrato {contratoEmEdicao.codigo}</p>
