@@ -12,6 +12,22 @@ const CHAVE_USUARIOS_PERMISSOES_RH_DP = 'USUARIOS_PERMISSOES_RH_DP';
 const CHAVE_PERMISSOES_AREAS_USUARIOS = 'PERMISSOES_AREAS_USUARIOS';
 const CACHE_TTL_MS = 30 * 1000;
 
+const FINANCEIRO_RELATORIOS_PERMISSION_KEYS = [
+  'financeiro.relatorios.visualizar',
+  'financeiro.relatorios.grupo_consolidado',
+  'financeiro.relatorios.fluxo_consolidado',
+  'financeiro.relatorios.dre',
+  'financeiro.relatorios.diagnostico_dre',
+  'financeiro.relatorios.intercompany',
+  'financeiro.relatorios.endividamento',
+  'financeiro.relatorios.analitico',
+  'financeiro.relatorios.financeiro_obras',
+  'financeiro.relatorios.movimentacao_contas',
+  'financeiro.relatorios.conciliacao_contas',
+  'financeiro.relatorios.resultado_obras',
+  'financeiro.relatorios.centros_custo'
+];
+
 const FINANCEIRO_PERMISSION_KEYS = [
   'financeiro.titulos.visualizar',
   'financeiro.titulos.criar',
@@ -22,16 +38,7 @@ const FINANCEIRO_PERMISSION_KEYS = [
   'financeiro.titulos.movimentos.visualizar',
   'financeiro.titulos.auditoria.visualizar',
   'financeiro.comprovantes.excluir',
-  'financeiro.relatorios.visualizar',
-  'financeiro.relatorios.grupo_consolidado',
-  'financeiro.relatorios.fluxo_consolidado',
-  'financeiro.relatorios.dre',
-  'financeiro.relatorios.diagnostico_dre',
-  'financeiro.relatorios.intercompany',
-  'financeiro.relatorios.endividamento',
-  'financeiro.relatorios.analitico',
-  'financeiro.relatorios.resultado_obras',
-  'financeiro.relatorios.centros_custo',
+  ...FINANCEIRO_RELATORIOS_PERMISSION_KEYS,
   'financeiro.conciliacao.visualizar',
   'financeiro.conciliacao.importar',
   'financeiro.conciliacao.conciliar',
@@ -1122,6 +1129,30 @@ async function canAccessFinanceiro(user) {
   }
 
   return userHasSetorCapability(user, 'eh_setor_financeiro');
+}
+
+async function canAccessFinanceiroRelatorios(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, FINANCEIRO_RELATORIOS_PERMISSION_KEYS);
+  }
+
+  return canAccessFinanceiro(user);
+}
+
+async function canAccessFinanceiroRelatorio(user, permissionKeys = []) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, permissionKeys);
+  }
+
+  return canAccessFinanceiro(user);
 }
 
 async function canViewSolicitacaoFinanceiro(user) {
@@ -2506,6 +2537,8 @@ module.exports = {
   canAccessCrm,
   canAccessProvisoes,
   canAccessFinanceiro,
+  canAccessFinanceiroRelatorio,
+  canAccessFinanceiroRelatorios,
   canViewSolicitacaoFinanceiro,
   canDeleteTitulosFinanceiros,
   canAccessFiscal,

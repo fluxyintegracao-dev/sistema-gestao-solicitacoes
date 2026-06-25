@@ -72,6 +72,7 @@ import {
   canManageSstArea,
   canViewProvisionamentos,
   canViewProvisionamentosDashboard,
+  canViewFinanceiroRelatorios,
   canViewRhDpApuracao,
   canViewRhDpColaboradores,
   canViewRhDpDocumentos,
@@ -304,6 +305,7 @@ export default function Layout() {
   const prioridadesDiretoriaAccess = canAccessPrioridadesDiretoria(user);
   const solicitacoesRelatoriosAccess = canViewSolicitacoesRelatorios(user);
   const financeiroAccess = canAccessFinanceiro(user);
+  const financeiroRelatoriosAccess = canViewFinanceiroRelatorios(user);
   const bancosEnterpriseAccess = canAccessBancosEnterprise(user);
   const fiscalAccess = canAccessFiscal(user);
   const fiscalConfigAccess = canManageFiscalConfig(user);
@@ -431,7 +433,7 @@ export default function Layout() {
       ]);
     }
 
-    if (financeiroAccess || bancosEnterpriseAccess || pagamentosAccess || boletosAccess) {
+    if (financeiroAccess || financeiroRelatoriosAccess || bancosEnterpriseAccess || pagamentosAccess || boletosAccess) {
       addGroup('Financeiro', [
         financeiroAccess ? item('/financeiro/contas-a-receber', 'Contas a Receber', HiOutlineWallet) : null,
         financeiroAccess ? item('/financeiro/contas-a-pagar', 'Contas a Pagar', HiOutlineWallet) : null,
@@ -440,7 +442,7 @@ export default function Layout() {
         pagamentosAccess ? item('/financeiro/pagamentos', 'Pagamentos em Massa', HiOutlinePaperAirplane) : null,
         boletosAccess ? item('/financeiro/boletos', 'Boletos', HiOutlineDocumentText) : null,
         financeiroAccess ? item('/financeiro/faturas-cartao', 'Faturas de Cartao', HiOutlineCreditCard) : null,
-        financeiroAccess ? item('/financeiro/relatorios', 'Relatórios Financeiros', HiOutlineDocumentText) : null,
+        financeiroRelatoriosAccess ? item('/financeiro/relatorios', 'Relatórios Financeiros', HiOutlineDocumentText) : null,
         financeiroAccess ? item('/financeiro/baixas', 'Baixas Realizadas', HiOutlineBanknotes) : null,
         financeiroAccess ? item('/financeiro/conciliacao', 'Conciliacao OFX', HiOutlineBanknotes) : null,
         financeiroAccess ? item('/financeiro/caixas', 'Caixas e Contas', HiOutlineBanknotes) : null,

@@ -43,6 +43,8 @@ import {
   canViewRhDpColaboradores,
   canViewRhDpDocumentos,
   canViewRhDpObrigacoes,
+  canViewFinanceiroRelatorio,
+  canViewFinanceiroRelatorios,
   canViewSolicitacoesRelatorioOperacional,
   canViewSolicitacoesRelatorios,
   canAccessSst,
@@ -429,6 +431,22 @@ function FinanceiroRoute({ children }) {
 function FinanceiroPagamentosRoute({ children }) {
   const { user } = useAuth();
   if (!canAccessPagamentos(user)) {
+    return <Navigate to="/" replace />;
+  }
+  return children;
+}
+
+function FinanceiroRelatoriosRoute({ children }) {
+  const { user } = useAuth();
+  if (!canViewFinanceiroRelatorios(user)) {
+    return <Navigate to="/" replace />;
+  }
+  return children;
+}
+
+function FinanceiroRelatorioRoute({ children, permissionKey }) {
+  const { user } = useAuth();
+  if (!canViewFinanceiroRelatorio(user, permissionKey)) {
     return <Navigate to="/" replace />;
   }
   return children;
@@ -926,17 +944,17 @@ export default function App() {
         <Route path="financeiro/boletos" element={<BoletosRoute><FinanceiroBoletos /></BoletosRoute>} />
         <Route path="financeiro/faturas-cartao" element={<FinanceiroRoute><FinanceiroFaturasCartao /></FinanceiroRoute>} />
         <Route path="financeiro/faturas-cartao/:id" element={<FinanceiroRoute><FinanceiroFaturaCartaoDetalhe /></FinanceiroRoute>} />
-        <Route path="financeiro/relatorios" element={<FinanceiroRoute><FinanceiroRelatorios /></FinanceiroRoute>} />
-        <Route path="financeiro/relatorios/grupo-consolidado" element={<FinanceiroRoute><FinanceiroExecutivoGrupo /></FinanceiroRoute>} />
-        <Route path="financeiro/relatorios/fluxo-consolidado" element={<FinanceiroRoute><FinanceiroFluxoConsolidado /></FinanceiroRoute>} />
-        <Route path="financeiro/relatorios/dre" element={<FinanceiroRoute><FinanceiroDre /></FinanceiroRoute>} />
-        <Route path="financeiro/relatorios/dre/diagnostico" element={<FinanceiroRoute><FinanceiroDiagnosticoDre /></FinanceiroRoute>} />
-        <Route path="financeiro/relatorios/intercompany" element={<FinanceiroRoute><FinanceiroIntercompany /></FinanceiroRoute>} />
-        <Route path="financeiro/relatorios/endividamento" element={<FinanceiroRoute><FinanceiroEndividamento /></FinanceiroRoute>} />
-        <Route path="financeiro/relatorios/analitico" element={<FinanceiroRoute><FinanceiroRelatorioAnalitico /></FinanceiroRoute>} />
-        <Route path="financeiro/relatorios/financeiro-obras" element={<FinanceiroRoute><FinanceiroObras /></FinanceiroRoute>} />
-        <Route path="financeiro/relatorios/resultado-obras" element={<FinanceiroRoute><FinanceiroResultadoObras /></FinanceiroRoute>} />
-        <Route path="financeiro/relatorios/centros-custo" element={<FinanceiroRoute><FinanceiroResultadoCentrosCusto /></FinanceiroRoute>} />
+        <Route path="financeiro/relatorios" element={<FinanceiroRelatoriosRoute><FinanceiroRelatorios /></FinanceiroRelatoriosRoute>} />
+        <Route path="financeiro/relatorios/grupo-consolidado" element={<FinanceiroRelatorioRoute permissionKey="financeiro.relatorios.grupo_consolidado"><FinanceiroExecutivoGrupo /></FinanceiroRelatorioRoute>} />
+        <Route path="financeiro/relatorios/fluxo-consolidado" element={<FinanceiroRelatorioRoute permissionKey="financeiro.relatorios.fluxo_consolidado"><FinanceiroFluxoConsolidado /></FinanceiroRelatorioRoute>} />
+        <Route path="financeiro/relatorios/dre" element={<FinanceiroRelatorioRoute permissionKey="financeiro.relatorios.dre"><FinanceiroDre /></FinanceiroRelatorioRoute>} />
+        <Route path="financeiro/relatorios/dre/diagnostico" element={<FinanceiroRelatorioRoute permissionKey="financeiro.relatorios.diagnostico_dre"><FinanceiroDiagnosticoDre /></FinanceiroRelatorioRoute>} />
+        <Route path="financeiro/relatorios/intercompany" element={<FinanceiroRelatorioRoute permissionKey="financeiro.relatorios.intercompany"><FinanceiroIntercompany /></FinanceiroRelatorioRoute>} />
+        <Route path="financeiro/relatorios/endividamento" element={<FinanceiroRelatorioRoute permissionKey="financeiro.relatorios.endividamento"><FinanceiroEndividamento /></FinanceiroRelatorioRoute>} />
+        <Route path="financeiro/relatorios/analitico" element={<FinanceiroRelatorioRoute permissionKey="financeiro.relatorios.analitico"><FinanceiroRelatorioAnalitico /></FinanceiroRelatorioRoute>} />
+        <Route path="financeiro/relatorios/financeiro-obras" element={<FinanceiroRelatorioRoute permissionKey="financeiro.relatorios.financeiro_obras"><FinanceiroObras /></FinanceiroRelatorioRoute>} />
+        <Route path="financeiro/relatorios/resultado-obras" element={<FinanceiroRelatorioRoute permissionKey="financeiro.relatorios.resultado_obras"><FinanceiroResultadoObras /></FinanceiroRelatorioRoute>} />
+        <Route path="financeiro/relatorios/centros-custo" element={<FinanceiroRelatorioRoute permissionKey="financeiro.relatorios.centros_custo"><FinanceiroResultadoCentrosCusto /></FinanceiroRelatorioRoute>} />
         <Route path="financeiro/baixas" element={<FinanceiroRoute><FinanceiroBaixas /></FinanceiroRoute>} />
         <Route path="financeiro/financiamentos-bancarios" element={<FinanceiroRoute><FinanceiroFinanciamentosBancarios /></FinanceiroRoute>} />
         <Route path="financeiro/bancos" element={<FinanceiroRoute><FinanceiroBancos /></FinanceiroRoute>} />

@@ -220,6 +220,7 @@ const {
   canCreateCompraSolicitacao,
   canCreateProvisoes,
   canAccessFinanceiro,
+  canAccessFinanceiroRelatorio,
   canViewSolicitacaoFinanceiro,
   canAccessTreinamento,
   canAccessComprovantes,
@@ -554,6 +555,17 @@ const allowFinanceiro = permit({
       : 'Acesso negado para o modulo financeiro'
   )
 });
+
+function allowFinanceiroRelatorio(permissionKeys = []) {
+  return permit({
+    resource: 'FINANCEIRO_RELATORIO',
+    custom: async (req) => (
+      (await canAccessFinanceiroRelatorio(req.user, permissionKeys))
+        ? true
+        : 'Acesso negado para este relatorio financeiro'
+    )
+  });
+}
 
 const allowSolicitacaoFinanceiro = permit({
   resource: 'SOLICITACAO_FINANCEIRO',
@@ -1501,21 +1513,21 @@ router.post('/financeiro/caixas/:id/fechar', allowFinanceiro, criticalRateLimit,
 router.get('/financeiro/transferencias', allowFinanceiro, validateRequest({ query: validateFinanceTransferenciaQuery }), TransferenciaFinanceiraController.index);
 router.post('/financeiro/transferencias', allowFinanceiro, criticalRateLimit, validateRequest({ body: validateFinanceTransferenciaBody }), TransferenciaFinanceiraController.create);
 router.post('/financeiro/transferencias/:id/cancelar', allowFinanceiro, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Transferencia financeira'), body: validateFinanceTransferenciaCancelBody }), TransferenciaFinanceiraController.cancelar);
-router.get('/financeiro/relatorios/grupo-consolidado', allowFinanceiro, validateRequest({ query: validateFinanceDreQuery }), RelatorioFinanceiroController.grupoConsolidado);
-router.get('/financeiro/relatorios/fluxo-caixa', allowFinanceiro, validateRequest({ query: validateFinanceFluxoCaixaQuery }), RelatorioFinanceiroController.fluxoCaixa);
-router.get('/financeiro/relatorios/fluxo-consolidado', allowFinanceiro, validateRequest({ query: validateFinanceFluxoConsolidadoQuery }), RelatorioFinanceiroController.fluxoConsolidado);
-router.get('/financeiro/relatorios/analitico', allowFinanceiro, validateRequest({ query: validateFinanceRelatorioAnaliticoQuery }), RelatorioFinanceiroController.analitico);
-router.get('/financeiro/relatorios/financeiro-obras', allowFinanceiro, validateRequest({ query: validateFinanceiroObrasQuery }), RelatorioFinanceiroController.financeiroObras);
-router.get('/financeiro/relatorios/dre/comparativo', allowFinanceiro, validateRequest({ query: validateFinanceDreComparativoQuery }), RelatorioFinanceiroController.dreComparativo);
-router.get('/financeiro/relatorios/dre/empresas', allowFinanceiro, validateRequest({ query: validateFinanceDreQuery }), RelatorioFinanceiroController.dreComparativoEmpresas);
-router.get('/financeiro/relatorios/dre', allowFinanceiro, validateRequest({ query: validateFinanceDreQuery }), RelatorioFinanceiroController.dre);
-router.get('/financeiro/relatorios/dre/diagnostico', allowFinanceiro, RelatorioFinanceiroController.diagnosticoDre);
-router.get('/financeiro/relatorios/intercompany', allowFinanceiro, validateRequest({ query: validateFinanceIntercompanyQuery }), RelatorioFinanceiroController.intercompany);
-router.get('/financeiro/relatorios/endividamento', allowFinanceiro, validateRequest({ query: validateFinanceEndividamentoQuery }), RelatorioFinanceiroController.endividamento);
-router.get('/financeiro/relatorios/movimentacao-contas', allowFinanceiro, RelatorioFinanceiroController.movimentacaoContas);
-router.get('/financeiro/relatorios/conciliacao-contas', allowFinanceiro, RelatorioFinanceiroController.conciliacaoContas);
-router.get('/financeiro/relatorios/resultado-obras', allowFinanceiro, ResultadoObrasController.index);
-router.get('/financeiro/relatorios/centros-custo', allowFinanceiro, ResultadoCentrosCustoController.index);
+router.get('/financeiro/relatorios/grupo-consolidado', allowFinanceiroRelatorio(['financeiro.relatorios.grupo_consolidado']), validateRequest({ query: validateFinanceDreQuery }), RelatorioFinanceiroController.grupoConsolidado);
+router.get('/financeiro/relatorios/fluxo-caixa', allowFinanceiroRelatorio(['financeiro.relatorios.visualizar']), validateRequest({ query: validateFinanceFluxoCaixaQuery }), RelatorioFinanceiroController.fluxoCaixa);
+router.get('/financeiro/relatorios/fluxo-consolidado', allowFinanceiroRelatorio(['financeiro.relatorios.fluxo_consolidado']), validateRequest({ query: validateFinanceFluxoConsolidadoQuery }), RelatorioFinanceiroController.fluxoConsolidado);
+router.get('/financeiro/relatorios/analitico', allowFinanceiroRelatorio(['financeiro.relatorios.analitico']), validateRequest({ query: validateFinanceRelatorioAnaliticoQuery }), RelatorioFinanceiroController.analitico);
+router.get('/financeiro/relatorios/financeiro-obras', allowFinanceiroRelatorio(['financeiro.relatorios.financeiro_obras']), validateRequest({ query: validateFinanceiroObrasQuery }), RelatorioFinanceiroController.financeiroObras);
+router.get('/financeiro/relatorios/dre/comparativo', allowFinanceiroRelatorio(['financeiro.relatorios.dre']), validateRequest({ query: validateFinanceDreComparativoQuery }), RelatorioFinanceiroController.dreComparativo);
+router.get('/financeiro/relatorios/dre/empresas', allowFinanceiroRelatorio(['financeiro.relatorios.dre']), validateRequest({ query: validateFinanceDreQuery }), RelatorioFinanceiroController.dreComparativoEmpresas);
+router.get('/financeiro/relatorios/dre', allowFinanceiroRelatorio(['financeiro.relatorios.dre']), validateRequest({ query: validateFinanceDreQuery }), RelatorioFinanceiroController.dre);
+router.get('/financeiro/relatorios/dre/diagnostico', allowFinanceiroRelatorio(['financeiro.relatorios.diagnostico_dre']), RelatorioFinanceiroController.diagnosticoDre);
+router.get('/financeiro/relatorios/intercompany', allowFinanceiroRelatorio(['financeiro.relatorios.intercompany']), validateRequest({ query: validateFinanceIntercompanyQuery }), RelatorioFinanceiroController.intercompany);
+router.get('/financeiro/relatorios/endividamento', allowFinanceiroRelatorio(['financeiro.relatorios.endividamento']), validateRequest({ query: validateFinanceEndividamentoQuery }), RelatorioFinanceiroController.endividamento);
+router.get('/financeiro/relatorios/movimentacao-contas', allowFinanceiroRelatorio(['financeiro.relatorios.movimentacao_contas']), RelatorioFinanceiroController.movimentacaoContas);
+router.get('/financeiro/relatorios/conciliacao-contas', allowFinanceiroRelatorio(['financeiro.relatorios.conciliacao_contas']), RelatorioFinanceiroController.conciliacaoContas);
+router.get('/financeiro/relatorios/resultado-obras', allowFinanceiroRelatorio(['financeiro.relatorios.resultado_obras']), ResultadoObrasController.index);
+router.get('/financeiro/relatorios/centros-custo', allowFinanceiroRelatorio(['financeiro.relatorios.centros_custo']), ResultadoCentrosCustoController.index);
 router.get('/financeiro/baixas', allowFinanceiro, validateRequest({ query: validateFinanceBaixasQuery }), TituloFinanceiroController.baixas);
 router.get('/financeiro/financiamentos-bancarios', allowFinanceiro, validateRequest({ query: validateFinanceFinanciamentoBancarioQuery }), FinanciamentoBancarioController.index);
 router.post('/financeiro/financiamentos-bancarios', allowFinanceiro, criticalRateLimit, validateRequest({ body: validateFinanceFinanciamentoBancarioCreateBody }), FinanciamentoBancarioController.create);

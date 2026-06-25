@@ -278,6 +278,9 @@ const MODULO_PERMISSION_GROUPS = [
           { key: 'financeiro.relatorios.intercompany', label: 'Entre Empresas', descricao: 'Acessar movimentações e relações financeiras entre empresas.' },
           { key: 'financeiro.relatorios.endividamento', label: 'Endividamento', descricao: 'Acessar relatório de dívidas classificadas explicitamente.' },
           { key: 'financeiro.relatorios.analitico', label: 'Analítico financeiro', descricao: 'Acessar base analítica de títulos e movimentos financeiros.' },
+          { key: 'financeiro.relatorios.financeiro_obras', label: 'Financeiro de obras', descricao: 'Acessar realizado, comprometido e a realizar por obra.' },
+          { key: 'financeiro.relatorios.movimentacao_contas', label: 'Movimentacao de contas', descricao: 'Acessar entradas, saidas e permutas por conta bancaria.' },
+          { key: 'financeiro.relatorios.conciliacao_contas', label: 'Conciliacao de contas', descricao: 'Acessar relatorio de movimentos bancarios conciliados, pendentes e ignorados.' },
           { key: 'financeiro.relatorios.resultado_obras', label: 'Resultado de obras', descricao: 'Ver dashboard financeiro por obra.' },
           { key: 'financeiro.relatorios.centros_custo', label: 'Centros de custo', descricao: 'Ver resultado financeiro por centro de custo.' }
         ]

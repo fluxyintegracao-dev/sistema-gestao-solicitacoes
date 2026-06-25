@@ -1,6 +1,7 @@
 import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { ResizableTable, ResizableTh } from '../components/ResizableTable';
+import { useAuth } from '../contexts/AuthContext';
 import { useUiVisibility } from '../hooks/useUiVisibility';
 import {
   getContasBancarias,
@@ -9,6 +10,7 @@ import {
   getRelatorioMovimentacaoContas
 } from '../services/financeiro';
 import { getMinhasObras } from '../services/obras';
+import { canViewFinanceiroRelatorio } from '../utils/acessoProduto';
 
 const FinanceiroExecutivoGrupo = lazy(() => import('./FinanceiroExecutivoGrupo'));
 const FinanceiroFluxoConsolidado = lazy(() => import('./FinanceiroFluxoConsolidado'));
@@ -1079,6 +1081,7 @@ const REPORT_CATALOG = [
     group: 'Caixa',
     description: 'Previsto e realizado por periodo e obra.',
     route: '/financeiro/relatorios',
+    permissionKey: 'financeiro.relatorios.visualizar',
     embedded: true,
     component: FluxoCaixaRelatorioConteudo
   },
@@ -1088,6 +1091,7 @@ const REPORT_CATALOG = [
     group: 'Executivo',
     description: 'Visao consolidada do grupo e indicadores executivos.',
     route: '/financeiro/relatorios/grupo-consolidado',
+    permissionKey: 'financeiro.relatorios.grupo_consolidado',
     visibilityKey: 'relatorios.financeiro.grupo_consolidado',
     component: FinanceiroExecutivoGrupo
   },
@@ -1097,6 +1101,7 @@ const REPORT_CATALOG = [
     group: 'Caixa',
     description: 'Fluxo consolidado entre empresas do grupo.',
     route: '/financeiro/relatorios/fluxo-consolidado',
+    permissionKey: 'financeiro.relatorios.fluxo_consolidado',
     visibilityKey: 'relatorios.financeiro.fluxo_consolidado',
     component: FinanceiroFluxoConsolidado
   },
@@ -1106,6 +1111,7 @@ const REPORT_CATALOG = [
     group: 'Resultado',
     description: 'Resultado gerencial por categorias financeiras.',
     route: '/financeiro/relatorios/dre',
+    permissionKey: 'financeiro.relatorios.dre',
     visibilityKey: 'relatorios.financeiro.dre',
     component: FinanceiroDre
   },
@@ -1115,6 +1121,7 @@ const REPORT_CATALOG = [
     group: 'Resultado',
     description: 'Consistencias e pendencias que impactam a DRE.',
     route: '/financeiro/relatorios/dre/diagnostico',
+    permissionKey: 'financeiro.relatorios.diagnostico_dre',
     visibilityKey: 'relatorios.financeiro.diagnostico_dre',
     component: FinanceiroDiagnosticoDre
   },
@@ -1124,6 +1131,7 @@ const REPORT_CATALOG = [
     group: 'Governanca',
     description: 'Movimentos entre empresas e eliminacoes no consolidado.',
     route: '/financeiro/relatorios/intercompany',
+    permissionKey: 'financeiro.relatorios.intercompany',
     visibilityKey: 'relatorios.financeiro.intercompany',
     component: FinanceiroIntercompany
   },
@@ -1133,6 +1141,7 @@ const REPORT_CATALOG = [
     group: 'Bancos',
     description: 'Acompanhamento de dividas e compromissos bancarios.',
     route: '/financeiro/relatorios/endividamento',
+    permissionKey: 'financeiro.relatorios.endividamento',
     visibilityKey: 'relatorios.financeiro.endividamento',
     component: FinanceiroEndividamento
   },
@@ -1142,6 +1151,7 @@ const REPORT_CATALOG = [
     group: 'Bancos',
     description: 'Sintetico e analitico de entradas, saidas e permutas por conta.',
     route: '/financeiro/relatorios?relatorio=movimentacao-contas',
+    permissionKey: 'financeiro.relatorios.movimentacao_contas',
     visibilityKey: 'relatorios.financeiro.movimentacao_contas',
     embedded: true,
     component: MovimentacaoContasRelatorioConteudo
@@ -1152,6 +1162,7 @@ const REPORT_CATALOG = [
     group: 'Bancos',
     description: 'Sintetico e analitico dos OFX conciliados, pendentes e ignorados.',
     route: '/financeiro/relatorios?relatorio=conciliacao-contas',
+    permissionKey: 'financeiro.relatorios.conciliacao_contas',
     visibilityKey: 'relatorios.financeiro.conciliacao_contas',
     embedded: true,
     component: ConciliacaoContasRelatorioConteudo
@@ -1162,6 +1173,7 @@ const REPORT_CATALOG = [
     group: 'Titulos',
     description: 'Extrato analitico dos titulos financeiros.',
     route: '/financeiro/relatorios/analitico',
+    permissionKey: 'financeiro.relatorios.analitico',
     visibilityKey: 'relatorios.financeiro.analitico',
     component: FinanceiroRelatorioAnalitico
   },
@@ -1171,6 +1183,7 @@ const REPORT_CATALOG = [
     group: 'Obras',
     description: 'Realizado, comprometido e a realizar por obra.',
     route: '/financeiro/relatorios/financeiro-obras',
+    permissionKey: 'financeiro.relatorios.financeiro_obras',
     visibilityKey: 'relatorios.financeiro.financeiro_obras',
     component: FinanceiroObras
   },
@@ -1180,6 +1193,7 @@ const REPORT_CATALOG = [
     group: 'Obras',
     description: 'Resultado financeiro agregado por obra.',
     route: '/financeiro/relatorios/resultado-obras',
+    permissionKey: 'financeiro.relatorios.resultado_obras',
     visibilityKey: 'relatorios.financeiro.resultado_obras',
     component: FinanceiroResultadoObras
   },
@@ -1189,6 +1203,7 @@ const REPORT_CATALOG = [
     group: 'Obras',
     description: 'Resultado agrupado por centro de custo.',
     route: '/financeiro/relatorios/centros-custo',
+    permissionKey: 'financeiro.relatorios.centros_custo',
     visibilityKey: 'relatorios.financeiro.centros_custo',
     component: FinanceiroResultadoCentrosCusto
   }
@@ -1228,14 +1243,18 @@ function getReportFullScreenRoute(report) {
 }
 
 export default function FinanceiroRelatorios() {
+  const { user } = useAuth();
   const { isVisible } = useUiVisibility();
   const [searchParams, setSearchParams] = useSearchParams();
   const [search, setSearch] = useState('');
   const isFullScreenMode = searchParams.get('tela') === 'inteira';
 
   const availableReports = useMemo(
-    () => REPORT_CATALOG.filter((report) => !report.visibilityKey || isVisible(report.visibilityKey)),
-    [isVisible]
+    () => REPORT_CATALOG.filter((report) => (
+      canViewFinanceiroRelatorio(user, report.permissionKey) &&
+      (!report.visibilityKey || isVisible(report.visibilityKey))
+    )),
+    [isVisible, user]
   );
 
   const filteredReports = useMemo(() => {
@@ -1251,7 +1270,19 @@ export default function FinanceiroRelatorios() {
 
   const selectedId = searchParams.get('relatorio') || availableReports[0]?.id || 'fluxo-caixa';
   const selectedReport =
-    availableReports.find((report) => report.id === selectedId) || availableReports[0] || REPORT_CATALOG[0];
+    availableReports.find((report) => report.id === selectedId) || availableReports[0] || null;
+
+  if (!selectedReport) {
+    return (
+      <div className="page solicitacoes-page financeiro-relatorios-page">
+        <div className="empty-state">
+          <strong>Nenhum relatorio financeiro liberado.</strong>
+          <span>Solicite ao administrador a permissao granular para acessar relatorios financeiros.</span>
+        </div>
+      </div>
+    );
+  }
+
   const SelectedReportComponent = selectedReport.component;
 
   function selectReport(report) {
