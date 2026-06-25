@@ -303,7 +303,7 @@ async function carregarTitulosPrevistos(periodo, obraWhere) {
     return [];
   }
 
-  const where = {
+  const where = applyIntercompanyExclusion({
     status: {
       [Op.in]: ['PREVISAO', 'ABERTO', 'PARCIAL']
     },
@@ -314,10 +314,10 @@ async function carregarTitulosPrevistos(periodo, obraWhere) {
       [Op.between]: [periodo.data_inicial, periodo.data_final]
     },
     ...obraWhere
-  };
+  }, true);
 
   return TituloFinanceiro.findAll({
-    attributes: ['id', 'tipo', 'data_vencimento', 'valor_saldo'],
+    attributes: ['id', 'tipo', 'data_vencimento', 'valor_saldo', 'intercompany', 'elimina_consolidado'],
     where,
     raw: true
   });
@@ -328,7 +328,10 @@ async function carregarMovimentosRealizados(periodo, obraWhere) {
     return [];
   }
 
-  const tituloWhere = obraWhere && obraWhere.obra_id ? { obra_id: obraWhere.obra_id } : undefined;
+  const tituloWhere = applyIntercompanyExclusion(
+    obraWhere && obraWhere.obra_id ? { obra_id: obraWhere.obra_id } : {},
+    true
+  );
 
   return MovimentoFinanceiro.findAll({
     attributes: ['id', 'data_movimento', 'valor_quitacao', 'juros', 'multa', 'desconto'],
@@ -342,7 +345,7 @@ async function carregarMovimentosRealizados(periodo, obraWhere) {
       {
         model: TituloFinanceiro,
         as: 'titulo',
-        attributes: ['id', 'tipo'],
+        attributes: ['id', 'tipo', 'intercompany', 'elimina_consolidado'],
         required: true,
         where: tituloWhere
       }
