@@ -1,7 +1,6 @@
-import { Fragment, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   HiArrowDownTray,
-  HiArrowPath,
   HiArrowUpTray,
   HiCheck,
   HiEye,
@@ -35,20 +34,6 @@ import {
 import { listarApropriacoes } from '../services/apropriacoes';
 import { buscarParceiros } from '../services/parceiros';
 
-function IconAction({ children, label, tone = 'default', className = '', ...props }) {
-  return (
-    <button
-      type="button"
-      className={`contratos-icon-action contratos-icon-action--${tone} ${className}`}
-      title={label}
-      aria-label={label}
-      {...props}
-    >
-      {children}
-    </button>
-  );
-}
-
 export default function GestaoContratos() {
   const { user } = useAuth();
   const [contratos, setContratos] = useState([]);
@@ -70,16 +55,18 @@ export default function GestaoContratos() {
   const [valorDisplay, setValorDisplay] = useState('');
   const [files, setFiles] = useState([]);
   const [salvando, setSalvando] = useState(false);
-  const [ajustes, setAjustes] = useState({});
   const [editandoId, setEditandoId] = useState(null);
   const [salvandoEdicaoId, setSalvandoEdicaoId] = useState(null);
+  const [contratoSelecionadoId, setContratoSelecionadoId] = useState(null);
   const [formEdicao, setFormEdicao] = useState({
     obra_id: '',
     codigo: '',
     ref_contrato: '',
     descricao: '',
     itens_apropriacao: '',
-    valor_total: ''
+    valor_total: '',
+    ajuste_solicitado: '',
+    ajuste_pago: ''
   });
   const [modalAnexos, setModalAnexos] = useState(null);
   const [anexos, setAnexos] = useState([]);
@@ -104,6 +91,8 @@ export default function GestaoContratos() {
   const isSetorObra = setorTokens.includes('OBRA');
   const podeAcessar = canAccessContratos(user);
   const podeGerenciarContratos = canManageContratos(user);
+  const contratoSelecionado = contratos.find(item => String(item.id) === String(contratoSelecionadoId)) || null;
+  const contratoEmEdicao = contratos.find(item => String(item.id) === String(editandoId)) || null;
 
   useEffect(() => {
     if (podeAcessar) {
@@ -119,6 +108,9 @@ export default function GestaoContratos() {
       setLoading(true);
       const data = await getContratosResumo(overrideFiltros ?? filtros);
       setContratos(Array.isArray(data) ? data : []);
+      if (contratoSelecionadoId && !data?.some?.(item => String(item.id) === String(contratoSelecionadoId))) {
+        setContratoSelecionadoId(null);
+      }
     } catch (error) {
       console.error(error);
       alert('Erro ao carregar contratos');
@@ -565,16 +557,6 @@ export default function GestaoContratos() {
     }
   }
 
-  function onChangeAjuste(id, campo, valor) {
-    setAjustes(prev => ({
-      ...prev,
-      [id]: {
-        ...prev[id],
-        [campo]: valor
-      }
-    }));
-  }
-
   function iniciarEdicao(contrato) {
     setEditandoId(contrato.id);
     setFormEdicao({
@@ -585,7 +567,13 @@ export default function GestaoContratos() {
       itens_apropriacao: String(contrato.itens_apropriacao || ''),
       valor_total: contrato.valor_total !== null && contrato.valor_total !== undefined
         ? String(contrato.valor_total)
-        : ''
+        : '',
+      ajuste_solicitado: contrato.ajuste_solicitado !== null && contrato.ajuste_solicitado !== undefined
+        ? String(contrato.ajuste_solicitado)
+        : '0',
+      ajuste_pago: contrato.ajuste_pago !== null && contrato.ajuste_pago !== undefined
+        ? String(contrato.ajuste_pago)
+        : '0'
     });
     setApropriacoesEdicao(normalizarApropriacoesContrato(contrato));
     setCredoresEdicao(normalizarCredoresContrato(contrato));
@@ -602,7 +590,9 @@ export default function GestaoContratos() {
       ref_contrato: '',
       descricao: '',
       itens_apropriacao: '',
-      valor_total: ''
+      valor_total: '',
+      ajuste_solicitado: '',
+      ajuste_pago: ''
     });
     setApropriacoesEdicao([]);
     setCredoresEdicao([]);
@@ -623,11 +613,23 @@ export default function GestaoContratos() {
     if (salvandoEdicaoId) return;
 
     const valorTotalEdicao = String(formEdicao.valor_total || '').trim();
+    const ajusteSolicitadoEdicao = String(formEdicao.ajuste_solicitado || '').trim();
+    const ajustePagoEdicao = String(formEdicao.ajuste_pago || '').trim();
     const valorTotalNumerico = valorTotalEdicao === ''
       ? null
       : Number(valorTotalEdicao.replace(',', '.'));
+    const ajusteSolicitadoNumerico = ajusteSolicitadoEdicao === ''
+      ? 0
+      : Number(ajusteSolicitadoEdicao.replace(',', '.'));
+    const ajustePagoNumerico = ajustePagoEdicao === ''
+      ? 0
+      : Number(ajustePagoEdicao.replace(',', '.'));
 
-    if (valorTotalEdicao !== '' && Number.isNaN(valorTotalNumerico)) {
+    if (
+      (valorTotalEdicao !== '' && Number.isNaN(valorTotalNumerico)) ||
+      Number.isNaN(ajusteSolicitadoNumerico) ||
+      Number.isNaN(ajustePagoNumerico)
+    ) {
       alert('Valor inválido.');
       return;
     }
@@ -639,6 +641,8 @@ export default function GestaoContratos() {
       descricao: String(formEdicao.descricao || '').trim() || null,
       itens_apropriacao: String(formEdicao.itens_apropriacao || '').trim() || null,
       valor_total: valorTotalNumerico,
+      ajuste_solicitado: ajusteSolicitadoNumerico,
+      ajuste_pago: ajustePagoNumerico,
       apropriacoes: montarApropriacoesPayload(apropriacoesEdicao),
       credores: montarCredoresPayload(credoresEdicao)
     };
@@ -653,32 +657,13 @@ export default function GestaoContratos() {
       await atualizarContrato(contrato.id, payload);
       await carregar();
       cancelarEdicao();
+      setContratoSelecionadoId(contrato.id);
       alert('Contrato atualizado com sucesso.');
     } catch (error) {
       console.error(error);
       alert(error?.message || 'Erro ao atualizar contrato.');
     } finally {
       setSalvandoEdicaoId(null);
-    }
-  }
-
-  async function salvarAjustes(contrato) {
-    if (!podeGerenciarContratos) {
-      alert('Seu usuario nao tem permissao para editar contratos.');
-      return;
-    }
-    const valores = ajustes[contrato.id];
-    if (!valores) return;
-    try {
-      await atualizarContrato(contrato.id, {
-        ajuste_solicitado: Number(valores.ajuste_solicitado ?? contrato.ajuste_solicitado ?? 0),
-        ajuste_pago: Number(valores.ajuste_pago ?? contrato.ajuste_pago ?? 0)
-      });
-      await carregar();
-      alert('Ajustes salvos.');
-    } catch (error) {
-      console.error(error);
-      alert('Erro ao salvar ajustes.');
     }
   }
 
@@ -1241,227 +1226,297 @@ export default function GestaoContratos() {
 
       <div className="card sol-surface-card app-table-shell contratos-table-card">
         <div className="table-wrapper contratos-table-wrapper">
-        <table className="table contratos-data-table">
-          <thead>
-            <tr>
-              <th className="text-left p-3">Contrato</th>
-              <th className="text-left p-3">Obra</th>
-              <th className="text-left p-3">Ref. do Contrato</th>
-              <th className="text-left p-3">Descrição</th>
-              <th className="text-left p-3">Credores</th>
-              <th className="text-left p-3">Itens de Apropriação</th>
-              <th className="text-right p-3">Solicitado</th>
-              <th className="text-right p-3">Pago</th>
-              <th className="text-right p-3">A pagar</th>
-              <th className="text-right p-3">Ajuste Solicitado</th>
-              <th className="text-right p-3">Ajuste Pago</th>
-              <th className="text-right p-3">Qtd. Solicitações</th>
-              <th className="text-left p-3">Anexos</th>
-              <th className="text-left p-3">Ações</th>
-            </tr>
-          </thead>
-          <tbody>
-            {contratos.length === 0 && (
+          <table className="table contratos-data-table">
+            <thead>
               <tr>
-                <td colSpan="14" className="p-4 text-center text-gray-500">
-                  Nenhum contrato encontrado.
-                </td>
+                <th className="text-left p-3 contratos-select-col">Sel.</th>
+                <th className="text-left p-3">Contrato</th>
+                <th className="text-left p-3">Obra</th>
+                <th className="text-left p-3">Ref. do Contrato</th>
+                <th className="text-left p-3">Descrição</th>
+                <th className="text-left p-3">Credores</th>
+                <th className="text-left p-3">Itens de Apropriação</th>
+                <th className="text-right p-3">Solicitado</th>
+                <th className="text-right p-3">Pago</th>
+                <th className="text-right p-3">A pagar</th>
+                <th className="text-right p-3">Ajuste Solicitado</th>
+                <th className="text-right p-3">Ajuste Pago</th>
+                <th className="text-right p-3">Qtd. Solicitações</th>
               </tr>
-            )}
-            {contratos.map(c => (
-              <Fragment key={c.id}>
-              <tr className="border-t contratos-row">
-                <td className="p-3 font-medium contratos-primary-cell" data-label="Contrato">
-                  {editandoId === c.id ? (
-                    <input
-                      name="codigo"
-                      value={formEdicao.codigo}
-                      onChange={onChangeEdicao}
-                      className="input contratos-table-input"
-                    />
-                  ) : (
-                    c.codigo
-                  )}
-                </td>
-                <td className="p-3" data-label="Obra">
-                  {editandoId === c.id ? (
-                    <select
-                      name="obra_id"
-                      value={formEdicao.obra_id}
-                      onChange={onChangeEdicao}
-                      className="input contratos-table-select"
-                    >
-                      <option value="">Selecione</option>
-                      {obras.map(obra => (
-                        <option key={obra.id} value={obra.id}>
-                          {obra.codigo} - {obra.nome}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    c.obra?.nome || '-'
-                  )}
-                </td>
-                <td className="p-3" data-label="Ref. do Contrato">
-                  {editandoId === c.id ? (
-                    <input
-                      name="ref_contrato"
-                      value={formEdicao.ref_contrato}
-                      onChange={onChangeEdicao}
-                      className="input contratos-table-input"
-                    />
-                  ) : (
-                    c.ref_contrato || '-'
-                  )}
-                </td>
-                <td className="p-3 contratos-description-cell" data-label="Descrição">
-                  {editandoId === c.id ? (
-                    <input
-                      name="descricao"
-                      value={formEdicao.descricao}
-                      onChange={onChangeEdicao}
-                      className="input contratos-table-input contratos-table-input-wide"
-                    />
-                  ) : (
-                    c.descricao || '-'
-                  )}
-                </td>
-                <td className="p-3 contratos-text-cell" data-label="Credores">{resumoCredoresContrato(c)}</td>
-                <td className="p-3 contratos-text-cell" data-label="Itens de Apropriação">
-                  {editandoId === c.id ? (
-                    <input
-                      name="itens_apropriacao"
-                      value={formEdicao.itens_apropriacao}
-                      onChange={onChangeEdicao}
-                      className="input contratos-table-input contratos-table-input-wide"
-                    />
-                  ) : (
-                    resumoApropriacoesContrato(c)
-                  )}
-                </td>
-                <td className="p-3 text-right" data-label="Solicitado">
-                  {editandoId === c.id ? (
-                    <input
-                      type="number"
-                      step="0.01"
-                      className="input contratos-table-number"
-                      name="valor_total"
-                      value={formEdicao.valor_total}
-                      onChange={onChangeEdicao}
-                    />
-                  ) : (
-                    Number(c.total_solicitado || 0).toLocaleString('pt-BR', {
-                      style: 'currency',
-                      currency: 'BRL'
-                    })
-                  )}
-                </td>
-                <td className="p-3 text-right" data-label="Pago">
-                  {Number(c.total_pago || 0).toLocaleString('pt-BR', {
-                    style: 'currency',
-                    currency: 'BRL'
-                  })}
-                </td>
-                <td className="p-3 text-right" data-label="A pagar">
-                  {Number(c.total_a_pagar || 0).toLocaleString('pt-BR', {
-                    style: 'currency',
-                    currency: 'BRL'
-                  })}
-                </td>
-                <td className="p-3 text-right" data-label="Ajuste Solicitado">
-                  <input
-                    type="number"
-                    step="0.01"
-                    className="input contratos-table-number"
-                    value={ajustes[c.id]?.ajuste_solicitado ?? c.ajuste_solicitado ?? 0}
-                    onChange={e => onChangeAjuste(c.id, 'ajuste_solicitado', e.target.value)}
-                    disabled={!podeGerenciarContratos}
-                  />
-                </td>
-                <td className="p-3 text-right" data-label="Ajuste Pago">
-                  <input
-                    type="number"
-                    step="0.01"
-                    className="input contratos-table-number"
-                    value={ajustes[c.id]?.ajuste_pago ?? c.ajuste_pago ?? 0}
-                    onChange={e => onChangeAjuste(c.id, 'ajuste_pago', e.target.value)}
-                    disabled={!podeGerenciarContratos}
-                  />
-                </td>
-                <td className="p-3 text-right" data-label="Qtd. Solicitações">{c.total_solicitacoes || 0}</td>
-                <td className="p-3" data-label="Anexos">
-                  <IconAction label="Ver anexos" tone="default" onClick={() => abrirAnexos(c)}>
-                    <HiEye />
-                  </IconAction>
-                </td>
-                <td className="p-3 contratos-actions-cell" data-label="Ações">
-                  <div className="contratos-actions">
-                    {editandoId === c.id ? (
-                      <>
-                        <IconAction
-                          label={salvandoEdicaoId === c.id ? 'Salvando edição' : 'Salvar edição'}
-                          tone="success"
-                          onClick={() => salvarEdicao(c)}
-                          disabled={salvandoEdicaoId === c.id}
-                        >
-                          <HiCheck />
-                        </IconAction>
-                        <IconAction
-                          label="Cancelar edição"
-                          tone="muted"
-                          onClick={cancelarEdicao}
-                          disabled={salvandoEdicaoId === c.id}
-                        >
-                          <HiXMark />
-                        </IconAction>
-                      </>
-                    ) : (
-                      <>
-                        {podeGerenciarContratos && (
-                          <>
-                            <IconAction label="Editar contrato" tone="primary" onClick={() => iniciarEdicao(c)}>
-                              <HiPencilSquare />
-                            </IconAction>
-                            <IconAction label="Salvar ajustes" tone="success" onClick={() => salvarAjustes(c)}>
-                              <HiArrowPath />
-                            </IconAction>
-                          </>
-                        )}
-                      </>
-                    )}
-                    {podeGerenciarContratos && (
-                      <IconAction label="Excluir contrato" tone="danger" onClick={() => excluirContratoItem(c)}>
-                        <HiTrash />
-                      </IconAction>
-                    )}
-                  </div>
-                </td>
-              </tr>
-              {editandoId === c.id && (
-                <tr className="border-t bg-[var(--c-surface)] contratos-edit-row">
-                  <td colSpan="14" className="p-3 space-y-3">
-                    {renderApropriacoesEditor({
-                      lista: apropriacoesEdicao,
-                      disponiveis: apropriacoesEdicaoDisponiveis,
-                      setter: setApropriacoesEdicao
-                    })}
-                    {renderCredoresEditor({
-                      lista: credoresEdicao,
-                      setter: setCredoresEdicao,
-                      busca: buscaCredorEdicao,
-                      setBusca: setBuscaCredorEdicao,
-                      resultados: resultadosCredorEdicao,
-                      setResultados: setResultadosCredorEdicao
-                    })}
+            </thead>
+            <tbody>
+              {contratos.length === 0 && (
+                <tr>
+                  <td colSpan="13" className="p-4 text-center text-gray-500">
+                    Nenhum contrato encontrado.
                   </td>
                 </tr>
               )}
-              </Fragment>
-            ))}
-          </tbody>
-        </table>
+              {contratos.map(c => {
+                const selecionado = String(contratoSelecionadoId) === String(c.id);
+                return (
+                  <tr
+                    key={c.id}
+                    className={`border-t contratos-row contratos-selectable-row ${selecionado ? 'is-selected' : ''}`}
+                    onClick={() => setContratoSelecionadoId(prev => (String(prev) === String(c.id) ? null : c.id))}
+                    tabIndex={0}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        setContratoSelecionadoId(prev => (String(prev) === String(c.id) ? null : c.id));
+                      }
+                    }}
+                    aria-selected={selecionado}
+                  >
+                    <td className="p-3 contratos-select-cell" data-label="Selecionar">
+                      <span className="contratos-row-check" aria-hidden="true">
+                        {selecionado && <HiCheck />}
+                      </span>
+                    </td>
+                    <td className="p-3 font-medium contratos-primary-cell" data-label="Contrato">{c.codigo}</td>
+                    <td className="p-3" data-label="Obra">{c.obra?.nome || '-'}</td>
+                    <td className="p-3" data-label="Ref. do Contrato">{c.ref_contrato || '-'}</td>
+                    <td className="p-3 contratos-description-cell" data-label="Descrição">{c.descricao || '-'}</td>
+                    <td className="p-3 contratos-text-cell" data-label="Credores">{resumoCredoresContrato(c)}</td>
+                    <td className="p-3 contratos-text-cell" data-label="Itens de Apropriação">{resumoApropriacoesContrato(c)}</td>
+                    <td className="p-3 text-right" data-label="Solicitado">
+                      {Number(c.total_solicitado || 0).toLocaleString('pt-BR', {
+                        style: 'currency',
+                        currency: 'BRL'
+                      })}
+                    </td>
+                    <td className="p-3 text-right" data-label="Pago">
+                      {Number(c.total_pago || 0).toLocaleString('pt-BR', {
+                        style: 'currency',
+                        currency: 'BRL'
+                      })}
+                    </td>
+                    <td className="p-3 text-right" data-label="A pagar">
+                      {Number(c.total_a_pagar || 0).toLocaleString('pt-BR', {
+                        style: 'currency',
+                        currency: 'BRL'
+                      })}
+                    </td>
+                    <td className="p-3 text-right" data-label="Ajuste Solicitado">
+                      {Number(c.ajuste_solicitado || 0).toLocaleString('pt-BR', {
+                        style: 'currency',
+                        currency: 'BRL'
+                      })}
+                    </td>
+                    <td className="p-3 text-right" data-label="Ajuste Pago">
+                      {Number(c.ajuste_pago || 0).toLocaleString('pt-BR', {
+                        style: 'currency',
+                        currency: 'BRL'
+                      })}
+                    </td>
+                    <td className="p-3 text-right" data-label="Qtd. Solicitações">{c.total_solicitacoes || 0}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       </div>
+
+      {contratoSelecionado && (
+        <div className="contratos-selection-toolbar fixed left-1/2 -translate-x-1/2 bottom-4 z-40">
+          <span className="contratos-selection-toolbar__title">
+            {contratoSelecionado.codigo}
+          </span>
+          <button
+            type="button"
+            className="btn btn-outline !min-h-0 h-9 px-3 inline-flex items-center gap-2"
+            onClick={() => abrirAnexos(contratoSelecionado)}
+          >
+            <HiEye className="w-4 h-4" />
+            <span>Anexos</span>
+          </button>
+          {podeGerenciarContratos && (
+            <>
+              <button
+                type="button"
+                className="btn btn-primary !min-h-0 h-9 px-3 inline-flex items-center gap-2"
+                onClick={() => iniciarEdicao(contratoSelecionado)}
+              >
+                <HiPencilSquare className="w-4 h-4" />
+                <span>Editar</span>
+              </button>
+              <button
+                type="button"
+                className="btn btn-outline !min-h-0 h-9 px-3 inline-flex items-center gap-2"
+                onClick={() => excluirContratoItem(contratoSelecionado)}
+              >
+                <HiTrash className="w-4 h-4" />
+                <span>Excluir</span>
+              </button>
+            </>
+          )}
+          <button
+            type="button"
+            className="btn btn-outline !min-h-0 h-9 px-3 inline-flex items-center gap-2"
+            onClick={() => setContratoSelecionadoId(null)}
+          >
+            <HiXMark className="w-4 h-4" />
+            <span>Limpar</span>
+          </button>
+        </div>
+      )}
+
+      {contratoEmEdicao && (
+        <div className="contratos-edit-modal fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4 py-6">
+          <div className="contratos-edit-modal__panel card w-full max-w-6xl overflow-hidden">
+            <div className="contratos-edit-modal__header">
+              <div>
+                <p className="sol-filtros-title">Editar contrato {contratoEmEdicao.codigo}</p>
+                <p className="sol-filtros-subtitle">
+                  Atualize dados gerais, apropriações e credores vinculados ao contrato.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={cancelarEdicao}
+                disabled={salvandoEdicaoId === contratoEmEdicao.id}
+              >
+                Fechar
+              </button>
+            </div>
+
+            <div className="contratos-edit-modal__body">
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(0,1.4fr)_minmax(180px,0.8fr)_minmax(220px,1fr)]">
+                <label className="sol-filter-field">
+                  <span className="sol-filter-label">Obra</span>
+                  <select
+                    name="obra_id"
+                    value={formEdicao.obra_id}
+                    onChange={onChangeEdicao}
+                    className="input w-full"
+                  >
+                    <option value="">Selecione</option>
+                    {obras.map(obra => (
+                      <option key={obra.id} value={obra.id}>
+                        {obra.codigo} - {obra.nome}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="sol-filter-field">
+                  <span className="sol-filter-label">Código</span>
+                  <input
+                    name="codigo"
+                    value={formEdicao.codigo}
+                    onChange={onChangeEdicao}
+                    className="input w-full"
+                  />
+                </label>
+
+                <label className="sol-filter-field">
+                  <span className="sol-filter-label">Ref. do Contrato</span>
+                  <input
+                    name="ref_contrato"
+                    value={formEdicao.ref_contrato}
+                    onChange={onChangeEdicao}
+                    className="input w-full"
+                  />
+                </label>
+
+                <label className="sol-filter-field md:col-span-2">
+                  <span className="sol-filter-label">Descrição</span>
+                  <textarea
+                    name="descricao"
+                    value={formEdicao.descricao}
+                    onChange={onChangeEdicao}
+                    className="input w-full"
+                    rows="3"
+                  />
+                </label>
+
+                <label className="sol-filter-field">
+                  <span className="sol-filter-label">Valor contratado</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    name="valor_total"
+                    value={formEdicao.valor_total}
+                    onChange={onChangeEdicao}
+                    className="input w-full"
+                  />
+                </label>
+
+                <label className="sol-filter-field">
+                  <span className="sol-filter-label">Ajuste solicitado</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    name="ajuste_solicitado"
+                    value={formEdicao.ajuste_solicitado}
+                    onChange={onChangeEdicao}
+                    className="input w-full"
+                  />
+                </label>
+
+                <label className="sol-filter-field">
+                  <span className="sol-filter-label">Ajuste pago</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    name="ajuste_pago"
+                    value={formEdicao.ajuste_pago}
+                    onChange={onChangeEdicao}
+                    className="input w-full"
+                  />
+                </label>
+
+                <label className="sol-filter-field md:col-span-2 xl:col-span-3">
+                  <span className="sol-filter-label">Itens de Apropriação</span>
+                  <textarea
+                    name="itens_apropriacao"
+                    value={formEdicao.itens_apropriacao}
+                    onChange={onChangeEdicao}
+                    className="input w-full"
+                    rows="2"
+                  />
+                </label>
+              </div>
+
+              {renderApropriacoesEditor({
+                lista: apropriacoesEdicao,
+                disponiveis: apropriacoesEdicaoDisponiveis,
+                setter: setApropriacoesEdicao
+              })}
+
+              {renderCredoresEditor({
+                lista: credoresEdicao,
+                setter: setCredoresEdicao,
+                busca: buscaCredorEdicao,
+                setBusca: setBuscaCredorEdicao,
+                resultados: resultadosCredorEdicao,
+                setResultados: setResultadosCredorEdicao
+              })}
+            </div>
+
+            <div className="contratos-edit-modal__footer">
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={cancelarEdicao}
+                disabled={salvandoEdicaoId === contratoEmEdicao.id}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => salvarEdicao(contratoEmEdicao)}
+                disabled={salvandoEdicaoId === contratoEmEdicao.id}
+              >
+                {salvandoEdicaoId === contratoEmEdicao.id ? 'Salvando...' : 'Salvar contrato'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {modalAnexos && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
