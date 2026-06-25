@@ -5548,27 +5548,71 @@ input[type="file"]:disabled {
 
 .finance-cadastros-card {
   border-radius: 18px;
+  padding: 1.05rem !important;
+}
+
+.finance-cadastros-card > h2,
+.finance-cadastros-card > div:first-child h2 {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.25;
+}
+
+.finance-cadastros-card > p,
+.finance-cadastros-card > div:first-child p {
+  margin-top: 0.22rem;
+  font-size: 0.78rem;
+  line-height: 1.45;
 }
 
 .finance-cadastros-card :is(.btn, .btn-primary, .btn-outline) {
-  min-height: 38px;
+  min-height: 34px;
+  border-radius: 12px;
 }
 
 .finance-cadastros-card .btn:not(.btn-icon) {
-  padding-inline: 0.95rem;
+  padding-inline: 0.85rem;
+  font-size: 0.82rem;
 }
 
 .finance-cadastros-card .app-list-card {
-  border-radius: 14px;
-  padding: 0.85rem 0.95rem;
+  border-radius: 12px;
+  padding: 0.68rem 0.78rem;
+}
+
+.finance-cadastros-card .app-list-stack {
+  gap: 0.55rem;
 }
 
 .finance-cadastros-card .input {
-  min-height: 40px;
+  min-height: 36px;
+  border-radius: 11px;
+  font-size: 0.82rem;
 }
 
 .finance-cadastros-card textarea.input {
-  min-height: 58px;
+  min-height: 52px;
+}
+
+.finance-cadastros-card form {
+  margin-top: 0.85rem !important;
+}
+
+.finance-cadastros-card .sol-filter-field,
+.finance-cadastros-card .app-filter-field {
+  padding: 0.42rem 0.52rem;
+  border-radius: 12px;
+}
+
+.finance-cadastros-card :is(.sol-filter-label, .app-filter-label) {
+  font-size: 0.68rem;
+}
+
+.finance-cadastros-card--contas-lista,
+.finance-cadastros-card--contas-pagadoras-lista,
+.finance-cadastros-card--categorias-lista {
+  margin-top: -0.45rem;
+  border-top-style: dashed;
 }
 
 .finance-cadastros-card--favorecidos {

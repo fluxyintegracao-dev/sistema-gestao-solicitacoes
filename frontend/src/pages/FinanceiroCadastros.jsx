@@ -736,8 +736,11 @@ export default function FinanceiroCadastros() {
           <div className="space-y-4 finance-cadastros-column finance-cadastros-column--bancos">
             <div className="card sol-surface-card finance-cadastros-card finance-cadastros-card--conta">
               <h2 className="text-lg font-semibold text-[var(--c-text)]">
-                {contaForm.id ? 'Editar conta bancaria' : 'Nova conta bancaria'}
+                Contas bancarias
               </h2>
+              <p className="text-sm text-[var(--c-muted)]">
+                {contaForm.id ? 'Edite a conta selecionada.' : 'Cadastre contas bancarias e caixas internos usados no financeiro.'}
+              </p>
               <form className="mt-4 space-y-3" onSubmit={handleSalvarConta}>
                 <label className="sol-filter-field">
                   <span className="sol-filter-label">Nome</span>
@@ -832,7 +835,7 @@ export default function FinanceiroCadastros() {
             </div>
 
             <div className="card sol-surface-card space-y-3 finance-cadastros-card finance-cadastros-card--contas-lista">
-              <h2 className="text-lg font-semibold text-[var(--c-text)]">Contas bancarias</h2>
+              <h3 className="text-sm font-semibold uppercase tracking-[0.08em] text-[var(--c-muted)]">Contas cadastradas</h3>
               {contas.length === 0 ? (
                 <p className="text-sm text-[var(--c-muted)]">Nenhuma conta bancaria cadastrada.</p>
               ) : (
@@ -868,10 +871,10 @@ export default function FinanceiroCadastros() {
               <div className="flex flex-col gap-1 md:flex-row md:items-start md:justify-between">
                 <div>
                   <h2 className="text-lg font-semibold text-[var(--c-text)]">
-                    {paymentAccountForm.id ? 'Editar conta pagadora' : 'Nova conta pagadora'}
+                    Contas pagadoras
                   </h2>
                   <p className="text-sm text-[var(--c-muted)]">
-                    Vincula uma conta bancaria interna ao CNPJ pagador, convenio bancario e empresa do grupo.
+                    {paymentAccountForm.id ? 'Edite a conta pagadora selecionada.' : 'Vincule uma conta bancaria interna ao CNPJ pagador, convenio bancario e empresa do grupo.'}
                   </p>
                 </div>
               </div>
@@ -991,7 +994,7 @@ export default function FinanceiroCadastros() {
             </div>
 
             <div className="card sol-surface-card space-y-3 finance-cadastros-card finance-cadastros-card--contas-pagadoras-lista">
-              <h2 className="text-lg font-semibold text-[var(--c-text)]">Contas pagadoras</h2>
+              <h3 className="text-sm font-semibold uppercase tracking-[0.08em] text-[var(--c-muted)]">Contas pagadoras cadastradas</h3>
               {paymentAccounts.length === 0 ? (
                 <p className="text-sm text-[var(--c-muted)]">Nenhuma conta pagadora cadastrada.</p>
               ) : (
@@ -1029,8 +1032,11 @@ export default function FinanceiroCadastros() {
           <div className="space-y-4 finance-cadastros-column finance-cadastros-column--categorias">
             <div className="card sol-surface-card finance-cadastros-card finance-cadastros-card--categoria" ref={categoriaFormRef}>
               <h2 className="text-lg font-semibold text-[var(--c-text)]">
-                {categoriaForm.id ? 'Editar categoria financeira' : 'Nova categoria financeira'}
+                Categorias financeiras
               </h2>
+              <p className="text-sm text-[var(--c-muted)]">
+                {categoriaForm.id ? 'Edite a categoria selecionada.' : 'Cadastre categorias usadas nos titulos, baixas e DRE.'}
+              </p>
               <form className="mt-4 space-y-3" onSubmit={handleSalvarCategoria}>
                 <input ref={categoriaNomeInputRef} className="input w-full" placeholder="Nome" value={categoriaForm.nome} onChange={(e) => setCategoriaForm((c) => ({ ...c, nome: e.target.value }))} required />
                 <select className="input w-full" value={categoriaForm.tipo} onChange={(e) => setCategoriaForm((c) => ({ ...c, tipo: e.target.value }))}>
@@ -1220,10 +1226,10 @@ export default function FinanceiroCadastros() {
             <div className="flex flex-col gap-1 md:flex-row md:items-start md:justify-between">
               <div>
                 <h2 className="text-lg font-semibold text-[var(--c-text)]">
-                  {formaPagamentoForm.id ? 'Editar forma de pagamento' : 'Nova forma de pagamento'}
+                  Formas de pagamento
                 </h2>
                 <p className="text-sm text-[var(--c-muted)]">
-                  Define como o titulo sera gerado: boleto, cartao, cheque, pix ou outros fluxos.
+                  {formaPagamentoForm.id ? 'Edite a forma selecionada.' : 'Defina como o titulo sera gerado: boleto, cartao, cheque, pix ou outros fluxos.'}
                 </p>
               </div>
             </div>
@@ -1385,10 +1391,10 @@ export default function FinanceiroCadastros() {
             <div className="flex flex-col gap-1 md:flex-row md:items-start md:justify-between">
               <div>
                 <h2 className="text-lg font-semibold text-[var(--c-text)]">
-                  {cartaoForm.id ? 'Editar cartao' : 'Novo cartao'}
+                  Cartoes
                 </h2>
                 <p className="text-sm text-[var(--c-muted)]">
-                  Cartoes cadastrados agrupam titulos por fatura conforme fechamento e vencimento.
+                  {cartaoForm.id ? 'Edite o cartao selecionado.' : 'Cadastre cartoes para agrupar titulos por fatura conforme fechamento e vencimento.'}
                 </p>
               </div>
             </div>
