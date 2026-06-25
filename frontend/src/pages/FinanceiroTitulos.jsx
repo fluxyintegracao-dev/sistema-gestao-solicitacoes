@@ -225,6 +225,7 @@ function downloadCsv(filename, rows) {
 
 function statusClass(status) {
   const normalized = String(status || '').trim().toUpperCase();
+  if (normalized === 'PREVISAO') return 'app-status-pill bg-sky-100 text-sky-700';
   if (normalized === 'QUITADO') return 'app-status-pill bg-emerald-100 text-emerald-700';
   if (normalized === 'PARCIAL') return 'app-status-pill bg-amber-100 text-amber-700';
   if (normalized === 'CANCELADO' || normalized === 'ESTORNADO') return 'app-status-pill bg-rose-100 text-rose-700';
@@ -233,7 +234,7 @@ function statusClass(status) {
 
 function isOverdue(titulo) {
   const normalized = String(titulo?.status || '').trim().toUpperCase();
-  if (!['ABERTO', 'PARCIAL'].includes(normalized)) return false;
+  if (!['PREVISAO', 'ABERTO', 'PARCIAL'].includes(normalized)) return false;
   const today = new Date();
   const dueDate = new Date(`${titulo?.data_vencimento}T00:00:00`);
   if (Number.isNaN(dueDate.getTime())) return false;
@@ -282,11 +283,11 @@ function isTituloBaixavel(titulo) {
 }
 
 function isTituloExcluivel(titulo) {
-  return ['ABERTO', 'PARCIAL'].includes(String(titulo?.status || '').trim().toUpperCase());
+  return ['PREVISAO', 'ABERTO', 'PARCIAL'].includes(String(titulo?.status || '').trim().toUpperCase());
 }
 
 function isTituloEditavel(titulo) {
-  return String(titulo?.status || '').trim().toUpperCase() === 'ABERTO' && Number(titulo?.valor_baixado || 0) === 0;
+  return ['PREVISAO', 'ABERTO'].includes(String(titulo?.status || '').trim().toUpperCase()) && Number(titulo?.valor_baixado || 0) === 0;
 }
 
 function parseCurrencyInput(value) {
@@ -1275,6 +1276,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
               onChange={(event) => setFilter('status', event.target.value)}
             >
               <option value="">Todos</option>
+              <option value="PREVISAO">Previsao</option>
               <option value="ABERTO">Aberto</option>
               <option value="PARCIAL">Parcial</option>
               <option value="QUITADO">Quitado</option>

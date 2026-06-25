@@ -47,6 +47,8 @@ const { sincronizarStatusSolicitacaoPorBaixaTitulos } = require('./solicitacaoFi
 const FORMAS_COBRANCA = ['BOLETO', 'PIX', 'OUTROS'];
 const STATUS_COBRANCA = ['NAO_APLICAVEL', 'PENDENTE_EMISSAO', 'EMITIDO', 'PAGO_BANCO', 'CONCILIADO', 'CANCELADO'];
 const PAYMENT_INTENT_INACTIVE_STATUSES = ['CANCELADO', 'REJEITADO', 'REJEITADO_BANCO', 'FALHA_INTEGRACAO'];
+const STATUS_TITULO_EDITAVEL = ['PREVISAO', 'ABERTO'];
+const STATUS_TITULO_INICIAL = ['PREVISAO', 'ABERTO'];
 
 function createHttpError(statusCode, message) {
   const error = new Error(message);
@@ -68,6 +70,11 @@ function getHoje() {
 
 function roundCurrency(value) {
   return Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;
+}
+
+function normalizarStatusTituloInicial(status) {
+  const normalized = String(status || '').trim().toUpperCase();
+  return STATUS_TITULO_INICIAL.includes(normalized) ? normalized : 'ABERTO';
 }
 
 function addMonths(dateString, amount) {
@@ -1501,8 +1508,8 @@ function assertTituloEditavel(titulo) {
       })
     : [];
 
-  if (status !== 'ABERTO') {
-    throw createHttpError(400, 'Somente titulos em aberto podem ser editados.');
+  if (!STATUS_TITULO_EDITAVEL.includes(status)) {
+    throw createHttpError(400, 'Somente titulos em aberto ou previsao podem ser editados.');
   }
 
   if (valorBaixado > 0 || movimentosAtivos.length > 0) {
@@ -1524,6 +1531,7 @@ async function atualizarTitulo(req, tituloId, payload = {}) {
   if (!['PAGAR', 'RECEBER'].includes(tipo)) {
     throw createHttpError(400, 'Tipo de titulo invalido.');
   }
+  const statusTitulo = normalizarStatusTituloInicial(payload.status || titulo.status);
 
   const obraId = Number(payload.obra_id);
   if (!Number.isInteger(obraId) || obraId <= 0) {
@@ -1550,6 +1558,10 @@ async function atualizarTitulo(req, tituloId, payload = {}) {
       400,
       'Titulo vinculado a fatura de cartao nao permite alterar valor por esta tela. Ajuste a fatura ou cancele o lancamento de origem.'
     );
+  }
+
+  if (statusTitulo === 'PREVISAO' && titulo.fatura_cartao_id) {
+    throw createHttpError(400, 'Titulo vinculado a fatura de cartao nao pode ser convertido para previsao.');
   }
 
   const [obra, parceiro, categoria] = await Promise.all([
@@ -1589,6 +1601,7 @@ async function atualizarTitulo(req, tituloId, payload = {}) {
     apropriacao_id: titulo.apropriacao_id,
     parceiro_id: titulo.parceiro_id,
     categoria_financeira_id: titulo.categoria_financeira_id,
+    status: titulo.status,
     valor_original: roundCurrency(titulo.valor_original),
     data_vencimento: titulo.data_vencimento,
     competencia_data: titulo.competencia_data,
@@ -1604,6 +1617,7 @@ async function atualizarTitulo(req, tituloId, payload = {}) {
     parceiro_id: parceiro.id,
     categoria_financeira_id: categoria?.id || null,
     tipo,
+    status: statusTitulo,
     descricao,
     numero_documento: payload.numero_documento || null,
     valor_original: roundCurrency(valorOriginal),
@@ -1663,6 +1677,7 @@ async function atualizarTitulo(req, tituloId, payload = {}) {
         apropriacao_id: apropriacao?.id || null,
         parceiro_id: parceiro.id,
         categoria_financeira_id: categoria?.id || null,
+        status: statusTitulo,
         valor_original: roundCurrency(valorOriginal),
         valor_bruto: impostosResumo.valorBruto,
         valor_impostos: impostosResumo.valorImpostos,
@@ -1982,6 +1997,7 @@ async function criarTituloPorSolicitacao(req, solicitacaoId, payload = {}) {
   if (!['PAGAR', 'RECEBER'].includes(tipo)) {
     throw createHttpError(400, 'Tipo de titulo invalido.');
   }
+  const statusTitulo = normalizarStatusTituloInicial(payload.status);
 
   const parceiroPadraoId = Number(payload.parceiro_id || solicitacao.parceiro_id);
 
@@ -2121,7 +2137,7 @@ async function criarTituloPorSolicitacao(req, solicitacaoId, payload = {}) {
           considera_dre: payload.considera_dre !== false,
           origem_titulo: 'SOLICITACAO',
           tipo,
-          status: 'ABERTO',
+          status: statusTitulo,
           descricao: descricaoParcela || descricaoPadraoTitulo(solicitacao),
           numero_documento: parcelaPayload.numero_documento || pagamento.payload.numero_documento || payload.numero_documento || chequeFields.cheque_numero || null,
           ...chequeFields,
@@ -2151,7 +2167,7 @@ async function criarTituloPorSolicitacao(req, solicitacaoId, payload = {}) {
           transaction
         });
 
-        if (pagamento.formaPagamento?.gera_fatura && pagamento.payload.cartao_id) {
+        if (statusTitulo !== 'PREVISAO' && pagamento.formaPagamento?.gera_fatura && pagamento.payload.cartao_id) {
           const { fatura } = await obterOuCriarFaturaCartao({
             cartaoId: pagamento.payload.cartao_id,
             dataCompra: pagamento.dataCompra,
@@ -2162,14 +2178,16 @@ async function criarTituloPorSolicitacao(req, solicitacaoId, payload = {}) {
           await vincularTituloAFatura({ titulo, fatura, transaction });
         }
 
-        const baixaCartaoDebito = await baixarTituloCartaoDebitoNoAto({
-          req,
-          titulo,
-          formaPagamento: pagamento.formaPagamento,
-          pagamentoPayload: pagamento.payload,
-          dataMovimento: pagamento.dataCompra,
-          transaction
-        });
+        const baixaCartaoDebito = statusTitulo === 'PREVISAO'
+          ? null
+          : await baixarTituloCartaoDebitoNoAto({
+            req,
+            titulo,
+            formaPagamento: pagamento.formaPagamento,
+            pagamentoPayload: pagamento.payload,
+            dataMovimento: pagamento.dataCompra,
+            transaction
+          });
         if (baixaCartaoDebito) {
           baixasCartaoDebito.push(baixaCartaoDebito);
         }
@@ -2263,6 +2281,7 @@ async function criarTituloManual(req, payload = {}) {
   if (!['PAGAR', 'RECEBER'].includes(tipo)) {
     throw createHttpError(400, 'Tipo de titulo invalido.');
   }
+  const statusTitulo = normalizarStatusTituloInicial(payload.status);
 
   const obraId = Number(payload.obra_id);
   if (!Number.isInteger(obraId) || obraId <= 0) {
@@ -2413,7 +2432,7 @@ async function criarTituloManual(req, payload = {}) {
           considera_dre: payload.considera_dre !== false,
           origem_titulo: 'MANUAL',
           tipo,
-          status: 'ABERTO',
+          status: statusTitulo,
           descricao: descricaoParcela || descricaoPadraoTituloManual(tipo),
           numero_documento: parcelaPayload.numero_documento || pagamento.payload.numero_documento || payload.numero_documento || chequeFields.cheque_numero || null,
           ...chequeFields,
@@ -2443,7 +2462,7 @@ async function criarTituloManual(req, payload = {}) {
           transaction
         });
 
-        if (pagamento.formaPagamento?.gera_fatura && pagamento.payload.cartao_id) {
+        if (statusTitulo !== 'PREVISAO' && pagamento.formaPagamento?.gera_fatura && pagamento.payload.cartao_id) {
           const { fatura } = await obterOuCriarFaturaCartao({
             cartaoId: pagamento.payload.cartao_id,
             dataCompra: pagamento.dataCompra,
@@ -2454,14 +2473,16 @@ async function criarTituloManual(req, payload = {}) {
           await vincularTituloAFatura({ titulo, fatura, transaction });
         }
 
-        const baixaCartaoDebito = await baixarTituloCartaoDebitoNoAto({
-          req,
-          titulo,
-          formaPagamento: pagamento.formaPagamento,
-          pagamentoPayload: pagamento.payload,
-          dataMovimento: pagamento.dataCompra,
-          transaction
-        });
+        const baixaCartaoDebito = statusTitulo === 'PREVISAO'
+          ? null
+          : await baixarTituloCartaoDebitoNoAto({
+            req,
+            titulo,
+            formaPagamento: pagamento.formaPagamento,
+            pagamentoPayload: pagamento.payload,
+            dataMovimento: pagamento.dataCompra,
+            transaction
+          });
         if (baixaCartaoDebito) {
           baixasCartaoDebito.push(baixaCartaoDebito);
         }

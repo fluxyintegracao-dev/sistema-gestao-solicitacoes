@@ -112,6 +112,7 @@ function loadColumns() {
 
 function statusClass(value) {
   const normalized = String(value || '').toUpperCase();
+  if (normalized === 'PREVISAO') return 'app-status-pill bg-sky-100 text-sky-700';
   if (['QUITADO', 'ATIVO'].includes(normalized)) return 'app-status-pill bg-emerald-100 text-emerald-700';
   if (['PARCIAL', 'SEM_BAIXA'].includes(normalized)) return 'app-status-pill bg-amber-100 text-amber-700';
   if (['ESTORNADO', 'CANCELADO'].includes(normalized)) return 'app-status-pill bg-rose-100 text-rose-700';
@@ -302,6 +303,7 @@ export default function FinanceiroRelatorioAnalitico() {
             <span className="app-filter-label">Status titulo</span>
             <select className="input w-full input-sm" value={filters.status_titulo} onChange={(event) => setFilter('status_titulo', event.target.value)}>
               <option value="">Todos</option>
+              <option value="PREVISAO">Previsao</option>
               <option value="ABERTO">Aberto</option>
               <option value="PARCIAL">Parcial</option>
               <option value="QUITADO">Quitado</option>

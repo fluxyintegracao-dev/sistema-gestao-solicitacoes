@@ -12,6 +12,8 @@ const {
 const CATEGORIAS_BEM = ['VEICULO', 'IMOVEL', 'TERRENO', 'SERVICO', 'MATERIAL', 'CREDITO', 'OUTROS'];
 const FORMAS_COBRANCA = ['BOLETO', 'PIX', 'OUTROS'];
 const STATUS_COBRANCA = ['NAO_APLICAVEL', 'PENDENTE_EMISSAO', 'EMITIDO', 'PAGO_BANCO', 'CONCILIADO', 'CANCELADO'];
+const STATUS_TITULO = ['PREVISAO', 'ABERTO', 'PARCIAL', 'QUITADO', 'CANCELADO', 'ESTORNADO'];
+const STATUS_TITULO_INICIAL = ['PREVISAO', 'ABERTO'];
 const CAMPOS_INTERCOMPANY_TITULO = [
   'intercompany_group_id',
   'empresa_origem_id',
@@ -402,6 +404,7 @@ function validateFinanceTituloQuery(query = {}) {
       'apropriacao_id',
       'parceiro_id',
       'categoria_financeira_id',
+      'forma_pagamento_id',
       'solicitacao_id',
       'numero_documento',
       'descricao',
@@ -431,13 +434,14 @@ function validateFinanceTituloQuery(query = {}) {
 
   return {
     tipo: parseEnum(query.tipo, 'Tipo', ['PAGAR', 'RECEBER']),
-    status: parseEnum(query.status, 'Status', ['ABERTO', 'PARCIAL', 'QUITADO', 'CANCELADO', 'ESTORNADO', 'ATIVA', 'CANCELADA']),
+    status: parseEnum(query.status, 'Status', [...STATUS_TITULO, 'ATIVA', 'CANCELADA']),
     q: parseOptionalText(query.q, 'Busca', 120),
     codigo: parseOptionalText(query.codigo, 'Codigo do titulo', 40),
     empresa_id: parseInteger(query.empresa_id, 'Empresa do grupo'),
     obra_id: parseInteger(query.obra_id, 'Obra'),
     parceiro_id: parseInteger(query.parceiro_id, 'Parceiro'),
     categoria_financeira_id: parseInteger(query.categoria_financeira_id, 'Categoria financeira'),
+    forma_pagamento_id: parseInteger(query.forma_pagamento_id, 'Forma de pagamento'),
     solicitacao_id: parseInteger(query.solicitacao_id, 'Solicitacao'),
     numero_documento: parseOptionalText(query.numero_documento, 'Numero do documento', 120),
     descricao: parseOptionalText(query.descricao, 'Descricao', 120),
@@ -693,7 +697,7 @@ function validateFinanceIntercompanyQuery(query = {}) {
     holding_id: parseInteger(query.holding_id, 'Holding'),
     empresa_id: parseInteger(query.empresa_id, 'Empresa do grupo'),
     tipo_intercompany: parseEnum(query.tipo_intercompany, 'Tipo', TIPOS_INTERCOMPANY),
-    status: parseEnum(query.status, 'Status', ['ABERTO', 'PARCIAL', 'QUITADO', 'CANCELADO', 'ESTORNADO', 'ATIVA', 'CANCELADA']),
+    status: parseEnum(query.status, 'Status', [...STATUS_TITULO, 'ATIVA', 'CANCELADA']),
     elimina_consolidado: parseBoolean(query.elimina_consolidado, 'Eliminar no consolidado'),
     limit: limit ? Math.min(limit, 1000) : undefined
   };
@@ -778,7 +782,7 @@ function validateFinanceRelatorioAnaliticoQuery(query = {}) {
 
   return {
     tipo: parseEnum(query.tipo, 'Tipo', ['PAGAR', 'RECEBER']),
-    status_titulo: parseEnum(query.status_titulo, 'Status do titulo', ['ABERTO', 'PARCIAL', 'QUITADO', 'CANCELADO', 'ESTORNADO']),
+    status_titulo: parseEnum(query.status_titulo, 'Status do titulo', STATUS_TITULO),
     status_movimento: parseEnum(query.status_movimento, 'Status da baixa', ['ATIVO', 'ESTORNADO', 'TODOS', 'SEM_BAIXA']),
     q: parseOptionalText(query.q, 'Busca', 120),
     obra_id: parseInteger(query.obra_id, 'Obra'),
@@ -1073,6 +1077,7 @@ function validateFinanceTituloCreateFromSolicitacaoBody(body = {}) {
     body,
     [
       'tipo',
+      'status',
       'empresa_id',
       'parceiro_id',
       'valor',
@@ -1112,6 +1117,7 @@ function validateFinanceTituloCreateFromSolicitacaoBody(body = {}) {
 
   return {
     tipo: parseEnum(body.tipo, 'Tipo', ['PAGAR', 'RECEBER']),
+    status: parseEnum(body.status, 'Status', STATUS_TITULO_INICIAL),
     empresa_id: parseInteger(body.empresa_id, 'Empresa do grupo'),
     parceiro_id: parseInteger(body.parceiro_id, 'Parceiro'),
     valor: parseDecimal(body.valor, 'Valor', { min: 0.01 }),
@@ -1159,6 +1165,7 @@ function validateFinanceTituloCreateBody(body = {}) {
     body,
     [
       'tipo',
+      'status',
       'empresa_id',
       'obra_id',
       'apropriacao_id',
@@ -1200,6 +1207,7 @@ function validateFinanceTituloCreateBody(body = {}) {
 
   return {
     tipo: parseEnum(body.tipo, 'Tipo', ['PAGAR', 'RECEBER'], { required: true }),
+    status: parseEnum(body.status, 'Status', STATUS_TITULO_INICIAL),
     empresa_id: parseInteger(body.empresa_id, 'Empresa do grupo'),
     obra_id: parseInteger(body.obra_id, 'Obra/Centro de custo', { required: true }),
     apropriacao_id: parseInteger(body.apropriacao_id, 'Apropriacao'),
@@ -1249,6 +1257,7 @@ function validateFinanceTituloUpdateBody(body = {}) {
     body,
     [
       'tipo',
+      'status',
       'empresa_id',
       'obra_id',
       'apropriacao_id',
@@ -1284,6 +1293,7 @@ function validateFinanceTituloUpdateBody(body = {}) {
 
   return {
     tipo: parseEnum(body.tipo, 'Tipo', ['PAGAR', 'RECEBER'], { required: true }),
+    status: parseEnum(body.status, 'Status', STATUS_TITULO_INICIAL),
     empresa_id: parseInteger(body.empresa_id, 'Empresa do grupo'),
     obra_id: parseInteger(body.obra_id, 'Obra/Centro de custo', { required: true }),
     apropriacao_id: parseInteger(body.apropriacao_id, 'Apropriacao'),

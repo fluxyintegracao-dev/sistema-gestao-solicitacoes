@@ -227,7 +227,7 @@ async function buildFinanceiroResumo({ req, isSuperadmin, hasFinanceAccess }) {
   const { inicio, fim } = getCurrentMonthRange();
 
   const whereAbertos = {
-    status: { [Op.in]: ['ABERTO', 'PARCIAL'] }
+    status: { [Op.in]: ['PREVISAO', 'ABERTO', 'PARCIAL'] }
   };
 
   if (obraIds) {

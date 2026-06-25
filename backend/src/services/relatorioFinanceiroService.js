@@ -305,7 +305,7 @@ async function carregarTitulosPrevistos(periodo, obraWhere) {
 
   const where = {
     status: {
-      [Op.in]: ['ABERTO', 'PARCIAL']
+      [Op.in]: ['PREVISAO', 'ABERTO', 'PARCIAL']
     },
     valor_saldo: {
       [Op.gt]: 0
@@ -627,7 +627,7 @@ async function carregarTitulosFluxoConsolidado(periodo, tituloScopeWhere) {
     ],
     where: {
       status: {
-        [Op.in]: ['ABERTO', 'PARCIAL']
+        [Op.in]: ['PREVISAO', 'ABERTO', 'PARCIAL']
       },
       valor_saldo: {
         [Op.gt]: 0
@@ -1273,7 +1273,7 @@ function buildFinanceiroObrasTituloWhere(filters, obraWhere, periodo, analise) {
   }
 
   if (analise === 'A_REALIZAR') {
-    where.status = { [Op.in]: ['ABERTO', 'PARCIAL'] };
+    where.status = { [Op.in]: ['PREVISAO', 'ABERTO', 'PARCIAL'] };
     where.valor_saldo = { [Op.gt]: 0 };
   }
 
@@ -2607,7 +2607,7 @@ async function gerarRelatorioEndividamento(req, filters = {}) {
   const companyScopeWhere = buildFluxoCompanyWhere(filters, empresas);
   const where = applyIntercompanyExclusion({
     tipo: 'PAGAR',
-    status: { [Op.in]: ['ABERTO', 'PARCIAL'] },
+    status: { [Op.in]: ['PREVISAO', 'ABERTO', 'PARCIAL'] },
     valor_saldo: { [Op.gt]: 0 },
     ...obraScopeWhere,
     ...companyScopeWhere
@@ -3234,7 +3234,7 @@ function summarizeIntercompany(titulos = [], transferencias = []) {
 async function gerarRelatorioIntercompany(req, filters = {}) {
   await assertFinanceAccess(req);
 
-  const tituloStatuses = ['ABERTO', 'PARCIAL', 'QUITADO', 'CANCELADO', 'ESTORNADO'];
+  const tituloStatuses = ['PREVISAO', 'ABERTO', 'PARCIAL', 'QUITADO', 'CANCELADO', 'ESTORNADO'];
   const transferenciaStatuses = ['ATIVA', 'CANCELADA'];
   const periodo = resolvePeriodo(filters);
   const schema = await getIntercompanyReportSchema();

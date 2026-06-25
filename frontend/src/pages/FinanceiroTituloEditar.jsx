@@ -165,7 +165,7 @@ function getTituloBloqueado(titulo) {
     ? titulo.paymentIntents.filter((item) => !['CANCELADO', 'REJEITADO', 'REJEITADO_BANCO'].includes(String(item.status || '').toUpperCase()))
     : [];
 
-  if (status !== 'ABERTO') return 'Somente titulos em aberto podem ser editados.';
+  if (!['PREVISAO', 'ABERTO'].includes(status)) return 'Somente titulos em aberto ou previsao podem ser editados.';
   if (valorBaixado > 0 || movimentosAtivos.length > 0) return 'Este titulo ja possui baixa. Estorne a baixa antes de corrigir o lancamento.';
   if (pagamentosAtivos.length > 0) return 'Este titulo possui pagamento em massa vinculado. Cancele ou rejeite o pagamento antes de editar.';
   return '';
@@ -179,6 +179,9 @@ function categoriaCompativel(categoria, tipoTitulo) {
 function buildFormFromTitulo(titulo) {
   return {
     tipo: String(titulo?.tipo || 'PAGAR').toUpperCase() === 'RECEBER' ? 'RECEBER' : 'PAGAR',
+    status: ['PREVISAO', 'ABERTO'].includes(String(titulo?.status || '').toUpperCase())
+      ? String(titulo.status).toUpperCase()
+      : 'ABERTO',
     empresa_id: String(titulo?.empresa_id || ''),
     obra_id: String(titulo?.obra_id || ''),
     apropriacao_id: String(titulo?.apropriacao_id || ''),
@@ -677,6 +680,7 @@ export default function FinanceiroTituloEditar() {
       const payload = {
         ...form,
         empresa_id: empresaDaObraId,
+        status: form.status || 'ABERTO',
         valor: toCurrencyNumber(form.valor),
         apropriacao_id: form.apropriacao_id || null,
         categoria_financeira_id: form.categoria_financeira_id || null,
@@ -792,6 +796,14 @@ export default function FinanceiroTituloEditar() {
             <select value={form.tipo} onChange={(event) => handleTipoChange(event.target.value)} disabled={Boolean(bloqueio)}>
               <option value="PAGAR">Conta a pagar</option>
               <option value="RECEBER">Conta a receber</option>
+            </select>
+          </label>
+
+          <label className="form-field">
+            <span>Status</span>
+            <select value={form.status} onChange={(event) => updateField('status', event.target.value)} disabled={Boolean(bloqueio)}>
+              <option value="ABERTO">Aberto</option>
+              <option value="PREVISAO">Previsao</option>
             </select>
           </label>
 

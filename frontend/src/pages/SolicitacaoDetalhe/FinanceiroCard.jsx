@@ -271,6 +271,7 @@ function buildDefaultForm(solicitacao) {
   const valorSolicitacao = solicitacao?.valor ? formatCurrencyInput(solicitacao.valor) : '';
   return {
     tipo: 'PAGAR',
+    status: 'ABERTO',
     empresa_id: solicitacao?.obra?.empresa_grupo_id ? String(solicitacao.obra.empresa_grupo_id) : '',
     parceiro_id: solicitacao?.parceiro?.id ? String(solicitacao.parceiro.id) : '',
     categoria_financeira_id: '',
@@ -300,6 +301,7 @@ function buildDefaultForm(solicitacao) {
 
 function statusClass(status) {
   const normalized = String(status || '').toUpperCase();
+  if (normalized === 'PREVISAO') return 'bg-sky-100 text-sky-700';
   if (normalized === 'QUITADO') return 'bg-emerald-100 text-emerald-700';
   if (normalized === 'PARCIAL') return 'bg-amber-100 text-amber-700';
   if (normalized === 'CANCELADO' || normalized === 'ESTORNADO') return 'bg-rose-100 text-rose-700';
@@ -1079,6 +1081,7 @@ export default function FinanceiroCard({
       await gerarContaPorSolicitacao(solicitacao.id, {
         tipo: form.tipo,
         empresa_id: Number(form.empresa_id),
+        status: form.status || 'ABERTO',
         parceiro_id: selectedPartner?.id || form.parceiro_id,
         categoria_financeira_id: form.categoria_financeira_id || undefined,
         competencia_data: form.competencia_data || undefined,
@@ -1274,6 +1277,21 @@ export default function FinanceiroCard({
                     <option value="PAGAR">Pagar</option>
                     <option value="RECEBER">Receber</option>
                   </select>
+                </label>
+
+                <label className="text-sm">
+                  <span className="mb-1 block text-slate-500">Status inicial</span>
+                  <select
+                    className="input w-full"
+                    value={form.status}
+                    onChange={(event) => setForm((current) => ({ ...current, status: event.target.value }))}
+                  >
+                    <option value="ABERTO">Aberto</option>
+                    <option value="PREVISAO">Previsao</option>
+                  </select>
+                  <span className="mt-1 block text-xs text-slate-500">
+                    Previsao entra nos relatorios, mas nao permite baixa ate virar aberto.
+                  </span>
                 </label>
 
                 <div className="space-y-2 text-sm">

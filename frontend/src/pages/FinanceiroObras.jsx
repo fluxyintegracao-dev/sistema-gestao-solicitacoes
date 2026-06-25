@@ -87,6 +87,7 @@ function formatDate(value) {
 
 function statusClass(value) {
   const normalized = String(value || '').toUpperCase();
+  if (normalized === 'PREVISAO') return 'app-status-pill bg-sky-100 text-sky-700';
   if (normalized === 'QUITADO') return 'app-status-pill bg-emerald-100 text-emerald-700';
   if (normalized === 'PARCIAL') return 'app-status-pill bg-amber-100 text-amber-700';
   if (normalized === 'ABERTO') return 'app-status-pill bg-slate-100 text-slate-700';

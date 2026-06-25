@@ -59,6 +59,7 @@ function labelTipoIntercompany(value) {
 
 function statusClass(status) {
   const normalized = String(status || '').toUpperCase();
+  if (normalized === 'PREVISAO') return 'bg-sky-100 text-sky-700';
   if (normalized === 'QUITADO') return 'bg-emerald-100 text-emerald-700';
   if (normalized === 'PARCIAL') return 'bg-amber-100 text-amber-700';
   if (normalized === 'CANCELADO' || normalized === 'ESTORNADO') return 'bg-rose-100 text-rose-700';
@@ -330,7 +331,7 @@ export default function FinanceiroTituloDetalhe() {
   const pagamentosAtivosCount = Array.isArray(titulo?.paymentIntents)
     ? pagamentosAtivos.length
     : Number(titulo?.payment_intents_ativos_count || 0);
-  const podeEditarTitulo = String(titulo?.status || '').toUpperCase() === 'ABERTO'
+  const podeEditarTitulo = ['PREVISAO', 'ABERTO'].includes(String(titulo?.status || '').toUpperCase())
     && Number(titulo?.valor_baixado || 0) === 0
     && movimentosAtivosCount === 0
     && pagamentosAtivosCount === 0;

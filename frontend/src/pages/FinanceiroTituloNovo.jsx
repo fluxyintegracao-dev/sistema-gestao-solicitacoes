@@ -179,6 +179,7 @@ function createImposto() {
 function buildDefaultForm(tipo = 'PAGAR') {
   return {
     tipo: resolveTipo(tipo),
+    status: 'ABERTO',
     obra_id: '',
     empresa_id: '',
     parceiro_id: '',
@@ -1168,6 +1169,7 @@ export default function FinanceiroTituloNovo() {
       payload.elimina_consolidado = form.intercompany ? Boolean(form.elimina_consolidado) : false;
       payload.transferencia_interna = form.intercompany ? Boolean(form.transferencia_interna) : false;
       payload.considera_dre = isCategoriaClassificadaParaDre(categoriaSelecionada);
+      payload.status = form.status || 'ABERTO';
       payload.intercompany = Boolean(form.intercompany);
       payload.competencia_data = form.competencia_data || undefined;
       payload.forma_cobranca = form.tipo === 'PAGAR'
@@ -1276,7 +1278,7 @@ export default function FinanceiroTituloNovo() {
               <div>
                 <p className="sol-filtros-title">Dados da conta</p>
                 <p className="sol-filtros-subtitle">
-                  Esta conta entra no previsto enquanto estiver em aberto ou parcial, mesmo sem solicitacao vinculada.
+                  Esta conta entra no previsto enquanto estiver em previsao, aberto ou parcial, mesmo sem solicitacao vinculada.
                 </p>
               </div>
             </div>
@@ -1310,6 +1312,21 @@ export default function FinanceiroTituloNovo() {
                   <option value="PAGAR">Conta a pagar</option>
                   <option value="RECEBER">Conta a receber</option>
                 </select>
+              </label>
+
+              <label className="sol-filter-field xl:col-span-2">
+                <span className="sol-filter-label">Status inicial</span>
+                <select
+                  className="input w-full"
+                  value={form.status}
+                  onChange={(event) => updateField('status', event.target.value)}
+                >
+                  <option value="ABERTO">Aberto</option>
+                  <option value="PREVISAO">Previsao</option>
+                </select>
+                <span className="app-note mt-2">
+                  Previsao entra nos relatorios, mas nao fica disponivel para baixa ate virar aberto.
+                </span>
               </label>
 
               <label className="sol-filter-field xl:col-span-3">
