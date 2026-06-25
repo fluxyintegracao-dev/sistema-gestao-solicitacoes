@@ -47,7 +47,7 @@ function classNameStatus(status) {
   }
 
   if (valor === 'AGUARDANDO_DIRETORIA') {
-    return 'app-status-pill compra-status-pill bg-amber-100 text-amber-700';
+    return 'app-status-pill compra-status-pill compra-status-warning bg-amber-100 text-amber-700';
   }
 
   if (valor === 'FINALIZADA' || valor === 'ENCERRADO') {
@@ -262,7 +262,7 @@ export default function SolicitacoesCompra() {
   }
 
   return (
-    <div className="page solicitacoes-page">
+    <div className="page solicitacoes-page compras-solicitacoes-page">
       <div className="app-page-header">
         <div className="app-page-header-row">
           <div>

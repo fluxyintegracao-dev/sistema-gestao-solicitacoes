@@ -8568,6 +8568,43 @@ body {
   color: #c7d2fe !important;
 }
 
+.dark .layout-shell .compras-solicitacoes-page .compras-solicitacoes-table-shell .compra-status-pill {
+  border-width: 1px !important;
+  border-style: solid !important;
+  font-weight: 800;
+  text-shadow: none;
+}
+
+.dark .layout-shell .compras-solicitacoes-page .compras-solicitacoes-table-shell .compra-status-warning {
+  border-color: rgba(245, 158, 11, 0.55) !important;
+  background: rgba(245, 158, 11, 0.18) !important;
+  color: #fde68a !important;
+}
+
+.dark .layout-shell .compras-solicitacoes-page .compras-solicitacoes-table-shell .compra-status-default {
+  border-color: rgba(96, 165, 250, 0.58) !important;
+  background: rgba(59, 130, 246, 0.20) !important;
+  color: #bfdbfe !important;
+}
+
+.dark .layout-shell .compras-solicitacoes-page .compras-solicitacoes-table-shell .compra-status-blue {
+  border-color: rgba(56, 189, 248, 0.58) !important;
+  background: rgba(14, 165, 233, 0.20) !important;
+  color: #bae6fd !important;
+}
+
+.dark .layout-shell .compras-solicitacoes-page .compras-solicitacoes-table-shell .compra-status-muted {
+  border-color: rgba(148, 163, 184, 0.46) !important;
+  background: rgba(148, 163, 184, 0.14) !important;
+  color: #cbd5e1 !important;
+}
+
+.dark .layout-shell .compras-solicitacoes-page .compras-solicitacoes-table-shell .compra-status-success {
+  border-color: rgba(52, 211, 153, 0.56) !important;
+  background: rgba(16, 185, 129, 0.18) !important;
+  color: #a7f3d0 !important;
+}
+
 .layout-shell .app-status-pill,
 .layout-shell .badge {
   display: inline-flex;
