@@ -1541,8 +1541,8 @@ export default function GestaoContratos() {
       )}
 
       {modalAnexos && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="card p-6 w-full max-w-lg space-y-4">
+        <div className="contratos-anexos-modal fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4 py-6">
+          <div className="contratos-anexos-modal__panel card w-full space-y-4">
             <div className="flex justify-between items-center">
               <h2 className="text-lg font-semibold">
                 Anexos do contrato {modalAnexos.codigo}
@@ -1550,7 +1550,7 @@ export default function GestaoContratos() {
               <button onClick={() => setModalAnexos(null)}>Fechar</button>
             </div>
 
-            <div className="space-y-2 max-h-64 overflow-auto">
+            <div className="contratos-anexos-modal__list space-y-2">
               {anexos.length === 0 && (
                 <p className="text-sm text-gray-500">
                   Nenhum anexo encontrado.
@@ -1618,12 +1618,14 @@ export default function GestaoContratos() {
               />
             </div>
 
-            <button
-              onClick={enviarAnexos}
-              className="bg-blue-600 text-white px-4 py-2 rounded"
-            >
-              Enviar anexos
-            </button>
+            <div className="contratos-anexos-modal__footer">
+              <button
+                onClick={enviarAnexos}
+                className="btn btn-primary"
+              >
+                Enviar anexos
+              </button>
+            </div>
           </div>
         </div>
       )}
