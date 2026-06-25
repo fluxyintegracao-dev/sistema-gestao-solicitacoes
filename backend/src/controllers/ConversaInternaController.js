@@ -185,7 +185,12 @@ async function criarConversaIndividual({ criadorId, destinatarioId, assunto, men
 
 async function obterOuCriarGrupoSetor({ setorId, assunto, criadorId }) {
   let conversa = await ConversaInterna.findOne({
-    where: { is_group: true, setor_id: setorId, status: 'ABERTA' }
+    where: {
+      is_group: true,
+      setor_id: setorId,
+      criado_por_id: criadorId,
+      status: 'ABERTA'
+    }
   });
 
   if (!conversa) {
