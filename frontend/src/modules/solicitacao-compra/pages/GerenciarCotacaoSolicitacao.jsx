@@ -575,11 +575,11 @@ function SecaoEnvioFornecedores({
     <div className="grid gap-3">
       {/* Envio para fornecedores vinculados via WhatsApp */}
       {linksVinculados.length > 0 && (
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5">
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 dark:border-emerald-700/70 dark:bg-emerald-950/45">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h3 className="text-sm font-semibold text-emerald-800">Enviar cotacoes via WhatsApp</h3>
-              <p className="mt-0.5 text-xs text-emerald-700">
+              <h3 className="text-sm font-semibold text-emerald-800 dark:text-emerald-100">Enviar cotacoes via WhatsApp</h3>
+              <p className="mt-0.5 text-xs text-emerald-700 dark:text-emerald-200">
                 {linksVinculados.length} fornecedor(es) com mensagem pronta.
               </p>
             </div>
@@ -602,7 +602,7 @@ function SecaoEnvioFornecedores({
 
       {/* Adicionar novos fornecedores */}
       {solicitacao.status !== 'ENCERRADO' && (
-        <div className="rounded-xl border border-[var(--c-border)] bg-slate-50/70 p-3">
+        <div className="rounded-xl border border-[var(--c-border)] bg-slate-50/70 p-3 dark:bg-slate-950/55">
           <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
             <div className="grid content-start gap-2.5">
               {/* Selecao por categoria */}
@@ -621,8 +621,8 @@ function SecaoEnvioFornecedores({
               </div>
 
               {selecionandoPorCategoria && (
-                <div className="grid gap-2 rounded-xl border border-blue-200 bg-blue-50 p-3">
-                  <p className="text-xs text-blue-700">
+                <div className="grid gap-2 rounded-xl border border-blue-200 bg-blue-50 p-3 dark:border-blue-800/70 dark:bg-blue-950/45">
+                  <p className="text-xs text-blue-700 dark:text-blue-200">
                     Selecione uma categoria para auto-selecionar os fornecedores cadastrados que a atendem:
                   </p>
                   <div className="flex gap-2">
@@ -642,7 +642,7 @@ function SecaoEnvioFornecedores({
                     </button>
                   </div>
                   {categoriaSelecionada && fornecedoresComCategoria.length === 0 && (
-                    <p className="text-xs text-blue-600">Nenhum fornecedor cadastrado com esta categoria.</p>
+                    <p className="text-xs text-blue-600 dark:text-blue-300">Nenhum fornecedor cadastrado com esta categoria.</p>
                   )}
                 </div>
               )}
@@ -651,7 +651,7 @@ function SecaoEnvioFornecedores({
                 <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
                   <span className="text-sm font-medium">Fornecedores</span>
                   {fornecedoresSelecionados.length > 0 && (
-                    <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
+                    <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-950/70 dark:text-blue-200">
                       {fornecedoresSelecionados.length} selecionado(s)
                     </span>
                   )}
@@ -665,7 +665,7 @@ function SecaoEnvioFornecedores({
                       onChange={(e) => onChangeFornecedorBusca(e.target.value)}
                     />
                     {deveMostrarAutocomplete && (
-                      <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-20 rounded-xl border border-[var(--c-border)] bg-white shadow-lg">
+                      <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-20 rounded-xl border border-[var(--c-border)] bg-white shadow-lg dark:bg-slate-950 dark:shadow-black/30">
                         {buscandoFornecedores ? (
                           <div className="px-3 py-3 text-sm text-[var(--c-muted)]">Buscando fornecedores...</div>
                         ) : fornecedoresAutocomplete.length === 0 ? (
@@ -680,7 +680,7 @@ function SecaoEnvioFornecedores({
                               <button
                                 key={selectionKey}
                                 type="button"
-                                className={`flex w-full items-start gap-3 border-b border-[var(--c-border)] px-3 py-2 text-left last:border-b-0 hover:bg-blue-50 ${checked ? 'bg-blue-50' : ''}`}
+                                className={`flex w-full items-start gap-3 border-b border-[var(--c-border)] px-3 py-2 text-left last:border-b-0 hover:bg-blue-50 dark:hover:bg-blue-950/45 ${checked ? 'bg-blue-50 dark:bg-blue-950/60' : ''}`}
                                 onClick={() => onToggleFornecedor(selectionKey, !checked)}
                               >
                                 <input type="checkbox" checked={checked} readOnly className="mt-1" />
@@ -712,12 +712,12 @@ function SecaoEnvioFornecedores({
                   </button>
                 </div>
                 {!deveMostrarAutocomplete && !deveMostrarListaCategoria && fornecedoresSelecionados.length === 0 && (
-                  <div className="rounded-lg border border-dashed border-[var(--c-border)] bg-white/70 px-3 py-2.5 text-xs text-[var(--c-muted)]">
+                  <div className="rounded-lg border border-dashed border-[var(--c-border)] bg-white/70 px-3 py-2.5 text-xs text-[var(--c-muted)] dark:bg-slate-950/45">
                     Digite no campo de busca para localizar fornecedores ou escolha uma categoria para listar os cadastrados.
                   </div>
                 )}
                 {deveMostrarListaCategoria && (
-                  <div className="app-list-stack max-h-[220px] overflow-y-auto rounded-xl border border-[var(--c-border)] bg-white/80 p-2">
+                  <div className="app-list-stack max-h-[220px] overflow-y-auto rounded-xl border border-[var(--c-border)] bg-white/80 p-2 dark:bg-slate-950/45">
                     {buscandoFornecedores ? (
                       <div className="text-sm text-[var(--c-muted)]">Buscando...</div>
                     ) : fornecedoresListaCategoria.length === 0 ? (
@@ -738,7 +738,7 @@ function SecaoEnvioFornecedores({
                             {Array.isArray(f.categoria_insumos) && f.categoria_insumos.length > 0 && (
                               <div className="flex flex-wrap gap-1 mt-1">
                                 {f.categoria_insumos.map((c) => (
-                                  <span key={c} className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] text-blue-700">{c}</span>
+                                  <span key={c} className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] text-blue-700 dark:bg-blue-950/70 dark:text-blue-200">{c}</span>
                                 ))}
                               </div>
                             )}
@@ -754,7 +754,7 @@ function SecaoEnvioFornecedores({
               </div>
             </div>
 
-            <div className="grid content-start gap-2.5 rounded-xl border border-[var(--c-border)] bg-white/85 p-3">
+            <div className="grid content-start gap-2.5 rounded-xl border border-[var(--c-border)] bg-white/85 p-3 dark:bg-slate-950/65">
               <div>
                 <div className="text-sm font-semibold text-[var(--c-text)]">Cadastro rapido</div>
                 <div className="text-xs text-[var(--c-muted)]">Inclua um fornecedor novo sem sair da cotacao.</div>
@@ -1580,7 +1580,7 @@ export default function GerenciarCotacaoSolicitacao() {
                 <h2 className="font-semibold">Fornecedores e links de cotacao</h2>
                 <p className="mt-1 text-sm text-[var(--c-muted)]">Pesquise fornecedores cadastrados, faca cadastro rapido e gere os links do portal.</p>
               </div>
-              <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-medium text-slate-700">
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-200">
                 {solicitacao.fornecedores?.length || 0} vinculado(s)
               </span>
             </div>
@@ -1610,7 +1610,7 @@ export default function GerenciarCotacaoSolicitacao() {
             />
 
             {Array.isArray(solicitacao.logs) && solicitacao.logs.some((log) => log.tipo_acao === 'RESPOSTA_INTERNA_COMPRAS') && (
-              <div className="mt-4 rounded-2xl border border-[var(--c-border)] bg-slate-50/70 p-4">
+              <div className="mt-4 rounded-2xl border border-[var(--c-border)] bg-slate-50/70 p-4 dark:bg-slate-950/55">
                 <div className="mb-3">
                   <h2 className="font-semibold">Auditoria de respostas internas</h2>
                 </div>
