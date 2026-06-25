@@ -12,8 +12,7 @@ import {
 } from 'react-icons/hi2';
 import { useAuth } from '../contexts/AuthContext';
 import PendingAttachmentsList from '../components/attachments/PendingAttachmentsList';
-import { canAccessContratos } from '../utils/acessoProduto';
-import { isGeoSetor } from '../utils/setor';
+import { canAccessContratos, canManageContratos } from '../utils/acessoProduto';
 import {
   UPLOAD_MAX_FILE_SIZE_MB_PADRAO,
   concatenarAnexosPendentes,
@@ -102,10 +101,9 @@ export default function GestaoContratos() {
     String(user?.setor?.codigo || '').toUpperCase(),
     String(user?.area || '').toUpperCase()
   ];
-  const isAdminGEO =
-    user?.perfil === 'ADMIN' && setorTokens.some(isGeoSetor);
   const isSetorObra = setorTokens.includes('OBRA');
   const podeAcessar = canAccessContratos(user);
+  const podeGerenciarContratos = canManageContratos(user);
 
   useEffect(() => {
     if (podeAcessar) {
@@ -618,6 +616,10 @@ export default function GestaoContratos() {
   }
 
   async function salvarEdicao(contrato) {
+    if (!podeGerenciarContratos) {
+      alert('Seu usuario nao tem permissao para editar contratos.');
+      return;
+    }
     if (salvandoEdicaoId) return;
 
     const valorTotalEdicao = String(formEdicao.valor_total || '').trim();
@@ -661,6 +663,10 @@ export default function GestaoContratos() {
   }
 
   async function salvarAjustes(contrato) {
+    if (!podeGerenciarContratos) {
+      alert('Seu usuario nao tem permissao para editar contratos.');
+      return;
+    }
     const valores = ajustes[contrato.id];
     if (!valores) return;
     try {
@@ -1369,6 +1375,7 @@ export default function GestaoContratos() {
                     className="input contratos-table-number"
                     value={ajustes[c.id]?.ajuste_solicitado ?? c.ajuste_solicitado ?? 0}
                     onChange={e => onChangeAjuste(c.id, 'ajuste_solicitado', e.target.value)}
+                    disabled={!podeGerenciarContratos}
                   />
                 </td>
                 <td className="p-3 text-right" data-label="Ajuste Pago">
@@ -1378,6 +1385,7 @@ export default function GestaoContratos() {
                     className="input contratos-table-number"
                     value={ajustes[c.id]?.ajuste_pago ?? c.ajuste_pago ?? 0}
                     onChange={e => onChangeAjuste(c.id, 'ajuste_pago', e.target.value)}
+                    disabled={!podeGerenciarContratos}
                   />
                 </td>
                 <td className="p-3 text-right" data-label="Qtd. Solicitações">{c.total_solicitacoes || 0}</td>
@@ -1409,17 +1417,23 @@ export default function GestaoContratos() {
                       </>
                     ) : (
                       <>
-                        <IconAction label="Editar contrato" tone="primary" onClick={() => iniciarEdicao(c)}>
-                          <HiPencilSquare />
-                        </IconAction>
-                        <IconAction label="Salvar ajustes" tone="success" onClick={() => salvarAjustes(c)}>
-                          <HiArrowPath />
-                        </IconAction>
+                        {podeGerenciarContratos && (
+                          <>
+                            <IconAction label="Editar contrato" tone="primary" onClick={() => iniciarEdicao(c)}>
+                              <HiPencilSquare />
+                            </IconAction>
+                            <IconAction label="Salvar ajustes" tone="success" onClick={() => salvarAjustes(c)}>
+                              <HiArrowPath />
+                            </IconAction>
+                          </>
+                        )}
                       </>
                     )}
-                    <IconAction label="Excluir contrato" tone="danger" onClick={() => excluirContratoItem(c)}>
-                      <HiTrash />
-                    </IconAction>
+                    {podeGerenciarContratos && (
+                      <IconAction label="Excluir contrato" tone="danger" onClick={() => excluirContratoItem(c)}>
+                        <HiTrash />
+                      </IconAction>
+                    )}
                   </div>
                 </td>
               </tr>

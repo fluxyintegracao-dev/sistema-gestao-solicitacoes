@@ -28,6 +28,7 @@ const {
   isSuperadmin,
   shouldRestrictContratosToObras
 } = require('../services/authorizationService');
+const { userHasSetorCapability } = require('../services/setorCapabilityService');
 const { registrarEventoSeguranca } = require('../services/securityLogService');
 const { normalizeOriginalName } = require('../utils/fileName');
 const CHAVE_SETORES_CRIACAO_TODAS_OBRAS = 'SETORES_CRIACAO_TODAS_OBRAS';
@@ -438,6 +439,10 @@ async function isAdminGEO(req) {
   const perfil = String(req.user?.perfil || '').trim().toUpperCase();
   if (isBusinessAdmin(req.user)) return true;
   if (perfil !== 'ADMIN') return false;
+
+  if (await userHasSetorCapability(req.user, 'eh_setor_geo')) {
+    return true;
+  }
 
   if (!req.user?.setor_id) return false;
 

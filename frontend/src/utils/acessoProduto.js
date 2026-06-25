@@ -597,6 +597,15 @@ export function canAccessContratos(user) {
   return isAdminGeo(user) || userHasSetorCapability(user, 'eh_setor_obra');
 }
 
+export function canManageContratos(user) {
+  if (!hasEnabledModule(user, 'CONTRATOS')) return false;
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasPermissao(user, 'contratos.geral.editar');
+  }
+  return isAdminGeo(user);
+}
+
 export function canAccessComercial(user) {
   if (!hasEnabledModule(user, 'COMERCIAL')) return false;
   if (isBusinessAdmin(user)) return true;

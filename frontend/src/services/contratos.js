@@ -65,7 +65,10 @@ export async function atualizarContrato(id, data) {
     headers: authHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(data)
   });
-  if (!res.ok) throw new Error('Erro ao atualizar contrato');
+  if (!res.ok) {
+    const data = await res.json().catch(() => null);
+    throw new Error(data?.error || 'Erro ao atualizar contrato');
+  }
   return res.json();
 }
 
