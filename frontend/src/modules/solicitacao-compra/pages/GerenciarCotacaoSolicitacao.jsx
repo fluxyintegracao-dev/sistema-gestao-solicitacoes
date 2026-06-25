@@ -575,7 +575,7 @@ function SecaoEnvioFornecedores({
     <div className="grid gap-3">
       {/* Envio para fornecedores vinculados via WhatsApp */}
       {linksVinculados.length > 0 && (
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 dark:border-emerald-700/70 dark:bg-emerald-950/45">
+        <div className="cotacao-whatsapp-panel rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 dark:border-emerald-700/70 dark:bg-emerald-950/45">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h3 className="text-sm font-semibold text-emerald-800 dark:text-emerald-100">Enviar cotacoes via WhatsApp</h3>
@@ -602,7 +602,7 @@ function SecaoEnvioFornecedores({
 
       {/* Adicionar novos fornecedores */}
       {solicitacao.status !== 'ENCERRADO' && (
-        <div className="rounded-xl border border-[var(--c-border)] bg-slate-50/70 p-3 dark:bg-slate-950/55">
+        <div className="cotacao-fornecedores-panel rounded-xl border border-[var(--c-border)] bg-slate-50/70 p-3 dark:bg-slate-950/55">
           <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
             <div className="grid content-start gap-2.5">
               {/* Selecao por categoria */}
@@ -665,7 +665,7 @@ function SecaoEnvioFornecedores({
                       onChange={(e) => onChangeFornecedorBusca(e.target.value)}
                     />
                     {deveMostrarAutocomplete && (
-                      <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-20 rounded-xl border border-[var(--c-border)] bg-white shadow-lg dark:bg-slate-950 dark:shadow-black/30">
+                      <div className="cotacao-fornecedores-autocomplete absolute left-0 right-0 top-[calc(100%+6px)] z-20 rounded-xl border border-[var(--c-border)] bg-white shadow-lg dark:bg-slate-950 dark:shadow-black/30">
                         {buscandoFornecedores ? (
                           <div className="px-3 py-3 text-sm text-[var(--c-muted)]">Buscando fornecedores...</div>
                         ) : fornecedoresAutocomplete.length === 0 ? (
@@ -712,12 +712,12 @@ function SecaoEnvioFornecedores({
                   </button>
                 </div>
                 {!deveMostrarAutocomplete && !deveMostrarListaCategoria && fornecedoresSelecionados.length === 0 && (
-                  <div className="rounded-lg border border-dashed border-[var(--c-border)] bg-white/70 px-3 py-2.5 text-xs text-[var(--c-muted)] dark:bg-slate-950/45">
+                  <div className="cotacao-fornecedores-empty rounded-lg border border-dashed border-[var(--c-border)] bg-white/70 px-3 py-2.5 text-xs text-[var(--c-muted)] dark:bg-slate-950/45">
                     Digite no campo de busca para localizar fornecedores ou escolha uma categoria para listar os cadastrados.
                   </div>
                 )}
                 {deveMostrarListaCategoria && (
-                  <div className="app-list-stack max-h-[220px] overflow-y-auto rounded-xl border border-[var(--c-border)] bg-white/80 p-2 dark:bg-slate-950/45">
+                  <div className="cotacao-fornecedores-list app-list-stack max-h-[220px] overflow-y-auto rounded-xl border border-[var(--c-border)] bg-white/80 p-2 dark:bg-slate-950/45">
                     {buscandoFornecedores ? (
                       <div className="text-sm text-[var(--c-muted)]">Buscando...</div>
                     ) : fornecedoresListaCategoria.length === 0 ? (
@@ -754,7 +754,7 @@ function SecaoEnvioFornecedores({
               </div>
             </div>
 
-            <div className="grid content-start gap-2.5 rounded-xl border border-[var(--c-border)] bg-white/85 p-3 dark:bg-slate-950/65">
+            <div className="cotacao-fornecedor-rapido grid content-start gap-2.5 rounded-xl border border-[var(--c-border)] bg-white/85 p-3 dark:bg-slate-950/65">
               <div>
                 <div className="text-sm font-semibold text-[var(--c-text)]">Cadastro rapido</div>
                 <div className="text-xs text-[var(--c-muted)]">Inclua um fornecedor novo sem sair da cotacao.</div>
@@ -1496,7 +1496,7 @@ export default function GerenciarCotacaoSolicitacao() {
   const isAvulsa = solicitacao.origem === 'AVULSA';
 
   return (
-    <div className="page solicitacoes-page page-compra-nova">
+    <div className="page solicitacoes-page page-compra-nova cotacao-gestao-page">
       {/* Header */}
       <div className="card sol-surface-card app-toolbar-card">
         <div className="app-page-header-row">

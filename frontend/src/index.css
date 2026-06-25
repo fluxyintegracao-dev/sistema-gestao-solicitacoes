@@ -10457,6 +10457,74 @@ body {
   min-width: 82rem;
 }
 
+.dark .layout-shell .cotacao-gestao-page .cotacao-whatsapp-panel {
+  border-color: rgba(16, 185, 129, 0.45) !important;
+  background: rgba(6, 55, 47, 0.88) !important;
+  color: #d1fae5 !important;
+}
+
+.dark .layout-shell .cotacao-gestao-page .cotacao-whatsapp-panel :is(h3, p, span, strong) {
+  color: #d1fae5 !important;
+}
+
+.dark .layout-shell .cotacao-gestao-page .cotacao-fornecedores-panel,
+.dark .layout-shell .cotacao-gestao-page .cotacao-fornecedores-empty,
+.dark .layout-shell .cotacao-gestao-page .cotacao-fornecedores-list,
+.dark .layout-shell .cotacao-gestao-page .cotacao-fornecedores-autocomplete,
+.dark .layout-shell .cotacao-gestao-page .cotacao-fornecedor-rapido,
+.dark .layout-shell .cotacao-gestao-page .sol-surface-card > .mt-4.rounded-2xl {
+  border-color: rgba(71, 101, 142, 0.72) !important;
+  background: rgba(13, 29, 50, 0.92) !important;
+  color: #e7edf7 !important;
+}
+
+.dark .layout-shell .cotacao-gestao-page .cotacao-fornecedor-rapido {
+  background: rgba(10, 23, 39, 0.94) !important;
+}
+
+.dark .layout-shell .cotacao-gestao-page .cotacao-fornecedores-empty {
+  border-style: dashed;
+  background: rgba(7, 17, 30, 0.92) !important;
+  color: #aec1dc !important;
+}
+
+.dark .layout-shell .cotacao-gestao-page .cotacao-fornecedores-panel :is(.text-\[var\(--c-text\)\], .font-semibold, .font-medium, label, h2, h3),
+.dark .layout-shell .cotacao-gestao-page .cotacao-fornecedor-rapido :is(.text-\[var\(--c-text\)\], .font-semibold, .font-medium, label, h2, h3),
+.dark .layout-shell .cotacao-gestao-page .sol-surface-card > .mt-4.rounded-2xl :is(.font-semibold, h2, h3) {
+  color: #eef5ff !important;
+}
+
+.dark .layout-shell .cotacao-gestao-page .cotacao-fornecedores-panel :is(.text-\[var\(--c-muted\)\], p),
+.dark .layout-shell .cotacao-gestao-page .cotacao-fornecedor-rapido :is(.text-\[var\(--c-muted\)\], p),
+.dark .layout-shell .cotacao-gestao-page .sol-surface-card > .mt-4.rounded-2xl :is(.text-\[var\(--c-muted\)\], p) {
+  color: #9fb3cf !important;
+}
+
+.dark .layout-shell .cotacao-gestao-page .cotacao-fornecedores-panel :is(.input, input:not([type="checkbox"]):not([type="radio"]), select, textarea),
+.dark .layout-shell .cotacao-gestao-page .cotacao-fornecedor-rapido :is(.input, input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+  border-color: rgba(71, 101, 142, 0.84) !important;
+  background: rgba(19, 35, 58, 0.96) !important;
+  color: #eef5ff !important;
+  -webkit-text-fill-color: #eef5ff !important;
+}
+
+.dark .layout-shell .cotacao-gestao-page .cotacao-fornecedores-panel :is(.input, input, textarea)::placeholder,
+.dark .layout-shell .cotacao-gestao-page .cotacao-fornecedor-rapido :is(.input, input, textarea)::placeholder {
+  color: #9fb3cf !important;
+  -webkit-text-fill-color: #9fb3cf !important;
+}
+
+.dark .layout-shell .cotacao-gestao-page .cotacao-fornecedores-autocomplete button:hover,
+.dark .layout-shell .cotacao-gestao-page .cotacao-fornecedores-autocomplete .bg-blue-50 {
+  background: rgba(37, 99, 235, 0.24) !important;
+}
+
+.dark .layout-shell .cotacao-gestao-page .cotacao-fornecedores-list .app-list-card,
+.dark .layout-shell .cotacao-gestao-page .sol-surface-card > .mt-4.rounded-2xl .rounded-lg {
+  border-color: rgba(71, 101, 142, 0.72) !important;
+  background: rgba(7, 17, 30, 0.62) !important;
+}
+
 .layout-shell .compras-cotacoes-page .compras-col-codigo-curto {
   width: 4.4rem;
 }
