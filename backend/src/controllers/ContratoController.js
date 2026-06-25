@@ -522,6 +522,13 @@ async function usuarioPodeAcessarObraContrato(req, obraId) {
     return true;
   }
 
+  if (
+    !(await shouldRestrictContratosToObras(req.user)) &&
+    await canManageContratos(req.user)
+  ) {
+    return true;
+  }
+
   const obrasPermitidas = await getUserObraScopeIds(req.user);
   if (obrasPermitidas === null) {
     return true;
