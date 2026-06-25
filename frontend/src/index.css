@@ -10296,6 +10296,7 @@ body {
   width: 100%;
   max-width: 100%;
   overflow-x: auto;
+  overscroll-behavior-x: contain;
   border: 1px solid var(--shell-border, var(--ui-border));
   border-radius: 1rem;
   background: color-mix(in srgb, var(--shell-panel, #fff) 96%, var(--module-contratos, #cc7600) 4%);
@@ -10303,7 +10304,7 @@ body {
 }
 
 .layout-shell .contratos-data-table {
-  min-width: 88rem;
+  min-width: max-content;
   table-layout: fixed;
   border-collapse: collapse;
   border-spacing: 0;
@@ -10315,6 +10316,8 @@ body {
   letter-spacing: 0.06em;
   line-height: 1.25;
   white-space: normal;
+  position: relative;
+  min-width: 0;
 }
 
 .layout-shell .contratos-data-table td {
@@ -10324,52 +10327,13 @@ body {
   vertical-align: top;
   border-bottom: 1px solid color-mix(in srgb, var(--shell-border, var(--ui-border)) 72%, transparent);
   border-radius: 0 !important;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: clip;
 }
 
 .layout-shell .contratos-data-table tbody tr:last-child td {
   border-bottom: 0;
-}
-
-.layout-shell .contratos-data-table th:nth-child(1),
-.layout-shell .contratos-data-table td:nth-child(1) {
-  width: 3.2rem;
-}
-
-.layout-shell .contratos-data-table th:nth-child(2),
-.layout-shell .contratos-data-table td:nth-child(2) {
-  width: 7.5rem;
-}
-
-.layout-shell .contratos-data-table th:nth-child(3),
-.layout-shell .contratos-data-table td:nth-child(3) {
-  width: 12rem;
-}
-
-.layout-shell .contratos-data-table th:nth-child(5),
-.layout-shell .contratos-data-table td:nth-child(5),
-.layout-shell .contratos-data-table th:nth-child(6),
-.layout-shell .contratos-data-table td:nth-child(6),
-.layout-shell .contratos-data-table th:nth-child(7),
-.layout-shell .contratos-data-table td:nth-child(7) {
-  width: 11rem;
-}
-
-.layout-shell .contratos-data-table th:nth-child(8),
-.layout-shell .contratos-data-table td:nth-child(8),
-.layout-shell .contratos-data-table th:nth-child(9),
-.layout-shell .contratos-data-table td:nth-child(9),
-.layout-shell .contratos-data-table th:nth-child(10),
-.layout-shell .contratos-data-table td:nth-child(10),
-.layout-shell .contratos-data-table th:nth-child(11),
-.layout-shell .contratos-data-table td:nth-child(11),
-.layout-shell .contratos-data-table th:nth-child(12),
-.layout-shell .contratos-data-table td:nth-child(12) {
-  width: 8.2rem;
-}
-
-.layout-shell .contratos-data-table th:nth-child(13),
-.layout-shell .contratos-data-table td:nth-child(13) {
-  width: 7rem;
 }
 
 .layout-shell .contratos-selectable-row {
@@ -10407,6 +10371,19 @@ body {
 .layout-shell .contratos-text-cell,
 .layout-shell .contratos-description-cell {
   overflow-wrap: anywhere;
+  word-break: normal;
+  white-space: normal;
+}
+
+.layout-shell .contratos-primary-cell,
+.layout-shell .contratos-data-table td[data-label="Obra"],
+.layout-shell .contratos-data-table td[data-label="Ref. do Contrato"] {
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+
+.layout-shell .contratos-data-table td.text-right {
+  white-space: nowrap;
 }
 
 .layout-shell .contratos-table-input,

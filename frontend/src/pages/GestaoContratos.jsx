@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   HiArrowDownTray,
   HiArrowUpTray,
@@ -33,6 +33,23 @@ import {
 } from '../services/contratos';
 import { listarApropriacoes } from '../services/apropriacoes';
 import { buscarParceiros } from '../services/parceiros';
+import { ResizableTable, ResizableTh } from '../components/ResizableTable';
+
+const CONTRATOS_TABLE_COLUMNS = [
+  { key: 'selecionar', width: 56, minWidth: 48 },
+  { key: 'contrato', width: 122, minWidth: 104 },
+  { key: 'obra', width: 190, minWidth: 150 },
+  { key: 'ref_contrato', width: 160, minWidth: 125 },
+  { key: 'descricao', width: 220, minWidth: 150 },
+  { key: 'credores', width: 190, minWidth: 145 },
+  { key: 'apropriacao', width: 230, minWidth: 160 },
+  { key: 'solicitado', width: 150, minWidth: 130 },
+  { key: 'pago', width: 130, minWidth: 115 },
+  { key: 'a_pagar', width: 145, minWidth: 125 },
+  { key: 'ajuste_solicitado', width: 155, minWidth: 130 },
+  { key: 'ajuste_pago', width: 135, minWidth: 120 },
+  { key: 'qtd_solicitacoes', width: 128, minWidth: 112 }
+];
 
 export default function GestaoContratos() {
   const { user } = useAuth();
@@ -93,6 +110,7 @@ export default function GestaoContratos() {
   const podeGerenciarContratos = canManageContratos(user);
   const contratoSelecionado = contratos.find(item => String(item.id) === String(contratoSelecionadoId)) || null;
   const contratoEmEdicao = contratos.find(item => String(item.id) === String(editandoId)) || null;
+  const contratosTableColumns = useMemo(() => CONTRATOS_TABLE_COLUMNS, []);
 
   useEffect(() => {
     if (podeAcessar) {
@@ -1226,28 +1244,32 @@ export default function GestaoContratos() {
 
       <div className="card sol-surface-card app-table-shell contratos-table-card">
         <div className="table-wrapper contratos-table-wrapper">
-          <table className="table contratos-data-table">
+          <ResizableTable
+            className="table contratos-data-table"
+            columns={contratosTableColumns}
+            storageKey="fluxy.contratos.gestao.columnWidths"
+          >
             <thead>
               <tr>
-                <th className="text-left p-3 contratos-select-col">Sel.</th>
-                <th className="text-left p-3">Contrato</th>
-                <th className="text-left p-3">Obra</th>
-                <th className="text-left p-3">Ref. do Contrato</th>
-                <th className="text-left p-3">Descrição</th>
-                <th className="text-left p-3">Credores</th>
-                <th className="text-left p-3">Itens de Apropriação</th>
-                <th className="text-right p-3">Solicitado</th>
-                <th className="text-right p-3">Pago</th>
-                <th className="text-right p-3">A pagar</th>
-                <th className="text-right p-3">Ajuste Solicitado</th>
-                <th className="text-right p-3">Ajuste Pago</th>
-                <th className="text-right p-3">Qtd. Solicitações</th>
+                <ResizableTh columnKey="selecionar" className="text-left p-3 contratos-select-col">Sel.</ResizableTh>
+                <ResizableTh columnKey="contrato" className="text-left p-3">Contrato</ResizableTh>
+                <ResizableTh columnKey="obra" className="text-left p-3">Obra</ResizableTh>
+                <ResizableTh columnKey="ref_contrato" className="text-left p-3">Ref. do Contrato</ResizableTh>
+                <ResizableTh columnKey="descricao" className="text-left p-3">Descrição</ResizableTh>
+                <ResizableTh columnKey="credores" className="text-left p-3">Credores</ResizableTh>
+                <ResizableTh columnKey="apropriacao" className="text-left p-3">Itens de Apropriação</ResizableTh>
+                <ResizableTh columnKey="solicitado" className="text-right p-3">Solicitado</ResizableTh>
+                <ResizableTh columnKey="pago" className="text-right p-3">Pago</ResizableTh>
+                <ResizableTh columnKey="a_pagar" className="text-right p-3">A pagar</ResizableTh>
+                <ResizableTh columnKey="ajuste_solicitado" className="text-right p-3">Ajuste Solicitado</ResizableTh>
+                <ResizableTh columnKey="ajuste_pago" className="text-right p-3">Ajuste Pago</ResizableTh>
+                <ResizableTh columnKey="qtd_solicitacoes" className="text-right p-3">Qtd. Solicitações</ResizableTh>
               </tr>
             </thead>
             <tbody>
               {contratos.length === 0 && (
                 <tr>
-                  <td colSpan="13" className="p-4 text-center text-gray-500">
+                  <td colSpan={contratosTableColumns.length} className="p-4 text-center text-gray-500">
                     Nenhum contrato encontrado.
                   </td>
                 </tr>
@@ -1314,7 +1336,7 @@ export default function GestaoContratos() {
                 );
               })}
             </tbody>
-          </table>
+          </ResizableTable>
         </div>
       </div>
 
