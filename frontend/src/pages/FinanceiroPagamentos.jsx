@@ -67,6 +67,8 @@ const BATCH_STEPS = [
   { statuses: ['AGUARDANDO_CONFIRMACAO_BAIXA', 'BAIXADO'], label: 'Baixa' }
 ];
 
+const REQUIRED_PAYMENT_BATCH_APPROVALS = 1;
+
 function today() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -213,14 +215,14 @@ function buildBatchGuidance(batch, approvalsCount, isBbRealProvider) {
     return {
       eyebrow: 'Proximo passo',
       title: 'Submeter o lote para aprovacao',
-      body: 'Confira conta pagadora, valor total e favorecidos antes de iniciar a dupla aprovacao.'
+      body: 'Confira conta pagadora, valor total e favorecidos antes de iniciar a aprovacao com MFA.'
     };
   }
   if (status === 'PENDENTE_APROVACAO') {
     return {
       eyebrow: 'Aprovacao',
-      title: `${approvalsCount}/2 aprovacoes registradas`,
-      body: 'Cada aprovador deve conferir os itens e informar MFA proprio. O criador do lote nao aprova o proprio lote.'
+      title: `${approvalsCount}/${REQUIRED_PAYMENT_BATCH_APPROVALS} aprovacao registrada`,
+      body: 'O aprovador deve conferir os itens e informar MFA proprio. O criador do lote nao aprova o proprio lote.'
     };
   }
   if (status === 'APROVADO') {
@@ -754,7 +756,7 @@ export default function FinanceiroPagamentos() {
           <div>
               <h1 className="text-xl font-semibold md:text-2xl">Pagamentos em Massa</h1>
               <p className="page-subtitle">
-                Motor interno para lotes PIX por chave, com dupla aprovacao, integracao Banco do Brasil e baixa semiautomatica.
+                Motor interno para lotes PIX por chave, com aprovacao por MFA, integracao Banco do Brasil e baixa semiautomatica.
               </p>
             </div>
             <div className="app-page-actions">
@@ -1117,7 +1119,7 @@ export default function FinanceiroPagamentos() {
                       <div className="flex flex-wrap gap-2">
                         <span className={statusClass(selectedBatch.status)}>{selectedBatch.status}</span>
                         <span className="app-status-pill bg-slate-100 text-slate-700">{formatCurrency(selectedBatch.valor_total)}</span>
-                        <span className="app-status-pill bg-slate-100 text-slate-700">{validApprovals.length}/2 aprovacoes</span>
+                        <span className="app-status-pill bg-slate-100 text-slate-700">{validApprovals.length}/{REQUIRED_PAYMENT_BATCH_APPROVALS} aprovacao</span>
                       </div>
                     </div>
 

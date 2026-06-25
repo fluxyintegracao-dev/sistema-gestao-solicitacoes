@@ -4,6 +4,8 @@ const { verifyTotpCode } = require('./mfaService');
 const { validatePaymentBatchIntegrity } = require('./paymentBatchIntegrityService');
 const { registrarEventoSeguranca } = require('./securityLogService');
 
+const REQUIRED_PAYMENT_BATCH_APPROVALS = 1;
+
 function createHttpError(statusCode, message) {
   const error = new Error(message);
   error.statusCode = statusCode;
@@ -51,7 +53,7 @@ function getBatchIntegrityHash(batch) {
   return integrityHash;
 }
 
-async function assertApprovalHashesMatchCurrentBatch(batch, { transaction = null, requireTwoApprovals = false } = {}) {
+async function assertApprovalHashesMatchCurrentBatch(batch, { transaction = null, requireMinimumApprovals = false } = {}) {
   const currentHash = getBatchIntegrityHash(batch);
   const approvals = await PaymentApproval.findAll({
     where: {
@@ -64,8 +66,8 @@ async function assertApprovalHashesMatchCurrentBatch(batch, { transaction = null
     transaction
   });
 
-  if (requireTwoApprovals && approvals.length < 2) {
-    throw createHttpError(400, 'Lote exige duas aprovacoes validas.');
+  if (requireMinimumApprovals && approvals.length < REQUIRED_PAYMENT_BATCH_APPROVALS) {
+    throw createHttpError(400, `Lote exige ${REQUIRED_PAYMENT_BATCH_APPROVALS} aprovacao valida.`);
   }
 
   for (const approval of approvals) {
@@ -106,7 +108,7 @@ async function approveBatchWithMfa(req, id, payload = {}) {
       transaction
     });
     if (approvalAlreadyRegistered) {
-      throw createHttpError(409, 'Este usuario ja aprovou este lote. A dupla aprovacao exige aprovadores diferentes.');
+      throw createHttpError(409, 'Este usuario ja aprovou este lote.');
     }
     await assertApprovalHashesMatchCurrentBatch(batch, { transaction });
 
@@ -126,7 +128,7 @@ async function approveBatchWithMfa(req, id, payload = {}) {
     }, { transaction });
 
     const approvals = await countValidApprovals(batch.id, { transaction });
-    if (approvals >= 2) {
+    if (approvals >= REQUIRED_PAYMENT_BATCH_APPROVALS) {
       const intentIds = batch.items.map((item) => item.payment_intent_id);
       await batch.update({
         status: 'APROVADO',
@@ -209,6 +211,7 @@ async function rejectBatch(req, id, payload = {}) {
 }
 
 module.exports = {
+  REQUIRED_PAYMENT_BATCH_APPROVALS,
   assertApprovalHashesMatchCurrentBatch,
   approveBatchWithMfa,
   countValidApprovals,

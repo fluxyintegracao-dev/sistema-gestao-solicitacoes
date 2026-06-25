@@ -8,6 +8,7 @@ const {
 } = require('../services/parceiroService');
 const {
   obterConfigCamposNovaSolicitacao,
+  obterOpcoesNovaSolicitacao,
   resolverCamposNovaSolicitacao
 } = require('../services/novaSolicitacaoCamposConfig');
 const { responderErroController } = require('../utils/controllerError');
@@ -342,6 +343,13 @@ module.exports = {
         return res.status(403).json({ error: 'Cadastro de credor nao habilitado para este tipo de solicitacao.' });
       }
 
+      const opcoesNovaSolicitacao = obterOpcoesNovaSolicitacao(
+        configCampos,
+        tipoSolicitacaoId,
+        areaResponsavel
+      );
+      const permiteCredorAvulsoComContrato = opcoesNovaSolicitacao.permitir_credor_avulso_com_contrato === true;
+
       const payload = {
         ...req.body,
         fornecedor: true,
@@ -356,7 +364,7 @@ module.exports = {
       delete payload.contrato_id;
 
       const parceiro = await criarParceiro(payload);
-      if (contrato) {
+      if (contrato && !permiteCredorAvulsoComContrato) {
         const [vinculo, criado] = await ContratoCredor.findOrCreate({
           where: {
             contrato_id: contrato.id,

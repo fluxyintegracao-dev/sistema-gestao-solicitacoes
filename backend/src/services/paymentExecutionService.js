@@ -13,6 +13,7 @@ const {
 } = require('../models');
 const { env } = require('../config/env');
 const {
+  REQUIRED_PAYMENT_BATCH_APPROVALS,
   assertApprovalHashesMatchCurrentBatch,
   countValidApprovals,
   verifyMfaStepUp
@@ -174,15 +175,15 @@ async function enqueueSendBatch(req, id, payload = {}) {
   if (String(batch.status || '').toUpperCase() !== 'APROVADO') {
     throw createHttpError(400, 'Lote precisa estar aprovado para envio.');
   }
-  if ((await countValidApprovals(batch.id)) < 2) {
-    throw createHttpError(400, 'Lote exige duas aprovacoes validas.');
+  if ((await countValidApprovals(batch.id)) < REQUIRED_PAYMENT_BATCH_APPROVALS) {
+    throw createHttpError(400, `Lote exige ${REQUIRED_PAYMENT_BATCH_APPROVALS} aprovacao valida.`);
   }
   const integrityBatch = await validatePaymentBatchIntegrity(batch.id, {
     expectedBatchStatuses: ['APROVADO'],
     expectedIntentStatuses: ['APROVADO'],
     phaseLabel: 'envio ao banco'
   });
-  await assertApprovalHashesMatchCurrentBatch(integrityBatch, { requireTwoApprovals: true });
+  await assertApprovalHashesMatchCurrentBatch(integrityBatch, { requireMinimumApprovals: true });
 
   await ensureNoPendingSendJob(batch.id);
   const job = await createSendBatchJob(batch.id);
@@ -205,14 +206,14 @@ async function reprocessBatch(req, id, payload = {}) {
     throw createHttpError(400, 'Apenas lotes com falha ou rejeicao podem ser reprocessados.');
   }
 
-  if ((await countValidApprovals(batch.id)) < 2) {
-    throw createHttpError(400, 'Lote exige duas aprovacoes validas para reprocessamento.');
+  if ((await countValidApprovals(batch.id)) < REQUIRED_PAYMENT_BATCH_APPROVALS) {
+    throw createHttpError(400, `Lote exige ${REQUIRED_PAYMENT_BATCH_APPROVALS} aprovacao valida para reprocessamento.`);
   }
   const integrityBatch = await validatePaymentBatchIntegrity(batch.id, {
     expectedBatchStatuses: reprocessableBatchStatuses,
     phaseLabel: 'reprocessamento'
   });
-  await assertApprovalHashesMatchCurrentBatch(integrityBatch, { requireTwoApprovals: true });
+  await assertApprovalHashesMatchCurrentBatch(integrityBatch, { requireMinimumApprovals: true });
 
   await ensureNoPendingSendJob(batch.id);
 
@@ -321,7 +322,7 @@ async function processSendBatchJob(req, jobId) {
       expectedIntentStatuses: ['APROVADO'],
       phaseLabel: 'processamento do envio ao banco'
     });
-    await assertApprovalHashesMatchCurrentBatch(integrityBatch, { transaction, requireTwoApprovals: true });
+    await assertApprovalHashesMatchCurrentBatch(integrityBatch, { transaction, requireMinimumApprovals: true });
 
     const intentIds = batch.items.map((item) => item.payment_intent_id);
     const attemptNumber = await PaymentTransaction.count({
@@ -425,15 +426,15 @@ async function enqueueBbSandboxSendBatch(req, id, payload = {}) {
   if (String(batch.status || '').toUpperCase() !== 'APROVADO') {
     throw createHttpError(400, 'Lote precisa estar aprovado para envio ao Banco do Brasil.');
   }
-  if ((await countValidApprovals(batch.id)) < 2) {
-    throw createHttpError(400, 'Lote exige duas aprovacoes validas.');
+  if ((await countValidApprovals(batch.id)) < REQUIRED_PAYMENT_BATCH_APPROVALS) {
+    throw createHttpError(400, `Lote exige ${REQUIRED_PAYMENT_BATCH_APPROVALS} aprovacao valida.`);
   }
   const integrityBatch = await validatePaymentBatchIntegrity(batch.id, {
     expectedBatchStatuses: ['APROVADO'],
     expectedIntentStatuses: ['APROVADO'],
     phaseLabel: 'envio ao Banco do Brasil'
   });
-  await assertApprovalHashesMatchCurrentBatch(integrityBatch, { requireTwoApprovals: true });
+  await assertApprovalHashesMatchCurrentBatch(integrityBatch, { requireMinimumApprovals: true });
 
   await ensureNoPendingSendJob(batch.id);
   const job = await createPaymentJob(batch.id, 'BB_SUBMIT_PIX_BATCH');
@@ -460,7 +461,7 @@ async function processBbSubmitPixBatchJob(req, jobId) {
     expectedIntentStatuses: ['APROVADO'],
     phaseLabel: 'processamento do envio ao Banco do Brasil'
   });
-  await assertApprovalHashesMatchCurrentBatch(integrityBatch, { requireTwoApprovals: true });
+  await assertApprovalHashesMatchCurrentBatch(integrityBatch, { requireMinimumApprovals: true });
 
   const startedAt = new Date();
   const attemptNumber = await PaymentTransaction.count({

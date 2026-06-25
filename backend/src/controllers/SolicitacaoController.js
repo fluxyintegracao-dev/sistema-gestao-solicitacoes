@@ -74,6 +74,7 @@ const {
 } = require('../services/solicitacaoRealtimeService');
 const {
   obterConfigCamposNovaSolicitacao,
+  obterOpcoesNovaSolicitacao,
   resolverCamposNovaSolicitacao
 } = require('../services/novaSolicitacaoCamposConfig');
 const { isObraCentroCusto } = require('../constants/centroCusto');
@@ -2128,7 +2129,13 @@ module.exports = {
       let parceiro = null;
 
       const permiteCredorNaSolicitacao = campoVisivel('credor') || campoVisivel('cadastro_credor');
-      const permiteCredorAvulsoPorCadastroRapido = campoVisivel('cadastro_credor');
+      const opcoesNovaSolicitacao = obterOpcoesNovaSolicitacao(
+        configCamposNovaSolicitacao,
+        tipo_solicitacao_id || tipo_macro_id,
+        area_responsavel
+      );
+      const permiteCredorAvulsoComContrato = opcoesNovaSolicitacao.permitir_credor_avulso_com_contrato === true;
+      const permiteVincularCredorPorCadastroRapido = campoVisivel('cadastro_credor') && !permiteCredorAvulsoComContrato;
 
       if (permiteCredorNaSolicitacao && parceiro_id !== undefined && parceiro_id !== null && parceiro_id !== '') {
         parceiro = await Parceiro.findByPk(Number(parceiro_id), {
@@ -2158,32 +2165,34 @@ module.exports = {
           });
 
           if (!credorVinculado) {
-            if (!permiteCredorAvulsoPorCadastroRapido) {
+            if (!permiteCredorAvulsoComContrato && !permiteVincularCredorPorCadastroRapido) {
               return res.status(400).json({
                 error: 'O credor selecionado nao esta vinculado ao contrato informado. Solicite ao setor de Gerencia de Processo o cadastro ou vinculo correto.'
               });
             }
 
-            const vinculoInativo = await ContratoCredor.findOne({
-              where: {
-                contrato_id: Number(contrato_id),
-                parceiro_id: Number(parceiro_id)
-              },
-              attributes: ['id', 'observacao', 'ativo']
-            });
+            if (!permiteCredorAvulsoComContrato) {
+              const vinculoInativo = await ContratoCredor.findOne({
+                where: {
+                  contrato_id: Number(contrato_id),
+                  parceiro_id: Number(parceiro_id)
+                },
+                attributes: ['id', 'observacao', 'ativo']
+              });
 
-            if (vinculoInativo) {
-              await vinculoInativo.update({
-                ativo: true,
-                observacao: vinculoInativo.observacao || 'Reativado automaticamente pelo cadastro rapido da nova solicitacao.'
-              });
-            } else {
-              await ContratoCredor.create({
-                contrato_id: Number(contrato_id),
-                parceiro_id: Number(parceiro_id),
-                observacao: 'Vinculado automaticamente pelo cadastro rapido da nova solicitacao.',
-                ativo: true
-              });
+              if (vinculoInativo) {
+                await vinculoInativo.update({
+                  ativo: true,
+                  observacao: vinculoInativo.observacao || 'Reativado automaticamente pelo cadastro rapido da nova solicitacao.'
+                });
+              } else {
+                await ContratoCredor.create({
+                  contrato_id: Number(contrato_id),
+                  parceiro_id: Number(parceiro_id),
+                  observacao: 'Vinculado automaticamente pelo cadastro rapido da nova solicitacao.',
+                  ativo: true
+                });
+              }
             }
           }
         }

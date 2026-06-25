@@ -17,7 +17,7 @@ import PendingAttachmentsList from '../components/attachments/PendingAttachments
 import { userHasSetorCapability } from '../utils/setor';
 import { hasEnabledModule } from '../utils/acessoProduto';
 import { applyTipoSolicitacaoModuleAvailability, getTipoSolicitacaoBehavior } from '../utils/tipoSolicitacao';
-import { resolverCamposNovaSolicitacaoFrontend } from '../utils/novaSolicitacaoCampos';
+import { obterOpcoesNovaSolicitacaoFrontend, resolverCamposNovaSolicitacaoFrontend } from '../utils/novaSolicitacaoCampos';
 import {
   normalizarConfigAutomacaoDestinoNovaSolicitacao,
   obterRegraAutomacaoDestinoNovaSolicitacao
@@ -374,7 +374,7 @@ export default function NovaSolicitacao() {
         ...payload,
         tipo_solicitacao_id: form.tipo_solicitacao_id,
         area_responsavel: form.area_responsavel,
-        contrato_id: form.contrato_id || null
+        contrato_id: permitirCredorAvulsoComContrato ? null : (form.contrato_id || null)
       });
       selecionarParceiro(parceiro);
       setNovoParceiro(criarNovoParceiroPadrao());
@@ -434,6 +434,13 @@ export default function NovaSolicitacao() {
   ), [comportamentoTipo, camposNovaSolicitacaoConfig, form.tipo_solicitacao_id, form.area_responsavel, moduloApropriacoesHabilitado]);
   const campoVisivel = (campo) => camposNovaSolicitacao?.[campo]?.visivel !== false;
   const campoObrigatorio = (campo) => Boolean(camposNovaSolicitacao?.[campo]?.obrigatorio);
+  const opcoesNovaSolicitacao = useMemo(() => (
+    obterOpcoesNovaSolicitacaoFrontend(
+      camposNovaSolicitacaoConfig,
+      form.tipo_solicitacao_id,
+      form.area_responsavel
+    )
+  ), [camposNovaSolicitacaoConfig, form.tipo_solicitacao_id, form.area_responsavel]);
   const subtipoObrigatorio = campoObrigatorio('subtipo');
   const medicaoObrigatoria = campoObrigatorio('periodo_medicao');
   const solicitacaoCompra = !comportamentoTipo.mostrar_apropriacao_principal && !comportamentoTipo.mostrar_valor;
@@ -449,6 +456,8 @@ export default function NovaSolicitacao() {
   const exibirCampoCredor = campoVisivel('credor');
   const exibirCadastroCredor = campoVisivel('cadastro_credor');
   const permitirVinculoCredor = exibirCampoCredor || exibirCadastroCredor;
+  const permitirCredorAvulsoComContrato = opcoesNovaSolicitacao.permitir_credor_avulso_com_contrato === true;
+  const restringirCredorAoContrato = exibirCamposContrato && !permitirCredorAvulsoComContrato;
   const exibirDataVencimento = campoVisivel('data_vencimento');
   const dataVencimentoObrigatoria = campoObrigatorio('data_vencimento');
   const exibirDataDemissao = campoVisivel('data_demissao');
@@ -592,11 +601,16 @@ export default function NovaSolicitacao() {
       ...prev,
       contrato_id: String(contrato.id),
       codigo_contrato: contrato.codigo || '',
-      parceiro_id: credores.length === 1 ? String(credores[0].id) : ''
+      parceiro_id: permitirCredorAvulsoComContrato ? prev.parceiro_id : (credores.length === 1 ? String(credores[0].id) : '')
     }));
     setRefContratoBusca(contrato.ref_contrato || '');
     setRefResultados([]);
     setApropriacoesContratoRateio(normalizarApropriacoesContratoParaRateio(contrato));
+    if (permitirCredorAvulsoComContrato) {
+      setParceiroResultados([]);
+      setParceiroBuscaExecutada(false);
+      return;
+    }
     if (credores.length === 1) {
       setParceiroSelecionado(credores[0]);
       setParceiroBusca(credores[0].nome || credores[0].cpf_cnpj || '');
@@ -1027,7 +1041,7 @@ export default function NovaSolicitacao() {
     return (
       <label className={className}>
         Credor
-        {exibirCamposContrato ? (
+        {restringirCredorAoContrato ? (
           <>
             <div className="relative">
               <div className="flex gap-2 nova-solicitacao-inline-actions">
@@ -1203,6 +1217,11 @@ export default function NovaSolicitacao() {
               >
                 Cadastrar novo credor
               </button>
+            )}
+            {exibirCamposContrato && permitirCredorAvulsoComContrato && (
+              <span className="mt-2 block text-xs text-gray-500">
+                Credor livre para este tipo de solicitacao; o contrato permanece vinculado para referencia e apropriacao.
+              </span>
             )}
           </>
         )}

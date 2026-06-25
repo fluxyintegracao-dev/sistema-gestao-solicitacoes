@@ -16,6 +16,14 @@ export const CAMPOS_NOVA_SOLICITACAO = [
   { id: 'anexos', label: 'Anexos', descricao: 'Arquivos anexados na abertura da solicitacao.', permiteObrigatorio: false }
 ];
 
+export const OPCOES_NOVA_SOLICITACAO = [
+  {
+    id: 'permitir_credor_avulso_com_contrato',
+    label: 'Credor livre com contrato',
+    descricao: 'Permite selecionar ou cadastrar credor sem vinculo com o contrato selecionado.'
+  }
+];
+
 function boolOrDefault(value, fallback) {
   if (typeof value === 'boolean') return value;
   if (value === undefined || value === null || value === '') return Boolean(fallback);
@@ -45,6 +53,34 @@ function obterRegraCampos(config, tipoId, areaResponsavel) {
     config?.regras?.[tipoKey]?.campos ||
     {}
   );
+}
+
+function obterRegraTipo(config, tipoId, areaResponsavel) {
+  const tipoKey = normalizarTipoKey(tipoId);
+  const areaKey = normalizarAreaNovaSolicitacao(areaResponsavel);
+
+  return (
+    config?.regras?.[areaKey]?.tipos?.[tipoKey] ||
+    config?.regras?.__GLOBAL__?.tipos?.[tipoKey] ||
+    config?.regras?.[tipoKey] ||
+    {}
+  );
+}
+
+function normalizarOpcoesTipo(opcoesRaw) {
+  const opcoes = {};
+  const idsValidos = new Set(OPCOES_NOVA_SOLICITACAO.map((opcao) => opcao.id));
+
+  Object.entries(opcoesRaw && typeof opcoesRaw === 'object' ? opcoesRaw : {}).forEach(([opcaoId, valor]) => {
+    if (!idsValidos.has(opcaoId)) return;
+    opcoes[opcaoId] = boolOrDefault(valor, false);
+  });
+
+  return opcoes;
+}
+
+export function obterOpcoesNovaSolicitacaoFrontend(config, tipoId, areaResponsavel) {
+  return normalizarOpcoesTipo(obterRegraTipo(config, tipoId, areaResponsavel)?.opcoes);
 }
 
 function padraoCampo(id, behavior = {}, contexto = {}) {
@@ -156,7 +192,8 @@ export function normalizarConfigCamposNovaSolicitacao(config) {
         const tipoKey = normalizarTipoKey(tipoId);
         if (!tipoKey) return;
         tipos[tipoKey] = {
-          campos: normalizarCampos(regraTipo?.campos)
+          campos: normalizarCampos(regraTipo?.campos),
+          opcoes: normalizarOpcoesTipo(regraTipo?.opcoes)
         };
       });
 
@@ -171,7 +208,8 @@ export function normalizarConfigCamposNovaSolicitacao(config) {
         regras.__GLOBAL__ = { tipos: {} };
       }
       regras.__GLOBAL__.tipos[tipoKey] = {
-        campos: normalizarCampos(regraAreaOuTipo.campos)
+        campos: normalizarCampos(regraAreaOuTipo.campos),
+        opcoes: normalizarOpcoesTipo(regraAreaOuTipo.opcoes)
       };
     }
   });

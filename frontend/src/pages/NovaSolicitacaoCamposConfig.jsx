@@ -7,8 +7,10 @@ import { hasEnabledModule } from '../utils/acessoProduto';
 import { applyTipoSolicitacaoModuleAvailability, getTipoSolicitacaoBehavior } from '../utils/tipoSolicitacao';
 import {
   CAMPOS_NOVA_SOLICITACAO,
+  OPCOES_NOVA_SOLICITACAO,
   normalizarConfigCamposNovaSolicitacao,
   normalizarAreaNovaSolicitacao,
+  obterOpcoesNovaSolicitacaoFrontend,
   resolverCamposNovaSolicitacaoFrontend
 } from '../utils/novaSolicitacaoCampos';
 
@@ -110,6 +112,9 @@ export default function NovaSolicitacaoCamposConfig() {
       }
     )
   ), [comportamentoTipo, regras, tipoSelecionadoId, areaSelecionada, moduloApropriacoesHabilitado]);
+  const opcoesTipo = useMemo(() => (
+    obterOpcoesNovaSolicitacaoFrontend({ regras }, tipoSelecionadoId, areaSelecionada)
+  ), [regras, tipoSelecionadoId, areaSelecionada]);
 
   function atualizarCampo(campoId, patch) {
     const definicao = CAMPOS_NOVA_SOLICITACAO.find((campo) => campo.id === campoId);
@@ -118,7 +123,8 @@ export default function NovaSolicitacaoCamposConfig() {
 
     setRegras((prev) => {
       const atualTiposArea = prev[areaKey]?.tipos || {};
-      const atualTipo = atualTiposArea[String(tipoSelecionadoId)]?.campos || {};
+      const atualRegraTipo = atualTiposArea[String(tipoSelecionadoId)] || {};
+      const atualTipo = atualRegraTipo.campos || {};
       const atualCampo = atualTipo[campoId] || {
         visivel: camposResolvidos[campoId]?.visivel_padrao ?? true,
         obrigatorio: camposResolvidos[campoId]?.obrigatorio_padrao ?? false
@@ -138,9 +144,36 @@ export default function NovaSolicitacaoCamposConfig() {
           tipos: {
             ...atualTiposArea,
             [String(tipoSelecionadoId)]: {
+              opcoes: atualRegraTipo.opcoes || {},
               campos: {
                 ...atualTipo,
                 [campoId]: proximoCampo
+              }
+            }
+          }
+        }
+      };
+    });
+  }
+
+  function atualizarOpcao(opcaoId, valor) {
+    if (!tipoSelecionadoId || !areaSelecionada) return;
+    const areaKey = normalizarAreaNovaSolicitacao(areaSelecionada);
+
+    setRegras((prev) => {
+      const atualTiposArea = prev[areaKey]?.tipos || {};
+      const atualTipo = atualTiposArea[String(tipoSelecionadoId)] || {};
+
+      return {
+        ...prev,
+        [areaKey]: {
+          tipos: {
+            ...atualTiposArea,
+            [String(tipoSelecionadoId)]: {
+              campos: atualTipo.campos || {},
+              opcoes: {
+                ...(atualTipo.opcoes || {}),
+                [opcaoId]: Boolean(valor)
               }
             }
           }
@@ -254,6 +287,34 @@ export default function NovaSolicitacaoCamposConfig() {
         </section>
 
         <section className="card overflow-hidden">
+          <div className="border-b border-[var(--c-border)] px-4 py-4">
+            <div className="mb-3">
+              <h3 className="text-sm font-semibold text-[var(--c-text)]">Regras operacionais deste tipo</h3>
+              <p className="mt-1 text-xs text-[var(--c-muted)]">
+                Ajustes que mudam a validacao do fluxo sem alterar a visibilidade dos campos.
+              </p>
+            </div>
+            <div className="grid gap-3">
+              {OPCOES_NOVA_SOLICITACAO.map((opcao) => (
+                <label
+                  key={opcao.id}
+                  className="flex items-start gap-3 rounded-lg border border-[var(--c-border)] bg-[var(--c-surface-muted)] px-3 py-3"
+                >
+                  <input
+                    type="checkbox"
+                    className="mt-1"
+                    checked={Boolean(opcoesTipo[opcao.id])}
+                    disabled={!areaSelecionada || !tipoSelecionadoId}
+                    onChange={(event) => atualizarOpcao(opcao.id, event.target.checked)}
+                  />
+                  <span>
+                    <span className="block text-sm font-semibold text-[var(--c-text)]">{opcao.label}</span>
+                    <span className="mt-1 block text-xs text-[var(--c-muted)]">{opcao.descricao}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
               <thead>

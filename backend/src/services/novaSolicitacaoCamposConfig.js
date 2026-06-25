@@ -2,6 +2,14 @@ const { ConfiguracaoSistema } = require('../models');
 
 const CHAVE_NOVA_SOLICITACAO_CAMPOS = 'NOVA_SOLICITACAO_CAMPOS_POR_TIPO';
 
+const OPCOES_NOVA_SOLICITACAO = [
+  {
+    id: 'permitir_credor_avulso_com_contrato',
+    label: 'Credor livre com contrato',
+    descricao: 'Permite selecionar ou cadastrar credor sem vinculo com o contrato selecionado.'
+  }
+];
+
 const CAMPOS_NOVA_SOLICITACAO = [
   {
     id: 'obra',
@@ -178,6 +186,18 @@ function normalizarMapaCampos(camposRaw) {
   return campos;
 }
 
+function normalizarOpcoesTipo(opcoesRaw) {
+  const opcoes = {};
+  const idsValidos = new Set(OPCOES_NOVA_SOLICITACAO.map((opcao) => opcao.id));
+
+  Object.entries(opcoesRaw && typeof opcoesRaw === 'object' ? opcoesRaw : {}).forEach(([opcaoId, valor]) => {
+    if (!idsValidos.has(opcaoId)) return;
+    opcoes[opcaoId] = boolOrDefault(valor, false);
+  });
+
+  return opcoes;
+}
+
 function normalizarConfigCampos(raw) {
   const regrasRaw = raw?.regras && typeof raw.regras === 'object' ? raw.regras : {};
   const regras = {};
@@ -192,7 +212,8 @@ function normalizarConfigCampos(raw) {
         const tipoKey = normalizarTipoKey(tipoId);
         if (!tipoKey) return;
         tipos[tipoKey] = {
-          campos: normalizarMapaCampos(regraTipo?.campos)
+          campos: normalizarMapaCampos(regraTipo?.campos),
+          opcoes: normalizarOpcoesTipo(regraTipo?.opcoes)
         };
       });
 
@@ -207,7 +228,8 @@ function normalizarConfigCampos(raw) {
         regras.__GLOBAL__ = { tipos: {} };
       }
       regras.__GLOBAL__.tipos[tipoKey] = {
-        campos: normalizarMapaCampos(regraAreaOuTipo.campos)
+        campos: normalizarMapaCampos(regraAreaOuTipo.campos),
+        opcoes: normalizarOpcoesTipo(regraAreaOuTipo.opcoes)
       };
     }
   });
@@ -225,6 +247,22 @@ function obterRegraCampos(config, tipoId, areaResponsavel) {
     config?.regras?.[tipoKey]?.campos ||
     {}
   );
+}
+
+function obterRegraTipo(config, tipoId, areaResponsavel) {
+  const tipoKey = normalizarTipoKey(tipoId);
+  const areaKey = normalizarAreaKey(areaResponsavel);
+
+  return (
+    config?.regras?.[areaKey]?.tipos?.[tipoKey] ||
+    config?.regras?.__GLOBAL__?.tipos?.[tipoKey] ||
+    config?.regras?.[tipoKey] ||
+    {}
+  );
+}
+
+function obterOpcoesNovaSolicitacao(config, tipoId, areaResponsavel) {
+  return normalizarOpcoesTipo(obterRegraTipo(config, tipoId, areaResponsavel)?.opcoes);
 }
 
 async function obterConfigCamposNovaSolicitacao() {
@@ -305,6 +343,7 @@ function montarPayloadConfigCampos(config) {
       fixo: Boolean(campo.fixo),
       permite_obrigatorio: campo.permiteObrigatorio !== false
     })),
+    opcoes_disponiveis: OPCOES_NOVA_SOLICITACAO,
     regras: normalizarConfigCampos(config).regras
   };
 }
@@ -314,6 +353,7 @@ module.exports = {
   CHAVE_NOVA_SOLICITACAO_CAMPOS,
   montarPayloadConfigCampos,
   obterConfigCamposNovaSolicitacao,
+  obterOpcoesNovaSolicitacao,
   resolverCamposNovaSolicitacao,
   salvarConfigCamposNovaSolicitacao
 };
