@@ -40,7 +40,8 @@ import {
   canPreparePagamentos,
   canRejectPagamentos,
   canReprocessPagamentos,
-  canSendPagamentosBanco
+  canSendPagamentosBanco,
+  canSyncPagamentosBanco
 } from '../utils/acessoProduto';
 
 const TABS = [
@@ -328,6 +329,7 @@ export default function FinanceiroPagamentos() {
   const canSend = useMemo(() => canSendPagamentosBanco(user), [user]);
   const canReject = useMemo(() => canRejectPagamentos(user), [user]);
   const canAudit = useMemo(() => canAuditPagamentos(user), [user]);
+  const canSync = useMemo(() => canSyncPagamentosBanco(user), [user]);
   const canCancel = useMemo(() => canCancelPagamentos(user), [user]);
   const canReprocess = useMemo(() => canReprocessPagamentos(user), [user]);
   const canConfirmBaixa = useMemo(() => canConfirmarBaixaPagamento(user), [user]);
@@ -1185,7 +1187,7 @@ export default function FinanceiroPagamentos() {
                             Enviar ao BB
                           </button>
                         )}
-                        {canAudit && (
+                        {canSync && (
                           <button type="button" className="btn btn-outline" onClick={() => runBatchAction('sync-bb', (id) => sincronizarPaymentBatchStatusBb(id))} disabled={!isBbSandbox || !['ENVIADO_AO_BANCO', 'PROCESSANDO_BANCO', 'FALHA_INTEGRACAO', 'AGUARDANDO_CONFIRMACAO_BAIXA'].includes(selectedBatch.status) || actionLoading === 'sync-bb'}>
                             <HiOutlineArrowPath className="h-4 w-4" />
                             Sincronizar BB

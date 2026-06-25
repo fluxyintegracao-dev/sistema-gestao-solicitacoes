@@ -48,6 +48,7 @@ const FINANCEIRO_PERMISSION_KEYS = [
   'financeiro.pagamentos.aprovar',
   'financeiro.pagamentos.rejeitar',
   'financeiro.pagamentos.enviar_banco',
+  'financeiro.pagamentos.sincronizar_banco',
   'financeiro.pagamentos.cancelar',
   'financeiro.pagamentos.reprocessar',
   'financeiro.pagamentos.confirmar_baixa',
@@ -64,6 +65,7 @@ const FINANCEIRO_PAGAMENTOS_PERMISSION_KEYS = [
   'financeiro.pagamentos.aprovar',
   'financeiro.pagamentos.rejeitar',
   'financeiro.pagamentos.enviar_banco',
+  'financeiro.pagamentos.sincronizar_banco',
   'financeiro.pagamentos.cancelar',
   'financeiro.pagamentos.reprocessar',
   'financeiro.pagamentos.confirmar_baixa',
@@ -1227,6 +1229,15 @@ async function canSendPagamentosBanco(user) {
   if (isBusinessAdmin(user)) return true;
   if (await userHasConfiguredAreaPermissions(user)) {
     return userHasAreaPermission(user, ['financeiro.pagamentos.enviar_banco']);
+  }
+
+  return userHasFinanceiroSector(user);
+}
+
+async function canSyncPagamentosBanco(user) {
+  if (isBusinessAdmin(user)) return true;
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, ['financeiro.pagamentos.sincronizar_banco']);
   }
 
   return userHasFinanceiroSector(user);
@@ -2566,6 +2577,7 @@ module.exports = {
   canPublishTreinamento,
   canRetryIntegracaoSienge,
   canSendPagamentosBanco,
+  canSyncPagamentosBanco,
   canViewIntegracaoSienge,
   canViewFiscalDocuments,
   canViewFiscalLogs,

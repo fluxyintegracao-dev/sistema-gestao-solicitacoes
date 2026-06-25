@@ -382,6 +382,7 @@ export function canAccessFinanceiro(user) {
       'financeiro.pagamentos.aprovar',
       'financeiro.pagamentos.rejeitar',
       'financeiro.pagamentos.enviar_banco',
+      'financeiro.pagamentos.sincronizar_banco',
       'financeiro.pagamentos.cancelar',
       'financeiro.pagamentos.reprocessar',
       'financeiro.pagamentos.confirmar_baixa',
@@ -457,6 +458,7 @@ export function canAccessPagamentos(user) {
       'financeiro.pagamentos.aprovar',
       'financeiro.pagamentos.rejeitar',
       'financeiro.pagamentos.enviar_banco',
+      'financeiro.pagamentos.sincronizar_banco',
       'financeiro.pagamentos.cancelar',
       'financeiro.pagamentos.reprocessar',
       'financeiro.pagamentos.confirmar_baixa',
@@ -489,6 +491,12 @@ export function canRejectPagamentos(user) {
 export function canSendPagamentosBanco(user) {
   if (isBusinessAdmin(user)) return true;
   if (hasConfiguredAreaPermissions(user)) return hasPermissao(user, 'financeiro.pagamentos.enviar_banco');
+  return userHasSetorCapability(user, 'eh_setor_financeiro') || normalizeToken(user?.perfil) === 'FINANCEIRO';
+}
+
+export function canSyncPagamentosBanco(user) {
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) return hasPermissao(user, 'financeiro.pagamentos.sincronizar_banco');
   return userHasSetorCapability(user, 'eh_setor_financeiro') || normalizeToken(user?.perfil) === 'FINANCEIRO';
 }
 

@@ -320,6 +320,7 @@ const MODULO_PERMISSION_GROUPS = [
           { key: 'financeiro.pagamentos.aprovar', label: 'Aprovar lotes', descricao: 'Aprovar lotes conforme alcada.' },
           { key: 'financeiro.pagamentos.rejeitar', label: 'Rejeitar lotes', descricao: 'Rejeitar lotes antes do envio bancario.' },
           { key: 'financeiro.pagamentos.enviar_banco', label: 'Enviar ao banco', descricao: 'Enviar lote aprovado para o provider bancario.' },
+          { key: 'financeiro.pagamentos.sincronizar_banco', label: 'Sincronizar retorno bancario', descricao: 'Atualizar manualmente o status do lote junto ao Banco do Brasil.' },
           { key: 'financeiro.pagamentos.cancelar', label: 'Cancelar pagamentos', descricao: 'Cancelar lotes ou itens antes do envio definitivo.' },
           { key: 'financeiro.pagamentos.reprocessar', label: 'Reprocessar falhas', descricao: 'Reprocessar jobs ou retornos elegiveis.' },
           { key: 'financeiro.pagamentos.confirmar_baixa', label: 'Confirmar baixa', descricao: 'Confirmar baixa semiautomatica apos confirmacao bancaria.' },
