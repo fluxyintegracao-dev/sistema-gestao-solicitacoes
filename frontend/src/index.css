@@ -8672,15 +8672,48 @@ body {
 .layout-shell .compra-detalhe-itens-shell {
   padding: 0.75rem;
   border-radius: 1.25rem;
+  overflow-x: auto;
+  scrollbar-gutter: stable;
 }
 
 .layout-shell .compra-detalhe-itens-table {
+  border-collapse: separate;
+  border-spacing: 0;
   table-layout: fixed;
 }
 
 .layout-shell .compra-detalhe-itens-table th,
 .layout-shell .compra-detalhe-itens-table td {
   overflow: hidden;
+}
+
+.layout-shell .compra-detalhe-itens-table thead th {
+  border-bottom: 1px solid var(--shell-border);
+  padding: 0.8rem 1rem;
+  white-space: nowrap;
+}
+
+.layout-shell .compra-detalhe-itens-table tbody tr {
+  transform: none;
+}
+
+.layout-shell .compra-detalhe-itens-table tbody tr:hover {
+  transform: none;
+}
+
+.layout-shell .compra-detalhe-itens-table tbody td {
+  border-top: 0;
+  border-bottom: 1px solid var(--shell-border);
+  padding: 0.95rem 1rem;
+}
+
+.layout-shell .compra-detalhe-itens-table tbody td:first-child,
+.layout-shell .compra-detalhe-itens-table tbody td:last-child {
+  border-radius: 0;
+}
+
+.layout-shell .compra-detalhe-itens-table tbody tr:last-child td {
+  border-bottom: 0;
 }
 
 .layout-shell .compra-detalhe-link-cell {
