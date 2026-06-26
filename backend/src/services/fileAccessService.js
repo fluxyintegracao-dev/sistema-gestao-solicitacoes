@@ -345,6 +345,13 @@ async function canAccessContratoFile(req, contratoId) {
 }
 
 async function canAccessComprovanteFile(req, comprovante) {
+  if (comprovante?.solicitacao_id) {
+    const acessoSolicitacao = await canAccessSolicitacaoFile(req, comprovante.solicitacao_id);
+    if (acessoSolicitacao.allowed) {
+      return acessoSolicitacao;
+    }
+  }
+
   const hasModuleAccess = await canAccessComprovantes(req.user);
   if (!hasModuleAccess) {
     await logFileDenied(
