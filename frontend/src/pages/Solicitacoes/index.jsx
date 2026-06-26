@@ -73,6 +73,11 @@ function dataCurta(valor) {
 }
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 200];
+const STATUS_AUTOMATICOS_SOLICITACAO = [
+  'TITULO_CADASTRADO',
+  'PARCIALMENTE PAGO',
+  'PAGA'
+];
 
 export default function Solicitacoes({ arquivadas = false }) {
   const navigate = useNavigate();
@@ -218,6 +223,14 @@ export default function Solicitacoes({ arquivadas = false }) {
     setResponsaveisOptions(extrairOpcoesResponsaveis(solicitacoes));
   }, [solicitacoes]);
 
+  useEffect(() => {
+    const statusDaPagina = (Array.isArray(solicitacoes) ? solicitacoes : [])
+      .map(item => item?.status_global)
+      .filter(Boolean);
+    if (!statusDaPagina.length) return;
+    setStatusOptions(prev => montarStatusOptions(prev, statusDaPagina, STATUS_AUTOMATICOS_SOLICITACAO));
+  }, [solicitacoes]);
+
   async function carregarTiposSolicitacao() {
     try {
       const data = await getTiposSolicitacao();
@@ -251,24 +264,35 @@ export default function Solicitacoes({ arquivadas = false }) {
       .replace(/\s+/g, '_');
   }
 
+  function montarStatusOptions(...listas) {
+    const map = new Map();
+
+    listas.flat().forEach(item => {
+      const label = typeof item === 'string' ? item : item?.label || item?.nome || item?.status_global || item?.value;
+      const nome = String(label || '').trim();
+      if (!nome) return;
+      const key = normalizarStatus(nome);
+      if (!map.has(key)) {
+        map.set(key, nome);
+      }
+    });
+
+    return Array.from(map.entries())
+      .map(([value, label]) => ({ value, label }))
+      .sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
+  }
+
   async function carregarStatusOptions() {
     try {
       const data = await getStatusSetor();
       const lista = Array.isArray(data) ? data : [];
-      const map = new Map();
-      lista.forEach(item => {
-        if (!item?.ativo) return;
-        const nome = String(item.nome || '').trim();
-        if (!nome) return;
-        const key = normalizarStatus(nome);
-        if (!map.has(key)) {
-          map.set(key, nome);
-        }
-      });
-      setStatusOptions(Array.from(map.entries()).map(([value, label]) => ({ value, label })));
+      const statusCadastrados = lista
+        .filter(item => item?.ativo)
+        .map(item => item?.nome);
+      setStatusOptions(montarStatusOptions(statusCadastrados, STATUS_AUTOMATICOS_SOLICITACAO));
     } catch (error) {
       console.error(error);
-      setStatusOptions([]);
+      setStatusOptions(montarStatusOptions(STATUS_AUTOMATICOS_SOLICITACAO));
     }
   }
 

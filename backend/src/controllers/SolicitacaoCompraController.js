@@ -953,15 +953,9 @@ function desenharCabecalhoFicha(doc, solicitacao) {
 
   doc
     .font('Helvetica-Bold')
-    .fontSize(5.8)
+    .fontSize(9)
     .fillColor('#000000')
-    .text('SOLICITACAO', x + 4, y + totalHeaderHeight - 17, {
-      width: logoWidth - 8,
-      align: 'center'
-    })
-    .font('Helvetica-Bold')
-    .fontSize(8)
-    .text(codigoSolicitacaoPrincipal, x + 4, y + totalHeaderHeight - 10, {
+    .text(codigoSolicitacaoPrincipal, x + 4, y + (totalHeaderHeight / 2) - 5, {
       width: logoWidth - 8,
       align: 'center'
     });
