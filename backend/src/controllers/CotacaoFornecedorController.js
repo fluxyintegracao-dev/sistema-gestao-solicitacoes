@@ -9,6 +9,7 @@ const {
   Obra,
   SolicitacaoCompra,
   SolicitacaoCompraFornecedor,
+  SolicitacaoCompraFornecedorItem,
   SolicitacaoCompraItem,
   SolicitacaoCompraItemApropriacao,
   SolicitacaoCompraItemManual,
@@ -22,7 +23,7 @@ const {
   gerarModeloCotacaoCsv,
   gerarModeloCotacaoXlsx,
   normalizeText,
-  obterItensCotaveis,
+  obterItensCotaveisDaCotacao,
   registrarLogSolicitacaoCompra
 } = require('../services/comprasCotacao');
 const { getPresignedUrl, uploadToS3 } = require('../services/s3');
@@ -142,6 +143,19 @@ function normalizarValorMinimoPedido(value) {
   return normalized;
 }
 
+function normalizarNumeroCotacao(value) {
+  if (value === '' || value === null || value === undefined) {
+    return null;
+  }
+
+  const raw = String(value).trim();
+  const normalized = raw.includes(',')
+    ? Number(raw.replace(/\./g, '').replace(',', '.'))
+    : Number(raw);
+
+  return Number.isFinite(normalized) ? normalized : NaN;
+}
+
 function normalizarCampoObrigatorio(value, label) {
   const normalized = String(value || '').trim();
   if (!normalized) {
@@ -257,13 +271,18 @@ async function carregarCotacaoPorToken(token) {
         as: 'respostas',
         where: { deleted_at: null },
         required: false
+      },
+      {
+        model: SolicitacaoCompraFornecedorItem,
+        as: 'itensSelecionados',
+        required: false
       }
     ]
   });
 }
 
 async function serializarCotacaoPublica(cotacaoFornecedor, req) {
-  const itensCotaveis = obterItensCotaveis(cotacaoFornecedor?.solicitacao || {});
+  const itensCotaveis = obterItensCotaveisDaCotacao(cotacaoFornecedor);
   const configuracoes = await obterConfiguracaoPublicaCotacao();
   const arquivoRespostaUrl = await resolvePublicAttachmentUrl(req, cotacaoFornecedor?.pdf_resposta_url);
   const arquivoRespostaExtension = path.extname(String(cotacaoFornecedor?.pdf_resposta_url || '').split('?')[0]).toLowerCase();
@@ -329,7 +348,7 @@ async function serializarCotacaoPublica(cotacaoFornecedor, req) {
 
 async function salvarRespostasCotacao(cotacaoFornecedor, itensResposta, options = {}) {
   const solicitacao = cotacaoFornecedor.solicitacao;
-  const itensCotaveis = obterItensCotaveis(solicitacao);
+  const itensCotaveis = obterItensCotaveisDaCotacao(cotacaoFornecedor);
   const itensPorKey = new Map(
     itensCotaveis.map((item) => [buildItemKey(item.item_tipo, item.item_referencia_id), item])
   );
@@ -360,11 +379,7 @@ async function salvarRespostasCotacao(cotacaoFornecedor, itensResposta, options 
     if (!disponivelValidos.includes(statusDisponibilidade)) {
       throw new Error(`Status de disponibilidade invalido: ${statusDisponibilidade}`);
     }
-    const disponivel = statusDisponibilidade !== 'NAO_TEM';
-    const precoNormalizado =
-      itemResposta.preco === '' || itemResposta.preco === null || itemResposta.preco === undefined
-        ? null
-        : Number(itemResposta.preco);
+    const precoNormalizado = normalizarNumeroCotacao(itemResposta.preco);
 
     if (precoNormalizado !== null && !Number.isFinite(precoNormalizado)) {
       throw new Error(`Preco invalido informado para o item ${itemBase.nome}`);
@@ -374,16 +389,17 @@ async function salvarRespostasCotacao(cotacaoFornecedor, itensResposta, options 
       throw new Error(`Preco nao pode ser negativo no item ${itemBase.nome}`);
     }
 
-    const quantidadeMinima =
-      itemResposta.quantidade_minima_item === '' ||
-      itemResposta.quantidade_minima_item === null ||
-      itemResposta.quantidade_minima_item === undefined
-        ? null
-        : Number(itemResposta.quantidade_minima_item);
+    const quantidadeMinima = normalizarNumeroCotacao(itemResposta.quantidade_minima_item);
 
     if (quantidadeMinima !== null && (!Number.isFinite(quantidadeMinima) || quantidadeMinima < 0)) {
       throw new Error(`Quantidade minima invalida para o item ${itemBase.nome}`);
     }
+
+    const statusEfetivo =
+      statusDisponibilidade !== 'NAO_TEM' && (precoNormalizado === null || precoNormalizado <= 0 || quantidadeMinima === null)
+        ? 'NAO_TEM'
+        : statusDisponibilidade;
+    const disponivel = statusEfetivo !== 'NAO_TEM';
 
     respostasPreparadas.push({
       solicitacao_compra_fornecedor_id: cotacaoFornecedor.id,
@@ -393,8 +409,8 @@ async function salvarRespostasCotacao(cotacaoFornecedor, itensResposta, options 
       solicitacao_compra_item_manual_id:
         itemTipo === 'MANUAL' ? itemReferenciaId : null,
       disponivel,
-      status_disponibilidade: statusDisponibilidade,
-      data_chegada: statusDisponibilidade === 'PARA_CHEGAR' && itemResposta.data_chegada
+      status_disponibilidade: statusEfetivo,
+      data_chegada: statusEfetivo === 'PARA_CHEGAR' && itemResposta.data_chegada
         ? itemResposta.data_chegada
         : null,
       preco: disponivel ? precoNormalizado : null,
@@ -649,7 +665,7 @@ function drawPdfCotacaoFooter(doc, metrics, pageNumber) {
 
 async function renderPdfCotacaoPublica(doc, cotacaoFornecedor) {
   const solicitacao = cotacaoFornecedor?.solicitacao || {};
-  const itensCotaveis = obterItensCotaveis(solicitacao);
+  const itensCotaveis = obterItensCotaveisDaCotacao(cotacaoFornecedor);
   const metrics = {
     left: 28,
     top: 28,
@@ -934,7 +950,7 @@ module.exports = {
         return res.status(404).json({ error: 'Cotacao nao encontrada' });
       }
 
-      const csv = gerarModeloCotacaoCsv(cotacaoFornecedor.solicitacao);
+      const csv = gerarModeloCotacaoCsv(cotacaoFornecedor.solicitacao, cotacaoFornecedor.itensSelecionados || []);
       res.setHeader('Content-Type', 'text/csv; charset=utf-8');
       res.setHeader(
         'Content-Disposition',
@@ -954,7 +970,7 @@ module.exports = {
         return res.status(404).json({ error: 'Cotacao nao encontrada' });
       }
 
-      const buffer = gerarModeloCotacaoXlsx(cotacaoFornecedor.solicitacao);
+      const buffer = gerarModeloCotacaoXlsx(cotacaoFornecedor.solicitacao, cotacaoFornecedor.itensSelecionados || []);
       res.setHeader(
         'Content-Type',
         'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'

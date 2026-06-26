@@ -253,36 +253,38 @@ export default function CotacaoFornecedorPublica() {
       return;
     }
 
-    const itensSemPreco = itens.filter((item) => {
-      const statusDisp = item.status_disponibilidade || 'DISPONIVEL';
-      if (statusDisp === 'NAO_TEM') return false;
-      const preco = Number(String(item.preco ?? '').replace(',', '.'));
-      return !Number.isFinite(preco) || preco <= 0;
-    });
+    const normalizarNumeroResposta = (value) => {
+      if (value === '' || value === null || value === undefined) return null;
+      const raw = String(value).trim();
+      const parsed = Number(raw.includes(',') ? raw.replace(/\./g, '').replace(',', '.') : raw);
+      return Number.isFinite(parsed) ? parsed : null;
+    };
 
-    if (itensSemPreco.length > 0) {
-      const confirmar = window.confirm(
-        `${itensSemPreco.length} item(ns) estao sem preco preenchido. Deseja enviar mesmo assim?`
-      );
-      if (!confirmar) {
-        return;
-      }
-    }
+    const itensPayload = itens.map((item) => {
+      const statusDisp = item.status_disponibilidade || 'DISPONIVEL';
+      const preco = normalizarNumeroResposta(item.preco);
+      const quantidadeMinima = normalizarNumeroResposta(item.quantidade_minima_item);
+      const deveMarcarIndisponivel =
+        statusDisp !== 'NAO_TEM' && (preco === null || preco <= 0 || quantidadeMinima === null);
+      const statusEfetivo = deveMarcarIndisponivel ? 'NAO_TEM' : statusDisp;
+
+      return {
+        item_tipo: item.item_tipo,
+        item_referencia_id: item.item_referencia_id,
+        status_disponibilidade: statusEfetivo,
+        disponivel: statusEfetivo !== 'NAO_TEM',
+        preco: statusEfetivo === 'NAO_TEM' ? null : item.preco,
+        prazo: item.prazo,
+        data_chegada: statusEfetivo === 'PARA_CHEGAR' ? item.data_chegada : null,
+        observacao: item.observacao,
+        quantidade_minima_item: statusEfetivo === 'NAO_TEM' ? null : item.quantidade_minima_item
+      };
+    });
 
     try {
       setSalvando(true);
       await responderCotacaoPublica(token, {
-        itens: itens.map((item) => ({
-          item_tipo: item.item_tipo,
-          item_referencia_id: item.item_referencia_id,
-          status_disponibilidade: item.status_disponibilidade || 'DISPONIVEL',
-          disponivel: (item.status_disponibilidade || 'DISPONIVEL') !== 'NAO_TEM',
-          preco: item.preco,
-          prazo: item.prazo,
-          data_chegada: item.status_disponibilidade === 'PARA_CHEGAR' ? item.data_chegada : null,
-          observacao: item.observacao,
-          quantidade_minima_item: item.quantidade_minima_item
-        })),
+        itens: itensPayload,
         valor_minimo_pedido: valorMinimoPedido,
         condicao_pagamento: montarCondicaoPagamento(condicoesPagamento),
         prazo_entrega: prazoEntrega,
@@ -602,8 +604,10 @@ export default function CotacaoFornecedorPublica() {
                         <input
                           className="input cotacao-publica-table-input h-6 text-[11px] px-1.5"
                           type="number"
+                          lang="pt-BR"
                           min="0"
-                          step="0.001"
+                          step="1"
+                          inputMode="decimal"
                           value={isNaoTem ? '' : item.quantidade_minima_item}
                           disabled={formularioBloqueado || isNaoTem}
                           onChange={(e) => atualizarItem(index, 'quantidade_minima_item', e.target.value)}

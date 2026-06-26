@@ -14,6 +14,7 @@ const {
   Solicitacao,
   SolicitacaoCompra,
   SolicitacaoCompraFornecedor,
+  SolicitacaoCompraFornecedorItem,
   SolicitacaoCompraItem,
   SolicitacaoCompraItemApropriacao,
   SolicitacaoCompraItemManual,
@@ -32,6 +33,8 @@ const { normalizeOriginalName } = require('../utils/fileName');
 const { findSetorByCapability, resolveSetorPersistenciaValue, userHasSetorCapability } = require('../services/setorCapabilityService');
 const { normalizeTipoSolicitacaoBehavior, normalizeTipoSolicitacaoCodigo } = require('../services/tipoSolicitacaoBehaviorService');
 const {
+  buildCotacaoItemKey,
+  carregarSolicitacaoCompraCompleta,
   gerarTokenCotacao,
   montarUrlCotacaoPublica,
   normalizeText: normalizeTextCompra,
@@ -567,6 +570,11 @@ async function carregarSolicitacaoCompra(id) {
             attributes: ['id', 'nome', 'email', 'whatsapp', 'contato', 'ativo']
           },
           {
+            model: SolicitacaoCompraFornecedorItem,
+            as: 'itensSelecionados',
+            required: false
+          },
+          {
             model: SolicitacaoCompraRespostaItem,
             as: 'respostas',
             where: { deleted_at: null },
@@ -846,6 +854,63 @@ function buildRespostaItemKey(itemTipo, itemReferenciaId) {
   return `${normalizeTextCompra(itemTipo)}:${Number(itemReferenciaId)}`;
 }
 
+function obterCotacaoFornecedorItemKeys(cotacaoFornecedor) {
+  const itensSelecionados = Array.isArray(cotacaoFornecedor?.itensSelecionados)
+    ? cotacaoFornecedor.itensSelecionados
+    : [];
+
+  if (!itensSelecionados.length) {
+    return null;
+  }
+
+  return new Set(
+    itensSelecionados
+      .map((item) => {
+        const itemReferenciaId = item.solicitacao_compra_item_id || item.solicitacao_compra_item_manual_id;
+        return buildCotacaoItemKey(item.item_tipo, itemReferenciaId);
+      })
+      .filter((key) => !key.endsWith(':NaN'))
+  );
+}
+
+function cotacaoFornecedorIncluiItem(cotacaoFornecedor, item) {
+  const keys = obterCotacaoFornecedorItemKeys(cotacaoFornecedor);
+  if (!keys) return true;
+  return keys.has(buildCotacaoItemKey(item.item_tipo, item.item_referencia_id));
+}
+
+function normalizarItensSelecionadosCotacao(itensPayload, itensCotaveis) {
+  const itensPorKey = new Map(
+    (itensCotaveis || []).map((item) => [buildCotacaoItemKey(item.item_tipo, item.item_referencia_id), item])
+  );
+  const payload = Array.isArray(itensPayload) && itensPayload.length
+    ? itensPayload
+    : itensCotaveis;
+  const selecionados = [];
+  const selecionadosKeys = new Set();
+
+  payload.forEach((item) => {
+    const key = buildCotacaoItemKey(item.item_tipo, item.item_referencia_id);
+    const itemBase = itensPorKey.get(key);
+    if (!itemBase) {
+      throw new Error('Item invalido informado para envio da cotacao.');
+    }
+    if (selecionadosKeys.has(key)) return;
+    selecionadosKeys.add(key);
+    selecionados.push({
+      item_tipo: itemBase.item_tipo,
+      solicitacao_compra_item_id: itemBase.item_tipo === 'CADASTRADO' ? itemBase.item_referencia_id : null,
+      solicitacao_compra_item_manual_id: itemBase.item_tipo === 'MANUAL' ? itemBase.item_referencia_id : null
+    });
+  });
+
+  if (!selecionados.length) {
+    throw new Error('Selecione ao menos um item para cotacao.');
+  }
+
+  return selecionados;
+}
+
 function montarComparativoSolicitacao(solicitacao) {
   const itens = obterItensCotaveis(solicitacao);
   const fornecedores = (solicitacao.fornecedores || []).map((cotacaoFornecedor) => ({
@@ -867,7 +932,9 @@ function montarComparativoSolicitacao(solicitacao) {
   }));
 
   const itensComparativo = itens.map((item) => {
-    const respostas = (solicitacao.fornecedores || []).map((cotacaoFornecedor) => {
+    const respostas = (solicitacao.fornecedores || [])
+      .filter((cotacaoFornecedor) => cotacaoFornecedorIncluiItem(cotacaoFornecedor, item))
+      .map((cotacaoFornecedor) => {
       const resposta = (cotacaoFornecedor.respostas || []).find((entry) => {
         const itemReferenciaId =
           entry.solicitacao_compra_item_id || entry.solicitacao_compra_item_manual_id;
@@ -2436,8 +2503,11 @@ module.exports = {
       }
 
       let fornecedoresPayload = [];
+      let itensPayload = null;
       try {
-        fornecedoresPayload = validateCompraEnviarBody(req.body || {}).fornecedores;
+        const dadosEnvio = validateCompraEnviarBody(req.body || {});
+        fornecedoresPayload = dadosEnvio.fornecedores;
+        itensPayload = dadosEnvio.itens;
       } catch (error) {
         await transaction.rollback();
         return res.status(400).json({ error: error.message || 'Dados de fornecedores invalidos.' });
@@ -2446,6 +2516,18 @@ module.exports = {
       if (!fornecedoresPayload.length) {
         await transaction.rollback();
         return res.status(400).json({ error: 'Selecione ao menos um fornecedor' });
+      }
+
+      let itensSelecionadosCotacao = [];
+      try {
+        const solicitacaoCompleta = await carregarSolicitacaoCompraCompleta(solicitacao.id);
+        itensSelecionadosCotacao = normalizarItensSelecionadosCotacao(
+          itensPayload,
+          obterItensCotaveis(solicitacaoCompleta || {})
+        );
+      } catch (error) {
+        await transaction.rollback();
+        return res.status(400).json({ error: error.message || 'Itens invalidos para envio da cotacao.' });
       }
 
       const vinculados = [];
@@ -2533,6 +2615,21 @@ module.exports = {
           );
         }
 
+        await SolicitacaoCompraFornecedorItem.destroy({
+          where: { solicitacao_compra_fornecedor_id: vinculacao.id },
+          transaction
+        });
+
+        await SolicitacaoCompraFornecedorItem.bulkCreate(
+          itensSelecionadosCotacao.map((item) => ({
+            solicitacao_compra_fornecedor_id: vinculacao.id,
+            item_tipo: item.item_tipo,
+            solicitacao_compra_item_id: item.solicitacao_compra_item_id,
+            solicitacao_compra_item_manual_id: item.solicitacao_compra_item_manual_id
+          })),
+          { transaction }
+        );
+
         await registrarLogSolicitacaoCompra({
           solicitacaoCompraId: solicitacao.id,
           usuarioId: usuario.id,
@@ -2541,7 +2638,8 @@ module.exports = {
           descricao: `Cotacao disponibilizada para ${fornecedor.nome}`,
           metadados: {
             cotacao_fornecedor_id: vinculacao.id,
-            token: vinculacao.token
+            token: vinculacao.token,
+            itens_enviados: itensSelecionadosCotacao.length
           },
           transaction
         });
@@ -2553,7 +2651,8 @@ module.exports = {
           email: fornecedor.email || '',
           whatsapp: fornecedor.whatsapp || '',
           token: vinculacao.token,
-          url_publica: montarUrlCotacaoPublica(req, vinculacao.token)
+          url_publica: montarUrlCotacaoPublica(req, vinculacao.token),
+          itens_enviados: itensSelecionadosCotacao.length
         });
       }
 

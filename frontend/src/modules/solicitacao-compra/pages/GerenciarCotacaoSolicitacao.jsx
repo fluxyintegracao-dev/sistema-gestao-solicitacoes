@@ -459,14 +459,19 @@ function SecaoEnvioFornecedores({
   fornecedores,
   buscandoFornecedores,
   fornecedoresSelecionados,
+  fornecedoresSelecionadosDados,
   novoFornecedor,
   categoriaFornecedorId,
   fornecedorBusca,
   enviandoFornecedores,
+  itensSelecionadosEnvio,
   onChangeFornecedorBusca,
   onChangeCategoriaFornecedorId,
   onBuscarFornecedores,
   onToggleFornecedor,
+  onToggleItemEnvio,
+  onSelecionarTodosItensEnvio,
+  onLimparItensEnvio,
   onChangeNovoFornecedor,
   onCriarFornecedorRapido,
   onEnviarFornecedores,
@@ -525,6 +530,14 @@ function SecaoEnvioFornecedores({
       return texto.includes(buscaFornecedorNormalizada);
     });
   }, [fornecedores, categoriaFornecedorId, buscaFornecedorNormalizada]);
+
+  const fornecedoresSelecionadosDetalhes = useMemo(() => (
+    fornecedoresSelecionados
+      .map((selectionKey) => fornecedoresSelecionadosDados?.[selectionKey] || fornecedores.find((f) => fornecedorSelectionKey(f) === selectionKey))
+      .filter(Boolean)
+  ), [fornecedoresSelecionados, fornecedoresSelecionadosDados, fornecedores]);
+
+  const qtdItensSelecionados = itensCombinados.filter((item) => itensSelecionadosEnvio?.[buildItemKey(item)]).length;
 
   function selecionarTodosComCategoria() {
     fornecedoresComCategoria.forEach((fornecedor) => {
@@ -606,7 +619,7 @@ function SecaoEnvioFornecedores({
       {/* Adicionar novos fornecedores */}
       {solicitacao.status !== 'ENCERRADO' && (
         <div className="cotacao-fornecedores-panel rounded-xl border border-[var(--c-border)] bg-slate-50/70 p-3 dark:bg-slate-950/55">
-          <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="grid items-start gap-4 xl:grid-cols-[minmax(320px,0.85fr)_minmax(240px,0.42fr)_300px]">
             <div className="grid content-start gap-2.5">
               {/* Selecao por categoria */}
               <div className="flex flex-wrap items-start justify-between gap-3">
@@ -757,6 +770,48 @@ function SecaoEnvioFornecedores({
               </div>
             </div>
 
+            <div className="cotacao-fornecedores-selecionados grid content-start gap-2.5 rounded-xl border border-[var(--c-border)] bg-white/85 p-3 dark:bg-slate-950/65">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <div className="text-sm font-semibold text-[var(--c-text)]">Fornecedores selecionados</div>
+                  <div className="text-xs text-[var(--c-muted)]">Revise antes de gerar os links.</div>
+                </div>
+                <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-700 dark:bg-blue-950/70 dark:text-blue-200">
+                  {fornecedoresSelecionadosDetalhes.length}
+                </span>
+              </div>
+              {fornecedoresSelecionadosDetalhes.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-[var(--c-border)] px-3 py-4 text-xs text-[var(--c-muted)]">
+                  Nenhum fornecedor selecionado.
+                </div>
+              ) : (
+                <div className="app-list-stack max-h-[250px] overflow-y-auto">
+                  {fornecedoresSelecionadosDetalhes.map((fornecedor) => {
+                    const selectionKey = fornecedorSelectionKey(fornecedor);
+                    return (
+                      <div key={selectionKey} className="rounded-lg border border-[var(--c-border)] bg-slate-50 px-3 py-2 text-xs dark:bg-slate-900/60">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <div className="truncate font-semibold text-[var(--c-text)]">{fornecedor.nome}</div>
+                            <div className="truncate text-[var(--c-muted)]">
+                              {fornecedor.whatsapp || fornecedor.telefone || fornecedor.email || 'Sem contato principal'}
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            className="text-[11px] font-semibold text-red-600 hover:text-red-700 dark:text-red-300"
+                            onClick={() => onToggleFornecedor(selectionKey, false, fornecedor)}
+                          >
+                            Remover
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
             <div className="cotacao-fornecedor-rapido grid content-start gap-2.5 rounded-xl border border-[var(--c-border)] bg-white/85 p-3 dark:bg-slate-950/65">
               <div>
                 <div className="text-sm font-semibold text-[var(--c-text)]">Cadastro rapido</div>
@@ -790,6 +845,62 @@ function SecaoEnvioFornecedores({
               </div>
             </div>
           </div>
+
+          {fornecedoresSelecionados.length > 0 && (
+            <div className="mt-4 rounded-xl border border-[var(--c-border)] bg-white/85 p-3 dark:bg-slate-950/65">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-semibold text-[var(--c-text)]">Itens que serao enviados</div>
+                  <div className="text-xs text-[var(--c-muted)]">
+                    Selecione os itens que vao compor estes links. Depois de gerar, a selecao fica gravada na cotacao.
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                    {qtdItensSelecionados}/{itensCombinados.length} item(ns)
+                  </span>
+                  <button type="button" className="btn btn-xs btn-outline" onClick={onSelecionarTodosItensEnvio}>Todos</button>
+                  <button type="button" className="btn btn-xs btn-outline" onClick={onLimparItensEnvio}>Limpar</button>
+                </div>
+              </div>
+              <div className="overflow-x-auto rounded-lg border border-[var(--c-border)]">
+                <table className="min-w-[920px] w-full text-left text-xs">
+                  <thead className="bg-slate-100 text-[10px] uppercase tracking-wide text-slate-600 dark:bg-slate-900 dark:text-slate-300">
+                    <tr>
+                      <th className="w-10 px-3 py-2">Sel.</th>
+                      <th className="px-3 py-2">Item</th>
+                      <th className="w-24 px-3 py-2">Qtd.</th>
+                      <th className="px-3 py-2">Especificacao</th>
+                      <th className="w-32 px-3 py-2">Necessario</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {itensCombinados.map((item) => {
+                      const itemKey = buildItemKey(item);
+                      return (
+                        <tr key={itemKey} className="border-t border-[var(--c-border)] align-top">
+                          <td className="px-3 py-2">
+                            <input
+                              type="checkbox"
+                              checked={Boolean(itensSelecionadosEnvio?.[itemKey])}
+                              onChange={(event) => onToggleItemEnvio(itemKey, event.target.checked)}
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <div className="font-semibold text-[var(--c-text)]">{item.nome}</div>
+                            <div className="text-[11px] text-[var(--c-muted)]">{item.item_tipo === 'MANUAL' ? 'Manual' : 'Cadastrado'}</div>
+                          </td>
+                          <td className="px-3 py-2">{formatNumeroCompra(item.quantidade)} {item.unidade}</td>
+                          <td className="px-3 py-2 text-[var(--c-muted)]">{item.especificacao || '-'}</td>
+                          <td className="px-3 py-2">{fmt(item.necessario_para)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -1099,6 +1210,7 @@ export default function GerenciarCotacaoSolicitacao() {
   const [registrandoComentario, setRegistrandoComentario] = useState(false);
   const [fornecedoresSelecionados, setFornecedoresSelecionados] = useState([]);
   const [fornecedoresSelecionadosDados, setFornecedoresSelecionadosDados] = useState({});
+  const [itensSelecionadosEnvio, setItensSelecionadosEnvio] = useState({});
   const [novoFornecedor, setNovoFornecedor] = useState({ nome: '', cnpj: '', email: '', whatsapp: '', contato: '' });
   const [vencedoresSelecionados, setVencedoresSelecionados] = useState({});
 
@@ -1251,6 +1363,31 @@ export default function GerenciarCotacaoSolicitacao() {
     return [...itens, ...manuais];
   }, [solicitacao]);
 
+  const selecionarTodosItensEnvio = () => {
+    setItensSelecionadosEnvio(
+      itensCombinados.reduce((acc, item) => {
+        acc[buildItemKey(item)] = true;
+        return acc;
+      }, {})
+    );
+  };
+
+  const limparItensEnvio = () => {
+    setItensSelecionadosEnvio({});
+  };
+
+  const garantirItensEnvioSelecionados = () => {
+    setItensSelecionadosEnvio((atual) => {
+      if (Object.values(atual || {}).some(Boolean)) {
+        return atual;
+      }
+      return itensCombinados.reduce((acc, item) => {
+        acc[buildItemKey(item)] = true;
+        return acc;
+      }, {});
+    });
+  };
+
   const pedidosPorFornecedor = useMemo(() => {
     const mapa = new Map();
     (solicitacao?.pedidos || []).forEach((pedido) => {
@@ -1312,10 +1449,23 @@ export default function GerenciarCotacaoSolicitacao() {
       }
       if (!payload.length) { alert('Selecione ou cadastre ao menos um fornecedor.'); return; }
 
+      const itensPayload = itensCombinados
+        .filter((item) => itensSelecionadosEnvio[buildItemKey(item)])
+        .map((item) => ({
+          item_tipo: item.item_tipo,
+          item_referencia_id: item.item_referencia_id
+        }));
+
+      if (!itensPayload.length) {
+        alert('Selecione ao menos um item para gerar a cotacao.');
+        return;
+      }
+
       setEnviandoFornecedores(true);
-      await enviarSolicitacaoCompraParaFornecedores(id, { fornecedores: payload });
+      await enviarSolicitacaoCompraParaFornecedores(id, { fornecedores: payload, itens: itensPayload });
       setFornecedoresSelecionados([]);
       setFornecedoresSelecionadosDados({});
+      setItensSelecionadosEnvio({});
       setNovoFornecedor({ nome: '', cnpj: '', email: '', whatsapp: '', contato: '' });
       await carregarTudo();
       alert('Links de cotacao gerados. Use os botoes de WhatsApp para enviar a mensagem a cada fornecedor.');
@@ -1341,6 +1491,11 @@ export default function GerenciarCotacaoSolicitacao() {
       };
       setFornecedores((atual) => [...atual, fornecedorFormatado].sort((a, b) => String(a.nome).localeCompare(String(b.nome))));
       setFornecedoresSelecionados((atual) => [...atual, fornecedorSelectionKey(fornecedorFormatado)]);
+      setFornecedoresSelecionadosDados((atual) => ({
+        ...atual,
+        [fornecedorSelectionKey(fornecedorFormatado)]: fornecedorFormatado
+      }));
+      garantirItensEnvioSelecionados();
       setNovoFornecedor({ nome: '', cnpj: '', email: '', whatsapp: '', contato: '' });
       alert('Fornecedor criado e selecionado.');
     } catch (error) {
@@ -1600,10 +1755,12 @@ export default function GerenciarCotacaoSolicitacao() {
               fornecedores={fornecedores}
               buscandoFornecedores={buscandoFornecedores}
               fornecedoresSelecionados={fornecedoresSelecionados}
+              fornecedoresSelecionadosDados={fornecedoresSelecionadosDados}
               novoFornecedor={novoFornecedor}
               categoriaFornecedorId={categoriaFornecedorId}
               fornecedorBusca={fornecedorBusca}
               enviandoFornecedores={enviandoFornecedores}
+              itensSelecionadosEnvio={itensSelecionadosEnvio}
               onChangeFornecedorBusca={setFornecedorBusca}
               onChangeCategoriaFornecedorId={setCategoriaFornecedorId}
               onBuscarFornecedores={carregarFornecedores}
@@ -1624,7 +1781,15 @@ export default function GerenciarCotacaoSolicitacao() {
                   }
                   return next;
                 });
+                if (checked) {
+                  garantirItensEnvioSelecionados();
+                }
               }}
+              onToggleItemEnvio={(itemKey, checked) => {
+                setItensSelecionadosEnvio((prev) => ({ ...prev, [itemKey]: checked }));
+              }}
+              onSelecionarTodosItensEnvio={selecionarTodosItensEnvio}
+              onLimparItensEnvio={limparItensEnvio}
               onChangeNovoFornecedor={(field, value) => setNovoFornecedor((prev) => ({ ...prev, [field]: value }))}
               onCriarFornecedorRapido={handleCriarFornecedorRapido}
               onEnviarFornecedores={handleEnviarFornecedores}

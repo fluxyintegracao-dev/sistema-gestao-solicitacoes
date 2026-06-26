@@ -137,6 +137,7 @@ db.SolicitacaoCompraItemManual = require('./SolicitacaoCompraItemManual')(sequel
 db.SolicitacaoCompraItemManualApropriacao = require('./SolicitacaoCompraItemManualApropriacao')(sequelize, Sequelize);
 db.FornecedorCompra = require('./FornecedorCompra')(sequelize, Sequelize);
 db.SolicitacaoCompraFornecedor = require('./SolicitacaoCompraFornecedor')(sequelize, Sequelize);
+db.SolicitacaoCompraFornecedorItem = require('./SolicitacaoCompraFornecedorItem')(sequelize, Sequelize);
 db.SolicitacaoCompraRespostaItem = require('./SolicitacaoCompraRespostaItem')(sequelize, Sequelize);
 db.SolicitacaoCompraAlocacao = require('./SolicitacaoCompraAlocacao')(sequelize, Sequelize);
 db.SolicitacaoCompraLog = require('./SolicitacaoCompraLog')(sequelize, Sequelize);
@@ -2040,6 +2041,27 @@ db.SolicitacaoCompra.hasMany(db.SolicitacaoCompraFornecedor, {
 db.SolicitacaoCompraFornecedor.belongsTo(db.SolicitacaoCompra, {
   foreignKey: 'solicitacao_compra_id',
   as: 'solicitacao'
+});
+
+db.SolicitacaoCompraFornecedor.hasMany(db.SolicitacaoCompraFornecedorItem, {
+  foreignKey: 'solicitacao_compra_fornecedor_id',
+  as: 'itensSelecionados',
+  onDelete: 'CASCADE'
+});
+
+db.SolicitacaoCompraFornecedorItem.belongsTo(db.SolicitacaoCompraFornecedor, {
+  foreignKey: 'solicitacao_compra_fornecedor_id',
+  as: 'cotacaoFornecedor'
+});
+
+db.SolicitacaoCompraFornecedorItem.belongsTo(db.SolicitacaoCompraItem, {
+  foreignKey: 'solicitacao_compra_item_id',
+  as: 'itemCadastrado'
+});
+
+db.SolicitacaoCompraFornecedorItem.belongsTo(db.SolicitacaoCompraItemManual, {
+  foreignKey: 'solicitacao_compra_item_manual_id',
+  as: 'itemManual'
 });
 
 db.SolicitacaoCompraFornecedor.hasMany(db.SolicitacaoCompraRespostaItem, {

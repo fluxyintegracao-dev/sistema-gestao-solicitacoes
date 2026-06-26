@@ -395,7 +395,7 @@ function validateCompraIntegrarBody(body = {}) {
 }
 
 function validateCompraEnviarBody(body = {}) {
-  ensureAllowedKeys(body, ['fornecedores'], 'Envio para fornecedores');
+  ensureAllowedKeys(body, ['fornecedores', 'itens'], 'Envio para fornecedores');
 
   if (!Array.isArray(body.fornecedores) || body.fornecedores.length === 0) {
     throw new ValidationError('Selecione ao menos um fornecedor.');
@@ -412,13 +412,14 @@ function validateCompraEnviarBody(body = {}) {
 
     ensureAllowedKeys(
       entry,
-      ['fornecedor_id', 'parceiro_id', 'nome', 'email', 'whatsapp', 'contato'],
+      ['fornecedor_id', 'parceiro_id', 'nome', 'cnpj', 'documento', 'email', 'whatsapp', 'contato'],
       `Fornecedor ${index + 1}`
     );
 
     const fornecedorId = parseInteger(entry.fornecedor_id, 'Fornecedor', { positiveOnly: true });
     const parceiroId = parseInteger(entry.parceiro_id, 'Parceiro', { positiveOnly: true });
     const nome = parseOptionalText(entry.nome, 'Nome do fornecedor', 255);
+    const cnpj = parseOptionalText(entry.cnpj || entry.documento, 'CPF/CNPJ do fornecedor', 30);
     const email = parseOptionalText(entry.email, 'Email do fornecedor', 255);
     const whatsapp = parseOptionalText(entry.whatsapp, 'WhatsApp do fornecedor', 100);
     const contato = parseOptionalText(entry.contato, 'Contato do fornecedor', 255);
@@ -435,14 +436,53 @@ function validateCompraEnviarBody(body = {}) {
       fornecedor_id: fornecedorId,
       parceiro_id: parceiroId,
       nome,
+      cnpj,
       email,
       whatsapp,
       contato
     };
   });
 
+  let itens = null;
+  if (body.itens !== undefined) {
+    if (!Array.isArray(body.itens) || body.itens.length === 0) {
+      throw new ValidationError('Selecione ao menos um item para cotacao.');
+    }
+
+    if (body.itens.length > 500) {
+      throw new ValidationError('Quantidade de itens excede o limite permitido.');
+    }
+
+    itens = body.itens.map((entry, index) => {
+      if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+        throw new ValidationError(`Item ${index + 1} invalido.`);
+      }
+
+      ensureAllowedKeys(
+        entry,
+        ['item_tipo', 'item_referencia_id', 'solicitacao_compra_item_id', 'solicitacao_compra_item_manual_id'],
+        `Item ${index + 1}`
+      );
+
+      const itemTipo = parseOptionalText(entry.item_tipo, 'Tipo do item', 20, { required: true }).toUpperCase();
+      if (!['CADASTRADO', 'MANUAL'].includes(itemTipo)) {
+        throw new ValidationError(`Tipo do item ${index + 1} invalido.`);
+      }
+
+      const referenciaInformada =
+        entry.item_referencia_id ||
+        (itemTipo === 'CADASTRADO' ? entry.solicitacao_compra_item_id : entry.solicitacao_compra_item_manual_id);
+
+      return {
+        item_tipo: itemTipo,
+        item_referencia_id: parseInteger(referenciaInformada, `Item ${index + 1}`, { required: true, positiveOnly: true })
+      };
+    });
+  }
+
   return {
-    fornecedores
+    fornecedores,
+    itens
   };
 }
 

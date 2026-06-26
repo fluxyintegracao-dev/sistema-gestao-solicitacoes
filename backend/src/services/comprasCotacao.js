@@ -9,6 +9,7 @@ const {
   SolicitacaoCompraItemApropriacao,
   SolicitacaoCompraItemManual,
   SolicitacaoCompraItemManualApropriacao,
+  SolicitacaoCompraFornecedorItem,
   SolicitacaoCompraLog
 } = require('../models');
 const { construirResumoApropriacoes } = require('./compraApropriacao');
@@ -56,6 +57,10 @@ function obterItemReferenciaId(item) {
   return Number(item.id);
 }
 
+function buildCotacaoItemKey(itemTipo, itemReferenciaId) {
+  return `${normalizeText(itemTipo)}:${Number(itemReferenciaId)}`;
+}
+
 function obterItensCotaveis(solicitacao) {
   const itens = (solicitacao?.itens || []).map((item) => {
     const apropriacoes = construirResumoApropriacoes(item);
@@ -100,6 +105,35 @@ function obterItensCotaveis(solicitacao) {
   return [...itens, ...itensManuais];
 }
 
+function obterItemIdDaSelecaoCotacao(itemSelecionado) {
+  return itemSelecionado?.solicitacao_compra_item_id || itemSelecionado?.solicitacao_compra_item_manual_id;
+}
+
+function filtrarItensCotaveisPorSelecao(itens, itensSelecionados = []) {
+  if (!Array.isArray(itensSelecionados) || itensSelecionados.length === 0) {
+    return itens;
+  }
+
+  const keysSelecionadas = new Set(
+    itensSelecionados
+      .map((item) => buildCotacaoItemKey(item.item_tipo, obterItemIdDaSelecaoCotacao(item)))
+      .filter((key) => !key.endsWith(':NaN'))
+  );
+
+  if (keysSelecionadas.size === 0) {
+    return itens;
+  }
+
+  return itens.filter((item) => keysSelecionadas.has(buildCotacaoItemKey(item.item_tipo, item.item_referencia_id)));
+}
+
+function obterItensCotaveisDaCotacao(cotacaoFornecedor) {
+  return filtrarItensCotaveisPorSelecao(
+    obterItensCotaveis(cotacaoFornecedor?.solicitacao || {}),
+    cotacaoFornecedor?.itensSelecionados || []
+  );
+}
+
 async function registrarLogSolicitacaoCompra({
   solicitacaoCompraId,
   usuarioId = null,
@@ -134,8 +168,8 @@ function serializeCsvValue(value) {
   return raw;
 }
 
-function gerarModeloCotacaoCsv(solicitacao) {
-  const linhas = obterItensCotaveis(solicitacao);
+function gerarModeloCotacaoCsv(solicitacao, itensSelecionados = []) {
+  const linhas = filtrarItensCotaveisPorSelecao(obterItensCotaveis(solicitacao), itensSelecionados);
   const header = [
     'produto_id',
     'nome',
@@ -164,8 +198,8 @@ function gerarModeloCotacaoCsv(solicitacao) {
   return `${header.join(',')}\n${rows.join('\n')}\n`;
 }
 
-function gerarModeloCotacaoXlsx(solicitacao) {
-  const linhas = obterItensCotaveis(solicitacao);
+function gerarModeloCotacaoXlsx(solicitacao, itensSelecionados = []) {
+  const linhas = filtrarItensCotaveisPorSelecao(obterItensCotaveis(solicitacao), itensSelecionados);
   const header = [
     'PRODUTO_ID', 'NOME', 'QUANTIDADE', 'PRECO', 'PRAZO',
     'DISPONIVEL', 'QUANTIDADE_MINIMA_ITEM', 'VALOR_MINIMO_PEDIDO'
@@ -314,6 +348,10 @@ async function carregarSolicitacaoCompraCompleta(id) {
           {
             model: FornecedorCompra,
             as: 'fornecedor'
+          },
+          {
+            model: SolicitacaoCompraFornecedorItem,
+            as: 'itensSelecionados'
           }
         ]
       }
@@ -322,7 +360,9 @@ async function carregarSolicitacaoCompraCompleta(id) {
 }
 
 module.exports = {
+  buildCotacaoItemKey,
   carregarSolicitacaoCompraCompleta,
+  filtrarItensCotaveisPorSelecao,
   gerarModeloCotacaoCsv,
   gerarModeloCotacaoXlsx,
   gerarTokenCotacao,
@@ -330,6 +370,7 @@ module.exports = {
   normalizeText,
   obterCodigoProdutoCotacao,
   obterItensCotaveis,
+  obterItensCotaveisDaCotacao,
   parseCsvRows,
   parseDisponivel,
   parseXlsxRows,
