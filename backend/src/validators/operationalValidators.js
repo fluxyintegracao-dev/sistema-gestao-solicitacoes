@@ -989,6 +989,21 @@ function validateSolicitacaoCredorBody(body = {}) {
   };
 }
 
+function validateSolicitacaoCredorCreateBody(body = {}) {
+  ensureAllowedKeys(
+    body,
+    ['nome', 'cpf_cnpj', 'telefone', 'email'],
+    'Cadastro de credor da solicitacao'
+  );
+
+  return {
+    nome: sanitizeString(body.nome, 'Nome do credor', { required: true, max: 255 }),
+    cpf_cnpj: sanitizeString(body.cpf_cnpj, 'CPF/CNPJ', { required: true, max: 32 }),
+    telefone: sanitizeString(body.telefone, 'Telefone', { required: true, max: 32 }),
+    email: sanitizeString(body.email, 'Email', { max: 255 })
+  };
+}
+
 function validateSolicitacaoResponsavelBody(body = {}) {
   ensureAllowedKeys(body, ['usuario_responsavel_id', 'prazo_compra'], 'Atribuicao de responsavel');
 
@@ -1086,6 +1101,7 @@ module.exports = {
   validateSolicitacaoArquivarMassaBody,
   validateSolicitacaoComentarioBody,
   validateSolicitacaoCreateBody,
+  validateSolicitacaoCredorCreateBody,
   validateSolicitacaoCredorBody,
   validateSolicitacaoDataVencimentoBody,
   validateSolicitacaoEnviarSetorBody,

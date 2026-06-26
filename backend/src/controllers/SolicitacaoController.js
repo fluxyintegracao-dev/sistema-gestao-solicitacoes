@@ -77,6 +77,7 @@ const {
   obterOpcoesNovaSolicitacao,
   resolverCamposNovaSolicitacao
 } = require('../services/novaSolicitacaoCamposConfig');
+const { criarParceiro } = require('../services/parceiroService');
 const { isObraCentroCusto } = require('../constants/centroCusto');
 const {
   userHasAreaPermission,
@@ -3254,6 +3255,111 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return res.status(500).json({ error: 'Erro ao atualizar credor da solicitacao' });
+    }
+  },
+
+  // =====================================================
+  // CADASTRAR CREDOR E VINCULAR NA SOLICITACAO
+  // =====================================================
+  async cadastrarCredorFinanceiro(req, res) {
+    const transaction = await sequelize.transaction();
+
+    try {
+      const { id } = req.params;
+
+      const solicitacao = await Solicitacao.findByPk(id, {
+        include: [{
+          model: Parceiro,
+          as: 'parceiro',
+          attributes: ['id', 'nome', 'cpf_cnpj']
+        }],
+        transaction,
+        lock: transaction.LOCK.UPDATE
+      });
+
+      if (!solicitacao) {
+        await transaction.rollback();
+        return res.status(404).json({ error: 'Solicitacao nao encontrada' });
+      }
+
+      const acesso = await verificarAcessoDetalheSolicitacao(req, solicitacao);
+      if (!acesso.allowed) {
+        await transaction.rollback();
+        return res.status(acesso.status || 403).json({ error: acesso.error || 'Acesso negado' });
+      }
+
+      const credorAnterior = solicitacao.parceiro
+        ? {
+            id: solicitacao.parceiro.id,
+            nome: solicitacao.parceiro.nome || null,
+            cpf_cnpj: solicitacao.parceiro.cpf_cnpj || null
+          }
+        : null;
+
+      const novoParceiro = await criarParceiro({
+        ...req.body,
+        fornecedor: true,
+        cliente: false,
+        corretor: false,
+        testemunha: false,
+        ativo: true
+      }, { transaction });
+
+      const novoCredorResumo = {
+        id: novoParceiro.id,
+        nome: novoParceiro.nome || null,
+        cpf_cnpj: novoParceiro.cpf_cnpj || null
+      };
+
+      await solicitacao.update({
+        parceiro_id: novoParceiro.id
+      }, { transaction });
+
+      await Historico.create({
+        solicitacao_id: id,
+        usuario_responsavel_id: req.user.id,
+        setor: req.user.area,
+        acao: 'CREDOR_CADASTRADO',
+        descricao: `Credor ${novoCredorResumo.nome || novoCredorResumo.id} cadastrado e vinculado a solicitacao`,
+        metadata: JSON.stringify({
+          parceiro_anterior_id: credorAnterior?.id || null,
+          parceiro_anterior_nome: credorAnterior?.nome || null,
+          parceiro_novo_id: novoCredorResumo.id,
+          parceiro_novo_nome: novoCredorResumo.nome || null
+        })
+      }, { transaction });
+
+      await transaction.commit();
+
+      const usuario = await User.findByPk(req.user.id, {
+        attributes: ['id', 'nome']
+      });
+
+      await publishSolicitacaoRealtimeEvent({
+        action: 'CREDOR_CREATED',
+        solicitacao,
+        actor: {
+          id: req.user.id,
+          nome: usuario?.nome || req.user?.nome || null
+        },
+        metadata: {
+          parceiro_anterior_id: credorAnterior?.id || null,
+          parceiro_novo_id: novoCredorResumo.id
+        }
+      });
+
+      return res.status(201).json({
+        id: solicitacao.id,
+        parceiro_id: novoCredorResumo.id,
+        parceiro: novoCredorResumo
+      });
+    } catch (error) {
+      if (!transaction.finished) {
+        await transaction.rollback();
+      }
+      console.error(error);
+      const status = /cpf\/cnpj|parceiro|telefone|nome/i.test(String(error?.message || '')) ? 400 : 500;
+      return res.status(status).json({ error: error?.message || 'Erro ao cadastrar credor da solicitacao' });
     }
   },
 

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { buscarParceiros } from '../../services/parceiros';
-import { updateCredorSolicitacao } from '../../services/solicitacoes';
+import { cadastrarCredorSolicitacao, updateCredorSolicitacao } from '../../services/solicitacoes';
 import { getEmpresasGrupo } from '../../services/empresasGrupo';
 import { getObras } from '../../services/obras';
 import { formatCurrencyInput, normalizeCurrencyTyping } from '../../utils/formatters';
@@ -300,6 +300,19 @@ function buildDefaultForm(solicitacao) {
   };
 }
 
+function criarCredorFormPadrao() {
+  return {
+    nome: '',
+    cpf_cnpj: '',
+    telefone: '',
+    email: ''
+  };
+}
+
+function onlyDigits(value) {
+  return String(value || '').replace(/\D/g, '');
+}
+
 function statusClass(status) {
   const normalized = String(status || '').toUpperCase();
   if (normalized === 'PREVISAO') return 'bg-sky-100 text-sky-700';
@@ -506,6 +519,9 @@ export default function FinanceiroCard({
   const [saving, setSaving] = useState(false);
   const [erro, setErro] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
+  const [cadastroCredorModalOpen, setCadastroCredorModalOpen] = useState(false);
+  const [cadastroCredorSaving, setCadastroCredorSaving] = useState(false);
+  const [cadastroCredorForm, setCadastroCredorForm] = useState(() => criarCredorFormPadrao());
   const [credorModalOpen, setCredorModalOpen] = useState(false);
   const [credorSaving, setCredorSaving] = useState(false);
   const [credorSearch, setCredorSearch] = useState('');
@@ -1202,6 +1218,42 @@ export default function FinanceiroCard({
     }
   }
 
+  function handleCadastroCredorChange(event) {
+    const { name, value } = event.target;
+    setCadastroCredorForm((current) => ({
+      ...current,
+      [name]: value
+    }));
+  }
+
+  function fecharCadastroCredorModal() {
+    setCadastroCredorModalOpen(false);
+    setCadastroCredorSaving(false);
+    setCadastroCredorForm(criarCredorFormPadrao());
+  }
+
+  async function handleCadastrarCredor() {
+    try {
+      setCadastroCredorSaving(true);
+      setErro('');
+      await cadastrarCredorSolicitacao(solicitacao.id, {
+        nome: cadastroCredorForm.nome,
+        cpf_cnpj: onlyDigits(cadastroCredorForm.cpf_cnpj),
+        telefone: onlyDigits(cadastroCredorForm.telefone),
+        email: cadastroCredorForm.email
+      });
+      fecharCadastroCredorModal();
+      if (typeof onSolicitacaoAtualizada === 'function') {
+        await onSolicitacaoAtualizada();
+      }
+      alert('Credor cadastrado e vinculado com sucesso.');
+    } catch (error) {
+      setErro(error?.message || 'Erro ao cadastrar credor');
+    } finally {
+      setCadastroCredorSaving(false);
+    }
+  }
+
   return (
     <>
       <div className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4 shadow-sm space-y-4">
@@ -1212,11 +1264,24 @@ export default function FinanceiroCard({
               Gere contas a pagar ou receber sem sair do fluxo da solicitacao.
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             {podeAcessarModuloFinanceiro && (
               <Link to="/financeiro/titulos" className="btn btn-outline">
                 Ver titulos
               </Link>
+            )}
+            {podeAcessarModuloFinanceiro && (
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={() => {
+                  setErro('');
+                  setCadastroCredorForm(criarCredorFormPadrao());
+                  setCadastroCredorModalOpen(true);
+                }}
+              >
+                Cadastrar credor
+              </button>
             )}
             {podeAcessarModuloFinanceiro && (
               <button
@@ -1312,6 +1377,105 @@ export default function FinanceiroCard({
           </div>
         )}
       </div>
+
+      {cadastroCredorModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6">
+          <div className="card flex max-h-[88vh] w-full max-w-lg flex-col overflow-hidden">
+            <div className="flex items-start justify-between gap-3 border-b border-[var(--c-border)] pb-3">
+              <div>
+                <h3 className="text-lg font-semibold text-[var(--c-text)]">Cadastrar credor</h3>
+                <p className="text-sm text-[var(--c-muted)]">
+                  Cadastre uma pessoa como credor ativo e vincule a esta solicitacao.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={fecharCadastroCredorModal}
+                disabled={cadastroCredorSaving}
+              >
+                Fechar
+              </button>
+            </div>
+
+            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto py-4">
+              {erro && (
+                <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+                  {erro}
+                </div>
+              )}
+
+              <label className="grid gap-1 text-sm text-[var(--c-muted)]">
+                Nome do credor
+                <input
+                  className="input"
+                  name="nome"
+                  value={cadastroCredorForm.nome}
+                  onChange={handleCadastroCredorChange}
+                  placeholder="Ex.: Fornecedor ABC"
+                  disabled={cadastroCredorSaving}
+                />
+              </label>
+
+              <label className="grid gap-1 text-sm text-[var(--c-muted)]">
+                CPF/CNPJ
+                <input
+                  className="input"
+                  name="cpf_cnpj"
+                  value={cadastroCredorForm.cpf_cnpj}
+                  onChange={handleCadastroCredorChange}
+                  placeholder="CPF ou CNPJ do credor"
+                  disabled={cadastroCredorSaving}
+                />
+              </label>
+
+              <label className="grid gap-1 text-sm text-[var(--c-muted)]">
+                Telefone
+                <input
+                  className="input"
+                  name="telefone"
+                  value={cadastroCredorForm.telefone}
+                  onChange={handleCadastroCredorChange}
+                  placeholder="(00) 00000-0000"
+                  disabled={cadastroCredorSaving}
+                />
+              </label>
+
+              <label className="grid gap-1 text-sm text-[var(--c-muted)]">
+                Email
+                <input
+                  className="input"
+                  name="email"
+                  type="email"
+                  value={cadastroCredorForm.email}
+                  onChange={handleCadastroCredorChange}
+                  placeholder="email@fornecedor.com"
+                  disabled={cadastroCredorSaving}
+                />
+              </label>
+            </div>
+
+            <div className="flex flex-col-reverse gap-2 border-t border-[var(--c-border)] pt-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={fecharCadastroCredorModal}
+                disabled={cadastroCredorSaving}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={handleCadastrarCredor}
+                disabled={cadastroCredorSaving}
+              >
+                {cadastroCredorSaving ? 'Cadastrando...' : 'Cadastrar e vincular'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {credorModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">

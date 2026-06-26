@@ -216,6 +216,20 @@ export async function updateCredorSolicitacao(id, parceiro_id) {
   return res.json();
 }
 
+export async function cadastrarCredorSolicitacao(id, data) {
+  const res = await fetch(`${API_URL}/solicitacoes/${id}/credor/cadastrar`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+
+  if (!res.ok) {
+    throw buildResponseError(res.status, 'Erro ao cadastrar credor', await parseJsonSafe(res));
+  }
+
+  return res.json();
+}
+
 export async function updateRefContratoSolicitacao(id, contrato_id) {
   const res = await fetch(`${API_URL}/solicitacoes/${id}/ref-contrato`, {
     method: 'PATCH',

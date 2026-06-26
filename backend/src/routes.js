@@ -82,6 +82,7 @@ const {
   validateSolicitacaoArquivarMassaBody,
   validateSolicitacaoComentarioBody,
   validateSolicitacaoCreateBody,
+  validateSolicitacaoCredorCreateBody,
   validateSolicitacaoCredorBody,
   validateSolicitacaoDataVencimentoBody,
   validateSolicitacaoEnviarSetorBody,
@@ -1165,6 +1166,7 @@ router.patch('/solicitacoes/:id/ref-contrato', requireEnabledModule('CONTRATOS')
 router.patch('/solicitacoes/:id/valor', validateRequest({ params: validateNumericIdParam('id', 'Solicitacao'), body: validateSolicitacaoValorBody }), auditSuccess({ eventType: 'SOLICITACAO_VALOR_UPDATED', resourceType: 'SOLICITACAO', description: 'Valor da solicitacao atualizado', resourceIdResolver: (req) => req.params.id }), SolicitacaoController.atualizarValor);
 router.patch('/solicitacoes/:id/data-vencimento', validateRequest({ params: validateNumericIdParam('id', 'Solicitacao'), body: validateSolicitacaoDataVencimentoBody }), auditSuccess({ eventType: 'SOLICITACAO_DUE_DATE_UPDATED', resourceType: 'SOLICITACAO', description: 'Data de vencimento da solicitacao atualizada', resourceIdResolver: (req) => req.params.id }), SolicitacaoController.atualizarDataVencimento);
 router.patch('/solicitacoes/:id/credor', requireEnabledModule('FINANCEIRO'), allowSolicitacaoFinanceiro, validateRequest({ params: validateNumericIdParam('id', 'Solicitacao'), body: validateSolicitacaoCredorBody }), auditSuccess({ eventType: 'SOLICITACAO_CREDOR_UPDATED', resourceType: 'SOLICITACAO', description: 'Credor da solicitacao atualizado', resourceIdResolver: (req) => req.params.id }), SolicitacaoController.atualizarCredor);
+router.post('/solicitacoes/:id/credor/cadastrar', requireEnabledModule('FINANCEIRO'), allowSolicitacaoFinanceiro, validateRequest({ params: validateNumericIdParam('id', 'Solicitacao'), body: validateSolicitacaoCredorCreateBody }), auditSuccess({ eventType: 'SOLICITACAO_CREDOR_CREATED_AND_LINKED', resourceType: 'SOLICITACAO', description: 'Credor cadastrado e vinculado a solicitacao', resourceIdResolver: (req) => req.params.id }), SolicitacaoController.cadastrarCredorFinanceiro);
 router.post('/solicitacoes/credores', auditSuccess({ eventType: 'SOLICITACAO_CREDOR_CREATED', resourceType: 'PARCEIRO', description: 'Credor criado durante abertura de solicitacao' }), ParceiroController.createCredorNovaSolicitacao);
 router.patch('/solicitacoes/arquivar-massa', validateRequest({ body: validateSolicitacaoArquivarMassaBody }), auditSuccess({ eventType: 'SOLICITACAO_ARCHIVED_BATCH', resourceType: 'SOLICITACAO', description: 'Solicitacoes arquivadas em massa', metadataResolver: (req) => ({ solicitacao_ids: req.body?.solicitacao_ids || [] }) }), SolicitacaoController.arquivarEmMassa);
 router.post('/solicitacoes/enviar-setor-massa', validateRequest({ body: validateSolicitacaoEnviarSetorMassaBody }), auditSuccess({ eventType: 'SOLICITACAO_SENT_BATCH', resourceType: 'SOLICITACAO', description: 'Solicitacoes enviadas em massa para outro setor', metadataResolver: (req) => ({ solicitacao_ids: req.body?.solicitacao_ids || [], setor_destino: req.body?.setor_destino || null }) }), SolicitacaoController.enviarParaSetorEmMassa);
