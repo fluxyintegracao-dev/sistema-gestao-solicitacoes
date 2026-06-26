@@ -63,6 +63,10 @@ module.exports = {
 
         // Orçamento = valorReferencia - custo esperado = valorReferencia * (1 - margem/100)
         const orcamento = (valorReferencia > 0 && margem > 0) ? valorReferencia * (1 - margem / 100) : null;
+        const faltaReceber = valorReferencia > 0
+          ? valorReferencia - receber.total_valor_baixado
+          : receber.total_valor_saldo;
+        const lucroPrejuizo = receber.total_valor_baixado - pagar.total_valor_baixado;
 
         return {
           id: obra.id,
@@ -74,6 +78,9 @@ module.exports = {
           planilha_geral: obra.planilha_geral != null ? Number(obra.planilha_geral) : null,
           margem_custo_esperada: obra.margem_custo_esperada != null ? Number(obra.margem_custo_esperada) : null,
           orcamento,
+          valor_referencia_resultado: valorReferencia || null,
+          falta_receber: faltaReceber,
+          lucro_prejuizo: lucroPrejuizo,
           pagar: {
             total: pagar.total_valor_original,
             executado: pagar.total_valor_baixado,

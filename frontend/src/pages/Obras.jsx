@@ -121,6 +121,13 @@ function getExecucaoPercentual(orcado, executado) {
   return Math.max(0, Math.min(100, Number(((Number(executado || 0) / base) * 100).toFixed(1))));
 }
 
+function getLucroPrejuizoColor(value) {
+  const numero = Number(value || 0);
+  if (numero > 0) return '#10b981';
+  if (numero < 0) return '#ef4444';
+  return 'var(--c-text)';
+}
+
 function isCadastroObra(obra) {
   return String(obra?.tipo_centro_custo || 'OBRA').trim().toUpperCase() === 'OBRA';
 }
@@ -382,6 +389,9 @@ export default function Obras() {
           {obrasFiltradas.map((obra) => {
             const orcado = Number(obra.resumo?.orcado || 0);
             const executado = Number(obra.resumo?.executado || 0);
+            const recebido = Number(obra.resumo?.recebido || 0);
+            const faltaReceber = Number(obra.resumo?.falta_receber || 0);
+            const lucroPrejuizo = Number(obra.resumo?.lucro_prejuizo || 0);
             const percentual = getExecucaoPercentual(orcado, executado);
             const cadastroEhObra = isCadastroObra(obra);
 
@@ -498,10 +508,10 @@ export default function Obras() {
                             className="text-[10px] font-bold uppercase tracking-[0.2em]"
                             style={{ color: 'var(--c-muted)' }}
                           >
-                            Orcado
+                            Executado
                           </div>
-                          <div className="mt-2 text-base font-black" style={{ color: 'var(--c-text)' }}>
-                            {formatCurrency(orcado)}
+                          <div className="mt-2 text-base font-black" style={{ color: 'var(--c-primary)' }}>
+                            {formatCurrency(executado)}
                           </div>
                         </div>
                         <div>
@@ -509,10 +519,32 @@ export default function Obras() {
                             className="text-[10px] font-bold uppercase tracking-[0.2em]"
                             style={{ color: 'var(--c-muted)' }}
                           >
-                            Executado
+                            Recebido
                           </div>
-                          <div className="mt-2 text-base font-black" style={{ color: 'var(--c-primary)' }}>
-                            {formatCurrency(executado)}
+                          <div className="mt-2 text-base font-black" style={{ color: '#10b981' }}>
+                            {formatCurrency(recebido)}
+                          </div>
+                        </div>
+                        <div>
+                          <div
+                            className="text-[10px] font-bold uppercase tracking-[0.2em]"
+                            style={{ color: 'var(--c-muted)' }}
+                          >
+                            Falta receber
+                          </div>
+                          <div className="mt-2 text-base font-black" style={{ color: faltaReceber > 0 ? '#f59e0b' : 'var(--c-text)' }}>
+                            {formatCurrency(faltaReceber)}
+                          </div>
+                        </div>
+                        <div>
+                          <div
+                            className="text-[10px] font-bold uppercase tracking-[0.2em]"
+                            style={{ color: 'var(--c-muted)' }}
+                          >
+                            Lucro/Prejuizo
+                          </div>
+                          <div className="mt-2 text-base font-black" style={{ color: getLucroPrejuizoColor(lucroPrejuizo) }}>
+                            {formatCurrency(lucroPrejuizo)}
                           </div>
                         </div>
                       </div>

@@ -18,6 +18,8 @@ const {
 const STATUS_TITULO_ABERTO = new Set(['ABERTO', 'PARCIAL']);
 const STATUS_MOVIMENTO_ATIVO = 'ATIVO';
 const TIPO_TITULO_PAGAR = 'PAGAR';
+const TIPO_TITULO_RECEBER = 'RECEBER';
+const STATUS_TITULOS_EXCLUIDOS_RESULTADO = ['CANCELADO', 'ESTORNADO'];
 const APROPRIACAO_SEM_VINCULO_ID = 'SEM_APROPRIACAO';
 
 function asNumber(value) {
@@ -502,7 +504,8 @@ async function listarObrasGestao() {
   const titulos = await TituloFinanceiro.findAll({
     where: {
       obra_id: { [Op.in]: obras.map((obra) => obra.id) },
-      tipo: TIPO_TITULO_PAGAR
+      tipo: { [Op.in]: [TIPO_TITULO_PAGAR, TIPO_TITULO_RECEBER] },
+      status: { [Op.notIn]: STATUS_TITULOS_EXCLUIDOS_RESULTADO }
     },
     include: [
       {
@@ -536,12 +539,29 @@ async function listarObrasGestao() {
   return obras.map((obra) => {
     const apropriacoesObra = appropriationsByObra.get(Number(obra.id)) || [];
     const titulosObra = titulosByObra.get(Number(obra.id)) || [];
+    const titulosPagarObra = titulosObra.filter((titulo) => String(titulo.tipo || '').toUpperCase() === TIPO_TITULO_PAGAR);
+    const titulosReceberObra = titulosObra.filter((titulo) => String(titulo.tipo || '').toUpperCase() === TIPO_TITULO_RECEBER);
     const orcado = roundCurrency(
       apropriacoesObra.reduce((total, item) => total + asNumber(item.valor_orcado), 0)
     );
     const executado = roundCurrency(
-      titulosObra.reduce((total, titulo) => total + sumMovimentosAtivos(titulo), 0)
+      titulosPagarObra.reduce((total, titulo) => total + sumMovimentosAtivos(titulo), 0)
     );
+    const recebido = roundCurrency(
+      titulosReceberObra.reduce((total, titulo) => total + asNumber(titulo.valor_baixado), 0)
+    );
+    const classificacao = String(obra.classificacao || '').trim().toUpperCase();
+    const valorReferenciaResultado = classificacao === 'PRIVADA'
+      ? asNumber(obra.vgv)
+      : classificacao === 'PUBLICA'
+        ? asNumber(obra.planilha_geral)
+        : 0;
+    const faltaReceber = roundCurrency(
+      valorReferenciaResultado > 0
+        ? valorReferenciaResultado - recebido
+        : titulosReceberObra.reduce((total, titulo) => total + asNumber(titulo.valor_saldo), 0)
+    );
+    const lucroPrejuizo = roundCurrency(recebido - executado);
 
     return {
       id: obra.id,
@@ -557,7 +577,11 @@ async function listarObrasGestao() {
       resumo: {
         orcado,
         executado,
-        saldo: roundCurrency(orcado - executado)
+        saldo: roundCurrency(orcado - executado),
+        recebido,
+        falta_receber: faltaReceber,
+        lucro_prejuizo: lucroPrejuizo,
+        valor_referencia_resultado: valorReferenciaResultado || null
       }
     };
   });

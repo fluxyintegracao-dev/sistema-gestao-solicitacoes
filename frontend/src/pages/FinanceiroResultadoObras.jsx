@@ -39,12 +39,17 @@ function ObraCard({ obra }) {
 
   const valorReferencia = isPrivada ? obra.vgv : isPublica ? obra.planilha_geral : null;
   const orcamento = obra.orcamento; // calculado no backend: valorReferencia * (1 - margem/100)
+  const valorReferenciaResultado = Number(obra.valor_referencia_resultado ?? valorReferencia ?? 0);
 
   const executado = obra.pagar.executado;
   const recebido = obra.receber.recebido;
   const totalPagar = obra.pagar.total;
   const totalReceber = obra.receber.total;
-  const faltaReceber = obra.receber.saldo;
+  const faltaReceber = Number(obra.falta_receber ?? (
+    valorReferenciaResultado > 0 ? valorReferenciaResultado - recebido : obra.receber.saldo
+  ));
+  const lucroPrejuizo = Number(obra.lucro_prejuizo ?? (recebido - executado));
+  const lucroPrejuizoColor = lucroPrejuizo > 0 ? '#10b981' : lucroPrejuizo < 0 ? '#ef4444' : 'var(--c-text)';
 
   const margemRealizada = executado > 0 && valorReferencia > 0
     ? ((executado / valorReferencia) * 100).toFixed(1)
@@ -111,6 +116,11 @@ function ObraCard({ obra }) {
           label="Falta receber"
           value={formatCurrency(faltaReceber)}
           color={faltaReceber > 0 ? '#f59e0b' : undefined}
+        />
+        <StatItem
+          label="Lucro/Prejuizo"
+          value={formatCurrency(lucroPrejuizo)}
+          color={lucroPrejuizoColor}
         />
         {margemRealizada != null && (
           <StatItem
@@ -180,9 +190,19 @@ export default function FinanceiroResultadoObras() {
     acc.executado += obra.pagar.executado;
     acc.totalReceber += obra.receber.total;
     acc.recebido += obra.receber.recebido;
-    acc.faltaReceber += obra.receber.saldo;
+    const classificacao = String(obra.classificacao || '').trim().toUpperCase();
+    const valorReferencia = classificacao === 'PRIVADA'
+      ? obra.vgv
+      : classificacao === 'PUBLICA'
+        ? obra.planilha_geral
+        : null;
+    const valorReferenciaResultado = Number(obra.valor_referencia_resultado ?? valorReferencia ?? 0);
+    acc.faltaReceber += Number(obra.falta_receber ?? (
+      valorReferenciaResultado > 0 ? valorReferenciaResultado - obra.receber.recebido : obra.receber.saldo
+    ));
+    acc.lucroPrejuizo += Number(obra.lucro_prejuizo ?? (obra.receber.recebido - obra.pagar.executado));
     return acc;
-  }, { orcamento: 0, executado: 0, totalReceber: 0, recebido: 0, faltaReceber: 0 });
+  }, { orcamento: 0, executado: 0, totalReceber: 0, recebido: 0, faltaReceber: 0, lucroPrejuizo: 0 });
 
   return (
     <div className="page solicitacoes-page">
@@ -226,7 +246,8 @@ export default function FinanceiroResultadoObras() {
               { label: 'Executado', value: formatCurrency(resumo.executado) },
               { label: 'Total receber', value: formatCurrency(resumo.totalReceber) },
               { label: 'Recebido', value: formatCurrency(resumo.recebido) },
-              { label: 'Falta receber', value: formatCurrency(resumo.faltaReceber) }
+              { label: 'Falta receber', value: formatCurrency(resumo.faltaReceber) },
+              { label: 'Lucro/Prejuizo', value: formatCurrency(resumo.lucroPrejuizo) }
             ].map((item) => (
               <div key={item.label} className="flex flex-col items-end">
                 <span className="text-[10px] uppercase tracking-wide text-[var(--c-muted)]">{item.label}</span>
