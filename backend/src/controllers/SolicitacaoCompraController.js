@@ -461,7 +461,19 @@ function isSetorComprasValue(value) {
   return normalizeFluxoTokenCompra(value) === 'COMPRAS';
 }
 
+function isStatusSolicitacaoCompraLiberadoParaCompras(status) {
+  const normalizado = normalizeFluxoTokenCompra(status);
+  if (['LIBERADO_PARA_COMPRA', 'LIBERADO', 'COTACAO', 'COTACAO_ENVIADA', 'EM_COTACAO', 'ENCERRADO', 'FINALIZADA'].includes(normalizado)) {
+    return true;
+  }
+  return normalizado.startsWith('PEDIDO_');
+}
+
 async function isSolicitacaoPrincipalLiberadaParaCompras(solicitacao, transaction = null) {
+  if (isStatusSolicitacaoCompraLiberadoParaCompras(solicitacao?.status)) {
+    return true;
+  }
+
   if (!Number(solicitacao?.solicitacao_principal_id || 0)) {
     return true;
   }
