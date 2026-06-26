@@ -368,15 +368,15 @@ async function buscarSetorGerenciaProcessos(transaction) {
 }
 
 async function montarFluxoAprovacaoCompra({ obra, transaction }) {
-  const setorGerenciaProcessos = await buscarSetorGerenciaProcessos(transaction);
+  const setorCompras = await buscarSetorCompras(transaction);
   const configuracao = await obterConfiguracaoAprovacaoDiretoria();
   const diretoria = obterDiretoriaParaObra(obra, configuracao.diretoriasPorClassificacao);
 
   return {
     usaFluxoDiretoria: Boolean(diretoria),
-    areaResponsavel: diretoria || setorGerenciaProcessos,
+    areaResponsavel: diretoria || setorCompras,
     diretoriaFluxoCodigo: diretoria || null,
-    setorDestinoPosAprovacao: diretoria ? setorGerenciaProcessos : null
+    setorDestinoPosAprovacao: diretoria ? setorCompras : null
   };
 }
 

@@ -2055,9 +2055,9 @@ export default function NovaSolicitacao() {
       )}
 
       {exibirCadastroCredor && modalParceiroAberto && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
-          <div className="card w-full max-w-2xl space-y-4">
-            <div className="flex items-start justify-between gap-4">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-3 sm:items-center sm:p-4">
+          <div className="card flex max-h-[calc(100vh-1.5rem)] w-full max-w-2xl flex-col overflow-hidden p-0 sm:max-h-[calc(100vh-2rem)]">
+            <div className="flex shrink-0 items-start justify-between gap-4 border-b border-[var(--c-border)] p-4">
               <div>
                 <h2 className="text-xl font-semibold" style={{ color: 'var(--c-text)' }}>Cadastrar Credor</h2>
                 <p className="text-sm" style={{ color: 'var(--c-muted)' }}>
@@ -2073,6 +2073,8 @@ export default function NovaSolicitacao() {
               </button>
             </div>
 
+            <div className="min-h-0 flex-1 overflow-y-auto p-4">
+              <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <label className="grid gap-1 text-sm">
                 CPF/CNPJ *
@@ -2261,8 +2263,10 @@ export default function NovaSolicitacao() {
                 </div>
               )}
             </div>
+              </div>
+            </div>
 
-            <div className="flex justify-end gap-2">
+            <div className="flex shrink-0 flex-wrap justify-end gap-2 border-t border-[var(--c-border)] bg-[var(--c-card)] p-4">
               <button
                 type="button"
                 className="btn btn-outline btn-sm"
