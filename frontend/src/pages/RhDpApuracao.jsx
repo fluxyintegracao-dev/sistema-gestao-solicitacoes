@@ -63,6 +63,7 @@ function statusClass(status) {
 function initialForm() {
   return {
     competencia: '',
+    dias_base: '30',
     tipo_vinculo: '',
     observacoes: ''
   };
@@ -229,6 +230,7 @@ export default function RhDpApuracao() {
       setGerando(true);
       const data = await gerarRhApuracao({
         competencia: form.competencia,
+        dias_base: Number(form.dias_base || 30),
         tipo_vinculo: form.tipo_vinculo || undefined,
         observacoes: form.observacoes || undefined
       });
@@ -405,6 +407,19 @@ export default function RhDpApuracao() {
               disabled={!podeEditar}
             />
           </label>
+          <label className="rhdp-apuracao-field">
+            <span>Base para diaria</span>
+            <select
+              className="form-control"
+              value={form.dias_base}
+              onChange={(event) => setForm((current) => ({ ...current, dias_base: event.target.value }))}
+              disabled={!podeEditar}
+            >
+              <option value="30">30 dias - mensal padrao</option>
+              <option value="22">22 dias - dias uteis</option>
+              <option value="20">20 dias - escala operacional</option>
+            </select>
+          </label>
         </div>
 
         <div className="rhdp-apuracao-form-grid rhdp-apuracao-form-grid-secondary">
@@ -561,6 +576,7 @@ export default function RhDpApuracao() {
                   <th className="px-3 py-2 font-medium">Empresa</th>
                   <th className="px-3 py-2 font-medium">Obra</th>
                   <th className="px-3 py-2 font-medium">Vinculo</th>
+                  <th className="px-3 py-2 font-medium">Base</th>
                   <th className="px-3 py-2 font-medium">Colaboradores</th>
                   <th className="px-3 py-2 font-medium">Liquido</th>
                   <th className="px-3 py-2 font-medium">Status</th>
@@ -575,6 +591,7 @@ export default function RhDpApuracao() {
                     <td className="px-3 py-3">{item.empresaGrupo?.nome || 'Por colaborador'}</td>
                     <td className="px-3 py-3">{item.obra?.nome || '-'}</td>
                     <td className="px-3 py-3">{item.tipo_vinculo || 'Misto'}</td>
+                    <td className="px-3 py-3">{item.dias_base || 30} dias</td>
                     <td className="px-3 py-3">{item.total_colaboradores || 0}</td>
                     <td className="px-3 py-3">{formatCurrency(item.total_liquido)}</td>
                     <td className="px-3 py-3">
@@ -604,7 +621,7 @@ export default function RhDpApuracao() {
                 Apuracao {detalhe.competencia} - {detalhe.obra?.nome || 'obra nao informada'}
               </h2>
               <p className="text-sm text-slate-500">
-                Recorte: empresa do cadastro do colaborador | {detalhe.tipo_vinculo || 'todos os vinculos'} | {detalhe.total_colaboradores || 0} colaborador(es)
+                Recorte: empresa do cadastro do colaborador | {detalhe.tipo_vinculo || 'todos os vinculos'} | base {detalhe.dias_base || 30} dias | {detalhe.total_colaboradores || 0} colaborador(es)
               </p>
               <p className="text-xs text-slate-400">
                 Criada em {formatDateTime(detalhe.createdAt)} por {detalhe.criadoPor?.nome || 'sistema'}
@@ -652,6 +669,11 @@ export default function RhDpApuracao() {
               <span className="app-summary-label">Conferencia</span>
               <strong className="app-summary-value">{detalhe.resumo_operacional?.itens_conferidos || 0} item(ns)</strong>
               <span className="app-summary-subvalue">{detalhe.resumo_operacional?.itens_pendentes || 0} pendente(s)</span>
+            </div>
+            <div className="app-summary-card">
+              <span className="app-summary-label">Base da diaria</span>
+              <strong className="app-summary-value">{detalhe.dias_base || 30} dias</strong>
+              <span className="app-summary-subvalue">Parametro usado no calculo proporcional</span>
             </div>
           </div>
 

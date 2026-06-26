@@ -14,6 +14,7 @@ const RH_STATUS_IMPORTACAO = ['PREVIEW', 'CONFIRMADA', 'CANCELADA'];
 const RH_STATUS_APURACAO = ['RASCUNHO', 'CONFERIDA'];
 const RH_STATUS_APURACAO_ITEM = ['PENDENTE', 'CONFERIDO'];
 const RH_STATUS_FECHAMENTO = ['FECHADO', 'ESTORNADO'];
+const RH_DIAS_BASE_APURACAO = [20, 22, 30];
 
 function isBlank(value) {
   return value == null || String(value).trim() === '';
@@ -55,6 +56,14 @@ function parseInteger(value, fieldName, { required = false, positiveOnly = true 
     throw new ValidationError(`${fieldName} invalido.`);
   }
 
+  return parsed;
+}
+
+function parseDiasBaseApuracao(value) {
+  const parsed = parseInteger(value, 'Dias base') || 30;
+  if (!RH_DIAS_BASE_APURACAO.includes(parsed)) {
+    throw new ValidationError('Dias base deve ser 20, 22 ou 30.');
+  }
   return parsed;
 }
 
@@ -634,7 +643,7 @@ function validateRhApuracaoCreateBody(body = {}) {
     empresa_grupo_id: parseInteger(body.empresa_grupo_id, 'Empresa do grupo'),
     obra_id: parseInteger(body.obra_id, 'Obra'),
     tipo_vinculo: parseEnum(body.tipo_vinculo, 'Tipo de vinculo', RH_TIPOS_VINCULO),
-    dias_base: parseInteger(body.dias_base, 'Dias base') || 30,
+    dias_base: parseDiasBaseApuracao(body.dias_base),
     observacoes: parseOptionalText(body.observacoes, 'Observacoes', 4000)
   };
 }

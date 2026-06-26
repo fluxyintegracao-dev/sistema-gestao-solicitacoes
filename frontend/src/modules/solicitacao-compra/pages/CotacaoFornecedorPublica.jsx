@@ -566,6 +566,11 @@ export default function CotacaoFornecedorPublica() {
                       <td>
                         <div className="cotacao-publica-cell-description">
                           <strong>{item.nome}</strong>
+                          {item.especificacao ? (
+                            <span className="mt-1 block whitespace-normal text-[10px] font-medium leading-snug text-[var(--sol-text-soft)]">
+                              {item.especificacao}
+                            </span>
+                          ) : null}
                         </div>
                       </td>
                       <td>

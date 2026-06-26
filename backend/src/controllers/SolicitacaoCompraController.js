@@ -63,6 +63,7 @@ const {
   isSuperadmin,
   isBusinessAdmin
 } = require('../services/authorizationService');
+const { validateCompraEnviarBody } = require('../validators/operationalValidators');
 const PDF_PAGE = {
   left: 20,
   top: 12,
@@ -2434,13 +2435,21 @@ module.exports = {
         }
       }
 
-      const fornecedoresPayload = Array.isArray(req.body?.fornecedores) ? req.body.fornecedores : [];
+      let fornecedoresPayload = [];
+      try {
+        fornecedoresPayload = validateCompraEnviarBody(req.body || {}).fornecedores;
+      } catch (error) {
+        await transaction.rollback();
+        return res.status(400).json({ error: error.message || 'Dados de fornecedores invalidos.' });
+      }
+
       if (!fornecedoresPayload.length) {
         await transaction.rollback();
         return res.status(400).json({ error: 'Selecione ao menos um fornecedor' });
       }
 
       const vinculados = [];
+      const fornecedoresProcessados = new Set();
 
       for (const entry of fornecedoresPayload) {
         let fornecedor = null;
@@ -2488,6 +2497,12 @@ module.exports = {
           await transaction.rollback();
           return res.status(400).json({ error: 'Fornecedor invalido informado para envio' });
         }
+
+        const fornecedorKey = String(fornecedor.id);
+        if (fornecedoresProcessados.has(fornecedorKey)) {
+          continue;
+        }
+        fornecedoresProcessados.add(fornecedorKey);
 
         let vinculacao = await SolicitacaoCompraFornecedor.findOne({
           where: {

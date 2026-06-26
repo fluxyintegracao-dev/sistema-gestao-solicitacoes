@@ -527,9 +527,12 @@ function SecaoEnvioFornecedores({
   }, [fornecedores, categoriaFornecedorId, buscaFornecedorNormalizada]);
 
   function selecionarTodosComCategoria() {
-    const ids = fornecedoresComCategoria.map((f) => fornecedorSelectionKey(f));
-    const novos = ids.filter((id) => !fornecedoresSelecionados.includes(id));
-    novos.forEach((id) => onToggleFornecedor(id, true));
+    fornecedoresComCategoria.forEach((fornecedor) => {
+      const selectionKey = fornecedorSelectionKey(fornecedor);
+      if (!fornecedoresSelecionados.includes(selectionKey)) {
+        onToggleFornecedor(selectionKey, true, fornecedor);
+      }
+    });
     setSelecionandoPorCategoria(false);
     setCategoriaSelecionada('');
   }
@@ -681,7 +684,7 @@ function SecaoEnvioFornecedores({
                                 key={selectionKey}
                                 type="button"
                                 className={`flex w-full items-start gap-3 border-b border-[var(--c-border)] px-3 py-2 text-left last:border-b-0 hover:bg-blue-50 dark:hover:bg-blue-950/45 ${checked ? 'bg-blue-50 dark:bg-blue-950/60' : ''}`}
-                                onClick={() => onToggleFornecedor(selectionKey, !checked)}
+                                onClick={() => onToggleFornecedor(selectionKey, !checked, f)}
                               >
                                 <input type="checkbox" checked={checked} readOnly className="mt-1" />
                                 <span className="min-w-0">
@@ -728,7 +731,7 @@ function SecaoEnvioFornecedores({
                           <input
                             type="checkbox"
                             checked={fornecedoresSelecionados.includes(fornecedorSelectionKey(f))}
-                            onChange={(e) => onToggleFornecedor(fornecedorSelectionKey(f), e.target.checked)}
+                            onChange={(e) => onToggleFornecedor(fornecedorSelectionKey(f), e.target.checked, f)}
                           />
                           <div>
                             <div className="font-medium">{f.nome}</div>
@@ -1095,6 +1098,7 @@ export default function GerenciarCotacaoSolicitacao() {
   const [comentarioCotacao, setComentarioCotacao] = useState('');
   const [registrandoComentario, setRegistrandoComentario] = useState(false);
   const [fornecedoresSelecionados, setFornecedoresSelecionados] = useState([]);
+  const [fornecedoresSelecionadosDados, setFornecedoresSelecionadosDados] = useState({});
   const [novoFornecedor, setNovoFornecedor] = useState({ nome: '', cnpj: '', email: '', whatsapp: '', contato: '' });
   const [vencedoresSelecionados, setVencedoresSelecionados] = useState({});
 
@@ -1292,7 +1296,9 @@ export default function GerenciarCotacaoSolicitacao() {
     try {
       const payload = [];
       fornecedoresSelecionados.forEach((selectionKey) => {
-        const fornecedor = fornecedores.find((item) => fornecedorSelectionKey(item) === selectionKey);
+        const fornecedor =
+          fornecedoresSelecionadosDados[selectionKey] ||
+          fornecedores.find((item) => fornecedorSelectionKey(item) === selectionKey);
         if (fornecedor) payload.push(fornecedorToCotacaoPayload(fornecedor));
       });
       if (String(novoFornecedor.nome || '').trim()) {
@@ -1309,6 +1315,7 @@ export default function GerenciarCotacaoSolicitacao() {
       setEnviandoFornecedores(true);
       await enviarSolicitacaoCompraParaFornecedores(id, { fornecedores: payload });
       setFornecedoresSelecionados([]);
+      setFornecedoresSelecionadosDados({});
       setNovoFornecedor({ nome: '', cnpj: '', email: '', whatsapp: '', contato: '' });
       await carregarTudo();
       alert('Links de cotacao gerados. Use os botoes de WhatsApp para enviar a mensagem a cada fornecedor.');
@@ -1600,9 +1607,24 @@ export default function GerenciarCotacaoSolicitacao() {
               onChangeFornecedorBusca={setFornecedorBusca}
               onChangeCategoriaFornecedorId={setCategoriaFornecedorId}
               onBuscarFornecedores={carregarFornecedores}
-              onToggleFornecedor={(id, checked) =>
-                setFornecedoresSelecionados((prev) => checked ? [...prev, id] : prev.filter((x) => x !== id))
-              }
+              onToggleFornecedor={(selectionKey, checked, fornecedor) => {
+                setFornecedoresSelecionados((prev) => {
+                  if (checked) {
+                    return prev.includes(selectionKey) ? prev : [...prev, selectionKey];
+                  }
+                  return prev.filter((item) => item !== selectionKey);
+                });
+                setFornecedoresSelecionadosDados((prev) => {
+                  const next = { ...prev };
+                  if (checked && fornecedor) {
+                    next[selectionKey] = fornecedor;
+                  }
+                  if (!checked) {
+                    delete next[selectionKey];
+                  }
+                  return next;
+                });
+              }}
               onChangeNovoFornecedor={(field, value) => setNovoFornecedor((prev) => ({ ...prev, [field]: value }))}
               onCriarFornecedorRapido={handleCriarFornecedorRapido}
               onEnviarFornecedores={handleEnviarFornecedores}
