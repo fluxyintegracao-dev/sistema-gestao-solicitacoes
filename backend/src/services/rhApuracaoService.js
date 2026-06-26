@@ -235,7 +235,6 @@ async function buildAgrupamentoImportacoes(data, transaction) {
 
   const colaboradorWhere = {};
   if (data.empresa_grupo_id) colaboradorWhere.empresa_grupo_id = data.empresa_grupo_id;
-  if (data.obra_id) colaboradorWhere.obra_id = data.obra_id;
   if (data.tipo_vinculo) colaboradorWhere.tipo_vinculo = data.tipo_vinculo;
 
   const linhas = await RhImportacaoLinha.findAll({

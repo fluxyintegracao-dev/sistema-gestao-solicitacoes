@@ -15,26 +15,56 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "br.com.fluxy.core"
+      "bundleIdentifier": "br.com.fluxy.core",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSCameraUsageDescription": "O Fluxy usa a camera apenas quando voce escolhe fotografar anexos para solicitacoes.",
+        "NSPhotoLibraryUsageDescription": "O Fluxy acessa suas fotos apenas quando voce escolhe anexar imagens a uma solicitacao.",
+        "NSPhotoLibraryAddUsageDescription": "O Fluxy pode salvar arquivos no dispositivo somente quando voce solicitar essa acao.",
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "br.com.fluxy.core",
+      "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#eef3fa"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "blockedPermissions": [
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
       "expo-router",
-      "expo-secure-store"
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "O Fluxy acessa suas fotos apenas quando voce escolhe anexar imagens a uma solicitacao.",
+          "cameraPermission": "O Fluxy usa a camera apenas quando voce escolhe fotografar anexos para solicitacoes."
+        }
+      ],
+      "expo-document-picker",
+      "expo-secure-store",
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "c8c2e65d-b16b-4f96-9259-946e20d04ea4"
+      }
+    },
+    "owner": "jrvjunior"
   }
 }

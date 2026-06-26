@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Alert, Image, StyleSheet, Text, View } from 'react-native';
+import { Alert, Image, Linking, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { Button } from '../../src/components/common/Button';
 import { Screen } from '../../src/components/common/Screen';
@@ -13,6 +13,7 @@ import {
   startMfaSetupRequest
 } from '../../src/services/api/auth';
 import { API_URL } from '../../src/services/api/client';
+import { PRIVACY_POLICY_URL, TERMS_OF_USE_URL } from '../../src/config/legal';
 import { colors, radii, shadows, spacing } from '../../src/theme';
 
 function buildInitials(name?: string | null) {
@@ -165,6 +166,14 @@ export default function PerfilPage() {
     setMfaMensagem('');
   };
 
+  const abrirLinkLegal = async (url: string) => {
+    try {
+      await Linking.openURL(url);
+    } catch (error) {
+      Alert.alert('Nao foi possivel abrir o link', error instanceof Error ? error.message : 'Tente novamente em instantes.');
+    }
+  };
+
   return (
     <Screen>
       <View style={styles.hero}>
@@ -312,6 +321,21 @@ export default function PerfilPage() {
               .map(([code]) => code)
               .join(', ') || '-'
           }
+        />
+      </SectionCard>
+
+      <SectionCard title="Legal" subtitle="Politica de privacidade e termos publicados para as lojas">
+        <Button
+          label="Politica de privacidade"
+          variant="secondary"
+          onPress={() => void abrirLinkLegal(PRIVACY_POLICY_URL)}
+          icon={<Feather name="external-link" size={16} color={colors.primary} />}
+        />
+        <Button
+          label="Termos de uso"
+          variant="secondary"
+          onPress={() => void abrirLinkLegal(TERMS_OF_USE_URL)}
+          icon={<Feather name="external-link" size={16} color={colors.primary} />}
         />
       </SectionCard>
 

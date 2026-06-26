@@ -8,6 +8,12 @@ Guia rapido para colaboradores e agentes automatizados.
 - Nao alterar arquivos fora deste repositorio, exceto em sessoes explicitamente abertas para colaboracao multirrepositorio no workspace e seguindo obrigatoriamente `docs/COLABORACAO_WORKSPACE.md` e o `AGENTS.md` do repositorio alvo.
 - Evitar mudancas destrutivas.
 - Sempre explicar as alteracoes.
+- Mudancas de frontend devem priorizar estabilidade operacional: antes de alterar telas, botoes, menus, filtros, tabelas ou fluxos, mapear quais acoes, permissoes, endpoints e regras de negocio dependem daquele trecho.
+- O padrao visual do Fluxy deve ser de sistema operacional/SaaS: compacto, escaneavel, utilitario e consistente. Evitar excesso de cards, botoes grandes sem necessidade, decoracao visual sem funcao e alteracoes esteticas que reduzam densidade util ou clareza.
+- Nao aplicar automaticamente padroes visuais genericos de landing page, hero, grids de cards ou botoes primarios em excesso nas telas internas do sistema.
+- Em ajustes de UI, preservar a logica existente dos botoes e fluxos. Se uma mudanca visual puder afetar clique, navegacao, permissao, envio de formulario, status, anexos, financeiro, compras ou solicitacoes, validar o comportamento antes de considerar concluido.
+- Preferir evoluir o frontend com componentes e padroes reutilizaveis, como filtros, tabelas, botoes de acao, toolbars e shells de pagina, em vez de correcoes isoladas que aumentem risco de efeito cascata.
+- Operacoes criticas devem considerar idempotencia e protecao contra multiplos cliques/envios simultaneos. Criacao de registros, envio de solicitacoes, aprovacoes, mudancas de status, anexos, geracao/baixa/exclusao de titulos, compras, cotacoes e integracoes externas nao podem gerar registros duplicados em sequencia sem validacao. Sempre que aplicavel, usar bloqueio de botao no frontend, chave de idempotencia, validacao no backend e transacao/bloqueio no banco.
 
 ## Fluxo
 1. Ler este arquivo antes de qualquer mudanca.

@@ -252,19 +252,6 @@ function resolveColaborador(row, lookup) {
   };
 }
 
-function ensureColaboradorPertenceObra(colaborador, obraId) {
-  const colaboradorObraId = Number(colaborador?.obra_id || 0);
-  const importacaoObraId = Number(obraId || 0);
-
-  if (!Number.isInteger(importacaoObraId) || importacaoObraId <= 0) {
-    throw new ValidationError('Obra e obrigatoria para importar planilhas RH/DP.');
-  }
-
-  if (colaboradorObraId !== importacaoObraId) {
-    throw new ValidationError('Colaborador nao pertence a obra selecionada para esta importacao.');
-  }
-}
-
 function parseLinhaJornada(row) {
   return {
     dias_trabalhados: parseImportDecimal(
@@ -351,9 +338,8 @@ function parseLinhaDesconto(row) {
   };
 }
 
-function parseLinhaImportacao(tipo, row, lookup, obraId) {
+function parseLinhaImportacao(tipo, row, lookup) {
   const referenciaColaborador = resolveColaborador(row, lookup);
-  ensureColaboradorPertenceObra(referenciaColaborador.colaborador, obraId);
 
   let payload;
   if (tipo === 'JORNADA') {
@@ -473,7 +459,7 @@ async function criarPreviewImportacaoRh(data, file, user) {
     const numeroLinha = index + 2;
 
     try {
-      const linha = parseLinhaImportacao(data.tipo, row, lookup, data.obra_id);
+      const linha = parseLinhaImportacao(data.tipo, row, lookup);
       linhasProcessadas.push({
         numero_linha: numeroLinha,
         colaborador_id: linha.colaborador.id,

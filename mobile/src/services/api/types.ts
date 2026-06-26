@@ -71,6 +71,7 @@ export interface PaginationMeta {
   limit: number;
   total: number;
   total_pages: number;
+  pages?: number;
 }
 
 export interface ApiPaginatedResponse<T> {
@@ -237,3 +238,125 @@ export interface MobileUploadAsset {
 }
 
 export type ResumoSolicitacoes = Record<string, Record<string, number>>;
+
+export interface ProvisionamentoPermissoes {
+  superadmin?: boolean;
+  pode_acessar?: boolean;
+  pode_criar?: boolean;
+  pode_aprovar?: boolean;
+  pode_dashboard_global?: boolean;
+}
+
+export interface ProvisionamentoCategoriaOption {
+  id: number;
+  nome: string;
+}
+
+export interface ProvisionamentoContexto {
+  permissoes?: ProvisionamentoPermissoes;
+  obras_criacao?: ObraOption[];
+  obras_acesso?: ObraOption[];
+  criadores_filtro?: UsuarioPublicoOption[];
+  status_disponiveis?: string[];
+  prioridades_disponiveis?: string[];
+}
+
+export interface ProvisionamentoUsuarioResumo {
+  id?: number;
+  nome?: string | null;
+  email?: string | null;
+}
+
+export interface ProvisionamentoAnexoItem {
+  id: number;
+  nome_original?: string | null;
+  caminho_arquivo?: string | null;
+  createdAt?: string | null;
+}
+
+export interface ProvisionamentoHistoricoItem {
+  id: number;
+  acao?: string | null;
+  descricao?: string | null;
+  comentario?: string | null;
+  status_anterior?: string | null;
+  status_novo?: string | null;
+  createdAt?: string | null;
+  usuario?: ProvisionamentoUsuarioResumo | null;
+}
+
+export interface ProvisionamentoListItem {
+  id: number;
+  codigo?: string | null;
+  descricao?: string | null;
+  status?: string | null;
+  prioridade?: string | null;
+  valor_previsto?: number | string | null;
+  data_prevista_desembolso?: string | null;
+  fornecedor_texto?: string | null;
+  comentario?: string | null;
+  createdAt?: string | null;
+  categoriaMacro?: ProvisionamentoCategoriaOption | null;
+  obra?: ObraOption | null;
+  usuarioCriacao?: ProvisionamentoUsuarioResumo | null;
+  usuarioAtualizacao?: ProvisionamentoUsuarioResumo | null;
+  aprovadoPor?: ProvisionamentoUsuarioResumo | null;
+  canceladoPor?: ProvisionamentoUsuarioResumo | null;
+}
+
+export interface ProvisionamentoDetalhe extends ProvisionamentoListItem {
+  aprovado_em?: string | null;
+  cancelado_em?: string | null;
+  realizado_em?: string | null;
+  historicos?: ProvisionamentoHistoricoItem[];
+  anexos?: ProvisionamentoAnexoItem[];
+}
+
+export interface ProvisionamentoPaginatedResponse extends ApiPaginatedResponse<ProvisionamentoListItem> {
+  resumo?: {
+    valor_total_filtrado?: number | string | null;
+    total_registros_filtrados?: number | string | null;
+  };
+}
+
+export interface DashboardProvisionamentoResumo {
+  cards: {
+    total_periodo: number | string;
+    total_proximos_7_dias: number | string;
+    total_proximos_30_dias: number | string;
+    quantidade_abertas: number | string;
+  };
+  graficos: {
+    pipeline_status: Array<{
+      status: string;
+      quantidade: number | string;
+      total_valor: number | string;
+    }>;
+    por_obra: Array<{
+      obra_id: number | string;
+      quantidade: number | string;
+      total_valor: number | string;
+      obra?: ObraOption | null;
+    }>;
+    por_categoria: Array<{
+      categoria_macro_id: number | string;
+      quantidade: number | string;
+      total_valor: number | string;
+      categoria?: ProvisionamentoCategoriaOption | null;
+    }>;
+  };
+  alertas: {
+    vencidas_nao_tratadas: {
+      quantidade: number | string;
+    };
+    itens_criticos_proximos: {
+      quantidade: number | string;
+    };
+    obras_concentracao_alta: Array<{
+      obra_id: number | string;
+      percentual: number | string;
+      total_valor: number | string;
+      obra?: ObraOption | null;
+    }>;
+  };
+}
