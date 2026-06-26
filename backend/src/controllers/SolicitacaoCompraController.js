@@ -129,6 +129,20 @@ function formatDate(date) {
   return value.toLocaleDateString('pt-BR');
 }
 
+function getCodigoSolicitacaoPrincipal(solicitacao) {
+  const codigoPrincipal = String(solicitacao?.solicitacaoPrincipal?.codigo || '').trim();
+  if (codigoPrincipal) return codigoPrincipal;
+
+  const codigoSolicitacao = String(solicitacao?.codigo || '').trim();
+  if (codigoSolicitacao) return codigoSolicitacao;
+
+  if (solicitacao?.id) {
+    return `SC-${String(solicitacao.id).padStart(5, '0')}`;
+  }
+
+  return '-';
+}
+
 function isImageAttachment(item) {
   const baseName = String(item?.arquivo_nome_original || item?.arquivo_url || '').split('?')[0].toLowerCase();
   const extension = path.extname(baseName);
@@ -905,6 +919,7 @@ function montarComparativoSolicitacao(solicitacao) {
 function desenharCabecalhoFicha(doc, solicitacao) {
   const installationConfig = getRuntimeInstallationConfig();
   const pdfLogoPath = getPdfLogoPath();
+  const codigoSolicitacaoPrincipal = getCodigoSolicitacaoPrincipal(solicitacao);
   const companyName =
     installationConfig?.pdf_company_name ||
     installationConfig?.company_legal_name ||
@@ -927,14 +942,29 @@ function desenharCabecalhoFicha(doc, solicitacao) {
   if (pdfLogoPath && fs.existsSync(pdfLogoPath)) {
     try {
       doc.image(pdfLogoPath, x + 4, y + 4, {
-        fit: [logoWidth - 8, totalHeaderHeight - 8],
+        fit: [logoWidth - 8, totalHeaderHeight - 22],
         align: 'center',
-        valign: 'center'
+        valign: 'top'
       });
     } catch (error) {
       // ignora a falha e segue com o restante da ficha
     }
   }
+
+  doc
+    .font('Helvetica-Bold')
+    .fontSize(5.8)
+    .fillColor('#000000')
+    .text('SOLICITACAO', x + 4, y + totalHeaderHeight - 17, {
+      width: logoWidth - 8,
+      align: 'center'
+    })
+    .font('Helvetica-Bold')
+    .fontSize(8)
+    .text(codigoSolicitacaoPrincipal, x + 4, y + totalHeaderHeight - 10, {
+      width: logoWidth - 8,
+      align: 'center'
+    });
 
   doc.rect(x + logoWidth, y, PDF_PAGE.width - logoWidth, titleHeight).stroke('#000000');
   doc
